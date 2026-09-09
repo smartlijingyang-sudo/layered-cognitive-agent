@@ -1,102 +1,84 @@
-"""act.authorize — Intent → stamped Intent (allow|deny|skip).
-
-Cordis 终态: 唯一真源是 ``@plugin`` 装饰器 + ``class _ActAuthorize(Worker)``。
-verdict 维度: use_tool/call_tool 看 ``allow`` 白名单;no_effect 走 skip;
-respond/stop/ask_human/delegate/handoff 走 allow;其它走 skip。
-"""
+# act.authorize — Intent → stamped Intent(verdict)。
+#
+# 做什么:按 effect_kind + tool 白名单决定 verdict (allow/deny/skip),写回 Intent。
+# 不做什么:不调 Body、不调框架、不发请求。
+#
+# ADR-0211 §1.1:execute keyword-only / typed。
+# ADR-0211 §5.2:Config 只放静态值(allow 白名单);不放端口名。
+# ADR-0211 §5.3:一个 Worker 一个动词 —— authorize 只做"裁决"。
+#
+# delete-when:无。
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from dataclasses import replace
 
-from agent_lab.primitives.artifact import Artifact, ArtifactKind
-
-from lca.contracts.atoms.control.slot import ControlSlot
-from lca.contracts.atoms.functional.group import FunctionalGroup
-from lca.contracts.atoms.scope.scope import Scope
-from lca.contracts.harness.composition.plugin_contract import (
-    ArchitectureContract,
-    AuthorityContract,
-    EvidenceContract,
-    LifecycleContract,
-    PluginContract,
-    PluginIdentity,
-)
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
-    OwnershipDeclaration,
-)
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.plugins.lab.internal.worker import Worker, register_worker
+from lca.plugins.lab.act.shape.plugin import Intent
+from lca.plugins.lab.internal.hooks import LabCarrier, bind_carrier
 
 
-class Config(BaseModel):
-    model_config = {"extra": "forbid"}
-
-
-@plugin(
+# ---------------------------------------------------------------------------
+# Carrier
+# ---------------------------------------------------------------------------
+_CARRIER = LabCarrier(
     id="lab.act.authorize",
-    provides=["lab.act.authorize.out:authorized"],
-    requires=["lab.act.shape.out:intent"],
-    layer="L4",
-    effects="none",
+    stage="act",
+    kind="TRANSFORMER",
     description="act.authorize — Intent → stamped Intent with grant verdict.",
-    kind=PluginKind.PRIMITIVE,
-    functional_group=FunctionalGroup.G7_EXECUTION,
-    contract=PluginContract(
-        identity=PluginIdentity(version="v1"),
-        architecture=ArchitectureContract(
-            group=FunctionalGroup.G7_EXECUTION,
-            control_slots=(ControlSlot.ACT_AUTHORIZE,),
-        ),
-        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
-        authority=AuthorityContract(grants=("lab.act.authorize.out:authorized",)),
-        observability=EvidenceContract(
-            descriptors=("lab.act.authorize.completed",),
-        ),
-    ),
-    ownership=OwnershipDeclaration(
-        reads=("lab.act.shape.out:intent",),
-        emits=("lab.act.authorize.out:authorized",),
-        state_mutation="forbidden",
-    ),
+    node_id="authorize",
+    source_module="lca.plugins.lab.act.authorize.plugin",
+    source_class="authorize",
+    provides=("lab.act.authorize.out:authorized",),
+    requires=("lab.act.shape.out:intent",),
+    emits=("lab.act.authorize.out:authorized",),
+    inputs=(("intent", "intent", True),),
+    outputs=(("authorized", "intent"),),
+    out_capabilities=("lab.act.authorize.out:authorized",),
 )
-async def setup(ctx: PluginContext, config: Config) -> None:
-    """Register the Worker on the cordis context as the canonical carrier."""
-    register_worker("act.authorize", _ActAuthorize)
-    register_worker("lab.act.authorize", _ActAuthorize)
 
 
-class _ActAuthorize(Worker):
-    factory = "lab.act.authorize"
-
-    def execute(self, node, inputs, seams=None):
-        out_port = node.config.get("to", "authorized")
-        intent_a = inputs.get(node.config.get("from", "intent"))
-        content = (
-            intent_a.content
-            if intent_a is not None and isinstance(intent_a.content, dict)
-            else {}
-        )
-        allow = set(node.config.get("allow", []) or [])
-        effect_kind = str(content.get("effect_kind") or "")
-        tool = content.get("tool")
-        if effect_kind == "no_effect":
-            verdict = "skip"
-        elif effect_kind in ("respond", "stop", "ask_human", "delegate", "handoff"):
-            verdict = "allow"
-        elif effect_kind in ("use_tool", "call_tool"):
-            verdict = "allow" if tool in allow else "deny"
-        else:
-            verdict = "skip"
-        stamped = {**content, "verdict": verdict, "tool": tool}
-        return {
-            out_port: Artifact(
-                kind=ArtifactKind.INTENT,
-                content=stamped,
-                schema_ref="tool.intent.v1",
-            )
-        }
+def setup(ctx, config):
+    """Register the carrier with the loader on plugin boot."""
+    bind_carrier(_CARRIER, ctx=ctx, config=config)
 
 
-register_worker("act.authorize", _ActAuthorize)
-register_worker("lab.act.authorize", _ActAuthorize)
+bind_carrier(_CARRIER)
+
+
+# ---------------------------------------------------------------------------
+# Verdict 闭集
+# ---------------------------------------------------------------------------
+
+# ADR-0211 §3:verdict / effect_kind 闭集,放模块顶部让 lint 易检。
+VERDICT_ALLOW = "allow"
+VERDICT_DENY = "deny"
+VERDICT_SKIP = "skip"
+
+# effect_kind → 默认 verdict;no_effect / 未识别 → skip;无 tool 调用 → allow。
+EFFECT_KIND_NO_TOOL_VERDICT = frozenset(
+    {"respond", "stop", "ask_human", "delegate", "handoff"}
+)
+EFFECT_KIND_REQUIRES_TOOL = frozenset({"use_tool", "call_tool"})
+
+
+def authorize(*, intent: Intent, allow: frozenset[str]) -> Intent:
+    """按 effect_kind + tool 白名单,给 Intent 打 verdict。"""
+    if intent.effect_kind == "no_effect":
+        return replace(intent, verdict=VERDICT_SKIP)
+    if intent.effect_kind in EFFECT_KIND_NO_TOOL_VERDICT:
+        return replace(intent, verdict=VERDICT_ALLOW)
+    if intent.effect_kind in EFFECT_KIND_REQUIRES_TOOL:
+        verdict = VERDICT_ALLOW if intent.tool in allow else VERDICT_DENY
+        return replace(intent, verdict=verdict)
+    return replace(intent, verdict=VERDICT_SKIP)
+
+
+__all__ = [
+    "EFFECT_KIND_NO_TOOL_VERDICT",
+    "EFFECT_KIND_REQUIRES_TOOL",
+    "VERDICT_ALLOW",
+    "VERDICT_DENY",
+    "VERDICT_SKIP",
+    "authorize",
+    "setup",
+]

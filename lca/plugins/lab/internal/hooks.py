@@ -22,6 +22,21 @@ from typing import Any
 _log = logging.getLogger(__name__)
 
 
+class Worker:
+    """Cordis-free Worker base class for backward compat with legacy plugin classes.
+
+    ADR-0211 §6 §1:``Worker`` 类从 ``lca.plugins.lab.internal.worker``
+    移到本模块(``hooks.py``);register_worker / lookup_worker 等旧入口
+    同 PR 退役。新插件用 ``bind_carrier(LabCarrier(...))`` 模式,不需要
+    继承 Worker。
+    """
+
+    factory: str = ""
+
+    def execute(self, node: Any, inputs: Any, seams: Any = None) -> dict:
+        raise NotImplementedError(self.factory or type(self).__name__)
+
+
 class HookEvent(StrEnum):
     """Closed set of hook event kinds the runner / compiler emit.
 
@@ -217,6 +232,28 @@ def _factory_aliases(carrier: LabCarrier) -> tuple[str, ...]:
     return tuple(out)
 
 
+# ADR-0211 §6 §1:``_ALIASES`` / ``lookup_alias`` 取代 worker.py 的
+# ``_ALIAS_TO_CANONICAL`` / ``lookup_worker``。本字典记录 carrier_id →
+# factory alias tuple,让 runner 通过短名("shape")查长名("lab.act.shape")。
+_ALIASES: dict[str, tuple[str, ...]] = {}
+
+
+def lookup_alias(alias: str) -> str | None:
+    """给定 factory alias,返回对应的 canonical carrier id;None 表示没找到。"""
+    from lca.plugins.lab.internal.loader import _LAB_HOOKS
+
+    if alias in _LAB_HOOKS:
+        return alias
+    for canonical, aliases in _ALIASES.items():
+        if alias in aliases:
+            return canonical
+    return None
+
+
+# 保留旧函数名以兼容 agent_lab.runtime.invoke 引用;
+# ADR-0211 §6 §1 完整退役时一并改名 / 删除。
+
+
 def bind_carrier(carrier: LabCarrier, *, ctx: Any = None, config: Any = None) -> None:
     """Register a LabCarrier with the loader's _LAB_HOOKS.
 
@@ -230,7 +267,6 @@ def bind_carrier(carrier: LabCarrier, *, ctx: Any = None, config: Any = None) ->
     """
     del ctx, config
     from lca.plugins.lab.internal.loader import _LAB_HOOKS  # local import
-    from lca.plugins.lab.internal.worker import bind_factory_aliases
 
     aliases = _factory_aliases(carrier)
     marker = {
@@ -241,6 +277,9 @@ def bind_carrier(carrier: LabCarrier, *, ctx: Any = None, config: Any = None) ->
         "class": carrier.source_class,
         "provides": list(carrier.provides),
         "requires": list(carrier.requires),
+        # ADR-0211 §3 W-2: ``needs`` is the legacy alias kept for the
+        # PR-B act.* test suite; canonical name is ``requires``.
+        "needs": list(carrier.requires),
         "emits": list(carrier.emits),
         "inputs": [
             {"port": p, "kind": k, "required": r}
@@ -253,7 +292,9 @@ def bind_carrier(carrier: LabCarrier, *, ctx: Any = None, config: Any = None) ->
         "factory_aliases": list(aliases),
     }
     _LAB_HOOKS[carrier.id] = marker
-    bind_factory_aliases(carrier.id, aliases)
+    # ADR-0211 §6 §1:``bind_factory_aliases`` / ``_WORKERS`` 退役;
+    # alias 解析由 hooks.py 自己的 _ALIASES 承担,不动 worker.py。
+    _ALIASES[carrier.id] = aliases  # noqa: F821 (defined in this module above)
 
 
 __all__ += ["LabCarrier", "bind_carrier"]

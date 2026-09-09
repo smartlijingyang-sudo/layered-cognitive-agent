@@ -1,109 +1,80 @@
-"""act.observe — Receipt | EXCEPTION → Observation (single exit from act phase).
-
-Cordis 终态: 唯一真源是 ``@plugin`` 装饰器 + ``class _ActObserve(Worker)``。
-EXCEPTION 形态: 从 ``receipt`` 或 ``exception`` 端口还原成
-Observation 载荷;无 receipt 时退化为空 dict。
-"""
+# act.observe — Observation → manifest(single exit from act phase)。
+#
+# 做什么:把 Observation 规整成下游可消费的 manifest 形态。
+# 不做什么:不重试、不改语义、不处理 EXCEPTION(runner 按 on_error 转 typed
+# failure Observation,observe 只接 typed Observation,违反 ADR-0211 §1.1 W-8)。
+#
+# ADR-0211 §1.1 W-1/W-2/W-3:keyword-only / typed / 无 framework ctx。
+# ADR-0211 §5.3:一个 Worker 一个动词 —— observe 只做"呈现"。
+#
+# delete-when:无。
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from dataclasses import dataclass
+from typing import Any
 
-from agent_lab.primitives.artifact import Artifact, ArtifactKind
-
-from lca.contracts.atoms.control.slot import ControlSlot
-from lca.contracts.atoms.functional.group import FunctionalGroup
-from lca.contracts.atoms.scope.scope import Scope
-from lca.contracts.harness.composition.plugin_contract import (
-    ArchitectureContract,
-    AuthorityContract,
-    EvidenceContract,
-    LifecycleContract,
-    PluginContract,
-    PluginIdentity,
-)
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
-    OwnershipDeclaration,
-)
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.plugins.lab.internal.worker import Worker, register_worker
+from lca.contracts.models.core.execution.decision import Observation
+from lca.plugins.lab.internal.hooks import LabCarrier, bind_carrier
 
 
-class Config(BaseModel):
-    model_config = {"extra": "forbid"}
-
-
-@plugin(
+# ---------------------------------------------------------------------------
+# Carrier
+# ---------------------------------------------------------------------------
+_CARRIER = LabCarrier(
     id="lab.act.observe",
-    provides=["lab.act.observe.out:observation"],
-    requires=["lab.act.execute.out:receipt"],
-    layer="L4",
-    effects="none",
-    description=(
-        "act.observe — Receipt or EXCEPTION → Observation; "
-        "single exit from the act phase."
-    ),
-    kind=PluginKind.PRIMITIVE,
-    functional_group=FunctionalGroup.G7_EXECUTION,
-    contract=PluginContract(
-        identity=PluginIdentity(version="v1"),
-        architecture=ArchitectureContract(
-            group=FunctionalGroup.G7_EXECUTION,
-            control_slots=(ControlSlot.OBSERVE_WILDCARD,),
-        ),
-        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
-        authority=AuthorityContract(grants=("lab.act.observe.out:observation",)),
-        observability=EvidenceContract(
-            descriptors=("lab.act.observe.completed",),
-        ),
-    ),
-    ownership=OwnershipDeclaration(
-        reads=("lab.act.execute.out:receipt",),
-        emits=("lab.act.observe.out:observation",),
-        state_mutation="forbidden",
-    ),
+    stage="act",
+    kind="TRANSFORMER",
+    description="act.observe — Observation → manifest.",
+    node_id="observe",
+    source_module="lca.plugins.lab.act.observe.plugin",
+    source_class="observe",
+    provides=("lab.act.observe.out:observation",),
+    requires=("lab.act.execute.out:observation",),
+    emits=("lab.act.observe.out:observation",),
+    inputs=(("observation", "observation", True),),
+    outputs=(("observation", "manifest"),),
+    out_capabilities=("lab.act.observe.out:observation",),
 )
-async def setup(ctx: PluginContext, config: Config) -> None:
-    """Register the Worker on the cordis context as the canonical carrier."""
-    register_worker("act.observe", _ActObserve)
-    register_worker("lab.act.observe", _ActObserve)
 
 
-class _ActObserve(Worker):
-    factory = "lab.act.observe"
-
-    def execute(self, node, inputs, seams=None):
-        out_port = node.config.get("to", "observation")
-        receipt = inputs.get(node.config.get("from", "receipt"))
-        exception = inputs.get("exception")
-        if receipt is not None and getattr(receipt, "kind", None) == ArtifactKind.EXCEPTION:
-            content = getattr(receipt, "content", {}) or {}
-            content = (
-                content.get("original", content)
-                if isinstance(content, dict)
-                else {"raw": content}
-            )
-        elif exception is not None and getattr(exception, "kind", None) == ArtifactKind.EXCEPTION:
-            content = getattr(exception, "content", {}) or {}
-            content = (
-                content.get("original", content)
-                if isinstance(content, dict)
-                else {"raw": content}
-            )
-        elif receipt is None:
-            content = {}
-        else:
-            content = getattr(receipt, "content", {}) or {}
-            if not isinstance(content, dict):
-                content = {"raw": content}
-        return {
-            out_port: Artifact(
-                kind=ArtifactKind.MANIFEST,
-                content=content,
-                schema_ref="observation.v1",
-            )
-        }
+def setup(ctx, config):
+    """Register the carrier with the loader on plugin boot."""
+    bind_carrier(_CARRIER, ctx=ctx, config=config)
 
 
-register_worker("act.observe", _ActObserve)
-register_worker("lab.act.observe", _ActObserve)
+bind_carrier(_CARRIER)
+
+
+# ---------------------------------------------------------------------------
+# Typed worker —— 纯函数,5 行。
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class ObservationManifest:
+    """act.observe 产出:model-visible 端可消费的 manifest 形态。"""
+
+    observation_id: str
+    success: bool
+    payload: Any
+    content_type: str
+    tool_call_id: str | None
+    error: str | None
+    latency_ms: int
+
+
+def observe(*, observation: Observation) -> ObservationManifest:
+    """把 Observation 规整成 ObservationManifest。"""
+    return ObservationManifest(
+        observation_id=observation.observation_id,
+        success=observation.success,
+        payload=observation.payload,
+        content_type=observation.content_type.value,
+        tool_call_id=observation.tool_call_id,
+        error=observation.error,
+        latency_ms=observation.latency_ms,
+    )
+
+
+__all__ = ["ObservationManifest", "observe", "setup"]
