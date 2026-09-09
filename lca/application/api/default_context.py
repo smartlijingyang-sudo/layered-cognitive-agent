@@ -29,8 +29,9 @@ _DEFAULT_PROFILE = "profiles/web-standard.yaml"
 # ``web-standard.yaml`` binds ``think.main`` to ``phase.think.standard``
 # and drives the 5-step think subgraph (shortcut → route → reason →
 # classify → gate) via the declarative edge's ``subgraph_ref`` in
-# ``bundles/declarative-phase-graph.yaml``. See
-# ``bundles/think-orchestrator-graph.yaml`` and ``bundles/think-steps.yaml``.
+# ``bundles/declarative-phase-graph.yaml``. The referenced plan bundle is
+# ``bundles/think-steps.yaml`` (also registers the 5 phase-executor
+# capabilities).
 
 # Public deprecation metadata (ADR-0115 决定 7).
 SET_DEFAULT_CTX_DEPRECATION_REASON = (

@@ -133,7 +133,12 @@ entries:
           target: act.main
           when: true
           subgraph_ref:
-            plan_ref: bundles/think-orchestrator-graph.yaml
+            # 2026-09-09: plan_ref redirected to think-steps.yaml. The
+            # former think-orchestrator-graph.yaml was an orphan bundle
+            # (its named "orchestrator" plugin never landed on disk);
+            # think-steps.yaml holds the same topology+edge patch and
+            # additionally registers the 5 phase-executor capabilities.
+            plan_ref: bundles/think-steps.yaml
             entry_node: think.shortcut
             binding_edge: think.main
         - source: act.main
