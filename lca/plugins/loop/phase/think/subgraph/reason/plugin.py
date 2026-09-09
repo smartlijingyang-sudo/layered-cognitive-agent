@@ -57,8 +57,8 @@ class ReasonStepExecutor:
         authority=AuthorityContract(grants=("plugin.serve",)),
         observability=EvidenceContract(
             descriptors=(
-                "phase_think_subgraph_reason.checked",
-                "phase_think_subgraph_reason.served",
+                "phase_think_reason.checked",
+                "phase_think_reason.served",
             )
         ),
     ),
