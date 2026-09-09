@@ -301,10 +301,11 @@ class TestYamlAuthHasNoRemovedSubscribers:
         self,
         yaml_auth: list[YamlAuthRecord],
     ) -> None:
+        # ADR-0212 D1:旧 fold deriver(对应 SpineStepTreeAccumulator subscriber
+        # 与 journal chain sinks)已物理删除,禁止任何 yaml 重新引入。
         forbidden: tuple[str, ...] = (
             "lca.plugins.events.sinks.journal.sink.JournalSink",
             "lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink",
-            "lca.plugins.events.subscribers.spine_step_tree_accumulator.subscriber.SpineStepTreeAccumulator",
         )
         offenders: list[str] = []
         for record in yaml_auth:

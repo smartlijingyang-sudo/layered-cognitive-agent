@@ -35,7 +35,12 @@ def test_boot_web_standard_exposes_event_spine_and_writable_registry() -> None:
 
 
 def test_event_spine_subscribe_accepts_deriver_callbacks() -> None:
-    """event_spine.subscribe() 可接受 StepTreeAccumulatorDeriver.on_event (FD-2)。"""
+    """event_spine.subscribe() 可接受 fold deriver 回调(FD-2)。
+
+    生产 fold 走 :func:`fold_step_tree` 纯函数(ADR-0212),
+    本测试断言 EventSpine.subscribe 接受任意 callable subscriber 形态,
+    不绑定具体 deriver 实现。
+    """
     ctx = asyncio.run(boot_profile("profiles/web-standard.yaml"))
     spine_core = ctx.inject("event_spine")
     assert spine_core is not None

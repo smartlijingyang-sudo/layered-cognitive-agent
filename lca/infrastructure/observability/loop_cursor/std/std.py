@@ -147,8 +147,7 @@ class StdLoopCursor:
         所有权:本方法是 ``writable.step.start`` 的唯一发射点;
         ``StepCoordinator``(writable_matrix)不再写该 EP。
         外部后果:step-tree fold(:mod:`lca.plugins.session.derivers.step_tree.journal_fold`)
-        与 ``StepTreeAccumulatorDeriver`` 以本 EP 显式开窗,
-        ``JournalStep.extra.window_signal`` 记 ``explicit``。
+        以本 EP 显式开窗,``JournalStep.extra.window_signal`` 记 ``explicit``。
         """
         s = self._state
         s.step_open = True

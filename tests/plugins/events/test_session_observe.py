@@ -7,8 +7,7 @@
 3. :func:`set_session` 把目录整表挂到新 Session（run-bind 路径）;
 4. 全部 sink/subscriber setup 只走目录登记 —— 不触碰
    ``EventBus.subscribe`` / ``mount_sink``（``spine_file_sink`` /
-   ``spine_file_sink`` /
-   ``spine_step_tree_accumulator``）。
+   ``spine_file_sink`` 等已注册组件）。
 """
 
 from __future__ import annotations

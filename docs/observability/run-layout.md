@@ -47,23 +47,30 @@ traces/
 | 文件 | 写者 | 触发 |
 |---|---|---|
 | `events.jsonl` | `RoutingFileSink` (registry 的 storage face) | 每个 spine EP |
-| `journal.json` | `StepTreeAccumulatorDeriver.flush()` | transport 在 terminalize 时调 (run 末尾) |
+| `journal.json` | `StepTreeFoldDeriver.flush()` (ADR-0212 §9) | transport 在 terminalize 时调 (run 末尾) |
 | `journal.narrative.md` | `StepNarrativeWriter` 由 `_StepTreeBundle.flush()` 触发 | run 末尾 |
 | `manifest.json` | `record_terminal_materialization()` | terminalize |
-| `model_visible/` | `StepTreeAccumulatorDeriver._write_model_visible()` | 每次 step close |
+| `model_visible/` | fold deriver 产物 → `model_visible/*.json` | 每次 step close |
 | `evidence/` | body / tool / facade 任意 evidence 写入者 | 同步 content addressing |
 
-**单一写入原则**：每个文件只有一个真实写入者（deriver 或 sink），不允许两个模块竞争同一文件。旧的 `StepGroupedBackend.flush` 已被删除（与 `StepTreeAccumulatorDeriver.flush` 重复写 `journal.json`）。
+**单一写入原则**(ADR-0212 §2.5 P5 / ADR-0195 O7):每个文件只有一个真实
+写入者(deriver 或 sink),不允许两个模块竞争同一文件。**`journal.json`
+唯一真值写者是 :class:`StepTreeFoldDeriver`**(fold 纯函数 + 写盘),写盘失败
+抛 :class:`JournalWriteError`(不再 ``log.warning + swallow`` —— 修复
+run_f78f66322f1d 的 doctor H3 重复 step_id 根因面)。旧的
+`StepGroupedBackend.flush` 与 `StepTreeAccumulatorDeriver.flush` 均已物理
+删除(ADR-0212 D1 delete-when = 0)。
 
-**StepTreeAccumulatorDeriver 装配位置**：`RunSessionBuilder.build` 阶段（**不是** boot 阶段）。
-deriver 需要 `run_id / run_dir / agent_role / strategy_key / plan_ref`，这些字段是 per-run 的；
-boot 阶段（`spine.core.setup`）不再订阅任何 per-run deriver。
+**StepTreeFoldDeriver 装配位置**:`RunSessionBuilder.build` 阶段(**不是**
+boot 阶段)。deriver 需要 `run_id / run_dir / agent_role / strategy_key /
+plan_ref`,这些字段是 per-run 的;boot 阶段(`spine.core.setup`)不再订阅
+任何 per-run deriver。
 
 ```text
 RunSessionBuilder.build(run_id=X)
     ├── StepCoordinator          ← Agent 唯一可见写入口 (ADR-0167 D2)
-    ├── StepTreeAccumulatorDeriver(run_id=X, run_dir=...)
-    │      └── event_spine.subscribe(deriver.on_event)
+    ├── StepTreeFoldDeriver(run_id=X, run_dir=...)
+    │      └── fold_session_snapshot() / fold_spine_ledger() → journal.json
     └── assemble_run_hub(...)
 ```
 

@@ -24,15 +24,15 @@ Step 边界语法(闭集,不引入新词表):
 
 1. **纯 fold** — ``fold_step_tree(events, ...)`` 是一次 left-fold:
    初始空 ``_StepTreeState``,逐 event 左折,最后物化为 ``JournalDocument``。
-   与 :class:`StepTreeAccumulatorDeriver` 的 in-memory callback 累积语义
-   等价,但不持有 mutable self、不订阅 spine、不写盘。
-2. **单一真值表** — ``PHASE_FOLD_EPS`` 复用旧 deriver 闭集,不引入平行词汇。
+   不持有 mutable self、不订阅 spine、不写盘 —— 写盘由
+   :class:`StepTreeFoldDeriver` (ADR-0212 §5 fail-loud) 负责,
+   失败抛 :class:`JournalWriteError`,不 swallow。
+2. **单一真值表** — ``PHASE_FOLD_EPS`` 闭集(ADR-0166 D4),不引入平行词汇。
 3. **可测试** — 任何测试 fixture 传 list[dict] 即可驱动 fold,不需要
    SpineReader / EventSpine / 运行中的 run。
 
 生产路径: RunSessionBuilder 装配 StepTreeFoldDeriver,flush 时 fold 本函数
-（I-SESSION-5）。StepTreeAccumulatorDeriver 保留给单元测试 / CLI replay /
-capability provide，非 EventSpine.subscribe 生产 builder 路径。
+（I-SESSION-5）。本模块是 journal.json 派生面的唯一真值函数（ADR-0212）。
 """
 
 from __future__ import annotations
@@ -66,7 +66,7 @@ from lca.contracts.models.observability.journal.totals import (
 from lca_kernel.events.fold.binding_engine import JournalBindingEngine, header_model_from_payload
 from lca_kernel.events.payloads.spine import category_to_spine_ep
 
-# 闭集 phase EP 表 —— 与 StepTreeAccumulatorDeriver 对齐(ADR-0166 D4 闭集)。
+# 闭集 phase EP 表 —— ADR-0166 D4 闭集；ADR-0212 后为 fold 唯一真值表。
 PHASE_FOLD_EPS: dict[str, StepPhase] = {
     "perceive.phase.fold": "perceive",
     "phase.perceive.fold": "perceive",
@@ -244,7 +244,8 @@ class _Frame:
 
     ``llm_started`` / ``stream_*_chunks``:Session 形态的 ``llm.stream.token``
     按 ``channel_kind`` 分流累积(reasoning vs output);``llm.call.end``
-    收口时拼成 ThinkingTrace。与 DSH ``StepTreeAccumulatorDeriver`` 同语义。
+    收口时拼成 ThinkingTrace。ADR-0212 收口后,fold 是 journal step
+    帧累积的唯一真值路径。
     """
 
     step_id: str
@@ -603,7 +604,7 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
                 state.open_step.model = call_model
     elif ep == "llm.stream.token":
         # Session 形态:按 channel_kind 分流累积 reasoning / output。
-        # 与 DSH StepTreeAccumulatorDeriver 同语义;全文在 spine.jsonl,
+        # ADR-0212 收口后,fold 是 stream 累积唯一真值;全文在 spine.jsonl,
         # 这里只保留截断后的摘要给 journal.json。
         target = _resolve_target(state, payload)
         if target is not None and target.llm_started:

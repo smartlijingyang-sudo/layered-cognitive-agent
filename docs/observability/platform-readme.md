@@ -46,4 +46,4 @@ Producer (Loop / Boot)
 1. `lca_kernel/events/config/observability/spine.yaml`  
 2. `lca/plugins/session/runtime/session.py` — append  
 3. `lca/plugins/session/runtime/spine_hook.py` — instrumentation 入 Session  
-4. `lca/infrastructure/observability/spine/derivers/step_tree_accumulator.py` — fold 示例  
+4. `lca/plugins/session/derivers/step_tree/journal_fold.py` — fold SSOT(ADR-0212 后唯一真值函数)  

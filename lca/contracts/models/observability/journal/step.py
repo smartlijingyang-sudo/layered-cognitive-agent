@@ -50,9 +50,10 @@ class ToolCallRecord:
     - ``arguments``: 完整参数(可能很大, 由 projector 按需裁剪)。canonical 字段。
     - ``arguments_summary``: **deprecated**(ADR-0185 spec §2.5 P5)。
       人话摘要, < 200 字符, 永远保留。
-      保留 1 个 minor 版本以兼容 reader / fold 路径(``step_tree_accumulator`` /
-      ``step_grouped_reader`` / ``step_narrative_writer`` / ``safe_executor``
-      等);caller 应在 viewer / narrative 渲染时按需从 ``arguments`` 派生,
+      保留 1 个 minor 版本以兼容 reader / fold 路径(``step_grouped_reader`` /
+      ``step_narrative_writer`` / ``safe_executor`` 等;fold 是 journal
+      派生面唯一真值,见 :mod:`lca.plugins.session.derivers.step_tree.journal_fold`)。
+      caller 应在 viewer / narrative 渲染时按需从 ``arguments`` 派生,
       不要直接读 ``arguments_summary``。
       delete-when:下个 minor 版本后,或所有 caller 迁移完毕时。
       tracking: ADR-0185 spec §2.5 P5。

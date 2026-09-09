@@ -123,7 +123,7 @@ branch: adr0194/p1-03-session-append-reexport
 | **P2-17** | refactor(manifest): 删除 EXECUTION_POINTS 副本 | B3, O1 | manifest.py 删 tuple | test_execution_point_coverage | P2-15 | — |
 | **P2-18** | feat(plugins/obs): deriver/step_tree 首包试点 | 0195 §2.3, O7 | observability/deriver/step_tree/ | deriver 测试 | P2-16 | Lane E 交叉 |
 | **P2-19** | feat(plugins/obs): exporter/otel 首包试点 | 0195 §2.3 | observability/exporter/otel/ | otel 测试 | P2-18 | 串行 |
-| **P2-20** | refactor(infra): 双份 deriver 合并到 plugins | O7 | step_tree_accumulator 迁或薄化 | fold 测试 | P2-18 | — |
+| **P2-20** | refactor(infra): 双份 deriver 合并到 plugins | O7 | step_tree_accumulator 迁或薄化 | fold 测试 | P2-18 | — | **DONE** [ADR-0212](0212-step-tree-deriver-ssot-cleanup.md):物理删除 `tree_accumulator.py` + `tree.py` shim(O7 delete-when = 0) |
 | **P2-21** | test(arch): emit single entry strict (L2,P-L7) | 0194 §7 L2 | test_emit_single_entry 扩展 | pytest | P2-16 | — |
 | **P2-22** | test(arch): yaml-only EP registry (P-L4) | 0195 §7 | registry drift | test_registry | P2-17 | — |
 

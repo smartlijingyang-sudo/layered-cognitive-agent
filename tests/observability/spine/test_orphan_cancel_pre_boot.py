@@ -4,21 +4,19 @@ PR-6 (ADR-0165.1 §19, design §4.3). When the orchestrator receives a
 user cancel *before* a step is open, the spine events emitted during
 shutdown cannot belong to the step tree. They must:
 
-1. Reach ``events.jsonl`` (append-only sink) so diagnosis is possible;
+1. Reach ``<run_id>.spine.jsonl`` (append-only sink) so diagnosis is possible;
 2. Carry ``phase="orphan"`` + ``reason="cancel_pre_boot"``;
-3. Be skipped by ``StepTreeAccumulatorDeriver`` (no ``journal.json`` step).
+3. Be skipped by step_tree fold(无 ``journal.json`` step;fold 走
+   :func:`fold_step_tree` 纯函数)。
 """
 
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from lca.infrastructure.observability.spine.context.context import SpineContext
-from lca.infrastructure.observability.spine.derivers.step.tree_accumulator import (
-    StepTreeAccumulatorDeriver,
-)
 from lca.infrastructure.observability.spine.event.record import EventRecord
 from lca.infrastructure.observability.spine.event.spine import EventSpine
 from lca.infrastructure.observability.spine.orphan.orphan import (
@@ -26,6 +24,7 @@ from lca.infrastructure.observability.spine.orphan.orphan import (
     mark_orphan,
 )
 from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
+from lca.plugins.session.derivers.step_tree.journal_fold import fold_step_tree
 
 
 def _live_event(**overrides: object) -> EventRecord:
@@ -39,8 +38,8 @@ def _live_event(**overrides: object) -> EventRecord:
         "epoch": 1,
         "causality_id": "sha256:cancel",
         "outcome": None,
-        "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
-        "when_corrected": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
+        "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC),
+        "when_corrected": datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC),
         "prev_event_hash": None,
         "run_id": "r-cancel-pre-boot",
         "step_id": None,
@@ -70,18 +69,10 @@ def _install_cancel_handler(spine: EventSpine) -> None:
 
 
 def test_cancel_pre_boot_emits_orphan_events(tmp_path: Path) -> None:
-    """E2E: cancel-during-boot produces an orphan trail in events.jsonl。"""
+    """E2E: cancel-during-boot produces an orphan trail in spine.jsonl。"""
     SpineContext.set_run("r-cancel-pre-boot")
-    run_dir = tmp_path / "r-cancel-pre-boot"
     sink = FileSink(tmp_path, run_id="r-cancel-pre-boot")
-    deriver = StepTreeAccumulatorDeriver(
-        run_id="r-cancel-pre-boot",
-        run_dir=run_dir,
-        agent_role="agt_cancel_pre_boot",
-        strategy_key="solo",
-        plan_ref="plan_cancel_pre_boot",
-    )
-    spine = EventSpine(sinks=[sink], subscribers=[deriver.on_event])
+    spine = EventSpine(sinks=[sink])
     _install_cancel_handler(spine)
 
     for execution_point in (
@@ -118,13 +109,10 @@ def test_cancel_pre_boot_emits_orphan_events(tmp_path: Path) -> None:
     for expected in ("kernel.run.start", "kernel.run.cancelled", "kernel.run.stop"):
         assert expected in live_points
 
-    # deriver flush 写入 journal.json, 但没累积 step(全 orphan)
-    deriver.flush()
-    assert run_dir.joinpath("journal.json").exists()
-    doc = deriver.document
-    assert doc is not None
+    # ADR-0212 §6:fold 消费 spine events → orphan event 不进入 step 闭集。
+    doc = fold_step_tree(records, run_id="r-cancel-pre-boot")
     assert len(doc.steps) == 0, (
-        "StepTreeAccumulatorDeriver must not accumulate orphan events as steps"
+        "fold_step_tree must not accumulate orphan events as steps"
     )
 
 

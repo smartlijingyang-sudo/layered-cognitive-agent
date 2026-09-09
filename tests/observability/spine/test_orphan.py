@@ -1,20 +1,20 @@
-"""Tests for PR-6 orphan-event semantics (ADR-0165.1 §19, design §4.3).
+"""Tests for PR-6 orphan-event semantics (ADR-0165.1 §19, design §4.3)。
 
-orphan events 携带 ``phase="orphan"`` + ``reason``,仍写到 events.jsonl
-(append-only sink),但被 StepTreeAccumulatorDeriver 跳过。
+orphan events 携带 ``phase="orphan"`` + ``reason``,仍写到 spine.jsonl
+(append-only sink),但被 step_tree fold 跳过(ADR-0212 收口后:fold
+不再持有 mutable 累积;orphan 事件经 `_coerce` 仍以 dict 形式进入 fold
+但 fold 的 step 闭集不消费 phase='orphan' 的事件,因此 closed_frames 空)。
+
+折叠路径收口后(ADR-0212)改走 :func:`fold_step_tree` 验证不变量等价。
 """
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
-from lca.infrastructure.observability.spine.context.context import SpineContext
-from lca.infrastructure.observability.spine.derivers.step.tree_accumulator import (
-    StepTreeAccumulatorDeriver,
-)
 from lca.infrastructure.observability.spine.event.record import EventRecord
 from lca.infrastructure.observability.spine.orphan.orphan import (
     CANCEL_PRE_BOOT,
@@ -22,6 +22,7 @@ from lca.infrastructure.observability.spine.orphan.orphan import (
     STOP_BEFORE_STEP,
     mark_orphan,
 )
+from lca.plugins.session.derivers.step_tree.journal_fold import fold_step_tree
 
 
 def _make_event(**overrides: object) -> EventRecord:
@@ -34,8 +35,8 @@ def _make_event(**overrides: object) -> EventRecord:
         "epoch": 1,
         "causality_id": "sha256:abc",
         "outcome": None,
-        "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
-        "when_corrected": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
+        "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC),
+        "when_corrected": datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC),
         "prev_event_hash": None,
         "run_id": "r1",
         "step_id": None,
@@ -45,30 +46,14 @@ def _make_event(**overrides: object) -> EventRecord:
     return EventRecord(**base)  # type: ignore[arg-type]
 
 
-def _bound_deriver(tmp_path: Path) -> StepTreeAccumulatorDeriver:
-    SpineContext.set_run("r-orphan")
-    return StepTreeAccumulatorDeriver(
-        run_id="r-orphan",
-        run_dir=tmp_path,
-        agent_role="agt_orphan_test",
-        strategy_key="solo",
-        plan_ref="plan_orphan",
-    )
-
-
-def test_orphan_phase_skipped_by_step_tree_deriver(tmp_path: Path) -> None:
-    """An orphan event must not affect the deriver's accumulated steps."""
-    deriver = _bound_deriver(tmp_path)
+def test_orphan_phase_skipped_by_step_tree_fold(tmp_path: Path) -> None:
+    """orphan event 不应被 fold 当成 step 累积(ADR-0212 收口后 fold SSOT)。"""
     rec = _make_event(phase="orphan", reason=CANCEL_PRE_BOOT)
     assert rec.phase == "orphan"
     assert rec.reason == CANCEL_PRE_BOOT
 
-    deriver.on_event(rec)
-
-    deriver.flush()
-    # orphan event 不被累积 → journal.json 存在(空 document),但没有 step
-    doc = deriver.document
-    assert doc is not None
+    doc = fold_step_tree([rec], run_id="r-orphan")
+    # orphan event 不被累积 → doc 存在(空 steps),但没有 step 帧
     assert len(doc.steps) == 0, "orphan event should not be accumulated as a step"
 
 

@@ -1,4 +1,4 @@
-"""fold 驱动的 step_tree deriver facade(ADR-0186 PR-3g / ADR-0191 Wave D)。
+"""fold 驱动的 step_tree deriver facade(ADR-0186 PR-3g / ADR-0191 Wave D / ADR-0212)。
 
 两条入口:
 1. :func:`derive_step_tree` — 一次性函数:传 events + run_id → 写 journal.json。
@@ -10,16 +10,17 @@
 in-process Session 快照非空时仅返回 Session 事件（ADR-0191 SSOT）;
 快照为空时仅读 ``<run_id>.spine.jsonl``（offline cold fold）。
 # Single-stream fold only (ADR-0191 Wave D / ADR-0192 E4).
+# ADR-0212 §5:写盘失败 fail-loud → JournalWriteError;不再 log.warning + swallow。
 """
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
 from lca.contracts.models.observability.journal.doc import JournalDocument
+from lca.contracts.observability.journal.errors import JournalWriteError
 from lca.infrastructure.observability.journal.step.projector import (
     JournalDocumentWriter,
 )
@@ -27,8 +28,6 @@ from lca.plugins.session.derivers.step_tree.journal_fold import (
     fold_step_tree,
 )
 from lca_kernel.events.reader.reader import SpineReader
-
-log = logging.getLogger(__name__)
 
 
 def derive_step_tree(
@@ -53,6 +52,10 @@ def derive_step_tree(
 
     Returns:
         写盘后的 JournalDocument。
+
+    Raises:
+        JournalWriteError: 写盘失败(ADR-0212 §5)。观测面失败 = 事实面事件,
+            必须 raise,不再 silent failure 留下 stale journal.json。
     """
     doc = fold_step_tree(
         events,
@@ -63,16 +66,20 @@ def derive_step_tree(
         plan_ref=plan_ref,
         objective=objective,
     )
-    JournalDocumentWriter(Path(run_dir) / "journal.json").write(doc)
+    target = Path(run_dir) / "journal.json"
+    try:
+        JournalDocumentWriter(target).write(doc)
+    except Exception as exc:
+        raise JournalWriteError(run_id, target, exc) from exc
     return doc
 
 
 class StepTreeFoldDeriver:
-    """fold 驱动的 step_tree deriver facade。
+    """fold 驱动的 step_tree deriver facade —— journal.json 派生面唯一真值(ADR-0212)。
 
-    与 :class:`StepTreeAccumulatorDeriver` 的接口差异:
     - 不持有 mutable 累积状态;每次 :meth:`derive` / :meth:`flush` 都是独立 fold。
-    - 不接受 ``on_event`` 单条订阅(那是旧 callback 路径)。
+    - 不订阅 EventSpine;只从 Session snapshot 或 spine ledger 单流 fold。
+    - 写盘失败 fail-loud:抛 :class:`JournalWriteError`(ADR-0212 §5)。
     - ``document`` 属性只在 ``derive`` / ``flush`` 后可读。
     """
 
@@ -110,6 +117,10 @@ class StepTreeFoldDeriver:
 
         纯 fold:每次调用独立,不续接上次状态。增量 fold 由 caller
         自行拼接 events 前缀。
+
+        写盘失败 raise :class:`JournalWriteError`(ADR-0212 §5):观测面失败
+        = 事实面事件,不再 ``log.warning + swallow``。幂等性由 fold 的纯函数
+        语义保证:同 events 输入永远产同 ``JournalDocument``。
         """
         doc = fold_step_tree(
             events,
@@ -121,17 +132,22 @@ class StepTreeFoldDeriver:
             objective=self._objective,
         )
         self._last_document = doc
+        target = self._run_dir / "journal.json"
         try:
-            JournalDocumentWriter(self._run_dir / "journal.json").write(doc)
+            JournalDocumentWriter(target).write(doc)
         except Exception as exc:
-            log.warning("StepTreeFoldDeriver.derive write failed err=%s", exc)
+            raise JournalWriteError(self._run_id, target, exc) from exc
         return doc
 
     def flush(self, *, outcome: str | None = None) -> None:
-        """fold Session snapshot or spine ledger, write journal.json.
+        """fold Session snapshot or spine ledger, write journal.json。
 
         ``outcome`` overrides the folded terminal state. When no event source
         exists and a prior derive ran, this is a no-op.
+
+        写盘失败 raise :class:`JournalWriteError`(ADR-0212 §5):fail-loud
+        同 :meth:`derive`。幂等性:同 events 同 outcome 重复调用产出同
+        JournalDocument,写盘覆盖同一份文件,step 数量与 step_id 集合不变。
         """
         if outcome is not None:
             self._outcome = outcome

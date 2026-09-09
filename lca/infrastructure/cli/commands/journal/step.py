@@ -7,8 +7,8 @@ thinking + tool_call + tool_result 五个原语到一个干净块。
 设计原则 (first-principles):
 
 1. 单一源是 ``journal.json`` (lca.journal/3.1);不在端点再去 grep spine。
-2. reasoning / raw_response_preview 在 journal 里已被 step_tree_accumulator 截到头+尾预算,
-   ``--tail`` 可看 model_visible/messages.json 完整版。
+2. reasoning / raw_response_preview 在 journal 里已被 :mod:`lca.plugins.session.derivers.step_tree.journal_fold`
+   按 head/tail 预算截断,``--tail`` 可看 model_visible/messages.json 完整版。
 3. tool_call.arguments / stdout_head 已经在 step.tool_call/result EP payload 直发;
    --json 给 agent,文本给人。
 4. --model-visible PATH 把 detail 路径附在末尾(不是自动打开, 避免副作用)。

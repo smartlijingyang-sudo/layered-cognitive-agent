@@ -212,8 +212,8 @@ class TestISession5:
         assert "event_spine.subscribe" not in builder_text, (
             "I-SESSION-5 违规:builder 仍挂 EventSpine.subscribe 作为 step_tree 主路径"
         )
-        assert "StepTreeAccumulatorDeriver(" not in builder_text, (
-            "I-SESSION-5 违规:builder 仍构造 StepTreeAccumulatorDeriver"
+        assert "StepTreeFoldDeriver(" in builder_text, (
+            "I-SESSION-5 违规:builder 未装配 StepTreeFoldDeriver (ADR-0212)"
         )
 
         fold_root = _REPO_ROOT / "lca" / "plugins" / "session" / "derivers" / "step_tree"
