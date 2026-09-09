@@ -82,8 +82,10 @@ class _ActExecute(Worker):
     factory = "lab.act.execute"
 
     def execute(self, node, inputs, seams=None):
-        from lca.plugins.lab.act.body_provider import get_body
-
+        if seams is None:
+            raise RuntimeError(
+                "lab.act.execute requires a typed Seams handle from the runner"
+            )
         intent_a = inputs.get("authorized")
         content = (
             intent_a.content
@@ -92,8 +94,7 @@ class _ActExecute(Worker):
         )
         tool_name = content.get("tool")
         try:
-            body = get_body()
-            result = body.act(intent=content, plan_ref="lab-act")
+            result = seams.body.act(intent=content, plan_ref=seams.plan_ref)
             return {
                 "receipt": Artifact(
                     kind=ArtifactKind.RECEIPT,

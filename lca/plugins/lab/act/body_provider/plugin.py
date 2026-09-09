@@ -35,8 +35,8 @@ def get_body(allowed_tools=None):
     from lca.cognition.body.executor.simple_body import SimpleBody
     from lca.cognition.body.tools.tool_registry import SimpleToolRegistry
     from lca.contracts.models.team.role.team import ToolPermissionManifest
+    from lca.plugins.act.action.handlers_provider import DefaultActionHandlerRegistry
     from lca.plugins.composer.act.action_authority import build_action_registry_from_authority
-    from lca.plugins.composer.act.body_provider import DefaultActionHandlerRegistry
 
     from lca.plugins.lab.tools.provider.plugin import get_registry as get_lab_registry
     from lca.plugins.lab.transport.provider.plugin import get_transport

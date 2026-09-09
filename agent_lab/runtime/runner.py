@@ -17,6 +17,7 @@ from agent_lab.graph.spec import InfoEdgeSpec, InfoNode, SubSpecLink
 from agent_lab.primitives.artifact import Artifact, ArtifactKind, make_exception
 from agent_lab.primitives.edge import Edge
 from agent_lab.runtime.invoke import invoke as invoke_node
+from agent_lab.runtime.seams import Seams
 
 _log = logging.getLogger(__name__)
 
@@ -71,6 +72,7 @@ class _Runner:
         sub_registry: dict[str, InfoEdgeSpec],
         trace: ExecutionTrace,
         subgraph_path: str,
+        seams: "Seams | None" = None,
         runtime_registry: dict[str, type] | None = None,
         inherited_plugins: list | None = None,
     ):
@@ -80,6 +82,7 @@ class _Runner:
         self.sub_registry = sub_registry
         self.trace = trace
         self.subgraph_path = subgraph_path
+        self.seams = seams
         # Per-node artifact store keyed by (node_id, port_id)
         self.store: dict[tuple[str, str], Artifact] = {}
         # Plugins inherited from the root runner. Sub-graph runners don't
@@ -253,7 +256,7 @@ class _Runner:
         # ADR-0206 §5.6: errors are routed edges, not try/catch. The runner
         # does not swallow exceptions; it hands each failure to one of three
         # handlers keyed by node.on_error.
-        outputs, status, error_info = self._invoke_with_policy(node, inputs)
+        outputs, status, error_info = self._invoke_with_policy(node, inputs, self.seams)
 
         output_rewrites: dict[str, str] = {}
         if status == "ok":
@@ -368,7 +371,7 @@ class _Runner:
             )
             for port_id in target.ins
         }
-        target_outputs = invoke_node(target, target_inputs)
+        target_outputs = invoke_node(target, target_inputs, self.seams)
         for port_id, artifact in target_outputs.items():
             self.store[(target_id, port_id)] = artifact
         self._executed.add(node.id)
@@ -376,7 +379,7 @@ class _Runner:
         return target_outputs, "routed", {"status": "routed", "route_to": target_id}
 
     def _invoke_with_policy(
-        self, node: InfoNode, inputs: dict[str, Artifact]
+        self, node: InfoNode, inputs: dict[str, Artifact], seams: "Seams | None" = None
     ) -> tuple[dict[str, Artifact], str, dict[str, Any]]:
         """Invoke node factory with on_error policy.
 
@@ -403,7 +406,7 @@ class _Runner:
         last_exc: Exception | None = None
         for attempt in range(1, max_attempts + 1):
             try:
-                outputs = invoke_node(node, inputs)
+                outputs = invoke_node(node, inputs, seams)
                 if attempt > 1:
                     error_info["retried_attempts"] = attempt - 1
                 return outputs, "ok", error_info
@@ -459,6 +462,7 @@ class _Runner:
             sub_registry=self.sub_registry,
             trace=self.trace,
             subgraph_path=f"{self.subgraph_path}/{link.sub_spec_id}",
+            seams=self.seams,
             inherited_plugins=self._plugins(),
         )
         child_outputs = child.run()
@@ -502,6 +506,12 @@ def run(
     bundle = _compile_or_raise(spec, sub_registry)
     effective = InfoEdgeSpec.model_validate(bundle.spec_dump)
     trace = ExecutionTrace()
+    # The runner is the single assembler of typed seam handles. Workers
+    # never import framework modules; they only call methods on seams.
+    # When seams is not provided by the caller, build the default body
+    # handle from the lab body_provider so act.* workers get their
+    # SimpleBody via seams.body.act(intent=...) instead of importing the
+    # provider module themselves.
     runner = _Runner(
         spec=effective,
         bundle=bundle,
@@ -509,6 +519,7 @@ def run(
         sub_registry=sub_registry,
         trace=trace,
         subgraph_path=effective.id,
+        seams=_default_seams(),
     )
     # Ensure the framework-emit bridge (session_log_emitter) is loaded
     # so every node_start / node_end / edge_fire / subgraph_* / *_compile
@@ -552,3 +563,15 @@ def _compile_or_raise(
     from agent_lab.graph.compile import compile as _compile
 
     return _compile(spec, sub_registry)
+
+
+def _default_seams() -> "Seams":
+    """Build the default Seams handle from the lab body_provider.
+
+    Composition lives here (the runner), not in worker modules. Workers
+    receive a typed handle and call seams.body.act(intent=...) only.
+    """
+    from lca.plugins.lab.act.body_provider.plugin import get_body, plan_ref_default
+    from lca.plugins.lab.session.provider.plugin import PLAN_REF
+
+    return Seams(body=get_body(), plan_ref=PLAN_REF or plan_ref_default())

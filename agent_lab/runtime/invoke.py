@@ -36,7 +36,9 @@ def invoke(
     """Dispatch ``node.factory`` to a registered Worker, else host passthrough.
 
     Registered workers win over the identity/graph.call builtin. Unknown
-    non-host factories raise ``KeyError``.
+    non-host factories raise ``KeyError``. ``seams`` is the typed handle
+    the runner hands every Worker — workers MUST NOT import framework
+    modules inside ``execute``, only call methods on seams.
     """
     from lca.plugins.lab.internal.loader import load_all
     from lca.plugins.lab.internal.worker import lookup_worker
