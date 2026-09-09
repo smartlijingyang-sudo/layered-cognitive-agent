@@ -1,9 +1,10 @@
 {
-  // Navigation on (Go to Definition); diagnostics stay off.
+  // VS Code: Pylance for Go to Definition; diagnostics stay off.
   // Typecheck/lint only via `lca-ops typecheck` / ruff CLI.
   // After changing: Developer: Reload Window.
-  "python.defaultInterpreterPath": "${workspaceFolder}/.venv",
-  "python.languageServer": "None",
+  // Keep basedpyright installed but language services off (conflicts with Pylance).
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+  "python.languageServer": "Pylance",
   "python.terminal.activateEnvironment": true,
   "python.analysis.extraPaths": [
     "${workspaceFolder}",
@@ -14,6 +15,7 @@
   "python.analysis.typeCheckingMode": "off",
   "python.analysis.diagnosticMode": "openFilesOnly",
   "python.analysis.indexing": true,
+  "python.analysis.autoImportCompletions": false,
   "python.analysis.diagnosticSeverityOverrides": {
     "reportGeneralTypeIssues": "none",
     "reportMissingImports": "none",
@@ -76,22 +78,6 @@
   "basedpyright.analysis.typeCheckingMode": "off",
   "basedpyright.analysis.diagnosticMode": "openFilesOnly",
   "basedpyright.analysis.diagnosticSeverityOverrides": {
-    "reportGeneralTypeIssues": "none",
-    "reportMissingImports": "none",
-    "reportMissingModuleSource": "none",
-    "reportSyntaxError": "none"
-  },
-
-  "cursorpyright.disableLanguageServices": false,
-  "cursorpyright.analysis.typeCheckingMode": "off",
-  "cursorpyright.analysis.diagnosticMode": "openFilesOnly",
-  "cursorpyright.analysis.extraPaths": [
-    "${workspaceFolder}",
-    "${workspaceFolder}/vendor/cordis/src",
-    "${workspaceFolder}/vendor/cosmokit/src",
-    "${workspaceFolder}/vendor/schemastery/src"
-  ],
-  "cursorpyright.analysis.diagnosticSeverityOverrides": {
     "reportGeneralTypeIssues": "none",
     "reportMissingImports": "none",
     "reportMissingModuleSource": "none",

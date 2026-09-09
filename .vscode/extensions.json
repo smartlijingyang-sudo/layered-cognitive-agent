@@ -2,12 +2,12 @@
   "recommendations": [
     "charliermarsh.ruff",
     "ms-python.python",
+    "ms-python.vscode-pylance",
     "tamasfe.even-better-toml",
     "redhat.vscode-yaml",
     "github.vscode-github-actions"
   ],
   "unwantedRecommendations": [
-    "ms-python.vscode-pylance",
     "detachhead.basedpyright",
     "ms-pyright.pyright",
     "ms-python.mypy-type-checker",
@@ -17,7 +17,7 @@
     "ms-python.isort",
     "usernamehw.errorlens",
     "sonarsource.sonarlint-vscode",
-    "meta.pyrefly"
+    "meta.pyrefly",
+    "anysphere.cursorpyright"
   ]
-}
 }
