@@ -55,3 +55,28 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from agent_lab.primitives.artifact import Artifact, ArtifactKind
+
+class _RouteOn(Worker):
+    factory = "route_on"
+
+    def execute(self, node, inputs, seams=None):
+        from agent_lab.primitives.artifact import Artifact, ArtifactKind
+        key_in = node.config["key_from"]
+        table: dict = node.config["table"]
+        out_port = node.outs[0]
+        key_a = inputs.get(key_in)
+        if key_a is None:
+            return {out_port: Artifact(kind=ArtifactKind.FACT, content={"routed": None})}
+        key = str(key_a.content) if not isinstance(key_a.content, dict) else str(key_a.content.get("verdict", ""))
+        chosen_in = table.get(key, node.config.get("default"))
+        if chosen_in is None or chosen_in not in inputs:
+            return {out_port: Artifact(kind=ArtifactKind.INTENT, content={"tool": "__none__", "args": {}, "verdict": "deny"}, schema_ref="tool.intent.v1")}
+        chosen = inputs[chosen_in]
+        return {out_port: chosen.model_copy(update={"content": {**chosen.content, "routed_via": key}})}
+
+register_worker("route_on", _RouteOn)
+register_worker("lab.route_on", _RouteOn)

@@ -55,3 +55,21 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from agent_lab.primitives.artifact import Artifact, ArtifactKind
+
+class _Think_Classify(Worker):
+    factory = "think.classify"
+
+    def execute(self, node, inputs, seams=None):
+        from lca.plugins.lab.think.classify.ops import classify_response
+        src = node.config.get("from", "response")
+        out = node.config.get("to", "decision")
+        fixture = (node.config.get("provider_config") or {}).get("fixture_classifier")
+        decision = classify_response(inputs.get(src) or inputs.get("response"), classifier=fixture)
+        return {out: decision}
+
+register_worker("think.classify", _Think_Classify)
+register_worker("lab.think.classify", _Think_Classify)

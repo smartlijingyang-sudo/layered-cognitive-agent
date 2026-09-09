@@ -55,3 +55,25 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from agent_lab.primitives.artifact import Artifact, ArtifactKind, make_text
+
+
+class _Constant(Worker):
+    factory = "constant"
+
+    def execute(self, node, inputs, seams=None):
+        dst = node.outs[0]
+        return {
+            dst: make_text(
+                str(node.config.get("value", "")),
+                schema_ref=node.config.get("schema_ref", "raw"),
+            )
+        }
+
+
+register_worker("constant", _Constant)
+register_worker("lab.passthrough.constant", _Constant)

@@ -55,3 +55,18 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from agent_lab.primitives.artifact import Artifact, ArtifactKind
+
+class _Remember_Snapshot(Worker):
+    factory = "remember.snapshot"
+
+    def execute(self, node, inputs, seams=None):
+        from lca.plugins.lab.memory.ops import LcaRememberStateStoreProvider
+        provider = LcaRememberStateStoreProvider.from_node_config(getattr(node, "config", None) or {})
+        return provider.save_state(journal_fact_artifact=inputs.get("journal_fact"))
+
+register_worker("remember.snapshot", _Remember_Snapshot)
+register_worker("lab.remember.snapshot", _Remember_Snapshot)

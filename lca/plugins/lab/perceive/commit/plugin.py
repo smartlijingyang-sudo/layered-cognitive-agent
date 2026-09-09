@@ -55,3 +55,18 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from lca.plugins.lab.perceive.ops import commit_manifest
+from agent_lab.primitives.artifact import Artifact, ArtifactKind, make_text, make_message, make_exception
+
+class _PerceiveCommit(Worker):
+    factory = "perceive.commit"
+
+    def execute(self, node, inputs, seams=None):
+        del node
+        return commit_manifest(trimmed_items=inputs.get("trimmed_items"))
+
+register_worker("perceive.commit", _PerceiveCommit)
+register_worker("lab.perceive.commit", _PerceiveCommit)

@@ -55,3 +55,30 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from agent_lab.primitives.artifact import Artifact, ArtifactKind, make_text
+
+
+class _Rank(Worker):
+    factory = "rank"
+
+    def execute(self, node, inputs, seams=None):
+        src = node.config.get("from", node.ins[0])
+        dst = node.config.get("to", node.outs[0])
+        keep = int(node.config.get("keep", 50))
+        split_on = node.config.get("split_on", "\n")
+        src_a = inputs.get(src)
+        if src_a is None:
+            return {dst: Artifact(kind=ArtifactKind.TEXT, content="")}
+        text = str(src_a.content)
+        parts = [p for p in text.split(split_on) if p][:keep]
+        return {
+            dst: Artifact(kind=ArtifactKind.TEXT, content=split_on.join(parts), schema_ref="ranked.v1")
+        }
+
+
+register_worker("rank", _Rank)
+register_worker("lab.passthrough.rank", _Rank)

@@ -55,3 +55,21 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from agent_lab.primitives.artifact import Artifact, ArtifactKind
+
+class _ObserveCheckpointNode(Worker):
+    factory = "observe_checkpoint_node"
+
+    def execute(self, node, inputs, seams=None):
+        from lca.plugins.lab.control.ops import LcaControlCheckpointProvider
+        provider = LcaControlCheckpointProvider.from_node_config(node.config)
+        out_port = node.config.get("to", "checkpoint_event")
+        event_type = node.config.get("event_type", "checkpoint")
+        return provider.emit(event_type=event_type, event_log=inputs.get("in_event_log"), out_port=out_port)
+
+register_worker("observe_checkpoint_node", _ObserveCheckpointNode)
+register_worker("observe_checkpoint", _ObserveCheckpointNode)
+register_worker("lab.observe_checkpoint_node", _ObserveCheckpointNode)

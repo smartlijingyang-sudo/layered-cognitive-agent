@@ -55,3 +55,21 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from lca.plugins.lab.perceive.ops import fold_sensor_items
+from agent_lab.primitives.artifact import Artifact, ArtifactKind, make_text, make_message, make_exception
+
+class _PerceiveSense(Worker):
+    factory = "perceive.sense"
+
+    def execute(self, node, inputs, seams=None):
+        del node
+        return fold_sensor_items(
+            sensors_artifact=inputs.get("sensors"),
+            state_artifact=inputs.get("state")
+        )
+
+register_worker("perceive.sense", _PerceiveSense)
+register_worker("lab.perceive.sense", _PerceiveSense)

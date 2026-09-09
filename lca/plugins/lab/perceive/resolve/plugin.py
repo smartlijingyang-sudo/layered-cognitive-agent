@@ -55,3 +55,21 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from lca.plugins.lab.perceive.ops import LcaPerceiveResolveProvider
+from agent_lab.primitives.artifact import Artifact, ArtifactKind, make_text, make_message, make_exception
+
+class _PerceiveResolve(Worker):
+    factory = "perceive.resolve"
+
+    def execute(self, node, inputs, seams=None):
+        del inputs
+        provider = LcaPerceiveResolveProvider.from_node_config(
+            getattr(node, "config", None) or {}
+        )
+        return provider.resolve()
+
+register_worker("perceive.resolve", _PerceiveResolve)
+register_worker("lab.perceive.resolve", _PerceiveResolve)

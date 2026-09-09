@@ -55,3 +55,24 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from agent_lab.primitives.artifact import Artifact, ArtifactKind, make_text
+
+
+class _SelectV2(Worker):
+    factory = "passthrough__select"
+
+    def execute(self, node, inputs, seams=None):
+        in_a = inputs.get("in")
+        field = node.config.get("field", "")
+        content = in_a.content if in_a else {}
+        if isinstance(content, dict):
+            return {"out": content.get(field)}
+        return {"out": Artifact(kind=ArtifactKind.TEXT, content="")}
+
+
+register_worker("passthrough__select", _SelectV2)
+register_worker("lab.passthrough.select_v2", _SelectV2)

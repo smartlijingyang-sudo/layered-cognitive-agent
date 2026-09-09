@@ -55,3 +55,24 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from lca.plugins.lab.perceive.ops import trim_items
+from agent_lab.primitives.artifact import Artifact, ArtifactKind, make_text, make_message, make_exception
+
+class _PerceiveTrim(Worker):
+    factory = "perceive.trim"
+
+    def execute(self, node, inputs, seams=None):
+        cfg = getattr(node, "config", None) or {}
+        max_chars = cfg.get("max_chars")
+        return trim_items(
+            sensor_items=inputs.get("sensor_items"),
+            memory_items=inputs.get("memory_items"),
+            policy_items=inputs.get("policy_items"),
+            max_chars=int(max_chars) if max_chars is not None else None
+        )
+
+register_worker("perceive.trim", _PerceiveTrim)
+register_worker("lab.perceive.trim", _PerceiveTrim)

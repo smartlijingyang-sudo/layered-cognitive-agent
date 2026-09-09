@@ -55,3 +55,28 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from agent_lab.primitives.artifact import Artifact, ArtifactKind, make_text
+
+
+class _Redact(Worker):
+    factory = "redact"
+
+    def execute(self, node, inputs, seams=None):
+        src = node.config.get("from", node.ins[0])
+        dst = node.config.get("to", node.outs[0])
+        patterns = list(node.config.get("patterns", []) or [])
+        src_a = inputs.get(src)
+        if src_a is None:
+            return {dst: Artifact(kind=ArtifactKind.TEXT, content="")}
+        text = str(src_a.content)
+        for pat in patterns:
+            text = text.replace(pat, "[REDACTED]")
+        return {dst: Artifact(kind=ArtifactKind.TEXT, content=text, schema_ref="redacted.v1")}
+
+
+register_worker("redact", _Redact)
+register_worker("lab.passthrough.redact", _Redact)

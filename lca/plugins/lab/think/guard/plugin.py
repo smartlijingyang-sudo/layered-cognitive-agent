@@ -55,3 +55,24 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+
+class _Think_Guard(Worker):
+    factory = "think.guard"
+
+    def execute(self, node, inputs, seams=None):
+        from lca.plugins.lab.think.guard.ops import enforce_decision
+        cfg = dict(node.config or {})
+        provider_cfg = dict(cfg.get("provider_config") or {})
+        merged = {**provider_cfg, **{k: cfg[k] for k in ("null_gate","gate_factory","fixture_gate_name","allow_empty_chain","gate") if k in cfg}}
+        src = cfg.get("from", "decision")
+        out = cfg.get("to", "enforced_decision")
+        result = enforce_decision(inputs.get(src) or inputs.get("decision"), inputs.get("in_state"), config=merged, out_port=out)
+        ports = node.outs or [out, "think_signal"]
+        return {port: result.get(port, Artifact(kind=ArtifactKind.FACT, content=None)) for port in ports}
+
+register_worker("think.guard", _Think_Guard)
+register_worker("think.guard", _Think_Guard)
+register_worker("lab.think.guard", _Think_Guard)

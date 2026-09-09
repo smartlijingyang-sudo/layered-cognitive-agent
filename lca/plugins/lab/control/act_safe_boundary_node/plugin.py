@@ -55,3 +55,21 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from agent_lab.primitives.artifact import Artifact, ArtifactKind
+
+class _ActSafeBoundaryNode(Worker):
+    factory = "act_safe_boundary_node"
+
+    def execute(self, node, inputs, seams=None):
+        from lca.plugins.lab.control.ops_act import LcaControlActSafeBoundaryProvider
+        from agent_lab.primitives.artifact import Artifact
+        provider = LcaControlActSafeBoundaryProvider.from_node_config(node.config)
+        out_port = node.config.get("to", "allowed")
+        result = provider.evaluate(inputs.get("in_args"))
+        return {out_port: result.get(out_port, Artifact(kind="fact", content={"allowed": True}))}
+
+register_worker("act_safe_boundary_node", _ActSafeBoundaryNode)
+register_worker("lab.act_safe_boundary_node", _ActSafeBoundaryNode)

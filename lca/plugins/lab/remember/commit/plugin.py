@@ -55,3 +55,25 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from agent_lab.primitives.artifact import Artifact, ArtifactKind
+
+class _Remember_Commit(Worker):
+    factory = "remember.commit"
+
+    def execute(self, node, inputs, seams=None):
+        from lca.plugins.lab.memory.ops import LcaRememberJournalProvider
+        provider = LcaRememberJournalProvider.from_node_config(getattr(node, "config", None) or {})
+        out_port = (getattr(node, "config", None) or {}).get("to", "journal_fact")
+        return provider.append_journal(
+            reflection_artifact=inputs.get("in_reflection"),
+            observation_artifact=inputs.get("in_observation"),
+            decision_artifact=inputs.get("in_decision"),
+            admitted_artifact=inputs.get("admitted"),
+            out_port=out_port,
+        )
+
+register_worker("remember.commit", _Remember_Commit)
+register_worker("lab.remember.commit", _Remember_Commit)

@@ -55,3 +55,21 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from agent_lab.primitives.artifact import Artifact, ArtifactKind
+
+class _ObserveWildcardNode(Worker):
+    factory = "observe_wildcard_node"
+
+    def execute(self, node, inputs, seams=None):
+        from lca.plugins.lab.control.ops_act import LcaControlObserveWildcardProvider
+        provider = LcaControlObserveWildcardProvider.from_node_config(node.config)
+        out_port = node.config.get("to", "wildcard_event")
+        event_type = node.config.get("event_type", "wildcard")
+        return provider.emit(event_type=event_type, in_event=inputs.get("in_event"), out_port=out_port)
+
+register_worker("observe_wildcard_node", _ObserveWildcardNode)
+register_worker("observe_wildcard", _ObserveWildcardNode)
+register_worker("lab.observe_wildcard_node", _ObserveWildcardNode)

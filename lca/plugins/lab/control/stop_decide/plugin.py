@@ -55,3 +55,26 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from agent_lab.primitives.artifact import Artifact, ArtifactKind
+
+class _StopDecide(Worker):
+    factory = "stop_decide"
+
+    def execute(self, node, inputs, seams=None):
+        from lca.plugins.lab.control.ops import LcaControlStopPolicyProvider
+        provider = LcaControlStopPolicyProvider.from_node_config(node.config)
+        out_port = node.config.get("to", "stop_decision")
+        return provider.decide(
+            state=inputs.get("in_state"),
+            decision=inputs.get("in_decision"),
+            observation=inputs.get("in_observation"),
+            reflection=inputs.get("in_reflection"),
+            out_port=out_port,
+        )
+
+register_worker("stop_decide", _StopDecide)
+register_worker("stop_decide_node", _StopDecide)
+register_worker("lab.stop_decide", _StopDecide)

@@ -55,3 +55,21 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from agent_lab.primitives.artifact import Artifact, ArtifactKind
+
+class _ActAuthorizeNode(Worker):
+    factory = "act_authorize_node"
+
+    def execute(self, node, inputs, seams=None):
+        from lca.plugins.lab.control.ops_act import LcaControlActAuthorizeProvider
+        from agent_lab.primitives.artifact import Artifact
+        provider = LcaControlActAuthorizeProvider.from_node_config(node.config)
+        out_port = node.config.get("to", "allowed")
+        result = provider.evaluate(inputs.get("in_args"))
+        return {out_port: result.get(out_port, Artifact(kind="fact", content={"allowed": True}))}
+
+register_worker("act_authorize_node", _ActAuthorizeNode)
+register_worker("lab.act_authorize_node", _ActAuthorizeNode)

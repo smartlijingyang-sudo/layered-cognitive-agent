@@ -55,3 +55,53 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from agent_lab.primitives.artifact import Artifact, ArtifactKind
+
+def _candidates_from_reflection(content):
+    candidates = []
+    reflection_id = content.get("reflection_id", "")
+    lesson = content.get("lesson")
+    if lesson:
+        candidates.append({"kind": "lesson", "verdict": content.get("verdict", ""), "text": lesson, "reflection_id": reflection_id})
+    correction = content.get("correction")
+    if isinstance(correction, dict) and correction:
+        candidates.append({"kind": "correction", "decision_id": correction.get("decision_id", ""), "action_type": correction.get("action_type", ""), "reflection_id": reflection_id})
+    extra = content.get("extra")
+    if isinstance(extra, dict) and extra:
+        candidates.append({"kind": "extra", "payload": extra, "reflection_id": reflection_id})
+    return candidates
+
+from agent_lab.primitives.artifact import Artifact, ArtifactKind
+
+class _Reflect_Extract(Worker):
+    factory = "reflect.extract"
+
+    def execute(self, node, inputs, seams=None):
+        src = (getattr(node, "config", None) or {}).get("from", "reflection")
+        reflection_artifact = inputs.get(src) or inputs.get("reflection")
+        content = {}
+        if reflection_artifact is not None and isinstance(reflection_artifact.content, dict):
+            content = dict(reflection_artifact.content)
+        candidates = _candidates_from_reflection(content)
+        reflection_out = Artifact(
+            kind=ArtifactKind.FACT,
+            content=content,
+            schema_ref=getattr(reflection_artifact, "schema_ref", None) or "reflection.v1",
+        )
+        memory_candidates = Artifact(
+            kind=ArtifactKind.FACT,
+            content={"items": candidates},
+            schema_ref="memory.candidates.v1",
+        )
+        reflect_signal = Artifact(
+            kind=ArtifactKind.FACT,
+            content={"reflection_id": content.get("reflection_id", ""), "verdict": content.get("verdict", ""), "candidate_count": len(candidates)},
+            schema_ref="reflect.signal.v1",
+        )
+        return {"reflection_out": reflection_out, "memory_candidates": memory_candidates, "reflect_signal": reflect_signal}
+
+register_worker("reflect.extract", _Reflect_Extract)
+register_worker("lab.reflect.extract", _Reflect_Extract)

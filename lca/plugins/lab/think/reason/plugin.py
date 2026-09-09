@@ -55,3 +55,26 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from agent_lab.primitives.artifact import Artifact, ArtifactKind
+
+class _Think_Reason(Worker):
+    factory = "think.reason"
+
+    def execute(self, node, inputs, seams=None):
+        from lca.plugins.lab.think.reason.ops import complete_turn
+        from lca.infrastructure.llm_adapter.openai_compat import OpenAICompatAdapter
+        src = node.config.get("from", "messages")
+        out = node.config.get("to", "response")
+        response = complete_turn(
+            inputs.get(src) or inputs.get("messages"),
+            inputs.get("tools"),
+            adapter_factory=OpenAICompatAdapter,
+            adapter_kwargs=dict(node.config.get("adapter_kwargs", {}) or {})
+        )
+        return {out: response}
+
+register_worker("think.reason", _Think_Reason)
+register_worker("lab.think.reason", _Think_Reason)

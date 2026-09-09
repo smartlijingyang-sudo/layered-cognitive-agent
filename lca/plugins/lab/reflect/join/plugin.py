@@ -55,3 +55,23 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from agent_lab.primitives.artifact import Artifact, ArtifactKind
+
+class _Reflect_Join(Worker):
+    factory = "reflect.join"
+
+    def execute(self, node, inputs, seams=None):
+        cfg = getattr(node, "config", None) or {}
+        outs = getattr(node, "outs", None) or []
+        out = (outs[0] if outs else None) or cfg.get("to", "combined")
+        merged = {}
+        for port_name, artifact in inputs.items():
+            content = artifact.content if artifact is not None else None
+            merged[port_name] = content if isinstance(content, dict) else {"_raw": content}
+        return {out: Artifact(kind=ArtifactKind.FACT, content=merged, schema_ref="reflect.combined.v1")}
+
+register_worker("reflect.join", _Reflect_Join)
+register_worker("lab.reflect.join", _Reflect_Join)

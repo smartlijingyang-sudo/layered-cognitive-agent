@@ -55,3 +55,19 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from agent_lab.primitives.artifact import Artifact, ArtifactKind
+
+class _Barrier(Worker):
+    factory = "barrier"
+
+    def execute(self, node, inputs, seams=None):
+        from agent_lab.primitives.artifact import Artifact, ArtifactKind
+        src = node.config.get("from", node.ins[0])
+        dst = node.config.get("to", node.outs[0])
+        return {dst: inputs.get(src, Artifact(kind=ArtifactKind.TEXT, content=""))}
+
+register_worker("barrier", _Barrier)
+register_worker("lab.barrier", _Barrier)

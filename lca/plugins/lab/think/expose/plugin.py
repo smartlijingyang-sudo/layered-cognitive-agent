@@ -55,3 +55,21 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from agent_lab.primitives.artifact import Artifact, ArtifactKind
+
+class _Think_Expose(Worker):
+    factory = "think.expose"
+
+    def execute(self, node, inputs, seams=None):
+        from lca.plugins.lab.think.expose.ops import peel_manifest
+        src = node.config.get("from", "in_assembled_manifest")
+        peeled = peel_manifest(inputs.get(src) or inputs.get("in_assembled_manifest"))
+        msg_out = node.config.get("to", "messages")
+        tools_out = node.config.get("tools_to", "tools")
+        return {msg_out: peeled["messages"], tools_out: peeled["tools"]}
+
+register_worker("think.expose", _Think_Expose)
+register_worker("lab.think.expose", _Think_Expose)

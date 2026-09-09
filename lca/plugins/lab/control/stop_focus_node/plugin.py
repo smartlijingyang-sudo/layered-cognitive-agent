@@ -55,3 +55,24 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from agent_lab.primitives.artifact import Artifact, ArtifactKind
+
+class _StopFocus(Worker):
+    factory = "stop_focus"
+
+    def execute(self, node, inputs, seams=None):
+        from lca.plugins.lab.control.ops import LcaControlStopFocusProvider
+        provider = LcaControlStopFocusProvider.from_node_config(node.config)
+        out_port = node.config.get("to", "focus_verdict")
+        return provider.evaluate(
+            state=inputs.get("in_state"),
+            decision=inputs.get("in_decision"),
+            out_port=out_port,
+        )
+
+register_worker("stop_focus", _StopFocus)
+register_worker("stop_focus_node", _StopFocus)
+register_worker("lab.stop_focus", _StopFocus)

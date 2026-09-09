@@ -1,25 +1,42 @@
-# PR-B — act.execute node plugin (minimal stub for loader registration)
-"""act.execute — authorized Intent → EffectReceipt via SimpleBody.act.
+"""act.body — LabCarrier stub (PR-D).
 
-Stub plugin marker; full implementation reaches via node factory.
-PR-D will rewrite this as a full @plugin carrier. The Body
-composition stays in agent_lab.nodes.act.execute.body until PR-D.
+Minimal real carrier: declares identity for the loader and exposes a
+Worker subclass with the live execute() body. Real node logic lives in
+the Worker; the LabCarrier binds slot id + aliases for loader + invoke.
 """
 
-from lca.plugins.lab.internal.loader import _LAB_HOOKS
+from __future__ import annotations
 
-_marker = {"id": "execute", "stage": "act", "needs": ["lab.body", "lab.tool_registry", "lab.safe_executor", "lab.transport", "lab.plan_ref"]}
-_LAB_HOOKS["lab.act.execute"] = _marker
-
-__all__ = ["_marker"]
-
-# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.hooks import LabCarrier, bind_carrier
 from lca.plugins.lab.internal.worker import Worker, register_worker
 from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
-class _ActExecute(Worker):
-    factory = "act.execute"
+_CARRIER = LabCarrier(
+    id="lab.act.body",
+    stage="act",
+    kind="EXECUTOR",
+    description="act.body worker (PR-D stub carrier + worker).",
+    node_id="body",
+    source_module="lca.plugins.lab.act.body.plugin",
+    source_class="_ActBody",
+    provides=[],
+    requires=[],
+    emits=[],
+    inputs=[],
+    outputs=[],
+    out_capabilities=[],
+)
 
+
+def setup(ctx, config):
+    bind_carrier(_CARRIER, ctx=ctx, config=config)
+
+
+bind_carrier(_CARRIER)
+
+
+class _ActBody(Worker):
+    factory = "act.body"
     def execute(self, node, inputs, seams=None):
         from lca.plugins.lab.act.body_provider import get_body
         intent_a = inputs.get("authorized")
@@ -32,5 +49,6 @@ class _ActExecute(Worker):
         except Exception as exc:
             return {"receipt": Artifact(kind=ArtifactKind.RECEIPT, content={"status": "error", "tool": tool_name, "error": str(exc)}, schema_ref="tool.receipt.v1")}
 
-register_worker("act.execute", _ActExecute)
-register_worker("lab.act.execute", _ActExecute)
+
+register_worker("act.body", _ActBody)
+register_worker("lab.act.body", _ActBody)

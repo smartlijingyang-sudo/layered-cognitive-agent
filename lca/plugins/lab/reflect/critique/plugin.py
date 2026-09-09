@@ -55,3 +55,20 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from agent_lab.primitives.artifact import Artifact, ArtifactKind
+
+class _Reflect_Critique(Worker):
+    factory = "reflect.critique"
+
+    def execute(self, node, inputs, seams=None):
+        from lca.plugins.lab.reflect.ops import LcaReflectCriticProvider
+        provider = LcaReflectCriticProvider.from_node_config(getattr(node, "config", None) or {})
+        src = (getattr(node, "config", None) or {}).get("from", "combined")
+        combined = inputs.get(src) or inputs.get("combined")
+        return provider.critique(combined_artifact=combined)
+
+register_worker("reflect.critique", _Reflect_Critique)
+register_worker("lab.reflect.critique", _Reflect_Critique)

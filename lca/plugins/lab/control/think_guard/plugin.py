@@ -55,3 +55,23 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from agent_lab.primitives.artifact import Artifact, ArtifactKind
+
+class _ThinkGuardNode(Worker):
+    factory = "think_guard_node"
+
+    def execute(self, node, inputs, seams=None):
+        from lca.plugins.lab.control.think_guard.ops import handle_control_decision
+        cfg = node.config or {}
+        provider_cfg = dict(cfg.get("provider_config") or {})
+        mode = str(provider_cfg.get("mode") or cfg.get("mode") or "passthrough")
+        out_port = cfg.get("to", "out_decision")
+        enforce_cfg = {k: v for k, v in provider_cfg.items() if k != "mode"}
+        return handle_control_decision(inputs.get("in_decision"), mode=mode, out_port=out_port, enforce_config=enforce_cfg)
+
+register_worker("think_guard_node", _ThinkGuardNode)
+register_worker("think_guard", _ThinkGuardNode)
+register_worker("lab.think_guard_node", _ThinkGuardNode)

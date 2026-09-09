@@ -55,3 +55,32 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from agent_lab.primitives.artifact import Artifact, ArtifactKind, make_text
+
+
+class _DedupV2(Worker):
+    factory = "passthrough__dedup"
+
+    def execute(self, node, inputs, seams=None):
+        text_a = inputs.get("text")
+        text = text_a.content if text_a else ""
+        sep = node.config.get("split_on", "\n")
+        lines = text.split(sep) if text else []
+        seen: set = set()
+        out: list = []
+        for ln in lines:
+            if ln not in seen:
+                seen.add(ln)
+                out.append(ln)
+        joined = sep.join(out)
+        if text_a is None:
+            return {"out": Artifact(kind=ArtifactKind.TEXT, content="")}
+        return {"out": Artifact(kind=text_a.kind, content=joined, schema_ref=text_a.schema_ref)}
+
+
+register_worker("passthrough__dedup", _DedupV2)
+register_worker("lab.passthrough.dedup_v2", _DedupV2)

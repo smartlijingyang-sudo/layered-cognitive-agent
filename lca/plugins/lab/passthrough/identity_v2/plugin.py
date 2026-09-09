@@ -55,3 +55,19 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from agent_lab.primitives.artifact import Artifact, ArtifactKind, make_text
+
+
+class _IdentityV2(Worker):
+    factory = "passthrough__identity"
+
+    def execute(self, node, inputs, seams=None):
+        return {"out": inputs.get("in")}
+
+
+register_worker("passthrough__identity", _IdentityV2)
+register_worker("lab.passthrough.identity_v2", _IdentityV2)

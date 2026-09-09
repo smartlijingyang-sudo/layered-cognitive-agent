@@ -55,3 +55,17 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from agent_lab.primitives.artifact import Artifact, ArtifactKind
+
+class _Remember_Fold_History(Worker):
+    factory = "remember__fold_history"
+
+    def execute(self, node, inputs, seams=None):
+        return {"messages": inputs.get("session")}
+
+register_worker("remember__fold_history", _Remember_Fold_History)
+register_worker("remember.fold_history", _Remember_Fold_History)
+register_worker("lab.remember__fold_history", _Remember_Fold_History)

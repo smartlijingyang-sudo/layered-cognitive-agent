@@ -55,3 +55,20 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from agent_lab.primitives.artifact import Artifact, ArtifactKind
+
+class _Join(Worker):
+    factory = "join"
+
+    def execute(self, node, inputs, seams=None):
+        out_port = node.outs[0]
+        merged: dict = {}
+        for k, a in inputs.items():
+            merged[k] = a.content
+        return {out_port: Artifact(kind=ArtifactKind.FACT, content=merged, schema_ref="join.merged.v1")}
+
+register_worker("join", _Join)
+register_worker("lab.join", _Join)

@@ -55,3 +55,20 @@ bind_carrier(_CARRIER)
 
 
 __all__ = ["setup", "_CARRIER"]
+
+# --- PR-D worker execute -----------------------------------------------
+from lca.plugins.lab.internal.worker import Worker, register_worker
+from agent_lab.primitives.artifact import Artifact, ArtifactKind
+
+class _RememberAdmitNode(Worker):
+    factory = "remember_admit_node"
+
+    def execute(self, node, inputs, seams=None):
+        from lca.plugins.lab.control.ops import LcaControlRememberAdmitProvider
+        provider = LcaControlRememberAdmitProvider.from_node_config(node.config)
+        out_port = node.config.get("to", "admit_verdict")
+        return provider.admit(observation=inputs.get("in_observation"), out_port=out_port)
+
+register_worker("remember_admit_node", _RememberAdmitNode)
+register_worker("remember_admit", _RememberAdmitNode)
+register_worker("lab.remember_admit_node", _RememberAdmitNode)
