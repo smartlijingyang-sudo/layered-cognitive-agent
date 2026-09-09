@@ -56,7 +56,7 @@ class GateStepExecutor:
         lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
         authority=AuthorityContract(grants=("plugin.serve",)),
         observability=EvidenceContract(
-            descriptors=("phase_think_subgraph_gate.checked", "phase_think_subgraph_gate.served")
+            descriptors=("phase_think_gate.checked", "phase_think_gate.served")
         ),
     ),
     relations=(),
