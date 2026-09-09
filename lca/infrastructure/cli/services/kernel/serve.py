@@ -45,7 +45,7 @@ from lca.infrastructure.cli.service.service import (
     HealthCheck,
     ServiceState,
     ServiceStatus,
-    http_ready,
+    health_body_ok,
 )
 from lca.infrastructure.cli.services.kernel.spawner import KernelServeSpawner
 from lca.infrastructure.cli.services.process.utils import find_pid_by_argv, port_listening
@@ -74,8 +74,13 @@ class KernelServeService:
         return self._spawner.health_url
 
     def state(self) -> ServiceState:
-        """Observe via HTTP /health + port listener."""
-        healthy = http_ready(self.health_url, timeout=1.0)
+        """Observe via HTTP /health + port listener.
+
+        Readiness requires HTTP 200 AND body ``status == "ok"``
+        (post-0213 PR-2). A 200 with degraded / partial payload must not
+        report the kernel as healthy.
+        """
+        healthy = health_body_ok(self.health_url, timeout=1.0)
         checks = (HealthCheck("health", healthy, self.health_url),)
         if healthy:
             return ServiceState(

@@ -274,3 +274,57 @@ def http_ready(url: str, timeout: float = 2.0) -> bool:
         # INTENTIONAL: HTTP 检查失败 → 回 False;这是 readiness probe,
         # caller 会重试或报错,不阻断启动流程。
         return False
+
+
+def health_body_ok(url: str, timeout: float = 2.0) -> bool:
+    """Return True iff ``GET url`` returns 200 AND body JSON has ``status == "ok"``.
+
+    Used by ``KernelServeService.state()`` for kernel health projection
+    after ADR-0213 PR-2: ``/health`` body now carries
+    ``{status, runs, live, event_bus, plugin}``. A 200 with body
+    ``{"status": "degraded"}`` (e.g. event_bus dropped_total > 0) or
+    ``{"status": "loading"}`` (boot in progress) must NOT report
+    ``kernel_serve`` as ready. This is the explicit post-0213 check; the
+    original ``http_ready`` retains its 2xx/3xx semantics for non-health
+    probes.
+    """
+    import json
+    import subprocess
+
+    try:
+        r = subprocess.run(  # noqa: S603
+            [  # noqa: S607 — controlled argv, not user-provided
+                "curl",
+                "-sS",
+                "--max-time",
+                str(timeout),
+                "-w",
+                "\n%{http_code}",
+                url,
+            ],
+            capture_output=True,
+            timeout=timeout + 1,
+            text=True,
+        )
+        if r.returncode != 0:
+            return False
+        out = r.stdout or ""
+        sep = out.rfind("\n")
+        if sep == -1:
+            return False
+        body = out[:sep]
+        try:
+            code = int(out[sep + 1 :].strip())
+        except ValueError:
+            return False
+        if code != 200:
+            return False
+        try:
+            parsed = json.loads(body)
+        except json.JSONDecodeError:
+            return False
+        if not isinstance(parsed, dict):
+            return False
+        return parsed.get("status") == "ok"
+    except Exception:
+        return False

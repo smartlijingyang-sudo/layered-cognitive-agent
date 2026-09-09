@@ -296,6 +296,16 @@ def health_payload(run_port: RunPort, *, ctx: Any) -> dict[str, Any]:
     ``queue_depth`` is always 0 (sync observer; no queue). ``dropped_total > 0``
     flips ``status`` to ``degraded``; readiness is unaffected (frontend
     surfaces the warning).
+
+    Includes ``plugin`` block (PR-0213.2 / ADR-0213 §决定 4) reporting
+    the event-registry catalog / pipeline / cognitive driver readiness.
+    ``registered`` is the current catalog size, ``expected`` is the
+    count of plugins in the resolved profile that declared a
+    ``marker_class`` (the same predicate ``_collect_marker_catalog``
+    uses). ``missing`` is the set difference. ``pipeline_registered`` /
+    ``cognitive_driver_registered`` are pulled from existing bus /
+    driver-registry state. Any error during read degrades gracefully
+    and the block is dropped — ``/health`` must never 500 on observability.
     """
     base: dict[str, Any] = {
         "status": "ok",
@@ -307,7 +317,93 @@ def health_payload(run_port: RunPort, *, ctx: Any) -> dict[str, Any]:
         base["event_bus"] = event_bus
         if event_bus.get("dropped_total", 0) > 0:
             base["status"] = "degraded"
+    plugin = _read_plugin_health(ctx)
+    if plugin is not None:
+        base["plugin"] = plugin
     return base
+
+
+def _read_plugin_health(ctx: Any) -> dict[str, Any] | None:
+    """Aggregate the 5 plugin-readiness signals for ``/health`` (PR-0213.2).
+
+    Graceful degradation mirrors :func:`_read_event_bus_health`: any error
+    returns ``None`` and the caller drops the block. See ADR-0213 §决定 4
+    for the wire schema; ``missing`` is computed from resolved profile
+    plugin ids whose ``marker_class`` is set but whose id is not present
+    in the live event-registry catalog.
+    """
+    try:
+        from lca_kernel.events import EventBus
+
+        bus = EventBus.default()
+        registry = bus.registry
+        registered = len(getattr(registry, "_plugins", {}))
+
+        expected = 0
+        missing: list[str] = []
+        try:
+            from lca.harness.profile.boot.products import (
+                resolved_profile_from_scope,
+            )
+
+            resolved = resolved_profile_from_scope(ctx) if ctx is not None else None
+        except Exception:
+            resolved = None
+        if resolved is not None:
+            catalog_ids = set(getattr(registry, "_plugins", {}).keys())
+            for plugin in getattr(resolved, "plugins", ()):
+                marker = getattr(getattr(plugin, "definition", None), "marker_class", None)
+                if marker is None:
+                    continue
+                expected += 1
+                if plugin.id not in catalog_ids:
+                    missing.append(plugin.id)
+
+        registry_populated = registered > 0 or expected == 0
+
+        # pipeline_registered: read the module-level _REGISTERED set used
+        # by ``register_pipeline_once`` to deduplicate pipeline loads.
+        pipeline_registered = False
+        try:
+            from lca.harness.profile.resolve import pipeline_loader
+
+            seen = pipeline_loader._REGISTERED.get(bus)  # module-level SSOT (SLF001)
+            pipeline_registered = bool(seen)
+        except Exception:
+            pipeline_registered = False
+
+        # cognitive_driver_registered: the cognitive plugin registers
+        # ``run_loop_driver_registry[cognitive]`` at setup time; the
+        # presence of ``"cognitive"`` in the registry is the SSOT.
+        cognitive_driver_registered = False
+        try:
+            from lca.contracts.mechanisms.capability.capability import (
+                require_capability,
+            )
+
+            driver_registry = require_capability(ctx, "run_loop_driver_registry")
+        except Exception:
+            driver_registry = None
+        if driver_registry is not None:
+            try:
+                cognitive_driver_registered = bool(driver_registry.contains("cognitive"))
+            except Exception:
+                cognitive_driver_registered = False
+
+        return {
+            "registered": registered,
+            "expected": expected,
+            "missing": missing,
+            "registry_populated": registry_populated,
+            "pipeline_registered": pipeline_registered,
+            "cognitive_driver_registered": cognitive_driver_registered,
+        }
+    except Exception as exc:
+        import structlog
+
+        _log = structlog.get_logger(__name__)
+        _log.warning("kernel_health_plugin_block_failed", error=str(exc), exc_info=True)
+        return None
 
 
 def _read_event_bus_health() -> dict[str, Any] | None:
