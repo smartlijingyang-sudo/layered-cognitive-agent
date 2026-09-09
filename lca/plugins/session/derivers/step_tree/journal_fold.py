@@ -335,9 +335,12 @@ def _begin_step(state: _StepTreeState, event: Mapping[str, Any], ts: float) -> N
         payload = {}
     open_frame = state.open_step
     start_step_id = str(payload.get("step_id") or "")
-    phase = payload.get("phase", "think")
-    if not isinstance(phase, str) or not phase:
-        phase = "think"
+    # frame.phase 在开新帧时从 payload.phase 派生(测试契约):
+    # writable.step.start 由 caller 决定 phase,fold 不硬编码。
+    # 升级路径不读 payload.phase(避免 cursor state.phase 污染,见 ADR-0184 D6 + run_6765361accc9)。
+    new_phase = payload.get("phase")
+    if not isinstance(new_phase, str) or not new_phase:
+        new_phase = "think"
     if (
         open_frame is not None
         and _frame_is_empty(open_frame)
@@ -348,11 +351,13 @@ def _begin_step(state: _StepTreeState, event: Mapping[str, Any], ts: float) -> N
         }
     ):
         # 原地升级:同一 step 的显式边界到达(不重复计步)。
+        # frame.phase 不在此覆写:writable.step.start 是 LLM 边界专属
+        # marker(ADR-0184 D6),phase 由 phase.fold 事件统一决定,
+        # 避免 cursor state.phase(如 perceive)污染 step-tree 物化结果。
         if start_step_id:
             open_frame.step_id = start_step_id
         open_frame.opened_by = "writable"
         open_frame.window_signal = "explicit"
-        open_frame.phase = phase  # type: ignore[assignment]
         return
     if open_frame is not None:
         _close_step(state, "fail")
@@ -360,7 +365,7 @@ def _begin_step(state: _StepTreeState, event: Mapping[str, Any], ts: float) -> N
     state.open_step = _Frame(
         step_id=start_step_id or f"step-{state.step_seq:03d}",
         step_index=state.step_seq,
-        phase=phase,  # type: ignore[arg-type]
+        phase=cast("StepPhase", new_phase),
         entered_at=ts,
         opened_by="writable",
         window_signal="explicit",
