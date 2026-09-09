@@ -230,8 +230,26 @@ def load_all() -> None:
                 doc = (sub_mod.__doc__ or "").lower()
                 if "provider: yes" in doc or "provider: true" in doc:
                     continue
+                # ADR-0211 §8:Worker 体检失败 = 契约错,fail-loud。
+                # 模式由环境变量 ``LCA_WORKER_AUDIT_MODE`` 控制:
+                #   raise  (CI / strict) — 体检错直接 raise,新 worker 写错立刻可见
+                #   warn   (default)    — 体检错走 WARNING,旧 worker 渐进迁移
+                # 其它 reflection 错误(import / 等)统一走 WARNING。
+                import os
+
+                from lca.plugins.lab.internal.audit import WorkerAuditFailure
+
+                audit_mode = os.environ.get("LCA_WORKER_AUDIT_MODE", "warn").lower()
                 try:
                     bind_worker(sub_module_name)
+                except WorkerAuditFailure as exc:
+                    if audit_mode == "raise":
+                        raise
+                    _log.warning(
+                        "stage worker audit failed (%s mode): %s",
+                        audit_mode,
+                        exc,
+                    )
                 except Exception as exc:
                     _log.warning(
                         "stage worker reflection failed: %s: %s", sub_module_name, exc
