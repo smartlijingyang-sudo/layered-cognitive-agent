@@ -17,7 +17,6 @@ from typing import Any
 
 from lca.plugins.lab.internal.audit.errors import WorkerAuditError
 
-
 _FORBIDDEN_PARAMS = frozenset({"ctx", "seams", "node", "inputs"})
 
 
@@ -75,12 +74,24 @@ def _w2_typed_input(sig: inspect.Signature, loc: str) -> list[WorkerAuditError]:
                 )
             )
             continue
+        # PEP 563 lazy annotations arrive as forward-ref strings
+        # (``from __future__ import annotations``);normalize before check.
+        if isinstance(ann, str):
+            if ann in {"dict", "Dict"}:
+                errs.append(
+                    WorkerAuditError(
+                        "W-2",
+                        loc,
+                        f"parameter {pname!r} 用了 dict(forward-ref);禁止(用 frozen dataclass / Protocol)",
+                    )
+                )
+            continue
         if ann is Any or ann is dict:
             errs.append(
                 WorkerAuditError(
                     "W-2",
                     loc,
-                    f"parameter {pname!r} 用了 {ann.__name__};禁止(用 frozen dataclass / Protocol)",
+                    f"parameter {pname!r} 用了 {getattr(ann, '__name__', str(ann))};禁止(用 frozen dataclass / Protocol)",
                 )
             )
     return errs
@@ -112,12 +123,22 @@ def _w5_typed_return(sig: inspect.Signature, loc: str) -> list[WorkerAuditError]
                 "返回值缺类型标注;Worker 必须 typed(frozen dataclass / Protocol)",
             )
         ]
+    if isinstance(ann, str):
+        if ann in {"dict", "Dict"}:
+            return [
+                WorkerAuditError(
+                    "W-5",
+                    loc,
+                    "返回值用了 dict(forward-ref);禁止(用 typed dataclass;不允许 dict[str, Artifact] 返回)",
+                )
+            ]
+        return []
     if ann is Any or ann is dict:
         return [
             WorkerAuditError(
                 "W-5",
                 loc,
-                f"返回值用了 {ann.__name__};禁止(用 typed dataclass;不允许 dict[str, Artifact] 返回)",
+                f"返回值用了 {getattr(ann, '__name__', str(ann))};禁止(用 typed dataclass;不允许 dict[str, Artifact] 返回)",
             )
         ]
     return []

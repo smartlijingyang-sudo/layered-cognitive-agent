@@ -52,7 +52,6 @@ from __future__ import annotations
 import importlib
 import logging
 import sys
-import pkgutil
 from typing import Any
 
 _log = logging.getLogger(__name__)
@@ -79,7 +78,6 @@ _REFLECTABLE_STAGES: frozenset[str] = frozenset({
 # (package + .plugin submodule).
 _HOOK_PACKAGES: tuple[str, ...] = (
     "lca.plugins.lab.act.authorize.plugin",
-    "lca.plugins.lab.act.body_provider.plugin",
     "lca.plugins.lab.act.compose.plugin",
     "lca.plugins.lab.act.execute.plugin",
     "lca.plugins.lab.act.observe.plugin",
@@ -212,57 +210,60 @@ def load_all() -> None:
             sub_module_name = f"{module_name}.plugin"
         try:
             importlib.import_module(module_name)
-            # ADR-0211 §7:stage 工人走反射入口,framework 自填 marker。
-            # 例外:模块 docstring 含 ``provider: yes`` / ``provider: true`` 的
-            # 走传统自注册路径(provider 不是 worker,需要显式 requires)。
-            parts = sub_module_name.split(".")
-            # ``lca.plugins.lab.<stage>.<basename>.plugin`` → parts[3] = stage
-            stage = parts[3] if len(parts) >= 4 else None
-            if stage and stage in _REFLECTABLE_STAGES:
-                try:
-                    sub_mod = importlib.import_module(sub_module_name)
-                except ImportError as exc:
-                    _log.warning("stage sub-module import failed: %s: %s", sub_module_name, exc)
-                    continue
-                # ADR-0211 §7:``provider: yes`` docstring marker → skip reflection,
-                # 走老 ``_CARRIER + bind_carrier`` 路径(provider 需要显式 requires)。
-                # 模块 import 时 ``bind_carrier(_CARRIER)`` 已自填 marker,这里不再补。
-                doc = (sub_mod.__doc__ or "").lower()
-                if "provider: yes" in doc or "provider: true" in doc:
-                    continue
-                # ADR-0211 §8:Worker 体检失败 = 契约错,fail-loud。
-                # 模式由环境变量 ``LCA_WORKER_AUDIT_MODE`` 控制:
-                #   raise  (CI / strict) — 体检错直接 raise,新 worker 写错立刻可见
-                #   warn   (default)    — 体检错走 WARNING,旧 worker 渐进迁移
-                # 其它 reflection 错误(import / 等)统一走 WARNING。
-                import os
-
-                from lca.plugins.lab.internal.audit import WorkerAuditFailure
-
-                audit_mode = os.environ.get("LCA_WORKER_AUDIT_MODE", "warn").lower()
-                try:
-                    bind_worker(sub_module_name)
-                except WorkerAuditFailure as exc:
-                    if audit_mode == "raise":
-                        raise
-                    _log.warning(
-                        "stage worker audit failed (%s mode): %s",
-                        audit_mode,
-                        exc,
-                    )
-                except Exception as exc:
-                    _log.warning(
-                        "stage worker reflection failed: %s: %s", sub_module_name, exc
-                    )
         except Exception as exc:  # pragma: no cover - import failures
             _log.warning("lab hook loader: %s import failed: %s", module_name, exc)
+            continue
+        # ADR-0211 §7:stage 工人走反射入口,framework 自填 marker。
+        # 例外:模块 docstring 含 ``provider: yes`` / ``provider: true`` 的
+        # 走传统自注册路径(provider 不是 worker,需要显式 requires)。
+        parts = sub_module_name.split(".")
+        # ``lca.plugins.lab.<stage>.<basename>.plugin`` → parts[3] = stage
+        stage = parts[3] if len(parts) >= 4 else None
+        if stage and stage in _REFLECTABLE_STAGES:
+            try:
+                sub_mod = importlib.import_module(sub_module_name)
+            except ImportError as exc:
+                _log.warning("stage sub-module import failed: %s: %s", sub_module_name, exc)
+                continue
+            # ADR-0211 §7:``provider: yes`` docstring marker → skip reflection,
+            # 走老 ``_CARRIER + bind_carrier`` 路径(provider 需要显式 requires)。
+            # 模块 import 时 ``bind_carrier(_CARRIER)`` 已自填 marker,这里不再补。
+            doc = (sub_mod.__doc__ or "").lower()
+            if "provider: yes" in doc or "provider: true" in doc:
+                continue
+            # ADR-0211 §8:Worker 体检失败 = 契约错,fail-loud。
+            # 模式由环境变量 ``LCA_WORKER_AUDIT_MODE`` 控制:
+            #   raise  (CI / strict) — 体检错直接 raise,新 worker 写错立刻可见
+            #   warn   (default)    — 体检错走 WARNING,旧 worker 渐进迁移
+            # 其它 reflection 错误(import / 等)统一走 WARNING。
+            import os
+
+            from lca.plugins.lab.internal.audit import WorkerAuditFailure
+
+            audit_mode = os.environ.get("LCA_WORKER_AUDIT_MODE", "warn").lower()
+            try:
+                bind_worker(sub_module_name)
+            except WorkerAuditFailure as exc:
+                # ADR-0211 §8:warn 模式 log 不 raise,marker 缺失由 reflection
+                # 测试 fixture 显式接受(见 tests/lab/test_reflection.py);strict
+                # 模式直接 raise,CI / 端到端 fail-loud。
+                if audit_mode == "raise":
+                    raise
+                _log.warning(
+                    "stage worker audit failed (%s mode): %s",
+                    audit_mode,
+                    exc,
+                )
+            except Exception as exc:
+                _log.warning(
+                    "stage worker reflection failed: %s: %s", sub_module_name, exc
+                )
     _LOADED = True
 
 
 def reset_for_tests() -> None:
     """Test-only — clear the loader state so each test starts clean."""
     global _LOADED
-    import sys
 
     # ADR-0211 §6 §1:``worker.py`` 已退役,不再 import;``_ALIASES`` 随 hooks.py
     # 重置。
@@ -328,8 +329,9 @@ def registered_lca_packages() -> tuple[str, ...]:
     that exists on disk under the LCA plugin namespace. Used by tests
     to detect drift between the loader allow-list and the filesystem layout.
     """
-    import lca.plugins.lab as _pkg
     import pathlib
+
+    import lca.plugins.lab as _pkg
 
     found: set[str] = set()
 
@@ -351,6 +353,6 @@ __all__ = [
     "list_ids",
     "load_all",
     "registered_lca_packages",
-    "resolve_plugin",
     "reset_for_tests",
+    "resolve_plugin",
 ]

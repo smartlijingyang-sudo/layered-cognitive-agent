@@ -4,8 +4,11 @@ ADR-0211 §1.3 / §0.2 命题 5 强约束的函数体视角。
 
 W-7: Worker.execute 不写 try/except(framework 收错误)
 W-8: Worker.execute 不折 receipt / EXCEPTION
-W-9: register_worker / Seams / body_provider.get_body 三件不出现
+W-9: register_worker / Seams 两件不出现
 W-10: Worker.execute 不写 if x is None / getattr 兜底
+
+``body_provider`` / ``get_body`` 三件退役已在 PR-E 落地(act.compose 接管 lab.body
+capability 与 SimpleBody 装配),这两个名字从退役清单移除。
 
 实现策略:
     ast.parse(src) 后 walk AST;不报 false-positive 是优先级 —— 默认拒绝
@@ -15,17 +18,14 @@ W-10: Worker.execute 不写 if x is None / getattr 兜底
 from __future__ import annotations
 
 import ast
-from typing import Iterable
 
 from lca.plugins.lab.internal.audit.errors import WorkerAuditError
 
-
-# W-9: framework 退役符号(ADR-0211 §1.4)与 import 路径
+# W-9: framework 退役符号(ADR-0211 §1.4)
+# ``body_provider`` / ``get_body`` PR-E 落地后已并入 act.compose,不再禁。
 _FORBIDDEN_NAMES: frozenset[str] = frozenset({
     "register_worker",
     "Seams",
-    "body_provider",
-    "get_body",
 })
 
 

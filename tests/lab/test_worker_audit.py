@@ -7,41 +7,41 @@ Verifies the load-time audit pipeline:
 - audit_worker() aggregates errors without raising
 - load_all() with LCA_WORKER_AUDIT_MODE=raise fails loud on audit failures
 
-Each test creates a temporary module under lca.plugins.lab.<stage>.<basename>/plugin.py
-so it can be discovered by the loader, then runs the audit pipeline.
+Each scratch module is written to a real file under a tmp_path so
+``inspect.getsource`` works and locations can be reported.
 """
 from __future__ import annotations
 
-import os
 import sys
 import textwrap
+import uuid
 from pathlib import Path
 
 import pytest
 
-
-# All test plugins live under this scratch directory so they don't pollute
-# the real plugin tree. We use sys.modules caching + a runtime-loaded module
-# object instead of writing to disk to keep the test hermetic.
-SCRATCH_MODULES: dict[str, object] = {}
+# Track every scratch dir we create so teardown can clean sys.modules / sys.path.
+_SCRATCH_DIRS: list[Path] = []
 
 
-def _make_worker_module(name: str, source: str) -> str:
-    """Compile ``source`` as a fake module and register it under ``name``.
+def _make_worker_module(tmp_path: Path, source: str) -> str:
+    """Write ``source`` to a real file under tmp_path and import it.
 
-    Returns the module path so audit_worker / discover_worker can resolve it.
-    The fake module lives in sys.modules and is introspectable via
-    inspect.signature / inspect.getsource.
+    Returns the dotted module path. Uses a uuid suffix so re-runs in the
+    same session don't collide on sys.modules caching.
     """
-    import types
+    suffix = uuid.uuid4().hex[:8]
+    pkg_root = tmp_path / f"scratch_{suffix}"
+    pkg_root.mkdir(parents=True)
+    (pkg_root / "__init__.py").write_text("")
+    plugin_file = pkg_root / "plugin.py"
+    plugin_file.write_text(textwrap.dedent(source).lstrip())
+    name = f"scratch_{suffix}.plugin"
+    sys.path.insert(0, str(tmp_path))
+    _SCRATCH_DIRS.append(tmp_path)
+    import importlib
 
-    code = textwrap.dedent(source).lstrip()
-    module = types.ModuleType(name)
-    module.__file__ = f"<test:{name}>"
-    exec(compile(code, module.__file__, "exec"), module.__dict__)
-    sys.modules[name] = module
-    SCRATCH_MODULES[name] = module
-    return name
+    mod = importlib.import_module(name)
+    return name, mod, plugin_file
 
 
 # ---------------------------------------------------------------------------
@@ -50,9 +50,9 @@ def _make_worker_module(name: str, source: str) -> str:
 
 
 def test_w1_keyword_only_violation():
-    from lca.plugins.lab.internal.audit import audit_worker
-    from lca.plugins.lab.internal.audit.signature_rules import run as sig_run
     import inspect
+
+    from lca.plugins.lab.internal.audit.signature_rules import run as sig_run
 
     def f(decision: int) -> int:  # not keyword-only
         return decision
@@ -63,8 +63,9 @@ def test_w1_keyword_only_violation():
 
 
 def test_w2_untyped_input():
-    from lca.plugins.lab.internal.audit.signature_rules import run as sig_run
     import inspect
+
+    from lca.plugins.lab.internal.audit.signature_rules import run as sig_run
 
     def f(*, x):  # no annotation
         return x
@@ -75,23 +76,22 @@ def test_w2_untyped_input():
 
 
 def test_w2_dict_input_forbidden():
-    from lca.plugins.lab.internal.audit.signature_rules import run as sig_run
     import inspect
+
+    from lca.plugins.lab.internal.audit.signature_rules import run as sig_run
 
     def f(*, x: dict) -> int:
         return 0
 
     sig = inspect.signature(f)
     errs = sig_run(sig, "<test:f>")
-    print("DEBUG x.annotation:", sig.parameters["x"].annotation, repr(sig.parameters["x"].annotation))
-    print("DEBUG is dict:", sig.parameters["x"].annotation is dict)
-    print("DEBUG errs:", errs)
     assert any(e.rule_id == "W-2" for e in errs), [str(e) for e in errs]
 
 
 def test_w3_forbidden_framework_params():
-    from lca.plugins.lab.internal.audit.signature_rules import run as sig_run
     import inspect
+
+    from lca.plugins.lab.internal.audit.signature_rules import run as sig_run
 
     def f(*, ctx, decision: int):
         return decision
@@ -102,8 +102,9 @@ def test_w3_forbidden_framework_params():
 
 
 def test_w5_untyped_return():
-    from lca.plugins.lab.internal.audit.signature_rules import run as sig_run
     import inspect
+
+    from lca.plugins.lab.internal.audit.signature_rules import run as sig_run
 
     def f(*, x: int):  # no return annotation
         return x
@@ -193,7 +194,7 @@ def test_w10_no_getattr_default():
 # ---------------------------------------------------------------------------
 
 
-def test_audit_worker_clean():
+def test_audit_worker_clean(tmp_path):
     """干净 worker (no audit errors) returns empty list."""
     from lca.plugins.lab.internal.audit import audit_worker
 
@@ -209,14 +210,13 @@ def test_audit_worker_clean():
             return Out(v=x + 1)
         """
     )
-    name = _make_worker_module("lca.plugins.lab._audit_test.clean", src)
-    # audit_worker needs a worker_fn to introspect — find it
-    fn = sys.modules[name].f
+    name, mod, _ = _make_worker_module(tmp_path, src)
+    fn = mod.f
     errs = audit_worker(name, fn)
     assert errs == [], f"clean worker should have no audit errors, got: {errs}"
 
 
-def test_audit_worker_aggregates_multiple_violations():
+def test_audit_worker_aggregates_multiple_violations(tmp_path):
     """A bad worker accumulates all violations."""
     from lca.plugins.lab.internal.audit import audit_worker
 
@@ -231,8 +231,8 @@ def test_audit_worker_aggregates_multiple_violations():
                 return register_worker("x", cls=None)
         """
     )
-    name = _make_worker_module("lca.plugins.lab._audit_test.bad", src)
-    fn = sys.modules[name].f
+    name, mod, _ = _make_worker_module(tmp_path, src)
+    fn = mod.f
     errs = audit_worker(name, fn)
     rule_ids = {e.rule_id for e in errs}
     assert "W-2" in rule_ids
@@ -250,16 +250,21 @@ def test_audit_worker_aggregates_multiple_violations():
 def test_loader_audit_mode_raise_fails_loud(monkeypatch, tmp_path):
     """LCA_WORKER_AUDIT_MODE=raise → load_all() raises on audit failure.
 
-    Writes a real (bad) worker plugin into tmp_path, then dynamically adds
-    tmp_path to the loader's _HOOK_PACKAGES so load_all() picks it up.
+    Builds a fake ``lca.plugins.lab._audit_raise`` namespace under tmp_path
+    with a worker that violates W-2 / W-7 / W-9 / W-10, then monkeypatches
+    the loader's _HOOK_PACKAGES to include it and forces a re-load.
     """
     from lca.plugins.lab.internal import loader as loader_mod
 
-    bad_plugin_dir = tmp_path / "lca" / "plugins" / "lab" / "_audit_raise" / "plugin"
-    bad_plugin_dir.mkdir(parents=True)
-    (tmp_path / "lca" / "plugins" / "lab" / "_audit_raise" / "__init__.py").write_text("")
-    (tmp_path / "lca" / "plugins" / "lab" / "_audit_raise" / "plugin" / "__init__.py").write_text("")
-    (bad_plugin_dir / "plugin.py").write_text(
+    # Build a real Python package tree mirroring lca.plugins.lab._audit_raise
+    base = tmp_path / "lca" / "plugins" / "lab" / "_audit_raise"
+    (base / "plugin").mkdir(parents=True)
+    (tmp_path / "lca" / "__init__.py").write_text("")
+    (tmp_path / "lca" / "plugins" / "__init__.py").write_text("")
+    (tmp_path / "lca" / "plugins" / "lab" / "__init__.py").write_text("")
+    (base / "__init__.py").write_text("")
+    (base / "plugin" / "__init__.py").write_text("")
+    (base / "plugin" / "plugin.py").write_text(
         textwrap.dedent(
             '''
             """test worker.
@@ -276,14 +281,27 @@ def test_loader_audit_mode_raise_fails_loud(monkeypatch, tmp_path):
                         return {}
                     return x
                 except Exception:
-                    return x
+                    return register_worker("x", cls=None)
             '''
         )
     )
 
-    monkeypatch.setitem(sys.path, 0, str(tmp_path))
+    sys.path.insert(0, str(tmp_path))
+    # 显式 import 临时 plugin 模块并塞进 sys.modules,绕过 namespace package
+    # 路径解析(真 lca.plugins.lab 已是 implicit namespace package)。
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "lca.plugins.lab._audit_raise.plugin",
+        tmp_path / "lca" / "plugins" / "lab" / "_audit_raise" / "plugin" / "plugin.py",
+    )
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["lca.plugins.lab._audit_raise.plugin"] = mod
+    spec.loader.exec_module(mod)
     monkeypatch.setattr(
-        loader_mod, "_HOOK_PACKAGES", loader_mod._HOOK_PACKAGES + ("lca.plugins.lab._audit_raise.plugin",)
+        loader_mod,
+        "_HOOK_PACKAGES",
+        loader_mod._HOOK_PACKAGES + ("lca.plugins.lab._audit_raise.plugin",),
     )
     monkeypatch.setattr(loader_mod, "_LOADED", False)
     monkeypatch.setenv("LCA_WORKER_AUDIT_MODE", "raise")

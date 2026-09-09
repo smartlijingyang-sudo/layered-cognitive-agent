@@ -38,11 +38,13 @@ def _resolve_location(worker_fn: Any, module_path: str) -> str:
         _, lineno = inspect.getsourcelines(worker_fn)
     except (OSError, TypeError):
         return module_path
-    if src_file:
+    # 拒绝非真实文件路径(虚拟 module、REPL、test scratch module):
+    # 这些通常以 ``<`` 开头,不参与 relative_to。
+    if src_file and not src_file.startswith("<"):
         try:
             rel = Path(src_file).resolve().relative_to(Path.cwd())
             return f"{rel}:{lineno}"
-        except ValueError:
+        except (ValueError, OSError):
             return f"{src_file}:{lineno}"
     return module_path
 

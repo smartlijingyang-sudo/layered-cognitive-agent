@@ -175,7 +175,6 @@ __all__ = [
 # needs and re-export it under the lab plugin tree.
 # ---------------------------------------------------------------------------
 
-from typing import Any, Callable
 
 
 @dataclass(frozen=True)
@@ -559,7 +558,7 @@ def bind_carrier(carrier: LabCarrier, *, ctx: Any = None, config: Any = None) ->
     _LAB_HOOKS[carrier.id] = marker
     # ADR-0211 §6 §1:``bind_factory_aliases`` / ``_WORKERS`` 退役;
     # alias 解析由 hooks.py 自己的 _ALIASES 承担,不动 worker.py。
-    _ALIASES[carrier.id] = aliases  # noqa: F821 (defined in this module above)
+    _ALIASES[carrier.id] = aliases
 
 
 __all__ += ["LabCarrier", "bind_carrier"]
@@ -592,10 +591,10 @@ class GraphPlugin:
 
     name: str
     kind: str
-    binds: tuple["Bind", ...] = ()
+    binds: tuple[Bind, ...] = ()
     config: dict[str, Any] = field(default_factory=dict)
 
-    def matches(self, event: "HookEvent", ctx: "HookContext") -> bool:
+    def matches(self, event: HookEvent, ctx: HookContext) -> bool:
         if not self.binds:
             return True
         for bind in self.binds:
@@ -605,7 +604,7 @@ class GraphPlugin:
                 return False
         return True
 
-    def dispatch(self, ctx: "HookContext") -> "HookContext":
+    def dispatch(self, ctx: HookContext) -> HookContext:
         if not self.matches(ctx.event, ctx):
             return ctx
         method = getattr(self, ctx.event.value, None)
@@ -625,16 +624,16 @@ class GraphPlugin:
         return spec
 
     # Default hook methods (no-op). Override in subclasses.
-    def on_decision(self, ctx: "HookContext") -> "HookContext":
+    def on_decision(self, ctx: HookContext) -> HookContext:
         return ctx
 
-    def on_observation(self, ctx: "HookContext") -> "HookContext":
+    def on_observation(self, ctx: HookContext) -> HookContext:
         return ctx
 
-    def on_reflection(self, ctx: "HookContext") -> "HookContext":
+    def on_reflection(self, ctx: HookContext) -> HookContext:
         return ctx
 
-    def on_event(self, ctx: "HookContext") -> "HookContext":
+    def on_event(self, ctx: HookContext) -> HookContext:
         return ctx
 
 
