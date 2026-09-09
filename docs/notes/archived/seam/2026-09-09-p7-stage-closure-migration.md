@@ -1,6 +1,7 @@
 # Agent Note: P7 阶段闭集迁移落地状态
 
 Status: implemented (ADR-0210 升 Accepted 2026-09-09；§6.1-§6.6 全部段实施完成；production path 验证)
+Archived: 2026-09-09
 
 ## Problem
 
