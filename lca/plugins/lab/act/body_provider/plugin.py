@@ -1,21 +1,20 @@
-# PR-D final cleanup — self-contained body provider (no agent_lab dependency)
-"""lab.body provider — composes SimpleBody + PipelineSafeExecutor + Transport
-for the act phase.
+"""lab.body provider — composes SimpleBody + PipelineSafeExecutor + Transport for the act phase.
 
-Replaces the deleted agent_lab.nodes.act.execute.body helper. Uses
-the LCA SimpleBody / PipelineSafeExecutor / LabToolRegistry / action
-authority plugins directly.
+唯一真源是 ``get_body()`` / ``plan_ref_default()`` 两个函数。
+``act.execute`` 直接 ``from lca.plugins.lab.act.body_provider import get_body``
+拿到 SimpleBody 句柄 —— 派发路径是直接的 Python import,既不需要
+loader_marker 也不需要 cordis ctx 桥接。
 
-delete-when (PR-D final acceptance):
-- This provider is the unique composition entry for the act phase.
-  When the LCA production path (lca.plugins.composer.act.body_provider)
-  absorbs the lab-specific tool registry / transport wiring, this
-  module is the merge target.
+composition 步骤:
+    1. ``lab.tool_registry`` → SimpleToolRegistry
+    2. ``PipelineSafeExecutor(ToolPermissionManifest(allowed))``
+    3. ``lab.transport`` → InternalTransport
+    4. ``build_action_registry_from_authority(...)``
+    5. ``SimpleBody(tool_registry, safe_executor, transport, action_registry)``
 """
 
 from __future__ import annotations
 
-from lca.plugins.lab.internal.loader import _LAB_HOOKS
 from lca.plugins.lab.session.provider.plugin import PLAN_REF
 
 
@@ -35,10 +34,7 @@ def get_body(allowed_tools=None):
     from lca.cognition.body.executor.pipeline_safe_executor import PipelineSafeExecutor
     from lca.cognition.body.executor.simple_body import SimpleBody
     from lca.cognition.body.tools.tool_registry import SimpleToolRegistry
-    from lca.contracts.models.core.policy.budget import Budget
-    from lca.contracts.models.core.state.state import AgentState
     from lca.contracts.models.team.role.team import ToolPermissionManifest
-    from lca.infrastructure.transport.agent_transport import InternalTransport
     from lca.plugins.composer.act.action_authority import build_action_registry_from_authority
     from lca.plugins.composer.act.body_provider import DefaultActionHandlerRegistry
 
@@ -89,6 +85,3 @@ def plan_ref_default() -> str:
 
 
 __all__ = ["get_body", "plan_ref_default"]
-
-# Register loader marker for the capability closure.
-_LAB_HOOKS["lab.act.body_provider"] = {"id": "body_provider", "stage": "composition"}

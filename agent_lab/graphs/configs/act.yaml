@@ -46,9 +46,11 @@ graph:
 nodes:
 
   # ----- shape: Decision → Intent | no_effect --------------------------------
+  # factory uses the plugin id (lab.act.shape); the short id ``act.shape`` is
+  # resolved by the carrier's alias binding (see lca.plugins.lab.act.shape.plugin).
   - id: shape
     region: phase:act
-    factory: act.shape
+    factory: lab.act.shape
     config: { from: decision, to: intent }
     ins: [decision]
     outs: [intent]
@@ -56,7 +58,7 @@ nodes:
   # ----- authorize: Intent → stamped Intent (allow|deny|skip) ----------------
   - id: authorize
     region: phase:act
-    factory: act.authorize
+    factory: lab.act.authorize
     config:
       allow: [bash, file_write, read_file]
       from: intent
@@ -70,7 +72,7 @@ nodes:
   # skip (demo short-circuit), which would bypass SafeExecutor entirely.
   - id: execute
     region: phase:act
-    factory: act.execute
+    factory: lab.act.execute
     config:
       from: authorized
       to: receipt
@@ -81,7 +83,7 @@ nodes:
   # ----- observe: Receipt|EXCEPTION → Observation (single exit) --------------
   - id: observe
     region: phase:act
-    factory: act.observe
+    factory: lab.act.observe
     config: { from: receipt, to: observation }
     ins: [receipt]
     outs: [observation]

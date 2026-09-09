@@ -1,42 +1,85 @@
-"""act.dispatch — LabCarrier stub (PR-D).
+"""act.dispatch — Intent verdict → route port (body | denied | none).
 
-Minimal real carrier: declares identity for the loader and exposes a
-Worker subclass with the live execute() body. Real node logic lives in
-the Worker; the LabCarrier binds slot id + aliases for loader + invoke.
+Cordis 终态: 唯一真源是 ``@plugin`` 装饰器 + ``class _ActDispatch(Worker)``。
+verdict 维度: ``allow`` → to_body;``deny`` → to_denied;其它 → to_none。
 """
 
 from __future__ import annotations
 
-from lca.plugins.lab.internal.hooks import LabCarrier, bind_carrier
-from lca.plugins.lab.internal.worker import Worker, register_worker
-from agent_lab.primitives.artifact import Artifact, ArtifactKind
+from pydantic import BaseModel
 
-_CARRIER = LabCarrier(
-    id="lab.act.dispatch",
-    stage="act",
-    kind="EXECUTOR",
-    description="act.dispatch worker (PR-D stub carrier + worker).",
-    node_id="dispatch",
-    source_module="lca.plugins.lab.act.dispatch.plugin",
-    source_class="_ActDispatch",
-    provides=[],
-    requires=[],
-    emits=[],
-    inputs=[],
-    outputs=[],
-    out_capabilities=[],
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
 )
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.plugins.lab.internal.worker import Worker, register_worker
 
 
-def setup(ctx, config):
-    bind_carrier(_CARRIER, ctx=ctx, config=config)
+class Config(BaseModel):
+    model_config = {"extra": "forbid"}
 
 
-bind_carrier(_CARRIER)
+@plugin(
+    id="lab.act.dispatch",
+    provides=[
+        "lab.act.dispatch.out:to_body",
+        "lab.act.dispatch.out:to_denied",
+        "lab.act.dispatch.out:to_none",
+    ],
+    requires=["lab.act.authorize.out:authorized"],
+    layer="L4",
+    effects="none",
+    description="act.dispatch — route Intent by verdict (body | denied | none).",
+    kind=PluginKind.PRIMITIVE,
+    functional_group=FunctionalGroup.G7_EXECUTION,
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G7_EXECUTION,
+            control_slots=(ControlSlot.OBSERVE_WILDCARD,),
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(
+            grants=(
+                "lab.act.dispatch.out:to_body",
+                "lab.act.dispatch.out:to_denied",
+                "lab.act.dispatch.out:to_none",
+            )
+        ),
+        observability=EvidenceContract(
+            descriptors=("lab.act.dispatch.completed",),
+        ),
+    ),
+    ownership=OwnershipDeclaration(
+        reads=("lab.act.authorize.out:authorized",),
+        emits=(
+            "lab.act.dispatch.out:to_body",
+            "lab.act.dispatch.out:to_denied",
+            "lab.act.dispatch.out:to_none",
+        ),
+        state_mutation="forbidden",
+    ),
+)
+async def setup(ctx: PluginContext, config: Config) -> None:
+    """Register the Worker on the cordis context as the canonical carrier."""
+    register_worker("act.dispatch", _ActDispatch)
+    register_worker("lab.act.dispatch", _ActDispatch)
 
 
 class _ActDispatch(Worker):
-    factory = "act.dispatch"
+    factory = "lab.act.dispatch"
+
     def execute(self, node, inputs, seams=None):
         src = node.config.get("from", "authorized")
         intent = inputs.get(src)
