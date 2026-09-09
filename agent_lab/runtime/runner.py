@@ -194,12 +194,10 @@ class _Runner:
         return frozen
 
     def run(self) -> dict[str, Artifact]:
-        # Seed: copy initial artifacts into per-node store for any node whose IN port
-        # matches an initial key.
-        for node in self.spec.nodes:
-            for port_id in node.ins:
-                if port_id in self.initial:
-                    self.store[(node.id, port_id)] = self.initial[port_id]
+        # Seed: 把 initial 写到 _initial 命名空间,而不是 (node.id, port_id) —
+        # 这样多个 node 有同名 IN port 时不会互相覆盖。
+        for port_id, art in self.initial.items():
+            self.store[("_initial", port_id)] = art
 
         for layer in self.bundle.layers:
             for node_id in layer:
@@ -238,6 +236,13 @@ class _Runner:
         inputs: dict[str, Artifact] = {
             port_id: self.store.get((node_id, port_id), empty) for port_id in node.ins
         }
+        # If missing in store,fallback to _initial namespace (for nodes whose IN
+        # ports come from graph initial dict,not from upstream edges).
+        for port_id in node.ins:
+            if inputs.get(port_id) is empty:
+                init_art = self.store.get(("_initial", port_id))
+                if init_art is not None:
+                    inputs[port_id] = init_art
 
         # Sub-spec link handling: enter nested sub-graph BEFORE invoking the
         # node factory. Stub identity nodes host a sub-spec call; their factory

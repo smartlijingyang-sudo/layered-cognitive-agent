@@ -250,8 +250,260 @@ def lookup_alias(alias: str) -> str | None:
     return None
 
 
-# 保留旧函数名以兼容 agent_lab.runtime.invoke 引用;
-# ADR-0211 §6 §1 完整退役时一并改名 / 删除。
+# ---------------------------------------------------------------------------
+# ADR-0211 §7:Worker 自动反射 — worker 文件零 framework 知识
+#
+# 反射规则(只对 ``lca.plugins.lab.act.*`` 生效,本 PR 范围):
+#   id          = ``lab.act.<basename>``
+#   stage       = 固定 ``"act"``
+#   kind        = 模块 docstring 解析 ``kind: TRANSFORMER|EXECUTOR|PROVIDER``
+#                 默认 ``TRANSFORMER``
+#   node_id     = 模块 basename
+#   description = 模块 docstring 第一段(非空行)
+#   source_class= basename + "Worker"
+#   requires    = ``inspect.signature(worker_fn)`` 的 keyword-only 参数名
+#   provides    = ``["lab.act.<basename>.out:<out_port>"]``
+#   emits       = 同 provides
+#   inputs      = ``[(参数名, type 名, True), ...]``
+#   outputs     = ``[(out_port, return_type_name)]``
+#   out_capabilities = 同 provides
+#
+# Worker 函数识别:模块里第一个**非 dataclass / 非 typing 派生**的顶层函数。
+# ---------------------------------------------------------------------------
+
+import importlib as _importlib
+import inspect as _inspect
+
+
+def _resolve_worker_fn(module: Any) -> Any:
+    """从模块里挑出 worker 主函数。
+
+    规则:
+    1. 只看模块**本文件定义**的函数(`module.__dict__` 而非 ``dir(module)``);
+       这样不会拿到 ``from .ops import ...`` 引入的同名 helper。
+    2. 取本文件定义的第一个 keyword-only def。
+    3. 跳过 ``setup`` / ``bind_carrier`` / 任何 ``_*`` 私有 helper。
+    """
+    SKIP = {"setup", "bind_carrier", "register_worker"}
+    candidates: list[Any] = []
+    for name, obj in module.__dict__.items():
+        if name.startswith("_") or name in SKIP:
+            continue
+        if not callable(obj):
+            continue
+        if not _inspect.isfunction(obj):
+            continue
+        # 必须在本模块定义,非 import
+        if getattr(obj, "__module__", None) != module.__name__:
+            continue
+        sig = _inspect.signature(obj)
+        if not any(
+            p.kind is _inspect.Parameter.KEYWORD_ONLY
+            for p in sig.parameters.values()
+        ):
+            continue
+        candidates.append(obj)
+    if not candidates:
+        raise WorkerDiscoveryError(
+            f"{module.__name__}: no keyword-only function defined in this module; "
+            "worker must define `def name(*, ...)` directly in plugin.py"
+        )
+    if len(candidates) > 1:
+        # 多于一个:取名字跟 basename 一致的;否则取第一个 + WARNING 注释。
+        basename = module.__name__.split(".")[-1]
+        for c in candidates:
+            if c.__name__ == basename:
+                return c
+        return candidates[0]
+    return candidates[0]
+
+
+class WorkerDiscoveryError(Exception):
+    """Worker 自动反射失败。worker 文件应符合 §7 反射规则。"""
+
+
+def _type_name(annotation: Any) -> str:
+    """annotation → 简短类型名(用于 marker 的 inputs/outputs kind)。
+
+    ``Artifact | None`` → ``artifact``(unwrap Optional);``list[X]`` → ``list``;
+    ``dict[K, V]`` → ``dict``。短路返回简化 marker 可读性。
+    """
+    import types as _types
+
+    if annotation is _inspect.Parameter.empty or annotation is _inspect.Signature.empty:
+        return "any"
+    # PEP 604 ``X | Y`` 形式
+    if isinstance(annotation, _types.UnionType):
+        non_none = [a for a in annotation.__args__ if a is not type(None)]
+        if non_none:
+            return _type_name(non_none[0])
+        return "any"
+    # typing.Union[X, Y, ...] 形式
+    origin = getattr(annotation, "__origin__", None)
+    args = getattr(annotation, "__args__", None)
+    if origin is not None and args is not None:
+        non_none = [a for a in args if a is not type(None)]
+        if non_none:
+            return _type_name(non_none[0])
+        return "any"
+    name = getattr(annotation, "__name__", None)
+    if name is not None:
+        return name.lower()
+    return str(annotation).lower()
+
+
+def _parse_in_mapping(spec: str) -> dict[str, str]:
+    """解析 ``in:`` 行 → ``{param_name: port_name}`` 映射。
+
+    例 ``sensors=sensors_artifact state=state_artifact`` →
+    ``{"sensors_artifact": "sensors", "state_artifact": "state"}``。
+    解析失败时返回空 dict(让 fallback 用参数名作为 port)。
+    """
+    if not spec:
+        return {}
+    out: dict[str, str] = {}
+    for tok in spec.split():
+        if "=" not in tok:
+            continue
+        port, _, param = tok.partition("=")
+        port = port.strip()
+        param = param.strip()
+        if port and param:
+            out[param] = port
+    return out
+
+
+def _parse_config_params(spec: str) -> set[str]:
+    """解析 ``config:`` 行 → ``{param_name}`` 集合。
+
+    例 ``max_chars processor_config`` → ``{"max_chars", "processor_config"}``。
+    config 参数**不**进 marker.requires(它们是 graph spec ``node.config``
+    静态字段,不是上游 capability key)。
+    """
+    if not spec:
+        return set()
+    return {tok.strip() for tok in spec.split() if tok.strip()}
+
+
+def _parse_docstring_meta(doc: str | None) -> dict[str, str]:
+    """从模块 docstring 解析 ``key: value`` 行(只取顶层 meta 行)。"""
+    if not doc:
+        return {}
+    meta: dict[str, str] = {}
+    for line in doc.splitlines():
+        s = line.strip()
+        if not s or ":" not in s:
+            continue
+        if s.startswith(("---", "===")):
+            continue
+        k, _, v = s.partition(":")
+        meta[k.strip().lower()] = v.strip()
+    return meta
+
+
+def discover_worker(module_path: str) -> tuple[LabCarrier, Any, tuple[str, ...]]:
+    """反射一个 stage worker 模块,返回 ``(LabCarrier, worker_fn, config_params)``。
+
+    worker 文件**零 framework 知识**;所有元数据由本函数从代码 + docstring 派生。
+    stage 由 module_path 推导(perceive / think / act / reflect / remember / ...)。
+    """
+    module = _importlib.import_module(module_path)
+    worker_fn = _resolve_worker_fn(module)
+    sig = _inspect.signature(worker_fn)
+
+    # 派生 id / stage / node_id
+    # module_path 形式: ``lca.plugins.lab.<stage>.<basename>[.plugin]``
+    parts = module_path.split(".")
+    basename = parts[-2] if parts[-1] == "plugin" else parts[-1]
+    # stage: ``lca.plugins.lab.<stage>...`` → parts[3]
+    if len(parts) >= 4 and parts[1] == "plugins" and parts[2] == "lab":
+        stage = parts[3]
+    else:
+        stage = "unknown"
+    cid = f"lab.{stage}.{basename}"
+    node_id = basename
+
+    # 派生 kind / description 从 docstring
+    meta = _parse_docstring_meta(module.__doc__)
+    kind = meta.get("kind", "TRANSFORMER").upper()
+    description = meta.get("description") or (
+        module.__doc__.splitlines()[0].strip() if module.__doc__ else cid
+    )
+
+    # 派生 requires / inputs from signature + docstring ``in:`` 端口映射
+    # + ``config:`` 静态 config 参数(不进 requires,只走 inputs)
+    #
+    # docstring 形如:
+    #   in: <port_name>=<param_name> [<port_name>=<param_name> ...]
+    #   config: <param_name> [<param_name> ...]
+    # 例如:
+    #   in: sensors=sensors_artifact state=state_artifact
+    #   config: max_chars
+    # config 参数从 graph spec 的 ``node.config`` 字段读,**不**进 ``requires``(不进
+    # requires 表示它不是上游产物的 capability key),但仍出现在 ``inputs`` 用于校验。
+    # 若 docstring 没有 ``in:`` 行,fallback 用参数名作为 port 名。
+    in_mapping = _parse_in_mapping(meta.get("in", ""))
+    config_params = _parse_config_params(meta.get("config", ""))
+    requires: list[str] = []
+    inputs: list[tuple[str, str, bool]] = []
+    for pname, param in sig.parameters.items():
+        if param.kind is _inspect.Parameter.KEYWORD_ONLY:
+            port_name = in_mapping.get(pname, pname)
+            if pname not in config_params:
+                requires.append(port_name)
+            inputs.append((port_name, _type_name(param.annotation), True))
+
+    # 派生 provides / outputs from return annotation
+    out_port = meta.get("out_port", "out")
+    out_type = _type_name(sig.return_annotation)
+    provides = (f"{cid}.out:{out_port}",)
+    outputs = ((out_port, out_type),)
+
+    carrier = LabCarrier(
+        id=cid,
+        stage=stage,
+        kind=kind,
+        description=description,
+        node_id=node_id,
+        source_module=module_path,
+        source_class=f"{node_id}Worker",
+        provides=provides,
+        requires=tuple(requires),
+        emits=provides,
+        inputs=tuple(inputs),
+        outputs=outputs,
+        out_capabilities=provides,
+    )
+    return carrier, worker_fn, tuple(sorted(config_params))
+
+
+def bind_worker(module_path: str, *, ctx: Any = None, config: Any = None) -> None:
+    """反射一个 stage worker 模块并 bind_carrier(框架入口,worker 文件不调)。
+
+    替代 worker 文件里手写的 ``_CARRIER = LabCarrier(...)`` + ``bind_carrier(_CARRIER)``。
+    stage 由 module_path 推导(perceive / think / act / reflect / remember)。
+    把 worker_fn + config_params + port_to_param 一起写入 marker;invoke 调
+    ``marker["worker_fn"](**mapped_inputs)``。
+    """
+    carrier, worker_fn, config_params = discover_worker(module_path)
+    bind_carrier(carrier, ctx=ctx, config=config)
+    from lca.plugins.lab.internal.loader import _LAB_HOOKS
+
+    marker = _LAB_HOOKS[carrier.id]
+    marker["worker_fn"] = worker_fn
+    marker["config_params"] = list(config_params)
+    # ADR-0211 §7:存 port→param 映射,invoke 用它把 inputs(port 名) 重写为
+    # worker_fn 的 keyword-only 参数名。
+    module = _importlib.import_module(module_path)
+    meta = _parse_docstring_meta(module.__doc__ or "")
+    in_mapping = _parse_in_mapping(meta.get("in", ""))
+    # in_mapping: {param_name: port_name} → 反转成 {port_name: param_name}
+    marker["port_to_param"] = {port: param for param, port in in_mapping.items()}
+
+
+# 旧名 alias —— 保留以兼容 PR-D final 2/2 期间可能残留的引用。
+discover_act_worker = discover_worker
+bind_act_worker = bind_worker
 
 
 def bind_carrier(carrier: LabCarrier, *, ctx: Any = None, config: Any = None) -> None:

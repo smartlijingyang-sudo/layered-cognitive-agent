@@ -1,77 +1,34 @@
-# PR-D final 2/2 — reflect.join real @plugin carrier
-"""Real carrier for ``agent_lab.nodes.reflect.join.plugin.ReflectJoin``.
+"""reflect.join — Merge all inputs into one combined artifact.
 
-Mirrors the LCA ``@plugin`` decorator contract (id / provides / requires /
-emits / effects / contract / setup) without importing ``cordis`` at module
-top. The actual ``ReflectJoin`` class is imported lazily inside ``setup()`` so the
-cordis chain (which the legacy class transitively pulls in) is only
-triggered when the carrier is actually registered with a live Cordis
-Context, not when the loader walks plugin modules.
-
-Slot id: ``lab.reflect.join``
-Output capability: ``lab.reflect.join.out:reflection``
-
-delete-when (PR-D final 2/2):
-- agent_lab/nodes/reflect/join/plugin.py replaced by this carrier
-  (test env: delete-when happens when LCA runtime with cordis
-  is in place and the legacy plugin can be removed)
+worker: join(*, in_observation, in_decision, in_prior_reflection) -> combined
+kind: TRANSFORMER
+out_port: combined
 """
-
-from __future__ import annotations
-
-from lca.plugins.lab.internal.hooks import (
-    LabCarrier,
-    bind_carrier,
-)
-
-
-# Carrier data: what the loader's register_carrier() needs.
-_CARRIER = LabCarrier(
-    id="lab.reflect.join",
-    stage="reflect",
-    kind="PRODUCER",
-    description='Join critique + lesson into a reflection artifact.',
-    node_id='join',
-    source_module='agent_lab.nodes.reflect.join.plugin',
-    source_class='ReflectJoin',
-    provides=['reflect_artifact'],
-    requires=[],
-    emits=['reflect_artifact'],
-    inputs=[('critique', 'FACT', False), ('lesson', 'FACT', False)],
-    outputs=[('reflection', 'FACT')],
-    out_capabilities=['lab.reflect.join.out:reflection'],
-)
-
-
-def setup(ctx, config):
-    """Register the carrier with the loader on plugin boot."""
-    bind_carrier(_CARRIER, ctx=ctx, config=config)
-
-
-# Auto-bind on import so the loader walks these like any other plugin
-# carrier — the setup() function is still callable from a real Cordis
-# boot path for two-phase register.
-bind_carrier(_CARRIER)
-
-
-__all__ = ["setup", "_CARRIER"]
-
-# --- PR-D worker execute -----------------------------------------------
-from lca.plugins.lab.internal.worker import Worker, register_worker
 from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
-class _Reflect_Join(Worker):
-    factory = "reflect.join"
 
-    def execute(self, node, inputs, seams=None):
-        cfg = getattr(node, "config", None) or {}
-        outs = getattr(node, "outs", None) or []
-        out = (outs[0] if outs else None) or cfg.get("to", "combined")
-        merged = {}
-        for port_name, artifact in inputs.items():
-            content = artifact.content if artifact is not None else None
-            merged[port_name] = content if isinstance(content, dict) else {"_raw": content}
-        return {out: Artifact(kind=ArtifactKind.FACT, content=merged, schema_ref="reflect.combined.v1")}
+def join(
+    *,
+    in_observation: Artifact | None,
+    in_decision: Artifact | None,
+    in_prior_reflection: Artifact | None,
+) -> dict[str, Artifact]:
+    """把所有输入 artifact 的 content 合并成一个 combined。"""
+    merged: dict[str, object] = {}
+    for port_name, artifact in {
+        "in_observation": in_observation,
+        "in_decision": in_decision,
+        "in_prior_reflection": in_prior_reflection,
+    }.items():
+        content = artifact.content if artifact is not None else None
+        merged[port_name] = content if isinstance(content, dict) else {"_raw": content}
+    return {
+        "combined": Artifact(
+            kind=ArtifactKind.FACT,
+            content=merged,
+            schema_ref="reflect.combined.v1",
+        )
+    }
 
-register_worker("reflect.join", _Reflect_Join)
-register_worker("lab.reflect.join", _Reflect_Join)
+
+__all__ = ["join"]

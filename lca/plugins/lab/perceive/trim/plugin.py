@@ -1,78 +1,30 @@
-# PR-D final 2/2 — perceive.trim real @plugin carrier
-"""Real carrier for ``agent_lab.nodes.perceive.trim.plugin.PerceiveTrim``.
+"""perceive.trim — Concatenate Hub item streams + apply ContextBudgeter.trim.
 
-Mirrors the LCA ``@plugin`` decorator contract (id / provides / requires /
-emits / effects / contract / setup) without importing ``cordis`` at module
-top. The actual ``PerceiveTrim`` class is imported lazily inside ``setup()`` so the
-cordis chain (which the legacy class transitively pulls in) is only
-triggered when the carrier is actually registered with a live Cordis
-Context, not when the loader walks plugin modules.
-
-Slot id: ``lab.perceive.trim``
-Output capability: ``lab.perceive.trim.out:trimmed``
-
-delete-when (PR-D final 2/2):
-- agent_lab/nodes/perceive/trim/plugin.py replaced by this carrier
-  (test env: delete-when happens when LCA runtime with cordis
-  is in place and the legacy plugin can be removed)
+worker: trim(*, sensor_items, memory_items, policy_items, max_chars) -> trimmed_items
+kind: TRANSFORMER
+out_port: trimmed_items
+in: sensor_items=sensor_items memory_items=memory_items policy_items=policy_items
+config: max_chars
 """
+from agent_lab.primitives.artifact import Artifact
 
-from __future__ import annotations
-
-from lca.plugins.lab.internal.hooks import (
-    LabCarrier,
-    bind_carrier,
-)
-
-
-# Carrier data: what the loader's register_carrier() needs.
-_CARRIER = LabCarrier(
-    id="lab.perceive.trim",
-    stage="perceive",
-    kind="TRANSFORMER",
-    description='Trim + rank sensor items by relevance / budget.',
-    node_id='trim',
-    source_module='agent_lab.nodes.perceive.trim.plugin',
-    source_class='PerceiveTrim',
-    provides=['trimmed'],
-    requires=['sensor_items'],
-    emits=['trimmed'],
-    inputs=[('sensor_items', 'FACT', False), ('state', 'FACT', False)],
-    outputs=[('trimmed', 'FACT')],
-    out_capabilities=['lab.perceive.trim.out:trimmed'],
-)
-
-
-def setup(ctx, config):
-    """Register the carrier with the loader on plugin boot."""
-    bind_carrier(_CARRIER, ctx=ctx, config=config)
-
-
-# Auto-bind on import so the loader walks these like any other plugin
-# carrier — the setup() function is still callable from a real Cordis
-# boot path for two-phase register.
-bind_carrier(_CARRIER)
-
-
-__all__ = ["setup", "_CARRIER"]
-
-# --- PR-D worker execute -----------------------------------------------
-from lca.plugins.lab.internal.worker import Worker, register_worker
 from lca.plugins.lab.perceive.ops import trim_items
-from agent_lab.primitives.artifact import Artifact, ArtifactKind, make_text, make_message, make_exception
 
-class _PerceiveTrim(Worker):
-    factory = "perceive.trim"
 
-    def execute(self, node, inputs, seams=None):
-        cfg = getattr(node, "config", None) or {}
-        max_chars = cfg.get("max_chars")
-        return trim_items(
-            sensor_items=inputs.get("sensor_items"),
-            memory_items=inputs.get("memory_items"),
-            policy_items=inputs.get("policy_items"),
-            max_chars=int(max_chars) if max_chars is not None else None
-        )
+def trim(
+    *,
+    sensor_items: Artifact | None,
+    memory_items: Artifact | None,
+    policy_items: Artifact | None,
+    max_chars: int | None = None,
+) -> dict[str, Artifact]:
+    """Concatenate Hub item streams and apply ContextBudgeter.trim."""
+    return trim_items(
+        sensor_items=sensor_items,
+        memory_items=memory_items,
+        policy_items=policy_items,
+        max_chars=max_chars,
+    )
 
-register_worker("perceive.trim", _PerceiveTrim)
-register_worker("lab.perceive.trim", _PerceiveTrim)
+
+__all__ = ["trim"]

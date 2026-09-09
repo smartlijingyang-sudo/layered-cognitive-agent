@@ -1,72 +1,25 @@
-# PR-D final 2/2 — remember.snapshot real @plugin carrier
-"""Real carrier for ``agent_lab.nodes.remember.snapshot.plugin.RememberSnapshot``.
+"""remember.snapshot — StateStore.save + emit remember_signal.
 
-Mirrors the LCA ``@plugin`` decorator contract (id / provides / requires /
-emits / effects / contract / setup) without importing ``cordis`` at module
-top. The actual ``RememberSnapshot`` class is imported lazily inside ``setup()`` so the
-cordis chain (which the legacy class transitively pulls in) is only
-triggered when the carrier is actually registered with a live Cordis
-Context, not when the loader walks plugin modules.
-
-Slot id: ``lab.remember.snapshot``
-Output capability: ``lab.remember.snapshot.out:snapshot``
-
-delete-when (PR-D final 2/2):
-- agent_lab/nodes/remember/snapshot/plugin.py replaced by this carrier
-  (test env: delete-when happens when LCA runtime with cordis
-  is in place and the legacy plugin can be removed)
+worker: snapshot(*, journal_fact, provider_config) -> state_ref + remember_signal
+kind: TRANSFORMER
+out_port: state_ref
+config: provider_config
 """
+from typing import Any
 
-from __future__ import annotations
+from agent_lab.primitives.artifact import Artifact
 
-from lca.plugins.lab.internal.hooks import (
-    LabCarrier,
-    bind_carrier,
-)
+from lca.plugins.lab.memory.ops import LcaRememberStateStoreProvider
 
 
-# Carrier data: what the loader's register_carrier() needs.
-_CARRIER = LabCarrier(
-    id="lab.remember.snapshot",
-    stage="remember",
-    kind="PRODUCER",
-    description='Snapshot the current remember state for resume.',
-    node_id='snapshot',
-    source_module='agent_lab.nodes.remember.snapshot.plugin',
-    source_class='RememberSnapshot',
-    provides=['remembered_snapshot'],
-    requires=[],
-    emits=['remembered_snapshot'],
-    inputs=[('history', 'FACT', False)],
-    outputs=[('snapshot', 'FACT')],
-    out_capabilities=['lab.remember.snapshot.out:snapshot'],
-)
+def snapshot(
+    *,
+    journal_fact: Artifact | None,
+    provider_config: dict[str, Any] | None = None,
+) -> dict[str, Artifact]:
+    """通过 StateStoreProvider 保存 state。"""
+    provider = LcaRememberStateStoreProvider.from_node_config(provider_config or {})
+    return provider.save(journal_artifact=journal_fact)
 
 
-def setup(ctx, config):
-    """Register the carrier with the loader on plugin boot."""
-    bind_carrier(_CARRIER, ctx=ctx, config=config)
-
-
-# Auto-bind on import so the loader walks these like any other plugin
-# carrier — the setup() function is still callable from a real Cordis
-# boot path for two-phase register.
-bind_carrier(_CARRIER)
-
-
-__all__ = ["setup", "_CARRIER"]
-
-# --- PR-D worker execute -----------------------------------------------
-from lca.plugins.lab.internal.worker import Worker, register_worker
-from agent_lab.primitives.artifact import Artifact, ArtifactKind
-
-class _Remember_Snapshot(Worker):
-    factory = "remember.snapshot"
-
-    def execute(self, node, inputs, seams=None):
-        from lca.plugins.lab.memory.ops import LcaRememberStateStoreProvider
-        provider = LcaRememberStateStoreProvider.from_node_config(getattr(node, "config", None) or {})
-        return provider.save_state(journal_fact_artifact=inputs.get("journal_fact"))
-
-register_worker("remember.snapshot", _Remember_Snapshot)
-register_worker("lab.remember.snapshot", _Remember_Snapshot)
+__all__ = ["snapshot"]

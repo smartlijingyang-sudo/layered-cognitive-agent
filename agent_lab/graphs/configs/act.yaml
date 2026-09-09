@@ -31,8 +31,8 @@ description: >
 graph:
   id: act
   layer: effect
-  purpose: Body.act(Decision) → Observation, decomposed into four workers.
-  members: [shape, authorize, execute, observe]
+  purpose: Body.act(Decision) → Observation, decomposed into five workers.
+  members: [shape, authorize, compose, execute, observe]
   references: [model_eye, agent_loop]
   relations:
     - { graph: agent_loop, kind: child_of, role: act_phase }
@@ -66,7 +66,7 @@ nodes:
     ins: [intent]
     outs: [authorized]
 
-  # ----- execute: authorized Intent → EffectReceipt (C10 narrow gate) --------
+  # ----- execute: authorized Intent + body_handle → EffectReceipt (C10) ----
   # Errors are folded into receipt content inside the node (status=error).
   # Do NOT set on_error=route here: the runner treats route as a pre-invoke
   # skip (demo short-circuit), which would bypass SafeExecutor entirely.
@@ -77,8 +77,18 @@ nodes:
       from: authorized
       to: receipt
       tools: [bash, file_write, read_file]
-    ins: [authorized]
+    ins: [authorized, body_handle]
     outs: [receipt]
+
+  # ----- compose: capability refs → BodyHandle(scope-bound) -------------------
+  # body_provider 提供的 lab.body 装配成 BodyHandle;execute 拿 BodyHandle 调用。
+  - id: compose
+    region: phase:act
+    factory: lab.act.compose
+    config:
+      plan_ref: agent_lab_act
+    ins: []
+    outs: [body_handle]
 
   # ----- observe: Receipt|EXCEPTION → Observation (single exit) --------------
   - id: observe
@@ -103,6 +113,11 @@ edges:
   - id: e_authorize_to_execute
     from: { spec: act, node: authorize, port: authorized }
     to:   { spec: act, node: execute, port: authorized }
+    kind: data
+
+  - id: e_compose_to_execute
+    from: { spec: act, node: compose, port: body_handle }
+    to:   { spec: act, node: execute, port: body_handle }
     kind: data
 
   - id: e_execute_to_observe

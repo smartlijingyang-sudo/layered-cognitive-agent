@@ -213,6 +213,104 @@ _DISPATCH = {
 }
 
 
+def _run_stage(stage: str, specs) -> None:
+    """Generic single-stage runner.
+
+    Reads ``graphs/configs/<stage>.yaml`` and supplies minimal initial ports
+    so the stage graph runs end-to-end with the reflection-derived worker
+    registry. ADR-0211 §7:every typed worker is wired through ``bind_worker``;
+    runner only handles graph mechanics.
+    """
+    spec = specs[stage]
+    # 每个 stage 给一份 demo initial;真实 run 由 Bundle / Profile 注入。
+    initial: dict = {}
+    if stage == "perceive":
+        initial = {
+            "state": Artifact(
+                kind=ArtifactKind.FACT,
+                content={"trace_id": "demo", "step": 0, "task": "demo"},
+                schema_ref="agent.state.v1",
+            ),
+            "provider_config": Artifact(
+                kind=ArtifactKind.FACT,
+                content={"fixture_sensors_name": "demo"},
+                schema_ref="perceive.provider_config.v1",
+            ),
+        }
+    elif stage == "think":
+        initial = {
+            "in_assembled_manifest": Artifact(
+                kind=ArtifactKind.MANIFEST,
+                content={
+                    "messages": [{"role": "user", "content": "demo"}],
+                    "tools": [],
+                },
+                schema_ref="context.manifest.v1",
+            ),
+            "in_state": Artifact(
+                kind=ArtifactKind.FACT,
+                content={"trace_id": "demo", "step": 0},
+                schema_ref="agent.state.v1",
+            ),
+        }
+    elif stage == "reflect":
+        initial = {
+            "in_observation": Artifact(
+                kind=ArtifactKind.FACT,
+                content={"success": True, "observation_id": "obs_demo"},
+                schema_ref="observation.v1",
+            ),
+            "in_decision": Artifact(
+                kind=ArtifactKind.FACT,
+                content={"decision_id": "dec_demo", "action_type": "respond"},
+                schema_ref="decision.v1",
+            ),
+            "in_prior_reflection": Artifact(
+                kind=ArtifactKind.FACT,
+                content={"reflection_id": "ref_prior", "verdict": "OK"},
+                schema_ref="reflection.v1",
+            ),
+        }
+    elif stage == "remember":
+        initial = {
+            "in_observation": Artifact(
+                kind=ArtifactKind.FACT,
+                content={"success": True, "observation_id": "obs_demo"},
+                schema_ref="observation.v1",
+            ),
+            "in_decision": Artifact(
+                kind=ArtifactKind.FACT,
+                content={"decision_id": "dec_demo"},
+                schema_ref="decision.v1",
+            ),
+            "in_reflection": Artifact(
+                kind=ArtifactKind.FACT,
+                content={"reflection_id": "ref_demo"},
+                schema_ref="reflection.v1",
+            ),
+            "in_candidates": Artifact(
+                kind=ArtifactKind.FACT,
+                content={"items": [{"kind": "lesson", "text": "demo", "reflection_id": "ref_demo"}]},
+                schema_ref="memory.candidates.v1",
+            ),
+            "journal_fact": Artifact(
+                kind=ArtifactKind.FACT,
+                content={"trace_id": "demo", "step": 1},
+                schema_ref="journal.fact.v1",
+            ),
+        }
+    trace = run_graph(spec, initial=initial, sub_registry=specs)
+    _print_trace(trace)
+    print("=== final outputs ===")
+    for k, v in trace.final_artifacts.items():
+        print(f"  {k}: kind={v.kind.value} digest={v.short_id()} content={v.content!r}")
+
+
+# 把 generic runner 接到 _DISPATCH 的 4 个 stage。
+for _stage in ("perceive", "think", "reflect", "remember"):
+    _DISPATCH[_stage] = lambda specs, s=_stage: _run_stage(s, specs)
+
+
 def _describe_graph(name: str) -> None:
     """Print a graph's YAML manifest plus nodes and data edges."""
     configs = Path(__file__).parent / "graphs" / "configs"

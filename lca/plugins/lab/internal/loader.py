@@ -51,6 +51,7 @@ from __future__ import annotations
 
 import importlib
 import logging
+import sys
 import pkgutil
 from typing import Any
 
@@ -63,19 +64,23 @@ _LAB_HOOKS: dict[str, Any] = {}
 # Lazy-load guard — load_all() is idempotent but cheap to skip.
 _LOADED: bool = False
 
+# ADR-0211 §7:六语义 phase 走 worker 反射协议(provider 形态除外)。
+# legacy carrier(passthrough / control / memory_extract / session_log / llm 等)
+# 暂走传统 ``_CARRIER + bind_carrier`` 路径。
+_REFLECTABLE_STAGES: frozenset[str] = frozenset(
+    {"perceive", "think", "act", "reflect", "remember"}
+)
+
 # The set of ``lca.plugins.lab`` subpackages that own @plugin carriers.
 # Auto-generated from filesystem at PR-D landing; PR-D adds the
 # remaining 89 node stubs. Each entry is the full module path
 # (package + .plugin submodule).
 _HOOK_PACKAGES: tuple[str, ...] = (
     "lca.plugins.lab.act.authorize.plugin",
-    "lca.plugins.lab.act.body.plugin",
     "lca.plugins.lab.act.body_provider.plugin",
     "lca.plugins.lab.act.compose.plugin",
     "lca.plugins.lab.act.execute.plugin",
     "lca.plugins.lab.act.observe.plugin",
-    "lca.plugins.lab.act.receipt_denied.plugin",
-    "lca.plugins.lab.act.receipt_none.plugin",
     "lca.plugins.lab.act.shape.plugin",
     "lca.plugins.lab.control.act_authorize_node.plugin",
     "lca.plugins.lab.control.act_budget_node.plugin",
@@ -187,13 +192,48 @@ def load_all() -> None:
     Idempotent: subsequent calls are no-ops. Failures are logged at WARNING
     level and do not raise — a missing plugin is treated the same way as
     the previous ``resolve_plugin`` path did (warn-and-skip).
+
+    ADR-0211 §7:对 ``lca.plugins.lab.act.*`` 模块自动调 ``bind_act_worker``
+    反射入口(worker 文件零 framework 知识);其它模块走传统的
+    ``_CARRIER = LabCarrier(...)`` + ``bind_carrier(_CARRIER)`` 自注册路径。
     """
     global _LOADED
     if _LOADED:
         return
+    from lca.plugins.lab.internal.hooks import bind_worker  # local import
     for module_name in _HOOK_PACKAGES:
+        # module_name 形式: ``lca.plugins.lab.<stage>.<basename>[.plugin]``
+        # 剥 ``.plugin`` 后缀得到 worker 子模块。
+        if module_name.endswith(".plugin"):
+            sub_module_name = module_name
+        else:
+            sub_module_name = f"{module_name}.plugin"
         try:
             importlib.import_module(module_name)
+            # ADR-0211 §7:stage 工人走反射入口,framework 自填 marker。
+            # 例外:模块 docstring 含 ``provider: yes`` / ``provider: true`` 的
+            # 走传统自注册路径(provider 不是 worker,需要显式 requires)。
+            parts = sub_module_name.split(".")
+            # ``lca.plugins.lab.<stage>.<basename>.plugin`` → parts[3] = stage
+            stage = parts[3] if len(parts) >= 4 else None
+            if stage and stage in _REFLECTABLE_STAGES:
+                try:
+                    sub_mod = importlib.import_module(sub_module_name)
+                except ImportError as exc:
+                    _log.warning("stage sub-module import failed: %s: %s", sub_module_name, exc)
+                    continue
+                # ADR-0211 §7:``provider: yes`` docstring marker → skip reflection,
+                # 走老 ``_CARRIER + bind_carrier`` 路径(provider 需要显式 requires)。
+                # 模块 import 时 ``bind_carrier(_CARRIER)`` 已自填 marker,这里不再补。
+                doc = (sub_mod.__doc__ or "").lower()
+                if "provider: yes" in doc or "provider: true" in doc:
+                    continue
+                try:
+                    bind_worker(sub_module_name)
+                except Exception as exc:
+                    _log.warning(
+                        "stage worker reflection failed: %s: %s", sub_module_name, exc
+                    )
         except Exception as exc:  # pragma: no cover - import failures
             _log.warning("lab hook loader: %s import failed: %s", module_name, exc)
     _LOADED = True
