@@ -1,32 +1,21 @@
-"""Plugin base — hook helper re-exports only (compat shim).
+"""Plugin base — thin compat shim for hook helper re-exports.
 
-PR-D final cleanup — the GraphPlugin base class and register_plugin
-decorator are no longer needed:
+.. deprecated::
+    This module is a PR-D final cleanup compat shim. The old
+    ``GraphPlugin`` dataclass and ``register_plugin`` no-op decorator
+    have been removed (ADR-0209 §1.1 + PR-D final 1/2 + 2/2).
+    Hook helper re-exports remain so legacy call sites
+    (``from agent_lab.plugins.base import HookContext`` etc.) keep
+    working; new code should import from
+    ``lca.plugins.lab.internal.hooks`` directly.
 
-- The 8 GraphPlugin subclasses (EventSinkPlugin, ObserverPlugin,
-  ParseDecisionPlugin, SemanticRouterPlugin, ControlSlotsPlugin,
-  ObservationRenderPlugin, MemoryExtractPlugin, ToolDispatchGuardPlugin)
-  were deleted from agent_lab.plugins. The new hook carriers in
-  lca.plugins.lab.<hook>/plugin.py use lca.plugins.lab.internal.hooks
-  GraphPlugin (the data class) via lca.plugins.lab.internal.hook_factories.
-- The agent_lab_default GraphPlugin class is therefore dead code.
-- The agent_lab register_plugin no-op decorator is also dead code
-  (no plugin uses it any more).
-
-What stays:
-- Hook helper re-exports (Bind, HookContext, HookEvent, fanout_hooks)
-  for any code that still imports them from this path.
-
-delete-when (PR-D final acceptance):
-- agent_lab_default is dead — no caller in lca/, tests/, scripts/
-- This module is only kept for the hook helper re-exports; once all
-  consumers import those from lca.plugins.lab.internal.hooks, this
-  whole module can be deleted.
+    delete-when: all consumers (lca/, scripts/, hooks/) import the 4
+    hook helpers from ``lca.plugins.lab.internal.hooks``. The
+    profile_loader is already on the new path; only this shim remains.
 """
 
 from lca.plugins.lab.internal.hooks import (
     Bind,
-    GraphPlugin,
     HookContext,
     HookEvent,
     fanout_hooks,
@@ -34,7 +23,6 @@ from lca.plugins.lab.internal.hooks import (
 
 __all__ = [
     "Bind",
-    "GraphPlugin",
     "HookContext",
     "HookEvent",
     "fanout_hooks",

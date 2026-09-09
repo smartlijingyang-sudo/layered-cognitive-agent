@@ -1,4 +1,19 @@
 # ADR-0075: 默认认知阶段只通过显式 PhaseExecutor capability 选择。
+#
+# .. note::
+#   Backward-compat only (ADR-0210 §6.3 P7 §6.5). The P7 region-tag
+#   path is the recommended runtime: ``spec.region + spec.phase`` +
+#   ``profile.regions.declare``. This bundle is kept so legacy profiles
+#   that wire ``declarative-phase-graph.yaml`` still resolve. New
+#   profiles should NOT depend on this bundle — the region-tag path
+#   covers all use cases (see lca.harness.graph.execute.interpreter
+#   and agent_lab.profile_loader.build_region_only_phase_graph).
+#
+# delete-when: All production profiles migrated to region-tag path AND
+# ADR-0210 升 Accepted. Until then, this bundle is the only way for
+# production profiles to declare 6-stage topology via the legacy 0075
+# SSOT. (After the migration, the data structures stay for backward
+# compat; only the bundle reference in production profiles is removed.)
 entries:
   - id: phase.perceive.standard
     name: phase_perceive_standard

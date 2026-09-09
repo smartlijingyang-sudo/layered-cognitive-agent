@@ -12,7 +12,6 @@ PR-D final cleanup. New hook carriers live in
 
 from agent_lab.plugins.base import (
     Bind,
-    GraphPlugin,
     HookContext,
     HookEvent,
     fanout_hooks,
@@ -20,7 +19,6 @@ from agent_lab.plugins.base import (
 
 __all__ = [
     "Bind",
-    "GraphPlugin",
     "HookContext",
     "HookEvent",
     "fanout_hooks",

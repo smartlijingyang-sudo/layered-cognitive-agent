@@ -96,7 +96,17 @@ class PhaseEdge:
 
 @dataclass(frozen=True, slots=True)
 class CognitivePhaseGraphPlan:
-    """Compiled topology, including the declared re-entry point after approval."""
+    """Compiled topology, including the declared re-entry point after approval.
+
+    .. deprecated::
+        保留 Optional / backward-compat only (ADR-0210 §6.3 P7 §6.5).
+        New code should NOT set ``CompiledRunPlan.phase_graph``; use the
+        P7 region-tag mechanism (spec.region + spec.phase +
+        profile.regions.declare) instead. See
+        ``agent_lab.profile_loader.build_region_only_phase_graph`` and
+        ``lca.harness.graph.execute.interpreter._resolve_phase_graph``
+        for the recommended runtime path.
+    """
 
     entry: str
     nodes: tuple[PhaseNode, ...]
@@ -117,6 +127,17 @@ class CognitivePhaseGraphPlan:
 
 @dataclass(frozen=True, slots=True)
 class PhaseBinding:
+    """Phase → executor capability binding.
+
+    .. deprecated::
+        ``semantic_phase`` field is retained for backward compat only
+        (ADR-0210 §6.3). New code should use the P7 region-tag
+        mechanism (``spec.region`` + ``spec.phase`` + profile's
+        ``regions.declare``). The ``executor_capability`` selection
+        (e.g. ``phase.act.standard``) remains the canonical way to
+        pick an executor; region labels do NOT enter the capability
+        closure (P7-I-2).
+    """
     node_id: str
     semantic_phase: SemanticPhase
     executor_capability: str
