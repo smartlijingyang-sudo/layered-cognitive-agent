@@ -140,10 +140,12 @@ class StdLoopCursor:
         写入路径:与 ``llm.request.header`` 同一 :class:`WritePort`
         链(``_append`` → ``write_port_append`` → ``<run_id>.spine.jsonl``),
         同源同步、无总线旁路。
-        payload 契约:``step``(当前 step_index)/ ``run_id`` / ``step_id`` /
-        ``phase``(开窗时所处相位,缺省 think)—— ``step`` / ``run_id``
-        与 spine.yaml ``spine.writable.step.start`` fields 对齐,
-        ``step_id`` / ``phase`` 为 cursor 侧补充键(老链不做 yaml schema 校验)。
+        payload 契约:``step``(当前 step_index)/ ``run_id`` / ``step_id`` —
+        ``step`` / ``run_id`` 与 spine.yaml ``spine.writable.step.start``
+        fields 对齐,``step_id`` 为 cursor 侧补充键(老链不做 yaml schema
+        校验)。**不写 phase 字段**:writable.step.start 是 LLM 边界专属
+        marker,frame.phase 由 phase.fold 事件统一决定,避免 cursor state
+        phase(如 perceive)与 LLM 边界语义错位污染 step-tree fold。
         所有权:本方法是 ``writable.step.start`` 的唯一发射点;
         ``StepCoordinator``(writable_matrix)不再写该 EP。
         外部后果:step-tree fold(:mod:`lca.plugins.session.derivers.step_tree.journal_fold`)
@@ -157,7 +159,6 @@ class StdLoopCursor:
                 "step": s.step_index,
                 "run_id": s.run_id,
                 "step_id": step_id,
-                "phase": s.phase or "think",
             },
         )
 
