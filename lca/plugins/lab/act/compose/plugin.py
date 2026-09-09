@@ -31,7 +31,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from lca.plugins.lab.internal.hooks import LabCarrier, bind_carrier
+from lca.plugins.lab.internal.loader import _LAB_HOOKS
 
 
 # ---------------------------------------------------------------------------
@@ -70,41 +70,43 @@ def compose(
 
 
 # ---------------------------------------------------------------------------
-# Carrier —— act.compose 节点 + lab.body capability provider(吸收 body_provider)。
+# Marker —— act.compose 节点 + lab.body capability provider(吸收 body_provider)。
 # ---------------------------------------------------------------------------
-_CARRIER = LabCarrier(
-    id="lab.act.compose",
-    stage="act",
-    kind="TRANSFORMER",
-    description="act.compose — capability refs → BodyHandle; owns lab.body provider.",
-    node_id="compose",
-    source_module="lca.plugins.lab.act.compose.plugin",
-    source_class="compose",
-    provides=("lab.body",),
-    requires=(
+_MARKER = {
+    "id": "lab.act.compose",
+    "stage": "act",
+    "kind": "TRANSFORMER",
+    "description": "act.compose — capability refs → BodyHandle; owns lab.body provider.",
+    "module": "lca.plugins.lab.act.compose.plugin",
+    "class": "compose",
+    "provides": ("lab.body",),
+    "requires": (
         "lab.tool_registry",
         "lab.safe_executor",
         "lab.transport",
         "lab.plan_ref",
     ),
-    inputs=(
-        ("plan_ref", "any", True),
-        ("body_ref", "any", True),
-        ("tool_registry_ref", "any", True),
-        ("safe_executor_ref", "any", True),
-        ("transport_ref", "any", True),
-    ),
-    outputs=(("body_handle", "body_handle"),),
-    out_capabilities=("lab.body",),
-)
+    "inputs": [
+        {"port": "plan_ref", "kind": "any", "required": True},
+        {"port": "body_ref", "kind": "any", "required": True},
+        {"port": "tool_registry_ref", "kind": "any", "required": True},
+        {"port": "safe_executor_ref", "kind": "any", "required": True},
+        {"port": "transport_ref", "kind": "any", "required": True},
+    ],
+    "outputs": [{"port": "body_handle", "kind": "body_handle"}],
+    "out_capabilities": ("lab.body",),
+    "factory_aliases": ("compose",),
+    "worker_fn": compose,
+    "config_params": [],
+}
+
+
+_LAB_HOOKS[_MARKER["id"]] = _MARKER
 
 
 def setup(ctx, config):
-    """Register the carrier with the loader on plugin boot."""
-    bind_carrier(_CARRIER, ctx=ctx, config=config)
-
-
-bind_carrier(_CARRIER)
+    """Compatibility no-op; marker is registered at import time."""
+    del ctx, config
 
 
 # ---------------------------------------------------------------------------

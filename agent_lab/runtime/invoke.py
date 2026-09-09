@@ -57,16 +57,14 @@ def invoke(
 ) -> dict[str, Artifact]:
     """Dispatch ``node.factory`` to its registered worker marker.
 
-    ADR-0211 §7:全部 worker 走反射 + ``_LAB_HOOKS`` marker;provider 形态
-    仍以 ``bind_carrier`` 走老路径(provider 无 worker_fn,invoke 失败
-    时 host passthrough fallback)。
+    Stage workers register under ``lab.<stage>.<basename>`` via the loader's
+    ``bind_worker`` reflection; missing markers fall back to host passthrough
+    for the small set of builtin factories (``graph.call`` / ``identity``).
     """
     from lca.plugins.lab.internal.loader import load_all, _LAB_HOOKS
-    from lca.plugins.lab.internal.hooks import lookup_alias
 
     load_all()
-    canonical = lookup_alias(node.factory) or node.factory
-    marker = _LAB_HOOKS.get(canonical)
+    marker = _LAB_HOOKS.get(node.factory)
     if marker is None or "worker_fn" not in marker:
         # 无反射 worker:host passthrough(``identity``-like)或 fail-loud。
         if node.factory in _HOST:

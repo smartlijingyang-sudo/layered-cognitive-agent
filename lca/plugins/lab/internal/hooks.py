@@ -160,408 +160,12 @@ def fanout_hooks(
 
 __all__ = [
     "Bind",
+    "GraphPlugin",
     "HookContext",
     "HookEvent",
+    "Worker",
     "fanout_hooks",
 ]
-
-
-# ---------------------------------------------------------------------------
-# PR-D final 2/2 — LabCarrier + bind_carrier
-#
-# A cordis-free mirror of the LCA @plugin carrier data model. The full
-# ``lca.harness.plugin_api`` path requires `cordis.plugin` (not available
-# in the test environment), so we re-declare the data shape the loader
-# needs and re-export it under the lab plugin tree.
-# ---------------------------------------------------------------------------
-
-
-
-@dataclass(frozen=True)
-class LabCarrier:
-    """Pydantic-free mirror of the LCA @plugin carrier shape.
-
-    Carries everything the loader's ``register_carrier`` needs to populate
-    `_LAB_HOOKS` and to satisfy the capability closed-set spec.
-
-    Fields:
-        id:              carrier slot id (e.g. ``lab.perceive.sense``)
-        stage:           process / phase (perceive / think / act / ...)
-        kind:            NodeKind equivalent (TRANSFORMER / EXECUTOR / ...)
-        description:     human-readable
-        node_id:         the agent_lab node factory id (matches basename)
-        source_module:   module path that owns the legacy class
-        source_class:    legacy class name (lazy-imported at runtime)
-        provides:        capability keys the node contributes
-        requires:        capability keys the node consumes
-        emits:           event-class / artefact-class names the node emits
-        inputs:          port spec (port_id, port_kind, required)
-        outputs:         port spec (port_id, port_kind)
-        out_capabilities: out:<port> capability keys (for closure spec)
-    """
-    id: str
-    stage: str
-    kind: str
-    description: str
-    node_id: str
-    source_module: str
-    source_class: str
-    provides: tuple[str, ...] = ()
-    requires: tuple[str, ...] = ()
-    emits: tuple[str, ...] = ()
-    inputs: tuple[tuple[str, str, bool], ...] = ()   # (port, kind, required)
-    outputs: tuple[tuple[str, str], ...] = ()         # (port, kind)
-    out_capabilities: tuple[str, ...] = ()
-
-
-def _factory_aliases(carrier: LabCarrier) -> tuple[str, ...]:
-    """YAML factory keys plus carrier.id. Order is stable; duplicates dropped."""
-    raw = [carrier.id]
-    if carrier.id.startswith("lab."):
-        raw.append(carrier.id[4:])
-    raw.append(carrier.id.rsplit(".", 1)[-1])
-    if carrier.node_id:
-        raw.append(carrier.node_id)
-    seen: set[str] = set()
-    out: list[str] = []
-    for alias in raw:
-        if alias and alias not in seen:
-            seen.add(alias)
-            out.append(alias)
-    return tuple(out)
-
-
-# ADR-0211 §6 §1:``_ALIASES`` / ``lookup_alias`` 取代 worker.py 的
-# ``_ALIAS_TO_CANONICAL`` / ``lookup_worker``。本字典记录 carrier_id →
-# factory alias tuple,让 runner 通过短名("shape")查长名("lab.act.shape")。
-_ALIASES: dict[str, tuple[str, ...]] = {}
-
-
-def lookup_alias(alias: str) -> str | None:
-    """给定 factory alias,返回对应的 canonical carrier id;None 表示没找到。"""
-    from lca.plugins.lab.internal.loader import _LAB_HOOKS
-
-    if alias in _LAB_HOOKS:
-        return alias
-    for canonical, aliases in _ALIASES.items():
-        if alias in aliases:
-            return canonical
-    return None
-
-
-# ---------------------------------------------------------------------------
-# ADR-0211 §7:Worker 自动反射 — worker 文件零 framework 知识
-#
-# 反射规则(只对 ``lca.plugins.lab.act.*`` 生效,本 PR 范围):
-#   id          = ``lab.act.<basename>``
-#   stage       = 固定 ``"act"``
-#   kind        = 模块 docstring 解析 ``kind: TRANSFORMER|EXECUTOR|PROVIDER``
-#                 默认 ``TRANSFORMER``
-#   node_id     = 模块 basename
-#   description = 模块 docstring 第一段(非空行)
-#   source_class= basename + "Worker"
-#   requires    = ``inspect.signature(worker_fn)`` 的 keyword-only 参数名
-#   provides    = ``["lab.act.<basename>.out:<out_port>"]``
-#   emits       = 同 provides
-#   inputs      = ``[(参数名, type 名, True), ...]``
-#   outputs     = ``[(out_port, return_type_name)]``
-#   out_capabilities = 同 provides
-#
-# Worker 函数识别:模块里第一个**非 dataclass / 非 typing 派生**的顶层函数。
-# ---------------------------------------------------------------------------
-
-import importlib as _importlib
-import inspect as _inspect
-
-
-def _resolve_worker_fn(module: Any) -> Any:
-    """从模块里挑出 worker 主函数。
-
-    规则:
-    1. 只看模块**本文件定义**的函数(`module.__dict__` 而非 ``dir(module)``);
-       这样不会拿到 ``from .ops import ...`` 引入的同名 helper。
-    2. 取本文件定义的第一个 keyword-only def。
-    3. 跳过 ``setup`` / ``bind_carrier`` / 任何 ``_*`` 私有 helper。
-    """
-    SKIP = {"setup", "bind_carrier", "register_worker"}
-    candidates: list[Any] = []
-    for name, obj in module.__dict__.items():
-        if name.startswith("_") or name in SKIP:
-            continue
-        if not callable(obj):
-            continue
-        if not _inspect.isfunction(obj):
-            continue
-        # 必须在本模块定义,非 import
-        if getattr(obj, "__module__", None) != module.__name__:
-            continue
-        sig = _inspect.signature(obj)
-        if not any(
-            p.kind is _inspect.Parameter.KEYWORD_ONLY
-            for p in sig.parameters.values()
-        ):
-            continue
-        candidates.append(obj)
-    if not candidates:
-        raise WorkerDiscoveryError(
-            f"{module.__name__}: no keyword-only function defined in this module; "
-            "worker must define `def name(*, ...)` directly in plugin.py"
-        )
-    if len(candidates) > 1:
-        # 多于一个:取名字跟 basename 一致的;否则取第一个 + WARNING 注释。
-        basename = module.__name__.split(".")[-1]
-        for c in candidates:
-            if c.__name__ == basename:
-                return c
-        return candidates[0]
-    return candidates[0]
-
-
-class WorkerDiscoveryError(Exception):
-    """Worker 自动反射失败。worker 文件应符合 §7 反射规则。"""
-
-
-def _type_name(annotation: Any) -> str:
-    """annotation → 简短类型名(用于 marker 的 inputs/outputs kind)。
-
-    ``Artifact | None`` → ``artifact``(unwrap Optional);``list[X]`` → ``list``;
-    ``dict[K, V]`` → ``dict``。短路返回简化 marker 可读性。
-    """
-    import types as _types
-
-    if annotation is _inspect.Parameter.empty or annotation is _inspect.Signature.empty:
-        return "any"
-    # PEP 604 ``X | Y`` 形式
-    if isinstance(annotation, _types.UnionType):
-        non_none = [a for a in annotation.__args__ if a is not type(None)]
-        if non_none:
-            return _type_name(non_none[0])
-        return "any"
-    # typing.Union[X, Y, ...] 形式
-    origin = getattr(annotation, "__origin__", None)
-    args = getattr(annotation, "__args__", None)
-    if origin is not None and args is not None:
-        non_none = [a for a in args if a is not type(None)]
-        if non_none:
-            return _type_name(non_none[0])
-        return "any"
-    name = getattr(annotation, "__name__", None)
-    if name is not None:
-        return name.lower()
-    return str(annotation).lower()
-
-
-def _parse_in_mapping(spec: str) -> dict[str, str]:
-    """解析 ``in:`` 行 → ``{param_name: port_name}`` 映射。
-
-    例 ``sensors=sensors_artifact state=state_artifact`` →
-    ``{"sensors_artifact": "sensors", "state_artifact": "state"}``。
-    解析失败时返回空 dict(让 fallback 用参数名作为 port)。
-    """
-    if not spec:
-        return {}
-    out: dict[str, str] = {}
-    for tok in spec.split():
-        if "=" not in tok:
-            continue
-        port, _, param = tok.partition("=")
-        port = port.strip()
-        param = param.strip()
-        if port and param:
-            out[param] = port
-    return out
-
-
-def _parse_config_params(spec: str) -> set[str]:
-    """解析 ``config:`` 行 → ``{param_name}`` 集合。
-
-    例 ``max_chars processor_config`` → ``{"max_chars", "processor_config"}``。
-    config 参数**不**进 marker.requires(它们是 graph spec ``node.config``
-    静态字段,不是上游 capability key)。
-    """
-    if not spec:
-        return set()
-    return {tok.strip() for tok in spec.split() if tok.strip()}
-
-
-def _parse_docstring_meta(doc: str | None) -> dict[str, str]:
-    """从模块 docstring 解析 ``key: value`` 行(只取顶层 meta 行)。"""
-    if not doc:
-        return {}
-    meta: dict[str, str] = {}
-    for line in doc.splitlines():
-        s = line.strip()
-        if not s or ":" not in s:
-            continue
-        if s.startswith(("---", "===")):
-            continue
-        k, _, v = s.partition(":")
-        meta[k.strip().lower()] = v.strip()
-    return meta
-
-
-def discover_worker(module_path: str) -> tuple[LabCarrier, Any, tuple[str, ...]]:
-    """反射一个 stage worker 模块,返回 ``(LabCarrier, worker_fn, config_params)``。
-
-    worker 文件**零 framework 知识**;所有元数据由本函数从代码 + docstring 派生。
-    stage 由 module_path 推导(perceive / think / act / reflect / remember / ...)。
-    """
-    module = _importlib.import_module(module_path)
-    worker_fn = _resolve_worker_fn(module)
-    sig = _inspect.signature(worker_fn)
-
-    # 派生 id / stage / node_id
-    # module_path 形式: ``lca.plugins.lab.<stage>.<basename>[.plugin]``
-    parts = module_path.split(".")
-    basename = parts[-2] if parts[-1] == "plugin" else parts[-1]
-    # stage: ``lca.plugins.lab.<stage>...`` → parts[3]
-    if len(parts) >= 4 and parts[1] == "plugins" and parts[2] == "lab":
-        stage = parts[3]
-    else:
-        stage = "unknown"
-    cid = f"lab.{stage}.{basename}"
-    node_id = basename
-
-    # 派生 kind / description 从 docstring
-    meta = _parse_docstring_meta(module.__doc__)
-    kind = meta.get("kind", "TRANSFORMER").upper()
-    description = meta.get("description") or (
-        module.__doc__.splitlines()[0].strip() if module.__doc__ else cid
-    )
-
-    # 派生 requires / inputs from signature + docstring ``in:`` 端口映射
-    # + ``config:`` 静态 config 参数(不进 requires,只走 inputs)
-    #
-    # docstring 形如:
-    #   in: <port_name>=<param_name> [<port_name>=<param_name> ...]
-    #   config: <param_name> [<param_name> ...]
-    # 例如:
-    #   in: sensors=sensors_artifact state=state_artifact
-    #   config: max_chars
-    # config 参数从 graph spec 的 ``node.config`` 字段读,**不**进 ``requires``(不进
-    # requires 表示它不是上游产物的 capability key),但仍出现在 ``inputs`` 用于校验。
-    # 若 docstring 没有 ``in:`` 行,fallback 用参数名作为 port 名。
-    in_mapping = _parse_in_mapping(meta.get("in", ""))
-    config_params = _parse_config_params(meta.get("config", ""))
-    requires: list[str] = []
-    inputs: list[tuple[str, str, bool]] = []
-    for pname, param in sig.parameters.items():
-        if param.kind is _inspect.Parameter.KEYWORD_ONLY:
-            port_name = in_mapping.get(pname, pname)
-            if pname not in config_params:
-                requires.append(port_name)
-            inputs.append((port_name, _type_name(param.annotation), True))
-
-    # 派生 provides / outputs from return annotation
-    out_port = meta.get("out_port", "out")
-    out_type = _type_name(sig.return_annotation)
-    provides = (f"{cid}.out:{out_port}",)
-    outputs = ((out_port, out_type),)
-
-    carrier = LabCarrier(
-        id=cid,
-        stage=stage,
-        kind=kind,
-        description=description,
-        node_id=node_id,
-        source_module=module_path,
-        source_class=f"{node_id}Worker",
-        provides=provides,
-        requires=tuple(requires),
-        emits=provides,
-        inputs=tuple(inputs),
-        outputs=outputs,
-        out_capabilities=provides,
-    )
-
-    # ADR-0211 §8:load-time worker 体检。错误聚合到 WorkerAuditFailure,
-    # 由 loader.load_all() 决定 raise;不降级到 WARNING — 降级会让违规
-    # 潜伏到 invoke 阶段,违反 fail-loud 语义。
-    from lca.plugins.lab.internal.audit import (
-        WorkerAuditFailure,
-        audit_worker,
-    )
-
-    audit_errors = audit_worker(module_path, worker_fn)
-    if audit_errors:
-        raise WorkerAuditFailure(audit_errors, module_path=module_path)
-
-    return carrier, worker_fn, tuple(sorted(config_params))
-
-
-def bind_worker(module_path: str, *, ctx: Any = None, config: Any = None) -> None:
-    """反射一个 stage worker 模块并 bind_carrier(框架入口,worker 文件不调)。
-
-    替代 worker 文件里手写的 ``_CARRIER = LabCarrier(...)`` + ``bind_carrier(_CARRIER)``。
-    stage 由 module_path 推导(perceive / think / act / reflect / remember)。
-    把 worker_fn + config_params + port_to_param 一起写入 marker;invoke 调
-    ``marker["worker_fn"](**mapped_inputs)``。
-    """
-    carrier, worker_fn, config_params = discover_worker(module_path)
-    bind_carrier(carrier, ctx=ctx, config=config)
-    from lca.plugins.lab.internal.loader import _LAB_HOOKS
-
-    marker = _LAB_HOOKS[carrier.id]
-    marker["worker_fn"] = worker_fn
-    marker["config_params"] = list(config_params)
-    # ADR-0211 §7:存 port→param 映射,invoke 用它把 inputs(port 名) 重写为
-    # worker_fn 的 keyword-only 参数名。
-    module = _importlib.import_module(module_path)
-    meta = _parse_docstring_meta(module.__doc__ or "")
-    in_mapping = _parse_in_mapping(meta.get("in", ""))
-    # in_mapping: {param_name: port_name} → 反转成 {port_name: param_name}
-    marker["port_to_param"] = {port: param for param, port in in_mapping.items()}
-
-
-# 旧名 alias —— 保留以兼容 PR-D final 2/2 期间可能残留的引用。
-discover_act_worker = discover_worker
-bind_act_worker = bind_worker
-
-
-def bind_carrier(carrier: LabCarrier, *, ctx: Any = None, config: Any = None) -> None:
-    """Register a LabCarrier with the loader's _LAB_HOOKS.
-
-    The real @plugin decorator builds a PluginDefinition and registers
-    it with Cordis. This function does the same end state for the lab
-    plugin tree without the cordis dependency.
-
-    The marker stored in _LAB_HOOKS is the dict the runner reads when
-    resolving a node factory. Factory aliases are recorded so invoke
-    can resolve YAML keys (``perceive.sense``, ``expose_schemas``).
-    """
-    del ctx, config
-    from lca.plugins.lab.internal.loader import _LAB_HOOKS  # local import
-
-    aliases = _factory_aliases(carrier)
-    marker = {
-        "id": carrier.node_id,
-        "stage": carrier.stage,
-        "kind": carrier.kind,
-        "module": carrier.source_module,
-        "class": carrier.source_class,
-        "provides": list(carrier.provides),
-        "requires": list(carrier.requires),
-        # ADR-0211 §3 W-2: ``needs`` is the legacy alias kept for the
-        # PR-B act.* test suite; canonical name is ``requires``.
-        "needs": list(carrier.requires),
-        "emits": list(carrier.emits),
-        "inputs": [
-            {"port": p, "kind": k, "required": r}
-            for (p, k, r) in carrier.inputs
-        ],
-        "outputs": [{"port": p, "kind": k} for (p, k) in carrier.outputs],
-        "out_capabilities": list(carrier.out_capabilities),
-        "description": carrier.description,
-        "carrier_id": carrier.id,
-        "factory_aliases": list(aliases),
-    }
-    _LAB_HOOKS[carrier.id] = marker
-    # ADR-0211 §6 §1:``bind_factory_aliases`` / ``_WORKERS`` 退役;
-    # alias 解析由 hooks.py 自己的 _ALIASES 承担,不动 worker.py。
-    _ALIASES[carrier.id] = aliases
-
-
-__all__ += ["LabCarrier", "bind_carrier"]
 
 
 # ---------------------------------------------------------------------------
@@ -637,4 +241,175 @@ class GraphPlugin:
         return ctx
 
 
-__all__ += ["GraphPlugin"]
+# ---------------------------------------------------------------------------
+# Worker discovery — register a stage worker's marker into _LAB_HOOKS by
+# reflecting its module. The carrier dataclass was removed in PR-D final 2/2
+# retirement; marker is now a plain dict shaped for the runner / invoke.
+# ---------------------------------------------------------------------------
+
+import importlib as _importlib
+import inspect as _inspect
+import types as _types
+
+
+class WorkerDiscoveryError(Exception):
+    """Worker reflection failed; worker must define a keyword-only function."""
+
+
+def _type_name(annotation: Any) -> str:
+    import types as _types
+
+    if annotation is _inspect.Parameter.empty or annotation is _inspect.Signature.empty:
+        return "any"
+    if isinstance(annotation, _types.UnionType):
+        non_none = [a for a in annotation.__args__ if a is not type(None)]
+        if non_none:
+            return _type_name(non_none[0])
+        return "any"
+    origin = getattr(annotation, "__origin__", None)
+    args = getattr(annotation, "__args__", None)
+    if origin is not None and args is not None:
+        non_none = [a for a in args if a is not type(None)]
+        if non_none:
+            return _type_name(non_none[0])
+        return "any"
+    name = getattr(annotation, "__name__", None)
+    if name is not None:
+        return name.lower()
+    return str(annotation).lower()
+
+
+def _parse_docstring_meta(doc: str | None) -> dict[str, str]:
+    if not doc:
+        return {}
+    meta: dict[str, str] = {}
+    for line in doc.splitlines():
+        s = line.strip()
+        if not s or ":" not in s:
+            continue
+        if s.startswith(("#", "---", "===")):
+            continue
+        k, _, v = s.partition(":")
+        meta[k.strip().lower()] = v.strip()
+    return meta
+
+
+def _resolve_worker_fn(module: Any) -> Any:
+    """Pick the worker fn from a stage plugin module.
+
+    Same rules as before (first keyword-only def defined in this module),
+    but the SKIP set no longer mentions ``bind_carrier`` (gone).
+    """
+    SKIP = {"setup"}
+    candidates: list[Any] = []
+    for name, obj in module.__dict__.items():
+        if name.startswith("_") or name in SKIP:
+            continue
+        if not callable(obj) or not _inspect.isfunction(obj):
+            continue
+        if getattr(obj, "__module__", None) != module.__name__:
+            continue
+        sig = _inspect.signature(obj)
+        if not any(
+            p.kind is _inspect.Parameter.KEYWORD_ONLY
+            for p in sig.parameters.values()
+        ):
+            continue
+        candidates.append(obj)
+    if not candidates:
+        raise WorkerDiscoveryError(
+            f"{module.__name__}: no keyword-only function defined in this module; "
+            "worker must define `def name(*, ...)` directly in plugin.py"
+        )
+    if len(candidates) > 1:
+        basename = module.__name__.split(".")[-1]
+        for c in candidates:
+            if c.__name__ == basename:
+                return c
+        return candidates[0]
+    return candidates[0]
+
+
+def discover_worker(module_path: str) -> tuple[dict, Any, tuple[str, ...]]:
+    """Reflect a stage worker module → ``(marker_dict, worker_fn, config_params)``.
+
+    ``marker_dict`` carries id / stage / kind / provides / requires / inputs /
+    outputs — same shape as the legacy carrier, but a plain ``dict`` for
+    readability. The loader's ``bind_worker`` writes this into ``_LAB_HOOKS``.
+    """
+    module = _importlib.import_module(module_path)
+    worker_fn = _resolve_worker_fn(module)
+    sig = _inspect.signature(worker_fn)
+
+    parts = module_path.split(".")
+    basename = parts[-2] if parts[-1] == "plugin" else parts[-1]
+    if len(parts) >= 4 and parts[1] == "plugins" and parts[2] == "lab":
+        stage = parts[3]
+    else:
+        stage = "unknown"
+    cid = f"lab.{stage}.{basename}"
+
+    meta = _parse_docstring_meta(module.__doc__)
+    kind = meta.get("kind", "TRANSFORMER").upper()
+    description = meta.get("description") or (
+        module.__doc__.splitlines()[0].strip() if module.__doc__ else cid
+    )
+    out_port = meta.get("out_port", "out")
+    out_type = _type_name(sig.return_annotation)
+    provides = (f"{cid}.out:{out_port}",)
+    outputs = ((out_port, out_type),)
+    requires: list[str] = []
+    inputs: list[tuple[str, str, bool]] = []
+    for pname, param in sig.parameters.items():
+        if param.kind is _inspect.Parameter.KEYWORD_ONLY:
+            requires.append(pname)
+            inputs.append((pname, _type_name(param.annotation), True))
+    config_params = tuple(
+        tok.strip() for tok in meta.get("config", "").split() if tok.strip()
+    )
+
+    marker = {
+        "id": cid,
+        "stage": stage,
+        "kind": kind,
+        "description": description,
+        "module": module_path,
+        "class": f"{basename}Worker",
+        "provides": list(provides),
+        "requires": requires,
+        "inputs": [
+            {"port": p, "kind": k, "required": r} for (p, k, r) in inputs
+        ],
+        "outputs": [{"port": p, "kind": k} for (p, k) in outputs],
+        "out_capabilities": list(provides),
+        "factory_aliases": [basename],
+    }
+
+    from lca.plugins.lab.internal.audit import (
+        WorkerAuditFailure,
+        audit_worker,
+    )
+
+    audit_errors = audit_worker(module_path, worker_fn)
+    if audit_errors:
+        raise WorkerAuditFailure(audit_errors, module_path=module_path)
+
+    return marker, worker_fn, config_params
+
+
+def bind_worker(module_path: str, *, ctx: Any = None, config: Any = None) -> None:
+    """Reflect a stage worker module and register its marker into ``_LAB_HOOKS``.
+
+    Provider-form plugins (``provider: yes`` in docstring) opt out and keep
+    their hand-rolled registration path.
+    """
+    del ctx, config
+    from lca.plugins.lab.internal.loader import _LAB_HOOKS
+
+    marker, worker_fn, config_params = discover_worker(module_path)
+    marker["worker_fn"] = worker_fn
+    marker["config_params"] = list(config_params)
+    _LAB_HOOKS[marker["id"]] = marker
+
+
+__all__ += ["WorkerDiscoveryError", "bind_worker", "discover_worker"]

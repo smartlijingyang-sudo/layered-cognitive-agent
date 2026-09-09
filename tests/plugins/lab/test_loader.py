@@ -1,7 +1,7 @@
 """Tests for the LCA lab plugin loader.
 
 PR-A.3 — verifies that lca.plugins.lab.internal.loader correctly loads
-all @plugin carriers and populates _LAB_HOOKS.
+all @plugin modules and populates _LAB_HOOKS.
 """
 
 import pytest

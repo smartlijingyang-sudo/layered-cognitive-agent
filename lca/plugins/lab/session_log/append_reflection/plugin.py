@@ -5,29 +5,21 @@ description: Session.append(graph.reflection.v1).
 """
 from __future__ import annotations
 
-from lca.plugins.lab.internal.hooks import LabCarrier, bind_carrier
+from lca.plugins.lab.internal.loader import _LAB_HOOKS
 
-_CARRIER = LabCarrier(
-    id="lab.session_log.append_reflection",
-    stage="session_log",
-    kind="PROVIDER",
-    description='Session.append(graph.reflection.v1).',
-    node_id="plugin",
-    source_module="lca.plugins.lab.append_reflection.plugin.plugin",
-    source_class="SessionLogEmitterPlugin",
-    provides=["lab.session"],
-    requires=["lab.session"],
-    inputs=(),
-    outputs=(("event", "event"),),
-    out_capabilities=["lab.session_log_marker"],
-)
+_MARKER = {
+    "id": "lab.session_log.append_reflection",
+    "stage": "session_log",
+    "kind": "PROVIDER",
+    "description": "Session.append(graph.reflection.v1).",
+    "module": "lca.plugins.lab.session_log.append_reflection.plugin",
+    "provides": ["lab.session"],
+    "requires": ["lab.session"],
+    "inputs": [],
+    "outputs": [{"port": "event", "kind": "event"}],
+    "out_capabilities": ["lab.session_log_marker"],
+}
 
+_LAB_HOOKS[_MARKER["id"]] = _MARKER
 
-def setup(ctx, config):
-    bind_carrier(_CARRIER, ctx=ctx, config=config)
-
-
-bind_carrier(_CARRIER)
-
-
-__all__ = ["setup"]
+__all__ = []

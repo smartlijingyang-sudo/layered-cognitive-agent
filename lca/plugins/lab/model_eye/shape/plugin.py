@@ -8,29 +8,21 @@ description: Shape the frozen manifest into the model-visible input bytes.
 """
 from __future__ import annotations
 
-from lca.plugins.lab.internal.hooks import LabCarrier, bind_carrier
+from lca.plugins.lab.internal.loader import _LAB_HOOKS
 
-_CARRIER = LabCarrier(
-    id="lab.model_eye.shape",
-    stage="model_eye",
-    kind="PROVIDER",
-    description='Shape the frozen manifest into the model-visible input bytes.',
-    node_id="plugin",
-    source_module="lca.plugins.lab.shape.plugin.plugin",
-    source_class="plugin",
-    provides=['model_visible_bytes'],
-    requires=[],
-    inputs=(),
-    outputs=(("out", "artifact"),),
-    out_capabilities=(),
-)
+_MARKER = {
+    "id": "lab.model_eye.shape",
+    "stage": "model_eye",
+    "kind": "PROVIDER",
+    "description": "Shape the frozen manifest into the model-visible input bytes.",
+    "module": "lca.plugins.lab.model_eye.shape.plugin",
+    "provides": ["model_visible_bytes"],
+    "requires": [],
+    "inputs": [],
+    "outputs": [{"port": "out", "kind": "artifact"}],
+    "out_capabilities": [],
+}
 
+_LAB_HOOKS[_MARKER["id"]] = _MARKER
 
-def setup(ctx, config):
-    bind_carrier(_CARRIER, ctx=ctx, config=config)
-
-
-bind_carrier(_CARRIER)
-
-
-__all__ = ["setup"]
+__all__ = []

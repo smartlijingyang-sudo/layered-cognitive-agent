@@ -187,15 +187,17 @@ _HOOK_PACKAGES: tuple[str, ...] = (
 
 
 def load_all() -> None:
-    """Import every LCA lab @plugin carrier and let it populate _LAB_HOOKS.
+    """Import every LCA lab @plugin module and let it populate _LAB_HOOKS.
 
     Idempotent: subsequent calls are no-ops. Failures are logged at WARNING
     level and do not raise — a missing plugin is treated the same way as
     the previous ``resolve_plugin`` path did (warn-and-skip).
 
-    ADR-0211 §7:对 ``lca.plugins.lab.act.*`` 模块自动调 ``bind_act_worker``
-    反射入口(worker 文件零 framework 知识);其它模块走传统的
-    ``_CARRIER = LabCarrier(...)`` + ``bind_carrier(_CARRIER)`` 自注册路径。
+    For stage workers (perceive / think / act / reflect / remember / etc.)
+    the loader reflects the module via ``bind_worker`` so the worker
+    file stays free of framework imports. Provider-form modules (those
+    with ``provider: yes`` in the docstring) opt out and use their own
+    module-level registration (direct dict write into ``_LAB_HOOKS``).
     """
     global _LOADED
     if _LOADED:
@@ -215,7 +217,7 @@ def load_all() -> None:
             continue
         # ADR-0211 §7:stage 工人走反射入口,framework 自填 marker。
         # 例外:模块 docstring 含 ``provider: yes`` / ``provider: true`` 的
-        # 走传统自注册路径(provider 不是 worker,需要显式 requires)。
+        # 走模块级自注册路径(provider 不是 worker,需要显式 requires)。
         parts = sub_module_name.split(".")
         # ``lca.plugins.lab.<stage>.<basename>.plugin`` → parts[3] = stage
         stage = parts[3] if len(parts) >= 4 else None
@@ -225,9 +227,7 @@ def load_all() -> None:
             except ImportError as exc:
                 _log.warning("stage sub-module import failed: %s: %s", sub_module_name, exc)
                 continue
-            # ADR-0211 §7:``provider: yes`` docstring marker → skip reflection,
-            # 走老 ``_CARRIER + bind_carrier`` 路径(provider 需要显式 requires)。
-            # 模块 import 时 ``bind_carrier(_CARRIER)`` 已自填 marker,这里不再补。
+            # provider 形态 plugin 模块级自填 marker;不调反射,避免覆盖。
             doc = (sub_mod.__doc__ or "").lower()
             if "provider: yes" in doc or "provider: true" in doc:
                 continue
@@ -244,9 +244,6 @@ def load_all() -> None:
             try:
                 bind_worker(sub_module_name)
             except WorkerAuditFailure as exc:
-                # ADR-0211 §8:warn 模式 log 不 raise,marker 缺失由 reflection
-                # 测试 fixture 显式接受(见 tests/lab/test_reflection.py);strict
-                # 模式直接 raise,CI / 端到端 fail-loud。
                 if audit_mode == "raise":
                     raise
                 _log.warning(
@@ -265,18 +262,11 @@ def reset_for_tests() -> None:
     """Test-only — clear the loader state so each test starts clean."""
     global _LOADED
 
-    # ADR-0211 §6 §1:``worker.py`` 已退役,不再 import;``_ALIASES`` 随 hooks.py
-    # 重置。
-
     # Remove the hook packages from sys.modules so they get re-imported
-    # (重新触发 ``bind_carrier(_CARRIER)`` 模块级调用,用于 provider 例外)。
+    # (重新触发 module-level registration;provider plugin 直接 dict 写入)。
     for module_name in _HOOK_PACKAGES:
         if module_name in sys.modules:
             del sys.modules[module_name]
-
-    # Reset hooks.py _ALIASES 表
-    from lca.plugins.lab.internal import hooks as _hooks_mod
-    _hooks_mod._ALIASES.clear()
 
     _LAB_HOOKS.clear()
     _LOADED = False

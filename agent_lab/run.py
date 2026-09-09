@@ -33,7 +33,7 @@ from agent_lab.runtime.runner import run as run_graph
 
 
 def _bootstrap() -> None:
-    """Load .env (for LLM secrets) and LabCarrier plugins.
+    """Load .env (for LLM secrets) and lab plugins.
 
     Workers live in ``lca.plugins.lab``; this entry must not import
     ``agent_lab.nodes``.
@@ -348,15 +348,91 @@ def _describe_graph(name: str) -> None:
         print(f"    - {link.node_id} -> {link.sub_spec_id}")
 
 
-def _iter_carrier_markers() -> list[tuple[str, dict]]:
-    from lca.plugins.lab.internal.loader import _LAB_HOOKS, load_all
+def _scan_plugin_modules() -> list[tuple[str, dict]]:
+    """Collect lab plugin metadata by scanning plugin module docstrings.
 
-    load_all()
+    Each ``lca.plugins.lab.<stage>.<basename>.plugin`` module declares
+    ``id:``, ``stage:``, ``kind:``, ``description:`` etc. in its
+    docstring. Returns ``[(slot_id, marker_dict), ...]`` shaped like the
+    legacy LabCarrier markers so ``--describe`` output stays stable.
+    """
+    import importlib
+    import pathlib
+
+    import lca.plugins.lab as _pkg
+
     out: list[tuple[str, dict]] = []
-    for slot_id, marker in sorted(_LAB_HOOKS.items()):
-        if isinstance(marker, dict):
-            out.append((slot_id, marker))
+    seen: set[str] = set()
+
+    def _walk(pkg_path: pathlib.Path, prefix: str) -> None:
+        for entry in sorted(pkg_path.iterdir()):
+            if entry.name.startswith("_") or not entry.is_dir():
+                continue
+            if not (entry / "__init__.py").exists():
+                continue
+            child_prefix = f"{prefix}.{entry.name}"
+            plugin_py = entry / "plugin.py"
+            if plugin_py.exists():
+                mod_name = f"{child_prefix}.plugin"
+                if mod_name in seen:
+                    continue
+                seen.add(mod_name)
+                try:
+                    mod = importlib.import_module(mod_name)
+                except Exception as exc:  # pragma: no cover - import surface
+                    _warn = f"describe: import {mod_name} failed: {exc}"
+                    print(_warn, file=sys.stderr)
+                    continue
+                meta = _parse_plugin_docstring(mod.__doc__ or "")
+                slot_id = meta.get("id") or mod_name
+                marker = {
+                    "id": meta.get("id") or entry.name,
+                    "stage": meta.get("stage", ""),
+                    "kind": meta.get("kind", ""),
+                    "description": meta.get("description", ""),
+                    "module": mod_name,
+                    "provides": meta.get("provides", []),
+                    "requires": meta.get("requires", []),
+                    "out_port": meta.get("out_port", "out"),
+                    "factory_aliases": meta.get("factory_aliases", []),
+                    "config": meta.get("config", []),
+                }
+                out.append((slot_id, marker))
+            _walk(entry, child_prefix)
+
+    _walk(pathlib.Path(_pkg.__path__[0]), "lca.plugins.lab")
+    out.sort(key=lambda kv: kv[0])
     return out
+
+
+def _parse_plugin_docstring(doc: str) -> dict[str, object]:
+    """Parse ``key: value`` lines from a plugin module docstring.
+
+    Supports single-value keys (``stage: act``) and list values split by
+    whitespace or comma (``provides: a b c`` / ``requires: x, y``).
+    """
+    meta: dict[str, object] = {
+        "provides": [],
+        "requires": [],
+        "factory_aliases": [],
+        "config": [],
+    }
+    for line in doc.splitlines():
+        s = line.strip()
+        if not s or ":" not in s:
+            continue
+        if s.startswith(("#", "---", "===")):
+            continue
+        k, _, v = s.partition(":")
+        key = k.strip().lower()
+        val = v.strip()
+        if key in {"provides", "requires", "factory_aliases", "config"}:
+            meta[key] = [t.strip() for t in val.replace(",", " ").split() if t.strip()]
+        elif key == "worker":
+            meta["worker"] = val
+        elif key in {"id", "stage", "kind", "description", "out_port"}:
+            meta[key] = val
+    return meta
 
 
 def _marker_matches(slot_id: str, marker: dict, name: str) -> bool:
@@ -368,27 +444,18 @@ def _marker_matches(slot_id: str, marker: dict, name: str) -> bool:
 def _print_carrier_marker(slot_id: str, marker: dict) -> None:
     print(f"\n[{slot_id}]  {marker.get('id', slot_id)}")
     print(f"  stage={marker.get('stage', '')}  kind={marker.get('kind', '')}")
+    print(f"  module={marker.get('module', '')}")
     print(f"  description: {marker.get('description', '')}")
-    inputs = marker.get("inputs") or []
-    if inputs:
-        print("  inputs:")
-        for p in inputs:
-            print(
-                f"    - {p.get('port')} ({p.get('kind')}, required={p.get('required')})"
-            )
-    outputs = marker.get("outputs") or []
-    if outputs:
-        print("  outputs:")
-        for p in outputs:
-            print(f"    - {p.get('port')} ({p.get('kind')})")
     if marker.get("provides"):
         print(f"  provides: {list(marker['provides'])}")
     if marker.get("requires"):
         print(f"  requires: {list(marker['requires'])}")
-    if marker.get("emits"):
-        print(f"  emits: {list(marker['emits'])}")
+    if marker.get("out_port"):
+        print(f"  out_port: {marker['out_port']}")
     if marker.get("factory_aliases"):
         print(f"  factory_aliases: {list(marker['factory_aliases'])}")
+    if marker.get("config"):
+        print(f"  config: {list(marker['config'])}")
 
 
 def _describe(target: str | None) -> None:
@@ -399,7 +466,7 @@ def _describe(target: str | None) -> None:
 
     if target is None or target == "all":
         print("=== Node Manifests ===")
-        for slot_id, marker in _iter_carrier_markers():
+        for slot_id, marker in _scan_plugin_modules():
             _print_carrier_marker(slot_id, marker)
         print("\n\n=== Graph Manifests ===")
         for stem in ("agent_loop", "model_eye", "act", "perceive", "think"):
@@ -441,11 +508,11 @@ def _describe(target: str | None) -> None:
 
     kind, _, name = target.partition(":")
     if kind == "node":
-        for slot_id, marker in _iter_carrier_markers():
+        for slot_id, marker in _scan_plugin_modules():
             if _marker_matches(slot_id, marker, name):
                 _print_carrier_marker(slot_id, marker)
                 return
-        print(f"no LabCarrier marker for: {name}")
+        print(f"no plugin module matches: {name}")
     elif kind == "graph":
         _describe_graph(name)
     else:

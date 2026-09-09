@@ -8,29 +8,21 @@ description: Commit a frozen ContextManifest.
 """
 from __future__ import annotations
 
-from lca.plugins.lab.internal.hooks import LabCarrier, bind_carrier
+from lca.plugins.lab.internal.loader import _LAB_HOOKS
 
-_CARRIER = LabCarrier(
-    id="lab.llm.commit_manifest",
-    stage="llm",
-    kind="PROVIDER",
-    description='Commit a frozen ContextManifest.',
-    node_id="plugin",
-    source_module="lca.plugins.lab.commit_manifest.plugin.plugin",
-    source_class="plugin",
-    provides=['llm_manifest'],
-    requires=[],
-    inputs=(),
-    outputs=(("out", "artifact"),),
-    out_capabilities=(),
-)
+_MARKER = {
+    "id": "lab.llm.commit_manifest",
+    "stage": "llm",
+    "kind": "PROVIDER",
+    "description": "Commit a frozen ContextManifest.",
+    "module": "lca.plugins.lab.llm.commit_manifest.plugin",
+    "provides": ["llm_manifest"],
+    "requires": [],
+    "inputs": [],
+    "outputs": [{"port": "out", "kind": "artifact"}],
+    "out_capabilities": [],
+}
 
+_LAB_HOOKS[_MARKER["id"]] = _MARKER
 
-def setup(ctx, config):
-    bind_carrier(_CARRIER, ctx=ctx, config=config)
-
-
-bind_carrier(_CARRIER)
-
-
-__all__ = ["setup"]
+__all__ = []
