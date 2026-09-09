@@ -145,6 +145,24 @@ class LabCarrier:
 - [x] 旧 CognitivePhaseGraphPlan 数据结构保留向后兼容
 - [x] phase.<name>.<executor> capability 闭集格式不变
 
+### 2026-09-09 commit 3 (ADR-0210 §6.3 实施)
+
+- [x] agent_lab/graph/spec.py 新增 current_region_label(spec)
+  (build full region label from spec.region + spec.phase)
+- [x] agent_lab/graph/spec.py 新增 walk_sub_specs(root) +
+  _walk_sub_specs(spec, registry, _seen) (iterative DFS walker
+  with cycle protection)
+- [x] agent_lab/graph/validate.py 新增
+  validate_subgraph_with_profile(root, profile_regions, registry)
+  (C14 region validation over ENTIRE nested sub_spec graph, not just root)
+- [x] validate_subgraph_with_profile_or_raise(...) raise variant
+- [x] tests/architecture/test_p7_runtime_region_recursion.py 全绿
+  (17 tests: region label construction + nested walk + cycle
+  prevention + per-sub_spec independence + profile extension)
+- [x] 154 passed total in tests/plugins/lab/ + tests/architecture/
+  (3 skips = cordis baseline + 1 future PR placeholder)
+- [x] 无回归
+
 ### 未来 commit (待做)
 
 - [ ] ADR-0210 升 Accepted（需 +1 owner review + 真实 production
