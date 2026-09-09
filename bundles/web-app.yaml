@@ -62,6 +62,10 @@ entries:
   name: gate_tool_loop_breaker
   $module: lca.plugins.cognitive.gate.tool_loop_breaker.plugin
   config: {}
+- id: gate.multi-tool-loop-breaker
+  name: gate_multi_tool_loop_breaker
+  $module: lca.plugins.cognitive.gate.multi_tool_loop_breaker.plugin
+  config: {}
 - id: gate.progress-loop-detector
   name: gate_progress_loop_detector
   $module: lca.plugins.cognitive.gate.progress_loop_detector.plugin
