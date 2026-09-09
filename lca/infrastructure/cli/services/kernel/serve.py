@@ -163,7 +163,9 @@ class KernelServeService:
                 stdout=log,
                 stderr=log,
                 stdin=subprocess.DEVNULL,
-                start_new_session=True,
+                # 不设 start_new_session=True:让子进程保持 lca-ops 的
+                # process group,SIGINT 能正确传给 uvicorn worker。
+                # close_fds=True 确保不继承无关 fd。
             )
         except OSError:
             return False

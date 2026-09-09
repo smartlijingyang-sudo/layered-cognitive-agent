@@ -11,7 +11,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT}"
 
-if command -v uv >/dev/null 2>&1; then
+# 默认走 venv python3(共享 lca_kernel serve 子进程解释器);详见
+# docs/specs/python-environment.md 与 KernelServeService._spawn docstring。
+# LCA_USE_UV=1 时显式回退到 uv run(创独立 .venv, vendored 包不同步,慎用)。
+if [ "${LCA_USE_UV:-0}" = "1" ] && command -v uv >/dev/null 2>&1; then
   exec uv run python3 -m lca.infrastructure.cli.cli "$@"
 fi
 exec python3 -m lca.infrastructure.cli.cli "$@"

@@ -17,7 +17,9 @@ kernel_serve:
   health_path: /health
   # 助理域（ADR-0187）：web-assistant = web-standard + assistant-runtime bundle。
   # 换回 profiles/web-standard.yaml 即关闭助理能力（存量路径不受影响，I-A1）。
-  profile: profiles/web-assistant.yaml
+  # 2026-09-09 临时回滚:web-assistant 当前 plugin 树 boot 失败,先用 web-standard
+  # 拉起 kernel;后续按 ADR-0187 修复 web-assistant plugin 集后切回。
+  profile: profiles/web-standard.yaml
 
 # ── LobeHub (Next.js frontend) ────────────────────────────────────────
 lobehub:
