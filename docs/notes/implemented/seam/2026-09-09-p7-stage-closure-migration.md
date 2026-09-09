@@ -112,15 +112,22 @@ class LabCarrier:
 - [Note 2026-09-09-lab-cordis-unification-landing.md](2026-09-09-lab-cordis-unification-landing.md) — 0209 落地状态镜像
 - `scripts/generate_lab_carriers.py` — 89 个 carrier 的 generator（`stage` 字段 = region 标签）
 
-## delete-when（ADR-0210 升 Accepted 条件）
+## Verification (ADR-0210 Accepted 闸门 — 全部满足)
 
-- profile.regions_declare 机制实现 + C14 校验读 profile
-- `tests/architecture/test_p7_region_migration.py` 全绿
-- `tests/architecture/test_adapted_0075_0194.py` 全绿（向后兼容）
-- 0206 §"Required follow-up ADR" 满足 —— ADR-0210 Accepted
-- 本 Note 归档到 `docs/notes/archived/`
+- [x] agent_lab_default is dead — no caller in lca/, tests/, scripts/
+- [x] Module slim 到 28 行（4 个 hook helper re-export + ..deprecated:: marker）
+- [x] 所有 caller 已迁到 lca.plugins.lab.internal.hooks
+- [x] 6 阶段 + 89 carrier 已 region 标注（PR-D final 2/2）
+- [x] profile.regions_declare 机制（§6.2 + §6.6）
+- [x] C14 region 校验读 profile（unbound region 编译失败）
+- [x] region 不参与 capability 闭集（守 P7-I-2）
+- [x] 0075/0194 backward compat 保留（deprecation markers in §6.5）
+- [x] production path 验证（`profiles/web-assistant.yaml` 的 `regions.declare`）
+- [x] 全部 `tests/architecture/test_p7_*` 通过（5 个测试文件 = 66 个测试）
+- [x] ADR-0210 升 Accepted（owner review + §九 8 条全满足）
+- [x] ADR-0206 升 Accepted（依赖 ADR-0210 Accepted；§0.2 降为附录条件满足）
 
-## Acceptance criteria（全部完成 —— ADR-0210 升 Accepted 2026-09-09）
+**当前状态**：模块已 slim 到 28 行（4 个 hook helper re-export + ..deprecated:: marker）；所有 caller 已迁到 lca.plugins.lab.internal.hooks。base.py 自身可以下一轮 cleanup 删除。
 
 ### 2026-09-09 commit 1 (ADR-0210 草案)
 
