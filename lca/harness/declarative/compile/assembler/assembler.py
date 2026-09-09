@@ -29,6 +29,9 @@ from lca.harness.declarative.compile.instrument.wrap import (
     wrap_executor,
     wrap_instrument,
 )
+from lca.harness.declarative.compile.subgraph_validation import (
+    validate_subgraph_references,
+)
 from lca.harness.declarative.controls.validation import require_valid
 
 
@@ -146,7 +149,16 @@ class GraphAssembler:
 
     本类刻意不导入任一业务插件模块，亦不会根据 plugin ID、类名或 factory
     key 决定分支。所有实现都由 plan node 的 capability key 定位。
+
+    Subgraph reference validation is delegated to the
+    ``SubgraphResolver`` registered at construction time. When no
+    resolver is registered, plans with ``PhaseEdge.subgraph_ref`` edges
+    will fail validation at compile time with ``PG-004`` raised by the
+    caller (the runtime factory wires a default resolver).
     """
+
+    def __init__(self, *, subgraph_resolver: object | None = None) -> None:
+        self._subgraph_resolver = subgraph_resolver
 
     def assemble(self, plan: CompiledRunPlan, scope: RestrictedScope) -> ExecutablePlan:
         if plan.phase_graph is None or not plan.phase_bindings:
@@ -154,6 +166,13 @@ class GraphAssembler:
                 "PG-001", "CompiledRunPlan has no declarative phase graph"
             )
         require_valid(plan.validation_report)
+        # Validate ``PhaseEdge.subgraph_ref`` references against any
+        # registered resolver. The assembler owns no I/O of its own; the
+        # default resolver is wired in by the runtime factory, and tests
+        # substitute a stub via ``GraphAssembler(resolver=...)``.
+        resolver = getattr(self, "_subgraph_resolver", None)
+        if resolver is not None:
+            validate_subgraph_references(plan, resolver)
         nodes: dict[str, ExecutableNode] = {}
         policies = {node.id: node.execution_policy for node in plan.phase_graph.nodes}
         for binding in plan.phase_bindings:

@@ -144,6 +144,16 @@ entries:
         - source: reflect.main
           target: remember.main
           when: true
+          # Minimum edge-level subgraph reference: when this edge fires,
+          # the interpreter recurses into ``bundles/reflect-subgraph.yaml``
+          # at ``reflect.inner_score`` and returns to the outer graph at
+          # ``remember.main``. The assembler enforces the matching
+          # back-reference edge in the subgraph at compile time (PG-004).
+          subgraph_ref:
+            plan_ref: bundles/reflect-subgraph.yaml
+            entry_node: reflect.inner_score
+            binding_edge: reflect.main
+            return_on: next
         - source: remember.main
           target: stop.main
           when: result.result_kind == "phase_error"
