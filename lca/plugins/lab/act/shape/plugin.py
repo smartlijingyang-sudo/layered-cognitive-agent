@@ -1,95 +1,79 @@
-"""act.shape — Decision → Intent (act-phase entry worker).
-
-Cordis 终态: 唯一真源是 ``@plugin`` 装饰器 + ``class _ActShape(Worker)``。
-模块级 ``register_worker`` 是 runtime 派发面的兜底
-（``agent_lab.runtime.invoke.lookup_worker`` 直接查 ``_WORKERS``），
-它与 cordis 启动路径殊途同源:同一个 ``_ActShape`` 类既被 cordis
-启动注入,也通过模块 import 副作用注册到 ``lca.plugins.lab.internal.worker``。
-"""
+# act.shape — Decision → Intent。
+#
+# 做什么:把 Decision 重排成 act-phase Intent schema。
+# 不做什么:不算 verdict、不调框架、不产出 Observation。
+#
+# ADR-0211 §1.1 W-1/W-2/W-3:execute keyword-only / typed / 无 framework ctx。
+# ADR-0211 §5.1:签名 = 真实依赖,读者一眼看清。
+# ADR-0211 §5.3:一个 Worker 一个动词 —— shape 只做"整形"。
+#
+# delete-when:无。
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from dataclasses import dataclass
+from typing import Any
 
-from agent_lab.primitives.artifact import Artifact, ArtifactKind
-
-from lca.contracts.atoms.control.slot import ControlSlot
-from lca.contracts.atoms.functional.group import FunctionalGroup
-from lca.contracts.atoms.scope.scope import Scope
-from lca.contracts.harness.composition.plugin_contract import (
-    ArchitectureContract,
-    AuthorityContract,
-    EvidenceContract,
-    LifecycleContract,
-    PluginContract,
-    PluginIdentity,
-)
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
-    OwnershipDeclaration,
-)
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.plugins.lab.internal.worker import Worker, register_worker
+from lca.contracts.models.core.execution.decision import Decision
+from lca.plugins.lab.internal.hooks import LabCarrier, bind_carrier
 
 
-class Config(BaseModel):
-    model_config = {"extra": "forbid"}
-
-
-@plugin(
+# ---------------------------------------------------------------------------
+# Carrier —— framework 注册 marker。
+# ---------------------------------------------------------------------------
+_CARRIER = LabCarrier(
     id="lab.act.shape",
-    provides=["lab.act.shape.out:intent"],
-    requires=["decision"],
-    layer="L4",
-    effects="none",
-    description="act.shape — Decision → Intent for Body.act().",
-    kind=PluginKind.PRIMITIVE,
-    functional_group=FunctionalGroup.G7_EXECUTION,
-    contract=PluginContract(
-        identity=PluginIdentity(version="v1"),
-        architecture=ArchitectureContract(
-            group=FunctionalGroup.G7_EXECUTION,
-            control_slots=(ControlSlot.OBSERVE_WILDCARD,),
-        ),
-        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
-        authority=AuthorityContract(grants=("lab.act.shape.out:intent",)),
-        observability=EvidenceContract(
-            descriptors=("lab.act.shape.completed",),
-        ),
-    ),
-    ownership=OwnershipDeclaration(
-        reads=("decision",),
-        emits=("lab.act.shape.out:intent",),
-        state_mutation="forbidden",
-    ),
+    stage="act",
+    kind="TRANSFORMER",
+    description="act.shape — Decision → Intent.",
+    node_id="shape",
+    source_module="lca.plugins.lab.act.shape.plugin",
+    source_class="shape",
+    provides=("lab.act.shape.out:intent",),
+    requires=("decision",),
+    emits=("lab.act.shape.out:intent",),
+    inputs=(("decision", "decision", True),),
+    outputs=(("intent", "intent"),),
+    out_capabilities=("lab.act.shape.out:intent",),
 )
-async def setup(ctx: PluginContext, config: Config) -> None:
-    """Register the Worker on the cordis context as the canonical carrier."""
-    register_worker("act.shape", _ActShape)
-    register_worker("lab.act.shape", _ActShape)
 
 
-class _ActShape(Worker):
-    factory = "lab.act.shape"
-
-    def execute(self, node, inputs, seams=None):
-        out_port = node.config.get("to", "intent")
-        decision_a = inputs.get(node.config.get("from", "decision"))
-        raw = (
-            decision_a.content
-            if decision_a is not None and isinstance(decision_a.content, dict)
-            else {}
-        )
-        return {
-            out_port: Artifact(
-                kind=ArtifactKind.INTENT,
-                content=dict(raw),
-                schema_ref="tool.intent.v1",
-            )
-        }
+def setup(ctx, config):
+    """Register the carrier with the loader on plugin boot."""
+    bind_carrier(_CARRIER, ctx=ctx, config=config)
 
 
-# 模块级 fallback —— `python -m agent_lab.run` 进程外入口走
-# ``load_all()`` 手动 import 而非 cordis 启动,这里保证 Worker
-# 在没有走 cordis 的情况下也能被 ``lookup_worker`` 查到。
-register_worker("act.shape", _ActShape)
-register_worker("lab.act.shape", _ActShape)
+bind_carrier(_CARRIER)
+
+
+# ---------------------------------------------------------------------------
+# Typed worker —— 纯函数,5 行。
+# ---------------------------------------------------------------------------
+
+# ADR-0211 §3:effect_kind 闭集,放模块顶部让 lint 易检。
+EFFECT_KIND_DEFAULT = "use_tool"
+
+
+@dataclass(frozen=True, slots=True)
+class Intent:
+    """act-phase Intent:action_type + tool + args + effect_kind + verdict。"""
+
+    action_type: str
+    tool: str | None
+    args: dict[str, Any]
+    effect_kind: str
+    verdict: str = "allow"
+
+
+def shape(*, decision: Decision) -> Intent:
+    """把 Decision 字典重排成 Intent。"""
+    first_call = decision.tool_calls[0] if decision.tool_calls else None
+    return Intent(
+        action_type=decision.action_type,
+        tool=first_call.tool_name if first_call else None,
+        args=dict(first_call.arguments) if first_call else {},
+        effect_kind=decision.extra.get("effect_kind", EFFECT_KIND_DEFAULT),
+    )
+
+
+__all__ = ["EFFECT_KIND_DEFAULT", "Intent", "setup", "shape"]

@@ -1,87 +1,50 @@
-"""lab.body provider — composes SimpleBody + PipelineSafeExecutor + Transport for the act phase.
-
-唯一真源是 ``get_body()`` / ``plan_ref_default()`` 两个函数。
-``act.execute`` 直接 ``from lca.plugins.lab.act.body_provider import get_body``
-拿到 SimpleBody 句柄 —— 派发路径是直接的 Python import,既不需要
-loader_marker 也不需要 cordis ctx 桥接。
-
-composition 步骤:
-    1. ``lab.tool_registry`` → SimpleToolRegistry
-    2. ``PipelineSafeExecutor(ToolPermissionManifest(allowed))``
-    3. ``lab.transport`` → InternalTransport
-    4. ``build_action_registry_from_authority(...)``
-    5. ``SimpleBody(tool_registry, safe_executor, transport, action_registry)``
-"""
+# act.body_provider — lab.body capability 的 marker provider。
+#
+# 做什么:声明 ``lab.body`` capability key 由本 provider 提供;在 boot 时
+# 通过 Cordis ctx 装配 SimpleBody(由 ``compose`` 函数内部调)。
+# 不做什么:不再 export ``get_body()`` 函数(由 act.compose 节点接管);
+# 不再被 act.execute / body / dispatch 等 worker 文件 import(违反
+# ADR-0211 §1.3「装配唯一 = Profile/Bundle」)。
+#
+# ADR-0211 §6 §3:本文件保留但收紧 — ``get_body()`` 函数退役;
+# ``act.compose`` 节点化接管装配职责。
 
 from __future__ import annotations
 
-from lca.plugins.lab.session.provider.plugin import PLAN_REF
+from lca.plugins.lab.internal.hooks import LabCarrier, bind_carrier
 
 
-def get_body(allowed_tools=None):
-    """Build a SimpleBody instance with the lab tool registry.
-
-    Args:
-        allowed_tools: optional whitelist; defaults to all tools in the
-            LabToolRegistry. The SimpleToolRegistry is built once per call.
-
-    Composition:
-        - PipelineSafeExecutor(ToolPermissionManifest(allowed))
-        - SimpleToolRegistry (built from lab.tools.provider.configure())
-        - InternalTransport (built from lab.transport.provider.get_transport())
-        - SimpleBody(tool_registry, safe_executor, transport, action_registry)
-    """
-    from lca.cognition.body.executor.pipeline_safe_executor import PipelineSafeExecutor
-    from lca.cognition.body.executor.simple_body import SimpleBody
-    from lca.cognition.body.tools.tool_registry import SimpleToolRegistry
-    from lca.contracts.models.team.role.team import ToolPermissionManifest
-    from lca.plugins.act.action.handlers_provider import DefaultActionHandlerRegistry
-    from lca.plugins.composer.act.action_authority import build_action_registry_from_authority
-
-    from lca.plugins.lab.tools.provider.plugin import get_registry as get_lab_registry
-    from lca.plugins.lab.transport.provider.plugin import get_transport
-
-    # 1. Build the lab tool registry -> SimpleToolRegistry copy
-    lab_tools = get_lab_registry()
-    tools = SimpleToolRegistry()
-    for name in lab_tools.names():
-        tool = lab_tools.get(name)
-        if tool is not None:
-            tools.register(tool)
-
-    # 2. Build the safe executor with the allowed tools
-    allowed = sorted(allowed_tools) if allowed_tools else sorted(lab_tools.names())
-    safe_executor = PipelineSafeExecutor(ToolPermissionManifest(allowed_tools=allowed))
-
-    # 3. Build the transport (lab_echo agent already registered)
-    transport = get_transport()
-
-    # 4. Build the action registry (default handlers + call_tool alias)
-    action_registry = build_action_registry_from_authority(
-        tools=tools,
-        safe_executor=safe_executor,
-        transport=transport,
-        handler_registry=DefaultActionHandlerRegistry(),
-        allowed_actions=None,
-        forbidden_actions=None,
-    )
-
-    # 5. Compose the body
-    body = SimpleBody(
-        tool_registry=tools,
-        safe_executor=safe_executor,
-        transport_registry=transport,
-        action_registry=action_registry,
-    )
-    # Expose helpers the caller expects
-    body.lab_tools = lambda: lab_tools
-    body.plan_ref = lambda: PLAN_REF
-    return body
+# ---------------------------------------------------------------------------
+# Carrier —— lab.body capability 的 marker。
+# ---------------------------------------------------------------------------
+_CARRIER = LabCarrier(
+    id="lab.act.body_provider",
+    stage="composition",
+    kind="PROVIDER",
+    description="lab.body provider — SimpleBody composition for act.compose.",
+    node_id="body_provider",
+    source_module="lca.plugins.lab.act.body_provider.plugin",
+    source_class="body_provider",
+    provides=("lab.body",),
+    requires=(
+        "lab.tool_registry",
+        "lab.safe_executor",
+        "lab.transport",
+        "lab.plan_ref",
+    ),
+    emits=("lab.body",),
+    inputs=(),
+    outputs=(("body", "body"),),
+    out_capabilities=("lab.body",),
+)
 
 
-def plan_ref_default() -> str:
-    """Default plan_ref for the lab act phase."""
-    return PLAN_REF
+def setup(ctx, config):
+    """Register the carrier with the loader on plugin boot."""
+    bind_carrier(_CARRIER, ctx=ctx, config=config)
 
 
-__all__ = ["get_body", "plan_ref_default"]
+bind_carrier(_CARRIER)
+
+
+__all__ = ["setup"]
