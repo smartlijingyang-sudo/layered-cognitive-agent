@@ -149,3 +149,87 @@ __all__ = [
     "HookEvent",
     "fanout_hooks",
 ]
+
+
+# ---------------------------------------------------------------------------
+# PR-D final 2/2 — LabCarrier + bind_carrier
+#
+# A cordis-free mirror of the LCA @plugin carrier data model. The full
+# ``lca.harness.plugin_api`` path requires `cordis.plugin` (not available
+# in the test environment), so we re-declare the data shape the loader
+# needs and re-export it under the lab plugin tree.
+# ---------------------------------------------------------------------------
+
+from typing import Any, Callable
+
+
+@dataclass(frozen=True)
+class LabCarrier:
+    """Pydantic-free mirror of the LCA @plugin carrier shape.
+
+    Carries everything the loader's ``register_carrier`` needs to populate
+    `_LAB_HOOKS` and to satisfy the capability closed-set spec.
+
+    Fields:
+        id:              carrier slot id (e.g. ``lab.perceive.sense``)
+        stage:           process / phase (perceive / think / act / ...)
+        kind:            NodeKind equivalent (TRANSFORMER / EXECUTOR / ...)
+        description:     human-readable
+        node_id:         the agent_lab node factory id (matches basename)
+        source_module:   module path that owns the legacy class
+        source_class:    legacy class name (lazy-imported at runtime)
+        provides:        capability keys the node contributes
+        requires:        capability keys the node consumes
+        emits:           event-class / artefact-class names the node emits
+        inputs:          port spec (port_id, port_kind, required)
+        outputs:         port spec (port_id, port_kind)
+        out_capabilities: out:<port> capability keys (for closure spec)
+    """
+    id: str
+    stage: str
+    kind: str
+    description: str
+    node_id: str
+    source_module: str
+    source_class: str
+    provides: tuple[str, ...] = ()
+    requires: tuple[str, ...] = ()
+    emits: tuple[str, ...] = ()
+    inputs: tuple[tuple[str, str, bool], ...] = ()   # (port, kind, required)
+    outputs: tuple[tuple[str, str], ...] = ()         # (port, kind)
+    out_capabilities: tuple[str, ...] = ()
+
+
+def bind_carrier(carrier: LabCarrier, *, ctx: Any = None, config: Any = None) -> None:
+    """Register a LabCarrier with the loader's _LAB_HOOKS.
+
+    The real @plugin decorator builds a PluginDefinition and registers
+    it with Cordis. This function does the same end state for the lab
+    plugin tree without the cordis dependency.
+
+    The marker stored in _LAB_HOOKS is the dict the runner reads when
+    resolving a node factory.
+    """
+    from lca.plugins.lab.internal.loader import _LAB_HOOKS  # local import
+
+    marker = {
+        "id": carrier.node_id,
+        "stage": carrier.stage,
+        "kind": carrier.kind,
+        "module": carrier.source_module,
+        "class": carrier.source_class,
+        "provides": list(carrier.provides),
+        "requires": list(carrier.requires),
+        "emits": list(carrier.emits),
+        "inputs": [
+            {"port": p, "kind": k, "required": r}
+            for (p, k, r) in carrier.inputs
+        ],
+        "outputs": [{"port": p, "kind": k} for (p, k) in carrier.outputs],
+        "out_capabilities": list(carrier.out_capabilities),
+        "description": carrier.description,
+    }
+    _LAB_HOOKS[carrier.id] = marker
+
+
+__all__ += ["LabCarrier", "bind_carrier"]
