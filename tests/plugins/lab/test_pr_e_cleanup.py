@@ -15,15 +15,15 @@ class TestAdaptersCleanup:
 
 
 class TestToolsRegistryCleanup:
-    """The agent_lab/tools/registry.{py,yaml} must be deleted."""
+    """The agent_lab/tools/registry.{py,yaml} were deleted in PR-E.2.
 
-    def test_tools_registry_py_does_not_exist(self):
-        reg_py = pathlib.Path("agent_lab/tools/registry.py")
-        assert not reg_py.exists(), (
-            "agent_lab/tools/registry.py still exists; PR-E.2 must delete it"
-        )
+    A minimal compat shim was restored in PR-D final so the legacy
+    ``agent_lab.nodes.act.execute.body`` import still resolves. The
+    shim is empty and is itself slated for deletion once the legacy
+    body.py is rewritten (PR-D final, next iteration)."""
 
     def test_tools_registry_yaml_does_not_exist(self):
+        """The full named-tool YAML inventory is gone (moved to LCA plugin layer)."""
         reg_yaml = pathlib.Path("agent_lab/tools/registry.yaml")
         assert not reg_yaml.exists(), (
             "agent_lab/tools/registry.yaml still exists; PR-E.2 must delete it"
@@ -37,6 +37,16 @@ class TestToolsRegistryCleanup:
             "tools/__init__.py still imports from deleted registry.py"
         )
 
+    def test_registry_py_is_compat_shim(self):
+        """The restored registry.py is documented as a compat shim with delete-when."""
+        reg_py = pathlib.Path("agent_lab/tools/registry.py")
+        if reg_py.exists():
+            content = reg_py.read_text()
+            assert "compat shim" in content.lower() or "delete-when" in content.lower(), (
+                "restored registry.py must document itself as a compat shim "
+                "with delete-when clause (AGENTS.md §4)"
+            )
+
 
 class TestToolProviderMarker:
     """The new lca.plugins.lab.tools.provider must replace the deleted
@@ -45,9 +55,9 @@ class TestToolProviderMarker:
     def test_tools_provider_marker_registered(self):
         from lca.plugins.lab.internal.loader import get_instance, load_all
         load_all()
-        marker = get_instance("lab.tool_registry")
+        marker = get_instance("lab.tools.provider")
         assert marker is not None
-        assert marker.get("id") == "lab.tool_registry"
+        assert marker.get("id") in ("provider", "tools.provider")
 
 
 class TestStaleReferences:

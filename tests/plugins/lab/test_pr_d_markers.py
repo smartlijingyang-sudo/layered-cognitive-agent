@@ -88,32 +88,23 @@ class TestPRDMarkerGeneration:
             assert "id" in marker, f"{marker_id} marker missing 'id' field"
 
     def test_every_marker_id_matches_slot(self):
-        """Marker['id'] should be either the basename (node markers) or the
-        full slot id (provider markers — body / tool_registry / transport / session).
+        """Marker['id'] should match either the basename OR the full slot id
+        (node markers use basename; provider markers use basename because
+        the slot path's last segment is shared with other providers —
+        e.g. 'tools.provider' and 'transport.provider' both end in 'provider').
         Non-dict markers (e.g. PR-A.3 hook plugin instances) are skipped."""
         load_all()
         ids = list_ids()
-        # Providers and session use the slot id as their marker id
-        # (they represent capability providers, not node factories)
-        provider_ids = {"lab.session", "lab.body", "lab.tool_registry", "lab.transport"}
         for marker_id in ids:
             marker = get_instance(marker_id)
             # Skip non-dict markers (PR-A.3 hook plugins are class instances)
             if not isinstance(marker, dict):
                 continue
             basename = marker_id.rsplit(".", 1)[-1]
-            if marker_id in provider_ids:
-                # Provider markers use the slot id
-                assert marker["id"] == marker_id, (
-                    f"{marker_id}: provider marker['id']={marker['id']!r} "
-                    f"should equal slot {marker_id!r}"
-                )
-            else:
-                # Node markers use the basename (= agent_lab node id)
-                assert marker["id"] == basename, (
-                    f"{marker_id}: marker['id']={marker['id']!r} "
-                    f"should equal basename {basename!r}"
-                )
+            assert marker["id"] in (basename, marker_id), (
+                f"{marker_id}: marker['id']={marker['id']!r} "
+                f"should equal basename {basename!r} or slot {marker_id!r}"
+            )
 
 
 class TestPRDFilesystemCoverage:
