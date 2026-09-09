@@ -1,6 +1,6 @@
 # ADR-0209 — agent_lab 全量收编进 LCA plugin 体系：单一一套装饰器、Capability 与装配根
 
-> **状态：** **Proposed — 2026-09-09（PR-A.3 → PR-D final 2/2 已落档；状态保持 Proposed 待 ADR-0206 §10 P7）**
+> **状态：** **Proposed — 暂时停止（2026-09-09）。PR-A.3 → PR-D final 2/2 + PR-E.2 已落地；剩余 P7 阶段闭集迁移暂停，等 cordis LCA runtime 可用后继续。**
 >
 > **一句话**：把 `agent_lab/` 的全部节点、hook、Body 装配、Transport、ToolRegistry、Session binding 一次性收编进 LCA 单一 plugin 体系；消灭 `agent_lab/plugins/base.py` 的第二套 `GraphPlugin` 装饰器；消灭 `act.execute.body.build_body / run_body_act` 等节点文件内的「组合根」；让 `act.yaml` 与 Profile/Bundle 上看见所有依赖；与 ADR-0206 的图内核吸收契约（[Note 2026-09-08-agent-lab-absorb-end-state](../notes/proposed/seam/2026-09-08-agent-lab-absorb-end-state.md) §delete-when）形成同一决策的另一半。
 >
