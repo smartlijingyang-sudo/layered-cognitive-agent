@@ -13,6 +13,9 @@ from lca.harness.declarative.compile.assembler.assembler import (
     GraphAssembler,
     MappingRestrictedScope,
 )
+# Lazy imports: orchestrator + subgraph_phase_runner form a cycle that
+# would deadlock at module-load time. Resolve each factory inside the
+# factory callable so the cycle is broken by deferral, not by accident.
 from lca.plugins.loop.phase.act.standard.plugin import create_executor as create_act_executor
 from lca.plugins.loop.phase.perceive.standard.plugin import (
     create_executor as create_perceive_executor,
@@ -25,30 +28,27 @@ from lca.plugins.loop.phase.remember.standard.plugin import (
 )
 from lca.plugins.loop.phase.stop.standard.plugin import create_executor as create_stop_executor
 from lca.plugins.loop.phase.think.standard.plugin import create_executor as create_think_executor
-from lca.plugins.loop.phase.think.subgraph.classify.plugin import (
-    create_executor as create_think_subgraph_classify_executor,
-)
-from lca.plugins.loop.phase.think.subgraph.gate.plugin import (
-    create_executor as create_think_subgraph_gate_executor,
-)
-from lca.plugins.loop.phase.think.subgraph.reason.plugin import (
-    create_executor as create_think_subgraph_reason_executor,
-)
-from lca.plugins.loop.phase.think.subgraph.route.plugin import (
-    create_executor as create_think_subgraph_route_executor,
-)
-from lca.plugins.loop.phase.think.subgraph.shortcut.plugin import (
-    create_executor as create_think_subgraph_shortcut_executor,
-)
+from lca.plugins.think.classify.plugin import create_executor as create_think_classify_executor
+from lca.plugins.think.gate.plugin import create_executor as create_think_gate_executor
+from lca.plugins.think.reason.plugin import create_executor as create_think_reason_executor
+from lca.plugins.think.route.plugin import create_executor as create_think_route_executor
+from lca.plugins.think.shortcut.plugin import create_executor as create_think_shortcut_executor
+
+
+def _create_think_orchestrator_executor() -> PhaseExecutor:
+    from lca.plugins.loop.phase.think.orchestrator.plugin import create_executor
+
+    return create_executor()
 
 _PHASE_EXECUTOR_FACTORIES: dict[str, Callable[[], PhaseExecutor]] = {
     "phase.perceive.standard": create_perceive_executor,
     "phase.think.standard": create_think_executor,
-    "phase.think.subgraph.shortcut": create_think_subgraph_shortcut_executor,
-    "phase.think.subgraph.route": create_think_subgraph_route_executor,
-    "phase.think.subgraph.reason": create_think_subgraph_reason_executor,
-    "phase.think.subgraph.classify": create_think_subgraph_classify_executor,
-    "phase.think.subgraph.gate": create_think_subgraph_gate_executor,
+    "phase.think.shortcut": create_think_shortcut_executor,
+    "phase.think.route": create_think_route_executor,
+    "phase.think.reason": create_think_reason_executor,
+    "phase.think.classify": create_think_classify_executor,
+    "phase.think.gate": create_think_gate_executor,
+    "phase.think.orchestrator": _create_think_orchestrator_executor,
     "phase.act.standard": create_act_executor,
     "phase.reflect.standard": create_reflect_executor,
     "phase.remember.standard": create_remember_executor,

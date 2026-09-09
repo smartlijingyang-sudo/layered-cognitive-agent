@@ -1,7 +1,0 @@
-# Logical plan identity for ``SubgraphReference.plan_ref`` / host ``plan_ref``.
-#
-# Not included in production profiles directly. ``BundleSubgraphResolver`` maps
-# this path to ``profiles/fixtures/think-subgraph-compile.yaml``, which merges
-# ``think-subgraph-steps.yaml`` + ``think-subgraph-graph.yaml``.
-
-entries: []

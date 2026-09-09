@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
 _DEFAULT_PROFILE = "profiles/web-standard.yaml"
 
-# ``web-standard.yaml`` binds ``think.main`` to ``phase.think.subgraph_host``
+# ``web-standard.yaml`` binds ``think.main`` to ``phase.think.orchestrator``
 # (5-step subgraph: shortcut → route → reason → classify → gate) so the
 # production default runs the decomposed think pipeline with parity to the
 # legacy monolithic ``phase.think.standard`` executor. See

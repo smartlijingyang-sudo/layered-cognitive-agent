@@ -16,24 +16,24 @@ from lca.plugins.loop.phase.remember.standard.plugin import (
     create_executor as create_remember_executor,
 )
 from lca.plugins.loop.phase.stop.standard.plugin import create_executor as create_stop_executor
-from lca.plugins.loop.phase.think.standard.plugin import create_executor as create_think_executor
-from lca.plugins.loop.phase.think.subgraph_host.plugin import (
-    create_executor as create_think_subgraph_host_executor,
+from lca.plugins.loop.phase.think.orchestrator.plugin import (
+    create_executor as create_think_orchestrator_executor,
 )
+from lca.plugins.loop.phase.think.standard.plugin import create_executor as create_think_executor
 
 
 def standard_phase_executors() -> Mapping[str, PhaseExecutor]:
     """Return the seven profile plugin implementations for focused runtime tests.
 
-    ``phase.think.subgraph_host`` is included because ``profiles/web-standard.yaml``
+    ``phase.think.orchestrator`` is included because ``profiles/web-standard.yaml``
     binds ``think.main`` to it; tests resolving ``profiles/web-standard.yaml`` need
-    the subgraph host registered alongside the six standard phase executors.
+    the orchestrator registered alongside the six standard phase executors.
     """
 
     return {
         "phase.perceive.standard": create_perceive_executor(),
         "phase.think.standard": create_think_executor(),
-        "phase.think.subgraph_host": create_think_subgraph_host_executor(),
+        "phase.think.orchestrator": create_think_orchestrator_executor(),
         "phase.act.standard": create_act_executor(),
         "phase.reflect.standard": create_reflect_executor(),
         "phase.remember.standard": create_remember_executor(),

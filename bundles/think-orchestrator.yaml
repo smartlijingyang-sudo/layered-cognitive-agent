@@ -1,4 +1,4 @@
-# Think orchestrator (replaces phase.think.subgraph_host).
+# Think orchestrator (replaces the old phase.think.subgraph_host container).
 # Loaded by profiles/fixtures/think-orchestrator-compile.yaml.
 # Sole entry: registers phase.think.orchestrator which drives the
 # think-orchestrator-graph.yaml topology.
