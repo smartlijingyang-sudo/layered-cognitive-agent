@@ -138,7 +138,7 @@ profiles/agent-lab-infoedge.yaml
 - `tests/plugins/lab/test_pr_e_cleanup.py` — adapters/ + registry.{py,yaml} 删除守护
 - `tests/architecture/test_lab_capability_closed_set.py` — capability 闭集 + YAML undeclared 守护
 
-验证矩阵：**46 passed, 5 skipped**（cordis 不在测试环境；3 个 capability 测试为 PR-A/B/C/D 推进过程暂态 skip）。
+验证矩阵：**115 passed, 3 skipped**（cordis 不在测试环境；3 个 capability 测试为 PR-A/B/C/D 推进过程暂态 skip）。
 
 ## Alternatives considered
 
@@ -211,6 +211,6 @@ PR-D final 必须满足：
 - [x] PR-C commit — session provider + runtime_bind 清理
 - [x] PR-D commit — 89 个剩余节点 marker
 - [x] PR-E.2 commit — adapters/ + tools/registry 删除
-- [ ] PR-D final — 真实 @plugin carrier rewrite（依赖 cordis LCA runtime）
+- [x] PR-D final 2/2 — 89 个 node 真实 @plugin carrier（`LabCarrier` + `bind_carrier`；generator 驱动）
 - [ ] ADR-0209 Accepted（依赖 PR-D final + ADR-0206 §10 P7）
 - [ ] Note 归档（依赖 ADR-0209 Accepted）
