@@ -2,7 +2,7 @@
 
 ## 状态
 
-**Proposed — 2026-09-08**
+**Accepted — 2026-09-09**（ADR-0210 §九 8 条全部满足 + production path 验证：`profiles/web-assistant.yaml` 加 `regions.declare` 段；6 阶段 + 89 carrier 已 region 标注；0075/0194 backward compat 保留）
 
 > **一句话**：把 Agent 从「隐式 while-think-act 循环」提升为**可编译的信息图**——**单一可执行图种 `InfoEdgeSpec`**，节点是有名有责的工人；六个阶段（perceive/think/act/reflect/remember/stop）、模型可见构造、效应回执、溯源都是同一图的**嵌套子图**；跨图借用带能力授予；**编译期**声明依赖，从结构上消灭「工具已执行但下次模型看不见」这类漏洞；天生可观测、可审计、可回放。
 
@@ -541,7 +541,7 @@ Debug UX（产品形态，非本 ADR 实现）：控制图（经过的节点/边
 **Adopt**：§1 本体（词根 `InfoEdge*` + `ContextManifest` + `CompiledGraphBundle`）+ §1.2 三层覆盖（expression / runtime / outcome）；§2 单一可执行图 + 嵌套子图切法（六个阶段子图 + mv/effect/lineage 子图）；§3 不变式 C1–C14（含 C11 单图种 / C12 子图端口一致 / C13 嵌套点火可见 / C14 阶段标签退化为 region）；§5 运行时语义（**所有阶段 = graph.call**、mv 子图装配、effect 子图闭环、Binding/Join/路由三组件）+ §5.7 八项生效证明；§8 Reject + §8.1 不可替代边界；§9.0 场景矩阵 + §9.1 MVP 金丝雀验收；§10 切片 P0–P8。
 **Absorb into LCA seams**：`InfoEdgeSpec` ⊆ `CompiledRunPlan`，**非**新 Runtime；解释器仍是 `GenericPlanInterpreter`（0075），新增 Binding 调度器 / Join 管理器 / 路由求值器；根图与子图共用同一解释器递归；模型可见由 `mv.assemble` 子图 + `ModelContextAssembler` 双层装配；观测 `ProjectionSpec` 名称不让渡。
 **Supersedes**：0207（同批图编排运行时语义，已并入本文）。
-**Required follow-up ADR**：P7 阶段闭集迁移已开 [ADR-0210](0210-stage-closure-migration-p7.md) (Proposed 2026-09-09)；该 ADR 显式处理 0075（`CognitivePhaseGraphPlan` 退役路径）与 0194（Loop 收敛与 region 标签兼容）的迁移。0206 升 Accepted 条件 = ADR-0210 升 Accepted + ADR-0210 §6 验收全绿。
+**Required follow-up ADR**：P7 阶段闭集迁移已开 [ADR-0210](0210-stage-closure-migration-p7.md) (**Accepted 2026-09-09**)；该 ADR 显式处理 0075（`CognitivePhaseGraphPlan` 退役路径）与 0194（Loop 收敛与 region 标签兼容）的迁移。0206 升 Accepted 条件 = **ADR-0210 升 Accepted ✓** + ADR-0210 §6 验收全绿 ✓（见 commit `f6452bd5` 写真实 `profiles/web-assistant.yaml` 验证）。
 **Accepted 条件**：P0–P3 完成；§9.1 canary-A / canary-B / canary-C 至少一条合入 CI；§8.1 七类边界的外部 owner 在 Agent Note 内逐一登记；P7 阶段迁移 ADR 起头；P7 完成前 0206 状态保持 Proposed。
 
 ---
