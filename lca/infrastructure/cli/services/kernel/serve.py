@@ -13,12 +13,23 @@ ADR-0119 决定 4 把 LCA 进程入口切到 ``uv run python -m lca_kernel serve
 
 不实现 ``start / stop / restart`` —— 这些命令面应直接调
 ``lca-ops kernel_serve`` 拿启动命令、或由外部 supervisor 守护。
+
+spawn 路径经验(2026-09-09):
+- 用 ``sys.executable``(当前 ``lca-ops`` 解释器,即 ``/opt/lca/venv/bin/python``)
+  直接 Popen,**不**走 ``uv run``。``uv run`` 创独立 venv / 用 lockfile
+  缓存,不与 ``/opt/lca/venv`` 同步,导致 ``ModuleNotFoundError: No module
+  named 'cordis'`` 这种"日志空、立即退出"的鬼火问题。
+- 任何手动 ``pip install`` 到 ``/home/lichao/.local/`` 的包无效;必须
+  ``/opt/lca/venv/bin/pip install``(详见 docs/operations/venv.md)。
+- spawn 后 30s 内未 ready 视为失败;SIGTERM 由 K6 ``lca_kernel.lifecycle``
+  守护,本 service 只负责 spawn + 等 /health。
 """
 
 from __future__ import annotations
 
 import contextlib
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Protocol, cast
@@ -132,11 +143,11 @@ class KernelServeService:
         self._LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
         log = self._LOG_PATH.open("ab", buffering=0)
         try:
+            # 用 sys.executable(当前 lca-ops 解释器)直接 spawn;
+            # 不走 uv run —— 见 module docstring "spawn 路径经验"。
             proc = subprocess.Popen(  # noqa: S603
                 [  # noqa: S607 — controlled argv, not user-provided
-                    "uv",
-                    "run",
-                    "python",
+                    sys.executable,
                     "-m",
                     "lca_kernel",
                     "serve",
