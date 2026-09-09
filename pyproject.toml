@@ -315,28 +315,23 @@ ignore_missing_imports = true
 module = ["gateway.*", "starlette", "starlette.*", "uvicorn"]
 ignore_missing_imports = true
 
+# Pylance reads [tool.pyright] and ignores workspace typeCheckingMode.
+# Keep the editor off here; CLI/CI uses pyrightconfig.ci.json via lca-ops typecheck.
 [tool.pyright]
 pythonVersion = "3.11"
-typeCheckingMode = "basic"
-venvPath = ".venv"
-include = ["lca"]
+typeCheckingMode = "off"
+venvPath = "."
+venv = ".venv"
 exclude = [
     "vendor/**",
     "lobehub-ui/**",
     "tests/**",
-    "lca/contracts/protocols/**",
-    "lca/infrastructure/llm_adapter/openai_compat/**",
     "**/__pycache__",
 ]
-reportMissingImports = true
-
-[[tool.pyright.overrides]]
-module = ["langfuse", "langfuse.*", "structlog", "structlog.*"]
 reportMissingImports = false
+reportMissingModuleSource = false
+reportMissingTypeStubs = false
 
-# basedpyright (VS Code) reads this instead of [tool.pyright]. CLI `pyright`
-# still uses [tool.pyright] basic. Without this, the editor paints lca/ red
-# because config-file typeCheckingMode overrides workspace settings.
 [tool.basedpyright]
 typeCheckingMode = "off"
 reportMissingImports = false

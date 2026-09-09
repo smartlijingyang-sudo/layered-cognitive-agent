@@ -9,6 +9,7 @@
   ],
   "unwantedRecommendations": [
     "detachhead.basedpyright",
-    "ms-python.mypy-type-checker"
+    "ms-python.mypy-type-checker",
+    "matangover.mypy"
   ]
 }

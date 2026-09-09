@@ -1,0 +1,16 @@
+{
+  "pythonVersion": "3.11",
+  "typeCheckingMode": "basic",
+  "venvPath": ".",
+  "venv": ".venv",
+  "include": ["lca", "lca_kernel"],
+  "exclude": [
+    "vendor/**",
+    "lobehub-ui/**",
+    "tests/**",
+    "lca/contracts/protocols/**",
+    "lca/infrastructure/llm_adapter/openai_compat/**",
+    "**/__pycache__"
+  ],
+  "reportMissingImports": true
+}

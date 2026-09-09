@@ -36,6 +36,9 @@ class TypeDiagnostic:
 
 
 _DEFAULT_PATHS = ["lca", "lca_kernel"]
+# Editor [tool.pyright] stays off so Pylance does not paint the tree red;
+# CLI/CI typecheck loads the basic profile from this project file instead.
+_PYRIGHT_CI_CONFIG = "pyrightconfig.ci.json"
 
 
 def _run_tool(cmd: list[str], *, cwd: Path) -> tuple[int, str]:
@@ -179,7 +182,12 @@ def run_typecheck(
     if not pyright_only:
         runners.append(("mypy", ["uv", "run", "mypy", *targets]))
     if not mypy_only:
-        runners.append(("pyright", ["uv", "run", "pyright", *targets]))
+        runners.append(
+            (
+                "pyright",
+                ["uv", "run", "pyright", "-p", _PYRIGHT_CI_CONFIG, *targets],
+            )
+        )
 
     results: list[tuple[str, int, str, list[TypeDiagnostic]]] = []
     worst_exit = 0
