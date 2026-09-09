@@ -120,7 +120,9 @@ class LabCarrier:
 - 0206 §"Required follow-up ADR" 满足 —— ADR-0210 Accepted
 - 本 Note 归档到 `docs/notes/archived/`
 
-## Acceptance criteria（当前 commit）
+## Acceptance criteria（当前 commit + 后续 commit）
+
+### 2026-09-09 commit 1 (ADR-0210 草案)
 
 - [x] ADR-0210 草案提交（Proposed 2026-09-09）
 - [x] ADR-0075 状态块加 "P7 partial Superseded by 0210" 引用
@@ -128,12 +130,36 @@ class LabCarrier:
 - [x] ADR-0206 状态块加 "Required follow-up ADR = 0210" 引用
 - [x] ADR-0210 加到 README 索引
 - [x] 本 Note 落地
-- [ ] profile.regions_declare 机制 + C14 校验读 profile（后续 commit）
-- [ ] tests/architecture/test_p7_region_migration.py 全绿（后续 commit）
-- [ ] tests/architecture/test_adapted_0075_0194.py 全绿（后续 commit）
-- [ ] ADR-0210 升 Accepted（依赖上述实现）
+
+### 2026-09-09 commit 2 (ADR-0210 §6.2 实施)
+
+- [x] agent_lab/profile_loader.py 新增 - load_profile_regions +
+  build_region_closed_set + region_label_for_node
+- [x] agent_lab/graph/validate.py 新增 _check_regions +
+  validate_with_profile + validate_with_profile_or_raise
+- [x] C14 region 校验读 profile (P7-I-4)
+- [x] region 标签不绑定 capability 闭集 (P7-I-2) 守护测试
+- [x] profile.regions.declare 扩展机制（P7-I-5）
+- [x] tests/architecture/test_p7_region_migration.py 全绿 (18 tests)
+- [x] tests/architecture/test_adapted_0075_0194.py 全绿 (5 tests, 1 skip)
+- [x] 旧 CognitivePhaseGraphPlan 数据结构保留向后兼容
+- [x] phase.<name>.<executor> capability 闭集格式不变
+
+### 未来 commit (待做)
+
+- [ ] ADR-0210 升 Accepted（需 +1 owner review + 真实 production
+  profile 引用 `regions.declare`）
 - [ ] ADR-0206 升 Accepted（依赖 ADR-0210 Accepted）
-- [ ] Note 归档（依赖 ADR-0210 Accepted）
+- [ ] 真实 profile 增 `regions.declare` 段（web-assistant.yaml
+  如需要 `phase:plan` / `phase:replan` 即可声明）
+- [ ] Note 归档到 `docs/notes/archived/seam/`（依赖 ADR-0210 Accepted）
+
+### 当前测试矩阵
+
+- 136 passed, 3 skipped in `tests/plugins/lab/` + `tests/architecture/`
+  (3 skips = cordis baseline + 1 future PR placeholder)
+- 23 pre-existing baseline failures in `tests/architecture/`
+  (全部 cordis 相关，与本 commit 无关)
 
 ## Alternatives considered
 
