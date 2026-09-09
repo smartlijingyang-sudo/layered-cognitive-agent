@@ -130,3 +130,69 @@ __all__ = [
     "region_label_for_node",
     "_normalize_region_label",
 ]
+
+# ---------------------------------------------------------------------------
+# ADR-0210 §6.4 — region-tag phase graph synthesis
+# ---------------------------------------------------------------------------
+
+def build_region_only_phase_graph(
+    spec,
+    region_label: str | None = None,
+) -> "CognitivePhaseGraphPlan":
+    """Build a minimal CognitivePhaseGraphPlan from a spec's region.
+
+    Per ADR-0210 §2.1 + §6.4: when a CompiledRunPlan.phase_graph is None
+    (the P7 path), the GenericPlanInterpreter must still be able to
+    drive execution. We synthesize a single-node CognitivePhaseGraphPlan
+    whose entry + terminal == spec.id, with semantic_phase derived from
+    the region label (if it matches a SemanticPhase) or 'act' as
+    a safe default.
+
+    This keeps the interpreter's "one phase per run" semantics intact
+    while honouring ADR-0210 §2.1 ("phase_graph: None is legal").
+    """
+    from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
+        CognitivePhaseGraphPlan,
+        PhaseEdge,
+        PhaseNode,
+    )
+    from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
+        SemanticPhase,
+    )
+
+    if region_label is None:
+        region_label = region_label_for_node(
+            spec.region.value if hasattr(spec.region, "value") else str(spec.region),
+            getattr(spec, "phase", "") or "",
+        )
+
+    # Map region label to SemanticPhase (only the 6 stages map cleanly).
+    phase_name = region_label.split(":", 1)[1] if region_label.startswith("phase:") else ""
+    if phase_name in {p.value for p in SemanticPhase}:
+        semantic_phase = SemanticPhase(phase_name)
+    else:
+        # Bare-enum region (model_visible / effect / etc.) or custom
+        # region (phase:plan / etc.) — fall back to 'act' so the
+        # interpreter can drive; downstream PhaseBinding.executor_capability
+        # closure selects the real executor.
+        semantic_phase = SemanticPhase.ACT
+
+    # Single-node plan: entry + terminal == spec.id
+    # entry is set on the plan (CognitivePhaseGraphPlan.entry), not on
+    # the PhaseNode. terminal=True is the single PhaseNode property.
+    node = PhaseNode(
+        id=spec.id,
+        semantic_phase=semantic_phase,
+        binding=f"phase.{semantic_phase.value}.standard",
+        max_visits=1,
+        terminal=True,
+    )
+    return CognitivePhaseGraphPlan(
+        entry=spec.id,
+        nodes=(node,),
+        edges=(),
+        approval_resume_node=None,
+    )
+
+
+__all__ += ["build_region_only_phase_graph"]

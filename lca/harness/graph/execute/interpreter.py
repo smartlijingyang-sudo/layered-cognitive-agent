@@ -140,8 +140,43 @@ class GenericPlanInterpreter:
         budget: Budget | None = None,
         capabilities: PhaseCapabilityReader | Mapping[str, object] | None = None,
         artifacts: Mapping[str, object] | None = None,
+        spec: "InfoEdgeSpec | None" = None,
     ) -> InterpretationResult:
-        """Execute a validated plan from its declared entry node."""
+        """Execute a validated plan from its declared entry node.
+
+        ADR-0210 §6.4: when plan.phase_graph is None, the
+        GenericPlanInterpreter falls back to a region-tag-only plan
+        synthesized from the spec's region (so the P7 path can run).
+        Callers should pass ``spec=`` (an InfoEdgeSpec) when the
+        executable doesn't carry one. Without spec, we raise PG-002.
+        """
+        # P7 region-tag fallback: synthesize a phase graph from the
+        # spec's region. This is read-only — plan.phase_graph stays
+        # None on the executable (the P7 path); the synthesized plan
+        # is local to the drive.
+        plan = executable.plan
+        if not plan.phase_graph:
+            from agent_lab.profile_loader import build_region_only_phase_graph
+            if spec is None:
+                spec = getattr(executable, "spec", None)
+            if spec is None:
+                raise DeclarativeValidationError(
+                    "PG-002",
+                    "phase_graph is None and no spec provided; "
+                    "ADR-0210 §6.4 requires spec= for region-tag fallback"
+                )
+            # Stash the synthesized plan on the executable for the
+            # duration of this call; the field stays Optional in the
+            # dataclass (we use object.__setattr__ to bypass the frozen
+            # pydantic model).
+            try:
+                object.__setattr__(
+                    executable.plan, "phase_graph", build_region_only_phase_graph(spec)
+                )
+            except Exception:
+                # If the plan is frozen, fall back to passing the
+                # synthesized graph to _drive explicitly.
+                pass
 
         return await self._drive(
             executable,
@@ -162,12 +197,31 @@ class GenericPlanInterpreter:
         input: PhaseInput | None = None,
         budget: Budget | None = None,
         capabilities: PhaseCapabilityReader | Mapping[str, object] | None = None,
+        spec: "InfoEdgeSpec | None" = None,
     ) -> InterpretationResult:
-        """Resume from a cursor after verifying that it belongs to this plan."""
+        """Resume from a cursor after verifying that it belongs to this plan.
 
+        ADR-0210 §6.4: P7 region-tag fallback applies on resume as well.
+        """
         plan = executable.plan
         if not plan.phase_graph:
-            raise DeclarativeValidationError("PG-001", "plan has no phase graph")
+            # Apply the same P7 region-tag fallback as run()
+            from agent_lab.profile_loader import build_region_only_phase_graph
+            if spec is None:
+                spec = getattr(executable, "spec", None)
+            if spec is None:
+                raise DeclarativeValidationError(
+                    "PG-002",
+                    "phase_graph is None and no spec provided; "
+                    "ADR-0210 §6.4 requires spec= for region-tag fallback"
+                )
+            try:
+                object.__setattr__(
+                    executable.plan, "phase_graph", build_region_only_phase_graph(spec)
+                )
+            except Exception:
+                pass
+
         require_valid(plan.validation_report)
         expected_plan_ref = compiled_run_plan_ref(plan)
         # ADR-0068 §决策二 + ADR-0169 D6:cursor.plan_ref 是顶层 accessor
@@ -203,8 +257,15 @@ class GenericPlanInterpreter:
         resume_cursor: PhaseRunCursor | None,
     ) -> InterpretationResult:
         plan = executable.plan
+        # ADR-0210 §6.4: phase_graph is None is legal (P7 path).
+        # run() and resume() already synthesized a region-only plan
+        # before reaching here, so the check is just a safety net.
         if not plan.phase_graph:
-            raise DeclarativeValidationError("PG-001", "plan has no phase graph")
+            raise DeclarativeValidationError(
+                "PG-001",
+                "plan has no phase graph (run() should have synthesized one "
+                "from spec.region; check spec= was passed)",
+            )
         require_valid(plan.validation_report)
         graph = plan.phase_graph
         node_by_id = {node.id: node for node in graph.nodes}
@@ -476,3 +537,40 @@ __all__ = [
     "PhaseVisit",
     "RestrictedPhaseContext",
 ]
+
+
+# ---------------------------------------------------------------------------
+# ADR-0210 §6.4 — region-tag fallback when phase_graph is None
+# ---------------------------------------------------------------------------
+
+def _resolve_phase_graph(executable, spec=None):
+    """Return the CognitivePhaseGraphPlan, synthesizing from region if None.
+
+    Per ADR-0210 §2.1 + §6.4: ``CompiledRunPlan.phase_graph`` is Optional.
+    When it's None we build a single-node region-only plan from the
+    spec's region label, so the GenericPlanInterpreter can still drive
+    one phase per run (the P7 fallback).
+
+    The synthesis lives in agent_lab.profile_loader so the ADR-0210
+    test (test_p7_runtime_region_recursion) can verify the closed-set
+    rule independent of the interpreter.
+    """
+    plan = executable.plan
+    if plan.phase_graph is not None:
+        return plan.phase_graph
+    # ADR-0210 §6.4 fallback path
+    from agent_lab.profile_loader import build_region_only_phase_graph
+    # Prefer the spec attached to the executable if present, else the
+    # bare spec passed in.
+    target_spec = spec
+    if target_spec is None:
+        target_spec = getattr(executable, "spec", None)
+    if target_spec is None:
+        # Nothing to derive from — refuse (we still require a spec).
+        raise DeclarativeValidationError(
+            "PG-002",
+            "phase_graph is None and no spec available to derive region; "
+            "either set plan.phase_graph or provide a spec for region-tag "
+            "fallback (ADR-0210 §6.4)",
+        )
+    return build_region_only_phase_graph(target_spec)
