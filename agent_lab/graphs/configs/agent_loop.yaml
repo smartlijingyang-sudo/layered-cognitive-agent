@@ -2,9 +2,9 @@
 # agent_loop — root loop (ADR-0206 §2)
 # =============================================================================
 # Owns five cognitive phase hosts (perceive / think / act / reflect /
-# remember). Stop is NOT a peer phase: StopPolicy + stop.focus attach as
-# control_slots on remember (after persist). Runner propagates data|project
-# edges only; control attachment is via control_slots sub_spec siblings.
+# remember). Control graphs are sibling graph.call hosts with parent data
+# edges — not extra sub_specs on the same phase host. Stop is not a peer
+# cognitive phase: stop_decide / stop_focus sit beside remember after persist.
 #
 # model_eye is NOT mounted here. It is perceive's child (perceive.yaml#eye).
 # perceive.out_manifest is already the frozen ContextManifest think reads.
@@ -14,19 +14,18 @@
 #
 # Local data:
 #   perceive.out_manifest  ──► think.in_assembled_manifest
-#   perceive.perceive_out  ──► think.perceive_out
-#   think.decision_out     ──► act / reflect / remember
-#   act.out_observation    ──► reflect / remember
-#   reflect.reflection_out ──► remember
-# Control (control_slots on remember):
-#   remember.state_ref + turn artifacts ──► stop_decide / stop_focus
+#   perceive.out_manifest  ──► think.perceive_out
+#   think.decision_out     ──► act / reflect / remember / think_guard / stop_*
+#   act.out_observation    ──► reflect / remember / remember_admit / stop_decide
+#   reflect.reflection_out ──► remember / stop_decide
+#   remember.state_ref     ──► stop_decide / stop_focus
 # =============================================================================
 
 id: agent_loop
 version: 0.1.0
 region: phase:agent_loop
-description: Root graph for the agent loop. Five cognitive phase hosts;
-  stop is control on remember. model_eye lives under perceive.
+description: Root graph for the agent loop. Five cognitive phase hosts plus
+  sibling control hosts. model_eye lives under perceive.
 
 # -----------------------------------------------------------------------------
 # GRAPH — organizational metadata (not data flow). Used by self-describe.
@@ -40,13 +39,23 @@ graph:
     - think                 # host → think.yaml
     - act                   # host → act.yaml
     - reflect               # host → reflect.yaml
-    - remember              # host → remember.yaml (+ stop_* control slots)
+    - remember              # host → remember.yaml
+    - perceive_context      # sibling host → control/perceive_context.yaml
+    - think_guard           # sibling host → control/think_guard.yaml (passthrough)
+    - remember_admit        # sibling host → control/remember_admit.yaml
+    - stop_decide           # sibling host → control/stop_decide.yaml
+    - stop_focus            # sibling host → control/stop_focus.yaml
   references:
     - perceive
     - think
     - act
     - reflect
     - remember
+    - perceive_context
+    - think_guard
+    - remember_admit
+    - stop_decide
+    - stop_focus
   relations:
     - { graph: act, kind: contains, role: act_phase }
   capabilities:
@@ -80,28 +89,42 @@ nodes:
   # Feeds state + header + user_turn; exposes out_manifest for think.
   - id: perceive
     region: phase:perceive
-    factory: identity
-    config: { from: out_manifest, to: perceive_out }
+    factory: graph.call
     ins: [user_turn, state, system, history, config]
     outs: [perceive_out, out_manifest]
+
+  # ===== CONTROL: perceive_context (sibling of perceive) ====================
+  # Mounts control/perceive_context.yaml. Reads the same user_turn as perceive.
+  - id: perceive_context
+    region: control
+    factory: graph.call
+    ins: [in_args]
+    outs: [allowed]
 
   # ===== PHASE: think (host) ================================================
   # Receives perceive.out_manifest as in_assembled_manifest (already assembled
   # by model_eye inside perceive; includes tools). No tools bypass port.
   - id: think
     region: phase:think
-    factory: identity
-    config: { from: decision_out, to: think_out }
+    factory: graph.call
     ins: [in_assembled_manifest, perceive_out, in_state]
     outs: [decision_out, think_signal]
+
+  # ===== CONTROL: think_guard (sibling of think) ============================
+  # Passthrough sibling. think.yaml#guard is DecisionGate SSOT; this host
+  # does not re-enforce and does not replace think.decision_out consumers.
+  - id: think_guard
+    region: control
+    factory: graph.call
+    ins: [in_decision]
+    outs: [out_decision]
 
   # ===== PHASE: act (host) ==================================================
   # Mounts act.yaml. Receives think.decision_out as in_decision; exposes
   # out_observation after shape→authorize→execute→observe.
   - id: act
     region: phase:act
-    factory: identity
-    config: { from: act_in, to: act_out }
+    factory: graph.call
     ins: [in_decision]
     outs: [out_observation]
 
@@ -112,23 +135,39 @@ nodes:
   # Reflect does not write Session/Memory (remember owns that).
   - id: reflect
     region: phase:reflect
-    factory: identity
-    config: { from: reflection_out, to: reflect_out }
+    factory: graph.call
     ins: [in_observation, in_decision, in_prior_reflection]
     outs: [reflection_out, memory_candidates, reflect_signal]
 
   # ===== PHASE: remember (host) ============================================
   # Mounts `remember.yaml` as a nested graph: admit → commit → snapshot.
   # Receives reflect/act/think artifacts + memory_candidates; emits
-  # journal_fact + state_ref + remember_signal. control_slots then attaches
-  # stop_decide / stop_focus on this host (reads state_ref; writes
-  # stop_decision / terminal / focus_verdict).
+  # journal_fact + state_ref + remember_signal. Stop control is sibling hosts
+  # below, not extra sub_specs on this host.
   - id: remember
     region: phase:remember
-    factory: identity
-    config: { from: state_ref, to: remember_out }
+    factory: graph.call
     ins: [in_reflection, in_observation, in_decision, in_candidates]
     outs: [journal_fact, state_ref, remember_signal]
+
+  # ===== CONTROL: remember_admit (sibling of remember) ======================
+  - id: remember_admit
+    region: control
+    factory: graph.call
+    ins: [in_observation]
+    outs: [admit_verdict]
+
+  # ===== CONTROL: stop_decide / stop_focus (siblings of remember) ===========
+  - id: stop_decide
+    region: control
+    factory: graph.call
+    ins: [state_ref, in_decision, in_observation, in_reflection]
+    outs: [stop_decision, terminal]
+  - id: stop_focus
+    region: control
+    factory: graph.call
+    ins: [state_ref, in_decision]
+    outs: [focus_verdict]
 
 # -----------------------------------------------------------------------------
 # EDGES — local data flow. Edges are grouped by their destination node so
@@ -142,6 +181,10 @@ edges:
   - id: e_init_user_to_perceive
     from: { spec: agent_loop, node: _initial, port: user_turn }
     to:   { spec: agent_loop, node: perceive, port: user_turn }
+    kind: data
+  - id: e_init_user_to_perceive_context
+    from: { spec: agent_loop, node: _initial, port: user_turn }
+    to:   { spec: agent_loop, node: perceive_context, port: in_args }
     kind: data
   - id: e_init_state_to_perceive
     from: { spec: agent_loop, node: _initial, port: state }
@@ -170,7 +213,7 @@ edges:
     to:   { spec: agent_loop, node: think,    port: in_assembled_manifest }
     kind: data
   - id: e_perceive_to_think
-    from: { spec: agent_loop, node: perceive, port: perceive_out }
+    from: { spec: agent_loop, node: perceive, port: out_manifest }
     to:   { spec: agent_loop, node: think,    port: perceive_out }
     kind: data
 
@@ -180,7 +223,7 @@ edges:
     to:   { spec: agent_loop, node: act,   port: in_decision }
     kind: data
 
-  # ── act → reflect → remember (cognitive tail; stop is control on remember) ──
+  # ── act → reflect → remember (cognitive tail; stop is a sibling host) ──
   - id: e_act_to_reflect_obs
     from: { spec: agent_loop, node: act,      port: out_observation }
     to:   { spec: agent_loop, node: reflect,  port: in_observation }
@@ -204,6 +247,44 @@ edges:
   - id: e_reflect_candidates_to_remember
     from: { spec: agent_loop, node: reflect,  port: memory_candidates }
     to:   { spec: agent_loop, node: remember, port: in_candidates }
+    kind: data
+
+  # ── think → think_guard (passthrough sibling; think.yaml#guard is SSOT) ──
+  - id: e_think_dec_to_think_guard
+    from: { spec: agent_loop, node: think, port: decision_out }
+    to:   { spec: agent_loop, node: think_guard, port: in_decision }
+    kind: data
+
+  # ── act → remember_admit (sibling of remember) ──
+  - id: e_act_obs_to_remember_admit
+    from: { spec: agent_loop, node: act, port: out_observation }
+    to:   { spec: agent_loop, node: remember_admit, port: in_observation }
+    kind: data
+
+  # ── remember / think / act / reflect → stop_decide ──
+  - id: e_remember_state_to_stop_decide
+    from: { spec: agent_loop, node: remember, port: state_ref }
+    to:   { spec: agent_loop, node: stop_decide, port: state_ref }
+    kind: data
+  - id: e_think_dec_to_stop_decide
+    from: { spec: agent_loop, node: think, port: decision_out }
+    to:   { spec: agent_loop, node: stop_decide, port: in_decision }
+    kind: data
+  - id: e_act_obs_to_stop_decide
+    from: { spec: agent_loop, node: act, port: out_observation }
+    to:   { spec: agent_loop, node: stop_decide, port: in_observation }
+    kind: data
+  - id: e_reflect_to_stop_decide
+    from: { spec: agent_loop, node: reflect, port: reflection_out }
+    to:   { spec: agent_loop, node: stop_decide, port: in_reflection }
+    kind: data
+  - id: e_remember_state_to_stop_focus
+    from: { spec: agent_loop, node: remember, port: state_ref }
+    to:   { spec: agent_loop, node: stop_focus, port: state_ref }
+    kind: data
+  - id: e_think_dec_to_stop_focus
+    from: { spec: agent_loop, node: think, port: decision_out }
+    to:   { spec: agent_loop, node: stop_focus, port: in_decision }
     kind: data
 
 # -----------------------------------------------------------------------------
@@ -265,9 +346,6 @@ sub_specs:
       reflect_signal:     reflect_signal
 
   # ── remember stage: admit → commit → snapshot ──
-  # Nested graph: remember. stop_decide / stop_focus are inserted here by
-  # control_slots (after this data-plane mount), reading state_ref + turn
-  # artifacts.
   - node: remember
     sub_spec: remember
     input_map:
@@ -280,12 +358,54 @@ sub_specs:
       state_ref:       state_ref
       remember_signal: remember_signal
 
+  # ── perceive_context: sibling of perceive ──
+  - node: perceive_context
+    sub_spec: perceive_context
+    input_map:
+      in_args: in_args
+    output_map:
+      allowed: allowed
+
+  # ── think_guard: passthrough sibling of think (think.yaml#guard is SSOT) ──
+  - node: think_guard
+    sub_spec: think_guard
+    input_map:
+      in_decision: in_decision
+    output_map:
+      out_decision: out_decision
+
+  # ── remember_admit: sibling of remember ──
+  - node: remember_admit
+    sub_spec: remember_admit
+    input_map:
+      in_observation: in_observation
+    output_map:
+      admit_verdict: admit_verdict
+
+  - node: stop_decide
+    sub_spec: stop_decide
+    input_map:
+      state_ref: in_state
+      in_decision: in_decision
+      in_observation: in_observation
+      in_reflection: in_reflection
+    output_map:
+      stop_decision: stop_decision
+      terminal: terminal
+  - node: stop_focus
+    sub_spec: stop_focus
+    input_map:
+      state_ref: in_state
+      in_decision: in_decision
+    output_map:
+      focus_verdict: focus_verdict
+
 # -----------------------------------------------------------------------------
 # PLUGINS — cross-cutting behavior attached to this graph's lifecycle.
 #
 # Plugins are the agent_lab extension point for things that don't belong
 # inside a single node's execute(): event sinks (durable fact writing),
-# metrics/tracing, control bindings, parse rules, memory policies, etc.
+# metrics/tracing, parse rules, memory policies, etc.
 # The compile hook fans ``before_compile`` / ``after_compile`` into every
 # plugin; the runner fans every ``node_start`` / ``node_end`` /
 # ``edge_fire`` / ``subgraph_enter`` / ``subgraph_exit`` into the same
@@ -330,15 +450,4 @@ plugins:
     kind: tool_dispatch_guard
     binds:
       - { kind: event_kind, value: on_decision }
-    config: {}
-
-  # --- Business wiring plugins (skeleton only fans hooks) ---
-  - id: default_control_slots
-    kind: control_slots
-    binds: []
-    config: {}
-
-  - id: default_semantic_router
-    kind: semantic_router
-    binds: []
     config: {}

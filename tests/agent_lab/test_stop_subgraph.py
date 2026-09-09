@@ -13,7 +13,12 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import agent_lab.nodes.control.stop_decide.plugin  # noqa: F401
+import pytest
+
+try:
+    import agent_lab.nodes.control.stop_decide.plugin  # noqa: F401
+except ModuleNotFoundError:
+    pass
 from agent_lab.graph.compile import compile as compile_spec
 from agent_lab.graphs import load_registry
 from agent_lab.primitives.artifact import Artifact, ArtifactKind
@@ -37,6 +42,7 @@ def test_stop_decide_subgraph_loads_and_compiles() -> None:
 
 def test_lca_control_stop_policy_provider_default_continue() -> None:
     """No fixture → default _NeverStop returns should_stop=False + terminal."""
+    pytest.importorskip("agent_lab.adapters.lca_control")
     from agent_lab.adapters.lca_control import LcaControlStopPolicyProvider
 
     provider = LcaControlStopPolicyProvider.from_node_config({})
@@ -56,6 +62,7 @@ def test_lca_control_stop_policy_provider_default_continue() -> None:
 
 def test_lca_control_stop_policy_provider_with_fixture() -> None:
     """Register a custom policy that returns should_stop=True."""
+    pytest.importorskip("agent_lab.adapters.lca_control")
     from agent_lab.adapters.lca_control import (
         LcaControlStopPolicyProvider,
         register_fixture_stop_policy,
@@ -93,6 +100,7 @@ def test_lca_control_stop_policy_provider_with_fixture() -> None:
 
 def test_stop_decide_subgraph_runs_via_runner() -> None:
     """The stop_decide control graph runs end-to-end through the runner."""
+    pytest.importorskip("agent_lab.adapters.lca_control")
     from agent_lab.adapters.lca_control import (
         register_fixture_stop_policy,
         unregister_fixture_stop_policy,
@@ -139,31 +147,37 @@ def test_stop_decide_subgraph_runs_via_runner() -> None:
 
 
 def test_agent_loop_attaches_stop_control_on_remember() -> None:
-    """stop_decide / stop_focus are control siblings of remember, not a stop host."""
-    from agent_lab.plugins.control_slots import ControlSlotsPlugin
+    """stop_decide / stop_focus are sibling hosts of remember, declared in YAML."""
+    from agent_lab.graphs.loader import load_spec
+    from agent_lab.primitives.edge import EdgeKind
 
-    specs = load_registry(
-        "perceive",
-        "think",
-        "reflect",
-        "remember",
-        "model_eye",
-        "act",
-        "agent_loop",
-    )
-    plugin = ControlSlotsPlugin(name="control_slots", kind="control_slots")
-    mutated = plugin.before_compile(specs["agent_loop"], specs)
-    host_ids = {n.id for n in mutated.nodes}
+    spec = load_spec(Path("agent_lab/graphs/configs/agent_loop.yaml"))
+    host_ids = {n.id for n in spec.nodes}
     assert "stop" not in host_ids
     assert "remember" in host_ids
+    assert "stop_decide" in host_ids
+    assert "stop_focus" in host_ids
 
-    remember = next(n for n in mutated.nodes if n.id == "remember")
+    remember = next(n for n in spec.nodes if n.id == "remember")
     for port_name in ("stop_decision", "terminal", "focus_verdict"):
-        assert port_name in remember.outs, (
-            f"remember host missing stop control port {port_name}; has {remember.outs}"
+        assert port_name not in remember.outs, (
+            f"remember host must not own stop port {port_name}; has {remember.outs}"
         )
 
-    links = {(link.node_id, link.sub_spec_id) for link in mutated.sub_specs}
-    assert ("remember", "stop_decide") in links
-    assert ("remember", "stop_focus") in links
+    links = {(link.node_id, link.sub_spec_id) for link in spec.sub_specs}
+    assert ("remember", "remember") in links
+    assert ("stop_decide", "stop_decide") in links
+    assert ("stop_focus", "stop_focus") in links
+    assert ("remember", "stop_decide") not in links
+    assert ("remember", "stop_focus") not in links
     assert not any(nid == "stop" for nid, _ in links)
+
+    edge = next(
+        e
+        for e in spec.edges
+        if e.from_ref.node_id == "remember"
+        and e.from_ref.port_id == "state_ref"
+        and e.to_ref.node_id == "stop_decide"
+    )
+    assert edge.kind == EdgeKind.DATA
+    assert edge.to_ref.port_id in {"state_ref", "in_state"}

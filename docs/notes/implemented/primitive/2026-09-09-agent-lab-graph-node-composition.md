@@ -1,6 +1,6 @@
 # Agent Note: agent_lab 图与工人组合律
 
-Status: proposed
+Status: implemented
 
 ## Problem
 
@@ -16,9 +16,9 @@ Status: proposed
 
 缺了这些闭包，“能力皆图”只是目录布局：图文件在，编排真值在 Python 里。子图也无法在不偷读的前提下复用另一处能力。
 
-## Proposal
+## Decision
 
-组合律将成为 `agent_lab` 图内核的编译期契约。它落实 [ADR-0206](../../../adr/0206-information-graph-kernel.md) 的单图种与 Grant，不改六阶段闭集、不改 Journal 词表、不把每个工人收成 Cordis `@plugin`（与 [absorb-end-state](../seam/2026-09-08-agent-lab-absorb-end-state.md) 一致）。[ADR-0209](../../../adr/0209-agent-lab-cordis-unification.md) 继续拥有 Session 单轨与 Body 组合根；本 note 拥有图/工人怎么接线。
+组合律是 `agent_lab` 图内核的编译期契约。它落实 [ADR-0206](../../../adr/0206-information-graph-kernel.md) 的单图种与 Grant，不改六阶段闭集、不改 Journal 词表、不把每个工人收成 Cordis `@plugin`（与 [absorb-end-state](../../proposed/seam/2026-09-08-agent-lab-absorb-end-state.md) 一致）。[ADR-0209](../../../adr/0209-agent-lab-cordis-unification.md) 拥有 Session 单轨与 Body 组合根；本 note 拥有图/工人怎么接线。
 
 ### 三平面
 
@@ -39,15 +39,14 @@ execute(node, inputs: Map<Port, Artifact>, seams: Mapping[str, object])
 
 `seams` 的 key 是 `manifest.requires` 的闭包，由 runner 按登记表注入，不多给。YAML `ins`/`outs` ⊆ manifest 端口；端口真值不在 `config.from` / `config.to`。输入 Artifact 只读。工人不 import 其他工人 `plugin.py`，不 `NodeRegistry.get` 兄弟，不读父 store，不读模块级 Body/Session 全局。删除 `relates_to`。
 
-`execute` 出现第二种业务问题、可复用子流程、或控制流（`if verdict` 选下游）时，升格为图。`act.execute` 将拆成：
+`execute` 出现第二种业务问题、可复用子流程、或控制流（`if verdict` 选下游）时，升格为图。`act.yaml` 现为：
 
 ```text
-shape → authorize → route_on(verdict)
-                      ├─ allow → body.act → receipt.shape
-                      ├─ deny  → receipt.denied
-                      └─ skip  → receipt.none
-receipt.* → observe ─project→ model_eye.see
-waiting_input ─control→ 挂起（不是 except）
+shape → authorize → dispatch(verdict)
+                      ├─ allow → act.body
+                      ├─ deny  → act.receipt_denied
+                      └─ skip  → act.receipt_none
+receipt → observe ─project→ model_eye.see
 ```
 
 有 `sub_specs` 的节点是 host：恰好一张子图，无业务 factory。`identity` 只留给真 passthrough。
@@ -119,18 +118,6 @@ ADR-0206 C1–C14 保持。下列 N* 由 `agent_lab.graph.validate` 硬失败：
 
 未声明 seam、borrow 超 `max_bytes` / 命中 `redact`、effect 绕过 SafeExecutor：运行拒绝，走 deterministic / control 拒绝支路。
 
-## Migration plan
-
-每一刀要么让编译器更严，要么删一条平行机制；不在同一变更里既留 plugin 插入又声称父图是 SSOT。兼容 shim 同变更删除。
-
-1. **本 note** — 组合律落成 proposed 决策。
-2. **端口闭包** — validate 执法 N1/N3/N4/N5；YAML 端口与 manifest 对齐。
-3. **control 兄弟化** — `agent_loop.yaml` 显式 host + 边；删除接线表；反转“无 plugin 则无 slot”测试。
-4. **观察面只读** — 删除改 outputs 的 semantic router；parse / observe / extract / tool guard 并进已有工人。`event_sink` / `observer` 可留，测试钉死不改 Artifact。
-5. **seams 注入** — 三参 `execute`；删除 `lab_tools()` / 节点内 Session 全局（与 ADR-0209 同一刀）。
-6. **act 升格** — 按上图拆 `act.execute`；修正 `on_error=route` 为先 invoke。
-7. **Grant 闭包** — C4 borrow 真执法；C1 可达 `mv.assemble`；C6 单写。
-
 不把 Kernel 图化。不引入 compile 期“图产生图”。不把每个 `@node` 收成 Cordis `@plugin`。lineage 子图由 [ADR-0206](../../../adr/0206-information-graph-kernel.md) §10 P8 拥有，本 note 不引入。
 
 ## Alternatives considered
@@ -155,27 +142,20 @@ slot 政策本身做成一张 compile 图，输出 `SubSpecLink[]`，更接近�
 
 Compile / Interpreter / `Session.append` 再图化，图会改写自己的解释器，违反 ADR-0206 Reject「口号化万物皆图」与 C9 Kernel-Closed。Kernel 保持闭集；Capability 才是图。
 
-## Acceptance criteria
+## Consequences
 
-- `agent_loop.yaml` 含 `stop_decide` / `stop_focus` / `think_guard` 等兄弟 host 与从 `remember`（或对应生产者）出发的 `data` 边；`python -m agent_lab.run --describe --target graph:agent_loop` 能回答 stop 的 `state_ref` 从哪根边来。
-- `rg ControlSlotsPlugin agent_lab/` = 0；`rg PHASE_OWNER_WIRING agent_lab/` = 0。
-- 改 outputs 的 semantic router 不存在，或测试证明 Observation hook 不改变 Artifact。
-- `validate` 对 N1–N8 有负例：违规 spec 编译退出码 ≠ 0。
-- 工人 `execute` 接受 `seams`；无 `lab_tools()` 模块全局；工人 `plugin.py` 不 import 兄弟工人。
-- 同一 host 两条 `sub_spec` 的 spec 编译失败。
-- 无 Grant 的跨 spec `data` 边编译失败。
-- 子图中途失败时父 OUT 不出现部分 `output_map` 端口。
+根图 YAML 更长，拓扑真值可读。Body 装配仍与 ADR-0209 重叠：`act.body` 继续调 `execute.body` 助手；`tools/registry.py` 未恢复。C1 只检查 act 是否有出站 `project` 边，不是全图可达。`observe_checkpoint` / `observe_wildcard` 未挂（无 event-log 生产者）。
 
-## Risks
+## Verification
 
-- 根图 YAML 变长。读者成本换来拓扑真值；若变长不可读，允许后加 `slots:` 糖，不得倒回 Python 插入。
-- 与 ADR-0209 在 Body/Session 组合根上重叠。本 note 不平行规定 Session 单轨；seams 注入与 Body 装配跟 0209 同一变更落地，避免两套 seams API。
-- 现有测试把 “plugin 插入才有 slot” 和 “before_compile 可改 spec” 当成正确行为。必须同变更反转，否则门禁会保护平行机制。
-- C1 可达性检查可能把合法的延迟 project 边判死。先用 `agent_loop` + `act`→`model_eye` 金丝雀钉范围，再扩大。
+- `python -m agent_lab.run --describe --target graph:agent_loop` 列出 `stop_decide` 与 `remember.state_ref` 边。
+- `rg ControlSlotsPlugin agent_lab/` = 0；`rg PHASE_OWNER_WIRING agent_lab/` = 0；`rg semantic_router agent_lab/` = 0。
+- `tests/agent_lab/test_validate_composition.py` 覆盖 N1–N8 / C4 / C1 金丝雀 / 子图失败不渗漏。
+- `scripts/check_agent_lab_node_imports.py` 拦截工人 `plugin.py` 互 import。
 
 ## Related
 
 - [ADR-0206](../../../adr/0206-information-graph-kernel.md) — 单图种、Grant、嵌套子图。
 - [ADR-0209](../../../adr/0209-agent-lab-cordis-unification.md) — Cordis 收编、Session 单轨、禁止节点内组合根。
-- [agent_lab absorb-end-state](../seam/2026-09-08-agent-lab-absorb-end-state.md) — 双挂桥接与工人不逐个 Cordis 化。
+- [agent_lab absorb-end-state](../../proposed/seam/2026-09-08-agent-lab-absorb-end-state.md) — 双挂桥接与工人不逐个 Cordis 化。
 - [agent_lab/README.md](../../../../agent_lab/README.md) — 进程外入口与图布局。

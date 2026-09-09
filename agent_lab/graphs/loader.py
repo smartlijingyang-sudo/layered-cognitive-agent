@@ -74,6 +74,7 @@ def _parse_edge(raw: dict[str, Any]) -> Edge:
         ),
         kind=_to_edge_kind(raw.get("kind", "data")),
         required=bool(raw.get("required", True)),
+        grant_id=raw.get("grant_id") or raw.get("grant"),
     )
 
 
@@ -176,3 +177,19 @@ def load_registry(*ids: str) -> dict[str, InfoEdgeSpec]:
         spec = load_spec(path)
         out[spec.id] = spec
     return out
+
+
+def load_closure(root_id: str) -> dict[str, InfoEdgeSpec]:
+    """Load root_id and every nested sub_spec id, recursively."""
+    loaded = load_registry(root_id)
+    pending = [root_id]
+    seen: set[str] = {root_id}
+    while pending:
+        current = loaded[pending.pop()]
+        for link in current.sub_specs:
+            if link.sub_spec_id in seen:
+                continue
+            seen.add(link.sub_spec_id)
+            loaded.update(load_registry(link.sub_spec_id))
+            pending.append(link.sub_spec_id)
+    return loaded

@@ -101,8 +101,7 @@ nodes:
 
   - id: eye
     region: model_visible
-    factory: identity
-    config: { from: manifest, to: manifest }
+    factory: graph.call
     ins: [context_manifest, system, history, config, tools, user_turn]
     outs: [manifest]
 

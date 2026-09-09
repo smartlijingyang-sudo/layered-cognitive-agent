@@ -8,15 +8,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-import logging
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from agent_lab.graph.spec import InfoEdgeSpec
 from agent_lab.graph.validate import ValidationError, validate
-
-_log = logging.getLogger(__name__)
 
 
 def _resolve_plugins(spec: InfoEdgeSpec) -> list:
@@ -45,6 +42,17 @@ def _stable_hash(obj: Any) -> str:
     return hashlib.sha256(json.dumps(obj, sort_keys=True, default=str).encode()).hexdigest()
 
 
+def _topology_signature(spec: InfoEdgeSpec) -> str:
+    return _stable_hash(
+        {
+            "nodes": [(n.id, n.factory, n.ins, n.outs) for n in spec.nodes],
+            "edges": [e.model_dump() for e in spec.edges],
+            "sub_specs": [s.model_dump() for s in spec.sub_specs],
+            "grants": [g.model_dump() for g in spec.grants],
+        }
+    )
+
+
 class CompiledGraphBundle(BaseModel):
     """Immutable execution plan. Recompile when plan_hash changes."""
 
@@ -67,10 +75,9 @@ def compile(
 ) -> CompiledGraphBundle:
     """Validate, build bindings, topological layers, return frozen bundle.
 
-    Plugins may rewrite ``spec`` and mutate ``sub_registry`` in place via
-    ``before_compile``. The rewritten spec is what ``spec_dump`` /
-    ``subgraph_calls`` reflect; callers that execute should rebuild the
-    spec from ``spec_dump`` (see ``runtime.runner.run``).
+    Plugins may observe ``spec`` via ``before_compile``. Nested graphs
+    come from the loader closure, not from plugin yaml scans. A copy is
+    allowed only when the topology signature is unchanged.
 
     Raises ValidationError on invariant violations.
     """
@@ -78,17 +85,21 @@ def compile(
         sub_registry = {}
 
     plugins = _resolve_plugins(spec)
-    # Pass the live sub_registry: plugins (e.g. control_slots) may mutate it
-    # in place so the runner can resolve inserted sub_spec ids.
     for plugin in plugins:
-        try:
-            rewritten = plugin.before_compile(spec, sub_registry)
-            if rewritten is not None:
-                spec = rewritten
-        except Exception as exc:  # pragma: no cover
-            _log.warning("plugin %s before_compile raised: %s", plugin.name, exc)
+        before = getattr(plugin, "before_compile", None)
+        if before is None:
+            continue
+        rewritten = before(spec, sub_registry)
+        if rewritten is None:
+            continue
+        if _topology_signature(rewritten) != _topology_signature(spec):
+            name = getattr(plugin, "name", type(plugin).__name__)
+            raise ValidationError(
+                [f"plugin {name} before_compile rewrote topology; forbidden"]
+            )
+        spec = rewritten
 
-    errs = validate(spec)
+    errs = validate(spec, sub_registry)
     if errs:
         raise ValidationError(errs)
 

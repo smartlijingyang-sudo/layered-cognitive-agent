@@ -20,7 +20,7 @@ import json
 import sys
 from pathlib import Path
 
-from agent_lab.graphs import load_graph_manifest, load_registry
+from agent_lab.graphs import load_closure, load_graph_manifest
 from agent_lab.primitives.artifact import (
     Artifact,
     ArtifactKind,
@@ -33,14 +33,11 @@ from agent_lab.runtime.runner import run as run_graph
 
 
 def _bootstrap() -> None:
-    """Eagerly load .env (for LLM secrets) and the tool registry, then wire
-    the registry into the dispatch nodes.
+    """Load .env (for LLM secrets) and LabCarrier plugins.
 
-    This is the only place the registry is loaded.  Act execute (and the
-    legacy dispatch_tool singleton) share it via configure_registry.
+    Workers live in ``lca.plugins.lab``; this entry must not import
+    ``agent_lab.nodes``.
     """
-    # Load project .env if present so OpenAICompatAdapter can read
-    # LLM_API_KEY / LLM_MODEL / LLM_BASE_URL out of the environment.
     try:
         from dotenv import load_dotenv
 
@@ -48,15 +45,8 @@ def _bootstrap() -> None:
     except Exception:  # noqa: S110 — missing .env is fine, env is the fallback
         pass
 
-    from agent_lab.nodes.act.execute.plugin import configure_registry
-    from agent_lab.nodes.act.execute.runtime_bind import ensure_act_runtime
-    from agent_lab.tools import ToolRegistry
     from lca.plugins.lab.internal.loader import load_all
 
-    registry = ToolRegistry()
-    registry.load_from_yaml(Path(__file__).parent / "tools" / "registry.yaml")
-    configure_registry(registry)
-    ensure_act_runtime()
     load_all()
 
 
@@ -223,43 +213,96 @@ _DISPATCH = {
 }
 
 
-def _describe(target: str | None) -> None:
-    """Print self-describing manifests.
+def _describe_graph(name: str) -> None:
+    """Print a graph's YAML manifest plus nodes and data edges."""
+    configs = Path(__file__).parent / "graphs" / "configs"
+    yaml_path = configs / f"{name}.yaml"
+    if not yaml_path.exists():
+        for subdir in sorted(configs.iterdir()):
+            if subdir.is_dir():
+                candidate = subdir / f"{name}.yaml"
+                if candidate.exists():
+                    yaml_path = candidate
+                    break
+    if not yaml_path.exists():
+        print(f"no graph yaml for: {name}")
+        return
+    from agent_lab.graphs.loader import load_spec
 
-    Usage:
-      python -m agent_lab.run describe                 # all nodes + graphs
-      python -m agent_lab.run describe --target node:redact
-      python -m agent_lab.run describe --target graph:agent_loop
-    """
-    from agent_lab.nodes import NodeRegistry
+    gm = load_graph_manifest(yaml_path)
+    spec = load_spec(yaml_path)
+    print(
+        f"[{gm.get('id', spec.id)}]  layer={gm.get('layer', spec.region.value)}  "
+        f"purpose={gm.get('purpose', spec.description)}"
+    )
+    print(f"  members={list(gm.get('members', [n.id for n in spec.nodes]))}")
+    print(f"  references={list(gm.get('references', []))}")
+    print(f"  relations={list(gm.get('relations', []))}")
+    print(f"  capabilities={gm.get('capabilities', {})}")
+    print("  nodes:")
+    for n in spec.nodes:
+        print(f"    - {n.id} factory={n.factory} ins={n.ins} outs={n.outs}")
+    print("  edges:")
+    for e in spec.edges:
+        print(f"    - {e.id}: {e.from_ref.label()} -> {e.to_ref.label()} ({e.kind.value})")
+    print("  sub_specs:")
+    for link in spec.sub_specs:
+        print(f"    - {link.node_id} -> {link.sub_spec_id}")
+
+
+def _iter_carrier_markers() -> list[tuple[str, dict]]:
+    from lca.plugins.lab.internal.loader import _LAB_HOOKS, load_all
+
+    load_all()
+    out: list[tuple[str, dict]] = []
+    for slot_id, marker in sorted(_LAB_HOOKS.items()):
+        if isinstance(marker, dict):
+            out.append((slot_id, marker))
+    return out
+
+
+def _marker_matches(slot_id: str, marker: dict, name: str) -> bool:
+    bare = slot_id[4:] if slot_id.startswith("lab.") else slot_id
+    aliases = marker.get("factory_aliases") or []
+    return name in {slot_id, bare, marker.get("id"), *aliases}
+
+
+def _print_carrier_marker(slot_id: str, marker: dict) -> None:
+    print(f"\n[{slot_id}]  {marker.get('id', slot_id)}")
+    print(f"  stage={marker.get('stage', '')}  kind={marker.get('kind', '')}")
+    print(f"  description: {marker.get('description', '')}")
+    inputs = marker.get("inputs") or []
+    if inputs:
+        print("  inputs:")
+        for p in inputs:
+            print(
+                f"    - {p.get('port')} ({p.get('kind')}, required={p.get('required')})"
+            )
+    outputs = marker.get("outputs") or []
+    if outputs:
+        print("  outputs:")
+        for p in outputs:
+            print(f"    - {p.get('port')} ({p.get('kind')})")
+    if marker.get("provides"):
+        print(f"  provides: {list(marker['provides'])}")
+    if marker.get("requires"):
+        print(f"  requires: {list(marker['requires'])}")
+    if marker.get("emits"):
+        print(f"  emits: {list(marker['emits'])}")
+    if marker.get("factory_aliases"):
+        print(f"  factory_aliases: {list(marker['factory_aliases'])}")
+
+
+def _describe(target: str | None) -> None:
+    """Print self-describing manifests from YAML + LabCarrier markers."""
+    if target is not None and target.startswith("graph:"):
+        _describe_graph(target.partition(":")[2])
+        return
 
     if target is None or target == "all":
-        # All node manifests
         print("=== Node Manifests ===")
-        for node_id in sorted(NodeRegistry.known()):
-            m = NodeRegistry.describe(node_id)
-            print(f"\n[{node_id}]  {m.name}")
-            print(f"  layer={m.layer.value}  kind={m.kind.value}")
-            print(f"  description: {m.description}")
-            if m.inputs:
-                print("  inputs:")
-                for p in m.inputs:
-                    print(f"    - {p.id} ({p.kind.value}, required={p.required})")
-            if m.outputs:
-                print("  outputs:")
-                for p in m.outputs:
-                    print(f"    - {p.id} ({p.kind.value}, required={p.required})")
-            if m.provides:
-                print(f"  provides: {list(m.provides)}")
-            if m.requires:
-                print(f"  requires: {list(m.requires)}")
-            if m.emits:
-                print(f"  emits: {list(m.emits)}")
-            if m.consumes:
-                print(f"  consumes: {list(m.consumes)}")
-            if m.relates_to:
-                print(f"  relates_to: {list(m.relates_to)}")
-        # All graph manifests
+        for slot_id, marker in _iter_carrier_markers():
+            _print_carrier_marker(slot_id, marker)
         print("\n\n=== Graph Manifests ===")
         for stem in ("agent_loop", "model_eye", "act", "perceive", "think"):
             yaml_path = Path(__file__).parent / "graphs" / "configs" / f"{stem}.yaml"
@@ -281,7 +324,6 @@ def _describe(target: str | None) -> None:
                     print(f"  provides: {list(caps['provides'])}")
                 if caps.get("requires"):
                     print(f"  requires: {list(caps['requires'])}")
-        # Tool registry
         from agent_lab.tools import ToolRegistry
 
         reg = ToolRegistry()
@@ -301,24 +343,13 @@ def _describe(target: str | None) -> None:
 
     kind, _, name = target.partition(":")
     if kind == "node":
-        m = NodeRegistry.describe(name)
-        print(f"[{m.id}] {m.name}")
-        print(f"  layer={m.layer.value}  kind={m.kind.value}  description={m.description}")
-        print(f"  inputs={[p.id for p in m.inputs]}  outputs={[p.id for p in m.outputs]}")
-        print(f"  provides={list(m.provides)}  requires={list(m.requires)}")
-        print(f"  emits={list(m.emits)}  consumes={list(m.consumes)}")
-        print(f"  relates_to={list(m.relates_to)}")
+        for slot_id, marker in _iter_carrier_markers():
+            if _marker_matches(slot_id, marker, name):
+                _print_carrier_marker(slot_id, marker)
+                return
+        print(f"no LabCarrier marker for: {name}")
     elif kind == "graph":
-        yaml_path = Path(__file__).parent / "graphs" / "configs" / f"{name}.yaml"
-        gm = load_graph_manifest(yaml_path)
-        if not gm:
-            print(f"no graph manifest for: {name}")
-            return
-        print(f"[{gm.get('id')}]  layer={gm.get('layer')}  purpose={gm.get('purpose')}")
-        print(f"  members={list(gm.get('members', []))}")
-        print(f"  references={list(gm.get('references', []))}")
-        print(f"  relations={list(gm.get('relations', []))}")
-        print(f"  capabilities={gm.get('capabilities', {})}")
+        _describe_graph(name)
     else:
         print(f"unknown target kind: {kind} (use 'node:<id>' or 'graph:<id>')")
 
@@ -358,13 +389,12 @@ def main(argv: list[str] | None = None) -> int:
         _run_negative()
         return 0
 
-    # Real boot: load the tool registry before any graph runs.
     _bootstrap()
     if args.mv_provider == "lca" or args.graph == "model_eye":
         _register_lca_mv()
-    specs = load_registry(
-        "perceive", "model_eye", "act", "agent_loop", "think", "reflect", "remember"
-    )
+    specs = load_closure("agent_loop")
+    if args.graph != "agent_loop":
+        specs.update(load_closure(args.graph))
     if args.graph == "model_eye":
         _DISPATCH[args.graph](specs, args.mv_provider)
     else:

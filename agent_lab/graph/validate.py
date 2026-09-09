@@ -7,9 +7,13 @@ diagnostics so the user fixes all in one pass.
 
 from __future__ import annotations
 
+from collections import Counter
+
 from agent_lab.graph.spec import InfoEdgeSpec
 from agent_lab.primitives.edge import EdgeKind
 from agent_lab.primitives.port import PortDir
+
+_HOST_FACTORIES = frozenset({"graph.call"})
 
 
 class ValidationError(Exception):
@@ -38,13 +42,75 @@ def _declared_sub_spec_inputs(spec: InfoEdgeSpec) -> dict[tuple[str, str], str]:
     return out
 
 
+def _check_n1_ports(spec: InfoEdgeSpec) -> list[str]:
+    """N1: YAML ins/outs ⊆ manifest ports. Skipped without NodeRegistry."""
+    try:
+        from agent_lab.nodes.base import NodeRegistry
+    except ImportError:
+        return []
+    errs: list[str] = []
+    for n in spec.nodes:
+        if n.factory in _HOST_FACTORIES:
+            continue
+        try:
+            manifest = NodeRegistry.describe(n.factory)
+        except KeyError:
+            continue
+        declared_in = {p.id for p in manifest.inputs}
+        declared_out = {p.id for p in manifest.outputs}
+        for port in n.ins:
+            if declared_in and port not in declared_in:
+                errs.append(
+                    f"N1: node {n.id} ins port {port!r} not in manifest {n.factory} "
+                    f"inputs {sorted(declared_in)}"
+                )
+        for port in n.outs:
+            if declared_out and port not in declared_out:
+                errs.append(
+                    f"N1: node {n.id} outs port {port!r} not in manifest {n.factory} "
+                    f"outputs {sorted(declared_out)}"
+                )
+    return errs
+
+
+def _check_n2_requires(spec: InfoEdgeSpec) -> list[str]:
+    """N2: each requires has a provider. Skipped without NodeRegistry."""
+    try:
+        from agent_lab.nodes.base import NodeRegistry
+    except ImportError:
+        return []
+    provided: set[str] = set()
+    for n in spec.nodes:
+        try:
+            man = NodeRegistry.describe(n.factory)
+        except KeyError:
+            continue
+        provided.update(man.provides)
+    errs: list[str] = []
+    for n in spec.nodes:
+        try:
+            man = NodeRegistry.describe(n.factory)
+        except KeyError:
+            continue
+        for req in man.requires:
+            if req not in provided:
+                errs.append(
+                    f"N2: node {n.id} requires {req!r} but no provider in spec"
+                )
+    return errs
+
+
 def _check_emits_against_edges(spec: InfoEdgeSpec) -> list[str]:
     """C2/C11: each effect edge source should declare an emit.
 
     Surfaces a non-fatal-style error if the node forgot to declare what
     it emits. Compile-time fails to find these means runtime has no
-    permission / capability basis.
+    permission / capability basis. Skipped without NodeRegistry.
     """
+    try:
+        from agent_lab.nodes.base import NodeRegistry
+    except ImportError:
+        return []
     errs: list[str] = []
     for e in spec.edges:
         if e.kind.value != "effect":
@@ -53,8 +119,6 @@ def _check_emits_against_edges(spec: InfoEdgeSpec) -> list[str]:
             src_node = spec.node(e.from_ref.node_id)
         except KeyError:
             continue
-        from agent_lab.nodes.base import NodeRegistry
-
         try:
             manifest = NodeRegistry.describe(src_node.factory)
         except KeyError:
@@ -67,13 +131,41 @@ def _check_emits_against_edges(spec: InfoEdgeSpec) -> list[str]:
     return errs
 
 
-def validate(spec: InfoEdgeSpec, registry: dict[str, dict[str, str]] | None = None) -> list[str]:
+def _check_c1_project_closure(
+    spec: InfoEdgeSpec, sub_registry: dict[str, InfoEdgeSpec] | None = None
+) -> list[str]:
+    """C1: act / act.observe / effect specs must project out to another spec."""
+    del sub_registry
+    needs = (
+        spec.id == "act"
+        or any(e.kind == EdgeKind.EFFECT for e in spec.edges)
+        or any(n.factory == "act.observe" for n in spec.nodes)
+    )
+    if not needs:
+        return []
+    has_project_out = any(
+        e.kind == EdgeKind.PROJECT and e.from_ref.spec_id == spec.id and e.to_ref.spec_id != spec.id
+        for e in spec.edges
+    )
+    if has_project_out:
+        return []
+    return [
+        "C1: act observation must project to another spec "
+        "(missing kind=project edge to model_eye / model_visible)"
+    ]
+
+
+def validate(spec: InfoEdgeSpec, sub_registry: dict[str, InfoEdgeSpec] | None = None) -> list[str]:
     """Return a list of error strings. Empty list means valid.
 
-    registry: optional {spec_id: {export_port_id: parent_port_id}} for cross-spec port checks.
+    sub_registry: nested specs from the loader closure (passed by compile).
     """
     errs: list[str] = []
     node_ids = {n.id for n in spec.nodes}
+
+    errs.extend(_check_n1_ports(spec))
+    errs.extend(_check_n2_requires(spec))
+    errs.extend(_check_c1_project_closure(spec, sub_registry))
 
     # C1/C2/C6 baseline: every port referenced by an edge must be declared.
     declared = _declared_ports(spec)
@@ -83,19 +175,19 @@ def validate(spec: InfoEdgeSpec, registry: dict[str, dict[str, str]] | None = No
             nk = (ref_key.node_id, ref_key.port_id)
             if ref_key.node_id == "_initial":
                 continue  # external input — caller supplies the artifact
-            # Cross-spec project edges legitimately reference nodes in another spec.
+            # Cross-spec project|borrow edges legitimately reference nodes in another spec.
             cross_spec = ref_key.spec_id != spec.id
-            if nk not in declared and ref_key.node_id in node_ids and not cross_spec:
+            cross_ok = e.kind in (EdgeKind.PROJECT, EdgeKind.BORROW)
+            if cross_spec and not cross_ok:
+                errs.append(
+                    f"N5: edge {e.id} crosses spec boundary with kind={e.kind.value}; "
+                    "only project|borrow allowed"
+                )
+            elif nk not in declared and ref_key.node_id in node_ids and not cross_spec:
                 errs.append(f"C6: edge {e.id} {ref_label} port {ref_key.label()} is not declared")
-            elif ref_key.node_id not in node_ids and not (
-                cross_spec and e.kind == EdgeKind.PROJECT
-            ):
+            elif ref_key.node_id not in node_ids and not (cross_spec and cross_ok):
                 errs.append(
                     f"C6: edge {e.id} {ref_label} references missing node {ref_key.node_id}"
-                )
-            elif cross_spec and e.kind != EdgeKind.PROJECT:
-                errs.append(
-                    f"C1: edge {e.id} {ref_label} crosses spec boundary but is not a project edge"
                 )
         # port dir sanity
         if e.from_ref.node_id in node_ids:
@@ -146,10 +238,49 @@ def validate(spec: InfoEdgeSpec, registry: dict[str, dict[str, str]] | None = No
                     f"{parent_port} not in node.outs={node.outs}"
                 )
 
+    counts = Counter(link.node_id for link in spec.sub_specs)
+    for node_id, n in counts.items():
+        if n != 1:
+            errs.append(f"N3: host {node_id} has {n} sub_specs; exactly one allowed")
+
+    for link in spec.sub_specs:
+        if link.node_id not in node_ids:
+            continue
+        host = spec.node(link.node_id)
+        if host.factory not in _HOST_FACTORIES:
+            errs.append(f"N4: host {host.id} factory={host.factory!r} must be 'graph.call'")
+
     # Grant port refs (best-effort string match)
     for g in spec.grants:
         if not g.ports:
             errs.append(f"C4: grant {g.id} declares no ports")
+
+    # C4: every borrow edge must cite a matching InfoGrant
+    grants_by_id = {g.id: g for g in spec.grants}
+    for e in spec.edges:
+        if e.kind != EdgeKind.BORROW:
+            continue
+        if not e.grant_id:
+            errs.append(f"C4: borrow edge {e.id} has no grant_id")
+            continue
+        grant = grants_by_id.get(e.grant_id)
+        if grant is None:
+            errs.append(f"C4: borrow edge {e.id} references unknown grant {e.grant_id!r}")
+            continue
+        if e.from_ref.spec_id != grant.from_spec:
+            errs.append(
+                f"C4: borrow edge {e.id} from_spec={e.from_ref.spec_id!r} "
+                f"!= grant.from_spec={grant.from_spec!r}"
+            )
+        if e.to_ref.spec_id != grant.to_spec:
+            errs.append(
+                f"C4: borrow edge {e.id} to_spec={e.to_ref.spec_id!r} "
+                f"!= grant.to_spec={grant.to_spec!r}"
+            )
+        if e.from_ref.port_id not in grant.ports:
+            errs.append(
+                f"C4: borrow edge {e.id} port {e.from_ref.port_id!r} not in grant.ports={grant.ports}"
+            )
 
     # C6.1: on_error=route must target an existing node with an IN port
     # that can receive an EXCEPTION artifact (ADR-0206 §5.6).
@@ -191,11 +322,11 @@ def validate(spec: InfoEdgeSpec, registry: dict[str, dict[str, str]] | None = No
 def _port_infos_by_factory() -> dict[str, dict[str, dict[str, str]]]:
     """{factory_name: {port_id: {"dir": "in"|"out", "kind": "<PortKind>", "schema_ref": "..."}}}.
 
-    Imported lazily because agent_lab.nodes pulls in adapters.
+    Skipped without NodeRegistry (agent_lab.nodes is gone).
     """
     try:
         from agent_lab.nodes.base import NodeRegistry
-    except Exception:  # pragma: no cover - adapter import failures
+    except ImportError:
         return {}
     out: dict[str, dict[str, dict[str, str]]] = {}
     for factory in NodeRegistry.known():
@@ -276,9 +407,9 @@ def _check_port_kind_compatibility(spec: InfoEdgeSpec) -> list[str]:
 
 
 def validate_or_raise(
-    spec: InfoEdgeSpec, registry: dict[str, dict[str, str]] | None = None
+    spec: InfoEdgeSpec, sub_registry: dict[str, InfoEdgeSpec] | None = None
 ) -> None:
-    errs = validate(spec, registry)
+    errs = validate(spec, sub_registry)
     if errs:
         raise ValidationError(errs)
 
@@ -331,14 +462,14 @@ def _check_regions(
 def validate_with_profile(
     spec: InfoEdgeSpec,
     profile_regions: "set[str] | None" = None,
-    registry: dict[str, dict[str, str]] | None = None,
+    sub_registry: dict[str, InfoEdgeSpec] | None = None,
 ) -> list[str]:
     """Validate with an optional profile regions overlay.
 
     Combines the standard validate() (C1-C13) with the C14 region check.
     Pass profile_regions=None to use only the 6-stage + bare-enum closed set.
     """
-    errs = validate(spec, registry)
+    errs = validate(spec, sub_registry)
     errs.extend(_check_regions(spec, profile_regions))
     return errs
 
@@ -346,10 +477,10 @@ def validate_with_profile(
 def validate_with_profile_or_raise(
     spec: InfoEdgeSpec,
     profile_regions: "set[str] | None" = None,
-    registry: dict[str, dict[str, str]] | None = None,
+    sub_registry: dict[str, InfoEdgeSpec] | None = None,
 ) -> None:
     """Raise ValidationError if validate_with_profile finds any errors."""
-    errs = validate_with_profile(spec, profile_regions, registry)
+    errs = validate_with_profile(spec, profile_regions, sub_registry)
     if errs:
         raise ValidationError(errs)
 

@@ -6,14 +6,19 @@ and every nested sub-graph (ADR-0206 C11: one graph kind, one runner).
 
 from __future__ import annotations
 
+import json
+import logging
 import time
 from dataclasses import dataclass, field
 from typing import Any
 
 from agent_lab.graph.compile import CompiledGraphBundle
 from agent_lab.graph.spec import InfoEdgeSpec, InfoNode, SubSpecLink
-from agent_lab.nodes import invoke as invoke_node
 from agent_lab.primitives.artifact import Artifact, ArtifactKind, make_exception
+from agent_lab.primitives.edge import Edge
+from agent_lab.runtime.invoke import invoke as invoke_node
+
+_log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -150,14 +155,16 @@ class _Runner:
     def _apply_output_hooks(
         self, node_id: str, outputs: dict[str, Artifact]
     ) -> dict[str, Artifact]:
-        """Fan AFTER_NODE_EXECUTE so plugins may rewrite outputs.
+        """Fan AFTER_NODE_EXECUTE for observation only; never replace artifacts.
 
-        The skeleton does not interpret schema_ref or cognitive event
-        names; a business plugin (e.g. semantic_router) owns that map.
+        Hooks may read ``payload["outputs"]``. Per-port replacements
+        (``id(new) != id(old)``) are ignored and logged; worker outputs
+        remain the data plane (N6).
         """
         from lca.plugins.lab.internal.hooks import HookContext, HookEvent, fanout_hooks
 
         plugins = self._plugins()
+        original = dict(outputs)
         ctx = HookContext(
             event=HookEvent.AFTER_NODE_EXECUTE,
             spec_id=self.spec.id,
@@ -166,8 +173,22 @@ class _Runner:
             payload={"outputs": dict(outputs), "plugins": plugins},
         )
         new_ctx = fanout_hooks(plugins, HookEvent.AFTER_NODE_EXECUTE, ctx)
-        rewritten = new_ctx.payload.get("outputs", outputs)
-        return rewritten if isinstance(rewritten, dict) else outputs
+        candidate = new_ctx.payload.get("outputs", original)
+        if not isinstance(candidate, dict):
+            return original
+        frozen: dict[str, Artifact] = {}
+        for port_id, old_art in original.items():
+            new_art = candidate.get(port_id, old_art)
+            if new_art is old_art:
+                frozen[port_id] = old_art
+            else:
+                _log.warning(
+                    "node %s port %s: hook attempted to replace output; keeping original",
+                    node_id,
+                    port_id,
+                )
+                frozen[port_id] = old_art
+        return frozen
 
     def run(self) -> dict[str, Artifact]:
         # Seed: copy initial artifacts into per-node store for any node whose IN port
@@ -249,28 +270,32 @@ class _Runner:
                 self.store[(node_id, port_id)] = artifact
         # status == "failed" already raised; we never get here.
 
-        # Propagate to downstream IN ports via data/project edges.
+        # Propagate to downstream IN ports via data/project/borrow edges.
         for edge in self.spec.edges:
             if edge.from_ref.node_id != node_id:
                 continue
-            if edge.kind.value not in ("data", "project"):
+            if edge.kind.value not in ("data", "project", "borrow"):
                 continue
             src_port = edge.from_ref.port_id
             dst_port = edge.to_ref.port_id
             src_a = self.store.get((node_id, src_port))
             if src_a is None:
                 continue
-            self.store[(edge.to_ref.node_id, dst_port)] = src_a
+            art = src_a
+            if edge.kind.value == "borrow":
+                art = self._apply_borrow_grant(edge, src_a)
+            self.store[(edge.to_ref.node_id, dst_port)] = art
             self._emit(
                 TraceEvent(
                     kind="edge_fire",
                     subgraph_path=self.subgraph_path,
                     edge_id=edge.id,
-                    artifact_digest=src_a.short_id(),
+                    artifact_digest=art.short_id(),
                     payload={
                         "kind": edge.kind.value,
                         "from": edge.from_ref.label(),
                         "to": edge.to_ref.label(),
+                        **({"grant_id": edge.grant_id} if edge.grant_id else {}),
                     },
                 )
             )
@@ -290,6 +315,66 @@ class _Runner:
             )
         )
 
+    def _apply_borrow_grant(self, edge: Edge, art: Artifact) -> Artifact:
+        """Copy a borrow edge under its InfoGrant; enforce max_bytes / redact."""
+        if not edge.grant_id:
+            raise _NonRetryableError(f"borrow edge {edge.id} has no grant_id")
+        grant = next((g for g in self.spec.grants if g.id == edge.grant_id), None)
+        if grant is None:
+            raise _NonRetryableError(
+                f"borrow edge {edge.id} references unknown grant {edge.grant_id!r}"
+            )
+        if grant.max_bytes:
+            size = len(json.dumps(art.content))
+            if size > grant.max_bytes:
+                raise _NonRetryableError(
+                    f"borrow edge {edge.id} exceeds grant.max_bytes={grant.max_bytes} (got {size})"
+                )
+        if grant.redact and isinstance(art.content, dict):
+            redacted = {k: v for k, v in art.content.items() if k not in grant.redact}
+            return Artifact(kind=art.kind, content=redacted, schema_ref=art.schema_ref)
+        return art
+
+    def _route_exception(
+        self, node: InfoNode, exc: Exception
+    ) -> tuple[dict[str, Artifact], str, dict[str, Any]]:
+        """Deliver EXCEPTION to route_to's first IN, invoke target, mark both executed."""
+        target_id = node.route_to
+        if not target_id:
+            raise RuntimeError(f"node {node.id}: on_error=route requires route_to to be set")
+        try:
+            target = self.spec.node(target_id)
+        except KeyError as err:
+            raise RuntimeError(
+                f"node {node.id}: on_error=route targets missing node {target_id}"
+            ) from err
+        if not target.ins:
+            raise RuntimeError(
+                f"node {node.id}: route_to={target_id} has no IN port to receive"
+                " the EXCEPTION artifact"
+            )
+        exception_port = target.ins[0]
+        exc_artifact = make_exception(
+            error_class=type(exc).__name__,
+            message=str(exc),
+            node_id=node.id,
+            transient=False,
+        )
+        self.store[(target_id, exception_port)] = exc_artifact
+        target_inputs: dict[str, Artifact] = {
+            port_id: self.store.get(
+                (target_id, port_id),
+                Artifact(kind=ArtifactKind.TEXT, content=""),
+            )
+            for port_id in target.ins
+        }
+        target_outputs = invoke_node(target, target_inputs)
+        for port_id, artifact in target_outputs.items():
+            self.store[(target_id, port_id)] = artifact
+        self._executed.add(node.id)
+        self._executed.add(target_id)
+        return target_outputs, "routed", {"status": "routed", "route_to": target_id}
+
     def _invoke_with_policy(
         self, node: InfoNode, inputs: dict[str, Artifact]
     ) -> tuple[dict[str, Artifact], str, dict[str, Any]]:
@@ -307,57 +392,10 @@ class _Runner:
           - retry    — re-invoke up to config.max_retries (default 3);
                        transient failures get a backoff; deterministic
                        failures are NOT retried (per ADR-0206 §5.6)
-          - route    — invoke the node referenced by route_to with the
-                       EXCEPTION artifact; the route target's outputs are
-                       forwarded as this node's outputs
+          - route    — invoke the worker first; on exception, deliver
+                       EXCEPTION to route_to and invoke that target
         """
         error_info: dict[str, Any] = {}
-        # on_error=route: handled by short-circuit before invocation, since
-        # we want the route target (not this node) to be the one that runs.
-        if node.on_error.value == "route":
-            target_id = node.route_to
-            if not target_id:
-                raise RuntimeError(f"node {node.id}: on_error=route requires route_to to be set")
-            try:
-                target = self.spec.node(target_id)
-            except KeyError as exc:
-                raise RuntimeError(
-                    f"node {node.id}: on_error=route targets missing node {target_id}"
-                ) from exc
-            if not target.ins:
-                raise RuntimeError(
-                    f"node {node.id}: route_to={target_id} has no IN port to receive"
-                    " the EXCEPTION artifact"
-                )
-            exception_port = target.ins[0]
-            exc_artifact = make_exception(
-                error_class="node.skipped",
-                message=f"upstream node {node.id} failed before invocation",
-                node_id=node.id,
-                transient=False,
-            )
-            # Eagerly invoke the route target. Reason: route_to may land
-            # in the SAME topological layer as the failing node (no edge
-            # connects them), and the layer loop iterates by sorted node
-            # id — so we can't rely on order. Invoke it here, before
-            # _run_node returns to the layer loop.
-            self.store[(target_id, exception_port)] = exc_artifact
-            target_inputs: dict[str, Artifact] = {
-                port_id: self.store.get(
-                    (target_id, port_id),
-                    Artifact(kind=ArtifactKind.TEXT, content=""),
-                )
-                for port_id in target.ins
-            }
-            target_outputs = invoke_node(target, target_inputs)
-            for port_id, artifact in target_outputs.items():
-                self.store[(target_id, port_id)] = artifact
-            self._executed.add(target_id)
-            error_info["status"] = "routed"
-            error_info["route_to"] = target_id
-            return target_outputs, "routed", error_info
-
-        # Retry / fail policies run the node itself.
         max_attempts = 1
         if node.on_error.value == "retry":
             max_attempts = max(1, int(node.config.get("max_retries", 3)))
@@ -370,20 +408,15 @@ class _Runner:
                     error_info["retried_attempts"] = attempt - 1
                 return outputs, "ok", error_info
             except Exception as exc:
+                if node.on_error.value == "route":
+                    return self._route_exception(node, exc)
                 last_exc = exc
                 # ADR-0206 §5.6: deterministic errors are never retried.
-                # The caller signals determinism by raising a non-transient
-                # exception; transient=True on the artifact (if it surfaces
-                # as one) gates retry. We honour `transient` on EXCEPTION
-                # artifacts; anything else is treated as deterministic.
                 if isinstance(exc, _NonRetryableError):
                     break
                 if attempt == max_attempts:
                     break
         if last_exc is None:
-            # Unreachable: the loop either returned successfully above or
-            # raised and recorded an exception in last_exc. Reaching here
-            # means max_attempts was 0, which the constructor rejects.
             raise RuntimeError(f"node {node.id}: retry loop exited without exception")
         error_info["status"] = "error"
         error_info["error"] = str(last_exc)
@@ -429,10 +462,11 @@ class _Runner:
             inherited_plugins=self._plugins(),
         )
         child_outputs = child.run()
-        # Write child outputs back to parent node's IN ports (via output_map reverse).
+        missing = [sub for sub in link.output_map if sub not in child_outputs]
+        if missing:
+            raise RuntimeError(f"sub_spec {link.sub_spec_id} missing exports {missing}")
         for sub_port, parent_port in link.output_map.items():
-            if sub_port in child_outputs:
-                self.store[(link.node_id, parent_port)] = child_outputs[sub_port]
+            self.store[(link.node_id, parent_port)] = child_outputs[sub_port]
         self._emit(
             TraceEvent(
                 kind="subgraph_exit",
@@ -459,17 +493,12 @@ def run(
 ) -> ExecutionTrace:
     """Compile + execute a root spec (with optional sub-spec registry).
 
-    Uses the post-``before_compile`` rewritten spec from the bundle so
-    plugins that insert sub_specs (e.g. control_slots) actually execute.
+    Uses the post-``before_compile`` spec from the bundle dump.
 
     Returns an ExecutionTrace containing every node_start / node_end /
     edge_fire / subgraph_enter / subgraph_exit event plus final artifacts.
     """
     sub_registry = sub_registry or {}
-    # One Session for session_log + FactGateway publish (act Body journal).
-    from agent_lab.nodes.act.execute.runtime_bind import ensure_act_runtime
-
-    ensure_act_runtime()
     bundle = _compile_or_raise(spec, sub_registry)
     effective = InfoEdgeSpec.model_validate(bundle.spec_dump)
     trace = ExecutionTrace()

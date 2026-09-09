@@ -14,6 +14,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -53,86 +55,65 @@ def test_every_new_phase_subgraph_compiles() -> None:
 
 def test_compile_hook_inserts_control_slots() -> None:
     from agent_lab.graph.compile import compile as compile_spec
-    from agent_lab.graphs import load_registry
+    from agent_lab.graphs.loader import load_closure
 
-    specs = load_registry(
-        "perceive",
-        "think",
-        "reflect",
-        "remember",
-        "toolbox",
-        "event_log",
-        "model_eye",
-        "act",
-        "agent_loop",
-    )
-    # Disable control_slots plugin → expect only the 5 manually-authored
-    # sub_specs.
-    stripped = [
-        p
-        for p in specs["agent_loop"].plugins
-        if p.kind != "control_slots"
-    ]
+    specs = load_closure("agent_loop")
+    stripped = [p for p in specs["agent_loop"].plugins if p.kind != "control_slots"]
     stripped_spec = specs["agent_loop"].model_copy(update={"plugins": stripped})
-    manual_only = compile_spec(stripped_spec, sub_registry=specs)
-    assert len(manual_only.subgraph_calls) == 5
-    # Enable hook → expect 5 main + every ControlSlot that has an owner.
-    with_hook = compile_spec(specs["agent_loop"], sub_registry=specs)
-    inserted = {x["sub_spec_id"] for x in with_hook.subgraph_calls}
-    # Owner-bound control slots (act.* not auto-inserted; grant is act.authorize).
+    bundle = compile_spec(stripped_spec, sub_registry=specs)
+    inserted = {x["sub_spec_id"] for x in bundle.subgraph_calls}
     expected = {
         "perceive_context",
         "think_guard",
         "remember_admit",
         "stop_decide",
-        "stop_focus",  # focus-aware stop governance (on remember)
-        "observe_checkpoint",  # cross-cutting, attached to multiple phases
-        "observe_wildcard",  # cross-cutting wildcard observer (observe.*)
+        "stop_focus",
     }
     for name in expected:
-        assert name in inserted, f"compile hook missed control slot {name}"
+        assert name in inserted, f"agent_loop yaml missed sibling host {name}"
     for removed in (
         "act_authorize",
         "act_budget",
         "act_constrain",
         "act_execute",
         "act_safe_boundary",
+        "observe_checkpoint",
+        "observe_wildcard",
     ):
-        assert removed not in inserted, f"act control stub {removed} must not auto-insert"
-    assert len(with_hook.subgraph_calls) >= 5 + len(expected)
+        assert removed not in inserted, f"{removed} must not auto-insert"
+    by_host: dict[str, list[str]] = {}
+    for x in bundle.subgraph_calls:
+        by_host.setdefault(x["node_id"], []).append(x["sub_spec_id"])
+    assert by_host["remember"] == ["remember"]
+    assert by_host["stop_decide"] == ["stop_decide"]
+    assert by_host["think_guard"] == ["think_guard"]
+    assert inserted == {
+        "perceive",
+        "think",
+        "act",
+        "reflect",
+        "remember",
+        *expected,
+    }
 
 
 def test_compile_hook_can_be_disabled() -> None:
-    """A profile that wants to author control slots manually can opt out."""
+    """Stripping a retired control_slots plugin still leaves YAML sibling hosts."""
     from agent_lab.graph.compile import compile as compile_spec
-    from agent_lab.graphs import load_registry
+    from agent_lab.graphs.loader import load_closure
 
-    specs = load_registry(
-        "perceive",
-        "think",
-        "reflect",
-        "remember",
-        "toolbox",
-        "event_log",
-        "model_eye",
-        "act",
-        "agent_loop",
-    )
-    # Strip the control_slots plugin so before_compile doesn't insert anything.
-    stripped = [
-        p
-        for p in specs["agent_loop"].plugins
-        if p.kind != "control_slots"
-    ]
+    specs = load_closure("agent_loop")
+    stripped = [p for p in specs["agent_loop"].plugins if p.kind != "control_slots"]
     stripped_spec = specs["agent_loop"].model_copy(update={"plugins": stripped})
     bundle = compile_spec(stripped_spec, sub_registry=specs)
     inserted = {x["sub_spec_id"] for x in bundle.subgraph_calls}
-    assert "think_guard" not in inserted
+    assert "think_guard" in inserted
     assert "act_authorize" not in inserted
 
 
 def test_act_budget_slot_runs_as_control() -> None:
     """Standalone act_budget graph still runs (not auto-mounted on act host)."""
+    pytest.importorskip("agent_lab.adapters.lca_control_act")
     from agent_lab.adapters.lca_control_act import (
         register_fixture_act_budget,
         unregister_fixture_act_budget,

@@ -28,6 +28,7 @@ class Edge(BaseModel):
     to_ref: PortRef
     kind: EdgeKind = EdgeKind.DATA
     required: bool = True
+    grant_id: str | None = None
 
     def label(self) -> str:
         return f"{self.from_ref.label()} --[{self.kind.value}]--> {self.to_ref.label()}"

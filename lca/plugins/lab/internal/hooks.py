@@ -200,6 +200,23 @@ class LabCarrier:
     out_capabilities: tuple[str, ...] = ()
 
 
+def _factory_aliases(carrier: LabCarrier) -> tuple[str, ...]:
+    """YAML factory keys plus carrier.id. Order is stable; duplicates dropped."""
+    raw = [carrier.id]
+    if carrier.id.startswith("lab."):
+        raw.append(carrier.id[4:])
+    raw.append(carrier.id.rsplit(".", 1)[-1])
+    if carrier.node_id:
+        raw.append(carrier.node_id)
+    seen: set[str] = set()
+    out: list[str] = []
+    for alias in raw:
+        if alias and alias not in seen:
+            seen.add(alias)
+            out.append(alias)
+    return tuple(out)
+
+
 def bind_carrier(carrier: LabCarrier, *, ctx: Any = None, config: Any = None) -> None:
     """Register a LabCarrier with the loader's _LAB_HOOKS.
 
@@ -208,10 +225,14 @@ def bind_carrier(carrier: LabCarrier, *, ctx: Any = None, config: Any = None) ->
     plugin tree without the cordis dependency.
 
     The marker stored in _LAB_HOOKS is the dict the runner reads when
-    resolving a node factory.
+    resolving a node factory. Factory aliases are recorded so invoke
+    can resolve YAML keys (``perceive.sense``, ``expose_schemas``).
     """
+    del ctx, config
     from lca.plugins.lab.internal.loader import _LAB_HOOKS  # local import
+    from lca.plugins.lab.internal.worker import bind_factory_aliases
 
+    aliases = _factory_aliases(carrier)
     marker = {
         "id": carrier.node_id,
         "stage": carrier.stage,
@@ -228,8 +249,11 @@ def bind_carrier(carrier: LabCarrier, *, ctx: Any = None, config: Any = None) ->
         "outputs": [{"port": p, "kind": k} for (p, k) in carrier.outputs],
         "out_capabilities": list(carrier.out_capabilities),
         "description": carrier.description,
+        "carrier_id": carrier.id,
+        "factory_aliases": list(aliases),
     }
     _LAB_HOOKS[carrier.id] = marker
+    bind_factory_aliases(carrier.id, aliases)
 
 
 __all__ += ["LabCarrier", "bind_carrier"]
@@ -288,6 +312,11 @@ class GraphPlugin:
         except Exception as exc:  # containment boundary
             _log.warning("plugin %s hook %s raised: %s", self.name, ctx.event.value, exc)
             return ctx
+
+    def before_compile(self, spec: Any, sub_registry: Any = None) -> Any:
+        """No-op: plugins must not rewrite topology. Return spec unchanged."""
+        del sub_registry
+        return spec
 
     # Default hook methods (no-op). Override in subclasses.
     def on_decision(self, ctx: "HookContext") -> "HookContext":

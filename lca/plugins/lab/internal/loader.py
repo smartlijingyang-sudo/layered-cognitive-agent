@@ -204,14 +204,18 @@ def reset_for_tests() -> None:
     """Test-only — clear the loader state so each test starts clean."""
     global _LOADED
     import sys
-    
+
+    from lca.plugins.lab.internal.worker import reset_aliases, reset_workers
+
     # Remove the hook packages from sys.modules so they get re-imported
     for module_name in _HOOK_PACKAGES:
         if module_name in sys.modules:
             del sys.modules[module_name]
-    
+
     _LAB_HOOKS.clear()
     _LOADED = False
+    reset_workers()
+    reset_aliases()
 
 
 def get_instance(slot_id: str) -> Any | None:
