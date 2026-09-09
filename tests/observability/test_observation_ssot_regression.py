@@ -79,7 +79,8 @@ def test_find_spine_file_missing_run_dir_raises(tmp_path: Path) -> None:
     with pytest.raises(ObservationSSOTError):
         find_spine_file(tmp_path / "nope", "run_abc")
 
-# ── 2. RunOutcomeProjector.failed auto-emits exception.caught ───────────
+
+# ── 3. RunOutcomeProjector.failed auto-emits exception.caught ───────────
 
 
 class _CapturingJournal:
