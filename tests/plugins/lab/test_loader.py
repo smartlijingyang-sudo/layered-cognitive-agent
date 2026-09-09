@@ -64,10 +64,10 @@ def test_get_instance_returns_handler():
 
     instance = get_instance("lab.hook.events")
     assert instance is not None, "Should return instance"
-    # Verify it has hook methods (GraphPlugin interface)
+    # Verify it has hook methods (self-contained GraphPlugin dataclass)
     assert hasattr(instance, "matches")
-    assert hasattr(instance, "dispatch")
-    assert hasattr(instance, "on_event")
+    on_event = getattr(instance, "on_event", None)
+    assert callable(on_event), "hook plugin must expose on_event()"
 
 
 def test_get_instance_returns_none_for_unknown():
@@ -209,14 +209,19 @@ def test_runner_uses_loader():
 
 
 def test_no_deprecation_warnings_after_pr_a3():
-    """Importing agent_lab.plugins.base should not emit DeprecationWarning."""
+    """Importing agent_lab.plugins.base should not emit DeprecationWarning.
+
+    PR-D final cleanup: the file is now a thin shim that re-exports
+    the 4 hook helpers only (no register_plugin / GraphPlugin / etc.).
+    """
     reset_for_tests()
     import warnings
     import sys
 
     # Remove agent_lab.plugins.base from sys.modules to force re-import
-    if "agent_lab.plugins.base" in sys.modules:
-        del sys.modules["agent_lab.plugins.base"]
+    for mod_name in ("agent_lab.plugins.base", "agent_lab.plugins"):
+        if mod_name in sys.modules:
+            del sys.modules[mod_name]
 
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")

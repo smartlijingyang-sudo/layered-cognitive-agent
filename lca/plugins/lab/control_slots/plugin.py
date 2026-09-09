@@ -1,9 +1,15 @@
-# PR-A.3 — simplified plugin that doesn't depend on LCA plugin system
-"""Control slots hook plugin for agent_lab prototype."""
+# PR-D final cleanup — self-contained hook plugin (no agent_lab dependency)
+"""Control Slots hook plugin for the lab prototype.
+
+Replaces the deleted agent_lab.plugins.* class with a self-contained
+GraphPlugin subclass from lca.plugins.lab.internal.hook_factories. The
+hook behaviour is now a no-op marker (real work is delegated to the
+LCA plugin system + the per-phase worker nodes).
+"""
 
 from lca.plugins.lab.internal.loader import _LAB_HOOKS
+from lca.plugins.lab.internal.hook_factories import ControlSlotsPlugin
 
-from agent_lab.plugins.control_slots import ControlSlotsPlugin
 _instance = ControlSlotsPlugin()
 _LAB_HOOKS["lab.hook.control_slots"] = _instance
 

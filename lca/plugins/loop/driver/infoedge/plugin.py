@@ -122,12 +122,13 @@ class InfoEdgeRunDriver:
     ) -> DriverOutcome:
         del mode, hub, bindings, run_context, ctx, machine_resolver
         from agent_lab.graphs import load_registry
-        from agent_lab.nodes.session_log._sink import configure_session
         from agent_lab.runtime.runner import run as run_graph
         from lca.plugins.lab.internal.loader import load_all
+        from lca.plugins.lab.session.provider.plugin import bind_active_session
 
-        event_session = _resolve_injected_session(session)
-        configure_session(event_session)
+        # Bind the active session to the lab session provider so the
+        # session_log_emitter hook can write through Session.append.
+        bind_active_session(event_session)
         load_all()
         try:
             specs = load_registry(_MVP_GRAPH_ID, *_AGENT_LOOP_SUBS)

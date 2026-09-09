@@ -123,13 +123,12 @@ class TestPRDFilesystemCoverage:
                 f"{area} has no plugin.py in any subdir"
             )
 
-    def test_old_agent_lab_node_dirs_still_present(self):
-        """Old agent_lab.nodes dirs are untouched by PR-D (delete-when is PR-D final)."""
-        for area in EXPECTED_AREAS:
-            if area == "session_log":
-                continue  # session_log already absorbed to lca.plugins.lab
-            old = pathlib.Path(f"agent_lab/nodes/{area}")
-            assert old.exists(), f"old dir unexpectedly missing: {old}"
+    def test_old_agent_lab_node_dirs_deleted(self):
+        """After PR-D final cleanup, agent_lab/nodes/ must be gone."""
+        nodes = pathlib.Path("agent_lab/nodes")
+        assert not nodes.exists(), (
+            f"agent_lab/nodes still exists; PR-D final cleanup must delete it"
+        )
 
 
 class TestLoaderClosedSet:

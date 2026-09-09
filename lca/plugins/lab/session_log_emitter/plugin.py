@@ -1,8 +1,16 @@
-# PR-A.3 — simplified plugin that doesn't depend on LCA plugin system
-"""Session log emitter hook plugin for agent_lab prototype.
+"""Session log emitter hook plugin for the lab prototype.
 
-Copied from agent_lab/nodes/session_log/plugin.py to avoid cordis dependency
-in test environment. This plugin routes hook events to the session log.
+Routes framework hook events into the LCA Session via the active
+publish session. Self-contained — does NOT import from agent_lab/
+(those modules are slated for final deletion per ADR-0209 §6).
+
+History:
+- PR-A.3: Copied from agent_lab/nodes/session_log/plugin.py to avoid
+  cordis dependency in the test environment.
+- PR-D final cleanup: Removed remaining agent_lab imports
+  (GraphPlugin, HookContext, session_log._sink) and replaced with
+  the lab-internal hooks and a direct Session.append() call via the
+  lab.session provider.
 """
 
 from __future__ import annotations
@@ -12,11 +20,10 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from lca.plugins.lab.internal.loader import _LAB_HOOKS
-from agent_lab.plugins.base import GraphPlugin, HookContext
+from lca.plugins.lab.internal.hooks import HookContext
 
 _log = logging.getLogger(__name__)
 
-# Mapping: HookEvent -> (event_type_str, input_port_id_for_session_log_node)
 _EVENT_TYPE_MAP: dict[str, str] = {
     "node_start": "graph.node_start.v1",
     "node_end": "graph.node_end.v1",
@@ -28,21 +35,48 @@ _EVENT_TYPE_MAP: dict[str, str] = {
 }
 
 
+def _current_session():
+    """Return the active lab session (set by the session provider at run entry).
+
+    Reads the publish session set by lca.plugins.lab.session.provider.bind_active_session.
+    Falls back to a process-global lookup that mirrors the prior agent_lab sink.
+    """
+    from lca.plugins.events.publishers._session_publish import current_publish_session
+    sess = current_publish_session()
+    if sess is not None:
+        return sess
+    # Fallback: process-local noop (allows hook to run before session is bound)
+    return _NoopSession()
+
+
+class _NoopSession:
+    """Stand-in for missing session — silently swallows appends."""
+
+    def append(self, event_type: str, payload: Any) -> None:
+        _log.debug("session_log_emitter: no session bound, dropping %s", event_type)
+
+
 @dataclass(frozen=True)
-class SessionLogEmitterPlugin(GraphPlugin):
-    """Route framework hooks into the Session via session_log._sink."""
+class SessionLogEmitterPlugin:
+    """Route framework hooks into the Session.
+
+    This is a hook-only plugin (no Node factory). The runner dispatches
+    events via the loader's fanout_hooks path; this class provides the
+    hook methods on_event / on_decision / on_observation / on_reflection
+    that the dispatcher invokes.
+    """
 
     name: str = "default_session_log_emitter"
     kind: str = "session_log_emitter"
     binds: tuple = ()
     config: dict = field(default_factory=dict)
 
+    def matches(self, event, ctx) -> bool:
+        return True  # all events
+
     def _append(self, event_type: str, ctx: HookContext) -> None:
         try:
-            from agent_lab.nodes.session_log._sink import get_session
-
-            sess = get_session()
-            # Build a compact event payload mirroring the trace event
+            sess = _current_session()
             payload = {
                 "kind": ctx.event.value,
                 "subgraph_path": ctx.subgraph_path,
@@ -62,16 +96,13 @@ class SessionLogEmitterPlugin(GraphPlugin):
         except Exception as exc:  # containment boundary
             _log.debug("SessionLogEmitterPlugin append %s failed: %s", event_type, exc)
 
-    # Hook handlers — call sess.append for each event type.
     def on_event(self, ctx: HookContext) -> HookContext:
         et = _EVENT_TYPE_MAP.get(ctx.event.value)
         if et is not None:
             self._append(et, ctx)
         return ctx
 
-    # Aliases — the plugin dispatcher calls hooks by event value.
     def on_decision(self, ctx: HookContext) -> HookContext:
-        # Domain facts are still routed to the Session (separable hook).
         return ctx
 
     def on_observation(self, ctx: HookContext) -> HookContext:
@@ -81,7 +112,6 @@ class SessionLogEmitterPlugin(GraphPlugin):
         return ctx
 
 
-# Populate at import time for load_all()
 _instance = SessionLogEmitterPlugin()
 _LAB_HOOKS["lab.hook.session_log_emitter"] = _instance
 

@@ -233,3 +233,74 @@ def bind_carrier(carrier: LabCarrier, *, ctx: Any = None, config: Any = None) ->
 
 
 __all__ += ["LabCarrier", "bind_carrier"]
+
+
+# ---------------------------------------------------------------------------
+# PR-D final cleanup — GraphPlugin (data class only, no register surface)
+#
+# This is the cordis-free mirror of agent_lab.plugins.base.GraphPlugin.
+# It provides the @dataclass hook methods the runner's fanout_hooks
+# dispatcher invokes. No `register` / `discover` / `resolve` surface —
+# the new loader path is lca.plugins.lab.internal.loader.
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class GraphPlugin:
+    """Base dataclass for hook-bearing plugins.
+
+    Subclass and override the hook methods you care about
+    (before_compile / after_compile / on_event / on_decision /
+    on_observation / on_reflection). The runner's fanout_hooks
+    dispatcher calls these via ``dispatch(ctx)``.
+
+    Fields:
+        name:     unique id within the loader's _LAB_HOOKS
+        kind:     plugin kind (e.g. ``event_sink``, ``observer``)
+        binds:    event selector; empty tuple means match-all
+        config:   yaml-level configuration block
+    """
+
+    name: str
+    kind: str
+    binds: tuple["Bind", ...] = ()
+    config: dict[str, Any] = field(default_factory=dict)
+
+    def matches(self, event: "HookEvent", ctx: "HookContext") -> bool:
+        if not self.binds:
+            return True
+        for bind in self.binds:
+            if (bind.kind == "event_kind"
+                    and bind.value != "*"
+                    and bind.value != event.value):
+                return False
+        return True
+
+    def dispatch(self, ctx: "HookContext") -> "HookContext":
+        if not self.matches(ctx.event, ctx):
+            return ctx
+        method = getattr(self, ctx.event.value, None)
+        if method is None:
+            method = getattr(self, "on_event", None)
+        if method is None:
+            return ctx
+        try:
+            return method(ctx)
+        except Exception as exc:  # containment boundary
+            _log.warning("plugin %s hook %s raised: %s", self.name, ctx.event.value, exc)
+            return ctx
+
+    # Default hook methods (no-op). Override in subclasses.
+    def on_decision(self, ctx: "HookContext") -> "HookContext":
+        return ctx
+
+    def on_observation(self, ctx: "HookContext") -> "HookContext":
+        return ctx
+
+    def on_reflection(self, ctx: "HookContext") -> "HookContext":
+        return ctx
+
+    def on_event(self, ctx: "HookContext") -> "HookContext":
+        return ctx
+
+
+__all__ += ["GraphPlugin"]
