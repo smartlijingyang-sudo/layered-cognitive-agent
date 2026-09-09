@@ -1,0 +1,49 @@
+# Think 5-step phase graph topology + edges.
+# Loaded via profiles/fixtures/think-orchestrator-compile.yaml.
+# Replaces bundles/think-subgraph-graph.yaml (same shape, new binding names).
+
+entries:
+  - id: phase.topology.standard
+    $name: phase_topology_think_orchestrator
+    $module: lca.plugins.loop.graph.topology.standard.plugin
+    config:
+      nodes:
+        - id: think.shortcut
+          phase: think
+          binding: phase.think.shortcut
+          max_visits: 4
+          entry: true
+        - id: think.route
+          phase: think
+          binding: phase.think.route
+          max_visits: 4
+        - id: think.reason
+          phase: think
+          binding: phase.think.reason
+          max_visits: 4
+        - id: think.classify
+          phase: think
+          binding: phase.think.classify
+          max_visits: 4
+        - id: think.gate
+          phase: think
+          binding: phase.think.gate
+          max_visits: 4
+
+  - id: phase.edge.standard
+    $name: phase_edge_think_orchestrator
+    $module: lca.plugins.loop.graph.edges.standard.plugin
+    config:
+      edges:
+        - source: think.shortcut
+          target: think.route
+          when: result.result_kind != "decision"
+        - source: think.route
+          target: think.reason
+          when: true
+        - source: think.reason
+          target: think.classify
+          when: true
+        - source: think.classify
+          target: think.gate
+          when: true

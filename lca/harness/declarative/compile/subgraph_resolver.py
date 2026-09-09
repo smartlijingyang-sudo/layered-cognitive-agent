@@ -26,6 +26,7 @@ from lca.harness.profile.resolve.resolve import ResolvedProfile, resolve_profile
 # Profiles live under ``profiles/fixtures/`` and are not production defaults.
 _PLAN_REF_PROFILES: Final[dict[str, str]] = {
     "bundles/think-subgraph.yaml": "profiles/fixtures/think-subgraph-compile.yaml",
+    "bundles/think-orchestrator.yaml": "profiles/fixtures/think-orchestrator-compile.yaml",
     "bundles/reflect-subgraph.yaml": "profiles/fixtures/reflect-subgraph-compile.yaml",
 }
 

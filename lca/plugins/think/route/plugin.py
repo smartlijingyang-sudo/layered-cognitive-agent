@@ -16,6 +16,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.models.core.execution.think_carry import CARRY_KEY, ThinkSubgraphCarry
+from lca.contracts.plugins.think.step_plugin_spec import step_plugin_spec
 from lca.contracts.protocols import SkillRouter
 from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
     PhaseContext,
@@ -29,6 +30,12 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.loop.phase._shared.common import StandardPhaseConfig
 
 STAGE_KIND = "think_stage"
+
+SPEC = step_plugin_spec(
+    plugin_id="phase.think.route",
+    module="lca.plugins.think.route.plugin",
+    test_suite="tests/think/test_route_phase_plugin.py",
+)
 
 
 def _carry(context: PhaseContext) -> ThinkSubgraphCarry:
@@ -74,6 +81,7 @@ class ThinkRouteExecutor:
     kind=PluginKind.PRIMITIVE,
     effects="none",
     test_suite="tests/think/test_route_phase_plugin.py",
+    spec=SPEC,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(

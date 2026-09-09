@@ -6,6 +6,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Final
 
+from lca.contracts.models.core.execution.think_carry import CARRY_KEY, ThinkSubgraphCarry
 from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
     PhaseContext,
 )
@@ -23,7 +24,6 @@ from lca.harness.graph.execute.subgraph_executor_factory import (
     executors_for_plan,
 )
 from lca.harness.graph.predicate import evaluate_restricted_predicate
-from lca.plugins.loop.phase.think.subgraph._shared import CARRY_KEY, ThinkSubgraphCarry
 
 SUBGRAPH_PHASE_RUNNER_CAPABILITY: Final = "declarative.subgraph.phase_runner"
 

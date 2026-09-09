@@ -9,12 +9,13 @@
 # + session-runtime (ADR-0186 Session SSOT: session.store before event-bus so
 #   the capability is live when publishers/sinks boot; RunSessionBuilder binds
 #   a per-run Session onto publish/observe slots).
-# + think-subgraph-steps + think-subgraph-host: register the 5-step think
-#   subgraph executors (shortcut/route/reason/classify/gate) plus the host
-#   PhaseExecutor that drives them. ``think.main`` itself is rebound to
-#   ``phase.think.subgraph_host`` via the topology patch below — the shared
-#   ``declarative-phase-graph`` bundle stays untouched, so other profiles
-#   importing that bundle continue to use ``phase.think.standard``.
+# + think-orchestrator + think-orchestrator-graph: register the
+#   phase.think.orchestrator PhaseExecutor that drives the 5-step think
+#   phase graph (shortcut/route/reason/classify/gate). ``think.main``
+#   itself is rebound to ``phase.think.orchestrator`` via the topology
+#   patch below — the shared ``declarative-phase-graph`` bundle stays
+#   untouched, so other profiles importing that bundle continue to use
+#   ``phase.think.standard``.
 # LLM secrets are owned by lca-llm-resolver (loads project .env at setup).
 
 bundles:
@@ -26,8 +27,7 @@ bundles:
   - bundles/loop_cursor.spine_default.yaml
   - bundles/session-runtime.yaml
   - bundles/event-bus-components.yaml
-  - bundles/think-subgraph-steps.yaml
-  - bundles/think-subgraph-host.yaml
+  - bundles/think-orchestrator.yaml
 
 patch:
   - id: lca-llm-resolver
@@ -58,7 +58,7 @@ patch:
           terminal_predicate: perceive.context_complete
         - id: think.main
           phase: think
-          binding: phase.think.subgraph_host
+          binding: phase.think.orchestrator
           max_visits: 8
         - id: act.main
           phase: act
