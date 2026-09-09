@@ -281,3 +281,74 @@ def validate_or_raise(
     errs = validate(spec, registry)
     if errs:
         raise ValidationError(errs)
+
+
+# ---------------------------------------------------------------------------
+# ADR-0210 §3 — C14 region validation (reads profile.regions_declare)
+# ---------------------------------------------------------------------------
+
+def _check_regions(
+    spec: InfoEdgeSpec,
+    profile_regions: "set[str] | None" = None,
+) -> list[str]:
+    """C14 region label validation (ADR-0210 §3 P7-I-1 / P7-I-4).
+
+    The spec-level region label (region.value + phase) must be in the
+    closed set:
+      - 6-stage recommended: phase:{perceive,think,act,reflect,remember,stop}
+      - bare enum: model_visible, effect, lineage, digest, control
+      - profile.regions.declare (custom set, optional)
+
+    Sub-specs (InfoEdgeSpec.sub_specs) get validated independently by
+    the GenericPlanInterpreter's recursive walk (per ADR-0206 §5.2).
+
+    Unbound region = compile error (matches C14 fail-loud behaviour).
+    region labels are NOT a capability gate (P7-I-2).
+    """
+    # Imported here to avoid a circular import at module load.
+    from agent_lab.profile_loader import build_region_closed_set
+
+    closed = build_region_closed_set(profile_regions)
+    errs: list[str] = []
+
+    # Spec-level region label
+    region_enum = spec.region.value if hasattr(spec.region, "value") else str(spec.region)
+    phase_name = getattr(spec, "phase", "") or ""
+    if region_enum == "phase":
+        spec_label = f"phase:{phase_name}" if phase_name else "phase:<unnamed>"
+    else:
+        spec_label = region_enum
+
+    if spec_label not in closed:
+        errs.append(
+            f"C14: spec {spec.id!r} region {spec_label!r} not in closed set "
+            f"(builtin 6-stage + bare enum + profile.regions.declare)"
+        )
+
+    return errs
+
+
+def validate_with_profile(
+    spec: InfoEdgeSpec,
+    profile_regions: "set[str] | None" = None,
+    registry: dict[str, dict[str, str]] | None = None,
+) -> list[str]:
+    """Validate with an optional profile regions overlay.
+
+    Combines the standard validate() (C1-C13) with the C14 region check.
+    Pass profile_regions=None to use only the 6-stage + bare-enum closed set.
+    """
+    errs = validate(spec, registry)
+    errs.extend(_check_regions(spec, profile_regions))
+    return errs
+
+
+def validate_with_profile_or_raise(
+    spec: InfoEdgeSpec,
+    profile_regions: "set[str] | None" = None,
+    registry: dict[str, dict[str, str]] | None = None,
+) -> None:
+    """Raise ValidationError if validate_with_profile finds any errors."""
+    errs = validate_with_profile(spec, profile_regions, registry)
+    if errs:
+        raise ValidationError(errs)
