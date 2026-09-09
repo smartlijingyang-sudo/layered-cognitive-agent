@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from lca.contracts.errors import ContractViolation
 from lca.contracts.harness.memory.skill import SkillCatalogEntry
 from lca.contracts.harness.tasks.session import session_event
 
@@ -522,6 +523,41 @@ class TurnControlCommitted:
     observation_payload: Any | None = None
     observation_error: str | None = None
     files_created: tuple[str, ...] = ()
+
+
+@session_event("task_progress.commit.v1", visibility="model")
+@dataclass(frozen=True, slots=True)
+class TaskProgressCommitted:
+    """事实面:一个 think step 提交 task_progress 状态 (ADR-0214 §4.1)。
+
+    每个 think step **至少**一条 T0 事件(决策时);reflect 阶段可补一条 T4
+    (本步反思);所以**最多 2 条/步**。append 必须**先于** ``execute_tool``
+    (durability 优先于动作)。失败 / 中断下,resume 从 Session fold 还原
+    最近一条,模型从该点继续。
+
+    字段语义:
+
+    - ``step_id`` — think step 标识(同 :class:`StepStarted.step_id`)
+    - ``completed`` / ``remaining`` / ``confidence`` / ``termination_reason``
+      — 与 :class:`TaskProgress` 一一对应,跨边界搬运
+    """
+
+    step_id: str
+    completed: tuple[str, ...] = ()
+    remaining: tuple[str, ...] = ()
+    confidence: float = 0.0
+    termination_reason: str | None = None
+
+    def __post_init__(self) -> None:
+        # dataclass(frozen=True, slots=True) 等价 Pydantic frozen + extra="forbid"
+        # (本文件全部事件均为 dataclass, 不引 Pydantic)。confidence 闭区间
+        # 与 :class:`TaskProgress` 保持同语义 — fail-loud,不静默 clamp。
+        if not isinstance(self.confidence, (int, float)) or isinstance(self.confidence, bool):
+            raise ContractViolation(
+                f"confidence must be a real number in [0, 1], got {type(self.confidence).__name__}"
+            )
+        if not 0.0 <= float(self.confidence) <= 1.0:
+            raise ContractViolation(f"confidence must be in [0, 1], got {self.confidence}")
 
 
 @session_event("session.end_seed.v1", visibility="audit")

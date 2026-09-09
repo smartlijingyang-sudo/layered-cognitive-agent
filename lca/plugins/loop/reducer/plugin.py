@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, ParamSpec, TypeVar, cast, overload
 from pydantic import BaseModel
 
 from lca.contracts.models.core.execution.decision import Turn
+from lca.contracts.models.core.execution.task_progress import TaskProgress
 from lca.contracts.models.core.perceive.perception import ContextManifest
 from lca.contracts.models.core.policy.stop import StopDecision
 from lca.contracts.models.core.state.lifecycle import TaskStatus
@@ -221,6 +222,37 @@ class DefaultReducer(Reducer):
         active_template 是 prompt template 名字;空 = use default。
         """
         state.active_template = active_template
+        return state
+
+    @_instrument_apply
+    def apply_task_progress(
+        self,
+        state: AgentState,
+        progress: TaskProgress,
+    ) -> AgentState:
+        """Fold a TaskProgress fact into ``state.task_progress`` (C4 单写).
+
+        ADR-0214 §3.4:Reducer 是 ``state.task_progress`` 唯一 writer;任何
+        cognition / Gate / 反射路径都不得直接 mutate 该字段(违反 → 跨
+        边界契约违约,C13 fail-loud)。
+
+        Invariants:
+        - ``completed`` 单调(新 completed ⊇ 旧 completed;sorted+set 合并
+          保证 order 稳定,fold 重放一致)。
+        - ``confidence`` ∈ [0, 1](由 :class:`TaskProgress.__post_init__`
+          构造时校验,reducer 不重复校验)。
+        - ``remaining`` 终态可空(中途可减可加,但 fold 后必须满足 schema)。
+        - ``apply_stop`` / ``apply_terminal_outcome`` 调用顺序由 caller 决定,
+          本方法与它们独立、不嵌入(同 ADR-0214 §3.4 / §0.2 C12 拆分原则)。
+        """
+        prev = state.task_progress
+        merged_completed = tuple(sorted(set(prev.completed) | set(progress.completed)))
+        state.task_progress = TaskProgress(
+            completed=merged_completed,
+            remaining=progress.remaining,
+            confidence=progress.confidence,
+            termination_reason=progress.termination_reason,
+        )
         return state
 
     @_instrument_apply

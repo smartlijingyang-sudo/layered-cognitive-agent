@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 from lca.contracts.atoms.enums.enums import SnapshotReason
 from lca.contracts.atoms.ids.ids import RunId, TraceId, new_id, utc_now
 from lca.contracts.models.core.execution.decision import Turn
+from lca.contracts.models.core.execution.task_progress import TaskProgress
 from lca.contracts.models.core.perceive.projection import PerceiveProjection
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.workspace.activation import ActivatedSkill
@@ -119,6 +120,15 @@ class AgentState:
     active_template: str | None = None
     activated_skills: list[ActivatedSkill] = field(default_factory=list)
     perceive: PerceiveProjection | None = None
+    # ADR-0214 §3.5:task_progress 是 Decision 决策投影的 state 字段;
+    # 唯一 writer 是 Reducer.apply_task_progress (C4 单写)。默认值是
+    # "空四元组";fold 后才有具体值。
+    task_progress: TaskProgress = field(default_factory=TaskProgress)
+    # ADR-0214 §5:TaskProgressProjection 是 Session events fold 的观察面;
+    # PR-B MultiToolLoopBreakerGate 读此字段判 "stuck / flatline / static"。
+    # 默认 None (plugin 未 wire 时 fail-open);Type 用 TYPE_CHECKING 避免
+    # contracts → plugins 反向依赖 (C13 单写矩阵)。
+    task_progress_projection: object | None = None
 
     def snapshot(self, reason: SnapshotReason = SnapshotReason.PERIODIC) -> StateSnapshot:
         """Append a checkpoint and return its reference."""

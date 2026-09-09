@@ -37,6 +37,7 @@ from lca.contracts.models.core.execution.result import (
     Result,
     ToolExecutionError,
 )
+from lca.contracts.models.core.execution.task_progress import TaskProgress
 from lca.contracts.models.core.policy.budget import create_budget
 from lca.contracts.models.core.policy.stop import StopDecision, StopReason
 from lca.contracts.models.core.state.lifecycle import AgentCard, TaskStatus, TeamMessage

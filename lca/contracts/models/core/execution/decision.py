@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from lca.contracts.atoms.enums.enums import ContentType, DelegationProtocol, ReflectionVerdict
 from lca.contracts.atoms.ids.ids import utc_now
+from lca.contracts.models.core.execution.task_progress import TaskProgress
 from lca.contracts.models.core.state.lifecycle import AgentCard
 
 if TYPE_CHECKING:
@@ -19,6 +20,7 @@ __all__ = [
     "DelegationSpec",
     "Observation",
     "Reflection",
+    "TaskProgress",
     "ToolCall",
 ]
 
@@ -76,6 +78,10 @@ class Decision:
     schema_version: str = "1.0"
     created_at: datetime = field(default_factory=utc_now)
     extra: dict[str, Any] = field(default_factory=dict)
+    # ADR-0214 §3.2:Decision 必填 task_progress 四元组。默认值是兼容
+    # 旧测试的占位;cognition emit 方必须显式构造(由
+    # tests/integration/test_decision_emit_consume.py 守卫)。
+    task_progress: TaskProgress = field(default_factory=TaskProgress)
 
 
 @dataclass
