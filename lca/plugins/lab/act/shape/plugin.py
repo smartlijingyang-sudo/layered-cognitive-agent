@@ -9,7 +9,7 @@ PR-D will rewrite this as a full @plugin carrier.
 
 from lca.plugins.lab.internal.loader import _LAB_HOOKS
 
-_marker = {"id": "act.shape", "stage": "act"}
+_marker = {"id": "shape", "stage": "act"}
 _LAB_HOOKS["lab.act.shape"] = _marker
 
 __all__ = ["_marker"]

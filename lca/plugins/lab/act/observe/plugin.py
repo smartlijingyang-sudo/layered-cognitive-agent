@@ -7,7 +7,7 @@ PR-D will rewrite this as a full @plugin carrier.
 
 from lca.plugins.lab.internal.loader import _LAB_HOOKS
 
-_marker = {"id": "act.observe", "stage": "act"}
+_marker = {"id": "observe", "stage": "act"}
 _LAB_HOOKS["lab.act.observe"] = _marker
 
 __all__ = ["_marker"]

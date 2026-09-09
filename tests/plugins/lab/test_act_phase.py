@@ -37,21 +37,21 @@ class TestActPhasePlugins:
         load_all()
         instance = get_instance("lab.act.shape")
         assert instance is not None
-        assert instance.get("id") == "act.shape"
+        assert instance.get("id") == "shape"
 
     def test_act_authorize_plugin_registered(self):
         """lab.act.authorize should resolve to the ActAuthorize marker."""
         load_all()
         instance = get_instance("lab.act.authorize")
         assert instance is not None
-        assert instance.get("id") == "act.authorize"
+        assert instance.get("id") == "authorize"
 
     def test_act_execute_plugin_registered(self):
         """lab.act.execute should resolve to the ActExecute marker with needs list."""
         load_all()
         instance = get_instance("lab.act.execute")
         assert instance is not None
-        assert instance.get("id") == "act.execute"
+        assert instance.get("id") == "execute"
         assert "lab.body" in instance.get("needs", [])
 
     def test_act_observe_plugin_registered(self):
@@ -59,7 +59,7 @@ class TestActPhasePlugins:
         load_all()
         instance = get_instance("lab.act.observe")
         assert instance is not None
-        assert instance.get("id") == "act.observe"
+        assert instance.get("id") == "observe"
 
     def test_act_execute_no_lca_cognition_import(self):
         """Act* plugin files must not import from lca.cognition.* directly."""
