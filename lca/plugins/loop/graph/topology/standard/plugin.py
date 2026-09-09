@@ -48,6 +48,10 @@ class PhaseNodeConfig(BaseModel):
     max_visits: int = Field(gt=0)
     terminal: bool = False
     entry: bool = False
+    # PR-C (ADR-0214 §6.1): PG-007 三件套入口 / 出口谓词(可空字符串由
+    # 编译器拒绝; None 表示未声明, 行为等价于历史)。
+    precondition: str | None = None
+    terminal_predicate: str | None = None
 
 
 class Config(BaseModel):

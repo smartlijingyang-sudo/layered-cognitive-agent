@@ -49,6 +49,9 @@ class _DeclaredNode:
     max_visits: int
     terminal: bool
     entry: bool
+    # PR-C (ADR-0214 §6.1): optional PG-007 三件套 — callable 名字字符串
+    precondition: str | None = None
+    terminal_predicate: str | None = None
 
 
 def compile_phase_graph_projection(specs: tuple[PluginSpec, ...]) -> PhaseGraphProjection:
@@ -114,6 +117,20 @@ def _compile_declared_node(raw_node: object, *, spec_id: str, index: int) -> _De
         raise ValueError(f"PG-001: {spec_id} nodes[{index}].max_visits must be positive")
     if type(terminal) is not bool or type(entry) is not bool:
         raise ValueError(f"PG-001: {spec_id} nodes[{index}] terminal and entry must be booleans")
+    precondition_raw = raw_node.get("precondition")
+    if precondition_raw is not None and (
+        not isinstance(precondition_raw, str) or not precondition_raw.strip()
+    ):
+        raise ValueError(
+            f"PG-007: {spec_id} nodes[{index}].precondition must be a non-empty string when declared"
+        )
+    terminal_predicate_raw = raw_node.get("terminal_predicate")
+    if terminal_predicate_raw is not None and (
+        not isinstance(terminal_predicate_raw, str) or not terminal_predicate_raw.strip()
+    ):
+        raise ValueError(
+            f"PG-007: {spec_id} nodes[{index}].terminal_predicate must be a non-empty string when declared"
+        )
     try:
         semantic_phase = SemanticPhase(phase)
     except ValueError as exc:
@@ -127,6 +144,10 @@ def _compile_declared_node(raw_node: object, *, spec_id: str, index: int) -> _De
         max_visits=max_visits,
         terminal=terminal,
         entry=entry,
+        precondition=str(precondition_raw).strip() if precondition_raw is not None else None,
+        terminal_predicate=(
+            str(terminal_predicate_raw).strip() if terminal_predicate_raw is not None else None
+        ),
     )
 
 
@@ -191,6 +212,8 @@ def _compile_phase_graph(
             max_visits=node.max_visits,
             terminal=node.terminal,
             execution_policy=policies.get(node.id, PhaseExecutionPolicy()),
+            precondition=node.precondition,
+            terminal_predicate=node.terminal_predicate,
         )
         for node in declared_nodes
     )

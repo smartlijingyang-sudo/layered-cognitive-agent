@@ -71,6 +71,10 @@ class PhaseNode:
     max_visits: int
     terminal: bool = False
     execution_policy: PhaseExecutionPolicy = field(default_factory=PhaseExecutionPolicy)
+    # PR-C (ADR-0214 §6.1): PG-007 三件套 — precondition / terminal_predicate
+    # 入口校验 / 出口谓词 (callable 名字, 由 harness 注册表解析, profile YAML 用字符串名引用)。
+    precondition: str | None = None
+    terminal_predicate: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.semantic_phase, SemanticPhase):
@@ -78,6 +82,14 @@ class PhaseNode:
         if not self.id or not self.binding or self.max_visits <= 0:
             raise DeclarativeValidationError(
                 "PG-001", "phase node id, binding and positive max_visits required"
+            )
+        if self.precondition is not None and not str(self.precondition).strip():
+            raise DeclarativeValidationError(
+                "PG-007", "phase node precondition must be a non-empty name when declared"
+            )
+        if self.terminal_predicate is not None and not str(self.terminal_predicate).strip():
+            raise DeclarativeValidationError(
+                "PG-007", "phase node terminal_predicate must be a non-empty name when declared"
             )
 
 

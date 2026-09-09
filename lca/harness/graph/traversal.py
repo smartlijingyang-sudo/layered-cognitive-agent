@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     DeclarativeValidationError,
@@ -13,6 +14,17 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
     PhaseRunCursor,
     SemanticPhase,
 )
+
+if TYPE_CHECKING:
+    from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
+        PhaseNode,
+    )
+
+
+# ``PhaseTraversal`` is defined later in this same module. Use string form so
+# the annotation resolves at runtime under ``from __future__ import annotations``
+# without requiring forward-reference bookkeeping inside ``TYPE_CHECKING``.
+PredicateRegistry = Callable[[str], Callable[["PhaseTraversal"], bool] | None]
 
 
 @dataclass(slots=True)
@@ -67,8 +79,26 @@ class PhaseTraversal:
             ),
         )
 
-    def visit(self, *, node_id: str, max_visits: int) -> int:
-        """Record entry to a node and enforce its declared visit budget."""
+    def visit(
+        self,
+        *,
+        node_id: str,
+        max_visits: int,
+        precondition: Callable[[PhaseTraversal], bool] | None = None,
+    ) -> int:
+        """Record entry to a node and enforce its declared visit budget.
+
+        PR-C (ADR-0214 §6.2): when ``precondition`` is provided and evaluates
+        ``False``, the visit is **not** recorded (so the call can be retried
+        until ``max_visits`` is reached without exhausting the budget on
+        unsatisfied preconditions) and ``-1`` is returned to signal
+        "attempted but not entered". Callers / the interpreter are free to
+        retry the visit on a subsequent iteration; when ``precondition`` is
+        ``None`` (the default) the historical budget-only behaviour is
+        preserved unchanged.
+        """
+        if precondition is not None and not precondition(self):
+            return -1
         self.current_node_id = node_id
         count = self.visit_counts.get(node_id, 0) + 1
         self.visit_counts[node_id] = count
@@ -96,8 +126,20 @@ class PhaseTraversal:
         edge: PhaseEdge,
         payload: object | None,
         causation_refs: tuple[str, ...],
+        target_node: PhaseNode | None = None,
+        predicate_registry: PredicateRegistry | None = None,
+        on_terminal: Callable[[], None] | None = None,
     ) -> None:
-        """Advance over an edge, enforcing declared loop budgets."""
+        """Advance over an edge, enforcing declared loop budgets.
+
+        PR-C (ADR-0214 §6.2): when ``target_node.terminal_predicate`` is
+        declared and the named predicate evaluates ``True`` against the
+        current traversal artifact state, ``on_terminal`` is invoked **in
+        place of** advancing — the caller typically routes to ``stop.main``
+        from that hook. When ``target_node`` / ``predicate_registry`` are
+        omitted, the historical edge-budget-only behaviour is preserved
+        unchanged (backward compatible).
+        """
         key = (edge.source, edge.target)
         count = self.edge_counts.get(key, 0) + 1
         self.edge_counts[key] = count
@@ -105,6 +147,22 @@ class PhaseTraversal:
             raise DeclarativeValidationError(
                 "PG-007", f"loop edge budget exhausted: {edge.source}->{edge.target}"
             )
+        if (
+            target_node is not None
+            and target_node.terminal_predicate is not None
+            and predicate_registry is not None
+        ):
+            predicate = predicate_registry(target_node.terminal_predicate)
+            if predicate is None:
+                raise DeclarativeValidationError(
+                    "PG-007",
+                    f"terminal predicate not registered: {target_node.terminal_predicate!r} "
+                    f"(node {target_node.id})",
+                )
+            if predicate(self):
+                if on_terminal is not None:
+                    on_terminal()
+                return
         self.current_node_id = edge.target
         self.next_input = PhaseInput(artifact=payload, causation_refs=causation_refs)
 

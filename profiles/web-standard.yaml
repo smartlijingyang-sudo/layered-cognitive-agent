@@ -53,6 +53,9 @@ patch:
           binding: phase.perceive.standard
           max_visits: 8
           entry: true
+          # PR-C (ADR-0214 §6.3): PG-007 三件套
+          precondition: perceive.has_minimum_context
+          terminal_predicate: perceive.context_complete
         - id: think.main
           phase: think
           binding: phase.think.subgraph_host
