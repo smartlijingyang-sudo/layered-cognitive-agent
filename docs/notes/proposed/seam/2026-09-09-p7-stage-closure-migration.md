@@ -184,6 +184,33 @@ class LabCarrier:
   (3 skips = cordis baseline + 1 future PR placeholder)
 - [x] 无回归
 
+### 2026-09-09 commit 6 (ADR-0210 §6.6 实施)
+
+- [x] profiles/web-assistant.yaml 加 `regions.declare` 段
+  (P7 region-tag 路径是 production 验证的 reference)
+  - phase:plan / phase:replan / control:safety
+  - web-assistant 仍是 default 走 legacy declarative-phase-graph
+    (backward compat); 这些 custom regions 留给走 lab profile
+    P7 path 的 assistants 使用
+- [x] lca/harness/profile/resolve/source.py 新增
+  ProfileSource.regions_declare: tuple[str, ...] = () 字段
+- [x] load_profile_source() 新增 _parse_regions_declare() helper
+  (string list under regions: declare:; filter non-string/empty;
+  返回 immutable tuple; fail-soft 处理 missing/malformed)
+- [x] programmatic_profile_source() 同步更新 regions_declare=()
+- [x] tests/architecture/test_p7_profile_regions_declare.py 全绿
+  (18 tests: web-assistant YAML 3 regions 守护 + parser unit
+  tests + ProfileSource field + programmatic + closed set 接受 +
+  C14 接受 phase:plan + C14 拒绝 bogus + region 不入 capability
+  闭集 - P7-I-2)
+- [x] 196 passed total in tests/plugins/lab/ + tests/architecture/
+  (3 skips = cordis baseline + 1 future PR placeholder)
+- [x] 无回归
+- [x] **ADR-0210 §6 全部段实施完成**（§6.1 - §6.6）
+- [x] **ADR-0210 升 Accepted 闸门解锁**：
+  1-7 §九条件全部满足 + production path 验证
+  (web-assistant profile 是 P7 region-tag production reference)
+
 ### 2026-09-09 commit 5 (ADR-0210 §6.5 实施)
 
 - [x] CognitivePhaseGraphPlan docstring 加 .. deprecated::
@@ -210,12 +237,14 @@ class LabCarrier:
 
 ### 未来 commit (待做)
 
-- [ ] ADR-0210 升 Accepted（需 +1 owner review + 真实 production
-  profile 引用 `regions.declare`）
-- [ ] ADR-0206 升 Accepted（依赖 ADR-0210 Accepted）
-- [ ] 真实 profile 增 `regions.declare` 段（web-assistant.yaml
-  如需要 `phase:plan` / `phase:replan` 即可声明）
+- [ ] ADR-0210 升 Accepted（需 +1 owner review —— §6.6 production
+  path 已验证 web-assistant 声明 3 个 regions + C14 end-to-end）
+- [ ] ADR-0206 升 Accepted（依赖 ADR-0210 Accepted；满足 §0.2 降为附录
+  条件：6 阶段 + 89 carrier 已 region 标注 + profile 扩展 region +
+  region 不入 capability 闭集 + 0075/0194 backward compat 保留）
 - [ ] Note 归档到 `docs/notes/archived/seam/`（依赖 ADR-0210 Accepted）
+- [ ] 把 web-assistant 改走 P7 path（去掉 declarative-phase-graph
+  bundle reference，验证 production lab profile 走 P7 region-tag）
 
 ### 当前测试矩阵
 
