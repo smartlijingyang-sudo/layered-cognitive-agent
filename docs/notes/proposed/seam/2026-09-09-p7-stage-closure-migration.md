@@ -163,6 +163,27 @@ class LabCarrier:
   (3 skips = cordis baseline + 1 future PR placeholder)
 - [x] 无回归
 
+### 2026-09-09 commit 4 (ADR-0210 §6.4 实施)
+
+- [x] agent_lab/profile_loader.py 新增 build_region_only_phase_graph(spec)
+  (synthesize single-node CognitivePhaseGraphPlan from spec.region;
+  maps 6 phase labels to SemanticPhase; bare enums / custom regions
+  fall back to ACT)
+- [x] lca/harness/graph/execute/interpreter.py 新增
+  _resolve_phase_graph(executable, spec=None) helper
+- [x] GenericPlanInterpreter.run() + resume() 新增 keyword-only
+  spec= arg; P7 region-tag fallback path
+- [x] _drive() error message updated to point at the spec= contract
+- [x] PG-002 (vs PG-001) when plan.phase_graph is None AND no spec
+  (defense-in-depth)
+- [x] tests/architecture/test_p7_interpreter_fallback.py 全绿
+  (15 tests: 6 phase mapping + bare/custom fallbacks + single-node
+  plan + P7-I-3 phase_graph: None legal + run/resume fallback +
+  0075 backward compat)
+- [x] 169 passed total in tests/plugins/lab/ + tests/architecture/
+  (3 skips = cordis baseline + 1 future PR placeholder)
+- [x] 无回归
+
 ### 未来 commit (待做)
 
 - [ ] ADR-0210 升 Accepted（需 +1 owner review + 真实 production
