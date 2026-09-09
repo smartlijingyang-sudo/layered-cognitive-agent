@@ -57,8 +57,8 @@ class ClassifyStepExecutor:
         authority=AuthorityContract(grants=("plugin.serve",)),
         observability=EvidenceContract(
             descriptors=(
-                "phase_think_subgraph_classify.checked",
-                "phase_think_subgraph_classify.served",
+                "phase_think_classify.checked",
+                "phase_think_classify.served",
             )
         ),
     ),
