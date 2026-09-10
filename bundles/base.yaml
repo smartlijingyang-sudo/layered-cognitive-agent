@@ -51,11 +51,10 @@ entries:
   name: lca_state_store_service
   $module: lca.plugins.state.state.store_seam
   config: {}
-- id: lca-llm-resolver
-  name: lca_llm_resolver
-  $module: lca.plugins.think.llm.resolver_seam
-  config:
-    default_model: qwen3.7-plus
+- id: phase.think.role_profile
+  name: phase_think_role_profile
+  $module: lca.plugins.think.role_profile_provider
+  config: {}
 - id: phase.think.reasoner
   name: phase_think_reasoner
   $module: lca.plugins.think.reasoner_provider

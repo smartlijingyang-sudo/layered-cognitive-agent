@@ -337,6 +337,15 @@ ACT_EXECUTION_SPACE = Capability[object]("act.execution_space", cardinality="one
 LLM_RESOLVER = Capability[object]("llm_resolver", cardinality="one")
 SAFE_EXECUTOR_SIMPLE = Capability[object]("safe_executor.simple", cardinality="factory")
 REASONER_PROMPT = Capability[object]("reasoner.prompt", cardinality="factory")
+REASONER_ROLE_PROFILE = Capability[object]("reasoner.role_profile", cardinality="one")
+"""Profile-selected ``RoleProfile`` consumed by ``phase.think.reasoner``.
+
+The inner think subgraph reuses a single ``PromptReasoner`` instance across
+``plan`` / ``render`` / ``complete`` reason nodes, so the role identity
+(role / goal / backstory / tool permission manifest) must be resolved once
+at boot and provided as a typed capability — never hard-coded inside the
+reasoner provider.
+"""
 BRAIN_PROMPT_CATALOG_FACTORY = Capability[object](
     "brain_prompt_catalog_factory", cardinality="factory"
 )

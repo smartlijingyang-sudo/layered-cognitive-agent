@@ -6,8 +6,15 @@ think 子图三个 reason 节点(``plan`` / ``render`` / ``complete``)通过
 ``build_turn_plan`` / ``render_turn`` / ``complete_turn``。
 
 LLM 凭证与 adapter 装配由 ``ProductionLLMResolver`` 在 framework
-层完成,本 plugin 直接从环境/Profile 读取 ``default_model``,不再
-依赖外部 ``llm_resolver`` capability。
+层完成,本 plugin 直接从 Bundle ``config.default_model`` 走 profile
+配置装配 adapter。``llm_resolver`` capability seam 已被本仓库的
+think-subgraph 迁移退役,不要在本插件上重新声明这条 requires。
+
+``RoleProfile`` 由上游 ``phase.think.role_profile`` provider 通过
+``reasoner.role_profile`` capability 注入,本 plugin 不再持有默认字面量。
+没有上游 provider 时 boot 会因 ``UndeclaredInteractionError`` /
+``MissingCapabilityError`` 失败,而不是悄悄把 ``assistant`` 身份
+写进 LLM prompt。
 
 与 ``lca.plugins.reasoner.prompt`` 的关系(同名 seam 不同形态):
 
@@ -19,11 +26,12 @@ LLM 凭证与 adapter 装配由 ``ProductionLLMResolver`` 在 framework
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
+from lca.contracts.capabilities import REASONER_ROLE_PROFILE
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
     AuthorityContract,
@@ -32,6 +40,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
+from lca.contracts.models.team.role.team import RoleProfile
 from lca.contracts.protocols import Reasoner
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
@@ -41,14 +50,14 @@ from lca.infrastructure.llm.resolver import ProductionLLMResolver
 
 
 class Config(BaseModel):
-    model_config = {"extra": "forbid"}
+    model_config = ConfigDict(extra="forbid")
     default_model: str | None = None
 
 
 @plugin(
     id="phase.think.reasoner",
     provides=("reasoner",),
-    requires=(),
+    requires=(REASONER_ROLE_PROFILE.key,),
     implements=[Reasoner],
     layer="L1",
     effects="none",
@@ -83,18 +92,14 @@ class Config(BaseModel):
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Resolve LLM adapter and bind it to PromptReasoner; register ``reasoner`` capability."""
     from lca.cognition.brain.reasoner.reasoner import PromptReasoner
-    from lca.contracts.models.team.role.team import (
-        RoleProfile,
-        ToolPermissionManifest,
-    )
 
     adapter = ProductionLLMResolver(default_model=config.default_model).resolve()
-    role_profile = RoleProfile(
-        role="assistant",
-        goal="answer user questions",
-        backstory="LCA inner think subgraph reasoner",
-        tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
-    )
+    role_profile = ctx.require(REASONER_ROLE_PROFILE.key)
+    if not isinstance(role_profile, RoleProfile):
+        raise TypeError(
+            "reasoner.role_profile must be a RoleProfile instance, got "
+            f"{type(role_profile).__name__}"
+        )
     ctx.provide("reasoner", PromptReasoner(llm=adapter, role_profile=role_profile))
 
 
