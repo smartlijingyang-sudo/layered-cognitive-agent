@@ -281,10 +281,6 @@ entries:
   name: lca_webserver_routes_runs_sessions
   $module: lca.plugins.transport.webserver.routes_2.routes_runs_sessions
   config: {}
-- id: lca-gateway-routes-openai-compat-files
-  name: lca_webserver_routes_openai_compat_files
-  $module: lca.plugins.transport.webserver.routes_1.routes_openai_compat_files
-  config: {}
 - id: lca-gateway-routes-device
   name: lca_webserver_routes_device
   $module: lca.plugins.transport.webserver.routes_1.routes_device

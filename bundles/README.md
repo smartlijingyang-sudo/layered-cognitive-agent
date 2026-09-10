@@ -16,7 +16,6 @@ primitives (perceive / gates / body / runtime / think / loop drivers) and
 | `lca-gateway-router` | `lca.plugins.transport.webserver.router` | L0 seam: provides `gateway_router` capability |
 | `lca-gateway-routes-health-options` | `lca.plugins.transport.webserver.routes_health_options` | L3 provider: `/health` + OPTIONS handlers |
 | `lca-gateway-routes-runs-sessions` | `lca.plugins.transport.webserver.routes_runs_sessions` | L3 provider: `/runs/*` + `/v1/sessions/*` |
-| `lca-gateway-routes-openai-compat-files` | `lca.plugins.transport.webserver.routes_openai_compat_files` | L3 provider: `/v1/models` + `/v1/chat/completions` + `/v1/embeddings` + `/v1/responses` + `/files/*` |
 | `lca-gateway-routes-device` | `lca.plugins.transport.webserver.routes_device` | L3 provider: `/api/device/*` + WS |
 
 Order matters: `lca-gateway-router` must boot **before** any routes

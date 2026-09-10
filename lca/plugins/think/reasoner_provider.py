@@ -92,8 +92,17 @@ class Config(BaseModel):
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Resolve LLM adapter and bind it to PromptReasoner; register ``reasoner`` capability."""
     from lca.cognition.brain.reasoner.reasoner import PromptReasoner
+    from lca.infrastructure.llm.config import llm_credentials
 
-    adapter = ProductionLLMResolver(default_model=config.default_model).resolve()
+    # ``ProductionLLMResolver`` 不自己读 env:``llm_credentials()`` 把 ``.env`` 里的
+    # ``LLM_API_KEY`` / ``LLM_BASE_URL`` / ``LLM_MODEL`` 经由 pydantic-settings
+    # 抬到 process env 之后取出来(BOOTSTRAP 白名单包含 ``LLM_`` 前缀)。
+    api_key, base_url, model_from_env = llm_credentials()
+    adapter = ProductionLLMResolver(
+        api_key=api_key,
+        base_url=base_url,
+        default_model=config.default_model or model_from_env,
+    ).resolve()
     role_profile = ctx.require(REASONER_ROLE_PROFILE.key)
     if not isinstance(role_profile, RoleProfile):
         raise TypeError(
