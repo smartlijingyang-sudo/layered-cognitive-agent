@@ -30,6 +30,7 @@ from lca.contracts.protocols.declarative.declarative_1.bundle_graph import (
     BundleGraphSpec,
 )
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
+    DeclarativeValidationError,
     SemanticPhase,
 )
 from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
