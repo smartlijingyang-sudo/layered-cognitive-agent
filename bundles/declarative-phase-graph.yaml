@@ -20,11 +20,6 @@ entries:
     $module: lca.plugins.loop.phase.perceive.standard.plugin
     config: {}
 
-  - id: phase.think.standard
-    name: phase_think_standard
-    $module: lca.plugins.loop.phase.think.standard.plugin
-    config: {}
-
   - id: phase.act.standard
     name: phase_act_standard
     $module: lca.plugins.loop.phase.act.standard.plugin

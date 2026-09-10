@@ -144,15 +144,15 @@ def test_plan_hash_is_deterministic_for_identical_inputs() -> None:
 def test_phase_executor_replacement_changes_plan_hash_without_assembler_change(
     standard_plan,
 ) -> None:
-    think = next(item for item in standard_plan.plugin_specs if item.id == "phase.think.standard")
+    perceive = next(item for item in standard_plan.plugin_specs if item.id == "phase.perceive.standard")
     replacement = replace(
-        think,
-        id="phase.think.fixture",
+        perceive,
+        id="phase.perceive.fixture",
         revision="2.0.0",
         relations=(
             PluginRelation(
                 type=RelationType.REPLACES,
-                target="phase.think.standard",
+                target="phase.perceive.standard",
                 mode="exclusive",
             ),
         ),
@@ -160,7 +160,7 @@ def test_phase_executor_replacement_changes_plan_hash_without_assembler_change(
     replaced = replace(
         standard_plan,
         plugin_specs=tuple(
-            replacement if item.id == think.id else item for item in standard_plan.plugin_specs
+            replacement if item.id == perceive.id else item for item in standard_plan.plugin_specs
         ),
     )
     assert compiled_run_plan_ref(replaced) != compiled_run_plan_ref(standard_plan)

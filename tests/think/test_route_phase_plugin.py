@@ -7,12 +7,13 @@ from typing import Any
 
 import pytest
 
-from lca.contracts.models.core.execution.think_carry import ThinkSubgraphCarry
 from lca.contracts.models.core.state.state import AgentState, Budget
-from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
-    PhaseInput,
+from lca.contracts.protocols.declarative.declarative_1.node_executor import (
+    NodeContext,
+    NodeInput,
+    NodeOutput,
 )
-from lca.plugins.think.route.plugin import ThinkRouteExecutor
+from lca.plugins.think.route import ThinkRouteExecutor
 
 
 @dataclass
@@ -35,40 +36,20 @@ class _Reducer:
 
 
 @dataclass
-class _StubPhaseContext:
-    plan_ref: str
-    node_ref: str
-    state: AgentState
-    journal: Any
-    budget: Any
-    artifacts: dict[str, Any]
-    capabilities: Any
-    decision: Any
-    observation: Any
-    reflection: Any
-    checkpoint_reason: Any
-
-    def emit_fact(self, fact: Any) -> str:
-        return ""
-
-    def propose_delta(self, delta: Any) -> None:
-        return None
+class _StubRuntime:
+    state: AgentState | None
+    skill_router: Any
+    reducer: Any
 
 
-def _ctx(caps: dict[str, Any]) -> _StubPhaseContext:
-    return _StubPhaseContext(
-        plan_ref="p",
-        node_ref="think.route",
-        state=AgentState(trace_id="t", task="x", budget=Budget()),
-        journal=None,
-        budget=None,
-        artifacts={},
-        capabilities=caps,
-        decision=None,
-        observation=None,
-        reflection=None,
-        checkpoint_reason=None,
+def _ctx(caps: dict[str, Any]) -> NodeContext:
+    state = AgentState(trace_id="t", task="x", budget=Budget())
+    runtime = _StubRuntime(
+        state=state,
+        skill_router=caps.get("phase.think.route"),
+        reducer=caps.get("phase.think.reducer"),
     )
+    return NodeContext(runtime=runtime, budget={}, metadata={})
 
 
 @pytest.mark.asyncio
@@ -76,38 +57,36 @@ async def test_route_calls_reducer_with_router_template() -> None:
     executor = ThinkRouteExecutor()
     router = _Router(template="hierarchical_prompt")
     reducer = _Reducer()
-    result = await executor.execute(
+    output = await executor.node_execute(
         _ctx(
             {
                 "phase.think.route": router,
                 "phase.think.reducer": reducer,
             }
         ),
-        PhaseInput(artifact=None),
+        NodeInput(port_values={}),
     )
-    assert result.result_kind == "think_stage"
-    assert isinstance(result.payload, ThinkSubgraphCarry)
     assert reducer.last_template == "hierarchical_prompt"
+    assert output.port_values.get("route_choice") == "hierarchical_prompt"
 
 
 @pytest.mark.asyncio
-async def test_route_without_router_passes_through() -> None:
+async def test_route_without_router_returns_empty_ports() -> None:
     executor = ThinkRouteExecutor()
-    result = await executor.execute(
+    output = await executor.node_execute(
         _ctx({"phase.think.reducer": _Reducer()}),
-        PhaseInput(artifact=None),
+        NodeInput(port_values={}),
     )
-    assert result.result_kind == "think_stage"
-    assert isinstance(result.payload, ThinkSubgraphCarry)
+    assert output.port_values == {}
 
 
 @pytest.mark.asyncio
 async def test_route_with_router_but_no_reducer_raises() -> None:
     executor = ThinkRouteExecutor()
-    with pytest.raises(RuntimeError, match=r"phase\.think\.reducer"):
-        await executor.execute(
+    with pytest.raises(RuntimeError, match=r"phase\.think\.reducer|reducer"):
+        await executor.node_execute(
             _ctx({"phase.think.route": _Router()}),
-            PhaseInput(artifact=None),
+            NodeInput(port_values={}),
         )
 
 
@@ -116,13 +95,13 @@ async def test_route_with_none_template_folds_to_state() -> None:
     """SkillRouter.route may return None; Reducer still gets called."""
     executor = ThinkRouteExecutor()
     reducer = _Reducer()
-    await executor.execute(
+    await executor.node_execute(
         _ctx(
             {
                 "phase.think.route": _Router(template=None),
                 "phase.think.reducer": reducer,
             }
         ),
-        PhaseInput(artifact=None),
+        NodeInput(port_values={}),
     )
     assert reducer.last_template is None

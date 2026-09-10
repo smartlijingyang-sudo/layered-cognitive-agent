@@ -16,7 +16,6 @@ bundles:
   - bundles/loop_cursor.spine_default.yaml
   - bundles/session-runtime.yaml
   - bundles/event-bus-components.yaml
-  - bundles/think-cordis.yaml
   - bundles/think.yaml
 
 patch:

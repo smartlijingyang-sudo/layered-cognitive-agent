@@ -8,12 +8,13 @@ from typing import Any
 import pytest
 
 from lca.contracts.models.core.execution.decision import Decision
-from lca.contracts.models.core.execution.think_carry import ThinkSubgraphCarry
 from lca.contracts.models.core.state.state import AgentState, Budget
-from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
-    PhaseInput,
+from lca.contracts.protocols.declarative.declarative_1.node_executor import (
+    NodeContext,
+    NodeInput,
+    NodeOutput,
 )
-from lca.plugins.think.shortcut.plugin import ThinkShortcutExecutor
+from lca.plugins.think.shortcut import ThinkShortcutExecutor
 
 
 @dataclass
@@ -31,46 +32,22 @@ class _HitShortcut:
 
 
 @dataclass
-class _StubPhaseContext:
-    """Minimal duck-typed stand-in for the PhaseContext Protocol."""
-
-    plan_ref: str
-    node_ref: str
-    state: AgentState
-    journal: Any
-    budget: Any
-    artifacts: dict[str, Any]
-    capabilities: Any
-    decision: Any
-    observation: Any
-    reflection: Any
-    checkpoint_reason: Any
-
-    def emit_fact(self, fact: Any) -> str:
-        return ""
-
-    def propose_delta(self, delta: Any) -> None:
-        return None
+class _StubRuntime:
+    state: AgentState | None
+    supports_shortcut: Any
 
 
-def _ctx(caps: dict[str, Any]) -> _StubPhaseContext:
-    return _StubPhaseContext(
-        plan_ref="p",
-        node_ref="think.shortcut",
-        state=AgentState(trace_id="t", task="x", budget=Budget()),
-        journal=None,
-        budget=None,
-        artifacts={},
-        capabilities=caps,
-        decision=None,
-        observation=None,
-        reflection=None,
-        checkpoint_reason=None,
+def _ctx(caps: dict[str, Any]) -> NodeContext:
+    state = AgentState(trace_id="t", task="x", budget=Budget())
+    runtime = _StubRuntime(
+        state=state,
+        supports_shortcut=caps.get("phase.think.shortcut"),
     )
+    return NodeContext(runtime=runtime, budget={}, metadata={})
 
 
 @pytest.mark.asyncio
-async def test_shortcut_hit_returns_decision_result() -> None:
+async def test_shortcut_hit_returns_decision_port() -> None:
     executor = ThinkShortcutExecutor()
     decision = Decision(
         decision_id="dec_x",
@@ -78,28 +55,25 @@ async def test_shortcut_hit_returns_decision_result() -> None:
         rationale="r",
         confidence=1.0,
     )
-    result = await executor.execute(
+    output = await executor.node_execute(
         _ctx({"phase.think.shortcut": _HitShortcut(out=decision)}),
-        PhaseInput(artifact=None),
+        NodeInput(port_values={}),
     )
-    assert result.result_kind == "decision"
-    assert isinstance(result.payload, Decision)
+    assert output.port_values == {"decision": decision}
 
 
 @pytest.mark.asyncio
-async def test_shortcut_miss_returns_stage_result() -> None:
+async def test_shortcut_miss_returns_empty_ports() -> None:
     executor = ThinkShortcutExecutor()
-    result = await executor.execute(
+    output = await executor.node_execute(
         _ctx({"phase.think.shortcut": _NoopShortcut()}),
-        PhaseInput(artifact=None),
+        NodeInput(port_values={}),
     )
-    assert result.result_kind == "think_stage"
-    assert isinstance(result.payload, ThinkSubgraphCarry)
+    assert output.port_values == {}
 
 
 @pytest.mark.asyncio
-async def test_shortcut_missing_capability_returns_stage() -> None:
+async def test_shortcut_missing_capability_returns_empty_ports() -> None:
     executor = ThinkShortcutExecutor()
-    result = await executor.execute(_ctx({}), PhaseInput(artifact=None))
-    assert result.result_kind == "think_stage"
-    assert isinstance(result.payload, ThinkSubgraphCarry)
+    output = await executor.node_execute(_ctx({}), NodeInput(port_values={}))
+    assert output.port_values == {}

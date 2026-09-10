@@ -22,7 +22,6 @@ bundles:
   - bundles/loop_cursor.spine_default.yaml
   - bundles/session-runtime.yaml
   - bundles/event-bus-components.yaml
-  - bundles/think-cordis.yaml
   - bundles/think.yaml
 
 patch:
@@ -42,9 +41,8 @@ patch:
   # terminal predicates on perceive.main. think.main carries a node-level
   # sub_spec_ref (Node Note 2026-09-09-phase-node-sub-spec-ref, ADR-0217
   # BundleGraphSpec v2) that delegates to bundles/think.yaml; the
-  # ``phase.think.standard`` binding below is a Pydantic-required field
-  # but the interpreter short-circuits the phase executor when
-  # ``sub_spec_ref`` is present.
+  # interpreter enters the subgraph via ``sub_spec_ref`` and does not
+  # invoke a phase executor for think.main.
   - id: phase.topology.standard
     config:
       nodes:

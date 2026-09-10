@@ -21,8 +21,8 @@ def test_semantic_phase_order_matches_closed_set() -> None:
 
 def test_phase_executor_capability_key_shape() -> None:
     assert (
-        phase_executor_capability_key(semantic_phase=SemanticPhase.THINK, variant="standard")
-        == "phase.think.standard"
+        phase_executor_capability_key(semantic_phase=SemanticPhase.PERCEIVE, variant="standard")
+        == "phase.perceive.standard"
     )
     assert PHASE_EXECUTOR_CAPABILITY_PREFIX == "phase."
 
@@ -31,10 +31,10 @@ def test_phase_executor_registry_groups_by_semantic_phase() -> None:
     sentinel = object()
     registry = PhaseExecutorRegistry(
         {
-            "phase.think.standard": sentinel,  # type: ignore[arg-type]
+            "phase.perceive.standard": sentinel,  # type: ignore[arg-type]
             "phase.act.standard": object(),  # type: ignore[arg-type]
         }
     )
-    think_bindings = registry.for_semantic_phase(SemanticPhase.THINK)
-    assert think_bindings == (("phase.think.standard", sentinel),)
-    assert registry.get("phase.think.standard") is sentinel
+    perceive_bindings = registry.for_semantic_phase(SemanticPhase.PERCEIVE)
+    assert perceive_bindings == (("phase.perceive.standard", sentinel),)
+    assert registry.get("phase.perceive.standard") is sentinel

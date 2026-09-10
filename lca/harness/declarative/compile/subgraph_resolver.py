@@ -211,7 +211,7 @@ def _project_to_phase_graph(
 
     每个 BundleGraphNode 投影为 PhaseNode:
       - ``semantic_phase`` 走 ``region`` 反查(默认 THINK,因为本路径只服务 think)
-      - ``binding`` 用占位 ``phase.think.standard``(interpreter 进入节点时按
+      - ``binding`` 取自 ``BundleGraphNode.factory``(interpreter 进入节点时按
         ``sub_spec_ref`` 短路走子图,不调用该 binding)
       - ``max_visits`` 取自 ``config.max_visits``(默认 1)
       - ``purpose`` / ``inputs`` / ``outputs`` 通过 ``sub_spec_ref.metadata``
@@ -237,7 +237,7 @@ def _project_to_phase_graph(
             PhaseNode(
                 id=n.id,
                 semantic_phase=SemanticPhase.THINK,
-                binding="phase.think.standard",  # 占位,interpreter 短路
+                binding=n.factory,
                 max_visits=max_visits,
             )
         )
