@@ -5,7 +5,7 @@ think.reason inner_graph 第 1 节点 plugin:调 ``Reasoner.build_turn_plan``
 运行时从 ``context.runtime.reasoner`` 拿 capability 实例。
 
 ADR-0218 §3.3:节点 plugin 由作者显式书写完整 ``@plugin(...)`` 装饰器,
-工厂 ``setup(ctx)`` 通过 Cordis ``ctx.provide`` 双键注册(composite + region-less)。
+工厂 ``setup(ctx)`` 通过 Cordis ``ctx.provide`` 单键注册 composite key。
 """
 
 from __future__ import annotations
@@ -97,12 +97,11 @@ class ThinkReasonPlanExecutor:
     ),
 )
 async def setup(ctx: PluginContext, config=None) -> None:
-    """双键注册:Cordis provide(composite + region-less)。"""
+    """Composite-key 注册:``{region}::{semantic_name}``。"""
     del config
     executor = ThinkReasonPlanExecutor()
     composite_key = f"{executor.region}::{executor.semantic_name}"
     ctx.provide(composite_key, executor)
-    ctx.provide(executor.semantic_name, executor)
 
 
 __all__ = ["ThinkReasonPlanExecutor", "setup"]

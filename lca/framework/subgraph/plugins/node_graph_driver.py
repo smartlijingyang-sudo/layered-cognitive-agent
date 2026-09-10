@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import contextlib
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from lca.contracts.exceptions.subgraph import (
@@ -131,7 +131,19 @@ class NodeGraphDriver:
         self._observers = observers
         self.max_subgraph_depth = max_subgraph_depth
         self._recursion_stack: set[str] = set()
-        self._nodes_by_id: dict[str, BundleGraphNode] = {n.id: n for n in spec.nodes}
+        # 显式 region 优先,fallback 到 bundle.region。任何 node 解析后仍为
+        # None → fail-loud,要求 yaml 在 node 或 bundle 层给出 region。
+        self._nodes_by_id: dict[str, BundleGraphNode] = {}
+        for n in spec.nodes:
+            effective_region = n.region if n.region is not None else spec.region
+            if not effective_region:
+                raise ValueError(
+                    f"BundleGraphSpec[{spec.id!r}].node[{n.id!r}] has no region "
+                    "(set node.region or spec.region)"
+                )
+            self._nodes_by_id[n.id] = (
+                n if n.region is not None else replace(n, region=effective_region)
+            )
         # entry:yaml 显式声明优先;否则 fallback 到 nodes 列表的第一个节点。
         if spec.entry is None:
             if not spec.nodes:

@@ -5,8 +5,8 @@ think 子图节点 plugin:调 Reasoner 生成候选 LLMResponse。
 运行时从 ``context.runtime.reasoner`` 拿 capability 实例。
 
 ADR-0218 §3.3:节点 plugin 由作者显式书写完整 ``@plugin(...)`` 装饰器,
-工厂 ``setup(ctx)`` 通过 Cordis ``ctx.provide`` 双键注册
-(composite + region-less,think 子图专用的 NodeExecutor 解析)。
+工厂 ``setup(ctx)`` 通过 Cordis ``ctx.provide`` 单键注册 composite key,
+think 子图专用的 NodeExecutor 解析。
 """
 
 from __future__ import annotations
@@ -98,14 +98,11 @@ class ThinkReasonExecutor:
     ),
 )
 async def setup(ctx: PluginContext, config=None) -> None:
-    """双键注册:Cordis provide(composite + region-less)。"""
+    """Composite-key 注册:``{region}::{semantic_name}``。"""
     del config
     executor = ThinkReasonExecutor()
-    # Composite key for region-scoped resolution (preferred)
     composite_key = f"{executor.region}::{executor.semantic_name}"
     ctx.provide(composite_key, executor)
-    # Region-less fallback for cross-region reuse
-    ctx.provide(executor.semantic_name, executor)
 
 
 __all__ = ["ThinkReasonExecutor", "setup"]

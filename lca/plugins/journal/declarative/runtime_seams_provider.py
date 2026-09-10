@@ -202,8 +202,6 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
             registry = {
                 (_REGION, name): cls() for cls, name in _EXECUTORS
             }
-            for cls, name in _EXECUTORS:
-                registry[(None, name)] = registry[(_REGION, name)]
 
             # Default capability providers (no-cordis fallback):
             # 让 think subgraph 真的跑通完整 5 步 → emit 一个默认 decision。
@@ -262,7 +260,7 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
                 def resolve_capability(self, capability):
                     return _CAPS.get(capability)
                 def resolve_factory(self, factory, region):
-                    return registry.get((region, factory)) or registry.get((None, factory))
+                    return registry.get((region, factory))
 
             bind_seams(
                 subgraph_runner=SubgraphRunner(

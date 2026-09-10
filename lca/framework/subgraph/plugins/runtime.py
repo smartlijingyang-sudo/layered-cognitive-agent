@@ -44,12 +44,12 @@ class SubgraphRuntime(Protocol):
         responsible for treating missing capabilities as soft failures.
         """
 
-    def resolve_factory(self, factory: str, region: str | None) -> Any:
-        """Composite-key lookup with region fallback.
+    def resolve_factory(self, factory: str, region: str) -> Any:
+        """Composite-key lookup with no fallback.
 
-        Tries ``f"{region}::{factory}"`` first when ``region`` is given,
-        then falls back to the bare ``factory`` key. Raises
-        :class:`FactoryResolutionError` when both miss.
+        Looks up exactly ``f"{region}::{factory}"``; ``region`` must be
+        non-empty. Raises :class:`FactoryResolutionError` when the
+        composite key has no binding.
         """
         ...
 
@@ -78,18 +78,18 @@ class CordisBackedRuntime:
             node = getattr(node, "parent", None)
         return None
 
-    def resolve_factory(self, factory: str, region: str | None) -> Any:
+    def resolve_factory(self, factory: str, region: str) -> Any:
         """Resolve a ``(factory, region)`` pair via composite key.
 
-        Order: exact ``f"{region}::{factory}"`` if ``region`` is given,
-        then bare ``factory`` for the region-less fallback. Raises
-        :class:`FactoryResolutionError` if neither binding exists.
+        Looks up exactly ``f"{region}::{factory}"``. Raises
+        :class:`FactoryResolutionError` when the composite key has no
+        binding. ``region`` must be non-empty; callers fall back from
+        ``BundleGraphNode.region`` to ``BundleGraphSpec.region`` before
+        invoking this method (see :class:`NodeGraphDriver`).
         """
-        if region is not None:
-            val = self.resolve(f"{region}::{factory}")
-            if val is not None:
-                return val
-        val = self.resolve(factory)
+        if not region:
+            raise FactoryResolutionError(factory, region)
+        val = self.resolve(f"{region}::{factory}")
         if val is not None:
             return val
         raise FactoryResolutionError(factory, region)

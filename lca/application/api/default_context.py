@@ -31,9 +31,10 @@ _DEFAULT_PROFILE = "profiles/web-standard.yaml"
 # ``think.main`` in ``bundles/declarative-phase-graph.yaml``. The referenced
 # plan bundle is ``bundles/think.yaml`` (ADR-0217 Bundle Graph Schema v2:
 # 纯图描述, 5 节点 + 5 边;plugin 注册由 5 个 @plugin(...) 装饰器走 Cordis,
-# Cordis capability key (`f"{region}::{semantic_name}"` composite key, with
-# region-less fallback) resolves the factory 业务语义名 to the NodeExecutor
-# instance)。
+# Cordis capability key (`f"{region}::{semantic_name}"` composite key)
+# resolves the factory 业务语义名 to the NodeExecutor instance. Each node's
+# effective region is ``node.region`` if set, else ``spec.region``; missing
+# both fails loud at driver construction.
 
 # Public deprecation metadata (ADR-0115 决定 7).
 SET_DEFAULT_CTX_DEPRECATION_REASON = (

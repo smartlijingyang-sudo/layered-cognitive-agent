@@ -5,8 +5,8 @@ think 子图节点 plugin:在 LLM 推理之前尝试确定性快速路径。
 运行时从 ``context.runtime.supports_shortcut`` 拿 capability 实例。
 
 ADR-0218 §3.3:节点 plugin 由作者显式书写完整 ``@plugin(...)`` 装饰器,
-工厂 ``setup(ctx)`` 通过 Cordis ``ctx.provide`` 双键注册
-(composite + region-less,think 子图专用的 NodeExecutor 解析)。
+工厂 ``setup(ctx)`` 通过 Cordis ``ctx.provide`` 单键注册 composite key,
+think 子图专用的 NodeExecutor 解析。
 """
 
 from __future__ import annotations
@@ -99,14 +99,11 @@ class ThinkShortcutExecutor:
     ),
 )
 async def setup(ctx: PluginContext, config=None) -> None:
-    """双键注册:Cordis provide(composite + region-less)。"""
+    """Composite-key 注册:``{region}::{semantic_name}``。"""
     del config
     executor = ThinkShortcutExecutor()
-    # Composite key for region-scoped resolution (preferred)
     composite_key = f"{executor.region}::{executor.semantic_name}"
     ctx.provide(composite_key, executor)
-    # Region-less fallback for cross-region reuse
-    ctx.provide(executor.semantic_name, executor)
 
 
 __all__ = ["ThinkShortcutExecutor", "setup"]
