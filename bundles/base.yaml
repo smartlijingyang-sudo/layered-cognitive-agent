@@ -1,8 +1,4 @@
 entries:
-- id: lca-llm-service
-  name: lca_llm_service
-  $module: lca.plugins.think.llm.seam
-  config: {}
 - id: lca-decision-classifier-seam
   name: lca_decision_classifier_seam
   $module: lca.plugins.gate.decision_classifier_seam
