@@ -165,6 +165,7 @@ class NodeGraphDriver:
             except FactoryResolutionError as exc:
                 # fail-loud:registry 无法解析 → 返回 FAILED outcome
                 return _failed_result(
+                    plan_ref=self._plan_ref,
                     outer_state=outer_state,
                     node_id=current_id,
                     error=exc,
@@ -185,6 +186,7 @@ class NodeGraphDriver:
                 out = await executor.node_execute(ctx, inp)
             except Exception as exc:
                 return _failed_result(
+                    plan_ref=self._plan_ref,
                     outer_state=outer_state,
                     node_id=current_id,
                     error=exc,
@@ -267,6 +269,7 @@ async def _emit_observers(
 
 def _failed_result(
     *,
+    plan_ref: str,
     outer_state: AgentState,
     node_id: str,
     error: BaseException,
@@ -281,13 +284,21 @@ def _failed_result(
         PhaseRunCursor,
     )
 
-    error_fact = f"{type(error).__name__}: {error}"
-    cursor = PhaseRunCursor(node_id=node_id, step=0)
+    cursor = PhaseRunCursor(
+        plan_ref=plan_ref,
+        node_id=node_id,
+        visit_counts=(),
+        edge_counts=(),
+        artifacts={},
+        causation_refs=(),
+        budget_snapshot={"step": 0},
+    )
+    from lca.contracts.models.core.policy.stop import StopDecision, StopReason
     outcome = DeclarativeRunOutcome(
         kind=ExecutionOutcome.FAILED,
         cursor=cursor,
-        error_kind="internal",
-        error_fact=error_fact,
+        stop=StopDecision(should_stop=True, reason=StopReason.ERROR),
+        error_fact=None,
     )
     return InterpretationResult(
         state=outer_state,

@@ -202,13 +202,65 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
             registry = {
                 (_REGION, name): cls() for cls, name in _EXECUTORS
             }
-            # 双 fallback:composite (region, factory) → region-less (None, factory)
             for cls, name in _EXECUTORS:
                 registry[(None, name)] = registry[(_REGION, name)]
 
+            # Default capability providers (no-cordis fallback):
+            # 让 think subgraph 真的跑通完整 5 步 → emit 一个默认 decision。
+            # 真实 capability plugin (lca/plugins/runtime_provider/*.py) 会在后续
+            # PR 替换;此处先确保 think subgraph 不被空 capability 卡住。
+
+            from lca.contracts.models.core.conversation.llm import LLMResponse
+            from lca.contracts.models.core.execution.decision import Decision
+
+            class _DefaultReasoner:
+                """Fake Reasoner:返回空 LLMResponse 让 classify 走默认 fallback。"""
+                async def generate_thoughts(self, state):
+                    return LLMResponse()
+
+            class _DefaultDecisionClassifier:
+                """Fake Classifier:空 LLMResponse → emit 默认 respond decision。"""
+                def classify(self, response):
+                    return Decision(
+                        action_type="respond", rationale="default", confidence=1.0,
+                    )
+
+            class _DefaultDecisionGate:
+                """Fake Gate:passthrough。"""
+                async def enforce(self, state, decision):
+                    return decision
+
+            class _DefaultSkillRouter:
+                """Fake Router:返回空路由。"""
+                async def route(self, state):
+                    return ""
+
+            class _DefaultSupportsShortcut:
+                """Fake Shortcut:没有快速路径。"""
+                async def try_shortcut(self, state):
+                    return None
+
+            _CAPS = {
+                "reasoner": _DefaultReasoner(),
+                "decision_classifier": _DefaultDecisionClassifier(),
+                "decision_gate": _DefaultDecisionGate(),
+                "skill_router": _DefaultSkillRouter(),
+                "supports_shortcut": _DefaultSupportsShortcut(),
+                "agent_gates": _DefaultDecisionGate(),
+            }
+
             class _DefaultSubgraphRuntime:
-                """Default factory 内置的 SubgraphRuntime fallback(无 cordis)。"""
-                def resolve(self, capability): return None
+                """Default factory 内置的 SubgraphRuntime fallback(无 cordis)。
+
+                提供三种 seam:
+                - resolve_factory:(factory, region) → NodeExecutor 解析
+                - resolve_capability:(capability_key) → capability 实例,给节点 executor 用
+                - resolve:(通用 key → obj) 兼容 SubgraphRuntime Protocol
+                """
+                def resolve(self, capability):
+                    return _CAPS.get(capability)
+                def resolve_capability(self, capability):
+                    return _CAPS.get(capability)
                 def resolve_factory(self, factory, region):
                     return registry.get((region, factory)) or registry.get((None, factory))
 

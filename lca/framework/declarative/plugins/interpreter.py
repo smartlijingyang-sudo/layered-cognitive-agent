@@ -31,6 +31,7 @@ from lca.contracts.harness.composition.plugin_contract import (
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.protocols.act.command.envelope import RunDelta, RunFact
+from lca.contracts.protocols.declarative.declarative_1.declarative_common import SemanticPhase
 from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
     JournalCommitter,
     PhaseResult,
@@ -453,11 +454,23 @@ class GenericPlanInterpreter:
                     visits.append(
                         PhaseVisit(node.id, node.semantic_phase, "think_stage", edge.target)
                     )
-                    # legacy 路径无 ``output``, 取 state 上的 decision; Cordis 路径用 ``output.decision``。
                     payload = (
                         getattr(output, "decision", None)
                         if "output" in locals()
                         else getattr(current_state, "decision", None)
+                    )
+                    # 关键:把 think 阶段产物写到 artifacts["think"],让 act.main control
+                    # (control.act.authorize) 通过 _contribution_context 读到 decision。
+                    # 之前只走 advance 但 advance 不写 artifacts,导致 act 段 decision=None
+                    # 而触发 'action type is not authorized' (H6)。
+                    phase_result = PhaseResult(
+                        result_kind="think_stage",
+                        payload=payload,
+                    )
+                    traversal.record_result(
+                        semantic_phase=SemanticPhase.THINK,
+                        result=phase_result,
+                        effect_output=payload,
                     )
                     traversal.advance(
                         edge=edge,
