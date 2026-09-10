@@ -1,19 +1,4 @@
-"""Tests for phase.think.local_gate plugin.
-
-Part of PR-2 think subgraph decompress (Task 2). The local_gate step
-extracts the per-think half of the original ``phase.think.gate``:
-it reads the ``phase.think.local_gate`` capability and enforces the
-current Decision via the local DecisionGate.
-
-Differences from the legacy ``gate`` step:
-- Reads capability key ``phase.think.local_gate`` (not ``gate``).
-- Returns ``result_kind="think_stage"`` (intermediate, not terminal).
-- Emits the enforced Decision via the carry, not via ``result.payload``.
-
-The terminal sink (``phase.think.verdict_emit``) and the plan-bound
-gate (``phase.think.agent_gate``) live in their own nodes; this step
-owns ONLY the per-think local enforce.
-"""
+"""Tests for phase.think.local_gate plugin (post-PhaseExecutor removal)."""
 
 from __future__ import annotations
 
@@ -23,15 +8,15 @@ from typing import Any
 import pytest
 
 from lca.contracts.models.core.execution.decision import Decision
-from lca.contracts.models.core.execution.think_carry import CARRY_KEY, ThinkSubgraphCarry
-from lca.contracts.models.core.state.state import AgentState, Budget
-from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
-    PhaseInput,
+from lca.contracts.protocols.declarative.declarative_1.node_executor import (
+    NodeContext,
+    NodeInput,
+    NodeOutput,
 )
-from lca.plugins.think.local_gate.plugin import ThinkLocalGateExecutor
+from lca.plugins.think.local_gate import ThinkLocalGateExecutor
 
 
-def _decision(decision_id: str = "dec_in") -> Decision:
+def _decision(decision_id: str = "dec_x") -> Decision:
     return Decision(  # type: ignore[call-arg]
         decision_id=decision_id,
         action_type="respond",
@@ -42,109 +27,77 @@ def _decision(decision_id: str = "dec_in") -> Decision:
 
 @dataclass
 class _LocalGate:
+    """Fake DecisionGate matching the Protocol signature."""
+
     out: Decision
 
-    async def enforce(self, state: AgentState, decision: Decision) -> Decision:
+    async def enforce(self, state, decision: Decision) -> Decision:
         return self.out
 
 
 @dataclass
-class _StubPhaseContext:
-    plan_ref: str
-    node_ref: str
-    state: AgentState
-    journal: Any
-    budget: Any
-    artifacts: dict[str, Any]
-    capabilities: Any
-    decision: Any
-    observation: Any
-    reflection: Any
-    checkpoint_reason: Any
-
-    def emit_fact(self, fact: Any) -> str:
-        return ""
-
-    def propose_delta(self, delta: Any) -> None:
-        return None
+class _StubRuntime:
+    state: Any
+    agent_gates: Any
 
 
-def _ctx(caps: dict[str, Any], decision: Decision | None = None) -> _StubPhaseContext:
-    artifacts: dict[str, Any] = {}
+def _make(caps: dict[str, Any], decision: Decision | None = None) -> tuple[NodeContext, NodeInput]:
+    from lca.contracts.models.core.state.state import AgentState, Budget
+    runtime = _StubRuntime(state=AgentState(trace_id="t", task="x", budget=Budget()), agent_gates=caps.get("agent_gates"))
+    port_values: dict[str, Any] = {}
     if decision is not None:
-        artifacts[CARRY_KEY] = ThinkSubgraphCarry(
-            state=AgentState(trace_id="t", task="x", budget=Budget()),
-            decision=decision,
-        )
-    return _StubPhaseContext(
-        plan_ref="p",
-        node_ref="think.local_gate",
-        state=AgentState(trace_id="t", task="x", budget=Budget()),
-        journal=None,
-        budget=None,
-        artifacts=artifacts,
-        capabilities=caps,
-        decision=None,
-        observation=None,
-        reflection=None,
-        checkpoint_reason=None,
+        port_values["decision"] = decision
+    return (
+        NodeContext(runtime=runtime, budget={"max_visits": 1}, metadata={}),
+        NodeInput(port_values=port_values),
     )
 
 
 @pytest.mark.asyncio
-async def test_local_gate_enforces_decision_and_passes_carry() -> None:
-    """Happy path: enforce decision and emit updated carry as intermediate."""
+async def test_local_gate_enforces_decision_and_emits_enforced() -> None:
+    """Happy path: enforce decision via local DecisionGate, emit enforced decision."""
     executor = ThinkLocalGateExecutor()
     decision_in = _decision("dec_in")
     gate = _LocalGate(out=_decision("dec_local"))
-    result = await executor.execute(
-        _ctx({"phase.think.local_gate": gate}, decision=decision_in),
-        PhaseInput(artifact=None),
-    )
-    assert result.result_kind == "think_stage"
-    # The enforced decision lives on the carry, not on result.payload.
-    assert isinstance(result.payload, ThinkSubgraphCarry)
-    assert result.payload.decision is not None
-    assert result.payload.decision.decision_id == "dec_local"
+    context, input_ = _make({"agent_gates": gate}, decision=decision_in)
+    result = await executor.node_execute(context=context, input=input_)
+    assert isinstance(result, NodeOutput)
+    assert "enforced_decision" in result.port_values
+    enforced = result.port_values["enforced_decision"]
+    assert isinstance(enforced, Decision)
+    assert enforced.decision_id == "dec_local"
 
 
 @pytest.mark.asyncio
-async def test_local_gate_does_not_consult_agent_gates() -> None:
-    """local_gate is per-think only; agent_gates belong to a separate node (agent_gate)."""
+async def test_local_gate_does_not_consult_other_capabilities() -> None:
+    """local_gate only reads agent_gates; other capabilities are ignored."""
     executor = ThinkLocalGateExecutor()
     decision_in = _decision("dec_in")
     local = _LocalGate(out=_decision("dec_local"))
-    # agent_gates registered but MUST be ignored by local_gate.
-    agent = _LocalGate(out=_decision("dec_agent_should_be_ignored"))
-    result = await executor.execute(
-        _ctx(
-            {"phase.think.local_gate": local, "phase.think.agent_gates": agent},
-            decision=decision_in,
-        ),
-        PhaseInput(artifact=None),
+    other = _LocalGate(out=_decision("dec_other_should_be_ignored"))
+    context, input_ = _make(
+        {"agent_gates": local, "other_capability": other}, decision=decision_in
     )
-    assert result.payload.decision.decision_id == "dec_local"  # type: ignore[union-attr]
+    result = await executor.node_execute(context=context, input=input_)
+    enforced = result.port_values["enforced_decision"]
+    assert enforced.decision_id == "dec_local"
 
 
 @pytest.mark.asyncio
-async def test_local_gate_without_decision_returns_input_artifact() -> None:
-    """No candidate decision → terminal fallback (matches legacy gate contract)."""
+async def test_local_gate_without_decision_returns_empty_output() -> None:
+    """No candidate decision → empty port_values (no enforced decision)."""
     executor = ThinkLocalGateExecutor()
-    sentinel = "fallback-input"
-    result = await executor.execute(
-        _ctx({"phase.think.local_gate": _LocalGate(out=_decision("dec_out"))}),
-        PhaseInput(artifact=sentinel),
-    )
-    assert result.result_kind == "decision"
-    assert result.payload == sentinel
+    context, input_ = _make({"agent_gates": _LocalGate(out=_decision("dec_out"))})
+    result = await executor.node_execute(context=context, input=input_)
+    assert result.port_values == {}
 
 
 @pytest.mark.asyncio
 async def test_local_gate_without_capability_passes_decision_through() -> None:
-    """No local_gate capability → passthrough carry unchanged."""
+    """No agent_gates capability → enforced_decision = input decision (passthrough)."""
     executor = ThinkLocalGateExecutor()
     decision_in = _decision("dec_in")
-    result = await executor.execute(_ctx({}, decision=decision_in), PhaseInput(artifact=None))
-    assert result.result_kind == "think_stage"
-    assert isinstance(result.payload, ThinkSubgraphCarry)
-    assert result.payload.decision is decision_in
+    context, input_ = _make({}, decision=decision_in)
+    result = await executor.node_execute(context=context, input=input_)
+    assert result.port_values["enforced_decision"] == decision_in
+    assert result.port_values["think_signal"] == "local_gated"
