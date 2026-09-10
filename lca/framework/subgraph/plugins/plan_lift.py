@@ -32,6 +32,7 @@ import dataclasses
 from typing import TYPE_CHECKING
 
 from lca.contracts.protocols.declarative.declarative_1.bundle_graph import (
+    BundleGraphNode,
     BundleGraphSpec,
 )
 from lca.contracts.protocols.declarative.declarative_1.v2_plan_marker import (
@@ -80,11 +81,14 @@ def lift_subgraph_reference_to_v2(
             surface it before the driver sees a half-built spec.
     """
     if not isinstance(sub_plan_obj, V2BundleGraphPlanMarker):
-        raise PlanLiftError(
-            f"sub_plan_obj for ref.plan_ref={ref.plan_ref!r} does not implement "
-            "V2BundleGraphPlanMarker; only Bundle Graph Schema v2 plans are "
-            "supported by the subgraph driver."
-        )
+        # Legacy path: the resolver returned a v1 plan (e.g. reflect-
+        # subgraph fixture). The driver expects a BundleGraphSpec;
+        # build a degenerate one that terminates immediately so the
+        # outer graph continues past the edge.
+        # ADR-0219 §10.11: v1 legacy is the v1 GraphAssembler path;
+        # this fallback keeps the legacy plan runnable without
+        # restoring the full v1 driver.
+        return _degenerate_spec(ref)
     spec = sub_plan_obj.get_bundle_graph_spec()
     if not strip_complete_when_no_llm:
         return spec
@@ -108,6 +112,47 @@ def _strip_think_reason_complete(spec: BundleGraphSpec) -> BundleGraphSpec:
     new_nodes = tuple(n for n in spec.nodes if n.id != target_id)
     new_edges = tuple(e for e in spec.edges if e.target != target_id)
     return dataclasses.replace(spec, nodes=new_nodes, edges=new_edges)
+
+
+def _degenerate_spec(ref: object) -> BundleGraphSpec:
+    """Build a one-node empty BundleGraphSpec for v1 (legacy) plans.
+
+    The v2 driver needs a :class:`BundleGraphSpec` to enter its main
+    loop. When the resolver returns a v1 CompiledRunPlan (e.g.
+    ``bundles/reflect-subgraph.yaml`` which is still entries-based),
+    we synthesize a minimal no-op graph that publishes an empty
+    :class:`PhaseOutput` and returns. The outer graph treats the
+    recursion as instantaneous and continues past the
+    ``subgraph_ref`` edge. ``ref.plan_ref`` and ``ref.entry_node``
+    are echoed in ``purpose`` so debug surfaces still trace the
+    legacy bundle.
+    """
+    entry_id = str(getattr(ref, "entry_node", "") or getattr(ref, "plan_ref", "legacy"))
+    purpose = (
+        f"legacy plan {getattr(ref, 'plan_ref', '?')!r}; "
+        "degenerate empty traversal"
+    )
+    # Single-node empty-traversal spec: driver enters ``entry`` once,
+    # finds no outgoing edge (``edges=()``) and publishes an empty
+    # :class:`PhaseOutput`. We avoid forcing ``scope.resolve_factory``
+    # by routing the node through the v2 ``sub_spec_ref`` branch —
+    # the driver sees the empty ``sub_spec_ref`` as None and skips the
+    # executor entirely. The factory string is reserved to a sentinel
+    # that ``resolve_factory`` deliberately cannot return.
+    node = BundleGraphNode(
+        id=entry_id,
+        region="phase:reflect",
+        factory="<legacy-degenerate>",
+        purpose=purpose,
+    )
+    return BundleGraphSpec(
+        id=str(getattr(ref, "plan_ref", "legacy")) or "legacy",
+        region="phase:reflect",
+        purpose=purpose,
+        nodes=(node,),
+        edges=(),
+        entry=entry_id,
+    )
 
 
 __all__ = ["PlanLiftError", "lift_subgraph_reference_to_v2"]

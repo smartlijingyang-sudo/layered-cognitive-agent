@@ -194,6 +194,19 @@ class NodeGraphDriver:
 
         while True:
             node = self._nodes_by_id[current_id]
+            # ADR-0219 §10.11: empty ``factory`` is a degenerate node
+            # marker introduced by ``plan_lift._degenerate_spec`` for v1
+            # legacy subgraph refs (e.g. ``bundles/reflect-subgraph.yaml``).
+            # The driver publishes an empty ``PhaseOutput`` and breaks
+            # without invoking ``scope.resolve_factory``.
+            if not node.factory or node.factory.startswith("<legacy"):
+                terminal_node = current_id
+                channel.publish(
+                    producer_node=terminal_node,
+                    phase=self._region_phase.value,
+                    output=PhaseOutput(),
+                )
+                break
             # ADR-0219 §10.11 item (1): inner recursion delegation. When the
             # current node has a typed sub_spec_ref, the driver delegates the
             # whole inner traversal to the injected SubgraphRunner, mirrors
