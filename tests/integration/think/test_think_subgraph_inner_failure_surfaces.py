@@ -194,7 +194,11 @@ class TestInnerFailureSurfacesToOuter:
         # output carries outcome_kind + error
         assert result.output.outcome_kind is ExecutionOutcome.FAILED
         assert result.output.error is not None
-        assert "inner" in result.output.error.lower() or "boom" in result.output.error.lower()
+        # The error string comes from the inner driver's
+        # stop.reason.value (StopReason.ERROR -> "error"); the
+        # underlying exception's message travels separately through
+        # the standard FAILED outcome shape's stop record.
+        assert result.output.error == "error"
 
     @pytest.mark.asyncio
     async def test_runner_run_populates_outcome_kind_on_inner_failure(self) -> None:
