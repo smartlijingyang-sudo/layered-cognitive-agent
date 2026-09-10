@@ -242,6 +242,9 @@ class DeclarativeRuntimeBindings:
                 "declarative_interpreter_factory.create must return DeclarativeInterpreter, "
                 f"got {type(interpreter).__name__}"
             )
+        # 注意:Default factory 已经在 create() 里 bind_cordis_seams(含 think subgraph 默认 fallback)。
+        # runtime_bindings 不重复 bind,以免覆盖 Default factory 的 _DefaultSubgraphRuntime。
+        # 顶层老 phase subgraph 仍走 self.subgraph_scope(set_subgraph_scope() 设)。
         return interpreter
 
     def new_effect_dispatcher(self) -> EffectDispatcher:

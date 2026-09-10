@@ -51,7 +51,7 @@ from lca.contracts.protocols.runtime.runtime.composition import (
 from lca.contracts.protocols.runtime.runtime.lifecycle import RuntimeLifecyclePublisher
 from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
 from lca.contracts.protocols.state.reducer import Reducer
-from lca.harness.declarative import GenericPlanInterpreter
+from lca.framework.declarative.plugins.interpreter import GenericPlanInterpreter
 from lca.harness.declarative.compile.subgraph_resolver import default_subgraph_resolver
 from lca.harness.declarative.execute.dispatch import RegistryDeltaReducer, RegistryEffectDispatcher
 from lca.harness.graph.execute.subgraph_executor_factory import (
@@ -161,7 +161,7 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
         phase_observer: object,
         lifecycle_publisher: RuntimeLifecyclePublisher,
     ) -> DeclarativeInterpreter:
-        return cast(
+        interpreter = cast(
             "DeclarativeInterpreter",
             GenericPlanInterpreter(
                 journal=journal,
@@ -175,6 +175,52 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
                 subgraph_scope=self._subgraph_scope,
             ),
         )
+        # Assembly root:bind_cordis_seams with the think subgraph defaults.
+        # 收集 6 个 think plugin dataclass 实例 → (factory, region) registry,
+        # 再用 framework 的 SubgraphRunner + InMemoryPhaseOutputChannel。
+        # 这条路径在 Cordis boot 不可用的环境(Default factory 不持 ctx)
+        # 中提供唯一能跑的 fallback;Cordis-bootstrapped 流程在 runtime_bindings
+        # 里覆盖(同名 seam 可重复 bind,后到的赢)。
+        bind_seams = getattr(interpreter, "bind_cordis_seams", None)
+        if callable(bind_seams):
+            print(f"[DEBUG] bind_cordis_seams called: factory={type(interpreter).__name__}", flush=True)
+            from lca.framework.subgraph.plugins.channel import InMemoryPhaseOutputChannel
+            from lca.framework.subgraph.plugins.runner import SubgraphRunner
+            from lca.plugins.think import (
+                ThinkShortcutExecutor, ThinkRouteExecutor, ThinkReasonExecutor,
+                ThinkClassifyExecutor, ThinkGateExecutor, ThinkLocalGateExecutor,
+            )
+            _REGION = "phase:think"
+            _EXECUTORS = (
+                (ThinkShortcutExecutor, "think.shortcut"),
+                (ThinkRouteExecutor, "think.route"),
+                (ThinkReasonExecutor, "think.reason"),
+                (ThinkClassifyExecutor, "think.classify"),
+                (ThinkGateExecutor, "think.gate"),
+                (ThinkLocalGateExecutor, "think.local_gate"),
+            )
+            registry = {
+                (_REGION, name): cls() for cls, name in _EXECUTORS
+            }
+            # 双 fallback:composite (region, factory) → region-less (None, factory)
+            for cls, name in _EXECUTORS:
+                registry[(None, name)] = registry[(_REGION, name)]
+
+            class _DefaultSubgraphRuntime:
+                """Default factory 内置的 SubgraphRuntime fallback(无 cordis)。"""
+                def resolve(self, capability): return None
+                def resolve_factory(self, factory, region):
+                    return registry.get((region, factory)) or registry.get((None, factory))
+
+            bind_seams(
+                subgraph_runner=SubgraphRunner(
+                    resolver=self._subgraph_resolver,
+                    runtime=_DefaultSubgraphRuntime(),
+                ),
+                subgraph_runtime=_DefaultSubgraphRuntime(),
+                channel_factory=InMemoryPhaseOutputChannel,
+            )
+        return interpreter
 
 
 class ObservabilityRuntimeJournalFactory(RuntimeJournalFactory):

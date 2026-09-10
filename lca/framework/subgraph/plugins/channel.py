@@ -111,8 +111,9 @@ class InMemoryPhaseOutputChannel:
     - we still want broadcast for observability — hence the dual sink.
     """
 
-    def __init__(self, *, ctx: Context) -> None:
+    def __init__(self, *, ctx: Context | None = None) -> None:
         self._ctx = ctx
+        # ctx=None:no-op broadcast (typed dict 仍工作,emit 静默跳过)
         self._outputs: dict[str, PhaseOutput] = {}
 
     def publish(
@@ -124,7 +125,8 @@ class InMemoryPhaseOutputChannel:
     ) -> None:
         key = f"{phase}::{producer_node}"
         self._outputs[key] = output
-        self._ctx.emit("subgraph.phase_output", producer_node, phase, output)
+        if self._ctx is not None:
+            self._ctx.emit("subgraph.phase_output", producer_node, phase, output)
 
     def read(self, *, consumer_node: str, want: type[T]) -> T:
         field_name = getattr(want, "__name__", None)
@@ -149,7 +151,8 @@ class InMemoryPhaseOutputChannel:
             else self._last("reflection"),
             response=delta.response if delta.response is not None else self._last("response"),
         )
-        self._ctx.emit("subgraph.phase_output.absorbed", merged)
+        if self._ctx is not None:
+            self._ctx.emit("subgraph.phase_output.absorbed", merged)
 
     def snapshot(self) -> Mapping[str, PhaseOutput]:
         return MappingProxyType(dict(self._outputs))

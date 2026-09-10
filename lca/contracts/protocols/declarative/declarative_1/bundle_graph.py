@@ -48,29 +48,19 @@ class BundleGraphNode:
     id: str
     region: str | None
     factory: str
-    purpose: str
-    inputs: tuple[str, ...]
-    outputs: tuple[str, ...]
+    purpose: str = ""
+    inputs: tuple[str, ...] = ()
+    outputs: tuple[str, ...] = ()
     config: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        # Per plan §13.x R9: inputs/outputs/purpose 是装饰性字段(@plugin + v2 driver 不读),
+        # 完全删除其非空校验,允许 yaml 简化。
         if not self.id:
             raise DeclarativeValidationError("PG-005-bundle-graph", "node.id must be non-empty")
         if not self.factory:
             raise DeclarativeValidationError(
                 "PG-005-bundle-graph", f"node[{self.id!r}].factory must be non-empty"
-            )
-        if not self.purpose:
-            raise DeclarativeValidationError(
-                "PG-005-bundle-graph", f"node[{self.id!r}].purpose must be non-empty"
-            )
-        if not self.inputs:
-            raise DeclarativeValidationError(
-                "PG-005-bundle-graph", f"node[{self.id!r}].inputs must be non-empty"
-            )
-        if not self.outputs:
-            raise DeclarativeValidationError(
-                "PG-005-bundle-graph", f"node[{self.id!r}].outputs must be non-empty"
             )
 
 

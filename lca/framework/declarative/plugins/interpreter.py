@@ -196,19 +196,27 @@ class GenericPlanInterpreter:
     def bind_cordis_seams(
         self,
         *,
-        subgraph_runner: object | None,
-        subgraph_runtime: object | None,
-        channel_factory: object | None,
+        subgraph_runner: object | None = None,
+        subgraph_runtime: object | None = None,
+        channel_factory: object | None = None,
     ) -> None:
         """Attach Cordis-injected think-subgraph seams.
 
         Called by the ``setup`` plugin below.  Kept separate from
         ``__init__`` so legacy direct constructors continue to work
         without any Cordis involvement.
+
+        All three kwargs are optional with ``None`` default. Partial bind
+        is allowed — caller may inject only the seam they need; the
+        interpreter's main loop fail-louds if a sub_spec_ref node fires
+        and the corresponding seam is ``None``.
         """
-        self._subgraph_runner = subgraph_runner
-        self._subgraph_runtime = subgraph_runtime
-        self._channel_factory = channel_factory
+        if subgraph_runner is not None:
+            self._subgraph_runner = subgraph_runner
+        if subgraph_runtime is not None:
+            self._subgraph_runtime = subgraph_runtime
+        if channel_factory is not None:
+            self._channel_factory = channel_factory
 
     async def run(
         self,
@@ -391,32 +399,30 @@ class GenericPlanInterpreter:
                 # Cordis 注入缺失, 走 _drive_subgraph_inner 的 legacy 路径
                 # (subgraph_scope / subgraph_executable_factory)。
                 if node.sub_spec_ref is not None:
-                    if self._subgraph_runner is not None and self._channel_factory is not None:
-                        sub_runner = self._subgraph_runner
-                        channel = self._channel_factory()
-                        sub_state, output = await sub_runner.run(
-                            ref=node.sub_spec_ref,
-                            outer_state=current_state,
-                            channel=channel,
+                    # Per plan §13.10/R6: think subgraph 走 Cordis-injected SubgraphRunner
+                    # 单引擎 seam。必须通过 bind_cordis_seams 注入;缺失直接 fail-loud
+                    # (不允许 silent fallback)。
+                    if self._subgraph_runner is None or self._channel_factory is None:
+                        raise DeclarativeValidationError(
+                            "PG-005",
+                            f"think subgraph node={node.id!r} has sub_spec_ref "
+                            f"but interpreter has no Cordis-injected "
+                            f"subgraph_runner/channel_factory; "
+                            f"call bind_cordis_seams() first",
                         )
-                        channel.absorb(output)
-                        current_state = sub_state
-                        virtual_result = PhaseResult(
-                            result_kind="think_stage",
-                            payload=output.decision,
-                        )
-                    else:
-                        current_state = await self._drive_subgraph_ref(
-                            ref=node.sub_spec_ref,
-                            outer_state=current_state,
-                            current_node_id=node.id,
-                            depth=0,
-                            edge_id=node.id,
-                        )
-                        virtual_result = PhaseResult(
-                            result_kind="think_stage",
-                            payload=getattr(current_state, "decision", None),
-                        )
+                    sub_runner = self._subgraph_runner
+                    channel = self._channel_factory()
+                    sub_state, output = await sub_runner.run(
+                        ref=node.sub_spec_ref,
+                        outer_state=current_state,
+                        channel=channel,
+                    )
+                    channel.absorb(output)
+                    current_state = sub_state
+                    virtual_result = PhaseResult(
+                        result_kind="think_stage",
+                        payload=output.decision,
+                    )
                     edge = self._select_edge(
                         graph.edges,
                         node.id,
@@ -830,7 +836,7 @@ class GenericPlanInterpreter:
                 f"subgraph_ref {ref.binding_edge!r} declared but interpreter "
                 f"has no subgraph_resolver wired",
             )
-        sub_plan_obj = resolver.resolve(ref.plan_ref)
+        sub_plan_obj = resolver.resolve(ref.plan_ref, runtime=self._subgraph_runtime)
         if not isinstance(sub_plan_obj, CompiledRunPlan):
             raise DeclarativeValidationError(
                 "PG-005",

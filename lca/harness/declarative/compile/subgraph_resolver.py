@@ -167,7 +167,7 @@ def _load_bundle_graph_spec(plan_ref: str) -> BundleGraphSpec:
                 id=str(n["id"]),
                 region=n.get("region"),
                 factory=str(n["factory"]),
-                purpose=str(n["purpose"]),
+                purpose=str(n.get("purpose") or ""),
                 inputs=tuple(n.get("inputs") or ()),
                 outputs=tuple(n.get("outputs") or ()),
                 config=dict(n.get("config") or {}),
@@ -204,7 +204,7 @@ def _load_bundle_graph_spec(plan_ref: str) -> BundleGraphSpec:
 def _project_to_phase_graph(
     spec: BundleGraphSpec,
     *,
-    runtime: Any,
+    runtime: Any | None = None,
 ) -> tuple[CognitivePhaseGraphPlan, tuple[str, ...]]:
     """BundleGraphSpec → CognitivePhaseGraphPlan。
 
@@ -231,7 +231,8 @@ def _project_to_phase_graph(
     for n in spec.nodes:
         # 规则 1:解析 factory(失败抛 FactoryResolutionError,PG-005-factory)
         node_region = n.region if n.region is not None else region_for_resolve
-        runtime.resolve_factory(n.factory, node_region)  # 命中即返回,失败 fail-loud
+        if runtime is not None:
+            runtime.resolve_factory(n.factory, node_region)  # 命中即返回,失败 fail-loud
         node_factories.append((n.id, n.factory, node_region))
 
         max_visits = int(n.config.get("max_visits", 1)) if n.config else 1
@@ -352,7 +353,7 @@ def _wrap_compiled_run_plan(
 
 
 @lru_cache(maxsize=16)
-def _compile_bundle_graph(plan_ref: str, *, runtime: Any) -> CompiledRunPlan:
+def _compile_bundle_graph(plan_ref: str, *, runtime: Any | None = None) -> CompiledRunPlan:
     """compile one BundleGraph v2 yaml into a CompiledRunPlan. cached per process.
 
     ``runtime`` 只用于 factory fail-loud 校验,不参与返回 plan 的内容;但
@@ -365,17 +366,20 @@ def _compile_bundle_graph(plan_ref: str, *, runtime: Any) -> CompiledRunPlan:
 
 
 class BundleSubgraphResolver:
-    """Resolve ``SubgraphReference.plan_ref`` bundle paths to ``CompiledRunPlan``.
+    """Resolve ``SubgraphReference.plan_ref`` bundle paths to ``CompiledRunPlan``,
+    AND duck-type the SubgraphRuntime ``resolve_factory`` seam so the same
+    instance can be passed both as ``resolver=`` and ``runtime=``.
 
-    两条路径:
+    两条解析路径:
     1. ``_PLAN_REF_PROFILES`` 命中 → fixture profile → CompiledRunPlan(legacy,
        reflect-subgraph 用,保留)
     2. ``bundles/<file>.yaml`` 文件存在 + 能解析为 BundleGraphSpec → v2 新路径
        (think.yaml 等用)
 
-    v2 路径需要 caller 显式传 ``runtime=``(只要求 duck-type
-    ``resolve_factory(factory, region)``);未传则 v2 路径返回 ``None``,让 caller
-    走 legacy 或降级路径——避免在没有真实 cordis scope 时错误声称 factory 存在。
+    v2 路径在 ``runtime=None`` 时仍编译(yaml 合法性校验),但跳过
+    ``resolve_factory`` 校验;v2 driver runtime 时由 scope.resolve_factory 真实取实例。
+
+    双职责集成(SubgraphResolver + SubgraphRuntime)消除两套注册表的边界冗余。
     """
 
     def resolve(self, plan_ref: str, *, runtime: Any | None = None) -> CompiledRunPlan | None:
@@ -384,9 +388,22 @@ class BundleSubgraphResolver:
             return _compile_subgraph_profile(relative_profile)
         # v2 新路径:plan_ref 以 ``bundles/`` 开头 + 文件存在 + 顶层含 ``nodes:``
         if _is_bundle_graph_v2(plan_ref):
-            if runtime is None:
-                return None
             return _compile_bundle_graph(plan_ref, runtime=runtime)
+        return None
+
+    def resolve_factory(self, factory: str, region: str | None) -> Any:
+        """Duck-type SubgraphRuntime.resolve_factory seam。
+
+        本 resolver 不持有 NodeExecutor 实例(那是 SubgraphRunner / v2 driver 的职责)。
+        本方法返回 None 表示 "此 resolver 不解析实例,请改用 v2 driver runtime
+        scope" —— 这是 fail-soft,不是 fail-loud;真正的 fail-loud 由 v2 driver
+        在 instance lookup miss 时触发(``scope.resolve_factory``)。
+
+        这个集成让 interpreter 可以把同一个 ``BundleSubgraphResolver`` 实例
+        同时传给 ``subgraph_resolver=`` 和 ``subgraph_runtime=``,无需额外
+        ``SubgraphRuntime`` 包装层。
+        """
+        del factory, region
         return None
 
 
@@ -412,6 +429,6 @@ def default_subgraph_resolver() -> SubgraphResolver:
 
 __all__ = [
     "BundleSubgraphResolver",
-    "_compile_bundle_graph",
+    "_compile_bundle_graph", "resolve_factory",
     "default_subgraph_resolver",
 ]

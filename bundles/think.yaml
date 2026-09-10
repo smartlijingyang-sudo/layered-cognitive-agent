@@ -56,7 +56,7 @@ edges:
   # shortcut → route: 没命中(decision 缺失)走 route;命中直接到 gate
   - from: think.shortcut
     to: think.route
-    when: result.payload == null
+    when: result.payload == None
   - from: think.shortcut
     to: think.gate
     when: result.payload != null
