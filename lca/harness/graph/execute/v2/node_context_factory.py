@@ -7,7 +7,7 @@ D5 消费点:NodeGraphDriver.run() 主循环每轮调一次。
 
 边界:
 - 不感知 executor 签名
-- 不调 FactoryRegistry
+- 不调 factory_resolver — Cordis resolution happens earlier in the stack (SubgraphRunner / node_graph_driver)
 - 不读 yaml(除 `node.config` 直接传 budget)
 - 用 MappingProxyType 包 budget/metadata 防止 plugin 修改 framework 内部状态
 - scope 是 MappingRestrictedScope(capability by .resolve(key)),**不**是 dict

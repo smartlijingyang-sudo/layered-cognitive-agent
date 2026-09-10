@@ -7,9 +7,9 @@ owns three responsibilities and nothing else:
 1. Resolve ``ref.plan_ref`` → ``CompiledRunPlan`` (via the injected
    ``subgraph_resolver``).
 2. Lift the plan to a :class:`BundleGraphSpec` via the plan_lift module.
-3. Drive the v2 scheduler with the injected ``subgraph_runtime`` and
-   ``factory_registry``; publish the resulting :class:`PhaseOutput` to
-   the supplied :class:`PhaseOutputChannel`.
+3. Drive the v2 scheduler with the injected ``subgraph_runtime``; publish
+   the resulting :class:`PhaseOutput` to the supplied
+   :class:`PhaseOutputChannel`.
 
 The runner is registered as a Cordis ``@plugin(kind=DRIVER)`` so the
 container owns its lifecycle and injects its capabilities via
@@ -35,9 +35,6 @@ from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
     SubgraphReference,
 )
-from lca.contracts.protocols.declarative.declarative_1.factory_resolver import (
-    FactoryRegistry,
-)
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
@@ -54,20 +51,18 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 class SubgraphRunner:
     """Subgraph execution entrypoint: load → lift → drive → publish.
 
-    Composition is wired in :func:`setup` from the three Cordis
-    capabilities (``subgraph_resolver`` / ``factory_registry`` /
-    ``subgraph_runtime``) — no ``__init__`` injection (per plan R6).
+    Composition is wired in :func:`setup` from the two Cordis
+    capabilities (``subgraph_resolver`` / ``subgraph_runtime``) — no
+    ``__init__`` injection (per plan R6).
     """
 
     def __init__(
         self,
         *,
         resolver: object,
-        registry: FactoryRegistry,
         runtime: SubgraphRuntime,
     ) -> None:
         self._resolver = resolver
-        self._registry = registry
         self._runtime = runtime
 
     async def run(
@@ -89,7 +84,6 @@ class SubgraphRunner:
             spec=spec,
             plan_ref=ref.plan_ref,
             scope=self._runtime,
-            registry=self._registry,
         )
         sub_result = await driver.run(
             outer_state=outer_state,
@@ -103,7 +97,7 @@ class SubgraphRunner:
     id="subgraph.runner",
     Config=None,
     provides=("subgraph_runner",),
-    requires=("subgraph_resolver", "factory_registry", "subgraph_runtime"),
+    requires=("subgraph_resolver", "subgraph_runtime"),
     layer="L1",
     kind=PluginKind.DRIVER,
     effects="none",
@@ -122,7 +116,7 @@ class SubgraphRunner:
         ),
     ),
     ownership=OwnershipDeclaration(
-        reads=("plugin.serve", "subgraph_resolver", "factory_registry", "subgraph_runtime"),
+        reads=("plugin.serve", "subgraph_resolver", "subgraph_runtime"),
         emits=("subgraph.executed",),
         state_mutation="forbidden",
     ),
@@ -130,14 +124,13 @@ class SubgraphRunner:
 async def setup(ctx: PluginContext, config=None) -> None:
     """Wire SubgraphRunner from Cordis-injected capabilities and provide it.
 
-    The three declared ``requires=`` keys are checked at boot by Cordis
+    The declared ``requires=`` keys are checked at boot by Cordis
     (per ADR-0110); a profile that fails to provide any of them raises
     :class:`cordis.fiber.ValidationError` before this ``setup`` runs.
     """
     resolver = ctx.inject("subgraph_resolver")
-    registry = ctx.inject("factory_registry")
     runtime = ctx.inject("subgraph_runtime")
-    runner = SubgraphRunner(resolver=resolver, registry=registry, runtime=runtime)
+    runner = SubgraphRunner(resolver=resolver, runtime=runtime)
     ctx.provide("subgraph_runner", runner)
 
 

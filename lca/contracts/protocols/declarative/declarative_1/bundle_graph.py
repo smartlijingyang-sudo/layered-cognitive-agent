@@ -159,11 +159,23 @@ class BundleGraphSpec:
             )
 
 
-# FactoryResolutionError 实际定义在 factory_resolver 模块;此处 re-export
-# 保持历史 import 路径 `from ...bundle_graph import FactoryResolutionError` 不破。
-from lca.contracts.protocols.declarative.declarative_1.factory_resolver import (  # noqa: E402
-    FactoryResolutionError as FactoryResolutionError,
-)
+class FactoryResolutionError(DeclarativeValidationError):
+    """Factory lookup failure — placed here so consumers can import from a stable module.
+
+    Cordis-backed resolution uses ``runtime.resolve_factory(factory, region)`` (see
+    lca/framework/subgraph/plugins/runtime.py); this error is raised when neither
+    the composite key (``f"{region}::{factory}"``) nor the region-less fallback
+    (just ``factory``) finds a registered NodeExecutor.
+    """
+
+    def __init__(self, factory: str, region: str | None) -> None:
+        super().__init__(
+            "PG-005-factory",
+            f"cannot resolve NodeExecutor factory={factory!r} region={region!r}",
+        )
+        self.factory = factory
+        self.region = region
+
 
 __all__ = [
     "BUNDLE_GRAPH_VERSION",
