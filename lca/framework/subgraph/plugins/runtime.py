@@ -23,6 +23,10 @@ from typing import Any, Protocol, runtime_checkable
 
 from cordis import Context  # noqa: TC002
 
+from lca.contracts.protocols.declarative.declarative_1.factory_resolver import (
+    FactoryResolutionError,
+)
+
 
 @runtime_checkable
 class SubgraphRuntime(Protocol):
@@ -38,6 +42,17 @@ class SubgraphRuntime(Protocol):
 
         Return ``None`` for unbound capabilities. Node plugins are
         responsible for treating missing capabilities as soft failures.
+        """
+
+    def resolve_factory(self, factory: str, region: str | None) -> Any:
+        """Composite-key lookup with region fallback.
+
+        Tries ``f"{region}::{factory}"`` first when ``region`` is given,
+        then falls back to the bare ``factory`` key. Raises
+        :class:`FactoryResolutionError` when both miss. Note: this
+        import is deleted in R9-5 once the legacy
+        :mod:`factory_resolver` is removed; for now we keep the existing
+        exception type to avoid a parallel exception hierarchy.
         """
         ...
 
@@ -65,6 +80,22 @@ class CordisBackedRuntime:
                 return own[capability]
             node = getattr(node, "parent", None)
         return None
+
+    def resolve_factory(self, factory: str, region: str | None) -> Any:
+        """Resolve a ``(factory, region)`` pair via composite key.
+
+        Order: exact ``f"{region}::{factory}"`` if ``region`` is given,
+        then bare ``factory`` for the region-less fallback. Raises
+        :class:`FactoryResolutionError` if neither binding exists.
+        """
+        if region is not None:
+            val = self.resolve(f"{region}::{factory}")
+            if val is not None:
+                return val
+        val = self.resolve(factory)
+        if val is not None:
+            return val
+        raise FactoryResolutionError(factory, region)
 
 
 __all__ = ["CordisBackedRuntime", "SubgraphRuntime"]
