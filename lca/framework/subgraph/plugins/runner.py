@@ -10,8 +10,9 @@ Out of scope:
 - the inner node loop (driver's job);
 - mutable outer state (returns updated state).
 
-Composition is wired in :func:`setup` from the two Cordis
-capability (``subgraph_resolver``) — no ``__init__`` injection (per plan R6).
+Composition is wired in :func:`setup`. The framework self-assembles the
+default resolver (``default_subgraph_resolver``) — profiles no longer
+need a dedicated ``lca-subgraph-resolver`` plugin to provide it.
 """
 
 from __future__ import annotations
@@ -57,6 +58,9 @@ from lca.framework.subgraph.plugins.plan_lift import lift_subgraph_reference_to_
 from lca.framework.subgraph.plugins.runtime import (
     PluginContextBackedRuntime,
     SubgraphRuntime,
+)
+from lca.harness.declarative.compile.subgraph_resolver import (
+    default_subgraph_resolver,
 )
 from lca.harness.declarative.execute.outcome_projection import (
     InterpretationResult,
@@ -229,7 +233,7 @@ def _failed_result(
     id="subgraph.runner",
     Config=None,
     provides=("subgraph_runner", "phase_output_channel_factory"),
-    requires=("subgraph_resolver",),
+    requires=(),
     layer="L1",
     kind=PluginKind.DRIVER,
     effects="none",
@@ -248,7 +252,7 @@ def _failed_result(
         ),
     ),
     ownership=OwnershipDeclaration(
-        reads=("plugin.serve", "subgraph_resolver"),
+        reads=("plugin.serve",),
         emits=("subgraph.executed",),
         state_mutation="forbidden",
     ),
@@ -274,7 +278,7 @@ async def setup(ctx: PluginContext, config=None) -> None:
     ``Session.append`` observer at construction-time and constructs
     the runner directly with ``observers=...``.
     """
-    resolver = ctx.require("subgraph_resolver")
+    resolver = default_subgraph_resolver()
     runtime = PluginContextBackedRuntime(ctx=ctx)
     observers: tuple[ObserverFn, ...] = ()
     if hasattr(ctx, "require"):
