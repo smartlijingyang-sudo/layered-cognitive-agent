@@ -67,7 +67,9 @@ class LoopGuard:
 class PhaseNode:
     id: str
     semantic_phase: SemanticPhase
-    binding: str
+    # Plan §13.11: sub_spec_ref 节点的 binding 为 None, interpreter 走子图
+    # 驱动, 不进 phase executor;其他节点 binding 必填以维持 PG-001 校验。
+    binding: str | None
     max_visits: int
     terminal: bool = False
     execution_policy: PhaseExecutionPolicy = field(default_factory=PhaseExecutionPolicy)
@@ -84,9 +86,13 @@ class PhaseNode:
     def __post_init__(self) -> None:
         if not isinstance(self.semantic_phase, SemanticPhase):
             object.__setattr__(self, "semantic_phase", SemanticPhase(self.semantic_phase))
-        if not self.id or not self.binding or self.max_visits <= 0:
+        if not self.id or self.max_visits <= 0:
             raise DeclarativeValidationError(
-                "PG-001", "phase node id, binding and positive max_visits required"
+                "PG-001", "phase node id and positive max_visits required"
+            )
+        if not self.binding and self.sub_spec_ref is None:
+            raise DeclarativeValidationError(
+                "PG-001", "phase node requires binding or sub_spec_ref"
             )
         if self.precondition is not None and not str(self.precondition).strip():
             raise DeclarativeValidationError(

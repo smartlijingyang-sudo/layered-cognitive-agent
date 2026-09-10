@@ -46,7 +46,9 @@ class _DeclaredNode:
 
     id: str
     semantic_phase: SemanticPhase
-    executor_capability: str
+    # Plan §13.11: sub_spec_ref 节点的 executor_capability 为 None;interpreter
+    # 走子图驱动, 不调 phase executor, 不进 phase binding 闭包。
+    executor_capability: str | None
     max_visits: int
     terminal: bool
     entry: bool
@@ -111,11 +113,14 @@ def _compile_declared_node(raw_node: object, *, spec_id: str, index: int) -> _De
     max_visits = raw_node.get("max_visits")
     terminal = raw_node.get("terminal", False)
     entry = raw_node.get("entry", False)
+    sub_spec_ref_raw = raw_node.get("sub_spec_ref")
     if not isinstance(node_id, str) or not node_id.strip():
         raise ValueError(f"PG-001: {spec_id} nodes[{index}].id must be a non-empty string")
     if not isinstance(phase, str) or not phase.strip():
         raise ValueError(f"PG-001: {spec_id} nodes[{index}].phase must be a semantic phase")
-    if not isinstance(binding, str) or not binding.strip():
+    # Plan §13.11: sub_spec_ref 节点允许省略 binding (interpreter 走子图驱动);
+    # 其他节点 binding 仍必填以维持 PG-001 校验。
+    if sub_spec_ref_raw is None and (not isinstance(binding, str) or not binding.strip()):
         raise ValueError(f"PG-001: {spec_id} nodes[{index}].binding must be a capability key")
     if isinstance(max_visits, bool) or not isinstance(max_visits, int) or max_visits <= 0:
         raise ValueError(f"PG-001: {spec_id} nodes[{index}].max_visits must be positive")
@@ -152,7 +157,7 @@ def _compile_declared_node(raw_node: object, *, spec_id: str, index: int) -> _De
         terminal_predicate=(
             str(terminal_predicate_raw).strip() if terminal_predicate_raw is not None else None
         ),
-        sub_spec_ref=_compile_subgraph_ref(raw_node.get("sub_spec_ref"), node_id),
+        sub_spec_ref=_compile_subgraph_ref(sub_spec_ref_raw, node_id),
     )
 
 
@@ -173,6 +178,14 @@ def _compile_phase_bindings(
 
     bindings: list[PhaseBinding] = []
     for node in declared_nodes:
+        # Plan §13.11: sub_spec_ref 节点不进 phase binding 闭包, executor_capability
+        # 为 None 时跳过 executor 校验。
+        if node.executor_capability is None:
+            assert node.sub_spec_ref is not None, (
+                f"PG-001: {node.id!r} has no binding and no sub_spec_ref; "
+                "exactly one of the two is required"
+            )
+            continue
         available = executor_capabilities.get(node.semantic_phase, set())
         if node.executor_capability not in available:
             raise ValueError(
@@ -208,7 +221,7 @@ def _compile_phase_graph(
 ) -> CognitivePhaseGraphPlan:
     """Project plugin-owned node metadata, policies, edges, and resume routing."""
 
-    policies = _compile_execution_policies(bindings, specs)
+    policies = _compile_execution_policies(bindings, specs, declared_nodes=declared_nodes)
     nodes = tuple(
         PhaseNode(
             id=node.id,
@@ -235,6 +248,8 @@ def _compile_phase_graph(
 def _compile_execution_policies(
     bindings: tuple[PhaseBinding, ...],
     specs: tuple[PluginSpec, ...],
+    *,
+    declared_nodes: tuple[_DeclaredNode, ...] = (),
 ) -> dict[str, PhaseExecutionPolicy]:
     """Compile per-node attempt policies from selected provider plugins.
 
@@ -244,12 +259,21 @@ def _compile_execution_policies(
     """
 
     node_ids = {binding.node_id for binding in bindings}
+    # Plan §13.11: sub_spec_ref 节点不进 phase binding 闭包, 但仍属
+    # 节点拓扑, 须让按 phase 声明的 policy 能命中 (think.main 等)。
+    node_ids.update(node.id for node in declared_nodes)
     node_ids_by_phase: dict[str, tuple[str, ...]] = {
         phase.value: tuple(
             binding.node_id for binding in bindings if binding.semantic_phase is phase
         )
         for phase in SemanticPhase
     }
+    # 补 sub_spec_ref 节点到 phase → node_id 映射。
+    for node in declared_nodes:
+        phase_key = node.semantic_phase.value
+        existing = node_ids_by_phase.get(phase_key, ())
+        if node.id not in existing:
+            node_ids_by_phase[phase_key] = existing + (node.id,)
     policies: dict[str, PhaseExecutionPolicy] = {}
     for spec in specs:
         if not any(

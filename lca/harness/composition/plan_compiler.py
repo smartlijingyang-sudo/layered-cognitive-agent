@@ -153,7 +153,9 @@ def _build_scope_plan(resolved: ResolvedProfile, options: CompileOptions) -> Sco
 
 
 def _require_executable_phase_graph(declarative: DeclarativePlanProjection) -> None:
-    present = {binding.semantic_phase for binding in declarative.phase_bindings}
+    # Plan §13.11: sub_spec_ref 节点不进 phase_bindings, 但仍是拓扑成员;
+    # 用 declarative.phase_graph.nodes 覆盖拓扑完整视图。
+    present = {node.semantic_phase for node in declarative.phase_graph.nodes}
     missing = tuple(phase for phase in SemanticPhase if phase not in present)
     if missing:
         phase_names = ", ".join(phase.value for phase in missing)

@@ -42,6 +42,36 @@ class RestrictedScope(Protocol):
     def resolve(self, capability: str) -> Any: ...
 
 
+class _SubspecStubExecutor:
+    """Plan §13.11: sub_spec_ref 节点占位 executor。
+
+    Interpreter 看到 ``node.sub_spec_ref is not None`` 就走 ``sub_runner.run``
+    委托, 不会调到这个 executor。保留它只为满足
+    ``assert_all_instrumented`` 的可运行检查, 并给 ``executable.nodes``
+    一个完整的 ``think.main`` 入口。
+    """
+
+    async def execute(self, context: Any, input: Any) -> Any:  # pragma: no cover - never invoked
+        raise DeclarativeValidationError(
+            "PG-005",
+            "sub_spec_ref node executor must not be called directly; "
+            "interpreter delegates via SubgraphRunner",
+        )
+
+
+def _build_subspec_stub(graph_node: Any) -> ExecutableNode:
+    """Wrap a sub_spec_ref ``PhaseNode`` as a no-op ``ExecutableNode``."""
+    # 用 wrap_executor 走标准包装路径, 保证 .execute 携带 Layer-3 标记。
+    return ExecutableNode(
+        node_id=graph_node.id,
+        semantic_phase=graph_node.semantic_phase,
+        executor_capability="",
+        executor=wrap_executor(_SubspecStubExecutor()),
+        contributions=(),
+        execution_policy=graph_node.execution_policy,
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class MappingRestrictedScope:
     """测试和驱动可使用的只读 capability scope。"""
@@ -175,6 +205,14 @@ class GraphAssembler:
             validate_subgraph_references(plan, resolver)
         nodes: dict[str, ExecutableNode] = {}
         policies = {node.id: node.execution_policy for node in plan.phase_graph.nodes}
+        # Plan §13.11: sub_spec_ref 节点不进 phase_bindings, 但 interpreter
+        # 仍要查 executable.nodes 以校验拓扑完整;补占位 ExecutableNode,
+        # executor 设为 NoOpPhaseExecutor (interpreter 走 sub_runner 委托,
+        # 不会真正调用该 executor)。
+        for graph_node in plan.phase_graph.nodes:
+            if graph_node.sub_spec_ref is None or graph_node.binding is not None:
+                continue
+            nodes[graph_node.id] = _build_subspec_stub(graph_node)
         for binding in plan.phase_bindings:
             execution_policy = policies.get(binding.node_id)
             if execution_policy is None:

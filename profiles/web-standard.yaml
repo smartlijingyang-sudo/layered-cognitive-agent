@@ -56,7 +56,6 @@ patch:
           terminal_predicate: perceive.context_complete
         - id: think.main
           phase: think
-          binding: phase.think.standard
           max_visits: 8
           sub_spec_ref:
             plan_ref: bundles/think.yaml

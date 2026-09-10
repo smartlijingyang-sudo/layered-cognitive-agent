@@ -37,7 +37,6 @@ patch:
           entry: true
         - id: think.main
           phase: think
-          binding: phase.think.standard
           max_visits: 8
           # Node Note 2026-09-09-phase-node-sub-spec-ref: 节点级嵌套 think 子图。
           sub_spec_ref:

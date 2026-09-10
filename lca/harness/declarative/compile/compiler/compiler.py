@@ -84,7 +84,7 @@ def compile_declarative_projection(
     active_specs, replacements = _resolve_replacements(specs)
     bindings = _compile_capability_bindings(active_specs, resolved)
     graph, phase_bindings = _compile_phase_projection(active_specs)
-    controls = _compile_control_projection(phase_bindings)
+    controls = _compile_control_projection(phase_bindings, phase_graph=graph, specs=active_specs)
     effect_policy = _compile_effect_projection(active_specs)
     action_authority = _compile_action_authority_projection(
         active_specs, task_contract=task_contract
@@ -130,7 +130,9 @@ def _build_validation_report(
 ) -> ValidationReport:
     """Combine compiler pass reports without exposing pass ordering to callers."""
     graph_report = PhaseGraphValidator().validate(graph, phase_bindings, specs, effect_policy)
-    control_report = validate_control_binding_closure(specs, phase_bindings, controls)
+    control_report = validate_control_binding_closure(
+        specs, phase_bindings, controls, phase_graph=graph
+    )
     return ValidationReport(spec_report.issues + graph_report.issues + control_report.issues)
 
 
@@ -150,9 +152,14 @@ def _compile_effect_projection(
 
 def _compile_control_projection(
     phase_bindings: tuple[PhaseBinding, ...],
+    *,
+    phase_graph: CognitivePhaseGraphPlan | None = None,
+    specs: tuple[PluginSpec, ...] = (),
 ) -> tuple[ControlEntry, ...]:
     """Project control contributions through one dedicated control-plane seam."""
-    return _compile_control_entries(phase_bindings)
+    return _compile_control_entries(
+        phase_bindings, phase_graph=phase_graph, specs=specs
+    )
 
 
 def _compile_phase_projection(
@@ -235,7 +242,12 @@ def _compile_capability_bindings(
     return tuple(bindings)
 
 
-def _compile_control_entries(bindings: tuple[PhaseBinding, ...]) -> tuple[ControlEntry, ...]:
+def _compile_control_entries(
+    bindings: tuple[PhaseBinding, ...],
+    *,
+    phase_graph: CognitivePhaseGraphPlan | None = None,
+    specs: tuple[PluginSpec, ...] = (),
+) -> tuple[ControlEntry, ...]:
     """Project every declared control contribution into the executable plan.
 
     Govern contributions own blocking verdicts.  Cross-cutting observe
@@ -272,6 +284,45 @@ def _compile_control_entries(bindings: tuple[PhaseBinding, ...]) -> tuple[Contro
                     evidence_required=True,
                 )
             )
+    # Plan §13.11: sub_spec_ref 节点 (think.main 等) 不进 phase_bindings, 但
+    # 仍可携带 control 贡献 (control.think.guard);让 phase_graph 中的 sub_spec_ref
+    # 节点把 declared control 也投成 ControlEntry, 避免 PG-010 错报。
+    if phase_graph is not None and specs:
+        sub_spec_phases = {
+            node.semantic_phase
+            for node in phase_graph.nodes
+            if node.sub_spec_ref is not None and node.binding is None
+        }
+        for spec in specs:
+            for contribution in spec.contributes:
+                if contribution.phase not in sub_spec_phases:
+                    continue
+                is_control = (
+                    contribution.role is ContributionRole.GOVERN
+                    or contribution.output.startswith("observe.")
+                )
+                if not is_control:
+                    continue
+                key = (contribution.phase, contribution.executor)
+                if key in seen:
+                    continue
+                seen.add(key)
+                entries.append(
+                    ControlEntry(
+                        phase=contribution.phase,
+                        executor_capability=contribution.executor,
+                        predicate="true",
+                        aggregation=(
+                            contribution.aggregation
+                            or (
+                                "deny-on-any-deny"
+                                if contribution.role is ContributionRole.GOVERN
+                                else "all-allow"
+                            )
+                        ),
+                        evidence_required=True,
+                    )
+                )
     return tuple(entries)
 
 

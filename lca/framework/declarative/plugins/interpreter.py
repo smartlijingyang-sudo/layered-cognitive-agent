@@ -370,8 +370,15 @@ class GenericPlanInterpreter:
             while True:
                 current_id = traversal.current_node_id
                 node = node_by_id.get(current_id)
-                executable_node = executable.nodes.get(current_id)
-                if node is None or executable_node is None:
+                # Plan §13.11: sub_spec_ref 节点不进 assembler.executable.nodes
+                # (无 phase executor), interpreter 走 sub_runner 委托;
+                # 其他节点仍要求 executable_node 已装配。
+                executable_node = (
+                    executable.nodes.get(current_id)
+                    if node is None or node.sub_spec_ref is None
+                    else None
+                )
+                if node is None or (executable_node is None and node.sub_spec_ref is None):
                     raise DeclarativeValidationError(
                         "PG-001", f"unassembled phase node: {current_id}"
                     )
@@ -380,31 +387,36 @@ class GenericPlanInterpreter:
                 # declare ``sub_spec_ref``; the outer drive delegates the
                 # whole subgraph to ``SubgraphRunner`` (Cordis-injected
                 # single-engine seam) and folds its PhaseOutput back into
-                # the outer channel before advancing.
+                # the outer channel before advancing.  Plan §13.11: 当
+                # Cordis 注入缺失, 走 _drive_subgraph_inner 的 legacy 路径
+                # (subgraph_scope / subgraph_executable_factory)。
                 if node.sub_spec_ref is not None:
-                    if self._subgraph_runner is None or self._channel_factory is None:
-                        raise DeclarativeValidationError(
-                            "PG-005",
-                            f"node {node.id!r} declares sub_spec_ref but the "
-                            "declarative.interpreter plugin was constructed "
-                            "without Cordis-injected subgraph_runner / "
-                            "phase_output_channel_factory; load the "
-                            "declarative framework bundle so the seam is "
-                            "wired before the think subgraph can run.",
+                    if self._subgraph_runner is not None and self._channel_factory is not None:
+                        sub_runner = self._subgraph_runner
+                        channel = self._channel_factory()
+                        sub_state, output = await sub_runner.run(
+                            ref=node.sub_spec_ref,
+                            outer_state=current_state,
+                            channel=channel,
                         )
-                    sub_runner = self._subgraph_runner
-                    channel = self._channel_factory()
-                    sub_state, output = await sub_runner.run(
-                        ref=node.sub_spec_ref,
-                        outer_state=current_state,
-                        channel=channel,
-                    )
-                    channel.absorb(output)
-                    current_state = sub_state
-                    virtual_result = PhaseResult(
-                        result_kind="think_stage",
-                        payload=output.decision,
-                    )
+                        channel.absorb(output)
+                        current_state = sub_state
+                        virtual_result = PhaseResult(
+                            result_kind="think_stage",
+                            payload=output.decision,
+                        )
+                    else:
+                        current_state = await self._drive_subgraph_ref(
+                            ref=node.sub_spec_ref,
+                            outer_state=current_state,
+                            current_node_id=node.id,
+                            depth=0,
+                            edge_id=node.id,
+                        )
+                        virtual_result = PhaseResult(
+                            result_kind="think_stage",
+                            payload=getattr(current_state, "decision", None),
+                        )
                     edge = self._select_edge(
                         graph.edges,
                         node.id,
@@ -435,9 +447,15 @@ class GenericPlanInterpreter:
                     visits.append(
                         PhaseVisit(node.id, node.semantic_phase, "think_stage", edge.target)
                     )
+                    # legacy 路径无 ``output``, 取 state 上的 decision; Cordis 路径用 ``output.decision``。
+                    payload = (
+                        getattr(output, "decision", None)
+                        if "output" in locals()
+                        else getattr(current_state, "decision", None)
+                    )
                     traversal.advance(
                         edge=edge,
-                        payload=output.decision,
+                        payload=payload,
                         causation_refs=(),
                     )
                     continue

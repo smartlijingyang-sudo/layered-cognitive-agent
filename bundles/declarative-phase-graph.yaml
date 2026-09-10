@@ -54,7 +54,6 @@ entries:
           entry: true
         - id: think.main
           phase: think
-          binding: phase.think.standard
           max_visits: 8
           # Bundle Graph Schema v2 (ADR-0217): think 节点持有节点级
           # sub_spec_ref,指向 bundles/think.yaml 纯图描述(5 节点 + 5 边)。

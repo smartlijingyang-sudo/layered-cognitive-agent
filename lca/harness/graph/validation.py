@@ -66,6 +66,11 @@ class PhaseGraphValidator:
                     )
         bindings = {binding.node_id: binding for binding in phase_bindings}
         for node in graph.nodes:
+            # Plan §13.11: sub_spec_ref 节点不进 phase binding 闭包, 跳过
+            # "无 binding" 与 executor_capability 比对。
+            if node.sub_spec_ref is not None:
+                self._validate_node_sub_spec_ref(node, nodes, issues)
+                continue
             binding = bindings.get(node.id)
             if binding is None:
                 issues.append(
@@ -81,8 +86,6 @@ class PhaseGraphValidator:
                 issues.append(
                     ValidationIssue("PG-001", f"binding executor mismatch: {node.id}", node.id)
                 )
-            if node.sub_spec_ref is not None:
-                self._validate_node_sub_spec_ref(node, nodes, issues)
         edge_targets: dict[str, list[PhaseEdge]] = defaultdict(list)
         for edge in graph.edges:
             if edge.source not in nodes or edge.target not in nodes:

@@ -44,11 +44,21 @@ def standard_plan():
 
 def test_standard_profile_has_complete_plugin_specs_and_six_phase_graph(standard_plan) -> None:
     assert is_validation_valid(standard_plan.validation_report)
-    assert {binding.semantic_phase for binding in standard_plan.phase_bindings} == set(
-        SemanticPhase
-    )
+    # Plan §13.11: think 走 sub_spec_ref 子图, 不进 phase_bindings;
+    # 完整六阶段用 phase_graph.nodes (含 sub_spec_ref 节点) 校验。
     assert standard_plan.phase_graph is not None
     assert {node.semantic_phase for node in standard_plan.phase_graph.nodes} == set(SemanticPhase)
+    think_node = next(
+        node for node in standard_plan.phase_graph.nodes if node.id == "think.main"
+    )
+    assert think_node.sub_spec_ref is not None
+    assert {binding.semantic_phase for binding in standard_plan.phase_bindings} == {
+        SemanticPhase.PERCEIVE,
+        SemanticPhase.ACT,
+        SemanticPhase.REFLECT,
+        SemanticPhase.REMEMBER,
+        SemanticPhase.STOP,
+    }
     assert standard_plan.phase_graph.approval_resume_node == "think.main"
     assert len(standard_plan.plugin_specs) >= 6
 
@@ -219,7 +229,7 @@ class _NoopSubgraphExecutor:
 class _StubSubgraphResolver:
     """Return a minimal CompiledRunPlan for any subgraph plan_ref."""
 
-    def resolve(self, plan_ref: str) -> CompiledRunPlan | None:
+    def resolve(self, plan_ref: str, *, runtime: object | None = None) -> CompiledRunPlan | None:
         return StubSubgraphResolver().resolve(plan_ref)
 
 
@@ -251,14 +261,29 @@ def stub_subgraph_resolver() -> StubSubgraphResolver:
 async def test_generic_interpreter_runs_only_from_phase_bindings(standard_plan) -> None:
     capabilities = _capabilities_for(standard_plan)
     executable = GraphAssembler().assemble(standard_plan, MappingRestrictedScope(capabilities))
-    assert {node.node_id: node.semantic_phase for node in executable.nodes.values()} == {
-        binding.node_id: binding.semantic_phase for binding in standard_plan.phase_bindings
+    # Plan §13.11: executable.nodes 还含 sub_spec_ref 节点占位 (think.main),
+    # phase_bindings 不含;以 phase_bindings 为基线 + sub_spec_ref 节点加回。
+    binding_view = {
+        binding.node_id: binding.semantic_phase
+        for binding in standard_plan.phase_bindings
     }
+    subspec_ids = {
+        node.id: node.semantic_phase
+        for node in standard_plan.phase_graph.nodes
+        if node.sub_spec_ref is not None
+    }
+    expected = {**binding_view, **subspec_ids}
+    assert {
+        node.node_id: node.semantic_phase for node in executable.nodes.values()
+    } == expected
     interpreter = GenericPlanInterpreter(
         subgraph_resolver=_StubSubgraphResolver(),
         subgraph_executable_factory=_stub_subgraph_executable_factory,
     )
     result = await interpreter.run(executable, state={"immutable": True})
+    # Plan §13.11: think.main 走 sub_spec_ref, interpreter 委托给子图
+    # 驱动器并记录 think_stage 访问;其余 5 个 phase 由主 drive 计入。
+    # visits 顺序: perceive, think(子图), act, reflect, remember, stop。
     assert [visit.semantic_phase for visit in result.visits] == list(SemanticPhase)
     assert result.terminal_node == "stop.main"
 

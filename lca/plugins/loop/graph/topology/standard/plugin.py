@@ -44,7 +44,11 @@ class PhaseNodeConfig(BaseModel):
 
     id: str = Field(min_length=1)
     phase: str = Field(min_length=1)
-    binding: str = Field(min_length=1)
+    # Plan §13.11: phase_node 字段在 sub_spec_ref 节点上不再 required(节点
+    # 由 interpreter 走子图驱动, 不调用 phase executor);其他节点保持
+    # 必填以维持 PG-001 校验。运行期在 _compile_declared_node 拒绝
+    # "无 binding 且无 sub_spec_ref" 组合。
+    binding: str | None = Field(default=None, min_length=1)
     max_visits: int = Field(gt=0)
     terminal: bool = False
     entry: bool = False

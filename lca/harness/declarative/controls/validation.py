@@ -148,6 +148,8 @@ def validate_control_binding_closure(
     specs: Sequence[PluginSpec],
     bindings: Sequence[PhaseBinding],
     entries: Sequence[ControlEntry],
+    *,
+    phase_graph: CognitivePhaseGraphPlan | None = None,
 ) -> ValidationReport:
     """Verify that every declared control contribution is executable."""
     issues: list[ValidationIssue] = []
@@ -165,6 +167,18 @@ def validate_control_binding_closure(
             if _is_control_contribution(contribution.role, contribution.output):
                 key = (binding.semantic_phase, contribution.executor)
                 binding_keys.setdefault(key, []).append(binding.node_id)
+    # Plan §13.11: sub_spec_ref 节点不进 phase_bindings, 但 control 仍可
+    # 依附 (think.main 等), 把 phase_graph 里 sub_spec_ref 节点的 phase
+    # 补到 binding_keys 视为可执行。
+    if phase_graph is not None:
+        for node in phase_graph.nodes:
+            if node.sub_spec_ref is not None and node.binding is None:
+                # 控制面贡献按 (phase, executor) 查;该节点的 phase 任何
+                # 已 declared 的 control 都视为可依附到该 sub_spec_ref 节点。
+                for key in (
+                    key for key in declared_keys if key[0] is node.semantic_phase
+                ):
+                    binding_keys.setdefault(key, []).append(node.id)
     for entry in entries:
         key = (entry.phase, entry.executor_capability)
         entry_keys[key] = entry_keys.get(key, 0) + 1
