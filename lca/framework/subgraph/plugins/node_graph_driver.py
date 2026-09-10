@@ -54,6 +54,10 @@ from lca.contracts.protocols.declarative.declarative_1.bundle_graph import (
     BundleGraphSpec,
     FactoryResolutionError,
 )
+from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
+    ExecutionOutcome,
+    PhaseResult as _PhaseResult,
+)
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     SemanticPhase,
 )
@@ -118,12 +122,21 @@ class NodeGraphDriver:
         scope: Any,  # SubgraphRuntime:有 .resolve/.resolve_factory 的对象
         region_phase: SemanticPhase = SemanticPhase.THINK,
         observers: tuple[ObserverFn, ...] = (),
+        sub_runner: Any | None = None,
+        channel_factory: Callable[[], PhaseOutputChannel] | None = None,
     ) -> None:
         self._spec = spec
         self._plan_ref = plan_ref
         self._scope = scope
         self._region_phase = region_phase
         self._observers = observers
+        # ADR-0219 §10.11 item (1): inner recursion plumbing. Both are
+        # populated by ``SubgraphRunner`` itself (which constructs the
+        # driver), never by an external caller. A direct driver
+        # construction that hits a ``sub_spec_ref`` node without these
+        # set returns a FAILED ``InterpretationResult`` (fail-loud).
+        self._sub_runner = sub_runner
+        self._channel_factory = channel_factory
         # 显式 region 优先,fallback 到 bundle.region。任何 node 解析后仍为
         # None → fail-loud,要求 yaml 在 node 或 bundle 层给出 region。
         self._nodes_by_id: dict[str, BundleGraphNode] = {}
@@ -179,6 +192,96 @@ class NodeGraphDriver:
 
         while True:
             node = self._nodes_by_id[current_id]
+            # ADR-0219 §10.11 item (1): inner recursion delegation. When the
+            # current node has a typed sub_spec_ref, the driver delegates the
+            # whole inner traversal to the injected SubgraphRunner, mirrors
+            # the outer interpreter pattern (interpreter.py:402-414), and
+            # advances via the normal edge-selection flow after folding.
+            if getattr(node, "sub_spec_ref", None) is not None:
+                if self._sub_runner is None or self._channel_factory is None:
+                    return _failed_result(
+                        plan_ref=self._plan_ref,
+                        outer_state=outer_state,
+                        node_id=current_id,
+                        error=RuntimeError(
+                            f"node {current_id!r} has sub_spec_ref but driver has "
+                            "no sub_runner/channel_factory; sub_spec_ref requires "
+                            "SubgraphRunner construction (ADR-0219 §10.11)"
+                        ),
+                        visits=tuple(visits),
+                        facts=tuple(facts),
+                        output=output,
+                    )
+                sub_runner = self._sub_runner
+                sub_channel = self._channel_factory()
+                sub_state, sub_output = await sub_runner.run(
+                    ref=node.sub_spec_ref,
+                    outer_state=outer_state,
+                    channel=sub_channel,
+                )
+                # mirror outer interpreter.py:402-414: absorb inner output
+                # into port_context so subsequent edge nodes see it.
+                sub_channel.absorb(sub_output)
+                # FAILED inner → propagate to outer driver via typed failure shape
+                if sub_output.outcome_kind is ExecutionOutcome.FAILED:
+                    return _failed_result(
+                        plan_ref=self._plan_ref,
+                        outer_state=sub_state,
+                        node_id=current_id,
+                        error=RuntimeError(
+                            sub_output.error or "inner subgraph failed"
+                        ),
+                        visits=tuple(visits),
+                        facts=tuple(facts),
+                        output=sub_output,
+                    )
+                outer_state = sub_state
+                # emit observer for this node as if it were a single node exec
+                await _emit_observers(
+                    self._observers,
+                    "phase_graph.node.start",
+                    {
+                        "plan_ref": self._plan_ref,
+                        "node_id": current_id,
+                        "purpose": node.purpose,
+                    },
+                )
+                await _emit_observers(
+                    self._observers,
+                    "phase_graph.node.end",
+                    {
+                        "plan_ref": self._plan_ref,
+                        "node_id": current_id,
+                        "purpose": node.purpose,
+                        "result_kind": "subgraph",
+                    },
+                )
+                visits.append(
+                    PhaseVisit(current_id, SemanticPhase.THINK, "subgraph", None)
+                )
+                # Synthetic PhaseResult so select_edge runs against
+                # self._spec.edges from current_id — the normal graph
+                # semantics. binding_edge on the SubgraphReference is
+                # advisory; the outer interpreter routes via the edge
+                # D5 below.
+                phase_result = _PhaseResult(result_kind="subgraph", payload=None)
+                edge = select_edge(
+                    current_node_id=current_id,
+                    edges=self._spec.edges,
+                    last_phase_result=phase_result,
+                    artifacts=artifacts,
+                )
+                if edge is None:
+                    terminal_node = current_id
+                    output = sub_output
+                    channel.publish(
+                        producer_node=terminal_node,
+                        phase=self._region_phase.value,
+                        output=output,
+                    )
+                    break
+                current_id = edge.target
+                continue
             try:
                 executor = self._scope.resolve_factory(node.factory, node.region)
             except FactoryResolutionError as exc:
