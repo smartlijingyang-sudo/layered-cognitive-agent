@@ -40,7 +40,6 @@ from lca.contracts.protocols.declarative.declarative_1.bundle_graph import (
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
-from lca.framework.subgraph.plugins.runtime import SubgraphRuntime
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
@@ -72,9 +71,7 @@ def collect_think_executors() -> dict[tuple[str, str], object]:
         rg_field = fields.get("region")
         if sn_field is None or rg_field is None:
             continue
-        semantic_name = (
-            sn_field.default if isinstance(sn_field.default, str) else None
-        )
+        semantic_name = sn_field.default if isinstance(sn_field.default, str) else None
         region = rg_field.default if isinstance(rg_field.default, str) else None
         if not isinstance(semantic_name, str) or not isinstance(region, str):
             continue
@@ -125,18 +122,20 @@ class ThinkSubgraphRuntime:
     def resolve(self, capability: str) -> object | None:
         if capability == "reasoner":
             return self._reasoner
-        if capability in {
-            "decision_classifier",
-            "decision_gate",
-            "agent_gates",
-        }:
-            return _LLMPassThrough(kind=capability)
+        if capability == "decision_classifier":
+            from lca.plugins.gate.decision_classifier_provider import DefaultDecisionClassifier
+
+            return DefaultDecisionClassifier()
+        if capability in {"decision_gate", "agent_gates"}:
+            return _NoGateEnforce()
         if capability == "skill_router":
             return _NoSkillRouter()
         if capability == "supports_shortcut":
             return _NoShortcut()
         if capability == "reducer":
-            return _NoOpReducer()
+            from lca.plugins.loop.reducer.plugin import DefaultReducer
+
+            return DefaultReducer()
         return None
 
     def resolve_capability(self, capability: str) -> object | None:
@@ -149,19 +148,15 @@ class ThinkSubgraphRuntime:
         return executor
 
 
-class _LLMPassThrough:
-    """Classifier / gate / agent_gates default Decision emitter."""
+class _NoGateEnforce:
+    """DecisionGate surface that returns the candidate decision unchanged.
 
-    def classify(self, response):  # type: ignore[no-untyped-def]
-        from lca.contracts.models.core.execution.decision import Decision
-        import uuid as _uuid
-
-        return Decision(
-            decision_id=f"dec-llm-{_uuid.uuid4().hex[:12]}",
-            action_type="respond",
-            rationale="LLM pass-through fallback",
-            confidence=0.5,
-        )
+    Used for ``decision_gate`` and ``agent_gates`` capability keys inside the
+    inner think subgraph. Those slots are ``DecisionGate | None`` and are
+    normally injected from the profile (see ``ChainedDecisionGateAssembler``);
+    when no profile binding is present the subgraph passes the candidate
+    decision through rather than fabricating one.
+    """
 
     async def enforce(self, state, decision):  # type: ignore[no-untyped-def]
         return decision
@@ -179,24 +174,6 @@ class _NoShortcut:
 
     async def try_shortcut(self, state):  # type: ignore[no-untyped-def]
         return None
-
-
-class _NoOpReducer:
-    """Reducer surface for the inner think subgraph.
-
-    ``think.route`` calls ``apply_skill_route(state, active_template)``;
-    in the no-LLM / short-circuit path we have no real reducer so this
-    just returns the state unchanged. The LLM pass-through keeps
-    routing deterministic.
-    """
-
-    def apply_skill_route(self, state, active_template):  # type: ignore[no-untyped-def]
-        return state
-
-    def __getattr__(self, name: str) -> object:
-        # Any other reducer method is a no-op for the inner subgraph;
-        # callers must treat absence as benign.
-        return lambda *args, **kwargs: None
 
 
 @plugin(
@@ -258,4 +235,4 @@ async def setup(ctx: PluginContext, config) -> None:  # type: ignore[no-untyped-
     )
 
 
-__all__ = ["setup", "collect_think_executors", "ThinkSubgraphRuntime"]
+__all__ = ["ThinkSubgraphRuntime", "collect_think_executors", "setup"]
