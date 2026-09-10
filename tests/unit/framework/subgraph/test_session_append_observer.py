@@ -13,8 +13,6 @@ import asyncio
 from typing import Any
 from unittest.mock import patch
 
-import pytest
-
 from lca.plugins.journal.declarative.runtime_seams_provider import (
     session_append_observer,
 )

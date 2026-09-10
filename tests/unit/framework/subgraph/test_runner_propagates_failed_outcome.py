@@ -10,8 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-import pytest
-
+from lca.contracts.models.core.policy.stop import StopDecision, StopReason
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
     DeclarativeRunOutcome,
@@ -21,13 +20,11 @@ from lca.contracts.protocols.declarative.declarative_1.declarative_execution imp
 from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
     SubgraphReference,
 )
-from lca.contracts.models.core.policy.stop import StopDecision, StopReason
 from lca.framework.subgraph.plugins.channel import (
     InMemoryPhaseOutputChannel,
     PhaseOutput,
 )
 from lca.framework.subgraph.plugins.runner import SubgraphRunner
-from lca.framework.subgraph.plugins.plan_lift import lift_subgraph_reference_to_v2
 
 
 @dataclass
@@ -46,7 +43,6 @@ class _OneNodeSpecFactory:
 
     def __init__(self) -> None:
         from lca.contracts.protocols.declarative.declarative_1.bundle_graph import (
-            BundleGraphEdge,
             BundleGraphNode,
             BundleGraphSpec,
         )
@@ -186,7 +182,7 @@ async def test_runner_propagates_failed_with_reason(monkeypatch) -> None:
         entry_node="inner.only",
         binding_edge="outer.entry",
     )
-    state, output = await runner.run(
+    _new_state, output = await runner.run(
         ref=ref,
         outer_state=_state(),
         channel=InMemoryPhaseOutputChannel(),
@@ -242,7 +238,7 @@ async def test_runner_falls_back_to_literal_when_no_stop(monkeypatch) -> None:
         entry_node="inner.only",
         binding_edge="outer.entry",
     )
-    state, output = await runner.run(
+    _new_state, output = await runner.run(
         ref=ref,
         outer_state=_state(),
         channel=InMemoryPhaseOutputChannel(),
@@ -281,7 +277,7 @@ async def test_runner_does_not_populate_outcome_kind_on_success(monkeypatch) -> 
         entry_node="inner.only",
         binding_edge="outer.entry",
     )
-    state, output = await runner.run(
+    _new_state, output = await runner.run(
         ref=ref,
         outer_state=_state(),
         channel=InMemoryPhaseOutputChannel(),

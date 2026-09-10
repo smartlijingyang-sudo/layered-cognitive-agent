@@ -14,12 +14,10 @@ and verifies:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
 import pytest
 
-from lca.contracts.models.core.conversation.llm import LLMResponse
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.protocols.declarative.declarative_1.bundle_graph import (
     BundleGraphSpec,
@@ -90,9 +88,6 @@ class _OuterScope:
         raise KeyError(capability)
 
     def resolve_factory(self, factory: str, region: str | None) -> Any:
-        from lca.framework.subgraph.plugins.node_graph_driver import (
-            NodeGraphDriver,
-        )
 
         # Won't be hit for nodes with sub_spec_ref. Other nodes are
         # bypassed via entry = think.reason in this test.
@@ -225,7 +220,7 @@ class TestInnerFailureSurfacesToOuter:
             entry_node="inner.boom",
             binding_edge="outer.boom",
         )
-        state, output = await runner.run(
+        _new_state, output = await runner.run(
             ref=ref,
             outer_state=_state(),
             channel=InMemoryPhaseOutputChannel(),

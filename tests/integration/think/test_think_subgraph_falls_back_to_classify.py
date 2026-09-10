@@ -24,7 +24,6 @@ Setup:
 
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass
 from typing import Any
 
@@ -42,8 +41,14 @@ from lca.contracts.protocols.declarative.declarative_1.v2_plan_marker import (
     V2BundleGraphPlanMarker,
 )
 from lca.framework.subgraph.plugins.channel import InMemoryPhaseOutputChannel
-from lca.framework.subgraph.plugins.node_graph_driver import NodeGraphDriver
 from lca.framework.subgraph.plugins.runner import SubgraphRunner
+from lca.plugins.think.classify import ThinkClassifyExecutor
+from lca.plugins.think.gate import ThinkGateExecutor
+from lca.plugins.think.reason.complete import ThinkReasonCompleteExecutor
+from lca.plugins.think.reason.plan import ThinkReasonPlanExecutor
+from lca.plugins.think.reason.render import ThinkReasonRenderExecutor
+from lca.plugins.think.route import ThinkRouteExecutor
+from lca.plugins.think.shortcut import ThinkShortcutExecutor
 
 
 def _state() -> AgentState:
@@ -99,15 +104,7 @@ _CAPS = {
 }
 
 
-# Import the real Think*Executor classes so we exercise the production code.
-from lca.plugins.think.classify import ThinkClassifyExecutor
-from lca.plugins.think.gate import ThinkGateExecutor
-from lca.plugins.think.reason.complete import ThinkReasonCompleteExecutor
-from lca.plugins.think.reason.plan import ThinkReasonPlanExecutor
-from lca.plugins.think.reason.render import ThinkReasonRenderExecutor
-from lca.plugins.think.route import ThinkRouteExecutor
-from lca.plugins.think.shortcut import ThinkShortcutExecutor
-
+# Real Think*Executor registry — same shape as Default factory's.
 _EXECUTOR_REGISTRY: dict[tuple[str, str], Any] = {
     ("phase:think", "think.shortcut"): ThinkShortcutExecutor(),
     ("phase:think", "think.route"): ThinkRouteExecutor(),
@@ -196,7 +193,7 @@ class TestThinkSubgraphFallsBackToClassify:
             entry_node="think.reason.plan",
             binding_edge="think.reason",
         )
-        state, output = await runner.run(
+        _state_after, output = await runner.run(
             ref=inner_ref,
             outer_state=_state(),
             channel=InMemoryPhaseOutputChannel(),
@@ -260,7 +257,7 @@ class TestThinkSubgraphFallsBackToClassify:
             entry_node="think.reason.plan",
             binding_edge="think.reason",
         )
-        state, output = await runner.run(
+        _state_after, _output = await runner.run(
             ref=inner_ref,
             outer_state=_state(),
             channel=InMemoryPhaseOutputChannel(),
