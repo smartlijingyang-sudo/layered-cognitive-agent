@@ -5,8 +5,8 @@ think 子图节点 plugin:调 Reasoner 生成候选 LLMResponse。
 运行时从 ``context.runtime.reasoner`` 拿 capability 实例。
 
 ADR-0218 §3.3:节点 plugin 由作者显式书写完整 ``@plugin(...)`` 装饰器,
-工厂 ``setup(ctx)`` 同时做 Cordis ``ctx.provide`` 与
-``FactoryRegistry.register``(think 子图专用的 NodeExecutor 解析)。
+工厂 ``setup(ctx)`` 通过 Cordis ``ctx.provide`` 双键注册
+(composite + region-less,think 子图专用的 NodeExecutor 解析)。
 """
 
 from __future__ import annotations
@@ -24,9 +24,6 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.protocols.declarative.declarative_1.factory_resolver import (
-    get_default_registry,
-)
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -39,15 +36,13 @@ from lca.contracts.protocols.think.cognition import Reasoner
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.loop.emit.cognitive.reasoner import run_reasoner_with_spine_facts
 
-_SEMANTIC_NAME = "think.reason"
-_REGION = "phase:think"
-
 
 @dataclass(frozen=True, slots=True)
 class ThinkReasonExecutor:
     """think 节点:调 Reasoner 生成候选 LLMResponse。"""
 
-    semantic_name: str = _SEMANTIC_NAME
+    semantic_name: str = "think.reason"
+    region: str = "phase:think"
 
     async def node_execute(
         self,
@@ -103,15 +98,14 @@ class ThinkReasonExecutor:
     ),
 )
 async def setup(ctx: PluginContext, config=None) -> None:
-    """双注册:Cordis provide + FactoryRegistry register。"""
+    """双键注册:Cordis provide(composite + region-less)。"""
     del config
     executor = ThinkReasonExecutor()
-    ctx.provide("phase.think.reason", executor)
-    get_default_registry().register(
-        executor,
-        semantic_name=_SEMANTIC_NAME,
-        region=_REGION,
-    )
+    # Composite key for region-scoped resolution (preferred)
+    composite_key = f"{executor.region}::{executor.semantic_name}"
+    ctx.provide(composite_key, executor)
+    # Region-less fallback for cross-region reuse
+    ctx.provide(executor.semantic_name, executor)
 
 
 __all__ = ["ThinkReasonExecutor", "setup"]
