@@ -122,6 +122,7 @@ class BundleGraphSpec:
     purpose: str | None
     nodes: tuple[BundleGraphNode, ...]
     edges: tuple[BundleGraphEdge, ...] = field(default_factory=tuple)
+    entry: str | None = None
 
     def __post_init__(self) -> None:
         if not self.id:
@@ -150,6 +151,12 @@ class BundleGraphSpec:
                     "PG-005-bundle-graph",
                     f"edge.target {e.target!r} not in nodes {sorted(ids)!r}",
                 )
+        # entry 校验
+        if self.entry is not None and self.entry not in ids:
+            raise DeclarativeValidationError(
+                "PG-005-bundle-graph",
+                f"entry {self.entry!r} not in nodes {sorted(ids)!r}",
+            )
 
 
 # FactoryResolutionError 实际定义在 factory_resolver 模块;此处 re-export

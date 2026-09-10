@@ -37,6 +37,8 @@ nodes:
       - decision
     config:
       max_visits: 1
+      result_kind: decision
+      payload_port: decision
 
   - id: think.route
     region: phase:think
@@ -49,6 +51,8 @@ nodes:
       - enforced_state
     config:
       max_visits: 1
+      result_kind: think_stage
+      payload_port: route_choice
 
   - id: think.reason
     region: phase:think
@@ -61,6 +65,8 @@ nodes:
       - response
     config:
       max_visits: 3
+      result_kind: think_stage
+      payload_port: response
 
   - id: think.classify
     region: phase:think
@@ -72,6 +78,8 @@ nodes:
       - decision
     config:
       max_visits: 1
+      result_kind: decision
+      payload_port: decision
 
   - id: think.gate
     region: phase:think
@@ -85,11 +93,11 @@ nodes:
       - think_signal
     config:
       max_visits: 8
+      result_kind: decision
+      payload_port: enforced_decision
 
 edges:
-  # shortcut → route: 当 shortcut 没命中时走 route;命中时直接到 gate
-  # (注:当前 think.shortcut 仅返回 decision,无 shortcut_taken 字段;先用
-  # result.payload 是否存在作为命中判定;后续可扩展 port metadata)
+  # shortcut → route: 没命中(decision 缺失)走 route;命中直接到 gate
   - from: think.shortcut
     to: think.route
     kind: control
@@ -99,17 +107,11 @@ edges:
     kind: control
     when: result.payload != None
 
-  # route → reason: 当 SkillRouter 选 llm 路径时
+  # route → reason: 必走(reason plugin 读 route_choice 决定是否真调 LLM)
   - from: think.route
     to: think.reason
     kind: control
-    when: result.payload != None and getattr(result.payload, 'route', None) == "reason"
-
-  # route → classify: 当 SkillRouter 选 direct 路径时
-  - from: think.route
-    to: think.classify
-    kind: control
-    when: result.payload != None and getattr(result.payload, 'route', None) == "direct"
+    when: true
 
   # reason → classify: 必走
   - from: think.reason

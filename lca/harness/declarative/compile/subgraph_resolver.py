@@ -200,6 +200,7 @@ def _load_bundle_graph_spec(plan_ref: str) -> BundleGraphSpec:
         purpose=raw.get("purpose"),
         nodes=tuple(nodes),
         edges=tuple(edges),
+        entry=raw.get("entry"),
     )
 
 
@@ -254,16 +255,18 @@ def _wrap_compiled_run_plan(
     spec: BundleGraphSpec,
     phase_graph: CognitivePhaseGraphPlan,
 ) -> CompiledRunPlan:
-    """最小 CompiledRunPlan 包装(只填 interpreter 必需的字段)。
+    """v2 CompiledRunPlan 包装(实现 V2BundleGraphPlanMarker)。
 
-    给每个 BundleGraphNode 投影一个 PhaseBinding,让 GraphAssembler 能装配。
-    ``executor_capability`` 固定为 ``phase.think.standard``,interpreter 进入
-    节点时按 ``sub_spec_ref`` 短路走子图,不调用该 binding;此处只为满足
-    GraphAssembler 的 Pydantic 必填字段。
+    走纯 v2 路径,**不再伪装成老 declarative plan**:
+    - phase_graph 含 BundleGraphNode 投影的 PhaseNode(framework 用,但 interpreter
+      v2 分支走 NodeGraphDriver,不调 phase executor)
+    - phase_bindings:最小合法(GraphAssembler 兜底层,本 ADR 落地后由 NodeGraphDriver
+      完全替代)
+    - capability / validation_report / provenance:最小合法
+    - 实现 V2BundleGraphPlanMarker:isinstance 命中,interpreter 走 v2 分支
 
-    CapabilityPlan 必须合法(``capability_plan_hash`` 读 provider_bindings),
-    即使 v2 路径下 plugin 注册职责在 cordis 不在 plan;这里给空 plan 即可,
-    interpreter 走 sub_spec_ref 短路后不会再用。
+    delete-when:interpreter v2 分支稳定后,可进一步精简 phase_bindings / capability /
+    validation_report(本 ADR §8 实施步骤 #11)。
     """
     from lca.contracts.protocols.composition.relation import TypedRelation
     from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
@@ -271,6 +274,9 @@ def _wrap_compiled_run_plan(
         PlanProvenance,
     )
     from lca.contracts.protocols.perceive.capability_plan import CapabilityPlan
+    from lca.contracts.protocols.declarative.declarative_1.v2_plan_marker import (
+        V2BundleGraphPlanMarker,
+    )
 
     profile_path = str(_repo_root() / "bundles/__bundle_graph_v2_stub__.yaml")
     scope = ScopePlan(
@@ -308,7 +314,19 @@ def _wrap_compiled_run_plan(
         task_contract="bundle-graph-v2",
         environment="bundle-graph-v2",
     )
-    return CompiledRunPlan(
+
+    class _V2Plan(CompiledRunPlan, V2BundleGraphPlanMarker):
+        """v2 plan subclass:实现 V2BundleGraphPlanMarker,挂载 spec。"""
+
+        _spec: BundleGraphSpec
+
+        def get_bundle_graph_spec(self) -> BundleGraphSpec:
+            return self._spec
+
+        def __init__(self, **kwargs: Any) -> None:  # type: ignore[no-untyped-def]
+            super().__init__(**kwargs)
+
+    plan = _V2Plan(
         profile_path=profile_path,
         capability=capability,
         scope=scope,
@@ -326,6 +344,9 @@ def _wrap_compiled_run_plan(
         provenance=plan_provenance,
         validation_report=ValidationReport(issues=()),
     )
+    # frozen dataclass 不让 setattr;用 object.__setattr__ 挂 spec
+    object.__setattr__(plan, "_spec", spec)
+    return plan
 
 
 @lru_cache(maxsize=16)

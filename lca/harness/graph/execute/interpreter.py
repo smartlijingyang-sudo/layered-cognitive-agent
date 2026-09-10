@@ -853,6 +853,38 @@ class GenericPlanInterpreter:
                 f"subgraph_resolver returned non-plan value for "
                 f"{ref.plan_ref!r}: {type(sub_plan_obj).__name__}",
             )
+
+        # v2 分支(ADR-0218):Bundle Graph Schema v2 plan 走独立调度器。
+        # 老 declarative 路径完全不动(scope/factory GraphAssembler 兜底)。
+        from lca.contracts.protocols.declarative.declarative_1.v2_plan_marker import (
+            V2BundleGraphPlanMarker,
+        )
+        if isinstance(sub_plan_obj, V2BundleGraphPlanMarker):
+            from lca.contracts.protocols.declarative.declarative_1.factory_resolver import (
+                get_default_registry,
+            )
+            from lca.harness.graph.execute.v2.node_graph_driver import NodeGraphDriver
+
+            spec = sub_plan_obj.get_bundle_graph_spec()
+            driver = NodeGraphDriver(
+                spec=spec,
+                plan_ref=ref.plan_ref,
+                scope=self._subgraph_scope,
+                registry=get_default_registry(),
+            )
+            sub_result = await driver.run(
+                outer_state=outer_state,
+                artifacts={},
+            )
+            # 失败传播(与老路径一致:PG-005 风格)
+            if sub_result.outcome is not None and sub_result.outcome.kind.name == "FAILED":
+                raise RuntimeError(
+                    f"subgraph {ref.plan_ref!r} failed at node "
+                    f"{sub_result.outcome.cursor.node_id!r}: "
+                    f"{sub_result.outcome.error_fact}"
+                )
+            return sub_result.state
+
         factory = self._subgraph_executable_factory
         scope = self._subgraph_scope
         if scope is not None:
