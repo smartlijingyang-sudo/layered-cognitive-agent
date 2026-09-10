@@ -17,6 +17,7 @@ capabilities (``subgraph_resolver`` / ``subgraph_runtime``) — no
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from lca.contracts.atoms.control.slot import ControlSlot
@@ -35,6 +36,9 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
+    ExecutionOutcome,
+)
 from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
     SubgraphReference,
 )
@@ -48,6 +52,7 @@ from lca.framework.subgraph.plugins.channel import (
 from lca.framework.subgraph.plugins.node_graph_driver import (
     MAX_SUBGRAPH_DEPTH_DEFAULT,
     NodeGraphDriver,
+    ObserverFn,
 )
 from lca.framework.subgraph.plugins.plan_lift import lift_subgraph_reference_to_v2
 from lca.framework.subgraph.plugins.runtime import SubgraphRuntime
@@ -74,10 +79,26 @@ class SubgraphRunner:
         resolver: object,
         runtime: SubgraphRuntime,
         max_subgraph_depth: int = MAX_SUBGRAPH_DEPTH_DEFAULT,
+        observers: tuple[ObserverFn, ...] = (),
+        channel_factory: Callable[[], PhaseOutputChannel] | None = None,
+        no_llm_mode: bool = False,
     ) -> None:
         self._resolver = resolver
         self._runtime = runtime
         self._max_depth = max_subgraph_depth
+        # ADR-0219 §10.11 item (4): observer port on the runner. Cordis
+        # boot may pass observers=() and rely on bind_cordis_seams to
+        # populate; Default factory passes the Session.append closure.
+        self._observers = observers
+        # ADR-0219 §10.11 item (1): inner driver recursion needs both a
+        # SubgraphRunner and a fresh PhaseOutputChannel per inner run.
+        # Both are populated by SubgraphRunner itself — never by an
+        # external caller — so the seam stays at the runner surface.
+        self._channel_factory = channel_factory
+        # ADR-0219 §10.11 item (2): default factory sets this True so the
+        # no-LLM path strips ``think.reason.complete`` at lift time. Real
+        # Reasoner wiring (separate PR) leaves it False.
+        self._no_llm_mode = no_llm_mode
         self._recursion_stack: set[str] = set()
 
     async def run(
@@ -94,6 +115,11 @@ class SubgraphRunner:
         publishes the terminal ``PhaseOutput`` on ``channel`` before
         this method returns; we additionally return it so the caller
         can ``absorb`` or forward without a second channel read.
+
+        On the FAILED path (ADR-0219 §10.11 item 3) we additionally
+        populate ``output.outcome_kind`` and ``output.error`` so the
+        outer interpreter can see the failure shape without an extra
+        envelope.
         """
         if ref.plan_ref in self._recursion_stack:
             raise SubgraphCycleError(ref.plan_ref)
@@ -104,18 +130,46 @@ class SubgraphRunner:
         self._recursion_stack.add(ref.plan_ref)
         try:
             sub_plan_obj = self._resolver.resolve(ref.plan_ref)  # type: ignore[union-attr]
-            spec = lift_subgraph_reference_to_v2(ref, sub_plan_obj)
+            spec = lift_subgraph_reference_to_v2(
+                ref,
+                sub_plan_obj,
+                strip_complete_when_no_llm=self._no_llm_mode,
+            )
             driver = NodeGraphDriver(
                 spec=spec,
                 plan_ref=ref.plan_ref,
                 scope=self._runtime,
+                observers=self._observers,
+                sub_runner=self,
+                channel_factory=self._channel_factory,
             )
             sub_result = await driver.run(
                 outer_state=outer_state,
                 channel=channel,
                 artifacts={},
             )
-            return sub_result.state, sub_result.output
+            output = sub_result.output
+            if (
+                sub_result.outcome is not None
+                and sub_result.outcome.kind is ExecutionOutcome.FAILED
+            ):
+                # ADR-0219 §10.11: FAILED outcome → typed failure shape on
+                # output. The derived string comes from the driver's stop
+                # reason when available; otherwise we use a literal so the
+                # outer fold always has something to surface.
+                stop = sub_result.outcome.stop
+                derived_error = (
+                    stop.reason.value
+                    if stop is not None and getattr(stop, "reason", None) is not None
+                    else "inner subgraph failed"
+                )
+                output = output.model_copy(
+                    update={
+                        "outcome_kind": ExecutionOutcome.FAILED,
+                        "error": derived_error,
+                    }
+                )
+            return sub_result.state, output
         finally:
             self._recursion_stack.discard(ref.plan_ref)
 
@@ -203,10 +257,26 @@ async def setup(ctx: PluginContext, config=None) -> None:
     The declared ``requires=`` keys are checked at boot by Cordis
     (per ADR-0110); a profile that fails to provide any of them raises
     :class:`cordis.fiber.ValidationError` before this ``setup`` runs.
+
+    ADR-0219 §10.11 item (4): the observer port is config-driven when
+    Cordis provides a ``subgraph_observers`` tuple; otherwise we fall
+    back to ``()`` (no observer wiring). The Default factory binds the
+    ``Session.append`` observer at construction-time and constructs
+    the runner directly with ``observers=...``.
     """
     resolver = ctx.inject("subgraph_resolver")
     runtime = ctx.inject("subgraph_runtime")
-    runner = SubgraphRunner(resolver=resolver, runtime=runtime)
+    observers: tuple[ObserverFn, ...] = ()
+    if hasattr(ctx, "require"):
+        try:
+            observers = tuple(ctx.require("subgraph_observers"))
+        except Exception:
+            observers = ()
+    runner = SubgraphRunner(
+        resolver=resolver,
+        runtime=runtime,
+        observers=observers,
+    )
     ctx.provide("subgraph_runner", runner)
 
 
