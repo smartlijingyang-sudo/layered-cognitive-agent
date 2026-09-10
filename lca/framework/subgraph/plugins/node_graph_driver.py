@@ -73,6 +73,7 @@ from lca.harness.graph.execute.v2.node_output_projector import (
 from lca.harness.graph.execute.v2.node_output_projector import (
     schema_from_node_config,
 )
+from lca.loop.emit.node_emitter import emit_for_node, emit_reasoner_meta_for_node
 
 MAX_SUBGRAPH_DEPTH_DEFAULT = 8
 ObserverFn = Callable[[str, dict[str, Any]], Awaitable[None]]
@@ -191,7 +192,13 @@ class NodeGraphDriver:
             inp = port_context.build_input(node.inputs)
 
             try:
-                out = await executor.node_execute(ctx, inp)
+                out = await self._execute_with_emits(
+                    executor=executor,
+                    ctx=ctx,
+                    node_input=inp,
+                    node=node,
+                    state=outer_state,
+                )
             except Exception as exc:
                 return _failed_result(
                     plan_ref=self._plan_ref,
@@ -262,6 +269,46 @@ class NodeGraphDriver:
             outcome=None,
             output=output,
         )
+
+    async def _execute_with_emits(
+        self,
+        *,
+        executor: Any,
+        ctx: Any,
+        node_input: Any,
+        node: BundleGraphNode,
+        state: AgentState,
+    ) -> Any:
+        """Wrap ``executor.node_execute`` with node-level EP dispatch (ADR-0217 §3.3.2).
+
+        ``emit_on_enter`` EPs fire before the executor. On success,
+        ``emit_on_exit`` EPs fire (with ``reasoner_meta`` routed to the
+        special helper that reads ``turn_plan`` / ``turn_render`` from
+        the input / output). On failure, ``reasoner_reason_end`` is
+        emitted with ``outcome="failure"`` and the exception is
+        re-raised so the existing failure path produces the FAILED
+        ``InterpretationResult``. EP dispatch failures are contained
+        (``contextlib.suppress`` inside the dispatcher) so observation
+        never blocks execution.
+        """
+        for ep_id in node.config.get("emit_on_enter", ()):
+            emit_for_node(ep_id, state)
+        try:
+            out = await executor.node_execute(ctx, node_input)
+        except BaseException:
+            for ep_id in node.config.get("emit_on_exit", ()):
+                if ep_id == "reasoner_reason_end":
+                    emit_for_node(ep_id, state, outcome="failure")
+            raise
+        for ep_id in node.config.get("emit_on_exit", ()):
+            if ep_id == "reasoner_meta":
+                plan = node_input.port_values.get("turn_plan")
+                render = out.port_values.get("turn_render")
+                if plan is not None and render is not None:
+                    emit_reasoner_meta_for_node(state, plan, render)
+            else:
+                emit_for_node(ep_id, state)
+        return out
 
     async def _drive_subgraph_ref(
         self,
@@ -357,6 +404,7 @@ def _failed_result(
         budget_snapshot={"step": 0},
     )
     from lca.contracts.models.core.policy.stop import StopDecision, StopReason
+
     outcome = DeclarativeRunOutcome(
         kind=ExecutionOutcome.FAILED,
         cursor=cursor,
