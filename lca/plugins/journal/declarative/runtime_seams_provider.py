@@ -8,7 +8,9 @@ replace any factory capability without changing the runtime kernel.
 from __future__ import annotations
 
 import inspect
-from typing import cast
+import logging
+from collections.abc import Awaitable, Callable
+from typing import Any, cast
 
 from pydantic import BaseModel
 
@@ -59,6 +61,29 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.runtime.loop.runtime_journal import RuntimeJournalCommitter
 from lca.runtime.projection.result_finalizer import RuntimeResultFinalizer
 from lca.runtime.support.checkpoint_resolution import DeclarativeCheckpointStateResolver
+
+_log = logging.getLogger(__name__)
+
+
+def session_append_observer() -> Callable[[str, dict[str, Any]], Awaitable[None]]:
+    """Build an observer that funnels ``phase_graph.node.{start,end}`` into Session.append.
+
+    ADR-0219 §10.11 item (4): single funnel between the inner driver
+    observer port and the durable journal. The closure imports
+    :mod:`lca.session.append` lazily to avoid the runtime-seams
+    import cycle (the session module imports harness which imports
+    this module).
+
+    Returns:
+        An async callable ``(event, payload) -> None`` suitable for
+        ``SubgraphRunner(observers=(session_append_observer(),))``.
+    """
+    from lca.session.append import Session
+
+    async def _observer(event: str, payload: dict[str, Any]) -> None:
+        Session.append(event, payload)
+
+    return _observer
 
 
 class Config(BaseModel):
@@ -150,6 +175,11 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
         phase_observer: object,
         lifecycle_publisher: RuntimeLifecyclePublisher,
     ) -> DeclarativeInterpreter:
+        # ADR-0219 §10.11 item (2): one-line operator signal that the
+        # no-LLM fallback path is engaged. Fires once per create()
+        # call so operators can see the difference between the real
+        # Reasoner path and the default factory's shortcut.
+        _log.info("no-LLM fallback active — think.reason.complete stripped")
         interpreter = cast(
             "DeclarativeInterpreter",
             GenericPlanInterpreter(
@@ -254,6 +284,15 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
                 subgraph_runner=SubgraphRunner(
                     resolver=self._subgraph_resolver,
                     runtime=_DefaultSubgraphRuntime(),
+                    # ADR-0219 §10.11 item (4): wire Session.append into
+                    # the inner driver observer port. Single funnel;
+                    # no parallel event bus.
+                    observers=(session_append_observer(),),
+                    channel_factory=InMemoryPhaseOutputChannel,
+                    # ADR-0219 §10.11 item (2): the Default factory's
+                    # no-LLM fallback strips think.reason.complete at
+                    # lift time so the inner graph terminates at render.
+                    no_llm_mode=True,
                 ),
                 subgraph_runtime=_DefaultSubgraphRuntime(),
                 channel_factory=InMemoryPhaseOutputChannel,

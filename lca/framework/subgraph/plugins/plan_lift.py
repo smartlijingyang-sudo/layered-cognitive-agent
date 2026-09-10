@@ -13,10 +13,11 @@ Two cases:
 
 1. **Already v2** — ``sub_plan_obj`` implements
    :class:`lca.contracts.protocols.declarative.declarative_1.v2_plan_marker.V2BundleGraphPlanMarker`.
-   The marker's ``get_bundle_graph_spec()`` is returned directly.
+   The marker's ``get_bundle_graph_spec()`` is returned directly, with
+   optional no-LLM lift-time mutation (ADR-0219 §10.11 item 2).
 2. **Not v2** — the function raises :class:`PlanLiftError` (fail-loud).
    Older legacy ``CognitivePhaseGraphPlan`` paths are deleted in a
-   later commit; until then the legacy lifter is unimplemented on
+20   later commit; until then the legacy lifter is unimplemented on
    purpose so a missing conversion is caught at boot rather than
    silently dropping nodes.
 
@@ -27,6 +28,7 @@ The runner injects it via a hard import.
 
 from __future__ import annotations
 
+import dataclasses
 from typing import TYPE_CHECKING
 
 from lca.contracts.protocols.declarative.declarative_1.bundle_graph import (
@@ -50,12 +52,26 @@ class PlanLiftError(RuntimeError):
 def lift_subgraph_reference_to_v2(
     ref: SubgraphReference,
     sub_plan_obj: CompiledRunPlan,
+    *,
+    strip_complete_when_no_llm: bool = False,
 ) -> BundleGraphSpec:
     """Return the :class:`BundleGraphSpec` for ``ref``'s resolved plan.
 
     The function is the only place where the old plan form is read in
     the think subgraph path. After this call the returned spec is
     consumed by :class:`lca.framework.subgraph.plugins.node_graph_driver.NodeGraphDriver`.
+
+    Args:
+        ref: Subgraph reference resolved by the runner.
+        sub_plan_obj: Compiled plan implementing the v2 marker.
+        strip_complete_when_no_llm: When True (the Default factory's
+            no-LLM fallback), drop ``think.reason.complete`` from the
+            spec and drop its incoming edge. The inner graph terminates
+            at ``think.reason.render`` and the outer driver advances
+            via its normal ``think.reason → think.classify`` edge.
+            ADR-0219 §10.11 item 2: make the no-LLM path observable in
+            tests rather than papering over the shape mismatch with a
+            stub LLMResponse.
 
     Raises:
         PlanLiftError: ``sub_plan_obj`` does not implement the v2
@@ -69,7 +85,29 @@ def lift_subgraph_reference_to_v2(
             "V2BundleGraphPlanMarker; only Bundle Graph Schema v2 plans are "
             "supported by the subgraph driver."
         )
-    return sub_plan_obj.get_bundle_graph_spec()
+    spec = sub_plan_obj.get_bundle_graph_spec()
+    if not strip_complete_when_no_llm:
+        return spec
+    return _strip_think_reason_complete(spec)
+
+
+def _strip_think_reason_complete(spec: BundleGraphSpec) -> BundleGraphSpec:
+    """Drop ``think.reason.complete`` and its incoming edge.
+
+    ADR-0219 §10.11 item 2: no-LLM fallback. The Default factory's
+    ``_DefaultReasoner`` does not implement ``complete_turn``; making
+    the no-LLM path observable in tests requires the complete node to
+    not be in the graph at all. The inner graph terminates at
+    ``render`` (no outgoing edge → driver publishes the channel output
+    and returns); the outer driver then advances via its declared
+    ``think.reason → think.classify`` edge.
+    """
+    target_id = "think.reason.complete"
+    if not any(n.id == target_id for n in spec.nodes):
+        return spec
+    new_nodes = tuple(n for n in spec.nodes if n.id != target_id)
+    new_edges = tuple(e for e in spec.edges if e.target != target_id)
+    return dataclasses.replace(spec, nodes=new_nodes, edges=new_edges)
 
 
 __all__ = ["PlanLiftError", "lift_subgraph_reference_to_v2"]
