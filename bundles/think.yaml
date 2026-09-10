@@ -1,128 +1,75 @@
-# bundles/think.yaml — think 子图纯图描述
-# ADR-0217 Bundle Graph Schema v2.本文件**只声明业务拓扑**,不注册 plugin,
-# 不写 plugin_id。plugin 注册走 @plugin(...) 装饰器;node 实现由
-# FactoryRegistry 按 factory 业务语义名解析。
+# bundles/think.yaml — think 子图纯图描述(精简)
+# ADR-0217 Bundle Graph Schema v2。
 #
-# 字段职责边界(每个字段都被框架读、做事,见 ADR §2 D5):
-#   id       : bundle 身份;BundleSubgraphResolver._is_bundle_graph_v2 sniff 用
+# 字段职责(每个字段都被框架读):
+#   id       : bundle 身份;BundleSubgraphResolver sniff 用
 #   region   : 子图 region 标签;FactoryResolver 反查上下文
-#   purpose  : 子图整体职责描述;写入 phase_graph.metadata
-#   nodes[]  : 5 个节点(对应 think 5 步)
-#     id     : 节点拓扑身份(供 edges source/target 锚点);interpreter 寻址 key
+#   purpose  : 子图整体职责;写入 phase_graph.metadata
+#   nodes[]
+#     id     : 节点拓扑身份(供 edges source/target 锚点)
 #     region : 节点 region(可空,fallback 到 bundle.region)
 #     factory: 业务语义名(如 think.shortcut);FactoryResolver 解析到 NodeExecutor
-#     purpose: 节点职责;写入 phase_graph.node.start/end payload(purpose)
-#     inputs : 节点声明性输入端口;framework 在子图边缘端口对齐时使用
-#     outputs: 节点声明性输出端口;同上
-#     config : 节点级图配置(只图级参数,不是 plugin 私有参数)
-#   edges[]  : 控制流拓扑
+#     config : 节点级图配置(只图级参数)
+#       max_visits : NodeContext.budget 透传,v2 driver 终止条件之一
+#   edges[]
 #     from/to : 节点 id 锚点
-#     kind    : control(默认,走 when)| data(走端口对齐)
 #     when    : bool-expr DSL;interpreter 在 node.end 后跑
 #
-# 迁移历史:本文件替换 bundles/think-steps.yaml(原 entries: 形态,plugin 注册表)。
-# PG-005 子图解析漏配在此闭环。
+# 不放(inputs/outputs/payload_port/result_kind):@plugin 装饰器不读,
+# v2 driver 不读,observer 不消费——纯摆设。
+#
+# 节点 plugin 注册走 @plugin(...) 装饰器;plugin 实现通过 factory 业务名
+# 由 FactoryRegistry.resolve(semantic_name="think.<name>", region="phase:think")
+# 解析到 Think<Name>Executor 实例。
+
 id: think.subgraph
 region: phase:think
 purpose: think 5 步执行 — shortcut 可 short-circuit,route → reason → classify → gate 收敛
 
 nodes:
   - id: think.shortcut
-    region: phase:think
     factory: think.shortcut
-    purpose: 模型能直接给最终决策时短路返回
-    inputs:
-      - in_assembled_manifest
-    outputs:
-      - decision
     config:
       max_visits: 1
-      result_kind: decision
-      payload_port: decision
 
   - id: think.route
-    region: phase:think
     factory: think.route
-    purpose: 选择路由(skill_route / llm / direct)
-    inputs:
-      - in_assembled_manifest
-    outputs:
-      - route_choice
-      - enforced_state
     config:
       max_visits: 1
-      result_kind: think_stage
-      payload_port: route_choice
 
   - id: think.reason
-    region: phase:think
     factory: think.reason
-    purpose: 调 LLM 生成候选 Decision
-    inputs:
-      - messages
-      - tools
-    outputs:
-      - response
     config:
       max_visits: 3
-      result_kind: think_stage
-      payload_port: response
 
   - id: think.classify
-    region: phase:think
     factory: think.classify
-    purpose: 把 LLMResponse 归类为 Decision
-    inputs:
-      - response
-    outputs:
-      - decision
     config:
       max_visits: 1
-      result_kind: decision
-      payload_port: decision
 
   - id: think.gate
-    region: phase:think
     factory: think.gate
-    purpose: DecisionGate — 决策合规与 gate 收敛
-    inputs:
-      - decision
-      - in_state
-    outputs:
-      - enforced_decision
-      - think_signal
     config:
       max_visits: 8
-      result_kind: decision
-      payload_port: enforced_decision
 
 edges:
   # shortcut → route: 没命中(decision 缺失)走 route;命中直接到 gate
   - from: think.shortcut
     to: think.route
-    kind: control
-    when: result.payload == None
+    when: result.payload == null
   - from: think.shortcut
     to: think.gate
-    kind: control
-    when: result.payload != None
+    when: result.payload != null
 
-  # route → reason: 必走(reason plugin 读 route_choice 决定是否真调 LLM)
+  # route → reason → classify → gate
   - from: think.route
     to: think.reason
-    kind: control
     when: true
-
-  # reason → classify: 必走
   - from: think.reason
     to: think.classify
-    kind: control
     when: true
-
-  # classify → gate: 必走
   - from: think.classify
     to: think.gate
-    kind: control
     when: true
 
 # terminal: think.gate 直接回 outer graph(binding_edge=think.main),

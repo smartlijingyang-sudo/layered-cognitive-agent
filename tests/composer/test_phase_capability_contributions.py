@@ -102,7 +102,6 @@ def test_standard_nodes_do_not_route_through_shared_semantic_branching() -> None
         "reflect/standard/plugin.py": "StandardReflectExecutor",
         "remember/standard/plugin.py": "StandardRememberExecutor",
         "stop/standard/plugin.py": "StandardStopExecutor",
-        "think/standard/plugin.py": "StandardThinkExecutor",
     }
     phase_root = Path("lca/plugins/loop/phase")
     for relpath, executor_name in expected_modules.items():
