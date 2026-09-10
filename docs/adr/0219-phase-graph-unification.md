@@ -633,6 +633,93 @@ ADR-0217 / ADR-0218 已经分别引入 BundleGraphSpec v2 + NodeGraphDriver v2,�
 
 试过(`lca/plugins/loop/phase/_shared/typed_payload.py` 初版,内含三个函数)。用户评审回"**太丑**":三个 helper 名字隐去 phase 来源,reader 调用时不知道数据从哪个 phase 出来;等于把"`artifacts.get('think')` 字符串 key"换了个更长的函数名,**反模式没真去掉**。改成 `PhaseContext` Protocol 的 `payload_of(phase, want)` 方法,数据流显式留在调用点,无 helper 命名税。删除 helper 文件,`grep -n 'upstream_\|typed_payload' lca/` = 0。
 
+### 10.11 收尾:四件 follow-up 一次性合拢(本 ADR 升级前必过)
+
+本 ADR 落地后留下 4 个已知 follow-up,根因都在 v2 `NodeGraphDriver` 与 `SubgraphRunner` 的 seam:
+
+1. **inner `sub_spec_ref` 分支缺失**。`bundles/think.yaml::think.reason.config.sub_spec_ref` 声明了嵌套子图,但 v2 driver 的 `run()` 无 `sub_spec_ref` 分支,直接 `scope.resolve_factory(node.factory, node.region)`(node_graph_driver.py L184) → 落到 `ThinkReasonCompleteExecutor.node_execute`(plugins/think/reason/complete.py L39-72),inner 3 节点(plan / render / complete)被压成 1 个 complete 调用。
+2. **`_DefaultReasoner` shape mismatch**。`ThinkReasonCompleteExecutor` duck-typed `reasoner.complete_turn(state, render)`(complete.py L68);`_DefaultReasoner`(runtime_seams_provider.py L202-207)只 `generate_thoughts`,complete 节点 fail-soft 空 `NodeOutput`(complete.py L68-70)。plan/render 节点同样无对应 capability。
+3. **inner FAILED 被吞**。`SubgraphRunner.run()`(runner.py L119)返回 `(state, output)`,`sub_result.outcome: DeclarativeRunOutcome` 被丢弃。`_failed_result`(runner.py L124-169)造的 FAILED 形态对外不可见。
+4. **inner 不进脊柱**。`_observers=()` 默认(node_graph_driver.py L121)+ `SubgraphRunner` 构造不接受 observers(runner.py L71-79)+ default-factory 不绑 `Session.append` → `phase_graph.node.start/end` 在 think 子图里完全无踪迹。
+
+#### §10.11.1 决定
+
+**根因**:v2 driver 是 outer interpreter 的 fork,被 fork 时漏掉了 (a) sub_spec_ref 递归分支,(b) observer 注入 plumbing;`SubgraphRunner` 拿了 cycle/depth 但没收 outcome-envelope 契约。**修复**:把 outer pattern 在 inner 处镜像——4 处是同一个 seam。
+
+**4 项合一,一次变更**:
+
+- (1) `BundleGraphNode` 新增 typed 字段 `sub_spec_ref: SubgraphReference | None = None`(对照 PhaseNode L84 的同名字段);`_load_bundle_graph_spec` 解析 yaml `config.sub_spec_ref` → `SubgraphReference`;`NodeGraphDriver.run()` 在 `scope.resolve_factory` 之前检查 `node.sub_spec_ref`,非空则委托 `self._sub_runner.run(...)` 并 `channel.absorb(sub_output)` —— 镜像 `interpreter.py:402-414` 的 outer 分支,**两处递归一处形状**。
+- (2) `lift_subgraph_reference_to_v2(..., strip_complete_when_no_llm: bool = False)` 新增 flag;default-factory 设 `True` 时,`think.reason.complete` 节点从 lifted spec 中剥离 + 重连 `render → classify`(顶层 classify 节点已经在 think.yaml L51),`_DefaultReasoner` 不再假装有 LLM shape;集成测试断言 spec 节点数 = 2,`_DefaultReasoner.generate_thoughts` 仍保留(被 legacy seam path 用,delete-when 见 `2026-09-10-nested-bundle-graph-spec.md` §2.11)。
+- (3) `PhaseOutput`(channel.py L39-50)新增 `outcome_kind: ExecutionOutcome | None = None` + `error: str | None = None`,frozen + `extra="forbid"` 不变;`SubgraphRunner.run` 在 return 前读 `sub_result.outcome`,FAILED 时 `model_copy(update=...)` 写两字段;外层 `_fold_subgraph_output` 读 `output.outcome_kind` 走 FAILED 分支。
+- (4) `SubgraphRunner.__init__` 新增 `observers: tuple[ObserverFn, ...] = ()`;`NodeGraphDriver` 构造处透传(self._observers);`Interpreter.bind_cordis_seams` 新增 `observers=()` 参数;default-factory 传 `(session_append_observer(),)`(factory 内置在 runtime_seams_provider),走 `Session.append` —— 单条 funnel,对应 AGENTS.md §2.2 表中 "Journal / Session log / Event 的唯一生产入口 = `Session.append`"。
+
+**不变式**(本 ADR 升级前必过):
+
+- **递归单元持栈**:v2 递归栈(`set[str]` 在 `SubgraphRunner._recursion_stack`)owner 不变,driver 不持栈、不做 cycle/depth 自管理——避免「unit of recursion ≠ unit of execution」的双轨异化(§10.11.3 reject A)。
+- **`PhaseOutput` 单一终态**:success-or-failure 同载体、frozen、`extra="forbid"`;新增字段是 typed enum + typed str,不是「error: str 替代 outcome_kind」。`InterpretationResult.outcome` 不动,仍是 driver 内部唯一 FAILED 形态 owner。
+- **观测面 ≤ 控制面**:observer 注入是 seam,**不是** `ctx.emit` 广播(`channel.py:80-110` 已 reject 该路径);funnel 单一 → `Session.append`;observer 失败仍由 `_emit_observers` 含住(node_graph_driver.py L329-338),不引入第二层 suppression。
+- **no-LLM 路径可观测**:`_DefaultReasoner` 不假装有 `complete_turn` / `build_turn_plan` / `render_turn`;集成测试断言 `think.reason.complete not in spec.nodes` when `strip_complete_when_no_llm=True`;首启动一行 `INFO` log 标识 fallback 生效。
+
+#### §10.11.2 落地形状(契约)
+
+```text
+# BundleGraphNode 新增一个 typed 字段(bundle_graph.py L38-65)
+@dataclass(frozen=True, slots=True)
+class BundleGraphNode:
+    id: str
+    region: str | None
+    factory: str
+    purpose: str = ""
+    config: Mapping[str, Any] = field(default_factory=dict)
+    sub_spec_ref: SubgraphReference | None = None  # NEW;yaml 解析时填充
+
+# PhaseOutput 扩两个 typed 字段(channel.py L39-50)
+class PhaseOutput(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    decision: Decision | None = None
+    observation: Observation | None = None
+    reflection: Reflection | None = None
+    response: LLMResponse | None = None
+    outcome_kind: ExecutionOutcome | None = None   # NEW
+    error: str | None = None                       # NEW
+
+# SubgraphRunner 新增 observers(runner.py L71-79);return type 不变,内部填 outcome_kind
+def __init__(self, *, resolver, runtime, max_subgraph_depth=..., observers=()): ...
+async def run(self, *, ref, outer_state, channel) -> tuple[AgentState, PhaseOutput]: ...
+
+# NodeGraphDriver 新增 sub_runner + channel_factory(node_graph_driver.py L114-126);
+# run() 内 sub_spec_ref 分支在前(L184 之前)
+def __init__(self, *, spec, plan_ref, scope, region_phase=THINK, observers=(),
+             sub_runner=None, channel_factory=None): ...
+```
+
+#### §10.11.3 Alternatives considered(reject)
+
+- **A — driver 自递归 + `BundleGraphSpec.sub_spec_ref` 重定位**。`InterpretationResult` 透传。Reject:relocate `PhaseNode.sub_spec_ref` → `BundleGraphSpec` 触 schema 变更(`declarative_graph.py:80-84` + yaml 解析 + 测试 fixture 全改),且把 driver 当递归单元要让它持栈——分裂 state(runner 持)与 behavior(driver 做),「unit of recursion ≠ unit of execution」的异化正是本 ADR 反对的(§6.1 决定)。代价高,赢面小。
+- **B — driver collapse 成 leaf,runner 拿 traversal**。driver 退化为「接单节点 + 单 executor」;`SubgraphRunner` 拿节点循环 + 边选择 + executor 解析。Reject:driver 已 owned `visits` / `facts` / `phase_result`(node_graph_driver.py L170, L228-230, L255) — 搬入 runner 后 runner surface area ~3× ,且 driver 还要能直接被 `lift_subgraph_reference_to_v2` 单点出口用,collapse 会破坏这两个不变式。
+- **C' — fake `_DefaultReasoner.complete_turn` 返回 stub `LLMResponse`**。让 no-LLM 路径看起来像 LLM 路径。Reject:把 shape mismatch 用 stub 盖住,操作员和测试失去「no-LLM mode 生效」的判别信号;集成测试无法断言 fallback 拓扑。
+- **D — observer 用 `ctx.emit` 广播**。`channel.py:80-110` 已 reject(无类型路由,跨 run 不隔离);`ctx.emit` 不是 AGENTS.md §2.2 表中 "Journal / Session log / Event" 的唯一生产入口(`Session.append` 是)。重新讨论即推翻既有决定,不接受。
+- **E — new exception type `InnerSubgraphFailedError` 在 runner 抛**。Reject:exception-based control flow 是 ADR-0219 §6 已 reject 的形态(runner 拥有 failure shape via typed result,不 raise);raise 会迫使 outer interpreter 的 `try/except` 拓宽,目前只 catch `SubgraphCycleError` / `SubgraphDepthExceededError`(guard violation),不 catch driver failure。
+- **F — 返回 3-tuple `(state, output, outcome_kind)`**。Reject:同 ADR-0219 §6 reject 多 return 的逻辑,丢 frozen 模型保证,迫使每消费者 unpack 三对象。
+
+#### §10.11.4 delete-when(本节通过条件)
+
+| 条件 | 命令 / 文件 | 通过条件 |
+|---|---|---|
+| `BundleGraphNode.sub_spec_ref` typed 化 | `grep -n 'sub_spec_ref' lca/contracts/protocols/declarative/declarative_1/bundle_graph.py` | 字段定义;`__post_init__` 验证 `SubgraphReference` 形状 |
+| yaml loader 解析 `config.sub_spec_ref` | `grep -n 'sub_spec_ref' lca/harness/declarative/compile/subgraph_resolver.py` | `_load_bundle_graph_spec` 内 `SubgraphReference(...)` 构造点 |
+| `PhaseOutput` 新增 typed 字段 | `grep -n 'outcome_kind\|error:' lca/framework/subgraph/plugins/channel.py` | 两个字段定义,frozen + `extra="forbid"` 不变 |
+| `SubgraphRunner` 透传 observers | `grep -n 'observers=' lca/framework/subgraph/plugins/runner.py lca/framework/subgraph/plugins/node_graph_driver.py` | runner 构造 + driver 构造两侧都有 |
+| `SubgraphRunner.run` 填 `outcome_kind` | `grep -n 'outcome_kind\|outcome\.kind' lca/framework/subgraph/plugins/runner.py` | return 前 `model_copy(update=...)` |
+| driver `sub_spec_ref` 分支 | `grep -n 'sub_spec_ref' lca/framework/subgraph/plugins/node_graph_driver.py` | `run()` 内 branch |
+| default-factory 绑 `Session.append` | `grep -n 'session_append_observer\|observers=' lca/plugins/journal/declarative/runtime_seams_provider.py` | closure + bind 调用 |
+| no-LLM mode 剥离 `think.reason.complete` | integration test `test_no_llm_mode_strips_complete` | spec.nodes 不含 `think.reason.complete` |
+| outer interpreter 读 `output.outcome_kind` | `grep -n 'outcome_kind' lca/framework/declarative/plugins/interpreter.py` | `_fold_subgraph_output` 内 branch |
+| 6 个新单测 + 2 个新集成测 | `pytest tests/unit/framework/subgraph/ tests/integration/think/ -v` | 全过 |
+| H6 + 本节端到端 | `./scripts/lca-ops runs create --user-text "ping" --wait --json` | run `success`;`traces/<run>.spine.jsonl` 含 ≥ 6 个 `phase_graph.node.{start,end}`(inner 3 节点 × 2 事件) |
+
+当且仅当上述 11 条全过,本 ADR 升级 Accepted。
+
 ---
 
 ## 11. delete-when 总览(可观察的状态)
