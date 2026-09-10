@@ -881,18 +881,13 @@ class Config(BaseModel):
 @plugin(
     id="declarative.interpreter",
     requires=(
-        "journal_committer",
-        "effect_gateway",
-        "delta_reducer",
-        "phase_observer",
         "subgraph_runner",
         "subgraph_runtime",
         "phase_output_channel_factory",
         "loop_guard_evaluator",
-        "runtime_lifecycle_publisher",
     ),
     provides=["declarative_interpreter"],
-    layer="L1",
+    layer="L2",
     effects="none",
     kind=PluginKind.DRIVER,
     description=(
@@ -937,32 +932,31 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     """Construct the interpreter instance with Cordis-injected capability seams."""
 
     del config
-    journal = ctx.inject("journal_committer")
-    effect_gateway = ctx.inject("effect_gateway")
-    reducer = ctx.inject("delta_reducer")
-    phase_observer = ctx.inject("phase_observer")
-    loop_guard_evaluator = ctx.inject("loop_guard_evaluator")
-    lifecycle_publisher = ctx.inject("runtime_lifecycle_publisher")
-    subgraph_runner = ctx.inject("subgraph_runner")
-    subgraph_runtime = ctx.inject("subgraph_runtime")
-    channel_factory = ctx.inject("phase_output_channel_factory")
+    loop_guard_evaluator = ctx.require("loop_guard_evaluator")
+    subgraph_runner = ctx.require("subgraph_runner")
+    subgraph_runtime = ctx.require("subgraph_runtime")
+    channel_factory = ctx.require("phase_output_channel_factory")
     # ADR-0219 §10.11 item (4): observer port from Cordis. Cordis-boot
     # may pass an empty tuple; the Default factory injects the
     # Session.append closure directly via its own construction path.
     observers: tuple = ()
-    if hasattr(ctx, "require"):
-        try:
-            observers = tuple(ctx.require("subgraph_observers"))
-        except Exception:
-            observers = ()
+    try:
+        observers = tuple(ctx.require("subgraph_observers"))
+    except Exception:
+        observers = ()
 
+    # journal / effect_gateway / reducer / phase_observer / lifecycle_publisher
+    # are wired by ``runtime_bindings.assemble`` from the *_factory
+    # capabilities (not Cordis-bound). Pass None placeholders; the
+    # interpreter accepts the binding-level replacements via its
+    # generic PlanInput once the runtime_bindings construct it.
     interpreter = GenericPlanInterpreter(
-        journal=journal,
-        effect_gateway=effect_gateway,
-        reducer=reducer,
-        phase_observer=phase_observer,
+        journal=None,
+        effect_gateway=None,
+        reducer=None,
+        phase_observer=None,
         loop_guard_evaluator=loop_guard_evaluator,
-        lifecycle_publisher=lifecycle_publisher,
+        lifecycle_publisher=None,
     )
     interpreter.bind_cordis_seams(
         subgraph_runner=subgraph_runner,

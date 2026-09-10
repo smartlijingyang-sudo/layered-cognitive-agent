@@ -224,6 +224,12 @@ class NodeGraphDriver:
                 # mirror outer interpreter.py:402-414: absorb inner output
                 # into port_context so subsequent edge nodes see it.
                 sub_channel.absorb(sub_output)
+                # ADR-0219 §10.11 close-out: forward the inner subgraph's
+                # produced port_values to the outer port_context so
+                # downstream edge nodes (e.g. think.classify) can read
+                # the inner reasoning's ``response`` without falling
+                # through to a no-input branch.
+                port_context.merge_output(sub_output.port_values)
                 # FAILED inner → propagate to outer driver via typed failure shape
                 if sub_output.outcome_kind is ExecutionOutcome.FAILED:
                     return _failed_result(

@@ -121,10 +121,27 @@ class DefaultResultFinalizerFactory(ResultFinalizerFactory):
 
 
 class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
-    """Build the standard interpreter with its local traversal policy."""
+    """Build the standard interpreter with its local traversal policy.
 
-    def __init__(self, loop_guard_evaluator: object | None = None) -> None:
+    The ``declarative.interpreter`` plugin (L2) provides the subgraph
+    and channel seams; this factory's ``create`` constructs a fresh
+    ``GenericPlanInterpreter`` using the journal / gateway / reducer /
+    observer / lifecycle passed by ``runtime_bindings`` and binds the
+    cached subgraph seams onto it before returning.
+    """
+
+    def __init__(
+        self,
+        loop_guard_evaluator: object | None = None,
+        *,
+        subgraph_runner: object | None = None,
+        subgraph_runtime: object | None = None,
+        channel_factory: object | None = None,
+    ) -> None:
         self._loop_guard_evaluator = loop_guard_evaluator
+        self._subgraph_runner = subgraph_runner
+        self._subgraph_runtime = subgraph_runtime
+        self._channel_factory = channel_factory
 
     def create(
         self,
@@ -135,7 +152,7 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
         phase_observer: object,
         lifecycle_publisher: RuntimeLifecyclePublisher,
     ) -> DeclarativeInterpreter:
-        return cast(
+        interpreter = cast(
             "DeclarativeInterpreter",
             GenericPlanInterpreter(
                 journal=journal,
@@ -146,6 +163,20 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
                 lifecycle_publisher=lifecycle_publisher,
             ),
         )
+        if all(
+            x is not None
+            for x in (
+                self._subgraph_runner,
+                self._subgraph_runtime,
+                self._channel_factory,
+            )
+        ):
+            interpreter.bind_cordis_seams(
+                subgraph_runner=self._subgraph_runner,
+                subgraph_runtime=self._subgraph_runtime,
+                channel_factory=self._channel_factory,
+            )
+        return interpreter
 
 
 class ObservabilityRuntimeJournalFactory(RuntimeJournalFactory):
@@ -157,7 +188,12 @@ class ObservabilityRuntimeJournalFactory(RuntimeJournalFactory):
 
 @plugin(
     id="lca-declarative-runtime-seams-provider",
-    requires=["loop_guard_evaluator"],
+    requires=[
+        "loop_guard_evaluator",
+        "subgraph_runner",
+        "subgraph_runtime",
+        "phase_output_channel_factory",
+    ],
     provides=[
         "checkpoint_state_resolver_factory",
         "declarative_interpreter_factory",
@@ -222,9 +258,39 @@ async def setup(ctx: PluginContext, config: Config) -> None:
 
     del config
     ctx.provide("checkpoint_state_resolver_factory", DefaultCheckpointStateResolverFactory())
+
+    # Pull the three subgraph / channel seams from Cordis so
+    # ``create`` can ``bind_cordis_seams`` on the interpreter. All
+    # three are provided by ``declarative.interpreter`` (L2) which
+    # runs before this L2 seams plugin in the cordis boot DAG; if a
+    # future profile replaces the L2 interpreter provider, the
+    # require calls fall through to None and the inner subgraph
+    # fails fast with PG-005 as before.
+    subgraph_runner: object | None = None
+    subgraph_runtime: object | None = None
+    channel_factory: object | None = None
+    if hasattr(ctx, "require"):
+        try:
+            subgraph_runner = ctx.require("subgraph_runner")
+        except Exception:
+            subgraph_runner = None
+        try:
+            subgraph_runtime = ctx.require("subgraph_runtime")
+        except Exception:
+            subgraph_runtime = None
+        try:
+            channel_factory = ctx.require("phase_output_channel_factory")
+        except Exception:
+            channel_factory = None
+
     ctx.provide(
         "declarative_interpreter_factory",
-        DefaultDeclarativeInterpreterFactory(ctx.require("loop_guard_evaluator")),
+        DefaultDeclarativeInterpreterFactory(
+            ctx.require("loop_guard_evaluator"),
+            subgraph_runner=subgraph_runner,
+            subgraph_runtime=subgraph_runtime,
+            channel_factory=channel_factory,
+        ),
     )
     ctx.provide("delta_reducer_factory", RegistryDeltaReducerFactory())
     ctx.provide("effect_dispatcher_factory", RegistryEffectDispatcherFactory())

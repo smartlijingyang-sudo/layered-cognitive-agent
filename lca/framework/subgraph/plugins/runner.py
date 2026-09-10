@@ -264,8 +264,8 @@ async def setup(ctx: PluginContext, config=None) -> None:
     ``Session.append`` observer at construction-time and constructs
     the runner directly with ``observers=...``.
     """
-    resolver = ctx.inject("subgraph_resolver")
-    runtime = ctx.inject("subgraph_runtime")
+    resolver = ctx.require("subgraph_resolver")
+    runtime = ctx.require("subgraph_runtime")
     observers: tuple[ObserverFn, ...] = ()
     if hasattr(ctx, "require"):
         try:
