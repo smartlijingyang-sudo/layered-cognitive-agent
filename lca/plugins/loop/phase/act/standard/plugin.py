@@ -71,29 +71,7 @@ class StandardActExecutor:
                 "decision": decision,
             },
         )
-        # ADR-0219 §4.3: typed payload. Downstream ``payload_of(ACT, Observation)``
-        # reads ``result.payload``; without an Observation the remember
-        # stage denies with "memory admission requires outcome and
-        # reflection". Carry the decision in an Observation so the
-        # downstream typed fold has data to read; the actual body work
-        # is delegated to the effect gateway via the envelope.
-        from lca.contracts.models.core.execution.decision import Observation
-        import uuid as _uuid
-        observation = Observation(
-            observation_id=f"obs-default-{_uuid.uuid4().hex[:12]}",
-            success=True,
-            payload={
-                "decision_id": decision.decision_id,
-                "effect_class": "tools",
-                "provider": "effect.body",
-                "result_summary": f"act executed for decision {decision.decision_id!r}",
-            },
-        )
-        return PhaseResult(
-            result_kind="observation",
-            payload=observation,
-            command_envelope=envelope,
-        )
+        return PhaseResult(result_kind="observation", command_envelope=envelope)
 
 
 @plugin(

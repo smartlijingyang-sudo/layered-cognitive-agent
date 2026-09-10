@@ -54,23 +54,11 @@ class StandardReflectExecutor:
         # ADR-0219 §4.3: typed read.
         brain = StandardPhaseCapabilities(context.capabilities).brain
         observation = context.payload_of(SemanticPhase.ACT, Observation)
-        # ADR-0219 §4.3: when the typed payload read is incomplete
-        # (e.g. no Brain wired in the no-LLM profile) build a typed
-        # Reflection from the observation alone so the downstream
-        # ``remember`` stage has data to fold. ``fallback_phase_result``
-        # returns ``payload=None`` which makes ``payload_of`` return
-        # ``None`` and ``control.remember.admit`` deny with
-        # "memory admission requires outcome and reflection".
-        from lca.contracts.models.core.execution.decision import Reflection
-        import uuid as _uuid
         if brain is None or observation is None:
-            return PhaseResult(
+            return fallback_phase_result(
+                phase=SemanticPhase.REFLECT,
                 result_kind="reflection",
-                payload=Reflection(
-                    reflection_id=f"ref-default-{_uuid.uuid4().hex[:12]}",
-                    observation_id=getattr(observation, "observation_id", None),
-                    summary="no brain wired; default reflection",
-                ),
+                input=input,
             )
         return PhaseResult(
             result_kind="reflection",

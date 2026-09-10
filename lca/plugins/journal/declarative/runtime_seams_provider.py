@@ -229,41 +229,6 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
                     continue
                 registry[(region, semantic_name)] = cls()
 
-            # ADR-0219 §10.11: in no-LLM mode, ``think.reason.complete``
-            # is stripped at lift time so no ``LLMResponse`` ever reaches
-            # ``think.classify``. The standard ``ThinkClassifyExecutor``
-            # gates on ``response is None`` and would emit an empty
-            # ``NodeOutput`` (no Decision), leaving ``act.authorize``
-            # with nothing to authorize. The Default factory swaps in a
-            # ``_NoLLMClassifyAdapter`` whose ``node_execute`` ignores
-            # the missing response and lets the classifier produce its
-            # default Decision. The decision is the same fallback the
-            # factory uses for any other caller; we just stop gating on
-            # an absent port value.
-            from lca.plugins.think.classify import ThinkClassifyExecutor
-            from lca.contracts.protocols.declarative.declarative_1.node_executor import (
-                NodeContext,
-                NodeInput,
-                NodeOutput,
-            )
-
-            class _NoLLMClassifyAdapter(ThinkClassifyExecutor):
-                """No-LLM variant of :class:`ThinkClassifyExecutor`."""
-
-                async def node_execute(
-                    self,
-                    context: NodeContext,
-                    input: NodeInput,
-                ) -> NodeOutput:
-                    runtime = context.runtime
-                    classifier = runtime.decision_classifier
-                    if classifier is None:
-                        return NodeOutput(port_values={})
-                    decision = classifier.classify(None)
-                    return NodeOutput(port_values={"decision": decision})
-
-            registry[("phase:think", "think.classify")] = _NoLLMClassifyAdapter()
-
             from lca.plugins.think.reason.complete import ThinkReasonCompleteExecutor
             registry[("phase:think", "think.reason")] = ThinkReasonCompleteExecutor()
 
@@ -275,36 +240,6 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
             from lca.contracts.models.core.conversation.llm import LLMResponse
             from lca.contracts.models.core.execution.decision import Decision
 
-            class _ReducerAdapter:
-                """Adapt the DeltaReducer given to the factory into a full Reducer.
-
-                ``DeclarativeInterpreterFactory.create`` receives a
-                ``DeltaReducer`` (which only implements ``apply_delta``);
-                the inner think subgraph expects a ``Reducer`` that also
-                exposes ``apply_skill_route``. The adapter forwards the
-                delta path unchanged and routes ``apply_skill_route`` to
-                the inner reducer: either the wrapped ``._reducer`` (when
-                ``RegistryDeltaReducer`` holds a real Reducer) or the
-                factory argument itself (when the caller already passed a
-                full Reducer).
-                """
-
-                def __init__(self, delta: object) -> None:
-                    self._delta = delta
-                    self._inner = getattr(delta, "_reducer", delta)
-
-                def apply_delta(self, state, delta):  # type: ignore[no-untyped-def]
-                    return self._delta.apply_delta(state, delta)
-
-                def apply_skill_route(self, state, active_template):  # type: ignore[no-untyped-def]
-                    inner = self._inner
-                    if inner is self._delta:
-                        # Caller passed a DeltaReducer with no inner reducer;
-                        # return the state untouched so the think subgraph
-                        # falls back to the no-route path.
-                        return state
-                    return inner.apply_skill_route(state, active_template)
-
             class _DefaultReasoner:
                 """Fake Reasoner:返回空 LLMResponse 让 classify 走默认 fallback。"""
                 async def generate_thoughts(self, state):
@@ -313,32 +248,9 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
             class _DefaultDecisionClassifier:
                 """Fake Classifier:空 LLMResponse → emit 默认 respond decision。"""
                 def classify(self, response):
-                    # In no-LLM mode ``think.reason.complete`` is stripped at
-                    # lift time, and ``think.reason.render`` only emits
-                    # ``turn_render``. Without an ``LLMResponse`` in the
-                    # graph, classify must still produce a Decision so the
-                    # outer interpreter has a decision to forward to
-                    # ``act.authorize``. Returning the default respond
-                    # decision keeps the no-LLM path observable in tests
-                    # without faking an LLMResponse shape on the way in.
-                    import uuid as _uuid
                     return Decision(
-                        decision_id=f"dec-default-{_uuid.uuid4().hex[:12]}",
-                        action_type="respond",
-                        rationale="default no-LLM fallback",
-                        confidence=1.0,
+                        action_type="respond", rationale="default", confidence=1.0,
                     )
-
-                def generate_decision(self, state, render=None):  # type: ignore[no-untyped-def]
-                    """Fallback path used when ``response`` port is absent.
-
-                    The no-LLM factory strips ``think.reason.complete``
-                    so no ``LLMResponse`` reaches ``think.classify``.
-                    This sibling method lets the classify node still
-                    produce a Decision by combining the (optional)
-                    ``turn_render`` port value with the runtime state.
-                    """
-                    return self.classify(None)
 
             class _DefaultDecisionGate:
                 """Fake Gate:passthrough。"""
@@ -362,14 +274,6 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
                 "skill_router": _DefaultSkillRouter(),
                 "supports_shortcut": _DefaultSupportsShortcut(),
                 "agent_gates": _DefaultDecisionGate(),
-                # ADR-0219 §10.11: think.route needs a reducer with
-                # ``apply_skill_route(state, active_template)``. The
-                # DeltaReducer the factory receives only implements
-                # ``apply_delta``; delegate ``apply_skill_route`` to the
-                # underlying Reducer (``reducer._reducer`` when wrapped,
-                # or the factory argument itself when it already
-                # implements the full Reducer protocol).
-                "reducer": _ReducerAdapter(reducer),
             }
 
             class _DefaultSubgraphRuntime:
