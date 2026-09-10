@@ -31,7 +31,6 @@ from lca.contracts.harness.composition.plugin_contract import (
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.protocols.act.command.envelope import RunDelta, RunFact
-from lca.contracts.protocols.declarative.declarative_1.declarative_common import SemanticPhase
 from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
     JournalCommitter,
     PhaseResult,
@@ -59,6 +58,7 @@ from lca.contracts.protocols.runtime.runtime.lifecycle import (
     RuntimeLifecyclePublisher,
 )
 from lca.contracts.protocols.state.plan import CompiledRunPlan
+from lca.framework.subgraph.plugins.channel import PhaseOutput
 from lca.harness.declarative.compile.assembler.assembler import (
     ExecutablePlan,
     RestrictedScope,
@@ -159,10 +159,7 @@ class GenericPlanInterpreter:
         phase_observer: PhaseObserver | None = None,
         loop_guard_evaluator: LoopGuardEvaluator | None = None,
         lifecycle_publisher: RuntimeLifecyclePublisher | None = None,
-        subgraph_resolver: object | None = None,
-        subgraph_executable_factory: object | None = None,
         subgraph_hook_emitter: SubgraphHookEmitter | None = None,
-        subgraph_scope: RestrictedScope | None = None,
     ) -> None:
         self._journal = journal or InMemoryJournalCommitter()
         self._transaction = PhaseExecutionTransaction(
@@ -177,12 +174,9 @@ class GenericPlanInterpreter:
         )
         self._loop_guard_evaluator = loop_guard_evaluator or DeclarativeLoopGuardEvaluator()
         self._lifecycle_publisher = lifecycle_publisher
-        self._subgraph_resolver = subgraph_resolver
-        self._subgraph_executable_factory = subgraph_executable_factory
         self._subgraph_hook_emitter: SubgraphHookEmitter = (
             subgraph_hook_emitter or NullSubgraphHookEmitter()
         )
-        self._subgraph_scope = subgraph_scope
         # Cordis-injected think-subgraph single-engine seams.  These are
         # ``None`` for legacy direct constructors; the plugin ``setup``
         # below wires them through ``ctx.inject(...)`` so the think
@@ -396,9 +390,7 @@ class GenericPlanInterpreter:
                 # declare ``sub_spec_ref``; the outer drive delegates the
                 # whole subgraph to ``SubgraphRunner`` (Cordis-injected
                 # single-engine seam) and folds its PhaseOutput back into
-                # the outer channel before advancing.  Plan §13.11: 当
-                # Cordis 注入缺失, 走 _drive_subgraph_inner 的 legacy 路径
-                # (subgraph_scope / subgraph_executable_factory)。
+                # the outer channel before advancing.
                 if node.sub_spec_ref is not None:
                     # Per plan §13.10/R6: think subgraph 走 Cordis-injected SubgraphRunner
                     # 单引擎 seam。必须通过 bind_cordis_seams 注入;缺失直接 fail-loud
@@ -420,10 +412,7 @@ class GenericPlanInterpreter:
                     )
                     channel.absorb(output)
                     current_state = sub_state
-                    virtual_result = PhaseResult(
-                        result_kind="think_stage",
-                        payload=output.decision,
-                    )
+                    virtual_result = self._fold_subgraph_output(output)
                     edge = self._select_edge(
                         graph.edges,
                         node.id,
@@ -452,24 +441,12 @@ class GenericPlanInterpreter:
                             f"no validated next edge from node: {node.id} after sub_spec",
                         )
                     visits.append(
-                        PhaseVisit(node.id, node.semantic_phase, "think_stage", edge.target)
+                        PhaseVisit(node.id, node.semantic_phase, virtual_result.result_kind, edge.target)
                     )
-                    payload = (
-                        getattr(output, "decision", None)
-                        if "output" in locals()
-                        else getattr(current_state, "decision", None)
-                    )
-                    # 关键:把 think 阶段产物写到 artifacts["think"],让 act.main control
-                    # (control.act.authorize) 通过 _contribution_context 读到 decision。
-                    # 之前只走 advance 但 advance 不写 artifacts,导致 act 段 decision=None
-                    # 而触发 'action type is not authorized' (H6)。
-                    phase_result = PhaseResult(
-                        result_kind="think_stage",
-                        payload=payload,
-                    )
+                    payload = virtual_result.payload
                     traversal.record_result(
-                        semantic_phase=SemanticPhase.THINK,
-                        result=phase_result,
+                        semantic_phase=node.semantic_phase,
+                        result=virtual_result,
                         effect_output=payload,
                     )
                     traversal.advance(
@@ -724,6 +701,19 @@ class GenericPlanInterpreter:
 
             logging.getLogger(__name__).debug("subgraph hook emitter raised: %s", exc)
 
+    @staticmethod
+    def _fold_subgraph_output(output: PhaseOutput) -> PhaseResult:
+        """Fold a subgraph's typed PhaseOutput into a single PhaseResult.
+
+        The subgraph's external contract is ``output.decision``; the other
+        fields (observation / reflection / response) are consumed by
+        other phases, not the outer interpreter.
+        """
+        return PhaseResult(
+            result_kind="decision",
+            payload=output.decision,
+        )
+
     async def _drive_subgraph(
         self,
         *,
@@ -756,19 +746,28 @@ class GenericPlanInterpreter:
     ) -> AgentState:
         """Recurse into a subgraph plan and return the merged outer state.
 
-        Per review 2026-09-10 §13.10: when the interpreter plugin is
-        Cordis-bootstrapped and the subgraph resolver returns a v2
-        BundleGraph plan marker, the recursion delegates to the v2
-        NodeGraphDriver through the injected ``subgraph_runner`` seam.
-        Otherwise the legacy GraphAssembler + inner ``_drive`` path
-        applies (the top-level perceive/act/reflect/remember/stop
-        subgraphs still rely on it).
+        ADR-0219 §3 + §6: **single seam** for subgraph recursion. The
+        Cordis-injected ``SubgraphRunner`` owns plan resolution, cycle
+        and depth guards, and the inner node loop (via
+        :class:`NodeGraphDriver`). The v1 ``GraphAssembler + inner
+        _drive`` path is removed (legacy deleted per ADR-0219 §10.5
+        reject); the runner is the only path.
         """
 
         if depth > MAX_SUBGRAPH_DEPTH:
             raise DeclarativeValidationError(
                 "PG-005",
                 f"subgraph recursion exceeded {MAX_SUBGRAPH_DEPTH} from outer seam {edge_id!r}",
+            )
+
+        sub_runner = self._subgraph_runner
+        channel_factory = self._channel_factory
+        if sub_runner is None or channel_factory is None:
+            raise DeclarativeValidationError(
+                "PG-005",
+                f"subgraph_ref {ref.binding_edge!r} declared but interpreter "
+                f"has no Cordis-injected subgraph_runner/channel_factory; "
+                f"call bind_cordis_seams() first",
             )
 
         emitter = self._subgraph_hook_emitter
@@ -791,13 +790,14 @@ class GenericPlanInterpreter:
         outcome = "success"
         error = ""
         try:
-            result_state = await self._drive_subgraph_inner(
+            channel = channel_factory()
+            sub_state, output = await sub_runner.run(
                 ref=ref,
                 outer_state=outer_state,
-                current_node_id=current_node_id,
-                depth=depth,
-                edge_id=edge_id,
+                channel=channel,
             )
+            channel.absorb(output)
+            result_state = sub_state
         except DeclarativeValidationError as exc:
             outcome = "validation_error"
             error = f"{exc.code}: {exc}"
@@ -823,88 +823,6 @@ class GenericPlanInterpreter:
                 ),
             )
         return result_state
-
-    async def _drive_subgraph_inner(
-        self,
-        *,
-        ref: SubgraphReference,
-        outer_state: AgentState,
-        current_node_id: str,
-        depth: int,
-        edge_id: str,
-    ) -> AgentState:
-        """Resolved recursion body for ``_drive_subgraph_ref``."""
-
-        del depth, edge_id, current_node_id
-        # Single-engine seam (review 2026-09-10 §13.10): when the
-        # subgraph_runner is Cordis-injected and the resolved plan is a
-        # v2 BundleGraph marker, delegate to the v2 driver through the
-        # runner.  Otherwise fall back to the legacy GraphAssembler +
-        # inner drive path used by the top-level perceive/act/reflect/
-        # remember/stop subgraphs.
-        resolver = self._subgraph_resolver
-        if resolver is None:
-            raise DeclarativeValidationError(
-                "PG-005",
-                f"subgraph_ref {ref.binding_edge!r} declared but interpreter "
-                f"has no subgraph_resolver wired",
-            )
-        sub_plan_obj = resolver.resolve(ref.plan_ref, runtime=self._subgraph_runtime)
-        if not isinstance(sub_plan_obj, CompiledRunPlan):
-            raise DeclarativeValidationError(
-                "PG-005",
-                f"subgraph_resolver returned non-plan value for "
-                f"{ref.plan_ref!r}: {type(sub_plan_obj).__name__}",
-            )
-
-        if self._subgraph_runner is not None and self._channel_factory is not None:
-            from lca.contracts.protocols.declarative.declarative_1.v2_plan_marker import (
-                V2BundleGraphPlanMarker,
-            )
-
-            if isinstance(sub_plan_obj, V2BundleGraphPlanMarker):
-                sub_runner = self._subgraph_runner
-                channel = self._channel_factory()
-                sub_state, output = await sub_runner.run(
-                    ref=ref,
-                    outer_state=outer_state,
-                    channel=channel,
-                )
-                channel.absorb(output)
-                return sub_state
-
-        # Legacy path (top-level perceive/act/reflect/remember/stop):
-        # GraphAssembler + inner drive, untouched by think-subgraph work.
-        factory = self._subgraph_executable_factory
-        scope = self._subgraph_scope
-        if scope is not None:
-            from lca.harness.declarative.compile.assembler.assembler import GraphAssembler
-
-            sub_executable = GraphAssembler().assemble(sub_plan_obj, scope)
-        elif factory is None:
-            raise DeclarativeValidationError(
-                "PG-005",
-                f"interpreter has no subgraph_executable_factory wired for {ref.plan_ref!r}",
-            )
-        else:
-            sub_executable = factory(sub_plan_obj)
-        sub_result = await self._drive(
-            sub_executable,
-            state=outer_state,
-            input=None,
-            budget=None,
-            capabilities=self._active_capabilities,
-            artifacts=None,
-            resume_cursor=None,
-            allow_natural_exit=True,
-        )
-        if sub_result.outcome is not None and sub_result.outcome.kind.name == "FAILED":
-            raise RuntimeError(
-                f"subgraph {ref.plan_ref!r} failed at node "
-                f"{sub_result.outcome.cursor.node_id!r}: "
-                f"{sub_result.outcome.error_fact}"
-            )
-        return sub_result.state
 
 
 # ---------------------------------------------------------------------------

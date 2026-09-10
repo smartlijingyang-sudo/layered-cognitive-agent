@@ -7,6 +7,11 @@ think 子图节点 plugin:用 DecisionGate 收敛候选 Decision。
 ADR-0218 §3.3:节点 plugin 由作者显式书写完整 ``@plugin(...)`` 装饰器,
 工厂 ``setup(ctx)`` 通过 Cordis ``ctx.provide`` 双键注册
 (composite + region-less,think 子图专用的 NodeExecutor 解析)。
+
+ADR-0219 §5.5 / §7:port contract 在 plugin 自身声明(typed ``PortName``
+Literal);gate 消费 ``decision`` 后写回 ``decision`` 槽——**不发明新字段**
+(`enforced_decision` / `think_signal` 退役)。语义:gate 是 decision 的
+transformer,不是另一个人。
 """
 
 from __future__ import annotations
@@ -29,6 +34,7 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeInput,
     NodeOutput,
 )
+from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
@@ -42,6 +48,10 @@ class ThinkGateExecutor:
 
     semantic_name: str = "think.gate"
     region: str = "phase:think"
+    # ADR-0219 §5.5: typed port contract declared on the plugin (graph
+    # layer does not know port names; it only knows topology).
+    declared_inputs: tuple[PortName, ...] = ("decision",)
+    declared_outputs: tuple[PortName, ...] = ("decision",)
 
     async def node_execute(
         self,
@@ -50,8 +60,8 @@ class ThinkGateExecutor:
     ) -> NodeOutput:
         """think 子图节点入口。
 
-        inputs 端口(yaml):decision, in_state
-        outputs 端口(yaml):enforced_decision, think_signal
+        ADR-0219 §7: gate 写回 ``decision`` 槽——**不发明新字段**。
+        语义:gate 是 decision 的 transformer,enforce 之后仍是 decision。
         """
         runtime = context.runtime
         state = runtime.state
@@ -64,12 +74,7 @@ class ThinkGateExecutor:
         if state is not None and isinstance(gate, DecisionGate):
             decision = await gate.enforce(state, decision)
 
-        return NodeOutput(
-            port_values={
-                "enforced_decision": decision,
-                "think_signal": "gated",
-            },
-        )
+        return NodeOutput(port_values={"decision": decision})
 
 
 @plugin(

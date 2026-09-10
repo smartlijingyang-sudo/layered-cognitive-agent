@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from lca.contracts.models.core.execution.decision import Decision
+
 from dataclasses import dataclass
-from typing import cast
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -16,7 +17,6 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.models.core.execution.decision import Decision
 from lca.contracts.protocols.act.command.envelope import CapabilityGrant, mint_envelope
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     PhaseContext,
@@ -48,8 +48,9 @@ class StandardActExecutor:
     """Authorize the selected Body operation through the effect gateway."""
 
     async def execute(self, context: PhaseContext, input: PhaseInput) -> PhaseResult:
+        # ADR-0219 §4.3: typed read.
         body = StandardPhaseCapabilities(context.capabilities).body
-        decision = cast("Decision | None", context.artifacts.get("think"))
+        decision = context.payload_of(SemanticPhase.THINK, Decision)
         if body is None or decision is None:
             return fallback_phase_result(
                 phase=SemanticPhase.ACT,

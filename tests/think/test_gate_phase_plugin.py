@@ -58,7 +58,7 @@ async def test_gate_returns_enforced_decision() -> None:
         _ctx({"phase.think.gate": gate}, decision=decision_in),
         NodeInput(port_values={"decision": decision_in}),
     )
-    assert result.port_values.get("enforced_decision").decision_id == "dec_out"
+    assert result.port_values.get("decision").decision_id == "dec_out"
 
 
 @pytest.mark.asyncio
@@ -79,4 +79,4 @@ async def test_gate_without_gate_capability_passes_decision_through() -> None:
         _ctx({}, decision=decision_in),
         NodeInput(port_values={"decision": decision_in}),
     )
-    assert result.port_values.get("enforced_decision") is decision_in
+    assert result.port_values.get("decision") is decision_in

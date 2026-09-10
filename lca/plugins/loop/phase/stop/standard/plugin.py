@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+from lca.contracts.models.core.execution.decision import (
+    Decision,
+    Observation,
+    Reflection,
+)
+
 from dataclasses import dataclass
-from typing import cast
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -16,7 +21,6 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.policy.stop import StopDecision, StopReason
 from lca.contracts.protocols.act.command.envelope import RunDelta
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
@@ -60,9 +64,9 @@ class StandardStopExecutor:
             )
         stop = stop_policy.decide(
             context.state,
-            cast("Decision | None", context.artifacts.get("think")),
-            cast("Observation | None", context.artifacts.get("act")),
-            cast("Reflection | None", context.artifacts.get("reflect")),
+            context.payload_of(SemanticPhase.THINK, Decision),
+            context.payload_of(SemanticPhase.ACT, Observation),
+            context.payload_of(SemanticPhase.REFLECT, Reflection),
         )
         return PhaseResult(
             result_kind="stop_decision",

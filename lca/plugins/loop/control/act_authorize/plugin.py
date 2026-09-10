@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from lca.contracts.models.core.execution.decision import Decision
+
 from pydantic import BaseModel, ConfigDict
 
 from lca.contracts.atoms.control.slot import ControlSlot
@@ -16,7 +18,6 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.models.core.execution.decision import Decision
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     ContributionRole,
     PhaseContext,
@@ -46,7 +47,9 @@ class ActAuthorizeExecutor:
 
     async def execute(self, context: PhaseContext, input: PhaseInput) -> PhaseResult:
         """Evaluate act-authorize control."""
-        decision = context.decision
+        # ADR-0219 §4.3: typed read via results_by_phase. Legacy
+        # ``context.decision`` is removed from PhaseContext Protocol.
+        decision = context.payload_of(SemanticPhase.THINK, Decision)
         if decision is None or not _is_known_action(decision):
             return PhaseResult(
                 result_kind="control",

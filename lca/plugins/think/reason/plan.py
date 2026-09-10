@@ -28,6 +28,7 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeInput,
     NodeOutput,
 )
+from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
@@ -40,6 +41,10 @@ class ThinkReasonPlanExecutor:
 
     semantic_name: str = "think.reason.plan"
     region: str = "phase:think"
+    # ADR-0219 §5.5: typed port contract declared on the plugin (graph
+    # layer does not know port names; it only knows topology).
+    declared_inputs: tuple[PortName, ...] = ()
+    declared_outputs: tuple[PortName, ...] = ("turn_plan",)
 
     async def node_execute(
         self,

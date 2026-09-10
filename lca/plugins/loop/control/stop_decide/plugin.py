@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from lca.contracts.models.core.execution.decision import Decision
+
 from pydantic import BaseModel, ConfigDict
 
 from lca.contracts.atoms.control.slot import ControlSlot
@@ -45,7 +47,8 @@ class StopDecideExecutor:
                     plugin_id="control.executor.stop-decide",
                 ),
             )
-        if context.decision is not None and context.decision.action_type == ActionType.STOP:
+        if (context.payload_of(SemanticPhase.THINK, Decision) is not None
+                and context.payload_of(SemanticPhase.THINK, Decision).action_type == ActionType.STOP):
             return PhaseResult(
                 result_kind="control",
                 payload=ControlVerdict(

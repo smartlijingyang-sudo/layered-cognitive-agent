@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from lca.contracts.models.core.execution.decision import Decision
+
 from pydantic import BaseModel, ConfigDict
 
 from lca.contracts.atoms.control.slot import ControlSlot
@@ -35,7 +37,8 @@ class ActConstrainExecutor:
 
     async def execute(self, context: PhaseContext, input: PhaseInput) -> PhaseResult:
         """Evaluate act-constrain control."""
-        decision = context.decision
+        # ADR-0219 §4.3: typed read.
+        decision = context.payload_of(SemanticPhase.THINK, Decision)
         if decision is None:
             return PhaseResult(
                 result_kind="control",

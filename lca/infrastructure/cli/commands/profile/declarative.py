@@ -230,8 +230,6 @@ def register(app: typer.Typer) -> None:
                         "id": n.id,
                         "factory": n.factory,
                         "purpose": n.purpose,
-                        "inputs": list(n.inputs),
-                        "outputs": list(n.outputs),
                         "config_keys": sorted(n.config.keys()),
                         "sub_spec_ref": (
                             dict(n.config["sub_spec_ref"])

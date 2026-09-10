@@ -11,7 +11,11 @@ extended to:
   outer :class:`SubgraphRunner` can forward it.
 
 The driver does **one** thing: walk yaml edges and run nodes until
-termination. Responsibility split:
+termination. Per ADR-0219 §6 the recursion guards
+(``SubgraphCycleError`` / ``SubgraphDepthExceededError``) and the
+failure-result constructor (``_failed_result``) were moved out of
+this module into :mod:`lca.framework.subgraph.plugins.runner`.
+Responsibility split:
 
 - scheduling loop          — this class
 - executor resolution      — delegated to ``self._scope.resolve_factory``
@@ -22,6 +26,9 @@ termination. Responsibility split:
 - edge selection           — delegated to ``select_edge``
 - terminal signal publish  — delegated to
   ``project_port_values_to_phase_output`` + ``channel.publish``
+- recursion guards         — delegated to :class:`SubgraphRunner`
+- failure ``InterpretationResult`` shape — delegated to
+  :func:`lca.framework.subgraph.plugins.runner._failed_result`
 
 D5 consumer: :class:`SubgraphRunner` (one ``.run()`` per think
 subgraph execution).
@@ -30,20 +37,17 @@ Boundaries:
 - does not import the outer drive / interpreter internals;
 - does not mutate outer ``AgentState`` directly (emits facts only);
 - does not call the Reducer or write the Spine (only produces
-  ``PhaseVisit`` / ``RunFact`` for the existing commit path).
+  ``PhaseVisit`` / ``RunFact`` for the existing commit path);
+- does not own cycle / depth guards (those live on the runner).
 """
 
 from __future__ import annotations
 
 import contextlib
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from typing import Any
 
-from lca.contracts.exceptions.subgraph import (
-    SubgraphCycleError,
-    SubgraphDepthExceededError,
-)
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.declarative.declarative_1.bundle_graph import (
     BundleGraphNode,
@@ -64,7 +68,7 @@ from lca.harness.declarative.execute.outcome_projection import (
     InterpretationResult,
     PhaseVisit,
 )
-from lca.harness.graph.execute.v2._port_context import PortContext
+from lca.harness.graph.execute.v2._port_context import PortRegistry
 from lca.harness.graph.execute.v2.edge_selector import select_edge
 from lca.harness.graph.execute.v2.node_context_factory import build_node_context
 from lca.harness.graph.execute.v2.node_output_projector import (
@@ -79,14 +83,6 @@ MAX_SUBGRAPH_DEPTH_DEFAULT = 8
 ObserverFn = Callable[[str, dict[str, Any]], Awaitable[None]]
 
 
-@dataclass(frozen=True, slots=True)
-class _ResolvedNode:
-    """driver 内部用的扁平节点视图(spec.nodes + 按 id 索引)。"""
-
-    node: BundleGraphNode
-    index: int
-
-
 class NodeGraphDriver:
     """v2 plan 调度循环。
 
@@ -98,7 +94,7 @@ class NodeGraphDriver:
             n = nodes[current]
             executor = scope.resolve_factory(n.factory, region)
             ctx = build_node_context(n, plan_ref, outer_state, scope)
-            inp = port_context.build_input(n.inputs)
+            inp = port_context.build_input(getattr(executor, "declared_inputs", ()))
             out = await executor.node_execute(ctx, inp)
             phase_result = _project_node_output(out, schema_from_node_config(n.config))
             observers.map(o -> o("phase_graph.node.start", {...}))
@@ -122,15 +118,12 @@ class NodeGraphDriver:
         scope: Any,  # SubgraphRuntime:有 .resolve/.resolve_factory 的对象
         region_phase: SemanticPhase = SemanticPhase.THINK,
         observers: tuple[ObserverFn, ...] = (),
-        max_subgraph_depth: int = MAX_SUBGRAPH_DEPTH_DEFAULT,
     ) -> None:
         self._spec = spec
         self._plan_ref = plan_ref
         self._scope = scope
         self._region_phase = region_phase
         self._observers = observers
-        self.max_subgraph_depth = max_subgraph_depth
-        self._recursion_stack: set[str] = set()
         # 显式 region 优先,fallback 到 bundle.region。任何 node 解析后仍为
         # None → fail-loud,要求 yaml 在 node 或 bundle 层给出 region。
         self._nodes_by_id: dict[str, BundleGraphNode] = {}
@@ -169,9 +162,14 @@ class NodeGraphDriver:
         publishes it. ``outer_input`` is the optional initial
         ``port_values`` projection from the outer drive.
         """
+        # Lazy import:avoid runner <-> driver circular import. The runner
+        # owns the canonical FAILED InterpretationResult shape (ADR-0219
+        # §6); the driver only needs it on the failure paths.
+        from lca.framework.subgraph.plugins.runner import _failed_result
+
         visits: list[PhaseVisit] = []
         facts: list[Any] = []
-        port_context = PortContext()
+        port_context = PortRegistry()
         if outer_input is not None:
             port_context.set_outer_input(outer_input)
 
@@ -201,7 +199,12 @@ class NodeGraphDriver:
                 outer_state=outer_state,
                 scope=self._scope,
             )
-            inp = port_context.build_input(node.inputs)
+            # ADR-0219 §5.5: driver reads port contract from the executor
+            # instance (`executor.declared_inputs`), not from the graph node
+            # (`node.inputs`). The graph only knows topology; the executor
+            # owns its own typed port contract.
+            declared_inputs = getattr(executor, "declared_inputs", ())
+            inp = port_context.build_input(declared_inputs)
 
             try:
                 out = await self._execute_with_emits(
@@ -322,61 +325,6 @@ class NodeGraphDriver:
                 emit_for_node(ep_id, state)
         return out
 
-    async def _drive_subgraph_ref(
-        self,
-        ref: Any,
-        outer_state: AgentState,
-        depth: int = 0,
-    ) -> AgentState:
-        """Guard recursion into a nested ``sub_spec_ref``.
-
-        Per ADR-0217 §3.3.1: depth is a soft limit (default 8). Cycle
-        detection uses the same ``plan_ref`` appearing twice on the
-        recursion stack. The guards fire *before* any inner execution;
-        ``try/finally`` guarantees the stack is unwound on either
-        success or failure.
-
-        The recursion body itself is reserved for the v1 PR-3 follow-up
-        (the resolver seam that resolves ``ref.plan_ref`` into a v2
-        BundleGraphSpec and re-enters :meth:`run`). Until then, this
-        method establishes the guards + state machine and delegates
-        the actual inner execution to ``_drive_subgraph_inner`` (a
-        thin seam the v1 PR-3 commit will wire up).
-
-        Raises:
-            SubgraphDepthExceededError: PG-007-depth
-            SubgraphCycleError: PG-007-cycle
-        """
-        if depth > self.max_subgraph_depth:
-            raise SubgraphDepthExceededError(depth, self.max_subgraph_depth)
-        if ref.plan_ref in self._recursion_stack:
-            raise SubgraphCycleError(ref.plan_ref)
-        self._recursion_stack.add(ref.plan_ref)
-        try:
-            return await self._drive_subgraph_inner(ref, outer_state, depth)
-        finally:
-            self._recursion_stack.discard(ref.plan_ref)
-
-    async def _drive_subgraph_inner(
-        self,
-        ref: Any,
-        outer_state: AgentState,
-        depth: int,
-    ) -> AgentState:
-        """Resolved recursion body for :meth:`_drive_subgraph_ref`.
-
-        PR-3 will swap this for: resolve ``ref.plan_ref`` via
-        ``self._scope`` into a BundleGraphSpec, instantiate a nested
-        ``NodeGraphDriver``, and call ``run()`` with port passthrough.
-
-        For PR-1 we just return ``outer_state`` so the recursion guards
-        are observable in isolation (cycle/depth tests); the no-op
-        body is intentional and documented in §2.1.2 of
-        ``docs/specs/2026-09-10-nested-bundle-graph-spec.md``.
-        """
-        del ref, depth
-        return outer_state
-
 
 async def _emit_observers(
     observers: tuple[ObserverFn, ...],
@@ -389,49 +337,4 @@ async def _emit_observers(
             await obs(event_name, payload)
 
 
-def _failed_result(
-    *,
-    plan_ref: str,
-    outer_state: AgentState,
-    node_id: str,
-    error: BaseException,
-    visits: tuple[PhaseVisit, ...],
-    facts: tuple[Any, ...],
-    output: PhaseOutput,
-) -> InterpretationResult:
-    """构造失败 outcome(与 _drive 失败语义对齐)。"""
-    from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
-        DeclarativeRunOutcome,
-        ExecutionOutcome,
-        PhaseRunCursor,
-    )
-
-    cursor = PhaseRunCursor(
-        plan_ref=plan_ref,
-        node_id=node_id,
-        visit_counts=(),
-        edge_counts=(),
-        artifacts={},
-        causation_refs=(),
-        budget_snapshot={"step": 0},
-    )
-    from lca.contracts.models.core.policy.stop import StopDecision, StopReason
-
-    outcome = DeclarativeRunOutcome(
-        kind=ExecutionOutcome.FAILED,
-        cursor=cursor,
-        stop=StopDecision(should_stop=True, reason=StopReason.ERROR),
-        error_fact=None,
-    )
-    return InterpretationResult(
-        state=outer_state,
-        artifact=None,
-        visits=visits,
-        facts=facts,
-        terminal_node=node_id,
-        outcome=outcome,
-        output=output,
-    )
-
-
-__all__ = ["NodeGraphDriver", "ObserverFn"]
+__all__ = ["MAX_SUBGRAPH_DEPTH_DEFAULT", "NodeGraphDriver", "ObserverFn"]

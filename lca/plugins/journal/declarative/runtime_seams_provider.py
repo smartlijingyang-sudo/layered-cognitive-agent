@@ -54,9 +54,6 @@ from lca.contracts.protocols.state.reducer import Reducer
 from lca.framework.declarative.plugins.interpreter import GenericPlanInterpreter
 from lca.harness.declarative.compile.subgraph_resolver import default_subgraph_resolver
 from lca.harness.declarative.execute.dispatch import RegistryDeltaReducer, RegistryEffectDispatcher
-from lca.harness.graph.execute.subgraph_executor_factory import (
-    default_subgraph_executable_factory,
-)
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.runtime.loop.runtime_journal import RuntimeJournalCommitter
 from lca.runtime.projection.result_finalizer import RuntimeResultFinalizer
@@ -125,32 +122,23 @@ class DefaultResultFinalizerFactory(ResultFinalizerFactory):
 
 
 class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
-    """Build the standard interpreter with its local traversal policy."""
+    """Build the standard interpreter with its local traversal policy.
+
+    ADR-0219 §10.5 reject: the v1 ``GraphAssembler + inner _drive`` legacy
+    path is deleted. ``SubgraphRunner`` (Cordis-injected) is the single
+    seam for subgraph recursion. The factory only owns
+    ``subgraph_resolver`` (passed to the runner); ``executable_factory``
+    and ``scope`` are gone.
+    """
 
     def __init__(
         self,
         loop_guard_evaluator: object | None = None,
         *,
         subgraph_resolver: object | None = None,
-        subgraph_executable_factory: object | None = None,
-        subgraph_scope: object | None = None,
     ) -> None:
         self._loop_guard_evaluator = loop_guard_evaluator
         self._subgraph_resolver = subgraph_resolver or default_subgraph_resolver()
-        self._subgraph_executable_factory = (
-            subgraph_executable_factory or default_subgraph_executable_factory()
-        )
-        self._subgraph_scope = subgraph_scope
-
-    def set_subgraph_scope(self, scope: object) -> None:
-        """Wire the resolved phase executor scope for subgraph assembly.
-
-        Called by ``DeclarativeRuntimeBindings.new_interpreter()`` at binding
-        time, when the Cordis scope is available. This lets the interpreter's
-        subgraph assembly resolve step executors from the same scope as the
-        outer graph, eliminating the need for hardcoded factory dicts.
-        """
-        self._subgraph_scope = scope
 
     def create(
         self,
@@ -170,9 +158,6 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
                 phase_observer=cast("PhaseObserver | None", phase_observer),
                 loop_guard_evaluator=cast("LoopGuardEvaluator | None", self._loop_guard_evaluator),
                 lifecycle_publisher=lifecycle_publisher,
-                subgraph_resolver=self._subgraph_resolver,
-                subgraph_executable_factory=self._subgraph_executable_factory,
-                subgraph_scope=self._subgraph_scope,
             ),
         )
         # Assembly root:bind_cordis_seams with the think subgraph defaults.
@@ -187,17 +172,15 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
             from lca.framework.subgraph.plugins.channel import InMemoryPhaseOutputChannel
             from lca.framework.subgraph.plugins.runner import SubgraphRunner
             from lca.plugins.think import (
-                ThinkShortcutExecutor, ThinkRouteExecutor, ThinkReasonExecutor,
-                ThinkClassifyExecutor, ThinkGateExecutor, ThinkLocalGateExecutor,
+                ThinkShortcutExecutor, ThinkRouteExecutor,
+                ThinkClassifyExecutor, ThinkGateExecutor,
             )
             _REGION = "phase:think"
             _EXECUTORS = (
                 (ThinkShortcutExecutor, "think.shortcut"),
                 (ThinkRouteExecutor, "think.route"),
-                (ThinkReasonExecutor, "think.reason"),
                 (ThinkClassifyExecutor, "think.classify"),
                 (ThinkGateExecutor, "think.gate"),
-                (ThinkLocalGateExecutor, "think.local_gate"),
             )
             registry = {
                 (_REGION, name): cls() for cls, name in _EXECUTORS

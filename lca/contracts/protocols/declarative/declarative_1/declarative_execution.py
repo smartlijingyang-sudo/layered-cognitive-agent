@@ -5,10 +5,15 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Literal, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Literal, Protocol, runtime_checkable
 
 from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.policy.stop import StopDecision
+
+if TYPE_CHECKING:
+    from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
+        SemanticPhase,
+    )
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.protocols.act.command.envelope import CommandEnvelope, RunDelta, RunFact
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
@@ -222,23 +227,42 @@ class PhaseResult:
 
 @runtime_checkable
 class PhaseContext(Protocol):
-    """插件可见的只读执行上下文；不暴露 Cordis Context。"""
+    """插件可见的只读执行上下文；不暴露 Cordis Context。
+
+    Per ADR-0219 §4: cross-node product propagation goes via
+    ``results_by_phase: Mapping[SemanticPhase, PhaseResult]``. The legacy
+    string-keyed ``artifacts`` dict plus the ``decision`` / ``observation``
+    / ``reflection`` single fields have been removed. Downstream code uses
+    the typed accessor ``payload_of(phase, want)`` — the data flow is
+    visible at the call site, no helper naming to memorise.
+    """
 
     plan_ref: str
     node_ref: str
     state: AgentState
     journal: JournalCommitter
     budget: Budget
-    artifacts: Mapping[str, object]
     capabilities: PhaseCapabilityReader
-    decision: Decision | None
-    observation: Observation | None
-    reflection: Reflection | None
+    results_by_phase: Mapping[SemanticPhase, PhaseResult]
     checkpoint_reason: str | None
 
     def emit_fact(self, fact: RunFact) -> str: ...
 
     def propose_delta(self, delta: RunDelta) -> None: ...
+
+    def payload_of(
+        self,
+        phase: "SemanticPhase",
+        want: type[object],
+    ) -> object | None:
+        """Return the typed payload from one upstream phase result.
+
+        ``payload_of(SemanticPhase.THINK, Decision)`` reads the THINK
+        phase's ``PhaseResult.payload`` and returns it if it is a
+        ``Decision``, else ``None``. The data flow is visible at the
+        call site; no separate ``upstream_<thing>`` helper to memorise.
+        """
+        ...
 
 
 @runtime_checkable

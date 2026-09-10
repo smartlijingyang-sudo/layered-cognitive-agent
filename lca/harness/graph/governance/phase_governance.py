@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Literal
 
-from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.policy.stop import StopDecision, StopReason
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import AgentState
@@ -17,7 +16,6 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
     ExecutionOutcome,
     PhaseInput,
     PhaseResult,
-    SemanticPhase,
 )
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 from lca.harness.declarative.compile.assembler.assembler import ExecutableNode
@@ -133,35 +131,16 @@ class PhaseGovernance:
         context: RestrictedPhaseContext,
         result: PhaseResult,
     ) -> RestrictedPhaseContext:
-        decision = context.artifacts.get("think")
-        observation = context.artifacts.get("act")
-        reflection = context.artifacts.get("reflect")
+        # ADR-0219 §4: typed fold via results_by_phase. The legacy
+        # decision/observation/reflection single fields + string-keyed
+        # ``artifacts`` dict are removed; downstream plugins read from
+        # ``context.results_by_phase.get(SemanticPhase.X)`` via the
+        # shared helper ``_extract_decision`` etc.
+        new_results = dict(context.results_by_phase)
+        new_results[executable_node.semantic_phase] = result
         return replace(
             context,
-            decision=(
-                result.payload
-                if executable_node.semantic_phase is SemanticPhase.THINK
-                and isinstance(result.payload, Decision)
-                else decision
-                if isinstance(decision, Decision)
-                else None
-            ),
-            observation=(
-                result.payload
-                if executable_node.semantic_phase is SemanticPhase.ACT
-                and isinstance(result.payload, Observation)
-                else observation
-                if isinstance(observation, Observation)
-                else None
-            ),
-            reflection=(
-                result.payload
-                if executable_node.semantic_phase is SemanticPhase.REFLECT
-                and isinstance(result.payload, Reflection)
-                else reflection
-                if isinstance(reflection, Reflection)
-                else None
-            ),
+            results_by_phase=new_results,
             checkpoint_reason=f"phase:{executable_node.node_id}",
         )
 

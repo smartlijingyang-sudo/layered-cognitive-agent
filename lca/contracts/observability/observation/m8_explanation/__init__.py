@@ -15,7 +15,7 @@ class RootCauseStep(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     step_index: int
-    statement: str  # 人读句:"act.main.inputs.decision = None"
+    statement: str  # 人读句:"act.main.results_by_phase[THINK].payload = None"
     evidence_fact_kind: str | None = None  # NodeEnter / NodeExit / ...
     evidence_node_id: str | None = None
     contract_clause: str | None = None  # art.action.action_type / ...

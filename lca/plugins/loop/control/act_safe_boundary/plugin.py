@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from lca.contracts.models.core.execution.decision import Decision
+
 from pydantic import BaseModel, ConfigDict
 
 from lca.contracts.atoms.control.slot import ControlSlot
@@ -46,7 +48,7 @@ class ActSafeBoundaryExecutor:
                     plugin_id="control.executor.act-safe-boundary",
                 ),
             )
-        decision = context.decision
+        decision = context.payload_of(SemanticPhase.THINK, Decision)
         if decision is not None and decision.action_type == ActionType.STOP:
             return PhaseResult(
                 result_kind="control",

@@ -41,6 +41,11 @@ class PhaseTraversal:
     visit_counts: dict[str, int]
     edge_counts: dict[tuple[str, str], int]
     artifacts: dict[str, object]
+    # ADR-0219 §4: typed mirror of the legacy ``artifacts`` dict. Each
+    # completed phase's ``PhaseResult`` is keyed by ``SemanticPhase`` so
+    # downstream ``context.payload_of(phase, T)`` calls don't need to
+    # touch the string-keyed ``artifacts`` cache.
+    results_by_phase: dict[SemanticPhase, PhaseResult]
     next_input: PhaseInput
 
     @classmethod
@@ -59,6 +64,7 @@ class PhaseTraversal:
             visit_counts={},
             edge_counts={},
             artifacts=dict(artifacts or {}),
+            results_by_phase={},
             next_input=input or PhaseInput(),
         )
 
@@ -72,6 +78,10 @@ class PhaseTraversal:
             visit_counts=dict(cursor.visit_counts),
             edge_counts={(source, target): count for source, target, count in cursor.edge_counts},
             artifacts=artifacts,
+            # ADR-0219 §4: typed mirror is rebuilt on first ``record_result``
+            # after resume; legacy ``artifacts`` string keys are kept for
+            # forward-compat with cursors persisted before this change.
+            results_by_phase={},
             next_input=input
             or PhaseInput(
                 artifact=artifacts.get("payload"),
@@ -113,11 +123,17 @@ class PhaseTraversal:
         result: PhaseResult,
         effect_output: object | None,
     ) -> object | None:
-        """Store the next-phase artifacts derived from a completed phase."""
+        """Store the next-phase artifacts derived from a completed phase.
+
+        ADR-0219 §4: writes both the legacy string-keyed ``artifacts`` cache
+        (for cursor persistence compatibility) and the typed
+        ``results_by_phase`` mirror used by ``RestrictedPhaseContext``.
+        """
         payload = result.payload if result.payload is not None else effect_output
         self.artifacts["result"] = result
         self.artifacts["payload"] = payload
         self.artifacts[semantic_phase.value] = payload
+        self.results_by_phase[semantic_phase] = result
         return payload
 
     def advance(

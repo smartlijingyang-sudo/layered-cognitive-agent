@@ -35,27 +35,27 @@ EdgeKind = Literal["control", "data"]
 class BundleGraphNode:
     """bundle 内单个节点声明。
 
-    字段都对应 yaml 中 `nodes[].<key>`,D5 消费点见 ADR-0217 §2:
-      id       : 边 source/target 锚点 + interpreter 寻址 key
+    字段对应 yaml 中 `nodes[].<key>`,D5 消费点见 ADR-0217 §2 + ADR-0219 §5.5:
+
+      id       : 边 source/target 锚点 + interpreter 寻址 key(图拓扑)
       region   : FactoryResolver 反查上下文(可空,fallback 到 BundleGraphSpec.region)
       factory  : 业务语义名,如 `think.reason`;FactoryResolver 解析到 NodeExecutor
       purpose  : 节点职责描述,写入 phase_graph.node.start/end payload(purpose)
-      inputs   : 节点声明性输入端口,非空;subgraph 边缘端口对齐用
-      outputs  : 节点声明性输出端口,非空;同上
       config   : 节点级图配置,只放图级参数(max_visits / cooldown 等),不向 plugin 注入
+
+    Per ADR-0219 §5.5(「图不知道业务,业务不知道图」):本 DTO **不再持有**
+    `inputs` / `outputs` 字段——port contract 属于 plugin 的 `NodeExecutor.declared_inputs`
+    / `declared_outputs` typed 属性;**图层与业务层互不感知**。
+    bundle yaml 容忍这两个字段(向后兼容),但 runtime 忽略。
     """
 
     id: str
     region: str | None
     factory: str
     purpose: str = ""
-    inputs: tuple[str, ...] = ()
-    outputs: tuple[str, ...] = ()
     config: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        # Per plan §13.x R9: inputs/outputs/purpose 是装饰性字段(@plugin + v2 driver 不读),
-        # 完全删除其非空校验,允许 yaml 简化。
         if not self.id:
             raise DeclarativeValidationError("PG-005-bundle-graph", "node.id must be non-empty")
         if not self.factory:

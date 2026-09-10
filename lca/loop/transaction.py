@@ -113,13 +113,17 @@ class PhaseExecutionTransaction:
         effect_policy: EffectPolicyPlan | None,
     ) -> PhaseTransactionResult:
         """Prepare, run, govern, record, effect, and reduce one phase visit."""
+        # ADR-0219 §4: ``traversal.results_by_phase`` is the typed mirror
+        # of completed ``PhaseResult`` records; ``record_result`` populates
+        # it for every phase visit. ``context.payload_of(phase, T)`` reads
+        # from this typed view.
         context = RestrictedPhaseContext(
             plan_ref=plan_ref,
             node_ref=node_id,
             state=state,
             journal=self._journal,
             budget=budget,
-            artifacts=traversal.artifacts,
+            results_by_phase=traversal.results_by_phase,
             capabilities=normalize_phase_capabilities(capabilities),
         )
         prepared = await self._governance.prepare_input(

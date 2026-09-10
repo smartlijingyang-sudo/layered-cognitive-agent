@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from lca.contracts.models.core.execution.decision import Decision
+
 from pydantic import BaseModel, ConfigDict
 
 from lca.cognition.brain.gate.service import GateService
@@ -17,7 +19,6 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.models.core.execution.decision import Decision
 from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
     StandardPhaseCapability,
 )
@@ -74,7 +75,8 @@ class ThinkGuardEnforceExecutor:
     """Run profile-selected decision gates and return the enforced Decision."""
 
     async def execute(self, context: PhaseContext, input: PhaseInput) -> PhaseResult:
-        decision = context.decision
+        # ADR-0219 §4.3: typed read.
+        decision = context.payload_of(SemanticPhase.THINK, Decision)
         if decision is None:
             return PhaseResult(result_kind="decision", payload=None)
         gate_service = _resolve_gate_service(context)
@@ -88,7 +90,8 @@ class ThinkGuardExecutor:
     """Map enforced Decision artifacts to the closed ControlVerdict vocabulary."""
 
     async def execute(self, context: PhaseContext, input: PhaseInput) -> PhaseResult:
-        decision = context.decision
+        # ADR-0219 §4.3: typed read.
+        decision = context.payload_of(SemanticPhase.THINK, Decision)
         if decision is None:
             return PhaseResult(
                 result_kind="control",

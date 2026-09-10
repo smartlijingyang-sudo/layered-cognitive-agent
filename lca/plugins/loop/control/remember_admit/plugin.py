@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from lca.contracts.models.core.execution.decision import (
+    Observation,
+    Reflection,
+)
+
 from pydantic import BaseModel, ConfigDict
 
 from lca.contracts.atoms.control.slot import ControlSlot
@@ -36,7 +41,9 @@ class RememberAdmitExecutor:
 
     async def execute(self, context: PhaseContext, input: PhaseInput) -> PhaseResult:
         """Evaluate remember-admit control."""
-        if context.observation is None or context.reflection is None:
+        # ADR-0219 §4.3: typed read.
+        if (context.payload_of(SemanticPhase.ACT, Observation) is None
+                or context.payload_of(SemanticPhase.REFLECT, Reflection) is None):
             return PhaseResult(
                 result_kind="control",
                 payload=ControlVerdict(

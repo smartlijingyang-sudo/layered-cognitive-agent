@@ -1,13 +1,15 @@
 """NodeExecutor Protocol — think 子图节点通用化接口。
 
-ADR-0217 §3.3。
+ADR-0217 §3.3 + ADR-0219 §5.5(typed port contract 挂在 plugin 自身)。
 
 职责边界:
 - 本协议**只服务 think 子图**(`bundles/think.yaml`);perceive / act / reflect /
   remember / stop 仍走 `PhaseExecutor.execute(context, input) -> PhaseResult`,
   本模块不替代。
-- 节点 plugin 不感知 phase、不感知 graph,只接 `NodeInput.port_values` 字典,
-  吐 `NodeOutput.port_values` 字典。框架负责端口投影、when 路由、嵌套递归。
+- 节点 plugin 自报 `declared_inputs` / `declared_outputs`(typed `PortName`
+  闭集)。**图层(``BundleGraphNode`` / driver)不持有 port 字段名** —
+  图只懂拓扑,plugin 自己懂 port contract。详见 ADR-0219 §5.5「图不知道
+  业务,业务不知道图」。
 - 失败表达:plugin 抛标准 Exception,框架 catch 后映射为 `node_failure`,
   而不是 `PhaseErrorKind` 枚举。
 
@@ -21,6 +23,8 @@ ADR-0217 §3.3。
 from __future__ import annotations
 
 from typing import Any, Mapping, Protocol, runtime_checkable
+
+from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 
 
 class NodeContext:
@@ -48,22 +52,31 @@ class NodeContext:
 
 
 class NodeInput:
-    """节点输入。"""
+    """节点输入。
+
+    `port_values` 是 driver 投影后的 typed dict:key 来自
+    ``executor.declared_inputs``,value 来自 `PortRegistry._ports`。
+    缺 port 不报错,填空 dict;plugin 自己处理空值。
+    """
 
     __slots__ = ("port_values",)
 
-    def __init__(self, port_values: Mapping[str, Any]) -> None:
+    def __init__(self, port_values: Mapping[PortName, Any]) -> None:
         self.port_values = dict(port_values)
 
 
 class NodeOutput:
-    """节点输出。"""
+    """节点输出。
+
+    `port_values` 是 plugin 自己声明的输出 port 集合(driver 用
+    ``executor.declared_outputs`` 校验完整性,不在 driver 读 `node.outputs`)。
+    """
 
     __slots__ = ("port_values", "next_hint")
 
     def __init__(
         self,
-        port_values: Mapping[str, Any],
+        port_values: Mapping[PortName, Any],
         next_hint: str | None = None,
     ) -> None:
         self.port_values = dict(port_values)
@@ -77,6 +90,11 @@ class NodeExecutor(Protocol):
     协议字段:
         semantic_name: 唯一标识,等于 yaml `factory:` 字符串(如 `think.reason`)。
             `FactoryResolver` 按 (semantic_name, region) 二元组命中。
+        declared_inputs / declared_outputs: typed port contract,plugin 自报。
+            必须全部 ∈ `PortName` Literal 闭集;driver 投影 `PortRegistry._ports`
+            → `NodeInput.port_values` 时只取 `declared_inputs` 里有的 key,
+            driver 校验 `NodeOutput.port_values` 的 key ⊆ `declared_outputs`。
+            bundle yaml 不再写 `inputs:` / `outputs:` 字段(ADR-0219 §5.5)。
 
     协议方法:
         execute: 接收 NodeContext + NodeInput,返回 NodeOutput。plugin 不感知
@@ -89,6 +107,8 @@ class NodeExecutor(Protocol):
     """
 
     semantic_name: str
+    declared_inputs: tuple[PortName, ...]
+    declared_outputs: tuple[PortName, ...]
 
     async def execute(
         self,

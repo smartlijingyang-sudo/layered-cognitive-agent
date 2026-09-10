@@ -6,9 +6,10 @@
 
 from __future__ import annotations
 
+from lca.contracts.models.core.execution.decision import Observation
+
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import cast
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -21,7 +22,6 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     PhaseContext,
     PhaseInput,
@@ -51,8 +51,9 @@ class StandardReflectExecutor:
     """Create reflection from the act artifact through the selected Brain."""
 
     async def execute(self, context: PhaseContext, input: PhaseInput) -> PhaseResult:
+        # ADR-0219 §4.3: typed read.
         brain = StandardPhaseCapabilities(context.capabilities).brain
-        observation = cast("Observation | None", context.artifacts.get("act"))
+        observation = context.payload_of(SemanticPhase.ACT, Observation)
         if brain is None or observation is None:
             return fallback_phase_result(
                 phase=SemanticPhase.REFLECT,
@@ -78,7 +79,8 @@ class RecoveryReflectExecutor:
         return getattr(observation, "success", None) is False
 
     async def execute(self, context: PhaseContext, input: PhaseInput) -> PhaseResult:
-        observation = context.artifacts.get("act")
+        # ADR-0219 §4.3: typed read.
+        observation = context.payload_of(SemanticPhase.ACT, Observation)
         base_result = await StandardReflectExecutor().execute(context, input)
         return PhaseResult(
             result_kind=base_result.result_kind,

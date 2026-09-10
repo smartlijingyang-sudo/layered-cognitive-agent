@@ -42,13 +42,13 @@ class _Template:
 ROOT_CAUSE_TEMPLATES: tuple[_Template, ...] = (
     _Template(
         "act_decision_missing",
-        "act.main.inputs.decision = None",
+        "act.main.results_by_phase[THINK].payload = None",
         evidence_fact_kind="NodeExit",
         contract_clause="art.action.action_type",
     ),
     _Template(
         "artifact_think_missing",
-        "artifacts.think = None",
+        "results_by_phase[THINK] = None",
         evidence_fact_kind="ArtifactSnapshot",
         contract_clause="art.think",
     ),

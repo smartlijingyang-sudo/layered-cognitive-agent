@@ -168,8 +168,9 @@ def _load_bundle_graph_spec(plan_ref: str) -> BundleGraphSpec:
                 region=n.get("region"),
                 factory=str(n["factory"]),
                 purpose=str(n.get("purpose") or ""),
-                inputs=tuple(n.get("inputs") or ()),
-                outputs=tuple(n.get("outputs") or ()),
+                # ADR-0219 §5.5: bundle yaml 仍容忍 inputs/outputs 字段(向后兼容),
+                # 但 runtime 不再读——port contract 由 plugin 的 declared_inputs/declared_outputs
+                # typed 属性持有。Loader 静默忽略 yaml 的这两个字段。
                 config=dict(n.get("config") or {}),
             )
         )
