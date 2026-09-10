@@ -1,0 +1,50 @@
+# Observation + Diagnosis bundle —— 默认开启的运行时观测与诊断面。
+#
+# 9 modules · 13 plugins · effects 全 none (走 Session.append 单轨)。
+#
+# 每条 entry 仅 register 自身,不修改图框架 contract;纯 plugin 增量。
+# 装载后 graph framework 行为零改变,只多了若干个 capability key 可供 caller 使用。
+#
+# 关键:每个 entry 的 ``id`` 必须等于该 plugin 的 native ``@plugin(id=...)`` 字串;
+# profile resolve 用 id 硬比对(``lca/harness/profile/resolve/resolve.py:307``)。
+
+entries:
+  - id: observation.lifecycle.plan_compile
+    $module: lca.plugins.observation.lifecycle.plan_compile
+    config: {}
+  - id: observation.lifecycle.subgraph_resolve
+    $module: lca.plugins.observation.lifecycle.subgraph_resolve
+    config: {}
+  - id: observation.lifecycle.bundle_load
+    $module: lca.plugins.observation.lifecycle.bundle_load
+    config: {}
+  - id: observation.node_trajectory
+    $module: lca.plugins.observation.node_trajectory
+    config: {}
+  - id: observation.decision_trace
+    $module: lca.plugins.observation.decision_trace
+    config: {}
+  - id: observation.control_trace
+    $module: lca.plugins.observation.control_trace
+    config: {}
+  - id: observation.tool_call_trace
+    $module: lca.plugins.observation.tool_call_trace
+    config: {}
+  - id: observation.llm_call_trace
+    $module: lca.plugins.observation.llm_call_trace
+    config: {}
+  - id: observation.runtime_bookkeeping
+    $module: lca.plugins.observation.runtime_bookkeeping
+    config: {}
+  - id: observation.artifact_snapshot
+    $module: lca.plugins.observation.artifact_snapshot
+    config: {}
+  - id: diagnosis.blueprint_trajectory_differ
+    $module: lca.plugins.diagnosis.blueprint_trajectory_differ
+    config: {}
+  - id: diagnosis.failure_explainer
+    $module: lca.plugins.diagnosis.failure_explainer
+    config: {}
+  - id: diagnosis.run_replay
+    $module: lca.plugins.diagnosis.run_replay
+    config: {}

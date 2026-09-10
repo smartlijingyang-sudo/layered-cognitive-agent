@@ -44,6 +44,7 @@ from lca.infrastructure.cli.commands import (
     journal_trace,
     kernel,
     notes,
+    observation,
     package_organization,
     profile_inspect,
     runs,
@@ -101,6 +102,7 @@ journal_session.register(_journal_group)
 kernel.register(app)
 notes.register(app)
 typecheck.register(app)
+observation.register(app)
 
 
 # ── legacy alias: `lca-ops logs` → `journal logs` ──────────────────

@@ -368,6 +368,50 @@ SIDECAR=$(ls traces/runs/"$LATEST"/[0-9a-f]*-*.json 2>/dev/null | head -1)
 
 ---
 
+### Step 4b — Observation-plane diagnostic (preferred when observation facts are present)
+
+**WHY.** Observation facts (PlanBlueprint / NodeEnter / NodeExit / DecisionTrace /
+ControlTrace / ToolCallTrace / LLMCallTrace / ArtifactSnapshot / SubgraphResolve /
+BundleLoad + diagnosis diff/explanation/replay) are emitted by
+`observation-9module` bundle plugins. When present, they let you skip Steps 2–4
+manual work and get a typed, structured diagnosis in one call.
+
+**DO.**
+
+```sh
+# Like a human-written diagnostic: summary → root_cause → graph → next_actions
+./scripts/lca-ops observation run-explain "$LATEST"           # human
+./scripts/lca-ops observation run-explain "$LATEST" --json    # you (agent)
+
+# Show every observation fact, filter by node or kind
+./scripts/lca-ops observation trace-show "$LATEST"
+./scripts/lca-ops observation trace-show "$LATEST" --node act.main
+./scripts/lca-ops observation trace-show "$LATEST" --filter kind=control
+
+# Time-ordered replay with per-node inputs / outputs / decisions
+./scripts/lca-ops observation run-replay "$LATEST"
+./scripts/lca-ops observation run-replay "$LATEST" --json
+
+# Show plan blueprint (expected graph)
+./scripts/lca-ops observation plan-show profiles/web-standard.yaml
+```
+
+**OUTPUT.** Structured JSON (default): `summary` + `root_cause_chain[]` +
+`graph_overview` + `next_actions[]` + `details_available`. Each root cause step
+points at a fact kind, a node id, and a contract clause. `next_actions` are
+copy-paste-runnable commands.
+
+**NEXT.** If `run-explain` summary is empty (`outcome=success`) → run passed;
+verify with user. If it identifies a missing node / denied control / failed
+artifact → use `trace-show --node <id>` to inspect that node's inputs / outputs,
+then Step 5 to read code.
+
+**FAIL.** No observation facts present → the `observation-9module` bundle is
+not loaded in the active profile. Add `bundles/observation-9module.yaml` to
+`profiles/<your-profile>.yaml` and re-run.
+
+---
+
 ### Step 5 — Locate the failure in code
 
 **WHY.** Now you read the actual code path. The traceback told you `path/to/file.py:line`. Find that line. Read the surrounding 30 lines and the docstring.

@@ -16,6 +16,7 @@
 bundles:
   - bundles/base.yaml
   - bundles/observability-default.yaml
+  - bundles/observation-9module.yaml
   - bundles/web-app.yaml
   - bundles/scenario-cordis-creator.yaml
   - bundles/declarative-phase-graph.yaml
