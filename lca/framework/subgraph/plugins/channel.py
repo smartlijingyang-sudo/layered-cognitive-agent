@@ -32,6 +32,9 @@ from pydantic import BaseModel, ConfigDict
 
 from lca.contracts.models.core.conversation.llm import LLMResponse
 from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection
+from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
+    ExecutionOutcome,
+)
 
 
 class PhaseOutput(BaseModel):
@@ -40,6 +43,14 @@ class PhaseOutput(BaseModel):
     Frozen Pydantic + ``extra="forbid"`` keeps the surface stable
     (ADR-0195 §1.4 D1-D4). At most one of each field is non-None per
     run; ``Decision`` is the canonical ``act.advance`` payload.
+
+    ADR-0219 §10.11 item (3): ``outcome_kind`` + ``error`` carry the
+    failure shape that ``SubgraphRunner.run`` would otherwise discard
+    at its return site. Both default to ``None`` on the success path;
+    the runner populates them only when the inner driver returned a
+    ``DeclarativeRunOutcome(kind=FAILED)``. Terminal-run metadata —
+    ``absorb()`` deliberately does NOT copy these into the merged
+    snapshot, since success/failure is not a mergeable payload.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -48,6 +59,8 @@ class PhaseOutput(BaseModel):
     observation: Observation | None = None
     reflection: Reflection | None = None
     response: LLMResponse | None = None
+    outcome_kind: ExecutionOutcome | None = None
+    error: str | None = None
 
 
 class ChannelNotSatisfiedError(LookupError):
