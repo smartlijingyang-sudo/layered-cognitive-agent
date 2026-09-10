@@ -56,6 +56,8 @@ from lca.contracts.protocols.declarative.declarative_1.bundle_graph import (
 )
 from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
     ExecutionOutcome,
+)
+from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
     PhaseResult as _PhaseResult,
 )
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (

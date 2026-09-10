@@ -17,9 +17,10 @@ ADR-0217:扩展以同时支持两种 bundle 形态:
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Final, Mapping
+from typing import Any, Final
 
 import yaml
 
@@ -311,15 +312,14 @@ def _wrap_compiled_run_plan(
     delete-when:interpreter v2 分支稳定后,可进一步精简 phase_bindings / capability /
     validation_report(本 ADR §8 实施步骤 #11)。
     """
-    from lca.contracts.protocols.composition.relation import TypedRelation
     from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
         PhaseBinding,
         PlanProvenance,
     )
-    from lca.contracts.protocols.perceive.capability_plan import CapabilityPlan
     from lca.contracts.protocols.declarative.declarative_1.v2_plan_marker import (
         V2BundleGraphPlanMarker,
     )
+    from lca.contracts.protocols.perceive.capability_plan import CapabilityPlan
 
     profile_path = str(_repo_root() / "bundles/__bundle_graph_v2_stub__.yaml")
     scope = ScopePlan(
@@ -469,6 +469,7 @@ def default_subgraph_resolver() -> SubgraphResolver:
 
 __all__ = [
     "BundleSubgraphResolver",
-    "_compile_bundle_graph", "resolve_factory",
+    "_compile_bundle_graph",
     "default_subgraph_resolver",
+    "resolve_factory",
 ]
