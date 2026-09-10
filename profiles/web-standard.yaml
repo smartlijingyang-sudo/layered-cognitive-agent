@@ -26,11 +26,6 @@ bundles:
   - bundles/think.yaml
 
 patch:
-  - id: lca-llm-resolver
-    config:
-      default_model: qwen3.7-plus
-      load_dotenv: true
-
   # EventSpine file sink — boot events process-local; run events under
   # traces/runs/<run_id>/<run_id>.spine.jsonl (ADR-0165.1 layout / PR-27 L10 / PR-4).
   - id: spine.sink.file

@@ -59,10 +59,6 @@ entries:
   name: phase_think_reasoner
   $module: lca.plugins.think.reasoner_provider
   config: {}
-- id: lca-subgraph-resolver
-  name: lca_subgraph_resolver
-  $module: lca.plugins.think.llm.subgraph_resolver_provider
-  config: {}
 - id: subgraph.runner
   name: subgraph_runner
   $module: lca.framework.subgraph.plugins.runner
