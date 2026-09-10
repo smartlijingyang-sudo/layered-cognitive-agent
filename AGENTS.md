@@ -160,6 +160,7 @@ contracts → infrastructure → cognition → runtime → agent
 | run 失败 / E2E 冒烟 | `debug-run <run_id>` / `e2e timeline` |
 | notes 体检 / ADR 审计 | `notes-check` / `notes-audit` |
 | 审计 Reducer 单写 / 能力归属 | `audit-state-writers` / `why <capability>` |
+| 声明图编译/逐层 inflate | `plan compile <p>` / `plan validate <json>` / `plan tree <p>` |
 
 **Before X,读 Y:** 调试 → [docs/debug/README.md](docs/debug/README.md);Journal/Trace → [docs/specs/harness-spine-spec.md](docs/specs/harness-spine-spec.md);散文 → [.agents/skills/lca-prose-standard](.agents/skills/lca-prose-standard/SKILL.md);新 Note → [.agents/skills/lca-write-note](.agents/skills/lca-write-note/SKILL.md);CI 测试可靠性 → [.agents/skills/lca-ci-test-reliability](.agents/skills/lca-ci-test-reliability/SKILL.md)。
 
