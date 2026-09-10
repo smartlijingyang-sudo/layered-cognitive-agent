@@ -6,6 +6,11 @@ from dataclasses import dataclass
 from typing import cast
 
 from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.models.core.execution.decision import (
+    Decision,
+    Observation,
+    Reflection,
+)
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
@@ -48,9 +53,15 @@ class StandardRememberExecutor:
 
     async def execute(self, context: PhaseContext, input: PhaseInput) -> PhaseResult:
         memory = StandardPhaseCapabilities(context.capabilities).memory
-        decision = cast("Decision | None", context.artifacts.get("think"))
-        observation = cast("Observation | None", context.artifacts.get("act"))
-        reflection = cast("Reflection | None", context.artifacts.get("reflect"))
+        decision = cast("Decision | None", context.payload_of(SemanticPhase.THINK, Decision))
+        observation = cast(
+            "Observation | None",
+            context.payload_of(SemanticPhase.ACT, Observation),
+        )
+        reflection = cast(
+            "Reflection | None",
+            context.payload_of(SemanticPhase.REFLECT, Reflection),
+        )
         if memory is None or decision is None or observation is None or reflection is None:
             return fallback_phase_result(
                 phase=SemanticPhase.REMEMBER,

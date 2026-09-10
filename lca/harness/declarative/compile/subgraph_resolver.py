@@ -17,6 +17,7 @@ ADR-0217:扩展以同时支持两种 bundle 形态:
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Final
@@ -30,12 +31,14 @@ from lca.contracts.protocols.declarative.declarative_1.bundle_graph import (
     BundleGraphSpec,
 )
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
+    DeclarativeValidationError,
     SemanticPhase,
 )
 from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
     CognitivePhaseGraphPlan,
     PhaseEdge,
     PhaseNode,
+    SubgraphReference,
     SubgraphResolver,
     ValidationReport,
 )
@@ -142,6 +145,35 @@ def _compile_subgraph_profile(relative_profile: str) -> CompiledRunPlan:
 # ---------------------------------------------------------------------------
 
 
+def _parse_sub_spec_ref(raw: Any) -> SubgraphReference | None:
+    """Parse yaml ``config.sub_spec_ref`` into a :class:`SubgraphReference`.
+
+    Returns ``None`` if the value is absent. Raises
+    :class:`DeclarativeValidationError` if the shape is invalid — fail-loud
+    so a typo in the bundle yaml surfaces at compile time, not at driver
+    runtime. ADR-0219 §10.11: this is the typed-funnel between yaml DTO
+    and ``BundleGraphNode.sub_spec_ref``.
+    """
+    if raw is None:
+        return None
+    if not isinstance(raw, Mapping):
+        raise DeclarativeValidationError(
+            "PG-004",
+            f"sub_spec_ref must be a mapping, got {type(raw).__name__}",
+        )
+    try:
+        return SubgraphReference(
+            plan_ref=str(raw["plan_ref"]),
+            entry_node=str(raw["entry_node"]),
+            binding_edge=str(raw["binding_edge"]),
+        )
+    except KeyError as exc:
+        raise DeclarativeValidationError(
+            "PG-004",
+            f"sub_spec_ref missing required field {exc.args[0]!r}",
+        ) from None
+
+
 def _load_bundle_graph_spec(plan_ref: str) -> BundleGraphSpec:
     """从 yaml 文件读取并构造 BundleGraphSpec。
 
@@ -162,6 +194,13 @@ def _load_bundle_graph_spec(plan_ref: str) -> BundleGraphSpec:
     for n in raw_nodes:
         if not isinstance(n, dict):
             raise TypeError(f"each node must be a mapping, got {type(n).__name__}")
+        # ADR-0219 §10.11: ``sub_spec_ref`` is a typed field on BundleGraphNode,
+        # not a config key. Pop it from config so downstream consumers (which
+        # see ``config`` as opaque node-level graph params) do not double-handle
+        # it. Inner drivers read ``node.sub_spec_ref`` directly.
+        raw_config = dict(n.get("config") or {})
+        raw_sub_spec_ref = raw_config.pop("sub_spec_ref", None)
+        sub_spec_ref = _parse_sub_spec_ref(raw_sub_spec_ref)
         nodes.append(
             BundleGraphNode(
                 id=str(n["id"]),
@@ -171,7 +210,8 @@ def _load_bundle_graph_spec(plan_ref: str) -> BundleGraphSpec:
                 # ADR-0219 §5.5: bundle yaml 仍容忍 inputs/outputs 字段(向后兼容),
                 # 但 runtime 不再读——port contract 由 plugin 的 declared_inputs/declared_outputs
                 # typed 属性持有。Loader 静默忽略 yaml 的这两个字段。
-                config=dict(n.get("config") or {}),
+                config=raw_config,
+                sub_spec_ref=sub_spec_ref,
             )
         )
 
@@ -272,15 +312,14 @@ def _wrap_compiled_run_plan(
     delete-when:interpreter v2 分支稳定后,可进一步精简 phase_bindings / capability /
     validation_report(本 ADR §8 实施步骤 #11)。
     """
-    from lca.contracts.protocols.composition.relation import TypedRelation
     from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
         PhaseBinding,
         PlanProvenance,
     )
-    from lca.contracts.protocols.perceive.capability_plan import CapabilityPlan
     from lca.contracts.protocols.declarative.declarative_1.v2_plan_marker import (
         V2BundleGraphPlanMarker,
     )
+    from lca.contracts.protocols.perceive.capability_plan import CapabilityPlan
 
     profile_path = str(_repo_root() / "bundles/__bundle_graph_v2_stub__.yaml")
     scope = ScopePlan(
@@ -430,6 +469,7 @@ def default_subgraph_resolver() -> SubgraphResolver:
 
 __all__ = [
     "BundleSubgraphResolver",
-    "_compile_bundle_graph", "resolve_factory",
+    "_compile_bundle_graph",
     "default_subgraph_resolver",
+    "resolve_factory",
 ]
