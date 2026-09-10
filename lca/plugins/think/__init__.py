@@ -1,7 +1,7 @@
 """think 子图节点插件集中导入入口。
 
 每个节点文件独立可被 profile / tests 直接 load;本文件批量导入 6 个节点,
-让 profile resolve 时自动触发所有节点的 setup()(Cordis 双键注册)。
+让 profile resolve 时自动触发所有节点的 setup()(Cordis single registration (composite key + region-less fallback))。
 
 节点清单(per ADR-0218 §3.3,扁平化 6 个 think 节点 plugin):
 - shortcut     : try deterministic shortcut before reason
