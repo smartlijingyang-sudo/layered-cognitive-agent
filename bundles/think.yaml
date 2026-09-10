@@ -39,8 +39,16 @@ nodes:
 
   - id: think.reason
     factory: think.reason
+    inputs: [in_assembled_manifest]
+    outputs: [response]
     config:
-      max_visits: 3
+      max_visits: 8
+      sub_spec_ref:
+        plan_ref: bundles/think_reason.yaml
+        entry_node: think.reason.plan
+        binding_edge: think.reason
+      emit_on_enter: []
+      emit_on_exit:  []
 
   - id: think.classify
     factory: think.classify

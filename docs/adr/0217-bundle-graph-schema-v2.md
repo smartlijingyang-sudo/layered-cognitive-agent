@@ -235,3 +235,30 @@ class NodeExecutor(Protocol):
 - `agent_lab/graphs/think/think.yaml` 与生产 kernel 的对齐 — 独立 ADR(可能涉及 ADR-0210 P7 强制路径)
 - `nodes[].inputs/outputs` port-aware edge 校验 — 字段投影本期不启用校验,留接口给后续
 - `edges[].kind: data` 数据流调度 — 投影本期只接受,解释器不区分 control/data 边,后续 Note
+
+### 3.3.1 Nested sub_spec_ref 任意深度
+
+v1 (2026-09-10 spec) 扩展:节点级 `sub_spec_ref` 支持任意深度嵌套。
+
+- `max_subgraph_depth` 从硬限 4 改为软限,默认 8
+- 同 `plan_ref` 在递归栈出现第二次 → `SubgraphCycleError` (PG-007-cycle)
+- 嵌套深度超过 `max_subgraph_depth` → `SubgraphDepthExceededError` (PG-007-depth)
+- budget 递减:outer budget - 1 传给 inner,inner 用尽即停
+
+### 3.3.2 节点 emit 声明
+
+v1 扩展:`node.config` 接受 `emit_on_enter: list[str]` 和 `emit_on_exit: list[str]`。
+
+- driver 在节点 enter/exit 时按列表调 `emit_for_node(ep_id, state)`
+- executor 不知道 EP 存在,沿用 ADR-0218 §3.3 薄壳原则
+- EP 列表元素必须是 `EXECUTION_POINTS` 白名单中的字符串
+- `EXECUTION_POINTS` 白名单不增不减 (C11 事件闭集不破)
+
+### 3.3.3 端口同名透传
+
+v1 扩展:inner_graph 终止端口名 ∈ outer 节点 `outputs` → 透传到 outer PortContext。
+
+- 铁律 1:端口同名透传
+- 铁律 2:缺失输入 = 空 NodeOutput
+- 铁律 3:同图同名端口冲突 = PG-006-port-conflict
+- 铁律 4:inner_graph 局部 PortContext 终止时销毁

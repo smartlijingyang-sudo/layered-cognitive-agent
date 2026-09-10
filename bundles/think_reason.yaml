@@ -1,0 +1,44 @@
+# bundles/think_reason.yaml — think.reason inner_graph (v1)
+# ADR-0217 Bundle Graph Schema v2。3 节点 + 2 边,执行顺序由图描述声明。
+# driver 递归调度:每个节点 enter/exit 按 config.emit_on_* 自动发 EP。
+# @plugin 不读 plugin 注册字段,v2 driver 不读 node bindings。
+
+id: think.reason.subgraph
+region: phase:think
+purpose: think.reason 内部 3 步执行 — plan → render → complete
+
+nodes:
+  - id: think.reason.plan
+    factory: think.reason.plan
+    inputs: []
+    outputs: [turn_plan]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+
+  - id: think.reason.render
+    factory: think.reason.render
+    inputs: [turn_plan]
+    outputs: [turn_render]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  [prompt_assembler_end, reasoner_meta]
+
+  - id: think.reason.complete
+    factory: think.reason.complete
+    inputs: [turn_render]
+    outputs: [response]
+    config:
+      max_visits: 3
+      emit_on_enter: [reasoner_reason_start]
+      emit_on_exit:  [reasoner_reason_end]
+
+edges:
+  - from: think.reason.plan
+    to: think.reason.render
+    when: true
+  - from: think.reason.render
+    to: think.reason.complete
+    when: true
