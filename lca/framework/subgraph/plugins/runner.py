@@ -115,21 +115,9 @@ class SubgraphRunner:
                 channel=channel,
                 artifacts={},
             )
-            return sub_result.state, sub_result.output or _failed_output()
+            return sub_result.state, sub_result.output
         finally:
             self._recursion_stack.discard(ref.plan_ref)
-
-
-def _failed_output() -> PhaseOutput:
-    """Empty :class:`PhaseOutput` for failure paths that lose the driver result.
-
-    The driver itself never raises; it folds failures into an
-    :class:`InterpretationResult` whose ``output`` field still carries
-    the last published :class:`PhaseOutput`. This helper is the
-    fallback when the driver returns without an ``output`` (defensive
-    only — the driver always sets one in production).
-    """
-    return PhaseOutput()
 
 
 def _failed_result(

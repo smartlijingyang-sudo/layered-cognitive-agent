@@ -50,12 +50,21 @@ class ActAuthorizeExecutor:
         # ADR-0219 §4.3: typed read via results_by_phase. Legacy
         # ``context.decision`` is removed from PhaseContext Protocol.
         decision = context.payload_of(SemanticPhase.THINK, Decision)
-        if decision is None or not _is_known_action(decision):
+        if decision is None:
             return PhaseResult(
                 result_kind="control",
                 payload=ControlVerdict(
                     kind=ControlVerdictKind.DENY,
-                    detail="action type is not authorized",
+                    detail="think phase produced no decision",
+                    plugin_id="control.executor.act-authorize",
+                ),
+            )
+        if not _is_known_action(decision):
+            return PhaseResult(
+                result_kind="control",
+                payload=ControlVerdict(
+                    kind=ControlVerdictKind.DENY,
+                    detail=f"action type {decision.action_type!r} is not authorized",
                     plugin_id="control.executor.act-authorize",
                 ),
             )

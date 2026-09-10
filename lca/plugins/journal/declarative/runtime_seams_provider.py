@@ -7,6 +7,7 @@ replace any factory capability without changing the runtime kernel.
 
 from __future__ import annotations
 
+import inspect
 from typing import cast
 
 from pydantic import BaseModel
@@ -168,23 +169,27 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
         # 里覆盖(同名 seam 可重复 bind,后到的赢)。
         bind_seams = getattr(interpreter, "bind_cordis_seams", None)
         if callable(bind_seams):
-            print(f"[DEBUG] bind_cordis_seams called: factory={type(interpreter).__name__}", flush=True)
             from lca.framework.subgraph.plugins.channel import InMemoryPhaseOutputChannel
             from lca.framework.subgraph.plugins.runner import SubgraphRunner
-            from lca.plugins.think import (
-                ThinkShortcutExecutor, ThinkRouteExecutor,
-                ThinkClassifyExecutor, ThinkGateExecutor,
-            )
-            _REGION = "phase:think"
-            _EXECUTORS = (
-                (ThinkShortcutExecutor, "think.shortcut"),
-                (ThinkRouteExecutor, "think.route"),
-                (ThinkClassifyExecutor, "think.classify"),
-                (ThinkGateExecutor, "think.gate"),
-            )
-            registry = {
-                (_REGION, name): cls() for cls, name in _EXECUTORS
-            }
+            from lca.plugins import think as _think_module
+
+            registry: dict[tuple[str, str], object] = {}
+            for _name, cls in inspect.getmembers(_think_module, inspect.isclass):
+                if not (
+                    isinstance(cls.__module__, str)
+                    and cls.__module__.startswith("lca.plugins.think")
+                    and cls.__name__.startswith("Think")
+                    and cls.__name__.endswith("Executor")
+                ):
+                    continue
+                semantic_name = getattr(cls, "semantic_name", None)
+                region = getattr(cls, "region", None)
+                if not isinstance(semantic_name, str) or not isinstance(region, str):
+                    continue
+                registry[(region, semantic_name)] = cls()
+
+            from lca.plugins.think.reason.complete import ThinkReasonCompleteExecutor
+            registry[("phase:think", "think.reason")] = ThinkReasonCompleteExecutor()
 
             # Default capability providers (no-cordis fallback):
             # 让 think subgraph 真的跑通完整 5 步 → emit 一个默认 decision。
