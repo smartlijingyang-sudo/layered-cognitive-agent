@@ -8,7 +8,7 @@ ADR-0217:扩展以同时支持两种 bundle 形态:
 
 职责分工:
 - yaml 解析:本模块私有 ``_load_bundle_graph_spec``
-- factory → NodeExecutor 解析:委托 ``FactoryRegistry.resolve``
+- factory → NodeExecutor 解析:委托 ``runtime.resolve_factory``(cordis composite key)
 - CognitivePhaseGraphPlan 投影:本模块私有 ``_project_to_phase_graph``
 - CompiledRunPlan 包装:本模块私有 ``_wrap_compiled_run_plan``
 
@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import yaml
 
@@ -38,9 +38,6 @@ from lca.contracts.protocols.declarative.declarative_1.declarative_graph import 
     PhaseNode,
     SubgraphResolver,
     ValidationReport,
-)
-from lca.contracts.protocols.declarative.declarative_1.factory_resolver import (
-    get_default_registry,
 )
 from lca.contracts.protocols.state.plan import COMPILED_RUN_PLAN_VERSION, CompiledRunPlan
 from lca.contracts.protocols.state.scope_plan import BudgetCeiling, ScopePlan
@@ -206,6 +203,8 @@ def _load_bundle_graph_spec(plan_ref: str) -> BundleGraphSpec:
 
 def _project_to_phase_graph(
     spec: BundleGraphSpec,
+    *,
+    runtime: Any,
 ) -> tuple[CognitivePhaseGraphPlan, tuple[str, ...]]:
     """BundleGraphSpec → CognitivePhaseGraphPlan。
 
@@ -219,8 +218,11 @@ def _project_to_phase_graph(
 
     返回 ``(plan, factories_resolved)``。``factories_resolved`` 是已成功解析的
     factory 列表,供 caller 校验用。**Resolve 在此发生**(fail-loud)。
+
+    ``runtime`` 只需暴露 ``resolve_factory(factory, region)`` —— 任何符合
+    ``SubgraphRuntime`` 协议(framework 侧)或仅 duck-type 该方法的 stub 均可,
+    本模块保留 layer 边界不在此处 import framework。
     """
-    registry = get_default_registry()
     region_for_resolve = spec.region
     node_factories: list[tuple[str, str, str | None]] = []  # (node_id, factory, region)
     phase_nodes: list[PhaseNode] = []
@@ -229,7 +231,7 @@ def _project_to_phase_graph(
     for n in spec.nodes:
         # 规则 1:解析 factory(失败抛 FactoryResolutionError,PG-005-factory)
         node_region = n.region if n.region is not None else region_for_resolve
-        registry.resolve(n.factory, node_region)  # 命中即返回,失败 fail-loud
+        runtime.resolve_factory(n.factory, node_region)  # 命中即返回,失败 fail-loud
         node_factories.append((n.id, n.factory, node_region))
 
         max_visits = int(n.config.get("max_visits", 1)) if n.config else 1
@@ -350,10 +352,15 @@ def _wrap_compiled_run_plan(
 
 
 @lru_cache(maxsize=16)
-def _compile_bundle_graph(plan_ref: str) -> CompiledRunPlan:
-    """compile one BundleGraph v2 yaml into a CompiledRunPlan. cached per process."""
+def _compile_bundle_graph(plan_ref: str, *, runtime: Any) -> CompiledRunPlan:
+    """compile one BundleGraph v2 yaml into a CompiledRunPlan. cached per process.
+
+    ``runtime`` 只用于 factory fail-loud 校验,不参与返回 plan 的内容;但
+    ``lru_cache`` 会按 (plan_ref, runtime) 同时缓存。生产调用方传同一个
+    CordisBackedRuntime 实例,缓存命中率不变。
+    """
     spec = _load_bundle_graph_spec(plan_ref)
-    phase_graph, _factories = _project_to_phase_graph(spec)
+    phase_graph, _factories = _project_to_phase_graph(spec, runtime=runtime)
     return _wrap_compiled_run_plan(spec, phase_graph)
 
 
@@ -365,15 +372,21 @@ class BundleSubgraphResolver:
        reflect-subgraph 用,保留)
     2. ``bundles/<file>.yaml`` 文件存在 + 能解析为 BundleGraphSpec → v2 新路径
        (think.yaml 等用)
+
+    v2 路径需要 caller 显式传 ``runtime=``(只要求 duck-type
+    ``resolve_factory(factory, region)``);未传则 v2 路径返回 ``None``,让 caller
+    走 legacy 或降级路径——避免在没有真实 cordis scope 时错误声称 factory 存在。
     """
 
-    def resolve(self, plan_ref: str) -> CompiledRunPlan | None:
+    def resolve(self, plan_ref: str, *, runtime: Any | None = None) -> CompiledRunPlan | None:
         relative_profile = _PLAN_REF_PROFILES.get(plan_ref)
         if relative_profile is not None:
             return _compile_subgraph_profile(relative_profile)
         # v2 新路径:plan_ref 以 ``bundles/`` 开头 + 文件存在 + 顶层含 ``nodes:``
         if _is_bundle_graph_v2(plan_ref):
-            return _compile_bundle_graph(plan_ref)
+            if runtime is None:
+                return None
+            return _compile_bundle_graph(plan_ref, runtime=runtime)
         return None
 
 
