@@ -60,9 +60,9 @@ entries:
   $module: lca.plugins.think.llm.resolver_seam
   config:
     default_model: qwen3.7-plus
-- id: lca-subgraph-runtime-llm
-  name: lca_subgraph_runtime_llm
-  $module: lca.plugins.think.llm.subgraph_runtime_provider
+- id: phase.think.reasoner
+  name: phase_think_reasoner
+  $module: lca.plugins.think.llm.reasoner_instance_provider
   config: {}
 - id: lca-subgraph-resolver
   name: lca_subgraph_resolver

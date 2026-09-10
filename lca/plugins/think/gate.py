@@ -81,7 +81,7 @@ class ThinkGateExecutor:
     id="phase.think.gate",
     Config=None,
     provides=("phase.think.gate",),
-    requires=("decision_gate",),
+    requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",

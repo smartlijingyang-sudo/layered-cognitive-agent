@@ -11,8 +11,7 @@ Out of scope:
 - mutable outer state (returns updated state).
 
 Composition is wired in :func:`setup` from the two Cordis
-capabilities (``subgraph_resolver`` / ``subgraph_runtime``) — no
-``__init__`` injection (per plan R6).
+capability (``subgraph_resolver``) — no ``__init__`` injection (per plan R6).
 """
 
 from __future__ import annotations
@@ -55,7 +54,10 @@ from lca.framework.subgraph.plugins.node_graph_driver import (
     ObserverFn,
 )
 from lca.framework.subgraph.plugins.plan_lift import lift_subgraph_reference_to_v2
-from lca.framework.subgraph.plugins.runtime import SubgraphRuntime
+from lca.framework.subgraph.plugins.runtime import (
+    PluginContextBackedRuntime,
+    SubgraphRuntime,
+)
 from lca.harness.declarative.execute.outcome_projection import (
     InterpretationResult,
     PhaseVisit,
@@ -226,8 +228,8 @@ def _failed_result(
 @plugin(
     id="subgraph.runner",
     Config=None,
-    provides=("subgraph_runner",),
-    requires=("subgraph_resolver", "subgraph_runtime"),
+    provides=("subgraph_runner", "phase_output_channel_factory"),
+    requires=("subgraph_resolver",),
     layer="L1",
     kind=PluginKind.DRIVER,
     effects="none",
@@ -246,13 +248,21 @@ def _failed_result(
         ),
     ),
     ownership=OwnershipDeclaration(
-        reads=("plugin.serve", "subgraph_resolver", "subgraph_runtime"),
+        reads=("plugin.serve", "subgraph_resolver"),
         emits=("subgraph.executed",),
         state_mutation="forbidden",
     ),
 )
 async def setup(ctx: PluginContext, config=None) -> None:
     """Wire SubgraphRunner from Cordis-injected capabilities and provide it.
+
+    The inner subgraph's capability scope is sourced from this same
+    ``ctx``: the runner constructs a :class:`PluginContextBackedRuntime`
+    that resolves every ``runtime.<capability>`` read inside a node
+    through ``ctx.require(capability)``. There is no separate
+    ``subgraph_runtime`` capability key; the framework never invents
+    objects of its own — capability bindings live entirely in the
+    PluginContext.
 
     The declared ``requires=`` keys are checked at boot by Cordis
     (per ADR-0110); a profile that fails to provide any of them raises
@@ -265,7 +275,7 @@ async def setup(ctx: PluginContext, config=None) -> None:
     the runner directly with ``observers=...``.
     """
     resolver = ctx.require("subgraph_resolver")
-    runtime = ctx.require("subgraph_runtime")
+    runtime = PluginContextBackedRuntime(ctx=ctx)
     observers: tuple[ObserverFn, ...] = ()
     if hasattr(ctx, "require"):
         try:
@@ -278,6 +288,16 @@ async def setup(ctx: PluginContext, config=None) -> None:
         observers=observers,
     )
     ctx.provide("subgraph_runner", runner)
+
+    # Phase output channel is a framework-owned seam; provide the
+    # default in-memory implementation so a profile that wants a
+    # different channel (e.g. journal-backed) can override via its
+    # own plugin without touching the runner.
+    from lca.framework.subgraph.plugins.channel import (
+        InMemoryPhaseOutputChannel,
+    )
+
+    ctx.provide("phase_output_channel_factory", InMemoryPhaseOutputChannel)
 
 
 __all__ = ["SubgraphRunner", "setup"]

@@ -440,8 +440,9 @@ class BundleSubgraphResolver:
         在 instance lookup miss 时触发(``scope.resolve_factory``)。
 
         这个集成让 interpreter 可以把同一个 ``BundleSubgraphResolver`` 实例
-        同时传给 ``subgraph_resolver=`` 和 ``subgraph_runtime=``,无需额外
-        ``SubgraphRuntime`` 包装层。
+        通过 ``subgraph_resolver=`` 传给 ``SubgraphRunner``,无需额外
+        runtime-side wrapping;``SubgraphRunner`` 内部通过
+        ``PluginContextBackedRuntime`` 拿到 capability。
         """
         del factory, region
         return None

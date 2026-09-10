@@ -78,7 +78,7 @@ class ThinkShortcutExecutor:
     id="phase.think.shortcut",
     Config=None,
     provides=("phase.think.shortcut",),
-    requires=("supports_shortcut",),
+    requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",

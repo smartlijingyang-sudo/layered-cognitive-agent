@@ -135,12 +135,10 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
         loop_guard_evaluator: object | None = None,
         *,
         subgraph_runner: object | None = None,
-        subgraph_runtime: object | None = None,
         channel_factory: object | None = None,
     ) -> None:
         self._loop_guard_evaluator = loop_guard_evaluator
         self._subgraph_runner = subgraph_runner
-        self._subgraph_runtime = subgraph_runtime
         self._channel_factory = channel_factory
 
     def create(
@@ -167,13 +165,11 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
             x is not None
             for x in (
                 self._subgraph_runner,
-                self._subgraph_runtime,
                 self._channel_factory,
             )
         ):
             interpreter.bind_cordis_seams(
                 subgraph_runner=self._subgraph_runner,
-                subgraph_runtime=self._subgraph_runtime,
                 channel_factory=self._channel_factory,
             )
         return interpreter
@@ -191,7 +187,6 @@ class ObservabilityRuntimeJournalFactory(RuntimeJournalFactory):
     requires=[
         "loop_guard_evaluator",
         "subgraph_runner",
-        "subgraph_runtime",
         "phase_output_channel_factory",
     ],
     provides=[
@@ -259,25 +254,20 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     del config
     ctx.provide("checkpoint_state_resolver_factory", DefaultCheckpointStateResolverFactory())
 
-    # Pull the three subgraph / channel seams from Cordis so
-    # ``create`` can ``bind_cordis_seams`` on the interpreter. All
-    # three are provided by ``declarative.interpreter`` (L2) which
-    # runs before this L2 seams plugin in the cordis boot DAG; if a
-    # future profile replaces the L2 interpreter provider, the
-    # require calls fall through to None and the inner subgraph
-    # fails fast with PG-005 as before.
+    # Pull the two subgraph / channel seams from Cordis so ``create``
+    # can ``bind_cordis_seams`` on the interpreter. Both are provided
+    # by ``declarative.interpreter`` (L2) which runs before this L2
+    # seams plugin in the cordis boot DAG; if a future profile
+    # replaces the L2 interpreter provider, the require calls fall
+    # through to None and the inner subgraph fails fast with PG-005
+    # as before.
     subgraph_runner: object | None = None
-    subgraph_runtime: object | None = None
     channel_factory: object | None = None
     if hasattr(ctx, "require"):
         try:
             subgraph_runner = ctx.require("subgraph_runner")
         except Exception:
             subgraph_runner = None
-        try:
-            subgraph_runtime = ctx.require("subgraph_runtime")
-        except Exception:
-            subgraph_runtime = None
         try:
             channel_factory = ctx.require("phase_output_channel_factory")
         except Exception:
@@ -288,7 +278,6 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         DefaultDeclarativeInterpreterFactory(
             ctx.require("loop_guard_evaluator"),
             subgraph_runner=subgraph_runner,
-            subgraph_runtime=subgraph_runtime,
             channel_factory=channel_factory,
         ),
     )

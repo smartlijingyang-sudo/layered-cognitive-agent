@@ -92,7 +92,7 @@ class ThinkRouteExecutor:
     id="phase.think.route",
     Config=None,
     provides=("phase.think.route",),
-    requires=("skill_router",),
+    requires=("reducer",),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",

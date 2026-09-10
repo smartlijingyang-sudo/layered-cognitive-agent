@@ -1,31 +1,45 @@
-"""SubgraphRuntime abstraction + Cordis-backed default implementation.
+"""SubgraphRuntime abstraction + PluginContext-backed default implementation.
 
-Per plan §3.2 / §13.3:
+The framework layer owns the protocol; the plugin layer owns the
+binding model. ``PluginContextBackedRuntime`` is the standard seam
+that resolves capabilities via :meth:`PluginContext.require`, so the
+framework never invents objects of its own — every capability is
+sourced from a :func:`@plugin`-registered binding, and a missing
+binding fails at :meth:`SubgraphRuntime.resolve` time rather than
+silently fabricating a default.
+
+Per ADR-0219 §6 / plan §3.2 / §13.3:
 
 - :class:`SubgraphRuntime` (Protocol) is the seam between the framework
   layer and the runtime layer that owns concrete capability instances.
-- The framework calls ``runtime.resolve(capability)`` to look up
-  capabilities (Reasoner, DecisionGate, …); it does not import any
-  provider class.
-- :class:`CordisBackedRuntime` is the default implementation, sourced
-  from a Cordis ``Context``. Cordis itself is not a runtime —
-  :class:`SubgraphRuntime` is the framework-facing abstraction; a
-  ``Mapping[str, Any]``-backed fake is equally valid for tests.
+- :class:`PluginContextBackedRuntime` is the default implementation,
+  sourced from a :class:`PluginContext`. It walks ``ctx.require`` for
+  every ``resolve(capability)`` call and a ``f"{region}::{factory}"``
+  composite key for ``resolve_factory``.
+- Inner subgraph node plugins read ``context.runtime.<capability>``;
+  the framework's :class:`NodeRuntimeView` translates that into a
+  ``runtime.resolve(capability)`` call, which routes here.
 
-This module does not carry ``@plugin`` for the runtime class itself:
-runtime is provided via ``setup`` which calls ``ctx.provide`` on the
-default ``CordisBackedRuntime`` instance.
+Profile / bundle authors may replace a single capability by providing
+a different binding (e.g. ``ctx.provide("decision_gate", MyGate())``);
+they do not subclass :class:`SubgraphRuntime`.
+
+The module does not carry an :func:`@plugin` decorator — the runner
+plugin owns ``ctx.provide("subgraph_runner", SubgraphRunner(...))``
+after constructing the runtime from ``ctx`` directly. ADR-0219 §6
+explicitly chose this wiring path; no ``subgraph_runtime`` capability
+key exists.
 """
 
 from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
 
-from cordis import Context  # noqa: TC002
-
 from lca.contracts.protocols.declarative.declarative_1.bundle_graph import (
     FactoryResolutionError,
 )
+from lca.harness.plugin.context import UndeclaredInteractionError
+from lca.harness.plugin_api import PluginContext
 
 
 @runtime_checkable
@@ -54,29 +68,27 @@ class SubgraphRuntime(Protocol):
         ...
 
 
-class CordisBackedRuntime:
-    """Default :class:`SubgraphRuntime` that resolves from a Cordis ``Context``.
+class PluginContextBackedRuntime:
+    """Default :class:`SubgraphRuntime` that resolves from a ``PluginContext``.
 
-    Resolution walks the Cordis binding chain so the nearest scope
-    wins (matches :func:`collect_context_bindings` semantics).
-
-    Cordis does not provide a per-key ``resolve`` API directly; this
-    class performs the same lookup by walking ``own_bindings`` along
-    the ``parent`` chain. The walk is bounded by the parent pointer
-    cycle, which Cordis guarantees terminates at ``None``.
+    ``resolve(capability)`` delegates to ``ctx.require(capability)``.
+    ``KeyError`` and ``UndeclaredInteractionError`` are coerced to
+    ``None`` so the :class:`NodeRuntimeView` soft-fail semantics are
+    preserved; node plugins that declared ``requires=(...)`` are
+    already validated at boot by the PluginContext layer, so the
+    soft-fail here only kicks in for capabilities the current
+    profile intentionally omitted (e.g. ``supports_shortcut`` when
+    no shortcut path exists).
     """
 
-    def __init__(self, *, ctx: Context) -> None:
+    def __init__(self, *, ctx: PluginContext) -> None:
         self._ctx = ctx
 
     def resolve(self, capability: str) -> Any:
-        node: Any = self._ctx
-        while node is not None:
-            own = getattr(node, "own_bindings", None)
-            if isinstance(own, dict) and capability in own:
-                return own[capability]
-            node = getattr(node, "parent", None)
-        return None
+        try:
+            return self._ctx.require(capability)
+        except (KeyError, UndeclaredInteractionError):
+            return None
 
     def resolve_factory(self, factory: str, region: str) -> Any:
         """Resolve a ``(factory, region)`` pair via composite key.
@@ -95,4 +107,4 @@ class CordisBackedRuntime:
         raise FactoryResolutionError(factory, region)
 
 
-__all__ = ["CordisBackedRuntime", "SubgraphRuntime"]
+__all__ = ["PluginContextBackedRuntime", "SubgraphRuntime"]

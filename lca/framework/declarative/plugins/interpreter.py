@@ -57,11 +57,9 @@ from lca.contracts.protocols.runtime.runtime.lifecycle import (
     RuntimeLifecycleEventType,
     RuntimeLifecyclePublisher,
 )
-from lca.contracts.protocols.state.plan import CompiledRunPlan
 from lca.framework.subgraph.plugins.channel import PhaseOutput
 from lca.harness.declarative.compile.assembler.assembler import (
     ExecutablePlan,
-    RestrictedScope,
 )
 from lca.harness.declarative.controls.validation import require_valid
 from lca.harness.declarative.execute.loop_guard import DeclarativeLoopGuardEvaluator
@@ -182,7 +180,6 @@ class GenericPlanInterpreter:
         # below wires them through ``ctx.inject(...)`` so the think
         # subgraph branch in ``_drive`` can delegate to the v2 driver.
         self._subgraph_runner: object | None = None
-        self._subgraph_runtime: object | None = None
         self._channel_factory: object | None = None
         # ADR-0219 §10.11 item (4): observer port on the interpreter. Stored
         # here so the Default factory (which constructs SubgraphRunner
@@ -196,7 +193,6 @@ class GenericPlanInterpreter:
         self,
         *,
         subgraph_runner: object | None = None,
-        subgraph_runtime: object | None = None,
         channel_factory: object | None = None,
         observers: tuple = (),
     ) -> None:
@@ -218,8 +214,6 @@ class GenericPlanInterpreter:
         """
         if subgraph_runner is not None:
             self._subgraph_runner = subgraph_runner
-        if subgraph_runtime is not None:
-            self._subgraph_runtime = subgraph_runtime
         if channel_factory is not None:
             self._channel_factory = channel_factory
         self._observers = tuple(observers)
@@ -882,7 +876,6 @@ class Config(BaseModel):
     id="declarative.interpreter",
     requires=(
         "subgraph_runner",
-        "subgraph_runtime",
         "phase_output_channel_factory",
         "loop_guard_evaluator",
     ),
@@ -919,7 +912,6 @@ class Config(BaseModel):
             "delta_reducer",
             "phase_observer",
             "subgraph_runner",
-            "subgraph_runtime",
             "phase_output_channel_factory",
             "loop_guard_evaluator",
             "runtime_lifecycle_publisher",
@@ -934,7 +926,6 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     del config
     loop_guard_evaluator = ctx.require("loop_guard_evaluator")
     subgraph_runner = ctx.require("subgraph_runner")
-    subgraph_runtime = ctx.require("subgraph_runtime")
     channel_factory = ctx.require("phase_output_channel_factory")
     # ADR-0219 §10.11 item (4): observer port from Cordis. Cordis-boot
     # may pass an empty tuple; the Default factory injects the
@@ -960,7 +951,6 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     )
     interpreter.bind_cordis_seams(
         subgraph_runner=subgraph_runner,
-        subgraph_runtime=subgraph_runtime,
         channel_factory=channel_factory,
         observers=observers,
     )
