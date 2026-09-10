@@ -15,6 +15,7 @@ LCA 是基于 vendored Cordis 的 Python 插件化认知 Agent 框架。
 | ADR 索引 | [docs/adr/README.md](docs/adr/README.md) |
 | SSOT 矩阵 | [ADR-0195 §4](docs/adr/0195-platform-architecture-convergence.md) · [platform-directory-architecture.md](docs/specs/platform-directory-architecture.md) |
 | 调试 runbook | [docs/debug/README.md](docs/debug/README.md) |
+| 代码工程守则 | [docs/agent-contract/coding-guardrails.md](docs/agent-contract/coding-guardrails.md) |
 
 **迁移态 disclaimer:** Durable 事实经 `FactGateway` → `Session.append` 单轨(ADR-0186/0191/0194 P1–P5 已落地);`spine_reflector_*` 已从 bundle 退役。插件 legacy 顶层目录与 reflector COMPAT shim 仍保留 import 回退;delete-when 见 [0194-0195-implementation-plan.md](docs/specs/0194-0195-implementation-plan.md) §P5 与 ADR-0195 §2.5。
 
@@ -35,6 +36,18 @@ LCA 是基于 vendored Cordis 的 Python 插件化认知 Agent 框架。
 | 改变闭集/层边界/SSOT/能力模型 | 停止编码,先提交 ADR/Note 草案 |
 
 **优先(递减):** 不变量与契约正确 → 依赖方向与单一职责 → 可观测真值 → 可删的兼容 → 局部性能 → "少改几行"的幻觉。
+
+## 1.5 代码工程守则(常驻提醒,每次写代码前自检)
+
+写代码任务的 standing rule,§1 7 问回答**做什么**,本节回答**怎么写**。LCA 落地点与反例见 [docs/agent-contract/coding-guardrails.md](docs/agent-contract/coding-guardrails.md)。
+
+1. **第一性原理:** 用业务行为重述需求(不含实现名词);标出所有跨越的边界(层/seam/控制面·观察面/进程/外部系统/信任);标出可逆与不可逆选择。缺这一步 = 后面都在凭习惯。
+2. **直击本质:** 找根因,不在表面包装;同一根因第二次出现 = 上次没修对;一次修一处根因,不附带"顺手优化"。LCA 落点:§2.2 六分类,分类错了 = 没找到本质。
+3. **架构优雅:** 跨边界前先写 seam(网络/进程/信任/所有权);单一职责,模块一句话能说清"干嘛的";依赖单向,不通过兄弟绕公开 API;按领域分组,不按技术层。LCA 落点:§2.1 单向层;lint-imports + check_package_contracts.py 守护。
+4. **模块化:** 一个模块一个概念、暴露小而稳定的 surface;真正需要插件点的位置才抽(至少两个实现,或能想象第二个);一起改的代码挨着放。LCA 落点:§3 C6 最小化;§5 plugin 硬约束。
+5. **设计模式:** 只在模式能消解具体成本时引入;组合优于继承、数据优于控制流、能选标准库就选标准库;两个相似是巧合,第三个才抽;模式让代码更易读,不是用来"显得专业"。失败信号:类名带 Manager/Helper/Utils/Handler 但说不清负责什么。
+6. **长期可维护:** 注释只解释 *为什么*,不解释 *是什么*(需要解释 *是什么* = 重写代码);测试是设计的一部分,无法独立测试 = 耦合太紧;每个新依赖/抽象/配置项必有 owner + delete-when,无 owner = 永久债。LCA 落点:§5 变更闭环;§6 验证矩阵;每个 bugfix 至少一个回归测试。
+7. **不做临时代码:** "先这样以后再改" = 不;兼容 shim 引入的同一 PR 必须同时删除,无 delete-when = 红灯;双写 SSOT 只在 COMPAT 期内允许,新代码默认 `to`;离开前无新增无期限 TODO、无死代码/死 import、类型标注完整、提交信息说清"做了什么/为什么"。LCA 落点:§4 COMPAT 原则;§5 离开前卫生。
 
 ## 2. 架构模型
 
