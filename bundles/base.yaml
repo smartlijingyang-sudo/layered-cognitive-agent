@@ -60,21 +60,6 @@ entries:
   $module: lca.plugins.think.llm.resolver_seam
   config:
     default_model: qwen3.7-plus
-
-- id: lca-subgraph-runtime-llm
-  name: lca_subgraph_runtime_llm
-  $module: lca.plugins.think.llm.subgraph_runtime_provider
-  config: {}
-
-- id: lca-subgraph-resolver
-  name: lca_subgraph_resolver
-  $module: lca.plugins.think.llm.subgraph_resolver_provider
-  config: {}
-
-- id: subgraph.runner
-  name: subgraph_runner
-  $module: lca.framework.subgraph.plugins.runner
-  config: {}
 - id: lca-memory-write-policy-simple
   name: lca_memory_write_policy_simple
   $module: lca.plugins.memory.policy.write_policy

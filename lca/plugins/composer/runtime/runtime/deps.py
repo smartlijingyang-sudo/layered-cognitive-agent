@@ -74,11 +74,6 @@ class ProductionRuntimeDeps:
     checkpoint_state_resolver_factory: CheckpointStateResolverFactory
     result_finalizer_factory: ResultFinalizerFactory
     phase_observer: PhaseObserver
-    # ADR-0219 §10.11: optional LLM wire the fixture / runtime adapter
-    # uses to build an LLM-backed think subgraph runtime. ``None`` is
-    # acceptable for tests that explicitly opt out of the LLM wire.
-    llm_resolver: object | None = None
-    subgraph_resolver: object | None = None
     lifecycle_publisher: RuntimeLifecyclePublisher | None = None
 
     def runtime_phase_capabilities(self) -> RuntimePhaseCapabilities:

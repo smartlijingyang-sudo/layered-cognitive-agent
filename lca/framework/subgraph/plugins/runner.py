@@ -108,15 +108,19 @@ class SubgraphRunner:
         outer_state: AgentState,
         channel: PhaseOutputChannel,
     ) -> tuple[AgentState, PhaseOutput]:
-        """Execute ``ref``'s subgraph and return ``(state, output)``."""
-        return await self._run_inner(ref, outer_state, channel)
+        """Execute ``ref``'s subgraph and return ``(state, output)``.
 
-    async def _run_inner(
-        self,
-        ref: SubgraphReference,
-        outer_state: AgentState,
-        channel: PhaseOutputChannel,
-    ) -> tuple[AgentState, PhaseOutput]:
+        Cycle and depth guards fire *before* any inner execution; the
+        stack is unwound on both success and failure. The driver
+        publishes the terminal ``PhaseOutput`` on ``channel`` before
+        this method returns; we additionally return it so the caller
+        can ``absorb`` or forward without a second channel read.
+
+        On the FAILED path (ADR-0219 §10.11 item 3) we additionally
+        populate ``output.outcome_kind`` and ``output.error`` so the
+        outer interpreter can see the failure shape without an extra
+        envelope.
+        """
         if ref.plan_ref in self._recursion_stack:
             raise SubgraphCycleError(ref.plan_ref)
         if len(self._recursion_stack) >= self._max_depth:
@@ -223,11 +227,7 @@ def _failed_result(
     id="subgraph.runner",
     Config=None,
     provides=("subgraph_runner",),
-    requires=(
-        "subgraph_resolver",
-        "subgraph_runtime",
-        "phase_output_channel_factory",
-    ),
+    requires=("subgraph_resolver", "subgraph_runtime"),
     layer="L1",
     kind=PluginKind.DRIVER,
     effects="none",
@@ -264,30 +264,18 @@ async def setup(ctx: PluginContext, config=None) -> None:
     ``Session.append`` observer at construction-time and constructs
     the runner directly with ``observers=...``.
     """
-    resolver = ctx.require("subgraph_resolver")
-    runtime = ctx.require("subgraph_runtime")
+    resolver = ctx.inject("subgraph_resolver")
+    runtime = ctx.inject("subgraph_runtime")
     observers: tuple[ObserverFn, ...] = ()
-    try:
-        observers = tuple(ctx.require("subgraph_observers"))
-    except Exception:
-        observers = ()
-    # ADR-0219 §10.11 close-out: pull the channel factory from the
-    # Cordis chain so the inner NodeGraphDriver receives the same
-    # in-memory channel surface as the outer interpreter. Without
-    # this, sub_spec_ref nodes fail with "no sub_runner/channel_factory"
-    # because the SubgraphRunner constructs NodeGraphDriver with
-    # ``channel_factory=self._channel_factory`` which is ``None`` until
-    # something explicit wires it.
-    channel_factory: Callable[[], object] | None = None
-    try:
-        channel_factory = ctx.require("phase_output_channel_factory")
-    except Exception:
-        channel_factory = None
+    if hasattr(ctx, "require"):
+        try:
+            observers = tuple(ctx.require("subgraph_observers"))
+        except Exception:
+            observers = ()
     runner = SubgraphRunner(
         resolver=resolver,
         runtime=runtime,
         observers=observers,
-        channel_factory=channel_factory,
     )
     ctx.provide("subgraph_runner", runner)
 

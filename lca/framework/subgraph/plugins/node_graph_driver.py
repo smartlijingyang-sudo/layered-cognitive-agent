@@ -170,7 +170,16 @@ class NodeGraphDriver:
         artifacts: Mapping[str, object],
         outer_input: Mapping[str, Any] | None = None,
     ) -> InterpretationResult:
-        """跑 v2 plan,返回 InterpretationResult(与 _drive 同形)。"""
+        """跑 v2 plan,返回 InterpretationResult(与 _drive 同形)。
+
+        ``channel`` is required: at termination the driver projects the
+        collected ``port_values`` into a :class:`PhaseOutput` and
+        publishes it. ``outer_input`` is the optional initial
+        ``port_values`` projection from the outer drive.
+        """
+        # Lazy import:avoid runner <-> driver circular import. The runner
+        # owns the canonical FAILED InterpretationResult shape (ADR-0219
+        # §6); the driver only needs it on the failure paths.
         from lca.framework.subgraph.plugins.runner import _failed_result
 
         visits: list[PhaseVisit] = []

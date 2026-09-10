@@ -40,19 +40,8 @@ from lca.plugins.journal.declarative.runtime_seams_provider import (
     RegistryDeltaReducerFactory,
     RegistryEffectDispatcherFactory,
 )
-from lca.framework.subgraph.plugins.channel import InMemoryPhaseOutputChannel
-from lca.framework.subgraph.plugins.runner import SubgraphRunner
-from lca.harness.declarative.compile.subgraph_resolver import (
-    default_subgraph_resolver,
-)
-from lca.plugins.journal.declarative.runtime_seams_provider import (
-    session_append_observer,
-)
 from lca.plugins.loop.reducer.plugin import DefaultReducer
 from lca.plugins.loop.state.stop_policy.plugin import DefaultStopPolicy
-from lca.plugins.think.llm.subgraph_runtime_provider import (
-    build_llm_subgraph_runtime,
-)
 
 
 class FixtureRuntimeAdapter:
@@ -60,24 +49,6 @@ class FixtureRuntimeAdapter:
 
     def __init__(self, deps: RuntimeDeps) -> None:
         self._deps = deps
-        # ADR-0219 §10.11: the think subgraph runtime is LLM-backed.
-        # Build it once from the fixture's :class:`LLMResolver` (the
-        # ``lca-llm-resolver`` plugin supplies it through
-        # ``capabilities``). The Cordis path keeps the same shape via
-        # ``lca-subgraph-runtime-llm``; this fixture path lets the
-        # ``composer`` runtime tests construct the interpreter without
-        # a Cordis boot.
-        self._subgraph_runtime = build_llm_subgraph_runtime(
-            llm_resolver=self._deps.llm_resolver,
-        )
-        self._subgraph_runner = SubgraphRunner(
-            resolver=getattr(self._deps, "subgraph_resolver", None)
-            or default_subgraph_resolver(),
-            runtime=self._subgraph_runtime,
-            observers=(session_append_observer(),),
-            channel_factory=InMemoryPhaseOutputChannel,
-        )
-        self._channel_factory = InMemoryPhaseOutputChannel
 
     def complete(self) -> RuntimeDeps:
         """Complete only the mechanisms that are intentionally fixture-local."""
@@ -106,12 +77,7 @@ class FixtureRuntimeAdapter:
             delta_reducer_factory=self._deps.delta_reducer_factory or RegistryDeltaReducerFactory(),
             journal_factory=self._deps.journal_factory or ObservabilityRuntimeJournalFactory(),
             interpreter_factory=self._deps.interpreter_factory
-            or DefaultDeclarativeInterpreterFactory(
-                DeclarativeLoopGuardEvaluator(),
-                subgraph_runtime=self._subgraph_runtime,
-                subgraph_runner=self._subgraph_runner,
-                channel_factory=self._channel_factory,
-            ),
+            or DefaultDeclarativeInterpreterFactory(DeclarativeLoopGuardEvaluator()),
             checkpoint_state_resolver_factory=self._deps.checkpoint_state_resolver_factory
             or DefaultCheckpointStateResolverFactory(),
             result_finalizer_factory=self._deps.result_finalizer_factory

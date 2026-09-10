@@ -65,11 +65,6 @@ class RuntimeDeps:
     checkpoint_state_resolver_factory: CheckpointStateResolverFactory | None = None
     result_finalizer_factory: ResultFinalizerFactory | None = None
     phase_observer: PhaseObserver = field(default_factory=TracingPhaseObserver)
-    # ADR-0219 §10.11: optional LLM wire used to build the think
-    # subgraph runtime. ``None`` triggers ``LLMUnavailableError`` in
-    # ``DefaultDeclarativeInterpreterFactory.create``.
-    llm_resolver: object | None = None
-    subgraph_resolver: object | None = None
 
 
 __all__ = ["RuntimeDeps"]

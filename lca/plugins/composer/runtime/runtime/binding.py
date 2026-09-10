@@ -57,12 +57,6 @@ def from_runtime_graph(
         checkpoint_state_resolver_factory=capabilities.checkpoint_state_resolver_factory,
         result_finalizer_factory=capabilities.result_finalizer_factory,
         phase_observer=capabilities.phase_observer,
-        # ADR-0219 §10.11: pass the LLMResolver through so the runtime
-        # adapter can build an LLM-backed think subgraph runtime. The
-        # capability is currently optional; if absent the adapter
-        # raises ``LLMUnavailableError`` fail-loud rather than
-        # silently re-introducing a stub.
-        llm_resolver=getattr(capabilities, "llm_resolver", None),
         lifecycle_publisher=capabilities.lifecycle_publisher,
     )
 

@@ -277,16 +277,12 @@ def _project_to_phase_graph(
         node_factories.append((n.id, n.factory, node_region))
 
         max_visits = int(n.config.get("max_visits", 1)) if n.config else 1
-        # ADR-0219 §10.11: forward ``sub_spec_ref`` so the interpreter
-        # can route the node through the inner SubgraphRunner instead
-        # of trying to resolve a missing executor for it.
         phase_nodes.append(
             PhaseNode(
                 id=n.id,
                 semantic_phase=SemanticPhase.THINK,
-                binding=n.factory if n.sub_spec_ref is None else None,
+                binding=n.factory,
                 max_visits=max_visits,
-                sub_spec_ref=n.sub_spec_ref,
             )
         )
 
@@ -348,7 +344,6 @@ def _wrap_compiled_run_plan(
             executor_capability=n.binding,
         )
         for n in phase_graph.nodes
-        if n.binding is not None
     )
     capability = CapabilityPlan(
         profile_path=profile_path,
