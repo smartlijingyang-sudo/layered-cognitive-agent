@@ -25,6 +25,9 @@ from typing import Any, Literal, Mapping
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
     DeclarativeValidationError,
 )
+from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
+    SubgraphReference,
+)
 
 BUNDLE_GRAPH_VERSION = "bundle-graph/v1"
 
@@ -54,6 +57,11 @@ class BundleGraphNode:
     factory: str
     purpose: str = ""
     config: Mapping[str, Any] = field(default_factory=dict)
+    # ADR-0219 §10.11: node-level typed ``sub_spec_ref`` mirrors the
+    # outer ``PhaseNode.sub_spec_ref`` (declarative_graph.py). When set,
+    # ``NodeGraphDriver.run`` delegates the inner traversal to the
+    # injected ``SubgraphRunner`` instead of resolving a factory.
+    sub_spec_ref: SubgraphReference | None = None
 
     def __post_init__(self) -> None:
         if not self.id:
@@ -61,6 +69,14 @@ class BundleGraphNode:
         if not self.factory:
             raise DeclarativeValidationError(
                 "PG-005-bundle-graph", f"node[{self.id!r}].factory must be non-empty"
+            )
+        if self.sub_spec_ref is not None and not isinstance(
+            self.sub_spec_ref, SubgraphReference
+        ):
+            raise DeclarativeValidationError(
+                "PG-005-bundle-graph",
+                f"node[{self.id!r}].sub_spec_ref must be a SubgraphReference, "
+                f"got {type(self.sub_spec_ref).__name__}",
             )
 
 
