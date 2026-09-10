@@ -4,7 +4,7 @@ v2 plan 调度主循环。**只**做一件事——按 yaml edges 跑节点,直�
 
 职责分层:
   - 调度循环本身(本类)
-  - executor 解析:委托 FactoryRegistry(已有)
+  - executor 解析:委托 ``scope.resolve_factory``(SubgraphRuntime seam)
   - NodeContext 构造:委托 build_node_context(已有)
   - NodeOutput → PhaseResult 投影:委托 project_node_output(已有)
   - 边选择:委托 select_edge(已有)
@@ -29,7 +29,7 @@ from lca.contracts.protocols.declarative.declarative_1.bundle_graph import (
     BundleGraphSpec,
 )
 from lca.contracts.protocols.declarative.declarative_1.factory_resolver import (
-    FactoryRegistry,
+    FactoryResolutionError,
 )
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     SemanticPhase,
@@ -69,7 +69,7 @@ class NodeGraphDriver:
         visits = []
         while True:
             n = nodes[current]
-            executor = registry.resolve(n.factory, region)
+            executor = scope.resolve_factory(n.factory, region)
             ctx = build_node_context(n, plan_ref, outer_state, scope)
             inp = port_context.build_input(n.inputs)
             out = await executor.node_execute(ctx, inp)
@@ -90,14 +90,12 @@ class NodeGraphDriver:
         *,
         spec: BundleGraphSpec,
         plan_ref: str,
-        scope: Any,  # _ScopeLike:有 .resolve(key) -> obj 的对象;Mapping 也兼容
-        registry: FactoryRegistry,
+        scope: Any,  # SubgraphRuntime:有 .resolve/.resolve_factory 的对象
         observers: tuple[ObserverFn, ...] = (),
     ) -> None:
         self._spec = spec
         self._plan_ref = plan_ref
         self._scope = scope
-        self._registry = registry
         self._observers = observers
         self._nodes_by_id: dict[str, BundleGraphNode] = {n.id: n for n in spec.nodes}
         # entry:yaml 显式声明优先;否则 fallback 到 nodes 列表的第一个节点。
@@ -137,9 +135,9 @@ class NodeGraphDriver:
         while True:
             node = self._nodes_by_id[current_id]
             try:
-                executor = self._registry.resolve(node.factory, node.region)
-            except Exception as exc:
-                # FactoryResolutionError(或其他) → fail-loud,返回 FAILED outcome
+                executor = self._scope.resolve_factory(node.factory, node.region)
+            except FactoryResolutionError as exc:
+                # fail-loud:runtime 无法解析 → 返回 FAILED outcome
                 return _failed_result(
                     outer_state=outer_state,
                     node_id=current_id,
