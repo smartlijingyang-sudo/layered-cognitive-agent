@@ -1,8 +1,8 @@
 # think-subgraph-dev — production loop with decomposed think phase graph.
 #
-# Same bundles as web-standard plus the 5-step think plugins.
-# The think subgraph topology is driven by the declarative edge's subgraph_ref
-# in declarative-phase-graph.yaml; think.main uses the standard binding.
+# Same bundles as web-standard;think 5 步子图走 ADR-0217 BundleGraphSpec v2
+# (bundles/think.yaml)。plugin 注册走 5 个 @plugin(...) 装饰器;FactoryRegistry
+# 按 factory 业务语义名解析到 NodeExecutor。
 #
 # Not the factory default. Use:
 #   uv run python -m lca_kernel serve --profile profiles/think-subgraph-dev.yaml
@@ -16,7 +16,8 @@ bundles:
   - bundles/loop_cursor.spine_default.yaml
   - bundles/session-runtime.yaml
   - bundles/event-bus-components.yaml
-  - bundles/think-steps.yaml
+  - bundles/think-cordis.yaml
+  - bundles/think.yaml
 
 patch:
   - id: lca-llm-resolver
@@ -41,7 +42,7 @@ patch:
           max_visits: 8
           # Node Note 2026-09-09-phase-node-sub-spec-ref: 节点级嵌套 think 子图。
           sub_spec_ref:
-            plan_ref: bundles/think-steps.yaml
+            plan_ref: bundles/think.yaml
             entry_node: think.shortcut
             binding_edge: think.main
         - id: act.main

@@ -61,13 +61,11 @@ entries:
           phase: think
           binding: phase.think.standard
           max_visits: 8
-          # Node Note 2026-09-09-phase-node-sub-spec-ref: think 节点持有
-          # 节点级 sub_spec_ref, 直接引用 think 5 步子图。interpreter 在
-          # 进入节点时分发到子图, 不调用 phase.think.standard phase executor。
-          # 与下一条 think.main → act.main 边的 subgraph_ref 二选一即可 —
-          # 本 PR 切到节点级, 边级 subgraph_ref 删除。
+          # Bundle Graph Schema v2 (ADR-0217): think 节点持有节点级
+          # sub_spec_ref,指向 bundles/think.yaml 纯图描述(5 节点 + 5 边)。
+          # interpreter 进入节点时分发到子图,不调用 phase.think.standard。
           sub_spec_ref:
-            plan_ref: bundles/think-steps.yaml
+            plan_ref: bundles/think.yaml
             entry_node: think.shortcut
             binding_edge: think.main
         - id: act.main

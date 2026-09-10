@@ -1,0 +1,39 @@
+# bundles/think-cordis.yaml — think 5 步 plugin 的 Cordis 注册入口
+# ADR-0217 职责边界:本 bundle 只承担 plugin 注册职责(老机制,不改);
+# 与 bundles/think.yaml(纯图描述,新机制)职责分离。
+#
+# 为什么不在 think.yaml 里直接列 plugin:y
+#   aml 职责是"声明图拓扑"(nodes/edges/config),不是"注册 plugin"。
+#   think.yaml 已被设计为 framework 读取字段,不出现 plugin_id / $module。
+#   5 步 plugin 的注册走 @plugin(...) 装饰器,这个 bundle 列出 module 路径让
+#   cordis 容器在启动时调 setup(),setup() 里既 ctx.provide(cordis 注册)又
+#   FactoryRegistry.register(NodeExecutor 注册)。
+#
+# 本 bundle 是 plugin 注册职责的唯一定义点。如有新增 think 子图节点,
+# 必须同时修改本 bundle(注册 plugin)与 think.yaml(声明节点)。
+
+entries:
+  - id: phase.think.shortcut
+    name: phase_think_shortcut
+    $module: lca.plugins.think.shortcut.plugin
+    config: {}
+
+  - id: phase.think.route
+    name: phase_think_route
+    $module: lca.plugins.think.route.plugin
+    config: {}
+
+  - id: phase.think.reason
+    name: phase_think_reason
+    $module: lca.plugins.think.reason.plugin
+    config: {}
+
+  - id: phase.think.classify
+    name: phase_think_classify
+    $module: lca.plugins.think.classify.plugin
+    config: {}
+
+  - id: phase.think.gate
+    name: phase_think_gate
+    $module: lca.plugins.think.gate.plugin
+    config: {}

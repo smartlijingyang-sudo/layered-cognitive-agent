@@ -9,11 +9,8 @@
 # + session-runtime (ADR-0186 Session SSOT: session.store before event-bus so
 #   the capability is live when publishers/sinks boot; RunSessionBuilder binds
 #   a per-run Session onto publish/observe slots).
-# + think-steps: register the 5-step think phase plugins
-#   (shortcut/route/reason/classify/gate) into Cordis scope. The think
-#   phase uses the standard PhaseExecutor binding (phase.think.standard);
-#   the subgraph topology is driven by the declarative edge's subgraph_ref
-#   in declarative-phase-graph.yaml.
+# + think: think 5 步子图的纯图描述(ADR-0217);plugin 注册走 5 个
+#   @plugin(...) 装饰器,FactoryRegistry 按 factory 业务语义名解析到 NodeExecutor。
 # LLM secrets are owned by lca-llm-resolver (loads project .env at setup).
 
 bundles:
@@ -25,7 +22,8 @@ bundles:
   - bundles/loop_cursor.spine_default.yaml
   - bundles/session-runtime.yaml
   - bundles/event-bus-components.yaml
-  - bundles/think-steps.yaml
+  - bundles/think-cordis.yaml
+  - bundles/think.yaml
 
 patch:
   - id: lca-llm-resolver
@@ -42,10 +40,11 @@ patch:
 
   # Patch topology to add PR-C (ADR-0214 §6.3) PG-007 preconditions and
   # terminal predicates on perceive.main. think.main carries a node-level
-  # sub_spec_ref (Node Note 2026-09-09-phase-node-sub-spec-ref) that
-  # delegates to bundles/think-steps.yaml; the ``phase.think.standard``
-  # binding below is a Pydantic-required field but the interpreter
-  # short-circuits the phase executor when ``sub_spec_ref`` is present.
+  # sub_spec_ref (Node Note 2026-09-09-phase-node-sub-spec-ref, ADR-0217
+  # BundleGraphSpec v2) that delegates to bundles/think.yaml; the
+  # ``phase.think.standard`` binding below is a Pydantic-required field
+  # but the interpreter short-circuits the phase executor when
+  # ``sub_spec_ref`` is present.
   - id: phase.topology.standard
     config:
       nodes:
@@ -62,7 +61,7 @@ patch:
           binding: phase.think.standard
           max_visits: 8
           sub_spec_ref:
-            plan_ref: bundles/think-steps.yaml
+            plan_ref: bundles/think.yaml
             entry_node: think.shortcut
             binding_edge: think.main
         - id: act.main
