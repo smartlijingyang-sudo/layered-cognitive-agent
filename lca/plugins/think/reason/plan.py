@@ -75,7 +75,7 @@ class ThinkReasonPlanExecutor:
 @plugin(
     id="phase.think.reason.plan",
     Config=None,
-    provides=("phase.think.reason.plan",),
+    provides=("phase:think::think.reason.plan",),
     requires=("reasoner",),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

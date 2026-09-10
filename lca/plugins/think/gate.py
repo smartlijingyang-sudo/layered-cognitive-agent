@@ -80,7 +80,7 @@ class ThinkGateExecutor:
 @plugin(
     id="phase.think.gate",
     Config=None,
-    provides=("phase.think.gate",),
+    provides=("phase:think::think.gate",),
     requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
@@ -107,14 +107,11 @@ class ThinkGateExecutor:
     ),
 )
 async def setup(ctx: PluginContext, config=None) -> None:
-    """双键注册:Cordis provide(composite + region-less)。"""
+    """Composite-key registration: ``{region}::{semantic_name}``."""
     del config
     executor = ThinkGateExecutor()
-    # Composite key for region-scoped resolution (preferred)
     composite_key = f"{executor.region}::{executor.semantic_name}"
     ctx.provide(composite_key, executor)
-    # Region-less fallback for cross-region reuse
-    ctx.provide(executor.semantic_name, executor)
 
 
 __all__ = ["ThinkGateExecutor", "setup"]

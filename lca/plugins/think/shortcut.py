@@ -77,7 +77,7 @@ class ThinkShortcutExecutor:
 @plugin(
     id="phase.think.shortcut",
     Config=None,
-    provides=("phase.think.shortcut",),
+    provides=("phase:think::think.shortcut",),
     requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

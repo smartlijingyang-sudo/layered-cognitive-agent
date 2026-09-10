@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
@@ -128,12 +128,27 @@ class PhaseTraversal:
         ADR-0219 §4: writes both the legacy string-keyed ``artifacts`` cache
         (for cursor persistence compatibility) and the typed
         ``results_by_phase`` mirror used by ``RestrictedPhaseContext``.
+
+        When the phase executor chose to ship its typed result through
+        ``command_envelope`` (effect.gateway path, e.g. act phase) the
+        :class:`PhaseResult.payload` is ``None`` — the actual outcome
+        lives on ``effect_output``. Mirror it onto ``result.payload`` so
+        ``RestrictedPhaseContext.payload_of(phase, T)`` can read the
+        downstream phase's typed artifact.
         """
         payload = result.payload if result.payload is not None else effect_output
         self.artifacts["result"] = result
         self.artifacts["payload"] = payload
         self.artifacts[semantic_phase.value] = payload
-        self.results_by_phase[semantic_phase] = result
+        # When the executor chose the effect path, ``result.payload`` is
+        # ``None`` but the typed artifact is on ``effect_output``. Patch it
+        # onto the recorded PhaseResult so the typed mirror exposes it.
+        if result.payload is None and effect_output is not None:
+            self.results_by_phase[semantic_phase] = replace(
+                result, payload=effect_output
+            )
+        else:
+            self.results_by_phase[semantic_phase] = result
         return payload
 
     def advance(

@@ -53,16 +53,37 @@ class StandardReflectExecutor:
     async def execute(self, context: PhaseContext, input: PhaseInput) -> PhaseResult:
         # ADR-0219 §4.3: typed read.
         brain = StandardPhaseCapabilities(context.capabilities).brain
+        reflection_pipeline = context.capabilities.get("cognitive_reflection_pipeline")
         observation = context.payload_of(SemanticPhase.ACT, Observation)
-        if brain is None or observation is None:
+        if observation is None:
             return fallback_phase_result(
                 phase=SemanticPhase.REFLECT,
                 result_kind="reflection",
                 input=input,
             )
-        return PhaseResult(
+        # Prefer the cognitive_reflection_pipeline capability (the
+        # LCA-default seam); fall back to ``Brain.reflect`` if no
+        # pipeline was wired. This avoids a hard requirement on a
+        # ``brain`` capability that isn't actually provided in this tree.
+        if reflection_pipeline is not None:
+            payload = await reflection_pipeline.reflect(
+                state=context.state,
+                observation=observation,
+                critic=None,
+            )
+            return PhaseResult(
+                result_kind="reflection",
+                payload=payload,
+            )
+        if brain is not None:
+            return PhaseResult(
+                result_kind="reflection",
+                payload=await brain.reflect(context.state, observation),
+            )
+        return fallback_phase_result(
+            phase=SemanticPhase.REFLECT,
             result_kind="reflection",
-            payload=await brain.reflect(context.state, observation),
+            input=input,
         )
 
 

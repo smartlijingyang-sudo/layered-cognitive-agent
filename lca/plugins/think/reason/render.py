@@ -75,7 +75,7 @@ class ThinkReasonRenderExecutor:
 @plugin(
     id="phase.think.reason.render",
     Config=None,
-    provides=("phase.think.reason.render",),
+    provides=("phase:think::think.reason.render",),
     requires=("reasoner",),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

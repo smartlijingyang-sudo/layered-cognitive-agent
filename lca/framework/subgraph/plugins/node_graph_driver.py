@@ -228,8 +228,16 @@ class NodeGraphDriver:
                 # produced port_values to the outer port_context so
                 # downstream edge nodes (e.g. think.classify) can read
                 # the inner reasoning's ``response`` without falling
-                # through to a no-input branch.
-                port_context.merge_output(sub_output.port_values)
+                # through to a no-input branch. ``PhaseOutput`` is
+                # terminal snapshot of the inner; the per-node outputs
+                # live on the inner channel's typed dict.
+                inner_outputs = getattr(sub_channel, "_outputs", None) or {}
+                for inner_output in inner_outputs.values():
+                    for field_name in ("decision", "observation", "reflection", "response"):
+                        value = getattr(inner_output, field_name, None)
+                        if value is not None:
+                            port_context.set_outer_input({field_name: value})
+                            break
                 # FAILED inner → propagate to outer driver via typed failure shape
                 if sub_output.outcome_kind is ExecutionOutcome.FAILED:
                     return _failed_result(

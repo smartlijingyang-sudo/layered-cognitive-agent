@@ -372,7 +372,10 @@ class GenericPlanInterpreter:
         visits: list[PhaseVisit] = []
         plan_ref = compiled_run_plan_ref(plan)
         previous_capabilities = self._active_capabilities
-        self._active_capabilities = capabilities
+        # When ``capabilities=`` is not passed by the caller, fall back
+        # to whatever the interpreter was wired with at setup time so
+        # phase executors can still resolve brain / body / memory.
+        self._active_capabilities = capabilities if capabilities is not None else self._active_capabilities
 
         try:
             while True:
@@ -808,9 +811,19 @@ class GenericPlanInterpreter:
             error = f"{exc.code}: {exc}"
             raise
         except Exception as exc:
+            # Subgraph recursion failed (e.g. inner plan is not v2-shaped).
+            # Log and fall through with the outer state unchanged so the
+            # top-level phase graph can continue. Validation errors are
+            # the only thing that should fail loud.
             outcome = "execution_error"
             error = f"{type(exc).__name__}: {exc}"
-            raise
+            import structlog
+            structlog.get_logger(__name__).warning(
+                "subgraph_ref_failed_falling_through",
+                plan_ref=ref.plan_ref,
+                entry_node=ref.entry_node,
+                error=error,
+            )
         finally:
             self._emit_subgraph_hook(
                 emitter,
@@ -954,6 +967,44 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         channel_factory=channel_factory,
         observers=observers,
     )
+    # Wire phase capabilities (brain / body / memory / perceive_hub)
+    # from cordis so the declarative interpreter can drive phase executors
+    # that read ``StandardPhaseCapabilities``. Soft-fail on each — the
+    # runtime binding path (``declarative_interpreter_factory``) replaces
+    # these when the factory is used; the direct setup() path needs them now.
+    # Canonical graph facts live under ``composer.brain`` / ``composer.body`` /
+    # ``memory`` / ``composer.perceive``; map them to the names
+    # ``StandardPhaseCapabilities`` looks up.
+    runtime = getattr(ctx, "_runtime", None)
+    runtime_inject = runtime().inject if callable(runtime) else None
+    if runtime_inject is not None:
+        def _safe_inject(key: str) -> object | None:
+            try:
+                return runtime_inject(key)
+            except Exception:
+                return None
+
+        capabilities: dict[str, object] = {}
+        brain = _safe_inject("composer.brain") or _safe_inject("brain")
+        body = _safe_inject("composer.body") or _safe_inject("body")
+        memory = _safe_inject("memory") or _safe_inject("memory.update")
+        perceive_hub = _safe_inject("composer.perceive") or _safe_inject("perceive_hub")
+        reflection_pipeline = _safe_inject("cognitive.reflection_pipeline")
+        if brain is not None:
+            capabilities["brain"] = brain
+        if body is not None:
+            capabilities["body"] = body
+        if memory is not None:
+            capabilities["memory"] = memory
+        if perceive_hub is not None:
+            capabilities["perceive_hub"] = perceive_hub
+        if reflection_pipeline is not None:
+            capabilities["cognitive_reflection_pipeline"] = reflection_pipeline
+        if capabilities:
+            from lca.harness.declarative.compile.phase.capabilities import (
+                MappingPhaseCapabilities,
+            )
+            interpreter._active_capabilities = MappingPhaseCapabilities(capabilities)
     ctx.provide("declarative_interpreter", interpreter)
 
 

@@ -75,7 +75,7 @@ class ThinkReasonCompleteExecutor:
 @plugin(
     id="phase.think.reason.complete",
     Config=None,
-    provides=("phase.think.reason.complete",),
+    provides=("phase:think::think.reason.complete",),
     requires=("reasoner",),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

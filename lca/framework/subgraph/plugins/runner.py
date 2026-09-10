@@ -286,13 +286,6 @@ async def setup(ctx: PluginContext, config=None) -> None:
             observers = tuple(ctx.require("subgraph_observers"))
         except Exception:
             observers = ()
-    runner = SubgraphRunner(
-        resolver=resolver,
-        runtime=runtime,
-        observers=observers,
-    )
-    ctx.provide("subgraph_runner", runner)
-
     # Phase output channel is a framework-owned seam; provide the
     # default in-memory implementation so a profile that wants a
     # different channel (e.g. journal-backed) can override via its
@@ -301,7 +294,15 @@ async def setup(ctx: PluginContext, config=None) -> None:
         InMemoryPhaseOutputChannel,
     )
 
-    ctx.provide("phase_output_channel_factory", InMemoryPhaseOutputChannel)
+    channel_factory = InMemoryPhaseOutputChannel
+    runner = SubgraphRunner(
+        resolver=resolver,
+        runtime=runtime,
+        observers=observers,
+        channel_factory=channel_factory,
+    )
+    ctx.provide("subgraph_runner", runner)
+    ctx.provide("phase_output_channel_factory", channel_factory)
 
 
 __all__ = ["SubgraphRunner", "setup"]

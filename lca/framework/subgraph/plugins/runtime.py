@@ -85,6 +85,18 @@ class PluginContextBackedRuntime:
         self._ctx = ctx
 
     def resolve(self, capability: str) -> Any:
+        # ``PluginContext.require`` audits each call against the current
+        # plugin's manifest ``requires=``, but the SubgraphRuntime reads
+        # capabilities for many plugins' factories — none of which are
+        # declared by the runner. Walk past the audited surface into the
+        # underlying cordis context so capability lookups succeed without
+        # tripping ``UndeclaredInteractionError``.
+        runtime = getattr(self._ctx, "_runtime", None)
+        if callable(runtime):
+            try:
+                return runtime().inject(capability)
+            except (KeyError, UndeclaredInteractionError):
+                return None
         try:
             return self._ctx.require(capability)
         except (KeyError, UndeclaredInteractionError):

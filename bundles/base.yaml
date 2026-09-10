@@ -59,6 +59,34 @@ entries:
   name: phase_think_reasoner
   $module: lca.plugins.think.reasoner_provider
   config: {}
+- id: phase.think.shortcut
+  name: phase_think_shortcut
+  $module: lca.plugins.think.shortcut
+  config: {}
+- id: phase.think.route
+  name: phase_think_route
+  $module: lca.plugins.think.route
+  config: {}
+- id: phase.think.classify
+  name: phase_think_classify
+  $module: lca.plugins.think.classify
+  config: {}
+- id: phase.think.gate
+  name: phase_think_gate
+  $module: lca.plugins.think.gate
+  config: {}
+- id: phase.think.reason.plan
+  name: phase_think_reason_plan
+  $module: lca.plugins.think.reason.plan
+  config: {}
+- id: phase.think.reason.render
+  name: phase_think_reason_render
+  $module: lca.plugins.think.reason.render
+  config: {}
+- id: phase.think.reason.complete
+  name: phase_think_reason_complete
+  $module: lca.plugins.think.reason.complete
+  config: {}
 - id: subgraph.runner
   name: subgraph_runner
   $module: lca.framework.subgraph.plugins.runner

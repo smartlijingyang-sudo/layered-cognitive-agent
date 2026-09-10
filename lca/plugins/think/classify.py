@@ -75,7 +75,7 @@ class ThinkClassifyExecutor:
 @plugin(
     id="phase.think.classify",
     Config=None,
-    provides=("phase.think.classify",),
+    provides=("phase:think::think.classify",),
     requires=("decision_classifier",),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
@@ -102,14 +102,11 @@ class ThinkClassifyExecutor:
     ),
 )
 async def setup(ctx: PluginContext, config=None) -> None:
-    """双键注册:Cordis provide(composite + region-less)。"""
+    """Composite-key registration: ``{region}::{semantic_name}``."""
     del config
     executor = ThinkClassifyExecutor()
-    # Composite key for region-scoped resolution (preferred)
     composite_key = f"{executor.region}::{executor.semantic_name}"
     ctx.provide(composite_key, executor)
-    # Region-less fallback for cross-region reuse
-    ctx.provide(executor.semantic_name, executor)
 
 
 __all__ = ["ThinkClassifyExecutor", "setup"]
