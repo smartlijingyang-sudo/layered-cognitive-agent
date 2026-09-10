@@ -1,0 +1,125 @@
+"""phase.think.local_gate — enforce Decision via agent_gates (per-agent guard).
+
+think 子图节点 plugin:用 agent_gates(agent 级别决策闸)收敛候选 Decision。
+``requires=("agent_gates",)`` 通过 Cordis 校验,
+运行时从 ``context.runtime.agent_gates`` 拿 capability 实例。
+
+与 ``phase.think.gate`` 的区别:本节点只跑 agent 级别 guardrail,
+不调通用 ``decision_gate``。通常用于在 subgraph 末端把候选 Decision
+按"agent-specific guard"再过一遍(避免误判 / 越权)。
+
+ADR-0218 §3.3:节点 plugin 由作者显式书写完整 ``@plugin(...)`` 装饰器,
+工厂 ``setup(ctx)`` 同时做 Cordis ``ctx.provide`` 与
+``FactoryRegistry.register``(think 子图专用的 NodeExecutor 解析)。
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
+from lca.contracts.protocols.declarative.declarative_1.factory_resolver import (
+    get_default_registry,
+)
+from lca.contracts.protocols.declarative.declarative_1.node_executor import (
+    NodeContext,
+    NodeInput,
+    NodeOutput,
+)
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
+from lca.contracts.protocols.think.cognition import DecisionGate
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+
+_SEMANTIC_NAME = "think.local_gate"
+_REGION = "phase:think"
+
+
+@dataclass(frozen=True, slots=True)
+class ThinkLocalGateExecutor:
+    """think 节点:用 agent_gates(agent 级别 DecisionGate)收敛候选 Decision。"""
+
+    semantic_name: str = _SEMANTIC_NAME
+
+    async def node_execute(
+        self,
+        context: NodeContext,
+        input: NodeInput,
+    ) -> NodeOutput:
+        """think 子图节点入口。
+
+        inputs 端口(yaml):decision, in_state
+        outputs 端口(yaml):enforced_decision, think_signal
+        """
+        runtime = context.runtime
+        state = runtime.state
+        agent_gates = runtime.agent_gates
+        decision = input.port_values.get("decision")
+
+        if decision is None:
+            return NodeOutput(port_values={})
+
+        if state is not None and isinstance(agent_gates, DecisionGate):
+            decision = await agent_gates.enforce(state, decision)
+
+        return NodeOutput(
+            port_values={
+                "enforced_decision": decision,
+                "think_signal": "local_gated",
+            },
+        )
+
+
+@plugin(
+    id="phase.think.local_gate",
+    Config=None,
+    provides=("phase.think.local_gate",),
+    requires=("agent_gates",),
+    layer="L2",
+    kind=PluginKind.PRIMITIVE,
+    effects="none",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G7_EXECUTION,
+            control_slots=(ControlSlot.OBSERVE_WILDCARD,),
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(grants=("plugin.serve",)),
+        observability=EvidenceContract(
+            descriptors=(
+                "phase_think_local_gate.checked",
+                "phase_think_local_gate.served",
+            )
+        ),
+    ),
+    ownership=OwnershipDeclaration(
+        reads=("plugin.serve", "agent_gates"),
+        emits=("plugin.served",),
+        state_mutation="forbidden",
+    ),
+)
+async def setup(ctx: PluginContext, config=None) -> None:
+    """双注册:Cordis provide + FactoryRegistry register。"""
+    del config
+    executor = ThinkLocalGateExecutor()
+    ctx.provide("phase.think.local_gate", executor)
+    get_default_registry().register(
+        executor,
+        semantic_name=_SEMANTIC_NAME,
+        region=_REGION,
+    )
+
+
+__all__ = ["ThinkLocalGateExecutor", "setup"]
