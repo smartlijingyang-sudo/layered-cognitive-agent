@@ -183,6 +183,10 @@ class PromptReasoner:
         self.assembler: PromptAssembler | None = assembler
         self.selector: PromptTemplateSelector | None = selector
         self.tools: list[Tool] = list(tools) if tools else []
+        # Optional reference to the boot-time ToolsService so the
+        # per-run tools list can be re-materialized from ``state`` (which
+        # carries the run dict the factory was bound against).
+        self._tools_service: object | None = None
         self._legacy_templates: dict[str, str] = dict(templates or {})
         self.available_skills = available_skills
 
@@ -262,10 +266,15 @@ class PromptReasoner:
         reasoner_prompt_token = None
         if render.trace is not None:
             reasoner_prompt_token = self._bind_reasoner_prompt(render.trace, render.manifest)
+        # Resolve the per-run tool list. ``self._tools_service`` is set
+        # at setup() time when the provider captures the boot-time
+        # ToolsService; ``fork_for_run`` re-materializes the tool
+        # instances bound to ``state`` (or an empty list if absent).
+        tools = self._resolve_tools(state)
         try:
             return await execute_llm_turn(
                 self.llm,
-                self.tools,
+                tools,
                 render.prompt,
                 step=state.step,
                 state=state,
@@ -274,6 +283,33 @@ class PromptReasoner:
         finally:
             if reasoner_prompt_token is not None:
                 self._reset_reasoner_prompt(reasoner_prompt_token)
+
+    def _resolve_tools(self, state: AgentState) -> list[Tool]:
+        """Materialize the tool list for this turn.
+
+        Prefers the per-run fork from ``self._tools_service``; falls
+        back to the boot-time ``self.tools`` list when the seam is
+        absent. The fork keeps tool instances bound to ``state`` so
+        ``Tool.execute(args)`` can read per-run context (file_store,
+        sandbox, etc.) without a manual binding step.
+        """
+        service = getattr(self, "_tools_service", None)
+        if service is None:
+            return list(self.tools)
+        run_binding = {
+            "file_store": getattr(state, "_file_store_ref", None),
+            "bindings": getattr(state, "bindings", None),
+            "sandbox": getattr(state, "_sandbox_ref", None),
+            "search": getattr(state, "_search_ref", None),
+            "skill_store": getattr(state, "_skill_store_ref", None),
+            "machine_resolver": getattr(state, "_machine_resolver_ref", None),
+        }
+        try:
+            forked = service.fork_for_run(run_binding)
+        except Exception:
+            return list(self.tools)
+        names = sorted(forked._tools.keys())  # type: ignore[attr-defined]
+        return [forked.get(name) for name in names if forked.get(name) is not None]
 
     async def generate_thoughts(self, state: AgentState) -> LLMResponse:
         """Render the prompt and call the LLM; spine EPs are emitted by the loop layer."""

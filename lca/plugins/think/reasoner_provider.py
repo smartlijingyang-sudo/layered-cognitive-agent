@@ -109,7 +109,22 @@ async def setup(ctx: PluginContext, config: Config) -> None:
             "reasoner.role_profile must be a RoleProfile instance, got "
             f"{type(role_profile).__name__}"
         )
-    ctx.provide("reasoner", PromptReasoner(llm=adapter, role_profile=role_profile))
+    # Capture the boot-time ToolsService so the reasoner can fork a
+    # per-run tool list inside ``complete_turn`` (``fork_for_run``
+    # binds the registered factories against the run dict). Walk past
+    # the audited facade (``ctx.require`` enforces the manifest
+    # ``requires=`` and would fail here) and read from the cordis
+    # Context directly.
+    tools_service: object | None = None
+    runtime = getattr(ctx, "_runtime", None)
+    if callable(runtime):
+        try:
+            tools_service = runtime().inject("tools")
+        except Exception:
+            tools_service = None
+    reasoner = PromptReasoner(llm=adapter, role_profile=role_profile)
+    reasoner._tools_service = tools_service  # type: ignore[attr-defined]
+    ctx.provide("reasoner", reasoner)
 
 
 __all__ = ["Config", "setup"]
