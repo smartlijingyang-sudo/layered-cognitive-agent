@@ -13,7 +13,8 @@ D5 消费点:NodeGraphDriver.run() 主循环每轮节点前查 / 节点后写。
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeInput,
@@ -49,6 +50,25 @@ class PortContext:
         """从 context 抽 declared_ports 构造 NodeInput。"""
         port_values = {p: self._ports.get(p) for p in declared_ports}
         return NodeInput(port_values=port_values)
+
+    def exit_subgraph(
+        self, outer_outputs: tuple[str, ...]
+    ) -> dict[str, object]:
+        """Project inner-graph port values onto the outer node's outputs.
+
+        Per ADR-0217 §3.3.3 (port passthrough — iron rule 1):
+        ``inner_graph`` 终止端口名 ∈ outer 节点 ``outputs`` 字段 → 透传
+        到 outer PortContext. 缺 port 不报错,outer 节点 ``build_input``
+        走缺省填空的策略(铁律 2)。
+
+        Iron rule 4: this PortContext is the *inner* graph's local one;
+        after returning, the caller drops it.  Only the dict survives.
+        """
+        outer_input: dict[str, object] = {}
+        for port in outer_outputs:
+            if port in self._ports:
+                outer_input[port] = self._ports[port]
+        return outer_input
 
 
 __all__ = ["PortContext"]

@@ -40,6 +40,10 @@ from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from lca.contracts.exceptions.subgraph import (
+    SubgraphCycleError,
+    SubgraphDepthExceededError,
+)
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.declarative.declarative_1.bundle_graph import (
     BundleGraphNode,
@@ -70,6 +74,7 @@ from lca.harness.graph.execute.v2.node_output_projector import (
     schema_from_node_config,
 )
 
+MAX_SUBGRAPH_DEPTH_DEFAULT = 8
 ObserverFn = Callable[[str, dict[str, Any]], Awaitable[None]]
 
 
@@ -116,12 +121,15 @@ class NodeGraphDriver:
         scope: Any,  # SubgraphRuntime:有 .resolve/.resolve_factory 的对象
         region_phase: SemanticPhase = SemanticPhase.THINK,
         observers: tuple[ObserverFn, ...] = (),
+        max_subgraph_depth: int = MAX_SUBGRAPH_DEPTH_DEFAULT,
     ) -> None:
         self._spec = spec
         self._plan_ref = plan_ref
         self._scope = scope
         self._region_phase = region_phase
         self._observers = observers
+        self.max_subgraph_depth = max_subgraph_depth
+        self._recursion_stack: set[str] = set()
         self._nodes_by_id: dict[str, BundleGraphNode] = {n.id: n for n in spec.nodes}
         # entry:yaml 显式声明优先;否则 fallback 到 nodes 列表的第一个节点。
         if spec.entry is None:
@@ -254,6 +262,61 @@ class NodeGraphDriver:
             outcome=None,
             output=output,
         )
+
+    async def _drive_subgraph_ref(
+        self,
+        ref: Any,
+        outer_state: AgentState,
+        depth: int = 0,
+    ) -> AgentState:
+        """Guard recursion into a nested ``sub_spec_ref``.
+
+        Per ADR-0217 §3.3.1: depth is a soft limit (default 8). Cycle
+        detection uses the same ``plan_ref`` appearing twice on the
+        recursion stack. The guards fire *before* any inner execution;
+        ``try/finally`` guarantees the stack is unwound on either
+        success or failure.
+
+        The recursion body itself is reserved for the v1 PR-3 follow-up
+        (the resolver seam that resolves ``ref.plan_ref`` into a v2
+        BundleGraphSpec and re-enters :meth:`run`). Until then, this
+        method establishes the guards + state machine and delegates
+        the actual inner execution to ``_drive_subgraph_inner`` (a
+        thin seam the v1 PR-3 commit will wire up).
+
+        Raises:
+            SubgraphDepthExceededError: PG-007-depth
+            SubgraphCycleError: PG-007-cycle
+        """
+        if depth > self.max_subgraph_depth:
+            raise SubgraphDepthExceededError(depth, self.max_subgraph_depth)
+        if ref.plan_ref in self._recursion_stack:
+            raise SubgraphCycleError(ref.plan_ref)
+        self._recursion_stack.add(ref.plan_ref)
+        try:
+            return await self._drive_subgraph_inner(ref, outer_state, depth)
+        finally:
+            self._recursion_stack.discard(ref.plan_ref)
+
+    async def _drive_subgraph_inner(
+        self,
+        ref: Any,
+        outer_state: AgentState,
+        depth: int,
+    ) -> AgentState:
+        """Resolved recursion body for :meth:`_drive_subgraph_ref`.
+
+        PR-3 will swap this for: resolve ``ref.plan_ref`` via
+        ``self._scope`` into a BundleGraphSpec, instantiate a nested
+        ``NodeGraphDriver``, and call ``run()`` with port passthrough.
+
+        For PR-1 we just return ``outer_state`` so the recursion guards
+        are observable in isolation (cycle/depth tests); the no-op
+        body is intentional and documented in §2.1.2 of
+        ``docs/specs/2026-09-10-nested-bundle-graph-spec.md``.
+        """
+        del ref, depth
+        return outer_state
 
 
 async def _emit_observers(
