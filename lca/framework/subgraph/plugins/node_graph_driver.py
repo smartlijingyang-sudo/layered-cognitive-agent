@@ -44,8 +44,6 @@ from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.declarative.declarative_1.bundle_graph import (
     BundleGraphNode,
     BundleGraphSpec,
-)
-from lca.contracts.protocols.declarative.declarative_1.factory_resolver import (
     FactoryResolutionError,
 )
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (

@@ -23,7 +23,7 @@ from typing import Any, Protocol, runtime_checkable
 
 from cordis import Context  # noqa: TC002
 
-from lca.contracts.protocols.declarative.declarative_1.factory_resolver import (
+from lca.contracts.protocols.declarative.declarative_1.bundle_graph import (
     FactoryResolutionError,
 )
 
@@ -49,10 +49,7 @@ class SubgraphRuntime(Protocol):
 
         Tries ``f"{region}::{factory}"`` first when ``region`` is given,
         then falls back to the bare ``factory`` key. Raises
-        :class:`FactoryResolutionError` when both miss. Note: this
-        import is deleted in R9-5 once the legacy
-        :mod:`factory_resolver` is removed; for now we keep the existing
-        exception type to avoid a parallel exception hierarchy.
+        :class:`FactoryResolutionError` when both miss.
         """
         ...
 
