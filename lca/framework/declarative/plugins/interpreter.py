@@ -184,6 +184,10 @@ class GenericPlanInterpreter:
         self._subgraph_runner: object | None = None
         self._subgraph_runtime: object | None = None
         self._channel_factory: object | None = None
+        # ADR-0219 §10.11 item (4): observer port on the interpreter. Stored
+        # here so the Default factory (which constructs SubgraphRunner
+        # directly) can pick them up via ``self._observers``.
+        self._observers: tuple = ()
         # Set for the duration of ``_drive`` so nested subgraph recursion
         # can reuse the outer run's phase capabilities (brain/body/etc.).
         self._active_capabilities: PhaseCapabilityReader | Mapping[str, object] | None = None
@@ -194,6 +198,7 @@ class GenericPlanInterpreter:
         subgraph_runner: object | None = None,
         subgraph_runtime: object | None = None,
         channel_factory: object | None = None,
+        observers: tuple = (),
     ) -> None:
         """Attach Cordis-injected think-subgraph seams.
 
@@ -201,10 +206,15 @@ class GenericPlanInterpreter:
         ``__init__`` so legacy direct constructors continue to work
         without any Cordis involvement.
 
-        All three kwargs are optional with ``None`` default. Partial bind
-        is allowed — caller may inject only the seam they need; the
+        All kwargs are optional with ``()`` / ``None`` defaults. Partial
+        bind is allowed — caller may inject only the seam they need; the
         interpreter's main loop fail-louds if a sub_spec_ref node fires
         and the corresponding seam is ``None``.
+
+        ADR-0219 §10.11 item (4): ``observers`` is forwarded to the
+        ``SubgraphRunner`` constructed by the Default factory so the
+        inner driver emits ``phase_graph.node.start/end`` for each node
+        execution into the observer funnel.
         """
         if subgraph_runner is not None:
             self._subgraph_runner = subgraph_runner
@@ -212,6 +222,7 @@ class GenericPlanInterpreter:
             self._subgraph_runtime = subgraph_runtime
         if channel_factory is not None:
             self._channel_factory = channel_factory
+        self._observers = tuple(observers)
 
     async def run(
         self,
@@ -935,6 +946,15 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     subgraph_runner = ctx.inject("subgraph_runner")
     subgraph_runtime = ctx.inject("subgraph_runtime")
     channel_factory = ctx.inject("phase_output_channel_factory")
+    # ADR-0219 §10.11 item (4): observer port from Cordis. Cordis-boot
+    # may pass an empty tuple; the Default factory injects the
+    # Session.append closure directly via its own construction path.
+    observers: tuple = ()
+    if hasattr(ctx, "require"):
+        try:
+            observers = tuple(ctx.require("subgraph_observers"))
+        except Exception:
+            observers = ()
 
     interpreter = GenericPlanInterpreter(
         journal=journal,
@@ -948,6 +968,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         subgraph_runner=subgraph_runner,
         subgraph_runtime=subgraph_runtime,
         channel_factory=channel_factory,
+        observers=observers,
     )
     ctx.provide("declarative_interpreter", interpreter)
 
