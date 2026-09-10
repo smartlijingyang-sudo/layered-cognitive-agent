@@ -14,7 +14,7 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeInput,
     NodeOutput,
 )
-from lca.plugins.think.reason import ThinkReasonExecutor
+from lca.plugins.think.reason.entry import ThinkReasonExecutor
 
 
 @dataclass

@@ -43,9 +43,9 @@ from lca.harness.declarative.compile.subgraph_resolver import (
     BundleSubgraphResolver,
     _load_bundle_graph_spec,
 )
-from lca.plugins.think.reason_complete import ThinkReasonCompleteExecutor
-from lca.plugins.think.reason_plan import ThinkReasonPlanExecutor
-from lca.plugins.think.reason_render import ThinkReasonRenderExecutor
+from lca.plugins.think.reason.complete import ThinkReasonCompleteExecutor
+from lca.plugins.think.reason.plan import ThinkReasonPlanExecutor
+from lca.plugins.think.reason.render import ThinkReasonRenderExecutor
 
 INNER_BUNDLE = "bundles/think_reason.yaml"
 
@@ -97,15 +97,11 @@ class _StubReasoner:
         self.calls.append("build_turn_plan")
         return self.plan
 
-    def render_turn(
-        self, state: AgentState, plan: ReasonerTurnPlan
-    ) -> ReasonerTurnRender:
+    def render_turn(self, state: AgentState, plan: ReasonerTurnPlan) -> ReasonerTurnRender:
         self.calls.append("render_turn")
         return self.render
 
-    async def complete_turn(
-        self, state: AgentState, render: ReasonerTurnRender
-    ) -> LLMResponse:
+    async def complete_turn(self, state: AgentState, render: ReasonerTurnRender) -> LLMResponse:
         self.calls.append("complete_turn")
         return self.response
 
@@ -262,13 +258,16 @@ class TestInnerSubgraphE2E:
         channel = InMemoryPhaseOutputChannel()
         state = _state()
 
-        with patch(
-            "lca.framework.subgraph.plugins.node_graph_driver.emit_for_node",
-            autospec=True,
-        ) as emit, patch(
-            "lca.framework.subgraph.plugins.node_graph_driver.emit_reasoner_meta_for_node",
-            autospec=True,
-        ) as emit_meta:
+        with (
+            patch(
+                "lca.framework.subgraph.plugins.node_graph_driver.emit_for_node",
+                autospec=True,
+            ) as emit,
+            patch(
+                "lca.framework.subgraph.plugins.node_graph_driver.emit_reasoner_meta_for_node",
+                autospec=True,
+            ) as emit_meta,
+        ):
             await driver.run(
                 outer_state=state,
                 channel=channel,

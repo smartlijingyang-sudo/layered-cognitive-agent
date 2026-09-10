@@ -23,7 +23,7 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
 )
-from lca.plugins.think.reason_plan import ThinkReasonPlanExecutor
+from lca.plugins.think.reason.plan import ThinkReasonPlanExecutor
 
 
 @dataclass
@@ -98,7 +98,7 @@ async def test_reason_plan_missing_state_returns_empty_ports() -> None:
 
 def test_reason_plan_module_does_not_import_emit() -> None:
     """反向断言:模块级不 import emit(EP 由 driver 调度,executor 不知道 EP)。"""
-    import lca.plugins.think.reason_plan as mod
+    import lca.plugins.think.reason.plan as mod
 
     src = mod.__file__
     assert src is not None

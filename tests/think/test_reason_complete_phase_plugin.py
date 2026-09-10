@@ -23,7 +23,7 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
 )
-from lca.plugins.think.reason_complete import ThinkReasonCompleteExecutor
+from lca.plugins.think.reason.complete import ThinkReasonCompleteExecutor
 
 
 @dataclass
@@ -32,9 +32,7 @@ class _Reasoner:
     call_count: int = 0
     received_render: ReasonerTurnRender | None = None
 
-    async def complete_turn(
-        self, state: AgentState, render: ReasonerTurnRender
-    ) -> LLMResponse:
+    async def complete_turn(self, state: AgentState, render: ReasonerTurnRender) -> LLMResponse:
         self.call_count += 1
         self.received_render = render
         return self.response
@@ -109,7 +107,7 @@ async def test_reason_complete_missing_capability_returns_empty_ports() -> None:
 
 def test_reason_complete_module_does_not_import_emit() -> None:
     """反向断言:模块级不 import emit(EP 由 driver 调度,executor 不知道 EP)。"""
-    import lca.plugins.think.reason_complete as mod
+    import lca.plugins.think.reason.complete as mod
 
     src = mod.__file__
     assert src is not None

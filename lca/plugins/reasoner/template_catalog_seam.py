@@ -96,6 +96,3 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     ctx.provide(
         REASONER_TEMPLATE_CATALOG.key, BuiltinReasonerTemplateCatalog(config.template_names)
     )
-
-
-__all__ = ["BuiltinReasonerTemplateCatalog", "Config", "setup"]
