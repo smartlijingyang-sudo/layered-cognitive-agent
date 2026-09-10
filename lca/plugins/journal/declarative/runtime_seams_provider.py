@@ -7,6 +7,7 @@ replace any factory capability without changing the runtime kernel.
 
 from __future__ import annotations
 
+import dataclasses
 import inspect
 import logging
 from collections.abc import Awaitable, Callable
@@ -212,8 +213,18 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
                     and cls.__name__.endswith("Executor")
                 ):
                     continue
-                semantic_name = getattr(cls, "semantic_name", None)
-                region = getattr(cls, "region", None)
+                # slots dataclass: `getattr(cls, "semantic_name")` returns a
+                # member descriptor (not the default string), so reading class
+                # attributes fails. Read declared dataclass fields instead.
+                if not dataclasses.is_dataclass(cls):
+                    continue
+                field_map = {f.name: f for f in dataclasses.fields(cls)}
+                sn_field = field_map.get("semantic_name")
+                rg_field = field_map.get("region")
+                if sn_field is None or rg_field is None:
+                    continue
+                semantic_name = sn_field.default if isinstance(sn_field.default, str) else None
+                region = rg_field.default if isinstance(rg_field.default, str) else None
                 if not isinstance(semantic_name, str) or not isinstance(region, str):
                     continue
                 registry[(region, semantic_name)] = cls()
