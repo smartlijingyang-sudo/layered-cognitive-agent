@@ -163,9 +163,15 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
         loop_guard_evaluator: object | None = None,
         *,
         subgraph_resolver: object | None = None,
+        subgraph_runtime: object | None = None,
+        subgraph_runner: object | None = None,
+        channel_factory: Callable[[], object] | None = None,
     ) -> None:
         self._loop_guard_evaluator = loop_guard_evaluator
         self._subgraph_resolver = subgraph_resolver or default_subgraph_resolver()
+        self._subgraph_runtime = subgraph_runtime
+        self._subgraph_runner = subgraph_runner
+        self._channel_factory = channel_factory
 
     def create(
         self,
@@ -176,11 +182,18 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
         phase_observer: object,
         lifecycle_publisher: RuntimeLifecyclePublisher,
     ) -> DeclarativeInterpreter:
-        # ADR-0219 §10.11 item (2): one-line operator signal that the
-        # no-LLM fallback path is engaged. Fires once per create()
-        # call so operators can see the difference between the real
-        # Reasoner path and the default factory's shortcut.
-        _log.info("no-LLM fallback active — think.reason.complete stripped")
+        # ADR-0219 §10.11: the Default factory no longer ships a stub
+        # Reasoner / Classifier / Gate. The interpreter needs a real
+        # ``SubgraphRuntime`` whose ``reasoner`` capability fronts the
+        # active ``LLMResolver`` (lca-llm-resolver). When the Cordis
+        # boot did not provide ``subgraph_runtime`` (Cordis path
+        # unreachable, no Cordis ``subgraph_runner`` plugin in the
+        # bundle set) the factory raises fail-loud rather than
+        # silently re-introducing the no-LLM shortcut. The CLI↔HTTP
+        # parity seam at ``composer/runtime/fixture/runtime_adapter``
+        # constructs the same factory; profiles that genuinely want
+        # an in-process runtime must include ``framework.subgraph``
+        # plugins in their bundle set.
         interpreter = cast(
             "DeclarativeInterpreter",
             GenericPlanInterpreter(
@@ -192,218 +205,41 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
                 lifecycle_publisher=lifecycle_publisher,
             ),
         )
-        # Assembly root:bind_cordis_seams with the think subgraph defaults.
-        # 收集 6 个 think plugin dataclass 实例 → (factory, region) registry,
-        # 再用 framework 的 SubgraphRunner + InMemoryPhaseOutputChannel。
-        # 这条路径在 Cordis boot 不可用的环境(Default factory 不持 ctx)
-        # 中提供唯一能跑的 fallback;Cordis-bootstrapped 流程在 runtime_bindings
-        # 里覆盖(同名 seam 可重复 bind,后到的赢)。
         bind_seams = getattr(interpreter, "bind_cordis_seams", None)
-        if callable(bind_seams):
-            from lca.framework.subgraph.plugins.channel import InMemoryPhaseOutputChannel
-            from lca.framework.subgraph.plugins.runner import SubgraphRunner
-            from lca.plugins import think as _think_module
+        if not callable(bind_seams):
+            return interpreter
 
-            registry: dict[tuple[str, str], object] = {}
-            for _name, cls in inspect.getmembers(_think_module, inspect.isclass):
-                if not (
-                    isinstance(cls.__module__, str)
-                    and cls.__module__.startswith("lca.plugins.think")
-                    and cls.__name__.startswith("Think")
-                    and cls.__name__.endswith("Executor")
-                ):
-                    continue
-                # slots dataclass: `getattr(cls, "semantic_name")` returns a
-                # member descriptor (not the default string), so reading class
-                # attributes fails. Read declared dataclass fields instead.
-                if not dataclasses.is_dataclass(cls):
-                    continue
-                field_map = {f.name: f for f in dataclasses.fields(cls)}
-                sn_field = field_map.get("semantic_name")
-                rg_field = field_map.get("region")
-                if sn_field is None or rg_field is None:
-                    continue
-                semantic_name = sn_field.default if isinstance(sn_field.default, str) else None
-                region = rg_field.default if isinstance(rg_field.default, str) else None
-                if not isinstance(semantic_name, str) or not isinstance(region, str):
-                    continue
-                registry[(region, semantic_name)] = cls()
-
-            # ADR-0219 §10.11: in no-LLM mode, ``think.reason.complete``
-            # is stripped at lift time so no ``LLMResponse`` ever reaches
-            # ``think.classify``. The standard ``ThinkClassifyExecutor``
-            # gates on ``response is None`` and would emit an empty
-            # ``NodeOutput`` (no Decision), leaving ``act.authorize``
-            # with nothing to authorize. The Default factory swaps in a
-            # ``_NoLLMClassifyAdapter`` whose ``node_execute`` ignores
-            # the missing response and lets the classifier produce its
-            # default Decision. The decision is the same fallback the
-            # factory uses for any other caller; we just stop gating on
-            # an absent port value.
-            from lca.plugins.think.classify import ThinkClassifyExecutor
-            from lca.contracts.protocols.declarative.declarative_1.node_executor import (
-                NodeContext,
-                NodeInput,
-                NodeOutput,
+        # ADR-0219 §10.11: the think subgraph runtime must be provided
+        # by a Cordis plugin (e.g. ``lca-subgraph-runtime-llm``). The
+        # Default factory's earlier stub registry was deleted; the
+        # requirement is now explicit so operators cannot accidentally
+        # ship a run without an LLM wire. ``composer/runtime/fixture
+        # /runtime_adapter`` provides the three capabilities at
+        # construction time; missing values surface as a typed
+        # :exc:`LLMUnavailableError` rather than a silent stub.
+        if (
+            self._subgraph_runtime is None
+            or self._subgraph_runner is None
+            or self._channel_factory is None
+        ):
+            from lca.infrastructure.llm.openai_client import (
+                LLMUnavailableError,
             )
 
-            class _NoLLMClassifyAdapter(ThinkClassifyExecutor):
-                """No-LLM variant of :class:`ThinkClassifyExecutor`."""
-
-                async def node_execute(
-                    self,
-                    context: NodeContext,
-                    input: NodeInput,
-                ) -> NodeOutput:
-                    runtime = context.runtime
-                    classifier = runtime.decision_classifier
-                    if classifier is None:
-                        return NodeOutput(port_values={})
-                    decision = classifier.classify(None)
-                    return NodeOutput(port_values={"decision": decision})
-
-            registry[("phase:think", "think.classify")] = _NoLLMClassifyAdapter()
-
-            from lca.plugins.think.reason.complete import ThinkReasonCompleteExecutor
-            registry[("phase:think", "think.reason")] = ThinkReasonCompleteExecutor()
-
-            # Default capability providers (no-cordis fallback):
-            # 让 think subgraph 真的跑通完整 5 步 → emit 一个默认 decision。
-            # 真实 capability plugin (lca/plugins/runtime_provider/*.py) 会在后续
-            # PR 替换;此处先确保 think subgraph 不被空 capability 卡住。
-
-            from lca.contracts.models.core.conversation.llm import LLMResponse
-            from lca.contracts.models.core.execution.decision import Decision
-
-            class _ReducerAdapter:
-                """Adapt the DeltaReducer given to the factory into a full Reducer.
-
-                ``DeclarativeInterpreterFactory.create`` receives a
-                ``DeltaReducer`` (which only implements ``apply_delta``);
-                the inner think subgraph expects a ``Reducer`` that also
-                exposes ``apply_skill_route``. The adapter forwards the
-                delta path unchanged and routes ``apply_skill_route`` to
-                the inner reducer: either the wrapped ``._reducer`` (when
-                ``RegistryDeltaReducer`` holds a real Reducer) or the
-                factory argument itself (when the caller already passed a
-                full Reducer).
-                """
-
-                def __init__(self, delta: object) -> None:
-                    self._delta = delta
-                    self._inner = getattr(delta, "_reducer", delta)
-
-                def apply_delta(self, state, delta):  # type: ignore[no-untyped-def]
-                    return self._delta.apply_delta(state, delta)
-
-                def apply_skill_route(self, state, active_template):  # type: ignore[no-untyped-def]
-                    inner = self._inner
-                    if inner is self._delta:
-                        # Caller passed a DeltaReducer with no inner reducer;
-                        # return the state untouched so the think subgraph
-                        # falls back to the no-route path.
-                        return state
-                    return inner.apply_skill_route(state, active_template)
-
-            class _DefaultReasoner:
-                """Fake Reasoner:返回空 LLMResponse 让 classify 走默认 fallback。"""
-                async def generate_thoughts(self, state):
-                    return LLMResponse()
-
-            class _DefaultDecisionClassifier:
-                """Fake Classifier:空 LLMResponse → emit 默认 respond decision。"""
-                def classify(self, response):
-                    # In no-LLM mode ``think.reason.complete`` is stripped at
-                    # lift time, and ``think.reason.render`` only emits
-                    # ``turn_render``. Without an ``LLMResponse`` in the
-                    # graph, classify must still produce a Decision so the
-                    # outer interpreter has a decision to forward to
-                    # ``act.authorize``. Returning the default respond
-                    # decision keeps the no-LLM path observable in tests
-                    # without faking an LLMResponse shape on the way in.
-                    import uuid as _uuid
-                    return Decision(
-                        decision_id=f"dec-default-{_uuid.uuid4().hex[:12]}",
-                        action_type="respond",
-                        rationale="default no-LLM fallback",
-                        confidence=1.0,
-                    )
-
-                def generate_decision(self, state, render=None):  # type: ignore[no-untyped-def]
-                    """Fallback path used when ``response`` port is absent.
-
-                    The no-LLM factory strips ``think.reason.complete``
-                    so no ``LLMResponse`` reaches ``think.classify``.
-                    This sibling method lets the classify node still
-                    produce a Decision by combining the (optional)
-                    ``turn_render`` port value with the runtime state.
-                    """
-                    return self.classify(None)
-
-            class _DefaultDecisionGate:
-                """Fake Gate:passthrough。"""
-                async def enforce(self, state, decision):
-                    return decision
-
-            class _DefaultSkillRouter:
-                """Fake Router:返回空路由。"""
-                async def route(self, state):
-                    return ""
-
-            class _DefaultSupportsShortcut:
-                """Fake Shortcut:没有快速路径。"""
-                async def try_shortcut(self, state):
-                    return None
-
-            _CAPS = {
-                "reasoner": _DefaultReasoner(),
-                "decision_classifier": _DefaultDecisionClassifier(),
-                "decision_gate": _DefaultDecisionGate(),
-                "skill_router": _DefaultSkillRouter(),
-                "supports_shortcut": _DefaultSupportsShortcut(),
-                "agent_gates": _DefaultDecisionGate(),
-                # ADR-0219 §10.11: think.route needs a reducer with
-                # ``apply_skill_route(state, active_template)``. The
-                # DeltaReducer the factory receives only implements
-                # ``apply_delta``; delegate ``apply_skill_route`` to the
-                # underlying Reducer (``reducer._reducer`` when wrapped,
-                # or the factory argument itself when it already
-                # implements the full Reducer protocol).
-                "reducer": _ReducerAdapter(reducer),
-            }
-
-            class _DefaultSubgraphRuntime:
-                """Default factory 内置的 SubgraphRuntime fallback(无 cordis)。
-
-                提供三种 seam:
-                - resolve_factory:(factory, region) → NodeExecutor 解析
-                - resolve_capability:(capability_key) → capability 实例,给节点 executor 用
-                - resolve:(通用 key → obj) 兼容 SubgraphRuntime Protocol
-                """
-                def resolve(self, capability):
-                    return _CAPS.get(capability)
-                def resolve_capability(self, capability):
-                    return _CAPS.get(capability)
-                def resolve_factory(self, factory, region):
-                    return registry.get((region, factory))
-
-            bind_seams(
-                subgraph_runner=SubgraphRunner(
-                    resolver=self._subgraph_resolver,
-                    runtime=_DefaultSubgraphRuntime(),
-                    # ADR-0219 §10.11 item (4): wire Session.append into
-                    # the inner driver observer port. Single funnel;
-                    # no parallel event bus.
-                    observers=(session_append_observer(),),
-                    channel_factory=InMemoryPhaseOutputChannel,
-                    # ADR-0219 §10.11 item (2): the Default factory's
-                    # no-LLM fallback strips think.reason.complete at
-                    # lift time so the inner graph terminates at render.
-                    no_llm_mode=True,
-                ),
-                subgraph_runtime=_DefaultSubgraphRuntime(),
-                channel_factory=InMemoryPhaseOutputChannel,
+            raise LLMUnavailableError(
+                "Default factory now requires an LLM-backed subgraph "
+                "runtime: provide ``subgraph_runtime``, "
+                "``subgraph_runner``, and ``channel_factory`` at "
+                "construction. The previous stub registry was "
+                "deleted in the ADR-0219 §10.11 close-out; use "
+                "``lca-subgraph-runtime-llm`` plus the framework "
+                "subgraph.runner plugin in the bundle set."
             )
+        bind_seams(
+            subgraph_runner=self._subgraph_runner,
+            subgraph_runtime=self._subgraph_runtime,
+            channel_factory=self._channel_factory,
+        )
         return interpreter
 
 
@@ -416,7 +252,12 @@ class ObservabilityRuntimeJournalFactory(RuntimeJournalFactory):
 
 @plugin(
     id="lca-declarative-runtime-seams-provider",
-    requires=["loop_guard_evaluator"],
+    requires=[
+        "loop_guard_evaluator",
+        "subgraph_runtime",
+        "subgraph_runner",
+        "phase_output_channel_factory",
+    ],
     provides=[
         "checkpoint_state_resolver_factory",
         "declarative_interpreter_factory",
@@ -481,8 +322,36 @@ async def setup(ctx: PluginContext, config: Config) -> None:
 
     del config
     ctx.provide("checkpoint_state_resolver_factory", DefaultCheckpointStateResolverFactory())
+    # ADR-0219 §10.11: wire the LLM-backed subgraph runtime at the
+    # Cordis seam so the interpreter factory receives the typed
+    # ``subgraph_runtime``, ``subgraph_runner``, and
+    # ``channel_factory`` it now requires. ``lca-subgraph-runtime-llm``
+    # provides ``subgraph_runtime``; the framework ``subgraph.runner``
+    # Cordis plugin provides ``subgraph_runner`` and
+    # ``phase_output_channel_factory``. When any of these are absent
+    # (no LLM wire on the boot path) the factory raises
+    # ``LLMUnavailableError`` fail-loud rather than silently
+    # substituting a stub Reasoner.
+    if hasattr(ctx, "require"):
+        try:
+            subgraph_runtime = ctx.require("subgraph_runtime")
+        except Exception:
+            subgraph_runtime = None
+        try:
+            subgraph_runner = ctx.require("subgraph_runner")
+        except Exception:
+            subgraph_runner = None
+        try:
+            channel_factory = ctx.require("phase_output_channel_factory")
+        except Exception:
+            channel_factory = None
+    else:
+        subgraph_runtime = subgraph_runner = channel_factory = None
     interpreter_factory = DefaultDeclarativeInterpreterFactory(
         ctx.require("loop_guard_evaluator"),
+        subgraph_runtime=subgraph_runtime,
+        subgraph_runner=subgraph_runner,
+        channel_factory=channel_factory,
     )
     ctx.provide("declarative_interpreter_factory", interpreter_factory)
     ctx.provide("delta_reducer_factory", RegistryDeltaReducerFactory())

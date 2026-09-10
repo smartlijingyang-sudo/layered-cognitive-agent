@@ -79,6 +79,7 @@ _RUNTIME_CAPABILITY_KEYS = (
     "effect_handler_registry",
     LOOP_GUARD_EVALUATOR.key,
     "idempotency_store",
+    "llm_resolver",  # ADR-0219 §10.11: optional LLM wire
     PHASE_OBSERVER.key,
     RESULT_FINALIZER_FACTORY.key,
     RUNTIME_FACTORY.key,
@@ -108,6 +109,11 @@ class RuntimeCapabilityClosure:
     result_finalizer_factory: ResultFinalizerFactory
     runtime_factory: RuntimeFactory
     lifecycle_publisher: RuntimeLifecyclePublisher
+    # ADR-0219 §10.11: optional LLM wire the runtime adapter uses to
+    # build an LLM-backed think subgraph runtime. ``None`` triggers a
+    # fail-loud ``LLMUnavailableError`` from the interpreter factory.
+    llm_resolver: object | None = None
+    subgraph_resolver: object | None = None
 
 
 def require_complete_runtime_graph(graph: AgentGraph) -> None:
@@ -165,6 +171,13 @@ def resolve_runtime_capabilities(
         lifecycle_publisher=cast(
             "RuntimeLifecyclePublisher", capabilities[RUNTIME_LIFECYCLE_PUBLISHER.key]
         ),
+        # ADR-0219 §10.11: llm_resolver is optional — Cordis provides it
+        # via ``lca-llm-resolver``. If the capability is absent we leave
+        # the field ``None``; the interpreter factory raises
+        # ``LLMUnavailableError`` when it tries to construct a subgraph
+        # runtime without an LLM wire.
+        llm_resolver=capabilities.get("llm_resolver"),
+        subgraph_resolver=capabilities.get("subgraph_resolver"),
     )
 
 
