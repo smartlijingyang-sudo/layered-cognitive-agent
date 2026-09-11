@@ -1,0 +1,28 @@
+# bundles/concept/decision_shortcut_try.yaml — Layer 2 概念图
+# ADR-0220 §3.3 — AgentState → Decision | None typed boundary(cross-graph
+# transport)。
+#
+# 节点命名:1 节点以 shortcut. 起首,与 §0.4 N9 action-domain 闭集一致
+# (shortcut.* 在闭集内)。
+#
+# 跨图引用:
+#   inputs  -> business.reasoning.shortcut 的 state port
+#   outputs -> business.reasoning.shortcut 的 decision port (Decision | None)
+#
+# delete-when: N/A(纯加法,business.reasoning.shortcut 在 P6 引用)。
+
+id: concept.decision.shortcut_try
+region: concept
+purpose: AgentState → Decision | None (deterministic shortcut before LLM)
+
+nodes:
+  - id: shortcut.try
+    factory: shortcut.try
+    inputs: [state]
+    outputs: [decision]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+
+edges: []

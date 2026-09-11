@@ -51,14 +51,40 @@ nodes:
       emit_on_exit:  []
 
   - id: think.classify
-    factory: think.classify
+    factory: think.classify.ref
+    inputs: [response]
+    outputs: [decision]
     config:
       max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+      # ADR-0220 P6: think.classify 改为 sub_spec_ref delegate 到
+      # concept.decision.classify (P5 落地的 3 节点 typed parse/compose
+      # pipeline)。typed response port 由上游 think.reason 经 close-out
+      # 投影转发,inner 图第一节点 decision.parse.tool_calls 直接消费。
+      sub_spec_ref:
+        plan_ref: bundles/concept/decision_classify.yaml
+        entry_node: decision.parse.tool_calls
+        binding_edge: think.classify
 
   - id: think.gate
-    factory: think.gate
+    factory: think.gate.ref
+    inputs: [decision]
+    outputs: [decision]
     config:
       max_visits: 8
+      emit_on_enter: []
+      emit_on_exit:  []
+      # ADR-0220 P6: think.gate 改为 sub_spec_ref delegate 到
+      # concept.decision.enforce (P5 落地的 2 节点 gate chain + reject
+      # stamp)。typed decision port 由上游 think.classify 经 close-out
+      # 投影转发,inner 图第一节点 gate.chain.run 直接消费。state port
+      # 缺失时 gate chain run 走 no-op(decision 不被 enforce),保证 think
+      # 路径不依赖 AgentState 透传。
+      sub_spec_ref:
+        plan_ref: bundles/concept/decision_enforce.yaml
+        entry_node: gate.chain.run
+        binding_edge: think.gate
 
 edges:
   # shortcut → route: 没命中(decision 缺失)走 route;命中直接到 gate
