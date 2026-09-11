@@ -82,7 +82,7 @@ class PlanInterpreter:
                 plan_ref=plan.id,
                 node_id=node.id,
                 binding_kind=node.binding,
-                node_config=dict(node.config) | {"agent_state": outer_state},
+                node_config={"agent_state": outer_state, **dict(node.config)},
                 subgraph_ref=node.subgraph_ref,
                 chain=(),
             )
