@@ -720,6 +720,53 @@ def __init__(self, *, spec, plan_ref, scope, region_phase=THINK, observers=(),
 
 当且仅当上述 11 条全过,本 ADR 升级 Accepted。
 
+#### §10.11.5 close-out 字段名 SSOT 收敛(本 ADR 升级前必过,接 §5.1 typed `PortName`)
+
+**根因:** `PhaseOutput` 在 `lca/framework/subgraph/plugins/channel.py` 写死 4 个字段定义,4 字段名又被 3 处分别字面化:
+- `node_graph_driver.py` 内联元组循环
+- `driver_signal.py` `port_values.get("decision")` 等四行(纯函数)
+- `channel.py` `absorb` merge 逻辑里的 `self._last("decision")` 等四行
+
+SSOT 假象: §5.1 把 4 字段名放进 `PortName` Literal 闭集,但 `PhaseOutput` 字段定义本身没有 typed fold 表达,字段名四处各自硬编码。违反 AGENTS.md §1.5 §3「数据优于控制流」+ §2.1 单向层(`subgraph/` 不该认得 cognition 字段名,且 `PhaseOutput` 字段定义不该是字面)。图驱动按 §0.1 应只见框架语言,不见业务字段名;`PhaseOutput` 字段集应只从 SSOT 派生。
+
+**改动:**
+
+1. `contracts/subgraph.py` 新增 `SubgraphCloseOut` Protocol: 只声明 `project(inner_outputs) -> Mapping[str, Any]`,**不列字段名**。
+2. `cognition/close_out.py` 新增 `CLOSE_OUT_FIELDS = ("decision", "observation", "reflection", "response")` 元组 + `CognitiveCloseOut` 实现 —— **close-out 字段名 SSOT 唯一定点**。
+3. `node_graph_driver.py` 与 `driver_signal.py` 改为 `close_out.project(inner_outputs)` 循环 —— 4 字段名从图驱动文件物理消失。
+4. `channel.py` 的 `PhaseOutput` 字段定义改为从 `CLOSE_OUT_FIELDS` 元组 + 字段类型映射(`Pydantic.create_model(__config__=...)`)构造;`channel.py` `absorb` 改为 `for field in CLOSE_OUT_FIELDS: ...` fold。**SSOT 必须包含字段定义本身,否则图驱动脱钩仍是假 SSOT**。
+5. `lca/plugins/diagnosis/blueprint_trajectory_differ/plugin.py:59` 同根形态审计结论: **不同根**,诊断 plugin 是 observation 面主动列举 phase 关键 artifact 字段(第 4 字段为 `degradation` 而非 `response`,触发条件有 phase 守卫),属合法职责,**不在本 PR 范围,记 backlog**。
+
+**不变式(新增 N7–N8):**
+
+| ID | 内容 | 验证 |
+|---|---|---|
+| **N7** | `lca/framework/subgraph/` 零字符串字面 `"decision"` / `"observation"` / `"reflection"` / `"response"` 作为控制流目标 | `grep -nE '("decision"\|"observation"\|"reflection"\|"response")' lca/framework/subgraph/` = 0(覆盖 `node_graph_driver.py` + `driver_signal.py` + 同目录其他文件) |
+| **N8** | close-out 字段名 SSOT = `lca/cognition/close_out.py::CLOSE_OUT_FIELDS`;改一处必须 ADR | `import` 路径检查 + 单点 grep |
+
+**delete-when(本节通过条件):**
+
+| 条件 | 命令 / 文件 | 通过条件 |
+|---|---|---|
+| `SubgraphCloseOut` Protocol 定义 | `lca/contracts/subgraph.py` | 存在,只声明 `.project()`,不列字段名 |
+| `CLOSE_OUT_FIELDS` SSOT | `lca/cognition/close_out.py` | 元组定义 + `CognitiveCloseOut` 实现 |
+| driver 字面消失 | `grep -nE '("decision"\|"observation"\|"reflection"\|"response")' lca/framework/subgraph/plugins/` | 0 行 |
+| driver 调 seam | `grep -n 'close_out\.project\|SubgraphCloseOut' lca/framework/subgraph/plugins/node_graph_driver.py` | 至少 1 处 |
+| `PortRegistry.merge` 含 last-write-wins 单测 | `tests/contracts/test_port_registry_typing.py` | 覆盖多源写入策略 — **本次未落**:ADR-0219 §5.2 范围,独立 PR;本次靠 `set_outer_input` 多次调用本身覆盖 |
+| 字段顺序可替换 | `tests/unit/framework/subgraph/test_node_graph_driver_close_out.py` | stub `SubgraphCloseOut` 注入,断言元组字面消失 + 4 字段顺序由 stub 决定 |
+| no-LLM mode + observer 注入不回归 | `pytest tests/unit/framework/subgraph/ tests/integration/think/ -v` | 全过 |
+| `channel.py` 字段定义从 `CLOSE_OUT_FIELDS` 派生 | `grep -n 'CLOSE_OUT_FIELDS' lca/framework/subgraph/plugins/channel.py` | ≥ 1 处 `PhaseOutput` 构造使用 SSOT 元组 |
+| `PhaseOutput.absorb` 用 `CLOSE_OUT_FIELDS` fold | `grep -n 'for field in CLOSE_OUT_FIELDS' lca/framework/subgraph/plugins/channel.py` | ≥ 1 处 fold |
+
+**rejected alternatives:**
+
+- **A — 元组留在 driver 但改成模块常量 `CLOSE_OUT_FIELDS_IN_DRIVER`**: SSOT 假象,`subgraph/` 仍认字段名,根因未动。违反 §2.1 单向层。
+- **B — 只迁字段名不动 `PortRegistry.merge`**: `set_outer_input` 多次调用的 `last-write-wins` 是图驱动关心的策略,违反 §1.5 §6「副作用集中在 seam」。留债。
+- **C — 加新独立 ADR 编号**: 平行机制,AGENTS.md §4 红灯。close-out 字段名与 §10.11 同 seam 区域(均在 `node_graph_driver.py` + `channel.py`),合并回收是 ADR 自己「4 件 follow-up 一次性合拢」原则的延伸。
+- **D — 把诊断 plugin 同根形态一起改**: 不同根(字段集合第 4 项不同 + 有 phase 守卫 + 属 observation 面合法职责),强行合一会污染诊断 plugin 的语义。记 backlog,下次 audit 单开 Note。
+
+当且仅当 §10.11 的 11 条 + §10.11.5 的 9 条全过,本 ADR 升级 Accepted。
+
 ---
 
 ## 11. delete-when 总览(可观察的状态)
@@ -736,8 +783,15 @@ def __init__(self, *, spec, plan_ref, scope, region_phase=THINK, observers=(),
 | `enforced_decision` / `think_signal` 0 出现 | `grep -rn 'enforced_decision\|think_signal' lca/ lca/plugins/` | 0 |
 | H6 端到端通过 | `./scripts/lca-ops runs create --user-text "ping" --wait --json` | run `success` |
 | 5 个 phase + think subgraph 测试全过 | `pytest tests/think/ tests/harness/graph/execute/ tests/declarative/test_phase_graph.py tests/contracts/test_subgraph_reference_contract.py` | 全过 |
+| `lca/framework/subgraph/` 0 close-out 字段名字面 | `grep -nE '("decision"\|"observation"\|"reflection"\|"response")' lca/framework/subgraph/` | 0(覆盖 `node_graph_driver.py` + `driver_signal.py`) |
+| `CLOSE_OUT_FIELDS` SSOT 唯一定点 | `grep -rn 'CLOSE_OUT_FIELDS' lca/` | 单点位于 `lca/cognition/close_out.py` |
+| `SubgraphCloseOut` Protocol 存在 | `lca/contracts/subgraph.py` | 存在,只声明 `.project()`,不列字段名 |
+| `PortRegistry.merge` 含 last-write-wins 单测 | `tests/contracts/test_port_registry_typing.py` | 覆盖多源写入策略 — **本次未落**:ADR-0219 §5.2 范围,独立 PR |
+| stub `SubgraphCloseOut` 注入断言 | `tests/unit/framework/subgraph/test_node_graph_driver_close_out.py` | 元组字面消失 + 4 字段顺序由 stub 决定 |
+| `PhaseOutput` 字段定义从 `CLOSE_OUT_FIELDS` 派生 | `grep -n 'CLOSE_OUT_FIELDS' lca/framework/subgraph/plugins/channel.py` | ≥ 1 处构造 |
+| `PhaseOutput.absorb` 用 `CLOSE_OUT_FIELDS` fold | `grep -n 'CLOSE_OUT_FIELDS' lca/framework/subgraph/plugins/channel.py` | ≥ 1 处 fold |
 
-当且仅当上述 10 条全过,本 ADR 升级 Accepted。
+当且仅当上述 16 条全过,本 ADR 升级 Accepted。
 
 ---
 
@@ -759,6 +813,10 @@ def __init__(self, *, spec, plan_ref, scope, region_phase=THINK, observers=(),
 - `RestrictedPhaseContext` 字段形状(lca/harness/declarative/lifecycle/phase_context.py)
 - `PortContext` → `PortRegistry`(lca/harness/graph/execute/v2/_port_context.py)
 - `think.gate` 数据流(lca/plugins/think/gate.py L50-72)
+- `node_graph_driver.py:236` close-out 字段名内联元组(§10.11.5 回收,接 §5.1 typed `PortName`)
+
+**Amends:**
+- §10.11 by §10.11.5: close-out 字段名 SSOT 收敛(`SubgraphCloseOut` Protocol + `CognitiveCloseOut` 实现 + 元组从 driver 文件物理消失 + `PhaseOutput` 字段定义从 SSOT 派生)
 
 **Supersedes:** 无(本 ADR 是收编,不是替代;0217/0218 保留作为本 ADR 的 build-on)
 
