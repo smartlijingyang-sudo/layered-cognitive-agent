@@ -37,8 +37,6 @@ from lca.plugins.transport.webserver.handlers.openai.shim import (
 )
 from lca.plugins.transport.webserver.route.register import register_routes
 
-_LLM_REQUIRES: tuple[str, ...] = ("llm_resolver",)
-
 
 async def _download_file(request: Request) -> Response:
     return await download_file(request, request.app.state.file_store)
@@ -56,19 +54,16 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
         "/v1/chat/completions",
         chat_completions,
         ("POST", "OPTIONS"),
-        requires=_LLM_REQUIRES,
     ),
     RouteSpec(
         "/v1/embeddings",
         embeddings_create,
         ("POST", "OPTIONS"),
-        requires=_LLM_REQUIRES,
     ),
     RouteSpec(
         "/v1/responses",
         responses_create,
         ("POST", "OPTIONS"),
-        requires=_LLM_REQUIRES,
     ),
 )
 
@@ -76,7 +71,7 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
 @plugin(
     id="lca-gateway-routes-openai-compat-files",
     provides=(),
-    requires=("route_registry", "llm_resolver"),
+    requires=("route_registry",),
     layer="L1",
     kind=PluginKind.PROVIDER,
     effects="none",
