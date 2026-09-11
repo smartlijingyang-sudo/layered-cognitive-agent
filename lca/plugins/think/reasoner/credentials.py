@@ -73,18 +73,66 @@ class Config(BaseModel):
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Resolve LLM adapter and publish as ``llm_adapter`` capability."""
+    import logging
+    import os
+
     from lca.infrastructure.llm.config import llm_credentials
     from lca.infrastructure.llm.resolver import ProductionLLMResolver
 
-    # ``ProductionLLMResolver`` 不自己读 env:``llm_credentials()`` 把 ``.env`` 里的
-    # ``LLM_API_KEY`` / ``LLM_BASE_URL`` / ``LLM_MODEL`` 经由 pydantic-settings
-    # 抬到 process env 之后取出来(BOOTSTRAP 白名单包含 ``LLM_`` 前缀)。
+    _log = logging.getLogger(__name__)
     api_key, base_url, model_from_env = llm_credentials()
+    env_api_key = os.environ.get("LLM_API_KEY")
+    env_base_url = os.environ.get("LLM_BASE_URL")
+    env_model = os.environ.get("LLM_MODEL")
+    env_api_style = os.environ.get("LLM_API_STYLE")
+    key_loaded = bool(api_key)
+    _log.info(
+        "phase.think.reasoner.credentials checked: "
+        "resolved.api_key.present=%s env.LLM_API_KEY.present=%s "
+        "env.LLM_BASE_URL=%s env.LLM_MODEL=%s env.LLM_API_STYLE=%s",
+        key_loaded,
+        bool(env_api_key),
+        env_base_url,
+        env_model,
+        env_api_style,
+    )
+    ctx.emit(
+        "phase_think_reasoner_credentials.checked",
+        {
+            "llm_api_key_present": key_loaded,
+            "env_llm_api_key_present": bool(env_api_key),
+            "env_llm_base_url": env_base_url,
+            "env_llm_model": env_model,
+            "env_llm_api_style": env_api_style,
+            "resolved_base_url": base_url,
+            "resolved_model": model_from_env,
+        },
+    )
+    if not key_loaded:
+        raise RuntimeError(
+            "phase.think.reasoner.credentials: LLM_API_KEY 未配置。"
+            f" env.LLM_API_KEY present={bool(env_api_key)},"
+            f" .env 加载后 llm_credentials().api_key 为空。"
+            " 检查 cwd 下是否存在 .env 或 BOOTSTRAP_PREFIXES 是否含 LLM_。"
+        )
     adapter = ProductionLLMResolver(
         api_key=api_key,
         base_url=base_url,
         default_model=config.default_model or model_from_env,
     ).resolve()
+    _log.info(
+        "phase.think.reasoner.credentials served: adapter_type=%s",
+        type(adapter).__name__,
+    )
+    ctx.emit(
+        "phase_think_reasoner_credentials.served",
+        {
+            "adapter_type": type(adapter).__name__,
+            "adapter_model": getattr(adapter, "_model", None) or getattr(adapter, "model", None),
+            "adapter_base_url": getattr(adapter, "_base_url", None) or getattr(adapter, "base_url", None),
+            "adapter_api_style": str(getattr(adapter, "_api", None) or getattr(adapter, "api", None)),
+        },
+    )
     ctx.provide("llm_adapter", adapter)
 
 

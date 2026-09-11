@@ -17,7 +17,7 @@ need a dedicated ``lca-subgraph-resolver`` plugin to provide it.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from lca.cognition.close_out import CognitiveCloseOut
@@ -114,6 +114,7 @@ class SubgraphRunner:
         ref: SubgraphReference,
         outer_state: AgentState,
         channel: PhaseOutputChannel,
+        outer_input: Mapping[str, Any] | None = None,
     ) -> tuple[AgentState, PhaseOutput]:
         """Execute ``ref``'s subgraph and return ``(state, output)``.
 
@@ -152,6 +153,7 @@ class SubgraphRunner:
                 outer_state=outer_state,
                 channel=channel,
                 artifacts={},
+                outer_input=outer_input,
             )
             output = sub_result.output
             if (

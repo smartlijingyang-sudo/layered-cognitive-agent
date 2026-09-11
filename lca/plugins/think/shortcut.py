@@ -58,18 +58,34 @@ class ThinkShortcutExecutor:
         inputs 端口(yaml):in_assembled_manifest
         outputs 端口(yaml):decision
         """
+        import logging
+
+        _log = logging.getLogger(__name__)
         runtime = context.runtime
         state = runtime.state
         cap = runtime.supports_shortcut
 
-        if cap is None or state is None:
+        if state is None:
+            raise RuntimeError(
+                "think.shortcut requires runtime.state; got None"
+            )
+        if cap is None:
+            # No SupportsShortcut capability wired — explicit no-op path.
+            # Edge interpreter routes empty port_values to the next node,
+            # which is think.reason (the full reason path).
+            _log.info(
+                "think.shortcut: no SupportsShortcut wired; falling through to think.reason"
+            )
             return NodeOutput(port_values={})
-
         assert isinstance(cap, SupportsShortcut), (  # noqa: S101
             "think.shortcut runtime.supports_shortcut must implement SupportsShortcut"
         )
         decision = await cap.try_shortcut(state)
         if decision is None:
+            # No shortcut available — fall through to think.reason plan.
+            _log.info(
+                "think.shortcut no-shortcut path; routing to think.reason next"
+            )
             return NodeOutput(port_values={})
         return NodeOutput(port_values={"decision": decision})
 

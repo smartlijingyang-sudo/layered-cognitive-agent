@@ -159,6 +159,12 @@ Run 复盘  coding-agent tools(ADR-0065 §六 / PR-9,只读)
   ./scripts/lca-ops cost <run_id>            LlmCallCompleted 成本累加
   ./scripts/lca-ops evidence <run_id> <ref>  查 state_ref → evidence payload
 
+  driver-debug 子集 —— think 子图流式 fail-loud 信号(从 stderr 还原):
+  ./scripts/lca-ops debug-credentials         .env 加载 + LLM adapter 形态
+  ./scripts/lca-ops debug-factories <profile>  plan spec 里所有 factory 解析状态
+  ./scripts/lca-ops debug-driver-chain <run>  从 stderr 还原节点执行链
+  ./scripts/lca-ops debug-short-circuits      当前 kernel 的 fail-loud 信号
+
   diagnose <alias> 已内置 4 个 alias:model-not-seen / loop-stuck /
   memory-poisoned / approval-rejected(看 DIAGNOSE_HINTS 拿修复建议)。
 

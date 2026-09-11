@@ -58,17 +58,34 @@ class ThinkClassifyExecutor:
         inputs 端口(yaml):response
         outputs 端口(yaml):decision
         """
+        import logging
+
+        _log = logging.getLogger(__name__)
         runtime = context.runtime
         classifier = runtime.decision_classifier
         response = input.port_values.get("response")
 
-        if classifier is None or response is None:
-            return NodeOutput(port_values={})
-
+        if response is None:
+            raise RuntimeError(
+                "think.classify requires response on input; got None"
+            )
+        if classifier is None:
+            raise RuntimeError(
+                "think.classify requires runtime.decision_classifier; got None"
+            )
         assert isinstance(classifier, DecisionClassifier), (  # noqa: S101
             "think.classify runtime.decision_classifier must implement DecisionClassifier"
         )
         decision = classifier.classify(response)
+        _log.info(
+            "think.classify produced decision action_type=%s",
+            getattr(decision, "action_type", None),
+        )
+        if getattr(decision, "action_type", None) is None:
+            raise RuntimeError(
+                f"think.classify produced Decision with action_type=None; "
+                f"classifier={type(classifier).__name__} response_type={type(response).__name__}"
+            )
         return NodeOutput(port_values={"decision": decision})
 
 

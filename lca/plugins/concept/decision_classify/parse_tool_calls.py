@@ -63,8 +63,16 @@ class DecisionParseToolCallsExecutor:
         outputs 端口(yaml):tool_calls (tuple[ToolCall, ...]),
         delegations (tuple[DelegationSpec, ...])
         """
-        del context
+        import logging
+
+        _log = logging.getLogger(__name__)
         response = input.port_values.get("response")
+        _log.info(
+            "decision.parse.tool_calls response_type=%s text_len=%s tool_calls_count=%s",
+            type(response).__name__ if response is not None else "None",
+            len(response.text) if isinstance(response, LLMResponse) and getattr(response, "text", None) else 0,
+            len(response.tool_calls) if isinstance(response, LLMResponse) and getattr(response, "tool_calls", None) else 0,
+        )
         if not isinstance(response, LLMResponse):
             raise TypeError(
                 "decision.parse.tool_calls: 'response' port must be an LLMResponse, "
@@ -72,6 +80,11 @@ class DecisionParseToolCallsExecutor:
             )
 
         tool_calls, delegations = _parse(response)
+        _log.info(
+            "decision.parse.tool_calls parsed tool_calls=%d delegations=%d",
+            len(tool_calls),
+            len(delegations),
+        )
         return NodeOutput(
             port_values={
                 "tool_calls": tool_calls,

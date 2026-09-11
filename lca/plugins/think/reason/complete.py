@@ -56,21 +56,32 @@ class ThinkReasonCompleteExecutor:
         inputs 端口(yaml):turn_render
         outputs 端口(yaml):response
         """
+        import logging
+
+        _log = logging.getLogger(__name__)
         runtime = context.runtime
         state = runtime.state
         reasoner = runtime.reasoner
         render = input.port_values.get("turn_render")
 
         if reasoner is None or state is None or render is None:
-            return NodeOutput(port_values={})
-
-        # Duck-typed async: fail-soft if absent.
+            raise RuntimeError(
+                "think.reason.complete requires reasoner, state, and turn_render; "
+                f"got reasoner={reasoner!r} state={state!r} render={render!r}"
+            )
         complete_turn = getattr(reasoner, "complete_turn", None)
         if not callable(complete_turn):
-            return NodeOutput(port_values={})
+            raise RuntimeError(
+                f"think.reason.complete requires reasoner.complete_turn; "
+                f"reasoner type {type(reasoner).__name__} lacks it"
+            )
         # Tools are passed explicitly; fall back to reasoner's boot-time
         # tools if the runtime context doesn't provide per-turn tools.
         response = await complete_turn(state, render)
+        _log.debug(
+            "think.reason.complete response_type=%s",
+            type(response).__name__,
+        )
         return NodeOutput(port_values={"response": response})
 
 

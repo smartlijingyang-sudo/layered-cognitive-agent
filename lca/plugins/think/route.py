@@ -58,12 +58,24 @@ class ThinkRouteExecutor:
         inputs 端口(yaml):in_assembled_manifest
         outputs 端口(yaml):route_choice, enforced_state
         """
+        import logging
+
+        _log = logging.getLogger(__name__)
         runtime = context.runtime
         state = runtime.state
         router = runtime.skill_router
         reducer = runtime.reducer
 
-        if router is None or state is None:
+        if state is None:
+            raise RuntimeError(
+                "think.route requires runtime.state; got None"
+            )
+        if router is None:
+            # No SkillRouter wired — explicit no-op path. Edge interpreter
+            # routes empty port_values to the next node (think.reason).
+            _log.info(
+                "think.route: no SkillRouter wired; falling through to think.reason"
+            )
             return NodeOutput(port_values={})
 
         assert isinstance(router, SkillRouter), (  # noqa: S101

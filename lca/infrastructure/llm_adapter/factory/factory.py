@@ -22,19 +22,23 @@ def load_dotenv_if_present(path: str | None = None) -> None:
 
     Args:
         path: 显式指定 .env 路径。为 None 时从当前工作目录向上寻找最近的 .env。
-              找不到则静默跳过（不报错），保证在无 .env 的环境中也能正常运行。
+              找不到则记录 warning,但仍正常返回。
     """
     if path is not None:
         _load_dotenv_file(Path(path))
         return
 
-    # 从 CWD 向上寻找最近的 .env
     current = Path.cwd()
     for directory in [current, *current.parents]:
         candidate = directory / ".env"
         if candidate.is_file():
             _load_dotenv_file(candidate)
             return
+    logger.warning(
+        "load_dotenv_if_present: no .env found from cwd=%s upwards; "
+        "LLM_* will only come from ambient process env",
+        current,
+    )
 
 
 def _load_dotenv_file(path: Path) -> None:

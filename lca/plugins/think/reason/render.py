@@ -100,21 +100,33 @@ class ThinkReasonRenderExecutor:
         inputs 端口(yaml):turn_plan
         outputs 端口(yaml):turn_render
         """
+        import logging
+
+        _log = logging.getLogger(__name__)
         runtime = context.runtime
         state = runtime.state
         reasoner = runtime.reasoner
         plan = input.port_values.get("turn_plan")
-
         if reasoner is None or state is None or plan is None:
-            return NodeOutput(port_values={})
-
+            raise RuntimeError(
+                "think.reason.render requires reasoner, state, and turn_plan; "
+                f"got reasoner={reasoner!r} state={state!r} plan={plan!r}"
+            )
         render_turn = getattr(reasoner, "render_turn", None)
         if not callable(render_turn):
-            return NodeOutput(port_values={})
+            raise RuntimeError(
+                f"think.reason.render requires reasoner.render_turn; "
+                f"reasoner type {type(reasoner).__name__} lacks it"
+            )
 
         role_profile = getattr(reasoner, "role_profile", None)
         boundary = _state_to_boundary(state, plan, role_profile)
         render = render_turn(*boundary)
+        _log.debug(
+            "think.reason.render emitted turn_render variant=%s section_count=%s",
+            getattr(render, "variant", None),
+            getattr(render, "section_count", None),
+        )
         return NodeOutput(port_values={"turn_render": render})
 
 

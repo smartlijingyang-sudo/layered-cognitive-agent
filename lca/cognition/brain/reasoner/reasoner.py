@@ -37,8 +37,12 @@ from lca.contracts.models.cognition.prompt_assembly import (
     PromptTemplateProvider,
     PromptTemplateSelector,
     PromptTrace,
+    normalize_selector_result,
 )
-from lca.contracts.models.cognition.reasoner_turn import ReasonerTurnRender
+from lca.contracts.models.cognition.reasoner_turn import (
+    ReasonerTurnPlan,
+    ReasonerTurnRender,
+)
 from lca.contracts.models.core.conversation.llm import LLMResponse
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.team.role.team import RoleProfile
@@ -106,6 +110,50 @@ class PromptReasoner:
         """Set boot-time tools and template_provider (called by compose plugin)."""
         self._tools = tuple(tools)
         self._template_provider = template_provider
+
+    def build_turn_plan(self, state: AgentState) -> ReasonerTurnPlan:
+        """Derive pre-render plan from state; selectors override template_id.
+
+        ADR-0220 §6 N10 stripped state out of ``render_turn``; the
+        ``think.reason.plan`` inner-graph node still needs a typed
+        :class:`ReasonerTurnPlan` to feed the render step. The plan
+        here is a thin derivation: state-trace + selector's template
+        pick + activated skills from the manifest. No prompt body is
+        built; that's render_turn's job.
+
+        ``template_id`` resolution: when the configured selector exists
+        we ask it; otherwise we look at ``state.context`` / role
+        preferences. We never silently fall back to ``""`` so the
+        graph layer fails loud at ``render_turn`` rather than producing
+        an empty prompt.
+        """
+        manifest = getattr(state, "context", None)
+        activated = tuple(getattr(manifest, "activated_skill_ids", ()) or ())
+        tools_count = len(getattr(state, "tools", ()) or ())
+        if self.selector is None:
+            raise RuntimeError(
+                "PromptReasoner.build_turn_plan: PromptTemplateSelector "
+                "is not wired; concept.template.select must populate "
+                "TemplateSelection before build_turn_plan."
+            )
+        template_id, decision_path = normalize_selector_result(
+            self.selector.select(state=state)
+        )
+        if not template_id:
+            raise RuntimeError(
+                "PromptReasoner.build_turn_plan: selector returned empty "
+                "template_id; concept.template.select must pick a non-empty id."
+            )
+        return ReasonerTurnPlan(
+            state_id=getattr(state, "trace_id", "") or "",
+            template_id=template_id,
+            decision_path=decision_path,
+            activated_skill_ids=activated,
+            tools_count=tools_count,
+            available_skills_count=len(activated),
+            sections_preview=(),
+            variant_preview=None,
+        )
 
     def render_turn(
         self,
@@ -237,7 +285,7 @@ class PromptReasoner:
                 )
             )
         try:
-            return await execute_llm_turn(
+            response = await execute_llm_turn(
                 self.llm,
                 list(effective_tools),
                 render.prompt,
@@ -245,6 +293,7 @@ class PromptReasoner:
                 state=state,
                 task=state.task or "",
             )
+            return response
         finally:
             if token is not None:
                 reset_current_reasoner_prompt(token)

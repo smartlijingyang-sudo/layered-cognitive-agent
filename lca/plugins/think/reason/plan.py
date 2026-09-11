@@ -56,19 +56,30 @@ class ThinkReasonPlanExecutor:
         inputs 端口(yaml):(无)
         outputs 端口(yaml):turn_plan
         """
+        import logging
+
+        _log = logging.getLogger(__name__)
         runtime = context.runtime
         state = runtime.state
         reasoner = runtime.reasoner
-
         if reasoner is None or state is None:
-            return NodeOutput(port_values={})
-
-        # Duck-typed: ``Reasoner.build_turn_plan`` is optional in some
-        # implementations; fail-soft if absent (e.g. legacy reasoner).
-        build_turn_plan = getattr(reasoner, "build_turn_plan", None)
-        if not callable(build_turn_plan):
-            return NodeOutput(port_values={})
-        plan = build_turn_plan(state)
+            raise RuntimeError(
+                "think.reason.plan requires reasoner and state on the runtime; "
+                f"got reasoner={reasoner!r} state={state!r}"
+            )
+        if not hasattr(reasoner, "build_turn_plan") or not callable(
+            getattr(reasoner, "build_turn_plan", None)
+        ):
+            raise RuntimeError(
+                f"think.reason.plan requires reasoner.build_turn_plan; "
+                f"reasoner type {type(reasoner).__name__} lacks it"
+            )
+        plan = reasoner.build_turn_plan(state)
+        _log.debug(
+            "think.reason.plan emitted turn_plan template_id=%s decision_path=%s",
+            plan.template_id,
+            plan.decision_path,
+        )
         return NodeOutput(port_values={"turn_plan": plan})
 
 

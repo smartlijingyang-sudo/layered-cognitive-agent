@@ -48,6 +48,7 @@ from lca.infrastructure.cli.commands import (
     package_organization,
     profile_inspect,
     runs,
+    driver_debug,
     services,
     tools,
     typecheck,
@@ -80,6 +81,7 @@ runs.register(app)
 assistants.register(app)
 e2e.register(app)
 tools.register(app)
+driver_debug.register(app)
 profile_inspect.register(app)
 diagnostics.register(app)
 events_delivery.register(app)

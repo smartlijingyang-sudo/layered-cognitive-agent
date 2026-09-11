@@ -45,7 +45,7 @@ class GateChainRejectExecutor:
 
     semantic_name: str = "gate.chain.reject"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("candidate", "enforced_decision")
+    declared_inputs: tuple[PortName, ...] = ("decision", "enforced_decision")
     declared_outputs: tuple[PortName, ...] = ("decision",)
 
     async def node_execute(
@@ -58,9 +58,22 @@ class GateChainRejectExecutor:
         inputs 端口(yaml):candidate (Decision), enforced_decision (Decision)
         outputs 端口(yaml):decision (Decision,可能被 stamped)
         """
+        import logging
+
+        _log = logging.getLogger(__name__)
         del context
-        candidate = input.port_values.get("candidate")
+        candidate = input.port_values.get("decision")
         enforced = input.port_values.get("enforced_decision")
+        _log.info(
+            "gate.chain.reject port_values_keys=%s candidate=%r",
+            sorted(input.port_values.keys()),
+            candidate,
+        )
+        _log.info(
+            "gate.chain.reject entered candidate_type=%s enforced_type=%s",
+            type(candidate).__name__,
+            type(enforced).__name__,
+        )
         if not isinstance(candidate, Decision):
             raise TypeError(
                 "gate.chain.reject: 'candidate' port must be a Decision, "
@@ -73,6 +86,11 @@ class GateChainRejectExecutor:
             )
 
         stamped = _stamp(candidate, enforced)
+        _log.info(
+            "gate.chain.reject returning decision action_type=%s degraded_from=%s",
+            stamped.action_type,
+            stamped.degraded_from,
+        )
         return NodeOutput(port_values={"decision": stamped})
 
 

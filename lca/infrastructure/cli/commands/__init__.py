@@ -22,6 +22,7 @@ from lca.infrastructure.cli.commands.profile import (
 )
 from lca.infrastructure.cli.commands.runs import (
     diagnostics,
+    driver_debug,
     runs,
     services,
     tools,

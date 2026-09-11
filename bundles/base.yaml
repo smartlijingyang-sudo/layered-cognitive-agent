@@ -127,6 +127,26 @@ entries:
   name: phase_concept_template_select_prompt_candidate_pick
   $module: lca.plugins.concept.template_select.pick
   config: {}
+- id: phase.concept.decision_classify.decision_parse_tool_calls
+  name: phase_concept_decision_classify_decision_parse_tool_calls
+  $module: lca.plugins.concept.decision_classify.parse_tool_calls
+  config: {}
+- id: phase.concept.decision_classify.decision_parse_intent
+  name: phase_concept_decision_classify_decision_parse_intent
+  $module: lca.plugins.concept.decision_classify.parse_intent
+  config: {}
+- id: phase.concept.decision_classify.decision_compose_action
+  name: phase_concept_decision_classify_decision_compose_action
+  $module: lca.plugins.concept.decision_classify.compose_action
+  config: {}
+- id: phase.concept.decision_enforce.gate_chain_run
+  name: phase_concept_decision_enforce_gate_chain_run
+  $module: lca.plugins.concept.decision_enforce.chain_run
+  config: {}
+- id: phase.concept.decision_enforce.gate_chain_reject
+  name: phase_concept_decision_enforce_gate_chain_reject
+  $module: lca.plugins.concept.decision_enforce.chain_reject
+  config: {}
 - id: subgraph.runner
   name: subgraph_runner
   $module: lca.framework.subgraph.plugins.runner

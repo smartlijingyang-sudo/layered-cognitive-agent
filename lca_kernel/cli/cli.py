@@ -153,6 +153,48 @@ async def _serve_async(
         allow_unknown_env: 允许 .env 含 BOOTSTRAP_NAMES 之外的 key。``serve()`` 入口通过
             ``--allow-unknown-env`` CLI flag 传入;默认 False(K6 fail-loud 守护严格性)。
     """
+    # 接管 root logger:uvicorn 会把 root 拉到 WARNING,plugin 的 INFO/debug
+    # 必须经此 dictConfig 显式走 stderr 才不会被吞。放在 uvicorn 配置之前,
+    # 后续 ``logger.info(...)`` 一定进 uvicorn.stderr log 路径。
+    import logging
+    import logging.config
+
+    logging.config.dictConfig(
+        {
+            "version": 1,
+            "disable_existing_loggers": False,
+            "formatters": {
+                "lca": {
+                    "format": (
+                        "%(asctime)s [%(levelname)-8s] %(name)s "
+                        "%(message)s"
+                    ),
+                },
+            },
+            "handlers": {
+                "stderr": {
+                    "class": "logging.StreamHandler",
+                    "stream": "ext://sys.stderr",
+                    "formatter": "lca",
+                    "level": "INFO",
+                },
+            },
+            "root": {"handlers": ["stderr"], "level": "INFO"},
+            "loggers": {
+                "uvicorn": {"level": "INFO"},
+                "uvicorn.error": {"level": "INFO"},
+                "uvicorn.access": {"level": "INFO"},
+            },
+        }
+    )
+    _log = logging.getLogger("lca_kernel.cli")
+    _log.info(
+        "lca_kernel boot: profile=%s host=%s port=%d allow_unknown_env=%s",
+        profile_path,
+        host,
+        port,
+        allow_unknown_env,
+    )
     # 步骤 1: 装 env 快照
     from lca_kernel.runtime.env import load_layered_env
 

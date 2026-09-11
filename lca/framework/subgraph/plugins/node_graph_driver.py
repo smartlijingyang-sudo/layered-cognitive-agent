@@ -49,6 +49,9 @@ from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import replace
 from typing import Any
 
+_log = logging.getLogger(__name__)
+_node_driver_log = _log
+
 from lca.cognition.close_out import CognitiveCloseOut
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.declarative.declarative_1.bundle_graph import (
@@ -189,6 +192,13 @@ class NodeGraphDriver:
         publishes it. ``outer_input`` is the optional initial
         ``port_values`` projection from the outer drive.
         """
+        """跑 v2 plan,返回 InterpretationResult(与 _drive 同形)。
+
+        ``channel`` is required: at termination the driver projects the
+        collected ``port_values`` into a :class:`PhaseOutput` and
+        publishes it. ``outer_input`` is the optional initial
+        ``port_values`` projection from the outer drive.
+        """
         # Lazy import:avoid runner <-> driver circular import. The runner
         # owns the canonical FAILED InterpretationResult shape (ADR-0219
         # §6); the driver only needs it on the failure paths.
@@ -199,13 +209,45 @@ class NodeGraphDriver:
         port_context = PortRegistry()
         if outer_input is not None:
             port_context.set_outer_input(outer_input)
+        _node_driver_log.info(
+            "phase_graph.driver.start plan_ref=%s entry=%s nodes=%s "
+            "outer_input_keys=%s",
+            self._plan_ref,
+            self._entry,
+            sorted(self._nodes_by_id.keys()),
+            sorted(outer_input.keys()) if outer_input else [],
+        )
 
         current_id = self._entry
         terminal_node = current_id
         output: PhaseOutput = PhaseOutput()
-
+        _loop_count = 0
         while True:
-            node = self._nodes_by_id[current_id]
+            _loop_count += 1
+            _node_driver_log.info(
+                "phase_graph.driver.loop_iter plan_ref=%s iter=%d current_id=%s",
+                self._plan_ref,
+                _loop_count,
+                current_id,
+            )
+            if _loop_count > 20:
+                _node_driver_log.error(
+                    "phase_graph.driver.loop_overflow plan_ref=%s entry=%s",
+                    self._plan_ref,
+                    self._entry,
+                )
+                break
+            try:
+                node = self._nodes_by_id[current_id]
+            except Exception as exc:
+                _node_driver_log.error(
+                    "phase_graph.driver.node_lookup_failed plan_ref=%s "
+                    "current_id=%s exc=%s",
+                    self._plan_ref,
+                    current_id,
+                    exc,
+                )
+                raise
             # ADR-0219 §10.11 item (1): inner recursion delegation. When the
             # current node has a typed sub_spec_ref, the driver delegates the
             # whole inner traversal to the injected SubgraphRunner, mirrors
@@ -238,6 +280,7 @@ class NodeGraphDriver:
                     ref=node.sub_spec_ref,
                     outer_state=outer_state,
                     channel=sub_channel,
+                    outer_input=dict(port_context._ports),
                 )
                 # mirror outer interpreter.py:402-414: absorb inner output
                 # into port_context so subsequent edge nodes see it.
@@ -250,6 +293,13 @@ class NodeGraphDriver:
                 # does not enumerate them.
                 inner_outputs = getattr(sub_channel, "_outputs", None) or {}
                 projected = dict(self._close_out.project(inner_outputs))
+                _node_driver_log.info(
+                    "phase_graph.subgraph close_out node_id=%s "
+                    "inner_outputs_keys=%s projected_keys=%s",
+                    current_id,
+                    sorted(inner_outputs.keys()),
+                    sorted(projected.keys()),
+                )
                 if projected:
                     port_context.set_outer_input(projected)
                 # FAILED inner → propagate to outer driver via typed failure shape
@@ -311,6 +361,15 @@ class NodeGraphDriver:
             try:
                 executor = self._scope.resolve_factory(node.factory, node.region)
             except FactoryResolutionError as exc:
+                _node_driver_log.error(
+                    "phase_graph.driver.factory_resolution_failed "
+                    "plan_ref=%s node_id=%s factory=%s region=%s exc=%s",
+                    self._plan_ref,
+                    current_id,
+                    node.factory,
+                    node.region,
+                    exc,
+                )
                 # fail-loud:registry 无法解析 → 返回 FAILED outcome
                 # Fire observer start+end so the failure is visible in traces.
                 await _emit_observers(
@@ -354,6 +413,13 @@ class NodeGraphDriver:
             # (`node.inputs`). The graph only knows topology; the executor
             # owns its own typed port contract.
             declared_inputs = getattr(executor, "declared_inputs", ())
+            if current_id == "gate.chain.reject":
+                _node_driver_log.info(
+                    "phase_graph.node.port_state node_id=%s ports=%s declared_inputs=%s",
+                    current_id,
+                    sorted(port_context._ports.keys()),
+                    list(declared_inputs),
+                )
             inp = port_context.build_input(declared_inputs)
 
             # 观察面 emit: start fires before execution, end fires after
@@ -370,12 +436,24 @@ class NodeGraphDriver:
             )
 
             try:
+                _node_driver_log.info(
+                    "phase_graph.node.executing node_id=%s factory=%s "
+                    "declared_inputs=%s",
+                    current_id,
+                    getattr(executor, "semantic_name", type(executor).__name__),
+                    list(getattr(executor, "declared_inputs", ())),
+                )
                 out = await self._execute_with_emits(
                     executor=executor,
                     ctx=ctx,
                     node_input=inp,
                     node=node,
                     state=outer_state,
+                )
+                _node_driver_log.info(
+                    "phase_graph.node.executed node_id=%s port_values_keys=%s",
+                    current_id,
+                    sorted(out.port_values.keys()),
                 )
             except Exception as exc:
                 await _emit_observers(
@@ -403,15 +481,48 @@ class NodeGraphDriver:
             phase_result = _project_node_output(out, schema)
             facts.extend(phase_result.facts)
 
+            # ADR-0217 §fail-loud: distinguish two flavors of empty output:
+            # (a) declared_inputs had missing ports — likely a wiring bug.
+            # (b) declared_inputs all resolved but port_values is empty —
+            #     the node's documented "no result this turn" signal
+            #     (e.g. think.shortcut returning None means "no shortcut
+            #     available, fall through"). Only (a) gets flagged.
+            declared_inputs = list(getattr(executor, "declared_inputs", ()))
+            received = (
+                set(inp.port_values.keys()) if inp is not None else set()
+            )
+            missing_inputs = [n for n in declared_inputs if n not in received]
+            short_circuit_bug = bool(missing_inputs) and bool(
+                getattr(executor, "declared_outputs", ())
+            )
+            node_end_payload: dict[str, Any] = {
+                "plan_ref": self._plan_ref,
+                "node_id": current_id,
+                "purpose": node.purpose,
+                "result_kind": phase_result.result_kind,
+            }
+            if short_circuit_bug:
+                node_end_payload["short_circuit"] = True
+                node_end_payload["declared_outputs"] = list(
+                    getattr(executor, "declared_outputs", ())
+                )
+                node_end_payload["declared_inputs"] = declared_inputs
+                node_end_payload["received_inputs"] = sorted(received)
+                node_end_payload["missing_inputs"] = missing_inputs
+                _fail_log = _node_driver_log.warning
+                _fail_log(
+                    "phase_graph.node.short_circuit node_id=%s factory=%s "
+                    "missing_inputs=%s declared_outputs=%s",
+                    current_id,
+                    getattr(executor, "semantic_name", type(executor).__name__),
+                    missing_inputs,
+                    list(getattr(executor, "declared_outputs", ())),
+                )
+
             await _emit_observers(
                 self._observers,
                 "phase_graph.node.end",
-                {
-                    "plan_ref": self._plan_ref,
-                    "node_id": current_id,
-                    "purpose": node.purpose,
-                    "result_kind": phase_result.result_kind,
-                },
+                node_end_payload,
             )
 
             visits.append(
@@ -426,6 +537,13 @@ class NodeGraphDriver:
                 edges=self._spec.edges,
                 last_phase_result=phase_result,
                 artifacts=artifacts,
+            )
+            _node_driver_log.info(
+                "phase_graph.node.edge_selected node_id=%s edge_target=%s "
+                "edges_count=%d",
+                current_id,
+                getattr(edge, "target", None) if edge else None,
+                len(self._spec.edges),
             )
             if edge is None:
                 # 终止:project port_values → PhaseOutput → channel publish
