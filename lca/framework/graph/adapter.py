@@ -1,4 +1,4 @@
-"""PlanInterpreterAdapter — exposes :class:`PlanInterpreter` under the
+"""PlanInterpreterAdapter - exposes :class:`PlanInterpreter` under the
 legacy :class:`DeclarativeInterpreter` Protocol.
 
 This is the **production cutover seam**. The runtime plugin factory
@@ -18,20 +18,23 @@ The adapter owns:
 - the five runtime closures plus ``loop_guard_evaluator`` and the
   ``PhaseCapabilityReader`` for phase executors,
 - a :class:`PhaseRunCursor` for :meth:`resume` to seed the visit
-  loop from a checkpointed node instead of restarting from entry.
+  loop from a checkpointed node instead of restarting from entry,
+- the configured :class:`GraphObserver` that observes visit / edge /
+  subgraph lifecycle events on the kernel side.
 
 Deletion policy: this adapter is the sole production entry point.
 There is no other production interpreter.
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from lca.contracts.protocols.graph.binding import BindingKind
 from lca.framework.graph.interpreter import PlanInterpreter
 from lca.framework.graph.lifter import lift_executable_plan
-from lca.contracts.protocols.graph.binding import BindingKind
 from lca.framework.graph.port_registry import PortRegistry
 from lca.framework.graph.strategies.node_executor_strategy import (
     NodeExecutorStrategy,
@@ -160,9 +163,9 @@ class PlanInterpreterAdapter:
         phase_observer = self.phase_observer
 
         async def runner(
-            phase_input: "PhaseInput",
+            phase_input: PhaseInput,
             strategy_ctx: Any,
-        ) -> "PhaseResult":
+        ) -> PhaseResult:
             node_id = str(getattr(strategy_ctx, "node_id", ""))
             semantic = node_id.split(".", 1)[0] if node_id else ""
             if not semantic:
@@ -224,7 +227,7 @@ class PlanInterpreterAdapter:
         self._depth_counter += 1
         return self._depth_counter
 
-    def _build_node_executor_lookup(self) -> "PhaseExecutorLookup":
+    def _build_node_executor_lookup(self) -> PhaseExecutorLookup:
         """Return the executor-lookup for :class:`NodeExecutorStrategy`.
 
         The factory-name-to-instance map lives in ``self._node_executors``.
@@ -249,7 +252,7 @@ class PlanInterpreterAdapter:
 
         return lookup
 
-    def _build_node_runtime_view_factory(self) -> "NodeRuntimeViewFactory":
+    def _build_node_runtime_view_factory(self) -> NodeRuntimeViewFactory:
         """Build a per-call :class:`_NodeRuntimeView` for node executors.
 
         The view wraps ``agent_state`` (read directly) plus a
@@ -332,9 +335,7 @@ class PlanInterpreterAdapter:
         return _legacy_result_shim(state=state, result=result)
 
 
-def _legacy_result_shim(
-    *, state: object, result: InterpretationResult
-) -> object:
+def _legacy_result_shim(*, state: object, result: InterpretationResult) -> object:
     """Wrap :class:`InterpretationResult` with legacy attribute names.
 
     Callers of the legacy interpreter expect ``visits`` / ``facts`` /
@@ -381,8 +382,8 @@ def _build_registry_with_runner(
     runner: PhaseRunner,
     recursive_runner: RecursiveRunner,
     depth_counter: Callable[[], int],
-    node_executor_lookup: "PhaseExecutorLookup",
-    node_runtime_view_factory: "NodeRuntimeViewFactory",
+    node_executor_lookup: PhaseExecutorLookup,
+    node_runtime_view_factory: NodeRuntimeViewFactory,
     source: StrategyRegistry,
 ) -> StrategyRegistry:
     """Return a fresh :class:`StrategyRegistry` whose strategies carry
@@ -458,7 +459,7 @@ def _build_phase_context(
     journal: Any,
     phase_observer: Any,
     capabilities: Any,
-) -> "PhaseContext":
+) -> PhaseContext:
     """Build the :class:`PhaseContext` passed to ``PhaseExecutor.execute``.
 
     Uses :class:`RestrictedPhaseContext` (the typed per-phase view).
@@ -470,9 +471,13 @@ def _build_phase_context(
         RestrictedPhaseContext,
     )
 
-    state = agent_state if isinstance(agent_state, AgentState) else AgentState(
-        trace_id=str(plan_ref or ""),
-        task=str(node_ref or ""),
+    state = (
+        agent_state
+        if isinstance(agent_state, AgentState)
+        else AgentState(
+            trace_id=str(plan_ref or ""),
+            task=str(node_ref or ""),
+        )
     )
     budget = getattr(state, "budget", None) or Budget()
     if capabilities is None:
@@ -517,7 +522,7 @@ class _NodeRuntimeView:
     the kernel-native cutover.
     """
 
-    __slots__ = ("_state", "_scope")
+    __slots__ = ("_scope", "_state")
 
     def __init__(self, *, state: Any, scope: Any) -> None:
         object.__setattr__(self, "_state", state)
