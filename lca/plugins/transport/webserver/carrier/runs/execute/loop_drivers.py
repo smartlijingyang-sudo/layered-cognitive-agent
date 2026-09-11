@@ -70,7 +70,7 @@ class RunLoopDriver(Protocol):
 class _BoundReasonerResolver:
     """Adapter that satisfies :class:`LlmResolver` from a bound ``PromptReasoner``.
 
-    The ``llm_resolver`` capability has no provider; ``phase.think.reasoner``
+    The ``llm_resolver`` capability has no provider; ``phase.think.reasoner.compose``
     is the single boot-time LLM-aware plugin and binds ``reasoner`` with the
     adapter already materialised. Wrapping ``reasoner.llm`` lets the runnable
     assembly call ``.resolve()`` exactly as if a real resolver were provided,
@@ -93,7 +93,7 @@ def _resolve_resolver_from_reasoner(ctx: Any) -> _BoundReasonerResolver:
     if adapter is None:
         raise TypeError(
             "reasoner capability is missing its bound LLMAdapter; "
-            "phase.think.reasoner.setup() did not run correctly"
+            "phase.think.reasoner.compose.setup() did not run correctly"
         )
     return _BoundReasonerResolver(adapter)
 
@@ -124,9 +124,9 @@ class CognitiveRunDriver:
             if ctx is None:
                 raise TypeError("CognitiveRunDriver.execute requires ctx or llm_resolver")
             # ``llm_resolver`` capability has no provider in this tree
-            # (``phase.think.reasoner`` is the only LLM-aware setup plugin
-            # and it binds ``reasoner``, not ``llm_resolver``). Recover by
-            # pulling the already-bound reasoner and wrapping its
+            # (``phase.think.reasoner.compose`` is the only LLM-aware setup
+            # plugin and it binds ``reasoner``, not ``llm_resolver``).
+            # Recover by pulling the already-bound reasoner and wrapping its
             # ``.llm`` LLMAdapter in a resolver-shaped object so the
             # downstream ``RunnableBuildRequest.llm`` path stays intact.
             resolver = _resolve_resolver_from_reasoner(ctx)

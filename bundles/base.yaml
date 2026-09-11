@@ -55,9 +55,13 @@ entries:
   name: phase_think_role_profile
   $module: lca.plugins.think.role_profile_provider
   config: {}
-- id: phase.think.reasoner
-  name: phase_think_reasoner
-  $module: lca.plugins.think.reasoner_provider
+- id: phase.think.reasoner.credentials
+  name: phase_think_reasoner_credentials
+  $module: lca.plugins.think.reasoner.credentials
+  config: {}
+- id: phase.think.reasoner.compose
+  name: phase_think_reasoner_compose
+  $module: lca.plugins.think.reasoner.compose
   config: {}
 - id: phase.think.shortcut
   name: phase_think_shortcut

@@ -271,6 +271,12 @@ async def test_run_brain_think_with_spine_facts_emits_failure_on_error() -> None
 @pytest.mark.asyncio
 async def test_run_reasoner_generate_thoughts_emits_prompt_assembler_eps() -> None:
     from lca.cognition.brain.reasoner.reasoner import PromptReasoner
+    from lca.contracts.models.cognition.prompt_assembly import (
+        PromptTemplate,
+        PromptTemplateProvider,
+        PromptTemplateSelector,
+        SectionReference,
+    )
     from lca.contracts.models.core.conversation.llm import LLMResponse
     from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
     from lca.contracts.protocols import LLMAdapter
@@ -287,6 +293,63 @@ async def test_run_reasoner_generate_thoughts_emits_prompt_assembler_eps() -> No
 
             return _gen()
 
+    template = PromptTemplate(
+        id="react_prompt",
+        variant="react",
+        sections=(SectionReference(name="role", kind="pure"),),
+    )
+
+    class _StubProvider(PromptTemplateProvider):
+        def __init__(self, tpl: PromptTemplate) -> None:
+            self._tpl = tpl
+
+        def get_template(self, template_id: str):
+            return self._tpl if template_id == self._tpl.id else None
+
+        def list_templates(self):
+            return ((self._tpl.id, self._tpl),)
+
+    class _StubRegistry:
+        def __init__(self, sections: dict | None = None) -> None:
+            self._sections = sections or {}
+
+        def register(self, section, *, kind, name):
+            pass
+
+        def resolve(self, *, kind, name):
+            return self._sections.get((name, kind))
+
+        def list_sections(self):
+            return ()
+
+    class _StaticRole:
+        name = "role"
+
+        def render(self, *, role_profile, tools):
+            from lca.contracts.models.cognition.prompt_assembly import SectionOutput
+
+            return SectionOutput(text="ROLE_BLOCK")
+
+    class _StubSelector(PromptTemplateSelector):
+        def select(self, *, state):
+            return ("react_prompt", "profile_default")
+
+    class _AssemblerWrapper:
+        template_provider = _StubProvider(template)
+
+        def render(self, **kwargs):
+            from lca.cognition.brain.sections.assembler import (
+                SectionManifestPromptAssembler,
+            )
+
+            return SectionManifestPromptAssembler(
+                registry=_StubRegistry(
+                    {("role", "pure"): _StaticRole()}
+                ),
+                template_provider=_StubProvider(template),
+                strip_empty_fields=True,
+            ).render(**kwargs)
+
     session = Session("reasoner_spine")
     token = set_publish_session(session)
     try:
@@ -299,8 +362,9 @@ async def test_run_reasoner_generate_thoughts_emits_prompt_assembler_eps() -> No
                 backstory="b",
                 tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
             ),
-            tools_desc="(无)",
-            templates={"react_prompt": "task={task}"},
+            assembler=_AssemblerWrapper(),
+            selector=_StubSelector(),
+            tools=[],
         )
         response = await run_reasoner_generate_thoughts_with_spine_facts(reasoner, state)
         assert response.text == "ok"

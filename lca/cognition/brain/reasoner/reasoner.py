@@ -1,9 +1,20 @@
-"""PromptReasoner — call LLM to generate candidate thoughts.
+"""PromptReasoner — call LLM with a section-manifest-rendered prompt.
 
-Solo / member / lead 共用同一个 Reasoner（ADR-0035）：状态携带
-``TeamAwareness`` 时由 ``PromptTemplateSelector`` 决定模板，
-否则走 ``react_prompt``。Reasoner 只负责 LLM 调用；模板渲染由
-``PromptAssembler``（通过 ``PromptSectionRegistry`` + ``PromptTemplateProvider``）承担。
+Solo / member / lead share the same Reasoner (ADR-0035): state carries
+``TeamAwareness`` and ``PromptTemplateSelector`` picks a template,
+otherwise ``react_prompt``. Reasoner is the only place that invokes the
+LLM; prompt rendering is delegated to ``PromptAssembler``
+(``PromptSectionRegistry`` + ``PromptTemplateProvider``).
+
+Public surface (P9, ADR-0220 §6.2):
+- ``__init__(llm, role_profile, *, assembler=None, selector=None, tools=())``
+- ``render_turn(state, plan) -> ReasonerTurnRender``
+- ``complete_turn(state, render) -> LLMResponse``
+
+``render_turn`` / ``complete_turn`` together replace the old
+turn-planning-then-render pair: turn planning now belongs to
+``business.reasoning.turn`` graph nodes (P4); Reasoner only renders
+and calls.
 """
 
 from __future__ import annotations
@@ -19,205 +30,98 @@ from lca.cognition.brain.sections.types import (
     render_context_lines as _context_lines,
 )
 from lca.cognition.brain.sections.types import (
-    render_member_reports,
-    render_teammates,
+    render_prior_conversation_from_state as _prior_conversation_text,
 )
 from lca.cognition.brain.sections.types import (
-    render_prior_conversation_from_state as _prior_conversation_text,
+    render_teammates,
 )
 from lca.cognition.brain.sections.types import (
     strip_empty_labeled_lines as _strip_empty_prompt_fields,
 )
-from lca.contracts.atoms.telemetry.telemetry import ATTR_PROMPT_TEMPLATE
 from lca.contracts.models.cognition.prompt_assembly import (
     PromptAssembler,
     PromptTemplateSelector,
-    PromptTrace,
-    SelectorDecisionPath,
-    normalize_assembler_result,
-    normalize_selector_result,
 )
-
-# ── Legacy helpers retained for tests that import them directly ────
-# The sections-based pipeline replaces the inline implementation;
-# these helpers stay so characterization tests pin the exact text
-# shape. They are *not* used by PromptReasoner itself anymore.
 from lca.contracts.models.cognition.reasoner_turn import ReasonerTurnPlan, ReasonerTurnRender
 from lca.contracts.models.core.conversation.llm import LLMResponse
-from lca.contracts.models.core.perceive.perception import ContextManifest
 from lca.contracts.models.core.state.state import AgentState
-from lca.contracts.models.team.delegation.delegation import DelegationResult
 from lca.contracts.models.team.role.team import RoleProfile
 from lca.contracts.observability import sha256_payload_digest as _sha256_digest
 from lca.contracts.protocols import LLMAdapter, Tool
-from lca.infrastructure.observability import annotate
 
 
 def build_teammates_text(profiles: Sequence[RoleProfile]) -> str:
     return render_teammates(profiles)
 
 
-def build_member_reports_text(results: Sequence[DelegationResult]) -> str:
-    return render_member_reports(results)
-
-
-def _role_prompt_vars(
-    role_profile: RoleProfile,
-    tools_desc: str,
-    state: AgentState,
-    context_lines: str,
-    *,
-    tools: Sequence[Tool] | None = None,
-    available_skills: str = "",
-    manifest: object | None = None,
-) -> dict[str, str]:
-    """Legacy helper used by characterization tests.
-
-    Renders the full role-keyed variable dict, mirroring the old
-    pre-section-manifest implementation so tests that import
-    ``_role_prompt_vars`` keep passing.
-    """
-
-    from lca.cognition.brain.prompt.surface import PromptSurface
-    from lca.cognition.brain.sections.types import (
-        clock_from_state,
-        render_artifacts_block,
-        render_assigned_roles,
-        render_prior_conversation_from_state,
-        render_subtasks_block,
-    )
-    from lca.cognition.brain.sections.types import (
-        render_activated_skills as _render_act,
-    )
-
-    tool_list = list(tools or [])
-    surface = PromptSurface.default()
-    rendered = surface.render_tools_block(tool_list, task=state.task or "")
-    cloud_sandbox = rendered.sandbox_block
-    tools_text = rendered.tools_xml if tool_list else tools_desc
-    clock = clock_from_state(state)
-    current_date = clock.text if clock else ""
-    variables: dict[str, str] = {
-        "role": role_profile.role,
-        "goal": role_profile.goal,
-        "backstory": role_profile.backstory,
-        "tools": tools_text,
-        "task": state.task,
-        "prior_conversation": render_prior_conversation_from_state(state),
-        "context": context_lines,
-        "available_skills": available_skills or "（无技能库）",
-        "activated_skills": _render_act(state),
-        "search_routing": "",
-        "cloud_sandbox": cloud_sandbox,
-    }
-    if current_date:
-        variables["current_date"] = current_date
-    else:
-        variables["current_date"] = ""
-    subtasks_block = render_subtasks_block(state)
-    if subtasks_block:
-        variables["context"] = variables["context"] + "\n\n" + subtasks_block
-    artifacts_block = render_artifacts_block(state)
-    if artifacts_block:
-        variables["context"] = variables["context"] + "\n\n" + artifacts_block
-    awareness = state.team_awareness
-    if awareness is not None:
-        variables["teammates"] = render_teammates(awareness.teammates)
-        variables["assigned_roles_text"] = render_assigned_roles(awareness.assigned_roles)
-        variables["member_reports_text"] = render_member_reports(awareness.results)
-        if awareness.consult_duty is not None:
-            variables["member_status_text"] = awareness.consult_duty.member_status.as_prompt_text()
-            from lca.contracts.models.team.consultation.consultation import build_evidence_pack_text
-
-            variables["evidence_pack_text"] = build_evidence_pack_text(
-                awareness.consult_duty.outcomes
-            )
-        else:
-            variables["member_status_text"] = ""
-            variables["evidence_pack_text"] = ""
-    return variables
-
-
 # ── PromptReasoner ─────────────────────────────────────────────────
 
 
 class PromptReasoner:
-    """Default Reasoner: render the prompt via the assembler, call the LLM.
+    """Render the prompt via the assembler, then call the LLM once per turn.
 
-    Constructor accepts either the **legacy** kwarg set
-    ``(tools_desc, templates, available_skills)`` for back-compat with
-    existing tests, or the **new** kwarg set
-    ``(catalog, assembler, selector, tools)`` for production wiring.
-    Both shapes are tolerated so we can land the section-manifest split
-    without rewriting every test at once.
+    ADR-0220 §6.2 P9 slimmed the constructor to a single new-shape kwarg set
+    and dropped the legacy ``tools_desc`` / ``templates`` / ``available_skills``
+    compat path. Per-run tool resolution moves to the ``primitive.llm.call``
+    graph node (P5); boot-time tools reach ``complete_turn`` via
+    ``tools=``.
     """
 
     def __init__(
         self,
         llm: LLMAdapter,
         role_profile: RoleProfile,
-        tools_desc_or_catalog: str | object | None = None,
         *,
-        # New-shape kwargs (preferred):
         assembler: PromptAssembler | None = None,
         selector: PromptTemplateSelector | None = None,
-        # Legacy kwargs (kept for the existing test surface):
-        tools_desc: str | None = None,
         tools: Sequence[Tool] | None = None,
-        templates: dict[str, str] | None = None,
-        available_skills: str = "",
     ) -> None:
         self.llm = llm
         self.role_profile = role_profile
-        if isinstance(tools_desc_or_catalog, str):
-            self.tools_desc = tools_desc_or_catalog
-            self.catalog = None
-        elif tools_desc_or_catalog is None:
-            # Callers using the legacy kwarg form (e.g. ``tools_desc="..."``)
-            # may omit the third positional argument; fall back to the kwarg.
-            self.tools_desc = tools_desc or ""
-            self.catalog = None
-        else:
-            self.catalog = tools_desc_or_catalog
-            self.tools_desc = tools_desc or ""
         self.assembler: PromptAssembler | None = assembler
         self.selector: PromptTemplateSelector | None = selector
         self.tools: list[Tool] = list(tools) if tools else []
-        self._legacy_templates: dict[str, str] = dict(templates or {})
-        self.available_skills = available_skills
-
-    # Legacy hooks — preserved verbatim so older tests keep compiling.
-    def register_template(self, name: str, template: str) -> None:
-        self._legacy_templates[name] = template
-
-    def build_turn_plan(self, state: AgentState) -> ReasonerTurnPlan:
-        """Pure pre-render metadata for spine ``prompt_assembler.assemble.start``."""
-        template_id, decision_path = self._select_template(state)
-        activated_skill_ids = tuple(skill.skill_id for skill in state.activated_skills)
-        sections_preview = tuple(self._template_section_names(template_id))
-        return ReasonerTurnPlan(
-            state_id=state.trace_id,
-            template_id=template_id,
-            decision_path=decision_path,
-            activated_skill_ids=activated_skill_ids,
-            tools_count=len(self.tools),
-            available_skills_count=self._available_skills_count_hint(),
-            sections_preview=sections_preview,
-            variant_preview=self._template_variant(template_id),
-        )
 
     def render_turn(self, state: AgentState, plan: ReasonerTurnPlan) -> ReasonerTurnRender:
         """Render the prompt and collect post-render spine metadata (no emit)."""
+        from lca.contracts.models.cognition.prompt_assembly import (
+            normalize_assembler_result,
+            normalize_selector_result,
+        )
         from lca.contracts.models.core.perceive.projection import current_manifest_from_state
 
         manifest = current_manifest_from_state(state)
-        prompt, trace, section_count = self._render_prompt(
-            state,
-            manifest=manifest,
-            template_id=plan.template_id,
-            decision_path=plan.decision_path,
+        assembler = self.assembler
+        if assembler is None:
+            raise RuntimeError(
+                "PromptReasoner.render_turn requires a PromptAssembler; "
+                "wire one in via the constructor or upgrade to the "
+                "section-manifest assembler plugin."
+            )
+        # When the caller passes an empty plan (e.g. the cognitive_emit
+        # spine envelope synthesizes one before turn-planning moves to
+        # graph nodes in P4) we ask the selector for the active template.
+        # The selector is optional; without it the assembler raises its
+        # own template-not-found error.
+        template_id = plan.template_id
+        decision_path = plan.decision_path
+        if not template_id and self.selector is not None:
+            selected_id, decision_path = normalize_selector_result(
+                self.selector.select(state=state)
+            )
+            template_id = selected_id
+        result = assembler.render(
+            template_id=template_id,
+            role_profile=self.role_profile,
+            state=state,
+            awareness=state.team_awareness,
+            manifest=manifest,  # type: ignore[arg-type]
+            tools=self.tools,
+            activated_skills=tuple(state.activated_skills),
+            selector_decision_path=decision_path,
         )
-        variant: str | None
+        prompt, trace = normalize_assembler_result(result)
+        section_count = len(trace.sections) if trace is not None else 0
         if trace is not None:
             activated_skill_ids = trace.activated_skill_ids
             total_chars = trace.total_chars
@@ -229,7 +133,7 @@ class PromptReasoner:
                     "used_fallback": s.used_fallback,
                     "skipped_empty": s.skipped_empty,
                     "text_chars": s.text_chars,
-                    # ADR-0176 D3 §5:EP payload 携带渲染正文与摘要，
+                    # ADR-0176 D3 §5:EP payload 携带渲染正文与摘要,
                     # viewer 无需回读 model_visible 旁路即可重建。
                     "text": s.text,
                     "content_digest": _sha256_digest(s.text) if s.text else None,
@@ -260,246 +164,58 @@ class PromptReasoner:
     ) -> LLMResponse:
         """Invoke the LLM for one rendered turn (ModelVisible bind stays here).
 
-        ADR-0220 §6.2 P9 will move per-run tool resolution to the
-        ``primitive.llm.call`` graph node (P5). For P2 we use the
-        boot-time ``self.tools`` list; the per-run fork path is gone.
+        ADR-0220 §6.2 P9 keeps ``complete_turn`` here; P5 will move per-run
+        tool resolution to the ``primitive.llm.call`` graph node. For P2 we
+        use the boot-time ``self.tools`` list.
         """
-        reasoner_prompt_token = None
+        # ADR-0220 §6.3 (P4 plan): bind/reset migrate into the
+        # ``primitive.llm.call`` graph node so ModelVisible hook reads the
+        # bound prompt via the same ContextVar without reasoner coupling.
+        # Until then Reasoner owns the bind around the LLM call.
+        # ADR-0185 PR-4 收口:旧 capture 旁路文件落盘退场;system prompt
+        # 原文由 ModelVisibleHook 在 LLM 边界走 spine event bus 发
+        # ``spine.llm.request.header``,reasoner 侧不再写盘。
+        from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
+            get_current_cursor,
+        )
+        from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
+            CurrentReasonerPrompt,
+            bind_current_reasoner_prompt,
+            reset_current_reasoner_prompt,
+        )
+
+        token: Any = None
         if render.trace is not None:
-            reasoner_prompt_token = self._bind_reasoner_prompt(render.trace, render.manifest)
-        tools = list(self.tools)
+            cursor = get_current_cursor()
+            if cursor is None:
+                step_id = f"step-unknown-{render.trace.template_id}"
+            else:
+                try:
+                    step_id = f"step-{cursor.snapshot.step_index + 1:03d}"
+                except Exception:
+                    step_id = f"step-unknown-{render.trace.template_id}"
+            token = bind_current_reasoner_prompt(
+                CurrentReasonerPrompt(
+                    step_id=step_id,
+                    template_id=render.trace.template_id,
+                    selector_decision_path=render.trace.selector_decision_path,
+                    system_prompt_text=render.trace.system_prompt_text,
+                    prompt_trace=render.trace,
+                    context_manifest=render.manifest,
+                )
+            )
         try:
             return await execute_llm_turn(
                 self.llm,
-                tools,
+                list(self.tools),
                 render.prompt,
                 step=state.step,
                 state=state,
                 task=state.task or "",
             )
         finally:
-            if reasoner_prompt_token is not None:
-                self._reset_reasoner_prompt(reasoner_prompt_token)
-
-    async def generate_thoughts(self, state: AgentState) -> LLMResponse:
-        """Render the prompt and call the LLM; spine EPs are emitted by the loop layer."""
-        plan = self.build_turn_plan(state)
-        annotate(**{ATTR_PROMPT_TEMPLATE: plan.template_id})
-        render = self.render_turn(state, plan)
-        return await self.complete_turn(state, render)
-
-    def _select_template(self, state: AgentState) -> tuple[str, SelectorDecisionPath]:
-        if self.selector is not None:
-            result = self.selector.select(state=state)
-            return normalize_selector_result(result)
-        return self._legacy_select_template(state), "legacy"
-
-    def _render_prompt(
-        self,
-        state: AgentState,
-        *,
-        manifest: object | None,
-        template_id: str,
-        decision_path: SelectorDecisionPath = "legacy",
-    ) -> tuple[str, PromptTrace | None, int]:
-        if self.assembler is not None:
-            result = self.assembler.render(
-                template_id=template_id,
-                role_profile=self.role_profile,
-                state=state,
-                awareness=state.team_awareness,
-                manifest=manifest,  # type: ignore[arg-type]
-                tools=self.tools,
-                activated_skills=tuple(state.activated_skills),
-                selector_decision_path=decision_path,
-            )
-            prompt, trace = normalize_assembler_result(result)
-            section_count = len(trace.sections) if trace is not None else 0
-            return prompt, trace, section_count
-        # Legacy fallback: substring substitution using the registered
-        # templates. Used by tests that still drive ``PromptReasoner``
-        # with a plain ``templates={...}`` dict.
-        template_name = template_id
-        variables = self._legacy_variables(state, manifest=manifest)
-        template = self._legacy_templates.get(template_name, "")
-        prompt = template.format(**variables) if template else ""
-        return prompt, None, 0
-
-    def _available_skills_count_hint(self) -> int:
-        catalog = getattr(self, "catalog", None)
-        if catalog is None:
-            return 0
-        installed = getattr(catalog, "installed_skills", None)
-        if installed is not None:
-            try:
-                return len(installed)
-            except TypeError:
-                return 0
-        return 0
-
-    def _template_section_names(self, template_id: str) -> list[str]:
-        """Return the names of sections a template references.
-
-        Falls back to an empty list when no assembler/template_provider is
-        wired (legacy/test paths). Used by ``build_turn_plan`` so the start EP
-        carries a useful section preview before render.
-        """
-        assembler = self.assembler
-        if assembler is None:
-            return []
-        provider = getattr(assembler, "template_provider", None)
-        if provider is None:
-            return []
-        template = provider.get_template(template_id)
-        if template is None:
-            return []
-        return [ref.name for ref in template.sections]
-
-    def _template_variant(self, template_id: str) -> str | None:
-        """Return the variant a template renders as (pre-render preview).
-
-        Falls back to ``None`` when no assembler/template_provider is wired
-        (legacy/test paths); the end EP then carries ``trace.variant``.
-        """
-        assembler = self.assembler
-        if assembler is None:
-            return None
-        provider = getattr(assembler, "template_provider", None)
-        if provider is None:
-            return None
-        template = provider.get_template(template_id)
-        if template is None:
-            return None
-        return getattr(template, "variant", None)
-
-    def _bind_reasoner_prompt(
-        self, trace: PromptTrace, context_manifest: ContextManifest | None
-    ) -> Any:
-        """Bind the rendered prompt truth into the LLM-boundary ContextVar.
-
-        Precondition: ``trace`` is the PromptTrace produced by this think
-        call's assembler render; ``context_manifest`` is the ContextManifest
-        read for the same think call (``None`` when perception produced
-        none). Ownership: the Reasoner binds and resets around the LLM call;
-        the LLM boundary hook reads the bound prompt to make skill/prompt
-        assembly recoverable from ``spine.llm.request.header`` payloads
-        (ADR-0167 D3/D4, ADR-0185 PR-4).
-        """
-        from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
-            CurrentReasonerPrompt,
-            bind_current_reasoner_prompt,
-        )
-
-        # ADR-0185 PR-4 收口:旧 capture 旁路文件落盘退场;
-        # system prompt 原文由 ModelVisibleHook 在 LLM 边界走 spine event bus
-        # 统一发 ``spine.llm.request.header`` payload,reasoner 侧不再写盘。
-        # ContextVar 绑定保留,供同 run 后续 LLM 调用的 hook 读取。
-        step_id = self._step_id_for_trace(trace)
-        return bind_current_reasoner_prompt(
-            CurrentReasonerPrompt(
-                step_id=step_id,
-                template_id=trace.template_id,
-                selector_decision_path=trace.selector_decision_path,
-                system_prompt_text=trace.system_prompt_text,
-                prompt_trace=trace,
-                context_manifest=context_manifest,
-            )
-        )
-
-    @staticmethod
-    def _step_id_for_trace(trace: PromptTrace) -> str:
-        from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
-            get_current_cursor,
-        )
-
-        cursor = get_current_cursor()
-        if cursor is None:
-            return f"step-unknown-{trace.template_id}"
-        try:
-            snap = cursor.snapshot
-            return f"step-{snap.step_index + 1:03d}"
-        except Exception:
-            return f"step-unknown-{trace.template_id}"
-
-    @staticmethod
-    def _reset_reasoner_prompt(token: Any) -> None:
-        from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
-            reset_current_reasoner_prompt,
-        )
-
-        reset_current_reasoner_prompt(token)
-
-    def _legacy_select_template(self, state: AgentState) -> str:
-        if isinstance(getattr(state, "active_template", None), str) and state.active_template:
-            return state.active_template
-        awareness = state.team_awareness
-        if awareness is None:
-            return "react_prompt"
-        if awareness.consult_duty is not None:
-            return "hierarchical_prompt"
-        return "routing_prompt"
-
-    def _legacy_variables(self, state: AgentState, *, manifest: object | None) -> dict[str, str]:
-        from lca.cognition.brain.prompt.surface import PromptSurface
-        from lca.cognition.brain.sections.types import (
-            clock_from_state,
-            context_exclusions_for,
-            render_activated_skills,
-            render_artifacts_block,
-            render_assigned_roles,
-            render_context_lines,
-            render_prior_conversation_from_state,
-            render_subtasks_block,
-        )
-
-        awareness = state.team_awareness
-        exclude = context_exclusions_for(awareness)
-        context_lines = render_context_lines(state, exclude_kinds=exclude)
-        subtasks_block = render_subtasks_block(state)
-        artifacts_block = render_artifacts_block(state)
-        if subtasks_block:
-            context_lines = context_lines + "\n\n" + subtasks_block
-        if artifacts_block:
-            context_lines = context_lines + "\n\n" + artifacts_block
-        surface = PromptSurface.default()
-        rendered = surface.render_tools_block(self.tools, task=state.task or "")
-        tools_text = rendered.tools_xml if self.tools else self.tools_desc
-        cloud_sandbox = rendered.sandbox_block
-        clock = clock_from_state(state)
-        current_date = clock.text if clock else ""
-        variables: dict[str, str] = {
-            "role": self.role_profile.role,
-            "goal": self.role_profile.goal,
-            "backstory": self.role_profile.backstory,
-            "tools": tools_text,
-            "task": state.task,
-            "prior_conversation": render_prior_conversation_from_state(state),
-            "context": context_lines,
-            "available_skills": self.available_skills or "（无技能库）",
-            "activated_skills": render_activated_skills(state),
-            "search_routing": "",
-            "cloud_sandbox": cloud_sandbox,
-            "current_date": current_date,
-        }
-        if awareness is not None:
-            variables["teammates"] = render_teammates(awareness.teammates)
-            variables["assigned_roles_text"] = render_assigned_roles(awareness.assigned_roles)
-            variables["member_reports_text"] = render_member_reports(awareness.results)
-            if awareness.consult_duty is not None:
-                variables["member_status_text"] = (
-                    awareness.consult_duty.member_status.as_prompt_text()
-                )
-                from lca.contracts.models.team.consultation.consultation import (
-                    build_evidence_pack_text,
-                )
-
-                variables["evidence_pack_text"] = build_evidence_pack_text(
-                    awareness.consult_duty.outcomes
-                )
-            else:
-                variables["member_status_text"] = ""
-                variables["evidence_pack_text"] = ""
-        return variables
+            if token is not None:
+                reset_current_reasoner_prompt(token)
 
 
 __all__ = [
@@ -507,8 +223,6 @@ __all__ = [
     "_context_lines",
     "_format_activated_skills",
     "_prior_conversation_text",
-    "_role_prompt_vars",
     "_strip_empty_prompt_fields",
-    "build_member_reports_text",
     "build_teammates_text",
 ]

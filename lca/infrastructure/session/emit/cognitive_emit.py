@@ -384,24 +384,45 @@ async def run_reasoner_generate_thoughts_with_spine_facts(
     reasoner: Reasoner,
     state: AgentState,
 ) -> LLMResponse:
-    """Run ``Reasoner.generate_thoughts`` with reasoner spine EPs via FactGateway.
+    """Run ``Reasoner`` with reasoner spine EPs via FactGateway.
 
-    Uses duck-typed ``build_turn_plan`` / ``render_turn`` / ``complete_turn`` when
-    present (``PromptReasoner``); otherwise delegates without spine envelope.
+    ADR-0220 §6.2 P9 slimmed :class:`PromptReasoner` to ``render_turn`` +
+    ``complete_turn`` only — turn planning / ``generate_thoughts``
+    moved out. Turn planning is now a graph-node concern (P4); here we
+    synthesize an empty ``ReasonerTurnPlan`` so the existing EP envelope
+    keeps working without requiring the caller to thread a plan in.
+
+    Both ``render_turn`` and ``complete_turn`` are mandatory; missing
+    either raises :class:`AttributeError` (no fallback path remains).
+
+    The start EP fires *after* ``render_turn`` resolves so the payload
+    carries the actual ``template_id`` picked by the reasoner's selector.
     """
-    build_turn_plan = getattr(reasoner, "build_turn_plan", None)
     render_turn = getattr(reasoner, "render_turn", None)
     complete_turn = getattr(reasoner, "complete_turn", None)
-    if not callable(build_turn_plan) or not callable(render_turn) or not callable(complete_turn):
-        return await reasoner.generate_thoughts(state)
+    if not callable(render_turn) or not callable(complete_turn):
+        raise AttributeError(
+            "Reasoner must implement render_turn(state, plan) and "
+            "complete_turn(state, render); got "
+            f"render_turn={callable(render_turn)}, "
+            f"complete_turn={callable(complete_turn)}"
+        )
 
-    plan: ReasonerTurnPlan = cast("ReasonerTurnPlan", build_turn_plan(state))
-    with contextlib.suppress(Exception):
-        emit_prompt_assembler_start_for_state(state, plan)
+    plan: ReasonerTurnPlan = ReasonerTurnPlan(
+        state_id=state.trace_id,
+        template_id="",
+        decision_path="legacy",
+        activated_skill_ids=(),
+        tools_count=0,
+        available_skills_count=0,
+        sections_preview=(),
+        variant_preview=None,
+    )
     try:
         render: ReasonerTurnRender = cast("ReasonerTurnRender", render_turn(state, plan))
     except BaseException:
         with contextlib.suppress(Exception):
+            emit_prompt_assembler_start_for_state(state, plan)
             emit_prompt_assembler_end_for_state(
                 state,
                 plan,
@@ -411,6 +432,34 @@ async def run_reasoner_generate_thoughts_with_spine_facts(
                 variant=plan.variant_preview,
             )
         raise
+    # Backfill the plan with the actual template/decision-path/variant the
+    # reasoner resolved at render time, so the EP payloads carry truthful
+    # values even when turn-planning is upstream of this entry point (P4).
+    rendered_template_id = (
+        render.trace.template_id if render.trace is not None else plan.template_id
+    )
+    rendered_decision_path = (
+        render.trace.selector_decision_path
+        if render.trace is not None
+        else plan.decision_path
+    )
+    rendered_sections_preview = (
+        tuple(s.name for s in render.trace.sections)
+        if render.trace is not None
+        else plan.sections_preview
+    )
+    plan = ReasonerTurnPlan(
+        state_id=plan.state_id,
+        template_id=rendered_template_id,
+        decision_path=rendered_decision_path,
+        activated_skill_ids=render.activated_skill_ids,
+        tools_count=plan.tools_count,
+        available_skills_count=plan.available_skills_count,
+        sections_preview=rendered_sections_preview,
+        variant_preview=render.variant,
+    )
+    with contextlib.suppress(Exception):
+        emit_prompt_assembler_start_for_state(state, plan)
     with contextlib.suppress(Exception):
         emit_prompt_assembler_end_for_state(state, plan, render, outcome="success")
     with contextlib.suppress(Exception):

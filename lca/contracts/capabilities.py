@@ -338,7 +338,7 @@ LLM_RESOLVER = Capability[object]("llm_resolver", cardinality="one")
 SAFE_EXECUTOR_SIMPLE = Capability[object]("safe_executor.simple", cardinality="factory")
 REASONER_PROMPT = Capability[object]("reasoner.prompt", cardinality="factory")
 REASONER_ROLE_PROFILE = Capability[object]("reasoner.role_profile", cardinality="one")
-"""Profile-selected ``RoleProfile`` consumed by ``phase.think.reasoner``.
+"""Profile-selected ``RoleProfile`` consumed by ``phase.think.reasoner.compose``.
 
 The inner think subgraph reuses a single ``PromptReasoner`` instance across
 ``plan`` / ``render`` / ``complete`` reason nodes, so the role identity

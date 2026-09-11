@@ -2,6 +2,14 @@
 
 Teammates live on TeamAwareness; consult_duty is its optional component.
 PromptReasoner is shape-agnostic: awareness renders itself into prompt vars.
+
+ADR-0220 §6.2 P9 slimmed :class:`PromptReasoner` to a single new-shape
+kwarg set and dropped the legacy ``tools_desc`` / ``templates`` /
+``generate_thoughts`` path. The pre-section-manifest characterization
+cases for those legacy hooks moved into
+``tests/scenario/prompt/test_prompt_assembler_integration.py`` (which
+exercises the section-manifest assembler end-to-end); this file now
+covers only ``build_teammates_text`` + ``TeamAwareness`` plumbing.
 """
 
 from __future__ import annotations
@@ -106,87 +114,3 @@ class TestAgentStateAwareness:
         assert state.team_awareness is None
         assert not hasattr(state, "role_mode")
         assert not hasattr(state, "teammates")
-
-
-class _CapturingStreamLLM:
-    """Minimal LLM fake: records prompts via stream() (n=1 production path)."""
-
-    def __init__(self, text: str = "ok") -> None:
-        self.text = text
-        self.prompts: list[str] = []
-
-    async def stream(self, prompt: str, **kwargs: object):
-        from lca.contracts.atoms.enums.enums import LLMStreamEventType
-        from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
-
-        self.prompts.append(prompt)
-        response = LLMResponse(text=self.text)
-        yield LLMStreamEvent(type=LLMStreamEventType.OUTPUT_TEXT_DELTA, text=response.text)
-        yield LLMStreamEvent(type=LLMStreamEventType.COMPLETED, response=response)
-
-
-class TestPromptReasonerSolo:
-    """Without awareness the reasoner renders the plain role prompt."""
-
-    async def test_solo_prompt_only(self) -> None:
-        from lca.cognition.brain.reasoner.reasoner import PromptReasoner
-
-        llm = _CapturingStreamLLM()
-        reasoner = PromptReasoner(
-            llm=llm,
-            role_profile=_make_profile("solo", "work"),
-            tools_desc="(no tools)",
-            templates={"react_prompt": "just {task}"},
-        )
-        state = AgentState(trace_id="t1", task="test", budget=Budget())
-        await reasoner.generate_thoughts(state)
-        assert len(llm.prompts) == 1
-        assert "just test" in llm.prompts[0]
-
-
-class TestPromptReasonerAwareness:
-    """With awareness the reasoner merges awareness vars and its default template."""
-
-    async def test_teammates_injected_from_awareness(self) -> None:
-        from lca.cognition.brain.reasoner.reasoner import PromptReasoner
-
-        llm = _CapturingStreamLLM()
-        reasoner = PromptReasoner(
-            llm=llm,
-            role_profile=_make_profile("lead", "manage"),
-            tools_desc="(no tools)",
-            templates={"hierarchical_prompt": "{teammates} | {member_status_text}"},
-        )
-        state = AgentState(
-            trace_id="t1",
-            task="test",
-            budget=Budget(),
-            team_awareness=_awareness([_make_profile("coder", "write code")]),
-        )
-        await reasoner.generate_thoughts(state)
-        prompt = llm.prompts[0]
-        assert "coder" in prompt
-        assert "write code" in prompt
-
-    async def test_active_template_override(self) -> None:
-        from lca.cognition.brain.reasoner.reasoner import PromptReasoner
-
-        llm = _CapturingStreamLLM()
-        reasoner = PromptReasoner(
-            llm=llm,
-            role_profile=_make_profile("lead", "manage"),
-            tools_desc="(no tools)",
-            templates={
-                "hierarchical_prompt": "HIER",
-                "custom": "CUSTOM {task}",
-            },
-        )
-        state = AgentState(
-            trace_id="t1",
-            task="test",
-            budget=Budget(),
-            team_awareness=_awareness([_make_profile("coder")]),
-            active_template="custom",
-        )
-        await reasoner.generate_thoughts(state)
-        assert llm.prompts[0] == "CUSTOM test"

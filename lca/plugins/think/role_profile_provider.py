@@ -1,7 +1,7 @@
 """phase.think.role_profile — ``RoleProfile`` provider for inner think subgraph.
 
 构造 :class:`RoleProfile` 实例并注册到 ``reasoner.role_profile`` capability 键。
-``phase.think.reasoner`` 在 boot 时通过 ``ctx.require("reasoner.role_profile")``
+``phase.think.reasoner.compose`` 在 boot 时通过 ``ctx.require("reasoner.role_profile")``
 取这个实例,而不是在源码里硬编码 role / goal / backstory。
 
 Profile YAML 通过 ``config:`` 字段覆盖默认值:
@@ -41,7 +41,7 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
-    """Profile-configurable role identity consumed by ``phase.think.reasoner``."""
+    """Profile-configurable role identity consumed by ``phase.think.reasoner.compose``."""
 
     model_config = ConfigDict(extra="forbid")
     role: str = "assistant"
@@ -60,8 +60,9 @@ class Config(BaseModel):
     effects="none",
     kind=PluginKind.PROVIDER,
     description=(
-        "Provide the RoleProfile instance consumed by phase.think.reasoner. "
-        "All fields are profile-configurable; no defaults are baked into the plugin."
+        "Provide the RoleProfile instance consumed by "
+        "phase.think.reasoner.compose. All fields are profile-configurable; "
+        "no defaults are baked into the plugin."
     ),
     test_suite="tests/architecture/test_reasoner_role_profile_capability.py",
     contract=PluginContract(
