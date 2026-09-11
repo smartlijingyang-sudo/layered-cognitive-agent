@@ -1,6 +1,6 @@
 # Agent Note: kernel-native node-executor runtime seam
 
-Status: proposed
+Status: implemented
 
 ## Problem
 
