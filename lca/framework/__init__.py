@@ -1,39 +1,16 @@
-"""Framework plugin collections owned by the framework author.
+"""Framework package: unified graph kernel and its supporting modules.
 
-These collections host the ``@plugin`` declarations that compose the
-declarative phase-graph interpreter and the subgraph runtime that drives
-it.  Business-domain plugins (think / reflect / runtime_provider …) live
-under :mod:`lca.plugins` and must remain independent from anything inside
-this package.
+The legacy ``lca.framework.declarative`` and ``lca.framework.subgraph``
+subpackages were deleted in the act-subgraph seam cutover (note
+2026-09-11). The production interpreter is now
+:class:`lca.framework.graph.adapter.PlanInterpreterAdapter` and the
+single visit state machine lives at :mod:`lca.framework.graph`.
 
-Sibling packages (declarative / subgraph) are imported lazily so the
-existing pre-implementation directory tree keeps importable as the
-framework plugin files are filled in commit-by-commit (see plan §10).
+Business-domain plugins (think / reflect / runtime_provider …) live
+under :mod:`lca.plugins` and must remain independent from anything
+inside this package.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from lca.framework import declarative, subgraph
-
-
-def __getattr__(name: str):
-    """Lazy attribute access for ``declarative`` and ``subgraph`` subpackages.
-
-    Both subpackages contain plugin modules whose individual ``.py``
-    files land in subsequent commits.  Eagerly importing them here
-    would break ``lca.framework.subgraph.plugins.channel`` import on
-    branches where only the subgraph plugin set has been wired up.
-    """
-    if name in {"declarative", "subgraph"}:
-        import importlib
-
-        module = importlib.import_module(f"lca.framework.{name}")
-        globals()[name] = module
-        return module
-    raise AttributeError(f"module 'lca.framework' has no attribute {name!r}")
-
-
-__all__ = ["declarative", "subgraph"]
+__all__: list[str] = []

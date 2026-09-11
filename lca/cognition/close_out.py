@@ -7,7 +7,7 @@ single point of truth for the five canonical phase-artifact fields.
 
 Adding a new close-out field (e.g. ``intent``) requires editing this
 tuple **and** amending ADR-0219 §10.11.5. ``PhaseOutput`` (in
-``lca.framework.subgraph.plugins.channel``) derives its field set
+``lca.framework.subgraph.plugins.channel`` previously derived its field set
 from this tuple via ``Pydantic.create_model``.
 
 No I/O. No third-party deps. No environment reads.

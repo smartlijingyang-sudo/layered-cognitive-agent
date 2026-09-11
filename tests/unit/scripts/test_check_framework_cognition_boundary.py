@@ -4,8 +4,6 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
-import pytest
-
 
 def _load_module():
     import sys
@@ -24,11 +22,9 @@ def test_lint_clean_returns_zero() -> None:
     assert mod.main([]) == 0
 
 
-def test_lint_whitelist_includes_pr7_followup_files() -> None:
+def test_lint_whitelist_empty() -> None:
     mod = _load_module()
-    paths = {entry[0] for entry in mod.LEGACY_WHITELIST}
-    assert "lca/framework/declarative/plugins/interpreter.py" in paths
-    assert "lca/framework/subgraph/plugins/runner.py" in paths
+    assert mod.LEGACY_WHITELIST == ()
 
 
 def test_lint_module_imports() -> None:

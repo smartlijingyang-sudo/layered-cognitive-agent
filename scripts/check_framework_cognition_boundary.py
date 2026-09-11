@@ -22,16 +22,10 @@ Boundaries enforced:
 - ``lca/contracts/protocols/graph/**`` may not import ``lca/framework/**``
   (graph protocols are contracts only; no implementation imports).
 
-Lifted legacy exceptions (PR-7 follow-up will remove these):
-
-- ``lca/framework/subgraph/plugins/{channel,driver_signal,node_graph_driver,runner}.py``
-- ``lca/framework/declarative/plugins/interpreter.py`` (line 606 imports
-  ApprovalPendingError from the contracts execution module)
-
-These files are slated for deletion when the in-flight ``bbcca980``
-act-subgraph refactor settles. The lint passes today because the new
-``lca/framework/graph/**`` package is clean; the remaining violations
-live only in code marked for removal.
+The legacy framework directories (``lca/framework/declarative`` and
+``lca/framework/subgraph``) were deleted in the act-subgraph seam
+cutover (note 2026-09-11). The whitelist is now empty; any new
+violation must be fixed at the source, not bypassed here.
 """
 from __future__ import annotations
 
@@ -76,16 +70,9 @@ class Violation:
         )
 
 
-# Files slated for deletion in the PR-7 follow-up. Each entry is a
-# (relative path, delete_when_note) tuple. The lint skips these
-# files and prints a summary line so the new code paths are clean.
-LEGACY_WHITELIST: tuple[tuple[str, str], ...] = (
-    ("lca/framework/subgraph/plugins/channel.py", "PR-7 follow-up: delete"),
-    ("lca/framework/subgraph/plugins/driver_signal.py", "PR-7 follow-up: delete"),
-    ("lca/framework/subgraph/plugins/node_graph_driver.py", "PR-7 follow-up: delete"),
-    ("lca/framework/subgraph/plugins/runner.py", "PR-7 follow-up: delete"),
-    ("lca/framework/declarative/plugins/interpreter.py", "PR-7 follow-up: delete"),
-)
+# No legacy files remain after the act-subgraph seam cutover. New
+# violations must be fixed at the source, not bypassed here.
+LEGACY_WHITELIST: tuple[tuple[str, str], ...] = ()
 
 
 def _iter_python_files(root: Path) -> Iterable[Path]:
@@ -109,12 +96,8 @@ def _module_to_path_segments(module: str) -> tuple[str, ...]:
 def _violations_for(src_root: Path, banned_root: Path) -> list[Violation]:
     src_root_abs = REPO_ROOT / src_root
     banned_segments = banned_root.parts
-    whitelist = {Path(p) for p, _ in LEGACY_WHITELIST}
     out: list[Violation] = []
     for file in _iter_python_files(src_root_abs):
-        rel = file.relative_to(REPO_ROOT)
-        if rel in whitelist:
-            continue
         text = file.read_text(encoding="utf-8", errors="ignore")
         for line_no, module in _iter_imports(text):
             segments = _module_to_path_segments(module)
@@ -125,7 +108,7 @@ def _violations_for(src_root: Path, banned_root: Path) -> list[Violation]:
             line_text = text.splitlines()[line_no - 1] if line_no <= len(text.splitlines()) else ""
             out.append(
                 Violation(
-                    file=rel,
+                    file=file.relative_to(REPO_ROOT),
                     line=line_no,
                     line_text=line_text,
                     src_root=src_root,
@@ -146,7 +129,6 @@ def main(argv: list[str] | None = None) -> int:
     for src_root, banned_root in CONTRACT_FORBIDDEN:
         all_violations.extend(_violations_for(src_root, banned_root))
 
-    print(f"framework/cognition boundary: skipped {len(LEGACY_WHITELIST)} legacy file(s)")
     if not all_violations:
         print("framework/cognition boundary: clean")
         return 0

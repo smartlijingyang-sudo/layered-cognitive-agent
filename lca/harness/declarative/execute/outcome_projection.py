@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import traceback as _traceback_mod
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -22,7 +23,6 @@ from lca.contracts.protocols.declarative.declarative_1.declarative_execution imp
     PhaseResult,
     PhaseRunCursor,
 )
-from lca.framework.subgraph.plugins.channel import PhaseOutput
 from lca.harness.declarative.controls.approval import ApprovalStateMachine, ApprovalTransition
 from lca.harness.graph.traversal import PhaseTraversal
 
@@ -46,7 +46,7 @@ class InterpretationResult:
     terminal_node: str
     cursor: PhaseRunCursor | None = None
     outcome: DeclarativeRunOutcome | None = None
-    output: PhaseOutput | None = None
+    output: Mapping[str, Any] | None = None
 
 
 class RunOutcomeProjector:

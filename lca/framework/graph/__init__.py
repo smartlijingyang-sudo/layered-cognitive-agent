@@ -1,10 +1,10 @@
 """Unified graph kernel — single visit state machine, one strategy per binding.
 
 PR-3 lays the skeleton: a strategy registry, three strategies that
-delegate to the existing :class:`lca.loop.transaction.PhaseExecutionTransaction`
-or :class:`lca.framework.subgraph.plugins.runner.SubgraphRunner` paths,
-and a ``PhaseExecutorLookup`` seam the strategies call to resolve an
-executor from a ``(binding, node_id)`` pair.
+delegate to host-injected closures (typically
+:class:`lca.loop.transaction.PhaseExecutionTransaction` for phase
+nodes), and a ``PhaseExecutorLookup`` seam the strategies call to
+resolve an executor from a ``(binding, node_id)`` pair.
 
 PR-4 adds the kernel itself: :class:`PlanInterpreter` is the single
 visit state machine, :class:`PlanTraversal` is the typed cursor,
@@ -12,13 +12,18 @@ visit state machine, :class:`PlanTraversal` is the typed cursor,
 and :func:`lift_executable_plan` are the yaml/DTO lifters, and
 :class:`VisitRecorder` is the trace SSOT.
 
-Future PRs:
+Subsequent PRs:
 
-- PR-5: add ``transform`` / ``observe`` / ``terminate`` / ``parallel``
+- PR-5: ``transform`` / ``observe`` / ``terminate`` / ``parallel``
   / ``gate_chain`` strategies.
-- PR-6: add ``agent_consult`` / ``agent_fanout`` strategies +
+- PR-6: ``agent_consult`` / ``agent_fanout`` strategies +
   ``AgentClient`` port.
-- PR-7: delete the parallel interpreter / driver / runner stack.
+- PR-7 (factory cutover): production interpreter returns
+  ``PlanInterpreterAdapter``.
+- Act-subgraph seam cutover (note 2026-09-11): deletes the legacy
+  ``lca/framework/declarative/`` and ``lca/framework/subgraph/``
+  directories; ``PlanInterpreterAdapter`` is the sole production entry
+  point.
 """
 from lca.framework.graph.adapter import PlanInterpreterAdapter
 from lca.framework.graph.interpreter import InterpretationResult, PlanInterpreter
@@ -44,8 +49,8 @@ from lca.framework.graph.traversal import (
 __all__ = [
     "InterpretationResult",
     "PhaseExecutorLookup",
-    "PlanInterpreterAdapter",
     "PlanInterpreter",
+    "PlanInterpreterAdapter",
     "PlanTraversal",
     "PortRegistry",
     "StrategyRegistry",
