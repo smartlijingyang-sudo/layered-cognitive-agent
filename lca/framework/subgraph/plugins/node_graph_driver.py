@@ -202,6 +202,7 @@ class NodeGraphDriver:
         # Lazy import:avoid runner <-> driver circular import. The runner
         # owns the canonical FAILED InterpretationResult shape (ADR-0219
         # §6); the driver only needs it on the failure paths.
+        from collections import deque
         from lca.framework.subgraph.plugins.runner import _failed_result
 
         visits: list[PhaseVisit] = []
@@ -218,11 +219,31 @@ class NodeGraphDriver:
             sorted(outer_input.keys()) if outer_input else [],
         )
 
-        current_id = self._entry
-        terminal_node = current_id
+        # ADR-0219 §5.5: executor.declared_inputs owns the port contract.
+        # Pre-resolve so the ready-queue can check port readiness without
+        # a factory lookup per node per cycle.
+        _resolved_executors: dict[str, Any] = {}
+        _declared_inputs_by_node: dict[str, tuple[str, ...]] = {}
+        for _nid, _node in self._nodes_by_id.items():
+            try:
+                _executor = self._scope.resolve_factory(_node.factory, _node.region)
+            except FactoryResolutionError:
+                _executor = None
+            _resolved_executors[_nid] = _executor
+            _declared_inputs_by_node[_nid] = tuple(
+                getattr(_executor, "declared_inputs", ()) or ()
+            )
+
+        visited: set[str] = set()
+        ready: deque[str] = deque()
+        ready.append(self._entry)
+        terminal_node = self._entry
         output: PhaseOutput = PhaseOutput()
         _loop_count = 0
-        while True:
+        while ready:
+            current_id = ready.popleft()
+            if current_id in visited:
+                continue
             _loop_count += 1
             _node_driver_log.info(
                 "phase_graph.driver.loop_iter plan_ref=%s iter=%d current_id=%s",
@@ -531,6 +552,8 @@ class NodeGraphDriver:
 
             # merge output → 下一节点可读
             port_context.merge_output(out.port_values)
+            visited.add(current_id)
+            terminal_node = current_id
 
             edge = select_edge(
                 current_node_id=current_id,
@@ -545,17 +568,42 @@ class NodeGraphDriver:
                 getattr(edge, "target", None) if edge else None,
                 len(self._spec.edges),
             )
-            if edge is None:
-                # 终止:project port_values → PhaseOutput → channel publish
-                terminal_node = current_id
-                output = project_port_values_to_phase_output(port_context._ports)
-                channel.publish(
-                    producer_node=terminal_node,
-                    phase=self._region_phase.value,
-                    output=output,
+
+            # ADR-0219 §5.5 + fan-in dispatch: enqueue every unvisited node
+            # whose ``declared_inputs`` are now satisfied by the port
+            # registry. This handles diamond-shaped subgraphs (e.g.
+            # concept.decision.classify) where fan-in nodes have no edge
+            # from the entry and would otherwise be skipped.
+            _enqueued_any = False
+            if edge is not None:
+                _enqueue_if_ready(
+                    edge.target,
+                    visited,
+                    ready,
+                    _declared_inputs_by_node,
+                    port_context._ports,
                 )
-                break
-            current_id = edge.target
+                _enqueued_any = True
+            for _nid in self._nodes_by_id:
+                if _nid in visited or _nid == current_id:
+                    continue
+                if any(_nid == q for q in ready):
+                    continue
+                _enqueue_if_ready(
+                    _nid,
+                    visited,
+                    ready,
+                    _declared_inputs_by_node,
+                    port_context._ports,
+                )
+
+        # 终止:ready queue exhausted or overflow. project port_values → PhaseOutput → channel publish
+        output = project_port_values_to_phase_output(port_context._ports)
+        channel.publish(
+            producer_node=terminal_node,
+            phase=self._region_phase.value,
+            output=output,
+        )
 
         return InterpretationResult(
             state=outer_state,
@@ -639,6 +687,28 @@ async def _emit_observers(
     for obs in observers:
         with contextlib.suppress(Exception):
             await obs(event_name, payload)
+
+
+def _enqueue_if_ready(
+    node_id: str,
+    visited: set[str],
+    ready: Any,
+    declared_inputs_by_node: dict[str, tuple[str, ...]],
+    ports: dict[str, Any],
+) -> None:
+    """Append ``node_id`` to the ready queue when its inputs are satisfied.
+
+    Fan-in dispatch support: a node whose declared_inputs are all
+    present in the port registry may run, regardless of whether the
+    driver reached it by walking edges. The check is a pure set
+    intersection — no I/O, no executor resolution.
+    """
+    if node_id in visited or node_id in ready:
+        return
+    needed = declared_inputs_by_node.get(node_id, ())
+    if not all(p in ports for p in needed):
+        return
+    ready.append(node_id)
 
 
 __all__ = ["MAX_SUBGRAPH_DEPTH_DEFAULT", "NodeGraphDriver", "ObserverFn"]
