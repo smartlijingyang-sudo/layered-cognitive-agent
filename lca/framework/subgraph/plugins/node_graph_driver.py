@@ -48,6 +48,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import replace
 from typing import Any
 
+from lca.cognition.close_out import CognitiveCloseOut
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.declarative.declarative_1.bundle_graph import (
     BundleGraphNode,
@@ -63,6 +64,7 @@ from lca.contracts.protocols.declarative.declarative_1.declarative_execution imp
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     SemanticPhase,
 )
+from lca.contracts.subgraph import SubgraphCloseOut
 from lca.framework.subgraph.plugins.channel import (
     PhaseOutput,
     PhaseOutputChannel,
@@ -126,6 +128,7 @@ class NodeGraphDriver:
         observers: tuple[ObserverFn, ...] = (),
         sub_runner: Any | None = None,
         channel_factory: Callable[[], PhaseOutputChannel] | None = None,
+        close_out: SubgraphCloseOut | None = None,
     ) -> None:
         self._spec = spec
         self._plan_ref = plan_ref
@@ -139,6 +142,12 @@ class NodeGraphDriver:
         # set returns a FAILED ``InterpretationResult`` (fail-loud).
         self._sub_runner = sub_runner
         self._channel_factory = channel_factory
+        # ADR-0219 §10.11.5: close-out field set is owned by the
+        # cognition layer; the driver only forwards the projected
+        # mapping onto the outer port context. ``SubgraphRunner``
+        # injects ``CognitiveCloseOut`` explicitly; a direct caller
+        # (test) gets the framework default.
+        self._close_out = close_out or CognitiveCloseOut()
         # 显式 region 优先,fallback 到 bundle.region。任何 node 解析后仍为
         # None → fail-loud,要求 yaml 在 node 或 bundle 层给出 region。
         self._nodes_by_id: dict[str, BundleGraphNode] = {}
@@ -224,29 +233,23 @@ class NodeGraphDriver:
                 # mirror outer interpreter.py:402-414: absorb inner output
                 # into port_context so subsequent edge nodes see it.
                 sub_channel.absorb(sub_output)
-                # ADR-0219 §10.11 close-out: forward the inner subgraph's
-                # produced port_values to the outer port_context so
-                # downstream edge nodes (e.g. think.classify) can read
-                # the inner reasoning's ``response`` without falling
-                # through to a no-input branch. ``PhaseOutput`` is
-                # terminal snapshot of the inner; the per-node outputs
-                # live on the inner channel's typed dict.
+                # ADR-0219 §10.11.5 close-out: project the inner
+                # subgraph's per-node outputs through the injected
+                # ``SubgraphCloseOut`` seam and forward the result onto
+                # the outer port context. Field names live in the
+                # cognition layer (``CLOSE_OUT_FIELDS``); the driver
+                # does not enumerate them.
                 inner_outputs = getattr(sub_channel, "_outputs", None) or {}
-                for inner_output in inner_outputs.values():
-                    for field_name in ("decision", "observation", "reflection", "response"):
-                        value = getattr(inner_output, field_name, None)
-                        if value is not None:
-                            port_context.set_outer_input({field_name: value})
-                            break
+                projected = dict(self._close_out.project(inner_outputs))
+                if projected:
+                    port_context.set_outer_input(projected)
                 # FAILED inner → propagate to outer driver via typed failure shape
                 if sub_output.outcome_kind is ExecutionOutcome.FAILED:
                     return _failed_result(
                         plan_ref=self._plan_ref,
                         outer_state=sub_state,
                         node_id=current_id,
-                        error=RuntimeError(
-                            sub_output.error or "inner subgraph failed"
-                        ),
+                        error=RuntimeError(sub_output.error or "inner subgraph failed"),
                         visits=tuple(visits),
                         facts=tuple(facts),
                         output=sub_output,
@@ -272,9 +275,7 @@ class NodeGraphDriver:
                         "result_kind": "subgraph",
                     },
                 )
-                visits.append(
-                    PhaseVisit(current_id, SemanticPhase.THINK, "subgraph", None)
-                )
+                visits.append(PhaseVisit(current_id, SemanticPhase.THINK, "subgraph", None))
                 # Synthetic PhaseResult so select_edge runs against
                 # self._spec.edges from current_id — the normal graph
                 # semantics. binding_edge on the SubgraphReference is

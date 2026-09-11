@@ -20,6 +20,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from lca.cognition.close_out import CognitiveCloseOut
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
@@ -88,6 +89,7 @@ class SubgraphRunner:
         observers: tuple[ObserverFn, ...] = (),
         channel_factory: Callable[[], PhaseOutputChannel] | None = None,
         no_llm_mode: bool = False,
+        close_out: CognitiveCloseOut | None = None,
     ) -> None:
         self._resolver = resolver
         self._runtime = runtime
@@ -105,6 +107,10 @@ class SubgraphRunner:
         # no-LLM path strips ``think.reason.complete`` at lift time. Real
         # Reasoner wiring (separate PR) leaves it False.
         self._no_llm_mode = no_llm_mode
+        # ADR-0219 §10.11.5: the runner owns the default close-out
+        # implementation. Callers may inject a different one (tests,
+        # alternative policies) via this seam.
+        self._close_out: CognitiveCloseOut = close_out or CognitiveCloseOut()
         self._recursion_stack: set[str] = set()
 
     async def run(
@@ -131,7 +137,8 @@ class SubgraphRunner:
             raise SubgraphCycleError(ref.plan_ref)
         if len(self._recursion_stack) >= self._max_depth:
             raise SubgraphDepthExceededError(
-                len(self._recursion_stack), self._max_depth,
+                len(self._recursion_stack),
+                self._max_depth,
             )
         self._recursion_stack.add(ref.plan_ref)
         try:
@@ -148,6 +155,7 @@ class SubgraphRunner:
                 observers=self._observers,
                 sub_runner=self,
                 channel_factory=self._channel_factory,
+                close_out=self._close_out,
             )
             sub_result = await driver.run(
                 outer_state=outer_state,

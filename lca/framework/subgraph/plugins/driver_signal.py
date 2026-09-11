@@ -10,15 +10,12 @@ Why a pure function (no Cordis / no plugin):
 - ``project_port_values_to_phase_output`` must be deterministic and
   trivially testable; it has no I/O, no scope access, no clock.
 
-Mapping (per plan §13.5):
+Per ADR-0219 §10.11.5: the field set is owned by
+:data:`lca.cognition.close_out.CLOSE_OUT_FIELDS`. This module imports
+the tuple and walks it; no field-name literal lives here.
 
-- ``port_values["decision"]`` → ``output.decision``
-- ``port_values["observation"]`` → ``output.observation``
-- ``port_values["reflection"]`` → ``output.reflection``
-- ``port_values["response"]`` → ``output.response``
-
-Unknown keys are silently ignored — only the four canonical fields
-are forwarded. Type mismatches (e.g. ``str`` for ``decision``) raise
+Unknown keys are silently ignored — only the canonical fields are
+forwarded. Type mismatches (e.g. ``str`` for ``decision``) raise
 ``PhaseOutput``'s frozen Pydantic validator; the function does not
 silently coerce.
 """
@@ -28,6 +25,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from lca.cognition.close_out import CLOSE_OUT_FIELDS
 from lca.framework.subgraph.plugins.channel import PhaseOutput
 
 
@@ -41,12 +39,10 @@ def project_port_values_to_phase_output(
     immutable (Pydantic ``frozen=True``); downstream consumers must
     not mutate it.
     """
-    return PhaseOutput(
-        decision=port_values.get("decision"),
-        observation=port_values.get("observation"),
-        reflection=port_values.get("reflection"),
-        response=port_values.get("response"),
-    )
+    kwargs: dict[str, Any] = {
+        field_name: port_values.get(field_name) for field_name in CLOSE_OUT_FIELDS
+    }
+    return PhaseOutput(**kwargs)
 
 
 __all__ = ["project_port_values_to_phase_output"]

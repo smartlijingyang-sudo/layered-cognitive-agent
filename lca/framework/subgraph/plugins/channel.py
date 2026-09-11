@@ -19,6 +19,13 @@ has a static definition point (this module), constraint
 (``ConfigDict(frozen=True, extra="forbid")``), no transformation chain
 across boundaries, and explicit consumers (drivers, absorbers,
 subgraph runner).
+
+ADR-0219 §10.11.5: the close-out field set is owned by
+:class:`lca.cognition.close_out.CLOSE_OUT_FIELDS`. ``PhaseOutput`` builds
+its dynamic field set from that tuple plus two terminal-run metadata
+fields (``outcome_kind`` / ``error``) that are not part of the
+close-out surface but live on the same model so the runner can return
+success and failure through one typed envelope.
 """
 
 from __future__ import annotations
@@ -28,39 +35,71 @@ from types import MappingProxyType
 from typing import Any, Protocol, TypeVar, runtime_checkable
 
 from cordis import Context  # noqa: TC002
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, create_model
 
-from lca.contracts.models.core.conversation.llm import LLMResponse
-from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection
+from lca.cognition.close_out import close_out_types
 from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
     ExecutionOutcome,
 )
 
 
-class PhaseOutput(BaseModel):
-    """Typed snapshot of one subgraph's terminal contribution.
+def _build_phase_output() -> type[BaseModel]:
+    """Build :class:`PhaseOutput` from ``CLOSE_OUT_FIELDS`` + terminal-run metadata.
 
-    Frozen Pydantic + ``extra="forbid"`` keeps the surface stable
-    (ADR-0195 §1.4 D1-D4). At most one of each field is non-None per
-    run; ``Decision`` is the canonical ``act.advance`` payload.
+    Keeps the field set in lock-step with the close-out SSOT in
+    :mod:`lca.cognition.close_out`; an entry added there appears here
+    automatically. Terminal-run metadata (``outcome_kind`` /
+    ``error``) are not part of the close-out surface but share the
+    model so the runner returns one typed envelope.
 
-    ADR-0219 §10.11 item (3): ``outcome_kind`` + ``error`` carry the
-    failure shape that ``SubgraphRunner.run`` would otherwise discard
-    at its return site. Both default to ``None`` on the success path;
-    the runner populates them only when the inner driver returned a
-    ``DeclarativeRunOutcome(kind=FAILED)``. Terminal-run metadata —
-    ``absorb()`` deliberately does NOT copy these into the merged
-    snapshot, since success/failure is not a mergeable payload.
+    ``__config__`` is passed at construction time because
+    ``create_model`` only honours ``model_config`` declared during
+    model creation — assigning it afterwards is silently ignored by
+    Pydantic v2.
     """
+    fields: dict[str, Any] = {
+        name: (payload_type | None, None) for name, payload_type in close_out_types().items()
+    }
+    fields["outcome_kind"] = (ExecutionOutcome | None, None)
+    fields["error"] = (str | None, None)
+    return create_model(
+        "PhaseOutput",
+        __base__=BaseModel,
+        __config__=ConfigDict(frozen=True, extra="forbid"),
+        **fields,
+    )
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
 
-    decision: Decision | None = None
-    observation: Observation | None = None
-    reflection: Reflection | None = None
-    response: LLMResponse | None = None
-    outcome_kind: ExecutionOutcome | None = None
-    error: str | None = None
+PhaseOutput: type[BaseModel] = _build_phase_output()
+"""Typed snapshot of one subgraph's terminal contribution.
+
+Frozen Pydantic + ``extra="forbid"`` keeps the surface stable
+(ADR-0195 §1.4 D1-D4). At most one of each close-out field is non-None
+per run; ``Decision`` is the canonical ``act.advance`` payload.
+
+The four close-out fields (``decision`` / ``observation`` /
+``reflection`` / ``response``) are derived from
+``lca.cognition.close_out.CLOSE_OUT_FIELDS``; the two terminal-run
+metadata fields (``outcome_kind`` / ``error``) are static.
+
+ADR-0219 §10.11 item (3): ``outcome_kind`` + ``error`` carry the
+failure shape that ``SubgraphRunner.run`` would otherwise discard at
+its return site. Both default to ``None`` on the success path; the
+runner populates them only when the inner driver returned a
+``DeclarativeRunOutcome(kind=FAILED)``. Terminal-run metadata —
+``absorb()`` deliberately does NOT copy these into the merged
+snapshot, since success/failure is not a mergeable payload.
+"""
+
+# Ensure the dynamic model exposes the field set we expect at import
+# time. If this fails, the close-out SSOT and the model drifted.
+from lca.cognition.close_out import CLOSE_OUT_FIELDS as _COF  # noqa: E402
+
+if not set(_COF).issubset(set(PhaseOutput.model_fields.keys())):
+    raise RuntimeError(
+        "PhaseOutput field set drifted from CLOSE_OUT_FIELDS SSOT; "
+        "check lca.cognition.close_out.CLOSE_OUT_FIELDS"
+    )
 
 
 class ChannelNotSatisfiedError(LookupError):
@@ -68,6 +107,21 @@ class ChannelNotSatisfiedError(LookupError):
 
 
 T = TypeVar("T")
+
+
+def _reverse_close_out_field(want: type[Any]) -> str | None:
+    """Map a typed payload class back to its close-out field name.
+
+    Returns ``None`` for types that are not part of
+    :data:`lca.cognition.close_out.CLOSE_OUT_FIELDS`; callers treat
+    ``None`` as a miss and surface ``ChannelNotSatisfiedError``.
+    """
+    from lca.cognition.close_out import close_out_types
+
+    for name, payload_type in close_out_types().items():
+        if payload_type is want:
+            return name
+    return None
 
 
 @runtime_checkable
@@ -142,7 +196,10 @@ class InMemoryPhaseOutputChannel:
             self._ctx.emit("subgraph.phase_output", producer_node, phase, output)
 
     def read(self, *, consumer_node: str, want: type[T]) -> T:
-        field_name = getattr(want, "__name__", None)
+        # ADR-0219 §10.11.5: type → field name is owned by the
+        # cognition close-out SSOT (one entry per ``CLOSE_OUT_FIELDS``).
+        # Reverse-lookup avoids re-listing the field names here.
+        field_name = _reverse_close_out_field(want)
         for output in self._outputs.values():
             value = getattr(output, field_name, None) if field_name else None
             if value is not None:
@@ -154,16 +211,19 @@ class InMemoryPhaseOutputChannel:
         )
 
     def absorb(self, delta: PhaseOutput) -> None:
-        merged = PhaseOutput(
-            decision=delta.decision if delta.decision is not None else self._last("decision"),
-            observation=delta.observation
-            if delta.observation is not None
-            else self._last("observation"),
-            reflection=delta.reflection
-            if delta.reflection is not None
-            else self._last("reflection"),
-            response=delta.response if delta.response is not None else self._last("response"),
-        )
+        # ADR-0219 §10.11.5: walk ``CLOSE_OUT_FIELDS`` instead of
+        # listing the four field names here. Each field falls back to
+        # the most recently published non-None value (``last-write-wins``
+        # within a single inner subgraph).
+        from lca.cognition.close_out import CLOSE_OUT_FIELDS
+
+        kwargs: dict[str, Any] = {}
+        for field_name in CLOSE_OUT_FIELDS:
+            value = getattr(delta, field_name, None)
+            if value is None:
+                value = self._last(field_name)
+            kwargs[field_name] = value
+        merged = PhaseOutput(**kwargs)
         if self._ctx is not None:
             self._ctx.emit("subgraph.phase_output.absorbed", merged)
 
