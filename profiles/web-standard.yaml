@@ -59,8 +59,11 @@ patch:
             binding_edge: think.main
         - id: act.main
           phase: act
-          binding: phase.act.standard
           max_visits: 8
+          sub_spec_ref:
+            plan_ref: bundles/act.yaml
+            entry_node: act.validate
+            binding_edge: act.main
         - id: reflect.main
           phase: reflect
           binding: phase.reflect.standard

@@ -147,6 +147,22 @@ entries:
   name: phase_concept_decision_enforce_gate_chain_reject
   $module: lca.plugins.concept.decision_enforce.chain_reject
   config: {}
+- id: phase.concept.act_subgraph.act_validate
+  name: phase_concept_act_subgraph_act_validate
+  $module: lca.plugins.concept.act_subgraph.validate
+  config: {}
+- id: phase.concept.act_subgraph.act_authorize
+  name: phase_concept_act_subgraph_act_authorize
+  $module: lca.plugins.concept.act_subgraph.authorize
+  config: {}
+- id: phase.concept.act_subgraph.act_envelope
+  name: phase_concept_act_subgraph_act_envelope
+  $module: lca.plugins.concept.act_subgraph.envelope
+  config: {}
+- id: phase.concept.act_subgraph.act_observe
+  name: phase_concept_act_subgraph_act_observe
+  $module: lca.plugins.concept.act_subgraph.observe
+  config: {}
 - id: subgraph.runner
   name: subgraph_runner
   $module: lca.framework.subgraph.plugins.runner

@@ -1,24 +1,19 @@
 """phase.concept.effect_execute.effect_execute — typed effect dispatcher.
 
-concept.effect.execute 图唯一节点 plugin:typed ``Decision`` +
-``AgentState`` → ``EffectReceipt`` typed boundary (ADR-0220 §3.3 + §4.2)。
+concept.effect.execute 图唯一节点 plugin:typed ``CommandEnvelope`` →
+``EffectReceipt`` typed boundary (ADR-0220 §3.3 + §4.2).
 
-节点职责:把 typed ``Decision``(action_type / tool_calls / delegations /
-response_text) dispatch 到对应 capability seam, 收集 typed
-``EffectReceipt``。``body`` capability 从 ``runtime.body`` 读;缺失 →
-RuntimeError(fail-loud)。RESPOND/DELEGATE 决策返回"skipped" receipt,
-让 reflection graph 仍能记录"no effect attempted"的事实。
+节点职责:把 typed ``CommandEnvelope`` dispatch 到 EffectDispatcher capability,
+收集 typed ``EffectReceipt``。``effect_gateway`` capability 从
+``runtime.effect_gateway`` 读;缺失 → RuntimeError(fail-loud)。
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 from lca.contracts.atoms.control.slot import ControlSlot
-from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.functional.group import FunctionalGroup
-from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.act.effect_receipt import (
     EffectOutcome,
@@ -32,8 +27,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.models.core.execution.decision import Decision
-from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.protocols.act.command.envelope import CommandEnvelope
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -48,11 +42,11 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 @dataclass(frozen=True, slots=True)
 class EffectExecuteExecutor:
-    """concept.effect.execute 节点:Decision → EffectReceipt。"""
+    """concept.effect.execute 节点:CommandEnvelope → EffectReceipt."""
 
     semantic_name: str = "effect.execute"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("decision", "state")
+    declared_inputs: tuple[PortName, ...] = ("envelope",)
     declared_outputs: tuple[PortName, ...] = ("receipt",)
 
     async def node_execute(
@@ -62,93 +56,70 @@ class EffectExecuteExecutor:
     ) -> NodeOutput:
         """effect.execute 入口。
 
-        inputs 端口(yaml):decision (Decision), state (AgentState)
-        outputs 端口(yaml):receipt (EffectReceipt)
+        inputs 端口:envelope (CommandEnvelope)
+        outputs 端口:receipt (EffectReceipt)
         """
-        runtime = context.runtime
-        decision = input.port_values.get("decision")
-        state = input.port_values.get("state") or runtime.state
-
-        if not isinstance(decision, Decision):
+        envelope = input.port_values.get("envelope")
+        if not isinstance(envelope, CommandEnvelope):
             raise TypeError(
-                "effect.execute: 'decision' port must be a Decision instance, "
-                f"got {type(decision).__name__}"
-            )
-        if state is not None and not isinstance(state, AgentState):
-            raise TypeError(
-                "effect.execute: 'state' port must be an AgentState "
-                f"instance or None, got {type(state).__name__}"
+                "effect.execute: 'envelope' port must be a CommandEnvelope "
+                f"instance, got {type(envelope).__name__}"
             )
 
-        receipt = _execute(decision, runtime)
+        receipt = await _dispatch(envelope, context)
         return NodeOutput(port_values={"receipt": receipt})
 
 
-def _execute(decision: Decision, runtime: Any) -> EffectReceipt:
-    """Dispatch the typed Decision into the body capability.
-
-    RESPOND / DELEGATE → receipt 表示 skipped effect(没有 tool 调用),
-    让 reflection 仍能记录。USE_TOOL → 调 ``runtime.body.dispatch_tool``
-    typed seam;缺失 body → fail loud。
-    """
-    if decision.action_type == ActionType.RESPOND.value:
-        return _skipped_receipt(provider="respond")
-    if decision.action_type == ActionType.DELEGATE.value:
-        return _skipped_receipt(provider="delegate")
-    if decision.action_type != ActionType.USE_TOOL.value:
-        return _skipped_receipt(provider=f"unknown:{decision.action_type}")
-
-    if not decision.tool_calls:
-        return _skipped_receipt(provider="use_tool_empty")
-
-    body = getattr(runtime, "body", None)
-    if body is None:
+async def _dispatch(envelope: CommandEnvelope, context: NodeContext) -> EffectReceipt:
+    """Dispatch the CommandEnvelope through the EffectDispatcher capability."""
+    runtime = context.runtime
+    gateway = getattr(runtime, "effect_gateway", None)
+    if gateway is None:
         raise RuntimeError(
-            "effect.execute: 'body' capability missing from runtime scope — "
-            "wire a Body dispatcher before concept.effect.execute runs."
+            "effect.execute: 'effect_gateway' capability missing from runtime "
+            "scope — wire an EffectDispatcher before concept.effect.execute runs."
         )
 
-    first_call = decision.tool_calls[0]
-    invocation_id = first_call.call_id or new_id("inv")
-    idempotency_key = first_call.idempotency_key or new_id("idem")
+    # Build a minimal EffectPolicyPlan from envelope metadata.
+    # The real policy comes from CompiledRunPlan; for concept-level dispatch
+    # we trust the envelope's own grant as the policy source.
+    from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
+        EffectPolicyPlan,
+    )
+
+    policy = EffectPolicyPlan(
+        allowed_effects=(envelope.grant.effect_class,),
+        approval_required=(),
+        idempotency_required=(),
+    )
+
     try:
-        dispatch = getattr(body, "dispatch_tool", None)
-        if not callable(dispatch):
-            raise RuntimeError("effect.execute: runtime.body.dispatch_tool must be callable.")
-        output_ref = dispatch(
-            tool_name=first_call.tool_name,
-            arguments=dict(first_call.arguments),
-            invocation_id=invocation_id,
-            idempotency_key=idempotency_key,
-        )
+        output = await gateway.execute(envelope, policy)
     except Exception as exc:
+        invocation_id = envelope.idempotency_key or "unknown"
         return EffectReceipt(
             invocation_id=invocation_id,
             outcome=EffectOutcome.FAILED,
-            idempotency_key=idempotency_key,
-            provider=first_call.tool_name,
+            idempotency_key=envelope.idempotency_key or "",
+            provider=envelope.metadata.get("operation", "unknown"),
             error_code=type(exc).__name__,
             retryable=True,
         )
-    output_str = output_ref if isinstance(output_ref, str) else None
-    return EffectReceipt(
-        invocation_id=invocation_id,
-        outcome=EffectOutcome.SUCCEEDED,
-        idempotency_key=idempotency_key,
-        provider=first_call.tool_name,
-        output_ref=output_str,
-    )
 
+    # output may be a dict receipt or a raw Observation
+    if isinstance(output, dict):
+        result = output.get("result", output)
+        invocation_id = output.get("invocation_id", envelope.idempotency_key or "unknown")
+    else:
+        result = output
+        invocation_id = envelope.idempotency_key or "unknown"
 
-def _skipped_receipt(*, provider: str) -> EffectReceipt:
-    """A typed EffectReceipt that records "no effect was attempted"."""
-    invocation_id = new_id("inv")
     return EffectReceipt(
-        invocation_id=invocation_id,
+        invocation_id=str(invocation_id),
         outcome=EffectOutcome.SUCCEEDED,
-        idempotency_key=invocation_id,
-        provider=provider,
-        output_ref=None,
+        idempotency_key=envelope.idempotency_key or "",
+        provider=envelope.metadata.get("operation", "unknown"),
+        output_ref=str(result) if result is not None else None,
     )
 
 
@@ -156,12 +127,12 @@ def _skipped_receipt(*, provider: str) -> EffectReceipt:
     id="phase.concept.effect_execute.effect_execute",
     Config=None,
     provides=("concept::effect.execute",),
-    requires=("body",),
+    requires=("effect_gateway",),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
-    effects="tool",
+    effects="tools",
     contract=PluginContract(
-        identity=PluginIdentity(version="v1"),
+        identity=PluginIdentity(version="v2"),
         architecture=ArchitectureContract(
             group=FunctionalGroup.G7_EXECUTION,
             control_slots=(ControlSlot.OBSERVE_WILDCARD,),
@@ -176,13 +147,13 @@ def _skipped_receipt(*, provider: str) -> EffectReceipt:
         ),
     ),
     ownership=OwnershipDeclaration(
-        reads=("plugin.serve", "body"),
+        reads=("plugin.serve", "effect_gateway"),
         emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )
 async def setup(ctx: PluginContext, config=None) -> None:
-    """Composite-key 注册:``{region}::{semantic_name}``。"""
+    """Composite-key registration: ``{region}::{semantic_name}``."""
     del config
     executor = EffectExecuteExecutor()
     composite_key = f"{executor.region}::{executor.semantic_name}"

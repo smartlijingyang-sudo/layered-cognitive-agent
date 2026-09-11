@@ -1,0 +1,92 @@
+# bundles/act.yaml — act 子图纯图描述
+# ADR-0217 Bundle Graph Schema v2 + ADR-0220 §3.3。
+#
+# 字段职责(每个字段都被框架读):
+#   id       : bundle 身份;BundleSubgraphResolver sniff 用
+#   region   : 子图 region 标签;FactoryResolver 反查上下文
+#   purpose  : 子图整体职责;写入 phase_graph.metadata
+#   nodes[]
+#     id     : 节点拓扑身份(供 edges source/target 锚点)
+#     region : 节点 region(可空,fallback 到 bundle.region)
+#     factory: 业务语义名;FactoryResolver 解析到 NodeExecutor
+#     config : 节点级图配置(只图级参数)
+#       max_visits : NodeContext.budget 透传,v2 driver 终止条件之一
+#   edges[]
+#     from/to : 节点 id 锚点
+#     when    : bool-expr DSL;interpreter 在 node.end 后跑
+#
+# act 5 步执行:validate → authorize → envelope → dispatch → observe。
+# validate/authorize 从 control.act.* 迁移;envelope 从 StandardActExecutor
+# 迁移;dispatch 委托给 concept.effect.execute(已有);observe 收集结果。
+#
+# 节点 plugin 注册走 @plugin(...) 装饰器;plugin 实现通过 factory 业务名
+# 由 FactoryRegistry.resolve(semantic_name="act.<name>", region="concept")
+# 解析到 Act<Name>Executor 实例。
+
+id: act.subgraph
+region: concept
+purpose: act 5 步执行 — validate → authorize → envelope → dispatch → observe
+
+nodes:
+  - id: act.validate
+    factory: act.validate
+    inputs: [decision]
+    outputs: [decision]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit: []
+
+  - id: act.authorize
+    factory: act.authorize
+    inputs: [decision, state]
+    outputs: [decision]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit: []
+
+  - id: act.envelope
+    factory: act.envelope
+    inputs: [decision]
+    outputs: [envelope]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit: []
+
+  - id: act.dispatch
+    factory: act.dispatch.ref
+    inputs: [envelope]
+    outputs: [receipt]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit: []
+      sub_spec_ref:
+        plan_ref: bundles/concept/effect_execute.yaml
+        entry_node: effect.execute
+        binding_edge: act.dispatch
+
+  - id: act.observe
+    factory: act.observe
+    inputs: [receipt]
+    outputs: [receipt]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit: []
+
+edges:
+  - from: act.validate
+    to: act.authorize
+    when: true
+  - from: act.authorize
+    to: act.envelope
+    when: true
+  - from: act.envelope
+    to: act.dispatch
+    when: true
+  - from: act.dispatch
+    to: act.observe
+    when: true

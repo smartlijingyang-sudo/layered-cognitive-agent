@@ -64,8 +64,13 @@ entries:
             binding_edge: think.main
         - id: act.main
           phase: act
-          binding: phase.act.standard
           max_visits: 8
+          # ADR-0220: act 子图分解。interpreter 进入节点时分发到子图,
+          # 不调用 phase.act.standard。子图描述在 bundles/act.yaml。
+          sub_spec_ref:
+            plan_ref: bundles/act.yaml
+            entry_node: act.validate
+            binding_edge: act.main
         - id: reflect.main
           phase: reflect
           binding: phase.reflect.standard
