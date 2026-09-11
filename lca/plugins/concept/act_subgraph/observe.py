@@ -1,10 +1,11 @@
 """phase.concept.act_subgraph.act_observe — typed effect observation node.
 
 ``concept.act_subgraph`` 内嵌节点:``EffectReceipt`` → ``EffectReceipt``
-(typed passthrough)。
+。
 
-act 子图最后一个节点,在执行完成后观察回执。当前为 typed passthrough
-占位;后续工作将加入 journal 观察记录。
+act 子图最后一个节点,在执行完成后观察回执并写入 journal 一条 ``effect.observed``
+事实(若 ``journal`` capability 可用),让下游 reflect / remember 节点可以做
+typed 推断。
 """
 
 from __future__ import annotations
@@ -53,14 +54,38 @@ class ActObserveExecutor:
 
         inputs 端口(yaml): receipt (EffectReceipt)
         outputs 端口(yaml): receipt (EffectReceipt)
+
+        记录一条 ``effect.observed`` RunFact 到 journal(若 runtime 暴露
+        ``journal`` capability),让 reflect/remember 节点可以基于它做
+        typed 推断。
         """
-        del context
         receipt = input.port_values.get("receipt")
         if not isinstance(receipt, EffectReceipt):
             raise TypeError(
                 "act.observe: 'receipt' port must be an EffectReceipt "
                 f"instance, got {type(receipt).__name__}"
             )
+
+        journal = getattr(context.runtime, "journal", None)
+        plan_ref = context.metadata.get("plan_ref", "unknown")
+        node_id = context.metadata.get("node_id", "act.observe")
+        if journal is not None and hasattr(journal, "commit_fact"):
+            from lca.contracts.protocols.act.command.envelope import RunFact
+
+            fact = RunFact(
+                fact_id=f"{plan_ref}:{node_id}:{receipt.invocation_id}",
+                plan_ref=plan_ref,
+                kind="effect.observed",
+                payload={
+                    "invocation_id": receipt.invocation_id,
+                    "outcome": receipt.outcome.value,
+                    "provider": receipt.provider,
+                    "idempotency_key": receipt.idempotency_key,
+                    "error_code": receipt.error_code,
+                },
+            )
+            journal.commit_fact(fact, plan_ref=plan_ref, node_ref=node_id)
+
         return NodeOutput(port_values={"receipt": receipt})
 
 

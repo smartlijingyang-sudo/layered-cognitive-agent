@@ -4,12 +4,10 @@ concept.act.subgraph 节点 2 (``concept.act.authorize``):typed
 ``Decision`` + ``AgentState`` → ``Decision``。从 ``control.act.budget``,
 ``control.act.constrain`` 和 ``control.act.safe-boundary`` 提取的授权逻辑。
 
-当前是 typed passthrough scaffold:
-1. Decision 必须存在
-2. 如果 state 和 budget 可用,检查剩余 step 容量
-3. 返回 Decision
-
-真正的策略逻辑将在 control plugin 迁移时填充。
+执行三类策略检查:
+1. Budget:steps / tokens / cost_usd 任一超限拒绝
+2. Constraint:USE_TOOL tool_calls call_ids 必须唯一
+3. Safety boundary:拒绝明显危险的 tool_name(本地确定性检查)
 """
 
 from __future__ import annotations
@@ -43,7 +41,7 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 @dataclass(frozen=True, slots=True)
 class ActAuthorizeExecutor:
-    """``concept.act.authorize`` 节点:策略级授权检查 (scaffold)。"""
+    """``concept.act.authorize`` 节点:策略级授权检查 (policy-level authorization)。"""
 
     semantic_name: str = "act.authorize"
     region: str = "concept"
@@ -74,14 +72,42 @@ class ActAuthorizeExecutor:
                 f"got {type(state).__name__}"
             )
 
-        # 检查剩余 step 容量(如果 state 和 budget 可用)
-        if state is not None:
-            budget = getattr(state, "budget", None)
-            if budget is not None and budget.exceeded("steps"):
+        # Budget check: refuse if any resource is exhausted.
+        budget = getattr(state, "budget", None) if state is not None else None
+        if budget is not None:
+            if budget.exceeded("steps"):
                 raise ValueError(
                     "act.authorize: budget step limit exceeded "
                     f"(used={budget.used_steps}, max={budget.max_steps})"
                 )
+            if budget.exceeded("tokens"):
+                raise ValueError(
+                    "act.authorize: budget token limit exceeded "
+                    f"(used={budget.used_tokens}, max={budget.max_tokens})"
+                )
+            if budget.exceeded("cost_usd"):
+                raise ValueError(
+                    "act.authorize: budget cost limit exceeded "
+                    f"(used={budget.used_cost_usd}, max={budget.max_cost_usd})"
+                )
+
+        # Constraint check: USE_TOOL tool_calls must have unique call_ids.
+        if decision.action_type == "use_tool" and decision.tool_calls:
+            call_ids = [call.call_id for call in decision.tool_calls]
+            if len(call_ids) != len(set(call_ids)):
+                duplicates = sorted({cid for cid in call_ids if call_ids.count(cid) > 1})
+                raise ValueError(f"act.authorize: duplicate tool call_ids {duplicates}")
+
+        # Safety boundary: USE_TOOL must not include self-destructive patterns
+        # in the tool_name (deterministic local check; deeper policy lives in
+        # the runtime capability seam).
+        if decision.action_type == "use_tool":
+            for call in decision.tool_calls:
+                name = call.tool_name.strip().lower()
+                if name.startswith("self_destruct") or name.startswith("rm_rf_root"):
+                    raise ValueError(
+                        f"act.authorize: unsafe tool name rejected: {call.tool_name!r}"
+                    )
 
         return NodeOutput(port_values={"decision": decision})
 
