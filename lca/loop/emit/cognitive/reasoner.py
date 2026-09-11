@@ -10,7 +10,7 @@ Think pipeline calls this seam so ``PromptReasoner`` stays pure; infrastructure
 
 delete-when:
     1. 所有 phase graph driver 都走 v2 (NOT v0 GraphAssembler fallback)
-    2. 节点级 sub_spec_ref 在 prod profile 落地 (think-subgraph-dev 已用)
+    2. 节点级 sub_spec_ref 在 prod profile 落地 (web-standard profile 已用)
     3. think.reason inner_graph 拆解已落地 (本 spec)
     4. 至少 1 个 prod profile 跑通 3 个月,期间无 seam fallback 触发
 owner: lca/loop/emit/cognitive/reasoner.py 维护者
