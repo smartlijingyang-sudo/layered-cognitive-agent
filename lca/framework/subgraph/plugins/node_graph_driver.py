@@ -130,7 +130,7 @@ class NodeGraphDriver:
         spec: BundleGraphSpec,
         plan_ref: str,
         scope: Any,  # SubgraphRuntime:有 .resolve/.resolve_factory 的对象
-        region_phase: SemanticPhase = SemanticPhase.THINK,
+        region_phase: SemanticPhase | None = None,
         observers: tuple[ObserverFn, ...] = (),
         sub_runner: Any | None = None,
         channel_factory: Callable[[], PhaseOutputChannel] | None = None,
@@ -139,7 +139,7 @@ class NodeGraphDriver:
         self._spec = spec
         self._plan_ref = plan_ref
         self._scope = scope
-        self._region_phase = region_phase
+        self._region_phase = region_phase or _infer_phase_from_spec(spec)
         self._observers = observers
         # ADR-0219 §10.11 item (1): inner recursion plumbing. Both are
         # populated by ``SubgraphRunner`` itself (which constructs the
@@ -606,6 +606,28 @@ class NodeGraphDriver:
             else:
                 emit_for_node(ep_id, state)
         return out
+
+
+def _infer_phase_from_spec(spec: BundleGraphSpec) -> SemanticPhase:
+    """Derive the semantic phase from the bundle spec id.
+
+    Convention: ``act.subgraph`` → ACT, ``think.subgraph`` → THINK.
+    Falls back to THINK for unrecognized specs (backward compat).
+    """
+    spec_id = spec.id or ""
+    if spec_id.startswith("act"):
+        return SemanticPhase.ACT
+    if spec_id.startswith("think"):
+        return SemanticPhase.THINK
+    if spec_id.startswith("perceive"):
+        return SemanticPhase.PERCEIVE
+    if spec_id.startswith("reflect"):
+        return SemanticPhase.REFLECT
+    if spec_id.startswith("remember"):
+        return SemanticPhase.REMEMBER
+    if spec_id.startswith("stop"):
+        return SemanticPhase.STOP
+    return SemanticPhase.THINK
 
 
 async def _emit_observers(
