@@ -99,17 +99,19 @@ def lift_executable_plan(executable: object) -> Plan:
         raise ValueError("ExecutablePlan has no phase_graph; cannot lift")
     raw_nodes = list(getattr(pg, "nodes", ()))
     raw_edges = list(getattr(pg, "edges", ()))
+    entry_id = str(getattr(pg, "entry", ""))
     nodes: list[PlanNode] = []
     for raw in raw_nodes:
         binding = _binding_for_phase_node(raw)
         subgraph_ref = _subgraph_ref_from(getattr(raw, "sub_spec_ref", None))
+        node_id = str(getattr(raw, "id", ""))
         nodes.append(
             PlanNode(
-                id=str(getattr(raw, "id", "")),
+                id=node_id,
                 binding=binding,
                 max_visits=int(getattr(raw, "max_visits", 1)),
                 terminal=bool(getattr(raw, "terminal", False)),
-                entry=bool(getattr(raw, "entry", False)),
+                entry=bool(getattr(raw, "entry", False)) or node_id == entry_id,
                 subgraph_ref=subgraph_ref,
             )
         )

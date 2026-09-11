@@ -40,6 +40,18 @@ from lca.framework.graph.strategy_registry import (
     register_strategy,
     resolve_executor,
 )
+from lca.framework.graph.strategies import (  # noqa: F401  side-effect: register strategies
+    agent_consult_strategy,
+    agent_fanout_strategy,
+    gate_chain_strategy,
+    node_executor_strategy,
+    observe_strategy,
+    parallel_strategy,
+    phase_executor_strategy,
+    subgraph_strategy,
+    terminate_strategy,
+    transform_strategy,
+)
 from lca.framework.graph.traversal import (
     PlanTraversal,
     install_predicate_evaluator,
