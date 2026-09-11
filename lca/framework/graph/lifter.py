@@ -17,6 +17,7 @@ projects yaml / DTO into the new kernel's typed Plan DTO.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 
 from lca.contracts.protocols.graph.binding import BindingKind
@@ -99,6 +100,14 @@ def lift_executable_plan(executable: object) -> Plan:
     ``executable.plan.phase_graph`` (when present) is a phase graph;
     we project it. ``executable.nodes`` is the executable-node dict
     keyed by id; we use it for node ordering.
+
+    For nodes carrying a ``subgraph_ref``, the outer node's
+    ``io_schema`` is derived from the inner entry node's declared
+    ``io_schema``. This makes the subgraph delegate's port contract
+    the single source of truth: the inner entry's ``inputs`` are
+    forwarded from the outer registry by :class:`SubgraphStrategy`,
+    and the inner entry's ``outputs`` are merged back. The outer
+    node's ``io_schema`` cannot drift from the inner contract.
     """
     plan_obj = getattr(executable, "plan", None)
     pg = getattr(plan_obj, "phase_graph", None) if plan_obj is not None else None
@@ -112,10 +121,12 @@ def lift_executable_plan(executable: object) -> Plan:
         binding = _binding_for_phase_node(raw)
         subgraph_ref = _subgraph_ref_from(getattr(raw, "sub_spec_ref", None))
         node_id = str(getattr(raw, "id", ""))
+        io_schema = _subgraph_entry_schema(subgraph_ref)
         nodes.append(
             PlanNode(
                 id=node_id,
                 binding=binding,
+                io_schema=io_schema,
                 max_visits=int(getattr(raw, "max_visits", 1)),
                 terminal=bool(getattr(raw, "terminal", False)),
                 entry=bool(getattr(raw, "entry", False)) or node_id == entry_id,
@@ -137,6 +148,49 @@ def lift_executable_plan(executable: object) -> Plan:
         edges=tuple(edges),
         approval_resume_node=getattr(pg, "approval_resume_node", None),
     )
+
+
+def _subgraph_entry_schema(
+    subgraph_ref: SubgraphReference | None,
+) -> NodeIOSchema:
+    """Return the inner entry node's :class:`NodeIOSchema` for a subgraph
+    delegate, or an empty schema when no delegate is wired.
+
+    Loading the inner plan is best-effort: tests and dry lifts may
+    pass :class:`ExecutablePlan` shims whose ``plan_ref`` paths do
+    not resolve. On failure, the outer node carries an empty schema
+    (current behavior) so existing tests keep passing.
+    """
+    if subgraph_ref is None:
+        return NodeIOSchema()
+    try:
+        import yaml
+
+        path = _bundle_yaml_path(subgraph_ref.plan_ref)
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            return NodeIOSchema()
+        spec = dict(raw)
+        if "entry" not in spec and subgraph_ref.entry_node:
+            spec["entry"] = subgraph_ref.entry_node
+        inner_plan = lift_graph_spec(spec)
+        return inner_plan.node(subgraph_ref.entry_node).io_schema
+    except (FileNotFoundError, KeyError, TypeError, ValueError):
+        return NodeIOSchema()
+
+
+def _bundle_yaml_path(plan_ref: str) -> Path:
+    """Resolve a bundle-relative ``plan_ref`` to a filesystem path.
+
+    Mirrors ``subgraph_strategy._repo_root`` so the lifter can read
+    inner plans at lift time without importing the strategy module
+    (avoids a circular import).
+    """
+    here = Path(__file__).resolve()
+    for parent in (here, *here.parents):
+        if (parent / "pyproject.toml").is_file() and (parent / "bundles").is_dir():
+            return parent / plan_ref
+    return Path.cwd() / plan_ref
 
 
 def _binding_from(value: object) -> BindingKind:
