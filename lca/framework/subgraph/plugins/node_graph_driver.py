@@ -176,6 +176,15 @@ class NodeGraphDriver:
             if spec.entry not in self._nodes_by_id:
                 raise ValueError(f"BundleGraphSpec[{spec.id!r}].entry {spec.entry!r} not in nodes")
             self._entry = spec.entry
+        # Set of node ids with at least one incoming edge in the spec.
+        # Used by the fan-in dispatch loop (run()) to skip nodes the
+        # topology has already placed on a path: those nodes must be
+        # reached via their declared predecessor's edge, not by
+        # stealing upstream ports from a sibling that also happens to
+        # satisfy the declared_inputs set (diamond conflict).
+        self._nodes_with_in_edge: frozenset[str] = frozenset(
+            e.target for e in spec.edges if e.target in self._nodes_by_id
+        )
 
     async def run(
         self,
@@ -297,12 +306,32 @@ class NodeGraphDriver:
                     current_id,
                     node.sub_spec_ref,
                 )
-                sub_state, sub_output = await sub_runner.run(
-                    ref=node.sub_spec_ref,
-                    outer_state=outer_state,
-                    channel=sub_channel,
-                    outer_input=dict(port_context._ports),
-                )
+                # Fire the host node's enter EPs before the inner subgraph
+                # runs so observation captures the act.dispatch start.
+                for ep_id in node.config.get("emit_on_enter", ()):
+                    emit_for_node(ep_id, outer_state)
+                try:
+                    sub_state, sub_output = await sub_runner.run(
+                        ref=node.sub_spec_ref,
+                        outer_state=outer_state,
+                        channel=sub_channel,
+                        outer_input=dict(port_context._ports),
+                    )
+                except BaseException:
+                    # Failure-aware end EPs only — mirror the failure
+                    # branch in ``_execute_with_emits`` (the host
+                    # ``act.dispatch`` node delegates to the inner
+                    # subgraph; on inner raise, the host's exit EPs
+                    # that take ``outcome="failure"`` still fire so
+                    # the observation surface is symmetric with the
+                    # non-sub_spec path).
+                    for ep_id in node.config.get("emit_on_exit", ()):
+                        if ep_id in _EP_FAILURE_AWARE:
+                            emit_for_node(ep_id, outer_state, outcome="failure")
+                    raise
+                # Success path: fire exit EPs.
+                for ep_id in node.config.get("emit_on_exit", ()):
+                    emit_for_node(ep_id, outer_state)
                 # mirror outer interpreter.py:402-414: absorb inner output
                 # into port_context so subsequent edge nodes see it.
                 sub_channel.absorb(sub_output)
@@ -377,7 +406,19 @@ class NodeGraphDriver:
                         output=output,
                     )
                     break
-                current_id = edge.target
+                # Mirror the post-non-sub-spec path: enqueue the
+                # edge target onto the ready queue so the next
+                # ``while ready:`` iteration picks it up. The non-sub-
+                # spec branch does this via ``_enqueue_if_ready``;
+                # this branch must do it explicitly because we
+                # bypassed the trailing enqueue block via ``continue``.
+                _enqueue_if_ready(
+                    edge.target,
+                    visited,
+                    ready,
+                    _declared_inputs_by_node,
+                    port_context._ports,
+                )
                 continue
             try:
                 executor = self._scope.resolve_factory(node.factory, node.region)
@@ -574,6 +615,14 @@ class NodeGraphDriver:
             # registry. This handles diamond-shaped subgraphs (e.g.
             # concept.decision.classify) where fan-in nodes have no edge
             # from the entry and would otherwise be skipped.
+            #
+            # The fan-in loop only enqueues nodes that have *no* incoming
+            # edge in the spec — nodes that do have an incoming edge must
+            # be reached via that edge's source, not by stealing its
+            # upstream's inputs. Skipping such nodes prevents a downstream
+            # node (e.g. act.envelope) from running before its declared
+            # predecessor (e.g. act.authorize) on a diamond with shared
+            # input ports.
             _enqueued_any = False
             if edge is not None:
                 _enqueue_if_ready(
@@ -588,6 +637,11 @@ class NodeGraphDriver:
                 if _nid in visited or _nid == current_id:
                     continue
                 if any(_nid == q for q in ready):
+                    continue
+                # Fan-in is reserved for nodes the spec declares as
+                # entry-orphaned (no incoming edge). Anything with an
+                # in-edge must travel through that edge's source.
+                if _nid in self._nodes_with_in_edge:
                     continue
                 _enqueue_if_ready(
                     _nid,
@@ -642,7 +696,13 @@ class NodeGraphDriver:
             out = await executor.node_execute(ctx, node_input)
         except BaseException:
             for ep_id in node.config.get("emit_on_exit", ()):
-                if ep_id == "reasoner_reason_end":
+                # Mirror success path's per-EP branching on the failure
+                # branch: EPs that take ``outcome="failure"`` get tagged,
+                # ``reasoner_meta`` does not fire (no successful render
+                # to project), everything else fires as-is. ``phase.tool.call.end``
+                # and ``body.tool.execute.end`` are part of the act-subgraph
+                # observation surface (ADR-0220 §3.3).
+                if ep_id in _EP_FAILURE_AWARE:
                     emit_for_node(ep_id, state, outcome="failure")
             raise
         for ep_id in node.config.get("emit_on_exit", ()):
@@ -654,6 +714,21 @@ class NodeGraphDriver:
             else:
                 emit_for_node(ep_id, state)
         return out
+
+
+# EPs whose ``emit_for_node`` helper accepts an ``outcome="failure"``
+# keyword. The driver tags failure-path emissions for these ids only;
+# other EPs fire verbatim on the exception branch (the observer
+# surface stays consistent with the contract that success-path emission
+# is what changed).
+_EP_FAILURE_AWARE: frozenset[str] = frozenset(
+    {
+        "reasoner_reason_end",
+        "body.tool.execute.end",
+        "phase.tool.call.end",
+        "phase.act.fold.end",
+    }
+)
 
 
 def _infer_phase_from_spec(spec: BundleGraphSpec) -> SemanticPhase:

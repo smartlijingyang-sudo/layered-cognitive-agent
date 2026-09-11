@@ -45,7 +45,12 @@ class ActAuthorizeExecutor:
 
     semantic_name: str = "act.authorize"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("decision", "state")
+    # ``state`` is optional (authorize reads ``state is not None`` and
+    # skips budget checks when state is absent). Declaring only the
+    # required input ``decision`` keeps the v2 driver's fan-in dispatch
+    # from blocking the chain when the outer drive did not supply an
+    # AgentState port.
+    declared_inputs: tuple[PortName, ...] = ("decision",)
     declared_outputs: tuple[PortName, ...] = ("decision",)
 
     async def node_execute(

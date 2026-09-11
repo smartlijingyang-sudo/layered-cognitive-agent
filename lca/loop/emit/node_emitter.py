@@ -13,10 +13,16 @@ from typing import Any
 
 from lca.contracts.models.core.state.state import AgentState
 from lca.infrastructure.session.emit.cognitive_emit import (
+    emit_body_tool_execute_end_for_state,
+    emit_body_tool_execute_start_for_state,
+    emit_phase_act_fold_end_for_state,
+    emit_phase_tool_call_end_for_state,
+    emit_phase_tool_call_start_for_state,
     emit_prompt_assembler_end_for_state,
     emit_prompt_assembler_start_for_state,
     emit_reasoner_reason_end_for_state,
     emit_reasoner_reason_start_for_state,
+    emit_think_gate_start_for_state,
 )
 
 _EP_DISPATCH: dict[str, Any] = {
@@ -25,6 +31,12 @@ _EP_DISPATCH: dict[str, Any] = {
     "reasoner_meta": None,
     "reasoner_reason_start": emit_reasoner_reason_start_for_state,
     "reasoner_reason_end": emit_reasoner_reason_end_for_state,
+    "think.gate.start": emit_think_gate_start_for_state,
+    "body.tool.execute.start": emit_body_tool_execute_start_for_state,
+    "body.tool.execute.end": emit_body_tool_execute_end_for_state,
+    "phase.tool.call.start": emit_phase_tool_call_start_for_state,
+    "phase.tool.call.end": emit_phase_tool_call_end_for_state,
+    "phase.act.fold.end": emit_phase_act_fold_end_for_state,
 }
 
 

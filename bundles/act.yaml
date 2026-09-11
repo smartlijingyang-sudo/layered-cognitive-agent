@@ -34,16 +34,16 @@ nodes:
     outputs: [decision]
     config:
       max_visits: 1
-      emit_on_enter: []
+      emit_on_enter: [phase.tool.call.start]
       emit_on_exit: []
 
   - id: act.authorize
     factory: act.authorize
-    inputs: [decision, state]
+    inputs: [decision]
     outputs: [decision]
     config:
       max_visits: 1
-      emit_on_enter: []
+      emit_on_enter: [think.gate.start]
       emit_on_exit: []
 
   - id: act.envelope
@@ -61,8 +61,8 @@ nodes:
     outputs: [receipt]
     config:
       max_visits: 1
-      emit_on_enter: []
-      emit_on_exit: []
+      emit_on_enter: [body.tool.execute.start]
+      emit_on_exit: [body.tool.execute.end]
       sub_spec_ref:
         plan_ref: bundles/concept/effect_execute.yaml
         entry_node: effect.execute
@@ -75,7 +75,7 @@ nodes:
     config:
       max_visits: 1
       emit_on_enter: []
-      emit_on_exit: []
+      emit_on_exit: [phase.tool.call.end, phase.act.fold.end]
 
 edges:
   - from: act.validate
