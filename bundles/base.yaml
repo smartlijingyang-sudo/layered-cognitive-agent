@@ -99,6 +99,34 @@ entries:
   name: phase_concept_tool_fork_dispatch
   $module: lca.plugins.concept.tool_fork.dispatch
   config: {}
+- id: phase.concept.role_snapshot.capability_role_normalize
+  name: phase_concept_role_snapshot_capability_role_normalize
+  $module: lca.plugins.concept.role_snapshot.normalize
+  config: {}
+- id: phase.concept.role_snapshot.capability_role_compose
+  name: phase_concept_role_snapshot_capability_role_compose
+  $module: lca.plugins.concept.role_snapshot.compose
+  config: {}
+- id: phase.concept.context_compose.context_lines_collect
+  name: phase_concept_context_compose_context_lines_collect
+  $module: lca.plugins.concept.context_compose.collect
+  config: {}
+- id: phase.concept.context_compose.context_skills_merge
+  name: phase_concept_context_compose_context_skills_merge
+  $module: lca.plugins.concept.context_compose.skills
+  config: {}
+- id: phase.concept.template_select.prompt_candidate_enumerate
+  name: phase_concept_template_select_prompt_candidate_enumerate
+  $module: lca.plugins.concept.template_select.enumerate
+  config: {}
+- id: phase.concept.template_select.prompt_candidate_score
+  name: phase_concept_template_select_prompt_candidate_score
+  $module: lca.plugins.concept.template_select.score
+  config: {}
+- id: phase.concept.template_select.prompt_candidate_pick
+  name: phase_concept_template_select_prompt_candidate_pick
+  $module: lca.plugins.concept.template_select.pick
+  config: {}
 - id: subgraph.runner
   name: subgraph_runner
   $module: lca.framework.subgraph.plugins.runner

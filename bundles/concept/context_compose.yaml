@@ -1,0 +1,33 @@
+# bundles/concept/context_compose.yaml — Layer 2 概念图
+# ADR-0220 §3.3 — ContextManifest + task + skills → ReasonerContext typed bundle.
+#
+# P3 骨架:2 节点 typed 纯变换。节点 id 全部以 context. 起首,与
+# §0.4 N9 action-domain 闭集一致。
+#
+# §3.3 每个概念图节点必须声明 inputs: + outputs: typed list。
+
+id: concept.context.compose
+region: concept
+purpose: ContextManifest + task + skills → ReasonerContext typed bundle
+
+nodes:
+  - id: context.lines.collect
+    factory: context.lines.collect
+    inputs: [state]
+    outputs: [manifest]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+  - id: context.skills.merge
+    factory: context.skills.merge
+    inputs: [manifest, task, state]
+    outputs: [context]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+
+edges:
+  - source: context.lines.collect
+    target: context.skills.merge

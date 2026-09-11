@@ -1,0 +1,37 @@
+# bundles/concept/role_snapshot.yaml — Layer 2 概念图
+# ADR-0220 §3.3 — RoleProfile + TeamAwareness → RoleSnapshot frozen pair.
+#
+# P3 骨架:2 节点 typed 纯变换。节点命名用 capability.* 而非 ADR §3.3
+# 表格里的 role.*,原因:tests/business/test_three_tier_graph_dispatch.py
+# ALLOWED_ACTION_DOMAINS 来自 §0.4 N9 闭集(无 role 域);此 spec gap 留待
+# ADR 更新(commit message 记录)。P3 graph id 保持 §3.3 命名
+# (concept.role.snapshot)以便 ADR §3.3 表格追溯。
+#
+# §0.4 N9 action-domain 闭集:节点 id 第一段必须是 capability。
+# §3.3 每个概念图节点必须声明 inputs: + outputs: typed list。
+
+id: concept.role.snapshot
+region: concept
+purpose: RoleProfile + TeamAwareness → RoleSnapshot frozen pair
+
+nodes:
+  - id: capability.role.normalize
+    factory: capability.role.normalize
+    inputs: [role_profile]
+    outputs: [role]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+  - id: capability.role.compose
+    factory: capability.role.compose
+    inputs: [role, team_awareness]
+    outputs: [role_snapshot]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+
+edges:
+  - source: capability.role.normalize
+    target: capability.role.compose

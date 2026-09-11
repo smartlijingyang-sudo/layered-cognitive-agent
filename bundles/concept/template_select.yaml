@@ -1,0 +1,48 @@
+# bundles/concept/template_select.yaml — Layer 2 概念图
+# ADR-0220 §3.3 — state + ReasonerContext → TemplateSelection typed bundle.
+#
+# P3 骨架:3 节点 typed 纯变换。节点命名用 prompt.* 而非 ADR §3.3 表格里
+# 的 template.*,原因:tests/business/test_three_tier_graph_dispatch.py
+# ALLOWED_ACTION_DOMAINS 来自 §0.4 N9 闭集(无 template 域);此 spec gap
+# 留待 ADR 更新(commit message 记录)。P3 graph id 保持 §3.3 命名
+# (concept.template.select)以便 ADR §3.3 表格追溯。真实 selector 逻辑
+# 在 P4/P5 由 PromptTemplateSelector provider 提供,P3 仅为 graph skeleton。
+#
+# §0.4 N9 action-domain 闭集:节点 id 第一段必须是 prompt。
+# §3.3 每个概念图节点必须声明 inputs: + outputs: typed list。
+
+id: concept.template.select
+region: concept
+purpose: state + ReasonerContext → TemplateSelection (template_id + variant + decision_path)
+
+nodes:
+  - id: prompt.candidate.enumerate
+    factory: prompt.candidate.enumerate
+    inputs: [state]
+    outputs: [candidates]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+  - id: prompt.candidate.score
+    factory: prompt.candidate.score
+    inputs: [candidates, state]
+    outputs: [scored]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+  - id: prompt.candidate.pick
+    factory: prompt.candidate.pick
+    inputs: [scored, state]
+    outputs: [template_selection]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+
+edges:
+  - source: prompt.candidate.enumerate
+    target: prompt.candidate.score
+  - source: prompt.candidate.score
+    target: prompt.candidate.pick
