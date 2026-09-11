@@ -68,8 +68,8 @@ class Decision:
 
     ADR-0220 §4.2: this DTO is the cross-graph boundary between
     ``concept.decision.classify`` / ``concept.decision.shortcut_try`` /
-    ``concept.decision.enforce`` (concept graphs) and ``business.reasoning.turn``
-    → ``business.action.turn``. ``frozen=True`` enforces the closed boundary;
+    ``concept.decision.enforce`` (concept graphs) and ``agent.reasoning.turn``
+    → ``agent.action.turn``. ``frozen=True`` enforces the closed boundary;
     the ``extra`` field is the explicitly-named bag for non-typed metadata
     that crosses this seam (no other unknown kwargs are accepted — dataclass
     constructor rejects them).
@@ -151,7 +151,7 @@ class Reflection:
 
     ADR-0220 §4.2: this DTO is the cross-graph boundary between
     ``concept.reflection.critique`` (concept graph) and
-    ``business.reflection.turn`` → ``business.memory.turn``. ``frozen=True``
+    ``agent.reflection.turn`` → ``agent.memory.turn``. ``frozen=True``
     enforces the closed boundary; ``extra`` is the explicitly-named bag.
     """
 

@@ -18,7 +18,7 @@ class EffectReceipt:
 
     ADR-0220 §4.2: this DTO is the cross-graph boundary between
     ``concept.effect.execute`` (concept graph) and
-    ``business.reflection.turn`` / ``business.memory.turn``. ``frozen=True``
+    ``agent.reflection.turn`` / ``agent.memory.turn``. ``frozen=True``
     enforces the closed boundary; the dataclass constructor rejects unknown
     kwargs (extra=forbid equivalent). All fields are explicitly named; the
     boundary contract is therefore: only the documented fields are accepted.

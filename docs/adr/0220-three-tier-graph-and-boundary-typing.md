@@ -2,7 +2,7 @@
 
 > **状态:** **Proposed — 2026-09-11**
 >
-> **一句话**: 把当前"图 = 代码分组"重构成"图 = 概念群"。把 LCA 图家族分为三层:**Layer 1 原语图** (`primitive.*`, 运行时原语) / **Layer 2 概念图** (`concept.*`, 可复用领域概念) / **Layer 3 业务图** (`business.*`, profile-specific 业务编排);每张图只做一件事,跨图通过 11 个 **boundary typed DTO** (`BindingsView` / `ForkedTools` / `RoleSnapshot` / `ReasonerContext` / `TemplateSelection` / `ReasonerTurnRender` / `Decision` / `EffectReceipt` / `Reflection` / `MemoryReceipt` / `StopPayload`) 显式互通。`PromptReasoner` 从 7 方法缩到 2 方法 (`render_turn` / `complete_turn`),`AgentState` 删除 `_file_store_ref` / `_sandbox_ref` / `_skill_store_ref` / `_machine_resolver_ref` / `_search_ref` 私有属性,seam 全部走 `RuntimePlane`;`reasoner_provider.setup` 的 `runtime().inject("tools")` 偷 inject 路径彻底删除。
+> **一句话**: 把当前"图 = 代码分组"重构成"图 = 概念群"。把 LCA 图家族分为三层:**Layer 1 原语图** (`primitive.*`, 运行时原语) / **Layer 2 概念图** (`concept.*`, 可复用领域概念) / **Layer 3 业务图** (`agent.*`, profile-specific 业务编排);每张图只做一件事,跨图通过 11 个 **boundary typed DTO** (`BindingsView` / `ForkedTools` / `RoleSnapshot` / `ReasonerContext` / `TemplateSelection` / `ReasonerTurnRender` / `Decision` / `EffectReceipt` / `Reflection` / `MemoryReceipt` / `StopPayload`) 显式互通。`PromptReasoner` 从 7 方法缩到 2 方法 (`render_turn` / `complete_turn`),`AgentState` 删除 `_file_store_ref` / `_sandbox_ref` / `_skill_store_ref` / `_machine_resolver_ref` / `_search_ref` 私有属性,seam 全部走 `RuntimePlane`;`reasoner_provider.setup` 的 `runtime().inject("tools")` 偷 inject 路径彻底删除。
 >
 > **触发**: 在 ADR-0217/0218/0219 落地后,`run_5b8c2a9f1e70` (`objective=ping`, H6) 虽 broken_hop=None,但 `PromptReasoner._resolve_tools` (reasoner.py:285-313) 仍反射读 6 个 state 私有属性,`PromptReasoner._legacy_*` (reasoner.py:472-533) 三个 legacy 方法 + `_legacy_templates` 私有 dict 仍持有;`reasoner_provider.setup` (reasoner_provider.py:113-126) 仍走 `runtime().inject("tools")` 偷 inject,绕过 Cordis manifest `requires=`。同一根因引发的现象链:
 >
@@ -19,13 +19,13 @@
 >
 > **Accepted 闸门:**
 >
-> 1. §3 三层图 schema (`primitive.*` / `concept.*` / `business.*`) 在 `bundles/` 下建立独立目录,`./scripts/lca-ops audit-plugin-shape` 把图层作为 `PluginKind` 一等公民登记
-> 2. §4 11 个 boundary typed DTO (`BindingsView` / `ForkedTools` / `RoleSnapshot` / `ReasonerContext` / `TemplateSelection` / `ReasonerTurnRender` / `Decision` / `EffectReceipt` / `Reflection` / `MemoryReceipt` / `StopPayload`) 在 `lca/contracts/models/cognition/boundary.py` 集中定义,全部 `model_config = ConfigDict(extra="forbid", frozen=True)` (`ReasonerBundle` 是 `business.reasoning.turn` 内部 4 DTO 聚合, 不算 boundary, 见 §5)
-> 3. §5 `business.reasoning.turn` 是 `bundles/business/reasoning_turn.yaml` 存在并通过 `tests/integration/think/test_business_reasoning_turn.py::test_e2e_with_prep_graph`
+> 1. §3 三层图 schema (`primitive.*` / `concept.*` / `agent.*`) 在 `bundles/` 下建立独立目录,`./scripts/lca-ops audit-plugin-shape` 把图层作为 `PluginKind` 一等公民登记
+> 2. §4 11 个 boundary typed DTO (`BindingsView` / `ForkedTools` / `RoleSnapshot` / `ReasonerContext` / `TemplateSelection` / `ReasonerTurnRender` / `Decision` / `EffectReceipt` / `Reflection` / `MemoryReceipt` / `StopPayload`) 在 `lca/contracts/models/cognition/boundary.py` 集中定义,全部 `model_config = ConfigDict(extra="forbid", frozen=True)` (`ReasonerBundle` 是 `agent.reasoning.turn` 内部 4 DTO 聚合, 不算 boundary, 见 §5)
+> 3. §5 `agent.reasoning.turn` 是 `bundles/agent/reasoning_turn.yaml` 存在并通过 `tests/integration/think/test_agent_reasoning_turn.py::test_e2e_with_prep_graph`
 > 4. §6 `PromptReasoner` 类只剩 `render_turn` / `complete_turn` 两个方法;`_tools_service` / `_resolve_tools` / `_legacy_select_template` / `_legacy_variables` / `_legacy_templates` 五个私有成员删除;`cognition/brain/reasoner/reasoner.py` ≤ 280 行 (当前 544 行)
 > 5. §7 `AgentState` 删除 `_file_store_ref` / `_sandbox_ref` / `_skill_store_ref` / `_machine_resolver_ref` / `_search_ref` 5 个私有属性;`reasoner.py` 中 `getattr(state, "_xxx_ref", None)` 调用全部归零
 > 6. §8 `reasoner_provider.setup` 删除 `runtime().inject("tools")` 偷 inject 路径;`bundles/base.yaml` 增加 `phase.think.reasoner.credentials` 和 `phase.think.reasoner.compose` 两个 plugin id,manifest 显式声明 `requires=("tools",)`
-> 7. §9 端到端:`./scripts/lca-ops runs create --user-text "ping" --wait --json` 跑通六语义 `perceive → think → act → reflect → remember → stop`,`broken_hop=None`;新路径走 `business.run.phase` 单业务图
+> 7. §9 端到端:`./scripts/lca-ops runs create --user-text "ping" --wait --json` 跑通六语义 `perceive → think → act → reflect → remember → stop`,`broken_hop=None`;新路径走 `agent.run.phase` 单业务图
 > 8. §10 既有测试全过:`tests/think/` + `tests/integration/think/` + `tests/harness/graph/execute/` 共 100+ 不退化;新增 `tests/business/test_three_tier_graph_dispatch.py` 验证原语图 / 概念图 / 业务图三层拓扑不交叉
 > 9. §11 零 `grep -rn "getattr(state, \"_\(file_store\|sandbox\|skill_store\|machine_resolver\|search\)_ref\"" lca/` = 0;零 `grep -rn "runtime().inject(" lca/plugins/` = 0;零 `grep -rn "self\._legacy_\(select_template\|variables\|templates\)" lca/` = 0
 
@@ -75,7 +75,7 @@
 
 | ID | 不变量 | 验证手段 |
 |---|---|---|
-| **N7** | 图分三层: `primitive.*` / `concept.*` / `business.*`; 任何图 bundle 路径必须匹配其中一个前缀 | `ls bundles/primitive*/ bundles/concept*/ bundles/business/` 各自存在; `find bundles -name "*.yaml" | grep -v "^bundles/\\(primitive\\|concept\\|business\\)/"` 第三方图只能放在子目录, 不允许顶级有图 |
+| **N7** | 图分三层: `primitive.*` / `concept.*` / `agent.*`; 任何图 bundle 路径必须匹配其中一个前缀 | `ls bundles/primitive*/ bundles/concept*/ bundles/agent/` 各自存在; `find bundles -name "*.yaml" | grep -v "^bundles/\\(primitive\\|concept\\|agent\\)/"` 第三方图只能放在子目录, 不允许顶级有图 |
 | **N8** | boundary typed DTO 在 `contracts/models/cognition/boundary.py` 集中定义; 跨图输入输出必须走 boundary DTO, 不允许裸 `dict` / `Mapping` | `grep -rn "dict\\[str, Any\\]" lca/contracts/models/cognition/boundary.py` = 0; 全部 DTO `frozen=True` + `extra="forbid"` |
 | **N9** | 节点 id 命名: `<动作域>.<对象>.<细节>`, 第一层动作域在闭集内 (`tool.*` / `prompt.*` / `decision.*` / `gate.*` / `effect.*` / `context.*` / `skill.*` / `memory.*` / `state.*` / `observe.*` / `spine.*` / `capability.*` / `llm.*` / `shortcut.*` / `perceive.*` / `reflect.*` / `stop.*`); 禁词 `process` / `handle` / `manage` / `do_*` / `xxx_impl` / `xxx_helper` | `scripts/lca-ops audit-bundle-node-naming` 新增 (本 PR 加) |
 | **N10** | `PromptReasoner` 类只剩 `render_turn` / `complete_turn` 两个公开方法; 私有成员只允许 `llm` / `role_profile` / `assembler` / `selector` (4 个 boot-time singleton ref); 其他私有成员 (`_tools_service` / `_legacy_templates` / `_available_skills` / `tools` / `_resolve_tools` / `_select_template` / `_legacy_select_template` / `_legacy_variables` / `_template_section_names` / `_template_variant` / `_bind_reasoner_prompt` / `_reset_reasoner_prompt` / `_step_id_for_trace` / `_available_skills_count_hint` / `_legacy_variables` / `register_template` / `build_turn_plan` / `generate_thoughts`) 全部删除 | `reasoner.py` ≤ 280 行; `grep -n "def " lca/cognition/brain/reasoner/reasoner.py` = 4 (构造函数 + 2 公开 + 1 dunder) |
@@ -91,7 +91,7 @@
 | 第一性原理 | 图是纯变换拓扑, 节点是最小语义动作, 边是 typed DTO 流 — 重画图就是重画认知 |
 | 职责单一 | 三层图各做各的: 原语图做运行时原语, 概念图做领域概念, 业务图做业务编排; 一张图一个职责 |
 | 模块化 | 节点不持上下文; capability 走 RuntimePlane, 不走 state 私有属性; business 图只引用 concept/primitive 图, 不写节点 |
-| 边界清晰 | 11 个 boundary typed DTO (`BindingsView` / `ForkedTools` / `RoleSnapshot` / `ReasonerContext` / `TemplateSelection` / `ReasonerTurnRender` / `Decision` / `EffectReceipt` / `Reflection` / `MemoryReceipt` / `StopPayload`) 是跨图唯一通道; boundary 有名字有类型, 不裸 dict (`ReasonerBundle` 是 `business.reasoning.turn` 内部聚合, 不算 boundary) |
+| 边界清晰 | 11 个 boundary typed DTO (`BindingsView` / `ForkedTools` / `RoleSnapshot` / `ReasonerContext` / `TemplateSelection` / `ReasonerTurnRender` / `Decision` / `EffectReceipt` / `Reflection` / `MemoryReceipt` / `StopPayload`) 是跨图唯一通道; boundary 有名字有类型, 不裸 dict (`ReasonerBundle` 是 `agent.reasoning.turn` 内部聚合, 不算 boundary) |
 | 优雅 | typed 闭集替字符串字面 (`tool.fork.dispatch` 替代 `process_tool_fork`); 每个 boundary DTO 都有 D1/D2/D3/D4 四问 |
 | 不留临时代码 | 不引入 compat shim; 同 PR 删除 `_resolve_tools` / `_legacy_*` / `_tools_service` / `state._xxx_ref` / `runtime().inject("tools")` / `_strip_think_reason_complete` / `cognitive_emit.run_reasoner_generate_thoughts_with_spine_facts` duck-type 路径 |
 | 测试是设计的一部分 | 每张图必须有 e2e 测试; boundary DTO 必有 frozen + extra=forbid 契约测试 |
@@ -199,12 +199,12 @@ ctx.provide("reasoner", reasoner)
 `bundles/` 下建立三个子目录, 与 `bundles/base.yaml` 平级:
 - `bundles/primitive/<name>.yaml` — Layer 1 原语图 (运行时原语, LCA 框架维护)
 - `bundles/concept/<name>.yaml` — Layer 2 概念图 (领域概念, LCA 库维护)
-- `bundles/business/<name>.yaml` — Layer 3 业务图 (业务编排, profile 维护)
+- `bundles/agent/<name>.yaml` — Layer 3 业务图 (业务编排, profile 维护)
 
 每张图的 `id` 必须匹配:
 - 原语图: `primitive.<domain>.<verb>` (e.g. `primitive.llm.call`)
 - 概念图: `concept.<domain>.<verb>` (e.g. `concept.template.select`)
-- 业务图: `business.<domain>.<noun>` (e.g. `business.reasoning.turn`)
+- 业务图: `agent.<domain>.<noun>` (e.g. `agent.reasoning.turn`)
 
 `./scripts/lca-ops audit-bundle-node-naming` 新增 (本 PR 加), 校验三层前缀闭集 + 节点命名闭集 (`tool.*` / `prompt.*` / ...) + 禁词 (`process` / `handle` / `manage` / ...)。
 
@@ -218,24 +218,24 @@ ctx.provide("reasoner", reasoner)
 | `primitive.typed.transform` | 1 (`dto.map.apply`) | 纯 typed DTO 映射 (无 I/O) |
 
 **复用价值**:
-- `primitive.llm.call` 被 `business.reasoning.turn` (调一次) + `concept.reflection.critique` (调一次) 复用 — 当前两处复制 LLM 边界逻辑
+- `primitive.llm.call` 被 `agent.reasoning.turn` (调一次) + `concept.reflection.critique` (调一次) 复用 — 当前两处复制 LLM 边界逻辑
 - `primitive.capability.fork` 被 `concept.tool.fork` + `concept.memory.snapshot` (新) 复用 — 当前两处反射 `fork_for_run`
 
 ### 3.3 概念图清单 (Layer 2)
 
 | 图 id | 节点数 | 职责 | 消费的业务图 |
 |---|---|---|---|
-| `concept.tool.fork` | 3 (`tool.bindings.snapshot` / `tool.fork.dispatch` / `tool.shapes.normalize`) | ToolsService → ForkedTools | `business.reasoning.turn` |
-| `concept.role.snapshot` | 2 (`role.profile.normalize` / `role.awareness.compose`) | RoleProfile + team_awareness → RoleSnapshot | `business.reasoning.turn` |
-| `concept.context.compose` | 2 (`context.lines.collect` / `context.skills.merge`) | ContextManifest + task + skills → ReasonerContext | `business.reasoning.turn` |
-| `concept.template.select` | 3 (`template.candidate.enumerate` / `template.candidate.score` / `template.candidate.pick`) | state + ReasonerContext → TemplateSelection | `business.reasoning.turn` |
-| `concept.prompt.render` | 3 (`prompt.sections.assemble` / `prompt.sections.fill` / `prompt.trace.compile`) | ReasonerContext + TemplateSelection + RoleSnapshot → ReasonerTurnRender | `business.reasoning.turn` |
-| `concept.decision.classify` | 3 (`decision.parse.tool_calls` / `decision.parse.intent` / `decision.compose.action`) | LLMResponse + ReasonerContext → Decision | `business.reasoning.turn` |
-| `concept.decision.enforce` | 2 (`gate.chain.run` / `gate.chain.reject`) | candidate Decision + gate chain → enforced Decision | `business.reasoning.turn` |
-| `concept.decision.shortcut_try` | 1 (`shortcut.try`) | state → Decision \| None | `business.reasoning.shortcut` |
-| `concept.reflection.critique` | 2 (`reflect.observation.build` / `reflect.critique.run`) | EffectReceipt → Reflection | `business.reflection.turn` |
-| `concept.memory.write` | 2 (`memory.admit.policy` / `memory.write.dispatch`) | Reflection → MemoryReceipt | `business.memory.turn` |
-| `concept.stop.should_check` | 2 (`stop.should.decide` / `stop.focus.converge`) | state + governance → StopPayload | `business.stop.turn` |
+| `concept.tool.fork` | 3 (`tool.bindings.snapshot` / `tool.fork.dispatch` / `tool.shapes.normalize`) | ToolsService → ForkedTools | `agent.reasoning.turn` |
+| `concept.role.snapshot` | 2 (`role.profile.normalize` / `role.awareness.compose`) | RoleProfile + team_awareness → RoleSnapshot | `agent.reasoning.turn` |
+| `concept.context.compose` | 2 (`context.lines.collect` / `context.skills.merge`) | ContextManifest + task + skills → ReasonerContext | `agent.reasoning.turn` |
+| `concept.template.select` | 3 (`template.candidate.enumerate` / `template.candidate.score` / `template.candidate.pick`) | state + ReasonerContext → TemplateSelection | `agent.reasoning.turn` |
+| `concept.prompt.render` | 3 (`prompt.sections.assemble` / `prompt.sections.fill` / `prompt.trace.compile`) | ReasonerContext + TemplateSelection + RoleSnapshot → ReasonerTurnRender | `agent.reasoning.turn` |
+| `concept.decision.classify` | 3 (`decision.parse.tool_calls` / `decision.parse.intent` / `decision.compose.action`) | LLMResponse + ReasonerContext → Decision | `agent.reasoning.turn` |
+| `concept.decision.enforce` | 2 (`gate.chain.run` / `gate.chain.reject`) | candidate Decision + gate chain → enforced Decision | `agent.reasoning.turn` |
+| `concept.decision.shortcut_try` | 1 (`shortcut.try`) | state → Decision \| None | `agent.reasoning.shortcut` |
+| `concept.reflection.critique` | 2 (`reflect.observation.build` / `reflect.critique.run`) | EffectReceipt → Reflection | `agent.reflection.turn` |
+| `concept.memory.write` | 2 (`memory.admit.policy` / `memory.write.dispatch`) | Reflection → MemoryReceipt | `agent.memory.turn` |
+| `concept.stop.should_check` | 2 (`stop.should.decide` / `stop.focus.converge`) | state + governance → StopPayload | `agent.stop.turn` |
 
 **关键**:
 - 节点 id 第一层动作域必须落在闭集 (§0.4 N9)
@@ -246,19 +246,19 @@ ctx.provide("reasoner", reasoner)
 
 | 图 id | 节点数 | 职责 |
 |---|---|---|
-| `business.perceive.turn` | 4 (`perceive.input.collect` / `perceive.sensor.run` / `perceive.observation.fold` / `perceive.manifest.compose`) | run_input + memory → ContextManifest |
-| `business.reasoning.turn` | 8 (`reason.prepare.tools` / `reason.prepare.role` / `reason.prepare.context` / `reason.prepare.template` / `reason.render.prompt` / `reason.llm.call` / `reason.classify.response` / `reason.gate.enforce`) | 8 个概念/原语图引用 → Decision |
-| `business.reasoning.shortcut` | 1 (`shortcut.try`) | 概念图引用 → Decision (无 LLM) |
-| `business.action.turn` | 3 (`act.action.resolve` / `act.capability.grant` / `act.effect.execute`) | Decision → EffectReceipt |
-| `business.reflection.turn` | 1 (`reflect.critique.run`) | EffectReceipt → Reflection |
-| `business.memory.turn` | 1 (`memory.write.dispatch`) | Reflection → MemoryReceipt |
-| `business.stop.turn` | 1 (`stop.should.decide`) | state + governance → StopPayload |
-| `business.run.phase` | 7 (`perceive.turn` / `reason.turn` / `act.turn` / `reflect.turn` / `remember.turn` / `stop.decide` / `loop.back`) | 6 phase + 1 loop back 边, 一次完整 run |
+| `agent.perceive.turn` | 4 (`perceive.input.collect` / `perceive.sensor.run` / `perceive.observation.fold` / `perceive.manifest.compose`) | run_input + memory → ContextManifest |
+| `agent.reasoning.turn` | 8 (`reason.prepare.tools` / `reason.prepare.role` / `reason.prepare.context` / `reason.prepare.template` / `reason.render.prompt` / `reason.llm.call` / `reason.classify.response` / `reason.gate.enforce`) | 8 个概念/原语图引用 → Decision |
+| `agent.reasoning.shortcut` | 1 (`shortcut.try`) | 概念图引用 → Decision (无 LLM) |
+| `agent.action.turn` | 3 (`act.action.resolve` / `act.capability.grant` / `act.effect.execute`) | Decision → EffectReceipt |
+| `agent.reflection.turn` | 1 (`reflect.critique.run`) | EffectReceipt → Reflection |
+| `agent.memory.turn` | 1 (`memory.write.dispatch`) | Reflection → MemoryReceipt |
+| `agent.stop.turn` | 1 (`stop.should.decide`) | state + governance → StopPayload |
+| `agent.run.phase` | 7 (`perceive.turn` / `reason.turn` / `act.turn` / `reflect.turn` / `remember.turn` / `stop.decide` / `loop.back`) | 6 phase + 1 loop back 边, 一次完整 run |
 
 **关键**:
 - 业务图节点 = `ref: <graph_id>` 引用, 不写实现
-- `business.run.phase` 是顶层 phase 图, `interpreter` 只跑这一张图, 完全不知道 `think` / `act` 字面 (强化 ADR-0219 N1)
-- profile 换业务 = 换 `business.run.phase` 引用的子图, 不动 `business.run.phase` 拓扑
+- `agent.run.phase` 是顶层 phase 图, `interpreter` 只跑这一张图, 完全不知道 `think` / `act` 字面 (强化 ADR-0219 N1)
+- profile 换业务 = 换 `agent.run.phase` 引用的子图, 不动 `agent.run.phase` 拓扑
 
 ### 3.5 delete-when
 
@@ -369,16 +369,16 @@ class ReasonerBundle(BaseModel):
 
 ---
 
-## 5. `business.reasoning.turn` 业务图
+## 5. `agent.reasoning.turn` 业务图
 
 ### 5.1 决定
 
-`bundles/business/reasoning_turn.yaml` 是核心业务图, 组合 8 个概念/原语图:
+`bundles/agent/reasoning_turn.yaml` 是核心业务图, 组合 8 个概念/原语图:
 
 ```yaml
-# bundles/business/reasoning_turn.yaml
-id: business.reasoning.turn
-region: business
+# bundles/agent/reasoning_turn.yaml
+id: agent.reasoning.turn
+region: agent
 purpose: 一个 turn 的认知流 — 准备 4 DTO → 渲染 → 调 LLM → 分类 → gate
 
 inputs:
@@ -429,9 +429,9 @@ outputs:
 - 4 个 prep 节点 fan-out 可并行 (driver 实现负责, 不在本 ADR 范围)
 - tools 同时流向 `reason.render.prompt` (供 prompt 渲染时知道 tools 数量) 和 `reason.llm.call` (供 LLM 调用)
 
-### 5.3 与 `business.run.phase` 的关系
+### 5.3 与 `agent.run.phase` 的关系
 
-`business.run.phase` 的 `reason.turn` 节点 = `subgraph_ref:` 指向 `business.reasoning.turn`, 沿用 ADR-0218 的 v2 subgraph driver。
+`agent.run.phase` 的 `reason.turn` 节点 = `subgraph_ref:` 指向 `agent.reasoning.turn`, 沿用 ADR-0218 的 v2 subgraph driver。
 
 ### 5.4 delete-when
 
@@ -540,7 +540,7 @@ class AgentState(BaseModel):
 
 ### 7.3 `BindingsView` 来源
 
-`BindingsView` 由 `RuntimePlane.current_bindings()` 在每 turn 暴露, 由 `business.run.phase` 的 `bindings` port 注入到 `business.reasoning.turn`, 再由 `business.reasoning.turn` 注入到 `concept.tool.fork` 的 `bindings` input。
+`BindingsView` 由 `RuntimePlane.current_bindings()` 在每 turn 暴露, 由 `agent.run.phase` 的 `bindings` port 注入到 `agent.reasoning.turn`, 再由 `agent.reasoning.turn` 注入到 `concept.tool.fork` 的 `bindings` input。
 
 ### 7.4 delete-when
 
@@ -614,7 +614,7 @@ entries:
 
 ### 9.2 新增验证
 
-- `tests/integration/think/test_business_reasoning_turn.py::test_e2e_with_prep_graph` — `business.reasoning.turn` 完整 e2e
+- `tests/integration/think/test_agent_reasoning_turn.py::test_e2e_with_prep_graph` — `agent.reasoning.turn` 完整 e2e
 - `tests/business/test_three_tier_graph_dispatch.py` — 三层图 dispatch 不交叉 (原语图不被业务图直接写, 概念图不被业务图写实现, 业务图只 `ref:`)
 - `tests/contracts/test_boundary_dto_frozen.py` — 11 个 boundary DTO 全部 `frozen=True` + `extra="forbid"` 契约测试
 - `tests/contracts/test_no_state_reflection.py` — `grep -rn "getattr(state, \"_" lca/ = 0`
@@ -633,7 +633,7 @@ entries:
 | **新增** | — | `tests/business/test_three_tier_graph_dispatch.py` (~8 个) |
 | **新增** | — | `tests/contracts/test_boundary_dto_frozen.py` (~12 个) |
 | **新增** | — | `tests/contracts/test_no_state_reflection.py` (~3 个) |
-| **新增** | — | `tests/integration/think/test_business_reasoning_turn.py::test_e2e_with_prep_graph` (~4 个) |
+| **新增** | — | `tests/integration/think/test_agent_reasoning_turn.py::test_e2e_with_prep_graph` (~4 个) |
 
 **总测试数**: 现有 63 个不退化 + 新增 ~27 个 = ~90 个.
 
@@ -647,12 +647,12 @@ entries:
 | **P2** | `bundles/primitive/` + `primitive.capability.fork` + `primitive.llm.call` 骨架 (impl 留 stub); `bundles/concept/` 目录 + `concept.tool.fork` 节点 (impl 走 `ToolsService.fork_for_run(BindingsView)` 新签名); 修改 `tools.py:73-89` `fork_for_run(bindings: BindingsView)` | +~450 / -~30 | 低 | `tests/primitive/test_capability_fork.py` |
 | **P3** | `concept.role.snapshot` + `concept.context.compose` + `concept.template.select` 三张概念图 + `PromptTemplateSelector` provider | +~600 | 中 | `tests/concept/test_role_snapshot.py` + `test_context_compose.py` + `test_template_select.py` |
 | **P4** | `concept.prompt.render` + `PromptReasoner.render_turn` 改签名 `(context, template, role) -> ReasonerTurnRender`; `_bind_reasoner_prompt` 移到 `primitive.llm.call` 节点 impl | +~400 / -~80 | 中 | `tests/concept/test_prompt_render.py` |
-| **P5** | `business.reasoning.turn` + 8 个概念/原语图引用; 新建 `tests/integration/think/test_business_reasoning_turn.py`; 暂保留旧 `think.yaml` 不删 (compatibility 期内, profile 选 `business_run_v2` 走新路径) | +~300 | 中 | e2e |
-| **P6** | `concept.decision.classify` + `concept.decision.enforce`; `think.classify` + `think.gate` 节点改 `ref:` 引用; `business.reasoning.shortcut` | +~500 | 中 | e2e |
+| **P5** | `agent.reasoning.turn` + 8 个概念/原语图引用; 新建 `tests/integration/think/test_agent_reasoning_turn.py`; 暂保留旧 `think.yaml` 不删 (compatibility 期内, profile 选 `agent_run_v2` 走新路径) | +~300 | 中 | e2e |
+| **P6** | `concept.decision.classify` + `concept.decision.enforce`; `think.classify` + `think.gate` 节点改 `ref:` 引用; `agent.reasoning.shortcut` | +~500 | 中 | e2e |
 | **P7** | `AgentState` 删除 5 个 `_xxx_ref`; `reasoner.py` 删除 `_resolve_tools` + 6 行 `getattr(state, ...)` 反射; `BindingsView` 由 `RuntimePlane.current_bindings()` 在每 turn 暴露; 新增 `tests/contracts/test_no_state_reflection.py` | +~150 / -~80 | 中 | `grep` 校验 + 全套回归 |
-| **P8** | `business.perceive.turn` + `business.action.turn` + `business.reflection.turn` + `business.memory.turn` + `business.stop.turn` + `business.run.phase` (顶层 phase 图, 替换 `bundles/declarative-phase-graph.yaml` 的 `phase.topology.standard`); interpreter 升级跑 `business.run.phase` 单图 | +~700 / -~300 | 中 | 全套 e2e |
+| **P8** | `agent.perceive.turn` + `agent.action.turn` + `agent.reflection.turn` + `agent.memory.turn` + `agent.stop.turn` + `agent.run.phase` (顶层 phase 图, 替换 `bundles/declarative-phase-graph.yaml` 的 `phase.topology.standard`); interpreter 升级跑 `agent.run.phase` 单图 | +~700 / -~300 | 中 | 全套 e2e |
 | **P9** | `PromptReasoner` 类减肥到 2 方法 + 4 boot singleton; `lca/plugins/think/reasoner_provider.py` 拆为 `credentials.py` + `compose.py`; `bundles/base.yaml` 替换 plugin id; 删除 `_legacy_*` / `_resolve_tools` / `_tools_service` 全部; `_strip_think_reason_complete` (plan_lift.py:95-115) 删除 (Default reasoner 现在能正确实现 `complete_turn` 因为 tools 走 boundary) | -~250 / +~150 | 高 | 全套 e2e + 既有 `tests/think/` 21 个不退化 |
-| **P10** | 收尾: `cognitive_emit.run_reasoner_generate_thoughts_with_spine_facts` (cognitive_emit.py:380-432) duck-type 路径删除, 改走 `business.run.phase` 显式调度; `bundles/think.yaml` / `bundles/think_reason.yaml` / `bundles/declarative-phase-graph.yaml` 三个旧 bundle 删; `audit-bundle-node-naming` 脚本加进 `lca-ops` | -~250 / +~80 | 高(收尾) | 全套回归 + 既有 40 脚本门禁 |
+| **P10** | 收尾: `cognitive_emit.run_reasoner_generate_thoughts_with_spine_facts` (cognitive_emit.py:380-432) duck-type 路径删除, 改走 `agent.run.phase` 显式调度; `bundles/think.yaml` / `bundles/think_reason.yaml` / `bundles/declarative-phase-graph.yaml` 三个旧 bundle 删; `audit-bundle-node-naming` 脚本加进 `lca-ops` | -~250 / +~80 | 高(收尾) | 全套回归 + 既有 40 脚本门禁 |
 
 **预计 10 PR**, 每个 PR 一张图 / 一个 boundary DTO / 一个收口动作, 每个 PR diff ≤ 600 行, 每个 PR 必带 verify command + 回归测试。
 
@@ -667,11 +667,11 @@ P1 (boundary DTO)
  │           │
  │           └─► P4 (concept.prompt.render + PromptReasoner.render_turn 改签名)
  │                 │
- │                 └─► P5 (business.reasoning.turn)
+ │                 └─► P5 (agent.reasoning.turn)
  │                       │
  │                       └─► P6 (concept.decision.classify + concept.decision.enforce)
  │                             │
- │                             └─► P8 (其他业务图 + business.run.phase)
+ │                             └─► P8 (其他业务图 + agent.run.phase)
  │                                   │
  │                                   └─► P9 (PromptReasoner 减肥 + reasoner_provider 拆分)
  │                                         │
@@ -688,8 +688,8 @@ P7 (AgentState 删 ref) ─► P9 ─► P10
 | ADR | 本 ADR 与其的关系 |
 |---|---|
 | ADR-0217 Bundle Graph Schema v2 | ✅ 直接承接 — 用同样的 yaml schema 写更多图 |
-| ADR-0218 Bundle Graph v2 Subgraph Driver | ✅ 直接承接 — `subgraph_ref:` 用于 `business.run.phase` 的 phase 节点嵌入子图 |
-| ADR-0219 phase-graph unification | ✅ 强化 — interpreter 升级跑 `business.run.phase` 单图, 彻底不知道 `think` / `act` 字面 (强化 ADR-0219 N1); `RestrictedPhaseContext` 的 `Mapping[SemanticPhase, PhaseResult]` 改为 `Mapping[PhaseBoundaryName, BoundaryDTO]` (强化 ADR-0219 N3) |
+| ADR-0218 Bundle Graph v2 Subgraph Driver | ✅ 直接承接 — `subgraph_ref:` 用于 `agent.run.phase` 的 phase 节点嵌入子图 |
+| ADR-0219 phase-graph unification | ✅ 强化 — interpreter 升级跑 `agent.run.phase` 单图, 彻底不知道 `think` / `act` 字面 (强化 ADR-0219 N1); `RestrictedPhaseContext` 的 `Mapping[SemanticPhase, PhaseResult]` 改为 `Mapping[PhaseBoundaryName, BoundaryDTO]` (强化 ADR-0219 N3) |
 | ADR-0035 Solo/Member/Lead Reasoner | ✅ 不破 — Profile 选择层, 不动图结构 |
 | ADR-0075 默认 6 phase | ✅ 不破 — 6 phase 仍 6 phase, phase 现在是 "业务图" 而非 "plugin" |
 | ADR-0074 Control plane | ✅ 不破 — control plugins 仍存在, 挂在图节点的 control slot |
@@ -705,7 +705,7 @@ P7 (AgentState 删 ref) ─► P9 ─► P10
 | 风险 | 缓解 |
 |---|---|
 | `PromptReasoner` 缩到 2 方法破坏既有测试 (21 个 think 测试) | P9 同 PR 改测试 + 增加 boundary test; 跑 `./scripts/lca-ops notes-check` 校验不留 compat shim |
-| `business.run.phase` 替换 `phase.topology.standard` 破坏既有 profile | P8 同 PR 改 `bundles/declarative-phase-graph.yaml` 改为 `business_run_v2`; 老 profile 走 compat 期临时保留, P10 删 |
+| `agent.run.phase` 替换 `phase.topology.standard` 破坏既有 profile | P8 同 PR 改 `bundles/declarative-phase-graph.yaml` 改为 `agent_run_v2`; 老 profile 走 compat 期临时保留, P10 删 |
 | `ToolsService.fork_for_run(bindings: BindingsView)` 新签名破坏既有 `ToolFactory.bind(run: Any)` 实现 | P2 同 PR 改所有 `ToolFactory.bind` 实现接 `BindingsView`; 列 audit 清单 (lca/plugins/tools/*) |
 | `AgentState` 删 5 个 `_xxx_ref` 破坏既有反射读 | P7 同 PR grep 全代码库找到所有反射读, 全部改为走 `BindingsView` |
 | 图层 schema 增加 `PluginKind` 一等公民可能影响 `audit-plugin-shape` | P10 同 PR 改 `scripts/lca-ops` 加 `audit-bundle-node-naming` 子命令 |
@@ -719,12 +719,12 @@ P7 (AgentState 删 ref) ─► P9 ─► P10
 | 只删 `_resolve_tools` 但保留 `_legacy_*` fallback | 违反 C6 最小化, fallback 是 dead path, 删除才彻底 |
 | 保留 `state._xxx_ref` 但让 `PromptReasoner` 不反射读 | 违反 boundary discipline, state 仍是隐式 seam 容器, 下次还会有人反射读别的 ref |
 | 把 `ForkedTools.items` 写成 `list[Tool]` 而不是 `tuple[Tool, ...]` | tuple 是 frozen + hashable, 与 `extra="forbid"` 一致; list 可变, 与 frozen 矛盾 |
-| 把 `business.run.phase` 的 phase 节点写成 `sub_spec_ref:` 而不是 `subgraph_ref:` | ADR-0218 已经合并, subgraph_ref 是 v2 标准, sub_spec_ref 是 v1 兼容路径 |
+| 把 `agent.run.phase` 的 phase 节点写成 `sub_spec_ref:` 而不是 `subgraph_ref:` | ADR-0218 已经合并, subgraph_ref 是 v2 标准, sub_spec_ref 是 v1 兼容路径 |
 
 ### 13.3 Open questions (评审时讨论)
 
 1. `concept.role.snapshot` 是否需要分 `role.profile.normalize` 和 `role.awareness.compose` 两个节点, 还是合并成一个 `role.snapshot.compose`? 当前建议拆分 (G1 职责单一)
-2. `business.reasoning.turn` 的 prep 4 节点 fan-out 是否需要 driver 显式支持并行调度? 当前 driver 是顺序, fan-out 由 YAML 拓扑表达; 并行是 driver 优化, 不是本 ADR 范围
+2. `agent.reasoning.turn` 的 prep 4 节点 fan-out 是否需要 driver 显式支持并行调度? 当前 driver 是顺序, fan-out 由 YAML 拓扑表达; 并行是 driver 优化, 不是本 ADR 范围
 3. `primitive.llm.call` 是否需要支持 stream 输出? 当前 LLMResponse 是最终响应, stream 由 transport 层负责; 本 ADR 不破既有
 4. 11 个 boundary DTO 是否拆到独立文件 (`boundary_bindings.py` / `boundary_thinking.py` / ...) 还是集中一个 `boundary.py`? 当前建议集中, 但 DTO 多 (>20) 后拆
 
@@ -736,14 +736,14 @@ P7 (AgentState 删 ref) ─► P9 ─► P10
 
 ```bash
 # N7 三层图 schema
-find bundles -maxdepth 1 -name "*.yaml" | grep -v "^bundles/base.yaml$" | grep -v "^bundles/\(primitive\|concept\|business\)/"  # = 0
+find bundles -maxdepth 1 -name "*.yaml" | grep -v "^bundles/base.yaml$" | grep -v "^bundles/\(primitive\|concept\|agent\)/"  # = 0
 
 # N8 boundary typed DTO frozen
 grep -rn "dict\[str, Any\]" lca/contracts/models/cognition/boundary.py  # = 0
 grep -n "frozen=False\|extra=\"ignore\"" lca/contracts/models/cognition/boundary.py  # = 0
 
 # N9 节点命名闭集
-grep -rn "id: [a-z_]*\.process\b\|id: [a-z_]*\.handle\b\|id: [a-z_]*\.manage\b\|id: do_" bundles/primitive bundles/concept bundles/business  # = 0
+grep -rn "id: [a-z_]*\.process\b\|id: [a-z_]*\.handle\b\|id: [a-z_]*\.manage\b\|id: do_" bundles/primitive bundles/concept bundles/agent  # = 0
 
 # N10 PromptReasoner 类减肥
 grep -n "def " lca/cognition/brain/reasoner/reasoner.py  # = 4
@@ -769,7 +769,7 @@ grep -rn 'artifacts\["think"\]\|artifacts\.get("think")' lca/ plugins/  # = 0 (A
 
 ## 15. 一句话总结
 
-把 LCA 图家族从 "代码分组" 重构成 "概念群": **三层图 + 11 个 boundary typed DTO + PromptReasoner 减肥到 2 方法 + AgentState 不持 ref + reasoner_provider 拆分**。读 `bundles/business/reasoning_turn.yaml` 就理解一次认知 turn。10 个 PR, 每个 ≤ 600 行, 每个带 e2e + 回归。
+把 LCA 图家族从 "代码分组" 重构成 "概念群": **三层图 + 11 个 boundary typed DTO + PromptReasoner 减肥到 2 方法 + AgentState 不持 ref + reasoner_provider 拆分**。读 `bundles/agent/reasoning_turn.yaml` 就理解一次认知 turn。10 个 PR, 每个 ≤ 600 行, 每个带 e2e + 回归。
 
 ---
 
@@ -777,10 +777,10 @@ grep -rn 'artifacts\["think"\]\|artifacts\.get("think")' lca/ plugins/  # = 0 (A
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ Layer 3: business.*           (profile 维护, 业务编排)        │
-│   business.run.phase          (顶层, interpreter 跑这张)     │
-│     ├─ business.perceive.turn                                 │
-│     ├─ business.reasoning.turn ─┐                             │
+│ Layer 3: agent.*           (profile 维护, 业务编排)        │
+│   agent.run.phase          (顶层, interpreter 跑这张)     │
+│     ├─ agent.perceive.turn                                 │
+│     ├─ agent.reasoning.turn ─┐                             │
 │     │   ├─ reason.prepare.tools ─┤                             │
 │     │   │  └─► concept.tool.fork                               │
 │     │   │       └─► primitive.capability.fork                  │
@@ -791,10 +791,10 @@ grep -rn 'artifacts\["think"\]\|artifacts\.get("think")' lca/ plugins/  # = 0 (A
 │     │   ├─ reason.llm.call       ─► primitive.llm.call         │
 │     │   ├─ reason.classify.response► concept.decision.classify │
 │     │   └─ reason.gate.enforce   ─► concept.decision.enforce   │
-│     ├─ business.action.turn                                     │
-│     ├─ business.reflection.turn ─► concept.reflection.critique │
-│     ├─ business.memory.turn     ─► concept.memory.write        │
-│     └─ business.stop.turn       ─► concept.stop.should_check   │
+│     ├─ agent.action.turn                                     │
+│     ├─ agent.reflection.turn ─► concept.reflection.critique │
+│     ├─ agent.memory.turn     ─► concept.memory.write        │
+│     └─ agent.stop.turn       ─► concept.stop.should_check   │
 ├─────────────────────────────────────────────────────────────┤
 │ Layer 2: concept.*            (LCA 库维护, 领域概念复用)       │
 │   11 张概念图, 见 §3.3                                         │
@@ -818,15 +818,15 @@ grep -rn 'artifacts\["think"\]\|artifacts\.get("think")' lca/ plugins/  # = 0 (A
 
 | Boundary | 类型 | 生产者图 | 消费者图 |
 |---|---|---|---|
-| `BindingsView` | per-run bindings | `RuntimePlane.current_bindings()` | `business.reasoning.turn` / `concept.tool.fork` |
-| `ForkedTools` | per-run tool 列表 | `concept.tool.fork` | `business.reasoning.turn` → `primitive.llm.call` |
-| `RoleSnapshot` | role 冻结 | `concept.role.snapshot` | `business.reasoning.turn` → `concept.prompt.render` |
-| `ReasonerContext` | context 组合 | `concept.context.compose` | `business.reasoning.turn` → `concept.prompt.render` / `concept.template.select` |
-| `TemplateSelection` | 模板选择 | `concept.template.select` | `business.reasoning.turn` → `concept.prompt.render` |
-| `ReasonerBundle` | 4 DTO bundle | `business.reasoning.turn` prep 阶段 | `business.reasoning.turn` render 阶段 |
-| `ReasonerTurnRender` | 渲染结果 | `concept.prompt.render` | `business.reasoning.turn` → `primitive.llm.call` |
-| `Decision` | 决策 | `concept.decision.classify` / `concept.decision.shortcut_try` / `concept.decision.enforce` | `business.reasoning.turn` → `business.action.turn` |
-| `EffectReceipt` | 执行回执 | `concept.effect.execute` | `business.reflection.turn` |
-| `Reflection` | 反思 | `concept.reflection.critique` | `business.memory.turn` |
-| `MemoryReceipt` | 记忆回执 | `concept.memory.write` | `business.stop.turn` |
-| `StopPayload` | 终止载荷 | `concept.stop.should_check` | `business.run.phase` loop back 边 |
+| `BindingsView` | per-run bindings | `RuntimePlane.current_bindings()` | `agent.reasoning.turn` / `concept.tool.fork` |
+| `ForkedTools` | per-run tool 列表 | `concept.tool.fork` | `agent.reasoning.turn` → `primitive.llm.call` |
+| `RoleSnapshot` | role 冻结 | `concept.role.snapshot` | `agent.reasoning.turn` → `concept.prompt.render` |
+| `ReasonerContext` | context 组合 | `concept.context.compose` | `agent.reasoning.turn` → `concept.prompt.render` / `concept.template.select` |
+| `TemplateSelection` | 模板选择 | `concept.template.select` | `agent.reasoning.turn` → `concept.prompt.render` |
+| `ReasonerBundle` | 4 DTO bundle | `agent.reasoning.turn` prep 阶段 | `agent.reasoning.turn` render 阶段 |
+| `ReasonerTurnRender` | 渲染结果 | `concept.prompt.render` | `agent.reasoning.turn` → `primitive.llm.call` |
+| `Decision` | 决策 | `concept.decision.classify` / `concept.decision.shortcut_try` / `concept.decision.enforce` | `agent.reasoning.turn` → `agent.action.turn` |
+| `EffectReceipt` | 执行回执 | `concept.effect.execute` | `agent.reflection.turn` |
+| `Reflection` | 反思 | `concept.reflection.critique` | `agent.memory.turn` |
+| `MemoryReceipt` | 记忆回执 | `concept.memory.write` | `agent.stop.turn` |
+| `StopPayload` | 终止载荷 | `concept.stop.should_check` | `agent.run.phase` loop back 边 |

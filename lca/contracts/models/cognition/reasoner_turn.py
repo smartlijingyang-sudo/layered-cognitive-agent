@@ -35,7 +35,7 @@ class ReasonerTurnRender:
     """Post-render metadata for assembler end EPs and LLM invocation.
 
     ADR-0220 §4.2: this DTO is the cross-graph boundary between
-    ``concept.prompt.render`` (concept graph) and ``business.reasoning.turn``
+    ``concept.prompt.render`` (concept graph) and ``agent.reasoning.turn``
     → ``primitive.llm.call``. ``frozen=True`` enforces the closed boundary;
     the dataclass constructor rejects unknown kwargs (extra=forbid equivalent).
     All fields are documented; no surprise fields can sneak through.

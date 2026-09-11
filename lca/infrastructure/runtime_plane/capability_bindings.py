@@ -4,7 +4,7 @@ ADR-0220 §7.3 / §闸门 5: ``BindingsView`` is the typed per-run capability
 bag that replaces the legacy ``AgentState._xxx_ref`` private attributes.
 The ``RuntimePlane`` exposes a typed ContextVar ``current_bindings()``
 that the runtime loop entry point populates each turn; the graph
-layer (``business.run.phase`` / ``business.reasoning.turn`` /
+layer (``agent.run.phase`` / ``agent.reasoning.turn`` /
 ``concept.tool.fork``) reads it via this seam rather than reading
 ``AgentState`` private attributes.
 
@@ -97,7 +97,7 @@ def reset_capability_bindings(
 def current_bindings() -> BindingsViewBuilder | None:
     """Return the active per-turn ``BindingsViewBuilder``, or ``None``.
 
-    The graph layer (``business.run.phase`` entry, ``concept.tool.fork``
+    The graph layer (``agent.run.phase`` entry, ``concept.tool.fork``
     fallback) calls this when no upstream typed ``BindingsView`` has
     been wired. ``None`` means "no per-turn bindings registered" — the
     caller decides whether to fail loud or to skip.

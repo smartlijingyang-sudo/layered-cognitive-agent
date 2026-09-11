@@ -1,8 +1,8 @@
-"""End-to-end: business.reasoning.shortcut + think.classify/gate cutover (ADR-0220 §11 P6).
+"""End-to-end: agent.reasoning.shortcut + think.classify/gate cutover (ADR-0220 §11 P6).
 
 Verifies the P6 cutover:
 
-  - ``business.reasoning.shortcut`` graph (1 node ``shortcut.try`` →
+  - ``agent.reasoning.shortcut`` graph (1 node ``shortcut.try`` →
     ``concept.decision.shortcut_try``) parses cleanly and drives
     end-to-end with a stub SubgraphRunner that emits a pre-canned
     Decision.
@@ -49,7 +49,7 @@ from lca.harness.declarative.compile.subgraph_resolver import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-SHORTCUT_BUNDLE = "bundles/business/reasoning_shortcut.yaml"
+SHORTCUT_BUNDLE = "bundles/agent/reasoning_shortcut.yaml"
 THINK_BUNDLE = "bundles/think.yaml"
 
 
@@ -94,7 +94,7 @@ class _ShortcutSubRunner:
             output = PhaseOutput()
         channel.publish(
             producer_node=ref.binding_edge,
-            phase="business",
+            phase="agent",
             output=output,
         )
         return outer_state, output
@@ -115,13 +115,13 @@ class _StaticScope:
         return None
 
 
-class TestBusinessReasoningShortcutBundleTopology:
+class TestAgentReasoningShortcutBundleTopology:
     """§3.4 + §11 P6 acceptance: bundle structure invariants."""
 
     def test_bundle_yaml_resolves_to_single_node_no_edge_graph(self) -> None:
         spec = _load_bundle_graph_spec(SHORTCUT_BUNDLE)
-        assert spec.id == "business.reasoning.shortcut"
-        assert spec.region == "business"
+        assert spec.id == "agent.reasoning.shortcut"
+        assert spec.region == "agent"
         assert len(spec.nodes) == 1
         assert len(spec.edges) == 0
 
@@ -144,8 +144,8 @@ class TestBusinessReasoningShortcutBundleTopology:
         assert len(inner.nodes) == 1
 
 
-class TestBusinessReasoningShortcutE2E:
-    """End-to-end drive: business.reasoning.shortcut → typed Decision."""
+class TestAgentReasoningShortcutE2E:
+    """End-to-end drive: agent.reasoning.shortcut → typed Decision."""
 
     @pytest.mark.asyncio
     async def test_shortcut_returns_typed_decision_when_capability_hits(self) -> None:
@@ -175,7 +175,7 @@ class TestBusinessReasoningShortcutE2E:
             and getattr(out.decision, "decision_id", None) == "dec_shortcut_v2"
             for out in snap.values()
         ), (
-            f"ADR-0220 §3.4 violated: business.reasoning.shortcut must end with "
+            f"ADR-0220 §3.4 violated: agent.reasoning.shortcut must end with "
             f"the typed Decision emitted by shortcut.try. Published: {sorted(snap)}"
         )
 

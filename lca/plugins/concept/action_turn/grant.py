@@ -1,6 +1,6 @@
 """phase.concept.action_turn.act_capability_grant — typed capability grant.
 
-business.action.turn 内嵌节点 2 (``concept.action.turn``):typed
+agent.action.turn 内嵌节点 2 (``concept.action.turn``):typed
 ``Decision`` → ``Decision`` (passthrough, capability grant seam 留待
 后续 PR 接入 effect policy)。
 

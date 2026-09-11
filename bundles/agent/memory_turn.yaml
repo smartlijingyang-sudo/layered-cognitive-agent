@@ -1,4 +1,4 @@
-# bundles/business/memory_turn.yaml — Layer 3 业务图
+# bundles/agent/memory_turn.yaml — Layer 3 业务图
 # ADR-0220 §3.4 — Reflection + MemoryReceipt(admit) + Observation + state
 # → MemoryReceipt(written) typed boundary
 #
@@ -11,8 +11,8 @@
 #
 # delete-when: N/A(纯加法,P10 删 compat 旧 bundle)。
 
-id: business.memory.turn
-region: business
+id: agent.memory.turn
+region: agent
 purpose: Reflection + Observation + state → MemoryReceipt typed boundary (concept.memory.write delegation)
 
 inputs:
@@ -22,7 +22,7 @@ inputs:
 
 nodes:
   - id: memory.write.dispatch
-    factory: business.memory.ref
+    factory: agent.memory.ref
     inputs: [reflection, observation, state]
     outputs: [memory_receipt]
     config:

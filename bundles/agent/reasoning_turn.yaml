@@ -1,5 +1,5 @@
-# bundles/business/reasoning_turn.yaml — Layer 3 业务图
-# ADR-0220 §3.4 + §5 — business.reasoning.turn:8 个概念/原语图引用 →
+# bundles/agent/reasoning_turn.yaml — Layer 3 业务图
+# ADR-0220 §3.4 + §5 — agent.reasoning.turn:8 个概念/原语图引用 →
 # Decision。
 #
 # 一个 turn 的认知流 — 准备 4 DTO → 渲染 → 调 LLM → 分类 → gate。
@@ -24,8 +24,8 @@
 # delete-when: N/A(纯加法,profile 选 business_run_v2 时走本图;旧 think.yaml
 # 在 P10 之前共存)。
 
-id: business.reasoning.turn
-region: business
+id: agent.reasoning.turn
+region: agent
 purpose: 一个 turn 的认知流 — 准备 4 DTO → 渲染 → 调 LLM → 分类 → gate → Decision
 
 inputs:
@@ -39,7 +39,7 @@ inputs:
 nodes:
   # prep 阶段 — 4 个 DTO 准备节点并行 fan-out
   - id: reason.prepare.tools
-    factory: business.reasoning.ref
+    factory: agent.reasoning.ref
     inputs: [bindings]
     outputs: [forked_tools]
     config:
@@ -52,7 +52,7 @@ nodes:
         binding_edge: reason.prepare.tools
 
   - id: reason.prepare.role
-    factory: business.reasoning.ref
+    factory: agent.reasoning.ref
     inputs: [role_profile, team_awareness]
     outputs: [role_snapshot]
     config:
@@ -65,7 +65,7 @@ nodes:
         binding_edge: reason.prepare.role
 
   - id: reason.prepare.context
-    factory: business.reasoning.ref
+    factory: agent.reasoning.ref
     inputs: [manifest, task, activated_skills]
     outputs: [context]
     config:
@@ -78,7 +78,7 @@ nodes:
         binding_edge: reason.prepare.context
 
   - id: reason.prepare.template
-    factory: business.reasoning.ref
+    factory: agent.reasoning.ref
     inputs: [state, context]
     outputs: [template_selection]
     config:
@@ -92,7 +92,7 @@ nodes:
 
   # render 阶段
   - id: reason.render.prompt
-    factory: business.reasoning.ref
+    factory: agent.reasoning.ref
     inputs: [template_selection, context, role_snapshot]
     outputs: [render]
     config:
@@ -106,7 +106,7 @@ nodes:
 
   # LLM 阶段
   - id: reason.llm.call
-    factory: business.reasoning.ref
+    factory: agent.reasoning.ref
     inputs: [render, forked_tools, state]
     outputs: [response]
     config:
@@ -120,7 +120,7 @@ nodes:
 
   # 收尾阶段
   - id: reason.classify.response
-    factory: business.reasoning.ref
+    factory: agent.reasoning.ref
     inputs: [response]
     outputs: [decision]
     config:
@@ -133,7 +133,7 @@ nodes:
         binding_edge: reason.classify.response
 
   - id: reason.gate.enforce
-    factory: business.reasoning.ref
+    factory: agent.reasoning.ref
     inputs: [decision, state]
     outputs: [decision]
     config:

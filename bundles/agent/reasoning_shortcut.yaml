@@ -1,9 +1,9 @@
-# bundles/business/reasoning_shortcut.yaml — Layer 3 业务图
+# bundles/agent/reasoning_shortcut.yaml — Layer 3 业务图
 # ADR-0220 §3.4 — AgentState → Decision | None (无 LLM 快速路径)
 #
 # 单节点业务图,只引用 ``concept.decision.shortcut_try`` 一张概念图。无 LLM
 # 调用,纯确定性快速路径。命中 → Decision;未命中(None)→ driver 顺
-# edge 走到下游业务图(典型: ``business.reasoning.turn``)。
+# edge 走到下游业务图(典型: ``agent.reasoning.turn``)。
 #
 # §3.4 业务图节点 = `sub_spec_ref:` 引用另一个图,不写实现。NodeGraphDriver
 # 看到 `sub_spec_ref` 字段就把节点委派给 SubgraphRunner,跑到 inner 图结束
@@ -17,8 +17,8 @@
 #
 # delete-when: N/A(纯加法,profile 走业务图时按需引用;P10 删 compat 旧 bundle)。
 
-id: business.reasoning.shortcut
-region: business
+id: agent.reasoning.shortcut
+region: agent
 purpose: 无 LLM 快速路径 — AgentState → Decision | None
 
 inputs:
@@ -26,7 +26,7 @@ inputs:
 
 nodes:
   - id: shortcut.try
-    factory: business.reasoning.shortcut.ref
+    factory: agent.reasoning.shortcut.ref
     inputs: [state]
     outputs: [decision]
     config:

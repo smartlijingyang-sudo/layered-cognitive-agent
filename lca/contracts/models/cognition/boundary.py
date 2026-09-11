@@ -1,7 +1,7 @@
 """Boundary typed DTOs (ADR-0220 §4).
 
 Cross-graph transports between Layer 1 (primitive.*), Layer 2 (concept.*)
-and Layer 3 (business.*) graphs. Each DTO is closed under two contracts:
+and Layer 3 (agent.*) graphs. Each DTO is closed under two contracts:
 no surprise fields (``extra="forbid"``-equivalent) and no mutation
 downstream (``frozen=True``-equivalent). The 7 boundary DTOs that already
 existed as frozen dataclasses in their original modules (``Decision`` /
@@ -81,7 +81,7 @@ class MemoryReceipt(BaseModel):
 
 
 class StopPayload(BaseModel):
-    """Output of ``concept.stop.should_check`` → ``business.run.phase``.
+    """Output of ``concept.stop.should_check`` → ``agent.run.phase``.
 
     Carries the loop-back decision: whether the run should continue, the
     focused reason if it should stop, and the final-output reference
@@ -125,7 +125,7 @@ class RoleSnapshot(BaseModel):
 
 
 class ReasonerBundle(BaseModel):
-    """business.reasoning.turn 4-DTO internal bundle (NOT a cross-graph boundary)."""
+    """agent.reasoning.turn 4-DTO internal bundle (NOT a cross-graph boundary)."""
 
     model_config = ConfigDict(extra="forbid", frozen=True, arbitrary_types_allowed=True)
     tools: ForkedTools

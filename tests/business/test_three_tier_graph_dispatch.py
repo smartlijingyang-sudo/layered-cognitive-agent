@@ -25,7 +25,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 BUNDLES_DIR = REPO_ROOT / "bundles"
 PRIMITIVE_DIR = BUNDLES_DIR / "primitive"
 CONCEPT_DIR = BUNDLES_DIR / "concept"
-BUSINESS_DIR = BUNDLES_DIR / "business"
+AGENT_DIR = BUNDLES_DIR / "agent"
 
 # Baselines (§10 §闸门 3): legacy flat graph bundles that exist before the
 # three-tier migration lands. They are tolerated by
@@ -44,7 +44,7 @@ BASELINE_TOP_LEVEL_BUNDLES: frozenset[str] = frozenset(
 # ``phase.`` and ``think.`` are explicitly allowed for compat-era bundles
 # (§10 permits them to keep ids until P10 deletes the underlying files).
 THREE_TIER_PREFIXES: frozenset[str] = frozenset(
-    {"primitive.", "concept.", "business.", "phase.", "think."}
+    {"primitive.", "concept.", "agent.", "phase.", "think."}
 )
 
 # ADR-0220 §0.4 N9 closed-set of action domains. The audit script (P10)
@@ -68,7 +68,7 @@ ALLOWED_ACTION_DOMAINS: frozenset[str] = frozenset(
         "perceive",
         "reflect",
         "stop",
-        # ADR-0220 §3.4: business.reasoning.turn uses the ``reason.*``
+        # ADR-0220 §3.4: agent.reasoning.turn uses the ``reason.*``
         # domain namespace for its 8 subgraph-ref nodes (prep.{tools,
         # role, context, template} / render.prompt / llm.call /
         # classify.response / gate.enforce). The §0.4 N9 closed set is
@@ -76,19 +76,19 @@ ALLOWED_ACTION_DOMAINS: frozenset[str] = frozenset(
         # domain-specific prefixes whose actions are still composable
         # into the layer-2 vocabulary.
         "reason",
-        # ADR-0220 §3.4: business.action.turn + concept.action.turn use
+        # ADR-0220 §3.4: agent.action.turn + concept.action.turn use
         # the ``act.*`` domain namespace for the 3-node action sequence
         # (act.action.resolve / act.capability.grant / act.effect.execute).
         # Same spec-gap rationale as ``reason`` above: business graphs
         # layer on the §0.4 N9 closed set.
         "act",
-        # ADR-0220 §3.4: business.run.phase uses ``remember.turn`` as
+        # ADR-0220 §3.4: agent.run.phase uses ``remember.turn`` as
         # the memory-write phase node id (the §3.3 ``memory.*``
         # vocabulary describes the inner concept graph; ``remember.*``
         # is the business-graph phase alias that maps to
-        # business.memory.turn).
+        # agent.memory.turn).
         "remember",
-        # ADR-0220 §3.4: business.run.phase's terminator node is named
+        # ADR-0220 §3.4: agent.run.phase's terminator node is named
         # ``loop.back`` (the loop-back edge consumer). Loop control is
         # a top-level phase-graph concern, not a domain action — it
         # belongs to the business graph's outer topology rather than
@@ -140,7 +140,7 @@ def _load_graph_bundle(path: Path) -> dict | None:
 def _all_graph_bundles() -> list[tuple[Path, dict]]:
     """Yield ``(path, parsed_dict)`` for every bundle that looks like a graph."""
     out: list[tuple[Path, dict]] = []
-    for directory in (PRIMITIVE_DIR, CONCEPT_DIR, BUSINESS_DIR, BUNDLES_DIR):
+    for directory in (PRIMITIVE_DIR, CONCEPT_DIR, AGENT_DIR, BUNDLES_DIR):
         for path in _list_yaml_files(directory):
             parsed = _load_graph_bundle(path)
             if parsed is not None:
@@ -172,7 +172,7 @@ class TestTopLevelBundlesLayout:
         ]
         assert not graph_offenders, (
             "ADR-0220 §3 violated: legacy graph bundles still at top level. "
-            "Move them under primitive/concept/business/. Files:\n"
+            "Move them under primitive/concept/agent/. Files:\n"
             + "\n".join(sorted(graph_offenders))
         )
 
@@ -191,7 +191,7 @@ class TestTopLevelBundlesLayout:
             for name, directory in (
                 ("primitive", PRIMITIVE_DIR),
                 ("concept", CONCEPT_DIR),
-                ("business", BUSINESS_DIR),
+                ("agent", AGENT_DIR),
             )
             if not directory.is_dir()
         ]
@@ -205,7 +205,7 @@ class TestTopLevelBundlesLayout:
     )
     def test_no_three_tier_violations_in_existing_bundles(self) -> None:
         """After P5/P8, every top-level YAML not in baseline must be a
-        layer-tagged graph bundle (under primitive/concept/business/).
+        layer-tagged graph bundle (under primitive/concept/agent/).
 
         Today there are flat compat-era graph bundles (``think.yaml``,
         ``think_reason.yaml``) tolerated by the baseline list. The
@@ -221,7 +221,7 @@ class TestTopLevelBundlesLayout:
         ]
         assert not graph_files, (
             "ADR-0220 §3.1: legacy graph bundles still at top level. "
-            "Move them under primitive/concept/business/. Files:\n" + "\n".join(sorted(graph_files))
+            "Move them under primitive/concept/agent/. Files:\n" + "\n".join(sorted(graph_files))
         )
 
 
@@ -266,18 +266,18 @@ class TestBusinessGraphReferenceOnly:
 
     @pytest.mark.xfail(
         strict=False,
-        reason="ADR-0220 Proposed — bundles/business/ not yet populated (P5/P8)",
+        reason="ADR-0220 Proposed — bundles/agent/ not yet populated (P5/P8)",
     )
     def test_business_graph_nodes_only_reference_other_graphs(self) -> None:
         """Each business-graph node must be a ``ref:`` to another graph id."""
-        if not BUSINESS_DIR.is_dir():
-            pytest.skip("bundles/business/ not yet created (P5/P8)")
+        if not AGENT_DIR.is_dir():
+            pytest.skip("bundles/agent/ not yet created (P5/P8)")
         graph_ids = {
             parsed.get("id")
             for _, parsed in _all_graph_bundles()
             if isinstance(parsed.get("id"), str)
         }
-        for path in _list_yaml_files(BUSINESS_DIR):
+        for path in _list_yaml_files(AGENT_DIR):
             parsed = _load_graph_bundle(path)
             if parsed is None:
                 continue

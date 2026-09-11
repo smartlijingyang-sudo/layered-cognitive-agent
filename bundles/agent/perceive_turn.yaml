@@ -1,4 +1,4 @@
-# bundles/business/perceive_turn.yaml — Layer 3 业务图
+# bundles/agent/perceive_turn.yaml — Layer 3 业务图
 # ADR-0220 §3.4 — run_input + memory → ContextManifest (4-node perceive
 # 序列封装在 ``concept.perceive.turn`` 内)。
 #
@@ -14,8 +14,8 @@
 #
 # delete-when: N/A(纯加法,P10 删 compat 旧 bundle)。
 
-id: business.perceive.turn
-region: business
+id: agent.perceive.turn
+region: agent
 purpose: run_input + state → ContextManifest typed boundary (concept.perceive.turn delegation)
 
 inputs:
@@ -24,7 +24,7 @@ inputs:
 
 nodes:
   - id: perceive.manifest.compose
-    factory: business.perceive.ref
+    factory: agent.perceive.ref
     inputs: [run_input, state]
     outputs: [manifest]
     config:

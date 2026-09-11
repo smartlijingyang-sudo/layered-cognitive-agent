@@ -1,8 +1,8 @@
-"""End-to-end: business.run.phase graph (ADR-0220 §11 P8).
+"""End-to-end: agent.run.phase graph (ADR-0220 §11 P8).
 
 Verifies the top-level phase graph:
 
-  - parses cleanly from ``bundles/business/run_phase.yaml``
+  - parses cleanly from ``bundles/agent/run_phase.yaml``
   - has 7 nodes + 6 edges (6 phase + loop.back)
   - every sub_spec_ref points to a loadable bundle
   - drives end-to-end through NodeGraphDriver with a stub SubgraphRunner
@@ -15,7 +15,7 @@ P10 deletes the compat path.
 
 This test asserts the bundle shape + an end-to-end drive, but does
 not depend on the production interpreter being upgraded to drive
-``business.run.phase`` as the top-level graph (that's part of the
+``agent.run.phase`` as the top-level graph (that's part of the
 P8 deliverable but lives behind the runtime entry point — not
 exercised in this e2e).
 """
@@ -67,7 +67,7 @@ from lca.harness.declarative.compile.subgraph_resolver import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-RUN_PHASE_BUNDLE = "bundles/business/run_phase.yaml"
+RUN_PHASE_BUNDLE = "bundles/agent/run_phase.yaml"
 
 
 def _state() -> AgentState:
@@ -165,7 +165,7 @@ class _RunPhaseSubRunner:
             return outer_state, PhaseOutput()
         channel.publish(
             producer_node=ref.binding_edge,
-            phase="business",
+            phase="agent",
             output=output,
         )
         return outer_state, output
@@ -189,15 +189,15 @@ class TestRunPhaseBundleTopology:
 
     def test_bundle_yaml_resolves_to_seven_node_six_edge_graph(self) -> None:
         spec = _load_bundle_graph_spec(RUN_PHASE_BUNDLE)
-        assert spec.id == "business.run.phase"
-        assert spec.region == "business"
+        assert spec.id == "agent.run.phase"
+        assert spec.region == "agent"
         assert len(spec.nodes) == 7
         assert len(spec.edges) == 6
 
     def test_six_phase_nodes_are_sub_spec_ref_delegates(self) -> None:
         """The 6 phase nodes (perceive / reason / act / reflect /
         remember / stop) all use sub_spec_ref to delegate to a
-        business.<phase>.turn graph. Only ``loop.back`` is inline.
+        agent.<phase>.turn graph. Only ``loop.back`` is inline.
         """
         spec = _load_bundle_graph_spec(RUN_PHASE_BUNDLE)
         phase_ids = {
@@ -213,9 +213,9 @@ class TestRunPhaseBundleTopology:
         for node in phase_nodes:
             assert isinstance(node, BundleGraphNode)
             assert node.sub_spec_ref is not None, (
-                f"ADR-0220 §3.4 violated: business.run.phase node {node.id!r} missing sub_spec_ref."
+                f"ADR-0220 §3.4 violated: agent.run.phase node {node.id!r} missing sub_spec_ref."
             )
-            assert node.sub_spec_ref.plan_ref.startswith("bundles/business/"), node
+            assert node.sub_spec_ref.plan_ref.startswith("bundles/agent/"), node
             assert node.sub_spec_ref.binding_edge == node.id
 
     def test_loop_back_is_inline_passthrough(self) -> None:
@@ -263,7 +263,7 @@ class TestRunPhaseBundleTopology:
 
 
 class TestRunPhaseE2E:
-    """End-to-end drive: business.run.phase walks all 7 nodes."""
+    """End-to-end drive: agent.run.phase walks all 7 nodes."""
 
     @pytest.mark.asyncio
     async def test_run_phase_drives_through_seven_nodes(self) -> None:

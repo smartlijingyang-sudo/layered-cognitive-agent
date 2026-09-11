@@ -1,6 +1,6 @@
-"""phase.business.run.phase.loop — typed StopPayload loop-back node.
+"""phase.agent.run.phase.loop — typed StopPayload loop-back node.
 
-``business.run.phase`` 顶层 phase 图的 loop-back 节点:typed
+``agent.run.phase`` 顶层 phase 图的 loop-back 节点:typed
 ``StopPayload`` 透传(typed passthrough)。
 
 语义:driver 走到 ``loop.back`` 后,检查 ``stop_payload.should_stop`` —
@@ -43,10 +43,10 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 @dataclass(frozen=True, slots=True)
 class RunPhaseLoopExecutor:
-    """``business.run.phase`` 顶层 loop-back 节点:StopPayload → StopPayload。"""
+    """``agent.run.phase`` 顶层 loop-back 节点:StopPayload → StopPayload。"""
 
     semantic_name: str = "loop.back"
-    region: str = "business"
+    region: str = "agent"
     declared_inputs: tuple[PortName, ...] = ("stop_payload",)
     declared_outputs: tuple[PortName, ...] = ("stop_payload",)
 
@@ -71,9 +71,9 @@ class RunPhaseLoopExecutor:
 
 
 @plugin(
-    id="phase.business.run.phase.loop",
+    id="phase.agent.run.phase.loop",
     Config=None,
-    provides=("business::loop.back",),
+    provides=("agent::loop.back",),
     requires=(),
     layer="L3",
     kind=PluginKind.PRIMITIVE,

@@ -1,12 +1,12 @@
 """phase.concept.action_turn.act_action_resolve — typed action resolver.
 
-business.action.turn 内嵌节点 1 (``concept.action.turn``):typed
+agent.action.turn 内嵌节点 1 (``concept.action.turn``):typed
 ``Decision`` → ``Decision`` (no-op projection, owned by this concept
 graph because ADR-0220 §3.4 names it as a business-graph node).
 
 ``act.action.resolve`` 的语义在 P5/P6 已经在 ``concept.decision.classify``
 + ``concept.decision.enforce`` 两图完成(P6 切掉 think.classify +
-think.gate)。这里把它在 ``business.action.turn`` 视作 typed projection:
+think.gate)。这里把它在 ``agent.action.turn`` 视作 typed projection:
 入参 Decision 已经过 enforce,出参直接透传,占位 ``resolve`` 节点。
 """
 

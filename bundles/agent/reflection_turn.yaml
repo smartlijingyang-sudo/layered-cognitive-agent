@@ -1,4 +1,4 @@
-# bundles/business/reflection_turn.yaml — Layer 3 业务图
+# bundles/agent/reflection_turn.yaml — Layer 3 业务图
 # ADR-0220 §3.4 — EffectReceipt → Reflection (无 LLM 错误反查)
 #
 # 单节点业务图,只引用 ``concept.reflection.critique``。节点名
@@ -15,8 +15,8 @@
 #
 # delete-when: N/A(纯加法,P10 删 compat 旧 bundle)。
 
-id: business.reflection.turn
-region: business
+id: agent.reflection.turn
+region: agent
 purpose: EffectReceipt → Reflection typed boundary (concept.reflection.critique delegation)
 
 inputs:
@@ -25,7 +25,7 @@ inputs:
 
 nodes:
   - id: reflect.critique.run
-    factory: business.reflection.ref
+    factory: agent.reflection.ref
     inputs: [receipt, state]
     outputs: [reflection]
     config:

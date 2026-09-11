@@ -5,7 +5,7 @@ think.reason inner_graph 第 2 节点 plugin:把 compat-era ``(state, plan)``
 ``(context, template, role) -> ReasonerTurnRender`` typed 入口。本节点负责
 在 seam 上做一次 state → typed-DTO 适配 —— 业务真实路径走
 ``concept.prompt.render`` 图,这里只是 inner_graph 的过渡适配,被 P5
-``business.reasoning.turn`` 取代。
+``agent.reasoning.turn`` 取代。
 
 ``requires=("reasoner",)`` 通过 Cordis 校验,运行时从
 ``context.runtime.reasoner`` 拿 capability 实例。

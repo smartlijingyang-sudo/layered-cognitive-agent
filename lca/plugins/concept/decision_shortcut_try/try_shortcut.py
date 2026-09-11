@@ -62,9 +62,9 @@ class ShortcutTryExecutor:
         outputs 端口(yaml):decision (Decision | None)
 
         缺失 state 或 capability → 返回空 ports,让 driver 走下一次
-        edge 选择(典型情况:production 的 ``business.reasoning.shortcut``
+        edge 选择(典型情况:production 的 ``agent.reasoning.shortcut``
         命中 ``shortcut.try`` 返回 ``None`` → driver 顺 edge 走到
-        ``business.reasoning.turn`` 走 LLM 完整路径)。
+        ``agent.reasoning.turn`` 走 LLM 完整路径)。
         """
         runtime = context.runtime
         state = input.port_values.get("state") or runtime.state

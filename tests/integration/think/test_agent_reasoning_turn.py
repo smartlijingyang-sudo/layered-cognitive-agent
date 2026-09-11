@@ -1,8 +1,8 @@
-"""End-to-end: business.reasoning.turn graph (ADR-0220 §3.4 + §11 P5).
+"""End-to-end: agent.reasoning.turn graph (ADR-0220 §3.4 + §11 P5).
 
 Verifies the 8-node business graph:
 
-  - parses cleanly from ``bundles/business/reasoning_turn.yaml``
+  - parses cleanly from ``bundles/agent/reasoning_turn.yaml``
   - each of the 8 sub_spec_ref nodes delegates to a loadable
     concept/primitive graph bundle
   - drives end-to-end through NodeGraphDriver with a stub
@@ -49,9 +49,9 @@ from lca.harness.declarative.compile.subgraph_resolver import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-BUNDLE_PATH = REPO_ROOT / "bundles" / "business" / "reasoning_turn.yaml"
+BUNDLE_PATH = REPO_ROOT / "bundles" / "agent" / "reasoning_turn.yaml"
 
-_OUTER_FACTORY = "business.reasoning.ref"
+_OUTER_FACTORY = "agent.reasoning.ref"
 # Each entry: outer_node_id -> (typed PhaseOutput to emit on that node's subgraph completion).
 # The outer driver absorbs the typed PhaseOutput, so subsequent edges see the same
 # typed payload via the port_context / channel. PhaseOutput's close-out field set is
@@ -69,9 +69,9 @@ def _decision_phase_output() -> PhaseOutput:
     """PhaseOutput carrying the terminal typed Decision emitted by gate.enforce."""
     return PhaseOutput(
         decision=Decision(
-            decision_id="dec_business_v2",
+            decision_id="dec_agent_v2",
             action_type=ActionType.RESPOND.value,
-            rationale="stub-business-v2",
+            rationale="stub-agent-v2",
             confidence=1.0,
             response_text="ok",
         )
@@ -118,7 +118,7 @@ class _StubSubRunner:
         # terminal contribution so the outer driver can absorb it.
         channel.publish(
             producer_node=ref.binding_edge,
-            phase="business",
+            phase="agent",
             output=output,
         )
         return outer_state, output
@@ -139,14 +139,14 @@ class _StaticScope:
         return None
 
 
-class TestBusinessReasoningTurnBundleTopology:
+class TestAgentReasoningTurnBundleTopology:
     """§3.4 + §11 P5 acceptance: bundle structure invariants."""
 
     def test_bundle_yaml_resolves_to_eight_node_nine_edge_graph(self) -> None:
         """The business graph has 8 nodes + 9 edges."""
         spec = _load_bundle_graph_spec(str(BUNDLE_PATH.relative_to(REPO_ROOT)))
-        assert spec.id == "business.reasoning.turn"
-        assert spec.region == "business"
+        assert spec.id == "agent.reasoning.turn"
+        assert spec.region == "agent"
         assert len(spec.nodes) == 8
         assert len(spec.edges) == 9
 
@@ -215,12 +215,12 @@ class TestBusinessReasoningTurnBundleTopology:
         assert incoming[template] == {"reason.prepare.context"}, incoming[template]
 
 
-class TestBusinessReasoningTurnE2E:
+class TestAgentReasoningTurnE2E:
     """End-to-end drive through NodeGraphDriver with a stub SubgraphRunner."""
 
     @pytest.mark.asyncio
     async def test_e2e_with_prep_graph(self) -> None:
-        """ADR-0220 §11 P5 e2e: business.reasoning.turn drives 8 nodes
+        """ADR-0220 §11 P5 e2e: agent.reasoning.turn drives 8 nodes
         in topological order and the final PhaseOutput carries the
         typed Decision emitted by reason.gate.enforce.
         """
@@ -250,10 +250,10 @@ class TestBusinessReasoningTurnE2E:
         snap = channel.snapshot()
         assert any(
             getattr(out, "decision", None) is not None
-            and getattr(out.decision, "decision_id", None) == "dec_business_v2"
+            and getattr(out.decision, "decision_id", None) == "dec_agent_v2"
             for out in snap.values()
         ), (
-            "ADR-0220 §5: business.reasoning.turn must end with the typed "
+            "ADR-0220 §5: agent.reasoning.turn must end with the typed "
             f"Decision emitted by reason.gate.enforce. Published: {sorted(snap)}"
         )
 
