@@ -112,9 +112,15 @@ class SubgraphStrategy(NodeStrategy):
         if not isinstance(outer_state, AgentState):
             outer_state = AgentState(trace_id="", task="", budget=_empty_budget())
         depth = 1
+        depth_token: Any = None
         if self.depth_counter is not None:
-            depth = self.depth_counter() + 1
+            from lca.framework.graph.adapter import _enter_subgraph, _exit_subgraph
+            current_depth, depth_token = _enter_subgraph()
+            depth = current_depth + 1
         if depth > self.max_depth:
+            if depth_token is not None:
+                from lca.framework.graph.adapter import _exit_subgraph
+                _exit_subgraph(depth_token)
             raise RuntimeError(
                 f"subgraph recursion exceeded max_depth={self.max_depth} at "
                 f"plan_ref={context.plan_ref!r} node_id={context.node_id!r}"
@@ -131,9 +137,15 @@ class SubgraphStrategy(NodeStrategy):
                 outcome = await outcome
         except BaseException as exc:
             self._observe_exit(context, ref, depth, outcome="failure", error=repr(exc))
+            if depth_token is not None:
+                from lca.framework.graph.adapter import _exit_subgraph
+                _exit_subgraph(depth_token)
             raise
         merged_output: Mapping[str, Any] = outcome  # type: ignore[assignment]
         self._observe_exit(context, ref, depth, outcome="success", error="")
+        if depth_token is not None:
+            from lca.framework.graph.adapter import _exit_subgraph
+            _exit_subgraph(depth_token)
         return NodeOutput(
             port_values=dict(merged_output),
             producer_node=context.node_id,

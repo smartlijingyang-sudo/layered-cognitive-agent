@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable, Mapping
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -124,7 +125,6 @@ class PlanInterpreterAdapter:
     node_executor_runtime_scope: Any = None
     graph_observer: GraphObserver | None = None
     graph_clock: Callable[[], int] | None = None
-    _depth_counter: int = 0
 
     def __post_init__(self) -> None:
         # Adapter accepts ``capabilities`` (single source) and the
@@ -256,8 +256,7 @@ class PlanInterpreterAdapter:
         return recursive_runner
 
     def _depth(self) -> int:
-        self._depth_counter += 1
-        return self._depth_counter
+        return _graph_depth.get()
 
     def _build_node_executor_lookup(self) -> PhaseExecutorLookup:
         """Return the executor-lookup for :class:`NodeExecutorStrategy`.
@@ -590,9 +589,27 @@ NodeRuntimeViewFactory = Callable[[Any], Any]
 """Build a per-call :class:`_NodeRuntimeView` from the outer :class:`AgentState`."""
 
 
+# Nesting depth for subgraph recursion (ADR-0220 P6 / subgraph bound).
+# Tracked via ContextVar so sibling / sequential subgraph entries at the
+# same level do not accumulate; only true recursion increments depth.
+_graph_depth: ContextVar[int] = ContextVar("lca_graph_depth", default=0)
+
+
+def _enter_subgraph() -> tuple[int, Any]:
+    """Record entry into one subgraph layer; return (depth_at_entry, reset_token)."""
+    depth = _graph_depth.get()
+    return depth, _graph_depth.set(depth + 1)
+
+
+def _exit_subgraph(token: Any) -> None:
+    _graph_depth.reset(token)
+
+
 __all__ = [
     "NodeRuntimeViewFactory",
     "PhaseRunCursor",
     "PlanInterpreterAdapter",
     "_LegacyResultShim",
+    "_enter_subgraph",
+    "_exit_subgraph",
 ]
