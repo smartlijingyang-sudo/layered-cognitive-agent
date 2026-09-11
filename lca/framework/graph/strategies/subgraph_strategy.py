@@ -1,65 +1,85 @@
 """SubgraphStrategy — recursive entry into another :class:`Plan`.
 
 A :class:`lca.contracts.protocols.graph.plan.SubgraphReference` on a node
-points to another plan. The strategy delegates to a caller-provided
-``sub_runner`` that takes ``(ref, outer_input, outer_state)`` and
-returns ``(updated_state, merged_output)``. The default ``sub_runner``
-is :class:`lca.framework.subgraph.plugins.runner.SubgraphRunner` (kept
-in PR-7 until deletion). PR-4 replaces this with a kernel-internal
-recursive :meth:`PlanInterpreter.run`.
+points to another plan. The strategy delegates to a host-injected
+``recursive_runner`` callable that takes ``(sub_plan, outer_state,
+depth)`` and returns a ``Mapping[str, Any]`` of merged output port
+values.
 
-The strategy enforces the recursion budget (default 4, per
-``MAX_SUBGRAPH_DEPTH`` in :mod:`lca.framework.subgraph.plugins.interpreter`)
-via the host-provided ``depth`` callable so the bound is the same
-regardless of which interpreter is on top.
+Production callers (post kernel-native cutover, note
+2026-09-11-kernel-native-phase-runner) inject a closure that:
+1. Loads the bundle YAML referenced by ``ref.plan_ref``.
+2. Lifts it into a :class:`Plan` via ``lift_graph_spec``.
+3. Calls :meth:`PlanInterpreter.run` recursively against the
+   strategy registry's executor for that sub-plan.
+
+The legacy ``sub_runner`` shim from
+:class:`lca.framework.subgraph.plugins.runner.SubgraphRunner` is no
+longer reachable after PR-9 deletes the framework/subgraph directory.
+The kernel-native recursive runner is the sole production path.
+
+The strategy enforces the recursion budget (default 4) via the
+host-provided ``depth_counter`` so the bound is the same regardless of
+which interpreter is on top.
 """
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
-from typing import Any
+from inspect import isawaitable
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from lca.contracts.models.core.state.state import AgentState, Budget
-from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
-    SubgraphReference as LegacySubgraphReference,
-)
 from lca.contracts.protocols.graph.binding import BindingKind
-from lca.contracts.protocols.graph.plan import SubgraphReference
 from lca.contracts.protocols.graph.node_io import (
     NodeInput,
     NodeIOSchema,
     NodeOutput,
 )
+from lca.contracts.protocols.graph.plan import Plan
 from lca.contracts.protocols.graph.strategy import NodeStrategy, StrategyContext
 from lca.framework.graph.strategy_registry import register_strategy
 
-SubRunner = Callable[
-    [LegacySubgraphReference, dict[str, Any], AgentState, int],
-    tuple[AgentState, dict[str, Any]],
+if TYPE_CHECKING:
+    pass
+
+RecursiveRunner = Callable[
+    [Plan, AgentState, int], "Mapping[str, Any] | Awaitable[Mapping[str, Any]]"
 ]
+"""Host-injected closure that recurses into a subgraph plan.
+
+The closure takes the sub-:class:`Plan`, the outer :class:`AgentState`,
+and the current depth; it returns a mapping of merged output port
+values (sync) or an awaitable that resolves to one (async). The
+strategy awaits the result if it is awaitable. Production closures
+are async because :meth:`PlanInterpreter.run` is async.
+"""
 
 
 @dataclass(frozen=True, slots=True)
 class SubgraphStrategy(NodeStrategy):
     """Recursive :class:`Plan` invocation.
 
-    ``sub_runner`` is host-injected. ``depth_counter`` returns the next
-    depth (current + 1) so the host enforces the recursion bound.
+    ``recursive_runner`` is host-injected. ``depth_counter`` returns
+    the next depth (current + 1) so the host enforces the recursion
+    bound.
     """
 
     kind: BindingKind = BindingKind.SUBGRAPH
     schema: NodeIOSchema = field(default_factory=NodeIOSchema)
-    sub_runner: SubRunner | None = None
+    recursive_runner: RecursiveRunner | None = None
     max_depth: int = 4
     depth_counter: Callable[[], int] | None = None
 
     async def execute(
         self, context: StrategyContext, input: NodeInput
     ) -> NodeOutput:
-        if self.sub_runner is None:
+        if self.recursive_runner is None:
             raise RuntimeError(
-                "SubgraphStrategy.execute called without sub_runner; "
-                "the host must inject one (typically SubgraphRunner.run)"
+                "SubgraphStrategy.execute called without recursive_runner; "
+                "the host must inject one (typically the kernel-native "
+                "recursive PlanInterpreter.run closure)"
             )
         ref = context.subgraph_ref
         if ref is None:
@@ -77,20 +97,59 @@ class SubgraphStrategy(NodeStrategy):
                 f"subgraph recursion exceeded max_depth={self.max_depth} at "
                 f"plan_ref={context.plan_ref!r} node_id={context.node_id!r}"
             )
-        updated_state, merged_output = self.sub_runner(
-            ref, dict(input.port_values), outer_state, depth
-        )
+        sub_plan = _load_subgraph_plan(ref.plan_ref, ref.entry_node)
+        outcome = self.recursive_runner(sub_plan, outer_state, depth)
+        if isawaitable(outcome):
+            outcome = await outcome
+        merged_output: Mapping[str, Any] = outcome  # type: ignore[assignment]
         return NodeOutput(
-            port_values=merged_output,
+            port_values=dict(merged_output),
             producer_node=context.node_id,
         )
 
 
-register_strategy(SubgraphStrategy())
+def _load_subgraph_plan(plan_ref: str, entry_node: str) -> Plan:
+    """Load a bundle YAML and lift it into a :class:`Plan`.
+
+    Mirrors the legacy ``lift_subgraph_reference_to_v2`` seam: load
+    the bundle YAML from ``<repo_root>/<plan_ref>`` and lift it via
+    :func:`lift_graph_spec`. The resulting :class:`Plan` is the
+    recursive-runner input.
+    """
+    import yaml
+
+    from lca.framework.graph.lifter import lift_graph_spec
+
+    repo_root = _repo_root()
+    path = repo_root / plan_ref
+    if not path.is_file():
+        raise FileNotFoundError(f"bundle graph yaml not found: {plan_ref}")
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise TypeError(
+            f"bundle graph yaml must be a mapping at top level, "
+            f"got {type(raw).__name__}"
+        )
+    spec = dict(raw)
+    if "entry" not in spec and entry_node:
+        spec["entry"] = entry_node
+    return lift_graph_spec(spec)
+
+
+def _repo_root() -> Path:
+    """Find the repo root by walking up from this file."""
+    here = Path(__file__).resolve()
+    for parent in (here, *here.parents):
+        if (parent / "pyproject.toml").is_file() and (parent / "bundles").is_dir():
+            return parent
+    return Path.cwd()
 
 
 def _empty_budget() -> Budget:
     return Budget()
 
 
-__all__ = ["SubgraphStrategy", "SubRunner"]
+register_strategy(SubgraphStrategy())
+
+
+__all__ = ["RecursiveRunner", "SubgraphStrategy"]

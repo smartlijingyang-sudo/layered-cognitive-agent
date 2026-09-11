@@ -97,7 +97,7 @@ class PlanInterpreter:
             edge = select_edge(
                 edges=plan.edges,
                 current_id=node.id,
-                result=output,
+                result=_result_discriminator(output),
                 artifacts=self.artifacts,
             )
             dispatch = self._classify(edge, output)
@@ -151,6 +151,42 @@ def _terminal_port_values(
     if not plan.declared_inputs:
         return dict(ports.snapshot())
     return ports.exit_subgraph(plan.declared_inputs)
+
+
+class _ResultView:
+    """Duck-typed view of a ``PhaseResult`` for the edge DSL predicate.
+
+    The legacy ``evaluate_restricted_predicate`` expects a result object
+    with ``result_kind`` and ``next_hints``. The new kernel carries that
+    data on :class:`NodeOutput`. ``_ResultView`` lets the interpreter
+    pass the kernel's typed output into the legacy predicate without
+    rebuilding a full ``PhaseResult``.
+    """
+
+    __slots__ = ("_output",)
+
+    def __init__(self, output: NodeOutput) -> None:
+        self._output = output
+
+    @property
+    def result_kind(self) -> str:
+        return self._output.result_kind or ""
+
+    @property
+    def next_hints(self) -> Mapping[str, Any]:
+        return self._output.next_hints or {}
+
+    def __getattr__(self, name: str) -> Any:
+        # Forward unknown reads to the wrapped NodeOutput so legacy
+        # predicates that reach beyond result_kind/next_hints still work.
+        return getattr(self._output, name)
+
+
+def _result_discriminator(output: NodeOutput) -> Any:
+    """Return a value the legacy edge predicate can read ``.result_kind`` on."""
+    if output.result_kind is None and not output.next_hints:
+        return output
+    return _ResultView(output)
 
 
 __all__ = ["InterpretationResult", "PlanInterpreter"]

@@ -7,8 +7,8 @@ does not reconstruct concrete registry-backed implementations in L2.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
-from typing import Protocol, runtime_checkable
+from collections.abc import Awaitable, Callable, Mapping
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from lca.contracts.mechanisms import HookRegistry
 from lca.contracts.models.core.execution.result import Result
@@ -19,6 +19,11 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
     EffectDispatcher,
     JournalCommitter,
 )
+
+if TYPE_CHECKING:
+    from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
+        PhaseExecutor,
+    )
 from lca.contracts.protocols.journal.artifact.closure import ArtifactClosure
 from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyStore
 from lca.contracts.protocols.runtime.infra.infra import StateStore
@@ -85,6 +90,8 @@ class DeclarativeInterpreterFactory(Protocol):
         reducer: DeltaReducer,
         phase_observer: object,
         lifecycle_publisher: RuntimeLifecyclePublisher,
+        phase_executors: Mapping[str, "PhaseExecutor"] | None = None,
+        phase_capabilities: object | None = None,
     ) -> DeclarativeInterpreter: ...
 
 

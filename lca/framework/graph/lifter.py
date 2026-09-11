@@ -45,7 +45,7 @@ def lift_graph_spec(spec: Mapping[str, Any]) -> Plan:
         node_id = str(raw.get("id", "")).strip()
         if not node_id:
             raise ValueError(f"plan {spec_id!r}: node id must be non-empty")
-        binding = _binding_from(raw.get("binding"))
+        binding = _binding_from_factory_or_binding(raw)
         schema = _schema_from(raw.get("inputs"), raw.get("outputs"))
         subgraph_ref = _subgraph_ref_from(raw.get("sub_spec_ref"))
         nodes.append(
@@ -156,6 +156,31 @@ def _binding_from(value: object) -> BindingKind:
     )
 
 
+def _binding_from_factory_or_binding(raw: Mapping[str, object]) -> BindingKind:
+    """Pick ``binding`` first, then fall back to ``factory`` for v2-think yaml.
+
+    The v2 BundleGraphSpec uses ``binding:`` (a :class:`BindingKind` value).
+    The legacy think/act subgraph yaml used ``factory:`` (a semantic name
+    like ``think.shortcut``). For backward compatibility we accept either
+    and default ``factory: think.*`` / ``factory: act.*`` to
+    :class:`BindingKind.NODE_EXECUTOR` so the kernel can dispatch them
+    via :class:`NodeExecutorStrategy`.
+    """
+    binding = raw.get("binding")
+    if binding is not None:
+        return _binding_from(binding)
+    factory = raw.get("factory")
+    if factory is None:
+        raise ValueError(
+            "node spec must declare either 'binding' or 'factory'; "
+            f"got neither in node keys={sorted(raw)}"
+        )
+    factory_str = str(factory)
+    if factory_str.startswith("phase."):
+        return BindingKind.PHASE_EXECUTOR
+    return BindingKind.NODE_EXECUTOR
+
+
 def _binding_for_phase_node(raw: object) -> BindingKind:
     sub_ref = getattr(raw, "sub_spec_ref", None)
     binding_attr = getattr(raw, "binding", None)
@@ -169,6 +194,12 @@ def _binding_for_phase_node(raw: object) -> BindingKind:
 def _schema_from(inputs: object, outputs: object) -> NodeIOSchema:
     in_specs = _to_port_specs(inputs)
     out_specs = _to_port_specs(outputs)
+    # Subgraph yaml often declares the same port as both input and output
+    # (the node reads from upstream and writes its own decision). The
+    # kernel treats inputs/outputs as one union for the strict-validator;
+    # we deduplicate so the schema's "unique names" invariant holds.
+    in_names = {p.name for p in in_specs}
+    out_specs = tuple(p for p in out_specs if p.name not in in_names)
     return NodeIOSchema(inputs=in_specs, outputs=out_specs)
 
 
@@ -202,7 +233,18 @@ def _subgraph_ref_from(raw: object) -> SubgraphReference | None:
             binding_edge=str(raw.get("binding_edge", "")),
             return_on=str(raw.get("return_on", "next")),
         )
-    return None
+    # Legacy typed dataclass: ``PhaseNode.sub_spec_ref`` (ADR-0217 §3) is
+    # a frozen dataclass with the same four fields as the new
+    # ``SubgraphReference``. Read attributes directly.
+    plan_ref = getattr(raw, "plan_ref", None)
+    if plan_ref is None:
+        return None
+    return SubgraphReference(
+        plan_ref=str(plan_ref),
+        entry_node=str(getattr(raw, "entry_node", "") or ""),
+        binding_edge=str(getattr(raw, "binding_edge", "") or ""),
+        return_on=str(getattr(raw, "return_on", "next") or "next"),
+    )
 
 
 __all__ = ["lift_executable_plan", "lift_graph_spec"]

@@ -236,6 +236,8 @@ class DeclarativeRuntimeBindings:
             reducer=self.new_delta_reducer(),
             phase_observer=self.phase_observer,
             lifecycle_publisher=self.lifecycle_publisher,
+            phase_executors=dict(self.phase_executors),
+            phase_capabilities=self.capabilities,
         )
         if not isinstance(interpreter, DeclarativeInterpreter):
             raise TypeError(

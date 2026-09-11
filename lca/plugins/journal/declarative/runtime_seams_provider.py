@@ -139,6 +139,8 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
         reducer: DeltaReducer,
         phase_observer: object,
         lifecycle_publisher: RuntimeLifecyclePublisher,
+        phase_executors: object | None = None,
+        phase_capabilities: object | None = None,
     ) -> DeclarativeInterpreter:
         return PlanInterpreterAdapter(
             journal=journal,
@@ -147,6 +149,8 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
             phase_observer=phase_observer,
             lifecycle_publisher=lifecycle_publisher,
             loop_guard_evaluator=self._loop_guard_evaluator,
+            phase_executors=phase_executors,
+            phase_capabilities=phase_capabilities,
         )
 
 

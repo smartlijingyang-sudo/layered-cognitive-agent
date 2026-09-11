@@ -2,35 +2,27 @@
 
 The strategy is the single seam that turns a six-phase ``PhaseExecutor``
 into a graph node. It calls a host-injected ``runner`` closure that
-takes a :class:`PhaseInput` and returns a :class:`PhaseResult`.
+takes a :class:`PhaseInput` and a :class:`StrategyContext` and
+returns a :class:`PhaseResult`. The runner may be sync or async;
+the strategy awaits the result if it is awaitable.
 
-Why the strategy does not build its own :class:`PhaseContext`:
-
-Building a Protocol-conforming PhaseContext from scratch requires
-non-trivial inputs (AgentState, JournalCommitter, Budget, capabilities,
-results_by_phase) that the new kernel does not yet own. To keep this
-PR self-contained, the strategy delegates context construction to a
-``runner`` callable injected by the host — typically the existing
-:class:`PhaseExecutionTransaction` setup. PR-4 (single visit
-state machine) replaces this with a first-class context builder that
-the kernel itself owns.
-
-Production setup:
+Production setup (kernel-native, post
+note 2026-09-11-kernel-native-phase-runner):
 
 ```python
-def runner(inp: PhaseInput) -> PhaseResult:
-    return transaction.run(...)
+async def runner(phase_input, strategy_ctx):
+    executor = phase_executors[f"phase.{semantic}.standard"]
+    context = RestrictedPhaseContext(...)
+    return await executor.execute(context, phase_input)
 
-strategy = PhaseExecutorStrategy(
-    runner=runner,
-    port_for_result_kind=lambda r: r.result_kind,
-)
+strategy = PhaseExecutorStrategy(runner=runner)
 ```
 """
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from inspect import isawaitable
 from typing import Any
 
 from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
@@ -46,13 +38,15 @@ from lca.contracts.protocols.graph.node_io import (
 from lca.contracts.protocols.graph.strategy import NodeStrategy, StrategyContext
 from lca.framework.graph.strategy_registry import register_strategy
 
-PhaseRunner = Callable[[PhaseInput, StrategyContext], PhaseResult]
+PhaseRunner = Callable[[PhaseInput, StrategyContext], "PhaseResult | Awaitable[PhaseResult]"]
 """Host-injected closure that runs one phase visit.
 
 The closure takes the strategy-provided :class:`PhaseInput` and the
 :class:`StrategyContext`; it owns all context construction and
-returns a :class:`PhaseResult`. In production this is the existing
-:class:`lca.loop.transaction.PhaseExecutionTransaction.run` body.
+returns a :class:`PhaseResult` (sync) or an awaitable that resolves
+to one (async). The strategy awaits the result if it is awaitable.
+Production closures are async because :class:`PhaseExecutor.execute`
+is async.
 """
 
 
@@ -70,10 +64,13 @@ class PhaseExecutorStrategy(NodeStrategy):
         if self.runner is None:
             raise RuntimeError(
                 "PhaseExecutorStrategy.execute called without runner; "
-                "the host must inject one (typically via PhaseExecutionTransaction)"
+                "the host must inject one"
             )
         phase_input = PhaseInput(artifact=dict(input.port_values) or None)
-        result: PhaseResult = self.runner(phase_input, context)
+        outcome = self.runner(phase_input, context)
+        if isawaitable(outcome):
+            outcome = await outcome
+        result: PhaseResult = outcome  # type: ignore[assignment]
         return _project_phase_result(result, context.node_id)
 
 
@@ -86,6 +83,8 @@ def _project_phase_result(result: PhaseResult, node_id: str) -> NodeOutput:
         port_values=port_values,
         next_hint=result.next_hints.get("next_hint") if result.next_hints else None,
         producer_node=node_id,
+        result_kind=result.result_kind,
+        next_hints=dict(result.next_hints) if result.next_hints else {},
     )
 
 

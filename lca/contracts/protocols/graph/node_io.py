@@ -128,6 +128,13 @@ class NodeOutput(BaseModel):
     Keys must be a subset of the strategy's declared schema. The graph
     kernel calls :meth:`NodeIOSchema.project_outputs` to enforce this
     after the strategy returns.
+
+    ``result_kind`` and ``next_hints`` mirror the legacy
+    :class:`PhaseResult` shape. Strategies that produce a
+    :class:`PhaseResult` (e.g. :class:`PhaseExecutorStrategy`) forward
+    both fields so the edge DSL predicate (``select_edge`` →
+    ``evaluate_restricted_predicate``) can read
+    ``result.result_kind`` without changing every strategy shape.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -135,6 +142,8 @@ class NodeOutput(BaseModel):
     port_values: Mapping[PortName, Any] = Field(default_factory=dict)
     next_hint: str | None = None
     producer_node: str = ""
+    result_kind: str | None = None
+    next_hints: Mapping[str, Any] = Field(default_factory=dict)
 
 
 __all__ = [

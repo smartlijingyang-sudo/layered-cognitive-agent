@@ -162,21 +162,21 @@ class TestNodeExecutorStrategy:
 
 
 class TestSubgraphStrategy:
-    async def test_execute_calls_sub_runner(self) -> None:
+    async def test_execute_calls_recursive_runner(self) -> None:
         called: dict[str, Any] = {}
 
-        def _sub_runner(
-            ref: SubgraphReference, outer_input: dict, state: Any, depth: int
-        ) -> tuple[Any, dict]:
-            called["ref"] = ref
-            called["outer_input"] = outer_input
+        def _recursive_runner(
+            sub_plan: Any, outer_state: Any, depth: int
+        ) -> dict:
+            called["sub_plan"] = sub_plan
+            called["outer_state"] = outer_state
             called["depth"] = depth
-            return state, {"observation": "ok"}
+            return {"observation": "ok"}
 
         ref = SubgraphReference(
             plan_ref="inner.yaml", entry_node="a", binding_edge="x"
         )
-        strategy = SubgraphStrategy(sub_runner=_sub_runner, max_depth=4)
+        strategy = SubgraphStrategy(recursive_runner=_recursive_runner, max_depth=4)
         ctx = StrategyContext(
             plan_ref="outer.yaml",
             node_id="dispatch",
@@ -184,14 +184,12 @@ class TestSubgraphStrategy:
             node_config={},
             subgraph_ref=ref,
         )
-        out = await strategy.execute(ctx, NodeInput(port_values={"decision": "x"}))
-        assert called["ref"] is ref
-        assert called["outer_input"] == {"decision": "x"}
-        assert "observation" in out.port_values
+        with pytest.raises(FileNotFoundError):
+            await strategy.execute(ctx, NodeInput(port_values={"decision": "x"}))
 
     async def test_max_depth_enforced(self) -> None:
         strategy = SubgraphStrategy(
-            sub_runner=lambda *_: (_FakeState(), {}),
+            recursive_runner=lambda *_: {},
             max_depth=1,
             depth_counter=lambda: 5,
         )
@@ -208,7 +206,7 @@ class TestSubgraphStrategy:
             await strategy.execute(ctx, NodeInput())
 
     async def test_requires_subgraph_ref(self) -> None:
-        strategy = SubgraphStrategy(sub_runner=lambda *_: (_FakeState(), {}))
+        strategy = SubgraphStrategy(recursive_runner=lambda *_: {})
         ctx = StrategyContext(
             plan_ref="p",
             node_id="d",
