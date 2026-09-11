@@ -235,9 +235,49 @@ def resolve_phase_executor_bindings(
     }
 
 
+def resolve_node_executor_bindings(
+    scope: Context,
+    *,
+    composite_prefix: str = "phase:think::",
+) -> dict[str, "NodeExecutor"]:
+    """Collect every node executor the booted scope already published.
+
+    Each think/cognition subgraph node registers its :class:`NodeExecutor`
+    under a composite Cordis key ``f"{region}::{factory_name}"``. This
+    resolver walks the live scope's ``own_bindings`` for keys with the
+    configured prefix and returns a ``{factory_name: NodeExecutor}`` map
+    keyed by the bare factory name (= node id).
+
+    The default prefix is ``phase:think::``. Production callers
+    (``bind_runtime_graph``) use the default; tests can override. The
+    caller is responsible for choosing the prefix that matches the
+    subgraph ``region`` they care about — the framework never inspects
+    business-layer regions like ``"phase:think"`` from this module.
+    """
+    from lca.contracts.protocols.declarative.declarative_1.node_executor import (
+        NodeExecutor,
+    )
+    from lca.harness.plugin.context import collect_context_bindings
+
+    all_bindings = collect_context_bindings(scope)
+    prefix_with_sep = (
+        composite_prefix if composite_prefix.endswith("::") else f"{composite_prefix}::"
+    )
+    out: dict[str, NodeExecutor] = {}
+    for key, value in all_bindings.items():
+        if not isinstance(key, str) or not key.startswith(prefix_with_sep):
+            continue
+        factory_name = key[len(prefix_with_sep) :]
+        if not factory_name:
+            continue
+        out[factory_name] = cast("NodeExecutor", value)
+    return out
+
+
 __all__ = [
     "RuntimeCapabilityClosure",
     "require_complete_runtime_graph",
+    "resolve_node_executor_bindings",
     "resolve_phase_executor_bindings",
     "resolve_resume_input_adapter",
     "resolve_runtime_capabilities",

@@ -31,6 +31,10 @@ from typing import TYPE_CHECKING, Any
 
 from lca.framework.graph.interpreter import PlanInterpreter
 from lca.framework.graph.lifter import lift_executable_plan
+from lca.contracts.protocols.graph.binding import BindingKind
+from lca.framework.graph.strategies.node_executor_strategy import (
+    NodeExecutorStrategy,
+)
 from lca.framework.graph.strategies.phase_executor_strategy import (
     PhaseExecutorStrategy,
     PhaseRunner,
@@ -104,6 +108,8 @@ class PlanInterpreterAdapter:
     capabilities: Any = None
     phase_executors: Mapping[str, Any] | None = None
     phase_capabilities: Any = None
+    node_executors: Mapping[str, Any] | None = None
+    node_executor_runtime_scope: Any = None
     _depth_counter: int = 0
 
     def __post_init__(self) -> None:
@@ -125,6 +131,8 @@ class PlanInterpreterAdapter:
                 self._build_runner(),
                 self._build_recursive_runner(),
                 self._depth,
+                self._build_node_executor_lookup(),
+                self._build_node_runtime_view_factory(),
                 default_strategy_registry(),
             )
 
@@ -188,15 +196,21 @@ class PlanInterpreterAdapter:
         the sub-plan via the adapter's per-adapter registry. The
         resulting :class:`InterpretationResult.output` is returned to
         the outer node as the merged port map.
+
+        The closure reads ``self.registry`` lazily — at call time —
+        because :meth:`__post_init__` builds the registry and assigns
+        it to ``self.registry`` only after this builder runs.
+        Capturing the value via a local variable would freeze the
+        pre-assignment ``None`` here.
         """
-        registry = self.registry
+        adapter = self
 
         async def recursive_runner(
             sub_plan: Any,
             outer_state: Any,
             depth: int,
         ) -> Mapping[str, Any]:
-            interp = PlanInterpreter(registry=registry)
+            interp = PlanInterpreter(registry=adapter.registry)
             result = await interp.run(sub_plan, outer_state=outer_state)
             return dict(result.output)
 
@@ -205,6 +219,48 @@ class PlanInterpreterAdapter:
     def _depth(self) -> int:
         self._depth_counter += 1
         return self._depth_counter
+
+    def _build_node_executor_lookup(self) -> "PhaseExecutorLookup":
+        """Return the executor-lookup for :class:`NodeExecutorStrategy`.
+
+        The factory-name-to-instance map lives in ``self._node_executors``.
+        The strategy receives ``context.node_id`` (= factory name) and
+        finds the matching executor instance. The framework never
+        inspects what factory names exist — the runtime closure
+        supplies the closed map.
+        """
+        executors = self.node_executors or {}
+
+        def lookup(*, binding: Any, node_id: str, region: str | None) -> Any:
+            if binding != BindingKind.NODE_EXECUTOR:
+                return None
+            executor = executors.get(node_id)
+            if executor is None:
+                available = ", ".join(sorted(executors))
+                raise RuntimeError(
+                    f"NodeExecutor lookup miss: node_id={node_id!r} "
+                    f"not in node_executors (have: {available or '<none>'})"
+                )
+            return executor
+
+        return lookup
+
+    def _build_node_runtime_view_factory(self) -> "NodeRuntimeViewFactory":
+        """Build a per-call :class:`_NodeRuntimeView` for node executors.
+
+        The view wraps ``agent_state`` (read directly) plus a
+        capability scope. ``context.runtime.<name>`` resolves
+        through the scope's ``get`` (PhaseCapabilityReader Protocol)
+        or ``resolve`` (legacy PluginContextBackedRuntime). Missing
+        capabilities return ``None`` so node plugins' existing
+        soft-fail paths stay intact.
+        """
+        scope = self.node_executor_runtime_scope
+
+        def factory(agent_state: Any) -> Any:
+            return _NodeRuntimeView(state=agent_state, scope=scope)
+
+        return factory
 
     async def run(
         self,
@@ -321,17 +377,23 @@ def _build_registry_with_runner(
     runner: PhaseRunner,
     recursive_runner: RecursiveRunner,
     depth_counter: Callable[[], int],
+    node_executor_lookup: "PhaseExecutorLookup",
+    node_runtime_view_factory: "NodeRuntimeViewFactory",
     source: StrategyRegistry,
 ) -> StrategyRegistry:
-    """Return a fresh :class:`StrategyRegistry` whose phase-executor
-    strategy carries the host-injected ``runner`` closure and whose
-    subgraph strategy carries the recursive runner.
+    """Return a fresh :class:`StrategyRegistry` whose strategies carry
+    host-injected closures.
 
-    The default registry exposes a singleton :class:`PhaseExecutorStrategy`
-    with ``runner=None`` (its registered shape). Each adapter copies the
-    registry, swaps in a fresh strategy instance with ``runner`` wired,
-    and runs that. Concurrent adapters no longer race over a shared
-    ``runner`` field.
+    The default registry exposes a singleton
+    :class:`PhaseExecutorStrategy` with ``runner=None`` (its registered
+    shape). Each adapter copies the registry, swaps in fresh strategy
+    instances with the closures wired, and runs that. Concurrent
+    adapters no longer race over a shared ``runner`` field.
+
+    The :class:`NodeExecutorStrategy` is also rewired so its
+    ``executor_lookup`` resolves :class:`NodeExecutor` instances by
+    factory name (== node id) from the runtime-supplied
+    ``node_executors`` map.
     """
     new_registry = StrategyRegistry()
     for kind in source.kinds():
@@ -343,6 +405,13 @@ def _build_registry_with_runner(
                 SubgraphStrategy(
                     recursive_runner=recursive_runner,
                     depth_counter=depth_counter,
+                )
+            )
+        elif isinstance(strategy, NodeExecutorStrategy):
+            new_registry.register(
+                NodeExecutorStrategy(
+                    executor_lookup=node_executor_lookup,
+                    node_runtime_view_factory=node_runtime_view_factory,
                 )
             )
         else:
@@ -428,7 +497,56 @@ class _LegacyResultShim:
     artifact: Any = None
 
 
+class _NodeRuntimeView:
+    """Duck-typed view of the legacy :class:`NodeContext.runtime`.
+
+    Node plugins (think subgraph) read ``context.runtime.<name>``
+    and ``context.runtime.state``. ``state`` is the outer
+    :class:`AgentState`; everything else resolves through
+    ``scope.get(name)`` (PhaseCapabilityReader Protocol) or
+    ``scope.resolve(name)`` (legacy PluginContextBackedRuntime).
+    Missing capabilities return ``None`` so the node plugins'
+    soft-fail paths stay intact.
+
+    Mirrors the v2 ``NodeRuntimeView`` that lived in
+    ``lca/harness/graph/execute/v2/node_context_factory.py`` before
+    the kernel-native cutover.
+    """
+
+    __slots__ = ("_state", "_scope")
+
+    def __init__(self, *, state: Any, scope: Any) -> None:
+        object.__setattr__(self, "_state", state)
+        object.__setattr__(self, "_scope", scope)
+
+    @property
+    def state(self) -> Any:
+        return self._state
+
+    def __getattr__(self, key: str) -> Any:
+        scope = object.__getattribute__(self, "_scope")
+        if scope is None:
+            return None
+        getter = getattr(scope, "get", None)
+        if getter is None:
+            getter = getattr(scope, "resolve", None)
+        if getter is None:
+            return None
+        try:
+            return getter(key)
+        except (KeyError, AttributeError, TypeError):
+            return None
+
+    def __setattr__(self, key: str, value: Any) -> None:
+        raise AttributeError("_NodeRuntimeView is read-only")
+
+
+NodeRuntimeViewFactory = Callable[[Any], Any]
+"""Build a per-call :class:`_NodeRuntimeView` from the outer :class:`AgentState`."""
+
+
 __all__ = [
+    "NodeRuntimeViewFactory",
     "PhaseRunCursor",
     "PlanInterpreterAdapter",
     "_LegacyResultShim",

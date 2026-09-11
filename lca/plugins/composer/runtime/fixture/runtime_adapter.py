@@ -98,6 +98,7 @@ class FixtureRuntimeAdapter:
             reducer=cast("Reducer", resolved.reducer),
             compiled_plan=cast("CompiledRunPlan", resolved.compiled_plan),
             phase_executors=resolved.phase_executors,
+            node_executors=resolved.node_executors,
             phase_capabilities=resolved.phase_capabilities,
             effect_handler_registry=cast("EffectHandlerRegistry", resolved.effect_handler_registry),
             delta_handler_registry=cast("DeltaHandlerRegistry", resolved.delta_handler_registry),

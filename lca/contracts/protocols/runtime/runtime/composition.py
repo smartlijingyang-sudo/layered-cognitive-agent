@@ -24,6 +24,9 @@ if TYPE_CHECKING:
     from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
         PhaseExecutor,
     )
+    from lca.contracts.protocols.declarative.declarative_1.node_executor import (
+        NodeExecutor,
+    )
 from lca.contracts.protocols.journal.artifact.closure import ArtifactClosure
 from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyStore
 from lca.contracts.protocols.runtime.infra.infra import StateStore
@@ -92,6 +95,8 @@ class DeclarativeInterpreterFactory(Protocol):
         lifecycle_publisher: RuntimeLifecyclePublisher,
         phase_executors: Mapping[str, "PhaseExecutor"] | None = None,
         phase_capabilities: object | None = None,
+        node_executors: Mapping[str, "NodeExecutor"] | None = None,
+        node_executor_runtime_scope: object | None = None,
     ) -> DeclarativeInterpreter: ...
 
 

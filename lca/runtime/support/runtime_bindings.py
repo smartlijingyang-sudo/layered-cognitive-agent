@@ -22,6 +22,7 @@ from lca.contracts.protocols.declarative.declarative_1.declarative_execution imp
     EffectDispatcher,
     PhaseCapabilityReader,
 )
+from lca.contracts.protocols.declarative.declarative_1.node_executor import NodeExecutor
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import PhaseExecutor
 from lca.contracts.protocols.journal.artifact.closure import ArtifactClosure
 from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyStore
@@ -119,6 +120,7 @@ class DeclarativeRuntimeBindings:
 
     plan: CompiledRunPlan | None
     phase_executors: Mapping[str, PhaseExecutor]
+    node_executors: Mapping[str, NodeExecutor]
     capabilities: RuntimePhaseCapabilities
     reducer: Reducer
     hooks: HookRegistry
@@ -145,6 +147,7 @@ class DeclarativeRuntimeBindings:
         *,
         plan: CompiledRunPlan | None,
         phase_executors: Mapping[str, PhaseExecutor],
+        node_executors: Mapping[str, NodeExecutor],
         capabilities: RuntimePhaseCapabilities,
         reducer: Reducer,
         hooks: HookRegistry,
@@ -168,6 +171,7 @@ class DeclarativeRuntimeBindings:
         return cls(
             plan=plan,
             phase_executors=MappingProxyType(dict(phase_executors)),
+            node_executors=MappingProxyType(dict(node_executors)),
             capabilities=capabilities,
             reducer=reducer,
             hooks=hooks,
@@ -238,6 +242,8 @@ class DeclarativeRuntimeBindings:
             lifecycle_publisher=self.lifecycle_publisher,
             phase_executors=dict(self.phase_executors),
             phase_capabilities=self.capabilities,
+            node_executors=dict(self.node_executors),
+            node_executor_runtime_scope=self.capabilities,
         )
         if not isinstance(interpreter, DeclarativeInterpreter):
             raise TypeError(

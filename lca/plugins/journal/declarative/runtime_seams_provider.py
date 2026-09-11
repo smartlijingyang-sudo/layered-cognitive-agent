@@ -141,6 +141,8 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
         lifecycle_publisher: RuntimeLifecyclePublisher,
         phase_executors: object | None = None,
         phase_capabilities: object | None = None,
+        node_executors: object | None = None,
+        node_executor_runtime_scope: object | None = None,
     ) -> DeclarativeInterpreter:
         return PlanInterpreterAdapter(
             journal=journal,
@@ -151,6 +153,8 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
             loop_guard_evaluator=self._loop_guard_evaluator,
             phase_executors=phase_executors,
             phase_capabilities=phase_capabilities,
+            node_executors=node_executors,
+            node_executor_runtime_scope=node_executor_runtime_scope,
         )
 
 

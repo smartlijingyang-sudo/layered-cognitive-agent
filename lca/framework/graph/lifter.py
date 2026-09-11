@@ -47,7 +47,14 @@ def lift_graph_spec(spec: Mapping[str, Any]) -> Plan:
             raise ValueError(f"plan {spec_id!r}: node id must be non-empty")
         binding = _binding_from_factory_or_binding(raw)
         schema = _schema_from(raw.get("inputs"), raw.get("outputs"))
-        subgraph_ref = _subgraph_ref_from(raw.get("sub_spec_ref"))
+        # Legacy think/act yaml nests ``sub_spec_ref`` under ``config:``;
+        # v2 puts it at the top level. Probe both surfaces so the
+        # :class:`PlanNode.subgraph_ref` is populated regardless.
+        config_raw = raw.get("config")
+        sub_spec_raw = raw.get("sub_spec_ref")
+        if sub_spec_raw is None and isinstance(config_raw, Mapping):
+            sub_spec_raw = config_raw.get("sub_spec_ref")
+        subgraph_ref = _subgraph_ref_from(sub_spec_raw)
         nodes.append(
             PlanNode(
                 id=node_id,
@@ -157,18 +164,30 @@ def _binding_from(value: object) -> BindingKind:
 
 
 def _binding_from_factory_or_binding(raw: Mapping[str, object]) -> BindingKind:
-    """Pick ``binding`` first, then fall back to ``factory`` for v2-think yaml.
+    """Pick the right binding for a BundleGraphSpec-style node.
 
-    The v2 BundleGraphSpec uses ``binding:`` (a :class:`BindingKind` value).
-    The legacy think/act subgraph yaml used ``factory:`` (a semantic name
-    like ``think.shortcut``). For backward compatibility we accept either
-    and default ``factory: think.*`` / ``factory: act.*`` to
-    :class:`BindingKind.NODE_EXECUTOR` so the kernel can dispatch them
-    via :class:`NodeExecutorStrategy`.
+    Three inputs in priority order:
+
+    1. ``binding:`` — explicit :class:`BindingKind` (v2 schema).
+    2. ``sub_spec_ref:`` — nested subgraph; the kernel recurses via
+       :class:`SubgraphStrategy`. Legacy think/act yaml nests
+       ``sub_spec_ref:`` under ``config:`` (alongside ``max_visits``),
+       so check both surfaces. Wins over ``factory`` so a node
+       like ``think.reason`` (sub-spec only) recurses instead of
+       dispatching a leaf executor that does not exist.
+    3. ``factory:`` — legacy think/act subgraph style; ``factory:
+       think.*`` / ``factory: act.*`` map to
+       :class:`BindingKind.NODE_EXECUTOR` so the kernel can dispatch
+       them via :class:`NodeExecutorStrategy`.
     """
     binding = raw.get("binding")
     if binding is not None:
         return _binding_from(binding)
+    if raw.get("sub_spec_ref") is not None:
+        return BindingKind.SUBGRAPH
+    config = raw.get("config")
+    if isinstance(config, Mapping) and config.get("sub_spec_ref") is not None:
+        return BindingKind.SUBGRAPH
     factory = raw.get("factory")
     if factory is None:
         raise ValueError(

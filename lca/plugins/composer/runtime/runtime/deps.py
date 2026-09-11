@@ -22,6 +22,7 @@ from lca.contracts.protocols import (
     StateStore,
 )
 from lca.contracts.protocols.act.effect.handler import EffectHandlerRegistry
+from lca.contracts.protocols.declarative.declarative_1.node_executor import NodeExecutor
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import PhaseExecutor
 from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyStore
 from lca.contracts.protocols.runtime.runtime.composition import (
@@ -61,6 +62,7 @@ class ProductionRuntimeDeps:
     reducer: Reducer
     compiled_plan: CompiledRunPlan
     phase_executors: Mapping[str, PhaseExecutor]
+    node_executors: Mapping[str, NodeExecutor]
     phase_capabilities: Mapping[str, object]
     effect_handler_registry: EffectHandlerRegistry
     delta_handler_registry: DeltaHandlerRegistry

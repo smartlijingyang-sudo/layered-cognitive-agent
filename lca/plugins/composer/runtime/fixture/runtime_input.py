@@ -22,6 +22,7 @@ from lca.contracts.protocols import (
     StopPolicy,
 )
 from lca.contracts.protocols.act.effect.handler import EffectHandlerRegistry
+from lca.contracts.protocols.declarative.declarative_1.node_executor import NodeExecutor
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import PhaseExecutor
 from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyStore
 from lca.contracts.protocols.runtime.runtime.composition import (
@@ -53,6 +54,7 @@ class RuntimeDeps:
     reducer: Reducer | None = None
     compiled_plan: CompiledRunPlan | None = None
     phase_executors: Mapping[str, PhaseExecutor] = field(default_factory=dict)
+    node_executors: Mapping[str, NodeExecutor] = field(default_factory=dict)
     effect_handler_registry: EffectHandlerRegistry | None = None
     delta_handler_registry: DeltaHandlerRegistry | None = None
     artifact_closure: ArtifactClosure | None = None

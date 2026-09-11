@@ -177,15 +177,26 @@ class _ResultView:
         return self._output.next_hints or {}
 
     def __getattr__(self, name: str) -> Any:
-        # Forward unknown reads to the wrapped NodeOutput so legacy
-        # predicates that reach beyond result_kind/next_hints still work.
-        return getattr(self._output, name)
+        # Kernel ``NodeOutput`` does not carry every PhaseResult field
+        # (``payload`` lives on the legacy result shape). Treat missing
+        # attributes as ``None`` so legacy edge predicates like
+        # ``result.payload == None`` resolve cleanly.
+        try:
+            return getattr(self._output, name)
+        except AttributeError:
+            return None
 
 
 def _result_discriminator(output: NodeOutput) -> Any:
-    """Return a value the legacy edge predicate can read ``.result_kind`` on."""
-    if output.result_kind is None and not output.next_hints:
-        return output
+    """Return a value the legacy edge predicate can read ``.result_kind`` on.
+
+    Always returns a :class:`_ResultView` so the predicate never
+    escapes with an AttributeError on missing fields like ``payload``.
+    The view's ``__getattr__`` returns ``None`` for fields the kernel
+    ``NodeOutput`` doesn't carry (``payload`` lives on the legacy
+    ``PhaseResult``, not on the kernel's typed output), which keeps
+    predicates like ``result.payload == None`` working.
+    """
     return _ResultView(output)
 
 
