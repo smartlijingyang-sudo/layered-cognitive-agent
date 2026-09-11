@@ -1,0 +1,28 @@
+# bundles/concept/effect_execute.yaml — Layer 2 概念图
+# ADR-0220 §3.3 — Decision → EffectReceipt typed boundary (effect
+# dispatcher, business.action.turn 的最后一节)。
+#
+# 节点命名:1 节点以 effect. 起首,与 §0.4 N9 action-domain 闭集一致
+# (effect.* 在闭集内)。
+#
+# 跨图引用:
+#   inputs  -> business.action.turn 的 decision port
+#   outputs -> business.reflection.turn 的 receipt port
+#
+# delete-when: N/A(纯加法,business.action.turn 在 P8 引用)。
+
+id: concept.effect.execute
+region: concept
+purpose: Decision → EffectReceipt typed boundary (tool body dispatcher)
+
+nodes:
+  - id: effect.execute
+    factory: effect.execute
+    inputs: [decision, state]
+    outputs: [receipt]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+
+edges: []
