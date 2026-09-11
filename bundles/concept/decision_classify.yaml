@@ -1,0 +1,49 @@
+# bundles/concept/decision_classify.yaml — Layer 2 概念图
+# ADR-0220 §3.3 — LLMResponse → Decision typed boundary(cross-graph transport)。
+#
+# 节点命名:3 节点全部以 decision. 起首,与 §0.4 N9 action-domain 闭集
+# 一致。§3.3 节点数 ≤ 4(本图 3 节点,符合 G1 职责单一)。
+#
+# 跨图引用:
+#   inputs  -> primitive.llm.call 节点的 response port
+#   outputs -> business.reasoning.turn 的 decision 端口
+#
+# delete-when: N/A(纯加法,business.reasoning.turn 在 P5 引用)。
+
+id: concept.decision.classify
+region: concept
+purpose: LLMResponse → Decision typed boundary — typed 3-stage parse/compose pipeline
+
+nodes:
+  - id: decision.parse.tool_calls
+    factory: decision.parse.tool_calls
+    inputs: [response]
+    outputs: [tool_calls, delegations]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+
+  - id: decision.parse.intent
+    factory: decision.parse.intent
+    inputs: [response]
+    outputs: [intent]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+
+  - id: decision.compose.action
+    factory: decision.compose.action
+    inputs: [tool_calls, delegations, intent]
+    outputs: [decision]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+
+edges:
+  - source: decision.parse.tool_calls
+    target: decision.compose.action
+  - source: decision.parse.intent
+    target: decision.compose.action

@@ -1,0 +1,170 @@
+# bundles/business/reasoning_turn.yaml — Layer 3 业务图
+# ADR-0220 §3.4 + §5 — business.reasoning.turn:8 个概念/原语图引用 →
+# Decision。
+#
+# 一个 turn 的认知流 — 准备 4 DTO → 渲染 → 调 LLM → 分类 → gate。
+#
+# §3.4 业务图节点 = `sub_spec_ref:` 引用另一个图,不写实现。NodeGraphDriver
+# 看到 `sub_spec_ref` 字段就把节点委派给 SubgraphRunner,跑到 inner 图结束
+# 后取回 typed boundary DTO。
+#
+# §0.4 N9 action-domain 闭集:节点 id 第一段 reason.* 是业务域(action domain
+# 由 §0.4 N9 闭集允许 reason.* — business 图节点 id 在 ADR §3.4 表中)。
+#
+# 跨图引用:
+#   reason.prepare.tools     -> concept.tool.fork        (BundlesView → ForkedTools)
+#   reason.prepare.role      -> concept.role.snapshot    (RoleProfile + TeamAwareness → RoleSnapshot)
+#   reason.prepare.context   -> concept.context.compose   (ContextManifest + task + skills → ReasonerContext)
+#   reason.prepare.template  -> concept.template.select   (state + ReasonerContext → TemplateSelection)
+#   reason.render.prompt     -> concept.prompt.render     (3 DTO → ReasonerTurnRender)
+#   reason.llm.call          -> primitive.llm.call        (ReasonerTurnRender + ForkedTools → LLMResponse)
+#   reason.classify.response -> concept.decision.classify (LLMResponse → Decision)
+#   reason.gate.enforce      -> concept.decision.enforce  (Decision + AgentState → enforced Decision)
+#
+# delete-when: N/A(纯加法,profile 选 business_run_v2 时走本图;旧 think.yaml
+# 在 P10 之前共存)。
+
+id: business.reasoning.turn
+region: business
+purpose: 一个 turn 的认知流 — 准备 4 DTO → 渲染 → 调 LLM → 分类 → gate → Decision
+
+inputs:
+  - port: bindings
+  - port: llm
+  - port: tools
+  - port: role
+  - port: selector
+  - port: state
+
+nodes:
+  # prep 阶段 — 4 个 DTO 准备节点并行 fan-out
+  - id: reason.prepare.tools
+    factory: business.reasoning.ref
+    inputs: [bindings]
+    outputs: [forked_tools]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+      sub_spec_ref:
+        plan_ref: bundles/concept/tool_fork.yaml
+        entry_node: tool.fork.dispatch
+        binding_edge: reason.prepare.tools
+
+  - id: reason.prepare.role
+    factory: business.reasoning.ref
+    inputs: [role_profile, team_awareness]
+    outputs: [role_snapshot]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+      sub_spec_ref:
+        plan_ref: bundles/concept/role_snapshot.yaml
+        entry_node: capability.role.normalize
+        binding_edge: reason.prepare.role
+
+  - id: reason.prepare.context
+    factory: business.reasoning.ref
+    inputs: [manifest, task, activated_skills]
+    outputs: [context]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+      sub_spec_ref:
+        plan_ref: bundles/concept/context_compose.yaml
+        entry_node: context.lines.collect
+        binding_edge: reason.prepare.context
+
+  - id: reason.prepare.template
+    factory: business.reasoning.ref
+    inputs: [state, context]
+    outputs: [template_selection]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+      sub_spec_ref:
+        plan_ref: bundles/concept/template_select.yaml
+        entry_node: prompt.candidate.enumerate
+        binding_edge: reason.prepare.template
+
+  # render 阶段
+  - id: reason.render.prompt
+    factory: business.reasoning.ref
+    inputs: [template_selection, context, role_snapshot]
+    outputs: [render]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+      sub_spec_ref:
+        plan_ref: bundles/concept/prompt_render.yaml
+        entry_node: prompt.sections.assemble
+        binding_edge: reason.render.prompt
+
+  # LLM 阶段
+  - id: reason.llm.call
+    factory: business.reasoning.ref
+    inputs: [render, forked_tools, state]
+    outputs: [response]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+      sub_spec_ref:
+        plan_ref: bundles/primitive/llm_call.yaml
+        entry_node: llm.invoke
+        binding_edge: reason.llm.call
+
+  # 收尾阶段
+  - id: reason.classify.response
+    factory: business.reasoning.ref
+    inputs: [response]
+    outputs: [decision]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+      sub_spec_ref:
+        plan_ref: bundles/concept/decision_classify.yaml
+        entry_node: decision.parse.tool_calls
+        binding_edge: reason.classify.response
+
+  - id: reason.gate.enforce
+    factory: business.reasoning.ref
+    inputs: [decision, state]
+    outputs: [decision]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+      sub_spec_ref:
+        plan_ref: bundles/concept/decision_enforce.yaml
+        entry_node: gate.chain.run
+        binding_edge: reason.gate.enforce
+
+edges:
+  - source: reason.prepare.tools
+    target: reason.render.prompt
+  - source: reason.prepare.role
+    target: reason.render.prompt
+  - source: reason.prepare.context
+    target: reason.render.prompt
+  - source: reason.prepare.context
+    target: reason.prepare.template
+  - source: reason.prepare.template
+    target: reason.render.prompt
+  - source: reason.render.prompt
+    target: reason.llm.call
+  - source: reason.prepare.tools
+    target: reason.llm.call
+  - source: reason.llm.call
+    target: reason.classify.response
+  - source: reason.classify.response
+    target: reason.gate.enforce
+
+outputs:
+  - port: decision
+    type: Decision

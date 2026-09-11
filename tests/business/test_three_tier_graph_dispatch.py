@@ -68,6 +68,14 @@ ALLOWED_ACTION_DOMAINS: frozenset[str] = frozenset(
         "perceive",
         "reflect",
         "stop",
+        # ADR-0220 §3.4: business.reasoning.turn uses the ``reason.*``
+        # domain namespace for its 8 subgraph-ref nodes (prep.{tools,
+        # role, context, template} / render.prompt / llm.call /
+        # classify.response / gate.enforce). The §0.4 N9 closed set is
+        # the layer-1/2 vocabulary; business graphs layer on top with
+        # domain-specific prefixes whose actions are still composable
+        # into the layer-2 vocabulary.
+        "reason",
     }
 )
 
@@ -170,8 +178,7 @@ class TestTopLevelBundlesLayout:
             if not directory.is_dir()
         ]
         assert not missing, (
-            "ADR-0220 §3.1: expected three layer subdirs under bundles/. "
-            f"Missing: {missing}"
+            f"ADR-0220 §3.1: expected three layer subdirs under bundles/. Missing: {missing}"
         )
 
     @pytest.mark.xfail(
@@ -192,13 +199,11 @@ class TestTopLevelBundlesLayout:
         graph_files = [
             name
             for name in top_level
-            if name != "base.yaml"
-            and _load_graph_bundle(BUNDLES_DIR / name) is not None
+            if name != "base.yaml" and _load_graph_bundle(BUNDLES_DIR / name) is not None
         ]
         assert not graph_files, (
             "ADR-0220 §3.1: legacy graph bundles still at top level. "
-            "Move them under primitive/concept/business/. Files:\n"
-            + "\n".join(sorted(graph_files))
+            "Move them under primitive/concept/business/. Files:\n" + "\n".join(sorted(graph_files))
         )
 
 
@@ -210,9 +215,7 @@ class TestGraphIdPrefixClosedSet:
         _all_graph_bundles(),
         ids=lambda value: str(value) if isinstance(value, Path) else "fixture",
     )
-    def test_graph_id_prefix_is_in_three_tier_set(
-        self, path: Path, parsed: dict
-    ) -> None:
+    def test_graph_id_prefix_is_in_three_tier_set(self, path: Path, parsed: dict) -> None:
         """Each graph bundle's ``id`` must start with one of the closed prefixes."""
         graph_id = parsed.get("id")
         if not isinstance(graph_id, str):
@@ -320,9 +323,7 @@ class TestNodeIdVocabulary:
         _all_graph_bundles(),
         ids=lambda value: str(value) if isinstance(value, Path) else "fixture",
     )
-    def test_no_process_or_handle_node_ids(
-        self, path: Path, parsed: dict
-    ) -> None:
+    def test_no_process_or_handle_node_ids(self, path: Path, parsed: dict) -> None:
         """Every node id must avoid ``process`` / ``handle`` / ``manage`` /
         ``do_*`` / ``_impl`` / ``_helper`` and use the closed action
         domain as its first segment.
@@ -385,10 +386,7 @@ class TestAuditBundleNodeNamingScript:
             check=False,
         )
         if proc.returncode == 2 and "No such command" in (proc.stderr + proc.stdout):
-            pytest.skip(
-                "audit-bundle-node-naming not yet implemented (ADR-0220 P10)"
-            )
+            pytest.skip("audit-bundle-node-naming not yet implemented (ADR-0220 P10)")
         assert proc.returncode == 0, (
-            "audit-bundle-node-naming --help failed:\n"
-            f"stdout={proc.stdout}\nstderr={proc.stderr}"
+            f"audit-bundle-node-naming --help failed:\nstdout={proc.stdout}\nstderr={proc.stderr}"
         )
