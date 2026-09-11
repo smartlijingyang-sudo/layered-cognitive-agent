@@ -1,6 +1,6 @@
 # Agent Note: kernel-native PhaseRunner closure for the unified graph kernel
 
-Status: proposed
+Status: implemented
 
 ## Problem
 
