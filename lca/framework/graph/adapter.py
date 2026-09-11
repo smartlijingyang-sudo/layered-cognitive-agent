@@ -1,4 +1,4 @@
-"""PlanInterpreterAdapter — exposes :class:`PlanInterpreter` under the
+"""PlanInterpreterAdapter - exposes :class:`PlanInterpreter` under the
 legacy :class:`DeclarativeInterpreter` Protocol.
 
 This is the **production cutover seam**. The runtime plugin factory
@@ -18,20 +18,25 @@ The adapter owns:
 - the five runtime closures plus ``loop_guard_evaluator`` and the
   ``PhaseCapabilityReader`` for phase executors,
 - a :class:`PhaseRunCursor` for :meth:`resume` to seed the visit
-  loop from a checkpointed node instead of restarting from entry.
+  loop from a checkpointed node instead of restarting from entry,
+- the configured :class:`GraphObserver` that observes visit / edge /
+  subgraph lifecycle events on the kernel side.
 
 Deletion policy: this adapter is the sole production entry point.
 There is no other production interpreter.
 """
+
 from __future__ import annotations
 
+import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from lca.contracts.protocols.graph.binding import BindingKind
 from lca.framework.graph.interpreter import PlanInterpreter
 from lca.framework.graph.lifter import lift_executable_plan
-from lca.contracts.protocols.graph.binding import BindingKind
+from lca.framework.graph.observation import GraphObserver, NullGraphObserver
 from lca.framework.graph.port_registry import PortRegistry
 from lca.framework.graph.strategies.node_executor_strategy import (
     NodeExecutorStrategy,
@@ -53,6 +58,12 @@ from lca.framework.graph.traversal import PlanTraversal
 from lca.harness.declarative.compile.phase.capabilities import (
     MappingPhaseCapabilities,
 )
+
+
+def _default_graph_clock() -> int:
+    """Monotonic millisecond clock used when no fake is injected."""
+    return time.monotonic_ns() // 1_000_000
+
 
 if TYPE_CHECKING:
     from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
@@ -111,6 +122,8 @@ class PlanInterpreterAdapter:
     phase_capabilities: Any = None
     node_executors: Mapping[str, Any] | None = None
     node_executor_runtime_scope: Any = None
+    graph_observer: GraphObserver | None = None
+    graph_clock: Callable[[], int] | None = None
     _depth_counter: int = 0
 
     def __post_init__(self) -> None:
@@ -123,10 +136,10 @@ class PlanInterpreterAdapter:
         # capability name and is the SSOT for which executor to call.
         if self.capabilities is None:
             self.capabilities = self.phase_capabilities
-        # Build the per-adapter registry once. Each adapter carries its
-        # own PhaseExecutorStrategy instance with a runner closure
-        # wired to the five runtime closures, so concurrent adapters do
-        # not stomp each other's runner.
+        if self.graph_observer is None:
+            self.graph_observer = NullGraphObserver()
+        if self.graph_clock is None:
+            self.graph_clock = _default_graph_clock
         if self.registry is None:
             self.registry = _build_registry_with_runner(
                 self._build_runner(),
@@ -134,6 +147,8 @@ class PlanInterpreterAdapter:
                 self._depth,
                 self._build_node_executor_lookup(),
                 self._build_node_runtime_view_factory(),
+                self.graph_observer,
+                self.graph_clock,
                 default_strategy_registry(),
             )
 
@@ -160,9 +175,9 @@ class PlanInterpreterAdapter:
         phase_observer = self.phase_observer
 
         async def runner(
-            phase_input: "PhaseInput",
+            phase_input: PhaseInput,
             strategy_ctx: Any,
-        ) -> "PhaseResult":
+        ) -> PhaseResult:
             node_id = str(getattr(strategy_ctx, "node_id", ""))
             semantic = node_id.split(".", 1)[0] if node_id else ""
             if not semantic:
@@ -212,9 +227,29 @@ class PlanInterpreterAdapter:
             depth: int,
             port_registry: PortRegistry | None = None,
         ) -> Mapping[str, Any]:
-            interp = PlanInterpreter(registry=adapter.registry)
+            seeded_state = outer_state
+            if outer_state is not None and not hasattr(outer_state, "graph_depth"):
+                try:
+                    object.__setattr__(outer_state, "graph_depth", depth)
+                    seeded_state = outer_state
+                except (AttributeError, TypeError):
+
+                    class _DepthCarrier:
+                        def __init__(self, base: Any, depth: int) -> None:
+                            self._base = base
+                            self.graph_depth = depth
+
+                        def __getattr__(self, name: str) -> Any:
+                            return getattr(self._base, name)
+
+                    seeded_state = _DepthCarrier(outer_state, depth)
+            interp = PlanInterpreter(
+                registry=adapter.registry,
+                observer=adapter.graph_observer,
+                clock=adapter.graph_clock,
+            )
             result = await interp.run(
-                sub_plan, outer_state=outer_state, port_registry=port_registry
+                sub_plan, outer_state=seeded_state, port_registry=port_registry
             )
             return dict(result.output)
 
@@ -224,7 +259,7 @@ class PlanInterpreterAdapter:
         self._depth_counter += 1
         return self._depth_counter
 
-    def _build_node_executor_lookup(self) -> "PhaseExecutorLookup":
+    def _build_node_executor_lookup(self) -> PhaseExecutorLookup:
         """Return the executor-lookup for :class:`NodeExecutorStrategy`.
 
         The factory-name-to-instance map lives in ``self._node_executors``.
@@ -249,7 +284,7 @@ class PlanInterpreterAdapter:
 
         return lookup
 
-    def _build_node_runtime_view_factory(self) -> "NodeRuntimeViewFactory":
+    def _build_node_runtime_view_factory(self) -> NodeRuntimeViewFactory:
         """Build a per-call :class:`_NodeRuntimeView` for node executors.
 
         The view wraps ``agent_state`` (read directly) plus a
@@ -332,9 +367,7 @@ class PlanInterpreterAdapter:
         return _legacy_result_shim(state=state, result=result)
 
 
-def _legacy_result_shim(
-    *, state: object, result: InterpretationResult
-) -> object:
+def _legacy_result_shim(*, state: object, result: InterpretationResult) -> object:
     """Wrap :class:`InterpretationResult` with legacy attribute names.
 
     Callers of the legacy interpreter expect ``visits`` / ``facts`` /
@@ -381,8 +414,10 @@ def _build_registry_with_runner(
     runner: PhaseRunner,
     recursive_runner: RecursiveRunner,
     depth_counter: Callable[[], int],
-    node_executor_lookup: "PhaseExecutorLookup",
-    node_runtime_view_factory: "NodeRuntimeViewFactory",
+    node_executor_lookup: PhaseExecutorLookup,
+    node_runtime_view_factory: NodeRuntimeViewFactory,
+    graph_observer: GraphObserver,
+    graph_clock: Callable[[], int],
     source: StrategyRegistry,
 ) -> StrategyRegistry:
     """Return a fresh :class:`StrategyRegistry` whose strategies carry
@@ -409,6 +444,8 @@ def _build_registry_with_runner(
                 SubgraphStrategy(
                     recursive_runner=recursive_runner,
                     depth_counter=depth_counter,
+                    observer=graph_observer,
+                    clock=graph_clock,
                 )
             )
         elif isinstance(strategy, NodeExecutorStrategy):
@@ -458,7 +495,7 @@ def _build_phase_context(
     journal: Any,
     phase_observer: Any,
     capabilities: Any,
-) -> "PhaseContext":
+) -> PhaseContext:
     """Build the :class:`PhaseContext` passed to ``PhaseExecutor.execute``.
 
     Uses :class:`RestrictedPhaseContext` (the typed per-phase view).
@@ -470,9 +507,13 @@ def _build_phase_context(
         RestrictedPhaseContext,
     )
 
-    state = agent_state if isinstance(agent_state, AgentState) else AgentState(
-        trace_id=str(plan_ref or ""),
-        task=str(node_ref or ""),
+    state = (
+        agent_state
+        if isinstance(agent_state, AgentState)
+        else AgentState(
+            trace_id=str(plan_ref or ""),
+            task=str(node_ref or ""),
+        )
     )
     budget = getattr(state, "budget", None) or Budget()
     if capabilities is None:
@@ -517,7 +558,7 @@ class _NodeRuntimeView:
     the kernel-native cutover.
     """
 
-    __slots__ = ("_state", "_scope")
+    __slots__ = ("_scope", "_state")
 
     def __init__(self, *, state: Any, scope: Any) -> None:
         object.__setattr__(self, "_state", state)

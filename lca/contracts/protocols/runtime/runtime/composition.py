@@ -83,7 +83,15 @@ class DeclarativeInterpreter(Protocol):
 
 @runtime_checkable
 class DeclarativeInterpreterFactory(Protocol):
-    """Create the profile-selected phase-graph traversal implementation."""
+    """Create the profile-selected phase-graph traversal implementation.
+
+    ``graph_observer`` and ``graph_clock`` are optional wiring knobs that
+    let production runs stream :class:`lca.framework.graph.observation.GraphObservation`
+    events to the spine while unit tests and fixture adapters stay
+    decoupled from the EventSpine surface. Default factories accept
+    ``None`` and forward to ``PlanInterpreterAdapter``'s NullGraphObserver
+    + monotonic millisecond clock fallback.
+    """
 
     def create(
         self,
@@ -93,10 +101,12 @@ class DeclarativeInterpreterFactory(Protocol):
         reducer: DeltaReducer,
         phase_observer: object,
         lifecycle_publisher: RuntimeLifecyclePublisher,
-        phase_executors: Mapping[str, "PhaseExecutor"] | None = None,
+        phase_executors: Mapping[str, PhaseExecutor] | None = None,
         phase_capabilities: object | None = None,
-        node_executors: Mapping[str, "NodeExecutor"] | None = None,
+        node_executors: Mapping[str, NodeExecutor] | None = None,
         node_executor_runtime_scope: object | None = None,
+        graph_observer: object | None = None,
+        graph_clock: Callable[[], int] | None = None,
     ) -> DeclarativeInterpreter: ...
 
 

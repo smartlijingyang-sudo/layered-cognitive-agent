@@ -234,6 +234,7 @@ class DeclarativeRuntimeBindings:
         set_scope = getattr(self.interpreter_factory, "set_subgraph_scope", None)
         if callable(set_scope):
             set_scope(self.phase_scope())
+        graph_observer = self._build_graph_observer()
         interpreter = self.interpreter_factory.create(
             journal=journal,
             effect_gateway=self.new_effect_dispatcher(),
@@ -244,6 +245,7 @@ class DeclarativeRuntimeBindings:
             phase_capabilities=self.capabilities,
             node_executors=dict(self.node_executors),
             node_executor_runtime_scope=self.capabilities,
+            graph_observer=graph_observer,
         )
         if not isinstance(interpreter, DeclarativeInterpreter):
             raise TypeError(
@@ -254,6 +256,38 @@ class DeclarativeRuntimeBindings:
         # runtime_bindings 不重复 bind,以免覆盖 Default factory 的 _DefaultSubgraphRuntime。
         # 顶层老 phase subgraph 仍走 self.subgraph_scope(set_subgraph_scope() 设)。
         return interpreter
+
+    def _build_graph_observer(self) -> object | None:
+        """Build a SpineGraphObserver wired to the active EventSpine.
+
+        Production runs install a process-local spine accessor via
+        spine.core; the observer reuses the same accessor so every
+        graph event flows through the existing single-writer path
+        (EventSpine.append -> SpineFileSink). When no spine is
+        active (unit tests, fixture adapters, pre-boot),
+        PlanInterpreterAdapter falls back to its NullGraphObserver.
+        """
+        from lca.framework.graph.observer_impls import SpineGraphObserver
+        from lca.harness.declarative.compile.instrument.wrap import _safe_append
+        from lca.plugins.observability.spine.runtime_hooks import (
+            resolve_active_spine,
+        )
+
+        spine = resolve_active_spine()
+        if spine is None:
+            return None
+
+        def emit(ep: str, payload: dict) -> None:
+            _safe_append(
+                spine=spine,
+                execution_point=ep,
+                channel="control",
+                payload=payload,
+                outcome=None,
+                span=None,
+            )
+
+        return SpineGraphObserver(emit=emit)
 
     def new_effect_dispatcher(self) -> EffectDispatcher:
         """Create the profile-selected effect seam from the frozen binding closure."""

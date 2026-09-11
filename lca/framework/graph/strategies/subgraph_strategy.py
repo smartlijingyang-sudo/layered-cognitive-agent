@@ -1,4 +1,4 @@
-"""SubgraphStrategy — recursive entry into another :class:`Plan`.
+"""SubgraphStrategy - recursive entry into another :class:`Plan`.
 
 A :class:`lca.contracts.protocols.graph.plan.SubgraphReference` on a node
 points to another plan. The strategy delegates to a host-injected
@@ -7,7 +7,7 @@ depth, outer_ports)`` and returns a ``Mapping[str, Any]`` of merged
 output port values. ``outer_ports`` is a :class:`PortRegistry` seeded
 from this node's :attr:`NodeInput.port_values` (via
 :meth:`PortRegistry.set_outer_input`) so edges like
-``sub_spec_ref`` can forward upstream values across the subgraph
+10→``sub_spec_ref`` can forward upstream values across the subgraph
 boundary; it is ``None`` when the outer node carried no port values.
 
 Production callers (post kernel-native cutover, note
@@ -17,7 +17,7 @@ Production callers (post kernel-native cutover, note
 3. Calls :meth:`PlanInterpreter.run` recursively against the
    strategy registry's executor for that sub-plan.
 
-The legacy ``sub_runner`` shim from
+20→The legacy ``sub_runner`` shim from
 :class:`lca.framework.subgraph.plugins.runner.SubgraphRunner` is no
 longer reachable after PR-9 deletes the framework/subgraph directory.
 The kernel-native recursive runner is the sole production path.
@@ -25,14 +25,22 @@ The kernel-native recursive runner is the sole production path.
 The strategy enforces the recursion budget (default 4) via the
 host-provided ``depth_counter`` so the bound is the same regardless of
 which interpreter is on top.
+
+Observability
+-------------
+Emits ``subgraph_enter`` before delegating to the recursive runner
+and ``subgraph_exit`` after. The observer is injected by the host
+(``PlanInterpreterAdapter``); the default is ``NullGraphObserver``
+so unit tests stay self-contained.
 """
+
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from inspect import isawaitable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.protocols.graph.binding import BindingKind
@@ -43,11 +51,15 @@ from lca.contracts.protocols.graph.node_io import (
 )
 from lca.contracts.protocols.graph.plan import Plan
 from lca.contracts.protocols.graph.strategy import NodeStrategy, StrategyContext
+from lca.framework.graph.observation import (
+    KIND_SUBGRAPH_ENTER,
+    KIND_SUBGRAPH_EXIT,
+    GraphObservation,
+    GraphObserver,
+    NullGraphObserver,
+)
 from lca.framework.graph.port_registry import PortRegistry
 from lca.framework.graph.strategy_registry import register_strategy
-
-if TYPE_CHECKING:
-    pass
 
 RecursiveRunner = Callable[
     [Plan, AgentState, int, "PortRegistry | None"],
@@ -73,7 +85,9 @@ class SubgraphStrategy(NodeStrategy):
 
     ``recursive_runner`` is host-injected. ``depth_counter`` returns
     the next depth (current + 1) so the host enforces the recursion
-    bound.
+    bound. ``observer`` receives enter/exit observations; the kernel
+    keeps the visit-level emissions and the strategy only reports the
+    subgraph boundary crossings.
     """
 
     kind: BindingKind = BindingKind.SUBGRAPH
@@ -81,10 +95,10 @@ class SubgraphStrategy(NodeStrategy):
     recursive_runner: RecursiveRunner | None = None
     max_depth: int = 4
     depth_counter: Callable[[], int] | None = None
+    observer: GraphObserver = field(default_factory=NullGraphObserver)
+    clock: Callable[[], int] | None = None
 
-    async def execute(
-        self, context: StrategyContext, input: NodeInput
-    ) -> NodeOutput:
+    async def execute(self, context: StrategyContext, input: NodeInput) -> NodeOutput:
         if self.recursive_runner is None:
             raise RuntimeError(
                 "SubgraphStrategy.execute called without recursive_runner; "
@@ -93,9 +107,7 @@ class SubgraphStrategy(NodeStrategy):
             )
         ref = context.subgraph_ref
         if ref is None:
-            raise RuntimeError(
-                f"node {context.node_id!r} has binding=SUBGRAPH but no subgraph_ref"
-            )
+            raise RuntimeError(f"node {context.node_id!r} has binding=SUBGRAPH but no subgraph_ref")
         outer_state = context.node_config.get("agent_state")
         if not isinstance(outer_state, AgentState):
             outer_state = AgentState(trace_id="", task="", budget=_empty_budget())
@@ -112,14 +124,76 @@ class SubgraphStrategy(NodeStrategy):
         if input.port_values:
             outer_ports = PortRegistry()
             outer_ports.set_outer_input(input.port_values)
-        outcome = self.recursive_runner(sub_plan, outer_state, depth, outer_ports)
-        if isawaitable(outcome):
-            outcome = await outcome
+        self._observe_enter(context, ref, depth)
+        try:
+            outcome = self.recursive_runner(sub_plan, outer_state, depth, outer_ports)
+            if isawaitable(outcome):
+                outcome = await outcome
+        except BaseException as exc:
+            self._observe_exit(context, ref, depth, outcome="failure", error=repr(exc))
+            raise
         merged_output: Mapping[str, Any] = outcome  # type: ignore[assignment]
+        self._observe_exit(context, ref, depth, outcome="success", error="")
         return NodeOutput(
             port_values=dict(merged_output),
             producer_node=context.node_id,
         )
+
+    def _observe_enter(
+        self,
+        context: StrategyContext,
+        ref: Any,
+        depth: int,
+    ) -> None:
+        self.observer.observe(
+            GraphObservation(
+                kind=KIND_SUBGRAPH_ENTER,
+                plan_ref=context.plan_ref,
+                occurred_at_ms=_now_ms(self.clock),
+                node_id=context.node_id,
+                depth=depth,
+                metadata=(
+                    ("entry_node", ref.entry_node),
+                    ("subgraph_plan_ref", ref.plan_ref),
+                    ("binding_edge", ref.binding_edge),
+                    ("return_on", ref.return_on),
+                ),
+            )
+        )
+
+    def _observe_exit(
+        self,
+        context: StrategyContext,
+        ref: Any,
+        depth: int,
+        *,
+        outcome: str,
+        error: str,
+    ) -> None:
+        self.observer.observe(
+            GraphObservation(
+                kind=KIND_SUBGRAPH_EXIT,
+                plan_ref=context.plan_ref,
+                occurred_at_ms=_now_ms(self.clock),
+                node_id=context.node_id,
+                depth=depth,
+                outcome=outcome,
+                error=error,
+                metadata=(
+                    ("entry_node", ref.entry_node),
+                    ("subgraph_plan_ref", ref.plan_ref),
+                    ("binding_edge", ref.binding_edge),
+                ),
+            )
+        )
+
+
+def _now_ms(clock: Callable[[], int] | None) -> int:
+    if clock is None:
+        import time as _time
+
+        return _time.monotonic_ns() // 1_000_000
+    return clock()
 
 
 def _load_subgraph_plan(plan_ref: str, entry_node: str) -> Plan:
@@ -141,8 +215,7 @@ def _load_subgraph_plan(plan_ref: str, entry_node: str) -> Plan:
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise TypeError(
-            f"bundle graph yaml must be a mapping at top level, "
-            f"got {type(raw).__name__}"
+            f"bundle graph yaml must be a mapping at top level, got {type(raw).__name__}"
         )
     spec = dict(raw)
     if "entry" not in spec and entry_node:

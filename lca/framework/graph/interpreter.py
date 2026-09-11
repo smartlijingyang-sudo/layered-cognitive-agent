@@ -1,4 +1,4 @@
-"""PlanInterpreter — single visit state machine for one :class:`Plan`.
+"""PlanInterpreter - single visit state machine for one :class:`Plan`.
 
 The kernel owns the visit loop:
 
@@ -7,7 +7,7 @@ while not traversal.terminated():
     node = plan.node(traversal.current_id)
     traversal.visit(node_id=node.id, max_visits=node.max_visits)
     strategy = registry.resolve(node.binding)
-    input = port_registry.build_input(schema.required_inputs())
+10→    input = port_registry.build_input(schema.required_inputs())
     output = await strategy.execute(strategy_context, input)
     port_registry.merge_output(output.port_values)
     recorder.record(VisitRecord(...))
@@ -17,7 +17,7 @@ while not traversal.terminated():
 
 The kernel does not implement binding-specific logic. Each strategy
 owns its own execute path. The kernel's job is:
-
+20→
 1. Track visits and enforce ``max_visits``.
 2. Build :class:`NodeInput` from the port registry using the
    strategy's declared schema.
@@ -27,24 +27,51 @@ owns its own execute path. The kernel's job is:
 Replaces the visit loops in the legacy interpreter classes deleted
 in the act-subgraph seam cutover (note 2026-09-11).
 
-Existing fixtures can opt in by calling
+30→Existing fixtures can opt in by calling
 :meth:`PlanInterpreter.run` instead of the legacy ``run`` /
 ``_drive`` entry points. PR-7 deletes the legacy entry points.
+
+Observability
+-------------
+The kernel emits one :class:`GraphObservation` per lifecycle event
+(visit start / visit end / edge / subgraph enter / subgraph exit)
+through the configured :class:`GraphObserver`. The kernel does
+not know EP names; :class:`GraphEpTable` is the only place that
+maps observation kinds to execution points.
 """
+
 from __future__ import annotations
 
-from collections.abc import Mapping
+import time
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
 from lca.contracts.protocols.graph.node_io import NodeOutput
-from lca.contracts.protocols.graph.plan import Plan
+from lca.contracts.protocols.graph.plan import Plan, PlanEdge, PlanNode
 from lca.contracts.protocols.graph.strategy import StrategyContext
 from lca.contracts.protocols.graph.visit import DispatchDecision, VisitRecord
+from lca.framework.graph.observation import (
+    KIND_EDGE,
+    KIND_VISIT_END,
+    KIND_VISIT_START,
+    GraphObservation,
+    GraphObserver,
+    NullGraphObserver,
+    inputs_of,
+    metadata_of,
+)
 from lca.framework.graph.port_registry import PortRegistry
 from lca.framework.graph.recorder import VisitRecorder
 from lca.framework.graph.strategy_registry import StrategyRegistry
 from lca.framework.graph.traversal import PlanTraversal, select_edge
+
+Clock = Callable[[], int]
+"""Monotonic millisecond clock. Default is ``time.monotonic_ns // 1_000_000``."""
+
+
+def _default_clock() -> int:
+    return time.monotonic_ns() // 1_000_000
 
 
 @dataclass
@@ -54,6 +81,8 @@ class PlanInterpreter:
     registry: StrategyRegistry
     recorder: VisitRecorder = field(default_factory=VisitRecorder)
     artifacts: Mapping[str, object] = field(default_factory=dict)
+    observer: GraphObserver = field(default_factory=NullGraphObserver)
+    clock: Clock = field(default=_default_clock)
 
     async def run(
         self,
@@ -76,14 +105,14 @@ class PlanInterpreter:
         visits: list[VisitRecord] = []
         facts: list = []
         terminal_node = traversal.current_id
+        depth = _resolve_depth(outer_state)
         while not traversal.terminated():
             node = plan.node(traversal.current_id)
+            self.observer.observe(_visit_start_of(node, plan.id, traversal, depth, self.clock()))
             traversal.visit(node_id=node.id, max_visits=node.max_visits)
             strategy = self.registry.resolve(node.binding)
             schema = node.io_schema
-            inputs = ports.build_input(
-                schema.required_inputs(), consumer_node=node.id
-            )
+            inputs = ports.build_input(schema.required_inputs(), consumer_node=node.id)
             context = StrategyContext(
                 plan_ref=plan.id,
                 node_id=node.id,
@@ -92,7 +121,25 @@ class PlanInterpreter:
                 subgraph_ref=node.subgraph_ref,
                 chain=(),
             )
-            output: NodeOutput = await strategy.execute(context, inputs)
+            visit_started = self.clock()
+            try:
+                output: NodeOutput = await strategy.execute(context, inputs)
+            except BaseException as exc:
+                self.observer.observe(
+                    _visit_end_of(
+                        node,
+                        plan.id,
+                        traversal.visit_counts.get(node.id, 1),
+                        depth,
+                        outcome="failure",
+                        error=repr(exc),
+                        elapsed_ms=self.clock() - visit_started,
+                        inputs=dict(inputs.port_values),
+                        outputs={},
+                        occurred_at_ms=self.clock(),
+                    )
+                )
+                raise
             ports.merge_output(output.port_values)
             edge = select_edge(
                 edges=plan.edges,
@@ -101,6 +148,23 @@ class PlanInterpreter:
                 artifacts=self.artifacts,
             )
             dispatch = self._classify(edge, output)
+            self.observer.observe(
+                _visit_end_of(
+                    node,
+                    plan.id,
+                    traversal.visit_counts.get(node.id, 1),
+                    depth,
+                    outcome="success",
+                    error="",
+                    elapsed_ms=self.clock() - visit_started,
+                    inputs=dict(inputs.port_values),
+                    outputs=dict(output.port_values),
+                    dispatch=dispatch.kind,
+                    occurred_at_ms=self.clock(),
+                )
+            )
+            if edge is not None:
+                self.observer.observe(_edge_of(plan.id, node.id, edge, depth, self.clock()))
             visit = VisitRecord(
                 plan_ref=plan.id,
                 node_id=node.id,
@@ -141,9 +205,7 @@ class InterpretationResult:
     output: dict[str, Any] = field(default_factory=dict)
 
 
-def _terminal_port_values(
-    ports: PortRegistry, plan: Plan
-) -> dict[str, Any]:
+def _terminal_port_values(ports: PortRegistry, plan: Plan) -> dict[str, Any]:
     """Project the terminal port set onto the plan's declared outputs.
 
     Falls back to the full snapshot when the plan declares no outputs.
@@ -200,4 +262,104 @@ def _result_discriminator(output: NodeOutput) -> Any:
     return _ResultView(output)
 
 
-__all__ = ["InterpretationResult", "PlanInterpreter"]
+def _resolve_depth(outer_state: Any) -> int:
+    """Read ``graph_depth`` off an AgentState-shaped outer state, default 1."""
+    depth = getattr(outer_state, "graph_depth", None)
+    if isinstance(depth, int) and depth > 0:
+        return depth
+    return 1
+
+
+def _visit_start_of(
+    node: PlanNode,
+    plan_ref: str,
+    traversal: PlanTraversal,
+    depth: int,
+    occurred_at_ms: int,
+) -> GraphObservation:
+    node_index = traversal.visit_counts.get(node.id, 0) + 1
+    return GraphObservation(
+        kind=KIND_VISIT_START,
+        plan_ref=plan_ref,
+        occurred_at_ms=occurred_at_ms,
+        node_id=node.id,
+        node_index=node_index,
+        depth=depth,
+        binding=node.binding.value,
+        metadata=metadata_of(
+            binding=node.binding,
+            purpose=str(node.config.get("purpose", "")),
+            region=str(node.config.get("region", "")),
+            max_visits=node.max_visits,
+            subgraph_plan_ref=(node.subgraph_ref.plan_ref if node.subgraph_ref else ""),
+        ),
+    )
+
+
+def _visit_end_of(
+    node: PlanNode,
+    plan_ref: str,
+    node_index: int,
+    depth: int,
+    *,
+    outcome: str,
+    error: str,
+    elapsed_ms: int,
+    inputs: Mapping[str, Any],
+    outputs: Mapping[str, Any],
+    dispatch: str = "",
+    occurred_at_ms: int = 0,
+) -> GraphObservation:
+    return GraphObservation(
+        kind=KIND_VISIT_END,
+        plan_ref=plan_ref,
+        occurred_at_ms=occurred_at_ms,
+        node_id=node.id,
+        node_index=node_index,
+        depth=depth,
+        binding=node.binding.value,
+        dispatch=dispatch,
+        outcome=outcome,
+        error=error,
+        elapsed_ms=elapsed_ms,
+        inputs=inputs_of(inputs),
+        outputs=inputs_of(outputs),
+        metadata=metadata_of(
+            binding=node.binding,
+            purpose=str(node.config.get("purpose", "")),
+            region=str(node.config.get("region", "")),
+            max_visits=node.max_visits,
+            subgraph_plan_ref=(node.subgraph_ref.plan_ref if node.subgraph_ref else ""),
+        ),
+    )
+
+
+def _edge_of(
+    plan_ref: str,
+    from_node: str,
+    edge: PlanEdge,
+    depth: int,
+    occurred_at_ms: int,
+) -> GraphObservation:
+    edge_id = f"{from_node}->{edge.target}"
+    return GraphObservation(
+        kind=KIND_EDGE,
+        plan_ref=plan_ref,
+        occurred_at_ms=occurred_at_ms,
+        depth=depth,
+        edge_id=edge_id,
+        from_node=from_node,
+        to_node=edge.target,
+        metadata=(("when", edge.when),),
+    )
+
+
+__all__ = [
+    "Clock",
+    "InterpretationResult",
+    "PlanInterpreter",
+    "_default_clock",
+    "_edge_of",
+    "_visit_end_of",
+    "_visit_start_of",
+]
