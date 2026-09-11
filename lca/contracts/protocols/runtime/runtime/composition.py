@@ -69,16 +69,14 @@ class DeclarativeInterpreter(Protocol):
     """Execute a previously assembled declarative phase graph.
 
     Graph, state, and outcome carriers remain opaque at the composition boundary.
-    The two properties nevertheless enforce the required asynchronous fresh-run
-    and resume entry points without coupling alternative implementations to the
-    default interpreter's internal carrier types.
+    ``run`` / ``resume`` are async callables; ``lca.loop.driver`` and the run-loop
+    call them as bound methods (e.g. ``await interpreter.run(executable, ...)``),
+    so this Protocol must declare methods, not properties.
     """
 
-    @property
-    def run(self) -> Callable[..., Awaitable[object]]: ...
+    async def run(self, executable: object, **kwargs: object) -> object: ...
 
-    @property
-    def resume(self) -> Callable[..., Awaitable[object]]: ...
+    async def resume(self, executable: object, **kwargs: object) -> object: ...
 
 
 @runtime_checkable
