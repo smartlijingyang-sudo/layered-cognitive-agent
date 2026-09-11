@@ -1,0 +1,39 @@
+# bundles/concept/reflection_critique.yaml — Layer 2 概念图
+# ADR-0220 §3.3 — EffectReceipt → Reflection typed boundary(cross-graph
+# transport)。
+#
+# 节点命名:2 节点全部以 reflect. 起首,与 §0.4 N9 action-domain 闭集一致
+# (reflect.* 在闭集内)。
+#
+# 跨图引用:
+#   inputs  -> business.reflection.turn 的 receipt port
+#   outputs -> business.memory.turn 的 reflection port
+#
+# delete-when: N/A(纯加法,business.reflection.turn 在 P8 引用)。
+
+id: concept.reflection.critique
+region: concept
+purpose: EffectReceipt → Reflection typed boundary (2-stage observation build + critique run)
+
+nodes:
+  - id: reflect.observation.build
+    factory: reflect.observation.build
+    inputs: [receipt]
+    outputs: [observation]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+
+  - id: reflect.critique.run
+    factory: reflect.critique.run
+    inputs: [observation, state]
+    outputs: [reflection]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+
+edges:
+  - source: reflect.observation.build
+    target: reflect.critique.run

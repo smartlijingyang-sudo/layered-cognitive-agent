@@ -76,6 +76,24 @@ ALLOWED_ACTION_DOMAINS: frozenset[str] = frozenset(
         # domain-specific prefixes whose actions are still composable
         # into the layer-2 vocabulary.
         "reason",
+        # ADR-0220 §3.4: business.action.turn + concept.action.turn use
+        # the ``act.*`` domain namespace for the 3-node action sequence
+        # (act.action.resolve / act.capability.grant / act.effect.execute).
+        # Same spec-gap rationale as ``reason`` above: business graphs
+        # layer on the §0.4 N9 closed set.
+        "act",
+        # ADR-0220 §3.4: business.run.phase uses ``remember.turn`` as
+        # the memory-write phase node id (the §3.3 ``memory.*``
+        # vocabulary describes the inner concept graph; ``remember.*``
+        # is the business-graph phase alias that maps to
+        # business.memory.turn).
+        "remember",
+        # ADR-0220 §3.4: business.run.phase's terminator node is named
+        # ``loop.back`` (the loop-back edge consumer). Loop control is
+        # a top-level phase-graph concern, not a domain action — it
+        # belongs to the business graph's outer topology rather than
+        # to the layer-1/2 N9 closed-set vocabulary.
+        "loop",
     }
 )
 

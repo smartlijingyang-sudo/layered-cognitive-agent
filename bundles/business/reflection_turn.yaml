@@ -1,0 +1,44 @@
+# bundles/business/reflection_turn.yaml — Layer 3 业务图
+# ADR-0220 §3.4 — EffectReceipt → Reflection (无 LLM 错误反查)
+#
+# 单节点业务图,只引用 ``concept.reflection.critique``。节点名
+# ``reflect.critique.run`` 取自 §3.3 concept graph 的最后一个节点(也是
+# Reflection 的生产节点)。本图把 EffectReceipt typed boundary 接进来,
+# 由 concept.reflection.critique 内部 reflect.observation.build + reflect.
+# critique.run 两节点完成 EffectReceipt → Observation → Reflection 投影。
+#
+# §3.4 业务图节点 = `sub_spec_ref:` 引用另一个图,不写实现。
+#
+# 跨图引用:
+#   reflect.critique.run -> concept.reflection.critique
+#     (entry: reflect.observation.build)
+#
+# delete-when: N/A(纯加法,P10 删 compat 旧 bundle)。
+
+id: business.reflection.turn
+region: business
+purpose: EffectReceipt → Reflection typed boundary (concept.reflection.critique delegation)
+
+inputs:
+  - port: receipt
+  - port: state
+
+nodes:
+  - id: reflect.critique.run
+    factory: business.reflection.ref
+    inputs: [receipt, state]
+    outputs: [reflection]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+      sub_spec_ref:
+        plan_ref: bundles/concept/reflection_critique.yaml
+        entry_node: reflect.observation.build
+        binding_edge: reflect.critique.run
+
+edges: []
+
+outputs:
+  - port: reflection
+    type: Reflection

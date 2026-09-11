@@ -1,0 +1,41 @@
+# bundles/concept/stop_should_check.yaml — Layer 2 概念图
+# ADR-0220 §3.3 — state + Decision + Observation + Reflection + MemoryReceipt
+# → StopPayload typed boundary(cross-graph transport, business.run.phase
+# loop-back edge consumer)。
+#
+# 节点命名:2 节点全部以 stop. 起首,与 §0.4 N9 action-domain 闭集一致
+# (stop.* 在闭集内)。
+#
+# 跨图引用:
+#   inputs  -> business.stop.turn 的 state + decision + observation +
+   reflection + memory_receipt ports
+#   outputs -> business.run.phase loop-back edge 的 stop_payload port
+#
+# delete-when: N/A(纯加法,business.stop.turn + business.run.phase 在 P8 引用)。
+
+id: concept.stop.should_check
+region: concept
+purpose: state + Decision + Observation + Reflection + MemoryReceipt → StopPayload typed boundary (2-stage decide + converge)
+
+nodes:
+  - id: stop.should.decide
+    factory: stop.should.decide
+    inputs: [state, decision, observation, reflection]
+    outputs: [stop_decision]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+
+  - id: stop.focus.converge
+    factory: stop.focus.converge
+    inputs: [stop_decision, memory_receipt]
+    outputs: [stop_payload]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+
+edges:
+  - source: stop.should.decide
+    target: stop.focus.converge

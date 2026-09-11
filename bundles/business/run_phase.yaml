@@ -1,0 +1,149 @@
+# bundles/business/run_phase.yaml — Layer 3 业务图(顶层 phase 图)
+# ADR-0220 §3.4 — 一次完整 run 的 6 phase + loop-back 边
+#
+# 节点命名:7 节点都是 phase 别名(perceive.turn / reason.turn /
+# act.turn / reflect.turn / remember.turn / stop.decide) + 1 loop-back
+# 节点 ``loop.back``。每个 phase 节点 = `sub_spec_ref:` 指向一张
+# ``business.<phase>.turn`` 图, profile 改业务 = 替换某 phase 引用的
+# 子图, 不动 ``business.run.phase`` 拓扑(强化 ADR-0220 §3.4
+# "profile 换业务 = 换 business.run.phase 引用的子图,不动
+# business.run.phase 拓扑")。
+#
+# interpreter v2 升级:跑本图(单图),完全不知道 ``think`` / ``act``
+# 字面 (强化 ADR-0219 N1, 强化 ADR-0220 §3.4)。
+#
+# delete-when: N/A(本图替代 declarative-phase-graph.yaml 的 phase.
+# topology.standard, P10 删 compat 旧 bundle)。
+#
+# 跨图引用:
+#   perceive.turn  -> business.perceive.turn
+#   reason.turn    -> business.reasoning.turn
+#   act.turn       -> business.action.turn
+#   reflect.turn   -> business.reflection.turn
+#   remember.turn  -> business.memory.turn
+#   stop.decide    -> business.stop.turn
+#   loop.back      -> business.run.phase 自身 (loop-back edge)
+
+id: business.run.phase
+region: business
+purpose: 6 phase + 1 loop-back — 一次完整 run 的 typed DTO 流
+
+inputs:
+  - port: run_input
+  - port: bindings
+  - port: llm
+  - port: tools
+  - port: role
+  - port: selector
+  - port: state
+
+nodes:
+  # 6 phase 节点 — 每个引用一张 business.<phase>.turn 图
+  - id: perceive.turn
+    factory: business.run.phase.ref
+    inputs: [run_input, state]
+    outputs: [manifest]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+      sub_spec_ref:
+        plan_ref: bundles/business/perceive_turn.yaml
+        entry_node: perceive.manifest.compose
+        binding_edge: perceive.turn
+
+  - id: reason.turn
+    factory: business.run.phase.ref
+    inputs: [bindings, llm, tools, role, selector, state, manifest]
+    outputs: [decision]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+      sub_spec_ref:
+        plan_ref: bundles/business/reasoning_turn.yaml
+        entry_node: reason.prepare.tools
+        binding_edge: reason.turn
+
+  - id: act.turn
+    factory: business.run.phase.ref
+    inputs: [decision, state]
+    outputs: [receipt]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+      sub_spec_ref:
+        plan_ref: bundles/business/action_turn.yaml
+        entry_node: act.effect.execute
+        binding_edge: act.turn
+
+  - id: reflect.turn
+    factory: business.run.phase.ref
+    inputs: [receipt, state]
+    outputs: [reflection]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+      sub_spec_ref:
+        plan_ref: bundles/business/reflection_turn.yaml
+        entry_node: reflect.critique.run
+        binding_edge: reflect.turn
+
+  - id: remember.turn
+    factory: business.run.phase.ref
+    inputs: [reflection, receipt, state]
+    outputs: [memory_receipt]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+      sub_spec_ref:
+        plan_ref: bundles/business/memory_turn.yaml
+        entry_node: memory.write.dispatch
+        binding_edge: remember.turn
+
+  - id: stop.decide
+    factory: business.run.phase.ref
+    inputs: [state, decision, receipt, reflection, memory_receipt]
+    outputs: [stop_payload]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+      sub_spec_ref:
+        plan_ref: bundles/business/stop_turn.yaml
+        entry_node: stop.should.decide
+        binding_edge: stop.decide
+
+  # loop-back 节点 — 不调任何 capability, 把 stop_payload 当 typed
+  # boundary 投影到 perceive.turn 的下一次迭代。driver 看到
+  # ``stop_payload.should_stop=True`` 走 "no next edge" 路径,自然终止。
+  - id: loop.back
+    factory: business.run.phase.loop
+    inputs: [stop_payload]
+    outputs: [stop_payload]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+
+edges:
+  # 6 phase 顺序
+  - source: perceive.turn
+    target: reason.turn
+  - source: reason.turn
+    target: act.turn
+  - source: act.turn
+    target: reflect.turn
+  - source: reflect.turn
+    target: remember.turn
+  - source: remember.turn
+    target: stop.decide
+  - source: stop.decide
+    target: loop.back
+
+outputs:
+  - port: stop_payload
+    type: StopPayload

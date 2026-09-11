@@ -1,0 +1,39 @@
+# bundles/concept/memory_write.yaml — Layer 2 概念图
+# ADR-0220 §3.3 — Reflection + MemoryReceipt(admit) + Observation + state
+# → MemoryReceipt(written) typed boundary(cross-graph transport)。
+#
+# 节点命名:2 节点全部以 memory. 起首,与 §0.4 N9 action-domain 闭集一致
+# (memory.* 在闭集内)。
+#
+# 跨图引用:
+#   inputs  -> business.memory.turn 的 reflection port
+#   outputs -> business.stop.turn 的 memory_receipt port
+#
+# delete-when: N/A(纯加法,business.memory.turn 在 P8 引用)。
+
+id: concept.memory.write
+region: concept
+purpose: Reflection → MemoryReceipt typed boundary (admit policy + MemorySystem write dispatch)
+
+nodes:
+  - id: memory.admit.policy
+    factory: memory.admit.policy
+    inputs: [reflection]
+    outputs: [memory_receipt]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+
+  - id: memory.write.dispatch
+    factory: memory.write.dispatch
+    inputs: [memory_receipt, observation, reflection, state]
+    outputs: [memory_receipt]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+
+edges:
+  - source: memory.admit.policy
+    target: memory.write.dispatch

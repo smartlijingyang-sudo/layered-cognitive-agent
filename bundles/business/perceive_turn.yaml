@@ -1,0 +1,43 @@
+# bundles/business/perceive_turn.yaml — Layer 3 业务图
+# ADR-0220 §3.4 — run_input + memory → ContextManifest (4-node perceive
+# 序列封装在 ``concept.perceive.turn`` 内)。
+#
+# 单节点业务图(4 个 perceive.* 节点封装在 ``concept.perceive.turn`` 内),
+# 引用 ``concept.perceive.turn`` 一张概念图。节点名 ``perceive.manifest.compose``
+# 取自 §3.4 business-graph 表(也匹配 §3.3 concept graph 的最后一个
+# 节点 — sub_spec_ref.entry_node 走 perceive.manifest.compose,整个
+# concept graph 跑完返回 typed ContextManifest)。
+#
+# 跨图引用:
+#   perceive.manifest.compose -> concept.perceive.turn
+#     (entry: perceive.input.collect)
+#
+# delete-when: N/A(纯加法,P10 删 compat 旧 bundle)。
+
+id: business.perceive.turn
+region: business
+purpose: run_input + state → ContextManifest typed boundary (concept.perceive.turn delegation)
+
+inputs:
+  - port: run_input
+  - port: state
+
+nodes:
+  - id: perceive.manifest.compose
+    factory: business.perceive.ref
+    inputs: [run_input, state]
+    outputs: [manifest]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+      sub_spec_ref:
+        plan_ref: bundles/concept/perceive_turn.yaml
+        entry_node: perceive.input.collect
+        binding_edge: perceive.manifest.compose
+
+edges: []
+
+outputs:
+  - port: manifest
+    type: ContextManifest

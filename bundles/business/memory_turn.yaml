@@ -1,0 +1,41 @@
+# bundles/business/memory_turn.yaml — Layer 3 业务图
+# ADR-0220 §3.4 — Reflection + MemoryReceipt(admit) + Observation + state
+# → MemoryReceipt(written) typed boundary
+#
+# 单节点业务图,引用 ``concept.memory.write``。节点名 ``memory.write.dispatch``
+# 取自 §3.3 concept graph 的最后一个节点(也是 MemorySystem.write 入口)。
+#
+# 跨图引用:
+#   memory.write.dispatch -> concept.memory.write
+#     (entry: memory.admit.policy)
+#
+# delete-when: N/A(纯加法,P10 删 compat 旧 bundle)。
+
+id: business.memory.turn
+region: business
+purpose: Reflection + Observation + state → MemoryReceipt typed boundary (concept.memory.write delegation)
+
+inputs:
+  - port: reflection
+  - port: observation
+  - port: state
+
+nodes:
+  - id: memory.write.dispatch
+    factory: business.memory.ref
+    inputs: [reflection, observation, state]
+    outputs: [memory_receipt]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+      sub_spec_ref:
+        plan_ref: bundles/concept/memory_write.yaml
+        entry_node: memory.admit.policy
+        binding_edge: memory.write.dispatch
+
+edges: []
+
+outputs:
+  - port: memory_receipt
+    type: MemoryReceipt

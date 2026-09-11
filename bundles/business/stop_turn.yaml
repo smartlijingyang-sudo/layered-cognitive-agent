@@ -1,0 +1,45 @@
+# bundles/business/stop_turn.yaml — Layer 3 业务图
+# ADR-0220 §3.4 — state + Decision + Observation + Reflection + MemoryReceipt
+# → StopPayload typed boundary
+#
+# 单节点业务图,引用 ``concept.stop.should_check``。节点名
+# ``stop.should.decide`` 取自 §3.3 concept graph 的第一个节点(也是
+# StopPolicy.decide 入口)。本图把 business.run.phase loop-back 边的
+# typed payloads 接进来。
+#
+# 跨图引用:
+#   stop.should.decide -> concept.stop.should_check
+#     (entry: stop.should.decide)
+#
+# delete-when: N/A(纯加法,P10 删 compat 旧 bundle)。
+
+id: business.stop.turn
+region: business
+purpose: state + Decision + Observation + Reflection + MemoryReceipt → StopPayload typed boundary
+
+inputs:
+  - port: state
+  - port: decision
+  - port: observation
+  - port: reflection
+  - port: memory_receipt
+
+nodes:
+  - id: stop.should.decide
+    factory: business.stop.ref
+    inputs: [state, decision, observation, reflection, memory_receipt]
+    outputs: [stop_payload]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+      sub_spec_ref:
+        plan_ref: bundles/concept/stop_should_check.yaml
+        entry_node: stop.should.decide
+        binding_edge: stop.should.decide
+
+edges: []
+
+outputs:
+  - port: stop_payload
+    type: StopPayload

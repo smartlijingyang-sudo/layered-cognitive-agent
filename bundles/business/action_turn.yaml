@@ -1,0 +1,41 @@
+# bundles/business/action_turn.yaml — Layer 3 业务图
+# ADR-0220 §3.4 — Decision → EffectReceipt typed boundary
+#
+# 单节点业务图(3 个 act.* 节点封装在 ``concept.action.turn`` 内),
+# 引用 ``concept.action.turn`` 一张概念图。节点名 ``act.effect.execute``
+# 取自 §3.4 business-graph 表(也匹配 §3.3 concept graph 的最后一个
+# 节点 — sub_spec_ref.entry_node 走 effect.execute,整个 concept
+# graph 跑完返回 typed EffectReceipt)。
+#
+# 跨图引用:
+#   act.effect.execute -> concept.action.turn (entry: act.action.resolve)
+#
+# delete-when: N/A(纯加法,P10 删 compat 旧 bundle)。
+
+id: business.action.turn
+region: business
+purpose: Decision → EffectReceipt typed boundary (concept.action.turn delegation)
+
+inputs:
+  - port: decision
+  - port: state
+
+nodes:
+  - id: act.effect.execute
+    factory: business.action.ref
+    inputs: [decision, state]
+    outputs: [receipt]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+      sub_spec_ref:
+        plan_ref: bundles/concept/action_turn.yaml
+        entry_node: act.action.resolve
+        binding_edge: act.effect.execute
+
+edges: []
+
+outputs:
+  - port: receipt
+    type: EffectReceipt
