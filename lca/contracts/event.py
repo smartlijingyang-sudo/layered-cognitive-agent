@@ -122,6 +122,8 @@ class Category(str, Enum):
     SPINE_PHASE_GRAPH_NODE_START = "spine.phase_graph.node.start"
     SPINE_PHASE_GRAPH_NODE_END = "spine.phase_graph.node.end"
     SPINE_PHASE_GRAPH_EDGE_TRANSIT = "spine.phase_graph.edge.transit"
+    SPINE_PHASE_GRAPH_SUBGRAPH_ENTER = "spine.phase_graph.subgraph.enter"
+    SPINE_PHASE_GRAPH_SUBGRAPH_EXIT = "spine.phase_graph.subgraph.exit"
     SPINE_PHASE_GRAPH_INSTRUMENT_COVERAGE = "spine.phase_graph.instrument.coverage"
     # observability/spine — PR-6 team / perception / control / boot / runtime.observed 新加 28 EP
     SPINE_TEAM_CASTING_STARTED = "spine.team.casting.started"
@@ -280,6 +282,8 @@ CATEGORY_DEFAULT_PLANE: dict[Category, Plane] = {
     Category.SPINE_PHASE_GRAPH_NODE_START: Plane.OBSERVABILITY,
     Category.SPINE_PHASE_GRAPH_NODE_END: Plane.OBSERVABILITY,
     Category.SPINE_PHASE_GRAPH_EDGE_TRANSIT: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_GRAPH_SUBGRAPH_ENTER: Plane.OBSERVABILITY,
+    Category.SPINE_PHASE_GRAPH_SUBGRAPH_EXIT: Plane.OBSERVABILITY,
     Category.SPINE_PHASE_GRAPH_INSTRUMENT_COVERAGE: Plane.OBSERVABILITY,
     Category.SPINE_TEAM_CASTING_STARTED: Plane.STRUCTURAL,
     Category.SPINE_TEAM_CASTING_COMPLETED: Plane.STRUCTURAL,

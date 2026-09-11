@@ -853,6 +853,31 @@ events:
     publishers:
       - events.spine.loop_cursor
 
+  - category: spine.phase_graph.subgraph.enter
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
+    fields:
+      plan_ref: str
+      entry_node: str
+      binding_edge: str
+      depth: int
+      outer_node_id: str
+    publishers:
+      - events.spine.loop_cursor
+
+  - category: spine.phase_graph.subgraph.exit
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
+    fields:
+      plan_ref: str
+      entry_node: str
+      outcome: str
+      depth: int
+      outer_node_id: str
+      error: str
+    publishers:
+      - events.spine.loop_cursor
+
   - category: spine.phase_graph.instrument.coverage
     plane: lca.contracts.event.Plane.OBSERVABILITY
     payload_class: lca_kernel.events.payloads.spine.SpineEventPayload

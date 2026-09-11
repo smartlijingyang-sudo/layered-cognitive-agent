@@ -44,6 +44,7 @@ Boundaries:
 from __future__ import annotations
 
 import contextlib
+import logging
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import replace
 from typing import Any
@@ -86,6 +87,8 @@ from lca.harness.graph.execute.v2.node_output_projector import (
     schema_from_node_config,
 )
 from lca.loop.emit.node_emitter import emit_for_node, emit_reasoner_meta_for_node
+
+_log = logging.getLogger(__name__)
 
 MAX_SUBGRAPH_DEPTH_DEFAULT = 8
 ObserverFn = Callable[[str, dict[str, Any]], Awaitable[None]]
@@ -225,6 +228,12 @@ class NodeGraphDriver:
                     )
                 sub_runner = self._sub_runner
                 sub_channel = self._channel_factory()
+                _log.debug(
+                    "node.subgraph_delegate plan_ref=%s node_id=%s sub_spec_ref=%s",
+                    self._plan_ref,
+                    current_id,
+                    node.sub_spec_ref,
+                )
                 sub_state, sub_output = await sub_runner.run(
                     ref=node.sub_spec_ref,
                     outer_state=outer_state,
@@ -303,6 +312,27 @@ class NodeGraphDriver:
                 executor = self._scope.resolve_factory(node.factory, node.region)
             except FactoryResolutionError as exc:
                 # fail-loud:registry 无法解析 → 返回 FAILED outcome
+                # Fire observer start+end so the failure is visible in traces.
+                await _emit_observers(
+                    self._observers,
+                    "phase_graph.node.start",
+                    {
+                        "plan_ref": self._plan_ref,
+                        "node_id": current_id,
+                        "purpose": node.purpose,
+                    },
+                )
+                await _emit_observers(
+                    self._observers,
+                    "phase_graph.node.end",
+                    {
+                        "plan_ref": self._plan_ref,
+                        "node_id": current_id,
+                        "purpose": node.purpose,
+                        "result_kind": "failure",
+                        "error": f"FactoryResolutionError: {exc}",
+                    },
+                )
                 return _failed_result(
                     plan_ref=self._plan_ref,
                     outer_state=outer_state,
@@ -326,6 +356,19 @@ class NodeGraphDriver:
             declared_inputs = getattr(executor, "declared_inputs", ())
             inp = port_context.build_input(declared_inputs)
 
+            # 观察面 emit: start fires before execution, end fires after
+            # (both success and failure paths). Observer failures are
+            # contained — observation never blocks execution.
+            await _emit_observers(
+                self._observers,
+                "phase_graph.node.start",
+                {
+                    "plan_ref": self._plan_ref,
+                    "node_id": current_id,
+                    "purpose": node.purpose,
+                },
+            )
+
             try:
                 out = await self._execute_with_emits(
                     executor=executor,
@@ -335,6 +378,17 @@ class NodeGraphDriver:
                     state=outer_state,
                 )
             except Exception as exc:
+                await _emit_observers(
+                    self._observers,
+                    "phase_graph.node.end",
+                    {
+                        "plan_ref": self._plan_ref,
+                        "node_id": current_id,
+                        "purpose": node.purpose,
+                        "result_kind": "failure",
+                        "error": f"{type(exc).__name__}: {exc}",
+                    },
+                )
                 return _failed_result(
                     plan_ref=self._plan_ref,
                     outer_state=outer_state,
@@ -349,16 +403,6 @@ class NodeGraphDriver:
             phase_result = _project_node_output(out, schema)
             facts.extend(phase_result.facts)
 
-            # 观察面 emit(framework 复用 EP,不引入新词表)
-            await _emit_observers(
-                self._observers,
-                "phase_graph.node.start",
-                {
-                    "plan_ref": self._plan_ref,
-                    "node_id": current_id,
-                    "purpose": node.purpose,
-                },
-            )
             await _emit_observers(
                 self._observers,
                 "phase_graph.node.end",

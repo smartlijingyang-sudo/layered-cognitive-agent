@@ -11,6 +11,7 @@ tests and downstream callers.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -81,6 +82,8 @@ from lca.harness.graph.traversal import PhaseTraversal
 from lca.harness.plan import compiled_run_plan_ref
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.loop.transaction import PhaseExecutionTransaction
+
+_log = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -375,7 +378,9 @@ class GenericPlanInterpreter:
         # When ``capabilities=`` is not passed by the caller, fall back
         # to whatever the interpreter was wired with at setup time so
         # phase executors can still resolve brain / body / memory.
-        self._active_capabilities = capabilities if capabilities is not None else self._active_capabilities
+        self._active_capabilities = (
+            capabilities if capabilities is not None else self._active_capabilities
+        )
 
         try:
             while True:
@@ -449,7 +454,9 @@ class GenericPlanInterpreter:
                             f"no validated next edge from node: {node.id} after sub_spec",
                         )
                     visits.append(
-                        PhaseVisit(node.id, node.semantic_phase, virtual_result.result_kind, edge.target)
+                        PhaseVisit(
+                            node.id, node.semantic_phase, virtual_result.result_kind, edge.target
+                        )
                     )
                     payload = virtual_result.payload
                     traversal.record_result(
@@ -779,6 +786,14 @@ class GenericPlanInterpreter:
             )
 
         emitter = self._subgraph_hook_emitter
+        _log.debug(
+            "subgraph.enter plan_ref=%s entry_node=%s binding_edge=%s depth=%d outer_node=%s",
+            ref.plan_ref,
+            ref.entry_node,
+            ref.binding_edge,
+            depth,
+            current_node_id,
+        )
         self._emit_subgraph_hook(
             emitter,
             SubgraphHookContext(
@@ -817,14 +832,20 @@ class GenericPlanInterpreter:
             # the only thing that should fail loud.
             outcome = "execution_error"
             error = f"{type(exc).__name__}: {exc}"
-            import structlog
-            structlog.get_logger(__name__).warning(
-                "subgraph_ref_failed_falling_through",
-                plan_ref=ref.plan_ref,
-                entry_node=ref.entry_node,
-                error=error,
+            _log.warning(
+                "subgraph_ref_failed_falling_through plan_ref=%s entry_node=%s error=%s",
+                ref.plan_ref,
+                ref.entry_node,
+                error,
             )
         finally:
+            _log.debug(
+                "subgraph.exit plan_ref=%s entry_node=%s outcome=%s error=%s",
+                ref.plan_ref,
+                ref.entry_node,
+                outcome,
+                error,
+            )
             self._emit_subgraph_hook(
                 emitter,
                 SubgraphHookContext(
@@ -978,6 +999,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     runtime = getattr(ctx, "_runtime", None)
     runtime_inject = runtime().inject if callable(runtime) else None
     if runtime_inject is not None:
+
         def _safe_inject(key: str) -> object | None:
             try:
                 return runtime_inject(key)
@@ -1004,6 +1026,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
             from lca.harness.declarative.compile.phase.capabilities import (
                 MappingPhaseCapabilities,
             )
+
             interpreter._active_capabilities = MappingPhaseCapabilities(capabilities)
     ctx.provide("declarative_interpreter", interpreter)
 

@@ -35,11 +35,18 @@ def register(app: typer.Typer) -> None:
     def run_replay_cmd(
         run_id: str = typer.Argument(..., help="run_id (例: run_xxx)"),
         json_mode: bool = typer.Option(True, "--json/--human", help="默认 --json"),
+        show_graph: bool = typer.Option(
+            False, "--show-graph", help="Print phase_graph node/subgraph timeline from spine."
+        ),
     ) -> None:
         facts = _load_facts(run_id)
         if not facts:
             typer.echo(f"no facts for run_id={run_id}", err=True)
             raise typer.Exit(code=1)
+
+        if show_graph:
+            _render_graph_timeline(facts)
+            return
 
         blueprint = _find_blueprint(facts)
         if blueprint is None:
@@ -76,7 +83,8 @@ def _load_facts(run_id: str) -> list[dict[str, Any]]:
             obj = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if (obj.get("execution_point") or "").startswith(("observation.", "diagnosis.")):
+        ep = obj.get("execution_point") or ""
+        if ep.startswith(("observation.", "diagnosis.", "phase_graph.")):
             out.append(obj)
     return out
 
@@ -109,6 +117,39 @@ def _typed(facts: list[dict[str, Any]], ep: str, model: type) -> list:
     return out
 
 
+def _render_graph_timeline(facts: list[dict[str, Any]]) -> None:
+    """Print a timeline of phase_graph node and subgraph events from spine."""
+    graph_events = [f for f in facts if (f.get("execution_point") or "").startswith("phase_graph.")]
+    if not graph_events:
+        typer.echo("no phase_graph events in spine")
+        return
+    typer.echo(f"[graph] {len(graph_events)} phase_graph events")
+    for f in graph_events:
+        ep = f.get("execution_point", "")
+        payload = f.get("payload") or f.get("data") or {}
+        if ep == "phase_graph.node.start":
+            typer.echo(f"  ▶ node.start  node={payload.get('node_id', '?')}")
+        elif ep == "phase_graph.node.end":
+            outcome = payload.get("outcome", "?")
+            marker = "✓" if outcome == "success" else "✗"
+            error = payload.get("exception_message", "")
+            line = f"  {marker} node.end    node={payload.get('node_id', '?')} outcome={outcome}"
+            if error:
+                line += f" error={error}"
+            typer.echo(line)
+        elif ep == "phase_graph.subgraph.enter":
+            typer.echo(
+                f"  ➤ subgraph.enter plan={payload.get('plan_ref', '?')} "
+                f"entry={payload.get('entry_node', '?')} depth={payload.get('depth', 0)}"
+            )
+        elif ep == "phase_graph.subgraph.exit":
+            outcome = payload.get("outcome", "?")
+            typer.echo(
+                f"  ◼ subgraph.exit  plan={payload.get('plan_ref', '?')} "
+                f"outcome={outcome} depth={payload.get('depth', 0)}"
+            )
+
+
 def _render_human(replay: RunReplay) -> None:
     typer.echo(
         f"[replay] run_id={replay.run_id} plan_ref={replay.plan_ref} "
@@ -121,9 +162,12 @@ def _render_human(replay: RunReplay) -> None:
     )
     for step in replay.replay_steps:
         marker = "✓" if step.status == "visited" else "✗"
+        sub_graph = step.node_id or "-"
+        # Show subgraph nesting when sub_graph_id is present in the payload
+        anomalies = list(step.anomalies)
         typer.echo(
-            f"  [{marker}] step={step.step:2d} {step.node_id or '-':30s} "
-            f"phase={step.phase or '-':10s} anomalies={list(step.anomalies)}"
+            f"  [{marker}] step={step.step:2d} {sub_graph:30s} "
+            f"phase={step.phase or '-':10s} anomalies={anomalies}"
         )
 
 

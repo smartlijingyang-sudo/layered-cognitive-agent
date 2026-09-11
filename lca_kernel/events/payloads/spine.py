@@ -104,6 +104,8 @@ SPINE_EXECUTION_POINTS: tuple[str, ...] = (
     "phase_graph.node.start",
     "phase_graph.node.end",
     "phase_graph.edge.transit",
+    "phase_graph.subgraph.enter",
+    "phase_graph.subgraph.exit",
     # Exception/finally
     "exception.caught",
     "exception.finally",
@@ -280,6 +282,8 @@ _SPINE_EP_TO_CATEGORY: dict[str, str] = {
     "phase_graph.node.start": "spine.phase_graph.node.start",
     "phase_graph.node.end": "spine.phase_graph.node.end",
     "phase_graph.edge.transit": "spine.phase_graph.edge.transit",
+    "phase_graph.subgraph.enter": "spine.phase_graph.subgraph.enter",
+    "phase_graph.subgraph.exit": "spine.phase_graph.subgraph.exit",
     "phase_graph.instrument.coverage": "spine.phase_graph.instrument.coverage",
     # Team (PR-6)
     "team.casting.started": "spine.team.casting.started",

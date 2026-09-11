@@ -74,6 +74,8 @@ class DebugRunReport:
     plan_ref: str = ""
     # ADR-0167 D10:replay 是多命令组合——dump messages、grep 同 plan、复现骨架。
     replay_commands: tuple[str, ...] = ()
+    # Graph trajectory: phase-graph node/subgraph execution trace from spine.
+    graph_trajectory: tuple[dict[str, Any], ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -96,6 +98,7 @@ class DebugRunReport:
             "suggested_action": self.suggested_action,
             "plan_ref": self.plan_ref,
             "replay_commands": list(self.replay_commands),
+            "graph_trajectory": list(self.graph_trajectory),
         }
 
     def render_text(self) -> str:
@@ -152,6 +155,40 @@ class DebugRunReport:
                 lines.append(f"{prefix} {cmd}")
         else:
             lines.append("      (no replay commands)")
+        # [9/9] graph trajectory — phase-graph node/subgraph execution trace.
+        lines.append("[9/9] graph.trajectory")
+        if not self.graph_trajectory:
+            lines.append("      (no phase_graph events in spine)")
+        else:
+            node_count = sum(1 for e in self.graph_trajectory if e.get("kind") == "node")
+            subgraph_count = sum(1 for e in self.graph_trajectory if e.get("kind") == "subgraph")
+            failure_nodes = [
+                e
+                for e in self.graph_trajectory
+                if e.get("kind") == "node" and e.get("outcome") == "failure"
+            ]
+            lines.append(f"      nodes={node_count} subgraphs={subgraph_count}")
+            # Node trajectory summary (visited node IDs in order)
+            visited = [
+                e.get("node_id", "?")
+                for e in self.graph_trajectory
+                if e.get("kind") == "node" and e.get("event") == "end"
+            ]
+            if visited:
+                lines.append("      trajectory          " + " → ".join(visited))
+            # Subgraph entries
+            for e in self.graph_trajectory:
+                if e.get("kind") == "subgraph" and e.get("event") == "enter":
+                    lines.append(
+                        f"      subgraph            plan_ref={e.get('plan_ref', '?')} "
+                        f"entry={e.get('entry_node', '?')} depth={e.get('depth', 0)}"
+                    )
+            # Failures
+            for e in failure_nodes:
+                lines.append(
+                    f"      FAILURE             node={e.get('node_id', '?')} "
+                    f"error={e.get('error', '(unknown)')}"
+                )
         return "\n".join(lines)
 
 
@@ -178,9 +215,7 @@ class DebugRunToolAdapter:
         manifest_summary = _safe_json(manifest_path)
         spine_events = _safe_lines(spine_events_path)
         seqs: list[int] = sorted(
-            run_seq
-            for e in spine_events
-            if isinstance((run_seq := e.get("run_seq")), int)
+            run_seq for e in spine_events if isinstance((run_seq := e.get("run_seq")), int)
         )
         max_seq = seqs[-1] if seqs else 0
         missing_seqs = tuple(s for s in range(1, max_seq + 1) if s not in set(seqs))
@@ -215,6 +250,8 @@ class DebugRunToolAdapter:
                 f"grep -rl {plan_ref} traces/runs/*/manifest.json  # 找同 plan 的所有 run"
             )
 
+        graph_trajectory = _extract_graph_trajectory(spine_events)
+
         return DebugRunReport(
             run_id=run_id,
             manifest_path=str(manifest_path),
@@ -235,7 +272,64 @@ class DebugRunToolAdapter:
             suggested_action=suggested,
             plan_ref=plan_ref,
             replay_commands=tuple(replay_commands),
+            graph_trajectory=graph_trajectory,
         )
+
+
+def _extract_graph_trajectory(
+    spine_events: list[dict[str, Any]],
+) -> tuple[dict[str, Any], ...]:
+    """Extract phase-graph node and subgraph execution trace from spine events.
+
+    Reads ``phase_graph.node.start``, ``phase_graph.node.end``,
+    ``phase_graph.subgraph.enter``, and ``phase_graph.subgraph.exit``
+    events from the spine JSONL and returns a flat timeline.
+    """
+    result: list[dict[str, Any]] = []
+    for event in spine_events:
+        ep = event.get("execution_point", "")
+        payload = event.get("payload") or event.get("data") or {}
+        if ep == "phase_graph.node.start":
+            result.append(
+                {
+                    "kind": "node",
+                    "event": "start",
+                    "node_id": payload.get("node_id", ""),
+                }
+            )
+        elif ep == "phase_graph.node.end":
+            result.append(
+                {
+                    "kind": "node",
+                    "event": "end",
+                    "node_id": payload.get("node_id", ""),
+                    "outcome": payload.get("outcome", ""),
+                    "error": payload.get("exception_message", ""),
+                }
+            )
+        elif ep == "phase_graph.subgraph.enter":
+            result.append(
+                {
+                    "kind": "subgraph",
+                    "event": "enter",
+                    "plan_ref": payload.get("plan_ref", ""),
+                    "entry_node": payload.get("entry_node", ""),
+                    "depth": payload.get("depth", 0),
+                }
+            )
+        elif ep == "phase_graph.subgraph.exit":
+            result.append(
+                {
+                    "kind": "subgraph",
+                    "event": "exit",
+                    "plan_ref": payload.get("plan_ref", ""),
+                    "entry_node": payload.get("entry_node", ""),
+                    "outcome": payload.get("outcome", ""),
+                    "depth": payload.get("depth", 0),
+                    "error": payload.get("error", ""),
+                }
+            )
+    return tuple(result)
 
 
 def _spine_event_key(event: dict[str, Any]) -> str:
@@ -304,10 +398,7 @@ def _extract_failure(
     doctor = extra.get("doctor_report", {}) or {}
     h6 = doctor.get("hops", {}).get("H6", {}) or {}
     error_message = (
-        h6.get("error")
-        or manifest.get("session_error")
-        or extra.get("session_error")
-        or None
+        h6.get("error") or manifest.get("session_error") or extra.get("session_error") or None
     )
     if isinstance(error_message, str) and not error_message.strip():
         error_message = None
