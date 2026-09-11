@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING, Any
 from lca.framework.graph.interpreter import PlanInterpreter
 from lca.framework.graph.lifter import lift_executable_plan
 from lca.contracts.protocols.graph.binding import BindingKind
+from lca.framework.graph.port_registry import PortRegistry
 from lca.framework.graph.strategies.node_executor_strategy import (
     NodeExecutorStrategy,
 )
@@ -209,9 +210,12 @@ class PlanInterpreterAdapter:
             sub_plan: Any,
             outer_state: Any,
             depth: int,
+            port_registry: PortRegistry | None = None,
         ) -> Mapping[str, Any]:
             interp = PlanInterpreter(registry=adapter.registry)
-            result = await interp.run(sub_plan, outer_state=outer_state)
+            result = await interp.run(
+                sub_plan, outer_state=outer_state, port_registry=port_registry
+            )
             return dict(result.output)
 
         return recursive_runner

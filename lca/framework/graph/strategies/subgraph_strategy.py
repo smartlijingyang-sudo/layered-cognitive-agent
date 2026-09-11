@@ -3,8 +3,12 @@
 A :class:`lca.contracts.protocols.graph.plan.SubgraphReference` on a node
 points to another plan. The strategy delegates to a host-injected
 ``recursive_runner`` callable that takes ``(sub_plan, outer_state,
-depth)`` and returns a ``Mapping[str, Any]`` of merged output port
-values.
+depth, outer_ports)`` and returns a ``Mapping[str, Any]`` of merged
+output port values. ``outer_ports`` is a :class:`PortRegistry` seeded
+from this node's :attr:`NodeInput.port_values` (via
+:meth:`PortRegistry.set_outer_input`) so edges like
+``sub_spec_ref`` can forward upstream values across the subgraph
+boundary; it is ``None`` when the outer node carried no port values.
 
 Production callers (post kernel-native cutover, note
 2026-09-11-kernel-native-phase-runner) inject a closure that:
@@ -39,21 +43,27 @@ from lca.contracts.protocols.graph.node_io import (
 )
 from lca.contracts.protocols.graph.plan import Plan
 from lca.contracts.protocols.graph.strategy import NodeStrategy, StrategyContext
+from lca.framework.graph.port_registry import PortRegistry
 from lca.framework.graph.strategy_registry import register_strategy
 
 if TYPE_CHECKING:
     pass
 
 RecursiveRunner = Callable[
-    [Plan, AgentState, int], "Mapping[str, Any] | Awaitable[Mapping[str, Any]]"
+    [Plan, AgentState, int, "PortRegistry | None"],
+    "Mapping[str, Any] | Awaitable[Mapping[str, Any]]",
 ]
 """Host-injected closure that recurses into a subgraph plan.
 
 The closure takes the sub-:class:`Plan`, the outer :class:`AgentState`,
-and the current depth; it returns a mapping of merged output port
-values (sync) or an awaitable that resolves to one (async). The
-strategy awaits the result if it is awaitable. Production closures
-are async because :meth:`PlanInterpreter.run` is async.
+the current depth, and an optional :class:`PortRegistry` seeded from
+the outer node's :attr:`NodeInput.port_values` (via
+:meth:`PortRegistry.set_outer_input`). It returns a mapping of merged
+output port values (sync) or an awaitable that resolves to one (async).
+The strategy awaits the result if it is awaitable. Production closures
+are async because :meth:`PlanInterpreter.run` is async. The fourth
+argument is ``None`` when the outer node carried no port values, so
+the inner plan starts from a fresh empty registry.
 """
 
 
@@ -98,7 +108,11 @@ class SubgraphStrategy(NodeStrategy):
                 f"plan_ref={context.plan_ref!r} node_id={context.node_id!r}"
             )
         sub_plan = _load_subgraph_plan(ref.plan_ref, ref.entry_node)
-        outcome = self.recursive_runner(sub_plan, outer_state, depth)
+        outer_ports: PortRegistry | None = None
+        if input.port_values:
+            outer_ports = PortRegistry()
+            outer_ports.set_outer_input(input.port_values)
+        outcome = self.recursive_runner(sub_plan, outer_state, depth, outer_ports)
         if isawaitable(outcome):
             outcome = await outcome
         merged_output: Mapping[str, Any] = outcome  # type: ignore[assignment]

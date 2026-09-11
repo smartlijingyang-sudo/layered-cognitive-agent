@@ -187,6 +187,63 @@ class TestSubgraphStrategy:
         with pytest.raises(FileNotFoundError):
             await strategy.execute(ctx, NodeInput(port_values={"decision": "x"}))
 
+    # Approach A: monkeypatch _load_subgraph_plan so we don't need a real bundle yaml.
+    async def test_execute_seeds_inner_port_registry_with_outer_input(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from lca.framework.graph.strategies import subgraph_strategy as sg_mod
+
+        captured: dict[str, Any] = {}
+
+        def _recursive_runner(
+            sub_plan: Any,
+            outer_state: Any,
+            depth: int,
+            port_registry: Any = None,
+        ) -> dict:
+            captured["sub_plan"] = sub_plan
+            captured["outer_state"] = outer_state
+            captured["depth"] = depth
+            captured["port_registry"] = port_registry
+            return {"observation": "ok"}
+
+        # Stub the bundle yaml load so we don't touch disk.
+        monkeypatch.setattr(
+            sg_mod,
+            "_load_subgraph_plan",
+            lambda plan_ref, entry_node: Plan(
+                id="inner",
+                nodes=(),
+                edges=(),
+                declared_inputs=(),
+            ),
+        )
+
+        ref = SubgraphReference(
+            plan_ref="inner.yaml", entry_node="a", binding_edge="x"
+        )
+        strategy = SubgraphStrategy(
+            recursive_runner=_recursive_runner, max_depth=4
+        )
+        ctx = StrategyContext(
+            plan_ref="outer.yaml",
+            node_id="dispatch",
+            binding_kind=BindingKind.SUBGRAPH,
+            node_config={},
+            subgraph_ref=ref,
+        )
+        await strategy.execute(
+            ctx,
+            NodeInput(
+                port_values={"response": "fake_llm_response_object"},
+                consumer_node="dispatch",
+            ),
+        )
+
+        ports = captured["port_registry"]
+        assert ports is not None
+        assert ports.snapshot()["response"] == "fake_llm_response_object"
+
     async def test_max_depth_enforced(self) -> None:
         strategy = SubgraphStrategy(
             recursive_runner=lambda *_: {},
