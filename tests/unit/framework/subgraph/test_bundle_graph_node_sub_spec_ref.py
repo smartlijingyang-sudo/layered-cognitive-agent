@@ -100,11 +100,18 @@ class TestYamlLoaderStripsSubSpecRef:
         assert "sub_spec_ref" not in reason_node.config
 
     def test_yaml_node_without_sub_spec_ref_stays_none(self) -> None:
+        """Nodes without ``sub_spec_ref`` in the yaml must keep ``sub_spec_ref``
+        as ``None`` after parsing. ADR-0220 P6 moved think.classify and
+        think.gate to ``sub_spec_ref`` delegates — those are excluded
+        from this check; only the pure-inline nodes (shortcut, route)
+        must satisfy the invariant.
+        """
+        inline_only = {"think.reason", "think.classify", "think.gate"}
         spec = _load_bundle_graph_spec("bundles/think.yaml")
         for n in spec.nodes:
-            if n.id == "think.reason":
+            if n.id in inline_only:
                 continue
-            assert n.sub_spec_ref is None
+            assert n.sub_spec_ref is None, f"unexpected sub_spec_ref on inline node {n.id!r}"
             assert "sub_spec_ref" not in n.config
 
     def test_inner_bundle_yaml_has_no_sub_spec_ref(self) -> None:

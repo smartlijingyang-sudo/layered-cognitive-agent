@@ -88,7 +88,6 @@ class SubgraphRunner:
         max_subgraph_depth: int = MAX_SUBGRAPH_DEPTH_DEFAULT,
         observers: tuple[ObserverFn, ...] = (),
         channel_factory: Callable[[], PhaseOutputChannel] | None = None,
-        no_llm_mode: bool = False,
         close_out: CognitiveCloseOut | None = None,
     ) -> None:
         self._resolver = resolver
@@ -103,10 +102,6 @@ class SubgraphRunner:
         # Both are populated by SubgraphRunner itself — never by an
         # external caller — so the seam stays at the runner surface.
         self._channel_factory = channel_factory
-        # ADR-0219 §10.11 item (2): default factory sets this True so the
-        # no-LLM path strips ``think.reason.complete`` at lift time. Real
-        # Reasoner wiring (separate PR) leaves it False.
-        self._no_llm_mode = no_llm_mode
         # ADR-0219 §10.11.5: the runner owns the default close-out
         # implementation. Callers may inject a different one (tests,
         # alternative policies) via this seam.
@@ -143,11 +138,7 @@ class SubgraphRunner:
         self._recursion_stack.add(ref.plan_ref)
         try:
             sub_plan_obj = self._resolver.resolve(ref.plan_ref)  # type: ignore[union-attr]
-            spec = lift_subgraph_reference_to_v2(
-                ref,
-                sub_plan_obj,
-                strip_complete_when_no_llm=self._no_llm_mode,
-            )
+            spec = lift_subgraph_reference_to_v2(ref, sub_plan_obj)
             driver = NodeGraphDriver(
                 spec=spec,
                 plan_ref=ref.plan_ref,
