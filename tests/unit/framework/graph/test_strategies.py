@@ -1,0 +1,238 @@
+"""Pure-unit tests for the PR-3 strategy skeleton.
+
+These tests inject fakes for the runner / executor / sub_runner seam
+so they do not depend on the production kernel. They prove:
+
+- Each strategy registers in the default registry.
+- ``execute`` calls the seam once with the expected args.
+- The :class:`PhaseResult` → :class:`NodeOutput` projection is
+  deterministic.
+- :class:`SubgraphStrategy` enforces ``max_depth``.
+"""
+from __future__ import annotations
+
+from typing import Any
+
+import pytest
+
+from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
+    PhaseInput,
+    PhaseResult,
+)
+from lca.contracts.protocols.declarative.declarative_1.node_executor import (
+    NodeOutput as LegacyNodeOutput,
+)
+from lca.contracts.protocols.graph.binding import BindingKind
+from lca.contracts.protocols.graph.node_io import (
+    NodeInput,
+    NodeIOSchema,
+    NodeOutput,
+    PortSpec,
+)
+from lca.contracts.protocols.graph.plan import Plan, PlanEdge, PlanNode, SubgraphReference
+from lca.contracts.protocols.graph.strategy import StrategyContext
+from lca.framework.graph import default_strategy_registry
+from lca.framework.graph.strategies import (
+    NodeExecutorStrategy,
+    PhaseExecutorStrategy,
+    SubgraphStrategy,
+)
+from lca.framework.graph.strategy_registry import (
+    PhaseExecutorLookup,
+    resolve_executor,
+)
+
+
+class TestRegistry:
+    def test_three_strategies_registered(self) -> None:
+        reg = default_strategy_registry()
+        kinds = {k.value for k in reg.kinds()}
+        assert {"phase_executor", "node_executor", "subgraph"}.issubset(kinds)
+
+    def test_resolve_returns_singleton(self) -> None:
+        reg = default_strategy_registry()
+        s1 = reg.resolve(BindingKind.PHASE_EXECUTOR)
+        s2 = reg.resolve(BindingKind.PHASE_EXECUTOR)
+        assert s1 is s2
+
+    def test_unknown_kind_raises(self) -> None:
+        reg = default_strategy_registry()
+        with pytest.raises(KeyError):
+            reg.resolve(BindingKind.TRANSFORM)
+
+
+class TestPhaseExecutorStrategy:
+    @pytest.fixture
+    def runner(self) -> Any:
+        calls: list[dict[str, Any]] = []
+
+        def _runner(inp: PhaseInput, ctx: StrategyContext) -> PhaseResult:
+            calls.append({"inp": inp, "ctx": ctx})
+            return PhaseResult(result_kind="decision", payload={"chosen": "a"})
+
+        _runner.calls = calls  # type: ignore[attr-defined]
+        return _runner
+
+    async def test_execute_calls_runner(
+        self, runner: Any
+    ) -> None:
+        strategy = PhaseExecutorStrategy(runner=runner)
+        ctx = StrategyContext(
+            plan_ref="p1",
+            node_id="perceive.main",
+            binding_kind=BindingKind.PHASE_EXECUTOR,
+            node_config={},
+        )
+        out = await strategy.execute(
+            ctx, NodeInput(port_values={}, consumer_node="perceive.main")
+        )
+        assert isinstance(out, NodeOutput)
+        assert out.producer_node == "perceive.main"
+        assert "decision" in out.port_values
+        assert runner.calls[0]["ctx"] is ctx  # type: ignore[attr-defined]
+
+    async def test_execute_requires_runner(self) -> None:
+        strategy = PhaseExecutorStrategy()
+        ctx = StrategyContext(
+            plan_ref="p1",
+            node_id="x",
+            binding_kind=BindingKind.PHASE_EXECUTOR,
+            node_config={},
+        )
+        with pytest.raises(RuntimeError, match="without runner"):
+            await strategy.execute(ctx, NodeInput())
+
+    def test_resolve_executor_raises_when_lookup_missing(self) -> None:
+        with pytest.raises(RuntimeError, match="no executor lookup"):
+            resolve_executor(None, binding=BindingKind.PHASE_EXECUTOR, node_id="x")
+
+    async def test_phase_error_routed_to_observation_port(self, runner: Any) -> None:
+        def _runner(inp: PhaseInput, ctx: StrategyContext) -> PhaseResult:
+            return PhaseResult(result_kind="phase_error", payload={"why": "boom"})
+
+        strategy = PhaseExecutorStrategy(runner=_runner)
+        ctx = StrategyContext(
+            plan_ref="p",
+            node_id="perceive.main",
+            binding_kind=BindingKind.PHASE_EXECUTOR,
+            node_config={},
+        )
+        out = await strategy.execute(ctx, NodeInput())
+        assert "observation" in out.port_values
+        assert out.port_values["observation"] == {"why": "boom"}
+
+
+class TestNodeExecutorStrategy:
+    async def test_execute_delegates_to_node_executor(self) -> None:
+        captured: dict[str, Any] = {}
+
+        class _StubNodeExec:
+            semantic_name = "think.reason"
+            declared_inputs: tuple[str, ...] = ()
+            declared_outputs: tuple[str, ...] = ()
+
+            async def execute(self, ctx: Any, inp: Any) -> Any:
+                captured["ctx"] = ctx
+                captured["inp"] = inp
+                return LegacyNodeOutput(port_values={"response": "hi"}, next_hint=None)
+
+        def _lookup(*, binding: BindingKind, node_id: str, region: str | None) -> Any:
+            return _StubNodeExec()
+
+        strategy = NodeExecutorStrategy(executor_lookup=_lookup)
+        ctx = StrategyContext(
+            plan_ref="p1",
+            node_id="think.reason",
+            binding_kind=BindingKind.NODE_EXECUTOR,
+            node_config={"budget": {"max_visits": 1}},
+        )
+        out = await strategy.execute(
+            ctx,
+            NodeInput(port_values={"decision": 1}, consumer_node="think.reason"),
+        )
+        assert "response" in out.port_values
+        assert captured["ctx"].metadata["plan_ref"] == "p1"
+        assert captured["ctx"].metadata["node_id"] == "think.reason"
+
+
+class TestSubgraphStrategy:
+    async def test_execute_calls_sub_runner(self) -> None:
+        called: dict[str, Any] = {}
+
+        def _sub_runner(
+            ref: SubgraphReference, outer_input: dict, state: Any, depth: int
+        ) -> tuple[Any, dict]:
+            called["ref"] = ref
+            called["outer_input"] = outer_input
+            called["depth"] = depth
+            return state, {"observation": "ok"}
+
+        ref = SubgraphReference(
+            plan_ref="inner.yaml", entry_node="a", binding_edge="x"
+        )
+        strategy = SubgraphStrategy(sub_runner=_sub_runner, max_depth=4)
+        ctx = StrategyContext(
+            plan_ref="outer.yaml",
+            node_id="dispatch",
+            binding_kind=BindingKind.SUBGRAPH,
+            node_config={},
+            subgraph_ref=ref,
+        )
+        out = await strategy.execute(ctx, NodeInput(port_values={"decision": "x"}))
+        assert called["ref"] is ref
+        assert called["outer_input"] == {"decision": "x"}
+        assert "observation" in out.port_values
+
+    async def test_max_depth_enforced(self) -> None:
+        strategy = SubgraphStrategy(
+            sub_runner=lambda *_: (_FakeState(), {}),
+            max_depth=1,
+            depth_counter=lambda: 5,
+        )
+        ctx = StrategyContext(
+            plan_ref="p",
+            node_id="d",
+            binding_kind=BindingKind.SUBGRAPH,
+            node_config={},
+            subgraph_ref=SubgraphReference(
+                plan_ref="x.yaml", entry_node="a", binding_edge="x"
+            ),
+        )
+        with pytest.raises(RuntimeError, match="subgraph recursion exceeded"):
+            await strategy.execute(ctx, NodeInput())
+
+    async def test_requires_subgraph_ref(self) -> None:
+        strategy = SubgraphStrategy(sub_runner=lambda *_: (_FakeState(), {}))
+        ctx = StrategyContext(
+            plan_ref="p",
+            node_id="d",
+            binding_kind=BindingKind.SUBGRAPH,
+            node_config={},
+        )
+        with pytest.raises(RuntimeError, match="no subgraph_ref"):
+            await strategy.execute(ctx, NodeInput())
+
+    def test_schema_validates_required_input(self) -> None:
+        schema = NodeIOSchema(inputs=(PortSpec(name="decision", required=True),))
+        assert schema.satisfied_by({"decision": 1})
+        assert not schema.satisfied_by({})
+
+
+class TestPlanSmoke:
+    def test_phase_node_in_plan(self) -> None:
+        p = Plan(
+            id="p",
+            nodes=(
+                PlanNode(id="a", binding=BindingKind.PHASE_EXECUTOR, entry=True),
+                PlanNode(id="b", binding=BindingKind.NODE_EXECUTOR),
+            ),
+            edges=(PlanEdge(source="a", target="b"),),
+        )
+        assert p.node("a").binding is BindingKind.PHASE_EXECUTOR
+
+
+# Test helpers
+class _FakeState:
+    trace_id = ""
+    run_id = ""
+    step = 0
