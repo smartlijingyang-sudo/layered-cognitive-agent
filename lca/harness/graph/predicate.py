@@ -116,9 +116,23 @@ def _ordered_compare(left: object, right: object, comparison: ast.cmpop) -> bool
 def _read_member(value: object, key: str) -> object:
     if key.startswith("_"):  # Prevent private reflection and arbitrary call paths.
         raise DeclarativeValidationError("PS-001", "predicate may not access private attributes")
+    if value is None:
+        # Boundary guard: predicate expressions like ``result.payload.should_stop``
+        # may chain through attributes the new kernel's ``_ResultView`` resolves
+        # to None. The legacy ``PhaseResult`` always carried ``payload`` (typed),
+        # so chained access never hit a None. The new kernel's view returns None
+        # for any undeclared attribute, which means a chained access on None
+        # used to raise ``AttributeError`` and abort the run. Treat any missing
+        # or None source as ``attribute not present`` so the predicate resolves
+        # to a comparison that simply fails to match — the same outcome the
+        # legacy code produced when the typed payload was absent.
+        return None
     if isinstance(value, Mapping):
         return value.get(key)
-    return cast("object", getattr(value, key))
+    try:
+        return cast("object", getattr(value, key))
+    except AttributeError:
+        return None
 
 
 __all__ = ["evaluate_restricted_predicate"]
