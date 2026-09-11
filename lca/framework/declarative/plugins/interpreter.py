@@ -720,14 +720,21 @@ class GenericPlanInterpreter:
     def _fold_subgraph_output(output: PhaseOutput) -> PhaseResult:
         """Fold a subgraph's typed PhaseOutput into a single PhaseResult.
 
-        The subgraph's external contract is ``output.decision``; the other
-        fields (observation / reflection / response) are consumed by
-        other phases, not the outer interpreter.
+        Priority: decision (think subgraph) > receipt (act subgraph) >
+        observation > reflection > response. The first non-None field
+        determines both the payload and the result_kind.
         """
-        return PhaseResult(
-            result_kind="decision",
-            payload=output.decision,
-        )
+        if output.decision is not None:
+            return PhaseResult(result_kind="decision", payload=output.decision)
+        if output.receipt is not None:
+            return PhaseResult(result_kind="observation", payload=output.receipt)
+        if output.observation is not None:
+            return PhaseResult(result_kind="observation", payload=output.observation)
+        if output.reflection is not None:
+            return PhaseResult(result_kind="reflection", payload=output.reflection)
+        if output.response is not None:
+            return PhaseResult(result_kind="response", payload=output.response)
+        return PhaseResult(result_kind="observation", payload=None)
 
     async def _drive_subgraph(
         self,

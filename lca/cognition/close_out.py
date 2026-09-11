@@ -3,7 +3,7 @@
 Per ADR-0219 §10.11.5: the set of fields the inner subgraph forwards
 to the outer node's port input is owned by the cognition layer, not
 the graph layer. ``CLOSE_OUT_FIELDS`` is the typed tuple; it is the
-single point of truth for the four canonical phase-artifact fields.
+single point of truth for the five canonical phase-artifact fields.
 
 Adding a new close-out field (e.g. ``intent``) requires editing this
 tuple **and** amending ADR-0219 §10.11.5. ``PhaseOutput`` (in
@@ -18,6 +18,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from lca.contracts.harness.act.effect_receipt import EffectReceipt
 from lca.contracts.models.core.conversation.llm import LLMResponse
 from lca.contracts.models.core.execution.decision import (
     Decision,
@@ -28,10 +29,11 @@ from lca.contracts.models.core.execution.decision import (
 CLOSE_OUT_FIELDS: tuple[str, ...] = (
     "decision",
     "observation",
+    "receipt",
     "reflection",
     "response",
 )
-"""SSOT for the four canonical phase-artifact fields forwarded from
+"""SSOT for the five canonical phase-artifact fields forwarded from
 inner-subgraph close-out to the outer node's port input.
 
 The tuple is ordered by priority: a later ``PhaseOutput`` overwrites
@@ -42,6 +44,7 @@ field per inner-subgraph run."""
 _CLOSE_OUT_TYPES: Mapping[str, type] = {
     "decision": Decision,
     "observation": Observation,
+    "receipt": EffectReceipt,
     "reflection": Reflection,
     "response": LLMResponse,
 }
