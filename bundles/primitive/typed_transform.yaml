@@ -1,0 +1,22 @@
+# bundles/primitive/typed_transform.yaml — Layer 1 原语图
+# ADR-0220 §3.2 — 纯 typed DTO 映射(无 I/O,1 节点)
+#
+# 职责:接收一个 typed DTO,经纯函数映射输出另一个 typed DTO。
+# 无 I/O,无副作用,可缓存可重放。概念图需要 DTO 投影时引用本图,
+# 不在节点实现里写映射逻辑。
+
+id: primitive.typed.transform
+region: primitive
+purpose: 纯 typed DTO 映射(无 I/O) — 1 节点
+
+nodes:
+  - id: dto.map.apply
+    factory: primitive.dto.map
+    inputs: [input_dto]
+    outputs: [output_dto]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit: []
+
+edges: []

@@ -91,9 +91,13 @@ class DecisionGateAssembler(Protocol):
 
 @runtime_checkable
 class Reasoner(Protocol):
-    """思考生成器：基于当前状态调用 LLM 并返回完整响应（含 text + tool_calls）。"""
+    """思考生成器：render_turn 渲染 prompt，complete_turn 调 LLM 返回完整响应。
 
-    async def generate_thoughts(self, state: AgentState) -> LLMResponse: ...
+    ADR-0220 §6 N10: generate_thoughts 已删除，Reasoner 只剩两个 typed DTO 方法。
+    """
+
+    def render_turn(self, context: object, template: object, role: object, **kwargs: object) -> object: ...
+    async def complete_turn(self, state: AgentState, render: object, **kwargs: object) -> LLMResponse: ...
 
 
 @runtime_checkable
@@ -229,6 +233,7 @@ class BrainFactory(Protocol):
         catalog: BrainPromptCatalog,
         *,
         tools: list[Tool] | None = None,
+        template_provider: object | None = None,
     ) -> Brain: ...
 
 

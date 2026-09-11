@@ -1,0 +1,33 @@
+# bundles/primitive/spine_emit.yaml — Layer 1 原语图
+# ADR-0220 §3.2 — typed fact → spine EP (2 节点)
+#
+# 职责:接收一个 typed DTO,经 spine event compose + dispatch 发一条
+# spine execution point。所有需要发 spine fact 的概念图/业务图通过
+# sub_spec_ref 引用本图,不直接调 spine API。
+
+id: primitive.spine.emit
+region: primitive
+purpose: typed fact → spine EP — 2 节点 compose + dispatch
+
+nodes:
+  - id: spine.event.compose
+    factory: primitive.spine.compose
+    inputs: [fact]
+    outputs: [envelope]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit: []
+
+  - id: spine.event.dispatch
+    factory: primitive.spine.dispatch
+    inputs: [envelope]
+    outputs: [receipt]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit: []
+
+edges:
+  - source: spine.event.compose
+    target: spine.event.dispatch

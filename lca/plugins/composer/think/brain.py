@@ -6,7 +6,11 @@ from typing import Any
 
 from lca.cognition.brain.pipeline.modular_brain import ModularBrain
 from lca.cognition.brain.reasoner.reasoner import PromptReasoner
-from lca.contracts.capabilities import BRAIN_PROMPT_CATALOG_FACTORY, BRAINS
+from lca.contracts.capabilities import (
+    BRAIN_PROMPT_CATALOG_FACTORY,
+    BRAINS,
+    PROMPT_TEMPLATE_PROVIDER,
+)
 from lca.contracts.mechanisms import consume
 from lca.contracts.mechanisms.capability.capability import require_capability
 from lca.contracts.protocols import (
@@ -138,11 +142,14 @@ def resolve_brain(spec: AgentSpec, llm: LLMAdapter, *, scope: object) -> Brain:
             "brain_prompt_catalog_factory.create must return BrainPromptCatalog, "
             f"got {type(prompt_catalog).__name__}"
         )
+    # Get template_provider from scope (provided by web-app bundle).
+    template_provider = require_capability(scope, PROMPT_TEMPLATE_PROVIDER.key)
     brain = factory(
         consume("llm", llm, PromptReasoner),
         spec.profile,
         prompt_catalog,
         tools=list(spec.tools),
+        template_provider=template_provider,
     )
     if not isinstance(brain, Brain):
         raise TypeError(

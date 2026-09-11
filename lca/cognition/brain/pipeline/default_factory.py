@@ -84,15 +84,16 @@ class SimpleBrainFactory:
         catalog: BrainPromptCatalog,
         *,
         tools: list[Tool] | None = None,
+        template_provider: object | None = None,
     ) -> Brain:
         reasoner = self._reasoner_cls(
             llm,
             role_profile,
-            catalog,
-            tools=tools,
-            assembler=self._assembler,
             selector=self._selector,
-            available_skills=catalog.render_brain_skills(),
+        )
+        reasoner.bind_boot_capabilities(
+            tools=tools or (),
+            template_provider=template_provider,
         )
         return ModularBrain(
             reasoner=reasoner,

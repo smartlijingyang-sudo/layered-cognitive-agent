@@ -68,6 +68,8 @@ class ThinkReasonCompleteExecutor:
         complete_turn = getattr(reasoner, "complete_turn", None)
         if not callable(complete_turn):
             return NodeOutput(port_values={})
+        # Tools are passed explicitly; fall back to reasoner's boot-time
+        # tools if the runtime context doesn't provide per-turn tools.
         response = await complete_turn(state, render)
         return NodeOutput(port_values={"response": response})
 

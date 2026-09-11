@@ -6,10 +6,11 @@ Consumes ``llm_adapter`` (from :mod:`lca.plugins.think.reasoner.credentials`),
 selector from their respective capability providers and constructs a
 :class:`PromptReasoner` instance for the inner think subgraph to call.
 
-The boot-time tools list is captured here as ``tools=`` on the constructor
-so :meth:`PromptReasoner.complete_turn` can hand a stable tool set to
-``execute_llm_turn``. Per-run tool resolution (P5) moves to
-``primitive.llm.call`` graph node (ADR-0220 §6.2).
+Per-turn tools and template_provider are passed as explicit method
+parameters on ``complete_turn`` / ``render_turn`` (ADR-0220 §6 N10);
+the reasoner holds no mutable per-run state. The compose plugin
+publishes ``tools`` and ``template_provider`` as separate capabilities
+for the graph node executors to consume.
 
 ``RoleProfile`` 由上游 ``phase.think.role_profile`` provider 通过
 ``reasoner.role_profile`` capability 注入,本 plugin 不再持有默认字面量。
@@ -116,8 +117,10 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         llm=adapter,
         role_profile=role_profile,
         selector=selector,
-        template_provider=template_provider,
+    )
+    reasoner.bind_boot_capabilities(
         tools=tools,
+        template_provider=template_provider,
     )
     ctx.provide("reasoner", reasoner)
 
