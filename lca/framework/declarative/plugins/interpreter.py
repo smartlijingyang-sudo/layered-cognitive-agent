@@ -37,6 +37,9 @@ from lca.contracts.protocols.declarative.declarative_1.declarative_execution imp
     PhaseResult,
     PhaseRunCursor,
 )
+from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
+    SemanticPhase,
+)
 from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
     SubgraphReference,
 )
@@ -418,10 +421,23 @@ class GenericPlanInterpreter:
                         )
                     sub_runner = self._subgraph_runner
                     channel = self._channel_factory()
+                    # Inject typed payload the subgraph needs from the
+                    # outer drive: act subgraph reads ``decision`` via
+                    # its entry node's declared_inputs port (act.validate);
+                    # think subgraph reads AgentState via runtime.state
+                    # and does not need outer_input here. Without this
+                    # injection the act driver would receive an empty
+                    # port_context and ``act.validate`` would raise on a
+                    # None decision (fail-loud → run failure → no tool
+                    # dispatch even when LLM emits action_type=use_tool).
+                    outer_input = self._subgraph_outer_input(
+                        node.semantic_phase, traversal
+                    )
                     sub_state, output = await sub_runner.run(
                         ref=node.sub_spec_ref,
                         outer_state=current_state,
                         channel=channel,
+                        outer_input=outer_input,
                     )
                     channel.absorb(output)
                     current_state = sub_state
@@ -715,6 +731,35 @@ class GenericPlanInterpreter:
             import logging
 
             logging.getLogger(__name__).debug("subgraph hook emitter raised: %s", exc)
+
+    @staticmethod
+    def _subgraph_outer_input(
+        semantic_phase: SemanticPhase,
+        traversal: Any,
+    ) -> dict[str, object] | None:
+        """Build the ``outer_input`` payload a sub-spec subgraph needs.
+
+        The driver reads each entry node's ``declared_inputs`` ports from
+        this dict (``port_context.set_outer_input``); without it, ports
+        resolve to None and the entry node fails its type guard.
+
+        Per phase:
+          - THINK: empty — think.shortcut / think.route read AgentState
+            via ``runtime.state``, not from port_values.
+          - ACT: ``{"decision": <prior think Decision>}`` — act.validate
+            gates on a typed Decision. Without this injection the act
+            driver raises on a None decision and the run fails before
+            any tool dispatch.
+
+        Returns ``None`` for phases whose subgraphs do not need
+        outer_input; callers pass it through unchanged.
+        """
+        if semantic_phase is not SemanticPhase.ACT:
+            return None
+        decision = traversal.artifacts.get(SemanticPhase.THINK.value)
+        if decision is None:
+            return None
+        return {"decision": decision}
 
     @staticmethod
     def _fold_subgraph_output(output: PhaseOutput) -> PhaseResult:
