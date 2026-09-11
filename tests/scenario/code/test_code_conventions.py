@@ -176,7 +176,7 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
         "ADR-0075 PlanCompiler 单一编译入口与原生声明式控制投影"
     ),
     "lca/harness/graph/execute/interpreter.py": (
-        "ADR-0075 GenericPlanInterpreter 统一 phase/result/delta 解释边界"
+        "ADR-0194 解释边界 shim,延迟导入 PlanInterpreterAdapter"
     ),
     "lca/loop/driver.py": (
         "ADR-0075 DeclarativeRuntimeDriver 统一 pause/resume/result 出口"

@@ -20,7 +20,6 @@ _FORBIDDEN_SYMBOLS: tuple[str, ...] = (
     "Session.append",
     "Reducer",
     "PhaseExecutor",
-    "GenericPlanInterpreter",
 )
 
 # P-L3: carrier 不得 import fold/deriver 实现 (read 路径专属)。

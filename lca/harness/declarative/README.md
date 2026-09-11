@@ -42,9 +42,7 @@ log:emit
 - `DeclarativePlanProjection`
 - `ExecutableNode`
 - `ExecutablePlan`
-- `GenericPlanInterpreter`
 - `GraphAssembler`
-- `InMemoryJournalCommitter`
 - `InterpretationResult`
 - `MappingRestrictedScope`
 - `PhaseVisit`

@@ -7,7 +7,7 @@
 
 ```text
 HTTP/CLI → CognitiveAgent → CognitiveRuntime → DeclarativeRuntimeDriver
-  → GenericPlanInterpreter（图遍历）
+  → PlanInterpreterAdapter（图遍历）
     → PhaseExecutionTransaction（单 phase visit）
       → PhaseExecutor（plugin）→ Brain/Body/Memory/PerceiveHub
       → FactGateway → Session.append → *.spine.jsonl

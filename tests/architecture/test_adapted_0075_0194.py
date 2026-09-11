@@ -7,7 +7,7 @@ Verifies that the existing 0075 (CognitivePhaseGraphPlan) and 0194
   - 0075 §三: PhaseBinding.executor_capability selection still uses
     `phase.<name>.<executor>` capability closure (region not in closure)
   - 0194: Loop state machine phase_transitions unchanged
-  - 0194: GenericPlanInterpreter recursively walks sub_specs
+  - 0194: PlanInterpreterAdapter recursively walks sub_specs
 
 These tests are deliberately light: they verify that the 0075/0194
 SHAPES still exist and are importable. The detailed behaviour of the

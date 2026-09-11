@@ -7,7 +7,7 @@ region-tag closed set extension via ``regions.declare``:
   - phase:replan
   - control:safety
 
-The closed set extension lets the GenericPlanInterpreter fallback
+The closed set extension lets the region-tag fallback
 (per ADR-0210 §6.4) accept custom regions in production paths.
 The C14 closed-set check (per ADR-0210 §3 P7-I-4) reads these from
 the profile and accepts them as legal region labels.

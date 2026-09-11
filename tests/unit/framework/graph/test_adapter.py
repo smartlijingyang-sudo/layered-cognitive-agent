@@ -1,16 +1,13 @@
 """Tests for the PR-7 production cutover adapter."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
-import pytest
-
 from lca.contracts.protocols.graph.binding import BindingKind
-from lca.contracts.protocols.graph.node_io import NodeIOSchema
-from lca.contracts.protocols.graph.plan import Plan, PlanEdge, PlanNode
+from lca.contracts.protocols.graph.node_io import NodeInput, NodeIOSchema, NodeOutput
+from lca.contracts.protocols.graph.plan import Plan, PlanNode
 from lca.contracts.protocols.graph.strategy import NodeStrategy, StrategyContext
-from lca.contracts.protocols.graph.node_io import NodeInput, NodeOutput
 from lca.framework.graph import PlanInterpreterAdapter, StrategyRegistry
 
 
@@ -69,7 +66,7 @@ class TestPlanInterpreterAdapter:
         assert result.terminal_node == "a"
 
     async def test_factory_returns_adapter(self) -> None:
-        from lca.framework.declarative.plugins.interpreter_factory import (
+        from lca.plugins.journal.declarative.runtime_seams_provider import (
             DefaultDeclarativeInterpreterFactory,
         )
 

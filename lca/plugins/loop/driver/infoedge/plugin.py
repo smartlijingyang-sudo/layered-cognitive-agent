@@ -11,7 +11,7 @@ session_log emitter without LLM or Gateway. Absorb target remains
 ``agent_loop`` (InfoEdge tree into CompiledRunPlan).
 
 # COMPAT(owner: agent_lab absorb / ADR-0206; delete-when:
-#   InfoEdgeSpec in CompiledRunPlan + GenericPlanInterpreter recursive
+#   InfoEdgeSpec in CompiledRunPlan + PlanInterpreterAdapter recursive
 #   nested subgraphs + rg 'agent_lab.runtime.runner' lca/ profiles/ bundles/ = 0)
 """
 

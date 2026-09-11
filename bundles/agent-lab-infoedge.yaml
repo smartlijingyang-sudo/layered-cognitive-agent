@@ -6,7 +6,7 @@
 #   profiles/agent-lab-infoedge.yaml and lca/plugins/loop/driver/infoedge/
 #   when all of:
 #     1. InfoEdgeSpec is a CompiledRunPlan region
-#     2. GenericPlanInterpreter recurses nested subgraphs
+#     2. PlanInterpreter recurses nested subgraphs
 #     3. rg 'agent_lab.runtime.runner' lca/ profiles/ bundles/ = 0)
 #
 # One loop-driver entry. The registry itself lives in runtime-core / web-app;

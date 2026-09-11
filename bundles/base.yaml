@@ -163,12 +163,6 @@ entries:
   name: phase_concept_act_subgraph_act_observe
   $module: lca.plugins.concept.act_subgraph.observe
   config: {}
-- id: subgraph.runner
-  name: subgraph_runner
-  $module: lca.framework.subgraph.plugins.runner
-- id: declarative.interpreter
-  name: declarative_interpreter
-  $module: lca.framework.declarative.plugins.interpreter
 - id: lca-memory-write-policy-simple
   name: lca_memory_write_policy_simple
   $module: lca.plugins.memory.policy.write_policy

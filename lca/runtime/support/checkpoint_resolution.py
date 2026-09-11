@@ -60,7 +60,7 @@ class DeclarativeCheckpointStateResolver(CheckpointStateResolver):
 
     The public interface deliberately exposes one operation: a checkpoint plus
     the plan identity accepted by the enclosing execution context becomes an
-    ``AgentState`` ready for ``GenericPlanInterpreter.resume``.  It hides the
+    ``AgentState`` ready for ``PlanInterpreterAdapter.resume``.  It hides the
     recovery source priority, fail-closed diagnostics, and legacy cursor
     compatibility from carrier adapters.
     """

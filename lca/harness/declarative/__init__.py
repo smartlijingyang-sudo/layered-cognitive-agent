@@ -30,10 +30,6 @@ if TYPE_CHECKING:
         PhaseVisit,
     )
     from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseContext
-    from lca.harness.graph.execute.interpreter import (
-        GenericPlanInterpreter,
-        InMemoryJournalCommitter,
-    )
 
 __all__ = [
     "ApprovalState",
@@ -42,9 +38,7 @@ __all__ = [
     "DeclarativePlanProjection",
     "ExecutableNode",
     "ExecutablePlan",
-    "GenericPlanInterpreter",
     "GraphAssembler",
-    "InMemoryJournalCommitter",
     "InterpretationResult",
     "MappingRestrictedScope",
     "PhaseVisit",
@@ -79,13 +73,22 @@ def __getattr__(name: str) -> Any:
 
         return validate_control_binding_closure
     if name in {
-        "GenericPlanInterpreter",
-        "InMemoryJournalCommitter",
         "InterpretationResult",
         "PhaseVisit",
         "RestrictedPhaseContext",
     }:
-        from lca.harness.graph.execute import interpreter as _interpreter
+        from lca.harness.declarative.execute.outcome_projection import (
+            InterpretationResult,
+            PhaseVisit,
+        )
+        from lca.harness.declarative.lifecycle.phase_context import (
+            RestrictedPhaseContext,
+        )
 
-        return getattr(_interpreter, name)
+        mapping = {
+            "InterpretationResult": InterpretationResult,
+            "PhaseVisit": PhaseVisit,
+            "RestrictedPhaseContext": RestrictedPhaseContext,
+        }
+        return mapping[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

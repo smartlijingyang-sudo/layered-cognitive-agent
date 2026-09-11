@@ -2,7 +2,7 @@
 
 ADR-0220 §3.4 P10: alternative topology provider that reads a Bundle Graph
 v2 YAML (ADR-0217) and projects it into the same ``PhaseNode`` list shape
-that the GenericPlanInterpreter expects. This replaces the legacy
+that the unified graph kernel expects. This replaces the legacy
 ``phase.topology.standard`` hand-written node list with the agent.run.phase
 typed DTO graph, while preserving the compile path's invariants.
 
