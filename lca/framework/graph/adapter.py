@@ -292,8 +292,46 @@ class PlanInterpreterAdapter:
         or ``resolve`` (legacy PluginContextBackedRuntime). Missing
         capabilities return ``None`` so node plugins' existing
         soft-fail paths stay intact.
+
+        The per-turn ``effect_gateway`` is layered onto the scope via
+        a thin wrapper so node plugins can read
+        ``context.runtime.effect_gateway`` — the dispatcher built
+        fresh for each turn by ``RuntimeBindings.new_interpreter()``
+        and passed to ``interpreter_factory.create(effect_gateway=)``.
+        The composition-time capability map does not carry per-turn
+        values; the wrapper keeps the seam explicit.
         """
-        scope = self.node_executor_runtime_scope
+        base_scope = self.node_executor_runtime_scope
+        effect_gateway = self.effect_gateway
+
+        class _AdapterScope:
+            """Delegate capability lookup to the base scope, then layer
+            ``effect_gateway`` so per-turn dispatch reaches node plugins."""
+
+            __slots__ = ("_base", "_effect_gateway")
+
+            def __init__(self, base: Any, effect_gateway: Any) -> None:
+                object.__setattr__(self, "_base", base)
+                object.__setattr__(self, "_effect_gateway", effect_gateway)
+
+            def get(self, name: str) -> Any:
+                if name == "effect_gateway":
+                    return self._effect_gateway
+                base = self._base
+                if base is None:
+                    return None
+                getter = getattr(base, "get", None) or getattr(base, "resolve", None)
+                if getter is None:
+                    return None
+                try:
+                    return getter(name)
+                except (KeyError, AttributeError, TypeError):
+                    return None
+
+            def __getattr__(self, name: str) -> Any:
+                return getattr(self._base, name)
+
+        scope = _AdapterScope(base_scope, effect_gateway)
 
         def factory(agent_state: Any) -> Any:
             return _NodeRuntimeView(state=agent_state, scope=scope)
