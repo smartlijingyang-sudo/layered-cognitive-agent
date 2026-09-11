@@ -164,6 +164,10 @@ entries:
   name: phase_concept_act_subgraph_act_observe
   $module: lca.plugins.concept.act_subgraph.observe
   config: {}
+- id: phase.concept.effect_execute.effect_execute
+  name: phase_concept_effect_execute_effect_execute
+  $module: lca.plugins.concept.effect_execute.execute
+  config: {}
 - id: lca-memory-write-policy-simple
   name: lca_memory_write_policy_simple
   $module: lca.plugins.memory.policy.write_policy

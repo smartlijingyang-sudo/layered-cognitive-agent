@@ -127,7 +127,7 @@ async def _dispatch(envelope: CommandEnvelope, context: NodeContext) -> EffectRe
     id="phase.concept.effect_execute.effect_execute",
     Config=None,
     provides=("concept::effect.execute",),
-    requires=("effect_gateway",),
+    requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="tools",
@@ -147,7 +147,7 @@ async def _dispatch(envelope: CommandEnvelope, context: NodeContext) -> EffectRe
         ),
     ),
     ownership=OwnershipDeclaration(
-        reads=("plugin.serve", "effect_gateway"),
+        reads=("plugin.serve",),
         emits=("plugin.served",),
         state_mutation="forbidden",
     ),
