@@ -11,7 +11,6 @@ from typing import Any
 
 import pytest
 
-from lca.contracts.models.core.execution.decision import Decision
 from lca.contracts.protocols.graph.binding import BindingKind
 from lca.contracts.protocols.graph.node_io import NodeInput
 from lca.contracts.protocols.graph.strategy import StrategyContext
@@ -127,21 +126,21 @@ class TestParallel:
 
 class TestGateChain:
     async def test_runs_gates_in_order(self) -> None:
-        decisions: list[Decision] = []
+        decisions: list[Any] = []
 
-        def make_decision(decision_id: str) -> Decision:
-            return Decision(
-                decision_id=decision_id,
-                action_type="noop",
-                rationale="",
-                confidence=0.0,
-            )
+        def make_decision(decision_id: str) -> Any:
+            class _D:
+                pass
+
+            d = _D()
+            d.decision_id = decision_id
+            return d
 
         class _StubGate:
             def __init__(self, suffix: str) -> None:
                 self.suffix = suffix
 
-            async def enforce(self, decision: Decision) -> Decision:
+            async def enforce(self, decision: Any) -> Any:
                 decisions.append(decision)
                 return make_decision(f"{decision.decision_id}-{self.suffix}")
 
@@ -154,7 +153,7 @@ class TestGateChain:
 
     async def test_rejects_non_decision_input(self) -> None:
         strategy = GateChainStrategy(gates=())
-        with pytest.raises(RuntimeError, match="must be a Decision"):
+        with pytest.raises(RuntimeError, match="decision-like"):
             await strategy.execute(_ctx(), NodeInput(port_values={"decision": "string"}))
 
 

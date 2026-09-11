@@ -17,9 +17,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Protocol
 
-from lca.contracts.models.core.execution.decision import Decision
 from lca.contracts.protocols.graph.binding import BindingKind
 from lca.contracts.protocols.graph.node_io import (
     NodeInput,
@@ -29,23 +28,38 @@ from lca.contracts.protocols.graph.node_io import (
 from lca.contracts.protocols.graph.strategy import NodeStrategy, StrategyContext
 from lca.framework.graph.strategy_registry import register_strategy
 
-DecisionGate = Any  # duck-typed; protocol lives in think/cognition.py
+
+class _DecisionLike(Protocol):
+    """Structural shape the framework requires for 'decision' payloads.
+
+    The framework never imports the cognition :class:`Decision` type.
+    Cognition implements this protocol structurally; the framework
+    enforces the shape at runtime via :func:`_looks_like_decision`.
+    """
+
+    decision_id: str
+
+
+def _looks_like_decision(payload: Any) -> bool:
+    """Structural check; the framework does not pin the cognition type."""
+    return hasattr(payload, "decision_id")
 
 
 @dataclass(frozen=True, slots=True)
 class GateChainStrategy(NodeStrategy):
     kind: BindingKind = BindingKind.GATE_CHAIN
     schema: NodeIOSchema = field(default_factory=NodeIOSchema)
-    gates: Sequence[DecisionGate] = ()
+    gates: Sequence[Any] = ()
 
     async def execute(
         self, context: StrategyContext, input: NodeInput
     ) -> NodeOutput:
         decision_payload = input.port_values.get("decision")
-        if not isinstance(decision_payload, Decision):
+        if not _looks_like_decision(decision_payload):
             raise RuntimeError(
                 f"GateChainStrategy at {context.node_id!r}: "
-                f"port 'decision' must be a Decision, got {type(decision_payload).__name__}"
+                f"port 'decision' must be a decision-like object, "
+                f"got {type(decision_payload).__name__}"
             )
         current = decision_payload
         for gate in self.gates:
