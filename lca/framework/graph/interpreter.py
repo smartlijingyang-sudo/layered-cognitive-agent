@@ -24,9 +24,8 @@ owns its own execute path. The kernel's job is:
 3. Dispatch to the resolved strategy.
 4. Merge the output, advance, terminate.
 
-Replaces the visit loops in
-:class:`lca.framework.declarative.plugins.interpreter.GenericPlanInterpreter`
-and :class:`lca.framework.subgraph.plugins.node_graph_driver.NodeGraphDriver`.
+Replaces the visit loops in the legacy interpreter classes deleted
+in the act-subgraph seam cutover (note 2026-09-11).
 
 Existing fixtures can opt in by calling
 :meth:`PlanInterpreter.run` instead of the legacy ``run`` /
@@ -38,7 +37,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from lca.contracts.protocols.graph.binding import BindingKind
 from lca.contracts.protocols.graph.node_io import NodeOutput
 from lca.contracts.protocols.graph.plan import Plan
 from lca.contracts.protocols.graph.strategy import StrategyContext
@@ -63,9 +61,17 @@ class PlanInterpreter:
         *,
         port_registry: PortRegistry | None = None,
         outer_state: Any = None,
+        traversal: PlanTraversal | None = None,
     ) -> InterpretationResult:
-        """Execute ``plan`` and return the typed :class:`InterpretationResult`."""
-        traversal = PlanTraversal(plan=plan)
+        """Execute ``plan`` and return the typed :class:`InterpretationResult`.
+
+        When ``traversal`` is provided, the kernel resumes from
+        ``traversal.current_id`` instead of starting at the plan's
+        declared entry node. Hosts use this path for checkpointed
+        resume; the adapter exposes it via :class:`PhaseRunCursor`.
+        """
+        if traversal is None:
+            traversal = PlanTraversal(plan=plan)
         ports = port_registry or PortRegistry()
         visits: list[VisitRecord] = []
         facts: list = []

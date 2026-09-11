@@ -7,8 +7,6 @@ replace any factory capability without changing the runtime kernel.
 
 from __future__ import annotations
 
-from typing import cast
-
 from pydantic import BaseModel
 
 from lca.contracts.atoms.control.slot import ControlSlot
@@ -31,10 +29,8 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
-from lca.contracts.protocols.gate.loop_guard import LoopGuardEvaluator
 from lca.contracts.protocols.journal.artifact.closure import ArtifactClosure
 from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyStore
-from lca.contracts.protocols.journal.phase.observation import PhaseObserver
 from lca.contracts.protocols.runtime.infra.infra import StateStore
 from lca.contracts.protocols.runtime.runtime.composition import (
     CheckpointStateResolver,
@@ -51,7 +47,7 @@ from lca.contracts.protocols.runtime.runtime.composition import (
 from lca.contracts.protocols.runtime.runtime.lifecycle import RuntimeLifecyclePublisher
 from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
 from lca.contracts.protocols.state.reducer import Reducer
-from lca.harness.declarative import GenericPlanInterpreter
+from lca.framework.graph.adapter import PlanInterpreterAdapter
 from lca.harness.declarative.execute.dispatch import RegistryDeltaReducer, RegistryEffectDispatcher
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.runtime.loop.runtime_journal import RuntimeJournalCommitter
@@ -121,25 +117,19 @@ class DefaultResultFinalizerFactory(ResultFinalizerFactory):
 
 
 class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
-    """Build the standard interpreter with its local traversal policy.
+    """Build the production interpreter with the five runtime closures.
 
-    The ``declarative.interpreter`` plugin (L2) provides the subgraph
-    and channel seams; this factory's ``create`` constructs a fresh
-    ``GenericPlanInterpreter`` using the journal / gateway / reducer /
-    observer / lifecycle passed by ``runtime_bindings`` and binds the
-    cached subgraph seams onto it before returning.
+    After the act-subgraph seam cutover (note 2026-09-11),
+    ``PlanInterpreterAdapter`` is the sole production interpreter.
+    The adapter wraps ``PlanInterpreter`` and stores the runtime
+    closures so host-injected strategy closures can reach them.
     """
 
     def __init__(
         self,
         loop_guard_evaluator: object | None = None,
-        *,
-        subgraph_runner: object | None = None,
-        channel_factory: object | None = None,
     ) -> None:
         self._loop_guard_evaluator = loop_guard_evaluator
-        self._subgraph_runner = subgraph_runner
-        self._channel_factory = channel_factory
 
     def create(
         self,
@@ -150,29 +140,14 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
         phase_observer: object,
         lifecycle_publisher: RuntimeLifecyclePublisher,
     ) -> DeclarativeInterpreter:
-        interpreter = cast(
-            "DeclarativeInterpreter",
-            GenericPlanInterpreter(
-                journal=journal,
-                effect_gateway=effect_gateway,
-                reducer=reducer,
-                phase_observer=cast("PhaseObserver | None", phase_observer),
-                loop_guard_evaluator=cast("LoopGuardEvaluator | None", self._loop_guard_evaluator),
-                lifecycle_publisher=lifecycle_publisher,
-            ),
+        return PlanInterpreterAdapter(
+            journal=journal,
+            effect_gateway=effect_gateway,
+            reducer=reducer,
+            phase_observer=phase_observer,
+            lifecycle_publisher=lifecycle_publisher,
+            loop_guard_evaluator=self._loop_guard_evaluator,
         )
-        if all(
-            x is not None
-            for x in (
-                self._subgraph_runner,
-                self._channel_factory,
-            )
-        ):
-            interpreter.bind_cordis_seams(
-                subgraph_runner=self._subgraph_runner,
-                channel_factory=self._channel_factory,
-            )
-        return interpreter
 
 
 class ObservabilityRuntimeJournalFactory(RuntimeJournalFactory):
@@ -186,8 +161,6 @@ class ObservabilityRuntimeJournalFactory(RuntimeJournalFactory):
     id="lca-declarative-runtime-seams-provider",
     requires=[
         "loop_guard_evaluator",
-        "subgraph_runner",
-        "phase_output_channel_factory",
     ],
     provides=[
         "checkpoint_state_resolver_factory",
@@ -254,31 +227,10 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     del config
     ctx.provide("checkpoint_state_resolver_factory", DefaultCheckpointStateResolverFactory())
 
-    # Pull the two subgraph / channel seams from Cordis so ``create``
-    # can ``bind_cordis_seams`` on the interpreter. Both are provided
-    # by ``declarative.interpreter`` (L2) which runs before this L2
-    # seams plugin in the cordis boot DAG; if a future profile
-    # replaces the L2 interpreter provider, the require calls fall
-    # through to None and the inner subgraph fails fast with PG-005
-    # as before.
-    subgraph_runner: object | None = None
-    channel_factory: object | None = None
-    if hasattr(ctx, "require"):
-        try:
-            subgraph_runner = ctx.require("subgraph_runner")
-        except Exception:
-            subgraph_runner = None
-        try:
-            channel_factory = ctx.require("phase_output_channel_factory")
-        except Exception:
-            channel_factory = None
-
     ctx.provide(
         "declarative_interpreter_factory",
         DefaultDeclarativeInterpreterFactory(
             ctx.require("loop_guard_evaluator"),
-            subgraph_runner=subgraph_runner,
-            channel_factory=channel_factory,
         ),
     )
     ctx.provide("delta_reducer_factory", RegistryDeltaReducerFactory())
