@@ -84,20 +84,45 @@ def _response() -> LLMResponse:
     return LLMResponse(text="hi", tool_calls=())
 
 
+def _stub_role_profile() -> Any:
+    from lca.contracts.models.team.role.team import (
+        RoleProfile,
+        ToolPermissionManifest,
+    )
+
+    return RoleProfile(
+        role="assistant",
+        goal="answer",
+        backstory="b",
+        tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
+    )
+
+
 @dataclass
 class _StubReasoner:
-    """Duck-typed: implements the three methods the 3 executors call."""
+    """Duck-typed: implements the three methods the 3 executors call.
+
+    ADR-0220 P4: ``render_turn`` now takes typed boundary DTOs
+    ``(context, template, role)``; we expose ``role_profile`` so the
+    ``phase.think.reason.render`` adapter can build ``RoleSnapshot``.
+    """
 
     plan: ReasonerTurnPlan = field(default_factory=_plan)
     render: ReasonerTurnRender = field(default_factory=_render)
     response: LLMResponse = field(default_factory=_response)
     calls: list[str] = field(default_factory=list)
+    role_profile: Any = field(default_factory=_stub_role_profile)
 
     def build_turn_plan(self, state: AgentState) -> ReasonerTurnPlan:
         self.calls.append("build_turn_plan")
         return self.plan
 
-    def render_turn(self, state: AgentState, plan: ReasonerTurnPlan) -> ReasonerTurnRender:
+    def render_turn(
+        self,
+        context: Any,
+        template: Any,
+        role: Any,
+    ) -> ReasonerTurnRender:
         self.calls.append("render_turn")
         return self.render
 

@@ -14,6 +14,11 @@ from lca.contracts.harness.memory.events import (
     ContextManifestCommitted,
     GateDecidedCommitted,
 )
+from lca.contracts.models.cognition.boundary import (
+    ReasonerContext,
+    RoleSnapshot,
+    TemplateSelection,
+)
 from lca.contracts.models.cognition.reasoner_turn import ReasonerTurnPlan, ReasonerTurnRender
 from lca.contracts.models.core.conversation.llm import LLMResponse
 from lca.contracts.models.core.execution.decision import Decision
@@ -402,10 +407,17 @@ async def run_reasoner_generate_thoughts_with_spine_facts(
     complete_turn = getattr(reasoner, "complete_turn", None)
     if not callable(render_turn) or not callable(complete_turn):
         raise AttributeError(
-            "Reasoner must implement render_turn(state, plan) and "
-            "complete_turn(state, render); got "
+            "Reasoner must implement render_turn(context, template, role) "
+            "and complete_turn(state, render); got "
             f"render_turn={callable(render_turn)}, "
             f"complete_turn={callable(complete_turn)}"
+        )
+
+    role_profile = getattr(reasoner, "role_profile", None)
+    if role_profile is None:
+        raise AttributeError(
+            "Reasoner must expose role_profile (boot-time seam) to build "
+            "the typed RoleSnapshot boundary DTO."
         )
 
     plan: ReasonerTurnPlan = ReasonerTurnPlan(
@@ -418,8 +430,25 @@ async def run_reasoner_generate_thoughts_with_spine_facts(
         sections_preview=(),
         variant_preview=None,
     )
+    reasoner_context = ReasonerContext(
+        task=state.task or "",
+        activated_skills=tuple(state.activated_skills),
+        manifest=None,
+    )
+    template_selection = TemplateSelection(
+        template_id=plan.template_id,
+        variant="react",
+        decision_path=plan.decision_path,
+    )
+    role_snapshot = RoleSnapshot(
+        profile=role_profile,
+        team_awareness=state.team_awareness,
+    )
     try:
-        render: ReasonerTurnRender = cast("ReasonerTurnRender", render_turn(state, plan))
+        render: ReasonerTurnRender = cast(
+            "ReasonerTurnRender",
+            render_turn(reasoner_context, template_selection, role_snapshot),
+        )
     except BaseException:
         with contextlib.suppress(Exception):
             emit_prompt_assembler_start_for_state(state, plan)
@@ -439,9 +468,7 @@ async def run_reasoner_generate_thoughts_with_spine_facts(
         render.trace.template_id if render.trace is not None else plan.template_id
     )
     rendered_decision_path = (
-        render.trace.selector_decision_path
-        if render.trace is not None
-        else plan.decision_path
+        render.trace.selector_decision_path if render.trace is not None else plan.decision_path
     )
     rendered_sections_preview = (
         tuple(s.name for s in render.trace.sections)

@@ -26,7 +26,7 @@ from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import (
-    PROMPT_ASSEMBLER,
+    PROMPT_TEMPLATE_PROVIDER,
     PROMPT_TEMPLATE_SELECTOR,
     REASONER_ROLE_PROFILE,
     TOOLS,
@@ -58,7 +58,7 @@ class Config(BaseModel):
         "llm_adapter",
         REASONER_ROLE_PROFILE.key,
         TOOLS.key,
-        PROMPT_ASSEMBLER.key,
+        PROMPT_TEMPLATE_PROVIDER.key,
         PROMPT_TEMPLATE_SELECTOR.key,
     ),
     implements=[Reasoner],
@@ -67,8 +67,9 @@ class Config(BaseModel):
     kind=PluginKind.PROVIDER,
     description=(
         "Compose a PromptReasoner from the active llm_adapter, "
-        "role_profile, tools list, assembler, and selector; publish "
-        "as the ``reasoner`` capability for the inner think subgraph."
+        "role_profile, tools list, template_provider, and selector; "
+        "publish as the ``reasoner`` capability for the inner think "
+        "subgraph (ADR-0220 P4 typed DTO seam)."
     ),
     test_suite="tests/test_plugin_alignment.py::test_tier1_plugin_shape",
     contract=PluginContract(
@@ -108,14 +109,14 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         )
     tools_service = ctx.require(TOOLS.key)
     tools = tools_service.list_tools() if tools_service is not None else ()
-    assembler = ctx.require(PROMPT_ASSEMBLER.key)
+    template_provider = ctx.require(PROMPT_TEMPLATE_PROVIDER.key)
     selector = ctx.require(PROMPT_TEMPLATE_SELECTOR.key)
 
     reasoner = PromptReasoner(
         llm=adapter,
         role_profile=role_profile,
-        assembler=assembler,
         selector=selector,
+        template_provider=template_provider,
         tools=tools,
     )
     ctx.provide("reasoner", reasoner)

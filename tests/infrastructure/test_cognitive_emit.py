@@ -337,15 +337,19 @@ async def test_run_reasoner_generate_thoughts_emits_prompt_assembler_eps() -> No
     class _AssemblerWrapper:
         template_provider = _StubProvider(template)
 
+        def get_template(self, template_id):
+            return self.template_provider.get_template(template_id)
+
+        def list_templates(self):
+            return self.template_provider.list_templates()
+
         def render(self, **kwargs):
             from lca.cognition.brain.sections.assembler import (
                 SectionManifestPromptAssembler,
             )
 
             return SectionManifestPromptAssembler(
-                registry=_StubRegistry(
-                    {("role", "pure"): _StaticRole()}
-                ),
+                registry=_StubRegistry({("role", "pure"): _StaticRole()}),
                 template_provider=_StubProvider(template),
                 strip_empty_fields=True,
             ).render(**kwargs)
@@ -362,7 +366,7 @@ async def test_run_reasoner_generate_thoughts_emits_prompt_assembler_eps() -> No
                 backstory="b",
                 tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
             ),
-            assembler=_AssemblerWrapper(),
+            template_provider=_AssemblerWrapper(),
             selector=_StubSelector(),
             tools=[],
         )

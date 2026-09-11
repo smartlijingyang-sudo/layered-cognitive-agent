@@ -1,11 +1,14 @@
-"""phase.think.reason.render — pure post-render turn metadata.
+"""phase.think.reason.render — adapter from (state, plan) to typed render_turn.
 
-think.reason inner_graph 第 2 节点 plugin:调 ``Reasoner.render_turn``
-从 (state, plan) 算 render,不调 LLM、不感知 EP。``requires=("reasoner",)``
-通过 Cordis 校验,运行时从 ``context.runtime.reasoner`` 拿 capability 实例。
+think.reason inner_graph 第 2 节点 plugin:把 compat-era ``(state, plan)``
+喂给 ``Reasoner.render_turn``,但 ADR-0220 §6 P4 已经把 ``render_turn`` 改成
+``(context, template, role) -> ReasonerTurnRender`` typed 入口。本节点负责
+在 seam 上做一次 state → typed-DTO 适配 —— 业务真实路径走
+``concept.prompt.render`` 图,这里只是 inner_graph 的过渡适配,被 P5
+``business.reasoning.turn`` 取代。
 
-ADR-0218 §3.3:节点 plugin 由作者显式书写完整 ``@plugin(...)`` 装饰器,
-工厂 ``setup(ctx)`` 通过 Cordis ``ctx.provide`` 单键注册 composite key。
+``requires=("reasoner",)`` 通过 Cordis 校验,运行时从
+``context.runtime.reasoner`` 拿 capability 实例。
 """
 
 from __future__ import annotations
@@ -23,6 +26,11 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
+from lca.contracts.models.cognition.boundary import (
+    ReasonerContext,
+    RoleSnapshot,
+    TemplateSelection,
+)
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -35,9 +43,45 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
+def _state_to_boundary(
+    state: object,
+    plan: object,
+    role_profile: object,
+) -> tuple[ReasonerContext, TemplateSelection, RoleSnapshot]:
+    """Translate the legacy (state, plan) adapter inputs into typed DTOs.
+
+    Each input is duck-typed so the adapter stays tolerant of the
+    partial ``AgentState`` shapes the inner-graph tests build. When the
+    legacy fields are missing we fall back to empty defaults; the
+    downstream ``Reasoner.render_turn`` decides whether that's enough.
+    """
+    task = getattr(state, "task", "") or ""
+    activated = getattr(state, "activated_skills", ()) or ()
+    manifest = getattr(state, "manifest", None)
+    awareness = getattr(state, "team_awareness", None)
+    template_id = getattr(plan, "template_id", "") or ""
+    decision_path = getattr(plan, "decision_path", "legacy")
+    variant = getattr(plan, "variant_preview", None)
+    context = ReasonerContext(
+        task=task,
+        activated_skills=tuple(activated),
+        manifest=manifest,
+    )
+    selection = TemplateSelection(
+        template_id=template_id,
+        variant=variant if variant in ("react", "hierarchical", "routing", "casting") else "react",
+        decision_path=decision_path,
+    )
+    snapshot = RoleSnapshot(profile=role_profile, team_awareness=awareness)
+    return context, selection, snapshot
+
+
 @dataclass(frozen=True, slots=True)
 class ThinkReasonRenderExecutor:
-    """think.reason inner_graph 第 2 节点:从 (state, plan) 算 ReasonerTurnRender。"""
+    """think.reason inner_graph 第 2 节点:从 (state, plan) 算 ReasonerTurnRender。
+
+    ADR-0220 P4:适配 (state, plan) → typed DTO 三元组 → reasoner.render_turn。
+    """
 
     semantic_name: str = "think.reason.render"
     region: str = "phase:think"
@@ -64,11 +108,13 @@ class ThinkReasonRenderExecutor:
         if reasoner is None or state is None or plan is None:
             return NodeOutput(port_values={})
 
-        # Duck-typed: fail-soft if absent.
         render_turn = getattr(reasoner, "render_turn", None)
         if not callable(render_turn):
             return NodeOutput(port_values={})
-        render = render_turn(state, plan)
+
+        role_profile = getattr(reasoner, "role_profile", None)
+        boundary = _state_to_boundary(state, plan, role_profile)
+        render = render_turn(*boundary)
         return NodeOutput(port_values={"turn_render": render})
 
 

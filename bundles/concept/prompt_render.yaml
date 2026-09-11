@@ -1,0 +1,54 @@
+# bundles/concept/prompt_render.yaml — Layer 2 概念图
+# ADR-0220 §3.3 — ReasonerContext + TemplateSelection + RoleSnapshot
+# → ReasonerTurnRender typed boundary (cross-graph transport)。
+#
+# 节点命名:3 节点全部以 prompt. 起首,与 §0.4 N9 action-domain 闭集
+# 一致;与 ADR §3.3 表格中 prompt.sections.assemble / prompt.sections.fill /
+# prompt.trace.compile 三节点同。
+#
+# §3.3 每个概念图节点必须声明 inputs: + outputs: typed list。
+# §3.3 节点数 ≤ 4 (本图 3 节点,符合 G1 职责单一)。
+#
+# 跨图引用:
+#   inputs  -> business.reasoning.turn  prep 三节点 (concept.tool.fork /
+#              concept.role.snapshot / concept.context.compose /
+#              concept.template.select) 的输出
+#   outputs -> primitive.llm.call 节点的 render port
+
+id: concept.prompt.render
+region: concept
+purpose: ReasonerContext + TemplateSelection + RoleSnapshot → ReasonerTurnRender (typed boundary)
+
+nodes:
+  - id: prompt.sections.assemble
+    factory: prompt.sections.assemble
+    inputs: [template_selection]
+    outputs: [prompt_template]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+
+  - id: prompt.sections.fill
+    factory: prompt.sections.fill
+    inputs: [prompt_template, context, role]
+    outputs: [prompt_text, prompt_trace]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+
+  - id: prompt.trace.compile
+    factory: prompt.trace.compile
+    inputs: [prompt_text, prompt_trace]
+    outputs: [render]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+
+edges:
+  - source: prompt.sections.assemble
+    target: prompt.sections.fill
+  - source: prompt.sections.fill
+    target: prompt.trace.compile
