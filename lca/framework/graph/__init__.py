@@ -20,6 +20,7 @@ Future PRs:
   ``AgentClient`` port.
 - PR-7: delete the parallel interpreter / driver / runner stack.
 """
+from lca.framework.graph.adapter import PlanInterpreterAdapter
 from lca.framework.graph.interpreter import InterpretationResult, PlanInterpreter
 from lca.framework.graph.lifter import (
     lift_executable_plan,
@@ -43,6 +44,7 @@ from lca.framework.graph.traversal import (
 __all__ = [
     "InterpretationResult",
     "PhaseExecutorLookup",
+    "PlanInterpreterAdapter",
     "PlanInterpreter",
     "PlanTraversal",
     "PortRegistry",

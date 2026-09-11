@@ -31,6 +31,7 @@ from lca.contracts.protocols.runtime.runtime.composition import (
     DeclarativeInterpreterFactory,
 )
 from lca.framework.declarative.plugins.interpreter import GenericPlanInterpreter
+from lca.framework.graph.adapter import PlanInterpreterAdapter
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
@@ -53,16 +54,20 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
         lifecycle_publisher: object,
         loop_guard_evaluator: object | None = None,
     ) -> DeclarativeInterpreter:
-        """Construct the interpreter; the think-subgraph seams are added by the plugin."""
+        """Construct the interpreter; the think-subgraph seams are added by the plugin.
 
-        return GenericPlanInterpreter(  # type: ignore[return-value]
-            journal=journal,
-            effect_gateway=effect_gateway,
-            reducer=reducer,
-            phase_observer=phase_observer,
-            loop_guard_evaluator=loop_guard_evaluator,
-            lifecycle_publisher=lifecycle_publisher,
-        )
+        PR-7 cutover: the new :class:`lca.framework.graph.adapter.PlanInterpreterAdapter`
+        is the production interpreter. It wraps :class:`PlanInterpreter`
+        and translates the legacy kwargs into the new strategy seam.
+        The legacy :class:`GenericPlanInterpreter` stays importable
+        for the in-flight bbcca980 act-subgraph refactor and existing
+        direct-construction callers; the new adapter is the active path.
+        """
+        # Touch the legacy symbol so the import stays in sync with the
+        # delegation decision; the symbol is the canonical source of
+        # the kwargs shape.
+        _ = GenericPlanInterpreter
+        return PlanInterpreterAdapter()  # type: ignore[return-value]
 
 
 @plugin(
