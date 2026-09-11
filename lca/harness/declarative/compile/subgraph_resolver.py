@@ -270,10 +270,23 @@ def _project_to_phase_graph(
     entry_node_id = spec.nodes[0].id
 
     for n in spec.nodes:
-        # 规则 1:解析 factory(失败抛 FactoryResolutionError,PG-005-factory)
+        # ADR-0220 P10: skip factory resolution for nodes carrying a
+        # ``sub_spec_ref`` — the framework delegates those nodes to
+        # SubgraphRunner (NodeGraphDriver.run:209) and never invokes the
+        # factory. The factory field on such nodes is metadata only.
         node_region = n.region if n.region is not None else region_for_resolve
-        if runtime is not None:
+        if runtime is not None and n.sub_spec_ref is None:
             runtime.resolve_factory(n.factory, node_region)  # 命中即返回,失败 fail-loud
+        elif runtime is not None:
+            # Sub_spec_ref path: validate the factory is at least
+            # syntactically present so the YAML surface stays honest.
+            if not n.factory:
+                raise DeclarativeValidationError(
+                    "PG-001",
+                    f"node {n.id!r} has sub_spec_ref but no factory field; "
+                    "sub_spec_ref delegation requires the node to carry a "
+                    "factory (see ADR-0220 §3.5)",
+                )
         node_factories.append((n.id, n.factory, node_region))
 
         max_visits = int(n.config.get("max_visits", 1)) if n.config else 1
