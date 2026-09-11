@@ -107,7 +107,7 @@ async def test_approval_pause_uses_plan_declared_resume_node(standard_plan) -> N
         ),
     )
     capabilities = _capabilities_for(plan)
-    capabilities["phase.act.standard"] = _ApprovalPendingExecutor()
+    capabilities["phase.perceive.standard"] = _ApprovalPendingExecutor()
     executable = GraphAssembler().assemble(plan, MappingRestrictedScope(capabilities))
 
     result = await GenericPlanInterpreter(
@@ -130,7 +130,7 @@ async def test_approval_pause_without_declared_resume_node_fails_closed(standard
         phase_graph=replace(standard_plan.phase_graph, approval_resume_node=None),
     )
     capabilities = _capabilities_for(plan)
-    capabilities["phase.act.standard"] = _ApprovalPendingExecutor()
+    capabilities["phase.perceive.standard"] = _ApprovalPendingExecutor()
     executable = GraphAssembler().assemble(plan, MappingRestrictedScope(capabilities))
 
     result = await GenericPlanInterpreter(

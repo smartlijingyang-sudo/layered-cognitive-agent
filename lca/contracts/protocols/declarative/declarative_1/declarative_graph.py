@@ -200,7 +200,7 @@ class PhaseBinding:
         (ADR-0210 §6.3). New code should use the P7 region-tag
         mechanism (``spec.region`` + ``spec.phase`` + profile's
         ``regions.declare``). The ``executor_capability`` selection
-        (e.g. ``phase.act.standard``) remains the canonical way to
+        (e.g. ``phase.perceive.standard``) remains the canonical way to
         pick an executor; region labels do NOT enter the capability
         closure (P7-I-2).
     """

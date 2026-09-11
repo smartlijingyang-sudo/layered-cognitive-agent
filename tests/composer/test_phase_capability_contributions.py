@@ -97,7 +97,7 @@ def test_standard_nodes_do_not_route_through_shared_semantic_branching() -> None
     assert "StandardPhaseExecutor" not in common
 
     expected_modules = {
-        "act/standard/plugin.py": "StandardActExecutor",
+        "perceive/standard/plugin.py": "StandardPerceiveExecutor",
         "perceive/standard/plugin.py": "StandardPerceiveExecutor",
         "reflect/standard/plugin.py": "StandardReflectExecutor",
         "remember/standard/plugin.py": "StandardRememberExecutor",

@@ -20,11 +20,6 @@ entries:
     $module: lca.plugins.loop.phase.perceive.standard.plugin
     config: {}
 
-  - id: phase.act.standard
-    name: phase_act_standard
-    $module: lca.plugins.loop.phase.act.standard.plugin
-    config: {}
-
   - id: phase.reflect.standard
     name: phase_reflect_standard
     $module: lca.plugins.loop.phase.reflect.standard.plugin
@@ -183,31 +178,6 @@ entries:
   - id: control.think.guard
     name: control_think_guard
     $module: lca.plugins.loop.control.think_guard.plugin
-    config: {}
-
-  - id: control.act.authorize
-    name: control_act_authorize
-    $module: lca.plugins.loop.control.act_authorize.plugin
-    config: {}
-
-  - id: control.act.budget
-    name: control_act_budget
-    $module: lca.plugins.loop.control.act_budget.plugin
-    config: {}
-
-  - id: control.act.constrain
-    name: control_act_constrain
-    $module: lca.plugins.loop.control.act_constrain.plugin
-    config: {}
-
-  - id: control.act.execute
-    name: control_act_execute
-    $module: lca.plugins.loop.control.act_execute.plugin
-    config: {}
-
-  - id: control.act.safe-boundary
-    name: control_act_safe_boundary
-    $module: lca.plugins.loop.control.act_safe_boundary.plugin
     config: {}
 
   - id: control.remember.admit

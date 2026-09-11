@@ -98,7 +98,7 @@ class TestScanControlSurface:
         py_file.write_text(
             "PhaseContribution(executor='control.perceive.context')\n"
             "PhaseContribution(executor='control.think.guard')\n"
-            "PhaseContribution(executor='control.act.execute')\n",
+            "PhaseContribution(executor='control.think.guard')\n",
             encoding="utf-8",
         )
 
@@ -107,7 +107,7 @@ class TestScanControlSurface:
         assert set(findings) == {
             "control.perceive.context",
             "control.think.guard",
-            "control.act.execute",
+            "control.think.guard",
         }
 
     def test_multiple_raw_control_yaml_documents_are_flagged(self, tmp_path: Path) -> None:

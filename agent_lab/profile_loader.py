@@ -183,7 +183,7 @@ def build_region_only_phase_graph(
     node = PhaseNode(
         id=spec.id,
         semantic_phase=semantic_phase,
-        binding=f"phase.{semantic_phase.value}.standard",
+        binding=f"phase.{semantic_phase.value}.subgraph",
         max_visits=1,
         terminal=True,
     )

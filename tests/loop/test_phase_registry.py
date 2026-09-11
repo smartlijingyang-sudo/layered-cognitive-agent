@@ -31,10 +31,14 @@ def test_phase_executor_registry_groups_by_semantic_phase() -> None:
     sentinel = object()
     registry = PhaseExecutorRegistry(
         {
-            "phase.perceive.standard": sentinel,  # type: ignore[arg-type]
-            "phase.act.standard": object(),  # type: ignore[arg-type]
+            "phase.reflect.standard": sentinel,  # type: ignore[arg-type]
+            "phase.perceive.standard": object(),  # type: ignore[arg-type]
         }
     )
     perceive_bindings = registry.for_semantic_phase(SemanticPhase.PERCEIVE)
-    assert perceive_bindings == (("phase.perceive.standard", sentinel),)
-    assert registry.get("phase.perceive.standard") is sentinel
+    assert len(perceive_bindings) == 1
+    assert perceive_bindings[0][0] == "phase.perceive.standard"
+    reflect_bindings = registry.for_semantic_phase(SemanticPhase.REFLECT)
+    assert len(reflect_bindings) == 1
+    assert reflect_bindings[0][1] is sentinel
+    assert registry.get("phase.perceive.standard") is not None

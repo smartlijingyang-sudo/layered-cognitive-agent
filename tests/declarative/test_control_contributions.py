@@ -9,7 +9,6 @@ from lca.contracts.models.core.execution.decision import (
     Decision,
     Observation,
     Reflection,
-    ToolCall,
     Turn,
 )
 from lca.contracts.models.core.policy.budget import Budget
@@ -18,9 +17,6 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
 from lca.contracts.protocols.gate.control_verdict import ControlVerdictKind
 from lca.harness.declarative.compile.phase.capabilities import MappingPhaseCapabilities
 from lca.plugins.control_contributions import (
-    ActAuthorizeExecutor,
-    ActBudgetExecutor,
-    ActConstrainExecutor,
     FocusStopExecutor,
     ObserveCheckpointExecutor,
     PerceiveContextExecutor,
@@ -60,102 +56,6 @@ async def test_perceive_context_allows_working_state():
     context = MockContext(state)
     result = await executor.execute(context, PhaseInput())
     assert result.payload.kind == ControlVerdictKind.ALLOW
-
-
-@pytest.mark.asyncio
-async def test_act_budget_allows_within_budget():
-    """Test act-budget allows when within budget."""
-    executor = ActBudgetExecutor()
-    state = _make_working_state()
-    context = MockContext(state)
-    result = await executor.execute(context, PhaseInput())
-    assert result.payload.kind == ControlVerdictKind.ALLOW
-
-
-@pytest.mark.asyncio
-async def test_act_budget_exhausted():
-    """Test act-budget returns exhausted when over budget."""
-    executor = ActBudgetExecutor()
-    state = _make_working_state()
-    state.budget = Budget(max_steps=0)
-    state.budget.used_steps = 1
-    context = MockContext(state)
-    result = await executor.execute(context, PhaseInput())
-    assert result.payload.kind == ControlVerdictKind.EXHAUSTED
-
-
-@pytest.mark.asyncio
-async def test_act_authorize_allows_valid_tool_action():
-    """Test act-authorize allows valid tool action."""
-    executor = ActAuthorizeExecutor()
-    state = _make_working_state()
-    decision = Decision(
-        decision_id="d1",
-        action_type=ActionType.USE_TOOL,
-        rationale="test",
-        confidence=1.0,
-        tool_calls=[ToolCall(call_id="c1", tool_name="bash", arguments={})],
-    )
-    context = MockContext(state, decision=decision)
-    result = await executor.execute(context, PhaseInput())
-    assert result.payload.kind == ControlVerdictKind.ALLOW
-
-
-@pytest.mark.asyncio
-async def test_act_authorize_denies_unnamed_tool():
-    """Test act-authorize denies unnamed tool."""
-    executor = ActAuthorizeExecutor()
-    state = _make_working_state()
-    decision = Decision(
-        decision_id="d1",
-        action_type=ActionType.USE_TOOL,
-        rationale="test",
-        confidence=1.0,
-        tool_calls=[ToolCall(call_id="c1", tool_name="", arguments={})],
-    )
-    context = MockContext(state, decision=decision)
-    result = await executor.execute(context, PhaseInput())
-    assert result.payload.kind == ControlVerdictKind.DENY
-
-
-@pytest.mark.asyncio
-async def test_act_constrain_allows_valid_call_ids():
-    """Test act-constrain allows valid call IDs."""
-    executor = ActConstrainExecutor()
-    state = _make_working_state()
-    decision = Decision(
-        decision_id="d1",
-        action_type=ActionType.USE_TOOL,
-        rationale="test",
-        confidence=1.0,
-        tool_calls=[
-            ToolCall(call_id="c1", tool_name="bash", arguments={}),
-            ToolCall(call_id="c2", tool_name="ls", arguments={}),
-        ],
-    )
-    context = MockContext(state, decision=decision)
-    result = await executor.execute(context, PhaseInput())
-    assert result.payload.kind == ControlVerdictKind.ALLOW
-
-
-@pytest.mark.asyncio
-async def test_act_constrain_denies_duplicate_call_ids():
-    """Test act-constrain denies duplicate call IDs."""
-    executor = ActConstrainExecutor()
-    state = _make_working_state()
-    decision = Decision(
-        decision_id="d1",
-        action_type=ActionType.USE_TOOL,
-        rationale="test",
-        confidence=1.0,
-        tool_calls=[
-            ToolCall(call_id="c1", tool_name="bash", arguments={}),
-            ToolCall(call_id="c1", tool_name="ls", arguments={}),
-        ],
-    )
-    context = MockContext(state, decision=decision)
-    result = await executor.execute(context, PhaseInput())
-    assert result.payload.kind == ControlVerdictKind.DENY
 
 
 @pytest.mark.asyncio

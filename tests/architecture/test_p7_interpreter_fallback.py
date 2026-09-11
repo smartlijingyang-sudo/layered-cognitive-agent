@@ -87,13 +87,13 @@ class TestBuildRegionOnlyPhaseGraph:
         assert node.semantic_phase == SemanticPhase.THINK
         assert node.terminal is True
         assert node.max_visits == 1
-        assert node.binding == "phase.think.standard"
+        assert node.binding == "phase.think.subgraph"
 
     def test_phase_act_maps_to_act_semantic_phase(self):
         spec = _spec(NodeRegion.PHASE, phase="act")
         graph = build_region_only_phase_graph(spec)
         assert graph.nodes[0].semantic_phase == SemanticPhase.ACT
-        assert graph.nodes[0].binding == "phase.act.standard"
+        assert graph.nodes[0].binding == "phase.act.subgraph"
 
     def test_all_six_stages_map_cleanly(self):
         for stage in ("perceive", "think", "act", "reflect", "remember", "stop"):
@@ -106,7 +106,7 @@ class TestBuildRegionOnlyPhaseGraph:
         spec = _spec(NodeRegion.MODEL_VISIBLE)
         graph = build_region_only_phase_graph(spec)
         assert graph.nodes[0].semantic_phase == SemanticPhase.ACT
-        assert graph.nodes[0].binding == "phase.act.standard"
+        assert graph.nodes[0].binding == "phase.act.subgraph"
 
     def test_custom_region_falls_back_to_act(self):
         """phase:plan / phase:replan — custom regions default to ACT."""
@@ -147,7 +147,7 @@ class TestPhaseGraphOptional:
             entry="x",
             nodes=(PhaseNode(
                 id="x", semantic_phase=SemanticPhase.ACT,
-                binding="phase.act.standard", max_visits=1,
+                binding="phase.perceive.standard", max_visits=1,
             ),),
             edges=(),
         )
@@ -214,7 +214,7 @@ class TestInterpreterRegionFallback:
             entry="explicit",
             nodes=(PhaseNode(
                 id="explicit", semantic_phase=SemanticPhase.ACT,
-                binding="phase.act.standard", max_visits=1,
+                binding="phase.perceive.standard", max_visits=1,
             ),),
             edges=(),
         )
@@ -242,7 +242,7 @@ class TestBackwardCompat0075:
             entry="x",
             nodes=(PhaseNode(
                 id="x", semantic_phase=SemanticPhase.ACT,
-                binding="phase.act.standard", max_visits=1,
+                binding="phase.perceive.standard", max_visits=1,
             ),),
             edges=(),
         )

@@ -51,7 +51,7 @@ def _control_contribution() -> PhaseContribution:
     return PhaseContribution(
         phase=SemanticPhase.ACT,
         role=ContributionRole.GOVERN,
-        executor="control.act.authorize",
+        executor="control.think.guard",
         output="act.authorize",
         order=0,
         aggregation="deny-on-any-deny",
@@ -61,7 +61,7 @@ def _control_contribution() -> PhaseContribution:
 def _entry() -> ControlEntry:
     return ControlEntry(
         phase=SemanticPhase.ACT,
-        executor_capability="control.act.authorize",
+        executor_capability="control.think.guard",
         predicate="true",
         aggregation="deny-on-any-deny",
     )
@@ -69,7 +69,7 @@ def _entry() -> ControlEntry:
 
 def test_control_binding_closure_accepts_complete_projection() -> None:
     contribution = _control_contribution()
-    spec = SimpleNamespace(id="control.act.authorize", contributes=(contribution,))
+    spec = SimpleNamespace(id="control.think.guard", contributes=(contribution,))
     binding = PhaseBinding(
         node_id="act.main",
         semantic_phase=SemanticPhase.ACT,
@@ -84,7 +84,7 @@ def test_control_binding_closure_accepts_complete_projection() -> None:
 
 def test_control_binding_closure_rejects_dropped_declared_contribution() -> None:
     contribution = _control_contribution()
-    spec = SimpleNamespace(id="control.act.authorize", contributes=(contribution,))
+    spec = SimpleNamespace(id="control.think.guard", contributes=(contribution,))
     binding = PhaseBinding(
         node_id="act.main",
         semantic_phase=SemanticPhase.ACT,

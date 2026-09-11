@@ -64,7 +64,7 @@ def test_diff_report_empty_when_clean() -> None:
 def test_root_cause_step_links_evidence_and_clause() -> None:
     s = RootCauseStep(
         step_index=1,
-        statement="act.main.control.act.authorize DENIED",
+        statement="think.main.control.think.guard DENIED",
         evidence_fact_kind="ControlTrace",
         evidence_node_id="act.main",
         contract_clause="art.action.action_type",

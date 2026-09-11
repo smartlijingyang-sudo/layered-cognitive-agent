@@ -64,7 +64,7 @@ class TestPluginDecoratorAcceptsTypedKwargs:
         contribution = PhaseContribution(
             phase=SemanticPhase.ACT,
             role=ContributionRole.GOVERN,
-            executor="control.act.budget",
+            executor="control.think.guard",
             output="act.budget",
             order=50,
             aggregation="deny-on-any-deny",
@@ -273,18 +273,13 @@ class TestDeclarativeControlProjection:
         plan = compile_plan(resolve_profile("profiles/web-standard.yaml"))
         entries = plan.control_entries
 
-        assert len(entries) == 12
+        assert len(entries) == 7
         assert {entry.executor_capability for entry in entries} == {
             "control.perceive.context",
             "control.think.guard",
-            "control.act.authorize",
-            "control.act.budget",
-            "control.act.constrain",
-            "control.act.execute",
-            "control.act.safe-boundary",
-            "control.remember.admit",
             "control.stop.decide",
             "control.stop.focus",
+            "control.remember.admit",
             "control.observe.checkpoint",
             "control.observe.wildcard",
         }

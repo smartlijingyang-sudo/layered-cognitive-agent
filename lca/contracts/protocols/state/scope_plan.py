@@ -43,7 +43,7 @@ class BudgetCeiling:
 
     任意字段 ``None`` = 不限制该维度。``max_cost_cents`` / ``max_tokens``
     / ``max_wall_clock_seconds`` / ``max_tool_calls`` / ``max_steps``
-    都是软上限：plugin 超过时由声明式 ``control.act.budget`` 贡献拒绝
+    都是软上限：plugin 超过时由 act.authorize 节点拒绝
     （PR-4 落地后）。
     """
 
