@@ -93,16 +93,23 @@ def tools_from_scope(
 
     if scope is None:
         return ()
-    bind = {
-        "file_store": provider_current(require_capability(scope, "file_store")),
-        "bindings": bindings,
-        "sandbox": provider_current(require_capability(scope, "sandbox")),
-        "search": require_capability(scope, "search"),
-        "skill_store": provider_current(require_capability(scope, "skills")),
-        "machine_resolver": machine_resolver,
-        "assistant_id": assistant_id,
-    }
-    return tuple(require_capability(scope, "tools").materialize(bind))
+    from lca.infrastructure.runtime_plane.capability_bindings import (
+        BindingsViewBuilder,
+    )
+
+    # ``materialize`` consumes a typed ``BindingsView``; the dict form it
+    # used to receive was silently downgraded to ``BindingsView()`` inside
+    # the g2a factory, so the onlyboxes sandbox (and any other plane-bound
+    # capability) never reached the LLM. Wrap the live seam refs first.
+    view = BindingsViewBuilder(
+        file_store=provider_current(require_capability(scope, "file_store")),
+        bindings=bindings,
+        sandbox=provider_current(require_capability(scope, "sandbox")),
+        search=require_capability(scope, "search"),
+        skill_store=provider_current(require_capability(scope, "skills")),
+        machine_resolver=machine_resolver,
+    ).build()
+    return tuple(require_capability(scope, "tools").materialize(view))
 
 
 __all__ = [
