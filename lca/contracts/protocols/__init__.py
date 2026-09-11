@@ -24,6 +24,13 @@ from lca.contracts.mechanisms import (
 # ── ActionHandler（ADR-0074 插件化行动处理器）────────
 from lca.contracts.protocols.act.action.handler import ActionHandler, ActionHandlerRegistry
 
+# ── Agent client protocol (PR-6; pure add) ─────
+from lca.contracts.protocols.agent import (
+    AgentClient,
+    AgentRequest,
+    AgentResponse,
+)
+
 # ── CommandEnvelope + RunFact (ADR-0068 §五 + ADR-0074 PR-7 V4) ─────────
 from lca.contracts.protocols.act.command.envelope import (
     BudgetReservation,
@@ -316,6 +323,9 @@ __all__ = [  # noqa: RUF022 — discovery order matches tests/contracts/test_pro
     "ActionHandler",
     "ActionHandlerRegistry",
     "ActionScopeAuthority",
+    "AgentClient",
+    "AgentRequest",
+    "AgentResponse",
     "AgentTransport",
     "AgentUnit",
     "ArtifactClosure",

@@ -5,15 +5,20 @@ must never know business DTO names like ``Decision`` /
 ``Observation`` / ``Reflection`` / ``EffectReceipt``. The cognition
 layer owns those names. This subpackage owns the **typed bridge**
 between the two: a registry of close-out fields with explicit
-priority, and an adapter that projects typed port values through the
-bridge.
+priority, an adapter that projects typed port values through the
+bridge, and the :class:`AgentClientAdapter` that lets the framework
+call cognition's team machinery without knowing DTO names.
 
-What lives here (PR-2):
+What lives here (PR-2 + PR-6):
 
 - :mod:`close_out_registry` — :class:`CloseOutField`, :data:`CLOSE_OUT_REGISTRY`,
   :func:`close_out_projection`.
 - :mod:`close_out_adapter` — :class:`CloseOutAdapter`, the single seam
-  the framework talks to.
+  the framework talks to for port projection.
+- :mod:`agent_client_adapter` — :class:`AgentClientAdapter`, the
+  single seam the framework uses to talk to agents.
+- :mod:`envelope` — pre-existing transport envelope helper (untouched).
+- :mod:`registry_factory` — pre-existing transport registry helper.
 
 What does NOT live here:
 
@@ -27,6 +32,7 @@ in planned PR-8):
 - The framework imports from this subpackage; this subpackage may
   not import from the framework.
 """
+from lca.cognition.wire.agent_client_adapter import AgentClientAdapter
 from lca.cognition.wire.close_out_adapter import CloseOutAdapter
 from lca.cognition.wire.close_out_registry import (
     CLOSE_OUT_REGISTRY,
@@ -35,6 +41,7 @@ from lca.cognition.wire.close_out_registry import (
 )
 
 __all__ = [
+    "AgentClientAdapter",
     "CLOSE_OUT_REGISTRY",
     "CloseOutAdapter",
     "CloseOutField",

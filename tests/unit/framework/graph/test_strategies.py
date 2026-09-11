@@ -58,21 +58,9 @@ class TestRegistry:
 
     def test_unknown_kind_raises(self) -> None:
         reg = default_strategy_registry()
-        # Strategies for the kinds covered by PR-3..PR-5 are registered.
-        for kind in (
-            BindingKind.PHASE_EXECUTOR,
-            BindingKind.NODE_EXECUTOR,
-            BindingKind.SUBGRAPH,
-            BindingKind.TRANSFORM,
-            BindingKind.OBSERVE,
-            BindingKind.TERMINATE,
-            BindingKind.PARALLEL,
-            BindingKind.GATE_CHAIN,
-        ):
+        # Every BindingKind now has a registered strategy (PR-3..PR-6).
+        for kind in BindingKind:
             reg.resolve(kind)
-        # AGENT_CONSULT / AGENT_FANOUT land in PR-6.
-        with pytest.raises(KeyError):
-            reg.resolve(BindingKind.AGENT_CONSULT)
         # Sanity: an empty registry raises for any kind.
         empty = StrategyRegistry()
         with pytest.raises(KeyError):
