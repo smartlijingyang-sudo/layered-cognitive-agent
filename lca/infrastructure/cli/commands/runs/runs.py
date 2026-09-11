@@ -155,7 +155,7 @@ def _create(
         ),
     ),
 ) -> None:
-    """Create one run via the carrier; print ``run_id`` + ``trace_id`` + ``live_url``.
+    """Create one run via the carrier; print ``run_id`` + ``trace_id`` + ``ws_url``.
 
     Thin wrapper around ``POST /runs`` (handlers/runs/api/command_endpoints.create_run).
     Returns immediately after dispatch; use ``--wait`` if you need the terminal verdict.
@@ -218,15 +218,21 @@ def _create(
 
     run_id = str(receipt.get("run_id", "") or "")
     trace_id = str(receipt.get("trace_id", "") or "")
-    live_url = str(receipt.get("live_url", "") or f"/runs/{run_id}/live")
 
     if json_mode:
         typer.echo(json.dumps({"status": status_code, **receipt}, indent=2, ensure_ascii=False))
         return
 
+    # P1: live streaming is via WebSocket at /v1/runs/{run_id}/ws.
+    # The receipt still carries ``live_url`` for byte-compat, but it
+    # points at a retired SSE path. Show the user the working WS URL.
+    http_base = base_url.rstrip("/")
+    ws_base = http_base.replace("http://", "ws://", 1).replace("https://", "wss://", 1)
+    ws_url = f"{ws_base}/v1/runs/{run_id}/ws" if run_id else ""
+
     typer.echo(f"run_id    = {run_id}")
     typer.echo(f"trace_id  = {trace_id}")
-    typer.echo(f"live_url  = {base_url.rstrip('/')}{live_url}")
+    typer.echo(f"ws_url    = {ws_url}")
 
     if not run_id:
         typer.echo("[lca-ops runs create] carrier did not return run_id", err=True)
