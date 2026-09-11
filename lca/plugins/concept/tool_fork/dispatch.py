@@ -1,13 +1,20 @@
 """phase.concept.tool.fork.dispatch — typed concept.tool.fork boundary.
 
 concept.tool.fork 图唯一节点 plugin:把 ``BindingsView`` typed boundary
-转成 ``ForkedTools`` typed boundary(ADR-0220 §4.1)。
+转成 ``ForkedTools`` typed boundary(ADR-0220 §4.1 + §7.3)。
 
-实现策略:P2 阶段直接调 ``ToolsService.fork_for_run``(typed signature
+实现策略:typed dispatch 调 ``ToolsService.fork_for_run``(typed signature
 cc55b547 已落),不调 primitive 节点(避免在 P2 阶段引入 graph-of-graph
 调度复杂度,留待 P3+ 真实跨图时收敛)。typed boundary 不变 — 同一份
 ``ForkedTools`` 输出可以被 primitive 和 concept 两个图各自生产,边界
 contract 一致。
+
+ADR-0220 P7: ``bindings`` 端口缺省时,从
+``lca.infrastructure.runtime_plane.capability_bindings.current_bindings_view()``
+读 typed boundary。这条 fallback 路径替代了 history 上 ``reasoner.py``
+的反射读 ``AgentState`` 私有 seam-ref 字段(ADR §2.2 表同一根因
+收敛点);若 fallback 也未绑定 → fail loud,要求 runtime 在每 turn
+显式 set ``BindingsViewBuilder``,禁止悄悄构造空 BindingsView。
 """
 
 from __future__ import annotations
@@ -52,6 +59,22 @@ _FORKED_BINDING_KEYS: frozenset[str] = frozenset(
 )
 
 
+def _bindings_from_runtime_plane() -> BindingsView | None:
+    """Pull the typed ``BindingsView`` from the runtime plane seam.
+
+    ADR-0220 §7.3: replaces the legacy ``reasoner.py:300-305`` reflection
+    reads on ``AgentState._xxx_ref`` private attrs. Returns ``None``
+    when the runtime entry point did not bind a
+    ``BindingsViewBuilder`` for the current turn — the caller
+    (this node) treats that as a hard fail.
+    """
+    from lca.infrastructure.runtime_plane.capability_bindings import (
+        current_bindings_view,
+    )
+
+    return current_bindings_view()
+
+
 @dataclass(frozen=True, slots=True)
 class ToolForkDispatchExecutor:
     """concept.tool.fork 节点:typed BindingsView → ForkedTools."""
@@ -71,8 +94,15 @@ class ToolForkDispatchExecutor:
 
         inputs 端口(yaml):bindings (BindingsView)
         outputs 端口(yaml):forked_tools (ForkedTools)
+
+        ADR-0220 P7 fallback 路径:端口未传 → 读
+        ``RuntimePlane.current_bindings()`` typed seam,不再反射 state。
+        两路都空 → fail loud,要求运行时显式 set
+        ``BindingsViewBuilder``。
         """
         bindings = input.port_values.get("bindings")
+        if bindings is None:
+            bindings = _bindings_from_runtime_plane()
         if not isinstance(bindings, BindingsView):
             raise TypeError(
                 "tool.fork.dispatch: 'bindings' port must be a BindingsView "
