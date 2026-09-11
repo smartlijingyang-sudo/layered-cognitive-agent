@@ -13,8 +13,9 @@ materializes them for one run.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, Generic, TypeVar
+from typing import Generic, TypeVar
 
+from lca.contracts.models.cognition.boundary import BindingsView
 from lca.contracts.protocols import Tool, ToolRegistry
 
 T = TypeVar("T", bound=Tool)
@@ -26,12 +27,12 @@ class ToolFactory(Generic[T]):
     name: str
     description: str
 
-    def bind(self, run: Any) -> T | None:
+    def bind(self, bindings: BindingsView) -> T | None:
         """Materialize a concrete tool for one run, or None to skip."""
         raise NotImplementedError
 
 
-_Factory = Callable[[Any], Tool | list[Tool] | None]
+_Factory = Callable[[BindingsView], Tool | list[Tool] | None]
 
 
 class ToolsService(ToolRegistry):
@@ -70,15 +71,17 @@ class ToolsService(ToolRegistry):
     def get(self, name: str) -> Tool | None:
         return self._tools.get(name)
 
-    def fork_for_run(self, run: Any) -> ToolsService:
-        """Fork a per-run registry: bind every factory against *run*.
+    def fork_for_run(self, bindings: BindingsView) -> ToolsService:
+        """Fork a per-run registry: bind every factory against *bindings*.
 
         The forked registry holds only this run's concrete instances. A
         factory may return a single ``Tool``, a list of tools, or None.
+        Factories receive the typed ``BindingsView`` so per-run refs are
+        statically known (ADR-0220 §4.1).
         """
         forked = ToolsService()
         for name, factory in self._factories.items():
-            bound = factory(run)
+            bound = factory(bindings)
             if bound is None:
                 continue
             if isinstance(bound, list):
@@ -95,16 +98,20 @@ class ToolsService(ToolRegistry):
     def list_tools(self) -> list[Tool]:
         return list(self._tools.values())
 
-    def materialize(self, run: object | None = None) -> list[Tool]:
-        """Bind every factory against *run* and return concrete tools.
+    def materialize(self, bindings: BindingsView | None = None) -> list[Tool]:
+        """Bind every factory against *bindings* and return concrete tools.
 
         Tool ``name`` is kept as the factory produced it — no factory-id
         prefix. A per-compose registry can then ``register`` these onto a
         fresh ``ToolsService`` without mutating the boot-time table.
+        Accepts ``None`` for backwards-compat with tests that predate
+        BindingsView; production code paths use fork_for_run.
         """
+        if bindings is None:
+            bindings = BindingsView()
         out: list[Tool] = list(self._tools.values())
         for factory in self._factories.values():
-            bound = factory(run)
+            bound = factory(bindings)
             if bound is None:
                 continue
             if isinstance(bound, list):

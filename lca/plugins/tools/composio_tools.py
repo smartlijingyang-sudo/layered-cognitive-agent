@@ -60,7 +60,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
 
     integration = ctx.require("composio")
 
-    def _factory(run: object | None = None) -> list[Tool]:
+    def _factory(bindings: object) -> list[Tool]:
         from lca.infrastructure.tools.composio import build_tools
 
         return build_tools(integration)

@@ -27,17 +27,20 @@ class Config(BaseModel):
     factories: list[str] = Field(default_factory=lambda: ["g2a"])
 
 
-def _g2a_factory(run: object | None = None) -> list:
+def _g2a_factory(bindings: object) -> list:
+    # BindingsView (ADR-0220 §4.1) replaces the prior ``run`` dict. Six
+    # typed fields are the only per-run refs the factory needs.
+    from lca.contracts.models.cognition.boundary import BindingsView
     from lca.infrastructure.tools.default.set import build_default_tools
 
-    bind = run if isinstance(run, dict) else {}
+    b = bindings if isinstance(bindings, BindingsView) else BindingsView()
     return build_default_tools(
-        store=bind.get("file_store"),
-        bindings=bind.get("bindings"),
-        sandbox=bind.get("sandbox"),
-        search=bind.get("search"),
-        skill_store=bind.get("skill_store"),
-        machine_resolver=bind.get("machine_resolver"),
+        store=b.file_store,
+        bindings=b.bindings,
+        sandbox=b.sandbox,
+        search=b.search,
+        skill_store=b.skill_store,
+        machine_resolver=b.machine_resolver,
         fallback=False,
     )
 

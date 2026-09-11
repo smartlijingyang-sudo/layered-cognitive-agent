@@ -54,7 +54,7 @@ class DelegationSpec:
     protocol: DelegationProtocol = DelegationProtocol.INTERNAL
 
 
-@dataclass
+@dataclass(frozen=True)
 class Decision:
     """One step's chosen action: type + rationale + tool calls / delegation.
 
@@ -65,6 +65,14 @@ class Decision:
     was rewritten by the anti-corruption layer (see ``DegradationPolicy``);
     ``None`` means the decision is native. Provenance flows Decision →
     Observation so hooks and stop policies can see the degradation.
+
+    ADR-0220 §4.2: this DTO is the cross-graph boundary between
+    ``concept.decision.classify`` / ``concept.decision.shortcut_try`` /
+    ``concept.decision.enforce`` (concept graphs) and ``business.reasoning.turn``
+    → ``business.action.turn``. ``frozen=True`` enforces the closed boundary;
+    the ``extra`` field is the explicitly-named bag for non-typed metadata
+    that crosses this seam (no other unknown kwargs are accepted — dataclass
+    constructor rejects them).
     """
 
     decision_id: str
@@ -137,9 +145,15 @@ class Observation:
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class Reflection:
-    """Critic output: verdict + lesson + optional correction Decision."""
+    """Critic output: verdict + lesson + optional correction Decision.
+
+    ADR-0220 §4.2: this DTO is the cross-graph boundary between
+    ``concept.reflection.critique`` (concept graph) and
+    ``business.reflection.turn`` → ``business.memory.turn``. ``frozen=True``
+    enforces the closed boundary; ``extra`` is the explicitly-named bag.
+    """
 
     reflection_id: str
     verdict: ReflectionVerdict

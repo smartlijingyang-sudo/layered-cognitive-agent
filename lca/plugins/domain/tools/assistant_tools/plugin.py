@@ -83,9 +83,14 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     bridge = ctx.require(ASSISTANT_FRONTEND_BRIDGE.key)
     overlay = ctx.require(ASSISTANT_SKILL_OVERLAY.key)
 
-    def _assistant_tools_factory(run: object | None = None) -> list[Any] | None:
+    def _assistant_tools_factory(bindings: object) -> list[Any] | None:
         tools: list[Any] = [AssistantCreateTool(catalog=catalog, bridge=bridge)]
-        create_skill = assistant_create_skill_tool_from_run(run, overlay=overlay)
+        # assistant_create_skill_tool_from_run reads ``assistant_id`` from a
+        # dict-like. BindingsView is a pydantic model; pull the relevant
+        # field through a dict proxy. When bindings has no assistant_id,
+        # the helper reads ``current_assistant_id()`` as fallback.
+        proxy = {} if bindings is None else {"bindings": bindings}
+        create_skill = assistant_create_skill_tool_from_run(proxy, overlay=overlay)
         if create_skill is not None:
             tools.append(create_skill)
         return tools
