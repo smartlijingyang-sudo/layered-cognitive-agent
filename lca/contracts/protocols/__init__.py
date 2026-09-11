@@ -146,6 +146,24 @@ from lca.contracts.protocols.gate.control_verdict import ControlVerdict, Control
 from lca.contracts.protocols.gate.lead_budget_policy import LeadBudgetPolicyResolver
 from lca.contracts.protocols.gate.loop_guard import LoopGuardEvaluator, LoopGuardVerdict
 
+# ── Graph kernel protocols (PR-1 foundation; pure add) ─────
+from lca.contracts.protocols.graph import (
+    BindingKind,
+    DispatchDecision,
+    NodeInput,
+    NodeIOSchema,
+    NodeOutput,
+    NodeSchemaError,
+    NodeStrategy,
+    Plan,
+    PlanEdge,
+    PlanNode,
+    PortSpec,
+    StrategyContext,
+    SubgraphReference as GraphSubgraphReference,
+    VisitRecord,
+)
+
 # ── ArtifactClosure（ADR-0074 可定制 loop exit 闭合文本）────────
 from lca.contracts.protocols.journal.artifact.closure import ArtifactClosure
 
@@ -302,6 +320,7 @@ __all__ = [  # noqa: RUF022 — discovery order matches tests/contracts/test_pro
     "AgentUnit",
     "ArtifactClosure",
     "AttachmentIdentity",
+    "BindingKind",
     "Body",
     "Brain",
     "BrainFactory",
@@ -337,6 +356,7 @@ __all__ = [  # noqa: RUF022 — discovery order matches tests/contracts/test_pro
     "DeclarativeValidationError",
     "DeltaReducer",
     "DeltaReducerFactory",
+    "DispatchDecision",
     "EffectCapabilities",
     "EffectDispatcher",
     "EffectDispatcherFactory",
@@ -348,6 +368,7 @@ __all__ = [  # noqa: RUF022 — discovery order matches tests/contracts/test_pro
     "GraphNodeExecutionContext",
     "GraphNodeExecutor",
     "GraphNodeExecutorRegistryProtocol",
+    "GraphSubgraphReference",
     "HasHooks",
     "Hook",
     "HookRegistry",
@@ -367,6 +388,11 @@ __all__ = [  # noqa: RUF022 — discovery order matches tests/contracts/test_pro
     "MissingSectionKindError",
     "ModeAdapter",
     "NamedRegistryProtocol",
+    "NodeIOSchema",
+    "NodeInput",
+    "NodeOutput",
+    "NodeSchemaError",
+    "NodeStrategy",
     "ObservabilityBackend",
     "OrchestrationRegistryProtocol",
     "PLUGIN_SPEC_VERSION",
@@ -385,12 +411,16 @@ __all__ = [  # noqa: RUF022 — discovery order matches tests/contracts/test_pro
     "PhaseObserverRegistry",
     "PhaseResult",
     "PhaseStateSnapshot",
+    "Plan",
+    "PlanEdge",
+    "PlanNode",
     "PlanProvenance",
     "PluginConfiguration",
     "PluginImplementation",
     "PluginRelation",
     "PluginSpec",
     "PluginSpecKind",
+    "PortSpec",
     "PromptAssembler",
     "PromptSectionRegistry",
     "PromptTemplate",
@@ -447,6 +477,7 @@ __all__ = [  # noqa: RUF022 — discovery order matches tests/contracts/test_pro
     "StateStore",
     "StatefulSection",
     "StopPolicy",
+    "StrategyContext",
     "SupportsShortcut",
     "Synthesizer",
     "TeamAssembly",
@@ -472,6 +503,7 @@ __all__ = [  # noqa: RUF022 — discovery order matches tests/contracts/test_pro
     "ValidationIssue",
     "ValidationReport",
     "Verdict",
+    "VisitRecord",
     "canonical_scope_of",
     "capability_plan_hash",
     "capability_plan_to_dict",
