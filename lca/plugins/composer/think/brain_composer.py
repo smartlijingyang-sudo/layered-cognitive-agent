@@ -74,6 +74,20 @@ class BrainComposer:
             value = getattr(brain, attr, None)
             if value is not None:
                 phase_capabilities[key] = value
+        # Bare-name aliases so legacy think plugins reading
+        # ``context.runtime.<name>`` (e.g. ``runtime.reasoner``,
+        # ``runtime.skill_router``, ``runtime.classifier``) resolve
+        # against the same instances. These names match what the
+        # node plugins expect in :mod:`lca.plugins.think.reason.*`.
+        for alias_attr, alias_key in (
+            ("reasoner", "reasoner"),
+            ("skill_router", "skill_router"),
+            ("classifier", "decision_classifier"),
+            ("decision_gate", "decision_gate"),
+        ):
+            value = getattr(brain, alias_attr, None)
+            if value is not None and alias_key not in phase_capabilities:
+                phase_capabilities[alias_key] = value
         decision_gate = _resolve_decision_gate(brain, gates)
         if decision_gate is not None:
             phase_capabilities["phase.think.decision_gate"] = decision_gate
