@@ -1,0 +1,26 @@
+# bundles/concept/tool_fork.yaml — Layer 2 概念图
+# ADR-0220 §3.3 — ToolsService + BindingsView → ForkedTools typed boundary
+# (cross-graph transport)。
+#
+# P2 骨架:1 节点 tool.fork.dispatch,接 typed BindingsView 输入,出
+# ForkedTools typed 输出。typed dispatch 直接调 ``ToolsService.fork_for_run``
+# (cc55b547 已落 typed 签名),不反射 state 私有属性。
+#
+# §0.4 N9 action-domain 闭集:节点 id 第一段必须是 ``tool``。
+# §3.3 每个概念图节点必须声明 ``inputs:`` + ``outputs:`` typed list。
+
+id: concept.tool.fork
+region: concept
+purpose: ToolsService + BindingsView → ForkedTools typed boundary (cross-graph transport)
+
+nodes:
+  - id: tool.fork.dispatch
+    factory: tool.fork.dispatch
+    inputs: [bindings]
+    outputs: [forked_tools]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+
+edges: []

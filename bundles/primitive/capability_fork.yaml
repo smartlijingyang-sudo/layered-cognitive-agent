@@ -1,0 +1,23 @@
+# bundles/primitive/capability_fork.yaml — Layer 1 原语图
+# ADR-0220 §3.2 — boot-time capability seam → typed per-run instance fork.
+#
+# P2 最小骨架:1 节点 capability.fork.dispatch,只负责 typed fork dispatch,
+# BindingsView → ForkedTools typed 转换走 ``ToolsService.fork_for_run``
+# (cc55b547 已落 typed 签名)。
+#
+# §0.4 N9 action-domain 闭集:节点 id 第一段必须是 ``capability``。
+# §3.2 node count ≤ 6。
+
+id: primitive.capability.fork
+region: primitive
+purpose: per-run capability fork — boot-time capability seam → typed per-run instance
+
+nodes:
+  - id: capability.fork.dispatch
+    factory: capability.fork.dispatch
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+
+edges: []

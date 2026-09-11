@@ -91,6 +91,14 @@ entries:
   name: phase_think_reason_complete
   $module: lca.plugins.think.reason.complete
   config: {}
+- id: phase.primitive.capability.fork.dispatch
+  name: phase_primitive_capability_fork_dispatch
+  $module: lca.plugins.primitive.capability_fork.dispatch
+  config: {}
+- id: phase.concept.tool.fork.dispatch
+  name: phase_concept_tool_fork_dispatch
+  $module: lca.plugins.concept.tool_fork.dispatch
+  config: {}
 - id: subgraph.runner
   name: subgraph_runner
   $module: lca.framework.subgraph.plugins.runner
