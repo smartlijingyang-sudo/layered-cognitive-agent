@@ -1,20 +1,35 @@
-# bundles/stop_subgraph.yaml — stop 单节点子图(Bundle Graph Schema v2,ADR-0217)。
+# bundles/stop_subgraph.yaml — stop 多节点子图
+# ADR-0217 Bundle Graph Schema v2 + ADR-0221 six-phase subgraph cutover.
 #
-# Framework 子树不再持有 PhaseExecutor/PhaseInput/PhaseResult 概念;
-# 顶层 plan 通过节点级 sub_spec_ref 进入本子图,kernel 通过 NodeExecutorStrategy
-# 派发 phase:stop::phase.stop.host。stop 是终态判定节点,发出 stop_decision port
-# 让外层边按 should_stop 路由。
+# 拓扑:should_check → focus(双节点 typed port pipeline);
+# fail 节点作为 artifact=PhaseExecutionFailure 时的旁路入口,在
+# ``phase.topology.standard`` 里以 sub_spec_ref 形态挂载(phase_execution_policy
+# runner 把 PhaseExecutionFailure 写进 artifact port,fail 节点接走)。
+#
+# 正常路径:should_check (stop_policy) → focus (consecutive stagnant turns)
+#         → stop_payload typed port。
+# 失败路径:fail (artifact → typed StopDecision(STOP, ERROR)) → focus 透传。
 
 id: stop.subgraph
 region: phase:stop
-purpose: stop 单步 — consult stop policy and emit stop_decision port
+purpose: stop 多步执行 — should_check (stop_policy) → focus (consecutive stagnant converge)
 
 nodes:
-  - id: stop.host
-    factory: phase.stop.host
+  - id: stop.should_check
+    factory: phase.stop.should_check
     inputs: [decision, observation, reflection]
     outputs: [stop_decision]
     config:
-      max_visits: 8
+      max_visits: 1
 
-edges: []
+  - id: stop.focus
+    factory: phase.stop.focus
+    inputs: [stop_decision, memory_receipt]
+    outputs: [stop_payload]
+    config:
+      max_visits: 1
+
+edges:
+  - from: stop.should_check
+    to: stop.focus
+    when: true

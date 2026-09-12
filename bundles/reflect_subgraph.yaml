@@ -1,19 +1,31 @@
-# bundles/reflect_subgraph.yaml — reflect 单节点子图(Bundle Graph Schema v2,ADR-0217)。
+# bundles/reflect_subgraph.yaml — reflect 多节点子图
+# ADR-0217 Bundle Graph Schema v2 + ADR-0221 six-phase subgraph cutover.
 #
-# Framework 子树不再持有 PhaseExecutor/PhaseInput/PhaseResult 概念;
-# 顶层 plan 通过节点级 sub_spec_ref 进入本子图,kernel 通过 NodeExecutorStrategy
-# 派发 phase:reflect::phase.reflect.host。
+# 拓扑:score → admit_recovery(双节点 typed port pipeline)。
+# score 调 reflection pipeline / brain 产 typed reflection;admit_recovery
+# 根据 observation.success 决定 next_hint + 决定 outer loop 是否走 recovery
+# 边(replaces 旧 RecoveryReflectExecutor)。
 
 id: reflect.subgraph
 region: phase:reflect
-purpose: reflect 单步 — score the just-finished turn against stop criteria
+purpose: reflect 双步执行 — score (reflection pipeline) → admit_recovery (recovery hint)
 
 nodes:
-  - id: reflect.host
-    factory: phase.reflect.host
+  - id: reflect.score
+    factory: phase.reflect.score
     inputs: [observation]
     outputs: [reflection]
     config:
-      max_visits: 8
+      max_visits: 1
 
-edges: []
+  - id: reflect.admit_recovery
+    factory: phase.reflect.admit_recovery
+    inputs: [observation, reflection]
+    outputs: [reflection, admit_recovery]
+    config:
+      max_visits: 1
+
+edges:
+  - from: reflect.score
+    to: reflect.admit_recovery
+    when: true

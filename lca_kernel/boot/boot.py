@@ -69,7 +69,8 @@ from lca.contracts.models.observability.journal.journal import (
 
 # boot_products is the seam's source-of-truth (compat-only in PR-2 sense);
 # the kernel still imports the data classes from the legacy module path.
-from lca.harness.composition.boot_compile import compile_profile_boot_products
+from lca_kernel.boot.observability import compile_observability_boot_plan
+from lca_kernel.plan.plan import compile_run_plan
 from lca.harness.plugin_api import PluginDefinition
 from lca.harness.profile.boot.products import (
     ProfileBootProducts,
@@ -144,7 +145,13 @@ async def run_resolved_kernel(
     bootstrap_file_store: FileStore | None = None,
 ) -> Context:
     """K3 入口(已知 ``ResolvedProfile``):Boot an already-resolved profile."""
-    products = compile_profile_boot_products(resolved)
+    from lca.harness.profile.boot.products import ProfileBootProducts
+
+    products = ProfileBootProducts(
+        resolved_profile=resolved,
+        compiled_run_plan=compile_run_plan(resolved),
+        compiled_observability_plan=compile_observability_boot_plan(),
+    )
     return await _boot_context(products, bootstrap_file_store=bootstrap_file_store)
 
 
@@ -180,7 +187,6 @@ async def boot_entries(
     测试 fixture 不会演化出第二套解析语义。
     """
     resolved = resolve_entries(entries)  # ↓ K1b:程序化 entries 走 K1 域校验
-    from lca.harness.composition.observability_compile import compile_observability_boot_plan
 
     products = ProfileBootProducts(
         resolved_profile=resolved,

@@ -1,10 +1,8 @@
-"""Stop-decide control executor."""
+"""control.stop.decide — NodeExecutor control node for the stop.decide slot."""
 
 from __future__ import annotations
 
-from lca.contracts.models.core.execution.decision import Decision
-
-from pydantic import BaseModel, ConfigDict
+from dataclasses import dataclass
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.enums.enums import ActionType
@@ -18,14 +16,13 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
-    ContributionRole,
-    PhaseContext,
-    PhaseContribution,
-    PhaseInput,
-    PhaseResult,
-    SemanticPhase,
+from lca.contracts.models.core.execution.decision import Decision
+from lca.contracts.protocols.declarative.declarative_1.node_executor import (
+    NodeContext,
+    NodeInput,
+    NodeOutput,
 )
+from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
@@ -33,81 +30,77 @@ from lca.contracts.protocols.gate.control_verdict import ControlVerdict, Control
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
+@dataclass(frozen=True, slots=True)
 class StopDecideExecutor:
-    """Execute stop-decide control policy."""
+    """Control node: budget / decision action_type STOP; emit ``verdict``."""
 
-    async def execute(self, context: PhaseContext, input: PhaseInput) -> PhaseResult:
-        """Evaluate stop-decide control."""
-        if context.state.budget.exceeded():
-            return PhaseResult(
-                result_kind="control",
-                payload=ControlVerdict(
-                    kind=ControlVerdictKind.STOP,
-                    detail="run budget is exhausted",
-                    plugin_id="control.executor.stop-decide",
-                ),
+    semantic_name: str = "control.stop.decide"
+    region: str = "phase:stop"
+    declared_inputs: tuple[PortName, ...] = ("decision",)
+    declared_outputs: tuple[PortName, ...] = ("verdict",)
+
+    async def node_execute(
+        self,
+        context: NodeContext,
+        input: NodeInput,
+    ) -> NodeOutput:
+        runtime = context.runtime or {}
+        state = runtime.get("agent_state")
+        budget = getattr(state, "budget", None) if state is not None else None
+        decision = input.port_values.get("decision")
+        if budget is not None and budget.exceeded():
+            verdict = ControlVerdict(
+                kind=ControlVerdictKind.STOP,
+                detail="run budget is exhausted",
+                plugin_id="control.executor.stop-decide",
             )
-        if (context.payload_of(SemanticPhase.THINK, Decision) is not None
-                and context.payload_of(SemanticPhase.THINK, Decision).action_type == ActionType.STOP):
-            return PhaseResult(
-                result_kind="control",
-                payload=ControlVerdict(
-                    kind=ControlVerdictKind.STOP,
-                    detail="decision requested terminal stop",
-                    plugin_id="control.executor.stop-decide",
-                ),
+            hint = "stop"
+        elif isinstance(decision, Decision) and decision.action_type == ActionType.STOP:
+            verdict = ControlVerdict(
+                kind=ControlVerdictKind.STOP,
+                detail="decision requested terminal stop",
+                plugin_id="control.executor.stop-decide",
             )
-        return PhaseResult(
-            result_kind="control",
-            payload=ControlVerdict(
+            hint = "stop"
+        else:
+            verdict = ControlVerdict(
                 kind=ControlVerdictKind.ALLOW,
                 detail="stop rule may continue",
                 plugin_id="control.executor.stop-decide",
-            ),
-        )
-
-
-class Config(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+            )
+            hint = None
+        return NodeOutput(port_values={"verdict": verdict}, next_hint=hint)
 
 
 @plugin(
     id="control.stop.decide",
-    Config=Config,
-    provides=["control.stop.decide"],
+    provides=("phase:stop::control.stop.decide",),
     layer="L2",
-    kind=PluginKind.PROVIDER,
+    kind=PluginKind.PRIMITIVE,
     effects="none",
     test_suite="tests/declarative/test_control_contributions.py",
-    contributes=[
-        PhaseContribution(
-            phase=SemanticPhase.STOP,
-            role=ContributionRole.GOVERN,
-            executor="control.stop.decide",
-            output="stop.decide",
-            order=0,
-            aggregation="deny-on-any-deny",
-        )
-    ],
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(
-            group=FunctionalGroup.G6_DECISION, control_slots=(ControlSlot.STOP_DECIDE,)
+            group=FunctionalGroup.G6_DECISION,
+            control_slots=(ControlSlot.STOP_DECIDE,),
         ),
         lifecycle=LifecycleContract(allowed_scopes=(Scope.TURN,)),
         authority=AuthorityContract(grants=("action.type.read",)),
-        observability=EvidenceContract(descriptors=("control.stop.decide.checked",)),
+        observability=EvidenceContract(
+            descriptors=("control_stop_decide.checked", "control_stop_decide.served")
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(
-        reads=("control.stop.decide",),
-        emits=("control.stop.decide.checked",),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )
-async def setup(ctx: PluginContext, config: Config) -> None:
+async def setup(ctx: PluginContext, config: object) -> None:
     del config
-    ctx.provide("control.stop.decide", StopDecideExecutor())
+    ctx.provide("phase:stop::control.stop.decide", StopDecideExecutor())
 
 
-__all__ = ["Config", "StopDecideExecutor", "setup"]
+__all__ = ["StopDecideExecutor", "setup"]

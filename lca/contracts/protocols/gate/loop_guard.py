@@ -5,17 +5,23 @@ The phase graph remains the source of loop topology.  A profile-selected
 that topology after its ordinary edge predicate matched.  This keeps resource
 limits and terminal conditions replaceable without giving plugins authority to
 mutate state, execute effects, or alter the phase graph.
+
+ADR-0221: ``result`` is typed as ``Any`` rather than ``PhaseResult``
+(retired); it carries the same ``result_kind`` discriminator the
+``select_edge`` predicate reads.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from lca.contracts.models.core.state.state import AgentState
-from lca.contracts.protocols.declarative.declarative_1.declarative_execution import PhaseResult
-from lca.contracts.protocols.declarative.declarative_1.declarative_graph import LoopGuard, PhaseEdge
+from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
+    LoopGuard,
+    PhaseEdge,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,7 +48,7 @@ class LoopGuardEvaluator(Protocol):
         guard: LoopGuard,
         edge: PhaseEdge,
         state: AgentState,
-        result: PhaseResult,
+        result: Any,
         artifacts: Mapping[str, object],
     ) -> LoopGuardVerdict: ...
 

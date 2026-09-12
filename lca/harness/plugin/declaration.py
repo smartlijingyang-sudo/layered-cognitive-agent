@@ -45,7 +45,6 @@ from lca.harness.plugin.spec_projection import native_spec_from_declaration
 
 if TYPE_CHECKING:
     from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
-        PhaseContribution,
         PluginSpec,
     )
 
@@ -120,7 +119,6 @@ def plugin(
     description: str | None = None,
     meta: PluginMetadata | None = None,
     relations: Sequence[RawRelationEntry] | None = None,
-    contributes: Sequence[object] | None = None,
     functional_group: FunctionalGroup | str | None = None,
     logic_address: LogicAddress | None = None,
     contract: PluginContract | None = None,
@@ -146,7 +144,6 @@ def plugin(
     description: str | None = None,
     meta: PluginMetadata | None = None,
     relations: Sequence[RawRelationEntry] | None = None,
-    contributes: Sequence[object] | None = None,
     functional_group: FunctionalGroup | str | None = None,
     logic_address: LogicAddress | None = None,
     contract: PluginContract | None = None,
@@ -171,7 +168,6 @@ def plugin(
     description: str | None = None,
     meta: PluginMetadata | None = None,
     relations: Sequence[RawRelationEntry] | None = None,
-    contributes: Sequence[object] | None = None,
     functional_group: FunctionalGroup | str | None = None,
     logic_address: LogicAddress | None = None,
     contract: PluginContract | None = None,
@@ -203,7 +199,6 @@ def plugin(
         desc = description or ""
         functional_group_value = _resolve_functional_group(functional_group)
         relation_tuple = _normalize_relations(relations)
-        contributes_tuple = _normalize_contributes(contributes)
         marker = _normalize_marker_class(marker_class, plugin_id=id)
 
         merged_meta: dict[str, object] = dict(meta) if meta else {}
@@ -266,7 +261,6 @@ def plugin(
                     test_suite=suite,
                     functional_group=functional_group_value,
                     module=fn.__module__,
-                    contributes=contributes_tuple,
                     ownership=ownership,
                 ),
                 description=desc,
@@ -477,66 +471,6 @@ def _normalize_relations(
 ) -> tuple[RawRelationEntry, ...]:
     """Normalize open relation declarations without assigning plan semantics."""
     return _normalize_declaration_entries(value, field="relations")
-
-
-def _normalize_contributes(value: Sequence[object] | None) -> tuple[PhaseContribution, ...]:
-    """Normalize ``contributes`` into typed phase entries."""
-    if value is None:
-        return ()
-    if not isinstance(value, (list, tuple)):
-        raise TypeError(f"@plugin contributes must be list/tuple, got {type(value).__name__}")
-    from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
-        ContributionRole,
-        PhaseContribution,
-        SemanticPhase,
-    )
-
-    normalized: list[PhaseContribution] = []
-    for index, item in enumerate(value):
-        if isinstance(item, PhaseContribution):
-            normalized.append(item)
-            continue
-        if isinstance(item, Mapping):
-            phase_value = item.get("phase")
-            role_value = item.get("role")
-            if not isinstance(phase_value, SemanticPhase):
-                raise TypeError(
-                    "@plugin contributes["
-                    f"{index}].phase must be SemanticPhase, got {type(phase_value).__name__}"
-                )
-            if not isinstance(role_value, ContributionRole):
-                raise TypeError(
-                    "@plugin contributes["
-                    f"{index}].role must be ContributionRole, got {type(role_value).__name__}"
-                )
-            executor = item.get("executor")
-            output = item.get("output")
-            order = item.get("order", index)
-            aggregation = item.get("aggregation")
-            if not isinstance(executor, str) or not executor:
-                raise TypeError(f"@plugin contributes[{index}].executor must be non-empty str")
-            if not isinstance(output, str) or not output:
-                raise TypeError(f"@plugin contributes[{index}].output must be non-empty str")
-            if not isinstance(order, int) or isinstance(order, bool):
-                raise TypeError(f"@plugin contributes[{index}].order must be int")
-            if aggregation is not None and not isinstance(aggregation, str):
-                raise TypeError(f"@plugin contributes[{index}].aggregation must be str or None")
-            normalized.append(
-                PhaseContribution(
-                    phase=phase_value,
-                    role=role_value,
-                    executor=executor,
-                    output=output,
-                    order=order,
-                    aggregation=aggregation,
-                )
-            )
-            continue
-        raise TypeError(
-            "@plugin contributes["
-            f"{index}] must be PhaseContribution or mapping, got {type(item).__name__}"
-        )
-    return tuple(normalized)
 
 
 def _normalize_implements(values: object) -> tuple[str, ...]:

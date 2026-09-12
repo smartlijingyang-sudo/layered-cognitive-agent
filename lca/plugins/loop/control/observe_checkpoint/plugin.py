@@ -1,8 +1,8 @@
-"""Observe-checkpoint control executor."""
+"""control.observe.checkpoint — NodeExecutor control node for observe.checkpoint slot."""
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+from dataclasses import dataclass
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -15,14 +15,12 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
-    ContributionRole,
-    PhaseContext,
-    PhaseContribution,
-    PhaseInput,
-    PhaseResult,
-    SemanticPhase,
+from lca.contracts.protocols.declarative.declarative_1.node_executor import (
+    NodeContext,
+    NodeInput,
+    NodeOutput,
 )
+from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
@@ -30,75 +28,71 @@ from lca.contracts.protocols.gate.control_verdict import ControlVerdict, Control
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
+@dataclass(frozen=True, slots=True)
 class ObserveCheckpointExecutor:
-    """Execute observe-checkpoint control policy."""
+    """Control node: validate checkpoint step monotonicity; emit ``verdict``."""
 
-    async def execute(self, context: PhaseContext, input: PhaseInput) -> PhaseResult:
-        """Evaluate observe-checkpoint control."""
-        if context.state.step < 0:
-            return PhaseResult(
-                result_kind="control",
-                payload=ControlVerdict(
-                    kind=ControlVerdictKind.DENY,
-                    detail="checkpoint step cannot be negative",
-                    plugin_id="control.executor.observe-checkpoint",
-                ),
+    semantic_name: str = "control.observe.checkpoint"
+    region: str = "phase:stop"
+    declared_inputs: tuple[PortName, ...] = ()
+    declared_outputs: tuple[PortName, ...] = ("verdict",)
+
+    async def node_execute(
+        self,
+        context: NodeContext,
+        input: NodeInput,
+    ) -> NodeOutput:
+        del input
+        runtime = context.runtime or {}
+        state = runtime.get("agent_state")
+        step = getattr(state, "step", 0) if state is not None else 0
+        if step < 0:
+            verdict = ControlVerdict(
+                kind=ControlVerdictKind.DENY,
+                detail="checkpoint step cannot be negative",
+                plugin_id="control.executor.observe-checkpoint",
             )
-        reason = (
-            getattr(context.checkpoint_reason, "value", str(context.checkpoint_reason))
-            if context.checkpoint_reason
-            else "periodic"
-        )
-        return PhaseResult(
-            result_kind="control",
-            payload=ControlVerdict(
+            hint = "stop"
+        else:
+            reason = runtime.get("checkpoint_reason", "periodic")
+            verdict = ControlVerdict(
                 kind=ControlVerdictKind.ALLOW,
                 detail=f"checkpoint is valid: {reason}",
                 plugin_id="control.executor.observe-checkpoint",
-            ),
-        )
-
-
-class Config(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+            )
+            hint = None
+        return NodeOutput(port_values={"verdict": verdict}, next_hint=hint)
 
 
 @plugin(
     id="control.observe.checkpoint",
-    Config=Config,
-    provides=["control.observe.checkpoint"],
+    provides=("phase:stop::control.observe.checkpoint",),
     layer="L2",
-    kind=PluginKind.PROVIDER,
+    kind=PluginKind.PRIMITIVE,
     effects="none",
     test_suite="tests/declarative/test_control_contributions.py",
-    contributes=[
-        PhaseContribution(
-            phase=SemanticPhase.STOP,
-            role=ContributionRole.OBSERVE,
-            executor="control.observe.checkpoint",
-            output="observe.checkpoint",
-            order=1,
-        )
-    ],
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(
-            group=FunctionalGroup.G6_DECISION, control_slots=(ControlSlot.OBSERVE_CHECKPOINT,)
+            group=FunctionalGroup.G6_DECISION,
+            control_slots=(ControlSlot.OBSERVE_CHECKPOINT,),
         ),
         lifecycle=LifecycleContract(allowed_scopes=(Scope.TURN,)),
         authority=AuthorityContract(grants=("checkpoint.read", "state.read")),
-        observability=EvidenceContract(descriptors=("control.observe.checkpoint.checked",)),
+        observability=EvidenceContract(
+            descriptors=("control_observe_checkpoint.checked", "control_observe_checkpoint.served")
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(
-        reads=("control.observe.checkpoint",),
-        emits=("control.observe.checkpoint.checked",),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )
-async def setup(ctx: PluginContext, config: Config) -> None:
+async def setup(ctx: PluginContext, config: object) -> None:
     del config
-    ctx.provide("control.observe.checkpoint", ObserveCheckpointExecutor())
+    ctx.provide("phase:stop::control.observe.checkpoint", ObserveCheckpointExecutor())
 
 
-__all__ = ["Config", "ObserveCheckpointExecutor", "setup"]
+__all__ = ["ObserveCheckpointExecutor", "setup"]

@@ -559,7 +559,7 @@ def _receipt_from_disk(
     ownership=OwnershipDeclaration(
         reads=(ASSISTANT_CATALOG.key, "event.bus"),
         emits=(ASSISTANT_SKILL_INSTALLED, ASSISTANT_SKILL_ACTIVATED),
-        state_mutation="reducer-only",
+        state_mutation="scoped",
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:

@@ -462,7 +462,7 @@ class _TitleObserver:
         lifecycle=LifecycleContract(allowed_scopes=(Scope.PROFILE,)),
     ),
     ownership=OwnershipDeclaration(
-        reads=("session.store",), emits=(), state_mutation="reducer-only"
+        reads=("session.store",), emits=(), state_mutation="scoped"
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:

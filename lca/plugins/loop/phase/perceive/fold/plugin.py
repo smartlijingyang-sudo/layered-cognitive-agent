@@ -1,4 +1,9 @@
-"""control.observe.wildcard — explicit no-op NodeExecutor for the wildcard slot."""
+"""phase.perceive.fold — terminal-of-typing: collapse manifest → observation.
+
+ADR-0221: takes the raw ``manifest`` from ``phase.perceive.observe`` and
+projects it onto the closed ``observation`` port that downstream
+``think.main`` consumes. This is the typed cross-phase boundary.
+"""
 
 from __future__ import annotations
 
@@ -28,40 +33,43 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 @dataclass(frozen=True, slots=True)
-class ObserveWildcardExecutor:
-    """No-op control node: always emits ``allow`` verdict."""
+class PerceiveFoldExecutor:
+    """Terminal-of-typing node: ``manifest`` → ``observation``."""
 
-    semantic_name: str = "control.observe.wildcard"
-    region: str = "phase:stop"
-    declared_inputs: tuple[PortName, ...] = ()
-    declared_outputs: tuple[PortName, ...] = ("verdict",)
+    semantic_name: str = "phase.perceive.fold"
+    region: str = "phase:perceive"
+    declared_inputs: tuple[PortName, ...] = ("manifest",)
+    declared_outputs: tuple[PortName, ...] = ("observation",)
 
     async def node_execute(
         self,
         context: NodeContext,
         input: NodeInput,
     ) -> NodeOutput:
-        del context, input
-        return NodeOutput(port_values={"verdict": {"verdict": "allow"}}, next_hint=None)
+        del context
+        return NodeOutput(
+            port_values={"observation": input.port_values.get("manifest")},
+            next_hint=None,
+        )
 
 
 @plugin(
-    id="control.observe.wildcard",
-    provides=("phase:stop::control.observe.wildcard",),
+    id="phase.perceive.fold",
+    provides=("phase:perceive::phase.perceive.fold",),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",
-    test_suite="tests/declarative/test_control_contributions.py",
+    test_suite="tests/declarative/test_phase_subgraph_parity.py",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(
-            group=FunctionalGroup.G6_DECISION,
+            group=FunctionalGroup.G7_EXECUTION,
             control_slots=(ControlSlot.OBSERVE_WILDCARD,),
         ),
-        lifecycle=LifecycleContract(allowed_scopes=(Scope.TURN,)),
-        authority=AuthorityContract(grants=("checkpoint.*",)),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(grants=("plugin.serve",)),
         observability=EvidenceContract(
-            descriptors=("control_observe_wildcard.checked", "control_observe_wildcard.served")
+            descriptors=("phase_perceive_fold.checked", "phase_perceive_fold.served")
         ),
     ),
     relations=(),
@@ -73,7 +81,7 @@ class ObserveWildcardExecutor:
 )
 async def setup(ctx: PluginContext, config: object) -> None:
     del config
-    ctx.provide("phase:stop::control.observe.wildcard", ObserveWildcardExecutor())
+    ctx.provide("phase:perceive::phase.perceive.fold", PerceiveFoldExecutor())
 
 
-__all__ = ["ObserveWildcardExecutor", "setup"]
+__all__ = ["PerceiveFoldExecutor", "setup"]

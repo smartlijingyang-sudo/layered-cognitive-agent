@@ -519,7 +519,7 @@ def _int_or_default(value: object, default: int) -> int:
     ownership=OwnershipDeclaration(
         reads=("event.bus", "event_descriptor_registry"),
         emits=(ASSISTANT_CREATED, ASSISTANT_BOOTSTRAP_COMPLETED),
-        state_mutation="reducer-only",
+        state_mutation="scoped",
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:

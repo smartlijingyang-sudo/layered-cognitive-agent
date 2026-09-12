@@ -181,7 +181,7 @@ class SessionCheckpointPolicy:
     ownership=OwnershipDeclaration(
         reads=("session.store",),
         emits=(),
-        state_mutation="reducer-only",
+        state_mutation="scoped",
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:

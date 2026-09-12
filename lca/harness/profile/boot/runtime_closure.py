@@ -82,10 +82,6 @@ _RUNTIME_CLOSURE_CATALOG: tuple[RuntimeClosureRequirement, ...] = (
         "lca.plugins.journal.declarative.runtime_seams_provider",
     ),
     RuntimeClosureRequirement(
-        "loop_guard_evaluator",
-        "lca.plugins.think.loop.guard_provider",
-    ),
-    RuntimeClosureRequirement(
         "evidence_store",
         "lca.plugins.observability.evidence.store_seam",
     ),

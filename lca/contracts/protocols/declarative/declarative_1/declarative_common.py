@@ -1,7 +1,11 @@
 """声明式计划使用的稳定共享词汇。
 
-本模块只定义跨插件声明、阶段图和执行 wire shape 共用的版本、错误码与
-受限词表。它不承载具体计划数据或运行时行为。
+ADR-0221: ``PHASE_EXECUTOR`` / ``CONTRIBUTION`` plugin kinds and the
+``ContributionRole`` / ``AGGREGATIONS`` vocabularies have been retired.
+Every phase node is now a ``PRIMITIVE`` (or ``PROVIDER``) kind; phase
+contributions are expressed as additional subgraph nodes inside the
+corresponding ``bundles/{phase}_subgraph.yaml``, not as static
+plugin-manifest declarations.
 """
 
 from __future__ import annotations
@@ -34,20 +38,10 @@ class SemanticPhase(str, Enum):
 class PluginSpecKind(str, Enum):
     SEAM = "seam"
     PROVIDER = "provider"
-    PHASE_EXECUTOR = "phase-executor"
-    CONTRIBUTION = "contribution"
     EFFECT_HANDLER = "effect-handler"
     OBSERVER = "observer"
     COMPOSITE = "composite"
     DRIVER = "driver"
-
-
-class ContributionRole(str, Enum):
-    PREPARE = "prepare"
-    GOVERN = "govern"
-    TRANSFORM = "transform"
-    OBSERVE = "observe"
-    FINALIZE = "finalize"
 
 
 class RelationType(str, Enum):
@@ -65,17 +59,13 @@ class RelationType(str, Enum):
 
 
 CARDINALITIES = frozenset({"one", "optional", "many", "ordered-many"})
-AGGREGATIONS = frozenset({"all-allow", "deny-on-any-deny", "first-terminal", "ordered-rewrite"})
 ALLOWED_EFFECTS = frozenset({"none", "tools", "memory", "network", "filesystem", "world"})
 
-
 __all__ = [
-    "AGGREGATIONS",
     "ALLOWED_EFFECTS",
     "CARDINALITIES",
     "DECLARATIVE_PLAN_VERSION",
     "PLUGIN_SPEC_VERSION",
-    "ContributionRole",
     "DeclarativeValidationError",
     "PluginSpecKind",
     "RelationType",

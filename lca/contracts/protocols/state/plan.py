@@ -18,16 +18,17 @@ from lca.contracts.protocols.declarative.declarative_1.declarative_common import
 from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
     ActionAuthorityPlan,
     CapabilityBinding,
-    CognitivePhaseGraphPlan,
     EffectPolicyPlan,
-    PhaseBinding,
     PlanProvenance,
     ReplacementDecision,
     ValidationReport,
 )
-from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
-    ControlEntry as DeclarativeControlEntry,
-)
+# PhaseBinding / ControlEntry / CognitivePhaseGraphPlan retired in ADR-0221 P3:
+# the v2 runtime builds its executable plan directly from
+# ``PlanInterpreter`` + NodeExecutor subgraphs, so the plan no longer
+# carries the v1 declarative phase graph region.
+DeclarativeControlEntry = None  # type: ignore[misc]
+PhaseBinding = None  # type: ignore[misc]
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import PluginSpec
 from lca.contracts.protocols.perceive.capability_plan import CapabilityPlan
 from lca.contracts.protocols.state.scope_plan import ScopePlan
@@ -55,8 +56,6 @@ class CompiledRunPlan:
     revision: str = "v2"
     plugin_specs: tuple[PluginSpec, ...] = ()
     capability_bindings: tuple[CapabilityBinding, ...] = ()
-    phase_graph: CognitivePhaseGraphPlan | None = None
-    phase_bindings: tuple[PhaseBinding, ...] = ()
     control_entries: tuple[DeclarativeControlEntry, ...] = ()
     replacement_map: tuple[ReplacementDecision, ...] = ()
     effect_policy: EffectPolicyPlan | None = None
@@ -79,7 +78,6 @@ class CompiledRunPlan:
         for name in (
             "plugin_specs",
             "capability_bindings",
-            "phase_bindings",
             "control_entries",
             "replacement_map",
         ):

@@ -1,8 +1,13 @@
-"""Perceive-context control executor."""
+"""control.perceive.context — NodeExecutor control node for the perceive slot.
+
+ADR-0221: returns a typed ``verdict`` port. The subgraph topology wires
+this node into the perceive flow (e.g. before ``perceive.fold``) and
+routes the edge based on ``next_hint``.
+"""
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+from dataclasses import dataclass
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -16,14 +21,12 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.models.core.state.lifecycle import TaskStatus
-from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
-    ContributionRole,
-    PhaseContext,
-    PhaseContribution,
-    PhaseInput,
-    PhaseResult,
-    SemanticPhase,
+from lca.contracts.protocols.declarative.declarative_1.node_executor import (
+    NodeContext,
+    NodeInput,
+    NodeOutput,
 )
+from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
@@ -31,72 +34,71 @@ from lca.contracts.protocols.gate.control_verdict import ControlVerdict, Control
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
+@dataclass(frozen=True, slots=True)
 class PerceiveContextExecutor:
-    """Execute perceive-context control policy."""
+    """Control node: allow / deny based on ``agent_state.status``."""
 
-    async def execute(self, context: PhaseContext, input: PhaseInput) -> PhaseResult:
-        """Evaluate perceive-context control."""
-        state = context.state
-        if state.status != TaskStatus.WORKING:
-            return PhaseResult(
-                result_kind="control",
-                payload=ControlVerdict(
-                    kind=ControlVerdictKind.STOP,
-                    detail="run state is not working",
-                    plugin_id="control.executor.perceive-context",
-                ),
+    semantic_name: str = "control.perceive.context"
+    region: str = "phase:perceive"
+    declared_inputs: tuple[PortName, ...] = ()
+    declared_outputs: tuple[PortName, ...] = ("verdict",)
+
+    async def node_execute(
+        self,
+        context: NodeContext,
+        input: NodeInput,
+    ) -> NodeOutput:
+        del input
+        runtime = context.runtime or {}
+        state = runtime.get("agent_state")
+        status = getattr(state, "status", TaskStatus.WORKING)
+        if status != TaskStatus.WORKING:
+            verdict = ControlVerdict(
+                kind=ControlVerdictKind.STOP,
+                detail="run state is not working",
+                plugin_id="control.executor.perceive-context",
             )
-        return PhaseResult(
-            result_kind="control",
-            payload=ControlVerdict(
+        else:
+            verdict = ControlVerdict(
                 kind=ControlVerdictKind.ALLOW,
                 detail="context assembly is permitted",
                 plugin_id="control.executor.perceive-context",
-            ),
+            )
+        return NodeOutput(
+            port_values={"verdict": verdict},
+            next_hint="stop" if verdict.kind == ControlVerdictKind.STOP else None,
         )
-
-
-class Config(BaseModel):
-    model_config = ConfigDict(extra="forbid")
 
 
 @plugin(
     id="control.perceive.context",
-    Config=Config,
-    provides=["control.perceive.context"],
+    provides=("phase:perceive::control.perceive.context",),
     layer="L2",
-    kind=PluginKind.PROVIDER,
+    kind=PluginKind.PRIMITIVE,
     effects="none",
     test_suite="tests/declarative/test_control_contributions.py",
-    contributes=[
-        PhaseContribution(
-            phase=SemanticPhase.PERCEIVE,
-            role=ContributionRole.GOVERN,
-            executor="control.perceive.context",
-            output="perceive.context",
-            order=0,
-            aggregation="deny-on-any-deny",
-        )
-    ],
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(
-            group=FunctionalGroup.G6_DECISION, control_slots=(ControlSlot.PERCEIVE_CONTEXT,)
+            group=FunctionalGroup.G6_DECISION,
+            control_slots=(ControlSlot.PERCEIVE_CONTEXT,),
         ),
         lifecycle=LifecycleContract(allowed_scopes=(Scope.TURN,)),
         authority=AuthorityContract(grants=("context.read",)),
-        observability=EvidenceContract(descriptors=("control.perceive.context.checked",)),
+        observability=EvidenceContract(
+            descriptors=("control_perceive_context.checked", "control_perceive_context.served")
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(
-        reads=("control.perceive.context",),
-        emits=("control.perceive.context.checked",),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )
-async def setup(ctx: PluginContext, config: Config) -> None:
+async def setup(ctx: PluginContext, config: object) -> None:
     del config
-    ctx.provide("control.perceive.context", PerceiveContextExecutor())
+    ctx.provide("phase:perceive::control.perceive.context", PerceiveContextExecutor())
 
 
-__all__ = ["Config", "PerceiveContextExecutor", "setup"]
+__all__ = ["PerceiveContextExecutor", "setup"]

@@ -40,8 +40,15 @@ def declarative_plan_hash(value: Any) -> str:
 
 
 def compiled_run_plan_ref(plan: CompiledRunPlan) -> str:
-    """Compute the cross-process stable canonical reference for a compiled plan."""
+    """Compute the cross-process stable canonical reference for a compiled plan.
 
+    ADR-0221 P3: the kernel may wrap the plan in ``V2ExecutablePlan``
+    to carry the v2 graph spec alongside the immutable plan. Unwrap
+    transparently here so callers continue to receive a stable
+    ``CompiledRunPlan`` view.
+    """
+    if hasattr(plan, "inner") and hasattr(plan, "graph_spec"):
+        plan = plan.inner
     payload = {
         "capability": capability_sub_plan_hash(plan),
         "control": control_entries_sub_plan_hash(plan),
@@ -124,7 +131,13 @@ def plugin_spec_to_dict(spec: PluginSpec) -> dict[str, Any]:
 
 
 def phase_graph_to_dict(graph: CognitivePhaseGraphPlan) -> dict[str, Any]:
-    """Project a phase graph to deterministic JSON-ready data."""
+    """Project a phase graph to deterministic JSON-ready data.
+
+    ADR-0221 P3: ``CognitivePhaseGraphPlan`` was retired from
+    ``CompiledRunPlan``. This helper stays only for tests that still
+    project a directly-constructed phase graph; new callers should use
+    ``PlanInterpreter`` instead.
+    """
 
     return cast("dict[str, Any]", _canonicalize(graph))
 
@@ -177,40 +190,20 @@ def _scope_plan_to_dict(plan: ScopePlan) -> dict[str, Any]:
 
 
 def _declarative_payload(plan: CompiledRunPlan) -> dict[str, Any]:
-    if plan.phase_graph is None:
-        return {}
+    # ADR-0221 P3: ``phase_graph`` / ``phase_bindings`` retired from
+    # ``CompiledRunPlan``; the v2 plan serialises only the v2 regions.
     return {
         "plugin_specs": [plugin_spec_to_dict(spec) for spec in plan.plugin_specs],
         "capability_bindings": [
             {
                 "capability": binding.capability,
-                "provider": binding.provider,
-                "cardinality": binding.cardinality,
+                "provider": binding.owner_plugin,
+                "cardinality": binding.fallback_policy,
                 "scope": binding.scope,
-                "grant": list(binding.grant),
-                "provenance": list(binding.provenance),
+                "grant": [binding.effect_class],
+                "provenance": [binding.provenance],
             }
             for binding in plan.capability_bindings
-        ],
-        "phase_graph": phase_graph_to_dict(plan.phase_graph),
-        "phase_bindings": [
-            {
-                "node_id": binding.node_id,
-                "semantic_phase": binding.semantic_phase.value,
-                "executor_capability": binding.executor_capability,
-                "contributions": [
-                    {
-                        "phase": contribution.phase.value,
-                        "role": contribution.role.value,
-                        "executor": contribution.executor,
-                        "output": contribution.output,
-                        "order": contribution.order,
-                        "aggregation": contribution.aggregation,
-                    }
-                    for contribution in binding.contributions
-                ],
-            }
-            for binding in plan.phase_bindings
         ],
         "control_entries": [
             {

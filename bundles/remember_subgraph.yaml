@@ -1,20 +1,30 @@
-# bundles/remember_subgraph.yaml — remember 单节点子图(Bundle Graph Schema v2,ADR-0217)。
+# bundles/remember_subgraph.yaml — remember 多节点子图
+# ADR-0217 Bundle Graph Schema v2 + ADR-0221 six-phase subgraph cutover.
 #
-# Framework 子树不再持有 PhaseExecutor/PhaseInput/PhaseResult 概念;
-# 顶层 plan 通过节点级 sub_spec_ref 进入本子图,kernel 通过 NodeExecutorStrategy
-# 派发 phase:remember::phase.remember.host。remember 是 terminal-of-typing 节点,
-# 不发出 port,直接吃 typed upstream 决策/观察/反思并写 memory。
+# 拓扑:write → fold(双节点 typed port pipeline)。
+# write mint memory envelope + 调 effect_gateway dispatch;fold 转发
+# ``memory_receipt`` port 到 outer。
 
 id: remember.subgraph
 region: phase:remember
-purpose: remember 单步 — admit typed upstream ports into memory
+purpose: remember 双步执行 — write (mint envelope + dispatch) → fold (memory_receipt)
 
 nodes:
-  - id: remember.host
-    factory: phase.remember.host
+  - id: remember.write
+    factory: phase.remember.write
     inputs: [decision, observation, reflection]
-    outputs: []
+    outputs: [memory_receipt]
     config:
-      max_visits: 8
+      max_visits: 1
 
-edges: []
+  - id: remember.fold
+    factory: phase.remember.fold
+    inputs: [memory_receipt]
+    outputs: [memory_receipt]
+    config:
+      max_visits: 1
+
+edges:
+  - from: remember.write
+    to: remember.fold
+    when: true

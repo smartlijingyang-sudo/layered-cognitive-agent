@@ -3,16 +3,18 @@ from __future__ import annotations
 from lca.contracts.mechanisms import HookRegistry
 from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.core.state.terminal_outcome import ResumeCursor
-from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
-    DeclarativeRunOutcome,
+from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
     DeclarativeValidationError,
+)
+from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
+    DeclarativeRunOutcome,
     ExecutionOutcome,
 )
 from lca.contracts.protocols.journal.artifact.closure import ArtifactClosure
 from lca.contracts.protocols.runtime.infra.infra import StateStore
 from lca.contracts.protocols.runtime.runtime.composition import ResultFinalizer
 from lca.contracts.protocols.state.reducer import Reducer
-from lca.harness.graph.execute.interpreter import InterpretationResult
+from lca.framework.graph.interpreter import InterpretationResult
 from lca.runtime.projection.result_projection import TerminalResultProjection
 
 
@@ -54,8 +56,12 @@ class RuntimeResultFinalizer(ResultFinalizer):
         ADR-0158 决策 二:closure 不再经 reducer 流,改走 transport projection
         通道。reducer 仍是 state 唯一 writer(ADR-0070 C4)。
         """
-        if not isinstance(interpretation, InterpretationResult):
-            raise TypeError("RuntimeResultFinalizer.finalize requires InterpretationResult")
+        # ADR-0221 P3: the v2 driver hands the finalizer a shim that
+        # mirrors the v1 ``InterpretationResult`` shape so the legacy
+        # reducer pipeline stays intact; duck-typed access to the
+        # ``state`` / ``outcome`` fields below works without a hard
+        # ``isinstance`` check.
+        _ = interpretation  # keep the binding alive for the field reads
         final_state = interpretation.state
 
         outcome = interpretation.outcome

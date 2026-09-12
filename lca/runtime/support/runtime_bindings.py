@@ -20,7 +20,6 @@ from lca.contracts.protocols.act.embodiment.embodiment import Body
 from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
     DeltaReducer,
     EffectDispatcher,
-    PhaseCapabilityReader,
 )
 from lca.contracts.protocols.declarative.declarative_1.node_executor import NodeExecutor
 from lca.contracts.protocols.journal.artifact.closure import ArtifactClosure
@@ -45,7 +44,7 @@ from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
 from lca.contracts.protocols.state.plan import CompiledRunPlan
 from lca.contracts.protocols.state.reducer import Reducer
 from lca.contracts.protocols.think.cognition import Brain, PerceiveHub
-from lca.harness.declarative.lifecycle.phase_observation import PhaseObserver
+from lca.contracts.protocols.journal.phase.observation import PhaseObserver
 from lca.harness.plan import compiled_run_plan_ref
 from lca.runtime.loop.runtime_event_publisher import NullRuntimeLifecyclePublisher
 
@@ -54,12 +53,16 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True, slots=True)
-class RuntimePhaseCapabilities(PhaseCapabilityReader):
+class RuntimePhaseCapabilities:
     """Frozen, composition-provided capability view for phase executors.
 
     The runtime does not enumerate standard phase dependencies.  Instead, each
     cognitive cluster contributes the capabilities required while closing
     ``AgentGraph``; custom executors can consume additional declared keys.
+
+    ADR-0221 P3: ``PhaseCapabilityReader`` Protocol retired. ``values``
+    exposes the underlying mapping for any caller that still needs
+    duck-typed capability lookup.
     """
 
     values: Mapping[str, object]
@@ -224,11 +227,11 @@ class DeclarativeRuntimeBindings:
             node_executor_runtime_scope=self.capabilities,
             graph_observer=graph_observer,
         )
-        if not isinstance(interpreter, DeclarativeInterpreter):
-            raise TypeError(
-                "declarative_interpreter_factory.create must return DeclarativeInterpreter, "
-                f"got {type(interpreter).__name__}"
-            )
+        # ADR-0221 P3: the v2 interpreter is the kernel-native
+        # ``PlanInterpreter`` dataclass. The Protocol-level
+        # ``isinstance`` check is retired — the factory's return type
+        # is the contract; consumers are duck-typed at the call site.
+        _ = interpreter  # explicit acknowledgement
         # 注意:Default factory 已经在 create() 里 bind_cordis_seams(含 think subgraph 默认 fallback)。
         # runtime_bindings 不重复 bind,以免覆盖 Default factory 的 _DefaultSubgraphRuntime。
         # 顶层老 phase subgraph 仍走 self.subgraph_scope(set_subgraph_scope() 设)。

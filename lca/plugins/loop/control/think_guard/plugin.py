@@ -1,12 +1,14 @@
-"""Think-guard control executors — gate enforcement via declarative phase graph."""
+"""control.think.guard — NodeExecutor control node for the think.guard slot.
+
+Provides two nodes: ``control.think.guard.enforce`` (transform) and
+``control.think.guard`` (govern / verdict emission). Each implements
+``NodeExecutor`` directly — no PhaseContribution, no PhaseExecutor.
+"""
 
 from __future__ import annotations
 
-from lca.contracts.models.core.execution.decision import Decision
+from dataclasses import dataclass
 
-from pydantic import BaseModel, ConfigDict
-
-from lca.cognition.brain.gate.service import GateService
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -19,17 +21,13 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
-    StandardPhaseCapability,
+from lca.contracts.models.core.execution.decision import Decision
+from lca.contracts.protocols.declarative.declarative_1.node_executor import (
+    NodeContext,
+    NodeInput,
+    NodeOutput,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
-    ContributionRole,
-    PhaseContext,
-    PhaseContribution,
-    PhaseInput,
-    PhaseResult,
-    SemanticPhase,
-)
+from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
@@ -38,7 +36,6 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 def _is_known_action(decision: Decision) -> bool:
-    """Return whether a decision uses the closed ActionType vocabulary."""
     try:
         ActionType(decision.action_type)
         return True
@@ -46,134 +43,130 @@ def _is_known_action(decision: Decision) -> bool:
         return False
 
 
-def _resolve_gate_service(context: PhaseContext) -> GateService | None:
-    """Return the profile-selected gate registry when declared to the phase."""
-    gates = context.capabilities.get(StandardPhaseCapability.GATES.value)
-    if gates is None:
-        return None
-    if not isinstance(gates, GateService):
-        raise TypeError(
-            "phase capability 'gates' must be GateService, "
-            f"got {type(gates).__name__}"
-        )
-    return gates
-
-
 def _verdict_from_decision(decision: Decision) -> tuple[ControlVerdictKind, str]:
-    """Derive control verdict from the enforced Decision artifact (ADR-0194 D3)."""
     gate_verdict = decision.extra.get("gate_verdict")
     if isinstance(gate_verdict, str) and gate_verdict == "deny":
         return ControlVerdictKind.STOP, decision.rationale or gate_verdict
     if decision.degraded_from is not None:
-        return ControlVerdictKind.REWRITE, decision.rationale or f"rewritten from {decision.degraded_from}"
+        return (
+            ControlVerdictKind.REWRITE,
+            decision.rationale or f"rewritten from {decision.degraded_from}",
+        )
     if isinstance(gate_verdict, str) and gate_verdict == "rewrite":
         return ControlVerdictKind.REWRITE, decision.rationale or gate_verdict
     return ControlVerdictKind.ALLOW, "decision gate contribution accepted"
 
 
+@dataclass(frozen=True, slots=True)
 class ThinkGuardEnforceExecutor:
-    """Run profile-selected decision gates and return the enforced Decision."""
+    """Transform node: run profile-selected decision gates."""
 
-    async def execute(self, context: PhaseContext, input: PhaseInput) -> PhaseResult:
-        # ADR-0219 §4.3: typed read.
-        decision = context.payload_of(SemanticPhase.THINK, Decision)
-        if decision is None:
-            return PhaseResult(result_kind="decision", payload=None)
-        gate_service = _resolve_gate_service(context)
+    semantic_name: str = "control.think.guard.enforce"
+    region: str = "phase:think"
+    declared_inputs: tuple[PortName, ...] = ("decision",)
+    declared_outputs: tuple[PortName, ...] = ("decision",)
+
+    async def node_execute(
+        self,
+        context: NodeContext,
+        input: NodeInput,
+    ) -> NodeOutput:
+        runtime = context.runtime or {}
+        decision = input.port_values.get("decision")
+        if not isinstance(decision, Decision):
+            return NodeOutput(port_values={"decision": None}, next_hint=None)
+        gate_service = runtime.get("gates")
         if gate_service is None:
-            return PhaseResult(result_kind="decision", payload=decision)
-        enforced = await gate_service.assemble().enforce(context.state, decision)
-        return PhaseResult(result_kind="decision", payload=enforced)
+            return NodeOutput(port_values={"decision": decision}, next_hint=None)
+        from lca.cognition.brain.gate.service import GateService
 
-
-class ThinkGuardExecutor:
-    """Map enforced Decision artifacts to the closed ControlVerdict vocabulary."""
-
-    async def execute(self, context: PhaseContext, input: PhaseInput) -> PhaseResult:
-        # ADR-0219 §4.3: typed read.
-        decision = context.payload_of(SemanticPhase.THINK, Decision)
-        if decision is None:
-            return PhaseResult(
-                result_kind="control",
-                payload=ControlVerdict(
-                    kind=ControlVerdictKind.ALLOW,
-                    detail="candidate decision not materialized",
-                    plugin_id="control.executor.think-guard",
-                ),
+        if not isinstance(gate_service, GateService):
+            raise TypeError(
+                "phase capability 'gates' must be GateService, "
+                f"got {type(gate_service).__name__}"
             )
+        enforced = await gate_service.assemble().enforce(runtime.get("agent_state"), decision)
+        return NodeOutput(port_values={"decision": enforced}, next_hint=None)
+
+
+@dataclass(frozen=True, slots=True)
+class ThinkGuardExecutor:
+    """Govern node: enforce action-type + gate verdict; emit ``verdict``."""
+
+    semantic_name: str = "control.think.guard"
+    region: str = "phase:think"
+    declared_inputs: tuple[PortName, ...] = ("decision",)
+    declared_outputs: tuple[PortName, ...] = ("verdict",)
+
+    async def node_execute(
+        self,
+        context: NodeContext,
+        input: NodeInput,
+    ) -> NodeOutput:
+        del context
+        decision = input.port_values.get("decision")
+        if not isinstance(decision, Decision):
+            verdict = ControlVerdict(
+                kind=ControlVerdictKind.ALLOW,
+                detail="candidate decision not materialized",
+                plugin_id="control.executor.think-guard",
+            )
+            return NodeOutput(port_values={"verdict": verdict}, next_hint=None)
         if not _is_known_action(decision):
-            return PhaseResult(
-                result_kind="control",
-                payload=ControlVerdict(
-                    kind=ControlVerdictKind.STOP,
-                    detail="candidate action type is unknown",
-                    plugin_id="control.executor.think-guard",
-                ),
+            verdict = ControlVerdict(
+                kind=ControlVerdictKind.STOP,
+                detail="candidate action type is unknown",
+                plugin_id="control.executor.think-guard",
+            )
+            return NodeOutput(
+                port_values={"verdict": verdict}, next_hint="stop"
             )
         kind, detail = _verdict_from_decision(decision)
-        return PhaseResult(
-            result_kind="control",
-            payload=ControlVerdict(
-                kind=kind,
-                detail=detail,
-                plugin_id="control.executor.think-guard",
-            ),
+        verdict = ControlVerdict(
+            kind=kind,
+            detail=detail,
+            plugin_id="control.executor.think-guard",
         )
-
-
-class Config(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+        hint = "stop" if kind == ControlVerdictKind.STOP else None
+        return NodeOutput(port_values={"verdict": verdict}, next_hint=hint)
 
 
 @plugin(
     id="control.think.guard",
-    Config=Config,
-    provides=["control.think.guard", "control.think.guard.enforce"],
+    provides=(
+        "phase:think::control.think.guard.enforce",
+        "phase:think::control.think.guard",
+    ),
     layer="L2",
-    kind=PluginKind.PROVIDER,
+    kind=PluginKind.PRIMITIVE,
     effects="none",
     test_suite="tests/declarative/test_control_contributions.py",
-    contributes=[
-        PhaseContribution(
-            phase=SemanticPhase.THINK,
-            role=ContributionRole.TRANSFORM,
-            executor="control.think.guard.enforce",
-            output="think.guard.enforce",
-            order=0,
-        ),
-        PhaseContribution(
-            phase=SemanticPhase.THINK,
-            role=ContributionRole.GOVERN,
-            executor="control.think.guard",
-            output="think.guard",
-            order=1,
-            aggregation="deny-on-any-deny",
-        ),
-    ],
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(
-            group=FunctionalGroup.G6_DECISION, control_slots=(ControlSlot.THINK_GUARD,)
+            group=FunctionalGroup.G6_DECISION,
+            control_slots=(ControlSlot.THINK_GUARD,),
         ),
         lifecycle=LifecycleContract(allowed_scopes=(Scope.TURN,)),
         authority=AuthorityContract(grants=("decision.read", "gates.assemble")),
-        observability=EvidenceContract(descriptors=("control.think.guard.checked",)),
+        observability=EvidenceContract(
+            descriptors=("control_think_guard.checked", "control_think_guard.served")
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(
-        reads=("control.think.guard", "gates"),
-        emits=("control.think.guard.checked",),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )
-async def setup(ctx: PluginContext, config: Config) -> None:
+async def setup(ctx: PluginContext, config: object) -> None:
     del config
-    ctx.provide("control.think.guard.enforce", ThinkGuardEnforceExecutor())
-    ctx.provide("control.think.guard", ThinkGuardExecutor())
+    ctx.provide("phase:think::control.think.guard.enforce", ThinkGuardEnforceExecutor())
+    ctx.provide("phase:think::control.think.guard", ThinkGuardExecutor())
 
 
 __all__ = [
-    "Config",
     "ThinkGuardEnforceExecutor",
     "ThinkGuardExecutor",
     "setup",

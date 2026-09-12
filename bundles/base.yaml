@@ -92,27 +92,81 @@ entries:
   $module: lca.plugins.think.reason.complete
   config: {}
 
-# Six-phase subgraph host plugins (NodeExecutor entry points).
-# Framework subtree does not see PhaseExecutor/PhaseInput/PhaseResult;
-# each host plugin wraps the standard phase logic and projects it onto
-# typed NodeInput/NodeOutput ports. Registered under region
-# ``phase:<x>`` so FactoryRegistry resolves the factory name to the
-# composite key.
-- id: phase.perceive.host
-  name: phase_perceive_host
-  $module: lca.plugins.loop.phase.perceive.host.plugin
+# Six-phase subgraph node plugins (ADR-0221). Each phase subgraph is a
+# multi-node typed port graph; the nodes below are the leaf executors
+# wired into the corresponding subgraph bundles
+# (``bundles/{perceive,reflect,remember,stop}_subgraph.yaml``). No
+# phase host / standard shim: every node plugin implements
+# ``NodeExecutor`` directly.
+- id: phase.perceive.observe
+  name: phase_perceive_observe
+  $module: lca.plugins.loop.phase.perceive.observe.plugin
   config: {}
-- id: phase.reflect.host
-  name: phase_reflect_host
-  $module: lca.plugins.loop.phase.reflect.host.plugin
+- id: phase.perceive.fold
+  name: phase_perceive_fold
+  $module: lca.plugins.loop.phase.perceive.fold.plugin
   config: {}
-- id: phase.remember.host
-  name: phase_remember_host
-  $module: lca.plugins.loop.phase.remember.host.plugin
+- id: phase.reflect.score
+  name: phase_reflect_score
+  $module: lca.plugins.loop.phase.reflect.score.plugin
   config: {}
-- id: phase.stop.host
-  name: phase_stop_host
-  $module: lca.plugins.loop.phase.stop.host.plugin
+- id: phase.reflect.admit_recovery
+  name: phase_reflect_admit_recovery
+  $module: lca.plugins.loop.phase.reflect.admit_recovery.plugin
+  config: {}
+- id: phase.remember.write
+  name: phase_remember_write
+  $module: lca.plugins.loop.phase.remember.write.plugin
+  config: {}
+- id: phase.remember.fold
+  name: phase_remember_fold
+  $module: lca.plugins.loop.phase.remember.fold.plugin
+  config: {}
+- id: phase.stop.should_check
+  name: phase_stop_should_check
+  $module: lca.plugins.loop.phase.stop.should_check.plugin
+  config: {}
+- id: phase.stop.focus
+  name: phase_stop_focus
+  $module: lca.plugins.loop.phase.stop.focus.plugin
+  config: {}
+- id: phase.stop.fail
+  name: phase_stop_fail
+  $module: lca.plugins.loop.phase.stop.fail.plugin
+  config: {}
+
+# Control contribution plugins (ADR-0221) — each is now a NodeExecutor that
+# emits a typed ``verdict`` port. Profile patches wire them into the
+# appropriate phase subgraph as additional nodes (e.g. ``control.stop.focus``
+# lands between ``phase.stop.should_check`` and ``phase.stop.focus``).
+- id: control.perceive.context
+  name: control_perceive_context
+  $module: lca.plugins.loop.control.perceive_context.plugin
+  config: {}
+- id: control.think.guard
+  name: control_think_guard
+  $module: lca.plugins.loop.control.think_guard.plugin
+  config: {}
+- id: control.remember.admit
+  name: control_remember_admit
+  $module: lca.plugins.loop.control.remember_admit.plugin
+  config: {}
+- id: control.stop.decide
+  name: control_stop_decide
+  $module: lca.plugins.loop.control.stop_decide.plugin
+  config: {}
+- id: control.stop.focus
+  name: control_stop_focus
+  $module: lca.plugins.loop.control.stop_focus.plugin
+  config:
+    max_consecutive_stagnant_turns: 3
+- id: control.observe.checkpoint
+  name: control_observe_checkpoint
+  $module: lca.plugins.loop.control.observe_checkpoint.plugin
+  config: {}
+- id: control.observe.wildcard
+  name: control_observe_wildcard
+  $module: lca.plugins.loop.control.observe_wildcard.plugin
   config: {}
 
 - id: phase.primitive.capability.fork.dispatch
@@ -371,10 +425,6 @@ entries:
 - id: lca-declarative-runtime-seams-provider
   name: lca_declarative_runtime_seams_provider
   $module: lca.plugins.journal.declarative.runtime_seams_provider
-  config: {}
-- id: lca-declarative-loop-guard
-  name: lca_declarative_loop_guard
-  $module: lca.plugins.think.loop.guard_provider
   config: {}
 - id: lca-cognitive-runtime-factory
   name: lca_cognitive_runtime_factory

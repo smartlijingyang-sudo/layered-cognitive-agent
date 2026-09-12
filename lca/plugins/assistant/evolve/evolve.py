@@ -528,7 +528,7 @@ def _read_card(card_path: Path) -> dict[str, Any]:
             ASSISTANT_SKILL_EVOLVED_PROPOSED,
             ASSISTANT_SKILL_EVOLVED_PROMOTED,
         ),
-        state_mutation="reducer-only",
+        state_mutation="scoped",
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:

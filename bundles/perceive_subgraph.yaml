@@ -1,22 +1,31 @@
-# bundles/perceive_subgraph.yaml — perceive 单节点子图(Bundle Graph Schema v2,ADR-0217)。
+# bundles/perceive_subgraph.yaml — perceive 多节点子图
+# ADR-0217 Bundle Graph Schema v2 + ADR-0221 six-phase subgraph cutover.
 #
-# Framework 子树不再持有 PhaseExecutor/PhaseInput/PhaseResult 概念;
-# 顶层 plan 通过节点级 sub_spec_ref 进入本子图,kernel 通过 NodeExecutorStrategy
-# 派发 phase:perceive::phase.perceive.host。host 在 plugin 内部把 typed port 投影
-# 为标准 PhaseExecutor 输入并把 PhaseResult.payload 回写到 observation port。
+# 拓扑:observe → fold(双节点 typed port pipeline)。
+# observe 调 PerceiveHub 拉 raw manifest;fold 把 manifest 投影到 closed
+# ``observation`` port,作为下游 think.main 的 typed boundary。
 #
-# 单节点 + 单边(回到 host 边由 kernel 自动收口,无需显式返回边)。
+# 不放(inputs/outputs/payload_port/result_kind):@plugin 装饰器不读,
+# v2 driver 不读,observer 不消费——纯摆设。
 
 id: perceive.subgraph
 region: phase:perceive
-purpose: perceive 单步 — collect the profile-selected context manifest
+purpose: perceive 双步执行 — observe (PerceiveHub) → fold (manifest → observation)
 
 nodes:
-  - id: perceive.host
-    factory: phase.perceive.host
-    inputs: []
+  - id: perceive.observe
+    factory: phase.perceive.observe
+    config:
+      max_visits: 1
+
+  - id: perceive.fold
+    factory: phase.perceive.fold
+    inputs: [manifest]
     outputs: [observation]
     config:
-      max_visits: 8
+      max_visits: 1
 
-edges: []
+edges:
+  - from: perceive.observe
+    to: perceive.fold
+    when: true

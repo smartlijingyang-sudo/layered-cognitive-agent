@@ -1,57 +1,35 @@
 """声明式计划契约的兼容导入门面。
 
-新代码应按职责从 ``declarative_common``、``declarative_plugin``、
-``declarative_graph`` 或 ``declarative_execution`` 导入。此模块保留原有
-导入路径，避免把纯模块边界重构变成调用方的行为性迁移。
+ADR-0221: ``PhaseExecutor`` / ``PhaseContext`` / ``PhaseBinding`` /
+``ControlEntry`` / ``PhaseContribution`` re-exports have been retired.
+New code imports directly from ``declarative_1.declarative_graph`` and
+``declarative_2.declarative_plugin``.
 """
 
 from lca.contracts.protocols.act.command.envelope import CommandEnvelope, RunDelta, RunFact
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
-    AGGREGATIONS,
     ALLOWED_EFFECTS,
     CARDINALITIES,
     DECLARATIVE_PLAN_VERSION,
     PLUGIN_SPEC_VERSION,
-    ContributionRole,
     DeclarativeValidationError,
     PluginSpecKind,
     RelationType,
     SemanticPhase,
-)
-from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
-    DeclarativeRunOutcome,
-    DeltaReducer,
-    EffectDispatcher,
-    ExecutionOutcome,
-    JournalCommitter,
-    PhaseAttemptFailure,
-    PhaseCapabilityReader,
-    PhaseContext,
-    PhaseErrorCategory,
-    PhaseErrorKind,
-    PhaseExecutionFailure,
-    PhaseExecutor,
-    PhaseInput,
-    PhaseResult,
-    PhaseRunCursor,
-    StandardPhaseCapability,
 )
 from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
     ActionAuthorityPlan,
     ActionScopeAuthority,
     CapabilityBinding,
     CognitivePhaseGraphPlan,
-    ControlEntry,
     EffectPolicyPlan,
     LoopGuard,
-    PhaseBinding,
     PhaseEdge,
     PhaseExecutionPolicy,
     PhaseNode,
     PlanProvenance,
     ReplacementDecision,
     SubgraphReference,
-    SubgraphResolver,
     ValidationIssue,
     ValidationReport,
     ValidationSeverity,
@@ -62,7 +40,6 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     EvidenceDeclaration,
     LifecycleDeclaration,
     OwnershipDeclaration,
-    PhaseContribution,
     PluginConfiguration,
     PluginImplementation,
     PluginRelation,
@@ -71,7 +48,6 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 
 __all__ = [
-    "AGGREGATIONS",
     "ALLOWED_EFFECTS",
     "CARDINALITIES",
     "DECLARATIVE_PLAN_VERSION",
@@ -82,35 +58,16 @@ __all__ = [
     "CapabilityDeclaration",
     "CognitivePhaseGraphPlan",
     "CommandEnvelope",
-    "ContributionRole",
-    "ControlEntry",
-    "DeclarativeRunOutcome",
     "DeclarativeValidationError",
-    "DeltaReducer",
-    "EffectDispatcher",
     "EffectGovernanceDeclaration",
     "EffectPolicyPlan",
     "EvidenceDeclaration",
-    "ExecutionOutcome",
-    "JournalCommitter",
     "LifecycleDeclaration",
     "LoopGuard",
     "OwnershipDeclaration",
-    "PhaseAttemptFailure",
-    "PhaseBinding",
-    "PhaseCapabilityReader",
-    "PhaseContext",
-    "PhaseContribution",
     "PhaseEdge",
-    "PhaseErrorCategory",
-    "PhaseErrorKind",
-    "PhaseExecutionFailure",
     "PhaseExecutionPolicy",
-    "PhaseExecutor",
-    "PhaseInput",
     "PhaseNode",
-    "PhaseResult",
-    "PhaseRunCursor",
     "PlanProvenance",
     "PluginConfiguration",
     "PluginImplementation",
@@ -122,9 +79,7 @@ __all__ = [
     "RunDelta",
     "RunFact",
     "SemanticPhase",
-    "StandardPhaseCapability",
     "SubgraphReference",
-    "SubgraphResolver",
     "ValidationIssue",
     "ValidationReport",
     "ValidationSeverity",

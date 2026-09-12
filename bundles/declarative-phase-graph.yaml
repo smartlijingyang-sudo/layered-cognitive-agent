@@ -1,4 +1,4 @@
-# ADR-0075: 默认认知阶段只通过显式 PhaseExecutor capability 选择。
+# ADR-0075 + ADR-0221: 默认认知阶段只通过显式 PhaseExecutor capability 选择。
 #
 # .. note::
 #   Backward-compat only (ADR-0210 §6.3 P7 §6.5). The P7 region-tag
@@ -6,37 +6,16 @@
 #   ``profile.regions.declare``. This bundle is kept so legacy profiles
 #   that wire ``declarative-phase-graph.yaml`` still resolve. New
 #   profiles should NOT depend on this bundle — the region-tag path
-#   covers all use cases (see lca.harness.graph.execute.interpreter
-#   and agent_lab.profile_loader.build_region_only_phase_graph).
+#   covers all use cases.
+#
+# ADR-0221 cutover: every phase main now enters its dedicated subgraph
+# bundle via node-level ``sub_spec_ref`` — no ``binding: phase.<x>.standard``
+# references remain. Control plugins are registered under ``bundles/base.yaml``
+# and wired into the subgraphs by the active Profile / Bundle patch.
 #
 # delete-when: All production profiles migrated to region-tag path AND
-# ADR-0210 升 Accepted. Until then, this bundle is the only way for
-# production profiles to declare 6-stage topology via the legacy 0075
-# SSOT. (After the migration, the data structures stay for backward
-# compat; only the bundle reference in production profiles is removed.)
+# ADR-0210 升 Accepted.
 entries:
-  - id: phase.perceive.standard
-    name: phase_perceive_standard
-    $module: lca.plugins.loop.phase.perceive.standard.plugin
-    config: {}
-
-  - id: phase.reflect.standard
-    name: phase_reflect_standard
-    $module: lca.plugins.loop.phase.reflect.standard.plugin
-    config: {}
-
-  - id: phase.remember.standard
-    name: phase_remember_standard
-    $module: lca.plugins.loop.phase.remember.standard.plugin
-    config: {}
-
-  - id: phase.stop.standard
-    name: phase_stop_standard
-    $module: lca.plugins.loop.phase.stop.standard.plugin
-    config: {}
-
-  # 节点身份、入口、终止标记和访问上限同样由 Profile/Bundle 声明；编译器
-  # 只验证并投影，绝不注入 *.main、perceive 入口、stop 终止或固定访问上限。
   - id: phase.topology.standard
     name: phase_topology_standard
     $module: lca.plugins.loop.graph.topology.standard.plugin
@@ -44,15 +23,18 @@ entries:
       nodes:
         - id: perceive.main
           phase: perceive
-          binding: phase.perceive.standard
           max_visits: 8
           entry: true
+          # ADR-0221: phase main is subgraph-driven; no phase.<x>.standard
+          # binding remains. The interpreter enters the subgraph via
+          # ``sub_spec_ref`` and dispatches NodeExecutor plugins.
+          sub_spec_ref:
+            plan_ref: bundles/perceive_subgraph.yaml
+            entry_node: perceive.observe
+            binding_edge: perceive.main
         - id: think.main
           phase: think
           max_visits: 8
-          # Bundle Graph Schema v2 (ADR-0217): think 节点持有节点级
-          # sub_spec_ref,指向 bundles/think.yaml 纯图描述(5 节点 + 5 边)。
-          # interpreter 进入节点时分发到子图,不调用 phase.think.standard。
           sub_spec_ref:
             plan_ref: bundles/think.yaml
             entry_node: think.shortcut
@@ -60,25 +42,32 @@ entries:
         - id: act.main
           phase: act
           max_visits: 8
-          # ADR-0220: act 子图分解。interpreter 进入节点时分发到子图,
-          # 不调用 phase.act.standard。子图描述在 bundles/act.yaml。
           sub_spec_ref:
             plan_ref: bundles/act.yaml
             entry_node: act.validate
             binding_edge: act.main
         - id: reflect.main
           phase: reflect
-          binding: phase.reflect.standard
           max_visits: 8
+          sub_spec_ref:
+            plan_ref: bundles/reflect_subgraph.yaml
+            entry_node: reflect.score
+            binding_edge: reflect.main
         - id: remember.main
           phase: remember
-          binding: phase.remember.standard
           max_visits: 8
+          sub_spec_ref:
+            plan_ref: bundles/remember_subgraph.yaml
+            entry_node: remember.write
+            binding_edge: remember.main
         - id: stop.main
           phase: stop
-          binding: phase.stop.standard
           max_visits: 8
           terminal: true
+          sub_spec_ref:
+            plan_ref: bundles/stop_subgraph.yaml
+            entry_node: stop.should_check
+            binding_edge: stop.main
 
   # 生产默认值：非副作用阶段可处理瞬时故障；动作阶段依赖 Effect Gateway 的
   # 幂等语义，超时后不重放。所有常规阶段耗尽后均由图显式收敛至 stop。
@@ -123,86 +112,35 @@ entries:
       edges:
         - source: perceive.main
           target: stop.main
-          when: result.result_kind == "phase_error"
+          when: result.payload.should_stop == true and result.payload.reason == "error"
         - source: perceive.main
           target: think.main
           when: true
         - source: think.main
           target: stop.main
-          when: result.result_kind == "phase_error"
+          when: result.payload.should_stop == true and result.payload.reason == "error"
         - source: think.main
           target: act.main
           when: true
         - source: act.main
           target: stop.main
-          when: result.result_kind == "phase_error"
+          when: result.payload.should_stop == true and result.payload.reason == "error"
         - source: act.main
           target: reflect.main
           when: true
         - source: reflect.main
           target: stop.main
-          when: result.result_kind == "phase_error"
+          when: result.payload.should_stop == true and result.payload.reason == "error"
         - source: reflect.main
           target: remember.main
           when: true
-          # Minimum edge-level subgraph reference: when this edge fires,
-          # the interpreter recurses into ``bundles/reflect-subgraph.yaml``
-          # at ``reflect.inner_score`` and returns to the outer graph at
-          # ``remember.main``. The assembler enforces the matching
-          # back-reference edge in the subgraph at compile time (PG-004).
-          subgraph_ref:
-            plan_ref: bundles/reflect-subgraph.yaml
-            entry_node: reflect.inner_score
-            binding_edge: reflect.main
-            return_on: next
-        - source: remember.main
-          target: stop.main
-          when: result.result_kind == "phase_error"
         - source: remember.main
           target: stop.main
           when: true
         - source: stop.main
           target: perceive.main
-          when: result.result_kind == "stop_decision" and not result.payload.should_stop
+          when: not result.payload.should_stop
           loop:
             max_iterations: 8
             budget: run.steps
-            terminal_predicate: result.result_kind == "stop_decision" and result.payload.should_stop
-
-  # ADR-0074: 所有控制贡献均由独立插件提供，支持按槽替换（Phase 3b）。
-  - id: control.perceive.context
-    name: control_perceive_context
-    $module: lca.plugins.loop.control.perceive_context.plugin
-    config: {}
-
-  - id: control.think.guard
-    name: control_think_guard
-    $module: lca.plugins.loop.control.think_guard.plugin
-    config: {}
-
-  - id: control.remember.admit
-    name: control_remember_admit
-    $module: lca.plugins.loop.control.remember_admit.plugin
-    config: {}
-
-  - id: control.stop.decide
-    name: control_stop_decide
-    $module: lca.plugins.loop.control.stop_decide.plugin
-    config: {}
-
-  # 防止跨工具或无工具路径在同一失败意图上做浅层反复认知；只在 STOP 治理槽收口。
-  - id: control.stop.focus
-    name: control_stop_focus
-    $module: lca.plugins.loop.control.stop_focus.plugin
-    config:
-      max_consecutive_stagnant_turns: 3
-
-  - id: control.observe.checkpoint
-    name: control_observe_checkpoint
-    $module: lca.plugins.loop.control.observe_checkpoint.plugin
-    config: {}
-
-  - id: control.observe.wildcard
-    name: control_observe_wildcard
-    $module: lca.plugins.loop.control.observe_wildcard.plugin
-    config: {}
+            terminal_predicate: result.payload.should_stop == true

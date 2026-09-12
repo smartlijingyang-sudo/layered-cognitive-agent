@@ -1,47 +1,38 @@
-"""Plan 编译(K2)。
+"""Plan 编译(K2) — v2 kernel-native, ADR-0221 P3.
 
-合并自 :mod:`lca.harness.composition.plan_compiler` 与
-:mod:`lca.harness.profile.capability_plan_resolver`,统一由
-:func:`compile_run_plan` 导出。ADR-0115 决定 1 K2。
+The v2 plan compiler emits ``CompiledRunPlan`` without the
+``phase_graph`` / ``phase_bindings`` regions that v1 used to feed
+``GraphAssembler``. The runtime builds its executable plan directly
+from ``PlanInterpreter`` + NodeExecutor subgraphs at boot.
+
+This module is the kernel-side public entry point; it re-exports
+``compile_plan`` from :mod:`lca_kernel.plan.plan_compile` so existing
+imports (``from lca_kernel.plan.plan import compile_run_plan``) keep
+working.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-from lca.harness.composition.plan_compiler import (
+from lca_kernel.plan.plan_compile import (
+    COMPILED_RUN_PLAN_VERSION,
     CompileOptions,
     PlanCompilerError,
     compile_plan,
 )
-from lca.harness.profile.resolve.capability_plan_resolver import (
-    CapabilityPlanOptions,
-    CapabilityPlanResolveError,
-    project_capability_plan,
-)
-
-if TYPE_CHECKING:
-    from lca.harness.profile.resolve.resolve import ResolvedProfile
 
 
 def compile_run_plan(
-    resolved: ResolvedProfile,
+    resolved,
     *,
     options: CompileOptions | None = None,
 ) -> object:
-    """公共 API 入口(同 :func:`lca.harness.composition.plan_compiler.compile_plan`).
-
-    命名遵循 ADR-0106 §8.1 函数前缀表(``compile_*``);保留旧名 ``compile_plan``
-    作为 deprecated alias 由 compat 层转发。
-    """
+    """公共 API 入口(同 :func:`compile_plan`)."""
     return compile_plan(resolved, options=options)
 
 
 __all__ = [
-    "CapabilityPlanOptions",
-    "CapabilityPlanResolveError",
+    "COMPILED_RUN_PLAN_VERSION",
     "CompileOptions",
     "PlanCompilerError",
     "compile_run_plan",
-    "project_capability_plan",
 ]

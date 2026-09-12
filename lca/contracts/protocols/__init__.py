@@ -107,6 +107,11 @@ from lca.contracts.protocols.composition.relation import (
     typed_relation_to_dict,
     typed_relations_from_iter,
 )
+from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
+    DeltaReducer,
+    EffectDispatcher,
+    JournalCommitter,
+)
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     DECLARATIVE_PLAN_VERSION,
     PLUGIN_SPEC_VERSION,
@@ -115,20 +120,10 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
     CapabilityBinding,
     CapabilityDeclaration,
     CognitivePhaseGraphPlan,
-    ContributionRole,
     DeclarativeValidationError,
-    DeltaReducer,
-    EffectDispatcher,
     EffectPolicyPlan,
-    JournalCommitter,
-    PhaseBinding,
-    PhaseContext,
-    PhaseContribution,
     PhaseEdge,
-    PhaseExecutor,
-    PhaseInput,
     PhaseNode,
-    PhaseResult,
     PlanProvenance,
     PluginConfiguration,
     PluginImplementation,
@@ -141,9 +136,18 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
     ValidationIssue,
     ValidationReport,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
-    ControlEntry as DeclarativeControlEntry,
+# ADR-0221: ``NodeExecutor`` is the sole node-level executor Protocol
+# (replaces ``PhaseExecutor``). Re-exported alongside
+# ``GraphNodeExecutor`` (the orchestration-graph variant) for callers
+# that distinguish them.
+from lca.contracts.protocols.declarative.declarative_1.node_executor import (
+    NodeContext as PhaseNodeContext,
+    NodeExecutor,
+    NodeInput as PhaseNodeInput,
+    NodeOutput as PhaseNodeOutput,
 )
+# ControlEntry retired in ADR-0221; phase control surfaces are now
+# additional NodeExecutor nodes in each phase subgraph bundle.
 from lca.contracts.protocols.gate.budget_policy import BudgetPolicy
 
 # ── 控制面单一入口（ADR-0066 + tracker §19）─────────────────────
@@ -318,7 +322,7 @@ from lca.contracts.protocols.think.cognitive_pipeline import (
     CognitiveThinkPipeline,
 )
 
-__all__ = [  # noqa: RUF022 — discovery order matches tests/contracts/test_protocols_package_contract.py::test_all_derived_from_explicit_reexports
+__all__ = [
     "ActionAuthorityPlan",
     "ActionHandler",
     "ActionHandlerRegistry",
@@ -352,7 +356,6 @@ __all__ = [  # noqa: RUF022 — discovery order matches tests/contracts/test_pro
     "CommandEnvelope",
     "CompiledRunPlan",
     "ComponentRegistryProtocol",
-    "ContributionRole",
     "ControlVerdict",
     "ControlVerdictKind",
     "Critic",
@@ -360,7 +363,6 @@ __all__ = [  # noqa: RUF022 — discovery order matches tests/contracts/test_pro
     "DecisionGate",
     "DecisionGateAssembler",
     "DecisionRef",
-    "DeclarativeControlEntry",
     "DeclarativeInterpreter",
     "DeclarativeInterpreterFactory",
     "DeclarativeValidationError",
@@ -398,6 +400,7 @@ __all__ = [  # noqa: RUF022 — discovery order matches tests/contracts/test_pro
     "MissingSectionKindError",
     "ModeAdapter",
     "NamedRegistryProtocol",
+    "NodeExecutor",
     "NodeIOSchema",
     "NodeInput",
     "NodeOutput",
@@ -408,18 +411,15 @@ __all__ = [  # noqa: RUF022 — discovery order matches tests/contracts/test_pro
     "PLUGIN_SPEC_VERSION",
     "PerceiveHub",
     "PerceiveHubAssembler",
-    "PhaseBinding",
     "PhaseBudgetSnapshot",
-    "PhaseContext",
-    "PhaseContribution",
     "PhaseEdge",
-    "PhaseExecutor",
-    "PhaseInput",
     "PhaseNode",
+    "PhaseNodeContext",
+    "PhaseNodeInput",
+    "PhaseNodeOutput",
     "PhaseObserver",
     "PhaseObserverContribution",
     "PhaseObserverRegistry",
-    "PhaseResult",
     "PhaseStateSnapshot",
     "Plan",
     "PlanEdge",

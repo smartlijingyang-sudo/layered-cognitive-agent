@@ -16,7 +16,6 @@ from lca.contracts.capabilities import (
     DECLARATIVE_INTERPRETER_FACTORY,
     DELTA_REDUCER_FACTORY,
     EFFECT_DISPATCHER_FACTORY,
-    LOOP_GUARD_EVALUATOR,
     PHASE_OBSERVER,
     RESULT_FINALIZER_FACTORY,
     RESUME_INPUT_ADAPTERS,
@@ -74,8 +73,9 @@ _RUNTIME_CAPABILITY_KEYS = (
     "delta_handler_registry",
     EFFECT_DISPATCHER_FACTORY.key,
     "effect_handler_registry",
-    LOOP_GUARD_EVALUATOR.key,
     "idempotency_store",
+    # ADR-0221 P3: LOOP_GUARD_EVALUATOR retired — loop guard now lives
+    # in the think-phase control.think.guard subgraph.
     PHASE_OBSERVER.key,
     RESULT_FINALIZER_FACTORY.key,
     RUNTIME_FACTORY.key,
@@ -118,15 +118,19 @@ def require_complete_runtime_graph(graph: AgentGraph) -> None:
 
 
 def resolve_runtime_capabilities(
-    plan: CompiledRunPlan,
+    plan: object,
     scope: Context,
 ) -> RuntimeCapabilityClosure:
-    """Close runtime mechanics through the plan-declared provider bindings only."""
+    """Close runtime mechanics through the plan-declared provider bindings only.
 
+    ADR-0221 P3: accepts ``V2ExecutablePlan`` and unwraps to its inner
+    ``CompiledRunPlan`` before consulting the capability region.
+    """
+    inner = getattr(plan, "inner", plan)
     try:
         resolver = ScopeCapabilityResolver.from_scope(scope)
         capabilities = resolver.require_declared_capabilities(
-            plan.capability.provider_bindings,
+            inner.capability.provider_bindings,
             _RUNTIME_CAPABILITY_KEYS,
         )
     except CapabilityResolutionError as exc:

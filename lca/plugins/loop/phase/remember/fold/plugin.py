@@ -1,4 +1,10 @@
-"""control.observe.wildcard — explicit no-op NodeExecutor for the wildcard slot."""
+"""phase.remember.fold — terminal-of-typing: typed ``memory_receipt`` port.
+
+ADR-0221: takes the envelope + receipt produced by
+``phase.remember.write`` and emits a single typed ``memory_receipt`` port
+that downstream consumers can observe. This is the typed
+cross-phase boundary.
+"""
 
 from __future__ import annotations
 
@@ -28,40 +34,43 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 @dataclass(frozen=True, slots=True)
-class ObserveWildcardExecutor:
-    """No-op control node: always emits ``allow`` verdict."""
+class RememberFoldExecutor:
+    """Terminal-of-typing: forward the typed ``memory_receipt`` port."""
 
-    semantic_name: str = "control.observe.wildcard"
-    region: str = "phase:stop"
-    declared_inputs: tuple[PortName, ...] = ()
-    declared_outputs: tuple[PortName, ...] = ("verdict",)
+    semantic_name: str = "phase.remember.fold"
+    region: str = "phase:remember"
+    declared_inputs: tuple[PortName, ...] = ("memory_receipt",)
+    declared_outputs: tuple[PortName, ...] = ("memory_receipt",)
 
     async def node_execute(
         self,
         context: NodeContext,
         input: NodeInput,
     ) -> NodeOutput:
-        del context, input
-        return NodeOutput(port_values={"verdict": {"verdict": "allow"}}, next_hint=None)
+        del context
+        return NodeOutput(
+            port_values={"memory_receipt": input.port_values.get("memory_receipt")},
+            next_hint=None,
+        )
 
 
 @plugin(
-    id="control.observe.wildcard",
-    provides=("phase:stop::control.observe.wildcard",),
+    id="phase.remember.fold",
+    provides=("phase:remember::phase.remember.fold",),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
-    effects="none",
-    test_suite="tests/declarative/test_control_contributions.py",
+    effects="memory",
+    test_suite="tests/declarative/test_phase_subgraph_parity.py",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(
-            group=FunctionalGroup.G6_DECISION,
+            group=FunctionalGroup.G7_EXECUTION,
             control_slots=(ControlSlot.OBSERVE_WILDCARD,),
         ),
-        lifecycle=LifecycleContract(allowed_scopes=(Scope.TURN,)),
-        authority=AuthorityContract(grants=("checkpoint.*",)),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(grants=("plugin.serve",)),
         observability=EvidenceContract(
-            descriptors=("control_observe_wildcard.checked", "control_observe_wildcard.served")
+            descriptors=("phase_remember_fold.checked", "phase_remember_fold.served")
         ),
     ),
     relations=(),
@@ -73,7 +82,7 @@ class ObserveWildcardExecutor:
 )
 async def setup(ctx: PluginContext, config: object) -> None:
     del config
-    ctx.provide("phase:stop::control.observe.wildcard", ObserveWildcardExecutor())
+    ctx.provide("phase:remember::phase.remember.fold", RememberFoldExecutor())
 
 
-__all__ = ["ObserveWildcardExecutor", "setup"]
+__all__ = ["RememberFoldExecutor", "setup"]

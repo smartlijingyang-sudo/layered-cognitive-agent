@@ -1,50 +1,32 @@
-"""声明式计划解释器所使用的稳定执行 wire shape 与协议。"""
+"""声明式计划解释器所使用的稳定执行 wire shape 与协议。
+
+ADR-0221: PhaseExecutor / PhaseInput / PhaseResult / PhaseContext /
+PhaseExecutionFailure / PhaseCapabilityReader / StandardPhaseCapability
+have been retired. Every phase node is a :class:`NodeExecutor` (see
+``declarative_1.node_executor``); upstream typed product propagation
+goes through :class:`NodeInput.port_values` and ``results_by_phase`` is
+no longer needed (the kernel passes the typed port map directly).
+
+This module keeps the surviving cross-cutting contracts:
+:data:`ExecutionOutcome`, :class:`DeclarativeRunOutcome`,
+:class:`PhaseRunCursor`, :class:`DeltaReducer`, :class:`EffectDispatcher`,
+:class:`JournalCommitter`. They are still consumed by the kernel's
+typed interpretation result and by the runtime bindings.
+"""
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Literal, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
-from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.policy.stop import StopDecision
-
-if TYPE_CHECKING:
-    from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
-        SemanticPhase,
-    )
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.protocols.act.command.envelope import CommandEnvelope, RunDelta, RunFact
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
     DeclarativeValidationError,
 )
 from lca.contracts.protocols.declarative.declarative_1.declarative_graph import EffectPolicyPlan
-
-
-@runtime_checkable
-class PhaseCapabilityReader(Protocol):
-    """Read only the capabilities declared for one phase execution scope.
-
-    Phase executors cannot discover services from a live Cordis context. They can
-    only ask for a named capability that the composition layer deliberately
-    placed in this narrow view.
-    """
-
-    def get(self, name: str) -> object | None: ...
-
-    def require(self, name: str) -> object: ...
-
-
-class StandardPhaseCapability(str, Enum):
-    """Closed names exposed to built-in phase executors."""
-
-    BRAIN = "brain"
-    BODY = "body"
-    GATES = "gates"
-    MEMORY = "memory"
-    PERCEIVE_HUB = "perceive_hub"
-    STOP_POLICY = "stop_policy"
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,183 +92,17 @@ class DeclarativeRunOutcome:
             raise DeclarativeValidationError("PG-009", "outcome must carry a PhaseRunCursor")
 
 
-@dataclass(frozen=True, slots=True)
-class PhaseInput:
-    artifact: object | None = None
-    causation_refs: tuple[str, ...] = ()
+class DeltaReducer(Protocol):
+    """Runtime Protocol for delta application — concrete impl lives at runtime_bindings."""
 
 
-PhaseErrorCategory = Literal["timeout", "transient", "permanent"]
-
-
-# Outer phase error kind (ADR-clean-truths 决策 一).
-# 区别于 PhaseErrorCategory（attempt 内部失败分类）,
-# 这里表达的是 PhaseExecutionFailure 这个 boundary 事件的根因。
-# UI / LobeHub / run-doctor 只读 error_kind,不再拼接文学化 message。
-PhaseErrorKind = Literal[
-    "timeout",  # wait_for / asyncio timeout
-    "contract",  # 类型/参数/状态 contract violation
-    "cancelled",  # 上层取消
-    "provider",  # LLM/provider 上游故障
-    "internal",  # 未分类内部错误
-]
-
-
-def _derive_error_kind(attempts: tuple[PhaseAttemptFailure, ...]) -> str:
-    """从最后一次 attempt 的 category 推导 outer error_kind。
-
-    PhaseErrorCategory 与 PhaseErrorKind 的映射:
-      timeout   → timeout
-      transient → provider
-      permanent → internal（永久错误被默认视为契约/语义错误,除非显式归类）
-    """
-    if not attempts:
-        return "internal"
-    last_category = attempts[-1].category
-    if last_category == "timeout":
-        return "timeout"
-    if last_category == "transient":
-        return "provider"
-    return "internal"
-
-
-@dataclass(frozen=True, slots=True)
-class PhaseAttemptFailure:
-    """Sanitized, replay-safe metadata for one failed phase attempt.
-
-    ``error_message`` carries a bounded, single-line copy of the upstream
-    error text (e.g. provider 429 reason). It is display projection material,
-    not a fact source; the canonical exception record remains the spine
-    ``exception.caught`` / sidecar path. Callers own the cap and sanitization;
-    empty string means the message was not captured.
-    """
-
-    attempt: int
-    category: PhaseErrorCategory
-    error_type: str
-    error_message: str = ""
-
-
-@dataclass(frozen=True, slots=True)
-class PhaseExecutionFailure:
-    """Typed payload emitted when a phase exhausts its attempt policy."""
-
-    node_id: str
-    attempts: tuple[PhaseAttemptFailure, ...]
-    last_tool_call_id: str | None = None
-    # ADR-clean-truths 决策 一:PhaseExecutionFailure 自身携带结构化错误分类,
-    # 下游不再依赖 message 字符串里的"the agent could not complete a required
-    # {node_id} step after {n} attempt(s)"这种文学化叙述。默认从 attempts[-1]
-    # 推导(timeout → "timeout",transient → "provider",其他 → "internal"),
-    # 显式传入可覆盖。
-    error_kind: PhaseErrorKind | None = None
-
-    def __post_init__(self) -> None:
-        if not self.node_id:
-            raise DeclarativeValidationError("PG-010", "phase execution failure requires a node id")
-        if not isinstance(self.attempts, tuple):
-            object.__setattr__(self, "attempts", tuple(self.attempts))
-        if not self.attempts:
-            raise DeclarativeValidationError(
-                "PG-010", "phase execution failure requires at least one attempt"
-            )
-        if self.error_kind is None:
-            object.__setattr__(self, "error_kind", _derive_error_kind(self.attempts))
-
-    def is_retryable(self) -> bool:
-        """外部策略可读的最小信号:是否值得重试。"""
-        return self.error_kind in ("timeout", "provider")
-
-
-@dataclass(frozen=True, slots=True)
-class PhaseResult:
-    """PhaseExecutor 的唯一标准返回值。"""
-
-    result_kind: str
-    facts: tuple[RunFact, ...] = ()
-    deltas: tuple[RunDelta, ...] = ()
-    evidence_refs: tuple[str, ...] = ()
-    next_hints: Mapping[str, object] = field(default_factory=dict)
-    payload: object | None = None
-    command_envelope: CommandEnvelope | None = None
-
-    def __post_init__(self) -> None:
-        if not self.result_kind:
-            raise DeclarativeValidationError("RT-002", "PhaseResult.result_kind must be non-empty")
-        if not isinstance(self.facts, tuple):
-            object.__setattr__(self, "facts", tuple(self.facts))
-        if not isinstance(self.deltas, tuple):
-            object.__setattr__(self, "deltas", tuple(self.deltas))
-        if not isinstance(self.evidence_refs, tuple):
-            object.__setattr__(
-                self, "evidence_refs", tuple(str(item) for item in self.evidence_refs)
-            )
-        if not isinstance(self.next_hints, Mapping):
-            object.__setattr__(self, "next_hints", dict(self.next_hints))
-
-
-@runtime_checkable
-class PhaseContext(Protocol):
-    """插件可见的只读执行上下文；不暴露 Cordis Context。
-
-    Per ADR-0219 §4: cross-node product propagation goes via
-    ``results_by_phase: Mapping[SemanticPhase, PhaseResult]``. The legacy
-    string-keyed ``artifacts`` dict plus the ``decision`` / ``observation``
-    / ``reflection`` single fields have been removed. Downstream code uses
-    the typed accessor ``payload_of(phase, want)`` — the data flow is
-    visible at the call site, no helper naming to memorise.
-    """
-
-    plan_ref: str
-    node_ref: str
-    state: AgentState
-    journal: JournalCommitter
-    budget: Budget
-    capabilities: PhaseCapabilityReader
-    results_by_phase: Mapping[SemanticPhase, PhaseResult]
-    checkpoint_reason: str | None
-
-    def emit_fact(self, fact: RunFact) -> str: ...
-
-    def propose_delta(self, delta: RunDelta) -> None: ...
-
-    def payload_of(
-        self,
-        phase: "SemanticPhase",
-        want: type[object],
-    ) -> object | None:
-        """Return the typed payload from one upstream phase result.
-
-        ``payload_of(SemanticPhase.THINK, Decision)`` reads the THINK
-        phase's ``PhaseResult.payload`` and returns it if it is a
-        ``Decision``, else ``None``. The data flow is visible at the
-        call site; no separate ``upstream_<thing>`` helper to memorise.
-        """
-        ...
-
-
-@runtime_checkable
-class PhaseExecutor(Protocol):
-    async def execute(self, context: PhaseContext, input: PhaseInput) -> PhaseResult: ...
-
-
-@runtime_checkable
 class EffectDispatcher(Protocol):
-    async def execute(self, envelope: CommandEnvelope, policy: EffectPolicyPlan) -> object: ...
+    """Runtime Protocol for effect dispatch — concrete impl lives at runtime_bindings."""
 
 
 @runtime_checkable
 class JournalCommitter(Protocol):
-    def commit_fact(self, fact: RunFact, *, plan_ref: str, node_ref: str) -> str: ...
-
-    def commit_evidence(self, evidence_ref: str, *, plan_ref: str, node_ref: str) -> str: ...
-
-    def commit_observation(self, observation: object, *, plan_ref: str, node_ref: str) -> str: ...
-
-
-@runtime_checkable
-class DeltaReducer(Protocol):
-    def apply_delta(self, state: AgentState, delta: RunDelta) -> AgentState: ...
+    """Runtime Protocol for journal commits — concrete impl lives at runtime_bindings."""
 
 
 __all__ = [
@@ -295,15 +111,5 @@ __all__ = [
     "EffectDispatcher",
     "ExecutionOutcome",
     "JournalCommitter",
-    "PhaseAttemptFailure",
-    "PhaseCapabilityReader",
-    "PhaseContext",
-    "PhaseErrorCategory",
-    "PhaseErrorKind",
-    "PhaseExecutionFailure",
-    "PhaseExecutor",
-    "PhaseInput",
-    "PhaseResult",
     "PhaseRunCursor",
-    "StandardPhaseCapability",
 ]

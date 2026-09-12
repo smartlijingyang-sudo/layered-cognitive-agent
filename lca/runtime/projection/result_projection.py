@@ -19,9 +19,11 @@ from lca.contracts.models.core.state.terminal_outcome import (
     TerminalOutcomeKind,
     TextRef,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
-    DeclarativeRunOutcome,
+from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
     DeclarativeValidationError,
+)
+from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
+    DeclarativeRunOutcome,
 )
 from lca.contracts.protocols.runtime.infra.infra import StateStore
 

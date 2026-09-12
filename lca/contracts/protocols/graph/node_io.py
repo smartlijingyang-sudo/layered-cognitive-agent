@@ -129,12 +129,11 @@ class NodeOutput(BaseModel):
     kernel calls :meth:`NodeIOSchema.project_outputs` to enforce this
     after the strategy returns.
 
-    ``result_kind`` and ``next_hints`` mirror the legacy
-    :class:`PhaseResult` shape. Strategies that produce a
-    :class:`PhaseResult` (e.g. :class:`PhaseExecutorStrategy`) forward
-    both fields so the edge DSL predicate (``select_edge`` →
-    ``evaluate_restricted_predicate``) can read
-    ``result.result_kind`` without changing every strategy shape.
+    ``result_kind`` and ``next_hints`` carry the discriminator the
+    edge DSL predicate (``select_edge`` →
+    ``evaluate_restricted_predicate``) reads off
+    ``result.result_kind`` without forcing every strategy to shape its
+    output as a legacy PhaseResult.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")

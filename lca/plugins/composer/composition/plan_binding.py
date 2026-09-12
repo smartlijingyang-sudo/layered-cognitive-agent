@@ -71,7 +71,10 @@ def bind_agent_from_scope(
     """
 
     plan = compiled_plan_from_scope(scope)
-    authority = plan.action_authority
+    # ADR-0221 P3: keep ``V2ExecutablePlan`` intact so the kernel driver
+    # can read the v2 graph spec alongside the immutable compiled plan.
+    inner = getattr(plan, "inner", plan)
+    authority = inner.action_authority
     if authority is None:
         raise BindPlanError(
             "compiled plan is missing required action_authority; "
@@ -216,7 +219,8 @@ def _composer_candidates(
 
     resolver = _scope_capabilities(scope, purpose="plan binding")
 
-    declared_capabilities = {binding.capability for binding in plan.capability_bindings}
+    inner = getattr(plan, "inner", plan)
+    declared_capabilities = {binding.capability for binding in inner.capability_bindings}
     candidates = sorted(
         capability for capability in declared_capabilities if capability.startswith("composer.")
     )
@@ -256,7 +260,8 @@ def _validate_capability_bindings(plan: CompiledRunPlan, scope: Context) -> None
     """
 
     resolver = _scope_capabilities(scope, purpose="capability validation")
-    for binding in plan.capability.provider_bindings:
+    inner = getattr(plan, "inner", plan)
+    for binding in inner.capability.provider_bindings:
         capability = binding.capability
         try:
             resolver.require_provider_binding(binding)

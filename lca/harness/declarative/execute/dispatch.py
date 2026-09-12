@@ -8,10 +8,14 @@ from typing import cast
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.act.command.envelope import CommandEnvelope, RunDelta
 from lca.contracts.protocols.act.effect.handler import EffectCapabilities, EffectHandlerRegistry
-from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
     DeclarativeValidationError,
+)
+from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
     DeltaReducer,
     EffectDispatcher,
+)
+from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
     EffectPolicyPlan,
 )
 from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyStore

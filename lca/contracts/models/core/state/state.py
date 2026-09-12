@@ -16,9 +16,7 @@ from lca.contracts.models.core.workspace.activation import ActivatedSkill
 from lca.contracts.models.team.team.awareness import TeamAwareness
 
 if TYPE_CHECKING:
-    from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
-        PhaseRunCursor,
-    )
+    from lca.framework.graph.adapter import PhaseRunCursor
 
 
 @dataclass

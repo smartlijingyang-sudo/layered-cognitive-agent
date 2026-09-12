@@ -1,20 +1,25 @@
-"""声明式阶段图及其已编译计划投影的稳定数据契约。"""
+"""声明式阶段图及其已编译计划投影的稳定数据契约。
+
+ADR-0221: ``PhaseBinding`` / ``ControlEntry`` / ``PhaseContribution`` /
+``ContributionRole`` / ``AGGREGATIONS`` are retired. Phase nodes either
+own a node-level ``sub_spec_ref`` (the production path) or remain in
+the schema for backward compat only — the executable plan today is a
+multi-node subgraph driven by NodeExecutors, not a static
+binding-to-PhaseExecutor table.
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Protocol, runtime_checkable
 
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
-    AGGREGATIONS,
     DeclarativeValidationError,
     SemanticPhase,
 )
 from lca.contracts.protocols.declarative.declarative_1.declarative_fault_tolerance import (
     PhaseExecutionPolicy,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import PhaseContribution
 
 
 class ValidationSeverity(str, Enum):
@@ -65,23 +70,22 @@ class LoopGuard:
 
 @dataclass(frozen=True, slots=True)
 class PhaseNode:
+    """A typed topology anchor in the declarative phase graph.
+
+    ``binding`` is retained for backward-compat reading (older
+    profile-bundle patches may still emit it) but the production
+    execution path consumes ``sub_spec_ref`` only.
+    """
+
     id: str
     semantic_phase: SemanticPhase
-    # Plan §13.11: sub_spec_ref 节点的 binding 为 None, interpreter 走子图
-    # 驱动, 不进 phase executor;其他节点 binding 必填以维持 PG-001 校验。
-    binding: str | None
-    max_visits: int
+    binding: str | None = None
+    max_visits: int = 1
     terminal: bool = False
     execution_policy: PhaseExecutionPolicy = field(default_factory=PhaseExecutionPolicy)
-    # PR-C (ADR-0214 §6.1): PG-007 三件套 — precondition / terminal_predicate
-    # 入口校验 / 出口谓词 (callable 名字, 由 harness 注册表解析, profile YAML 用字符串名引用)。
     precondition: str | None = None
     terminal_predicate: str | None = None
-    # Node-level sub_spec_ref (Node Note 2026-09-09-phase-node-sub-spec-ref):
-    # 把 think 节点挂成 InfoEdgeSpec 嵌套子图代理。binding_edge 必须 == node.id,
-    # 与 PhaseEdge.subgraph_ref 的 PG-004 不变量对齐。优先级低于边级 subgraph_ref
-    # (interpreter 进入节点时若边级已挂 sub_spec, 不重复 fork)。
-    sub_spec_ref: SubgraphReference | None = None
+    sub_spec_ref: "SubgraphReference | None" = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.semantic_phase, SemanticPhase):
@@ -89,10 +93,6 @@ class PhaseNode:
         if not self.id or self.max_visits <= 0:
             raise DeclarativeValidationError(
                 "PG-001", "phase node id and positive max_visits required"
-            )
-        if not self.binding and self.sub_spec_ref is None:
-            raise DeclarativeValidationError(
-                "PG-001", "phase node requires binding or sub_spec_ref"
             )
         if self.precondition is not None and not str(self.precondition).strip():
             raise DeclarativeValidationError(
@@ -112,14 +112,7 @@ class PhaseNode:
 
 @dataclass(frozen=True, slots=True)
 class SubgraphReference:
-    """Compile-time handle from one phase edge to a subgraph plan.
-
-    Binds an outer edge to a referenced plan (bundle-relative ``plan_ref``
-    or absolute plan identity), declares the entry node inside that plan,
-    and pins ``binding_edge`` to the outer edge id so the assembler can
-    enforce the two-graph mutual-reference invariant: if plan A's edge X
-    points at plan B, plan B must declare a back-reference naming X.
-    """
+    """Compile-time handle from one phase edge to a subgraph plan."""
 
     plan_ref: str
     entry_node: str
@@ -165,13 +158,9 @@ class CognitivePhaseGraphPlan:
     """Compiled topology, including the declared re-entry point after approval.
 
     .. deprecated::
-        保留 Optional / backward-compat only (ADR-0210 §6.3 P7 §6.5).
-        New code should NOT set ``CompiledRunPlan.phase_graph``; use the
-        P7 region-tag mechanism (spec.region + spec.phase +
-        profile.regions.declare) instead. See
-        ``agent_lab.profile_loader.build_region_only_phase_graph`` and
-        ``lca.harness.graph.execute.interpreter._resolve_phase_graph``
-        for the recommended runtime path.
+        Backward-compat only (ADR-0210 §6.3 P7 §6.5). New code uses the
+        P7 region-tag mechanism (``spec.region + spec.phase`` +
+        ``profile.regions.declare``) and Bundle Graph Spec v2 subgraphs.
     """
 
     entry: str
@@ -184,56 +173,8 @@ class CognitivePhaseGraphPlan:
             object.__setattr__(self, "nodes", tuple(self.nodes))
         if not isinstance(self.edges, tuple):
             object.__setattr__(self, "edges", tuple(self.edges))
-        # An edge-only projection is useful to validate a topology provider in
-        # isolation. Any executable graph, however, must own an explicit entry
-        # node; the compiler must never insert one as a hidden default.
         if self.nodes and not self.entry:
             raise DeclarativeValidationError("PG-001", "phase graph entry is required")
-
-
-@dataclass(frozen=True, slots=True)
-class PhaseBinding:
-    """Phase → executor capability binding.
-
-    .. deprecated::
-        ``semantic_phase`` field is retained for backward compat only
-        (ADR-0210 §6.3). New code should use the P7 region-tag
-        mechanism (``spec.region`` + ``spec.phase`` + profile's
-        ``regions.declare``). The ``executor_capability`` selection
-        (e.g. ``phase.perceive.standard``) remains the canonical way to
-        pick an executor; region labels do NOT enter the capability
-        closure (P7-I-2).
-    """
-
-    node_id: str
-    semantic_phase: SemanticPhase
-    executor_capability: str
-    contributions: tuple[PhaseContribution, ...] = ()
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.semantic_phase, SemanticPhase):
-            object.__setattr__(self, "semantic_phase", SemanticPhase(self.semantic_phase))
-        if not self.node_id or not self.executor_capability:
-            raise DeclarativeValidationError(
-                "PG-001", "phase binding node_id and executor required"
-            )
-        if not isinstance(self.contributions, tuple):
-            object.__setattr__(self, "contributions", tuple(self.contributions))
-
-
-@dataclass(frozen=True, slots=True)
-class ControlEntry:
-    phase: SemanticPhase
-    executor_capability: str
-    predicate: str
-    aggregation: str
-    evidence_required: bool = True
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.phase, SemanticPhase):
-            object.__setattr__(self, "phase", SemanticPhase(self.phase))
-        if self.aggregation not in AGGREGATIONS:
-            raise DeclarativeValidationError("PS-001", "control entry aggregation is invalid")
 
 
 @dataclass(frozen=True, slots=True)
@@ -247,20 +188,7 @@ class ReplacementDecision:
 
 @dataclass(frozen=True, slots=True)
 class EffectPolicyPlan:
-    """Plan-owned effect governance and privilege projection (ADR-0199 §3.1 + P3-06).
-
-    ``gateway_capability``, ``allowed_effects``, ``approval_required`` and
-    ``idempotency_required`` describe the Body-side enforcement shape
-    compiled from ``PluginSpec.effects`` + ``effect_governance``. The new
-    ``privileges`` field (ADR-0199 §3.1 fourth dimension, P3-06) carries
-    the union of ``PluginContract.privileges`` declared by every active
-    plugin, so the Body path can enforce I-HPC-5 (undeclared privilege
-    fails setup) without a separate scan.
-
-    Default ``privileges=()`` keeps the field backward-compatible: any code
-    that constructs ``EffectPolicyPlan`` without naming it keeps working
-    unchanged.
-    """
+    """Plan-owned effect governance and privilege projection (ADR-0199 §3.1)."""
 
     gateway_capability: str = "effect.gateway"
     allowed_effects: tuple[str, ...] = ("none",)
@@ -300,14 +228,7 @@ class ActionScopeAuthority:
 
 @dataclass(frozen=True, slots=True)
 class ActionAuthorityPlan:
-    """Plan-owned action authority, including explicit grants for each Agent scope.
-
-    ``scope`` and ``allowed_actions`` describe the plan's primary role for
-    existing consumers. ``scoped_actions`` is the complete permission surface
-    selected by composition when one compiled Team plan closes a member or lead.
-    A direct fixture that omits ``scoped_actions`` remains a complete one-scope
-    plan rather than receiving a hidden runtime fallback.
-    """
+    """Plan-owned action authority, including explicit grants for each Agent scope."""
 
     allowed_actions: frozenset[str] = field(default_factory=frozenset)
     forbidden_actions: frozenset[str] = field(default_factory=frozenset)
@@ -363,43 +284,19 @@ class PlanProvenance:
     actor_grant: tuple[str, ...] = ()
 
 
-@runtime_checkable
-class SubgraphResolver(Protocol):
-    """Compile-time seam that turns a ``SubgraphReference.plan_ref`` into a plan.
-
-    Implementations are pluggable: the default (``BundleSubgraphResolver``
-    in ``lca.harness.declarative.compile.subgraph_resolver``) reads
-    bundle-relative paths; test doubles return hand-built plans. The
-    Protocol owns no I/O so it can be substituted in unit tests without
-    touching the filesystem.
-    """
-
-    def resolve(self, plan_ref: str) -> object | None:
-        """Return the referenced ``CompiledRunPlan`` or ``None`` if unresolved.
-
-        The return is annotated as ``object`` so the Protocol stays free
-        of state-layer imports; concrete implementations and validators
-        narrow the type via their own contracts.
-        """
-        ...
-
-
 __all__ = [
     "ActionAuthorityPlan",
     "ActionScopeAuthority",
     "CapabilityBinding",
     "CognitivePhaseGraphPlan",
-    "ControlEntry",
     "EffectPolicyPlan",
     "LoopGuard",
-    "PhaseBinding",
     "PhaseEdge",
     "PhaseExecutionPolicy",
     "PhaseNode",
     "PlanProvenance",
     "ReplacementDecision",
     "SubgraphReference",
-    "SubgraphResolver",
     "ValidationIssue",
     "ValidationReport",
     "ValidationSeverity",

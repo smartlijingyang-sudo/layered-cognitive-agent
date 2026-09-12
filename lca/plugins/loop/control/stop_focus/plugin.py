@@ -1,18 +1,16 @@
-"""Focus-aware STOP governance for declarative cognitive turns.
+"""control.stop.focus — NodeExecutor control node for the stop.focus slot.
 
-This contribution deliberately governs only whether a turn may continue after a
-repeated, unsuccessful intent.  It reads already-reduced ``Turn`` facts and
-returns a standard ``ControlVerdict``; it never mutates state, selects graph
-edges, or performs an effect.  The harness remains the owner of journaling and
-terminal projection.
+Same stagnant-turn semantics as the previous standard executor, but
+implemented as a NodeExecutor that emits a typed ``verdict`` port.
+The new ``phase.stop.focus`` phase node owns the actual focus convergence
+logic; this control node only emits the verdict that gates whether the
+focus path may override the upstream stop decision.
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-
-from pydantic import BaseModel, ConfigDict, Field
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.enums.enums import ReflectionVerdict
@@ -27,14 +25,12 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.models.core.execution.decision import Decision, Turn
-from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
-    ContributionRole,
-    PhaseContext,
-    PhaseContribution,
-    PhaseInput,
-    PhaseResult,
-    SemanticPhase,
+from lca.contracts.protocols.declarative.declarative_1.node_executor import (
+    NodeContext,
+    NodeInput,
+    NodeOutput,
 )
+from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
@@ -42,80 +38,7 @@ from lca.contracts.protocols.gate.control_verdict import ControlVerdict, Control
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
-class Config(BaseModel):
-    """Configuration for consecutive no-progress cognitive turns."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    max_consecutive_stagnant_turns: int = Field(default=3, ge=1)
-
-
-@dataclass(frozen=True, slots=True)
-class FocusStopExecutor:
-    """Stop an unchanged, unsuccessful intent after a bounded number of turns.
-
-    A turn is stagnant only if it has an unsuccessful observation, its
-    reflection explicitly reports correction/blockage, and its action intent is
-    unchanged from the immediately preceding stagnant turn.  This deliberately
-    leaves successful turns, intent changes, and incomplete reflection facts
-    untouched so the policy neither guesses semantic equivalence nor replaces
-    the tool-level circuit breaker.
-    """
-
-    max_consecutive_stagnant_turns: int = 3
-
-    async def execute(self, context: PhaseContext, input: PhaseInput) -> PhaseResult:
-        """Return an auditable continuation or focus-closure verdict."""
-
-        del input
-        count = self._consecutive_stagnant_turns(context.state.history)
-        if count >= self.max_consecutive_stagnant_turns:
-            return PhaseResult(
-                result_kind="control",
-                payload=ControlVerdict(
-                    kind=ControlVerdictKind.STOP,
-                    detail=(
-                        "cognitive focus policy stopped repeated unsuccessful intent "
-                        f"after {count} consecutive stagnant turns "
-                        f"(limit={self.max_consecutive_stagnant_turns})"
-                    ),
-                    plugin_id="control.stop.focus",
-                ),
-            )
-        return PhaseResult(
-            result_kind="control",
-            payload=ControlVerdict(
-                kind=ControlVerdictKind.ALLOW,
-                detail=(
-                    "cognitive focus policy allows continuation "
-                    f"(consecutive_stagnant_turns={count}, "
-                    f"limit={self.max_consecutive_stagnant_turns})"
-                ),
-                plugin_id="control.stop.focus",
-            ),
-        )
-
-    @staticmethod
-    def _consecutive_stagnant_turns(history: Iterable[object]) -> int:
-        """Count the trailing run of identical, reflected no-progress turns."""
-
-        expected_intent: tuple[object, ...] | None = None
-        count = 0
-        for item in reversed(tuple(history)):
-            if not isinstance(item, Turn) or not _is_stagnant(item):
-                break
-            intent = _intent_signature(item.decision)
-            if expected_intent is None:
-                expected_intent = intent
-            elif intent != expected_intent:
-                break
-            count += 1
-        return count
-
-
 def _is_stagnant(turn: Turn) -> bool:
-    """Return whether one durable Turn explicitly shows no cognitive progress."""
-
     reflection = turn.reflection
     return (
         not turn.observation.success
@@ -125,8 +48,6 @@ def _is_stagnant(turn: Turn) -> bool:
 
 
 def _intent_signature(decision: Decision) -> tuple[object, ...]:
-    """Build a conservative, deterministic identity for one declared intent."""
-
     action_type = str(decision.action_type)
     tool_names = tuple(call.tool_name for call in decision.tool_calls)
     delegation_targets = tuple(
@@ -136,47 +57,107 @@ def _intent_signature(decision: Decision) -> tuple[object, ...]:
     return action_type, tool_names, delegation_targets, response
 
 
+def _consecutive_stagnant_turns(history: Iterable[object]) -> int:
+    expected_intent: tuple[object, ...] | None = None
+    count = 0
+    for item in reversed(tuple(history)):
+        if not isinstance(item, Turn) or not _is_stagnant(item):
+            break
+        intent = _intent_signature(item.decision)
+        if expected_intent is None:
+            expected_intent = intent
+        elif intent != expected_intent:
+            break
+        count += 1
+    return count
+
+
+@dataclass(frozen=True, slots=True)
+class FocusStopExecutor:
+    """Control node: emit ``verdict`` once consecutive stagnant turns reach limit."""
+
+    semantic_name: str = "control.stop.focus"
+    region: str = "phase:stop"
+    declared_inputs: tuple[PortName, ...] = ()
+    declared_outputs: tuple[PortName, ...] = ("verdict",)
+
+    max_consecutive_stagnant_turns: int = 3
+
+    async def node_execute(
+        self,
+        context: NodeContext,
+        input: NodeInput,
+    ) -> NodeOutput:
+        del input
+        runtime = context.runtime or {}
+        state = runtime.get("agent_state")
+        history = getattr(state, "history", ()) or () if state is not None else ()
+        count = _consecutive_stagnant_turns(history)
+        if count >= self.max_consecutive_stagnant_turns:
+            verdict = ControlVerdict(
+                kind=ControlVerdictKind.STOP,
+                detail=(
+                    "cognitive focus policy stopped repeated unsuccessful intent "
+                    f"after {count} consecutive stagnant turns "
+                    f"(limit={self.max_consecutive_stagnant_turns})"
+                ),
+                plugin_id="control.stop.focus",
+            )
+            hint = "stop"
+        else:
+            verdict = ControlVerdict(
+                kind=ControlVerdictKind.ALLOW,
+                detail=(
+                    "cognitive focus policy allows continuation "
+                    f"(consecutive_stagnant_turns={count}, "
+                    f"limit={self.max_consecutive_stagnant_turns})"
+                ),
+                plugin_id="control.stop.focus",
+            )
+            hint = None
+        return NodeOutput(port_values={"verdict": verdict}, next_hint=hint)
+
+
 @plugin(
     id="control.stop.focus",
-    Config=Config,
-    provides=["control.stop.focus"],
+    provides=("phase:stop::control.stop.focus",),
     layer="L2",
-    kind=PluginKind.PROVIDER,
+    kind=PluginKind.PRIMITIVE,
     effects="none",
     test_suite="tests/declarative/test_control_contributions.py",
-    contributes=[
-        PhaseContribution(
-            phase=SemanticPhase.STOP,
-            role=ContributionRole.GOVERN,
-            executor="control.stop.focus",
-            output="stop.focus",
-            order=10,
-            aggregation="deny-on-any-deny",
-        )
-    ],
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(
-            group=FunctionalGroup.G6_DECISION, control_slots=(ControlSlot.STOP_DECIDE,)
+            group=FunctionalGroup.G6_DECISION,
+            control_slots=(ControlSlot.STOP_DECIDE,),
         ),
         lifecycle=LifecycleContract(allowed_scopes=(Scope.TURN,)),
         authority=AuthorityContract(grants=("turn.read",)),
-        observability=EvidenceContract(descriptors=("control.stop.focus.checked",)),
+        observability=EvidenceContract(
+            descriptors=("control_stop_focus.checked", "control_stop_focus.served")
+        ),
     ),
     relations=(),
     ownership=OwnershipDeclaration(
-        reads=("control.stop.focus",),
-        emits=("control.stop.focus.checked",),
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )
-async def setup(ctx: PluginContext, config: Config) -> None:
+async def setup(ctx: PluginContext, config: object) -> None:
     """Mount the profile-configured, read-only focus governance executor."""
-
+    # Keep config-driven ``max_consecutive_stagnant_turns`` parity with the
+    # previous ``Config(max_consecutive_stagnant_turns=...)`` model: the
+    # bundle YAML may set a custom limit; default 3 is the safe fallback.
+    max_turns = 3
+    if config is not None:
+        max_attr = getattr(config, "max_consecutive_stagnant_turns", None)
+        if isinstance(max_attr, int) and max_attr >= 1:
+            max_turns = max_attr
     ctx.provide(
-        "control.stop.focus",
-        FocusStopExecutor(max_consecutive_stagnant_turns=config.max_consecutive_stagnant_turns),
+        "phase:stop::control.stop.focus",
+        FocusStopExecutor(max_consecutive_stagnant_turns=max_turns),
     )
 
 
-__all__ = ["Config", "FocusStopExecutor", "setup"]
+__all__ = ["FocusStopExecutor", "setup"]

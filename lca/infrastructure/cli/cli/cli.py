@@ -73,23 +73,16 @@ def _root(ctx: typer.Context) -> None:
         raise typer.Exit(0)
 
 
-# Register all command groups
-workflow.register(app)
-services.register(app)
-journal.register(app)
-runs.register(app)
-assistants.register(app)
-e2e.register(app)
-tools.register(app)
-driver_debug.register(app)
-profile_inspect.register(app)
-diagnostics.register(app)
-events_delivery.register(app)
-package_organization.register(app)
-audit.register(app)
-creator_plan.register(app)
-composio.register(app)
-declarative.register(app)
+# Register all command groups (skip retired composition/declarative-graph
+# modules that fail to import under ADR-0221 P3).
+for _cmd in (
+    workflow, services, journal, runs, assistants, e2e,
+    tools, driver_debug, profile_inspect, diagnostics,
+    events_delivery, package_organization, audit,
+    creator_plan, composio, declarative,
+):
+    if _cmd is not None:
+        _cmd.register(app)
 # ``journal`` owns the ``journal`` typer group; the four siblings below
 # add their subcommands to that same group rather than calling
 # add_typer again (typer would create a duplicate group entry).

@@ -216,7 +216,15 @@ class PlanInterpreter:
 
 @dataclass
 class InterpretationResult:
-    """The typed return value of :meth:`PlanInterpreter.run`."""
+    """The typed return value of :meth:`PlanInterpreter.run`.
+
+    ADR-0221 P3: ``state`` / ``outcome`` / ``cursor`` are not yet
+    produced by the v2 interpreter — they live on the v0
+    ``_LegacyResultShim``. Callers that need them must derive them from
+    ``output`` and the ``AgentState`` they passed in. The kernel
+    driver wraps the result with the appropriate shim at the
+    composition boundary; this dataclass stays narrow.
+    """
 
     plan: Plan
     terminal_node: str

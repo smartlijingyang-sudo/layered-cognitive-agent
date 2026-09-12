@@ -12,12 +12,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from lca.contracts.models.core.state.state import AgentState, StateSnapshot
-from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
     DeclarativeValidationError,
-    PhaseRunCursor,
 )
 from lca.contracts.protocols.runtime.infra.infra import StateStore
 from lca.contracts.protocols.runtime.runtime.composition import CheckpointStateResolver
+from lca.framework.graph.adapter import PhaseRunCursor
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,8 +37,8 @@ class DeclarativeCheckpoint:
     def __post_init__(self) -> None:
         if not self.plan_ref:
             raise ValueError("checkpoint plan_ref must not be empty")
-        if self.cursor.plan_ref != self.plan_ref:
-            raise ValueError("checkpoint cursor and plan_ref must match")
+        # ADR-0221 P3: v2 ``PhaseRunCursor`` no longer carries plan_ref;
+        # plan identity is held on the ``DeclarativeCheckpoint`` itself.
         snapshot_cursor = self.state_snapshot.phase_cursor
         if snapshot_cursor is not None and snapshot_cursor.plan_ref != self.plan_ref:
             raise ValueError("checkpoint snapshot and plan_ref must match")

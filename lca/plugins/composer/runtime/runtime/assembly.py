@@ -30,7 +30,7 @@ def assemble_runtime_from_graph(
     spec: AgentSpec,
     graph: AgentGraph,
     *,
-    plan: CompiledRunPlan,
+    plan: object,
     scope: Context,
 ) -> Runtime:
     """Build one runtime from a complete graph and its immutable plan.
@@ -39,8 +39,12 @@ def assemble_runtime_from_graph(
     mechanics are resolved exclusively through the provider bindings declared
     in ``plan``; a missing binding therefore fails during composition instead
     of silently selecting a fallback while executing a turn.
-    """
 
+    ADR-0221 P3: keep ``V2ExecutablePlan`` intact — the kernel driver
+    needs the v2 graph spec alongside the immutable compiled plan.
+    Capabilities live on the inner ``CompiledRunPlan`` and the resolver
+    handles unwrapping transparently.
+    """
     capabilities = resolve_runtime_capabilities(plan, scope)
     bindings = bind_runtime_graph(
         capabilities,

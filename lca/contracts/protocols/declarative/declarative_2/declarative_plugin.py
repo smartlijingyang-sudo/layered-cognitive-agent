@@ -1,89 +1,102 @@
-"""声明式插件的稳定、可序列化 schema。
+"""PluginSpec / PluginManifest declarations.
 
-插件描述所需的 identity、capability、生命周期、证据和验证元数据均在此处定义。
-运行时编译、关系解析和执行选择由 harness 拥有。
+ADR-0221: ``PhaseContribution`` and the ``contributes`` PluginSpec field
+have been retired. Phase contributions are expressed as additional
+subgraph nodes inside the corresponding phase subgraph bundle, not as
+static plugin-manifest declarations.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from enum import Enum
+from typing import TYPE_CHECKING, Any
 
-from lca.contracts.protocols.declarative.declarative_1.declarative_capability import (
-    CapabilityDeclaration,
-)
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
-    AGGREGATIONS,
     ALLOWED_EFFECTS,
     PLUGIN_SPEC_VERSION,
-    ContributionRole,
     DeclarativeValidationError,
     PluginSpecKind,
     RelationType,
-    SemanticPhase,
 )
 
+if TYPE_CHECKING:
+    from lca.contracts.atoms.functional.group import FunctionalGroup
 
-def _as_text_tuple(value: tuple[str, ...] | Any) -> tuple[str, ...]:
-    """Normalize declaration text collections while preserving tuple identity."""
-    return value if isinstance(value, tuple) else tuple(str(item) for item in value)
+
+def _as_text_tuple(values: Sequence[str] | None) -> tuple[str, ...]:
+    if values is None:
+        return ()
+    if not isinstance(values, (list, tuple)):
+        raise DeclarativeValidationError("PS-001", "tuple-typed field must be sequence")
+    result = []
+    for item in values:
+        if not isinstance(item, str):
+            raise DeclarativeValidationError(
+                "PS-001", f"tuple element must be str, got {type(item).__name__}"
+            )
+        result.append(item)
+    return tuple(result)
+
+
+def _require_non_empty_text(value: str, field: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise DeclarativeValidationError("PS-001", f"{field} must be non-empty str")
+    return value
+
+
+@dataclass(frozen=True, slots=True)
+class CapabilityDeclaration:
+    key: str
+    cardinality: str = "one"
+    protocol: str = "object"
+    resolution_key: str = ""
+    scope: str = "profile"
+
+    def __post_init__(self) -> None:
+        _require_non_empty_text(self.key, "capability.key")
+        if self.cardinality not in {"one", "optional", "many", "ordered-many"}:
+            raise DeclarativeValidationError(
+                "PS-001", f"cardinality must be in known set; got {self.cardinality!r}"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class EvidenceDeclaration:
+    emits: tuple[str, ...] = ()
+    replay: str = "optional"
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "emits", _as_text_tuple(self.emits))
+        if self.replay not in {"required", "optional", "forbidden"}:
+            raise DeclarativeValidationError(
+                "PS-001", f"replay must be required/optional/forbidden; got {self.replay!r}"
+            )
 
 
 @dataclass(frozen=True, slots=True)
 class EffectGovernanceDeclaration:
-    """Plan-owned governance facts for one declared effect class."""
-
     effect_class: str
-    requires_approval: bool = False
-    requires_idempotency: bool = False
+    policy: str
+    evidence_ref: str | None = None
 
     def __post_init__(self) -> None:
         if self.effect_class not in ALLOWED_EFFECTS:
             raise DeclarativeValidationError(
-                "PS-006",
-                f"unsupported effect class: {self.effect_class}",
+                "PS-006", f"effect_governance effect_class must be in ALLOWED_EFFECTS"
             )
-        if type(self.requires_approval) is not bool:
-            raise DeclarativeValidationError(
-                "PS-006",
-                "effect governance requires_approval must be a boolean",
-            )
-        if type(self.requires_idempotency) is not bool:
-            raise DeclarativeValidationError(
-                "PS-006",
-                "effect governance requires_idempotency must be a boolean",
-            )
-        if self.effect_class == "none" and (self.requires_approval or self.requires_idempotency):
-            raise DeclarativeValidationError(
-                "PS-006",
-                "effect class 'none' cannot require approval or idempotency",
-            )
+        _require_non_empty_text(self.policy, "effect_governance.policy")
 
 
 @dataclass(frozen=True, slots=True)
-class PluginImplementation:
-    module: str
-    setup: str = "setup"
-    factory: str = "create_executor"
+class LifecycleDeclaration:
+    scopes: tuple[str, ...] = ()
+    activation: str = "true"
+    disposal: str = "required"
 
     def __post_init__(self) -> None:
-        if not self.module:
-            raise DeclarativeValidationError("PS-001", "implementation.module must be non-empty")
-        if not self.setup:
-            raise DeclarativeValidationError("PS-001", "implementation.setup must be non-empty")
-
-
-@dataclass(frozen=True, slots=True)
-class PluginConfiguration:
-    schema: str
-    values: Mapping[str, Any] = field(default_factory=dict)
-
-    def __post_init__(self) -> None:
-        if not self.schema:
-            raise DeclarativeValidationError("PS-001", "configuration.schema must be non-empty")
-        if not isinstance(self.values, Mapping):
-            object.__setattr__(self, "values", dict(self.values))
+        object.__setattr__(self, "scopes", _as_text_tuple(self.scopes))
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,39 +106,36 @@ class OwnershipDeclaration:
     state_mutation: str = "forbidden"
 
     def __post_init__(self) -> None:
-        if self.state_mutation not in {"forbidden", "reducer-only"}:
-            raise DeclarativeValidationError(
-                "PS-001", "ownership.state_mutation must be forbidden or reducer-only"
-            )
         object.__setattr__(self, "reads", _as_text_tuple(self.reads))
         object.__setattr__(self, "emits", _as_text_tuple(self.emits))
+        if self.state_mutation not in {"forbidden", "scoped", "allowed"}:
+            raise DeclarativeValidationError(
+                "PS-001",
+                f"state_mutation must be forbidden/scoped/allowed; got {self.state_mutation!r}",
+            )
 
 
 @dataclass(frozen=True, slots=True)
-class LifecycleDeclaration:
-    scopes: tuple[str, ...]
-    activation: str
-    disposal: str
+class PluginImplementation:
+    module: str
+    setup: str = "setup"
+    factory: str | None = None
 
     def __post_init__(self) -> None:
-        if not self.scopes:
-            raise DeclarativeValidationError("PS-001", "lifecycle.scopes must be non-empty")
-        if not self.activation:
-            raise DeclarativeValidationError("PS-001", "lifecycle.activation must be explicit")
-        if not self.disposal:
-            raise DeclarativeValidationError("PS-001", "lifecycle.disposal must be explicit")
-        object.__setattr__(self, "scopes", _as_text_tuple(self.scopes))
+        _require_non_empty_text(self.module, "implementation.module")
+        _require_non_empty_text(self.setup, "implementation.setup")
 
 
 @dataclass(frozen=True, slots=True)
-class EvidenceDeclaration:
-    emits: tuple[str, ...]
-    replay: str
+class PluginConfiguration:
+    schema: str = "builtins.dict"
+    values: Mapping[str, Any] = field(default_factory=dict)
+    frozen: bool = True
 
     def __post_init__(self) -> None:
-        if not self.replay:
-            raise DeclarativeValidationError("PS-001", "evidence.replay must be explicit")
-        object.__setattr__(self, "emits", _as_text_tuple(self.emits))
+        _require_non_empty_text(self.schema, "configuration.schema")
+        if not isinstance(self.values, Mapping):
+            object.__setattr__(self, "values", dict(self.values))
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,30 +151,6 @@ class VerificationDeclaration:
             raise DeclarativeValidationError("PS-001", "verification.properties must be non-empty")
         object.__setattr__(self, "properties", _as_text_tuple(self.properties))
         object.__setattr__(self, "fixtures", _as_text_tuple(self.fixtures))
-
-
-@dataclass(frozen=True, slots=True)
-class PhaseContribution:
-    phase: SemanticPhase
-    role: ContributionRole
-    executor: str
-    output: str
-    order: int | None = None
-    aggregation: str | None = None
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.phase, SemanticPhase):
-            object.__setattr__(self, "phase", SemanticPhase(self.phase))
-        if not isinstance(self.role, ContributionRole):
-            object.__setattr__(self, "role", ContributionRole(self.role))
-        if not self.executor:
-            raise DeclarativeValidationError("PS-001", "contribution.executor must be non-empty")
-        if not self.output:
-            raise DeclarativeValidationError("PS-001", "contribution.output must be non-empty")
-        if self.role is ContributionRole.GOVERN and self.aggregation not in AGGREGATIONS:
-            raise DeclarativeValidationError(
-                "PS-001", "govern contribution must declare a supported aggregation"
-            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -204,7 +190,6 @@ class PluginSpec:
     relations: tuple[PluginRelation, ...]
     evidence: EvidenceDeclaration
     verification: VerificationDeclaration
-    contributes: tuple[PhaseContribution, ...] = ()
     effect_governance: tuple[EffectGovernanceDeclaration, ...] = ()
 
     def __post_init__(self) -> None:
@@ -227,8 +212,6 @@ class PluginSpec:
             object.__setattr__(self, "requires", tuple(self.requires))
         if not isinstance(self.relations, tuple):
             object.__setattr__(self, "relations", tuple(self.relations))
-        if not isinstance(self.contributes, tuple):
-            object.__setattr__(self, "contributes", tuple(self.contributes))
         if not isinstance(self.effect_governance, tuple):
             object.__setattr__(self, "effect_governance", tuple(self.effect_governance))
         for governance in self.effect_governance:
@@ -242,21 +225,6 @@ class PluginSpec:
                     "PS-006",
                     "effect governance must refer to an effect declared by the PluginSpec",
                 )
-        kinds_requiring_contribution = {
-            PluginSpecKind.CONTRIBUTION,
-            PluginSpecKind.PHASE_EXECUTOR,
-            PluginSpecKind.EFFECT_HANDLER,
-            PluginSpecKind.OBSERVER,
-        }
-        requires_control_contribution = self.kind is PluginSpecKind.PROVIDER and self.id.startswith(
-            "control."
-        )
-        if (
-            self.kind in kinds_requiring_contribution or requires_control_contribution
-        ) and not self.contributes:
-            raise DeclarativeValidationError(
-                "PS-001", f"{self.id or self.kind.value} requires an explicit contributes section"
-            )
 
 
 __all__ = [
@@ -265,7 +233,6 @@ __all__ = [
     "EvidenceDeclaration",
     "LifecycleDeclaration",
     "OwnershipDeclaration",
-    "PhaseContribution",
     "PluginConfiguration",
     "PluginImplementation",
     "PluginRelation",
