@@ -55,23 +55,37 @@ def lift_graph_spec(spec: Mapping[str, Any]) -> Plan:
         if sub_spec_raw is None and isinstance(config_raw, Mapping):
             sub_spec_raw = config_raw.get("sub_spec_ref")
         subgraph_ref = _subgraph_ref_from(sub_spec_raw)
-        # When a node delegates to a subgraph, the inner entry's
-        # io_schema is the SSOT for the outer port contract. The
-        # outer kernel needs to read the right inputs from its
-        # registry (e.g. ``decision`` for act.main) and write the
-        # right outputs back, regardless of whether the outer yaml
-        # uses ``inputs:`` or ``declared_inputs:`` on the node. Match
-        # ``lift_executable_plan`` so v2 driver parity holds.
-        schema = (
-            _subgraph_entry_schema(subgraph_ref)
-            if subgraph_ref is not None
-            else _schema_from(raw.get("inputs"), raw.get("outputs"))
-        )
+        # First-principle port-naming for subgraph nodes: the YAML's
+        # ``declared_inputs``/``declared_outputs`` are the **outer-facing**
+        # port names (what the outer kernel reads from / writes to its
+        # port registry). The inner subgraph entry's ``inputs``/``outputs``
+        # are the **inner-facing** port names. They can legitimately
+        # differ — e.g. ``phase_main_outer.yaml::reflect.main`` declares
+        # ``declared_inputs: [act_outcome]`` while the inner subgraph
+        # reads ``observation``. Carrying both schemas lets the kernel
+        # read ``act_outcome`` from its own registry and have
+        # :class:`SubgraphStrategy` translate the value across the seam
+        # into ``observation`` for the inner. When the YAML omits
+        # ``declared_inputs``/``declared_outputs`` we fall back to the
+        # inner entry's schema (legacy behavior — port names coincide).
+        schema: NodeIOSchema
+        inner_schema: NodeIOSchema | None = None
+        if subgraph_ref is not None:
+            inner_schema = _subgraph_entry_schema(subgraph_ref)
+            declared_in = raw.get("declared_inputs")
+            declared_out = raw.get("declared_outputs")
+            if declared_in is not None or declared_out is not None:
+                schema = _schema_from(declared_in, declared_out)
+            else:
+                schema = inner_schema
+        else:
+            schema = _schema_from(raw.get("inputs"), raw.get("outputs"))
         nodes.append(
             PlanNode(
                 id=node_id,
                 binding=binding,
                 io_schema=schema,
+                inner_io_schema=inner_schema if subgraph_ref is not None else None,
                 config=dict(raw),
                 max_visits=int(raw.get("max_visits", 1)),
                 terminal=bool(raw.get("terminal", False)),
@@ -107,6 +121,12 @@ def lift_executable_plan(executable: object) -> Plan:
     """Lift a production :class:`ExecutablePlan` (or duck-typed equivalent)
     into the new :class:`Plan` shape.
 
+    Pass-through: if ``executable`` is already a v2 :class:`Plan`
+    (kernel-native ``lift_graph_spec`` result), return it unchanged.
+    The v2 driver in :mod:`lca.loop.driver` constructs the ``Plan``
+    directly and hands it to ``interpreter.run`` without an
+    ``ExecutablePlan`` wrapper.
+
     The legacy ``CognitivePhaseGraphPlan`` lives on ``executable.plan``.
     ``executable.plan.phase_graph`` (when present) is a phase graph;
     we project it. ``executable.nodes`` is the executable-node dict
@@ -120,6 +140,8 @@ def lift_executable_plan(executable: object) -> Plan:
     and the inner entry's ``outputs`` are merged back. The outer
     node's ``io_schema`` cannot drift from the inner contract.
     """
+    if isinstance(executable, Plan):
+        return executable
     plan_obj = getattr(executable, "plan", None)
     pg = getattr(plan_obj, "phase_graph", None) if plan_obj is not None else None
     if pg is None:
@@ -133,11 +155,15 @@ def lift_executable_plan(executable: object) -> Plan:
         subgraph_ref = _subgraph_ref_from(getattr(raw, "sub_spec_ref", None))
         node_id = str(getattr(raw, "id", ""))
         io_schema = _subgraph_entry_schema(subgraph_ref)
+        # Legacy path has no declared_inputs/declared_outputs; outer
+        # and inner port names coincide, so ``inner_io_schema`` equals
+        # ``io_schema`` (identity translation at the subgraph seam).
         nodes.append(
             PlanNode(
                 id=node_id,
                 binding=binding,
                 io_schema=io_schema,
+                inner_io_schema=io_schema if subgraph_ref is not None else None,
                 max_visits=int(getattr(raw, "max_visits", 1)),
                 terminal=bool(getattr(raw, "terminal", False)),
                 entry=bool(getattr(raw, "entry", False)) or node_id == entry_id,

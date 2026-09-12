@@ -155,32 +155,24 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
         # shape of this factory) only re-bound ``NodeExecutorStrategy``
         # and left ``SubgraphStrategy.recursive_runner=None``, which
         # raised at dispatch time once outer-plan nodes bound SUBGRAPH.
-        # Borrow the adapter's registry (already built with the
-        # runtime-seam closures wired) and hand it to a plain
-        # ``PlanInterpreter``; the caller (v2 driver) uses the
-        # ``outer_state=`` kwarg that ``PlanInterpreter.run`` expects.
+        # Wire the five runtime closures into the adapter so its
+        # ``__post_init__`` can layer ``effect_gateway`` (and the other
+        # per-turn seams) onto the node-executor runtime scope; without
+        # that layer, ``concept.effect.execute`` raises a fail-loud
+        # "effect_gateway missing from runtime scope" the moment the
+        # act subgraph dispatches.
         from lca.framework.graph.adapter import PlanInterpreterAdapter
-        from lca.framework.graph.interpreter import (
-            NullGraphObserver,
-            PlanInterpreter,
-            _default_clock,
-        )
 
-        host = PlanInterpreterAdapter(
+        return PlanInterpreterAdapter(
+            journal=journal,
+            effect_gateway=effect_gateway,
+            reducer=reducer,
+            phase_observer=phase_observer,
+            lifecycle_publisher=lifecycle_publisher,
             node_executors=node_executors if isinstance(node_executors, Mapping) else None,
             node_executor_runtime_scope=node_executor_runtime_scope,
             graph_observer=graph_observer,
             graph_clock=graph_clock,
-        )
-        return PlanInterpreter(
-            registry=host.registry,
-            observer=graph_observer or NullGraphObserver(),
-            clock=graph_clock or _default_clock,
-        )
-        return PlanInterpreter(
-            registry=host.registry,
-            observer=graph_observer or NullGraphObserver(),
-            clock=graph_clock or _default_clock,
         )
 
 

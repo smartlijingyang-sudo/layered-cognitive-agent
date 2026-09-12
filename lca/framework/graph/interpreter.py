@@ -140,6 +140,7 @@ class PlanInterpreter:
                 },
                 subgraph_ref=node.subgraph_ref,
                 chain=(),
+                inner_io_schema=node.inner_io_schema,
             )
             visit_started = self.clock()
             try:

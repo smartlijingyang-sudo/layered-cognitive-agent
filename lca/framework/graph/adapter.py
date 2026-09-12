@@ -105,6 +105,10 @@ class PlanInterpreterAdapter:
     node_executor_runtime_scope: Any = None
     graph_observer: GraphObserver | None = None
     graph_clock: Callable[[], int] | None = None
+    # Per-adapter mirror of phase results (ADR-0219 §4). The kernel
+    # carries this across ``run``/``resume`` calls so nested
+    # sub-plans see the same phase → typed payload mapping.
+    _phase_results: dict = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.graph_observer is None:
@@ -265,22 +269,35 @@ class PlanInterpreterAdapter:
         self,
         executable: object,
         *,
-        state: object,
+        state: object = None,
+        outer_state: object = None,
+        traversal: object = None,
         input: object = None,
         budget: object = None,
         capabilities: object = None,
         artifacts: object = None,
         spec: object = None,
     ) -> object:
-        """Execute ``executable`` fresh from the declared entry node."""
+        """Execute ``executable`` fresh from the declared entry node.
+
+        Both ``state=`` (legacy kwarg name) and ``outer_state=`` (new
+        ``PlanInterpreter.run`` kwarg) are accepted; the legacy alias
+        maps onto the v2 ``outer_state`` parameter the kernel expects.
+        """
         plan = lift_executable_plan(executable)
+        seeded_state = state if outer_state is None else outer_state
         interp = PlanInterpreter(
             registry=self.registry or default_strategy_registry(),
+            observer=self.graph_observer,
+            clock=self.graph_clock,
             artifacts=artifacts or {},
+            results_by_phase=self._phase_results,
         )
-        result = await interp.run(plan, outer_state=state)
+        result = await interp.run(
+            plan, outer_state=seeded_state, traversal=traversal
+        )
         return _legacy_result_shim(
-            state=state,
+            state=seeded_state,
             result=result,
         )
 
@@ -288,8 +305,9 @@ class PlanInterpreterAdapter:
         self,
         executable: object,
         *,
-        state: object,
+        state: object = None,
         cursor: object,
+        outer_state: object = None,
         input: object = None,
         budget: object = None,
         capabilities: object = None,
@@ -304,12 +322,17 @@ class PlanInterpreterAdapter:
         checkpointed node first instead of restarting from the entry.
         The visited set seeds ``traversal.visit_counts`` so
         ``max_visits`` enforcement remains correct on resume.
+
+        Both ``state=`` (legacy) and ``outer_state=`` (v2) kwargs are
+        accepted; they are equivalent for the kernel.
         """
+        seeded_state = state if outer_state is None else outer_state
         plan = lift_executable_plan(executable)
         if cursor is None or not getattr(cursor, "current_node_id", ""):
             return await self.run(
                 executable,
-                state=state,
+                state=seeded_state,
+                outer_state=seeded_state,
                 input=input,
                 budget=budget,
                 capabilities=capabilities,
@@ -320,11 +343,16 @@ class PlanInterpreterAdapter:
         visited = tuple(getattr(cursor, "visited_nodes", ()) or ())
         interp = PlanInterpreter(
             registry=self.registry or default_strategy_registry(),
+            observer=self.graph_observer,
+            clock=self.graph_clock,
             artifacts=artifacts or {},
+            results_by_phase=self._phase_results,
         )
         seeded = _seed_traversal(plan, start_id, visited)
-        result = await interp.run(plan, outer_state=state, traversal=seeded)
-        return _legacy_result_shim(state=state, result=result)
+        result = await interp.run(
+            plan, outer_state=seeded_state, traversal=seeded
+        )
+        return _legacy_result_shim(state=seeded_state, result=result)
 
 
 def _legacy_result_shim(*, state: object, result: InterpretationResult) -> object:
