@@ -16,7 +16,6 @@ from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.runtime.runtime.composition import ResultFinalizer
 from lca.framework.graph.adapter import PhaseRunCursor
 from lca.framework.graph.interpreter import InterpretationResult, PlanInterpreter
-from lca.framework.graph.lifter import lift_executable_plan
 from lca.runtime.loop.runtime_journal import RuntimeJournal
 from lca.runtime.support.checkpoint_resolution import DeclarativeCheckpoint
 from lca.runtime.support.runtime_bindings import DeclarativeRuntimeBindings
@@ -153,8 +152,9 @@ class DeclarativeExecution:
         directly; the kernel lifts it without any v1 ``phase_graph``
         reconstruction.
         """
-        import yaml
         from pathlib import Path
+
+        import yaml
 
         bundles = getattr(self._bindings, "bundles", ()) or ()
         for entry in bundles:

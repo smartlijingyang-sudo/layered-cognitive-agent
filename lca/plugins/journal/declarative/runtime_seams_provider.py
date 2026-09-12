@@ -49,7 +49,6 @@ from lca.contracts.protocols.runtime.runtime.composition import (
 from lca.contracts.protocols.runtime.runtime.lifecycle import RuntimeLifecyclePublisher
 from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
 from lca.contracts.protocols.state.reducer import Reducer
-from lca.framework.graph.adapter import PlanInterpreter
 from lca.harness.declarative.execute.dispatch import RegistryDeltaReducer, RegistryEffectDispatcher
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.runtime.loop.runtime_journal import RuntimeJournalCommitter
@@ -152,6 +151,10 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
         # ADR-0221 P3: return the kernel-native ``PlanInterpreter``
         # directly. The runtime-seam strategies are registered inline;
         # the v0 ``PlanInterpreterAdapter`` shim is gone.
+        # Build a private registry that mirrors the framework defaults
+        # and wires the runtime-seam node-executor lookup into the
+        # ``NodeExecutorStrategy`` instance.
+        from lca.framework.graph.adapter import default_strategy_registry
         from lca.framework.graph.interpreter import (
             NullGraphObserver,
             PlanInterpreter,
@@ -161,11 +164,6 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
             NodeExecutorStrategy,
         )
         from lca.framework.graph.strategy_registry import StrategyRegistry
-
-        # Build a private registry that mirrors the framework defaults
-        # and wires the runtime-seam node-executor lookup into the
-        # ``NodeExecutorStrategy`` instance.
-        from lca.framework.graph.adapter import default_strategy_registry
 
         registry = StrategyRegistry()
         executors_dict: dict[str, object] = {}
@@ -180,7 +178,7 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
                 # strategy.
                 def _view(agent_state, _scope=node_executor_runtime_scope):
                     class _View:
-                        __slots__ = ("_state", "_scope")
+                        __slots__ = ("_scope", "_state")
 
                         def __init__(self):
                             self._state = agent_state

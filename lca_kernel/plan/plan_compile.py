@@ -15,15 +15,20 @@ work; only the v1-only fields are no-ops.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
-from lca.contracts.atoms.scope.scope import Scope
-from lca.contracts.protocols.declarative.declarative_1.declarative_graph import ActionAuthorityPlan
-from lca.contracts.protocols.state.plan import COMPILED_RUN_PLAN_VERSION, CompiledRunPlan
-from lca.contracts.protocols.state.scope_plan import ScopePlan
 from dataclasses import dataclass, field
 from pathlib import Path
+
 import yaml
+
+from lca.contracts.atoms.scope.scope import Scope
+from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
+    ActionAuthorityPlan,
+)
+from lca.contracts.protocols.state.plan import (
+    COMPILED_RUN_PLAN_VERSION,
+    CompiledRunPlan,
+)
+from lca.contracts.protocols.state.scope_plan import BudgetCeiling, ScopePlan
 from lca.harness.profile.resolve.capability_plan_resolver import (
     CapabilityPlanOptions,
     project_capability_plan,
@@ -119,7 +124,7 @@ class CompileOptions:
             raise TypeError("acl_grants must be a tuple of non-empty strings")
         if self.budget_ceiling is not None and not isinstance(self.budget_ceiling, BudgetCeiling):
             raise TypeError("budget_ceiling must be a BudgetCeiling or None")
-        for field, value in (
+        for _field, value in (
             ("task_id", self.task_id),
             ("env_fingerprint", self.env_fingerprint),
         ):
@@ -145,7 +150,6 @@ def compile_plan(
     opts = options or CompileOptions()
     cap_options = CapabilityPlanOptions(include_disabled=opts.include_disabled)
     capability = project_capability_plan(resolved, options=cap_options)
-    from lca.contracts.protocols.state.scope_plan import BudgetCeiling
     scope = ScopePlan(
         profile_path=resolved.profile_path,
         lifecycle=opts.lifecycle,
