@@ -62,20 +62,25 @@ from lca.framework.graph.port_registry import PortRegistry
 from lca.framework.graph.strategy_registry import register_strategy
 
 RecursiveRunner = Callable[
-    [Plan, AgentState, int, "PortRegistry | None"],
+    [Plan, AgentState, int, "PortRegistry | None", "Mapping | None"],
     "Mapping[str, Any] | Awaitable[Mapping[str, Any]]",
 ]
 """Host-injected closure that recurses into a subgraph plan.
 
 The closure takes the sub-:class:`Plan`, the outer :class:`AgentState`,
-the current depth, and an optional :class:`PortRegistry` seeded from
-the outer node's :attr:`NodeInput.port_values` (via
-:meth:`PortRegistry.set_outer_input`). It returns a mapping of merged
-output port values (sync) or an awaitable that resolves to one (async).
-The strategy awaits the result if it is awaitable. Production closures
-are async because :meth:`PlanInterpreter.run` is async. The fourth
-argument is ``None`` when the outer node carried no port values, so
-the inner plan starts from a fresh empty registry.
+the current depth, an optional :class:`PortRegistry` seeded from the
+outer node's :attr:`NodeInput.port_values` (via
+:meth:`PortRegistry.set_outer_input`), and the outer
+:class:`PlanInterpreter`'s ``results_by_phase`` mapping so the inner
+interpreter shares the outer's typed phase mirror (ADR-0219 §4). It
+returns a mapping of merged output port values (sync) or an awaitable
+that resolves to one (async). The strategy awaits the result if it is
+awaitable. Production closures are async because
+:meth:`PlanInterpreter.run` is async. The fourth argument is ``None``
+when the outer node carried no port values, so the inner plan starts
+from a fresh empty registry. The fifth argument is the outer's mirror
+or ``None`` when the outer plan carried no mirror; a fresh empty
+mapping is used in that case.
 """
 
 
@@ -111,15 +116,18 @@ class SubgraphStrategy(NodeStrategy):
         outer_state = context.node_config.get("agent_state")
         if not isinstance(outer_state, AgentState):
             outer_state = AgentState(trace_id="", task="", budget=_empty_budget())
+        outer_mirror = context.node_config.get("results_by_phase") or {}
         depth = 1
         depth_token: Any = None
         if self.depth_counter is not None:
             from lca.framework.graph.adapter import _enter_subgraph, _exit_subgraph
+
             current_depth, depth_token = _enter_subgraph()
             depth = current_depth + 1
         if depth > self.max_depth:
             if depth_token is not None:
                 from lca.framework.graph.adapter import _exit_subgraph
+
                 _exit_subgraph(depth_token)
             raise RuntimeError(
                 f"subgraph recursion exceeded max_depth={self.max_depth} at "
@@ -132,19 +140,21 @@ class SubgraphStrategy(NodeStrategy):
             outer_ports.set_outer_input(input.port_values)
         self._observe_enter(context, ref, depth)
         try:
-            outcome = self.recursive_runner(sub_plan, outer_state, depth, outer_ports)
+            outcome = self.recursive_runner(sub_plan, outer_state, depth, outer_ports, outer_mirror)
             if isawaitable(outcome):
                 outcome = await outcome
         except BaseException as exc:
             self._observe_exit(context, ref, depth, outcome="failure", error=repr(exc))
             if depth_token is not None:
                 from lca.framework.graph.adapter import _exit_subgraph
+
                 _exit_subgraph(depth_token)
             raise
         merged_output: Mapping[str, Any] = outcome  # type: ignore[assignment]
         self._observe_exit(context, ref, depth, outcome="success", error="")
         if depth_token is not None:
             from lca.framework.graph.adapter import _exit_subgraph
+
             _exit_subgraph(depth_token)
         return NodeOutput(
             port_values=dict(merged_output),

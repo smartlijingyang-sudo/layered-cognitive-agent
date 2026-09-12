@@ -291,7 +291,7 @@ async def test_subgraph_strategy_emits_enter_exit(monkeypatch) -> None:
         lambda ref, entry: _make_plan(),
     )
 
-    async def runner(sub_plan, outer_state, depth, outer_ports):
+    async def runner(sub_plan, outer_state, depth, outer_ports, outer_mirror=None):
         return {"decision": "ok"}
 
     strategy = SubgraphStrategy(recursive_runner=runner, observer=rec)
@@ -316,7 +316,7 @@ async def test_subgraph_strategy_emits_failure_exit(monkeypatch) -> None:
         lambda ref, entry: _make_plan(),
     )
 
-    async def runner(sub_plan, outer_state, depth, outer_ports):
+    async def runner(sub_plan, outer_state, depth, outer_ports, outer_mirror=None):
         raise RuntimeError("subgraph boom")
 
     strategy = SubgraphStrategy(recursive_runner=runner, observer=rec)

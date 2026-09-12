@@ -178,7 +178,7 @@ async def test_subgraph_boundary_emits_enter_and_exit(tmp_path: Path, monkeypatc
             lambda ref, entry: sub_plan,
         )
 
-        async def runner(plan_, outer_state, depth, outer_ports):
+        async def runner(plan_, outer_state, depth, outer_ports, outer_mirror=None):
             inner_reg = StrategyRegistry()
             inner_reg.register(_NoopStrategy())
             inner = PlanInterpreter(registry=inner_reg, observer=observer)

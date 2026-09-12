@@ -9,6 +9,7 @@ so they do not depend on the production kernel. They prove:
   deterministic.
 - :class:`SubgraphStrategy` enforces ``max_depth``.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -38,7 +39,6 @@ from lca.framework.graph.strategies import (
     SubgraphStrategy,
 )
 from lca.framework.graph.strategy_registry import (
-    PhaseExecutorLookup,
     StrategyRegistry,
     resolve_executor,
 )
@@ -79,9 +79,7 @@ class TestPhaseExecutorStrategy:
         _runner.calls = calls  # type: ignore[attr-defined]
         return _runner
 
-    async def test_execute_calls_runner(
-        self, runner: Any
-    ) -> None:
+    async def test_execute_calls_runner(self, runner: Any) -> None:
         strategy = PhaseExecutorStrategy(runner=runner)
         ctx = StrategyContext(
             plan_ref="p1",
@@ -89,9 +87,7 @@ class TestPhaseExecutorStrategy:
             binding_kind=BindingKind.PHASE_EXECUTOR,
             node_config={},
         )
-        out = await strategy.execute(
-            ctx, NodeInput(port_values={}, consumer_node="perceive.main")
-        )
+        out = await strategy.execute(ctx, NodeInput(port_values={}, consumer_node="perceive.main"))
         assert isinstance(out, NodeOutput)
         assert out.producer_node == "perceive.main"
         assert "decision" in out.port_values
@@ -166,16 +162,14 @@ class TestSubgraphStrategy:
         called: dict[str, Any] = {}
 
         def _recursive_runner(
-            sub_plan: Any, outer_state: Any, depth: int
+            sub_plan: Any, outer_state: Any, depth: int, port_registry=None, outer_mirror=None
         ) -> dict:
             called["sub_plan"] = sub_plan
             called["outer_state"] = outer_state
             called["depth"] = depth
             return {"observation": "ok"}
 
-        ref = SubgraphReference(
-            plan_ref="inner.yaml", entry_node="a", binding_edge="x"
-        )
+        ref = SubgraphReference(plan_ref="inner.yaml", entry_node="a", binding_edge="x")
         strategy = SubgraphStrategy(recursive_runner=_recursive_runner, max_depth=4)
         ctx = StrategyContext(
             plan_ref="outer.yaml",
@@ -200,6 +194,7 @@ class TestSubgraphStrategy:
             outer_state: Any,
             depth: int,
             port_registry: Any = None,
+            outer_mirror: Any = None,
         ) -> dict:
             captured["sub_plan"] = sub_plan
             captured["outer_state"] = outer_state
@@ -219,12 +214,8 @@ class TestSubgraphStrategy:
             ),
         )
 
-        ref = SubgraphReference(
-            plan_ref="inner.yaml", entry_node="a", binding_edge="x"
-        )
-        strategy = SubgraphStrategy(
-            recursive_runner=_recursive_runner, max_depth=4
-        )
+        ref = SubgraphReference(plan_ref="inner.yaml", entry_node="a", binding_edge="x")
+        strategy = SubgraphStrategy(recursive_runner=_recursive_runner, max_depth=4)
         ctx = StrategyContext(
             plan_ref="outer.yaml",
             node_id="dispatch",
@@ -255,9 +246,7 @@ class TestSubgraphStrategy:
             node_id="d",
             binding_kind=BindingKind.SUBGRAPH,
             node_config={},
-            subgraph_ref=SubgraphReference(
-                plan_ref="x.yaml", entry_node="a", binding_edge="x"
-            ),
+            subgraph_ref=SubgraphReference(plan_ref="x.yaml", entry_node="a", binding_edge="x"),
         )
         with pytest.raises(RuntimeError, match="subgraph recursion exceeded"):
             await strategy.execute(ctx, NodeInput())

@@ -259,6 +259,7 @@ class PlanInterpreterAdapter:
             outer_state: Any,
             depth: int,
             port_registry: PortRegistry | None = None,
+            outer_mirror: Mapping[Any, Any] | None = None,
         ) -> Mapping[str, Any]:
             seeded_state = outer_state
             if outer_state is not None and not hasattr(outer_state, "graph_depth"):
@@ -276,10 +277,16 @@ class PlanInterpreterAdapter:
                             return getattr(self._base, name)
 
                     seeded_state = _DepthCarrier(outer_state, depth)
+            # ADR-0219 §4: share the outer's typed phase mirror so
+            # inner phase executors see prior phases' PhaseResult
+            # entries accumulated by the outer plan, and inner
+            # phase visits append to the same dict the outer
+            # interpreter observes on the next iteration.
             interp = PlanInterpreter(
                 registry=adapter.registry,
                 observer=adapter.graph_observer,
                 clock=adapter.graph_clock,
+                results_by_phase=outer_mirror if outer_mirror is not None else {},
             )
             result = await interp.run(
                 sub_plan, outer_state=seeded_state, port_registry=port_registry
