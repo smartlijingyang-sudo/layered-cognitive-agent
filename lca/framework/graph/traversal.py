@@ -13,6 +13,7 @@ to move forward, ``fork`` is the only way to recurse into a subgraph.
 Replaces the legacy ``_loop_count > 20`` hard cap from
 :class:`lca.framework.subgraph.plugins.node_graph_driver.NodeGraphDriver`.
 """
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -30,6 +31,7 @@ class PlanTraversal:
     visit_counts: dict[str, int] = field(default_factory=dict)
     terminal: bool = False
     last_dispatch_kind: str = "init"
+    terminal_reason: tuple[str, str, int, int] | None = None
 
     def __post_init__(self) -> None:
         if not self.current_id:
@@ -41,16 +43,23 @@ class PlanTraversal:
                 self.current_id = self.plan.nodes[0].id
 
     def visit(self, *, node_id: str, max_visits: int) -> int:
-        """Record one visit to ``node_id``; return the new count."""
+        """Record one visit to ``node_id``; return the new count.
+
+        When the count exceeds ``max_visits`` the traversal is marked
+        terminal (``terminal_reason`` is populated) instead of raising.
+        The main loop in :class:`PlanInterpreter` checks ``terminated()``
+        and exits cleanly — see ADR-0214 PG-007 passive→active.
+        """
         if max_visits <= 0:
-            raise ValueError(
-                f"plan {self.plan.id!r} node {node_id!r}: max_visits must be > 0"
-            )
+            raise ValueError(f"plan {self.plan.id!r} node {node_id!r}: max_visits must be > 0")
         self.visit_counts[node_id] = self.visit_counts.get(node_id, 0) + 1
         if self.visit_counts[node_id] > max_visits:
-            raise RuntimeError(
-                f"plan {self.plan.id!r} node {node_id!r} exceeded max_visits={max_visits} "
-                f"(got {self.visit_counts[node_id]} visits)"
+            self.terminal = True
+            self.terminal_reason = (
+                "budget_exceeded",
+                node_id,
+                max_visits,
+                self.visit_counts[node_id],
             )
         return self.visit_counts[node_id]
 
@@ -71,7 +80,7 @@ class PlanTraversal:
             return
         self.current_id = edge.target
 
-    def fork(self, *, entry: str) -> "PlanTraversal":
+    def fork(self, *, entry: str) -> PlanTraversal:
         """Return a fresh traversal rooted at ``entry`` for subgraph recursion."""
         return PlanTraversal(plan=self.plan, current_id=entry)
 

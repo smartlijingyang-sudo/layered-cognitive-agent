@@ -116,6 +116,27 @@ class PlanInterpreter:
             node = plan.node(traversal.current_id)
             self.observer.observe(_visit_start_of(node, plan.id, traversal, depth, self.clock()))
             traversal.visit(node_id=node.id, max_visits=node.max_visits)
+            # ADR-0214 PG-007 passive→active: over-budget visit flips
+            # ``terminal`` instead of raising.  The over-budget node is
+            # NOT executed — emit a failure visit_end and exit cleanly.
+            if traversal.terminated():
+                self.observer.observe(
+                    _visit_end_of(
+                        node,
+                        plan.id,
+                        traversal.visit_counts.get(node.id, 1),
+                        depth,
+                        outcome="failure",
+                        error=f"budget_exceeded: node {node.id!r} visited "
+                        f"{traversal.visit_counts[node.id]} times "
+                        f"(max_visits={node.max_visits})",
+                        elapsed_ms=0,
+                        inputs={},
+                        outputs={},
+                        occurred_at_ms=self.clock(),
+                    )
+                )
+                break
             strategy = self.registry.resolve(node.binding)
             schema = node.io_schema
             inputs = ports.build_input(schema.required_inputs(), consumer_node=node.id)
