@@ -217,6 +217,45 @@ class TestLifter:
         assert lifted.nodes[0].binding is BindingKind.NODE_EXECUTOR
         assert lifted.nodes[1].binding is BindingKind.SUBGRAPH
 
+    def test_lift_graph_spec_subgraph_ref_inherits_inner_entry_schema(self) -> None:
+        """An outer node carrying ``sub_spec_ref`` must declare its
+        io_schema from the inner entry node's ports so the kernel
+        forwards the right outer registry values into the subgraph.
+
+        Regression for the v2 driver bug where ``phase.main.outer``'s
+        ``act.main`` had empty ``io_schema.inputs`` (the lifter read
+        ``raw.get("inputs")`` instead of inheriting the inner entry's
+        schema), so ``act.validate`` received ``decision=None`` even
+        though ``think.main`` produced a USE_TOOL Decision.
+
+        See run_d30a634f057b / run_6ad8ca880cef — every node-only
+        ``declared_inputs/declared_outputs`` field on the outer v2
+        yaml is ignored unless the lifter falls back to the inner
+        entry's schema when ``sub_spec_ref`` is wired.
+        """
+        from pathlib import Path as _Path
+
+        import yaml as _yaml
+
+        repo_root = _Path(__file__).resolve().parents[4]
+        outer_yaml = (repo_root / "bundles" / "phase_main_outer.yaml").read_text(
+            encoding="utf-8"
+        )
+        spec = _yaml.safe_load(outer_yaml)
+        plan = lift_graph_spec(spec)
+
+        nodes_by_id = {n.id: n for n in plan.nodes}
+        act_main = nodes_by_id["act.main"]
+        # Outer act.main carries a sub_spec_ref pointing at act.yaml.
+        # Its inner entry is ``act.validate`` whose declared inputs
+        # include ``decision`` (the port we need to forward from the
+        # prior phase). The lifter must surface this so the kernel
+        # calls ``build_input(["decision"], ...)`` and the subgraph
+        # entry sees the Decision instance.
+        assert act_main.subgraph_ref is not None
+        assert act_main.subgraph_ref.entry_node == "act.validate"
+        assert "decision" in act_main.io_schema.required_inputs()
+
 
 class TestPlanInterpreter:
     async def test_run_visits_each_node_once(self) -> None:
