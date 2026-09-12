@@ -166,16 +166,18 @@ def complete_model(
                 tool_calls=tool_calls,
             ),
         )
-        if text:
-            from lca.loop.fact_gateway import append_surface_bound
+        from lca.loop.fact_gateway import append_surface_bound
 
-            append_surface_bound(
-                SURFACE_ASSISTANT_TYPE,
-                {"message": {"role": "assistant", "content": text}},
-                actor=_LIFECYCLE_ACTOR,
-                surface_op="append",
-                visibility="model",
-            )
+        assistant_message: dict[str, Any] = {"role": "assistant", "content": text or None}
+        if tool_calls:
+            assistant_message["tool_calls"] = tool_calls
+        append_surface_bound(
+            SURFACE_ASSISTANT_TYPE,
+            {"message": assistant_message},
+            actor=_LIFECYCLE_ACTOR,
+            surface_op="append",
+            visibility="model",
+        )
 
 
 def fail_model(*, turn: int | None = None, step: int, error: str) -> None:
