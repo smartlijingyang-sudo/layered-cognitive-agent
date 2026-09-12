@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from lca.harness.composition.boot_compile import compile_profile_boot_products
-from lca.harness.composition.plan_compiler import (
+from lca.harness.profile.plan.explain import explain_compile_plan
+from lca_kernel.plan.plan_compile import (
     CompileOptions,
     PlanCompilerError,
     compile_plan,
-    explain_compile_plan,
 )
 
 __all__ = [

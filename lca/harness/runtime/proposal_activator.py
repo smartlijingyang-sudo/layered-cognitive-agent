@@ -32,7 +32,7 @@ from lca.contracts.runtime.trust import EMPTY_TRUST_ENVELOPE
 from lca.harness.runtime.activation_ref import compute_activation_ref
 
 if TYPE_CHECKING:
-    from lca.harness.composition.plan_compiler import CompiledRunPlan
+    from lca.contracts.protocols.state.plan import CompiledRunPlan
 
 __all__ = (
     "ProposalActivationError",

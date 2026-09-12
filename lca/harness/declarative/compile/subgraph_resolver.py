@@ -44,14 +44,7 @@ from lca.contracts.protocols.declarative.declarative_1.declarative_graph import 
 )
 from lca.contracts.protocols.state.plan import COMPILED_RUN_PLAN_VERSION, CompiledRunPlan
 from lca.contracts.protocols.state.scope_plan import BudgetCeiling, ScopePlan
-from lca.harness.declarative.compile.compiler.compiler import compile_declarative_projection
-from lca.harness.declarative.controls.validation import PhaseGraphValidator, require_valid
 from lca.harness.plan import build_input_provenance
-from lca.harness.profile.plan.projection import ProfileCompilationProjections
-from lca.harness.profile.resolve.capability_plan_resolver import (
-    CapabilityPlanOptions,
-    project_capability_plan,
-)
 from lca.harness.profile.resolve.resolve import ResolvedProfile, resolve_profile
 
 # Bundle path → fixture profile that compiles the subgraph in isolation.
@@ -68,68 +61,18 @@ def _repo_root() -> Path:
 def _compile_subgraph_fixture(resolved: ResolvedProfile) -> CompiledRunPlan:
     """Compile one subgraph fixture profile without production runtime closure.
 
-    Subgraph bundles only need the declarative phase graph projection. They
-    must not pull in the full production runtime seam closure that a
-    runnable profile like ``web-standard`` requires.
+    The v1 ``compile_declarative_projection`` projection this helper used
+    was retired in ADR-0221 P3; v2 ``plan_compile`` does not emit
+    ``phase_graph`` on the compiled plan. A v2-native subgraph fixture
+    compiler is tracked separately; until it lands this entry point fails
+    loud instead of silently importing a deleted module.
     """
-
-    projections = ProfileCompilationProjections.build(resolved)
-    declarative = compile_declarative_projection(
-        resolved,
-        task_contract="subgraph-fixture",
-        environment="subgraph-fixture",
-        actor_grant=(),
-        projection=projections.selected,
-    )
-    if declarative.phase_graph is None:
-        raise ValueError(
-            f"subgraph fixture profile {resolved.profile_path!r} produced no phase graph"
-        )
-    subgraph_report = PhaseGraphValidator().validate(
-        declarative.phase_graph,
-        declarative.phase_bindings,
-        declarative.plugin_specs,
-        declarative.effect_policy,
-        require_all_semantic_phases=False,
-    )
-    require_valid(subgraph_report)
-    capability = project_capability_plan(
-        resolved,
-        options=CapabilityPlanOptions(),
-        projection=projections.selected,
-    )
-    scope = ScopePlan(
-        profile_path=resolved.profile_path,
-        lifecycle=Scope.RUN,
-        visibility=tuple(Scope),
-        acl_grants=(),
-        budget_ceiling=BudgetCeiling(),
-        revision="v1",
-    )
-    input_provenance = build_input_provenance(
-        profile_path=resolved.profile_path,
-        bundles=resolved.bundles,
-        patches=(),
-        task_id=None,
-        env_fingerprint=None,
-    )
-    return CompiledRunPlan(
-        profile_path=resolved.profile_path,
-        capability=capability,
-        scope=scope,
-        plan_version=COMPILED_RUN_PLAN_VERSION,
-        input_provenance=input_provenance,
-        revision="v3",
-        plugin_specs=declarative.plugin_specs,
-        capability_bindings=declarative.capability_bindings,
-        phase_graph=declarative.phase_graph,
-        phase_bindings=declarative.phase_bindings,
-        control_entries=declarative.control_entries,
-        replacement_map=declarative.replacement_map,
-        effect_policy=declarative.effect_policy,
-        action_authority=declarative.action_authority,
-        provenance=declarative.provenance,
-        validation_report=subgraph_report,
+    raise NotImplementedError(
+        "_compile_subgraph_fixture requires a v2-native subgraph fixture "
+        "compiler; the v1 declarative projection was retired in "
+        "ADR-0221 P3. The hot path (``compile_plan`` via kernel boot) is "
+        "unaffected; only fixtures routed through ``_compile_subgraph_profile`` "
+        "hit this gap."
     )
 
 

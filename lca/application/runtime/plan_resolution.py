@@ -13,17 +13,17 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from lca.contracts.protocols.state.plan import CompiledRunPlan
-from lca.harness.composition.plan_compiler import (
-    CompileOptions,
-    PlanCompilerError,
-    compile_plan,
-)
 from lca.harness.plan import compiled_run_plan_ref, declarative_plan_hash
 from lca.harness.profile.resolve.resolve import (
     ResolvedProfile,
     resolve_profile,
 )
 from lca.harness.profile.validate.errors import ProfileResolveError
+from lca_kernel.plan.plan_compile import (
+    CompileOptions,
+    PlanCompilerError,
+    compile_plan,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,8 +105,18 @@ class PlanResolutionService:
         # graph_ref / plugin_set_ref are derived from immutable plan
         # regions; both are stable hashes over canonical JSON (I-HPC-2:
         # the plan is read-only so the hashes are stable across reads).
-        graph_ref = declarative_plan_hash(plan.phase_graph)
-        plugin_set_ref = declarative_plan_hash(plan.plugin_specs)
+        # ADR-0221 P3: in the v2 path, ``compile_plan`` returns a
+        # ``V2ExecutablePlan`` wrapper whose ``.inner`` is the immutable
+        # ``CompiledRunPlan`` (no ``phase_graph`` region); the v2 graph
+        # spec travels under ``.graph_spec``. Unwrap uniformly so the
+        # three SSOT refs remain deterministic across v1/v2.
+        inner = getattr(plan, "inner", plan)
+        graph_input = getattr(plan, "graph_spec", None)
+        if graph_input is None:
+            graph_input = getattr(inner, "phase_graph", None)
+        plugin_input = getattr(inner, "plugin_specs", ())
+        graph_ref = declarative_plan_hash(graph_input)
+        plugin_set_ref = declarative_plan_hash(plugin_input)
 
         return PlanResolutionResult(
             plan_ref=plan_ref,

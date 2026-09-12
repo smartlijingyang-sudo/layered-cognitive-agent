@@ -128,8 +128,8 @@ def register(app: typer.Typer) -> None:
             from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
                 SemanticPhase,
             )
-            from lca.harness.composition.plan_compiler import compile_plan
             from lca.harness.profile.resolve.resolve import resolve_profile
+            from lca_kernel.plan.plan_compile import compile_plan
 
             try:
                 phase = SemanticPhase(slot)

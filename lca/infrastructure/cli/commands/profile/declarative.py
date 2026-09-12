@@ -10,7 +10,6 @@ from typing import Any, cast
 import typer
 
 from lca.contracts.protocols.declarative.declarative_1.bundle_graph import BundleGraphSpec
-from lca.harness.composition.plan_compiler import CompileOptions, compile_plan
 from lca.harness.declarative.controls.validation import is_validation_valid
 from lca.harness.plan import compiled_run_plan_to_dict
 from lca.harness.profile.resolve.resolve import resolve_profile
@@ -20,6 +19,7 @@ from lca.infrastructure.cli.commands.profile.declarative_graph import (
     explain_declarative_plan,
     render_declarative_graph,
 )
+from lca_kernel.plan.plan_compile import CompileOptions, compile_plan
 
 
 def register(app: typer.Typer) -> None:

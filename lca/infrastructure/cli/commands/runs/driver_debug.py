@@ -16,7 +16,6 @@ import glob
 import json
 import os
 import re
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -151,9 +150,9 @@ def find_latest_kernel_stderr() -> Path | None:
 def cmd_debug_credentials(json_mode: bool) -> None:
     """Verify .env load + LLM adapter resolve end-to-end (no kernel needed)."""
     from lca.infrastructure.llm.config import (
-        load_provider_settings,
         llm_credentials,
         llm_openai_credentials,
+        load_provider_settings,
         normalize_llm_environ,
         prepare_llm_environ,
     )
@@ -275,7 +274,6 @@ def _boot_factory_index(profile: Path) -> dict[str, list[str]]:
     driver itself uses at runtime.
     """
     import asyncio
-    import contextlib
 
     try:
         from lca.harness.diagnostics.inspect.inspect import inspect_profile_tree
@@ -314,7 +312,7 @@ def cmd_debug_factories(profile: Path, json_mode: bool) -> None:
         typer.echo(f"Profile not found: {profile}", err=True)
         raise typer.Exit(2)
     from lca.harness.profile.resolve.resolve import resolve_profile
-    from lca.harness.composition.plan_compiler import compile_plan
+    from lca_kernel.plan.plan_compile import compile_plan
 
     resolved = resolve_profile(profile)
     plan = compile_plan(resolved)
@@ -489,7 +487,7 @@ def cmd_debug_driver_chain(run_id: str, json_mode: bool) -> None:
         # Kernel stderr timestamps are local time (no TZ marker); started_at /
         # closed_at are unix epoch seconds (UTC). Convert local → epoch via
         # ``datetime.astimezone()`` to avoid naive/aware mixing.
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         def parse_ts(ts: str) -> float | None:
             try:
@@ -556,9 +554,7 @@ def cmd_debug_short_circuits(json_mode: bool) -> None:
     for line in text.splitlines():
         if "phase_graph.node.short_circuit" in line:
             short_circuits.append(_parse_lca_log_line(line))
-        elif "factory_resolution_failed" in line:
-            failures.append(_parse_lca_log_line(line))
-        elif "loop_overflow" in line:
+        elif "factory_resolution_failed" in line or "loop_overflow" in line:
             failures.append(_parse_lca_log_line(line))
     report = {
         "stderr_path": str(stderr),

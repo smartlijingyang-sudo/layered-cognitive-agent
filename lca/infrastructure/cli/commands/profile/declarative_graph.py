@@ -6,8 +6,9 @@ import ast
 from pathlib import Path
 from typing import Any
 
-from lca.harness.composition.plan_compiler import compile_plan, explain_compile_plan
+from lca.harness.profile.plan.explain import explain_compile_plan
 from lca.harness.profile.resolve.resolve import resolve_profile
+from lca_kernel.plan.plan_compile import compile_plan
 
 
 def explain_declarative_plan(profile: Path) -> dict[str, Any]:

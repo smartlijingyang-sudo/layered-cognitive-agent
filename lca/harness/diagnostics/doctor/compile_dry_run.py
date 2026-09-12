@@ -24,9 +24,9 @@ from lca.contracts.diagnostics.doctor import (
     DoctorFinding,
     DoctorReport,
 )
-from lca.harness.composition.plan_compiler import PlanCompilerError, compile_plan
 from lca.harness.plan import compiled_run_plan_ref
 from lca.harness.profile.resolve.resolve import resolve_profile
+from lca_kernel.plan.plan_compile import PlanCompilerError, compile_plan
 
 if TYPE_CHECKING:
     from lca.application.runtime.plan_resolution import PlanResolutionService

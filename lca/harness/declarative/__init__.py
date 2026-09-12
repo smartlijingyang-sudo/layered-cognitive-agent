@@ -15,10 +15,6 @@ if TYPE_CHECKING:
         MappingRestrictedScope,
         RestrictedScope,
     )
-    from lca.harness.declarative.compile.compiler.compiler import (
-        DeclarativePlanProjection,
-        compile_declarative_projection,
-    )
     from lca.harness.declarative.controls.approval import (
         ApprovalState,
         ApprovalStateMachine,
@@ -35,7 +31,6 @@ __all__ = [
     "ApprovalState",
     "ApprovalStateMachine",
     "ApprovalTransition",
-    "DeclarativePlanProjection",
     "ExecutableNode",
     "ExecutablePlan",
     "GraphAssembler",
@@ -44,7 +39,6 @@ __all__ = [
     "PhaseVisit",
     "RestrictedPhaseContext",
     "RestrictedScope",
-    "compile_declarative_projection",
     "validate_control_binding_closure",
 ]
 
@@ -60,10 +54,6 @@ def __getattr__(name: str) -> Any:
         from lca.harness.declarative.compile import assembler as _assembler
 
         return getattr(_assembler, name)
-    if name in {"DeclarativePlanProjection", "compile_declarative_projection"}:
-        from lca.harness.declarative.compile import compiler as _compiler
-
-        return getattr(_compiler, name)
     if name in {"ApprovalState", "ApprovalStateMachine", "ApprovalTransition"}:
         from lca.harness.declarative.controls import approval as _approval
 
