@@ -22,15 +22,18 @@ prior phase results instead of None.
 
 from __future__ import annotations
 
-from typing import Any
-
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.models.core.execution.decision import Decision
+from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     PhaseResult,
     SemanticPhase,
 )
 from lca.framework.graph.adapter import _build_phase_context
+
+
+def _empty_state() -> AgentState:
+    return AgentState(trace_id="t", task="x", budget=Budget())
 
 
 def _decision(decision_id: str) -> Decision:
@@ -56,7 +59,7 @@ def test_build_phase_context_forwards_results_by_phase() -> None:
     ctx = _build_phase_context(
         plan_ref="plan-x",
         node_ref="reflect.main",
-        agent_state=None,
+        agent_state=_empty_state(),
         journal=None,
         phase_observer=None,
         capabilities=None,
@@ -73,7 +76,7 @@ def test_build_phase_context_default_empty_when_omitted() -> None:
     ctx = _build_phase_context(
         plan_ref="plan-x",
         node_ref="perceive.main",
-        agent_state=None,
+        agent_state=_empty_state(),
         journal=None,
         phase_observer=None,
         capabilities=None,
@@ -98,7 +101,7 @@ def test_build_phase_context_typed_lookups() -> None:
     ctx = _build_phase_context(
         plan_ref="plan-x",
         node_ref="reflect.main",
-        agent_state=None,
+        agent_state=_empty_state(),
         journal=None,
         phase_observer=None,
         capabilities=None,
@@ -110,3 +113,48 @@ def test_build_phase_context_typed_lookups() -> None:
     assert ctx.payload_of(SemanticPhase.THINK, dict) is None
     # Different phase: None
     assert ctx.payload_of(SemanticPhase.ACT, Decision) is None
+
+
+def test_build_phase_context_shared_dict_is_mutable() -> None:
+    """The runner closure in ``PlanInterpreterAdapter._build_runner``
+    writes ``results_by_phase[semantic_phase] = result`` after each
+    phase visit. The kernel reuses the same dict for the next visit,
+    so subsequent ``_build_phase_context`` calls see the mutation.
+
+    This test pins the seam: the dict reference threaded through
+    the factory IS the same object on both sides of a visit, so the
+    runner's mutation lands in the mirror that subsequent reads
+    consult. Without shared-reference mutation, the dict the kernel
+    populates and the dict the runner writes would be different
+    objects and ``results_by_phase`` would stay empty forever.
+    """
+    shared: dict[SemanticPhase, PhaseResult] = {}
+
+    ctx_before = _build_phase_context(
+        plan_ref="plan-x",
+        node_ref="perceive.main",
+        agent_state=_empty_state(),
+        journal=None,
+        phase_observer=None,
+        capabilities=None,
+        results_by_phase=shared,
+    )
+    assert ctx_before.payload_of(SemanticPhase.THINK, Decision) is None
+
+    shared[SemanticPhase.THINK] = PhaseResult(
+        result_kind="decision",
+        payload=_decision("after-think"),
+    )
+
+    ctx_after = _build_phase_context(
+        plan_ref="plan-x",
+        node_ref="act.main",
+        agent_state=_empty_state(),
+        journal=None,
+        phase_observer=None,
+        capabilities=None,
+        results_by_phase=shared,
+    )
+    payload = ctx_after.payload_of(SemanticPhase.THINK, Decision)
+    assert payload is not None, "subsequent visit on the same dict must see the runner's write"
+    assert payload.decision_id == "after-think"

@@ -83,6 +83,14 @@ class PlanInterpreter:
     artifacts: Mapping[str, object] = field(default_factory=dict)
     observer: GraphObserver = field(default_factory=NullGraphObserver)
     clock: Clock = field(default=_default_clock)
+    # ADR-0219 §4 typed mirror of phase results: phase executors read prior
+    # phases through ``context.payload_of(phase, want)`` which reads from
+    # this mapping. The kernel populates it after each PHASE_EXECUTOR visit;
+    # the strategy passes it through ``context.node_config`` so the runner
+    # closure (which is per-adapter, not per-interpreter) can hand it to
+    # ``_build_phase_context`` without each interpreter needing its own
+    # bespoke runner.
+    results_by_phase: dict = field(default_factory=dict)
 
     async def run(
         self,
@@ -113,11 +121,25 @@ class PlanInterpreter:
             strategy = self.registry.resolve(node.binding)
             schema = node.io_schema
             inputs = ports.build_input(schema.required_inputs(), consumer_node=node.id)
+            # ADR-0219 §4 typed mirror of phase results: the runner closure
+            # in adapter.py reads ``results_by_phase`` from node_config to
+            # hand to ``_build_phase_context`` so phase executors can call
+            # ``context.payload_of(phase, want)``. The same dict is mutated
+            # by the strategy after each phase visit so subsequent phases
+            # see prior phases' typed payloads (think → act → reflect →
+            # remember → stop). Without this mirror, reflect/remember/stop
+            # read None for prior phases and the stop policy never sees a
+            # completed decision — the agent loops on stop → perceive.
+            results_so_far = self.results_by_phase
             context = StrategyContext(
                 plan_ref=plan.id,
                 node_id=node.id,
                 binding_kind=node.binding,
-                node_config={"agent_state": outer_state, **dict(node.config)},
+                node_config={
+                    "agent_state": outer_state,
+                    "results_by_phase": results_so_far,
+                    **dict(node.config),
+                },
                 subgraph_ref=node.subgraph_ref,
                 chain=(),
             )

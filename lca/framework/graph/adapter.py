@@ -34,6 +34,14 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
+    SemanticPhase,
+)
+from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
+    PhaseContext,
+    PhaseInput,
+    PhaseResult,
+)
 from lca.contracts.protocols.graph.binding import BindingKind
 from lca.framework.graph.interpreter import PlanInterpreter
 from lca.framework.graph.lifter import lift_executable_plan
@@ -67,11 +75,6 @@ def _default_graph_clock() -> int:
 
 
 if TYPE_CHECKING:
-    from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
-        PhaseContext,
-        PhaseInput,
-        PhaseResult,
-    )
     from lca.framework.graph.interpreter import InterpretationResult
 
 
@@ -190,7 +193,22 @@ class PlanInterpreterAdapter:
                 capability_key=capability_key,
                 node_id=node_id,
             )
-            agent_state = dict(strategy_ctx.node_config or {}).get("agent_state")
+            node_config = dict(strategy_ctx.node_config or {})
+            agent_state = node_config.get("agent_state")
+            # ADR-0219 §4 typed mirror: the kernel populates
+            # ``results_by_phase`` into ``node_config`` from the
+            # interpreter's accumulated PhaseResult mapping. The
+            # runner forwards it to ``_build_phase_context`` so the
+            # phase executor can call ``context.payload_of(phase,
+            # want)`` and see prior phases' typed payloads. After the
+            # executor returns, the runner writes the new
+            # ``PhaseResult`` back into the same dict — keyed by the
+            # resolved ``SemanticPhase`` — so the next phase visit
+            # sees it. This is the seam that wires the
+            # ``RestrictedPhaseContext`` results mirror through the
+            # runner closure without coupling every interpreter to a
+            # bespoke runner.
+            results_by_phase = node_config.get("results_by_phase") or {}
             context = _build_phase_context(
                 plan_ref=strategy_ctx.plan_ref,
                 node_ref=node_id,
@@ -198,8 +216,20 @@ class PlanInterpreterAdapter:
                 journal=journal,
                 phase_observer=phase_observer,
                 capabilities=capabilities,
+                results_by_phase=results_by_phase,
             )
-            return await executor.execute(context, phase_input)
+            result = await executor.execute(context, phase_input)
+            try:
+                semantic_phase = SemanticPhase(semantic)
+            except ValueError:
+                # Unknown semantic prefix — skip the mirror write so
+                # the run keeps moving. Only ``perceive``, ``think``,
+                # ``act``, ``reflect``, ``remember``, ``stop`` are
+                # recorded; anything else (e.g. ``loop.back``) is left
+                # out on purpose.
+                return result
+            results_by_phase[semantic_phase] = result
+            return result
 
         return runner
 
@@ -532,10 +562,21 @@ def _build_phase_context(
     journal: Any,
     phase_observer: Any,
     capabilities: Any,
+    results_by_phase: Mapping[SemanticPhase, PhaseResult] | None = None,
 ) -> PhaseContext:
     """Build the :class:`PhaseContext` passed to ``PhaseExecutor.execute``.
 
     Uses :class:`RestrictedPhaseContext` (the typed per-phase view).
+    ``results_by_phase`` is the ADR-0219 §4 typed mirror of prior
+    phase results — ``payload_of(phase, want)`` reads from it, so
+    reflect/remember/stop can see think/act/reflect payloads from
+    earlier visits. Without this mirror every phase sees an empty
+    context, the stop policy never finds a completed decision or
+    satisfied delivery, and the kernel loops on the
+    stop -> perceive edge until PlanTraversal.visit raises
+    ``max_visits exceeded``. Legacy lca/loop/transaction.py:126
+    threads the same mirror through the v1 driver.
+
     Capabilities default to an empty mapping if the adapter did not
     receive one so tests can construct adapters without a Cordis boot.
     """
@@ -562,6 +603,7 @@ def _build_phase_context(
         journal=journal,
         budget=budget,
         capabilities=capabilities,
+        results_by_phase=results_by_phase or {},
     )
 
 
