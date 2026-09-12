@@ -101,6 +101,67 @@ def test_private_attribute_still_rejected() -> None:
         evaluate_restricted_predicate("result._private", result=result, artifacts={})
 
 
+def test_loopback_predicate_gated_on_result_kind_non_stop() -> None:
+    """Bundles gate ``stop.main -> perceive.main`` on ``result_kind == "stop_decision"``.
+
+    The kernel evaluates outgoing edges of every phase exit, not just the
+    stop phase. Without the ``result_kind`` gate, ``not None.should_stop``
+    short-circuits to True on a non-stop phase and the run loops back
+    forever. Assert the production predicate shape used by
+    ``bundles/declarative-phase-graph.yaml`` evaluates to False when the
+    last phase exit was not the stop phase.
+    """
+    result = _ViewWithNonePayload()
+    matched = evaluate_restricted_predicate(
+        'result.result_kind == "stop_decision" and not result.payload.should_stop',
+        result=result,
+        artifacts={},
+    )
+    assert matched is False
+
+
+def test_loopback_predicate_matches_when_stop_decides_not_to_stop() -> None:
+    """Stop phase says ``should_stop=False``; loop-back predicate matches."""
+    payload = type("P", (), {"should_stop": False})()
+
+    class _StopDecisionView:
+        result_kind = "stop_decision"
+
+        def __init__(self, payload: Any) -> None:
+            self.payload = payload
+
+        def __getattr__(self, name: str) -> Any:
+            return getattr(self.payload, name, None)
+
+    matched = evaluate_restricted_predicate(
+        'result.result_kind == "stop_decision" and not result.payload.should_stop',
+        result=_StopDecisionView(payload),
+        artifacts={},
+    )
+    assert matched is True
+
+
+def test_loopback_predicate_blocks_when_stop_decides_to_stop() -> None:
+    """Stop phase says ``should_stop=True``; loop-back predicate fails (terminal)."""
+    payload = type("P", (), {"should_stop": True})()
+
+    class _StopDecisionView:
+        result_kind = "stop_decision"
+
+        def __init__(self, payload: Any) -> None:
+            self.payload = payload
+
+        def __getattr__(self, name: str) -> Any:
+            return getattr(self.payload, name, None)
+
+    matched = evaluate_restricted_predicate(
+        'result.result_kind == "stop_decision" and not result.payload.should_stop',
+        result=_StopDecisionView(payload),
+        artifacts={},
+    )
+    assert matched is False
+
+
 def test_mapping_value_with_missing_key_returns_none() -> None:
     """Mapping lookup for a missing key returns ``None`` (unchanged behaviour)."""
 

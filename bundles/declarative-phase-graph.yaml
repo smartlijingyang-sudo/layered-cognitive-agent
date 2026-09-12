@@ -163,11 +163,11 @@ entries:
           when: true
         - source: stop.main
           target: perceive.main
-          when: not result.payload.should_stop
+          when: result.result_kind == "stop_decision" and not result.payload.should_stop
           loop:
             max_iterations: 8
             budget: run.steps
-            terminal_predicate: result.payload.should_stop
+            terminal_predicate: result.result_kind == "stop_decision" and result.payload.should_stop
 
   # ADR-0074: 所有控制贡献均由独立插件提供，支持按槽替换（Phase 3b）。
   - id: control.perceive.context
