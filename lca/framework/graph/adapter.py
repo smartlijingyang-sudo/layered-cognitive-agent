@@ -208,7 +208,10 @@ class PlanInterpreterAdapter:
             # ``RestrictedPhaseContext`` results mirror through the
             # runner closure without coupling every interpreter to a
             # bespoke runner.
-            results_by_phase = node_config.get("results_by_phase") or {}
+            results_by_phase = node_config.get("results_by_phase")
+            if results_by_phase is None:
+                results_by_phase = {}
+                node_config["results_by_phase"] = results_by_phase
             context = _build_phase_context(
                 plan_ref=strategy_ctx.plan_ref,
                 node_ref=node_id,
