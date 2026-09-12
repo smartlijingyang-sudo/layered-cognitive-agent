@@ -1,8 +1,11 @@
 # bundles/concept/decision_classify.yaml — Layer 2 概念图
-# ADR-0220 §3.3 — LLMResponse → Decision typed boundary(cross-graph transport)。
+# ADR-0221 — LLMResponse → Decision typed boundary(cross-graph transport)。
 #
-# 节点命名:3 节点全部以 decision. 起首,与 §0.4 N9 action-domain 闭集
-# 一致。§3.3 节点数 ≤ 4(本图 3 节点,符合 G1 职责单一)。
+# 节点命名:2 节点(ADR-0221 合并原 ADR-0220 §3.3 的 3 节点图)。
+# decision.parse.response 单 pass 同时产出 tool_calls / delegations /
+# intent,消解 fan-out 隐式假设(v2 graph driver 单 cursor 不支持 fan-out;
+# 原 3 节点图在 run_dfa3f8615ea6 触发 act.validate TypeError)。
+# §3.3 节点数 ≤ 4 (本图 2 节点,符合 G1 职责单一)。
 #
 # 跨图引用:
 #   inputs  -> primitive.llm.call 节点的 response port
@@ -12,22 +15,13 @@
 
 id: concept.decision.classify
 region: concept
-purpose: LLMResponse → Decision typed boundary — typed 3-stage parse/compose pipeline
+purpose: LLMResponse → Decision typed boundary — single-node typed parse + compose pipeline
 
 nodes:
-  - id: decision.parse.tool_calls
-    factory: decision.parse.tool_calls
+  - id: decision.parse.response
+    factory: decision.parse.response
     inputs: [response]
-    outputs: [tool_calls, delegations]
-    config:
-      max_visits: 1
-      emit_on_enter: []
-      emit_on_exit:  []
-
-  - id: decision.parse.intent
-    factory: decision.parse.intent
-    inputs: [response]
-    outputs: [intent]
+    outputs: [tool_calls, delegations, intent]
     config:
       max_visits: 1
       emit_on_enter: []
@@ -43,7 +37,5 @@ nodes:
       emit_on_exit:  []
 
 edges:
-  - source: decision.parse.tool_calls
-    target: decision.compose.action
-  - source: decision.parse.intent
+  - source: decision.parse.response
     target: decision.compose.action

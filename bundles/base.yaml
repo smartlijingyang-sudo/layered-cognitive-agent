@@ -205,13 +205,9 @@ entries:
   name: phase_concept_template_select_prompt_candidate_pick
   $module: lca.plugins.concept.template_select.pick
   config: {}
-- id: phase.concept.decision_classify.decision_parse_tool_calls
-  name: phase_concept_decision_classify_decision_parse_tool_calls
+- id: phase.concept.decision_classify.decision_parse_response
+  name: phase_concept_decision_classify_decision_parse_response
   $module: lca.plugins.concept.decision_classify.parse_tool_calls
-  config: {}
-- id: phase.concept.decision_classify.decision_parse_intent
-  name: phase_concept_decision_classify_decision_parse_intent
-  $module: lca.plugins.concept.decision_classify.parse_intent
   config: {}
 - id: phase.concept.decision_classify.decision_compose_action
   name: phase_concept_decision_classify_decision_compose_action

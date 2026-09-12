@@ -58,13 +58,15 @@ nodes:
       max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
-      # ADR-0220 P6: think.classify 改为 sub_spec_ref delegate 到
-      # concept.decision.classify (P5 落地的 3 节点 typed parse/compose
-      # pipeline)。typed response port 由上游 think.reason 经 close-out
-      # 投影转发,inner 图第一节点 decision.parse.tool_calls 直接消费。
+      # ADR-0221: think.classify 改为 sub_spec_ref delegate 到
+      # concept.decision.classify (2 节点 typed parse/compose pipeline;
+      # ADR-0220 §3.3 的 3 节点图已合并 — decision.parse.tool_calls +
+      # decision.parse.intent → decision.parse.response)。typed response
+      # port 由上游 think.reason 经 close-out 投影转发,inner 图第一节点
+      # decision.parse.response 直接消费。
       sub_spec_ref:
         plan_ref: bundles/concept/decision_classify.yaml
-        entry_node: decision.parse.tool_calls
+        entry_node: decision.parse.response
         binding_edge: think.classify
 
   - id: think.gate

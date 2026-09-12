@@ -15,10 +15,10 @@ D5 mapping (each port name has one or more D4 consumers):
 - ``in_assembled_manifest`` think.shortcut / think.route →  outer loop
 - ``route_choice``          think.route                 →  downstream
 - ``enforced_state``        think.route                 →  Reducer / state fold
-- ``tool_calls``            decision.parse.tool_calls   →  decision.compose.action
-- ``delegations``           decision.parse.tool_calls   →  decision.compose.action
+- ``tool_calls``            decision.parse.response     →  decision.compose.action
+- ``delegations``           decision.parse.response     →  decision.compose.action
 - ``enforced_decision``     decision.enforce.chain_run  →  act subgraph
-- ``intent``                decision.parse.intent       →  decision.compose.action
+- ``intent``                decision.parse.response     →  decision.compose.action
 - ``role``                  role_snapshot.normalize     →  role_snapshot.compose
 - ``role_snapshot``         role_snapshot.compose       →  downstream
 - ``context``               context_compose.skills      →  think.reason.render

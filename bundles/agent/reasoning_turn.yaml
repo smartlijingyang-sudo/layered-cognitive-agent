@@ -129,7 +129,7 @@ nodes:
       emit_on_exit:  []
       sub_spec_ref:
         plan_ref: bundles/concept/decision_classify.yaml
-        entry_node: decision.parse.tool_calls
+        entry_node: decision.parse.response
         binding_edge: reason.classify.response
 
   - id: reason.gate.enforce
