@@ -21,7 +21,7 @@ from lca.plugins.composer.runtime.runtime.factory import (
     build_fixture_cognitive_runtime,
 )
 from lca.plugins.strategies.peer.relay import HandoffStrategy
-from tests.phase_executors import standard_phase_executors
+
 from tests.support.action_authority import build_test_action_registry, build_test_body
 from tests.support.strategy_registry import build_strategy_registry
 from tests.support.team_stage import stage_with_invoker
@@ -214,11 +214,11 @@ class TestHandoffRuntimeStop(unittest.IsolatedAsyncioTestCase):
         hooks = MagicMock()
         state_store = MagicMock()
         plan = compile_plan(resolve_profile("profiles/web-standard.yaml"))
-        phase_executors: dict[str, object] = dict(standard_phase_executors())
+        node_executors: dict[str, object] = {}
         allow = _AllowContribution()
         for binding in plan.phase_bindings:
             for contribution in binding.contributions:
-                phase_executors[contribution.executor] = allow
+                node_executors[contribution.executor] = allow
 
         hooks.trigger = AsyncMock()
         memory.perceive = AsyncMock(side_effect=lambda s: s)
@@ -261,7 +261,7 @@ class TestHandoffRuntimeStop(unittest.IsolatedAsyncioTestCase):
                     "stop_policy": stop_policy,
                 },
                 compiled_plan=plan,
-                phase_executors=phase_executors,
+                node_executors=node_executors,
             )
         )
         result = await runtime.run("test task", max_steps=10)

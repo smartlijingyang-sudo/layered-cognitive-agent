@@ -9,8 +9,8 @@
 # + session-runtime (ADR-0186 Session SSOT: session.store before event-bus so
 #   the capability is live when publishers/sinks boot; RunSessionBuilder binds
 #   a per-run Session onto publish/observe slots).
-# + think: think 5 步子图的纯图描述(ADR-0217);plugin 注册走 5 个
-#   @plugin(...) 装饰器,FactoryRegistry 按 factory 业务语义名解析到 NodeExecutor。
+# + think + act + perceive + reflect + remember + stop subgraph bundles
+#   (ADR-0217/0220; six-phase subgraph cutover 2026-09-12).
 # LLM secrets are owned by lca-llm-resolver (loads project .env at setup).
 
 bundles:
@@ -24,6 +24,11 @@ bundles:
   - bundles/session-runtime.yaml
   - bundles/event-bus-components.yaml
   - bundles/think.yaml
+  - bundles/act.yaml
+  - bundles/perceive_subgraph.yaml
+  - bundles/reflect_subgraph.yaml
+  - bundles/remember_subgraph.yaml
+  - bundles/stop_subgraph.yaml
 
 patch:
   # EventSpine file sink — boot events process-local; run events under
@@ -34,22 +39,27 @@ patch:
       runs_root: traces/runs
 
   # Patch topology to add PR-C (ADR-0214 §6.3) PG-007 preconditions and
-  # terminal predicates on perceive.main. think.main carries a node-level
-  # sub_spec_ref (Node Note 2026-09-09-phase-node-sub-spec-ref, ADR-0217
-  # BundleGraphSpec v2) that delegates to bundles/think.yaml; the
-  # interpreter enters the subgraph via ``sub_spec_ref`` and does not
-  # invoke a phase executor for think.main.
+  # terminal predicates on perceive.main. Each phase main carries a
+  # node-level sub_spec_ref (Node Note 2026-09-09-phase-node-sub-spec-ref,
+  # ADR-0217 BundleGraphSpec v2) that delegates to the phase's subgraph
+  # bundle; the interpreter enters the subgraph via ``sub_spec_ref``
+  # and dispatches NodeExecutor plugins (think/act pattern; six-phase
+  # subgraph cutover 2026-09-12). Framework subtree no longer sees
+  # PhaseExecutor/PhaseInput/PhaseResult.
   - id: phase.topology.standard
     config:
       nodes:
         - id: perceive.main
           phase: perceive
-          binding: phase.perceive.standard
           max_visits: 8
           entry: true
           # PR-C (ADR-0214 §6.3): PG-007 三件套
           precondition: perceive.has_minimum_context
           terminal_predicate: perceive.context_complete
+          sub_spec_ref:
+            plan_ref: bundles/perceive_subgraph.yaml
+            entry_node: perceive.host
+            binding_edge: perceive.main
         - id: think.main
           phase: think
           max_visits: 8
@@ -66,14 +76,23 @@ patch:
             binding_edge: act.main
         - id: reflect.main
           phase: reflect
-          binding: phase.reflect.standard
           max_visits: 8
+          sub_spec_ref:
+            plan_ref: bundles/reflect_subgraph.yaml
+            entry_node: reflect.host
+            binding_edge: reflect.main
         - id: remember.main
           phase: remember
-          binding: phase.remember.standard
           max_visits: 8
+          sub_spec_ref:
+            plan_ref: bundles/remember_subgraph.yaml
+            entry_node: remember.host
+            binding_edge: remember.main
         - id: stop.main
           phase: stop
-          binding: phase.stop.standard
           max_visits: 8
           terminal: true
+          sub_spec_ref:
+            plan_ref: bundles/stop_subgraph.yaml
+            entry_node: stop.host
+            binding_edge: stop.main

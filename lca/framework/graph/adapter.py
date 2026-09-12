@@ -5,18 +5,16 @@ This is the **production cutover seam**. The runtime plugin factory
 at ``lca.plugins.journal.declarative.runtime_seams_provider`` constructs
 this adapter with the five runtime closures
 (``journal`` / ``effect_gateway`` / ``reducer`` / ``phase_observer`` /
-``lifecycle_publisher``), the phase capability reader, and
-``loop_guard_evaluator``. The adapter hands them to the kernel via
+``lifecycle_publisher``). The adapter hands them to the kernel via
 host-injected strategy closures.
 
 The adapter owns:
 
 - a per-adapter :class:`StrategyRegistry` populated by copying the
-  default registry's strategies and overriding
-  :class:`PhaseExecutorStrategy` with the runner closure it builds,
-- the runner closure for ``PhaseExecutorStrategy``,
-- the five runtime closures plus ``loop_guard_evaluator`` and the
-  ``PhaseCapabilityReader`` for phase executors,
+  default registry's strategies and overriding the subgraph,
+  node_executor, transform, observe, terminate, parallel, gate_chain,
+  agent_consult and agent_fanout strategies with the closures wired
+  by the host,
 - a :class:`PhaseRunCursor` for :meth:`resume` to seed the visit
   loop from a checkpointed node instead of restarting from entry,
 - the configured :class:`GraphObserver` that observes visit / edge /
@@ -34,15 +32,6 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
-    SemanticPhase,
-)
-from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
-    PhaseContext,
-    PhaseInput,
-    PhaseResult,
-)
-from lca.contracts.protocols.graph.binding import BindingKind
 from lca.framework.graph.interpreter import PlanInterpreter
 from lca.framework.graph.lifter import lift_executable_plan
 from lca.framework.graph.observation import GraphObserver, NullGraphObserver
@@ -50,23 +39,16 @@ from lca.framework.graph.port_registry import PortRegistry
 from lca.framework.graph.strategies.node_executor_strategy import (
     NodeExecutorStrategy,
 )
-from lca.framework.graph.strategies.phase_executor_strategy import (
-    PhaseExecutorStrategy,
-    PhaseRunner,
-)
 from lca.framework.graph.strategies.subgraph_strategy import (
     RecursiveRunner,
     SubgraphStrategy,
 )
 from lca.framework.graph.strategy_registry import (
-    PhaseExecutorLookup,
+    NodeExecutorLookup,
     StrategyRegistry,
     default_strategy_registry,
 )
 from lca.framework.graph.traversal import PlanTraversal
-from lca.harness.declarative.compile.phase.capabilities import (
-    MappingPhaseCapabilities,
-)
 
 
 def _default_graph_clock() -> int:
@@ -101,10 +83,8 @@ class PlanInterpreterAdapter:
     ``run`` and ``resume`` accept the legacy kwargs (``state``,
     ``input``, ``budget``, ``capabilities``, ``artifacts``,
     ``executable``) and return an :class:`InterpretationResult` from
-    the new kernel. The runtime closures, capability reader, and
-    loop guard are stored on the adapter so the kernel-native
-    :class:`PhaseRunner` closure can reach them when it constructs
-    a :class:`RestrictedPhaseContext` for each phase visit.
+    the new kernel. The runtime closures and loop guard are stored on
+    the adapter so the kernel-native strategies can reach them.
 
     ``run`` performs a fresh traversal from the plan's entry node.
     ``resume`` accepts a :class:`PhaseRunCursor` and seeds the
@@ -113,8 +93,7 @@ class PlanInterpreterAdapter:
     """
 
     registry: StrategyRegistry | None = None
-    runner: Any = None
-    executor_lookup: PhaseExecutorLookup | None = None
+    executor_lookup: NodeExecutorLookup | None = None
     journal: Any = None
     effect_gateway: Any = None
     reducer: Any = None
@@ -122,30 +101,18 @@ class PlanInterpreterAdapter:
     lifecycle_publisher: Any = None
     loop_guard_evaluator: Any = None
     capabilities: Any = None
-    phase_executors: Mapping[str, Any] | None = None
-    phase_capabilities: Any = None
     node_executors: Mapping[str, Any] | None = None
     node_executor_runtime_scope: Any = None
     graph_observer: GraphObserver | None = None
     graph_clock: Callable[[], int] | None = None
 
     def __post_init__(self) -> None:
-        # Adapter accepts ``capabilities`` (single source) and the
-        # ``phase_executors`` / ``phase_capabilities`` pair from the
-        # runtime factory's expanded ``create()`` signature. Prefer the
-        # single ``capabilities`` value when set; otherwise fall back
-        # to ``phase_capabilities``. ``phase_executors`` always wins as
-        # the executor resolver because it is keyed by canonical
-        # capability name and is the SSOT for which executor to call.
-        if self.capabilities is None:
-            self.capabilities = self.phase_capabilities
         if self.graph_observer is None:
             self.graph_observer = NullGraphObserver()
         if self.graph_clock is None:
             self.graph_clock = _default_graph_clock
         if self.registry is None:
-            self.registry = _build_registry_with_runner(
-                self._build_runner(),
+            self.registry = _build_registry(
                 self._build_recursive_runner(),
                 self._depth,
                 self._build_node_executor_lookup(),
@@ -154,87 +121,6 @@ class PlanInterpreterAdapter:
                 self.graph_clock,
                 default_strategy_registry(),
             )
-
-    def _build_runner(self) -> PhaseRunner:
-        """Return the closure ``PhaseExecutorStrategy.execute`` invokes.
-
-        The closure resolves the :class:`PhaseExecutor` for the active
-        node from ``self._phase_executors`` (the canonical
-        ``Mapping[str, PhaseExecutor]`` provided by
-        ``ProductionRuntimeDeps``), builds a
-        :class:`RestrictedPhaseContext` from the five runtime closures
-        plus the ``AgentState`` carried in
-        ``StrategyContext.node_config["agent_state"]``, and awaits
-        ``executor.execute(context, phase_input)``.
-
-        The capability key for one phase is
-        ``phase.<semantic_phase>.standard``; the node id of the form
-        ``<semantic_phase>.main`` parses to ``<semantic_phase>``. Nodes
-        that don't fit this convention raise a fail-loud.
-        """
-        phase_executors = self.phase_executors
-        capabilities = self.capabilities
-        journal = self.journal
-        phase_observer = self.phase_observer
-
-        async def runner(
-            phase_input: PhaseInput,
-            strategy_ctx: Any,
-        ) -> PhaseResult:
-            node_id = str(getattr(strategy_ctx, "node_id", ""))
-            semantic = node_id.split(".", 1)[0] if node_id else ""
-            if not semantic:
-                raise RuntimeError(
-                    f"PhaseRunner cannot resolve semantic phase from node_id={node_id!r}"
-                )
-            capability_key = f"phase.{semantic}.standard"
-            executor = _resolve_phase_executor(
-                phase_executors=phase_executors,
-                capability_key=capability_key,
-                node_id=node_id,
-            )
-            node_config = dict(strategy_ctx.node_config or {})
-            agent_state = node_config.get("agent_state")
-            # ADR-0219 §4 typed mirror: the kernel populates
-            # ``results_by_phase`` into ``node_config`` from the
-            # interpreter's accumulated PhaseResult mapping. The
-            # runner forwards it to ``_build_phase_context`` so the
-            # phase executor can call ``context.payload_of(phase,
-            # want)`` and see prior phases' typed payloads. After the
-            # executor returns, the runner writes the new
-            # ``PhaseResult`` back into the same dict — keyed by the
-            # resolved ``SemanticPhase`` — so the next phase visit
-            # sees it. This is the seam that wires the
-            # ``RestrictedPhaseContext`` results mirror through the
-            # runner closure without coupling every interpreter to a
-            # bespoke runner.
-            results_by_phase = node_config.get("results_by_phase")
-            if results_by_phase is None:
-                results_by_phase = {}
-                node_config["results_by_phase"] = results_by_phase
-            context = _build_phase_context(
-                plan_ref=strategy_ctx.plan_ref,
-                node_ref=node_id,
-                agent_state=agent_state,
-                journal=journal,
-                phase_observer=phase_observer,
-                capabilities=capabilities,
-                results_by_phase=results_by_phase,
-            )
-            result = await executor.execute(context, phase_input)
-            try:
-                semantic_phase = SemanticPhase(semantic)
-            except ValueError:
-                # Unknown semantic prefix — skip the mirror write so
-                # the run keeps moving. Only ``perceive``, ``think``,
-                # ``act``, ``reflect``, ``remember``, ``stop`` are
-                # recorded; anything else (e.g. ``loop.back``) is left
-                # out on purpose.
-                return result
-            results_by_phase[semantic_phase] = result
-            return result
-
-        return runner
 
     def _build_recursive_runner(self) -> RecursiveRunner:
         """Return the kernel-native recursive closure for subgraphs.
@@ -277,11 +163,6 @@ class PlanInterpreterAdapter:
                             return getattr(self._base, name)
 
                     seeded_state = _DepthCarrier(outer_state, depth)
-            # ADR-0219 §4: share the outer's typed phase mirror so
-            # inner phase executors see prior phases' PhaseResult
-            # entries accumulated by the outer plan, and inner
-            # phase visits append to the same dict the outer
-            # interpreter observes on the next iteration.
             interp = PlanInterpreter(
                 registry=adapter.registry,
                 observer=adapter.graph_observer,
@@ -298,7 +179,7 @@ class PlanInterpreterAdapter:
     def _depth(self) -> int:
         return _graph_depth.get()
 
-    def _build_node_executor_lookup(self) -> PhaseExecutorLookup:
+    def _build_node_executor_lookup(self) -> NodeExecutorLookup:
         """Return the executor-lookup for :class:`NodeExecutorStrategy`.
 
         The factory-name-to-instance map lives in ``self._node_executors``.
@@ -320,6 +201,8 @@ class PlanInterpreterAdapter:
                     f"not in node_executors (have: {available or '<none>'})"
                 )
             return executor
+
+        from lca.contracts.protocols.graph.binding import BindingKind
 
         return lookup
 
@@ -487,11 +370,10 @@ def _seed_traversal(plan: object, start_id: str, visited: tuple[str, ...]) -> Pl
     )
 
 
-def _build_registry_with_runner(
-    runner: PhaseRunner,
+def _build_registry(
     recursive_runner: RecursiveRunner,
     depth_counter: Callable[[], int],
-    node_executor_lookup: PhaseExecutorLookup,
+    node_executor_lookup: NodeExecutorLookup,
     node_runtime_view_factory: NodeRuntimeViewFactory,
     graph_observer: GraphObserver,
     graph_clock: Callable[[], int],
@@ -500,13 +382,12 @@ def _build_registry_with_runner(
     """Return a fresh :class:`StrategyRegistry` whose strategies carry
     host-injected closures.
 
-    The default registry exposes a singleton
-    :class:`PhaseExecutorStrategy` with ``runner=None`` (its registered
-    shape). Each adapter copies the registry, swaps in fresh strategy
+    The default registry exposes singletons for every binding kind.
+    Each adapter copies the registry, swaps in fresh strategy
     instances with the closures wired, and runs that. Concurrent
-    adapters no longer race over a shared ``runner`` field.
+    adapters no longer race over shared closure fields.
 
-    The :class:`NodeExecutorStrategy` is also rewired so its
+    The :class:`NodeExecutorStrategy` is rewired so its
     ``executor_lookup`` resolves :class:`NodeExecutor` instances by
     factory name (== node id) from the runtime-supplied
     ``node_executors`` map.
@@ -514,9 +395,7 @@ def _build_registry_with_runner(
     new_registry = StrategyRegistry()
     for kind in source.kinds():
         strategy = source.resolve(kind)
-        if isinstance(strategy, PhaseExecutorStrategy):
-            new_registry.register(PhaseExecutorStrategy(runner=runner))
-        elif isinstance(strategy, SubgraphStrategy):
+        if isinstance(strategy, SubgraphStrategy):
             new_registry.register(
                 SubgraphStrategy(
                     recursive_runner=recursive_runner,
@@ -535,86 +414,6 @@ def _build_registry_with_runner(
         else:
             new_registry.register(strategy)
     return new_registry
-
-
-def _resolve_phase_executor(
-    *,
-    phase_executors: Mapping[str, Any] | None,
-    capability_key: str,
-    node_id: str,
-) -> Any:
-    """Resolve one phase executor instance from the executor map.
-
-    ``phase_executors`` is the canonical ``Mapping[str, PhaseExecutor]``
-    owned by ``ProductionRuntimeDeps``. The map is keyed by capability
-    key (e.g. ``phase.perceive.standard``). Missing executor raises
-    fail-loud — the kernel cannot proceed without it.
-    """
-    if phase_executors is None:
-        raise RuntimeError(
-            f"PlanInterpreterAdapter.phase_executors is None; "
-            f"cannot resolve {capability_key!r} for node {node_id!r}"
-        )
-    executor = phase_executors.get(capability_key)
-    if executor is None:
-        raise RuntimeError(
-            f"phase executor {capability_key!r} not found in phase_executors "
-            f"(have: {sorted(phase_executors)})"
-        )
-    return executor
-
-
-def _build_phase_context(
-    *,
-    plan_ref: str,
-    node_ref: str,
-    agent_state: Any,
-    journal: Any,
-    phase_observer: Any,
-    capabilities: Any,
-    results_by_phase: Mapping[SemanticPhase, PhaseResult] | None = None,
-) -> PhaseContext:
-    """Build the :class:`PhaseContext` passed to ``PhaseExecutor.execute``.
-
-    Uses :class:`RestrictedPhaseContext` (the typed per-phase view).
-    ``results_by_phase`` is the ADR-0219 §4 typed mirror of prior
-    phase results — ``payload_of(phase, want)`` reads from it, so
-    reflect/remember/stop can see think/act/reflect payloads from
-    earlier visits. Without this mirror every phase sees an empty
-    context, the stop policy never finds a completed decision or
-    satisfied delivery, and the kernel loops on the
-    stop -> perceive edge until PlanTraversal.visit raises
-    ``max_visits exceeded``. Legacy lca/loop/transaction.py:126
-    threads the same mirror through the v1 driver.
-
-    Capabilities default to an empty mapping if the adapter did not
-    receive one so tests can construct adapters without a Cordis boot.
-    """
-    from lca.contracts.models.core.state.state import AgentState, Budget
-    from lca.harness.declarative.lifecycle.phase_context import (
-        RestrictedPhaseContext,
-    )
-
-    state = (
-        agent_state
-        if isinstance(agent_state, AgentState)
-        else AgentState(
-            trace_id=str(plan_ref or ""),
-            task=str(node_ref or ""),
-        )
-    )
-    budget = getattr(state, "budget", None) or Budget()
-    if capabilities is None:
-        capabilities = MappingPhaseCapabilities({})
-    return RestrictedPhaseContext(
-        plan_ref=str(plan_ref or ""),
-        node_ref=str(node_ref or ""),
-        state=state,
-        journal=journal,
-        budget=budget,
-        capabilities=capabilities,
-        results_by_phase=results_by_phase or {},
-    )
 
 
 @dataclass
@@ -677,7 +476,6 @@ class _NodeRuntimeView:
 
 NodeRuntimeViewFactory = Callable[[Any], Any]
 """Build a per-call :class:`_NodeRuntimeView` from the outer :class:`AgentState`."""
-
 
 # Nesting depth for subgraph recursion (ADR-0220 P6 / subgraph bound).
 # Tracked via ContextVar so sibling / sequential subgraph entries at the

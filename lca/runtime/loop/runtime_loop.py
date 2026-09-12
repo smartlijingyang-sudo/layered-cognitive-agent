@@ -48,9 +48,6 @@ if TYPE_CHECKING:
         StateStore,
     )
     from lca.contracts.protocols.act.effect.handler import EffectHandlerRegistry
-    from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
-        PhaseExecutor,
-    )
     from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyStore
     from lca.contracts.protocols.session.resume.input import ResumeInputAdapter
     from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
@@ -107,10 +104,6 @@ class CognitiveRuntime(Runtime):
     @property
     def compiled_plan(self) -> CompiledRunPlan | None:
         return self._bindings.plan
-
-    @property
-    def phase_executors(self) -> Mapping[str, PhaseExecutor]:
-        return self._bindings.phase_executors
 
     @property
     def effect_handler_registry(self) -> EffectHandlerRegistry:

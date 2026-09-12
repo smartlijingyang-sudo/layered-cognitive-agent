@@ -1,10 +1,8 @@
 """Unified graph kernel — single visit state machine, one strategy per binding.
 
-PR-3 lays the skeleton: a strategy registry, three strategies that
+PR-3 lays the skeleton: a strategy registry and strategies that
 delegate to host-injected closures (typically
-:class:`lca.loop.transaction.PhaseExecutionTransaction` for phase
-nodes), and a ``PhaseExecutorLookup`` seam the strategies call to
-resolve an executor from a ``(binding, node_id)`` pair.
+``lca.plugins.composer.runtime.runtime.factory`` for node executors).
 
 PR-4 adds the kernel itself: :class:`PlanInterpreter` is the single
 visit state machine, :class:`PlanTraversal` is the typed cursor,
@@ -24,6 +22,9 @@ Subsequent PRs:
   ``lca/framework/declarative/`` and ``lca/framework/subgraph/``
   directories; ``PlanInterpreterAdapter`` is the sole production entry
   point.
+- Six-phase subgraph cutover (note 2026-09-12): every phase main
+  binds ``subgraph`` / ``node_executor``; the framework never sees
+  ``PhaseExecutor`` / ``PhaseInput`` / ``PhaseResult``.
 """
 from lca.framework.graph.adapter import PlanInterpreterAdapter
 from lca.framework.graph.interpreter import InterpretationResult, PlanInterpreter
@@ -34,7 +35,7 @@ from lca.framework.graph.lifter import (
 from lca.framework.graph.port_registry import PortRegistry
 from lca.framework.graph.recorder import VisitRecorder
 from lca.framework.graph.strategy_registry import (
-    PhaseExecutorLookup,
+    NodeExecutorLookup,
     StrategyRegistry,
     default_strategy_registry,
     register_strategy,
@@ -47,7 +48,6 @@ from lca.framework.graph.strategies import (  # noqa: F401  side-effect: registe
     node_executor_strategy,
     observe_strategy,
     parallel_strategy,
-    phase_executor_strategy,
     subgraph_strategy,
     terminate_strategy,
     transform_strategy,
@@ -60,7 +60,7 @@ from lca.framework.graph.traversal import (
 
 __all__ = [
     "InterpretationResult",
-    "PhaseExecutorLookup",
+    "NodeExecutorLookup",
     "PlanInterpreter",
     "PlanInterpreterAdapter",
     "PlanTraversal",

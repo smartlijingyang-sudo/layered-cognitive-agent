@@ -119,10 +119,12 @@ class DefaultResultFinalizerFactory(ResultFinalizerFactory):
 class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
     """Build the production interpreter with the five runtime closures.
 
-    After the act-subgraph seam cutover (note 2026-09-11),
-    ``PlanInterpreterAdapter`` is the sole production interpreter.
-    The adapter wraps ``PlanInterpreter`` and stores the runtime
-    closures so host-injected strategy closures can reach them.
+    After the six-phase subgraph cutover (note 2026-09-12), every
+    phase main binds ``subgraph`` and dispatches node executors via
+    :class:`NodeExecutorStrategy`. ``PlanInterpreterAdapter`` is the
+    sole production interpreter; the adapter carries the runtime
+    closures so the subgraph / node_executor strategies can reach
+    them when they build per-call views for node plugins.
     """
 
     def __init__(
@@ -139,8 +141,6 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
         reducer: DeltaReducer,
         phase_observer: object,
         lifecycle_publisher: RuntimeLifecyclePublisher,
-        phase_executors: object | None = None,
-        phase_capabilities: object | None = None,
         node_executors: object | None = None,
         node_executor_runtime_scope: object | None = None,
         graph_observer: object | None = None,
@@ -153,8 +153,6 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
             phase_observer=phase_observer,
             lifecycle_publisher=lifecycle_publisher,
             loop_guard_evaluator=self._loop_guard_evaluator,
-            phase_executors=phase_executors,
-            phase_capabilities=phase_capabilities,
             node_executors=node_executors,
             node_executor_runtime_scope=node_executor_runtime_scope,
             graph_observer=graph_observer,

@@ -21,9 +21,6 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
 )
 
 if TYPE_CHECKING:
-    from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
-        PhaseExecutor,
-    )
     from lca.contracts.protocols.declarative.declarative_1.node_executor import (
         NodeExecutor,
     )
@@ -99,8 +96,6 @@ class DeclarativeInterpreterFactory(Protocol):
         reducer: DeltaReducer,
         phase_observer: object,
         lifecycle_publisher: RuntimeLifecyclePublisher,
-        phase_executors: Mapping[str, PhaseExecutor] | None = None,
-        phase_capabilities: object | None = None,
         node_executors: Mapping[str, NodeExecutor] | None = None,
         node_executor_runtime_scope: object | None = None,
         graph_observer: object | None = None,

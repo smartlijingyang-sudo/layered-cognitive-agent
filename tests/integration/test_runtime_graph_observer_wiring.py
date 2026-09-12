@@ -39,7 +39,6 @@ def _minimal_bindings() -> object:
 
     return DeclarativeRuntimeBindings.assemble(
         plan=None,
-        phase_executors={},
         node_executors={},
         capabilities=MagicMock(name="capabilities"),
         reducer=MagicMock(name="reducer"),

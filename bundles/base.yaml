@@ -92,6 +92,29 @@ entries:
   $module: lca.plugins.think.reason.complete
   config: {}
 
+# Six-phase subgraph host plugins (NodeExecutor entry points).
+# Framework subtree does not see PhaseExecutor/PhaseInput/PhaseResult;
+# each host plugin wraps the standard phase logic and projects it onto
+# typed NodeInput/NodeOutput ports. Registered under region
+# ``phase:<x>`` so FactoryRegistry resolves the factory name to the
+# composite key.
+- id: phase.perceive.host
+  name: phase_perceive_host
+  $module: lca.plugins.loop.phase.perceive.host.plugin
+  config: {}
+- id: phase.reflect.host
+  name: phase_reflect_host
+  $module: lca.plugins.loop.phase.reflect.host.plugin
+  config: {}
+- id: phase.remember.host
+  name: phase_remember_host
+  $module: lca.plugins.loop.phase.remember.host.plugin
+  config: {}
+- id: phase.stop.host
+  name: phase_stop_host
+  $module: lca.plugins.loop.phase.stop.host.plugin
+  config: {}
+
 - id: phase.primitive.capability.fork.dispatch
   name: phase_primitive_capability_fork_dispatch
   $module: lca.plugins.primitive.capability_fork.dispatch

@@ -15,7 +15,7 @@ from lca.contracts.protocols import (
     StateStore,
 )
 from lca.contracts.protocols.act.effect.handler import EffectHandlerRegistry
-from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import PhaseExecutor
+from lca.contracts.protocols.declarative.declarative_1.node_executor import NodeExecutor
 from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyStore
 from lca.contracts.protocols.session.resume.input import ResumeInputAdapter
 from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
@@ -63,7 +63,6 @@ def _production_deps() -> ProductionRuntimeDeps:
         perceive_hub=cast("PerceiveHub", object()),
         reducer=cast("Reducer", DefaultReducer()),
         compiled_plan=cast("CompiledRunPlan", object()),
-        phase_executors={},
         phase_capabilities={},
         effect_handler_registry=cast("EffectHandlerRegistry", object()),
         delta_handler_registry=cast("DeltaHandlerRegistry", object()),
@@ -100,7 +99,7 @@ def test_production_factory_closes_runtime_from_explicit_dependencies() -> None:
     assert runtime.bindings.result_finalizer_factory is deps.result_finalizer_factory
     assert runtime.phase_observer is deps.phase_observer
     assert runtime.bindings.plan is deps.compiled_plan
-    assert dict(runtime.phase_executors) == {}
+    assert dict(runtime.node_executors) == {}
 
 
 def test_production_binding_uses_selected_runtime_mechanism_factories() -> None:
@@ -187,7 +186,6 @@ def test_production_dependency_model_rejects_missing_closure_member() -> None:
             perceive_hub=cast("PerceiveHub", object()),
             reducer=cast("Reducer", DefaultReducer()),
             compiled_plan=cast("CompiledRunPlan", object()),
-            phase_executors=cast("dict[str, PhaseExecutor]", {}),
             phase_capabilities={},
             effect_handler_registry=cast("EffectHandlerRegistry", object()),
             delta_handler_registry=cast("DeltaHandlerRegistry", object()),
@@ -252,10 +250,10 @@ def test_fixture_adapter_preserves_explicit_values_when_completing_defaults() ->
     assert completed.phase_capabilities["stop_policy"] is completed.stop_policy
 
 
-def test_binding_freezes_phase_executor_mapping_after_composition() -> None:
-    executors: dict[str, PhaseExecutor] = {}
-    runtime = build_fixture_cognitive_runtime(replace(_fixture_deps(), phase_executors=executors))
+def test_binding_freezes_node_executor_mapping_after_composition() -> None:
+    executors: dict[str, NodeExecutor] = {}
+    runtime = build_fixture_cognitive_runtime(replace(_fixture_deps(), node_executors=executors))
 
-    executors["late"] = cast("PhaseExecutor", object())
+    executors["late"] = cast("NodeExecutor", object())
 
-    assert "late" not in runtime.phase_executors
+    assert "late" not in runtime.bindings.node_executors

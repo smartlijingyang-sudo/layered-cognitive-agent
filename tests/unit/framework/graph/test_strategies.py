@@ -1,12 +1,11 @@
-"""Pure-unit tests for the PR-3 strategy skeleton.
+"""Pure-unit tests for the unified graph kernel strategies.
 
-These tests inject fakes for the runner / executor / sub_runner seam
-so they do not depend on the production kernel. They prove:
+These tests inject fakes for the runner / executor / recursive
+runner seam so they do not depend on the production kernel. They
+prove:
 
 - Each strategy registers in the default registry.
 - ``execute`` calls the seam once with the expected args.
-- The :class:`PhaseResult` → :class:`NodeOutput` projection is
-  deterministic.
 - :class:`SubgraphStrategy` enforces ``max_depth``.
 """
 
@@ -16,10 +15,6 @@ from typing import Any
 
 import pytest
 
-from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
-    PhaseInput,
-    PhaseResult,
-)
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeOutput as LegacyNodeOutput,
 )
@@ -35,7 +30,6 @@ from lca.contracts.protocols.graph.strategy import StrategyContext
 from lca.framework.graph import default_strategy_registry
 from lca.framework.graph.strategies import (
     NodeExecutorStrategy,
-    PhaseExecutorStrategy,
     SubgraphStrategy,
 )
 from lca.framework.graph.strategy_registry import (
@@ -45,83 +39,29 @@ from lca.framework.graph.strategy_registry import (
 
 
 class TestRegistry:
-    def test_three_strategies_registered(self) -> None:
+    def test_strategies_registered(self) -> None:
         reg = default_strategy_registry()
         kinds = {k.value for k in reg.kinds()}
-        assert {"phase_executor", "node_executor", "subgraph"}.issubset(kinds)
+        assert {"node_executor", "subgraph"}.issubset(kinds)
+        assert "phase_executor" not in kinds
 
     def test_resolve_returns_singleton(self) -> None:
         reg = default_strategy_registry()
-        s1 = reg.resolve(BindingKind.PHASE_EXECUTOR)
-        s2 = reg.resolve(BindingKind.PHASE_EXECUTOR)
+        s1 = reg.resolve(BindingKind.NODE_EXECUTOR)
+        s2 = reg.resolve(BindingKind.NODE_EXECUTOR)
         assert s1 is s2
 
     def test_unknown_kind_raises(self) -> None:
         reg = default_strategy_registry()
-        # Every BindingKind now has a registered strategy (PR-3..PR-6).
         for kind in BindingKind:
             reg.resolve(kind)
-        # Sanity: an empty registry raises for any kind.
         empty = StrategyRegistry()
         with pytest.raises(KeyError):
-            empty.resolve(BindingKind.PHASE_EXECUTOR)
-
-
-class TestPhaseExecutorStrategy:
-    @pytest.fixture
-    def runner(self) -> Any:
-        calls: list[dict[str, Any]] = []
-
-        def _runner(inp: PhaseInput, ctx: StrategyContext) -> PhaseResult:
-            calls.append({"inp": inp, "ctx": ctx})
-            return PhaseResult(result_kind="decision", payload={"chosen": "a"})
-
-        _runner.calls = calls  # type: ignore[attr-defined]
-        return _runner
-
-    async def test_execute_calls_runner(self, runner: Any) -> None:
-        strategy = PhaseExecutorStrategy(runner=runner)
-        ctx = StrategyContext(
-            plan_ref="p1",
-            node_id="perceive.main",
-            binding_kind=BindingKind.PHASE_EXECUTOR,
-            node_config={},
-        )
-        out = await strategy.execute(ctx, NodeInput(port_values={}, consumer_node="perceive.main"))
-        assert isinstance(out, NodeOutput)
-        assert out.producer_node == "perceive.main"
-        assert "decision" in out.port_values
-        assert runner.calls[0]["ctx"] is ctx  # type: ignore[attr-defined]
-
-    async def test_execute_requires_runner(self) -> None:
-        strategy = PhaseExecutorStrategy()
-        ctx = StrategyContext(
-            plan_ref="p1",
-            node_id="x",
-            binding_kind=BindingKind.PHASE_EXECUTOR,
-            node_config={},
-        )
-        with pytest.raises(RuntimeError, match="without runner"):
-            await strategy.execute(ctx, NodeInput())
+            empty.resolve(BindingKind.NODE_EXECUTOR)
 
     def test_resolve_executor_raises_when_lookup_missing(self) -> None:
         with pytest.raises(RuntimeError, match="no executor lookup"):
-            resolve_executor(None, binding=BindingKind.PHASE_EXECUTOR, node_id="x")
-
-    async def test_phase_error_routed_to_observation_port(self, runner: Any) -> None:
-        def _runner(inp: PhaseInput, ctx: StrategyContext) -> PhaseResult:
-            return PhaseResult(result_kind="phase_error", payload={"why": "boom"})
-
-        strategy = PhaseExecutorStrategy(runner=_runner)
-        ctx = StrategyContext(
-            plan_ref="p",
-            node_id="perceive.main",
-            binding_kind=BindingKind.PHASE_EXECUTOR,
-            node_config={},
-        )
-        out = await strategy.execute(ctx, NodeInput())
-        assert "observation" in out.port_values
-        assert out.port_values["observation"] == {"why": "boom"}
+            resolve_executor(None, binding=BindingKind.NODE_EXECUTOR, node_id="x")
 
 
 class TestNodeExecutorStrategy:
@@ -181,7 +121,6 @@ class TestSubgraphStrategy:
         with pytest.raises(FileNotFoundError):
             await strategy.execute(ctx, NodeInput(port_values={"decision": "x"}))
 
-    # Approach A: monkeypatch _load_subgraph_plan so we don't need a real bundle yaml.
     async def test_execute_seeds_inner_port_registry_with_outer_input(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -202,7 +141,6 @@ class TestSubgraphStrategy:
             captured["port_registry"] = port_registry
             return {"observation": "ok"}
 
-        # Stub the bundle yaml load so we don't touch disk.
         monkeypatch.setattr(
             sg_mod,
             "_load_subgraph_plan",
@@ -235,21 +173,43 @@ class TestSubgraphStrategy:
         assert ports is not None
         assert ports.snapshot()["response"] == "fake_llm_response_object"
 
-    async def test_max_depth_enforced(self) -> None:
-        strategy = SubgraphStrategy(
-            recursive_runner=lambda *_: {},
-            max_depth=1,
-            depth_counter=lambda: 5,
+    async def test_max_depth_enforced(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from lca.framework.graph.strategies import subgraph_strategy as sg_mod
+
+        monkeypatch.setattr(
+            sg_mod,
+            "_load_subgraph_plan",
+            lambda plan_ref, entry_node: Plan(
+                id="inner",
+                nodes=(),
+                edges=(),
+                declared_inputs=(),
+            ),
         )
-        ctx = StrategyContext(
-            plan_ref="p",
-            node_id="d",
-            binding_kind=BindingKind.SUBGRAPH,
-            node_config={},
-            subgraph_ref=SubgraphReference(plan_ref="x.yaml", entry_node="a", binding_edge="x"),
-        )
-        with pytest.raises(RuntimeError, match="subgraph recursion exceeded"):
-            await strategy.execute(ctx, NodeInput())
+        from lca.framework.graph.adapter import _enter_subgraph, _exit_subgraph
+
+        # Pre-set the depth context var so the strategy sees current_depth >= 1
+        # and increments past max_depth=1.
+        depth_token = _enter_subgraph()[1]
+        try:
+            strategy = SubgraphStrategy(
+                recursive_runner=lambda *_: {},
+                max_depth=1,
+                depth_counter=lambda: 5,
+            )
+            ctx = StrategyContext(
+                plan_ref="p",
+                node_id="d",
+                binding_kind=BindingKind.SUBGRAPH,
+                node_config={},
+                subgraph_ref=SubgraphReference(
+                    plan_ref="x.yaml", entry_node="a", binding_edge="x"
+                ),
+            )
+            with pytest.raises(RuntimeError, match="subgraph recursion exceeded"):
+                await strategy.execute(ctx, NodeInput())
+        finally:
+            _exit_subgraph(depth_token)
 
     async def test_requires_subgraph_ref(self) -> None:
         strategy = SubgraphStrategy(recursive_runner=lambda *_: {})
@@ -269,16 +229,16 @@ class TestSubgraphStrategy:
 
 
 class TestPlanSmoke:
-    def test_phase_node_in_plan(self) -> None:
+    def test_node_in_plan(self) -> None:
         p = Plan(
             id="p",
             nodes=(
-                PlanNode(id="a", binding=BindingKind.PHASE_EXECUTOR, entry=True),
+                PlanNode(id="a", binding=BindingKind.SUBGRAPH, entry=True),
                 PlanNode(id="b", binding=BindingKind.NODE_EXECUTOR),
             ),
             edges=(PlanEdge(source="a", target="b"),),
         )
-        assert p.node("a").binding is BindingKind.PHASE_EXECUTOR
+        assert p.node("a").binding is BindingKind.SUBGRAPH
 
 
 # Test helpers

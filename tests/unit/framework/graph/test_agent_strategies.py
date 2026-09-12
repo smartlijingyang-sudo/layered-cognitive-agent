@@ -130,10 +130,9 @@ class TestAgentFanoutStrategy:
 
 
 class TestRegistryAllBindings:
-    def test_all_ten_kinds_registered(self) -> None:
+    def test_all_nine_kinds_registered(self) -> None:
         kinds = {k.value for k in default_strategy_registry().kinds()}
         expected = {
-            "phase_executor",
             "node_executor",
             "subgraph",
             "agent_consult",

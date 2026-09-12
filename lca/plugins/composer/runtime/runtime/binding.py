@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING
 
 from lca.contracts.mechanisms import consume
 from lca.contracts.protocols.declarative.declarative_1.node_executor import NodeExecutor
-from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import PhaseExecutor
 from lca.contracts.protocols.session.resume.input import ResumeInputAdapter
 from lca.contracts.protocols.state.plan import CompiledRunPlan
 from lca.plugins.composer.runtime.runtime.deps import ProductionRuntimeDeps
@@ -31,7 +30,6 @@ def from_runtime_graph(
     graph: AgentGraph,
     capabilities: RuntimeCapabilityClosure,
     compiled_plan: CompiledRunPlan,
-    phase_executors: Mapping[str, PhaseExecutor],
     node_executors: Mapping[str, NodeExecutor],
     resume_input_adapter: ResumeInputAdapter,
 ) -> ProductionRuntimeDeps:
@@ -45,7 +43,6 @@ def from_runtime_graph(
         perceive_hub=graph.perceive_hub,
         reducer=capabilities.reducer,
         compiled_plan=compiled_plan,
-        phase_executors=phase_executors,
         node_executors=node_executors,
         phase_capabilities=graph.phase_capabilities,
         effect_handler_registry=capabilities.effect_handler_registry,
@@ -70,7 +67,6 @@ def build_production_runtime_bindings(
     """Freeze one complete production closure before a runtime factory runs."""
     return DeclarativeRuntimeBindings.assemble(
         plan=deps.compiled_plan,
-        phase_executors=deps.phase_executors,
         node_executors=deps.node_executors,
         capabilities=deps.runtime_phase_capabilities(),
         reducer=deps.reducer,
@@ -101,20 +97,14 @@ def bind_runtime_graph(
     plan: CompiledRunPlan,
     scope: Context,
 ) -> DeclarativeRuntimeBindings:
-    """Close one complete graph into immutable runtime bindings at one seam."""
+    """close one complete graph into immutable runtime bindings at one seam."""
     from lca.plugins.composer.runtime.runtime.capabilities import (
         require_complete_runtime_graph,
         resolve_node_executor_bindings,
-        resolve_phase_executor_bindings,
         resolve_resume_input_adapter,
     )
 
     require_complete_runtime_graph(graph)
-    from lca.harness.declarative.compile.subgraph_resolver import default_subgraph_resolver
-
-    phase_executors = resolve_phase_executor_bindings(
-        plan, scope, subgraph_resolver=default_subgraph_resolver()
-    )
     node_executors = resolve_node_executor_bindings(scope)
     resume_input_adapter = resolve_resume_input_adapter(
         spec,
@@ -124,7 +114,6 @@ def bind_runtime_graph(
         graph=graph,
         capabilities=capabilities,
         compiled_plan=plan,
-        phase_executors=phase_executors,
         node_executors=node_executors,
         resume_input_adapter=resume_input_adapter,
     )

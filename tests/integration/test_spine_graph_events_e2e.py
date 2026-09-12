@@ -240,7 +240,6 @@ def _force_module_register() -> None:
     """Touch the strategies so their module-level ``register_strategy`` fires."""
     from lca.framework.graph.strategies import (
         node_executor_strategy,  # noqa: F401
-        phase_executor_strategy,  # noqa: F401
         subgraph_strategy,  # noqa: F401
     )
 

@@ -22,7 +22,6 @@ class BindingKind(str, Enum):
     entry in the strategy registry — neither will silently default.
     """
 
-    PHASE_EXECUTOR = "phase_executor"
     NODE_EXECUTOR = "node_executor"
     SUBGRAPH = "subgraph"
     AGENT_CONSULT = "agent_consult"

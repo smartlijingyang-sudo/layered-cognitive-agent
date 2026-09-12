@@ -45,7 +45,7 @@ from lca.plugins.gate.decision_classifier_provider import DefaultDecisionClassif
 from lca.plugins.journal.artifact.closure_provider import DefaultArtifactClosure
 from lca.plugins.loop.reducer.plugin import DefaultReducer
 from lca.plugins.loop.state.stop_policy.plugin import DefaultStopPolicy
-from tests.phase_executors import standard_phase_executors
+
 
 
 def _state() -> AgentState:
@@ -88,7 +88,7 @@ class TestCheckpointResume:
     async def test_checkpoint_persists_via_state_store(self) -> None:
         store = InMemoryStateStore()
         plan = compile_plan(resolve_profile("profiles/web-standard.yaml"))
-        phase_executors: dict[str, object] = dict(standard_phase_executors())
+        node_executors: dict[str, object] = {}
 
         class _AllowContribution:
             async def execute(self, _context: object, _input: PhaseInput) -> PhaseResult:
@@ -103,7 +103,7 @@ class TestCheckpointResume:
         allow = _AllowContribution()
         for binding in plan.phase_bindings:
             for contribution in binding.contributions:
-                phase_executors[contribution.executor] = allow
+                node_executors[contribution.executor] = allow
 
         class _Mem:
             async def perceive(self, s: AgentState) -> AgentState:
@@ -156,7 +156,7 @@ class TestCheckpointResume:
                     "stop_policy": stop_policy,
                 },
                 compiled_plan=plan,
-                phase_executors=phase_executors,
+                node_executors=node_executors,
             )
         )
         result = await rt.run("checkpoint me", max_steps=3)

@@ -32,7 +32,7 @@ from lca.contracts.protocols.graph.node_io import (
 from lca.contracts.protocols.graph.ports import PortName
 from lca.contracts.protocols.graph.strategy import NodeStrategy, StrategyContext
 from lca.framework.graph.strategy_registry import (
-    PhaseExecutorLookup,
+    NodeExecutorLookup,
     register_strategy,
     resolve_executor,
 )
@@ -55,7 +55,7 @@ class NodeExecutorStrategy(NodeStrategy):
 
     kind: BindingKind = BindingKind.NODE_EXECUTOR
     schema: NodeIOSchema = field(default_factory=NodeIOSchema)
-    executor_lookup: PhaseExecutorLookup | None = None
+    executor_lookup: NodeExecutorLookup | None = None
     node_runtime_view_factory: Any = None
 
     async def execute(

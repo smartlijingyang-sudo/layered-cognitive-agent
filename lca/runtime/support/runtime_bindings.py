@@ -23,7 +23,6 @@ from lca.contracts.protocols.declarative.declarative_1.declarative_execution imp
     PhaseCapabilityReader,
 )
 from lca.contracts.protocols.declarative.declarative_1.node_executor import NodeExecutor
-from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import PhaseExecutor
 from lca.contracts.protocols.journal.artifact.closure import ArtifactClosure
 from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyStore
 from lca.contracts.protocols.memory.memory import MemorySystem
@@ -46,7 +45,6 @@ from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
 from lca.contracts.protocols.state.plan import CompiledRunPlan
 from lca.contracts.protocols.state.reducer import Reducer
 from lca.contracts.protocols.think.cognition import Brain, PerceiveHub
-from lca.harness.declarative import MappingRestrictedScope
 from lca.harness.declarative.lifecycle.phase_observation import PhaseObserver
 from lca.harness.plan import compiled_run_plan_ref
 from lca.runtime.loop.runtime_event_publisher import NullRuntimeLifecyclePublisher
@@ -119,7 +117,6 @@ class DeclarativeRuntimeBindings:
     """
 
     plan: CompiledRunPlan | None
-    phase_executors: Mapping[str, PhaseExecutor]
     node_executors: Mapping[str, NodeExecutor]
     capabilities: RuntimePhaseCapabilities
     reducer: Reducer
@@ -146,7 +143,6 @@ class DeclarativeRuntimeBindings:
         cls,
         *,
         plan: CompiledRunPlan | None,
-        phase_executors: Mapping[str, PhaseExecutor],
         node_executors: Mapping[str, NodeExecutor],
         capabilities: RuntimePhaseCapabilities,
         reducer: Reducer,
@@ -166,11 +162,10 @@ class DeclarativeRuntimeBindings:
         phase_observer: PhaseObserver,
         lifecycle_publisher: RuntimeLifecyclePublisher | None = None,
     ) -> DeclarativeRuntimeBindings:
-        """冻结阶段 executor 映射，防止运行开始后出现环境式重新绑定。"""
+        """冻结节点 executor 映射，防止运行开始后出现环境式重新绑定。"""
 
         return cls(
             plan=plan,
-            phase_executors=MappingProxyType(dict(phase_executors)),
             node_executors=MappingProxyType(dict(node_executors)),
             capabilities=capabilities,
             reducer=reducer,
@@ -196,16 +191,10 @@ class DeclarativeRuntimeBindings:
         return compiled_run_plan_ref(self.require_executable_plan())
 
     def require_executable_plan(self) -> CompiledRunPlan:
-        """Return the selected plan only when its phase executor seam is complete."""
-        if self.plan is None or not self.phase_executors:
+        """Return the selected plan once the bindings carry its node executors."""
+        if self.plan is None or not self.node_executors:
             raise ValueError(
-                "DeclarativeRuntimeBindings requires a compiled_plan and phase_executors."
-            )
-        required = {binding.executor_capability for binding in self.plan.phase_bindings}
-        missing = sorted(required.difference(self.phase_executors))
-        if missing:
-            raise ValueError(
-                "DeclarativeRuntimeBindings is missing phase executors: " + ", ".join(missing)
+                "DeclarativeRuntimeBindings requires a compiled_plan and node_executors."
             )
         return self.plan
 
@@ -222,18 +211,8 @@ class DeclarativeRuntimeBindings:
             state_store=self.state_store,
         )
 
-    def phase_scope(self) -> MappingRestrictedScope:
-        """Expose only the frozen phase executor scope to the interpreter."""
-        return MappingRestrictedScope(self.phase_executors)
-
     # Construct the profile-selected interpreter from this verified closure.
     def new_interpreter(self, *, journal: RuntimeJournal) -> DeclarativeInterpreter:
-        # Wire the resolved phase executor scope into the interpreter factory
-        # so that subgraph assembly can resolve step executors from the same
-        # Cordis scope (no hardcoded _PHASE_EXECUTOR_FACTORIES needed).
-        set_scope = getattr(self.interpreter_factory, "set_subgraph_scope", None)
-        if callable(set_scope):
-            set_scope(self.phase_scope())
         graph_observer = self._build_graph_observer()
         interpreter = self.interpreter_factory.create(
             journal=journal,
@@ -241,8 +220,6 @@ class DeclarativeRuntimeBindings:
             reducer=self.new_delta_reducer(),
             phase_observer=self.phase_observer,
             lifecycle_publisher=self.lifecycle_publisher,
-            phase_executors=dict(self.phase_executors),
-            phase_capabilities=self.capabilities,
             node_executors=dict(self.node_executors),
             node_executor_runtime_scope=self.capabilities,
             graph_observer=graph_observer,

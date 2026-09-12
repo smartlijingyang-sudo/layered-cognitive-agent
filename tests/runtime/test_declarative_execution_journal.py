@@ -45,7 +45,7 @@ async def test_declarative_execution_uses_the_injected_turn_journal() -> None:
     finalizer.finalize = AsyncMock(return_value="carrier-result")
     bindings = DeclarativeRuntimeBindings.assemble(
         plan=MagicMock(),
-        phase_executors={},
+        node_executors={},
         capabilities=RuntimePhaseCapabilities(
             {
                 "brain": MagicMock(),
@@ -133,13 +133,13 @@ async def test_declarative_execution_uses_the_injected_turn_journal() -> None:
     )
 
 
-def test_runtime_bindings_reject_missing_phase_executor() -> None:
-    """A non-empty executor map is insufficient when a plan binding is absent."""
+def test_runtime_bindings_reject_missing_plan() -> None:
+    """Bindings require a plan + node executors to be ready for a run."""
     bindings = DeclarativeRuntimeBindings.assemble(
         plan=SimpleNamespace(
             phase_bindings=(SimpleNamespace(executor_capability="phase.missing"),),
         ),
-        phase_executors={"phase.present": object()},
+        node_executors={"phase.present": object()},
         capabilities=MagicMock(),
         reducer=MagicMock(),
         hooks=MagicMock(),

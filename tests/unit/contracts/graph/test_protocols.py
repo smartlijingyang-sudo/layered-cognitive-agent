@@ -93,8 +93,8 @@ class TestNodeOutput:
 
 
 class TestBindingKind:
-    def test_ten_entries(self) -> None:
-        assert len(BindingKind) == 10
+    def test_nine_entries(self) -> None:
+        assert len(BindingKind) == 9
 
     def test_all_values_are_strings(self) -> None:
         for kind in BindingKind:
@@ -113,10 +113,10 @@ class TestSubgraphReference:
 class TestPlanNode:
     def test_max_visits_must_be_positive(self) -> None:
         with pytest.raises(ValidationError):
-            PlanNode(id="n", binding=BindingKind.PHASE_EXECUTOR, max_visits=0)
+            PlanNode(id="n", binding=BindingKind.NODE_EXECUTOR, max_visits=0)
 
     def test_default_values(self) -> None:
-        n = PlanNode(id="n", binding=BindingKind.PHASE_EXECUTOR)
+        n = PlanNode(id="n", binding=BindingKind.NODE_EXECUTOR)
         assert n.max_visits == 1
         assert n.terminal is False
         assert n.entry is False
@@ -131,7 +131,7 @@ class TestPlanEdge:
 
 class TestPlan:
     def _node(self, id_: str, *, entry: bool = False) -> PlanNode:
-        return PlanNode(id=id_, binding=BindingKind.PHASE_EXECUTOR, entry=entry)
+        return PlanNode(id=id_, binding=BindingKind.NODE_EXECUTOR, entry=entry)
 
     def test_exactly_one_entry_required(self) -> None:
         with pytest.raises(ValidationError):
@@ -177,7 +177,7 @@ class TestVisitRecord:
         r = VisitRecord(
             plan_ref="p",
             node_id="n",
-            binding_kind=BindingKind.PHASE_EXECUTOR,
+            binding_kind=BindingKind.NODE_EXECUTOR,
             inputs={"decision": 1},
             outputs={"observation": 2},
             dispatch=DispatchDecision(kind="terminal"),

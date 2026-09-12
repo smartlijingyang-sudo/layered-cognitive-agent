@@ -21,14 +21,14 @@ from lca.contracts.protocols.graph.binding import BindingKind
 from lca.contracts.protocols.graph.strategy import NodeStrategy
 
 
-class PhaseExecutorLookup(Protocol):
-    """Strategy-side seam to resolve an executor for one binding + node.
+class NodeExecutorLookup(Protocol):
+    """Strategy-side seam to resolve a node executor for one visit.
 
     The kernel does not know how to look up an executor. The strategy
-    receives a :class:`PhaseExecutorLookup` callable and uses it to
+    receives a :class:`NodeExecutorLookup` callable and uses it to
     fetch the right executor for the current node. Implementations live
     in the host (typically a Cordis-injected closure in tests, or the
-    production ``CapabilityKeyResolver`` in deployment).
+    production ``FactoryRegistry`` in deployment).
     """
 
     def __call__(self, *, binding: BindingKind, node_id: str, region: str | None) -> Any: ...
@@ -75,13 +75,13 @@ def default_strategy_registry() -> StrategyRegistry:
 
 
 def resolve_executor(
-    lookup: PhaseExecutorLookup | None,
+    lookup: NodeExecutorLookup | None,
     *,
     binding: BindingKind,
     node_id: str,
     region: str | None = None,
 ) -> Any:
-    """Helper: invoke a :class ``PhaseExecutorLookup`` or raise."""
+    """Helper: invoke a :class`NodeExecutorLookup` or raise."""
     if lookup is None:
         raise RuntimeError(
             f"no executor lookup registered; cannot resolve binding={binding.value!r} "
@@ -91,7 +91,7 @@ def resolve_executor(
 
 
 __all__ = [
-    "PhaseExecutorLookup",
+    "NodeExecutorLookup",
     "StrategyRegistry",
     "default_strategy_registry",
     "register_strategy",

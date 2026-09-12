@@ -88,7 +88,6 @@ def test_runtime_binding_adapter_owns_runtime_graph_mapping() -> None:
     assert "bind_runtime_graph(" in assembly_source
     assert "ProductionRuntimeDeps" not in assembly_source
     assert "ScopeCapabilityResolver" not in assembly_source
-    assert "resolve_phase_executor_bindings" not in assembly_source
     assert "resolve_resume_input_adapter" not in assembly_source
 
     assert "RESUME_INPUT_ADAPTERS" in capabilities_source
@@ -148,16 +147,10 @@ def test_runtime_binding_adapter_maps_one_complete_graph_to_bindings() -> None:
     spec = cast("AgentSpec", SimpleNamespace())
     resume_input_adapter = object()
 
-    with (
-        patch(
-            "lca.plugins.composer.runtime.runtime_capabilities.resolve_phase_executor_bindings",
-            return_value={"execute": object()},
-        ) as resolve_executors,
-        patch(
-            "lca.plugins.composer.runtime.runtime_capabilities.resolve_resume_input_adapter",
-            return_value=resume_input_adapter,
-        ) as resolve_resume_adapter,
-    ):
+    with patch(
+        "lca.plugins.composer.runtime.runtime_capabilities.resolve_resume_input_adapter",
+        return_value=resume_input_adapter,
+    ) as resolve_resume_adapter:
         bindings = bind_runtime_graph(
             closure,
             spec=spec,
@@ -166,7 +159,6 @@ def test_runtime_binding_adapter_maps_one_complete_graph_to_bindings() -> None:
             scope=scope,
         )
 
-    resolve_executors.assert_called_once_with(plan, scope)
     resolve_resume_adapter.assert_called_once_with(spec, closure.resume_input_adapters)
     assert bindings.reducer is closure.reducer
     assert bindings.effect_handler_registry is closure.effect_handler_registry
@@ -197,7 +189,6 @@ def test_production_runtime_deps_rejects_conflicting_phase_capabilities() -> Non
         perceive_hub=object(),
         reducer=object(),
         compiled_plan=object(),
-        phase_executors={},
         phase_capabilities={"brain": object()},
         effect_handler_registry=object(),
         delta_handler_registry=object(),

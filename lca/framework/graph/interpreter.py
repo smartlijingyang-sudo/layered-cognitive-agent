@@ -83,13 +83,11 @@ class PlanInterpreter:
     artifacts: Mapping[str, object] = field(default_factory=dict)
     observer: GraphObserver = field(default_factory=NullGraphObserver)
     clock: Clock = field(default=_default_clock)
-    # ADR-0219 §4 typed mirror of phase results: phase executors read prior
-    # phases through ``context.payload_of(phase, want)`` which reads from
-    # this mapping. The kernel populates it after each PHASE_EXECUTOR visit;
-    # the strategy passes it through ``context.node_config`` so the runner
-    # closure (which is per-adapter, not per-interpreter) can hand it to
-    # ``_build_phase_context`` without each interpreter needing its own
-    # bespoke runner.
+    # ADR-0219 §4 typed mirror: subgraph nodes that need to read prior
+    # phase results get them through ``context.node_config["results_by_phase"]``
+    # which is seeded from this field by the recursive runner. The
+    # kernel carries it across subgraph boundaries so nested runs see
+    # the same dict.
     results_by_phase: dict = field(default_factory=dict)
 
     async def run(
@@ -238,13 +236,12 @@ def _terminal_port_values(ports: PortRegistry, plan: Plan) -> dict[str, Any]:
 
 
 class _ResultView:
-    """Duck-typed view of a ``PhaseResult`` for the edge DSL predicate.
+    """Duck-typed view of :class:`NodeOutput` for the edge DSL predicate.
 
-    The legacy ``evaluate_restricted_predicate`` expects a result object
-    with ``result_kind`` and ``next_hints``. The new kernel carries that
-    data on :class:`NodeOutput`. ``_ResultView`` lets the interpreter
-    pass the kernel's typed output into the legacy predicate without
-    rebuilding a full ``PhaseResult``.
+    Edge predicates read ``result.result_kind`` and
+    ``result.next_hints``. The kernel stores both on
+    :class:`NodeOutput`; this view exposes them on a result-shaped
+    object so the predicate DSL stays ergonomic.
     """
 
     __slots__ = ("_output",)
@@ -261,10 +258,9 @@ class _ResultView:
         return self._output.next_hints or {}
 
     def __getattr__(self, name: str) -> Any:
-        # Kernel ``NodeOutput`` does not carry every PhaseResult field
-        # (``payload`` lives on the legacy result shape). Treat missing
-        # attributes as ``None`` so legacy edge predicates like
-        # ``result.payload == None`` resolve cleanly.
+        # Kernel ``NodeOutput`` does not carry every legacy result
+        # field; treat missing attributes as ``None`` so predicates
+        # like ``result.payload == None`` resolve cleanly.
         try:
             return getattr(self._output, name)
         except AttributeError:
@@ -272,14 +268,12 @@ class _ResultView:
 
 
 def _result_discriminator(output: NodeOutput) -> Any:
-    """Return a value the legacy edge predicate can read ``.result_kind`` on.
+    """Return a value the edge predicate can read ``.result_kind`` on.
 
     Always returns a :class:`_ResultView` so the predicate never
-    escapes with an AttributeError on missing fields like ``payload``.
-    The view's ``__getattr__`` returns ``None`` for fields the kernel
-    ``NodeOutput`` doesn't carry (``payload`` lives on the legacy
-    ``PhaseResult``, not on the kernel's typed output), which keeps
-    predicates like ``result.payload == None`` working.
+    escapes with an AttributeError on missing fields. The view's
+    ``__getattr__`` returns ``None`` for fields the kernel
+    ``NodeOutput`` doesn't carry.
     """
     return _ResultView(output)
 

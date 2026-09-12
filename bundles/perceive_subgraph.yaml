@@ -1,0 +1,22 @@
+# bundles/perceive_subgraph.yaml — perceive 单节点子图(Bundle Graph Schema v2,ADR-0217)。
+#
+# Framework 子树不再持有 PhaseExecutor/PhaseInput/PhaseResult 概念;
+# 顶层 plan 通过节点级 sub_spec_ref 进入本子图,kernel 通过 NodeExecutorStrategy
+# 派发 phase:perceive::phase.perceive.host。host 在 plugin 内部把 typed port 投影
+# 为标准 PhaseExecutor 输入并把 PhaseResult.payload 回写到 observation port。
+#
+# 单节点 + 单边(回到 host 边由 kernel 自动收口,无需显式返回边)。
+
+id: perceive.subgraph
+region: phase:perceive
+purpose: perceive 单步 — collect the profile-selected context manifest
+
+nodes:
+  - id: perceive.host
+    factory: phase.perceive.host
+    inputs: []
+    outputs: [observation]
+    config:
+      max_visits: 8
+
+edges: []

@@ -1,0 +1,20 @@
+# bundles/stop_subgraph.yaml — stop 单节点子图(Bundle Graph Schema v2,ADR-0217)。
+#
+# Framework 子树不再持有 PhaseExecutor/PhaseInput/PhaseResult 概念;
+# 顶层 plan 通过节点级 sub_spec_ref 进入本子图,kernel 通过 NodeExecutorStrategy
+# 派发 phase:stop::phase.stop.host。stop 是终态判定节点,发出 stop_decision port
+# 让外层边按 should_stop 路由。
+
+id: stop.subgraph
+region: phase:stop
+purpose: stop 单步 — consult stop policy and emit stop_decision port
+
+nodes:
+  - id: stop.host
+    factory: phase.stop.host
+    inputs: [decision, observation, reflection]
+    outputs: [stop_decision]
+    config:
+      max_visits: 8
+
+edges: []

@@ -41,9 +41,6 @@ if TYPE_CHECKING:
     from lca.contracts.harness.composition.composer import AgentGraph
     from lca.contracts.protocols import ArtifactClosure, Reducer
     from lca.contracts.protocols.act.effect.handler import EffectHandlerRegistry
-    from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
-        PhaseExecutor,
-    )
     from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyStore
     from lca.contracts.protocols.runtime.runtime.composition import (
         CheckpointStateResolverFactory,
@@ -184,57 +181,6 @@ def resolve_resume_input_adapter(
     return adapter
 
 
-def resolve_phase_executor_bindings(
-    plan: CompiledRunPlan,
-    scope: Context,
-    *,
-    subgraph_resolver: object | None = None,
-) -> dict[str, PhaseExecutor]:
-    """Resolve every executor declared by the plan before interpretation starts.
-
-    The graph interpreter receives a closed mapping rather than an ambient
-    Context. This preserves plan locality: phase selection is visible from the
-    immutable plan and cannot vary later because a Context gained a capability.
-
-    When ``subgraph_resolver`` is provided, bindings from referenced subgraph
-    plans are also resolved so that subgraph step executors are available in
-    the same scope as outer plan executors.
-    """
-    from lca.contracts.protocols.state.plan import CompiledRunPlan as _CRP
-
-    capabilities = {
-        capability
-        for phase_binding in plan.phase_bindings
-        for capability in (
-            phase_binding.executor_capability,
-            *(contribution.executor for contribution in phase_binding.contributions),
-        )
-    }
-    # Walk subgraph_ref edges and collect their bindings too.
-    if subgraph_resolver is not None and plan.phase_graph is not None:
-        for edge in plan.phase_graph.edges:
-            if edge.subgraph_ref is None:
-                continue
-            sub_plan = subgraph_resolver.resolve(edge.subgraph_ref.plan_ref)
-            if not isinstance(sub_plan, _CRP):
-                continue
-            for sub_binding in sub_plan.phase_bindings:
-                capabilities.add(sub_binding.executor_capability)
-                for contribution in sub_binding.contributions:
-                    capabilities.add(contribution.executor)
-    try:
-        resolver = ScopeCapabilityResolver.from_scope(scope)
-    except CapabilityResolutionError as exc:
-        raise MissingCapabilityError("phase executor binding requires a booted Context") from exc
-    try:
-        bindings = resolver.require_exact_bindings(capabilities)
-    except CapabilityResolutionError as exc:
-        raise MissingCapabilityError(str(exc)) from exc
-    return {
-        capability: cast("PhaseExecutor", executor) for capability, executor in bindings.items()
-    }
-
-
 def resolve_node_executor_bindings(
     scope: Context,
     *,
@@ -286,7 +232,6 @@ __all__ = [
     "RuntimeCapabilityClosure",
     "require_complete_runtime_graph",
     "resolve_node_executor_bindings",
-    "resolve_phase_executor_bindings",
     "resolve_resume_input_adapter",
     "resolve_runtime_capabilities",
 ]

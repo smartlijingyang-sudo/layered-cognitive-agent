@@ -1,0 +1,19 @@
+# bundles/reflect_subgraph.yaml — reflect 单节点子图(Bundle Graph Schema v2,ADR-0217)。
+#
+# Framework 子树不再持有 PhaseExecutor/PhaseInput/PhaseResult 概念;
+# 顶层 plan 通过节点级 sub_spec_ref 进入本子图,kernel 通过 NodeExecutorStrategy
+# 派发 phase:reflect::phase.reflect.host。
+
+id: reflect.subgraph
+region: phase:reflect
+purpose: reflect 单步 — score the just-finished turn against stop criteria
+
+nodes:
+  - id: reflect.host
+    factory: phase.reflect.host
+    inputs: [observation]
+    outputs: [reflection]
+    config:
+      max_visits: 8
+
+edges: []

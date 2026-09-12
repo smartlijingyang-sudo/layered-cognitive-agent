@@ -139,7 +139,7 @@ class TestLifter:
             "id": "p1",
             "entry": "a",
             "nodes": [
-                {"id": "a", "binding": "phase_executor", "entry": True},
+                {"id": "a", "binding": "node_executor", "entry": True},
                 {"id": "b", "binding": "node_executor"},
             ],
             "edges": [{"from": "a", "to": "b", "when": "true"}],
@@ -147,7 +147,7 @@ class TestLifter:
         plan = lift_graph_spec(spec)
         assert plan.id == "p1"
         assert len(plan.nodes) == 2
-        assert plan.nodes[0].binding is BindingKind.PHASE_EXECUTOR
+        assert plan.nodes[0].binding is BindingKind.NODE_EXECUTOR
         assert plan.edges[0].source == "a"
         assert plan.edges[0].target == "b"
 
@@ -202,7 +202,7 @@ class TestLifter:
             id="outer",
             phase_graph=_Graph(
                 nodes=[
-                    _Node(id="perceive", binding="phase.perceive", entry=True, max_visits=8),
+                    _Node(id="perceive", binding="node_executor", entry=True, max_visits=8),
                     _Node(id="think", binding=None, sub_spec_ref="sub.yaml"),
                 ],
                 edges=[_Edge(source="perceive", target="think")],
@@ -214,7 +214,7 @@ class TestLifter:
 
         lifted = lift_executable_plan(_Exec(plan=plan_obj))
         assert lifted.id == "outer"
-        assert lifted.nodes[0].binding is BindingKind.PHASE_EXECUTOR
+        assert lifted.nodes[0].binding is BindingKind.NODE_EXECUTOR
         assert lifted.nodes[1].binding is BindingKind.SUBGRAPH
 
 
@@ -304,16 +304,9 @@ def _registry_with_stubs(
     )
     registry.register(
         _StubStrategy(
-            kind=BindingKind.PHASE_EXECUTOR,
-            schema=NodeIOSchema(),
-            emit={"decision": "p"},
-        )
-    )
-    registry.register(
-        _StubStrategy(
             kind=BindingKind.NODE_EXECUTOR,
             schema=NodeIOSchema(),
-            emit={"decision": "n"},
+            emit={"decision": "p"},
         )
     )
     registry.register(

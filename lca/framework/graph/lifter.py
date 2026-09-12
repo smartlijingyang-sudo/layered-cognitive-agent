@@ -200,13 +200,6 @@ def _binding_from(value: object) -> BindingKind:
         try:
             return BindingKind(value)
         except ValueError:
-            # Legacy capability keys (e.g. "phase.perceive.standard",
-            # "phase.think.standard") name PhaseExecutors. Default
-            # anything phase.* to PHASE_EXECUTOR so legacy profiles
-            # lift without modification. New yaml should use the
-            # BindingKind value directly.
-            if value.startswith("phase."):
-                return BindingKind.PHASE_EXECUTOR
             if value.startswith("concept."):
                 return BindingKind.NODE_EXECUTOR
             raise ValueError(
@@ -248,9 +241,6 @@ def _binding_from_factory_or_binding(raw: Mapping[str, object]) -> BindingKind:
             "node spec must declare either 'binding' or 'factory'; "
             f"got neither in node keys={sorted(raw)}"
         )
-    factory_str = str(factory)
-    if factory_str.startswith("phase."):
-        return BindingKind.PHASE_EXECUTOR
     return BindingKind.NODE_EXECUTOR
 
 

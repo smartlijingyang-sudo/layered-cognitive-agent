@@ -97,7 +97,6 @@ class FixtureRuntimeAdapter:
             perceive_hub=resolved.perceive_hub,
             reducer=cast("Reducer", resolved.reducer),
             compiled_plan=cast("CompiledRunPlan", resolved.compiled_plan),
-            phase_executors=resolved.phase_executors,
             node_executors=resolved.node_executors,
             phase_capabilities=resolved.phase_capabilities,
             effect_handler_registry=cast("EffectHandlerRegistry", resolved.effect_handler_registry),
