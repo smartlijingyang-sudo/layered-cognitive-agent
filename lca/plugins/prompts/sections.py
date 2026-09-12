@@ -392,6 +392,7 @@ _REACT_TOOL_USAGE_TEXT = """<tool_usage_guidelines>
 - When no tools are needed: reply with text directly (pure text response ends the step)
 - Real-time news/search: follow search routing above, prefer web_search
 - Reply in standard Markdown format
+- If a previous tool call was rejected by the gate or returned an empty/error result, do not repeat the same invocation. Instead, produce a plain-text answer explaining what went wrong and stop.
 </tool_usage_guidelines>"""
 
 _ROUTING_INSTRUCTIONS_TEXT = """你是团队主导者（lead，自由路由模式）。
