@@ -7,14 +7,13 @@ import operator
 from collections.abc import Callable, Mapping
 from typing import Any, cast
 
-from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
+from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
     DeclarativeValidationError,
-    PhaseResult,
 )
 
 
 def evaluate_restricted_predicate(
-    expression: str, *, result: PhaseResult, artifacts: Mapping[str, object]
+    expression: str, *, result: Any, artifacts: Mapping[str, object]
 ) -> bool:
     """Evaluate the declarative edge DSL with a fixed, side-effect-free grammar."""
     if isinstance(expression, bool):

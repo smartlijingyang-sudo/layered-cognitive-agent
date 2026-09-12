@@ -118,7 +118,14 @@ def _resolve_default_predicate() -> object:
         from lca.harness.graph.predicate import evaluate_restricted_predicate
 
         return evaluate_restricted_predicate
-    except ImportError:
+    except ImportError as exc:
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "predicate evaluator fallback to _default_predicate: %s; "
+            "outer-plan edges with predicate expressions will misroute",
+            exc,
+        )
         return _default_predicate
 
 
