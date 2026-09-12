@@ -9,10 +9,12 @@ import contextlib
 import inspect
 import json
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import asdict, is_dataclass
 from typing import Any
 
 import structlog
+from pydantic import BaseModel
 
 from lca_kernel.events.fold.fold import EpochHeader, foldRequestHeader
 from lca_kernel.events.session.session import (
@@ -36,16 +38,42 @@ def _now_ms() -> int:
     return int(time.time() * 1000)
 
 
+def _to_jsonable(value: Any) -> Any:
+    """Lift Pydantic/dataclass/Sequence/primitive values into JSON-safe primitives.
+
+    The fact-plane boundary owns typed-container conversion: callers can hand
+    over ``ContextManifest``-shaped dataclasses or Pydantic models nested in a
+    Mapping without manually calling ``asdict``. Anything this converter does
+    not recognize stays a ``TypeError`` so silent loss of structure can't
+    sneak through.
+    """
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, BaseModel):
+        return _to_jsonable(value.model_dump(mode="python"))
+    if is_dataclass(value) and not isinstance(value, type):
+        return _to_jsonable(asdict(value))
+    if isinstance(value, Mapping):
+        return {str(k): _to_jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set, frozenset)) or (
+        isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray))
+    ):
+        return [_to_jsonable(v) for v in value]
+    raise TypeError(f"session event data 包含不可无损 JSON 序列化的值: {type(value).__name__}")
+
+
 def _snapshot_data(data: Mapping[str, Any]) -> dict[str, Any]:
     """无损 JSON 快照：校验可序列化性并与调用方可变输入脱钩。
 
-    对齐 dsh ``snapshotJsonValue``：校验与拷贝走同一遍序列化，日志里落的
-    是快照值，不是调用方引用的对象。``allow_nan=False`` 拒绝非 JSON 数值。
+    对齐 dsh ``snapshotJsonValue``：typed 容器(``BaseModel`` / dataclass /
+    Sequence)经 :func:`_to_jsonable` 在边界处提升为 JSON-safe 原语,然后再走
+    ``json.dumps`` 校验 + 拷贝。``allow_nan=False`` 拒绝非 JSON 数值。
     """
     if not isinstance(data, Mapping):
         raise TypeError(f"session event data 必须是 Mapping, got {type(data).__name__}")
+    lifted = _to_jsonable(data)
     try:
-        encoded = json.dumps(data, allow_nan=False)
+        encoded = json.dumps(lifted, allow_nan=False)
     except (TypeError, ValueError) as exc:
         raise TypeError(f"session event data 不是可无损 JSON 序列化的值: {exc}") from exc
     snapshot = json.loads(encoded)
