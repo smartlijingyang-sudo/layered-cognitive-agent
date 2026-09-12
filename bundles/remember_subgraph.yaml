@@ -10,14 +10,14 @@ region: phase:remember
 purpose: remember 双步执行 — write (mint envelope + dispatch) → fold (memory_receipt)
 
 nodes:
-  - id: remember.write
+  - id: phase.remember.write
     factory: phase.remember.write
     inputs: [decision, observation, reflection]
     outputs: [memory_receipt]
     config:
       max_visits: 1
 
-  - id: remember.fold
+  - id: phase.remember.fold
     factory: phase.remember.fold
     inputs: [memory_receipt]
     outputs: [memory_receipt]
@@ -25,6 +25,6 @@ nodes:
       max_visits: 1
 
 edges:
-  - from: remember.write
-    to: remember.fold
+  - from: phase.remember.write
+    to: phase.remember.fold
     when: true

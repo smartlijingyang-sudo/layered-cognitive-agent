@@ -1,0 +1,126 @@
+# bundles/phase_main_outer.yaml — outer plan, explicit phase topology.
+#
+# ADR-0221 P3 cutover: the v2 driver no longer reads
+# ``phase.topology.standard`` / ``phase.topology.bundle`` Cordis
+# providers. Topology is declared here as a v2 BundleGraphSpec
+# (ADR-0217) — the runtime kernel reads this yaml directly.
+#
+# Each ``phase.<x>.main`` node carries a ``sub_spec_ref`` that
+# delegates to the corresponding phase subgraph bundle. The interpreter
+# enters the subgraph via ``sub_spec_ref.entry_node`` and returns to
+# the outer traversal at ``sub_spec_ref.binding_edge``.
+#
+# Edges follow the legacy ``phase.edge.standard`` semantics:
+# ``should_stop`` short-circuits each phase to ``stop.main``; otherwise
+# the chain advances perceive → think → act → reflect → remember →
+# stop, looping back to perceive while ``should_stop`` is false.
+
+id: phase.main.outer
+region: phase:agent
+purpose: Six-phase outer plan (perceive → think → act → reflect → remember → stop) wired through sub_spec_ref into per-phase subgraphs.
+
+nodes:
+  - id: perceive.main
+    region: phase:perceive
+    max_visits: 8
+    entry: true
+    sub_spec_ref:
+      plan_ref: bundles/perceive_subgraph.yaml
+      entry_node: phase.perceive.observe
+      binding_edge: perceive.main
+    declared_inputs: []
+    declared_outputs: [perceive_payload]
+
+  - id: think.main
+    region: phase:think
+    max_visits: 8
+    sub_spec_ref:
+      plan_ref: bundles/think.yaml
+      entry_node: think.shortcut
+      binding_edge: think.main
+    declared_inputs: [perceive_payload]
+    declared_outputs: [decision]
+
+  - id: act.main
+    region: phase:act
+    max_visits: 8
+    sub_spec_ref:
+      plan_ref: bundles/act.yaml
+      entry_node: act.validate
+      binding_edge: act.main
+    declared_inputs: [decision]
+    declared_outputs: [act_outcome]
+
+  - id: reflect.main
+    region: phase:reflect
+    max_visits: 8
+    sub_spec_ref:
+      plan_ref: bundles/reflect_subgraph.yaml
+      entry_node: phase.reflect.score
+      binding_edge: reflect.main
+    declared_inputs: [act_outcome]
+    declared_outputs: [reflect_outcome]
+
+  - id: remember.main
+    region: phase:remember
+    max_visits: 8
+    sub_spec_ref:
+      plan_ref: bundles/remember_subgraph.yaml
+      entry_node: phase.remember.write
+      binding_edge: remember.main
+    declared_inputs: [reflect_outcome]
+    declared_outputs: [memory_record]
+
+  - id: stop.main
+    region: phase:stop
+    max_visits: 8
+    terminal: true
+    sub_spec_ref:
+      plan_ref: bundles/stop_subgraph.yaml
+      entry_node: phase.stop.should_check
+      binding_edge: stop.main
+    declared_inputs: [memory_record]
+    declared_outputs: [stop_decision]
+
+edges:
+  # perceive → stop on error short-circuit, else → think.
+  - from: perceive.main
+    to: stop.main
+    when: result.payload.should_stop == true and result.payload.reason == "error"
+  - from: perceive.main
+    to: think.main
+    when: true
+
+  # think → stop on error short-circuit, else → act.
+  - from: think.main
+    to: stop.main
+    when: result.payload.should_stop == true and result.payload.reason == "error"
+  - from: think.main
+    to: act.main
+    when: true
+
+  # act → stop on error short-circuit, else → reflect.
+  - from: act.main
+    to: stop.main
+    when: result.payload.should_stop == true and result.payload.reason == "error"
+  - from: act.main
+    to: reflect.main
+    when: true
+
+  # reflect → stop on error short-circuit, else → remember.
+  - from: reflect.main
+    to: stop.main
+    when: result.payload.should_stop == true and result.payload.reason == "error"
+  - from: reflect.main
+    to: remember.main
+    when: true
+
+  # remember → stop (always).
+  - from: remember.main
+    to: stop.main
+    when: true
+
+  # stop → perceive on continue (loop).
+  - from: stop.main
+    to: perceive.main
+    when: not result.payload.should_stop

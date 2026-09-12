@@ -170,8 +170,17 @@ class DeclarativeExecution:
                 else:
                     continue
             data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-            if "nodes" in data or "edges" in data:
-                return data
+            if not (isinstance(data, dict) and ("nodes" in data or "edges" in data)):
+                continue
+            # ADR-0221 P3 + outer-plan cutover: a phase subgraph bundle has
+            # ``id: <phase>.subgraph`` and is meant to be entered through a
+            # ``sub_spec_ref`` on the outer plan node, not executed as the
+            # outer plan itself. Skip any bundle whose id ends in
+            # ``.subgraph`` so the outer plan (id not ending in
+            # ``.subgraph``) is selected as the v2 graph spec.
+            if str(data.get("id", "")).endswith(".subgraph"):
+                continue
+            return data
         # No v2 graph found: emit a single empty Plan so the interpreter
         # at least runs end-to-end and the kernel can report the
         # completion back to the caller.

@@ -148,70 +148,39 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
         graph_observer: object | None = None,
         graph_clock: object | None = None,
     ) -> DeclarativeInterpreter:
-        # ADR-0221 P3: return the kernel-native ``PlanInterpreter``
-        # directly. The runtime-seam strategies are registered inline;
-        # the v0 ``PlanInterpreterAdapter`` shim is gone.
-        # Build a private registry that mirrors the framework defaults
-        # and wires the runtime-seam node-executor lookup into the
-        # ``NodeExecutorStrategy`` instance.
-        from lca.framework.graph.adapter import default_strategy_registry
+        # ADR-0221 P3 + outer-plan cutover: the kernel-native
+        # ``PlanInterpreterAdapter.__post_init__`` is the single source
+        # of truth for ``recursive_runner`` + ``executor_lookup`` wiring
+        # — building a fresh ``StrategyRegistry`` inline (the prior
+        # shape of this factory) only re-bound ``NodeExecutorStrategy``
+        # and left ``SubgraphStrategy.recursive_runner=None``, which
+        # raised at dispatch time once outer-plan nodes bound SUBGRAPH.
+        # Borrow the adapter's registry (already built with the
+        # runtime-seam closures wired) and hand it to a plain
+        # ``PlanInterpreter``; the caller (v2 driver) uses the
+        # ``outer_state=`` kwarg that ``PlanInterpreter.run`` expects.
+        from lca.framework.graph.adapter import PlanInterpreterAdapter
         from lca.framework.graph.interpreter import (
             NullGraphObserver,
             PlanInterpreter,
             _default_clock,
         )
-        from lca.framework.graph.strategies.node_executor_strategy import (
-            NodeExecutorStrategy,
+
+        host = PlanInterpreterAdapter(
+            node_executors=node_executors if isinstance(node_executors, Mapping) else None,
+            node_executor_runtime_scope=node_executor_runtime_scope,
+            graph_observer=graph_observer,
+            graph_clock=graph_clock,
         )
-        from lca.framework.graph.strategy_registry import StrategyRegistry
-
-        registry = StrategyRegistry()
-        executors_dict: dict[str, object] = {}
-        if node_executors is not None and isinstance(node_executors, Mapping):
-            executors_dict = dict(node_executors)
-        for kind in default_strategy_registry().kinds():
-            resolved = default_strategy_registry().resolve(kind)
-            if isinstance(resolved, NodeExecutorStrategy):
-                # Rebind the runtime-seam ``executor_lookup`` and
-                # ``node_runtime_view_factory`` onto the fresh
-                # registry so node_executors + agent_state reach the
-                # strategy.
-                def _view(agent_state, _scope=node_executor_runtime_scope):
-                    class _View:
-                        __slots__ = ("_scope", "_state")
-
-                        def __init__(self):
-                            self._state = agent_state
-                            self._scope = _scope
-
-                        @property
-                        def state(self):
-                            return self._state
-
-                        def __getattr__(self, key):
-                            scope = self._scope
-                            if scope is None:
-                                return None
-                            getter = getattr(scope, "get", None) or getattr(scope, "resolve", None)
-                            if getter is None:
-                                return None
-                            try:
-                                return getter(key)
-                            except (KeyError, AttributeError, TypeError):
-                                return None
-
-                    return _View()
-
-                resolved = NodeExecutorStrategy(
-                    executor_lookup=lambda *, binding, node_id, region: executors_dict.get(node_id),
-                    node_runtime_view_factory=_view,
-                )
-            registry.register(resolved)
-
         return PlanInterpreter(
-            registry=registry,
+            registry=host.registry,
             observer=graph_observer or NullGraphObserver(),
-            clock=graph_clock or _default_clock,  # store the callable, not the result
+            clock=graph_clock or _default_clock,
+        )
+        return PlanInterpreter(
+            registry=host.registry,
+            observer=graph_observer or NullGraphObserver(),
+            clock=graph_clock or _default_clock,
         )
 
 

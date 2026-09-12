@@ -456,6 +456,29 @@ class _NodeRuntimeView:
     def state(self) -> Any:
         return self._state
 
+    def get(self, key: str) -> Any:
+        """Capability lookup used by node plugins that read
+        ``context.runtime.<name>`` via the legacy ``runtime.get(name)``
+        pattern (e.g. ``PerceiveObserveExecutor``). Delegates to the
+        underlying scope so missing capabilities return ``None``;
+        ``"state"`` / ``"agent_state"`` are the outer :class:`AgentState`
+        and resolve through the view's own slot.
+        """
+        if key in ("state", "agent_state"):
+            return self._state
+        scope = object.__getattribute__(self, "_scope")
+        if scope is None:
+            return None
+        getter = getattr(scope, "get", None)
+        if getter is None:
+            getter = getattr(scope, "resolve", None)
+        if getter is None:
+            return None
+        try:
+            return getter(key)
+        except (KeyError, AttributeError, TypeError):
+            return None
+
     def __getattr__(self, key: str) -> Any:
         scope = object.__getattribute__(self, "_scope")
         if scope is None:

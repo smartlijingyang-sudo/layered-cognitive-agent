@@ -16,58 +16,10 @@
 # delete-when: All production profiles migrated to region-tag path AND
 # ADR-0210 升 Accepted.
 entries:
-  - id: phase.topology.standard
-    name: phase_topology_standard
-    $module: lca.plugins.loop.graph.topology.standard.plugin
-    config:
-      nodes:
-        - id: perceive.main
-          phase: perceive
-          max_visits: 8
-          entry: true
-          # ADR-0221: phase main is subgraph-driven; no phase.<x>.standard
-          # binding remains. The interpreter enters the subgraph via
-          # ``sub_spec_ref`` and dispatches NodeExecutor plugins.
-          sub_spec_ref:
-            plan_ref: bundles/perceive_subgraph.yaml
-            entry_node: perceive.observe
-            binding_edge: perceive.main
-        - id: think.main
-          phase: think
-          max_visits: 8
-          sub_spec_ref:
-            plan_ref: bundles/think.yaml
-            entry_node: think.shortcut
-            binding_edge: think.main
-        - id: act.main
-          phase: act
-          max_visits: 8
-          sub_spec_ref:
-            plan_ref: bundles/act.yaml
-            entry_node: act.validate
-            binding_edge: act.main
-        - id: reflect.main
-          phase: reflect
-          max_visits: 8
-          sub_spec_ref:
-            plan_ref: bundles/reflect_subgraph.yaml
-            entry_node: reflect.score
-            binding_edge: reflect.main
-        - id: remember.main
-          phase: remember
-          max_visits: 8
-          sub_spec_ref:
-            plan_ref: bundles/remember_subgraph.yaml
-            entry_node: remember.write
-            binding_edge: remember.main
-        - id: stop.main
-          phase: stop
-          max_visits: 8
-          terminal: true
-          sub_spec_ref:
-            plan_ref: bundles/stop_subgraph.yaml
-            entry_node: stop.should_check
-            binding_edge: stop.main
+  # ADR-0221 P3 + outer-plan cutover: the legacy ``phase.topology.standard``
+  # Cordis provider is gone; outer plan topology lives in
+  # ``bundles/phase_main_outer.yaml``. Profiles that previously relied on
+  # this entry now pull ``phase_main_outer.yaml`` into their bundles list.
 
   # 生产默认值：非副作用阶段可处理瞬时故障；动作阶段依赖 Effect Gateway 的
   # 幂等语义，超时后不重放。所有常规阶段耗尽后均由图显式收敛至 stop。

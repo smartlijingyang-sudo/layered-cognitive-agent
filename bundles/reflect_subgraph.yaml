@@ -11,14 +11,14 @@ region: phase:reflect
 purpose: reflect 双步执行 — score (reflection pipeline) → admit_recovery (recovery hint)
 
 nodes:
-  - id: reflect.score
+  - id: phase.reflect.score
     factory: phase.reflect.score
     inputs: [observation]
     outputs: [reflection]
     config:
       max_visits: 1
 
-  - id: reflect.admit_recovery
+  - id: phase.reflect.admit_recovery
     factory: phase.reflect.admit_recovery
     inputs: [observation, reflection]
     outputs: [reflection, admit_recovery]
@@ -26,6 +26,6 @@ nodes:
       max_visits: 1
 
 edges:
-  - from: reflect.score
-    to: reflect.admit_recovery
+  - from: phase.reflect.score
+    to: phase.reflect.admit_recovery
     when: true

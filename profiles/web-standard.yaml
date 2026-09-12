@@ -19,10 +19,10 @@ bundles:
   - bundles/observation-9module.yaml
   - bundles/web-app.yaml
   - bundles/scenario-cordis-creator.yaml
-  - bundles/declarative-phase-graph.yaml
   - bundles/loop_cursor.spine_default.yaml
   - bundles/session-runtime.yaml
   - bundles/event-bus-components.yaml
+  - bundles/phase_main_outer.yaml
   - bundles/think.yaml
   - bundles/act.yaml
   - bundles/perceive_subgraph.yaml
@@ -39,60 +39,9 @@ patch:
       runs_root: traces/runs
 
   # Patch topology to add PR-C (ADR-0214 §6.3) PG-007 preconditions and
-  # terminal predicates on perceive.main. Each phase main carries a
-  # node-level sub_spec_ref (Node Note 2026-09-09-phase-node-sub-spec-ref,
-  # ADR-0217 BundleGraphSpec v2) that delegates to the phase's subgraph
-  # bundle; the interpreter enters the subgraph via ``sub_spec_ref``
-  # and dispatches NodeExecutor plugins (think/act pattern; six-phase
-  # subgraph cutover 2026-09-12). Framework subtree no longer sees
-  # PhaseExecutor/PhaseInput/PhaseResult.
-  - id: phase.topology.standard
-    config:
-      nodes:
-        - id: perceive.main
-          phase: perceive
-          max_visits: 8
-          entry: true
-          # PR-C (ADR-0214 §6.3): PG-007 三件套
-          precondition: perceive.has_minimum_context
-          terminal_predicate: perceive.context_complete
-          sub_spec_ref:
-            plan_ref: bundles/perceive_subgraph.yaml
-            entry_node: perceive.host
-            binding_edge: perceive.main
-        - id: think.main
-          phase: think
-          max_visits: 8
-          sub_spec_ref:
-            plan_ref: bundles/think.yaml
-            entry_node: think.shortcut
-            binding_edge: think.main
-        - id: act.main
-          phase: act
-          max_visits: 8
-          sub_spec_ref:
-            plan_ref: bundles/act.yaml
-            entry_node: act.validate
-            binding_edge: act.main
-        - id: reflect.main
-          phase: reflect
-          max_visits: 8
-          sub_spec_ref:
-            plan_ref: bundles/reflect_subgraph.yaml
-            entry_node: reflect.host
-            binding_edge: reflect.main
-        - id: remember.main
-          phase: remember
-          max_visits: 8
-          sub_spec_ref:
-            plan_ref: bundles/remember_subgraph.yaml
-            entry_node: remember.host
-            binding_edge: remember.main
-        - id: stop.main
-          phase: stop
-          max_visits: 8
-          terminal: true
-          sub_spec_ref:
-            plan_ref: bundles/stop_subgraph.yaml
-            entry_node: stop.host
-            binding_edge: stop.main
+  # Outer plan topology is declared declaratively in
+  # ``bundles/phase_main_outer.yaml`` (added above); no Cordis
+  # topology-provider patch is needed on this profile anymore.
+  # The legacy ``phase.topology.standard`` patch was removed as part
+  # of the outer-plan cutover (ADR-0221 P3 + topology-provider
+  # retirement).

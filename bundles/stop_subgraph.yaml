@@ -15,14 +15,14 @@ region: phase:stop
 purpose: stop 多步执行 — should_check (stop_policy) → focus (consecutive stagnant converge)
 
 nodes:
-  - id: stop.should_check
+  - id: phase.stop.should_check
     factory: phase.stop.should_check
     inputs: [decision, observation, reflection]
     outputs: [stop_decision]
     config:
       max_visits: 1
 
-  - id: stop.focus
+  - id: phase.stop.focus
     factory: phase.stop.focus
     inputs: [stop_decision, memory_receipt]
     outputs: [stop_payload]
@@ -30,6 +30,6 @@ nodes:
       max_visits: 1
 
 edges:
-  - from: stop.should_check
-    to: stop.focus
+  - from: phase.stop.should_check
+    to: phase.stop.focus
     when: true

@@ -13,12 +13,12 @@ region: phase:perceive
 purpose: perceive 双步执行 — observe (PerceiveHub) → fold (manifest → observation)
 
 nodes:
-  - id: perceive.observe
+  - id: phase.perceive.observe
     factory: phase.perceive.observe
     config:
       max_visits: 1
 
-  - id: perceive.fold
+  - id: phase.perceive.fold
     factory: phase.perceive.fold
     inputs: [manifest]
     outputs: [observation]
@@ -26,6 +26,6 @@ nodes:
       max_visits: 1
 
 edges:
-  - from: perceive.observe
-    to: perceive.fold
+  - from: phase.perceive.observe
+    to: phase.perceive.fold
     when: true

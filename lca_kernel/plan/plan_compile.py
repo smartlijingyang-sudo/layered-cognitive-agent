@@ -79,9 +79,19 @@ def _wrap_v2_plan(plan, *, resolved):
             else:
                 continue
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-        if "nodes" in data or "edges" in data:
-            graph_spec = data
-            break
+        if not (isinstance(data, dict) and ("nodes" in data or "edges" in data)):
+            continue
+        # ADR-0221 P3 + outer-plan cutover: a phase subgraph bundle has
+        # ``id: <phase>.subgraph`` and is meant to be entered through a
+        # ``sub_spec_ref`` on the outer plan node, not executed as the
+        # outer plan itself. Skip any bundle whose id ends in
+        # ``.subgraph`` so the outer plan (``id`` not ending in
+        # ``.subgraph``) is selected as the v2 graph spec.
+        bundle_id = str(data.get("id", ""))
+        if bundle_id.endswith(".subgraph"):
+            continue
+        graph_spec = data
+        break
     # ADR-0221 P3: when no node carries ``entry: true``, mark the first
     # node as the entry so the v2 traversal has a starting point.
     nodes = graph_spec.get("nodes") or []
