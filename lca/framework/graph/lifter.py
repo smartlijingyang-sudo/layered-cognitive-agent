@@ -47,7 +47,6 @@ def lift_graph_spec(spec: Mapping[str, Any]) -> Plan:
         if not node_id:
             raise ValueError(f"plan {spec_id!r}: node id must be non-empty")
         binding = _binding_from_factory_or_binding(raw)
-        schema = _schema_from(raw.get("inputs"), raw.get("outputs"))
         # Legacy think/act yaml nests ``sub_spec_ref`` under ``config:``;
         # v2 puts it at the top level. Probe both surfaces so the
         # :class:`PlanNode.subgraph_ref` is populated regardless.
@@ -56,6 +55,18 @@ def lift_graph_spec(spec: Mapping[str, Any]) -> Plan:
         if sub_spec_raw is None and isinstance(config_raw, Mapping):
             sub_spec_raw = config_raw.get("sub_spec_ref")
         subgraph_ref = _subgraph_ref_from(sub_spec_raw)
+        # When a node delegates to a subgraph, the inner entry's
+        # io_schema is the SSOT for the outer port contract. The
+        # outer kernel needs to read the right inputs from its
+        # registry (e.g. ``decision`` for act.main) and write the
+        # right outputs back, regardless of whether the outer yaml
+        # uses ``inputs:`` or ``declared_inputs:`` on the node. Match
+        # ``lift_executable_plan`` so v2 driver parity holds.
+        schema = (
+            _subgraph_entry_schema(subgraph_ref)
+            if subgraph_ref is not None
+            else _schema_from(raw.get("inputs"), raw.get("outputs"))
+        )
         nodes.append(
             PlanNode(
                 id=node_id,
