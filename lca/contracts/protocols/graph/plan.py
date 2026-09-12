@@ -53,9 +53,18 @@ class PlanNode(BaseModel):
     terminal: bool = False
     entry: bool = False
     subgraph_ref: SubgraphReference | None = None
+    # Inner-facing schema for subgraph nodes (ADR-0217 §3.3.3 +
+    # first-principle port-naming fix). When the YAML declares
+    # ``declared_inputs``/``declared_outputs`` that differ from the
+    # inner entry's ``inputs``/``outputs``, ``io_schema`` carries the
+    # outer-facing names (YAML) and ``inner_io_schema`` carries the
+    # inner entry's names. :class:`SubgraphStrategy` uses both to
+    # translate port values across the seam. ``None`` for non-subgraph
+    # nodes and for legacy plans whose outer/inner names coincide.
+    inner_io_schema: NodeIOSchema | None = None
 
     @model_validator(mode="after")
-    def _max_visits_positive(self) -> "PlanNode":
+    def _max_visits_positive(self) -> PlanNode:
         if self.max_visits <= 0:
             raise ValueError(f"node {self.id!r}: max_visits must be > 0, got {self.max_visits}")
         return self
@@ -95,7 +104,7 @@ class Plan(BaseModel):
     declared_inputs: tuple[PortName, ...] = ()
 
     @model_validator(mode="after")
-    def _one_entry(self) -> "Plan":
+    def _one_entry(self) -> Plan:
         entries = [n.id for n in self.nodes if n.entry]
         if len(self.nodes) > 0 and len(entries) != 1:
             raise ValueError(

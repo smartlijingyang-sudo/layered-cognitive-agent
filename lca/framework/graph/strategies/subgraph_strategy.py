@@ -134,10 +134,43 @@ class SubgraphStrategy(NodeStrategy):
                 f"plan_ref={context.plan_ref!r} node_id={context.node_id!r}"
             )
         sub_plan = _load_subgraph_plan(ref.plan_ref, ref.entry_node)
+        # First-principle port-name translation at the subgraph seam.
+        # The outer kernel hands us ports keyed by the outer-facing
+        # names (``node.io_schema.inputs`` — YAML's ``declared_inputs``
+        # when set, else inner entry's ``inputs``). The inner subgraph
+        # entry reads from ports keyed by the inner-facing names
+        # (``sub_plan.node(entry).io_schema.inputs``). When the two
+        # differ — e.g. ``phase_main_outer.yaml::reflect.main`` declares
+        # ``declared_inputs: [act_outcome]`` but the inner subgraph
+        # reads ``observation`` — we must translate before seeding the
+        # inner port registry. Otherwise the inner looks up a name
+        # (``observation``) it never gets and either crashes or falls
+        # back to whatever stale value the outer port registry happens
+        # to leak from an earlier phase (the original ``ContextManifest``
+        # bug). ``inner_io_schema`` is ``None`` for legacy plans where
+        # outer and inner names coincide; in that case identity is the
+        # correct translation and the existing test contract holds.
+        inner_schema = context.inner_io_schema
+        outer_input_names: tuple[str, ...] = tuple(input.port_values.keys())
+        translated_input: dict[str, Any] = dict(input.port_values)
+        if inner_schema is not None and inner_schema.inputs:
+            inner_input_names = tuple(p.name for p in inner_schema.inputs)
+            if len(outer_input_names) == len(inner_input_names):
+                translated_input = {
+                    inner_input_names[i]: input.port_values[outer_input_names[i]]
+                    for i in range(len(outer_input_names))
+                }
+            elif outer_input_names and not inner_input_names:
+                # Outer declares inputs but inner doesn't list any;
+                # treat inner as accepting whatever the outer sends.
+                translated_input = dict(input.port_values)
+            elif inner_input_names and not outer_input_names:
+                # Inner declares inputs but outer sent none; pass empty.
+                translated_input = {}
         outer_ports: PortRegistry | None = None
-        if input.port_values:
+        if translated_input:
             outer_ports = PortRegistry()
-            outer_ports.set_outer_input(input.port_values)
+            outer_ports.set_outer_input(translated_input)
         self._observe_enter(context, ref, depth)
         try:
             outcome = self.recursive_runner(sub_plan, outer_state, depth, outer_ports, outer_mirror)
@@ -151,13 +184,31 @@ class SubgraphStrategy(NodeStrategy):
                 _exit_subgraph(depth_token)
             raise
         merged_output: Mapping[str, Any] = outcome  # type: ignore[assignment]
+        # Translate inner output port names back to outer output names.
+        # Same positional mapping as inputs: when YAML declared outputs
+        # differ from inner entry outputs, position-wise rename the
+        # merged dict so the outer kernel indexes ``act_outcome``
+        # rather than ``receipt``, ``reflect_outcome`` rather than
+        # ``admit_recovery``, and so on.
+        outer_output: dict[str, Any] = dict(merged_output)
+        if inner_schema is not None and inner_schema.outputs:
+            inner_output_names = tuple(p.name for p in inner_schema.outputs)
+            outer_declared_outputs = _outer_declared_outputs(context)
+            if outer_declared_outputs and len(outer_declared_outputs) == len(
+                inner_output_names
+            ):
+                outer_output = {
+                    outer_declared_outputs[i]: merged_output.get(inner_output_names[i])
+                    for i in range(len(outer_declared_outputs))
+                    if inner_output_names[i] in merged_output
+                }
         self._observe_exit(context, ref, depth, outcome="success", error="")
         if depth_token is not None:
             from lca.framework.graph.adapter import _exit_subgraph
 
             _exit_subgraph(depth_token)
         return NodeOutput(
-            port_values=dict(merged_output),
+            port_values=outer_output,
             producer_node=context.node_id,
         )
 
@@ -216,6 +267,21 @@ def _now_ms(clock: Callable[[], int] | None) -> int:
 
         return _time.monotonic_ns() // 1_000_000
     return clock()
+
+
+def _outer_declared_outputs(context: StrategyContext) -> tuple[str, ...]:
+    """Return the YAML's ``declared_outputs`` for the outer node, if any.
+
+    The lifter copies the entire raw yaml node mapping into
+    ``PlanNode.config``; ``SubgraphStrategy`` reads
+    ``declared_outputs`` from there to know the outer-facing output
+    names. Returns ``None`` when YAML omits the field (legacy plans
+    where outer names coincide with inner entry names).
+    """
+    declared = context.node_config.get("declared_outputs") if context.node_config else None
+    if isinstance(declared, (list, tuple)) and declared:
+        return tuple(str(name) for name in declared)
+    return ()
 
 
 def _load_subgraph_plan(plan_ref: str, entry_node: str) -> Plan:

@@ -21,8 +21,7 @@ from pydantic import BaseModel, ConfigDict
 
 from lca.contracts.protocols.graph.binding import BindingKind
 from lca.contracts.protocols.graph.node_io import NodeInput, NodeIOSchema, NodeOutput
-from lca.contracts.protocols.graph.plan import PlanEdge, SubgraphReference
-from lca.contracts.protocols.graph.ports import PortName
+from lca.contracts.protocols.graph.plan import SubgraphReference
 
 
 class StrategyContext(BaseModel):
@@ -42,6 +41,13 @@ class StrategyContext(BaseModel):
     node_config: Mapping[str, Any]
     subgraph_ref: SubgraphReference | None = None
     chain: tuple[str, ...] = ()
+    # Inner-facing port schema for subgraph nodes (first-principle
+    # port-naming fix). ``None`` means outer port names coincide with
+    # inner entry port names (identity translation). ``SubgraphStrategy``
+    # reads this to translate outer input ports → inner input ports and
+    # inner output ports → outer output ports at the subgraph seam;
+    # other strategies ignore it.
+    inner_io_schema: NodeIOSchema | None = None
 
 
 @runtime_checkable

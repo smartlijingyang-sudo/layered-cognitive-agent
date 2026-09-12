@@ -21,7 +21,11 @@ nodes:
   - id: phase.reflect.admit_recovery
     factory: phase.reflect.admit_recovery
     inputs: [observation, reflection]
-    outputs: [reflection, admit_recovery]
+    # admit_recovery is intentionally NOT a port — it would have no
+    # PortName registration and no port_values consumer. The recovery
+    # routing hint flows via next_hint → kernel.next_hints and is read
+    # by the recovery edge predicate (declarative-recovery.yaml).
+    outputs: [reflection]
     config:
       max_visits: 1
 

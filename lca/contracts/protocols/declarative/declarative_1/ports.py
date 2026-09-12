@@ -39,6 +39,19 @@ D5 mapping (each port name has one or more D4 consumers):
 - ``stop_decision``         stop.policy                 →  outer interpreter
 - ``stop_payload``          stop.policy                 →  outer interpreter
 
+Outer-flow-control port names (first-principle fix for the
+``ContextManifest`` reflect bug; ``bundles/phase_main_outer.yaml``
+declares these as ``declared_inputs``/``declared_outputs`` and the
+kernel uses them as the typed projection between phase main subgraphs
+— see ADR-0219 §5.1 + the kernel's :class:`SubgraphStrategy`
+positional translation. Each has one writer (the upstream phase main)
+and one reader (the next phase main):
+
+- ``perceive_payload``      perceive.main   →  think.main
+- ``act_outcome``           act.main        →  reflect.main
+- ``reflect_outcome``       reflect.main    →  remember.main
+- ``memory_record``         remember.main   →  stop.main
+
 Historical (deleted, no D4 consumer — see ADR-0219 §7.2):
 
 - ``think_signal``          retired 2026-09-10 (was think.gate invented field)
@@ -52,6 +65,7 @@ from __future__ import annotations
 from typing import Literal
 
 PortName = Literal[
+    "act_outcome",
     "candidates",
     "context",
     "context_items",
@@ -65,13 +79,16 @@ PortName = Literal[
     "intent",
     "manifest",
     "memory_receipt",
+    "memory_record",
     "observation",
     "observations",
+    "perceive_payload",
     "prompt_template",
     "prompt_text",
     "prompt_trace",
     "raw_inputs",
     "receipt",
+    "reflect_outcome",
     "reflection",
     "render",
     "response",
