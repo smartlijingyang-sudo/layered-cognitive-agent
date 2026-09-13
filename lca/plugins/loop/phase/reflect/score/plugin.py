@@ -11,8 +11,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.enums.enums import ContentType
 from lca.contracts.atoms.functional.group import FunctionalGroup
+from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.atoms.scope.scope import Scope
+from lca.contracts.harness.act.effect_receipt import EffectOutcome, EffectReceipt
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
     AuthorityContract,
@@ -21,6 +24,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
+from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -32,6 +36,30 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.think.cognition import Brain
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+
+
+def _normalize_observation(value: object) -> object:
+    """Convert an ``EffectReceipt`` to an ``Observation`` at the reflect boundary.
+
+    ADR-0220 separates the act-world receipt from the reflect-world
+    observation. Downstream reflection primitives (critic, memory) expect
+    ``Observation.success``; the receipt exposes ``outcome`` instead.
+    """
+    if isinstance(value, EffectReceipt):
+        return Observation(
+            observation_id=new_id("obs"),
+            success=value.outcome is EffectOutcome.SUCCEEDED,
+            payload=None,
+            content_type=ContentType.TEXT,
+            error=value.error_code,
+            extra={
+                "effect_receipt_invocation_id": value.invocation_id,
+                "effect_receipt_provider": value.provider,
+                "effect_receipt_error_code": value.error_code,
+                "effect_receipt_retryable": value.retryable,
+            },
+        )
+    return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,7 +77,7 @@ class ReflectScoreExecutor:
         input: NodeInput,
     ) -> NodeOutput:
         runtime = context.runtime or {}
-        observation = input.port_values.get("observation")
+        observation = _normalize_observation(input.port_values.get("observation"))
         pipeline = runtime.get("cognitive_reflection_pipeline")
         brain = runtime.get("brain")
         payload: object | None = None

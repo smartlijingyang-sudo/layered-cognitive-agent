@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
+from lca.contracts.harness.act.effect_receipt import EffectOutcome, EffectReceipt
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
     AuthorityContract,
@@ -42,6 +43,8 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 def _is_failure(observation: object) -> bool:
     if observation is None:
         return True
+    if isinstance(observation, EffectReceipt):
+        return observation.outcome is not EffectOutcome.SUCCEEDED
     if isinstance(observation, Mapping):
         success = observation.get("success")
         return success is False or success is None

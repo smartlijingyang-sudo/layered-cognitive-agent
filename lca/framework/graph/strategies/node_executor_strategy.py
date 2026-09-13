@@ -61,12 +61,15 @@ class NodeExecutorStrategy(NodeStrategy):
     async def execute(
         self, context: StrategyContext, input: NodeInput
     ) -> NodeOutput:
+        import sys
+        print(f"[NodeExecutorStrategy] Executing node: {context.node_id}", file=sys.stderr)
         executor = resolve_executor(
             self.executor_lookup,
             binding=self.kind,
             node_id=context.node_id,
             region=None,
         )
+        print(f"[NodeExecutorStrategy] Found executor: {type(executor).__name__}", file=sys.stderr)
         agent_state = dict(context.node_config or {}).get("agent_state")
         runtime = self._build_runtime(agent_state)
         legacy_ctx = LegacyNodeContext(

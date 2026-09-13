@@ -15,8 +15,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.enums.enums import ContentType
 from lca.contracts.atoms.functional.group import FunctionalGroup
+from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.atoms.scope.scope import Scope
+from lca.contracts.harness.act.effect_receipt import EffectOutcome, EffectReceipt
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
     AuthorityContract,
@@ -44,6 +47,25 @@ from lca.contracts.protocols.runtime.runtime.runtime import StopPolicy
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
+def _normalize_observation(value: object) -> object:
+    """Convert an ``EffectReceipt`` to an ``Observation`` at the stop boundary."""
+    if isinstance(value, EffectReceipt):
+        return Observation(
+            observation_id=new_id("obs"),
+            success=value.outcome is EffectOutcome.SUCCEEDED,
+            payload=None,
+            content_type=ContentType.TEXT,
+            error=value.error_code,
+            extra={
+                "effect_receipt_invocation_id": value.invocation_id,
+                "effect_receipt_provider": value.provider,
+                "effect_receipt_error_code": value.error_code,
+                "effect_receipt_retryable": value.retryable,
+            },
+        )
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class StopShouldCheckExecutor:
     """Primitive: invoke stop_policy, emit typed ``stop_decision`` port."""
@@ -58,9 +80,13 @@ class StopShouldCheckExecutor:
         context: NodeContext,
         input: NodeInput,
     ) -> NodeOutput:
+        import sys
+        print(f"[StopShouldCheckExecutor] node_execute called", file=sys.stderr)
         runtime = context.runtime or {}
         policy = runtime.get("stop_policy")
+        print(f"[StopShouldCheckExecutor] policy: {type(policy).__name__ if policy else None}", file=sys.stderr)
         if not isinstance(policy, StopPolicy):
+            print(f"[StopShouldCheckExecutor] No valid policy, returning default", file=sys.stderr)
             return NodeOutput(
                 port_values={
                     "stop_decision": StopDecision(
@@ -71,7 +97,7 @@ class StopShouldCheckExecutor:
                 next_hint=None,
             )
         decision = input.port_values.get("decision")
-        observation = input.port_values.get("observation")
+        observation = _normalize_observation(input.port_values.get("observation"))
         reflection = input.port_values.get("reflection")
         stop = policy.decide(
             runtime.get("agent_state"),
