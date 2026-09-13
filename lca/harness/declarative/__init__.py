@@ -11,7 +11,6 @@ if TYPE_CHECKING:
     from lca.harness.declarative.compile.assembler.assembler import (
         ExecutableNode,
         ExecutablePlan,
-        MappingRestrictedScope,
         RestrictedScope,
     )
     from lca.harness.declarative.controls.approval import (
@@ -33,7 +32,6 @@ __all__ = [
     "ExecutableNode",
     "ExecutablePlan",
     "InterpretationResult",
-    "MappingRestrictedScope",
     "PhaseVisit",
     "RestrictedPhaseContext",
     "RestrictedScope",
@@ -45,7 +43,6 @@ def __getattr__(name: str) -> Any:
     if name in {
         "ExecutableNode",
         "ExecutablePlan",
-        "MappingRestrictedScope",
         "RestrictedScope",
     }:
         from lca.harness.declarative.compile import assembler as _assembler

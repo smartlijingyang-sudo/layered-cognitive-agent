@@ -43,9 +43,6 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
     PhaseResult,
 )
 from lca.contracts.protocols.state.plan import CompiledRunPlan
-from lca.harness.declarative.compile.assembler.assembler import (
-    MappingRestrictedScope,
-)
 from lca.harness.declarative.compile.subgraph_validation import (
     validate_subgraph_references,
 )
