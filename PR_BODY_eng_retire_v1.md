@@ -52,3 +52,8 @@
 - [x] No v1 dual path without delete-when
 - [x] No `complete_turn` silent boot empty-tools fallback
 - [x] No god assembly in graph nodes
+
+## Follow-up (does not block this PR)
+
+- **`FU-retire-v1-planinterpreter-tool-hop`** — Add a contract test where `PlanInterpreter` drives `think.reason` through real `ForkedTools` / sandbox EP (mock LLM OK). Existing `tests/integration/cutover/test_tool_call_e2e.py` only proves wiring + stub Observation and does **not** count.
+
