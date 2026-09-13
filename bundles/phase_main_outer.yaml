@@ -79,8 +79,8 @@ nodes:
       plan_ref: bundles/stop_subgraph.yaml
       entry_node: phase.stop.should_check
       binding_edge: stop.main
-    declared_inputs: [memory_record]
-    declared_outputs: [stop_decision]
+    declared_inputs: [decision, act_outcome, reflect_outcome]
+    declared_outputs: [stop_payload]
 
 edges:
   # perceive → stop on error short-circuit, else → think.
@@ -123,4 +123,4 @@ edges:
   # stop → perceive on continue (loop).
   - from: stop.main
     to: perceive.main
-    when: not result.payload.should_stop
+    when: not result.port_values.stop_payload.should_stop

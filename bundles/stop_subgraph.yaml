@@ -18,7 +18,7 @@ nodes:
   - id: phase.stop.should_check
     factory: phase.stop.should_check
     inputs: [decision, observation, reflection]
-    outputs: [stop_decision]
+    outputs: [stop_payload]
     config:
       max_visits: 1
 

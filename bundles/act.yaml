@@ -31,7 +31,7 @@ nodes:
   - id: act.validate
     factory: act.validate
     inputs: [decision]
-    outputs: [decision]
+    outputs: [receipt]
     config:
       max_visits: 1
       emit_on_enter: [phase.tool.call.start]

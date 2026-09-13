@@ -647,7 +647,7 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
             target.llm_started = False
             target.stream_reasoning_chunks.clear()
             target.stream_final_chunks.clear()
-    elif ep == "spine.llm.request.header.assistant":
+    elif ep == "llm.request.header.assistant":
         # 模型所见即日志:assistant message 是 LLM 响应的 SSOT。
         # 补全 ThinkingTrace.raw_response_preview;tool_calls 非空时构造 ToolCallRecord。
         target = _resolve_target(state, payload)
