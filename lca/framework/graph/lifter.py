@@ -8,7 +8,7 @@ profile yaml and the new graph kernel. It accepts three input shapes:
   ``lca.harness.declarative.compile.subgraph_resolver`` handles this.
 - v2 pure-graph shape (``nodes`` / ``edges`` at the bundle root, per
   ADR-0217): this module's :func:`lift_graph_spec`.
-- :class:`lca.harness.declarative.compile.assembler.assembler.ExecutablePlan`
+- the retired v0 ExecutablePlan (deleted ADR-0221 P3)
   from the production interpreter: this module's :func:`lift_executable_plan`.
 
 The lifter never instantiates a strategy or executor; it only

@@ -417,7 +417,7 @@ def register(app: typer.Typer) -> None:
         target: str = typer.Argument(..., help="只支持 declarative-boundaries"),
         json_mode: bool = typer.Option(False, "--json", help="输出 JSON"),
     ) -> None:
-        """审计最小可信内核与 GraphAssembler 的声明式边界。"""
+        """审计最小可信内核与 PlanInterpreter（v2）的声明式边界。"""
         if target != "declarative-boundaries":
             _fail("audit only supports declarative-boundaries")
         report = audit_declarative_boundaries(Path.cwd())

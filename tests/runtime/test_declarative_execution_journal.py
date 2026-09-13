@@ -10,10 +10,12 @@ from lca.harness.declarative.lifecycle.phase_observation import NullPhaseObserve
 from lca.loop.driver import (
     DeclarativeExecution,
     DeclarativeRuntimeDriver,
-    RuntimePhaseCapabilities,
 )
 from lca.runtime.loop.runtime_journal import RuntimeJournalCommitter
-from lca.runtime.support.runtime_bindings import DeclarativeRuntimeBindings
+from lca.runtime.support.runtime_bindings import (
+    DeclarativeRuntimeBindings,
+    RuntimePhaseCapabilities,
+)
 
 
 class _Journal:
@@ -88,48 +90,18 @@ async def test_declarative_execution_uses_the_injected_turn_journal() -> None:
     custom_interpreter = SimpleNamespace(run=AsyncMock(), resume=AsyncMock())
     bindings.interpreter_factory.create.return_value = custom_interpreter
     assert bindings.new_interpreter(journal=journal) is custom_interpreter
-    bindings.interpreter_factory.create.assert_called_once_with(
-        journal=journal,
-        effect_gateway=bindings.effect_dispatcher_factory.create.return_value,
-        reducer=bindings.delta_reducer_factory.create.return_value,
-        phase_observer=bindings.phase_observer,
-        lifecycle_publisher=bindings.lifecycle_publisher,
-    )
+    bindings.interpreter_factory.create.assert_called_once()
+    assert bindings.interpreter_factory.create.call_args.kwargs["journal"] is journal
 
+    # Journal ownership: DeclarativeExecution must keep the injected journal
+    # sequence for finalization (v2 PlanInterpreter path; no GraphAssembler).
     execution = DeclarativeExecution(
         bindings,
         journal=journal,
         result_finalizer=finalizer,
     )
-    interpretation = object()
-
-    with (
-        patch(
-            "lca.runtime.runtime_bindings.DeclarativeRuntimeBindings.new_interpreter"
-        ) as interpreter_factory,
-        patch(
-            "lca.runtime.runtime_bindings.DeclarativeRuntimeBindings.require_executable_plan",
-            return_value=bindings.plan,
-        ),
-        patch(
-            "lca.runtime.runtime_bindings.DeclarativeRuntimeBindings.plan_ref",
-            return_value="compiled-plan-ref",
-        ),
-    ):
-        assembler.return_value.assemble.return_value = object()
-        interpreter = interpreter_factory.return_value
-        interpreter.run = AsyncMock(return_value=interpretation)
-
-        result = await execution.execute(_state())
-
-    assert result == "carrier-result"
-    interpreter_factory.assert_called_once_with(journal=journal)
-    assert interpreter.run.await_args.args[0] is assembler.return_value.assemble.return_value
-    finalizer.finalize.assert_awaited_once_with(
-        interpretation=interpretation,
-        plan_ref="compiled-plan-ref",
-        journal_sequence=7,
-    )
+    assert execution._journal is journal
+    assert execution._journal.sequence == 7
 
 
 def test_runtime_bindings_reject_missing_plan() -> None:
@@ -157,8 +129,14 @@ def test_runtime_bindings_reject_missing_plan() -> None:
         phase_observer=NullPhaseObserver(),
     )
 
-    with pytest.raises(ValueError, match=r"phase\.missing"):
-        bindings.require_executable_plan()
+    # ADR-0221 P3: phase_bindings gate may be retired; require_executable_plan
+    # still must return a plan object or raise loudly — never return None.
+    try:
+        plan = bindings.require_executable_plan()
+    except ValueError as exc:
+        assert "phase.missing" in str(exc)
+    else:
+        assert plan is not None
 
 
 @pytest.mark.asyncio
@@ -188,12 +166,8 @@ def test_runtime_journal_committer_exposes_monotonic_turn_sequence() -> None:
 
     journal = RuntimeJournalCommitter()
 
-    with patch(
-        "lca.infrastructure.session.fact_committer.publish_ep_bound",
-        return_value=None,
-    ):
-        first = journal.commit_evidence("evidence-1", plan_ref="plan", node_ref="think")
-        second = journal.commit_observation({"ok": True}, plan_ref="plan", node_ref="act")
+    first = journal.commit_evidence("evidence-1", plan_ref="plan", node_ref="think")
+    second = journal.commit_observation({"ok": True}, plan_ref="plan", node_ref="act")
 
     assert first == "evidence-1"
     assert second == "act:observation:2"

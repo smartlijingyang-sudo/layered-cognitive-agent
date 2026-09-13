@@ -1,6 +1,12 @@
-"""ADR-0075 最小可信内核的声明式编译、组装与执行实现。
+"""ADR-0075 declarative compile / controls / lifecycle surface.
 
-公开符号 lazy 导出，避免 ``import lca.harness.graph.*`` 时 eager 拉全链。
+Production execution walks v2 ``PlanInterpreter``
+(``lca.framework.graph.interpreter``) — the v0 ``GraphAssembler`` path was
+deleted in ADR-0221 P3 (commit 63a68a4d). This package no longer exports
+``GraphAssembler`` / ``ExecutablePlan`` / ``MappingRestrictedScope``.
+
+Importing ``GraphAssembler`` from here raises ``AttributeError`` so
+production and tests fail loud instead of silently reconstituting a v1 path.
 """
 
 from __future__ import annotations
@@ -8,47 +14,45 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from lca.harness.declarative.compile.assembler.assembler import (
-        ExecutableNode,
-        ExecutablePlan,
-        RestrictedScope,
-    )
+
     from lca.harness.declarative.controls.approval import (
         ApprovalState,
         ApprovalStateMachine,
         ApprovalTransition,
     )
     from lca.harness.declarative.controls.validation import validate_control_binding_closure
-    from lca.harness.declarative.execute.outcome_projection import (
-        InterpretationResult,
-        PhaseVisit,
-    )
     from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseContext
 
 __all__ = [
     "ApprovalState",
     "ApprovalStateMachine",
     "ApprovalTransition",
-    "ExecutableNode",
-    "ExecutablePlan",
-    "InterpretationResult",
-    "PhaseVisit",
+
     "RestrictedPhaseContext",
-    "RestrictedScope",
     "validate_control_binding_closure",
 ]
+
+_RETIRED_V1 = frozenset(
+    {
+        "GraphAssembler",
+        "ExecutableNode",
+        "ExecutablePlan",
+        "MappingRestrictedScope",
+        "RestrictedScope",
+        "InterpretationResult",
+        "PhaseVisit",
+        "DeclarativePlanProjection",
+        "compile_declarative_projection",
+    }
+)
 
 
 def __getattr__(name: str) -> Any:
     if name in {
-        "ExecutableNode",
-        "ExecutablePlan",
-        "RestrictedScope",
+        "ApprovalState",
+        "ApprovalStateMachine",
+        "ApprovalTransition",
     }:
-        from lca.harness.declarative.compile import assembler as _assembler
-
-        return getattr(_assembler, name)
-    if name in {"ApprovalState", "ApprovalStateMachine", "ApprovalTransition"}:
         from lca.harness.declarative.controls import approval as _approval
 
         return getattr(_approval, name)
@@ -56,23 +60,17 @@ def __getattr__(name: str) -> Any:
         from lca.harness.declarative.controls.validation import validate_control_binding_closure
 
         return validate_control_binding_closure
-    if name in {
-        "InterpretationResult",
-        "PhaseVisit",
-        "RestrictedPhaseContext",
-    }:
-        from lca.harness.declarative.execute.outcome_projection import (
-            InterpretationResult,
-            PhaseVisit,
-        )
+    if name == "RestrictedPhaseContext":
         from lca.harness.declarative.lifecycle.phase_context import (
             RestrictedPhaseContext,
         )
 
-        mapping = {
-            "InterpretationResult": InterpretationResult,
-            "PhaseVisit": PhaseVisit,
-            "RestrictedPhaseContext": RestrictedPhaseContext,
-        }
-        return mapping[name]
+        return RestrictedPhaseContext
+    if name in _RETIRED_V1:
+        raise AttributeError(
+            f"lca.harness.declarative.{name} was retired with the v0 GraphAssembler "
+            f"path (ADR-0221 P3). Production walks PlanInterpreter only; "
+            f"delete-when ≤ eng/retire-v1-reasoner-sandbox. "
+            f"Import PlanInterpreter from lca.framework.graph.interpreter instead."
+        )
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
