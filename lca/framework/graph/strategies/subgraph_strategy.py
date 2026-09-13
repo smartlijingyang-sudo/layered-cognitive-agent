@@ -191,17 +191,33 @@ class SubgraphStrategy(NodeStrategy):
         # rather than ``receipt``, ``reflect_outcome`` rather than
         # ``admit_recovery``, and so on.
         outer_output: dict[str, Any] = dict(merged_output)
-        if inner_schema is not None and inner_schema.outputs:
+        outer_declared_outputs = _outer_declared_outputs(context)
+        
+        # First, try to use inner_io_schema for translation (backward compatibility)
+        inner_schema = context.inner_io_schema
+        if inner_schema is not None and inner_schema.outputs and outer_declared_outputs:
             inner_output_names = tuple(p.name for p in inner_schema.outputs)
-            outer_declared_outputs = _outer_declared_outputs(context)
-            if outer_declared_outputs and len(outer_declared_outputs) == len(
-                inner_output_names
-            ):
-                outer_output = {
+            if len(outer_declared_outputs) == len(inner_output_names):
+                translated = {
                     outer_declared_outputs[i]: merged_output.get(inner_output_names[i])
                     for i in range(len(outer_declared_outputs))
                     if inner_output_names[i] in merged_output
                 }
+                # Only use translated if we got some outputs
+                if translated:
+                    outer_output = translated
+        
+        # If translation didn't work or wasn't applicable, try direct mapping
+        # from merged_output to outer_declared_outputs by matching names
+        if outer_declared_outputs and len(outer_output) != len(outer_declared_outputs):
+            # Try to find matching outputs in merged_output
+            direct_mapped = {}
+            for outer_name in outer_declared_outputs:
+                if outer_name in merged_output:
+                    direct_mapped[outer_name] = merged_output[outer_name]
+            if direct_mapped:
+                outer_output = direct_mapped
+        
         self._observe_exit(context, ref, depth, outcome="success", error="")
         if depth_token is not None:
             from lca.framework.graph.adapter import _exit_subgraph

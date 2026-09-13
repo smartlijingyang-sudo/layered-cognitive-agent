@@ -1,16 +1,15 @@
 """phase.think.reasoner.compose — assemble PromptReasoner from injected parts.
 
 Consumes ``llm_adapter`` (from :mod:`lca.plugins.think.reasoner.credentials`),
-``role_profile`` (from :mod:`lca.plugins.think.role_profile_provider`), and
-``tools`` (from :mod:`lca.plugins.act.tools.seam`). Wires the assembler /
-selector from their respective capability providers and constructs a
-:class:`PromptReasoner` instance for the inner think subgraph to call.
+``role_profile`` (from :mod:`lca.plugins.think.role_profile_provider``).
+Wires the assembler / selector from their respective capability providers
+and constructs a :class:`PromptReasoner` instance for the inner think
+subgraph to call.
 
-Per-turn tools and template_provider are passed as explicit method
-parameters on ``complete_turn`` / ``render_turn`` (ADR-0220 §6 N10);
-the reasoner holds no mutable per-run state. The compose plugin
-publishes ``tools`` and ``template_provider`` as separate capabilities
-for the graph node executors to consume.
+Per-turn tools are NOT composed here. ADR-0220 §4.1: tools are materialized
+per-turn by ``think.reason.complete`` from ``ToolsService.fork_for_run(BindingsView)``,
+not at boot time. The compose plugin only wires LLM + role profile +
+template provider — the reasoner holds no tool state of its own.
 
 ``RoleProfile`` 由上游 ``phase.think.role_profile`` provider 通过
 ``reasoner.role_profile`` capability 注入,本 plugin 不再持有默认字面量。
@@ -30,7 +29,6 @@ from lca.contracts.capabilities import (
     PROMPT_TEMPLATE_PROVIDER,
     PROMPT_TEMPLATE_SELECTOR,
     REASONER_ROLE_PROFILE,
-    TOOLS,
 )
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -58,7 +56,6 @@ class Config(BaseModel):
     requires=(
         "llm_adapter",
         REASONER_ROLE_PROFILE.key,
-        TOOLS.key,
         PROMPT_TEMPLATE_PROVIDER.key,
         PROMPT_TEMPLATE_SELECTOR.key,
     ),
@@ -68,7 +65,7 @@ class Config(BaseModel):
     kind=PluginKind.PROVIDER,
     description=(
         "Compose a PromptReasoner from the active llm_adapter, "
-        "role_profile, tools list, template_provider, and selector; "
+        "role_profile, template_provider, and selector; "
         "publish as the ``reasoner`` capability for the inner think "
         "subgraph (ADR-0220 P4 typed DTO seam)."
     ),
@@ -90,7 +87,7 @@ class Config(BaseModel):
     ),
     relations=(),
     ownership=OwnershipDeclaration(
-        reads=("plugin.serve", "llm_adapter", REASONER_ROLE_PROFILE.key, TOOLS.key),
+        reads=("plugin.serve", "llm_adapter", REASONER_ROLE_PROFILE.key),
         emits=("reasoner.checked",),
         state_mutation="forbidden",
     ),
@@ -108,8 +105,6 @@ async def setup(ctx: PluginContext, config: Config) -> None:
             "reasoner.role_profile must be a RoleProfile instance, got "
             f"{type(role_profile).__name__}"
         )
-    tools_service = ctx.require(TOOLS.key)
-    tools = tools_service.list_tools() if tools_service is not None else ()
     template_provider = ctx.require(PROMPT_TEMPLATE_PROVIDER.key)
     selector = ctx.require(PROMPT_TEMPLATE_SELECTOR.key)
 
@@ -119,7 +114,6 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         selector=selector,
     )
     reasoner.bind_boot_capabilities(
-        tools=tools,
         template_provider=template_provider,
     )
     ctx.provide("reasoner", reasoner)
