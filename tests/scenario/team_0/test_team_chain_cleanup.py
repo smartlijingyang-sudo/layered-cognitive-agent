@@ -158,16 +158,7 @@ class TestHonestFacade(unittest.IsolatedAsyncioTestCase):
         from lca.cognition.brain.reasoner.reasoner import PromptReasoner
 
         rt.brain = MagicMock()
-        rt.brain.reasoner = PromptReasoner(
-            MagicMock(),
-            profile,
-            "t",
-            templates={
-                "react_prompt": "r",
-                "hierarchical_prompt": "h {teammates} {member_status_text}",
-                "routing_prompt": "rt {teammates} {assigned_roles_text} {notes}",
-            },
-        )
+        rt.brain.reasoner = PromptReasoner(llm=MagicMock())
         rt.body = MagicMock()
         rt.memory = MagicMock()
         # ROUTING + consult_duty is not expressible as LeadMandate; BOARD is consultation+gate.

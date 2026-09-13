@@ -1,8 +1,9 @@
 """phase.think.role_profile — ``RoleProfile`` provider for inner think subgraph.
 
 构造 :class:`RoleProfile` 实例并注册到 ``reasoner.role_profile`` capability 键。
-``phase.think.reasoner.compose`` 在 boot 时通过 ``ctx.require("reasoner.role_profile")``
-取这个实例,而不是在源码里硬编码 role / goal / backstory。
+Graph 节点（``think.reason.render`` / ``concept.role.snapshot``）通过该
+capability 组装 ``RoleSnapshot``；``phase.think.reasoner.compose`` 不再
+把 RoleProfile 写入 PromptReasoner（eng/retire-v1-reasoner-sandbox）。
 
 Profile YAML 通过 ``config:`` 字段覆盖默认值:
 
@@ -41,7 +42,7 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):
-    """Profile-configurable role identity consumed by ``phase.think.reasoner.compose``."""
+    """Profile-configurable role identity for RoleSnapshot boundary DTOs."""
 
     model_config = ConfigDict(extra="forbid")
     role: str = "assistant"
@@ -60,9 +61,8 @@ class Config(BaseModel):
     effects="none",
     kind=PluginKind.PROVIDER,
     description=(
-        "Provide the RoleProfile instance consumed by "
-        "phase.think.reasoner.compose. All fields are profile-configurable; "
-        "no defaults are baked into the plugin."
+        "Provide the RoleProfile instance for RoleSnapshot boundary DTOs. "
+        "All fields are profile-configurable."
     ),
     test_suite="tests/architecture/test_reasoner_role_profile_capability.py",
     contract=PluginContract(

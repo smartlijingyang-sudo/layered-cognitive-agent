@@ -128,9 +128,7 @@ def test_render_turn_signature_matches_p4_dto_contract() -> None:
     """
     reasoner = PromptReasoner(
         llm=_StubLLM(),
-        role_profile=_role_profile(),
         template_provider=_Provider(_template()),
-        tools=[],
     )
     render = reasoner.render_turn(_context(), _selection(), _role_snapshot())
     assert isinstance(render, ReasonerTurnRender)
@@ -144,9 +142,7 @@ def test_render_turn_does_not_touch_agent_state_manifest() -> None:
     """``render_turn`` 不读 AgentState 上的 manifest;输出 ``manifest=None``。"""
     reasoner = PromptReasoner(
         llm=_StubLLM(),
-        role_profile=_role_profile(),
         template_provider=_Provider(_template()),
-        tools=[],
     )
     render = reasoner.render_turn(_context(), _selection(), _role_snapshot())
     # ReasonerTurnRender.manifest 永远是 None(typed reasoner 不跨过 state 读 perceive),
@@ -158,9 +154,7 @@ def test_render_turn_rejects_empty_template_without_selector() -> None:
     """空 ``template_id`` + 无 selector → RuntimeError,不静默回退。"""
     reasoner = PromptReasoner(
         llm=_StubLLM(),
-        role_profile=_role_profile(),
         template_provider=_Provider(_template()),
-        tools=[],
     )
     empty_selection = TemplateSelection(
         template_id="",
@@ -173,11 +167,7 @@ def test_render_turn_rejects_empty_template_without_selector() -> None:
 
 def test_render_turn_rejects_missing_template_provider() -> None:
     """无 ``template_provider`` → RuntimeError,显式不接。"""
-    reasoner = PromptReasoner(
-        llm=_StubLLM(),
-        role_profile=_role_profile(),
-        tools=[],
-    )
+    reasoner = PromptReasoner(llm=_StubLLM())
     with pytest.raises(RuntimeError, match="template_provider"):
         reasoner.render_turn(_context(), _selection(), _role_snapshot())
 
@@ -194,7 +184,7 @@ def test_reasoner_file_line_count_under_280() -> None:
 
 
 def test_reasoner_method_def_count_is_four() -> None:
-    """N10:PromptReasoner 类方法 def 数 = 4(__init__ + render_turn + _render_with_template + complete_turn)。"""
+    """N10:PromptReasoner 类方法 def 数 = 4(__init__ + build_turn_plan + render_turn + complete_turn)。"""
     text = REASONER_PATH.read_text(encoding="utf-8")
     method_defs = [
         line.strip()
@@ -210,7 +200,7 @@ def test_reasoner_method_def_count_is_four() -> None:
 def test_reasoner_has_no_legacy_dead_path() -> None:
     """N10 衍生:``reasoner.py`` 不能再出现 ``_resolve_tools`` / ``_legacy_*`` / ``_tools_service``。"""
     text = REASONER_PATH.read_text(encoding="utf-8")
-    for forbidden in ("_resolve_tools", "_legacy_templates", "_tools_service"):
+    for forbidden in ("_resolve_tools", "_legacy_templates", "_tools_service", "bind_boot_capabilities", "self._tools", "self.role_profile"):
         assert forbidden not in text, (
             f"ADR-0220 §6.2 violated: '{forbidden}' still present in reasoner.py."
         )

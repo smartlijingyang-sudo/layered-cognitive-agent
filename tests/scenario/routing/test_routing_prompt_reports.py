@@ -92,13 +92,7 @@ class TestMemberReportsText(unittest.TestCase):
 class TestRoutingPromptMemberReports(unittest.IsolatedAsyncioTestCase):
     async def test_prompt_contains_member_reports_and_excludes_duplicate_context(self) -> None:
         llm = _CaptureLLM()
-        reasoner = PromptReasoner(
-            llm,  # type: ignore[arg-type]
-            _profile("Lead"),
-            "(no tools available)",
-            tools_desc="(no tools available)",
-            templates={"routing_prompt": load_builtin_prompt("routing_prompt")},
-        )
+        reasoner = PromptReasoner(llm=llm)  # type: ignore[arg-type]
         awareness = TeamAwareness(
             teammates=[_profile("Alice"), _profile("Bob")],
             assigned_roles=["Alice"],

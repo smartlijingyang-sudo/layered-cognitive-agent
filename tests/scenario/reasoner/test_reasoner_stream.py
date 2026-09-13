@@ -119,12 +119,7 @@ class TestReasonerStreamPath(unittest.IsolatedAsyncioTestCase):
     async def test_empty_stream_falls_back_to_complete(self) -> None:
         expected = '{"action_type":"respond","response_text":"news summary","confidence":0.9}'
         llm = _EmptyStreamCompleteFallbackLLM(expected)
-        reasoner = PromptReasoner(
-            llm,
-            _profile(),
-            "",
-            templates={"react_prompt": "TASK: {task}\n{context}"},
-        )
+        reasoner = PromptReasoner(llm=llm)
         result = await reasoner.generate_thoughts(_state())
         self.assertEqual(result.text, expected)
         self.assertEqual(llm.complete_calls, 1)
@@ -148,12 +143,7 @@ class TestReasonerStreamPath(unittest.IsolatedAsyncioTestCase):
                 yield LLMStreamEvent(type=LLMStreamEventType.COMPLETED, response=None)
 
         llm = _RetryCompleteLLM()
-        reasoner = PromptReasoner(
-            llm,
-            _profile(),
-            "",
-            templates={"react_prompt": "{task}"},
-        )
+        reasoner = PromptReasoner(llm=llm)
         result = await reasoner.generate_thoughts(_state())
         self.assertEqual(result.text, expected)
         self.assertEqual(llm.complete_calls, 2)
@@ -161,12 +151,7 @@ class TestReasonerStreamPath(unittest.IsolatedAsyncioTestCase):
     async def test_n1_uses_stream_and_matches_complete_text(self) -> None:
         expected = '{"action_type":"respond","response_text":"hello","confidence":1.0}'
         llm = _DualPathLLM(expected)
-        reasoner = PromptReasoner(
-            llm,
-            _profile(),
-            "",
-            templates={"react_prompt": "TASK: {task}\n{context}"},
-        )
+        reasoner = PromptReasoner(llm=llm)
         result = await reasoner.generate_thoughts(_state(step=7))
         self.assertEqual(result.text, expected)
         self.assertEqual(llm.stream_steps, [7])
@@ -177,12 +162,7 @@ class TestReasonerStreamPath(unittest.IsolatedAsyncioTestCase):
             '"arguments":{"query":"today news"},"rationale":"x","confidence":0.9}'
         )
         llm = _ReasoningOnlyStreamLLM(reasoning_json)
-        reasoner = PromptReasoner(
-            llm,
-            _profile(),
-            "",
-            templates={"react_prompt": "TASK: {task}\n{context}"},
-        )
+        reasoner = PromptReasoner(llm=llm)
         result = await reasoner.generate_thoughts(_state())
         self.assertEqual(result.text, "")
 
@@ -204,12 +184,7 @@ class TestReasonerStreamPath(unittest.IsolatedAsyncioTestCase):
                 )
 
         llm = _PostSearchLLM()
-        reasoner = PromptReasoner(
-            llm,
-            _profile(),
-            "",
-            templates={"react_prompt": "TASK: {task}\n{context}"},
-        )
+        reasoner = PromptReasoner(llm=llm)
         result = await reasoner.generate_thoughts(_state_after_web_search())
         self.assertEqual(result.text, expected)
         self.assertEqual(calls, ["stream"])
