@@ -88,11 +88,14 @@ class BrainComposer:
             value = getattr(brain, alias_attr, None)
             if value is not None and alias_key not in phase_capabilities:
                 phase_capabilities[alias_key] = value
-        # Project the boot-time RoleProfile onto the phase capability map so
-        # think.reason.render can resolve it via runtime.get (node runtime
-        # scope is RuntimePhaseCapabilities — not the Cordis plugin ctx).
+        # Project boot-time Cordis capabilities onto the phase map so node
+        # plugins resolve them via runtime.get / runtime.<name>
+        # (RuntimePhaseCapabilities is the node scope — not Cordis ctx).
         role_profile = require_capability(scope, REASONER_ROLE_PROFILE.key)
         phase_capabilities[REASONER_ROLE_PROFILE.key] = role_profile
+        # concept.tool.fork (think.reason.fork_tools) needs ToolsService.
+        tools = require_capability(scope, "tools")
+        phase_capabilities["tools"] = tools
         decision_gate = _resolve_decision_gate(brain, gates)
         if decision_gate is not None:
             phase_capabilities["phase.think.decision_gate"] = decision_gate
