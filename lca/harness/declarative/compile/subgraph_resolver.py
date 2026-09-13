@@ -215,9 +215,9 @@ def _project_to_phase_graph(
 
     for n in spec.nodes:
         # ADR-0220 P10: skip factory resolution for nodes carrying a
-        # ``sub_spec_ref`` — the framework delegates those nodes to
-        # SubgraphRunner (NodeGraphDriver.run:209) and never invokes the
-        # factory. The factory field on such nodes is metadata only.
+        # ``sub_spec_ref`` — PlanInterpreter / BundleGraphSpec delegates
+        # those nodes to the subgraph path and never invokes the factory.
+        # The factory field on such nodes is metadata only.
         node_region = n.region if n.region is not None else region_for_resolve
         if runtime is not None and n.sub_spec_ref is None:
             runtime.resolve_factory(n.factory, node_region)  # 命中即返回,失败 fail-loud
@@ -259,15 +259,15 @@ def _wrap_compiled_run_plan(
     """v2 CompiledRunPlan 包装(实现 V2BundleGraphPlanMarker)。
 
     走纯 v2 路径,**不再伪装成老 declarative plan**:
-    - phase_graph 含 BundleGraphNode 投影的 PhaseNode(framework 用,但 interpreter
-      v2 分支走 NodeGraphDriver,不调 phase executor)
-    - phase_bindings:最小合法(GraphAssembler 兜底层,本 ADR 落地后由 NodeGraphDriver
-      完全替代)
+    - phase_graph 含 BundleGraphNode 投影的 PhaseNode(PlanInterpreter /
+      BundleGraphSpec 路径消费;不调 v0 phase executor)
+    - phase_bindings:最小合法(GraphAssembler 已退役;生产单轨为
+      PlanInterpreter + BundleGraphSpec)
     - capability / validation_report / provenance:最小合法
-    - 实现 V2BundleGraphPlanMarker:isinstance 命中,interpreter 走 v2 分支
+    - 实现 V2BundleGraphPlanMarker:isinstance 命中,PlanInterpreter 走 v2 分支
 
-    delete-when:interpreter v2 分支稳定后,可进一步精简 phase_bindings / capability /
-    validation_report(本 ADR §8 实施步骤 #11)。
+    delete-when:PlanInterpreter v2 分支稳定后,可进一步精简 phase_bindings /
+    capability / validation_report(本 ADR §8 实施步骤 #11)。
     """
     from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
         PhaseBinding,
