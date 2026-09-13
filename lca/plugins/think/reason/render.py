@@ -77,6 +77,23 @@ def _state_to_boundary(
     return context, selection, snapshot
 
 
+def _resolve_role_profile(runtime: object) -> object | None:
+    """Read ``reasoner.role_profile`` from the node runtime capability scope.
+
+    PromptReasoner no longer owns RoleProfile (eng/retire-v1-reasoner-sandbox);
+    ``phase.think.role_profile`` provides the capability and this adapter
+    consumes it at the graph boundary.
+    """
+    from lca.contracts.capabilities import REASONER_ROLE_PROFILE
+
+    getter = getattr(runtime, "get", None)
+    if callable(getter):
+        profile = getter(REASONER_ROLE_PROFILE.key)
+        if profile is not None:
+            return profile
+    return getattr(runtime, REASONER_ROLE_PROFILE.key, None)
+
+
 @dataclass(frozen=True, slots=True)
 class ThinkReasonRenderExecutor:
     """think.reason inner_graph 第 2 节点:从 (state, plan) 算 ReasonerTurnRender。
