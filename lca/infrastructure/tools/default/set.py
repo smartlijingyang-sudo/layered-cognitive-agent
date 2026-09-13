@@ -130,7 +130,12 @@ def _tools_for_ref(
 ) -> list[Tool]:
     if plane.kind is PlaneKind.SANDBOX:
         if sandbox is None:
-            return []
+            raise RuntimeError(
+                "Profile/Bindings declare a SANDBOX plane but sandbox "
+                "capability is None — refuse to fork empty sandbox tools "
+                "(runCommand/executeCode). Wire sandbox before tool.fork "
+                "(eng/retire-v1-reasoner-sandbox)."
+            )
         return lca_computer.build_computer_tools(
             sandbox=sandbox, plane=plane, file_store=file_store
         )
