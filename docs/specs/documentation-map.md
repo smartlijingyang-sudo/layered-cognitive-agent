@@ -6,6 +6,7 @@
 |---|---|---|
 | 了解开发约束、仓库地图和验证命令 | [根 AGENTS.md](../../AGENTS.md) | 每次开发会话的高频入口 |
 | 查询术语、数据所有权和结构化认知模型 | [LCA structured cognition guide](lca-structured-cognition-guide.md) | Fact、State、Decision、Verdict、Effect、Journal 等词汇 |
+| 读外环图 + act→工具调用栈（新人） | [phase-graph-and-act-tool-path.md](../guides/phase-graph-and-act-tool-path.md) | `factory`/`semantic_name` 查类；act.validate→…→SafeExecutor→`tool.execute` |
 | 查询现行协议与操作说明 | `docs/specs/` | Harness、阶段图、运行时投影、工具恢复、命名与包组织规范、集成规范 |
 | 查询包目录规模、命名与拆分规则 | [package-organization-discipline.md](package-organization-discipline.md) | 5/6/8 规则、概念群映射、代码体量硬约束 |
 | 查询图书馆式目录认知可靠性 | [cognitive-directory-discipline.md](cognitive-directory-discipline.md) | ≤5 文件/目录、路径即语义、agent 新建清单 |
