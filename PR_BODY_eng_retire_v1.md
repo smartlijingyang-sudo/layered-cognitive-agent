@@ -31,10 +31,18 @@
    journal EP emissions on reasoner enter/exit (`reasoner_reason_start/end`)
    and tool schema publish from `ToolsService.materialize`.
 
+### DoD#4 evidence (real run, not prose)
+
+- Test: `tests/cognition/reasoner/test_tool_using_run_evidence.py::test_tool_using_path_fork_reasoner_sandbox_journal_broken_hop_none`
+- Asserts: fork → `ForkedTools` with `runCommand`/`executeCode`; mock LLM tool
+  call via `PromptReasoner.complete_turn`; sandbox execute commits
+  `ToolStartedCommitted` / `ToolInvokedCommitted` + `phase.tool.call.start/end`;
+  doctor `broken_hop is None`.
+
 ## Test plan
 
-- [ ] `uv run pytest tests/harness/declarative/compile/test_subgraph_ref_validation.py tests/harness/declarative/compile/test_assembler_wraps_instrument.py tests/harness/declarative/compile/test_layer3_check.py -q`
-- [ ] `uv run pytest tests/cognition/reasoner/test_prompt_reasoner_fail_matrix.py tests/plugins/concept/test_tool_fork_fail_loud.py tests/concept/test_prompt_render.py tests/architecture/test_reasoner_role_profile_capability.py -q`
+- [ ] `uv run pytest tests/harness/declarative/compile/test_subgraph_ref_validation.py tests/harness/declarative/compile/test_assembler_wraps_instrument.py tests/harness/declarative/compile/test_layer3_check.py -q` (no `LLM_API_KEY` required — compile conftest overrides K3 boot)
+- [ ] `uv run pytest tests/cognition/reasoner/test_prompt_reasoner_fail_matrix.py tests/cognition/reasoner/test_tool_using_run_evidence.py tests/plugins/concept/test_tool_fork_fail_loud.py tests/concept/test_prompt_render.py tests/architecture/test_reasoner_role_profile_capability.py -q`
 - [ ] `uv run pytest tests/architecture/test_handler_substitutability.py::test_declarative_execution_uses_registry_dispatch tests/runtime/test_declarative_execution_journal.py -q`
 
 ## Hard-ban checklist
