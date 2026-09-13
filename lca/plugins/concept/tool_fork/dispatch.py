@@ -75,6 +75,42 @@ def _bindings_from_runtime_plane() -> BindingsView | None:
     return current_bindings_view()
 
 
+
+_SANDBOX_TOOL_APIS: frozenset[str] = frozenset({"runCommand", "executeCode"})
+
+
+def _tool_api_name(tool: object) -> str:
+    name = getattr(tool, "name", "") or ""
+    if ":" in name:
+        return name.rsplit(":", 1)[-1]
+    return name
+
+
+def _assert_sandbox_tools_visible(bindings: BindingsView, items: tuple) -> None:
+    """Fail loud when Profile→Bindings declare sandbox but fork omitted APIs."""
+    sandbox_expected = bindings.sandbox is not None
+    if not sandbox_expected:
+        plane_bindings = bindings.bindings
+        for attr in ("primary", "secondary"):
+            plane = getattr(plane_bindings, attr, None) if plane_bindings is not None else None
+            kind = getattr(plane, "kind", None)
+            kind_name = getattr(kind, "name", None) or str(kind or "")
+            if kind_name == "SANDBOX" or str(kind_name).endswith("SANDBOX") or str(kind) == "sandbox":
+                sandbox_expected = True
+                break
+    if not sandbox_expected:
+        return
+    present = {_tool_api_name(tool) for tool in items}
+    missing = sorted(_SANDBOX_TOOL_APIS - present)
+    if missing:
+        raise RuntimeError(
+            "tool.fork.dispatch: BindingsView declares sandbox but forked "
+            f"tools missing {missing}; got {sorted(present)}. "
+            "Profile → Bindings → ForkedTools must surface runCommand/"
+            "executeCode (eng/retire-v1-reasoner-sandbox)."
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class ToolForkDispatchExecutor:
     """concept.tool.fork 节点:typed BindingsView → ForkedTools."""
@@ -114,8 +150,10 @@ class ToolForkDispatchExecutor:
             raise RuntimeError("tool.fork.dispatch: 'tools' capability missing from runtime scope")
 
         forked = tools_service.fork_for_run(bindings)
+        items = tuple(forked.list_tools())
+        _assert_sandbox_tools_visible(bindings, items)
         forked_tools = ForkedTools(
-            items=tuple(forked.list_tools()),
+            items=items,
             binding_keys=_FORKED_BINDING_KEYS,
         )
         return NodeOutput(port_values={"forked_tools": forked_tools})
