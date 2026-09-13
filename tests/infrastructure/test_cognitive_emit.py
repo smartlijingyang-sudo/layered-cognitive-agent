@@ -358,18 +358,7 @@ async def test_run_reasoner_generate_thoughts_emits_prompt_assembler_eps() -> No
     token = set_publish_session(session)
     try:
         state = _state()
-        reasoner = PromptReasoner(
-            llm=_NoopLLM(),
-            role_profile=RoleProfile(
-                role="r",
-                goal="g",
-                backstory="b",
-                tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
-            ),
-            template_provider=_AssemblerWrapper(),
-            selector=_StubSelector(),
-            tools=[],
-        )
+        reasoner = PromptReasoner(llm=_NoopLLM())
         response = await run_reasoner_generate_thoughts_with_spine_facts(reasoner, state)
         assert response.text == "ok"
         starts = [

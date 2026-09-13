@@ -86,14 +86,11 @@ class SimpleBrainFactory:
         tools: list[Tool] | None = None,
         template_provider: object | None = None,
     ) -> Brain:
+        del role_profile, tools  # RoleSnapshot / ForkedTools are turn DTOs
         reasoner = self._reasoner_cls(
             llm,
-            role_profile,
             selector=self._selector,
-        )
-        reasoner.bind_boot_capabilities(
-            tools=tools or (),
-            template_provider=template_provider,
+            template_provider=template_provider,  # type: ignore[arg-type]
         )
         return ModularBrain(
             reasoner=reasoner,

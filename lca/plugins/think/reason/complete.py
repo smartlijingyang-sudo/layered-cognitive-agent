@@ -101,7 +101,7 @@ class ThinkReasonCompleteExecutor:
     region: str = "phase:think"
     # ADR-0219 §5.5: typed port contract declared on the plugin (graph
     # layer does not know port names; it only knows topology).
-    declared_inputs: tuple[PortName, ...] = ("turn_render",)
+    declared_inputs: tuple[PortName, ...] = ("turn_render", "forked_tools")
     declared_outputs: tuple[PortName, ...] = ("response",)
 
     async def node_execute(
@@ -111,7 +111,7 @@ class ThinkReasonCompleteExecutor:
     ) -> NodeOutput:
         """think.reason.complete 入口。
 
-        inputs 端口(yaml):turn_render
+        inputs 端口(yaml):turn_render, forked_tools
         outputs 端口(yaml):response
         """
         runtime = context.runtime
@@ -130,18 +130,15 @@ class ThinkReasonCompleteExecutor:
                 f"think.reason.complete requires reasoner.complete_turn; "
                 f"reasoner type {type(reasoner).__name__} lacks it"
             )
-
-        # Per-turn tool materialization (ADR-0220 §4.1).
-        # Fork tools from ToolsService + BindingsView so sandbox-bound
-        # tools (executeCode, runCommand, …) reach the LLM with correct
-        # per-run capability bindings. Falls back to the reasoner's
-        # boot-time tools when the runtime seams are unavailable.
-        per_turn_tools = _materialize_per_turn_tools(runtime)
-        if per_turn_tools is not None:
-            response = await complete_turn(state, render, tools=per_turn_tools)
-        else:
-            response = await complete_turn(state, render)
-
+        forked_tools = input.port_values.get("forked_tools")
+        if forked_tools is None:
+            raise RuntimeError(
+                "think.reason.complete requires forked_tools port "
+                "(Profile → Bindings → concept.tool.fork → ForkedTools); "
+                "silent boot empty-tools fallback is retired "
+                "(eng/retire-v1-reasoner-sandbox)."
+            )
+        response = await complete_turn(state, render, tools=forked_tools)
         _log.debug(
             "think.reason.complete response_type=%s",
             type(response).__name__,

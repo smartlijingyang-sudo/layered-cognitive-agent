@@ -123,7 +123,7 @@ class TestL1ProtocolCompliance(unittest.TestCase):
             backstory="t",
             tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
         )
-        reasoner = PromptReasoner(llm, rp, "(无)", templates={"react_prompt": "test"})
+        reasoner = PromptReasoner(llm=llm)
         return reasoner
 
     def test_modular_brain_is_brain(self):
@@ -180,7 +180,7 @@ class TestL2ProtocolCompliance(unittest.TestCase):
             backstory="t",
             tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
         )
-        reasoner = PromptReasoner(llm, rp, "(无)", templates={"react_prompt": "test"})
+        reasoner = PromptReasoner(llm=llm)
         brain = ModularBrain(
             reasoner=reasoner,
             reducer=DefaultReducer(),
@@ -230,7 +230,7 @@ class TestL3ProtocolCompliance(unittest.TestCase):
             backstory="t",
             tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
         )
-        reasoner = PromptReasoner(llm, rp, "(无)", templates={"react_prompt": "test"})
+        reasoner = PromptReasoner(llm=llm)
         brain = ModularBrain(
             reasoner=reasoner,
             reducer=DefaultReducer(),
@@ -310,7 +310,6 @@ class TestBrainFactoryRegistryIntegration(unittest.TestCase):
             role="测试",
             goal="测试",
             backstory="测试",
-            tools=build_weather_tools(),
             llm=MockLLMAdapter(),
             brain="default",
         )
@@ -340,7 +339,6 @@ class TestBrainFactoryRegistryIntegration(unittest.TestCase):
             role="测试",
             goal="测试",
             backstory="测试",
-            tools=[],
             llm=MockLLMAdapter(),
             brain=StubBrain(),
         )
@@ -356,7 +354,6 @@ class TestBrainFactoryRegistryIntegration(unittest.TestCase):
                 role="测试",
                 goal="测试",
                 backstory="测试",
-                tools=[],
                 llm=MockLLMAdapter(),
                 brain="nonexistent",
             )

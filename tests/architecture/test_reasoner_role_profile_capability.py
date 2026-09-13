@@ -1,16 +1,10 @@
-"""Architecture test — ``phase.think.reasoner.compose`` consumes ``reasoner.role_profile``.
+"""Architecture test — role_profile stays a Cordis capability; compose does not assemble it.
 
-The inner think subgraph reuses a single ``PromptReasoner`` instance across
-``plan`` / ``render`` / ``complete`` reason nodes, so the role identity
-(role / goal / backstory / tool permission manifest) must be resolved once
-at boot and provided as a typed capability — never hard-coded inside the
-reasoner compose plugin.
-
-ADR-0220 §6.2 P9 split the original ``phase.think.reasoner`` provider
-into ``phase.think.reasoner.credentials`` (resolves the LLM adapter)
-plus ``phase.think.reasoner.compose`` (assembles the PromptReasoner).
-The role_profile contract moves to the compose plugin — only that one
-needs the capability injection.
+eng/retire-v1-reasoner-sandbox: ``phase.think.reasoner.compose`` constructs
+PromptReasoner from llm + template ports only. ``RoleProfile`` is provided by
+``phase.think.role_profile`` and consumed as ``RoleSnapshot`` on the graph
+boundary (``concept.role.snapshot`` / think.reason.render), not owned by
+PromptReasoner.
 """
 
 from __future__ import annotations
@@ -33,27 +27,22 @@ def _by_id(resolved: object) -> dict[str, object]:
     return {plugin.id: plugin.definition for plugin in resolved.plugins}
 
 
-def test_reasoner_plugin_requires_role_profile(resolved: object) -> None:
-    """``phase.think.reasoner.compose`` must declare ``reasoner.role_profile`` in ``requires``."""
-
-    definition = _by_id(resolved)[REASONER_PLUGIN_ID]
-    assert REASONER_ROLE_PROFILE.key in definition.required_capability_keys
-
-
 def test_role_profile_provider_exists_and_provides(resolved: object) -> None:
-    """A dedicated provider in the bundle exposes ``reasoner.role_profile``."""
-
     definition = _by_id(resolved)[ROLE_PROFILE_PROVIDER_ID]
     assert REASONER_ROLE_PROFILE.key in definition.provided_capability_keys
 
 
-def test_reasoner_plugin_does_not_hardcode_role_profile(resolved: object) -> None:
-    """The reasoner compose plugin must not provide the role itself.
+def test_reasoner_compose_does_not_require_role_profile(resolved: object) -> None:
+    """Compose must not assemble RoleProfile into PromptReasoner."""
+    definition = _by_id(resolved)[REASONER_PLUGIN_ID]
+    assert REASONER_ROLE_PROFILE.key not in definition.required_capability_keys
 
-    Two providers both providing the same ``cardinality="one"`` capability
-    would force Cordis to disambiguate at boot — that is the failure mode
-    this test exists to prevent once ``phase.think.role_profile`` lands.
-    """
 
+def test_reasoner_compose_does_not_require_tools(resolved: object) -> None:
+    definition = _by_id(resolved)[REASONER_PLUGIN_ID]
+    assert "tools" not in definition.required_capability_keys
+
+
+def test_reasoner_compose_does_not_provide_role_profile(resolved: object) -> None:
     definition = _by_id(resolved)[REASONER_PLUGIN_ID]
     assert REASONER_ROLE_PROFILE.key not in definition.provided_capability_keys

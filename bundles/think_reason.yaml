@@ -1,13 +1,26 @@
-# bundles/think_reason.yaml — think.reason inner_graph (v1)
-# ADR-0217 Bundle Graph Schema v2。3 节点 + 2 边,执行顺序由图描述声明。
-# driver 递归调度:每个节点 enter/exit 按 config.emit_on_* 自动发 EP。
-# @plugin 不读 plugin 注册字段,v2 driver 不读 node bindings。
+# bundles/think_reason.yaml — think.reason inner_graph (v2 ports)
+# ADR-0217 Bundle Graph Schema v2 + eng/retire-v1-reasoner-sandbox.
+# plan → render → complete, with concept.tool.fork feeding ForkedTools
+# into complete (fail-loud; no boot empty-tools fallback).
 
 id: think.reason.subgraph
 region: phase:think
-purpose: think.reason 内部 3 步执行 — plan → render → complete
+purpose: think.reason 内部执行 — fork tools ∥ plan → render → complete
 
 nodes:
+  - id: think.reason.fork_tools
+    factory: think.reason.fork_tools.ref
+    inputs: []
+    outputs: [forked_tools]
+    config:
+      max_visits: 1
+      emit_on_enter: []
+      emit_on_exit:  []
+      sub_spec_ref:
+        plan_ref: bundles/concept/tool_fork.yaml
+        entry_node: tool.fork.dispatch
+        binding_edge: think.reason.fork_tools
+
   - id: think.reason.plan
     factory: think.reason.plan
     inputs: []
@@ -28,7 +41,7 @@ nodes:
 
   - id: think.reason.complete
     factory: think.reason.complete
-    inputs: [turn_render]
+    inputs: [turn_render, forked_tools]
     outputs: [response]
     config:
       max_visits: 3
@@ -40,5 +53,8 @@ edges:
     to: think.reason.render
     when: true
   - from: think.reason.render
+    to: think.reason.complete
+    when: true
+  - from: think.reason.fork_tools
     to: think.reason.complete
     when: true

@@ -7,8 +7,9 @@ think.reason inner_graph 第 2 节点 plugin:把 compat-era ``(state, plan)``
 ``concept.prompt.render`` 图,这里只是 inner_graph 的过渡适配,被 P5
 ``agent.reasoning.turn`` 取代。
 
-``requires=("reasoner",)`` 通过 Cordis 校验,运行时从
-``context.runtime.reasoner`` 拿 capability 实例。
+``requires=("reasoner", "reasoner.role_profile")``：role 从 Cordis
+capability 注入，不再从 ``PromptReasoner.role_profile`` 读取
+(eng/retire-v1-reasoner-sandbox)。
 """
 
 from __future__ import annotations
@@ -119,7 +120,13 @@ class ThinkReasonRenderExecutor:
                 f"reasoner type {type(reasoner).__name__} lacks it"
             )
 
-        role_profile = getattr(reasoner, "role_profile", None)
+        role_profile = _resolve_role_profile(runtime)
+        if role_profile is None:
+            raise RuntimeError(
+                "think.reason.render requires reasoner.role_profile capability; "
+                "PromptReasoner no longer owns RoleProfile "
+                "(eng/retire-v1-reasoner-sandbox)."
+            )
         boundary = _state_to_boundary(state, plan, role_profile)
         render = render_turn(*boundary)
         _log.debug(
@@ -134,7 +141,7 @@ class ThinkReasonRenderExecutor:
     id="phase.think.reason.render",
     Config=None,
     provides=("phase:think::think.reason.render",),
-    requires=("reasoner",),
+    requires=("reasoner", "reasoner.role_profile"),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",
@@ -154,7 +161,7 @@ class ThinkReasonRenderExecutor:
         ),
     ),
     ownership=OwnershipDeclaration(
-        reads=("plugin.serve", "reasoner"),
+        reads=("plugin.serve", "reasoner", "reasoner.role_profile"),
         emits=("plugin.served",),
         state_mutation="forbidden",
     ),

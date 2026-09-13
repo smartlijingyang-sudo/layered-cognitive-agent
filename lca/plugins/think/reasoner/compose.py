@@ -1,21 +1,12 @@
-"""phase.think.reasoner.compose — assemble PromptReasoner from injected parts.
+"""phase.think.reasoner.compose — Cordis provider for PromptReasoner ports.
 
-Consumes ``llm_adapter`` (from :mod:`lca.plugins.think.reasoner.credentials`),
-``role_profile`` (from :mod:`lca.plugins.think.role_profile_provider``).
-Wires the assembler / selector from their respective capability providers
-and constructs a :class:`PromptReasoner` instance for the inner think
-subgraph to call.
-
-Per-turn tools are NOT composed here. ADR-0220 §4.1: tools are materialized
-per-turn by ``think.reason.complete`` from ``ToolsService.fork_for_run(BindingsView)``,
-not at boot time. The compose plugin only wires LLM + role profile +
-template provider — the reasoner holds no tool state of its own.
-
-``RoleProfile`` 由上游 ``phase.think.role_profile`` provider 通过
-``reasoner.role_profile`` capability 注入,本 plugin 不再持有默认字面量。
-没有上游 provider 时 boot 会因 ``UndeclaredInteractionError`` /
-``MissingCapabilityError`` 失败,而不是悄悄把 ``assistant`` 身份
-写进 LLM prompt。
+Boot-boundary construction only (SRP): inject ``llm_adapter``,
+``prompt_template_provider``, and ``prompt_template_selector``, then publish
+the ``reasoner`` capability. Role identity and per-turn tools are **not**
+assembled here — they arrive as boundary DTOs
+(``RoleSnapshot`` / ``ForkedTools``) on ``render_turn`` / ``complete_turn``
+via ``concept.role.snapshot`` and ``concept.tool.fork``
+(eng/retire-v1-reasoner-sandbox / ADR-0220 §6).
 """
 
 from __future__ import annotations
@@ -28,7 +19,6 @@ from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import (
     PROMPT_TEMPLATE_PROVIDER,
     PROMPT_TEMPLATE_SELECTOR,
-    REASONER_ROLE_PROFILE,
 )
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -38,7 +28,6 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.models.team.role.team import RoleProfile
 from lca.contracts.protocols import Reasoner
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
@@ -55,7 +44,6 @@ class Config(BaseModel):
     provides=("reasoner",),
     requires=(
         "llm_adapter",
-        REASONER_ROLE_PROFILE.key,
         PROMPT_TEMPLATE_PROVIDER.key,
         PROMPT_TEMPLATE_SELECTOR.key,
     ),
@@ -64,10 +52,9 @@ class Config(BaseModel):
     effects="none",
     kind=PluginKind.PROVIDER,
     description=(
-        "Compose a PromptReasoner from the active llm_adapter, "
-        "role_profile, template_provider, and selector; "
-        "publish as the ``reasoner`` capability for the inner think "
-        "subgraph (ADR-0220 P4 typed DTO seam)."
+        "Compose a PromptReasoner from injected llm_adapter + template "
+        "ports; publish as the ``reasoner`` capability. RoleSnapshot / "
+        "ForkedTools arrive as turn boundary DTOs (not assembled here)."
     ),
     test_suite="tests/test_plugin_alignment.py::test_tier1_plugin_shape",
     contract=PluginContract(
@@ -87,33 +74,29 @@ class Config(BaseModel):
     ),
     relations=(),
     ownership=OwnershipDeclaration(
-        reads=("plugin.serve", "llm_adapter", REASONER_ROLE_PROFILE.key),
+        reads=(
+            "plugin.serve",
+            "llm_adapter",
+            PROMPT_TEMPLATE_PROVIDER.key,
+            PROMPT_TEMPLATE_SELECTOR.key,
+        ),
         emits=("reasoner.checked",),
         state_mutation="forbidden",
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    """Assemble :class:`PromptReasoner` and publish as ``reasoner`` capability."""
+    """Construct :class:`PromptReasoner` from ports and publish ``reasoner``."""
     from lca.cognition.brain.reasoner.reasoner import PromptReasoner
 
     del config
 
     adapter = ctx.require("llm_adapter")
-    role_profile = ctx.require(REASONER_ROLE_PROFILE.key)
-    if not isinstance(role_profile, RoleProfile):
-        raise TypeError(
-            "reasoner.role_profile must be a RoleProfile instance, got "
-            f"{type(role_profile).__name__}"
-        )
     template_provider = ctx.require(PROMPT_TEMPLATE_PROVIDER.key)
     selector = ctx.require(PROMPT_TEMPLATE_SELECTOR.key)
 
     reasoner = PromptReasoner(
         llm=adapter,
-        role_profile=role_profile,
         selector=selector,
-    )
-    reasoner.bind_boot_capabilities(
         template_provider=template_provider,
     )
     ctx.provide("reasoner", reasoner)

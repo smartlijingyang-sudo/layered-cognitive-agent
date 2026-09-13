@@ -311,14 +311,7 @@ def test_reasoner_uses_assembler_and_selector_when_wired() -> None:
     )
     selector = TeamAwarenessTemplateSelector()
     llm = _CaptureLLM()
-    reasoner = PromptReasoner(
-        llm=llm,
-        role_profile=_profile("solo"),
-        tools_desc="(none)",
-        assembler=assembler,
-        selector=selector,
-        tools=[],
-    )
+    reasoner = PromptReasoner(llm=llm)
 
     asyncio.run(reasoner.generate_thoughts(_empty_state()))
 

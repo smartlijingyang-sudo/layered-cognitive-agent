@@ -207,13 +207,7 @@ async def test_prompt_assembler_eps_emitted_with_payload():
             backstory="b",
             tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
         )
-        reasoner = PromptReasoner(
-            llm=_NoopLLM(),
-            role_profile=role_profile,
-            assembler=assembler,
-            selector=_StubStaticSelector(),
-            tools=[],
-        )
+        reasoner = PromptReasoner(llm=_NoopLLM())
         await run_reasoner_generate_thoughts_with_spine_facts(reasoner, _build_state())
     finally:
         reset_publish_session(token)

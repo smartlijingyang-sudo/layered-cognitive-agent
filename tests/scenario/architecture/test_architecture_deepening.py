@@ -190,16 +190,7 @@ class TestSkillRouterTemplate:
             tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
         )
         brain = ModularBrain(
-            reasoner=PromptReasoner(
-                CapturingLLM(),
-                rp,
-                tools_desc="none",
-                templates={
-                    "custom_research": "TEMPLATE_MARKER_RESEARCH\nROLE: {role}\nTASK: {task}\n"
-                    "{tools}\n{context}\n{goal}\n{backstory}",
-                    "react_prompt": load_builtin_prompt("react_prompt"),
-                },
-            ),
+            reasoner=PromptReasoner(llm=CapturingLLM()),
             reducer=DefaultReducer(),
             classifier=DefaultDecisionClassifier(),
             critic=SimpleCritic(),

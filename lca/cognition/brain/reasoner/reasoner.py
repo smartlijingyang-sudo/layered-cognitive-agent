@@ -6,19 +6,12 @@ flows through typed boundary DTOs (ADR-0220 §6 P4):
   ``render_turn(context, template, role, template_provider) -> ReasonerTurnRender``
   ``complete_turn(state, render, tools) -> LLMResponse``
 
-P4 strips state out of ``render_turn``: a typed ``ReasonerContext`` carries
-``task`` / ``activated_skills`` / ``manifest``; a typed ``TemplateSelection``
-carries ``template_id`` / ``variant`` / ``decision_path``; a typed
-``RoleSnapshot`` carries ``profile`` + ``team_awareness``. The
-``concept.prompt.render`` graph feeds those three DTOs in and consumes the
-``ReasonerTurnRender`` that ``render_turn`` returns.
-
-Boot-time constructor dependencies are limited to the LLM and the role
-profile. Per-run tools arrive as the typed ``ForkedTools`` boundary on
-``complete_turn``; per-run template provider arrives as an explicit
-parameter on ``render_turn``. The ModelVisible ``CurrentReasonerPrompt``
-ContextVar bind around the LLM call migrates into the ``primitive.llm.call``
-graph node alongside the tool fork.
+Boot-time constructor dependencies are limited to injected ports
+(``llm`` / ``selector`` / ``template_provider``). Role identity arrives as
+``RoleSnapshot``; per-turn tools arrive as ``ForkedTools`` (or a tool
+sequence). PromptReasoner does **not** own RoleProfile assembly or a
+boot-time tools list — those belong at the Cordis/Profile → Bindings →
+``concept.tool.fork`` boundary (eng/retire-v1-reasoner-sandbox).
 """
 
 from __future__ import annotations
@@ -29,6 +22,7 @@ from typing import Any
 from lca.cognition.brain.llm_turn import execute_llm_turn
 from lca.cognition.brain.sections.assembler import render_template
 from lca.contracts.models.cognition.boundary import (
+    ForkedTools,
     ReasonerContext,
     RoleSnapshot,
     TemplateSelection,
@@ -45,18 +39,12 @@ from lca.contracts.models.cognition.reasoner_turn import (
 )
 from lca.contracts.models.core.conversation.llm import LLMResponse
 from lca.contracts.models.core.state.state import AgentState
-from lca.contracts.models.team.role.team import RoleProfile
 from lca.contracts.observability import sha256_payload_digest as _sha256_digest
 from lca.contracts.protocols import LLMAdapter, Tool
 
 
 def _section_output_dicts(trace: PromptTrace) -> tuple[dict[str, Any], ...]:
-    """Render a PromptTrace's per-section breakdown as immutable dicts.
-
-    ``ReasonerTurnRender.section_outputs`` is a typed tuple of frozen
-    dicts; we build it here so the renderer contract does not leak
-    ``SectionTrace`` outside the assembler boundary.
-    """
+    """Render a PromptTrace's per-section breakdown as immutable dicts."""
     return tuple(
         {
             "name": s.name,
@@ -65,8 +53,6 @@ def _section_output_dicts(trace: PromptTrace) -> tuple[dict[str, Any], ...]:
             "used_fallback": s.used_fallback,
             "skipped_empty": s.skipped_empty,
             "text_chars": s.text_chars,
-            # ADR-0176 D3 §5:EP payload 携带渲染正文与摘要,viewer 无需回读
-            # model_visible 旁路即可重建。
             "text": s.text,
             "content_digest": _sha256_digest(s.text) if s.text else None,
         }
@@ -74,59 +60,33 @@ def _section_output_dicts(trace: PromptTrace) -> tuple[dict[str, Any], ...]:
     )
 
 
-# ── PromptReasoner ─────────────────────────────────────────────────
+def _coerce_tools(tools: Sequence[Tool] | ForkedTools) -> tuple[Tool, ...]:
+    """Accept ForkedTools or a raw sequence; reject None at the call site."""
+    if isinstance(tools, ForkedTools):
+        return tuple(tools.items)
+    return tuple(tools)
 
 
 class PromptReasoner:
     """Render the prompt from typed boundary DTOs, then call the LLM.
 
-    ADR-0220 §6 N10: only ``llm`` / ``role_profile`` / ``selector`` as
-    boot-time singleton refs via constructor. ``tools`` and
-    ``template_provider`` are set post-construction by the compose plugin
-    as immutable boot-time capabilities; method signatures accept them
-    as explicit parameters so the graph-node path can pass per-call
-    values without reading hidden state.
+    SRP: consume injected ports + boundary DTOs only. No RoleProfile /
+    tools assembly state on the instance.
     """
 
     def __init__(
         self,
         llm: LLMAdapter,
-        role_profile: RoleProfile,
         *,
         selector: PromptTemplateSelector | None = None,
-    ) -> None:
-        self.llm = llm
-        self.role_profile = role_profile
-        self.selector: PromptTemplateSelector | None = selector
-        self._tools: tuple[Tool, ...] = ()
-        self._template_provider: PromptTemplateProvider | None = None
-
-    def bind_boot_capabilities(
-        self,
-        *,
-        tools: Sequence[Tool] = (),
         template_provider: PromptTemplateProvider | None = None,
     ) -> None:
-        """Set boot-time tools and template_provider (called by compose plugin)."""
-        self._tools = tuple(tools)
-        self._template_provider = template_provider
+        self.llm = llm
+        self.selector: PromptTemplateSelector | None = selector
+        self._template_provider: PromptTemplateProvider | None = template_provider
 
     def build_turn_plan(self, state: AgentState) -> ReasonerTurnPlan:
-        """Derive pre-render plan from state; selectors override template_id.
-
-        ADR-0220 §6 N10 stripped state out of ``render_turn``; the
-        ``think.reason.plan`` inner-graph node still needs a typed
-        :class:`ReasonerTurnPlan` to feed the render step. The plan
-        here is a thin derivation: state-trace + selector's template
-        pick + activated skills from the manifest. No prompt body is
-        built; that's render_turn's job.
-
-        ``template_id`` resolution: when the configured selector exists
-        we ask it; otherwise we look at ``state.context`` / role
-        preferences. We never silently fall back to ``""`` so the
-        graph layer fails loud at ``render_turn`` rather than producing
-        an empty prompt.
-        """
+        """Derive pre-render plan from state; selectors override template_id."""
         manifest = getattr(state, "context", None)
         activated = tuple(getattr(manifest, "activated_skill_ids", ()) or ())
         tools_count = len(getattr(state, "tools", ()) or ())
@@ -162,21 +122,7 @@ class PromptReasoner:
         role: RoleSnapshot,
         template_provider: PromptTemplateProvider | None = None,
     ) -> ReasonerTurnRender:
-        """Render a prompt from typed boundary DTOs (no AgentState reads).
-
-        ``context`` carries ``task`` / ``activated_skills`` / ``manifest``
-        (this turn's perceive output). ``template`` carries the picked
-        template id + variant + selector decision path.
-        ``role`` carries ``profile`` + ``team_awareness``.
-        ``template_provider`` supplies the actual prompt template content.
-        Falls back to ``self._template_provider`` if not passed explicitly.
-
-        When ``template.template_id`` is empty (callers that have not
-        yet migrated to ``concept.template.select``) we ask
-        ``self.selector`` for the active template. Empty template id
-        with no selector wired raises ``RuntimeError`` so the render
-        graph can fail loud at boot instead of silently falling back.
-        """
+        """Render a prompt from typed boundary DTOs (no AgentState reads)."""
         template_id = template.template_id
         decision_path = template.decision_path
         if not template_id:
@@ -186,24 +132,19 @@ class PromptReasoner:
                     "PromptTemplateSelector wired; concept.template.select "
                     "must populate TemplateSelection before render_turn."
                 )
-            from lca.contracts.models.cognition.prompt_assembly import (
-                normalize_selector_result,
-            )
-
             selected_id, selected_path = normalize_selector_result(
                 self.selector.select(state=_empty_state_for_selector())
             )
             template_id = selected_id
             decision_path = selected_path
 
-        if template_provider is None:
-            template_provider = self._template_provider
-        if template_provider is None:
+        provider = template_provider if template_provider is not None else self._template_provider
+        if provider is None:
             raise RuntimeError(
                 "PromptReasoner.render_turn needs template_provider; "
-                "pass it explicitly or call bind_boot_capabilities first."
+                "pass it explicitly or inject it at Cordis compose boot."
             )
-        tpl = template_provider.get_template(template_id)
+        tpl = provider.get_template(template_id)
         if tpl is None:
             from lca.contracts.models.cognition.prompt_assembly import (
                 MissingPromptSectionError,
@@ -245,16 +186,20 @@ class PromptReasoner:
         self,
         state: AgentState,
         render: ReasonerTurnRender,
-        tools: Sequence[Tool] | None = None,
+        tools: Sequence[Tool] | ForkedTools,
     ) -> LLMResponse:
-        """Invoke the LLM for one rendered turn (ModelVisible bind stays here).
+        """Invoke the LLM for one rendered turn.
 
-        ``tools`` carries the per-turn tool list. Falls back to
-        ``self._tools`` (set by bind_boot_capabilities) if not passed.
-        The ModelVisible bind around ``execute_llm_turn`` stays here
-        until ``primitive.llm.call`` lands.
+        ``tools`` is required — there is no silent fallback to a boot-time
+        empty tools list when ``concept.tool.fork`` failed or was skipped.
         """
-        effective_tools = tools if tools is not None else self._tools
+        if tools is None:  # type: ignore[comparison-overlap]
+            raise RuntimeError(
+                "PromptReasoner.complete_turn requires per-turn tools "
+                "(ForkedTools or Sequence[Tool]); boot empty-tools fallback "
+                "is retired (eng/retire-v1-reasoner-sandbox)."
+            )
+        effective_tools = _coerce_tools(tools)
         from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
             get_current_cursor,
         )
@@ -285,7 +230,7 @@ class PromptReasoner:
                 )
             )
         try:
-            response = await execute_llm_turn(
+            return await execute_llm_turn(
                 self.llm,
                 list(effective_tools),
                 render.prompt,
@@ -293,20 +238,13 @@ class PromptReasoner:
                 state=state,
                 task=state.task or "",
             )
-            return response
         finally:
             if token is not None:
                 reset_current_reasoner_prompt(token)
 
 
 def _empty_state_for_selector() -> AgentState:
-    """Build the minimum AgentState the legacy selector Protocol expects.
-
-    Selectors that have not migrated to ``ReasonerContext`` still
-    ask for ``AgentState``. We construct an empty state with no
-    active records; selectors that actually read records will
-    short-circuit on the empty inputs.
-    """
+    """Minimum AgentState for legacy selectors that still expect AgentState."""
     from lca.contracts.models.core.state.state import (
         AgentState as _AgentState,
     )
