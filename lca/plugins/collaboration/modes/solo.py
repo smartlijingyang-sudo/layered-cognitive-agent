@@ -1,4 +1,4 @@
-"""Profile-registerable default adapter and builder for the Solo run mode."""
+﻿"""Profile-registerable default adapter and builder for the Solo run mode."""
 
 from __future__ import annotations
 

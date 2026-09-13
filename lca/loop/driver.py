@@ -21,6 +21,87 @@ from lca.runtime.support.checkpoint_resolution import DeclarativeCheckpoint
 from lca.runtime.support.runtime_bindings import DeclarativeRuntimeBindings
 
 
+
+def _stop_from_interpretation_output(
+    output_ports: dict,
+    *,
+    visits: tuple = (),
+) -> "StopDecision":
+    """Lift graph terminal stop ports into a real ``StopDecision``.
+
+    Prefer an explicit ``StopDecision`` on ``stop_payload`` / ``stop_decision``.
+    ``StopPayload`` only carries ``final_output_ref``; recover text from the
+    last respond decision in visits when needed.
+    """
+    from lca.contracts.models.cognition.boundary import StopPayload
+    from lca.contracts.models.core.policy.stop import StopDecision, StopReason
+
+    for key in ("stop_payload", "stop_decision", "stop"):
+        raw = output_ports.get(key)
+        if isinstance(raw, StopDecision):
+            return raw
+        if isinstance(raw, StopPayload):
+            final_output = _recover_final_output_text(raw, visits=visits)
+            reason = StopReason.TASK_COMPLETED
+            if raw.reason:
+                try:
+                    reason = StopReason(raw.reason)
+                except ValueError:
+                    reason = StopReason.TASK_COMPLETED
+            return StopDecision(
+                should_stop=bool(raw.should_stop),
+                reason=reason,
+                final_output=final_output,
+                status="completed" if raw.should_stop else None,
+            )
+
+    # Scan visits newest-first for a StopDecision / StopPayload in outputs.
+    for visit in reversed(tuple(visits) or ()):
+        outs = getattr(visit, "outputs", None) or {}
+        if not isinstance(outs, dict):
+            continue
+        for key in ("stop_payload", "stop_decision"):
+            raw = outs.get(key)
+            if isinstance(raw, StopDecision):
+                return raw
+            if isinstance(raw, StopPayload):
+                final_output = _recover_final_output_text(raw, visits=visits)
+                return StopDecision(
+                    should_stop=bool(raw.should_stop),
+                    reason=StopReason.TASK_COMPLETED,
+                    final_output=final_output,
+                    status="completed" if raw.should_stop else None,
+                )
+
+    return StopDecision(should_stop=True, reason=StopReason.TASK_COMPLETED)
+
+
+def _recover_final_output_text(payload: object, *, visits: tuple = ()) -> str | None:
+    """Best-effort text for terminal recording when only a ref is present."""
+    direct = getattr(payload, "final_output", None)
+    if isinstance(direct, str) and direct.strip():
+        return direct
+    ref = getattr(payload, "final_output_ref", None)
+    if isinstance(ref, str) and ref.strip() and not ref.startswith("mem:") and "\n" in ref:
+        # Some paths stash the literal text in the ref field during cutover.
+        return ref
+    for visit in reversed(tuple(visits) or ()):
+        outs = getattr(visit, "outputs", None) or {}
+        if not isinstance(outs, dict):
+            continue
+        decision = outs.get("decision") or outs.get("enforced_decision")
+        text = getattr(decision, "response_text", None) if decision is not None else None
+        if isinstance(text, str) and text.strip():
+            return text
+        # Also accept StopDecision nested in outputs.
+        nested = outs.get("stop_payload") or outs.get("stop_decision")
+        nested_text = getattr(nested, "final_output", None) if nested is not None else None
+        if isinstance(nested_text, str) and nested_text.strip():
+            return nested_text
+    return ref if isinstance(ref, str) and ref.strip() else None
+
+
+
 class DeclarativeExecution:
     """V2 driver module: ``CompiledRunPlan`` → :class:`InterpretationResult`."""
 
@@ -84,46 +165,50 @@ class DeclarativeExecution:
             )
         # ADR-0221 P3: ``InterpretationResult`` does not carry the
         # legacy v1 ``state``/``outcome``/``cursor`` shape that the
-        # v0 ``ResultFinalizer`` still expects. Project the v2 output
-        # into a minimal shim with the fields the finalizer reads.
+        # ResultFinalizer still expects. Project terminal ports
+        # (especially stop_payload / StopDecision) into that shape —
+        # never fabricate an empty StopDecision (that caused COMPLETED
+        # tool+respond runs to be misclassified as zero-output FAILED).
         from dataclasses import dataclass as _dc
+        from dataclasses import field as _field
 
-        inner = getattr(plan, "inner", plan)
-        action_authority = inner.action_authority
-        scoped_authority = action_authority.scoped_actions[0] if action_authority.scoped_actions else None
-        cursor_obj = interpretation.terminal_node
-
-        if cursor_obj:
-            from lca.framework.graph.adapter import PhaseRunCursor as _PRC
-
-            _cursor_value = _PRC(current_node_id=cursor_obj, visited_nodes=())
-        else:
-            _cursor_value = None
-
-        @_dc(frozen=True, slots=True)
-        class _OutcomeShim:
-            kind = scoped_authority.allowed_actions if scoped_authority else "completed"
-            cursor = _cursor_value
-            stop = "final"
-            error_fact = None
-            approval_request = {"approval_id": "ok"}
-
+        from lca.contracts.models.cognition.boundary import StopPayload
         from lca.contracts.models.core.policy.stop import StopDecision, StopReason
+        from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
+            ExecutionOutcome,
+        )
+        from lca.framework.graph.adapter import PhaseRunCursor as _PRC
 
-        _stop = StopDecision(should_stop=True, reason=StopReason.TASK_COMPLETED)
+        output_ports = dict(interpretation.output or {})
+        stop_decision = _stop_from_interpretation_output(
+            output_ports, visits=interpretation.visits
+        )
+
+        cursor_obj = interpretation.terminal_node
+        _cursor_value = (
+            _PRC(current_node_id=cursor_obj, visited_nodes=()) if cursor_obj else None
+        )
+
+        if stop_decision.should_stop and (
+            stop_decision.final_output or stop_decision.reason == StopReason.TASK_COMPLETED
+        ):
+            _kind = ExecutionOutcome.COMPLETED
+        elif stop_decision.should_stop and stop_decision.failure is not None:
+            _kind = ExecutionOutcome.FAILED
+        else:
+            _kind = ExecutionOutcome.COMPLETED
+
+        _stop_value = stop_decision
 
         @_dc(frozen=True, slots=True)
         class _OutcomeShim:
-            kind: object = scoped_authority.allowed_actions if scoped_authority else "completed"
+            kind: object = _kind
             cursor: object = _cursor_value
-            stop: object = _stop
+            stop: object = _stop_value
             error_fact: object | None = None
             approval_request: dict | None = None
 
         _outcome = _OutcomeShim()
-
-        from dataclasses import field as _field
-
         _state_ref = state
         _visits_ref = interpretation.visits
         _facts_ref = interpretation.facts
@@ -144,6 +229,7 @@ class DeclarativeExecution:
             plan_ref=self._bindings.plan_ref(),
             journal_sequence=self._journal.sequence,
         )
+
 
     def _load_v2_graph_spec(self, plan) -> dict:
         """Walk the resolved bundles, find the first v2 graph spec.

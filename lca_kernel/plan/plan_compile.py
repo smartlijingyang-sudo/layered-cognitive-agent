@@ -24,6 +24,7 @@ from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
     ActionAuthorityPlan,
 )
+from lca.harness.declarative.compile.action.authority import compile_action_authority
 from lca.contracts.protocols.state.plan import (
     COMPILED_RUN_PLAN_VERSION,
     CompiledRunPlan,
@@ -179,7 +180,10 @@ def compile_plan(
             # v2 ADR-0221 P3: phase_graph + phase_bindings retired from
             # CompiledRunPlan; runtime builds the executable plan via
             # PlanInterpreter + NodeExecutor subgraphs at boot.
-            action_authority=ActionAuthorityPlan(),
+            # Empty ActionAuthorityPlan() left Body registry vacant ->
+            # UnregisteredActionError on use_tool + outer max_visits loop.
+            # Empty plugin_specs => SOLO defaults (respond/use_tool/stop/ask_human).
+            action_authority=compile_action_authority(()),
         ),
         resolved=resolved,
     )
