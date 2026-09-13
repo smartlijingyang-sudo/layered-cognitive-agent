@@ -54,7 +54,7 @@ nodes:
     factory: reflect.critique
     config:
       provider_kind: lca
-      provider_ref: agent_lab.adapters.lca_reflect:LcaReflectCriticProvider
+      provider_ref: lca.plugins.lab.reflect.ops:LcaReflectCriticProvider
       provider_config: {}
     ins: [combined]
     outs: [reflection]

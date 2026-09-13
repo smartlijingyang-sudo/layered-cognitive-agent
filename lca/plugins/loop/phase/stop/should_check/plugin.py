@@ -80,13 +80,9 @@ class StopShouldCheckExecutor:
         context: NodeContext,
         input: NodeInput,
     ) -> NodeOutput:
-        import sys
-        print(f"[StopShouldCheckExecutor] node_execute called", file=sys.stderr)
         runtime = context.runtime or {}
         policy = runtime.get("stop_policy")
-        print(f"[StopShouldCheckExecutor] policy: {type(policy).__name__ if policy else None}", file=sys.stderr)
         if not isinstance(policy, StopPolicy):
-            print(f"[StopShouldCheckExecutor] No valid policy, returning default", file=sys.stderr)
             return NodeOutput(
                 port_values={
                     "stop_decision": StopDecision(
