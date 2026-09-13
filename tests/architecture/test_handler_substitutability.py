@@ -24,7 +24,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
 )
 from lca.contracts.protocols.state.delta_handler import DeltaHandler, DeltaHandlerRegistry
 from lca.harness.declarative.execute.dispatch import RegistryEffectDispatcher
-from lca.loop.driver import RuntimePhaseCapabilities
+from lca.runtime.support.runtime_bindings import RuntimePhaseCapabilities
 from lca.plugins.act.action.handlers_provider import (
     DefaultActionHandlerRegistry,
     InMemoryActionHandlerRegistry,
@@ -289,7 +289,8 @@ def test_declarative_execution_uses_registry_dispatch() -> None:
         for call in ast.walk(execution)
         if isinstance(call, ast.Call) and isinstance(call.func, ast.Attribute)
     }
-    assert "GraphAssembler" in called_names
+    # ADR-0221 P3: production Turn module must NOT construct GraphAssembler.
+    assert "GraphAssembler" not in called_names
     assert "new_interpreter" in called_attributes
 
 

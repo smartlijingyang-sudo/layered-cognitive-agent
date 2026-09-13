@@ -91,7 +91,7 @@ def _mermaid_text(value: str) -> str:
 
 
 def audit_declarative_boundaries(root: Path) -> dict[str, Any]:
-    """Reject implementation-identity dispatch in MTK and GraphAssembler."""
+    """Reject implementation-identity dispatch in MTK and PlanInterpreter (v2)."""
     files = (
         root / "lca/contracts/protocols/declarative_phase_graph.py",
         root / "lca/harness/declarative/compile/assembler.py",

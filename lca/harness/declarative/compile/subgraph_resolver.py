@@ -39,9 +39,10 @@ from lca.contracts.protocols.declarative.declarative_1.declarative_graph import 
     PhaseEdge,
     PhaseNode,
     SubgraphReference,
-    SubgraphResolver,
     ValidationReport,
 )
+from lca.harness.declarative.compile.subgraph_validation import SubgraphResolver
+
 from lca.contracts.protocols.state.plan import COMPILED_RUN_PLAN_VERSION, CompiledRunPlan
 from lca.contracts.protocols.state.scope_plan import BudgetCeiling, ScopePlan
 from lca.harness.plan import build_input_provenance
