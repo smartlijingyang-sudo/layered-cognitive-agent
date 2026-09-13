@@ -44,7 +44,6 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
 )
 from lca.contracts.protocols.state.plan import CompiledRunPlan
 from lca.harness.declarative.compile.assembler.assembler import (
-    GraphAssembler,
     MappingRestrictedScope,
 )
 from lca.harness.declarative.compile.subgraph_validation import (
@@ -271,61 +270,3 @@ class TestValidateSubgraphReferences:
             validate_subgraph_references(plan, resolver)  # type: ignore[arg-type]
         assert excinfo.value.code == "PG-004"
         assert "reflect.main" in str(excinfo.value)
-
-
-class TestGraphAssemblerSubgraphWiring:
-    """The assembler delegates to the validator when a resolver is set."""
-
-    def _assemble(self, plan: CompiledRunPlan, resolver: object | None) -> None:
-        GraphAssembler(subgraph_resolver=resolver).assemble(
-            plan,
-            MappingRestrictedScope(capabilities={"phase.test.recording": _RecordingExecutor()}),
-        )
-
-    def test_no_resolver_skips_subgraph_validation(self) -> None:
-        edge = PhaseEdge(source="reflect.main", target="remember.main", when="true")
-        plan = _make_outer_plan(edge=edge)
-        # No resolver wired → validation pass is skipped. Existing
-        # behavior preserved for plans without subgraph refs.
-        self._assemble(plan, resolver=None)
-
-    def test_resolver_invoked_when_subgraph_ref_present(self) -> None:
-        edge = PhaseEdge(
-            source="reflect.main",
-            target="remember.main",
-            when="true",
-            subgraph_ref=SubgraphReference(
-                plan_ref="bundles/reflect-subgraph.yaml",
-                entry_node="reflect.inner_score",
-                binding_edge="reflect.main",
-            ),
-        )
-        plan = _make_outer_plan(edge=edge)
-        sub_plan = _make_subgraph_plan(
-            entry_node="reflect.inner_score",
-            back_ref_plan="reflect.main",
-        )
-        resolver = _StubResolver({"bundles/reflect-subgraph.yaml": sub_plan})
-
-        self._assemble(plan, resolver=resolver)
-
-        assert resolver.called == ["bundles/reflect-subgraph.yaml"]
-
-    def test_unresolved_reference_raises_pg_004_from_assembler(self) -> None:
-        edge = PhaseEdge(
-            source="reflect.main",
-            target="remember.main",
-            when="true",
-            subgraph_ref=SubgraphReference(
-                plan_ref="does/not/exist.yaml",
-                entry_node="reflect.inner_score",
-                binding_edge="reflect.main",
-            ),
-        )
-        plan = _make_outer_plan(edge=edge)
-        resolver = _StubResolver()
-
-        with pytest.raises(DeclarativeValidationError) as excinfo:
-            self._assemble(plan, resolver=resolver)
-        assert excinfo.value.code == "PG-004"
-        assert "does/not/exist.yaml" in str(excinfo.value)

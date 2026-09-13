@@ -28,7 +28,6 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
 from lca.contracts.protocols.state.plan import CompiledRunPlan
 from lca.harness.declarative.compile.assembler.assembler import (
     ExecutableNode,
-    GraphAssembler,
     MappingRestrictedScope,
 )
 from lca.harness.declarative.compile.instrument.wrap import (
@@ -87,24 +86,6 @@ def _compile_single_node_plan() -> CompiledRunPlan:
         phase_graph=phase_graph,
         phase_bindings=(phase_binding,),
         validation_report=ValidationReport(issues=()),
-    )
-
-
-def test_assembler_wraps_with_instrument() -> None:
-    """Every ``ExecutableNode.executor.execute`` must carry instrument markers."""
-    plan = _compile_single_node_plan()
-    scope = MappingRestrictedScope(capabilities={"phase.test.recording": _RecordingExecutor()})
-    executable = GraphAssembler().assemble(plan, scope)
-
-    assert "perceive.main" in executable.nodes
-    node = executable.nodes["perceive.main"]
-    assert isinstance(node, ExecutableNode)
-    runnable = node.executor.execute
-    assert getattr(runnable, WRAP_INSTRUMENTED_ATTR, False) is True, (
-        f"node {node.node_id!r} executor is missing {WRAP_INSTRUMENTED_ATTR}"
-    )
-    assert getattr(runnable, "wrap_provenance", None) == ASSEMBLER_PROVENANCE, (
-        f"node {node.node_id!r} executor wrap_provenance is not {ASSEMBLER_PROVENANCE!r}"
     )
 
 

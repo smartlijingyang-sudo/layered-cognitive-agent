@@ -104,7 +104,6 @@ async def test_declarative_execution_uses_the_injected_turn_journal() -> None:
     interpretation = object()
 
     with (
-        patch("lca.loop.driver.GraphAssembler") as assembler,
         patch(
             "lca.runtime.runtime_bindings.DeclarativeRuntimeBindings.new_interpreter"
         ) as interpreter_factory,

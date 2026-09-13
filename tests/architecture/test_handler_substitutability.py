@@ -289,7 +289,6 @@ def test_declarative_execution_uses_registry_dispatch() -> None:
         for call in ast.walk(execution)
         if isinstance(call, ast.Call) and isinstance(call.func, ast.Attribute)
     }
-    assert "GraphAssembler" in called_names
     assert "new_interpreter" in called_attributes
 
 
