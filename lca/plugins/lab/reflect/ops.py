@@ -59,7 +59,11 @@ class LcaReflectCriticProvider:
 
     @classmethod
     def from_node_config(cls, config: dict[str, Any]) -> LcaReflectCriticProvider:
-        cfg = config.get("provider_config") or {}
+        # The invoke framework extracts ``provider_config`` from the node
+        # config and passes it as a standalone kwarg, so ``config`` here
+        # is already the provider_config dict (e.g. {"fixture_critic_name": ...}).
+        # Support both the flat form and the legacy nested form.
+        cfg = config.get("provider_config") if "provider_config" in config else config
         name = cfg.get("fixture_critic_name")
         if name and name in _FIXTURE_CRITICS:
             return cls(_critic=_FIXTURE_CRITICS[name])
@@ -113,7 +117,7 @@ class LcaReflectMemoryProvider:
 
     @classmethod
     def from_node_config(cls, config: dict[str, Any]) -> LcaReflectMemoryProvider:
-        cfg = config.get("provider_config") or {}
+        cfg = config.get("provider_config") if "provider_config" in config else config
         name = cfg.get("fixture_memory_name")
         if name and name in _FIXTURE_MEMORIES:
             return cls(_memory=_FIXTURE_MEMORIES[name])

@@ -36,18 +36,16 @@ def _candidates_from_reflection(content: dict[str, Any]) -> list[dict[str, Any]]
 
 def extract(
     *,
-    reflection: Artifact | None,
+    reflection: Artifact,
 ) -> dict[str, Artifact]:
     """从 reflection artifact 抽出 reflection_out / memory_candidates / reflect_signal。"""
-    content: dict[str, Any] = (
-        dict(reflection.content) if reflection is not None and isinstance(reflection.content, dict) else {}
-    )
+    content: dict[str, Any] = dict(reflection.content)
     candidates = _candidates_from_reflection(content)
     return {
         "reflection_out": Artifact(
             kind=ArtifactKind.FACT,
             content=content,
-            schema_ref=getattr(reflection, "schema_ref", None) or "reflection.v1",
+            schema_ref=reflection.schema_ref or "reflection.v1",
         ),
         "memory_candidates": Artifact(
             kind=ArtifactKind.FACT,

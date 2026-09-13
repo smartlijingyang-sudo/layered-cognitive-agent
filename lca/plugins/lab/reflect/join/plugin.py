@@ -9,9 +9,9 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
 
 def join(
     *,
-    in_observation: Artifact | None,
-    in_decision: Artifact | None,
-    in_prior_reflection: Artifact | None,
+    in_observation: Artifact,
+    in_decision: Artifact,
+    in_prior_reflection: Artifact,
 ) -> dict[str, Artifact]:
     """把所有输入 artifact 的 content 合并成一个 combined。"""
     merged: dict[str, object] = {}
@@ -20,7 +20,7 @@ def join(
         "in_decision": in_decision,
         "in_prior_reflection": in_prior_reflection,
     }.items():
-        content = artifact.content if artifact is not None else None
+        content = artifact.content
         merged[port_name] = content if isinstance(content, dict) else {"_raw": content}
     return {
         "combined": Artifact(

@@ -65,6 +65,10 @@ def invoke(
 
     load_all()
     marker = _LAB_HOOKS.get(node.factory)
+    if marker is None:
+        # YAML factory names (e.g. ``reflect.join``) are short forms;
+        # bind_worker registers under ``lab.<stage>.<basename>``.
+        marker = _LAB_HOOKS.get(f"lab.{node.factory}")
     if marker is None or "worker_fn" not in marker:
         # 无反射 worker:host passthrough(``identity``-like)或 fail-loud。
         if node.factory in _HOST:

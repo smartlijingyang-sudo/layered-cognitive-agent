@@ -55,7 +55,7 @@ LCA_PATHS: tuple[LcaPath, ...] = (
         "lca.contracts.atoms.ids.ids",
         "new_id",
         LcaStatus.OK,
-        ("nodes/reflect/critique", "adapters/lca_reflect"),
+        ("nodes/reflect/critique", "plugins/lab/reflect/ops"),
     ),
     LcaPath(
         "lca.contracts.models.core.execution.decision",
@@ -134,7 +134,7 @@ LCA_PATHS: tuple[LcaPath, ...] = (
         "lca.contracts.models.core.state.state",
         "AgentState",
         LcaStatus.OK,
-        ("nodes/perceive/commit", "nodes/reflect/critique", "adapters/lca_reflect"),
+        ("nodes/perceive/commit", "plugins/lab/reflect/ops"),
     ),
     LcaPath(
         "lca.contracts.models.team.role.team",

@@ -50,7 +50,7 @@ def test_reflect_subgraph_loads_and_compiles() -> None:
 
 def test_lca_reflect_critic_provider_default() -> None:
     """Default critic returns a Reflection artifact with ON_TRACK verdict."""
-    from agent_lab.adapters.lca_reflect import LcaReflectCriticProvider
+    from lca.plugins.lab.reflect.ops import LcaReflectCriticProvider
 
     provider = LcaReflectCriticProvider.from_node_config({})
     combined = Artifact(
@@ -78,7 +78,7 @@ def test_lca_reflect_critic_provider_default() -> None:
 
 def test_lca_reflect_critic_provider_with_fixture() -> None:
     """fixture_critic_name overrides the default with a custom verdict."""
-    from agent_lab.adapters.lca_reflect import (
+    from lca.plugins.lab.reflect.ops import (
         LcaReflectCriticProvider,
         register_fixture_critic,
         unregister_fixture_critic,
@@ -124,11 +124,8 @@ def test_lca_reflect_critic_provider_with_fixture() -> None:
 
 def test_reflect_extract_derives_candidates_from_lesson() -> None:
     """reflect.extract turns lesson/correction into candidates; no durable write."""
-    from agent_lab.nodes.reflect.extract.plugin import ReflectExtract
+    from lca.plugins.lab.reflect.extract.plugin import extract as reflect_extract
 
-    node = ReflectExtract.__new__(ReflectExtract)
-    node.config = {}
-    node.outs = ["reflection_out", "memory_candidates", "reflect_signal"]
     reflection = Artifact(
         kind=ArtifactKind.FACT,
         content={
@@ -140,7 +137,7 @@ def test_reflect_extract_derives_candidates_from_lesson() -> None:
         },
         schema_ref="reflection.v1",
     )
-    out = node.execute(node, {"reflection": reflection})
+    out = reflect_extract(reflection=reflection)
     assert out["reflection_out"].content["reflection_id"] == "refl_lesson"
     items = out["memory_candidates"].content["items"]
     kinds = {item["kind"] for item in items}
@@ -152,17 +149,14 @@ def test_reflect_extract_derives_candidates_from_lesson() -> None:
 
 
 def test_reflect_extract_empty_reflection_yields_no_candidates() -> None:
-    from agent_lab.nodes.reflect.extract.plugin import ReflectExtract
+    from lca.plugins.lab.reflect.extract.plugin import extract as reflect_extract
 
-    node = ReflectExtract.__new__(ReflectExtract)
-    node.config = {}
-    node.outs = ["reflection_out", "memory_candidates", "reflect_signal"]
     reflection = Artifact(
         kind=ArtifactKind.FACT,
         content={"reflection_id": "refl_empty", "verdict": "on_track", "lesson": None},
         schema_ref="reflection.v1",
     )
-    out = node.execute(node, {"reflection": reflection})
+    out = reflect_extract(reflection=reflection)
     assert out["memory_candidates"].content["items"] == []
     assert out["reflect_signal"].content["verdict"] == "on_track"
 
@@ -174,7 +168,7 @@ def test_reflect_extract_empty_reflection_yields_no_candidates() -> None:
 
 def test_reflect_subgraph_runs_via_runner() -> None:
     """The reflect sub-graph runs end-to-end through agent_lab's runner."""
-    from agent_lab.adapters.lca_reflect import (
+    from lca.plugins.lab.reflect.ops import (
         register_fixture_critic,
         unregister_fixture_critic,
     )
@@ -203,7 +197,7 @@ def test_reflect_subgraph_runs_via_runner() -> None:
                 n.config = {
                     **dict(n.config or {}),
                     "provider_kind": "lca",
-                    "provider_ref": "agent_lab.adapters.lca_reflect:LcaReflectCriticProvider",
+                    "provider_ref": "lca.plugins.lab.reflect.ops:LcaReflectCriticProvider",
                     "provider_config": {"fixture_critic_name": name},
                 }
 
