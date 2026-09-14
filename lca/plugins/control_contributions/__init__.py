@@ -9,20 +9,16 @@ from lca.plugins.loop.control.observe_checkpoint.plugin import ObserveCheckpoint
 from lca.plugins.loop.control.observe_wildcard.plugin import ObserveWildcardExecutor
 from lca.plugins.loop.control.perceive_context.plugin import PerceiveContextExecutor
 from lca.plugins.loop.control.remember_admit.plugin import RememberAdmitExecutor
-from lca.plugins.loop.control.stop_decide.plugin import StopDecideExecutor
-from lca.plugins.loop.control.stop_focus.plugin import FocusStopExecutor
 from lca.plugins.loop.control.think_guard.plugin import (
     ThinkGuardEnforceExecutor,
     ThinkGuardExecutor,
 )
 
 __all__ = [
-    "FocusStopExecutor",
     "ObserveCheckpointExecutor",
     "ObserveWildcardExecutor",
     "PerceiveContextExecutor",
     "RememberAdmitExecutor",
-    "StopDecideExecutor",
     "ThinkGuardEnforceExecutor",
     "ThinkGuardExecutor",
 ]

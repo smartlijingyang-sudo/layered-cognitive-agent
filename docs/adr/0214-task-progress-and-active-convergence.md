@@ -20,7 +20,7 @@
 **编号**: 0214 (0213 已占用,0214–0222 范围预留)
 
 **关系**:
-- **Builds on**: ADR-0158 (StopDecision / TerminalOutcome SSOT) · ADR-0186 (Session SSOT) · ADR-0191 (turn.control.v1 fold) · ADR-0194 (认知 Loop 架构收敛) · ADR-0195 (平台架构收敛 + §1.4 单写矩阵 + §2.5 P5) · ADR-0211 (Worker Contract 收紧) · ADR-0212 (step_tree 派生面 SSOT)
+- **Builds on**: ADR-0158 (StopDecision / TerminalOutcome SSOT) · ADR-0186 (Session SSOT) · ADR-0191 (turn.control.v1 fold) · ADR-0194 (认知 Loop 架构收敛) · ADR-0195 (平台架构收敛 + §1.4 单写矩阵 + §2.5 P5) · ADR-0212 (step_tree 派生面 SSOT)
 - **Refines**: ADR-0077 (TerminalOutcome 的 "task_progress_complete" 新 stop_reason) · ADR-0051 (tool loop breaker, **不删**, 升级为 multi-tool 视角) · PG-007 (扩展 precondition + terminal_predicate)
 - **Supersedes**: 无
 - **Reject**: 「在 SkillSet 路由层做熔断」(违反 ADR-0195 §1.4 单一写者矩阵,引入第二事实源);「用更强 LLM 替代」(违反 ADR-0062 G0 机制不可插件化);「把 task_progress 放在 prompt 自由文本里」(违反 C13 信息血统闭合,跨边界必须有 typed Contract);「保留单工具 tool_loop_breaker 同时删 task_progress」(违反 C6 最小化与本 ADR §0.1 第一性原理)

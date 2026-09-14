@@ -71,7 +71,6 @@ from lca.contracts.models.team.team.coordination import (
 from lca.contracts.protocols import (
     DecisionGate,
     SharedMemoryStore,
-    StopPolicy,
     TransportRegistryProtocol,
 )
 from lca.contracts.protocols.act.action.action import Action, ActionRegistryProtocol

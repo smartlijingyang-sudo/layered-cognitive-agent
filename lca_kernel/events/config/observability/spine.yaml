@@ -736,6 +736,23 @@ events:
       step: int
       run_id: str
       outcome: str
+
+  - category: spine.terminal.commit
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
+    fields:
+      run_id: str
+      outcome: str
+      reason: str
+      final_output: str
+
+  - category: spine.body.deterministic_fail
+    plane: lca.contracts.event.Plane.STRUCTURAL
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
+    fields:
+      run_id: str
+      tool_name: str
+      error: str
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
       - lca.loop.fact_gateway.DefaultFactGateway

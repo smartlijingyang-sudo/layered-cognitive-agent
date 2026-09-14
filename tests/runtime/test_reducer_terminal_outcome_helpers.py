@@ -104,7 +104,6 @@ class TestClassifyKind:
     def test_working_without_output_becomes_failed_with_fallback_message(self) -> None:
         state = _state(TaskStatus.WORKING)
         stop = StopDecision(
-            should_stop=True,
             reason=StopReason.BUDGET_EXCEEDED,
             final_output=None,
             status=TaskStatus.WORKING,
@@ -120,8 +119,7 @@ class TestClassifyKind:
         """WORKING + should_stop + non-empty response_text is authoritative."""
         state = _state(TaskStatus.WORKING)
         stop = StopDecision(
-            should_stop=True,
-            reason=StopReason.TASK_COMPLETED,
+            reason=StopReason.CONTINUE,
             final_output="hello",
             status=None,  # legacy producer omits status
         )
@@ -136,8 +134,7 @@ class TestClassifyKind:
     def test_completed_with_output_stays_completed(self) -> None:
         state = _state(TaskStatus.COMPLETED)
         stop = StopDecision(
-            should_stop=True,
-            reason=StopReason.TASK_COMPLETED,
+            reason=StopReason.CONTINUE,
             final_output="done",
             status=TaskStatus.COMPLETED,
         )
@@ -152,8 +149,7 @@ class TestClassifyKind:
         state = _state(TaskStatus.COMPLETED)
         state.history.append(_turn(action_type=ActionType.HANDOFF, response_text=None))
         stop = StopDecision(
-            should_stop=True,
-            reason=StopReason.TASK_COMPLETED,
+            reason=StopReason.CONTINUE,
             final_output=None,
             status=TaskStatus.COMPLETED,
         )
@@ -166,8 +162,7 @@ class TestClassifyKind:
         """COMPLETED with no output and no HANDOFF → zero-output guard → FAILED."""
         state = _state(TaskStatus.COMPLETED)
         stop = StopDecision(
-            should_stop=True,
-            reason=StopReason.TASK_COMPLETED,
+            reason=StopReason.CONTINUE,
             final_output=None,
             status=TaskStatus.COMPLETED,
         )
@@ -182,7 +177,6 @@ class TestClassifyKind:
         state = _state(TaskStatus.FAILED)
         state.last_error = "boom"
         stop = StopDecision(
-            should_stop=True,
             reason=StopReason.ERROR,
             final_output=None,
             status=TaskStatus.FAILED,
@@ -197,7 +191,6 @@ class TestClassifyKind:
     def test_failed_without_error_gets_phase_failure_fallback(self) -> None:
         state = _state(TaskStatus.FAILED)
         stop = StopDecision(
-            should_stop=True,
             reason=StopReason.ERROR,
             final_output=None,
             status=TaskStatus.FAILED,
@@ -211,7 +204,6 @@ class TestClassifyKind:
     def test_input_required_becomes_waiting_input(self) -> None:
         state = _state(TaskStatus.INPUT_REQUIRED)
         stop = StopDecision(
-            should_stop=True,
             reason=StopReason.CONTINUE,
             final_output=None,
             status=TaskStatus.INPUT_REQUIRED,
@@ -225,7 +217,6 @@ class TestClassifyKind:
     def test_canceled_becomes_canceled(self) -> None:
         state = _state(TaskStatus.CANCELED)
         stop = StopDecision(
-            should_stop=True,
             reason=StopReason.CONTINUE,
             final_output=None,
             status=TaskStatus.CANCELED,
@@ -249,7 +240,6 @@ class TestBuildErrorRef:
         state = _state()
         state.last_error = "boom"
         stop = StopDecision(
-            should_stop=True,
             reason=StopReason.ERROR,
             final_output=None,
             status=TaskStatus.FAILED,
@@ -265,7 +255,6 @@ class TestBuildErrorRef:
         state = _state()
         assert not state.last_error
         stop = StopDecision(
-            should_stop=True,
             reason=StopReason.ERROR,
             final_output=None,
             status=TaskStatus.FAILED,
@@ -281,7 +270,6 @@ class TestBuildErrorRef:
         state = _state()
         assert not state.last_error
         stop = StopDecision(
-            should_stop=True,
             reason=StopReason.CONTINUE,
             final_output=None,
             status=TaskStatus.CANCELED,
@@ -296,7 +284,6 @@ class TestBuildErrorRef:
         state = _state()
         assert not state.last_error
         stop = StopDecision(
-            should_stop=True,
             reason=StopReason.CONTINUE,
             final_output=None,
             status=None,
@@ -310,8 +297,7 @@ class TestBuildErrorRef:
     def test_completed_returns_none(self) -> None:
         state = _state()
         stop = StopDecision(
-            should_stop=True,
-            reason=StopReason.TASK_COMPLETED,
+            reason=StopReason.CONTINUE,
             final_output="ok",
             status=TaskStatus.COMPLETED,
         )
@@ -322,7 +308,6 @@ class TestBuildErrorRef:
     def test_waiting_input_returns_none(self) -> None:
         state = _state()
         stop = StopDecision(
-            should_stop=True,
             reason=StopReason.CONTINUE,
             final_output=None,
             status=TaskStatus.INPUT_REQUIRED,
@@ -343,8 +328,7 @@ class TestOrchestratorEndToEnd:
     def test_completed_with_output(self) -> None:
         state = _state(TaskStatus.WORKING)
         stop = StopDecision(
-            should_stop=True,
-            reason=StopReason.TASK_COMPLETED,
+            reason=StopReason.CONTINUE,
             final_output="Hello, world!",
             status=TaskStatus.COMPLETED,
         )
@@ -366,8 +350,7 @@ class TestOrchestratorEndToEnd:
         """Legacy producer omits status; non-empty output is authoritative."""
         state = _state(TaskStatus.WORKING)
         stop = StopDecision(
-            should_stop=True,
-            reason=StopReason.TASK_COMPLETED,
+            reason=StopReason.CONTINUE,
             final_output="legacy output",
             status=None,
         )
@@ -378,12 +361,11 @@ class TestOrchestratorEndToEnd:
         assert outcome.kind is TerminalOutcomeKind.COMPLETED
         assert outcome.final_output_ref is not None
         assert outcome.final_output_ref.text == "legacy output"
-        assert outcome.stop_reason == StopReason.TASK_COMPLETED.value
+        assert outcome.stop_reason == StopReason.CONTINUE.value
 
     def test_failed_without_output(self) -> None:
         state = _state(TaskStatus.WORKING)
         stop = StopDecision(
-            should_stop=True,
             reason=StopReason.BUDGET_EXCEEDED,
             final_output=None,
             status=TaskStatus.WORKING,
@@ -401,7 +383,6 @@ class TestOrchestratorEndToEnd:
         state = _state(TaskStatus.FAILED)
         state.last_error = "Something went wrong"
         stop = StopDecision(
-            should_stop=True,
             reason=StopReason.ERROR,
             final_output=None,
             status=TaskStatus.FAILED,
@@ -417,7 +398,6 @@ class TestOrchestratorEndToEnd:
     def test_waiting_input_without_cursor_raises(self) -> None:
         state = _state(TaskStatus.INPUT_REQUIRED)
         stop = StopDecision(
-            should_stop=True,
             reason=StopReason.CONTINUE,
             final_output=None,
             status=TaskStatus.INPUT_REQUIRED,
@@ -429,7 +409,6 @@ class TestOrchestratorEndToEnd:
         state = _state(TaskStatus.INPUT_REQUIRED)
         cursor = ResumeCursor(cursor="cur-1", session_seq=2, approval_id="app-1")
         stop = StopDecision(
-            should_stop=True,
             reason=StopReason.CONTINUE,
             final_output=None,
             status=TaskStatus.INPUT_REQUIRED,
@@ -444,7 +423,6 @@ class TestOrchestratorEndToEnd:
     def test_canceled_kind_and_error_ref(self) -> None:
         state = _state(TaskStatus.CANCELED)
         stop = StopDecision(
-            should_stop=True,
             reason=StopReason.CONTINUE,
             final_output=None,
             status=TaskStatus.CANCELED,
@@ -462,7 +440,6 @@ class TestOrchestratorEndToEnd:
     def test_working_terminal_becomes_failed_with_chinese_fallback(self) -> None:
         state = _state(TaskStatus.WORKING)
         stop = StopDecision(
-            should_stop=True,
             reason=StopReason.BUDGET_EXCEEDED,
             final_output=None,
             status=None,
@@ -480,8 +457,7 @@ class TestOrchestratorEndToEnd:
         state = _state(TaskStatus.COMPLETED)
         state.history.append(_turn(action_type=ActionType.HANDOFF, response_text=None))
         stop = StopDecision(
-            should_stop=True,
-            reason=StopReason.TASK_COMPLETED,
+            reason=StopReason.CONTINUE,
             final_output=None,
             status=TaskStatus.COMPLETED,
         )

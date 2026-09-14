@@ -170,7 +170,8 @@ contracts → infrastructure → cognition → runtime → agent
 | 场景 | 命令 |
 |---|---|
 | 服务状态 / 重启 / 触发 run | `status --json` / `kernel-restart` / `runs create --user-text "..."` |
-| run 失败 / E2E 冒烟 | `debug-run <run_id>` / `e2e timeline` |
+| run 图观测(第一步) | `timeline <run_id>`(=`observation run-replay --show-graph`) |
+| run 失败摘要 / E2E 冒烟 | `debug-run <run_id>` / `e2e timeline` |
 | notes 体检 / ADR 审计 | `notes-check` / `notes-audit` |
 | 审计 Reducer 单写 / 能力归属 | `audit-state-writers` / `why <capability>` |
 | 声明图编译/逐层 inflate | `plan compile <p>` / `plan validate <json>` / `plan tree <p>` |

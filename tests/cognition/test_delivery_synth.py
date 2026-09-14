@@ -8,11 +8,8 @@ from lca.cognition.convergence.payload import (
     is_substantive_stdout,
     turn_has_delivery_signal,
 )
-from lca.cognition.convergence.task_class import resolve_task_class
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.models.core.execution.decision import Decision, Observation, ToolCall, Turn
-from lca.contracts.models.core.perceive.perception import ContextItem, ContextManifest
-from lca.contracts.models.core.perceive.projection import PerceiveProjection
 from lca.contracts.models.core.state.state import AgentState, Budget
 from tests.support.session_gate_helpers import append_control_turn, bound_session
 
@@ -51,26 +48,6 @@ def test_synthesize_includes_producer_stdout() -> None:
         assert evidence.satisfied is True
         text = synthesize_delivery_response(state, evidence)
         assert joke in text
-
-
-def test_resolve_task_class_prefers_manifest_hint() -> None:
-    manifest = ContextManifest(
-        digest="d",
-        items=(
-            ContextItem(
-                kind="convergence_task_class",
-                payload="visual_artifact",
-                provenance="test",
-            ),
-        ),
-    )
-    state = AgentState(
-        trace_id="t",
-        task="用python写一个图计划的笑话",
-        budget=Budget(),
-        perceive=PerceiveProjection(manifest=manifest, digest="d", step=1),
-    )
-    assert resolve_task_class(state) == "visual_artifact"
 
 
 # ---------------------------------------------------------------------------

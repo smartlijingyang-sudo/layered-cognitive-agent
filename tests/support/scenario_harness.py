@@ -110,7 +110,6 @@ _CLOSED_SET: frozenset[str] = frozenset(
         "lca-sensor-test-results",
         "lca-sensor-prev-patches",
         "sensor.clock",
-        "sensor.convergence-task",
         "sensor.workspace-artifacts",
         "sensor.inbox-facts",
         "sensor.team-inbox",

@@ -1,4 +1,10 @@
-"""Perceive, memory, state, and stop-cluster assembly helpers."""
+"""Perceive, memory, and state assembly helpers.
+
+Post-retirement (plan `docs/plans/2026-09-14-stop-decision-retirement.md`),
+the State-cluster stop policy is gone. The fixed `stop` phase is replaced
+by the `terminal.commit` outer node; loop termination is driven by the
+model's own `decision.action_type` and by Body's `DeterministicToolError`.
+"""
 
 from __future__ import annotations
 
@@ -14,7 +20,6 @@ from lca.contracts.protocols import (
     PerceiveHub,
     SharedMemoryStore,
     StateStore,
-    StopPolicy,
 )
 from lca.contracts.protocols.journal.spec.spec import STATE_STORE_CHOICE_PROFILE_DEFAULT
 from lca.infrastructure.capability.memory.memory import MemoryService
@@ -79,15 +84,8 @@ def build_perceive_hub(
     )
 
 
-def resolve_stop_policy(*, scope: object) -> StopPolicy:
-    """Resolve the State-cluster policy consumed only by the fixed stop phase."""
-
-    return cast("StopPolicy", require_capability(scope, "stop_policy"))
-
-
 __all__ = [
     "build_perceive_hub",
     "resolve_memory",
     "resolve_state_store",
-    "resolve_stop_policy",
 ]

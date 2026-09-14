@@ -78,6 +78,8 @@ SPINE_EXECUTION_POINTS: tuple[str, ...] = (
     "phase.tool.call.start",
     "phase.tool.call.end",
     "phase.tool.denied",
+    "terminal.commit",
+    "body.deterministic_fail",
     # Lifecycle normalization (ADR-0166 S5)
     "lifecycle.finally",
     "body.sandbox.enter",
@@ -254,6 +256,8 @@ _SPINE_EP_TO_CATEGORY: dict[str, str] = {
     "phase.think.fold": "spine.phase.think.fold",
     "phase.remember.fold": "spine.phase.remember.fold",
     "phase.stop.fold": "spine.phase.stop.fold",
+    "terminal.commit": "spine.terminal.commit",
+    "body.deterministic_fail": "spine.body.deterministic_fail",
     "phase.reflect.fold": "spine.phase.reflect.fold",
     "phase.act.fold.start": "spine.phase.act.fold.start",
     "phase.act.fold.end": "spine.phase.act.fold.end",

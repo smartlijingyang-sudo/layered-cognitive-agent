@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the temporary `phase.think.subgraph_host` + `_shared.py` glue with five flat L2 phase plugins (`phase.think.{shortcut,route,reason,classify,gate}`) plus a thin `phase.think.orchestrator`, matching the shape of `agent_lab/graphs/configs/act.yaml`.
+**Goal:** Replace the temporary `phase.think.subgraph_host` + `_shared.py` glue with five flat L2 phase plugins (`phase.think.{shortcut,route,reason,classify,gate}`) plus a thin `phase.think.orchestrator`, matching the shape of the InfoEdge prototype's `act.yaml`.
 
 **Architecture:** Each step plugin reads its dependency directly from `PhaseContext.capabilities` (typed contract, C13). The `SubgraphPhaseRunner` owns the cross-node `ThinkSubgraphCarry` plumbing. The orchestrator plugin is just a `SubgraphPhaseRunner.run_terminal_subgraph` wrapper.
 

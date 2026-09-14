@@ -36,8 +36,12 @@ class ProfileSource:
 
     ``regions_declare`` (ADR-0210 §6.2) carries the profile's optional
     custom region tag declarations (e.g. ``phase:plan`` / ``phase:replan``).
-    Empty tuple = no custom regions; the C14 closed set is just the 6-stage
-    recommended + bare-enum set (see agent_lab.profile_loader).
+    Empty tuple = no custom regions. This is a parsed fact with no
+    validating consumer: labels are not checked against a region closed
+    set before they reach ``resolve_factory``, so a malformed region
+    surfaces as a factory lookup miss rather than a profile error. The
+    closed-set mechanism is specified in
+    ``docs/design/2026-09-14-agent-lab-info-graph-reference.md`` §4.4.
     """
 
     profile_path: Path
@@ -101,12 +105,11 @@ def load_profile_source(
     )
     env_map = dict(os.environ if env is None else env)
     expand_entry_environment(entries, env_map)
-    # ADR-0210 §6.2 — read profile.regions.declare for the P7 region-tag
-    # closed set extension. ProfileSource carries this as an immutable
-    # tuple so the C14 region validator (and the runtime region
-    # fallback in interpreter.py) can read it without re-parsing the
-    # profile. We extract from the same parsed dict so any
-    # patch-driven transformation above is reflected.
+    # ADR-0210 §6.2 — profile.regions.declare is the P7 region-tag closed
+    # set extension. Carried as an immutable tuple so consumers read the
+    # parsed fact instead of re-parsing the profile. Extracted from the
+    # same dict as the entries so any patch-driven transformation above
+    # is reflected.
     regions_declare = _parse_regions_declare(raw)
     return ProfileSource(
         profile_path=_profile_identity(path),

@@ -39,7 +39,7 @@ class EffectReceipt:
     deterministic failures the agent cannot retry into success,
     ``"transient"`` for retryable infra errors, ``None`` for success or
     any failure class the body has not yet classified. The cognition
-    seam (``DefaultStopPolicy._deterministic_failure_stop``,
+    seam (``act.observe.should_terminate`` propagation and
     ``ReflectObservationBuildExecutor._build_observation``) reads
     this field directly — keeping it on the EffectReceipt is the
     single SSOT for failure classification across the Body↔Cognition

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from lca.cognition.convergence.constants import MIN_SUBSTANTIVE_STDOUT_CHARS
-from lca.cognition.convergence.task_class import task_requires_synthesis
 from lca.contracts.atoms.semantic.cli_diagnostic import is_cli_diagnostic_output
 from lca.contracts.models.core.execution.decision import Observation
 
@@ -85,10 +84,9 @@ def turn_has_delivery_signal(
     files_created: tuple[str, ...] = (),
     task: str = "",
 ) -> bool:
+    del task
     if merge_files_created(payload, files_created=files_created):
         return True
-    if task_requires_synthesis(task):
-        return False
     # Direct list/tuple payload (read-shaped tools) — bypass payload_stdout
     # which only knows the dict-wrapped stdout keys.
     if isinstance(payload, (list, tuple)):

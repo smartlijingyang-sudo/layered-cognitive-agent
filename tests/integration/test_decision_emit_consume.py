@@ -4,8 +4,8 @@ PR-A 范围:Decision DTO 新增 ``task_progress`` 字段 + 默认值兜底兼容
 测试 + 断言 cognition 路径必须显式传。
 
 **注:** 全仓 28+ 处 ``Decision(...)`` 构造点(``lca/cognition/brain/decision_gates/*``,
-``lca/plugins/gate/decision_classifier_provider.py``, ``lca/plugins/lab/think/ops.py``
-等)的显式 ``task_progress=...`` 迁移是 PR-B / PR-D 的职责;PR-A 仅:
+``lca/plugins/gate/decision_classifier_provider.py`` 等)的显式 ``task_progress=...``
+迁移是 PR-B / PR-D 的职责;PR-A 仅:
 
 - 提供 typed Contract (TaskProgress dataclass + Decision 字段)
 - 默认值兼容旧测试 / 迁移态代码
@@ -79,7 +79,6 @@ def test_decision_task_progress_with_invalid_confidence() -> None:
 _DECISION_CALL_SCAN_TARGETS: tuple[str, ...] = (
     "lca/cognition/brain/decision_gates",
     "lca/plugins/gate",
-    "lca/plugins/lab/think",
     "lca/runtime/support",
 )
 

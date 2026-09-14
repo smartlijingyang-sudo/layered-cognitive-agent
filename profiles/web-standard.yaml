@@ -28,7 +28,6 @@ bundles:
   - bundles/perceive_subgraph.yaml
   - bundles/reflect_subgraph.yaml
   - bundles/remember_subgraph.yaml
-  - bundles/stop_subgraph.yaml
 
 patch:
   # EventSpine file sink — boot events process-local; run events under

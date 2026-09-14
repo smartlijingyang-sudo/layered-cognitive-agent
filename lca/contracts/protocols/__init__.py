@@ -267,7 +267,7 @@ from lca.contracts.protocols.runtime.runtime.lifecycle import (
     RuntimeLifecycleSubscriberContribution,
     RuntimeLifecycleSubscriberRegistry,
 )
-from lca.contracts.protocols.runtime.runtime.runtime import Runtime, StopPolicy
+from lca.contracts.protocols.runtime.runtime.runtime import Runtime
 from lca.contracts.protocols.session.run.mode import (
     ModeAdapter,
     RegisteredMode,
@@ -486,7 +486,6 @@ __all__ = [
     "SkillSearchResult",
     "StateStore",
     "StatefulSection",
-    "StopPolicy",
     "StrategyContext",
     "SupportsShortcut",
     "Synthesizer",

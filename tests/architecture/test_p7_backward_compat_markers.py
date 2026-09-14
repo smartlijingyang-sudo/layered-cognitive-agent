@@ -6,8 +6,6 @@ deprecation markers pointing to the P7 region-tag path:
   - CognitivePhaseGraphPlan class docstring
   - PhaseBinding class docstring
   - declarative-phase-graph.yaml bundle header
-  - agent_lab/plugins/base.py (hook helper re-export shim)
-  - agent_lab/plugins/__init__.py (no stale GraphPlugin re-export)
 
 These markers make the 0075/0194 path's status explicit (Optional +
 backward-compat, NOT SSOT) and point to the recommended P7 path
@@ -100,70 +98,6 @@ class TestDeclarativePhaseGraphBundleHeader:
         assert len(data["entries"]) >= 1, (
             "bundle should declare at least one phase entry"
         )
-
-
-# ---------------------------------------------------------------------------
-# agent_lab.plugins.base (hook helper re-export shim)
-# ---------------------------------------------------------------------------
-
-class TestAgentLabPluginsBaseShim:
-    """agent_lab/plugins/base.py is a thin compat shim (no GraphPlugin / no register_plugin)."""
-
-    def test_base_no_graphplugin(self):
-        f = pathlib.Path("agent_lab/plugins/base.py")
-        text = f.read_text(encoding="utf-8")
-        # No GraphPlugin class body in the shim
-        assert "class GraphPlugin" not in text, (
-            "base.py must not define GraphPlugin (moved to lca.plugins.lab.internal.hooks)"
-        )
-        # No register_plugin function
-        assert "def register_plugin" not in text, (
-            "base.py must not define register_plugin (deleted in PR-D final)"
-        )
-        # Has the deprecation marker
-        assert ".. deprecated::" in text, (
-            "base.py must carry a .. deprecated:: marker (ADR-0210 §6.5)"
-        )
-        # The shim re-exports the 4 hook helpers
-        for sym in ("Bind", "HookContext", "HookEvent", "fanout_hooks"):
-            assert sym in text, f"base.py must re-export {sym}"
-
-    def test_base_all_exports_match(self):
-        """The shim's __all__ is exactly the 4 hook helpers (no leak)."""
-        f = pathlib.Path("agent_lab/plugins/base.py")
-        text = f.read_text(encoding="utf-8")
-        # Find __all__ block
-        start = text.find("__all__")
-        end = text.find("]", start)
-        block = text[start : end + 1]
-        assert "Bind" in block and "HookContext" in block
-        assert "HookEvent" in block and "fanout_hooks" in block
-        # No GraphPlugin or register_plugin
-        assert "GraphPlugin" not in block
-        assert "register_plugin" not in block
-
-
-# ---------------------------------------------------------------------------
-# agent_lab.plugins.__init__ (no stale GraphPlugin re-export)
-# ---------------------------------------------------------------------------
-
-class TestAgentLabPluginsInitClean:
-    """agent_lab/plugins/__init__.py must not re-export GraphPlugin (deleted)."""
-
-    def test_init_no_graphplugin(self):
-        f = pathlib.Path("agent_lab/plugins/__init__.py")
-        text = f.read_text(encoding="utf-8")
-        # __all__ block must not include GraphPlugin
-        start = text.find("__all__")
-        end = text.find("]", start)
-        block = text[start : end + 1]
-        assert "GraphPlugin" not in block, (
-            "agent_lab/plugins/__init__.py must not re-export GraphPlugin "
-            "(PR-D final 1/2 + ADR-0210 §6.5)"
-        )
-        # The 4 hook helpers remain
-        for sym in ("Bind", "HookContext", "HookEvent", "fanout_hooks"):
-            assert sym in block, f"__init__.py must re-export {sym}"
 
 
 # ---------------------------------------------------------------------------

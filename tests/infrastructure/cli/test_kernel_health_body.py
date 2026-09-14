@@ -103,7 +103,7 @@ def test_read_plugin_health_returns_full_block(monkeypatch: pytest.MonkeyPatch) 
     fake_bus.registry = fake_registry
 
     fake_driver_registry = MagicMock()
-    fake_driver_registry.contains = lambda target: target in {"cognitive", "infoedge"}
+    fake_driver_registry.contains = lambda target: target in {"cognitive"}
 
     class _FakeResolved:
         from typing import ClassVar

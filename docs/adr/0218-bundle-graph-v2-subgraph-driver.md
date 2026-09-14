@@ -405,7 +405,6 @@ outer drive (interpreter._drive)
 ## 9. 范围外(明确不做)
 
 - `bundles/reflect-subgraph.yaml` 迁 v2 — 独立 ADR(ADR-0217 §7 已声明)
-- `agent_lab/graphs/*` 与生产 kernel 对齐 — 独立 ADR(ADR-0217 §7)
 - `NodeExecutor` 用于 think 之外的 phase(perceive / act / reflect / remember / stop) — 本 ADR 不动 PhaseExecutor
 - 节点动态并发(并行 / 合并节点) — `edges[].kind: data` 字段已预留,本 ADR 不实现并行调度,留后续 ADR
 - 节点故障恢复(checkpoint / resume) — v2 plan 不走 Session checkpoint,留后续

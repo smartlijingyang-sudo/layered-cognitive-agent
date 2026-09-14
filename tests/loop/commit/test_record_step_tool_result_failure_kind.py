@@ -1,13 +1,12 @@
 """Regression test: ``step.tool_result.record`` payload surfaces failure_kind.
 
-The Body executor's deterministic-failure stop policy
-(``DefaultStopPolicy._deterministic_failure_stop``) reads
-``observation.extra[FAILURE_KIND]`` to decide whether to short-circuit
-the loop instead of letting the agent retry the same call until the
-budget burns out. Until now the spine fact committed by
-``record_step_tool_result`` did not surface that tag — observers and
-post-hoc replays could not distinguish a deterministic read failure
-from a transient retryable one.
+The post-retirement mechanism (``act.observe.should_terminate`` driven
+by ``EffectReceipt.failure_kind``) reads ``observation.extra[FAILURE_KIND]``
+to decide whether to short-circuit the loop instead of letting the agent
+retry the same call until the budget burns out. Until now the spine
+fact committed by ``record_step_tool_result`` did not surface that tag
+— observers and post-hoc replays could not distinguish a deterministic
+read failure from a transient retryable one.
 
 This test pins the contract: when the caller passes ``failure_kind``,
 it must appear in the spine payload; otherwise the field is absent

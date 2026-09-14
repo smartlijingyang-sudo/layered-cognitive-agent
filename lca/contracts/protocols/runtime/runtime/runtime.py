@@ -1,14 +1,18 @@
-"""L2 Runtime 协议 —— 认知循环入口。"""
+"""L2 Runtime 协议 —— 认知循环入口。
+
+The retired `StopPolicy` Protocol previously lived here; loop termination
+now flows through `TerminalCommitExecutor` reading `decision.action_type`
+or Body raising `DeterministicToolError`. See plan
+`docs/plans/2026-09-14-stop-decision-retirement.md`.
+"""
 
 from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.core.policy.budget import DEFAULT_MAX_STEPS
-from lca.contracts.models.core.policy.stop import StopDecision
-from lca.contracts.models.core.state.state import AgentState, StateSnapshot
+from lca.contracts.models.core.state.state import StateSnapshot
 from lca.contracts.models.team.run.context import RunContext
 
 
@@ -31,21 +35,3 @@ class Runtime(Protocol):
         input: object | None = None,
         max_steps: int = DEFAULT_MAX_STEPS,
     ) -> Result: ...
-
-
-@runtime_checkable
-class StopPolicy(Protocol):
-    """Decide whether the fixed stop phase ends the current cognitive run.
-
-    This is a State-cluster strategy. It is intentionally visible only through
-    the stop phase's narrow capability view, rather than as a peer AgentGraph
-    dependency or a top-level AgentSpec selection axis.
-    """
-
-    def decide(
-        self,
-        state: AgentState,
-        decision: Decision | None,
-        observation: Observation | None,
-        reflection: Reflection | None,
-    ) -> StopDecision: ...
