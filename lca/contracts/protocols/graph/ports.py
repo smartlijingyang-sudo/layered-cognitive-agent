@@ -1,11 +1,8 @@
-"""Port name for graph node IO.
+"""Typed port-name brand for graph node IO.
 
-Re-exports the typed :data:`PortName` from the declarative layer so the
-graph protocol package has a single canonical import surface. New code
-should depend on ``lca.contracts.protocols.graph.ports.PortName``.
-
-Existing imports of :data:`lca.contracts.atoms.ports.PortName` continue
-to resolve; this module is a thin alias, not a relocation.
+Re-exports :data:`PortName` from the declarative layer so the graph
+protocol package has a single canonical import surface. New code should
+depend on ``lca.contracts.protocols.graph.ports.PortName``.
 """
 from __future__ import annotations
 

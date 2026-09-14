@@ -31,6 +31,12 @@ from lca.framework.graph.strategy_registry import register_strategy
 
 FanoutReducer = Callable[[Sequence[AgentResponse]], dict[str, Any]]
 
+# Stub echo port name. Shared with ``AgentConsultStrategy`` so the two
+# strategies' stub clients emit on the same port key when a host wires
+# them in tandem. Framework-local on purpose: the host declares its
+# own cognition-layer port names via ``NodeIOSchema``.
+STUB_ECHO_PORT: str = "echo_payload"
+
 
 def default_fanout_reducer(responses: Iterable[AgentResponse]) -> dict[str, Any]:
     """Last-write-wins fan-in reducer. Deterministic for a given input."""
@@ -78,7 +84,7 @@ class _StubClient:
         return AgentResponse(
             source_agent=request.target_agent,
             status="ok",
-            payload={"response": f"echo:{request.target_agent}"},
+            payload={STUB_ECHO_PORT: f"echo:{request.target_agent}"},
         )
 
     async def fanout(
@@ -88,7 +94,7 @@ class _StubClient:
             AgentResponse(
                 source_agent=t,
                 status="ok",
-                payload={"response": f"echo:{t}"},
+                payload={STUB_ECHO_PORT: f"echo:{t}"},
             )
             for t in targets
         ]
@@ -98,6 +104,7 @@ register_strategy(AgentFanoutStrategy(client=_StubClient()))
 
 
 __all__ = [
+    "STUB_ECHO_PORT",
     "AgentFanoutStrategy",
     "FanoutReducer",
     "default_fanout_reducer",

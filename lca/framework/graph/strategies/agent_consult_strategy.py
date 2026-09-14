@@ -28,6 +28,13 @@ from lca.contracts.protocols.graph.node_io import (
 from lca.contracts.protocols.graph.strategy import NodeStrategy, StrategyContext
 from lca.framework.graph.strategy_registry import register_strategy
 
+# Stub echo port name. The default ``_StubClient`` returns a synthetic
+# payload so unit tests can assert on the value the strategy emitted
+# into the port store. The key is intentionally framework-local so the
+# stub does not collide with cognition-layer port names (which the
+# host declares via ``NodeIOSchema``, not via this stub).
+STUB_ECHO_PORT: str = "echo_payload"
+
 
 @dataclass(frozen=True, slots=True)
 class AgentConsultStrategy(NodeStrategy):
@@ -71,7 +78,7 @@ class _StubClient:
         return AgentResponse(
             source_agent=request.target_agent,
             status="ok",
-            payload={"response": f"echo:{request.target_agent}"},
+            payload={STUB_ECHO_PORT: f"echo:{request.target_agent}"},
         )
 
     async def fanout(self, request: AgentRequest, *, targets: Any) -> Any:
@@ -79,7 +86,7 @@ class _StubClient:
             AgentResponse(
                 source_agent=t,
                 status="ok",
-                payload={"response": f"echo:{t}"},
+                payload={STUB_ECHO_PORT: f"echo:{t}"},
             )
             for t in targets
         ]
@@ -88,4 +95,4 @@ class _StubClient:
 register_strategy(AgentConsultStrategy(client=_StubClient()))
 
 
-__all__ = ["AgentConsultStrategy"]
+__all__ = ["STUB_ECHO_PORT", "AgentConsultStrategy"]

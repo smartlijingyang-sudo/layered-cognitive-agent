@@ -4,8 +4,13 @@ Each module registers one :class:`NodeStrategy` subclass against the
 default :class:`StrategyRegistry` at import time. The kernel resolves
 strategies by binding kind; strategies themselves are stateless.
 """
-from lca.framework.graph.strategies.agent_consult_strategy import AgentConsultStrategy
-from lca.framework.graph.strategies.agent_fanout_strategy import AgentFanoutStrategy
+from lca.framework.graph.strategies.agent_consult_strategy import (
+    STUB_ECHO_PORT,
+    AgentConsultStrategy,
+)
+from lca.framework.graph.strategies.agent_fanout_strategy import (
+    AgentFanoutStrategy,
+)
 from lca.framework.graph.strategies.gate_chain_strategy import GateChainStrategy
 from lca.framework.graph.strategies.node_executor_strategy import NodeExecutorStrategy
 from lca.framework.graph.strategies.observe_strategy import ObserveStrategy
@@ -18,6 +23,7 @@ from lca.framework.graph.strategies.transform_strategy import (
 )
 
 __all__ = [
+    "STUB_ECHO_PORT",
     "AgentConsultStrategy",
     "AgentFanoutStrategy",
     "GateChainStrategy",

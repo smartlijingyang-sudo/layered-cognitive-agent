@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 
 from lca.contracts.protocols.graph.binding import BindingKind
-from lca.contracts.protocols.graph.node_io import NodeInput
+from lca.contracts.protocols.graph.node_io import NodeInput, NodeIOSchema, PortSpec
 from lca.contracts.protocols.graph.strategy import StrategyContext
 from lca.framework.graph.strategies import (
     GateChainStrategy,
@@ -85,10 +85,36 @@ class TestTerminate:
         out = await strategy.execute(_ctx("n2"), NodeInput(port_values={"decision": "d"}))
         assert out.port_values == {"response": "end:n2"}
 
-    async def test_terminate_requires_fn(self) -> None:
+    async def test_terminate_falls_back_to_default_when_fn_missing(self) -> None:
+        """Empty terminate fn → default terminator builds a StopPayload."""
+        from lca.contracts.models.cognition.boundary import StopPayload
+
         strategy = TerminateStrategy()
-        with pytest.raises(RuntimeError, match="without terminate"):
-            await strategy.execute(_ctx(), NodeInput())
+        out = await strategy.execute(
+            _ctx("n3"), NodeInput(port_values={"decision": "d"})
+        )
+        assert "terminal_outcome" in out.port_values
+        assert isinstance(out.port_values["terminal_outcome"], StopPayload)
+
+    async def test_terminate_uses_schema_declared_port_names(self) -> None:
+        """Host-declared ``io_schema`` overrides the framework fallback."""
+        from lca.contracts.models.cognition.boundary import StopPayload
+
+        schema = NodeIOSchema(
+            inputs=(
+                PortSpec(name="my_decision"),
+                PortSpec(name="my_act_outcome"),
+            ),
+            outputs=(PortSpec(name="my_terminal_outcome"),),
+        )
+        strategy = TerminateStrategy(schema=schema)
+        out = await strategy.execute(
+            _ctx("n4"),
+            NodeInput(port_values={"my_decision": "d", "my_act_outcome": None}),
+        )
+        assert "my_terminal_outcome" in out.port_values
+        assert "terminal_outcome" not in out.port_values
+        assert isinstance(out.port_values["my_terminal_outcome"], StopPayload)
 
 
 class TestParallel:
@@ -155,6 +181,32 @@ class TestGateChain:
         strategy = GateChainStrategy(gates=())
         with pytest.raises(RuntimeError, match="decision-like"):
             await strategy.execute(_ctx(), NodeInput(port_values={"decision": "string"}))
+
+    async def test_uses_schema_declared_port_names(self) -> None:
+        """Host-declared ``io_schema`` overrides the framework fallback."""
+
+        def make_decision(decision_id: str) -> Any:
+            class _D:
+                pass
+
+            d = _D()
+            d.decision_id = decision_id
+            return d
+
+        class _PassGate:
+            async def enforce(self, decision: Any) -> Any:
+                return decision
+
+        schema = NodeIOSchema(
+            inputs=(PortSpec(name="my_decision"),),
+            outputs=(PortSpec(name="my_decision_out"),),
+        )
+        strategy = GateChainStrategy(gates=[_PassGate()], schema=schema)
+        out = await strategy.execute(
+            _ctx(), NodeInput(port_values={"my_decision": make_decision("d0")})
+        )
+        assert "my_decision_out" in out.port_values
+        assert "decision" not in out.port_values
 
 
 class TestStrategyRegistryExtras:

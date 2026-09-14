@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 
+from lca.cognition.wire.agent_client_adapter import AgentClientAdapter
 from lca.contracts.protocols.agent.client import (
     AgentClient,
     AgentRequest,
@@ -14,9 +15,9 @@ from lca.contracts.protocols.agent.client import (
 from lca.contracts.protocols.graph.binding import BindingKind
 from lca.contracts.protocols.graph.node_io import NodeInput
 from lca.contracts.protocols.graph.strategy import StrategyContext
-from lca.cognition.wire.agent_client_adapter import AgentClientAdapter
 from lca.framework.graph import default_strategy_registry
 from lca.framework.graph.strategies import (
+    STUB_ECHO_PORT,
     AgentConsultStrategy,
     AgentFanoutStrategy,
 )
@@ -47,7 +48,7 @@ class _RecordingClient(AgentClient):
         return AgentResponse(
             source_agent=request.target_agent,
             status="ok",
-            payload={"response": f"echo:{request.target_agent}"},
+            payload={STUB_ECHO_PORT: f"echo:{request.target_agent}"},
         )
 
     async def fanout(
@@ -58,7 +59,7 @@ class _RecordingClient(AgentClient):
             AgentResponse(
                 source_agent=t,
                 status="ok",
-                payload={"response": f"echo:{t}"},
+                payload={STUB_ECHO_PORT: f"echo:{t}"},
             )
             for t in targets
         ]
@@ -70,7 +71,7 @@ class TestAgentConsultStrategy:
         strategy = AgentConsultStrategy(client=client)
         ctx = _ctx("n1", target_agent="planner")
         out = await strategy.execute(ctx, NodeInput(port_values={"decision": "d"}))
-        assert out.port_values["response"] == "echo:planner"
+        assert out.port_values[STUB_ECHO_PORT] == "echo:planner"
         assert client.calls[0].target_agent == "planner"
         assert client.calls[0].payload == {"decision": "d"}
 
@@ -114,7 +115,7 @@ class TestAgentFanoutStrategy:
         ctx = _ctx("n1", targets=("a", "b", "c"))
         out = await strategy.execute(ctx, NodeInput(port_values={"decision": "d"}))
         # Last-write-wins reducer; final response is from "c".
-        assert out.port_values["response"] == "echo:c"
+        assert out.port_values[STUB_ECHO_PORT] == "echo:c"
         assert client.calls[0].target_agent == "*"
 
     async def test_requires_non_empty_targets(self) -> None:
@@ -197,7 +198,7 @@ class TestEndToEndAgentFixture:
     """
 
     async def test_five_agents_run_in_sequence(self) -> None:
-        from lca.contracts.protocols.graph.node_io import PortSpec, NodeIOSchema
+        from lca.contracts.protocols.graph.node_io import NodeIOSchema, PortSpec
         from lca.contracts.protocols.graph.plan import Plan, PlanEdge, PlanNode
         from lca.framework.graph import PlanInterpreter, StrategyRegistry
 
@@ -208,7 +209,7 @@ class TestEndToEndAgentFixture:
                 binding=BindingKind.AGENT_CONSULT,
                 io_schema=NodeIOSchema(
                     inputs=(PortSpec(name="decision"),),
-                    outputs=(PortSpec(name="response"),),
+                    outputs=(PortSpec(name=STUB_ECHO_PORT),),
                 ),
                 entry=(idx == 0),
                 max_visits=1,
@@ -230,4 +231,4 @@ class TestEndToEndAgentFixture:
         assert {v.node_id for v in result.visits} == {n.id for n in nodes}
         assert result.terminal_node == "agent.summarizer"
         # Each consult payload was forwarded through the port_values.
-        assert any(v.outputs.get("response") == "echo:critic" for v in result.visits)
+        assert any(v.outputs.get(STUB_ECHO_PORT) == "echo:critic" for v in result.visits)

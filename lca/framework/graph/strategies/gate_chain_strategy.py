@@ -2,9 +2,16 @@
 
 The strategy consumes a list of gates (host-injected via
 ``config["gates"]``) and runs them sequentially on the current
-``decision`` payload, threading the result through. Each gate may
+decision payload, threading the result through. Each gate may
 rewrite the decision; the chain ends with the final decision emitted
-on the ``decision`` port.
+on the schema-declared output port.
+
+Port names are read from ``self.schema`` (set when the host registers
+the strategy): the first required input declares where the decision
+payload comes in, and the first output declares where the chain
+result goes out. When the schema is empty (legacy / undeclared
+wiring), the strategy falls back to ``"decision"`` so older plans
+keep working without amendment.
 
 The strategy does NOT introduce a new gate protocol. It reuses the
 existing :class:`lca.contracts.protocols.think.cognition.DecisionGate`
@@ -28,9 +35,15 @@ from lca.contracts.protocols.graph.node_io import (
 from lca.contracts.protocols.graph.strategy import NodeStrategy, StrategyContext
 from lca.framework.graph.strategy_registry import register_strategy
 
+# Fallback port names used only when ``self.schema`` is empty
+# (legacy / undeclared). Hosts that declare an ``io_schema`` get the
+# schema's own names; the framework does not encode cognition-layer
+# port names.
+_DEFAULT_DECISION_PORT: str = "decision"
+
 
 class _DecisionLike(Protocol):
-    """Structural shape the framework requires for 'decision' payloads.
+    """Structural shape the framework requires for decision payloads.
 
     The framework never imports the cognition :class:`Decision` type.
     Cognition implements this protocol structurally; the framework
@@ -45,6 +58,17 @@ def _looks_like_decision(payload: Any) -> bool:
     return hasattr(payload, "decision_id")
 
 
+def _input_port_name(schema: NodeIOSchema) -> str:
+    required = schema.required_inputs()
+    return required[0] if required else _DEFAULT_DECISION_PORT
+
+
+def _output_port_name(schema: NodeIOSchema) -> str:
+    if schema.outputs:
+        return schema.outputs[0].name
+    return _DEFAULT_DECISION_PORT
+
+
 @dataclass(frozen=True, slots=True)
 class GateChainStrategy(NodeStrategy):
     kind: BindingKind = BindingKind.GATE_CHAIN
@@ -54,18 +78,20 @@ class GateChainStrategy(NodeStrategy):
     async def execute(
         self, context: StrategyContext, input: NodeInput
     ) -> NodeOutput:
-        decision_payload = input.port_values.get("decision")
+        in_port = _input_port_name(self.schema)
+        out_port = _output_port_name(self.schema)
+        decision_payload = input.port_values.get(in_port)
         if not _looks_like_decision(decision_payload):
             raise RuntimeError(
                 f"GateChainStrategy at {context.node_id!r}: "
-                f"port 'decision' must be a decision-like object, "
+                f"port {in_port!r} must be a decision-like object, "
                 f"got {type(decision_payload).__name__}"
             )
         current = decision_payload
         for gate in self.gates:
             current = await gate.enforce(current)
         return NodeOutput(
-            port_values={"decision": current},
+            port_values={out_port: current},
             producer_node=context.node_id,
         )
 
