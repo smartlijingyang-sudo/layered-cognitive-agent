@@ -22,6 +22,10 @@ from lca.contracts.observability.observation import (
     RunReplay,
     ToolCallTrace,
 )
+from lca.infrastructure.observability.graph_timeline import (
+    is_graph_event,
+    render_record,
+)
 from lca.plugins.diagnosis.run_replay.plugin import build_run_replay
 
 _LOG = logging.getLogger(__name__)
@@ -118,36 +122,14 @@ def _typed(facts: list[dict[str, Any]], ep: str, model: type) -> list:
 
 
 def _render_graph_timeline(facts: list[dict[str, Any]]) -> None:
-    """Print a timeline of phase_graph node and subgraph events from spine."""
-    graph_events = [f for f in facts if (f.get("execution_point") or "").startswith("phase_graph.")]
+    """Print the phase_graph timeline through the shared projection."""
+    graph_events = [f for f in facts if is_graph_event(str(f.get("execution_point") or ""))]
     if not graph_events:
         typer.echo("no phase_graph events in spine")
         return
     typer.echo(f"[graph] {len(graph_events)} phase_graph events")
     for f in graph_events:
-        ep = f.get("execution_point", "")
-        payload = f.get("payload") or f.get("data") or {}
-        if ep == "phase_graph.node.start":
-            typer.echo(f"  ▶ node.start  node={payload.get('node_id', '?')}")
-        elif ep == "phase_graph.node.end":
-            outcome = payload.get("outcome", "?")
-            marker = "✓" if outcome == "success" else "✗"
-            error = payload.get("exception_message", "")
-            line = f"  {marker} node.end    node={payload.get('node_id', '?')} outcome={outcome}"
-            if error:
-                line += f" error={error}"
-            typer.echo(line)
-        elif ep == "phase_graph.subgraph.enter":
-            typer.echo(
-                f"  ➤ subgraph.enter plan={payload.get('plan_ref', '?')} "
-                f"entry={payload.get('entry_node', '?')} depth={payload.get('depth', 0)}"
-            )
-        elif ep == "phase_graph.subgraph.exit":
-            outcome = payload.get("outcome", "?")
-            typer.echo(
-                f"  ◼ subgraph.exit  plan={payload.get('plan_ref', '?')} "
-                f"outcome={outcome} depth={payload.get('depth', 0)}"
-            )
+        typer.echo(render_record(f))
 
 
 def _render_human(replay: RunReplay) -> None:
