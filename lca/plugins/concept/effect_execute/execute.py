@@ -70,8 +70,32 @@ class EffectExecuteExecutor:
         return NodeOutput(port_values={"receipt": receipt})
 
 
+def _derive_outcome(result: object) -> tuple[EffectOutcome, str | None]:
+    """Derive EffectOutcome and error_code from the dispatch result.
+
+    If the result is an Observation (or contains one as ``result``),
+    read ``success`` to decide SUCCEEDED vs FAILED.  A failed Observation
+    contributes its ``error`` field as the error_code.  Anything else
+    defaults to SUCCEEDED (the dispatch did not raise).
+    """
+    from lca.contracts.models.core.execution.decision import Observation
+
+    obs: object | None = None
+    if isinstance(result, Observation):
+        obs = result
+    elif isinstance(result, dict):
+        inner = result.get("result")
+        if isinstance(inner, Observation):
+            obs = inner
+    if obs is not None and not obs.success:
+        error_code = (obs.error or "tool_failed")[:128]
+        return EffectOutcome.FAILED, error_code
+    return EffectOutcome.SUCCEEDED, None
+
+
 async def _dispatch(envelope: CommandEnvelope, context: NodeContext) -> EffectReceipt:
     """Dispatch the CommandEnvelope through the EffectDispatcher capability."""
+
     runtime = context.runtime
     gateway = getattr(runtime, "effect_gateway", None)
     if gateway is None:
@@ -114,12 +138,14 @@ async def _dispatch(envelope: CommandEnvelope, context: NodeContext) -> EffectRe
         result = output
         invocation_id = envelope.idempotency_key or "unknown"
 
+    outcome, error_code = _derive_outcome(result)
     return EffectReceipt(
         invocation_id=str(invocation_id),
-        outcome=EffectOutcome.SUCCEEDED,
+        outcome=outcome,
         idempotency_key=envelope.idempotency_key or "",
         provider=envelope.metadata.get("operation", "unknown"),
         output_ref=str(result) if result is not None else None,
+        error_code=error_code,
     )
 
 

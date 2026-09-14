@@ -42,11 +42,9 @@ maps observation kinds to execution points.
 
 from __future__ import annotations
 
-import dataclasses
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import Any
 
 from lca.contracts.protocols.graph.node_io import NodeOutput
@@ -74,34 +72,6 @@ Clock = Callable[[], int]
 
 def _default_clock() -> int:
     return time.monotonic_ns() // 1_000_000
-
-
-def _serialize_for_spine(value: Any) -> Any:
-    """Convert non-serializable objects to spine-friendly representations.
-    
-    The spine requires JSON-serializable values. This function converts:
-    - dataclass instances to dicts
-    - Enum instances to their values
-    - datetime instances to ISO format strings
-    - Other non-serializable objects to their repr()
-    """
-    if value is None or isinstance(value, (bool, int, float, str)):
-        return value
-    if isinstance(value, Enum):
-        return value.value
-    if dataclasses.is_dataclass(value) and not isinstance(value, type):
-        return {k: _serialize_for_spine(v) for k, v in dataclasses.asdict(value).items()}
-    if isinstance(value, dict):
-        return {k: _serialize_for_spine(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_serialize_for_spine(item) for item in value]
-    # For datetime and other types, use repr as fallback
-    try:
-        import json
-        json.dumps(value)
-        return value
-    except (TypeError, ValueError):
-        return repr(value)
 
 
 @dataclass
@@ -220,9 +190,6 @@ class PlanInterpreter:
                 artifacts=self.artifacts,
             )
             dispatch = self._classify(edge, output)
-            # Serialize outputs for spine (convert non-JSON-serializable objects)
-            serialized_inputs = {k: _serialize_for_spine(v) for k, v in inputs.port_values.items()}
-            serialized_outputs = {k: _serialize_for_spine(v) for k, v in output.port_values.items()}
             self.observer.observe(
                 _visit_end_of(
                     node,
@@ -232,8 +199,8 @@ class PlanInterpreter:
                     outcome="success",
                     error="",
                     elapsed_ms=self.clock() - visit_started,
-                    inputs=serialized_inputs,
-                    outputs=serialized_outputs,
+                    inputs=inputs.port_values,
+                    outputs=output.port_values,
                     dispatch=dispatch.kind,
                     occurred_at_ms=self.clock(),
                 )

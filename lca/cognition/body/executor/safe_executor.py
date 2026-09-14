@@ -470,6 +470,8 @@ class SimpleSafeExecutor(SafeExecutor):
         observation: Observation | None = None
         try:
             observation = await tool.execute(args)
+            if not observation.success:
+                outcome = "failure"
             return observation
         except ApprovalPendingError:
             outcome = "failure"

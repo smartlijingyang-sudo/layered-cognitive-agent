@@ -207,13 +207,20 @@ class UseToolOperation(Action):
             tool_name=",".join(tool_names) or "use_tool",
             invocation_id=decision.decision_id or "",
         )
+        outcome = "success"
         try:
-            return await self._batch_executor.execute(decision.tool_calls)
+            observations = await self._batch_executor.execute(decision.tool_calls)
+            if not observations.success:
+                outcome = "failed"
+            return observations
+        except Exception:
+            outcome = "failed"
+            raise
         finally:
             commit_body_tool_decision_end(
                 tool_name=",".join(tool_names) or "use_tool",
                 invocation_id=decision.decision_id or "",
-                outcome="success",
+                outcome=outcome,
             )
 
 
