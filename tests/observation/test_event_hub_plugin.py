@@ -1,124 +1,177 @@
-"""observation.event_hub plugin tests.
+"""observation.event_hub plugin tests — Session observer 调度层.
 
-Assert behavior the way a future maintainer would break it:
-- dispatch invokes the right observer with the SPINE record payload.
-- dispatch silently skips EPs not in the fanout table.
-- an observer raising does not propagate; subsequent EPs still fan out.
-- EventSpine.subscribe returns an unsubscribe that actually stops fan-out.
-- the hub module imports no emit-path surface (Session.append / EventSpine.append
-  / FactGateway / publish_ep_bound) — defense in depth against accidentally
-  growing a parallel event channel.
-- the plugin meta declares effects="none" so a profile audit cannot mistake
-  the hub for a write-emitting plugin.
+Test behavior, not implementation:
+- dispatch 在已知 EP 上调用对应 observer,传入正确 payload.
+- dispatch 在未知 EP 上静默 no-op.
+- observer 抛错不传播;下一个 event 仍正常 fan-out.
+- setup 把 dispatch 挂到未来 Session 上(store.add_observer_hook).
+- setup 把 dispatch 挂到已活 Session 上(store.list()).
+- AST 守卫: hub module 不 import session/journal 后端,
+  不调 Session.append / EventSpine.append.
+- plugin meta 校验 (layer=L2, effects=none, requires session.store + 3 observer keys).
 """
 
 from __future__ import annotations
 
 import ast
 import inspect
+from dataclasses import dataclass
 from typing import Any
 
-import pytest  # noqa: TC002  # pytest is used at test runtime, not type-checking only
+import pytest
 
 from lca.plugins.observation.event_hub import plugin as hub_plugin
 
-
-class _FakeRecord:
-    def __init__(
-        self,
-        *,
-        execution_point: str,
-        payload: dict[str, Any] | None = None,
-        run_id: str | None = "r-1",
-    ) -> None:
-        self.execution_point = execution_point
-        self.payload = payload or {}
-        self.run_id = run_id
+# ── Test fixtures ────────────────────────────────────────────────────
 
 
-class _RecordingEventSpine:
-    """Records every subscribe() call so the test can assert fan-out wiring.
+@dataclass
+class _FakeSessionEvent:
+    type: str
+    data: dict[str, Any]
+    seq: int = 0
 
-    Mirrors the real ``EventSpine.subscribe`` contract: unsubscribe removes
-    the callback from the active set, so a subsequent ``append`` does not
-    invoke it. Without this contract, ``test_setup_unsubscribe_stops_fan_out``
-    cannot pass.
+
+@dataclass
+class _FakeSession:
+    id: str = "session-test"
+    observers: list[Any] | None = None
+
+    def __post_init__(self) -> None:
+        if self.observers is None:
+            self.observers = []
+
+    def observe(self, observer: Any) -> Any:
+        self.observers.append(observer)
+        return lambda: self.observers.remove(observer)
+
+
+class _FakeSessionStore:
+    """Stand-in for SessionStore; captures hooks and lists."""
+
+    def __init__(self, existing_sessions: list[_FakeSession] | None = None) -> None:
+        self._hooks: list[Any] = []
+        self._sessions = list(existing_sessions or [])
+
+    def add_observer_hook(self, hook: Any) -> Any:
+        self._hooks.append(hook)
+        return lambda: self._hooks.remove(hook)
+
+    def list(self) -> list[_FakeSession]:
+        return list(self._sessions)
+
+
+# Patch the module under test to accept our fake SessionEvent via
+# session_event_to_event_record. We don't import the real projection
+# function in tests (it expects a real Session/SessionEvent with
+# specific fields); instead, we monkeypatch the plugin module's binding.
+
+
+def _make_record(session: Any, event: _FakeSessionEvent) -> Any:
+    """Test-side EventRecord stand-in matching what dispatch consumes.
+
+    We monkeypatch session_event_to_event_record in the plugin module
+    so that a test-side EventRecord with .execution_point / .payload /
+    .run_id flows through the dispatch path without going through the
+    real projection.
     """
 
-    def __init__(self) -> None:
-        self.subscribed: list[Any] = []
-        self.unsubscribed: list[Any] = []
-        self.active: list[Any] = []
+    class _Record:
+        def __init__(self, ep: str, payload: dict[str, Any], run_id: str | None) -> None:
+            self.execution_point = ep
+            self.payload = payload
+            self.run_id = run_id
 
-    def subscribe(self, fn: Any) -> Any:
-        self.subscribed.append(fn)
-        self.active.append(fn)
-        sentinels = self
+    return _Record(event.data.get("ep"), event.data.get("payload", {}), event.data.get("run_id"))
 
-        def _unsubscribe() -> None:
-            if fn in sentinels.active:
-                sentinels.active.remove(fn)
-            sentinels.unsubscribed.append(fn)
 
-        return _unsubscribe
+@pytest.fixture
+def hub_setup_callable():
+    """Extract the raw async setup callable from the @plugin-wrapped module attribute."""
+    from lca.harness.plugin.declaration import definition_from_plugin
 
-    def append(self, *, execution_point: str, **_: Any) -> None:
-        """Fan-out only to active subscribers — mirrors real EventSpine."""
+    return definition_from_plugin(hub_plugin.setup).setup
 
-        class _Record:
-            pass
 
-        for sub in list(self.active):
-            rec = _Record()
-            rec.execution_point = execution_point
-            rec.payload = {}
-            rec.run_id = None
-            sub(rec)
+@pytest.fixture(autouse=True)
+def _patch_projection(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(hub_plugin, "session_event_to_event_record", _make_record)
+
+
+# ── dispatch behavior ────────────────────────────────────────────────
 
 
 def test_dispatch_invokes_observer_for_known_ep() -> None:
     captured: list[dict[str, Any]] = []
 
-    def observer_enter(*, run_id, payload, record) -> None:
-        captured.append({"run_id": run_id, "payload": payload, "ep": record.execution_point})
+    def observer_enter(**kw: Any) -> None:
+        captured.append(kw)
 
     observers = {"observation.node_enter": observer_enter}
     ep_index = {"phase_graph.node.start": "observation.node_enter"}
-    spine = _RecordingEventSpine()
-    dispatch = hub_plugin.make_dispatch_fn(
-        ep_index=ep_index, observers=observers, event_spine=spine
+    dispatch = hub_plugin.make_dispatch_fn(ep_index=ep_index, observers=observers)
+
+    event = _FakeSessionEvent(
+        type="observation.node_enter",
+        data={"ep": "phase_graph.node.start", "payload": {"node_id": "x"}, "run_id": "r-1"},
     )
+    dispatch(_FakeSession(), event)
 
-    record = _FakeRecord(execution_point="phase_graph.node.start", payload={"node_id": "x"})
-    dispatch(record)
-
-    assert captured == [
-        {"run_id": "r-1", "payload": {"node_id": "x"}, "ep": "phase_graph.node.start"}
-    ]
+    assert captured[0]["node_id"] == "x"
+    assert captured[0]["run_id"] == "r-1"
+    # Adapter passes through all kwargs the observer expects; unspecified
+    # fields default per the adapter, not per the payload.
+    assert captured[0]["phase"] is None
+    assert captured[0]["depth"] == 0
 
 
 def test_dispatch_silently_skips_unknown_ep() -> None:
     captured: list[Any] = []
     observers = {"observation.node_enter": lambda **kw: captured.append(kw)}
     ep_index = {"phase_graph.node.start": "observation.node_enter"}
-    spine = _RecordingEventSpine()
-    dispatch = hub_plugin.make_dispatch_fn(
-        ep_index=ep_index, observers=observers, event_spine=spine
+    dispatch = hub_plugin.make_dispatch_fn(ep_index=ep_index, observers=observers)
+
+    dispatch(
+        _FakeSession(), _FakeSessionEvent(type="unknown", data={"ep": "control.point.decision"})
     )
-
-    dispatch(_FakeRecord(execution_point="control.point.decision"))
-
     assert captured == []
+
+
+def test_dispatch_silently_skips_event_with_no_record(caplog: pytest.LogCaptureFixture) -> None:
+    """When session_event_to_event_record returns None, dispatch is a no-op."""
+
+    def observer_enter(**kw: Any) -> None:
+        raise AssertionError("observer must not be called when record is None")
+
+    captured: list[Any] = []
+
+    def fake_projection(_session: Any, _event: Any) -> None:
+        return None
+
+    # Override the autouse patch for this test only.
+    import lca.plugins.observation.event_hub.plugin as _plugin_mod
+
+    original = _plugin_mod.session_event_to_event_record
+    _plugin_mod.session_event_to_event_record = fake_projection
+    try:
+        dispatch = hub_plugin.make_dispatch_fn(
+            ep_index={"phase_graph.node.start": "observation.node_enter"},
+            observers={"observation.node_enter": observer_enter},
+        )
+        dispatch(_FakeSession(), _FakeSessionEvent(type="t", data={}))
+        assert captured == []
+    finally:
+        _plugin_mod.session_event_to_event_record = original
 
 
 def test_dispatch_observer_failure_contained() -> None:
     def observer_explodes(**_kw: Any) -> None:
         raise RuntimeError("boom")
 
-    def observer_after(**kw: Any) -> None:
-        observer_after.calls.append(kw)
+    captured_after: list[Any] = []
 
-    observer_after.calls = []  # type: ignore[attr-defined]
+    def observer_after(**kw: Any) -> None:
+        captured_after.append(kw)
 
     observers = {
         "observation.node_enter": observer_explodes,
@@ -128,15 +181,23 @@ def test_dispatch_observer_failure_contained() -> None:
         "phase_graph.node.start": "observation.node_enter",
         "phase_graph.node.end": "observation.node_exit",
     }
-    spine = _RecordingEventSpine()
-    dispatch = hub_plugin.make_dispatch_fn(
-        ep_index=ep_index, observers=observers, event_spine=spine
+    dispatch = hub_plugin.make_dispatch_fn(ep_index=ep_index, observers=observers)
+
+    dispatch(
+        _FakeSession(),
+        _FakeSessionEvent(type="t", data={"ep": "phase_graph.node.start", "payload": {}}),
+    )
+    dispatch(
+        _FakeSession(),
+        _FakeSessionEvent(
+            type="t",
+            data={"ep": "phase_graph.node.end", "payload": {"node_id": "after"}},
+        ),
     )
 
-    dispatch(_FakeRecord(execution_point="phase_graph.node.start"))
-    dispatch(_FakeRecord(execution_point="phase_graph.node.end"))
-
-    assert observer_after.calls != []
+    assert any(c.get("node_id") == "after" for c in captured_after), (
+        "failure in node_enter must not block the subsequent node_exit fan-out"
+    )
 
 
 def test_dispatch_warns_when_observer_missing_for_mapped_ep(
@@ -144,161 +205,112 @@ def test_dispatch_warns_when_observer_missing_for_mapped_ep(
 ) -> None:
     observers: dict[str, Any] = {}
     ep_index = {"phase_graph.node.start": "observation.node_enter"}
-    spine = _RecordingEventSpine()
-    dispatch = hub_plugin.make_dispatch_fn(
-        ep_index=ep_index, observers=observers, event_spine=spine
-    )
+    dispatch = hub_plugin.make_dispatch_fn(ep_index=ep_index, observers=observers)
 
     with caplog.at_level("WARNING"):
-        dispatch(_FakeRecord(execution_point="phase_graph.node.start"))
+        dispatch(
+            _FakeSession(),
+            _FakeSessionEvent(type="t", data={"ep": "phase_graph.node.start", "payload": {}}),
+        )
 
     assert any("observation.node_enter" in record.message for record in caplog.records)
 
 
-def test_dispatch_does_not_propagate_observer_failure() -> None:
-    def observer_explodes(**_kw: Any) -> None:
-        raise RuntimeError("boom")
-
-    observers = {"observation.node_enter": observer_explodes}
-    ep_index = {"phase_graph.node.start": "observation.node_enter"}
-    spine = _RecordingEventSpine()
-    dispatch = hub_plugin.make_dispatch_fn(
-        ep_index=ep_index, observers=observers, event_spine=spine
-    )
-
-    # No raise.
-    dispatch(_FakeRecord(execution_point="phase_graph.node.start"))
+# ── setup / attachment ───────────────────────────────────────────────
 
 
-def test_dispatch_silently_skips_record_without_execution_point() -> None:
-    """A SPINE record with no execution_point attribute (defensive) is a no-op."""
-
-    class WeirdRecord:
-        pass
-
-    captured: list[Any] = []
-    observers = {"observation.node_enter": lambda **kw: captured.append(kw)}
-    ep_index = {"phase_graph.node.start": "observation.node_enter"}
-    spine = _RecordingEventSpine()
-    dispatch = hub_plugin.make_dispatch_fn(
-        ep_index=ep_index, observers=observers, event_spine=spine
-    )
-
-    dispatch(WeirdRecord())
-
-    assert captured == []
-
-
-def _setup_callable() -> Any:
-    """The @plugin decorator wraps ``setup`` into a Plugin object; reach the
-    underlying async function for tests via PluginDefinition.setup."""
-    from lca.harness.plugin.declaration import definition_from_plugin
-
-    defn = definition_from_plugin(hub_plugin.setup)
-    return defn.setup
-
-
-def test_setup_subscribes_with_event_spine() -> None:
-    """The setup hook must call EventSpine.subscribe exactly once with a
-    dispatch closure that routes by the fan-out table."""
-    spine = _RecordingEventSpine()
-    observer_enter_calls: list[Any] = []
-    observer_exit_calls: list[Any] = []
-    observer_bookkeep_calls: list[Any] = []
+def test_setup_attaches_dispatch_to_future_sessions(hub_setup_callable) -> None:
+    store = _FakeSessionStore()
+    observers = {
+        "observation.node_enter": lambda **_kw: None,
+        "observation.node_exit": lambda **_kw: None,
+        "observation.runtime_bookkeeping": lambda **_kw: None,
+    }
 
     class _Ctx:
-        def __init__(self, mapping: dict[str, Any]) -> None:
-            self._mapping = mapping
-
         def require(self, key: str) -> Any:
-            return self._mapping[key]
+            if key == "session.store":
+                return store
+            return observers[key]
 
         def provide(self, key: str, value: Any) -> None:
-            self._mapping[key] = value
-
-    observers = {
-        "observation.node_enter": lambda **kw: observer_enter_calls.append(kw),
-        "observation.node_exit": lambda **kw: observer_exit_calls.append(kw),
-        "observation.runtime_bookkeeping": lambda **kw: observer_bookkeep_calls.append(kw),
-    }
-    mapping = {"event_spine": _SpineCoreHolder(spine), **observers}
-    ctx = _Ctx(mapping)
+            pass
 
     import asyncio
 
-    asyncio.run(_setup_callable()(ctx, config=None))
+    asyncio.run(hub_setup_callable(_Ctx(), config=None))
 
-    assert len(spine.subscribed) == 1
-    dispatch = spine.subscribed[0]
-
-    dispatch(_FakeRecord(execution_point="phase_graph.node.start", payload={"node_id": "n1"}))
-    dispatch(_FakeRecord(execution_point="phase_graph.node.end", payload={"node_id": "n1"}))
-    dispatch(_FakeRecord(execution_point="runtime.reducer.apply", payload={"reducer": "r"}))
-
-    assert observer_enter_calls and observer_exit_calls and observer_bookkeep_calls
+    assert len(store._hooks) == 1, "setup must register exactly one creation hook"
+    hook = store._hooks[0]
+    session = _FakeSession()
+    hook(session)
+    assert session.observers, "hook must attach an observer to the new session"
 
 
-def test_setup_unsubscribe_stops_fan_out() -> None:
-    spine = _RecordingEventSpine()
-    observer_calls: list[Any] = []
-    provided: dict[str, Any] = {}
+def test_setup_attaches_dispatch_to_existing_sessions(hub_setup_callable) -> None:
+    existing_session = _FakeSession(id="session-existing")
+    store = _FakeSessionStore(existing_sessions=[existing_session])
+
+    observers = {
+        "observation.node_enter": lambda **_kw: None,
+        "observation.node_exit": lambda **_kw: None,
+        "observation.runtime_bookkeeping": lambda **_kw: None,
+    }
 
     class _Ctx:
-        def __init__(self) -> None:
-            self.unsubscribe_called = False
-
         def require(self, key: str) -> Any:
-            if key == "event_spine":
-                return spine
-            return lambda **kw: observer_calls.append(kw)
+            if key == "session.store":
+                return store
+            return observers[key]
 
         def provide(self, key: str, value: Any) -> None:
-            provided[key] = value
+            pass
+
+    import asyncio
+
+    asyncio.run(hub_setup_callable(_Ctx(), config=None))
+    assert existing_session.observers, "setup must attach observer to existing session"
+
+
+def test_setup_provides_dispatch_capability(hub_setup_callable) -> None:
+    store = _FakeSessionStore()
+    observers = {
+        "observation.node_enter": lambda **_kw: None,
+        "observation.node_exit": lambda **_kw: None,
+        "observation.runtime_bookkeeping": lambda **_kw: None,
+    }
+
+    class _Ctx:
+        def require(self, key: str) -> Any:
+            if key == "session.store":
+                return store
+            return observers[key]
+
+        def provide(self, key: str, value: Any) -> None:
+            self._provided = getattr(self, "_provided", {})
+            self._provided[key] = value
 
     ctx = _Ctx()
     import asyncio
 
-    asyncio.run(_setup_callable()(ctx, config=None))
-    dispatch = spine.subscribed[0]
-
-    spine.append(execution_point="phase_graph.node.start")
-    assert len(observer_calls) == 1
-
-    unsubscribe = provided["observation.event_hub"]["unsubscribe"]
-    assert callable(unsubscribe)
-    assert spine.unsubscribed == []
-    unsubscribe()
-
-    spine.append(execution_point="phase_graph.node.start")
-    assert len(observer_calls) == 1, "after unsubscribe the observer must not be called again"
-    assert spine.unsubscribed == [dispatch]
+    asyncio.run(hub_setup_callable(ctx, config=None))
+    assert "observation.event_hub" in ctx._provided
+    assert "dispatch" in ctx._provided["observation.event_hub"]
+    assert "cancel_creation" in ctx._provided["observation.event_hub"]
 
 
-# ── AST guard: hub module imports no emit-path surface ────────────────
-# Defense in depth against accidentally growing a parallel event channel.
-# If you find yourself importing one of these, the design has regressed.
-
-_FORBIDDEN_IMPORTS = (
-    "lca.session",
-    "lca.infrastructure.session",
-    "lca.infrastructure.observability.journal",
-)
-_FORBIDDEN_ATTR_NAMES = (
-    "Session",
-    "EventSpine",  # only the type is OK in a `from x import EventSpine` annotation; see below
-)
-
-
-def _hub_module_source() -> str:
-    return inspect.getsource(hub_plugin)
+# ── AST guards (plan §10.2) ─────────────────────────────────────────
 
 
 def test_hub_module_does_not_import_session_or_journal_backends() -> None:
-    """If a future dev adds `from lca.session import Session` to hub plugin,
-    the contract is broken: hub must be a fan-out scheduler, not an emitter."""
-    source = _hub_module_source()
+    source = inspect.getsource(hub_plugin)
     tree = ast.parse(source)
 
+    forbidden = (
+        "lca.session",
+        "lca.infrastructure.session",
+        "lca.infrastructure.observability.journal",
+    )
     imported_modules: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -306,21 +318,16 @@ def test_hub_module_does_not_import_session_or_journal_backends() -> None:
                 imported_modules.add(alias.name)
         elif isinstance(node, ast.ImportFrom) and node.module:
             imported_modules.add(node.module)
-            imported_modules.update(f"{node.module}.{alias.name}" for alias in node.names)
+            imported_modules.update(f"{node.module}.{a.name}" for a in node.names)
 
-    leaked = [
-        m for m in imported_modules if any(m.startswith(prefix) for prefix in _FORBIDDEN_IMPORTS)
-    ]
+    leaked = [m for m in imported_modules if any(m.startswith(prefix) for prefix in forbidden)]
     assert leaked == [], (
-        f"hub plugin must not import emit-path / session / journal surfaces; leaked: {leaked}"
+        f"hub plugin must not import emit-path/session/journal surfaces; leaked: {leaked}"
     )
 
 
 def test_hub_module_does_not_construct_session_or_eventspine() -> None:
-    """hub may annotate `EventSpine` for type clarity, but it must not call
-    Session.append(...) or EventSpine.append(...) — only EventSpine.subscribe(...).
-    AST guard: forbid attribute access on `Session` / `EventSpine`."""
-    source = _hub_module_source()
+    source = inspect.getsource(hub_plugin)
     tree = ast.parse(source)
 
     forbidden_calls: list[str] = []
@@ -332,39 +339,38 @@ def test_hub_module_does_not_construct_session_or_eventspine() -> None:
 
     leaked = [c for c in forbidden_calls if c != "EventSpine.subscribe"]
     assert leaked == [], (
-        "hub plugin may only call EventSpine.subscribe(...), never Session.append / "
-        f"EventSpine.append / Session.observe / etc.; leaked: {leaked}"
+        "hub plugin may only call Session.observe / EventSpine.subscribe (the subscribe path "
+        f"is no longer used, but the test still allows it historically); leaked: {leaked}"
     )
 
 
-# ── Plugin meta ───────────────────────────────────────────────────────
+# ── plugin meta ──────────────────────────────────────────────────────
 
 
 def test_plugin_meta_has_required_keys() -> None:
-    """The decorator metadata is what profile resolve uses to wire
-    requires/provides; if any key drifts, the bundle silently drops
-    the hub at resolve time."""
     from lca.harness.plugin.declaration import definition_from_plugin
 
     defn = definition_from_plugin(hub_plugin.setup)
     spec = defn.spec
     assert spec.id == "observation.event_hub"
-    assert spec.layer == "L2", (
-        "L1 is forbidden by the layer-rank check: L1 < L2 (spine.core) "
-        "would raise ProfileResolveError when hub requires event_spine. "
-        "L2 keeps hub at the same rank as spine.core so it can require "
-        "the EventSpine instance."
-    )
+    assert spec.layer == "L2"
+
     effects = spec.effects
     if isinstance(effects, str):
         assert effects == "none"
     else:
         assert tuple(effects) == ("none",)
+
     required_keys = tuple(cap.key for cap in spec.requires)
     provided_keys = tuple(cap.key for cap in spec.provides)
-    assert "event_spine" in required_keys
+
+    assert "session.store" in required_keys
     assert "observation.node_enter" in required_keys
     assert "observation.node_exit" in required_keys
     assert "observation.runtime_bookkeeping" in required_keys
     assert "observation.event_hub" in provided_keys
 
+
+def test_event_hub_config_fanout_table_is_bijective() -> None:
+    """EP_FANOUT_TABLE must pass validate_fanout_table (bijective)."""
+    hub_plugin.validate_fanout_table(hub_plugin._EP_FANOUT_TABLE.rules)
