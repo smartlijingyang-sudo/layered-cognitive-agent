@@ -1,6 +1,6 @@
 # Agent Note: Observation + Diagnosis 9-module 机制骨架
 
-Status: implemented
+Status: implemented (M0 event_hub runtime hookup landed; 9 modules + 1 scheduler module = 10 modules, 14 plugins)
 
 ## Problem
 
@@ -98,11 +98,58 @@ Cordis eventbus 与 SPINE 是两套独立事件系统,SPINE 是 file-sink,Cordis
 - `bundles/observation-9module.yaml` —— 装载入口
 - `profiles/web-standard.yaml` `bundles:` —— 装载列表
 
+## Implementation 补完(M0 event_hub 接通 runtime, 2026-09-14)
+
+「下一 PR TODO」两条候选路径(framework listener / runtime emit hook)都触碰 AGENTS.md §1 C1 / C11 / C13 与 ADR-0194 §3「认知原语零 emit」红线。改 framework 或 Session.append 主单轨都不被采纳;选第三条路:**bundle 内自装配 hub plugin,只调已存在的 `EventSpine.subscribe()`**,零 framework / harness / runtime 改动。
+
+### 落地
+
+- **Contract**: `lca/contracts/observability/observation/m0_event_hub/`。`EventHubConfig`(`BaseModel` frozen + `extra="forbid"`)承载 `rules: tuple[FanoutRule, ...]`;`FanoutRule` 单条 EP → observer capability + `enabled` 开关。**bijective 校验**(1 EP ↔ 1 observer)走 `validate_fanout_table()` 纯函数 + `EventHubConfig.model_validator` 双层守护。装载期抛 `EventHubConfigError`(first-class);直接构造 `EventHubConfig` 抛 pydantic `ValidationError`(消息含原始文本)。两层异常都能 grep 出同一条字串。
+- **Plugin**: `lca/plugins/observation/event_hub/plugin.py`。`@plugin(id="observation.event_hub", requires=("event_spine", "observation.node_enter", "observation.node_exit", "observation.runtime_bookkeeping"), effects="none")`;setup 调 `ctx.require("event_spine").subscribe(make_dispatch_fn(...))` 把 closure 挂到 EventSpine 的 `_subscribers` 列表。
+- **EP_FANOUT_TABLE** 当前覆盖 3 条 SPINE EP:`phase_graph.node.start` → `observation.node_enter`;`phase_graph.node.end` → `observation.node_exit`;`runtime.reducer.apply` → `observation.runtime_bookkeeping`。其余 9 类 observation fact(`DecisionTrace` / `ControlTrace` / `ToolCallTrace` / `LLMCallTrace` / `PlanCompileComplete` / `SubgraphResolve` / `BundleLoad` / `ArtifactSnapshot` / `NodeException`)按 plugin 间禁止直接 import 契约,在各 driver / lifecycle 调用方显式 `ctx.require(observer_capability_key)(...)` —— 单独 PR 处理。
+- **Bundle**: `bundles/observation-9module.yaml` 把 `observation.event_hub` 列在 13 observer 之后(cordis resolve 按 yaml 顺序装载,放最后确保 observer 已 provide);header 注释更新为 `10 modules · 14 plugins`。
+- **Tests**: `tests/observation/test_event_hub_contract.py`(8 test,bijective + extra=forbid + frozen + Pydantic 双层)+ `tests/observation/test_event_hub_plugin.py`(11 test,dispatch 行为 + observer 失败隔离 + unsubscribe 真正生效 + AST 守护 hub 不 import Session/journal + AST 守护 hub 不调除 `EventSpine.subscribe` 外的 EventSpine/Session 方法 + plugin meta 校验)。
+
+### 防并行多轨(用户 review 落实)
+
+hub plugin 实现期禁止出现的字符串(AST 守卫守护):
+
+| 禁 | 理由 |
+|---|---|
+| `Session.append(` 在 hub module | 必须经 13 observer 已声明的 `append_surface_bound` 单点 |
+| `EventSpine.append(` 在 hub module | hub 只订阅,不写 SPINE |
+| `publish_ep_bound` / `publish_spine_ep` / `FactGateway(` | 不发明新 emit 路径 |
+| `import lca.session` / `import lca.infrastructure.session` | 不直连 Session 后端(C7 + business-event-isolation) |
+| `from lca.infrastructure.observability.journal` | 不直连旧 journal backends |
+
+历史教训 cite: `spine_reflector_*`(ADR-0194 P5 退役,20+ 插件最后收敛回 `FactGateway`)+ `EventBus.publish`(ADR-0186 退役,曾是第二事实通道)。hub 不是第三条事实通道,它是调度器。
+
+### 通道拓扑(hub 装好后)
+
+```
+runtime 触发 → EventSpine.append → sinks(SpineFileSink 写盘) + _subscribers(纯订阅回调列表)
+                                                       │
+                                                       ├─ SpineFileSink (写盘)
+                                                       ├─ ProjectionCache / SpineAnomaly / TelemetryCapture
+                                                       └─ 🆕 observation.event_hub._dispatch  ← 本 PR
+                                                                          │
+                                                                          │ EP_FANOUT_TABLE[record.execution_point]
+                                                                          ▼
+                                                                   observer_fn(record.payload)
+                                                                          │
+                                                                          │  observer 内部已调 append_surface_bound
+                                                                          ▼
+                                                                   Session.append → self._log.append(event)
+```
+
+两条通道(Session.append / EventSpine.append)各走各的入口,各写各的存储;hub 只出现在 EventSpine 的 `_subscribers` 列表,**不写两条通道的任何一个**,不重写 emit 拓扑。
+
 ## 下一 PR TODO
 
-让运行时自动 emit 接通。两条可行路径(需要 ADR):
+M0 event_hub 已落地,Runtime auto-emit 一公里接通(phase_graph.node.start/end + runtime.reducer.apply 已扇出到 13 observer)。剩余工作:
 
-1. **Framework 加 SPINE EP listener API**(最干净,但需要 ADR + 改 `lca/framework/` 或 `lca/runtime/` 装配层)
-2. **Runtime 装配层在 emit SPINE EP 时调 `ObservationHub.notify(ep, payload)`**,hub 自己注册 fan-out(改 `infrastructure/session/append.py`,也需要 ADR)
+1. **9 类 runtime-emit 主动驱动**: `DecisionTrace` / `ControlTrace` / `ToolCallTrace` / `LLMCallTrace` / `PlanCompileComplete` / `SubgraphResolve` / `BundleLoad` / `ArtifactSnapshot` / `NodeException`。每个调用方在 driver / lifecycle 节点显式 `ctx.require(observer_capability_key)(payload)`。hub 的 `EP_FANOUT_TABLE` 预留 `enabled` 开关,后续 PR 翻成 `True` 即可把 fan-out 也启用(双通道保险)。
+2. **`phase_graph.subgraph.enter/exit` / `phase_graph.edge.transit` EP 的 emit**: `SpineGraphObserver` 类已存在但未装配,需 framework 决策 ADR(触碰 C1 / C11),单独 PR 处理,不在本 note 范围。
+3. **Session.append 主单轨契约**: 不动。
 
-两条路径共同前提:**不发明平行事件通道,不改 graph framework 内部机制,不破坏 Session.append 单轨**。
+共同前提(写入 note 头部): **不发明平行事件通道,不改 graph framework 内部机制,不破坏 Session.append 单轨**。
