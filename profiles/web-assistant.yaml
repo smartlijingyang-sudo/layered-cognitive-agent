@@ -34,13 +34,13 @@ description: |
   Adds AssistantHome catalog, bootstrap projection and workspace binding
   on top of web-standard. Default path (``web-standard.yaml``) untouched.
 
-  ADR-0210 §6.6 — web-assistant now runs the P7 region-tag path
+  ADR-0210 §6.6 — web-assistant runs the P7 region-tag path
   (no ``declarative-phase-graph.yaml`` bundle). The custom regions
   (``phase:plan`` / ``phase:replan`` / ``control:safety``) declared
-  below are the closed-set extension that the GenericPlanInterpreter
-  uses for runtime phase selection. The default 6-stage topology is
-  still available via the lab profile
-  (``profiles/agent-lab-infoedge.yaml``) for assistant debug paths.
+  below are the closed-set extension. They are parsed onto
+  ``ProfileSource.regions_declare`` and no consumer validates them
+  yet; see ``docs/design/2026-09-14-agent-lab-info-graph-reference.md``
+  §4.4 for the closed-set mechanism.
 
 regions:
   declare:
