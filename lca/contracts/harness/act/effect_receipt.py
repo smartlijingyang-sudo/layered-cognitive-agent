@@ -32,6 +32,19 @@ class EffectReceipt:
     error_code: str | None = None
     retryable: bool = False
     compensation_available: bool = False
+    failure_kind: str | None = None
+    """Body-classifier tag forwarded to the cognition seam.
+
+    Mirrors ``Observation.extra[FAILURE_KIND]``: ``"execution"`` for
+    deterministic failures the agent cannot retry into success,
+    ``"transient"`` for retryable infra errors, ``None`` for success or
+    any failure class the body has not yet classified. The cognition
+    seam (``DefaultStopPolicy._deterministic_failure_stop``,
+    ``ReflectObservationBuildExecutor._build_observation``) reads
+    this field directly — keeping it on the EffectReceipt is the
+    single SSOT for failure classification across the Body↔Cognition
+    boundary; do not derive it from ``error_code`` text at the seam.
+    """
 
     def __post_init__(self) -> None:
         if not self.invocation_id.strip() or not self.provider.strip():
@@ -44,6 +57,12 @@ class EffectReceipt:
             raise ValueError("failed effect must carry an error code")
         if self.retryable and self.outcome is not EffectOutcome.FAILED:
             raise ValueError("only failed effects can be retryable")
+        if self.failure_kind is not None and self.outcome is not EffectOutcome.FAILED:
+            raise ValueError(
+                "only failed effects carry a failure_kind tag "
+                f"(got outcome={self.outcome.value!r}, "
+                f"failure_kind={self.failure_kind!r})"
+            )
 
 
 def receipt_from_dispatcher(
@@ -60,6 +79,10 @@ def receipt_from_dispatcher(
     if not isinstance(key, str) or not key:
         raise ValueError("gateway receipt must contain idempotency_key")
     error_code = value.get("error_code")
+    raw_failure_kind = value.get("failure_kind")
+    failure_kind = (
+        raw_failure_kind if isinstance(raw_failure_kind, str) and raw_failure_kind else None
+    )
     return EffectReceipt(
         invocation_id=invocation_id,
         outcome=EffectOutcome.FAILED if error_code else EffectOutcome.SUCCEEDED,
@@ -68,6 +91,7 @@ def receipt_from_dispatcher(
         output_ref=value.get("output_ref") if isinstance(value.get("output_ref"), str) else None,
         error_code=error_code if isinstance(error_code, str) else None,
         retryable=bool(value.get("retryable", False)),
+        failure_kind=failure_kind,
     )
 
 

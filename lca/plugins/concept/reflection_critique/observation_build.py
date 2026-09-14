@@ -12,6 +12,7 @@ concept.reflection.critique 图节点 1:typed ``EffectReceipt`` →
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.enums.enums import ContentType
@@ -77,9 +78,19 @@ def _build_observation(receipt: EffectReceipt) -> Observation:
     """Project the typed EffectReceipt boundary onto a critic-ready Observation.
 
     Pure typed transformation: no I/O, no env reads, no LLM call.
+
     EffectReceipt.outcome maps to Observation.success; error_code
-    becomes Observation.error when present.
+    becomes Observation.error when present; failure_kind (Body's
+    classifier tag for transient-vs-deterministic) flows through to
+    Observation.extra[FAILURE_KIND] so stop-policy
+    ``_deterministic_failure_stop`` can read it from a single typed
+    port instead of re-deriving from ``error`` string text.
     """
+    from lca.contracts.atoms.semantic.keys import FAILURE_KIND
+
+    extra: dict[str, Any] = {}
+    if receipt.failure_kind:
+        extra[FAILURE_KIND] = receipt.failure_kind
     return Observation(
         observation_id=f"obs_{receipt.invocation_id}",
         success=receipt.outcome is EffectOutcome.SUCCEEDED,
@@ -87,6 +98,7 @@ def _build_observation(receipt: EffectReceipt) -> Observation:
         content_type=ContentType.TEXT,
         tool_call_id=receipt.invocation_id,
         error=receipt.error_code,
+        extra=extra,
     )
 
 

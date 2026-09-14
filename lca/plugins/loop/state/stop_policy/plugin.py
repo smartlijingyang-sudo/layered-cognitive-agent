@@ -132,31 +132,41 @@ class DefaultStopPolicy(StopPolicy):
     ) -> StopDecision | None:
         """Stop the loop when the last tool call hit a non-recoverable error.
 
-        Returns a ``StopDecision(reason=ERROR, status=FAILED)`` if the
-        most recent observation succeeded=``False`` and carries the
-        Body-executor ``failure_kind == "execution"`` tag (deterministic
-        error class: code bugs, permission denied, type errors).
-        Transient failures (``failure_kind == "transient"``) and
-        business-level ``success=False`` without the executor tag are
-        not handled here — they remain the model's call to retry.
+        Returns ``StopDecision(reason=ERROR, status=FAILED)`` when the
+        observation carries any of these deterministic-failure signals:
+
+        - ``failure_kind == "execution"`` — Body's classifier tag for
+          non-retryable errors (permission denied, file not found, type
+          errors). This is the primary signal.
+        - ``failure_kind == "transient"`` — explicitly retries. Not a
+          stop signal on its own.
+        - ``success=False`` with a non-empty ``error`` and no tag — a
+          legacy observation pre-dating the classifier; treat as
+          non-retryable to avoid the run_0d71855ae274 8-step loop.
+        - ``success=False`` with neither error nor tag — same logic;
+          the model cannot make progress on this path.
         """
         from lca.contracts.atoms.semantic.keys import (
             FAILURE_KIND,
             FAILURE_KIND_EXECUTION,
+            FAILURE_KIND_TRANSIENT,
         )
 
         if observation is None or observation.success:
             return None
         extra = observation.extra if isinstance(observation.extra, dict) else {}
-        if extra.get(FAILURE_KIND) != FAILURE_KIND_EXECUTION:
+        failure_kind = extra.get(FAILURE_KIND)
+        if failure_kind == FAILURE_KIND_TRANSIENT:
             return None
-        error_text = (observation.error or "").strip()
-        return StopDecision(
-            should_stop=True,
-            reason=StopReason.ERROR,
-            status=TaskStatus.FAILED,
-            final_output=error_text or None,
-        )
+        if failure_kind == FAILURE_KIND_EXECUTION or failure_kind is None:
+            error_text = (observation.error or "").strip()
+            return StopDecision(
+                should_stop=True,
+                reason=StopReason.ERROR,
+                status=TaskStatus.FAILED,
+                final_output=error_text or None,
+            )
+        return None
 
     def _budget_exhausted_decision(
         self,

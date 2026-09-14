@@ -71,8 +71,16 @@ def test_delivery_satisfied_stops_via_live_observation_when_fold_empty() -> None
     assert stop.status is not None
 
 
-def test_delivery_satisfied_does_not_stop_on_failed_observation() -> None:
-    """Negative case: failed observation must NOT trigger the backup."""
+def test_delivery_satisfied_stops_on_failed_observation_without_tag() -> None:
+    """Failed observation with no failure_kind tag still stops the loop.
+
+    Pre-fix (run_0d71855ae274) the deterministic-failure backup only
+    fired when ``extra[FAILURE_KIND] == "execution"`` was set, so a
+    failed observation that the Body executor never tagged slipped
+    through to burn all 8 max_visits. The backup now treats any
+    ``success=False`` observation (with a non-empty error) as a
+    deterministic failure and stops the loop.
+    """
     state = AgentState(
         trace_id="t",
         task="task",
@@ -90,6 +98,41 @@ def test_delivery_satisfied_does_not_stop_on_failed_observation() -> None:
         success=False,
         payload={},
         error="boom",
+    )
+    reflection = Reflection(
+        reflection_id="r",
+        verdict=ReflectionVerdict.ON_TRACK,
+        lesson=None,
+    )
+
+    stop = DefaultStopPolicy(_StubClosure()).decide(state, decision, observation, reflection)
+    assert stop.should_stop is True
+    assert stop.reason is not None
+    assert stop.status is not None
+
+
+def test_delivery_satisfied_does_not_stop_on_transient_tag() -> None:
+    """Transient failures must remain retriable (model may recover)."""
+    from lca.contracts.atoms.semantic.keys import FAILURE_KIND_TRANSIENT
+
+    state = AgentState(
+        trace_id="t",
+        task="task",
+        budget=create_budget(max_steps=8),
+    )
+    decision = Decision(
+        decision_id="d",
+        action_type=ActionType.USE_TOOL,
+        rationale="x",
+        confidence=0.9,
+        tool_calls=[ToolCall(call_id="c", tool_name="t", arguments={})],
+    )
+    observation = Observation(
+        observation_id="o",
+        success=False,
+        payload={},
+        error="timeout",
+        extra={"failure_kind": FAILURE_KIND_TRANSIENT},
     )
     reflection = Reflection(
         reflection_id="r",

@@ -323,6 +323,34 @@ class TestEffectReceipt:
         assert receipt.output_ref is None
         assert receipt.error_code is None
         assert receipt.retryable is False
+        assert receipt.failure_kind is None
+
+    def test_failure_kind_only_on_failed(self) -> None:
+        """``failure_kind`` tag is reserved for FAILED outcomes.
+
+        Putting it on a SUCCEEDED receipt would mislead the cognition
+        seam into thinking the tool hit a deterministic failure when
+        it actually produced output.
+        """
+        with pytest.raises(ValueError):
+            EffectReceipt(
+                invocation_id="i1",
+                outcome=EffectOutcome.SUCCEEDED,
+                idempotency_key="k1",
+                provider="prov",
+                failure_kind="execution",
+            )
+
+    def test_failure_kind_carries_through_when_failed(self) -> None:
+        receipt = EffectReceipt(
+            invocation_id="i1",
+            outcome=EffectOutcome.FAILED,
+            idempotency_key="k1",
+            provider="prov",
+            error_code="boom",
+            failure_kind="execution",
+        )
+        assert receipt.failure_kind == "execution"
 
     def test_rejects_unknown_field(self) -> None:
         with pytest.raises(TypeError):

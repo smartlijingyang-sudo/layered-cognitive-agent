@@ -70,14 +70,19 @@ class EffectExecuteExecutor:
         return NodeOutput(port_values={"receipt": receipt})
 
 
-def _derive_outcome(result: object) -> tuple[EffectOutcome, str | None]:
-    """Derive EffectOutcome and error_code from the dispatch result.
+def _derive_outcome(
+    result: object,
+) -> tuple[EffectOutcome, str | None, str | None]:
+    """Derive EffectOutcome, error_code, and failure_kind from the dispatch result.
 
     If the result is an Observation (or contains one as ``result``),
     read ``success`` to decide SUCCEEDED vs FAILED.  A failed Observation
-    contributes its ``error`` field as the error_code.  Anything else
-    defaults to SUCCEEDED (the dispatch did not raise).
+    contributes its ``error`` field as the error_code and its
+    ``extra[FAILURE_KIND]`` as the failure_kind tag (so the cognition
+    seam can distinguish deterministic failures from transient
+    retries without re-classifying the text).
     """
+    from lca.contracts.atoms.semantic.keys import FAILURE_KIND
     from lca.contracts.models.core.execution.decision import Observation
 
     obs: object | None = None
@@ -89,8 +94,13 @@ def _derive_outcome(result: object) -> tuple[EffectOutcome, str | None]:
             obs = inner
     if obs is not None and not obs.success:
         error_code = (obs.error or "tool_failed")[:128]
-        return EffectOutcome.FAILED, error_code
-    return EffectOutcome.SUCCEEDED, None
+        failure_kind = None
+        if isinstance(obs.extra, dict):
+            tag = obs.extra.get(FAILURE_KIND)
+            if isinstance(tag, str) and tag:
+                failure_kind = tag
+        return EffectOutcome.FAILED, error_code, failure_kind
+    return EffectOutcome.SUCCEEDED, None, None
 
 
 async def _dispatch(envelope: CommandEnvelope, context: NodeContext) -> EffectReceipt:
@@ -138,7 +148,7 @@ async def _dispatch(envelope: CommandEnvelope, context: NodeContext) -> EffectRe
         result = output
         invocation_id = envelope.idempotency_key or "unknown"
 
-    outcome, error_code = _derive_outcome(result)
+    outcome, error_code, failure_kind = _derive_outcome(result)
     return EffectReceipt(
         invocation_id=str(invocation_id),
         outcome=outcome,
@@ -146,6 +156,7 @@ async def _dispatch(envelope: CommandEnvelope, context: NodeContext) -> EffectRe
         provider=envelope.metadata.get("operation", "unknown"),
         output_ref=str(result) if result is not None else None,
         error_code=error_code,
+        failure_kind=failure_kind,
     )
 
 
