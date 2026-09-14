@@ -13,6 +13,7 @@ Error contract:
 
 from __future__ import annotations
 
+import dataclasses
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
@@ -64,14 +65,28 @@ class PortReader(BaseModel):
         payload_type = self.registry.port_type(port_name)
 
         # Typed payload: validate field existence against the declared type.
-        if payload_type is not None and issubclass(payload_type, BaseModel):
-            if field_name not in payload_type.model_fields:
-                raise UnknownFieldError(
-                    f"edge from {self.source_node!r} reads port {port_name!r} "
-                    f"payload_type {payload_type.__name__} has no field {field_name!r}",
-                    port_name=port_name,
-                )
-            return getattr(value, field_name)
+        if payload_type is not None:
+            if isinstance(payload_type, type) and issubclass(
+                payload_type, BaseModel
+            ):
+                if field_name not in payload_type.model_fields:
+                    raise UnknownFieldError(
+                        f"edge from {self.source_node!r} reads port {port_name!r} "
+                        f"payload_type {payload_type.__name__} has no field {field_name!r}",
+                        port_name=port_name,
+                    )
+                return getattr(value, field_name)
+            if dataclasses.is_dataclass(payload_type):
+                field_names = {
+                    f.name for f in dataclasses.fields(payload_type)
+                }
+                if field_name not in field_names:
+                    raise UnknownFieldError(
+                        f"edge from {self.source_node!r} reads port {port_name!r} "
+                        f"payload_type {payload_type.__name__} has no field {field_name!r}",
+                        port_name=port_name,
+                    )
+                return getattr(value, field_name)
 
         # Dict payload: key lookup.
         if isinstance(value, dict):

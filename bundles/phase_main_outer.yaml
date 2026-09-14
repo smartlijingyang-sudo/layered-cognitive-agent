@@ -19,61 +19,106 @@ purpose: Six-phase outer plan (perceive → think → act → reflect → rememb
 nodes:
   - id: perceive.main
     region: phase:perceive
-    max_visits: 8
+    max_visits: 1
     entry: true
     sub_spec_ref:
       plan_ref: bundles/perceive_subgraph.yaml
       entry_node: phase.perceive.observe
       binding_edge: perceive.main
     declared_inputs: []
-    declared_outputs: [perceive_payload, routing]
+    # ``in_assembled_manifest`` is what ``think.main`` consumes next;
+    # ``observation`` is the closed-port projection that downstream
+    # reflect nodes may also need. Both are produced by the inner
+    # ``perceive.subgraph`` fold node.
+    declared_outputs: [in_assembled_manifest, observation, routing]
 
   - id: think.main
     region: phase:think
-    max_visits: 8
+    max_visits: 1
     sub_spec_ref:
       plan_ref: bundles/think.yaml
       entry_node: think.shortcut
       binding_edge: think.main
-    declared_inputs: [perceive_payload]
-    declared_outputs: [decision, routing]
+    # think.subgraph's entry ``think.shortcut`` declares inputs:
+    # ``[in_assembled_manifest]`` (per ThinkShortcutExecutor's
+    # declared_inputs). The outer-facing name matches the inner
+    # entry's input so SubgraphStrategy's name-based fallback
+    # forwards the registry value into the inner.
+    declared_inputs: [in_assembled_manifest]
+    # Inner think.subgraph emits ``decision`` (the typed Decision
+    # produced by decision.compose.action). SubgraphStrategy's
+    # positional translation maps inner_outputs[0] to the outer
+    # ``decision`` port. terminal.commit and act.main read this
+    # port via the kernel-wide port registry.
+    declared_outputs: [decision]
 
   - id: act.main
     region: phase:act
-    max_visits: 8
+    max_visits: 1
     sub_spec_ref:
       plan_ref: bundles/act.yaml
       entry_node: act.validate
       binding_edge: act.main
+    # Inner act.subgraph's entry ``act.validate`` reads ``decision``
+    # (per ActValidateExecutor.declared_inputs). The kernel-wide
+    # port registry exposes ``decision`` (the typed-port D4 boundary
+    # carried from think.subgraph via the registry) so act subgraph
+    # receives it.
     declared_inputs: [decision]
-    declared_outputs: [act_outcome, should_terminate, routing]
+    # Inner act.subgraph emits ``should_terminate`` (via act.observe)
+    # and the ``decision`` carried through validate/authorize/envelope.
+    # ``routing`` is not produced by act's typed-port boundary;
+    # routing decisions propagate via the kernel-wide port registry.
+    declared_outputs: [decision, should_terminate]
 
   - id: reflect.main
     region: phase:reflect
-    max_visits: 8
+    max_visits: 1
     sub_spec_ref:
       plan_ref: bundles/reflect_subgraph.yaml
       entry_node: phase.reflect.score
       binding_edge: reflect.main
-    declared_inputs: [act_outcome]
-    declared_outputs: [reflect_outcome, routing]
+    # No ``declared_inputs``: the reflect subgraph reads
+    # ``observation`` from the kernel-wide port registry (perceive
+    # produced it earlier; the registry persists across phases).
+    # Forwarding an explicit name here would fail the typed-port
+    # contract check when the upstream phase doesn't produce it
+    # under the same name.
+    # Inner reflect.subgraph emits ``reflection`` (via score) and
+    # ``routing`` (via admit_recovery); ``reflect_outcome`` was a
+    # legacy alias. Downstream remember.main reads ``reflection``
+    # directly from the port registry.
+    declared_outputs: [reflection, routing]
 
   - id: remember.main
     region: phase:remember
-    max_visits: 8
+    max_visits: 1
     sub_spec_ref:
       plan_ref: bundles/remember_subgraph.yaml
       entry_node: phase.remember.write
       binding_edge: remember.main
-    declared_inputs: [reflect_outcome]
-    declared_outputs: [memory_record, routing]
+    # Inner ``phase.remember.write`` declared_inputs are
+    # ``[decision, observation, reflection]`` per the executor's
+    # contract; ``reflect_outcome`` was a legacy alias. The reflect
+    # subgraph emits ``reflection`` upstream which we forward under
+    # the same name so SubgraphStrategy's name-based fallback
+    # delivers it.
+    declared_inputs: [decision, observation, reflection]
+    # ``memory_record`` is a legacy alias; the inner emits
+    # ``memory_receipt``. ``routing`` is not produced by the
+    # remember subgraph; routing decisions propagate via the
+    # kernel-wide port registry.
+    declared_outputs: [memory_receipt]
 
   - id: terminal.commit
     region: phase:terminal
     binding: terminate
     max_visits: 1
     terminal: true
-    declared_inputs: [decision, act_outcome, reflect_outcome, routing]
+    # The typed-port D4 boundary emits ``decision`` (the stamped
+    # Decision from think.subgraph). ``reflection`` flows through
+    # from the reflect subgraph's outer port declaration.
+    declared_inputs: [decision, reflection]
     declared_outputs: [terminal_outcome]
 
 edges:
@@ -81,22 +126,22 @@ edges:
   - from: perceive.main
     to: think.main
 
-  # think → act when routing.action_type == use_tool.
+  # think → act when decision.action_type == use_tool.
   - from: think.main
     to: act.main
     when:
       kind: eq
-      port: { name: routing, field: action_type }
+      port: { name: decision, field: action_type }
       value: use_tool
 
-  # think → terminal.commit when routing.action_type == respond
+  # think → terminal.commit when decision.action_type == respond
   # AND decision.response_text is non-empty.
   - from: think.main
     to: terminal.commit
     when:
       kind: and
       children:
-        - { kind: eq, port: { name: routing, field: action_type }, value: respond }
+        - { kind: eq, port: { name: decision, field: action_type }, value: respond }
         - { kind: ne, port: { name: decision, field: response_text }, value: "" }
 
   # act → think on USE_TOOL (the re-ask-model loop).
@@ -104,7 +149,7 @@ edges:
     to: think.main
     when:
       kind: eq
-      port: { name: routing, field: action_type }
+      port: { name: decision, field: action_type }
       value: use_tool
 
   # act → terminal.commit on should_terminate.
@@ -112,8 +157,13 @@ edges:
     to: terminal.commit
     when:
       kind: eq
-      port: { name: routing, field: should_terminate }
+      port: { name: should_terminate }
       value: true
+
+  # act → reflect.main (reflect reads observation/reflection from the
+  # kernel-wide port registry; the wiring edge just routes control).
+  - from: act.main
+    to: reflect.main
 
   # reflect → remember.
   - from: reflect.main

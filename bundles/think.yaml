@@ -11,6 +11,8 @@ purpose: think 5 步执行 — shortcut 可 short-circuit,route → reason → c
 nodes:
   - id: think.shortcut
     factory: think.shortcut
+    inputs: [in_assembled_manifest]
+    outputs: [decision]
     config:
       max_visits: 1
 
@@ -55,6 +57,7 @@ nodes:
     factory: think.gate.ref
     inputs: [decision]
     outputs: [decision, routing]
+    terminal: true
     config:
       max_visits: 8
       emit_on_enter: []
@@ -71,13 +74,13 @@ nodes:
         binding_edge: think.gate
 
 edges:
-  # shortcut → route: 没命中(response 缺失)走 route;命中直接到 gate
+  # shortcut → route: 没命中(decision 缺失)走 route;命中直接到 gate
   - from: think.shortcut
     to: think.route
-    when: { kind: missing, port: { name: response } }
+    when: { kind: missing, port: { name: decision } }
   - from: think.shortcut
     to: think.gate
-    when: { kind: exists, port: { name: response } }
+    when: { kind: exists, port: { name: decision } }
 
   # route → reason → classify → gate
   - from: think.route

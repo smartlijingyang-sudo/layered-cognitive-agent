@@ -52,8 +52,14 @@ def _lift_graph_spec_inner(spec: Mapping[str, Any]) -> Plan:
     raw_nodes = spec.get("nodes", ())
     raw_edges = spec.get("edges", ())
     raw_entry = spec.get("entry")
+    if raw_nodes is None:
+        raw_nodes = ()
+    if raw_edges is None:
+        raw_edges = ()
     if not isinstance(raw_nodes, (list, tuple)):
         raise ValueError(f"plan {spec_id!r}: nodes must be a sequence")
+    if not isinstance(raw_edges, (list, tuple)):
+        raise ValueError(f"plan {spec_id!r}: edges must be a sequence")
     nodes: list[PlanNode] = []
     for raw in raw_nodes:
         if not isinstance(raw, Mapping):
@@ -70,6 +76,14 @@ def _lift_graph_spec_inner(spec: Mapping[str, Any]) -> Plan:
         if sub_spec_raw is None and isinstance(config_raw, Mapping):
             sub_spec_raw = config_raw.get("sub_spec_ref")
         subgraph_ref = _subgraph_ref_from(sub_spec_raw)
+        if subgraph_ref is not None and subgraph_ref.plan_ref:
+            # The plan_ref must point to a real bundle file; a typo'd
+            # or moved reference previously slipped through because
+            # ``_subgraph_entry_schema`` silently swallows load errors
+            # and returns an empty schema, so the outer node lifted
+            # clean and the kernel crashed at first dispatch. Lift-time
+            # check turns this into a fail-loud error.
+            _require_subgraph_plan_exists(spec_id, node_id, subgraph_ref)
         # First-principle port-naming for subgraph nodes: the YAML's
         # ``declared_inputs``/``declared_outputs`` are the **outer-facing**
         # port names (what the outer kernel reads from / writes to its
@@ -91,6 +105,21 @@ def _lift_graph_spec_inner(spec: Mapping[str, Any]) -> Plan:
             declared_out = raw.get("declared_outputs")
             if declared_in is not None or declared_out is not None:
                 schema = _schema_from(declared_in, declared_out)
+                # Subgraph port contract (ADR-0217 §3.3.3 +
+                # first-principle port-naming): outer-facing declared
+                # port names must exist in the inner plan's reachable
+                # port set, otherwise the kernel silently reads None /
+                # drops values at runtime. Catch the mismatch at lift
+                # time so a mis-wired bundle fails boot instead of
+                # leaking a missing-port crash at first dispatch.
+                _enforce_subgraph_port_contract(
+                    spec_id=spec_id,
+                    node_id=node_id,
+                    outer_schema=schema,
+                    subgraph_ref=subgraph_ref,
+                    declared_inputs_present=declared_in is not None,
+                    declared_outputs_present=declared_out is not None,
+                )
             else:
                 schema = inner_schema
         else:
@@ -111,11 +140,19 @@ def _lift_graph_spec_inner(spec: Mapping[str, Any]) -> Plan:
     edges: list[PlanEdge] = []
     for raw in raw_edges:
         if not isinstance(raw, Mapping):
-            continue
+            raise PlanLiftError(
+                f"plan {spec_id!r}: edge must be a mapping, got {type(raw).__name__}"
+            )
         source = str(raw.get("from") or raw.get("source", "")).strip()
         target = str(raw.get("to") or raw.get("target", "")).strip()
-        if not source or not target:
-            continue
+        if not source:
+            raise PlanLiftError(
+                f"plan {spec_id!r}: edge missing 'from' (or 'source'): {dict(raw)}"
+            )
+        if not target:
+            raise PlanLiftError(
+                f"plan {spec_id!r}: edge missing 'to' (or 'target'): {dict(raw)}"
+            )
         edges.append(
             PlanEdge(
                 source=source,
@@ -231,6 +268,132 @@ def _subgraph_entry_schema(
         return NodeIOSchema()
 
 
+def _require_subgraph_plan_exists(
+    spec_id: str, node_id: str, subgraph_ref: SubgraphReference
+) -> None:
+    """Raise :class:`PlanLiftError` if *subgraph_ref.plan_ref* points nowhere.
+
+    Subgraph delegates whose target file is missing or unreadable
+    silently degrade today (``_subgraph_entry_schema`` returns an
+    empty schema on load failure, leaving the outer node with no
+    inputs / no outputs and the kernel crashing at first dispatch).
+    Catching this at lift time surfaces a structured boot error so
+    the operator sees the wrong ``plan_ref`` next to the wrong node.
+    """
+    try:
+        path = _bundle_yaml_path(subgraph_ref.plan_ref)
+    except (OSError, ValueError) as exc:
+        raise PlanLiftError(
+            f"plan {spec_id!r}: subgraph node {node_id!r} plan_ref "
+            f"{subgraph_ref.plan_ref!r} failed to resolve: {exc}",
+            plan_id=spec_id,
+            node_id=node_id,
+        ) from exc
+    if not path.exists():
+        raise PlanLiftError(
+            f"plan {spec_id!r}: subgraph node {node_id!r} plan_ref "
+            f"{subgraph_ref.plan_ref!r} does not exist (resolved path={path})",
+            plan_id=spec_id,
+            node_id=node_id,
+        )
+
+
+def _enforce_subgraph_port_contract(
+    *,
+    spec_id: str,
+    node_id: str,
+    outer_schema: NodeIOSchema,
+    subgraph_ref: SubgraphReference,
+    declared_inputs_present: bool,
+    declared_outputs_present: bool,
+) -> None:
+    """Reject subgraph ``declared_inputs/outputs`` names the inner plan can't honor.
+
+    The subgraph data contract (ADR-0217 §3.3.3) is **name-based**:
+    :class:`SubgraphStrategy` reads ``outer_schema.outputs`` by name
+    from the merged inner output dict, and the inner kernel reads
+    ``inner_schema.inputs`` by name from the outer port registry.
+    A name that exists on one side but not the other causes a
+    silent drop at runtime (``merged_output[outer_name]`` is
+    ``None`` / not-present, or the inner reads a name it never
+    received).
+
+    Lift-time rejection turns this into a boot-time failure with
+    structured context so the operator fixes the bundle.
+
+    Inputs contract: every name in ``outer_schema.inputs`` must
+    exist in the union of inputs declared on any inner plan node
+    reachable from the entry.
+
+    Outputs contract: every name in ``outer_schema.outputs`` must
+    exist in the union of outputs declared on any inner plan node
+    reachable from the entry. The subgraph entry node itself may
+    only declare a subset; downstream inner nodes produce the
+    rest and merge into the outer output dict.
+
+    Falls through silently when the inner plan cannot be loaded
+    (``_require_subgraph_plan_exists`` already raised a structured
+    error in that case; duplicating it here would just produce
+    noise).
+    """
+    inner_plan = _load_subgraph_plan_for_contract(subgraph_ref)
+    if inner_plan is None:
+        return
+    if declared_inputs_present:
+        inner_in_names: set[str] = set()
+        for n in inner_plan.nodes:
+            inner_in_names |= {p.name for p in n.io_schema.inputs}
+        unknown = [p.name for p in outer_schema.inputs if p.name not in inner_in_names]
+        if unknown:
+            raise PlanLiftError(
+                f"plan {spec_id!r}: subgraph node {node_id!r} declared_inputs "
+                f"{unknown!r} are not declared by any inner plan node; "
+                f"the inner kernel cannot read them. inner_declared_inputs="
+                f"{sorted(inner_in_names)}",
+                plan_id=spec_id,
+                node_id=node_id,
+            )
+    if declared_outputs_present:
+        inner_out_names: set[str] = set()
+        for n in inner_plan.nodes:
+            inner_out_names |= n.io_schema.output_names()
+        unknown = [p.name for p in outer_schema.outputs if p.name not in inner_out_names]
+        if unknown:
+            raise PlanLiftError(
+                f"plan {spec_id!r}: subgraph node {node_id!r} declared_outputs "
+                f"{unknown!r} are not produced by any inner plan node; "
+                f"the subgraph will never emit them. inner_declared_outputs="
+                f"{sorted(inner_out_names)}",
+                plan_id=spec_id,
+                node_id=node_id,
+            )
+
+
+def _load_subgraph_plan_for_contract(
+    subgraph_ref: SubgraphReference,
+) -> Plan | None:
+    """Load the inner plan referenced by *subgraph_ref* for contract checks.
+
+    Returns ``None`` when the plan cannot be loaded (missing file,
+    malformed yaml, missing entry node). The contract check is
+    best-effort; the inner-plan lift error gets surfaced
+    separately by the boot-time ``plan_validation`` aggregator.
+    """
+    try:
+        import yaml
+
+        path = _bundle_yaml_path(subgraph_ref.plan_ref)
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            return None
+        spec = dict(raw)
+        if "entry" not in spec and subgraph_ref.entry_node:
+            spec["entry"] = subgraph_ref.entry_node
+        return _lift_graph_spec_inner(spec)
+    except (FileNotFoundError, KeyError, TypeError, ValueError):
+        return None
+
+
 def _bundle_yaml_path(plan_ref: str) -> Path:
     """Resolve a bundle-relative ``plan_ref`` to a filesystem path.
 
@@ -303,14 +466,21 @@ def _binding_for_phase_node(raw: object) -> BindingKind:
 
 
 def _schema_from(inputs: object, outputs: object) -> NodeIOSchema:
+    """Build a :class:`NodeIOSchema` from yaml ``inputs``/``outputs`` declarations.
+
+    Inputs and outputs are independent port namespaces. A name
+    that appears on both sides is a **read+write alias** (e.g. an
+    act subgraph reads ``decision`` from upstream and emits a
+    stamped ``decision`` downstream) — :class:`NodeIOSchema`
+    permits this within the schema-level uniqueness invariant
+    (uniqueness is per-direction). Both sides are preserved so the
+    lifter records the full emit/read contract, the kernel
+    forwards a same-named upstream value into the subgraph via
+    :class:`SubgraphStrategy`, and downstream wiring checks see
+    the emitted port on the output side.
+    """
     in_specs = _to_port_specs(inputs)
     out_specs = _to_port_specs(outputs)
-    # Subgraph yaml often declares the same port as both input and output
-    # (the node reads from upstream and writes its own decision). The
-    # kernel treats inputs/outputs as one union for the strict-validator;
-    # we deduplicate so the schema's "unique names" invariant holds.
-    in_names = {p.name for p in in_specs}
-    out_specs = tuple(p for p in out_specs if p.name not in in_names)
     return NodeIOSchema(inputs=in_specs, outputs=out_specs)
 
 
@@ -484,20 +654,28 @@ def _validate_predicate_node(
                 port_name=port_name,
             )
         port_spec = _find_port_spec(schema, port_name)
-        if (
-            pred.port.field is not None
-            and port_spec is not None
-            and port_spec.payload_type is not None
-            and pred.port.field not in port_spec.payload_type.model_fields
-        ):
-            raise PlanLiftError(
-                f"edge {edge_id!r}: port {port_name!r} payload type "
-                f"{port_spec.payload_type.__name__!r} has no field "
-                f"{pred.port.field!r}",
-                plan_id=plan_id,
-                edge_id=edge_id,
-                port_name=port_name,
-            )
+        if pred.port.field is not None:
+            # Typed-port field SSOT: when the bundle declares a
+            # ``payload_type`` for the source port, the predicate's
+            # named field must exist on that payload type — this is a
+            # hard fail-loud because the kernel can statically prove
+            # the field reference is bogus. When the bundle omits
+            # ``payload_type``, the port is treated as dynamic and
+            # the field check is skipped (kernel resolves the field
+            # at runtime via :class:`PortReader`). The legacy-bundle
+            # escape hatch is intentional: forcing every port to
+            # declare a BaseModel payload_type would break the typed-
+            # port D4 cutover's gradual rollout.
+            if port_spec is not None and port_spec.payload_type is not None:
+                if pred.port.field not in port_spec.payload_type.model_fields:
+                    raise PlanLiftError(
+                        f"edge {edge_id!r}: port {port_name!r} payload type "
+                        f"{port_spec.payload_type.__name__!r} has no field "
+                        f"{pred.port.field!r}",
+                        plan_id=plan_id,
+                        edge_id=edge_id,
+                        port_name=port_name,
+                    )
         return
     for child in pred.children:
         _validate_predicate_node(

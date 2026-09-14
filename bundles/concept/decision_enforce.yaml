@@ -19,7 +19,11 @@ nodes:
   - id: gate.chain.run
     factory: gate.chain.run
     inputs: [decision, state]
-    outputs: [enforced_decision]
+    # ``decision`` is passthrough: gate.chain.run reads it from
+    # upstream, runs the gate chain, and forwards the original
+    # decision to gate.chain.reject alongside the enforced copy
+    # (which downstream uses to stamp ``routing``).
+    outputs: [enforced_decision, decision]
     config:
       max_visits: 1
       emit_on_enter: []

@@ -28,6 +28,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+import dataclasses
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from lca.contracts.protocols.graph.ports import PortName
@@ -56,7 +58,7 @@ class PortSpec(BaseModel):
 
     name: PortName
     required: bool = True
-    payload_type: type[BaseModel] | None = None  # None = dynamic port, no field access
+    payload_type: type | None = None  # None = dynamic port, no field access
 
 
 class NodeIOSchema(BaseModel):
@@ -81,11 +83,22 @@ class NodeIOSchema(BaseModel):
 
     @model_validator(mode="after")
     def _names_unique(self) -> "NodeIOSchema":
-        seen: set[PortName] = set()
-        for spec in (*self.inputs, *self.outputs):
-            if spec.name in seen:
-                raise NodeSchemaError(f"duplicate port name in schema: {spec.name!r}")
-            seen.add(spec.name)
+        # Uniqueness is enforced within each direction (no two
+        # inputs share a name; no two outputs share a name). A
+        # port that appears on both sides is intentionally
+        # permitted — it represents a read+write alias (e.g. an
+        # act subgraph reads ``decision`` from upstream and emits
+        # a stamped ``decision`` downstream under the same name).
+        seen_in: set[PortName] = set()
+        for spec in self.inputs:
+            if spec.name in seen_in:
+                raise NodeSchemaError(f"duplicate input port name in schema: {spec.name!r}")
+            seen_in.add(spec.name)
+        seen_out: set[PortName] = set()
+        for spec in self.outputs:
+            if spec.name in seen_out:
+                raise NodeSchemaError(f"duplicate output port name in schema: {spec.name!r}")
+            seen_out.add(spec.name)
         return self
 
     def required_inputs(self) -> tuple[PortName, ...]:

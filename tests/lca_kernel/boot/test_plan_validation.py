@@ -233,25 +233,39 @@ class TestValidateProfilePlans:
     # Aggregated errors — user sees all problems at once.
     # ---------------------------------------------------------------------------
 
-    def test_aggregates_errors_across_plans(self, tmp_path: Path) -> None:
+    def test_aggregates_errors_across_plans(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Multiple bad plans surface all problems in a single failure.
 
         Outer plan + a ``sub_spec_ref`` it reaches, both malformed.
         The aggregated ``reason`` carries context for both so the
         operator fixes them in one pass instead of N.
         """
-        # Inner plan: reached via sub_spec_ref.entry_node, no termination.
+        # Inner plan: edge predicate port 'foo' not in source
+        # outputs — caught by ``validate_predicates`` at lift time
+        # so the bug doesn't depend on ``_validate_termination``
+        # (subgraph lifecycle is bound to the outer's
+        # ``binding_edge`` and lacks an inner terminal).
         inner = {
-            "id": "broken.inner_no_termination",
+            "id": "broken.inner_predicate_port",
             "nodes": [
                 {
-                    "id": "only",
+                    "id": "a",
                     "binding": "node_executor",
                     "outputs": ["x"],
                     "entry": True,
                 },
+                {
+                    "id": "b",
+                    "binding": "node_executor",
+                    "inputs": ["x"],
+                    "terminal": True,
+                },
             ],
-            "edges": [],
+            "edges": [
+                {"from": "a", "to": "b", "when": {"kind": "eq", "port": {"name": "foo"}, "value": 1}},
+            ],
         }
         inner_path = _write_bundle(tmp_path, "inner.yaml", inner)
         # Wire the outer to reference the inner via sub_spec_ref.
@@ -281,13 +295,28 @@ class TestValidateProfilePlans:
         }
         outer_path = _write_bundle(tmp_path, "phase_main_outer.yaml", outer_mapping)
         resolved = _resolved_profile((outer_path,))
+        # Pin the inner-plan path resolver to tmp_path so this test
+        # never reads the real production ``bundles/`` tree.
+        import lca.framework.graph.lifter as lifter_mod
+        import lca_kernel.boot.plan_validation as pv_mod
+
+        monkeypatch.setattr(
+            lifter_mod,
+            "_bundle_yaml_path",
+            lambda plan_ref: tmp_path / plan_ref,
+        )
+        monkeypatch.setattr(
+            pv_mod,
+            "_bundle_yaml_path",
+            lambda plan_ref: tmp_path / plan_ref,
+        )
 
         with pytest.raises(PlanLiftError) as exc_info:
             validate_profile_plans(resolved)
         # ``reason`` carries aggregated context for both failing plans.
         msg = str(exc_info.value)
         assert "broken.string_predicate" in msg
-        assert "broken.inner_no_termination" in msg
+        assert "broken.inner_predicate_port" in msg
         assert exc_info.value.plan_id == "<test>"
 
     # ---------------------------------------------------------------------------
@@ -298,3 +327,99 @@ class TestValidateProfilePlans:
         """A profile with no bundles validates trivially."""
         resolved = _resolved_profile(())
         validate_profile_plans(resolved)  # must not raise
+
+
+# ---------------------------------------------------------------------------
+# Boot-time plan-level checks: typed-port wiring + reachability +
+# subgraph plan_ref existence (added: must catch at boot, not at first
+# dispatch).
+# ---------------------------------------------------------------------------
+
+
+class TestBootPlanLevelChecks:
+    def test_missing_input_in_predecessor_outputs(self, tmp_path: Path) -> None:
+        """b requires 'x' but a only produces 'foo' — fail loud at boot."""
+        plan = {
+            "id": "broken.missing_input",
+            "nodes": [
+                {"id": "a", "binding": "node_executor", "outputs": ["foo"], "entry": True},
+                {"id": "b", "binding": "node_executor", "inputs": ["x"], "terminal": True},
+            ],
+            "edges": [{"from": "a", "to": "b", "when": True}],
+        }
+        bundle = _write_bundle(tmp_path, "phase_main_outer.yaml", plan)
+        resolved = _resolved_profile((bundle,))
+        with pytest.raises(PlanLiftError) as exc_info:
+            validate_profile_plans(resolved)
+        msg = str(exc_info.value)
+        assert "broken.missing_input" in msg
+        assert "missing" in msg or "not produced" in msg
+
+    def test_reachability_island_node(self, tmp_path: Path) -> None:
+        """Orphan 'island' node unreachable from entry — fail loud."""
+        plan = {
+            "id": "broken.unreachable",
+            "nodes": [
+                {
+                    "id": "a",
+                    "binding": "node_executor",
+                    "outputs": ["x"],
+                    "entry": True,
+                    "terminal": True,
+                },
+                {"id": "island", "binding": "node_executor", "outputs": ["y"]},
+            ],
+            "edges": [],
+        }
+        bundle = _write_bundle(tmp_path, "phase_main_outer.yaml", plan)
+        resolved = _resolved_profile((bundle,))
+        with pytest.raises(PlanLiftError) as exc_info:
+            validate_profile_plans(resolved)
+        msg = str(exc_info.value)
+        assert "island" in msg
+        assert "unreachable" in msg
+
+    def test_edges_must_be_sequence(self, tmp_path: Path) -> None:
+        """edges is a string — lifter rejects at lift time."""
+        plan = {
+            "id": "broken.edges_string",
+            "nodes": [
+                {
+                    "id": "a",
+                    "binding": "node_executor",
+                    "outputs": ["x"],
+                    "entry": True,
+                    "terminal": True,
+                }
+            ],
+            "edges": "oops",
+        }
+        bundle = _write_bundle(tmp_path, "phase_main_outer.yaml", plan)
+        resolved = _resolved_profile((bundle,))
+        with pytest.raises(PlanLiftError) as exc_info:
+            validate_profile_plans(resolved)
+        msg = str(exc_info.value)
+        assert "edges" in msg
+        assert "sequence" in msg
+
+    def test_edge_missing_endpoint(self, tmp_path: Path) -> None:
+        """Edge without 'from' is rejected at lift time."""
+        plan = {
+            "id": "broken.edge_no_from",
+            "nodes": [
+                {
+                    "id": "a",
+                    "binding": "node_executor",
+                    "outputs": ["x"],
+                    "entry": True,
+                    "terminal": True,
+                }
+            ],
+            "edges": [{"to": "a", "when": True}],
+        }
+        bundle = _write_bundle(tmp_path, "phase_main_outer.yaml", plan)
+        resolved = _resolved_profile((bundle,))
+        with pytest.raises(PlanLiftError) as exc_info:
+            validate_profile_plans(resolved)
+        msg = str(exc_info.value)
+        assert "from" in msg

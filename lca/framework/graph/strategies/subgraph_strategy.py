@@ -310,7 +310,7 @@ def _load_subgraph_plan(plan_ref: str, entry_node: str) -> Plan:
     """
     import yaml
 
-    from lca.framework.graph.lifter import lift_graph_spec
+    from lca.framework.graph.lifter import _lift_graph_spec_inner, validate_predicates
 
     repo_root = _repo_root()
     path = repo_root / plan_ref
@@ -324,7 +324,14 @@ def _load_subgraph_plan(plan_ref: str, entry_node: str) -> Plan:
     spec = dict(raw)
     if "entry" not in spec and entry_node:
         spec["entry"] = entry_node
-    return lift_graph_spec(spec)
+    # Inner subgraph plans don't need their own terminal node —
+    # the kernel terminates when the outer ``binding_edge`` returns
+    # to the caller. Run the inner-only lifter so ``_validate_termination``
+    # doesn't reject an otherwise valid subgraph (predicate and port
+    # checks still apply via ``validate_predicates``).
+    plan = _lift_graph_spec_inner(spec)
+    validate_predicates(plan)
+    return plan
 
 
 def _repo_root() -> Path:

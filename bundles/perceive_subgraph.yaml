@@ -15,13 +15,19 @@ purpose: perceive 双步执行 — observe (PerceiveHub) → fold (manifest → 
 nodes:
   - id: phase.perceive.observe
     factory: phase.perceive.observe
+    outputs: [manifest, routing]
     config:
       max_visits: 1
 
   - id: phase.perceive.fold
     factory: phase.perceive.fold
     inputs: [manifest]
-    outputs: [observation]
+    # ``in_assembled_manifest`` is the typed boundary that
+    # ``think.shortcut`` consumes (per ThinkShortcutExecutor's
+    # declared_inputs); naming it here keeps the inner-emit
+    # aligned with the outer ``think.main.declared_inputs``.
+    outputs: [in_assembled_manifest, observation]
+    terminal: true
     config:
       max_visits: 1
 

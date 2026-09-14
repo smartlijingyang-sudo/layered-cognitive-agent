@@ -17,8 +17,13 @@ purpose: reflect 双步执行 — score (reflection pipeline) → admit_recovery
 nodes:
   - id: phase.reflect.score
     factory: phase.reflect.score
+    # ``observation`` is what ReflectScoreExecutor.declared_inputs
+    # reads. ``observation`` is also emitted downstream so
+    # ``phase.reflect.admit_recovery`` (declared_inputs:
+    # ``[observation, reflection]``) can read it from a reachable
+    # predecessor.
     inputs: [observation]
-    outputs: [reflection]
+    outputs: [observation, reflection]
     config:
       max_visits: 1
 

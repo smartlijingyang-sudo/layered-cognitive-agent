@@ -46,7 +46,7 @@ class GateChainRunExecutor:
     semantic_name: str = "gate.chain.run"
     region: str = "concept"
     declared_inputs: tuple[PortName, ...] = ("decision", "state")
-    declared_outputs: tuple[PortName, ...] = ("enforced_decision",)
+    declared_outputs: tuple[PortName, ...] = ("enforced_decision", "decision")
 
     async def node_execute(
         self,
@@ -72,7 +72,13 @@ class GateChainRunExecutor:
 
         gates = _resolve_gates(context)
         enforced = await _run_chain(gates, state, decision)
-        return NodeOutput(port_values={"enforced_decision": enforced})
+        # Passthrough the original ``decision`` so ``gate.chain.reject``
+        # can read it (D4 typed-port contract: every edge target's
+        # required input must be produced by a reachable predecessor
+        # — reject's inputs are ``[decision, enforced_decision]``).
+        return NodeOutput(
+            port_values={"enforced_decision": enforced, "decision": decision}
+        )
 
 
 def _resolve_gates(context: NodeContext) -> tuple[DecisionGate, ...]:

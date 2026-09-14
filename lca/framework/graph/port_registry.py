@@ -23,6 +23,7 @@ the bridge that names a business DTO for each port.
 
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Mapping
 from typing import Any
 
@@ -88,6 +89,8 @@ class PortRegistry(BaseModel):
                 # below readable; skip when ``value`` itself is a class.
                 continue
             if payload_type is None and isinstance(value, BaseModel):
+                payload_type = type(value)
+            if payload_type is None and dataclasses.is_dataclass(value):
                 payload_type = type(value)
             if payload_type is not None and isinstance(payload_type, type):
                 self._port_types[name] = payload_type

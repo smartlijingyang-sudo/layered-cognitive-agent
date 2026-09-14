@@ -30,8 +30,20 @@ purpose: act 5 步执行 — validate → authorize → envelope → dispatch �
 nodes:
   - id: act.validate
     factory: act.validate
+    # Inner entry reads ``decision`` from the kernel-wide port
+    # registry (forwarded by the outer :class:`SubgraphStrategy`
+    # when the outer act.main subgraph delegates here). Declaring
+    # the input in yaml keeps the lifter's ``required_inputs`` set
+    # so the typed-port wiring check enforces a downstream
+    # predecessor emitting ``decision`` at boot, instead of
+    # silently letting the executor receive ``None``.
     inputs: [decision]
-    outputs: [receipt]
+    # Executor declares both inputs=[decision] and outputs=[decision];
+    # a node that reads and emits under the same name needs only the
+    # output declaration in yaml so the lifter keeps it on the
+    # output side (the executor's declared_inputs feeds the runtime
+    # wiring layer independently).
+    outputs: [decision]
     config:
       max_visits: 1
       emit_on_enter: [phase.tool.call.start]
