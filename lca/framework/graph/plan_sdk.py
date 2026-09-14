@@ -9,6 +9,86 @@ Serialization produces YAML matching the v2 BundleGraphSpec shape
 (structured ``when`` predicates, not string DSL). Parsing reverses
 the process so ``parse_plan_yaml(serialize_plan(p))`` recovers the
 same ``Plan`` with typed :class:`Predicate` objects on every edge.
+
+Port name catalog (D5 mapping — each port name has one or more D4 consumers):
+=============================================================================
+
+The graph framework does NOT enforce a closed set of port names at the
+type level. ``PortName`` is a ``NewType`` alias for ``str`` (see
+``lca.contracts.protocols.declarative.declarative_1.ports``). Lift-time
+validation ensures every referenced port exists in the node's IO schema.
+
+This catalog documents the business port names used by the agent/cognition
+domain. It lives here (SDK layer) rather than in the framework because
+the framework is domain-agnostic. Adding a new business port name requires
+updating this catalog and the D5 mapping in ``docs/adr/0219-phase-graph-unification.md`` §5.1.
+
+Core cognition ports:
+- ``decision``              think.classify / think.gate  →  outer interpreter / act phase
+- ``observation``           observation nodes           →  outer interpreter
+- ``reflection``            reflect nodes               →  outer interpreter
+- ``response``              think.reason.complete       →  think.classify
+
+Turn planning ports:
+- ``turn_plan``             think.reason.plan           →  think.reason.render
+- ``turn_render``           think.reason.render         →  think.reason.complete
+
+Shortcut and routing ports:
+- ``in_assembled_manifest`` think.shortcut / think.route →  outer loop
+- ``route_choice``          think.route                 →  downstream
+- ``enforced_state``        think.route                 →  Reducer / state fold
+
+Decision subgraph ports:
+- ``tool_calls``            decision.parse.response     →  decision.compose.action
+- ``delegations``           decision.parse.response     →  decision.compose.action
+- ``enforced_decision``     decision.enforce.chain_run  →  act subgraph
+- ``intent``                decision.parse.response     →  decision.compose.action
+
+Role snapshot ports:
+- ``role``                  role_snapshot.normalize     →  role_snapshot.compose
+- ``role_snapshot``         role_snapshot.compose       →  downstream
+
+Context composition ports:
+- ``context``               context_compose.skills      →  think.reason.render
+- ``manifest``              context_compose.collect     →  think.reason.render
+- ``context_items``         perceive_turn.fold          →  perceive consumers
+- ``raw_inputs``            perceive_turn.collect       →  perceive consumers
+
+Prompt rendering ports:
+- ``prompt_text``           prompt_render.fill          →  prompt consumers
+- ``prompt_trace``          prompt_render.fill          →  prompt consumers
+- ``prompt_template``       prompt_render.assemble      →  prompt consumers
+- ``render``                prompt_render.compile       →  prompt consumers
+
+Template selection ports:
+- ``template_selection``    template_select.pick        →  reasoner
+- ``scored``                template_select.score       →  template_select.pick
+- ``candidates``            template_select.enumerate   →  template_select.score
+
+Action subgraph ports:
+- ``forked_tools``          tool_fork.dispatch          →  act subgraph
+- ``envelope``              act_subgraph.act_envelope   →  body / executor
+- ``receipt``               effect_execute.execute      →  downstream
+- ``memory_receipt``        memory_write.admit_policy / memory_write.dispatch → downstream
+
+Stop policy ports:
+- ``stop_decision``         stop.policy                 →  outer interpreter
+- ``stop_payload``          stop.policy                 →  outer interpreter
+
+Outer-flow-control port names (first-principle fix for the
+``ContextManifest`` reflect bug; ``bundles/phase_main_outer.yaml``
+declares these as ``declared_inputs``/``declared_outputs`` and the
+kernel uses them as the typed projection between phase main subgraphs
+— see ADR-0219 §5.1 + the kernel's :class:`SubgraphStrategy`
+positional translation. Each has one writer (the upstream phase main)
+and one reader (the next phase main):
+- ``perceive_payload``      perceive.main   →  think.main
+- ``act_outcome``           act.main        →  reflect.main
+- ``reflect_outcome``       reflect.main    →  remember.main
+- ``memory_record``         remember.main   →  stop.main
+
+Historical (deleted, no D4 consumer — see ADR-0219 §7.2):
+- ``think_signal``          retired 2026-09-10 (was think.gate invented field)
 """
 
 from __future__ import annotations
