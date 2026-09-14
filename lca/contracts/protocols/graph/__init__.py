@@ -31,6 +31,11 @@ What's NOT in here (deferred):
   fields (lives in ``lca.cognition.wire.close_out_adapter``, PR-2).
 """
 from lca.contracts.protocols.graph.binding import BindingKind
+from lca.contracts.protocols.graph.errors import (
+    PlanLiftError,
+    UnknownFieldError,
+    UnsetPortError,
+)
 from lca.contracts.protocols.graph.node_io import (
     NodeInput,
     NodeIOSchema,
@@ -40,23 +45,31 @@ from lca.contracts.protocols.graph.node_io import (
 )
 from lca.contracts.protocols.graph.plan import Plan, PlanEdge, PlanNode, SubgraphReference
 from lca.contracts.protocols.graph.ports import PortName
+from lca.contracts.protocols.graph.predicate import PortRef, Predicate
+from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.contracts.protocols.graph.strategy import NodeStrategy, StrategyContext
 from lca.contracts.protocols.graph.visit import DispatchDecision, VisitRecord
 
 __all__ = [
     "BindingKind",
     "DispatchDecision",
-    "NodeInput",
     "NodeIOSchema",
+    "NodeInput",
     "NodeOutput",
     "NodeSchemaError",
     "NodeStrategy",
     "Plan",
     "PlanEdge",
+    "PlanLiftError",
     "PlanNode",
     "PortName",
+    "PortRef",
     "PortSpec",
+    "Predicate",
+    "RoutingDecision",
     "StrategyContext",
     "SubgraphReference",
+    "UnknownFieldError",
+    "UnsetPortError",
     "VisitRecord",
 ]
