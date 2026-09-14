@@ -73,7 +73,7 @@ class DefaultStopPolicy(StopPolicy):
         completed = self._completed_decision(state, decision, observation, reflection)
         if completed is not None:
             return completed
-        delivery_stop = self._delivery_satisfied_stop(state, decision, reflection)
+        delivery_stop = self._delivery_satisfied_stop(state, decision, observation, reflection)
         if delivery_stop is not None:
             return delivery_stop
         if state.budget.exceeded():
@@ -189,9 +189,22 @@ class DefaultStopPolicy(StopPolicy):
         self,
         state: AgentState,
         decision: Decision | None,
+        observation: Observation | None,
         reflection: Reflection | None,
     ) -> StopDecision | None:
-        """Backup for DeliverySatisfiedGate: stop when evidence is ready but model keeps tooling."""
+        """Backup for DeliverySatisfiedGate: stop when evidence is ready but model keeps tooling.
+
+        Two triggers unlock ``should_stop`` here, in priority order:
+
+        1. ``evidence.satisfied`` — the durable fold has enough signal
+           (artifact present, producer success, or user-visible text).
+           Source of truth for replays.
+        2. ``observation.success`` — the latest in-flight tool call
+           succeeded. Falls back to this when the fold is empty (e.g.
+           ``state.control_turns`` not yet projected in this iteration)
+           so the loop converges instead of burning budget on a
+           cache-hit repetition of the same tool call.
+        """
         if decision is None or reflection is None:
             return None
         if decision.action_type == ActionType.RESPOND:
@@ -199,7 +212,8 @@ class DefaultStopPolicy(StopPolicy):
         if reflection.verdict == ReflectionVerdict.NEEDS_CORRECTION:
             return None
         evidence = self._runtime.evidence(state)
-        if not evidence.satisfied:
+        live_tool_ok = observation is not None and observation.success
+        if not evidence.satisfied and not live_tool_ok:
             return None
         final_output = self._runtime.synthesize(state, evidence).strip()
         if not final_output:

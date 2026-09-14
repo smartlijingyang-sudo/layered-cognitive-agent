@@ -258,7 +258,14 @@ v1 扩展:`node.config` 接受 `emit_on_enter: list[str]` 和 `emit_on_exit: lis
 
 v1 扩展:inner_graph 终止端口名 ∈ outer 节点 `outputs` → 透传到 outer PortContext。
 
-- 铁律 1:端口同名透传
+- 铁律 1:端口同名透传(`set_outer_input` 用 `setdefault`,已写入的值不被覆盖)
 - 铁律 2:缺失输入 = 空 NodeOutput
 - 铁律 3:同图同名端口冲突 = PG-006-port-conflict
 - 铁律 4:inner_graph 局部 PortContext 终止时销毁
+- 铁律 5 (2026-09-14 增):外层跨 iteration last-write-wins(`merge_output` 用 `update`)。
+  `PlanInterpreter.run` 在 outer loop iteration 之间复用同一个 `PortRegistry`
+  实例(`stop.main → perceive.main` 反复跳转);若沿用 setdefault,step 1 写入
+  的 typed port(`decision` / `observation` / `reflection`)会永久锁定后续 7 次
+  iteration,让 stop-policy 永远看不到 fresh 输入,run 烧到 `max_visits` budget
+  fail-loud。`merge_output` 必须覆盖。`set_outer_input` 保留 setdefault,因
+  为它只在首轮 seed,语义是"outer caller first-write wins"。
