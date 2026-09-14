@@ -5,6 +5,7 @@ LCA 的"高级工程师自助定位"基础设施入口。所有 debug / observab
 ## 入口
 
 - **[run-debug-guide.md](./run-debug-guide.md)** — `lca-ops debug-run <run_id>` 的完整 8 步 SOP + **Step 0b/0c**「后端 5xx 怎么看日志」 + 每步 `WHY / DO / OUTPUT / NEXT / FAIL` + 工具对照表 + 常见失败模式 → 命令映射。命令路径由 [`scripts/check_run_debug_sync.py`](../../scripts/check_run_debug_sync.py) 与 CLI 注册表同步。
+  推荐第一步: `./scripts/lca-ops runs debug <run_id>`(默认 `graph` layer + `json` 输出,JSON 含 `next_layer_hint` 指引下一步 layer)。
 - **`.agents/skills/lca-debug-run/SKILL.md`** — Agent 触发入口。口语映射 + 5 步流程概览 + bug-vs-debrief 决策 + 升级到 `lca-code-review` 的证据包交接。人类通常不需要这一份。
 - **`AGENTS.md` §6** — 命令矩阵指针 + 服务问题分流(不是 run 问题)。
 
@@ -118,15 +119,18 @@ curl -sS "http://127.0.0.1:9876/src/store/chat/slices/agentRun/actions/dispatch/
 
 按"我要做什么"选命令;每个命令的完整语义、副作用、边界见 `run-debug-guide.md` 和 `lca-ops <cmd> --help`。
 
-### 诊断一次 run
+### 诊断一次 run(按可靠性排序)
 
-| 命令 | 用途 |
-|---|---|
-| `lca-ops debug-run <run_id>` | 主入口,8-section 报告 |
-| `lca-ops debug-env <run_id>` | dump RunAmbit |
-| `lca-ops trace <run_id>` | journal 轨迹 |
-| `lca-ops explain <run_id>` | 失败路径投影 |
-| `lca-ops diagnose <problem>` | 模式诊断(连字符):`model-not-seen` / `loop-stuck` / `memory-poisoned` / `approval-rejected`(`phase-error` 不存在) |
+| 命令 | 用途 | 依赖 |
+|---|---|---|
+| `lca-ops debug-graph <run_id>` | **第一选择**:一次性图骨架 + 每节点 input/output 真实 payload + reducer 决策序列 + llm/tool_call 响应 + 自动根因标记(`✗`) | `<run_id>.spine.jsonl`(每个 run 都有,物化缺失也能用) |
+| `lca-ops timeline <run_id>` | 纯 phase_graph 节点时序(≈50ms,无 payload) | `<run_id>.spine.jsonl` |
+| `lca-ops debug-run <run_id>` | 8 段诊断摘要 | `journal.json` / `manifest.json`(终端物化后才完整) |
+| `lca-ops journal trace <run_id>` | spine ledger 全量,grep 友好 | `<run_id>.spine.jsonl` |
+| `lca-ops debug-env <run_id>` | dump RunAmbit | 同 `debug-run` |
+| `lca-ops trace <run_id>` | journal v2 轨迹(legacy) | `lca_journal.jsonl` |
+| `lca-ops explain <run_id>` | 失败路径投影 | `journal.json`(**注意**: 部分 run 因 reducer 走 `lifecycle.finally` 但未触发 terminalize 会返 `event_count: 0`;改用 `debug-graph` / `timeline` / `journal trace` 取 spine 全量) |
+| `lca-ops diagnose <problem>` | 模式诊断(连字符):`model-not-seen` / `loop-stuck` / `memory-poisoned` / `approval-rejected`(`phase-error` 不存在) | 模式匹配 |
 
 ### 离线分析
 

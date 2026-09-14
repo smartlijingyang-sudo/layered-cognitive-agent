@@ -119,6 +119,29 @@ Run 触发  创建新 run（carrier-aligned，唯一入口）
   ./scripts/lca-ops runs create --user-text "..."   # 走 POST /runs，返回 run_id + trace_id
   ./scripts/lca-ops runs create --user-text "..." --wait   # 阻塞直到 terminal
   ./scripts/lca-ops runs create --user-text "..." --json    # 原始 carrier receipt
+  # --wait 仍可用(轮询 /runs/{id}/doctor 到 terminal),但只在你需要脚本里
+  # 拿到 terminal verdict 再继续时才加;调试 run 时建议直接看图,不阻塞。
+
+  # 调试 run 的标准剧本 - 第一步永远是 runs debug
+  # 1) 第一步:`runs debug` 按 layer 一次性输出,默认 graph + JSON,JSON 含 `next_layer_hint` 指引下一步。
+  ./scripts/lca-ops runs debug <run_id>                       # 顶层 orchestrator,直读 spine 五个 layer 的 projection
+  #    layer 列表(每个 layer 一行,默认 graph):
+  #      summary  - run 级计数 + terminal_outcome + anomalies_present,先判断要不要继续
+  #      graph    - 节点骨架 + 每个节点的真实 input/output + reducer 决策 + llm/tool_call 响应 + 自动根因标记
+  #      events   - 按 seq 排序的原始 spine 行(payload_keys 一览,适合 grep 后再下钻)
+  #      diff     - 计划蓝图 vs 实际执行节点(missing / unexpected),需要 blueprint.json
+  #      explain  - 第一个失败节点 + 上下文,定位根因后告诉调用者该看哪个 layer
+  #    agent 直接拿 JSON;人类加 `--output human` 看树形。
+  # 2) 下钻 / 专家路径 - 当 runs debug 的 hint 指向更深切片,或需要 HTML / 7 段摘要 / 旧入口时:
+  ./scripts/lca-ops debug-graph <run_id>                  # 与 runs debug layer=graph 等价,旧入口,保留
+  ./scripts/lca-ops timeline <run_id>                     # = observation run-replay --show-graph,纯图骨架,轻量
+  ./scripts/lca-ops debug-run <run_id>                    # 8 段诊断(读 journal.json,某些 run 缺失)
+  ./scripts/lca-ops journal trace <run_id>                # spine ledger 全量(grep 友好)
+  ./scripts/lca-ops journal trajectory <run_id>           # DSH 风格 HTML waterfall
+  ./scripts/lca-ops observation trace-show <run_id>       # observation fact 过滤(--node / --kind / --seq)
+  ./scripts/lca-ops observation run-replay <run_id>       # observation 时间序回放(默认 --show-graph)
+  ./scripts/lca-ops observation run-explain <run_id>      # observation summary + root_cause_chain + next_actions
+  ./scripts/lca-ops observation plan-show <ref>           # 显示 plan blueprint(预期图)
 
   HTTP 等价（外部脚本用）：
   curl -X POST http://127.0.0.1:8765/runs -H 'Content-Type: application/json' \

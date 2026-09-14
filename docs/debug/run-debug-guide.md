@@ -5,10 +5,43 @@
 > happened", or supplies a `run_id`, follow the 8-step procedure below.
 > Each step tells you **why / how / output / what next / fail mode**.
 >
-> Humans get readable views via the journal viewers the SOP names —
-> `journal trace --human`, `journal narrative`, `journal trajectory` —
+> Humans get readable views via the journal viewers the SOP names -
+> `journal trace --human`, `journal narrative`, `journal trajectory` -
 > not from this document.
->
+
+## Decision tree (new first step)
+
+`runs debug` is the recommended first command because it reads the spine
+directly and gives the agent a `next_layer_hint` (default layer `graph`,
+default output `json`). Pick a layer only when the hint tells you to.
+
+```sh
+./scripts/lca-ops runs debug <run_id>                                # default: graph layer, JSON
+./scripts/lca-ops runs debug <run_id> --layer <L> --output human    # specific layer, human-readable
+```
+
+Five layers, one sentence each:
+
+- `summary` - run-level counts and `terminal_outcome`; use when you only need to know whether the run reached terminal and whether anomalies exist.
+- `graph` - phase-graph skeleton with per-node real input/output payloads, reducer decisions, llm / tool_call responses, and automatic root-cause flags; use when the run looks wrong and you want one structured view.
+- `events` - raw spine rows sorted by `seq` with `payload_keys` per row; use when you need to grep a specific execution point or pivot on a key.
+- `diff` - expected blueprint nodes vs executed nodes (missing / unexpected); use when the run succeeded but produced an unexpected graph shape.
+- `explain` - first failed node plus its context and a follow-up hint; use after `summary` or `graph` flagged an anomaly and you want the root cause in one call.
+
+Specialist fall-back commands (still available; use them when `runs debug`
+is not enough or the user asked for a specific view):
+
+- `./scripts/lca-ops debug-graph <run_id>` - same projection as `runs debug --layer graph`, older entry point.
+- `./scripts/lca-ops timeline <run_id>` - alias for `observation run-replay --show-graph`, lightweight skeleton only.
+- `./scripts/lca-ops debug-run <run_id>` - 8-section diagnostic from `journal.json` / `manifest.json`; useful for runs without observation facts.
+- `./scripts/lca-ops journal trace <run_id>` - full spine ledger dump, grep-friendly.
+- `./scripts/lca-ops journal trajectory <run_id>` - DSH-style HTML waterfall.
+- `./scripts/lca-ops observation trace-show <run_id>` - filtered observation facts (by node / kind / seq).
+- `./scripts/lca-ops observation run-replay <run_id>` - time-ordered observation replay with per-node inputs / outputs / decisions.
+- `./scripts/lca-ops observation run-explain <run_id>` - structured summary + `root_cause_chain` + `next_actions`.
+- `./scripts/lca-ops observation plan-show <ref>` - expected blueprint graph for a profile.
+- `./scripts/lca-ops explain <run_id>` - failure-path projection (legacy).
+
 > **Path convention.** All commands in this SOP are written as
 > `./scripts/lca-ops ...`. From anywhere else invoke it as
 > `<repo>/scripts/lca-ops ...`. The bare `lca-ops` on `$PATH` is the same
@@ -42,6 +75,27 @@ Trigger phrases (run this immediately, do not ask for clarification):
 
 ```sh
 LATEST=$(ls -1t traces/runs | head -1)
+```
+
+---
+
+## 30 秒速查(只回答"现在到底跑到哪了")
+
+不读这 SOP 也能用——99% 的"图跑的流程 / 哪一步出问题"问题,这一行就能答完:
+
+```sh
+LATEST=$(ls -1t traces/runs | head -1)
+./scripts/lca-ops debug-graph "$LATEST"
+```
+
+`debug-graph` 一次性输出:**图骨架 + 每节点真实 input/output payload + reducer 决策序列 + llm 响应 + tool_call 实际参数 + 自动根因标记**(`✗`)。直读 `<run_id>.spine.jsonl`,不依赖 journal.json / manifest.json 物化——本次实测 `run_bc004d84ce51` 走 `lifecycle.finally` 但未触发 terminalize 时,`explain` / `debug-run` 返空,`debug-graph` 仍能出全图并自动标出根因(`apply_error → apply_stop → kernel.run.stop outcome=failure`)。
+
+需要更轻量的纯图骨架 / 单挑细节:
+
+```sh
+./scripts/lca-ops timeline "$LATEST"                              # 仅 phase_graph 节点时序,≈50ms
+./scripts/lca-ops journal trace "$LATEST" | grep -E "llm\.|tool\.|gate\.|reducer\."  # spine 原始事件
+./scripts/lca-ops debug-run "$LATEST"                             # 8 段摘要(若 journal.json 存在)
 ```
 
 ---
@@ -246,6 +300,8 @@ curl -sS http://127.0.0.1:9876/src/path/to/just/changed.ts | grep "你刚加的�
 # You (agent) — JSON for programmatic parsing
 ./scripts/lca-ops observation run-replay "$LATEST" --show-graph --json
 ```
+
+**Seam note.** `timeline` 直接读 `<run_id>.spine.jsonl`(ADR-0167,每个 run 收尾必生成);`debug-run` / `explain` 读 `journal.json` / `manifest.json`,依赖 `RunTerminalizer.terminalize` 触发物化。Run 走 `lifecycle.finally` 但未触发 terminalize 时(典型:`think` 阶段后 reducer 直接 `agent_loop.iteration.end`),`debug-run` / `explain` 会返空(`event_count: 0` / `no facts for run_id=...`),而 `timeline` 仍能出 phase_graph 全图。**所以 `timeline` 是第一选择**,不是 `debug-run`。
 
 **OUTPUT.** A phase-graph node/subgraph timeline from the spine ledger (ADR-0167):
 
