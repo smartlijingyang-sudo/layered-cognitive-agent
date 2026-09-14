@@ -1084,12 +1084,14 @@ decision output ports with payload_type."
 
 ---
 
-## Task 7: Rewrite remaining bundle YAMLs (think, declarative-phase-graph, declarative-recovery)
+## Task 7: Rewrite remaining bundle YAMLs (think, declarative-phase-graph, declarative-recovery) + clean stale comments
 
 **Files:**
 - Modify: `bundles/think.yaml`
 - Modify: `bundles/declarative-phase-graph.yaml`
 - Modify: `bundles/declarative-recovery.yaml`
+- Modify: `bundles/perceive_subgraph.yaml` (clean stale comments only — no actual predicate rewrite)
+- Modify: `bundles/reflect_subgraph.yaml` (clean stale comments only)
 
 **Interfaces:**
 - Consumes: typed Predicate YAML schema (Task 6)
@@ -1100,6 +1102,8 @@ decision output ports with payload_type."
 Convert these specific clauses (line numbers from current file):
 - L95: `when: result.payload == None` → `when: { kind: missing, port: { name: response } }`
 - L98: `when: result.payload != null` → `when: { kind: exists, port: { name: response } }`
+
+Also update the docstring comment block at the top that mentions `result_kind` (it currently says "不放(inputs/outputs/payload_port/result_kind):@plugin 装饰器不读") — replace with the new typed predicate terminology.
 
 Ensure `think.shortcut` declares `response` as an output port.
 
@@ -1129,18 +1133,22 @@ when: { kind: eq, port: { name: routing, field: should_admit_recovery }, value: 
 
 (Note: the new `RoutingDecision` may need a new field `should_admit_recovery`, or use `should_terminate` for the same semantic.)
 
-- [ ] **Step 4: Run all bundle lift tests**
+- [ ] **Step 4: Clean stale `result_kind` comments in `perceive_subgraph.yaml` and `reflect_subgraph.yaml`**
+
+These files have docstring comments that mention `result_kind` / `next_hint`. They are not actual predicate clauses (verified by grep — they're inside `# ...` comment blocks). Rewrite them to mention `RoutingDecision` port terminology. The comments are stale because they describe a field that no longer exists.
+
+- [ ] **Step 5: Run all bundle lift tests**
 
 ```bash
 pytest tests/lca_kernel/plan/test_phase_main_outer_lift.py -v
 # Add lift tests for think.yaml / declarative-phase-graph.yaml / declarative-recovery.yaml
 ```
 
-Add a parametrized test in `test_phase_main_outer_lift.py`:
+- [ ] **Step 6: Add parametrized bundle lift test** (replaces the deleted step)
+
+In `tests/lca_kernel/plan/test_phase_main_outer_lift.py`, add:
 
 ```python
-import pytest
-
 @pytest.mark.parametrize("bundle_path", [
     "bundles/phase_main_outer.yaml",
     "bundles/think.yaml",
@@ -1155,30 +1163,43 @@ def test_bundle_lifts(bundle_path):
         assert edge.when is None or hasattr(edge.when, "kind")
 ```
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add bundles/think.yaml bundles/declarative-phase-graph.yaml bundles/declarative-recovery.yaml \
+git add bundles/think.yaml \
+        bundles/declarative-phase-graph.yaml \
+        bundles/declarative-recovery.yaml \
+        bundles/perceive_subgraph.yaml \
+        bundles/reflect_subgraph.yaml \
         tests/lca_kernel/plan/test_phase_main_outer_lift.py
 git commit -m "refactor(bundles): rewrite think/declarative bundles to typed predicates
 
-All string-DSL when: clauses converted to typed Predicate. Verified
-by parametrized lift test across the four affected bundles."
+All string-DSL when: clauses converted to typed Predicate. Stale
+comments in perceive_subgraph.yaml / reflect_subgraph.yaml updated
+to RoutingDecision terminology. Verified by parametrized lift test
+across the four affected bundles."
 ```
 
 ---
 
 ## Task 8: Migrate plugin output ports from `result_kind`/`next_hints` to `RoutingDecision`
 
-**Files:**
+**Files (verified by `grep -rln "result_kind=\|next_hints=\|next_hint=" lca/`):**
+
+- Modify: `lca/framework/graph/strategies/node_executor_strategy.py` — the kernel's strategy that wraps `LegacyNodeOutput` into `NodeOutput`. Replace `result_kind`/`next_hint`/`next_hints` reads with `port_values["routing"]` lookup. If `routing` is absent (legacy plugin), fall back to constructing a `RoutingDecision` from a hard-coded `ActionType` matching the plugin's role.
+- Modify: `lca/plugins/loop/control/observe_checkpoint/plugin.py`
+- Modify: `lca/plugins/loop/control/observe_wildcard/plugin.py`
+- Modify: `lca/plugins/loop/control/perceive_context/plugin.py`
+- Modify: `lca/plugins/loop/control/remember_admit/plugin.py`
+- Modify: `lca/plugins/loop/control/think_guard/plugin.py`
 - Modify: `lca/plugins/loop/phase/perceive/fold/plugin.py`
 - Modify: `lca/plugins/loop/phase/perceive/observe/plugin.py`
-- Modify: `lca/plugins/loop/phase/think/{classify,reason,...}/plugin.py` (multiple)
-- Modify: `lca/plugins/loop/phase/act/{...}/plugin.py` (multiple)
-- Modify: `lca/plugins/loop/phase/reflect/{admit_recovery,score}/plugin.py`
-- Modify: `lca/plugins/loop/phase/remember/{fold,write}/plugin.py`
-- Modify: `lca/plugins/loop/graph/recovery/plugin.py`
-- Modify: `lca/plugins/loop/control/{think_guard,observe_checkpoint,...}/plugin.py`
+- Modify: `lca/plugins/loop/phase/reflect/admit_recovery/plugin.py`
+- Modify: `lca/plugins/loop/phase/reflect/score/plugin.py`
+- Modify: `lca/plugins/loop/phase/remember/fold/plugin.py`
+- Modify: `lca/plugins/loop/phase/remember/write/plugin.py`
+
+(think/act plugin files emit `result` not `result_kind` directly — they go through `node_executor_strategy.py`. Verified by grep.)
 
 **Interfaces:**
 - Consumes: `RoutingDecision` (Task 1)
@@ -1187,39 +1208,75 @@ by parametrized lift test across the four affected bundles."
 - [ ] **Step 1: Inventory all `result_kind` / `next_hints` setters**
 
 ```bash
-grep -rn "result_kind=\|next_hints=\|next_hint=" lca/plugins/ | sort -u
+grep -rn "result_kind=\|next_hints=\|next_hint=" lca/ lca_kernel/ 2>&1 | grep -v ".pyc" | sort -u
 ```
 
 Document the list. Each occurrence becomes one edit.
 
-- [ ] **Step 2: Migrate perceive/fold/plugin.py**
+- [ ] **Step 2: Update `node_executor_strategy.py`**
 
-Find the existing code:
+In `lca/framework/graph/strategies/node_executor_strategy.py`, replace the `NodeOutput` construction at line 99-108:
+
 ```python
+# BEFORE:
 return NodeOutput(
-    port_values={"observation": ...},
-    result_kind="observation_folded",
-    next_hints={...},
+    port_values=dict(legacy_output.port_values),
+    next_hint=legacy_output.next_hint,
+    producer_node=context.node_id,
+    result_kind=(
+        getattr(legacy_output, "result_kind", None) or None
+    ),
+    next_hints=dict(getattr(legacy_output, "next_hints", {}) or {}),
+)
+
+# AFTER: pass-through (the new fields don't exist; routing lives in port_values)
+return NodeOutput(
+    port_values=dict(legacy_output.port_values),
+    producer_node=context.node_id,
 )
 ```
 
-Replace with:
+This is safe because `node_executor_strategy.py` is the SHIM that translates plugin output → kernel NodeOutput. Once Task 8 lands, plugins emit `routing: RoutingDecision(...)` into `port_values` directly, so the shim just passes through.
+
+- [ ] **Step 3: Migrate each plugin**
+
+For each plugin in the file list above, find the `NodeOutput(...)` construction and add a `routing: RoutingDecision(...)` to `port_values`. Pick the right `action_type` for each plugin:
+
+| Plugin | `action_type` |
+|---|---|
+| `perceive/fold` | `RESPOND` (perceive always completes, drives next phase via outer routing) |
+| `perceive/observe` | `RESPOND` |
+| `control/think_guard` | depends on guard result; check the existing `next_hints`/`result_kind` semantic |
+| `control/observe_checkpoint` | `RESPOND` (checkpoint is observability) |
+| `control/observe_wildcard` | `RESPOND` |
+| `control/perceive_context` | `RESPOND` |
+| `control/remember_admit` | depends on admit decision |
+| `reflect/admit_recovery` | depends on admit_recovery result; might be `STOP` or `RESPOND` |
+| `reflect/score` | `RESPOND` |
+| `remember/fold` | `RESPOND` |
+| `remember/write` | `RESPOND` |
+
+For each, replace:
+```python
+return NodeOutput(
+    port_values={...},
+    result_kind="x",
+    next_hints={...},
+)
+```
+with:
 ```python
 return NodeOutput(
     port_values={
-        "observation": ...,
+        **existing_port_values,
         "routing": RoutingDecision(
-            action_type=ActionType.RESPOND,
+            action_type=ActionType.RESPOND,  # or appropriate
             should_terminate=False,
-            next_hint="observation_folded",
+            next_hint="x",  # preserve the prior result_kind as next_hint for traceability
         ),
     },
 )
 ```
-
-- [ ] **Step 3: Apply same pattern to all other plugins**
-
-For each plugin in the list from Step 1, replace `result_kind="x"` with a `routing: RoutingDecision(...)` port where `action_type` and `should_terminate` carry the semantic intent.
 
 - [ ] **Step 4: Run plugin tests**
 
@@ -1227,18 +1284,26 @@ For each plugin in the list from Step 1, replace `result_kind="x"` with a `routi
 pytest tests/lca_plugins/loop/ -q
 ```
 
-Expected: pass (after migration).
+Expected: pass.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Run grep to verify zero residual `result_kind=` setters**
 
 ```bash
-git add lca/plugins/loop/
-git commit -m "refactor(plugins): emit RoutingDecision port instead of result_kind/next_hints
+grep -rn "result_kind=\|next_hints=" lca/ lca_kernel/ | grep -v ".pyc" | grep -v "tests/"
+```
 
-Every decision-producing plugin now writes a typed RoutingDecision
-port. The 3 ad-hoc NodeOutput fields are uniformly replaced. Routing
-data flows through the same port store as business data — single
-source of truth."
+Expected: zero hits.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add lca/framework/graph/strategies/node_executor_strategy.py lca/plugins/loop/
+git commit -m "refactor(plugins+kernel): migrate to RoutingDecision port
+
+Every plugin emitting result_kind/next_hint/next_hints now writes
+a typed RoutingDecision into port_values. node_executor_strategy
+strips the 3 ad-hoc fields (they no longer exist on NodeOutput).
+Routing data flows through the same port store as business data."
 ```
 
 ---
