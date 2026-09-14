@@ -26,6 +26,7 @@ Subsequent PRs:
   binds ``subgraph`` / ``node_executor``; the framework never sees
   ``PhaseExecutor`` / ``PhaseInput`` / ``PhaseResult``.
 """
+
 from lca.framework.graph.adapter import PlanInterpreterAdapter
 from lca.framework.graph.interpreter import InterpretationResult, PlanInterpreter
 from lca.framework.graph.lifter import (
@@ -56,7 +57,7 @@ from lca.framework.graph.strategy_registry import (
 )
 from lca.framework.graph.traversal import (
     PlanTraversal,
-    install_predicate_evaluator,
+    ReaderFactory,
     select_edge,
 )
 
@@ -72,9 +73,9 @@ __all__ = [
     "VisitRecorder",
     "default_strategy_registry",
     "evaluate_predicate",
-    "install_predicate_evaluator",
     "lift_executable_plan",
     "lift_graph_spec",
+    "ReaderFactory",
     "register_strategy",
     "resolve_executor",
     "select_edge",

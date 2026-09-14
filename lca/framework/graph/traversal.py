@@ -10,16 +10,20 @@ It is a state machine, not a free-form iterator: ``terminated()`` is
 the typed predicate the main loop checks, ``advance`` is the only way
 to move forward, ``fork`` is the only way to recurse into a subgraph.
 
-Replaces the legacy ``_loop_count > 20`` hard cap from
-:class:`lca.framework.subgraph.plugins.node_graph_driver.NodeGraphDriver`.
+D4 cutover: ``select_edge`` now takes a ``reader_factory`` and evaluates
+typed :class:`Predicate` objects via :func:`evaluate_predicate`. The
+legacy string DSL evaluator has been deleted.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from lca.contracts.protocols.graph.errors import UnknownFieldError, UnsetPortError
 from lca.contracts.protocols.graph.plan import Plan, PlanEdge
+from lca.framework.graph.port_reader import PortReader
+from lca.framework.graph.predicate_evaluator import evaluate_predicate
 
 
 @dataclass
@@ -85,68 +89,42 @@ class PlanTraversal:
         return PlanTraversal(plan=self.plan, current_id=entry)
 
 
+ReaderFactory = Callable[[str], PortReader]
+
+
 def select_edge(
     *,
     edges: tuple[PlanEdge, ...],
     current_id: str,
-    result: object | None = None,
-    artifacts: Mapping[str, object] | None = None,
+    reader_factory: ReaderFactory,
 ) -> PlanEdge | None:
-    """Pick the first outgoing edge from ``current_id`` whose ``when`` evaluates true.
+    """Pick the first outgoing edge whose typed predicate evaluates true.
 
-    The DSL evaluator is reused from the existing harness:
-    :func:`lca.harness.graph.predicate.evaluate_restricted_predicate`.
-    Tests inject a stub by replacing ``_PREDICATE_EVALUATOR``.
+    D4 cutover: ``reader_factory`` builds a :class:`PortReader` for the
+    edge's source node. Predicates are structured :class:`Predicate`
+    objects evaluated by :func:`evaluate_predicate`. No string DSL, no
+    silent None, no fallback.
+
+    When a predicate references an unset port, the edge does not match
+    (returns False) — this preserves the "no edge → terminate" semantics
+    without raising on every unset port reference.
     """
-    predicate = _PREDICATE_EVALUATOR
     for edge in edges:
         if edge.source != current_id:
             continue
-        if predicate(edge.when, result=result, artifacts=artifacts or {}):
+        if edge.when is None:
             return edge
+        reader = reader_factory(edge.source)
+        try:
+            if evaluate_predicate(edge.when, reader=reader):
+                return edge
+        except (UnsetPortError, UnknownFieldError):
+            continue
     return None
-
-
-_PREDICATE_EVALUATOR = None
-
-
-def _default_predicate(
-    when: object, *, result: object | None, artifacts: Mapping[str, object]
-) -> bool:
-    # Typed Predicate objects require the typed evaluator (D3+);
-    # the default string evaluator cannot handle them.
-    if not isinstance(when, str):
-        return False
-    return when == "true" or when == ""
-
-
-def install_predicate_evaluator(fn: object) -> None:
-    """Replace the DSL evaluator. Used by host wiring; tests can stub."""
-    global _PREDICATE_EVALUATOR
-    _PREDICATE_EVALUATOR = fn  # type: ignore[assignment]
-
-
-def _resolve_default_predicate() -> object:
-    try:
-        from lca.harness.graph.predicate import evaluate_restricted_predicate
-
-        return evaluate_restricted_predicate
-    except ImportError as exc:
-        import logging
-
-        logging.getLogger(__name__).warning(
-            "predicate evaluator fallback to _default_predicate: %s; "
-            "outer-plan edges with predicate expressions will misroute",
-            exc,
-        )
-        return _default_predicate
-
-
-install_predicate_evaluator(_resolve_default_predicate())
 
 
 __all__ = [
     "PlanTraversal",
-    "install_predicate_evaluator",
+    "ReaderFactory",
     "select_edge",
 ]

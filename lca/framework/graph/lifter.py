@@ -14,6 +14,7 @@ profile yaml and the new graph kernel. It accepts three input shapes:
 The lifter never instantiates a strategy or executor; it only
 projects yaml / DTO into the new kernel's typed Plan DTO.
 """
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -21,17 +22,31 @@ from pathlib import Path
 from typing import Any
 
 from lca.contracts.protocols.graph.binding import BindingKind
+from lca.contracts.protocols.graph.errors import PlanLiftError
 from lca.contracts.protocols.graph.node_io import NodeIOSchema, PortSpec
 from lca.contracts.protocols.graph.plan import Plan, PlanEdge, PlanNode, SubgraphReference
+from lca.contracts.protocols.graph.predicate import PortRef, Predicate
 
 
 def lift_graph_spec(spec: Mapping[str, Any]) -> Plan:
     """Lift a v2 BundleGraphSpec-shaped mapping into a :class:`Plan`.
 
-    Required keys: ``id``, ``nodes`` (sequence), `` ``edges`` (sequence).
-    Optional: ``entry``, ``approval_resume_node``, ``declared_inputs``.
-    Each node must carry ``id`` + ``binding`` (a :class:`BindingKind`
-    value or its string); ``inputs``/``outputs`` are optional schema hints.
+    Runs predicate and termination validation after building the plan.
+    See :func:`validate_predicates` and :func:`_validate_termination`.
+    """
+    plan = _lift_graph_spec_inner(spec)
+    validate_predicates(plan)
+    _validate_termination(plan)
+    return plan
+
+
+def _lift_graph_spec_inner(spec: Mapping[str, Any]) -> Plan:
+    """Build a :class:`Plan` from a spec without validation.
+
+    Used internally by :func:`lift_graph_spec` (which adds validation)
+    and by :func:`_subgraph_entry_schema` (which loads inner plans
+    best-effort; running validation on incomplete inner plans would
+    produce false positives).
     """
     spec_id = str(spec.get("id", ""))
     raw_nodes = spec.get("nodes", ())
@@ -105,7 +120,7 @@ def lift_graph_spec(spec: Mapping[str, Any]) -> Plan:
             PlanEdge(
                 source=source,
                 target=target,
-                when=str(raw.get("when", "true")),
+                when=_coerce_when(raw.get("when")),
                 subgraph_ref=_subgraph_ref_from(raw.get("subgraph_ref")),
             )
         )
@@ -176,7 +191,7 @@ def lift_executable_plan(executable: object) -> Plan:
             PlanEdge(
                 source=str(getattr(raw, "source", "")),
                 target=str(getattr(raw, "target", "")),
-                when=str(getattr(raw, "when", "true")),
+                when=_coerce_when(getattr(raw, "when", "true")),
             )
         )
     return Plan(
@@ -210,7 +225,7 @@ def _subgraph_entry_schema(
         spec = dict(raw)
         if "entry" not in spec and subgraph_ref.entry_node:
             spec["entry"] = subgraph_ref.entry_node
-        inner_plan = lift_graph_spec(spec)
+        inner_plan = _lift_graph_spec_inner(spec)
         return inner_plan.node(subgraph_ref.entry_node).io_schema
     except (FileNotFoundError, KeyError, TypeError, ValueError):
         return NodeIOSchema()
@@ -239,12 +254,8 @@ def _binding_from(value: object) -> BindingKind:
         except ValueError:
             if value.startswith("concept."):
                 return BindingKind.NODE_EXECUTOR
-            raise ValueError(
-                f"binding must be a BindingKind or string, got {value!r}"
-            )
-    raise ValueError(
-        f"binding must be a BindingKind or string, got {type(value).__name__}"
-    )
+            raise ValueError(f"binding must be a BindingKind or string, got {value!r}")
+    raise ValueError(f"binding must be a BindingKind or string, got {type(value).__name__}")
 
 
 def _binding_from_factory_or_binding(raw: Mapping[str, object]) -> BindingKind:
@@ -347,4 +358,174 @@ def _subgraph_ref_from(raw: object) -> SubgraphReference | None:
     )
 
 
-__all__ = ["lift_executable_plan", "lift_graph_spec"]
+_LEAF_PREDICATE_KINDS = frozenset({"eq", "ne", "in", "exists", "missing"})
+
+
+def _coerce_when(raw: object) -> Predicate | None:
+    """Coerce a YAML ``when`` value to :class:`Predicate` or ``None``.
+
+    - ``None`` / ``True`` / ``"true"`` / ``""`` → ``None`` (unconditional)
+    - :class:`Predicate` → pass-through
+    - dict with ``kind`` → structured Predicate (D6 plan SDK path)
+    - other strings → ``None`` (legacy DSL, treated as unconditional;
+      the interpreter's string evaluator handles them at runtime)
+    """
+    if raw is None:
+        return None
+    if isinstance(raw, Predicate):
+        return raw
+    if isinstance(raw, bool):
+        return (
+            None
+            if raw
+            else Predicate(
+                kind="eq",
+                port=PortRef(name="__never__"),
+                value=True,
+            )
+        )
+    if isinstance(raw, Mapping):
+        return _parse_predicate_dict(raw)
+    if isinstance(raw, str):
+        normalized = raw.strip().lower()
+        if normalized in ("true", "false", ""):
+            return None
+        return None  # legacy DSL string — interpreter handles at runtime
+    return None
+
+
+def _parse_predicate_dict(raw: Mapping[str, Any]) -> Predicate:
+    """Parse a dict-shaped predicate into a :class:`Predicate`."""
+    kind = str(raw.get("kind", ""))
+    if not kind:
+        raise PlanLiftError("predicate dict missing 'kind' field")
+    bool_kinds = frozenset({"and", "or", "not"})
+    if kind in bool_kinds:
+        children_raw = raw.get("children", ())
+        if not isinstance(children_raw, (list, tuple)):
+            raise PlanLiftError(f"predicate kind={kind!r}: children must be a sequence")
+        children = tuple(c for c in (_coerce_when(c) for c in children_raw) if c is not None)
+        return Predicate(kind=kind, children=children)
+    if kind in _LEAF_PREDICATE_KINDS:
+        port_raw = raw.get("port")
+        port = _parse_port_ref(port_raw) if port_raw is not None else None
+        value = raw.get("value")
+        return Predicate(kind=kind, port=port, value=value)
+    raise PlanLiftError(f"unknown predicate kind: {kind!r}")
+
+
+def _parse_port_ref(raw: object) -> PortRef:
+    """Parse a ``port`` dict into a :class:`PortRef`."""
+    if isinstance(raw, PortRef):
+        return raw
+    if isinstance(raw, Mapping):
+        name = str(raw.get("name", ""))
+        field = raw.get("field")
+        return PortRef(name=name, field=str(field) if field is not None else None)
+    raise PlanLiftError(f"port ref must be a dict or PortRef, got {type(raw).__name__}")
+
+
+def validate_predicates(plan: Plan) -> None:
+    """Validate all typed :class:`Predicate` edges against source-node schemas.
+
+    Raises :class:`PlanLiftError` with structured context on first violation:
+
+    - Leaf predicate references a port not in source node's ``io_schema.outputs``.
+    - Leaf ``Predicate.field`` is not declared on the port's ``payload_type``.
+
+    String ``when`` values (legacy DSL) are skipped — they have no typed
+    structure to validate. Boolean combinators recurse on children.
+    """
+    for edge in plan.edges:
+        if not isinstance(edge.when, Predicate):
+            continue
+        try:
+            source_node = plan.node(edge.source)
+        except KeyError:
+            # Plan model_validator already rejects dangling edges;
+            # guard here is defensive only.
+            continue
+        _validate_predicate_node(
+            edge.when,
+            source_node.io_schema,
+            plan_id=plan.id,
+            edge_id=f"{edge.source}->{edge.target}",
+        )
+
+
+def _validate_predicate_node(
+    pred: Predicate,
+    schema: NodeIOSchema,
+    *,
+    plan_id: str,
+    edge_id: str,
+) -> None:
+    """Recursively validate one predicate tree against *schema*."""
+    if pred.kind in _LEAF_PREDICATE_KINDS:
+        if pred.port is None:
+            raise PlanLiftError(
+                f"leaf predicate kind={pred.kind!r} requires port",
+                plan_id=plan_id,
+                edge_id=edge_id,
+            )
+        port_name = pred.port.name
+        if port_name not in schema.output_names():
+            raise PlanLiftError(
+                f"edge {edge_id!r}: predicate port {port_name!r} not in "
+                f"source node outputs {sorted(schema.output_names())}",
+                plan_id=plan_id,
+                edge_id=edge_id,
+                port_name=port_name,
+            )
+        port_spec = _find_port_spec(schema, port_name)
+        if (
+            pred.port.field is not None
+            and port_spec is not None
+            and port_spec.payload_type is not None
+            and pred.port.field not in port_spec.payload_type.model_fields
+        ):
+            raise PlanLiftError(
+                f"edge {edge_id!r}: port {port_name!r} payload type "
+                f"{port_spec.payload_type.__name__!r} has no field "
+                f"{pred.port.field!r}",
+                plan_id=plan_id,
+                edge_id=edge_id,
+                port_name=port_name,
+            )
+        return
+    for child in pred.children:
+        _validate_predicate_node(
+            child,
+            schema,
+            plan_id=plan_id,
+            edge_id=edge_id,
+        )
+
+
+def _find_port_spec(schema: NodeIOSchema, name: str) -> PortSpec | None:
+    for spec in (*schema.inputs, *schema.outputs):
+        if spec.name == name:
+            return spec
+    return None
+
+
+def _validate_termination(plan: Plan) -> None:
+    """Ensure the plan has at least one termination policy.
+
+    A plan terminates when any node has ``terminal=True`` OR any node's
+    ``io_schema.terminal_predicate`` is not ``None``. Without a
+    termination policy the kernel would run indefinitely.
+    """
+    for node in plan.nodes:
+        if node.terminal:
+            return
+        if node.io_schema.terminal_predicate is not None:
+            return
+    raise PlanLiftError(
+        f"plan {plan.id!r}: no termination policy — "
+        "at least one node must have terminal=True or a terminal_predicate",
+        plan_id=plan.id,
+    )
+
+
+__all__ = ["lift_executable_plan", "lift_graph_spec", "validate_predicates", "_validate_termination"]

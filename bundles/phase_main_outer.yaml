@@ -5,23 +5,12 @@
 # providers. Topology is declared here as a v2 BundleGraphSpec
 # (ADR-0217) — the runtime kernel reads this yaml directly.
 #
-# Each ``phase.<x>.main`` node carries a ``sub_spec_ref`` that
-# delegates to the corresponding phase subgraph bundle. The interpreter
-# enters the subgraph via ``sub_spec_ref.entry_node`` and returns to
-# the outer traversal at ``sub_spec_ref.binding_edge``.
-#
-# The post-stop-decision-retirement shape: the outer plan advances
-# perceive → think → act → reflect → remember on the data shape
-# ``decision.action_type`` and ``decision.response_text``. The
-# ``terminal.commit`` outer node is dispatched by the v2 driver through
-# the new ``BindingKind.TERMINAL_COMMIT`` binding kind. Loop control is
-# no longer a host-side policy; ``terminal.commit`` runs once and the
-# kernel commits a typed ``StopDecision`` to the reducer. The driver
-# emits ``SPINE_TERMINAL_COMMIT`` at the same site.
-#
-# Edges: ``act.main → think.main`` carries the USE_TOOL → re-ask-model
-# loop. ``<phase>.main → terminal.commit`` carries the model-driven
-# RESPOND-with-output path. There is no legacy ``should_stop`` predicate.
+# D4 typed-port cutover: all edge ``when:`` predicates are typed
+# :class:`Predicate` dicts (no string DSL). Cross-node reads go through
+# :class:`PortReader` which resolves :class:`PortRef` against declared
+# output ports. The ``routing`` port carries a :class:`RoutingDecision`
+# that replaces the legacy ``result_kind`` / ``next_hint`` / ``next_hints``
+# ad-hoc fields.
 
 id: phase.main.outer
 region: phase:agent
@@ -37,7 +26,7 @@ nodes:
       entry_node: phase.perceive.observe
       binding_edge: perceive.main
     declared_inputs: []
-    declared_outputs: [perceive_payload]
+    declared_outputs: [perceive_payload, routing]
 
   - id: think.main
     region: phase:think
@@ -47,7 +36,7 @@ nodes:
       entry_node: think.shortcut
       binding_edge: think.main
     declared_inputs: [perceive_payload]
-    declared_outputs: [decision]
+    declared_outputs: [decision, routing]
 
   - id: act.main
     region: phase:act
@@ -57,7 +46,7 @@ nodes:
       entry_node: act.validate
       binding_edge: act.main
     declared_inputs: [decision]
-    declared_outputs: [act_outcome, should_terminate]
+    declared_outputs: [act_outcome, should_terminate, routing]
 
   - id: reflect.main
     region: phase:reflect
@@ -67,7 +56,7 @@ nodes:
       entry_node: phase.reflect.score
       binding_edge: reflect.main
     declared_inputs: [act_outcome]
-    declared_outputs: [reflect_outcome]
+    declared_outputs: [reflect_outcome, routing]
 
   - id: remember.main
     region: phase:remember
@@ -77,52 +66,68 @@ nodes:
       entry_node: phase.remember.write
       binding_edge: remember.main
     declared_inputs: [reflect_outcome]
-    declared_outputs: [memory_record]
+    declared_outputs: [memory_record, routing]
 
   - id: terminal.commit
     region: phase:terminal
     binding: terminate
     max_visits: 1
     terminal: true
-    declared_inputs: [decision, act_outcome, reflect_outcome]
+    declared_inputs: [decision, act_outcome, reflect_outcome, routing]
     declared_outputs: [terminal_outcome]
 
 edges:
   # perceive → think (model-driven continuation).
   - from: perceive.main
     to: think.main
-    when: true
 
-  # think → act (model-driven continuation); think → terminal.commit
-  # when the model emitted RESPOND with non-empty response_text.
+  # think → act when routing.action_type == use_tool.
   - from: think.main
     to: act.main
-    when: result.payload.decision.action_type == "use_tool"
+    when:
+      kind: eq
+      port: { name: routing, field: action_type }
+      value: use_tool
+
+  # think → terminal.commit when routing.action_type == respond
+  # AND decision.response_text is non-empty.
   - from: think.main
     to: terminal.commit
-    when: result.payload.decision.action_type == "respond" and result.payload.decision.response_text != ""
+    when:
+      kind: and
+      children:
+        - { kind: eq, port: { name: routing, field: action_type }, value: respond }
+        - { kind: ne, port: { name: decision, field: response_text }, value: "" }
 
-  # act → think on USE_TOOL (the re-ask-model loop); act → terminal.commit
-  # on Body-raised DeterministicToolError (FAILURE_KIND_EXECUTION).
+  # act → think on USE_TOOL (the re-ask-model loop).
   - from: act.main
     to: think.main
-    when: result.payload.decision.action_type == "use_tool"
+    when:
+      kind: eq
+      port: { name: routing, field: action_type }
+      value: use_tool
+
+  # act → terminal.commit on should_terminate.
   - from: act.main
     to: terminal.commit
-    when: result.payload.should_terminate == true
+    when:
+      kind: eq
+      port: { name: routing, field: should_terminate }
+      value: true
 
   # reflect → remember.
   - from: reflect.main
     to: remember.main
-    when: true
 
   # remember → terminal.commit (always; commit closes the loop).
   - from: remember.main
     to: terminal.commit
-    when: true
 
-  # terminal.commit never loops back; the kernel exits via the new
+  # terminal.commit never loops back; the kernel exits via the
   # BindingKind.TERMINATE executor.
   - from: terminal.commit
     to: think.main
-    when: false
+    when:
+      kind: eq
+      port: { name: routing, field: should_terminate }
+      value: false
