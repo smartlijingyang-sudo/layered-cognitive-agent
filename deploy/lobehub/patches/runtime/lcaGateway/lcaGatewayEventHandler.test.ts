@@ -26,6 +26,7 @@ import type { ConversationContext, UIChatMessage } from '@lobechat/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { messageService } from '@/services/message';
+import { dbMessageSelectors } from '@/store/chat/slices/message/selectors/dbMessage';
 import type { ChatStore } from '@/store/chat/store';
 import { messageMapKey } from '@/store/chat/utils/messageMapKey';
 
@@ -282,5 +283,114 @@ describe('createLcaGatewayEventHandler (multi-run / multi-LLM)', () => {
     expect(updateToolCalls.map((c: { value: { tools: Array<{ id: string }> } }) =>
       c.value.tools.map((t) => t.id),
     )).toEqual([['call-1'], ['call-2', 'call-1'], ['call-3', 'call-2', 'call-1']]);
+  });
+
+  // Mirrors Case A's event sequence, but the LCA wire's actual `agent_runtime_end`
+  // payload (`event_translator.py:233-246` — `{finalState, reason, reasonDetail,
+  // phase}`) carries NO `uiMessages`. The handler then falls through to
+  // `fetchAndReplaceMessages(get, context, undefined, reader)`
+  // (`gatewayEventHandler.ts:1208-1210`), which uses the LCA-specific
+  // in-memory reader (`messageService.ts:30-43`). This case exercises that
+  // path end-to-end: the in-memory reader reconciles against
+  // `dbMessagesMap`, the singleton `messageService.getMessages` is bypassed.
+  it('drives three steps and the LCA terminal reconciliation (no uiMessages on agent_runtime_end)', async () => {
+    const dbSpy = vi
+      .spyOn(messageService, 'getMessages')
+      .mockResolvedValue([] as unknown as UIChatMessage[]);
+    // The LCA reader resolves its snapshot via `dbMessageSelectors.getDbMessagesByKey`.
+    // Spy on the selector to count how many times the LCA reader was invoked.
+    const readerSpy = vi.spyOn(dbMessageSelectors, 'getDbMessagesByKey');
+
+    const { store, replaceMessages } = createStore();
+    const handler = createLcaGatewayEventHandler(() => store, {
+      assistantMessageId: 'assistant-msg',
+      context,
+      operationId: 'op-1',
+    });
+
+    // Same three-step event sequence as Case A.
+    handler(
+      makeEvent(
+        'stream_chunk',
+        { chunkType: 'text', content: 'searching flights... ', snapshotMode: 'append' } as never,
+        1,
+      ),
+    );
+    handler(makeEvent('stream_chunk', oneToolChunk('call-1', 'searchFlights'), 1));
+    handler(makeEvent('step_start', { phase: 'execution_complete' } as never, 1));
+
+    handler(
+      makeEvent(
+        'stream_chunk',
+        { chunkType: 'text', content: 'comparing quotes... ', snapshotMode: 'append' } as never,
+        2,
+      ),
+    );
+    handler(makeEvent('stream_chunk', oneToolChunk('call-2', 'compareQuotes'), 2));
+    handler(makeEvent('step_start', { phase: 'execution_complete' } as never, 2));
+
+    handler(
+      makeEvent(
+        'stream_chunk',
+        { chunkType: 'text', content: 'booking now... ', snapshotMode: 'append' } as never,
+        3,
+      ),
+    );
+    handler(makeEvent('stream_chunk', oneToolChunk('call-3', 'bookFlight'), 3));
+    handler(makeEvent('step_start', { phase: 'execution_complete' } as never, 3));
+
+    // LCA wire's actual terminal: NO `uiMessages`. This drives the
+    // `fetchAndReplaceMessages` path with the LCA reader at line 1208-1210.
+    handler(
+      makeEvent(
+        'agent_runtime_end',
+        {
+          phase: 'execution_complete',
+          reason: 'completed',
+        } as never,
+        3,
+      ),
+    );
+
+    await flush();
+
+    // ── Invariant 1: the LCA in-memory reader was called exactly once at
+    // terminal. The `reader` parameter passed to `fetchAndReplaceMessages`
+    // is the LCA reader (built by `createLcaInMemoryMessagesReader` in the
+    // LCA factory), which calls `dbMessageSelectors.getDbMessagesByKey`
+    // exactly once per invocation. No other code path in the handler
+    // touches that selector, so the spy count isolates the LCA reader.
+    expect(readerSpy).toHaveBeenCalledTimes(1);
+
+    // ── Invariant 2: `replaceMessages` was called exactly once with the
+    // in-memory array. Three `step_start` events must NOT trigger
+    // `replaceMessages` (the LCA wire does not attach `uiMessages` to
+    // `step_start`); mid-stream chunks under `runtimeType: 'lca-gateway'`
+    // are short-circuited by `shouldSkipMidStreamMessageFetch`.
+    expect(replaceMessages).toHaveBeenCalledTimes(1);
+
+    const lastCall = replaceMessages.mock.calls.at(-1);
+    expect(lastCall).toBeDefined();
+    const [terminalMessages] = lastCall as unknown as [
+      UIChatMessage[],
+      Record<string, unknown>,
+    ];
+    expect(terminalMessages).toHaveLength(2);
+    const finalAssistant = terminalMessages.find((m) => m.role === 'assistant');
+
+    // ── Invariant 3: terminal assistant row carries all three tools in
+    // the in-memory accumulation order. The LCA reader returns the live
+    // `dbMessagesMap[topicKey]` array, where the assistant row has been
+    // mutated in place by the mock `internal_dispatchMessage` after each
+    // `tools_calling` chunk. After three chunks the assistant's tools are
+    // `[call-3, call-2, call-1]` (newest-first post-fix order).
+    expect(finalAssistant?.tools).toHaveLength(3);
+    const toolIds = (finalAssistant?.tools as Array<{ id: string }>).map((t) => t.id);
+    expect(toolIds).toEqual(['call-3', 'call-2', 'call-1']);
+
+    // ── Invariant 4: the singleton `messageService.getMessages` was never
+    // called. The LCA factory overrides `params.messageService` with the
+    // LCA in-memory reader, so the singleton is bypassed entirely.
+    expect(dbSpy).not.toHaveBeenCalled();
   });
 });
