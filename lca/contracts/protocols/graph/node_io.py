@@ -14,6 +14,9 @@ Design constraints:
 - :class:`NodeInput.require` and :class:`NodeOutput.require` raise
   :class:`NodeSchemaError` with structured context (producer node,
   consumer node, requested port) so debug never relies on grep logs.
+- :class:`PortSpec.payload_type` is load-bearing for predicate lift
+  validation (Task 5). ``None`` means the port is dynamic and predicates
+  cannot use ``field`` (only the port value as a whole).
 
 What's NOT here: business DTO names like ``Decision`` / ``Observation`` /
 ``Reflection`` — those live in :mod:`lca.contracts.models.core.execution`
@@ -28,6 +31,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from lca.contracts.protocols.graph.ports import PortName
+from lca.contracts.protocols.graph.predicate import Predicate
 
 
 class NodeSchemaError(ValueError):
@@ -41,16 +45,18 @@ class NodeSchemaError(ValueError):
 class PortSpec(BaseModel):
     """One typed port declaration on a node.
 
-    The ``payload_type`` is informational (string name) so the schema
-    is JSON-serializable for plan export. Actual runtime type checks
-    happen in the strategy; the schema only governs **names**.
+    The ``payload_type`` is load-bearing for lift-time validation of
+    :class:`Predicate.field` references. When ``None``, the port is
+    dynamic and predicates cannot access fields (only the port value
+    as a whole). Lift validation (Task 5) rejects ``Predicate.field is not None``
+    on a port with ``payload_type is None``.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     name: PortName
     required: bool = True
-    payload_type: str | None = None
+    payload_type: type[BaseModel] | None = None  # None = dynamic port, no field access
 
 
 class NodeIOSchema(BaseModel):
@@ -61,12 +67,17 @@ class NodeIOSchema(BaseModel):
     kernel never inspects schema names directly; it hands them to
     :class:`lca.framework.graph.port_registry.PortRegistry` to build
     :class:`NodeInput`.
+
+    The ``terminal_predicate`` is evaluated after each visit to this node.
+    If it matches, the kernel terminates the plan (no edge selection needed).
+    This replaces the legacy ``terminal.commit`` outer node pattern.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     inputs: tuple[PortSpec, ...] = Field(default_factory=tuple)
     outputs: tuple[PortSpec, ...] = Field(default_factory=tuple)
+    terminal_predicate: Predicate | None = None  # plan-level termination
 
     @model_validator(mode="after")
     def _names_unique(self) -> "NodeIOSchema":
@@ -129,20 +140,16 @@ class NodeOutput(BaseModel):
     kernel calls :meth:`NodeIOSchema.project_outputs` to enforce this
     after the strategy returns.
 
-    ``result_kind`` and ``next_hints`` carry the discriminator the
-    edge DSL predicate (``select_edge`` →
-    ``evaluate_restricted_predicate``) reads off
-    ``result.result_kind`` without forcing every strategy to shape its
-    output as a legacy PhaseResult.
+    Routing decisions are now expressed through the typed ``RoutingDecision``
+    port (see :mod:`lca.contracts.protocols.graph.routing`). The legacy
+    ``result_kind``, ``next_hint``, and ``next_hints`` fields have been
+    removed — they are replaced by the typed port store.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     port_values: Mapping[PortName, Any] = Field(default_factory=dict)
-    next_hint: str | None = None
     producer_node: str = ""
-    result_kind: str | None = None
-    next_hints: Mapping[str, Any] = Field(default_factory=dict)
 
 
 __all__ = [
