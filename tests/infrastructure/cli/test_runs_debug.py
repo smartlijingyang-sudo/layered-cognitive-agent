@@ -76,10 +76,9 @@ def test_runs_debug_events_layer(run_dir: Path) -> None:
 
 def test_runs_debug_explain_layer(run_dir: Path) -> None:
     """The fixture only has a terminal kernel.run.stop=failure; no
-    phase_graph.node.end carries outcome=failure. The explain layer must
-    NOT promote kernel.run.stop into first_failed (it is the terminal
-    verdict, not the root cause). Instead it surfaces a 'reducer-driven
-    terminal' summary and points the agent at graph layer reducer_sequence.
+    phase_graph.node.end carries outcome=failure. Explain must surface
+    the reducer-driven teardown as root_cause_kind=reducer_teardown
+    (not first_failed) and include the reducer method.
     """
     runner = CliRunner()
     result = runner.invoke(app, ["runs", "debug", "run_test_runs_debug",
@@ -87,7 +86,8 @@ def test_runs_debug_explain_layer(run_dir: Path) -> None:
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     assert payload["layer"] == "explain"
-    assert payload["root_cause_present"] is False
+    assert payload["root_cause_present"] is True
+    assert payload["root_cause_kind"] == "reducer_teardown"
     assert payload["terminal_outcome"] == "failure"
     assert "reducer" in payload["hint"]
 
@@ -182,3 +182,192 @@ def test_runs_debug_spine_empty_vs_missing(tmp_path: Path, monkeypatch: pytest.M
     combined = result.output + (result.stderr or "")
     assert "spine_missing" in combined
     assert "spine_empty" not in combined
+
+
+def test_runs_debug_graph_layer_carries_chain_effects_data_flow(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Graph layer must expose edges / effects / data_flow / llm_prompts
+    so an agent can answer the four business questions: chain visibility,
+    per-node effects, data flow edges, and the prompt that drove an LLM.
+    """
+    monkeypatch.chdir(tmp_path)
+    run_id = "run_test_chain"
+    rd = tmp_path / "traces" / "runs" / run_id
+    rd.mkdir(parents=True)
+    rows = [
+        {"execution_point": "kernel.run.start", "channel": "fact",
+         "span_id": "s1", "parent_span_id": None, "sequence": 1, "epoch": 1,
+         "causality_id": "c1", "outcome": None,
+         "ts": "2026-09-14T00:00:00+00:00",
+         "when_corrected": "2026-09-14T00:00:00+00:00",
+         "prev_event_hash": None, "run_id": run_id, "step_id": None, "payload": {}},
+        {"execution_point": "phase_graph.node.start", "channel": "control",
+         "span_id": "s2", "parent_span_id": "s1", "sequence": 2, "epoch": 1,
+         "causality_id": "c2", "outcome": None,
+         "ts": "2026-09-14T00:00:01+00:00",
+         "when_corrected": "2026-09-14T00:00:01+00:00",
+         "prev_event_hash": None, "run_id": run_id, "step_id": None,
+         "payload": {"node_id": "phase.perceive.observe", "visit_index": 1}},
+        {"execution_point": "phase_graph.node.end", "channel": "control",
+         "span_id": "s3", "parent_span_id": "s2", "sequence": 3, "epoch": 1,
+         "causality_id": "c3", "outcome": "success",
+         "ts": "2026-09-14T00:00:02+00:00",
+         "when_corrected": "2026-09-14T00:00:02+00:00",
+         "prev_event_hash": None, "run_id": run_id, "step_id": None,
+         "payload": {"node_id": "phase.perceive.observe", "visit_index": 1,
+                     "elapsed_ms": 1000, "dispatch": "next",
+                     "inputs": {},
+                     "outputs": {"manifest": {"digest": "sha256:x"}}}},
+        {"execution_point": "phase_graph.edge.transit", "channel": "control",
+         "span_id": "s4", "parent_span_id": "s3", "sequence": 4, "epoch": 1,
+         "causality_id": "c4", "outcome": None,
+         "ts": "2026-09-14T00:00:03+00:00",
+         "when_corrected": "2026-09-14T00:00:03+00:00",
+         "prev_event_hash": None, "run_id": run_id, "step_id": None,
+         "payload": {"edge_id": "phase.perceive.observe->think.reason.complete",
+                     "from_node": "phase.perceive.observe",
+                     "metadata": {"when": "True"}}},
+        {"execution_point": "phase_graph.node.start", "channel": "control",
+         "span_id": "s5", "parent_span_id": "s4", "sequence": 5, "epoch": 1,
+         "causality_id": "c5", "outcome": None,
+         "ts": "2026-09-14T00:00:04+00:00",
+         "when_corrected": "2026-09-14T00:00:04+00:00",
+         "prev_event_hash": None, "run_id": run_id, "step_id": None,
+         "payload": {"node_id": "think.reason.complete", "visit_index": 1,
+                     "outputs": {"_ts_in": "2026-09-14T00:00:04+00:00"}}},
+        {"execution_point": "llm.call.start", "channel": "control",
+         "span_id": "s6", "parent_span_id": "s5", "sequence": 6, "epoch": 1,
+         "causality_id": "c6", "outcome": None,
+         "ts": "2026-09-14T00:00:04+00:00",
+         "when_corrected": "2026-09-14T00:00:04+00:00",
+         "prev_event_hash": None, "run_id": run_id, "step_id": None,
+         "payload": {"model": "qwen3.7-plus", "stream": True}},
+        {"execution_point": "llm.request.header", "channel": "control",
+         "span_id": "s7", "parent_span_id": "s6", "sequence": 7, "epoch": 1,
+         "causality_id": "c7", "outcome": None,
+         "ts": "2026-09-14T00:00:04+00:00",
+         "when_corrected": "2026-09-14T00:00:04+00:00",
+         "prev_event_hash": None, "run_id": run_id, "step_id": "step-001",
+         "payload": {"step_id": "step-001", "reason": "initial",
+                     "messages": [{"role": "user", "content": "ping"}],
+                     "tools": [{"name": "runCommand"}], "system": ""}},
+        {"execution_point": "llm.call.end", "channel": "control",
+         "span_id": "s8", "parent_span_id": "s7", "sequence": 8, "epoch": 1,
+         "causality_id": "c8", "outcome": "success",
+         "ts": "2026-09-14T00:00:05+00:00",
+         "when_corrected": "2026-09-14T00:00:05+00:00",
+         "prev_event_hash": None, "run_id": run_id, "step_id": None,
+         "payload": {"model": "qwen3.7-plus", "latency_ms": 1000,
+                     "outcome": "success"}},
+        {"execution_point": "phase_graph.node.end", "channel": "control",
+         "span_id": "s9", "parent_span_id": "s8", "sequence": 9, "epoch": 1,
+         "causality_id": "c9", "outcome": "success",
+         "ts": "2026-09-14T00:00:06+00:00",
+         "when_corrected": "2026-09-14T00:00:06+00:00",
+         "prev_event_hash": None, "run_id": run_id, "step_id": None,
+         "payload": {"node_id": "think.reason.complete", "visit_index": 1,
+                     "elapsed_ms": 2000, "dispatch": "terminal",
+                     "inputs": {"manifest": "x"},
+                     "outputs": {"response": {"model": "qwen3.7-plus"}}}},
+        {"execution_point": "kernel.run.stop", "channel": "fact",
+         "span_id": "s10", "parent_span_id": "s9", "sequence": 10, "epoch": 1,
+         "causality_id": "c10", "outcome": "success",
+         "ts": "2026-09-14T00:00:07+00:00",
+         "when_corrected": "2026-09-14T00:00:07+00:00",
+         "prev_event_hash": None, "run_id": run_id, "step_id": None,
+         "payload": {"outcome": "success"}},
+    ]
+    (rd / f"{run_id}.spine.jsonl").write_text(
+        "\n".join(json.dumps(r) for r in rows), encoding="utf-8"
+    )
+    runner = CliRunner()
+    result = runner.invoke(app, ["runs", "debug", run_id,
+                                 "--layer", "graph", "--output", "json"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+
+    assert "edges" in payload, "graph layer must surface edges"
+    edges = payload["edges"]
+    assert any(e.get("kind") == "edge" and e.get("from") == "phase.perceive.observe"
+               and e.get("to") == "think.reason.complete" for e in edges)
+
+    assert "data_flow" in payload, "graph layer must surface data_flow"
+    flow = payload["data_flow"]
+    assert any(f.get("from") == "phase.perceive.observe"
+               and f.get("to") == "think.reason.complete" for f in flow), (
+        f"expected data_flow edge perceive->think, got {flow}"
+    )
+
+    assert "llm_prompts" in payload, "graph layer must surface llm_prompts"
+    assert payload["llm_prompts"], "llm_prompts must not be empty"
+    first_prompt = payload["llm_prompts"][0]
+    assert first_prompt["messages"][0]["content"] == "ping"
+
+    nodes_by_id = {n["node_id"]: n for n in payload["nodes"]}
+    think = nodes_by_id.get("think.reason.complete")
+    assert think is not None
+    assert any(e.get("kind") == "llm_call" for e in think["effects"]), (
+        f"think.reason.complete must own its llm_call effects, got {think['effects']}"
+    )
+    assert any(e.get("kind") == "llm_request" for e in think["effects"]), (
+        "llm.request.header must attach to the LLM-calling node"
+    )
+
+
+def test_runs_debug_explain_layer_includes_first_prompt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When run fails via reducer teardown, explain must surface the
+    first llm prompt so the agent can see what the LLM was asked.
+    """
+    monkeypatch.chdir(tmp_path)
+    run_id = "run_test_explain_prompt"
+    rd = tmp_path / "traces" / "runs" / run_id
+    rd.mkdir(parents=True)
+    rows = [
+        {"execution_point": "kernel.run.start", "channel": "fact",
+         "span_id": "s1", "parent_span_id": None, "sequence": 1, "epoch": 1,
+         "causality_id": "c1", "outcome": None,
+         "ts": "2026-09-14T00:00:00+00:00",
+         "when_corrected": "2026-09-14T00:00:00+00:00",
+         "prev_event_hash": None, "run_id": run_id, "step_id": None,
+         "payload": {}},
+        {"execution_point": "llm.request.header", "channel": "control",
+         "span_id": "s2", "parent_span_id": "s1", "sequence": 2, "epoch": 1,
+         "causality_id": "c2", "outcome": None,
+         "ts": "2026-09-14T00:00:01+00:00",
+         "when_corrected": "2026-09-14T00:00:01+00:00",
+         "prev_event_hash": None, "run_id": run_id, "step_id": "step-001",
+         "payload": {"step_id": "step-001", "reason": "initial",
+                     "messages": [{"role": "user", "content": "ping"}],
+                     "tools": [], "system": ""}},
+        {"execution_point": "runtime.reducer.apply", "channel": "control",
+         "span_id": "s3", "parent_span_id": "s2", "sequence": 3, "epoch": 1,
+         "causality_id": "c3", "outcome": None,
+         "ts": "2026-09-14T00:00:02+00:00",
+         "when_corrected": "2026-09-14T00:00:02+00:00",
+         "prev_event_hash": None, "run_id": run_id, "step_id": None,
+         "payload": {"method": "apply_error", "phase": "start"}},
+        {"execution_point": "kernel.run.stop", "channel": "fact",
+         "span_id": "s4", "parent_span_id": "s3", "sequence": 4, "epoch": 1,
+         "causality_id": "c4", "outcome": "failure",
+         "ts": "2026-09-14T00:00:03+00:00",
+         "when_corrected": "2026-09-14T00:00:03+00:00",
+         "prev_event_hash": None, "run_id": run_id, "step_id": None,
+         "payload": {"outcome": "failure"}},
+    ]
+    (rd / f"{run_id}.spine.jsonl").write_text(
+        "\n".join(json.dumps(r) for r in rows), encoding="utf-8"
+    )
+    runner = CliRunner()
+    result = runner.invoke(app, ["runs", "debug", run_id,
+                                 "--layer", "explain", "--output", "json"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["root_cause_present"] is True
+    assert payload["root_cause_kind"] == "reducer_teardown"
+    assert payload["reducer_method"] == "apply_error"
+    assert payload["first_prompt"] is not None
+    assert payload["first_prompt"]["user_message_preview"] == "ping"
+    assert "llm_prompts" in payload["hint"] or "graph" in payload["hint"]
