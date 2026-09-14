@@ -367,8 +367,11 @@ def _coerce_when(raw: object) -> Predicate | None:
     - ``None`` / ``True`` / ``"true"`` / ``""`` → ``None`` (unconditional)
     - :class:`Predicate` → pass-through
     - dict with ``kind`` → structured Predicate (D6 plan SDK path)
-    - other strings → ``None`` (legacy DSL, treated as unconditional;
-      the interpreter's string evaluator handles them at runtime)
+    - any other string → ``PlanLiftError``. The legacy string-DSL
+      edge conditions silently evaluated to ``False`` and were the
+      root cause of ``outcome=failure`` runs (see spec §0). The D4
+      cutover rejects every string at lift time so a misroute never
+      reaches runtime.
     """
     if raw is None:
         return None
@@ -390,7 +393,10 @@ def _coerce_when(raw: object) -> Predicate | None:
         normalized = raw.strip().lower()
         if normalized in ("true", "false", ""):
             return None
-        return None  # legacy DSL string — interpreter handles at runtime
+        raise PlanLiftError(
+            f"string `when: {raw!r}` is no longer supported; "
+            "use a typed Predicate dict (see ADR-0195 typed-port graph)",
+        )
     return None
 
 

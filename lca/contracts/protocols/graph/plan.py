@@ -75,9 +75,11 @@ class PlanNode(BaseModel):
 class PlanEdge(BaseModel):
     """One directed edge in a plan graph.
 
-    ``when`` accepts either a typed :class:`Predicate` (new path) or a
-    legacy DSL string. The traversal predicate evaluator handles both;
-    the SDK always produces typed predicates for new plans.
+    ``when`` is a typed :class:`Predicate` (structured, lift-validated).
+    ``None`` means "always true" — the edge fires unconditionally.
+
+    D4 cutover: string DSL ``when`` fields have been deleted. Every edge
+    carries a structured :class:`Predicate` or ``None``.
     ``subgraph_ref`` on an edge triggers the same nested-execution path
     as :attr:`PlanNode.subgraph_ref`, but keyed off the edge instead of
     the source node.
@@ -87,7 +89,7 @@ class PlanEdge(BaseModel):
 
     source: str
     target: str
-    when: Predicate | str = "true"
+    when: Predicate | None = None
     subgraph_ref: SubgraphReference | None = None
 
 

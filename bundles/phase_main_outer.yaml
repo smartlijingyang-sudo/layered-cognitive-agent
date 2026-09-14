@@ -122,12 +122,3 @@ edges:
   # remember → terminal.commit (always; commit closes the loop).
   - from: remember.main
     to: terminal.commit
-
-  # terminal.commit never loops back; the kernel exits via the
-  # BindingKind.TERMINATE executor.
-  - from: terminal.commit
-    to: think.main
-    when:
-      kind: eq
-      port: { name: routing, field: should_terminate }
-      value: false

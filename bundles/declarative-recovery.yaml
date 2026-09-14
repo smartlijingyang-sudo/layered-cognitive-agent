@@ -3,11 +3,12 @@
 #
 # Recovery flow:
 # 1. Phase fails (e.g., tool call returns error)
-# 2. Reflect phase detects failure and sets result.next_hints.admit_recovery = True
-# 3. Edge reflect.main → think.main is taken (when: result.next_hints.admit_recovery)
+# 2. Reflect phase detects failure and sets routing.next_hint = "admit_recovery"
+# 3. Edge reflect.main → think.main is taken (when: routing.next_hint == admit_recovery)
 # 4. Think phase retries with adjusted strategy
 # 5. LoopGuard limits to 1 recovery iteration (maxIterations: 1)
 #
+# D4 typed-port cutover: edge predicates use typed Predicate dicts.
 # This ensures bounded recovery: agent gets one retry, then must stop.
 
 entries:
@@ -18,7 +19,10 @@ entries:
     config:
       source: reflect.main
       target: think.main
-      when: result.next_hints.admit_recovery
+      when:
+        kind: eq
+        port: { name: routing, field: next_hint }
+        value: admit_recovery
       loop:
         maxIterations: 1
         budget: run.steps

@@ -52,15 +52,18 @@ _NEXT_HINT: dict[str, dict[str, str]] = {
     "events": {
         "rows_present": "next_layer=graph for skeleton view, or filter --domain <name>",
         "rows_empty": "next_layer=summary to confirm the run reached the spine",
+        "spine_missing": "stop: spine ledger not found under traces/runs/",
     },
     "diff": {
         "blueprint_missing": "next_layer=summary: plan not materialised; only execution trace available",
         "deviations_present": "next_layer=explain to root-cause unexpected nodes",
         "no_deviations": "next_layer=summary for run-level verdict",
+        "spine_missing": "stop: spine ledger not found under traces/runs/",
     },
     "explain": {
         "root_cause_present": "next_layer=events to walk the offending step in raw form",
         "no_root_cause": "next_layer=summary for run-level counts",
+        "spine_missing": "stop: spine ledger not found under traces/runs/",
     },
 }
 
@@ -277,12 +280,31 @@ def register(app: typer.Typer) -> None:
 
         events = load_spine_events(run_id)
         if not events:
-            payload = {
-                "layer": layer,
-                "run_id": run_id,
-                "spine_missing": True,
-                "hint": _NEXT_HINT[layer]["spine_missing"],
-            }
+            from lca.infrastructure.cli.commands._shared.projection import (
+                spine_filename_for_run_cwd,
+            )
+
+            spine_path = spine_filename_for_run_cwd(run_id)
+            if spine_path.exists():
+                payload = {
+                    "layer": layer,
+                    "run_id": run_id,
+                    "spine_empty": True,
+                    "spine_path": str(spine_path),
+                    "hint": (
+                        "stop: spine file exists but contains no parseable "
+                        "rows; check kernel logs for write errors"
+                    ),
+                }
+            else:
+                payload = {
+                    "layer": layer,
+                    "run_id": run_id,
+                    "spine_missing": True,
+                    "hint": _NEXT_HINT[layer].get(
+                        "spine_missing", "stop: spine ledger not found"
+                    ),
+                }
             emit(output, payload, human_renderer=_human)
             raise typer.Exit(code=1)
 

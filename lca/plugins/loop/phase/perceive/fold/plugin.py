@@ -29,6 +29,8 @@ from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
+from lca.contracts.protocols.graph.routing import RoutingDecision
+from lca.contracts.atoms.enums.enums import ActionType
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
@@ -48,8 +50,10 @@ class PerceiveFoldExecutor:
     ) -> NodeOutput:
         del context
         return NodeOutput(
-            port_values={"observation": input.port_values.get("manifest")},
-            next_hint=None,
+            port_values={
+                "observation": input.port_values.get("manifest"),
+                "routing": RoutingDecision(action_type=ActionType.RESPOND),
+            },
         )
 
 

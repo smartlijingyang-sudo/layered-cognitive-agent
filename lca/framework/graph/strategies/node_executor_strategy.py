@@ -97,14 +97,14 @@ class NodeExecutorStrategy(NodeStrategy):
         legacy_output: LegacyNodeOutput = await executor_call(
             legacy_ctx, legacy_input
         )
+        # D4 cutover: pass-through only. The legacy NodeOutput carries
+        # port_values (typed port store) and an optional next_hint (free-form
+        # metadata). The kernel NodeOutput drops result_kind/next_hint/next_hints
+        # — routing decisions now flow through the typed RoutingDecision port
+        # in port_values. Plugins that need routing emit it directly.
         return NodeOutput(
             port_values=dict(legacy_output.port_values),
-            next_hint=legacy_output.next_hint,
             producer_node=context.node_id,
-            result_kind=(
-                getattr(legacy_output, "result_kind", None) or None
-            ),
-            next_hints=dict(getattr(legacy_output, "next_hints", {}) or {}),
         )
 
     def _build_runtime(self, agent_state: Any) -> Any:

@@ -31,6 +31,7 @@ nodes:
     factory: decision.compose.action
     inputs: [tool_calls, delegations, intent]
     outputs: [decision]
+    terminal: true
     config:
       max_visits: 1
       emit_on_enter: []

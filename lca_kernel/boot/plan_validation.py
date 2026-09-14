@@ -233,10 +233,11 @@ def _subgraph_ref_with_entry(
 
 
 # Strings that the lifter's :func:`_coerce_when` maps to ``None`` —
-# the predicates evaluate to "always true" at runtime, but the legacy
-# string DSL (``when: result.payload...``) is no longer supported and
-# silently fires every edge regardless of the upstream decision. We
-# fail loud at boot so a misroute never reaches runtime.
+# the predicates evaluate to "always true" at runtime, but any other
+# string is rejected at lift time (D4 typed-port cutover). The legacy
+# string-DSL edge conditions silently fired every edge regardless of
+# the upstream decision; we fail loud at boot so a misroute never
+# reaches runtime.
 _STRING_WHEN_ALIASES = frozenset({"true", "false", ""})
 
 

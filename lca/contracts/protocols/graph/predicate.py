@@ -1,7 +1,9 @@
 """Typed, structured predicates over port names.
 
-Replaces the string DSL (``when: result.payload.decision.action_type == "use_tool"``).
-Every cross-node read is a typed :class:`PortRef`, validated at plan lift.
+Replaces the legacy string DSL where edge conditions were written as
+Python-attribute paths on a duck-typed view; the new design carries
+typed :class:`Predicate` values throughout the kernel. Every
+cross-node read is a typed :class:`PortRef`, validated at plan lift.
 """
 
 from __future__ import annotations

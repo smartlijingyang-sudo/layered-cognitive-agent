@@ -165,6 +165,31 @@ def timeline_alias(
     run_replay_command(run_id=run_id, show_graph=show_graph, as_json=as_json)
 
 
+# ── top-level alias: `lca-ops debug-graph <run_id>` → `observation debug-graph` ──
+# 一次性图 + 节点真实 payload + reducer 决策 + 自动根因。直读 spine,
+# 不依赖 observation-9module bundle(``explain`` / ``run-replay`` 在物化
+# 缺失的 run 上返 0;这条不会)。 SSOT 入口,agent 第一查询。
+# delete-when: never (顶层 alias 是文档化入口)。
+
+
+@app.command(
+    name="debug-graph",
+    help=(
+        "Run debug one-shot: graph skeleton + per-node input/output payload + "
+        "reducer decisions + llm responses + auto root-cause markers. Reads "
+        "spine directly; works even when journal.json has not materialized."
+    ),
+)
+def debug_graph_alias(
+    run_id: str = typer.Argument(..., help="run_id (例: run_xxx)"),
+    as_json: bool = typer.Option(False, "--json", help="JSON output (default: human)."),
+) -> None:
+    """Forward to ``observation debug-graph``.  See ``observation debug-graph --help``."""
+    from lca.infrastructure.cli.commands.observation.debug_graph import debug_graph_command
+
+    debug_graph_command(run_id=run_id, as_json=as_json)
+
+
 def main() -> None:
     """Entry point for scripts/lca-ops."""
     app()

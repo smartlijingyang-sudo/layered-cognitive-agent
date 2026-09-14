@@ -32,6 +32,8 @@ from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
+from lca.contracts.protocols.graph.routing import RoutingDecision
+from lca.contracts.atoms.enums.enums import ActionType
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
@@ -58,7 +60,12 @@ class RememberWriteExecutor:
         observation = input.port_values.get("observation")
         reflection = input.port_values.get("reflection")
         if decision is None or observation is None or reflection is None:
-            return NodeOutput(port_values={"envelope": None}, next_hint=None)
+            return NodeOutput(
+                port_values={
+                    "envelope": None,
+                    "routing": RoutingDecision(action_type=ActionType.RESPOND),
+                },
+            )
         plan_ref = str(context.metadata.get("plan_ref", ""))
         node_id = str(context.metadata.get("node_id", "remember.write"))
         envelope = mint_envelope(
@@ -82,8 +89,11 @@ class RememberWriteExecutor:
         # Forward both the envelope (typed side-effect wire) and the receipt
         # to the fold node so downstream can render a typed ``memory_receipt``.
         return NodeOutput(
-            port_values={"envelope": envelope, "memory_receipt": receipt},
-            next_hint=None,
+            port_values={
+                "envelope": envelope,
+                "memory_receipt": receipt,
+                "routing": RoutingDecision(action_type=ActionType.RESPOND),
+            },
         )
 
 

@@ -32,6 +32,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
+from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
@@ -73,11 +74,12 @@ class ThinkGuardEnforceExecutor:
     ) -> NodeOutput:
         runtime = context.runtime or {}
         decision = input.port_values.get("decision")
+        routing = RoutingDecision(action_type=ActionType.RESPOND)
         if not isinstance(decision, Decision):
-            return NodeOutput(port_values={"decision": None}, next_hint=None)
+            return NodeOutput(port_values={"decision": None, "routing": routing})
         gate_service = runtime.get("gates")
         if gate_service is None:
-            return NodeOutput(port_values={"decision": decision}, next_hint=None)
+            return NodeOutput(port_values={"decision": decision, "routing": routing})
         from lca.cognition.brain.gate.service import GateService
 
         if not isinstance(gate_service, GateService):
@@ -86,7 +88,7 @@ class ThinkGuardEnforceExecutor:
                 f"got {type(gate_service).__name__}"
             )
         enforced = await gate_service.assemble().enforce(runtime.get("agent_state"), decision)
-        return NodeOutput(port_values={"decision": enforced}, next_hint=None)
+        return NodeOutput(port_values={"decision": enforced, "routing": routing})
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,7 +113,12 @@ class ThinkGuardExecutor:
                 detail="candidate decision not materialized",
                 plugin_id="control.executor.think-guard",
             )
-            return NodeOutput(port_values={"verdict": verdict}, next_hint=None)
+            return NodeOutput(
+                port_values={
+                    "verdict": verdict,
+                    "routing": RoutingDecision(action_type=ActionType.RESPOND),
+                },
+            )
         if not _is_known_action(decision):
             verdict = ControlVerdict(
                 kind=ControlVerdictKind.STOP,
@@ -119,7 +126,14 @@ class ThinkGuardExecutor:
                 plugin_id="control.executor.think-guard",
             )
             return NodeOutput(
-                port_values={"verdict": verdict}, next_hint="stop"
+                port_values={
+                    "verdict": verdict,
+                    "routing": RoutingDecision(
+                        action_type=ActionType.RESPOND,
+                        should_terminate=True,
+                        next_hint="stop",
+                    ),
+                },
             )
         kind, detail = _verdict_from_decision(decision)
         verdict = ControlVerdict(
@@ -127,8 +141,17 @@ class ThinkGuardExecutor:
             detail=detail,
             plugin_id="control.executor.think-guard",
         )
-        hint = "stop" if kind == ControlVerdictKind.STOP else None
-        return NodeOutput(port_values={"verdict": verdict}, next_hint=hint)
+        should_terminate = kind == ControlVerdictKind.STOP
+        return NodeOutput(
+            port_values={
+                "verdict": verdict,
+                "routing": RoutingDecision(
+                    action_type=ActionType.RESPOND,
+                    should_terminate=should_terminate,
+                    next_hint="stop" if should_terminate else None,
+                ),
+            },
+        )
 
 
 @plugin(

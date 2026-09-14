@@ -13,6 +13,8 @@
 # references remain. Control plugins are registered under ``bundles/base.yaml``
 # and wired into the subgraphs by the active Profile / Bundle patch.
 #
+# D4 typed-port cutover: edge predicates use typed Predicate dicts.
+#
 # delete-when: All production profiles migrated to region-tag path AND
 # ADR-0210 升 Accepted.
 entries:
@@ -64,35 +66,52 @@ entries:
       edges:
         - source: perceive.main
           target: stop.main
-          when: result.payload.should_stop == true and result.payload.reason == "error"
+          when:
+            kind: and
+            children:
+              - { kind: eq, port: { name: routing, field: should_stop }, value: true }
+              - { kind: eq, port: { name: routing, field: reason }, value: error }
         - source: perceive.main
           target: think.main
-          when: true
         - source: think.main
           target: stop.main
-          when: result.payload.should_stop == true and result.payload.reason == "error"
+          when:
+            kind: and
+            children:
+              - { kind: eq, port: { name: routing, field: should_stop }, value: true }
+              - { kind: eq, port: { name: routing, field: reason }, value: error }
         - source: think.main
           target: act.main
-          when: true
         - source: act.main
           target: stop.main
-          when: result.payload.should_stop == true and result.payload.reason == "error"
+          when:
+            kind: and
+            children:
+              - { kind: eq, port: { name: routing, field: should_stop }, value: true }
+              - { kind: eq, port: { name: routing, field: reason }, value: error }
         - source: act.main
           target: reflect.main
-          when: true
         - source: reflect.main
           target: stop.main
-          when: result.payload.should_stop == true and result.payload.reason == "error"
+          when:
+            kind: and
+            children:
+              - { kind: eq, port: { name: routing, field: should_stop }, value: true }
+              - { kind: eq, port: { name: routing, field: reason }, value: error }
         - source: reflect.main
           target: remember.main
-          when: true
         - source: remember.main
           target: stop.main
-          when: true
         - source: stop.main
           target: perceive.main
-          when: not result.payload.should_stop
+          when:
+            kind: not
+            children:
+              - { kind: eq, port: { name: routing, field: should_stop }, value: true }
           loop:
             max_iterations: 8
             budget: run.steps
-            terminal_predicate: result.payload.should_stop == true
+            terminal_predicate:
+              kind: eq
+              port: { name: routing, field: should_stop }
+              value: true

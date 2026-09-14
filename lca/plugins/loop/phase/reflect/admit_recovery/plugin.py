@@ -1,10 +1,9 @@
 """phase.reflect.admit_recovery — recovery-routing hint node.
 
 ADR-0221: terminal-of-typing for the reflect subgraph. Reads the
-``reflection`` payload from the upstream score node and emits an
-``admit_recovery`` port + a ``next_hint`` hint so the outer interpreter's
-loop guard can route to recovery edges when the observation indicates
-failure.
+``reflection`` payload from the upstream score node and emits a typed
+``routing`` port so the outer kernel's typed predicate evaluator can
+route to recovery edges when the observation indicates failure.
 
 This node mirrors the previous ``RecoveryReflectExecutor`` semantics:
 the verdict is purely about routing — it does not modify the typed
@@ -17,6 +16,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.act.effect_receipt import EffectOutcome, EffectReceipt
@@ -37,6 +37,7 @@ from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
+from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
@@ -58,16 +59,7 @@ class ReflectAdmitRecoveryExecutor:
     semantic_name: str = "phase.reflect.admit_recovery"
     region: str = "phase:reflect"
     declared_inputs: tuple[PortName, ...] = ("observation", "reflection")
-    # First-principle dead-port removal (C13 信息血统闭合):
-    # ``admit_recovery`` was previously listed as a port but had no
-    # ``PortName`` registration and no ``port_values`` consumer in the
-    # kernel — the recovery edge reads ``result.next_hints.admit_recovery``
-    # (not port_values), so the port was untyped, unregistered, and
-    # unreferenced. The plugin emits the recovery hint via
-    # ``next_hint`` only; downstream routing reads ``next_hints`` through
-    # the kernel's edge DSL. Removing the port stops ``NodeOutput``
-    # from rejecting the unknown key.
-    declared_outputs: tuple[PortName, ...] = ("reflection",)
+    declared_outputs: tuple[PortName, ...] = ("reflection", "routing")
 
     async def node_execute(
         self,
@@ -80,8 +72,11 @@ class ReflectAdmitRecoveryExecutor:
         return NodeOutput(
             port_values={
                 "reflection": input.port_values.get("reflection"),
+                "routing": RoutingDecision(
+                    action_type=ActionType.RESPOND,
+                    next_hint="admit_recovery" if admit else None,
+                ),
             },
-            next_hint="admit_recovery" if admit else None,
         )
 
 

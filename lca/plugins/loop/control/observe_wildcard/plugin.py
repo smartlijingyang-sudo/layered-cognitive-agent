@@ -24,6 +24,8 @@ from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
+from lca.contracts.protocols.graph.routing import RoutingDecision
+from lca.contracts.atoms.enums.enums import ActionType
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
@@ -42,7 +44,12 @@ class ObserveWildcardExecutor:
         input: NodeInput,
     ) -> NodeOutput:
         del context, input
-        return NodeOutput(port_values={"verdict": {"verdict": "allow"}}, next_hint=None)
+        return NodeOutput(
+            port_values={
+                "verdict": {"verdict": "allow"},
+                "routing": RoutingDecision(action_type=ActionType.RESPOND),
+            },
+        )
 
 
 @plugin(

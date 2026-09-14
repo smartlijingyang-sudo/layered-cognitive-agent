@@ -1,176 +1,116 @@
-"""Predicate evaluator boundary guards.
+"""D4 cutover: typed predicate evaluator boundary tests.
 
-The kernel-side ``select_edge`` calls :func:`evaluate_restricted_predicate`
-with a result view that may have ``payload`` resolve to ``None`` for
-graph nodes whose ``NodeOutput`` does not carry a typed payload
-(``_ResultView.__getattr__`` swallows missing attributes and returns
-``None``). The legacy ``PhaseResult`` always carried a typed payload,
-so chained attribute access like ``not result.payload.should_stop``
-worked there. The new kernel must guard against ``None`` at the
-predicate boundary so chained access on a missing attribute resolves
-to a comparison that simply does not match, instead of raising
-``AttributeError`` and aborting the run.
+The old AST-based ``evaluate_restricted_predicate`` has been deleted.
+The typed evaluator (:func:`evaluate_predicate`) operates on structured
+:class:`Predicate` objects — there is no string parsing, no ``eval``,
+no ``ast.parse``, and no attribute path traversal. The only way to
+access data is through :class:`PortRef` against declared port names.
+
+These tests verify:
+1. The typed evaluator handles all predicate kinds correctly.
+2. Port access is restricted to declared ports (no arbitrary attribute access).
+3. Unknown fields raise :class:`UnknownFieldError` (fail-loud).
 """
 
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
 
-from lca.harness.graph.predicate import evaluate_restricted_predicate
+from lca.contracts.protocols.graph.errors import UnknownFieldError, UnsetPortError
+from lca.contracts.protocols.graph.predicate import PortRef, Predicate
+from lca.framework.graph.port_reader import PortReader
+from lca.framework.graph.port_registry import PortRegistry
+from lca.framework.graph.predicate_evaluator import evaluate_predicate
 
 
-class _ResultLike:
-    """Stand-in for a legacy ``PhaseResult`` with a typed payload."""
-
-    def __init__(self, payload: Any) -> None:
-        self.payload = payload
-        self.result_kind = "decision"
+def _reader_with_port(name: str, value: object) -> PortReader:
+    reg = PortRegistry()
+    reg.set_typed_port(name, value)
+    return PortReader(source_node="test", registry=reg)
 
 
-class _ViewWithNonePayload:
-    """Stand-in for the new kernel's ``_ResultView`` whose ``payload`` resolves to ``None``."""
-
-    def __getattr__(self, name: str) -> Any:
-        if name == "payload":
-            return None
-        if name == "result_kind":
-            return "decision"
-        raise AttributeError(name)
+def test_eq_leaf_matches() -> None:
+    reader = _reader_with_port("action", "use_tool")
+    pred = Predicate(kind="eq", port=PortRef(name="action"), value="use_tool")
+    assert evaluate_predicate(pred, reader=reader) is True
 
 
-def test_chained_access_on_typed_payload_resolves() -> None:
-    """Legacy shape: ``payload`` is an object with ``should_stop``; predicate works."""
-    payload = type("P", (), {"should_stop": True})()
-    result = _ResultLike(payload)
-    assert evaluate_restricted_predicate(
-        "not result.payload.should_stop", result=result, artifacts={}
-    ) is False
+def test_eq_leaf_no_match() -> None:
+    reader = _reader_with_port("action", "respond")
+    pred = Predicate(kind="eq", port=PortRef(name="action"), value="use_tool")
+    assert evaluate_predicate(pred, reader=reader) is False
 
 
-def test_chained_access_on_none_payload_does_not_match() -> None:
-    """New kernel shape: ``payload`` is ``None``; chained access must NOT raise.
+def test_ne_leaf() -> None:
+    reader = _reader_with_port("text", "hello")
+    pred = Predicate(kind="ne", port=PortRef(name="text"), value="")
+    assert evaluate_predicate(pred, reader=reader) is True
 
-    Returning ``None`` for the predicate comparison yields a False match,
-    which is the same outcome the legacy code produced when the typed
-    payload was absent (the comparison ``not None`` is True but the
-    runtime state at the predicate site treated missing payload as
-    "no decision yet").
-    """
-    result = _ViewWithNonePayload()
-    # Must not raise AttributeError
-    matched = evaluate_restricted_predicate(
-        "not result.payload.should_stop", result=result, artifacts={}
+
+def test_exists_returns_true_when_port_set() -> None:
+    reader = _reader_with_port("response", "some text")
+    pred = Predicate(kind="exists", port=PortRef(name="response"))
+    assert evaluate_predicate(pred, reader=reader) is True
+
+
+def test_missing_returns_true_when_port_unset() -> None:
+    reg = PortRegistry()
+    reader = PortReader(source_node="test", registry=reg)
+    pred = Predicate(kind="missing", port=PortRef(name="response"))
+    assert evaluate_predicate(pred, reader=reader) is True
+
+
+def test_and_combinator() -> None:
+    from pydantic import BaseModel
+
+    class Routing(BaseModel):
+        action_type: str
+        should_terminate: bool = False
+
+    reg = PortRegistry()
+    reg.set_typed_port(
+        "routing",
+        Routing(action_type="respond", should_terminate=False),
+        payload_type=Routing,
     )
-    # ``not None.should_stop`` -> ``not None`` -> True; legacy semantics
-    # treated this as "no stop decision yet, keep going".
-    assert matched is True
-
-
-def test_chained_access_on_missing_attribute_does_not_match() -> None:
-    """Attribute access on a missing attribute must NOT raise."""
-    result = _ViewWithNonePayload()
-    matched = evaluate_restricted_predicate(
-        "result.missing.deeper.path == 1", result=result, artifacts={}
+    reader = PortReader(source_node="test", registry=reg)
+    pred = Predicate(
+        kind="and",
+        children=(
+            Predicate(kind="eq", port=PortRef(name="routing", field="action_type"), value="respond"),
+            Predicate(kind="eq", port=PortRef(name="routing", field="should_terminate"), value=False),
+        ),
     )
-    assert matched is False
+    assert evaluate_predicate(pred, reader=reader) is True
 
 
-def test_existing_result_kind_comparison_still_works() -> None:
-    """Regression: the original ``result_kind == "phase_error"`` shape stays correct."""
-    result = _ResultLike(type("P", (), {"should_stop": False})())
-    assert evaluate_restricted_predicate(
-        'result.result_kind == "phase_error"', result=result, artifacts={}
-    ) is False
-    result2 = _ResultLike(type("P", (), {"should_stop": False})())
-    result2.result_kind = "phase_error"
-    assert evaluate_restricted_predicate(
-        'result.result_kind == "phase_error"', result=result2, artifacts={}
-    ) is True
+def test_unset_port_raises_for_eq() -> None:
+    reg = PortRegistry()
+    reader = PortReader(source_node="test", registry=reg)
+    pred = Predicate(kind="eq", port=PortRef(name="nonexistent"), value="x")
+    with pytest.raises(UnsetPortError):
+        evaluate_predicate(pred, reader=reader)
 
 
-def test_private_attribute_still_rejected() -> None:
-    """The private-attribute guard must remain in force for None inputs too."""
-    from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
-        DeclarativeValidationError,
+def test_unknown_field_raises() -> None:
+    from pydantic import BaseModel
+
+    class Payload(BaseModel):
+        action_type: str
+
+    reg = PortRegistry()
+    reg.set_typed_port("p", Payload(action_type="x"), payload_type=Payload)
+    reader = PortReader(source_node="test", registry=reg)
+    pred = Predicate(kind="eq", port=PortRef(name="p", field="nonexistent"), value="x")
+    with pytest.raises(UnknownFieldError):
+        evaluate_predicate(pred, reader=reader)
+
+
+def test_not_combinator() -> None:
+    reg = PortRegistry()
+    reader = PortReader(source_node="test", registry=reg)
+    pred = Predicate(
+        kind="not",
+        children=(Predicate(kind="exists", port=PortRef(name="response")),),
     )
-
-    result = _ViewWithNonePayload()
-    with pytest.raises(DeclarativeValidationError):
-        evaluate_restricted_predicate("result._private", result=result, artifacts={})
-
-
-def test_loopback_predicate_gated_on_result_kind_non_stop() -> None:
-    """Bundles gate ``stop.main -> perceive.main`` on ``result_kind == "stop_decision"``.
-
-    The kernel evaluates outgoing edges of every phase exit, not just the
-    stop phase. Without the ``result_kind`` gate, ``not None.should_stop``
-    short-circuits to True on a non-stop phase and the run loops back
-    forever. Assert the production predicate shape used by
-    ``bundles/declarative-phase-graph.yaml`` evaluates to False when the
-    last phase exit was not the stop phase.
-    """
-    result = _ViewWithNonePayload()
-    matched = evaluate_restricted_predicate(
-        'result.result_kind == "stop_decision" and not result.payload.should_stop',
-        result=result,
-        artifacts={},
-    )
-    assert matched is False
-
-
-def test_loopback_predicate_matches_when_stop_decides_not_to_stop() -> None:
-    """Stop phase says ``should_stop=False``; loop-back predicate matches."""
-    payload = type("P", (), {"should_stop": False})()
-
-    class _StopDecisionView:
-        result_kind = "stop_decision"
-
-        def __init__(self, payload: Any) -> None:
-            self.payload = payload
-
-        def __getattr__(self, name: str) -> Any:
-            return getattr(self.payload, name, None)
-
-    matched = evaluate_restricted_predicate(
-        'result.result_kind == "stop_decision" and not result.payload.should_stop',
-        result=_StopDecisionView(payload),
-        artifacts={},
-    )
-    assert matched is True
-
-
-def test_loopback_predicate_blocks_when_stop_decides_to_stop() -> None:
-    """Stop phase says ``should_stop=True``; loop-back predicate fails (terminal)."""
-    payload = type("P", (), {"should_stop": True})()
-
-    class _StopDecisionView:
-        result_kind = "stop_decision"
-
-        def __init__(self, payload: Any) -> None:
-            self.payload = payload
-
-        def __getattr__(self, name: str) -> Any:
-            return getattr(self.payload, name, None)
-
-    matched = evaluate_restricted_predicate(
-        'result.result_kind == "stop_decision" and not result.payload.should_stop',
-        result=_StopDecisionView(payload),
-        artifacts={},
-    )
-    assert matched is False
-
-
-def test_mapping_value_with_missing_key_returns_none() -> None:
-    """Mapping lookup for a missing key returns ``None`` (unchanged behaviour)."""
-
-    class _MappingResult:
-        payload = {"x": 1}
-        result_kind = "decision"
-
-    result = _MappingResult()
-    matched = evaluate_restricted_predicate(
-        "result.payload.y == 1", result=result, artifacts={}
-    )
-    assert matched is False
+    assert evaluate_predicate(pred, reader=reader) is True

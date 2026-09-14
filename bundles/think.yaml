@@ -1,26 +1,8 @@
 # bundles/think.yaml — think 子图纯图描述(精简)
 # ADR-0217 Bundle Graph Schema v2。
 #
-# 字段职责(每个字段都被框架读):
-#   id       : bundle 身份;BundleSubgraphResolver sniff 用
-#   region   : 子图 region 标签;FactoryResolver 反查上下文
-#   purpose  : 子图整体职责;写入 phase_graph.metadata
-#   nodes[]
-#     id     : 节点拓扑身份(供 edges source/target 锚点)
-#     region : 节点 region(可空,fallback 到 bundle.region)
-#     factory: 业务语义名(如 think.shortcut);FactoryResolver 解析到 NodeExecutor
-#     config : 节点级图配置(只图级参数)
-#       max_visits : NodeContext.budget 透传,v2 driver 终止条件之一
-#   edges[]
-#     from/to : 节点 id 锚点
-#     when    : bool-expr DSL;interpreter 在 node.end 后跑
-#
-# 不放(inputs/outputs/payload_port/result_kind):@plugin 装饰器不读,
-# v2 driver 不读,observer 不消费——纯摆设。
-#
-# 节点 plugin 注册走 @plugin(...) 装饰器;plugin 实现通过 factory 业务名
-# 由 FactoryRegistry.resolve(semantic_name="think.<name>", region="phase:think")
-# 解析到 Think<Name>Executor 实例。
+# D4 typed-port cutover: edge predicates use typed :class:`Predicate`
+# dicts. The legacy string-DSL edge conditions are gone.
 
 id: think.subgraph
 region: phase:think
@@ -89,24 +71,21 @@ nodes:
         binding_edge: think.gate
 
 edges:
-  # shortcut → route: 没命中(decision 缺失)走 route;命中直接到 gate
+  # shortcut → route: 没命中(response 缺失)走 route;命中直接到 gate
   - from: think.shortcut
     to: think.route
-    when: result.payload == None
+    when: { kind: missing, port: { name: response } }
   - from: think.shortcut
     to: think.gate
-    when: result.payload != null
+    when: { kind: exists, port: { name: response } }
 
   # route → reason → classify → gate
   - from: think.route
     to: think.reason
-    when: true
   - from: think.reason
     to: think.classify
-    when: true
   - from: think.classify
     to: think.gate
-    when: true
 
 # terminal: think.gate 直接回 outer graph(binding_edge=think.main),
 #           无需显式返回边。

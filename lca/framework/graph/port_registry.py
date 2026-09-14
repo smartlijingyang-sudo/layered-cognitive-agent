@@ -56,7 +56,12 @@ class PortRegistry(BaseModel):
         for name, value in ports.items():
             self._ports.setdefault(name, value)
 
-    def merge_output(self, port_values: Mapping[PortName, Any]) -> None:
+    def merge_output(
+        self,
+        port_values: Mapping[PortName, Any],
+        *,
+        payload_types: Mapping[PortName, type] | None = None,
+    ) -> None:
         """Merge one node's outputs into the registry.
 
         ADR-0217 §3.3.3 iron rule 5: last-write-wins across iterations.
@@ -64,9 +69,28 @@ class PortRegistry(BaseModel):
         iterations (e.g. ``stop.main → perceive.main``); without this
         rule, a stale typed port from step 1 would shadow fresh outputs
         from step 2 onwards, breaking stop-policy convergence.
+
+        D4: ``payload_types`` may be supplied explicitly (typically by
+        the interpreter, which reads the node's
+        ``NodeIOSchema.outputs``). For each port whose value is a
+        :class:`pydantic.BaseModel` subclass instance, the payload
+        type is auto-registered so :class:`PortReader` can navigate
+        into typed fields (``Predicate.field`` access) even when the
+        caller did not supply ``payload_types``. Values that are not
+        BaseModels and have no explicit type are stored as dynamic.
         """
+        types = payload_types or {}
         for name, value in port_values.items():
             self._ports[name] = value
+            payload_type = types.get(name)
+            if payload_type is None and isinstance(value, type):
+                # isinstance check below — keep isinstance() branches
+                # below readable; skip when ``value`` itself is a class.
+                continue
+            if payload_type is None and isinstance(value, BaseModel):
+                payload_type = type(value)
+            if payload_type is not None and isinstance(payload_type, type):
+                self._port_types[name] = payload_type
 
     def build_input(
         self, declared_ports: tuple[PortName, ...], *, consumer_node: str = ""

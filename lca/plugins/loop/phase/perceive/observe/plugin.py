@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
@@ -30,6 +31,7 @@ from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
+from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.contracts.protocols.think.cognition import PerceiveHub
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
@@ -51,11 +53,12 @@ class PerceiveObserveExecutor:
         del input
         runtime = context.runtime or {}
         hub = runtime.get("perceive_hub")
+        routing = RoutingDecision(action_type=ActionType.RESPOND)
         if not isinstance(hub, PerceiveHub):
-            return NodeOutput(port_values={"manifest": None}, next_hint=None)
+            return NodeOutput(port_values={"manifest": None, "routing": routing})
         agent_state = runtime.get("agent_state")
         manifest = await hub.perceive(agent_state)  # type: ignore[arg-type]
-        return NodeOutput(port_values={"manifest": manifest}, next_hint=None)
+        return NodeOutput(port_values={"manifest": manifest, "routing": routing})
 
 
 @plugin(

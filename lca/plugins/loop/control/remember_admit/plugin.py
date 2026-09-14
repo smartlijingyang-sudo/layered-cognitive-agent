@@ -27,6 +27,8 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
+from lca.contracts.protocols.graph.routing import RoutingDecision
+from lca.contracts.atoms.enums.enums import ActionType
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
@@ -70,7 +72,12 @@ class RememberAdmitExecutor:
                 plugin_id="control.executor.remember-admit",
             )
             hint = None
-        return NodeOutput(port_values={"verdict": verdict}, next_hint=hint)
+        return NodeOutput(
+            port_values={
+                "verdict": verdict,
+                "routing": RoutingDecision(action_type=ActionType.RESPOND),
+            },
+        )
 
 
 @plugin(

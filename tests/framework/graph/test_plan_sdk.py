@@ -175,7 +175,7 @@ class TestBuilders:
         e = edge("a", "b")
         assert e.source == "a"
         assert e.target == "b"
-        assert e.when == "true"
+        assert e.when is None  # D4: None means "always true"
 
     def test_edge_with_predicate(self) -> None:
         pred = eq(port("decision"), "use_tool")

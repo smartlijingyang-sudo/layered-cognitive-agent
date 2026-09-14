@@ -30,6 +30,8 @@ from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
+from lca.contracts.protocols.graph.routing import RoutingDecision
+from lca.contracts.atoms.enums.enums import ActionType
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
@@ -49,8 +51,10 @@ class RememberFoldExecutor:
     ) -> NodeOutput:
         del context
         return NodeOutput(
-            port_values={"memory_receipt": input.port_values.get("memory_receipt")},
-            next_hint=None,
+            port_values={
+                "memory_receipt": input.port_values.get("memory_receipt"),
+                "routing": RoutingDecision(action_type=ActionType.RESPOND),
+            },
         )
 
 

@@ -7,29 +7,33 @@ while not traversal.terminated():
     node = plan.node(traversal.current_id)
     traversal.visit(node_id=node.id, max_visits=node.max_visits)
     strategy = registry.resolve(node.binding)
-10→    input = port_registry.build_input(schema.required_inputs())
+    input = port_registry.build_input(schema.required_inputs())
     output = await strategy.execute(strategy_context, input)
     port_registry.merge_output(output.port_values)
-    recorder.record(VisitRecord(...))
-    edge = select_edge(plan.edges, current_id, output, artifacts)
+
+    if node.io_schema.terminal_predicate:
+        reader = PortReader(source_node=node.id, registry=port_registry)
+        if evaluate_predicate(node.io_schema.terminal_predicate, reader=reader):
+            traversal.terminal = True
+            break
+
+    edge = select_edge(plan.edges, current_id, reader_factory=...)
     traversal.advance(edge=edge, dispatch_kind=...)
 ```
 
 The kernel does not implement binding-specific logic. Each strategy
 owns its own execute path. The kernel's job is:
-20→
+
 1. Track visits and enforce ``max_visits``.
 2. Build :class:`NodeInput` from the port registry using the
    strategy's declared schema.
 3. Dispatch to the resolved strategy.
 4. Merge the output, advance, terminate.
 
-Replaces the visit loops in the legacy interpreter classes deleted
-in the act-subgraph seam cutover (note 2026-09-11).
-
-30→Existing fixtures can opt in by calling
-:meth:`PlanInterpreter.run` instead of the legacy ``run`` /
-``_drive`` entry points. PR-7 deletes the legacy entry points.
+D4 cutover: the legacy ``_ResultView`` and ``_result_discriminator``
+have been deleted. Cross-node reads go through :class:`PortReader`
+(typed port resolver). ``select_edge`` takes a reader factory and
+evaluates structured :class:`Predicate` objects.
 
 Observability
 -------------
@@ -61,7 +65,9 @@ from lca.framework.graph.observation import (
     inputs_of,
     metadata_of,
 )
+from lca.framework.graph.port_reader import PortReader
 from lca.framework.graph.port_registry import PortRegistry
+from lca.framework.graph.predicate_evaluator import evaluate_predicate
 from lca.framework.graph.recorder import VisitRecorder
 from lca.framework.graph.strategy_registry import StrategyRegistry
 from lca.framework.graph.traversal import PlanTraversal, select_edge
@@ -112,6 +118,10 @@ class PlanInterpreter:
         facts: list = []
         terminal_node = traversal.current_id
         depth = _resolve_depth(outer_state)
+
+        def _reader_factory(source_node: str) -> PortReader:
+            return PortReader(source_node=source_node, registry=ports)
+
         while not traversal.terminated():
             node = plan.node(traversal.current_id)
             self.observer.observe(_visit_start_of(node, plan.id, traversal, depth, self.clock()))
@@ -182,12 +192,58 @@ class PlanInterpreter:
                     )
                 )
                 raise
-            ports.merge_output(output.port_values)
+            ports.merge_output(
+                output.port_values,
+                payload_types={
+                    spec.name: spec.payload_type
+                    for spec in schema.outputs
+                    if spec.payload_type is not None
+                },
+            )
+
+            # D4: terminal_predicate evaluation before edge selection.
+            if schema.terminal_predicate is not None:
+                reader = _reader_factory(node.id)
+                try:
+                    if evaluate_predicate(schema.terminal_predicate, reader=reader):
+                        traversal.terminal = True
+                        traversal.terminal_reason = ("terminal_predicate", node.id, 0, 0)
+                        self.observer.observe(
+                            _visit_end_of(
+                                node,
+                                plan.id,
+                                traversal.visit_counts.get(node.id, 1),
+                                depth,
+                                outcome="success",
+                                error="",
+                                elapsed_ms=self.clock() - visit_started,
+                                inputs=inputs.port_values,
+                                outputs=output.port_values,
+                                dispatch="terminal",
+                                occurred_at_ms=self.clock(),
+                            )
+                        )
+                        visit = VisitRecord(
+                            plan_ref=plan.id,
+                            node_id=node.id,
+                            binding_kind=node.binding,
+                            inputs=dict(inputs.port_values),
+                            outputs=dict(output.port_values),
+                            dispatch=DispatchDecision(kind="terminal"),
+                            error=None,
+                        )
+                        self.recorder.record(visit)
+                        visits.append(visit)
+                        facts.extend(output.port_values.get("facts", ()) or ())
+                        terminal_node = node.id
+                        break
+                except Exception:
+                    pass  # terminal_predicate failure → fall through to edge selection
+
             edge = select_edge(
                 edges=plan.edges,
                 current_id=node.id,
-                result=_result_discriminator(output),
-                artifacts=self.artifacts,
+                reader_factory=_reader_factory,
             )
             dispatch = self._classify(edge, output)
             self.observer.observe(
@@ -263,49 +319,6 @@ def _terminal_port_values(ports: PortRegistry, plan: Plan) -> dict[str, Any]:
     if not plan.declared_inputs:
         return dict(ports.snapshot())
     return ports.exit_subgraph(plan.declared_inputs)
-
-
-class _ResultView:
-    """Duck-typed view of :class:`NodeOutput` for the edge DSL predicate.
-
-    Edge predicates read ``result.result_kind`` and
-    ``result.next_hints``. The kernel stores both on
-    :class:`NodeOutput`; this view exposes them on a result-shaped
-    object so the predicate DSL stays ergonomic.
-    """
-
-    __slots__ = ("_output",)
-
-    def __init__(self, output: NodeOutput) -> None:
-        self._output = output
-
-    @property
-    def result_kind(self) -> str:
-        return self._output.result_kind or ""
-
-    @property
-    def next_hints(self) -> Mapping[str, Any]:
-        return self._output.next_hints or {}
-
-    def __getattr__(self, name: str) -> Any:
-        # Kernel ``NodeOutput`` does not carry every legacy result
-        # field; treat missing attributes as ``None`` so predicates
-        # like ``result.payload == None`` resolve cleanly.
-        try:
-            return getattr(self._output, name)
-        except AttributeError:
-            return None
-
-
-def _result_discriminator(output: NodeOutput) -> Any:
-    """Return a value the edge predicate can read ``.result_kind`` on.
-
-    Always returns a :class:`_ResultView` so the predicate never
-    escapes with an AttributeError on missing fields. The view's
-    ``__getattr__`` returns ``None`` for fields the kernel
-    ``NodeOutput`` doesn't carry.
-    """
-    return _ResultView(output)
 
 
 def _resolve_depth(outer_state: Any) -> int:
@@ -396,7 +409,7 @@ def _edge_of(
         edge_id=edge_id,
         from_node=from_node,
         to_node=edge.target,
-        metadata=(("when", edge.when),),
+        metadata=(("when", str(edge.when)),),
     )
 
 

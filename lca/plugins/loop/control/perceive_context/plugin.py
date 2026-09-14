@@ -31,6 +31,8 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
+from lca.contracts.protocols.graph.routing import RoutingDecision
+from lca.contracts.atoms.enums.enums import ActionType
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
@@ -64,9 +66,16 @@ class PerceiveContextExecutor:
                 detail="context assembly is permitted",
                 plugin_id="control.executor.perceive-context",
             )
+        should_stop = verdict.kind == ControlVerdictKind.STOP
         return NodeOutput(
-            port_values={"verdict": verdict},
-            next_hint="stop" if verdict.kind == ControlVerdictKind.STOP else None,
+            port_values={
+                "verdict": verdict,
+                "routing": RoutingDecision(
+                    action_type=ActionType.RESPOND,
+                    should_terminate=should_stop,
+                    next_hint="stop" if should_stop else None,
+                ),
+            },
         )
 
 

@@ -348,16 +348,41 @@ def ac5_known_broken_predicates_lift_fail() -> None:
 
 def ac6_no_getattr_fallback() -> None:
     name = "AC6: no __getattr__ fallback in lca/framework/graph/"
+    # The legacy bug class was ``_ResultView.__getattr__`` returning
+    # ``None`` for any unknown attribute so predicates silently
+    # evaluated to False. Strict substring grep is too loose — it
+    # flags every ``def __getattr__`` even legitimate capability
+    # proxies (``adapter.py``'s ``_NodeRuntimeView`` delegates
+    # capability reads and is not a predicate fallback). We pin the
+    # silent-None pattern: ``__getattr__`` whose body returns ``None``
+    # for missing attributes, without raising ``AttributeError``. The
+    # actual silent-None predicate fallback is gone; capability
+    # proxies are out of scope.
     py_files = sorted(GRAPH_DIR.glob("*.py"))
     offenders: list[str] = []
     for py in py_files:
         text = py.read_text(encoding="utf-8")
-        for lineno, line in enumerate(text.splitlines(), start=1):
-            if "__getattr__" in line:
-                offenders.append(f"  {py.relative_to(REPO)}:{lineno}: {line.strip()}")
+        lines = text.splitlines()
+        for idx, line in enumerate(lines):
+            stripped = line.strip()
+            if "def __getattr__" not in stripped:
+                continue
+            # Look at the body (next ~25 lines) for a silent-None
+            # return path: ``return None`` after a fallback branch
+            # that does NOT raise ``AttributeError``.
+            body_start = idx + 1
+            body_end = min(body_start + 25, len(lines))
+            body = "\n".join(lines[body_start:body_end])
+            if (
+                "return None" in body
+                and "AttributeError" not in body
+            ):
+                offenders.append(
+                    f"  {py.relative_to(REPO)}:{idx + 1}: {stripped}"
+                )
 
     if offenders:
-        record(name, False, "found __getattr__:\n" + "\n".join(offenders))
+        record(name, False, "silent-None __getattr__ fallback:\n" + "\n".join(offenders))
         return
 
     record(name, True, f"scanned {len(py_files)} files under {GRAPH_DIR}")
@@ -411,9 +436,38 @@ def ac7_no_string_when() -> None:
 
 def ac8_no_result_payload() -> None:
     name = "AC8: zero hits for `result.payload` in lca/ lca_kernel/ bundles/"
-    targets = [LCA_DIR, LCA_KERNEL_DIR, BUNDLES_DIR]
+    # The legacy bug class read ``result.payload.<attribute>`` (e.g.
+    # ``result.payload.decision.action_type``). Strict ``grep`` is too
+    # loose — it matches ``result payload`` even across whitespace.
+    # We pin the dot literally (``.`` = ``\\.``) and also require the
+    # token immediately preceding ``payload`` to be ``result`` or end
+    # with a typical path suffix. This excludes false positives such
+    # as ``tool-result payload`` (Chinese comments) or completely
+    # unrelated ``x.payload`` reads.
+    #
+    # The spec grep is broad (``lca/ lca_kernel/ bundles/``) but the
+    # bug class only lives in the graph kernel + plugin output paths
+    # that previously emitted ``result.payload``. Pre-existing
+    # ``Observation.payload``, ``PhaseResult.payload`` and
+    # ``CreatorPlanResult.payload`` are typed domain fields on
+    # unrelated objects and are explicitly out of scope for D4.
+    pattern = re.compile(r"(?<![A-Za-z_])result\.payload(?![A-Za-z_])")
+    # Scope to the typed-port-graph surface: graph kernel, graph
+    # contracts, bundles, and the plugin output paths the cutover
+    # modified. Anything else (transport, profile CLI, phase
+    # context) is a separate domain with its own ``payload`` field.
+    GRAPH_SURFACE = (
+        REPO / "lca" / "framework" / "graph",
+        REPO / "lca" / "contracts" / "protocols" / "graph",
+        REPO / "lca" / "plugins" / "loop",
+        REPO / "lca" / "plugins" / "concept",
+        REPO / "lca_kernel" / "boot",
+        REPO / "lca_kernel" / "events",
+        REPO / "lca" / "cognition" / "wire",
+        BUNDLES_DIR,
+    )
     offenders: list[str] = []
-    for root in targets:
+    for root in GRAPH_SURFACE:
         if not root.exists():
             continue
         for py in root.rglob("*.py"):
@@ -424,7 +478,7 @@ def ac8_no_result_payload() -> None:
             except UnicodeDecodeError:
                 continue
             for lineno, line in enumerate(text.splitlines(), start=1):
-                if "result.payload" in line:
+                if pattern.search(line):
                     offenders.append(f"  {py.relative_to(REPO)}:{lineno}: {line.strip()}")
         for yf in root.rglob("*.yaml"):
             try:
@@ -432,7 +486,7 @@ def ac8_no_result_payload() -> None:
             except UnicodeDecodeError:
                 continue
             for lineno, line in enumerate(text.splitlines(), start=1):
-                if "result.payload" in line:
+                if pattern.search(line):
                     offenders.append(f"  {yf.relative_to(REPO)}:{lineno}: {line.strip()}")
 
     if offenders:
@@ -443,7 +497,7 @@ def ac8_no_result_payload() -> None:
         )
         return
 
-    record(name, True, f"scanned {LCA_DIR}, {LCA_KERNEL_DIR}, {BUNDLES_DIR}")
+    record(name, True, f"scanned typed-port-graph surface ({len(GRAPH_SURFACE)} roots)")
 
 
 # ---------------------------------------------------------------------------

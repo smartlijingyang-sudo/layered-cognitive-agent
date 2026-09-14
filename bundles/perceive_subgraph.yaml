@@ -5,8 +5,8 @@
 # observe 调 PerceiveHub 拉 raw manifest;fold 把 manifest 投影到 closed
 # ``observation`` port,作为下游 think.main 的 typed boundary。
 #
-# 不放(inputs/outputs/payload_port/result_kind):@plugin 装饰器不读,
-# v2 driver 不读,observer 不消费——纯摆设。
+# D4 typed-port cutover: each node emits a ``routing`` port carrying
+# :class:`RoutingDecision` for downstream edge predicate evaluation.
 
 id: perceive.subgraph
 region: phase:perceive
@@ -28,4 +28,3 @@ nodes:
 edges:
   - from: phase.perceive.observe
     to: phase.perceive.fold
-    when: true
