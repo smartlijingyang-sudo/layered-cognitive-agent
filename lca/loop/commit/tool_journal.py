@@ -376,6 +376,7 @@ def record_step_tool_result(
     files_created: tuple[str, ...] = (),
     error: str | None = None,
     delta_summary: str = "",
+    failure_kind: str | None = None,
     state: AgentState | None = None,
     session: object | None = None,
     actor: str = "body",
@@ -419,6 +420,8 @@ def record_step_tool_result(
         payload["error"] = error
     if delta_summary:
         payload["delta_summary"] = delta_summary
+    if failure_kind is not None:
+        payload["failure_kind"] = failure_kind
     return publish_ep_bound(
         "step.tool_result.record",
         payload,

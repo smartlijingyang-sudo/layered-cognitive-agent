@@ -346,6 +346,9 @@ class SimpleSafeExecutor(SafeExecutor):
                 stderr=_extract_stderr(observation),
                 files_created=_extract_files_created(observation),
                 delta_summary=_delta_summary_from_obs(observation),
+                failure_kind=observation.extra.get(FAILURE_KIND)
+                if isinstance(getattr(observation, "extra", None), dict)
+                else None,
             )
             act_closed = True
             return observation
