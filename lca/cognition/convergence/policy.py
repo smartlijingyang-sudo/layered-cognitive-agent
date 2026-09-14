@@ -20,12 +20,6 @@ class DefaultConvergencePolicy:
                 rationale=evidence.detail,
                 evidence=evidence,
             )
-        if evidence.producer_success_since_task >= 3 and evidence.task_class == "informative_text":
-            return ConvergenceVerdict(
-                kind="nudge",
-                rationale="多次 producer 成功但未收口；应 text respond",
-                evidence=evidence,
-            )
         return ConvergenceVerdict(
             kind="continue",
             rationale=evidence.detail or "continue",

@@ -343,7 +343,6 @@ class DeliveryEvidenceCommitted:
     """Folded delivery evidence snapshot for convergence debug (ADR-0196)."""
 
     step: int
-    task_class: str
     artifact_count: int
     producer_success_count: int
     satisfied: bool
@@ -358,7 +357,6 @@ class ConvergenceEvaluatedCommitted:
     step: int
     kind: str
     rationale: str
-    task_class: str
     satisfied: bool
     detail: str = ""
 
@@ -369,7 +367,6 @@ class PromptSurfaceRenderedCommitted:
     """PromptSurface render audit — tools/sandbox SSOT (ADR-0196)."""
 
     step: int
-    task_class: str
     tool_count: int
     include_full_sandbox: bool
     digest: str

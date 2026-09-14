@@ -128,11 +128,10 @@ class ToolsSection:
     ) -> SectionOutput:
         del role_profile, awareness, manifest, activated_skills
         surface = PromptSurface.default()
-        rendered = surface.render_tools_block(tools, task=state.task or "", state=state)
+        rendered = surface.render_tools_block(tools)
         emit_prompt_surface_rendered(
             state,
             step=state.step,
-            task_class=rendered.task_class,
             tool_count=rendered.tool_count,
             include_full_sandbox=rendered.include_full_sandbox,
             digest=rendered.digest,

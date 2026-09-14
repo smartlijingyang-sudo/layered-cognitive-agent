@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from lca.cognition.convergence.material import collect_delivery_material
-from lca.contracts.models.core.policy.convergence import DeliveryEvidence, TaskClass
+from lca.contracts.models.core.policy.convergence import DeliveryEvidence
 from lca.contracts.models.core.state.state import AgentState
 
 _FALLBACK = "任务产出已在工作区就绪，以下为交付说明。"
@@ -41,18 +41,10 @@ def synthesize_delivery_response(
     if body:
         return body
 
-    if evidence.task_class == "visual_artifact" and evidence.artifact_count:
+    if evidence.artifact_count:
         return f"{_FALLBACK}\n\n{_ARTIFACT_HEADER}\n（共 {evidence.artifact_count} 个产物）"
 
     return _FALLBACK
 
 
-def delivery_channel_label(task_class: TaskClass) -> str:
-    if task_class == "informative_text":
-        return "text"
-    if task_class in {"visual_artifact", "code_demo", "mixed"}:
-        return "artifact"
-    return "unknown"
-
-
-__all__ = ["delivery_channel_label", "synthesize_delivery_response"]
+__all__ = ["synthesize_delivery_response"]

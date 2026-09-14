@@ -23,7 +23,6 @@ def emit_delivery_evidence(
     return append_catalog_bound(
         DeliveryEvidenceCommitted(
             step=state.step,
-            task_class=evidence.task_class,
             artifact_count=evidence.artifact_count,
             producer_success_count=evidence.producer_success_since_task,
             satisfied=evidence.satisfied,
@@ -47,7 +46,6 @@ def emit_convergence_evaluated(
             step=state.step,
             kind=verdict.kind,
             rationale=verdict.rationale,
-            task_class=verdict.evidence.task_class,
             satisfied=verdict.evidence.satisfied,
             detail=verdict.evidence.detail,
         ),
@@ -61,7 +59,6 @@ def emit_prompt_surface_rendered(
     state: AgentState,
     *,
     step: int,
-    task_class: str,
     tool_count: int,
     include_full_sandbox: bool,
     digest: str,
@@ -71,7 +68,6 @@ def emit_prompt_surface_rendered(
     return append_catalog_bound(
         PromptSurfaceRenderedCommitted(
             step=step,
-            task_class=task_class,
             tool_count=tool_count,
             include_full_sandbox=include_full_sandbox,
             digest=digest,
