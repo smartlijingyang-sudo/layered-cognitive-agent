@@ -10,6 +10,7 @@ reads the populated row. See spec §5.3.1.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 
@@ -40,11 +41,18 @@ def wire_tool_call(
         identifier, api_name = "lobe-cloud-sandbox", tool_name
     else:
         identifier, api_name = coords
+    # Wire protocol: ``arguments`` is a JSON-encoded string to match the
+    # LobeHub ChatToolPayloadSchema contract (``z.string()``). Sending a dict
+    # makes the trpc updateMessage call fail schema validation and silently
+    # clears the assistant bubble on completion (because the persist fallback
+    # refetch runs before the failed write resolves). Mirrors the OpenAI
+    # compat / Anthropic adapter convention (see
+    # ``lca/infrastructure/llm_adapter/openai_compat/anthropic/_anthropic_stream.py``).
     return {
         "id": invocation_id or tool_name,
         "identifier": identifier,
         "apiName": api_name,
-        "arguments": dict(arguments or {}),
+        "arguments": json.dumps(arguments or {}, ensure_ascii=False),
         "type": "builtin",
     }
 

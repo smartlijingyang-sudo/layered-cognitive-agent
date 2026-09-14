@@ -66,6 +66,10 @@ _RACE_TIMEOUT_S = 0.5
 _PUMP_QUEUE_MAX = 256
 
 
+def _dbg(msg: str, *args: Any) -> None:
+    print(f"[LCA-DEBUG-WS] {msg}", *args, flush=True)
+
+
 def build_agent_gateway_app(*, run_port: RunPort | None = None) -> Starlette:
     """Build the Starlette app exposing /v1/runs/{run_id}/ws.
 
@@ -109,11 +113,17 @@ async def _run_session(
     run_port: RunPort | None,
     public_pem: str | None = None,
 ) -> None:
+    _dbg("_run_session enter run_id=%s peer=%s", run_id, getattr(ws.client, 'host', '?'))
     # 1. auth handshake
     try:
         first = await _recv_json(ws)
     except WebSocketDisconnect:
+        _dbg("_run_session recv auth: disconnect run_id=%s", run_id)
         return
+    except Exception as exc:
+        _dbg("_run_session recv auth EXC run_id=%s: %r", run_id, exc)
+        return
+    _dbg("_run_session recv auth frame: type=%s token_len=%s", (first or {}).get('type'), len((first or {}).get('token') or ''))
     if not first or first.get("type") != "auth":
         await ws.send_json({"type": "auth_failed", "reason": "expected auth frame"})
         return
@@ -124,12 +134,18 @@ async def _run_session(
         await ws.send_json({"type": "auth_failed", "reason": str(exc)})
         return
     await ws.send_json({"type": "auth_success"})
+    _dbg("sent auth_success run_id=%s", run_id)
 
     # 2. resume handshake (optional but expected)
     try:
         resume = await _recv_json(ws)
     except WebSocketDisconnect:
+        _dbg("recv resume: WebSocketDisconnect run_id=%s", run_id)
         return
+    except Exception as exc:
+        _dbg("recv resume EXC run_id=%s: %r", run_id, exc)
+        return
+    _dbg("recv resume frame: type=%s lastEventId=%s wantStatus=%s", (resume or {}).get('type'), (resume or {}).get('lastEventId'), (resume or {}).get('wantStatus'))
     if not resume or resume.get("type") != "resume":
         last_id = "0"
         want_status = False
@@ -140,15 +156,19 @@ async def _run_session(
     replayed_upto = "" if last_id == "0" else str(last_id)
     if run_id is not None:
         history = await stream_manager.read_history(run_id, count=1000)
+        _dbg("read_history run_id=%s count=%s replayed_upto=%s", run_id, len(history), replayed_upto)
         terminal_status = _terminal_status_from_history(history)
         history.reverse()
+        sent = 0
         for ev in history:
             ev_id = str(ev.get("id") or "")
             if ev_id and replayed_upto and ev_id <= replayed_upto:
                 continue
             await _send_agent_event(ws, ev)
+            sent += 1
             if ev_id:
                 replayed_upto = ev_id
+        _dbg("replayed %s events run_id=%s", sent, run_id)
         if want_status:
             if terminal_status is not None:
                 status = terminal_status
@@ -186,6 +206,7 @@ async def _live_loop(
     at ``"0"`` instead re-delivers the replayed prefix, and every
     ``snapshotMode: "append"`` chunk in it would be applied twice by the UI.
     """
+    _dbg("_live_loop enter run_id=%s start_id=%s", run_id, start_id)
     frame_queue: asyncio.Queue[bytes] = asyncio.Queue(maxsize=_PUMP_QUEUE_MAX)
     pump_stop = asyncio.Event()
     last_id = start_id or "0"
@@ -350,6 +371,7 @@ async def _send_agent_event(ws: WebSocket, ev: dict) -> None:
             "timestamp": ev.get("timestamp", 0),
         },
     }
+    _dbg("_send_agent_event id=%s type=%s", ev.get("id"), (ev.get("data") or {}).get("type") if isinstance(ev.get("data"), dict) else ev.get("type"))
     await ws.send_json(envelope)
 
 
