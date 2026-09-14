@@ -1,6 +1,9 @@
 # Observation + Diagnosis bundle —— 默认开启的运行时观测与诊断面。
 #
-# 9 modules · 13 plugins · effects 全 none (走 Session.append 单轨)。
+# 10 modules · 14 plugins · effects 全 none (走 Session.append 单轨)。
+#   - 9 观察/诊断 module + 1 调度 module(M0 event_hub)。
+#   - event_hub 必须列在 13 observer 之后 —— 它 require observer capability key,
+#     cordis resolve 按 yaml 顺序装载,放最后确保 observer 已 provide。
 #
 # 每条 entry 仅 register 自身,不修改图框架 contract;纯 plugin 增量。
 # 装载后 graph framework 行为零改变,只多了若干个 capability key 可供 caller 使用。
@@ -47,4 +50,7 @@ entries:
     config: {}
   - id: diagnosis.run_replay
     $module: lca.plugins.diagnosis.run_replay
+    config: {}
+  - id: observation.event_hub
+    $module: lca.plugins.observation.event_hub
     config: {}

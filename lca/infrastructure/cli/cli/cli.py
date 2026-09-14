@@ -33,6 +33,7 @@ from lca.infrastructure.cli.commands import (
     creator_plan,
     declarative,
     diagnostics,
+    driver_debug,
     e2e,
     events_delivery,
     journal,
@@ -48,7 +49,6 @@ from lca.infrastructure.cli.commands import (
     package_organization,
     profile_inspect,
     runs,
-    driver_debug,
     services,
     tools,
     typecheck,
@@ -128,6 +128,41 @@ def logs_alias(
     from lca.infrastructure.cli.commands.journal.journal import _follow_spine_ssot
 
     _follow_spine_ssot(replay=replay, verbose=verbose)
+
+
+# ── top-level alias: `lca-ops timeline <run_id>` → `observation run-replay --show-graph` ──
+# First-step entry point for run debugging: shows the phase-graph node/subgraph
+# timeline from the spine ledger.  See docs/debug/run-debug-guide.md Step 1.
+# delete-when: never (the alias is the documented first step).
+
+
+@app.command(
+    name="timeline",
+    help=(
+        "Show the phase-graph timeline for a run (alias for "
+        "`observation run-replay <run_id> --show-graph`).  Run-debug Step 1."
+    ),
+)
+def timeline_alias(
+    run_id: str = typer.Argument(
+        ...,
+        help="run_id (例: run_xxx); default to latest under traces/runs/.",
+    ),
+    show_graph: bool = typer.Option(
+        True,
+        "--show-graph/--no-show-graph",
+        help="Print phase_graph node/subgraph timeline from spine (default: on).",
+    ),
+    as_json: bool = typer.Option(
+        False,
+        "--json",
+        help="JSON output (default: human).",
+    ),
+) -> None:
+    """Forward to ``observation run-replay``.  See ``observation run-replay --help``."""
+    from lca.infrastructure.cli.commands.observation.run_replay import run_replay_command
+
+    run_replay_command(run_id=run_id, show_graph=show_graph, as_json=as_json)
 
 
 def main() -> None:
