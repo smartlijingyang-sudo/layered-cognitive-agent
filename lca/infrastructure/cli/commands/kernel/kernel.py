@@ -107,6 +107,146 @@ def register(app: typer.Typer) -> None:
         else:
             typer.echo(f"compiled: profile={profile_path} keys={sorted(serialized.keys())}")
 
+    @app.command(name="kernel_plugins")
+    def kernel_plugins(
+        profile_path: Path = typer.Option(
+            Path("profiles/web-standard.yaml"),
+            "--profile",
+            "-p",
+            help="Profile YAML path to enumerate plugins for",
+        ),
+        layer: str = typer.Option(
+            "",
+            "--layer",
+            help="Filter by layer (e.g. L0,L1). Comma-separated; empty = all layers.",
+        ),
+        plugin_id: str = typer.Option(
+            "",
+            "--id",
+            help="Filter to a single plugin id",
+        ),
+        as_json: bool = typer.Option(False, "--json", help="Emit canonical JSON"),
+    ) -> None:
+        """List the plugin catalog a profile would load, grouped by layer.
+
+        Projects the same ``plugin_specs`` tuple the compiled plan carries;
+        agents and operators can answer "what loaded" without booting the
+        kernel or parsing ``kernel_compose --json``.
+        """
+        from lca.harness.profile.resolve.resolve import resolve_profile
+        from lca_kernel.plan.plan_compile import compile_plan
+
+        if not profile_path.exists():
+            typer.echo(f"Profile not found: {profile_path}", err=True)
+            raise typer.Exit(2)
+        resolved = resolve_profile(profile_path)
+        plan = compile_plan(resolved)
+        specs = list(plan.plugin_specs)
+
+        if plugin_id:
+            specs = [spec for spec in specs if spec.id == plugin_id]
+        elif layer:
+            wanted = {layer.strip() for layer in layer.split(",") if layer.strip()}
+            specs = [spec for spec in specs if spec.layer in wanted]
+
+        if as_json:
+            payload = {
+                "profile": str(profile_path),
+                "plugin_count": len(specs),
+                "plugins": [
+                    {
+                        "id": spec.id,
+                        "layer": spec.layer,
+                        "kind": spec.kind.value if hasattr(spec.kind, "value") else str(spec.kind),
+                        "module": spec.implementation.module,
+                        "revision": spec.revision,
+                    }
+                    for spec in specs
+                ],
+            }
+            typer.echo(json.dumps(payload, indent=2, ensure_ascii=False))
+            return
+
+        if not specs:
+            typer.echo("(no plugins match filter)")
+            return
+        by_layer: dict[str, list[str]] = {}
+        for spec in specs:
+            by_layer.setdefault(spec.layer, []).append(spec.id)
+        for layer_name in sorted(by_layer):
+            ids = by_layer[layer_name]
+            typer.echo(f"{layer_name} ({len(ids)}):")
+            for pid in ids:
+                typer.echo(f"  {pid}")
+        typer.echo(f"total: {len(specs)}")
+
+    @app.command(name="kernel_boot_log")
+    def kernel_boot_log(
+        stderr_path: Path | None = typer.Option(
+            None,
+            "--stderr",
+            help="Explicit path to a kernel stderr file (defaults to the latest "
+            "lca-kernel.stderr.*.log under /tmp)",
+        ),
+        failed_only: bool = typer.Option(
+            False,
+            "--failed-only",
+            help="Keep only boot.pending_event entries whose status != ok",
+        ),
+        as_json: bool = typer.Option(False, "--json", help="Emit canonical JSON"),
+    ) -> None:
+        """Read the kernel's boot log and surface each plugin fiber spawn.
+
+        Parses ``boot.pending_event`` lines written by
+        :func:`lca_kernel.boot._emit_boot_events`. Each line carries
+        ``plugin_id`` / ``layer`` / ``kind`` / ``status`` / ``duration_ms``;
+        the command groups by layer in the human form and emits a flat
+        list in the JSON form. When ``--stderr`` is omitted, the latest
+        ``lca-kernel.stderr.*.log`` under ``/tmp`` is used so operators
+        can answer "what just loaded?" immediately after a restart.
+        """
+        target = stderr_path if stderr_path is not None else _latest_kernel_stderr()
+        if target is None:
+            typer.echo(
+                "No kernel stderr file found. Pass --stderr <path> or boot the kernel first.",
+                err=True,
+            )
+            raise typer.Exit(2)
+        if not target.exists():
+            typer.echo(f"stderr file not found: {target}", err=True)
+            raise typer.Exit(2)
+        entries = _parse_boot_pending_events(target.read_text(encoding="utf-8"))
+        all_entries = entries
+        if failed_only:
+            entries = [entry for entry in entries if entry["status"] != "ok"]
+        if as_json:
+            payload = {
+                "stderr": str(target),
+                "plugin_count": len(entries),
+                "entries": entries,
+            }
+            typer.echo(json.dumps(payload, indent=2, ensure_ascii=False))
+            return
+        if not all_entries:
+            typer.echo(f"no boot.pending_event lines in {target}")
+            return
+        if not entries:
+            typer.echo(f"all {len(all_entries)} entries were ok; nothing failed")
+            return
+        by_layer: dict[str, list[dict[str, object]]] = {}
+        for entry in entries:
+            by_layer.setdefault(str(entry["layer"]), []).append(entry)
+        for layer_name in sorted(by_layer):
+            rows = by_layer[layer_name]
+            typer.echo(f"{layer_name} ({len(rows)}):")
+            for row in rows:
+                marker = "ok" if row["status"] == "ok" else f"FAIL({row['status']})"
+                typer.echo(
+                    f"  {row['plugin_id']:<64} {row['kind']:<10} {marker:<10} "
+                    f"{float(row['duration_ms']):.1f}ms"
+                )
+        typer.echo(f"total: {len(entries)}")
+
 
 def _compile_only(profile_path: Path) -> None:
     """Compile a profile without booting — for ``--dry-run`` / inspect."""
@@ -164,3 +304,62 @@ def _serialize_plan(plan: object) -> dict[str, object]:
     else:
         data["plugin_count"] = data.get("plugin_count", 0)
     return data
+
+
+_STDERR_DIR = Path("/tmp")  # noqa: S108 — kernel stderr files are stable paths under KernelServeSpawner._STDERR_DIR; keep aligned with spawner.py
+_STDERR_PREFIX = "lca-kernel.stderr."
+
+
+def _latest_kernel_stderr() -> Path | None:
+    """Return the most recent ``lca-kernel.stderr.*.log`` under ``/tmp``.
+
+    Matches both ``lca-kernel.stderr.<pid>.<timestamp>.log`` and the
+    ``pre`` form written when the spawner fails before knowing the PID.
+    The spawner prunes to keep only the 5 most recent files; we mirror
+    that with the same prefix filter.
+    """
+    candidates = sorted(
+        (
+            path
+            for path in _STDERR_DIR.iterdir()
+            if path.is_file()
+            and path.name.startswith(_STDERR_PREFIX)
+            and path.name.endswith(".log")
+        ),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    return candidates[0] if candidates else None
+
+
+def _parse_boot_pending_events(text: str) -> list[dict[str, object]]:
+    """Extract ``boot.pending_event`` rows from a kernel stderr blob.
+
+    structlog prints each ``key=value`` pair right-aligned in fixed-width
+    columns. We tokenize the line, keep only the ``key=value`` tokens, and
+    collect the ones ``boot.pending_event`` writes (event_type /
+    plugin_id / layer / kind / status / duration_ms). Lines that do not
+    match the schema are skipped so Uvicorn banners or other log streams
+    in the same file do not poison the output.
+    """
+    keys = ("plugin_id", "layer", "kind", "status", "duration_ms")
+    out: list[dict[str, object]] = []
+    for raw_line in text.splitlines():
+        if "boot.pending_event" not in raw_line:
+            continue
+        entry: dict[str, object] = {}
+        for token in raw_line.split():
+            if "=" not in token:
+                continue
+            key, _, value = token.partition("=")
+            if key in keys:
+                if key == "duration_ms":
+                    try:
+                        entry[key] = float(value)
+                    except ValueError:
+                        entry[key] = value
+                else:
+                    entry[key] = value
+        if "plugin_id" in entry:
+            out.append(entry)
+    return out

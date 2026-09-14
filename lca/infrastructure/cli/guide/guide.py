@@ -103,6 +103,11 @@ SIGTERM/SIGINT LIFO dispose)。本地改完代码 / 换 profile / 强制刷新:
   # 仅 boot profile 并 block 到 SIGINT(无 transport)
   ./scripts/lca-ops kernel-boot [profile_path]
 
+  # 列出某 profile 会加载的 plugin 目录(按 layer 分组,不实际 boot)
+  ./scripts/lca-ops kernel_plugins [-p profile] [--layer L0,L1] [--id <plugin_id>] [--json]
+  # 读最新 kernel stderr(默认 /tmp/lca-kernel.stderr.*.log),只解析 boot.pending_event
+  ./scripts/lca-ops kernel_boot_log [--stderr <path>] [--failed-only] [--json]
+
   # LCA 进程出问题 → 看 journal 而非 restart
   ./scripts/lca-ops logs
   ./scripts/lca-ops explain <run_id>
