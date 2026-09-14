@@ -156,3 +156,29 @@ def test_runs_debug_unknown_layer_rejected(run_dir: Path) -> None:
     combined = result.output + (result.stderr or "")
     assert "unknown layer" in combined
     assert "bogus" in combined
+
+
+def test_runs_debug_spine_empty_vs_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Distinguish 'no spine file' from 'file exists but all rows corrupt'.
+
+    Both must exit 1, but the payload must surface the right cause so
+    the agent can pivot to kernel logs vs runs create receipt.
+    """
+    monkeypatch.chdir(tmp_path)
+
+    rd = tmp_path / "traces" / "runs" / "run_corrupt"
+    rd.mkdir(parents=True)
+    (rd / "run_corrupt.spine.jsonl").write_text(
+        "not json\n{also bad\n", encoding="utf-8"
+    )
+    runner = CliRunner()
+    result = runner.invoke(app, ["runs", "debug", "run_corrupt", "--output", "json"])
+    combined = result.output + (result.stderr or "")
+    assert "spine_empty" in combined
+    assert "spine_missing" not in combined
+    assert "no parseable" in combined
+
+    result = runner.invoke(app, ["runs", "debug", "run_absent", "--output", "json"])
+    combined = result.output + (result.stderr or "")
+    assert "spine_missing" in combined
+    assert "spine_empty" not in combined
