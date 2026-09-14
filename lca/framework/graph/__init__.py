@@ -34,7 +34,7 @@ from lca.framework.graph.lifter import (
 )
 from lca.framework.graph.port_reader import PortReader
 from lca.framework.graph.port_registry import PortRegistry
-from lca.framework.graph.predicate_evaluator import PredicateEvaluator
+from lca.framework.graph.predicate_evaluator import evaluate_predicate
 from lca.framework.graph.recorder import VisitRecorder
 from lca.framework.graph.strategies import (  # noqa: F401  side-effect: register strategies
     agent_consult_strategy,
@@ -68,10 +68,10 @@ __all__ = [
     "PlanTraversal",
     "PortReader",
     "PortRegistry",
-    "PredicateEvaluator",
     "StrategyRegistry",
     "VisitRecorder",
     "default_strategy_registry",
+    "evaluate_predicate",
     "install_predicate_evaluator",
     "lift_executable_plan",
     "lift_graph_spec",

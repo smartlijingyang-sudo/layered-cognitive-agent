@@ -15,27 +15,28 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from lca.contracts.protocols.graph.errors import UnknownFieldError
 from lca.contracts.protocols.graph.predicate import PortRef
 from lca.framework.graph.port_registry import PortRegistry
 
 
-class PortReader:
+class PortReader(BaseModel):
     """Reads port values from a :class:`PortRegistry` with typed field access.
 
     Constructed per-edge or per-predicate evaluation; holds a reference
     to the registry (not a copy) so it always sees the latest writes.
+
+    Frozen BaseModel per ADR-0195 §1.4 — identity is set at construction.
+    ``arbitrary_types_allowed`` because :class:`PortRegistry` is a BaseModel
+    with PrivateAttr internals that pydantic cannot introspect structurally.
     """
 
-    def __init__(self, registry: PortRegistry) -> None:
-        self._registry = registry
+    model_config = ConfigDict(frozen=True, extra="forbid", arbitrary_types_allowed=True)
 
-    @property
-    def registry(self) -> PortRegistry:
-        """The underlying registry (read-only access for predicate evaluation)."""
-        return self._registry
+    source_node: str
+    registry: PortRegistry
 
     def read(self, ref: PortRef) -> Any:
         """Resolve ``ref`` against the registry.
@@ -47,7 +48,7 @@ class PortReader:
         Raises :class:`UnknownFieldError` if the field doesn't exist on
         the port's payload (dict key or payload_type attribute).
         """
-        value = self._registry.read(ref.name)
+        value = self.registry.read(ref.name)
 
         if ref.field is None:
             return value
@@ -56,18 +57,18 @@ class PortReader:
 
     def port_has_value(self, name: str) -> bool:
         """Check whether the port is set in the registry (without raising)."""
-        return name in self._registry.snapshot()
+        return name in self.registry.snapshot()
 
     def _resolve_field(self, port_name: str, field_name: str, value: Any) -> Any:
         """Navigate into ``field_name`` on ``value``."""
-        payload_type = self._registry.port_type(port_name)
+        payload_type = self.registry.port_type(port_name)
 
         # Typed payload: validate field existence against the declared type.
         if payload_type is not None and issubclass(payload_type, BaseModel):
             if field_name not in payload_type.model_fields:
                 raise UnknownFieldError(
-                    f"port {port_name!r} payload_type {payload_type.__name__} "
-                    f"has no field {field_name!r}",
+                    f"edge from {self.source_node!r} reads port {port_name!r} "
+                    f"payload_type {payload_type.__name__} has no field {field_name!r}",
                     port_name=port_name,
                 )
             return getattr(value, field_name)
@@ -76,15 +77,16 @@ class PortReader:
         if isinstance(value, dict):
             if field_name not in value:
                 raise UnknownFieldError(
-                    f"port {port_name!r} dict payload has no key {field_name!r}",
+                    f"edge from {self.source_node!r} reads port {port_name!r} "
+                    f"dict payload has no key {field_name!r}",
                     port_name=port_name,
                 )
             return value[field_name]
 
         # Untyped non-dict payload: cannot resolve field.
         raise UnknownFieldError(
-            f"port {port_name!r} value {type(value).__name__} does not support "
-            f"field access for {field_name!r}",
+            f"edge from {self.source_node!r} reads port {port_name!r} "
+            f"value {type(value).__name__} does not support field access for {field_name!r}",
             port_name=port_name,
         )
 
