@@ -137,14 +137,18 @@ async def _run_session(
         last_id = resume.get("lastEventId", "0")
         want_status = resume.get("wantStatus", False)
 
+    replayed_upto = "" if last_id == "0" else str(last_id)
     if run_id is not None:
         history = await stream_manager.read_history(run_id, count=1000)
         terminal_status = _terminal_status_from_history(history)
         history.reverse()
         for ev in history:
-            if ev.get("id") and last_id != "0" and ev["id"] <= last_id:
+            ev_id = str(ev.get("id") or "")
+            if ev_id and replayed_upto and ev_id <= replayed_upto:
                 continue
             await _send_agent_event(ws, ev)
+            if ev_id:
+                replayed_upto = ev_id
         if want_status:
             if terminal_status is not None:
                 status = terminal_status
@@ -158,7 +162,13 @@ async def _run_session(
     # 3. live loop: race XREAD stream pump vs incoming WS control frames
     if run_id is None:
         return
-    await _live_loop(ws, run_id=run_id, stream_manager=stream_manager, run_port=run_port)
+    await _live_loop(
+        ws,
+        run_id=run_id,
+        stream_manager=stream_manager,
+        run_port=run_port,
+        start_id=replayed_upto,
+    )
 
 
 async def _live_loop(
@@ -167,11 +177,18 @@ async def _live_loop(
     run_id: str,
     stream_manager: LcaStreamEventManager,
     run_port: RunPort | None,
+    start_id: str = "",
 ) -> None:
-    """Race stream frames against client control frames until disconnect."""
+    """Race stream frames against client control frames until disconnect.
+
+    ``start_id`` is the highest stream id the resume replay already wrote to
+    this socket. The XREAD pump reads strictly-after that cursor; starting it
+    at ``"0"`` instead re-delivers the replayed prefix, and every
+    ``snapshotMode: "append"`` chunk in it would be applied twice by the UI.
+    """
     frame_queue: asyncio.Queue[bytes] = asyncio.Queue(maxsize=_PUMP_QUEUE_MAX)
     pump_stop = asyncio.Event()
-    last_id = "0"
+    last_id = start_id or "0"
     pump_task: asyncio.Task[None] | None = None
     pump_started = False
 

@@ -206,6 +206,7 @@ class TelemetryLLMAdapter(LLMAdapter):
         reasoning_text = ""
         reasoning_started: float | None = None
         reasoning_seq = 0
+        output_seq = 0
         final_response: LLMResponse | None = None
         turn, step, inner_kwargs = _stream_observability_kwargs(dict(kwargs))
 
@@ -309,6 +310,20 @@ class TelemetryLLMAdapter(LLMAdapter):
                             channel_kind="reasoning",
                         )
                         reasoning_seq += 1
+                elif event.type == LLMStreamEventType.OUTPUT_TEXT_DELTA:
+                    # The answer channel is a fact too: without this row the
+                    # assistant body never reaches Session, so neither the
+                    # journal step nor the gateway wire (``stream_chunk``
+                    # ``chunkType: "text"``) can carry the reply.
+                    delta_text = event.text or ""
+                    if delta_text:
+                        self._spine().emit_llm_stream_token(
+                            model=model,
+                            text_delta=delta_text,
+                            seq=output_seq,
+                            channel_kind="output",
+                        )
+                        output_seq += 1
                 yield event
         except asyncio.CancelledError:
             end_outcome = "cancelled"
