@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -133,3 +134,96 @@ def test_file_and_console_setup_are_plugin_carriers() -> None:
     assert callable(file_setup.setup)
     assert hasattr(console_setup, "setup")
     assert callable(console_setup.setup)
+
+
+GRAPH_PAYLOAD: dict[str, Any] = {
+    "kind": "visit_end",
+    "plan_ref": "think.subgraph",
+    "node_id": "think.reason.llm",
+    "node_index": 1,
+    "depth": 2,
+    "binding": "node_executor",
+    "edge_id": "",
+    "from_node": "",
+    "to_node": "",
+    "dispatch": "next",
+    "outcome": "success",
+    "error": "",
+    "elapsed_ms": 604,
+    "inputs": {"context": ["a"]},
+    "outputs": {"decision": {"kind": "answer"}},
+    "metadata": {"binding": "node_executor"},
+}
+
+
+def _graph_rec(**overrides: Any) -> EventRecord:
+    base: dict[str, Any] = {
+        "execution_point": "phase_graph.node.end",
+        "payload": dict(GRAPH_PAYLOAD),
+        "run_id": "run_live",
+        "sequence": 44,
+    }
+    base.update(overrides)
+    return _make_rec(**base)
+
+
+def test_console_graph_timeline_writes_one_compact_line() -> None:
+    """The live line names the graph, the node, the timing and the ports.
+
+    ``run=``/``seq=`` come from the ``EventRecord`` the spine hands over, which
+    is what makes this line quotable against the durable record later.
+    """
+    stream = io.StringIO()
+
+    ConsoleSink(stream, format="graph_timeline").write(_graph_rec())
+
+    assert stream.getvalue() == (
+        "run=run_live  seq=44  phase_graph.node.end  node=think.reason.llm"
+        "  ok  604ms  depth=2  dispatch=next  in=context  out=decision\n"
+    )
+    assert "answer" not in stream.getvalue()
+
+
+def test_console_graph_timeline_drops_every_other_event() -> None:
+    """Narrowing the stream is the point; the full payload stays in the spine file.
+
+    ``phase_graph.instrument.coverage`` shares the ``phase_graph.`` prefix but is
+    not a lifecycle event, so it pins exact matching rather than prefix matching.
+    """
+    stream = io.StringIO()
+    sink = ConsoleSink(stream, format="graph_timeline")
+
+    sink.write(_graph_rec(execution_point="phase_graph.instrument.coverage"))
+    sink.write(_graph_rec(execution_point="llm.stream.token"))
+
+    assert stream.getvalue() == ""
+
+
+def test_console_default_format_still_writes_full_jsonl() -> None:
+    """Default is unchanged, so existing machine consumers see no difference."""
+    stream = io.StringIO()
+
+    ConsoleSink(stream).write(_graph_rec())
+
+    written = json.loads(stream.getvalue())
+    assert written["execution_point"] == "phase_graph.node.end"
+    assert written["payload"]["outputs"] == {"decision": {"kind": "answer"}}
+
+
+def test_console_setup_reads_the_bundle_format_config() -> None:
+    """``config.format`` selects the projection, so the bundle owns the choice."""
+    timeline_ctx = _StubPluginContext()
+    asyncio.run(console_setup.setup(timeline_ctx, {"format": "graph_timeline"}))
+    jsonl_ctx = _StubPluginContext()
+    asyncio.run(console_setup.setup(jsonl_ctx, {}))
+
+    assert timeline_ctx.provided["console_sink"]._format == "graph_timeline"
+    assert jsonl_ctx.provided["console_sink"]._format == "jsonl"
+
+
+def test_console_graph_timeline_still_swallows_sink_failures() -> None:
+    """A broken stream must not reach the spine hot path in either format."""
+    sink = ConsoleSink(io.StringIO(), format="graph_timeline")
+    sink._stream = None  # type: ignore[assignment]
+
+    sink.write(_graph_rec())

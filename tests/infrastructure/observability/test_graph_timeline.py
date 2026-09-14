@@ -27,6 +27,7 @@ from lca.infrastructure.observability.graph_timeline import (
     is_graph_event,
     render_line,
     render_record,
+    split_event_id,
 )
 
 ERROR_LIMIT = 120
@@ -221,3 +222,40 @@ def test_render_record_tolerates_missing_payload() -> None:
     assert render_record({"execution_point": EP_NODE_START}) == (
         "phase_graph.node.start  node=-  binding=-  visit=0  depth=0  plan=-"
     )
+
+
+def test_join_keys_come_from_the_spine_event_id() -> None:
+    """The spine writes ``event_id`` as ``<run_id>:<seq>``; both readers use it."""
+    assert split_event_id("run_ab:17") == ("run_ab", "17")
+    assert split_event_id("run_ab:17:18") == ("run_ab:17", "18")
+    assert split_event_id("legacy_id_without_separator") == ("", "")
+    assert split_event_id("") == ("", "")
+
+
+def test_live_and_post_hoc_lines_are_the_same_bytes() -> None:
+    """A line quoted from a live terminal must be findable in the run's spine file.
+
+    The live carrier reads the join keys off the ``EventRecord`` it is handed;
+    the post-hoc reader parses them back out of ``event_id``. If the two ever
+    drift, an agent and a human stop talking about the same event, so this is
+    the load-bearing equality rather than a formatting snapshot.
+    """
+    payload = {
+        "node_id": "phase.act.execute",
+        "outcome": "failure",
+        "elapsed_ms": 623,
+        "depth": 2,
+        "error": "ToolError: upstream 503",
+        "inputs": {"task": 1},
+    }
+    live = render_line(EP_NODE_END, payload, run_id="run_ab", seq=9)
+    on_disk = render_record(
+        {"event_id": "run_ab:9", "execution_point": EP_NODE_END, "payload": payload}
+    )
+    assert live == on_disk
+    assert live.startswith("run=run_ab  seq=9  phase_graph.node.end  node=phase.act.execute")
+
+
+def test_records_without_join_keys_still_render() -> None:
+    line = render_line(EP_NODE_END, {"node_id": "n", "outcome": "success", "elapsed_ms": 1})
+    assert "run=" not in line and "seq=" not in line

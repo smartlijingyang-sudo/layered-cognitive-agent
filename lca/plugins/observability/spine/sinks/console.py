@@ -1,8 +1,11 @@
-"""``spine.sink.console`` — L0 stdout JSONL sink for development.
+"""``spine.sink.console`` — L0 stdout sink for development.
 
-Provides ``console_sink``. Writes one JSON object per ``EventRecord`` to
-stdout. ``write`` never raises — serialization or I/O failures are
-swallowed so a console sink cannot break the spine hot path.
+Provides ``console_sink``. ``write`` never raises — serialization or I/O
+failures are swallowed so a console sink cannot break the spine hot path.
+
+Two formats, selected by bundle ``config.format``: ``jsonl`` (default) emits one
+JSON object per ``EventRecord``; ``graph_timeline`` emits only graph lifecycle
+records as compact lines, for reading a live run.
 """
 
 from __future__ import annotations
@@ -10,10 +13,9 @@ from __future__ import annotations
 import json
 import logging
 import sys
+from collections.abc import Mapping
 from dataclasses import asdict
 from typing import Any, TextIO
-
-log = logging.getLogger(__name__)
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -30,18 +32,47 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.infrastructure.observability.graph_timeline import (
+    is_graph_event,
+    render_line,
+)
 from lca.infrastructure.observability.spine.event.record import EventRecord
+
+log = logging.getLogger(__name__)
 
 
 class ConsoleSink:
-    """Best-effort stdout sink — one JSON line per EventRecord."""
+    """Best-effort stdout sink.
 
-    def __init__(self, stream: TextIO | None = None) -> None:
+    ``jsonl`` (default) writes one JSON object per ``EventRecord``, which is what
+    a machine consumer wants. ``graph_timeline`` writes only graph lifecycle
+    records, one compact line each, which is what a person watching a live run
+    wants; the full-payload JSONL of the same events stays in the run's spine
+    file, so nothing is lost by narrowing the stream.
+
+    Both formats render through
+    :func:`lca.infrastructure.observability.graph_timeline.render_line`, so a
+    line seen here is byte-identical to the one ``trace-show`` later prints for
+    the same ``run_id`` + ``seq``.
+    """
+
+    def __init__(self, stream: TextIO | None = None, *, format: str = "jsonl") -> None:
         self._stream: TextIO = stream if stream is not None else sys.stdout
+        self._format = format
 
     def write(self, record: EventRecord) -> None:
         try:
-            line = json.dumps(asdict(record), default=str, sort_keys=False)
+            if self._format == "graph_timeline":
+                if not is_graph_event(record.execution_point):
+                    return
+                line = render_line(
+                    record.execution_point,
+                    record.payload,
+                    run_id=record.run_id,
+                    seq=record.sequence,
+                )
+            else:
+                line = json.dumps(asdict(record), default=str, sort_keys=False)
             self._stream.write(line + "\n")
             self._stream.flush()
         except Exception:
@@ -62,8 +93,8 @@ class ConsoleSink:
     kind=PluginKind.SEAM,
     effects="none",
     description=(
-        "Console sink — stdout JSON lines of EventRecord for development; "
-        "provides console_sink. write() never raises."
+        "Console sink — stdout EventRecord JSON lines, or compact phase_graph "
+        "lines via config.format; provides console_sink. write() never raises."
     ),
     test_suite="tests.lca_plugins.observability.spine.test_sinks",
     contract=PluginContract(
@@ -87,8 +118,8 @@ class ConsoleSink:
 )
 async def setup(ctx: PluginContext, config: Any) -> None:
     """Provide a singleton ``ConsoleSink`` under ``console_sink``."""
-    del config  # accepted for protocol conformance; this plugin is config-free.
-    ctx.provide("console_sink", ConsoleSink())
+    fmt = config.get("format", "jsonl") if isinstance(config, Mapping) else "jsonl"
+    ctx.provide("console_sink", ConsoleSink(format=fmt))
 
 
 __all__ = ["ConsoleSink", "setup"]

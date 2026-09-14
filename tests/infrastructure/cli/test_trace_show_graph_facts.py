@@ -60,7 +60,7 @@ def _graph_record(**overrides: Any) -> dict[str, Any]:
     record: dict[str, Any] = {
         "category": "spine.phase_graph",
         "channel": "control",
-        "event_id": "evt_0001",
+        "event_id": f"{RUN_ID}:1",
         "execution_point": "phase_graph.node.end",
         "payload": payload,
         "trace_id": "trace_0001",
@@ -149,7 +149,8 @@ def test_human_projection_names_outcome_timing_and_route(
 
     assert exit_code == 0
     assert out.strip() == (
-        "phase_graph.node.end  node=phase.act.execute  FAIL  2780ms  depth=1"
+        f"run={RUN_ID}  seq=1  phase_graph.node.end  node=phase.act.execute"
+        "  FAIL  2780ms  depth=1"
         "  dispatch=error  in=-  out=-  error=TimeoutError: sandbox exec exceeded 90s"
     )
 
@@ -245,7 +246,7 @@ def test_node_filter_still_applies_to_graph_facts(
         [
             _graph_record(),
             _graph_record(
-                event_id="evt_0002",
+                event_id=f"{RUN_ID}:2",
                 payload={"node_id": "phase.think.reason", "outputs": {}},
             ),
         ],

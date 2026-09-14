@@ -82,16 +82,31 @@ def _bounded(text: str) -> str:
     return f"{safe[:ERROR_FIELD_LIMIT]}…(+{len(safe) - ERROR_FIELD_LIMIT})"
 
 
-def render_line(execution_point: str, payload: Mapping[str, Any]) -> str:
+def render_line(
+    execution_point: str,
+    payload: Mapping[str, Any],
+    *,
+    run_id: str = "",
+    seq: int | str = "",
+) -> str:
     """Render one graph lifecycle record as a single grep-safe line.
 
-    Unknown execution points still get a line rather than being dropped, so a
-    new kernel kind degrades to visible-but-plain instead of vanishing.
+    ``run_id``/``seq`` are the join keys back to the durable spine record. The
+    live carrier reads them off the :class:`EventRecord` it is handed; the
+    post-hoc CLI reads them from ``event_id``, which the spine writes as
+    ``<run_id>:<seq>``. Both therefore produce the same bytes for the same
+    event, which is what lets a person and an agent quote one line to each
+    other. Unknown execution points still get a line rather than being
+    dropped, so a new kernel kind degrades to visible-but-plain.
     """
     node = _one_line(str(payload.get("node_id") or ""))
     plan_ref = str(payload.get("plan_ref") or "")
     depth = payload.get("depth", 0)
     parts = [execution_point]
+    if run_id:
+        parts.insert(0, f"run={run_id}")
+    if seq != "":
+        parts.insert(1 if run_id else 0, f"seq={seq}")
 
     if execution_point == EP_NODE_START:
         parts.append(f"node={node or '-'}")
@@ -134,12 +149,25 @@ def render_line(execution_point: str, payload: Mapping[str, Any]) -> str:
 
 
 def render_record(record: Mapping[str, Any]) -> str:
-    """Render one spine record (``execution_point`` + ``payload``)."""
+    """Render one spine record, deriving the join keys from its ``event_id``."""
     payload = record.get("payload")
+    run_id, seq = split_event_id(str(record.get("event_id") or ""))
     return render_line(
         str(record.get("execution_point") or ""),
         payload if isinstance(payload, Mapping) else {},
+        run_id=run_id,
+        seq=seq,
     )
+
+
+def split_event_id(event_id: str) -> tuple[str, str]:
+    """``<run_id>:<seq>`` as the spine writes it; empty pair when it has no separator.
+
+    A record whose ``event_id`` does not carry the separator gets no join keys
+    rather than a line claiming the whole id is its sequence.
+    """
+    run_id, sep, seq = event_id.rpartition(":")
+    return (run_id, seq) if sep else ("", "")
 
 
 __all__ = [
@@ -153,4 +181,5 @@ __all__ = [
     "is_graph_event",
     "render_line",
     "render_record",
+    "split_event_id",
 ]
