@@ -111,8 +111,12 @@ _PREDICATE_EVALUATOR = None
 
 
 def _default_predicate(
-    when: str, *, result: object | None, artifacts: Mapping[str, object]
+    when: object, *, result: object | None, artifacts: Mapping[str, object]
 ) -> bool:
+    # Typed Predicate objects require the typed evaluator (D3+);
+    # the default string evaluator cannot handle them.
+    if not isinstance(when, str):
+        return False
     return when == "true" or when == ""
 
 

@@ -6,6 +6,7 @@ The kernel never inspects field names; it reads only the topology
 and the typed :class:`lca.contracts.protocols.graph.node_io.NodeIOSchema`
 references declared on each node.
 """
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -16,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from lca.contracts.protocols.graph.binding import BindingKind
 from lca.contracts.protocols.graph.node_io import NodeIOSchema
 from lca.contracts.protocols.graph.ports import PortName
+from lca.contracts.protocols.graph.predicate import Predicate
 
 
 class SubgraphReference(BaseModel):
@@ -73,18 +75,19 @@ class PlanNode(BaseModel):
 class PlanEdge(BaseModel):
     """One directed edge in a plan graph.
 
-    ``when`` is a DSL predicate; the existing
-    :func:`lca.harness.graph.predicate.evaluate_restricted_predicate`
-    is reused unchanged. ``subgraph_ref`` on an edge triggers the
-    same nested-execution path as :attr:`PlanNode.subgraph_ref`,
-    but keyed off the edge instead of the source node.
+    ``when`` accepts either a typed :class:`Predicate` (new path) or a
+    legacy DSL string. The traversal predicate evaluator handles both;
+    the SDK always produces typed predicates for new plans.
+    ``subgraph_ref`` on an edge triggers the same nested-execution path
+    as :attr:`PlanNode.subgraph_ref`, but keyed off the edge instead of
+    the source node.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     source: str
     target: str
-    when: str = "true"
+    when: Predicate | str = "true"
     subgraph_ref: SubgraphReference | None = None
 
 
