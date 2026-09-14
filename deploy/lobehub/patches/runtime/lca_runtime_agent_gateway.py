@@ -1,7 +1,8 @@
 """Patch: front-end WS gateway client + lobehub-ui source modifications.
 
 This module owns:
-- 9 new TS files under ``src/store/chat/agents/transports/lcaGateway/``
+- the TS files under ``lcaGateway/`` (see ``_NEW_FILES``), copied verbatim
+  into ``src/store/chat/agents/transports/lcaGateway/``
 - Source modifications migrated from the retired ``lca_run_driver`` patch:
   ``streamingExecutor.ts`` (gateway-only dispatch),
   ``customInteractionHandlers.ts``, ``intervention/index.tsx``,
@@ -26,6 +27,8 @@ _NEW_FILES = (
     "connect.ts",
     "execute.ts",
     "executeGatewayRun.ts",
+    "messageService.ts",
+    "messageService.test.ts",
     "reconnect.ts",
     "event_handler.ts",
     "event_router.ts",
