@@ -32,7 +32,6 @@ from lca.infrastructure.observability.replay import StandardCursor
 from lca.infrastructure.observability.spine.derivers.waterfall.waterfall import (
     WaterfallDeriver,
 )
-from lca.infrastructure.observability.spine.event.record import EventRecord
 
 _DEFAULT_TRACES_ROOT = Path("traces")
 
@@ -61,8 +60,16 @@ def register(app: typer.Typer) -> None:
         # ADR-0185 PR-4:trajectory 「model saw」链接仅 spine fold SSOT。
         mv_path: Path | None = _spine_path(run_id, traces_root)
         deriver = WaterfallDeriver(run_id, model_visible_root=mv_path)
-        for record in _read_events_jsonl(run_id, traces_root):
-            deriver.on_event(record)
+        # Use the tolerant SpineRow loader: real spine rows no longer
+        # satisfy the strict EventRecord dataclass (sequence / span_id /
+        # when / epoch / causality_id are absent). WaterfallDeriver
+        # accepts dicts directly.
+        from lca.infrastructure.cli.commands._shared.projection import (
+            load_spine_events,
+        )
+
+        for row in load_spine_events(run_id, traces_root=traces_root):
+            deriver.on_event(row)
         if out is None:
             out = run_dir / "journal.trajectory.html"
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -168,27 +175,6 @@ def register(app: typer.Typer) -> None:
                 typer.echo(f"step {s.step_index}: digest mismatch (inferred={ctx.inferred})")
                 failed += 1
         typer.echo(f"\nverify-model-visible: passed={passed} failed={failed}")
-
-
-def _read_events_jsonl(run_id: str, traces_root: Path) -> list[EventRecord]:
-    """Read spine ledger into ``EventRecord`` instances for derivers (PR-27 / PR-4).
-
-    Kept on EventRecord because WaterfallDeriver.on_event type-checks the
-    schema (execution_point whitelist, span_id required, etc.). Lines that
-    do not parse are skipped — best-effort, fail-soft.
-    """
-    spine_path = _spine_path(run_id, traces_root)
-    if spine_path is None:
-        return []
-    out: list[EventRecord] = []
-    for line in spine_path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        try:
-            out.append(EventRecord(**json.loads(line)))
-        except (TypeError, ValueError):
-            continue
-    return out
 
 
 def _spine_path(run_id: str, traces_root: Path) -> Path | None:
