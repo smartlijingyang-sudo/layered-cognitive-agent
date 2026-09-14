@@ -120,7 +120,8 @@ def _extract_run_id(record: Any) -> str | None:
     description=(
         "Event hub —— fan-out SPINE EP (phase_graph.node.start/end + "
         "runtime.reducer.apply) 到对应 observer capability,触发其内部 "
-        "append_surface_bound 单轨 emit。hub 自己不 emit 任何事件。"
+        "append_surface_bound 单轨 emit。hub 自己不 emit 任何事件。L2 "
+        "because requires 同层 spine.core 提供的 event_spine capability。"
     ),
 )
 async def setup(ctx: PluginContext, config: Any) -> None:
@@ -130,7 +131,10 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     publish_ep_bound;emit 路径完全由 observer 内部 append_surface_bound 承担。
     """
     del config
-    event_spine: EventSpine = ctx.require("event_spine")
+    # `event_spine` capability 由 spine.core (L2) 提供; 它是 SpineCore holder,
+    # 真正的 EventSpine 实例在 .event_spine 属性上。
+    spine_core = ctx.require("event_spine")
+    event_spine: EventSpine = spine_core.event_spine
     observers: dict[str, Callable[..., None]] = {
         "observation.node_enter": ctx.require("observation.node_enter"),
         "observation.node_exit": ctx.require("observation.node_exit"),

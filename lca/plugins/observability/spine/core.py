@@ -190,7 +190,7 @@ def _activate_process_local_spine(ctx: PluginContext, event_spine: EventSpine) -
     id="spine.core",
     provides=("event_spine", "spine_context"),
     requires=("emit_pipeline", "file_sink"),
-    layer="L2",
+    layer="L1",
     kind=PluginKind.SEAM,
     effects="none",
     description=(

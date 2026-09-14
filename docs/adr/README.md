@@ -67,7 +67,7 @@
 | [0091](0091-profile-selected-followup-dispatch.md) | Profile 选择的会话 Follow-up 调度与可靠队列 | Accepted |
 | [0092](0092-durable-session-command-ledger.md) | 持久化 Session 命令账本 | Accepted |
 | [0093](0093-continuous-control-plane.md) | 持续执行控制面 | Proposed |
-| [0094](0094-stop-policy-locality.md) | StopPolicy 的 State 群局部性 | Accepted |
+| [0094](0094-stop-policy-locality.md) | StopPolicy 的 State 群局部性 | Superseded |
 | [0095](0095-loop-guard-locality.md) | LoopGuard 的解释器局部性 | Accepted |
 | [0096](0096-journal-protocol-layer-everything-pluggable.md) | Journal Protocol Layer 一切插件化 — 协议 SSOT 双向落地 + 链路日志清晰 | Proposed |
 | [0097](0097-event-identity-derivation.md) | Event Identity 派生策略 —— ULID（与 ADR-0065 注释一致） | Superseded |
@@ -161,6 +161,7 @@
 | [0212](0212-step-tree-deriver-ssot-cleanup.md) | step_tree 派生面 SSOT 单写收口 — 删 `StepTreeAccumulatorDeriver` 整文件 + ADR-0195 O7 re-export shim + 删 stale test；`StepTreeFoldDeriver.derive()` 写盘失败从 `log.warning + swallow` 升级为 typed exception `JournalWriteError`（fail-loud）；回归 run_f78f66322f1d 的 doctor H3 重复 step_id；C9 幂等 + C11 事实可追溯 失败端收口 | Proposed |
 | [0213](0213-kernel-serve-spawn-result-and-health-readiness.md) | KernelServe spawn 结果结构化 + /health plugin readiness 字段 — `KernelServeSpawner` 5 原子 step（preflight/start/port_bound/http_ready/plugin_ready）+ stderr 每 spawn 独立落盘 + timeout 永不为 True + `kernel-restart` 子命令拆出 `stack.heal` + `/health` body 新增 `plugin` 字段；配套 Note [`2026-09-09-kernel-serve-spawn-state-machine`](../../notes/implemented/seam/2026-09-09-kernel-serve-spawn-state-machine.md)；落地分 PR-1/2/3 | Implemented (PR-1/2/3) |
 | [0221](0221-concept-decision-classify-parse-merge.md) | concept.decision.classify — parse 节点合并,消解 fan-out 隐式假设；3 节点图(`parse.tool_calls` / `parse.intent` / `compose.action`)→ 2 节点图(`parse.response` / `compose.action`)；同 LLMResponse 同步输出 `tool_calls` / `delegations` / `intent` 三端口；Refines ADR-0220 §3.3 / §11 P6；0220 升 Accepted 时由 meta-ADR 同步 amend | Proposed |
+| [0230](0230-stop-decision-retirement.md) | Stop-Decision Retirement — 删 `StopPolicy` Protocol + `DefaultStopPolicy` + 8 stop 插件 + 3 stop bundle；`StopDecision` 去 `should_stop`；`StopPayload` 去 `should_stop` + `focus_converged`；外层 plan 用 `terminal.commit` 取代 `stop.main`（绑定 `BindingKind.TERMINATE`）；loop 终止由模型 `decision.action_type == "respond"` 与 Body `EffectReceipt.failure_kind == "execution"` 共同驱动；新增 `spine.terminal.commit` (OBSERVABILITY) + `spine.body.deterministic_fail` (STRUCTURAL) EP；Supersedes ADR-0094 的 StopPolicy 局部性结论 | Implemented |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
 

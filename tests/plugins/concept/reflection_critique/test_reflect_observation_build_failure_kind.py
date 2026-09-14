@@ -2,10 +2,9 @@
 
 Regression for run_0d71855ae274: ``_build_observation`` previously
 constructed ``Observation(extra={})`` regardless of the receipt's
-failure classification. The stop-policy backup
-(``DefaultStopPolicy._deterministic_failure_stop``) needs the tag
-inside ``Observation.extra[FAILURE_KIND]`` to fire; without it, the
-8 max_visits burn out on the same failed tool call.
+failure classification. ``act.observe`` now reads the tag inside
+``Observation.extra[FAILURE_KIND]`` to set ``should_terminate=True``;
+without it, the 8 max_visits burn out on the same failed tool call.
 """
 
 from __future__ import annotations

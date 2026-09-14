@@ -100,7 +100,7 @@ edges:
     when: result.payload.decision.action_type == "use_tool"
   - from: think.main
     to: terminal.commit
-    when: result.payload.decision.action_type == "respond" and bool(result.payload.decision.response_text)
+    when: result.payload.decision.action_type == "respond" and result.payload.decision.response_text != ""
 
   # act → think on USE_TOOL (the re-ask-model loop); act → terminal.commit
   # on Body-raised DeterministicToolError (FAILURE_KIND_EXECUTION).
