@@ -50,6 +50,9 @@ from lca_kernel.boot.plan_validation.checks.entry_uniqueness import (
 from lca_kernel.boot.plan_validation.checks.max_visits_bounds import (
     MaxVisitsBoundsCheck,
 )
+from lca_kernel.boot.plan_validation.checks.max_visits_vs_scc import (
+    MaxVisitsVsSccCheck,
+)
 from lca_kernel.boot.plan_validation.checks.predicate_wellformed import (
     PredicateWellformedCheck,
 )
@@ -604,6 +607,7 @@ _PLAN_CHECKS: tuple[Callable[[Plan, str], PlanLiftError | None], ...] = (
     #   Keeping it disabled matches current production behavior;
     #   re-enable once phase cycles are broken up at the boundary
     #   by per-phase terminal predicates.)
+    MaxVisitsVsSccCheck(),
 )
 
 

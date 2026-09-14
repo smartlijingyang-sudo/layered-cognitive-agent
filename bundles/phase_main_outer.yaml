@@ -34,7 +34,7 @@ nodes:
 
   - id: think.main
     region: phase:think
-    max_visits: 1
+    max_visits: 2
     sub_spec_ref:
       plan_ref: bundles/think.yaml
       entry_node: think.shortcut
@@ -54,7 +54,7 @@ nodes:
 
   - id: act.main
     region: phase:act
-    max_visits: 1
+    max_visits: 2
     sub_spec_ref:
       plan_ref: bundles/act.yaml
       entry_node: act.validate
