@@ -343,7 +343,6 @@ class DeliveryEvidenceCommitted:
     """Folded delivery evidence snapshot for convergence debug (ADR-0196)."""
 
     step: int
-    task_class: str
     artifact_count: int
     producer_success_count: int
     satisfied: bool
@@ -358,7 +357,6 @@ class ConvergenceEvaluatedCommitted:
     step: int
     kind: str
     rationale: str
-    task_class: str
     satisfied: bool
     detail: str = ""
 
@@ -369,7 +367,6 @@ class PromptSurfaceRenderedCommitted:
     """PromptSurface render audit — tools/sandbox SSOT (ADR-0196)."""
 
     step: int
-    task_class: str
     tool_count: int
     include_full_sandbox: bool
     digest: str
@@ -429,6 +426,13 @@ class ToolInvokedCommitted:
     output_text: str | None = None
     output_truncated: bool = False
     projected_state: dict[str, Any] = field(default_factory=dict)
+    # Inline return text for tools that don't route through evidence (most
+    # ``text``-producing tools like ``search``, ``web-browsing``). The
+    # ``output_text`` whitelist only matches ``output``/``stdout``/``content``;
+    # we surface ``text`` separately so ``_map_tool_invoked`` can hand it to
+    # the LobeHub gateway handler and the persisted assistant message keeps a
+    # non-empty ``content``.
+    text: str | None = None
 
 
 @session_event("decision.made.v1", visibility="model")

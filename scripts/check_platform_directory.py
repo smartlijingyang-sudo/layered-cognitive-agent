@@ -33,13 +33,11 @@ REQUIRED_LCA_TOP = frozenset(
 # Each must have README.md at package root
 REQUIRED_README_PACKAGES = REQUIRED_LCA_TOP | {"lca_kernel"}
 
-# New @plugin files forbidden under these legacy roots (P0: only block new plugin.py)
-LEGACY_PLUGIN_ROOTS_NO_NEW_PLUGIN_PY = frozenset(
-    {
-        "events/publishers/spine_loop_cursor",
-        "events/publishers/spine_writable_matrix",
-    }
-)
+# 2026-09-14 dead-code 修剪:events/publishers/spine_loop_cursor 与
+# events/publishers/spine_writable_matrix 两个目录已删除,不再列入
+# legacy plugin roots 守卫(cursor 写入走 SessionWritePortAdapter →
+# Session.append SSOT,不再经 EventBus 旁路)。
+LEGACY_PLUGIN_ROOTS_NO_NEW_PLUGIN_PY: frozenset[str] = frozenset()
 
 SEAM_TREE_ANCHORS = frozenset(
     {

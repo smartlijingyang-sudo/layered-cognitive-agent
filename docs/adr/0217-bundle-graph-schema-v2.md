@@ -24,7 +24,7 @@
 - **Builds on**: ADR-0075 (declarative phase graph SSOT) · ADR-0199 (cognitive plugin convergence) · ADR-0210 (stage closure migration P7, P7 region-tag 作 region 字段来源) · [notes/implemented/contract/2026-09-09-phase-node-sub-spec-ref.md](../notes/implemented/contract/2026-09-09-phase-node-sub-spec-ref.md) (节点级 `sub_spec_ref` 作 sub_spec_ref 字段来源)
 - **Refines**: `BundleSubgraphResolver`(从单 fixture 映射扩展为新 schema 解析) · `compile_declarative_projection`(新增 factory→plugin 解析层)
 - **Supersedes**: 无
-- **Reject**: 「在 `_PLAN_REF_PROFILES` 加 `bundles/think-steps.yaml` 映射」(只修 PG-005 不升级 schema,保留双职责错位);「直接搬 agent_lab schema」(违反 ADR-0210 P7 路径边界 + agent_lab port-level edge 与 PhaseEdge node-level 不对齐);「引入独立 graphs/ 目录」(违反 ADR-0195 §4 SSOT 矩阵,引入第三 SSOT)
+- **Reject**: 「在 `_PLAN_REF_PROFILES` 加 `bundles/think-steps.yaml` 映射」(只修 PG-005 不升级 schema,保留双职责错位);「直接搬 InfoEdge prototype schema」(违反 ADR-0210 P7 路径边界 + prototype port-level edge 与 PhaseEdge node-level 不对齐);「引入独立 graphs/ 目录」(违反 ADR-0195 §4 SSOT 矩阵,引入第三 SSOT)
 
 ---
 
@@ -205,7 +205,7 @@ class NodeExecutor(Protocol):
 | 备选 | 否决理由 | 备选成本(将来复用价值) |
 |---|---|---|
 | `entries:` 形态 + 加 `_PLAN_REF_PROFILES` 映射 | 修 PG-005 不升级 schema,保留双职责错位;5 步顺序语义继续散落在 5 个 plugin `setup()` | 零(且被本 ADR 取代) |
-| 直接接 `agent_lab/graphs/think/think.yaml` | agent_lab port-level edge 与 kernel PhaseEdge node-level 不对齐;`factory: think.expose` 没有对应 `@plugin` 装饰器;agent_lab `region` 是 P7 专属,接进来强制生产走 P7 违 ADR-0075 兼容路径 | 零(agent_lab 自留) |
+| 直接接 InfoEdge prototype YAML | prototype port-level edge 与 kernel PhaseEdge node-level 不对齐;`factory: think.expose` 没有对应 `@plugin` 装饰器;prototype `region` 是 P7 专属,接进来强制生产走 P7 违 ADR-0075 兼容路径 | 零(prototype 自留) |
 | 引入独立 `graphs/` 目录 | 违反 ADR-0195 §4 SSOT 矩阵,新增第三 SSOT(profile / bundle / graph) | 零 |
 | 用 JSON Schema / Pydantic extra="allow" 保留向后兼容 | 违反 AGENTS.md §4 COMPAT shim 原则 + C13 信息血统闭合;新旧两套 schema 长期共存 = 必然漂移 | 零 |
 
@@ -232,7 +232,6 @@ class NodeExecutor(Protocol):
 
 - `bundles/reflect-subgraph.yaml` 改造 — 独立 ADR/Note
 - `bundles/think-orchestrator-graph.yaml` 改造 — 独立 ADR/Note(已被 8d2a67b5 删,无需处理)
-- `agent_lab/graphs/think/think.yaml` 与生产 kernel 的对齐 — 独立 ADR(可能涉及 ADR-0210 P7 强制路径)
 - `nodes[].inputs/outputs` port-aware edge 校验 — 字段投影本期不启用校验,留接口给后续
 - `edges[].kind: data` 数据流调度 — 投影本期只接受,解释器不区分 control/data 边,后续 Note
 
@@ -258,7 +257,14 @@ v1 扩展:`node.config` 接受 `emit_on_enter: list[str]` 和 `emit_on_exit: lis
 
 v1 扩展:inner_graph 终止端口名 ∈ outer 节点 `outputs` → 透传到 outer PortContext。
 
-- 铁律 1:端口同名透传
+- 铁律 1:端口同名透传(`set_outer_input` 用 `setdefault`,已写入的值不被覆盖)
 - 铁律 2:缺失输入 = 空 NodeOutput
 - 铁律 3:同图同名端口冲突 = PG-006-port-conflict
 - 铁律 4:inner_graph 局部 PortContext 终止时销毁
+- 铁律 5 (2026-09-14 增):外层跨 iteration last-write-wins(`merge_output` 用 `update`)。
+  `PlanInterpreter.run` 在 outer loop iteration 之间复用同一个 `PortRegistry`
+  实例(`stop.main → perceive.main` 反复跳转);若沿用 setdefault,step 1 写入
+  的 typed port(`decision` / `observation` / `reflection`)会永久锁定后续 7 次
+  iteration,让 stop-policy 永远看不到 fresh 输入,run 烧到 `max_visits` budget
+  fail-loud。`merge_output` 必须覆盖。`set_outer_input` 保留 setdefault,因
+  为它只在首轮 seed,语义是"outer caller first-write wins"。

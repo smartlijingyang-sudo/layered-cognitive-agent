@@ -42,16 +42,41 @@ def _elapsed_ms(started: float) -> int:
     return int((time.perf_counter() - started) * _PERF_COUNTER_SCALE)
 
 
+# Single SSOT for body-layer stdout-shaped keys. Kept in sync with the
+# convergence layer's ``_STDOUT_KEYS`` in
+# ``lca/cognition/convergence/payload.py``. Any new stdout-shaped payload
+# key must be added to both lists. delete-when: pipeline_safe_executor is
+# folded into safe_executor (single owner of the contract).
+_STDOUT_KEYS = ("output", "stdout", "content", "text")
+
+
 def _extract_stdout_head(observation: Any, *, limit: int = 2000) -> str:
     """从 Observation.payload 抽 stdout-like 文本;空 observation 返回空串。"""
     payload = getattr(observation, "payload", None)
     if not isinstance(payload, dict):
         return ""
-    for key in ("output", "stdout", "content"):
+    for key in _STDOUT_KEYS:
         value = payload.get(key)
         if isinstance(value, str):
             return value[:limit]
     return ""
+
+
+def _extract_stdout_chars_total(observation: Any) -> int:
+    """真实 stdout 字符数,优先取 ``output`` / ``stdout`` / ``content`` / ``text`` 第一个非空 str。
+
+    Returns 0 when observation 无 stdout-like 文本;用于填入
+    ``step.tool_result.record.stdout_chars_total``,让 critic / LLM context
+    看到真实产出长度(避免被 ``stdout_head`` 摘要误判为空)。
+    """
+    payload = getattr(observation, "payload", None)
+    if not isinstance(payload, dict):
+        return 0
+    for key in _STDOUT_KEYS:
+        value = payload.get(key)
+        if isinstance(value, str):
+            return len(value)
+    return 0
 
 
 def _extract_stderr(observation: Any, *, limit: int = 2000) -> str:
@@ -92,9 +117,10 @@ def _delta_summary_from_obs(observation: Any, *, limit: int = 200) -> str:
 
 
 from lca.cognition.body.emit.tool_journal import (  # noqa: E402
-    emit_tool_invoked,
+    prepare_tool_invoked,
     prepare_tool_started,
-    record_tool_started_observability,
+    record_tool_invoked_diagnostic,
+    record_tool_started_diagnostic,
 )
 
 
@@ -130,7 +156,7 @@ def _commit_tool_started(
         evidence_store=evidence_store,
         evidence_policy=evidence_policy,
     )
-    record_tool_started_observability(tool, args, invocation_id, receipt)
+    record_tool_started_diagnostic(tool, args, invocation_id)
     commit_tool_journal_receipt(receipt)
     commit_tool_phase_call_start(
         tool_name=tool.name,
@@ -156,7 +182,7 @@ def _commit_tool_invoked(
     )
 
     evidence_store, evidence_policy = _resolve_evidence_pair()
-    receipt = emit_tool_invoked(
+    receipt = prepare_tool_invoked(
         tool,
         args,
         obs,
@@ -166,6 +192,16 @@ def _commit_tool_invoked(
         arguments_ref=arguments_ref,
         evidence_store=evidence_store,
         evidence_policy=evidence_policy,
+    )
+    # Diagnostic-only: ``step.tool_result.record`` is committed by
+    # ``execute`` directly upstream (lines below 324); going through
+    # ``emit_tool_invoked`` would double-emit the same ``invocation_id``.
+    record_tool_invoked_diagnostic(
+        tool,
+        obs,
+        receipt,
+        latency_ms=latency_ms,
+        attempt=attempt,
     )
     committed = receipt.catalog_event
     commit_tool_journal_receipt(receipt)
@@ -311,9 +347,16 @@ class SimpleSafeExecutor(SafeExecutor):
                 ok=observation.success,
                 error=observation.error or None,
                 stdout_head=_extract_stdout_head(observation),
+                stdout_chars_total=_extract_stdout_chars_total(observation),
+                stdout_truncated=observation.payload.get("stdout_truncated", False)
+                if isinstance(getattr(observation, "payload", None), dict)
+                else False,
                 stderr=_extract_stderr(observation),
                 files_created=_extract_files_created(observation),
                 delta_summary=_delta_summary_from_obs(observation),
+                failure_kind=observation.extra.get(FAILURE_KIND)
+                if isinstance(getattr(observation, "extra", None), dict)
+                else None,
             )
             act_closed = True
             return observation
@@ -470,6 +513,8 @@ class SimpleSafeExecutor(SafeExecutor):
         observation: Observation | None = None
         try:
             observation = await tool.execute(args)
+            if not observation.success:
+                outcome = "failure"
             return observation
         except ApprovalPendingError:
             outcome = "failure"

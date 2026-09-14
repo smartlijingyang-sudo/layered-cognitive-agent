@@ -2,8 +2,8 @@
 
 > **状态**：plans（对话材料 + 暂缓登记，非 note lifecycle）
 > **对话日期**：2026-09-09
-> **评审方案来源**：用户提交的外部文档《Agent Lab 群体智能架构评审与基建完善方案》（smartlijingyang-sudo/layered-cognitive-agent 的 agent_lab 图 B 评审）
-> **评审对象**：图 B（agent_lab InfoEdge）vs 图 A（生产 LCA 架构）
+> **评审方案来源**：用户提交的外部文档《Agent Lab 群体智能架构评审与基建完善方案》（smartlijingyang-sudo/layered-cognitive-agent 的 InfoEdge prototype 图 B 评审）
+> **评审对象**：图 B（InfoEdge prototype）vs 图 A（生产 LCA 架构）
 
 ## Problem
 
@@ -57,7 +57,7 @@
 |---|---|---|
 | "没有持续群体控制面" | ADR-0093 正是 Continuous Control Plane（Proposed 2026-08-27）：Trigger / WorkItem / WorkQueue / Lease / SessionWorkActivator | [ADR-0093](../adr/0093-continuous-control-plane.md) |
 | "没有群体级任务市场" | ADR-0093 §决策已规定 WorkQueue 持久去重、原子 claim、过期 lease 恢复、dead-letter | [ADR-0093](../adr/0093-continuous-control-plane.md) |
-| "图 B 已吸收但仍依赖适配器" | agent_lab 双挂桥接 + delete-when 已立契约 | [docs/notes/proposed/seam/2026-09-08-agent-lab-absorb-end-state.md](../proposed/seam/2026-09-08-agent-lab-absorb-end-state.md) |
+| "图 B 已吸收但仍依赖适配器" | InfoEdge prototype 双挂桥接 + delete-when 已立契约 | Note `2026-09-08-agent-lab-absorb-end-state` 已退役，见 `docs/design/2026-09-14-agent-lab-info-graph-reference.md` |
 | "图内核扩展" | InfoEdgeSpec 嵌套子图 + CompiledGraphBundle | [ADR-0206](../adr/0206-information-graph-kernel.md) Proposed |
 
 #### 与现有 ADR 冲突（不应采纳）
@@ -82,7 +82,7 @@
 | 4 | 群体可观测指标空白（评审 §8 P2 末尾 10 项） | ADR-0172.1 Group 指标族，列为 ADR-0172 扩展 | ADR 治理 |
 | 5 | 角色分化（评审 §4.2 六类） | 若要做，先 ADR/Note 草案，明确"能力配置 + Policy 而非新 Agent 类"，对应 AGENTS.md C1 + ADR-0093 §验收 §6 "不得扩大 capability grant" | 须先 ADR |
 | 6 | `ActionValue` / `expected_information_gain` / 三层 utility | 先 ADR/Note 草案（涉及新决策原语，须走 C6 原语默认 no-op + C1 闭集审查） | 须先 ADR |
-| 7 | agent_lab 双挂吸收 | 已有 Note `2026-09-08-agent-lab-absorb-end-state.md`（proposed）驱动；按 delete-when 推进 | 已立契约 |
+| 7 | InfoEdge prototype 双挂吸收 | 已有 Note `2026-09-08-agent-lab-absorb-end-state.md`（proposed）驱动；按 delete-when 推进 | **已落地**（2026-09-14 双挂删除；本表保留为审计记录） |
 | 8 | 评审 §5.3 四类对象再切分 | 与 ADR-0186 / 0191 / 0194 / 0195 重复；以 ADR-0186 §3 + 0194 §1 为 SSOT，不开新平面 | 驳回新提案 |
 | 9 | ADR-0206 P7 阶段闭集迁移 | 已立契约——ADR-0206 §10 P7 显式承担；不得在本主题下平行新开 | 已立契约 |
 
@@ -176,7 +176,7 @@ design 是宪法级长期设计；本材料尚未达到这个分量。
 |---|---|---|
 | ADR-0093 仍未 Accepted，但 `lca/plugins/collaboration/continuous/` 有 ≥3 个 caller | `rg 'continuous_control_plane_factory' lca/` 计数 | PR-B |
 | AssistantAgent routines 上线但调度失败 / dead-letter 误归零 | `journalctl` / run 记录 | PR-C + PR-D |
-| agent_lab 双挂 `agent-lab-infoedge` 出现删除条件之一 | 对照 [Note delete-when](../proposed/seam/2026-09-08-agent-lab-absorb-end-state.md) §delete-when | 优先图 B 吸收，再回到本文件 |
+| InfoEdge prototype 双挂删除条件出现 | 对照已退役的 Note `2026-09-08-agent-lab-absorb-end-state` §delete-when | **已落地**(2026-09-14 双挂全部删除;后续审计追踪见 `docs/design/2026-09-14-agent-lab-info-graph-reference.md`) |
 | 出现"群体共享信号"需求（如多 worker 同源协调 / 跨 Worker 信息互引用） | RFC / 用户对话 / Issue 标题含 colony / swarm / multi-agent coordination | 先 PR-A 落档拒绝理由，**不直接做** colony 层 |
 | 用户明确"开始实施" | 直接信号 | 启动对应 PR |
 | AGENTS.md / 根 ADR 索引发生与群体运行时有关的大改 | `./scripts/lca-ops notes-audit` 红 | 重审 §"Re-evaluation triggers" |
@@ -194,8 +194,7 @@ design 是宪法级长期设计；本材料尚未达到这个分量。
 # 2. ADR-0093 当前状态（必须是 Proposed 或 Accepted 才能开始 PR-B/C/D）
 grep -A1 '## 状态' docs/adr/0093-continuous-control-plane.md
 
-# 3. agent_lab 删除条件扫描
-rg 'agent_lab.runtime.runner' lca/ lca_kernel/ profiles/ bundles/
+# 3. InfoEdge prototype 删除条件扫描(2026-09-14 已落地)
 
 # 4. 层依赖扫描
 # 任何准备在 lca/colony/、新增信息素、ActionValue 词根前必须确认：
@@ -319,7 +318,7 @@ grep -rn 'PheromoneSignal' lca/ # 必须空
 
 - ADR-0093 状态变化（Proposed → Accepted / Superseded）
 - ADR-0206 P7 阶段闭集迁移完成
-- agent_lab 双挂被吸收（删除条件全部满足）
+- InfoEdge prototype 双挂被吸收（删除条件全部满足;**已落地** 2026-09-14）
 - AGENTS.md / ADR-0195 分层变更
 - 用户/团队对群体运行时方向有新决策
 
@@ -329,8 +328,7 @@ grep -rn 'PheromoneSignal' lca/ # 必须空
 # 1. 拉 ADR 现状
 ./scripts/lca-ops notes-audit
 
-# 2. 查 agent_lab 状态
-rg 'agent_lab.runtime.runner' lca/ lca_kernel/ profiles/ bundles/
+# 2. 查 InfoEdge prototype 状态(2026-09-14 已落地删除)
 
 # 3. 查 colony 相关新增
 rg -l 'colony|Pheromone|ActionValue' lca/ lca_kernel/
@@ -375,8 +373,7 @@ wc -l docs/notes/plans/2026-09-09-colony-runtime-architecture-review-response.md
 # colony / pheromone / 信息素：必须为空
 rg -l 'lca/colony/|PheromoneSignal|pheromone_gateway' lca/ lca_kernel/
 
-# agent_lab 双挂吸收进度
-rg 'agent_lab.runtime.runner' lca/ lca_kernel/ profiles/ bundles/
+# InfoEdge prototype 双挂吸收进度(2026-09-14 已落地)
 
 # ADR-0093 现状
 grep -A1 '## 状态' docs/adr/0093-continuous-control-plane.md

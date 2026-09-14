@@ -18,7 +18,7 @@
 
 **关系**：
 
-- **Builds on**：ADR-0015 contracts 无行为、ADR-0062 Plugin 运行时收口、ADR-0093 持续控制面、ADR-0110 插件合约统一化、ADR-0167 step-tree materialization、ADR-0167.1 step-tree deriver wiring cleanup、ADR-0186 Session SSOT、ADR-0191 Fact Plane 收敛、ADR-0194 认知 Loop 架构收敛、ADR-0195 平台架构收敛（O7 退役契约持有者）、ADR-0209 agent_lab 收编、ADR-0211 Worker Contract 收紧。
+- **Builds on**：ADR-0015 contracts 无行为、ADR-0062 Plugin 运行时收口、ADR-0093 持续控制面、ADR-0110 插件合约统一化、ADR-0167 step-tree materialization、ADR-0167.1 step-tree deriver wiring cleanup、ADR-0186 Session SSOT、ADR-0191 Fact Plane 收敛、ADR-0194 认知 Loop 架构收敛、ADR-0195 平台架构收敛（O7 退役契约持有者）。
 - **Refines**：ADR-0167 §"StepTreeAccumulatorDeriver 退役声明"（从「声明不写盘」到「物理删除」）、ADR-0195 §2.5 P5（O7 delete-when 真正达成）、ADR-0186 §I-SESSION-5（派生面失败可见性，C9 幂等/重入 与 C11 事实可追溯 的失败端）。
 - **Supersedes**：无。
 - **Reject**：「保留 tree_accumulator 但加 `@deprecated`」（跨 PR 后门，违反 AGENTS.md §4「无 delete-when 的兼容分支 = 红灯」）；「让 derive() 继续 `log.warning` swallow 写盘失败」（观测面 silent failure，正是 run_f78f66322f1d 的根因面）；「把 O7 shim 改名为新 shim 再删」（没意义的多一步）；「新增第二个 fold deriver 用于 'capability provide'」（违反 C4 Reducer single-write 与 ADR-0195 §1.4 单写矩阵）。
@@ -229,16 +229,6 @@ def test_spine_replay_equals_single_fold(run_f78f66322f1d):
 7. 改 4 个 import 树（test_observation_ssot_regression / test_orphan_cancel_pre_boot / test_orphan / test_runtime_journal_binding_integration）：移除 `tree_accumulator` import
 8. 改 11 个引用文档：tree_accumulator 字面 → StepTreeFoldDeriver
 9. 跑 §7 验证矩阵；通过后提 PR
-
----
-
-## 10. 与 ADR-0186 / 0191 / 0194 / 0195 / 0209 / 0211 的关系
-
-- ADR-0186 I-SESSION-5：派生面 SSOT 已收敛为 StepTreeFoldDeriver；本 ADR 把"退役声明"兑现为物理删除。
-- ADR-0191 Fact Plane 收敛：本 ADR 让 FactAppendError 旁边多一个 JournalWriteError（typed exception 同语义层）。
-- ADR-0194 P5：衍生面 SSOT 收口的一部分。
-- ADR-0195 O7 delete-when：本 ADR 让 O7 守卫从 1 → 0。
-- ADR-0209 / 0211：lab / Worker Contract 系列；本 ADR 与它们无重叠（不动 lab plugin 与 Worker signature），但同 PR 一起跑 `lca-pre-push-checks` 减少集成 risk。
 
 ---
 

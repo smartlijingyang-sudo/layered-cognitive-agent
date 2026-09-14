@@ -37,8 +37,6 @@ SPINE_EXECUTION_POINTS: tuple[str, ...] = (
     # Cognition
     "brain.perceive.start",
     "brain.perceive.end",
-    "brain.think.start",
-    "brain.think.end",
     "think.gate.start",
     "think.gate.end",
     "critic.eval.start",
@@ -55,9 +53,7 @@ SPINE_EXECUTION_POINTS: tuple[str, ...] = (
     "body.tool.execute.start",
     "body.tool.execute.end",
     "body.tool.retry",
-    # Writable matrix (ADR-0167 D11)
-    "writable.step.start",
-    "writable.step.end",
+    # Writable matrix (ADR-0167 D11;step 边界已退役,见 hook llm.request.header)
     "writable.segment.start",
     "writable.segment.end",
     # Loop cursor control (ADR-0169)
@@ -82,6 +78,8 @@ SPINE_EXECUTION_POINTS: tuple[str, ...] = (
     "phase.tool.call.start",
     "phase.tool.call.end",
     "phase.tool.denied",
+    "terminal.commit",
+    "body.deterministic_fail",
     # Lifecycle normalization (ADR-0166 S5)
     "lifecycle.finally",
     "body.sandbox.enter",
@@ -194,8 +192,6 @@ _SPINE_EP_TO_CATEGORY: dict[str, str] = {
     # Cognition（PR-2 全量；试点已含 brain.perceive.start）
     "brain.perceive.start": "spine.cognition.brain.perceive.start",
     "brain.perceive.end": "spine.cognition.brain.perceive.end",
-    "brain.think.start": "spine.cognition.brain.think.start",
-    "brain.think.end": "spine.cognition.brain.think.end",
     "think.gate.start": "spine.cognition.think.gate.start",
     "think.gate.end": "spine.cognition.think.gate.end",
     "critic.eval.start": "spine.cognition.critic.eval.start",
@@ -248,9 +244,7 @@ _SPINE_EP_TO_CATEGORY: dict[str, str] = {
     "agent.spawn": "spine.agent.spawn",
     "agent.iteration": "spine.agent.iteration",
     "agent.final": "spine.agent.final",
-    # Writable matrix (PR-5)
-    "writable.step.start": "spine.writable.step.start",
-    "writable.step.end": "spine.writable.step.end",
+    # Writable matrix (PR-5;step 边界已退役,见 hook llm.request.header)
     "writable.segment.start": "spine.writable.segment.start",
     "writable.segment.end": "spine.writable.segment.end",
     "writable.iteration.halt": "spine.writable.iteration.halt",
@@ -262,6 +256,8 @@ _SPINE_EP_TO_CATEGORY: dict[str, str] = {
     "phase.think.fold": "spine.phase.think.fold",
     "phase.remember.fold": "spine.phase.remember.fold",
     "phase.stop.fold": "spine.phase.stop.fold",
+    "terminal.commit": "spine.terminal.commit",
+    "body.deterministic_fail": "spine.body.deterministic_fail",
     "phase.reflect.fold": "spine.phase.reflect.fold",
     "phase.act.fold.start": "spine.phase.act.fold.start",
     "phase.act.fold.end": "spine.phase.act.fold.end",

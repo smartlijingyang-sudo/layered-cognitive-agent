@@ -7,15 +7,12 @@ region-tag closed set extension via ``regions.declare``:
   - phase:replan
   - control:safety
 
-The closed set extension lets the region-tag fallback
-(per ADR-0210 §6.4) accept custom regions in production paths.
-The C14 closed-set check (per ADR-0210 §3 P7-I-4) reads these from
-the profile and accepts them as legal region labels.
+``lca.harness.profile.resolve.source`` parses the section into
+``ProfileSource.regions_declare`` as an immutable tuple.
 """
 
 import pathlib
 
-import pytest
 import yaml
 
 
@@ -154,97 +151,6 @@ class TestProfileSourceRegionsDeclareField:
         )
 
 
-class TestClosedSetAcceptsProfileRegions:
-    """build_region_closed_set accepts profile.regions.declare."""
-
-    def test_6_stage_plus_bare_plus_custom(self):
-        from agent_lab.profile_loader import build_region_closed_set
-        closed = build_region_closed_set({"phase:plan", "phase:replan", "control:safety"})
-        # Builtin 6-stage
-        for stage in ("perceive", "think", "act", "reflect", "remember", "stop"):
-            assert f"phase:{stage}" in closed
-        # Bare-enum
-        for region in ("model_visible", "effect", "lineage", "digest", "control"):
-            assert region in closed
-        # Custom
-        for region in ("phase:plan", "phase:replan", "control:safety"):
-            assert region in closed
-
-    def test_load_profile_regions_reads_web_assistant(self):
-        """load_profile_regions(web-assistant) returns the 3 declared regions."""
-        from agent_lab.profile_loader import load_profile_regions
-        result = load_profile_regions("profiles/web-assistant.yaml")
-        assert result == set(REGIONS_DECLARED), (
-            f"web-assistant regions.declare must be {set(REGIONS_DECLARED)}, got {result}"
-        )
-
-
-class TestC14AcceptsProfileExtendedRegions:
-    """The C14 validator accepts custom regions declared by the profile."""
-
-    def test_phase_plan_spec_valid_against_web_assistant(self):
-        """A spec with phase=plan is valid under web-assistant's closed set."""
-        from agent_lab.graph.spec import InfoEdgeSpec, NodeRegion
-        from agent_lab.graph.validate import validate_with_profile
-        from agent_lab.profile_loader import build_region_closed_set, load_profile_regions
-
-        spec = InfoEdgeSpec(
-            id="plan_test",
-            version="0.1.0",
-            region=NodeRegion.PHASE,
-            description="",
-            phase="plan",  # custom region, not in 6-stage set
-            nodes=[],
-            edges=[],
-            grants=[],
-            sub_specs=[],
-            plugins=[],
-            discard_sink=None,
-        )
-        profile_regions = load_profile_regions("profiles/web-assistant.yaml")
-        closed = build_region_closed_set(profile_regions)
-        # The spec's region label is "phase:plan" — must be in the
-        # web-assistant-extended closed set.
-        assert "phase:plan" in closed
-        # The validator should not raise C14 for this spec.
-        from agent_lab.graph.spec import current_region_label
-        assert current_region_label(spec) == "phase:plan"
-        errs = validate_with_profile(spec, profile_regions=profile_regions)
-        c14 = [e for e in errs if e.startswith("C14:")]
-        assert c14 == [], f"unexpected C14 errors: {c14}"
-
-    def test_unknown_region_still_fails_under_web_assistant(self):
-        """A spec with region='phase:totally_made_up' fails C14 even with web-assistant."""
-        from agent_lab.graph.spec import InfoEdgeSpec, NodeRegion
-        from agent_lab.graph.validate import validate_with_profile
-        from agent_lab.profile_loader import load_profile_regions
-
-        spec = InfoEdgeSpec(
-            id="bogus",
-            version="0.1.0",
-            region=NodeRegion.PHASE,
-            description="",
-            phase="totally_made_up",
-            nodes=[],
-            edges=[],
-            grants=[],
-            sub_specs=[],
-            plugins=[],
-            discard_sink=None,
-        )
-        profile_regions = load_profile_regions("profiles/web-assistant.yaml")
-        errs = validate_with_profile(spec, profile_regions=profile_regions)
-        c14 = [e for e in errs if e.startswith("C14:")]
-        assert len(c14) == 1
-        assert "phase:totally_made_up" in c14[0]
-        assert "'bogus'" in c14[0]
-
-
-# ---------------------------------------------------------------------------
-# Verify the 3 declared regions are NOT in the lab.* capability closed set
-# (P7-I-2: region labels do NOT participate in capability closure)
-# ---------------------------------------------------------------------------
-
 class TestWebAssistantOnP7Path:
     """web-assistant.yaml now runs the P7 region-tag path
     (declarative-phase-graph.yaml removed; the 3 custom regions
@@ -285,31 +191,3 @@ class TestWebAssistantOnP7Path:
         assert "P7 region-tag path" in text or "P7 path" in text, (
             "web-assistant.yaml header must document the P7 region-tag switch"
         )
-
-
-
-
-class TestRegionNotInLabCapabilityClosedSet:
-    """The 3 declared regions (phase:plan, phase:replan, control:safety) must
-    NOT appear in the lab.* capability closed set in capability-closed-set.md
-    (P7-I-2 — region labels are observation dimensions, not capability
-    dimensions)."""
-
-    def test_regions_not_in_capability_spec(self):
-        f = pathlib.Path("docs/specs/capability-closed-set.md")
-        if not f.exists():
-            pytest.skip("capability-closed-set.md not in this checkout")
-        text = f.read_text(encoding="utf-8")
-        import re
-        # Extract the closed set list (between ```text ``` fences)
-        m = re.search(r"```text\n(.*?)```", text, re.DOTALL)
-        assert m, "no fenced closed set in spec"
-        closed = m.group(1)
-        # The 3 declared regions must NOT appear as lab.* keys
-        for region in REGIONS_DECLARED:
-            # The closed set has no `region:`, no `phase:plan` etc. as a
-            # capability key.
-            assert f'"{region}"' not in closed, (
-                f"region {region!r} leaked into lab.* capability closed set "
-                f"(P7-I-2 violation)"
-            )

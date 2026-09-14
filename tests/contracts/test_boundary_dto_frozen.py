@@ -323,6 +323,34 @@ class TestEffectReceipt:
         assert receipt.output_ref is None
         assert receipt.error_code is None
         assert receipt.retryable is False
+        assert receipt.failure_kind is None
+
+    def test_failure_kind_only_on_failed(self) -> None:
+        """``failure_kind`` tag is reserved for FAILED outcomes.
+
+        Putting it on a SUCCEEDED receipt would mislead the cognition
+        seam into thinking the tool hit a deterministic failure when
+        it actually produced output.
+        """
+        with pytest.raises(ValueError):
+            EffectReceipt(
+                invocation_id="i1",
+                outcome=EffectOutcome.SUCCEEDED,
+                idempotency_key="k1",
+                provider="prov",
+                failure_kind="execution",
+            )
+
+    def test_failure_kind_carries_through_when_failed(self) -> None:
+        receipt = EffectReceipt(
+            invocation_id="i1",
+            outcome=EffectOutcome.FAILED,
+            idempotency_key="k1",
+            provider="prov",
+            error_code="boom",
+            failure_kind="execution",
+        )
+        assert receipt.failure_kind == "execution"
 
     def test_rejects_unknown_field(self) -> None:
         with pytest.raises(TypeError):
@@ -397,31 +425,26 @@ class TestMemoryReceipt:
 
 class TestStopPayload:
     def test_minimal_construction_works(self) -> None:
-        sp = StopPayload(should_stop=False)
-        assert sp.should_stop is False
-        assert sp.focus_converged is False
+        sp = StopPayload()
         assert sp.reason is None
         assert sp.final_output_ref is None
 
     def test_full_construction(self) -> None:
         sp = StopPayload(
-            should_stop=True,
-            focus_converged=True,
             reason="budget_exceeded",
             final_output_ref="artifact://out",
         )
-        assert sp.should_stop is True
         assert sp.reason == "budget_exceeded"
         assert sp.final_output_ref == "artifact://out"
 
     def test_rejects_extra_field(self) -> None:
         with pytest.raises(ValidationError):
-            StopPayload(should_stop=False, unknown_field="x")
+            StopPayload(reason=None, unknown_field="x")
 
     def test_is_frozen_assignment_raises(self) -> None:
-        sp = StopPayload(should_stop=False)
+        sp = StopPayload()
         with pytest.raises(ValidationError):
-            sp.should_stop = True
+            sp.reason = "budget_exceeded"
 
 
 class TestConfigIntrospection:

@@ -32,9 +32,16 @@ def ref_of(bindings: PlaneBindings, kind: PlaneKind) -> PlaneRef | None:
 def make_sandbox_ref(*, name: str = "onlyboxes") -> PlaneRef:
     """The only writer of a sandbox PlaneRef. Disk identity is GuestLayout."""
     ident = name.strip() or "onlyboxes"
+    lowered = ident.lower()
+    if "local" in lowered:
+        label = "Local sandbox"
+    elif "onlyboxes" in lowered:
+        label = "Onlyboxes"
+    else:
+        label = ident
     return PlaneRef(
         id=ident,
-        label="Onlyboxes",
+        label=label,
         kind=PlaneKind.SANDBOX,
         root=ONLYBOXES.root,
         outputs_dir=ONLYBOXES.outputs_dir,

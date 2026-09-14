@@ -2,7 +2,9 @@
 
 ## 状态
 
-**Accepted — 2026-08-28**
+**Superseded by ADR-0230 (2026-09-14) — StopDecision Retirement.** The `StopPolicy` seam this ADR owned is retired; loop termination is now driven by the model's own `decision.action_type` and by Body's `DeterministicToolError`. The historical rationale (collapse redundant StopRule layers, keep one deep module in the State cluster) still holds for any policy class that lives in the future; this ADR is kept for audit only.
+
+Originally Accepted — 2026-08-28
 
 ## 背景
 

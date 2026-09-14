@@ -277,17 +277,17 @@ def test_builder_cursor_fork_and_advance_methods_intact(tmp_path: Path) -> None:
     )
     try:
         cursor = session.loop_cursor
-        for method in (
-            "advance",
-            "fork",
-            "halt",
-            "close",
-            "record_thinking",
-            "record_tool_call",
-            "record_tool_result",
-            "record_request_header",
-        ):
+        # 2026-09-14 dead-code 修剪:LoopCursor Protocol 只剩 advance + open_step。
+        for method in ("advance", "open_step"):
             assert hasattr(cursor, method), f"missing {method}"
+        # 确认被删除的方法不再暴露(避免有人偷偷加回来)。
+        for removed in ("record_thinking", "record_tool_call",
+                        "record_tool_result", "record_request_header",
+                        "halt", "close", "fork"):
+            assert not hasattr(cursor, removed), (
+                f"{removed} 已从 LoopCursor Protocol 删除,留存在实现层会"
+                "让历史 compat 路径复活(run_c2d944661a78 类 bug)"
+            )
         # incarnation 显式身份
         assert cursor.incarnation.incarnation_seq == 1
     finally:

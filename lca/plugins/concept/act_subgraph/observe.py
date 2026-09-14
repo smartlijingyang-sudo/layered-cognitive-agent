@@ -15,6 +15,9 @@ from dataclasses import dataclass
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
+from lca.contracts.atoms.semantic.keys import (
+    FAILURE_KIND_EXECUTION,
+)
 from lca.contracts.harness.act.effect_receipt import EffectReceipt
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -58,6 +61,16 @@ class ActObserveExecutor:
         记录一条 ``effect.observed`` RunFact 到 journal(若 runtime 暴露
         ``journal`` capability),让 reflect/remember 节点可以基于它做
         typed 推断。
+
+        Deterministic-failure shortcut (plan
+        ``docs/plans/2026-09-14-stop-decision-retirement.md``, PR-3):
+        when the receipt's ``extra[FAILURE_KIND] == EXECUTION``,
+        ``act.observe`` emits a ``should_terminate=true`` payload on
+        the result node, and the outer driver routes the next edge
+        to ``terminal.commit`` instead of looping back to think.
+        Body's deterministic-failure signal (failure_kind=execution)
+        is the single source of truth for "the model cannot make
+        progress on this path".
         """
         receipt = input.port_values.get("receipt")
         if not isinstance(receipt, EffectReceipt):
@@ -86,7 +99,16 @@ class ActObserveExecutor:
             )
             journal.commit_fact(fact, plan_ref=plan_ref, node_ref=node_id)
 
-        return NodeOutput(port_values={"receipt": receipt})
+        should_terminate = False
+        if receipt.failure_kind == FAILURE_KIND_EXECUTION or (receipt.failure_kind is None and receipt.outcome.value == "failed"):
+            should_terminate = True
+
+        return NodeOutput(
+            port_values={
+                "receipt": receipt,
+                "should_terminate": should_terminate,
+            }
+        )
 
 
 @plugin(

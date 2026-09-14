@@ -51,6 +51,13 @@ patch:
       boot_path: .lca/spine/oii-debug-boot-spine.jsonl
       runs_root: traces/runs
 
+  # EventSpine console sink — oii-debug is the canonical debug profile; opt
+  # the live console into ``graph_timeline`` so the operator sees the same
+  # line shape ``trace-show`` prints, matching web-standard's choice.
+  - id: spine.sink.console
+    config:
+      format: graph_timeline
+
   # OII-only source-level attacher overrides(migrated from the legacy
   # bundles/spine-oii-debug.yaml entry; loop_cursor.spine_debug no longer
   # redeclares spine.reflector.source to avoid cross-bundle plugin id

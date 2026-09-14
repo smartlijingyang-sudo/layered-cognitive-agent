@@ -8,7 +8,6 @@ from lca.cognition.convergence.payload import (
 )
 from lca.cognition.convergence.predicates import delivery_satisfied
 from lca.cognition.convergence.producer_tools import is_producer_tool
-from lca.cognition.convergence.task_class import resolve_task_class
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.models.core.policy.convergence import DeliveryEvidence
 from lca.contracts.models.core.state.state import AgentState
@@ -37,28 +36,21 @@ def _has_user_visible_delivery(state: AgentState) -> bool:
             continue
         if not turn.observation_success:
             continue
-        if turn_has_delivery_signal(
-            turn.observation_payload,
-            files_created=turn.files_created,
-            task=state.task or "",
-        ):
+        if turn_has_delivery_signal(turn.observation_payload):
             return True
     return False
 
 
 def build_delivery_evidence(state: AgentState) -> DeliveryEvidence:
-    task_class = resolve_task_class(state)
     artifacts = artifact_count(state)
     producer_ok = _producer_success_count(state)
     user_visible = _has_user_visible_delivery(state)
     satisfied, detail = delivery_satisfied(
-        task_class,
         artifact_count=artifacts,
         producer_ok=producer_ok,
         has_user_visible_delivery=user_visible,
     )
     return DeliveryEvidence(
-        task_class=task_class,
         artifact_count=artifacts,
         has_user_visible_text=user_visible,
         producer_success_since_task=producer_ok,

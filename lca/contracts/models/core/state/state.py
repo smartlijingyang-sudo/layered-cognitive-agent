@@ -37,7 +37,7 @@ class Budget:
 
         ``resource`` accepts the portable loop-guard names ``steps``,
         ``tokens``, ``cost_usd`` and ``wall_clock_seconds``. Omitting it
-        preserves the runtime-wide check used by the State-cluster StopPolicy. This method
+        preserves the runtime-wide check used by the budget guard. This method
         reports an overage; loop re-entry uses its own stricter admission
         policy so the current terminal phase remains able to close cleanly.
         """

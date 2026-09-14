@@ -83,6 +83,17 @@ def _map_tool_invoked(data: dict[str, Any], *, parent: str | None) -> dict[str, 
         result = {"content": output_text}
     elif not data.get("ok", True) and data.get("error"):
         result = {"error": str(data.get("error"))}
+    # Fallback: many text-producing tools (``search``, ``web-browsing``, etc.)
+    # put their return string on ``obs.payload["text"]`` rather than the
+    # ``output`` / ``stdout`` / ``content`` whitelist that
+    # ``prepare_tool_invoked`` reads. When the explicit ``output_text`` is
+    # empty, surface ``text`` so the LobeHub gateway handler can write the
+    # tool return onto the tool message and ``persistAssistantRow`` keeps
+    # a non-empty assistant content.
+    if result is None and data.get("ok", True):
+        text_payload = data.get("text")
+        if isinstance(text_payload, str) and text_payload:
+            result = {"content": text_payload}
     return {
         "event": _parent_body(
             {

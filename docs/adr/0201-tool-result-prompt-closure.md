@@ -29,8 +29,9 @@ SafeExecutor Observation
 | 缺口 | 修复 |
 |---|---|
 | Reflect 批部分成功误报失败 | `critic._partial_batch_reflection` → ON_TRACK |
-| Delivery gate 把 PDF dump 当交付 | `task_requires_synthesis` → stdout 不算 delivery |
 | spine header 缺 history merge | `ModelVisibleHookAdapter._kwargs_for_hook` 合并 wire messages |
+
+> **2026-09-14 修订**：`task_requires_synthesis` 随 ADR-0196 的 task-class taxonomy 一起删除；"PDF dump 当交付"的原修复已被通用 `is_substantive_stdout` 谓词覆盖（仍区分 import-only 与短答空白），不再需要 task-class 二次过滤。MV5 撤销。
 
 ## 1. 不变量
 
@@ -40,9 +41,8 @@ SafeExecutor Observation
 | MV2 | `data.message.role` MUST 为 `tool`；`tool_call_id` 与 assistant tool_calls 一致 |
 | MV3 | Receipt（CursorRecord / turn.control）与 surface message 分轨；Receipt 不替代 FC message |
 | MV4 | cognition 禁止直接写 model-visible message；唯一生产 `append_tool_result_surface` |
-| MV5 | 合成/分析类 task 的 tool stdout 不构成 `DeliveryEvidence` 满足 |
-| MV6 | `SpineLlmRequestHeaderPayload.messages` 反映 adapter 实际 wire（含 history merge） |
-| MV7 | 删除 compat 前须有 `rg` / pytest delete-when 检测 |
+| MV5 | `SpineLlmRequestHeaderPayload.messages` 反映 adapter 实际 wire（含 history merge） |
+| MV6 | 删除 compat 前须有 `rg` / pytest delete-when 检测 |
 
 ## 2. 实现锚点
 
@@ -52,7 +52,6 @@ SafeExecutor Observation
 | Emit | `lca/infrastructure/session/emit/tool_surface_emit.py` |
 | Commit | `lca/loop/commit/tool_journal.py` |
 | Body 接线 | `lca/cognition/body/executor/safe_executor.py` |
-| 交付谓词 | `lca/cognition/convergence/task_class.task_requires_synthesis` |
 | 观测 merge | `lca/plugins/events/hooks/model_visible/adapter.py` |
 
 ## 3. delete-when

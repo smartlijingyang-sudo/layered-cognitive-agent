@@ -10,6 +10,7 @@ reads the populated row. See spec §5.3.1.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 
@@ -40,11 +41,18 @@ def wire_tool_call(
         identifier, api_name = "lobe-cloud-sandbox", tool_name
     else:
         identifier, api_name = coords
+    # Wire protocol: ``arguments`` is a JSON-encoded string to match the
+    # LobeHub ChatToolPayloadSchema contract (``z.string()``). Sending a dict
+    # makes the trpc updateMessage call fail schema validation and silently
+    # clears the assistant bubble on completion (because the persist fallback
+    # refetch runs before the failed write resolves). Mirrors the OpenAI
+    # compat / Anthropic adapter convention (see
+    # ``lca/infrastructure/llm_adapter/openai_compat/anthropic/_anthropic_stream.py``).
     return {
         "id": invocation_id or tool_name,
         "identifier": identifier,
         "apiName": api_name,
-        "arguments": dict(arguments or {}),
+        "arguments": json.dumps(arguments or {}, ensure_ascii=False),
         "type": "builtin",
     }
 
@@ -160,12 +168,23 @@ class EventTranslator:
 
     @staticmethod
     def _tool_invoked(e: dict) -> dict:
-        """spec §5.3.1: NO top-level projected_state — use ``result.state`` (native shape)."""
+        """spec §5.3.1: NO top-level projected_state — use ``result.state`` (native shape).
+
+        Also surface ``output_text`` (the inline stdout / content for non-evidence
+        tools, set by ``prepare_tool_invoked``) into ``result.content`` so the
+        LobeHub gateway handler can write it onto the tool message in memory.
+        Without this, the assistant bubble shows the tool invocation but never
+        its return text, and the post-run ``persistAssistantRow`` writes an
+        empty ``content`` for the assistant message.
+        """
         result_raw = e.get("result")
         result: dict[str, Any] = dict(result_raw) if isinstance(result_raw, dict) else {}
         projected = e.get("projected_state")
         if isinstance(projected, dict) and projected:
             result["state"] = projected
+        output_text = e.get("output_text")
+        if isinstance(output_text, str) and output_text:
+            result.setdefault("content", output_text)
         return {
             "type": "tool_end",
             "data": {
@@ -351,10 +370,23 @@ class EventTranslator:
         ok = payload.get("ok")
         is_success = ok if isinstance(ok, bool) else outcome not in ("failure", "failed", "error")
         tool_calling = wire_tool_call(tool_name, invocation_id, {})
-        output_text = payload.get("output_text")
+        # Tool result lands in ``payload["message"]`` as an OpenAI-shaped
+        # ``{role, tool_call_id, content}`` envelope produced by
+        # ``build_tool_surface_data``. The LobeHub gateway handler reads
+        # ``data.result`` to feed the in-memory message row (and the
+        # post-run ``persistAssistantRow`` writes it back to DB); without
+        # ``result.content`` the assistant bubble stays empty after the
+        # tool completes and the LLM never sees its own tool return text,
+        # so it cannot produce a final answer.
+        message = payload.get("message")
+        result_content = ""
+        if isinstance(message, dict):
+            content = message.get("content")
+            if isinstance(content, str):
+                result_content = content
         result: dict[str, Any] | None = None
-        if isinstance(output_text, str) and output_text:
-            result = {"content": output_text}
+        if result_content:
+            result = {"content": result_content}
         return {
             "type": "tool_end",
             "data": {

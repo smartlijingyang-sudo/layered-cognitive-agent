@@ -55,15 +55,6 @@ class CordisEventTableEntry:
 # ─────────────────────────────────────────────────────────────────
 
 _CORDIS_EVENT_TABLE_ENTRIES: Final[tuple[CordisEventTableEntry, ...]] = (
-    # ── writable.step.*  (ADR-0169 L1:begin/end 配对) ─────────────
-    CordisEventTableEntry(
-        execution_point="writable.step.start",
-        cordis_name="agent.writable.step.start",
-    ),
-    CordisEventTableEntry(
-        execution_point="writable.step.end",
-        cordis_name="agent.writable.step.end",
-    ),
     # ── writable.segment.*  (ADR-0169 L2:begin/end 配对) ──────────
     CordisEventTableEntry(
         execution_point="writable.segment.start",

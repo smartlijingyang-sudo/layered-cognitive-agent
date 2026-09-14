@@ -1,8 +1,8 @@
 """Gate / perceive / think Session fact production (ADR-0191 R2, ADR-0194 P1-06/14/15).
 
 Single production seam for ``gate.decided.v1``, ``context.manifested.v1``, and
-``brain.think.start`` / ``brain.think.end`` / reasoner spine EPs (via
-``publish_ep_bound``). All helpers no-op when no Session is bound (tests / offline).
+reasoner spine EPs (via ``publish_ep_bound``). All helpers no-op when no Session
+is bound (tests / offline).
 """
 
 from __future__ import annotations
@@ -21,11 +21,10 @@ from lca.contracts.models.cognition.boundary import (
 )
 from lca.contracts.models.cognition.reasoner_turn import ReasonerTurnPlan, ReasonerTurnRender
 from lca.contracts.models.core.conversation.llm import LLMResponse
-from lca.contracts.models.core.execution.decision import Decision
 from lca.contracts.models.core.perceive.perception import ContextItem, ContextManifest
 from lca.contracts.models.core.policy.gate_policy import GateDecided
 from lca.contracts.models.core.state.state import AgentState
-from lca.contracts.protocols import Brain, Reasoner
+from lca.contracts.protocols import Reasoner
 from lca.contracts.protocols.loop.fact_gateway import AppendReceipt
 from lca.loop.fact_gateway import append_catalog_bound, publish_ep_bound
 
@@ -114,39 +113,6 @@ def emit_context_manifested_for_state(
             digest=manifest.digest,
             items=tuple(_context_item_wire(item) for item in manifest.items),
         ),
-        state=state,
-        session=session,
-        actor=actor,
-    )
-
-
-def emit_brain_think_start_for_state(
-    state: AgentState,
-    *,
-    session: object | None = None,
-    actor: str = "brain",
-) -> AppendReceipt | None:
-    """Append one ``brain.think.start`` spine fact."""
-    return publish_ep_bound(
-        "brain.think.start",
-        {"state_id": state.trace_id},
-        state=state,
-        session=session,
-        actor=actor,
-    )
-
-
-def emit_brain_think_end_for_state(
-    state: AgentState,
-    *,
-    outcome: str = "success",
-    session: object | None = None,
-    actor: str = "brain",
-) -> AppendReceipt | None:
-    """Append one ``brain.think.end`` spine fact."""
-    return publish_ep_bound(
-        "brain.think.end",
-        {"state_id": state.trace_id, "outcome": outcome},
         state=state,
         session=session,
         actor=actor,
@@ -625,28 +591,7 @@ async def run_reasoner_generate_thoughts_with_spine_facts(
     return cast("LLMResponse", response)
 
 
-async def run_brain_think_with_spine_facts(brain: Brain, state: AgentState) -> Decision:
-    """Run ``brain.think`` with ``brain.think.start/end`` facts via FactGateway.
-
-    Spine mirror failures must not block cognition (same contract as the former
-    ``ModularBrain`` inline envelope).
-    """
-    with contextlib.suppress(Exception):
-        emit_brain_think_start_for_state(state)
-    try:
-        decision = await brain.think(state)
-    except BaseException:
-        with contextlib.suppress(Exception):
-            emit_brain_think_end_for_state(state, outcome="failure")
-        raise
-    with contextlib.suppress(Exception):
-        emit_brain_think_end_for_state(state, outcome="success")
-    return decision
-
-
 __all__ = [
-    "emit_brain_think_end_for_state",
-    "emit_brain_think_start_for_state",
     "emit_context_manifested",
     "emit_context_manifested_for_state",
     "emit_critic_eval_end_for_state",
@@ -659,6 +604,5 @@ __all__ = [
     "emit_reasoner_reason_start_for_state",
     "emit_skill_router_route_for_state",
     "emit_synthesizer_merge_for_state",
-    "run_brain_think_with_spine_facts",
     "run_reasoner_generate_thoughts_with_spine_facts",
 ]

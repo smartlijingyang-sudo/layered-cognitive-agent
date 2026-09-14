@@ -151,6 +151,16 @@ class ToolForkDispatchExecutor:
 
         forked = tools_service.fork_for_run(bindings)
         items = tuple(forked.list_tools())
+        # When the SANDBOX plane is bound, drop Creator host-CWD primitives
+        # (bash/file_write/…) so Solo cannot fall back to host /mnt/data misses.
+        # Mirrors lca.plugins.collaboration.modes.solo.filter_solo_tools.
+        if getattr(bindings, "sandbox", None) is not None:
+            _creator_host = frozenset(
+                {"bash", "file_write", "cordis_control", "profile_apply", "profile_diff"}
+            )
+            items = tuple(
+                tool for tool in items if getattr(tool, "name", "") not in _creator_host
+            )
         _assert_sandbox_tools_visible(bindings, items)
         forked_tools = ForkedTools(
             items=items,

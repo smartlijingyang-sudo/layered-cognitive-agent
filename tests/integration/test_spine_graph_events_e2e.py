@@ -44,6 +44,7 @@ from lca.framework.graph.ep_table import (
     EP_SUBGRAPH_EXIT,
 )
 from lca.framework.graph.interpreter import PlanInterpreter
+from lca.framework.graph.observation import payload_of
 from lca.framework.graph.observer_impls import SpineGraphObserver
 from lca.framework.graph.strategies.subgraph_strategy import SubgraphStrategy
 from lca.framework.graph.strategy_registry import (
@@ -234,6 +235,116 @@ async def test_subgraph_boundary_emits_enter_and_exit(tmp_path: Path, monkeypatc
     assert exit_["payload"]["kind"] == "subgraph_exit"
     assert exit_["payload"]["outcome"] == "success"
     assert enter["payload"]["metadata"]["subgraph_plan_ref"] == "inner"
+
+
+def _live_forked_tools() -> object:
+    """One real per-turn tool bundle: pydantic model over live ``Tool_*`` objects."""
+    from lca.contracts.models.cognition.boundary import ForkedTools
+    from lca.contracts.models.core.execution.tool import ToolApi, ToolManifest
+    from lca.infrastructure.tools.builder.builder import build_tools_from_manifest
+
+    class _Search:
+        async def search(self, args: dict) -> dict:
+            return {"success": True}
+
+    tool = build_tools_from_manifest(
+        ToolManifest(
+            identifier="web_search",
+            type="builtin",
+            api=(
+                ToolApi(
+                    name="search",
+                    description="live web search",
+                    parameters={"type": "object", "properties": {}},
+                ),
+            ),
+        ),
+        _Search(),
+    )[0]
+    return ForkedTools(items=(tool,), binding_keys=frozenset({"search"}))
+
+
+@dataclass(frozen=True, slots=True)
+class _LiveToolPortStrategy(NodeStrategy):
+    """Node ``a`` publishes ``forked_tools``; node ``b`` reads it then optionally fails."""
+
+    kind: BindingKind = BindingKind.NODE_EXECUTOR
+    schema: NodeIOSchema = field(default_factory=NodeIOSchema)
+    fail_on_b: bool = False
+
+    async def execute(self, context, input):  # type: ignore[override]
+        if context.node_id == "a":
+            return NodeOutput(
+                port_values={"forked_tools": _live_forked_tools()},
+                producer_node=context.node_id,
+                result_kind="decision",
+                next_hints={"next": "b"},
+            )
+        if self.fail_on_b:
+            raise TimeoutError("llm stream idle timeout")
+        assert input.port_values["forked_tools"] is not None
+        return NodeOutput(
+            port_values={"response": "done"},
+            producer_node=context.node_id,
+            result_kind="decision",
+            next_hints={"next": ""},
+        )
+
+
+def _live_tool_plan() -> Plan:
+    from lca.contracts.protocols.graph.node_io import PortSpec
+
+    return Plan(
+        id="plan-live-tools",
+        nodes=(
+            PlanNode(id="a", binding=BindingKind.NODE_EXECUTOR, entry=True),
+            PlanNode(
+                id="b",
+                binding=BindingKind.NODE_EXECUTOR,
+                terminal=True,
+                io_schema=NodeIOSchema(inputs=(PortSpec(name="forked_tools"),)),
+            ),
+        ),
+        edges=(PlanEdge(source="a", target="b"),),
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("fail_on_b", [False, True], ids=["success", "node_fails"])
+async def test_node_end_with_live_tools_reaches_the_session_plane(fail_on_b: bool) -> None:
+    """A node whose ports hold live tools must still land its terminal fact.
+
+    ``Session.append`` is the only write path to the journal and it rejects
+    payloads that are not losslessly JSON. A live ``Tool_*`` instance reaching
+    it drops the ``phase_graph.node.end`` record outright, so the run loses the
+    node's outcome and the frontend never learns how the step ended.
+    """
+    from lca.framework.graph.observation import KIND_VISIT_END
+    from lca.framework.graph.observer_impls import RecordingObserver
+    from lca.session.append import Session
+
+    observer = RecordingObserver()
+    reg = StrategyRegistry()
+    reg.register(_LiveToolPortStrategy(fail_on_b=fail_on_b))
+    interp = PlanInterpreter(registry=reg, observer=observer)
+    if fail_on_b:
+        with pytest.raises(TimeoutError, match="idle timeout"):
+            await interp.run(_live_tool_plan())
+    else:
+        await interp.run(_live_tool_plan())
+
+    ends = [e for e in observer.by_kind(KIND_VISIT_END) if e.node_id == "b"]
+    assert len(ends) == 1
+
+    event = Session("run-live-tools").append(EP_NODE_END, payload_of(ends[0]))
+    data = event.data
+    assert data["outcome"] == ("failure" if fail_on_b else "success")
+    assert data["node_id"] == "b"
+    projected = data["inputs"]["forked_tools"]
+    assert projected.startswith("ForkedTools(items=(<")
+    assert "Tool_search" in projected
+    if fail_on_b:
+        assert "llm stream idle timeout" in data["error"]
 
 
 def _force_module_register() -> None:

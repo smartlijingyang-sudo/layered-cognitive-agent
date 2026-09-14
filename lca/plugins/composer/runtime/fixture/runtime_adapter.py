@@ -41,7 +41,6 @@ from lca.plugins.journal.declarative.runtime_seams_provider import (
     RegistryEffectDispatcherFactory,
 )
 from lca.plugins.loop.reducer.plugin import DefaultReducer
-from lca.plugins.loop.state.stop_policy.plugin import DefaultStopPolicy
 
 
 class FixtureRuntimeAdapter:
@@ -56,12 +55,10 @@ class FixtureRuntimeAdapter:
         artifact_closure = (
             self._deps.artifact_closure or fixture_runtime_defaults.artifact_closure()
         )
-        stop_policy = self._deps.stop_policy or DefaultStopPolicy(artifact_closure)
-        phase_capabilities = {**self._deps.phase_capabilities, "stop_policy": stop_policy}
+        phase_capabilities = dict(self._deps.phase_capabilities)
         return replace(
             self._deps,
             phase_capabilities=phase_capabilities,
-            stop_policy=stop_policy,
             reducer=self._deps.reducer or DefaultReducer(),
             effect_handler_registry=self._deps.effect_handler_registry
             or fixture_runtime_defaults.effect_handlers(),

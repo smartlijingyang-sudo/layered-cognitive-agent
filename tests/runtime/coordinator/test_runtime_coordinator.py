@@ -139,6 +139,104 @@ async def test_handle_stamped_writes_projected_state_to_db_before_tool_end(
     assert any(e["type"] == "tool_end" for e in history)
 
 
+async def test_tool_end_with_content_publishes_followup_text_chunk(
+    manager: LcaStreamEventManager, clean_run_id: str
+) -> None:
+    """spine body.tool.execute.end with textual result must surface the answer
+    to the LobeHub client as an assistant bubble.
+
+    Replicates the live run ``run_634aefcbb06f`` failure: after a tool returns
+    ``result.content = "Example Domain"``, the LLM driver stops without
+    re-emitting text, so the assistant bubble stays empty. The coordinator
+    follows up ``tool_end`` with a single ``stream_chunk chunkType=text``
+    carrying the tool result, so the front-end ``accumulatedContent``
+    accumulator has the answer when ``agent_runtime_end`` lands.
+    """
+    coord = LcaAgentRuntimeCoordinator(
+        stream_manager=manager,
+        translator=EventTranslator(),
+        metadata_writer=AsyncMock(),
+        tool_state_writer=AsyncMock(),
+    )
+    await coord.start(clean_run_id, ctx={})
+    await coord.handle_stamped(
+        clean_run_id,
+        {
+            "event": {
+                "execution_point": "body.tool.execute.end",
+                "payload": {
+                    "tool_name": "runCommand",
+                    "invocation_id": "tc1",
+                    "ok": True,
+                    "latency_ms": 120,
+                    "message": {
+                        "role": "tool",
+                        "tool_call_id": "tc1",
+                        "content": "Example Domain\n",
+                    },
+                },
+            }
+        },
+    )
+    history = await manager.read_history(clean_run_id, count=20)
+    tool_ends = [e for e in history if e["type"] == "tool_end"]
+    assert len(tool_ends) == 1
+    assert tool_ends[0]["data"]["result"]["content"] == "Example Domain\n"
+
+    text_chunks_after_tool_end = [
+        e
+        for e in history
+        if e["type"] == "stream_chunk"
+        and e["data"]["chunkType"] == "text"
+        and e["data"]["content"] == "Example Domain\n"
+    ]
+    assert len(text_chunks_after_tool_end) == 1, (
+        "tool_end with textual result must emit a follow-up stream_chunk text "
+        "so the assistant bubble renders the answer when the LLM driver stops"
+    )
+    # read_history returns newest-first; the follow-up text chunk must be
+    # NEWER than tool_end (i.e. appear earlier in the list), since the
+    # coordinator publishes tool_end first and the follow-up immediately after.
+    text_index = history.index(text_chunks_after_tool_end[0])
+    tool_end_index = history.index(tool_ends[0])
+    assert text_index < tool_end_index, (
+        "the follow-up text chunk must publish AFTER tool_end so the front-end "
+        "sees the answer after the tool card"
+    )
+
+
+async def test_tool_end_without_content_does_not_emit_text_chunk(
+    manager: LcaStreamEventManager, clean_run_id: str
+) -> None:
+    """No tool text → no synthetic assistant text chunk (preserves the
+    wait-for-LLM path for tool runs that legitimately need a follow-up)."""
+    coord = LcaAgentRuntimeCoordinator(
+        stream_manager=manager,
+        translator=EventTranslator(),
+        metadata_writer=AsyncMock(),
+        tool_state_writer=AsyncMock(),
+    )
+    await coord.start(clean_run_id, ctx={})
+    await coord.handle_stamped(
+        clean_run_id,
+        {
+            "event": {
+                "execution_point": "body.tool.execute.end",
+                "payload": {
+                    "tool_name": "runCommand",
+                    "invocation_id": "tc2",
+                    "ok": True,
+                    "latency_ms": 50,
+                },
+            }
+        },
+    )
+    history = await manager.read_history(clean_run_id, count=20)
+    assert not any(
+        e["type"] == "stream_chunk" and e["data"]["chunkType"] == "text" for e in history
+    )
+
+
 async def test_terminal_publishes_agent_runtime_end(
     manager: LcaStreamEventManager, clean_run_id: str
 ) -> None:

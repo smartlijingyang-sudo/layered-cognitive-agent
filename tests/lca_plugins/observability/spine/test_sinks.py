@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -133,3 +134,172 @@ def test_file_and_console_setup_are_plugin_carriers() -> None:
     assert callable(file_setup.setup)
     assert hasattr(console_setup, "setup")
     assert callable(console_setup.setup)
+
+
+GRAPH_PAYLOAD: dict[str, Any] = {
+    "kind": "visit_end",
+    "plan_ref": "think.subgraph",
+    "node_id": "think.reason.llm",
+    "node_index": 1,
+    "depth": 2,
+    "binding": "node_executor",
+    "edge_id": "",
+    "from_node": "",
+    "to_node": "",
+    "dispatch": "next",
+    "outcome": "success",
+    "error": "",
+    "elapsed_ms": 604,
+    "inputs": {"context": ["a"]},
+    "outputs": {"decision": {"kind": "answer"}},
+    "metadata": {"binding": "node_executor"},
+}
+
+
+def _graph_rec(**overrides: Any) -> EventRecord:
+    base: dict[str, Any] = {
+        "execution_point": "phase_graph.node.end",
+        "payload": dict(GRAPH_PAYLOAD),
+        "run_id": "run_live",
+        "sequence": 44,
+    }
+    base.update(overrides)
+    return _make_rec(**base)
+
+
+def test_console_graph_timeline_writes_one_compact_line() -> None:
+    """The live line names the graph, the node, the timing and the ports.
+
+    ``run=``/``seq=`` come from the ``EventRecord`` the spine hands over, which
+    is what makes this line quotable against the durable record later.
+    """
+    stream = io.StringIO()
+
+    ConsoleSink(stream, format="graph_timeline").write(_graph_rec())
+
+    assert stream.getvalue() == (
+        "run=run_live  seq=44  phase_graph.node.end  node=think.reason.llm"
+        "  ok  604ms  depth=2  dispatch=next  in=context  out=decision\n"
+    )
+    assert "answer" not in stream.getvalue()
+
+
+def test_console_graph_timeline_drops_every_other_event() -> None:
+    """Narrowing the stream is the point; the full payload stays in the spine file.
+
+    ``phase_graph.instrument.coverage`` shares the ``phase_graph.`` prefix but is
+    not a lifecycle event, so it pins exact matching rather than prefix matching.
+    """
+    stream = io.StringIO()
+    sink = ConsoleSink(stream, format="graph_timeline")
+
+    sink.write(_graph_rec(execution_point="phase_graph.instrument.coverage"))
+    sink.write(_graph_rec(execution_point="llm.stream.token"))
+
+    assert stream.getvalue() == ""
+
+
+def test_console_default_format_still_writes_full_jsonl() -> None:
+    """Default is unchanged, so existing machine consumers see no difference."""
+    stream = io.StringIO()
+
+    ConsoleSink(stream).write(_graph_rec())
+
+    written = json.loads(stream.getvalue())
+    assert written["execution_point"] == "phase_graph.node.end"
+    assert written["payload"]["outputs"] == {"decision": {"kind": "answer"}}
+
+
+def test_console_setup_reads_the_bundle_format_config() -> None:
+    """``config.format`` selects the projection, so the bundle owns the choice."""
+    timeline_ctx = _StubPluginContext()
+    asyncio.run(console_setup.setup(timeline_ctx, {"format": "graph_timeline"}))
+    jsonl_ctx = _StubPluginContext()
+    asyncio.run(console_setup.setup(jsonl_ctx, {}))
+
+    assert timeline_ctx.provided["console_sink"]._format == "graph_timeline"
+    assert jsonl_ctx.provided["console_sink"]._format == "jsonl"
+
+
+def test_console_graph_timeline_still_swallows_sink_failures() -> None:
+    """A broken stream must not reach the spine hot path in either format."""
+    sink = ConsoleSink(io.StringIO(), format="graph_timeline")
+    sink._stream = None  # type: ignore[assignment]
+
+    sink.write(_graph_rec())
+
+
+def test_console_write_event_renders_timeline_line_from_event_id() -> None:
+    """Session-observer entrypoint: join keys come from ``<run_id>:<seq>``.
+
+    Bypasses ``EventRecord.__post_init__`` so a Session observer can drive
+    the live stream without rebuilding the strict record shape.
+    """
+    stream = io.StringIO()
+    sink = ConsoleSink(stream, format="graph_timeline")
+
+    sink.write_event(
+        "phase_graph.node.end",
+        dict(GRAPH_PAYLOAD),
+        "run_abc:44",
+    )
+
+    assert stream.getvalue() == (
+        "run=run_abc  seq=44  phase_graph.node.end  node=think.reason.llm"
+        "  ok  604ms  depth=2  dispatch=next  in=context  out=decision\n"
+    )
+
+
+def test_console_write_event_drops_non_graph_events_in_timeline_format() -> None:
+    """graph_timeline narrowing still applies on the Session observer path."""
+    stream = io.StringIO()
+    sink = ConsoleSink(stream, format="graph_timeline")
+
+    sink.write_event("llm.stream.token", {"text": "hi"}, "run_abc:1")
+
+    assert stream.getvalue() == ""
+
+
+def test_console_setup_registers_session_observer() -> None:
+    """setup writes the sink under ``console_sink`` AND into the observer catalog.
+
+    The catalog is the production wiring (ADR-0186 / spine_file_sink
+    precedent): the live EventSpine does not wire this sink itself because
+    the DAG runs ``spine.core`` before ``spine.sink.console``, so the
+    observer registration is what carries events to stdout in a real run.
+    """
+    from lca.plugins.events._session_observe import (
+        clear_observer_catalog,
+        observer_catalog,
+    )
+
+    clear_observer_catalog()
+    try:
+        ctx = _StubPluginContext()
+        asyncio.run(console_setup.setup(ctx, {"format": "graph_timeline"}))
+
+        catalog = observer_catalog()
+        assert len(catalog) == 1, (
+            f"console sink must register exactly one Session observer; got {list(catalog)!r}"
+        )
+        registered_sink = ctx.provided["console_sink"]
+        assert isinstance(registered_sink, ConsoleSink)
+        _, callback = next(iter(catalog.items()))
+        stream = io.StringIO()
+        registered_sink._stream = stream  # type: ignore[assignment]
+        callback(
+            type(
+                "P",
+                (),
+                {
+                    "execution_point": "phase_graph.node.start",
+                    "payload": dict(GRAPH_PAYLOAD),
+                },
+            )(),
+            type("R", (), {"event_id": "run_e2e:1"})(),
+        )
+        assert stream.getvalue().startswith(
+            "run=run_e2e  seq=1  phase_graph.node.start"
+        )
+    finally:
+        clear_observer_catalog()

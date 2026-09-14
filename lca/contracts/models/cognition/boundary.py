@@ -81,17 +81,22 @@ class MemoryReceipt(BaseModel):
 
 
 class StopPayload(BaseModel):
-    """Output of ``concept.stop.should_check`` → ``agent.run.phase``.
+    """Output of ``terminal.commit`` → ``apply_stop`` / ``apply_terminal_outcome``.
 
-    Carries the loop-back decision: whether the run should continue, the
-    focused reason if it should stop, and the final-output reference
-    for terminal recording. ``focus_converged`` is the admission flag
-    produced by ``stop.focus.converge``.
+    Carries the loop's terminal payload. ``reason`` is set by the model
+    (RESPOND with non-empty response_text maps to a focused payload),
+    by Body raising ``DeterministicToolError`` (ERROR), or by the
+    budget guard (BUDGET_EXCEEDED). ``final_output_ref`` is the optional
+    pointer to the model's answer text; the reducer resolves it into
+    ``TerminalOutcome.final_output``.
+
+    The historical ``should_stop`` boolean and ``focus_converged`` flag
+    are gone: loop termination is the terminal outcome itself, decided
+    by the data shape (``reason`` and ``final_output_ref`` presence),
+    not by a separate predicate.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
-    should_stop: bool
-    focus_converged: bool = False
     reason: str | None = None
     final_output_ref: str | None = None
 

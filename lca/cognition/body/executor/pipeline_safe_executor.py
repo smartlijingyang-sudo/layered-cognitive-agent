@@ -28,6 +28,10 @@ from typing import Any, cast
 
 import structlog
 
+from lca.cognition.body.executor.safe_executor import (
+    _extract_stdout_chars_total,
+    _extract_stdout_head,
+)
 from lca.cognition.body.internal._retry_classification import (
     _DETERMINISTIC_EXCEPTIONS,
 )
@@ -315,6 +319,7 @@ class PipelineSafeExecutor(SafeExecutor):
             arguments=None,
         )
         act_closed = False
+        execute_started = time.perf_counter()
         try:
             result = await self._pipeline_for(tool, retry_policy, cache_config).execute(
                 tool.name, args, invocation_id=invocation_id
@@ -345,6 +350,9 @@ class PipelineSafeExecutor(SafeExecutor):
                     invocation_id=invocation_id,
                     outcome="ok",
                     ok=observation.success,
+                    latency_ms=_elapsed_ms(execute_started),
+                    stdout_head=_extract_stdout_head(observation),
+                    stdout_chars_total=_extract_stdout_chars_total(observation),
                 )
                 act_closed = True
                 return observation
@@ -370,6 +378,7 @@ class PipelineSafeExecutor(SafeExecutor):
                 outcome="failure",
                 ok=observation.success,
                 error=observation.error,
+                latency_ms=_elapsed_ms(execute_started),
             )
             act_closed = True
             return observation
@@ -385,6 +394,7 @@ class PipelineSafeExecutor(SafeExecutor):
                     outcome="failure",
                     ok=False,
                     error=str(exc),
+                    latency_ms=_elapsed_ms(execute_started),
                 )
             raise
 

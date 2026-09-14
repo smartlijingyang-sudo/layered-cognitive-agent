@@ -101,6 +101,7 @@ def tool_invoked_receipt(
     output_text: str | None = None,
     output_truncated: bool = False,
     projected_state: Mapping[str, Any] | None = None,
+    text: str | None = None,
     actor: str = "body",
 ) -> ToolJournalReceipt:
     """Build a ``tool.invoked.v1`` receipt for FactGateway commit."""
@@ -120,6 +121,7 @@ def tool_invoked_receipt(
             output_text=output_text,
             output_truncated=output_truncated,
             projected_state=dict(projected_state or {}),
+            text=text,
         ),
         actor=actor,
     )

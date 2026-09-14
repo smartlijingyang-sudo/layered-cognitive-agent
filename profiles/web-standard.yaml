@@ -28,7 +28,6 @@ bundles:
   - bundles/perceive_subgraph.yaml
   - bundles/reflect_subgraph.yaml
   - bundles/remember_subgraph.yaml
-  - bundles/stop_subgraph.yaml
 
 patch:
   # EventSpine file sink — boot events process-local; run events under
@@ -37,6 +36,14 @@ patch:
     config:
       boot_path: .lca/spine/boot-spine.jsonl
       runs_root: traces/runs
+
+  # EventSpine console sink — web-standard is the profile operators watch a
+  # live run through, so the console opts into ``graph_timeline`` here while
+  # the bundle default stays ``jsonl`` for machine consumers that ingest the
+  # default config unchanged.
+  - id: spine.sink.console
+    config:
+      format: graph_timeline
 
   # Patch topology to add PR-C (ADR-0214 §6.3) PG-007 preconditions and
   # Outer plan topology is declared declaratively in

@@ -69,8 +69,6 @@ LLM_SPINE_EPS: Final[tuple[str, ...]] = (
     "llm.stream.stall",
     "llm.request.header",
     "llm.request.header.assistant",
-    "brain.think.start",
-    "brain.think.end",
     "brain.perceive.start",
     "brain.perceive.end",
     "step.thinking.record",
@@ -120,9 +118,7 @@ SKILL_SPINE_EXECUTION_POINTS: Final[tuple[str, ...]] = (
     "skill.package.searched",
 )
 
-TOOL_SESSION_EVENTS: Final[tuple[str, ...]] = (
-    "tool.schema.published.v1",
-)
+TOOL_SESSION_EVENTS: Final[tuple[str, ...]] = ("tool.schema.published.v1",)
 
 TOOL_EXECUTION_SPINE_EPS: Final[tuple[str, ...]] = (
     "body.tool.execute.start",
@@ -149,14 +145,12 @@ ASSISTANT_SPINE_EPS: Final[tuple[str, ...]] = (
     "assistant.retired",
 )
 
-ASSISTANT_SESSION_EVENTS: Final[tuple[str, ...]] = (
-    "assistant.run.bound.v1",
-)
+ASSISTANT_SESSION_EVENTS: Final[tuple[str, ...]] = ("assistant.run.bound.v1",)
 
 # Families surfaced by debug-run [2/8] meta summary
 DEBUG_RUN_META_FAMILIES: Final[tuple[tuple[str, tuple[str, ...]], ...]] = (
     ("session", ("turn.", "step.started", "step.ended", "message.accepted", "session.created")),
-    ("llm", ("llm.", "model.", "thinking.", "brain.think", "step.thinking")),
+    ("llm", ("llm.", "model.", "thinking.", "step.thinking")),
     (
         "prompt",
         (

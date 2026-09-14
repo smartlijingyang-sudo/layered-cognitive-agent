@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
-from lca.cognition.convergence.configurable_policy import (
-    ConfigurableConvergencePolicy,
-    ConvergencePolicyConfig,
-)
+from lca.cognition.convergence.policy import DefaultConvergencePolicy
 from lca.cognition.convergence.runtime import ConvergenceRuntime
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -30,9 +27,6 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 class Config(BaseModel):
     model_config = {"extra": "forbid"}
-
-    producer_nudge_threshold: int = Field(default=3, ge=1)
-    enable_producer_nudge: bool = True
 
 
 @plugin(
@@ -69,11 +63,7 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    policy = ConfigurableConvergencePolicy(
-        ConvergencePolicyConfig(
-            producer_nudge_threshold=config.producer_nudge_threshold,
-            enable_producer_nudge=config.enable_producer_nudge,
-        )
-    )
+    del config
+    policy = DefaultConvergencePolicy()
     ctx.provide(CONVERGENCE_POLICY.key, policy)
     ctx.provide("convergence_runtime", ConvergenceRuntime(policy=policy))

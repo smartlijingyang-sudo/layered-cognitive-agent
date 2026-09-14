@@ -11,10 +11,6 @@ entries:
   name: sensor_clock
   $module: lca.plugins.sensors.clock.clock
   config: {}
-- id: sensor.convergence-task
-  name: sensor_convergence_task
-  $module: lca.plugins.sensors.convergence.task
-  config: {}
 - id: sensor.workspace-artifacts
   name: sensor_workspace_artifacts
   $module: lca.plugins.sensors.workspace.artifacts
@@ -124,10 +120,6 @@ entries:
 - id: safe_executor.simple
   name: safe_executor_simple
   $module: lca.plugins.cognitive.body.safe_executor
-  config: {}
-- id: state.stop-policy.default
-  name: state_stop_policy_default
-  $module: lca.plugins.loop.state.stop_policy.plugin
   config: {}
 - id: resume_input.human_answer
   name: resume_input_human_answer

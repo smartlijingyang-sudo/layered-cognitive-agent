@@ -21,13 +21,13 @@ Status: implemented
 
 新增 9 个测试覆盖:`test_phase_node_pr_c.py` 不变(新字段默认 None);`test_subgraph_reference_contract.py` +4 节点级 case;`test_interpreter_subgraph.py` +3 节点级 case;`test_phase_graph.py` +2 节点级 validation case。
 
-不平行事件词表、不改 agent_lab/、不动 ADR-0206/0209/0210/0214 状态、不改其他 5 个 phase。
+不平行事件词表、不动 ADR-0206/0210/0214 状态、不改其他 5 个 phase。
 
 ## Alternatives considered
 
-### Why not 把 think 移到 agent_lab `agent_loop.yaml` 的 sub_spec 形态?
+### Why not 把 think 移到 InfoEdge prototype `agent_loop.yaml` 的 sub_spec 形态?
 
-agent_lab/graphs/configs/agent_loop.yaml 已经是 InfoEdgeSpec sub_spec 模型成熟形态,think 是 `expose → reason → classify → guard` 4 步。但 LCA 已投入 PR-2 把 think 拆成 5/6 步(`shortcut → route → reason → classify → local_gate`),其中 `local_gate` 拆开局部与 plan-bound enforce。放弃 PR-2 投入 = 同一阶段两种步数 = 违反"无平行"。
+InfoEdge prototype graphs/configs/agent_loop.yaml 已经是 InfoEdgeSpec sub_spec 模型成熟形态,think 是 `expose → reason → classify → guard` 4 步。但 LCA 已投入 PR-2 把 think 拆成 5/6 步(`shortcut → route → reason → classify → local_gate`),其中 `local_gate` 拆开局部与 plan-bound enforce。放弃 PR-2 投入 = 同一阶段两种步数 = 违反"无平行"。
 
 ### Why not 新增 `phase.think.think_subgraph` binding plugin(像以前的 subgraph_host)?
 
@@ -47,7 +47,7 @@ agent_lab/graphs/configs/agent_loop.yaml 已经是 InfoEdgeSpec sub_spec 模型�
 
 **保留**:其他 5 个 phase 仍走 0075 `CognitivePhaseGraphPlan` 模型,interpreter `_drive` 主循环对它们走原 phase executor 路径;`approval_resume_node: think.main` 语义扩展为"回到 think 子图首步",resume 时按 `entry_node: think.shortcut` 启动子图。
 
-**已知未做**:`phase.think.standard` plugin + bundle 注册 + profile binding 字段仍未删除(下个 PR);MAX 嵌套深度限制当前共享 `MAX_SUBGRAPH_DEPTH=4`(节点级 + 边级递归共享同一计数器);`lca/plugins/loop/driver/infoedge/plugin.py` 的 COMPAT shim `delete-when` 条件之一仍待 `GenericPlanInterpreter recursive nested subgraphs` 全实现。
+**已知未做**:`phase.think.standard` plugin + bundle 注册 + profile binding 字段仍未删除(下个 PR);MAX 嵌套深度限制当前共享 `MAX_SUBGRAPH_DEPTH=4`(节点级 + 边级递归共享同一计数器);`GenericPlanInterpreter recursive nested subgraphs` 全实现仍待递归深度语义统一。
 
 ## Verification
 

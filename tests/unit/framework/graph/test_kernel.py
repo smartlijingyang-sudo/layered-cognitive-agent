@@ -63,11 +63,19 @@ class _StubStrategy(NodeStrategy):
 
 
 class TestPortRegistry:
-    def test_outer_input_wins_on_merge(self) -> None:
+    def test_merge_output_overrides_outer_input_in_iteration(self) -> None:
+        """ADR-0217 §3.3.3 iron rule 5: merge_output last-write-wins.
+
+        ``set_outer_input`` (iron rule 1) only seeds empty slots — once
+        an inner node writes via ``merge_output`` the registry carries
+        that value. Subsequent ``merge_output`` calls overwrite the
+        same port (last-write-wins) so outer-loop iterations see the
+        current iteration's typed ports instead of stale step-1 DTOs.
+        """
         reg = PortRegistry()
         reg.set_outer_input({"decision": "outer"})
         reg.merge_output({"decision": "inner"})
-        assert reg.snapshot()["decision"] == "outer"
+        assert reg.snapshot()["decision"] == "inner"
 
     def test_build_input_projects_required_ports(self) -> None:
         reg = PortRegistry()

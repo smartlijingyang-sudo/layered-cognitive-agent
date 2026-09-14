@@ -1,6 +1,7 @@
-"""Observation contracts —— 9 modules,每个子问题一个 module。
+"""Observation contracts —— 10 modules,每个子问题一个 module。
 
 子问题 → module 映射(第一性原理):
+  M0 调度        → EventHubConfig / FanoutRule(SPINE EP → observer 1:1 映射)
   M1 期望        → PlanBlueprint
   M2 输入现场    → NodeEnter
   M3 输出现场    → NodeExit
@@ -17,6 +18,18 @@
 
 from __future__ import annotations
 
+from lca.contracts.observability.observation.m0_event_hub import (
+    EventHubConfig as EventHubConfig,
+)
+from lca.contracts.observability.observation.m0_event_hub import (
+    EventHubConfigError as EventHubConfigError,
+)
+from lca.contracts.observability.observation.m0_event_hub import (
+    FanoutRule as FanoutRule,
+)
+from lca.contracts.observability.observation.m0_event_hub import (
+    validate_fanout_table as validate_fanout_table,
+)
 from lca.contracts.observability.observation.m1_blueprint import (
     PlanBlueprint as PlanBlueprint,
 )
@@ -107,7 +120,10 @@ __all__ = [
     "DecisionTrace",
     "DiffReport",
     "EdgeDeviation",
+    "EventHubConfig",
+    "EventHubConfigError",
     "FailureExplanation",
+    "FanoutRule",
     "LLMCallTrace",
     "MissingNode",
     "NodeEnter",
@@ -127,4 +143,6 @@ __all__ = [
     "SubgraphResolve",
     "ToolCallTrace",
     "UnexpectedNode",
+    "validate_fanout_table",
 ]
+

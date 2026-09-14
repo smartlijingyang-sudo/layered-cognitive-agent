@@ -1,16 +1,18 @@
-"""Sandbox resolver — Onlyboxes only.
+﻿"""Sandbox resolver — Onlyboxes preferred, local host-backed fallback.
 
 Host sidecar is a machine transport, not a Sandbox. Tests may still inject a
 real Sandbox via ``set_sandbox_resolver``. Gateway must not inject Host here.
 
-Required env (after ``load_dotenv_if_present``):
+Required env for Onlyboxes (after ``load_dotenv_if_present``):
 - ``ONLYBOXES_BASE_URL`` — console HTTP base, e.g. ``http://127.0.0.1:8089``
 - ``ONLYBOXES_ACCESS_TOKEN`` — dashboard access token (``obx_...``)
 
 Optional:
-- ``LCA_SANDBOX_BACKEND`` — if set to anything other than ``onlyboxes`` / empty,
-  still only Onlyboxes is supported; unknown values log a warning and return
-  ``None`` unless Onlyboxes credentials are present (credentials win).
+- ``LCA_SANDBOX_BACKEND`` — ``onlyboxes`` | ``local`` | empty.
+  Empty / ``local``: Onlyboxes when credentials exist, else local host-backed.
+  ``onlyboxes``: Onlyboxes only (returns ``None`` without credentials).
+- ``LCA_LOCAL_SANDBOX_ROOT`` — host directory backing the local guest mount
+  (default: writable ``/mnt/data``, else ``~/.cache/lca/local-sandbox/mnt/data``).
 """
 
 from __future__ import annotations
@@ -50,6 +52,7 @@ _ENV_BASE_URL = "ONLYBOXES_BASE_URL"
 _ENV_ACCESS_TOKEN = "ONLYBOXES_ACCESS_TOKEN"  # noqa: S105
 _ENV_SANDBOX_BACKEND = "LCA_SANDBOX_BACKEND"
 _BACKEND_ONLYBOXES = "onlyboxes"
+_BACKEND_LOCAL = "local"
 
 
 def onlyboxes_base_url() -> str | None:
@@ -71,30 +74,40 @@ def sandbox_backend() -> str:
 
 
 def resolve_sandbox() -> Sandbox | None:
-    """Onlyboxes, or a test-injected Sandbox. Never Host."""
+    """Onlyboxes when configured; else local host-backed Sandbox. Never Host."""
     if _override is not None:
         found = _override()
         if found is not None:
             return found
 
     backend = sandbox_backend()
-    if backend and backend not in {_BACKEND_ONLYBOXES, ""}:
+    if backend and backend not in {_BACKEND_ONLYBOXES, _BACKEND_LOCAL, ""}:
         _log.warning(
-            "LCA_SANDBOX_BACKEND=%s is unsupported; only 'onlyboxes' is available",
+            "LCA_SANDBOX_BACKEND=%s is unsupported; expected 'onlyboxes' or 'local'",
             backend,
         )
 
     base = onlyboxes_base_url()
     token = onlyboxes_access_token()
-    if not base or not token:
+    prefer_onlyboxes = backend in {_BACKEND_ONLYBOXES, ""}
+    if prefer_onlyboxes and base and token:
+        from lca.infrastructure.sandbox.onlyboxes.adapter import OnlyboxesSandboxAdapter
+
+        _log.info("Using OnlyboxesSandboxAdapter base_url=%s", base)
+        return OnlyboxesSandboxAdapter(base_url=base, access_token=token)
+
+    if backend == _BACKEND_ONLYBOXES:
         _log.info(
-            "Onlyboxes not configured (need %s + %s); sandbox tool omitted",
+            "Onlyboxes requested but not configured (need %s + %s); sandbox omitted",
             _ENV_BASE_URL,
             _ENV_ACCESS_TOKEN,
         )
         return None
 
-    from lca.infrastructure.sandbox.onlyboxes.adapter import OnlyboxesSandboxAdapter
+    # Local host-backed Sandbox: materializes SANDBOX plane tools without
+    # conflating Host/MACHINE transport with sandbox computer APIs.
+    from lca.infrastructure.sandbox.local.adapter import LocalSandboxAdapter
 
-    _log.info("Using OnlyboxesSandboxAdapter base_url=%s", base)
-    return OnlyboxesSandboxAdapter(base_url=base, access_token=token)
+    local = LocalSandboxAdapter()
+    _log.info("Using LocalSandboxAdapter host_root=%s", local.host_root)
+    return local

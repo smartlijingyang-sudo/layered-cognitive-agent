@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from lca.cognition.convergence.constants import MIN_SUBSTANTIVE_STDOUT_CHARS
-from lca.cognition.convergence.task_class import task_requires_synthesis
 from lca.contracts.atoms.semantic.cli_diagnostic import is_cli_diagnostic_output
 from lca.contracts.models.core.execution.decision import Observation
 
@@ -52,7 +51,24 @@ def merge_files_created(
     return payload_files_created(payload)
 
 
-def is_substantive_stdout(text: str) -> bool:
+def is_substantive_stdout(text: str | list[str] | tuple[str, ...] | None) -> bool:
+    """Return True iff ``text`` carries content worth surfacing as a delivery.
+
+    Accepts str (the stdout-shaped historical case) and list/tuple of str
+    (read-shaped tools such as ``listFiles`` return a list of entries
+    directly).  A non-empty list with at least one non-blank entry counts;
+    an empty list does not (it conveys "no items", which the model still
+    needs to surface as a final response).
+    """
+    if text is None:
+        return False
+    if isinstance(text, (list, tuple)):
+        return any(
+            isinstance(item, str) and item.strip() and not is_cli_diagnostic_output(item.strip())
+            for item in text
+        )
+    if not isinstance(text, str):
+        return False
     stripped = text.strip()
     if not stripped or is_cli_diagnostic_output(stripped):
         return False
@@ -68,10 +84,13 @@ def turn_has_delivery_signal(
     files_created: tuple[str, ...] = (),
     task: str = "",
 ) -> bool:
+    del task
     if merge_files_created(payload, files_created=files_created):
         return True
-    if task_requires_synthesis(task):
-        return False
+    # Direct list/tuple payload (read-shaped tools) — bypass payload_stdout
+    # which only knows the dict-wrapped stdout keys.
+    if isinstance(payload, (list, tuple)):
+        return is_substantive_stdout(payload)
     return is_substantive_stdout(payload_stdout(payload))
 
 

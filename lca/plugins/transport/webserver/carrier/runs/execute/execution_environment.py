@@ -15,6 +15,10 @@ from typing import Any, cast
 import structlog
 
 from lca.contracts.atoms.ids.ids import RunId, TraceId
+from lca.contracts.mechanisms.capability.capability import (
+    provider_current,
+    require_capability,
+)
 from lca.contracts.models.core.state.plane import PlaneBindings
 from lca.contracts.models.observability.journal.journal import RunScope
 from lca.contracts.models.team.run.context import RunContext
@@ -24,6 +28,11 @@ from lca.infrastructure.observability.events.event.descriptor_env import bind_de
 from lca.infrastructure.observability.facade.run.ambit import (
     RunAmbit,
     bind_run_ambit,
+)
+from lca.infrastructure.runtime_plane.capability_bindings import (
+    BindingsViewBuilder,
+    reset_capability_bindings,
+    set_capability_bindings,
 )
 from lca.infrastructure.runtime_plane.scope.scope import plane_bindings_scope
 from lca.infrastructure.sandbox.runtime.scope import bind_sandbox_runtime
@@ -164,6 +173,11 @@ class RunExecutionEnvironment:
             if assistant_id:
                 log_context["assistant_id"] = assistant_id
             structlog.contextvars.bind_contextvars(**log_context)
+            # ADR-0220 §7.3: publish the per-turn BindingsViewBuilder next to
+            # the plane scope so concept.tool.fork reads typed bindings.
+            # Refs mirror runnable_assembly.tools_from_scope, but with the
+            # plane-filtered providers so unforked planes stay unforked.
+            capability_token = None
             if assistant_id:
                 from lca.infrastructure.observability.meta_event_emit import (
                     emit_assistant_run_bound,
@@ -175,6 +189,16 @@ class RunExecutionEnvironment:
                     profile=str(getattr(session, "profile", "") or ""),
                 )
             try:
+                capability_token = set_capability_bindings(
+                    BindingsViewBuilder(
+                        file_store=providers.file_store,
+                        bindings=bindings,
+                        sandbox=providers.sandbox,
+                        search=require_capability(self._ctx, "search"),
+                        skill_store=provider_current(require_capability(self._ctx, "skills")),
+                        machine_resolver=self._machine_resolver,
+                    )
+                )
                 with (
                     run_workspace_scope(session.run_id) as workspace,
                     run_scope(ambit.scope) if ambit.scope is not None else nullcontext(),
@@ -195,6 +219,8 @@ class RunExecutionEnvironment:
                             workspace=workspace,
                         )
             finally:
+                if capability_token is not None:
+                    reset_capability_bindings(capability_token)
                 structlog.contextvars.clear_contextvars()
                 if coordinator_token is not None:
                     reset_current_coordinator(coordinator_token)

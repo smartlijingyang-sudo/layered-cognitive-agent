@@ -72,17 +72,16 @@ def test_cursor_error_is_exception_subclass() -> None:
     assert issubclass(CursorError, Exception)
 
 
-def test_loop_cursor_protocol_has_10_methods() -> None:
-    expected = {
-        "advance",
-        "halt",
-        "close",
-        "record_thinking",
-        "record_tool_call",
-        "record_tool_result",
-        "record_request_header",
-        "open_step",
-        "fork",
-        "snapshot",
-    }
+def test_loop_cursor_protocol_has_only_live_methods() -> None:
+    # 2026-09-14 dead-code 修剪:record_* / halt / close / fork 全部删除,
+    # Protocol 只剩 advance + open_step + snapshot。
+    expected = {"advance", "open_step", "snapshot"}
     assert expected <= set(dir(LoopCursor))
+    # 反向断言:被删的方法绝不能再悄悄出现(防止回归)。
+    forbidden = {
+        "halt", "close", "fork",
+        "record_thinking", "record_tool_call",
+        "record_tool_result", "record_request_header",
+    }
+    leaked = forbidden & set(dir(LoopCursor))
+    assert not leaked, f"deleted methods leaked back into LoopCursor Protocol: {leaked}"

@@ -32,6 +32,7 @@ Trigger phrases (run this immediately, do not ask for clarification):
 | "最新一次 run" / "刚才那个" / "上次" / "最近一次" / "看看刚才发生了什么" | yes |
 | "为啥这次失败" / "这次出错了" / "分析一下这次" | yes |
 | "理解一下过程" / "走了一遍啥逻辑" / "DSH 风格轨迹" / "给我个 HTML" | yes |
+| "图跑的流程" / "phase graph timeline" / "运行轨迹" | yes (Step 1 first) |
 | supplies a `run_<id>` directly | yes |
 | "刚才服务挂了" / "kernel 不响应" | no — go to AGENTS.md §6 service matrix |
 | "POST /lca-api/runs 500" / "看起来 healthy 但调用挂" / "接口挂了但 status 正常" | no — go to **Step 0b** in this SOP |
@@ -45,7 +46,7 @@ LATEST=$(ls -1t traces/runs | head -1)
 
 ---
 
-## The 8-step procedure
+## The 8-step procedure (with timeline as Step 1)
 
 Each step has five labels you should expect to find in your own output:
 
@@ -229,9 +230,44 @@ curl -sS http://127.0.0.1:9876/src/path/to/just/changed.ts | grep "你刚加的�
 
 ---
 
-### Step 1 — One-shot 8-section diagnostic
+### Step 1 — Phase-graph timeline (observation run-replay --show-graph)
 
-**WHY.** `debug-run` is the canonical "tell me about this run" entry point (ADR-0122). It collects manifest, journal summary, error_ref, stack frames, and a suggested action in one shot.
+**WHY.** When a run fails, the first thing an agent (or human) needs is **which phase-graph nodes actually ran and in what order** — not a flat 8-section summary. The `observation.event_hub` plugin fan-outs `phase_graph.node.start/end` and `runtime.reducer.apply` to the observation facts; `observation run-replay --show-graph` reads them back as a human-readable timeline. **This is the canonical first step.**
+
+**DO.**
+
+```sh
+# Top-level alias (preferred — same as below, easier to remember)
+./scripts/lca-ops timeline "$LATEST"
+
+# Equivalent canonical path
+./scripts/lca-ops observation run-replay "$LATEST" --show-graph
+
+# You (agent) — JSON for programmatic parsing
+./scripts/lca-ops observation run-replay "$LATEST" --show-graph --json
+```
+
+**OUTPUT.** A phase-graph node/subgraph timeline from the spine ledger (ADR-0167):
+
+```
+phase_graph.subgraph.enter perceive
+  phase_graph.node.start perceive.main (run_id=run_x)
+  observation.node_enter perceive.main
+  phase_graph.node.end   perceive.main
+phase_graph.subgraph.exit perceive
+phase_graph.subgraph.enter think
+  phase_graph.node.start think.main
+  observation.node_enter think.main
+  ...
+```
+
+**NEXT.** If the timeline shows the run **terminated earlier than expected** (e.g. `act.main` never ran) → advance to Step 2 (spine event trace) to find the failure. If the timeline shows all expected nodes ran and exited → run probably succeeded; use Step 1a for confirmation. If `no facts for run_id=...` → the run predates the observation-9module bundle; fall back to Step 1a (`debug-run`).
+
+**FAIL.** `observation run-replay` returns `no facts for run_id=...` because the `observation-9module` bundle is not loaded in the active profile — add `bundles/observation-9module.yaml` to `profiles/<your-profile>.yaml: bundles:` and `kernel-restart`. If the timeline prints but `observation.node_enter/exit` lines are missing for an older run, the `observation.event_hub` plugin was not loaded when that run executed; older runs cannot be retro-fanned-out.
+
+### Step 1a — One-shot 8-section diagnostic (debug-run)
+
+**WHY.** `debug-run` is the canonical "tell me about this run" entry point (ADR-0122). It collects manifest, journal summary, error_ref, stack frames, and a suggested action in one shot. **It is the flat summary that complements Step 1's timeline view** — use it after Step 1 to read manifest status / error label / replay commands. For pre-observation-9module runs, it is the only first step available.
 
 **DO.**
 
@@ -256,7 +292,7 @@ curl -sS http://127.0.0.1:9876/src/path/to/just/changed.ts | grep "你刚加的�
   - `lca-ops journal replay <run_id> --step K --diff-only` (model-visible 重放)
   - `grep -rl <plan_ref> traces/runs/*/manifest.json` (反查同 plan 所有 run)
 
-**NEXT.** If `status=passed` → done; the user is wrong about the failure. If `status=failed`, advance to Step 2.
+**NEXT.** If `status=passed` → done; the user is wrong about the failure. If `status=failed`, advance to Step 2. **Do not start here when an observation timeline is available — go back to Step 1.**
 
 **FAIL.** `debug-run` errors → Step 0 service problem is real; resolve first.
 
@@ -383,14 +419,17 @@ manual work and get a typed, structured diagnosis in one call.
 ./scripts/lca-ops observation run-explain "$LATEST"           # human
 ./scripts/lca-ops observation run-explain "$LATEST" --json    # you (agent)
 
-# Show every observation fact, filter by node or kind
+# Show every observation / phase_graph fact, filter by node or kind
 ./scripts/lca-ops observation trace-show "$LATEST"
 ./scripts/lca-ops observation trace-show "$LATEST" --node act.main
-./scripts/lca-ops observation trace-show "$LATEST" --filter kind=control
+./scripts/lca-ops observation trace-show "$LATEST" --kind visit_end
+./scripts/lca-ops observation trace-show "$LATEST" --filter phase_graph.subgraph
+./scripts/lca-ops observation trace-show "$LATEST" --seq 16 --human --full
 
 # Time-ordered replay with per-node inputs / outputs / decisions
 ./scripts/lca-ops observation run-replay "$LATEST"
 ./scripts/lca-ops observation run-replay "$LATEST" --json
+./scripts/lca-ops observation run-replay "$LATEST" --show-graph
 
 # Show plan blueprint (expected graph)
 ./scripts/lca-ops observation plan-show profiles/web-standard.yaml
@@ -403,8 +442,10 @@ copy-paste-runnable commands.
 
 **NEXT.** If `run-explain` summary is empty (`outcome=success`) → run passed;
 verify with user. If it identifies a missing node / denied control / failed
-artifact → use `trace-show --node <id>` to inspect that node's inputs / outputs,
-then Step 5 to read code.
+artifact → use `trace-show --node <id>` to inspect that node's inputs / outputs
+(`--json` carries the untruncated payload; `--human` prints one compact line per
+lifecycle event with outcome, elapsed, route and port names), then Step 5 to read
+code. `run-replay --show-graph` prints the same lines for the whole run in order.
 
 **FAIL.** No observation facts present → the `observation-9module` bundle is
 not loaded in the active profile. Add `bundles/observation-9module.yaml` to
@@ -572,6 +613,7 @@ When you (the agent) write the bug summary for the user:
 - ❌ `cat traces/lca_journal.jsonl` — dead path; the journal SSOT is `traces/runs/<id>/events.jsonl`.
 - ❌ `cat traces/runs/<id>/kernel.log` and concluding "no kernel log = bug": see Step 1 — most runs don't write one.
 - ❌ Patching source + restart as the *first* move. ADR-0122 says one command should locate any bug; if it doesn't, that's a missing ADR, not a missing grep.
+- ❌ Skipping Step 1 (timeline) and going straight to `debug-run`. The timeline is the canonical first read; `debug-run` is the flat summary that complements it. For pre-observation-9module runs the timeline returns `no facts`, then `debug-run` is the fallback.
 
 ## How to trigger a run (canonical entry point)
 

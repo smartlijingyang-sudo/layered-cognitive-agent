@@ -103,7 +103,7 @@ def test_factory_raises_when_profile_missing_plan_ref() -> None:
         observability: dict = field(default_factory=dict)
 
     spine = _StubSpine()
-    with pytest.raises(TypeError, match="profile.plan_ref"):
+    with pytest.raises(TypeError, match=r"profile\.plan_ref"):
         LoopCursorFactory.from_profile(
             profile=_NoPlanRef(),  # type: ignore[arg-type]
             run_id="r-3",
@@ -121,14 +121,17 @@ def test_factory_cursor_satisfies_loop_cursor_protocol() -> None:
         spine=_StubSpine(),  # type: ignore[arg-type]
     )
     # Protocol 不带 runtime_checkable —— 直接验证契约面
+    # 2026-09-14 修剪后只剩 advance + open_step
     assert hasattr(cursor, "snapshot")
     assert hasattr(cursor, "advance")
-    assert hasattr(cursor, "record_thinking")
-    assert hasattr(cursor, "record_tool_call")
-    assert hasattr(cursor, "record_tool_result")
-    assert hasattr(cursor, "record_request_header")
-    assert hasattr(cursor, "halt")
-    assert hasattr(cursor, "close")
-    assert hasattr(cursor, "fork")
+    assert hasattr(cursor, "open_step")
+    # 反向断言:被删的方法绝不能再悄悄出现(防止回归)。
+    for removed in ("halt", "close", "fork",
+                    "record_thinking", "record_tool_call",
+                    "record_tool_result", "record_request_header"):
+        assert not hasattr(cursor, removed), (
+            f"{removed} 已从 LoopCursor Protocol 删除,留存在实现层会"
+            "让历史 compat 路径复活(run_c2d944661a78 类 bug)"
+        )
     # snapshot.phase 默认 None(OUTSIDE_LOOP;ADR-0169 I-CURSOR-2)
     assert cursor.snapshot.phase is None

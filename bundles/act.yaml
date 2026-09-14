@@ -71,7 +71,7 @@ nodes:
   - id: act.observe
     factory: act.observe
     inputs: [receipt]
-    outputs: [receipt]
+    outputs: [receipt, should_terminate]
     config:
       max_visits: 1
       emit_on_enter: []

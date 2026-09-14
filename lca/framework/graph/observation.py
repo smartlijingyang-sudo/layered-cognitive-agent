@@ -25,8 +25,11 @@ Why inputs/outputs/metadata are tuples of pairs:
 
 from __future__ import annotations
 
+import dataclasses
+import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Protocol, runtime_checkable
 
 from lca.contracts.protocols.graph.binding import BindingKind
@@ -105,12 +108,41 @@ class BindingKindField:
         return str(binding)
 
 
+def _json_safe(value: Any) -> Any:
+    """Project one carried value into the lossless-JSON form the fact plane accepts.
+
+    ``Session.append`` is the only journal write path and it refuses payloads it
+    cannot round-trip, which drops the whole record. Port values are live kernel
+    objects — per-turn ``ForkedTools`` holds ``Tool`` instances with bound
+    closures — so anything without a JSON form degrades to its ``repr``: the
+    value stays attributable instead of the terminal event vanishing.
+    """
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, Enum):
+        return value.value
+    if dataclasses.is_dataclass(value) and not isinstance(value, type):
+        return {k: _json_safe(v) for k, v in dataclasses.asdict(value).items()}
+    if isinstance(value, Mapping):
+        return {str(k): _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    try:
+        json.dumps(value)
+    except (TypeError, ValueError):
+        return repr(value)
+    return value
+
+
 def payload_of(event: GraphObservation) -> dict[str, Any]:
     """Serialize one :class:`GraphObservation` for spine.
 
     Every field is included. No filtering: empty strings and zero
     integers are part of the contract so debug readers can
     distinguish "start" from "end" without a separate marker.
+    Port values are projected by :func:`_json_safe` here, the single
+    seam between kernel truth and the fact plane, so no call site can
+    hand a live object to ``Session.append`` and lose the record.
     """
     return {
         "kind": event.kind,
@@ -127,9 +159,9 @@ def payload_of(event: GraphObservation) -> dict[str, Any]:
         "outcome": event.outcome,
         "error": event.error,
         "elapsed_ms": event.elapsed_ms,
-        "inputs": dict(event.inputs),
-        "outputs": dict(event.outputs),
-        "metadata": dict(event.metadata),
+        "inputs": {str(k): _json_safe(v) for k, v in event.inputs},
+        "outputs": {str(k): _json_safe(v) for k, v in event.outputs},
+        "metadata": {str(k): _json_safe(v) for k, v in event.metadata},
     }
 
 

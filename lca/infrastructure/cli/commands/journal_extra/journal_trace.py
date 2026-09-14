@@ -386,10 +386,6 @@ def _event_kind(ep: str, payload: dict[str, Any], outcome: str | None) -> str:
         return "phase.remember.fold"
     if ep == "phase.stop.fold":
         return "phase.stop.fold"
-    if ep == "brain.think.start":
-        return f"brain.think.start  state={payload.get('state_id', '?')[:16]}"
-    if ep == "brain.think.end":
-        return f"brain.think.end  state={payload.get('state_id', '?')[:16]}"
     if ep == "reasoner.reason.start":
         return f"reasoner.reason.start  state={payload.get('state_id', '?')[:16]}"
     if ep == "reasoner.reason.end":
@@ -436,10 +432,6 @@ def _event_kind(ep: str, payload: dict[str, Any], outcome: str | None) -> str:
         return f"✗ exception.caught  exc={payload.get('exc_type', '?')}"
     if ep == "exception.finally":
         return f"exception.finally  boundary={payload.get('boundary', '?')}"
-    if ep == "writable.step.start":
-        return "writable.step.start"
-    if ep == "writable.step.end":
-        return "writable.step.end"
     if ep == "writable.segment.start":
         return "writable.segment.start"
     if ep == "writable.segment.end":
@@ -639,8 +631,6 @@ _KIND_KEYS: dict[str, frozenset[str]] = {
     "phase.think.fold": frozenset({"phase"}),
     "phase.act.fold.start": frozenset({"tool_name", "objective"}),
     "phase.act.fold.end": frozenset({"outcome", "error"}),
-    "brain.think.start": frozenset({"state_id"}),
-    "brain.think.end": frozenset({"state_id"}),
     "reasoner.reason.start": frozenset({"state_id"}),
     "reasoner.reason.end": frozenset({"state_id"}),
     "critic.eval.start": frozenset({"state_id"}),
@@ -659,8 +649,6 @@ _KIND_KEYS: dict[str, frozenset[str]] = {
     "lifecycle.finally": frozenset({"boundary", "trace_id"}),
     "exception.caught": frozenset({"exc_type", "boundary"}),
     "exception.finally": frozenset({"boundary"}),
-    "writable.step.start": frozenset(),
-    "writable.step.end": frozenset(),
     "writable.segment.start": frozenset(),
     "writable.segment.end": frozenset(),
 }

@@ -19,7 +19,6 @@ from lca.contracts.protocols import (
     PerceiveHub,
     Reducer,
     StateStore,
-    StopPolicy,
 )
 from lca.contracts.protocols.act.effect.handler import EffectHandlerRegistry
 from lca.contracts.protocols.declarative.declarative_1.node_executor import NodeExecutor
@@ -49,7 +48,6 @@ class RuntimeDeps:
     state_store: StateStore
     perceive_hub: PerceiveHub
     phase_capabilities: Mapping[str, object]
-    stop_policy: StopPolicy | None = None
     reducer: Reducer | None = None
     compiled_plan: CompiledRunPlan | None = None
     node_executors: Mapping[str, NodeExecutor] = field(default_factory=dict)

@@ -157,23 +157,11 @@ class StepTreeFoldDeriver:
         self.derive(events)
 
     def _iter_events(self) -> Iterable[Any]:
-        """Session in-process SSOT when snapshot exists; spine-only for cold offline fold.
+        """SSOT = spine ledger(单源 fold)。
 
-        ADR-0191 Wave D: live run events enter via ``Session.append`` first;
-        in-process snapshot is authoritative. Spine ledger supplements only
-        when no bound Session snapshot is available (offline doctor/replay).
+        ADR-0212 §5:journal 是 fold 派生面,输入必须是 SSOT(spine)。
+        Session snapshot 是 in-process cache/projection,不进 fold。
         """
-        session = self._session
-        snapshot_events: list[Any] = []
-        snapshot = getattr(session, "snapshot_events", None) if session is not None else None
-        if callable(snapshot):
-            raw_snapshot = snapshot()
-            if isinstance(raw_snapshot, Iterable):
-                snapshot_events = list(raw_snapshot)
-
-        if snapshot_events:
-            return iter(snapshot_events)
-
         path = self._spine_path
         if path is None:
             path = self._run_dir / f"{self._run_id}.spine.jsonl"

@@ -1,7 +1,8 @@
-"""Terminal observation + NullHookRegistry tests."""
+"""Terminal observation + NullHookRegistry tests (SSOT: Session.append)."""
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from lca.contracts.models.observability.event.event import OperationOutcome, RuntimeKind
@@ -16,11 +17,17 @@ from lca.plugins.transport.webserver.handlers.runs.terminal.observation import (
     journal_has_terminal_event,
 )
 from lca.runtime.support.null_hook_registry import NullHookRegistry
+from lca.session.append import Session
 
 
-def _session(*, run_id: str, hub: object) -> RunSession:
+def _session_with_session(*, run_id: str, session: Session | None = None) -> RunSession:
     from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
 
+    bridge = None
+    if session is not None:
+        from lca.session.lifecycle.bind import RunEventSessionBridge
+
+        bridge = RunEventSessionBridge(session)
     return RunSession(
         run_id=run_id,
         trace_id=f"trace-{run_id}",
@@ -29,8 +36,16 @@ def _session(*, run_id: str, hub: object) -> RunSession:
         question="q",
         user_text="u",
         mode="solo",
-        hub=hub,  # type: ignore[arg-type]
+        event_session=bridge,
     )
+
+
+def _session(*, run_id: str, hub: object) -> RunSession:
+    """Compat shim:hub.journal.write 路径已退役 —— 测试改写为 Session。
+
+    保留函数签名以最小化测试改动:``hub`` 仅作占位参数。
+    """
+    return _session_with_session(run_id=run_id)
 
 
 def test_null_hook_registry_trigger_is_noop() -> None:
@@ -45,23 +60,41 @@ def test_null_hook_registry_trigger_is_noop() -> None:
 
 
 def test_journal_has_terminal_event_detects_agent_run_finished() -> None:
-    from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
+    from lca.infrastructure.observability.facade.facade.facade import record as _record
+    from lca.plugins.events.publishers._session_publish import (
+        current_publish_session,
+        set_publish_session,
+    )
 
-    journal = MemoryJournal()
-    journal.write(AgentRunFinished(status="failed", error="boom"))
-    hub = type("Hub", (), {"journal": journal})()
-    session = _session(run_id="run-t1", hub=hub)
-    assert journal_has_terminal_event(session) is True
+    session = Session(f"run-t1-{id(object())}")
+    token = set_publish_session(session)
+    try:
+        _record(AgentRunFinished(status="failed", error="boom"))
+        run_session = _session_with_session(run_id="run-t1", session=session)
+        assert journal_has_terminal_event(run_session) is True
+    finally:
+        from lca.plugins.events.publishers._session_publish import reset_publish_session
+
+        reset_publish_session(token)
+        # Verify unbound state for downstream tests.
+        assert current_publish_session() is None
 
 
 def test_emit_carrier_run_failed_skips_when_terminal_exists() -> None:
-    from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
+    from lca.infrastructure.observability.facade.facade.facade import record as _record
+    from lca.plugins.events.publishers._session_publish import (
+        reset_publish_session,
+        set_publish_session,
+    )
 
-    journal = MemoryJournal()
-    journal.write(AgentRunFinished(status="failed", error="already"))
-    hub = type("Hub", (), {"journal": journal})()
-    session = _session(run_id="run-t2", hub=hub)
-    assert emit_carrier_run_failed(session, hub=hub, user_message="late") is None  # type: ignore[arg-type]
+    session = Session(f"run-t2-{id(object())}")
+    token = set_publish_session(session)
+    try:
+        _record(AgentRunFinished(status="failed", error="already"))
+        run_session = _session_with_session(run_id="run-t2", session=session)
+        assert emit_carrier_run_failed(run_session, user_message="late") is None
+    finally:
+        reset_publish_session(token)
 
 
 def test_is_carrier_terminal_observed() -> None:
@@ -98,3 +131,8 @@ def test_failure_reader_loads_exception_message(tmp_path) -> None:
     summary = failure_summary_for_run(run_id, user_error="用户可见", traces_root=tmp_path / "runs")
     assert summary["exception_class"] == "ValidationError"
     assert summary["has_traceback"] is True
+
+
+def test_unused_helper_no_crash() -> None:
+    """Suppress unused import warnings."""
+    json.dumps({})

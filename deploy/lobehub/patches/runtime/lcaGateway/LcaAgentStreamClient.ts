@@ -35,6 +35,9 @@ import type {
   AgentStreamEvent,
   ConnectionStatus,
 } from '@lobechat/agent-gateway-client';
+import debug from 'debug';
+
+const log = debug('lobe-client:lca-gateway');
 
 // ─── Wire message shapes ─────────────────────────────────────────────
 //
@@ -253,6 +256,7 @@ export class LcaAgentStreamClient {
     }
     this.ws = ws;
     ws.onopen = () => {
+      log('[WS-CLIENT] ws.onopen readyState=%s opId=%s', ws.readyState, this.options.operationId);
       this.setStatus('authenticating');
       // ADR-0200 I-AGB-7: every LCA WS session begins with an auth frame
       // carrying the purpose-bound JWT. Resume follows auth_success so the
@@ -260,6 +264,7 @@ export class LcaAgentStreamClient {
       this.sendRaw({ type: 'auth', token: this.options.token });
     };
     ws.onmessage = (event) => {
+      log('[WS-CLIENT] ws.onmessage bytes=%s', typeof event.data === 'string' ? event.data.length : 'binary');
       this.handleFrame(event.data);
     };
     ws.onerror = (event) => {
@@ -293,14 +298,17 @@ export class LcaAgentStreamClient {
     try {
       parsed = typeof raw === 'string' ? JSON.parse(raw) : null;
     } catch {
+      log('[WS-CLIENT] handleFrame JSON parse error');
       this.emit('error', new Error('LCA gateway frame is not valid JSON'));
       return;
     }
     if (!isRecord(parsed) || typeof parsed.type !== 'string') {
+      log('[WS-CLIENT] handleFrame missing type: %o', parsed);
       this.emit('error', new Error('LCA gateway frame missing type discriminator'));
       return;
     }
     const message = parsed as ServerMessage;
+    log('[WS-CLIENT] handleFrame type=%s id=%s', message.type, 'id' in message ? message.id : 'n/a');
     switch (message.type) {
       case 'auth_success': {
         this.authed = true;
@@ -384,16 +392,21 @@ export class LcaAgentStreamClient {
   // ─── Internal: send helpers ─────────────────────────────────────
 
   private send(message: ClientMessage): boolean {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
+    if (!this.ws || this.ws.readyState !== this.ws.OPEN) return false;
     return this.sendRaw(message);
   }
 
   private sendRaw(message: ClientMessage): boolean {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
+    if (!this.ws || this.ws.readyState !== this.ws.OPEN) {
+      log('[WS-CLIENT] sendRaw skip (ws=%s readyState=%s): %o', !!this.ws, this.ws?.readyState, message);
+      return false;
+    }
     try {
+      log('[WS-CLIENT] sendRaw -> %s (tokenLen=%s): %o', message.type, 'token' in message ? (message.token?.length ?? 0) : 'n/a', message);
       this.ws.send(JSON.stringify(message));
       return true;
     } catch (err) {
+      log('[WS-CLIENT] sendRaw ERR: %o', err);
       this.emit('error', err instanceof Error ? err : new Error(String(err)));
       return false;
     }
@@ -421,8 +434,11 @@ export class LcaAgentStreamClient {
       } catch (err) {
         // Listener errors must not abort the dispatch loop or break
         // the WebSocket lifecycle. Log to console and continue.
-         
-        console.error(`[lca-gateway] listener for "${event}" threw:`, err);
+
+        const errInfo = err instanceof Error
+          ? {name: err.name, message: err.message, stack: err.stack}
+          : {raw: err, type: typeof err, stringified: (() => { try { return JSON.stringify(err); } catch { return String(err); } })()};
+        console.error(`[lca-gateway] listener for "${event}" threw:`, errInfo);
       }
     }
   }

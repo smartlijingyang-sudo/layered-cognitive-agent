@@ -136,7 +136,6 @@ class RunLifecycleCoordinator:
 
                     emit_carrier_run_failed(
                         session,
-                        hub=hub,
                         user_message=format_user_error(
                             outcome.error,
                             run_id=session.run_id,
@@ -156,7 +155,6 @@ class RunLifecycleCoordinator:
             )
             emit_carrier_run_failed(
                 session,
-                hub=hub,
                 user_message=user_message,
                 exception_class=type(exc).__name__,
             )
@@ -189,7 +187,6 @@ class RunLifecycleCoordinator:
             )
             emit_carrier_run_failed(
                 session,
-                hub=hub,
                 user_message=user_message,
                 exception_class=type(exc).__name__,
             )
@@ -260,7 +257,6 @@ class RunLifecycleCoordinator:
             )
             emit_carrier_run_failed(
                 session,
-                hub=session.hub,
                 user_message=user_message,
                 exception_class=type(exc).__name__,
             )
@@ -285,7 +281,6 @@ class RunLifecycleCoordinator:
                 strategy_key=session.mode,
                 objective=session.user_text,
                 error=error or f"{type(exc).__name__}: {exc}",
-                hub=hub,
             )
         )
 

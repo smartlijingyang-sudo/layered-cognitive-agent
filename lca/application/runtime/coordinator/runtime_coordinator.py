@@ -91,6 +91,48 @@ class LcaAgentRuntimeCoordinator:
         # Track natural terminal publication
         if envelope["type"] == "agent_runtime_end":
             self._natural_terminal_published.add(run_id)
+            return
+
+        # When the tool returns textual content and the LLM driver ends the
+        # run without re-prompting, the assistant bubble otherwise stays
+        # empty — the front-end `agent_runtime_end` branch falls back to a
+        # DB refetch that reads the (still unpopulated) assistant row.
+        # Mirror the tool result onto the assistant stream as one append-mode
+        # text chunk so the bubble renders the answer the LLM was supposed
+        # to summarize. Subsequent LLM text chunks, if any, append on top.
+        if envelope["type"] == "tool_end":
+            followup = self._assistant_text_for_tool_end(envelope)
+            if followup is not None:
+                await self._mgr.publish(
+                    run_id,
+                    followup["type"],
+                    followup["data"],
+                    step_index=step_index,
+                )
+
+    @staticmethod
+    def _assistant_text_for_tool_end(envelope: dict) -> dict | None:
+        """Build a single ``stream_chunk text`` follow-up for a textual tool
+        result. Returns ``None`` when the tool result has no usable text, so
+        the front-end keeps waiting for the LLM's real follow-up.
+        """
+        data = envelope.get("data") or {}
+        if data.get("isSuccess") is False:
+            return None
+        result = data.get("result")
+        if not isinstance(result, dict):
+            return None
+        text = result.get("content")
+        if not isinstance(text, str) or not text.strip():
+            return None
+        return {
+            "type": "stream_chunk",
+            "data": {
+                "chunkType": "text",
+                "content": text,
+                "snapshotMode": "append",
+            },
+        }
 
     async def _persist_tool_plugin_state(
         self,

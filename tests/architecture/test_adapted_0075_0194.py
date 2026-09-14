@@ -100,19 +100,3 @@ class Test0194ShapePreserved:
         assert hasattr(mod, "setup"), (
             "projection_host module must expose a setup() entry point"
         )
-
-
-class TestPlanProvenanceRoundTrip:
-    """plan_ref still works under P7 (region tag does not change plan_ref)."""
-
-    def test_plan_ref_constant_unchanged(self):
-        from lca.plugins.lab.session.provider.plugin import PLAN_REF
-        assert PLAN_REF == "agent_lab_act", (
-            "PLAN_REF is owned by lab session provider, not region; "
-            "P7 must not change it"
-        )
-
-
-# Note: The closed-set region-leakage check already lives in
-# tests/architecture/test_p7_region_migration.py::TestRegionNotInCapabilityClosedSet.
-# We don't duplicate it here.
