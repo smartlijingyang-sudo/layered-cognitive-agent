@@ -23,9 +23,12 @@ import typer
 
 _LOG_DEBUG_GRAPH_TAG = "debug-graph"
 
-# 根因启发式:节点 outcome 或 reducer method 含此集合 → 标记 ✗
+# Anomaly heuristic: only mark a reducer method as anomalous when its
+# outcome itself indicates failure. `apply_stop` and `apply_error` are
+# normal teardown methods per AGENTS.md §3 C12 (apply_stop precedes
+# apply_terminal_outcome), so they no longer trigger the marker by name.
 _FAIL_OUTCOMES = {"fail", "failed", "failure", "error", "rejected"}
-_STOP_METHODS = {"apply_stop", "apply_error"}
+_STOP_METHODS: set[str] = set()
 
 
 def _spine_path(run_id: str) -> Path:
@@ -214,8 +217,11 @@ def build_debug_graph(events: list[dict[str, Any]]) -> dict[str, Any]:
                 "outcome": p.get("outcome"),
             }
         )
-        if p.get("method") in _STOP_METHODS:
-            anomalies.append(f"reducer invoked {p.get('method')} (phase={p.get('phase')})")
+        if str(p.get("outcome") or "").lower() in _FAIL_OUTCOMES:
+            anomalies.append(
+                f"reducer {p.get('method')} returned outcome={p.get('outcome')} "
+                f"(phase={p.get('phase')})"
+            )
 
     # 3. llm 响应
     for ev in events:
@@ -277,7 +283,7 @@ def render_human(report: dict[str, Any], run_id: str) -> str:
     if report["reducer_sequence"]:
         out.append("─── reducer apply_* sequence ───")
         for r in report["reducer_sequence"]:
-            mark = "✗" if r["method"] in _STOP_METHODS else "·"
+            mark = "✗" if str(r["outcome"] or "").lower() in _FAIL_OUTCOMES else "·"
             out.append(f"  {mark} {r['method']:30s} phase={r['phase']!s:8s} outcome={r['outcome']}")
         out.append("")
 

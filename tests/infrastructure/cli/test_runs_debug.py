@@ -75,13 +75,60 @@ def test_runs_debug_events_layer(run_dir: Path) -> None:
 
 
 def test_runs_debug_explain_layer(run_dir: Path) -> None:
+    """The fixture only has a terminal kernel.run.stop=failure; no
+    phase_graph.node.end carries outcome=failure. The explain layer must
+    NOT promote kernel.run.stop into first_failed (it is the terminal
+    verdict, not the root cause). Instead it surfaces a 'reducer-driven
+    terminal' summary and points the agent at graph layer reducer_sequence.
+    """
     runner = CliRunner()
     result = runner.invoke(app, ["runs", "debug", "run_test_runs_debug",
                                  "--layer", "explain", "--output", "json"])
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     assert payload["layer"] == "explain"
+    assert payload["root_cause_present"] is False
+    assert payload["terminal_outcome"] == "failure"
+    assert "reducer" in payload["hint"]
+
+
+def test_runs_debug_explain_layer_with_node_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When a phase_graph.node.end carries outcome=failure, explain must
+    surface it as first_failed (not kernel.run.stop)."""
+    monkeypatch.chdir(tmp_path)
+    run_id = "run_test_explain_node_fail"
+    rd = tmp_path / "traces" / "runs" / run_id
+    rd.mkdir(parents=True)
+    rows = [
+        {"execution_point": "phase_graph.node.end", "channel": "fact",
+         "span_id": "s1", "parent_span_id": None, "sequence": 1, "epoch": 1,
+         "causality_id": "c1", "outcome": None, "when": "2026-09-14T00:00:01+00:00",
+         "when_corrected": "2026-09-14T00:00:01+00:00", "prev_event_hash": None,
+         "run_id": run_id, "step_id": None,
+         "payload": {"node_id": "think.reason.complete", "outcome": "failure",
+                     "error": "llm timeout", "ts": "2026-09-14T00:00:01+00:00"}},
+        {"execution_point": "kernel.run.stop", "channel": "fact",
+         "span_id": "s2", "parent_span_id": "s1", "sequence": 2, "epoch": 1,
+         "causality_id": "c2", "outcome": "failure",
+         "when": "2026-09-14T00:00:02+00:00",
+         "when_corrected": "2026-09-14T00:00:02+00:00", "prev_event_hash": None,
+         "run_id": run_id, "step_id": None,
+         "payload": {"outcome": "failure", "error": ""}},
+    ]
+    (rd / f"{run_id}.spine.jsonl").write_text(
+        "\n".join(json.dumps(r) for r in rows), encoding="utf-8"
+    )
+    runner = CliRunner()
+    result = runner.invoke(app, ["runs", "debug", run_id,
+                                 "--layer", "explain", "--output", "json"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
     assert payload["root_cause_present"] is True
+    assert payload["first_failed"]["node_id"] == "think.reason.complete"
+    assert payload["first_failed"]["error"] == "llm timeout"
+    assert "events" in payload["hint"]
 
 
 def test_runs_debug_human_output(run_dir: Path) -> None:

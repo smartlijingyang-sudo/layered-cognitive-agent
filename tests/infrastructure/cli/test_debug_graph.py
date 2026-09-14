@@ -97,9 +97,11 @@ def test_build_debug_graph_extracts_nodes_reducer_llm_and_root_cause(fake_run_di
     methods = [r["method"] for r in report["reducer_sequence"]]
     assert "apply_error" in methods
     assert "apply_stop" in methods
-    # 根因 marker 至少含 reducer stop + kernel.run.stop=failure
+    # AGENTS.md §3 C12: apply_stop precedes apply_terminal_outcome as a
+    # normal teardown path; it must NOT be flagged by name. Anomalies are
+    # now driven by outcome=failure only.
     joined = " | ".join(report["anomalies"])
-    assert "apply_stop" in joined
+    assert "apply_stop" not in joined
     assert "kernel.run.stop outcome=failure" in joined
 
 
@@ -112,7 +114,7 @@ def test_debug_graph_cli_top_level_alias_human_output(fake_run_dir: Path) -> Non
     assert "=== debug-graph run_id=run_test_debug_graph ===" in out
     assert "─── graph skeleton ───" in out
     assert "─── reducer apply_* sequence ───" in out
-    assert "✗ apply_stop" in out  # stop method flagged
+    assert "· apply_stop" in out  # apply_stop is normal teardown (C12), not flagged
     assert "tool_call: runCommand(command='ls')" in out  # tool call rendered
     assert "─── root-cause markers ───" in out
 

@@ -107,12 +107,17 @@ def _layer_events(events: list[SpineRow]) -> dict[str, Any]:
         }
         for e in events
     ]
-    rows.sort(key=lambda r: r["seq"] or 0)
+    rows.sort(key=lambda r: (r["seq"] or 0, str(r["when"] or "")))
     return {
         "layer": "events",
         "run_id": events[0].get("run_id") if events else None,
         "rows": rows,
         "rows_present": bool(rows),
+        "hint": (
+            "next_layer=graph for skeleton view, or filter --domain <name>"
+            if rows
+            else "next_layer=summary to confirm the run reached the spine"
+        ),
     }
 
 
@@ -150,35 +155,72 @@ def _layer_diff(events: list[SpineRow]) -> dict[str, Any]:
 
 
 def _layer_explain(events: list[SpineRow]) -> dict[str, Any]:
-    """Root-cause narrative. Walks the spine for failed nodes / lifecycle events."""
-    failed: list[SpineRow] = []
+    """Root-cause narrative. Scans for the earliest failed node-level event.
 
+    `kernel.run.stop outcome=failure` is the terminal verdict, not the
+    root cause. The agent that follows this hint wants the FIRST node that
+    failed — a `phase_graph.node.end` with `payload.outcome` in the fail
+    set. If none exists, the run terminated via reducer-driven teardown
+    (C12: apply_stop precedes apply_terminal_outcome), which the graph
+    layer surfaces separately.
+    """
     def _is_fail(v: object) -> bool:
         return isinstance(v, str) and v.lower() in {"fail", "failed", "failure", "error"}
 
-    for e in events:
-        payload_outcome = (e.get("payload") or {}).get("outcome")
-        ep_outcome = e.get("outcome")
-        if _is_fail(payload_outcome) or _is_fail(ep_outcome):
-            failed.append(e)
-    if not failed:
+    def _ts_key(e: SpineRow) -> str:
+        return str(e.get("ts") or e.get("when") or "")
+
+    sorted_events = sorted(events, key=_ts_key)
+
+    terminal = next(
+        (e for e in sorted_events if e.get("execution_point") == "kernel.run.stop"),
+        None,
+    )
+    node_failures = [
+        e for e in sorted_events
+        if e.get("execution_point") == "phase_graph.node.end"
+        and _is_fail((e.get("payload") or {}).get("outcome"))
+    ]
+    if not node_failures:
+        if terminal is not None and _is_fail((terminal.get("payload") or {}).get("outcome")):
+            return {
+                "layer": "explain",
+                "root_cause_present": False,
+                "summary": (
+                    "no node-level failure found; run terminated via reducer "
+                    "(apply_stop -> apply_terminal_outcome). See graph layer "
+                    "reducer_sequence."
+                ),
+                "terminal_outcome": (terminal.get("payload") or {}).get("outcome"),
+                "next_actions": [
+                    "next_layer=graph to inspect reducer_sequence",
+                ],
+                "hint": "next_layer=graph to inspect reducer_sequence",
+            }
         return {
             "layer": "explain",
             "root_cause_present": False,
             "summary": "no failed nodes / lifecycle events in spine",
             "next_actions": ["next_layer=summary to confirm run reached terminal"],
+            "hint": "next_layer=summary to confirm run reached terminal",
         }
-    first = failed[0]
+
+    first = node_failures[0]
+    payload = first.get("payload") or {}
     return {
         "layer": "explain",
         "root_cause_present": True,
         "first_failed": {
             "execution_point": first.get("execution_point"),
-            "seq": first.get("sequence") or first.get("event_seq") or 0,
-            "outcome": first.get("outcome") or (first.get("payload") or {}).get("outcome"),
-            "error": (first.get("payload") or {}).get("error"),
+            "node_id": payload.get("node_id"),
+            "ts": first.get("ts"),
+            "outcome": payload.get("outcome"),
+            "error": payload.get("error"),
         },
-        "next_actions": ["next_layer=events to walk the offending step in raw form"],
+        "next_actions": [
+            "next_layer=events to grep for this node_id and surrounding rows",
+        ],
+        "hint": "next_layer=events to grep for this node_id and surrounding rows",
     }
 
 
@@ -246,10 +288,14 @@ def register(app: typer.Typer) -> None:
 
         projection = _LAYER_DISPATCH[layer]
         payload = projection(events)
-        if "hint" not in payload and not payload.get("anomalies_present"):
-            payload["hint"] = _NEXT_HINT[layer].get("no_anomalies", "")
-        elif "hint" not in payload and payload.get("anomalies_present"):
-            payload["hint"] = _NEXT_HINT[layer].get("anomalies_present", "")
+        if "hint" not in payload or not payload["hint"]:
+            default_key = (
+                "anomalies_present"
+                if payload.get("anomalies_present") or payload.get("deviations_present")
+                or payload.get("root_cause_present")
+                else "no_anomalies"
+            )
+            payload["hint"] = _NEXT_HINT[layer].get(default_key, "")
 
         emit(output, payload, human_renderer=_human)
 
