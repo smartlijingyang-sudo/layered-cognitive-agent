@@ -152,6 +152,7 @@ class PlanLiftError(ValueError):
     - an edge's `from` node isn't in the plan
     - the plan has no termination policy
     """
+    plan_id: str | None = None
     node_id: str | None = None
     edge_id: str | None = None
     port_name: str | None = None
