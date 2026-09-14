@@ -62,15 +62,8 @@ import structlog
 from cordis import Context
 
 from lca.contracts.models.observability.journal.journal import (
-    BootObservabilityAssembled,
     BootPluginFiberSpawned,
-    BootProfileResolved,
 )
-
-# boot_products is the seam's source-of-truth (compat-only in PR-2 sense);
-# the kernel still imports the data classes from the legacy module path.
-from lca_kernel.boot.observability import compile_observability_boot_plan
-from lca_kernel.plan.plan import compile_run_plan
 from lca.harness.plugin_api import PluginDefinition
 from lca.harness.profile.boot.products import (
     ProfileBootProducts,
@@ -82,8 +75,13 @@ from lca.harness.profile.boot.products import (
 from lca.harness.profile.boot.projection import BootEntry
 from lca.harness.profile.resolve.resolve import ResolvedProfile, resolve_entries
 from lca.infrastructure.file.store import FileStore
+
+# boot_products is the seam's source-of-truth (compat-only in PR-2 sense);
+# the kernel still imports the data classes from the legacy module path.
+from lca_kernel.boot.observability import compile_observability_boot_plan
 from lca_kernel.boot.stages import Stage
 from lca_kernel.cli.errors import KernelError, StageError
+from lca_kernel.plan.plan import compile_run_plan
 from lca_kernel.runtime.observability import install_observability
 
 _log = structlog.get_logger(__name__)
@@ -353,37 +351,17 @@ def _emit_boot_events(
     topo_order: tuple[str, ...],
     boot_started: float,
 ) -> None:
-    """Flush pending boot events and emit final BootProfileResolved / BootObservabilityAssembled.
+    """Boot 诊断事实 → structlog(SSOT only,无 journal 旁路)。
 
-    Journal may still be ``None`` (no plugin wired a journal backend) — in
-    that case ``BoundObservability.journal.write`` is a documented safe
-    no-op and we silently skip. The events are still recorded as boot
-    diagnostic data via :class:`BootTrace` when observability re-installs
-    with the journal available.
+    K3 阶段在 Session bind 之前;``Session.append`` 不可达。boot 诊断走
+    结构化日志(``lca_kernel.boot.*``),运行时事实仍由 ``Session.append``
+    收口。
     """
-    bound = _safe_inject(ctx, "observability")
-    journal = getattr(bound, "journal", None) if bound is not None else None
-    if journal is None:
-        return
-    obs_started = time.monotonic()
-    for event in pending_events:
-        with contextlib.suppress(Exception):
-            journal.write(event)
     duration_ms = (time.monotonic() - boot_started) * 1000
     profile_path = str(
         getattr(products, "path", "") or getattr(products.resolved_profile, "path", "")
     )
-    with contextlib.suppress(Exception):
-        journal.write(
-            BootProfileResolved(
-                profile_path=profile_path,
-                manifest_hash="",
-                plugin_count=len(topo_order),
-                bundle_count=0,
-                duration_ms=duration_ms,
-                topo_order=topo_order,
-            )
-        )
+    bound = _safe_inject(ctx, "observability")
     bound_seams = tuple(
         name
         for name, present in (
@@ -394,17 +372,21 @@ def _emit_boot_events(
         )
         if present
     )
-    with contextlib.suppress(Exception):
-        journal.write(
-            BootObservabilityAssembled(
-                bound_seams=bound_seams,
-                evidence_store_kind=type(getattr(bound, "evidence_store", None)).__name__
-                if getattr(bound, "evidence_store", None) is not None
-                else "none",
-                journal_enabled=getattr(bound, "journal", None) is not None,
-                duration_ms=(time.monotonic() - obs_started) * 1000,
-            )
-        )
+    _log.info(
+        "boot.profile_resolved",
+        profile_path=profile_path,
+        plugin_count=len(topo_order),
+        duration_ms=duration_ms,
+    )
+    _log.info(
+        "boot.observability_assembled",
+        bound_seams=bound_seams,
+        evidence_store_kind=type(getattr(bound, "evidence_store", None)).__name__
+        if getattr(bound, "evidence_store", None) is not None
+        else "none",
+    )
+    for event in pending_events:
+        _log.info("boot.pending_event", event_type=type(event).__name__)
 
 
 def _safe_inject(ctx: Any, key: str) -> Any:

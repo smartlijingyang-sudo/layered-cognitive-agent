@@ -1,9 +1,10 @@
-"""Carrier-side terminal observation — Journal facts when agent path did not close the run.
+"""Carrier-side terminal observation — Session facts when agent path did not close the run.
 
 ``AgentRunFinished`` remains owned by :mod:`lca.agent.cognitive_agent`. When the
-lifecycle coordinator observes failure before that finally block runs (or when
-``record()`` was unbound), we emit a ``RuntimeObserved`` terminal fact so SSE /
-live tail consumers receive an explicit failure signal.
+lifecycle coordinator observes failure before that finally block runs, we
+emit a ``RuntimeObserved`` terminal fact so SSE / live tail consumers
+receive an explicit failure signal (SSOT via ``Session.append``,
+no journal fallback).
 """
 
 from __future__ import annotations
@@ -21,12 +22,9 @@ from lca.contracts.models.observability.journal.journal import (
     TeamRunFinished,
 )
 from lca.contracts.observability.registry.status import RunLifecycleStatus
-from lca.plugins.transport.webserver.handlers.runs.terminal.status.status import (
-    journal_store,
-)
+from lca.infrastructure.observability import record
 
 if TYPE_CHECKING:
-    from lca.infrastructure.observability import BoundObservability
     from lca.plugins.transport.webserver.handlers.runs.session.session.session import (
         RunSession,
     )
@@ -37,35 +35,50 @@ _TERMINAL_EVENT_TYPES = (AgentRunFinished, TeamRunFinished)
 _CARRIER_TERMINAL_OPERATION = "run.lifecycle.failed"
 
 
+def _resolve_session_inner(session: RunSession) -> Any:
+    """Resolve the bound run Session from ``RunSession.event_session``.
+
+    Accepts ``RunEventSessionBridge`` directly or a ``BoundRunEventSession``
+    (which exposes ``.bridge``).
+    """
+    obj = getattr(session, "event_session", None)
+    if obj is None:
+        return None
+    inner = getattr(obj, "inner", None)
+    if isinstance(inner, object) and not callable(inner):
+        return inner
+    bridge = getattr(obj, "bridge", None)
+    if bridge is not None:
+        return getattr(bridge, "inner", None)
+    return None
+
+
 def journal_has_terminal_event(session: RunSession) -> bool:
-    """Return whether the run journal already records a terminal container event."""
-    hub = session.hub
-    if hub is None:
+    """Return whether the Session already records a terminal container event."""
+    inner = _resolve_session_inner(session)
+    if inner is None:
         return False
-    store = journal_store(hub)
-    if store is None:
-        return False
-    return any(isinstance(stamped.event, _TERMINAL_EVENT_TYPES) for stamped in store.events)
+    return any(
+        event.type in {"AgentRunFinished", "TeamRunFinished"}
+        for event in inner.snapshot_events()
+    )
 
 
 def emit_carrier_run_failed(
     session: RunSession,
     *,
-    hub: BoundObservability | None,
     user_message: str,
     exception_class: str = "",
     err_kind: str = "unknown",
     status: str = "",
 ) -> StampedEvent | None:
-    """Append ``RuntimeObserved(run.lifecycle.failed)`` when no terminal journal fact exists."""
+    """Append ``RuntimeObserved(run.lifecycle.failed)`` to Session (SSOT only)."""
     if not user_message.strip():
         return None
     if journal_has_terminal_event(session):
         return None
-    if hub is None or hub.journal is None:
-        return None
     wire_status = status.strip() or RunLifecycleStatus.FAILED.value
-    return hub.journal.write(
+    return record(
         RuntimeObserved(
             kind=RuntimeKind.ERROR,
             operation=_CARRIER_TERMINAL_OPERATION,
@@ -85,25 +98,15 @@ def emit_carrier_run_failed(
 
 def ensure_carrier_terminal_observation(session: RunSession) -> StampedEvent | None:
     """Best-effort terminal fact before hub close when the run failed without ``AgentRunFinished``."""
-    from lca.infrastructure.observability import fold_run_state
-
-    folded = None
-    store = journal_store(session.hub) if session.hub is not None else None
-    if store is not None:
-        folded = fold_run_state(store.events)
-    failed = (
-        session.status in {RunLifecycleStatus.FAILED, RunLifecycleStatus.CANCELED}
-        or (folded is not None and folded.status in {RunLifecycleStatus.FAILED, RunLifecycleStatus.CANCELED})
-    )
+    failed = session.status in {RunLifecycleStatus.FAILED, RunLifecycleStatus.CANCELED}
     if not failed:
         return None
     if journal_has_terminal_event(session):
         return None
-    message = (folded.error if folded is not None and folded.error else None) or session.error or "run failed"
+    message = session.error or "run failed"
     wire_status = session.status.value if hasattr(session.status, "value") else str(session.status)
     return emit_carrier_run_failed(
         session,
-        hub=session.hub,
         user_message=message,
         exception_class=_exception_class_from_message(message),
         status=wire_status,

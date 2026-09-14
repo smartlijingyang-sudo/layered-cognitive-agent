@@ -20,7 +20,6 @@ from lca.infrastructure.observability.journal.engine.journal_io import (
 )
 from lca.plugins.transport.webserver.doctor import diagnose
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession
-from lca.plugins.transport.webserver.handlers.runs.terminal.status.status import journal_store
 from lca.plugins.transport.webserver.read.runs.step.tree_flush import (
     flush_step_tree_artifacts,
 )
@@ -129,32 +128,12 @@ def session_locator(session: RunSession) -> RunLocator:
 
 
 def ledger_high_watermark_for(session: RunSession) -> int:
-    """Read the final Journal sequence from memory, then fall back to the spine file."""
-    store = journal_store(session.hub)
-    if store is not None:
-        try:
-            events = store.events
-            return max((int(getattr(event, "seq", 0) or 0) for event in events), default=0)
-        except Exception as exc:
-            _log.debug(
-                "ledger_high_watermark_from_hub_failed", run_id=session.run_id, error=str(exc)
-            )
+    """Read the final Session sequence from the spine file (SSOT only)."""
     return watermark_from_file(session.spine_path)
 
 
 def terminal_event_seq_for(session: RunSession) -> int:
-    """Return the seq of the last AgentRunFinished, RunFinished, or RunSealed event."""
-    store = journal_store(session.hub)
-    if store is not None:
-        events: list[object] = []
-        try:
-            events = list(store.events)
-        except Exception as exc:
-            _log.debug("terminal_event_seq_from_hub_failed", run_id=session.run_id, error=str(exc))
-        for stamped in reversed(events):
-            event = getattr(stamped, "event", None)
-            if event is not None and type(event).__name__ in _TERMINAL_EVENT_TYPES:
-                return int(getattr(stamped, "seq", 0) or 0)
+    """Return the seq of the last AgentRunFinished / TeamRunFinished in spine.jsonl."""
     return terminal_event_seq_from_file(session.spine_path)
 
 

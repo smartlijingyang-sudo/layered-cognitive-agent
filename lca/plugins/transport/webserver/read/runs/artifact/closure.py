@@ -10,7 +10,6 @@ from lca.contracts.atoms.enums.enums import StreamChannel
 from lca.contracts.models.observability.journal.journal import StepTextDelta
 from lca.infrastructure.observability import BoundObservability
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession
-from lca.plugins.transport.webserver.handlers.runs.terminal.status.status import journal_store
 
 _log = structlog.get_logger(__name__)
 
@@ -55,16 +54,16 @@ def emit_artifact_closure_if_needed(
     if not closure:
         return
     try:
-        store = journal_store(hub)
-        if store is not None:
-            store.append(
-                StepTextDelta(
-                    step=-1,
-                    text_delta="\n\n" + closure,
-                    seq=0,
-                    channel=StreamChannel.ANSWER.value,
-                )
+        from lca.infrastructure.observability import record as _record_event
+
+        _record_event(
+            StepTextDelta(
+                step=-1,
+                text_delta="\n\n" + closure,
+                seq=0,
+                channel=StreamChannel.ANSWER.value,
             )
+        )
         _log.info(
             "artifact_closure_emitted",
             hop="H2",

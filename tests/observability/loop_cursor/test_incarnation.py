@@ -18,11 +18,7 @@ from lca.contracts.observability.core.incarnation import (
     Incarnation,
     IncarnationRegistry,
 )
-from lca.contracts.observability.cursor.loop_cursor_payloads import (
-    ThinkingRecord,
-)
 from lca.infrastructure.observability.loop_cursor import (
-    InMemoryLoopCursor,
     StdLoopCursor,
 )
 
@@ -173,51 +169,10 @@ def test_cursor_phase_fold_payload_carries_incarnation() -> None:
     assert rec["incarnation"] == 2
 
 
-def test_cursor_record_thinking_payload_envelope_l14() -> None:
-    c, spine = _make_std()
-    c.advance("think")
-    c.record_thinking(
-        ThinkingRecord(
-            content_digest="abc",
-            content_path=None,
-            token_count=10,
-            thinking_kind="reasoning",
-        )
-    )
-    last = spine.records[-1]
-    assert last["execution_point"] == "step.thinking.record"
-    # L14:envelope 必携带 plan_ref + incarnation_seq
-    assert last["payload"]["plan_ref"] == "plan-A"
-    assert last["payload"]["incarnation"] == 2
-
-
-def test_cursor_fork_bumps_incarnation_seq_keeps_identity() -> None:
-    c, _ = _make_std()
-    child = c.fork("child_agent")
-    assert isinstance(child, StdLoopCursor)
-    # child 继承 run_id + plan_ref,seq += 1(ADR-0171 P4)
-    assert child.snapshot.incarnation == 3
-    assert child.incarnation.run_id == "r1"
-    assert child.incarnation.plan_ref == "plan-A"
-
-
-def test_in_memory_cursor_fork_bumps_incarnation_seq() -> None:
-    c = InMemoryLoopCursor(
-        run_id="r1",
-        trace_id="t1",
-        incarnation=Incarnation(run_id="r1", plan_ref="plan-A", incarnation_seq=5),
-    )
-    child = c.fork("child_agent")
-    assert isinstance(child, InMemoryLoopCursor)
-    assert child.snapshot.incarnation == 6
-    assert child.incarnation.run_id == "r1"
-    assert child.incarnation.plan_ref == "plan-A"
-
-
-def test_cursor_chain_fork_monotonic_seq() -> None:
-    c, _ = _make_std()
-    seqs = [c.snapshot.incarnation]
-    for _ in range(3):
-        c = c.fork("delegation")
-        seqs.append(c.snapshot.incarnation)
-    assert seqs == [2, 3, 4, 5]
+# 2026-09-14 dead-code 修剪:cursor.record_thinking / fork 已从 LoopCursor
+# Protocol 删除,以下 3 个测试随之撤除(Incarnation.child() 派生逻辑本身
+# 由 :file:`tests/contracts/test_incarnation_child.py` 守护):
+#   - test_cursor_record_thinking_payload_envelope_l14
+#   - test_cursor_fork_bumps_incarnation_seq_keeps_identity
+#   - test_in_memory_cursor_fork_bumps_incarnation_seq
+#   - test_cursor_chain_fork_monotonic_seq

@@ -34,16 +34,6 @@ def build_test_catalog() -> dict[str, type]:
             "DelegationCachePlugin",
         ),
         (
-            "events.spine.writable_matrix",
-            "lca.plugins.events.publishers.spine_writable_matrix.plugin",
-            "WritableMatrixPlugin",
-        ),
-        (
-            "events.spine.loop_cursor",
-            "lca.plugins.events.publishers.spine_loop_cursor.plugin",
-            "LoopCursorPlugin",
-        ),
-        (
             "events.model_visible.publisher",
             "lca.plugins.events.publishers.model_visible.publisher",
             "ModelVisiblePublisher",

@@ -1,8 +1,7 @@
 """Phase fold spine fact commit seam (ADR-0194 P2-12).
 
-Phase fold EPs commit via ``publish_ep_bound``. Production phase.tool.*
-EPs live in ``tool_journal_commit``; loop-cursor fold EPs still route through
-``spine_loop_cursor`` until that publisher migrates.
+Phase fold EPs commit via ``publish_ep_bound`` (FactGateway →
+Session.append SSOT, ADR-0186 / 0191).
 """
 
 from __future__ import annotations

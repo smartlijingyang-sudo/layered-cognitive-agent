@@ -38,6 +38,7 @@ from lca.contracts.models.observability.diagnostic.diagnostic import (
 from lca.contracts.models.observability.event.event import OperationOutcome, RuntimeKind
 from lca.contracts.models.observability.journal.journal import (
     JournalEvent,
+    RunScope,
     RuntimeObserved,
     StampedEvent,
 )
@@ -172,11 +173,33 @@ def bind_backends(bound: BoundObservability) -> Iterator[BoundObservability]:
 
 
 def record(event: JournalEvent) -> StampedEvent | None:
-    """向当前 journal 写入领域/运行时事实。"""
-    bound = _bound.get()
-    if bound is None or bound.journal is None:
-        return None
-    return bound.journal.write(event)
+    """向 Session 写入领域/运行时事实(SSOT only,无 fallback)。
+
+    Session bound:经 raw ``Session.append`` 落 Session 日志 →
+    ``<run_id>.spine.jsonl``。无 Session 时抛 ``RuntimeError``(fail-loud);
+    SSOT 唯一真值,不允许旁路到 RunStore。
+    """
+    from dataclasses import asdict
+
+    from lca.infrastructure.session._overflow_0.bindings import (
+        resolve_session_reader,
+    )
+
+    session = resolve_session_reader()
+    if session is None:
+        raise RuntimeError(
+            f"record({type(event).__name__}) requires a bound Session "
+            "(SSOT only; bind via bind_run_event_session or set_publish_session)"
+        )
+    event_type = type(event).__name__
+    payload = asdict(event)
+    record_event = session.append(event_type, payload)
+    return StampedEvent(
+        event=event,
+        seq=record_event.seq,
+        ts=record_event.time / 1000.0,
+        scope=RunScope(),
+    )
 
 
 @contextmanager

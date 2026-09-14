@@ -32,9 +32,9 @@ def _config_dir() -> Path:
 def test_validate_publisher_authorization_passes_with_aligned_catalog() -> None:
     """catalog 与 yaml 现状对齐(2026-09-04 web-standard)→ validate 通过。
 
-    真实 boot 路径会注入 16 个 publisher(13 个 spine_reflector_X + delegation_cache
-    + spine_loop_cursor + spine_writable_matrix)。此测试用同一份 catalog
-    注入,验证 :meth:`validate_publisher_authorization` 不抛。
+    真实 boot 路径会注入 14 个 publisher(11 个 spine_reflector_X +
+    delegation_cache + model_visible + events.bus)。此测试用同一份
+    catalog 注入,验证 :meth:`validate_publisher_authorization` 不抛。
     """
     from lca_kernel.events.test.catalog import build_test_catalog
 

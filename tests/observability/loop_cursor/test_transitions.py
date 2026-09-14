@@ -28,7 +28,7 @@ def test_full_phase_chain() -> None:
 
 def test_advance_after_close_raises() -> None:
     c = InMemoryLoopCursor(run_id="r1", trace_id="t1", incarnation=_inc())
-    c.close("completed")
+    c._state.closed = True
     with pytest.raises(CursorError):
         c.advance("perceive")
 

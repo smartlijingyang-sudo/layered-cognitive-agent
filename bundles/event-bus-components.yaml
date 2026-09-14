@@ -3,14 +3,10 @@ entries:
   name: events_bus
   $module: lca_kernel.events.manifest.manifest
   config: {}
-- id: events.spine.loop_cursor
-  name: events_spine_loop_cursor
-  $module: lca.plugins.events.publishers.spine_loop_cursor.plugin
-  config: {}
-- id: events.spine.writable_matrix
-  name: events_spine_writable_matrix
-  $module: lca.plugins.events.publishers.spine_writable_matrix.plugin
-  config: {}
+# 2026-09-14 dead-code 修剪:events.spine.loop_cursor /
+# events.spine.writable_matrix 两 publisher 在生产路径零 caller(Send 方法
+# 无调用方、capability key 无消费者)。cursor 写入走 SessionWritePortAdapter
+# → Session.append → spine sink(ADR-0186 SSOT);不再经 EventBus 旁路。
 - id: events.model_visible.publisher
   name: events_model_visible_publisher
   $module: lca.plugins.events.publishers.model_visible.publisher
