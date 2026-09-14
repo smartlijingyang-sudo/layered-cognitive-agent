@@ -242,7 +242,7 @@ def register(app: typer.Typer) -> None:
                 "hint": _NEXT_HINT[layer]["spine_missing"],
             }
             emit(output, payload, human_renderer=_human)
-            return
+            raise typer.Exit(code=1)
 
         projection = _LAYER_DISPATCH[layer]
         payload = projection(events)
