@@ -99,6 +99,13 @@ class DefaultStopPolicy(StopPolicy):
                 status=TaskStatus.COMPLETED,
             )
         if decision.action_type != ActionType.RESPOND and not degraded_ok:
+            # Deterministic tool failure (PermissionError, FileNotFoundError,
+            # TypeError, etc., tagged ``failure_kind = "execution"`` by the
+            # Body executor) means the model cannot make progress on this
+            # path.  Stop the loop instead of cycling through 8 retries.
+            deterministic_failure_stop = self._deterministic_failure_stop(observation)
+            if deterministic_failure_stop is not None:
+                return deterministic_failure_stop
             return None
         final_output = decision.response_text or self._degraded_output(observation, degraded_ok)
         should_stop = reflection.verdict != ReflectionVerdict.NEEDS_CORRECTION
@@ -118,6 +125,38 @@ class DefaultStopPolicy(StopPolicy):
         if degraded_ok and observation is not None and isinstance(observation.payload, str):
             return observation.payload
         return None
+
+    @staticmethod
+    def _deterministic_failure_stop(
+        observation: Observation | None,
+    ) -> StopDecision | None:
+        """Stop the loop when the last tool call hit a non-recoverable error.
+
+        Returns a ``StopDecision(reason=ERROR, status=FAILED)`` if the
+        most recent observation succeeded=``False`` and carries the
+        Body-executor ``failure_kind == "execution"`` tag (deterministic
+        error class: code bugs, permission denied, type errors).
+        Transient failures (``failure_kind == "transient"``) and
+        business-level ``success=False`` without the executor tag are
+        not handled here — they remain the model's call to retry.
+        """
+        from lca.contracts.atoms.semantic.keys import (
+            FAILURE_KIND,
+            FAILURE_KIND_EXECUTION,
+        )
+
+        if observation is None or observation.success:
+            return None
+        extra = observation.extra if isinstance(observation.extra, dict) else {}
+        if extra.get(FAILURE_KIND) != FAILURE_KIND_EXECUTION:
+            return None
+        error_text = (observation.error or "").strip()
+        return StopDecision(
+            should_stop=True,
+            reason=StopReason.ERROR,
+            status=TaskStatus.FAILED,
+            final_output=error_text or None,
+        )
 
     def _budget_exhausted_decision(
         self,

@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from lca.cognition.convergence.delivery_synth import synthesize_delivery_response
 from lca.cognition.convergence.evidence import build_delivery_evidence
-from lca.cognition.convergence.payload import is_substantive_stdout
+from lca.cognition.convergence.payload import (
+    is_substantive_stdout,
+    turn_has_delivery_signal,
+)
 from lca.cognition.convergence.task_class import resolve_task_class
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.models.core.execution.decision import Decision, Observation, ToolCall, Turn
@@ -68,3 +71,35 @@ def test_resolve_task_class_prefers_manifest_hint() -> None:
         perceive=PerceiveProjection(manifest=manifest, digest="d", step=1),
     )
     assert resolve_task_class(state) == "visual_artifact"
+
+
+# ---------------------------------------------------------------------------
+# list-payload support: tools like listFiles return list-of-strings, not
+# stdout-shaped strings.  A non-empty list with at least one non-blank entry
+# must count as a delivery signal so convergence gates can stop the loop.
+# ---------------------------------------------------------------------------
+
+
+def test_turn_has_delivery_signal_accepts_non_empty_list_payload() -> None:
+    assert turn_has_delivery_signal(
+        ["/etc/hostname", "/etc/hosts", "/etc/passwd"],
+    )
+
+
+def test_turn_has_delivery_signal_rejects_empty_list_payload() -> None:
+    # Empty list conveys "no items" — the model still has to surface
+    # that as a final response, so it is not a delivery signal on its own.
+    assert not turn_has_delivery_signal([])
+
+
+def test_turn_has_delivery_signal_rejects_list_of_blanks() -> None:
+    # A list whose items are all blank strings is the same shape as ``[]``
+    # for delivery purposes — no meaningful entries to surface.
+    assert not turn_has_delivery_signal(["", "   ", "\t"])
+
+
+def test_turn_has_delivery_signal_dict_with_files_key_is_delivery() -> None:
+    # Existing contract: ``payload_files_created`` treats ``files_created``
+    # / ``files`` keys as a delivery signal (used by writeFile output
+    # where the body is a dict like ``{"files": ["report.md"]}``).
+    assert turn_has_delivery_signal({"files": ["a", "b"]})
