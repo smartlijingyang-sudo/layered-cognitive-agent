@@ -221,7 +221,7 @@ def test_setup_subscribes_with_event_spine() -> None:
         "observation.node_exit": lambda **kw: observer_exit_calls.append(kw),
         "observation.runtime_bookkeeping": lambda **kw: observer_bookkeep_calls.append(kw),
     }
-    mapping = {"event_spine": spine, **observers}
+    mapping = {"event_spine": _SpineCoreHolder(spine), **observers}
     ctx = _Ctx(mapping)
 
     import asyncio
@@ -349,6 +349,12 @@ def test_plugin_meta_has_required_keys() -> None:
     defn = definition_from_plugin(hub_plugin.setup)
     spec = defn.spec
     assert spec.id == "observation.event_hub"
+    assert spec.layer == "L2", (
+        "L1 is forbidden by the layer-rank check: L1 < L2 (spine.core) "
+        "would raise ProfileResolveError when hub requires event_spine. "
+        "L2 keeps hub at the same rank as spine.core so it can require "
+        "the EventSpine instance."
+    )
     effects = spec.effects
     if isinstance(effects, str):
         assert effects == "none"

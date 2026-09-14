@@ -285,6 +285,19 @@ def _capture_outcome(state: _StepTreeState, ep: str, event: Mapping[str, Any]) -
     if ep == "exception.caught":
         state.terminal_outcome = "failed"
         return
+    if ep == "spine.terminal.commit":
+        ev_outcome = str(event.get("outcome") or "").strip().lower()
+        ev_reason = str(event.get("reason") or "").strip().lower()
+        if ev_outcome == "completed":
+            state.terminal_outcome = "completed"
+        elif ev_reason == "budget_exceeded":
+            state.terminal_outcome = "budget_exhausted"
+        else:
+            state.terminal_outcome = "failed"
+        return
+    if ep == "spine.body.deterministic_fail":
+        state.terminal_outcome = "failed"
+        return
     if ep in {"kernel.run.stop", "lifecycle.finally"}:
         ev_outcome = str(event.get("outcome") or "").strip().lower()
         if ev_outcome in {"success", "completed"}:

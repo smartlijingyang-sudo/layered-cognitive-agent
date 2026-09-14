@@ -6,11 +6,6 @@ name: runtime-core
 description: |
   Minimal declarative runtime primitives required by profile boot closure.
 entries:
-  - id: state.stop-policy.default
-    name: state_stop_policy_default
-    $module: lca.plugins.loop.state.stop_policy.plugin
-    config: {}
-
   # Minimal production profiles still need an explicitly selected loop owner.
   # The registry and driver are independent plugin entries, so specialized
   # profiles can replace the driver without changing runtime-core consumers.

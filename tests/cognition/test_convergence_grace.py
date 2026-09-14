@@ -9,12 +9,6 @@ from lca.contracts.models.core.perceive.perception import ContextItem, ContextMa
 from lca.contracts.models.core.perceive.projection import PerceiveProjection
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import AgentState, Budget
-from lca.plugins.loop.state.stop_policy.plugin import DefaultStopPolicy
-
-
-class _EmptyArtifactClosure:
-    def synthesize(self, *, fallback: str = "") -> str | None:
-        return None
 
 
 def _delivery_satisfied_state() -> AgentState:
@@ -57,16 +51,3 @@ def test_policy_budget_exhausted_grace_when_delivery_satisfied() -> None:
     assert evidence.satisfied is True
     verdict = DefaultConvergencePolicy().evaluate_budget_exhausted(state, evidence=evidence)
     assert verdict.kind == "grace_respond"
-
-
-def test_stop_policy_grace_respond_on_budget_exhausted_with_delivery() -> None:
-    policy = DefaultStopPolicy(_EmptyArtifactClosure())
-    state = _delivery_satisfied_state()
-    observation = Observation(observation_id="obs", success=False, payload=None)
-
-    stop = policy.decide(state, None, observation, None)
-
-    assert stop.should_stop is True
-    assert stop.status == TaskStatus.COMPLETED
-    assert stop.final_output is not None
-    assert "工作区" in stop.final_output or len(stop.final_output) > 20

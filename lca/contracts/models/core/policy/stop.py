@@ -1,7 +1,12 @@
-"""StopReason / StopDecision —— 停止阶段使用的数据契约。
+"""StopReason / StopDecision — the loop's terminal payload contract.
 
-``StopPolicy`` 是 State 群内的策略接口，见
-``lca.contracts.protocols.runtime.StopPolicy``。
+The loop terminator is a four-field struct produced by the model itself
+(via `TerminalCommitExecutor` reading `decision.action_type` and
+`decision.response_text`) or by Body raising `DeterministicToolError`,
+or by the budget guard. There is no host-side policy class and no
+`should_stop` boolean. ADR-0094 previously owned the StopPolicy seam;
+that seam is retired per plan
+`docs/plans/2026-09-14-stop-decision-retirement.md`.
 """
 
 from __future__ import annotations
@@ -17,26 +22,33 @@ if TYPE_CHECKING:
 
 
 class StopReason(Enum):
-    """Why the loop stopped (or continues)."""
+    """Why the loop reached a terminal state.
+
+    The model never produces a stop reason directly. The producer of
+    `StopDecision.reason` is one of three typed sites:
+    - model RESPOND with non-empty response_text maps to a terminal
+      payload (the model is the implicit source of "done")
+    - Body raises DeterministicToolError on `failure_kind == execution`,
+      and the outer driver maps it to ERROR
+    - the budget guard produces BUDGET_EXCEEDED when max_visits fires
+    """
 
     CONTINUE = "continue"
     BUDGET_EXCEEDED = "budget_exceeded"
-    TASK_COMPLETED = "task_completed"
     ERROR = "error"
 
 
 @dataclass(frozen=True)
 class StopDecision:
-    """Loop's only stop signal — continue or halt with reason/output/status.
+    """Loop's terminal payload — applied by the reducer's apply_stop.
 
-    ADR-0122: ``final_output`` carries the successful answer when
-    ``reason == TASK_COMPLETED``; ``failure`` carries a typed :class:`RunDiagnostic`
-    when ``reason == ERROR``. The reducer / TerminalOutcome consumes one of
-    the two — never both — so consumers do not have to disambiguate by
-    string heuristics.
+    ADR-0122: ``final_output`` carries the successful answer when the
+    model produced RESPOND with non-empty text; ``failure`` carries a
+    typed :class:`RunDiagnostic` when ``reason == ERROR``. The reducer
+    consumes one of the two, never both, so consumers do not have to
+    disambiguate by string heuristics.
     """
 
-    should_stop: bool = False
     reason: StopReason = StopReason.CONTINUE
     final_output: str | None = None
     status: TaskStatus | None = None

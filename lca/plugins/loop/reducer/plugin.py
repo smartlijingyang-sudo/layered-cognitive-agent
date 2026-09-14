@@ -384,8 +384,11 @@ class DefaultReducer(Reducer):
         """
         # A terminal stop carrying output is authoritative even when older
         # StopDecision producers omit the optional status field; otherwise
-        # the output would be discarded by the zero-output guard.
-        if state.status == TaskStatus.WORKING and stop.should_stop and bool(response_text):
+        # the output would be discarded by the zero-output guard. The
+        # post-retirement shape has no ``should_stop`` boolean; presence
+        # of ``final_output`` (or an explicit ``status``) is the terminal
+        # signal.
+        if state.status == TaskStatus.WORKING and bool(response_text):
             state.status = TaskStatus.COMPLETED
 
         if state.status == TaskStatus.WORKING:

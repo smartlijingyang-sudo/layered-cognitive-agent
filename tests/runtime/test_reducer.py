@@ -10,7 +10,7 @@ import pytest
 from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection, Turn
 from lca.contracts.models.core.perceive.perception import ContextItem, ContextManifest
 from lca.contracts.models.core.policy.budget import create_budget
-from lca.contracts.models.core.policy.stop import StopDecision
+from lca.contracts.models.core.policy.stop import StopDecision, StopReason
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.core.workspace.activation import ActivatedSkill
@@ -86,8 +86,7 @@ def test_apply_stop_writes_status_only() -> None:
 
     state = _state()
     stop = StopDecision(
-        should_stop=True,
-        reason="completed",  # type: ignore[arg-type]
+        reason=StopReason.CONTINUE,
         status=TaskStatus.COMPLETED,
         final_output="done",
     )
@@ -102,8 +101,7 @@ def test_apply_stop_does_not_mutate_state_final_output_field() -> None:
 
     state = _state()
     stop = StopDecision(
-        should_stop=True,
-        reason="completed",  # type: ignore[arg-type]
+        reason=StopReason.CONTINUE,
         status=TaskStatus.COMPLETED,
         final_output="done\n\n[artifact closure]",
     )
@@ -168,7 +166,6 @@ def test_apply_terminal_outcome_rejects_waiting_input_without_durable_cursor() -
     )
 
     stop = StopDecision(
-        should_stop=True,
         reason="approval_required",  # type: ignore[arg-type]
         status=TaskStatus.INPUT_REQUIRED,
     )
@@ -216,7 +213,6 @@ class TestFailedTerminalCarriesErrorRef:
         from lca.contracts.models.core.policy.stop import StopReason
 
         stop = StopDecision(
-            should_stop=True,
             reason=StopReason.ERROR,
             status=TaskStatus.FAILED,
         )
@@ -237,7 +233,6 @@ class TestFailedTerminalCarriesErrorRef:
         from lca.contracts.models.core.policy.stop import StopReason
 
         stop = StopDecision(
-            should_stop=True,
             reason=StopReason.ERROR,
             status=TaskStatus.FAILED,
         )
@@ -357,7 +352,6 @@ class TestInstrumentApply:
         session, token, _bus = _bind_collecting_session()
         try:
             stop = StopDecision(
-                should_stop=True,
                 reason="approval_required",  # type: ignore[arg-type]
                 status=TaskStatus.INPUT_REQUIRED,
             )

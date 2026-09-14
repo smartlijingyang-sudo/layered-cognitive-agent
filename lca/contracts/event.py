@@ -112,6 +112,8 @@ class Category(str, Enum):
     SPINE_PHASE_THINK_FOLD = "spine.phase.think.fold"
     SPINE_PHASE_REMEMBER_FOLD = "spine.phase.remember.fold"
     SPINE_PHASE_STOP_FOLD = "spine.phase.stop.fold"
+    SPINE_TERMINAL_COMMIT = "spine.terminal.commit"
+    SPINE_BODY_DETERMINISTIC_FAIL = "spine.body.deterministic_fail"
     SPINE_PHASE_REFLECT_FOLD = "spine.phase.reflect.fold"
     SPINE_PHASE_ACT_FOLD_START = "spine.phase.act.fold.start"
     SPINE_PHASE_ACT_FOLD_END = "spine.phase.act.fold.end"
@@ -272,6 +274,8 @@ CATEGORY_DEFAULT_PLANE: dict[Category, Plane] = {
     Category.SPINE_PHASE_THINK_FOLD: Plane.OBSERVABILITY,
     Category.SPINE_PHASE_REMEMBER_FOLD: Plane.OBSERVABILITY,
     Category.SPINE_PHASE_STOP_FOLD: Plane.OBSERVABILITY,
+    Category.SPINE_TERMINAL_COMMIT: Plane.OBSERVABILITY,
+    Category.SPINE_BODY_DETERMINISTIC_FAIL: Plane.STRUCTURAL,
     Category.SPINE_PHASE_REFLECT_FOLD: Plane.OBSERVABILITY,
     Category.SPINE_PHASE_ACT_FOLD_START: Plane.OBSERVABILITY,
     Category.SPINE_PHASE_ACT_FOLD_END: Plane.OBSERVABILITY,

@@ -425,31 +425,26 @@ class TestMemoryReceipt:
 
 class TestStopPayload:
     def test_minimal_construction_works(self) -> None:
-        sp = StopPayload(should_stop=False)
-        assert sp.should_stop is False
-        assert sp.focus_converged is False
+        sp = StopPayload()
         assert sp.reason is None
         assert sp.final_output_ref is None
 
     def test_full_construction(self) -> None:
         sp = StopPayload(
-            should_stop=True,
-            focus_converged=True,
             reason="budget_exceeded",
             final_output_ref="artifact://out",
         )
-        assert sp.should_stop is True
         assert sp.reason == "budget_exceeded"
         assert sp.final_output_ref == "artifact://out"
 
     def test_rejects_extra_field(self) -> None:
         with pytest.raises(ValidationError):
-            StopPayload(should_stop=False, unknown_field="x")
+            StopPayload(reason=None, unknown_field="x")
 
     def test_is_frozen_assignment_raises(self) -> None:
-        sp = StopPayload(should_stop=False)
+        sp = StopPayload()
         with pytest.raises(ValidationError):
-            sp.should_stop = True
+            sp.reason = "budget_exceeded"
 
 
 class TestConfigIntrospection:

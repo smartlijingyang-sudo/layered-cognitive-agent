@@ -28,7 +28,6 @@ from agent_lab.primitives.artifact import Artifact, ArtifactKind
 # Fixture registries
 # ---------------------------------------------------------------------------
 _FIXTURE_DECISION_GATES: dict[str, Any] = {}
-_FIXTURE_STOP_POLICIES: dict[str, Any] = {}
 _FIXTURE_CHECKPOINTS: dict[str, Any] = {}
 _FIXTURE_REMEMBER_ADMITS: dict[str, Any] = {}
 _FIXTURE_STOP_FOCUS: dict[str, Any] = {}
@@ -42,12 +41,7 @@ def unregister_fixture_decision_gate(name: str) -> None:
     _FIXTURE_DECISION_GATES.pop(name, None)
 
 
-def register_fixture_stop_policy(name: str, policy: Any) -> None:
-    _FIXTURE_STOP_POLICIES[name] = policy
 
-
-def unregister_fixture_stop_policy(name: str) -> None:
-    _FIXTURE_STOP_POLICIES.pop(name, None)
 
 
 def register_fixture_checkpoint(name: str, checkpoint: Any) -> None:
@@ -120,64 +114,6 @@ class LcaControlDecisionGateProvider:
                 kind=ArtifactKind.FACT,
                 content=_decision_to_dict(enforced),
                 schema_ref="decision.v1",
-            ),
-        }
-
-
-# ---------------------------------------------------------------------------
-# LcaControlStopPolicyProvider — stop_decide
-# ---------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class LcaControlStopPolicyProvider:
-    """Bridge stop_decide_node → LCA StopPolicy.decide.
-
-    Resolution order:
-      1. ``provider_config.fixture_stop_policy_name``
-      2. ``provider_config.policy_factory`` (module:Class form)
-      3. Fallback: _NeverStop (always returns CONTINUE)
-    """
-
-    _policy: Any
-
-    @classmethod
-    def from_node_config(cls, config: dict[str, Any]) -> LcaControlStopPolicyProvider:
-        cfg = config.get("provider_config") or {}
-        name = cfg.get("fixture_stop_policy_name")
-        if name and name in _FIXTURE_STOP_POLICIES:
-            return cls(_policy=_FIXTURE_STOP_POLICIES[name])
-        factory = cfg.get("policy_factory")
-        if isinstance(factory, dict) and factory.get("ref"):
-            policy_cls = _import_dotted(factory["ref"])
-            kwargs = dict(factory.get("kwargs") or {})
-            return cls(_policy=policy_cls(**kwargs))
-        return cls(_policy=_NeverStop())
-
-    def decide(
-        self,
-        *,
-        state: Any = None,
-        decision: Any = None,
-        observation: Any = None,
-        reflection: Any = None,
-        out_port: str = "stop_decision",
-    ) -> dict[str, Artifact]:
-        result = _call_maybe_async(self._policy.decide, state, decision, observation, reflection)
-        sd_dict = _stop_decision_to_dict(result)
-        return {
-            out_port: Artifact(
-                kind=ArtifactKind.FACT,
-                content=sd_dict,
-                schema_ref="stop_decision.v1",
-            ),
-            "terminal": Artifact(
-                kind=ArtifactKind.FACT,
-                content={
-                    "stop_decision": sd_dict,
-                    "ts": datetime.now(UTC).isoformat(),
-                },
-                schema_ref="terminal.v1",
             ),
         }
 
@@ -288,15 +224,6 @@ class _IdentityGate:
 
     async def enforce(self, state: Any, decision: Any) -> Any:
         return decision
-
-
-class _NeverStop:
-    """Fallback StopPolicy that always returns CONTINUE."""
-
-    def decide(self, state: Any, decision: Any, observation: Any, reflection: Any) -> Any:
-        from lca.contracts.models.core.policy.stop import StopDecision, StopReason
-
-        return StopDecision(should_stop=False, reason=StopReason.CONTINUE)
 
 
 class _NoopCheckpoint:
@@ -503,15 +430,12 @@ __all__ = [
     "LcaControlDecisionGateProvider",
     "LcaControlRememberAdmitProvider",
     "LcaControlStopFocusProvider",
-    "LcaControlStopPolicyProvider",
     "register_fixture_checkpoint",
     "register_fixture_decision_gate",
     "register_fixture_remember_admit",
     "register_fixture_stop_focus",
-    "register_fixture_stop_policy",
     "unregister_fixture_checkpoint",
     "unregister_fixture_decision_gate",
     "unregister_fixture_remember_admit",
     "unregister_fixture_stop_focus",
-    "unregister_fixture_stop_policy",
 ]

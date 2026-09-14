@@ -286,7 +286,7 @@ class TestADRBackwardCompatibilityNote:
     def test_terminal_outcome_isolated_from_stop_decision(self) -> None:
         from lca.contracts.models.core.policy.stop import StopDecision
 
-        decision = StopDecision(should_stop=True, final_output="legacy")
+        decision = StopDecision(reason="continue", final_output="legacy")
         outcome = _completed()
         assert decision is not outcome
         assert outcome.kind is TerminalOutcomeKind.COMPLETED

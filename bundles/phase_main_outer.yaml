@@ -1,7 +1,7 @@
 # bundles/phase_main_outer.yaml — outer plan, explicit phase topology.
 #
 # ADR-0221 P3 cutover: the v2 driver no longer reads
-# ``phase.topology.standard`` / ``phase.topology.bundle`` Cordis
+# ``phase.topology.standard`` / ``phase.topology.standard`` Cordis
 # providers. Topology is declared here as a v2 BundleGraphSpec
 # (ADR-0217) — the runtime kernel reads this yaml directly.
 #
@@ -10,14 +10,22 @@
 # enters the subgraph via ``sub_spec_ref.entry_node`` and returns to
 # the outer traversal at ``sub_spec_ref.binding_edge``.
 #
-# Edges follow the legacy ``phase.edge.standard`` semantics:
-# ``should_stop`` short-circuits each phase to ``stop.main``; otherwise
-# the chain advances perceive → think → act → reflect → remember →
-# stop, looping back to perceive while ``should_stop`` is false.
+# The post-stop-decision-retirement shape: the outer plan advances
+# perceive → think → act → reflect → remember on the data shape
+# ``decision.action_type`` and ``decision.response_text``. The
+# ``terminal.commit`` outer node is dispatched by the v2 driver through
+# the new ``BindingKind.TERMINAL_COMMIT`` binding kind. Loop control is
+# no longer a host-side policy; ``terminal.commit`` runs once and the
+# kernel commits a typed ``StopDecision`` to the reducer. The driver
+# emits ``SPINE_TERMINAL_COMMIT`` at the same site.
+#
+# Edges: ``act.main → think.main`` carries the USE_TOOL → re-ask-model
+# loop. ``<phase>.main → terminal.commit`` carries the model-driven
+# RESPOND-with-output path. There is no legacy ``should_stop`` predicate.
 
 id: phase.main.outer
 region: phase:agent
-purpose: Six-phase outer plan (perceive → think → act → reflect → remember → stop) wired through sub_spec_ref into per-phase subgraphs.
+purpose: Six-phase outer plan (perceive → think → act → reflect → remember → terminal.commit) wired through sub_spec_ref into per-phase subgraphs.
 
 nodes:
   - id: perceive.main
@@ -49,7 +57,7 @@ nodes:
       entry_node: act.validate
       binding_edge: act.main
     declared_inputs: [decision]
-    declared_outputs: [act_outcome]
+    declared_outputs: [act_outcome, should_terminate]
 
   - id: reflect.main
     region: phase:reflect
@@ -71,56 +79,50 @@ nodes:
     declared_inputs: [reflect_outcome]
     declared_outputs: [memory_record]
 
-  - id: stop.main
-    region: phase:stop
-    max_visits: 8
+  - id: terminal.commit
+    region: phase:terminal
+    binding: terminate
+    max_visits: 1
     terminal: true
-    sub_spec_ref:
-      plan_ref: bundles/stop_subgraph.yaml
-      entry_node: phase.stop.should_check
-      binding_edge: stop.main
     declared_inputs: [decision, act_outcome, reflect_outcome]
-    declared_outputs: [stop_payload]
+    declared_outputs: [terminal_outcome]
 
 edges:
-  # perceive → stop on error short-circuit, else → think.
-  - from: perceive.main
-    to: stop.main
-    when: result.payload.should_stop == true and result.payload.reason == "error"
+  # perceive → think (model-driven continuation).
   - from: perceive.main
     to: think.main
     when: true
 
-  # think → stop on error short-circuit, else → act.
-  - from: think.main
-    to: stop.main
-    when: result.payload.should_stop == true and result.payload.reason == "error"
+  # think → act (model-driven continuation); think → terminal.commit
+  # when the model emitted RESPOND with non-empty response_text.
   - from: think.main
     to: act.main
-    when: true
+    when: result.payload.decision.action_type == "use_tool"
+  - from: think.main
+    to: terminal.commit
+    when: result.payload.decision.action_type == "respond" and bool(result.payload.decision.response_text)
 
-  # act → stop on error short-circuit, else → reflect.
+  # act → think on USE_TOOL (the re-ask-model loop); act → terminal.commit
+  # on Body-raised DeterministicToolError (FAILURE_KIND_EXECUTION).
   - from: act.main
-    to: stop.main
-    when: result.payload.should_stop == true and result.payload.reason == "error"
+    to: think.main
+    when: result.payload.decision.action_type == "use_tool"
   - from: act.main
-    to: reflect.main
-    when: true
+    to: terminal.commit
+    when: result.payload.should_terminate == true
 
-  # reflect → stop on error short-circuit, else → remember.
-  - from: reflect.main
-    to: stop.main
-    when: result.payload.should_stop == true and result.payload.reason == "error"
+  # reflect → remember.
   - from: reflect.main
     to: remember.main
     when: true
 
-  # remember → stop (always).
+  # remember → terminal.commit (always; commit closes the loop).
   - from: remember.main
-    to: stop.main
+    to: terminal.commit
     when: true
 
-  # stop → perceive on continue (loop).
-  - from: stop.main
-    to: perceive.main
-    when: not result.port_values.stop_payload.should_stop
+  # terminal.commit never loops back; the kernel exits via the new
+  # BindingKind.TERMINATE executor.
+  - from: terminal.commit
+    to: think.main
+    when: false

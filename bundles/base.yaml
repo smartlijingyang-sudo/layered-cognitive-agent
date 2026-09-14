@@ -122,23 +122,6 @@ entries:
   name: phase_remember_fold
   $module: lca.plugins.loop.phase.remember.fold.plugin
   config: {}
-- id: phase.stop.should_check
-  name: phase_stop_should_check
-  $module: lca.plugins.loop.phase.stop.should_check.plugin
-  config: {}
-- id: phase.stop.focus
-  name: phase_stop_focus
-  $module: lca.plugins.loop.phase.stop.focus.plugin
-  config: {}
-- id: phase.stop.fail
-  name: phase_stop_fail
-  $module: lca.plugins.loop.phase.stop.fail.plugin
-  config: {}
-
-# Control contribution plugins (ADR-0221) — each is now a NodeExecutor that
-# emits a typed ``verdict`` port. Profile patches wire them into the
-# appropriate phase subgraph as additional nodes (e.g. ``control.stop.focus``
-# lands between ``phase.stop.should_check`` and ``phase.stop.focus``).
 - id: control.perceive.context
   name: control_perceive_context
   $module: lca.plugins.loop.control.perceive_context.plugin
@@ -151,15 +134,6 @@ entries:
   name: control_remember_admit
   $module: lca.plugins.loop.control.remember_admit.plugin
   config: {}
-- id: control.stop.decide
-  name: control_stop_decide
-  $module: lca.plugins.loop.control.stop_decide.plugin
-  config: {}
-- id: control.stop.focus
-  name: control_stop_focus
-  $module: lca.plugins.loop.control.stop_focus.plugin
-  config:
-    max_consecutive_stagnant_turns: 3
 - id: control.observe.checkpoint
   name: control_observe_checkpoint
   $module: lca.plugins.loop.control.observe_checkpoint.plugin

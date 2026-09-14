@@ -12,6 +12,8 @@ directly through ``PlanInterpreter``.
 from __future__ import annotations
 
 from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.policy.stop import StopDecision
+from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.runtime.runtime.composition import ResultFinalizer
 from lca.framework.graph.adapter import PhaseRunCursor
@@ -21,59 +23,61 @@ from lca.runtime.support.checkpoint_resolution import DeclarativeCheckpoint
 from lca.runtime.support.runtime_bindings import DeclarativeRuntimeBindings
 
 
-
 def _stop_from_interpretation_output(
     output_ports: dict,
     *,
     visits: tuple = (),
-) -> "StopDecision":
-    """Lift graph terminal stop ports into a real ``StopDecision``.
+) -> StopDecision:
+    """Lift graph terminal payload ports into a real ``StopDecision``.
 
-    Prefer an explicit ``StopDecision`` on ``stop_payload`` / ``stop_decision``.
-    ``StopPayload`` only carries ``final_output_ref``; recover text from the
-    last respond decision in visits when needed.
+    Prefer an explicit ``StopDecision`` on ``terminal_outcome`` /
+    ``stop_payload`` / ``stop_decision``. ``StopPayload`` carries only
+    ``reason`` and ``final_output_ref`` (no `should_stop` boolean); the
+    presence of ``final_output_ref`` or a non-empty ``reason`` is the
+    terminal signal. Recover text from the last respond decision in
+    visits when ``final_output_ref`` is a journal pointer.
     """
     from lca.contracts.models.cognition.boundary import StopPayload
     from lca.contracts.models.core.policy.stop import StopDecision, StopReason
 
-    for key in ("stop_payload", "stop_decision", "stop"):
+    def _resolve_reason(raw_reason: str | None) -> StopReason:
+        if not raw_reason:
+            return StopReason.CONTINUE
+        try:
+            return StopReason(raw_reason)
+        except ValueError:
+            return StopReason.ERROR
+
+    def _from_payload(raw: StopPayload) -> StopDecision:
+        final_output = _recover_final_output_text(raw, visits=visits)
+        reason = _resolve_reason(raw.reason)
+        status = TaskStatus.COMPLETED if reason is StopReason.CONTINUE else TaskStatus.FAILED
+        return StopDecision(
+            reason=reason,
+            final_output=final_output,
+            status=status,
+        )
+
+    for key in ("terminal_outcome", "stop_payload", "stop_decision", "stop"):
         raw = output_ports.get(key)
         if isinstance(raw, StopDecision):
             return raw
         if isinstance(raw, StopPayload):
-            final_output = _recover_final_output_text(raw, visits=visits)
-            reason = StopReason.TASK_COMPLETED
-            if raw.reason:
-                try:
-                    reason = StopReason(raw.reason)
-                except ValueError:
-                    reason = StopReason.TASK_COMPLETED
-            return StopDecision(
-                should_stop=bool(raw.should_stop),
-                reason=reason,
-                final_output=final_output,
-                status="completed" if raw.should_stop else None,
-            )
+            return _from_payload(raw)
 
     # Scan visits newest-first for a StopDecision / StopPayload in outputs.
     for visit in reversed(tuple(visits) or ()):
         outs = getattr(visit, "outputs", None) or {}
         if not isinstance(outs, dict):
             continue
-        for key in ("stop_payload", "stop_decision"):
+        for key in ("terminal_outcome", "stop_payload", "stop_decision"):
             raw = outs.get(key)
             if isinstance(raw, StopDecision):
                 return raw
             if isinstance(raw, StopPayload):
-                final_output = _recover_final_output_text(raw, visits=visits)
-                return StopDecision(
-                    should_stop=bool(raw.should_stop),
-                    reason=StopReason.TASK_COMPLETED,
-                    final_output=final_output,
-                    status="completed" if raw.should_stop else None,
-                )
+                return _from_payload(raw)
 
-    return StopDecision(should_stop=True, reason=StopReason.TASK_COMPLETED)
+    return StopDecision(reason=StopReason.ERROR)
 
 
 def _recover_final_output_text(payload: object, *, visits: tuple = ()) -> str | None:
@@ -172,8 +176,7 @@ class DeclarativeExecution:
         from dataclasses import dataclass as _dc
         from dataclasses import field as _field
 
-        from lca.contracts.models.cognition.boundary import StopPayload
-        from lca.contracts.models.core.policy.stop import StopDecision, StopReason
+        from lca.contracts.models.core.policy.stop import StopReason
         from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
             ExecutionOutcome,
         )
@@ -189,11 +192,7 @@ class DeclarativeExecution:
             _PRC(current_node_id=cursor_obj, visited_nodes=()) if cursor_obj else None
         )
 
-        if stop_decision.should_stop and (
-            stop_decision.final_output or stop_decision.reason == StopReason.TASK_COMPLETED
-        ):
-            _kind = ExecutionOutcome.COMPLETED
-        elif stop_decision.should_stop and stop_decision.failure is not None:
+        if stop_decision.failure is not None or stop_decision.reason is StopReason.ERROR:
             _kind = ExecutionOutcome.FAILED
         else:
             _kind = ExecutionOutcome.COMPLETED
