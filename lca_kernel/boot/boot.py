@@ -386,7 +386,15 @@ def _emit_boot_events(
         else "none",
     )
     for event in pending_events:
-        _log.info("boot.pending_event", event_type=type(event).__name__)
+        _log.info(
+            "boot.pending_event",
+            event_type=type(event).__name__,
+            plugin_id=getattr(event, "plugin_id", None),
+            layer=getattr(event, "layer", None),
+            kind=getattr(event, "kind", None),
+            status=getattr(event, "status", None),
+            duration_ms=getattr(event, "duration_ms", None),
+        )
 
 
 def _safe_inject(ctx: Any, key: str) -> Any:

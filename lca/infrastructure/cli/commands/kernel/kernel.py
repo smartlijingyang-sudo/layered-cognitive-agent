@@ -159,6 +159,8 @@ def _serialize_plan(plan: object) -> dict[str, object]:
         data["plugin_count"] = len(data["plugins"])
     elif "entries" in data and isinstance(data["entries"], list):
         data["plugin_count"] = len(data["entries"])
+    elif ("plugin_specs" in data and isinstance(data["plugin_specs"], tuple)) or ("plugin_specs" in data and isinstance(data["plugin_specs"], list)):
+        data["plugin_count"] = len(data["plugin_specs"])
     else:
         data["plugin_count"] = data.get("plugin_count", 0)
     return data

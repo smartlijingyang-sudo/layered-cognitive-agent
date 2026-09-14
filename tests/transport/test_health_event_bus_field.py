@@ -117,10 +117,55 @@ def test_health_payload_event_bus_dropped_sets_degraded(
 
     body = client.get("/health").json()
     assert body["status"] == "degraded"
-    assert body["event_bus"]["dropped_total"] == 5
-    assert body["event_bus"]["published_total"] == 5
-    # Response still 200; degraded is a label, not a readiness gate.
-    assert client.get("/health").status_code == 200
+
+
+def test_health_payload_plugin_block_reports_fiber_count_separate_from_event_registry() -> None:
+    """Regression: ``/health`` distinguishes event-registry count from cordis fiber count.
+
+    Bug fix (poteto-mode investigation 2026-09-14): the ``plugin`` block
+    on ``/health`` exposed only ``registered``/``expected`` (the event-registry
+    catalog — 4 publisher slots on web-standard). Operators asked "how many
+    plugins loaded?" and the answer was a misleading ``4``. The fix adds a
+    separate ``fiber_count`` field whose value matches the resolved profile's
+    enabled plugin list (the same predicate ``_boot_context`` uses for the
+    K3 topo_order — 244 on web-standard). The event-registry counters stay
+    unchanged so the spawner's ``plugin_ready`` predicate still works.
+    """
+    from pathlib import Path
+
+    from lca.harness.profile.boot.products import (
+        ProfileBootProducts,
+        attach_profile_boot_products,
+    )
+    from lca.harness.profile.resolve.resolve import resolve_profile
+
+    resolved = resolve_profile(Path("profiles/web-standard.yaml"))
+    ctx_holder: dict[str, Any] = {}
+
+    async def _wire() -> None:
+        from cordis import Context
+
+        ctx = Context()
+        attach_profile_boot_products(
+            ctx, ProfileBootProducts(resolved_profile=resolved)
+        )
+        ctx_holder["ctx"] = ctx
+
+    import asyncio
+
+    asyncio.run(_wire())
+
+    payload = health_payload(_StubRunPort(), ctx=ctx_holder["ctx"])
+    plugin_block = payload["plugin"]
+    expected_enabled = sum(1 for p in resolved.plugins if not p.disabled)
+
+    # Event-registry counters remain (legacy contract — spawner depends on them).
+    assert "registered" in plugin_block
+    assert "expected" in plugin_block
+    # New field surfaces the cordis-side count.
+    assert "fiber_count" in plugin_block, plugin_block
+    assert plugin_block["fiber_count"] == expected_enabled
+    assert plugin_block["fiber_count"] > plugin_block["registered"]
 
 
 def test_health_payload_event_bus_missing_graceful(

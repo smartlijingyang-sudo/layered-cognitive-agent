@@ -312,13 +312,18 @@ def cmd_debug_factories(profile: Path, json_mode: bool) -> None:
         typer.echo(f"Profile not found: {profile}", err=True)
         raise typer.Exit(2)
     from lca.harness.profile.resolve.resolve import resolve_profile
-    from lca_kernel.plan.plan_compile import compile_plan
 
     resolved = resolve_profile(profile)
-    plan = compile_plan(resolved)
     factory_index = _boot_factory_index(profile)
     visited: set[str] = set()
     referenced: list[tuple[str, str, str, str, str]] = []  # (bundle, node, factory, region, kind)
+
+    # v2 (ADR-0221 P3) cutover: the compiled plan no longer carries a
+    # declarative phase_graph, so the v1 entry point (``plan.phase_graph``)
+    # raises AttributeError. Drive the walk off the resolved profile's
+    # declared bundles instead; ``walk_bundle`` recurses through every
+    # ``sub_spec_ref.plan_ref`` so the outer plan is enumerated the same
+    # way it was under v1.
 
     def load_bundle(bundle_path: str) -> dict[str, Any]:
         path = Path(bundle_path)
@@ -350,16 +355,13 @@ def cmd_debug_factories(profile: Path, json_mode: bool) -> None:
             if isinstance(sub_ref, dict) and sub_ref.get("plan_ref"):
                 walk_bundle(sub_ref["plan_ref"], depth + 1)
 
-    pg = plan.phase_graph
-    if pg is not None:
-        for node in pg.nodes:
-            sub = getattr(node, "sub_spec_ref", None)
-            if sub is not None and getattr(sub, "plan_ref", None):
-                walk_bundle(sub.plan_ref)
-        for edge in getattr(pg, "edges", []) or []:
-            sub = getattr(edge, "subgraph_ref", None)
-            if sub is not None and getattr(sub, "plan_ref", None):
-                walk_bundle(sub.plan_ref)
+    # v2 (ADR-0221 P3) cutover: the compiled plan no longer carries a
+    # declarative phase_graph, so the v1 entry point (``plan.phase_graph``)
+    # raises AttributeError. Drive the walk off the resolved profile's
+    # declared bundles instead; ``walk_bundle`` recurses through every
+    # ``sub_spec_ref.plan_ref`` so phase subgraphs are still visited.
+    for bundle_path in resolved.bundles:
+        walk_bundle(bundle_path)
 
     rows: list[dict[str, Any]] = []
     miss_count = 0

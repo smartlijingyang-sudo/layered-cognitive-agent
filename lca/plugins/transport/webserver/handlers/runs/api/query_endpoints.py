@@ -361,6 +361,10 @@ def _read_plugin_health(ctx: Any) -> dict[str, Any] | None:
 
         registry_populated = registered > 0 or expected == 0
 
+        fiber_count = sum(
+            1 for plugin in getattr(resolved, "plugins", ()) if not plugin.disabled
+        )
+
         # pipeline_registered: read the module-level _REGISTERED set used
         # by ``register_pipeline_once`` to deduplicate pipeline loads.
         pipeline_registered = False
@@ -397,6 +401,15 @@ def _read_plugin_health(ctx: Any) -> dict[str, Any] | None:
             "registry_populated": registry_populated,
             "pipeline_registered": pipeline_registered,
             "cognitive_driver_registered": cognitive_driver_registered,
+            # ADR-0213 §决定 4 + poteto-mode investigation 2026-09-14:
+            # the ``registered``/``expected`` counters report the event-registry
+            # catalog only (4 publisher slots on web-standard). Operators asking
+            # "how many plugins loaded" need the cordis-side count too, which
+            # is the resolved profile's enabled plugin list (same predicate
+            # ``_boot_context`` uses for the K3 topo_order). Surfaced as a
+            # distinct key so existing consumers do not mis-read it as the
+            # event-registry count.
+            "fiber_count": fiber_count,
         }
     except Exception as exc:
         import structlog

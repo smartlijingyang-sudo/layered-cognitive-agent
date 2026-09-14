@@ -21,15 +21,12 @@ from pathlib import Path
 import yaml
 
 from lca.contracts.atoms.scope.scope import Scope
-from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
-    ActionAuthorityPlan,
-)
-from lca.harness.declarative.compile.action.authority import compile_action_authority
 from lca.contracts.protocols.state.plan import (
     COMPILED_RUN_PLAN_VERSION,
     CompiledRunPlan,
 )
 from lca.contracts.protocols.state.scope_plan import BudgetCeiling, ScopePlan
+from lca.harness.declarative.compile.action.authority import compile_action_authority
 from lca.harness.profile.resolve.capability_plan_resolver import (
     CapabilityPlanOptions,
     project_capability_plan,
@@ -56,6 +53,7 @@ class V2ExecutablePlan:
     inner: object  # CompiledRunPlan — typed loosely to avoid cycle import.
     graph_spec: dict = field(default_factory=dict)
     profile_path: str = ""
+    plugin_specs: tuple = ()  # delegated to ``inner.plugin_specs`` at construction; surfaced here so CLI / introspection see the catalog without reaching into ``inner``.
 
 
 def _wrap_v2_plan(plan, *, resolved):
@@ -103,6 +101,7 @@ def _wrap_v2_plan(plan, *, resolved):
         inner=plan,
         graph_spec=graph_spec,
         profile_path=resolved.profile_path,
+        plugin_specs=getattr(plan, "plugin_specs", ()) or (),
     )
 
 
@@ -157,6 +156,13 @@ def compile_plan(
     v2 shape: ``phase_graph`` is always ``None`` and ``phase_bindings``
     is always empty. Callers that need the executable graph ask
     ``PlanInterpreter`` for it at boot.
+
+    ``plugin_specs`` is the projection of every enabled
+    :class:`~lca.contracts.protocols.declarative.declarative_2.declarative_plugin.PluginSpec`
+    on the resolved profile (ADR-0221 P3). CLI surfaces such as
+    ``lca-ops kernel_compose --json`` and the ``V2ExecutablePlan.plugin_specs``
+    field surface this list so operators can enumerate the loaded plugin
+    catalog without re-running ``resolve_profile``.
     """
     opts = options or CompileOptions()
     cap_options = CapabilityPlanOptions(include_disabled=opts.include_disabled)
@@ -168,6 +174,9 @@ def compile_plan(
         acl_grants=opts.acl_grants,
         budget_ceiling=opts.budget_ceiling or BudgetCeiling(),
     )
+    plugin_specs: tuple = tuple(
+        plugin.definition.spec for plugin in resolved.plugins if not plugin.disabled
+    )
     return _wrap_v2_plan(
         CompiledRunPlan(
             profile_path=resolved.profile_path,
@@ -175,7 +184,7 @@ def compile_plan(
             scope=scope,
             plan_version=COMPILED_RUN_PLAN_VERSION,
             revision="v2",
-            plugin_specs=(),  # ADR-0221 P3: PluginSpec projection lives in plugin_id index, not here.
+            plugin_specs=plugin_specs,
             capability_bindings=capability.provider_bindings,
             # v2 ADR-0221 P3: phase_graph + phase_bindings retired from
             # CompiledRunPlan; runtime builds the executable plan via

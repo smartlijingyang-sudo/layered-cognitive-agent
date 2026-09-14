@@ -228,3 +228,51 @@ def test_emit_boot_events_handles_empty_topo_order() -> None:
     )
     assert profile_event.plugin_count == 0
     assert profile_event.topo_order == ()
+
+
+def test_emit_boot_events_structlog_records_plugin_id() -> None:
+    """Regression: structlog ``boot.pending_event`` must carry plugin_id/layer/kind/status.
+
+    Bug fix (poteto-mode investigation 2026-09-14): prior to the fix, the
+    line in :func:`_emit_boot_events` only bound ``event_type`` and dropped
+    every field of the buffered :class:`BootPluginFiberSpawned`. Operators
+    staring at the kernel stderr could not tell which plugin_id produced
+    which line, and the only way to enumerate the boot was to re-run
+    ``resolve_profile`` in Python. This test asserts that all six
+    identifying fields reach the log record.
+    """
+    import structlog
+
+    capture = _CaptureStore()
+    ctx = _ctx_with_journal(capture)
+
+    pending = [
+        BootPluginFiberSpawned(
+            plugin_id="p-alpha",
+            layer="L2",
+            kind="provider",
+            stage=Stage.BOOT,
+            duration_ms=12.3,
+            status="ok",
+        ),
+    ]
+    with structlog.testing.capture_logs() as logs:
+        _emit_boot_events(
+            ctx,
+            pending_events=pending,
+            products=_FakeProducts(),
+            topo_order=("p-alpha",),
+            boot_started=time.monotonic(),
+        )
+
+    boot_pending = [
+        entry for entry in logs if entry.get("event") == "boot.pending_event"
+    ]
+    assert len(boot_pending) == 1, f"expected one boot.pending_event, got {logs!r}"
+    entry = boot_pending[0]
+    assert entry["plugin_id"] == "p-alpha", entry
+    assert entry["layer"] == "L2", entry
+    assert entry["kind"] == "provider", entry
+    assert entry["status"] == "ok", entry
+    assert entry["duration_ms"] == 12.3, entry
+    assert entry["event_type"] == "BootPluginFiberSpawned", entry
