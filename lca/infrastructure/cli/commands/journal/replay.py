@@ -171,11 +171,11 @@ def register(app: typer.Typer) -> None:
 
 
 def _read_events_jsonl(run_id: str, traces_root: Path) -> list[EventRecord]:
-    """Read spine ledger into ``EventRecord`` instances for derivers (PR-27 / PR-4)。
+    """Read spine ledger into ``EventRecord`` instances for derivers (PR-27 / PR-4).
 
-    ADR-0169 PR-27 L10 + PR-4 收口:唯一 ``<run_id>.spine.jsonl``;缺失返回
-    空 list。Per-line parse errors are skipped(best-effort; trajectory page
-    degrades gracefully)。
+    Kept on EventRecord because WaterfallDeriver.on_event type-checks the
+    schema (execution_point whitelist, span_id required, etc.). Lines that
+    do not parse are skipped — best-effort, fail-soft.
     """
     spine_path = _spine_path(run_id, traces_root)
     if spine_path is None:
@@ -187,7 +187,6 @@ def _read_events_jsonl(run_id: str, traces_root: Path) -> list[EventRecord]:
         try:
             out.append(EventRecord(**json.loads(line)))
         except (TypeError, ValueError):
-            # Unknown EP / missing field — skip, not fail (graceful degrade)
             continue
     return out
 
