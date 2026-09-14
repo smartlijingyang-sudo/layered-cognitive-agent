@@ -42,12 +42,20 @@ def _elapsed_ms(started: float) -> int:
     return int((time.perf_counter() - started) * _PERF_COUNTER_SCALE)
 
 
+# Single SSOT for body-layer stdout-shaped keys. Kept in sync with the
+# convergence layer's ``_STDOUT_KEYS`` in
+# ``lca/cognition/convergence/payload.py``. Any new stdout-shaped payload
+# key must be added to both lists. delete-when: pipeline_safe_executor is
+# folded into safe_executor (single owner of the contract).
+_STDOUT_KEYS = ("output", "stdout", "content", "text")
+
+
 def _extract_stdout_head(observation: Any, *, limit: int = 2000) -> str:
     """从 Observation.payload 抽 stdout-like 文本;空 observation 返回空串。"""
     payload = getattr(observation, "payload", None)
     if not isinstance(payload, dict):
         return ""
-    for key in ("output", "stdout", "content"):
+    for key in _STDOUT_KEYS:
         value = payload.get(key)
         if isinstance(value, str):
             return value[:limit]
@@ -55,7 +63,7 @@ def _extract_stdout_head(observation: Any, *, limit: int = 2000) -> str:
 
 
 def _extract_stdout_chars_total(observation: Any) -> int:
-    """真实 stdout 字符数,优先取 ``output`` / ``stdout`` / ``content`` 第一个非空 str。
+    """真实 stdout 字符数,优先取 ``output`` / ``stdout`` / ``content`` / ``text`` 第一个非空 str。
 
     Returns 0 when observation 无 stdout-like 文本;用于填入
     ``step.tool_result.record.stdout_chars_total``,让 critic / LLM context
@@ -64,7 +72,7 @@ def _extract_stdout_chars_total(observation: Any) -> int:
     payload = getattr(observation, "payload", None)
     if not isinstance(payload, dict):
         return 0
-    for key in ("output", "stdout", "content"):
+    for key in _STDOUT_KEYS:
         value = payload.get(key)
         if isinstance(value, str):
             return len(value)

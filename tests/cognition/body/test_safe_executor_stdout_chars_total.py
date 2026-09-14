@@ -83,3 +83,25 @@ def test_regression_ls_run_payload_pattern() -> None:
     }
     obs = _Obs(success=True, payload=payload)
     assert _extract_stdout_chars_total(obs) > 0
+
+
+def test_falls_back_to_text_key_when_output_stdout_content_missing() -> None:
+    """Search / Tavily / read_shaped tools carry stdout-shaped text in ``payload['text']``.
+
+    Pre-fix the body extractor missed this key, so search results were reported
+    as zero-length stdout and ``step.tool_result.record.stdout_chars_total``
+    stayed 0 even when the tool returned a multi-thousand-character summary.
+    """
+    long_text = "Andrej Karpathy 2025 vibe coding summary" * 100
+    obs = _Obs(payload={"text": long_text, "query": "vibe coding"})
+    assert _extract_stdout_chars_total(obs) == len(long_text)
+    # _extract_stdout_head must agree on the same key.
+    from lca.cognition.body.executor.safe_executor import _extract_stdout_head
+
+    assert _extract_stdout_head(obs) == long_text[:2000]
+
+
+def test_text_key_loses_to_output_when_both_present() -> None:
+    """Key order ``output → stdout → content → text`` preserves priority."""
+    obs = _Obs(payload={"output": "real-output", "text": "search-fallback"})
+    assert _extract_stdout_chars_total(obs) == len("real-output")
