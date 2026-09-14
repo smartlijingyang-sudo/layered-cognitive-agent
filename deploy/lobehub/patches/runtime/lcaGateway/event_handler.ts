@@ -1,14 +1,34 @@
-// LCA-P1: re-export of the native gateway event handler.
+// LCA-P1: LCA gateway event handler factory.
 //
 // The native handler at
 // `lobehub-ui/src/store/chat/slices/agentRun/actions/transports/gateway/gatewayEventHandler.ts`
-// is the canonical AgentStreamEvent consumer. It is wired against the
-// agent-gateway-client `on(...)` callback shape, which LCA's
-// AgentStreamClient (Task 8) already implements. We re-export so the
-// patched chat store can `import { createLcaGatewayEventHandler }
-// from '@/store/chat/agents/transports/lcaGateway/event_handler'`.
-//
-// When the patch is not applied, the chat store falls back to the
-// legacy SSE path (retired in PR-4).
+// is the canonical AgentStreamEvent consumer. The LCA transport reuses it
+// with two overrides:
+//   - `runtimeType: 'lca-gateway'` so the shared handler skips mid-stream
+//     DB refetches (LCA persists assistant rows only on turn seal, so a
+//     mid-run DB read would clobber content the WS stream already rendered).
+//   - `messageService: { getMessages: createLcaInMemoryMessagesReader(get) }`
+//     so any non-skipped refetch reconciles against `dbMessagesMap` directly
+//     — the same surface `dbMessageSelectors.getDbMessageById` walks —
+//     instead of the DB.
 
-export { createGatewayEventHandler as createLcaGatewayEventHandler } from '@/store/chat/slices/agentRun/actions/transports/gateway/gatewayEventHandler';
+import { createGatewayEventHandler } from '@/store/chat/slices/agentRun/actions/transports/gateway/gatewayEventHandler';
+
+import { createLcaInMemoryMessagesReader } from './messageService';
+
+/**
+ * Build the LCA gateway event handler. Delegates to the shared native
+ * handler factory and threads the LCA in-memory reader through
+ * `messageService.getMessages`, so mid-run reads return the live store
+ * snapshot instead of hollow DB rows.
+ *
+ * `params` mirrors the native `createGatewayEventHandler` shape; the
+ * factory adds the two LCA-specific fields (`runtimeType`,
+ * `messageService`) on top of whatever the caller passed.
+ */
+export const createLcaGatewayEventHandler: typeof createGatewayEventHandler = (get, params) =>
+  createGatewayEventHandler(get, {
+    ...params,
+    messageService: { getMessages: createLcaInMemoryMessagesReader(get) },
+    runtimeType: 'lca-gateway',
+  });

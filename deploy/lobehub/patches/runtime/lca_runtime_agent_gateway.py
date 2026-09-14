@@ -31,6 +31,7 @@ _NEW_FILES = (
     "messageService.test.ts",
     "reconnect.ts",
     "event_handler.ts",
+    "event_handler.test.ts",
     "event_router.ts",
     "client.ts",
     "interrupt.ts",
