@@ -26,8 +26,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, PrivateAttr
 
+from lca.contracts.protocols.graph.errors import UnsetPortError
 from lca.contracts.protocols.graph.node_io import NodeInput
 from lca.contracts.protocols.graph.ports import PortName
 
@@ -43,7 +44,8 @@ class PortRegistry(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    _ports: dict[PortName, Any] = {}
+    _ports: dict[PortName, Any] = PrivateAttr(default_factory=dict)
+    _port_types: dict[PortName, type] = PrivateAttr(default_factory=dict)
 
     def set_outer_input(self, ports: Mapping[PortName, Any]) -> None:
         """Seed the registry from an outer caller (kernel / outer plan).
@@ -89,6 +91,50 @@ class PortRegistry(BaseModel):
     def snapshot(self) -> Mapping[PortName, Any]:
         """Read-only view of the current port store."""
         return dict(self._ports)
+
+    # --- typed read / write (Task 3 / D3) ---
+
+    def read(self, name: PortName) -> Any:
+        """Read a port value; raise :class:`UnsetPortError` if not set.
+
+        Unlike :meth:`build_input` (which yields ``None`` for missing
+        ports), ``read`` fails loud — callers that need the port must
+        get it or hear about it immediately.
+        """
+        if name not in self._ports:
+            raise UnsetPortError(
+                f"port {name!r} has not been written to the registry",
+                port_name=name,
+            )
+        return self._ports[name]
+
+    def port_type(self, name: PortName) -> type | None:
+        """Return the payload_type registered for ``name``, or ``None``.
+
+        Ports set via :meth:`merge_output` / :meth:`set_outer_input`
+        have no type info (``None``). Use :meth:`set_typed_port` to
+        register a type alongside the value.
+        """
+        return self._port_types.get(name)
+
+    def set_typed_port(
+        self,
+        name: PortName,
+        value: Any,
+        *,
+        payload_type: type | None = None,
+    ) -> None:
+        """Store a port value and optionally register its payload_type.
+
+        Follows last-write-wins semantics (same as :meth:`merge_output`).
+        When ``payload_type`` is ``None``, only the value is stored —
+        :meth:`port_type` will return ``None`` for this port.
+        """
+        self._ports[name] = value
+        if payload_type is not None:
+            self._port_types[name] = payload_type
+        else:
+            self._port_types.pop(name, None)
 
 
 __all__ = ["PortRegistry"]

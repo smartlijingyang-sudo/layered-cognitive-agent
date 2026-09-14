@@ -32,15 +32,10 @@ from lca.framework.graph.lifter import (
     lift_executable_plan,
     lift_graph_spec,
 )
+from lca.framework.graph.port_reader import PortReader
 from lca.framework.graph.port_registry import PortRegistry
+from lca.framework.graph.predicate_evaluator import PredicateEvaluator
 from lca.framework.graph.recorder import VisitRecorder
-from lca.framework.graph.strategy_registry import (
-    NodeExecutorLookup,
-    StrategyRegistry,
-    default_strategy_registry,
-    register_strategy,
-    resolve_executor,
-)
 from lca.framework.graph.strategies import (  # noqa: F401  side-effect: register strategies
     agent_consult_strategy,
     agent_fanout_strategy,
@@ -51,6 +46,13 @@ from lca.framework.graph.strategies import (  # noqa: F401  side-effect: registe
     subgraph_strategy,
     terminate_strategy,
     transform_strategy,
+)
+from lca.framework.graph.strategy_registry import (
+    NodeExecutorLookup,
+    StrategyRegistry,
+    default_strategy_registry,
+    register_strategy,
+    resolve_executor,
 )
 from lca.framework.graph.traversal import (
     PlanTraversal,
@@ -64,7 +66,9 @@ __all__ = [
     "PlanInterpreter",
     "PlanInterpreterAdapter",
     "PlanTraversal",
+    "PortReader",
     "PortRegistry",
+    "PredicateEvaluator",
     "StrategyRegistry",
     "VisitRecorder",
     "default_strategy_registry",
