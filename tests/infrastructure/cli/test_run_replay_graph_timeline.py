@@ -21,13 +21,15 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import pytest
 import typer
 from typer.testing import CliRunner
 
 from lca.infrastructure.cli.commands.observation import run_replay as run_replay_module
+
+if TYPE_CHECKING:
+    import pytest
 
 RUN_ID = "run_replaygraph01"
 
@@ -53,7 +55,9 @@ def _invoke(*args: str) -> Any:
     return CliRunner().invoke(app, [RUN_ID, *args], catch_exceptions=False)
 
 
-def test_show_graph_renders_every_lifecycle_kind(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_show_graph_renders_every_lifecycle_kind(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.chdir(tmp_path)
     _write_spine(
         tmp_path,
@@ -79,7 +83,10 @@ def test_show_graph_renders_every_lifecycle_kind(tmp_path: Path, monkeypatch: py
                     "node_id": "think.main",
                     "depth": 1,
                     "plan_ref": "agent_loop",
-                    "metadata": {"entry_node": "think.shortcut", "subgraph_plan_ref": "bundles/think.yaml"},
+                    "metadata": {
+                        "entry_node": "think.shortcut",
+                        "subgraph_plan_ref": "bundles/think.yaml",
+                    },
                 },
             ),
             _record(
@@ -149,7 +156,7 @@ def test_show_graph_renders_every_lifecycle_kind(tmp_path: Path, monkeypatch: py
     )
     assert lines[4] == (
         f"run={RUN_ID}  seq=4  phase_graph.edge.transit"
-        "  edge=think.reason.llm->stop.main  depth=2  when=outcome == \"failure\""
+        '  edge=think.reason.llm->stop.main  depth=2  when=outcome == "failure"'
     )
     assert lines[5] == (
         f"run={RUN_ID}  seq=5  phase_graph.subgraph.exit  node=think.main"

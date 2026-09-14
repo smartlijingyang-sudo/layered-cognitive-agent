@@ -28,8 +28,6 @@ from typing import Any
 
 from lca.infrastructure.observability.adapters.policy import sanitize
 
-GRAPH_EP_PREFIX = "phase_graph."
-
 EP_NODE_START = "phase_graph.node.start"
 EP_NODE_END = "phase_graph.node.end"
 EP_EDGE_TRANSIT = "phase_graph.edge.transit"
@@ -177,7 +175,6 @@ __all__ = [
     "EP_SUBGRAPH_ENTER",
     "EP_SUBGRAPH_EXIT",
     "GRAPH_EPS",
-    "GRAPH_EP_PREFIX",
     "is_graph_event",
     "render_line",
     "render_record",

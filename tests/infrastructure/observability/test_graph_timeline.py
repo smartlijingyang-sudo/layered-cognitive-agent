@@ -259,3 +259,22 @@ def test_live_and_post_hoc_lines_are_the_same_bytes() -> None:
 def test_records_without_join_keys_still_render() -> None:
     line = render_line(EP_NODE_END, {"node_id": "n", "outcome": "success", "elapsed_ms": 1})
     assert "run=" not in line and "seq=" not in line
+
+
+def test_ep_names_match_the_kernel_table() -> None:
+    """This module names the five lifecycle EPs again, so pin it against the kernel.
+
+    ``graph_timeline`` cannot import ``lca.framework.graph.ep_table`` without
+    creating an infrastructure→framework edge that does not exist today, so the
+    duplication is guarded the way the EP registry duplication already is: a
+    drift test rather than a shared constant.
+    """
+    from lca.framework.graph.ep_table import default_graph_ep_table
+
+    assert dict(default_graph_ep_table().all()) == {
+        "visit_start": EP_NODE_START,
+        "visit_end": EP_NODE_END,
+        "edge": EP_EDGE_TRANSIT,
+        "subgraph_enter": EP_SUBGRAPH_ENTER,
+        "subgraph_exit": EP_SUBGRAPH_EXIT,
+    }

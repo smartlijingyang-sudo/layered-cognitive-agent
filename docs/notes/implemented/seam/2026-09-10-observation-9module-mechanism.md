@@ -35,7 +35,7 @@ Status: implemented
 
 **CLI**(4 个 `lca-ops` 子命令挂在 `observation` typer group 下):
 - `lca-ops observation plan-show <profile>` —— 显示 PlanBlueprint
-- `lca-ops observation trace-show <run_id> [--node <id>] [--filter kind=<kind>]` —— 显示 observation facts
+- `lca-ops observation trace-show <run_id> [--node <id>] [--kind <payload.kind>] [--seq <n>] [--filter <ep 子串>] [--full]` —— 显示 observation / diagnosis / phase_graph facts(graph facts 经 `graph_timeline` 投影;`--json` 为 agent 默认,给全量 payload)
 - `lca-ops observation run-explain <run_id>` —— 输出 summary → root_cause_chain → graph_overview → next_actions
 - `lca-ops observation run-replay <run_id>` —— 时间序 steps,agent 可 walk
 

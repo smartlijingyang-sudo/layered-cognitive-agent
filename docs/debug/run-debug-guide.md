@@ -383,14 +383,17 @@ manual work and get a typed, structured diagnosis in one call.
 ./scripts/lca-ops observation run-explain "$LATEST"           # human
 ./scripts/lca-ops observation run-explain "$LATEST" --json    # you (agent)
 
-# Show every observation fact, filter by node or kind
+# Show every observation / phase_graph fact, filter by node or kind
 ./scripts/lca-ops observation trace-show "$LATEST"
 ./scripts/lca-ops observation trace-show "$LATEST" --node act.main
-./scripts/lca-ops observation trace-show "$LATEST" --filter kind=control
+./scripts/lca-ops observation trace-show "$LATEST" --kind visit_end
+./scripts/lca-ops observation trace-show "$LATEST" --filter phase_graph.subgraph
+./scripts/lca-ops observation trace-show "$LATEST" --seq 16 --human --full
 
 # Time-ordered replay with per-node inputs / outputs / decisions
 ./scripts/lca-ops observation run-replay "$LATEST"
 ./scripts/lca-ops observation run-replay "$LATEST" --json
+./scripts/lca-ops observation run-replay "$LATEST" --show-graph
 
 # Show plan blueprint (expected graph)
 ./scripts/lca-ops observation plan-show profiles/web-standard.yaml
@@ -403,8 +406,10 @@ copy-paste-runnable commands.
 
 **NEXT.** If `run-explain` summary is empty (`outcome=success`) → run passed;
 verify with user. If it identifies a missing node / denied control / failed
-artifact → use `trace-show --node <id>` to inspect that node's inputs / outputs,
-then Step 5 to read code.
+artifact → use `trace-show --node <id>` to inspect that node's inputs / outputs
+(`--json` carries the untruncated payload; `--human` prints one compact line per
+lifecycle event with outcome, elapsed, route and port names), then Step 5 to read
+code. `run-replay --show-graph` prints the same lines for the whole run in order.
 
 **FAIL.** No observation facts present → the `observation-9module` bundle is
 not loaded in the active profile. Add `bundles/observation-9module.yaml` to
