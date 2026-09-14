@@ -12,7 +12,7 @@ Status: implemented
 2. **图语义缺失** — `entries:` 形态无法表达"节点做什么、按什么顺序、可挂什么子图"这种拓扑语义;**节点之间的流向靠 `phase.topology.standard` 嵌在其它 bundle 里**(如 `declarative-phase-graph.yaml`),5 个 think 步没有自己显式的流向声明。
 3. **分层职责错位** — `progress.md` Task 3 Ruling #2 说 "think-steps.yaml 只供 fixture 用,生产 profile 通过 auto-discovery 注册 plugin" — 这是迁就现状的妥协,而不是设计目标。生产 profile 应该只需要图描述,plugin 注册是图框架的职责。
 
-`agent_lab/graphs/think/think.yaml` 已经存在一种"纯图描述 + nodes/edges" 形态,但与生产 kernel 解析路径(`BundleSubgraphResolver` → `compile_declarative_projection`)不接。本 Note 提议**借鉴 agent_lab 的节点字段思路,设计一套自有的、适配生产 kernel 的 bundle 图 schema**,把 graph 描述职责从 `entries:` 抽出来。
+`InfoEdge prototype graphs/think/think.yaml` 曾经存在一种"纯图描述 + nodes/edges" 形态,但与生产 kernel 解析路径(`BundleSubgraphResolver` → `compile_declarative_projection`)不接。本 Note 提议**借鉴 InfoEdge prototype 的节点字段思路,设计一套自有的、适配生产 kernel 的 bundle 图 schema**,把 graph 描述职责从 `entries:` 抽出来。
 
 **设计原则(职责边界硬约束)**:
 - **业务 yaml = 业务层** — 描述业务走向(id / purpose / inputs / outputs / config(图级) / edges),**不出现** `plugin_id` / `$module` / `entries:` / plugin 私有参数
@@ -172,13 +172,13 @@ edges:
 | 字段 | 类型 | 含义 | 来源 |
 |---|---|---|---|
 | `id` | str | bundle 内唯一 ID;`plan_ref` 用它;写入 `CompiledRunPlan.metadata` 作 trace 标签 | 新 |
-| `region` | str | region 标签(对齐 ADR-0210 §6.4 P7 路径);驱动 factory 反查 | 借鉴 agent_lab |
+| `region` | str | region 标签(对齐 ADR-0210 §6.4 P7 路径);驱动 factory 反查 | 借鉴 InfoEdge prototype |
 | `factory` | str | **业务语义名**(`think.reason`);框架按规则解析到 `NodeExecutor`(think 子图专用);不出现 plugin_id | 新 |
-| `purpose` | str | 节点语义职责描述;写入 `phase_graph.node.start/end` 事件的 `payload.purpose`,作可观测性锚点 | 借鉴 agent_lab |
-| `inputs` | tuple[str, ...] | 节点声明性输入端口;非空;框架用作 subgraph 边缘端口对齐 | 借鉴 agent_lab |
-| `outputs` | tuple[str, ...] | 节点声明性输出端口;非空;框架用作 subgraph 边缘端口对齐 | 借鉴 agent_lab |
+| `purpose` | str | 节点语义职责描述;写入 `phase_graph.node.start/end` 事件的 `payload.purpose`,作可观测性锚点 | 借鉴 InfoEdge prototype |
+| `inputs` | tuple[str, ...] | 节点声明性输入端口;非空;框架用作 subgraph 边缘端口对齐 | 借鉴 InfoEdge prototype |
+| `outputs` | tuple[str, ...] | 节点声明性输出端口;非空;框架用作 subgraph 边缘端口对齐 | 借鉴 InfoEdge prototype |
 | `config` | dict | 节点级配置;**只放图级参数**(loop 预算 / max_visits / cooldown);不向 plugin 注入 | 既有 `entries[].config` 的位置 |
-| `edges[].kind` | enum | `control` (默认) \| `data` (端口数据流,强制配 `from_port`/`to_port`) | 借鉴 agent_lab |
+| `edges[].kind` | enum | `control` (默认) \| `data` (端口数据流,强制配 `from_port`/`to_port`) | 借鉴 InfoEdge prototype |
 | `edges[].when` | bool-expr | 控制边触发条件(DSL 复用 `phase.edge.standard.when`) | 既有 |
 | sub_spec_ref(节点级) | object | 每节点可挂子 spec,递归入口 | 既有 [2026-09-09-phase-node-sub-spec-ref.md](../../implemented/contract/2026-09-09-phase-node-sub-spec-ref.md) |
 
@@ -265,16 +265,16 @@ def resolve(self, plan_ref: str) -> CompiledRunPlan | None:
 
 **否决**:这是修 bug,不是修设计。entries: 形态本身就不能表达节点顺序(5 个 plugin 之间没边、没节点身份、没 ports),而 think 5 步恰好是"顺序+条件分支"语义最强的场景。维持现状等于把"为什么 think 5 步要按这个顺序"的知识永远埋在 5 个独立 plugin 的 `setup()` 里;新增/调换一个 step 就要改 5 个文件,违反 C6 最小化。
 
-### Why not 直接接 agent_lab schema?
+### Why not 直接接 InfoEdge prototype schema?
 
-把 `agent_lab/graphs/think/think.yaml` 的 nodes/edges 形态直接搬过来,`BundleSubgraphResolver` 调 `agent_lab.profile_loader.build_region_only_phase_graph` 把 agent_lab plan 转成 kernel plan。
+把 prototype `graphs/think/think.yaml` 的 nodes/edges 形态直接搬过来,让 `BundleSubgraphResolver` 调 prototype 的 profile loader(历史上是 plan 转 kernel plan 的唯一消费方)把 prototype plan 转成 kernel plan。
 
-**否决**:agent_lab schema 与生产 kernel 有 3 处不可对齐的分歧:
-1. agent_lab 的 `factory: think.expose` 没有 `@plugin(...)` 装饰器与之对应,需要新加 `lca.plugins.think.expose` plugin + `phase.think.expose` capability key(改 PluginSpec 闭集)
-2. agent_lab 的 `edges[].from/to` 是 port-level(节点内端口),kernel `PhaseEdge` 是 node-level,转换需要补 port-aware edge schema(超出本次改动范围)
-3. agent_lab 的 `region: phase:think` 是 ADR-0210 P7 路径专属字段;接进来等于强制生产 profile 走 P7,与 ADR-0075 legacy 路径冲突
+**否决**:prototype schema 与生产 kernel 有 3 处不可对齐的分歧:
+1. prototype 的 `factory: think.expose` 没有 `@plugin(...)` 装饰器与之对应,需要新加 `lca.plugins.think.expose` plugin + `phase.think.expose` capability key(改 PluginSpec 闭集)
+2. prototype 的 `edges[].from/to` 是 port-level(节点内端口),kernel `PhaseEdge` 是 node-level,转换需要补 port-aware edge schema(超出本次改动范围)
+3. prototype 的 `region: phase:think` 是 ADR-0210 P7 路径专属字段;接进来等于强制生产 profile 走 P7,与 ADR-0075 legacy 路径冲突
 
-借鉴节点字段思路(`region`/`factory`/`inputs`/`outputs`),但 schema 独立定义 + 走 `compile_declarative_projection` 而不是 agent_lab 解析路径。
+借鉴节点字段思路(`region`/`factory`/`inputs`/`outputs`),但 schema 独立定义 + 走 `compile_declarative_projection` 而不是 prototype 解析路径。
 
 ### Why not 把"图描述"职责从 bundle 抽到独立 layer(类似 DAG 文件)?
 

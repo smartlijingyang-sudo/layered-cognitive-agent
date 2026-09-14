@@ -257,7 +257,7 @@ wins:
 - **Profiles**: `web-standard.yaml` patches every phase main to
   bind via `sub_spec_ref`. Other profiles
   (`benchmark.yaml`, `cordis-creator.yaml`, `composio-enabled.yaml`,
-  `web-standard-continuous.yaml`, `agent-lab-infoedge.yaml`) still
+  `web-standard-continuous.yaml`) still
   reference `declarative-phase-graph.yaml` which still wires
   `phase.<x>.standard` directly — that is the v1 path; they
   remain loadable. Migrating those profiles to the new subgraph
@@ -330,10 +330,9 @@ registrations into one and break capability attribution. **Rejected.**
 
 ## Risks / Follow-ups
 
-- **Other profiles still bind `phase.<x>.standard`.** Five profiles
+- **Other profiles still bind `phase.<x>.standard`.** Four profiles
   (`benchmark.yaml`, `cordis-creator.yaml`,
-  `composio-enabled.yaml`, `web-standard-continuous.yaml`,
-  `agent-lab-infoedge.yaml`) still load
+  `composio-enabled.yaml`, `web-standard-continuous.yaml`) still load
   `bundles/declarative-phase-graph.yaml` and the v1 driver under
   `lca/loop/transaction.py` resolves their `phase.<x>.standard`
   capability keys against `ProductionRuntimeDeps.phase_executors`.

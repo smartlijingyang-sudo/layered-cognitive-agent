@@ -4,7 +4,7 @@
 >
 > **一句话**：把 ADR-0075 的 `CognitivePhaseGraphPlan` 六阶段闭集（perceive / think / act / reflect / remember / stop 编译期枚举 + SSOT 锁）和 ADR-0194 的 Loop 收敛（C14 region 标签机制）合并：阶段从「SSOT 锁」退化为 `region = phase:<name>` 的 region 标签值集合，编译器仍校验 region 标签属于已知集但**标签值不绑定调度特权**，用户可在 profile 中扩展自定义 region（`phase:plan` / `phase:replan`），超集由 `region = phase:<name>` 表达。这是 [ADR-0206 §10 P7](../0206-information-graph-kernel.md) 的实施切片。
 
-**编号**：0210（0206 §10 P7 §"Required follow-up ADR" — "该 ADR 编号待 P7 启动时再分配"；0206/0207/0208/0209 已占用）。
+**编号**：0210（0206 §10 P7 §"Required follow-up ADR" — "该 ADR 编号待 P7 启动时再分配"；0206/0207/0208 已占用）。
 
 **Accepted 闸门（ADR-0210 §九 8 条全部满足）**：
 1. ✅ `region = phase:<name>` 全部 89 个 carrier 标注（PR-D final 2/2 commit `aa8536e6`）
@@ -20,12 +20,12 @@
 
 **关系**：
 
-- **Builds on**：ADR-0004 Protocol-First、ADR-0068 CompiledRunPlan、ADR-0075 阶段图（**部分 supersede**）、ADR-0194 Loop 收敛（**部分 supersede**）、ADR-0206 信息图内核 §5.2 + §10 P7 + C14 Phase-Tag-Only、ADR-0209 agent_lab → LCA plugin 体系收编。
+- **Builds on**：ADR-0004 Protocol-First、ADR-0068 CompiledRunPlan、ADR-0075 阶段图（**部分 supersede**）、ADR-0194 Loop 收敛（**部分 supersede**）、ADR-0206 信息图内核 §5.2 + §10 P7 + C14 Phase-Tag-Only。
 - **Supersedes**：0075 §二「六个认知语义契约作为 SSOT 锁」部分语义（阶段枚举从 SSOT 降级为 region 标签）；0194 §"Loop 状态机收敛"中阶段闭集强制部分（region 标签可扩展但**调度特权不再由 region 持有**）。
 - **不 supersede**：0075 §三「阶段由 PhaseExecutor capability 选择」、0194 §ProjectionHost 五缝（这五层是 Looperunner 的结构分层，region 标签只是其一）。
-- **Reject**：把「阶段闭集」当 SSOT 锁；把 region 标签绑定调度特权（"phase:act" 必须由 act 标准 executor）；让 region 标签影响 capability grant（违反 ADR-0209 §1.5 / AGENTS.md C5 能力三维单调）。
+- **Reject**：把「阶段闭集」当 SSOT 锁；把 region 标签绑定调度特权（"phase:act" 必须由 act 标准 executor）；让 region 标签影响 capability grant（违反 AGENTS.md C5 能力三维单调）。
 
-**理由**：ADR-0206 §5.2 + C14 已经把阶段从闭集降级为 region 标签机制；ADR-0209 在 PR-D final 2/2 用 generator 把所有 89 个 node plugin（含 perceive / think / act / reflect / remember 5 个 phase 主工人 + stop 控制工人）的 `region` 字段都设为 `phase:<name>` 形式（PR-D final 2/2 的 NODE_CARRIERS 字段 `stage` 即 `perceive/think/...`）。**这一步是把"region 标签已实际生效"正式化为 ADR-0206 §10 P7 的"完成"判定**：每个 phase worker 已有 `region = phase:<name>` 标注、region 校验仍是编译期必检（unbound region 编译失败）、region 标签不绑定调度（profile 可选 `phase:plan` 等自定义 region）。
+**理由**：ADR-0206 §5.2 + C14 已经把阶段从闭集降级为 region 标签机制。**这一步是把"region 标签已实际生效"正式化为 ADR-0206 §10 P7 的"完成"判定**：每个 phase worker 已有 `region = phase:<name>` 标注、region 校验仍是编译期必检（unbound region 编译失败）、region 标签不绑定调度（profile 可选 `phase:plan` 等自定义 region）。
 
 **Follow-ups**：[ADR-0206 §10 P7 acceptance condition](../0206-information-graph-kernel.md)（"`region = phase:<name>` 全量使用；canary 子图嵌套一致性；0075/0194 迁移 Owner 登记在 Agent Note"）+ 落地切片见本文 §6。
 
@@ -90,7 +90,7 @@ PhaseExecutor 选择通过 capability "phase.act.standard"（或其他 executor 
 region 标签不参与 capability 闭集检查
 ```
 
-**不变量保留**：AGENTS.md C5「能力三维单调」+ ADR-0209 §1.5 + ADR-0206 C14 — region 标签是观察/分析维度，不是治理维度。
+**不变量保留**：AGENTS.md C5「能力三维单调」+ ADR-0206 C14 — region 标签是观察/分析维度，不是治理维度。
 
 ### 2.3 6 阶段保持 + 自定义 region 允许
 
@@ -129,7 +129,7 @@ def validate_region(region: str, profile_regions: set[str]) -> None:
 
 | ID | 不变量 | 落点 |
 |---|---|---|
-| **P7-I-1** | 六阶段 region 标签 (`phase:perceive` / `phase:think` / `phase:act` / `phase:reflect` / `phase:remember` / `phase:stop`) 保留为推荐集 | `lca.contracts.declarative.declarative_common.SemanticPhase` 保留 + `agent_lab.graphs.configs.*.yaml` 的 `region: phase:<name>` 字段全量使用（PR-D final 2/2 generator 已生成） |
+| **P7-I-1** | 六阶段 region 标签 (`phase:perceive` / `phase:think` / `phase:act` / `phase:reflect` / `phase:remember` / `phase:stop`) 保留为推荐集 | `lca.contracts.declarative.declarative_common.SemanticPhase` 保留 + `bundles/phase_main_outer.yaml` 中 `region: phase:<name>` 字段的六阶段使用 |
 | **P7-I-2** | region 标签不参与 capability 闭集（违反即 ADR-0210 Reject 列表） | `lca.contracts.capabilities` 不再按 region 分组；`phase.<name>.<executor>` 是唯一 phase capability 命名 |
 | **P7-I-3** | `CognitivePhaseGraphPlan.phase_graph: None` 在 `CompiledRunPlan` 中合法 | `lca.contracts.protocols.state.plan.CompiledRunPlan.phase_graph` 字段保持 `Optional[CognitivePhaseGraphPlan]`（现状） |
 | **P7-I-4** | region 校验是编译期必检 | C14 校验 + `unbound region → 编译失败`（现状） |
@@ -155,8 +155,8 @@ def validate_region(region: str, profile_regions: set[str]) -> None:
 
 | 提议 | 拒绝理由 |
 |---|---|
-| 在 ADR-0210 内新建 `lca/colony/` 或 Pheromone 标签 | 违反 ADR-0209；与 ADR-0206 §8.1「不可替代边界」冲突；参考 [Note 2026-09-09-colony-runtime-architecture-review-response](../notes/plans/2026-09-09-colony-runtime-architecture-review-response.md) §"Reject" |
-| 把 region 标签加入 capability 闭集 | 违反 ADR-0209 §1.5 + AGENTS.md C5；region 标签是观察/分析维度，capability 是治理维度 |
+| 在 ADR-0210 内新建 `lca/colony/` 或 Pheromone 标签 | 违反 AGENTS.md §4；与 ADR-0206 §8.1「不可替代边界」冲突；参考 [Note 2026-09-09-colony-runtime-architecture-review-response](../notes/plans/2026-09-09-colony-runtime-architecture-review-response.md) §"Reject" |
+| 把 region 标签加入 capability 闭集 | 违反 AGENTS.md C5；region 标签是观察/分析维度，capability 是治理维度 |
 | 在 `CognitivePhaseGraphPlan` 字段上新增 `region` 标签映射 | plan 字段是可选挂载，region 标签在 `InfoNode` 上 —— 双层结构会让 model 冗余 |
 | 把六阶段 `SemanticPhase` 枚举删除 | 六阶段是推荐集，保留是**展示性约束**（profile / tool 引用）；删除会让 telemetry / spine span 失去稳定 key |
 | 引入新的 `lca.plugins.lab.session.phase_provider` 之类的 provider 框架 | P7 是闭集迁移，不是新增 plugin surface |
@@ -180,7 +180,7 @@ def validate_region(region: str, profile_regions: set[str]) -> None:
    - C14 region 校验读 profile.regions_declare（compiler pass）
 3. **declarative-phase-graph bundle 不变**（仍是占位 Plan region；profile 可关闭）
 4. **更新 spec / Note**：
-   - `docs/specs/capability-closed-set.md` 加 `region:*` 不在 capability 闭集（与 ADR-0209 §1.5 一致）
+   - 旧 `docs/specs/capability-closed-set.md` 已随本 PR 退役；region:* 不在 capability 闭集的不变量落到本 ADR 与 AGENTS.md C5 一致
    - `docs/notes/implemented/seam/` 加 P7 实施 Note
 5. **测试**：
    - `tests/architecture/test_p7_region_migration.py` — 6 阶段 region 校验 + 自定义 region 通过 + `phase:act` 不绑定 capability

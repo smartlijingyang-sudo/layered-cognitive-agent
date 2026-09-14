@@ -347,7 +347,6 @@ Each live lane runs on its own cloud VM at the PR head. Drive through `control-c
 - [ ] Delete `tests/plugins/state/test_stop_policy_delivery.py`.
 - [ ] Delete `tests/plugins/state/test_stop_policy_delivery_via_observation.py`.
 - [ ] Delete `tests/plugins/state/test_stop_policy_no_second_think_repro.py`.
-- [ ] Delete `tests/agent_lab/test_stop_focus_subgraph.py`.
 - [ ] Edit `bundles/base.yaml` (lines 125-162, 140-141).
 - [ ] Edit `bundles/runtime-core.yaml` (lines 9-11).
 - [ ] Edit `bundles/web-app.yaml` (lines 124-126).
@@ -371,10 +370,6 @@ Each live lane runs on its own cloud VM at the PR head. Drive through `control-c
 - [ ] Edit `lca/infrastructure/cli/commands/journal_extra/journal_trace.py:295-391, 605-615`.
 - [ ] Edit `scripts/lca-inspect-plan.py:55-154`.
 - [ ] Edit `scripts/e2e_smoke_test.py:195`.
-- [ ] Edit `agent_lab/graphs/configs/control/stop_decide.yaml`.
-- [ ] Edit `agent_lab/graphs/configs/control/stop_focus.yaml`.
-- [ ] Edit `agent_lab/_lca_paths.py:107, 110`.
-- [ ] Edit `agent_lab/profile_loader.py:17, 38`.
 - [ ] Edit `tests/cognition/test_convergence_grace.py:12, 63, 65`.
 - [ ] Edit `tests/runtime/test_terminal_outcome_integration.py:24, 32, 34`.
 - [ ] Edit `tests/runtime/test_reducer.py:13, 25, 88, 104, 170, 218, 239, 359`.
@@ -388,8 +383,6 @@ Each live lane runs on its own cloud VM at the PR head. Drive through `control-c
 - [ ] Edit `tests/harness/test_plugin_optional_fields.py:280, 281`.
 - [ ] Edit `tests/composer/test_agent_assembly_runtime_bindings.py:4`.
 - [ ] Edit `tests/composer/test_phase_capability_contributions.py:104`.
-- [ ] Edit `tests/agent_lab/test_stop_subgraph.py`.
-- [ ] Edit `tests/agent_lab/test_control_slot_graphs.py:102, 108`.
 - [ ] Edit `tests/contracts/test_terminal_outcome_contract.py:287, 289`.
 - [ ] Edit `tests/contracts/test_agent_state_shape.py:70`.
 - [ ] Edit `tests/contracts/test_boundary_dto_frozen.py:425, 430, 437`.
@@ -431,16 +424,13 @@ Each live lane runs on its own cloud VM at the PR head. Drive through `control-c
 - [ ] Update `lca/plugins/lab/control/ops.py` to drop `LcaControlStopPolicyProvider` and the CONTINUE-only fallback StopPolicy.
 - [ ] Update `lca/plugins/agent/run_phase/loop.py`, `lca/plugins/act/delta/handlers_provider.py`, `lca/plugins/act/action/handlers_provider.py` to drop the now-dead stop handlers.
 - [ ] Update `lca/runtime/agent_runtime/phases.py`, `lca/plugins/tools/diagnostics/debug/run.py`, `lca/infrastructure/cli/commands/journal_extra/journal_trace.py`, `scripts/lca-inspect-plan.py`, `scripts/e2e_smoke_test.py` to drop the StopPolicy references.
-- [ ] Update `agent_lab/graphs/configs/control/stop_decide.yaml`, `agent_lab/graphs/configs/control/stop_focus.yaml`, `agent_lab/_lca_paths.py`, `agent_lab/profile_loader.py` to drop StopPolicy / phase.stop references.
 - [ ] Update the 23 test files listed in the Files. block to drop `DefaultStopPolicy` imports, `StopDecision(should_stop=...)` constructions, and the `control.stop.*` plugin id assertions.
-- [ ] Delete `tests/plugins/state/test_stop_policy.py`, `tests/plugins/state/test_stop_policy_delivery.py`, `tests/plugins/state/test_stop_policy_delivery_via_observation.py`, `tests/plugins/state/test_stop_policy_no_second_think_repro.py`, `tests/agent_lab/test_stop_focus_subgraph.py`.
 - [ ] Update docs `docs/adr/0094-stop-policy-locality.md`, `docs/adr/README.md`, `docs/specs/glossary.md`, `docs/specs/tool-failure-recovery.md`, `docs/specs/harness-spine-spec.md`, `docs/specs/lca-structured-cognition-guide.md`, `docs/design/2026-08-19-cognitive-primitive-constitution-v3.md`, `docs/design/2026-08-21-agent-primitive-system-constitution.md`, `docs/notes/implemented/seam/2026-09-12-six-phase-subgraph-cutover.md`, `docs/notes/baselines/plugin-id-grammar.json`, `docs/notes/baselines/capability-set-*-pre-pr10.json`, `docs/plans/2026-08-27-agent-loop-focus-governance.md`, `docs/plans/2026-09-01-run-failure-rca-and-fix-plan.md`, `CONTEXT.md` to remove or supersede StopPolicy references.
 - [ ] Update `tests/architecture/test_p7_region_migration.py` to drop the `phase:stop` region assertion.
 - [ ] Add the new `tests/refactor/test_no_stop_decision_residue.py` that asserts zero hits for the retired symbols.
 
 **You see.**
 
-- [ ] `grep -rln "StopPolicy\|DefaultStopPolicy\|StopDecision.should_stop" lca/ bundles/ profiles/ tests/ scripts/ docs/ agent_lab/ 2>/dev/null | grep -v __pycache__` returns only the archival `docs/adr/0094-stop-policy-locality.md` and `docs/specs/glossary.md` retired-mention entries.
 - [ ] `grep -rln "phase.stop\.\|stop_should_check\|stop_focus\|stop_decide\|control\.stop\." lca/plugins/ bundles/ profiles/ 2>/dev/null | grep -v __pycache__` returns zero hits.
 - [ ] `python -c "from lca.plugins.loop.state.stop_policy.plugin import DefaultStopPolicy"` raises `ModuleNotFoundError`.
 - [ ] `./scripts/lca-ops runs create --user-text "echo smoke" --profile web-standard --wait --json` still completes successfully (the kernel has not been broken by the deletion).

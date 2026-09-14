@@ -13,7 +13,7 @@ plugin and replace it with a thinner `phase.think.orchestrator` whose sole job
 is to drive the `SubgraphPhaseRunner`.
 
 After this change the think subgraph has the same shape as
-`agent_lab/graphs/configs/act.yaml`: five flat, independently registered
+the InfoEdge prototype's `act.yaml`: five flat, independently registered
 phase plugins, no private `_shared.py` aggregator.
 
 ## 2. Background
@@ -176,7 +176,7 @@ elsewhere in the system; the new `route` plugin reads it directly via
   phase graph).
 - `Brain` protocol (kept; reflect still uses it).
 - `reflect` subgraph, `act`, `perceive`, `remember`, `stop`.
-- The `agent_lab` InfoEdgeSpec graph (figure A).
+- The InfoEdge prototype `InfoEdgeSpec` graph (figure A).
 - The `using-superpowers` skill entry itself — once this PR lands, the
   consuming workflow retires its reference, but that is a separate change.
 
