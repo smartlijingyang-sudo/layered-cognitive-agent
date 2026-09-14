@@ -36,6 +36,7 @@ from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
+from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
@@ -46,7 +47,7 @@ class GateChainRejectExecutor:
     semantic_name: str = "gate.chain.reject"
     region: str = "concept"
     declared_inputs: tuple[PortName, ...] = ("decision", "enforced_decision")
-    declared_outputs: tuple[PortName, ...] = ("decision",)
+    declared_outputs: tuple[PortName, ...] = ("decision", "routing")
 
     async def node_execute(
         self,
@@ -91,7 +92,12 @@ class GateChainRejectExecutor:
             stamped.action_type,
             stamped.degraded_from,
         )
-        return NodeOutput(port_values={"decision": stamped})
+        return NodeOutput(
+            port_values={
+                "decision": stamped,
+                "routing": RoutingDecision(action_type=stamped.action_type),
+            }
+        )
 
 
 def _stamp(candidate: Decision, enforced: Decision) -> Decision:

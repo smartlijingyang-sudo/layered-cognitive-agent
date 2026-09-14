@@ -28,7 +28,7 @@ nodes:
   - id: gate.chain.reject
     factory: gate.chain.reject
     inputs: [decision, enforced_decision]
-    outputs: [decision]
+    outputs: [decision, routing]
     config:
       max_visits: 1
       emit_on_enter: []

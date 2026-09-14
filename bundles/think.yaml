@@ -54,7 +54,7 @@ nodes:
   - id: think.gate
     factory: think.gate.ref
     inputs: [decision]
-    outputs: [decision]
+    outputs: [decision, routing]
     config:
       max_visits: 8
       emit_on_enter: []
