@@ -261,12 +261,21 @@ def prepare_tool_invoked(
     args_dict = dict(args)
     inline_args: dict[str, Any] = {} if arguments_ref is not None or not obs.success else args_dict
     inline_output_text: str | None = None
+    inline_text: str | None = None
     if output_ref is None and obs.success:
         for key in ("output", "stdout", "content"):
             value = output_dict.get(key)
             if isinstance(value, str):
                 inline_output_text = value
                 break
+        # Many text-producing tools (``search``, ``web-browsing``) put their
+        # return string on ``obs.payload["text"]``. Carry it through to the
+        # LobeHub gateway as ``data.text`` so ``_map_tool_invoked`` can hand
+        # it back via ``result.content`` for the in-memory tool message and
+        # the persisted assistant row.
+        text_value = output_dict.get("text")
+        if isinstance(text_value, str) and text_value:
+            inline_text = text_value
     projected_state_dict: dict[str, Any] = {}
     try:
         projected_state_dict = project_tool_state(tool.name, args_dict, obs)
@@ -285,6 +294,7 @@ def prepare_tool_invoked(
         output_ref=output_ref,
         output_text=inline_output_text,
         projected_state=projected_state_dict,
+        text=inline_text,
     )
 
 
