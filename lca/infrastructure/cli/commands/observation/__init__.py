@@ -14,6 +14,7 @@ from __future__ import annotations
 import typer
 
 from lca.infrastructure.cli.commands.observation import (
+    debug_graph,
     plan_show,
     run_explain,
     run_replay,
@@ -31,3 +32,4 @@ def register(app: typer.Typer) -> None:
     trace_show.register(obs_app)
     run_explain.register(obs_app)
     run_replay.register(obs_app)
+    debug_graph.register(obs_app)

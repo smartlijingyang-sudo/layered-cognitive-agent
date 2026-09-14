@@ -75,6 +75,8 @@ def register(app: typer.Typer) -> None:
     """Register the ``runs`` subcommand on the CLI app."""
     runs_app = typer.Typer(help="Run lifecycle (carrier-aligned).", no_args_is_help=True)
     runs_app.command(name="create", help=_create.__doc__ or "")(_create)
+    from lca.infrastructure.cli.commands.runs import debug as runs_debug
+    runs_debug.register(runs_app)
     app.add_typer(runs_app, name="runs")
 
 
@@ -136,7 +138,11 @@ def _create(
     wait: bool = typer.Option(
         False,
         "--wait",
-        help="Block until the run is terminal (polls ``GET /runs/{id}/doctor`` every 2s, max 5 min).",
+        help=(
+            "Block until the run is terminal (polls ``GET /runs/{id}/doctor`` every 2s, max 5 min). "
+            "Debug run 的工作流:不加 --wait,create 立即返回 → ``lca-ops timeline <run_id>`` 看图。"
+            "只在脚本需要 terminal verdict 再继续时才加。"
+        ),
     ),
     facade: bool = typer.Option(
         False,
@@ -158,7 +164,12 @@ def _create(
     """Create one run via the carrier; print ``run_id`` + ``trace_id`` + ``ws_url``.
 
     Thin wrapper around ``POST /runs`` (handlers/runs/api/command_endpoints.create_run).
-    Returns immediately after dispatch; use ``--wait`` if you need the terminal verdict.
+    Returns immediately after dispatch; pass ``--wait`` only if you need the terminal
+    verdict in-script. For debugging, follow up with
+    ``lca-ops timeline <run_id>`` (or ``observation run-replay --show-graph``)
+    instead of waiting — the timeline works even when ``journal.json`` has not
+    materialized (which happens on runs that exit via ``lifecycle.finally``
+    without ``RunTerminalizer.terminalize``).
 
     This is the canonical "trigger a run" command for coding agents. ``/v1/chat/completions``
     does NOT register a run and is NOT a substitute (it is a LobeHub UI proxy, see ADR-0099).
