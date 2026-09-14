@@ -150,6 +150,12 @@ async def run_resolved_kernel(
         compiled_run_plan=compile_run_plan(resolved),
         compiled_observability_plan=compile_observability_boot_plan(),
     )
+    # Fail-loud at boot if any plan is malformed (typed-port-graph redesign).
+    # Runs after compile_run_plan (so the resolver's bundle paths are valid)
+    # and before _boot_context (so the kernel refuses to start).
+    from lca_kernel.boot.plan_validation import validate_profile_plans
+
+    validate_profile_plans(resolved)
     return await _boot_context(products, bootstrap_file_store=bootstrap_file_store)
 
 
