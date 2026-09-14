@@ -1,0 +1,286 @@
+// LCA-P1: multi-run / multi-LLM regression test for the LCA gateway path.
+//
+// Copied into
+// `lobehub-ui/src/store/chat/agents/transports/lcaGateway/lcaGatewayEventHandler.test.ts`
+// by `lca_runtime_agent_gateway`; run from the lobehub-ui root:
+//   bun vitest run src/store/chat/agents/transports/lcaGateway/lcaGatewayEventHandler.test.ts
+//
+// This is the task-4 regression test that locks the LCA wire's shape on the
+// shared handler. It drives a synthetic run with three step boundaries and
+// one terminal snapshot, where the wire emits ONE tool per
+// `stream_chunk.tools_calling` (the LCA shape — see
+// `lca/application/runtime/coordinator/event_translator.py:333-346`).
+// The previous `mergeToolsCallingChunks` shim is gone; the task-3 fix made
+// `preserveToolResultMessageIds` merge by id so per-chunk-single tools
+// accumulate. The hetero cumulative path's tool ordering was not explicitly
+// tested before this task, and the task-3 re-review surfaced a latent
+// regression: hetero cumulative chunks `['item_1']`, `['item_1', 'item_2']`,
+// `['item_4']` produced `[item_1, item_2, item_4]` pre-fix and
+// `[item_4, item_1, item_2]` post-fix. This test pins the post-fix order
+// for the LCA path explicitly — `[newest_incoming_first, ...existing_leftover]`
+// — and a follow-up PR will reverse the helper's loop order so hetero's
+// cumulative order is preserved.
+
+import type { AgentStreamEvent } from '@lobechat/agent-gateway-client';
+import type { ConversationContext, UIChatMessage } from '@lobechat/types';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { messageService } from '@/services/message';
+import type { ChatStore } from '@/store/chat/store';
+import { messageMapKey } from '@/store/chat/utils/messageMapKey';
+
+import { createLcaGatewayEventHandler } from './event_handler';
+
+const context = {
+  agentId: 'agent-1',
+  topicId: 'topic-1',
+} as ConversationContext;
+
+const makeEvent = (
+  type: AgentStreamEvent['type'],
+  data?: AgentStreamEvent['data'],
+  stepIndex?: number,
+) =>
+  ({
+    data,
+    id: `event-${type}-${stepIndex ?? 0}`,
+    operationId: 'op-1',
+    stepIndex: stepIndex ?? 0,
+    timestamp: 0,
+    type,
+  }) as AgentStreamEvent;
+
+const topicKey = messageMapKey({ agentId: 'agent-1', topicId: 'topic-1' });
+
+/** Assistant row already in the store when the LCA stream begins. */
+const seedAssistant = {
+  content: '',
+  id: 'assistant-msg',
+  model: 'gpt-4o',
+  parentId: 'msg-user',
+  provider: 'openai',
+  role: 'assistant',
+  topicId: 'topic-1',
+} as unknown as UIChatMessage;
+
+/** Final assistant message the LCA runtime ships on `agent_runtime_end`. */
+const terminalAssistant = {
+  content: 'Booking confirmed: MU-5101 for PEK→PVG on 2026-10-01',
+  id: 'assistant-msg',
+  model: 'gpt-4o',
+  parentId: 'msg-user',
+  provider: 'openai',
+  role: 'assistant',
+  tools: [
+    {
+      apiName: 'searchFlights',
+      arguments: '{"q":"PEK"}',
+      id: 'call-1',
+      result: { content: '3 flights found', id: 'call-1' },
+      type: 'default',
+    },
+    {
+      apiName: 'compareQuotes',
+      arguments: '{"ids":[1,2]}',
+      id: 'call-2',
+      result: { content: 'cheapest: MU-5101', id: 'call-2' },
+      type: 'default',
+    },
+    {
+      apiName: 'bookFlight',
+      arguments: '{"flight":"MU-5101"}',
+      id: 'call-3',
+      result: { content: 'confirmed', id: 'call-3' },
+      type: 'default',
+    },
+  ],
+  topicId: 'topic-1',
+} as unknown as UIChatMessage;
+
+/**
+ * Per-chunk-single wire shape: ONE tool per `stream_chunk.tools_calling`.
+ * Mirrors the LCA event translator's `_spine_tool_call_record` (one tool per
+ * emitted chunk, NOT the cumulative shape hetero emits).
+ */
+const oneToolChunk = (id: string, apiName: string) =>
+  ({
+    chunkType: 'tools_calling' as const,
+    toolsCalling: [{ apiName, arguments: '{}', id, type: 'default' }],
+  }) as AgentStreamEvent['data'];
+
+/**
+ * Build the store with `internal_dispatchMessage` actually mutating the
+ * assistant row in `dbMessagesMap` so the next `tools_calling` chunk's
+ * `preserveToolResultMessageIds` read sees the accumulated tools. The
+ * reducer-based dispatch is mocked so the test does not depend on Zustand
+ * internals — we just emulate its observable side-effect (the row's
+ * `tools` array updates in place after each `updateMessage` with `value.tools`).
+ */
+const createStore = () => {
+  const dbMessagesMap: Record<string, UIChatMessage[]> = {
+    [topicKey]: [
+      { content: 'book me a flight', id: 'msg-user', role: 'user' } as unknown as UIChatMessage,
+      { ...seedAssistant },
+    ],
+  };
+
+  const updateAssistantTools = (tools: unknown[]) => {
+    const bucket = dbMessagesMap[topicKey];
+    const idx = bucket.findIndex((m) => m.id === 'assistant-msg');
+    if (idx >= 0) {
+      bucket[idx] = { ...bucket[idx], tools } as UIChatMessage;
+    }
+  };
+
+  const replaceMessages = vi.fn((messages: UIChatMessage[]) => {
+    dbMessagesMap[topicKey] = messages;
+  });
+
+  const store = {
+    activeAgentId: 'agent-1',
+    activeTopicId: 'topic-1',
+    associateMessageWithOperation: vi.fn(),
+    completeOperation: vi.fn(),
+    dbMessagesMap,
+    internal_dispatchMessage: vi.fn((payload: { type?: string; value?: { tools?: unknown[] } }) => {
+      if (payload?.type === 'updateMessage' && Array.isArray(payload.value?.tools)) {
+        updateAssistantTools(payload.value.tools);
+      }
+    }),
+    internal_toggleToolCallingStreaming: vi.fn(),
+    operations: {},
+    replaceMessages,
+    startOperation: vi.fn(() => ({
+      abortController: new AbortController(),
+      operationId: 'reasoning-op',
+    })),
+    updateOperationMetadata: vi.fn(),
+  } as unknown as ChatStore;
+
+  return { replaceMessages, store };
+};
+
+// The handler enqueues work on an internal promise chain; flush the microtask
+// queue so async event handlers settle before assertions.
+const flush = async () => {
+  for (let i = 0; i < 50; i += 1) await Promise.resolve();
+};
+
+describe('createLcaGatewayEventHandler (multi-run / multi-LLM)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('drives three steps and a terminal snapshot with one tool per tools_calling chunk', async () => {
+    const dbSpy = vi
+      .spyOn(messageService, 'getMessages')
+      .mockResolvedValue([] as unknown as UIChatMessage[]);
+
+    const { store, replaceMessages } = createStore();
+    const handler = createLcaGatewayEventHandler(() => store, {
+      assistantMessageId: 'assistant-msg',
+      context,
+      operationId: 'op-1',
+    });
+
+    // Three step boundaries. Each step streams a text delta then the LCA
+    // wire's per-chunk-single tools_calling chunk (one tool). The LCA wire
+    // does NOT attach uiMessages to step_start (verified at
+    // event_translator.py:209-218), so step_start only bumps stepCount.
+    handler(
+      makeEvent(
+        'stream_chunk',
+        { chunkType: 'text', content: 'searching flights... ', snapshotMode: 'append' } as never,
+        1,
+      ),
+    );
+    handler(makeEvent('stream_chunk', oneToolChunk('call-1', 'searchFlights'), 1));
+    handler(makeEvent('step_start', { phase: 'execution_complete' } as never, 1));
+
+    handler(
+      makeEvent(
+        'stream_chunk',
+        { chunkType: 'text', content: 'comparing quotes... ', snapshotMode: 'append' } as never,
+        2,
+      ),
+    );
+    handler(makeEvent('stream_chunk', oneToolChunk('call-2', 'compareQuotes'), 2));
+    handler(makeEvent('step_start', { phase: 'execution_complete' } as never, 2));
+
+    handler(
+      makeEvent(
+        'stream_chunk',
+        { chunkType: 'text', content: 'booking now... ', snapshotMode: 'append' } as never,
+        3,
+      ),
+    );
+    handler(makeEvent('stream_chunk', oneToolChunk('call-3', 'bookFlight'), 3));
+    handler(makeEvent('step_start', { phase: 'execution_complete' } as never, 3));
+
+    // Terminal snapshot — the LCA runtime's SoT for the final assistant
+    // content AND its tools (each carrying `result.content`). This is the
+    // single point at which the LCA path must reconcile the store.
+    handler(
+      makeEvent(
+        'agent_runtime_end',
+        {
+          reason: 'completed',
+          uiMessages: [
+            { content: 'book me a flight', id: 'msg-user', role: 'user' } as UIChatMessage,
+            terminalAssistant,
+          ],
+        } as never,
+        3,
+      ),
+    );
+
+    await flush();
+
+    // ── Assertion 1: final assistant content equals the runtime-written text
+    const lastCall = replaceMessages.mock.calls.at(-1);
+    expect(lastCall).toBeDefined();
+    const [terminalMessages, terminalOptions] = lastCall as unknown as [
+      UIChatMessage[],
+      Record<string, unknown>,
+    ];
+    expect(terminalMessages).toHaveLength(2);
+    const finalAssistant = terminalMessages.find((m) => m.role === 'assistant');
+    expect(finalAssistant?.content).toBe('Booking confirmed: MU-5101 for PEK→PVG on 2026-10-01');
+    expect(terminalOptions).toMatchObject({ action: 'gateway/agent_runtime_end', context });
+
+    // ── Assertion 2: final tools array has all three tool calls, each with result.content
+    expect(finalAssistant?.tools).toHaveLength(3);
+    const toolIds = (finalAssistant?.tools as Array<{ id: string }>).map((t) => t.id);
+    expect(toolIds).toEqual(['call-1', 'call-2', 'call-3']);
+    for (const tool of finalAssistant?.tools as Array<{
+      result?: { content?: string };
+    }>) {
+      expect(tool.result?.content).toBeTruthy();
+    }
+
+    // ── Assertion 3: replaceMessages called EXACTLY ONCE with the terminal snapshot
+    expect(replaceMessages).toHaveBeenCalledTimes(1);
+
+    // ── Assertion 4: the messageService (DB singleton) was never called —
+    // the LCA reader reconciles against `dbMessagesMap`, not the DB.
+    expect(dbSpy).not.toHaveBeenCalled();
+
+    // ── Pin the per-chunk-single accumulation that the LCA wire relies on.
+    // The shared handler's `preserveToolResultMessageIds` (gatewayEventHandler.ts:121)
+    // must merge each new tool into the assistant's existing tools array —
+    // not replace it. After three chunks the in-memory tools array is
+    // [call-3, call-2, call-1] (newest-first post-fix order; the brief locks
+    // this order rather than risk a loop-reorder at this stage).
+    const updateToolCalls = (store.internal_dispatchMessage as ReturnType<typeof vi.fn>).mock.calls
+      .map(([payload]) => payload)
+      .filter(
+        (payload: { type?: string; id?: string; value?: { tools?: unknown[] } }) =>
+          payload?.type === 'updateMessage' &&
+          payload.id === 'assistant-msg' &&
+          Array.isArray(payload.value?.tools),
+      );
+    expect(updateToolCalls.map((c: { value: { tools: Array<{ id: string }> } }) =>
+      c.value.tools.map((t) => t.id),
+    )).toEqual([['call-1'], ['call-2', 'call-1'], ['call-3', 'call-2', 'call-1']]);
+  });
+});
