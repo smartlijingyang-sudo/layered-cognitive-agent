@@ -113,15 +113,21 @@ def prepare_tool_started(
     return receipt, arguments_ref
 
 
-def record_tool_started_observability(
+def record_tool_started_diagnostic(
     tool: Tool,
     args: dict[str, Any],
     invocation_id: str,
-    receipt: ToolJournalReceipt,
 ) -> None:
-    """Record diagnostic + cursor evidence for a prepared ``ToolStarted``."""
-    args_dict = dict(args)
-    inline_args = dict(receipt.catalog_event.arguments)
+    """Emit diagnostic observability for a prepared ``ToolStarted``.
+
+    Caller responsibility: also commit ``step.tool_call.record`` when this is
+    the single track for that invocation. ``SimpleSafeExecutor.execute`` calls
+    ``record_step_tool_call`` directly upstream of the ``_commit_tool_started``
+    helper; using this diagnostic-only helper from that seam prevents the
+    duplicate ``step.tool_call.record`` spine fact observed in run traces
+    (single invocation appeared twice in the same step).
+    """
+    del args
     emit_diagnostic(
         category=DiagnosticCategory.TOOL.value,
         operation="tool.start",
@@ -131,6 +137,26 @@ def record_tool_started_observability(
             "invocation_id": invocation_id,
         },
     )
+
+
+def record_tool_started_observability(
+    tool: Tool,
+    args: dict[str, Any],
+    invocation_id: str,
+    receipt: ToolJournalReceipt,
+) -> None:
+    """Record diagnostic + cursor evidence for a prepared ``ToolStarted``.
+
+    Callers that have NOT separately committed ``step.tool_call.record`` upstream
+    (e.g. the ``emit_tool_started`` public wrapper) get the full bundle here.
+    Direct callers that already routed through
+    ``SimpleSafeExecutor.execute`` must use
+    :func:`record_tool_started_diagnostic` instead to avoid duplicate spine
+    facts under the same ``invocation_id``.
+    """
+    args_dict = dict(args)
+    inline_args = dict(receipt.catalog_event.arguments)
+    record_tool_started_diagnostic(tool, args_dict, invocation_id)
     from lca.loop.commit.tool_journal import (
         record_step_tool_call,
     )
@@ -262,7 +288,7 @@ def prepare_tool_invoked(
     )
 
 
-def record_tool_invoked_observability(
+def record_tool_invoked_diagnostic(
     tool: Tool,
     obs: Observation,
     receipt: ToolJournalReceipt,
@@ -270,10 +296,15 @@ def record_tool_invoked_observability(
     latency_ms: int,
     attempt: int,
 ) -> None:
-    """Record diagnostic + cursor evidence for a prepared ``ToolInvoked``."""
+    """Emit diagnostic observability for a prepared ``ToolInvoked``.
+
+    Mirror of :func:`record_tool_started_diagnostic`: callers that have
+    already routed ``step.tool_result.record`` upstream (e.g.
+    ``SimpleSafeExecutor.execute`` writes it directly) use this helper to
+    avoid duplicate spine facts under the same ``invocation_id``.
+    """
     committed = receipt.catalog_event
     resolved_id = committed.invocation_id
-    inline_output_text = committed.output_text
     emit_diagnostic(
         category=DiagnosticCategory.TOOL.value,
         operation="tool.complete",
@@ -288,6 +319,34 @@ def record_tool_invoked_observability(
             "latency_ms": latency_ms,
             "error": "" if obs.success else (obs.error or ""),
         },
+    )
+
+
+def record_tool_invoked_observability(
+    tool: Tool,
+    obs: Observation,
+    receipt: ToolJournalReceipt,
+    *,
+    latency_ms: int,
+    attempt: int,
+) -> None:
+    """Record diagnostic + cursor evidence for a prepared ``ToolInvoked``.
+
+    Callers that have NOT separately committed ``step.tool_result.record``
+    upstream (e.g. the ``emit_tool_invoked`` public wrapper) get the full
+    bundle here. ``SimpleSafeExecutor._commit_tool_invoked`` uses
+    :func:`record_tool_invoked_diagnostic` instead because the upstream
+    ``execute`` already committed the spine fact.
+    """
+    committed = receipt.catalog_event
+    resolved_id = committed.invocation_id
+    inline_output_text = committed.output_text
+    record_tool_invoked_diagnostic(
+        tool,
+        obs,
+        receipt,
+        latency_ms=latency_ms,
+        attempt=attempt,
     )
     delta = _delta_summary_from_obs(
         obs,
