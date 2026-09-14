@@ -227,3 +227,79 @@ def test_console_graph_timeline_still_swallows_sink_failures() -> None:
     sink._stream = None  # type: ignore[assignment]
 
     sink.write(_graph_rec())
+
+
+def test_console_write_event_renders_timeline_line_from_event_id() -> None:
+    """Session-observer entrypoint: join keys come from ``<run_id>:<seq>``.
+
+    Bypasses ``EventRecord.__post_init__`` so a Session observer can drive
+    the live stream without rebuilding the strict record shape.
+    """
+    stream = io.StringIO()
+    sink = ConsoleSink(stream, format="graph_timeline")
+
+    sink.write_event(
+        "phase_graph.node.end",
+        dict(GRAPH_PAYLOAD),
+        "run_abc:44",
+    )
+
+    assert stream.getvalue() == (
+        "run=run_abc  seq=44  phase_graph.node.end  node=think.reason.llm"
+        "  ok  604ms  depth=2  dispatch=next  in=context  out=decision\n"
+    )
+
+
+def test_console_write_event_drops_non_graph_events_in_timeline_format() -> None:
+    """graph_timeline narrowing still applies on the Session observer path."""
+    stream = io.StringIO()
+    sink = ConsoleSink(stream, format="graph_timeline")
+
+    sink.write_event("llm.stream.token", {"text": "hi"}, "run_abc:1")
+
+    assert stream.getvalue() == ""
+
+
+def test_console_setup_registers_session_observer() -> None:
+    """setup writes the sink under ``console_sink`` AND into the observer catalog.
+
+    The catalog is the production wiring (ADR-0186 / spine_file_sink
+    precedent): the live EventSpine does not wire this sink itself because
+    the DAG runs ``spine.core`` before ``spine.sink.console``, so the
+    observer registration is what carries events to stdout in a real run.
+    """
+    from lca.plugins.events._session_observe import (
+        clear_observer_catalog,
+        observer_catalog,
+    )
+
+    clear_observer_catalog()
+    try:
+        ctx = _StubPluginContext()
+        asyncio.run(console_setup.setup(ctx, {"format": "graph_timeline"}))
+
+        catalog = observer_catalog()
+        assert len(catalog) == 1, (
+            f"console sink must register exactly one Session observer; got {list(catalog)!r}"
+        )
+        registered_sink = ctx.provided["console_sink"]
+        assert isinstance(registered_sink, ConsoleSink)
+        _, callback = next(iter(catalog.items()))
+        stream = io.StringIO()
+        registered_sink._stream = stream  # type: ignore[assignment]
+        callback(
+            type(
+                "P",
+                (),
+                {
+                    "execution_point": "phase_graph.node.start",
+                    "payload": dict(GRAPH_PAYLOAD),
+                },
+            )(),
+            type("R", (), {"event_id": "run_e2e:1"})(),
+        )
+        assert stream.getvalue().startswith(
+            "run=run_e2e  seq=1  phase_graph.node.start"
+        )
+    finally:
+        clear_observer_catalog()
