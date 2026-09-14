@@ -1,80 +1,77 @@
-"""CloseOutAdapter — the seam the framework graph kernel calls.
+"""CloseOutAdapter — generic subgraph → outer port translation.
 
-This is the single ACL class that framework code can import without
-breaking the layer rule. It hides:
+The framework graph kernel calls :meth:`CloseOutAdapter.close_out`
+when a subgraph node finishes. For each port declared in the outer
+node's ``io_schema.outputs``, the adapter copies the value of the
+matching inner port by name. A caller-supplied ``rename_map`` lets a
+subgraph node expose one port under a different outer name when the
+inner and outer DTOs use different vocabularies.
 
-- which :data:`CLOSE_OUT_REGISTRY` fields are wired up;
-- how priorities resolve when multiple inner outputs collide;
-- the typed payload classes each field carries.
-
-The framework sees only port names (:data:`lca.contracts.protocols.graph.ports.PortName`)
-and gets back a plain ``dict[str, Any]``. The cognition layer owns the
-mapping from port name to business DTO.
+The adapter is the framework-facing ACL: framework imports from
+``lca.cognition.wire``, the adapter does not import framework.
+The inner registry is typed loosely (``Any``) — the adapter only
+requires ``has_port`` and ``read`` methods, which
+:class:`lca.framework.graph.port_registry.PortRegistry` satisfies.
 
 Why this class instead of free functions:
 
-- Future graph kernel (planned PR-4) will inject this adapter at boot,
-  allowing test fixtures to swap in a custom projection policy
-  without rewriting the kernel.
-- The registry lookup happens once per adapter construction, not per
-  visit. The hot path (:meth:`project`) is just a dict comprehension.
+- Future graph kernel can inject this adapter at boot so test
+  fixtures swap projection policy without rewriting the kernel.
+- A rename map is the only place where inner→outer vocabulary
+  differences live; everything else is identical-name forwarding.
 """
+
 from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from lca.cognition.wire.close_out_registry import (
-    CLOSE_OUT_REGISTRY,
-    CloseOutField,
-    close_out_projection,
-)
+from lca.contracts.protocols.graph.node_io import PortSpec
+from lca.contracts.protocols.graph.ports import PortName
 
 
 @dataclass(frozen=True, slots=True)
 class CloseOutAdapter:
-    """The framework-facing ACL for close-out projection.
+    """Generic subgraph → outer port translator.
 
-    Defaults to the production :data:`CLOSE_OUT_REGISTRY`. Tests and
-    alternative projections may pass a custom ``fields`` tuple to
-    narrow or reorder the projection surface.
+    ``rename_map`` maps an outer port name to its inner counterpart
+    when the inner and outer vocaularies differ (e.g. an inner
+    ``observation`` port surfaced as outer ``act_outcome``). Names
+    not in the map are forwarded unchanged.
+
+    Default behavior (no rename map) requires outer and inner port
+    names to match; missing inner ports yield no entry (no error).
     """
 
-    fields: tuple[CloseOutField, ...] = field(default_factory=lambda: CLOSE_OUT_REGISTRY)
+    rename_map: Mapping[PortName, PortName] = field(default_factory=dict)
 
-    def project(self, inner_outputs: Mapping[Any, Any]) -> dict[str, Any]:
-        """Project inner outputs through this adapter's field set.
+    def close_out(
+        self,
+        *,
+        inner_registry: Any,
+        outer_outputs: tuple[PortSpec, ...],
+    ) -> dict[PortName, Any]:
+        """Project inner registry ports onto the outer node's outputs.
 
-        Returns a plain dict keyed by field name. Empty when no
-        inner output produced a recognized field.
+        For each :class:`PortSpec` in ``outer_outputs``, look up the
+        inner port (via ``rename_map`` if present, else by the spec
+        name) and copy its value. Inner ports that are unset yield
+        no entry — they are silently dropped, matching the iron
+        rule 2 in :meth:`PortRegistry.exit_subgraph`.
+
+        ``inner_registry`` only needs ``has_port(name) -> bool`` and
+        ``read(name) -> Any``. Callers that raise on missing ports
+        in ``read`` should first check ``has_port``; the adapter
+        uses ``has_port`` before every ``read`` and skips missing
+        ports without raising.
         """
-        if self.fields is CLOSE_OUT_REGISTRY:
-            return close_out_projection(inner_outputs)
-        # Custom field set: build a one-off registry-shaped mapping.
-        custom: dict[str, Any] = {}
-        sorted_fields = sorted(self.fields, key=lambda f: -f.priority)
-        for fld in sorted_fields:
-            for output in inner_outputs.values():
-                if not hasattr(output, fld.name):
-                    continue
-                value = getattr(output, fld.name, None)
-                if value is not None and fld.name not in custom:
-                    custom[fld.name] = value
-                    break
-        return custom
-
-    def field_names(self) -> tuple[str, ...]:
-        """Return the field names this adapter recognizes, in priority order."""
-        return tuple(f.name for f in sorted(self.fields, key=lambda f: -f.priority))
-
-    def payload_types(self) -> dict[str, type]:
-        """Return the field name → payload type mapping.
-
-        Useful for runtime type-check helpers. Keys are field names;
-        values are the business DTO classes.
-        """
-        return {f.name: f.payload_type for f in self.fields}
+        projected: dict[PortName, Any] = {}
+        for spec in outer_outputs:
+            inner_name = self.rename_map.get(spec.name, spec.name)
+            if inner_registry.has_port(inner_name):
+                projected[spec.name] = inner_registry.read(inner_name)
+        return projected
 
 
 __all__ = ["CloseOutAdapter"]

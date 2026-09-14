@@ -92,6 +92,14 @@ class PortRegistry(BaseModel):
         """Read-only view of the current port store."""
         return dict(self._ports)
 
+    def has_port(self, name: PortName) -> bool:
+        """Return True iff ``name`` is set in the port store.
+
+        Used by the close-out adapter (D10) to skip inner ports that
+        were never written without raising on :meth:`read`.
+        """
+        return name in self._ports
+
     # --- typed read / write (Task 3 / D3) ---
 
     def read(self, name: PortName) -> Any:
