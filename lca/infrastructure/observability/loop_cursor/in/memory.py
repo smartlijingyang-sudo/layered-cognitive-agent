@@ -46,8 +46,6 @@ class InMemoryLoopCursor:
             run_id=s.run_id,
             trace_id=s.trace_id,
             incarnation=s.incarnation.incarnation_seq,
-            step_id=s.step_id,
-            step_index=s.step_index,
             iteration=s.iteration,
             attempt_in_step=s.attempt_in_step,
             phase=s.phase,
@@ -61,36 +59,8 @@ class InMemoryLoopCursor:
         """暴露当前 cursor 的显式身份(ADR-0169 D6)。"""
         return self._state.incarnation
 
-    def _ensure_open(self) -> None:
-        if self._state.closed:
-            raise CursorError("cursor closed")
-
-    # ── 显式 step 边界(与 StdLoopCursor 同口径,ADR-0184 D6)────────
-    def _emit_step_start(self, *, step_id: str) -> None:
-        """有 spine 时发 ``writable.step.start``;无 spine 纯状态机则只置位。
-
-        幂等:已开窗同 step_id 重复调用不发第二条 EP(与 StdLoopCursor 一致)。
-        """
-        s = self._state
-        if s.step_open and s.step_id == step_id:
-            return
-        s.step_open = True
-        s.step_id = step_id
-        if self._spine is None:
-            return
-        s.seq += 1
-        self._spine.append(
-            execution_point="writable.step.start",
-            payload={
-                "step": s.step_index,
-                "run_id": s.run_id,
-                "step_id": step_id,
-            },
-            run_id=s.run_id,
-            seq=s.seq,
-            incarnation=s.incarnation.incarnation_seq,
-            phase=s.phase,
-        )
+    # ── step 计数器(SSOT=hook 端,本 cursor 不参与)──────────────
+    # 历史:曾持有 step_index 自增;已砍掉,step 边界由 hook 唯一驱动。
 
     def advance(
         self,
@@ -102,14 +72,12 @@ class InMemoryLoopCursor:
         objective: str = "",
         summary: str = "",
     ) -> CursorSnapshot:
-        self._ensure_open()
         s = self._state
         if s.phase == "stop" and phase != "perceive":
             raise CursorError(f"cannot advance from stop to {phase!r}")
         if s.phase == "stop" and phase == "perceive":
             s.iteration += 1
             s.attempt_in_step = 0
-            s.step_index = 0
         s.phase = phase
         if self._spine is not None:
             s.seq += 1
@@ -122,7 +90,6 @@ class InMemoryLoopCursor:
                     "summary": summary,
                     "incarnation": s.incarnation.incarnation_seq,
                     "plan_ref": s.incarnation.plan_ref,
-                    "step_index": s.step_index,
                 },
                 run_id=s.run_id,
                 seq=s.seq,
@@ -130,22 +97,6 @@ class InMemoryLoopCursor:
                 phase=s.phase,
             )
         return self.snapshot
-
-    def open_step(self, step_id: str) -> None:
-        """LLM 边界 step 推进 —— L6 自增 + 显式 ``writable.step.start``。
-
-        与 StdLoopCursor 同口径(ADR-0184 D6);``llm.request.header`` 仍由
-        hook 侧唯一发射,本方法不派生。
-        幂等:同 step_id 在 ``step_open`` 仍为 True 时不发第二条 EP。
-        """
-        self._ensure_open()
-        s = self._state
-        if s.step_open and s.step_id == step_id:
-            return
-        s.step_index += 1
-        s.step_id = step_id
-        s.attempt_in_step = 0
-        self._emit_step_start(step_id=step_id)
 
 
 def _static_protocol_check() -> None:

@@ -136,9 +136,10 @@ class StepCoordinator:
     def begin_step(self, phase: str, **ctx: Any) -> str:
         """SSOT 收口后,begin_step 仅保留 driver 派生 step_id 的内部状态。
 
-        不再写 ``writable.step.start`` EP —— 该显式边界由 cursor 发射:
-        ``record_request_header`` / ``open_step``(ADR-0184 D6)。
-        业务路径必须走 cursor。
+        不再写任何 step 边界 EP —— 该显式边界由 hook
+        ``ModelVisibleHook.capture_pre_llm`` 通过
+        ``spine.llm.request.header`` 唯一发射(单生产者)。
+        业务路径必须走 hook,不要直接调用本方法。
         """
         if self._current_step is not None:
             raise RuntimeError(f"begin_step while step {self._current_step!r} still open")
@@ -153,7 +154,7 @@ class StepCoordinator:
         *,
         error: str | None = None,
     ) -> None:
-        """仅做 driver.end_step 状态收尾,不再写 ``writable.step.end`` EP。
+        """仅做 driver.end_step 状态收尾,不再写任何 step 边界 EP。
 
         该显式边界由 cursor 发射:``advance('stop')`` 与 ``close``
         (ADR-0184 D6)。

@@ -101,7 +101,8 @@ class RunLifecycleCoordinator:
             environment = RunExecutionEnvironment(
                 session,
                 ctx=ctx,
-                        machine_resolver=self._machine_resolver,
+                hub=hub,
+                machine_resolver=self._machine_resolver,
             )
             async with environment.prepare() as prepared:
                 workspace = prepared.workspace
@@ -109,7 +110,8 @@ class RunLifecycleCoordinator:
                     session,
                     question=question,
                     mode=mode,
-                        bindings=prepared.bindings,
+                    hub=hub,
+                    bindings=prepared.bindings,
                     run_context=prepared.run_context,
                     ctx=ctx,
                     machine_resolver=self._machine_resolver,
@@ -153,7 +155,7 @@ class RunLifecycleCoordinator:
             )
             emit_carrier_run_failed(
                 session,
-                        user_message=user_message,
+                user_message=user_message,
                 exception_class=type(exc).__name__,
             )
             emit_carrier_exception_finally(
@@ -185,7 +187,7 @@ class RunLifecycleCoordinator:
             )
             emit_carrier_run_failed(
                 session,
-                        user_message=user_message,
+                user_message=user_message,
                 exception_class=type(exc).__name__,
             )
             emit_carrier_exception_finally(
@@ -278,8 +280,8 @@ class RunLifecycleCoordinator:
                 agent_role=session.agent.name if session.agent else "",
                 strategy_key=session.mode,
                 objective=session.user_text,
-                error=error or f"{type(exc).__name__}: {exc}"
-                        )
+                error=error or f"{type(exc).__name__}: {exc}",
+            )
         )
 
     @staticmethod

@@ -233,14 +233,11 @@ def _journal_step_outcome(raw: str | None) -> StepOutcome | None:
 class _Frame:
     """fold 中间态:一个 step 的累积帧。
 
+    step 边界由 ``llm.request.header`` EP 唯一驱动(SSOT)。其他 EP 按
+    顺序挂到当前 open 帧上,不参与切步。
+
     ``model`` / ``request_reason`` 由 ``llm.request.header`` payload 写入;
     ``step.thinking.record`` 构造 ThinkingTrace 时从 ``model`` 取模型名。
-    ``opened_by`` 记开帧来源(``writable`` / ``think`` / ``header``),
-    ``llm.request.header`` 据此判定「同一 think 步的 LLM 边界」还是「新步」。
-    ``window_signal`` ∈ ``{"explicit", "implicit"}``(ADR-0184 D6):
-    显式边界信号(``writable.step.start`` 或 cursor ``llm.request.header``)
-    开/升级帧 → ``explicit``;仅 ``brain.think.start`` 隐式兜底开窗 →
-    ``implicit``。物化时写 ``JournalStep.extra.window_signal``。
 
     ``llm_started`` / ``stream_*_chunks``:Session 形态的 ``llm.stream.token``
     按 ``channel_kind`` 分流累积(reasoning vs output);``llm.call.end``
@@ -263,8 +260,6 @@ class _Frame:
     exited_at: float | None = None
     model: str = ""
     request_reason: str = ""
-    opened_by: str = "writable"
-    window_signal: str = "implicit"
     llm_started: bool = False
     stream_reasoning_chunks: list[str] = field(default_factory=list)
     stream_final_chunks: list[str] = field(default_factory=list)
@@ -282,7 +277,6 @@ class _StepTreeState:
     terminal_outcome: str | None = None
     open_step: _Frame | None = None
     closed_frames: list[_Frame] = field(default_factory=list)
-    steps_by_index: dict[int, _Frame] = field(default_factory=dict)
     phases: list[PhaseRecord] = field(default_factory=list)
 
 
@@ -310,66 +304,28 @@ def _capture_outcome(state: _StepTreeState, ep: str, event: Mapping[str, Any]) -
             state.terminal_outcome = "failed"
 
 
-def _frame_is_empty(frame: _Frame) -> bool:
-    """帧尚无 step 内容(thinking / tool_call / tool_result 均空)。"""
-    return frame.thinking is None and frame.tool_call is None and frame.tool_result is None
+def _open_step(
+    state: _StepTreeState, step_id: str, model: str, request_reason: str, ts: float
+) -> _Frame:
+    """step 边界单一入口(SSOT):``llm.request.header`` 触发。
 
-
-def _begin_step(state: _StepTreeState, event: Mapping[str, Any], ts: float) -> None:
-    """``writable.step.start`` 显式开窗(ADR-0184 D6)。
-
-    与 ``llm.request.header`` / ``brain.think.start`` 的交互(显式 > 隐式,
-    一次模型请求 = 一步):
-
-    - 无开帧 → 开新帧,``window_signal="explicit"``;payload ``step_id``
-      非空时采用(cursor 与 fold 同派生,见 ``_resolve_target``),否则
-      回落 ``step_{seq:03d}``。
-    - 开帧存在但为空且由 ``llm.request.header`` 开(同源边界,事件流里
-      header 先于 start)→ 原地升级为显式帧,不关旧开新。
-    - 开帧存在但为空且由隐式 ``think`` 开 → 原地升级为显式帧。
-    - 其余(开帧已有内容 / 已由显式边界开)→ 视为上一步收口,
-      ``fail`` 关闭后开新帧。
+    每次 LLM 边界 = 一步:关旧帧(若开)→ 开新帧。step_id 直接来自
+    payload(cursor / hook 单派生,不再需要 fold 端"原地升级"合并)。
+    不读 payload.phase:phase 由 phase.fold 唯一决定。
     """
-    payload = event.get("payload") or {}
-    if not isinstance(payload, Mapping):
-        payload = {}
-    open_frame = state.open_step
-    start_step_id = str(payload.get("step_id") or "")
-    # frame.phase 在开新帧时从 payload.phase 派生(测试契约):
-    # writable.step.start 由 caller 决定 phase,fold 不硬编码。
-    # 升级路径不读 payload.phase(避免 cursor state.phase 污染,见 ADR-0184 D6 + run_6765361accc9)。
-    new_phase = payload.get("phase")
-    if not isinstance(new_phase, str) or not new_phase:
-        new_phase = "think"
-    if (
-        open_frame is not None
-        and _frame_is_empty(open_frame)
-        and open_frame.opened_by
-        in {
-            "header",
-            "think",
-        }
-    ):
-        # 原地升级:同一 step 的显式边界到达(不重复计步)。
-        # frame.phase 不在此覆写:writable.step.start 是 LLM 边界专属
-        # marker(ADR-0184 D6),phase 由 phase.fold 事件统一决定,
-        # 避免 cursor state.phase(如 perceive)污染 step-tree 物化结果。
-        if start_step_id:
-            open_frame.step_id = start_step_id
-        open_frame.opened_by = "writable"
-        open_frame.window_signal = "explicit"
-        return
-    if open_frame is not None:
-        _close_step(state, "fail")
+    if state.open_step is not None:
+        _close_step(state, "success")
     state.step_seq += 1
-    state.open_step = _Frame(
-        step_id=start_step_id or f"step-{state.step_seq:03d}",
+    frame = _Frame(
+        step_id=step_id,
         step_index=state.step_seq,
-        phase=cast("StepPhase", new_phase),
+        phase="think",
         entered_at=ts,
-        opened_by="writable",
-        window_signal="explicit",
+        model=model,
+        request_reason=request_reason,
     )
+    state.open_step = frame
+    return frame
 
 
 def _tool_result_ok(payload: Mapping[str, Any]) -> bool:
@@ -381,16 +337,39 @@ def _tool_result_ok(payload: Mapping[str, Any]) -> bool:
 
 
 def _assign_tool_call(target: _Frame, payload: Mapping[str, Any], ep: str) -> None:
-    target.tool_call = _binding_engine().apply_tool_call(target.tool_call, payload, ep)
+    # 不同 invocation_id = 不同 tool,新帧覆盖;同 invocation_id = 同一 tool
+    # 的镜像 record,走 binding merge 累积字段(避免 listFiles → readFile
+    # 互相覆盖的回归:run_3cf06424f0b7)。
+    incoming_inv = str(payload.get("invocation_id") or "")
+    existing_inv = (
+        str(getattr(target.tool_call, "invocation_id", "") or "")
+        if target.tool_call is not None
+        else ""
+    )
+    if incoming_inv and existing_inv and incoming_inv != existing_inv:
+        target.tool_call = _binding_engine().apply_tool_call(None, payload, ep)
+    else:
+        target.tool_call = _binding_engine().apply_tool_call(target.tool_call, payload, ep)
 
 
 def _assign_tool_result(target: _Frame, payload: Mapping[str, Any], ep: str) -> None:
-    target.tool_result = _binding_engine().apply_tool_result(
-        target.tool_result,
-        payload,
-        ep,
-        ok_default=_tool_result_ok(payload),
+    incoming_inv = str(payload.get("invocation_id") or "")
+    existing_inv = (
+        str(getattr(target.tool_result, "invocation_id", "") or "")
+        if target.tool_result is not None
+        else ""
     )
+    if incoming_inv and existing_inv and incoming_inv != existing_inv:
+        target.tool_result = _binding_engine().apply_tool_result(
+            None, payload, ep, ok_default=_tool_result_ok(payload)
+        )
+    else:
+        target.tool_result = _binding_engine().apply_tool_result(
+            target.tool_result,
+            payload,
+            ep,
+            ok_default=_tool_result_ok(payload),
+        )
 
 
 def _capture_exception(state: _StepTreeState, payload: Mapping[str, Any], ts: float) -> None:
@@ -420,37 +399,6 @@ def _close_step(state: _StepTreeState, outcome: str) -> None:
         f.reflect = ReflectTrace(summary=f.tool_result.delta_summary[:200])
     state.open_step = None
     state.closed_frames.append(f)
-    state.steps_by_index[f.step_index] = f
-
-
-def _resolve_target(state: _StepTreeState, payload: Mapping[str, Any]) -> _Frame | None:
-    """返回这条工具事件应该 attach 的 step 帧。
-
-    优先级:
-    1. ``open_step`` —— 当前开着的帧。
-    2. ``payload.step_index`` → ``step-{index:03d}``(与 cursor / hook 同
-       派生,ADR-0168 §D7)匹配已关帧的 ``step_id`` —— header 开的帧其
-       step_id 由 header payload 写入,即使帧索引与 cursor 索引漂移
-       (无 header 的隐式 think 步多占帧号)也能精确归属。
-    3. 最近一个已关帧(时间窗兜底)—— ``brain.think.end`` 关帧之后
-       cursor 仍在 act 窗口发 ``step.tool_call.record`` /
-       ``step.tool_result.record`` / ``body.tool.execute.*``;这些事件
-       属于刚关闭的那一步。``body.tool.execute.*`` 不携带 step_index,
-       直接走本条;语义与 :func:`_record_phase` 的 ``closed_frames[-1]``
-       一致。
-    4. 无任何帧(事件早于首个 step)→ None,调用方 drop。
-    """
-    if state.open_step is not None:
-        return state.open_step
-    event_step_index = payload.get("step_index")
-    if isinstance(event_step_index, int):
-        target_id = f"step-{event_step_index:03d}"
-        for frame in reversed(state.closed_frames):
-            if frame.step_id == target_id:
-                return frame
-    if state.closed_frames:
-        return state.closed_frames[-1]
-    return None
 
 
 def _record_phase(
@@ -497,111 +445,29 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
     if not isinstance(payload, Mapping):
         payload = {}
 
-    if ep == "writable.step.start":
-        _begin_step(state, event, ts)
-    elif ep == "writable.step.end":
-        # record 级 outcome 缺失时回退读 payload.outcome(cursor 老链
-        # 写入路径 record 级 outcome 恒 None,outcome 在 payload 内)。
-        _close_step(state, str(event.get("outcome") or payload.get("outcome") or "success"))
-    elif ep in PHASE_FOLD_EPS:
-        _record_phase(state, PHASE_FOLD_EPS[ep], ts, event)
-        if ep == "phase.think.fold":
-            target = state.open_step
-            if target is None and state.closed_frames:
-                target = state.closed_frames[-1]
-            if target is not None:
-                target.thinking = _binding_engine().apply_thinking_patch(
-                    target.thinking,
-                    payload,
-                    ep,
-                    frame_model=target.model or "",
-                )
-                model = str(payload.get("objective") or "")
-                if (
-                    str(payload.get("objective_kind") or "") == "model_name"
-                    and model
-                    and not target.model
-                ):
-                    target.model = model
-    elif ep == "phase.act.fold.start":
-        _record_phase(state, "act", ts, event)
-    elif ep == "brain.think.start":
-        if state.open_step is None:
-            # 隐式兜底开窗(ADR-0176 D1 §1 (2)):无显式 step 边界信号时
-            # 由 think 包络开窗,window_signal 标 implicit。
-            state.step_seq += 1
-            state.open_step = _Frame(
-                step_id=f"step-{state.step_seq:03d}",
-                step_index=state.step_seq,
-                phase="think",
-                entered_at=ts,
-                opened_by="think",
-                window_signal="implicit",
-            )
-    elif ep == "brain.think.end":
-        if state.open_step is not None:
-            _close_step(state, str(event.get("outcome") or "success"))
-    elif ep == "llm.request.header":
-        # cursor step 边(StdLoopCursor.record_request_header,THINK 窗口内;
-        # ADR-0185 hook 路径经 Session)。DSH 切步语义:一步 = 一次模型请求。
-        # ``brain.think.start`` 开的隐式 think 帧尚无内容时,header 是
-        # 同一步的 LLM 边界 → 原地升级(采用 payload step_id / model /
-        # reason),不再关旧开新造成一次 LLM 调用计两步;
-        # ``writable.step.start`` 开的空帧在 payload step_id 匹配时同样
-        # 原地升级(边界先发射,header 是同一步的首个事实,ADR-0184 D6)。
-        # 前一步已有内容时按正常收口关闭并开新步。
-        open_frame = state.open_step
+    # step 边界单一信号:llm.request.header(SSOT)。其他 EP 挂到当前帧。
+    if ep == "llm.request.header":
         header_step_id = str(payload.get("step_id") or "")
         header_model = header_model_from_payload(payload) or str(payload.get("model") or "")
-        can_upgrade = (
-            open_frame is not None
-            and _frame_is_empty(open_frame)
-            and (
-                open_frame.opened_by == "think"
-                or (
-                    open_frame.opened_by == "writable"
-                    and bool(header_step_id)
-                    and open_frame.step_id == header_step_id
-                )
-            )
+        if not header_step_id:
+            # 缺 step_id 时退化:取 cursor 当前 step_index + 1;
+            # 正常路径 hook 必带 step_id,缺值即 fold 抛错更安全。
+            return
+        frame = _open_step(
+            state,
+            step_id=header_step_id,
+            model=header_model,
+            request_reason=str(payload.get("reason") or ""),
+            ts=ts,
         )
-        if can_upgrade and open_frame is not None:
-            if header_step_id:
-                open_frame.step_id = header_step_id
-            open_frame.model = header_model
-            open_frame.request_reason = str(payload.get("reason") or "")
-            if open_frame.opened_by == "think":
-                open_frame.opened_by = "header"
-            open_frame.window_signal = "explicit"
-            open_frame.thinking = _binding_engine().apply_thinking_patch(
-                open_frame.thinking,
-                payload,
-                ep,
-                frame_model=header_model,
-            )
-        else:
-            if open_frame is not None:
-                _close_step(state, "success")
-            state.step_seq += 1
-            state.open_step = _Frame(
-                step_id=header_step_id or f"step-{state.step_seq:03d}",
-                step_index=state.step_seq,
-                phase="think",
-                entered_at=ts,
-                model=header_model,
-                request_reason=str(payload.get("reason") or ""),
-                opened_by="header",
-                window_signal="explicit",
-            )
-            state.open_step.thinking = _binding_engine().apply_thinking_patch(
-                state.open_step.thinking,
-                payload,
-                ep,
-                frame_model=header_model,
-            )
+        frame.thinking = _binding_engine().apply_thinking_patch(
+            frame.thinking,
+            payload,
+            ep,
+            frame_model=header_model,
+        )
     elif ep == "llm.call.start":
         # 标记 LLM 窗口开启;stream.token 据此判断是否属于当前 step。
-        # Session 形态的 payload 携带 model,同步到帧上(供 ThinkingTrace 使用)。
         if state.open_step is not None:
             state.open_step.llm_started = True
             call_model = str(payload.get("model") or "")
@@ -609,9 +475,7 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
                 state.open_step.model = call_model
     elif ep == "llm.stream.token":
         # Session 形态:按 channel_kind 分流累积 reasoning / output。
-        # ADR-0212 收口后,fold 是 stream 累积唯一真值;全文在 spine.jsonl,
-        # 这里只保留截断后的摘要给 journal.json。
-        target = _resolve_target(state, payload)
+        target = state.open_step
         if target is not None and target.llm_started:
             delta = str(payload.get("text_delta") or "")
             if delta:
@@ -622,7 +486,7 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
                     target.stream_final_chunks.append(delta)
     elif ep == "llm.call.end":
         # 收口:把累积的 stream 缓冲拼成 ThinkingTrace。
-        target = _resolve_target(state, payload)
+        target = state.open_step
         if target is not None:
             model = str(payload.get("model") or target.model or "unknown")
             latency_ms = int(payload.get("latency_ms") or 0)
@@ -649,15 +513,13 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
             target.stream_final_chunks.clear()
     elif ep == "llm.request.header.assistant":
         # 模型所见即日志:assistant message 是 LLM 响应的 SSOT。
-        # 补全 ThinkingTrace.raw_response_preview;tool_calls 非空时构造 ToolCallRecord。
-        target = _resolve_target(state, payload)
+        target = state.open_step
         if target is not None:
             assistant_content = str(payload.get("assistant_content") or "")
             tool_calls = payload.get("tool_calls")
             usage_raw = payload.get("usage")
             usage: dict[str, Any] = dict(usage_raw) if isinstance(usage_raw, Mapping) else {}
             if target.thinking is not None:
-                # 补全 preview(从完整 assistant_content 截断)
                 thinking = target.thinking
                 prompt_tokens = thinking.prompt_tokens
                 if prompt_tokens is None:
@@ -678,14 +540,9 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
                     completion_tokens=completion_tokens,
                     decision="use_tool"
                     if isinstance(tool_calls, list) and tool_calls
-                    else (
-                        "respond"
-                        if assistant_content.strip()
-                        else thinking.decision
-                    ),
+                    else ("respond" if assistant_content.strip() else thinking.decision),
                 )
             else:
-                # llm.call.end 未到达或失败 → 直接从 assistant_content 构造
                 prompt_tokens_raw = usage.get("prompt_tokens")
                 completion_tokens_raw = usage.get("completion_tokens")
                 target.thinking = ThinkingTrace(
@@ -727,8 +584,30 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
                         arguments=dict(call_args) if isinstance(call_args, dict) else {},
                         arguments_summary="",
                     )
+    elif ep == "phase.act.fold.start":
+        _record_phase(state, "act", ts, event)
+    elif ep in PHASE_FOLD_EPS:
+        _record_phase(state, PHASE_FOLD_EPS[ep], ts, event)
+        if ep == "phase.think.fold":
+            target = state.open_step
+            if target is None and state.closed_frames:
+                target = state.closed_frames[-1]
+            if target is not None:
+                target.thinking = _binding_engine().apply_thinking_patch(
+                    target.thinking,
+                    payload,
+                    ep,
+                    frame_model=target.model or "",
+                )
+                model = str(payload.get("objective") or "")
+                if (
+                    str(payload.get("objective_kind") or "") == "model_name"
+                    and model
+                    and not target.model
+                ):
+                    target.model = model
     elif ep == "step.thinking.record":
-        target = _resolve_target(state, payload)
+        target = state.open_step
         if target is not None:
             token_count = payload.get("token_count")
             target.thinking = ThinkingTrace(
@@ -746,22 +625,21 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
         _record_phase(state, "reflect", ts, event)
         if state.open_step is not None and state.open_step.phase == "act":
             _close_step(state, str(event.get("outcome") or "success"))
-    elif ep == "step.tool_call.record":
-        target = _resolve_target(state, payload)
+    elif ep in {
+        "step.tool_call.record",
+        "step.tool_result.record",
+        "body.tool.execute.end",
+    }:
+        # body.tool.execute.start 与 step.tool_call.record 同义(invocation
+        # / name / args 已由 record 携带),丢弃避免重复合并覆写前一次 tool。
+        target = state.open_step
+        if target is None and state.closed_frames:
+            target = state.closed_frames[-1]
         if target is not None:
-            _assign_tool_call(target, payload, ep)
-    elif ep == "step.tool_result.record":
-        target = _resolve_target(state, payload)
-        if target is not None:
-            _assign_tool_result(target, payload, ep)
-    elif ep == "body.tool.execute.start":
-        target = _resolve_target(state, payload)
-        if target is not None:
-            _assign_tool_call(target, payload, ep)
-    elif ep == "body.tool.execute.end":
-        target = _resolve_target(state, payload)
-        if target is not None:
-            _assign_tool_result(target, payload, ep)
+            if ep == "step.tool_call.record":
+                _assign_tool_call(target, payload, ep)
+            else:
+                _assign_tool_result(target, payload, ep)
     elif ep == "exception.caught":
         _capture_exception(state, payload, ts)
 
@@ -807,7 +685,7 @@ def _materialize(
             segments=tuple(f.segments),
             outcome=_journal_step_outcome(f.outcome),
             error=f.error,
-            extra={"window_signal": f.window_signal},
+            extra={},
         )
         for f in sorted(state.closed_frames, key=lambda fr: fr.step_index)
     ]

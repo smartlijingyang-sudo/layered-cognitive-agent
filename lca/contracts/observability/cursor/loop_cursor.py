@@ -45,15 +45,13 @@ class CursorSnapshot:
 
     字段语义钉死,新增必须先有 ADR:
     - phase=None ⇒ OUTSIDE_LOOP(cursor 关闭后)
-    - step_index 自增,从 1 起;iteration 内重新计数
     - iteration ⊃ ADR-0095 iteration;attempt_in_step 与 iteration 独立计数
+    - step 边界由 ModelVisibleHook 唯一驱动,不在 cursor snapshot 暴露
     """
 
     run_id: str
     trace_id: str
     incarnation: int
-    step_id: str | None
-    step_index: int
     iteration: int
     attempt_in_step: int
     phase: PhaseName | None
@@ -72,20 +70,21 @@ class LoopCursor(Protocol):
     业务路径唯一允许做的:
         - advance(phase)        : 转移 phase 窗口;唯一派生
                                   ``phase.<name>.fold`` EP。
-        - open_step(step_id)    : LLM 边界 step 自增 + 落
-                                  ``writable.step.start`` EP(ADR-0184 D6)。
-                                  ``llm.request.header`` 由 hook 侧
-                                  Session 路径唯一发射(ADR-0185)。
+        - bump_step()           : LLM 边界 step_index 自增,**不发 EP**;
+                                  step 边界由 hook 端
+                                  ``spine.llm.request.header`` 唯一发射
+                                  (ADR-0169 I-CURSOR + ADR-0185)。
 
     不暴露:
         ``record_thinking`` / ``record_tool_call`` / ``record_tool_result`` /
         ``record_request_header`` / ``halt`` / ``close`` / ``fork`` /
         ``resume_cursor`` / ``emit_phase`` / ``emit`` / ``subscribe`` /
-        ``flush`` / ``begin_step`` / ``end_step`` / ``open_segment`` /
-        ``close_segment`` / ``register_projection``。
+        ``flush`` / ``begin_step`` / ``end_step`` / ``open_step`` /
+        ``open_segment`` / ``close_segment`` / ``register_projection`` /
+        ``emit_step_start``。
 
-    这些接口历史上属于 cursor 第二轨(``coord.*`` 路径),2026-09-14 修
-    剪确认生产零 caller,留 Protocol 层禁止扩展。Runtime 收尾走
+    这些接口历史上属于 cursor 第二轨(``coord.*`` / writable.step.start
+    路径),确认生产零 caller,留 Protocol 层禁止扩展。Runtime 收尾走
     :class:`~lca.infrastructure.observability.loop_cursor.close.barrier_impl.StdCloseBarrier`。
     """
 
@@ -103,9 +102,6 @@ class LoopCursor(Protocol):
         objective: str = "",
         summary: str = "",
     ) -> CursorSnapshot: ...
-
-    # ── LLM 边界 step 推进(1) ───────────────────────────────────
-    def open_step(self, step_id: str) -> None: ...
 
 
 __all__ = [

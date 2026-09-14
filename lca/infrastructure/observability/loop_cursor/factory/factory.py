@@ -74,7 +74,7 @@ class LoopCursorFactory:
                 "Use RunSessionBuilder._compute_plan_ref to derive it before "
                 "constructing the cursor."
             )
-        plan_ref = cast("str", getattr(profile, "plan_ref"))
+        plan_ref = cast("str", profile.plan_ref)
         incarnation = Incarnation(
             run_id=run_id,
             plan_ref=str(plan_ref),
