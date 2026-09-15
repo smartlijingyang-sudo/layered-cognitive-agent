@@ -131,6 +131,20 @@ def _resolve_enum_member(enum_cls: type, full_path: str, *, ctx: str) -> Any:
     return member
 
 
+def _class_path_importable(full_path: str) -> bool:
+    """Whether ``module.ClassName`` resolves, as a predicate.
+
+    Used by the post-boot publisher-authorization sweep, where a miss is not an
+    error yet — it becomes one diagnostic among others. Returning the sentinel
+    keeps the caller free of a swallow that looks like it hides a failure.
+    """
+    try:
+        _resolve_class(full_path, base_cls=object, ctx=f"token={full_path!r}")
+    except UnknownCategoryError:
+        return False
+    return True
+
+
 def _resolve_class(full_path: str, *, base_cls: type, ctx: str) -> type:
     """按 ``module.ClassName`` 全路径解析 class；必须是 ``base_cls`` 子类。
 
@@ -482,12 +496,8 @@ class EventRegistry:
             for token in spec.publishers_tokens:
                 if token in self._plugins:
                     continue
-                if _looks_like_class_path(token):
-                    try:
-                        _resolve_class(token, base_cls=object, ctx=f"token={token!r}")
-                        continue
-                    except UnknownCategoryError:
-                        pass
+                if _looks_like_class_path(token) and _class_path_importable(token):
+                    continue
                 diagnostics.append(
                     f"yaml category={spec.category.value!r} "
                     f"publisher token={token!r} 解析失败："
