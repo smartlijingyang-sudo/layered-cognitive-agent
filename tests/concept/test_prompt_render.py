@@ -172,6 +172,52 @@ def test_render_turn_rejects_missing_template_provider() -> None:
         reasoner.render_turn(_context(), _selection(), _role_snapshot())
 
 
+# ── Bug fix: empty system prompt when registry unwired (regression) ──
+
+
+@dataclass
+class _StubRegistry:
+    """Minimal PromptSectionRegistry stub that resolves one section to non-empty text."""
+
+    def register(self, section: object, *, kind: str, name: str) -> None:
+        raise AssertionError("stub registry rejects registration")
+
+    def resolve(self, *, kind: str, name: str) -> object | None:
+        if (kind, name) == ("pure", "role"):
+            return _StaticRole()
+        return None
+
+    def list_sections(self) -> tuple[tuple[str, str, object], ...]:
+        return (("pure", "role", _StaticRole()),)
+
+
+def test_render_turn_emits_non_empty_system_prompt_when_registry_wired() -> None:
+    """Reasoner 接受 section registry 时,渲染的 ``system_prompt_text`` 非空。
+
+    Regression for the empty-system-prompt defect: tool-using runs ended
+    with ``budget_exceeded`` because ``render_template`` was called with
+    ``registry=None`` and produced ``system_prompt_text == ""``. Wiring the
+    registry at boot must produce a real system prompt so the LLM has a
+    stop rule and can converge inside ``think.main max_visits=2``.
+    """
+    from lca.contracts.models.cognition.prompt_assembly import PromptSectionRegistry
+
+    assert isinstance(_StubRegistry(), PromptSectionRegistry)  # Protocol shape
+
+    reasoner = PromptReasoner(
+        llm=_StubLLM(),
+        template_provider=_Provider(_template()),
+        section_registry=_StubRegistry(),
+    )
+    render = reasoner.render_turn(_context(), _selection(), _role_snapshot())
+    assert render.trace is not None
+    assert render.trace.system_prompt_text != "", (
+        "reasoner.render_turn produced empty system_prompt_text even with "
+        "a section registry wired; the LLM sees no stop rule and overruns "
+        "think.main max_visits=2 on every tool-using run."
+    )
+
+
 # ── File-shape invariants (ADR §6.1 / N10) ────────────────────────
 
 

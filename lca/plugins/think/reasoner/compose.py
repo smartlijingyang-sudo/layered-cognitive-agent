@@ -17,6 +17,7 @@ from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import (
+    PROMPT_SECTION_REGISTRY,
     PROMPT_TEMPLATE_PROVIDER,
     PROMPT_TEMPLATE_SELECTOR,
 )
@@ -44,6 +45,7 @@ class Config(BaseModel):
     provides=("reasoner",),
     requires=(
         "llm_adapter",
+        PROMPT_SECTION_REGISTRY.key,
         PROMPT_TEMPLATE_PROVIDER.key,
         PROMPT_TEMPLATE_SELECTOR.key,
     ),
@@ -77,6 +79,7 @@ class Config(BaseModel):
         reads=(
             "plugin.serve",
             "llm_adapter",
+            PROMPT_SECTION_REGISTRY.key,
             PROMPT_TEMPLATE_PROVIDER.key,
             PROMPT_TEMPLATE_SELECTOR.key,
         ),
@@ -93,11 +96,13 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     adapter = ctx.require("llm_adapter")
     template_provider = ctx.require(PROMPT_TEMPLATE_PROVIDER.key)
     selector = ctx.require(PROMPT_TEMPLATE_SELECTOR.key)
+    section_registry = ctx.require(PROMPT_SECTION_REGISTRY.key)
 
     reasoner = PromptReasoner(
         llm=adapter,
         selector=selector,
         template_provider=template_provider,
+        section_registry=section_registry,
     )
     ctx.provide("reasoner", reasoner)
 

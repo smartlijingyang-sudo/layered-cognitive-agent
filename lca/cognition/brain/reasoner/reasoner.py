@@ -28,6 +28,7 @@ from lca.contracts.models.cognition.boundary import (
     TemplateSelection,
 )
 from lca.contracts.models.cognition.prompt_assembly import (
+    PromptSectionRegistry,
     PromptTemplateProvider,
     PromptTemplateSelector,
     PromptTrace,
@@ -80,10 +81,12 @@ class PromptReasoner:
         *,
         selector: PromptTemplateSelector | None = None,
         template_provider: PromptTemplateProvider | None = None,
+        section_registry: PromptSectionRegistry | None = None,
     ) -> None:
         self.llm = llm
         self.selector: PromptTemplateSelector | None = selector
         self._template_provider: PromptTemplateProvider | None = template_provider
+        self._section_registry: PromptSectionRegistry | None = section_registry
 
     def build_turn_plan(self, state: AgentState) -> ReasonerTurnPlan:
         """Derive pre-render plan from state; selectors override template_id."""
@@ -153,6 +156,7 @@ class PromptReasoner:
             raise MissingPromptSectionError(template_id, "pure")
         prompt, trace = render_template(
             template=tpl,
+            registry=self._section_registry,
             role_profile=role.profile,
             awareness=role.team_awareness,
             manifest=context.manifest,
