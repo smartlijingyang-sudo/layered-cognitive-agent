@@ -55,7 +55,6 @@ if TYPE_CHECKING:
     )
     from lca.contracts.protocols.runtime.runtime.lifecycle import RuntimeLifecyclePublisher
     from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
-    from lca.contracts.protocols.state.plan import CompiledRunPlan
     from lca.harness.declarative.lifecycle.phase_observation import PhaseObserver
 
 
