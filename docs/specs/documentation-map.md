@@ -28,3 +28,7 @@
 ## 维护边界
 
 将新内容放入已有的权威家。当前系统如何工作，写入 `docs/specs/` 或 `docs/observability/`；为什么选择某种结构，写入 ADR；仅在长期设计仍有独立价值时更新 `docs/design/`。实施计划、调查笔记、进度、验收日志和优化报告在结束后归档到 `history/YYYY-MM/<topic>/`，不再进入仓库根目录或 `docs/`。
+
+## Phase-graph node orchestration (planning)
+
+- [phase-graph-node-orchestration](../architecture/phase-graph-node-orchestration/) — inventory, industry matrix, proposed graph, 0206 six-column review table
