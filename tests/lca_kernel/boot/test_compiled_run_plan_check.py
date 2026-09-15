@@ -60,7 +60,6 @@ def _node(
             else BindingKind.NODE_EXECUTOR
         ),
         config={},
-        max_visits=1,
         terminal=terminal,
         entry=entry,
         subgraph_ref=subgraph_ref,

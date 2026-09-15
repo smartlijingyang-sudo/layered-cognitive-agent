@@ -35,7 +35,6 @@ def _node(
         id=node_id,
         binding=BindingKind.NODE_EXECUTOR,
         config={},
-        max_visits=1,
         terminal=terminal,
         entry=entry,
         subgraph_ref=None,

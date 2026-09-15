@@ -121,7 +121,6 @@ class TestPhaseNodeSubSpecRef:
             "id": "think.main",
             "semantic_phase": SemanticPhase.THINK,
             "binding": "phase.think.standard",
-            "max_visits": 1,
         }
         base.update(overrides)
         return PhaseNode(**base)

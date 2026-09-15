@@ -60,7 +60,6 @@ def _make_node(phase_name: str, *, node_id: str | None = None) -> PhaseNode:
         id=node_id or f"{phase_name}.main",
         semantic_phase=SemanticPhase(phase_name),
         binding=f"phase.{phase_name}.standard",
-        max_visits=1,
     )
 
 

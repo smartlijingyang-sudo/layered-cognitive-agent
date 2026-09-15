@@ -44,14 +44,12 @@ def _make_outer_plan(*, edge: PhaseEdge) -> SimpleNamespace:
         id="reflect.main",
         semantic_phase=SemanticPhase.REFLECT,
         binding="phase.test.recording",
-        max_visits=4,
         execution_policy=PhaseExecutionPolicy(),
     )
     target_node = PhaseNode(
         id="remember.main",
         semantic_phase=SemanticPhase.REMEMBER,
         binding="phase.test.recording",
-        max_visits=4,
         execution_policy=PhaseExecutionPolicy(),
     )
     phase_graph = CognitivePhaseGraphPlan(
@@ -71,7 +69,6 @@ def _make_subgraph_plan(
         id=entry_node,
         semantic_phase=SemanticPhase.REFLECT,
         binding="phase.test.recording",
-        max_visits=4,
         terminal=True,
         execution_policy=PhaseExecutionPolicy(),
     )

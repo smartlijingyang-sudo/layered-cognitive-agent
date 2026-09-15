@@ -212,7 +212,6 @@ class TestEndToEndAgentFixture:
                     outputs=(PortSpec(name=STUB_ECHO_PORT),),
                 ),
                 entry=(idx == 0),
-                max_visits=1,
                 config={"target_agent": name},
             )
             for idx, name in enumerate(

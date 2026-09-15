@@ -413,7 +413,6 @@ def _plan(
                 id="perceive.main",
                 semantic_phase=SemanticPhase.PERCEIVE,
                 binding="phase.perceive.standard",
-                max_visits=1,
             ),
         ),
         edges=(),

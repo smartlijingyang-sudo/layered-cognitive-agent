@@ -86,7 +86,7 @@ class TestNodeExecutorStrategy:
             plan_ref="p1",
             node_id="think.reason",
             binding_kind=BindingKind.NODE_EXECUTOR,
-            node_config={"budget": {"max_visits": 1}},
+            node_config={},
         )
         out = await strategy.execute(
             ctx,

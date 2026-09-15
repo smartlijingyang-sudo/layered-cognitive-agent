@@ -151,10 +151,9 @@ class TestBuilders:
         assert r.next_hint == "done"
 
     def test_node_returns_plan_node(self) -> None:
-        n = node("think", BindingKind.NODE_EXECUTOR, max_visits=8)
+        n = node("think", BindingKind.NODE_EXECUTOR)
         assert n.id == "think"
         assert n.binding == BindingKind.NODE_EXECUTOR
-        assert n.max_visits == 8
         assert isinstance(n.io_schema, NodeIOSchema)
 
     def test_node_with_string_binding(self) -> None:
@@ -207,7 +206,6 @@ def _build_test_plan() -> Plan:
         "node_executor",
         outputs=[PortSpec(name="decision")],
         entry=True,
-        max_visits=8,
     )
     act_node = node(
         "act",
@@ -259,7 +257,6 @@ class TestSerialize:
         assert think["id"] == "think"
         assert think["binding"] == "node_executor"
         assert think["entry"] is True
-        assert think["max_visits"] == 8
         assert "outputs" in think["io_schema"]
 
     def test_serialize_edge_structured_predicate(self) -> None:
@@ -304,7 +301,6 @@ class TestRoundTrip:
         for orig, parsed in zip(p.nodes, p2.nodes, strict=True):
             assert parsed.id == orig.id
             assert parsed.binding == orig.binding
-            assert parsed.max_visits == orig.max_visits
             assert parsed.terminal == orig.terminal
             assert parsed.entry == orig.entry
 

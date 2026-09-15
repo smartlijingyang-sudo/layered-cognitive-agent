@@ -47,7 +47,7 @@ def _graph_record(**overrides: Any) -> dict[str, Any]:
         "from_node": "",
         "inputs": {"turn_plan": {"user_text": "改一下超时"}},
         "kind": "visit_end",
-        "metadata": {"binding": "node_executor", "max_visits": 1},
+        "metadata": {"binding": "node_executor"},
         "node_id": "phase.perceive.observe",
         "node_index": 1,
         "occurred_at_ms": 24628829897,

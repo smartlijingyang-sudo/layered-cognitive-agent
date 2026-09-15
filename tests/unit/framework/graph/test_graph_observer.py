@@ -120,7 +120,7 @@ def test_observation_payload_carries_every_field() -> None:
         elapsed_ms=17,
         inputs=(("turn_plan", {"x": 1}),),
         outputs=(("decision", {"a": "b"}),),
-        metadata=(("binding", "NODE_EXECUTOR"), ("max_visits", 1)),
+        metadata=(("binding", "NODE_EXECUTOR"),),
     )
     payload = payload_of(obs)
     assert payload["kind"] == KIND_VISIT_END
@@ -136,7 +136,7 @@ def test_observation_payload_carries_every_field() -> None:
     assert payload["elapsed_ms"] == 17
     assert payload["inputs"] == {"turn_plan": {"x": 1}}
     assert payload["outputs"] == {"decision": {"a": "b"}}
-    assert payload["metadata"] == {"binding": "NODE_EXECUTOR", "max_visits": 1}
+    assert payload["metadata"] == {"binding": "NODE_EXECUTOR"}
 
 
 def test_null_observer_is_default_and_records_nothing() -> None:

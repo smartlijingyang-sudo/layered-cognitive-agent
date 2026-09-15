@@ -26,7 +26,6 @@ def _make_minimal_node(**overrides: object) -> PhaseNode:
         "id": "n",
         "semantic_phase": SemanticPhase.PERCEIVE,
         "binding": "phase.perceive.standard",
-        "max_visits": 1,
     }
     base.update(overrides)
     return PhaseNode(**base)  # type: ignore[arg-type]
