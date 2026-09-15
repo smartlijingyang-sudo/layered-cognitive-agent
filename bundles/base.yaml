@@ -241,6 +241,21 @@ entries:
   name: phase_concept_act_subgraph_act_envelope
   $module: lca.nodes.act.envelope.envelope
   config: {}
+# PR-3.8.4: typed-boundary 1:1 fan-out node. Reads ``envelope`` and
+# emits ``envelope`` (pass-through), ``envelopes`` (list-of-one on the
+# 1:1 path), and ``routing``; orchestrator only (no execution).
+- id: phase.concept.act_subgraph.act_fanout
+  name: phase_concept_act_subgraph_act_fanout
+  $module: lca.nodes.act.fanout
+  config: {}
+# PR-3.8.5: typed-boundary 1:1 receipt-join node. Reads ``receipts``
+# (list[EffectReceipt]) and emits ``receipt`` (singular) plus
+# ``routing``; orchestrator only (no execution). N:N reject branch
+# routes via kernel ``select_edge → None`` (terminal dispatch).
+- id: phase.concept.act_subgraph.act_join
+  name: phase_concept_act_subgraph_act_join
+  $module: lca.nodes.act.join
+  config: {}
 - id: phase.concept.act_subgraph.act_observe
   name: phase_concept_act_subgraph_act_observe
   $module: lca.nodes.act.observe.observe

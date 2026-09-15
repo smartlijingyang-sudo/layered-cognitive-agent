@@ -63,6 +63,20 @@ nodes:
       emit_on_enter: []
       emit_on_exit: []
 
+  # PR-3.8.4: 1:1 envelope fan-out typed-boundary node. Consumes the
+  # single ``envelope`` from ``act.envelope`` and emits a list-of-one
+  # ``envelopes`` plus a ``routing`` decision. ``envelope`` is also
+  # passed through (1:1 wiring ⇒ ``envelopes[0] is envelope``) so the
+  # downstream ``act.dispatch`` keeps its single-envelope input wired;
+  # N:N wiring + dispatch consumes ``envelopes`` is a separate follow-up PR.
+  - id: act.fanout
+    factory: act.fanout
+    inputs: [envelope]
+    outputs: [envelope, envelopes, routing]
+    config:
+      emit_on_enter: []
+      emit_on_exit: []
+
   - id: act.dispatch
     factory: act.dispatch.ref
     inputs: [envelope]
