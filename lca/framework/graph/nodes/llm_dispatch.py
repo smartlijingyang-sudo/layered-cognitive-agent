@@ -16,6 +16,11 @@ retired ``think.reason.complete``:
 
 The orchestrator ``think.reason`` wires them via edges; the deleted
 ``complete`` node used to do all three jobs inline.
+
+The :func:`@graph_node <graph_node>` decorator (ADR-0227) replaces the
+manual ``NodeExecutor`` dataclass + ``@plugin(...)`` setup pair that lived
+in :mod:`lca.plugins.think.llm_dispatch.execute` (PR2). Composite-key
+registration under ``think::llm.call`` is preserved.
 """
 
 from __future__ import annotations
@@ -23,6 +28,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from lca.contracts.models.core.conversation.llm import LLMResponse, TokenUsage
+from lca.framework.graph.nodes.decorator import graph_node
 
 if TYPE_CHECKING:
     from lca.contracts.models.core.state.state import AgentState
@@ -32,6 +38,12 @@ if TYPE_CHECKING:
     )
 
 
+@graph_node(
+    id="llm.call",
+    region="think",
+    inputs=("state", "writer", "model_visible_request"),
+    outputs=("llm_response", "usage"),
+)
 async def llm_dispatch(
     *,
     state: AgentState,
