@@ -14,7 +14,6 @@ to fetch the strategy object, then ``execute`` is called directly.
 """
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
 from typing import Any, Protocol
 
 from lca.contracts.protocols.graph.binding import BindingKind
