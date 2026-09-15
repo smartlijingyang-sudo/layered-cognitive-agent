@@ -7,7 +7,6 @@ step 边界由 ``llm.request.header`` 唯一驱动(SSOT);fold 只从 spine
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
 from pathlib import Path
 
 from lca.plugins.session.derivers.step_tree import (
@@ -15,7 +14,6 @@ from lca.plugins.session.derivers.step_tree import (
     derive_step_tree,
 )
 from lca.plugins.session.derivers.step_tree.journal_fold import fold_step_tree
-from lca_kernel.events.session.session import SessionEvent
 
 # ── fold_step_tree 纯函数 ────────────────────────────────────────
 
