@@ -75,6 +75,13 @@ entries:
   name: phase_think_route_decide
   $module: lca.nodes.think.route.decide
   config: {}
+# PR-3.8.1: typed budget gate between route.decide and the miss-path
+# reasoning chain. Reads ``state.budget`` and emits a ``RoutingDecision``
+# typed port (ADR-0219 §5.5, ADR-0225, ADR-0228).
+- id: phase.think.budget.check
+  name: phase_think_budget_check
+  $module: lca.nodes.think.budget_check
+  config: {}
 - id: lca.nodes.plan.compose
   name: lca_nodes_plan_compose
   $module: lca.nodes.plan.compose

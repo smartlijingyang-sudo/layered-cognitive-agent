@@ -21,6 +21,16 @@ nodes:
     outputs: [routing]
     config:
 
+  # PR-3.8.1: budget gate sits between ``think.route.decide`` and the
+  # miss-path reasoning chain. Reads ``state.budget`` and either stops
+  # the run (route to ``terminal.commit``) or continues to
+  # ``think.route``. Honors ADR-0225 (no per-node max_visits).
+  - id: think.budget.check
+    factory: think.budget.check
+    inputs: [state]
+    outputs: [routing]
+    config:
+
   - id: think.route
     factory: think.route
     config:
@@ -105,17 +115,31 @@ nodes:
         binding_edge: think.gate
 
 edges:
-  # shortcut → route.decide → {route, gate}: think.route.decide 读 decision
-  # 端口并 emit RoutingDecision typed port,next_node 决定下游图节点。
-  # 取代原先两条 when-port-existence 边谓词(missing/exists kind)。
+  # shortcut → route.decide → {budget.check → route, gate}: think.route.decide
+  # 读 decision 端口并 emit RoutingDecision typed port,next_node 决定下游图
+  # 节点。miss-path (routing.next_node == "think.route") 改道先经
+  # budget.check, 由 budget.check 决定继续到 think.route 还是
+  # terminal.commit (should_terminate)。short-circuit path 不变。
   - from: think.shortcut
     to: think.route.decide
   - from: think.route.decide
-    to: think.route
+    to: think.budget.check
     when:
       kind: eq
       port: { name: routing, field: next_node }
       value: think.route
+  - from: think.budget.check
+    to: think.route
+    when:
+      kind: eq
+      port: { name: routing, field: should_terminate }
+      value: false
+  - from: think.budget.check
+    to: terminal.commit
+    when:
+      kind: eq
+      port: { name: routing, field: should_terminate }
+      value: true
   - from: think.route.decide
     to: think.gate
     when:
