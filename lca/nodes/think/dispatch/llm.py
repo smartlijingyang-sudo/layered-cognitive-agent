@@ -26,6 +26,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from lca.cognition.body.emit._args_summary import summarize_args
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
@@ -38,9 +39,6 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.models.core.conversation.llm import LLMResponse, TokenUsage
-from lca.contracts.models.observability.tool.journal_receipt import (
-    tool_call_resolved_receipt,
-)
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -52,7 +50,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.session.bindings import resolve_session_reader
-from lca.loop.commit.tool_journal import commit_tool_journal_receipt
+from lca.loop.commit.tool_journal import record_step_tool_call
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,13 +99,12 @@ class LlmCallExecutor:
         tool_calls = list(response.tool_calls or ())
         step = state.step
         for tc in tool_calls:
-            receipt = tool_call_resolved_receipt(
+            arguments = tc.arguments
+            record_step_tool_call(
                 tool_name=tc.name,
-                tool_call_id=tc.call_id,
-                arguments=tc.arguments,
-            )
-            commit_tool_journal_receipt(
-                receipt,
+                invocation_id=tc.call_id,
+                arguments=arguments,
+                arguments_summary=summarize_args(arguments),
                 state=state,
                 session=session,
             )
