@@ -18,6 +18,36 @@ Profile / Bundle → `ResolvedProfile` → `CompiledRunPlan` 的**编译时**管
 - Phase 遍历执行（`harness/graph` + `lca/loop`）
 - 插件业务 setup（各 plugin `plugin.py`）
 
+## 3. 输入
+
+`ResolvedProfile` 与 bundle 路径（boot 编译）、observability 事件配置
+（`lca_kernel.events.compile.compiler` 的输入形状）、插件声明的 `resources` 条目
+（第四维度，只读可分发内容）。
+
+## 4. 输出
+
+包门面 `__all__` 共 5 个符号：`compile_profile_boot_products`、
+`compile_plan`、`explain_compile_plan`、`CompileOptions`、`PlanCompilerError`。
+产物是 `ProfileBootProducts`、`CompiledRunPlan` / `V2ExecutablePlan`、
+`CompiledObservabilityPlan` 与 `ResourceRegistry` 条目——全是值，不触发运行。
+
+## 5. 允许依赖
+
+`lca.contracts` 与 `lca_kernel.plan` / `lca_kernel.events`（编译实现由 kernel 提供，
+经 re-export 使用）；自身 `lca.harness` 内的 profile/validate 模块。
+
+## 6. 禁止依赖
+
+`lca.cognition`、`lca.agent`、`lca.application`、`lca.plugins`、`lca.session`、
+`lca.loop`、`lca.runtime`、`lca.nodes`（当前 import 数均为 0）。编译期不得触到
+运行期与事实平面：一旦依赖它们，profile 编译就不再是 boot 的纯前置步骤。
+
+## 8. 失败语义
+
+按源码 `raise` 统计：`ResourceProjectionError` 5（资源越界 / 非法引用 / 非只读
+意图）、`ObservabilityCompileError` 1（附 plan 校验码）。两者都是类型化异常向上抛，
+由 boot 决定终止；本层不吞错误、不产出「部分编译成功」。
+
 ## 7. 副作用
 
 无对外副作用：三个模块都是**编译期纯投影**，不读写文件、不开 socket、不写
@@ -39,3 +69,8 @@ resource 投影刻意只读：按 I-HPC-6，资源内容不获得任何执行权
 ## 迁移
 
 Wave P4：profile/compile 文件收拢至本目录；kernel 只保留薄 re-export。
+
+## 9. 公共入口
+
+包门面导出五个名字：`CompileOptions`, `PlanCompilerError`, `compile_plan`,
+`compile_profile_boot_products`, `explain_compile_plan`。
