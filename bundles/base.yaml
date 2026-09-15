@@ -71,6 +71,10 @@ entries:
   name: phase_think_route
   $module: lca.nodes.think.route.route
   config: {}
+- id: phase.think.route.decide
+  name: phase_think_route_decide
+  $module: lca.nodes.think.route.decide
+  config: {}
 - id: phase.think.gate
   name: phase_think_gate
   $module: lca.nodes.think.gate

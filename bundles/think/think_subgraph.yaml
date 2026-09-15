@@ -15,6 +15,12 @@ nodes:
     outputs: [decision]
     config:
 
+  - id: think.route.decide
+    factory: think.route.decide
+    inputs: [decision]
+    outputs: [routing]
+    config:
+
   - id: think.route
     factory: think.route
     config:
@@ -99,13 +105,23 @@ nodes:
         binding_edge: think.gate
 
 edges:
-  # shortcut → route: 没命中(decision 缺失)走 route;命中直接到 gate
+  # shortcut → route.decide → {route, gate}: think.route.decide 读 decision
+  # 端口并 emit RoutingDecision typed port,next_node 决定下游图节点。
+  # 取代原先两条 when-port-existence 边谓词(missing/exists kind)。
   - from: think.shortcut
+    to: think.route.decide
+  - from: think.route.decide
     to: think.route
-    when: { kind: missing, port: { name: decision } }
-  - from: think.shortcut
+    when:
+      kind: eq
+      port: { name: routing, field: next_node }
+      value: think.route
+  - from: think.route.decide
     to: think.gate
-    when: { kind: exists, port: { name: decision } }
+    when:
+      kind: eq
+      port: { name: routing, field: next_node }
+      value: think.gate
 
   # route → reason → history.assemble → llm.dispatch → decision.parse → gate
   - from: think.route
