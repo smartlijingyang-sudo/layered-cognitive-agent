@@ -25,7 +25,7 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[2]
 LCA = REPO / "lca"
-OVERLAY_MODULE = LCA / "plugins" / "assistant" / "skill_overlay.py"
+OVERLAY_MODULE = LCA / "plugins" / "assistant" / "skill" / "overlay.py"
 
 _BANNED_TOKENS: tuple[str, ...] = (
     "AssistantRuntime",
