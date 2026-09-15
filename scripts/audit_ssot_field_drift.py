@@ -19,6 +19,9 @@ SSOT 字段契约:
 退出码:
     0 —— 全部 run 字段语义正常
     1 —— 发现异常字段值
+
+spine 读不动本身也是异常(``spine.unreadable_line`` / ``spine.scan_aborted``):
+残缺扫描不能被当成"该 run 无漂移"。
 """
 
 from __future__ import annotations
@@ -52,13 +55,20 @@ def _scan_run(run_dir: Path) -> dict[str, list[dict[str, object]]]:
     spine_path = run_dir / f"{run_dir.name}.spine.jsonl"
     if spine_path.exists():
         try:
-            for ln in spine_path.read_text(encoding="utf-8").splitlines():
+            for line_no, ln in enumerate(spine_path.read_text(encoding="utf-8").splitlines(), 1):
                 ln = ln.strip()
                 if not ln:
                     continue
                 try:
                     rec = json.loads(ln)
-                except Exception:
+                except Exception as exc:
+                    findings["spine.unreadable_line"].append(
+                        {
+                            "run_id": run_dir.name,
+                            "line": line_no,
+                            "error": type(exc).__name__,
+                        }
+                    )
                     continue
                 ep = rec.get("execution_point")
                 payload = rec.get("payload")
@@ -89,8 +99,12 @@ def _scan_run(run_dir: Path) -> dict[str, list[dict[str, object]]]:
                                 "value": obj,
                             }
                         )
-        except Exception:
-            pass
+        except Exception as exc:
+            # 残缺扫描必须留痕:否则一个读到一半崩掉的 spine 会被当成
+            # "该 run 无漂移",审计结果偏乐观。
+            findings["spine.scan_aborted"].append(
+                {"run_id": run_dir.name, "error": type(exc).__name__}
+            )
     return findings
 
 
