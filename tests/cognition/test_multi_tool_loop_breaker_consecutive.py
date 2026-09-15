@@ -42,9 +42,7 @@ def _run_command_turn(*, arguments: dict[str, object], success: bool = True) -> 
             action_type=ActionType.USE_TOOL,
             rationale="r",
             confidence=1.0,
-            tool_calls=(
-                ToolCall(call_id="c-prev", tool_name="runCommand", arguments=arguments),
-            ),
+            tool_calls=(ToolCall(call_id="c-prev", tool_name="runCommand", arguments=arguments),),
         ),
         observation=Observation(
             observation_id="o-prev", success=success, payload={"stdout": "TOOL_WORKS\n"}
@@ -64,14 +62,10 @@ def test_default_policy_blocks_second_identical_tool_call() -> None:
             action_type=ActionType.USE_TOOL,
             rationale="r",
             confidence=1.0,
-            tool_calls=(
-                ToolCall(call_id="c-cand", tool_name="runCommand", arguments=args),
-            ),
+            tool_calls=(ToolCall(call_id="c-cand", tool_name="runCommand", arguments=args),),
         )
 
-        result = asyncio.run(
-            MultiToolLoopBreakerGate().enforce(state, candidate)
-        )
+        result = asyncio.run(MultiToolLoopBreakerGate().enforce(state, candidate))
 
     assert result.action_type == ActionType.RESPOND, (
         f"second identical tool call must be blocked; got {result.action_type}"
@@ -96,9 +90,7 @@ def test_default_policy_allows_first_call_when_no_history() -> None:
                 ),
             ),
         )
-        result = asyncio.run(
-            MultiToolLoopBreakerGate().enforce(state, candidate)
-        )
+        result = asyncio.run(MultiToolLoopBreakerGate().enforce(state, candidate))
 
     assert result.action_type == ActionType.USE_TOOL
 
@@ -124,9 +116,7 @@ def test_default_policy_allows_distinct_arguments() -> None:
                 ),
             ),
         )
-        result = asyncio.run(
-            MultiToolLoopBreakerGate().enforce(state, candidate)
-        )
+        result = asyncio.run(MultiToolLoopBreakerGate().enforce(state, candidate))
 
     assert result.action_type == ActionType.USE_TOOL
 
@@ -134,9 +124,7 @@ def test_default_policy_allows_distinct_arguments() -> None:
 def test_profile_can_raise_threshold_to_three() -> None:
     """Profile override: consecutive_repeat_max=3 ⇒ second call still allowed."""
     args = {"command": "echo X"}
-    gate = MultiToolLoopBreakerGate(
-        thresholds=LoopPolicyThresholds(consecutive_repeat_max=3)
-    )
+    gate = MultiToolLoopBreakerGate(thresholds=LoopPolicyThresholds(consecutive_repeat_max=3))
     with bound_session("consecutive_repeat_3_profile"):
         state = AgentState(trace_id="t", task="demo", budget=Budget())
         extend_control_turns(state, (_run_command_turn(arguments=args),))
@@ -146,9 +134,7 @@ def test_profile_can_raise_threshold_to_three() -> None:
             action_type=ActionType.USE_TOOL,
             rationale="r",
             confidence=1.0,
-            tool_calls=(
-                ToolCall(call_id="c-cand", tool_name="runCommand", arguments=args),
-            ),
+            tool_calls=(ToolCall(call_id="c-cand", tool_name="runCommand", arguments=args),),
         )
         result = asyncio.run(gate.enforce(state, candidate))
 

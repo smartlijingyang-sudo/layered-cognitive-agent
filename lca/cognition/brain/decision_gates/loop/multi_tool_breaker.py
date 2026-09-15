@@ -197,10 +197,7 @@ class MultiToolLoopBreakerGate(DecisionGate):
             if len(recent_turns) >= self._thresholds.consecutive_repeat_max:
                 break
         variance = _fingerprint_variance_over_turns(recent_turns, candidate)
-        if (
-            len(recent_turns) + 1 >= self._thresholds.consecutive_repeat_max
-            and variance == 0.0
-        ):
+        if len(recent_turns) + 1 >= self._thresholds.consecutive_repeat_max and variance == 0.0:
             return self._block(
                 state,
                 decision,
