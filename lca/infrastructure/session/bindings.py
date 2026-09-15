@@ -31,16 +31,16 @@ _default_checkpoint_policy: SessionCheckpointPolicyProtocol | None = None
 
 
 def _active_publish_session() -> object | None:
-    """Read the live publish Session.
+    """Read the live publish Session through its owning seam.
 
-    ``_session_publish._ACTIVE_SESSION`` is reassigned by
-    :func:`set_publish_session`; binding it via ``from X import Y`` would
-    capture the value at import time and never observe updates. Always read
-    the live module attribute so resolve_* sees the current binding.
+    :func:`lca.plugins.events.publishers._session_publish.current_publish_session`
+    is the single read entry point; consumers must never bind
+    ``_ACTIVE_SESSION`` via ``from X import Y`` because that captures the
+    import-time ``None`` and never observes :func:`set_publish_session`.
     """
-    from lca.plugins.events.publishers import _session_publish
+    from lca.plugins.events.publishers._session_publish import current_publish_session
 
-    return _session_publish._ACTIVE_SESSION
+    return current_publish_session()
 
 
 def resolve_raw_session(target: object | None) -> Session | None:

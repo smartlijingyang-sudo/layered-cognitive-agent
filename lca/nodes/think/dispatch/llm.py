@@ -38,7 +38,11 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.models.core.conversation.llm import LLMResponse, TokenUsage
+from lca.contracts.models.core.conversation.llm import (
+    LLMResponse,
+    LLMStreamEventType,
+    TokenUsage,
+)
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -49,7 +53,6 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.infrastructure.session.bindings import resolve_session_reader
 from lca.loop.commit.tool_journal import record_step_tool_call
 
 
@@ -77,15 +80,25 @@ class LlmCallExecutor:
         writer = _resolve_port("writer", input=input, context=context)
         request = _resolve_port("model_visible_request", input=input, context=context)
         adapter = _resolve_port("adapter", input=input, context=context)
-        # The adapter contract is ``complete(prompt: str, system=..., history=..., tools=...)``;
+        # The adapter contract is ``stream(prompt, system=..., history=..., tools=...)``;
         # the typed ``ModelVisibleRequest`` is the in-process view, not the wire shape.
         # Unpack it here so the node body owns the typed-boundary translation.
+        # Streaming, not ``complete``, is the boundary that produces
+        # ``llm.stream.token``: the reasoning channel is what the journal folds
+        # ``thinking.reasoning`` from, and a non-streaming call discards it.
         prompt = request.messages[-1]["content"] if request.messages else ""
         history = request.messages[:-1] if len(request.messages) > 1 else []
-        # session-bound so TelemetryLLMAdapter can route llm.call.start/end through
-        # publish_ep_bound with state+session instead of dropping events on the unbound path.
-        session = _resolve_session(context)
-        response: LLMResponse = await adapter.complete(
+        # FactGateway resolves the bound publish seam for llm.call.start/end and
+        # step.tool_call.record; injecting a Session here would route the append
+        # around the run bridge and lose the ledger write.
+        #
+        # ``cursor`` + ``reasoner_prompt`` are the model-visible identity the
+        # outer adapter needs to publish ``llm.request.header`` — the single
+        # fact that opens a journal step. Same explicit DI as
+        # ``lca.plugins.primitive.llm_call.invoke``.
+        cursor, reasoner_prompt = _model_visible_identity(state, request)
+        response: LLMResponse = LLMResponse(text="")
+        async for event in adapter.stream(
             prompt,
             system=request.system,
             history=history,
@@ -93,8 +106,11 @@ class LlmCallExecutor:
             state=state,
             turn=int(state.extra.get("current_turn", 0)),
             step=state.step,
-            session=session,
-        )
+            cursor=cursor,
+            reasoner_prompt=reasoner_prompt,
+        ):
+            if event.type is LLMStreamEventType.COMPLETED and event.response is not None:
+                response = event.response
         usage: TokenUsage | None = response.usage
         tool_calls = list(response.tool_calls or ())
         step = state.step
@@ -106,7 +122,6 @@ class LlmCallExecutor:
                 arguments=arguments,
                 arguments_summary=summarize_args(arguments),
                 state=state,
-                session=session,
             )
         writer.append_assistant_message(
             turn=step,
@@ -140,6 +155,33 @@ class LlmCallExecutor:
         )
 
 
+def _model_visible_identity(state: Any, request: Any) -> tuple[Any, Any]:
+    """Build the ``(cursor, reasoner_prompt)`` pair for the model-visible hook.
+
+    ``cursor`` comes from the per-turn :class:`CursorRecord` binding; without a
+    cursor there is no step identity, so the hook stays transparent (same
+    degradation as ``primitive.llm.call``).
+    """
+    from lca.cognition.body.executor.cursor_record import CursorRecord
+    from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
+        CurrentReasonerPrompt,
+    )
+
+    cursor = CursorRecord.get()
+    step = int(getattr(state, "step", 0) or 0)
+    if cursor is not None:
+        step_index = getattr(getattr(cursor, "snapshot", None), "step_index", None)
+        if isinstance(step_index, int):
+            step = step_index + 1
+    reasoner_prompt = CurrentReasonerPrompt(
+        step_id=f"step-{step:03d}",
+        template_id="",
+        selector_decision_path="",
+        system_prompt_text=str(request.system or ""),
+    )
+    return cursor, reasoner_prompt
+
+
 def _resolve_port(name: str, *, input: NodeInput, context: NodeContext) -> Any:
     """Read a declared port from ``input.port_values`` or ``context.runtime``."""
     value = input.port_values.get(name)
@@ -152,23 +194,6 @@ def _resolve_port(name: str, *, input: NodeInput, context: NodeContext) -> Any:
             f"llm.call: '{name}' port must be supplied via input.port_values or context.runtime"
         )
     return value
-
-
-def _resolve_session(context: NodeContext) -> Any:
-    """Prefer ``context.runtime.session``; fall back to module-level binding.
-
-    ``TelemetryLLMAdapter.complete`` emits ``llm.call.start/end`` via
-    ``publish_ep_bound``, which drops events when both ``session`` and the
-    module-level ``_ACTIVE_SESSION`` are unbound.
-    """
-    runtime = getattr(context, "runtime", None)
-    if runtime is not None:
-        session = getattr(runtime, "session", None)
-        if session is None and hasattr(runtime, "get"):
-            session = runtime.get("session")
-        if session is not None:
-            return session
-    return resolve_session_reader()
 
 
 @plugin(

@@ -1,13 +1,13 @@
 """Unit tests for the ``think.llm.dispatch`` node (:class:`LlmCallExecutor`).
 
 Regression target: after the typed-boundary split of
-``think.reason.complete``, the executor was calling
-``adapter.complete(prompt, system=..., history=..., tools=...)`` without
-forwarding ``state`` / ``turn`` / ``step`` / ``session``. The
-``TelemetryLLMAdapter`` consumes those kwargs to route
-``llm.call.start/end`` through ``publish_ep_bound``; without them the
-session/state pair is unbound and the events are dropped (silent journal
-emptiness, run-replay lost the LLM round-trip).
+``think.reason.complete``, the executor stopped driving the streaming
+adapter boundary and dropped the ``cursor`` / ``reasoner_prompt``
+identity, so ``llm.stream.token`` (reasoning channel) and
+``llm.request.header`` were never produced — the journal fold opens a
+step only on the header, so ``journal.steps`` went empty. It also injected
+the Session *reader* as the publish writer, which appends around the run
+bridge and loses the spine ledger write.
 """
 
 from __future__ import annotations
@@ -19,6 +19,8 @@ import pytest
 
 from lca.contracts.models.core.conversation.llm import (
     LLMResponse,
+    LLMStreamEvent,
+    LLMStreamEventType,
     NativeToolCall,
     TokenUsage,
 )
@@ -52,19 +54,23 @@ class _FakeWriter:
 
 @dataclass
 class _RecordingAdapter:
-    """Async ``LLMAdapter`` stand-in that captures kwargs verbatim."""
+    """Async ``LLMAdapter`` stand-in that captures the streaming call kwargs."""
 
     response: LLMResponse
+    last_prompt: str = ""
+    last_kwargs: dict[str, Any] = None  # type: ignore[assignment]
 
-    async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:
-        # Capture the call site the test wants to assert against.
+    def __post_init__(self) -> None:
+        if self.last_kwargs is None:
+            self.last_kwargs = {}
+
+    async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:  # pragma: no cover
+        raise AssertionError("llm.call must drive the streaming boundary, not complete()")
+
+    async def stream(self, prompt: str, **kwargs: Any):
         self.last_prompt = prompt
         self.last_kwargs = kwargs
-        return self.response
-
-    async def stream(self, prompt: str, **kwargs: Any):  # pragma: no cover - stub
-        if False:
-            yield None
+        yield LLMStreamEvent(type=LLMStreamEventType.COMPLETED, response=self.response)
 
 
 def _state(step: int = 3, turn: int = 7) -> AgentState:
@@ -102,23 +108,22 @@ def _node_context(runtime: Any = None) -> NodeContext:
 # ── Tests ────────────────────────────────────────────────────────
 
 
-async def test_node_execute_forwards_state_turn_step_session_to_adapter() -> None:
-    """``state`` / ``turn`` / ``step`` / ``session`` kwargs reach ``adapter.complete``.
+async def test_node_execute_forwards_identity_to_streaming_boundary() -> None:
+    """``state`` / ``turn`` / ``step`` / ``cursor`` / ``reasoner_prompt`` reach
+    ``adapter.stream``.
 
-    The ``TelemetryLLMAdapter`` is the sole emitter of
-    ``llm.call.start`` / ``llm.call.end`` and only routes them through
-    ``publish_ep_bound`` when both ``state`` and ``session`` are present;
-    ``turn`` / ``step`` are forwarded into ``model.failed.v1`` payloads.
+    ``TelemetryLLMAdapter`` emits ``llm.call.start/end`` + ``llm.stream.token``
+    from the streaming boundary, and ``ModelVisibleHookAdapter`` needs
+    ``cursor`` + ``reasoner_prompt`` to publish ``llm.request.header`` — the
+    only fact that opens a journal step.
     """
     executor = LlmCallExecutor()
     state = _state(step=3, turn=7)
     writer = _FakeWriter()
-    session = object()
     adapter = _RecordingAdapter(response=_response())
-    runtime = {"adapter": adapter, "session": session}
 
     await executor.node_execute(
-        context=_node_context(runtime=runtime),
+        context=_node_context(runtime={"adapter": adapter}),
         input=NodeInput(
             port_values={
                 "state": state,
@@ -131,7 +136,33 @@ async def test_node_execute_forwards_state_turn_step_session_to_adapter() -> Non
     assert adapter.last_kwargs.get("state") is state
     assert adapter.last_kwargs.get("turn") == 7
     assert adapter.last_kwargs.get("step") == 3
-    assert adapter.last_kwargs.get("session") is session
+    assert adapter.last_kwargs.get("reasoner_prompt") is not None
+    assert adapter.last_kwargs["reasoner_prompt"].system_prompt_text == "sys"
+
+
+async def test_node_execute_does_not_inject_a_publish_writer() -> None:
+    """The node never hands a Session to the emit seam.
+
+    FactGateway owns writer resolution; injecting the Session *reader* appends
+    behind :class:`RunEventSessionBridge`, so the fact reaches the log but not
+    the spine ledger.
+    """
+    executor = LlmCallExecutor()
+    state = _state(step=1, turn=2)
+    adapter = _RecordingAdapter(response=_response())
+
+    await executor.node_execute(
+        context=_node_context(runtime={"adapter": adapter, "session": object()}),
+        input=NodeInput(
+            port_values={
+                "state": state,
+                "writer": _FakeWriter(),
+                "model_visible_request": _request(),
+            }
+        ),
+    )
+
+    assert "session" not in adapter.last_kwargs
 
 
 async def test_node_execute_uses_state_step_when_turn_slot_missing() -> None:
@@ -155,72 +186,6 @@ async def test_node_execute_uses_state_step_when_turn_slot_missing() -> None:
 
     assert adapter.last_kwargs.get("turn") == 0
     assert adapter.last_kwargs.get("step") == 11
-
-
-async def test_node_execute_falls_back_to_module_level_publish_session(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """No ``runtime.session`` ⇒ ``session`` kwarg sourced from module binding.
-
-    Priority per task brief: ``context.runtime.session`` first,
-    ``resolve_session_reader()`` second. This test pins the second leg
-    so a future refactor cannot silently drop the module-level fallback.
-    The module reader is patched to a sentinel rather than building a
-    full Session — the test only cares that the executor reads from
-    the binding when ``runtime.session`` is absent.
-    """
-    from lca.nodes.think.dispatch import llm as dispatch_module
-
-    module_session = object()
-    monkeypatch.setattr(dispatch_module, "resolve_session_reader", lambda: module_session)
-
-    executor = LlmCallExecutor()
-    state = _state(step=1, turn=2)
-    adapter = _RecordingAdapter(response=_response())
-
-    await executor.node_execute(
-        context=_node_context(runtime={"adapter": adapter}),
-        input=NodeInput(
-            port_values={
-                "state": state,
-                "writer": _FakeWriter(),
-                "model_visible_request": _request(),
-            }
-        ),
-    )
-
-    assert adapter.last_kwargs.get("session") is module_session
-
-
-async def test_node_execute_runtime_session_wins_over_module_level_binding(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """``runtime.session`` is preferred over the module-level reader.
-
-    Pins the priority order so a future refactor cannot silently flip it.
-    """
-    from lca.nodes.think.dispatch import llm as dispatch_module
-
-    runtime_session = object()
-    module_session = object()
-    monkeypatch.setattr(dispatch_module, "resolve_session_reader", lambda: module_session)
-
-    executor = LlmCallExecutor()
-    state = _state(step=1, turn=1)
-    adapter = _RecordingAdapter(response=_response())
-
-    await executor.node_execute(
-        context=_node_context(runtime={"adapter": adapter, "session": runtime_session}),
-        input=NodeInput(
-            port_values={
-                "state": state,
-                "writer": _FakeWriter(),
-                "model_visible_request": _request(),
-            }
-        ),
-    )
-
-    assert adapter.last_kwargs.get("session") is runtime_session
 
 
 async def test_node_execute_missing_state_raises_type_error() -> None:
@@ -253,8 +218,8 @@ async def test_node_execute_emits_step_tool_call_record_per_tool_call(
     ``step.tool_call.record``, which ``record_step_tool_call`` publishes
     via ``publish_ep_bound``. Per ``NativeToolCall`` in the response:
     ``tool_name`` / ``invocation_id`` (= ``tc.call_id``) / ``arguments``
-    are forwarded verbatim, plus the resolved ``state`` and ``session``
-    so the unbound-session silent-drop path can't recur.
+    are forwarded verbatim plus the resolved ``state``; the writer is left
+    to FactGateway so the append goes through the run bridge.
     """
     from lca.nodes.think.dispatch import llm as dispatch_module
 
@@ -267,7 +232,6 @@ async def test_node_execute_emits_step_tool_call_record_per_tool_call(
 
     executor = LlmCallExecutor()
     state = _state(step=4, turn=9)
-    session = object()
     adapter = _RecordingAdapter(
         response=_response_with_tool_calls(
             NativeToolCall(
@@ -282,7 +246,7 @@ async def test_node_execute_emits_step_tool_call_record_per_tool_call(
             ),
         )
     )
-    runtime = {"adapter": adapter, "session": session}
+    runtime = {"adapter": adapter}
 
     await executor.node_execute(
         context=_node_context(runtime=runtime),
@@ -302,13 +266,13 @@ async def test_node_execute_emits_step_tool_call_record_per_tool_call(
     assert first["invocation_id"] == "call-1"
     assert first["arguments"] == {"msg": "hello"}
     assert first["state"] is state
-    assert first["session"] is session
+    assert "session" not in first
 
     assert second["tool_name"] == "writeFile"
     assert second["invocation_id"] == "call-2"
     assert second["arguments"] == {"path": "/var/data/x", "content": "abc"}
     assert second["state"] is state
-    assert second["session"] is session
+    assert "session" not in second
 
 
 async def test_node_execute_no_tool_calls_skips_step_tool_call_record(

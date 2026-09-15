@@ -13,8 +13,9 @@ import contextlib
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
+from lca.cognition.body.executor.cursor_record import CursorRecord
 from lca.contracts.models.core.conversation.conversation import ConversationTurn
 from lca.contracts.models.core.state.plane import PlaneBindings
 from lca.contracts.observability.infra.close_barrier import CloseReason
@@ -59,6 +60,7 @@ from lca.plugins.transport.webserver.read.runs.journal.projection_binding import
 )
 
 _RUNS_ROOT = Path("traces")  # ADR-0065 §七: locator root, runs/ 是其子目录
+
 
 @dataclass
 class RunSession:
@@ -149,9 +151,10 @@ class RunSession:
         """
         if self._closed:
             return False
-        # spec section H ContextVar deletion: ``loop_cursor_token`` reset
-        # path is gone. The cursor itself is closed via ``CursorRecord`` /
-        # runtime close hooks below; no ContextVar reset to release.
+        # ``loop_cursor_token`` holds the cursor this run replaced (see
+        # ``CursorRecord.bind``), so close restores the previous binding instead
+        # of clearing it — a nested run keeps its own cursor.
+        CursorRecord.bind(cast("Any", self.loop_cursor_token))
         self.loop_cursor_token = None
         bound = getattr(self, "event_session", None)
         with contextlib.suppress(Exception):

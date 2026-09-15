@@ -22,6 +22,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, cast
 
+from lca.cognition.body.executor.cursor_record import CursorRecord
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.mechanisms.capability.capability import (
     MissingCapabilityError,
@@ -196,10 +197,13 @@ class RunSessionBuilder:
             trace_id=trace_id,
             spine=spine_for_cursor,
         )
-        # spec section H ContextVar deletion: cursor no longer bound via
-        # ``install_run_cursor`` ContextVar;callers (reasoner.complete_turn /
-        # ModelVisibleHookAdapter) receive the cursor via explicit kwargs.
-        cursor_token: Any = None
+        # The cursor is this run's step identity: ``ModelVisibleHookAdapter``
+        # reads it to publish ``llm.request.header`` (the only fact that opens a
+        # journal step) and the telemetry adapter advances it to emit
+        # ``phase.think.fold``. spec §H replaced the ContextVar with explicit
+        # process-level binding here; the consumers read it back via
+        # ``CursorRecord.get()``.
+        cursor_token: Any = CursorRecord.bind(cursor)
 
         agent_role = agent.name or agent.agent_id or ""
         strategy_key = request.mode or "solo"

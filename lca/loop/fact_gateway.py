@@ -11,6 +11,8 @@ import inspect
 from collections.abc import Mapping
 from typing import Any, cast
 
+import structlog
+
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.loop.fact_gateway import AppendReceipt, FactGateway
 from lca.contracts.protocols.loop.spine_publish import (
@@ -20,11 +22,65 @@ from lca.contracts.protocols.loop.spine_publish import (
 )
 from lca.harness.session.emit import emit
 from lca.infrastructure.session.bindings import resolve_raw_session
-from lca.plugins.events.publishers._session_publish import (
-    _ACTIVE_SESSION,
-)
+from lca.plugins.events.publishers._session_publish import current_publish_session
 from lca_kernel.events.payloads.payloads import SpineEventPayload
 from lca_kernel.events.session.session import SessionEvent, SessionProtocol
+
+_log = structlog.get_logger(__name__)
+
+
+def _fact_label(event: Any) -> str:
+    """Best-effort identity of a catalog event for the drop log."""
+    category = getattr(event, "category", None)
+    return str(getattr(category, "value", None) or category or type(event).__name__)
+
+
+def _require_publish_writer(session: object | None, *, fact: str, actor: str) -> object | None:
+    """Resolve the publish writer; loud when a durable fact would be dropped.
+
+    ``session`` 是调用方显式注入的 writer;缺省时经
+    :func:`current_publish_session` 实时读取 active binding。绑定动作发生在
+    run bind,晚于本模块 import,所以缺省读取必须走函数入口 —— 直接
+    ``from ... import _ACTIVE_SESSION`` 会冻结 import 时的 ``None``。
+
+    显式注入的若是 raw :class:`Session`(reader seam),而 bound publish seam 的
+    正是同一个 run,则改走 publish seam:spine ledger 的落盘 sink 挂在
+    :class:`RunEventSessionBridge` 的 observer 上,绕开 bridge 的 append 会让
+    事实进日志但不进 ledger。
+
+    未绑定只能发生在 run bind 之前(boot / 诊断路径);此时事实无法落
+    Session,必须留下可见记录,静默丢弃会让整条 journal 事实链空转。
+    """
+    bound = current_publish_session()
+    writer = session if session is not None else bound
+    if writer is None:
+        _log.warning(
+            "fact_gateway.unbound_drop",
+            fact=fact,
+            actor=actor,
+            detail="no Session bound at emit; durable fact not committed",
+        )
+        return None
+    return _prefer_publish_seam(writer, bound)
+
+
+def _prefer_publish_seam(writer: object, bound: object | None) -> object:
+    """Swap a raw Session for the bound publish seam covering the same run.
+
+    The spine ledger sink is a bridge observer, so it only fires on appends made
+    through the publish seam. A writer that cannot take the typed payload
+    (``append(payload, *, producer)``) but resolves to the same Session as the
+    bound seam is therefore rerouted; a genuinely different Session is left
+    alone so an explicit writer still owns its own facts.
+    """
+    if bound is None or writer is bound:
+        return writer
+    if _supports_payload_append(writer) or not _supports_payload_append(bound):
+        return writer
+    raw = resolve_raw_session(writer)
+    if raw is not None and raw is resolve_raw_session(bound):
+        return bound
+    return writer
 
 
 def _record_to_receipt(record: SessionEvent) -> AppendReceipt:
@@ -159,13 +215,13 @@ def append_catalog_bound(
     session: object | None = None,
     actor: str,
 ) -> AppendReceipt | None:
-    """Resolve bound writer; append catalog event; no-op when unbound.
+    """Resolve bound writer; append catalog event; drop (loudly) when unbound.
 
     ``state`` is retained for call-site symmetry (step metadata lives on
-    state; session binding is always contextvar-based today).
+    state; session binding lives on the publish seam).
     """
     del state
-    writer = session if session is not None else _ACTIVE_SESSION
+    writer = _require_publish_writer(session, fact=_fact_label(event), actor=actor)
     if writer is None:
         return None
     return DefaultFactGateway(writer).append_catalog(event, actor=actor)
@@ -179,9 +235,9 @@ def publish_ep_bound(
     session: object | None = None,
     actor: str,
 ) -> AppendReceipt | None:
-    """Resolve bound writer; append spine EP event; no-op when unbound."""
+    """Resolve bound writer; append spine EP event; drop (loudly) when unbound."""
     del state
-    writer = session if session is not None else _ACTIVE_SESSION
+    writer = _require_publish_writer(session, fact=ep, actor=actor)
     if writer is None:
         return None
     return DefaultFactGateway(writer).publish_ep(ep, payload, actor=actor)

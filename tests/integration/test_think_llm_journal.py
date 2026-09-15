@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -35,7 +34,10 @@ import pytest
 
 from lca.contracts.models.core.conversation.llm import (
     LLMResponse,
+    LLMStreamEvent,
+    LLMStreamEventType,
     NativeToolCall,
+    TokenUsage,
 )
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.team.role.team import (
@@ -58,13 +60,17 @@ class _ScriptedEcho(LLMAdapter):
     name: str = "scripted-echo-llm"
     calls: int = 0
 
-    async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:
+    async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:  # pragma: no cover
+        raise AssertionError("think.llm.call drives stream(), not complete()")
+
+    async def stream(self, prompt: str, **kwargs: Any) -> Any:
         del prompt, kwargs
         self.calls += 1
         if self.calls == 1:
-            return LLMResponse(
+            response = LLMResponse(
                 text="",
                 model=self.name,
+                usage=TokenUsage(prompt_tokens=1234, completion_tokens=56),
                 tool_calls=[
                     NativeToolCall(
                         call_id="call_echo_1",
@@ -73,16 +79,80 @@ class _ScriptedEcho(LLMAdapter):
                     ),
                 ],
             )
-        return LLMResponse(
-            text="echo 命令的输出是 hello。",
-            model=self.name,
-        )
+            reasoning = "需要先运行 echo hello,再把它的内容回给用户。"
+        else:
+            response = LLMResponse(
+                text="echo 命令的输出是 hello。",
+                model=self.name,
+                usage=TokenUsage(prompt_tokens=1300, completion_tokens=24),
+            )
+            reasoning = "工具已经返回 stdout,直接总结答案。"
+        # Reasoning arrives as its own channel, exactly as the provider streams
+        # ``reasoning_content`` deltas; the journal folds thinking from it.
+        yield LLMStreamEvent(type=LLMStreamEventType.REASONING_TEXT_DELTA, text=reasoning)
+        if response.text:
+            yield LLMStreamEvent(type=LLMStreamEventType.OUTPUT_TEXT_DELTA, text=response.text)
+        yield LLMStreamEvent(type=LLMStreamEventType.COMPLETED, response=response)
 
 
 def _read_spine_records(path: Path) -> list[dict[str, Any]]:
     return [
         json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()
     ]
+
+
+def _bind_run_cursor(ctx: Any, run_id: str, bridge: Any) -> Any:
+    """Publish this run's loop cursor, as ``RunSessionBuilder`` does at run setup.
+
+    The cursor carries the step identity behind ``llm.request.header`` and
+    ``phase.think.fold``; without it both facts are never produced and the fold
+    opens no step.
+    """
+    from types import SimpleNamespace
+
+    from lca.cognition.body.executor.cursor_record import CursorRecord
+    from lca.infrastructure.observability.loop_cursor.persistence.coordinator import (
+        NullPersistenceCoordinator,
+    )
+    from lca.plugins.session.runtime.cursor.port import SessionWritePortAdapter
+    from lca_kernel.runtime.observability import ObservabilityRuntime
+
+    runtime = ObservabilityRuntime.from_profile(
+        profile=SimpleNamespace(plan_ref="", preset=None),
+        ctx=ctx,
+        persistence=NullPersistenceCoordinator(),
+    )
+    cursor = runtime.make_cursor(
+        run_id=run_id,
+        trace_id=run_id,
+        spine=SessionWritePortAdapter(bridge),
+    )
+    return CursorRecord.bind(cursor)
+
+
+def _bind_capability_bindings(ctx: Any) -> Any:
+    """Publish the per-turn ``BindingsViewBuilder`` on the runtime plane seam.
+
+    Mirrors ``RunExecutionEnvironment`` (the carrier) so the graph reads the
+    same typed bindings it would on a live run.
+    """
+    from lca.contracts.mechanisms.capability.capability import (
+        provider_current,
+        require_capability,
+    )
+    from lca.infrastructure.runtime_plane.capability_bindings import (
+        BindingsViewBuilder,
+        set_capability_bindings,
+    )
+
+    return set_capability_bindings(
+        BindingsViewBuilder(
+            file_store=provider_current(require_capability(ctx, "file_store")),
+            search=require_capability(ctx, "search"),
+            skill_store=provider_current(require_capability(ctx, "skills")),
+            mode="solo",
+        )
+    )
 
 
 @pytest.mark.profile_integration
@@ -95,13 +165,10 @@ def test_think_llm_journal_populates_journal_json() -> None:
     session to the adapter (so ``llm.call.start/end`` reach the spine)
     and still emits ``step.tool_call.record`` (so the journal fold has a
     tool_call to project). Reads the journal AFTER the run completes.
-    """
-    if os.environ.get("LLM_API_KEY"):
-        pytest.skip(
-            "real-LLM path is exercised by tests/contract/* and tests/scenario/*; "
-            "this test uses a scripted LLM adapter and only asserts the wire shape."
-        )
 
+    The LLM is scripted, so no provider credential is consulted; an
+    ``LLM_API_KEY`` present in the environment must not switch this gate off.
+    """
     try:
         from lca.harness.profile.boot.boot import boot_profile
         from lca.plugins.composer.composition.agent_assembly import (
@@ -144,10 +211,26 @@ def test_think_llm_journal_populates_journal_json() -> None:
             # internal binder will see _ACTIVE_SESSION occupied and skip
             # its own bind — the documented cooperative behaviour).
             bound = bind_run_event_session_from_store(store, run_id)
+            cursor_token = _bind_run_cursor(ctx, run_id, bound.bridge)
             try:
                 agent = PlanBoundAgentAssembler().assemble_agent(spec, scope=ctx)
-                result = await agent.run("请用 bash 工具运行 echo hello 并把结果告诉我。")
+                # ``concept.tool.fork`` reads its typed ``bindings`` port from the
+                # runtime plane seam, which the carrier (RunExecutionEnvironment)
+                # publishes per turn. This test drives ``agent.run`` directly, so it
+                # publishes the same builder from the same booted capabilities.
+                token = _bind_capability_bindings(ctx)
+                try:
+                    result = await agent.run("请用 bash 工具运行 echo hello 并把结果告诉我。")
+                finally:
+                    from lca.infrastructure.runtime_plane.capability_bindings import (
+                        reset_capability_bindings,
+                    )
+
+                    reset_capability_bindings(token)
             finally:
+                from lca.cognition.body.executor.cursor_record import CursorRecord
+
+                CursorRecord.bind(cursor_token)
                 # Keep ``bound`` in scope: the fold deriver reads the
                 # Session via its bridge (already unbound, but the
                 # bridge reference is still valid in this process).
@@ -197,16 +280,9 @@ def test_think_llm_journal_populates_journal_json() -> None:
             pytest.skip(
                 f"web-standard profile plan-resolution blocked: {type(exc).__name__}: {msg}."
             )
-        if "tool.fork.dispatch" in msg and "BindingsView" in msg:
-            pytest.skip(
-                f"web-standard profile runtime graph wiring has a None "
-                f"tool.fork.dispatch 'bindings' port (pre-existing typed-port "
-                f"defect): {type(exc).__name__}: {msg}."
-            )
-        pytest.skip(
-            f"web-standard profile cannot run the e2e in this sandbox "
-            f"({type(exc).__name__}: {msg})."
-        )
+        # No catch-all: anything else this path raises is a real defect in the
+        # emit → ledger → fold chain and must fail the gate, not skip it.
+        raise
 
     # ── Result terminal outcome ───────────────────────────────────────
     assert status is TaskStatus.COMPLETED, (
@@ -294,14 +370,15 @@ def test_think_llm_journal_populates_journal_json() -> None:
 
     llm_call_starts = [r for r in spine_records if r.get("execution_point") == "llm.call.start"]
     assert llm_call_starts, "at least one spine event with execution_point == 'llm.call.start'"
+    # ``llm.call.start`` carries the request side (model + prompt preview);
+    # usage arrives on ``llm.call.end``, which is asserted below.
     assert any(
         r.get("payload", {}).get("model") == "scripted-echo-llm"
-        and r.get("payload", {}).get("prompt_tokens", 0) > 0
         and r.get("payload", {}).get("prompt_preview")
         for r in llm_call_starts
     ), (
-        f"at least one llm.call.start must carry model='scripted-echo-llm', "
-        f"prompt_tokens > 0, and a non-empty prompt_preview; "
+        f"at least one llm.call.start must carry model='scripted-echo-llm' "
+        f"and a non-empty prompt_preview; "
         f"got events={llm_call_starts!r}"
     )
 
@@ -317,6 +394,27 @@ def test_think_llm_journal_populates_journal_json() -> None:
         f"outcome='success', and completion_tokens > 0; "
         f"got events={llm_call_ends!r}"
     )
+
+    # ── reasoning channel: the native thinking text is a logged fact ───
+    # ``llm.stream.token`` with ``channel_kind == "reasoning"`` is what the fold
+    # concatenates into ``step.thinking.reasoning``; a non-streaming call
+    # boundary loses it, which is how "no model thinking in the journal" hid.
+    reasoning_tokens = [
+        r
+        for r in spine_records
+        if r.get("execution_point") == "llm.stream.token"
+        and r.get("payload", {}).get("channel_kind") == "reasoning"
+        and (r.get("payload", {}).get("text_delta") or "")
+    ]
+    assert reasoning_tokens, (
+        "at least one llm.stream.token with channel_kind='reasoning' and a "
+        f"non-empty text_delta; got {len(spine_records)} spine events"
+    )
+
+    # ``phase.think.fold`` is cursor-derived and patches the step's thinking
+    # model; its absence means the cursor binding at run setup went missing.
+    think_folds = [r for r in spine_records if r.get("execution_point") == "phase.think.fold"]
+    assert think_folds, "at least one phase.think.fold spine event (cursor-derived)"
 
     step_tool_call_records = [
         r for r in spine_records if r.get("execution_point") == "step.tool_call.record"
