@@ -28,8 +28,8 @@ from __future__ import annotations
 
 from typing import get_args
 
-from lca.contracts.observability import resume as resume_module
 from lca.contracts.observability.cursor.loop_cursor import IterationReason as CanonicalReason
+from lca.contracts.observability.registry import resume as resume_module
 
 
 def test_iteration_reason_alias_is_loop_cursor_symbol() -> None:
