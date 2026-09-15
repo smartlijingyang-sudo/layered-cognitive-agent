@@ -23,7 +23,7 @@ import json
 import shutil
 import uuid
 from collections.abc import Callable, Mapping
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 from typing import Any
 
@@ -260,7 +260,7 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
         self._catalog = catalog
         self._emit = event_emitter
         self._url_importer_factory = url_importer_factory or _default_url_importer
-        self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self._clock = clock or (lambda: datetime.now(UTC))
 
     # ── 公开面 ────────────────────────────────────────────────────────
 
