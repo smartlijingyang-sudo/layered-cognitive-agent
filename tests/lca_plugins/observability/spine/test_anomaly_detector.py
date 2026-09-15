@@ -18,7 +18,7 @@ removes any one of them is caught at boot.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
