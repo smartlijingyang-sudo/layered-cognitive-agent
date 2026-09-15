@@ -296,11 +296,13 @@ def test_think_llm_journal_populates_journal_json() -> None:
     assert llm_call_starts, "at least one spine event with execution_point == 'llm.call.start'"
     assert any(
         r.get("payload", {}).get("model") == "scripted-echo-llm"
+        and r.get("payload", {}).get("prompt_tokens", 0) > 0
         and r.get("payload", {}).get("prompt_preview")
         for r in llm_call_starts
     ), (
-        f"at least one llm.call.start must carry model='scripted-echo-llm' "
-        f"and a non-empty prompt_preview; got events={llm_call_starts!r}"
+        f"at least one llm.call.start must carry model='scripted-echo-llm', "
+        f"prompt_tokens > 0, and a non-empty prompt_preview; "
+        f"got events={llm_call_starts!r}"
     )
 
     llm_call_ends = [r for r in spine_records if r.get("execution_point") == "llm.call.end"]
@@ -308,10 +310,12 @@ def test_think_llm_journal_populates_journal_json() -> None:
     assert any(
         r.get("payload", {}).get("model") == "scripted-echo-llm"
         and r.get("payload", {}).get("outcome") == "success"
+        and r.get("payload", {}).get("completion_tokens", 0) > 0
         for r in llm_call_ends
     ), (
-        f"at least one llm.call.end must carry model='scripted-echo-llm' "
-        f"and outcome='success'; got events={llm_call_ends!r}"
+        f"at least one llm.call.end must carry model='scripted-echo-llm', "
+        f"outcome='success', and completion_tokens > 0; "
+        f"got events={llm_call_ends!r}"
     )
 
     step_tool_call_records = [
