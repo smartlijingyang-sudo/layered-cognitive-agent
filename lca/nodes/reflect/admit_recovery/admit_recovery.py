@@ -96,7 +96,10 @@ class ReflectAdmitRecoveryExecutor:
         lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
         authority=AuthorityContract(grants=("plugin.serve",)),
         observability=EvidenceContract(
-            descriptors=("phase_reflect_admit_recovery.checked", "phase_reflect_admit_recovery.served")
+            descriptors=(
+                "phase_reflect_admit_recovery.checked",
+                "phase_reflect_admit_recovery.served",
+            )
         ),
     ),
     relations=(),

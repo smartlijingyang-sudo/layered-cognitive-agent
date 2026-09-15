@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. Supersedes ADR-0227 (typed-boundary `@graph_node` decorator).
+Accepted. Supersedes ADR-0227 (typed-boundary `@graph_node` decorator).
 
 ## Context
 

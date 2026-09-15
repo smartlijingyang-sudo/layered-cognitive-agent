@@ -26,7 +26,7 @@ registration under ``think::llm.call`` is preserved.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -50,13 +50,6 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-
-if TYPE_CHECKING:
-    from lca.contracts.models.core.state.state import AgentState
-    from lca.contracts.protocols.session.model.context import ModelVisibleRequest
-    from lca.contracts.protocols.session.run_session_writer import (
-        RunSessionWriterProtocol,
-    )
 
 
 @dataclass(frozen=True, slots=True)
