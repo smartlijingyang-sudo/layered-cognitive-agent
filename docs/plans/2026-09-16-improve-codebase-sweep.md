@@ -1,0 +1,98 @@
+# Sweep backlog and rejected candidates
+
+Baseline `f1e6a7867`. Queues below are machine-signalled, each row names its
+evidence command. Rejected rows record why a tempting candidate is not shippable
+in this sweep (per `.agents/skills/lca-improve-codebase/SKILL.md` §Reject when).
+
+## Open queues (ordered by value)
+
+| queue | how measured | remaining |
+|---|---|---|
+| pytest collection errors | `uv run pytest -q --collect-only --no-cov \| grep -cE '^ERROR tests/'` | ~33 (from 49) |
+| silent-swallow inventory | `python3 scripts/check_no_silent_swallow.py` | 29 (from 35) |
+| `lca.harness.composition.plan_compiler` consumers (8 test modules + 3 scripts) | `grep -rn harness.composition.plan_compiler` | v1 plan-shape migration: `phase_graph`/`phase_bindings` gone from `CompiledRunPlan`; needs `graph_spec` re-render per consumer |
+| `DeclarativeRunOutcome` / `PhaseRunCursor` / `PhaseAttemptFailure` / `PhaseResult` importers (6 test modules) | collection ERROR list | legacy re-export removed from `declarative_2.declarative_phase_graph` while `tests/contracts/test_declarative_contract_modules.py` still pins it — needs a keep-or-retire decision on that COMPAT surface |
+| F401 unused imports | `uv run ruff check . --select F401 --output-format=concise` | ~55 (from 69) |
+| E402 module import not at top | `--select E402` | 16 |
+| S112 try/except/continue | `--select S112` | 7 |
+| SIM105 / S110 | `--select SIM105,S110` | 7 + 4 |
+| `# type: ignore` audit | `uv run mypy --warn-unused-ignores` (per-area) | 123 sites to triage |
+| `COMPAT(delete-when: …)` shims | `grep -rn "delete-when" --include=*.py lca lca_kernel scripts` | 57/59 markers to test for elapsed windows |
+| doc-link rot outside `docs/adr/` | `python3 scripts/verify_md_links.py` | 116 non-ADR broken links (137 total) |
+| `scripts/check_package_contracts.py`, `check_emit_single_entry.py`, `check_no_bare_strings.py`, `check_readme_filled.py`, `verify_md_links.py` | each exits 1 | one unit per finding class |
+| vulture dead code | `uv run vulture lca --min-confidence 80` | unmeasured |
+| stale per-file-ignores in `pyproject.toml` | `grep -n 'gateway/\|lca/infrastructure/cli/cli.py' pyproject.toml` | `"gateway/*" = ["TC002"]` (package deleted in 0af87aeb8); `"lca/infrastructure/cli/cli.py"` while the real path is `cli/cli/cli.py` |
+
+## Rejected / blocked candidates
+
+- **`scripts/lca-inspect-plan.py`, `scripts/e2e_smoke_test.py`,
+  `scripts/snapshot_capability_tree.py`.** All three import the deleted
+  `lca.harness.composition.plan_compiler` *and* read `plan.phase_graph` /
+  `plan.phase_bindings`, which no longer exist on `CompiledRunPlan`. Fixing the
+  import alone leaves each crashing a few lines later, so there is no bounded
+  unit here — the candidate is "re-render these three tools onto
+  `V2ExecutablePlan.graph_spec`", which is a 1–3 PR plan, not a sweep unit.
+  `e2e_smoke_test.py` is reached by `lca-ops e2e timeline`
+  (`lca/infrastructure/cli/commands/kernel/e2e.py:120`), so it cannot be deleted
+  as dead either.
+- **Stub package dirs `lca/plugins/assistant/{catalog,tools}`.** Referenced by
+  plugin ids in `bundles/assistant-runtime.yaml` and by
+  `lca/plugins/domain/**` (`id="lca.plugins.assistant.catalog.catalog"`);
+  deleting needs the id-vs-path question settled first. The other three
+  zero-reference stubs (`spine/derivers/step`, `plugins/think/loop`,
+  `plugins/think/system`) are being deleted.
+- **`tests/scenario/code/test_code_conventions.py` revived fully.** Its
+  `_SCAN_PACKAGES` names the deleted top-level `gateway` package (removed in
+  0af87aeb8), and its `_PROJECT_ROOT` is two levels short, so `_LCA_ROOT` points
+  at `tests/scenario/lca` and the glossary path at
+  `tests/scenario/docs/specs/glossary.md`. Fixing the root makes the 250-line
+  guard scan the real `lca/` tree, where 100 non-exempt files exceed the limit,
+  and re-enables two glossary-coverage tests. Landing that needs a
+  freeze-and-ratchet decision on the 100 oversized files plus a naming decision on
+  `SpineHandler` (named in AGENTS.md §3 C11, matched by the banned-suffix
+  pattern) — an ADR/note, not a sweep unit. The `LcaStreamEventManager` half of
+  the naming violation is already fixed.
+- **`tests/unit/framework/test_phase_registry.py`.** Imports
+  `lca.loop.phases.registry` (`SEMANTIC_PHASE_ORDER`, `PhaseExecutorRegistry`,
+  `is_semantic_phase_closed_set`, `phase_executor_capability_key`,
+  `PHASE_EXECUTOR_CAPABILITY_PREFIX`); none of those names exists anywhere in the
+  repo. The read model was retired with ADR-0194 P4, so the test is for a deleted
+  subsystem — deleting it is a judgement about whether the semantic-phase
+  closed-set invariant still needs a guard, which belongs in a note.
+- **`tests/scenario/llm_0/test_llm_failover.py` (2 sites in
+  `tests/scenario/plugin/test_plugin_wiring_e2e.py` too).** Reference
+  `lca.plugins.think.llm…` / `lca.plugins.loop.state.stop_policy.plugin`, both
+  gone: `lca/plugins/think/` now has `cognitive|composition|loop|null|reasoner|system`
+  and StopPolicy was retired (docs/plans/2026-09-14-stop-decision-retirement.md).
+  Each is a "does this guard still have a subject?" decision.
+- **`tests/infrastructure/cli/test_kernel_serve_probe_lan.py`.** Targets a
+  module-level `_probe_lan` that no longer exists; the current code has
+  `KernelSupervisor._probe_health`. The test's own header says it was rewritten
+  for the module-level function, so reviving it means re-deriving what the LAN
+  fail-fast behavior is now — not an import fix.
+- **`tests/infrastructure/test_assistant_merged_skill_store.py` sibling
+  `tests/scenario/operational/...::test_file_write_rejects_unwritable_path_as_execution`.**
+  Surfaces only because the module now collects: it asserts a `write_file` to
+  `/mnt/data/some-file.py` fails, and the shipped path returns `success=True`.
+  Real behavior question (path policy), left failing rather than adjusted.
+- **`profiles/*.yaml: id: lca-llm-resolver` (5+ profiles).**
+  `resolve_profile` rejects it: "patch id 'lca-llm-resolver' does not match any
+  bundled plugin". Blocks
+  `tests/scenario/sqlite/test_sqlite_state_store.py::test_continuous_profile_enables_sqlite_state_and_control_plane`
+  and `tests/scenario/plugin/test_plugin_tree_single_owner.py`
+  parametrizations. Needs the replacement plugin id for the LLM resolver seam.
+- **Whole-tree `ruff format` (393 files) and `I001`/`W292`/`RUF022`
+  single-rule sweeps.** Disqualified by the plan's AC1: reformatting-only diffs.
+  Formatting is folded in only where a file is already being changed for a real
+  reason.
+- **`--select RUF100 --fix` mass pass.** Reverted within this session: with
+  `--select` the config's rule set is replaced, so every directive for a rule
+  outside that one selection reads as "unused" and 181 files lost live
+  suppressions (`ruff check .` jumped 502 → 959). The correct form is
+  `ruff check . --fix --fixable RUF100`, which is what drained the real 18.
+- **Renaming `SpineHandler`** (and any other public name that a frozen ADR or
+  AGENTS.md §3 cites). AGENTS.md §4 forbids editing old ADRs and §1 routes
+  closed-set/vocabulary changes to an ADR first; `docs/adr/0200` naming
+  `LcaStreamEventManager` was the near-miss here (that rename was safe because
+  the class is not part of the ADR's normative contract; `SpineHandler` is named
+  in AGENTS.md itself).
