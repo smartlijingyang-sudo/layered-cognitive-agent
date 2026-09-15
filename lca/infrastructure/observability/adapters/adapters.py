@@ -72,15 +72,27 @@ def _usage_of(response: LLMResponse) -> tuple[int, int]:
     return usage.prompt_tokens or 0, usage.completion_tokens or 0
 
 
-def _stream_observability_kwargs(kwargs: dict[str, Any]) -> tuple[int, int, dict[str, Any]]:
+def _stream_observability_kwargs(
+    kwargs: dict[str, Any],
+) -> tuple[int, int, object | None, object | None, dict[str, Any]]:
+    """Extract observability kwargs (turn/step/state/session) for spine emit.
+
+    state/session are forwarded alongside turn/step so the emit seam can
+    bind the FactGateway writer (publish_ep_bound drops when both are
+    unbound).
+    """
     turn = kwargs.get("turn", 0)
     if not isinstance(turn, int):
         turn = 0
     step = kwargs.get("step", 0)
     if not isinstance(step, int):
         step = 0
-    inner_kwargs = {k: v for k, v in kwargs.items() if k not in ("turn", "step")}
-    return turn, step, inner_kwargs
+    state = kwargs.get("state")
+    session = kwargs.get("session")
+    inner_kwargs = {
+        k: v for k, v in kwargs.items() if k not in ("turn", "step", "state", "session")
+    }
+    return turn, step, state, session, inner_kwargs
 
 
 def _maybe_fail_model(*, turn: int, step: int, error: str) -> None:
@@ -171,21 +183,25 @@ class TelemetryLLMAdapter(LLMAdapter):
         model = _model_label(self._inner)
         started = time.perf_counter()
         _open_think_step(prompt)
+        _turn, step, state, session, inner_kwargs = _stream_observability_kwargs(dict(kwargs))
         self._spine().emit_llm_call_start(
             model=model,
             stream=False,
             prompt_preview=prompt,
+            state=state,
+            session=session,
         )
         try:
-            response = await self._inner.complete(prompt, **kwargs)
+            response = await self._inner.complete(prompt, **inner_kwargs)
         except Exception as exc:
             self._spine().emit_llm_call_end(
                 model=model,
                 stream=False,
                 outcome="failure",
                 latency_ms=int((time.perf_counter() - started) * _PERF_COUNTER_SCALE),
+                state=state,
+                session=session,
             )
-            _turn, step, _ = _stream_observability_kwargs(dict(kwargs))
             _maybe_fail_model(turn=_turn, step=step, error=str(exc))
             raise
         prompt_tokens, completion_tokens = _usage_of(response)
@@ -196,6 +212,8 @@ class TelemetryLLMAdapter(LLMAdapter):
             latency_ms=int((time.perf_counter() - started) * _PERF_COUNTER_SCALE),
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
+            state=state,
+            session=session,
         )
         _advance_think_fold(model=model, ok=True)
         return response
@@ -208,13 +226,15 @@ class TelemetryLLMAdapter(LLMAdapter):
         reasoning_seq = 0
         output_seq = 0
         final_response: LLMResponse | None = None
-        turn, step, inner_kwargs = _stream_observability_kwargs(dict(kwargs))
+        turn, step, state, session, inner_kwargs = _stream_observability_kwargs(dict(kwargs))
 
         _open_think_step(prompt)
         self._spine().emit_llm_call_start(
             model=model,
             stream=True,
             prompt_preview=prompt,
+            state=state,
+            session=session,
         )
 
         # ``llm.call.end`` must fire in ``finally`` because consumers
@@ -284,6 +304,8 @@ class TelemetryLLMAdapter(LLMAdapter):
                             latency_ms=int((time.perf_counter() - started) * _PERF_COUNTER_SCALE),
                             prompt_tokens=pt or None,
                             completion_tokens=ct or None,
+                            state=state,
+                            session=session,
                         )
                         spine_end_emitted = True
                 elif event.type == LLMStreamEventType.REASONING_TEXT_DELTA:
@@ -308,6 +330,8 @@ class TelemetryLLMAdapter(LLMAdapter):
                             text_delta=delta_text,
                             seq=reasoning_seq,
                             channel_kind="reasoning",
+                            state=state,
+                            session=session,
                         )
                         reasoning_seq += 1
                 elif event.type == LLMStreamEventType.OUTPUT_TEXT_DELTA:
@@ -322,6 +346,8 @@ class TelemetryLLMAdapter(LLMAdapter):
                             text_delta=delta_text,
                             seq=output_seq,
                             channel_kind="output",
+                            state=state,
+                            session=session,
                         )
                         output_seq += 1
                 yield event
@@ -352,6 +378,8 @@ class TelemetryLLMAdapter(LLMAdapter):
                     latency_ms=int((time.perf_counter() - started) * _PERF_COUNTER_SCALE),
                     prompt_tokens=prompt_tokens or None,
                     completion_tokens=completion_tokens or None,
+                    state=state,
+                    session=session,
                 )
             # Cursor advance for phase.think.fold is unconditional: every
             # LLM call resolves to either ``respond`` (success) or
