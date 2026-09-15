@@ -5,6 +5,32 @@ Node files here are the typed-boundary primitives of the cognitive
 six-phase closed set (ADR-0194 / ADR-0228) plus the outer-loop
 graph-node-executors.
 
+## 1. 职责
+
+六语义 phase 闭集的 typed-boundary 节点实现，加上外循环的
+`graph_node_executor`（`loop/`，非 phase region）。目录即契约：
+`lca/<region>/<sub-group>/<node>.py`，`id` 与 region 前缀决定 Cordis 复合键
+`<region>::<id>`。
+
+## 2. 不负责
+
+- 图的构建与遍历（`lca/framework/graph/`、`bundles/*.yaml`）
+- 插件 Manifest 词汇与装配（`lca/plugins/`、`lca/harness/`）
+- 认知算法本体（`lca/cognition/`）；节点只做边界投影与调用编排
+- 控制面 State 单写（Reducer / RunCommitter，C4）
+
+## 7. 副作用
+
+节点是**图的一次 visit**，不直接写世界：
+
+| 通道 | 后果 |
+|---|---|
+| 端口输出 | 返回 `NodeOutput`，由 kernel 合并进 PortRegistry 并记录 `VisitRecord`；节点不自行改 State |
+| 事实投递 | 需要落事实的节点（如 `think/dispatch/llm.py`）经注入的 writer / `FactGateway` 调 `append_assistant_message` / `append_tool_call` / `append_tool_result`，仍收敛到 `Session.append` 单入口 |
+| 失败 | 抛给 kernel：kernel 记录带 `error` 的 `VisitRecord` 后向上抛；节点内不做 `except: pass` 式吞没 |
+
+`perceive/`、`act/`、`remember/`、`reflect/`、`stop/` 目前是保留空目录，尚无节点实现。
+
 ## Layout
 
 ```
