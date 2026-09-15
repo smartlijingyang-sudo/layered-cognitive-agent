@@ -5,6 +5,7 @@
 | 需求 | 权威位置 | 说明 |
 |---|---|---|
 | 了解开发约束、仓库地图和验证命令 | [根 AGENTS.md](../../AGENTS.md) | 每次开发会话的高频入口 |
+| 读顶位架构速查（以 graph 为主轴） | [architecture.md](architecture.md) | 五层单向依赖 + 图三层 + BundleGraphSpec v2 + 四段事实链 + 当前在飞 |
 | 查询术语、数据所有权和结构化认知模型 | [LCA structured cognition guide](lca-structured-cognition-guide.md) | Fact、State、Decision、Verdict、Effect、Journal 等词汇 |
 | 读外环图 + act→工具调用栈（新人） | [phase-graph-and-act-tool-path.md](../guides/phase-graph-and-act-tool-path.md) | `factory`/`semantic_name` 查类；act.validate→…→SafeExecutor→`tool.execute` |
 | 查询现行协议与操作说明 | `docs/specs/` | Harness、阶段图、运行时投影、工具恢复、命名与包组织规范、集成规范 |
