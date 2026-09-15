@@ -72,7 +72,7 @@ class RuntimePhaseCapabilities:
 
         object.__setattr__(self, "values", MappingProxyType(dict(self.values)))
 
-    def with_extra(self, extra: Mapping[str, object]) -> "RuntimePhaseCapabilities":
+    def with_extra(self, extra: Mapping[str, object]) -> RuntimePhaseCapabilities:
         """Return a new instance with *extra* merged over ``self.values``.
 
         Runtime node executors resolve their declared ports via
@@ -213,7 +213,7 @@ class DeclarativeRuntimeBindings:
         """Return the stable identity of the selected executable plan."""
         return compiled_run_plan_ref(self.require_executable_plan())
 
-    def with_writer(self, writer: object) -> "DeclarativeRuntimeBindings":
+    def with_writer(self, writer: object) -> DeclarativeRuntimeBindings:
         """Return a copy with ``writer`` injected into the phase capabilities.
 
         Think subgraph node executors (e.g. ``history.derive``,
