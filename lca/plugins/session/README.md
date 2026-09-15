@@ -12,6 +12,26 @@
 
 **Bundle SSOT:** [`bundles/session-runtime.yaml`](../../../bundles/session-runtime.yaml) — 每条 `$module` 须可 `importlib` 加载且暴露 `setup`。
 
+## 1. 职责
+
+`bundles/session-runtime.yaml` 装配的薄 plugin：SessionStore + DSH Session 的
+runtime store、DSH 投影 fold、标题服务、遥测捕获与 checkpoint policy。
+
+## 2. 不负责
+
+- 事实平面 API 本体（append / catalog / fold / repair / bind / recovery 在
+  [`lca/session/`](../../session/README.md)，Wave P1/P4 迁移目标）
+- 认知决策与图遍历
+
+## 7. 副作用
+
+| 家族 | 后果 |
+|---|---|
+| `runtime` | 装配期注册 `session.store` capability；run 期的 durable 写仍只经 `Session.append` 单入口 |
+| `checkpoint_policy` | 三个边界触发 `await session.flush()`，失败抛 `CheckpointFailure`；`enabled=False` 时 no-op |
+| `telemetry_*` | 默认 DISABLED；启用后外发 OTel，队列满丢弃本批（不回滚已 commit 的 append） |
+| `title_service` / `title_llm_provider` | 生成标题属读侧派生；LLM 失败按 contained 处理并保留回退标题，不阻塞主响应、也不写事实 |
+
 ## 迁移
 
 Wave P1/P4/P5-02：事实 API（append / catalog / fold / repair / bind / recovery）→ `lca.session`；runtime 子模块目录化（`bus/facade.py`、`spine/hook.py` 等）。
