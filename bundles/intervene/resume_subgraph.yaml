@@ -1,0 +1,21 @@
+# bundles/intervene/resume_subgraph.yaml — intervene 子图纯图描述。
+#
+# ADR-0228 §Decision 4 + §Decision 6: intervene is a cross-phase
+# subgraph, not a six-phase primitive. The kernel reads the persisted
+# ``Command`` from the spine and re-projects it as a typed ``command``
+# port; ``intervene.resume`` consumes the port and emits a typed
+# ``decision`` port that the think phase already understands.
+
+id: intervene.subgraph
+region: region:intervene
+purpose: intervene 1 节点执行 — re-feed persisted Command → typed Decision port
+
+nodes:
+  - id: intervene.resume
+    factory: intervene.resume
+    inputs: [command]
+    outputs: [decision]
+    config:
+
+# terminal: intervene.resume 直接回 outer graph(binding_edge=intervene.main),
+#           无需显式返回边。
