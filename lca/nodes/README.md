@@ -31,6 +31,42 @@ graph-node-executors.
 
 `perceive/`、`act/`、`remember/`、`reflect/`、`stop/` 目前是保留空目录，尚无节点实现。
 
+## 3. 输入
+
+`NodeContext` 与 `NodeInput`（kernel 合并后的端口值）、节点自身 `io_schema`、
+`BindingKind` 与 region 前缀；think 侧节点还接收注入的 reasoner / adapter 接缝对象。
+
+## 4. 输出
+
+每个节点返回 `NodeOutput`：端口值（decision / observation / routing / facts 等）
+加 `producer_node`；kernel 负责合并端口、记录 `VisitRecord` 并选择下一条边。
+节点自身不返回控制面 State，也不写事实。
+
+## 5. 允许依赖
+
+`lca.contracts`（绝大多数 import）、`lca.harness`（NodeContext / plugin API 接缝）、
+`lca.cognition`（调用认知原语）、`lca.infrastructure`、`lca.plugins` 各一处。
+不 import `lca_kernel` 内部。
+
+## 6. 禁止依赖
+
+`lca.application`、`lca.agent`、`lca.runtime`、`lca.session`、`lca.loop`。
+节点不得直接写事实或触控制面：需要落事实时经接缝由 runtime 侧完成（C2 双平面）。
+
+## 8. 失败语义
+
+按源码 `raise` 统计：`TypeError` 77、`ValueError` 14、`RuntimeError` 11、
+`KeyError` 2、`MissingPromptSectionError` 1、`CapabilityGrantExceededError` 1。
+端口/类型不符即抛错，绝不静默降级；能力越界由 `CapabilityGrantExceededError`
+拒绝（C5）。异常向上传给 kernel，由它记录失败 visit 后再抛。
+
+## 9. 公共入口
+
+包门面为空（`lca/nodes/__init__.py` 不重导出符号），调用方按 region 路径取用节点
+模块，例如 `lca/nodes/think/dispatch/llm.py`、`lca/nodes/think/route/`、
+`lca/nodes/loop/`（外循环 graph_node_executor，非六语义 phase region）。
+新增节点走「Adding a new node」一节的两步：实现 `@plugin` + 注册 bundle 条目。
+
 ## Layout
 
 ```
