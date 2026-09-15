@@ -100,7 +100,6 @@ def register(app: typer.Typer) -> None:
             get_supervisor,
         )
 
-        ctx = make_context(json_mode, quiet, config)
         cfg = default_program_config()
         sup = get_supervisor(cfg)
         sup.restart()
