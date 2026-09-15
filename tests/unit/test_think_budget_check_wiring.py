@@ -28,7 +28,6 @@ are reachable from inner plans.
 from __future__ import annotations
 
 import yaml
-from pydantic import ValidationError
 
 from lca.contracts.protocols.graph.binding import BindingKind
 from lca.contracts.protocols.graph.plan import Plan, PlanEdge, PlanNode

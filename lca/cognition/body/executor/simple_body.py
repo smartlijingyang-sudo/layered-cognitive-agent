@@ -7,6 +7,10 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from lca.cognition.body.actions.action_handlers import record_decision_made
+from lca.cognition.body.emit.observation_surface import (
+    observation_content,
+    observation_error,
+)
 from lca.cognition.body.executor.cursor_record import CursorRecord
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.semantic.keys import OBS_DEGRADED_FROM
@@ -43,32 +47,16 @@ def _default_no_cache() -> Any:
 def _observation_content(observation: Observation) -> str:
     """Stringify an Observation's content for ``surface/tool_result``.
 
-    Mirrors the legacy ``commit_body_tool_execute_end`` projection: text
-    payloads round-trip as strings; structured payloads JSON-encode so
-    the model sees a coherent string instead of ``repr({...})``.
+    Delegates to the shared projection so the declarative graph path
+    (:class:`lca.nodes.concept.effect.execute.EffectExecuteExecutor`) and
+    this seam cannot drift apart on what the model sees.
     """
-    payload = getattr(observation, "payload", None)
-    if payload is None:
-        return ""
-    if isinstance(payload, str):
-        return payload
-    if isinstance(payload, (dict, list, tuple)):
-        return json.dumps(payload, ensure_ascii=False)
-    return str(payload)
+    return observation_content(observation)
 
 
 def _observation_error(observation: Observation) -> dict[str, Any] | None:
     """Project an Observation error to the writer's ``ToolError`` TypedDict."""
-    if getattr(observation, "success", True):
-        return None
-    err = getattr(observation, "error", None)
-    if err is None:
-        return {"kind": "execution", "message": "unknown", "retryable": False}
-    return {
-        "kind": "execution",
-        "message": str(err),
-        "retryable": False,
-    }
+    return observation_error(observation)
 
 
 # Body 是 phase=act 执行平面;advance(phase) 是把 cursor 推到对应窗口的 SSOT。
