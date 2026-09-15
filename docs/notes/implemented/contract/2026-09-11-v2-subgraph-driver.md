@@ -2,7 +2,7 @@
 
 Status: implemented
 
-**关联 ADR:** [ADR-0218](../../../../adr/0218-bundle-graph-v2-subgraph-driver.md)(同 PR 共生)
+**关联 ADR:** [ADR-0218](../../../adr/0218-bundle-graph-v2-subgraph-driver.md)(同 PR 共生)
 
 ## Problem
 
@@ -16,7 +16,7 @@ ADR-0217 引入 `NodeExecutor` 作为 think 子图节点协议,但 `interpreter.
 
 ### 1. `V2BundleGraphPlanMarker` Protocol(plan 形态识别)
 
-[contracts/protocols/declarative/declarative_1/v2_plan_marker.py](../../../../contracts/protocols/declarative/declarative_1/v2_plan_marker.py) 定义 Protocol:
+[contracts/protocols/declarative/declarative_1/v2_plan_marker.py](../../../../lca/contracts/protocols/declarative/declarative_1/v2_plan_marker.py) 定义 Protocol:
 
 ```python
 @runtime_checkable
