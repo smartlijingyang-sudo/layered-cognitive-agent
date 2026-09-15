@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 
 from lca.contracts.models.team.delegation.delegation import DelegationResult, find_result
 from lca.contracts.models.team.team.awareness import TeamAwareness
@@ -21,7 +21,7 @@ def _result(
         error=None if success else "boom",
         task_id="task_1",
         step=0,
-        returned_at=datetime(2026, 8, 3, tzinfo=timezone.utc),
+        returned_at=datetime(2026, 8, 3, tzinfo=UTC),
     )
 
 

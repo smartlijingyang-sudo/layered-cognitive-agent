@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 
 from lca.cognition.body.delegation.cache import (
     cached_delegation_observation,
@@ -32,7 +32,7 @@ def _delegation_result(role: str = "Alice", subtask: str = "analyze") -> Delegat
         error=None,
         task_id="task_9",
         step=0,
-        returned_at=datetime(2026, 8, 3, tzinfo=timezone.utc),
+        returned_at=datetime(2026, 8, 3, tzinfo=UTC),
     )
 
 
