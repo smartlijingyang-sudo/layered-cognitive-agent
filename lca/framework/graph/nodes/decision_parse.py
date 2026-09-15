@@ -16,6 +16,11 @@ The orchestrator ``think.reason`` wires them via edges; the deleted
 The parse mirrors ``decision_classify.decision.parse.response`` but emits
 a single :class:`Decision` (the spec §E node emits ``decision`` as one
 typed port, not the typed-port split used by ``concept.decision.classify``).
+
+The :func:`@graph_node <graph_node>` decorator (ADR-0227) replaces the
+manual ``NodeExecutor`` dataclass + ``@plugin(...)`` setup pair that lived
+in :mod:`lca.plugins.think.decision_parse.execute` (PR2). Composite-key
+registration under ``think::decision.parse`` is preserved.
 """
 
 from __future__ import annotations
@@ -29,6 +34,7 @@ from lca.contracts.models.core.execution.decision import (
     DelegationSpec,
     ToolCall,
 )
+from lca.framework.graph.nodes.decorator import graph_node
 
 if TYPE_CHECKING:
     from lca.contracts.models.core.conversation.llm import LLMResponse
@@ -39,6 +45,12 @@ _log = logging.getLogger(__name__)
 _DELEGATE_TOOL_NAME = "delegate"
 
 
+@graph_node(
+    id="decision.parse",
+    region="think",
+    inputs=("state", "llm_response"),
+    outputs=("decision",),
+)
 async def decision_parse(*, state: Any, llm_response: LLMResponse) -> Decision:
     """Project an :class:`LLMResponse` into a :class:`Decision`.
 

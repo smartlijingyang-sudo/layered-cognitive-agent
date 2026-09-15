@@ -1,11 +1,11 @@
-"""Unit tests for the ``phase.think.history_assemble.history_derive`` plugin.
+"""Unit tests for the ``think.history.assemble`` node.
 
-The plugin is the typed-boundary adapter between
-:class:`lca.framework.graph.nodes.history_assemble.history_assemble` (a pure
-async fn) and the think subgraph's ``factory: history.derive`` node declared
-in ``bundles/concept/history_assemble.yaml``. Mirrors the structure of
-:class:`lca.plugins.concept.context_compose.collect.ContextLinesCollectExecutor`
-so the registration contract stays uniform across concept / think plugins.
+The :func:`@graph_node <graph_node>` decorator (ADR-0227) wraps the pure
+``history_assemble`` async fn in
+:mod:`lca.framework.graph.nodes.history_assemble` as a
+``NodeExecutor``-shaped cordis carrier registered under the composite key
+``think::history.derive`` — matches the ``factory: history.derive`` node
+declared in ``bundles/concept/history_assemble.yaml``.
 
 delete-when: N/A — typed-boundary adapter required by the inner graph bundle.
 """
@@ -25,11 +25,7 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeInput,
 )
 from lca.contracts.protocols.session.model.context import ModelVisibleRequest
-from lca.plugins.think.history_assemble import (
-    HistoryAssembleExecutor,
-    setup,
-)
-from lca.plugins.think.history_assemble.execute import HistoryAssembleExecutor as _ReimportExecutor
+from lca.framework.graph.nodes.history_assemble import history_assemble
 
 # ── Minimal fixtures ────────────────────────────────────────────
 
@@ -73,31 +69,27 @@ def _node_context(runtime: dict[str, Any] | None = None) -> NodeContext:
 # ── Tests ────────────────────────────────────────────────────────
 
 
-def test_executor_declares_history_derive_semantic_name_in_think_region() -> None:
+def test_decorator_declares_history_derive_semantic_name_in_think_region() -> None:
     """``semantic_name`` must match ``factory: history.derive`` in the bundle."""
-    executor = HistoryAssembleExecutor()
-    assert executor.semantic_name == "history.derive"
-    assert executor.region == "think"
-    assert executor.declared_inputs == ("state", "writer")
-    assert executor.declared_outputs == ("model_visible_request",)
+    assert history_assemble.semantic_name == "history.derive"
+    assert history_assemble.region == "think"
+    assert history_assemble.declared_inputs == ("state", "writer")
+    assert history_assemble.declared_outputs == ("model_visible_request",)
 
 
-def test_plugin_module_is_importable_and_exposes_setup() -> None:
-    """The plugin module is discoverable from the public package surface.
-
-    ``setup`` is a :class:`cordis.plugin.Plugin` carrier after the
-    ``@plugin(...)`` decorator runs; the wrapped fn lives at
-    ``setup.setup`` (mirrors :mod:`lca.plugins.concept.context_compose.collect`).
-    """
+def test_plugin_module_is_importable_and_exposes_history_assemble() -> None:
+    """The plugin module re-exports the @graph_node-decorated fn."""
     module = import_module("lca.plugins.think.history_assemble")
-    assert module.HistoryAssembleExecutor is _ReimportExecutor
-    assert hasattr(module.setup, "setup")
-    assert callable(module.setup.setup)
+    assert module.history_assemble is history_assemble
+    # cordis carrier lives at ``history_assemble.setup``; the cordis
+    # ``@plugin(...)`` decorator names the inner fn ``setup.setup``.
+    assert hasattr(history_assemble.setup, "setup")
+    assert callable(history_assemble.setup.setup)
 
 
 async def test_node_execute_returns_model_visible_request_with_orphan_dropped_messages() -> None:
     """``node_execute`` calls the pure async fn and wraps the result."""
-    executor = HistoryAssembleExecutor()
+    executor = history_assemble.__executor_cls__()
     writer = _FakeWriter(
         messages=[
             {"role": "user", "content": "hello"},
@@ -124,7 +116,7 @@ async def test_node_execute_returns_model_visible_request_with_orphan_dropped_me
 
 async def test_node_execute_falls_back_to_context_runtime_when_writer_missing_from_ports() -> None:
     """Mirror context_compose: writer in ``context.runtime`` is honored as fallback."""
-    executor = HistoryAssembleExecutor()
+    executor = history_assemble.__executor_cls__()
     writer = _FakeWriter(messages=[{"role": "user", "content": "q"}])
     state = _make_state()
     out = await executor.node_execute(
@@ -140,7 +132,7 @@ async def test_node_execute_falls_back_to_context_runtime_when_writer_missing_fr
 
 async def test_node_execute_missing_writer_raises_type_error() -> None:
     """``writer`` is required; missing on both ports and runtime → TypeError."""
-    executor = HistoryAssembleExecutor()
+    executor = history_assemble.__executor_cls__()
     state = _make_state()
     with pytest.raises(TypeError, match="'writer' port must be"):
         await executor.node_execute(
@@ -149,15 +141,25 @@ async def test_node_execute_missing_writer_raises_type_error() -> None:
         )
 
 
-async def test_node_execute_wrong_state_type_raises_type_error() -> None:
-    """``state`` must be ``AgentState`` (or None); wrong type → TypeError."""
-    executor = HistoryAssembleExecutor()
+async def test_node_execute_wrong_state_type_propagates_to_user_fn() -> None:
+    """``state`` is passed through to the user fn unchanged.
+
+    The :func:`@graph_node <graph_node>` decorator (ADR-0227) does not
+    perform per-port isinstance guards; the user fn's type signature
+    remains the typed-boundary contract. A wrong-type ``state`` is
+    passed through verbatim so the user fn's body (or downstream
+    caller) decides the failure mode. The old manual ``execute.py``
+    guard is intentionally dropped — the decorator is the contract.
+    """
+    executor = history_assemble.__executor_cls__()
     writer = _FakeWriter(messages=[])
-    with pytest.raises(TypeError, match="'state' port must be an AgentState"):
-        await executor.node_execute(
-            context=_node_context(),
-            input=NodeInput(port_values={"state": "not-a-state", "writer": writer}),
-        )
+    out = await executor.node_execute(
+        context=_node_context(),
+        input=NodeInput(port_values={"state": "not-a-state", "writer": writer}),
+    )
+    request = out.port_values["model_visible_request"]
+    assert isinstance(request, ModelVisibleRequest)
+    assert request.messages == []
 
 
 async def test_setup_registers_executor_under_composite_key() -> None:
@@ -166,7 +168,7 @@ async def test_setup_registers_executor_under_composite_key() -> None:
     ctx = MagicMock()
     ctx.provide = MagicMock(side_effect=lambda key, value: captured.__setitem__(key, value))
 
-    await setup.setup(ctx, config=None)
+    await history_assemble.setup.setup(ctx, config=None)
 
     assert list(captured) == ["think::history.derive"]
-    assert isinstance(captured["think::history.derive"], HistoryAssembleExecutor)
+    assert isinstance(captured["think::history.derive"], history_assemble.__executor_cls__)
