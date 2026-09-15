@@ -10,8 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
     ALLOWED_EFFECTS,
@@ -20,9 +19,6 @@ from lca.contracts.protocols.declarative.declarative_1.declarative_common import
     PluginSpecKind,
     RelationType,
 )
-
-if TYPE_CHECKING:
-    from lca.contracts.atoms.functional.group import FunctionalGroup
 
 
 def _as_text_tuple(values: Sequence[str] | None) -> tuple[str, ...]:
