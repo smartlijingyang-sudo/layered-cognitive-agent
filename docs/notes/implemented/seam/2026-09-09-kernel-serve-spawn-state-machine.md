@@ -2,7 +2,7 @@
 
 Status: implemented
 
-> 配套 ADR:[`0213-kernel-serve-spawn-result-and-health-readiness.md`](../../adr/0213-kernel-serve-spawn-result-and-health-readiness.md)。
+> 配套 ADR:[`0213-kernel-serve-spawn-result-and-health-readiness.md`](../../../adr/0213-kernel-serve-spawn-result-and-health-readiness.md)。
 > 本 note 描述单点 seam 的改动;跨 ADR 影响走 ADR 本身。
 
 ## Problem
@@ -163,9 +163,9 @@ spawner 直接实例,**不再过载全站自愈**。
 
 ## Related
 
-- ADR [`0213`](../../adr/0213-kernel-serve-spawn-result-and-health-readiness.md)
-- ADR [`0119`](../../adr/0119-webserver-as-plugin.md) 决定 4
-- ADR [`0183`](../../adr/0183-event-bus-framework-ssot.md) / [`0181`](../../adr/0181-spine-as-events-publishers-subscribers.md)
+- ADR [`0213`](../../../adr/0213-kernel-serve-spawn-result-and-health-readiness.md)
+- ADR [`0119`](../../../adr/0119-webserver-as-plugin.md) 决定 4
+- ADR [`0183`](../../../adr/0183-event-bus-framework-ssot.md) / [`0181`](../../../adr/0181-spine-as-events-publishers-subscribers.md)
 - Implemented [`2026-09-08-kernel-serve-host-default-and-lan-probe.md`](../../implemented/seam/2026-09-08-kernel-serve-host-default-and-lan-probe.md)
 - Implemented [`2026-09-04-event-bus-publisher-authorization.md`](../../implemented/seam/2026-09-04-event-bus-publisher-authorization.md)
 
