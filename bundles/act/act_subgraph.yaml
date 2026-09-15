@@ -124,8 +124,16 @@ edges:
     to: act.envelope
     when: true
   - from: act.envelope
-    to: act.dispatch
+    to: act.fanout
     when: true
+  - from: act.fanout
+    to: act.dispatch
+    when:
+      kind: eq
+      port:
+        name: routing
+        field: next_hint
+      value: fanout_1to1
   - from: act.dispatch
     to: act.join
     when: true
@@ -137,4 +145,3 @@ edges:
         name: routing
         field: next_hint
       value: join_1to1
-    when: true
