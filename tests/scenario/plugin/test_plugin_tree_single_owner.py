@@ -175,13 +175,13 @@ async def test_omitting_seam_plugin_does_not_bypass(
         raise AssertionError(f"module-level factory used after omitting {omit_id}")
 
     monkeypatch.setattr("lca.infrastructure.sandbox.factory.resolve_sandbox", _boom)
-    monkeypatch.setattr("lca.infrastructure.tools.default_set.resolve_sandbox", _boom)
+    monkeypatch.setattr("lca.infrastructure.tools.default.set.resolve_sandbox", _boom)
     import lca.infrastructure.file.store as file_store_module
 
     assert not hasattr(file_store_module, "get_default_file_store")
     assert not hasattr(file_store_module, "set_default_file_store")
     monkeypatch.setattr(
-        "lca.infrastructure.tools.default_set.build_g2a_chat_tools",
+        "lca.infrastructure.tools.default.set.build_g2a_chat_tools",
         _boom,
     )
     monkeypatch.setattr(
@@ -219,7 +219,7 @@ async def test_omitting_tools_provider_skips_g2a_not_fallback(
     def _boom(*_a: object, **_k: object) -> object:
         raise AssertionError("build_g2a_chat_tools must not run when tools-provider is omitted")
 
-    monkeypatch.setattr("lca.infrastructure.tools.default_set.build_g2a_chat_tools", _boom)
+    monkeypatch.setattr("lca.infrastructure.tools.default.set.build_g2a_chat_tools", _boom)
     from lca.plugins.transport.webserver.carrier.runs.lifecycle.runnable_assembly import (
         tools_from_scope,
     )

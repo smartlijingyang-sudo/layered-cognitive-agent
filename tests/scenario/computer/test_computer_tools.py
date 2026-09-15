@@ -104,7 +104,7 @@ class TestDefaultToolsComputer(unittest.TestCase):
     def test_default_set_prefers_computer_over_legacy(self) -> None:
         from unittest.mock import patch
 
-        with patch("lca.infrastructure.tools.default_set.resolve_sandbox") as mock:
+        with patch("lca.infrastructure.tools.default.set.resolve_sandbox") as mock:
             mock.return_value = InlineSandbox()
             names = {t.name for t in build_default_tools(self.store)}
         self.assertIn("listFiles", names)
@@ -129,7 +129,7 @@ class TestDefaultToolsComputer(unittest.TestCase):
         resolver = MagicMock()
         resolver.resolve_machine.return_value = machine
         with patch(
-            "lca.infrastructure.tools.default_set.resolve_sandbox", return_value=InlineSandbox()
+            "lca.infrastructure.tools.default.set.resolve_sandbox", return_value=InlineSandbox()
         ):
             names = {t.name for t in build_default_tools(self.store, machine_resolver=resolver)}
         self.assertIn("listFiles", names)

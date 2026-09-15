@@ -331,7 +331,7 @@ class TestDefaultTools(unittest.TestCase):
         self.addCleanup(self._tmp.cleanup)
 
     def test_build_default_tools_includes_skill_tools(self) -> None:
-        with patch("lca.infrastructure.tools.default_set.resolve_sandbox", return_value=None):
+        with patch("lca.infrastructure.tools.default.set.resolve_sandbox", return_value=None):
             names = {t.name for t in build_default_tools(self.file_store)}
         self.assertIn("writeFile", names)
         self.assertIn("search_skill", names)
@@ -344,7 +344,7 @@ class TestDefaultTools(unittest.TestCase):
         self.assertNotIn("sandbox_inspect", names)
 
     def test_build_default_tools_includes_run_skill_script_when_sandbox(self) -> None:
-        with patch("lca.infrastructure.tools.default_set.resolve_sandbox") as mock_sbx:
+        with patch("lca.infrastructure.tools.default.set.resolve_sandbox") as mock_sbx:
             mock_sbx.return_value = object()
             names = {t.name for t in build_default_tools(self.file_store)}
         self.assertIn("run_skill_script", names)
