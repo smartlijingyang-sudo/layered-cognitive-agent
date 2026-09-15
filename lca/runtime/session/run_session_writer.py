@@ -19,7 +19,8 @@ from lca.contracts.models.session.token_usage import TokenUsage
 from lca.contracts.models.session.tool_call import ToolCall
 from lca.contracts.models.session.tool_error import ToolError
 from lca.contracts.protocols.session.run_session_writer import RunSessionWriterProtocol
-from lca_kernel.events.session.session import SessionProtocol
+from lca.session.lifecycle.bind import _event_ref_from_session
+from lca_kernel.events.session.session import SessionEvent, SessionProtocol
 
 
 class SessionWriterUnboundError(RuntimeError):
@@ -46,21 +47,14 @@ class RunSessionWriter(RunSessionWriterProtocol):
         return self._session
 
     @staticmethod
-    def _event_ref(session: SessionProtocol, seq: int, event_type: str) -> EventRef:
-        """Build an ``EventRef`` from a SessionEvent the way bind.py does.
+    def _event_ref(session: SessionProtocol, event: SessionEvent) -> EventRef:
+        """Build an ``EventRef`` from a SessionEvent.
 
-        The :class:`SessionProtocol.append` call returns a ``SessionEvent``;
-        the writer's public surface returns an ``EventRef`` so callers can
-        treat persist results uniformly with the rest of the publish path.
+        Delegates to :func:`lca.session.lifecycle.bind._event_ref_from_session`
+        so the writer and the bind observer share one canonical EventRef
+        shape. Preserves ``event.time`` fidelity.
         """
-        return EventRef(
-            event_id=f"{session.id}:{seq}",
-            category=event_type,
-            trace_id="",
-            ts=0.0,
-            persisted=False,
-            subscriber_count=0,
-        )
+        return _event_ref_from_session(session, event)
 
     def append_user_message(
         self,
@@ -75,7 +69,7 @@ class RunSessionWriter(RunSessionWriterProtocol):
             {"message_id": message_id, "role": role, "content": content},
             surface_op="user_message",
         )
-        return self._event_ref(session, event.seq, event.type)
+        return self._event_ref(session, event)
 
     def append_assistant_message(
         self,
@@ -100,7 +94,7 @@ class RunSessionWriter(RunSessionWriterProtocol):
             },
             surface_op="assistant_message",
         )
-        return self._event_ref(session, event.seq, event.type)
+        return self._event_ref(session, event)
 
     def append_tool_call(
         self,
@@ -129,7 +123,7 @@ class RunSessionWriter(RunSessionWriterProtocol):
             },
             surface_op=None,
         )
-        return self._event_ref(session, event.seq, event.type)
+        return self._event_ref(session, event)
 
     def append_tool_result(
         self,
@@ -164,7 +158,7 @@ class RunSessionWriter(RunSessionWriterProtocol):
             surface_op="tool_result",
             source_event_seqs=source_event_seqs,
         )
-        return self._event_ref(session, event.seq, event.type)
+        return self._event_ref(session, event)
 
     def _last_assistant_tool_call_seq(self, call_id: CallId) -> int | None:
         """Locate the most recent surface/assistant_message seq that declared ``call_id``.
@@ -197,9 +191,14 @@ class RunSessionWriter(RunSessionWriterProtocol):
         raise NotImplementedError("derive_messages is implemented in Task 2")
 
     def request_header(self) -> EpochHeader | None:
-        """Return the folded :class:`EpochHeader` from the bound Session, if any."""
+        """Return the folded :class:`EpochHeader` from the bound Session, if any.
+
+        Per :class:`RunSessionWriterProtocol`, ``request_header`` is part of
+        the Session contract; the writer calls it directly (no duck-type
+        fallback). Sessions that have not yet folded a header return ``None``.
+        """
         session = self._require_session()
-        return getattr(session, "request_header", lambda: None)()
+        return session.request_header()
 
 
 __all__ = ["RunSessionWriter", "SessionWriterUnboundError"]

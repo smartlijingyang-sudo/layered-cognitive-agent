@@ -42,6 +42,7 @@ class _InMemorySession:
         event = _StoredEvent(
             type=event_type,
             seq=self.next_seq,
+            time=self.next_seq * 1000.0,
             data=dict(data),
             surface_op=surface_op,
             source_event_seqs=source_event_seqs,
@@ -71,6 +72,7 @@ class _InMemorySession:
 class _StoredEvent:
     type: str
     seq: int
+    time: float
     data: dict[str, Any]
     surface_op: Any | None
     source_event_seqs: tuple[int, ...] | None
