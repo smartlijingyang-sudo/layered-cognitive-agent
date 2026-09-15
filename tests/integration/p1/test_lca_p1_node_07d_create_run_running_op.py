@@ -113,11 +113,11 @@ async def test_create_run_populates_running_op_when_coordinator_bound(
 
     try:
         from lca.infrastructure.observability.stream import (
-            LcaStreamEventManager,
+            LcaStreamEventLog,
             get_agent_runtime_redis_client,
         )
 
-        mgr = LcaStreamEventManager(get_agent_runtime_redis_client())
+        mgr = LcaStreamEventLog(get_agent_runtime_redis_client())
         if await mgr.exists(run_id):
             history = await mgr.read_history(run_id, count=5)
             assert any(e["type"] == "agent_runtime_init" for e in history)

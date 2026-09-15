@@ -7,21 +7,21 @@ import pytest
 
 from lca.application.runtime.coordinator.event_translator import EventTranslator
 from lca.application.runtime.coordinator.runtime_coordinator import LcaAgentRuntimeCoordinator
-from lca.infrastructure.observability.stream import LcaStreamEventManager
+from lca.infrastructure.observability.stream import LcaStreamEventLog
 
 
 @pytest.fixture
-async def manager() -> AsyncIterator[LcaStreamEventManager]:
+async def manager() -> AsyncIterator[LcaStreamEventLog]:
     import redis.asyncio as aioredis
 
     client = aioredis.from_url("redis://127.0.0.1:6379/0", decode_responses=True)
-    mgr = LcaStreamEventManager(client)
+    mgr = LcaStreamEventLog(client)
     yield mgr
     await client.aclose()
 
 
 @pytest.fixture
-async def clean_run_id(manager: LcaStreamEventManager) -> AsyncIterator[str]:
+async def clean_run_id(manager: LcaStreamEventLog) -> AsyncIterator[str]:
     run_id = "test_coord_unit"
     await manager.cleanup(run_id)
     yield run_id
@@ -29,7 +29,7 @@ async def clean_run_id(manager: LcaStreamEventManager) -> AsyncIterator[str]:
 
 
 async def test_start_publishes_agent_runtime_init(
-    manager: LcaStreamEventManager, clean_run_id: str
+    manager: LcaStreamEventLog, clean_run_id: str
 ) -> None:
     coord = LcaAgentRuntimeCoordinator(
         stream_manager=manager,
@@ -43,7 +43,7 @@ async def test_start_publishes_agent_runtime_init(
 
 
 async def test_handle_stamped_publishes_text_chunk(
-    manager: LcaStreamEventManager, clean_run_id: str
+    manager: LcaStreamEventLog, clean_run_id: str
 ) -> None:
     coord = LcaAgentRuntimeCoordinator(
         stream_manager=manager,
@@ -63,7 +63,7 @@ async def test_handle_stamped_publishes_text_chunk(
 
 
 async def test_handle_stamped_writes_initial_plugin_state_on_tool_started(
-    manager: LcaStreamEventManager, clean_run_id: str
+    manager: LcaStreamEventLog, clean_run_id: str
 ) -> None:
     """tool_start: persist identifier/apiName/args before the WS event."""
     tool_state_writer = AsyncMock()
@@ -96,7 +96,7 @@ async def test_handle_stamped_writes_initial_plugin_state_on_tool_started(
 
 
 async def test_handle_stamped_writes_projected_state_to_db_before_tool_end(
-    manager: LcaStreamEventManager, clean_run_id: str
+    manager: LcaStreamEventLog, clean_run_id: str
 ) -> None:
     """spec §5.3.1: server must write projected_state to message row BEFORE tool_end."""
     tool_state_writer = AsyncMock()
@@ -140,7 +140,7 @@ async def test_handle_stamped_writes_projected_state_to_db_before_tool_end(
 
 
 async def test_tool_end_with_content_publishes_followup_text_chunk(
-    manager: LcaStreamEventManager, clean_run_id: str
+    manager: LcaStreamEventLog, clean_run_id: str
 ) -> None:
     """spine body.tool.execute.end with textual result must surface the answer
     to the LobeHub client as an assistant bubble.
@@ -206,7 +206,7 @@ async def test_tool_end_with_content_publishes_followup_text_chunk(
 
 
 async def test_tool_end_without_content_does_not_emit_text_chunk(
-    manager: LcaStreamEventManager, clean_run_id: str
+    manager: LcaStreamEventLog, clean_run_id: str
 ) -> None:
     """No tool text → no synthetic assistant text chunk (preserves the
     wait-for-LLM path for tool runs that legitimately need a follow-up)."""
@@ -238,7 +238,7 @@ async def test_tool_end_without_content_does_not_emit_text_chunk(
 
 
 async def test_terminal_publishes_agent_runtime_end(
-    manager: LcaStreamEventManager, clean_run_id: str
+    manager: LcaStreamEventLog, clean_run_id: str
 ) -> None:
     coord = LcaAgentRuntimeCoordinator(
         stream_manager=manager,
@@ -256,7 +256,7 @@ async def test_terminal_publishes_agent_runtime_end(
 
 
 async def test_watchdog_publishes_synthetic_terminal_if_session_terminal_but_no_spine_event(
-    manager: LcaStreamEventManager, clean_run_id: str
+    manager: LcaStreamEventLog, clean_run_id: str
 ) -> None:
     """spec §1 broken #3: parent run with no live SpineClose must not hang the stream."""
     coord = LcaAgentRuntimeCoordinator(
@@ -279,7 +279,7 @@ async def test_watchdog_publishes_synthetic_terminal_if_session_terminal_but_no_
 
 
 async def test_watchdog_no_op_if_already_published(
-    manager: LcaStreamEventManager, clean_run_id: str
+    manager: LcaStreamEventLog, clean_run_id: str
 ) -> None:
     """The watchdog must not double-publish if the natural SpineClose already fired."""
     coord = LcaAgentRuntimeCoordinator(
@@ -315,7 +315,7 @@ async def test_watchdog_no_op_if_already_published(
 
 
 async def test_watchdog_no_op_when_session_still_running(
-    manager: LcaStreamEventManager, clean_run_id: str
+    manager: LcaStreamEventLog, clean_run_id: str
 ) -> None:
     coord = LcaAgentRuntimeCoordinator(
         stream_manager=manager,

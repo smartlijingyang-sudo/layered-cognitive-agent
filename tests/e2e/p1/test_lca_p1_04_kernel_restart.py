@@ -30,13 +30,13 @@ def test_redis_stream_survives_process_restart() -> None:
     import uuid
 
     from lca.infrastructure.observability.stream import (
-        LcaStreamEventManager,
+        LcaStreamEventLog,
         get_agent_runtime_redis_client,
     )
 
     async def _run() -> None:
         run_id = uuid.uuid4().hex
-        mgr = LcaStreamEventManager(get_agent_runtime_redis_client())
+        mgr = LcaStreamEventLog(get_agent_runtime_redis_client())
         try:
             # Simulate "before restart" — publish 5 events.
             pre_ids: list[str] = []
@@ -51,7 +51,7 @@ def test_redis_stream_survives_process_restart() -> None:
 
             # "Kernel dies and restarts" — the Redis key is untouched.
             # Create a new manager (simulating a new process binding).
-            mgr2 = LcaStreamEventManager(get_agent_runtime_redis_client())
+            mgr2 = LcaStreamEventLog(get_agent_runtime_redis_client())
             assert await mgr2.exists(run_id)
 
             # "After restart" — publish 3 more events.

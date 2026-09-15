@@ -1,4 +1,4 @@
-"""LcaStreamEventManager unit tests against a real Redis at 127.0.0.1:6379.
+"""LcaStreamEventLog unit tests against a real Redis at 127.0.0.1:6379.
 
 This is L1 (unit) but uses real Redis because mocking Redis semantics
 falsifies the stream API. The dev Redis is part of the LCA dev stack
@@ -10,14 +10,14 @@ import json
 import pytest
 
 from lca.contracts.transport.stream_keys import stream_key
-from lca.infrastructure.observability.stream.stream_event_manager import LcaStreamEventManager
+from lca.infrastructure.observability.stream.stream_event_manager import LcaStreamEventLog
 
 
 @pytest.fixture
 async def manager():
     import redis.asyncio as aioredis
     client = aioredis.from_url("redis://127.0.0.1:6379/0", decode_responses=True)
-    mgr = LcaStreamEventManager(client)
+    mgr = LcaStreamEventLog(client)
     yield mgr
     await client.aclose()
 

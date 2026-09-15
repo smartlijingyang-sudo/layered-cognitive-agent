@@ -40,7 +40,7 @@ from starlette.routing import WebSocketRoute
 from starlette.websockets import WebSocket, WebSocketDisconnect, WebSocketState
 
 from lca.infrastructure.observability.stream import (
-    LcaStreamEventManager,
+    LcaStreamEventLog,
     get_agent_runtime_redis_client,
 )
 from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.auth import (
@@ -76,7 +76,7 @@ def build_agent_gateway_app(*, run_port: RunPort | None = None) -> Starlette:
     The `run_port` parameter is optional; tests inject a fake; production
     passes the real LCA RunPort (resolved from app.state).
     """
-    stream_manager = LcaStreamEventManager(get_agent_runtime_redis_client())
+    stream_manager = LcaStreamEventLog(get_agent_runtime_redis_client())
 
     async def handler(websocket: WebSocket) -> None:
         run_id = websocket.path_params.get("run_id")
@@ -109,7 +109,7 @@ async def _run_session(
     ws: WebSocket,
     *,
     run_id: str | None,
-    stream_manager: LcaStreamEventManager,
+    stream_manager: LcaStreamEventLog,
     run_port: RunPort | None,
     public_pem: str | None = None,
 ) -> None:
@@ -195,7 +195,7 @@ async def _live_loop(
     ws: WebSocket,
     *,
     run_id: str,
-    stream_manager: LcaStreamEventManager,
+    stream_manager: LcaStreamEventLog,
     run_port: RunPort | None,
     start_id: str = "",
 ) -> None:
@@ -447,7 +447,7 @@ def _extract_id_from_sse_frame(frame: bytes) -> str | None:
 def make_production_ws_handler() -> Any:
     """Return a WebSocket handler that resolves ``run_port`` from ``app.state``."""
 
-    stream_manager = LcaStreamEventManager(get_agent_runtime_redis_client())
+    stream_manager = LcaStreamEventLog(get_agent_runtime_redis_client())
 
     async def handler(websocket: WebSocket) -> None:
         run_id = websocket.path_params.get("run_id")

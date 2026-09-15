@@ -11,21 +11,21 @@ import uuid
 
 import redis.asyncio as aioredis
 
-from lca.infrastructure.observability.stream import LcaStreamEventManager
+from lca.infrastructure.observability.stream import LcaStreamEventLog
 from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.wire.http import (
     build_http_app,
 )
 
 
 async def _seed_run(run_id: str) -> None:
-    mgr = LcaStreamEventManager(
+    mgr = LcaStreamEventLog(
         aioredis.from_url("redis://127.0.0.1:6379/0", decode_responses=True)
     )
     await mgr.publish(run_id, "agent_runtime_init", {"agentId": "a1"}, step_index=0)
 
 
 async def _cleanup_run(run_id: str) -> None:
-    mgr = LcaStreamEventManager(
+    mgr = LcaStreamEventLog(
         aioredis.from_url("redis://127.0.0.1:6379/0", decode_responses=True)
     )
     await mgr.cleanup(run_id)

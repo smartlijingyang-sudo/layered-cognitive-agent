@@ -1,4 +1,4 @@
-"""LcaStreamEventManager — Redis Stream backing the agent runtime event bus.
+"""LcaStreamEventLog — Redis Stream backing the agent runtime event bus.
 
 This is a 1:1 Python mirror of the TypeScript implementation in
 `apps/server/src/modules/AgentRuntime/StreamEventManager.ts:139-211`. The
@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from redis.asyncio import Redis
 
 
-class LcaStreamEventManager:
+class LcaStreamEventLog:
     """Redis Stream event bus, native-wire-compat."""
 
     def __init__(self, redis: Redis) -> None:
@@ -186,4 +186,4 @@ def _encode_sse_agent_event(event: dict) -> bytes:
     ).encode()
 
 
-__all__ = ("LcaStreamEventManager",)
+__all__ = ("LcaStreamEventLog",)

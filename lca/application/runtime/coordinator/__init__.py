@@ -2,7 +2,7 @@
 
 Mirror of `apps/server/src/modules/AgentRuntime/AgentRuntimeCoordinator.ts`.
 Subscribes to `LiveRunProjection.tail` and publishes AgentStreamEvent
-into Redis via LcaStreamEventManager.
+into Redis via LcaStreamEventLog.
 """
 
 from lca.application.runtime.coordinator.event_translator import EventTranslator

@@ -71,7 +71,7 @@ def test_resume_replays_history_then_emits_resume_complete(gateway_app, rsa_keys
     """L2-2: A fresh client connecting with lastEventId=0 receives prior events in order."""
     import redis.asyncio as aioredis
 
-    from lca.infrastructure.observability.stream import LcaStreamEventManager
+    from lca.infrastructure.observability.stream import LcaStreamEventLog
 
     run_id = f"test_resume_{uuid.uuid4().hex[:8]}"
     token = mint_for_test("u1", run_id, rsa_keys_module["private"])
@@ -79,7 +79,7 @@ def test_resume_replays_history_then_emits_resume_complete(gateway_app, rsa_keys
     async def seed_then_cleanup() -> None:
         client = aioredis.from_url("redis://127.0.0.1:6379/0", decode_responses=True)
         try:
-            mgr = LcaStreamEventManager(client)
+            mgr = LcaStreamEventLog(client)
             await mgr.publish(run_id, "agent_runtime_init", {"agentId": "a1"}, step_index=0)
             await mgr.publish(
                 run_id,
@@ -93,7 +93,7 @@ def test_resume_replays_history_then_emits_resume_complete(gateway_app, rsa_keys
     async def cleanup_only() -> None:
         client = aioredis.from_url("redis://127.0.0.1:6379/0", decode_responses=True)
         try:
-            await LcaStreamEventManager(client).cleanup(run_id)
+            await LcaStreamEventLog(client).cleanup(run_id)
         finally:
             await client.aclose()
 

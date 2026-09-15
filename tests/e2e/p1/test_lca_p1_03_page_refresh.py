@@ -25,19 +25,19 @@ def test_page_refresh_resume_replays_from_last_event_id() -> None:
 
     The gateway resume path reads history and emits only events whose
     id > lastEventId. This test verifies that invariant directly
-    against the LcaStreamEventManager, without a kernel.
+    against the LcaStreamEventLog, without a kernel.
     """
     import asyncio
     import uuid
 
     from lca.infrastructure.observability.stream import (
-        LcaStreamEventManager,
+        LcaStreamEventLog,
         get_agent_runtime_redis_client,
     )
 
     async def _run() -> None:
         run_id = uuid.uuid4().hex
-        mgr = LcaStreamEventManager(get_agent_runtime_redis_client())
+        mgr = LcaStreamEventLog(get_agent_runtime_redis_client())
         try:
             # Publish 10 events.
             ids: list[str] = []

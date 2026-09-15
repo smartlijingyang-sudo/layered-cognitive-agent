@@ -31,7 +31,7 @@ def test_refresh_ws_token_returns_200_when_jwt_keys_seeded() -> None:
     """Happy path: app.state.jwt_keys populated → 200 + 3-part JWT."""
     import redis.asyncio as aioredis
 
-    from lca.infrastructure.observability.stream import LcaStreamEventManager
+    from lca.infrastructure.observability.stream import LcaStreamEventLog
     from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.wire.http import (
         build_http_app,
     )
@@ -49,7 +49,7 @@ def test_refresh_ws_token_returns_200_when_jwt_keys_seeded() -> None:
     async def _seed_then_cleanup() -> None:
         client = aioredis.from_url("redis://127.0.0.1:6379/0", decode_responses=True)
         try:
-            mgr = LcaStreamEventManager(client)
+            mgr = LcaStreamEventLog(client)
             await mgr.publish(
                 run_id, "agent_runtime_init", {"agentId": "a1"}, step_index=0
             )
@@ -59,7 +59,7 @@ def test_refresh_ws_token_returns_200_when_jwt_keys_seeded() -> None:
     async def _drop() -> None:
         client = aioredis.from_url("redis://127.0.0.1:6379/0", decode_responses=True)
         try:
-            await LcaStreamEventManager(client).cleanup(run_id)
+            await LcaStreamEventLog(client).cleanup(run_id)
         finally:
             await client.aclose()
 
@@ -81,7 +81,7 @@ def test_refresh_ws_token_returns_503_when_jwt_missing() -> None:
     """
     import redis.asyncio as aioredis
 
-    from lca.infrastructure.observability.stream import LcaStreamEventManager
+    from lca.infrastructure.observability.stream import LcaStreamEventLog
     from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.wire.http import (
         build_http_app,
     )
@@ -94,7 +94,7 @@ def test_refresh_ws_token_returns_503_when_jwt_missing() -> None:
     async def _seed_then_cleanup() -> None:
         client = aioredis.from_url("redis://127.0.0.1:6379/0", decode_responses=True)
         try:
-            mgr = LcaStreamEventManager(client)
+            mgr = LcaStreamEventLog(client)
             await mgr.publish(
                 run_id, "agent_runtime_init", {"agentId": "a1"}, step_index=0
             )
@@ -104,7 +104,7 @@ def test_refresh_ws_token_returns_503_when_jwt_missing() -> None:
     async def _drop() -> None:
         client = aioredis.from_url("redis://127.0.0.1:6379/0", decode_responses=True)
         try:
-            await LcaStreamEventManager(client).cleanup(run_id)
+            await LcaStreamEventLog(client).cleanup(run_id)
         finally:
             await client.aclose()
 

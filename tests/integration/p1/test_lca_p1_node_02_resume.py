@@ -13,7 +13,7 @@ import uuid
 from starlette.testclient import TestClient
 
 from lca.infrastructure.observability.stream import (
-    LcaStreamEventManager,
+    LcaStreamEventLog,
     get_agent_runtime_redis_client,
 )
 from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.auth import (
@@ -25,7 +25,7 @@ def _publish_initial_events(run_id: str) -> None:
     """Seed the run with two events so resume has something to replay."""
 
     async def _seed() -> None:
-        mgr = LcaStreamEventManager(get_agent_runtime_redis_client())
+        mgr = LcaStreamEventLog(get_agent_runtime_redis_client())
         await mgr.publish(
             run_id,
             "agent_runtime_init",
@@ -44,7 +44,7 @@ def _publish_initial_events(run_id: str) -> None:
 
 def _cleanup(run_id: str) -> None:
     async def _go() -> None:
-        mgr = LcaStreamEventManager(get_agent_runtime_redis_client())
+        mgr = LcaStreamEventLog(get_agent_runtime_redis_client())
         await mgr.cleanup(run_id)
 
     asyncio.run(_go())

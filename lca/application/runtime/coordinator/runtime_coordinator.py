@@ -16,7 +16,7 @@ from lca.application.runtime.coordinator.event_translator import EventTranslator
 from lca.application.runtime.coordinator.terminal_hints import (
     resolve_live_terminal_hint,
 )
-from lca.infrastructure.observability.stream import LcaStreamEventManager
+from lca.infrastructure.observability.stream import LcaStreamEventLog
 
 MetadataWriter = Callable[[str, dict], Awaitable[None]]
 
@@ -35,7 +35,7 @@ class LcaAgentRuntimeCoordinator:
     def __init__(
         self,
         *,
-        stream_manager: LcaStreamEventManager,
+        stream_manager: LcaStreamEventLog,
         translator: EventTranslator,
         metadata_writer: MetadataWriter,
         tool_state_writer: ToolStateWriter,

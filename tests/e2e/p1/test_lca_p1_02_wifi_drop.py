@@ -21,20 +21,20 @@ def test_wifi_drop_30s_reconnect_no_event_loss(lca_client) -> None:
 def test_wifi_drop_reconnect_preserves_event_order() -> None:
     """Unit-level: reconnect with lastEventId replays only unseen events.
 
-    Exercises the LcaStreamEventManager read_history path that the
+    Exercises the LcaStreamEventLog read_history path that the
     gateway uses for resume replay. Does not require a kernel.
     """
     import asyncio
     import uuid
 
     from lca.infrastructure.observability.stream import (
-        LcaStreamEventManager,
+        LcaStreamEventLog,
         get_agent_runtime_redis_client,
     )
 
     async def _run() -> None:
         run_id = uuid.uuid4().hex
-        mgr = LcaStreamEventManager(get_agent_runtime_redis_client())
+        mgr = LcaStreamEventLog(get_agent_runtime_redis_client())
         try:
             # Publish 5 events.
             ids: list[str] = []

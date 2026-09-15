@@ -88,7 +88,7 @@ def test_refresh_ws_token_returns_200_with_token_when_redis_key_alive() -> None:
     """Live stream key → 200 with a 3-part JWT (header.payload.signature)."""
     import redis.asyncio as aioredis
 
-    from lca.infrastructure.observability.stream import LcaStreamEventManager
+    from lca.infrastructure.observability.stream import LcaStreamEventLog
 
     app = build_http_app()
     run_id = f"ws200_{uuid.uuid4().hex[:8]}"
@@ -96,7 +96,7 @@ def test_refresh_ws_token_returns_200_with_token_when_redis_key_alive() -> None:
     async def _seed_then_cleanup() -> None:
         client = aioredis.from_url("redis://127.0.0.1:6379/0", decode_responses=True)
         try:
-            mgr = LcaStreamEventManager(client)
+            mgr = LcaStreamEventLog(client)
             await mgr.publish(run_id, "agent_runtime_init", {"agentId": "a1"}, step_index=0)
         finally:
             await client.aclose()
@@ -104,8 +104,8 @@ def test_refresh_ws_token_returns_200_with_token_when_redis_key_alive() -> None:
     async def _drop() -> None:
         client = aioredis.from_url("redis://127.0.0.1:6379/0", decode_responses=True)
         try:
-            from lca.infrastructure.observability.stream import LcaStreamEventManager
-            await LcaStreamEventManager(client).cleanup(run_id)
+            from lca.infrastructure.observability.stream import LcaStreamEventLog
+            await LcaStreamEventLog(client).cleanup(run_id)
         finally:
             await client.aclose()
 

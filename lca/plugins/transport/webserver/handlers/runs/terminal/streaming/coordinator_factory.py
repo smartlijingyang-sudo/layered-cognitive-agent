@@ -9,7 +9,7 @@ from lca.application.runtime.coordinator.runtime_coordinator import LcaAgentRunt
 from lca.contracts.observability.running_operation import RunningOperationStore
 from lca.contracts.observability.tool_message_plugin_state import ToolMessagePluginStateStore
 from lca.infrastructure.observability.stream import (
-    LcaStreamEventManager,
+    LcaStreamEventLog,
     get_agent_runtime_redis_client,
 )
 from lca.infrastructure.observability.tool_message_plugin_state_store import (
@@ -48,7 +48,7 @@ def build_agent_runtime_coordinator(
         )
 
     return LcaAgentRuntimeCoordinator(
-        stream_manager=LcaStreamEventManager(get_agent_runtime_redis_client()),
+        stream_manager=LcaStreamEventLog(get_agent_runtime_redis_client()),
         translator=EventTranslator(),
         metadata_writer=metadata_writer,
         tool_state_writer=tool_state_writer,

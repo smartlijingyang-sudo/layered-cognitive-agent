@@ -25,7 +25,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from lca.infrastructure.observability.stream import (
-    LcaStreamEventManager,
+    LcaStreamEventLog,
     get_agent_runtime_redis_client,
 )
 from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.auth import (
@@ -35,7 +35,7 @@ from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.auth impor
 )
 
 
-def _stream_manager() -> LcaStreamEventManager:
+def _stream_manager() -> LcaStreamEventLog:
     """Per-request stream manager.
 
     A module-level instance would bind its async Redis client to the
@@ -43,7 +43,7 @@ def _stream_manager() -> LcaStreamEventManager:
     which would surface as ``RuntimeError: Event loop is closed``. The
     factory keeps the manager scoped to the active loop.
     """
-    return LcaStreamEventManager(get_agent_runtime_redis_client())
+    return LcaStreamEventLog(get_agent_runtime_redis_client())
 
 
 def _get_running_operation_store(request: Request) -> Any | None:
