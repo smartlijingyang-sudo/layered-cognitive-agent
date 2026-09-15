@@ -25,7 +25,7 @@ Delete `max_visits` from the v2 graph driver surface in PR1 (subtraction-only). 
 - Drop both reads at `lca.framework.graph.lifter.py` lines 133 and 219 (`lift_graph_spec`, `lift_executable_plan`).
 - Drop the `max_visits` kwarg and serializer branch in `lca.framework.graph.plan_sdk.py` lines 215, 336, 485.
 - Drop `PhaseNode.max_visits` at `lca/contracts/protocols/declarative/declarative_1/declarative_graph.py` line 83; rephrase the PG-001 check at lines 93–95 to an id-only uniqueness check.
-- Drop `PlanNodeSpec.max_visits` at `lca/contracts/observability/observation/m1_blueprint/__init__.py` line 23.
+- **Keep** `PlanNodeSpec.max_visits` at `lca/contracts/observability/observation/m1_blueprint/__init__.py` line 23. This is a separate observability-snapshot namespace (`PlanNodeSpec` is the compile-time projection emitted by `lca/plugins/observation/lifecycle/plan_compile/plugin.py:80`); the field stays for the blueprint-trajectory-differ plugin to consume. The runtime `PlanNode.max_visits` field is what this ADR deletes.
 - Drop the projections at `lca/harness/declarative/compile/subgraph_resolver.py` lines 200, 236–242 and the field at `lca/harness/profile/plan/explain.py` line 43.
 - Drop the `max_visits` kwarg from the resume-path `traversal.visit` call at `lca/loop/driver.py` line 164.
 - Drop the `max=` label from `lca/infrastructure/cli/commands/profile/declarative_graph.py` line 28 and the `"max_visits"` key from `lca/infrastructure/cli/commands/profile/declarative.py` line 280.
