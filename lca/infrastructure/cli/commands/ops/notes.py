@@ -118,7 +118,7 @@ def _run_subprocess(
     *args: str, json_mode: bool, repo_root: Path
 ) -> subprocess.CompletedProcess[str]:
     """Run ``python <script>`` under the repo root and return the proc."""
-    return subprocess.run(  # noqa: S603  -- args are hardcoded script paths
+    return subprocess.run(  # args are hardcoded script paths
         [sys.executable, *args],
         cwd=repo_root,
         capture_output=True,
@@ -167,7 +167,7 @@ def register(app: typer.Typer) -> None:
         report_path.parent.mkdir(parents=True, exist_ok=True)
         # Script doesn't support ``--json`` yet — pass None to keep the
         # contract honest (only forward flags the script accepts).
-        proc = subprocess.run(  # noqa: S603  -- hardcoded script path
+        proc = subprocess.run(  # hardcoded script path
             [
                 sys.executable,
                 "scripts/audit_adr_health.py",
