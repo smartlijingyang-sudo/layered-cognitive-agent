@@ -79,7 +79,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     plugin id). The :class:`NamedRegistry` slot for ``fact_readers`` is
     registered but its ``otel`` factory is the no-op :func:`_make_otel_reader`.
     """
-    return None  # noqa: PLR1711 — explicit no-op for static analysers
+    return None  # explicit no-op for static analysers
 
 
 def _make_otel_reader(
