@@ -19,6 +19,7 @@ from lca.infrastructure.cli.cli.cli import app
 from lca.infrastructure.observability.spine.sinks.tracing_file_sink import (
     TracingFileSink,
 )
+from datetime import UTC
 
 # ── helpers ──────────────────────────────────────────────────────────────
 
@@ -52,8 +53,8 @@ def _seed_run_with_exception(
         epoch=1,
         causality_id="cu-1",
         outcome="failure",
-        when=datetime(2026, 9, 3, 12, 0, 0, tzinfo=timezone.utc),
-        when_corrected=datetime(2026, 9, 3, 12, 0, 0, tzinfo=timezone.utc),
+        when=datetime(2026, 9, 3, 12, 0, 0, tzinfo=UTC),
+        when_corrected=datetime(2026, 9, 3, 12, 0, 0, tzinfo=UTC),
         prev_event_hash=None,
         run_id=run_id,
         step_id="step-1",
