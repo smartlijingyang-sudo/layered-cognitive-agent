@@ -3,7 +3,7 @@
 > **目录宪法：** [platform-directory-architecture.md](../../docs/specs/platform-directory-architecture.md)  
 > **决策：** ADR-0186 · ADR-0191 · ADR-0192 · ADR-0195
 
-## 职责
+## 1. 职责
 
 Run 级**唯一 durable 事实**的 append 与 fold 入口。
 
@@ -16,12 +16,23 @@ Run 级**唯一 durable 事实**的 append 与 fold 入口。
 | `checkpoint.py` | 三边界 flush policy | `plugins/session/checkpoint_policy/` |
 | `bind.py` | run bind、spine hook | `plugins/session/runtime/bind.py` |
 
-## 不负责
+## 2. 不负责
 
 - 认知决策（cognition）
 - HTTP 路由（transport）
 - 控制面 State 单写（Reducer / RunCommitter）
 - 投影写回事实（C7）
+
+## 7. 副作用
+
+| 动作 | 后果 |
+|---|---|
+| `Session.append(event_type, data, …)` | 校验 payload → 追加到本 run 日志（仅此一个生产入口）→ 同步 fire observers（异常 contained，不回滚已 commit 的 append）→ 返回落日志的 `SessionEvent` |
+| spine hook（`bind.py`） | 把本 run 的 Session 事件投递到 `<run_id>.spine.jsonl`；未 bind 时不产出 |
+| `checkpoint.py` durability barrier | 三个入口（step 边界、模型请求边界、工具结果批次）共享同一形态：`await session.flush()` → 检查 per-listener `FlushResult` → 放行或抛 `CheckpointFailure`；`enabled=False` 时三入口 no-op 放行 |
+| `repair.py` | 只在崩溃 turn 追加修复事实；不回写既有事件（仅追加，不可变） |
+
+日志是 append-only：不存在删除或原地修改已提交事件的 API。
 
 ## SSOT
 
