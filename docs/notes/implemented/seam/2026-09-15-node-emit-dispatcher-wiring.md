@@ -59,7 +59,7 @@ The whitelist and the dispatch table are two views of the same closed set. Today
 
 ## Out of scope
 
-- Closed-set EP additions are recorded in [ADR-0240](../../../../adr/0240-node-emit-dispatch-whitelist-additions.md).
+- Closed-set EP additions are recorded in [ADR-0240](../../../adr/0240-node-emit-dispatch-whitelist-additions.md).
 - Imperative `publish_ep_bound` calls in `cognitive_emit.py`, `tool_journal.py`, `safe_executor.py`, `action_handlers.py`. Their payloads (decision_id, tool_name, error class) are richer than the dispatcher's kwargs; folding them in is a separate seam proposal.
 - `NodeEventEmissionCheck` re-enable in `DEFAULT_CHECKS`. Deferred to a follow-up PR after production runs accumulate kernel-cutover data.
 - `NodeEventEmissionCheck` style and naming checks (`NodeIdNamingCheck`, `PortNamingConventionCheck`, `PlanIdAliasSuffixCheck`) — currently disabled in `DEFAULT_CHECKS` for production profiles; re-enable order is a separate runbook decision.
