@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import inspect
 
-from lca.plugins.act import delta_handler_registry_provider, delta_handlers_provider
+from lca.plugins.act.delta import handler_registry_provider as delta_handler_registry_provider
+from lca.plugins.act.delta import handlers_provider as delta_handlers_provider
 
 
 def test_delta_handler_implementations_do_not_own_registry_assembly() -> None:
