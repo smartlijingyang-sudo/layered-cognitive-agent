@@ -5,7 +5,9 @@ from __future__ import annotations
 import unittest
 
 from lca.cognition.brain.prompt.conversation_prompt import format_prior_conversation
-from lca.cognition.brain.reasoner.reasoner import _prior_conversation_text
+from lca.cognition.brain.sections.types import (
+    render_prior_conversation_from_state as _prior_conversation_text,
+)
 from lca.contracts.models.core.conversation.conversation import (
     PRIOR_CONVERSATION_WM_KEY,
     ConversationTurn,
