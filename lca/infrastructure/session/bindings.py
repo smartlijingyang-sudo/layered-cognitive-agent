@@ -19,7 +19,6 @@ from lca.contracts.protocols.session.model.context import (
 from lca.infrastructure.session.context.model_context_assembler import (
     default_model_context_assembler,
 )
-from lca.plugins.events.publishers._session_publish import _ACTIVE_SESSION
 from lca.session.append import Session
 
 _model_context_assembler: contextvars.ContextVar[ModelContextAssembler | None] = (
@@ -29,6 +28,19 @@ _checkpoint_policy_var: contextvars.ContextVar[SessionCheckpointPolicyProtocol |
     contextvars.ContextVar("lca_session_checkpoint_policy", default=None)
 )
 _default_checkpoint_policy: SessionCheckpointPolicyProtocol | None = None
+
+
+def _active_publish_session() -> object | None:
+    """Read the live publish Session.
+
+    ``_session_publish._ACTIVE_SESSION`` is reassigned by
+    :func:`set_publish_session`; binding it via ``from X import Y`` would
+    capture the value at import time and never observe updates. Always read
+    the live module attribute so resolve_* sees the current binding.
+    """
+    from lca.plugins.events.publishers import _session_publish
+
+    return _session_publish._ACTIVE_SESSION
 
 
 def resolve_raw_session(target: object | None) -> Session | None:
@@ -56,7 +68,7 @@ def resolve_session_reader() -> SessionReader | None:
     SPEC section H:_current_publish_session ContextVar 已删除;本读
     ``_ACTIVE_SESSION`` module-level state(由 ``set_publish_session`` 设置)。
     """
-    session = resolve_raw_session(_ACTIVE_SESSION)
+    session = resolve_raw_session(_active_publish_session())
     if session is None:
         return None
     return session
@@ -64,7 +76,7 @@ def resolve_session_reader() -> SessionReader | None:
 
 def resolve_flushable_session() -> FlushableSession | None:
     """Bound runtime Session for checkpoint ``flush()``, or ``None``."""
-    return resolve_raw_session(_ACTIVE_SESSION)
+    return resolve_raw_session(_active_publish_session())
 
 
 def resolve_session_for_emit(state: AgentState | None = None) -> object | None:
@@ -75,7 +87,7 @@ def resolve_session_for_emit(state: AgentState | None = None) -> object | None:
     ``set_publish_session`` / run bind boundary).
     """
     _ = state
-    writer = _ACTIVE_SESSION
+    writer = _active_publish_session()
     resolved = resolve_raw_session(writer)
     if resolved is not None:
         return resolved
