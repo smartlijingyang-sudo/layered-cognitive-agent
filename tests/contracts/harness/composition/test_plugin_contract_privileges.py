@@ -12,8 +12,6 @@ whose privilege it has not declared.
 
 from __future__ import annotations
 
-import importlib
-import sys
 import warnings
 
 import pytest
