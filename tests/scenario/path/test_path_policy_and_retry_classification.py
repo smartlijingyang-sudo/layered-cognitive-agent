@@ -21,8 +21,8 @@ from pathlib import Path
 
 import pytest
 
-from lca.cognition.body import pipeline_safe_executor as pipeline_executor_module
-from lca.cognition.body import safe_executor as safe_executor_module
+from lca.cognition.body.executor import pipeline_safe_executor as pipeline_executor_module
+from lca.cognition.body.executor import safe_executor as safe_executor_module
 from lca.contracts.atoms.semantic.keys import (
     FAILURE_KIND,
     FAILURE_KIND_EXECUTION,
