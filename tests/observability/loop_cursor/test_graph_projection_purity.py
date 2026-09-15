@@ -22,7 +22,7 @@ output.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone, UTC
+from datetime import UTC, datetime
 
 from lca.contracts.observability.cursor.loop_cursor import CursorSnapshot
 from lca.contracts.observability.cursor.loop_projection import LoopProjectionDefinition
