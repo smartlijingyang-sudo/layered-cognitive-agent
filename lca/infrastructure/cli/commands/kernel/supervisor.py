@@ -21,11 +21,8 @@ at the same ``[program:lca_kernel_dev]`` config file.
 
 from __future__ import annotations
 
-import contextlib
 import json
 import os
-import signal
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -34,14 +31,13 @@ from typing import Any
 import typer
 
 from lca.infrastructure.cli.services.kernel.supervisor import (
-    KernelSupervisor,
     ProgramConfig,
     ProgramState,
     ProgramStatus,
-    clear_state,
     default_program_config,
+    get_supervisor,
     parse_program_config,
-    read_state_file,
+    status_from_state_file,
 )
 
 
@@ -218,7 +214,7 @@ def register(app: typer.Typer) -> None:
 
         # ── resolve config + build supervisor ──────────────────────
         cfg = _resolve_config(config_path, profile=profile, port=port)
-        sup = _supervisor_singleton(cfg)
+        sup = get_supervisor(cfg)
 
         # ── dispatch ──────────────────────────────────────────────
         if action == "start":
@@ -290,38 +286,25 @@ def register(app: typer.Typer) -> None:
             return
 
         if action == "restart":
-            status = sup.restart()
+            sup.restart()
             ready = sup.wait_ready(timeout=cfg.readiness_timeout)
             status = sup.status()
-            if ready:
-                _emit_ok(
-                    as_json,
-                    verdict="ready",
-                    detail=(
-                        f"supervisor restarted pid={status.pid} "
-                        f"restart_count={status.restart_count}"
-                    ),
-                    status=_program_status_json(status),
-                    next_command=(
-                        f"./scripts/lca-ops kernel-supervisor status --name {cfg.name}"
-                    ),
-                )
-                return
-            _emit_error(
-                as_json,
-                f"restart did not become ready within "
-                f"{cfg.readiness_timeout}s: {status.last_event}",
-                status=_program_status_json(status),
-                next_command=f"./scripts/lca-ops kernel-supervisor logs --name {cfg.name}",
+            _emit_restart_result(
+                cfg=cfg,
+                status=status,
+                ready=ready,
+                json_mode=as_json,
             )
-            raise typer.Exit(1)
+            if not ready:
+                raise typer.Exit(1)
+            return
 
         if action == "status":
             status = sup.status()
             # If the in-process supervisor is empty (we never started
             # in this process), fall back to the persisted state file.
             if status.state == ProgramState.STOPPED and status.pid is None:
-                persisted = _status_from_state_file(cfg)
+                persisted = status_from_state_file(cfg)
                 if persisted is not None:
                     status = persisted
             events = [_program_event_json(e) for e in sup.events()]
@@ -389,7 +372,7 @@ def register(app: typer.Typer) -> None:
 # ── helpers ─────────────────────────────────────────────────────────────
 
 
-_SUPERVISORS: dict[str, KernelSupervisor] = {}
+
 
 
 def _resolve_config(
@@ -417,98 +400,6 @@ def _pid_alive(pid: int) -> bool:
     except OSError:
         return False
     return True
-
-
-def _supervisor_singleton(cfg: ProgramConfig) -> KernelSupervisor:
-    """One supervisor per CLI invocation. State persists across
-    invocations via :func:`_read_state_file` (written by `_transition`
-    in the previous process).
-    """
-    key = f"{cfg.name}:{cfg.directory}:{cfg.command}:{cfg.args}"
-    sup = _SUPERVISORS.get(key)
-    if sup is None:
-        sup = KernelSupervisor(cfg)
-        _SUPERVISORS[key] = sup
-        # Hydrate from state file ONLY if the persisted pid is still
-        # alive in /proc. Otherwise treat the program as STOPPED so
-        # `start()` actually spawns a new one.
-        st = read_state_file()
-        if st is not None and st.get("program") == cfg.name:
-            persisted_pid = st.get("pid")
-            alive = (
-                persisted_pid is not None and _pid_alive(int(persisted_pid))
-            )
-            if alive:
-                sup._state = ProgramState(st["state"])
-                sup._last_event = st.get("last_event", "")
-                sup._restart_count = st.get("restart_count", 0)
-                sup._last_exit_code = st.get("last_exit_code")
-                sup._spawned_at = time.monotonic()  # restart the clock
-                persisted_pid_int = int(persisted_pid)
-                class _PhantomProc:
-                    """Stand-in for :class:`subprocess.Popen` when the
-                    supervisor was hydrated from a state file written
-                    by a previous process. Forwards signals; the only
-                    real subprocess work happens in a future ``start()``.
-                    """
-                    pid = persisted_pid_int
-                    def poll(self) -> int | None:
-                        try:
-                            os.kill(persisted_pid_int, 0)
-                        except OSError:
-                            return -1
-                        return None
-                    def send_signal(self, sig: int) -> None:
-                        with contextlib.suppress(ProcessLookupError):
-                            os.kill(persisted_pid_int, sig)
-                    def wait(self, timeout: float | None = None) -> int:
-                        # PhantomProc can't really wait — block on the
-                        # pid until it exits or timeout elapses.
-                        deadline = time.monotonic() + (timeout or 10.0)
-                        while time.monotonic() < deadline:
-                            try:
-                                waited_pid, status = os.waitpid(
-                                    persisted_pid_int, os.WNOHANG
-                                )
-                                if waited_pid == persisted_pid_int:
-                                    return os.waitstatus_to_exitcode(status)
-                            except ChildProcessError:
-                                return -1
-                            time.sleep(0.1)
-                        raise subprocess.TimeoutExpired(
-                            "phantom", timeout
-                        )
-                sup._proc = _PhantomProc()
-            else:
-                # Persisted state refers to a dead pid; treat as
-                # STOPPED so start() can spawn fresh.
-                clear_state()
-    return sup
-
-
-def _status_from_state_file(cfg: ProgramConfig) -> ProgramStatus | None:
-    """Read the persisted snapshot if the in-process supervisor is empty.
-
-    Used by ``status`` and ``events`` when the supervisor was never
-    ``start()``ed in this process — gives cross-process visibility.
-    """
-    st = read_state_file()
-    if st is None or st.get("program") != cfg.name:
-        return None
-    try:
-        state = ProgramState(st["state"])
-    except (KeyError, ValueError):
-        return None
-    return ProgramStatus(
-        name=cfg.name,
-        state=state,
-        pid=st.get("pid"),
-        uptime_s=st.get("uptime_s", 0.0),
-        restart_count=st.get("restart_count", 0),
-        last_exit_code=st.get("last_exit_code"),
-        last_event=st.get("last_event", ""),
-        spawned_at=st.get("spawned_at"),
-    )
 
 
 def _emit_ok(
@@ -546,6 +437,54 @@ def _emit_error(
         typer.echo(f"❌ failed: {reason}", err=True)
         if next_command:
             typer.echo(f"   next: {next_command}", err=True)
+
+
+def _emit_restart_result(
+    *,
+    cfg: ProgramConfig,
+    status: ProgramStatus,
+    ready: bool,
+    json_mode: bool,
+) -> dict[str, Any]:
+    """Single source of truth for ``restart`` action output.
+
+    Used by both ``lca-ops kernel-supervisor restart`` and
+    ``lca-ops kernel-restart`` so the wire shape stays identical.
+
+    In text mode prints verdict + next hint to stdout. In JSON mode
+    emits the full payload (verdict + status + next_command). Returns
+    the dict so callers can inspect the result programmatically.
+    """
+    if ready:
+        detail = (
+            f"LCA kernel restarted (pid={status.pid}, "
+            f"restart_count={status.restart_count})"
+        )
+        next_cmd = (
+            f"./scripts/lca-ops kernel-supervisor status --name {cfg.name}"
+        )
+    else:
+        detail = (
+            f"restart did not become ready within "
+            f"{cfg.readiness_timeout}s: {status.last_event}"
+        )
+        next_cmd = (
+            f"./scripts/lca-ops kernel-supervisor logs --name {cfg.name}"
+        )
+    payload: dict[str, Any] = {
+        "verdict": "ready" if ready else "failed",
+        "detail": detail,
+        "status": status.__dict__,
+        "next_command": next_cmd,
+    }
+    if json_mode:
+        typer.echo(json.dumps(payload, indent=2))
+    else:
+        marker = "✅" if ready else "❌"
+        typer.echo(f"{marker} {payload['verdict']}: {detail}")
+        if next_cmd:
+            typer.echo(f"   next: {next_cmd}")
+    return payload
 
 
 def _tail_log(

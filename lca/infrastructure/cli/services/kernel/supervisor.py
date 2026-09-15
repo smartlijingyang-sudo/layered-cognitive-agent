@@ -127,6 +127,127 @@ def clear_state() -> None:
         _STATE_PATH.unlink(missing_ok=True)
 
 
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+# Per-process cache of supervisor instances, keyed by config fingerprint.
+# Lives in the service module so both ``kernel-supervisor`` and
+# ``kernel-restart`` (CLI) reuse the same instance when invoked from
+# the same Python process. Cross-process state is the JSON state file.
+_SUPERVISOR_CACHE: dict[str, KernelSupervisor] = {}
+
+
+class _PhantomProc:
+    """Stand-in for :class:`subprocess.Popen` when the supervisor was
+    hydrated from a state file written by a previous process.
+
+    Forwards signals; the only real subprocess work happens in a future
+    ``start()`` call. The methods ``wait`` / ``poll`` are needed because
+    :meth:`KernelSupervisor.stop` talks to the proc the same way it
+    would to a real ``Popen`` — keeps the supervisor's surface
+    uniform across the in-process and hydrated cases.
+    """
+
+    __slots__ = ("_pid",)
+
+    def __init__(self, pid: int) -> None:
+        self._pid = pid
+
+    @property
+    def pid(self) -> int:
+        return self._pid
+
+    def poll(self) -> int | None:
+        try:
+            os.kill(self._pid, 0)
+        except OSError:
+            return -1
+        return None
+
+    def send_signal(self, sig: int) -> None:
+        with contextlib.suppress(ProcessLookupError):
+            os.kill(self._pid, sig)
+
+    def wait(self, timeout: float | None = None) -> int:
+        deadline = time.monotonic() + (timeout or 10.0)
+        while time.monotonic() < deadline:
+            try:
+                waited_pid, status = os.waitpid(self._pid, os.WNOHANG)
+                if waited_pid == self._pid:
+                    return os.waitstatus_to_exitcode(status)
+            except ChildProcessError:
+                return -1
+            time.sleep(0.1)
+        raise subprocess.TimeoutExpired(self._pid, timeout)
+
+
+def _hydrate_from_state_file(sup: KernelSupervisor, cfg: ProgramConfig) -> None:
+    """Read the most recent state-file snapshot and apply it to ``sup``
+    IF the persisted pid is still alive. Called from
+    :func:`get_supervisor` on first use within a process.
+    """
+    st = read_state_file()
+    if st is None or st.get("program") != cfg.name:
+        return
+    persisted_pid = st.get("pid")
+    if persisted_pid is None or not _pid_alive(int(persisted_pid)):
+        clear_state()
+        return
+    sup._state = ProgramState(st["state"])
+    sup._last_event = st.get("last_event", "")
+    sup._restart_count = st.get("restart_count", 0)
+    sup._last_exit_code = st.get("last_exit_code")
+    sup._spawned_at = time.monotonic()  # reset the clock for this process
+    sup._proc = _PhantomProc(int(persisted_pid))
+
+
+def get_supervisor(cfg: ProgramConfig) -> KernelSupervisor:
+    """One canonical supervisor per (config fingerprint) per process.
+
+    Hydrates from the cross-process state file on first use so a
+    status / restart in a fresh CLI invocation sees what the previous
+    process wrote. The kernel spawn / event loop work lives in
+    :class:`KernelSupervisor`; this function is only the
+    "find-or-create + hydrate" entry point.
+    """
+    key = f"{cfg.name}:{cfg.directory}:{cfg.command}:{cfg.args}"
+    sup = _SUPERVISOR_CACHE.get(key)
+    if sup is not None:
+        return sup
+    sup = KernelSupervisor(cfg)
+    _SUPERVISOR_CACHE[key] = sup
+    _hydrate_from_state_file(sup, cfg)
+    return sup
+
+
+def status_from_state_file(cfg: ProgramConfig) -> ProgramStatus | None:
+    """Read the persisted snapshot, returning ``None`` if the state
+    file is missing or refers to a different program.
+    """
+    st = read_state_file()
+    if st is None or st.get("program") != cfg.name:
+        return None
+    try:
+        state = ProgramState(st["state"])
+    except (KeyError, ValueError):
+        return None
+    return ProgramStatus(
+        name=cfg.name,
+        state=state,
+        pid=st.get("pid"),
+        uptime_s=st.get("uptime_s", 0.0),
+        restart_count=st.get("restart_count", 0),
+        last_exit_code=st.get("last_exit_code"),
+        last_event=st.get("last_event", ""),
+        spawned_at=st.get("spawned_at"),
+    )
+
+
 # ── Public types ────────────────────────────────────────────────────────
 
 
@@ -897,6 +1018,8 @@ __all__ = [
     "clear_state",
     "decide_restart",
     "default_program_config",
+    "get_supervisor",
     "parse_program_config",
     "read_state_file",
+    "status_from_state_file",
 ]

@@ -11,22 +11,19 @@ the deps). They pin the wire-stable contract:
 
 from __future__ import annotations
 
-import os
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 
 from lca.infrastructure.cli.services.kernel.supervisor import (
+    ProgramConfig,
     ProgramState,
-    RestartDecision,
     clear_state,
     decide_restart,
+    get_supervisor,
     parse_program_config,
     read_state_file,
 )
-
 
 # ── decide_restart (pure, table-driven) ──────────────────────────────
 
@@ -214,3 +211,36 @@ class TestStateFile:
         state.write_text("not json")
         monkeypatch.setattr(mod, "_STATE_PATH", state)
         assert read_state_file() is None
+
+
+# ── get_supervisor (singleton + hydration) ──────────────────────────
+
+
+class TestGetSupervisor:
+    def test_returns_same_instance_for_same_config(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        # Reset module-level cache so the test is hermetic.
+        import lca.infrastructure.cli.services.kernel.supervisor as mod
+        monkeypatch.setattr(mod, "_SUPERVISOR_CACHE", {})
+
+        cfg = ProgramConfig(
+            name="test_app", command="/bin/echo", args=("hi",),
+        )
+        a = get_supervisor(cfg)
+        b = get_supervisor(cfg)
+        assert a is b
+
+    def test_returns_different_instance_for_different_config(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        import lca.infrastructure.cli.services.kernel.supervisor as mod
+        monkeypatch.setattr(mod, "_SUPERVISOR_CACHE", {})
+
+        a = get_supervisor(
+            ProgramConfig(name="x", command="/bin/echo", args=())
+        )
+        b = get_supervisor(
+            ProgramConfig(name="y", command="/bin/echo", args=())
+        )
+        assert a is not b

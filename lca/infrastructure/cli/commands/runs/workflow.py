@@ -90,55 +90,26 @@ def register(app: typer.Typer) -> None:
         ``{verdict, status, detail, next_command}``。失败时 ``status`` 字段
         给出 last_event + restart_count。
         """
-        import json as _json
-        import sys as _sys
 
-        from lca.infrastructure.cli.commands.kernel.supervisor import (
-            _supervisor_singleton,
-        )
         from lca.infrastructure.cli.services.kernel.supervisor import (
             default_program_config,
+            get_supervisor,
         )
 
         ctx = make_context(json_mode, quiet, config)
         cfg = default_program_config()
-        sup = _supervisor_singleton(cfg)
+        sup = get_supervisor(cfg)
         sup.restart()
         ready = sup.wait_ready(timeout=cfg.readiness_timeout)
         status = sup.status()
-        if ready:
-            detail = f"LCA kernel restarted (pid={status.pid}, restart_count={status.restart_count})"
-            ctx.console.verdict(True, detail)
-            if json_mode:
-                _sys.stdout.write(
-                    _json.dumps(
-                        {
-                            "verdict": "ready",
-                            "detail": detail,
-                            "status": status.__dict__,
-                            "next_command": (
-                                f"./scripts/lca-ops kernel-supervisor status "
-                                f"--name {cfg.name}"
-                            ),
-                        },
-                        indent=2,
-                    )
-                )
-            return
-        detail = f"restart did not become ready within {cfg.readiness_timeout}s: {status.last_event}"
-        ctx.console.verdict(False, detail)
-        if json_mode:
-            _sys.stdout.write(
-                _json.dumps(
-                    {
-                        "verdict": "failed",
-                        "detail": detail,
-                        "status": status.__dict__,
-                        "next_command": (
-                            f"./scripts/lca-ops kernel-supervisor logs --name {cfg.name}"
-                        ),
-                    },
-                    indent=2,
-                )
-            )
-        raise typer.Exit(1)
+        from lca.infrastructure.cli.commands.kernel.supervisor import (
+            _emit_restart_result,
+        )
+        _emit_restart_result(
+            cfg=cfg,
+            status=status,
+            ready=ready,
+            json_mode=json_mode,
+        )
+        if not ready:
+            raise typer.Exit(1)
