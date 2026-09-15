@@ -45,28 +45,28 @@
 
 | 评审缺口 | 仓库实情 | 文件锚点 |
 |---|---|---|
-| "可观测机制已吸收，缺群体指标" | Observability Exporters + Compile Graph 已落 | [ADR-0172](../adr/0172-observability-exporters.md) Proposed / [ADR-0198](../adr/0198-observability-compile-graph.md) Accepted |
-| "事实单轨方向" | Session/FactGateway/spine/deriver 已 Implemented | [ADR-0186](../adr/0186-session-as-event-ssot.md) Implemented / [ADR-0191](../adr/0191-runtime-loop-dsh-convergence-and-control-plane.md) Implemented / [ADR-0194](../adr/0194-cognitive-loop-architecture-convergence.md) Implemented |
-| "执行窄门 + 决策/观测分离" | CompiledRunPlan + Effect Gateway + Decision/Observation 分离 | [ADR-0075](../adr/0075-declarative-phase-graph-and-minimal-trusted-kernel.md) Accepted / [ADR-0050](../adr/0050-run-bound-sandbox-runtime.md) / [ADR-0051](../adr/0051-run-workspace-plane.md) |
-| "图作为执行事实" | 图作为 CompiledRunPlan region（0075 phase_graph） | [ADR-0075](../adr/0075-declarative-phase-graph-and-minimal-trusted-kernel.md) |
-| Effect idempotency / durable receipt | SqliteIdempotencyStore capability 已落地 | [ADR-0093](../adr/0093-continuous-control-plane.md) §实施状态 |
+| "可观测机制已吸收，缺群体指标" | Observability Exporters + Compile Graph 已落 | [ADR-0172](../../adr/0172-observability-exporters.md) Proposed / [ADR-0198](../../adr/0198-observability-compile-graph.md) Accepted |
+| "事实单轨方向" | Session/FactGateway/spine/deriver 已 Implemented | [ADR-0186](../../adr/0186-session-as-event-ssot.md) Implemented / [ADR-0191](../../adr/0191-runtime-loop-dsh-convergence-and-control-plane.md) Implemented / [ADR-0194](../../adr/0194-cognitive-loop-architecture-convergence.md) Implemented |
+| "执行窄门 + 决策/观测分离" | CompiledRunPlan + Effect Gateway + Decision/Observation 分离 | [ADR-0075](../../adr/0075-declarative-phase-graph-and-minimal-trusted-kernel.md) Accepted / [ADR-0050](../../adr/0050-run-bound-sandbox-runtime.md) / [ADR-0051](../../adr/0051-run-workspace-plane.md) |
+| "图作为执行事实" | 图作为 CompiledRunPlan region（0075 phase_graph） | [ADR-0075](../../adr/0075-declarative-phase-graph-and-minimal-trusted-kernel.md) |
+| Effect idempotency / durable receipt | SqliteIdempotencyStore capability 已落地 | [ADR-0093](../../adr/0093-continuous-control-plane.md) §实施状态 |
 
 #### 已 Proposed（决策已立但未 Accepted）
 
 | 评审缺口 | 仓库实情 | 文件锚点 |
 |---|---|---|
-| "没有持续群体控制面" | ADR-0093 正是 Continuous Control Plane（Proposed 2026-08-27）：Trigger / WorkItem / WorkQueue / Lease / SessionWorkActivator | [ADR-0093](../adr/0093-continuous-control-plane.md) |
-| "没有群体级任务市场" | ADR-0093 §决策已规定 WorkQueue 持久去重、原子 claim、过期 lease 恢复、dead-letter | [ADR-0093](../adr/0093-continuous-control-plane.md) |
+| "没有持续群体控制面" | ADR-0093 正是 Continuous Control Plane（Proposed 2026-08-27）：Trigger / WorkItem / WorkQueue / Lease / SessionWorkActivator | [ADR-0093](../../adr/0093-continuous-control-plane.md) |
+| "没有群体级任务市场" | ADR-0093 §决策已规定 WorkQueue 持久去重、原子 claim、过期 lease 恢复、dead-letter | [ADR-0093](../../adr/0093-continuous-control-plane.md) |
 | "图 B 已吸收但仍依赖适配器" | InfoEdge prototype 双挂桥接 + delete-when 已立契约 | Note `2026-09-08-agent-lab-absorb-end-state` 已退役，见 `docs/design/2026-09-14-agent-lab-info-graph-reference.md` |
-| "图内核扩展" | InfoEdgeSpec 嵌套子图 + CompiledGraphBundle | [ADR-0206](../adr/0206-information-graph-kernel.md) Proposed |
+| "图内核扩展" | InfoEdgeSpec 嵌套子图 + CompiledGraphBundle | [ADR-0206](../../adr/0206-information-graph-kernel.md) Proposed |
 
 #### 与现有 ADR 冲突（不应采纳）
 
 | 评审建议 | 冲突点 | 处理 |
 |---|---|---|
-| 新增 Pheromone 平面 / PheromoneSignal 词根 | [ADR-0206](../adr/0206-information-graph-kernel.md) §8 Reject 已显式表态"信息素 ≠ 可审计边；隐喻止于 Grant / Borrow；无衰减黑板垃圾场" | 驳回 |
-| 建 `lca/colony/` 目录 | 违反 [ADR-0001](../adr/0001-five-layer-separation.md) 五层单向依赖分层；与 [ADR-0195](../adr/0195-platform-architecture-convergence.md) SSOT 矩阵冲突；重叠 [ADR-0093](../adr/0093-continuous-control-plane.md) 已实现组件 | 驳回 |
-| 六类角色（Scout/Builder/Verifier/Router/Guardian/Forager）作为 Worker 类型 | [ADR-0075](../adr/0075-declarative-phase-graph-and-minimal-trusted-kernel.md) §二 + [ADR-0093](../adr/0093-continuous-control-plane.md) §验收 §6 "不得扩大 capability grant"；违反 AGENTS.md C1 认知闭集 | 须先 ADR/Note 草案，能力配置化而非新 Agent 类 |
+| 新增 Pheromone 平面 / PheromoneSignal 词根 | [ADR-0206](../../adr/0206-information-graph-kernel.md) §8 Reject 已显式表态"信息素 ≠ 可审计边；隐喻止于 Grant / Borrow；无衰减黑板垃圾场" | 驳回 |
+| 建 `lca/colony/` 目录 | 违反 [ADR-0001](../../adr/0001-five-layer-separation.md) 五层单向依赖分层；与 [ADR-0195](../../adr/0195-platform-architecture-convergence.md) SSOT 矩阵冲突；重叠 [ADR-0093](../../adr/0093-continuous-control-plane.md) 已实现组件 | 驳回 |
+| 六类角色（Scout/Builder/Verifier/Router/Guardian/Forager）作为 Worker 类型 | [ADR-0075](../../adr/0075-declarative-phase-graph-and-minimal-trusted-kernel.md) §二 + [ADR-0093](../../adr/0093-continuous-control-plane.md) §验收 §6 "不得扩大 capability grant"；违反 AGENTS.md C1 认知闭集 | 须先 ADR/Note 草案，能力配置化而非新 Agent 类 |
 | `ActionValue` / `expected_information_gain` / 三层 utility 函数 | 涉及新决策原语，违反 AGENTS.md C1 / C6 | 须先 ADR/Note 草案 |
 | 五源四系拼接（蚂蚁/工蜂/COIN/Distributed/信息论） | 评审未做"已存在 ADR 索引"，直接拼接违反 AGENTS.md §1 "禁止新增平行 ADR/Note/Proposal" | 驳回作为落地方案；保留为对照材料 |
 
