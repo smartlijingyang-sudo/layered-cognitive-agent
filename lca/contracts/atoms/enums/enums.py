@@ -18,6 +18,7 @@ class ActionType(str, Enum):
     HANDOFF = "handoff"
     STOP = "stop"
     ASK_HUMAN = "ask_human"
+    SHORT_CIRCUIT = "short_circuit"
 
 
 class DecisionGateName(str, Enum):

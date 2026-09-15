@@ -18,6 +18,7 @@ class RoutingDecision(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     action_type: ActionType
     should_terminate: bool = False
+    next_node: str | None = None  # target node semantic_name for graph routing
     next_hint: str | None = None  # free-form metadata, not routing
 
 
