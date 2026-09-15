@@ -66,7 +66,21 @@ plugins:
 
 事件 yaml 与 Pipeline yaml 的 `publishers:` / `consumer_rules:` / `hooks:` / `sinks:` 在 PR-5 之后改为 id 引用；当前形态由 `lca_kernel/events/registry.py` 与 `lca/harness/profile/pipeline_loader.py` 解析。
 
-## 7. 插件如何发现
+## 7. 副作用
+
+插件自身不在 setup 之外持有世界写入口；可观察后果都经 manifest 声明：
+
+| 声明 | 后果 |
+|---|---|
+| `effects=(…)`（必填） | 该插件可产生的效果类别；运行时副作用只能经 `CommandEnvelope` → Body → SafeExecutor 窄门落地（C5 能力单调、C10 执行窄门），未声明的效果在 grant 检查处被 `CapabilityGrantExceededError` 拒绝 |
+| `provides` / `requires` | 向 capability registry 注册与解析；未声明的 `setup()` 调用触发 `UndeclaredInteractionError` |
+| `emits`（`OwnershipDeclaration`） | 允许投递的 journal/spine 事件词表；事实写入仍只经 `Session.append` 单入口 |
+| `log:emit` | 通过 `PluginContext` 发结构化日志（观察面，不改变状态） |
+
+`setup()` 期间的注册是唯一在装配阶段发生的持久效果：它写入 capability registry，
+由 profile 解析与装配测试复核。
+
+## 8. 插件如何发现
 
 **不要**用文件枚举列举本目录的插件（路径会随 PR-10 迁移而失效）。改用以下入口：
 
@@ -80,7 +94,7 @@ plugins:
 
 实时清单：`find lca/plugins -name '*.py' | wc -l` 与 `uv run python scripts/check_plugin_metadata.py 2>&1 | head -1`。
 
-## 8. 子目录角色（静态表）
+## 9. 子目录角色（静态表）
 
 本表只列**目录角色**，不列具体文件路径——具体路径以 `inspect-tree` 输出为准。
 
@@ -95,10 +109,6 @@ plugins:
 | `composer/` `composer/{act,think,perceive,collaboration,runtime,composition}/` | 组合根（plan → agent graph 绑定；fixtures）；在 PR-8 中迁至 `lca/application/composer/` |
 | `bundles/` | 插件化 bundle 入口的 Python 形态（多数 bundle 已为 yaml） |
 | `events/` 内无 `@plugin` 的子包 | 私有辅助，被同目录的插件文件调用 |
-
-## 9. 副作用
-
-`log:emit`（插件通过 `PluginContext` 发送结构化日志）。
 
 ## 10. 失败语义
 
