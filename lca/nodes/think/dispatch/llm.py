@@ -48,6 +48,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.infrastructure.session.bindings import resolve_session_reader
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,7 +58,10 @@ class LlmCallExecutor:
     semantic_name: str = "llm.call"
     region: str = "phase:think"
     declared_inputs: tuple[PortName, ...] = (
-        "state", "writer", "model_visible_request", "adapter",
+        "state",
+        "writer",
+        "model_visible_request",
+        "adapter",
     )
     declared_outputs: tuple[PortName, ...] = ("llm_response", "usage")
 
@@ -76,11 +80,18 @@ class LlmCallExecutor:
         # Unpack it here so the node body owns the typed-boundary translation.
         prompt = request.messages[-1]["content"] if request.messages else ""
         history = request.messages[:-1] if len(request.messages) > 1 else []
+        # session-bound so TelemetryLLMAdapter can route llm.call.start/end through
+        # publish_ep_bound with state+session instead of dropping events on the unbound path.
+        session = _resolve_session(context)
         response: LLMResponse = await adapter.complete(
             prompt,
             system=request.system,
             history=history,
             tools=list(request.tools) if request.tools else None,
+            state=state,
+            turn=int(state.extra.get("current_turn", 0)),
+            step=state.step,
+            session=session,
         )
         usage: TokenUsage | None = response.usage
         tool_calls = list(response.tool_calls or ())
@@ -117,9 +128,7 @@ class LlmCallExecutor:
         )
 
 
-def _resolve_port(
-    name: str, *, input: NodeInput, context: NodeContext
-) -> Any:
+def _resolve_port(name: str, *, input: NodeInput, context: NodeContext) -> Any:
     """Read a declared port from ``input.port_values`` or ``context.runtime``."""
     value = input.port_values.get(name)
     if value is None and hasattr(context, "runtime") and context.runtime is not None:
@@ -131,6 +140,23 @@ def _resolve_port(
             f"llm.call: '{name}' port must be supplied via input.port_values or context.runtime"
         )
     return value
+
+
+def _resolve_session(context: NodeContext) -> Any:
+    """Prefer ``context.runtime.session``; fall back to module-level binding.
+
+    ``TelemetryLLMAdapter.complete`` emits ``llm.call.start/end`` via
+    ``publish_ep_bound``, which drops events when both ``session`` and the
+    module-level ``_ACTIVE_SESSION`` are unbound.
+    """
+    runtime = getattr(context, "runtime", None)
+    if runtime is not None:
+        session = getattr(runtime, "session", None)
+        if session is None and hasattr(runtime, "get"):
+            session = runtime.get("session")
+        if session is not None:
+            return session
+    return resolve_session_reader()
 
 
 @plugin(
