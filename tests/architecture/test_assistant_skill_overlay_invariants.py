@@ -92,7 +92,7 @@ class TestWritePathConstrainedToHomeSkills:
         skill_src = tmp_path / "pkg"
         skill_src.mkdir()
         (skill_src / "SKILL.md").write_text(
-            "---\nname: iso-skill\ndescription: d\n---\nbody\n", encoding="utf-8"
+            "---\nname: iso-skill\ndescription: d\nreferences: []\n---\nbody\n", encoding="utf-8"
         )
 
         catalog = AssistantCatalogImpl(root=root)
@@ -161,7 +161,7 @@ class TestEPClosureForInstallAndActivate:
         skill_src = tmp_path / "pkg"
         skill_src.mkdir()
         (skill_src / "SKILL.md").write_text(
-            "---\nname: ep-skill\ndescription: d\n---\nbody\n", encoding="utf-8"
+            "---\nname: ep-skill\ndescription: d\nreferences: []\n---\nbody\n", encoding="utf-8"
         )
 
         await overlay.install(handle.assistant_id, SkillSource(local_path=str(skill_src)))
