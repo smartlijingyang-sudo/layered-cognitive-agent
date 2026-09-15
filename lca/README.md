@@ -56,11 +56,9 @@ attribute 'X'`，不猜测、不静默返回 `None`。白名单符号的真实�
 写回 `globals()`，后续访问不再走 import。
 
 ## 9. 公共入口
+包门面导出的名字与模块 __all__ 一一对应（共 14 项）：
 
-```python
-from lca import Agent, Team            # 外部调用方的简洁门面
-from lca.contracts... import Decision   # 分层内部走具体子模块
-```
+`Agent`, `AgentSpec`, `Debate`, `FanOut`, `Governance`, `Graph`, `LeadMandate`, `LeadSpec`, `PeerRelay`, `PeerSwarm`, `Pipeline`, `Team`, `TeamLead`, `TeamSpec`
 
 ## 7. 副作用
 
