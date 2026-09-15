@@ -75,6 +75,22 @@ entries:
   name: phase_think_route_decide
   $module: lca.nodes.think.route.decide
   config: {}
+# PR-3.8.1: typed budget gate between route.decide and the miss-path
+# reasoning chain. Reads ``state.budget`` and emits a ``RoutingDecision``
+# typed port (ADR-0219 §5.5, ADR-0225, ADR-0228).
+- id: phase.think.budget.check
+  name: phase_think_budget_check
+  $module: lca.nodes.think.budget_check
+  config: {}
+# PR-3.8.2: typed-boundary context-compaction node that lifts the
+# off-graph compaction step into a typed node. Reads ``writer`` +
+# ``state`` and emits ``CompactReceipt`` + ``RoutingDecision``. Sits
+# between ``think.budget.check`` and ``think.history.assemble`` (PR-3.8.2
+# also re-wires ``budget.check`` downstream edge to this node).
+- id: phase.think.context.compact
+  name: phase_think_context_compact
+  $module: lca.nodes.think.context_compact
+  config: {}
 - id: lca.nodes.plan.compose
   name: lca_nodes_plan_compose
   $module: lca.nodes.plan.compose
@@ -116,6 +132,16 @@ entries:
 - id: phase.think.decision.parse
   name: phase_think_decision_parse
   $module: lca.nodes.think.decision.parse
+  config: {}
+# PR-3.8.3: typed-boundary repair node between think.decision.parse
+# and think.gate. Reads the parsed Decision + tools runtime
+# registry; emits either the original / repaired Decision plus a
+# RoutingDecision that forwards to think.gate (ok / repaired) or
+# re-routes to think.route.decide (rejected_schema /
+# rejected_truncated). No per-node max_visits (ADR-0225).
+- id: phase.think.decision.repair
+  name: phase_think_decision_repair
+  $module: lca.nodes.think.decision_repair
   config: {}
 
 # Six-phase subgraph node plugins (ADR-0221). Each phase subgraph is a
