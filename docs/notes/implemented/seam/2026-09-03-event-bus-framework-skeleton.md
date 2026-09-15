@@ -87,7 +87,7 @@ ruff / format / mypy: `All checks passed!`(mypy 仅 pre-existing 错,与本 PR �
 
 ## 后续 PR 触发器(2026-09-03 已全部落地)
 
-- **PR-7(SinkBackend + Profile 装载 Pipeline)** 已合(commit `1b8ce7a8`)。`pipeline_loader.py` + `profiles/event-pipeline/web-standard.yaml` 落地态见[附录 C 已实装态](../../contract/2026-09-03-event-bus-pipeline-spec.md) §C.1。
+- **PR-7(SinkBackend + Profile 装载 Pipeline)** 已合(commit `1b8ce7a8`)。`pipeline_loader.py` + `profiles/event-pipeline/web-standard.yaml` 落地态见[附录 C 已实装态](../contract/2026-09-03-event-bus-pipeline-spec.md) §C.1。
 - **PR-5(record 单一入口)** 已合(commit `ff907239`)。`_build_event_record` 与 2 处 `except ValueError` fallback 已删;`spine_chain_sink` / `spine_file_sink` 改调 `build_record`。
 - **PR-6(yaml 前缀规则)** 已合(commit `f8032be0`)。yaml 100 处 `subscribers:` 折叠为前缀规则 + `default_subscribers:` 死配置清理完成,等价性脚本归档。
 - **PR-12(trace_id + 自观察)** 已合(commit `1b8ce7a8` 集成补漏)。`TraceContextHook` / `MechanismDispatchObserver` 实装,contextvars 注入 + 自指派观察事件启用。
