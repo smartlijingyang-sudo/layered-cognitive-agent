@@ -36,8 +36,7 @@ class RunSessionWriterProtocol(Protocol):
         message_id: str,
         role: Literal["user", "human"],
         content: str,
-    ) -> EventRef:
-        ...
+    ) -> EventRef: ...
 
     def append_assistant_message(
         self,
@@ -48,8 +47,7 @@ class RunSessionWriterProtocol(Protocol):
         content: str | None,
         tool_calls: list[ToolCall] | None,
         usage: TokenUsage | None,
-    ) -> EventRef:
-        ...
+    ) -> EventRef: ...
 
     def append_tool_call(
         self,
@@ -59,8 +57,7 @@ class RunSessionWriterProtocol(Protocol):
         call_id: CallId,
         name: str,
         arguments: str,
-    ) -> EventRef:
-        ...
+    ) -> EventRef: ...
 
     def append_tool_result(
         self,
@@ -71,14 +68,23 @@ class RunSessionWriterProtocol(Protocol):
         content: str,
         error: ToolError | None,
         meta: Any | None,
-    ) -> EventRef:
-        ...
+    ) -> EventRef: ...
 
-    def derive_messages(self) -> list[Message]:
-        ...
+    def derive_messages(self) -> list[Message]: ...
 
-    def request_header(self) -> EpochHeader | None:
-        ...
+    def request_header(self) -> EpochHeader | None: ...
+
+    def tools(self) -> tuple[dict[str, Any], ...]:
+        """Return the per-run OpenAI tool specs for the next LLM call.
+
+        Spec §E + ADR-0226 §4: tools are sourced from the per-run
+        :class:`ToolsService` fork (see
+        :mod:`lca.infrastructure.capability.tools.tools.ToolsService.list_tools`).
+        This seam is the typed-boundary placeholder; the boot-time
+        binder populates the underlying registry via
+        ``fork_for_run(bindings)`` and the writer returns the static
+        tuple to the LLM call.
+        """
 
 
 __all__ = ["RunSessionWriterProtocol"]

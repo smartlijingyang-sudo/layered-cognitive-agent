@@ -1,0 +1,27 @@
+# bundles/concept/llm_dispatch.yaml — Layer 2 概念图
+# Spec §E — think.llm.dispatch 内部图。
+#
+# 单节点 inner graph:llm.call 从 (state, writer, model_visible_request) 调
+# LLM adapter,经 persist-before-execute 把 assistant row + tool_calls
+# 写到 Session,然后把 LLMResponse + TokenUsage 透传到下一节点。
+#
+# 跨图引用:
+#   inputs  -> primitive.history.derive 的 model_visible_request 端口
+#   outputs -> primitive.decision.parse 节点的 llm_response 端口
+#
+# delete-when: N/A(纯加法,think.llm.dispatch 节点在 think.yaml 引用)。
+
+id: concept.llm.dispatch
+region: concept
+purpose: ModelVisibleRequest → LLMResponse typed boundary (persist-before-execute)
+
+nodes:
+  - id: llm.call
+    factory: llm.call
+    inputs: [state, writer, model_visible_request]
+    outputs: [llm_response, usage]
+    config:
+      emit_on_enter: []
+      emit_on_exit:  []
+
+edges: []

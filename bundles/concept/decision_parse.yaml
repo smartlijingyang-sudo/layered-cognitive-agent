@@ -1,0 +1,28 @@
+# bundles/concept/decision_parse.yaml — Layer 2 概念图
+# Spec §E — think.decision.parse 内部图。
+#
+# 单节点 inner graph:decision.parse 从 LLMResponse 投影 typed
+# Decision(action_type, tool_calls, delegations, rationale)。
+# action_type ∈ {respond, use_tool, delegate} 由节点决定,
+# downstream think.gate 据此走 enforce 链。
+#
+# 跨图引用:
+#   inputs  -> primitive.llm.call 节点的 llm_response 端口
+#   outputs -> business.reasoning.turn 的 decision 端口
+#
+# delete-when: N/A(纯加法,think.decision.parse 节点在 think.yaml 引用)。
+
+id: concept.decision.parse
+region: concept
+purpose: LLMResponse → Decision typed boundary — single-pass parse + action_type inference
+
+nodes:
+  - id: decision.parse
+    factory: decision.parse
+    inputs: [state, llm_response]
+    outputs: [decision]
+    config:
+      emit_on_enter: []
+      emit_on_exit:  []
+
+edges: []

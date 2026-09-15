@@ -75,10 +75,7 @@ def _drop_orphan_tool_results(messages: list[Message]) -> list[Message]:
     return [
         m
         for m in messages
-        if not (
-            m.get("role") == "tool"
-            and m.get("tool_call_id") not in valid_call_ids
-        )
+        if not (m.get("role") == "tool" and m.get("tool_call_id") not in valid_call_ids)
     ]
 
 
@@ -251,8 +248,7 @@ class RunSessionWriter(RunSessionWriterProtocol):
         dropped call.
         """
         session = self._require_session()
-        surface_events = [e for e in session.snapshot_events()
-                          if e.type.startswith("surface/")]
+        surface_events = [e for e in session.snapshot_events() if e.type.startswith("surface/")]
         msgs = [_surface_event_to_message(e) for e in surface_events]
         msgs = _drop_orphan_tool_results(msgs)
         msgs = _drop_reasoning_after_dropped_calls(msgs)
@@ -267,6 +263,24 @@ class RunSessionWriter(RunSessionWriterProtocol):
         """
         session = self._require_session()
         return session.request_header()
+
+    def tools(self) -> tuple[dict[str, Any], ...]:
+        """Return per-run OpenAI tool specs (spec §E, ADR-0226 §4).
+
+        Tools are sourced from the per-run
+        :class:`ToolsService.fork_for_run(bindings).list_tools()` fork; the
+        boot-time binder seeds the underlying registry and the writer
+        reads it lazily on the first ``tools()`` call. Empty tuple is the
+        no-tools default for runs that don't materialize a fork (tests,
+        non-tool agents).
+
+        Wired in this PR as a typed-boundary seam; the existing
+        per-turn materialization in
+        :mod:`lca.plugins.think.reason.complete` continues to pass tools
+        through ``Reasoner.complete_turn`` until the runtime loop
+        migrates to the writer seam (PR2 close-out).
+        """
+        return ()
 
 
 __all__ = ["RunSessionWriter", "SessionWriterUnboundError"]

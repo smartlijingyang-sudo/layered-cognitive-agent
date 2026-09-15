@@ -1,13 +1,12 @@
 ﻿# bundles/think_reason.yaml — think.reason inner_graph (v2 ports)
 # ADR-0217 Bundle Graph Schema v2 + eng/retire-v1-reasoner-sandbox.
 # fork_tools first (materialize Sandbox computer tools), then
-# plan → render → complete. complete joins turn_render + forked_tools.
-# entry must be fork_tools: a sole plan entry left forked_tools null and
-# fail-loud at complete (no boot empty-tools fallback).
+# plan → render. The LLM call moved to think.llm.dispatch (spec §E)
+# in Task 3; think.reason.complete is deleted in the same change.
 
 id: think.reason.subgraph
 region: phase:think
-purpose: think.reason 内部执行 — fork tools then plan → render → complete
+purpose: think.reason 内部执行 — fork tools then plan → render (LLM call moved to think.llm.dispatch)
 entry: think.reason.fork_tools
 
 nodes:
@@ -38,25 +37,12 @@ nodes:
     config:
       emit_on_enter: []
       emit_on_exit:  [prompt_assembler_end, reasoner_meta]
-
-  - id: think.reason.complete
-    factory: think.reason.complete
-    inputs: [turn_render, forked_tools]
-    outputs: [response]
-    config:
-      emit_on_enter: [reasoner_reason_start]
-      emit_on_exit:  [reasoner_reason_end]
+    terminal: true
 
 edges:
   - from: think.reason.fork_tools
     to: think.reason.plan
     when: true
-  - from: think.reason.fork_tools
-    to: think.reason.complete
-    when: true
   - from: think.reason.plan
     to: think.reason.render
-    when: true
-  - from: think.reason.render
-    to: think.reason.complete
     when: true

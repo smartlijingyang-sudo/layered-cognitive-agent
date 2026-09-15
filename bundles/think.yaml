@@ -6,7 +6,7 @@
 
 id: think.subgraph
 region: phase:think
-purpose: think 5 步执行 — shortcut 可 short-circuit,route → reason → classify → gate 收敛
+purpose: think 5 步执行 — shortcut 可 short-circuit,route → reason → history.assemble → llm.dispatch → decision.parse → gate 收敛
 
 nodes:
   - id: think.shortcut
@@ -40,12 +40,44 @@ nodes:
       emit_on_exit:  []
       # Spec §D: think.history.assemble runs immediately before llm.dispatch;
       # it projects ModelVisibleRequest from RunSessionWriter with orphan-drop
-      # applied. T3 wires think.llm.dispatch + think.decision.parse and
-      # deletes think.reason.complete; T2 lands only the assemble node.
+      # applied. T3 wires think.llm.dispatch + think.decision.parse after it.
       sub_spec_ref:
         plan_ref: bundles/concept/history_assemble.yaml
         entry_node: history.derive
         binding_edge: think.history.assemble
+
+  - id: think.llm.dispatch
+    factory: think.llm.dispatch.ref
+    inputs: [state, writer, model_visible_request]
+    outputs: [llm_response, usage]
+    config:
+      emit_on_enter: []
+      emit_on_exit:  []
+      # Spec §E: think.llm.dispatch is one of three single-responsibility
+      # nodes that replace think.reason.complete. It calls the LLM adapter
+      # with the ModelVisibleRequest, persists the assistant row + tool_calls
+      # to RunSessionWriter (persist-before-execute, spec §C), and forwards
+      # (LLMResponse, TokenUsage) to think.decision.parse.
+      sub_spec_ref:
+        plan_ref: bundles/concept/llm_dispatch.yaml
+        entry_node: llm.call
+        binding_edge: think.llm.dispatch
+
+  - id: think.decision.parse
+    factory: think.decision.parse.ref
+    inputs: [state, llm_response]
+    outputs: [decision]
+    config:
+      emit_on_enter: []
+      emit_on_exit:  []
+      # Spec §E: think.decision.parse is the third single-responsibility
+      # node; it projects LLMResponse into a typed Decision. Its
+      # terminal_predicate routes action_type ∈ {respond, ask_user}
+      # to the outer graph.
+      sub_spec_ref:
+        plan_ref: bundles/concept/decision_parse.yaml
+        entry_node: decision.parse
+        binding_edge: think.decision.parse
 
   - id: think.classify
     factory: think.classify.ref
@@ -59,7 +91,9 @@ nodes:
       # ADR-0220 §3.3 的 3 节点图已合并 — decision.parse.tool_calls +
       # decision.parse.intent → decision.parse.response)。typed response
       # port 由上游 think.reason 经 close-out 投影转发,inner 图第一节点
-      # decision.parse.response 直接消费。
+      # decision.parse.response 直接消费。Task 3 把 think.reason.complete
+      # 拆成 llm.dispatch + decision.parse,classify 暂时作为 outer-facing
+      # 入口保留;后续 task 会把它和 decision.parse 合并。
       sub_spec_ref:
         plan_ref: bundles/concept/decision_classify.yaml
         entry_node: decision.parse.response
@@ -75,7 +109,7 @@ nodes:
       emit_on_exit:  []
       # ADR-0220 P6: think.gate 改为 sub_spec_ref delegate 到
       # concept.decision.enforce (P5 落地的 2 节点 gate chain + reject
-      # stamp)。typed decision port 由上游 think.classify 经 close-out
+      # stamp)。typed decision port 由上游 think.decision.parse 经 close-out
       # 投影转发,inner 图第一节点 gate.chain.run 直接消费。state port
       # 缺失时 gate chain run 走 no-op(decision 不被 enforce),保证 think
       # 路径不依赖 AgentState 透传。
@@ -93,14 +127,16 @@ edges:
     to: think.gate
     when: { kind: exists, port: { name: decision } }
 
-  # route → reason → history.assemble → classify → gate
+  # route → reason → history.assemble → llm.dispatch → decision.parse → gate
   - from: think.route
     to: think.reason
   - from: think.reason
     to: think.history.assemble
   - from: think.history.assemble
-    to: think.classify
-  - from: think.classify
+    to: think.llm.dispatch
+  - from: think.llm.dispatch
+    to: think.decision.parse
+  - from: think.decision.parse
     to: think.gate
 
 # terminal: think.gate 直接回 outer graph(binding_edge=think.main),
