@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from lca.contracts.protocols.assistant.skill_overlay import SkillInstallReceipt, SkillSource
+from lca.contracts.protocols.assistant.skill_overlay import SkillSource
 from lca.infrastructure.skills.assistant.merged_store import AssistantMergedSkillStore
 from lca.infrastructure.skills.disk.store import DiskSkillPackageStore
 from lca.infrastructure.skills.settings.settings import SkillSettings
