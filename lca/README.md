@@ -21,6 +21,47 @@ Loop Driver，transport plugin 独立于认知与运行层）。
 - 具体 provider 实现的业务语义：各层 README 自述职责与副作用，本文件只给地图
 - 前端与沙箱连接器（`lobehub-ui/`、daemon）
 
+## 3. 输入
+
+包初始化期只接受 `lca.contracts` 的值类型：`lca/__init__.py` 静态 import
+`lca.contracts.models.team.team.coordination` 与
+`lca.contracts.protocols.journal.spec.spec`，加上标准库 `importlib` / `typing`。
+
+## 4. 输出
+
+`__all__` 声明的 `Agent` / `Team` / `TeamLead` 门面符号与 coordination 值类型
+（`Debate`、`FanOut`、`Graph`、`Pipeline`、`PeerRelay`、`PeerSwarm`、
+`LeadMandate`、`Governance`、`AgentSpec`、`LeadSpec`、`TeamSpec` …）。
+其中 `Agent` / `Team` / `TeamLead` 三个名字由 `__getattr__` **按需**解析，
+import 本包不等于装配组合根。
+
+## 5. 允许依赖
+
+- `lca.contracts`（静态）
+- `lca.application.api.api`——仅经 `_LAZY_COMPOSITION_SYMBOLS` 白名单、仅这三个符号、
+  仅在首次属性访问时 `import_module`
+
+## 6. 禁止依赖
+
+- 在包初始化期 import `application` / `runtime` / `agent` / `plugins`：那会把组合根
+  变成 package import 的反向依赖边（AGENTS.md §2.1 单向层）
+- 用本包门面做分层内部依赖：层内代码 import 具体子模块，门面只给外部调用方
+- 借 `__getattr__` 兜底任意名字：白名单之外的名字必须失败
+
+## 8. 失败语义
+
+`from lca import X`（X 不在白名单）→ `AttributeError: module 'lca' has no
+attribute 'X'`，不猜测、不静默返回 `None`。白名单符号的真实解析错误由
+`lca.application.api.api` 自身抛出并向上传播（本层不吞异常）。首次成功解析后结果
+写回 `globals()`，后续访问不再走 import。
+
+## 9. 公共入口
+
+```python
+from lca import Agent, Team            # 外部调用方的简洁门面
+from lca.contracts... import Decision   # 分层内部走具体子模块
+```
+
 ## 7. 副作用
 
 包级**无**：`import lca` 与 `lca/__init__.py` 不打开文件、不建连接、不写状态；
