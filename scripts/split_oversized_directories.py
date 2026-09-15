@@ -156,7 +156,6 @@ def _rewrite_imports(moves: list[tuple[Path, Path]]) -> int:
                     rf'"{re.escape(old)}"',
                     rf"'{re.escape(old)}'",
                 ):
-                    repl = pat.replace(re.escape(old), new).replace(r"\bfrom ", "from ").replace(r"\bimport ", "import ")
                     if pat.startswith(r"\bfrom"):
                         text = re.sub(rf"\bfrom {re.escape(old)} import\b", f"from {new} import", text)
                     elif pat.startswith(r"\bimport"):
