@@ -21,8 +21,10 @@ from lca.contracts.protocols.loop.spine_publish import (
     is_session_ssot_hook_active,
 )
 from lca.harness.session.emit import emit
-from lca.infrastructure.session.bindings import resolve_raw_session
-from lca.plugins.events.publishers._session_publish import current_publish_session
+from lca.infrastructure.session.bindings import (
+    active_publish_session,
+    resolve_raw_session,
+)
 from lca_kernel.events.payloads.payloads import SpineEventPayload
 from lca_kernel.events.session.session import SessionEvent, SessionProtocol
 
@@ -39,7 +41,7 @@ def _require_publish_writer(session: object | None, *, fact: str, actor: str) ->
     """Resolve the publish writer; loud when a durable fact would be dropped.
 
     ``session`` 是调用方显式注入的 writer;缺省时经
-    :func:`current_publish_session` 实时读取 active binding。绑定动作发生在
+    :func:`active_publish_session` 实时读取 active binding。绑定动作发生在
     run bind,晚于本模块 import,所以缺省读取必须走函数入口 —— 直接
     ``from ... import _ACTIVE_SESSION`` 会冻结 import 时的 ``None``。
 
@@ -51,7 +53,7 @@ def _require_publish_writer(session: object | None, *, fact: str, actor: str) ->
     未绑定只能发生在 run bind 之前(boot / 诊断路径);此时事实无法落
     Session,必须留下可见记录,静默丢弃会让整条 journal 事实链空转。
     """
-    bound = current_publish_session()
+    bound = active_publish_session()
     writer = session if session is not None else bound
     if writer is None:
         _log.warning(

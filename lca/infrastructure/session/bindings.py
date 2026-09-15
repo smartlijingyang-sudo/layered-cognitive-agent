@@ -30,17 +30,18 @@ _checkpoint_policy_var: contextvars.ContextVar[SessionCheckpointPolicyProtocol |
 _default_checkpoint_policy: SessionCheckpointPolicyProtocol | None = None
 
 
-def _active_publish_session() -> object | None:
-    """Read the live publish Session through its owning seam.
+def active_publish_session() -> object | None:
+    """Read the live publish Session, or ``None`` when unbound.
 
-    :func:`lca.plugins.events.publishers._session_publish.current_publish_session`
-    is the single read entry point; consumers must never bind
-    ``_ACTIVE_SESSION`` via ``from X import Y`` because that captures the
-    import-time ``None`` and never observes :func:`set_publish_session`.
+    ``_session_publish._ACTIVE_SESSION`` is reassigned by
+    :func:`set_publish_session`; consumers that bind it via
+    ``from X import Y`` capture the import-time ``None`` and never observe the
+    run binding made later. This function is the single live read — every
+    consumer resolves the writer through it.
     """
-    from lca.plugins.events.publishers._session_publish import current_publish_session
+    from lca.plugins.events.publishers import _session_publish
 
-    return current_publish_session()
+    return _session_publish._ACTIVE_SESSION
 
 
 def resolve_raw_session(target: object | None) -> Session | None:
@@ -68,7 +69,7 @@ def resolve_session_reader() -> SessionReader | None:
     SPEC section H:_current_publish_session ContextVar 已删除;本读
     ``_ACTIVE_SESSION`` module-level state(由 ``set_publish_session`` 设置)。
     """
-    session = resolve_raw_session(_active_publish_session())
+    session = resolve_raw_session(active_publish_session())
     if session is None:
         return None
     return session
@@ -76,7 +77,7 @@ def resolve_session_reader() -> SessionReader | None:
 
 def resolve_flushable_session() -> FlushableSession | None:
     """Bound runtime Session for checkpoint ``flush()``, or ``None``."""
-    return resolve_raw_session(_active_publish_session())
+    return resolve_raw_session(active_publish_session())
 
 
 def resolve_session_for_emit(state: AgentState | None = None) -> object | None:
@@ -87,7 +88,7 @@ def resolve_session_for_emit(state: AgentState | None = None) -> object | None:
     ``set_publish_session`` / run bind boundary).
     """
     _ = state
-    writer = _active_publish_session()
+    writer = active_publish_session()
     resolved = resolve_raw_session(writer)
     if resolved is not None:
         return resolved
@@ -167,6 +168,7 @@ def set_checkpoint_policy(
 
 
 __all__ = [
+    "active_publish_session",
     "await_model_request_checkpoint",
     "await_step_boundary_checkpoint",
     "await_tool_side_effect_checkpoint",

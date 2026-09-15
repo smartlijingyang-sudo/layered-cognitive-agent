@@ -97,16 +97,6 @@ def reset_publish_session(
     _ACTIVE_SESSION = None
 
 
-def current_publish_session() -> _PublishSession | None:
-    """读取当前 active Session;未绑定返回 ``None``。
-
-    唯一合法的读取入口:``_ACTIVE_SESSION`` 由 :func:`set_publish_session`
-    重新赋值,消费方若 ``from ... import _ACTIVE_SESSION`` 只会在 import 时
-    取到 ``None`` 快照,永远看不到后续绑定(run bind 在 import 之后)。
-    """
-    return _ACTIVE_SESSION
-
-
 def publish_via_session(
     payload: Any,
     *,
@@ -139,7 +129,6 @@ def publish_via_session(
 
 
 __all__ = [
-    "current_publish_session",
     "publish_via_session",
     "reset_publish_session",
     "set_publish_session",

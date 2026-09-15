@@ -29,13 +29,13 @@ if TYPE_CHECKING:
 
 
 def test_resolve_session_reader_sees_set_publish_session() -> None:
-    """``set_publish_session(s)`` then ``bindings._active_publish_session()``
+    """``set_publish_session(s)`` then ``bindings.active_publish_session()``
     returns ``s``, not the import-time-captured ``None``.
     """
     sentinel = object()
     try:
         _session_publish.set_publish_session(sentinel)
-        assert bindings._active_publish_session() is sentinel
+        assert bindings.active_publish_session() is sentinel
         assert _session_publish._ACTIVE_SESSION is sentinel
     finally:
         _session_publish.reset_publish_session(None)
@@ -45,7 +45,7 @@ def test_resolve_session_reader_returns_none_after_reset() -> None:
     """``reset_publish_session`` is observed immediately by live readers."""
     _session_publish.set_publish_session(object())
     _session_publish.reset_publish_session(None)
-    assert bindings._active_publish_session() is None
+    assert bindings.active_publish_session() is None
     assert bindings.resolve_session_reader() is None
 
 
@@ -57,10 +57,10 @@ def test_active_publish_session_does_not_capture_stale_value() -> None:
     second = object()
     try:
         _session_publish.set_publish_session(first)
-        assert bindings._active_publish_session() is first
+        assert bindings.active_publish_session() is first
         _session_publish.set_publish_session(second)
-        assert bindings._active_publish_session() is second
-        assert bindings._active_publish_session() is not first
+        assert bindings.active_publish_session() is second
+        assert bindings.active_publish_session() is not first
     finally:
         _session_publish.reset_publish_session(None)
 
