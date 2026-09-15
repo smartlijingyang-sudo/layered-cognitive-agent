@@ -108,6 +108,21 @@ nodes:
         entry_node: decision.parse
         binding_edge: think.decision.parse
 
+  # PR-3.8.3: typed-boundary repair node between decision.parse
+  # and think.gate. Reads the parsed Decision + the per-run tools
+  # registry (via context.runtime) and emits either the original
+  # Decision (well-formed / irreparable) or the repaired Decision
+  # (truncated JSON successfully repaired). The accompanying
+  # RoutingDecision's reason gates downstream routing: decision_ok
+  # and decision_repaired forward to think.gate;
+  # decision_rejected_{schema,truncated} re-route to
+  # think.route.decide for a full re-reason.
+  - id: think.decision.repair
+    factory: think.decision.repair
+    inputs: [decision]
+    outputs: [decision, routing]
+    config:
+
   - id: think.gate
     factory: think.gate.ref
     inputs: [decision]
@@ -187,7 +202,24 @@ edges:
   - from: think.llm.dispatch
     to: think.decision.parse
   - from: think.decision.parse
+    to: think.decision.repair
+  # PR-3.8.3: decision.repair routes to think.gate when the
+  # Decision is well-formed or successfully repaired; rejects
+  # re-route to think.route.decide so Gate never sees a malformed
+  # payload (ADR-0047 wire-block split: schema repair here,
+  # wire-level blocking in Body).
+  - from: think.decision.repair
     to: think.gate
+    when:
+      kind: in
+      port: { name: routing, field: next_hint }
+      value: [decision_ok, decision_repaired]
+  - from: think.decision.repair
+    to: think.route.decide
+    when:
+      kind: in
+      port: { name: routing, field: next_hint }
+      value: [decision_rejected_schema, decision_rejected_truncated]
 
 # terminal: think.gate 直接回 outer graph(binding_edge=think.main),
 #           无需显式返回边。

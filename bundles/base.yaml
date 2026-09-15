@@ -133,6 +133,16 @@ entries:
   name: phase_think_decision_parse
   $module: lca.nodes.think.decision.parse
   config: {}
+# PR-3.8.3: typed-boundary repair node between think.decision.parse
+# and think.gate. Reads the parsed Decision + tools runtime
+# registry; emits either the original / repaired Decision plus a
+# RoutingDecision that forwards to think.gate (ok / repaired) or
+# re-routes to think.route.decide (rejected_schema /
+# rejected_truncated). No per-node max_visits (ADR-0225).
+- id: phase.think.decision.repair
+  name: phase_think_decision_repair
+  $module: lca.nodes.think.decision_repair
+  config: {}
 
 # Six-phase subgraph node plugins (ADR-0221). Each phase subgraph is a
 # multi-node typed port graph; the nodes below are the leaf executors
