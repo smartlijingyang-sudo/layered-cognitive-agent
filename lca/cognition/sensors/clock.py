@@ -10,7 +10,7 @@ the Composer (per spec §5.5: 固定组合顺序).
 
 from __future__ import annotations
 
-from datetime import datetime, timezone, UTC
+from datetime import UTC, datetime
 
 from lca.contracts.models.core.perceive.perception import ContextItem
 from lca.contracts.models.core.state.state import AgentState
