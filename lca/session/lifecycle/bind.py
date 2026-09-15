@@ -146,7 +146,14 @@ class RunEventSessionBridge:
 
 @dataclass(slots=True)
 class BoundRunEventSession:
-    """Run-local Session binding; disposer owns unbind + store.dispose."""
+    """Run-local Session binding; disposer owns unbind + store.dispose.
+
+    ``writer`` is the PR2 single surface-write seam
+    (:class:`lca.runtime.session.RunSessionWriter`); constructed here and
+    passed to consumers (PromptReasoner, Body, LLM adapter hook, decision
+    parser) via constructor injection. Replaces the dual ContextVar-bound
+    mechanism deleted in Task 3.
+    """
 
     store: Any
     bridge: RunEventSessionBridge
@@ -154,6 +161,7 @@ class BoundRunEventSession:
     run_id: str
     spine_hook_token: Any = None
     persistence_flush_cancel: Any = None
+    writer: Any = None
 
 
 def bind_run_event_session_from_store(
@@ -184,6 +192,9 @@ def bind_run_event_session_from_store(
 
     spine_hook_token = bind_bridge_spine_hook(bridge)
     persistence_flush_cancel = inner.register_flush_listener(SessionPersistenceFlushListener())
+    from lca.runtime.session import RunSessionWriter
+
+    writer = RunSessionWriter(session=inner)
     return BoundRunEventSession(
         store=store,
         bridge=bridge,
@@ -191,6 +202,7 @@ def bind_run_event_session_from_store(
         run_id=run_id,
         spine_hook_token=spine_hook_token,
         persistence_flush_cancel=persistence_flush_cancel,
+        writer=writer,
     )
 
 
