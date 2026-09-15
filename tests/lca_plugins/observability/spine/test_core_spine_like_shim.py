@@ -18,7 +18,7 @@ The test pins three properties:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from typing import Any
 
 from lca.infrastructure.observability.spine.event.record import EventRecord
@@ -53,7 +53,7 @@ def _make_event_spine() -> tuple[EventSpine, _CapturingSink]:
 
 
 def _make_record(seq: int = 1) -> EventRecord:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return EventRecord(
         execution_point="phase.perceive.fold",
         channel="fact",

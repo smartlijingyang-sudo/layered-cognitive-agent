@@ -8,7 +8,7 @@ boot-scope 但 deriver 必须 per-run);生产 step_tree 由 RunSessionBuilder
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 
 from lca.harness.plugin.declaration import definition_from_plugin
@@ -29,8 +29,8 @@ _BASE_KWARGS: dict[str, object] = {
     "epoch": 1,
     "causality_id": "sha256:abc",
     "outcome": None,
-    "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
-    "when_corrected": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
+    "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC),
+    "when_corrected": datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC),
     "prev_event_hash": None,
     "run_id": "r-test",
     "step_id": "s-test",

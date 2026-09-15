@@ -18,7 +18,7 @@ removes any one of them is caught at boot.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 
 import pytest
 
@@ -36,8 +36,8 @@ _BASE_KWARGS: dict[str, object] = {
     "epoch": 1,
     "causality_id": "sha256:abc",
     "outcome": None,
-    "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
-    "when_corrected": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
+    "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC),
+    "when_corrected": datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC),
     "prev_event_hash": None,
     "run_id": "r-test",
     "step_id": "s-test",
@@ -189,7 +189,7 @@ def test_check_stuck_trips_when_span_open_past_threshold() -> None:
     from lca.plugins.observability.spine.derivers.anomaly import AnomalyDetector
 
     detector = AnomalyDetector()
-    past = datetime(2026, 9, 1, 11, 0, 0, tzinfo=timezone.utc)
+    past = datetime(2026, 9, 1, 11, 0, 0, tzinfo=UTC)
     future = past + timedelta(seconds=120)
     detector._open_spans["lca-span-00000099"] = past
 
@@ -208,7 +208,7 @@ def test_check_stuck_does_not_trip_for_recent_spans() -> None:
     from lca.plugins.observability.spine.derivers.anomaly import AnomalyDetector
 
     detector = AnomalyDetector()
-    started = datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc)
+    started = datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC)
     detector._open_spans["lca-span-00000099"] = started
 
     event = _make_event(
