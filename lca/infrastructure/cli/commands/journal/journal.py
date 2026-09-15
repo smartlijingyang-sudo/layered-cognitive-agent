@@ -72,7 +72,7 @@ def register(app: typer.Typer, group: typer.Typer | None = None) -> None:
         verbose: bool = typer.Option(
             False, "--verbose", "-v", help="显示完整 payload（默认仅控制点 + channel + outcome）"
         ),
-        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),  # noqa: B008
+        config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
     ) -> None:
         """事实流。默认 follow 最新 run 的 spine SSOT,不是 kernel_serve.log。"""
         ops_config = OpsConfig.load(config)
