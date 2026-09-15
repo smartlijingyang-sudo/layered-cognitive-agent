@@ -110,7 +110,7 @@ class BundleGraphEdge:
             )
 
     @classmethod
-    def from_kwargs(cls, **kwargs: Any) -> "BundleGraphEdge":
+    def from_kwargs(cls, **kwargs: Any) -> BundleGraphEdge:
         """从 yaml 关键字构造,支持 `from`/`to` 别名 → `source`/`target`。"""
         if "from" in kwargs and "source" not in kwargs:
             kwargs["source"] = kwargs.pop("from")
