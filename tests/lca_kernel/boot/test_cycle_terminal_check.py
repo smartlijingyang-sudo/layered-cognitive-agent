@@ -5,7 +5,9 @@ Six cases cover the design:
 - 2-node cycle without terminal → reject (infinite loop trap)
 - 2-node cycle with one terminal → pass
 - 3-node SCC all non-terminal → reject (lists all 3 nodes)
-- Single-node SCC (self-loop) → pass (handled by SelfLoopSafeCheck)
+- Single-node SCC (self-loop) → pass (per ADR-0225 the prior
+  ``SelfLoopSafeCheck`` was retired; self-loops now exit via per-node
+  ``terminal_predicate`` like any other cycle)
 - Linear plan (a→b→c, c terminal) → pass
 - Cycle with terminal_predicate node → pass (predicate counts as terminal)
 """
@@ -120,7 +122,9 @@ class TestCycleHasTerminalCheck:
     # ------------------------------------------------------------------
 
     def test_single_node_self_loop_does_not_raise(self) -> None:
-        """Self-loop is handled by SelfLoopSafeCheck, not this check."""
+        """Self-loop is not flagged by this check; per ADR-0225 the
+        prior ``SelfLoopSafeCheck`` was retired and self-loops exit
+        via per-node ``terminal_predicate``."""
         plan = _plan(
             _node("a", entry=True),
             edges=(PlanEdge(source="a", target="a"),),

@@ -166,7 +166,6 @@ def _strategy_registry() -> StrategyRegistry:
     return registry
 
 
-@pytest.mark.integration
 async def test_five_consecutive_identical_tool_calls_terminate_naturally() -> None:
     """A self-looping ``a`` that emits 5 identical tool-call Decisions
     then a natural-exit ``respond`` Decision must terminate the plan
@@ -209,7 +208,6 @@ async def test_five_consecutive_identical_tool_calls_terminate_naturally() -> No
             )
 
 
-@pytest.mark.integration
 async def test_tool_call_loop_runs_full_count_with_identical_payloads() -> None:
     """Stronger guarantee: the loop body executes exactly
     ``VISITS_BEFORE_NATURAL_EXIT`` times before the natural-exit fires,

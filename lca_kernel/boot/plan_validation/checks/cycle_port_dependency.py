@@ -32,8 +32,12 @@ runtime can still resolve the cycle via per-node
 the *mutual* port dependency pair is fatal because every node
 needs a port that its only potential producer also needs.
 
-Single-node SCCs are skipped — self-loop port dependencies are a
-narrower concern covered by :class:`SelfLoopSafeCheck`.
+Single-node SCCs are skipped — self-loop port dependencies are
+out of scope for this check; per ADR-0225 the prior
+:class:`SelfLoopSafeCheck` was retired (its purpose was to forbid
+self-loops whose ``max_visits > 1`` ceiling could burn out, but the
+ceiling is gone). Self-loops now exit via per-node
+``terminal_predicate`` like any other cycle.
 Subgraph delegate nodes (``subgraph_ref is not None``) are also
 skipped because their IO schema is delegated to the inner plan and
 the outer kernel cannot reason about port resolution statically.

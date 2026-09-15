@@ -255,7 +255,7 @@ Files to delete or modify:
 - `lca/framework/graph/lifter.py:133,219` — drop reads
 - `lca/framework/graph/plan_sdk.py:336` — drop the serializer branch
 - `lca/contracts/protocols/declarative/declarative_1/declarative_graph.py:83,93-95` — drop `PhaseNode.max_visits` and PG-001's max_visits check (keep id-only check)
-- `lca/contracts/observability/observation/m1_blueprint/__init__.py:23` — drop `PlanNodeSpec.max_visits`
+- `lca/contracts/observability/observation/m1_blueprint/__init__.py:23` — **carved out** (kept): `PlanNodeSpec.max_visits` is a separate observability-snapshot namespace consumed by `plan_compile/plugin.py:80` and tested by `tests/observation/test_blueprint_contract.py:21`. ADR-0225 keeps this field; only the runtime `PlanNode.max_visits` is deleted.
 - `lca/harness/declarative/compile/subgraph_resolver.py:200,236-242` — drop the projection
 - `lca/harness/profile/plan/explain.py:43` — drop field
 - `lca/infrastructure/cli/commands/profile/declarative_graph.py:28` — drop label

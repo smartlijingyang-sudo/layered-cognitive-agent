@@ -44,7 +44,7 @@ class BundleGraphNode:
       region   : FactoryResolver 反查上下文(可空,fallback 到 BundleGraphSpec.region)
       factory  : 业务语义名,如 `think.reason`;FactoryResolver 解析到 NodeExecutor
       purpose  : 节点职责描述,写入 phase_graph.node.start/end payload(purpose)
-      config   : 节点级图配置,只放图级参数(max_visits / cooldown 等),不向 plugin 注入
+      config   : 节点级图配置,只放图级参数(cooldown 等,ADR-0225 删除了 max_visits),不向 plugin 注入
 
     Per ADR-0219 §5.5(「图不知道业务,业务不知道图」):本 DTO **不再持有**
     `inputs` / `outputs` 字段——port contract 属于 plugin 的 `NodeExecutor.declared_inputs`
