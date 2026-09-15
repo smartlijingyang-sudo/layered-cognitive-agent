@@ -1,28 +1,15 @@
-# ADR-0075: Recovery phase graph edges.
-# Extends the default phase graph with reflect→think recovery edge.
+# HISTORY / RESIDUAL (M1 Issue #14 — 2026-09-15)
 #
-# Recovery flow:
-# 1. Phase fails (e.g., tool call returns error)
-# 2. Reflect phase detects failure and sets routing.next_hint = "admit_recovery"
-# 3. Edge reflect.main → think.main is taken (when: routing.next_hint == admit_recovery)
-# 4. Think phase retries with adjusted strategy
-# 5. LoopGuard limits to 1 recovery iteration (maxIterations: 1)
+# This bundle is NO LONGER an edge source of truth.
+# Bounded reflect→think ``admit_recovery`` lives on
+# ``bundles/outer/phase_main.yaml`` (typed Predicate + loop obligation).
+# Plugins may still produce recovery *hints* (routing.next_hint); they must
+# not register a parallel edge table.
 #
-# D4 typed-port cutover: edge predicates use typed Predicate dicts.
-# This ensures bounded recovery: agent gets one retry, then must stop.
+# delete-when: 2026-10-15 — remove this file once `rg declarative-recovery`
+# returns only history docs / dated residuals (no profile bundles list).
+#
+# Prior content (retired): phase.edge.reflect_to_think.recovery with
+# LoopGuard maxIterations=1 via lca.plugins.loop.graph.recovery.plugin.
 
-entries:
-  # Recovery edge: reflect → think (only when recovery is admitted)
-  - id: phase.edge.reflect_to_think.recovery
-    name: phase_edge_reflect_to_think_recovery
-    $module: lca.plugins.loop.graph.recovery.plugin
-    config:
-      source: reflect.main
-      target: think.main
-      when:
-        kind: eq
-        port: { name: routing, field: next_hint }
-        value: admit_recovery
-      loop:
-        maxIterations: 1
-        budget: run.steps
+entries: []

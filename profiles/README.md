@@ -12,7 +12,8 @@ bundles:
   - bundles/base.yaml                # Tier-1 services + Tier-2 providers
   - bundles/web-app.yaml             # Tier-3 behaviors + transport stack
   - bundles/scenario-cordis-creator.yaml
-  - bundles/declarative-phase-graph.yaml
+  - bundles/outer/phase_main.yaml    # M1 ControlPlan edge SSOT (+ recovery)
+  # + phase subgraphs (think/act/perceive/reflect/remember)
 
 patch:
   - id: lca-llm-resolver
@@ -21,10 +22,10 @@ patch:
       load_dotenv: true
 ```
 
-The resolved bundle list now picks up the new transport plugins
-(`lca-gateway-router` + 4 routes providers) from `bundles/web-app.yaml`
-(PR-4) and the boot event observability from
-`bundles/declarative-phase-graph.yaml` (PR-3).
+The resolved bundle list picks up transport plugins from `bundles/web-app.yaml`
+and the outer ControlPlan from `bundles/outer/phase_main.yaml` (M1).
+`declarative-phase-graph` / `declarative-recovery` are **not** production edge
+sources (history residuals only; delete-when 2026-10-15).
 
 ## New in PR-1 ~ PR-5
 

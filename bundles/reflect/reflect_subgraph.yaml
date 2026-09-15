@@ -8,7 +8,7 @@
 #
 # D4 typed-port cutover: the recovery routing hint flows via the typed
 # ``routing`` port (``RoutingDecision.next_hint``). The edge predicate
-# in ``declarative-recovery.yaml`` reads this port.
+# on ``bundles/outer/phase_main.yaml`` (M1) reads this port.
 
 id: reflect.subgraph
 region: phase:reflect

@@ -1,4 +1,11 @@
-"""Bounded recovery phase-edge provider for ADR-0075."""
+"""Bounded recovery phase-edge provider for ADR-0075 (HISTORY).
+
+M1 (Issue #14, 2026-09-15): ControlPlan recovery edges live on
+``bundles/outer/phase_main.yaml``. This plugin must not be treated as an
+edge SSOT — reflect nodes emit routing hints only. The
+``declarative-recovery.yaml`` bundle entries are emptied; delete-when
+2026-10-15 once no profile loads this module for edges.
+"""
 
 from __future__ import annotations
 
