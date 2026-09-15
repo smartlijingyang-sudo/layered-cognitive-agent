@@ -3,6 +3,11 @@
 This module is intentionally separate from :mod:`plan_compiler`: compiling a
 profile is a pure construction/validation concern, while explainability is a
 read-only serialization concern consumed by CLI and diagnostics.
+
+ADR-0221 P3 retired the v1 ``phase_graph`` / ``phase_bindings`` region
+from ``CompiledRunPlan``; this projection deliberately omits it and
+serializes only the v2 plan surface (capability bindings, control
+entries, replacement map, validation report).
 """
 
 from __future__ import annotations
@@ -30,37 +35,7 @@ def explain_compile_plan(plan: CompiledRunPlan) -> dict[str, Any]:
     both to humans inspecting a profile and to tooling that needs to reconstruct
     why a phase, provider, relation, or replacement was selected.
     """
-    phase_graph = plan.phase_graph
     provenance = plan.provenance
-    phase_nodes = []
-    phase_edges = []
-    if phase_graph is not None:
-        phase_nodes = [
-            {
-                "id": node.id,
-                "semantic_phase": node.semantic_phase.value,
-                "binding": node.binding,
-                "terminal": node.terminal,
-            }
-            for node in phase_graph.nodes
-        ]
-        phase_edges = [
-            {
-                "source": edge.source,
-                "target": edge.target,
-                "when": edge.when,
-                "loop": (
-                    {
-                        "max_iterations": edge.loop.max_iterations,
-                        "budget": edge.loop.budget,
-                        "terminal_predicate": edge.loop.terminal_predicate,
-                    }
-                    if edge.loop is not None
-                    else None
-                ),
-            }
-            for edge in phase_graph.edges
-        ]
 
     return {
         "profile_path": plan.profile_path,
@@ -71,11 +46,6 @@ def explain_compile_plan(plan: CompiledRunPlan) -> dict[str, Any]:
         "declarative": {
             "schema_version": plan.plan_version,
             "plugin_count": len(plan.plugin_specs),
-            "phase_graph": {
-                "entry": phase_graph.entry if phase_graph is not None else "",
-                "nodes": phase_nodes,
-                "edges": phase_edges,
-            },
             "capability_bindings": [
                 {
                     "capability": binding.capability,
@@ -86,24 +56,6 @@ def explain_compile_plan(plan: CompiledRunPlan) -> dict[str, Any]:
                     "provenance": list(binding.provenance),
                 }
                 for binding in plan.capability_bindings
-            ],
-            "phase_bindings": [
-                {
-                    "node": binding.node_id,
-                    "phase": binding.semantic_phase.value,
-                    "executor": binding.executor_capability,
-                    "contributions": [
-                        {
-                            "role": contribution.role.value,
-                            "executor": contribution.executor,
-                            "output": contribution.output,
-                            "order": contribution.order,
-                            "aggregation": contribution.aggregation,
-                        }
-                        for contribution in binding.contributions
-                    ],
-                }
-                for binding in plan.phase_bindings
             ],
             "relations": [
                 {

@@ -20,7 +20,6 @@ if TYPE_CHECKING:
         ApprovalStateMachine,
         ApprovalTransition,
     )
-    from lca.harness.declarative.controls.validation import validate_control_binding_closure
     from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseContext
 
 __all__ = [
@@ -29,7 +28,6 @@ __all__ = [
     "ApprovalTransition",
 
     "RestrictedPhaseContext",
-    "validate_control_binding_closure",
 ]
 
 _RETIRED_V1 = frozenset(
@@ -56,10 +54,6 @@ def __getattr__(name: str) -> Any:
         from lca.harness.declarative.controls import approval as _approval
 
         return getattr(_approval, name)
-    if name == "validate_control_binding_closure":
-        from lca.harness.declarative.controls.validation import validate_control_binding_closure
-
-        return validate_control_binding_closure
     if name == "RestrictedPhaseContext":
         from lca.harness.declarative.lifecycle.phase_context import (
             RestrictedPhaseContext,

@@ -26,7 +26,7 @@ from lca.application.runtime.plan_resolution import (
     PlanResolutionResult,
     PlanResolutionService,
 )
-from lca.harness.composition.plan_compiler import (
+from lca.harness.composition import (
     CompileOptions,
     PlanCompilerError,
 )

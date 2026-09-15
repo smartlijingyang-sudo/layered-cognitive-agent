@@ -31,7 +31,6 @@ v0 `GraphAssembler` / `ExecutablePlan` / `MappingRestrictedScope` 已删除
 - `ApprovalStateMachine`
 - `ApprovalTransition`
 - `RestrictedPhaseContext`
-- `validate_control_binding_closure`
 
 ## 5. 允许依赖
 —

@@ -3,6 +3,12 @@
 The contracts package owns serializable values and schema-level invariants. This
 module owns cross-value validation that depends on the compiled plan and its
 runtime seam, keeping behavior close to the harness test surface.
+
+ADR-0221 P3 retired ``spec.contributes`` / ``ContributionRole`` /
+``PhaseContribution`` / the v1 declarative ``phase_graph`` /
+``phase_bindings`` region. ``validate_control_binding_closure`` was
+deleted in the same PR (no callers; the executable control projection
+is owned by ``PlanInterpreter`` + ``NodeExecutor`` subgraphs).
 """
 
 from __future__ import annotations
@@ -11,21 +17,16 @@ from collections import defaultdict
 from collections.abc import Sequence
 
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
-    ContributionRole,
     DeclarativeValidationError,
     PluginSpecKind,
     RelationType,
-    SemanticPhase,
 )
 from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
-    ControlEntry,
-    PhaseBinding,
     ValidationIssue,
     ValidationReport,
     ValidationSeverity,
 )
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import PluginSpec
-from lca.harness.graph.validation import PhaseGraphValidator
 
 
 def validation_errors(report: ValidationReport) -> tuple[ValidationIssue, ...]:
@@ -71,8 +72,6 @@ class PluginSpecValidator:
             for offer in spec.provides:
                 provided[offer.key].append(spec)
                 capability_keys.add(offer.key)
-            for contribution in spec.contributes:
-                capability_keys.add(contribution.executor)
         for spec in specs:
             for requirement in spec.requires:
                 if requirement.cardinality != "optional" and requirement.key not in provided:
@@ -113,7 +112,6 @@ class PluginSpecValidator:
                         )
             if any(effect != "none" for effect in spec.effects) and spec.kind not in {
                 PluginSpecKind.EFFECT_HANDLER,
-                PluginSpecKind.PHASE_EXECUTOR,
                 PluginSpecKind.PROVIDER,
             }:
                 issues.append(
@@ -144,92 +142,6 @@ class PluginSpecValidator:
         return ValidationReport(tuple(issues))
 
 
-def validate_control_binding_closure(
-    specs: Sequence[PluginSpec],
-    bindings: Sequence[PhaseBinding],
-    entries: Sequence[ControlEntry],
-    *,
-    phase_graph: CognitivePhaseGraphPlan | None = None,
-) -> ValidationReport:
-    """Verify that every declared control contribution is executable."""
-    issues: list[ValidationIssue] = []
-    binding_keys: dict[tuple[SemanticPhase, str], list[str]] = {}
-    declared_keys: dict[tuple[SemanticPhase, str], list[str]] = {}
-    entry_keys: dict[tuple[SemanticPhase, str], int] = {}
-
-    for spec in specs:
-        for contribution in spec.contributes:
-            if _is_control_contribution(contribution.role, contribution.output):
-                key = (contribution.phase, contribution.executor)
-                declared_keys.setdefault(key, []).append(spec.id)
-    for binding in bindings:
-        for contribution in binding.contributions:
-            if _is_control_contribution(contribution.role, contribution.output):
-                key = (binding.semantic_phase, contribution.executor)
-                binding_keys.setdefault(key, []).append(binding.node_id)
-    # Plan §13.11: sub_spec_ref 节点不进 phase_bindings, 但 control 仍可
-    # 依附 (think.main 等), 把 phase_graph 里 sub_spec_ref 节点的 phase
-    # 补到 binding_keys 视为可执行。
-    if phase_graph is not None:
-        for node in phase_graph.nodes:
-            if node.sub_spec_ref is not None and node.binding is None:
-                # 控制面贡献按 (phase, executor) 查;该节点的 phase 任何
-                # 已 declared 的 control 都视为可依附到该 sub_spec_ref 节点。
-                for key in (
-                    key for key in declared_keys if key[0] is node.semantic_phase
-                ):
-                    binding_keys.setdefault(key, []).append(node.id)
-    for entry in entries:
-        key = (entry.phase, entry.executor_capability)
-        entry_keys[key] = entry_keys.get(key, 0) + 1
-
-    for (phase, executor), owners in declared_keys.items():
-        if not binding_keys.get((phase, executor)):
-            issues.append(
-                ValidationIssue(
-                    "PG-010",
-                    f"control contribution has no executable phase binding: {executor}",
-                    f"{phase.value}:{','.join(sorted(owners))}",
-                )
-            )
-    for (phase, executor), nodes in binding_keys.items():
-        if not declared_keys.get((phase, executor)):
-            issues.append(
-                ValidationIssue(
-                    "PG-010",
-                    f"phase binding contains undeclared control contribution: {executor}",
-                    ",".join(sorted(nodes)),
-                )
-            )
-        count = entry_keys.get((phase, executor), 0)
-        if count != 1:
-            issues.append(
-                ValidationIssue(
-                    "PG-010",
-                    f"control contribution must project to exactly one ControlEntry: {executor}; got {count}",
-                    phase.value,
-                )
-            )
-    for (phase, executor), count in entry_keys.items():
-        if (phase, executor) not in binding_keys:
-            issues.append(
-                ValidationIssue(
-                    "PG-010",
-                    f"ControlEntry has no executable control contribution: {executor}",
-                    phase.value,
-                )
-            )
-        elif count != 1:
-            issues.append(
-                ValidationIssue("PG-010", f"ControlEntry is duplicated: {executor}", phase.value)
-            )
-    return ValidationReport(tuple(issues))
-
-
-def _is_control_contribution(role: ContributionRole, output: str) -> bool:
-    return role is ContributionRole.GOVERN or output.startswith("observe.")
-
-
 def _protocols_compatible(source: PluginSpec, target: PluginSpec) -> bool:
     source_protocols = {(item.key, item.protocol) for item in source.provides}
     target_protocols = {(item.key, item.protocol) for item in target.provides}
@@ -243,11 +155,9 @@ def _grants_monotonic(child: PluginSpec, parent: PluginSpec) -> bool:
 
 
 __all__ = [
-    "PhaseGraphValidator",
     "PluginSpecValidator",
     "is_validation_valid",
     "require_valid",
-    "validate_control_binding_closure",
     "validation_errors",
     "validation_warnings",
 ]
