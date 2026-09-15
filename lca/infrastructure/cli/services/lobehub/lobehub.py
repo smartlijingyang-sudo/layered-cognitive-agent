@@ -510,7 +510,7 @@ class LobeHubService:
             self._state.save_snapshot("patches", [deploy_dir], "*")
             self._verify_cache = None
             return any(r.status == "applied" for r in results)
-        except Exception as exc:  # noqa: BLE001 — health check best-effort
+        except Exception as exc:  # health check best-effort
             print(f"[lca] patch ensure failed: {type(exc).__name__}: {exc}", flush=True)
             return False
 
