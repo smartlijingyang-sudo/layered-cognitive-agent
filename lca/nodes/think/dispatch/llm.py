@@ -17,10 +17,8 @@ retired ``think.reason.complete``:
 The orchestrator ``think.reason`` wires them via edges; the deleted
 ``complete`` node used to do all three jobs inline.
 
-The :func:`@graph_node <graph_node>` decorator (ADR-0227) replaces the
-manual ``NodeExecutor`` dataclass + ``@plugin(...)`` setup pair that lived
-in :mod:`lca.plugins.think.llm_dispatch.execute` (PR2). Composite-key
-registration under ``think::llm.call`` is preserved.
+Canonical shape: hand-written ``@dataclass(frozen=True, slots=True)`` +
+``@plugin(...)`` carrier, per ADR-0228 D2.
 """
 
 from __future__ import annotations

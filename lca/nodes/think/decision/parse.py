@@ -18,10 +18,8 @@ The parse mirrors ``decision_classify.decision.parse.response`` but emits
 a single :class:`Decision` (the spec §E node emits ``decision`` as one
 typed port, not the typed-port split used by ``concept.decision.classify``).
 
-The :func:`@graph_node <graph_node>` decorator (ADR-0227) replaces the
-manual ``NodeExecutor`` dataclass + ``@plugin(...)`` setup pair that lived
-in :mod:`lca.plugins.think.decision_parse.execute` (PR2). Composite-key
-registration under ``think::decision.parse`` is preserved.
+Canonical shape: hand-written ``@dataclass(frozen=True, slots=True)`` +
+``@plugin(...)`` carrier, per ADR-0228 D2.
 """
 
 from __future__ import annotations

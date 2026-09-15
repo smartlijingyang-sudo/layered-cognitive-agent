@@ -2,7 +2,7 @@
 
 Single tree for every graph node implementation in the LCA runtime.
 Node files here are the typed-boundary primitives of the cognitive
-six-phase closed set (ADR-0194 / ADR-0227) plus the outer-loop
+six-phase closed set (ADR-0194 / ADR-0228) plus the outer-loop
 graph-node-executors.
 
 ## Layout
@@ -51,10 +51,8 @@ lca/nodes/
    (`bundles/*.yaml:plugins:`) discovers nodes by id, not by import path.
    Only the Python import path changes; `phase.think.shortcut` and
    `think::think.shortcut` continue to be the discovery keys.
-5. **`@graph_node` decorator lives at `lca.framework.graph.nodes.decorator`.**
-   The decorator is a graph-kernel primitive; nodes import it across the
-   `lca.framework` / `lca.nodes` seam (framework is a free top-level package,
-   not in the lint-imports 8-layer contract).
+5. **All nodes use the hand-written `@plugin(...)` carrier pattern.** See
+   `think/route/shortcut.py` and ADR-0228 D2 for the canonical shape.
 
 ## Adding a new node
 
@@ -62,13 +60,11 @@ lca/nodes/
 2. Decide whether the node clusters with existing siblings (sub-group) or
    stands alone (file directly under `<region>/`).
 3. Pick the implementation mechanism:
-   - **Hand-written `@plugin(...)` carrier** when `node_execute` reads
-     multiple capabilities from runtime, has type assertions, or branches
-     on capability-presence (e.g. `think/route/shortcut.py` — capability
-     absence falls through to next node).
-   - **`@graph_node(...)` decorator** when the function is a typed-boundary
-     adapter from `inputs=...` ports to `outputs=...` ports (e.g.
-     `think/history/assemble.py`). See ADR-0227 §Decision §1 for the API.
+   - **Hand-written `@plugin(...)` carrier** (the only canonical shape per
+     ADR-0228 D2) when `node_execute` reads capabilities from runtime, has
+     type assertions, or branches on capability-presence (e.g.
+     `think/route/shortcut.py` — capability absence falls through to next
+     node).
 4. Place the file at `lca/nodes/<region>/<sub-group>/<node>.py`.
 5. Register it in `bundles/<bundle>.yaml:plugins:` with the existing
    `phase.<region>.<id>` plugin id (unchanged) and the new
@@ -80,8 +76,7 @@ lca/nodes/
 
 This tree was introduced in note
 [`2026-09-15-unified-nodes-directory-layout`](../notes/implemented/seam/2026-09-15-unified-nodes-directory-layout.md)
-after PR3 (`@graph_node` DSL, ADR-0227) introduced the typed-boundary
-mechanism but left the node files scattered across
-`lca/framework/graph/nodes/`, `lca/plugins/think/`, and
+after PR3 introduced the typed-boundary mechanism but left the node files
+scattered across `lca/framework/graph/nodes/`, `lca/plugins/think/`, and
 `lca/plugins/loop/graph/nodes/`. The unified tree gives every node a
 home discoverable by `ls` without reading docs.

@@ -8,10 +8,8 @@ LLM-call preparation step. The orphan-drop lives on
 :meth:`RunSessionWriter.derive_messages`; this node is the typed-boundary
 adapter that wires the writer into the think subgraph's LLM dispatch port.
 
-The :func:`@graph_node <graph_node>` decorator (ADR-0227) replaces the
-manual ``NodeExecutor`` dataclass + ``@plugin(...)`` setup pair that lived
-in :mod:`lca.plugins.think.history_assemble.execute` (PR2). Composite-key
-registration under ``think::history.derive`` is preserved.
+Canonical shape: hand-written ``@dataclass(frozen=True, slots=True)`` +
+``@plugin(...)`` carrier, per ADR-0228 D2.
 """
 
 from __future__ import annotations
