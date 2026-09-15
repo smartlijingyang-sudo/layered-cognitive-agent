@@ -85,12 +85,11 @@ async def setup(ctx: PluginContext, config: Any) -> None:
 
     def _assistant_tools_factory(bindings: object) -> list[Any] | None:
         tools: list[Any] = [AssistantCreateTool(catalog=catalog, bridge=bridge)]
-        # assistant_create_skill_tool_from_run reads ``assistant_id`` from a
-        # dict-like. BindingsView is a pydantic model; pull the relevant
-        # field through a dict proxy. When bindings has no assistant_id,
-        # the helper reads ``current_assistant_id()`` as fallback.
-        proxy = {} if bindings is None else {"bindings": bindings}
-        create_skill = assistant_create_skill_tool_from_run(proxy, overlay=overlay)
+        # ``assistant_id`` comes from the run bindings when the caller has
+        # them, else from the ambient ``current_assistant_id()``;
+        # ``assistant_create_skill_tool_from_run`` owns that precedence, so the
+        # bindings value is forwarded unchanged instead of re-wrapped here.
+        create_skill = assistant_create_skill_tool_from_run(bindings, overlay=overlay)
         if create_skill is not None:
             tools.append(create_skill)
         return tools

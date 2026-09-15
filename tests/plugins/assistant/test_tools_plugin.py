@@ -9,7 +9,7 @@ import pytest
 from lca.harness.plugin_api import definition_from_plugin
 from lca.infrastructure.tools.assistant.create_skill_tool import AssistantCreateSkillTool
 from lca.infrastructure.tools.assistant.create_tool import AssistantCreateTool
-from lca.plugins.assistant import tools as tools_plugin
+from lca.plugins.domain.tools.assistant_tools import plugin as tools_plugin
 
 
 class _FakeToolsService:
