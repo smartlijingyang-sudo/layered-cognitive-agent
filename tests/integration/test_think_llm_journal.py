@@ -272,10 +272,6 @@ def test_think_llm_journal_populates_journal_json() -> None:
                 "web-standard profile cannot boot in this sandbox (pre-existing "
                 "plan-validation defect); structural assertion cannot run."
             )
-        if "requires a bound Session" in msg:
-            pytest.skip(
-                f"e2e Session cannot be bound in this sandbox: {type(exc).__name__}: {msg}."
-            )
         if "PlanResolution" in msg or "plan-resolution" in msg:
             pytest.skip(
                 f"web-standard profile plan-resolution blocked: {type(exc).__name__}: {msg}."
@@ -421,6 +417,16 @@ def test_think_llm_journal_populates_journal_json() -> None:
     ]
     assert step_tool_call_records, (
         "at least one spine event with execution_point == 'step.tool_call.record'"
+    )
+    # One row per invocation: a second producer (e.g. the think node emitting
+    # alongside the body executor) duplicates the fact byte-for-byte under the
+    # same invocation_id, and metrics_projection.tool_call_count then counts it
+    # twice.
+    invocation_ids = [r.get("payload", {}).get("invocation_id") for r in step_tool_call_records]
+    assert all(invocation_ids), f"step.tool_call.record missing invocation_id: {invocation_ids!r}"
+    assert len(invocation_ids) == len(set(invocation_ids)), (
+        f"step.tool_call.record must be single-writer: {len(invocation_ids)} rows for "
+        f"{len(set(invocation_ids))} distinct invocation ids: {invocation_ids!r}"
     )
     assert any(
         r.get("payload", {}).get("tool_name") == "bash"

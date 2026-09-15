@@ -26,7 +26,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from lca.cognition.body.emit._args_summary import summarize_args
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
@@ -53,7 +52,6 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.loop.commit.tool_journal import record_step_tool_call
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,15 +112,11 @@ class LlmCallExecutor:
         usage: TokenUsage | None = response.usage
         tool_calls = list(response.tool_calls or ())
         step = state.step
-        for tc in tool_calls:
-            arguments = tc.arguments
-            record_step_tool_call(
-                tool_name=tc.name,
-                invocation_id=tc.call_id,
-                arguments=arguments,
-                arguments_summary=summarize_args(arguments),
-                state=state,
-            )
+        # ``step.tool_call.record`` has exactly one producer: the body executor
+        # that actually starts the invocation (``SimpleSafeExecutor.execute`` /
+        # its pipeline twin). Emitting it here as well wrote a second
+        # byte-identical row per ``invocation_id``, which
+        # ``metrics_projection.tool_call_count`` then double-counted.
         writer.append_assistant_message(
             turn=step,
             step=step,

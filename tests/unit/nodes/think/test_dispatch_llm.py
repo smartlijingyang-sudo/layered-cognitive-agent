@@ -209,133 +209,29 @@ async def test_node_execute_missing_state_raises_type_error() -> None:
         )
 
 
-async def test_node_execute_emits_step_tool_call_record_per_tool_call(
+async def test_node_execute_does_not_commit_step_tool_call_record(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Each LLM tool_call → one ``record_step_tool_call`` call.
+    """The node must not write ``step.tool_call.record`` — the body owns it.
 
-    The journal fold (``journal_fold.py:642``) consumes the spine EP
-    ``step.tool_call.record``, which ``record_step_tool_call`` publishes
-    via ``publish_ep_bound``. Per ``NativeToolCall`` in the response:
-    ``tool_name`` / ``invocation_id`` (= ``tc.call_id``) / ``arguments``
-    are forwarded verbatim plus the resolved ``state``; the writer is left
-    to FactGateway so the append goes through the run bridge.
+    ``SimpleSafeExecutor.execute`` (and its pipeline twin) is the single
+    producer of that spine EP per invocation. A second emit from here wrote a
+    byte-identical row under the same ``invocation_id``, which
+    ``metrics_projection.tool_call_count`` counted twice. Spying on the
+    canonical function (not a module-local alias) catches a re-introduction
+    whatever import path the node uses.
     """
-    from lca.nodes.think.dispatch import llm as dispatch_module
+    import lca.loop.commit.tool_journal as tool_journal
 
     calls: list[dict[str, Any]] = []
+    monkeypatch.setattr(tool_journal, "record_step_tool_call", lambda **kw: calls.append(kw))
 
-    def spy(**kwargs: Any) -> None:
-        calls.append(kwargs)
-
-    monkeypatch.setattr(dispatch_module, "record_step_tool_call", spy)
-
-    executor = LlmCallExecutor()
-    state = _state(step=4, turn=9)
-    adapter = _RecordingAdapter(
-        response=_response_with_tool_calls(
-            NativeToolCall(
-                call_id="call-1",
-                name="echo",
-                arguments={"msg": "hello"},
-            ),
-            NativeToolCall(
-                call_id="call-2",
-                name="writeFile",
-                arguments={"path": "/var/data/x", "content": "abc"},
-            ),
-        )
-    )
-    runtime = {"adapter": adapter}
-
-    await executor.node_execute(
-        context=_node_context(runtime=runtime),
-        input=NodeInput(
-            port_values={
-                "state": state,
-                "writer": _FakeWriter(),
-                "model_visible_request": _request(),
-            }
-        ),
-    )
-
-    assert len(calls) == 2
-    first, second = calls
-
-    assert first["tool_name"] == "echo"
-    assert first["invocation_id"] == "call-1"
-    assert first["arguments"] == {"msg": "hello"}
-    assert first["state"] is state
-    assert "session" not in first
-
-    assert second["tool_name"] == "writeFile"
-    assert second["invocation_id"] == "call-2"
-    assert second["arguments"] == {"path": "/var/data/x", "content": "abc"}
-    assert second["state"] is state
-    assert "session" not in second
-
-
-async def test_node_execute_no_tool_calls_skips_step_tool_call_record(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Empty ``response.tool_calls`` → ``record_step_tool_call`` not called.
-
-    A response with only text (no native tool calls) is the common
-    ``respond`` decision path; the empty loop must not emit a phantom
-    ``step.tool_call.record`` spine fact.
-    """
-    from lca.nodes.think.dispatch import llm as dispatch_module
-
-    calls: list[dict[str, Any]] = []
-
-    def spy(**kwargs: Any) -> None:
-        calls.append(kwargs)
-
-    monkeypatch.setattr(dispatch_module, "record_step_tool_call", spy)
-
-    executor = LlmCallExecutor()
-    adapter = _RecordingAdapter(response=_response())
-
-    await executor.node_execute(
-        context=_node_context(runtime={"adapter": adapter}),
-        input=NodeInput(
-            port_values={
-                "state": _state(),
-                "writer": _FakeWriter(),
-                "model_visible_request": _request(),
-            }
-        ),
-    )
-
-    assert calls == []
-
-
-async def test_node_execute_step_tool_call_arguments_summary_truncates_long_values(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Non-empty arguments → ``arguments_summary`` is derived and ≤ 200 chars.
-
-    Pins the contract that ``summarize_args`` (canonical body-side
-    helper) is the source of the summary: keys joined with ``=``, values
-    repr'd and truncated, total length bounded by ~200 chars.
-    """
-    from lca.nodes.think.dispatch import llm as dispatch_module
-
-    calls: list[dict[str, Any]] = []
-
-    def spy(**kwargs: Any) -> None:
-        calls.append(kwargs)
-
-    monkeypatch.setattr(dispatch_module, "record_step_tool_call", spy)
-
-    long_value = "x" * 500
     executor = LlmCallExecutor()
     adapter = _RecordingAdapter(
         response=_response_with_tool_calls(
+            NativeToolCall(call_id="call-1", name="echo", arguments={"msg": "hello"}),
             NativeToolCall(
-                call_id="call-1",
-                name="echo",
-                arguments={"key": long_value},
+                call_id="call-2", name="writeFile", arguments={"path": "/x", "content": "abc"}
             ),
         )
     )
@@ -344,14 +240,60 @@ async def test_node_execute_step_tool_call_arguments_summary_truncates_long_valu
         context=_node_context(runtime={"adapter": adapter}),
         input=NodeInput(
             port_values={
-                "state": _state(),
+                "state": _state(step=4, turn=9),
                 "writer": _FakeWriter(),
                 "model_visible_request": _request(),
             }
         ),
     )
 
-    assert len(calls) == 1
-    summary = calls[0]["arguments_summary"]
-    assert summary  # non-empty for a non-empty dict
-    assert len(summary) <= 201  # 200 + the trailing ellipsis char
+    assert calls == [], f"llm.call must not commit step.tool_call.record: {calls!r}"
+
+
+def test_node_module_has_no_tool_journal_commit_reference() -> None:
+    """Structural lock behind the behavioural spy above.
+
+    A top-level ``from lca.loop.commit.tool_journal import record_step_tool_call``
+    would bind the name before a monkeypatch could take effect, so also assert
+    the node source never mentions the canonical emitter.
+    """
+    from pathlib import Path
+
+    import lca.nodes.think.dispatch.llm as dispatch_module
+
+    source = Path(dispatch_module.__file__).read_text(encoding="utf-8")
+    assert "record_step_tool_call" not in source, (
+        "llm.call re-gained a second step.tool_call.record producer; the body "
+        "executor is the single owner"
+    )
+
+
+async def test_node_execute_persists_declared_tool_calls_to_the_writer() -> None:
+    """Declared tool calls still reach the Session writer (assistant row + tool rows).
+
+    Dropping the spine emit must not drop the conversation facts the fold and
+    the next model turn read.
+    """
+    executor = LlmCallExecutor()
+    writer = _FakeWriter()
+    adapter = _RecordingAdapter(
+        response=_response_with_tool_calls(
+            NativeToolCall(call_id="call-1", name="echo", arguments={"msg": "hello"}),
+            NativeToolCall(call_id="call-2", name="writeFile", arguments={"path": "/x"}),
+        )
+    )
+
+    await executor.node_execute(
+        context=_node_context(runtime={"adapter": adapter}),
+        input=NodeInput(
+            port_values={
+                "state": _state(step=4, turn=9),
+                "writer": writer,
+                "model_visible_request": _request(),
+            }
+        ),
+    )
+
+    assert [c["call_id"] for c in writer.tool_calls] == ["call-1", "call-2"]
+    assert writer.assistant_messages[0]["tool_calls"] is not None
+    assert len(writer.assistant_messages[0]["tool_calls"]) == 2
