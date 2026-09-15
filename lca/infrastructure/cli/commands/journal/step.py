@@ -46,7 +46,9 @@ def _load_journal(run_dir: Path) -> dict[str, Any] | None:
     try:
         data: dict[str, Any] = json.loads(journal_path.read_text(encoding="utf-8"))
         return data
-    except Exception:
+    except (OSError, ValueError):
+        # Unreadable file or malformed JSON only. Anything else is a bug in this
+        # command and must not be reported to the user as "journal 不存在或损坏".
         return None
 
 
