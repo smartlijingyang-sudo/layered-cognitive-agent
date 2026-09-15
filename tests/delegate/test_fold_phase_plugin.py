@@ -25,7 +25,7 @@ from lca.contracts.protocols.graph.delegation import (
     DelegationReceipt,
     FoldedDelegationResult,
 )
-from lca.nodes.delegate.fold.fold import DelegateFoldExecutor
+from lca.nodes.delegate.fold import DelegateFoldExecutor
 
 
 def _ctx() -> NodeContext:

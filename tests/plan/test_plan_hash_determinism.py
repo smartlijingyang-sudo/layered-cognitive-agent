@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import re
 
-from lca.harness.composition.plan_compiler import CompileOptions, compile_plan
 from lca.harness.plan import (
     capability_sub_plan_hash,
     compiled_run_plan_ref,
@@ -30,6 +29,7 @@ from lca.harness.plan import (
     scope_sub_plan_hash,
 )
 from lca.harness.profile.resolve.resolve import resolve_profile
+from lca_kernel.plan.plan_compile import CompileOptions, compile_plan
 
 WEB_STANDARD = "profiles/web-standard.yaml"
 

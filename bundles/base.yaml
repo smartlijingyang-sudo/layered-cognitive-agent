@@ -83,7 +83,7 @@ entries:
 # ports; emits a revised ``TaskList`` typed port (ADR-0228 §Decision 3).
 - id: lca.nodes.plan.revise
   name: lca_nodes_plan_revise
-  $module: lca.nodes.plan.revise.revise
+  $module: lca.nodes.plan.revise
   config: {}
 - id: phase.think.gate
   name: phase_think_gate
@@ -95,7 +95,7 @@ entries:
 # typed ``Decision`` port.
 - id: lca.nodes.intervene.resume
   name: lca_nodes_intervene_resume
-  $module: lca.nodes.intervene.resume.resume
+  $module: lca.nodes.intervene.resume
   config: {}
 - id: phase.think.reason.plan
   name: phase_think_reason_plan
@@ -150,11 +150,11 @@ entries:
   config: {}
 - id: phase.delegate.fold
   name: phase_delegate_fold
-  $module: lca.nodes.delegate.fold.fold
+  $module: lca.nodes.delegate.fold
   config: {}
 - id: lca.nodes.delegate.compose
   name: lca_nodes_delegate_compose
-  $module: lca.nodes.delegate.compose.compose
+  $module: lca.nodes.delegate.compose
   config: {}
 - id: control.perceive.context
   name: control_perceive_context
@@ -183,51 +183,51 @@ entries:
   config: {}
 - id: phase.concept.tool.fork.dispatch
   name: phase_concept_tool_fork_dispatch
-  $module: lca.plugins.concept.tool_fork.dispatch
+  $module: lca.nodes.concept.tool_fork.dispatch
   config: {}
 - id: phase.concept.role_snapshot.capability_role_normalize
   name: phase_concept_role_snapshot_capability_role_normalize
-  $module: lca.plugins.concept.role_snapshot.normalize
+  $module: lca.nodes.concept.role_snapshot.normalize
   config: {}
 - id: phase.concept.role_snapshot.capability_role_compose
   name: phase_concept_role_snapshot_capability_role_compose
-  $module: lca.plugins.concept.role_snapshot.compose
+  $module: lca.nodes.concept.role_snapshot.compose
   config: {}
 - id: phase.concept.context_compose.context_lines_collect
   name: phase_concept_context_compose_context_lines_collect
-  $module: lca.plugins.concept.context_compose.collect
+  $module: lca.nodes.concept.context_compose.collect
   config: {}
 - id: phase.concept.context_compose.context_skills_merge
   name: phase_concept_context_compose_context_skills_merge
-  $module: lca.plugins.concept.context_compose.skills
+  $module: lca.nodes.concept.context_compose.skills
   config: {}
 - id: phase.concept.template_select.prompt_candidate_enumerate
   name: phase_concept_template_select_prompt_candidate_enumerate
-  $module: lca.plugins.concept.template_select.enumerate
+  $module: lca.nodes.concept.template_select.enumerate
   config: {}
 - id: phase.concept.template_select.prompt_candidate_score
   name: phase_concept_template_select_prompt_candidate_score
-  $module: lca.plugins.concept.template_select.score
+  $module: lca.nodes.concept.template_select.score
   config: {}
 - id: phase.concept.template_select.prompt_candidate_pick
   name: phase_concept_template_select_prompt_candidate_pick
-  $module: lca.plugins.concept.template_select.pick
+  $module: lca.nodes.concept.template_select.pick
   config: {}
 - id: phase.concept.decision_classify.decision_parse_response
   name: phase_concept_decision_classify_decision_parse_response
-  $module: lca.plugins.concept.decision_classify.parse_tool_calls
+  $module: lca.nodes.concept.decision_classify.parse_tool_calls
   config: {}
 - id: phase.concept.decision_classify.decision_compose_action
   name: phase_concept_decision_classify_decision_compose_action
-  $module: lca.plugins.concept.decision_classify.compose_action
+  $module: lca.nodes.concept.decision_classify.compose_action
   config: {}
 - id: phase.concept.decision_enforce.gate_chain_run
   name: phase_concept_decision_enforce_gate_chain_run
-  $module: lca.plugins.concept.decision_enforce.chain_run
+  $module: lca.nodes.concept.decision_enforce.chain_run
   config: {}
 - id: phase.concept.decision_enforce.gate_chain_reject
   name: phase_concept_decision_enforce_gate_chain_reject
-  $module: lca.plugins.concept.decision_enforce.chain_reject
+  $module: lca.nodes.concept.decision_enforce.chain_reject
   config: {}
 - id: phase.concept.act_subgraph.act_validate
   name: phase_concept_act_subgraph_act_validate
@@ -519,5 +519,5 @@ entries:
 # ``Command`` and emits ``RoutingDecision(should_terminate=True)``.
 - id: lca.nodes.intervene.interrupt
   name: lca_nodes_intervene_interrupt
-  $module: lca.nodes.intervene.interrupt.interrupt
+  $module: lca.nodes.intervene.interrupt
   config: {}

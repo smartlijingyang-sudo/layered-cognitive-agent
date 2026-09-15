@@ -21,7 +21,7 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
 )
-from lca.nodes.plan.compose.compose import (
+from lca.nodes.plan.compose import (
     PlanComposeExecutor,
     _compose_entries,
     _short_task_id,

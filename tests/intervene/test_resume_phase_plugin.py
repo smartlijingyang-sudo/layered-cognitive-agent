@@ -17,7 +17,7 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeInput,
 )
 from lca.contracts.protocols.graph.command import Command
-from lca.nodes.intervene.resume.resume import ResumeExecutor
+from lca.nodes.intervene.resume import ResumeExecutor
 
 
 def _ctx() -> NodeContext:

@@ -1,7 +1,7 @@
 """Unit tests for the ``delegate.compose`` node (ADR-0228 D5).
 
 The hand-written :class:`DelegateComposeExecutor` in
-:mod:`lca.nodes.delegate.compose.compose` reads a Decision port + a
+:mod:`lca.nodes.delegate.compose` reads a Decision port + a
 duck-typed capability_grant and emits a tuple of
 :class:`DelegationRequest`. The tests pin the typed-port contract:
 
@@ -30,7 +30,7 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeInput,
 )
 from lca.contracts.protocols.graph.delegation import DelegationRequest
-from lca.nodes.delegate.compose.compose import (
+from lca.nodes.delegate.compose import (
     DEFAULT_TIMEOUT_MS,
     DELEGATE_CAPABILITY,
     DelegateComposeExecutor,
@@ -163,7 +163,7 @@ async def test_idempotency_key_format_is_decision_id_colon_target() -> None:
 
 def test_plugin_module_exposes_setup_carrier_with_composite_key() -> None:
     """``setup.setup()`` registers ``region:delegate::delegate.compose``."""
-    module = import_module("lca.nodes.delegate.compose.compose")
+    module = import_module("lca.nodes.delegate.compose")
     assert hasattr(module, "setup")
     assert hasattr(module.setup, "setup")
     assert callable(module.setup.setup)

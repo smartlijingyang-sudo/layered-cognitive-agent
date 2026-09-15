@@ -21,7 +21,7 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
 )
-from lca.nodes.plan.revise.revise import PlanReviseExecutor
+from lca.nodes.plan.revise import PlanReviseExecutor
 
 
 def _ctx() -> NodeContext:

@@ -23,11 +23,6 @@ from lca.contracts.protocols.state.scope_plan import (
     ScopePlan,
     scope_plan_hash,
 )
-from lca.harness.composition.plan_compiler import (
-    CompileOptions,
-    compile_plan,
-    explain_compile_plan,
-)
 from lca.harness.plan import (
     build_input_provenance,
     capability_sub_plan_hash,
@@ -37,8 +32,13 @@ from lca.harness.plan import (
     declarative_plan_hash,
     scope_sub_plan_hash,
 )
+from lca.harness.profile.plan.explain import explain_compile_plan
 from lca.harness.profile.resolve.resolve import ResolvedProfile, resolve_profile
 from lca.infrastructure.cli.commands.profile.declarative import render_declarative_graph
+from lca_kernel.plan.plan_compile import (
+    CompileOptions,
+    compile_plan,
+)
 
 # ── build_input_provenance ──────────────────────────────────────────
 

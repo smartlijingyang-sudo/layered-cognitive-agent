@@ -15,13 +15,13 @@ from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     ActionAuthorityPlan,
 )
-from lca.harness.composition.plan_compiler import compile_plan
 from lca.harness.declarative.compile.action.authority import compile_action_authority
 from lca.harness.declarative.compile.authority.authority import (
     action_authority_for_scope,
     action_is_permitted,
 )
 from lca.harness.profile.resolve.resolve import resolve_profile
+from lca_kernel.plan.plan_compile import compile_plan
 
 # ── Data class contract ───────────────────────────────────────────────
 
@@ -163,7 +163,7 @@ def test_compile_plan_action_authority_forbids_actions_via_task_contract() -> No
     assert "use_tool" in plan.action_authority.allowed_actions
 
     # Compile again with task_id that triggers a carve-out.
-    from lca.harness.composition.plan_compiler import CompileOptions
+    from lca_kernel.plan.plan_compile import CompileOptions
 
     carved_plan = compile_plan(
         resolved,

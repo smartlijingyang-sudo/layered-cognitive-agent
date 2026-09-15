@@ -4,7 +4,7 @@ Verifies the typed ``delegate.await`` pass-through node: kernel-fed
 ``DelegationReceipt`` tuples come out unchanged. ADR-0228 §D5.
 
 ``delegate.await.block`` lives under a folder named ``await`` (Python
-reserved keyword). ``from lca.nodes.delegate.await.block import …`` is a
+reserved keyword). ``from lca.nodes.delegate.block import …`` is a
 syntax error at parse time, so the module is loaded via
 ``importlib.import_module`` and a small ``AwaitExecutor`` indirection
 keeps the test bodies identical to the ``fold`` test style.
@@ -28,11 +28,11 @@ def _executor() -> object:
     """Return a fresh ``DelegateAwaitExecutor`` for each test.
 
     The module path contains ``await`` (a reserved keyword), so static
-    ``from lca.nodes.delegate.await.block import …`` is a syntax error.
+    ``from lca.nodes.delegate.block import …`` is a syntax error.
     The bundle resolver and runtime use ``importlib.import_module``
     dynamically; the tests mirror that.
     """
-    module = importlib.import_module("lca.nodes.delegate.await.block")
+    module = importlib.import_module("lca.nodes.delegate.block")
     return module.DelegateAwaitExecutor()
 
 

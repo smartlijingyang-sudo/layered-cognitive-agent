@@ -19,7 +19,7 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
 )
 from lca.contracts.protocols.graph.command import Command
 from lca.contracts.protocols.graph.routing import RoutingDecision
-from lca.nodes.intervene.interrupt.interrupt import InterruptExecutor
+from lca.nodes.intervene.interrupt import InterruptExecutor
 
 
 def _ctx() -> NodeContext:
