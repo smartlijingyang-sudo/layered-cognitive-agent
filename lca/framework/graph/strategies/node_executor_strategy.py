@@ -26,7 +26,6 @@ from typing import Any
 
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext as LegacyNodeContext,
-    NodeExecutor,
     NodeInput as LegacyNodeInput,
     NodeOutput as LegacyNodeOutput,
 )
@@ -36,7 +35,6 @@ from lca.contracts.protocols.graph.node_io import (
     NodeIOSchema,
     NodeOutput,
 )
-from lca.contracts.protocols.graph.ports import PortName
 from lca.contracts.protocols.graph.strategy import NodeStrategy, StrategyContext
 from lca.framework.graph.strategy_registry import (
     NodeExecutorLookup,
