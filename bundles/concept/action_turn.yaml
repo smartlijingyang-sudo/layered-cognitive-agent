@@ -21,7 +21,6 @@ nodes:
     inputs: [decision]
     outputs: [decision]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
 
@@ -30,7 +29,6 @@ nodes:
     inputs: [decision]
     outputs: [decision]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
 
@@ -39,7 +37,6 @@ nodes:
     inputs: [decision, state]
     outputs: [receipt]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
       sub_spec_ref:

@@ -26,7 +26,6 @@ nodes:
     inputs: [reflection, observation, state]
     outputs: [memory_receipt]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
       sub_spec_ref:

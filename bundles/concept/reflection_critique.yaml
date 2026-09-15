@@ -21,7 +21,6 @@ nodes:
     inputs: [receipt]
     outputs: [observation]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
 
@@ -30,7 +29,6 @@ nodes:
     inputs: [observation, state]
     outputs: [reflection]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
 

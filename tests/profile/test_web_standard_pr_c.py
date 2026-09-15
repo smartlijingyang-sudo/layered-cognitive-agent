@@ -85,11 +85,6 @@ def test_non_perceive_nodes_have_no_predicate_fields(compiled_plan) -> None:
         assert node.terminal_predicate is None, f"{node.id}.terminal_predicate must stay None"
 
 
-def test_perceive_node_max_visits_unchanged(perceive_node) -> None:
-    """``perceive.main.max_visits`` 仍是 8(锁 PG-007 兜底语义)。"""
-    assert perceive_node.max_visits == 8
-
-
 def test_perceive_node_terminal_flag_unchanged(compiled_plan) -> None:
     """``perceive.main`` 仍是 entry, ``stop.main`` 仍是 terminal(锁拓扑)。"""
     assert compiled_plan.phase_graph is not None

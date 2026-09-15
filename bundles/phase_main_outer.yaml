@@ -19,7 +19,6 @@ purpose: Six-phase outer plan (perceive → think → act → reflect → rememb
 nodes:
   - id: perceive.main
     region: phase:perceive
-    max_visits: 1
     entry: true
     sub_spec_ref:
       plan_ref: bundles/perceive_subgraph.yaml
@@ -34,7 +33,6 @@ nodes:
 
   - id: think.main
     region: phase:think
-    max_visits: 2
     sub_spec_ref:
       plan_ref: bundles/think.yaml
       entry_node: think.shortcut
@@ -54,7 +52,6 @@ nodes:
 
   - id: act.main
     region: phase:act
-    max_visits: 2
     sub_spec_ref:
       plan_ref: bundles/act.yaml
       entry_node: act.validate
@@ -73,7 +70,6 @@ nodes:
 
   - id: reflect.main
     region: phase:reflect
-    max_visits: 1
     sub_spec_ref:
       plan_ref: bundles/reflect_subgraph.yaml
       entry_node: phase.reflect.score
@@ -92,7 +88,6 @@ nodes:
 
   - id: remember.main
     region: phase:remember
-    max_visits: 1
     sub_spec_ref:
       plan_ref: bundles/remember_subgraph.yaml
       entry_node: phase.remember.write
@@ -113,7 +108,6 @@ nodes:
   - id: terminal.commit
     region: phase:terminal
     binding: terminate
-    max_visits: 1
     terminal: true
     # The typed-port D4 boundary emits ``decision`` (the stamped
     # Decision from think.subgraph). ``reflection`` flows through

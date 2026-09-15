@@ -20,7 +20,6 @@ nodes:
     inputs: [role_profile]
     outputs: [role]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
   - id: capability.role.compose
@@ -28,7 +27,6 @@ nodes:
     inputs: [role, team_awareness]
     outputs: [role_snapshot]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
 

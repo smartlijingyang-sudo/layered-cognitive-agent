@@ -51,7 +51,6 @@ nodes:
     inputs: [run_input, state]
     outputs: [manifest]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
       sub_spec_ref:
@@ -64,7 +63,6 @@ nodes:
     inputs: [bindings, llm, tools, role, selector, state, manifest]
     outputs: [decision]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
       sub_spec_ref:
@@ -77,7 +75,6 @@ nodes:
     inputs: [decision, state]
     outputs: [receipt]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
       sub_spec_ref:
@@ -90,7 +87,6 @@ nodes:
     inputs: [receipt, state]
     outputs: [reflection]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
       sub_spec_ref:
@@ -103,7 +99,6 @@ nodes:
     inputs: [reflection, receipt, state]
     outputs: [memory_receipt]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
       sub_spec_ref:
@@ -116,7 +111,6 @@ nodes:
     inputs: [state, decision, receipt, reflection, memory_receipt]
     outputs: [terminal_outcome]
     config:
-      max_visits: 1
 
 edges:
   # 5 phase 顺序 + terminal commit

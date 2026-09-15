@@ -25,7 +25,6 @@ nodes:
     inputs: [template_selection]
     outputs: [prompt_template]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
 
@@ -34,7 +33,6 @@ nodes:
     inputs: [prompt_template, context, role]
     outputs: [prompt_text, prompt_trace]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
 
@@ -43,7 +41,6 @@ nodes:
     inputs: [prompt_text, prompt_trace]
     outputs: [render]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
 

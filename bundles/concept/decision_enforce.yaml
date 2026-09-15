@@ -25,7 +25,6 @@ nodes:
     # (which downstream uses to stamp ``routing``).
     outputs: [enforced_decision, decision]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
 
@@ -34,7 +33,6 @@ nodes:
     inputs: [decision, enforced_decision]
     outputs: [decision, routing]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
 

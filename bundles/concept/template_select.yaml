@@ -21,7 +21,6 @@ nodes:
     inputs: [state]
     outputs: [candidates]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
   - id: prompt.candidate.score
@@ -29,7 +28,6 @@ nodes:
     inputs: [candidates, state]
     outputs: [scored]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
   - id: prompt.candidate.pick
@@ -37,7 +35,6 @@ nodes:
     inputs: [scored, state]
     outputs: [template_selection]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
 

@@ -19,7 +19,6 @@ nodes:
     inputs: [bindings]
     outputs: [forked_tools]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
 

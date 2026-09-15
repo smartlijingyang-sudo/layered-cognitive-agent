@@ -16,7 +16,6 @@ nodes:
     inputs: []
     outputs: [forked_tools]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
       sub_spec_ref:
@@ -29,7 +28,6 @@ nodes:
     inputs: []
     outputs: [turn_plan]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
 
@@ -38,7 +36,6 @@ nodes:
     inputs: [turn_plan]
     outputs: [turn_render]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  [prompt_assembler_end, reasoner_meta]
 
@@ -47,7 +44,6 @@ nodes:
     inputs: [turn_render, forked_tools]
     outputs: [response]
     config:
-      max_visits: 3
       emit_on_enter: [reasoner_reason_start]
       emit_on_exit:  [reasoner_reason_end]
 

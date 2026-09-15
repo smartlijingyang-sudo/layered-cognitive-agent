@@ -23,7 +23,6 @@ nodes:
     inputs: [response]
     outputs: [tool_calls, delegations, intent]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
 
@@ -33,7 +32,6 @@ nodes:
     outputs: [decision]
     terminal: true
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
 

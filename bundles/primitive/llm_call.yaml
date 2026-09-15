@@ -18,7 +18,6 @@ nodes:
     inputs: [render, tools, state]
     outputs: [response]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
 

@@ -17,7 +17,6 @@ nodes:
     factory: phase.perceive.observe
     outputs: [manifest, routing]
     config:
-      max_visits: 1
 
   - id: phase.perceive.fold
     factory: phase.perceive.fold
@@ -29,7 +28,6 @@ nodes:
     outputs: [in_assembled_manifest, observation]
     terminal: true
     config:
-      max_visits: 1
 
 edges:
   - from: phase.perceive.observe

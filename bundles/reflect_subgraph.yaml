@@ -25,14 +25,12 @@ nodes:
     inputs: [observation]
     outputs: [observation, reflection]
     config:
-      max_visits: 1
 
   - id: phase.reflect.admit_recovery
     factory: phase.reflect.admit_recovery
     inputs: [observation, reflection]
     outputs: [reflection, routing]
     config:
-      max_visits: 1
 
 edges:
   - from: phase.reflect.score

@@ -43,7 +43,6 @@ nodes:
     inputs: [bindings]
     outputs: [forked_tools]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
       sub_spec_ref:
@@ -56,7 +55,6 @@ nodes:
     inputs: [role_profile, team_awareness]
     outputs: [role_snapshot]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
       sub_spec_ref:
@@ -69,7 +67,6 @@ nodes:
     inputs: [manifest, task, activated_skills]
     outputs: [context]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
       sub_spec_ref:
@@ -82,7 +79,6 @@ nodes:
     inputs: [state, context]
     outputs: [template_selection]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
       sub_spec_ref:
@@ -96,7 +92,6 @@ nodes:
     inputs: [template_selection, context, role_snapshot]
     outputs: [render]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
       sub_spec_ref:
@@ -110,7 +105,6 @@ nodes:
     inputs: [render, forked_tools, state]
     outputs: [response]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
       sub_spec_ref:
@@ -124,7 +118,6 @@ nodes:
     inputs: [response]
     outputs: [decision]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
       sub_spec_ref:
@@ -137,7 +130,6 @@ nodes:
     inputs: [decision, state]
     outputs: [decision]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
       sub_spec_ref:

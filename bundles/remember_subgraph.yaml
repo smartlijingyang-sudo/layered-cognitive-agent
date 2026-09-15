@@ -15,14 +15,12 @@ nodes:
     inputs: [decision, observation, reflection]
     outputs: [memory_receipt]
     config:
-      max_visits: 1
 
   - id: phase.remember.fold
     factory: phase.remember.fold
     inputs: [memory_receipt]
     outputs: [memory_receipt]
     config:
-      max_visits: 1
 
 edges:
   - from: phase.remember.write

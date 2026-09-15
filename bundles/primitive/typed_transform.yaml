@@ -15,7 +15,6 @@ nodes:
     inputs: [input_dto]
     outputs: [output_dto]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit: []
 

@@ -14,19 +14,16 @@ nodes:
     inputs: [in_assembled_manifest]
     outputs: [decision]
     config:
-      max_visits: 1
 
   - id: think.route
     factory: think.route
     config:
-      max_visits: 1
 
   - id: think.reason
     factory: think.reason
     inputs: [in_assembled_manifest]
     outputs: [response]
     config:
-      max_visits: 8
       sub_spec_ref:
         plan_ref: bundles/think_reason.yaml
         entry_node: think.reason.fork_tools
@@ -39,7 +36,6 @@ nodes:
     inputs: [response]
     outputs: [decision]
     config:
-      max_visits: 1
       emit_on_enter: []
       emit_on_exit:  []
       # ADR-0221: think.classify 改为 sub_spec_ref delegate 到
@@ -59,7 +55,6 @@ nodes:
     outputs: [decision, routing]
     terminal: true
     config:
-      max_visits: 8
       emit_on_enter: []
       emit_on_exit:  []
       # ADR-0220 P6: think.gate 改为 sub_spec_ref delegate 到
