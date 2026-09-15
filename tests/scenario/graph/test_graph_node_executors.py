@@ -8,9 +8,9 @@ from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.core.state.state import Budget
 from lca.contracts.models.team.graph.graph import ExecutionGraph, GraphEdge, GraphNode, NodeType
 from lca.contracts.protocols import GraphNodeExecutionContext, GraphNodeExecutor
-from lca.plugins.loop.graph.nodes.aggregator.plugin import AggregatorGraphNodeExecutor
-from lca.plugins.loop.graph.nodes.registry.plugin import GraphNodeExecutorRegistry
-from lca.plugins.loop.graph.nodes.topology.plugin import TopologyGraphNodeExecutor
+from lca.nodes.loop.aggregator.plugin import AggregatorGraphNodeExecutor
+from lca.nodes.loop.registry.plugin import GraphNodeExecutorRegistry
+from lca.nodes.loop.topology.plugin import TopologyGraphNodeExecutor
 from lca.plugins.strategies.graph.graph import GraphStrategy
 from tests.support.team_stage import stage_with_invoker
 

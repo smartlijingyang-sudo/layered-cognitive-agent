@@ -222,7 +222,7 @@ class RunSessionWriter(RunSessionWriterProtocol):
 
         Returns ``None`` when no preceding assistant row carried the matching
         tool call — in that case the result still appends, but orphan-drop at
-        :func:`lca.framework.graph.nodes.history_assemble.history_assemble`
+        :func:`lca.nodes.think.history.assemble.history_assemble`
         will drop it before it reaches the model.
         """
         session = self._require_session()

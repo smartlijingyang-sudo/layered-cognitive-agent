@@ -1,12 +1,12 @@
-"""phase.think.shortcut — try a deterministic shortcut before reason.
+"""phase.think.route — SkillRouter picks active template; Reducer folds state.
 
-think 子图节点 plugin:在 LLM 推理之前尝试确定性快速路径。
-``requires=("supports_shortcut",)`` 通过 Cordis 校验,
-运行时从 ``context.runtime.supports_shortcut`` 拿 capability 实例。
+think 子图节点 plugin:运行时动态选择 Prompt 模板并折叠 AgentState。
+``requires=("skill_router",)`` 通过 Cordis 校验,
+运行时从 ``context.runtime.skill_router`` 拿 capability 实例。
 
 ADR-0218 §3.3:节点 plugin 由作者显式书写完整 ``@plugin(...)`` 装饰器,
-工厂 ``setup(ctx)`` 通过 Cordis ``ctx.provide`` 单键注册 composite key,
-think 子图专用的 NodeExecutor 解析。
+工厂 ``setup(ctx)`` 通过 Cordis ``ctx.provide`` 双键注册
+(composite + region-less,think 子图专用的 NodeExecutor 解析)。
 """
 
 from __future__ import annotations
@@ -33,20 +33,20 @@ from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
-from lca.contracts.protocols.think.cognition import SupportsShortcut
+from lca.contracts.protocols.think.cognition import SkillRouter
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 @dataclass(frozen=True, slots=True)
-class ThinkShortcutExecutor:
-    """think 节点:在 LLM 推理前调用 SupportsShortcut.try_shortcut。"""
+class ThinkRouteExecutor:
+    """think 节点:从 SkillRouter 选 active template,由 Reducer 折叠 state。"""
 
-    semantic_name: str = "think.shortcut"
+    semantic_name: str = "think.route"
     region: str = "phase:think"
     # ADR-0219 §5.5: typed port contract declared on the plugin (graph
     # layer does not know port names; it only knows topology).
     declared_inputs: tuple[PortName, ...] = ("in_assembled_manifest",)
-    declared_outputs: tuple[PortName, ...] = ("decision",)
+    declared_outputs: tuple[PortName, ...] = ("route_choice", "enforced_state")
 
     async def node_execute(
         self,
@@ -56,45 +56,51 @@ class ThinkShortcutExecutor:
         """think 子图节点入口。
 
         inputs 端口(yaml):in_assembled_manifest
-        outputs 端口(yaml):decision
+        outputs 端口(yaml):route_choice, enforced_state
         """
         import logging
 
         _log = logging.getLogger(__name__)
         runtime = context.runtime
         state = runtime.state
-        cap = runtime.supports_shortcut
+        router = runtime.skill_router
+        reducer = runtime.reducer
 
         if state is None:
-            raise RuntimeError(
-                "think.shortcut requires runtime.state; got None"
-            )
-        if cap is None:
-            # No SupportsShortcut capability wired — explicit no-op path.
-            # Edge interpreter routes empty port_values to the next node,
-            # which is think.reason (the full reason path).
-            _log.info(
-                "think.shortcut: no SupportsShortcut wired; falling through to think.reason"
-            )
+            raise RuntimeError("think.route requires runtime.state; got None")
+        if router is None:
+            # No SkillRouter wired — explicit no-op path. Edge interpreter
+            # routes empty port_values to the next node (think.reason).
+            _log.info("think.route: no SkillRouter wired; falling through to think.reason")
             return NodeOutput(port_values={})
-        assert isinstance(cap, SupportsShortcut), (  # noqa: S101
-            "think.shortcut runtime.supports_shortcut must implement SupportsShortcut"
+
+        assert isinstance(router, SkillRouter), (  # noqa: S101
+            "think.route runtime.skill_router must implement SkillRouter"
         )
-        decision = await cap.try_shortcut(state)
-        if decision is None:
-            # No shortcut available — fall through to think.reason plan.
-            _log.info(
-                "think.shortcut no-shortcut path; routing to think.reason next"
+        if reducer is None:
+            raise RuntimeError(
+                "think.route requires runtime.reducer when a SkillRouter is configured"
             )
-            return NodeOutput(port_values={})
-        return NodeOutput(port_values={"decision": decision})
+        apply_skill_route = getattr(reducer, "apply_skill_route", None)
+        if not callable(apply_skill_route):
+            raise RuntimeError(
+                "think.route reducer must expose apply_skill_route(state, active_template)"
+            )
+        active_template = await router.route(state)
+        routed_state = apply_skill_route(state, active_template)
+        return NodeOutput(
+            port_values={
+                "route_choice": active_template,
+                "enforced_state": routed_state,
+            },
+        )
 
 
 @plugin(
-    id="phase.think.shortcut",
+    id="phase.think.route",
     Config=None,
-    provides=("phase:think::think.shortcut",),
-    requires=(),
+    provides=("phase:think::think.route",),
+    requires=("reducer",),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",
@@ -108,23 +114,23 @@ class ThinkShortcutExecutor:
         authority=AuthorityContract(grants=("plugin.serve",)),
         observability=EvidenceContract(
             descriptors=(
-                "phase_think_shortcut.checked",
-                "phase_think_shortcut.served",
+                "phase_think_route.checked",
+                "phase_think_route.served",
             )
         ),
     ),
     ownership=OwnershipDeclaration(
-        reads=("plugin.serve", "supports_shortcut"),
+        reads=("plugin.serve", "skill_router"),
         emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )
 async def setup(ctx: PluginContext, config=None) -> None:
-    """Composite-key 注册:``{region}::{semantic_name}``。"""
+    """Composite-key registration: ``{region}::{semantic_name}``."""
     del config
-    executor = ThinkShortcutExecutor()
+    executor = ThinkRouteExecutor()
     composite_key = f"{executor.region}::{executor.semantic_name}"
     ctx.provide(composite_key, executor)
 
 
-__all__ = ["ThinkShortcutExecutor", "setup"]
+__all__ = ["ThinkRouteExecutor", "setup"]

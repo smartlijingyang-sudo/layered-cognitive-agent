@@ -12,9 +12,8 @@ from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
-    NodeOutput,
 )
-from lca.plugins.think.shortcut import ThinkShortcutExecutor
+from lca.nodes.think.route.shortcut import ThinkShortcutExecutor
 
 
 @dataclass

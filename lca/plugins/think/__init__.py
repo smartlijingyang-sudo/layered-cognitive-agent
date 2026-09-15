@@ -1,29 +1,12 @@
-from lca.framework.graph.nodes.decorator import graph_node
-from lca.plugins.think.classify import ThinkClassifyExecutor
-from lca.plugins.think.classify import setup as _setup_classify
-from lca.plugins.think.gate import ThinkGateExecutor
-from lca.plugins.think.gate import setup as _setup_gate
-from lca.plugins.think.reason.plan import ThinkReasonPlanExecutor
-from lca.plugins.think.reason.plan import setup as _setup_reason_plan
-from lca.plugins.think.reason.render import ThinkReasonRenderExecutor
-from lca.plugins.think.reason.render import setup as _setup_reason_render
-from lca.plugins.think.route import ThinkRouteExecutor
-from lca.plugins.think.route import setup as _setup_route
-from lca.plugins.think.shortcut import ThinkShortcutExecutor
-from lca.plugins.think.shortcut import setup as _setup_shortcut
+"""think plugin surface — providers only.
 
-__all__ = [
-    "ThinkClassifyExecutor",
-    "ThinkGateExecutor",
-    "ThinkReasonPlanExecutor",
-    "ThinkReasonRenderExecutor",
-    "ThinkRouteExecutor",
-    "ThinkShortcutExecutor",
-    "_setup_classify",
-    "_setup_gate",
-    "_setup_reason_plan",
-    "_setup_reason_render",
-    "_setup_route",
-    "_setup_shortcut",
-    "graph_node",
-]
+Graph nodes (`think.shortcut`, `think.route`, `think.gate`, `think.reason.*`,
+`think.history.assemble`, `think.llm.dispatch`, `think.decision.parse`) live
+under :mod:`lca.nodes.think.*` since the unified nodes directory layout
+(note 2026-09-15). This package retains only providers (pipeline / role /
+reasoner / composition).
+"""
+
+from __future__ import annotations
+
+__all__: list[str] = []

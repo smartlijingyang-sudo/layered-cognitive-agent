@@ -32,7 +32,7 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
 )
-from lca.plugins.think.reason.render import ThinkReasonRenderExecutor
+from lca.nodes.think.reason.render import ThinkReasonRenderExecutor
 
 
 def _role_profile() -> RoleProfile:
@@ -151,7 +151,7 @@ async def test_reason_render_missing_capability_returns_empty_ports() -> None:
 
 def test_reason_render_module_does_not_import_emit() -> None:
     """反向断言:模块级不 import emit(EP 由 driver 调度,executor 不知道 EP)。"""
-    import lca.plugins.think.reason.render as mod
+    import lca.nodes.think.reason.render as mod
 
     src = mod.__file__
     assert src is not None

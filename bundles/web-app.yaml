@@ -243,19 +243,19 @@ entries:
   config: {}
 - id: lca.graph-node-executor-registry
   name: lca_graph_node_executor_registry
-  $module: lca.plugins.loop.graph.nodes.registry.plugin
+  $module: lca.nodes.loop.registry.plugin
   config: {}
 - id: graph-node.agent.default
   name: graph_node_agent_default
-  $module: lca.plugins.loop.graph.nodes.agent.plugin
+  $module: lca.nodes.loop.agent.plugin
   config: {}
 - id: graph-node.aggregator.default
   name: graph_node_aggregator_default
-  $module: lca.plugins.loop.graph.nodes.aggregator.plugin
+  $module: lca.nodes.loop.aggregator.plugin
   config: {}
 - id: graph-node.topology.default
   name: graph_node_topology_default
-  $module: lca.plugins.loop.graph.nodes.topology.plugin
+  $module: lca.nodes.loop.topology.plugin
   config: {}
 - id: strategy.graph
   name: strategy_graph

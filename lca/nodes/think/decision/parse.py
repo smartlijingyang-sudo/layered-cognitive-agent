@@ -1,7 +1,8 @@
 """``think.decision.parse`` graph node (spec §E).
 
 Single responsibility: project an :class:`LLMResponse` into a typed
-:class:`Decision` for downstream ``think.classify`` / ``think.gate``.
+:class:`Decision` for downstream ``think.gate`` (and the outer
+interpreter).
 
 This is the third of three single-responsibility nodes that replace
 ``think.reason.complete``:

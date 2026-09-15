@@ -12,9 +12,8 @@ from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
-    NodeOutput,
 )
-from lca.plugins.think.gate import ThinkGateExecutor
+from lca.nodes.think.gate import ThinkGateExecutor
 
 
 def _decision(decision_id: str = "dec_in") -> Decision:

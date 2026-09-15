@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from lca.contracts.models.team.graph.graph import NodeType
-from lca.plugins.loop.graph.nodes.agent.plugin import AgentGraphNodeExecutor
-from lca.plugins.loop.graph.nodes.aggregator.plugin import AggregatorGraphNodeExecutor
-from lca.plugins.loop.graph.nodes.registry.plugin import GraphNodeExecutorRegistry
-from lca.plugins.loop.graph.nodes.topology.plugin import TopologyGraphNodeExecutor
+from lca.nodes.loop.agent.plugin import AgentGraphNodeExecutor
+from lca.nodes.loop.aggregator.plugin import AggregatorGraphNodeExecutor
+from lca.nodes.loop.registry.plugin import GraphNodeExecutorRegistry
+from lca.nodes.loop.topology.plugin import TopologyGraphNodeExecutor
 
 
 def build_default_graph_node_executor_registry() -> GraphNodeExecutorRegistry:

@@ -2,7 +2,7 @@
 
 The :func:`@graph_node <graph_node>` decorator (ADR-0227) wraps the pure
 ``history_assemble`` async fn in
-:mod:`lca.framework.graph.nodes.history_assemble` as a
+:mod:`lca.nodes.think.history.assemble` as a
 ``NodeExecutor``-shaped cordis carrier registered under the composite key
 ``think::history.derive`` — matches the ``factory: history.derive`` node
 declared in ``bundles/concept/history_assemble.yaml``.
@@ -25,7 +25,7 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeInput,
 )
 from lca.contracts.protocols.session.model.context import ModelVisibleRequest
-from lca.framework.graph.nodes.history_assemble import history_assemble
+from lca.nodes.think.history.assemble import history_assemble
 
 # ── Minimal fixtures ────────────────────────────────────────────
 
@@ -79,7 +79,7 @@ def test_decorator_declares_history_derive_semantic_name_in_think_region() -> No
 
 def test_plugin_module_is_importable_and_exposes_history_assemble() -> None:
     """The plugin module re-exports the @graph_node-decorated fn."""
-    module = import_module("lca.plugins.think.history_assemble")
+    module = import_module("lca.nodes.think.history")
     assert module.history_assemble is history_assemble
     # cordis carrier lives at ``history_assemble.setup``; the cordis
     # ``@plugin(...)`` decorator names the inner fn ``setup.setup``.
