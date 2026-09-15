@@ -1,5 +1,14 @@
 """phase.delegate.await — block until all children return.
 
+External reference (borrowed / rejected): the existing ``AGENT_FANOUT``
+strategy's gather semantics (ADR-0228 §L19) shape the "wait until all
+children return" semantics. asyncio's ``asyncio.gather(...)`` is the
+implementation idiom but is hidden behind the typed-port boundary;
+this node never leaks the bare asyncio primitive across a seam.
+``delegate.await`` is idempotent under AGENTS.md §3 C9 (same
+``delegation_request`` + ``delegation_receipt`` input → same output)
+so a re-feed after a partial fan-out crash is safe.
+
 Per ADR-0228 §D5: blocks until kernel signals all children returned.
 Emits tuple of ``DelegationReceipt``. Idempotent (C9): re-feeding the
 same receipts yields the same output.

@@ -1,5 +1,14 @@
 """phase.delegate.fold — aggregate receipts into a typed folded result.
 
+External reference (borrowed / rejected): the existing
+``AGENT_CONSULT`` strategy's reduce step (ADR-0228 §L19) shapes the
+ok/error counting + payload-shape merging. LangGraph's
+``Send`` + reducer pattern is the closest structural cousin, but is
+rejected because it lives inside the graph-state; LCA keeps the
+folded result as a typed port (``FoldedDelegationResult``) so the
+outer ``think`` phase can read it without coupling to the inner
+subgraph's state shape (AGENTS.md §3 C13 typed Contract).
+
 Per ADR-0228 §Decision 5: the third and terminal node of the
 ``delegate`` subgraph. Reads the tuple of ``DelegationReceipt`` produced
 by ``delegate.await`` and emits a typed ``FoldedDelegationResult`` plus

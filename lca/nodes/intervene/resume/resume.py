@@ -1,5 +1,13 @@
 """phase.intervene.resume — re-feed persisted Command to think phase.
 
+External reference (borrowed / rejected): LangGraph's
+``Command(resume=<value>)`` API (ADR-0228 §L18) shapes the typed-port
+re-entry shape. Hermes-agent's `_interrupt_requested` resume path
+(ADR-0228 §L18) shapes the journal-first projection. AutoGen's
+``handoff_to_user`` (string-keyed resume) is rejected because it
+violates AGENTS.md §3 C13 typed Contract — LCA's ``Command`` carries
+``kind`` (Literal) + ``payload`` (typed dict) + provenance.
+
 Per ADR-0228 §Decision 4: the kernel reads a persisted ``Command`` from
 the spine (observation), re-projects it as a typed port via this node,
 and forwards it as a typed ``Decision`` input to the ``think`` phase.

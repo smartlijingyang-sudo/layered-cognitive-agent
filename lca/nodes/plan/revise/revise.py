@@ -1,5 +1,14 @@
 """region.plan.revise — replan based on Reflection (ADR-0228 §Decision 3).
 
+External reference (borrowed / rejected): BabyAGI's replan task-priority
+loop (ADR-0228 §L17) shapes the ``replan_requested`` + ``blocked_tasks``
+diffing. Hermes-agent's ``_LoopState`` aggregate (history/2026-08/
+hermes-agent-loop §"What we reject") is rejected because mixing 30+
+fields into one mutable aggregate violates AGENTS.md §3 C13 (typed
+Contract per cross-boundary payload) and C4 (Reducer single-writer);
+this node keeps ``TaskList`` as the typed SSOT and emits a new
+immutable revision.
+
 Per ADR-0228 D3: reads ``state.task_list`` + ``reflection.replan_requested``
 + ``reflection.blocked_tasks`` and emits a revised ``TaskList`` with a
 bumped revision. Entries whose ``depends_on`` references an entry that

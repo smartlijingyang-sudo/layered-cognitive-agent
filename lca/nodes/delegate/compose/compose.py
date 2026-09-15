@@ -1,5 +1,16 @@
 """delegate.compose — typed fan-out boundary (ADR-0228 D5).
 
+External reference (borrowed / rejected): the existing
+``AGENT_FANOUT`` strategy at ``lca/framework/graph/strategies/
+agent_fanout_strategy.py`` (ADR-0228 §L19) is the runtime substrate —
+this node adds the typed-port contract that the strategy lacked.
+Hermes-agent's ``delegate_task`` (history/2026-08/hermes-agent-
+pluginization §"工具") is rejected because it grants sub-agents write
+access to agent-local state; LCA enforces AGENTS.md §3 C5 capability
+monotonicity via ``CapabilityGrantExceededError`` when the parent
+grant lacks the ``"delegate"`` capability. The ``idempotency_key``
+field (ADR-0228 §Decision 5 + AGENTS.md §3 C9) makes retry safe.
+
 Reads a Decision port and emits a tuple of :class:`DelegationRequest`,
 one per declared target. The kernel runs them via the existing
 ``AGENT_FANOUT`` strategy with capability-monotonicity check (C5);

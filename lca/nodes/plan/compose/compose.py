@@ -1,5 +1,13 @@
 """region.plan.compose — seed the typed plan store on first turn (ADR-0228 §Decision 3).
 
+External reference (borrowed / rejected): BabyAGI's todo seeding loop and
+AutoGPT's ``task_creation_agent`` (ADR-0228 §L17) shape the entry-derive
+path. Hermes-agent's ``delegate_task`` (history/2026-08/hermes-agent-
+pluginization/hermes-agent-research.md §"工具") is rejected because it
+mutates agent-local state directly; LCA forbids that under AGENTS.md §3
+C4 Reducer single-writer — the executor emits a typed ``TaskList`` port
+and lets the reducer fold it onto ``AgentState.task_list``.
+
 Per ADR-0228 D3: reads ``state.task_list`` (or seeds an empty list), the
 latest ``decision`` port, and ``observation`` for context. Emits a new
 ``TaskList`` typed port. Brain reads; the reducer folds it back onto
