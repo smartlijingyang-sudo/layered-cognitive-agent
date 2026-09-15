@@ -1289,12 +1289,12 @@
     <div style="flex:1;padding:0;display:grid;grid-template-rows:auto 1fr auto;gap:2.6vh">
       <div data-anim="kicker" class="t-meta" style="color:rgba(255,255,255,.78);letter-spacing:.22em">FIELD NOTE · 2026 Q4</div>
 
-      <h1 data-anim="title" style="align-self:end;font-family:var(--sans),var(--sans-zh);font-weight:200;font-size:min(11.6vw,19vh);line-height:.94;letter-spacing:-.025em;color:#fff">从工作空间<br/>到企业 <span style="font-style:italic;font-weight:300">Agent 平台</span></h1>
+      <h1 data-anim="title" style="align-self:end;font-family:var(--sans),var(--sans-zh);font-weight:200;font-size:min(11.6vw,19vh);line-height:.94;letter-spacing:-.025em;color:#fff">从 <span style="font-style:italic;font-weight:300">agent harness</span><br/>到企业级智能体</h1>
 
       <div data-anim="bottom" style="display:grid;grid-template-rows:auto auto;gap:1.6vh;border-top:1px solid rgba(255,255,255,.22);padding-top:2vh">
-        <div data-anim="lead" class="lead" style="max-width:52ch;color:rgba(255,255,255,.86)">LCA(Layered Cognitive Agent)三条产品演进线:Workbuddy → Agent API → Multi-Agent。</div>
+        <div data-anim="lead" class="lead" style="max-width:52ch;color:rgba(255,255,255,.86)">LCA(Layered Cognitive Agent)三条产品演进线:办公助理 → Agent API → Agent 团队。</div>
         <div style="display:flex;justify-content:space-between;align-items:end">
-          <div class="t-meta" style="color:rgba(255,255,255,.6)">技术经理 · 内部汇报</div>
+          <div class="t-meta" style="color:rgba(255,255,255,.6)">内部汇报</div>
           <div class="t-meta" style="color:rgba(255,255,255,.6)">→ swipe / arrow keys</div>
         </div>
       </div>
@@ -1313,83 +1313,144 @@
     <div style="flex:1;padding:0;display:flex;flex-direction:column;gap:5vh">
       <div data-anim="head" style="display:flex;flex-direction:column;gap:1.4vh">
         <div class="t-meta">CONTEXT · 2026 Q4</div>
-        <h2 style="font-family:var(--sans),var(--sans-zh);font-weight:200;font-size:min(5.8vw,10.2vh);line-height:1;letter-spacing:-.035em;color:var(--text-primary)">为什么是现在做这件事</h2>
-        <p class="lead" style="max-width:54ch;color:var(--text-secondary);font-weight:300">三条线同时到位:模型侧成熟、企业侧有真场景、平台侧有可收敛的架构。</p>
+        <h2 style="font-family:var(--sans),var(--sans-zh);font-weight:200;font-size:min(5.8vw,10.2vh);line-height:1;letter-spacing:-.035em;color:var(--text-primary)">当下的位置</h2>
+        <p class="lead" style="max-width:54ch;color:var(--text-secondary);font-weight:300">模型 · 场景 · 底座三件事,现在都到位了。</p>
       </div>
 
-      <div data-anim="grid" class="why-now-grid">
+      <div data-anim="grid" class="why-now-grid" style="flex:1">
         <div class="why-col">
           <span class="t-cat" style="color:var(--accent)">— 01 · 模型</span>
-          <h3 style="font-family:var(--sans),var(--sans-zh);font-weight:300;font-size:max(18px,1.5vw);line-height:1.2;color:var(--text-primary);margin:1.2vh 0">推理模型进入工具稳定期</h3>
-          <p>Function Calling 与结构化输出已成事实标准;多步任务与长上下文足以承担企业流程中的认知负载。</p>
-          <div class="why-num-bottom" style="color:var(--text-primary)">2024</div>
+          <h3 style="font-family:var(--sans),var(--sans-zh);font-weight:400;font-size:max(20px,1.7vw);line-height:1.2;color:var(--text-primary);margin:1.2vh 0">工具调用成为标准能力</h3>
+          <p>Function Calling 与结构化输出稳定,多步任务与长上下文足以承担真实企业流程的认知负载。</p>
         </div>
         <div class="why-col">
           <span class="t-cat" style="color:var(--accent)">— 02 · 场景</span>
-          <h3 style="font-family:var(--sans),var(--sans-zh);font-weight:300;font-size:max(18px,1.5vw);line-height:1.2;color:var(--text-primary);margin:1.2vh 0">OA / 知识检索 / 报告自动化</h3>
-          <p>业务侧已经出现"按 Agent 触发对话"的硬需求:工单流转、合同抽取、周报草拟、数据追问。</p>
-          <div class="why-num-bottom" style="color:var(--text-primary)">每日</div>
+          <h3 style="font-family:var(--sans),var(--sans-zh);font-weight:400;font-size:max(20px,1.7vw);line-height:1.2;color:var(--text-primary);margin:1.2vh 0">办公场景已被反复验证</h3>
+          <p>工单流转、合同抽取、周报草拟、数据追问——业务侧已经摸出"按 Agent 触发对话"的真实用法。</p>
         </div>
         <div class="why-col">
-          <span class="t-cat" style="color:var(--accent)">— 03 · 架构</span>
-          <h3 style="font-family:var(--sans),var(--sans-zh);font-weight:300;font-size:max(18px,1.5vw);line-height:1.2;color:var(--text-primary);margin:1.2vh 0">LCA 收敛完成,可对外承载</h3>
-          <p>ADR-0194 / 0195 全栈平台架构收敛,Kernel · Loop · Session · Plugin 五平面已稳定,具备开放 API 的工程基础。</p>
-          <div class="why-num-bottom" style="color:var(--accent)">P0–P5</div>
+          <span class="t-cat" style="color:var(--accent)">— 03 · 底座</span>
+          <h3 style="font-family:var(--sans),var(--sans-zh);font-weight:400;font-size:max(20px,1.7vw);line-height:1.2;color:var(--text-primary);margin:1.2vh 0">平台层已经稳定</h3>
+          <p>内核、循环、会话、插件五层平面收敛完成,具备对外承载产品形态的工程基础。</p>
         </div>
+      </div>
+
+      <div data-anim="footnote" style="margin-top:auto;padding-top:2vh;border-top:1px solid var(--border-subtle)">
+        <span class="t-meta" style="color:var(--text-helper)">三个事实同时到位,后面所有产品形态都从这出发。</span>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ============ P03 · System Diagram · LCA 架构全景 ============ -->
+<!-- ============ P03 · 图编排 · Workflow Graph · 带流动特效 ============ -->
 <section class="slide light" data-animate="system-diagram" data-slide-id="architecture-overview" data-layout="S17">
   <div class="canvas-card">
     <div class="chrome-min">
-      <div class="l">Architecture · LCA 全景</div>
+      <div class="l">Architecture · Graph Orchestration</div>
       <div class="r">03 / 13</div>
     </div>
 
     <div style="flex:1;padding:0;display:grid;grid-template-columns:5fr 11fr;gap:3vw;align-items:stretch">
       <div data-anim="head" style="display:flex;flex-direction:column;gap:2vh;justify-content:center">
         <div class="t-meta">SYSTEM MAP · 03</div>
-        <h2 style="font-family:var(--sans),var(--sans-zh);font-weight:200;font-size:min(5.2vw,9.2vh);line-height:1;letter-spacing:-.035em;color:var(--text-primary)">一层内核,<br/>一圈插件,<br/>一种事实链。</h2>
-        <p style="color:var(--text-secondary);font-size:max(16px,1vw);line-height:1.55;font-weight:400;max-width:36ch">Kernel 编译与启动;Graph 解释执行;Loop 机制事务;Session 追加事实;Cognition 纯算法;Plugins 按 seam 替换;Transport 只承运;Observability 只 fold 与 export。</p>
+        <h2 style="font-family:var(--sans),var(--sans-zh);font-weight:200;font-size:min(5.2vw,9.2vh);line-height:1;letter-spacing:-.035em;color:var(--text-primary)">每次运行,<br/>都是一张图。</h2>
+        <p style="color:var(--text-secondary);font-size:max(16px,1vw);line-height:1.55;font-weight:400;max-width:36ch">图是 LCA 的骨头。节点是一次原子动作,边是数据流,运行时按图解释执行,可挂可拆、可重排。</p>
       </div>
 
-      <div data-anim="diagram" style="display:flex;flex-direction:column;gap:2.6vh;justify-content:center;height:100%">
-        <div style="position:relative;width:100%;height:62vh;min-height:380px;display:grid;place-items:center">
-          <div style="position:relative;width:88%;aspect-ratio:640/540;display:grid;grid-template-rows:auto 1fr auto;gap:1vh">
-            <!-- top label -->
-            <div style="font-family:var(--mono);font-size:13px;color:var(--text-helper);letter-spacing:.06em;padding-left:2%">— 外圈 · PLUGINS / TRANSPORT / OBSERVABILITY</div>
-            <!-- middle diagram -->
-            <div style="position:relative;border:1.5px solid var(--ink);display:flex;align-items:center;justify-content:center">
-              <svg viewBox="0 0 640 460" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%" aria-hidden="true">
-                <rect x="170" y="130" width="300" height="220" fill="#002FA7"/>
-                <line x1="320" y1="350" x2="320" y2="420" stroke="#0a0a0a" stroke-width="1.5" stroke-dasharray="4 4"/>
-                <polygon points="316,418 324,418 320,430" fill="#0a0a0a"/>
-              </svg>
-              <div style="position:absolute;top:6%;left:5%;font-family:var(--mono);font-size:13px;color:var(--text-primary);letter-spacing:.06em">— 中层 · COGNITION · LOOP · SESSION</div>
-              <div style="position:absolute;top:28%;left:28%;width:45%;color:#fff;display:flex;flex-direction:column;gap:.6vh">
-                <div style="font-family:var(--mono);font-size:13px;letter-spacing:.06em">G0 · LCA_KERNEL</div>
-                <div style="font-family:var(--mono);font-size:13px;letter-spacing:.06em">HARNESS / GRAPH</div>
-                <div style="font-family:var(--sans);font-size:24px;font-weight:200;letter-spacing:-.02em;margin-top:2vh">K1—K8 + MTK</div>
-                <div style="font-family:var(--sans);font-size:13px;color:rgba(255,255,255,.7);margin-top:.6vh">events/config · EnvelopeBus · fold</div>
-              </div>
-              <div style="position:absolute;top:78%;left:51%;font-family:var(--mono);font-size:11px;color:var(--text-helper)">*.spine.jsonl</div>
+      <div data-anim="diagram" style="position:relative;display:flex;flex-direction:column;justify-content:center;height:100%;min-height:0">
+        <!-- workflow canvas -->
+        <div style="position:relative;border:1px solid var(--ink);aspect-ratio:16/9;background:var(--paper);overflow:hidden">
+          <!-- subtle grid background -->
+          <div style="position:absolute;inset:0;background-image:radial-gradient(var(--grey-2) 1px,transparent 1px);background-size:18px 18px;opacity:.35"></div>
+
+          <!-- SVG 连线层 -->
+          <svg viewBox="0 0 800 450" style="position:absolute;inset:0;width:100%;height:100%" aria-hidden="true">
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="#0a0a0a"/>
+              </marker>
+              <marker id="arrow-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="#002FA7"/>
+              </marker>
+            </defs>
+            <!-- edges -->
+            <path d="M 165 225 C 215 225, 245 130, 290 130" fill="none" stroke="#0a0a0a" stroke-width="1.4" marker-end="url(#arrow)"/>
+            <path d="M 165 225 C 215 225, 245 320, 290 320" fill="none" stroke="#0a0a0a" stroke-width="1.4" marker-end="url(#arrow)"/>
+            <path d="M 415 130 C 460 130, 490 225, 535 225" fill="none" stroke="#0a0a0a" stroke-width="1.4" marker-end="url(#arrow)"/>
+            <path d="M 415 320 C 460 320, 490 225, 535 225" fill="none" stroke="#0a0a0a" stroke-width="1.4" marker-end="url(#arrow)"/>
+            <!-- 回边:reflect → think (反思循环) -->
+            <path d="M 555 195 C 555 90, 320 90, 320 195" fill="none" stroke="#002FA7" stroke-width="1.2" stroke-dasharray="4 4" marker-end="url(#arrow-blue)"/>
+            <!-- 动画 dot 沿主路径流动 -->
+            <circle r="3.5" fill="#002FA7">
+              <animateMotion dur="3.6s" repeatCount="indefinite" path="M 165 225 C 215 225, 245 130, 290 130 C 340 130, 380 130, 415 130 C 460 130, 490 225, 535 225 C 580 225, 620 225, 660 225"/>
+            </circle>
+            <circle r="3.5" fill="#002FA7" opacity=".5">
+              <animateMotion dur="3.6s" repeatCount="indefinite" begin="1.2s" path="M 165 225 C 215 225, 245 130, 290 130 C 340 130, 380 130, 415 130 C 460 130, 490 225, 535 225 C 580 225, 620 225, 660 225"/>
+            </circle>
+            <circle r="3.5" fill="#002FA7" opacity=".3">
+              <animateMotion dur="3.6s" repeatCount="indefinite" begin="2.4s" path="M 165 225 C 215 225, 245 130, 290 130 C 340 130, 380 130, 415 130 C 460 130, 490 225, 535 225 C 580 225, 620 225, 660 225"/>
+            </circle>
+          </svg>
+
+          <!-- 节点层 (HTML on top of SVG) -->
+          <!-- INPUT -->
+          <div style="position:absolute;left:8%;top:46%;transform:translateY(-50%)">
+            <div style="background:var(--paper);border:1.5px solid var(--ink);padding:10px 16px;font-family:var(--sans-zh);font-weight:500;font-size:max(14px,1.05vw);color:var(--text-primary);box-shadow:3px 3px 0 var(--ink)">
+              <div class="t-meta" style="color:var(--accent);letter-spacing:.06em">INPUT</div>
+              用户需求
             </div>
-            <!-- bottom strip -->
-            <div style="display:grid;grid-template-columns:auto 1fr;align-items:center;background:var(--grey-1);height:8%;min-height:30px;padding:0 2%">
-              <span style="font-family:var(--mono);font-size:12px;color:var(--text-primary);letter-spacing:.06em">SESSION  →  DERIVER  →  EXPORTER</span>
-              <span style="font-family:var(--mono);font-size:11px;color:var(--text-helper);text-align:right;padding-right:1%">(fold-only)</span>
+          </div>
+
+          <!-- THINK -->
+          <div style="position:absolute;left:30%;top:21%;transform:translateY(-50%)">
+            <div style="background:var(--accent);color:#fff;padding:10px 16px;font-family:var(--sans-zh);font-weight:500;font-size:max(14px,1.05vw);box-shadow:3px 3px 0 var(--ink)">
+              <div style="font-family:var(--mono);font-size:10px;letter-spacing:.06em;opacity:.85">THINK</div>
+              思考 · 决策
             </div>
+          </div>
+
+          <!-- TOOL -->
+          <div style="position:absolute;left:30%;top:64%;transform:translateY(-50%)">
+            <div style="background:var(--paper);border:1.5px solid var(--ink);padding:10px 16px;font-family:var(--sans-zh);font-weight:500;font-size:max(14px,1.05vw);color:var(--text-primary);box-shadow:3px 3px 0 var(--ink)">
+              <div class="t-meta" style="color:var(--accent);letter-spacing:.06em">TOOL</div>
+              调用 · 取数
+            </div>
+          </div>
+
+          <!-- REFLECT -->
+          <div style="position:absolute;left:55%;top:46%;transform:translateY(-50%)">
+            <div style="background:var(--paper);border:1.5px solid var(--ink);padding:10px 16px;font-family:var(--sans-zh);font-weight:500;font-size:max(14px,1.05vw);color:var(--text-primary);box-shadow:3px 3px 0 var(--ink)">
+              <div class="t-meta" style="color:var(--accent);letter-spacing:.06em">REFLECT</div>
+              校验 · 反思
+            </div>
+          </div>
+
+          <!-- OUTPUT -->
+          <div style="position:absolute;left:78%;top:46%;transform:translateY(-50%)">
+            <div style="background:var(--ink);color:var(--paper);padding:10px 16px;font-family:var(--sans-zh);font-weight:500;font-size:max(14px,1.05vw)">
+              <div class="t-meta" style="color:rgba(255,255,255,.7);letter-spacing:.06em">OUTPUT</div>
+              可交付产物
+            </div>
+          </div>
+
+          <!-- 顶部说明 -->
+          <div style="position:absolute;top:3%;left:2%;font-family:var(--mono);font-size:11px;color:var(--text-helper);letter-spacing:.06em">
+            run · agent.reasoning.turn
+          </div>
+          <div style="position:absolute;top:3%;right:2%;font-family:var(--mono);font-size:11px;color:var(--text-helper);letter-spacing:.06em">
+            — live
           </div>
         </div>
 
-        <div class="t-meta" style="color:var(--text-helper);text-align:left;padding-top:1vh">Producer → FactGateway.append → Session.append → fold → export</div>
+        <!-- legend -->
+        <div style="margin-top:1.6vh;display:flex;justify-content:space-between;align-items:center">
+          <div class="t-meta" style="color:var(--text-helper)">— 节点是一次原子动作 · 边是数据流 · 运行时按图解释执行</div>
+          <div class="t-meta" style="color:var(--text-helper)">↺ 反思回边允许回到上游</div>
+        </div>
       </div>
     </div>
 
-    <div class="t-meta" style="color:var(--text-helper);text-align:right">→ 事实链单向 · 跨边界必经 typed Contract</div>
+    <div class="t-meta" style="color:var(--text-helper);text-align:left;padding-left:1vw">→ 同一张图,每次运行的轨迹都被记录到 Session</div>
   </div>
 </section>
 
@@ -1403,9 +1464,9 @@
 
     <div style="flex:1;padding:0;display:flex;flex-direction:column;gap:5vh">
       <div data-anim="head" style="display:flex;flex-direction:column;gap:1.4vh">
-        <div class="t-meta">ADR-0195 §2.3 · C13 信息血统闭合</div>
+        <div class="t-meta">FACT CHAIN · 04</div>
         <h2 style="font-family:var(--sans),var(--sans-zh);font-weight:200;font-size:min(5.8vw,10.2vh);line-height:1;letter-spacing:-.035em;color:var(--text-primary)">所有事实只走一条链</h2>
-        <p class="lead" style="max-width:54ch;color:var(--text-secondary);font-weight:300">Loop · Tool · LLM 旧写路径全部退役,任何跨边界传递必经 typed Contract。</p>
+        <p class="lead" style="max-width:54ch;color:var(--text-secondary);font-weight:300">从发生到投影,单轨、可追溯、不可绕过。</p>
       </div>
 
       <div data-anim="timeline" style="margin-top:4vh;display:flex;flex-direction:column;gap:2.6vh">
@@ -1449,15 +1510,15 @@
       <div data-anim="footnote" style="margin-top:auto;display:grid;grid-template-columns:repeat(3,1fr);gap:3vw;border-top:1px solid var(--border-subtle);padding-top:2.6vh">
         <div>
           <div class="t-cat" style="color:var(--accent)">控制面</div>
-          <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.55;font-weight:400">Command · Approval · Policy · CapabilityGrant。授权即留痕。</p>
+          <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.55;font-weight:400">每一次授权都留痕,操作可回放。</p>
         </div>
         <div>
           <div class="t-cat" style="color:var(--accent)">观察面</div>
-          <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.55;font-weight:400">Session · Trace · Metrics · Projection。不得触发控制面副作用。</p>
+          <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.55;font-weight:400">日志、追踪、指标只看,不擅自行动。</p>
         </div>
         <div>
           <div class="t-cat" style="color:var(--accent)">执行窄门</div>
-          <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.55;font-weight:400">Cognition → Body → SafeExecutor → Sandbox。绕过即 CapabilityGrantExceeded。</p>
+          <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.55;font-weight:400">真正落地的副作用只走一条窄通道,绕过会立刻报错。</p>
         </div>
       </div>
     </div>
@@ -1469,25 +1530,25 @@
   <div class="canvas-card split">
     <div class="split-half">
       <div class="half" style="padding:5.6vh 3.6vw 4.4vh;justify-content:space-between">
-        <div class="chrome-min"><div class="l">PHASE 01 · 2026 Q4 — 2027 Q1</div><div class="r">05 / 13</div></div>
-        <h2 class="h-statement" style="font-family:var(--sans),var(--sans-zh);color:var(--text-primary)">先把人<br/>安顿下来。</h2>
+        <div class="chrome-min"><div class="l">PHASE 01 · 起步</div><div class="r">05 / 13</div></div>
+        <h2 class="h-statement" style="font-family:var(--sans),var(--sans-zh);color:var(--text-primary)">先把<br/>助理做出来。</h2>
         <div style="border-top:1px solid var(--border-subtle);padding-top:1.6vh;display:flex;justify-content:space-between;align-items:end">
           <div class="t-meta">SECTION 01 · 05</div>
           <div class="t-meta" style="color:var(--text-helper)">→ 06</div>
         </div>
       </div>
       <div class="half" style="padding:5.6vh 3.6vw 4.4vh;background:var(--grey-1);justify-content:space-between">
-        <div class="chrome-min"><div class="l">PHASE GOAL</div><div class="r">WORKBUDDY · 类比</div></div>
+        <div class="chrome-min"><div class="l">PHASE GOAL</div><div class="r">OFFICE ASSISTANT</div></div>
         <div style="display:flex;flex-direction:column;gap:2.4vh;color:var(--text-primary)">
-          <p class="lead" style="font-weight:300;color:var(--text-primary);max-width:30ch">给每个人一个隔离的 AI 工作空间。可以建助理、配 Skill、挂 MCP,把重复劳动外包给模型。</p>
+          <p class="lead" style="font-weight:300;color:var(--text-primary);max-width:30ch">每人一个办公助理。可以建助理、配能力、挂工具,把重复劳动交给模型。</p>
           <div style="display:flex;flex-direction:column;gap:1vh;font-size:max(16px,1vw);line-height:1.6;color:var(--text-secondary);font-weight:400">
-            <div>· 隔离工作空间(LobeHub UI)</div>
-            <div>· 创建助理(Assistant + Profile)</div>
-            <div>· 装载 Skill 与 MCP(Manifest 声明)</div>
+            <div>· 隔离的工作空间</div>
+            <div>· 创建助理与配置</div>
+            <div>· 装载 Skill 与外部工具</div>
             <div>· 办公自动化场景优先</div>
           </div>
         </div>
-        <div class="t-meta" style="color:var(--text-helper);text-align:right">类似 Workbuddy · 个人/小团队入口</div>
+        <div class="t-meta" style="color:var(--text-helper);text-align:right">个人与小团队的入口形态</div>
       </div>
     </div>
   </div>
@@ -1496,66 +1557,99 @@
 <!-- ============ P06 · Image Hero · 阶段一产品形态 ============ -->
 <section class="slide light" data-animate="image-hero" data-slide-id="phase1-product" data-layout="S22" data-image-slot="s22-hero-21x9">
   <div class="canvas-card" style="padding:0;display:flex;flex-direction:column;overflow:hidden">
-    <div data-anim="img" style="position:relative;flex:0 0 50%;overflow:hidden;background:var(--grey-1);aspect-ratio:21/9;min-height:280px">
-      <!-- HTML-only LobeHub mock UI (Swiss rule: SVG forbidden for visible text) -->
-      <div style="position:absolute;inset:0;display:grid;grid-template-rows:32px 1fr;background:var(--paper)">
-        <!-- top chrome -->
-        <div style="background:var(--ink);color:rgba(255,255,255,.7);font-family:var(--mono);font-size:11px;display:flex;align-items:center;justify-content:center;letter-spacing:.06em">lobehub-ui · workspace · assistant</div>
-
-        <!-- body: sidebar + main -->
-        <div style="display:grid;grid-template-columns:180px 1fr;border-top:1px solid var(--border-subtle)">
-          <!-- sidebar -->
-          <aside style="background:var(--paper);border-right:1px solid var(--border-subtle);padding:10px 14px;display:flex;flex-direction:column;gap:10px">
+    <!-- 上半屏:前端对话界面 mock — 含 思考过程 + 工具调用 -->
+    <div data-anim="img" style="position:relative;flex:0 0 48%;overflow:hidden;background:var(--grey-1);aspect-ratio:21/9;min-height:280px">
+      <div style="position:absolute;inset:0;display:grid;grid-template-rows:1fr;background:var(--paper)">
+        <div style="display:grid;grid-template-columns:200px 1fr;min-height:0">
+          <!-- 左侧:助理 tab 列表(3 个助理可切换) -->
+          <aside style="background:var(--paper);border-right:1px solid var(--border-subtle);padding:12px 14px;display:flex;flex-direction:column;gap:14px">
             <div>
-              <div style="font-family:var(--sans-zh);font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:6px">工作空间</div>
-              <div style="height:1px;background:var(--border-subtle);margin-bottom:6px"></div>
-              <div style="font-family:var(--sans-zh);font-size:11px;color:var(--text-secondary);line-height:1.8">— 产品研发<br/>— 行政办公<br/>— 财务分析</div>
+              <div style="font-family:var(--sans-zh);font-size:11px;font-weight:600;color:var(--text-helper);letter-spacing:.06em;margin-bottom:8px">助理 · ASSISTANTS</div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <div style="background:var(--ink);color:var(--paper);padding:8px 10px;font-family:var(--sans-zh);font-size:12px;font-weight:500">周报助手</div>
+                <div style="padding:8px 10px;font-family:var(--sans-zh);font-size:12px;color:var(--text-secondary)">合同抽取</div>
+                <div style="padding:8px 10px;font-family:var(--sans-zh);font-size:12px;color:var(--text-secondary)">数据追问</div>
+              </div>
             </div>
-            <div>
-              <div style="font-family:var(--sans-zh);font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:6px">助理</div>
-              <div style="height:1px;background:var(--border-subtle);margin-bottom:6px"></div>
-              <div style="font-family:var(--sans-zh);font-size:11px;color:var(--text-secondary);line-height:1.8">— 周报助手<br/>— 合同抽取<br/>— 数据追问</div>
+            <div style="margin-top:auto">
+              <div style="font-family:var(--mono);font-size:10px;color:var(--text-helper);letter-spacing:.06em">PROFILE · weekly-report-v1</div>
+              <div style="font-family:var(--mono);font-size:10px;color:var(--text-helper);margin-top:4px">SKILLS · 4 · TOOLS · 6</div>
             </div>
           </aside>
 
-          <!-- chat area -->
-          <main style="padding:12px 18px;display:flex;flex-direction:column;gap:8px;background:var(--paper);overflow:hidden">
-            <div style="background:var(--accent);color:#fff;padding:10px 14px;align-self:end;max-width:62%;font-family:var(--sans-zh);font-size:12px;line-height:1.45">把上周 OKR 整理成周报草稿,并附 3 条风险。</div>
-            <div style="background:#fff;border:1px solid var(--border-subtle);padding:10px 14px;max-width:80%;font-family:var(--sans-zh);font-size:11px;line-height:1.6;color:var(--text-primary)">
-              <div style="font-family:var(--mono);font-size:10px;color:var(--text-helper);margin-bottom:4px">周报助手 · Profile: weekly-report-v1</div>
-              <div>调用: silica-weekly · mcp/jira-read</div>
-              <div>结果: 3 段 OKR / 2 条已完成 / 1 条延期</div>
-              <div style="font-family:var(--mono);font-size:10px;color:var(--text-helper);margin-top:4px">— 已写入 spine.jsonl · ready to review</div>
+          <!-- 主对话区:用户提问 → 思考 → tool → 回复 -->
+          <main style="padding:14px 18px;display:flex;flex-direction:column;gap:10px;background:var(--paper);overflow:hidden;min-height:0">
+            <!-- 用户提问 -->
+            <div style="display:flex;justify-content:flex-end">
+              <div style="background:var(--ink);color:var(--paper);padding:10px 14px;max-width:62%;font-family:var(--sans-zh);font-size:12px;line-height:1.5">把上周 OKR 整理成周报草稿,并附 3 条风险。</div>
             </div>
-            <div style="margin-top:auto;display:flex;gap:8px;border:1px solid var(--border-subtle);padding:6px 10px;font-family:var(--sans-zh);font-size:11px;color:var(--text-placeholder);align-items:center">
+            <!-- 思考过程(折叠展开) -->
+            <div style="display:flex;flex-direction:column;gap:6px;max-width:84%">
+              <div style="display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;color:var(--text-helper);letter-spacing:.06em">
+                <span style="width:6px;height:6px;background:var(--accent);display:inline-block"></span>
+                <span>THINKING · 0.8s</span>
+              </div>
+              <div style="border-left:2px solid var(--accent);padding:6px 10px;font-family:var(--sans-zh);font-size:11px;line-height:1.55;color:var(--text-secondary);background:var(--grey-1)">
+                需要先抓本周 OKR 数据 → 调用 silica-weekly;然后扫描未完成项 → 调用 mcp/jira-read;最后合成草稿并标注风险等级。
+              </div>
+            </div>
+            <!-- 工具调用轨迹 -->
+            <div style="display:flex;flex-direction:column;gap:4px;max-width:84%">
+              <div style="display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;color:var(--text-helper);letter-spacing:.06em;padding:6px 10px;border:1px solid var(--border-subtle)">
+                <span style="font-family:var(--sans-zh);color:var(--text-primary)">→ tool · silica-weekly</span>
+                <span style="color:var(--text-helper)">/runs last-week</span>
+                <span style="margin-left:auto;color:var(--accent)">OK · 142ms</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;color:var(--text-helper);letter-spacing:.06em;padding:6px 10px;border:1px solid var(--border-subtle)">
+                <span style="font-family:var(--sans-zh);color:var(--text-primary)">→ tool · mcp/jira-read</span>
+                <span style="color:var(--text-helper)">/issues status!=Done</span>
+                <span style="margin-left:auto;color:var(--accent)">OK · 86ms</span>
+              </div>
+            </div>
+            <!-- 最终回复 -->
+            <div style="background:var(--paper);border:1px solid var(--border-subtle);padding:10px 14px;max-width:84%;font-family:var(--sans-zh);font-size:11.5px;line-height:1.65;color:var(--text-primary)">
+              <div style="font-family:var(--mono);font-size:10px;color:var(--text-helper);letter-spacing:.06em;margin-bottom:4px">RESPONSE</div>
+              <div>周报草稿已就绪:3 段 OKR(2 已完成 / 1 延期),3 条风险含影响面与建议 owner。可在右侧画布直接修订。</div>
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <span style="padding:3px 10px;border:1px solid var(--border-subtle);font-family:var(--sans-zh);font-size:11px">复制到 OA</span>
+                <span style="padding:3px 10px;border:1px solid var(--border-subtle);font-family:var(--sans-zh);font-size:11px">导出 Markdown</span>
+              </div>
+            </div>
+            <!-- 输入框 -->
+            <div style="margin-top:auto;display:flex;gap:8px;border:1px solid var(--border-subtle);padding:7px 10px;font-family:var(--sans-zh);font-size:11px;color:var(--text-placeholder);align-items:center">
               <span style="flex:1">输入消息 · Enter 发送</span>
-              <span style="background:var(--accent);color:#fff;padding:3px 10px;font-weight:500">Run</span>
+              <span style="background:var(--ink);color:var(--paper);padding:3px 12px;font-weight:500">Run</span>
             </div>
           </main>
         </div>
       </div>
 
-      <div class="chrome-min" style="position:absolute;top:0;left:0;right:0;color:rgba(255,255,255,.9);padding:5.6vh 5vw 0">
-        <div class="l">Phase 01 · Product Form</div>
-        <div class="r">06 / 13</div>
-      </div>
     </div>
 
-    <!-- lower body: title block + KPI row -->
-    <div class="image-hero-body" style="flex:1;display:grid;grid-template-rows:auto auto auto;gap:2vh;padding:4vh 5vw 6vh">
+    <!-- 下半屏:title + description -->
+    <div class="image-hero-body" style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:2.4vh;padding:5vh 5vw 7vh">
       <div style="max-width:60vw">
         <div class="t-meta" style="color:var(--accent);margin-bottom:.8vh">— 06 / PHASE 01</div>
-        <div style="font-family:var(--sans),var(--sans-zh);font-weight:200;font-size:min(4.4vw,7.4vh);line-height:1;letter-spacing:-.035em;color:var(--text-primary)">
-          LobeHub 工作空间<br/>助理 · Skill · MCP
+        <div style="font-family:var(--sans),var(--sans-zh);font-weight:200;font-size:min(4.2vw,7vh);line-height:1;letter-spacing:-.035em;color:var(--text-primary)">
+          办公助理<br/>思考 + 工具 + 交付
         </div>
       </div>
-      <div style="max-width:54ch;font-family:var(--sans),var(--sans-zh);font-size:max(15px,1.2vw);line-height:1.55;font-weight:300;color:var(--text-primary);letter-spacing:-.005em">
-        官方 LobeHub v2.2.13 作为前端壳,LCA Gateway 承载 Agent 运行。一次回车 = 一次 Run,四事件流式投影到画布。
+      <div style="max-width:64ch;font-family:var(--sans),var(--sans-zh);font-size:max(15px,1.15vw);line-height:1.6;font-weight:300;color:var(--text-secondary);letter-spacing:-.005em">
+        一句需求进来,助理先想清楚思路、调起合适的工具、把结果整理成可用的产物。整个过程在画布上展开,可追溯、可改写、可直接交给下游系统。
       </div>
-      <div class="image-hero-stats" style="gap:4vw;display:grid;grid-template-columns:repeat(3,1fr)">
-        <div style="display:flex;flex-direction:column;gap:.6vh"><div style="height:1px;background:var(--ink)"></div><div class="t-meta">UI</div><div style="font-family:var(--sans);font-weight:200;font-size:min(3.6vw,6vh);line-height:.95;letter-spacing:-.04em">1.x</div><div style="height:1px;background:var(--border-subtle)"></div><p class="body-sm" style="margin-top:.8vh;color:var(--text-secondary)">LobeHub 官方壳 · 补丁注入 LcaRunDriver</p></div>
-        <div style="display:flex;flex-direction:column;gap:.6vh"><div style="height:1px;background:var(--ink)"></div><div class="t-meta">Agent</div><div style="font-family:var(--sans);font-weight:200;font-size:min(3.6vw,6vh);line-height:.95;letter-spacing:-.04em">solo/team</div><div style="height:1px;background:var(--border-subtle)"></div><p class="body-sm" style="margin-top:.8vh;color:var(--text-secondary)">Profile 选择器 · 真实 LLM 由 Bundle 解析</p></div>
-        <div style="display:flex;flex-direction:column;gap:.6vh"><div style="height:1px;background:var(--ink)"></div><div class="t-meta">Plugin</div><div style="font-family:var(--sans);font-weight:200;font-size:min(3.6vw,6vh);line-height:.95;letter-spacing:-.04em;color:var(--accent)">43+</div><div style="height:1px;background:var(--border-subtle)"></div><p class="body-sm" style="margin-top:.8vh;color:var(--text-secondary)">Assistant / Skill / MCP · Manifest 声明</p></div>
+      <div style="display:flex;gap:2vw;border-top:1px solid var(--border-subtle);padding-top:2vh;margin-top:1vh">
+        <div>
+          <div class="t-meta" style="color:var(--accent)">— 想法</div>
+          <p style="font-family:var(--sans-zh);font-size:max(15px,1vw);line-height:1.5;color:var(--text-primary);margin-top:.6vh">先想清楚思路,选对工具与先后</p>
+        </div>
+        <div>
+          <div class="t-meta" style="color:var(--accent)">— 调用</div>
+          <p style="font-family:var(--sans-zh);font-size:max(15px,1vw);line-height:1.5;color:var(--text-primary);margin-top:.6vh">按需调起工具与外部系统</p>
+        </div>
+        <div>
+          <div class="t-meta" style="color:var(--accent)">— 交付</div>
+          <p style="font-family:var(--sans-zh);font-size:max(15px,1vw);line-height:1.5;color:var(--text-primary);margin-top:.6vh">产物可改写、可追溯、可流转</p>
+        </div>
       </div>
     </div>
   </div>
@@ -1572,45 +1666,45 @@
     <div style="flex:1;padding:0;display:grid;grid-template-columns:5fr 11fr;gap:3vw;align-items:stretch">
       <div data-anim="head" style="display:flex;flex-direction:column;gap:1.6vh;justify-content:center">
         <div class="t-meta">PHASE 01 · STACK</div>
-        <h2 style="font-family:var(--sans),var(--sans-zh);font-weight:200;font-size:min(5.2vw,9.2vh);line-height:1;letter-spacing:-.035em;color:var(--text-primary)">三层壳,各管一段</h2>
-        <p class="lead" style="max-width:32ch;color:var(--text-secondary);font-weight:300">前端壳、Agent 引擎、插件生态各居其位,边界由 lint-imports 与 package contracts 守护。</p>
+        <h2 style="font-family:var(--sans),var(--sans-zh);font-weight:200;font-size:min(5.2vw,9.2vh);line-height:1;letter-spacing:-.035em;color:var(--text-primary)">三层职责<br/>各司其职</h2>
+        <p class="lead" style="max-width:32ch;color:var(--text-secondary);font-weight:300">前端对话、Agent 引擎、插件生态各管一段,边界清晰,改一处不波及其它。</p>
       </div>
 
       <div data-anim="stack" class="sub-card-stack">
         <article class="card-fill sub-card">
           <span class="big-num">01</span>
-          <h4 style="font-family:var(--sans),var(--sans-zh);font-weight:500;font-size:max(20px,1.5vw);line-height:1.2;color:var(--text-primary);margin:1vh 0">前端壳 · LobeHub v2.2.13</h4>
-          <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.6;font-weight:400">官方 UI,vendored 不直接改;通过 runLcaJournal / finishLcaChat 补丁把 LCA 事件投影进画布。<br/><span class="t-meta" style="color:var(--text-helper)">POST /runs · GET /runs/{id}/live</span></p>
+          <h4 style="font-family:var(--sans),var(--sans-zh);font-weight:500;font-size:max(20px,1.5vw);line-height:1.2;color:var(--text-primary);margin:1vh 0">前端对话层</h4>
+          <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.6;font-weight:400">承载对话界面、助理列表、Skill 与 MCP 配置。一次回车 = 一次 Run,运行过程在画布上展开。<br/><span class="t-meta" style="color:var(--text-helper)">前端 / UI 层 · 独立交付</span></p>
         </article>
         <article class="card-fill sub-card">
           <span class="big-num">02</span>
-          <h4 style="font-family:var(--sans),var(--sans-zh);font-weight:500;font-size:max(20px,1.5vw);line-height:1.2;color:var(--text-primary);margin:1vh 0">Agent 引擎 · LCA Gateway</h4>
-          <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.6;font-weight:400">承载 Loop · PhaseTransaction · FactGateway;一次回车 = 一次 Run,solo / team / auto 三种模式可选。<br/><span class="t-meta" style="color:var(--text-helper)">lca/plugins/transport/webserver</span></p>
+          <h4 style="font-family:var(--sans),var(--sans-zh);font-weight:500;font-size:max(20px,1.5vw);line-height:1.2;color:var(--text-primary);margin:1vh 0">Agent 引擎</h4>
+          <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.6;font-weight:400">负责思考、决策、调用工具、产出回复。可单人、可组队、可自动派发。<br/><span class="t-meta" style="color:var(--text-helper)">solo / team / auto 三种模式</span></p>
         </article>
         <article class="card-fill sub-card">
           <span class="big-num">03</span>
-          <h4 style="font-family:var(--sans),var(--sans-zh);font-weight:500;font-size:max(20px,1.5vw);line-height:1.2;color:var(--text-primary);margin:1vh 0">插件生态 · Assistant / Skill / MCP</h4>
-          <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.6;font-weight:400">一 manifest 一包;effects 必声明;Plugin 间禁止直接 import,只通过 capability key 协作。<br/><span class="t-meta" style="color:var(--text-helper)">lca/plugins/{cognitive,domain,composition}</span></p>
+          <h4 style="font-family:var(--sans),var(--sans-zh);font-weight:500;font-size:max(20px,1.5vw);line-height:1.2;color:var(--text-primary);margin:1vh 0">插件与能力</h4>
+          <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.6;font-weight:400">Skill 是流程、Tool 是动作、MCP 是外部系统的标准接口。助理按需装配,互不干扰。<br/><span class="t-meta" style="color:var(--text-helper)">助理 / Skill / Tool / MCP</span></p>
         </article>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ============ P08 · Section 2 · 阶段二幕封 · Split Statement (dark) ============ -->
+<!-- ============ P08 · Section 2 · 阶段二幕封 · CrewAI 风格"造一个 Agent" ============ -->
 <section class="slide split" data-animate="split-statement" data-slide-id="section-2" data-layout="S03">
   <div class="canvas-card">
     <div class="split-half">
       <div class="half b-accent" style="padding:5.6vh 3.6vw 4.4vh;justify-content:space-between;position:relative;overflow:hidden">
         <canvas class="ascii-bg" aria-hidden="true"></canvas>
         <div class="chrome-min" style="margin-bottom:0;position:relative;z-index:1">
-          <div class="l">PHASE 02 · 2027 Q1 — 2027 Q3</div>
+          <div class="l">PHASE 02 · 起步</div>
           <div class="r">08 / 13</div>
         </div>
         <div data-anim="manifesto" style="display:flex;flex-direction:column;gap:2vh;position:relative;z-index:1">
           <div class="t-meta" style="color:rgba(255,255,255,.78);letter-spacing:.22em;margin-bottom:1.6vh">SECTION 02</div>
-          <h2 style="font-family:var(--sans),var(--sans-zh);font-size:min(7.6vw,13.4vh);line-height:.94;letter-spacing:-.025em;font-weight:200;color:#fff">把 Agent<br/>变成 <span style="font-style:italic;font-weight:300">API</span>。</h2>
-          <div style="font-family:var(--sans),var(--sans-zh);font-size:max(14px,1vw);line-height:1.6;color:rgba(255,255,255,.82);font-weight:400;max-width:36ch;margin-top:1.4vh">在 OA / 工单 / 报表里直接调用 Agent。OpenAI 兼容 / runs / live 三种面同时开放。</div>
+          <h2 style="font-family:var(--sans),var(--sans-zh);font-size:min(7vw,12.6vh);line-height:.94;letter-spacing:-.025em;font-weight:200;color:#fff">给 Agent<br/>一个 <span style="font-style:italic;font-weight:300">目标</span>。</h2>
+          <div style="font-family:var(--sans),var(--sans-zh);font-size:max(14px,1vw);line-height:1.6;color:rgba(255,255,255,.82);font-weight:400;max-width:36ch;margin-top:1.4vh">像造一个助理那样造一个 Agent。设目标、选角色、装能力、交给系统去跑。</div>
         </div>
         <div data-anim="signature" style="display:flex;justify-content:space-between;align-items:end;border-top:1px solid rgba(255,255,255,.22);padding-top:2vh;position:relative;z-index:1">
           <div class="t-meta" style="color:rgba(255,255,255,.62)">暗底 · 转折页</div>
@@ -1618,129 +1712,135 @@
         </div>
       </div>
       <div class="half" style="padding:5.6vh 3.6vw 4.4vh;justify-content:space-between">
-        <div class="chrome-min"><div class="l">DELIVERABLE</div><div class="r">API · THREE FACES</div></div>
+        <div class="chrome-min"><div class="l">FOUR STEPS</div><div class="r">造一个 Agent</div></div>
         <div style="display:flex;flex-direction:column;gap:2vh;color:var(--text-primary)">
-          <div style="display:flex;flex-direction:column;gap:.8vh">
-            <span class="t-cat" style="color:var(--accent)">— 兼容面</span>
-            <p style="font-weight:400;font-size:max(18px,1.2vw);line-height:1.4;color:var(--text-primary)">/v1/chat/completions · /v1/embeddings · /v1/responses</p>
-            <span class="t-meta" style="color:var(--text-helper)">管家面 · 不开 Loop · 直接回上游</span>
+          <div style="display:flex;gap:14px;align-items:flex-start">
+            <span style="font-family:var(--sans);font-weight:200;font-size:min(3.4vw,5.6vh);line-height:.9;color:var(--accent);min-width:32px">01</span>
+            <div>
+              <div style="font-family:var(--sans-zh);font-weight:500;font-size:max(18px,1.3vw);line-height:1.3;color:var(--text-primary)">给它一个目标</div>
+              <div class="t-meta" style="color:var(--text-helper);margin-top:.4vh">一句话写清楚想让它做什么</div>
+            </div>
           </div>
-          <div style="display:flex;flex-direction:column;gap:.8vh">
-            <span class="t-cat" style="color:var(--accent)">— 命令面</span>
-            <p style="font-weight:400;font-size:max(18px,1.2vw);line-height:1.4;color:var(--text-primary)">POST /runs · GET /runs/{id}/live</p>
-            <span class="t-meta" style="color:var(--text-helper)">一次回车 = 一次 Run · SSE 四事件</span>
+          <div style="display:flex;gap:14px;align-items:flex-start">
+            <span style="font-family:var(--sans);font-weight:200;font-size:min(3.4vw,5.6vh);line-height:.9;color:var(--accent);min-width:32px">02</span>
+            <div>
+              <div style="font-family:var(--sans-zh);font-weight:500;font-size:max(18px,1.3vw);line-height:1.3;color:var(--text-primary)">选一个角色</div>
+              <div class="t-meta" style="color:var(--text-helper);margin-top:.4vh">研究员 · 写手 · 分析师 · 客服 …</div>
+            </div>
           </div>
-          <div style="display:flex;flex-direction:column;gap:.8vh">
-            <span class="t-cat" style="color:var(--accent)">— 诊断面</span>
-            <p style="font-weight:400;font-size:max(18px,1.2vw);line-height:1.4;color:var(--text-primary)">cancel · answer · profile · doctor · presence</p>
-            <span class="t-meta" style="color:var(--text-helper)">命令与只读诊断,默认观察面</span>
+          <div style="display:flex;gap:14px;align-items:flex-start">
+            <span style="font-family:var(--sans);font-weight:200;font-size:min(3.4vw,5.6vh);line-height:.9;color:var(--accent);min-width:32px">03</span>
+            <div>
+              <div style="font-family:var(--sans-zh);font-weight:500;font-size:max(18px,1.3vw);line-height:1.3;color:var(--text-primary)">装上能力</div>
+              <div class="t-meta" style="color:var(--text-helper);margin-top:.4vh">Skill · Tool · MCP · 知识库 · 数据源</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:14px;align-items:flex-start">
+            <span style="font-family:var(--sans);font-weight:200;font-size:min(3.4vw,5.6vh);line-height:.9;color:var(--accent);min-width:32px">04</span>
+            <div>
+              <div style="font-family:var(--sans-zh);font-weight:500;font-size:max(18px,1.3vw);line-height:1.3;color:var(--text-primary)">交给系统去跑</div>
+              <div class="t-meta" style="color:var(--text-helper);margin-top:.4vh">OA / 工单 / 报表 / 业务流程触发</div>
+            </div>
           </div>
         </div>
-        <div class="t-meta" style="color:var(--text-helper);text-align:right">→ 09 看技术规格</div>
+        <div class="t-meta" style="color:var(--text-helper);text-align:right">→ 09 看完整产品形态</div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ============ P09 · Tech Spec Sheet · Agent API 三面规格 ============ -->
-<section class="slide light" data-animate="tech-spec" data-slide-id="phase2-api" data-layout="S21">
+<!-- ============ P09 · Phase 02 · 造一个 Agent · CrewAI 风格产品形态 ============ -->
+<section class="slide light" data-animate="grid-reveal" data-slide-id="phase2-api" data-layout="S05">
   <div class="canvas-card">
     <div class="chrome-min">
-      <div class="l">Phase 02 · Agent API Spec</div>
+      <div class="l">Phase 02 · Product Form</div>
       <div class="r">09 / 13</div>
     </div>
 
-    <div style="flex:1;padding:0;display:flex;flex-direction:column;gap:3vh">
-      <div style="flex:1;display:grid;grid-template-columns:5fr 11fr;gap:3vw;align-items:start">
-        <div data-anim="head" style="display:flex;flex-direction:column;gap:1.6vh;justify-content:start">
-          <div class="t-meta">SPEC · 09</div>
-          <h2 style="font-family:var(--sans),var(--sans-zh);font-weight:200;font-size:min(5.2vw,9.2vh);line-height:.96;letter-spacing:-.035em;color:var(--text-primary)">三种面,<br/>同一条事实链。</h2>
-          <p class="lead" style="max-width:30ch;color:var(--text-secondary);font-weight:300">企业现有系统可以直接触发 Agent,无需重写前端。能力 / scope / effects 三维单调 ⊆ 调用者 grant。</p>
-        </div>
-
-        <div data-anim="spec" style="display:flex;flex-direction:column;gap:2vh;justify-content:start">
-          <div class="spec-kpi-grid">
-            <div class="spec-kpi">
-              <div class="t-meta">FACES</div>
-              <div class="spec-kpi-num">3</div>
-              <div class="spec-kpi-lbl">compat · runs · doctor</div>
-            </div>
-            <div class="spec-kpi">
-              <div class="t-meta">PROFILES</div>
-              <div class="spec-kpi-num">10+</div>
-              <div class="spec-kpi-lbl">weekly · contract · ticket · report</div>
-            </div>
-            <div class="spec-kpi">
-              <div class="t-meta">PROTOCOLS</div>
-              <div class="spec-kpi-num">2</div>
-              <div class="spec-kpi-lbl">OpenAI 兼容 · SSE 四事件</div>
-            </div>
-          </div>
-
-          <div class="spec-bars" aria-hidden="true">
-            <span class="bar-vert" style="--h:16vh"></span>
-            <span class="bar-vert" style="--h:22vh"></span>
-            <span class="bar-vert" style="--h:10vh"></span>
-            <span class="bar-vert" style="--h:28vh"></span>
-            <span class="bar-vert" style="--h:14vh"></span>
-            <span class="bar-vert" style="--h:20vh"></span>
-            <span class="bar-vert" style="--h:12vh"></span>
-            <span class="bar-vert" style="--h:24vh"></span>
-            <span class="bar-vert" style="--h:16vh"></span>
-          </div>
-
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2vw;border-top:1px solid var(--border-subtle);padding-top:2vh">
-            <div>
-              <div class="t-cat" style="color:var(--accent)">— OA / 工单</div>
-              <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.55;font-weight:400">触发条件满足即调 /runs,SSE 把中间结果写回工单 timeline。</p>
-            </div>
-            <div>
-              <div class="t-cat" style="color:var(--accent)">— 报表 / 周报</div>
-              <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.55;font-weight:400">定时任务触发 Assistant,产物写 spine.jsonl,前端只读 fold。</p>
-            </div>
-            <div>
-              <div class="t-cat" style="color:var(--accent)">— 内部工具</div>
-              <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.55;font-weight:400">嵌入式 iframe 加载 LobeHub,或直连 /runs;UI 与控制面解耦。</p>
-            </div>
-          </div>
-        </div>
+    <div style="flex:1;padding:0;display:grid;grid-template-columns:5fr 11fr;gap:3vw;align-items:stretch">
+      <div data-anim="head" style="display:flex;flex-direction:column;gap:1.6vh;justify-content:center">
+        <div class="t-meta">— 09 / PHASE 02</div>
+        <h2 style="font-family:var(--sans),var(--sans-zh);font-weight:200;font-size:min(5.2vw,9.2vh);line-height:1;letter-spacing:-.035em;color:var(--text-primary)">造一个<br/>Agent</h2>
+        <p class="lead" style="max-width:32ch;color:var(--text-secondary);font-weight:300">把目标、角色、能力写清楚,系统就替你跑完剩下的事。</p>
       </div>
 
-      <div style="display:flex;justify-content:space-between;align-items:end;border-top:1px solid var(--ink);padding-top:1.6vh">
-        <div style="display:flex;flex-direction:column;gap:.6vh">
-          <span class="t-meta" style="color:var(--accent)">YEARLY GOAL · 2027</span>
-          <span style="font-family:var(--sans),var(--sans-zh);font-weight:200;font-size:min(3.6vw,6.4vh);line-height:.94;color:var(--text-primary)">≥10 个内部业务系统接入 Agent API</span>
+      <div data-anim="stack" style="display:flex;flex-direction:column;gap:2.4vh;justify-content:center">
+        <!-- 配置卡 -->
+        <article style="background:var(--paper);border:1px solid var(--ink);padding:2.4vh 2.2vw;display:flex;flex-direction:column;gap:1.6vh">
+          <div style="display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border-subtle);padding-bottom:1vh">
+            <span style="width:8px;height:8px;background:var(--accent);display:block"></span>
+            <span class="t-meta" style="color:var(--text-primary);letter-spacing:.06em">AGENT · 周报写手</span>
+            <span class="t-meta" style="color:var(--text-helper);margin-left:auto">draft</span>
+          </div>
+          <div style="display:grid;grid-template-columns:100px 1fr;gap:1.6vh 2vw;font-family:var(--sans),var(--sans-zh);font-size:max(15px,1vw);line-height:1.55">
+            <span class="t-meta" style="color:var(--text-helper)">目标</span>
+            <span style="color:var(--text-primary)">每周一上午 9 点,把上周 OKR 整理成可投递的周报草稿</span>
+            <span class="t-meta" style="color:var(--text-helper)">角色</span>
+            <span style="color:var(--text-primary)">周报写手 · 熟悉团队项目节奏,擅长结构化总结</span>
+            <span class="t-meta" style="color:var(--text-helper)">能力</span>
+            <span style="color:var(--text-primary);display:flex;gap:6px;flex-wrap:wrap">
+              <span style="padding:2px 8px;border:1px solid var(--accent);color:var(--accent);font-size:max(13px,.85vw)">silica-weekly</span>
+              <span style="padding:2px 8px;border:1px solid var(--accent);color:var(--accent);font-size:max(13px,.85vw)">mcp/jira-read</span>
+              <span style="padding:2px 8px;border:1px solid var(--accent);color:var(--accent);font-size:max(13px,.85vw)">mcp/ding-send</span>
+              <span style="padding:2px 8px;border:1px solid var(--border-subtle);color:var(--text-secondary);font-size:max(13px,.85vw)">+ 1</span>
+            </span>
+          </div>
+        </article>
+        <!-- 调用示意 -->
+        <article style="background:var(--ink);color:var(--paper);padding:2.4vh 2.2vw;display:flex;flex-direction:column;gap:1.2vh">
+          <div class="t-meta" style="color:rgba(255,255,255,.6);letter-spacing:.06em">TRIGGER · 任何业务系统都可以调用</div>
+          <div style="font-family:var(--mono);font-size:max(14px,.92vw);line-height:1.7;color:rgba(255,255,255,.88)">
+            <span style="color:rgba(255,255,255,.5)">POST</span>&nbsp;/agents/<span style="color:#84a8ff">weekly-writer</span>/runs
+            <div style="height:.8vh"></div>
+            <span style="color:rgba(255,255,255,.5)">{ "trigger":</span>&nbsp;<span style="color:#84a8ff">"oa.weekly"</span><span style="color:rgba(255,255,255,.5)">, "context":{ … } }</span>
+            <div style="height:.8vh"></div>
+            <span style="color:rgba(255,255,255,.5)">→</span>&nbsp;<span style="color:rgba(255,255,255,.7)">SSE: thinking · tool · text · done</span>
+          </div>
+        </article>
+        <!-- 三处落地 -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1.6vw;border-top:1px solid var(--border-subtle);padding-top:2vh">
+          <div>
+            <div class="t-cat" style="color:var(--accent)">— OA 定时</div>
+            <p style="color:var(--text-secondary);font-size:max(15px,.92vw);line-height:1.5;font-weight:400">每周一自动跑,产物写回钉钉文档。</p>
+          </div>
+          <div>
+            <div class="t-cat" style="color:var(--accent)">— 工单触发</div>
+            <p style="color:var(--text-secondary);font-size:max(15px,.92vw);line-height:1.5;font-weight:400">特定事件触发,工单系统按需调起。</p>
+          </div>
+          <div>
+            <div class="t-cat" style="color:var(--accent)">— 报表 / 自定义</div>
+            <p style="color:var(--text-secondary);font-size:max(15px,.92vw);line-height:1.5;font-weight:400">前端或脚本调用,产物落地到目标系统。</p>
+          </div>
         </div>
-        <div class="t-meta" style="color:var(--text-helper)">MP-09</div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ============ P10 · Section 3 · 阶段三幕封 · Split Statement ============ -->
+<!-- ============ P10 · Section 3 · 阶段三幕封 · 多个 Agent 像一支队伍 ============ -->
 <section class="slide light" data-animate="statement-rise" data-slide-id="section-3" data-layout="S03">
   <div class="canvas-card split">
     <div class="split-half">
       <div class="half" style="padding:5.6vh 3.6vw 4.4vh;justify-content:space-between">
-        <div class="chrome-min"><div class="l">PHASE 03 · 2027 Q3 — 2028 Q1</div><div class="r">10 / 13</div></div>
-        <h2 class="h-statement" style="font-family:var(--sans),var(--sans-zh);color:var(--text-primary)">一个人<br/>不够,<br/>就一队人。</h2>
+        <div class="chrome-min"><div class="l">PHASE 03 · 协作</div><div class="r">10 / 13</div></div>
+        <h2 class="h-statement" style="font-family:var(--sans),var(--sans-zh);font-size:min(7.2vw,12.6vh);font-weight:200;color:var(--text-primary);line-height:.94">把任务<br/>交给<br/><span style="font-style:italic;font-weight:300">一支队伍</span>。</h2>
         <div style="border-top:1px solid var(--border-subtle);padding-top:1.6vh;display:flex;justify-content:space-between;align-items:end">
           <div class="t-meta">SECTION 03 · 10</div>
           <div class="t-meta" style="color:var(--text-helper)">→ 11</div>
         </div>
       </div>
       <div class="half" style="padding:5.6vh 3.6vw 4.4vh;background:var(--grey-1);justify-content:space-between">
-        <div class="chrome-min"><div class="l">PHASE GOAL</div><div class="r">MULTI-AGENT</div></div>
+        <div class="chrome-min"><div class="l">PHASE GOAL</div><div class="r">AGENT 团队</div></div>
         <div style="display:flex;flex-direction:column;gap:2.4vh;color:var(--text-primary)">
-          <p class="lead" style="font-weight:300;color:var(--text-primary);max-width:30ch">复杂任务拆给多个 Agent 协作。orchestrator-workers / handoffs / agents-as-tools 三种模式可声明。</p>
+          <p class="lead" style="font-weight:300;color:var(--text-primary);max-width:30ch">复杂任务派给多个 Agent 协同完成。研究员 · 写手 · 分析师 · 评审员,像一支能分工、能交付的队伍。</p>
           <div style="display:flex;flex-direction:column;gap:1vh;font-size:max(16px,1vw);line-height:1.6;color:var(--text-secondary);font-weight:400">
-            <div>· 角色库(Role Library)+ 自动 Casting</div>
-            <div>· 团队拓扑(orchestrator / peer / swarm)</div>
-            <div>· 共享资源 + 证据合面</div>
-            <div>· 治理:终止策略 / 循环守卫 / 预算</div>
+            <div>· 角色库 + 自动指派</div>
+            <div>· 多种团队编排方式</div>
+            <div>· 共享资源 · 互相调用 · 汇总结论</div>
+            <div>· 自动停止 · 循环保护 · 预算上限</div>
           </div>
         </div>
-        <div class="t-meta" style="color:var(--text-helper);text-align:right">ADR-0219 / 0071 / 0095 · 团队协作</div>
+        <div class="t-meta" style="color:var(--text-helper);text-align:right">企业级智能体形态</div>
       </div>
     </div>
   </div>
@@ -1759,107 +1859,64 @@
         <div style="position:relative;padding:5vh 3.2vw;background:var(--ink);color:var(--paper);height:100%;display:flex;flex-direction:column;justify-content:space-between">
           <div>
             <div class="t-meta" style="color:rgba(255,255,255,.7);letter-spacing:.22em;margin-bottom:1.6vh">PATTERNS · 03</div>
-            <h2 style="font-family:var(--sans),var(--sans-zh);font-weight:200;font-size:min(4.4vw,8vh);line-height:1;letter-spacing:-.035em;color:#fff">多智能体<br/>不是多<br/>几个 LLM。</h2>
+            <h2 style="font-family:var(--sans),var(--sans-zh);font-weight:200;font-size:min(4.4vw,8vh);line-height:1;letter-spacing:-.035em;color:#fff">像一个<br/><span style="font-style:italic;font-weight:300">真正的</span><br/>团队。</h2>
           </div>
-          <p style="font-family:var(--sans),var(--sans-zh);font-size:max(14px,1vw);line-height:1.6;color:rgba(255,255,255,.78);font-weight:300;max-width:32ch">它是 delegation · role · topology · 共享资源 · 协议 · 结果合成的独立系统。<br/><span style="color:rgba(255,255,255,.5)">—— ADR-0071 / 0219</span></p>
+          <p style="font-family:var(--sans),var(--sans-zh);font-size:max(14px,1vw);line-height:1.6;color:rgba(255,255,255,.78);font-weight:300;max-width:32ch">分工、交接、共享证据、汇总结论。多种编排方式可以混搭,挑最顺手的那种。</p>
         </div>
       </div>
 
       <div data-anim="cards" style="padding:5vh 3.2vw;display:flex;flex-direction:column;gap:2vh;justify-content:center">
         <article class="card-fill force-card">
           <span class="force-num">01</span>
-          <h4 style="font-family:var(--sans),var(--sans-zh);font-weight:500;font-size:max(20px,1.5vw);line-height:1.2;color:var(--text-primary)">Orchestrator-Workers</h4>
-          <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.55;font-weight:400;display:grid;grid-template-columns:1fr 1fr;gap:1vw">中央调度:拆任务 → 派发 → 收集证据 → 合成。<br/>适用:周报、报告、研究综述等多步长任务。</p>
+          <h4 style="font-family:var(--sans),var(--sans-zh);font-weight:500;font-size:max(20px,1.5vw);line-height:1.2;color:var(--text-primary)">总指挥 + 队员</h4>
+          <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.55;font-weight:400;display:grid;grid-template-columns:1fr 1fr;gap:1vw">一个人拆任务,把活儿派给队员,最后把成果收上来。<br/>适用:周报、报告、研究综述等多步长任务。</p>
         </article>
         <article class="card-fill force-card">
           <span class="force-num">02</span>
-          <h4 style="font-family:var(--sans),var(--sans-zh);font-weight:500;font-size:max(20px,1.5vw);line-height:1.2;color:var(--text-primary)">Handoffs</h4>
-          <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.55;font-weight:400;display:grid;grid-template-columns:1fr 1fr;gap:1vw">按角色交班:接待 → 检索 → 起草 → 复核。<br/>适用:工单流转、跨部门审批、对话路由。</p>
+          <h4 style="font-family:var(--sans),var(--sans-zh);font-weight:500;font-size:max(20px,1.5vw);line-height:1.2;color:var(--text-primary)">按角色交班</h4>
+          <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.55;font-weight:400;display:grid;grid-template-columns:1fr 1fr;gap:1vw">接待 → 检索 → 起草 → 复核,每个环节交给最合适的人。<br/>适用:工单流转、跨部门审批、对话路由。</p>
         </article>
         <article class="card-fill force-card">
           <span class="force-num">03</span>
-          <h4 style="font-family:var(--sans),var(--sans-zh);font-weight:500;font-size:max(20px,1.5vw);line-height:1.2;color:var(--text-primary)">Agents-as-Tools</h4>
-          <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.55;font-weight:400;display:grid;grid-template-columns:1fr 1fr;gap:1vw">把 Agent 当工具:主 Agent 调用子 Agent。<br/>适用:知识检索 + 工具调用的复合场景。</p>
+          <h4 style="font-family:var(--sans),var(--sans-zh);font-weight:500;font-size:max(20px,1.5vw);line-height:1.2;color:var(--text-primary)">把 Agent 当工具</h4>
+          <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.55;font-weight:400;display:grid;grid-template-columns:1fr 1fr;gap:1vw">主 Agent 像在调工具一样调子 Agent,组合出更复杂的能力。<br/>适用:知识检索 + 工具调用的复合场景。</p>
         </article>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ============ P12 · Horizontal Timeline · 全局演进路线 ============ -->
-<section class="slide light" data-animate="timeline-walk" data-slide-id="evolution-roadmap" data-layout="S11">
+<!-- ============ P12 · Phase 三阶段 · 不含时间表的演进节点 ============ -->
+<section class="slide light" data-animate="grid-reveal" data-slide-id="evolution-roadmap" data-layout="S05">
   <div class="canvas-card">
     <div class="chrome-min">
-      <div class="l">Evolution · 18-Month Roadmap</div>
+      <div class="l">Evolution · Three Stages</div>
       <div class="r">12 / 13</div>
     </div>
 
-    <div style="flex:1;padding:0;display:flex;flex-direction:column;gap:5vh">
-      <div data-anim="head" style="display:flex;flex-direction:column;gap:1.4vh">
-        <div class="t-meta">ROADMAP · 12</div>
-        <h2 style="font-family:var(--sans),var(--sans-zh);font-weight:200;font-size:min(5.8vw,10.2vh);line-height:1;letter-spacing:-.035em;color:var(--text-primary)">一条主线,三个里程碑</h2>
-        <p class="lead" style="max-width:54ch;color:var(--text-secondary);font-weight:300">从单点体验到平台能力,再到协作智能。每段独立可交付,产品与架构同时推进。</p>
+    <div style="flex:1;padding:0;display:grid;grid-template-columns:5fr 11fr;gap:3vw;align-items:stretch">
+      <div data-anim="head" style="display:flex;flex-direction:column;gap:1.6vh;justify-content:center">
+        <div class="t-meta">— 12 / EVOLUTION</div>
+        <h2 style="font-family:var(--sans),var(--sans-zh);font-weight:200;font-size:min(5.2vw,9.2vh);line-height:1;letter-spacing:-.035em;color:var(--text-primary)">三段路,<br/>一段比一段<br/>更宽阔。</h2>
+        <p class="lead" style="max-width:32ch;color:var(--text-secondary);font-weight:300">每段都先把上一段做透,再往下一段走。具体节奏看真实使用反馈来定,不画时间表。</p>
       </div>
 
-      <div data-anim="timeline" style="margin-top:4vh;display:flex;flex-direction:column;gap:2.6vh">
-        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:1.6vw;position:relative">
-          <span style="position:absolute;top:11px;left:5%;right:5%;height:1px;background:repeating-linear-gradient(to right,currentColor 0 4px,transparent 4px 8px);opacity:.35"></span>
-          <div style="display:flex;flex-direction:column;align-items:center;gap:1.6vh">
-            <span style="width:8px;height:8px;background:var(--accent);display:block;flex-shrink:0"></span>
-            <div style="display:flex;flex-direction:column;gap:.4vh;align-items:center;text-align:left">
-              <span class="t-meta" style="color:var(--accent)">2026 Q4</span>
-              <span style="font-family:var(--sans),var(--sans-zh);font-weight:500;font-size:max(16px,1.1vw);line-height:1.2;color:var(--text-primary)">Workbuddy 上线</span>
-              <span style="font-family:var(--sans),var(--sans-zh);font-size:max(14px,.85vw);color:var(--text-secondary);line-height:1.4">单用户体验闭环</span>
-            </div>
-          </div>
-          <div style="display:flex;flex-direction:column;align-items:center;gap:1.6vh">
-            <span style="width:8px;height:8px;background:var(--accent);display:block;flex-shrink:0"></span>
-            <div style="display:flex;flex-direction:column;gap:.4vh;align-items:center;text-align:left">
-              <span class="t-meta" style="color:var(--accent)">2027 Q1</span>
-              <span style="font-family:var(--sans),var(--sans-zh);font-weight:500;font-size:max(16px,1.1vw);line-height:1.2;color:var(--text-primary)">Agent API 公测</span>
-              <span style="font-family:var(--sans),var(--sans-zh);font-size:max(14px,.85vw);color:var(--text-secondary);line-height:1.4">三类面开放</span>
-            </div>
-          </div>
-          <div style="display:flex;flex-direction:column;align-items:center;gap:1.6vh">
-            <span style="width:8px;height:8px;background:var(--accent);display:block;flex-shrink:0"></span>
-            <div style="display:flex;flex-direction:column;gap:.4vh;align-items:center;text-align:left">
-              <span class="t-meta" style="color:var(--accent)">2027 Q2</span>
-              <span style="font-family:var(--sans),var(--sans-zh);font-weight:500;font-size:max(16px,1.1vw);line-height:1.2;color:var(--text-primary)">10+ 业务系统接入</span>
-              <span style="font-family:var(--sans),var(--sans-zh);font-size:max(14px,.85vw);color:var(--text-secondary);line-height:1.4">Profile 库成型</span>
-            </div>
-          </div>
-          <div style="display:flex;flex-direction:column;align-items:center;gap:1.6vh">
-            <span style="width:8px;height:8px;background:var(--accent);display:block;flex-shrink:0"></span>
-            <div style="display:flex;flex-direction:column;gap:.4vh;align-items:center;text-align:left">
-              <span class="t-meta" style="color:var(--accent)">2027 Q3</span>
-              <span style="font-family:var(--sans),var(--sans-zh);font-weight:500;font-size:max(16px,1.1vw);line-height:1.2;color:var(--text-primary)">Multi-Agent 试验</span>
-              <span style="font-family:var(--sans),var(--sans-zh);font-size:max(14px,.85vw);color:var(--text-secondary);line-height:1.4">三种协作模式</span>
-            </div>
-          </div>
-          <div style="display:flex;flex-direction:column;align-items:center;gap:1.6vh">
-            <span style="width:8px;height:8px;background:var(--accent);display:block;flex-shrink:0"></span>
-            <div style="display:flex;flex-direction:column;gap:.4vh;align-items:center;text-align:left">
-              <span class="t-meta" style="color:var(--accent)">2028 Q1</span>
-              <span style="font-family:var(--sans),var(--sans-zh);font-weight:500;font-size:max(16px,1.1vw);line-height:1.2;color:var(--text-primary)">企业级智能体平台</span>
-              <span style="font-family:var(--sans),var(--sans-zh);font-size:max(14px,.85vw);color:var(--text-secondary);line-height:1.4">对内服务化</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div data-anim="footnote" style="margin-top:6vh;display:grid;grid-template-columns:repeat(3,1fr);gap:3vw;border-top:1px solid var(--border-subtle);padding-top:2.6vh">
-        <div>
-          <div class="t-cat" style="color:var(--accent)">技术节奏</div>
-          <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.55;font-weight:400">P0–P5 平台架构已完成;ADR-0219/0220 图三层与边界 DTO 是后续主要落点。</p>
-        </div>
-        <div>
-          <div class="t-cat" style="color:var(--accent)">产品节奏</div>
-          <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.55;font-weight:400">先有 Workbuddy 的真实使用,才有 API 的合理形态,才有 Multi-Agent 的场景。</p>
-        </div>
-        <div>
-          <div class="t-cat" style="color:var(--accent)">组织节奏</div>
-          <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.55;font-weight:400">平台组 + 业务代表共建 Profile 与 Skill;治理组负责能力 / scope / effects 单调性审计。</p>
-        </div>
+      <div data-anim="stack" class="sub-card-stack">
+        <article class="card-fill sub-card">
+          <span class="big-num">01</span>
+          <h4 style="font-family:var(--sans),var(--sans-zh);font-weight:500;font-size:max(20px,1.5vw);line-height:1.2;color:var(--text-primary);margin:1vh 0">先有真实用户</h4>
+          <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.6;font-weight:400">把办公助理做透,让一线同事真正用起来。没有真实用户,后面的形态都是空想。</p>
+        </article>
+        <article class="card-fill sub-card">
+          <span class="big-num">02</span>
+          <h4 style="font-family:var(--sans),var(--sans-zh);font-weight:500;font-size:max(20px,1.5vw);line-height:1.2;color:var(--text-primary);margin:1vh 0">再把能力开放出去</h4>
+          <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.6;font-weight:400">让 OA、工单、报表按需调起助理。能力开放是"被用得上"的检验,不是"被部署"的展示。</p>
+        </article>
+        <article class="card-fill sub-card">
+          <span class="big-num">03</span>
+          <h4 style="font-family:var(--sans),var(--sans-zh);font-weight:500;font-size:max(20px,1.5vw);line-height:1.2;color:var(--text-primary);margin:1vh 0">最后让多 Agent 协作</h4>
+          <p style="color:var(--text-secondary);font-size:max(16px,.94vw);line-height:1.6;font-weight:400">复杂任务派给一支队伍去做。多种编排方式并存,挑最顺手的那种,不必押注单一形态。</p>
+        </article>
       </div>
     </div>
   </div>
@@ -1885,8 +1942,8 @@
         </div>
 
         <div data-anim="signature" style="display:flex;justify-content:space-between;align-items:end;border-top:1px solid rgba(255,255,255,.22);padding-top:2vh;position:relative;z-index:1">
-          <div class="t-meta" style="color:rgba(255,255,255,.62)">技术经理 · 内部汇报</div>
-          <div class="t-meta" style="color:rgba(255,255,255,.62)">2026.09.15</div>
+          <div class="t-meta" style="color:rgba(255,255,255,.62)">内部汇报</div>
+          <div class="t-meta" style="color:rgba(255,255,255,.62)">2026.09</div>
         </div>
       </div>
 
@@ -1900,22 +1957,22 @@
           <div style="display:grid;grid-template-columns:auto 1fr;gap:2vw;align-items:start;padding:2.6vh 0;border-top:1px solid var(--border-subtle)">
             <div style="font-family:var(--sans);font-weight:200;font-size:min(4.4vw,7.8vh);line-height:.9;color:var(--text-primary)">01</div>
             <div>
-              <h3 style="font-family:var(--sans),var(--sans-zh);font-weight:500;font-size:max(18px,1.8vw);line-height:1.2;letter-spacing:-.015em;color:var(--text-primary);margin-bottom:1vh">平台先行 · 单点体验先跑</h3>
-              <p style="font-family:var(--sans),var(--sans-zh);font-size:max(16px,.94vw);line-height:1.6;color:var(--text-secondary);font-weight:400">先用 LobeHub 把"个人助理 + Skill + MCP"做透,让真实用户跑起来,形成第一批 Profile。</p>
+              <h3 style="font-family:var(--sans),var(--sans-zh);font-weight:500;font-size:max(18px,1.8vw);line-height:1.2;letter-spacing:-.015em;color:var(--text-primary);margin-bottom:1vh">先把助理做透</h3>
+              <p style="font-family:var(--sans),var(--sans-zh);font-size:max(16px,.94vw);line-height:1.6;color:var(--text-secondary);font-weight:400">把助理做透,让一线同事真的用起来,先把"被用得上"这件事跑通。</p>
             </div>
           </div>
           <div style="display:grid;grid-template-columns:auto 1fr;gap:2vw;align-items:start;padding:2.6vh 0;border-top:1px solid var(--border-subtle)">
             <div style="font-family:var(--sans);font-weight:200;font-size:min(4.4vw,7.8vh);line-height:.9;color:var(--text-primary)">02</div>
             <div>
-              <h3 style="font-family:var(--sans),var(--sans-zh);font-weight:500;font-size:max(18px,1.8vw);line-height:1.2;letter-spacing:-.015em;color:var(--text-primary);margin-bottom:1vh">能力外溢 · Agent API 接入</h3>
-              <p style="font-family:var(--sans),var(--sans-zh);font-size:max(16px,.94vw);line-height:1.6;color:var(--text-secondary);font-weight:400">三类面同时开放,让 OA / 工单 / 报表直接触发 Agent,把"对话即流程"做成企业能力。</p>
+              <h3 style="font-family:var(--sans),var(--sans-zh);font-weight:500;font-size:max(18px,1.8vw);line-height:1.2;letter-spacing:-.015em;color:var(--text-primary);margin-bottom:1vh">把能力交给业务</h3>
+              <p style="font-family:var(--sans),var(--sans-zh);font-size:max(16px,.94vw);line-height:1.6;color:var(--text-secondary);font-weight:400">让 OA、工单、报表按需调起助理。"对话即流程"做成企业级能力,而不是单点工具。</p>
             </div>
           </div>
           <div style="display:grid;grid-template-columns:auto 1fr;gap:2vw;align-items:start;padding:2.6vh 0;border-top:1px solid var(--border-subtle);border-bottom:2px solid var(--accent)">
             <div style="font-family:var(--sans);font-weight:200;font-size:min(4.4vw,7.8vh);line-height:.9;color:var(--accent)">03</div>
             <div>
-              <h3 style="font-family:var(--sans),var(--sans-zh);font-weight:500;font-size:max(18px,1.8vw);line-height:1.2;letter-spacing:-.015em;color:var(--accent);margin-bottom:1vh">协作升级 · Multi-Agent 终态</h3>
-              <p style="font-family:var(--sans),var(--sans-zh);font-size:max(16px,.94vw);line-height:1.6;color:var(--text-secondary);font-weight:400">orchestrator / handoffs / agents-as-tools 三种模式可声明,企业级智能体平台成形。</p>
+              <h3 style="font-family:var(--sans),var(--sans-zh);font-weight:500;font-size:max(18px,1.8vw);line-height:1.2;letter-spacing:-.015em;color:var(--accent);margin-bottom:1vh">让多个 Agent 协作</h3>
+              <p style="font-family:var(--sans),var(--sans-zh);font-size:max(16px,.94vw);line-height:1.6;color:var(--text-secondary);font-weight:400">复杂任务交给一支 Agent 队伍去做。多种编排方式并存,挑最顺手的那种。</p>
             </div>
           </div>
         </div>
@@ -1934,132 +1991,128 @@
 <script>
 const SPEAKER_NOTES = [
   {
-    id: 'cover', title: '企业 Agent 平台的演进路线', section: '开场', minutes: 0.6,
+    id: 'cover', title: '从 agent harness 底座到企业级智能体', section: '开场', minutes: 0.6,
     purpose: '把"三阶段演进"这条主线一次性立起来,让大家带着结构听后面的内容',
     talk: [
-      'LCA 已经收敛到可以对外承载产品的程度',
-      '今天汇报的是产品演进的路线:Workbuddy → Agent API → Multi-Agent',
-      '每一段都对应真实的使用场景和工程基础'
+      '今天讲的是一条产品演进路线',
+      '从 harness 底座开始,一步步长成企业级的智能体平台',
+      '三段路:办公助理 → 把 Agent 变成能力 → 多 Agent 协作'
     ],
-    transition: '下一页 Why Now,把"为什么是现在做这件事"先讲清楚'
+    transition: '下一页先把"当下的位置"讲清楚'
   },
   {
-    id: 'why-now', title: '为什么是现在', section: 'Context', minutes: 1.2,
-    purpose: '用三个并列论据把"窗口期"立住,避免讨论"要不要做"',
+    id: 'why-now', title: '当下的位置', section: 'Context', minutes: 1.2,
+    purpose: '用三个并列事实把"为什么现在讲这件事"立住,避免讨论"要不要做"',
     talk: [
-      '模型侧:Function Calling 与结构化输出已经是事实标准,多步任务可承担',
-      '场景侧:OA / 工单 / 周报 / 报表都出现了"按 Agent 触发对话"的硬需求',
-      '架构侧:LCA 平台收敛 ADR-0194/0195 已经落地 P0–P5,可以对外承载'
+      '模型:工具调用已经是事实标准,长上下文与多步任务可承担',
+      '场景:OA、工单、合同、周报都已经被反复验证',
+      '底座:harness 与平台层稳定,具备对外承载产品形态的工程基础'
     ],
-    transition: '窗口期确认后,下一页展示 LCA 架构全景,先建立技术共识'
+    transition: '下一页展示架构全景,建立共同语境'
   },
   {
-    id: 'architecture-overview', title: 'LCA 架构全景', section: 'Context', minutes: 1.4,
-    purpose: '把"内核 + 插件 + 事实链"三层结构讲清楚,后面所有产品形态都长在这上面',
+    id: 'architecture-overview', title: '图编排', section: 'Context', minutes: 1.4,
+    purpose: '把"图是 LCA 的骨头"这件事讲清楚,后面所有产品形态都长在图上',
     talk: [
-      '内核:lca_kernel K1–K8 + harness/graph MTK,不写 run 事实,不 import transport',
-      '中间层:cognition / loop / session 三块,负责 Phase 解释、机制事务、事实追加',
-      '外圈:plugins / transport / observability,各管一段,通过 capability key 协作',
-      '所有事实走 Producer → FactGateway → Session.append → *.spine.jsonl → fold 这条单链'
+      '图:每次 Run 是一张图,节点是原子动作,边是数据流',
+      '运行时:按图解释执行,可挂可拆、可重排',
+      '轨迹:同一张图,每次运行的轨迹都被记录到 Session',
+      '反馈:反思回边允许回到上游,直到终止策略满足'
     ],
-    transition: '架构共识建立后,下一页用横向时间线把这条事实链展开'
+    transition: '图的概念建立后,下一页讲事实链是如何把每一段记录下来的'
   },
   {
     id: 'fact-flow', title: '所有事实只走一条链', section: 'Context', minutes: 1.0,
     purpose: '把"单轨事实链"和"控制/观察分离"两个核心约束讲清楚',
     talk: [
-      '四段链:Produce → Gateway → Append → Fold,Loop / Tool / LLM 旧写路径全部退役',
+      '四段链:Produce → Gateway → Append → Fold,每一步都可追溯',
       '控制面 / 观察面严格分离:诊断命令默认只读,不触发副作用',
-      '执行窄门:cognition → Body → SafeExecutor → Sandbox,绕过即 CapabilityGrantExceeded',
-      '这是 C13 信息血统闭合,跨边界必须经 typed Contract'
+      '执行窄门:真正落地的副作用只走一条窄通道,绕过会立刻报错',
+      '跨边界传递必经 typed Contract,这是事实层的硬约束'
     ],
-    transition: '事实链讲完,正式进入产品演进的第一阶段:Workbuddy'
+    transition: '事实链讲完,正式进入产品演进的第一阶段:办公助理'
   },
   {
-    id: 'section-1', title: '阶段一 · 先把人安顿下来', section: 'Phase 01', minutes: 0.6,
-    purpose: '用一句宣言立阶段调性,让"Workbuddy 类比"成为下一阶段的产品语言',
+    id: 'section-1', title: '阶段一 · 先把助理做出来', section: 'Phase 01', minutes: 0.6,
+    purpose: '用一句宣言立阶段调性,把"先做助理"作为第一阶段的重点',
     talk: [
       '阶段一的目标不是炫技术,是让人先用起来',
-      '类比 Workbuddy:每个人都有隔离的 AI 工作空间',
-      '可以建助理、配 Skill、挂 MCP,把重复劳动外包'
+      '每人一个办公助理,把重复劳动外包',
+      '助理可以装 Skill、配能力、挂外部工具'
     ],
-    transition: '下一页用 S22 大图把阶段一的产品形态展示出来'
+    transition: '下一页把产品形态展示出来'
   },
   {
     id: 'phase1-product', title: '阶段一产品形态', section: 'Phase 01', minutes: 1.4,
-    purpose: '把"工作空间 + 助理 + Skill + MCP"这一产品形态用一图说清',
+    purpose: '把"思考 + 工具 + 交付"这一产品形态用一图说清',
     talk: [
-      '前端壳:LobeHub v2.2.13,官方 UI 不直接改,通过 LcaRunDriver 补丁把 LCA 事件投影进画布',
-      'Agent:LCA Gateway,一次回车 = 一次 Run,四事件流式回画布',
-      '插件:Assistant / Skill / MCP / Domain / Tool,一 manifest 一包',
-      '三个数字:UI 1.x 官方壳 / Agent solo/team 三模式 / 插件 43+'
+      '用户说一句需求,助理先想清楚思路',
+      '再调起合适的工具,把结果整理成可用的产物',
+      '整个过程在画布上展开,可追溯、可改写、可直接交给下游系统'
     ],
-    transition: '产品形态讲完,下一页从技术角度把三层壳各管一段说清楚'
+    transition: '下一页讲清楚前端、引擎、插件三层各管什么'
   },
   {
-    id: 'phase1-stack', title: '阶段一技术栈', section: 'Phase 01', minutes: 1.2,
-    purpose: '把"前端壳 / Agent 引擎 / 插件生态"三个职责讲清楚,避免职责混淆',
+    id: 'phase1-stack', title: '阶段一产品分层', section: 'Phase 01', minutes: 1.2,
+    purpose: '把"前端 / 引擎 / 插件"三层职责讲清楚,避免职责混淆',
     talk: [
-      '前端壳:LobeHub,只承载 UI 与四事件投影,不直接 import LCA 内部',
-      'Agent 引擎:Gateway,承载 Loop / PhaseTransaction / FactGateway',
-      '插件生态:43+ plugins,一 manifest 一包,effects 必声明',
-      '边界由 lint-imports 和 package contracts 守护'
+      '前端层:承载对话界面、助理列表、Skill 与工具配置',
+      '引擎层:负责思考、决策、调起工具、产出回复',
+      '插件与能力:Skill 是流程、Tool 是动作、MCP 是外部接口',
+      '三层各管一段,改一处不波及其它'
     ],
     transition: '阶段一立稳,翻到下一页进入阶段二幕封'
   },
   {
-    id: 'section-2', title: '阶段二 · 把 Agent 变成 API', section: 'Phase 02', minutes: 0.6,
+    id: 'section-2', title: '阶段二 · 给 Agent 一个目标', section: 'Phase 02', minutes: 0.6,
     purpose: '用暗底 + 宣言强化"转折",让团队意识到这是从体验到平台的跨越',
     talk: [
       '阶段二把 Agent 从"产品里的对话"变成"系统能调用的能力"',
-      '三类面同时开放:OpenAI 兼容 / runs 命令面 / doctor 诊断面',
-      '企业现有系统不需要重写前端,可以直接触发'
+      '像造一个助理那样造一个 Agent:设目标、选角色、装能力',
+      '然后交给 OA、工单、报表按需去调'
     ],
-    transition: '下一页用 S21 技术规格把三类面的边界和指标说清楚'
+    transition: '下一页把完整的造 Agent 流程展开'
   },
   {
-    id: 'phase2-api', title: 'Agent API 三面规格', section: 'Phase 02', minutes: 1.6,
-    purpose: '用技术规格页面把 Agent API 的能力、形态、接入路径一次性落地',
+    id: 'phase2-api', title: '造一个 Agent', section: 'Phase 02', minutes: 1.6,
+    purpose: '用产品形态页面把"造 Agent 与调 Agent"一次性说清',
     talk: [
-      '三个数字:3 类面 / 10+ Profile / 2 协议(OpenAI 兼容 + SSE 四事件)',
-      'OA / 工单:触发条件满足即调 /runs,SSE 把中间结果写回工单 timeline',
-      '报表 / 周报:定时任务触发 Assistant,产物写 spine.jsonl,前端只读 fold',
-      '内部工具:嵌入式 iframe 或直连 /runs,UI 与控制面解耦',
-      '2027 年度目标:≥10 个内部业务系统接入 Agent API'
+      '给它一个目标:每周一上午 9 点整理上周 OKR 成周报草稿',
+      '选一个角色:周报写手,熟悉团队项目节奏',
+      '装上能力:数据查询、读工单、发钉钉',
+      '然后任何业务系统按需调它:定时 / 触发 / 调用'
     ],
-    transition: '阶段二 API 形态讲完,翻到下一页进入阶段三幕封'
+    transition: '阶段二讲完,翻到下一页进入阶段三幕封'
   },
   {
-    id: 'section-3', title: '阶段三 · 一个人不够, 就一队人', section: 'Phase 03', minutes: 0.6,
-    purpose: '用宣言把"Multi-Agent"的本质讲清:不是多几个 LLM,是一套协作系统',
+    id: 'section-3', title: '阶段三 · 把任务交给一支队伍', section: 'Phase 03', minutes: 0.6,
+    purpose: '用宣言把"Agent 团队"的本质讲清:不是多几个 LLM,是一支能分工协作的队伍',
     talk: [
-      '复杂任务拆给多个 Agent 协作',
-      'orchestrator-workers / handoffs / agents-as-tools 三种模式可声明',
-      '治理:终止策略 / 循环守卫 / 预算三位一体'
+      '复杂任务派给多个 Agent 协同完成',
+      '总指挥 + 队员、按角色交班、把 Agent 当工具三种编排并存',
+      '自动停止、循环保护、预算上限三位一体'
     ],
-    transition: '下一页用 S13 三力卡片把三种协作模式展开'
+    transition: '下一页把三种编排方式展开'
   },
   {
-    id: 'phase3-multi-agent', title: '三种 Multi-Agent 协作模式', section: 'Phase 03', minutes: 1.4,
-    purpose: '把三种协作模式各自的适用场景讲清楚,避免"哪种最好"的伪问题',
+    id: 'phase3-multi-agent', title: '三种 Agent 团队编排', section: 'Phase 03', minutes: 1.4,
+    purpose: '把三种编排各自的适用场景讲清楚,避免"哪种最好"的伪问题',
     talk: [
-      'Orchestrator-Workers:中央调度,拆任务 → 派发 → 收集证据 → 合成,适合周报、研究综述',
-      'Handoffs:按角色交班,接待 → 检索 → 起草 → 复核,适合工单流转、跨部门审批',
-      'Agents-as-Tools:把 Agent 当工具,主 Agent 调用子 Agent,适合知识检索 + 工具调用复合场景',
-      '三者是 Pattern,不是选其一;不同任务用不同 Pattern'
+      '总指挥 + 队员:一个人拆任务,把活儿派给队员,最后把成果收上来,适合周报、研究综述',
+      '按角色交班:接待 → 检索 → 起草 → 复核,每个环节交给最合适的人,适合工单流转',
+      '把 Agent 当工具:主 Agent 像调工具一样调子 Agent,适合知识检索 + 工具调用复合场景',
+      '三种是 Pattern,不是选其一;不同任务用不同 Pattern'
     ],
-    transition: '三种模式讲完,翻到下一页把 18 个月的整体路线落成一图'
+    transition: '三种模式讲完,翻到下一页把整体演进路线收束'
   },
   {
     id: 'evolution-roadmap', title: '18 个月演进路线', section: 'Roadmap', minutes: 1.4,
-    purpose: '把三个阶段落到 5 个里程碑,让团队对节奏和阶段成果有共同预期',
+    purpose: '把三个阶段串成一条演进脉络,让团队对阶段成果有共同预期',
     talk: [
-      '2026 Q4:Workbuddy 上线,单用户体验闭环',
-      '2027 Q1:Agent API 公测,三类面开放',
-      '2027 Q2:10+ 业务系统接入,Profile 库成型',
-      '2027 Q3:Multi-Agent 试验,三种协作模式',
-      '2028 Q1:企业级智能体平台,对内服务化',
-      '三个节奏:技术 / 产品 / 组织三条线并行,但每段独立可交付'
+      '阶段一:先把助理做透,让一线同事真的用起来',
+      '阶段二:把能力开放给业务,让 OA、工单、报表按需调起',
+      '阶段三:让多 Agent 协作,复杂任务派给一支队伍',
+      '每段独立可交付,具体节奏看真实使用反馈来定,不画时间表'
     ],
     transition: '路线讲完,翻到收尾页留三条承诺'
   },
@@ -2067,9 +2120,9 @@ const SPEAKER_NOTES = [
     id: 'closing', title: '三条承诺', section: 'Closing', minutes: 0.8,
     purpose: '用三条承诺收束全场,让汇报的结论可被记住',
     talk: [
-      '平台先行:先把 LobeHub 工作空间做透,形成第一批 Profile',
-      '能力外溢:Agent API 三类面同时开放,接入 10+ 业务系统',
-      '协作升级:Multi-Agent 三种模式可声明,企业级平台成形',
+      '先把助理做透:让一线同事真的用起来,先把"被用得上"这件事跑通',
+      '把能力交给业务:让 OA、工单、报表按需调起助理',
+      '让多个 Agent 协作:复杂任务交给一支队伍去做',
       '记住一句话:先把底座稳住,再让上层跑出所有可能性'
     ],
     transition: '汇报结束 · 谢谢大家,准备进入 Q&A'
