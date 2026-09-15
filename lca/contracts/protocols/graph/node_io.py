@@ -82,7 +82,7 @@ class NodeIOSchema(BaseModel):
     terminal_predicate: Predicate | None = None  # plan-level termination
 
     @model_validator(mode="after")
-    def _names_unique(self) -> "NodeIOSchema":
+    def _names_unique(self) -> NodeIOSchema:
         # Uniqueness is enforced within each direction (no two
         # inputs share a name; no two outputs share a name). A
         # port that appears on both sides is intentionally
