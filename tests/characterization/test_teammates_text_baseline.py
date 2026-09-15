@@ -14,7 +14,7 @@ covers only ``build_teammates_text`` + ``TeamAwareness`` plumbing.
 
 from __future__ import annotations
 
-from lca.cognition.brain.reasoner.reasoner import build_teammates_text
+from lca.cognition.brain.sections.types import render_teammates as build_teammates_text
 from lca.cognition.member_status import InMemoryMemberStatus
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
