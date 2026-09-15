@@ -6,17 +6,27 @@
 act 子图最后一个节点,在执行完成后观察回执并写入 journal 一条 ``effect.observed``
 事实(若 ``journal`` capability 可用),让下游 reflect / remember 节点可以做
 typed 推断。
+
+PR-3.8.7: 本节点同时承担 ``act.result.normalize`` 的归一化语义(merge
+target,见 spec §3.3)。归一化在 ``node_execute`` 内部完成,不改
+``declared_inputs`` / ``declared_outputs``,typed-boundary port schema
+对外不可见(AGENTS.md §3 C13)。不要把归一化拆成单独的 graph node。
 """
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
+from typing import Any
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.atoms.semantic.keys import (
     FAILURE_KIND_EXECUTION,
+    FAILURE_KIND_TOOL_WIRE,
+    FAILURE_KIND_TRANSIENT,
+    FAILURE_KIND_VALIDATION,
 )
 from lca.contracts.harness.act.effect_receipt import EffectReceipt
 from lca.contracts.harness.composition.plugin_contract import (
@@ -37,6 +47,58 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+
+# ADR-0197 ``guard.tool-result-spill`` 阈值(50_000 字节)。``output_ref`` 超过该
+# 阈值视为 inline 负载溢出,emit stub receipt 并把 ``output_ref`` 改写为合成的
+# spill URI,避免下游 typed 推断时把超大 inline 引用当成有效负载。
+_MAX_OUTPUT_REF_BYTES = 50_000
+_SPILL_URI_PREFIX = "spill://"
+
+# Closed-set ``failure_kind`` → ``error_reason`` map(PR-3.8.7 merge from
+# ``act.result.normalize``):同一 ``failure_kind`` 多次调用得到同一
+# ``error_reason``(deterministic、idempotent)。未知 ``failure_kind`` 不抛异常、
+# 不修改 ``error_code``(plan §Task 1 第 5 条)。
+_FAILURE_KIND_TO_ERROR_REASON: dict[str, str] = {
+    FAILURE_KIND_EXECUTION: FAILURE_KIND_EXECUTION,
+    FAILURE_KIND_TRANSIENT: FAILURE_KIND_TRANSIENT,
+    FAILURE_KIND_VALIDATION: FAILURE_KIND_VALIDATION,
+    FAILURE_KIND_TOOL_WIRE: FAILURE_KIND_TOOL_WIRE,
+}
+
+
+def _normalize_receipt(receipt: EffectReceipt) -> EffectReceipt:
+    """``act.observe`` 内部归一化步骤(PR-3.8.7 fold from ``act.result.normalize``)。
+
+    Idempotent + deterministic:同一 ``receipt`` 多次调用产生结构等价的
+    ``EffectReceipt``(字段值相同,允许新实例)。无更新时返回同一实例,
+    保证 ``tests/loop/test_act_observe_should_terminate.py`` 的 ``is``
+    身份断言继续成立。
+
+    归一化规则(plan §Task 1):
+      1. 剥离不可序列化字段 — ``EffectReceipt`` 字段均为基础类型,no-op。
+      2. bytes ≤ 50_000 → base64-string — receipt 无 inline 字节负载,no-op。
+      3. bytes > 50_000 → spill 到 side artifact,``output_ref`` 改写为
+         ``spill://<invocation_id>`` URI,emit stub receipt。
+      4. ``failure_kind`` 已设置且 ``error_code`` 仍为空时,从 closed-set map
+         推导 ``error_reason`` 并写入 ``error_code``(deterministic,no exception)。
+         已设置的 ``error_code`` 不覆盖(body 已分类更具体)。
+    """
+    updates: dict[str, Any] = {}
+
+    if (
+        receipt.output_ref is not None
+        and len(receipt.output_ref.encode("utf-8")) > _MAX_OUTPUT_REF_BYTES
+    ):
+        updates["output_ref"] = f"{_SPILL_URI_PREFIX}{receipt.invocation_id}"
+
+    if receipt.failure_kind is not None and receipt.error_code is None:
+        reason = _FAILURE_KIND_TO_ERROR_REASON.get(receipt.failure_kind)
+        if reason is not None:
+            updates["error_code"] = reason
+
+    if not updates:
+        return receipt
+    return dataclasses.replace(receipt, **updates)
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +141,11 @@ class ActObserveExecutor:
                 f"instance, got {type(receipt).__name__}"
             )
 
+        # PR-3.8.7: normalize before emit (folded from ``act.result.normalize``).
+        # The normalize step is idempotent + deterministic; the typed-boundary port
+        # schema (``declared_inputs`` / ``declared_outputs``) is unchanged.
+        normalized = _normalize_receipt(receipt)
+
         journal = getattr(context.runtime, "journal", None)
         plan_ref = context.metadata.get("plan_ref", "unknown")
         node_id = context.metadata.get("node_id", "act.observe")
@@ -86,26 +153,28 @@ class ActObserveExecutor:
             from lca.contracts.protocols.act.command.envelope import RunFact
 
             fact = RunFact(
-                fact_id=f"{plan_ref}:{node_id}:{receipt.invocation_id}",
+                fact_id=f"{plan_ref}:{node_id}:{normalized.invocation_id}",
                 plan_ref=plan_ref,
                 kind="effect.observed",
                 payload={
-                    "invocation_id": receipt.invocation_id,
-                    "outcome": receipt.outcome.value,
-                    "provider": receipt.provider,
-                    "idempotency_key": receipt.idempotency_key,
-                    "error_code": receipt.error_code,
+                    "invocation_id": normalized.invocation_id,
+                    "outcome": normalized.outcome.value,
+                    "provider": normalized.provider,
+                    "idempotency_key": normalized.idempotency_key,
+                    "error_code": normalized.error_code,
                 },
             )
             journal.commit_fact(fact, plan_ref=plan_ref, node_ref=node_id)
 
         should_terminate = False
-        if receipt.failure_kind == FAILURE_KIND_EXECUTION or (receipt.failure_kind is None and receipt.outcome.value == "failed"):
+        if normalized.failure_kind == FAILURE_KIND_EXECUTION or (
+            normalized.failure_kind is None and normalized.outcome.value == "failed"
+        ):
             should_terminate = True
 
         return NodeOutput(
             port_values={
-                "receipt": receipt,
+                "receipt": normalized,
                 "should_terminate": should_terminate,
             }
         )

@@ -77,6 +77,10 @@ nodes:
 
   - id: act.observe
     factory: act.observe
+    # PR-3.8.7: act.observe 同时承担 act.result.normalize 的归一化语义
+    # (schema/spill/coerce/error_reason)。归一化在 node_execute 内部完成,
+    # declared_inputs/declared_outputs 保持不变,typed-boundary port schema
+    # 对外不可见(AGENTS.md §3 C13)。不要把归一化拆成单独的 graph node。
     inputs: [receipt]
     outputs: [receipt, should_terminate]
     config:
