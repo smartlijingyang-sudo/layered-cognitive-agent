@@ -27,15 +27,36 @@ registration under ``think::decision.parse`` is preserved.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.atoms.scope.scope import Scope
+from lca.contracts.harness.composition.plugin_contract import (
+    ArchitectureContract,
+    AuthorityContract,
+    EvidenceContract,
+    LifecycleContract,
+    PluginContract,
+    PluginIdentity,
+)
 from lca.contracts.models.core.execution.decision import (
     Decision,
     DelegationSpec,
     ToolCall,
 )
-from lca.nodes._decorator import graph_node
+from lca.contracts.protocols.declarative.declarative_1.node_executor import (
+    NodeContext,
+    NodeInput,
+    NodeOutput,
+)
+from lca.contracts.protocols.declarative.declarative_1.ports import PortName
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 if TYPE_CHECKING:
     from lca.contracts.models.core.conversation.llm import LLMResponse
@@ -46,35 +67,55 @@ _log = logging.getLogger(__name__)
 _DELEGATE_TOOL_NAME = "delegate"
 
 
-@graph_node(
-    id="decision.parse",
-    region="think",
-    inputs=("state", "llm_response"),
-    outputs=("decision",),
-)
-async def decision_parse(*, state: Any, llm_response: LLMResponse) -> Decision:
-    """Project an :class:`LLMResponse` into a :class:`Decision`.
+@dataclass(frozen=True, slots=True)
+class DecisionParseExecutor:
+    """think.decision.parse 节点:LLMResponse → :class:`Decision`."""
 
-    Step 1 — extract native tool calls + delegate tool specs.
-    Step 2 — derive intent from response text (after leak-recovery so
-    JSON that was smuggled inside ``text`` does not double-count).
-    Step 3 — assemble a :class:`Decision` with ``action_type`` inferred
-    from tool presence (``use_tool`` when there are tool calls or
-    delegations; ``respond`` otherwise).
-    """
-    del state  # reserved for future state-aware routing
-    tool_calls, delegations, intent = _project_response(llm_response)
-    action_type = _infer_action_type(tool_calls=tool_calls, delegations=delegations)
-    decision_id = new_id("decision")
-    return Decision(
-        decision_id=decision_id,
-        action_type=action_type,
-        rationale=intent,
-        confidence=1.0,
-        tool_calls=list(tool_calls),
-        delegations=list(delegations),
-        response_text=intent if action_type == "respond" else None,
-    )
+    semantic_name: str = "decision.parse"
+    region: str = "phase:think"
+    declared_inputs: tuple[PortName, ...] = ("state", "llm_response")
+    declared_outputs: tuple[PortName, ...] = ("decision",)
+
+    async def node_execute(
+        self,
+        context: NodeContext,
+        input: NodeInput,
+    ) -> NodeOutput:
+        """Project an :class:`LLMResponse` into a :class:`Decision`."""
+        _resolve_port("state", input=input, context=context)
+        llm_response = _resolve_port("llm_response", input=input, context=context)
+        tool_calls, delegations, intent = _project_response(llm_response)
+        action_type = _infer_action_type(tool_calls=tool_calls, delegations=delegations)
+        decision_id = new_id("decision")
+        return NodeOutput(
+            port_values={
+                "decision": Decision(
+                    decision_id=decision_id,
+                    action_type=action_type,
+                    rationale=intent,
+                    confidence=1.0,
+                    tool_calls=list(tool_calls),
+                    delegations=list(delegations),
+                    response_text=intent if action_type == "respond" else None,
+                )
+            }
+        )
+
+
+def _resolve_port(
+    name: str, *, input: NodeInput, context: NodeContext
+) -> Any:
+    """Read a declared port from ``input.port_values`` or ``context.runtime``."""
+    value = input.port_values.get(name)
+    if value is None and hasattr(context, "runtime") and context.runtime is not None:
+        value = getattr(context.runtime, name, None)
+        if value is None and hasattr(context.runtime, "get"):
+            value = context.runtime.get(name)
+    if value is None:
+        raise TypeError(
+            f"decision.parse: '{name}' port must be supplied via input.port_values or context.runtime"
+        )
+    return value
 
 
 def _project_response(
@@ -118,11 +159,7 @@ def _infer_action_type(
     tool_calls: list[ToolCall],
     delegations: list[DelegationSpec],
 ) -> str:
-    """Pick the :class:`Decision.action_type` from the parsed payload.
-
-    ``delegate`` is reported as ``delegate``; any native or leaked tool
-    call becomes ``use_tool``; an empty payload is a ``respond``.
-    """
+    """Pick the :class:`Decision.action_type` from the parsed payload."""
     if delegations:
         return "delegate"
     if tool_calls:
@@ -130,4 +167,41 @@ def _infer_action_type(
     return "respond"
 
 
-__all__ = ["decision_parse"]
+@plugin(
+    id="phase.think.decision.parse",
+    Config=None,
+    provides=("phase:think::decision.parse",),
+    requires=(),
+    layer="L2",
+    kind=PluginKind.PRIMITIVE,
+    effects="none",
+    contract=PluginContract(
+        identity=PluginIdentity(version="v1"),
+        architecture=ArchitectureContract(
+            group=FunctionalGroup.G7_EXECUTION,
+            control_slots=(ControlSlot.OBSERVE_WILDCARD,),
+        ),
+        lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
+        authority=AuthorityContract(grants=("plugin.serve",)),
+        observability=EvidenceContract(
+            descriptors=(
+                "phase_think_decision_parse.checked",
+                "phase_think_decision_parse.served",
+            )
+        ),
+    ),
+    ownership=OwnershipDeclaration(
+        reads=("plugin.serve",),
+        emits=("plugin.served",),
+        state_mutation="forbidden",
+    ),
+)
+async def setup(ctx: PluginContext, config=None) -> None:
+    """Composite-key 注册:``{region}::{semantic_name}``。"""
+    del config
+    executor = DecisionParseExecutor()
+    composite_key = f"{executor.region}::{executor.semantic_name}"
+    ctx.provide(composite_key, executor)
+
+
+__all__ = ["DecisionParseExecutor", "setup"]
