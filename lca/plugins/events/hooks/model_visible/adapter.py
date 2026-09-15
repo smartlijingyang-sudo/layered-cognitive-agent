@@ -82,6 +82,7 @@ def _kwargs_for_hook(
     *,
     inner: LLMAdapter,
     prompt: str = "",
+    system: str | None = None,
 ) -> dict[str, Any]:
     out = dict(kwargs)
     history = out.get("history")
@@ -92,7 +93,9 @@ def _kwargs_for_hook(
                 openai_messages_with_history,
             )
 
-            out["messages"] = tuple(openai_messages_with_history(wire_prompt, list(history)))
+            out["messages"] = tuple(
+                openai_messages_with_history(system, wire_prompt, list(history))
+            )
         elif "messages" not in out:
             out["messages"] = tuple(history)
     elif "messages" not in out and "history" in out:
@@ -232,7 +235,12 @@ class ModelVisibleHookAdapter(LLMAdapter):
                 self._hook.capture_pre_llm(
                     run_id=run_id,
                     incarnation=incarnation,
-                    kwargs=_kwargs_for_hook(kwargs, inner=self._inner, prompt=prompt),
+                    kwargs=_kwargs_for_hook(
+                        kwargs,
+                        inner=self._inner,
+                        prompt=prompt,
+                        system=system_text,
+                    ),
                     system_prompt_text=system_text,
                 )
             except Exception as exc:  # INTENTIONAL: L10 + D5 不挡业务
@@ -272,7 +280,12 @@ class ModelVisibleHookAdapter(LLMAdapter):
                 self._hook.capture_pre_llm(
                     run_id=run_id,
                     incarnation=incarnation,
-                    kwargs=_kwargs_for_hook(kwargs, inner=self._inner, prompt=prompt),
+                    kwargs=_kwargs_for_hook(
+                        kwargs,
+                        inner=self._inner,
+                        prompt=prompt,
+                        system=system_text,
+                    ),
                     system_prompt_text=system_text,
                 )
             except Exception as exc:  # INTENTIONAL: L10 + D5 不挡业务
