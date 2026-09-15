@@ -23,7 +23,6 @@ from lca.plugins.events._session_observe import (
     set_session,
 )
 from lca.plugins.events.publishers._session_publish import (
-    current_publish_session,
     reset_publish_session,
     set_publish_session,
 )
@@ -146,7 +145,14 @@ class RunEventSessionBridge:
 
 @dataclass(slots=True)
 class BoundRunEventSession:
-    """Run-local Session binding; disposer owns unbind + store.dispose."""
+    """Run-local Session binding; disposer owns unbind + store.dispose.
+
+    ``writer`` is the PR2 single surface-write seam
+    (:class:`lca.runtime.session.RunSessionWriter`); constructed here and
+    passed to consumers (PromptReasoner, Body, LLM adapter hook, decision
+    parser) via constructor injection. Replaces the dual ContextVar-bound
+    mechanism deleted in Task 3.
+    """
 
     store: Any
     bridge: RunEventSessionBridge
@@ -154,6 +160,7 @@ class BoundRunEventSession:
     run_id: str
     spine_hook_token: Any = None
     persistence_flush_cancel: Any = None
+    writer: Any = None
 
 
 def bind_run_event_session_from_store(
@@ -184,6 +191,9 @@ def bind_run_event_session_from_store(
 
     spine_hook_token = bind_bridge_spine_hook(bridge)
     persistence_flush_cancel = inner.register_flush_listener(SessionPersistenceFlushListener())
+    from lca.runtime.session import RunSessionWriter
+
+    writer = RunSessionWriter(session=inner)
     return BoundRunEventSession(
         store=store,
         bridge=bridge,
@@ -191,6 +201,7 @@ def bind_run_event_session_from_store(
         run_id=run_id,
         spine_hook_token=spine_hook_token,
         persistence_flush_cancel=persistence_flush_cancel,
+        writer=writer,
     )
 
 
@@ -249,8 +260,16 @@ class EventSessionBinder:
 
     @contextlib.contextmanager
     def bound(self, run_id: str) -> Iterator[BoundRunEventSession | None]:
-        """Bind for ``run_id`` if publish slot empty; otherwise yield None."""
-        if current_publish_session() is not None:
+        """Bind for ``run_id`` if publish slot empty; otherwise yield None.
+
+        SPEC section H:_current_publish_session ContextVar 已删除;
+        ``set_publish_session`` 改为 module-level binding,本检查仅在
+        in-process 单 run 场景下正确(不跨 asyncio.Task)。
+        """
+        from lca.plugins.events.publishers._session_publish import (
+            _ACTIVE_SESSION,
+        )
+        if _ACTIVE_SESSION is not None:
             yield None
             return
         bound = bind_run_event_session_from_store(self._store, run_id)

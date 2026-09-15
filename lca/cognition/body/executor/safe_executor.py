@@ -30,7 +30,7 @@ from lca.contracts.models.core.execution.result import ApprovalPendingError, Too
 from lca.contracts.models.team.role.team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.contracts.observability.evidence.evidence import EvidenceRef
 from lca.contracts.protocols import SafeExecutor, Tool
-from lca.infrastructure.session._overflow_0.bindings import await_tool_side_effect_checkpoint
+from lca.infrastructure.session.bindings import await_tool_side_effect_checkpoint
 from lca.infrastructure.tools.tool.invocation_scope import tool_invocation_scope
 
 _log = structlog.get_logger("lca.safe_executor")

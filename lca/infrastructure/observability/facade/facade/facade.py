@@ -181,7 +181,7 @@ def record(event: JournalEvent) -> StampedEvent | None:
     """
     from dataclasses import asdict
 
-    from lca.infrastructure.session._overflow_0.bindings import (
+    from lca.infrastructure.session.bindings import (
         resolve_session_reader,
     )
 

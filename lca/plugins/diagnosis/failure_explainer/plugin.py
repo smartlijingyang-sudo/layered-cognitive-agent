@@ -24,7 +24,7 @@ from lca.contracts.observability.observation import (
     RootCauseStep,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.loop.fact_gateway import append_surface_bound
+from lca.loop.fact_gateway import publish_ep_bound
 
 _EV_EXPLANATION = "diagnosis.failure_explanation"
 _OBSERVER_ACTOR = "diagnosis"
@@ -176,12 +176,10 @@ def observe_explanation(
 ) -> FailureExplanation:
     """Caller-facing wrapper:计算 + emit。"""
     explanation = explain_failure(run_id=run_id, diff=diff, control_traces=control_traces)
-    append_surface_bound(
+    publish_ep_bound(
         _EV_EXPLANATION,
         explanation.model_dump(mode="json"),
         actor=_OBSERVER_ACTOR,
-        surface_op="append",
-        visibility="model",
     )
     return explanation
 

@@ -110,6 +110,7 @@ class _AnthropicMessagesStrategy:
         cleaned = strip_observability_kwargs(kwargs)
         tools = cleaned.pop("tools", None)
         history = cleaned.pop("history", None) or []
+        system = cleaned.pop("system", None)
         model = str(cleaned.pop("model", self._model))
         generation = build_request_generation(
             model=model,
@@ -121,9 +122,7 @@ class _AnthropicMessagesStrategy:
         payload: dict[str, Any] = {
             "model": model,
             "max_tokens": max_tokens,
-            "messages": anthropic_messages_with_history(prompt, history)
-            if history
-            else [{"role": "user", "content": prompt}],
+            "messages": anthropic_messages_with_history(system, prompt, history or None),
         }
         if stream:
             payload["stream"] = True

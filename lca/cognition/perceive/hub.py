@@ -21,7 +21,7 @@ from lca.contracts.models.observability.diagnostic.diagnostic import (
 )
 from lca.contracts.protocols import MemorySystem, PerceiveHub, Sensor
 from lca.contracts.protocols.think.cognition import SensorDisabledError
-from lca.infrastructure.session._overflow_0.bindings import resolve_session_reader
+from lca.infrastructure.session.bindings import resolve_session_reader
 from lca.infrastructure.session.commit.fact_committer import emit_diagnostic
 
 _log = structlog.get_logger("lca.perceive_hub")

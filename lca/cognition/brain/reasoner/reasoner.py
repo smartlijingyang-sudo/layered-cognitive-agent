@@ -204,18 +204,20 @@ class PromptReasoner:
                 "is retired (eng/retire-v1-reasoner-sandbox)."
             )
         effective_tools = _coerce_tools(tools)
-        from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
-            get_current_cursor,
-        )
-        from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
-            CurrentReasonerPrompt,
-            bind_current_reasoner_prompt,
-            reset_current_reasoner_prompt,
-        )
 
-        token: Any = None
+        # spec section H ContextVar deletion: cursor + reasoner_prompt
+        # are passed explicitly via kwargs to ``execute_llm_turn`` →
+        # ``llm.complete(cursor=..., reasoner_prompt=...)``; ModelVisibleHookAdapter
+        # pops them and forwards to the hook.
+        cursor: Any = None
+        reasoner_prompt: Any = None
         if render.trace is not None:
-            cursor = get_current_cursor()
+            from lca.cognition.body.executor.cursor_record import CursorRecord
+            from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
+                CurrentReasonerPrompt,
+            )
+
+            cursor = CursorRecord.get()
             if cursor is None:
                 step_id = f"step-unknown-{render.trace.template_id}"
             else:
@@ -223,15 +225,13 @@ class PromptReasoner:
                     step_id = f"step-{cursor.snapshot.step_index + 1:03d}"
                 except Exception:
                     step_id = f"step-unknown-{render.trace.template_id}"
-            token = bind_current_reasoner_prompt(
-                CurrentReasonerPrompt(
-                    step_id=step_id,
-                    template_id=render.trace.template_id,
-                    selector_decision_path=render.trace.selector_decision_path,
-                    system_prompt_text=render.trace.system_prompt_text,
-                    prompt_trace=render.trace,
-                    context_manifest=render.manifest,
-                )
+            reasoner_prompt = CurrentReasonerPrompt(
+                step_id=step_id,
+                template_id=render.trace.template_id,
+                selector_decision_path=render.trace.selector_decision_path,
+                system_prompt_text=render.trace.system_prompt_text,
+                prompt_trace=render.trace,
+                context_manifest=render.manifest,
             )
         try:
             return await execute_llm_turn(
@@ -241,10 +241,11 @@ class PromptReasoner:
                 step=state.step,
                 state=state,
                 task=state.task or "",
+                cursor=cursor,
+                reasoner_prompt=reasoner_prompt,
             )
         finally:
-            if token is not None:
-                reset_current_reasoner_prompt(token)
+            pass  # explicit DI; no ContextVar reset needed
 
 
 def _empty_state_for_selector() -> AgentState:

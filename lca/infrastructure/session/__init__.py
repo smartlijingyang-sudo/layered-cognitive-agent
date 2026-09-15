@@ -1,7 +1,6 @@
 """Session runtime seams consumed by cognition (model context + checkpoint)."""
 
-from lca.infrastructure.session._overflow_0.bindings import (
-    assemble_model_history,
+from lca.infrastructure.session.bindings import (
     await_model_request_checkpoint,
     await_step_boundary_checkpoint,
     await_tool_side_effect_checkpoint,
@@ -17,8 +16,8 @@ from lca.infrastructure.session.context.model_context_assembler import (
 
 __all__ = [
     "DefaultModelContextAssembler",
-    "assemble_model_history",
     "await_model_request_checkpoint",
+    "await_step_boundary_checkpoint",
     "await_tool_side_effect_checkpoint",
     "current_model_context_assembler",
     "resolve_flushable_session",

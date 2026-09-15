@@ -1,0 +1,168 @@
+"""Run-scoped Session + checkpoint bindings for cognition hot paths."""
+
+from __future__ import annotations
+
+import contextvars
+from collections.abc import Iterator
+from contextlib import contextmanager
+from typing import cast
+
+from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.protocols.session.checkpoint.policy import (
+    FlushableSession,
+    SessionCheckpointPolicyProtocol,
+)
+from lca.contracts.protocols.session.model.context import (
+    ModelContextAssembler,
+    SessionReader,
+)
+from lca.infrastructure.session.context.model_context_assembler import (
+    default_model_context_assembler,
+)
+from lca.plugins.events.publishers._session_publish import _ACTIVE_SESSION
+from lca.session.append import Session
+
+_model_context_assembler: contextvars.ContextVar[ModelContextAssembler | None] = (
+    contextvars.ContextVar("lca_model_context_assembler", default=None)
+)
+_checkpoint_policy_var: contextvars.ContextVar[SessionCheckpointPolicyProtocol | None] = (
+    contextvars.ContextVar("lca_session_checkpoint_policy", default=None)
+)
+_default_checkpoint_policy: SessionCheckpointPolicyProtocol | None = None
+
+
+def resolve_raw_session(target: object | None) -> Session | None:
+    """Unwrap publish seam (bridge / facade) to the in-process :class:`Session`."""
+    if target is None:
+        return None
+    from lca.plugins.session.runtime.bus.facade import SessionBusFacade
+
+    if isinstance(target, Session):
+        return target
+    inner = getattr(target, "inner", None)
+    if isinstance(inner, Session):
+        return inner
+    if isinstance(target, SessionBusFacade):
+        return target.session
+    session = getattr(target, "session", None)
+    if isinstance(session, Session):
+        return session
+    return None
+
+
+def resolve_session_reader() -> SessionReader | None:
+    """Bound publish/observe Session as :class:`SessionReader`, or ``None``.
+
+    SPEC section H:_current_publish_session ContextVar 已删除;本读
+    ``_ACTIVE_SESSION`` module-level state(由 ``set_publish_session`` 设置)。
+    """
+    session = resolve_raw_session(_ACTIVE_SESSION)
+    if session is None:
+        return None
+    return session
+
+
+def resolve_flushable_session() -> FlushableSession | None:
+    """Bound runtime Session for checkpoint ``flush()``, or ``None``."""
+    return resolve_raw_session(_ACTIVE_SESSION)
+
+
+def resolve_session_for_emit(state: AgentState | None = None) -> object | None:
+    """Bound Session writer for cognitive fact emission, or ``None``.
+
+    ``state`` is accepted for call-site symmetry (step metadata lives on
+    state; session binding is now module-level ``_ACTIVE_SESSION``, set by
+    ``set_publish_session`` / run bind boundary).
+    """
+    _ = state
+    writer = _ACTIVE_SESSION
+    resolved = resolve_raw_session(writer)
+    if resolved is not None:
+        return resolved
+    return writer
+
+
+def current_model_context_assembler() -> ModelContextAssembler:
+    assembler = _model_context_assembler.get()
+    if assembler is not None:
+        return assembler
+    return default_model_context_assembler()
+
+
+def _resolve_checkpoint_policy() -> SessionCheckpointPolicyProtocol:
+    policy = _checkpoint_policy_var.get()
+    if policy is not None:
+        return policy
+    global _default_checkpoint_policy
+    if _default_checkpoint_policy is None:
+        from lca.plugins.session.checkpoint_policy.checkpoint_policy import (
+            SessionCheckpointPolicy,
+        )
+
+        _default_checkpoint_policy = cast(
+            "SessionCheckpointPolicyProtocol",
+            SessionCheckpointPolicy(enabled=True),
+        )
+    policy = _default_checkpoint_policy
+    assert policy is not None
+    return policy
+
+
+async def await_model_request_checkpoint() -> None:
+    """DSH ``llm/stream`` boundary; no-op when Session is unbound."""
+    session = resolve_flushable_session()
+    if session is None:
+        return
+    await _resolve_checkpoint_policy().before_model_request(session)
+
+
+async def await_tool_side_effect_checkpoint() -> None:
+    """DSH ``tools/execute`` boundary; no-op when Session is unbound."""
+    session = resolve_flushable_session()
+    if session is None:
+        return
+    await _resolve_checkpoint_policy().before_tool_side_effect(session)
+
+
+async def await_step_boundary_checkpoint() -> None:
+    """DSH ``agent/pre-step`` boundary; no-op when Session is unbound."""
+    session = resolve_flushable_session()
+    if session is None:
+        return
+    await _resolve_checkpoint_policy().at_step_boundary(session)
+
+
+@contextmanager
+def set_model_context_assembler(
+    assembler: ModelContextAssembler | None,
+) -> Iterator[None]:
+    token = _model_context_assembler.set(assembler)
+    try:
+        yield
+    finally:
+        _model_context_assembler.reset(token)
+
+
+@contextmanager
+def set_checkpoint_policy(
+    policy: SessionCheckpointPolicyProtocol | None,
+) -> Iterator[None]:
+    token = _checkpoint_policy_var.set(policy)
+    try:
+        yield
+    finally:
+        _checkpoint_policy_var.reset(token)
+
+
+__all__ = [
+    "await_model_request_checkpoint",
+    "await_step_boundary_checkpoint",
+    "await_tool_side_effect_checkpoint",
+    "current_model_context_assembler",
+    "resolve_flushable_session",
+    "resolve_raw_session",
+    "resolve_session_for_emit",
+    "resolve_session_reader",
+    "set_checkpoint_policy",
+    "set_model_context_assembler",
+]

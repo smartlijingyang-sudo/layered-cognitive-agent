@@ -23,7 +23,7 @@ from lca.contracts.observability.observation import (
     UnexpectedNode,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.loop.fact_gateway import append_surface_bound
+from lca.loop.fact_gateway import publish_ep_bound
 
 _EV_DIFF = "diagnosis.diff_report"
 _OBSERVER_ACTOR = "diagnosis"
@@ -110,12 +110,10 @@ def observe_diff(
 ) -> DiffReport:
     """Caller-facing wrapper:计算 + emit。"""
     report = diff_blueprint_trajectory(run_id=run_id, blueprint=blueprint, node_exits=node_exits)
-    append_surface_bound(
+    publish_ep_bound(
         _EV_DIFF,
         report.model_dump(mode="json"),
         actor=_OBSERVER_ACTOR,
-        surface_op="append",
-        visibility="model",
     )
     return report
 

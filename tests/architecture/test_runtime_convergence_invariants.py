@@ -166,6 +166,7 @@ class TestControlPlaneProtocols:
             src = path.read_text(encoding="utf-8")
             assert "ModelContextAssembler" not in src
             assert "assemble_model_history" not in src
+            assert "RunSessionWriter" not in src
 
     def test_gates_do_not_read_state_history_directly(self) -> None:
         gates_dir = ROOT / "lca/cognition/brain/decision_gates"

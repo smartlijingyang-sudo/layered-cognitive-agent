@@ -27,7 +27,13 @@ from lca_kernel.events.bus.bus import EventBus
 
 @pytest.fixture
 def hook(bound_session: Any) -> Any:
-    """单实例 :class:`ModelVisibleHook` + monkey-patch 的 cursor / prompt providers。"""
+    """单实例 :class:`ModelVisibleHook` + state state (cursor / prompt 显式传入)。
+
+    spec section H: hook 构造不再接 ``cursor_provider`` / ``prompt_ctx_getter``
+    回调;cursor + system_prompt_text 由 caller 在 ``capture_pre_llm`` 调时
+    经 kwargs 显式传入。本 fixture 暴露 ``state['cursor']`` + ``state['prompt']``
+    让 test 用例在每次 ``capture_pre_llm`` 调时读出来当参。
+    """
     from lca.plugins.events.hooks.model_visible.hook import ModelVisibleHook
     from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
         CurrentReasonerPrompt,
@@ -57,17 +63,7 @@ def hook(bound_session: Any) -> Any:
             self._snapshot.step_index += 1
             self._snapshot.step_id = step_id
 
-    def cursor_provider() -> Any:
-        return state["cursor"]
-
-    def prompt_provider() -> Any:
-        return state["prompt"]
-
-    h = ModelVisibleHook(
-        bus=bound_session.bus,
-        cursor_provider=cursor_provider,
-        prompt_ctx_getter=prompt_provider,
-    )
+    h = ModelVisibleHook(bus=bound_session.bus)
 
     def make_prompt(template_id: str, text: str) -> Any:
         return CurrentReasonerPrompt(
@@ -146,7 +142,11 @@ def test_capture_pre_llm_initial_then_change(hook: Any) -> None:
     hook.state["prompt"] = hook.make_prompt("t1", "first")
 
     ref1 = hook.hook.capture_pre_llm(
-        run_id="run-1", step_index=0, incarnation=1, kwargs={"tools": [], "messages": []}
+        run_id="run-1",
+        step_index=0,
+        incarnation=1,
+        kwargs={"tools": [], "messages": []},
+        system_prompt_text=hook.state["prompt"].system_prompt_text,
     )
     assert ref1 is not None
     assert ref1.category == "spine.llm.request.header"
@@ -154,7 +154,11 @@ def test_capture_pre_llm_initial_then_change(hook: Any) -> None:
     # 第二次 prompt 变 → reason=change
     hook.state["prompt"] = hook.make_prompt("t1", "second")
     ref2 = hook.hook.capture_pre_llm(
-        run_id="run-1", step_index=0, incarnation=1, kwargs={"tools": [], "messages": []}
+        run_id="run-1",
+        step_index=0,
+        incarnation=1,
+        kwargs={"tools": [], "messages": []},
+        system_prompt_text=hook.state["prompt"].system_prompt_text,
     )
     assert ref2 is not None
     assert ref2.category == "spine.llm.request.header"
@@ -166,10 +170,22 @@ def test_capture_pre_llm_fold_skips_repeat(hook: Any) -> None:
     hook.state["prompt"] = hook.make_prompt("t1", "stable")
 
     kwargs: dict[str, Any] = {"tools": [], "messages": []}
-    ref1 = hook.hook.capture_pre_llm(run_id="run-1", step_index=0, incarnation=1, kwargs=kwargs)
+    ref1 = hook.hook.capture_pre_llm(
+        run_id="run-1",
+        step_index=0,
+        incarnation=1,
+        kwargs=kwargs,
+        system_prompt_text=hook.state["prompt"].system_prompt_text,
+    )
     assert ref1 is not None
 
-    ref2 = hook.hook.capture_pre_llm(run_id="run-1", step_index=0, incarnation=1, kwargs=kwargs)
+    ref2 = hook.hook.capture_pre_llm(
+        run_id="run-1",
+        step_index=0,
+        incarnation=1,
+        kwargs=kwargs,
+        system_prompt_text=hook.state["prompt"].system_prompt_text,
+    )
     assert ref2 is None, "同 header 应 fold 跳过"
 
 
@@ -194,7 +210,11 @@ def test_capture_pre_llm_advances_cursor_step(hook: Any) -> None:
     hook.state["prompt"] = hook.make_prompt("t1", "sys-a")
 
     ref1 = hook.hook.capture_pre_llm(
-        run_id="run-adv", step_index=0, incarnation=1, kwargs={"tools": [], "messages": []}
+        run_id="run-adv",
+        step_index=0,
+        incarnation=1,
+        kwargs={"tools": [], "messages": []},
+        system_prompt_text=hook.state["prompt"].system_prompt_text,
     )
     assert ref1 is not None
     assert cursor.snapshot.step_index == 1
@@ -207,6 +227,7 @@ def test_capture_pre_llm_advances_cursor_step(hook: Any) -> None:
         step_index=cursor.snapshot.step_index,
         incarnation=1,
         kwargs={"tools": [], "messages": []},
+        system_prompt_text=hook.state["prompt"].system_prompt_text,
     )
     assert ref2 is not None
     assert cursor.snapshot.step_index == 2
@@ -219,21 +240,39 @@ def test_capture_pre_llm_fold_skip_does_not_advance_cursor(hook: Any) -> None:
     hook.state["prompt"] = hook.make_prompt("t1", "stable")
 
     kwargs: dict[str, Any] = {"tools": [], "messages": []}
-    ref1 = hook.hook.capture_pre_llm(run_id="run-skip", step_index=0, incarnation=1, kwargs=kwargs)
+    ref1 = hook.hook.capture_pre_llm(
+        run_id="run-skip",
+        step_index=0,
+        incarnation=1,
+        kwargs=kwargs,
+        system_prompt_text=hook.state["prompt"].system_prompt_text,
+    )
     assert ref1 is not None
     assert hook.state["cursor"].opened_steps == ["step-001"]
 
-    ref2 = hook.hook.capture_pre_llm(run_id="run-skip", step_index=0, incarnation=1, kwargs=kwargs)
+    ref2 = hook.hook.capture_pre_llm(
+        run_id="run-skip",
+        step_index=0,
+        incarnation=1,
+        kwargs=kwargs,
+        system_prompt_text=hook.state["prompt"].system_prompt_text,
+    )
     assert ref2 is None, "同 header 同 step 应 fold 跳过"
     assert hook.state["cursor"].opened_steps == ["step-001"], "fold 跳过不得新开步"
 
 
 def test_capture_pre_llm_transparent_when_prompt_missing(hook: Any) -> None:
-    """prompt 未注入 → 透明降级,不发盘,不抛错。"""
+    """prompt 未注入 → 透明降级,不发盘,不抛错。
+
+    spec section H: hook 现在收 ``system_prompt_text`` 显式 kwarg;
+    ``None`` 仍 publish(空 system 归一为 absent)。
+    """
     hook.state["cursor"] = hook.StubCursor("run-1")
     hook.state["prompt"] = None
 
-    ref = hook.hook.capture_pre_llm(run_id="run-1", step_index=0, incarnation=1, kwargs={})
+    ref = hook.hook.capture_pre_llm(
+        run_id="run-1", step_index=0, incarnation=1, kwargs={}, system_prompt_text=None
+    )
     assert ref is None
 
 
@@ -243,7 +282,13 @@ def test_capture_pre_llm_transparent_when_cursor_missing(hook: Any) -> None:
     hook.state["prompt"] = hook.make_prompt("t1", "x")
 
     # capture_pre_llm 不要求 cursor(由 caller 注入 run_id);prompt 齐全即发
-    ref = hook.hook.capture_pre_llm(run_id="run-1", step_index=0, incarnation=1, kwargs={})
+    ref = hook.hook.capture_pre_llm(
+        run_id="run-1",
+        step_index=0,
+        incarnation=1,
+        kwargs={},
+        system_prompt_text=hook.state["prompt"].system_prompt_text,
+    )
     assert ref is not None
 
 
@@ -297,6 +342,7 @@ def test_capture_pre_llm_narrows_tool_objects(hook: Any, bound_session: Any) -> 
             step_index=0,
             incarnation=1,
             kwargs={"tools": [_Tool()], "messages": []},
+            system_prompt_text=hook.state["prompt"].system_prompt_text,
         )
     finally:
         reset_publish_session(token)
@@ -330,6 +376,7 @@ def test_capture_pre_llm_construction_failure_is_transparent(hook: Any) -> None:
         step_index=0,
         incarnation=1,
         kwargs={"tools": [], "messages": [], "manifest": object()},
+        system_prompt_text=hook.state["prompt"].system_prompt_text,
     )
     assert ref is None
 
@@ -347,7 +394,11 @@ def test_capture_post_llm_emits_assistant_payload(hook: Any) -> None:
     hook.state["prompt"] = hook.make_prompt("t1", "stable")
 
     hook.hook.capture_pre_llm(
-        run_id="run-2", step_index=0, incarnation=1, kwargs={"tools": [], "messages": []}
+        run_id="run-2",
+        step_index=0,
+        incarnation=1,
+        kwargs={"tools": [], "messages": []},
+        system_prompt_text=hook.state["prompt"].system_prompt_text,
     )
 
     class _StubResponse:

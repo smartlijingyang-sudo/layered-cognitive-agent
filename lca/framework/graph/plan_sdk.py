@@ -27,11 +27,11 @@ Core cognition ports:
 - ``decision``              think.classify / think.gate  →  outer interpreter / act phase
 - ``observation``           observation nodes           →  outer interpreter
 - ``reflection``            reflect nodes               →  outer interpreter
-- ``response``              think.reason.complete       →  think.classify
+- ``response``              think.llm.dispatch          →  think.decision.parse
 
 Turn planning ports:
 - ``turn_plan``             think.reason.plan           →  think.reason.render
-- ``turn_render``           think.reason.render         →  think.reason.complete
+- ``turn_render``           think.reason.render         →  think.llm.dispatch
 
 Shortcut and routing ports:
 - ``in_assembled_manifest`` think.shortcut / think.route →  outer loop

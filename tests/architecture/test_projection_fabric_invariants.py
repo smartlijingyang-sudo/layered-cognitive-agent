@@ -15,10 +15,10 @@ def test_cognition_production_has_no_build_tool_history() -> None:
         assert "build_tool_history" not in src, f"{path} still references build_tool_history"
 
 
-def test_executor_uses_assembler_not_derive_messages() -> None:
+def test_executor_uses_run_session_writer_not_shadow_helper() -> None:
     src = EXECUTOR.read_text(encoding="utf-8")
-    assert "assemble_model_history" in src
-    assert "derive_messages" not in src
+    assert "assemble_model_history" not in src
+    assert "RunSessionWriter" in src
 
 
 def test_session_derive_messages_uses_projection_fabric() -> None:

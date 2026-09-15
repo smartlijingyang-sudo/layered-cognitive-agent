@@ -35,6 +35,7 @@ ALLOW_HARNESS_ONLY: frozenset[str] = frozenset(
 
 # lifecycle_emit seam helpers → catalog wire types they produce.
 # Catalog step boundaries may also be emitted from phase_fact_emitter (ADR-0192).
+# message.accepted.v1: retired (PR2 T4) — surface/user_message replaces the wire.
 _LIFECYCLE_SEAM_PRODUCERS: dict[str, tuple[str, ...]] = {
     "turn.started.v1": ("begin_turn",),
     "turn.ended.v1": ("end_turn",),
@@ -43,7 +44,6 @@ _LIFECYCLE_SEAM_PRODUCERS: dict[str, tuple[str, ...]] = {
     "model.requested.v1": ("request_model",),
     "model.completed.v1": ("complete_model",),
     "model.failed.v1": ("fail_model",),
-    "message.accepted.v1": ("accept_user_message",),
     "assistant.responded.v1": ("complete_model",),
     "session.created.v1": ("create_session",),
     "session.checkpoint.v1": ("checkpoint", "emit_approval_pause_from_result"),
@@ -137,7 +137,6 @@ def _is_lifecycle_required(event_type: str) -> bool:
     return event_type in {
         "session.created.v1",
         "session.checkpoint.v1",
-        "message.accepted.v1",
         "assistant.responded.v1",
     }
 

@@ -10,7 +10,7 @@ from typing import Any
 
 from lca.contracts.observability.observation import DecisionTrace
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.loop.fact_gateway import append_surface_bound
+from lca.loop.fact_gateway import publish_ep_bound
 
 _EV_DECISION = "observation.decision"
 _OBSERVER_ACTOR = "observation"
@@ -44,12 +44,10 @@ def observe_decision(
         accepted=accepted,
         occurred_at=_now_iso(),
     )
-    append_surface_bound(
+    publish_ep_bound(
         _EV_DECISION,
         fact.model_dump(mode="json"),
         actor=_OBSERVER_ACTOR,
-        surface_op="append",
-        visibility="model",
     )
 
 

@@ -82,6 +82,7 @@ def _kwargs_for_hook(
     *,
     inner: LLMAdapter,
     prompt: str = "",
+    system: str | None = None,
 ) -> dict[str, Any]:
     out = dict(kwargs)
     history = out.get("history")
@@ -92,7 +93,9 @@ def _kwargs_for_hook(
                 openai_messages_with_history,
             )
 
-            out["messages"] = tuple(openai_messages_with_history(wire_prompt, list(history)))
+            out["messages"] = tuple(
+                openai_messages_with_history(system, wire_prompt, list(history))
+            )
         elif "messages" not in out:
             out["messages"] = tuple(history)
     elif "messages" not in out and "history" in out:
@@ -131,16 +134,33 @@ def _emit_lifecycle_pre(hook: Any, kwargs: dict[str, Any]) -> None:
 
 
 def _emit_lifecycle_post(hook: Any, response: LLMResponse) -> None:
+    from lca.infrastructure.session.bindings import (
+        resolve_session_reader,
+    )
     from lca.infrastructure.session.emit.lifecycle_emit import complete_model
+    from lca.runtime.session.run_session_writer import RunSessionWriter
 
     step = hook._step_counter
+    session = resolve_session_reader()
+    if session is None:
+        return
+    tool_calls = _tool_calls_payload(response)
+    text = response.text or ""
     usage = response.usage if isinstance(response.usage, dict) else None
     complete_model(
         turn=1,
         step=step,
         usage=usage,
-        content=response.text or "",
-        tool_calls=_tool_calls_payload(response),
+        content=text,
+        tool_calls=tool_calls,
+    )
+    RunSessionWriter(session=session).append_assistant_message(
+        turn=1,
+        step=step,
+        role="assistant",
+        content=text or None,
+        tool_calls=tool_calls,
+        usage=None,
     )
 
 
@@ -168,9 +188,10 @@ class ModelVisibleHookAdapter(LLMAdapter):
     def __init__(self, inner: LLMAdapter, hook: ModelVisibleHook) -> None:
         self._inner = inner
         self._hook = hook
-        # hook 自带 cursor_provider(setup 时注入 get_current_cursor);此处复用,
-        # 不再独立存 provider,避免 cursor ContextVar 解析路径分叉。
-        self._cursor_provider = hook._cursor_provider
+        # spec section H ContextVar deletion: cursor + reasoner_prompt no
+        # longer come from a ``_cursor_provider`` callable on the hook.
+        # They are explicit kwargs on the LLM call (``cursor`` + ``reasoner_prompt``),
+        # extracted here before forwarding to ``self._inner.complete``.
 
     @property
     def inner(self) -> LLMAdapter:
@@ -180,9 +201,33 @@ class ModelVisibleHookAdapter(LLMAdapter):
     def hook(self) -> ModelVisibleHook:
         return self._hook
 
+    @staticmethod
+    def _split_model_visible_kwargs(kwargs: dict[str, Any]) -> tuple[Any, Any]:
+        """Pop ``cursor`` + ``reasoner_prompt`` from kwargs for the hook.
+
+        spec section H: caller (reasoner / llm.invoke node) passes the
+        bound ``LoopCursor`` and the current ``CurrentReasonerPrompt`` via
+        kwargs to ``llm.complete(prompt, *, cursor=..., reasoner_prompt=...)``.
+        The adapter pops them before forwarding the rest to the inner LLM
+        (inner LLMs must not see ``cursor`` / ``reasoner_prompt``).
+        """
+        cursor = kwargs.pop("cursor", None)
+        reasoner_prompt = kwargs.pop("reasoner_prompt", None)
+        return cursor, reasoner_prompt
+
+    @staticmethod
+    def _system_text_from_prompt(reasoner_prompt: Any) -> str | None:
+        """Extract ``system_prompt_text`` from a ``CurrentReasonerPrompt``-shaped obj."""
+        if reasoner_prompt is None:
+            return None
+        text = getattr(reasoner_prompt, "system_prompt_text", None)
+        return text if isinstance(text, str) else None
+
     async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:
         # 同一次调用共用入站快照:step 身份在 hook 内部唯一派生 + 锁定。
-        attrs = _snapshot_attrs(self._cursor_provider())
+        cursor, reasoner_prompt = self._split_model_visible_kwargs(kwargs)
+        attrs = _snapshot_attrs(cursor)
+        system_text = self._system_text_from_prompt(reasoner_prompt)
         if attrs is not None:
             run_id, incarnation = attrs
             try:
@@ -190,7 +235,13 @@ class ModelVisibleHookAdapter(LLMAdapter):
                 self._hook.capture_pre_llm(
                     run_id=run_id,
                     incarnation=incarnation,
-                    kwargs=_kwargs_for_hook(kwargs, inner=self._inner, prompt=prompt),
+                    kwargs=_kwargs_for_hook(
+                        kwargs,
+                        inner=self._inner,
+                        prompt=prompt,
+                        system=system_text,
+                    ),
+                    system_prompt_text=system_text,
                 )
             except Exception as exc:  # INTENTIONAL: L10 + D5 不挡业务
                 _log.debug("model_visible_pre_hook_failed: %s", exc)
@@ -219,7 +270,9 @@ class ModelVisibleHookAdapter(LLMAdapter):
 
     async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[LLMStreamEvent]:
         # 与 complete() 同语义:pre/post 共用入站快照。
-        attrs = _snapshot_attrs(self._cursor_provider())
+        cursor, reasoner_prompt = self._split_model_visible_kwargs(kwargs)
+        attrs = _snapshot_attrs(cursor)
+        system_text = self._system_text_from_prompt(reasoner_prompt)
         if attrs is not None:
             run_id, incarnation = attrs
             try:
@@ -227,7 +280,13 @@ class ModelVisibleHookAdapter(LLMAdapter):
                 self._hook.capture_pre_llm(
                     run_id=run_id,
                     incarnation=incarnation,
-                    kwargs=_kwargs_for_hook(kwargs, inner=self._inner, prompt=prompt),
+                    kwargs=_kwargs_for_hook(
+                        kwargs,
+                        inner=self._inner,
+                        prompt=prompt,
+                        system=system_text,
+                    ),
+                    system_prompt_text=system_text,
                 )
             except Exception as exc:  # INTENTIONAL: L10 + D5 不挡业务
                 _log.debug("model_visible_pre_hook_failed: %s", exc)

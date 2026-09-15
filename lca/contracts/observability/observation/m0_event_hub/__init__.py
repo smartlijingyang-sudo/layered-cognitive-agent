@@ -7,7 +7,7 @@
 - 13 个 observer 自身不感知 hub 存在 —— hub 只订阅,不重写 emit 路径。
 
 Producers: observation.event_hub plugin
-Consumers: Session.append 单轨(由 observer 内部 append_surface_bound 触发,hub 不参与)
+Consumers: Session.append 单轨(由 observer 内部 publish_ep_bound 触发,hub 不参与)
 """
 
 from __future__ import annotations

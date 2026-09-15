@@ -1,6 +1,6 @@
 """observation plugin smoke tests —— 每个 plugin 调用 observer 函数不抛错。
 
-不验证 Session 单轨落盘(Session unbound 时 append_surface_bound no-op),
+不验证 Session 单轨落盘(Session unbound 时 publish_ep_bound no-op),
 只验证:
   1. observer 函数可调用
   2. 构造的 fact 通过 Pydantic schema 验证

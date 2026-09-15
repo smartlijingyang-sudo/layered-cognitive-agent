@@ -11,7 +11,7 @@ from lca.contracts.models.core.perceive.perception import ContextManifest
 from lca.contracts.models.core.perceive.projection import PerceiveProjection
 from lca.contracts.models.core.policy.gate_policy import GateDecided
 from lca.contracts.models.core.state.state import AgentState
-from lca.infrastructure.session._overflow_0.bindings import resolve_session_reader
+from lca.infrastructure.session.bindings import resolve_session_reader
 from lca.infrastructure.session.context.turn_control_reader import append_turn_control_fact
 from lca.plugins.events.publishers._session_publish import (
     reset_publish_session,

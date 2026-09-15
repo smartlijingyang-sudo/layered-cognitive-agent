@@ -31,7 +31,6 @@ from lca.contracts.observability.canonical_digest import canonical_digest
 from lca.contracts.observability.journal.run_journal import RunJournalFactory
 from lca.harness.plan import compiled_run_plan_ref
 from lca.harness.profile.boot.products import compiled_plan_from_scope
-from lca.infrastructure.observability.loop_cursor.bind.bind import install_run_cursor
 from lca.infrastructure.observability.loop_cursor.persistence.coordinator import (
     NullPersistenceCoordinator,
 )
@@ -197,7 +196,10 @@ class RunSessionBuilder:
             trace_id=trace_id,
             spine=spine_for_cursor,
         )
-        cursor_token = install_run_cursor(cursor)
+        # spec section H ContextVar deletion: cursor no longer bound via
+        # ``install_run_cursor`` ContextVar;callers (reasoner.complete_turn /
+        # ModelVisibleHookAdapter) receive the cursor via explicit kwargs.
+        cursor_token: Any = None
 
         agent_role = agent.name or agent.agent_id or ""
         strategy_key = request.mode or "solo"

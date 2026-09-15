@@ -1,4 +1,9 @@
-"""Project neutral tool history onto OpenAI / Anthropic request messages."""
+"""Project neutral tool history onto OpenAI / Anthropic request messages.
+
+Spec §G: system prompt goes to ``role=system`` (the first message on
+both OpenAI Chat Completions and Anthropic Messages wire shapes); it is
+never injected as ``role=user``.
+"""
 
 from __future__ import annotations
 
@@ -7,10 +12,19 @@ from typing import Any
 
 
 def openai_messages_with_history(
-    prompt: str, history: list[dict[str, Any]]
+    system: str | None,
+    prompt: str,
+    history: list[dict[str, Any]] | None,
 ) -> list[dict[str, Any]]:
-    messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
-    for item in history:
+    """OpenAI-compatible messages with optional ``role=system`` header.
+
+    ``system`` (when truthy) becomes the first message with ``role=system``.
+    ``history`` items follow, then ``prompt`` becomes the final user turn.
+    """
+    messages: list[dict[str, Any]] = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    for item in history or ():
         role = item.get("role")
         if role == "assistant":
             calls = item.get("tool_calls") or []
@@ -45,14 +59,25 @@ def openai_messages_with_history(
             content = item.get("content")
             if isinstance(content, str) and content.strip():
                 messages.append({"role": "user", "content": content})
+    messages.append({"role": "user", "content": prompt})
     return messages
 
 
 def anthropic_messages_with_history(
-    prompt: str, history: list[dict[str, Any]]
+    system: str | None,
+    prompt: str,
+    history: list[dict[str, Any]] | None,
 ) -> list[dict[str, Any]]:
-    messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
-    for item in history:
+    """Anthropic-compatible messages with optional in-band ``role=system`` header.
+
+    Anthropic's native wire shape uses a top-level ``system`` field, but it
+    also accepts ``role=system`` as the first in-messages entry. Keeping a
+    single wire path with OpenAI: ``system`` lives in messages[0] when set.
+    """
+    messages: list[dict[str, Any]] = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    for item in history or ():
         role = item.get("role")
         if role == "assistant":
             blocks: list[dict[str, Any]] = []
@@ -94,4 +119,5 @@ def anthropic_messages_with_history(
             content = item.get("content")
             if isinstance(content, str) and content.strip():
                 messages.append({"role": "user", "content": content})
+    messages.append({"role": "user", "content": prompt})
     return messages

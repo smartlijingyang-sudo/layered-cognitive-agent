@@ -152,7 +152,7 @@ def make_dispatch_fn(
     description=(
         "Event hub —— fan-out SPINE-shape SessionEvent (phase_graph.node.start/end "
         "+ runtime.reducer.apply) 到对应 observer capability,触发其内部 "
-        "append_surface_bound 单轨 emit。hub 自己不 emit 任何事件。L2 因为 "
+        "publish_ep_bound 单轨 emit。hub 自己不 emit 任何事件。L2 因为 "
         "requires 同层 spine_anomaly 用的 session.store."
     ),
 )

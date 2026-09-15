@@ -9,7 +9,7 @@ per-Turn drivers.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -165,8 +165,10 @@ class CognitiveRuntime(Runtime):
         if ctx and ctx.extra.get(PRIOR_CONVERSATION_WM_KEY):
             state.extra[PRIOR_CONVERSATION_WM_KEY] = ctx.extra[PRIOR_CONVERSATION_WM_KEY]
         self._bindings.require_executable_plan()
+        from lca.infrastructure.session.bindings import (
+            resolve_session_reader,
+        )
         from lca.infrastructure.session.emit.lifecycle_emit import (
-            accept_user_message,
             begin_turn,
             reset_lifecycle,
         )
@@ -177,6 +179,7 @@ class CognitiveRuntime(Runtime):
         # 进程级 singleton —— install 一次覆盖前一个 run 的绑定
         # (若前一个 run 忘记 dispose,这里强制清理)。
         from lca.infrastructure.skills.activation.bridge import bridge as global_bridge
+        from lca.runtime.session.run_session_writer import RunSessionWriter
 
         # 持有 live state 的 closure;``state`` 是 mutable,reducer 内
         # ``extend`` 会改 list 本身 —— 不需要 reassign 引用。
@@ -188,7 +191,13 @@ class CognitiveRuntime(Runtime):
         try:
             reset_lifecycle()
             begin_turn()
-            accept_user_message(message_id=f"task:{trace_id}", content=task)
+            session_reader = resolve_session_reader()
+            if session_reader is not None:
+                RunSessionWriter(session=session_reader).append_user_message(
+                    message_id=f"task:{trace_id}",
+                    role="user",
+                    content=task,
+                )
             await self._lifecycle.publish(RuntimeLifecycleEventType.STARTED, state)
             return await self._run_driver(
                 state, runner=lambda: self._bindings.new_driver().run(state)
@@ -216,8 +225,8 @@ class CognitiveRuntime(Runtime):
             resume_input.input_value,
             resume_input.turn,
         )
-        from lca.infrastructure.session._overflow_0.bindings import resolve_session_reader
-        from lca.infrastructure.session.emit.surface_emit import append_human_answer_surface
+        from lca.infrastructure.session.bindings import resolve_session_reader
+        from lca.runtime.session.run_session_writer import RunSessionWriter
 
         session_reader = resolve_session_reader()
         if session_reader is not None and resume_input.turn is not None:
@@ -225,7 +234,13 @@ class CognitiveRuntime(Runtime):
             if obs is not None and (obs.extra or {}).get("source") == "human_answer":
                 payload = obs.payload
                 if isinstance(payload, str):
-                    append_human_answer_surface(payload)
+                    stripped = payload.strip()
+                    if stripped:
+                        RunSessionWriter(session=session_reader).append_user_message(
+                            message_id=f"human_answer:{obs.observation_id}",
+                            role="human",
+                            content=stripped,
+                        )
 
         phase_cursor = snapshot.phase_cursor
         if phase_cursor is None:
@@ -312,7 +327,7 @@ class CognitiveRuntime(Runtime):
         # Mutable holder so the except branches can update the outcome
         # that the finally block reads when emitting resume.end / finally.
         outcome_holder: dict[str, Outcome] = {"value": "success"}
-        from lca.infrastructure.session._overflow_0.bindings import await_step_boundary_checkpoint
+        from lca.infrastructure.session.bindings import await_step_boundary_checkpoint
 
         await await_step_boundary_checkpoint()
         try:

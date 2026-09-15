@@ -189,6 +189,7 @@ class _ChatCompletionsStrategy:
     def _build_request_kwargs(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         tools = kwargs.pop("tools", None)
         history = kwargs.pop("history", None) or []
+        system = kwargs.pop("system", None)
         model = kwargs.pop("model", self._model)
         generation = build_request_generation(
             model=model,
@@ -197,9 +198,7 @@ class _ChatCompletionsStrategy:
         )
         api_kwargs: dict[str, Any] = {
             "model": model,
-            "messages": openai_messages_with_history(prompt, history)
-            if history
-            else [{"role": "user", "content": prompt}],
+            "messages": openai_messages_with_history(system, prompt, history or None),
             **generation,
         }
         if tools:

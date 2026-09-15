@@ -18,7 +18,7 @@ from lca.contracts.observability.observation import (
     NodeExit,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.loop.fact_gateway import append_surface_bound
+from lca.loop.fact_gateway import publish_ep_bound
 
 _EV_NODE_ENTER = "observation.node_enter"
 _EV_NODE_EXIT = "observation.node_exit"
@@ -53,12 +53,10 @@ def observe_node_enter(
         entered_at=_now_iso(),
         inputs=inputs or {},
     )
-    append_surface_bound(
+    publish_ep_bound(
         _EV_NODE_ENTER,
         fact.model_dump(mode="json"),
         actor=_OBSERVER_ACTOR,
-        surface_op="append",
-        visibility="model",
     )
 
 
@@ -88,12 +86,10 @@ def observe_node_exit(
         exception=exception,
         exited_at=_now_iso(),
     )
-    append_surface_bound(
+    publish_ep_bound(
         _EV_NODE_EXIT,
         fact.model_dump(mode="json"),
         actor=_OBSERVER_ACTOR,
-        surface_op="append",
-        visibility="model",
     )
 
 

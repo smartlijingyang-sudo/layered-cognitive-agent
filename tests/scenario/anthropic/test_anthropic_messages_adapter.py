@@ -232,11 +232,13 @@ class TestAnthropicMessagesAdapter(unittest.IsolatedAsyncioTestCase):
         assert posted is not None
         body = posted.posts[0][1]
         messages = body["messages"]
-        self.assertEqual(messages[0], {"role": "user", "content": "continue"})
-        self.assertEqual(messages[1]["content"][0]["type"], "tool_use")
-        self.assertEqual(messages[1]["content"][0]["id"], "toolu_1")
-        self.assertEqual(messages[2]["content"][0]["type"], "tool_result")
-        self.assertEqual(messages[2]["content"][0]["tool_use_id"], "toolu_1")
+        # Spec §G: history precedes the user prompt so the model sees prior
+        # turns (assistant tool_use + tool result) before the new user turn.
+        self.assertEqual(messages[0]["content"][0]["type"], "tool_use")
+        self.assertEqual(messages[0]["content"][0]["id"], "toolu_1")
+        self.assertEqual(messages[1]["content"][0]["type"], "tool_result")
+        self.assertEqual(messages[1]["content"][0]["tool_use_id"], "toolu_1")
+        self.assertEqual(messages[-1], {"role": "user", "content": "continue"})
 
     async def test_complete_maps_tool_use(self) -> None:
         _FakeAsyncClient.next_payload = {

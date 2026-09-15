@@ -16,7 +16,7 @@ from lca.contracts.harness.memory.events import TurnControlCommitted
 from lca.contracts.models.core.execution.decision import Turn
 from lca.contracts.models.core.state.state import AgentState
 from lca.harness.session.emit import emit
-from lca.infrastructure.session._overflow_0.bindings import resolve_session_reader
+from lca.infrastructure.session.bindings import resolve_session_reader
 from lca.plugins.session.session_turn_control.session_turn_control import TurnControlUnit
 from lca_kernel.events.session.session import SessionEvent, SessionProtocol
 

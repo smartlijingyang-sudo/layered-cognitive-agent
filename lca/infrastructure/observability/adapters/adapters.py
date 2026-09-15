@@ -365,12 +365,14 @@ def _advance_think_fold(*, model: str, ok: bool) -> None:
     """Close the think fold via cursor (SSOT for ``phase.think.fold``).
 
     ADR-0169 P2: cursor is the single writer; ``coord.*`` is forbidden.
-    """
-    from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
-        get_current_cursor,
-    )
 
-    cursor = get_current_cursor()
+    spec section H ContextVar deletion: cursor is sourced from
+    :class:`CursorRecord` (explicit DI) instead of the deleted
+    ``get_current_cursor()`` ContextVar.
+    """
+    from lca.cognition.body.executor.cursor_record import CursorRecord
+
+    cursor = CursorRecord.get()
     if cursor is None:
         return
     cursor.advance(
@@ -387,12 +389,14 @@ def _open_think_step(prompt: str) -> None:
     ADR-0169 P2: ``phase.<x>.fold`` is cursor-derived. objective must
     be the user prompt (kind ``user_text``); model name is recorded at
     fold time, not here.
-    """
-    from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
-        get_current_cursor,
-    )
 
-    cursor = get_current_cursor()
+    spec section H ContextVar deletion: cursor is sourced from
+    :class:`CursorRecord` (explicit DI) instead of the deleted
+    ``get_current_cursor()`` ContextVar.
+    """
+    from lca.cognition.body.executor.cursor_record import CursorRecord
+
+    cursor = CursorRecord.get()
     if cursor is None:
         return
     objective = (prompt or "").strip().replace("\n", " ")

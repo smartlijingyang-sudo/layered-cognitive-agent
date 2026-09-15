@@ -23,7 +23,7 @@ from lca.contracts.observability.observation import (
     ToolCallTrace,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.loop.fact_gateway import append_surface_bound
+from lca.loop.fact_gateway import publish_ep_bound
 
 _EV_REPLAY = "diagnosis.run_replay"
 _OBSERVER_ACTOR = "diagnosis"
@@ -173,12 +173,10 @@ def observe_replay(
         tool_calls=tool_calls,
         llm_calls=llm_calls,
     )
-    append_surface_bound(
+    publish_ep_bound(
         _EV_REPLAY,
         replay.model_dump(mode="json"),
         actor=_OBSERVER_ACTOR,
-        surface_op="append",
-        visibility="model",
     )
     return replay
 
