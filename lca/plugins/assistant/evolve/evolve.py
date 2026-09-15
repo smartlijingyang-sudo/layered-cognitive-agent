@@ -24,7 +24,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Callable, Mapping
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 from typing import Any
 
@@ -146,7 +146,7 @@ class _AssistantEvolveImpl(AssistantEvolve, SkillAcquirer):
     ) -> None:
         self._catalog = catalog
         self._emit_fn = event_emitter
-        self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self._clock = clock or (lambda: datetime.now(UTC))
         self._min_confidence = min_confidence
         self._min_evidence = min_evidence
         self._draft_confidence = draft_confidence
