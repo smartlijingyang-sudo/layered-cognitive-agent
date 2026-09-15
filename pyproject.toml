@@ -1689,13 +1689,15 @@ public_api = [
 schema_version = "1.0.0"
 
 [tool.lca.package_contracts."lca.plugins"]
-responsibility = "lca.plugins: 可装配的行为单元集合。本 README 由脚手架生成，待包负责人补充具体细节。"
-not_responsible_for = "跨层职责（详见 spec §3.4 闭集纪律）"
+responsibility = "lca.plugins: 可装配行为单元（Seam / Provider / Loop Driver 实现），每个插件以 @plugin 自描述并由 bundles/*.yaml 以 id 激活"
+not_responsible_for = "PluginSpec 声明与 Profile 解析（lca/harness/profile）、运行时调度（lca/loop、lca/framework/graph）、事实定义（lca/session）、组合根装配（lca/application）"
 allowed_dependencies = [
     "lca.contracts",
 ]
 forbidden_dependencies = [
     "gateway",
+    "lca.application",
+    "lca.agent",
 ]
 side_effects = [
     "log:emit",
