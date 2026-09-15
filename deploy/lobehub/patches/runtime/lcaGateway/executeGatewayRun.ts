@@ -156,7 +156,6 @@ export async function lcaExecuteGatewayRun(
     context,
     gatewayOperationId: receipt.runId,
     operationId: gatewayOpId,
-    preserveStreamedContentOnTerminal: true,
     runLifecycle: buildRunLifecycle(get, {
       context,
       parentMessageId: assistantMessageId,
