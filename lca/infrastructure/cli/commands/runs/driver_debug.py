@@ -127,7 +127,10 @@ def find_stderr_for_run(run_id: str) -> Path | None:
     for path in candidates:
         try:
             text = Path(path).read_text(encoding="utf-8", errors="replace")
-        except Exception:
+        except OSError:
+            # The candidate list is a glob; a log can be rotated or unreadable
+            # between listing and reading. Anything else is a bug and must not
+            # be absorbed here.
             continue
         if needle_run in text and (needle_trace is None or needle_trace in text):
             return Path(path)
