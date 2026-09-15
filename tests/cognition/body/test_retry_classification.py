@@ -14,8 +14,8 @@ incident can be added once.
 
 from __future__ import annotations
 
-from lca.cognition.body import pipeline_safe_executor as _pipeline_mod
-from lca.cognition.body import safe_executor as _safe_mod
+from lca.cognition.body.executor import pipeline_safe_executor as _pipeline_mod
+from lca.cognition.body.executor import safe_executor as _safe_mod
 from lca.cognition.body.internal._retry_classification import _DETERMINISTIC_EXCEPTIONS
 
 
