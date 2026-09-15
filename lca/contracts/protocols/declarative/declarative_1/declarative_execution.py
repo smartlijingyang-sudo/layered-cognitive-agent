@@ -16,17 +16,15 @@ typed interpretation result and by the runtime bindings.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Protocol, runtime_checkable
 
 from lca.contracts.models.core.policy.stop import StopDecision
-from lca.contracts.models.core.state.state import AgentState, Budget
-from lca.contracts.protocols.act.command.envelope import CommandEnvelope, RunDelta, RunFact
+from lca.contracts.protocols.act.command.envelope import RunFact
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
     DeclarativeValidationError,
 )
-from lca.contracts.protocols.declarative.declarative_1.declarative_graph import EffectPolicyPlan
 
 
 @dataclass(frozen=True, slots=True)
