@@ -11,9 +11,16 @@ The strategy trusts the kernel to enforce schema contracts:
 ``declared_inputs`` from the executor is the single source of truth for
 which ports the executor will read; the strategy does not inspect the
 ``NodeIOSchema`` to recompute it.
+
+Node-level ``emit_on_enter`` / ``emit_on_exit`` declarations under
+``config.config`` (the yaml shape the lifter hands over) are forwarded
+to :func:`lca.loop.emit.node_emitter.emit_for_node` before and after the
+executor call. Driver dispatch is failure-contained so a misconfigured
+EP does not abort the graph (ADR-0240 / Note `2026-09-15-node-emit-dispatcher-wiring`).
 """
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -36,6 +43,7 @@ from lca.framework.graph.strategy_registry import (
     register_strategy,
     resolve_executor,
 )
+from lca.loop.emit.node_emitter import emit_for_node
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,8 +102,20 @@ class NodeExecutorStrategy(NodeStrategy):
                 f"node executor {type(executor).__name__} exposes neither "
                 "node_execute nor execute; cannot dispatch from kernel"
             )
+        # Node-level emit dispatch (ADR-0240): the yaml `emit_on_enter`
+        # list lives at `context.node_config["config"]["emit_on_enter"]`
+        # after the lifter flattens the node dict. Fire each EP via the
+        # dispatcher before invoking the executor. State may be absent
+        # for non-subgraph nodes; the helpers dereference `state.trace_id`
+        # so we skip dispatch when state is None.
+        self._dispatch_node_emits(
+            context.node_config, "emit_on_enter", agent_state
+        )
         legacy_output: LegacyNodeOutput = await executor_call(
             legacy_ctx, legacy_input
+        )
+        self._dispatch_node_emits(
+            context.node_config, "emit_on_exit", agent_state
         )
         # D4 cutover: pass-through only. The legacy NodeOutput carries
         # port_values (typed port store) and an optional next_hint (free-form
@@ -121,6 +141,33 @@ class NodeExecutorStrategy(NodeStrategy):
         if self.node_runtime_view_factory is not None:
             return self.node_runtime_view_factory(agent_state)
         return {}
+
+    @staticmethod
+    def _dispatch_node_emits(
+        node_config: Any, key: str, state: Any
+    ) -> None:
+        """Fire node-level ``emit_on_enter`` / ``emit_on_exit`` entries.
+
+        Reads the list from ``node_config["config"][key]`` (the yaml
+        shape the lifter hands over). Falls back to ``node_config[key]``
+        for hand-built plans. A non-list value is treated as no-op;
+        dispatcher failures are contained with
+        :func:`contextlib.suppress` so a misconfigured EP does not
+        abort the graph (ADR-0240 §Decision).
+        """
+        if not isinstance(node_config, dict):
+            return
+        emits: Any = None
+        inner = node_config.get("config")
+        if isinstance(inner, dict):
+            emits = inner.get(key)
+        if emits is None:
+            emits = node_config.get(key)
+        if not isinstance(emits, (list, tuple)):
+            return
+        for ep_id in emits:
+            with contextlib.suppress(Exception):
+                emit_for_node(ep_id, state)
 
 
 register_strategy(NodeExecutorStrategy())

@@ -112,24 +112,40 @@ class NodeEventEmissionCheck(PlanCheck):
 def _read_emits(node: object, key: str) -> tuple[str, object] | None:
     """Read an emit-list field from a node's ``config`` mapping.
 
+    The lifter sets ``node.config = dict(raw)`` over the whole yaml node
+    mapping, so production declarations nest at ``config["config"][key]``
+    while hand-built plans declare ``config[key]`` directly. Both shapes
+    are probed before the key is treated as absent; a malformed value in
+    either shape still fails loud.
+
     Returns a tagged tuple so the caller can distinguish the three
     relevant shapes without re-running isinstance checks:
 
-    - ``None`` when the key is absent (not declared — neutral).
+    - ``None`` when the key is absent from both shapes (not declared).
     - ``("malformed", value)`` when the key is present but not a
       list/tuple.
     - ``("declared", list)`` when the key is present and well-typed
       (the value is copied into a list so callers can mutate / measure).
+      The top-level shape wins when both are present and well-typed.
     """
     config = getattr(node, "config", None)
     if not isinstance(config, dict):
         return None
-    val = config.get(key)
-    if val is None:
+    present: list[object] = []
+    top = config.get(key)
+    if top is not None:
+        present.append(top)
+    inner = config.get("config")
+    if isinstance(inner, dict):
+        nested = inner.get(key)
+        if nested is not None:
+            present.append(nested)
+    if not present:
         return None
-    if not isinstance(val, (list, tuple)):
-        return ("malformed", val)
-    return ("declared", list(val))
+    for val in present:
+        if not isinstance(val, (list, tuple)):
+            return ("malformed", val)
+    return ("declared", list(present[0]))
 
 
 def _is_empty_or_absent(read: tuple[str, object] | None) -> bool:

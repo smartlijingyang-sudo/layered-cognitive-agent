@@ -1,6 +1,6 @@
 """Tests for :class:`NodeEventEmissionCheck`.
 
-Nine cases cover the decision tree:
+Twelve cases cover the decision tree:
 
 - entry node with non-empty ``emit_on_enter`` → pass
 - entry node with empty ``emit_on_enter`` → reject
@@ -11,6 +11,12 @@ Nine cases cover the decision tree:
 - plain node with empty config → pass (leaf default)
 - malformed ``emit_on_enter`` (string instead of list) → reject
 - subgraph delegate node with no emits → pass (subgraph owns)
+- terminal node with nested ``config.config.emit_on_exit`` → pass
+  (the production yaml shape the lifter hands over)
+- terminal node with top-level ``config.emit_on_exit`` → pass
+  (legacy hand-built shape; proves both paths are probed)
+- malformed nested ``config.config.emit_on_exit`` → reject
+  (type check survives the two-path probe)
 
 Plus structural assertions for ``check_id`` / ``label``.
 
@@ -257,6 +263,73 @@ class TestNodeEventEmissionCheck:
             ),
         )
         assert self.check.run(plan, plan_id="test.plan") is None
+
+    # ------------------------------------------------------------------
+    # Case 10: nested config.config.emit_on_exit (production shape) → pass
+    # ------------------------------------------------------------------
+
+    def test_nested_emit_on_exit_does_not_raise(self) -> None:
+        """The lifter sets ``node.config = dict(raw)``, so yaml nests the
+        declaration under ``config["config"]`` — the check must probe it."""
+        plan = _plan(
+            _executor_node(
+                "a",
+                config={"emit_on_enter": ["plan.start"]},
+                entry=True,
+            ),
+            _executor_node(
+                "commit",
+                config={"config": {"emit_on_exit": ["terminal.commit"]}},
+                terminal=True,
+            ),
+        )
+        assert self.check.run(plan, plan_id="test.plan") is None
+
+    # ------------------------------------------------------------------
+    # Case 11: top-level config.emit_on_exit (legacy shape) → pass
+    # ------------------------------------------------------------------
+
+    def test_top_level_emit_on_exit_does_not_raise(self) -> None:
+        """Hand-built plans declare the key at the top level; that path
+        must keep working so both probes are exercised."""
+        plan = _plan(
+            _executor_node(
+                "a",
+                config={"emit_on_enter": ["plan.start"]},
+                entry=True,
+            ),
+            _executor_node(
+                "commit",
+                config={"emit_on_exit": ["terminal.commit"]},
+                terminal=True,
+            ),
+        )
+        assert self.check.run(plan, plan_id="test.plan") is None
+
+    # ------------------------------------------------------------------
+    # Case 12: malformed nested emit_on_exit → reject
+    # ------------------------------------------------------------------
+
+    def test_malformed_nested_emit_on_exit_raises(self) -> None:
+        """``emit_on_exit: "terminal.commit"`` as a bare string fails loud
+        in the nested shape too — the type check is path-independent."""
+        plan = _plan(
+            _executor_node(
+                "a",
+                config={"emit_on_enter": ["plan.start"]},
+                entry=True,
+            ),
+            _executor_node(
+                "commit",
+                config={"config": {"emit_on_exit": "terminal.commit"}},
+                terminal=True,
+            ),
+        )
+        err = self.check.run(plan, plan_id="test.plan")
+        assert isinstance(err, PlanLiftError)
+        assert err.plan_id == "test.plan"
+        assert err.node_id == "commit"
+        assert "emit_on_exit malformed" in str(err)
 
     # ------------------------------------------------------------------
     # Structural assertions
