@@ -38,6 +38,9 @@ from lca.harness.profile.resolve.resolve import ResolvedProfile
 from lca_kernel.boot.plan_validation.checks.compiled_run_plan import (
     check_compiled_run_plan,
 )
+from lca_kernel.boot.plan_validation.checks.node_executor_coverage import (
+    check_node_executor_coverage,
+)
 from lca_kernel.boot.plan_validation.checks.cycle_port_dependency import (
     CyclePortDependencyCheck,
 )
@@ -104,6 +107,28 @@ def validate_profile_plans(resolved: ResolvedProfile) -> None:
     )
 
     outer_mapping, outer_path = _select_outer_plan(bundles, profile_dir=profile_dir)
+
+    # Node-executor coverage runs pre-lift on the raw bundle mappings
+    # because the lifter discards the ``factory`` field after mapping
+    # it to ``BindingKind.NODE_EXECUTOR`` (see
+    # :func:`lca.framework.graph.lifter._binding_from_factory_or_binding`).
+    # Collect every plan mapping we will validate (outer + every inner
+    # ``sub_spec_ref`` subgraph reachable from the outer) and assert
+    # each ``factory`` resolves to a plugin spec in the resolved
+    # profile. A missing entry is the bug that used to surface as
+    # ``NodeExecutor lookup miss`` mid-run; now it fails boot with a
+    # clear message naming the missing factory.
+    if outer_mapping is not None:
+        coverage_mappings: list[Mapping[str, Any]] = [outer_mapping]
+        for inner_mapping, _inner_id in _subgraph_ref_with_entry(
+            outer_mapping,
+            recurse=True,
+        ):
+            coverage_mappings.append(inner_mapping)
+        failures.extend(
+            check_node_executor_coverage(coverage_mappings, resolved)
+        )
+
     if outer_mapping is None:
         return  # no plan-shaped bundle in this profile
 
