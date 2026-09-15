@@ -31,32 +31,6 @@ log:emit
 模块导入失败 → ImportError；类实例化失败 → TypeError / ValueError；运行时错误以 L1 protocol 中定义的异常类型抛出。
 
 ## 9. 公共入口
-**__init__.py 显式 __all__**:
+包门面导出的名字与模块 __all__ 一一对应（共 6 项）：
 
-- `ActAuthorizeExecutor`
-- `ActBudgetExecutor`
-- `ActConstrainExecutor`
-- `ActExecuteExecutor`
-- `ActSafeBoundaryExecutor`
-- `FocusStopExecutor`
-- `ObserveCheckpointExecutor`
-- `ObserveWildcardExecutor`
-- `PerceiveContextExecutor`
-- `RememberAdmitExecutor`
-- `StopDecideExecutor`
-- `ThinkGuardExecutor`
-
-**模块清单**:
-
-- `lca/plugins/control_contributions/act_authorize.py`
-- `lca/plugins/control_contributions/act_budget.py`
-- `lca/plugins/control_contributions/act_constrain.py`
-- `lca/plugins/control_contributions/act_execute.py`
-- `lca/plugins/control_contributions/act_safe_boundary.py`
-- `lca/plugins/control_contributions/observe_checkpoint.py`
-- `lca/plugins/control_contributions/observe_wildcard.py`
-- `lca/plugins/control_contributions/perceive_context.py`
-- `lca/plugins/control_contributions/remember_admit.py`
-- `lca/plugins/control_contributions/stop_decide.py`
-- `lca/plugins/control_contributions/stop_focus.py`
-- `lca/plugins/control_contributions/think_guard.py`
+`ObserveCheckpointExecutor`, `ObserveWildcardExecutor`, `PerceiveContextExecutor`, `RememberAdmitExecutor`, `ThinkGuardEnforceExecutor`, `ThinkGuardExecutor`
