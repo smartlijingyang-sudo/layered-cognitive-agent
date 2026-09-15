@@ -39,9 +39,46 @@
 `TYPE_CHECKING` 类型标注、在者是运行时注入对象的类型；两者都不 import runtime 的
 实现类，装配由 `application` 完成。
 
-## 禁止依赖
+## 3. 输入
 
-`harness`、`plugins`、`runtime`、`agent`、`application`（见 pyproject package_contracts）
+`AgentState`、`Decision` / `Observation` / `Reflection`、`Budget`、`RoleProfile` /
+`TeamAwareness`、`MemoryRecord` 等 `lca.contracts` 类型；执行路径额外接受注入的
+`RunSessionWriter`、`ToolRegistry`、`SkillPackageStore` 等接缝对象。
+
+## 4. 输出
+
+`__all__` 汇总约 178 个符号，按家族分：`brain/`（Reasoner、Critic、Gate 链、
+prompt 组装）、`body/`（`SimpleBody`、`SafeExecutor`、ActionRegistry）、
+`memory/`（null / layered / team / simple / semantic / temporal / policy）、
+`perceive/`、`sensors/`、`collaboration/`（Blackboard、AgentExecutor）、
+`team/`、`wire/`。认知产出是**值**：Decision / Observation / Reflection /
+`ReasonerTurnPlan`，由 runtime 决定如何落事实。
+
+## 5. 允许依赖
+
+`lca.contracts`（类型与 Protocol）。现状还包含 `lca.infrastructure`（工具与凭据
+适配器）、`lca.loop`（事实接缝）、以及 Body/LLM-turn 执行边界注入用到的
+`lca.runtime.session.run_session_writer` 类型；这些是迁移中的例外，见 §6。
+
+## 6. 禁止依赖
+
+`harness`、`plugins`、`runtime`、`agent`、`application`（`pyproject.toml` 的
+package contracts 与 `lint-imports` 强制；新增反向边会使该门禁失败）。
+
+## 8. 失败语义
+
+抛类型集中在执行与协议边界（按源码 `raise` 频次）：`ToolExecutionError` 19、
+`ValueError` 15、`TypeError` 12、`RuntimeError` 7、`KeyError` 4、
+`MissingPromptSectionError` 3、`RegistryKeyError` 2、`UnregisteredActionError` 1。
+确定性错误（`ValueError` / `TypeError`）不重试；瞬时错误由执行窄门按分类处理
+（AGENTS.md §3 错误分类、C10）。
+
+## 9. 公共入口
+
+`lca.cognition.brain`（Think 管线与 Gate 链）、`lca.cognition.body`（Body 与
+SafeExecutor）、`lca.cognition.memory`（记忆系统实现）。调用方是 runtime /
+plugins，不是另一个认知组件内部。
+
 
 ## Gate 正名
 
