@@ -14,7 +14,6 @@ from lca.contracts.protocols.journal.artifact.closure import ArtifactClosure
 from lca.contracts.protocols.runtime.infra.infra import StateStore
 from lca.contracts.protocols.runtime.runtime.composition import ResultFinalizer
 from lca.contracts.protocols.state.reducer import Reducer
-from lca.framework.graph.interpreter import InterpretationResult
 from lca.runtime.projection.result_projection import TerminalResultProjection
 
 
