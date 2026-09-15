@@ -39,7 +39,7 @@ log:emit
 ## 9. 公共入口
 **__init__.py 显式 __all__**:
 
-- `GatewayHttpClient`
+- `KernelServeHttpClient`
 
 **模块清单**:
 
