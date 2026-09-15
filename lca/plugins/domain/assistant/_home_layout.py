@@ -18,7 +18,7 @@ import hashlib
 import json
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 
 from lca.contracts.observability.canonical_digest import canonical_digest
@@ -324,7 +324,7 @@ def _read_json(path: Path) -> dict[str, object]:
 
 
 def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def count_yaml_in(directory: Path) -> int:
