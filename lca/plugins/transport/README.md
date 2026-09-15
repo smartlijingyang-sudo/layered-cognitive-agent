@@ -2,6 +2,27 @@
 
 > 权威决策：[ADR-0115](../../docs/adr/0115-kernel-transport-boundary.md) · [ADR-0195](../../docs/adr/0195-platform-architecture-convergence.md) · [platform-directory-architecture.md](../../docs/specs/platform-directory-architecture.md)
 
+## 1. 职责
+
+承运层：触发 run、绑定 run scope、把 Session / spine 事实折叠成 wire DTO 返回。
+三个子平面分工固定——`webserver/carrier/` 写路径（触发）、`webserver/read/`
+读路径（折叠）、`webserver/wire/` DTO 适配。
+
+## 2. 不负责
+
+- 认知循环（`lca/loop/`）与事实定义（`lca/session/`）
+- 第二 Runtime：transport 不解释 phase 图、不做状态修复、不写控制面 State
+  （见下文「禁止」）
+
+## 7. 副作用
+
+| 子平面 | 后果 |
+|---|---|
+| carrier | run 未被认知路径关闭时，经 `emit_carrier_run_failed` 向 `Session.append` 追加一条终态事实；已有终态事件时不重复追加 |
+| carrier | 启动 driver 任务；真正的世界副作用仍经 Command / Approval 控制面 |
+| read | `runs/terminal/failure` 创建 `traces/runs/<run_id>/` 并追加 `kernel.log`；live SSE 只订阅 `session.tail` |
+| wire | 无：只做 DTO ↔ contract 转换 |
+
 ## 30 秒：Transport 做什么
 
 Transport **触发 run、绑定 scope、返回 wire DTO**；认知在 `lca/loop/`，事实在 `lca/session/`。
