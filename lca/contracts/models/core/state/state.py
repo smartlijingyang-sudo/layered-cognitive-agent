@@ -17,6 +17,7 @@ from lca.contracts.models.team.team.awareness import TeamAwareness
 
 if TYPE_CHECKING:
     from lca.framework.graph.adapter import PhaseRunCursor
+    from lca.contracts.models.cognition.task import TaskList
 
 
 @dataclass
@@ -127,6 +128,19 @@ class AgentState:
     # 默认 None (plugin 未 wire 时 fail-open);Type 用 TYPE_CHECKING 避免
     # contracts → plugins 反向依赖 (C13 单写矩阵)。
     task_progress_projection: object | None = None
+    # ADR-0228 §Decision 3:plan subgraph SSOT. plan.compose / plan.revise
+    # read this typed field via the ``state`` port and emit a new TaskList;
+    # the reducer is the sole writer (AGENTS.md §3 C4). Empty TaskList is
+    # the canonical "no plan yet" shape — never ``None`` — so consumers
+    # don't fork on shape. ``TaskList`` is imported lazily via
+    # ``TYPE_CHECKING`` (annotation-only) and the factory resolves it at
+    # instance-construction time to avoid a cognition ↔ core cycle
+    # through ``cognition.prompt_assembly``.
+    task_list: "TaskList" = field(  # type: ignore[type-arg]
+        default_factory=lambda: __import__(
+            "lca.contracts.models.cognition.task", fromlist=["TaskList"]
+        ).TaskList()
+    )
 
     def snapshot(self, reason: SnapshotReason = SnapshotReason.PERIODIC) -> StateSnapshot:
         """Append a checkpoint and return its reference."""

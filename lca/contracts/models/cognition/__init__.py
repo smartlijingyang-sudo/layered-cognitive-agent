@@ -25,6 +25,13 @@ from lca.contracts.models.cognition.prompt_assembly import (
     normalize_selector_result,
     templates_from_provider,
 )
+from lca.contracts.models.cognition.task import (
+    Reflection,
+    TaskEntry,
+    TaskId,
+    TaskList,
+    TaskStatus,
+)
 
 __all__ = [
     "BrainPromptCatalog",
@@ -40,6 +47,7 @@ __all__ = [
     "PromptTrace",
     "PureSection",
     "ReasonerTemplateCatalog",
+    "Reflection",
     "SectionKind",
     "SectionManifest",
     "SectionOutput",
@@ -47,6 +55,10 @@ __all__ = [
     "SectionTrace",
     "SelectorDecisionPath",
     "StatefulSection",
+    "TaskEntry",
+    "TaskId",
+    "TaskList",
+    "TaskStatus",
     "normalize_assembler_result",
     "normalize_selector_result",
     "templates_from_provider",

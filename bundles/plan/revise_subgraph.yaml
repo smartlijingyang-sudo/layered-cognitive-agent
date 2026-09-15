@@ -1,0 +1,28 @@
+# bundles/plan/revise_subgraph.yaml — plan 子图纯图描述(PR-3.7.b 仅 revise 半边)
+#
+# ADR-0228 §Decision 3 + §Decision 6: plan is a cross-phase subgraph,
+# not a six-phase primitive. The kernel reads ``state.task_list``
+# (set by the reducer on previous turns) and the reflect-phase
+# ``Reflection`` port; ``plan.revise`` emits a revised ``TaskList``
+# typed port.
+#
+# The companion ``plan.compose`` subgraph lands in the same PR; once
+# both nodes exist, this file is replaced by a single
+# ``plan_subgraph.yaml`` containing compose → revise (or the kernel
+# invokes each node directly from the outer ``phase_main.yaml``
+# topology — both shapes are valid per ADR-0228 §Decision 6).
+
+id: plan.revise.subgraph
+region: region:plan
+purpose: plan 1 节点执行 — replan TaskList based on Reflection
+
+nodes:
+  - id: plan.revise
+    factory: plan.revise
+    inputs: [state, reflection]
+    outputs: [task_list]
+    config:
+
+# terminal: plan.revise 直接回 outer graph(binding_edge=plan.main),
+#           无需显式返回边。reducer 负责把 task_list typed port 折叠回
+#           AgentState.task_list(AGENTS.md §3 C4 单写)。

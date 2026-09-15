@@ -79,6 +79,12 @@ entries:
   name: lca_nodes_plan_compose
   $module: lca.nodes.plan.compose
   config: {}
+# PR-3.7.b: plan.revise sibling node. Reads ``state`` + ``reflection``
+# ports; emits a revised ``TaskList`` typed port (ADR-0228 §Decision 3).
+- id: lca.nodes.plan.revise
+  name: lca_nodes_plan_revise
+  $module: lca.nodes.plan.revise.revise
+  config: {}
 - id: phase.think.gate
   name: phase_think_gate
   $module: lca.nodes.think.gate
@@ -146,9 +152,9 @@ entries:
   name: phase_delegate_fold
   $module: lca.nodes.delegate.fold.fold
   config: {}
-- id: lca.nodes.delegate.await
-  name: lca_nodes_delegate_await
-  $module: lca.nodes.delegate.await.block
+- id: lca.nodes.delegate.compose
+  name: lca_nodes_delegate_compose
+  $module: lca.nodes.delegate.compose.compose
   config: {}
 - id: control.perceive.context
   name: control_perceive_context
