@@ -2,8 +2,17 @@
 
 > ADR-0195 §2.4 Adapter pattern
 
-Maps HTTP/CLI payloads ↔ `lca/contracts` types. No business rules, no I/O beyond
-serialization.
+## 1. 职责
+
+Maps HTTP/CLI payloads ↔ `lca/contracts` types.
+
+## 2. 不负责
+
+No business rules, no routing, no Session/Journal access.
+
+## 7. 副作用
+
+无：只做 DTO ↔ DTO 转换与序列化，不写文件、不发事件、不改状态。wire DTO 的字段约束由 `lca/contracts` 一侧的 Pydantic 模型定义，本包不复制规则。
 
 | Source (legacy) | Target |
 |---|---|
