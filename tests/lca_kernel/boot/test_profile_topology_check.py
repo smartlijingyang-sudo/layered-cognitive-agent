@@ -18,8 +18,6 @@ reachability, terminal policy) are covered by the other
 
 from __future__ import annotations
 
-import pytest
-
 from lca.contracts.protocols.graph.errors import PlanLiftError
 from lca_kernel.boot.plan_validation.checks.profile_topology import (
     check_profile_topology,
