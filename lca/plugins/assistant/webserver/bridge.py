@@ -22,6 +22,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from typing import Any
 
 import structlog
@@ -256,10 +257,11 @@ def _mount_assistant_routes(ctx: PluginContext, app: Any) -> None:
         existing.add(spec.path)
 
         def _dispose(_route: Any = route) -> None:
-            try:
+            # Idempotent teardown (AGENTS.md C9): the route may already have
+            # been removed — by a re-entrant install or by the app discarding
+            # its router — and that is the state the disposer wants anyway.
+            with contextlib.suppress(ValueError):
                 app.router.routes.remove(_route)
-            except ValueError:
-                pass
 
         inner: Any = ctx._runtime()  # type: ignore[attr-defined]
         inner.effect(_dispose, label=f"route:{spec.path}")
