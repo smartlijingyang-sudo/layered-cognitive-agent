@@ -96,7 +96,14 @@ class GateChainStrategy(NodeStrategy):
         )
 
 
-def _empty_chain() -> Sequence[DecisionGate]:
+def _empty_chain() -> Sequence[Any]:
+    """Gates are host-injected ``DecisionGate`` implementations.
+
+    Typed ``Any`` rather than the Protocol: importing
+    ``lca.contracts.protocols.think.cognition`` would pull cognition DTOs
+    across the framework boundary that
+    ``scripts/check_framework_cognition_boundary.py`` guards.
+    """
     return ()
 
 
