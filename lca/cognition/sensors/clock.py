@@ -10,7 +10,7 @@ the Composer (per spec §5.5: 固定组合顺序).
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 
 from lca.contracts.models.core.perceive.perception import ContextItem
 from lca.contracts.models.core.state.state import AgentState
@@ -24,7 +24,7 @@ class ClockSensor(Sensor):
         self._now = now
 
     async def read(self, state: AgentState) -> list[ContextItem]:
-        now = self._now or datetime.now(timezone.utc)
+        now = self._now or datetime.now(UTC)
         return [
             ContextItem(
                 kind="clock",
