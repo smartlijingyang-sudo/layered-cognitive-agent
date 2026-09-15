@@ -78,6 +78,19 @@ def _bindings_from_runtime_plane() -> BindingsView | None:
 _SANDBOX_TOOL_APIS: frozenset[str] = frozenset({"runCommand", "executeCode"})
 
 
+def _filter_solo_creator_tools(items: tuple) -> tuple:
+    """Drop Creator host-CWD primitives — single source of truth in solo mode.
+
+    Delegates to ``filter_solo_tools`` in ``lca.plugins.collaboration.modes.solo``
+    so the dispatch node never owns its own copy of the host-tool allowlist.
+    Adding a new Creator host-CWD tool only requires editing the solo mode
+    module; this dispatch gate picks the change up automatically.
+    """
+    from lca.plugins.collaboration.modes.solo import filter_solo_tools
+
+    return tuple(filter_solo_tools(items))
+
+
 def _tool_api_name(tool: object) -> str:
     name = getattr(tool, "name", "") or ""
     if ":" in name:
@@ -154,14 +167,14 @@ class ToolForkDispatchExecutor:
 
         forked = tools_service.fork_for_run(bindings)
         items = tuple(forked.list_tools())
-        # When the SANDBOX plane is bound, drop Creator host-CWD primitives
-        # (bash/file_write/…) so Solo cannot fall back to host /mnt/data misses.
-        # Mirrors lca.plugins.collaboration.modes.solo.filter_solo_tools.
-        if getattr(bindings, "sandbox", None) is not None:
-            _creator_host = frozenset(
-                {"bash", "file_write", "cordis_control", "profile_apply", "profile_diff"}
-            )
-            items = tuple(tool for tool in items if getattr(tool, "name", "") not in _creator_host)
+        # Drop Creator host-CWD primitives when the active mode is solo —
+        # the solo Adapter (build_solo_agent) applies the same filter to
+        # Agent.tools at composition time; tool_fork.dispatch is the second
+        # gate and must stay in sync. Keyed on ``mode`` (the typed policy
+        # signal carried on BindingsView), NOT on ``sandbox is not None``
+        # — sandbox plane = isolation, not creator/tool visibility policy.
+        if getattr(bindings, "mode", "solo") == "solo":
+            items = _filter_solo_creator_tools(items)
         _assert_sandbox_tools_visible(bindings, items)
         forked_tools = ForkedTools(
             items=items,

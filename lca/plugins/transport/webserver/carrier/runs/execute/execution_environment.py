@@ -197,6 +197,7 @@ class RunExecutionEnvironment:
                         search=require_capability(self._ctx, "search"),
                         skill_store=provider_current(require_capability(self._ctx, "skills")),
                         machine_resolver=self._machine_resolver,
+                        mode=(getattr(session, "mode", "") or "solo").strip() or "solo",
                     )
                 )
                 with (

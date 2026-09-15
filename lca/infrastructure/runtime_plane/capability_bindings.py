@@ -42,6 +42,11 @@ class BindingsViewBuilder:
     The runtime entry point constructs one of these per turn and feeds
     it to ``set_capability_bindings()`` so the graph layer can read
     the typed ``BindingsView`` without touching state.
+
+    ``mode`` carries the run-coordination mode selected for this turn
+    (``"solo"`` / ``"cordis-creator"`` / ``"team"``) so per-run tool-
+    visibility gates can key on policy, not on the sandbox isolation
+    seam.
     """
 
     file_store: object | None = None
@@ -50,6 +55,7 @@ class BindingsViewBuilder:
     machine_resolver: object | None = None
     search: object | None = None
     bindings: object | None = None
+    mode: str = "solo"
 
     def build(self) -> BindingsView:
         """Project the builder onto the typed ``BindingsView`` boundary DTO.
@@ -65,6 +71,7 @@ class BindingsViewBuilder:
             machine_resolver=self.machine_resolver,
             search=self.search,
             bindings=self.bindings,
+            mode=self.mode,
         )
 
 

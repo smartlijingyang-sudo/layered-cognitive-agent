@@ -187,3 +187,108 @@ async def test_module_does_not_import_emit() -> None:
         text = f.read()
     assert "from lca.infrastructure.session.emit" not in text
     assert "from lca.loop.emit" not in text
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Regression: tool-visibility gate keys on `mode`, NOT on `sandbox`.
+# Bug: solo profile binds sandbox by default (via scenario-cordis-creator
+# bundle, web-standard). The old dispatch filtered out creator host-CWD
+# tools whenever sandbox was non-None, so solo runs saw only read-only
+# tools (readFile/listFiles). Fix: key the filter on BindingsView.mode.
+# ──────────────────────────────────────────────────────────────────────
+
+
+_CREATOR_HOST_TOOL_NAMES = (
+    "bash",
+    "file_write",
+    "cordis_control",
+    "profile_apply",
+    "profile_diff",
+)
+
+
+def _all_tools_dict() -> dict[str, _ToolStub]:
+    """Tool table that includes both creator host-CWD primitives and sandbox computer APIs."""
+    return {
+        **{name: _ToolStub(name=name) for name in _CREATOR_HOST_TOOL_NAMES},
+        "runCommand": _ToolStub(name="runCommand"),
+        "executeCode": _ToolStub(name="executeCode"),
+        "listFiles": _ToolStub(name="listFiles"),
+        "readFile": _ToolStub(name="readFile"),
+    }
+
+
+def _bindings_with(mode: str, *, sandbox: bool = False) -> BindingsView:
+    """Build a BindingsView with explicit mode + optional sandbox."""
+    return BindingsView(
+        sandbox=object() if sandbox else None,
+        mode=mode,
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("sandbox", [True, False])
+async def test_solo_mode_drops_creator_host_tools_regardless_of_sandbox(
+    sandbox: bool,
+) -> None:
+    """Solo mode (the default) drops creator host-CWD primitives even with sandbox.
+
+    web-standard defaults: solo mode + sandbox plane bound (onlyboxes).
+    Solo keeps the sandbox computer set (runCommand/executeCode/listFiles).
+    """
+    tools = _ToolsServiceStub(tools=_all_tools_dict())
+    executor = ToolForkDispatchExecutor()
+    bindings = _bindings_with(mode="solo", sandbox=sandbox)
+    result = await executor.node_execute(
+        _ctx(tools),
+        NodeInput(port_values={"bindings": bindings}),
+    )
+    forked: _ToolsServiceStub = result.port_values["forked_tools"].items  # type: ignore[assignment]
+    names = {t.name for t in forked}
+    # Creator host-CWD primitives are dropped.
+    for host in _CREATOR_HOST_TOOL_NAMES:
+        assert host not in names, f"{host!r} should be filtered out in solo mode"
+    # Sandbox computer APIs are kept (sandbox plane is isolation, not a gate).
+    assert "runCommand" in names
+    assert "executeCode" in names
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("sandbox", [True, False])
+async def test_cordis_creator_mode_keeps_creator_host_tools(
+    sandbox: bool,
+) -> None:
+    """Creator mode keeps creator host-CWD primitives — sandbox does not gate them.
+
+    Regression for the solo-filter bug: the old dispatch used
+    ``bindings.sandbox is not None`` as the gate, which dropped creator
+    tools even when the active mode was ``cordis-creator``. After the fix,
+    the gate is ``bindings.mode``; sandbox is only isolation.
+    """
+    tools = _ToolsServiceStub(tools=_all_tools_dict())
+    executor = ToolForkDispatchExecutor()
+    bindings = _bindings_with(mode="cordis-creator", sandbox=sandbox)
+    result = await executor.node_execute(
+        _ctx(tools),
+        NodeInput(port_values={"bindings": bindings}),
+    )
+    forked: _ToolsServiceStub = result.port_values["forked_tools"].items  # type: ignore[assignment]
+    names = {t.name for t in forked}
+    for host in _CREATOR_HOST_TOOL_NAMES:
+        assert host in names, f"{host!r} must be present in cordis-creator mode"
+
+
+@pytest.mark.asyncio
+async def test_team_mode_keeps_creator_host_tools() -> None:
+    """Team mode (non-solo, non-creator) is not gated by the solo filter."""
+    tools = _ToolsServiceStub(tools=_all_tools_dict())
+    executor = ToolForkDispatchExecutor()
+    bindings = _bindings_with(mode="team", sandbox=False)
+    result = await executor.node_execute(
+        _ctx(tools),
+        NodeInput(port_values={"bindings": bindings}),
+    )
+    forked: _ToolsServiceStub = result.port_values["forked_tools"].items  # type: ignore[assignment]
+    names = {t.name for t in forked}
+    for host in _CREATOR_HOST_TOOL_NAMES:
+        assert host in names, f"{host!r} must be present in team mode"

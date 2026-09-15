@@ -102,7 +102,14 @@ class StopPayload(BaseModel):
 
 
 class BindingsView(BaseModel):
-    """Per-run bindings from RuntimePlane; replaces ``AgentState._xxx_ref``."""
+    """Per-run bindings from RuntimePlane; replaces ``AgentState._xxx_ref``.
+
+    ``mode`` carries the run-coordination mode selected for this turn
+    (``"solo"`` / ``"cordis-creator"`` / ``"team"``). It is the typed
+    signal tool-visibility gates must read — sandbox plane ≠ creator
+    mode (sandbox is isolation, mode is policy). See
+    ``lca.nodes.concept.tool_fork.dispatch`` for the consumer.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True, arbitrary_types_allowed=True)
     file_store: object | None = None
@@ -111,6 +118,7 @@ class BindingsView(BaseModel):
     machine_resolver: object | None = None
     search: object | None = None
     bindings: object | None = None
+    mode: str = "solo"
 
 
 class ForkedTools(BaseModel):
