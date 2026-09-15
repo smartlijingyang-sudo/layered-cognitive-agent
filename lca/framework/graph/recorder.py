@@ -9,9 +9,6 @@ The recorder does not own state mutation; it is pure observation.
 """
 from __future__ import annotations
 
-from collections.abc import Iterable
-from typing import Any
-
 from lca.contracts.protocols.graph.visit import VisitRecord
 
 
