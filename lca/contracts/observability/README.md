@@ -37,37 +37,6 @@ log:emit
 模块导入失败 → ImportError；类实例化失败 → TypeError / ValueError；运行时错误以 L1 protocol 中定义的异常类型抛出。
 
 ## 9. 公共入口
-**__init__.py 显式 __all__**:
+包门面导出的名字与模块 __all__ 一一对应（共 17 项）：
 
-- `Classification`
-- `EvidenceIntegrityError`
-- `EvidencePolicy`
-- `EvidenceReceipt`
-- `EvidenceRef`
-- `EvidenceStore`
-- `RetentionClass`
-- `RunLedgerFactory`
-
-**模块清单**:
-
-- `lca/contracts/observability/cli_debug_command.py`
-- `lca/contracts/observability/coding_agent_tools.py`
-- `lca/contracts/observability/cost.py`
-- `lca/contracts/observability/error_codes.py`
-- `lca/contracts/observability/event_descriptor_registry.py`
-- `lca/contracts/observability/event_identity.py`
-- `lca/contracts/observability/evidence.py`
-- `lca/contracts/observability/genai_semantic.py`
-- `lca/contracts/observability/journal_formatter.py`
-- `lca/contracts/observability/journal_store.py`
-- `lca/contracts/observability/ledger.py`
-- `lca/contracts/observability/migrate.py`
-- `lca/contracts/observability/named_registry.py`
-- `lca/contracts/observability/ports.py`
-- `lca/contracts/observability/run_journal.py`
-- `lca/contracts/observability/run_locator.py`
-- `lca/contracts/observability/run_manifest.py`
-- `lca/contracts/observability/session_events.py`
-- `lca/contracts/observability/trace_tool.py`
-- `lca/contracts/observability/v2.py`
-- `lca/contracts/observability/w3c_trace_context.py`
+`Classification`, `DIGEST_PREFIX`, `ErrKind`, `EvidenceIntegrityError`, `EvidencePolicy`, `EvidenceReceipt`, `EvidenceRef`, `EvidenceStore`, `ExceptionRecord`, `Outcome`, `RetentionClass`, `RunLedgerFactory`, `RunLifecycleStatus`, `SourceLocation`, `classify_exception`, `exc_to_record`, `sha256_payload_digest`
