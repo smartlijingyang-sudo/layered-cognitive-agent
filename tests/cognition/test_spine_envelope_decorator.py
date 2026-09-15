@@ -12,6 +12,7 @@ on real ``Critic`` / ``SkillRouter`` boundary points to assert:
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import patch
 
 import pytest
@@ -40,15 +41,13 @@ def test_decorator_emits_start_then_end_on_success() -> None:
             calls.append((ep, str(payload.get("state_id", "")), dict(payload)))
 
         with patch(
-            "lca.infrastructure.session.spine_envelope.publish_ep_bound",
+            "lca.infrastructure.session.commit.spine_envelope.publish_ep_bound",
             side_effect=_capture,
         ):
 
             @with_spine_envelope("test.point", state_id_arg="state")
             async def _fn(state: _State) -> str:
                 return "ok"
-
-            import asyncio
 
             result = asyncio.run(_fn(_State()))
         assert result == "ok"
@@ -76,15 +75,13 @@ def test_decorator_emits_failure_on_exception() -> None:
             calls.append((ep, dict(payload)))
 
         with patch(
-            "lca.infrastructure.session.spine_envelope.publish_ep_bound",
+            "lca.infrastructure.session.commit.spine_envelope.publish_ep_bound",
             side_effect=_capture,
         ):
 
             @with_spine_envelope("boom", state_id_arg="state")
             async def _fn(state: _State) -> str:
                 raise ValueError("kaboom")
-
-            import asyncio
 
             with pytest.raises(ValueError, match="kaboom"):
                 asyncio.run(_fn(_State()))
@@ -102,16 +99,12 @@ def test_decorator_noop_when_session_unbound() -> None:
     class _State:
         trace_id = "trace-3"
 
-    try:
+    @with_spine_envelope("does.not.exist", state_id_arg="state")
+    async def _fn(state: _State) -> int:
+        return 42
 
-        @with_spine_envelope("does.not.exist", state_id_arg="state")
-        async def _fn(state: _State) -> int:
-            return 42
+    assert asyncio.run(_fn(_State())) == 42
 
-        import asyncio
-
-        assert asyncio.run(_fn(_State())) == 42
-    finally:
 
 def test_decorator_preserves_function_metadata() -> None:
     """The decorator must preserve name and docstring via functools.wraps."""
@@ -135,15 +128,13 @@ def test_decorator_routes_via_publish_ep_bound() -> None:
             trace_id = "trace-gateway"
 
         with patch(
-            "lca.infrastructure.session.spine_envelope.publish_ep_bound",
+            "lca.infrastructure.session.commit.spine_envelope.publish_ep_bound",
             wraps=publish_ep_bound,
         ) as publish:
 
             @with_spine_envelope("critic_eval", state_id_arg="state", actor="critic")
             async def _fn(state: _State) -> str:
                 return "ok"
-
-            import asyncio
 
             assert asyncio.run(_fn(_State())) == "ok"
         assert publish.call_count == 2
