@@ -104,13 +104,22 @@ def _node_context(runtime: dict[str, Any] | None = None) -> NodeContext:
 def test_executor_declares_history_derive_semantic_name_in_think_region() -> None:
     """``semantic_name`` must match ``factory: history.derive`` in the bundle.
 
-    ``declared_inputs`` grew from ``(state, writer)`` to ``(state, writer, forked_tools)``
-    when spec §E closed (see ADR-0195 §4 / PR-3.8.borrow-tools-wire). The
-    extra port is optional — see ``test_node_execute_tools_empty_when_forked_tools_missing``.
+    ``declared_inputs`` grew from ``(state, writer)`` to
+    ``(state, writer, forked_tools, response)`` — ``forked_tools`` was
+    added by PR-3.8.borrow-tools-wire (spec §E) and ``response`` was
+    added by the spec §G system-prompt seam fix (run_a0cdcd40d8b9
+    regression). Both ports are optional in the wiring seam — see
+    ``test_node_execute_tools_empty_when_forked_tools_missing`` and
+    ``test_system_empty_when_no_header_no_render_no_role_profile``.
     """
     assert HistoryDeriveExecutor().semantic_name == "history.derive"
     assert HistoryDeriveExecutor().region == "phase:think"
-    assert HistoryDeriveExecutor().declared_inputs == ("state", "writer", "forked_tools")
+    assert HistoryDeriveExecutor().declared_inputs == (
+        "state",
+        "writer",
+        "forked_tools",
+        "response",
+    )
     assert HistoryDeriveExecutor().declared_outputs == ("model_visible_request",)
 
 
@@ -260,3 +269,163 @@ async def test_node_execute_tools_empty_when_forked_tools_missing() -> None:
     request = out.port_values["model_visible_request"]
     assert isinstance(request, ModelVisibleRequest)
     assert request.tools == ()
+
+
+# ── System prompt seam (spec §G + run_a0cdcd40d8b9 regression) ─────────
+#
+# Spec §G mandates the per-run system prompt lands in
+# ``ModelVisibleRequest.system``. The folded header (``EpochHeader.system``)
+# publishes only when ``ModelVisibleHook.capture_pre_llm`` runs *inside*
+# the LLM adapter — too late for ``think.history.assemble`` which prepares
+# the request before ``think.llm.dispatch``. Three fallbacks fill the gap
+# in priority order; each must be exercised.
+
+
+@dataclass
+class _StubSectionTrace:
+    name: str
+
+
+@dataclass
+class _StubPromptTrace:
+    template_id: str = "react_prompt"
+    system_prompt_text: str = ""
+
+
+@dataclass
+class _StubReasonerTurnRender:
+    """Mimics ``ReasonerTurnRender`` — only ``trace.system_prompt_text`` is read."""
+
+    trace: _StubPromptTrace | None = None
+
+
+def _render(system_text: str) -> _StubReasonerTurnRender:
+    return _StubReasonerTurnRender(trace=_StubPromptTrace(system_prompt_text=system_text))
+
+
+async def test_system_falls_back_to_response_trace_when_header_missing() -> None:
+    """``writer.request_header() is None`` ⇒ system sourced from ``response.trace``.
+
+    Per-run Session journals do not yet contain ``spine.llm.request.header``
+    at history.assemble time; the only authoritative source at this seam
+    is the upstream ``ReasonerTurnRender`` already produced by
+    ``think.reason.render`` (one step earlier in the subgraph). Without
+    this fallback the LLM sees ``system=""`` and runs with no identity /
+    rules (run_a0cdcd40d8b9 regression).
+    """
+    executor = HistoryDeriveExecutor()
+    writer = _FakeWriter(messages=[{"role": "user", "content": "hi"}], system=None)
+    out = await executor.node_execute(
+        context=_node_context(),
+        input=NodeInput(
+            port_values={
+                "state": _make_state(),
+                "writer": writer,
+                "response": _render("You are LobeHub 助手."),
+            }
+        ),
+    )
+    request = out.port_values["model_visible_request"]
+    assert request.system == "You are LobeHub 助手."
+
+
+async def test_system_prefers_header_when_folded() -> None:
+    """``header.system`` wins over ``response.trace`` (replay-safe fold path).
+
+    On second turns / replay the Session fold has populated
+    ``EpochHeader.system``; the fold is the SSOT for *reconstructed* runs.
+    The response port only carries the latest render — older turns in
+    the journal replay must keep the historical header even if a newer
+    render is in flight.
+    """
+    executor = HistoryDeriveExecutor()
+    writer = _FakeWriter(messages=[{"role": "user", "content": "hi"}], system="from-fold")
+    out = await executor.node_execute(
+        context=_node_context(),
+        input=NodeInput(
+            port_values={
+                "state": _make_state(),
+                "writer": writer,
+                "response": _render("from-render"),
+            }
+        ),
+    )
+    request = out.port_values["model_visible_request"]
+    assert request.system == "from-fold"
+
+
+async def test_system_role_profile_fallback_when_no_render() -> None:
+    """No header AND no ``response`` port ⇒ compose from ``role_profile``.
+
+    Older runtimes / tests pass only the writer + state; the
+    ``role_profile`` is still available via ``context.runtime`` (it is a
+    boot-time singleton, not a per-turn render). Composing a system
+    prompt from ``role`` / ``goal`` / ``backstory`` ensures the LLM has
+    at least an identity even when the render seam is absent.
+    """
+    from lca.contracts.models.team.role.team import (
+        RoleProfile,
+        ToolPermissionManifest,
+    )
+
+    role_profile = RoleProfile(
+        role="助手",
+        goal="帮助用户完成日常任务",
+        backstory="我是 LobeHub 助手.",
+        tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
+    )
+    executor = HistoryDeriveExecutor()
+    writer = _FakeWriter(messages=[{"role": "user", "content": "hi"}], system=None)
+    out = await executor.node_execute(
+        context=_node_context(runtime={"role_profile": role_profile}),
+        input=NodeInput(port_values={"state": _make_state(), "writer": writer}),
+    )
+    request = out.port_values["model_visible_request"]
+    assert "LobeHub 助手" in request.system
+    assert "帮助用户" in request.system
+
+
+async def test_system_empty_when_no_header_no_render_no_role_profile() -> None:
+    """No source at all ⇒ empty string (existing behavior; no regression)."""
+    executor = HistoryDeriveExecutor()
+    writer = _FakeWriter(messages=[{"role": "user", "content": "hi"}], system=None)
+    out = await executor.node_execute(
+        context=_node_context(),
+        input=NodeInput(port_values={"state": _make_state(), "writer": writer}),
+    )
+    request = out.port_values["model_visible_request"]
+    assert request.system == ""
+
+
+async def test_system_ignores_response_without_trace() -> None:
+    """``response.trace is None`` (render missing registry) ⇒ fall through to role.
+
+    When the Reasoner renders without a section registry the trace is
+    ``None`` and ``system_prompt_text == ""``. We must not propagate an
+    empty string that would clobber a usable ``role_profile`` fallback.
+    """
+    from lca.contracts.models.team.role.team import (
+        RoleProfile,
+        ToolPermissionManifest,
+    )
+
+    role_profile = RoleProfile(
+        role="助手",
+        goal="帮助用户",
+        backstory="我是 LobeHub 助手.",
+        tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
+    )
+    executor = HistoryDeriveExecutor()
+    writer = _FakeWriter(messages=[{"role": "user", "content": "hi"}], system=None)
+    out = await executor.node_execute(
+        context=_node_context(runtime={"role_profile": role_profile}),
+        input=NodeInput(
+            port_values={
+                "state": _make_state(),
+                "writer": writer,
+                "response": _StubReasonerTurnRender(trace=None),
+            }
+        ),
+    )
+    request = out.port_values["model_visible_request"]
+    assert "LobeHub 助手" in request.system

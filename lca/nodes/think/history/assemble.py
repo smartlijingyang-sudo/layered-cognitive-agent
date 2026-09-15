@@ -1,12 +1,26 @@
-"""``think.history.assemble`` graph node (spec §D).
+"""``think.history.assemble`` graph node (spec §D + §G).
 
 Single responsibility: derive the :class:`ModelVisibleRequest` from
-:class:`RunSessionWriter` by orphan-dropping dangling tool/result messages.
+:class:`RunSessionWriter` by orphan-dropping dangling tool/result messages,
+and source the system prompt per spec §G so the LLM has identity / rules.
 
 Mirrors OpenAI Agents SDK's ``drop_orphan_function_calls`` pattern at every
 LLM-call preparation step. The orphan-drop lives on
 :meth:`RunSessionWriter.derive_messages`; this node is the typed-boundary
 adapter that wires the writer into the think subgraph's LLM dispatch port.
+
+System prompt seam (spec §G — fix duplication + ensure LLM has identity):
+
+The folded ``EpochHeader.system`` only becomes non-empty when
+``ModelVisibleHook.capture_pre_llm`` runs *inside* the LLM adapter — too
+late for history.assemble, which prepares the request before
+``think.llm.dispatch``. Three-tier fallback at this seam:
+
+  1. folded header (``writer.request_header().system``) — replay-safe
+  2. live render (``response.trace.system_prompt_text`` from
+     ``think.reason.render`` one node earlier) — fixes the
+     ``system=""`` regression (run_a0cdcd40d8b9)
+  3. ``role_profile`` composition — last-resort for legacy runtimes
 
 Canonical shape: hand-written ``@dataclass(frozen=True, slots=True)`` +
 ``@plugin(...)`` carrier, per ADR-0228 D2.
@@ -75,17 +89,28 @@ def _forked_to_tools(forked: object) -> tuple[dict[str, Any], ...]:
 
 @dataclass(frozen=True, slots=True)
 class HistoryDeriveExecutor:
-    """think.history.assemble 节点:writer + forked_tools → :class:`ModelVisibleRequest`.
+    """think.history.assemble 节点:writer + response + forked_tools → :class:`ModelVisibleRequest`.
 
     Spec §E: history.assemble projects the LLM-visible slice (messages +
     system + tools) from the typed-boundary inputs. ``tools`` comes from
     the upstream ``ForkedTools`` port (ADR-0220 §4 boundary DTO); the
     writer owns the message stream, not the tool schema source.
+
+    Spec §G: ``system`` is sourced via a three-tier fallback
+    (folded header → live render from ``response.trace`` →
+    ``role_profile`` composition). The fallback exists because the
+    folded header publishes during the LLM call itself (too late for
+    this node); see module docstring for details.
     """
 
     semantic_name: str = "history.derive"
     region: str = "phase:think"
-    declared_inputs: tuple[PortName, ...] = ("state", "writer", "forked_tools")
+    declared_inputs: tuple[PortName, ...] = (
+        "state",
+        "writer",
+        "forked_tools",
+        "response",
+    )
     declared_outputs: tuple[PortName, ...] = ("model_visible_request",)
 
     async def node_execute(
@@ -99,7 +124,11 @@ class HistoryDeriveExecutor:
         del state
         messages = writer.derive_messages()
         header = writer.request_header()
-        system = _system_from_header(header)
+        system = _resolve_system(
+            header=header,
+            response=input.port_values.get("response"),
+            runtime=getattr(context, "runtime", None),
+        )
         tools = _forked_to_tools(input.port_values.get("forked_tools"))
         return NodeOutput(
             port_values={
@@ -134,6 +163,103 @@ def _system_from_header(header: Any) -> str:
     if isinstance(system, str):
         return system
     return ""
+
+
+def _system_from_response(response: Any) -> str:
+    """Pull the rendered system prompt from an upstream ``ReasonerTurnRender``.
+
+    ``think.reason.render`` runs one step earlier in the subgraph and
+    emits a typed-boundary :class:`ReasonerTurnRender` whose ``trace``
+    carries the joined ``system_prompt_text``. This is the authoritative
+    per-turn render — spec §G mandates the LLM see the assembled prompt
+    as ``role=system``, never as ``role=user`` and never omitted.
+    """
+    trace = getattr(response, "trace", None)
+    if trace is None:
+        return ""
+    text = getattr(trace, "system_prompt_text", None)
+    return text if isinstance(text, str) else ""
+
+
+def _system_from_role_profile(runtime: Any) -> str:
+    """Compose a minimal system prompt from a :class:`RoleProfile` on the runtime.
+
+    Last-resort fallback when neither the folded header nor the upstream
+    render are available. The Reasoner sections normally assemble richer
+    text; this fallback just stitches the role's identity + goal so the
+    LLM has at least an identity in legacy / minimal-render runs.
+
+    Looks up the profile via either the canonical capability key
+    ``reasoner.role_profile`` (declared in :data:`lca.contracts.capabilities
+    .REASONER_ROLE_PROFILE`) or a plain ``role_profile`` attribute on the
+    runtime namespace — the latter covers tests that bypass the
+    capability registry.
+    """
+    if runtime is None:
+        return ""
+    getter = getattr(runtime, "get", None)
+    profile: Any = None
+    if callable(getter):
+        profile = getter("reasoner.role_profile")
+        if profile is None:
+            profile = getter("role_profile")
+    if profile is None:
+        profile = getattr(runtime, "reasoner", None)
+        if profile is not None:
+            profile = getattr(profile, "role_profile", None)
+    if profile is None:
+        profile = getattr(runtime, "role_profile", None)
+    if profile is None:
+        return ""
+    parts: list[str] = []
+    role = getattr(profile, "role", None)
+    if isinstance(role, str) and role.strip():
+        parts.append(f"你是{role}.")
+    goal = getattr(profile, "goal", None)
+    if isinstance(goal, str) and goal.strip():
+        parts.append(f"目标:{goal}")
+    backstory = getattr(profile, "backstory", None)
+    if isinstance(backstory, str) and backstory.strip():
+        parts.append(backstory)
+    return " ".join(parts)
+
+
+def _resolve_system(
+    *,
+    header: Any,
+    response: Any,
+    runtime: Any,
+) -> str:
+    """Pick the system prompt using spec §G's three-tier fallback.
+
+    Priority (highest wins):
+
+    1. ``writer.request_header().system`` — folded journal state.
+       Replay-safe path: a run reconstructed from ``spine.jsonl`` keeps
+       the historical header even when the live render emits newer text.
+    2. ``response.trace.system_prompt_text`` — the live per-turn render
+       produced by ``think.reason.render`` one node earlier. Fixes
+       run_a0cdcd40d8b9 where ``writer.request_header()`` was ``None``
+       because ``spine.llm.request.header`` had not yet been published
+       (the publish happens *inside* the LLM adapter call, after
+       history.assemble prepares the request).
+    3. ``role_profile``-derived composition — last resort for legacy
+       runtimes / tests that do not pass a render. The rendered
+       section-joined text is the authoritative system prompt; this
+       fallback only ensures the LLM has at least an identity when
+       the render seam is absent.
+
+    Header None / empty / non-string is treated as "no header" so the
+    fallback chain runs even when fold produced a header object with
+    no system field (canonical normalization drops absent strings).
+    """
+    from_header = _system_from_header(header)
+    if from_header:
+        return from_header
+    from_response = _system_from_response(response)
+    if from_response:
+        return from_response
+    return _system_from_role_profile(runtime)
 
 
 @plugin(
