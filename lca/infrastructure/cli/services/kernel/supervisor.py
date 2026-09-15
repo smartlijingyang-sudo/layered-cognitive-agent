@@ -851,10 +851,9 @@ class KernelSupervisor:
         try:
             proc.wait(timeout=deadline)  # type: ignore[attr-defined]
         except (subprocess.TimeoutExpired, AttributeError):
-            try:
+            with contextlib.suppress(OSError, ProcessLookupError):
+                # already dead or reaped: SIGKILL has nothing to signal
                 os.kill(proc.pid, signal.SIGKILL)
-            except (OSError, ProcessLookupError):
-                pass
             with contextlib.suppress(subprocess.TimeoutExpired, AttributeError):
                 proc.wait(timeout=2.0)  # type: ignore[attr-defined]
         self._join_threads(timeout=2.0)
