@@ -115,6 +115,55 @@ nodes:
     declared_inputs: [decision, reflection]
     declared_outputs: [terminal_outcome]
 
+  # PR-3.8.6: act.approve.gate — typed-boundary HITL gate under
+  # region:intervene (sibling subgraph, NOT a 7th phase — ADR-0228 §3).
+  # Reads decision + command ports; emits decision + routing. Routing
+  # next_hint semantics drive the outer edges below:
+  #   - approve_skipped → act.envelope (needs_approval absent/False)
+  #   - approve_interrupt → intervene.interrupt (needs_approval + no cmd)
+  #   - approve_approved → act.envelope (command.kind == "approve")
+  #   - approve_rejected → terminal.commit (reject/redirect/resume-abandon)
+  - id: act.approve.gate
+    factory: act.approve.gate
+    region: phase:intervene
+    # The gate is a pure transform of the ``decision`` port; the
+    # ``command`` port is optional (consumed only on resume re-entry
+    # when the kernel re-projects a persisted Command into the
+    # registry). Outer plan uses ``inputs``/``outputs`` (the leaf
+    # node shape; ``declared_inputs``/``declared_outputs`` only
+    # apply when ``sub_spec_ref`` is present). The executor's own
+    # ``declared_inputs=("decision", "command")`` keeps the typed-
+    # boundary contract intact at the NodeExecutor layer.
+    inputs: [decision]
+    outputs: [decision, routing]
+
+  # PR-3.8.6: intervene.interrupt outer-level wiring stub — the
+  # interrupt subgraph node is reached from act.approve.gate via the
+  # approve_interrupt next_hint. The subgraph itself stays the source
+  # of truth (intervene.interrupt emits the typed Command +
+  # RoutingDecision(should_terminate=True)).
+  - id: intervene.interrupt
+    region: phase:intervene
+    sub_spec_ref:
+      plan_ref: bundles/intervene/interrupt_subgraph.yaml
+      entry_node: intervene.interrupt
+      binding_edge: intervene.interrupt
+    declared_inputs: [decision]
+    declared_outputs: [command, routing]
+
+  # PR-3.8.6: intervene.resume outer-level wiring stub — on resume
+  # the kernel re-projects the persisted Command into the
+  # kernel-wide port registry, then routes back to act.approve.gate
+  # with the command port populated.
+  - id: intervene.resume
+    region: phase:intervene
+    sub_spec_ref:
+      plan_ref: bundles/intervene/resume_subgraph.yaml
+      entry_node: intervene.resume
+      binding_edge: intervene.resume
+    declared_inputs: [command]
+    declared_outputs: [decision]
+
 edges:
   # perceive → think (model-driven continuation).
   - from: perceive.main
@@ -156,8 +205,12 @@ edges:
 
   # act → reflect.main (reflect reads observation/reflection from the
   # kernel-wide port registry; the wiring edge just routes control).
+  # PR-3.8.6: route through act.approve.gate first so the gate can
+  # consult needs_approval (approve_skipped / approve_approved →
+  # reflect.main pass-through; approve_interrupt → intervene.interrupt;
+  # approve_rejected → terminal.commit).
   - from: act.main
-    to: reflect.main
+    to: act.approve.gate
 
   # reflect → remember.
   - from: reflect.main
@@ -166,3 +219,80 @@ edges:
   # remember → terminal.commit (always; commit closes the loop).
   - from: remember.main
     to: terminal.commit
+
+  # PR-3.8.6: act.approve.gate routing edges. The gate emits a
+  # ``RoutingDecision`` whose ``next_hint`` is the discriminated tag:
+  #
+  #   - approve_skipped / approve_approved → reflect.main (gate ran
+  #     after act.main; envelope/dispatch/observe already completed
+  #     inside the act subgraph, so pass-through continues to reflect)
+  #   - approve_interrupt → intervene.interrupt (needs_approval + no
+  #     command yet; pause for the user's typed Command)
+  #   - approve_rejected → terminal.commit (reject / redirect-abandon
+  #     / resume-as-timeout: abort cleanly, never re-enter act)
+  #
+  # Note: the plan informally references ``act.envelope`` / ``act.authorize``
+  # as edge targets — those are inner nodes of ``act.subgraph``. At the
+  # outer level, after act.main completes, the equivalent of "approve →
+  # continue act" is to route to ``reflect.main`` (the next phase after
+  # act). Re-entering ``act.main`` would re-run the act subgraph, which
+  # is wrong. The ideal integration puts the gate INSIDE act.subgraph
+  # (between authorize and envelope), which requires editing
+  # ``bundles/act/act_subgraph.yaml`` — outside this PR's edit scope
+  # per the file-modification constraint.
+  - from: act.approve.gate
+    to: intervene.interrupt
+    when:
+      kind: eq
+      port: { name: routing, field: next_hint }
+      value: approve_interrupt
+
+  - from: act.approve.gate
+    to: terminal.commit
+    when:
+      kind: eq
+      port: { name: routing, field: next_hint }
+      value: approve_rejected
+
+  - from: act.approve.gate
+    to: reflect.main
+    when:
+      kind: in
+      port: { name: routing, field: next_hint }
+      value: [approve_skipped, approve_approved]
+
+  # PR-3.8.6: resume edge — intervene.resume re-feeds the journal-
+  # persisted Command as a typed Decision port, then the kernel re-
+  # enters the gate so the Command is consulted on resume.
+  #
+  # Predicate note: the plan specifies ``kind: exists, port: { name:
+  # command }`` but ``intervene.resume``'s declared outputs are
+  # ``[decision]`` (the Command is consumed to produce the Decision;
+  # it is not re-emitted). At the outer level predicates are validated
+  # against the source node's declared outputs, so a ``command``
+  # predicate fails lift. The resume edge therefore fires
+  # unconditionally — the kernel re-projects the persisted Command
+  # into the registry before re-entering the gate, and the gate's
+  # internal logic reads ``command`` from its inputs.
+  #
+  # NOTE (architectural gap, see task-6-report §Concerns): the plan
+  # also specifies an ``act.authorize → act.approve.gate`` entry edge.
+  # ``act.authorize`` is an inner node of ``act.subgraph`` (out of
+  # this PR's edit scope per the file-modification constraint), so
+  # that wiring belongs inside ``act_subgraph.yaml``. At the outer
+  # level, the gate is reached via this resume edge only; the
+  # pass-through from ``act.main`` requires act_subgraph to route
+  # ``act.authorize → act.approve.gate → act.envelope`` (a follow-up
+  # to this PR).
+  - from: intervene.resume
+    to: act.approve.gate
+    when: true
+
+  # PR-3.8.6: on resume the kernel re-projects the persisted Command
+  # and re-enters via intervene.resume (which consumes command →
+  # emits decision). This edge makes intervene.resume reachable from
+  # intervene.interrupt (the pause point) so the resume cycle is a
+  # closed loop at the outer level.
+  - from: intervene.interrupt
+    to: intervene.resume
+    when: true
