@@ -28,11 +28,11 @@ think
   → stop
 ```
 
-声明式运行路径由 [`CognitiveRuntime`](../../lca/runtime/runtime_loop.py) 绑定 `CompiledRunPlan`、phase executors、effect handler registry 和 delta handler registry，然后交给 [`DeclarativeRuntimeDriver`](../../lca/runtime/declarative_runtime.py)。通用解释器位于 [`GenericPlanInterpreter`](../../lca/harness/declarative/interpreter.py)。
+声明式运行路径由 [`CognitiveRuntime`](../../lca/runtime/loop/runtime_loop.py) 绑定 `CompiledRunPlan`、phase executors、effect handler registry 和 delta handler registry，然后交给 [`DeclarativeRuntimeDriver`](../../lca/loop/driver.py)。通用解释器位于 [`PlanInterpreter`](../../lca/framework/graph/interpreter.py)。
 
 ## 3. SafeExecutor 的错误分型
 
-[`SimpleSafeExecutor`](../../lca/cognition/body/safe_executor.py) 的执行顺序是权限检查、参数校验、`ToolStarted`、缓存检查、局部重试、`ToolInvoked`。默认 [`RetryPolicy`](../../lca/contracts/models/team/role_team.py) 允许最多三次重试，并使用指数退避。
+[`SimpleSafeExecutor`](../../lca/cognition/body/executor/safe_executor.py) 的执行顺序是权限检查、参数校验、`ToolStarted`、缓存检查、局部重试、`ToolInvoked`。默认 [`RetryPolicy`](../../lca/contracts/models/team/role_team.py) 允许最多三次重试，并使用指数退避。
 
 | 错误类型 | `failure_kind` | SafeExecutor 行为 | Agent 是否重新思考 |
 |---|---|---|---|
@@ -57,7 +57,7 @@ for attempt in range(retry_policy.max_retries + 1):
 
 ## 4. Journal 记录边界
 
-工具事件由 [`tool_journal_emit.py`](../../lca/cognition/body/tool_journal_emit.py) 统一发射。一次完整的工具动作至少有以下事实：
+工具事件由 [`tool_journal.py`](../../lca/cognition/body/emit/tool_journal.py) 统一发射。一次完整的工具动作至少有以下事实：
 
 | 事件 | 时机 | 关键字段 |
 |---|---|---|
@@ -65,9 +65,9 @@ for attempt in range(retry_policy.max_retries + 1):
 | `ToolStarted` | 进入实际执行前 | `tool_name`、`invocation_id`、参数摘要 |
 | `ToolInvoked` | 最终执行结果确定后 | `ok`、`attempt`、`error`、`latency_ms`、`invocation_id` |
 
-`ToolInvoked.attempt` 表示同一次 SafeExecutor 调用最终使用的尝试次数；`ok=false` 和 `error` 表示最终失败。工具事件模型见 [`journal.py`](../../lca/contracts/models/observability/journal.py)。
+`ToolInvoked.attempt` 表示同一次 SafeExecutor 调用最终使用的尝试次数；`ok=false` 和 `error` 表示最终失败。工具事件模型见 [`journal.py`](../../lca/contracts/models/observability/journal/journal.py)。
 
-声明式解释器还会通过 [`RuntimeJournalCommitter`](../../lca/runtime/declarative_runtime.py) 记录 `phase.result` 和 `effect.receipt`，并携带 `plan_ref`、`node_ref` 和 operation。工具 Journal 事实回答“工具发生了什么”，phase 事实回答“执行图走到了哪里”。两者不能互相替代。
+声明式解释器还会通过 [`RuntimeJournalCommitter`](../../lca/loop/driver.py) 记录 `phase.result` 和 `effect.receipt`，并携带 `plan_ref`、`node_ref` 和 operation。工具 Journal 事实回答“工具发生了什么”，phase 事实回答“执行图走到了哪里”。两者不能互相替代。
 
 ## 5. 失败如何进入 Reflect
 
@@ -147,7 +147,7 @@ effectful 操作使用幂等键：
 plan_ref + node_ref + decision_id
 ```
 
-[`RuntimeIdempotencyStore`](../../lca/runtime/declarative_runtime.py) 的状态语义如下：
+[`RuntimeIdempotencyStore`](../../lca/loop/driver.py) 的状态语义如下：
 
 | claim 状态 | 语义 | 处理 |
 |---|---|---|
@@ -161,7 +161,7 @@ Handler 成功返回后，网关保存统一 receipt；Handler 抛出异常时�
 
 ## 9. 失败结果的统一上层语义
 
-`GenericPlanInterpreter` 将运行结果收敛为 `DeclarativeRunOutcome`：
+`PlanInterpreter` 将运行结果收敛为 `DeclarativeRunOutcome`：
 
 ```text
 completed
@@ -187,9 +187,9 @@ effect_uncertain
 
 ## 参考
 
-- [`runtime_loop.py`](../../lca/runtime/runtime_loop.py)
-- [`declarative_runtime.py`](../../lca/runtime/declarative_runtime.py)
+- [`runtime_loop.py`](../../lca/runtime/loop/runtime_loop.py)
+- [`driver.py`](../../lca/loop/driver.py)
 - [`interpreter.py`](../../lca/harness/declarative/interpreter.py)
-- [`safe_executor.py`](../../lca/cognition/body/safe_executor.py)
-- [`tool_journal_emit.py`](../../lca/cognition/body/tool_journal_emit.py)
+- [`safe_executor.py`](../../lca/cognition/body/executor/safe_executor.py)
+- [`tool_journal.py`](../../lca/cognition/body/emit/tool_journal.py)
 - [`declarative-phase-graph.yaml`](../../bundles/declarative-phase-graph.yaml)
