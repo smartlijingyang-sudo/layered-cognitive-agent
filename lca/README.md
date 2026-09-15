@@ -7,6 +7,29 @@
 
 LCA 是**插件化认知 Agent 框架**：Profile 编译成图，Graph 驱动 Loop，Loop 追加 Session 事实，Cognition 只算不写。
 
+## 1. 职责
+
+LCA 是**插件化认知 Agent 框架**：Profile 编译成图，Graph 驱动 Loop，Loop 追加
+Session 事实，Cognition 只算不写。本包按单向依赖层组织
+（`contracts → infrastructure → cognition → runtime → agent`，`application` 为组合根，
+`harness` 承载 Session/Profile/Boot 与声明式阶段，`plugins` 提供 Seam/Provider/
+Loop Driver，transport plugin 独立于认知与运行层）。
+
+## 2. 不负责
+
+- G0 启动与事件 yaml SSOT：那是与 `lca` 平级的 `lca_kernel/`，下层不得 import 其内部
+- 具体 provider 实现的业务语义：各层 README 自述职责与副作用，本文件只给地图
+- 前端与沙箱连接器（`lobehub-ui/`、daemon）
+
+## 7. 副作用
+
+包级**无**：`import lca` 与 `lca/__init__.py` 不打开文件、不建连接、不写状态；
+它只重导出 `contracts` 值类型，并按需解析 `Agent` / `Team` 门面。
+真实的对外后果逐层记录在各包 README 的 §7：`lca/loop`（经 `Session.append` 落事实）、
+`lca/session`（append-only 日志 + observer contained）、
+`lca/infrastructure/observability`（sink 落盘、exporter 外发）、
+`lca/plugins/transport`（carrier 追加终态事实、read 写诊断文件）。
+
 ## 顶层包地图
 
 ```text
