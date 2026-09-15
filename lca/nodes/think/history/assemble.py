@@ -15,7 +15,7 @@ Canonical shape: hand-written ``@dataclass(frozen=True, slots=True)`` +
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -28,6 +28,8 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
+from lca.contracts.models.cognition.boundary import ForkedTools
+from lca.contracts.protocols import Tool
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -40,20 +42,50 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 from lca.contracts.protocols.session.model.context import ModelVisibleRequest
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
-if TYPE_CHECKING:
-    from lca.contracts.models.core.state.state import AgentState
-    from lca.contracts.protocols.session.run_session_writer import (
-        RunSessionWriterProtocol,
-    )
+
+def _tool_to_spec(tool: Tool) -> dict[str, Any]:
+    """Serialize one Tool Protocol instance to OpenAI function-calling tool spec.
+
+    Mirrors ``lca.infrastructure.llm_adapter.openai_compat.chat._chat_completions.to_openai_chat_tool_spec``
+    — kept local to avoid an infrastructure → cognition import (lca/nodes/
+    lives in L2 cognition per ADR-0220). The chat-completions adapter
+    detects the dict shape at the wire boundary (see PR-3.8.borrow-tools-wire)
+    so passing the wire-ready dict here is safe.
+    """
+    return {
+        "type": "function",
+        "function": {
+            "name": tool.name,
+            "description": tool.description,
+            "parameters": tool.parameters,
+        },
+    }
+
+
+def _forked_to_tools(forked: object) -> tuple[dict[str, Any], ...]:
+    """Project ``ForkedTools.items`` into wire-ready tool specs.
+
+    Tolerates a missing or non-ForkedTools port: returns ``()`` so the
+    LLM call still works for runs without tools (tests, no-tool agents).
+    """
+    if not isinstance(forked, ForkedTools) or not forked.items:
+        return ()
+    return tuple(_tool_to_spec(tool) for tool in forked.items)
 
 
 @dataclass(frozen=True, slots=True)
 class HistoryDeriveExecutor:
-    """think.history.assemble 节点:writer → :class:`ModelVisibleRequest`."""
+    """think.history.assemble 节点:writer + forked_tools → :class:`ModelVisibleRequest`.
+
+    Spec §E: history.assemble projects the LLM-visible slice (messages +
+    system + tools) from the typed-boundary inputs. ``tools`` comes from
+    the upstream ``ForkedTools`` (ADR-0220 §4 boundary DTO), NOT from
+    ``writer.tools()`` — that seam stayed a stub.
+    """
 
     semantic_name: str = "history.derive"
     region: str = "phase:think"
-    declared_inputs: tuple[PortName, ...] = ("state", "writer")
+    declared_inputs: tuple[PortName, ...] = ("state", "writer", "forked_tools")
     declared_outputs: tuple[PortName, ...] = ("model_visible_request",)
 
     async def node_execute(
@@ -68,17 +100,17 @@ class HistoryDeriveExecutor:
         messages = writer.derive_messages()
         header = writer.request_header()
         system = _system_from_header(header)
-        tools: tuple[dict[str, Any], ...] = ()
+        tools = _forked_to_tools(input.port_values.get("forked_tools"))
         return NodeOutput(
-            port_values={"model_visible_request": ModelVisibleRequest(
-                messages=messages, system=system, tools=tools
-            )}
+            port_values={
+                "model_visible_request": ModelVisibleRequest(
+                    messages=messages, system=system, tools=tools
+                )
+            }
         )
 
 
-def _resolve_port(
-    name: str, *, input: NodeInput, context: NodeContext
-) -> Any:
+def _resolve_port(name: str, *, input: NodeInput, context: NodeContext) -> Any:
     """Read a declared port from ``input.port_values`` or ``context.runtime``."""
     value = input.port_values.get(name)
     if value is None and hasattr(context, "runtime") and context.runtime is not None:

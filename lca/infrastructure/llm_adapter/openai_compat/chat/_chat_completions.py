@@ -21,8 +21,19 @@ from lca.infrastructure.llm_adapter.openai_compat.shared._shared import (
 )
 
 
-def to_openai_chat_tool_spec(tool: Tool) -> dict[str, Any]:
-    """将 Tool 协议实例转换为 Chat Completions function-calling tool spec。"""
+def to_openai_chat_tool_spec(tool: Tool | dict[str, Any]) -> dict[str, Any]:
+    """Serialize Tool Protocol instance (or pre-shaped dict) to wire format.
+
+    Accepts both shapes for boundary tolerance:
+    - ``Tool`` Protocol instance → serialize via name/description/parameters
+    - pre-shaped ``dict`` (already in OpenAI wire format) → pass through
+
+    The dict path lets ``ModelVisibleRequest.tools`` carry wire-ready specs
+    (its declared type is ``tuple[dict, ...]`` per ADR-0191 Wave A1); the
+    Tool path keeps the typed-boundary contract when callers pass instances.
+    """
+    if isinstance(tool, dict):
+        return tool
     return {
         "type": "function",
         "function": {

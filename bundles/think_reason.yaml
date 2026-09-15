@@ -3,6 +3,11 @@
 # fork_tools first (materialize Sandbox computer tools), then
 # plan → render. The LLM call moved to think.llm.dispatch (spec §E)
 # in Task 3; think.reason.complete is deleted in the same change.
+#
+# PR-3.8.borrow-tools-wire: think.reason subgraph surface now exposes
+# ``forked_tools`` (was: hidden inside the inner plan). The downstream
+# think.history.assemble reads it as a typed-boundary input so the LLM
+# sees per-run tool schemas — closes spec §E.
 
 id: think.reason.subgraph
 region: phase:think

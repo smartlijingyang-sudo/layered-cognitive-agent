@@ -56,7 +56,22 @@ def anthropic_messages_url(base_url: str) -> str:
     return f"{root}/v1/messages"
 
 
-def to_anthropic_tool_spec(tool: Tool) -> dict[str, Any]:
+def to_anthropic_tool_spec(tool: Tool | dict[str, Any]) -> dict[str, Any]:
+    """Serialize Tool Protocol instance (or pre-shaped dict) to Anthropic wire.
+
+    Accepts both shapes for boundary tolerance (PR-3.8.borrow-tools-wire):
+    - ``Tool`` Protocol instance → serialize to Anthropic wire format
+    - pre-shaped ``dict`` (OpenAI wire format with ``function.{name,
+      description, parameters}``) → unpack to Anthropic flat shape
+    """
+    if isinstance(tool, dict):
+        function = tool.get("function", tool)
+        schema = function.get("parameters") or {"type": "object"}
+        return {
+            "name": function.get("name", ""),
+            "description": function.get("description", ""),
+            "input_schema": schema if isinstance(schema, dict) else {"type": "object"},
+        }
     schema = tool.parameters if isinstance(tool.parameters, dict) else {"type": "object"}
     return {
         "name": tool.name,

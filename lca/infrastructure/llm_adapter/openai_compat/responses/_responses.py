@@ -25,8 +25,15 @@ _RESPONSE_FUNCTION_ARGS_DELTA = "response.function_call_arguments.delta"
 _RESPONSE_COMPLETED = "response.completed"
 
 
-def to_openai_responses_tool_spec(tool: Tool) -> dict[str, Any]:
-    """将 Tool 协议实例转换为 Responses API 扁平 tool spec。"""
+def to_openai_responses_tool_spec(tool: Tool | dict[str, Any]) -> dict[str, Any]:
+    """Serialize Tool Protocol instance (or pre-shaped dict) to wire format.
+
+    Accepts both shapes for boundary tolerance (PR-3.8.borrow-tools-wire):
+    - ``Tool`` Protocol instance → serialize via name/description/parameters
+    - pre-shaped ``dict`` (already in OpenAI Responses wire format) → pass through
+    """
+    if isinstance(tool, dict):
+        return tool
     return {
         "type": "function",
         "name": tool.name,

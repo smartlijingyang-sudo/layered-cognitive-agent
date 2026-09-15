@@ -28,7 +28,10 @@ nodes:
   - id: think.reason
     factory: think.reason
     inputs: [in_assembled_manifest]
-    outputs: [response]
+    # PR-3.8.borrow-tools-wire: ``forked_tools`` now exposed on the
+    # subgraph surface so think.history.assemble can read it as a typed
+    # boundary input (spec §E). Previously hidden inside the inner plan.
+    outputs: [response, forked_tools]
     config:
       sub_spec_ref:
         plan_ref: bundles/think_reason.yaml
@@ -39,7 +42,7 @@ nodes:
 
   - id: think.history.assemble
     factory: think.history.assemble.ref
-    inputs: [response, state]
+    inputs: [response, state, forked_tools]
     outputs: [model_visible_request]
     config:
       emit_on_enter: []

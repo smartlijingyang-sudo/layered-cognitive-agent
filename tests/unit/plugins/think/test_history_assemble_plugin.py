@@ -19,6 +19,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from lca.contracts.models.cognition.boundary import ForkedTools
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
@@ -27,6 +28,36 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
 from lca.contracts.protocols.session.model.context import ModelVisibleRequest
 from lca.nodes.think.history import assemble as history_module
 from lca.nodes.think.history.assemble import HistoryDeriveExecutor
+
+# ── Minimal tool stub (Tool is runtime_checkable Protocol + Pydantic is_instance) ──
+
+
+def _make_stub_tool(name: str) -> type:
+    """Build a Tool Protocol-conforming class with ClassVars + async execute.
+
+    Tool Protocol declares ``name/description/parameters`` as ClassVar;
+    Pydantic ``is_instance_of`` checks Protocol via ``isinstance`` which
+    honors ClassVar as class attributes. Instance attributes are NOT seen.
+    """
+
+    async def _execute(self, args):  # pragma: no cover - stub
+        return None
+
+    def _validate(self, args):  # pragma: no cover - stub
+        return None
+
+    return type(
+        f"_StubTool_{name}",
+        (),
+        {
+            "name": name,
+            "description": f"description for {name}",
+            "parameters": {"type": "object", "properties": {}},
+            "execute": _execute,
+            "validate": _validate,
+        },
+    )
+
 
 # ── Minimal fixtures ────────────────────────────────────────────
 
@@ -71,10 +102,15 @@ def _node_context(runtime: dict[str, Any] | None = None) -> NodeContext:
 
 
 def test_executor_declares_history_derive_semantic_name_in_think_region() -> None:
-    """``semantic_name`` must match ``factory: history.derive`` in the bundle."""
+    """``semantic_name`` must match ``factory: history.derive`` in the bundle.
+
+    ``declared_inputs`` grew from ``(state, writer)`` to ``(state, writer, forked_tools)``
+    when spec §E closed (see ADR-0195 §4 / PR-3.8.borrow-tools-wire). The
+    extra port is optional — see ``test_node_execute_tools_empty_when_forked_tools_missing``.
+    """
     assert HistoryDeriveExecutor().semantic_name == "history.derive"
     assert HistoryDeriveExecutor().region == "phase:think"
-    assert HistoryDeriveExecutor().declared_inputs == ("state", "writer")
+    assert HistoryDeriveExecutor().declared_inputs == ("state", "writer", "forked_tools")
     assert HistoryDeriveExecutor().declared_outputs == ("model_visible_request",)
 
 
@@ -171,3 +207,56 @@ async def test_setup_registers_executor_under_composite_key() -> None:
 
     assert list(captured) == ["phase:think::history.derive"]
     assert isinstance(captured["phase:think::history.derive"], HistoryDeriveExecutor)
+
+
+# ── ForkedTools → ModelVisibleRequest.tools (spec §E) ────────────
+
+
+def _stub_tool(name: str):
+    return _make_stub_tool(name)()
+
+
+async def test_node_execute_populates_tools_from_forked_tools_port() -> None:
+    """ForkedTools 透传到 ``ModelVisibleRequest.tools``(spec §E)。
+
+    修复点:history.derive 之前 ``tools=()`` 写死,导致 LLM 看不到任何
+    tool schema(spec §J test_run_with_tool_use 失败的原因)。
+
+    用 ``model_construct`` 绕过 Pydantic ``is_instance_of`` Protocol 校验
+    —— 真实生产路径上 ForkedTools 由 tool_fork.dispatch 构造,其 items
+    来自 ToolsService.fork_for_run() 返回的真实 Tool 实现,本测试只关心
+    history.derive 是否正确读 ForkedTools.items 并序列化为 tool spec。
+    """
+    executor = HistoryDeriveExecutor()
+    writer = _FakeWriter(messages=[{"role": "user", "content": "q"}])
+    stub_run = _make_stub_tool("runCommand")()
+    stub_exec = _make_stub_tool("executeCode")()
+    forked = ForkedTools.model_construct(
+        items=(stub_run, stub_exec),
+        binding_keys=frozenset({"sandbox"}),
+    )
+    out = await executor.node_execute(
+        context=_node_context(),
+        input=NodeInput(
+            port_values={"state": _make_state(), "writer": writer, "forked_tools": forked}
+        ),
+    )
+    request = out.port_values["model_visible_request"]
+    assert isinstance(request, ModelVisibleRequest)
+    assert len(request.tools) == 2
+    by_name = {spec["function"]["name"]: spec for spec in request.tools}
+    assert set(by_name) == {"runCommand", "executeCode"}
+    assert by_name["runCommand"]["function"]["parameters"]["type"] == "object"
+
+
+async def test_node_execute_tools_empty_when_forked_tools_missing() -> None:
+    """ForkedTools 缺失 → ``request.tools == ()``,不抛(向后兼容测试/无工具 run)。"""
+    executor = HistoryDeriveExecutor()
+    writer = _FakeWriter(messages=[{"role": "user", "content": "q"}])
+    out = await executor.node_execute(
+        context=_node_context(),
+        input=NodeInput(port_values={"state": _make_state(), "writer": writer}),
+    )
+    request = out.port_values["model_visible_request"]
+    assert isinstance(request, ModelVisibleRequest)
+    assert request.tools == ()
