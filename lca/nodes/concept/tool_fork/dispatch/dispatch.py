@@ -75,7 +75,6 @@ def _bindings_from_runtime_plane() -> BindingsView | None:
     return current_bindings_view()
 
 
-
 _SANDBOX_TOOL_APIS: frozenset[str] = frozenset({"runCommand", "executeCode"})
 
 
@@ -95,7 +94,11 @@ def _assert_sandbox_tools_visible(bindings: BindingsView, items: tuple) -> None:
             plane = getattr(plane_bindings, attr, None) if plane_bindings is not None else None
             kind = getattr(plane, "kind", None)
             kind_name = getattr(kind, "name", None) or str(kind or "")
-            if kind_name == "SANDBOX" or str(kind_name).endswith("SANDBOX") or str(kind) == "sandbox":
+            if (
+                kind_name == "SANDBOX"
+                or str(kind_name).endswith("SANDBOX")
+                or str(kind) == "sandbox"
+            ):
                 sandbox_expected = True
                 break
     if not sandbox_expected:
@@ -158,9 +161,7 @@ class ToolForkDispatchExecutor:
             _creator_host = frozenset(
                 {"bash", "file_write", "cordis_control", "profile_apply", "profile_diff"}
             )
-            items = tuple(
-                tool for tool in items if getattr(tool, "name", "") not in _creator_host
-            )
+            items = tuple(tool for tool in items if getattr(tool, "name", "") not in _creator_host)
         _assert_sandbox_tools_visible(bindings, items)
         forked_tools = ForkedTools(
             items=items,

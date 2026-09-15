@@ -76,9 +76,7 @@ class GateChainRunExecutor:
         # can read it (D4 typed-port contract: every edge target's
         # required input must be produced by a reachable predecessor
         # — reject's inputs are ``[decision, enforced_decision]``).
-        return NodeOutput(
-            port_values={"enforced_decision": enforced, "decision": decision}
-        )
+        return NodeOutput(port_values={"enforced_decision": enforced, "decision": decision})
 
 
 def _resolve_gates(context: NodeContext) -> tuple[DecisionGate, ...]:
