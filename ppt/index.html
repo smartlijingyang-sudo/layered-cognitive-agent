@@ -1342,7 +1342,7 @@
   </div>
 </section>
 
-<!-- ============ P03 · 图编排 · Workflow Graph · 带流动特效 ============ -->
+<!-- ============ P03 · 图编排 · Phase 闭集 + 子节点展开 · 带流动特效 ============ -->
 <section class="slide light" data-animate="system-diagram" data-slide-id="architecture-overview" data-layout="S17">
   <div class="canvas-card">
     <div class="chrome-min">
@@ -1350,116 +1350,158 @@
       <div class="r">03 / 13</div>
     </div>
 
-    <div style="flex:1;padding:0;display:grid;grid-template-columns:5fr 11fr;gap:3vw;align-items:stretch">
-      <div data-anim="head" style="display:flex;flex-direction:column;gap:2vh;justify-content:center">
-        <div class="t-meta">SYSTEM MAP · 03</div>
-        <h2 style="font-family:var(--sans),var(--sans-zh);font-weight:200;font-size:min(5.2vw,9.2vh);line-height:1;letter-spacing:-.035em;color:var(--text-primary)">每次运行,<br/>都是一张图。</h2>
-        <p style="color:var(--text-secondary);font-size:max(16px,1vw);line-height:1.55;font-weight:400;max-width:36ch">图是 LCA 的骨头。节点是一次原子动作,边是数据流,运行时按图解释执行,可挂可拆、可重排。</p>
+    <!-- 顶部简短说明 -->
+    <div data-anim="head" style="display:flex;justify-content:space-between;align-items:end;border-bottom:1px solid var(--border-subtle);padding-bottom:1.4vh;margin-bottom:2vh">
+      <div>
+        <div class="t-meta" style="color:var(--accent)">SYSTEM MAP · 03</div>
+        <div style="font-family:var(--sans),var(--sans-zh);font-weight:200;font-size:min(3.4vw,5.6vh);line-height:1;letter-spacing:-.035em;color:var(--text-primary);margin-top:.6vh">
+          每次运行,都是一张图。
+        </div>
       </div>
+      <div style="max-width:48ch;font-family:var(--sans),var(--sans-zh);font-size:max(14px,1vw);line-height:1.6;color:var(--text-secondary);font-weight:400;text-align:right">
+        图是 LCA 的骨头。节点是一次原子动作,边是数据流。运行时按图解释执行,可挂可拆、可重排。
+      </div>
+    </div>
 
-      <div data-anim="diagram" style="position:relative;display:flex;flex-direction:column;justify-content:center;height:100%;min-height:0">
-        <!-- workflow canvas -->
-        <div style="position:relative;border:1px solid var(--ink);aspect-ratio:16/9;background:var(--paper);overflow:hidden">
-          <!-- subtle grid background -->
-          <div style="position:absolute;inset:0;background-image:radial-gradient(var(--grey-2) 1px,transparent 1px);background-size:18px 18px;opacity:.35"></div>
+    <!-- workflow canvas with phase + subnodes -->
+    <div data-anim="diagram" style="position:relative;flex:1;min-height:0;display:flex;flex-direction:column">
+      <div style="position:relative;border:1px solid var(--ink);flex:1;min-height:380px;background:var(--paper);overflow:hidden;display:flex;flex-direction:column">
+        <!-- subtle grid background -->
+        <div style="position:absolute;inset:0;background-image:radial-gradient(var(--grey-2) 1px,transparent 1px);background-size:18px 18px;opacity:.35;pointer-events:none"></div>
 
-          <!-- SVG 连线层 -->
-          <svg viewBox="0 0 1000 460" style="position:absolute;inset:0;width:100%;height:100%" aria-hidden="true">
-            <defs>
-              <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                <path d="M0,0 L10,5 L0,10 z" fill="#0a0a0a"/>
-              </marker>
-              <marker id="arrow-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                <path d="M0,0 L10,5 L0,10 z" fill="#002FA7"/>
-              </marker>
-            </defs>
-            <!-- 主链路:perceive → think → act → reflect → remember → stop -->
-            <path d="M 80 230 C 120 230, 140 230, 175 230" fill="none" stroke="#0a0a0a" stroke-width="1.4" marker-end="url(#arrow)"/>
-            <path d="M 245 230 C 290 230, 310 230, 345 230" fill="none" stroke="#0a0a0a" stroke-width="1.4" marker-end="url(#arrow)"/>
-            <path d="M 415 230 C 460 230, 480 230, 515 230" fill="none" stroke="#0a0a0a" stroke-width="1.4" marker-end="url(#arrow)"/>
-            <path d="M 585 230 C 630 230, 650 230, 685 230" fill="none" stroke="#0a0a0a" stroke-width="1.4" marker-end="url(#arrow)"/>
-            <path d="M 755 230 C 800 230, 820 230, 855 230" fill="none" stroke="#0a0a0a" stroke-width="1.4" marker-end="url(#arrow)"/>
-            <!-- 反思回边:reflect → think -->
-            <path d="M 550 205 C 550 90, 295 90, 295 205" fill="none" stroke="#002FA7" stroke-width="1.2" stroke-dasharray="4 4" marker-end="url(#arrow-blue)"/>
-            <!-- 终止回边:stop → think (条件终止后回到新一轮) -->
-            <path d="M 890 255 C 890 380, 295 380, 295 255" fill="none" stroke="#0a0a0a" stroke-width="1" stroke-dasharray="2 4" opacity=".5" marker-end="url(#arrow)"/>
-            <!-- 动画 dot 沿主路径流动 -->
-            <circle r="4" fill="#002FA7">
-              <animateMotion dur="6.5s" repeatCount="indefinite" path="M 80 230 C 120 230, 140 230, 175 230 C 210 230, 230 230, 245 230 C 280 230, 300 230, 345 230 C 380 230, 400 230, 415 230 C 450 230, 470 230, 515 230 C 550 230, 570 230, 585 230 C 620 230, 640 230, 685 230 C 720 230, 740 230, 755 230 C 790 230, 810 230, 855 230"/>
-            </circle>
-            <circle r="4" fill="#002FA7" opacity=".5">
-              <animateMotion dur="6.5s" repeatCount="indefinite" begin="2.2s" path="M 80 230 C 120 230, 140 230, 175 230 C 210 230, 230 230, 245 230 C 280 230, 300 230, 345 230 C 380 230, 400 230, 415 230 C 450 230, 470 230, 515 230 C 550 230, 570 230, 585 230 C 620 230, 640 230, 685 230 C 720 230, 740 230, 755 230 C 790 230, 810 230, 855 230"/>
-            </circle>
-            <circle r="4" fill="#002FA7" opacity=".3">
-              <animateMotion dur="6.5s" repeatCount="indefinite" begin="4.3s" path="M 80 230 C 120 230, 140 230, 175 230 C 210 230, 230 230, 245 230 C 280 230, 300 230, 345 230 C 380 230, 400 230, 415 230 C 450 230, 470 230, 515 230 C 550 230, 570 230, 585 230 C 620 230, 640 230, 685 230 C 720 230, 740 230, 755 230 C 790 230, 810 230, 855 230"/>
-            </circle>
-          </svg>
+        <!-- SVG 连线层 -->
+        <svg viewBox="0 0 1600 500" preserveAspectRatio="xMidYMid meet" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none" aria-hidden="true">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="#0a0a0a"/>
+            </marker>
+            <marker id="arrow-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="#002FA7"/>
+            </marker>
+          </defs>
+          <!-- 主链路 -->
+          <path d="M 175 250 C 230 250, 260 250, 295 250" fill="none" stroke="#0a0a0a" stroke-width="1.4" marker-end="url(#arrow)"/>
+          <path d="M 535 250 C 590 250, 620 250, 655 250" fill="none" stroke="#0a0a0a" stroke-width="1.4" marker-end="url(#arrow)"/>
+          <path d="M 895 250 C 950 250, 980 250, 1015 250" fill="none" stroke="#0a0a0a" stroke-width="1.4" marker-end="url(#arrow)"/>
+          <path d="M 1255 250 C 1310 250, 1340 250, 1375 250" fill="none" stroke="#0a0a0a" stroke-width="1.4" marker-end="url(#arrow)"/>
+          <path d="M 1500 250 L 1560 250" fill="none" stroke="#0a0a0a" stroke-width="1.4" marker-end="url(#arrow)"/>
+          <!-- 反思回边:reflect → think -->
+          <path d="M 1140 200 C 1140 60, 415 60, 415 200" fill="none" stroke="#002FA7" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arrow-blue)"/>
+          <!-- 终止后新一轮:stop → think -->
+          <path d="M 1490 305 C 1490 460, 415 460, 415 305" fill="none" stroke="#0a0a0a" stroke-width="1" stroke-dasharray="2 5" opacity=".5" marker-end="url(#arrow)"/>
+          <!-- 动画 dot 沿主路径流动 -->
+          <circle r="4.5" fill="#002FA7">
+            <animateMotion dur="9s" repeatCount="indefinite" path="M 175 250 C 230 250, 260 250, 295 250 L 535 250 C 590 250, 620 250, 655 250 L 895 250 C 950 250, 980 250, 1015 250 L 1255 250 C 1310 250, 1340 250, 1375 250 L 1500 250 L 1560 250"/>
+          </circle>
+          <circle r="4.5" fill="#002FA7" opacity=".5">
+            <animateMotion dur="9s" repeatCount="indefinite" begin="3s" path="M 175 250 C 230 250, 260 250, 295 250 L 535 250 C 590 250, 620 250, 655 250 L 895 250 C 950 250, 980 250, 1015 250 L 1255 250 C 1310 250, 1340 250, 1375 250 L 1500 250 L 1560 250"/>
+          </circle>
+          <circle r="4.5" fill="#002FA7" opacity=".3">
+            <animateMotion dur="9s" repeatCount="indefinite" begin="6s" path="M 175 250 C 230 250, 260 250, 295 250 L 535 250 C 590 250, 620 250, 655 250 L 895 250 C 950 250, 980 250, 1015 250 L 1255 250 C 1310 250, 1340 250, 1375 250 L 1500 250 L 1560 250"/>
+          </circle>
+        </svg>
 
-          <!-- 节点层 (HTML on top of SVG) -->
-          <!-- 1. perceive -->
-          <div style="position:absolute;left:8%;top:46%;transform:translateY(-50%)">
-            <div style="background:var(--paper);border:1.5px solid var(--ink);padding:10px 14px;font-family:var(--sans-zh);font-weight:500;font-size:max(13px,1vw);color:var(--text-primary);box-shadow:3px 3px 0 var(--ink);min-width:130px">
-              <div class="t-meta" style="color:var(--accent);letter-spacing:.06em;font-size:10px">PERCEIVE</div>
-              感知 · 上下文
+        <!-- 节点层 (6 个 phase 卡片 + 子节点) -->
+        <!-- 1. PERCEIVE -->
+        <div style="position:absolute;left:1.5%;top:32%;transform:translateY(-50%);width:14%">
+          <div style="background:var(--paper);border:1.5px solid var(--ink);padding:12px 12px 10px;font-family:var(--sans-zh);font-weight:500;color:var(--text-primary);box-shadow:3px 3px 0 var(--ink)">
+            <div class="t-meta" style="color:var(--accent);letter-spacing:.06em;font-size:10px">PERCEIVE</div>
+            <div style="font-size:max(14px,1.05vw);line-height:1.2;margin-top:2px">感知 · 上下文</div>
+            <div style="height:1px;background:var(--border-subtle);margin:8px 0 6px"></div>
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <div style="font-family:var(--mono);font-size:max(10px,.7vw);color:var(--text-secondary);padding:2px 6px;background:var(--grey-1)">sensor.input</div>
+              <div style="font-family:var(--mono);font-size:max(10px,.7vw);color:var(--text-secondary);padding:2px 6px;background:var(--grey-1)">context.compose</div>
+              <div style="font-family:var(--mono);font-size:max(10px,.7vw);color:var(--text-secondary);padding:2px 6px;background:var(--grey-1)">history.assemble</div>
             </div>
-          </div>
-
-          <!-- 2. think -->
-          <div style="position:absolute;left:24.5%;top:46%;transform:translateY(-50%)">
-            <div style="background:var(--accent);color:#fff;padding:10px 14px;font-family:var(--sans-zh);font-weight:500;font-size:max(13px,1vw);box-shadow:3px 3px 0 var(--ink);min-width:130px">
-              <div style="font-family:var(--mono);font-size:10px;letter-spacing:.06em;opacity:.85">THINK</div>
-              推理 · 决策
-            </div>
-          </div>
-
-          <!-- 3. act -->
-          <div style="position:absolute;left:41.5%;top:46%;transform:translateY(-50%)">
-            <div style="background:var(--paper);border:1.5px solid var(--ink);padding:10px 14px;font-family:var(--sans-zh);font-weight:500;font-size:max(13px,1vw);color:var(--text-primary);box-shadow:3px 3px 0 var(--ink);min-width:130px">
-              <div class="t-meta" style="color:var(--accent);letter-spacing:.06em;font-size:10px">ACT</div>
-              执行 · 工具调用
-            </div>
-          </div>
-
-          <!-- 4. reflect -->
-          <div style="position:absolute;left:58.5%;top:46%;transform:translateY(-50%)">
-            <div style="background:var(--paper);border:1.5px solid var(--ink);padding:10px 14px;font-family:var(--sans-zh);font-weight:500;font-size:max(13px,1vw);color:var(--text-primary);box-shadow:3px 3px 0 var(--ink);min-width:130px">
-              <div class="t-meta" style="color:var(--accent);letter-spacing:.06em;font-size:10px">REFLECT</div>
-              校验 · 反思
-            </div>
-          </div>
-
-          <!-- 5. remember -->
-          <div style="position:absolute;left:75.5%;top:46%;transform:translateY(-50%)">
-            <div style="background:var(--paper);border:1.5px solid var(--ink);padding:10px 14px;font-family:var(--sans-zh);font-weight:500;font-size:max(13px,1vw);color:var(--text-primary);box-shadow:3px 3px 0 var(--ink);min-width:130px">
-              <div class="t-meta" style="color:var(--accent);letter-spacing:.06em;font-size:10px">REMEMBER</div>
-              记忆 · 沉淀
-            </div>
-          </div>
-
-          <!-- 6. stop -->
-          <div style="position:absolute;left:88.5%;top:46%;transform:translateY(-50%)">
-            <div style="background:var(--ink);color:var(--paper);padding:10px 14px;font-family:var(--sans-zh);font-weight:500;font-size:max(13px,1vw);min-width:90px">
-              <div class="t-meta" style="color:rgba(255,255,255,.7);letter-spacing:.06em;font-size:10px">STOP</div>
-              终止 · 产出
-            </div>
-          </div>
-
-          <!-- 顶部说明 -->
-          <div style="position:absolute;top:3%;left:2%;font-family:var(--mono);font-size:11px;color:var(--text-helper);letter-spacing:.06em">
-            run · agent.reasoning.turn
-          </div>
-          <div style="position:absolute;top:3%;right:2%;font-family:var(--mono);font-size:11px;color:var(--text-helper);letter-spacing:.06em">
-            — live
           </div>
         </div>
 
-        <!-- legend -->
-        <div style="margin-top:1.6vh;display:flex;justify-content:flex-start;align-items:center;gap:3vw;padding-left:1vw">
-          <div class="t-meta" style="color:var(--text-helper)">— 六语义 phase 闭集 · 节点是原子动作 · 边是数据流</div>
-          <div class="t-meta" style="color:var(--text-helper)">↺ 反思回边 · 终止后可开启新一轮</div>
+        <!-- 2. THINK (蓝填充) -->
+        <div style="position:absolute;left:18.5%;top:32%;transform:translateY(-50%);width:15%">
+          <div style="background:var(--accent);color:#fff;padding:12px 12px 10px;font-family:var(--sans-zh);font-weight:500;box-shadow:3px 3px 0 var(--ink)">
+            <div style="font-family:var(--mono);font-size:10px;letter-spacing:.06em;opacity:.85">THINK</div>
+            <div style="font-size:max(14px,1.05vw);line-height:1.2;margin-top:2px">推理 · 决策</div>
+            <div style="height:1px;background:rgba(255,255,255,.3);margin:8px 0 6px"></div>
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <div style="font-family:var(--mono);font-size:max(10px,.7vw);color:#fff;padding:2px 6px;background:rgba(255,255,255,.18)">role.cast</div>
+              <div style="font-family:var(--mono);font-size:max(10px,.7vw);color:#fff;padding:2px 6px;background:rgba(255,255,255,.18)">reasoner.run</div>
+              <div style="font-family:var(--mono);font-size:max(10px,.7vw);color:#fff;padding:2px 6px;background:rgba(255,255,255,.18)">decision.parse</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. ACT -->
+        <div style="position:absolute;left:35.5%;top:32%;transform:translateY(-50%);width:15%">
+          <div style="background:var(--paper);border:1.5px solid var(--ink);padding:12px 12px 10px;font-family:var(--sans-zh);font-weight:500;color:var(--text-primary);box-shadow:3px 3px 0 var(--ink)">
+            <div class="t-meta" style="color:var(--accent);letter-spacing:.06em;font-size:10px">ACT</div>
+            <div style="font-size:max(14px,1.05vw);line-height:1.2;margin-top:2px">执行 · 工具调用</div>
+            <div style="height:1px;background:var(--border-subtle);margin:8px 0 6px"></div>
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <div style="font-family:var(--mono);font-size:max(10px,.7vw);color:var(--text-secondary);padding:2px 6px;background:var(--grey-1)">effect.gateway</div>
+              <div style="font-family:var(--mono);font-size:max(10px,.7vw);color:var(--text-secondary);padding:2px 6px;background:var(--grey-1)">sandbox.run</div>
+              <div style="font-family:var(--mono);font-size:max(10px,.7vw);color:var(--text-secondary);padding:2px 6px;background:var(--grey-1)">tool.dispatch</div>
+              <div style="font-family:var(--mono);font-size:max(10px,.7vw);color:var(--text-secondary);padding:2px 6px;background:var(--grey-1)">mcp.invoke</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. REFLECT -->
+        <div style="position:absolute;left:52.5%;top:32%;transform:translateY(-50%);width:14%">
+          <div style="background:var(--paper);border:1.5px solid var(--ink);padding:12px 12px 10px;font-family:var(--sans-zh);font-weight:500;color:var(--text-primary);box-shadow:3px 3px 0 var(--ink)">
+            <div class="t-meta" style="color:var(--accent);letter-spacing:.06em;font-size:10px">REFLECT</div>
+            <div style="font-size:max(14px,1.05vw);line-height:1.2;margin-top:2px">校验 · 反思</div>
+            <div style="height:1px;background:var(--border-subtle);margin:8px 0 6px"></div>
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <div style="font-family:var(--mono);font-size:max(10px,.7vw);color:var(--text-secondary);padding:2px 6px;background:var(--grey-1)">critic.score</div>
+              <div style="font-family:var(--mono);font-size:max(10px,.7vw);color:var(--text-secondary);padding:2px 6px;background:var(--grey-1)">trace.diff</div>
+              <div style="font-family:var(--mono);font-size:max(10px,.7vw);color:var(--text-secondary);padding:2px 6px;background:var(--grey-1)">policy.check</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. REMEMBER -->
+        <div style="position:absolute;left:68.5%;top:32%;transform:translateY(-50%);width:13%">
+          <div style="background:var(--paper);border:1.5px solid var(--ink);padding:12px 12px 10px;font-family:var(--sans-zh);font-weight:500;color:var(--text-primary);box-shadow:3px 3px 0 var(--ink)">
+            <div class="t-meta" style="color:var(--accent);letter-spacing:.06em;font-size:10px">REMEMBER</div>
+            <div style="font-size:max(14px,1.05vw);line-height:1.2;margin-top:2px">记忆 · 沉淀</div>
+            <div style="height:1px;background:var(--border-subtle);margin:8px 0 6px"></div>
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <div style="font-family:var(--mono);font-size:max(10px,.7vw);color:var(--text-secondary);padding:2px 6px;background:var(--grey-1)">memory.propose</div>
+              <div style="font-family:var(--mono);font-size:max(10px,.7vw);color:var(--grey-3);padding:2px 6px;background:var(--grey-1);font-style:italic">…commit</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. STOP (黑底) -->
+        <div style="position:absolute;left:84%;top:32%;transform:translateY(-50%);width:14%">
+          <div style="background:var(--ink);color:var(--paper);padding:12px 12px 10px;font-family:var(--sans-zh);font-weight:500">
+            <div class="t-meta" style="color:rgba(255,255,255,.7);letter-spacing:.06em;font-size:10px">STOP</div>
+            <div style="font-size:max(14px,1.05vw);line-height:1.2;margin-top:2px">终止 · 产出</div>
+            <div style="height:1px;background:rgba(255,255,255,.22);margin:8px 0 6px"></div>
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <div style="font-family:var(--mono);font-size:max(10px,.7vw);color:rgba(255,255,255,.85);padding:2px 6px;background:rgba(255,255,255,.1)">budget.evaluate</div>
+              <div style="font-family:var(--mono);font-size:max(10px,.7vw);color:rgba(255,255,255,.85);padding:2px 6px;background:rgba(255,255,255,.1)">goal.match</div>
+              <div style="font-family:var(--mono);font-size:max(10px,.7vw);color:rgba(255,255,255,.6);padding:2px 6px;background:rgba(255,255,255,.1);font-style:italic">terminal</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 顶部说明 -->
+        <div style="position:absolute;top:3%;left:2%;font-family:var(--mono);font-size:11px;color:var(--text-helper);letter-spacing:.06em">
+          run · agent.reasoning.turn · live
+        </div>
+        <div style="position:absolute;top:3%;right:2%;font-family:var(--mono);font-size:11px;color:var(--text-helper);letter-spacing:.06em">
+          六 phase 闭集 · C1
         </div>
       </div>
     </div>
+
+    <!-- legend -->
+    <div style="margin-top:1.6vh;display:flex;justify-content:flex-start;align-items:center;gap:3vw;padding-left:1vw;padding-right:18vw">
+      <div class="t-meta" style="color:var(--text-helper)">— 每个 phase 是一个 seam,内部子节点可替换</div>
+    </div>
+  </div>
+</section>
 
     <div class="t-meta" style="color:var(--text-helper);text-align:left;padding-left:1vw">→ 同一张图,每次运行的轨迹都被记录到 Session</div>
   </div>
@@ -2022,13 +2064,13 @@ const SPEAKER_NOTES = [
     transition: '下一页展示架构全景,建立共同语境'
   },
   {
-    id: 'architecture-overview', title: '图编排 · 六 phase 闭集', section: 'Context', minutes: 1.4,
-    purpose: '把"六 phase 闭集"作为图编排的语义骨架讲清楚',
+    id: 'architecture-overview', title: '图编排 · 六 phase 闭集 + 子节点', section: 'Context', minutes: 1.6,
+    purpose: '把"六 phase 闭集"作为图编排的语义骨架讲清楚,并展示每个 phase 内部的具体子节点',
     talk: [
       '六 phase 闭集:perceive → think → act → reflect → remember → stop,改变需要先有 ADR',
-      '一次 Run 是一张图:节点是 phase 实例,边是数据流',
-      '运行时按图解释执行,每个 phase 可以挂多个具体插件实现',
-      '反思可回到上游,stop 之后可以开启新一轮'
+      '每个 phase 是一个 seam,内部挂多个具体子节点 — 比如 ACT 里有 effect.gateway · sandbox.run · tool.dispatch · mcp.invoke',
+      'THINK 是认知核心,内部有 role.cast · reasoner.run · decision.parse',
+      '运行时按图解释执行,反思可回到上游 THINK,stop 之后可以开启新一轮'
     ],
     transition: '图的骨架建立后,下一页讲事实链是如何把每一段都记录下来的'
   },
