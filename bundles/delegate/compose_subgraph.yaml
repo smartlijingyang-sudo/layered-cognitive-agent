@@ -1,0 +1,23 @@
+# bundles/delegate/compose_subgraph.yaml — delegate subgraph (ADR-0228 D5)
+#
+# First-pass typed fan-out subgraph. ``delegate.compose`` reads a
+# Decision + capability_grant and emits a tuple of DelegationRequest;
+# the kernel runs them via the existing AGENT_FANOUT strategy. Future
+# PR-3.7.c iterations will add ``delegate.await`` and ``delegate.fold``
+# as downstream nodes consuming ``delegation_receipt`` /
+# ``folded_delegation_result`` ports.
+#
+# ADR-0228 §D6: ``delegate`` is a cross-phase region directory; it is
+# NOT one of the six phases. The six-phase closed set stays
+# {perceive, think, act, remember, reflect, stop}.
+
+id: delegate.subgraph
+region: region:delegate
+purpose: delegate 跨 phase fan-out — compose(Decision → tuple[DelegationRequest])
+
+nodes:
+  - id: delegate.compose
+    factory: delegate.compose
+    inputs: [decision, capability_grant]
+    outputs: [delegation_request]
+    config: {}
