@@ -17,7 +17,17 @@ import pytest
 
 from lca.infrastructure.cli.services.kernel.supervisor import (
     ProgramConfig,
+    ProgramEvent,
     ProgramState,
+    ProgramStatus,
+    build_check_config_result,
+    build_command_error_result,
+    build_config_error_result,
+    build_events_result,
+    build_restart_result,
+    build_start_result,
+    build_status_result,
+    build_stop_result,
     clear_state,
     decide_restart,
     get_supervisor,
@@ -244,3 +254,143 @@ class TestGetSupervisor:
             ProgramConfig(name="y", command="/bin/echo", args=())
         )
         assert a is not b
+
+
+# ── Action result builders (wire contract) ──────────────────────────
+
+
+def _status_fixture(state: ProgramState = ProgramState.RUNNING) -> ProgramStatus:
+    return ProgramStatus(
+        name="lca_kernel_dev",
+        state=state,
+        pid=12345,
+        uptime_s=4.5,
+        restart_count=0,
+        last_exit_code=None,
+        last_event="readiness probe passed",
+        spawned_at=1234567890.0,
+    )
+
+
+class TestActionResultBuilders:
+    """Pin the wire-stable output shape across all actions.
+
+    Every ``build_*_result`` returns a dict with stable keys
+    (verdict, detail|reason, status?, next_command?). Service-layer
+    tests pin this contract so refactors can't silently change it.
+    """
+
+    def test_build_start_ready(self) -> None:
+        cfg = ProgramConfig(name="lca_kernel_dev", command="/bin/echo")
+        status = _status_fixture()
+        result = build_start_result(cfg, status, ready=True)
+        assert result["verdict"] == "ready"
+        assert "started pid=" in result["detail"]
+        assert result["status"]["pid"] == 12345
+        assert "kernel-supervisor status" in result["next_command"]
+
+    def test_build_start_failed(self) -> None:
+        cfg = ProgramConfig(
+            name="lca_kernel_dev", command="/bin/echo",
+            readiness_timeout=30.0,
+        )
+        status = _status_fixture(state=ProgramState.STARTING)
+        result = build_start_result(cfg, status, ready=False)
+        assert result["verdict"] == "failed"
+        assert "did not become ready within" in result["detail"]
+        assert "kernel-supervisor logs" in result["next_command"]
+
+    def test_build_stop(self) -> None:
+        cfg = ProgramConfig(name="lca_kernel_dev", command="/bin/echo")
+        status = _status_fixture(state=ProgramState.STOPPED)
+        result = build_stop_result(cfg, status, orphans_killed=2)
+        assert result["verdict"] == "ready"
+        assert "orphans_killed=2" in result["detail"]
+        assert "kernel-supervisor start" in result["next_command"]
+
+    def test_build_restart_ready(self) -> None:
+        cfg = ProgramConfig(name="lca_kernel_dev", command="/bin/echo")
+        status = _status_fixture()
+        result = build_restart_result(cfg, status, ready=True)
+        assert result["verdict"] == "ready"
+        assert "LCA kernel restarted" in result["detail"]
+
+    def test_build_restart_failed(self) -> None:
+        cfg = ProgramConfig(
+            name="lca_kernel_dev", command="/bin/echo",
+            readiness_timeout=15.0,
+        )
+        status = _status_fixture(state=ProgramState.STARTING)
+        result = build_restart_result(cfg, status, ready=False)
+        assert result["verdict"] == "failed"
+        assert "kernel-supervisor logs" in result["next_command"]
+
+    def test_build_status_running(self) -> None:
+        cfg = ProgramConfig(name="lca_kernel_dev", command="/bin/echo")
+        events = [
+            ProgramEvent(ts=1.0, kind="spawned", pid=12345, message="hi"),
+        ]
+        result = build_status_result(
+            cfg, _status_fixture(), events=events,
+        )
+        assert result["verdict"] == "ready"
+        assert "next_command" not in result
+        assert len(result["events"]) == 1
+        assert result["events"][0]["kind"] == "spawned"
+
+    def test_build_status_fatal_includes_next_command(self) -> None:
+        cfg = ProgramConfig(name="lca_kernel_dev", command="/bin/echo")
+        status = _status_fixture(state=ProgramState.FATAL)
+        result = build_status_result(
+            cfg, status, events=[], is_fatal=True,
+        )
+        assert result["verdict"] == "failed"
+        assert "kernel-supervisor logs" in result["next_command"]
+
+    def test_build_events(self) -> None:
+        events = [
+            ProgramEvent(ts=1.0, kind="spawned", pid=42),
+            ProgramEvent(ts=2.0, kind="died", exit_code=1),
+        ]
+        result = build_events_result(events)
+        assert result["verdict"] == "ready"
+        assert len(result["events"]) == 2
+        assert result["events"][0]["kind"] == "spawned"
+        assert result["events"][1]["exit_code"] == 1
+
+    def test_build_check_config(self) -> None:
+        progs = [
+            ProgramConfig(name="app_a", command="/bin/echo"),
+            ProgramConfig(
+                name="app_b", command="/bin/echo",
+                args=("--port", "8080"),
+            ),
+        ]
+        result = build_check_config_result("/tmp/sup.conf", progs)
+        assert result["verdict"] == "ready"
+        assert result["config_path"] == "/tmp/sup.conf"
+        assert len(result["programs"]) == 2
+
+    def test_build_config_error(self) -> None:
+        result = build_config_error_result(
+            "/tmp/bad.conf", ValueError("missing command"),
+        )
+        assert result["verdict"] == "failed"
+        assert "missing command" in result["reason"]
+        assert "check-config" in result["next_command"]
+
+    def test_build_command_error_with_orphans(self) -> None:
+        cfg = ProgramConfig(name="app", command="/bin/echo")
+        result = build_command_error_result(
+            "start", cfg, orphan_pids=[123, 456],
+            status=_status_fixture(),
+        )
+        assert result["verdict"] == "failed"
+        assert "pid=[123, 456]" in result["reason"]
+        assert "kernel-supervisor stop" in result["next_command"]
+
+    def test_build_command_error_unknown_action(self) -> None:
+        result = build_command_error_result("foobar", None)
+        assert result["verdict"] == "failed"
+        assert "unknown action 'foobar'" in result["reason"]
+        assert "--help" in result["next_command"]

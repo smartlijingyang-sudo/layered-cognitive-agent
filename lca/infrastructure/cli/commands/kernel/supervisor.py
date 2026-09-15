@@ -10,17 +10,18 @@ Commands (all support ``--json`` for agents):
                 ``stderr_logfile``
 - ``check-config <path>`` — parse and report errors without starting
 
-Design
-------
-This is the dev-path replacement for system-level supervisors. The
-production path is an external supervisor (ADR-0119). Here we keep
-the LCA-internal abstraction small and supervisord-syntax-compatible
-so operators can drop in a real ``supervisord`` later by pointing it
-at the same ``[program:lca_kernel_dev]`` config file.
+This module is a thin dispatcher: action payload shapes live in
+:mod:`lca.infrastructure.cli.services.kernel.supervisor` (the
+``build_*_result`` builders) so both ``lca-ops kernel-supervisor
+{start,stop,...}`` and ``lca-ops kernel-restart`` share one
+wire contract. ``_render`` below is the single output function; it
+takes the dict the builder produced and emits JSON or human text
+depending on ``--json``.
 """
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import sys
@@ -31,37 +32,52 @@ from typing import Any
 import typer
 
 from lca.infrastructure.cli.services.kernel.supervisor import (
+    KernelSupervisor,
     ProgramConfig,
     ProgramState,
     ProgramStatus,
+    build_check_config_result,
+    build_command_error_result,
+    build_config_error_result,
+    build_events_result,
+    build_restart_result,
+    build_start_result,
+    build_status_result,
+    build_stop_result,
     default_program_config,
     get_supervisor,
     parse_program_config,
     status_from_state_file,
 )
 
-
-def _program_status_json(s) -> dict[str, Any]:
-    return {
-        "name": s.name,
-        "state": s.state.value,
-        "pid": s.pid,
-        "uptime_s": round(s.uptime_s, 2),
-        "restart_count": s.restart_count,
-        "last_exit_code": s.last_exit_code,
-        "last_event": s.last_event,
-        "spawned_at": s.spawned_at,
-    }
+# ── Output rendering ──────────────────────────────────────────────────
 
 
-def _program_event_json(e) -> dict[str, Any]:
-    return {
-        "ts": e.ts,
-        "kind": e.kind,
-        "pid": e.pid,
-        "exit_code": e.exit_code,
-        "message": e.message,
-    }
+def _render(payload: dict[str, Any], *, json_mode: bool) -> dict[str, Any]:
+    """Single output function for every action result.
+
+    JSON mode: ``typer.echo(json.dumps(payload, indent=2))``.
+    Text mode: short verdict + next hint line, ``next_command``
+    goes to stderr so it doesn't pollute stdout pipelines.
+
+    Returns the dict for callers that want to inspect the result
+    programmatically (e.g. tests).
+    """
+    if json_mode:
+        typer.echo(json.dumps(payload, indent=2))
+        return payload
+
+    verdict = payload.get("verdict", "?")
+    detail = payload.get("detail") or payload.get("reason", "")
+    marker = "✅" if verdict == "ready" else "❌"
+    typer.echo(f"{marker} {verdict}: {detail}")
+    next_cmd = payload.get("next_command")
+    if next_cmd:
+        typer.echo(f"   next: {next_cmd}", err=True)
+    return payload
+
+
+# ── CLI-side helpers ──────────────────────────────────────────────────
 
 
 def _find_orphan_pids() -> list[int]:
@@ -69,12 +85,11 @@ def _find_orphan_pids() -> list[int]:
 
     Used to refuse double-spawn when the kernel is already alive but
     not owned by *this* supervisor instance. We match on the **exact
-    cmdline structure** (``/opt/lca/venv/bin/python`` + ``-m`` +
-    ``lca_kernel`` + ``serve``) to avoid false positives from any
-    shell whose argv happens to contain those substrings (e.g. a
-    `ps | grep lca_kernel serve` filter).
+    cmdline structure** to avoid false positives from any shell whose
+    argv happens to contain those substrings.
     """
     import os as _os
+
     pids: list[int] = []
     for d in _os.listdir("/proc"):
         if not d.isdigit():
@@ -84,16 +99,16 @@ def _find_orphan_pids() -> list[int]:
                 raw = fh.read()
         except OSError:
             continue
-        # cmdline uses NUL separators; tokens are split on NUL.
         tokens = raw.split(b"\x00")
-        # Look for the canonical sequence anywhere in the cmdline:
-        # any python* interpreter (path or name) + ``-m lca_kernel serve``.
+
         def _is_python(tok: bytes) -> bool:
-            base = tok.split(b"/")[-1]  # /opt/lca/venv/bin/python3 → python3
+            base = tok.split(b"/")[-1]
             return base.startswith(b"python") and (
-                base == b"python" or base[len(b"python"):][:1] in (b"", b".")
+                base == b"python"
+                or base[len(b"python"):][:1] in (b"", b".")
                 or base[len(b"python"):][:1].isdigit()
             )
+
         for j in range(len(tokens) - 3):
             if (
                 _is_python(tokens[j])
@@ -109,392 +124,24 @@ def _find_orphan_pids() -> list[int]:
     return pids
 
 
-def register(app: typer.Typer) -> None:
-    """Register ``lca-ops kernel-supervisor {start,stop,restart,...}``."""
-
-    @app.command(name="kernel-supervisor")
-    def kernel_supervisor(
-        action: str = typer.Argument(
-            ...,
-            help=(
-                "One of: start, stop, restart, status, events, logs, "
-                "check-config"
-            ),
-        ),
-        config_path: Path | None = typer.Option(
-            None,
-            "--config",
-            "-c",
-            help="supervisord-style config file (default: dev-only config)",
-        ),
-        name: str = typer.Option(
-            "lca_kernel_dev",
-            "--name",
-            help="Program name (for multi-program configs)",
-        ),
-        as_json: bool = typer.Option(
-            False, "--json", help="Emit canonical JSON"
-        ),
-        tail_lines: int = typer.Option(
-            50, "--lines",
-            help="For `logs`: number of lines to print",
-        ),
-        follow: bool = typer.Option(
-            False, "--follow", "-f",
-            help="For `logs`: keep tailing (Ctrl+C to exit)",
-        ),
-        profile: str = typer.Option(
-            "profiles/web-standard.yaml",
-            "--profile",
-            "-p",
-            help="For dev-default config: profile path",
-        ),
-        port: int = typer.Option(
-            8765, "--port",
-            help="For dev-default config: HTTP port",
-        ),
-    ) -> None:
-        """Local supervisord-style process manager for the LCA kernel.
-
-        All subcommands accept ``--json`` for agent consumers. Output
-        shape is :class:`dict` with these stable keys:
-
-        - ``verdict``: ``"ready"`` / ``"failed"`` / ``"deferred"``
-        - ``status``: :class:`ProgramStatus` snapshot (always present)
-        - ``events``: list of recent :class:`ProgramEvent` (only on
-          ``status`` / ``events`` actions)
-        - ``reason``: human-readable one-liner (on failure)
-        - ``next_command``: one ``lca-ops`` subcommand to run for
-          diagnosis (on failure)
-        """
-        # ── check-config: standalone, no spawn ─────────────────────
-        if action == "check-config":
-            if config_path is None:
-                _emit_error(
-                    as_json,
-                    "check-config requires --config <path>",
-                    next_command="./scripts/lca-ops kernel-supervisor check-config --config <path>",
-                )
-                raise typer.Exit(2)
-            try:
-                progs = parse_program_config(config_path)
-            except (ValueError, OSError) as exc:
-                _emit_error(
-                    as_json,
-                    f"config invalid: {exc}",
-                    next_command=f"./scripts/lca-ops kernel-supervisor check-config --config {config_path}",
-                )
-                raise typer.Exit(1) from None
-            if as_json:
-                typer.echo(
-                    json.dumps(
-                        {
-                            "verdict": "ready",
-                            "config_path": str(config_path),
-                            "programs": [
-                                {
-                                    "name": p.name,
-                                    "argv_head": p.argv()[:3],
-                                    "host": p.host(),
-                                    "port": p.port(),
-                                    "autorestart": p.autorestart,
-                                    "startretries": p.startretries,
-                                }
-                                for p in progs
-                            ],
-                        },
-                        indent=2,
-                    )
-                )
-            else:
-                typer.echo(f"OK {config_path}: {len(progs)} program(s)")
-                for p in progs:
-                    typer.echo(f"  - {p.name} port={p.port()} host={p.host()}")
-            return
-
-        # ── resolve config + build supervisor ──────────────────────
-        cfg = _resolve_config(config_path, profile=profile, port=port)
-        sup = get_supervisor(cfg)
-
-        # ── dispatch ──────────────────────────────────────────────
-        if action == "start":
-            # Refuse to double-spawn if a kernel is already alive.
-            orphans = _find_orphan_pids()
-            if orphans:
-                _emit_error(
-                    as_json,
-                    f"kernel already running (pid={orphans}); refusing "
-                    f"double-spawn. Run `./scripts/lca-ops kernel-supervisor "
-                    f"stop` first or SIGTERM the orphan.",
-                    status=_program_status_json(sup.status()),
-                    next_command=(
-                        f"./scripts/lca-ops kernel-supervisor stop --name {cfg.name}"
-                    ),
-                )
-                raise typer.Exit(1)
-            status = sup.start()
-            ready = sup.wait_ready(timeout=cfg.readiness_timeout)
-            status = sup.status()  # refresh after wait_ready
-            if ready and status.state == ProgramState.RUNNING:
-                _emit_ok(
-                    as_json,
-                    verdict="ready",
-                    detail=(
-                        f"supervisor started pid={status.pid} "
-                        f"uptime={status.uptime_s:.1f}s"
-                    ),
-                    status=_program_status_json(status),
-                    next_command=(
-                        "./scripts/lca-ops kernel-supervisor status"
-                        f" --name {cfg.name}"
-                    ),
-                )
-                return
-            _emit_error(
-                as_json,
-                f"supervisor start did not become ready within "
-                f"{cfg.readiness_timeout}s: {status.last_event}",
-                status=_program_status_json(status),
-                next_command=(
-                    f"./scripts/lca-ops kernel-supervisor logs --name {cfg.name}"
-                ),
-            )
-            raise typer.Exit(1)
-
-        if action == "stop":
-            status = sup.stop()
-            # Kill any orphan kernels not owned by this supervisor.
-            orphans = _find_orphan_pids()
-            for pid in orphans:
-                import signal as _signal
-                try:
-                    os.kill(pid, _signal.SIGTERM)
-                except OSError:
-                    continue
-            if orphans:
-                import time as _time
-                _time.sleep(min(cfg.stopwaitsecs, 5.0))
-            _emit_ok(
-                as_json,
-                verdict="ready",
-                detail=f"supervisor stopped (exit_code={status.last_exit_code}, orphans_killed={len(orphans)})",
-                status=_program_status_json(status),
-                next_command=(
-                    f"./scripts/lca-ops kernel-supervisor start --name {cfg.name}"
-                ),
-            )
-            return
-
-        if action == "restart":
-            sup.restart()
-            ready = sup.wait_ready(timeout=cfg.readiness_timeout)
-            status = sup.status()
-            _emit_restart_result(
-                cfg=cfg,
-                status=status,
-                ready=ready,
-                json_mode=as_json,
-            )
-            if not ready:
-                raise typer.Exit(1)
-            return
-
-        if action == "status":
-            status = sup.status()
-            # If the in-process supervisor is empty (we never started
-            # in this process), fall back to the persisted state file.
-            if status.state == ProgramState.STOPPED and status.pid is None:
-                persisted = status_from_state_file(cfg)
-                if persisted is not None:
-                    status = persisted
-            events = [_program_event_json(e) for e in sup.events()]
-            verdict = (
-                "ready" if status.state in {ProgramState.RUNNING, ProgramState.STOPPED}
-                else "failed"
-            )
-            payload: dict[str, Any] = {
-                "verdict": verdict,
-                "status": _program_status_json(status),
-                "events": events,
-            }
-            if status.state in {ProgramState.FATAL}:
-                payload["next_command"] = (
-                    f"./scripts/lca-ops kernel-supervisor logs --name {cfg.name}"
-                )
-            if as_json:
-                typer.echo(json.dumps(payload, indent=2))
-            else:
-                typer.echo(
-                    f"{status.name}: state={status.state.value} "
-                    f"pid={status.pid} uptime={status.uptime_s:.1f}s "
-                    f"restarts={status.restart_count}"
-                )
-                if status.last_event:
-                    typer.echo(f"  last_event: {status.last_event}")
-                for ev in events[-5:]:
-                    typer.echo(f"  {ev['kind']:10s} {ev['message'][:60]}")
-            return
-
-        if action == "events":
-            events = [_program_event_json(e) for e in sup.events()]
-            if as_json:
-                typer.echo(json.dumps({"verdict": "ready", "events": events}, indent=2))
-            else:
-                for ev in events:
-                    typer.echo(
-                        f"{ev['ts']:.2f} {ev['kind']:10s} pid={ev['pid']} "
-                        f"exit={ev['exit_code']} {ev['message'][:60]}"
-                    )
-            return
-
-        if action == "logs":
-            # Print tail of the configured stderr_logfile; supervise
-            # ``--follow`` by polling the file mtime + size.
-            log_path = cfg.stderr_logfile or cfg.stdout_logfile
-            if log_path is None:
-                _emit_error(
-                    as_json,
-                    "no stderr_logfile configured; set one in [program:...]",
-                    next_command=f"edit {config_path} and add stderr_logfile=",
-                )
-                raise typer.Exit(2)
-            _tail_log(Path(log_path), lines=tail_lines, follow=follow, as_json=as_json)
-            return
-
-        _emit_error(
-            as_json,
-            f"unknown action {action!r}",
-            next_command="./scripts/lca-ops kernel-supervisor --help",
-        )
-        raise typer.Exit(2)
-
-
-# ── helpers ─────────────────────────────────────────────────────────────
-
-
-
-
-
 def _resolve_config(
-    config_path: Path | None,
-    *,
-    profile: str,
-    port: int,
+    config_path: Path | None, *, profile: str, port: int
 ) -> ProgramConfig:
     if config_path is None:
         return default_program_config(profile=profile, port=port)
     progs = parse_program_config(config_path)
-    if len(progs) > 1:
-        # Multi-program: caller picks by --name. Default = first.
-        # (LCA dev path only needs one program.)
-        return progs[0]
+    if not progs:
+        raise ValueError(f"{config_path}: no [program:...] sections found")
     return progs[0]
 
 
-def _pid_alive(pid: int) -> bool:
-    """True iff ``pid`` is a running process. ``os.kill(pid, 0)`` probes
-    without sending a signal.
-    """
-    try:
-        os.kill(pid, 0)
-    except OSError:
-        return False
-    return True
-
-
-def _emit_ok(
-    as_json: bool, *, verdict: str, detail: str, status: dict[str, Any],
-    next_command: str | None = None, events: list[dict[str, Any]] | None = None,
-) -> None:
-    payload: dict[str, Any] = {"verdict": verdict, "detail": detail, "status": status}
-    if events is not None:
-        payload["events"] = events
-    if next_command is not None:
-        payload["next_command"] = next_command
-    if as_json:
-        typer.echo(json.dumps(payload, indent=2))
-    else:
-        typer.echo(f"✅ {verdict}: {detail}")
-        if next_command:
-            typer.echo(f"   next: {next_command}")
-
-
-def _emit_error(
-    as_json: bool,
-    reason: str,
-    *,
-    status: dict[str, Any] | None = None,
-    next_command: str | None = None,
-) -> None:
-    payload: dict[str, Any] = {"verdict": "failed", "reason": reason}
-    if status is not None:
-        payload["status"] = status
-    if next_command is not None:
-        payload["next_command"] = next_command
-    if as_json:
-        typer.echo(json.dumps(payload, indent=2))
-    else:
-        typer.echo(f"❌ failed: {reason}", err=True)
-        if next_command:
-            typer.echo(f"   next: {next_command}", err=True)
-
-
-def _emit_restart_result(
-    *,
-    cfg: ProgramConfig,
-    status: ProgramStatus,
-    ready: bool,
-    json_mode: bool,
-) -> dict[str, Any]:
-    """Single source of truth for ``restart`` action output.
-
-    Used by both ``lca-ops kernel-supervisor restart`` and
-    ``lca-ops kernel-restart`` so the wire shape stays identical.
-
-    In text mode prints verdict + next hint to stdout. In JSON mode
-    emits the full payload (verdict + status + next_command). Returns
-    the dict so callers can inspect the result programmatically.
-    """
-    if ready:
-        detail = (
-            f"LCA kernel restarted (pid={status.pid}, "
-            f"restart_count={status.restart_count})"
-        )
-        next_cmd = (
-            f"./scripts/lca-ops kernel-supervisor status --name {cfg.name}"
-        )
-    else:
-        detail = (
-            f"restart did not become ready within "
-            f"{cfg.readiness_timeout}s: {status.last_event}"
-        )
-        next_cmd = (
-            f"./scripts/lca-ops kernel-supervisor logs --name {cfg.name}"
-        )
-    payload: dict[str, Any] = {
-        "verdict": "ready" if ready else "failed",
-        "detail": detail,
-        "status": status.__dict__,
-        "next_command": next_cmd,
-    }
-    if json_mode:
-        typer.echo(json.dumps(payload, indent=2))
-    else:
-        marker = "✅" if ready else "❌"
-        typer.echo(f"{marker} {payload['verdict']}: {detail}")
-        if next_cmd:
-            typer.echo(f"   next: {next_cmd}")
-    return payload
-
-
 def _tail_log(
-    path: Path, *, lines: int, follow: bool, as_json: bool
+    path: Path, *, lines: int, follow: bool, json_mode: bool
 ) -> None:
     """Read last ``lines`` lines of ``path``; optionally follow."""
     if not path.exists():
         typer.echo(f"(no log file at {path})")
         return
-    # Read tail
     try:
         data = path.read_bytes()
     except OSError as exc:
@@ -502,13 +149,12 @@ def _tail_log(
         return
     text = data.decode("utf-8", errors="replace")
     buf = text.splitlines()[-lines:]
-    if as_json:
+    if json_mode:
         typer.echo(json.dumps({"verdict": "ready", "lines": buf}, indent=2))
         return
     sys.stdout.write("\n".join(buf) + "\n")
     if not follow:
         return
-    # Follow: poll mtime + size.
     last_size = path.stat().st_size if path.exists() else 0
     try:
         while True:
@@ -526,6 +172,231 @@ def _tail_log(
                 last_size = cur
     except KeyboardInterrupt:
         return
+
+
+def _kill_orphans(pids: list[int], grace_s: float) -> None:
+    """SIGTERM each orphan, wait up to ``grace_s``, return."""
+    import signal as _signal
+
+    for pid in pids:
+        with contextlib.suppress(OSError):
+            os.kill(pid, _signal.SIGTERM)
+    if pids:
+        time.sleep(min(grace_s, 5.0))
+
+
+# ── Dispatcher ────────────────────────────────────────────────────────
+
+
+def register(app: typer.Typer) -> None:
+    """Register ``lca-ops kernel-supervisor {start,stop,restart,...}``.
+
+    The dispatcher is intentionally thin: every action's payload shape
+    lives in the service layer (see ``build_*_result``); this function
+    only does:
+
+    1. Parse typer args + resolve config.
+    2. Look up the (shared) supervisor instance via :func:`get_supervisor`.
+    3. Run the action.
+    4. Build a payload via ``build_*_result``.
+    5. ``_render`` to stdout (json) / stderr (text).
+    """
+
+    @app.command(name="kernel-supervisor")
+    def kernel_supervisor(
+        action: str = typer.Argument(
+            ...,
+            help=(
+                "One of: start, stop, restart, status, events, logs, "
+                "check-config"
+            ),
+        ),
+        config_path: Path | None = typer.Option(
+            None, "--config", "-c",
+            help="supervisord-style config file (default: dev-only config)",
+        ),
+        name: str = typer.Option(
+            "lca_kernel_dev", "--name",
+            help="Program name (for multi-program configs)",
+        ),
+        as_json: bool = typer.Option(
+            False, "--json", help="Emit canonical JSON"
+        ),
+        tail_lines: int = typer.Option(
+            50, "--lines", help="For `logs`: number of lines to print",
+        ),
+        follow: bool = typer.Option(
+            False, "--follow", "-f",
+            help="For `logs`: keep tailing (Ctrl+C to exit)",
+        ),
+        profile: str = typer.Option(
+            "profiles/web-standard.yaml", "--profile", "-p",
+            help="For dev-default config: profile path",
+        ),
+        port: int = typer.Option(
+            8765, "--port",
+            help="For dev-default config: HTTP port",
+        ),
+    ) -> None:
+        """Local supervisord-style process manager for the LCA kernel.
+
+        Output shape (--json): ``{verdict, detail|reason, status,
+        next_command?, events?}``. Text mode prints verdict + next
+        hint to stderr.
+        """
+        # ── check-config: standalone, no spawn ─────────────────────
+        if action == "check-config":
+            if config_path is None:
+                _render(
+                    {
+                        "verdict": "failed",
+                        "reason": "check-config requires --config <path>",
+                        "next_command": (
+                            "./scripts/lca-ops kernel-supervisor "
+                            "check-config --config <path>"
+                        ),
+                    },
+                    json_mode=as_json,
+                )
+                raise typer.Exit(2) from None
+            try:
+                progs = parse_program_config(config_path)
+            except (ValueError, OSError) as exc:
+                _render(
+                    build_config_error_result(config_path, exc),
+                    json_mode=as_json,
+                )
+                raise typer.Exit(1) from None
+            _render(
+                build_check_config_result(config_path, progs),
+                json_mode=as_json,
+            )
+            return
+
+        # ── resolve config + supervisor (shared across CLI calls) ──
+        try:
+            cfg = _resolve_config(config_path, profile=profile, port=port)
+        except (ValueError, OSError) as exc:
+            _render(
+                build_config_error_result(
+                    config_path or "(default)", exc,
+                ),
+                json_mode=as_json,
+            )
+            raise typer.Exit(2) from None
+        sup = get_supervisor(cfg)
+
+        # ── dispatch ──────────────────────────────────────────────
+        if action == "start":
+            orphans = _find_orphan_pids()
+            if orphans:
+                _render(
+                    build_command_error_result(
+                        action, cfg,
+                        orphan_pids=orphans,
+                        status=sup.status(),
+                    ),
+                    json_mode=as_json,
+                )
+                raise typer.Exit(1) from None
+            sup.start()
+            ready = sup.wait_ready(timeout=cfg.readiness_timeout)
+            status = sup.status()
+            _render(
+                build_start_result(cfg, status, ready=ready),
+                json_mode=as_json,
+            )
+            if not ready:
+                raise typer.Exit(1) from None
+            return
+
+        if action == "stop":
+            status = sup.stop()
+            orphans = _find_orphan_pids()
+            _kill_orphans(orphans, grace_s=cfg.stopwaitsecs)
+            status = sup.status()
+            _render(
+                build_stop_result(cfg, status, orphans_killed=len(orphans)),
+                json_mode=as_json,
+            )
+            return
+
+        if action == "restart":
+            sup.restart()
+            ready = sup.wait_ready(timeout=cfg.readiness_timeout)
+            status = sup.status()
+            _render(
+                build_restart_result(cfg, status, ready=ready),
+                json_mode=as_json,
+            )
+            if not ready:
+                raise typer.Exit(1) from None
+            return
+
+        if action == "status":
+            status = _status_with_hydration(sup, cfg)
+            _render(
+                build_status_result(
+                    cfg,
+                    status,
+                    events=list(sup.events()),
+                    is_fatal=(status.state == ProgramState.FATAL),
+                ),
+                json_mode=as_json,
+            )
+            return
+
+        if action == "events":
+            _render(
+                build_events_result(list(sup.events())),
+                json_mode=as_json,
+            )
+            return
+
+        if action == "logs":
+            log_path = cfg.stderr_logfile or cfg.stdout_logfile
+            if log_path is None:
+                _render(
+                    {
+                        "verdict": "failed",
+                        "reason": "no stderr_logfile configured",
+                        "next_command": (
+                            f"edit {config_path or '<default>'} and add "
+                            "stderr_logfile="
+                        ),
+                    },
+                    json_mode=as_json,
+                )
+                raise typer.Exit(2) from None
+            _tail_log(
+                Path(log_path), lines=tail_lines, follow=follow,
+                json_mode=as_json,
+            )
+            return
+
+        _render(
+            build_command_error_result(action, cfg),
+            json_mode=as_json,
+        )
+        raise typer.Exit(2) from None
+
+
+# ── Status hydration ──────────────────────────────────────────────────
+
+
+def _status_with_hydration(
+    sup: KernelSupervisor, cfg: ProgramConfig
+) -> ProgramStatus:
+    """If the in-process supervisor is empty (state=STOPPED + pid=None),
+    fall back to the persisted state file. Returns the most informative
+    :class:`ProgramStatus` snapshot for this process.
+    """
+    status = sup.status()
+    if status.state == ProgramState.STOPPED and status.pid is None:
+        persisted = status_from_state_file(cfg)
+        if persisted is not None:
+            return persisted
+    return status
 
 
 __all__ = ["register"]

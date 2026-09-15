@@ -91,7 +91,11 @@ def register(app: typer.Typer) -> None:
         给出 last_event + restart_count。
         """
 
+        from lca.infrastructure.cli.commands.kernel.supervisor import (
+            _render,
+        )
         from lca.infrastructure.cli.services.kernel.supervisor import (
+            build_restart_result,
             default_program_config,
             get_supervisor,
         )
@@ -102,13 +106,8 @@ def register(app: typer.Typer) -> None:
         sup.restart()
         ready = sup.wait_ready(timeout=cfg.readiness_timeout)
         status = sup.status()
-        from lca.infrastructure.cli.commands.kernel.supervisor import (
-            _emit_restart_result,
-        )
-        _emit_restart_result(
-            cfg=cfg,
-            status=status,
-            ready=ready,
+        _render(
+            build_restart_result(cfg, status, ready=ready),
             json_mode=json_mode,
         )
         if not ready:
