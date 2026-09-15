@@ -2,7 +2,7 @@
 
 **评估日期**：2026-08-20
 **评估对象**：`lca/infrastructure/observability/` 全部模块 + 跨层日志发射点
-**评估目的**：在合并 [`ADR-0063`](../../adr/0063-run-trace-ssot.md) 与 `refactor/run-diagnostics-plugin` 之前，沉淀当前日志系统的结构性问题清单，供后续 ADR 选题。
+**评估目的**：在合并 [`ADR-0063`](../adr/0063-run-trace-ssot.md) 与 `refactor/run-diagnostics-plugin` 之前，沉淀当前日志系统的结构性问题清单，供后续 ADR 选题。
 
 本文档**只列问题**，不列修复方案。每条问题指向具体文件 / 行号 / 模块,后续 ADR 评审时直接引用本文条目编号。
 
