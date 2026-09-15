@@ -40,6 +40,9 @@ if TYPE_CHECKING:
     from lca.contracts.harness.composition.composer import AgentGraph
     from lca.contracts.protocols import ArtifactClosure, Reducer
     from lca.contracts.protocols.act.effect.handler import EffectHandlerRegistry
+    from lca.contracts.protocols.declarative.declarative_1.node_executor import (
+        NodeExecutor,
+    )
     from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyStore
     from lca.contracts.protocols.runtime.runtime.composition import (
         CheckpointStateResolverFactory,
@@ -190,7 +193,7 @@ def resolve_node_executor_bindings(
     *,
     composite_separator: str = "::",
     registry_separator: str = "::",
-) -> dict[str, "NodeExecutor"]:
+) -> dict[str, NodeExecutor]:
     """Collect every node executor the booted scope already published.
 
     Each think/cognition/concept subgraph node registers its
@@ -212,9 +215,6 @@ def resolve_node_executor_bindings(
     default is deliberately permissive because the framework has no
     business-layer concept of "subgraph region".
     """
-    from lca.contracts.protocols.declarative.declarative_1.node_executor import (
-        NodeExecutor,
-    )
     from lca.harness.plugin.context import collect_context_bindings
 
     sep = registry_separator
