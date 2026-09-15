@@ -11,6 +11,7 @@ reducer seam (planned PR-7 wiring).
 """
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -25,6 +26,8 @@ from lca.contracts.protocols.graph.strategy import NodeStrategy, StrategyContext
 from lca.framework.graph.strategy_registry import register_strategy
 
 Observer = Callable[[StrategyContext, dict[str, Any], dict[str, Any]], None]
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,7 +44,9 @@ class ObserveStrategy(NodeStrategy):
             try:
                 self.observer(context, port_values, port_values)
             except Exception:
-                pass
+                # Contained per AGENTS.md §3: an observer failure must not roll
+                # back the committed visit, and must not be invisible either.
+                log.exception("observe strategy: observer raised at node %s", context.node_id)
         return NodeOutput(port_values=port_values, producer_node=context.node_id)
 
 

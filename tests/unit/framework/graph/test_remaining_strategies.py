@@ -7,6 +7,7 @@ so the strategies are exercised end-to-end.
 """
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import pytest
@@ -74,6 +75,21 @@ class TestObserve:
         strategy = ObserveStrategy(observer=bad)
         out = await strategy.execute(_ctx(), NodeInput(port_values={"decision": 1}))
         assert out.port_values == {"decision": 1}
+
+    async def test_observer_failure_is_logged(self, caplog: pytest.LogCaptureFixture) -> None:
+        """Contained, not silent: the visit survives and the error is traceable."""
+
+        def bad(ctx: StrategyContext, ins: dict[str, Any], outs: dict[str, Any]) -> None:
+            raise RuntimeError("boom")
+
+        strategy = ObserveStrategy(observer=bad)
+        logger = "lca.framework.graph.strategies.observe_strategy"
+        with caplog.at_level(logging.ERROR, logger=logger):
+            await strategy.execute(_ctx("obs-node"), NodeInput(port_values={"decision": 1}))
+
+        messages = [r.getMessage() for r in caplog.records]
+        assert any("obs-node" in m for m in messages), messages
+        assert any("boom" in (r.exc_text or "") for r in caplog.records), messages
 
 
 class TestTerminate:
