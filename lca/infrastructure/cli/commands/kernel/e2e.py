@@ -48,7 +48,7 @@ def _spawn(script: Path, extra_env: dict[str, str]) -> int:
     env.update(extra_env)
     # Inherit parent stdio so the agent/CI sees the same output as if it had
     # run the script directly. The returned exit code is the script's.
-    result = subprocess.run(  # noqa: S603 — repo-local script, env-controlled.
+    result = subprocess.run(  # repo-local script, env-controlled.
         [sys.executable, str(script)],
         env=env,
         check=False,
