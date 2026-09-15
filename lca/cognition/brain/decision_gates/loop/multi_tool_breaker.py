@@ -15,10 +15,12 @@ Three trigger conditions, evaluated in order:
 2. ``completed_set_growth == 0`` over the last ``progress_break`` steps —
    progress has flatlined at the observation level even if confidence has
    not crashed.
-3. ``fingerprint_variance == 0`` over the last ``window`` turns — the
-   model is re-issuing the same tool call with the same observation; this
-   is the classic polling loop the single-tool breaker misses because the
-   tools alternate.
+3. ``fingerprint_variance == 0`` over the last ``consecutive_repeat_max``
+   turns — the model is re-issuing the same tool call with the same
+   observation; this is the classic polling loop the single-tool breaker
+   misses because the tools alternate. The window is sized for the
+   production repeat distribution (default 2, see
+   ``LoopPolicyThresholds.consecutive_repeat_max``).
 
 The gate sits in the Think plane and only rewrites a candidate Decision.
 It never executes a tool, mutates an external system, or changes graph
@@ -153,15 +155,18 @@ class MultiToolLoopBreakerGate(DecisionGate):
 
     Trigger ladder (in order):
 
-    1. ``confidence_delta < -stuck_threshold`` (over ``progress_break``
+    1. ``fingerprint_variance == 0`` over ``consecutive_repeat_max``
+       recent turns for the candidate tool → break, kind=fingerprint_static
+       (catches the same-args-same-tool polling loop that single-tool
+       breaker misses when alternating). Window defaults to 2 because the
+       production repeat distribution peaks at two calls. Runs first so
+       the gate remains effective even when ``task_progress_projection``
+       wiring (ADR-0214 PR-F) has not landed.
+    2. ``confidence_delta < -stuck_threshold`` (over ``progress_break``
        steps) AND ``completed_growth == 0`` → break, kind=stuck_progress
-    2. ``completed_growth == 0`` over ``progress_break`` steps → break,
+    3. ``completed_growth == 0`` over ``progress_break`` steps → break,
        kind=completed_flatline (catches models that hold confidence flat
        while spinning wheels)
-    3. ``fingerprint_variance == 0`` over ``progress_warn`` recent turns
-       for the candidate tool → break, kind=fingerprint_static (catches
-       the same-args-same-tool polling loop that single-tool breaker
-       misses when alternating)
 
     All thresholds come from :class:`LoopPolicyThresholds` so the gate is
     profile-configurable.  The single-tool ``ToolLoopBreakerGate`` is kept
@@ -180,13 +185,46 @@ class MultiToolLoopBreakerGate(DecisionGate):
         if decision.action_type != ActionType.USE_TOOL or not decision.tool_calls:
             return decision
 
+        candidate = decision.tool_calls[0]
+
+        # ── Trigger 3 first: pure fingerprint comparison, no projection
+        # required. Production data shows most repeat-tool loops surface at
+        # the second call; gating this on projection availability makes the
+        # gate a no-op when wiring (ADR-0214 PR-F) hasn't landed yet.
+        recent_turns: list[ControlTurnView] = []
+        for turn in iter_control_turns_reversed(state):
+            recent_turns.append(turn)
+            if len(recent_turns) >= self._thresholds.consecutive_repeat_max:
+                break
+        variance = _fingerprint_variance_over_turns(recent_turns, candidate)
+        if (
+            len(recent_turns) + 1 >= self._thresholds.consecutive_repeat_max
+            and variance == 0.0
+        ):
+            return self._block(
+                state,
+                decision,
+                candidate.tool_name,
+                rationale=_BLOCKED_PROGRESS_RATIONALE,
+                verdict=MultiToolBreakVerdict(
+                    kind="fingerprint_static",
+                    window=self._thresholds.consecutive_repeat_max,
+                    confidence_delta=0.0,
+                    completed_growth=0,
+                    fingerprint_variance=variance,
+                ),
+                response=(
+                    f"工具 {candidate.tool_name} 连续 "
+                    f"{self._thresholds.consecutive_repeat_max} 次相同指纹, "
+                    f"已熔断。"
+                ),
+            )
+
         projection = self._resolve_projection(state)
         if projection is None:
-            # C9 fail-open: projection missing means we cannot evaluate
-            # progress; let single-tool breaker have its shot.
+            # C9 fail-open for triggers 1/2: projection missing means we
+            # cannot evaluate progress; trigger 3 already ran above.
             return decision
-
-        candidate = decision.tool_calls[0]
 
         # Layer 4 ladder (per LoopPolicyThresholds field docs).
         history = _confidence_history_from_projection(projection, self._thresholds.progress_break)
@@ -237,35 +275,9 @@ class MultiToolLoopBreakerGate(DecisionGate):
                 ),
             )
 
-        # ── Trigger 3: static fingerprint across recent turns ───────────
-        # iter_control_turns_reversed is a generator; materialize the first
-        # ``progress_warn`` turns newest-first, then evaluate fingerprint
-        # variance.  ``None`` fingerprint on either side fails open to 1.0.
-        recent_turns: list[ControlTurnView] = []
-        for turn in iter_control_turns_reversed(state):
-            recent_turns.append(turn)
-            if len(recent_turns) >= self._thresholds.progress_warn:
-                break
-        variance = _fingerprint_variance_over_turns(recent_turns, candidate)
-        if len(recent_turns) >= self._thresholds.progress_warn and variance == 0.0:
-            return self._block(
-                state,
-                decision,
-                candidate.tool_name,
-                rationale=_BLOCKED_PROGRESS_RATIONALE,
-                verdict=MultiToolBreakVerdict(
-                    kind="fingerprint_static",
-                    window=self._thresholds.progress_warn,
-                    confidence_delta=confidence_delta,
-                    completed_growth=growth,
-                    fingerprint_variance=variance,
-                ),
-                response=(
-                    f"工具 {candidate.tool_name} 最近 "
-                    f"{self._thresholds.progress_warn} 步指纹无变化, "
-                    f"已熔断。"
-                ),
-            )
+        # ── Trigger 3 has moved above the projection resolution so it
+        # remains effective even when ``task_progress_projection`` is not
+        # bound (production path today). ──
 
         return decision
 
