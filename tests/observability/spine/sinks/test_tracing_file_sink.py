@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 from unittest.mock import patch
 
@@ -45,8 +45,8 @@ def _make_record(
         epoch=1,
         causality_id="cu-1",
         outcome="success",
-        when=datetime(2026, 9, 3, 12, 0, 0, tzinfo=timezone.utc),
-        when_corrected=datetime(2026, 9, 3, 12, 0, 0, tzinfo=timezone.utc),
+        when=datetime(2026, 9, 3, 12, 0, 0, tzinfo=UTC),
+        when_corrected=datetime(2026, 9, 3, 12, 0, 0, tzinfo=UTC),
         prev_event_hash=None,
         run_id=run_id,
         step_id="step-1",

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 
 import pytest
 
@@ -20,8 +20,8 @@ def _rec(**overrides):
         "epoch": 1,
         "causality_id": "sha256:abc",
         "outcome": None,
-        "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
-        "when_corrected": datetime(2026, 9, 1, 12, 0, 0, 100000, tzinfo=timezone.utc),
+        "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC),
+        "when_corrected": datetime(2026, 9, 1, 12, 0, 0, 100000, tzinfo=UTC),
         "prev_event_hash": None,
         "run_id": "r1",
         "step_id": "s1",

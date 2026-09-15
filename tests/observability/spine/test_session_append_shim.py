@@ -12,7 +12,7 @@ RuntimeError fail-loud。同步直写路径已删除。
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 from typing import Any
 
@@ -31,7 +31,7 @@ from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
 
 
 def _stub_record(execution_point: str) -> EventRecord:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return EventRecord(
         execution_point=execution_point,
         channel="fact",

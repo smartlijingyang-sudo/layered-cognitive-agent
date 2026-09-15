@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 
 from lca.infrastructure.observability.spine.event.record import EventRecord
@@ -20,8 +20,8 @@ def _make_rec(**overrides) -> EventRecord:
         "epoch": 1,
         "causality_id": "ca",
         "outcome": None,
-        "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
-        "when_corrected": datetime(2026, 9, 1, 12, 0, 0, 100000, tzinfo=timezone.utc),
+        "when": datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC),
+        "when_corrected": datetime(2026, 9, 1, 12, 0, 0, 100000, tzinfo=UTC),
         "prev_event_hash": None,
         "run_id": "r1",
         "step_id": "s1",

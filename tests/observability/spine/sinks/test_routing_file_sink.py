@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 
 from lca.infrastructure.observability.spine.event.record import EventRecord
@@ -13,7 +13,7 @@ from lca.infrastructure.observability.spine.sinks.routing_file_sink import (
 
 
 def _rec(*, run_id: str, ep: str = "kernel.run.start") -> EventRecord:
-    now = datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 9, 1, 12, 0, 0, tzinfo=UTC)
     return EventRecord(
         execution_point=ep,
         channel="control",
