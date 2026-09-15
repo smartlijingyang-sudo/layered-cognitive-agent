@@ -11,7 +11,7 @@ from lca.cognition.body.guard.spill import ToolResultSpillGuard
 from lca.cognition.body.guard.timeout import ToolTimeoutGuard, _TOOL_TIMEOUT
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.execution.decision import Observation
-from lca.contracts.protocols.act.tool.pipeline import ToolDefinition, ToolExecutionContext
+from lca.contracts.protocols.act.tool.pipeline import ToolExecutionContext
 from lca.contracts.protocols.runtime.infra.infra import Tool
 
 

@@ -7,7 +7,6 @@ from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.models.core.execution.decision import Decision, Observation, ToolCall, Turn
 from lca.contracts.models.core.perceive.perception import ContextItem, ContextManifest
 from lca.contracts.models.core.perceive.projection import PerceiveProjection
-from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import AgentState, Budget
 
 
