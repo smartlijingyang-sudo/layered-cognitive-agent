@@ -45,7 +45,7 @@ async def test_merged_store_lists_assistant_skills_before_global(tmp_path: Path)
     global_store = DiskSkillPackageStore(SkillSettings(cache_dir=tmp_path / "global"))
     global_store.install_package(
         skill_id="global-skill",
-        skill_md_text="---\nname: global\ndescription: g\n---\nbody",
+        skill_md_text="---\nname: global\ndescription: g\nreferences: []\n---\nbody",
         resource_files={},
         source_url="u",
     )
@@ -60,7 +60,7 @@ async def test_merged_store_lists_assistant_skills_before_global(tmp_path: Path)
 def _write_local_skill(root: Path, skill_id: str) -> Path:
     root.mkdir()
     (root / "SKILL.md").write_text(
-        f"---\nname: {skill_id}\ndescription: demo\n---\nbody",
+        f"---\nname: {skill_id}\ndescription: demo\nreferences: []\n---\nbody",
         encoding="utf-8",
     )
     return root
