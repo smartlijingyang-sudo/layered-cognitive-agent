@@ -18,7 +18,7 @@ Status: implemented
 
 ## Decision
 
-落地 [ADR-0205 WireContract 元机制](../adr/0205-wire-contract-as-plugin-seam.md) 的 P0 第 1 应用域 — surface render WireContract:
+落地 [ADR-0205 WireContract 元机制](../../../adr/0205-wire-contract-as-plugin-seam.md) 的 P0 第 1 应用域 — surface render WireContract:
 
 **核心组件**:
 1. `lca_kernel/contracts/wire/contracts/model_openai.py` — `OpenAIUserMessage` / `OpenAIAssistantMessage` / `OpenAIToolMessage` / `OpenAIToolCall` / `OpenAIFunction` (Pydantic frozen, `extra="forbid"`)
@@ -101,7 +101,7 @@ Status: implemented
 
 ## Status / next steps
 
-P0 实施中 (9 PR, [ADR-0204 §9](../adr/0204-surface-render-slot-plan-strategy.md))。完成后 P1 推广:
+P0 实施中 (9 PR, [ADR-0204 §9](../../../adr/0204-surface-render-slot-plan-strategy.md))。完成后 P1 推广:
 - P1-PR-10: Tool Invocation WireContract (`ToolInvocationEnvelope` / `ToolResultEnvelope`)
 - P1-PR-11: Fact Shape WireContract (`FactPayload`)
 - P1-PR-12: Skill Descriptor WireContract (`SkillManifest` / `SkillEntrypoint`)
