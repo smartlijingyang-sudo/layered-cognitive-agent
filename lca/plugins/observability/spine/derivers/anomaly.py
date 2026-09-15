@@ -40,7 +40,7 @@ from __future__ import annotations
 
 import logging
 from collections import deque
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from typing import Any
 
 from lca.contracts.observability.canonical_digest import canonical_digest
@@ -284,7 +284,7 @@ class AnomalyDetector(Deriver):
             return {
                 "span_id": event.span_id,
                 "when": event.when.isoformat(),
-                "now": datetime.now(timezone.utc).isoformat(),
+                "now": datetime.now(UTC).isoformat(),
             }
         if kind == "stalled":
             return {"sequence": event.sequence}
