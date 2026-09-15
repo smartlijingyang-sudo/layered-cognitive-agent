@@ -321,7 +321,9 @@ class PlanInterpreterAdapter:
         with ``cursor.current_node_id`` so the kernel visits the
         checkpointed node first instead of restarting from the entry.
         The visited set seeds ``traversal.visit_counts`` so
-        ``max_visits`` enforcement remains correct on resume.
+        :class:`PlanTraversal`'s visit-count invariant survives
+        resume (ADR-0225: the deleted ``max_visits`` per-node
+        counter is replaced by edge predicates + ``AgentState.budget``).
 
         Both ``state=`` (legacy) and ``outer_state=`` (v2) kwargs are
         accepted; they are equivalent for the kernel.
@@ -387,8 +389,11 @@ def _seed_traversal(plan: object, start_id: str, visited: tuple[str, ...]) -> Pl
     The new kernel does not yet expose a first-class
     ``PlanTraversal.resume(checkpoint)``; we instantiate the traversal
     with ``current_id=start_id`` and pre-populate ``visit_counts`` from
-    ``visited``. ``max_visits`` enforcement remains correct because
-    the kernel reads ``visit_counts`` directly before each visit.
+    ``visited``. The kernel reads ``visit_counts`` directly before each
+    visit, so the seeded counts carry forward to the resumed plan.
+    Per ADR-0225, the deleted ``max_visits`` per-node ceiling is
+    replaced by edge predicates + ``AgentState.budget``; this seeding
+    preserves visit-count observability for diagnostics only.
     """
     visit_counts: dict[str, int] = dict.fromkeys(visited, 1)
     return PlanTraversal(

@@ -27,7 +27,7 @@ chain ``A→B→C`` is fine because each port is produced by an
 earlier node and consumed by a later one; a 3-node cycle where the
 dependency relation forms a directed cycle ``A→B→C→A`` is a
 scheduling bug but it is not a mutual-dependency deadlock (the
-runtime can still resolve the cycle via ``max_visits`` /
+runtime can still resolve the cycle via per-node
 ``terminal_predicate`` — see :class:`CycleHasTerminalCheck`). Only
 the *mutual* port dependency pair is fatal because every node
 needs a port that its only potential producer also needs.

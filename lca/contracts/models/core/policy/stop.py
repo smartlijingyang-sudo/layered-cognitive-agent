@@ -30,7 +30,7 @@ class StopReason(Enum):
       payload (the model is the implicit source of "done")
     - Body raises DeterministicToolError on `failure_kind == execution`,
       and the outer driver maps it to ERROR
-    - the budget guard produces BUDGET_EXCEEDED when max_visits fires
+    - the budget guard produces BUDGET_EXCEEDED when AgentState.budget is exhausted (per ADR-0225, the prior ``max_visits`` per-node ceiling is gone)
     """
 
     CONTINUE = "continue"

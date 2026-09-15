@@ -190,7 +190,10 @@ def compile_plan(
             # CompiledRunPlan; runtime builds the executable plan via
             # PlanInterpreter + NodeExecutor subgraphs at boot.
             # Empty ActionAuthorityPlan() left Body registry vacant ->
-            # UnregisteredActionError on use_tool + outer max_visits loop.
+            # UnregisteredActionError on use_tool; the loop is then
+            # bounded by AgentState.budget (max_steps, max_wall_clock)
+            # plus per-node terminal_predicate (ADR-0225: the prior
+            # max_visits per-node ceiling is gone).
             # Empty plugin_specs => SOLO defaults (respond/use_tool/stop/ask_human).
             action_authority=compile_action_authority(()),
         ),

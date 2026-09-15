@@ -9,8 +9,7 @@
 #     id     : 节点拓扑身份(供 edges source/target 锚点)
 #     region : 节点 region(可空,fallback 到 bundle.region)
 #     factory: 业务语义名;FactoryResolver 解析到 NodeExecutor
-#     config : 节点级图配置(只图级参数)
-#       max_visits : NodeContext.budget 透传,v2 driver 终止条件之一
+#     config : 节点级图配置(只图级参数;ADR-0225 删除 max_visits)
 #   edges[]
 #     from/to : 节点 id 锚点
 #     when    : bool-expr DSL;interpreter 在 node.end 后跑

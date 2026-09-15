@@ -2,13 +2,14 @@
 
 Reject strongly connected components (cycles) that contain no
 terminal node.  A cycle without a terminal is an infinite-loop
-trap — the interpreter enters the cycle, traverses it until
-``max_visits`` exhausts every node, then dead-ends with no
-termination signal.
+trap — the interpreter enters the cycle and dead-ends with no
+termination signal.  After ADR-0225, the prior ``max_visits``
+per-node ceiling no longer fires to break runaway cycles, so this
+check is the runtime guard against cycles that have no exit.
 
 The check uses an iterative Tarjan SCC algorithm to avoid
 recursion limits on large graphs.  Single-node SCCs are skipped
-(self-loops are handled by :class:`SelfLoopSafeCheck`).
+(self-loops are now safe via per-node ``terminal_predicate``).
 """
 from __future__ import annotations
 
@@ -95,9 +96,10 @@ class CycleHasTerminalCheck(PlanCheck):
                 return PlanLiftError(
                     f"plan {plan_id!r}: strongly connected component "
                     f"{scc_names!r} contains no terminal node; the "
-                    f"interpreter will loop inside the cycle until every "
-                    f"node's ``max_visits`` budget exhausts and then "
-                    f"dead-end. Add a terminal node to the cycle or "
+                    f"interpreter will loop inside the cycle indefinitely "
+                    f"because no node's terminal_predicate will ever fire. "
+                    f"Add a terminal node to the cycle, attach a "
+                    f"terminal_predicate to one of its nodes, or "
                     f"restructure the edges.",
                     plan_id=plan_id,
                 )
