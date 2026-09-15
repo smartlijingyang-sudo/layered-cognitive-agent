@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 from lca.contracts.protocols.memory.operational_skills import (
     SkillIndexEntry,
@@ -16,6 +17,8 @@ from lca.infrastructure.skills.settings.settings import SkillSettings
 
 if TYPE_CHECKING:
     from lca.contracts.protocols.assistant.skill_overlay import AssistantSkillOverlay
+
+_T = TypeVar("_T")
 
 
 class AssistantMergedSkillStore(SkillPackageStore):
@@ -66,32 +69,30 @@ class AssistantMergedSkillStore(SkillPackageStore):
             merged.append(entry)
         return tuple(merged)
 
-    def get(self, skill_id: str) -> SkillPackage:
+    def _lookup(self, fetch: Callable[[SkillPackageStore], _T]) -> _T:
+        """Read the assistant scope first, then the global scope.
+
+        A miss in the assistant scope is not an error — the skill may simply be
+        a global one — so it falls through to the global store, whose own
+        ``SkillNotFoundError`` is the single authoritative failure the caller
+        sees.
+        """
         assistant_store = self._assistant_disk_store()
         if assistant_store is not None:
             try:
-                return assistant_store.get(skill_id)
-            except SkillNotFoundError:
-                pass
-        return self._global.get(skill_id)
+                return fetch(assistant_store)
+            except SkillNotFoundError:  # WHY: assistant scope is only one of two
+                pass  # lookup scopes; the global store below decides.
+        return fetch(self._global)
+
+    def get(self, skill_id: str) -> SkillPackage:
+        return self._lookup(lambda store: store.get(skill_id))
 
     def read_resource(self, skill_id: str, rel_path: str) -> str:
-        assistant_store = self._assistant_disk_store()
-        if assistant_store is not None:
-            try:
-                return assistant_store.read_resource(skill_id, rel_path)
-            except SkillNotFoundError:
-                pass
-        return self._global.read_resource(skill_id, rel_path)
+        return self._lookup(lambda store: store.read_resource(skill_id, rel_path))
 
     def resource_files(self, skill_id: str) -> dict[str, bytes]:
-        assistant_store = self._assistant_disk_store()
-        if assistant_store is not None:
-            try:
-                return assistant_store.resource_files(skill_id)
-            except SkillNotFoundError:
-                pass
-        return self._global.resource_files(skill_id)
+        return self._lookup(lambda store: store.resource_files(skill_id))
 
 
 __all__ = ["AssistantMergedSkillStore"]
