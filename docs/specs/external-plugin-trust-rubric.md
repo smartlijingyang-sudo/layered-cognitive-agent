@@ -6,7 +6,7 @@
 
 ## 0. Why a rubric?
 
-Per [ADR-0199 §3.4](../adr/0199-hermes-inspired-cognitive-plugin-convergence.md#34-pluginorigin--trust-model):
+Per [ADR-0199 §3.4](../adr/0199-hermes-inspired-cognitive-plugin-convergence.md#34-pluginorigin-与信任模型):
 plugins with `source` in `{"project", "pip"}` default to `untrusted` and disabled. The runtime cannot silently admit them — they need explicit profile provenance + a runtime isolation tier.
 
 This rubric answers: **once a plugin is admitted, where does it run?**
@@ -85,7 +85,7 @@ plugin author's advisory.
 
 ## 7. Cross-references
 
-- [ADR-0199 §3.4 PluginOrigin & trust model](../adr/0199-hermes-inspired-cognitive-plugin-convergence.md#34-pluginorigin--trust-model)
+- [ADR-0199 §3.4 PluginOrigin & trust model](../adr/0199-hermes-inspired-cognitive-plugin-convergence.md#34-pluginorigin-与信任模型)
 - [ADR-0199 §10 Phase 5 external plugin isolation](../adr/0199-hermes-inspired-cognitive-plugin-convergence.md#10-分阶段实施计划)
-- [Implementation plan §8 P5-01..P5-06](../specs/0199-implementation-plan.md#8-p5--external-plugin-trust)
-- [ExternalPluginKind contract](../contracts/runtime/trust.py) (P5-02)
+- [Implementation plan §8 P5-01..P5-06](../specs/0199-implementation-plan.md#8-p5--external-plugin-trust6-pr)
+- [ExternalPluginKind contract](../../lca/contracts/runtime/trust.py) (P5-02)
