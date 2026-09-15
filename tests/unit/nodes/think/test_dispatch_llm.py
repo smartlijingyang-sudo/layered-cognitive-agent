@@ -17,8 +17,15 @@ from typing import Any
 
 import pytest
 
-from lca.contracts.models.core.conversation.llm import LLMResponse, TokenUsage
+from lca.contracts.models.core.conversation.llm import (
+    LLMResponse,
+    NativeToolCall,
+    TokenUsage,
+)
 from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.models.observability.tool.journal_receipt import (
+    ToolJournalReceipt,
+)
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -85,6 +92,10 @@ def _request() -> ModelVisibleRequest:
 
 def _response() -> LLMResponse:
     return LLMResponse(text="ok", model="m", usage=TokenUsage(), tool_calls=[])
+
+
+def _response_with_tool_calls(*calls: NativeToolCall) -> LLMResponse:
+    return LLMResponse(text="", model="m", usage=TokenUsage(), tool_calls=list(calls))
 
 
 def _node_context(runtime: Any = None) -> NodeContext:
@@ -234,3 +245,109 @@ async def test_node_execute_missing_state_raises_type_error() -> None:
                 }
             ),
         )
+
+
+async def test_node_execute_emits_tool_journal_receipt_per_tool_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Each LLM tool_call → one ``commit_tool_journal_receipt`` call.
+
+    Mirrors the old ``execute_llm_turn`` stream path
+    (``lca/cognition/brain/llm_turn/executor.py:140-155``): on every
+    completed tool call, build a ``tool_call_resolved_receipt`` and
+    commit it via ``commit_tool_journal_receipt``. The receipt's
+    ``tool_name`` / ``tool_call_id`` / ``arguments`` come from the LLM
+    response's ``NativeToolCall`` verbatim. ``state`` and ``session``
+    are forwarded so the unbound-session silent-drop path can't recur.
+    """
+    from lca.nodes.think.dispatch import llm as dispatch_module
+
+    calls: list[tuple[ToolJournalReceipt, dict[str, Any]]] = []
+
+    def spy(receipt: ToolJournalReceipt, **kwargs: Any) -> None:
+        calls.append((receipt, kwargs))
+
+    monkeypatch.setattr(dispatch_module, "commit_tool_journal_receipt", spy)
+
+    executor = LlmCallExecutor()
+    state = _state(step=4, turn=9)
+    session = object()
+    adapter = _RecordingAdapter(
+        response=_response_with_tool_calls(
+            NativeToolCall(
+                call_id="call-1",
+                name="echo",
+                arguments={"msg": "hello"},
+            ),
+            NativeToolCall(
+                call_id="call-2",
+                name="writeFile",
+                arguments={"path": "/var/data/x", "content": "abc"},
+            ),
+        )
+    )
+    runtime = {"adapter": adapter, "session": session}
+
+    await executor.node_execute(
+        context=_node_context(runtime=runtime),
+        input=NodeInput(
+            port_values={
+                "state": state,
+                "writer": _FakeWriter(),
+                "model_visible_request": _request(),
+            }
+        ),
+    )
+
+    assert len(calls) == 2
+    first_receipt, first_kwargs = calls[0]
+    second_receipt, second_kwargs = calls[1]
+
+    catalog_first = first_receipt.catalog_event
+    catalog_second = second_receipt.catalog_event
+    assert catalog_first.tool_name == "echo"
+    assert catalog_first.tool_call_id == "call-1"
+    assert catalog_first.arguments == {"msg": "hello"}
+    assert catalog_second.tool_name == "writeFile"
+    assert catalog_second.tool_call_id == "call-2"
+    assert catalog_second.arguments == {"path": "/var/data/x", "content": "abc"}
+
+    assert first_kwargs.get("state") is state
+    assert first_kwargs.get("session") is session
+    assert second_kwargs.get("state") is state
+    assert second_kwargs.get("session") is session
+
+
+async def test_node_execute_no_tool_calls_skips_journal_receipt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Empty ``response.tool_calls`` → ``commit_tool_journal_receipt`` not called.
+
+    A response with only text (no native tool calls) is the common
+    ``respond`` decision path; committing an empty ``tool_calls`` loop
+    must not emit a phantom ``tool.call.resolved.v1`` catalog fact.
+    """
+    from lca.nodes.think.dispatch import llm as dispatch_module
+
+    calls: list[tuple[ToolJournalReceipt, dict[str, Any]]] = []
+
+    def spy(receipt: ToolJournalReceipt, **kwargs: Any) -> None:
+        calls.append((receipt, kwargs))
+
+    monkeypatch.setattr(dispatch_module, "commit_tool_journal_receipt", spy)
+
+    executor = LlmCallExecutor()
+    adapter = _RecordingAdapter(response=_response())
+
+    await executor.node_execute(
+        context=_node_context(runtime={"adapter": adapter}),
+        input=NodeInput(
+            port_values={
+                "state": _state(),
+                "writer": _FakeWriter(),
+                "model_visible_request": _request(),
+            }
+        ),
+    )
+
+    assert calls == []
