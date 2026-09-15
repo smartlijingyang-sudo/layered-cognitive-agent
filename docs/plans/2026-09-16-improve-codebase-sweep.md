@@ -96,3 +96,33 @@ in this sweep (per `.agents/skills/lca-improve-codebase/SKILL.md` §Reject when)
   `LcaStreamEventManager` was the near-miss here (that rename was safe because
   the class is not part of the ADR's normative contract; `SpineHandler` is named
   in AGENTS.md itself).
+
+## Landed since the first ledger snapshot
+
+- 4 dead `# type: ignore`-adjacent and F401 sites in `scripts/` (yaml/sys/shutil/re)
+  and `lca/runtime/projection/result_finalizer.py`, `lca/plugins/composer/runtime/
+  runtime/{capabilities,assembly}.py`.
+- 3 reasoner renderers repointed to `lca/cognition/brain/sections/types.py`
+  (`render_teammates`, `render_member_reports`, `render_prior_conversation_from_state`)
+  — the characterization module's 8 golden text assertions run again; the routing
+  module's remaining failure drives the removed `PromptReasoner.generate_thoughts`
+  and needs a DTO rewrite (candidate below).
+- Link rot: 140 → 84 broken links. Classes fixed — layer-table prefix one level
+  short (`docs/specs/platform-directory-architecture.md`), doubled `adr-` filename
+  prefix (`docs/specs/hermes-lca-semantic-reference.md`), anglicised heading
+  fragments recomputed with `scripts/verify_md_links.py:slugify_heading`
+  (`docs/specs/external-plugin-trust-rubric.md`), and `../adr/` written from
+  three-levels-deep notes (`docs/notes/{archived,implemented}/seam/*`,
+  `docs/notes/plans/2026-09-09-colony-runtime-architecture-review-response.md`).
+
+## Additional rejected / blocked candidates
+
+- **Deleted-link targets.** `docs/adr/0209-agent-lab-cordis-unification.md` and the
+  sibling note `2026-09-09-lab-cordis-unification-landing.md` do not exist; the
+  archived P7 record links them. Repairing that means deciding whether ADR-0209 was
+  withdrawn or renamed — a docs-ownership question, not a link fix.
+- **`tests/scenario/routing/test_routing_prompt_reports.py`'s last failure** drives
+  `PromptReasoner.generate_thoughts(state)`; the current surface is
+  `build_turn_plan` / `render_turn` / `complete_turn` over `ReasonerContext`,
+  `TemplateSelection`, `RoleSnapshot`. Rewiring needs the prompt-template provider,
+  so it is a candidate, not a sweep unit.
