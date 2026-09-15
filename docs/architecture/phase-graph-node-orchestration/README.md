@@ -73,3 +73,5 @@ Guard / 租约 / Spine 作为 **插件平面**（不是第七 phase）是对的�
 4. 用 `02` 拍板 M1（外环边 SSOT）是否立刻开 PR；其余按依赖插入排期。
 
 有问题直接拿 inventory 表里的节点 id / 边谓词对线即可。
+
+- M1 fault-domain obligations attachment: [`04-m1-fault-domain-obligations.md`](./04-m1-fault-domain-obligations.md)

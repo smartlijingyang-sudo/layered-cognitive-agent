@@ -24,7 +24,7 @@ from typing import Any
 from lca.contracts.protocols.graph.binding import BindingKind
 from lca.contracts.protocols.graph.errors import PlanLiftError
 from lca.contracts.protocols.graph.node_io import NodeIOSchema, PortSpec
-from lca.contracts.protocols.graph.plan import Plan, PlanEdge, PlanNode, SubgraphReference
+from lca.contracts.protocols.graph.plan import EdgeLoopObligation, Plan, PlanEdge, PlanNode, SubgraphReference
 from lca.contracts.protocols.graph.predicate import PortRef, Predicate
 
 
@@ -158,6 +158,7 @@ def _lift_graph_spec_inner(spec: Mapping[str, Any]) -> Plan:
                 target=target,
                 when=_coerce_when(raw.get("when")),
                 subgraph_ref=_subgraph_ref_from(raw.get("subgraph_ref")),
+                loop=_coerce_loop(raw.get("loop")),
             )
         )
     return Plan(
@@ -227,6 +228,7 @@ def lift_executable_plan(executable: object) -> Plan:
                 source=str(getattr(raw, "source", "")),
                 target=str(getattr(raw, "target", "")),
                 when=_coerce_when(getattr(raw, "when", "true")),
+                loop=_coerce_loop(getattr(raw, "loop", None)),
             )
         )
     return Plan(
@@ -527,6 +529,53 @@ def _subgraph_ref_from(raw: object) -> SubgraphReference | None:
 
 
 _LEAF_PREDICATE_KINDS = frozenset({"eq", "ne", "in", "exists", "missing"})
+
+
+def _coerce_loop(raw: object) -> EdgeLoopObligation | None:
+    """Coerce a YAML ``loop:`` mapping into :class:`EdgeLoopObligation`.
+
+    Accepts both snake_case and camelCase keys (``max_iterations`` /
+    ``maxIterations``, ``terminal_predicate`` / ``terminalPredicate``).
+    ``None`` / empty → no obligation. Missing positive max_iterations or
+    empty budget fail loud at lift (no silent unbound re-entry).
+    """
+    if raw is None:
+        return None
+    if isinstance(raw, EdgeLoopObligation):
+        return raw
+    if not isinstance(raw, Mapping):
+        raise PlanLiftError(
+            f"edge loop must be a mapping or EdgeLoopObligation, got {type(raw).__name__}"
+        )
+    max_iterations = raw.get("max_iterations", raw.get("maxIterations", 1))
+    budget = raw.get("budget", "run.steps")
+    terminal_raw = raw.get("terminal_predicate", raw.get("terminalPredicate"))
+    try:
+        max_iterations_int = int(max_iterations)
+    except (TypeError, ValueError) as exc:
+        raise PlanLiftError(
+            f"edge loop.max_iterations must be a positive int, got {max_iterations!r}"
+        ) from exc
+    if max_iterations_int <= 0:
+        raise PlanLiftError(
+            f"edge loop.max_iterations must be > 0, got {max_iterations_int}"
+        )
+    budget_str = str(budget or "").strip()
+    if not budget_str:
+        raise PlanLiftError("edge loop.budget must be a non-empty string")
+    terminal_pred = None
+    if terminal_raw is not None and terminal_raw is not False:
+        if isinstance(terminal_raw, str):
+            raise PlanLiftError(
+                f"edge loop.terminal_predicate string DSL is no longer supported; "
+                f"use a typed Predicate dict (got {terminal_raw!r})"
+            )
+        terminal_pred = _coerce_when(terminal_raw)
+    return EdgeLoopObligation(
+        max_iterations=max_iterations_int,
+        budget=budget_str,
+        terminal_predicate=terminal_pred,
+    )
 
 
 def _coerce_when(raw: object) -> Predicate | None:

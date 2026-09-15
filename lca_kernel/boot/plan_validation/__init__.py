@@ -35,6 +35,9 @@ from lca.framework.graph.lifter import (
 )
 from lca.harness.profile.resolve.resolve import ResolvedProfile
 
+from lca_kernel.boot.plan_validation.checks.admit_recovery_edge import (
+    AdmitRecoveryEdgeCheck,
+)
 from lca_kernel.boot.plan_validation.checks.compiled_run_plan import (
     check_compiled_run_plan,
 )
@@ -575,6 +578,8 @@ _PLAN_CHECKS: tuple[Callable[[Plan, str], PlanLiftError | None], ...] = (
     EntryUniquenessCheck(),
     PredicateWellformedCheck(),
     SubgraphPortContractCheck(),
+    # M1 outer edge SSOT: bounded admit_recovery on phase.main.outer.
+    AdmitRecoveryEdgeCheck(),
     # Style / SSOT checks (skip in test fixtures that don't declare
     # these fields, but kept available for ``DEFAULT_CHECKS`` to
     # enable on production bundles via config):
