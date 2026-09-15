@@ -15,6 +15,7 @@ Delete `max_visits` from the v2 driver surface in PR1: `PlanNode`, `PhaseNode`, 
 - **Keep `max_visits`, add `MultiToolLoopBreaker` to default gate chain** — rejected: PR2's wire-shape fix removes the cycle the breaker was guarding, so the counter becomes pure overhead (75 decorative + 5 harmful declarations).
 - **Replace with LangGraph-style `recursion_limit`** — rejected: `recursion_limit` caps super-steps globally at the executor layer, a different shape from per-node visit count; no current use case demands it.
 - **Increase the `max_visits` values** — rejected: a higher counter only delays the same bug (`run_cc39610072bf`); the right termination signal is `Decision(action_type=respond)` plus `AgentState.budget`, not a ceiling on the wrong counter.
+- **Do nothing (baseline)** — rejected: leaves the 75 decorative + 5 harmful declarations in place and forces every reader of `PlanNode` to learn a counter semantics that does not contribute to termination.
 
 ## Consequences (verified via PR1 commit)
 
