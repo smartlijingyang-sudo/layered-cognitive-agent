@@ -193,12 +193,24 @@ class SimpleBody(Body):
         cursor advance (not relevant for this path) needs it. We accept it
         so callers can route through the same composition seam.
 
+        ``state`` carries the current ``step`` directly; the per-call
+        ``turn`` is read from ``state.extra["current_turn"]`` (set by the
+        ``session.created.v1`` / ``turn.started.v1`` projection in
+        ``harness.projection.agent_state``). Both default to ``0`` when
+        ``state`` is ``None`` or the slot is unset, so single-shot tests
+        without a session-bound agent still produce a deterministic
+        turn/step on the journal rows.
+
         This is the root-cause fix for ``run_cc39610072bf``: with
         persist-before-execute, the assistant ``tool_calls`` row is in the
         journal before the next LLM call sees the history, so an orphan
         tool row cannot precede the assistant row that declared the call.
         """
-        del state
+        # ``AgentState`` exposes ``step`` directly; the matching ``turn`` is
+        # carried in ``state.extra["current_turn"]`` (projection-driven;
+        # may be absent before the first ``turn.started.v1`` event).
+        turn = int(state.extra.get("current_turn", 0)) if state is not None else 0
+        step = state.step if state is not None else 0
         if self.writer is None:
             raise ToolExecutionError(
                 "Body.dispatch_tool_call requires a bound RunSessionWriter; "
@@ -229,8 +241,8 @@ class SimpleBody(Body):
         #    failure → the tool never runs.
         try:
             self.writer.append_assistant_message(
-                turn=0,
-                step=0,
+                turn=turn,
+                step=step,
                 role="assistant",
                 content=None,
                 tool_calls=tool_calls_payload,  # type: ignore[arg-type]
@@ -264,8 +276,8 @@ class SimpleBody(Body):
         #    row never landed (defence in depth).
         try:
             self.writer.append_tool_result(
-                turn=0,
-                step=0,
+                turn=turn,
+                step=step,
                 call_id=call.call_id,
                 content=_observation_content(observation),
                 error=_observation_error(observation),

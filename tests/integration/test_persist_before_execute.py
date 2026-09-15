@@ -150,16 +150,25 @@ class _FakeSafeExecutor:
         return await tool.execute(args)
 
 
-def _state() -> AgentState:
+def _state(step: int = 0, turn: int = 0) -> AgentState:
+    """Build an AgentState with ``current_turn`` stored in ``state.extra``.
+
+    ``AgentState`` does not have a top-level ``turn`` attribute; the
+    per-call turn lives at ``state.extra["current_turn"]`` (set by the
+    ``turn.started.v1`` projection in ``harness.projection.agent_state``).
+    ``history`` is a ``@property`` alias over ``control_turns`` and is not
+    a constructor kwarg — pass nothing.
+    """
     from lca.contracts.models.core.policy.budget import create_budget
 
-    return AgentState(
+    state = AgentState(
         trace_id="trace-1",
-        step=0,
-        turn=0,
+        task="test",
         budget=create_budget(max_steps=10),
-        history=[],
     )
+    state.step = step
+    state.extra["current_turn"] = turn
+    return state
 
 
 def _decision_with_one_tool_call(call_id: str = "call-1", tool_name: str = "echo") -> Decision:
@@ -257,3 +266,76 @@ def test_dispatch_tool_call_without_writer_raises() -> None:
     with pytest.raises(ToolExecutionError):
         asyncio.run(body.dispatch_tool_call(decision=_decision_with_one_tool_call()))
     assert recorder.calls == []
+
+
+def test_result_write_failure_reports_persistence_failed_but_tool_ran() -> None:
+    """Spec §C: defence-in-depth on the tool-result write.
+
+    The assistant row persists (first ``append`` succeeds); the tool runs
+    and returns success; the tool-result ``append`` raises. ``dispatch_tool_call``
+    must:
+      - return ``EffectReceipt(FAILED, error_code="session_persistence_failed")``;
+      - leave the journal holding ``[surface/user_message,
+        surface/assistant_message{tool_calls=[X]}]`` with NO
+        ``surface/tool_result`` (the append failed before the event landed);
+      - the tool DID run — the executor was called.
+
+    The journal is consistent: the assistant row precedes (and declares)
+    the tool call, so ``derive_messages()`` orphan-drops nothing. The wire
+    shape ``[user, assistant{tool_calls=[X]}]`` reaches the model with no
+    dangling tool row — the ``drop_orphan_function_calls`` defence-in-depth
+    is unverified-by-design on this seam because the failure mode keeps
+    the journal clean.
+    """
+    # ``fail_after=1``: first append (assistant_message) succeeds, second
+    # append (tool_result) raises — the scenario this test exercises.
+    # The user message is pre-populated under a permissive budget so it
+    # does not consume the failure slot reserved for the tool_result.
+    session = _FlakySession(fail_after=10**6)
+    writer = RunSessionWriter(session=session)
+    writer.append_user_message(message_id="u1", role="user", content="hi")
+    # Now arm the failure: the next two appends (assistant, tool_result)
+    # consume the budget; the assistant succeeds (count→0), the
+    # tool_result raises.
+    session.fail_after = 1
+    recorder = _Recorder()
+    tool = _FakeTool(name="echo", recorder=recorder)
+    registry = _FakeToolRegistry(tools={"echo": tool})
+
+    body = SimpleBody(
+        tool_registry=registry,  # type: ignore[arg-type]
+        safe_executor=_FakeSafeExecutor(),  # type: ignore[arg-type]
+        transport_registry=None,  # type: ignore[arg-type]
+        action_registry=None,  # type: ignore[arg-type]
+        writer=writer,
+    )
+
+    receipt = asyncio.run(
+        body.dispatch_tool_call(decision=_decision_with_one_tool_call(), state=_state())
+    )
+
+    # Receipt is rejected with the persistence-failure code.
+    assert isinstance(receipt, EffectReceipt)
+    assert receipt.outcome is EffectOutcome.FAILED
+    assert receipt.error_code == "session_persistence_failed"
+
+    # Tool DID run — the executor was invoked before the result append failed.
+    assert recorder.calls == [{"name": "echo", "args": {"x": 1}}]
+
+    # Journal: user + assistant_message(tool_calls=[X]); NO surface/tool_result.
+    surface_events = [e for e in session.events if e.type.startswith("surface/")]
+    assert [e.type for e in surface_events] == [
+        "surface/user_message",
+        "surface/assistant_message",
+    ]
+    # The assistant row carries the declared tool_call (no orphan yet).
+    assistant_event = surface_events[1]
+    assert assistant_event.data["tool_calls"] == [
+        {"id": "call-1", "name": "echo", "arguments": '{"x": 1}'}
+    ]
+
+    # derive_messages() orphan-drops nothing: the journal is consistent
+    # (the assistant row precedes the (never-written) tool_result).
+    msgs = writer.derive_messages()
+    assert [m["role"] for m in msgs] == ["user", "assistant"]
+    assert msgs[1]["tool_calls"] == [{"id": "call-1", "name": "echo", "arguments": '{"x": 1}'}]
