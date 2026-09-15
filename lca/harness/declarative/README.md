@@ -49,3 +49,9 @@ log:emit
 ## 8. 失败语义
 模块导入失败 → ImportError；退役符号 → AttributeError（fail-loud）；
 运行时错误以 L1 protocol 中定义的异常类型抛出。
+
+## 9. 公共入口
+
+包门面导出四个名字：`ApprovalState`, `ApprovalStateMachine`,
+`ApprovalTransition`, `RestrictedPhaseContext`。
+compile / execute 子模块（`compile/`、`execute/`）按各自路径取用，不经门面。
