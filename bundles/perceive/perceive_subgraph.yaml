@@ -28,6 +28,7 @@ nodes:
     outputs: [in_assembled_manifest, observation]
     terminal: true
     config:
+      emit_on_exit: [phase.perceive.fold]
 
 edges:
   - from: phase.perceive.observe

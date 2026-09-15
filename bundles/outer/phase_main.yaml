@@ -114,6 +114,8 @@ nodes:
     # from the reflect subgraph's outer port declaration.
     declared_inputs: [decision, reflection]
     declared_outputs: [terminal_outcome]
+    config:
+      emit_on_exit: [terminal.commit]
 
   # PR-3.8.6: act.approve.gate — typed-boundary HITL gate under
   # region:intervene (sibling subgraph, NOT a 7th phase — ADR-0228 §3).

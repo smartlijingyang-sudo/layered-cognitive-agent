@@ -133,7 +133,7 @@ nodes:
     terminal: true
     config:
       emit_on_enter: []
-      emit_on_exit:  []
+      emit_on_exit:  [think.gate.end]
       # ADR-0220 P6: think.gate 改为 sub_spec_ref delegate 到
       # concept.decision.enforce (P5 落地的 2 节点 gate chain + reject
       # stamp)。typed decision port 由上游 think.decision.parse 经 close-out
