@@ -6,7 +6,7 @@ and cognition never imports framework internals.
 
 Run from the project root:
 
-    python scripts/check_framework_cognition_boundary.py [--strict]
+    python scripts/check_framework_cognition_boundary.py
 
 Exits 0 when the rule holds; non-zero on the first violation.
 
@@ -120,8 +120,7 @@ def _violations_for(src_root: Path, banned_root: Path) -> list[Violation]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--strict", action="store_true")
-    args = parser.parse_args(argv)
+    parser.parse_args(argv)
 
     all_violations: list[Violation] = []
     for src_root, banned_root in FORBIDDEN_PAIRS:
