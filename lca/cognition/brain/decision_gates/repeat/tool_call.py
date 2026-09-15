@@ -6,7 +6,6 @@ import json
 
 from lca.cognition.brain.decision_gates.chained.chained import record_gate_decided
 from lca.cognition.brain.decision_gates.loop.fingerprint import tool_call_fingerprint
-from lca.cognition.brain.guard.loop_policy import LoopGuardPolicyView, StaticLoopGuardPolicy
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.execution.decision import Decision
