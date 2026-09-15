@@ -5,4 +5,4 @@ from lca.infrastructure.idempotency.store import (
     SqliteIdempotencyStore,
 )
 
-__all__ = ['IdempotencyStoreCorruptError', 'SqliteIdempotencyStore', 'IdempotencyStoreCorruptError', 'SqliteIdempotencyStore']
+__all__ = ['IdempotencyStoreCorruptError', 'SqliteIdempotencyStore']
