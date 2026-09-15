@@ -4,4 +4,4 @@ from lca.infrastructure.handler.registry import (
     UniqueOperationRegistry,
 )
 
-__all__ = ['UniqueOperationRegistry', 'UniqueOperationRegistry']
+__all__ = ['UniqueOperationRegistry']
