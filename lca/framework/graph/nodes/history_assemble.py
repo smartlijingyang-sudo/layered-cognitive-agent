@@ -7,6 +7,11 @@ Mirrors OpenAI Agents SDK's ``drop_orphan_function_calls`` pattern at every
 LLM-call preparation step. The orphan-drop lives on
 :meth:`RunSessionWriter.derive_messages`; this node is the typed-boundary
 adapter that wires the writer into the think subgraph's LLM dispatch port.
+
+The :func:`@graph_node <graph_node>` decorator (ADR-0227) replaces the
+manual ``NodeExecutor`` dataclass + ``@plugin(...)`` setup pair that lived
+in :mod:`lca.plugins.think.history_assemble.execute` (PR2). Composite-key
+registration under ``think::history.derive`` is preserved.
 """
 
 from __future__ import annotations
@@ -14,6 +19,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from lca.contracts.protocols.session.model.context import ModelVisibleRequest
+from lca.framework.graph.nodes.decorator import graph_node
 
 if TYPE_CHECKING:
     from lca.contracts.models.core.state.state import AgentState
@@ -22,6 +28,12 @@ if TYPE_CHECKING:
     )
 
 
+@graph_node(
+    id="history.derive",
+    region="think",
+    inputs=("state", "writer"),
+    outputs=("model_visible_request",),
+)
 async def history_assemble(
     *,
     state: AgentState,
