@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from typing import Any
 
 import pytest
@@ -48,7 +48,7 @@ def _snap(seq: int = 0, phase: str | None = "think", step_id: str | None = "s1")
 
 
 def _record(*, ep: str, seq: int, payload: dict[str, Any] | None = None) -> EventRecord:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return EventRecord(
         execution_point=ep,
         channel="control",

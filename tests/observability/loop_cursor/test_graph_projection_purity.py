@@ -22,7 +22,7 @@ output.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 
 from lca.contracts.observability.cursor.loop_cursor import CursorSnapshot
 from lca.contracts.observability.cursor.loop_projection import LoopProjectionDefinition
@@ -46,8 +46,8 @@ def _make_record(execution_point: str, sequence: int) -> EventRecord:
         epoch=sequence,
         causality_id=f"caus-{sequence:06x}",
         outcome=None,
-        when=datetime.now(timezone.utc),
-        when_corrected=datetime.now(timezone.utc),
+        when=datetime.now(UTC),
+        when_corrected=datetime.now(UTC),
         prev_event_hash=None,
         run_id="r",
         step_id=None,

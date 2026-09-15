@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from typing import Any
 
 from lca.contracts.observability.cursor.loop_cursor import CursorSnapshot
@@ -38,7 +38,7 @@ def _snap(seq: int = 0, step_id: str | None = "s1") -> CursorSnapshot:
 
 
 def _record(*, ep: str, seq: int, payload: dict[str, Any] | None = None) -> EventRecord:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return EventRecord(
         execution_point=ep,
         channel="control",
