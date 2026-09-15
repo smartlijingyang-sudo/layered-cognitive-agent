@@ -24,11 +24,24 @@ nodes:
   # PR-3.8.1: budget gate sits between ``think.route.decide`` and the
   # miss-path reasoning chain. Reads ``state.budget`` and either stops
   # the run (route to ``terminal.commit``) or continues to
-  # ``think.route``. Honors ADR-0225 (no per-node max_visits).
+  # ``think.context.compact`` (re-wired by PR-3.8.2 once the
+  # compaction node exists). Honors ADR-0225 (no per-node max_visits).
   - id: think.budget.check
     factory: think.budget.check
     inputs: [state]
     outputs: [routing]
+    config:
+
+  # PR-3.8.2: typed-boundary context-compaction node. Reads ``writer``
+  # + ``state`` and emits a ``CompactReceipt`` plus a
+  # ``RoutingDecision``. Threshold gate (``used_tokens / max_tokens
+  # >= 0.7``) selects between the noop and ``truncate_oldest`` paths;
+  # the node never raises out of the graph (error path produces an
+  # empty receipt + a ``compact_skipped_error`` re-route).
+  - id: think.context.compact
+    factory: think.context.compact
+    inputs: [writer, state]
+    outputs: [compact_receipt, routing]
     config:
 
   - id: think.route
@@ -115,11 +128,12 @@ nodes:
         binding_edge: think.gate
 
 edges:
-  # shortcut → route.decide → {budget.check → route, gate}: think.route.decide
+  # shortcut → route.decide → {budget.check → context.compact, gate}: think.route.decide
   # 读 decision 端口并 emit RoutingDecision typed port,next_node 决定下游图
   # 节点。miss-path (routing.next_node == "think.route") 改道先经
-  # budget.check, 由 budget.check 决定继续到 think.route 还是
-  # terminal.commit (should_terminate)。short-circuit path 不变。
+  # budget.check, 由 budget.check 决定继续到 think.context.compact
+  # (PR-3.8.2 wiring) 还是 terminal.commit (should_terminate)。
+  # short-circuit path 不变。
   - from: think.shortcut
     to: think.route.decide
   - from: think.route.decide
@@ -129,7 +143,7 @@ edges:
       port: { name: routing, field: next_node }
       value: think.route
   - from: think.budget.check
-    to: think.route
+    to: think.context.compact
     when:
       kind: eq
       port: { name: routing, field: should_terminate }
@@ -140,6 +154,22 @@ edges:
       kind: eq
       port: { name: routing, field: should_terminate }
       value: true
+  # PR-3.8.2: context.compact routes to history.assemble on success
+  # or noop (OR'd predicate over ``next_hint``), and re-routes to
+  # ``think.route.decide`` on the error path so Gate can fail-loud
+  # downstream.
+  - from: think.context.compact
+    to: think.history.assemble
+    when:
+      kind: in
+      port: { name: routing, field: next_hint }
+      value: [compact_done, compact_noop]
+  - from: think.context.compact
+    to: think.route.decide
+    when:
+      kind: eq
+      port: { name: routing, field: next_hint }
+      value: compact_skipped_error
   - from: think.route.decide
     to: think.gate
     when:

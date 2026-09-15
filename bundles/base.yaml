@@ -82,6 +82,15 @@ entries:
   name: phase_think_budget_check
   $module: lca.nodes.think.budget_check
   config: {}
+# PR-3.8.2: typed-boundary context-compaction node that lifts the
+# off-graph compaction step into a typed node. Reads ``writer`` +
+# ``state`` and emits ``CompactReceipt`` + ``RoutingDecision``. Sits
+# between ``think.budget.check`` and ``think.history.assemble`` (PR-3.8.2
+# also re-wires ``budget.check`` downstream edge to this node).
+- id: phase.think.context.compact
+  name: phase_think_context_compact
+  $module: lca.nodes.think.context_compact
+  config: {}
 - id: lca.nodes.plan.compose
   name: lca_nodes_plan_compose
   $module: lca.nodes.plan.compose
