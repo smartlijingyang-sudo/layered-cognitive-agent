@@ -20,10 +20,10 @@ from lca.session import (
     validate_event_type_for_read,
 )
 from lca.session import append as session_append
-from lca.session import bind as session_bind
 from lca.session import catalog as session_catalog
-from lca.session import recovery as session_recovery
-from lca.session import repair as session_repair
+from lca.session.lifecycle import bind as session_bind
+from lca.session.lifecycle import recovery as session_recovery
+from lca.session.lifecycle import repair as session_repair
 
 
 def test_append_public_api() -> None:
