@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 
 from lca.cognition.brain.reasoner.reasoner import PromptReasoner
 from lca.cognition.brain.sections.types import (
@@ -38,7 +38,7 @@ def _result(role: str, subtask: str, output: str) -> DelegationResult:
         error=None,
         task_id=f"task_{role}",
         step=0,
-        returned_at=datetime(2026, 8, 3, tzinfo=timezone.utc),
+        returned_at=datetime(2026, 8, 3, tzinfo=UTC),
     )
 
 
@@ -81,7 +81,7 @@ class TestMemberReportsText(unittest.TestCase):
             error="timeout",
             task_id=None,
             step=0,
-            returned_at=datetime(2026, 8, 3, tzinfo=timezone.utc),
+            returned_at=datetime(2026, 8, 3, tzinfo=UTC),
         )
         text = build_member_reports_text([failed])
         self.assertIn("失败", text)
