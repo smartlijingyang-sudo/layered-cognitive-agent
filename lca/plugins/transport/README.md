@@ -23,6 +23,44 @@
 | read | `runs/terminal/failure` 创建 `traces/runs/<run_id>/` 并追加 `kernel.log`；live SSE 只订阅 `session.tail` |
 | wire | 无：只做 DTO ↔ contract 转换 |
 
+## 3. 输入
+
+HTTP/CLI 请求体与查询参数、WS 握手与帧、run 标识与 `RunLifecycleStatus`、
+`ResolvedProfile` / `CompiledRunPlan` 引用（只读比对），以及注入的 coordinator /
+gateway / store 接缝对象。
+
+## 4. 输出
+
+wire DTO（`lca.contracts.transport` 形态）、SSE/OpenAI 流帧、HTTP 响应；
+读侧另有 fold 派生的 timeline / debug 视图。节点不返回控制面 State。
+
+## 5. 允许依赖
+
+`lca.contracts`、`lca.infrastructure`、`lca.harness`、`lca.plugins`（同族复用）、
+`lca.cognition`、`lca.application`、`lca.loop`、`lca.runtime`、`lca.session`、
+`lca_kernel.boot` / `events` / `runtime`、第三方 `starlette` / `uvicorn` /
+`httpx` / `openai` / `cordis`。这些是现状 import 计数（164 / 99 / 17 / 239 / 8 /
+6 / 2 / 1 / 5 / 各 1+），不是目标态；收敛条件见「现状 → 目标映射」。
+
+## 6. 禁止依赖
+
+`lca.agent`、`lca.nodes`（当前零 import）。transport 不得解释 phase 图、不得做
+状态修复、不得成为第二 Runtime（见「禁止」一节）。
+
+## 8. 失败语义
+
+按源码 `raise` 统计：`RuntimeError` 17、`AuthError` 11、`InvalidTokenError` 11、
+`ValueError` 7、`TypeError` 4、`FileIntegrityError` 3、`IngestUrlPolicyError` 3。
+鉴权与入站 URL 策略失败一律抛错，不放行；观测/关闭路径的吞没例外集中在
+`webserver/carrier` 的 reconnect/close/cancel（pyproject per-file-ignores 已登记）。
+
+## 9. 公共入口
+
+包门面不重导出符号（模块级列表为空）。按子平面路径取用：
+webserver/carrier、webserver/read、webserver/wire、webserver/handlers、
+webserver/routes、device_hub。装配以 bundle 的 `$module` 路径为准。
+
+
 ## 30 秒：Transport 做什么
 
 Transport **触发 run、绑定 scope、返回 wire DTO**；认知在 `lca/loop/`，事实在 `lca/session/`。
