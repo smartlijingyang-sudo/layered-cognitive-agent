@@ -46,11 +46,13 @@ maps observation kinds to execution points.
 
 from __future__ import annotations
 
+import contextlib
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from lca.contracts.protocols.graph.errors import UnknownFieldError, UnsetPortError
 from lca.contracts.protocols.graph.node_io import NodeOutput
 from lca.contracts.protocols.graph.plan import Plan, PlanEdge, PlanNode
 from lca.contracts.protocols.graph.strategy import StrategyContext
@@ -189,7 +191,11 @@ class PlanInterpreter:
             # D4: terminal_predicate evaluation before edge selection.
             if schema.terminal_predicate is not None:
                 reader = _reader_factory(node.id)
-                try:
+                # Data-absence errors mean "not terminal yet" — the same
+                # reading ``select_edge`` applies to edge predicates. A
+                # malformed predicate (ValueError) is a plan defect and has
+                # to surface instead of silently falling through to edges.
+                with contextlib.suppress(UnsetPortError, UnknownFieldError):
                     if evaluate_predicate(schema.terminal_predicate, reader=reader):
                         traversal.terminal = True
                         traversal.terminal_reason = ("terminal_predicate", node.id, 0, 0)
@@ -222,8 +228,6 @@ class PlanInterpreter:
                         facts.extend(output.port_values.get("facts", ()) or ())
                         terminal_node = node.id
                         break
-                except Exception:
-                    pass  # terminal_predicate failure → fall through to edge selection
 
             edge = select_edge(
                 edges=plan.edges,

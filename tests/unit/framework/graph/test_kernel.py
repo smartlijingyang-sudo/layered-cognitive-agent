@@ -422,3 +422,62 @@ def _make_record(node_id: str) -> VisitRecord:
         binding_kind=BindingKind.TRANSFORM,
         dispatch=DispatchDecision(kind="next", next_node="next"),
     )
+
+
+@dataclass(frozen=True, slots=True)
+class _DecisionOnly(NodeStrategy):
+    """Emits a single ``decision`` port; declares nothing else."""
+
+    kind: BindingKind = BindingKind.TRANSFORM
+    schema: NodeIOSchema = field(default_factory=NodeIOSchema)
+
+    async def execute(self, context: StrategyContext, input: NodeInput) -> NodeOutput:
+        return NodeOutput(port_values={"decision": "d"}, producer_node=context.node_id)
+
+
+def _plan_with_terminal_predicate(pred: object) -> Plan:
+    return Plan(
+        id="tp-plan",
+        nodes=(
+            PlanNode(
+                id="a",
+                binding=BindingKind.TRANSFORM,
+                entry=True,
+                io_schema=NodeIOSchema(terminal_predicate=pred),  # type: ignore[arg-type]
+            ),
+            PlanNode(
+                id="b",
+                binding=BindingKind.TRANSFORM,
+                io_schema=NodeIOSchema(),
+            ),
+        ),
+        edges=(PlanEdge(source="a", target="b"),),
+    )
+
+
+class TestTerminalPredicateErrorClassification:
+    """D4: "no data yet" is not the same as "the plan is malformed"."""
+
+    async def test_unset_port_falls_through_to_edge_selection(self) -> None:
+        from lca.contracts.protocols.graph.predicate import PortRef, Predicate
+
+        pred = Predicate(kind="eq", port=PortRef(name="never_emitted"), value=1)
+        registry = StrategyRegistry()
+        registry.register(_DecisionOnly())
+        interp = PlanInterpreter(registry=registry)
+
+        result = await interp.run(_plan_with_terminal_predicate(pred))
+
+        assert [v.node_id for v in result.visits] == ["a", "b"]
+        assert result.terminal_node == "b"
+
+    async def test_malformed_predicate_surfaces(self) -> None:
+        from lca.contracts.protocols.graph.predicate import Predicate
+
+        pred = Predicate(kind="eq", value=1)  # leaf without ``port``
+        registry = StrategyRegistry()
+        registry.register(_DecisionOnly())
+        interp = PlanInterpreter(registry=registry)
+
+        with pytest.raises(ValueError, match="requires 'port'"):
+            await interp.run(_plan_with_terminal_predicate(pred))
