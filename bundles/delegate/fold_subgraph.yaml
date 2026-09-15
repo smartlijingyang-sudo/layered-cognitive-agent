@@ -1,0 +1,23 @@
+# bundles/delegate/fold_subgraph.yaml — delegate subgraph terminal fold node
+# ADR-0228 §Decision 5 + §Decision 6.
+#
+# Topology: single typed-boundary node that reads ``delegation_receipt``
+# tuples and emits a ``FoldedDelegationResult`` + updated ``Decision`` for
+# the outer think phase. ``delegate.compose`` and ``delegate.await`` are
+# siblings owned by other sub-PRs; this bundle is intentionally
+# terminal-of-typing and side-effect-free so it can be tested in
+# isolation.
+
+id: delegate.fold.subgraph
+region: delegate
+purpose: delegate 终端 fold —— receipts → FoldedDelegationResult + Decision
+
+nodes:
+  - id: delegate.fold
+    factory: delegate.fold
+    inputs: [delegation_receipt]
+    outputs: [decision, folded_result]
+    terminal: true
+    config:
+
+# terminal: delegate.fold 直接回 outer graph,无需显式返回边。

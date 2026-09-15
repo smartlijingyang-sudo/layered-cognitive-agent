@@ -130,6 +130,10 @@ entries:
   name: phase_remember_fold
   $module: lca.nodes.remember.fold.fold
   config: {}
+- id: phase.delegate.fold
+  name: phase_delegate_fold
+  $module: lca.nodes.delegate.fold.fold
+  config: {}
 - id: control.perceive.context
   name: control_perceive_context
   $module: lca.plugins.loop.control.perceive_context.plugin
