@@ -411,7 +411,7 @@ __all__ = [
 ]
 
 
-def build_create_run_app() -> "Starlette":
+def build_create_run_app() -> Starlette:
     """Test factory mirroring the production /runs route mounting.
 
     The production router in :mod:`lca.plugins.transport.webserver.handlers.runs.api.routes`
