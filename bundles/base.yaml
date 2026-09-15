@@ -146,6 +146,10 @@ entries:
   name: phase_delegate_fold
   $module: lca.nodes.delegate.fold.fold
   config: {}
+- id: lca.nodes.delegate.await
+  name: lca_nodes_delegate_await
+  $module: lca.nodes.delegate.await.block
+  config: {}
 - id: control.perceive.context
   name: control_perceive_context
   $module: lca.plugins.loop.control.perceive_context.plugin
@@ -503,4 +507,11 @@ entries:
 - id: lca-default-reducer
   name: lca_default_reducer
   $module: lca.plugins.loop.reducer.plugin
+  config: {}
+# ADR-0228 §Decision 4: ``intervene.interrupt`` is the typed pause
+# primitive that projects an upstream ``Decision`` into a typed
+# ``Command`` and emits ``RoutingDecision(should_terminate=True)``.
+- id: lca.nodes.intervene.interrupt
+  name: lca_nodes_intervene_interrupt
+  $module: lca.nodes.intervene.interrupt.interrupt
   config: {}

@@ -1,0 +1,25 @@
+# bundles/delegate/await_subgraph.yaml — delegate subgraph (await-only fragment)
+# ADR-0228 §D5 / §D6. ``delegate`` is a cross-phase region (NOT a six-phase
+# region). This fragment ships the await half of the subgraph; the compose
+# and fold halves land via the delegate.compose / delegate.fold subagents
+# and are wired into the same bundle once they exist.
+#
+# Topological role: ``delegate.await`` blocks until the kernel feeds all
+# child receipts via the typed ``delegation_receipt`` port, then emits the
+# same tuple as the subgraph output. The kernel is the only writer of the
+# ``delegation_receipt`` port; this node is a pure typed pass-through.
+
+id: delegate.await.subgraph
+region: region:delegate
+purpose: delegate await — pass-through of kernel-collected child receipts
+
+nodes:
+  - id: delegate.await
+    factory: delegate.await
+    inputs: [delegation_request, delegation_receipt]
+    outputs: [delegation_receipt]
+    terminal: true
+    config:
+
+# terminal: delegate.await directly returns to outer graph (binding_edge=
+#           delegate.main); no explicit return edge required.
