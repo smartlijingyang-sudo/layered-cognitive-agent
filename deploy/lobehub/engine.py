@@ -55,7 +55,7 @@ import re
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 from typing import Any
 
@@ -174,7 +174,7 @@ def _read_manifest() -> Manifest:
 
 
 def _write_manifest(m: Manifest) -> None:
-    m.patched_at = datetime.now(timezone.utc).isoformat()
+    m.patched_at = datetime.now(UTC).isoformat()
     m.lobehub_release = _read_origin_release()
     MANIFEST_FILE.write_text(json.dumps(m.to_json(), indent=2, ensure_ascii=False) + "\n")
 
