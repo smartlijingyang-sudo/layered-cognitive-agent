@@ -21,17 +21,13 @@ from dataclasses import dataclass, field
 from typing import Any
 from unittest.mock import patch
 
-import pytest
 
 from lca.contracts.protocols.graph.node_io import (
     NodeInput,
-    NodeIOSchema,
-    NodeOutput,
 )
 from lca.framework.graph.strategies.node_executor_strategy import (
     NodeExecutorStrategy,
 )
-from lca.framework.graph.strategy_registry import resolve_executor
 from lca.contracts.protocols.graph.binding import BindingKind
 
 
