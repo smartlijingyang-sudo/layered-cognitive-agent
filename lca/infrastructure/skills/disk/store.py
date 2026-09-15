@@ -185,12 +185,10 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
         declared_refs = parse_references_field(skill_md_text)
         for ref in declared_refs:
             candidate = (dest / ref).resolve()
-            try:
-                candidate.relative_to(dest.resolve())
-            except ValueError:
+            if not candidate.is_relative_to(dest.resolve()):
                 raise SkillContractError(
                     f"SKILL.md references[{ref!r}] 越界 — 必须落在 {sid!r} 包内"
-                ) from None
+                )
             if not candidate.is_file():
                 raise SkillContractError(f"SKILL.md references[{ref!r}] 指向缺失文件: {candidate}")
 
