@@ -97,6 +97,25 @@ nodes:
       emit_on_enter: []
       emit_on_exit: [phase.tool.call.end, phase.act.fold.end]
 
+  # PR-3.8.5: 1:1 receipt join typed-boundary node. Consumes the
+  # ``receipts`` list port (emitted by effect.execute after PR-3.8.5
+  # fix1 commit 3b17af47f changed declared_outputs from 'receipt' to
+  # 'receipts') and emits a single ``receipt`` plus ``routing`` decision.
+  # On the 1:1 path (single receipt) the node passes through and routes
+  # to ``act.observe`` via the ``join_1to1`` edge predicate below. On
+  # ``len > 1`` the node emits ``routing.next_hint =
+  # 'join_rejects_parallel_in_v1'``; no outgoing edge matches, so the
+  # kernel's ``select_edge`` returns ``None`` and the subgraph dispatch
+  # is classified as ``terminal`` (fail-loud -- N:N partial-failure
+  # policy is a follow-up PR).
+  - id: act.join
+    factory: act.join
+    inputs: [receipts]
+    outputs: [receipt, routing]
+    config:
+      emit_on_enter: []
+      emit_on_exit: []
+
 edges:
   - from: act.validate
     to: act.authorize
@@ -108,5 +127,14 @@ edges:
     to: act.dispatch
     when: true
   - from: act.dispatch
+    to: act.join
+    when: true
+  - from: act.join
     to: act.observe
+    when:
+      kind: eq
+      port:
+        name: routing
+        field: next_hint
+      value: join_1to1
     when: true
