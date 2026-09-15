@@ -17,7 +17,7 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
 )
-from lca.plugins.loop.phase.reflect.score.plugin import (
+from lca.nodes.reflect.score.score import (
     ReflectScoreExecutor,
     _normalize_observation,
 )
@@ -125,7 +125,7 @@ class TestAdmitRecoveryIsFailure:
     """admit_recovery._is_failure must handle EffectReceipt."""
 
     def test_failed_receipt_is_failure(self) -> None:
-        from lca.plugins.loop.phase.reflect.admit_recovery.plugin import _is_failure
+        from lca.nodes.reflect.admit_recovery.admit_recovery import _is_failure
 
         receipt = EffectReceipt(
             invocation_id="inv_1",
@@ -137,7 +137,7 @@ class TestAdmitRecoveryIsFailure:
         assert _is_failure(receipt) is True
 
     def test_succeeded_receipt_is_not_failure(self) -> None:
-        from lca.plugins.loop.phase.reflect.admit_recovery.plugin import _is_failure
+        from lca.nodes.reflect.admit_recovery.admit_recovery import _is_failure
 
         receipt = EffectReceipt(
             invocation_id="inv_2",
@@ -148,7 +148,7 @@ class TestAdmitRecoveryIsFailure:
         assert _is_failure(receipt) is False
 
     def test_unknown_receipt_is_failure(self) -> None:
-        from lca.plugins.loop.phase.reflect.admit_recovery.plugin import _is_failure
+        from lca.nodes.reflect.admit_recovery.admit_recovery import _is_failure
 
         receipt = EffectReceipt(
             invocation_id="inv_3",

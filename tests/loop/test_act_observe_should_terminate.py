@@ -14,7 +14,6 @@ from __future__ import annotations
 import pytest
 
 from lca.contracts.atoms.semantic.keys import (
-    FAILURE_KIND,
     FAILURE_KIND_EXECUTION,
     FAILURE_KIND_TRANSIENT,
 )
@@ -23,7 +22,7 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
 )
-from lca.plugins.concept.act_subgraph.observe import ActObserveExecutor
+from lca.nodes.act.observe.observe import ActObserveExecutor
 
 
 def _make_context() -> NodeContext:

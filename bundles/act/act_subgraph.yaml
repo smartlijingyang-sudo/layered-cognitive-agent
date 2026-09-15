@@ -71,7 +71,7 @@ nodes:
       emit_on_enter: [body.tool.execute.start]
       emit_on_exit: [body.tool.execute.end]
       sub_spec_ref:
-        plan_ref: bundles/concept/effect_execute.yaml
+        plan_ref: bundles/concept/effect/effect_execute.yaml
         entry_node: effect.execute
         binding_edge: act.dispatch
 

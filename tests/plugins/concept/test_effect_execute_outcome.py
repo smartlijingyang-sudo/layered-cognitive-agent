@@ -11,7 +11,7 @@ from lca.contracts.atoms.enums.enums import ContentType
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.harness.act.effect_receipt import EffectOutcome
 from lca.contracts.models.core.execution.decision import Observation
-from lca.plugins.concept.effect_execute.execute import _derive_outcome
+from lca.nodes.concept.effect.execute.execute import _derive_outcome
 
 
 class TestDeriveOutcome:

@@ -20,7 +20,7 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
-from lca.framework.graph.nodes.decorator import graph_node
+from lca.nodes._decorator import graph_node
 
 # ── Minimal fixtures ──────────────────────────────────────────────
 
@@ -429,6 +429,6 @@ def test_graph_node_decorator_accepts_all_six_phases() -> None:
 
 
 def test_decorator_module_is_importable() -> None:
-    """`lca.framework.graph.nodes.decorator` is the public surface for `@graph_node`."""
-    module = import_module("lca.framework.graph.nodes.decorator")
+    """`lca.nodes._decorator` is the public surface for `@graph_node`."""
+    module = import_module("lca.nodes._decorator")
     assert callable(module.graph_node)

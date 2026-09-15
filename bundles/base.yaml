@@ -92,27 +92,27 @@ entries:
 # ``NodeExecutor`` directly.
 - id: phase.perceive.observe
   name: phase_perceive_observe
-  $module: lca.plugins.loop.phase.perceive.observe.plugin
+  $module: lca.nodes.perceive.observe.observe
   config: {}
 - id: phase.perceive.fold
   name: phase_perceive_fold
-  $module: lca.plugins.loop.phase.perceive.fold.plugin
+  $module: lca.nodes.perceive.fold.fold
   config: {}
 - id: phase.reflect.score
   name: phase_reflect_score
-  $module: lca.plugins.loop.phase.reflect.score.plugin
+  $module: lca.nodes.reflect.score.score
   config: {}
 - id: phase.reflect.admit_recovery
   name: phase_reflect_admit_recovery
-  $module: lca.plugins.loop.phase.reflect.admit_recovery.plugin
+  $module: lca.nodes.reflect.admit_recovery.admit_recovery
   config: {}
 - id: phase.remember.write
   name: phase_remember_write
-  $module: lca.plugins.loop.phase.remember.write.plugin
+  $module: lca.nodes.remember.write.write
   config: {}
 - id: phase.remember.fold
   name: phase_remember_fold
-  $module: lca.plugins.loop.phase.remember.fold.plugin
+  $module: lca.nodes.remember.fold.fold
   config: {}
 - id: control.perceive.context
   name: control_perceive_context
@@ -189,23 +189,23 @@ entries:
   config: {}
 - id: phase.concept.act_subgraph.act_validate
   name: phase_concept_act_subgraph_act_validate
-  $module: lca.plugins.concept.act_subgraph.validate
+  $module: lca.nodes.act.validate.validate
   config: {}
 - id: phase.concept.act_subgraph.act_authorize
   name: phase_concept_act_subgraph_act_authorize
-  $module: lca.plugins.concept.act_subgraph.authorize
+  $module: lca.nodes.act.authorize.authorize
   config: {}
 - id: phase.concept.act_subgraph.act_envelope
   name: phase_concept_act_subgraph_act_envelope
-  $module: lca.plugins.concept.act_subgraph.envelope
+  $module: lca.nodes.act.envelope.envelope
   config: {}
 - id: phase.concept.act_subgraph.act_observe
   name: phase_concept_act_subgraph_act_observe
-  $module: lca.plugins.concept.act_subgraph.observe
+  $module: lca.nodes.act.observe.observe
   config: {}
 - id: phase.concept.effect_execute.effect_execute
   name: phase_concept_effect_execute_effect_execute
-  $module: lca.plugins.concept.effect_execute.execute
+  $module: lca.nodes.concept.effect.execute.execute
   config: {}
 - id: lca-memory-write-policy-simple
   name: lca_memory_write_policy_simple

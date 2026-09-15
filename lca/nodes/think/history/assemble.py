@@ -19,7 +19,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from lca.contracts.protocols.session.model.context import ModelVisibleRequest
-from lca.framework.graph.nodes.decorator import graph_node
+from lca.nodes._decorator import graph_node
 
 if TYPE_CHECKING:
     from lca.contracts.models.core.state.state import AgentState

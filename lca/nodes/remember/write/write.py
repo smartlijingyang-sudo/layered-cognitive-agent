@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
@@ -33,7 +34,6 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.contracts.protocols.graph.routing import RoutingDecision
-from lca.contracts.atoms.enums.enums import ActionType
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 

@@ -1,8 +1,9 @@
-"""phase.perceive.fold — terminal-of-typing: collapse manifest → observation.
+"""phase.remember.fold — terminal-of-typing: typed ``memory_receipt`` port.
 
-ADR-0221: takes the raw ``manifest`` from ``phase.perceive.observe`` and
-projects it onto the closed ``observation`` port that downstream
-``think.main`` consumes. This is the typed cross-phase boundary.
+ADR-0221: takes the envelope + receipt produced by
+``phase.remember.write`` and emits a single typed ``memory_receipt`` port
+that downstream consumers can observe. This is the typed
+cross-phase boundary.
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
@@ -30,18 +32,17 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.contracts.protocols.graph.routing import RoutingDecision
-from lca.contracts.atoms.enums.enums import ActionType
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 @dataclass(frozen=True, slots=True)
-class PerceiveFoldExecutor:
-    """Terminal-of-typing node: ``manifest`` → ``observation``."""
+class RememberFoldExecutor:
+    """Terminal-of-typing: forward the typed ``memory_receipt`` port."""
 
-    semantic_name: str = "phase.perceive.fold"
-    region: str = "phase:perceive"
-    declared_inputs: tuple[PortName, ...] = ("manifest",)
-    declared_outputs: tuple[PortName, ...] = ("observation",)
+    semantic_name: str = "phase.remember.fold"
+    region: str = "phase:remember"
+    declared_inputs: tuple[PortName, ...] = ("memory_receipt",)
+    declared_outputs: tuple[PortName, ...] = ("memory_receipt",)
 
     async def node_execute(
         self,
@@ -51,18 +52,18 @@ class PerceiveFoldExecutor:
         del context
         return NodeOutput(
             port_values={
-                "observation": input.port_values.get("manifest"),
+                "memory_receipt": input.port_values.get("memory_receipt"),
                 "routing": RoutingDecision(action_type=ActionType.RESPOND),
             },
         )
 
 
 @plugin(
-    id="phase.perceive.fold",
-    provides=("phase:perceive::phase.perceive.fold",),
+    id="phase.remember.fold",
+    provides=("phase:remember::phase.remember.fold",),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
-    effects="none",
+    effects="memory",
     test_suite="tests/declarative/test_phase_subgraph_parity.py",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
@@ -73,7 +74,7 @@ class PerceiveFoldExecutor:
         lifecycle=LifecycleContract(allowed_scopes=(Scope.RUN,)),
         authority=AuthorityContract(grants=("plugin.serve",)),
         observability=EvidenceContract(
-            descriptors=("phase_perceive_fold.checked", "phase_perceive_fold.served")
+            descriptors=("phase_remember_fold.checked", "phase_remember_fold.served")
         ),
     ),
     relations=(),
@@ -85,7 +86,7 @@ class PerceiveFoldExecutor:
 )
 async def setup(ctx: PluginContext, config: object) -> None:
     del config
-    ctx.provide("phase:perceive::phase.perceive.fold", PerceiveFoldExecutor())
+    ctx.provide("phase:remember::phase.remember.fold", RememberFoldExecutor())
 
 
-__all__ = ["PerceiveFoldExecutor", "setup"]
+__all__ = ["RememberFoldExecutor", "setup"]

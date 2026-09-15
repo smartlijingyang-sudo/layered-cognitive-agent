@@ -28,7 +28,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from lca.contracts.models.core.conversation.llm import LLMResponse, TokenUsage
-from lca.framework.graph.nodes.decorator import graph_node
+from lca.nodes._decorator import graph_node
 
 if TYPE_CHECKING:
     from lca.contracts.models.core.state.state import AgentState

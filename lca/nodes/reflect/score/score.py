@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from lca.contracts.atoms.control.slot import ControlSlot
-from lca.contracts.atoms.enums.enums import ContentType, ActionType
+from lca.contracts.atoms.enums.enums import ActionType, ContentType
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.atoms.scope.scope import Scope

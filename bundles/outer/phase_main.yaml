@@ -21,7 +21,7 @@ nodes:
     region: phase:perceive
     entry: true
     sub_spec_ref:
-      plan_ref: bundles/perceive_subgraph.yaml
+      plan_ref: bundles/perceive/perceive_subgraph.yaml
       entry_node: phase.perceive.observe
       binding_edge: perceive.main
     declared_inputs: []
@@ -34,7 +34,7 @@ nodes:
   - id: think.main
     region: phase:think
     sub_spec_ref:
-      plan_ref: bundles/think.yaml
+      plan_ref: bundles/think/think_subgraph.yaml
       entry_node: think.shortcut
       binding_edge: think.main
     # think.subgraph's entry ``think.shortcut`` declares inputs:
@@ -53,7 +53,7 @@ nodes:
   - id: act.main
     region: phase:act
     sub_spec_ref:
-      plan_ref: bundles/act.yaml
+      plan_ref: bundles/act/act_subgraph.yaml
       entry_node: act.validate
       binding_edge: act.main
     # Inner act.subgraph's entry ``act.validate`` reads ``decision``
@@ -71,7 +71,7 @@ nodes:
   - id: reflect.main
     region: phase:reflect
     sub_spec_ref:
-      plan_ref: bundles/reflect_subgraph.yaml
+      plan_ref: bundles/reflect/reflect_subgraph.yaml
       entry_node: phase.reflect.score
       binding_edge: reflect.main
     # No ``declared_inputs``: the reflect subgraph reads
@@ -89,7 +89,7 @@ nodes:
   - id: remember.main
     region: phase:remember
     sub_spec_ref:
-      plan_ref: bundles/remember_subgraph.yaml
+      plan_ref: bundles/remember/remember_subgraph.yaml
       entry_node: phase.remember.write
       binding_edge: remember.main
     # Inner ``phase.remember.write`` declared_inputs are

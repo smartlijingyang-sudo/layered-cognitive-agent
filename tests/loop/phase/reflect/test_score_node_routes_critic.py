@@ -27,7 +27,7 @@ from unittest.mock import AsyncMock
 from lca.contracts.atoms.enums.enums import ReflectionVerdict
 from lca.contracts.models.core.execution.decision import Observation, Reflection
 from lca.contracts.models.core.state.state import AgentState
-from lca.plugins.loop.phase.reflect.score.plugin import ReflectScoreExecutor
+from lca.nodes.reflect.score.score import ReflectScoreExecutor
 
 
 @dataclass

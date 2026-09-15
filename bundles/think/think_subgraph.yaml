@@ -79,26 +79,6 @@ nodes:
         entry_node: decision.parse
         binding_edge: think.decision.parse
 
-  - id: think.classify
-    factory: think.classify.ref
-    inputs: [response]
-    outputs: [decision]
-    config:
-      emit_on_enter: []
-      emit_on_exit:  []
-      # ADR-0221: think.classify 改为 sub_spec_ref delegate 到
-      # concept.decision.classify (2 节点 typed parse/compose pipeline;
-      # ADR-0220 §3.3 的 3 节点图已合并 — decision.parse.tool_calls +
-      # decision.parse.intent → decision.parse.response)。typed response
-      # port 由上游 think.reason 经 close-out 投影转发,inner 图第一节点
-      # decision.parse.response 直接消费。Task 3 把 think.reason.complete
-      # 拆成 llm.dispatch + decision.parse,classify 暂时作为 outer-facing
-      # 入口保留;后续 task 会把它和 decision.parse 合并。
-      sub_spec_ref:
-        plan_ref: bundles/concept/decision_classify.yaml
-        entry_node: decision.parse.response
-        binding_edge: think.classify
-
   - id: think.gate
     factory: think.gate.ref
     inputs: [decision]

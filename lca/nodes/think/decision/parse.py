@@ -35,7 +35,7 @@ from lca.contracts.models.core.execution.decision import (
     DelegationSpec,
     ToolCall,
 )
-from lca.framework.graph.nodes.decorator import graph_node
+from lca.nodes._decorator import graph_node
 
 if TYPE_CHECKING:
     from lca.contracts.models.core.conversation.llm import LLMResponse

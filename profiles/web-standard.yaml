@@ -22,12 +22,12 @@ bundles:
   - bundles/loop_cursor.spine_default.yaml
   - bundles/session-runtime.yaml
   - bundles/event-bus-components.yaml
-  - bundles/phase_main_outer.yaml
-  - bundles/think.yaml
-  - bundles/act.yaml
-  - bundles/perceive_subgraph.yaml
-  - bundles/reflect_subgraph.yaml
-  - bundles/remember_subgraph.yaml
+  - bundles/outer/phase_main.yaml
+  - bundles/think/think_subgraph.yaml
+  - bundles/act/act_subgraph.yaml
+  - bundles/perceive/perceive_subgraph.yaml
+  - bundles/reflect/reflect_subgraph.yaml
+  - bundles/remember/remember_subgraph.yaml
 
 patch:
   # EventSpine file sink — boot events process-local; run events under
