@@ -257,7 +257,10 @@ def _build_factory_index() -> dict[str, list[str]]:
             continue
         try:
             text = path.read_text(encoding="utf-8")
-        except Exception:
+        except (OSError, UnicodeDecodeError):
+            # A file can vanish mid-rglob or be a non-UTF-8 artifact; the
+            # capability attribution simply does not see it. Any other error is
+            # a bug and must surface rather than silently shrink the registry.
             continue
         for m in pattern.finditer(text):
             inner = m.group(1)
