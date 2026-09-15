@@ -54,7 +54,6 @@ class ObserveCheckpointExecutor:
                 detail="checkpoint step cannot be negative",
                 plugin_id="control.executor.observe-checkpoint",
             )
-            hint = "stop"
         else:
             reason = runtime.get("checkpoint_reason", "periodic")
             verdict = ControlVerdict(
@@ -62,7 +61,6 @@ class ObserveCheckpointExecutor:
                 detail=f"checkpoint is valid: {reason}",
                 plugin_id="control.executor.observe-checkpoint",
             )
-            hint = None
         return NodeOutput(
             port_values={
                 "verdict": verdict,
