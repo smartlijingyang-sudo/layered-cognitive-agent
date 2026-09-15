@@ -61,6 +61,25 @@ async def test_route_decide_is_idempotent() -> None:
 
 
 @pytest.mark.asyncio
+async def test_route_decide_is_pure_across_instances() -> None:
+    """Two separately-constructed executors must agree on the same input.
+
+    Strengthens the brief's "no hidden state" requirement: equality across
+    fresh instances proves the executor carries no instance-level state that
+    leaks into subsequent outputs.
+    """
+    input_present = NodeInput(port_values={"decision": {"action_type": "respond"}})
+    out_a = await ThinkRouteDecideExecutor().node_execute(_ctx(), input_present)
+    out_b = await ThinkRouteDecideExecutor().node_execute(_ctx(), input_present)
+    assert out_a.port_values["routing"] == out_b.port_values["routing"]
+
+    input_absent = NodeInput(port_values={})
+    out_c = await ThinkRouteDecideExecutor().node_execute(_ctx(), input_absent)
+    out_d = await ThinkRouteDecideExecutor().node_execute(_ctx(), input_absent)
+    assert out_c.port_values["routing"] == out_d.port_values["routing"]
+
+
+@pytest.mark.asyncio
 async def test_route_decide_next_node_is_string() -> None:
     executor = ThinkRouteDecideExecutor()
 

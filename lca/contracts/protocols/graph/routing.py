@@ -18,8 +18,16 @@ class RoutingDecision(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     action_type: ActionType
     should_terminate: bool = False
-    next_node: str | None = None  # target node semantic_name for graph routing
-    next_hint: str | None = None  # free-form metadata, not routing
+    # ``next_node`` is the control-plane routing target: a node sets it when
+    # it wants the kernel/graph scheduler to advance execution to a specific
+    # downstream ``semantic_name``. Use it only when the decision actually
+    # selects a successor node in the graph.
+    next_node: str | None = None
+    # ``next_hint`` is free-form metadata forwarded to downstream nodes and
+    # the observability surface; it never influences graph routing. Use it
+    # to carry rationale, tags, or structured hints (e.g. the reason for
+    # short-circuiting) that consumers may read but the scheduler ignores.
+    next_hint: str | None = None
 
 
 __all__ = ["RoutingDecision"]
