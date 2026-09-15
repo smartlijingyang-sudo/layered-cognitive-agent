@@ -42,16 +42,16 @@ layered-cognitive-agent/
 
 | 包 | 环 | 职责 | 不负责 |
 |---|---|---|---|
-| [`contracts/`](../contracts/README.md) | R0 | Protocol、DTO、枚举、闭集 | 行为、I/O、env |
-| [`harness/`](../harness/README.md) | R0 | 编译、MTK、Profile resolve、plugin API | 业务 cognition、HTTP |
-| [`loop/`](../loop/README.md) | R1 | Turn 驱动、PhaseTransaction、FactGateway | Reasoner/Gate 算法 |
-| [`session/`](../session/README.md) | R1 | append、fold、repair、checkpoint | 业务语义 |
-| [`cognition/`](../cognition/README.md) | R2 | Brain/Body/Memory/Gate 纯算法 | Session/Journal/Spine emit |
-| [`runtime/`](../runtime/README.md) | R1 | CognitiveRuntime 窄入口、bindings | phase 业务 |
-| [`agent/`](../agent/README.md) | — | AgentUnit、Team 调度 | HTTP、Plan 编译 |
-| [`application/`](../application/README.md) | L4 | 组合根、spawn、API 门面 | 认知原语实现 |
-| [`infrastructure/`](../infrastructure/README.md) | — | 适配器、持久化端口、LLM 桥 | 业务 fold 策略 |
-| [`plugins/`](../plugins/ARCHITECTURE.md) | R3 | 可替换 Manifest 贡献 | G0 机制、MTK |
+| [`contracts/`](../../lca/contracts/README.md) | R0 | Protocol、DTO、枚举、闭集 | 行为、I/O、env |
+| [`harness/`](../../lca/harness/README.md) | R0 | 编译、MTK、Profile resolve、plugin API | 业务 cognition、HTTP |
+| [`loop/`](../../lca/loop/README.md) | R1 | Turn 驱动、PhaseTransaction、FactGateway | Reasoner/Gate 算法 |
+| [`session/`](../../lca/session/README.md) | R1 | append、fold、repair、checkpoint | 业务语义 |
+| [`cognition/`](../../lca/cognition/README.md) | R2 | Brain/Body/Memory/Gate 纯算法 | Session/Journal/Spine emit |
+| [`runtime/`](../../lca/runtime/README.md) | R1 | CognitiveRuntime 窄入口、bindings | phase 业务 |
+| [`agent/`](../../lca/agent/README.md) | — | AgentUnit、Team 调度 | HTTP、Plan 编译 |
+| [`application/`](../../lca/application/README.md) | L4 | 组合根、spawn、API 门面 | 认知原语实现 |
+| [`infrastructure/`](../../lca/infrastructure/README.md) | — | 适配器、持久化端口、LLM 桥 | 业务 fold 策略 |
+| [`plugins/`](../../lca/plugins/ARCHITECTURE.md) | R3 | 可替换 Manifest 贡献 | G0 机制、MTK |
 
 依赖方向（单向）：`contracts → infrastructure → cognition → runtime → agent → application`；`harness` 仅依赖 `contracts`；`loop/session` 依赖 `contracts` + `harness`；`plugins` 经 Context 注入，禁止 plugin→plugin import。
 
@@ -139,7 +139,7 @@ layered-cognitive-agent/
 
 ## 9. `lca/plugins/` — Seam 树（真正插件化的目标物理布局）
 
-> 完整映射与 43 个 legacy 顶层目录对照见 [plugins/ARCHITECTURE.md](../plugins/ARCHITECTURE.md)。
+> 完整映射与 43 个 legacy 顶层目录对照见 [plugins/ARCHITECTURE.md](../../lca/plugins/ARCHITECTURE.md)。
 
 ```text
 plugins/
