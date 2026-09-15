@@ -45,13 +45,13 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
 )
-from lca.plugins.concept.prompt_render.assemble import (
+from lca.nodes.concept.prompt_render.assemble.assemble import (
     PromptSectionsAssembleExecutor,
 )
-from lca.plugins.concept.prompt_render.compile import (
+from lca.nodes.concept.prompt_render.compile.compile import (
     PromptTraceCompileExecutor,
 )
-from lca.plugins.concept.prompt_render.fill import PromptSectionsFillExecutor
+from lca.nodes.concept.prompt_render.fill.fill import PromptSectionsFillExecutor
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BUNDLE_PATH = REPO_ROOT / "bundles" / "concept" / "prompt_render.yaml"

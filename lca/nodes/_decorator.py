@@ -3,7 +3,7 @@
 ADR-0227 §Decision: this decorator generalizes the
 ``@dataclass(slots=True)`` ``NodeExecutor`` + ``@plugin(...)`` setup pair
 that lived inline in
-:mod:`lca.plugins.concept.context_compose.collect` and
+:mod:`lca.nodes.concept.context_compose.collect.collect` and
 :mod:`lca.plugins.think.history_assemble.execute` (PR2). Plugin authors
 write one function definition per node; the decorator produces the
 identical artifact the hand-written pair produces today.

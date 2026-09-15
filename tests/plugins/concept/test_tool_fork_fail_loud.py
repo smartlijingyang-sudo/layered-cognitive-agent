@@ -9,7 +9,7 @@ import pytest
 from lca.contracts.models.cognition.boundary import BindingsView
 from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
 from lca.infrastructure.capability.tools.tools import ToolsService
-from lca.plugins.concept.tool_fork.dispatch import (
+from lca.nodes.concept.tool_fork.dispatch.dispatch import (
     ToolForkDispatchExecutor,
     _assert_sandbox_tools_visible,
 )

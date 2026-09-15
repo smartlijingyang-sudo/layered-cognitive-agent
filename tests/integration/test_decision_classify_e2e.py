@@ -31,10 +31,10 @@ from lca.framework.graph.strategies.node_executor_strategy import (
 from lca.framework.graph.strategy_registry import (
     StrategyRegistry,
 )
-from lca.plugins.concept.decision_classify.compose_action import (
+from lca.nodes.concept.decision_classify.compose_action.compose_action import (
     DecisionComposeActionExecutor,
 )
-from lca.plugins.concept.decision_classify.parse_tool_calls import (
+from lca.nodes.concept.decision_classify.parse_tool_calls.parse_tool_calls import (
     DecisionParseResponseExecutor,
 )
 

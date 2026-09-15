@@ -25,7 +25,7 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeInput,
 )
 from lca.contracts.protocols.graph.routing import RoutingDecision
-from lca.plugins.concept.decision_enforce.chain_reject import (
+from lca.nodes.concept.decision_enforce.chain_reject.chain_reject import (
     GateChainRejectExecutor,
 )
 

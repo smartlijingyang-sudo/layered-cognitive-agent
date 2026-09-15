@@ -32,7 +32,7 @@ from lca.infrastructure.runtime_plane.capability_bindings import (
     reset_capability_bindings,
     set_capability_bindings,
 )
-from lca.plugins.concept.tool_fork.dispatch import ToolForkDispatchExecutor
+from lca.nodes.concept.tool_fork.dispatch.dispatch import ToolForkDispatchExecutor
 
 
 @dataclass
@@ -169,7 +169,7 @@ async def test_tools_capability_missing_fails_loud() -> None:
 @pytest.mark.asyncio
 async def test_module_does_not_import_emit() -> None:
     """P5 invariant: node plugin module is pure — no EP / journal import."""
-    import lca.plugins.concept.tool_fork.dispatch as mod
+    import lca.nodes.concept.tool_fork.dispatch.dispatch as mod
 
     src = mod.__file__
     assert src is not None

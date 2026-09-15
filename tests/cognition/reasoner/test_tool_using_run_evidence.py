@@ -49,7 +49,7 @@ from lca.infrastructure.tools.sandbox.runtime_tools import (
     SANDBOX_EXECUTE_TOOL_NAME,
     SandboxExecuteTool,
 )
-from lca.plugins.concept.tool_fork.dispatch import ToolForkDispatchExecutor
+from lca.nodes.concept.tool_fork.dispatch.dispatch import ToolForkDispatchExecutor
 from lca.plugins.transport.webserver.doctor.doctor import diagnose_step_tree
 from tests.support.inline_sandbox import InlineSandbox
 

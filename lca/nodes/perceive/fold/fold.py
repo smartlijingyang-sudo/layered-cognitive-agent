@@ -41,7 +41,10 @@ class PerceiveFoldExecutor:
     semantic_name: str = "phase.perceive.fold"
     region: str = "phase:perceive"
     declared_inputs: tuple[PortName, ...] = ("manifest",)
-    declared_outputs: tuple[PortName, ...] = ("observation",)
+    declared_outputs: tuple[PortName, ...] = (
+        "in_assembled_manifest",
+        "observation",
+    )
 
     async def node_execute(
         self,
@@ -49,9 +52,11 @@ class PerceiveFoldExecutor:
         input: NodeInput,
     ) -> NodeOutput:
         del context
+        observation = input.port_values.get("manifest")
         return NodeOutput(
             port_values={
-                "observation": input.port_values.get("manifest"),
+                "in_assembled_manifest": observation,
+                "observation": observation,
                 "routing": RoutingDecision(action_type=ActionType.RESPOND),
             },
         )
