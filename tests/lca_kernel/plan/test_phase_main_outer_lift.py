@@ -1,4 +1,4 @@
-"""Atomic lift test for ``bundles/phase_main_outer.yaml`` (Task 6).
+"""Atomic lift test for ``bundles/outer/phase_main.yaml`` (Task 6).
 
 The outer plan is the production spine for the six-phase loop
 (perceive → think → act → reflect → remember → terminal). After the
@@ -20,7 +20,7 @@ import yaml
 from lca.framework.graph.lifter import lift_graph_spec
 
 REPO = Path(__file__).resolve().parent.parent.parent.parent
-BUNDLE = REPO / "bundles" / "phase_main_outer.yaml"
+BUNDLE = REPO / "bundles" / "outer" / "phase_main.yaml"
 
 
 def test_phase_main_outer_yaml_lifts() -> None:
@@ -57,7 +57,7 @@ def test_phase_main_outer_has_termination() -> None:
         n.io_schema.terminal_predicate is not None for n in plan.nodes
     )
     assert terminal_nodes or has_predicate, (
-        "phase_main_outer.yaml has no terminal node or terminal_predicate; "
+        "outer/phase_main.yaml has no terminal node or terminal_predicate; "
         "the kernel would run forever"
     )
 
@@ -77,5 +77,5 @@ def test_phase_main_outer_edges_reference_declared_ports() -> None:
         lift_graph_spec(spec)
     except PlanLiftError as exc:  # pragma: no cover - guard
         raise AssertionError(
-            f"phase_main_outer.yaml should lift clean, got PlanLiftError: {exc}"
+            f"outer/phase_main.yaml should lift clean, got PlanLiftError: {exc}"
         )

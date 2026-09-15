@@ -20,7 +20,7 @@ What's in here (PR-1):
                        :class:`NodeInput`, :class:`NodeOutput`.
 - :mod:`binding`    — :class:`BindingKind` enum (10 entries).
 - :mod:`visit`     — :class:`VisitRecord`, :class:`DispatchDecision`.
-- :mod:`plan`      — :class:`Plan`, :class:`PlanNode`, :class:`PlanEdge`.
+- :mod:`plan`      — :class:`Plan`, :class:`PlanNode`, :class:`PlanEdge`, :class:`EdgeLoopObligation`.
 - :mod:`strategy`  — :class:`NodeStrategy` Protocol (10 binding kinds).
 
 What's NOT in here (deferred):
@@ -43,7 +43,7 @@ from lca.contracts.protocols.graph.node_io import (
     NodeSchemaError,
     PortSpec,
 )
-from lca.contracts.protocols.graph.plan import Plan, PlanEdge, PlanNode, SubgraphReference
+from lca.contracts.protocols.graph.plan import EdgeLoopObligation, Plan, PlanEdge, PlanNode, SubgraphReference
 from lca.contracts.protocols.graph.ports import PortName
 from lca.contracts.protocols.graph.predicate import PortRef, Predicate
 from lca.contracts.protocols.graph.routing import RoutingDecision
@@ -53,6 +53,7 @@ from lca.contracts.protocols.graph.visit import DispatchDecision, VisitRecord
 __all__ = [
     "BindingKind",
     "DispatchDecision",
+    "EdgeLoopObligation",
     "NodeIOSchema",
     "NodeInput",
     "NodeOutput",
