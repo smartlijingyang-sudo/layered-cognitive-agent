@@ -17,9 +17,59 @@ spine EP 投递与提交收据，`transport.py` 承担 transport 面与 `kernel.
 - 图遍历与 edge 选择（`lca/framework/graph`）
 - HTTP 路由与 SSE 帧格式（`lca/plugins/transport`）
 
+## 3. 输入
+
+`ResolvedProfile` 编译产物（`CompiledRunPlan` / `V2ExecutablePlan`，经
+`lca_kernel.plan.plan_compile`）、绑定后的 `RunSessionWriter` /
+`FactGateway` writer、`AgentState` 与 graph 的 `Plan` / `NodeInput`。
+
+## 4. 输出
+
+包门面 `lca/loop/__init__.py.__all__` 恰好 10 个符号——事实投递
+`publish_ep_bound` / `append_catalog_bound` / `DefaultFactGateway`，工具与记忆
+commit 收据 `commit_tool_phase_call_start` / `commit_tool_phase_call_end` /
+`commit_tool_phase_denied` / `commit_tool_journal_receipt` /
+`commit_act_journal_receipt` / `commit_memory_journal_receipt` /
+`commit_memory_spine_receipt`。驱动与解释器类型（`RuntimeDriver`、
+`DeclarativeRuntimeDriver`、`TurnExecutor`、`PlanInterpreter`、
+`InterpretationResult`、`DeclarativeExecution`、`DeclarativeCheckpoint`、
+`SpineEmitRef`）从子模块 `lca.loop.driver` / `lca.loop.emit.*` /
+`lca.loop.commit.*` 导出，不经包门面。
+
+## 5. 允许依赖
+
+—（镜像 pyproject `[tool.lca.package_contracts.lca.loop].allowed_dependencies`：
+`lca.contracts`、`lca.framework`、`lca.harness`、`lca.infrastructure`、
+`lca.runtime`、`lca_kernel.events`、`lca_kernel.plan`）
+
+## 6. 禁止依赖
+
+**pyproject.toml `[tool.lca.package_contracts.lca.loop].forbidden_dependencies`**:
+`lca.agent`、`lca.application`、`lca.plugins`。本层不得 import 组合根或 agent
+业务，也不得 import 具体插件实现；插件经 seam/provider 注入。
+
+## 8. 失败语义
+
+按源码 `raise` 统计：`ValueError` 3、`TypeError` 2、`AttributeError` 1。
+事实投递失败**不静默**：未绑定 publish writer 时显式丢弃并给出原因
+（`publish_ep_bound` 返回 `None`），observer 异常 contained 且不回滚已 commit 的
+append；driver 侧异常向上抛给 kernel 记录失败 visit。
+
+## 9. 公共入口
+
+包门面（与模块 __all__ 声明一一对应）：
+
+`DefaultFactGateway`, `append_catalog_bound`, `publish_ep_bound`,
+`commit_act_journal_receipt`, `commit_memory_journal_receipt`,
+`commit_memory_spine_receipt`, `commit_tool_journal_receipt`,
+`commit_tool_phase_call_start`, `commit_tool_phase_call_end`,
+`commit_tool_phase_denied`
+
+子模块入口：`lca.loop.driver`、`lca.loop.emit`、`lca.loop.commit`、
+`lca.loop.control`、`lca.loop.transport`、`lca.loop.fact_gateway`
 ## 7. 副作用
 
-只写事实，不写世界：
+只写事实，不写世界（镜像 pyproject side_effects：`fact:session-append`、`log:emit`）：
 
 | 入口 | 后果 |
 |---|---|
