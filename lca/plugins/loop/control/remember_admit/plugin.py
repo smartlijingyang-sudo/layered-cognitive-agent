@@ -57,21 +57,18 @@ class RememberAdmitExecutor:
                 detail="memory admission requires outcome and reflection",
                 plugin_id="control.executor.remember-admit",
             )
-            hint = "stop"
         elif status != TaskStatus.WORKING:
             verdict = ControlVerdict(
                 kind=ControlVerdictKind.DENY,
                 detail="terminal run does not admit new memory",
                 plugin_id="control.executor.remember-admit",
             )
-            hint = "stop"
         else:
             verdict = ControlVerdict(
                 kind=ControlVerdictKind.ALLOW,
                 detail="turn is admissible to memory",
                 plugin_id="control.executor.remember-admit",
             )
-            hint = None
         return NodeOutput(
             port_values={
                 "verdict": verdict,
