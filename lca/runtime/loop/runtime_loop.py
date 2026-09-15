@@ -192,8 +192,17 @@ class CognitiveRuntime(Runtime):
             reset_lifecycle()
             begin_turn()
             session_reader = resolve_session_reader()
+            run_writer: RunSessionWriter | None = None
             if session_reader is not None:
-                RunSessionWriter(session=session_reader).append_user_message(
+                run_writer = RunSessionWriter(session=session_reader)
+                # Layer the per-run writer into the phase capabilities so
+                # think subgraph node executors (``history.derive``,
+                # ``llm.call``) can read it via ``context.runtime.writer``;
+                # otherwise their declared ``writer`` port fails the
+                # port-required TypeError before any reasoning fires.
+                if self._bindings.capabilities.get("writer") is None:
+                    self._bindings = self._bindings.with_writer(run_writer)
+                run_writer.append_user_message(
                     message_id=f"task:{trace_id}",
                     role="user",
                     content=task,

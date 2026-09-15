@@ -96,6 +96,10 @@ class BrainComposer:
         # concept.tool.fork (think.reason.fork_tools) needs ToolsService.
         tools = require_capability(scope, "tools")
         phase_capabilities["tools"] = tools
+        # think.llm.dispatch reads ``adapter`` from the runtime scope
+        # (``context.runtime.adapter``); expose the per-Agent LLM under
+        # the bare alias so the typed-boundary node can resolve it.
+        phase_capabilities["adapter"] = llm
         decision_gate = _resolve_decision_gate(brain, gates)
         if decision_gate is not None:
             phase_capabilities["phase.think.decision_gate"] = decision_gate

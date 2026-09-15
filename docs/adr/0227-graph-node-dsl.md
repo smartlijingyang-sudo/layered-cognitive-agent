@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed → Implemented in the same PR (PR3 of the session-write-path redesign; PR2 introduced three typed graph nodes by hand, PR1 dropped `max_visits` per ADR-0225)
+**Superseded by ADR-0228** (2026-09-15). Originally: Proposed → Implemented in the same PR (PR3 of the session-write-path redesign; PR2 introduced three typed graph nodes by hand, PR1 dropped `max_visits` per ADR-0225). The decorator at `lca/nodes/_decorator.py` produced a `@plugin(...)` carrier whose `setup.setup` is a nested attribute; the bundle resolver reads a module-level `setup(ctx, config=None)` callable. The mismatch meant the kernel never saw `@graph_node`-decorated modules and every backend run failed at H6 with `NodeExecutor lookup miss`. The three PR3 think nodes were rewritten as hand-written `@plugin(...)` carriers in commit `daee237b6 refactor(nodes): rewrite 3 think nodes with @plugin(...) instead of @graph_node`. The decorator code remains with zero callers; ADR-0228 retires it.
 
 ## Context
 

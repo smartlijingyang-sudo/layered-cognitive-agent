@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from types import MappingProxyType
 from typing import TYPE_CHECKING, cast
 
@@ -71,6 +71,26 @@ class RuntimePhaseCapabilities:
         """Snapshot the contribution map before phase interpretation begins."""
 
         object.__setattr__(self, "values", MappingProxyType(dict(self.values)))
+
+    def with_extra(self, extra: Mapping[str, object]) -> "RuntimePhaseCapabilities":
+        """Return a new instance with *extra* merged over ``self.values``.
+
+        Runtime node executors resolve their declared ports via
+        ``context.runtime.<port>`` (see
+        :class:`lca.framework.graph.adapter.PlanInterpreterAdapter._AdapterScope`),
+        and the runtime scope is exactly this :class:`RuntimePhaseCapabilities`.
+        Composition populates the static fields (``brain``, ``body``,
+        ``phase.think.*``, etc.); per-run values that arrive after
+        composition — most notably the per-run :class:`RunSessionWriter`
+        bound by ``bind_run_event_session_from_store`` — have no other
+        carrier, so we expose this seam so the run loop can layer them
+        in without mutating the composition-time closure.
+        """
+        if not extra:
+            return self
+        merged: dict[str, object] = dict(self.values)
+        merged.update(extra)
+        return RuntimePhaseCapabilities(merged)
 
     def get(self, name: str) -> object | None:
         """Return a named capability from the graph's explicit contribution map."""
@@ -192,6 +212,21 @@ class DeclarativeRuntimeBindings:
     def plan_ref(self) -> str:
         """Return the stable identity of the selected executable plan."""
         return compiled_run_plan_ref(self.require_executable_plan())
+
+    def with_writer(self, writer: object) -> "DeclarativeRuntimeBindings":
+        """Return a copy with ``writer`` injected into the phase capabilities.
+
+        Think subgraph node executors (e.g. ``history.derive``,
+        ``llm.call``) declare a ``writer`` port that flows in from
+        the per-run :class:`RunSessionWriter` bound by
+        :func:`lca.session.lifecycle.bind.bind_run_event_session_from_store`.
+        Composition only fills the static phase capability map
+        (``brain``, ``body``, ``phase.think.*``); the writer is bound
+        later, when the run actually starts. This seam lets the run
+        loop layer the writer in without mutating the composition-time
+        closure.
+        """
+        return replace(self, capabilities=self.capabilities.with_extra({"writer": writer}))
 
     def require_executable_plan(self) -> CompiledRunPlan:
         """Return the selected plan once the bindings carry its node executors."""

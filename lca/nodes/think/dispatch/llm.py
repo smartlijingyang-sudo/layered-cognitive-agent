@@ -80,7 +80,17 @@ class LlmCallExecutor:
         writer = _resolve_port("writer", input=input, context=context)
         request = _resolve_port("model_visible_request", input=input, context=context)
         adapter = _resolve_port("adapter", input=input, context=context)
-        response: LLMResponse = await adapter.complete(request)
+        # The adapter contract is ``complete(prompt: str, system=..., history=..., tools=...)``;
+        # the typed ``ModelVisibleRequest`` is the in-process view, not the wire shape.
+        # Unpack it here so the node body owns the typed-boundary translation.
+        prompt = request.messages[-1]["content"] if request.messages else ""
+        history = request.messages[:-1] if len(request.messages) > 1 else []
+        response: LLMResponse = await adapter.complete(
+            prompt,
+            system=request.system,
+            history=history,
+            tools=list(request.tools) if request.tools else None,
+        )
         usage: TokenUsage | None = response.usage
         tool_calls = list(response.tool_calls or ())
         step = state.step
