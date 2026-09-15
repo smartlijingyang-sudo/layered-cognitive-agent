@@ -3,7 +3,7 @@
 锁定:
 1. ``perceive.main.precondition`` == ``perceive.has_minimum_context``
 2. ``perceive.main.terminal_predicate`` == ``perceive.context_complete``
-3. 既有 6 个 phase 节点结构不破(id / phase / max_visits 与历史一致)。
+3. 既有 6 个 phase 节点结构不破(id / phase / region / binding / sub_spec_ref 与历史一致;``max_visits`` 字段在 ADR-0225 中删除)。
 4. YAML 解析通过 Pydantic Config 严格校验(extra=forbid)。
 """
 
