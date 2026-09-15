@@ -39,6 +39,25 @@ def declarative_plan_hash(value: Any) -> str:
     return canonical_digest(canonical_json(value), length=32)
 
 
+def _unwrap_v2(plan: CompiledRunPlan | Any) -> CompiledRunPlan:
+    """Return the ``CompiledRunPlan`` inside a v2 wrapper, or ``plan`` itself.
+
+    ADR-0221 P3: the kernel may wrap the plan in ``V2ExecutablePlan``
+    to carry the v2 graph spec alongside the immutable plan. This is the
+    single point that recognises that wrapper and unwraps to the inner
+    ``CompiledRunPlan`` so callers (plan_ref hashing, to_dict projection,
+    CLI introspection) see a stable v1-shaped view.
+
+    Duck-typed on purpose: ``V2ExecutablePlan`` lives in ``lca_kernel``,
+    which already imports ``lca.harness.*``, so an eager
+    ``isinstance(V2ExecutablePlan)`` here would create a cycle. The shape
+    (``inner`` + ``graph_spec``) is stable on the wrapper class.
+    """
+    if hasattr(plan, "inner") and hasattr(plan, "graph_spec"):
+        return plan.inner
+    return plan
+
+
 def compiled_run_plan_ref(plan: CompiledRunPlan) -> str:
     """Compute the cross-process stable canonical reference for a compiled plan.
 
@@ -47,8 +66,7 @@ def compiled_run_plan_ref(plan: CompiledRunPlan) -> str:
     transparently here so callers continue to receive a stable
     ``CompiledRunPlan`` view.
     """
-    if hasattr(plan, "inner") and hasattr(plan, "graph_spec"):
-        plan = plan.inner
+    plan = _unwrap_v2(plan)
     payload = {
         "capability": capability_sub_plan_hash(plan),
         "control": control_entries_sub_plan_hash(plan),
@@ -93,7 +111,7 @@ def compiled_run_plan_to_dict(plan: CompiledRunPlan) -> dict[str, Any]:
     same way ``compiled_run_plan_ref`` does so callers see a v1-shaped
     payload even when the v2 region is the source of truth.
     """
-    inner = plan.inner if hasattr(plan, "inner") and hasattr(plan, "graph_spec") else plan
+    inner = _unwrap_v2(plan)
 
     result: dict[str, Any] = {
         "profile_path": inner.profile_path,
