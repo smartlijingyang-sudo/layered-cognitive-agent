@@ -47,7 +47,12 @@ class EffectExecuteExecutor:
     semantic_name: str = "effect.execute"
     region: str = "concept"
     declared_inputs: tuple[PortName, ...] = ("envelope",)
-    declared_outputs: tuple[PortName, ...] = ("receipt",)
+    # PR-3.8.5 fix1: emit ``receipts`` (list-of-one) so the act subgraph's
+    # ``act.join`` typed-boundary node (declared_inputs=("receipts",)) sees
+    # the receipt via the kernel port registry. Previously emitted the
+    # singular ``receipt`` which left ``receipts=None`` at join and every
+    # act subgraph run terminated silently at join.
+    declared_outputs: tuple[PortName, ...] = ("receipts",)
 
     async def node_execute(
         self,
@@ -57,7 +62,7 @@ class EffectExecuteExecutor:
         """effect.execute 入口。
 
         inputs 端口:envelope (CommandEnvelope)
-        outputs 端口:receipt (EffectReceipt)
+        outputs 端口:receipts (list[EffectReceipt], length 1)
         """
         envelope = input.port_values.get("envelope")
         if not isinstance(envelope, CommandEnvelope):
@@ -67,7 +72,7 @@ class EffectExecuteExecutor:
             )
 
         receipt = await _dispatch(envelope, context)
-        return NodeOutput(port_values={"receipt": receipt})
+        return NodeOutput(port_values={"receipts": [receipt]})
 
 
 def _derive_outcome(
