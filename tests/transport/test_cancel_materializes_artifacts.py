@@ -35,7 +35,7 @@ from lca.plugins.transport.webserver.handlers.runs.session.session.session impor
 # registry_commands 必须先于 lifecycle 子模块被进程导入:它拉动 execute 包链,
 # lifecycle 包的懒加载 __getattr__ 依赖该顺序打破循环。因此
 # ``RunLifecycleCoordinator`` 在用例内局部导入(此时 execute 链已加载)。
-from lca.plugins.transport.webserver.handlers.runs.terminal import registry_commands
+from lca.plugins.transport.webserver.handlers.runs.terminal.registry import commands as registry_commands
 from lca.plugins.transport.webserver.read.runs.identity.identity import (
     parse_agent_ref,
 )
