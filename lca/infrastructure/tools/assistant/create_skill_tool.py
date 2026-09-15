@@ -89,6 +89,18 @@ class AssistantCreateSkillTool(Tool):
         except ValueError as exc:
             return self._fail(start, str(exc))
 
+        if explicit_id:
+            # The installer names the package from SKILL.md frontmatter, so an
+            # `skill_id` argument that disagrees with it would be silently
+            # dropped; refuse instead of installing under a different id.
+            declared_id = sanitize_skill_id(skill_title(meta, "assistant-skill"))
+            if skill_id != declared_id:
+                return self._fail(
+                    start,
+                    f"skill_id {skill_id!r} 与 SKILL.md frontmatter 的 "
+                    f"name {declared_id!r} 不一致 — 二者必须相同",
+                )
+
         staging = Path(tempfile.mkdtemp(prefix="lca-create-skill-"))
         try:
             (staging / "SKILL.md").write_text(skill_md, encoding="utf-8")
