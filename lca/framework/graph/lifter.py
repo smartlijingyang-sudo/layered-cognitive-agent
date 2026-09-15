@@ -493,10 +493,7 @@ def _to_port_specs(names: object) -> tuple[PortSpec, ...]:
     for name in names:
         if not isinstance(name, str) or not name:
             continue
-        try:
-            out.append(PortSpec(name=name))
-        except Exception:
-            continue
+        out.append(PortSpec(name=name))
     return tuple(out)
 
 

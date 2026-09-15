@@ -151,3 +151,26 @@ class TestLiftValidation:
         with pytest.raises(PlanLiftError) as exc_info:
             _validate_termination(plan)
         assert "termination" in str(exc_info.value).lower()
+
+
+class TestPortSpecProjection:
+    """`_to_port_specs` must keep every declared port instead of dropping any."""
+
+    def test_every_string_port_survives_lift(self) -> None:
+        from lca.framework.graph.lifter import _to_port_specs
+
+        names = ["decision", "observation", "a b", "x" * 200, "routing.next"]
+        specs = _to_port_specs(names)
+        assert [s.name for s in specs] == names
+
+    def test_single_string_is_treated_as_one_port(self) -> None:
+        from lca.framework.graph.lifter import _to_port_specs
+
+        assert [s.name for s in _to_port_specs("decision")] == ["decision"]
+
+    def test_non_string_and_empty_entries_are_filtered(self) -> None:
+        from lca.framework.graph.lifter import _to_port_specs
+
+        assert [s.name for s in _to_port_specs(["ok", "", None, 7])] == ["ok"]
+        assert _to_port_specs(None) == ()
+        assert _to_port_specs({"a": 1}) == ()
