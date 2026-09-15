@@ -13,6 +13,7 @@ from lca.plugins.events.publishers.delegation_cache.plugin import (
 )
 from lca_kernel.events import TeamDelegationCacheHit
 from lca_kernel.events.bus.bus import EventBus, EventRef
+from datetime import UTC
 
 
 def _state_with_hit_result(
@@ -34,7 +35,7 @@ def _state_with_hit_result(
                 error=None,
                 task_id=new_id("task"),
                 step=0,
-                returned_at=datetime.now(tz=timezone.utc),
+                returned_at=datetime.now(tz=UTC),
             ),
         )
     )
