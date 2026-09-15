@@ -136,7 +136,7 @@ class AgentState:
     # ``TYPE_CHECKING`` (annotation-only) and the factory resolves it at
     # instance-construction time to avoid a cognition ↔ core cycle
     # through ``cognition.prompt_assembly``.
-    task_list: "TaskList" = field(  # type: ignore[type-arg]
+    task_list: TaskList = field(  # type: ignore[type-arg]
         default_factory=lambda: __import__(
             "lca.contracts.models.cognition.task", fromlist=["TaskList"]
         ).TaskList()
