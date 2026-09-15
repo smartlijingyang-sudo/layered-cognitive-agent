@@ -47,12 +47,6 @@ from lca_kernel.boot.plan_validation.checks.cycle_terminal import (
 from lca_kernel.boot.plan_validation.checks.entry_uniqueness import (
     EntryUniquenessCheck,
 )
-from lca_kernel.boot.plan_validation.checks.max_visits_bounds import (
-    MaxVisitsBoundsCheck,
-)
-from lca_kernel.boot.plan_validation.checks.max_visits_vs_scc import (
-    MaxVisitsVsSccCheck,
-)
 from lca_kernel.boot.plan_validation.checks.predicate_wellformed import (
     PredicateWellformedCheck,
 )
@@ -366,36 +360,6 @@ def _check_reachability(plan: Plan, *, plan_id: str) -> PlanLiftError | None:
     return None
 
 
-def _check_self_loop_safe(plan: Plan, *, plan_id: str) -> PlanLiftError | None:
-    """Reject self-loops with ``max_visits > 1``.
-
-    A self-loop ``a → a`` with ``max_visits=1`` is fine — the kernel
-    visits the node once and the loop terminates because the visit
-    budget is exhausted. With ``max_visits > 1`` the same node can
-    keep traversing the self-loop until the budget runs out, which
-    silently inflates run cost without producing new state. Some
-    executors genuinely need self-loops for retry semantics, so
-    the cap is "raise only when the budget exceeds the safe
-    single-visit value" — the operator can lower ``max_visits`` to
-    silence the check.
-    """
-    for node in plan.nodes:
-        if node.max_visits <= 1:
-            continue
-        for edge in plan.edges:
-            if edge.source == node.id and edge.target == node.id:
-                return PlanLiftError(
-                    f"plan {plan_id!r}: node {node.id!r} has a self-loop "
-                    f"with max_visits={node.max_visits}; this lets the "
-                    f"interpreter revisit the node indefinitely and "
-                    f"inflates run cost. Lower ``max_visits`` to 1 or "
-                    f"remove the self-loop edge.",
-                    plan_id=plan_id,
-                    node_id=node.id,
-                )
-    return None
-
-
 def _check_terminal_reachable_from_entry(
     plan: Plan, *, plan_id: str
 ) -> PlanLiftError | None:
@@ -482,8 +446,7 @@ def _check_cycle_has_terminal(
 
     A strongly connected component without a terminal node is a
     classic "infinite loop" trap — the interpreter enters the
-    cycle, traverses it until ``max_visits`` exhausts each node,
-    and then dead-ends with no termination signal. Static
+    cycle and has no termination signal inside it. Static
     reachability of a terminal elsewhere in the plan is not
     enough: a cycle that doesn't include a terminal leaves the
     kernel trapped inside it on every entry. The check
@@ -552,19 +515,19 @@ def _check_cycle_has_terminal(
             strongconnect(v)
     for scc in sccs:
         if len(scc) <= 1:
-            # Single-node SCC: self-loop already covered by
-            # ``_check_self_loop_safe`` and a non-self-loop
-            # single-node SCC trivially terminates via max_visits.
+            # Single-node SCC: a non-self-loop single-node SCC
+            # trivially terminates; self-loops are protected by
+            # terminal_predicate (PR2) or the kernel's
+            # AgentState.budget.
             continue
         if not (set(scc) & terminals):
             scc_names = sorted(node_ids[i] for i in scc)
             return PlanLiftError(
                 f"plan {plan_id!r}: strongly connected component "
                 f"{scc_names!r} contains no terminal node; the "
-                f"interpreter will loop inside the cycle until every "
-                f"node's ``max_visits`` budget exhausts and then "
-                f"dead-end. Add a terminal node to the cycle or "
-                f"break the cycle with a one-way exit edge.",
+                f"interpreter will loop inside the cycle. Add a "
+                f"terminal node to the cycle or break the cycle "
+                f"with a one-way exit edge.",
                 plan_id=plan_id,
             )
     return None
@@ -575,7 +538,6 @@ _PLAN_CHECKS: tuple[Callable[[Plan, str], PlanLiftError | None], ...] = (
     # the test that imports them by name).
     _check_typed_port_wiring,
     _check_reachability,
-    _check_self_loop_safe,
     _check_terminal_reachable_from_entry,
     _check_terminal_no_outgoing_edges,
     # Class-based :class:`PlanCheck` strategies wired in via the
@@ -586,7 +548,6 @@ _PLAN_CHECKS: tuple[Callable[[Plan, str], PlanLiftError | None], ...] = (
     # Mandatory structural checks (graph integrity, runtime safety):
     CyclePortDependencyCheck(),
     EntryUniquenessCheck(),
-    MaxVisitsBoundsCheck(),
     PredicateWellformedCheck(),
     SubgraphPortContractCheck(),
     # Style / SSOT checks (skip in test fixtures that don't declare
@@ -602,12 +563,11 @@ _PLAN_CHECKS: tuple[Callable[[Plan, str], PlanLiftError | None], ...] = (
     #   plan-internal unused-output model produces false positives.
     #   Re-enable per-profile via extra config when ready.)
     # - CycleHasTerminalCheck (production phase cycles like
-    #   think.main ↔ act.main rely on max_visits convergence, so
-    #   the SCC-without-terminal check is opt-in via extra config.
+    #   think.main ↔ act.main rely on terminal_predicate convergence,
+    #   so the SCC-without-terminal check is opt-in via extra config.
     #   Keeping it disabled matches current production behavior;
     #   re-enable once phase cycles are broken up at the boundary
     #   by per-phase terminal predicates.)
-    MaxVisitsVsSccCheck(),
 )
 
 
