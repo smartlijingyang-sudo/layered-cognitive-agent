@@ -1,3 +1,11 @@
+## 6. 禁止依赖
+
+pyproject `[tool.lca.package_contracts.lca.cognition].forbidden_dependencies` 逐项：
+`lca.runtime`、`lca.agent`、`lca.application`、`lca.harness`、`lca.plugins`、
+`gateway`（`gateway/` 顶层包已在 ADR-0119 followup 迁入 `lca/*`，此处保留为回归
+哨兵）。认知层不得 import 组合根与运行/宿主层；§5 列出的三条现状边是待收敛偏差，
+新增同类 import 会让本门禁与 `lint-imports` 一起失败。
+
 # lca/cognition — 纯认知原语（R2）
 
 > v3 概念群 · [platform-directory-architecture.md](../../docs/specs/platform-directory-architecture.md)
@@ -56,9 +64,13 @@ prompt 组装）、`body/`（`SimpleBody`、`SafeExecutor`、ActionRegistry）�
 
 ## 5. 允许依赖
 
-`lca.contracts`（类型与 Protocol）。现状还包含 `lca.infrastructure`（工具与凭据
-适配器）、`lca.loop`（事实接缝）、以及 Body/LLM-turn 执行边界注入用到的
-`lca.runtime.session.run_session_writer` 类型；这些是迁移中的例外，见 §6。
+`lca.contracts`, `lca.infrastructure`（镜像 pyproject
+`[tool.lca.package_contracts.lca.cognition].allowed_dependencies`，另含自身
+`lca.cognition`）。现状还有三条**迁移期**边：`lca.loop`（9 个文件引用，Body 事实接缝）、
+`lca.runtime`（`RunSessionWriter` 类型；在 `simple_body.py` 仅出现在
+`TYPE_CHECKING` 块）、以及 `lca/cognition/team/modes/default_modes.py`
+对 `lca.plugins.collaboration.modes.*` 的三条 import——它们不在允许清单内，
+收敛条件见 §6 与「副作用」一节。
 
 ## 6. 禁止依赖
 
