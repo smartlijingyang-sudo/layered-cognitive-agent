@@ -11,8 +11,6 @@ from lca.contracts.harness.tasks.session import session_event
 from lca.loop.fact_gateway import (
     DefaultFactGateway,
     append_catalog_bound,
-    append_surface_bound,
-    fact_gateway_for_emit,
     publish_ep_bound,
 )
 from lca.plugins.events.publishers._session_publish import (
@@ -47,7 +45,6 @@ def test_append_catalog_delegates_to_session() -> None:
 
 
 def test_append_catalog_noop_when_session_unbound() -> None:
-    assert fact_gateway_for_emit() is None
     assert append_catalog_bound(_GatewayCatalogPayload(kind="probe", value=1), actor="gate") is None
 
 
@@ -85,46 +82,6 @@ def test_append_catalog_bound_unwraps_bridge() -> None:
         assert event is not None
         assert event.type == "test.gateway.catalog.v1"
         assert event.actor == "lifecycle"
-    finally:
-        reset_publish_session(token)
-
-
-def test_append_surface_bound_unwraps_bridge() -> None:
-    from lca.session.lifecycle.bind import RunEventSessionBridge
-    from lca_kernel.events.fold.fold import SURFACE_USER_TYPE
-
-    session = Session("t-bound-bridge-surface")
-    bridge = RunEventSessionBridge(session)
-    token = set_publish_session(bridge)
-    try:
-        receipt = append_surface_bound(
-            SURFACE_USER_TYPE,
-            {"content": "hi", "messages": [{"role": "user", "content": "hi"}]},
-            actor="surface",
-            surface_op="append",
-        )
-        assert receipt is not None
-        assert session.event_count == 1
-        event = session.event_at(0)
-        assert event is not None
-        assert event.type == SURFACE_USER_TYPE
-        assert event.actor == "surface"
-    finally:
-        reset_publish_session(token)
-
-
-def test_fact_gateway_for_emit_unwraps_bridge_for_catalog() -> None:
-    from lca.session.lifecycle.bind import RunEventSessionBridge
-
-    session = Session("t-fg-bridge-catalog")
-    bridge = RunEventSessionBridge(session)
-    token = set_publish_session(bridge)
-    try:
-        gateway = fact_gateway_for_emit()
-        assert gateway is not None
-        receipt = gateway.append_catalog(_GatewayCatalogPayload(kind="fg", value=1), actor="gate")
-        assert session.event_count == 1
-        assert receipt.seq == 0
     finally:
         reset_publish_session(token)
 
@@ -295,7 +252,7 @@ def test_cognitive_emit_context_manifested_via_gateway() -> None:
                 kind="policy_fact",
                 payload="loop warning",
                 provenance="repeat_tool_call",
-                extra={"kind": "repeat_tool_call", "gate": "RepeatToolCallGate"},
+                source="repeat_tool_call",
             ),
         ),
         digest="digest-gw",

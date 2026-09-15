@@ -78,7 +78,6 @@ def test_plan_tree_think_subgraph_profile_text() -> None:
     assert "bundles/think_reason.yaml" in out
     assert "think.reason.plan" in out
     assert "think.reason.render" in out
-    assert "think.reason.complete" in out
     assert "all layers inflated and validated" in out
 
 
@@ -130,7 +129,6 @@ def test_plan_tree_think_subgraph_profile_json_structure() -> None:
     assert [n["id"] for n in reason_layer["nodes"]] == [
         "think.reason.plan",
         "think.reason.render",
-        "think.reason.complete",
     ]
 
 

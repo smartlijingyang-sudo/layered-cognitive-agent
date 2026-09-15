@@ -26,7 +26,7 @@ from lca.contracts.observability.observation.m1_blueprint import (
     PlanNodeSpec,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.loop.fact_gateway import append_surface_bound
+from lca.loop.fact_gateway import publish_ep_bound
 
 _EV_PLAN_BLUEPRINT = "observation.plan_blueprint"
 _EV_PLAN_COMPILE_OK = "observation.plan_compile.complete"
@@ -105,12 +105,10 @@ def observe_plan_compile(
         effect_policy=effect_policy or {},
         compiled_at=now,
     )
-    append_surface_bound(
+    publish_ep_bound(
         _EV_PLAN_BLUEPRINT,
         blueprint.model_dump(mode="json"),
         actor=_OBSERVER_ACTOR,
-        surface_op="append",
-        visibility="model",
     )
     compile_ok = PlanCompileComplete(
         run_id=run_id,
@@ -118,12 +116,10 @@ def observe_plan_compile(
         profile_path=profile_path,
         compiled_at=now,
     )
-    append_surface_bound(
+    publish_ep_bound(
         _EV_PLAN_COMPILE_OK,
         compile_ok.model_dump(mode="json"),
         actor=_OBSERVER_ACTOR,
-        surface_op="append",
-        visibility="model",
     )
 
 

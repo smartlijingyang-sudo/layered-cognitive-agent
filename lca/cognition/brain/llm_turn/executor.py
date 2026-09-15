@@ -25,10 +25,11 @@ from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.observability.tool.journal_receipt import tool_call_resolved_receipt
 from lca.contracts.models.team.partial.buffer import append_run_partial
 from lca.contracts.protocols import LLMAdapter, Tool
-from lca.infrastructure.session._overflow_0.bindings import (
-    assemble_model_history,
+from lca.infrastructure.session.bindings import (
     await_model_request_checkpoint,
+    resolve_session_reader,
 )
+from lca.runtime.session.run_session_writer import RunSessionWriter
 
 _log = structlog.get_logger(__name__)
 
@@ -48,7 +49,10 @@ async def execute_llm_turn(
     """Run one LobeHub-aligned ``call_llm`` turn."""
     mode = resolve_llm_turn_mode(state)
     llm_kwargs = build_llm_call_kwargs(state=state, task=task)
-    llm_kwargs["history"] = assemble_model_history(step=step)
+    session = resolve_session_reader()
+    llm_kwargs["history"] = (
+        RunSessionWriter(session=session).derive_messages() if session is not None else []
+    )
     await await_model_request_checkpoint()
     if mode == LlmTurnMode.SUMMARIZE:
         return await _summarize_after_search(llm, tools, prompt, step=step, llm_kwargs=llm_kwargs)

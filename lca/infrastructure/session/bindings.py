@@ -5,7 +5,7 @@ from __future__ import annotations
 import contextvars
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any, cast
+from typing import cast
 
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.session.checkpoint.policy import (
@@ -103,14 +103,6 @@ def _resolve_checkpoint_policy() -> SessionCheckpointPolicyProtocol:
     return policy
 
 
-def assemble_model_history(*, step: int) -> list[dict[str, Any]]:
-    """Model wire history from bound Session fold; unbound → empty list."""
-    session = resolve_session_reader()
-    if session is None:
-        return []
-    return current_model_context_assembler().assemble(session, step=step).messages
-
-
 async def await_model_request_checkpoint() -> None:
     """DSH ``llm/stream`` boundary; no-op when Session is unbound."""
     session = resolve_flushable_session()
@@ -158,7 +150,6 @@ def set_checkpoint_policy(
 
 
 __all__ = [
-    "assemble_model_history",
     "await_model_request_checkpoint",
     "await_step_boundary_checkpoint",
     "await_tool_side_effect_checkpoint",

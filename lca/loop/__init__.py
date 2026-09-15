@@ -22,7 +22,6 @@ if TYPE_CHECKING:
     from lca.loop.fact_gateway import (
         DefaultFactGateway,
         append_catalog_bound,
-        fact_gateway_for_emit,
         publish_ep_bound,
     )
 
@@ -36,7 +35,6 @@ __all__ = [
     "commit_tool_phase_call_end",
     "commit_tool_phase_call_start",
     "commit_tool_phase_denied",
-    "fact_gateway_for_emit",
     "publish_ep_bound",
 ]
 
@@ -45,7 +43,6 @@ def __getattr__(name: str) -> Any:
     if name in {
         "DefaultFactGateway",
         "append_catalog_bound",
-        "fact_gateway_for_emit",
         "publish_ep_bound",
     }:
         from lca.loop import fact_gateway as _fact_gateway

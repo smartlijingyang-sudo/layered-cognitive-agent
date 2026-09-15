@@ -14,7 +14,7 @@ from typing import Any
 
 from lca.contracts.observability.observation import ArtifactSnapshot
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.loop.fact_gateway import append_surface_bound
+from lca.loop.fact_gateway import publish_ep_bound
 
 _EV_ARTIFACT = "observation.artifact_snapshot"
 _OBSERVER_ACTOR = "observation"
@@ -40,12 +40,10 @@ def observe_artifact_snapshot(
         context_digest=context_digest,
         snapshotted_at=_now_iso(),
     )
-    append_surface_bound(
+    publish_ep_bound(
         _EV_ARTIFACT,
         fact.model_dump(mode="json"),
         actor=_OBSERVER_ACTOR,
-        surface_op="append",
-        visibility="model",
     )
 
 

@@ -274,11 +274,9 @@ class RunSessionWriter(RunSessionWriterProtocol):
         no-tools default for runs that don't materialize a fork (tests,
         non-tool agents).
 
-        Wired in this PR as a typed-boundary seam; the existing
-        per-turn materialization in
-        :mod:`lca.plugins.think.reason.complete` continues to pass tools
-        through ``Reasoner.complete_turn`` until the runtime loop
-        migrates to the writer seam (PR2 close-out).
+        Wired in this PR as a typed-boundary seam. Per-turn materialization
+        (formerly in the retired ``phase.think.reason.complete`` plugin)
+        moves to the runtime loop in PR2 close-out.
         """
         return ()
 

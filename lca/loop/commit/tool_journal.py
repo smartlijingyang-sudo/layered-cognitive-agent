@@ -172,35 +172,41 @@ def commit_body_tool_execute_end(
     显式接受 bool 是为了 fold binding / HOP 多源对账能拿到这个字段
     (spine.yaml 已声明 ``ok: bool``)。不传时从 outcome 派生。
     """
-    from lca.infrastructure.session.emit.tool_surface_emit import append_tool_result_surface
-    from lca.loop.fact_gateway import enrich_ep_payload
+    from lca.runtime.session.run_session_writer import RunSessionWriter
 
     del state
+    if session is None:
+        return None
     if ok is None:
         ok = outcome == "success"
-    enriched = enrich_ep_payload(
-        "body.tool.execute.end",
-        {
-            "tool_name": tool_name,
-            "invocation_id": invocation_id,
-            "attempt": attempt,
-            "outcome": outcome,
-            "ok": ok,
-            **({"latency_ms": latency_ms} if latency_ms is not None else {}),
-        },
+    content = observation.content if observation is not None else None
+    error = observation.error if observation is not None else None
+    meta = {
+        "tool_name": tool_name,
+        "invocation_id": invocation_id,
+        "attempt": attempt,
+        "outcome": outcome,
+        "ok": ok,
+    }
+    if latency_ms is not None:
+        meta["latency_ms"] = latency_ms
+    ref = RunSessionWriter(session=session).append_tool_result(
+        turn=0,
+        step=0,
+        call_id=invocation_id,
+        content="" if content is None else str(content),
+        error=error,
+        meta=meta,
     )
-    receipt = append_tool_result_surface(
-        tool_name=tool_name,
-        invocation_id=invocation_id,
-        attempt=attempt,
-        outcome=outcome,
-        observation=observation,
-        latency_ms=latency_ms,
-        session=session,
-        actor=actor,
-        enriched_fields=enriched,
+    from lca.contracts.protocols.loop.fact_gateway import AppendReceipt
+
+    parts = ref.event_id.rsplit(":", 1) if ":" in ref.event_id else ["", "0"]
+    return AppendReceipt(
+        event_type="surface/tool_result",
+        seq=int(parts[1]) if parts[1].isdigit() else 0,
+        session_id=parts[0],
+        time=int(ref.ts * 1000),
     )
-    return receipt
 
 
 def commit_body_tool_decision_start(

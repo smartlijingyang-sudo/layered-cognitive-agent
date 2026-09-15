@@ -19,7 +19,7 @@ from lca.contracts.protocols.loop.spine_publish import (
     is_session_ssot_hook_active,
 )
 from lca.harness.session.emit import emit
-from lca.infrastructure.session._overflow_0.bindings import resolve_raw_session
+from lca.infrastructure.session.bindings import resolve_raw_session
 from lca.plugins.events.publishers._session_publish import current_publish_session
 from lca_kernel.events.payloads.payloads import SpineEventPayload
 from lca_kernel.events.session.session import SessionEvent, SessionProtocol
@@ -127,25 +127,6 @@ class DefaultFactGateway(FactGateway):
         record = emit(self._catalog_session, event, actor=actor)
         return _record_to_receipt(record)
 
-    def append_surface(
-        self,
-        event_type: str,
-        data: Mapping[str, Any],
-        *,
-        actor: str,
-        surface_op: str = "append",
-        visibility: str = "model",
-    ) -> AppendReceipt:
-        """提交 model-visible surface 节点(raw Session.append 形态)。"""
-        record = self._catalog_session.append(
-            event_type,
-            dict(data),
-            actor=actor,
-            surface_op=surface_op,
-            visibility=visibility,
-        )
-        return _record_to_receipt(record)
-
     def publish_ep(self, ep: str, payload: Mapping[str, Any], *, actor: str) -> AppendReceipt:
         """提交 spine EP 事实(category 鉴权 + I17 enrich + FieldProducer merge)。"""
         merged = _enrich_publish_payload(ep, payload)
@@ -169,29 +150,6 @@ class DefaultFactGateway(FactGateway):
         return None
 
 
-def _bound_publish_writer(
-    *,
-    session: object | None = None,
-    state: AgentState | None = None,
-) -> object | None:
-    del state
-    if session is not None:
-        return session
-    return current_publish_session()
-
-
-def fact_gateway_for_emit(
-    state: AgentState | None = None,
-    *,
-    session: object | None = None,
-) -> DefaultFactGateway | None:
-    """Resolve bound publish writer; ``None`` when unbound (tests / offline)."""
-    writer = _bound_publish_writer(session=session, state=state)
-    if writer is None:
-        return None
-    return DefaultFactGateway(writer)
-
-
 def append_catalog_bound(
     event: Any,
     *,
@@ -199,34 +157,16 @@ def append_catalog_bound(
     session: object | None = None,
     actor: str,
 ) -> AppendReceipt | None:
-    """``append_catalog`` with bound publish session; no-op if unbound."""
-    writer = _bound_publish_writer(session=session, state=state)
+    """Resolve bound writer; append catalog event; no-op when unbound.
+
+    ``state`` is retained for call-site symmetry (step metadata lives on
+    state; session binding is always contextvar-based today).
+    """
+    del state
+    writer = session if session is not None else current_publish_session()
     if writer is None:
         return None
     return DefaultFactGateway(writer).append_catalog(event, actor=actor)
-
-
-def append_surface_bound(
-    event_type: str,
-    data: Mapping[str, Any],
-    *,
-    state: AgentState | None = None,
-    session: object | None = None,
-    actor: str,
-    surface_op: str = "append",
-    visibility: str = "model",
-) -> AppendReceipt | None:
-    """``append_surface`` with bound publish session; no-op if unbound."""
-    writer = _bound_publish_writer(session=session, state=state)
-    if writer is None:
-        return None
-    return DefaultFactGateway(writer).append_surface(
-        event_type,
-        data,
-        actor=actor,
-        surface_op=surface_op,
-        visibility=visibility,
-    )
 
 
 def publish_ep_bound(
@@ -237,8 +177,9 @@ def publish_ep_bound(
     session: object | None = None,
     actor: str,
 ) -> AppendReceipt | None:
-    """``publish_ep`` with bound publish session; no-op if unbound."""
-    writer = _bound_publish_writer(session=session, state=state)
+    """Resolve bound writer; append spine EP event; no-op when unbound."""
+    del state
+    writer = session if session is not None else current_publish_session()
     if writer is None:
         return None
     return DefaultFactGateway(writer).publish_ep(ep, payload, actor=actor)
@@ -247,8 +188,6 @@ def publish_ep_bound(
 __all__ = [
     "DefaultFactGateway",
     "append_catalog_bound",
-    "append_surface_bound",
     "enrich_ep_payload",
-    "fact_gateway_for_emit",
     "publish_ep_bound",
 ]

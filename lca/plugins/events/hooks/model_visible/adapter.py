@@ -131,16 +131,33 @@ def _emit_lifecycle_pre(hook: Any, kwargs: dict[str, Any]) -> None:
 
 
 def _emit_lifecycle_post(hook: Any, response: LLMResponse) -> None:
+    from lca.infrastructure.session.bindings import (
+        resolve_session_reader,
+    )
     from lca.infrastructure.session.emit.lifecycle_emit import complete_model
+    from lca.runtime.session.run_session_writer import RunSessionWriter
 
     step = hook._step_counter
+    session = resolve_session_reader()
+    if session is None:
+        return
+    tool_calls = _tool_calls_payload(response)
+    text = response.text or ""
     usage = response.usage if isinstance(response.usage, dict) else None
     complete_model(
         turn=1,
         step=step,
         usage=usage,
-        content=response.text or "",
-        tool_calls=_tool_calls_payload(response),
+        content=text,
+        tool_calls=tool_calls,
+    )
+    RunSessionWriter(session=session).append_assistant_message(
+        turn=1,
+        step=step,
+        role="assistant",
+        content=text or None,
+        tool_calls=tool_calls,
+        usage=None,
     )
 
 

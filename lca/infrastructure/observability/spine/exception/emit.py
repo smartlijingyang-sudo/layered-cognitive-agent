@@ -49,7 +49,7 @@ def emit_exception_caught(record: ExceptionRecordT) -> EventRecord | None:
     payload,统一走 ``error`` channel + ``failure`` outcome。
     """
     payload = record.asdict()
-    from lca.infrastructure.session._overflow_0.bindings import resolve_session_reader
+    from lca.infrastructure.session.bindings import resolve_session_reader
     from lca.loop.fact_gateway import publish_ep_bound
 
     session = resolve_session_reader()

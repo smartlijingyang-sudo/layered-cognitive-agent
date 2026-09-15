@@ -18,7 +18,7 @@ from lca.contracts.harness.memory.events import ContextInjected
 from lca.contracts.protocols.act.command.envelope import RunFact
 from lca.contracts.protocols.loop.fact_gateway import AppendReceipt
 from lca.contracts.protocols.observability.fact_committer import FactCommitter
-from lca.infrastructure.session._overflow_0.bindings import resolve_session_reader
+from lca.infrastructure.session.bindings import resolve_session_reader
 from lca.loop.fact_gateway import append_catalog_bound, publish_ep_bound
 
 _log = structlog.get_logger(__name__)

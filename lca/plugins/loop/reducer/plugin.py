@@ -201,7 +201,7 @@ class DefaultReducer(Reducer):
         result = self.apply_turn(state, turn)
         writer = session
         if writer is None:
-            from lca.infrastructure.session._overflow_0.bindings import resolve_flushable_session
+            from lca.infrastructure.session.bindings import resolve_flushable_session
 
             writer = resolve_flushable_session()
         if writer is not None:

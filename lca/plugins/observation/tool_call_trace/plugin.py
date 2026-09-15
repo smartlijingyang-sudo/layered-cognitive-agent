@@ -10,7 +10,7 @@ from typing import Any
 
 from lca.contracts.observability.observation import ToolCallTrace
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.loop.fact_gateway import append_surface_bound
+from lca.loop.fact_gateway import publish_ep_bound
 
 _EV_TOOL_CALL = "observation.tool_call"
 _OBSERVER_ACTOR = "observation"
@@ -42,12 +42,10 @@ def observe_tool_call(
         retry_count=retry_count,
         occurred_at=_now_iso(),
     )
-    append_surface_bound(
+    publish_ep_bound(
         _EV_TOOL_CALL,
         fact.model_dump(mode="json"),
         actor=_OBSERVER_ACTOR,
-        surface_op="append",
-        visibility="model",
     )
 
 

@@ -87,10 +87,6 @@ entries:
   name: phase_think_reason_render
   $module: lca.plugins.think.reason.render
   config: {}
-- id: phase.think.reason.complete
-  name: phase_think_reason_complete
-  $module: lca.plugins.think.reason.complete
-  config: {}
 
 # Six-phase subgraph node plugins (ADR-0221). Each phase subgraph is a
 # multi-node typed port graph; the nodes below are the leaf executors

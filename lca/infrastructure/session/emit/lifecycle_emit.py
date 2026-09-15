@@ -2,19 +2,18 @@
 
 Single production seam for catalog ``@session_event`` facts that must land at
 phase boundaries.  All helpers no-op when no Session is bound (tests / offline).
+Idempotency is delegated to the Session append-only log + Reducer contract
+(spec §H; pre-T4 `_LifecycleState` ContextVar is gone).
 """
 
 from __future__ import annotations
 
-import contextvars
-from dataclasses import dataclass
 from typing import Any
 
 from lca.contracts.harness.collaboration.agent import LiveAgentStatus
 from lca.contracts.harness.memory.events import (
     ApprovalPersisted,
     AssistantResponded,
-    MessageAccepted,
     ModelCompleted,
     ModelFailed,
     ModelRequested,
@@ -29,39 +28,10 @@ from lca.contracts.harness.memory.events import (
 )
 from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.core.state.lifecycle import TaskStatus
-from lca.infrastructure.session._overflow_0.bindings import resolve_session_reader
-from lca.infrastructure.session.emit.surface_emit import append_user_surface
+from lca.infrastructure.session.bindings import resolve_session_reader
 from lca.loop.fact_gateway import append_catalog_bound
-from lca_kernel.events.fold.fold import SURFACE_ASSISTANT_TYPE
 
 _LIFECYCLE_ACTOR = "lifecycle"
-
-_lifecycle: contextvars.ContextVar[_LifecycleState | None] = contextvars.ContextVar(
-    "lca_session_lifecycle",
-    default=None,
-)
-
-
-@dataclass
-class _LifecycleState:
-    turn: int = 1
-    open_step: int | None = None
-    turn_open: bool = False
-    message_accepted: bool = False
-    approval_pause_emitted: bool = False
-
-
-def reset_lifecycle(*, turn: int = 1) -> None:
-    """Reset per-run lifecycle tracking (call at run bind / fresh run)."""
-    _lifecycle.set(_LifecycleState(turn=turn))
-
-
-def _state() -> _LifecycleState:
-    current = _lifecycle.get()
-    if current is None:
-        current = _LifecycleState()
-        _lifecycle.set(current)
-    return current
 
 
 def _session() -> Any | None:
@@ -77,50 +47,15 @@ def begin_turn(*, turn: int | None = None, reason: str = "user_input") -> None:
     """``turn.started.v1`` — once per user-driven turn."""
     if _session() is None:
         return
-    state = _state()
-    if turn is not None:
-        state.turn = turn
-    if state.turn_open:
-        return
-    _append_catalog(TurnStarted(turn=state.turn))
-    state.turn_open = True
-
-
-def accept_user_message(
-    *,
-    message_id: str,
-    content: str,
-    role: str = "user",
-) -> None:
-    """``message.accepted.v1`` + durable user surface (DSH user/message)."""
-    session = _session()
-    if session is None:
-        return
-    state = _state()
-    if state.message_accepted:
-        return
-    text = content.strip()
-    if not text:
-        return
-    _append_catalog(
-        MessageAccepted(message_id=message_id, role=role, content_ref=text),
-    )
-    append_user_surface(
-        {"role": role, "content": text},
-    )
-    state.message_accepted = True
+    _append_catalog(TurnStarted(turn=turn or 1))
 
 
 def begin_step(*, turn: int | None = None, step: int) -> None:
     """``step.started.v1`` — open one model-request step."""
     if _session() is None:
         return
-    state = _state()
-    turn_no = turn if turn is not None else state.turn
-    if state.open_step == step:
-        return
+    turn_no = turn if turn is not None else 1
     _append_catalog(StepStarted(turn=turn_no, step=step))
-    state.open_step = step
 
 
 def request_model(
@@ -133,8 +68,7 @@ def request_model(
     """``model.requested.v1`` — immediately before LLM dispatch."""
     if _session() is None:
         return
-    state = _state()
-    turn_no = turn if turn is not None else state.turn
+    turn_no = turn if turn is not None else 1
     begin_step(turn=turn_no, step=step)
     _append_catalog(
         ModelRequested(turn=turn_no, step=step, provider=provider, model=model),
@@ -149,12 +83,15 @@ def complete_model(
     content: str = "",
     tool_calls: list[dict[str, Any]] | None = None,
 ) -> None:
-    """``model.completed.v1`` + ``assistant.responded.v1`` + assistant surface."""
-    session = _session()
-    if session is None:
+    """``model.completed.v1`` + ``assistant.responded.v1`` (catalog-only).
+
+    Surface event (``surface/assistant_message``) is appended separately by
+    :meth:`RunSessionWriter.append_assistant_message` — see
+    :func:`lca.plugins.events.hooks.model_visible.adapter._emit_lifecycle_post`.
+    """
+    if _session() is None:
         return
-    state = _state()
-    turn_no = turn if turn is not None else state.turn
+    turn_no = turn if turn is not None else 1
     _append_catalog(ModelCompleted(turn=turn_no, step=step, usage=usage))
     text = content.strip()
     if text or tool_calls:
@@ -166,26 +103,13 @@ def complete_model(
                 tool_calls=tool_calls,
             ),
         )
-        from lca.loop.fact_gateway import append_surface_bound
-
-        assistant_message: dict[str, Any] = {"role": "assistant", "content": text or None}
-        if tool_calls:
-            assistant_message["tool_calls"] = tool_calls
-        append_surface_bound(
-            SURFACE_ASSISTANT_TYPE,
-            {"message": assistant_message},
-            actor=_LIFECYCLE_ACTOR,
-            surface_op="append",
-            visibility="model",
-        )
 
 
 def fail_model(*, turn: int | None = None, step: int, error: str) -> None:
     """``model.failed.v1`` — terminal model error for this step."""
     if _session() is None:
         return
-    state = _state()
-    turn_no = turn if turn is not None else state.turn
+    turn_no = turn if turn is not None else 1
     _append_catalog(ModelFailed(turn=turn_no, step=step, error=error))
 
 
@@ -213,21 +137,14 @@ def persist_approval(approval_id: str, resume_point: dict[str, object]) -> Appro
     """``approval.persisted.v1`` — durable declarative resume point."""
     if _session() is None:
         return None
-    state = _state()
-    if state.approval_pause_emitted:
-        return None
     event = ApprovalPersisted(approval_id=approval_id, resume_point=resume_point)
     _append_catalog(event)
-    state.approval_pause_emitted = True
     return event
 
 
 def emit_approval_pause_from_result(result: Result) -> None:
     """Emit ``approval.persisted.v1`` + ``waiting_input`` checkpoint from carrier ``extra``."""
     if result.status is not TaskStatus.INPUT_REQUIRED:
-        return
-    state = _state()
-    if state.approval_pause_emitted:
         return
     extra = result.extra or {}
     approval_request = extra.get("approval_request")
@@ -278,27 +195,21 @@ def end_step(*, turn: int | None = None, step: int) -> None:
     """``step.ended.v1`` — close one step after remember/act cycle."""
     if _session() is None:
         return
-    state = _state()
-    turn_no = turn if turn is not None else state.turn
-    if state.open_step != step:
-        return
+    turn_no = turn if turn is not None else 1
     _append_catalog(StepEnded(turn=turn_no, step=step))
-    state.open_step = None
 
 
 def end_turn(*, turn: int | None = None, reason: str = "completed") -> None:
     """``turn.ended.v1`` — close the user turn at run terminal."""
     if _session() is None:
         return
-    state = _state()
-    turn_no = turn if turn is not None else state.turn
-    if state.open_step is not None:
-        end_step(turn=turn_no, step=state.open_step)
-    if not state.turn_open:
-        return
+    turn_no = turn if turn is not None else 1
     _append_catalog(TurnEnded(turn=turn_no, reason=reason))
-    state.turn_open = False
-    state.message_accepted = False
+
+
+def reset_lifecycle(*, turn: int = 1) -> None:
+    """Compatibility no-op for pre-T4 reset hooks (state ContextVar removed)."""
+    del turn
 
 
 def resolve_run_session_writer(run_session: Any) -> Any | None:
@@ -347,7 +258,6 @@ def emit_run_attachments(
 
 
 __all__ = [
-    "accept_user_message",
     "begin_step",
     "begin_turn",
     "checkpoint",
