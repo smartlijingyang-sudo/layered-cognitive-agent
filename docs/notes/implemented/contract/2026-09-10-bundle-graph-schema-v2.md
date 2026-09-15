@@ -2,7 +2,7 @@
 
 Status: implemented
 
-**关联 ADR:** [ADR-0217](../../../../adr/0217-bundle-graph-schema-v2.md)(同 PR 共生)
+**关联 ADR:** [ADR-0217](../../../adr/0217-bundle-graph-schema-v2.md)(同 PR 共生)
 
 ## Problem
 
@@ -31,7 +31,7 @@ Status: implemented
 
 ### 1. `bundles/think.yaml` 是 think 子图唯一纯图描述源
 
-`bundles/think.yaml` 含 5 节点 + 5 边的图描述,`factory` 字段写业务语义名(`think.shortcut` / `think.route` / `think.reason` / `think.classify` / `think.gate`)。**不出现** `plugin_id` / `$module` / `entries:`。每个字段都被 framework 消费(D5 列见 [ADR-0217 §2](../../../../adr/0217-bundle-graph-schema-v2.md))。
+`bundles/think.yaml` 含 5 节点 + 5 边的图描述,`factory` 字段写业务语义名(`think.shortcut` / `think.route` / `think.reason` / `think.classify` / `think.gate`)。**不出现** `plugin_id` / `$module` / `entries:`。每个字段都被 framework 消费(D5 列见 [ADR-0217 §2](../../../adr/0217-bundle-graph-schema-v2.md))。
 
 ### 2. `bundles/think-cordis.yaml` 专管 think 5 步 plugin 注册
 
@@ -41,11 +41,11 @@ Status: implemented
 
 ### 3. `BundleGraphSpec` DTO 三个 dataclass
 
-[contracts/protocols/declarative/declarative_1/bundle_graph.py](../../../../contracts/protocols/declarative/declarative_1/bundle_graph.py) 定义 `BundleGraphNode` / `BundleGraphEdge` / `BundleGraphSpec`,`dataclass(frozen=True, slots=True)`,字段校验在 `__post_init__`,PG-005-bundle-graph 错误码。`FactoryResolutionError` PG-005-factory 错误码。
+[contracts/protocols/declarative/declarative_1/bundle_graph.py](../../../../lca/contracts/protocols/declarative/declarative_1/bundle_graph.py) 定义 `BundleGraphNode` / `BundleGraphEdge` / `BundleGraphSpec`,`dataclass(frozen=True, slots=True)`,字段校验在 `__post_init__`,PG-005-bundle-graph 错误码。`FactoryResolutionError` PG-005-factory 错误码。
 
 ### 4. `NodeExecutor` 协议(think 子图专用)
 
-[contracts/protocols/declarative/declarative_1/node_executor.py](../../../../contracts/protocols/declarative/declarative_1/node_executor.py) 定义 `NodeContext` / `NodeInput` / `NodeOutput` / `NodeExecutor(Protocol)`。Plugin 不感知 phase、不感知 graph,只接 `port_values` 字典。`@runtime_checkable`,duck typing 可直接 `isinstance(_, NodeExecutor)`。
+[contracts/protocols/declarative/declarative_1/node_executor.py](../../../../lca/contracts/protocols/declarative/declarative_1/node_executor.py) 定义 `NodeContext` / `NodeInput` / `NodeOutput` / `NodeExecutor(Protocol)`。Plugin 不感知 phase、不感知 graph,只接 `port_values` 字典。`@runtime_checkable`,duck typing 可直接 `isinstance(_, NodeExecutor)`。
 
 ### 5. `FactoryRegistry` 三级规则
 
@@ -58,7 +58,7 @@ Status: implemented
 
 ### 6. `BundleSubgraphResolver` 双路径
 
-[harness/declarative/compile/subgraph_resolver.py](../../../../harness/declarative/compile/subgraph_resolver.py) 扩展 `_is_bundle_graph_v2` sniff:
+[harness/declarative/compile/subgraph_resolver.py](../../../../lca/harness/declarative/compile/subgraph_resolver.py) 扩展 `_is_bundle_graph_v2` sniff:
 - `_PLAN_REF_PROFILES` 命中 → 走 fixture profile(legacy,reflect-subgraph 用)
 - 文件存在 + 顶层含 `nodes:` → 走 v2 新路径:`_load_bundle_graph_spec` → `_project_to_phase_graph` → `_wrap_compiled_run_plan`
 
