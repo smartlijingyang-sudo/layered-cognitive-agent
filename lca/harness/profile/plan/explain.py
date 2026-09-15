@@ -49,11 +49,11 @@ def explain_compile_plan(plan: CompiledRunPlan) -> dict[str, Any]:
             "capability_bindings": [
                 {
                     "capability": binding.capability,
-                    "provider": binding.provider,
-                    "cardinality": binding.cardinality,
+                    "provider": binding.owner_plugin,
+                    "cardinality": binding.owner_kind,
                     "scope": binding.scope,
-                    "grant": list(binding.grant),
-                    "provenance": list(binding.provenance),
+                    "grant": [binding.resolution_key],
+                    "provenance": [binding.provenance],
                 }
                 for binding in plan.capability_bindings
             ],

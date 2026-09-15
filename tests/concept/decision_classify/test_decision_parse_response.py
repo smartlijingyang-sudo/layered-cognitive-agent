@@ -24,7 +24,7 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
 )
-from lca.nodes.concept.decision_classify.parse_tool_calls.parse_tool_calls import (
+from lca.nodes.concept.decision_classify.parse_tool_calls import (
     DecisionParseResponseExecutor,
 )
 

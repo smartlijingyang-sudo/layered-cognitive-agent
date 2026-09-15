@@ -23,15 +23,11 @@ def test_key_prefix_is_agent_runtime_stream() -> None:
 
 def test_ttl_is_7200_seconds() -> None:
     async def _go() -> None:
-        client = aioredis.from_url(
-            "redis://127.0.0.1:6379/0", decode_responses=True
-        )
+        client = aioredis.from_url("redis://127.0.0.1:6379/0", decode_responses=True)
         mgr = LcaStreamEventManager(client)
         run_id = f"l2_6_ttl_{uuid.uuid4().hex}"
         try:
-            await mgr.publish(
-                run_id, "stream_chunk", {"x": 1}, step_index=0
-            )
+            await mgr.publish(run_id, "stream_chunk", {"x": 1}, step_index=0)
             ttl = await client.ttl(stream_key(run_id))
             assert 7100 <= ttl <= 7200, f"unexpected TTL: {ttl}"
         finally:
@@ -43,10 +39,9 @@ def test_ttl_is_7200_seconds() -> None:
 
 def test_maxlen_caps_around_1000() -> None:
     """Spec §5.1: MAXLEN ~ 1000 — write 1500, expect ≤ 1200 entries."""
+
     async def _go() -> None:
-        client = aioredis.from_url(
-            "redis://127.0.0.1:6379/0", decode_responses=True
-        )
+        client = aioredis.from_url("redis://127.0.0.1:6379/0", decode_responses=True)
         mgr = LcaStreamEventManager(client)
         run_id = f"l2_6_maxlen_{uuid.uuid4().hex}"
         try:

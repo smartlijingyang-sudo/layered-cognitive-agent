@@ -13,4 +13,11 @@
 | 外部研究 | [`2026-08/research/`](2026-08/research/) | Agent 原语、DeepSeek Harness 和框架生态调查 |
 | Hermes Agent Loop 对照 | [`2026-08/hermes-agent-loop/`](2026-08/hermes-agent-loop/) | Hermes 核心能力、Agent Loop 映射与无进展工具调用熔断实施记录 |
 
+## 2026-09
+
+| 主题 | 路径 | 内容 |
+|---|---|---|
+| Think 子图默认切换 | [`2026-09/think-subgraph-default-cutover/`](2026-09/think-subgraph-default-cutover/) | 生产 profile 切到 `phase.think.subgraph_host` 后的验证命令与现场输出 |
+| Borrowed Phase-Graph Nodes(PR-3.6 + PR-3.8.x)| [`2026-09/borrow-nodes-pr3.8/`](2026-09/borrow-nodes-pr3.8/) | 7 个 typed-boundary phase-graph 节点(`think.budget.check` / `think.context.compact` / `think.decision.repair` / `act.fanout` / `act.join` / `act.approve.gate` / `act.observe` 合并)的设计稿与单 PR 计划 |
+
 新的过程性材料应在工作结束时进入 `history/YYYY-MM/<topic>/`。若其中结论仍然约束当前代码，应将结论提炼到 ADR 或现行规范后再归档原始材料。

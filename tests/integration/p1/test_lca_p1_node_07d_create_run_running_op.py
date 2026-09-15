@@ -69,7 +69,9 @@ async def test_create_run_populates_running_op_when_coordinator_bound(
     from lca.infrastructure.file.store import LocalFileStore
     from lca.plugins.transport.webserver.handlers.runs.api import command_endpoints
 
-    monkeypatch.setattr(command_endpoints, "resolve_profile_mode", lambda _ctx, mode: mode or "solo")
+    monkeypatch.setattr(
+        command_endpoints, "resolve_profile_mode", lambda _ctx, mode: mode or "solo"
+    )
 
     run_id = f"run_{uuid.uuid4().hex[:8]}"
     topic_id = f"topic_{uuid.uuid4().hex[:8]}"

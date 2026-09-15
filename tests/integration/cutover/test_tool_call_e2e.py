@@ -20,6 +20,7 @@ The test:
 The seam proof does not need a real tool-execution fixture; it
 verifies the kernel wiring is intact.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -59,8 +60,7 @@ def _terminal_plan() -> Plan:
         ),
     )
     edges = tuple(
-        PlanEdge(source=nodes[i].id, target=nodes[i + 1].id)
-        for i in range(len(nodes) - 1)
+        PlanEdge(source=nodes[i].id, target=nodes[i + 1].id) for i in range(len(nodes) - 1)
     )
     return Plan(id="tool-call-e2e", nodes=nodes, edges=edges)
 
@@ -126,8 +126,7 @@ class TestToolCallE2E:
 
         # 1. The kernel reached the terminal node.
         assert result.terminal_node == "stop", (
-            f"kernel did not advance to the terminal node; "
-            f"got {result.terminal_node!r}"
+            f"kernel did not advance to the terminal node; got {result.terminal_node!r}"
         )
 
         # 2. Every phase node was visited exactly once.
@@ -137,8 +136,7 @@ class TestToolCallE2E:
         # 3. The act visit's output carried the observation port value.
         act_visit = next(v for v in result.visits if v.node_id == "act")
         assert "observation" in act_visit.outputs, (
-            f"act node did not produce an observation port; "
-            f"got outputs={dict(act_visit.outputs)!r}"
+            f"act node did not produce an observation port; got outputs={dict(act_visit.outputs)!r}"
         )
         assert act_visit.outputs["observation"] is expected, (
             f"act observation port did not land the host payload; "

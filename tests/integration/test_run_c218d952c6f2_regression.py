@@ -19,18 +19,16 @@ from pathlib import Path
 
 import pytest
 
-from lca.contracts.atoms.enums.enums import ActionType
-from lca.contracts.models.core.execution.decision import (
-    Decision,
-    Observation,
-    ToolCall,
-    Turn,
-)
-from lca.contracts.models.core.policy.loop_policy import LoopPolicyThresholds
-from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.cognition.brain.decision_gates.loop.multi_tool_breaker import (
     MultiToolLoopBreakerGate,
 )
+from lca.contracts.atoms.enums.enums import ActionType
+from lca.contracts.models.core.execution.decision import (
+    Decision,
+    ToolCall,
+)
+from lca.contracts.models.core.policy.loop_policy import LoopPolicyThresholds
+from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.plugins.session.task_progress.projection import TaskProgressProjection
 
 
@@ -62,7 +60,7 @@ def _extract_tool_sequence() -> list[dict]:
 def test_run_c218d952c6f2_spine_ledger_exists():
     """fixture 前置: spine ledger 必须存在 (生产复测已落地)。"""
     if not _spine_path().exists():
-        pytest.skip(f"spine ledger missing — run fixture skipped")
+        pytest.skip("spine ledger missing — run fixture skipped")
     assert _spine_path().stat().st_size > 0
 
 
@@ -146,9 +144,7 @@ def test_run_c218d952c6f2_should_break_under_new_gates():
     )
 
     gate = MultiToolLoopBreakerGate(
-        thresholds=LoopPolicyThresholds(
-            progress_warn=3, progress_break=6, break_failures=3
-        )
+        thresholds=LoopPolicyThresholds(progress_warn=3, progress_break=6, break_failures=3)
     )
 
     import asyncio
@@ -176,9 +172,7 @@ def test_run_c218d952c6f2_pg007_was_the_old_hard_stop():
     with manifest_path.open() as f:
         manifest = json.load(f)
     session_error = manifest.get("session_error", "")
-    assert "PG-007" in session_error, (
-        f"fixture 应当显示 PG-007 hard stop; 实际: {session_error!r}"
-    )
+    assert "PG-007" in session_error, f"fixture 应当显示 PG-007 hard stop; 实际: {session_error!r}"
     assert "perceive.main" in session_error, (
         f"fixture 应当锁定 perceive.main; 实际: {session_error!r}"
     )

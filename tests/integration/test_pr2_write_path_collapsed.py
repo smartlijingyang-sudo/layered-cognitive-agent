@@ -36,7 +36,9 @@ def _has_attr(module_path: str, attr: str) -> bool:
 def test_surface_modules_are_deleted() -> None:
     """The dual-writer surface modules must not be importable."""
     assert not _has_attr("lca.infrastructure.session.emit.surface_emit", "append_user_surface")
-    assert not _has_attr("lca.infrastructure.session.emit.tool_surface_emit", "append_tool_result_surface")
+    assert not _has_attr(
+        "lca.infrastructure.session.emit.tool_surface_emit", "append_tool_result_surface"
+    )
     assert not _has_attr("lca.infrastructure.session.emit.lifecycle_emit", "accept_user_message")
     # ``complete_model`` survives T4 (catalog-only path stays) — see brief Step 4.5.
     assert not _has_attr("lca.infrastructure.session.emit.lifecycle_emit", "_LifecycleState")
@@ -44,7 +46,9 @@ def test_surface_modules_are_deleted() -> None:
 
 def test_overflow_module_is_deleted() -> None:
     """The ``_overflow_0`` shadow module must not be importable."""
-    assert not _has_attr("lca.infrastructure.session._overflow_0.bindings", "assemble_model_history")
+    assert not _has_attr(
+        "lca.infrastructure.session._overflow_0.bindings", "assemble_model_history"
+    )
     assert not _has_attr("lca.infrastructure.session._overflow_0", "assemble_model_history")
 
 

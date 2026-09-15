@@ -12,7 +12,7 @@ from __future__ import annotations
 from lca.contracts.atoms.semantic.keys import FAILURE_KIND
 from lca.contracts.harness.act.effect_receipt import EffectOutcome, EffectReceipt
 from lca.contracts.models.core.execution.decision import Observation
-from lca.nodes.concept.reflection_critique.observation_build.observation_build import (
+from lca.nodes.concept.reflection_critique.observation_build import (
     _build_observation,
 )
 

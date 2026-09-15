@@ -42,9 +42,7 @@ def test_heartbeat_frame_echoes_ack(rsa_keys: dict[str, str]) -> None:
         # the live loop processes. Send resume with no history; the
         # gateway enters the live loop and the next frame we send
         # goes through _handle_control_frame.
-        ws.send_json(
-            {"type": "resume", "lastEventId": "0", "wantStatus": False}
-        )
+        ws.send_json({"type": "resume", "lastEventId": "0", "wantStatus": False})
         ws.send_json({"type": "heartbeat"})
 
         # Read frames until heartbeat_ack; collect all we see.

@@ -18,12 +18,16 @@ from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.wire.http 
 
 
 async def _seed_run(run_id: str) -> None:
-    mgr = LcaStreamEventManager(aioredis.from_url("redis://127.0.0.1:6379/0", decode_responses=True))
+    mgr = LcaStreamEventManager(
+        aioredis.from_url("redis://127.0.0.1:6379/0", decode_responses=True)
+    )
     await mgr.publish(run_id, "agent_runtime_init", {"agentId": "a1"}, step_index=0)
 
 
 async def _cleanup_run(run_id: str) -> None:
-    mgr = LcaStreamEventManager(aioredis.from_url("redis://127.0.0.1:6379/0", decode_responses=True))
+    mgr = LcaStreamEventManager(
+        aioredis.from_url("redis://127.0.0.1:6379/0", decode_responses=True)
+    )
     await mgr.cleanup(run_id)
 
 
@@ -32,9 +36,7 @@ def test_ws_token_404_when_run_redis_key_missing() -> None:
     from starlette.testclient import TestClient
 
     with TestClient(build_http_app()) as client:
-        resp = client.post(
-            f"/v1/runs/{uuid.uuid4().hex}/ws-token", json={"userId": "u1"}
-        )
+        resp = client.post(f"/v1/runs/{uuid.uuid4().hex}/ws-token", json={"userId": "u1"})
         assert resp.status_code == 404
         body = resp.json()
         assert body["error"] == "running_operation_not_found"

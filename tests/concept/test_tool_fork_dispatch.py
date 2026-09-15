@@ -32,7 +32,7 @@ from lca.infrastructure.runtime_plane.capability_bindings import (
     reset_capability_bindings,
     set_capability_bindings,
 )
-from lca.nodes.concept.tool_fork.dispatch.dispatch import ToolForkDispatchExecutor
+from lca.nodes.concept.tool_fork.dispatch import ToolForkDispatchExecutor
 
 
 @dataclass
@@ -61,7 +61,7 @@ class _ToolsServiceStub:
 
     tools: dict[str, _ToolStub]
 
-    def fork_for_run(self, bindings: BindingsView) -> "_ToolsServiceStub":
+    def fork_for_run(self, bindings: BindingsView) -> _ToolsServiceStub:
         # The fork returns a new instance with the same tool table — the
         # dispatch node only reads ``list_tools()`` afterwards, so the
         # bound-ref shape does not affect the test outcome.
@@ -84,8 +84,14 @@ def _ctx(tools: _ToolsServiceStub | None) -> NodeContext:
 
 def _explicit_bindings() -> BindingsView:
     fs = object()
-    return BindingsView(file_store=fs, sandbox=None, skill_store=None,
-                       machine_resolver=None, search=None, bindings=None)
+    return BindingsView(
+        file_store=fs,
+        sandbox=None,
+        skill_store=None,
+        machine_resolver=None,
+        search=None,
+        bindings=None,
+    )
 
 
 @pytest.mark.asyncio
@@ -129,8 +135,12 @@ async def test_explicit_port_wins_over_seam_when_both_bound() -> None:
     try:
         executor = ToolForkDispatchExecutor()
         explicit = BindingsView(
-            file_store=explicit_fs, sandbox=None, skill_store=None,
-            machine_resolver=None, search=None, bindings=None,
+            file_store=explicit_fs,
+            sandbox=None,
+            skill_store=None,
+            machine_resolver=None,
+            search=None,
+            bindings=None,
         )
         await executor.node_execute(
             _ctx(tools),
@@ -169,7 +179,7 @@ async def test_tools_capability_missing_fails_loud() -> None:
 @pytest.mark.asyncio
 async def test_module_does_not_import_emit() -> None:
     """P5 invariant: node plugin module is pure — no EP / journal import."""
-    import lca.nodes.concept.tool_fork.dispatch.dispatch as mod
+    import lca.nodes.concept.tool_fork.dispatch as mod
 
     src = mod.__file__
     assert src is not None

@@ -60,9 +60,7 @@ def test_auth_expired_raises_invalid_token_error(rsa_keys: dict[str, str]) -> No
         )
 
 
-def test_auth_success_with_fresh_token(
-    lca_gateway_app, rsa_keys: dict[str, str]
-) -> None:
+def test_auth_success_with_fresh_token(lca_gateway_app, rsa_keys: dict[str, str]) -> None:
     """Fresh token → server emits ``auth_success`` then waits for resume."""
     run_id = uuid.uuid4().hex
     token = mint_user_jwt(

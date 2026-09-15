@@ -66,9 +66,7 @@ def test_resume_replays_events_and_emits_resume_complete(
             with client.websocket_connect(f"/v1/runs/{run_id}/ws") as ws:
                 ws.send_json({"type": "auth", "token": token})
                 assert ws.receive_json() == {"type": "auth_success"}
-                ws.send_json(
-                    {"type": "resume", "lastEventId": "0", "wantStatus": True}
-                )
+                ws.send_json({"type": "resume", "lastEventId": "0", "wantStatus": True})
 
                 seen_init = False
                 seen_chunk = False
@@ -115,9 +113,7 @@ def test_resume_with_zero_events_emits_only_resume_complete(
             with client.websocket_connect(f"/v1/runs/{run_id}/ws") as ws:
                 ws.send_json({"type": "auth", "token": token})
                 assert ws.receive_json() == {"type": "auth_success"}
-                ws.send_json(
-                    {"type": "resume", "lastEventId": "0", "wantStatus": True}
-                )
+                ws.send_json({"type": "resume", "lastEventId": "0", "wantStatus": True})
                 seen_complete = False
                 for _ in range(10):
                     try:

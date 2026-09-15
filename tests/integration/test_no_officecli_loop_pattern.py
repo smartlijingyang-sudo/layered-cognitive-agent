@@ -9,17 +9,15 @@ state + projection, 验证 breaker 一定熔断。
 
 from __future__ import annotations
 
-import asyncio
-
 import pytest
 
+from lca.cognition.brain.decision_gates.loop.multi_tool_breaker import (
+    MultiToolLoopBreakerGate,
+)
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.models.core.execution.decision import Decision, ToolCall
 from lca.contracts.models.core.policy.loop_policy import LoopPolicyThresholds
 from lca.contracts.models.core.state.state import AgentState, Budget
-from lca.cognition.brain.decision_gates.loop.multi_tool_breaker import (
-    MultiToolLoopBreakerGate,
-)
 from lca.plugins.session.task_progress.projection import TaskProgressProjection
 
 
@@ -39,8 +37,7 @@ def _build_officecli_loop_state(
     start_conf = 0.6
     end_conf = max(0.0, start_conf - confidence_drop)
     history = [
-        start_conf + (end_conf - start_conf) * (i / (n_history - 1))
-        for i in range(n_history)
+        start_conf + (end_conf - start_conf) * (i / (n_history - 1)) for i in range(n_history)
     ]
     for c in history:
         projection._confidence_history.append(c)
@@ -61,9 +58,7 @@ async def test_officecli_loop_pattern_triggers_multi_tool_breaker():
     """invariant: read_skill_reference 失败 5 步 + activate_skill 反复 → 熔断."""
     state = _build_officecli_loop_state(confidence_drop=0.5, completed_steps=())
     gate = MultiToolLoopBreakerGate(
-        thresholds=LoopPolicyThresholds(
-            progress_warn=3, progress_break=6, break_failures=3
-        )
+        thresholds=LoopPolicyThresholds(progress_warn=3, progress_break=6, break_failures=3)
     )
 
     # 第 6 步决策: 选 activate_skill (反例典型工具)
@@ -116,9 +111,7 @@ async def test_officecli_loop_with_real_progress_does_not_trigger():
     state.task_progress_projection = projection
 
     gate = MultiToolLoopBreakerGate(
-        thresholds=LoopPolicyThresholds(
-            progress_warn=3, progress_break=6, break_failures=3
-        )
+        thresholds=LoopPolicyThresholds(progress_warn=3, progress_break=6, break_failures=3)
     )
 
     decision = Decision(
@@ -147,13 +140,9 @@ async def test_officecli_loop_with_short_history_does_not_trigger():
     """invariant: history 不足 (≤ progress_break) → fail-open 不触发.
 
     避免对早期 run 误杀。"""
-    state = _build_officecli_loop_state(
-        confidence_drop=0.5, completed_steps=(), n_history=3
-    )
+    state = _build_officecli_loop_state(confidence_drop=0.5, completed_steps=(), n_history=3)
     gate = MultiToolLoopBreakerGate(
-        thresholds=LoopPolicyThresholds(
-            progress_warn=3, progress_break=6, break_failures=3
-        )
+        thresholds=LoopPolicyThresholds(progress_warn=3, progress_break=6, break_failures=3)
     )
 
     decision = Decision(

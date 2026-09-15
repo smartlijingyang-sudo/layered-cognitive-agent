@@ -33,8 +33,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-import pytest
-
 from lca.contracts.protocols.graph.binding import BindingKind
 from lca.contracts.protocols.graph.node_io import (
     NodeInput,
@@ -53,7 +51,6 @@ from lca.framework.graph import (
     PlanTraversal,
     StrategyRegistry,
 )
-
 
 # Visits to ``a`` before the natural-exit Decision fires. Mirrors the
 # failure case in run_cc39610072bf: 5 identical tool calls in a row.
@@ -88,16 +85,12 @@ def _build_plan() -> Plan:
             PlanEdge(
                 source="a",
                 target="a",
-                when=Predicate(
-                    kind="missing", port=PortRef(name="done"), value=None
-                ),
+                when=Predicate(kind="missing", port=PortRef(name="done"), value=None),
             ),
             PlanEdge(
                 source="a",
                 target="b",
-                when=Predicate(
-                    kind="exists", port=PortRef(name="done"), value=True
-                ),
+                when=Predicate(kind="exists", port=PortRef(name="done"), value=True),
             ),
         ),
     )
@@ -121,9 +114,7 @@ def _scripted_strategy() -> NodeStrategy:
         kind: BindingKind = BindingKind.TRANSFORM
         schema: NodeIOSchema = field(default_factory=NodeIOSchema)
 
-        async def execute(
-            self, context: StrategyContext, input: NodeInput
-        ) -> NodeOutput:
+        async def execute(self, context: StrategyContext, input: NodeInput) -> NodeOutput:
             if context.node_id == "a":
                 counter["n"] += 1
                 visit_n = counter["n"]
@@ -203,8 +194,7 @@ async def test_five_consecutive_identical_tool_calls_terminate_naturally() -> No
     for visit in result.visits:
         if visit.error is not None:
             assert "budget_exceeded" not in str(visit.error).lower(), (
-                f"unexpected budget_exceeded on visit to {visit.node_id}: "
-                f"{visit.error}"
+                f"unexpected budget_exceeded on visit to {visit.node_id}: {visit.error}"
             )
 
 
@@ -227,16 +217,13 @@ async def test_tool_call_loop_runs_full_count_with_identical_payloads() -> None:
     # 5 visits to ``a`` + 1 visit to ``b`` = 6 recorded visits total.
     assert len(result.visits) == VISITS_BEFORE_NATURAL_EXIT + 1
     tool_call_visits = [
-        v for v in result.visits
-        if v.node_id == "a" and v.outputs.get("tool_call") is not None
+        v for v in result.visits if v.node_id == "a" and v.outputs.get("tool_call") is not None
     ]
     natural_exit_visits = [
-        v for v in result.visits
-        if v.node_id == "a" and v.outputs.get("done") is True
+        v for v in result.visits if v.node_id == "a" and v.outputs.get("done") is True
     ]
     assert len(tool_call_visits) == VISITS_BEFORE_NATURAL_EXIT - 1, (
-        f"first {VISITS_BEFORE_NATURAL_EXIT - 1} visits must emit the "
-        f"identical tool-call Decision"
+        f"first {VISITS_BEFORE_NATURAL_EXIT - 1} visits must emit the identical tool-call Decision"
     )
     assert len(natural_exit_visits) == 1, (
         "exactly one visit must emit the natural-exit respond Decision"

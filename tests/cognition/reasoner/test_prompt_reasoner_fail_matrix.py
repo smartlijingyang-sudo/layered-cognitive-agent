@@ -13,11 +13,10 @@ from dataclasses import dataclass
 import pytest
 
 from lca.cognition.brain.reasoner.reasoner import PromptReasoner
-from lca.contracts.models.cognition.boundary import ForkedTools
 from lca.contracts.models.cognition.reasoner_turn import ReasonerTurnRender
 from lca.contracts.models.core.conversation.llm import LLMResponse
 from lca.contracts.models.core.state.state import AgentState, Budget
-from lca.contracts.protocols import LLMAdapter, Tool
+from lca.contracts.protocols import LLMAdapter
 
 
 @dataclass
@@ -74,7 +73,7 @@ async def test_complete_turn_accepts_forked_tools(monkeypatch: pytest.MonkeyPatc
     reasoner = PromptReasoner(llm=_StubLLM())
     captured: dict[str, object] = {}
 
-    async def _fake_execute(llm, tools, prompt, **kwargs):  # noqa: ANN001
+    async def _fake_execute(llm, tools, prompt, **kwargs):
         captured["tools"] = list(tools)
         return LLMResponse(text="ok")
 

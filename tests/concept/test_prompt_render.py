@@ -45,13 +45,13 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
 )
-from lca.nodes.concept.prompt_render.assemble.assemble import (
+from lca.nodes.concept.prompt_render.assemble import (
     PromptSectionsAssembleExecutor,
 )
-from lca.nodes.concept.prompt_render.compile.compile import (
+from lca.nodes.concept.prompt_render.compile import (
     PromptTraceCompileExecutor,
 )
-from lca.nodes.concept.prompt_render.fill.fill import PromptSectionsFillExecutor
+from lca.nodes.concept.prompt_render.fill import PromptSectionsFillExecutor
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BUNDLE_PATH = REPO_ROOT / "bundles" / "concept" / "prompt_render.yaml"
@@ -246,7 +246,14 @@ def test_reasoner_method_def_count_is_four() -> None:
 def test_reasoner_has_no_legacy_dead_path() -> None:
     """N10 衍生:``reasoner.py`` 不能再出现 ``_resolve_tools`` / ``_legacy_*`` / ``_tools_service``。"""
     text = REASONER_PATH.read_text(encoding="utf-8")
-    for forbidden in ("_resolve_tools", "_legacy_templates", "_tools_service", "bind_boot_capabilities", "self._tools", "self.role_profile"):
+    for forbidden in (
+        "_resolve_tools",
+        "_legacy_templates",
+        "_tools_service",
+        "bind_boot_capabilities",
+        "self._tools",
+        "self.role_profile",
+    ):
         assert forbidden not in text, (
             f"ADR-0220 §6.2 violated: '{forbidden}' still present in reasoner.py."
         )

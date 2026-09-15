@@ -29,6 +29,7 @@ from lca_kernel.events.bus.bus import (
 @pytest.fixture
 def bus() -> EventBus[EventPayload]:
     from lca_kernel.events.test.catalog import build_test_bus
+
     return build_test_bus()
 
 

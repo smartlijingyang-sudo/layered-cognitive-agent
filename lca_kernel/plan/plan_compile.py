@@ -51,6 +51,15 @@ class V2ExecutablePlan:
     """
 
     inner: object  # CompiledRunPlan — typed loosely to avoid cycle import.
+
+    def __getattr__(self, name: str):
+        # Delegate CompiledRunPlan surface to ``inner`` so legacy callers
+        # that touch ``plan.plan_version`` / ``plan.phase_graph`` / etc.
+        # still work without knowing about the wrapper. The wrapper itself
+        # exposes only ``inner`` / ``graph_spec`` / ``profile_path`` /
+        # ``plugin_specs`` explicitly; everything else falls through.
+        return getattr(self.inner, name)
+
     graph_spec: dict = field(default_factory=dict)
     profile_path: str = ""
     plugin_specs: tuple = ()  # delegated to ``inner.plugin_specs`` at construction; surfaced here so CLI / introspection see the catalog without reaching into ``inner``.

@@ -104,9 +104,7 @@ def test_orphan_tool_result_dropped_at_history_assemble() -> None:
     )
     # Orphan: tool result with call_id="Y" that does not match the
     # assistant's declared tool call id "X".
-    writer.append_tool_result(
-        turn=0, step=0, call_id="Y", content="orphan", error=None, meta=None
-    )
+    writer.append_tool_result(turn=0, step=0, call_id="Y", content="orphan", error=None, meta=None)
 
     msgs = writer.derive_messages()
 
@@ -114,9 +112,7 @@ def test_orphan_tool_result_dropped_at_history_assemble() -> None:
     assert [m["role"] for m in msgs] == ["user", "assistant"]
     # Assistant preserved with its declared tool_call (orphan-drop only
     # touches tool/result rows, not assistant rows).
-    assert msgs[1]["tool_calls"] == [
-        {"id": "X", "name": "bash", "arguments": "{}"}
-    ]
+    assert msgs[1]["tool_calls"] == [{"id": "X", "name": "bash", "arguments": "{}"}]
 
 
 def test_non_orphan_tool_result_preserved() -> None:
@@ -136,9 +132,7 @@ def test_non_orphan_tool_result_preserved() -> None:
         tool_calls=[{"id": "X", "name": "bash", "arguments": "{}"}],
         usage=None,
     )
-    writer.append_tool_result(
-        turn=0, step=0, call_id="X", content="ok", error=None, meta=None
-    )
+    writer.append_tool_result(turn=0, step=0, call_id="X", content="ok", error=None, meta=None)
 
     msgs = writer.derive_messages()
 
@@ -155,9 +149,7 @@ def test_orphan_tool_result_without_assistant_kept_in_journal_but_dropped_at_wir
     session = _InMemorySession()
     writer = RunSessionWriter(session=session)
     writer.append_user_message(message_id="u1", role="user", content="hi")
-    writer.append_tool_result(
-        turn=0, step=0, call_id="Z", content="orphan", error=None, meta=None
-    )
+    writer.append_tool_result(turn=0, step=0, call_id="Z", content="orphan", error=None, meta=None)
 
     # Journal holds the orphan event (provenance + audit trail).
     assert any(e.type == "surface/tool_result" for e in session.events)

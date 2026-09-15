@@ -81,10 +81,7 @@ def test_model_visible_hook_adapter_accepts_explicit_cursor_and_reasoner_prompt(
     init_src = inspect.getsource(ModelVisibleHookAdapter.__init__)
     # Strip comments to avoid false positives from prose references to
     # ``_cursor_provider`` in the explanation block.
-    code_lines = [
-        ln for ln in init_src.splitlines()
-        if ln.lstrip().startswith("#") is False
-    ]
+    code_lines = [ln for ln in init_src.splitlines() if ln.lstrip().startswith("#") is False]
     code_only = "\n".join(code_lines)
     assert "self._cursor_provider" not in code_only, (
         "ModelVisibleHookAdapter.__init__ must not store a ContextVar-backed "
@@ -102,6 +99,6 @@ def test_model_visible_hook_adapter_accepts_explicit_cursor_and_reasoner_prompt(
 
 
 def test_session_publish_test_file_deleted():
-    assert not os.path.exists(
-        "tests/plugins/events/publishers/test_session_publish.py"
-    ), "test_session_publish.py tests ContextVar-bound state; deleted per inventory E3"
+    assert not os.path.exists("tests/plugins/events/publishers/test_session_publish.py"), (
+        "test_session_publish.py tests ContextVar-bound state; deleted per inventory E3"
+    )

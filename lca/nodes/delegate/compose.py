@@ -187,7 +187,7 @@ def _enforce_delegate_capability(grant: Any) -> None:
     id="lca.nodes.delegate.compose",
     Config=None,
     provides=("region:delegate::delegate.compose",),
-    requires=("decision", "capability_grant"),
+    requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects=("network",),

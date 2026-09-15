@@ -45,9 +45,7 @@ def test_interrupt_invokes_run_port_cancel(rsa_keys: dict[str, str]) -> None:
         ws.send_json({"type": "auth", "token": token})
         ws.receive_json()
         # Skip the resume handshake; jump straight to interrupt.
-        ws.send_json(
-            {"type": "resume", "lastEventId": "0", "wantStatus": False}
-        )
+        ws.send_json({"type": "resume", "lastEventId": "0", "wantStatus": False})
         # Drain any pre-interrupt frames (none in this scenario).
         ws.send_json({"type": "interrupt"})
         # Receive until disconnect or a few frames.
@@ -72,9 +70,7 @@ def test_interrupt_does_not_invoke_when_no_port(rsa_keys: dict[str, str]) -> Non
     with TestClient(app) as client, client.websocket_connect(f"/v1/runs/{run_id}/ws") as ws:
         ws.send_json({"type": "auth", "token": token})
         ws.receive_json()
-        ws.send_json(
-            {"type": "resume", "lastEventId": "0", "wantStatus": False}
-        )
+        ws.send_json({"type": "resume", "lastEventId": "0", "wantStatus": False})
         ws.send_json({"type": "interrupt"})
         try:
             ws.receive_text()

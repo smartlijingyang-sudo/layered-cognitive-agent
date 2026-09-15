@@ -63,7 +63,9 @@ def test_one_hour_stability() -> None:
     from tests.e2e.p1._lca_gateway_client import LcaGatewayClient
 
     async def _run() -> dict:
-        client = LcaGatewayClient(base_url=os.environ.get("LCA_GATEWAY_URL", "http://127.0.0.1:9876"))
+        client = LcaGatewayClient(
+            base_url=os.environ.get("LCA_GATEWAY_URL", "http://127.0.0.1:9876")
+        )
         try:
             from tests.e2e.p1._stability_loop import run_stability
 

@@ -21,6 +21,7 @@ import pytest
 
 from lca.cognition.body.executor.safe_executor import SimpleSafeExecutor
 from lca.cognition.brain.reasoner.reasoner import PromptReasoner
+from lca.contracts.harness.memory.events import ToolInvokedCommitted, ToolStartedCommitted
 from lca.contracts.models.cognition.boundary import BindingsView, ForkedTools
 from lca.contracts.models.cognition.reasoner_turn import ReasonerTurnRender
 from lca.contracts.models.core.conversation.llm import LLMResponse, NativeToolCall
@@ -34,7 +35,6 @@ from lca.contracts.models.observability import (
     close_document,
     empty_document,
 )
-from lca.contracts.harness.memory.events import ToolInvokedCommitted, ToolStartedCommitted
 from lca.contracts.models.observability.journal.step import ToolCallRecord, ToolResult
 from lca.contracts.models.team.role.team import CacheConfig, RetryPolicy, ToolPermissionManifest
 from lca.contracts.protocols import LLMAdapter, Tool
@@ -49,7 +49,7 @@ from lca.infrastructure.tools.sandbox.runtime_tools import (
     SANDBOX_EXECUTE_TOOL_NAME,
     SandboxExecuteTool,
 )
-from lca.nodes.concept.tool_fork.dispatch.dispatch import ToolForkDispatchExecutor
+from lca.nodes.concept.tool_fork.dispatch import ToolForkDispatchExecutor
 from lca.plugins.transport.webserver.doctor.doctor import diagnose_step_tree
 from tests.support.inline_sandbox import InlineSandbox
 

@@ -57,9 +57,7 @@ def test_tool_result_routes_to_resume_approval(rsa_keys: dict[str, str]) -> None
             with client.websocket_connect(f"/v1/runs/{run_id}/ws") as ws:
                 ws.send_json({"type": "auth", "token": token})
                 ws.receive_json()
-                ws.send_json(
-                    {"type": "resume", "lastEventId": "0", "wantStatus": False}
-                )
+                ws.send_json({"type": "resume", "lastEventId": "0", "wantStatus": False})
                 # Tiny sleep so the live_loop is wired up before we send tool_result.
                 await asyncio.sleep(0.05)
                 ws.send_json(

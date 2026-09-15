@@ -24,15 +24,17 @@ def rsa_keys() -> dict[str, str]:
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption(),
     ).decode()
-    public_pem = private_key.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    ).decode()
+    public_pem = (
+        private_key.public_key()
+        .public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        .decode()
+    )
     os.environ["LCA_JWT_SECRET"] = private_pem
     os.environ["LCA_JWT_PUBLIC_KEY"] = public_pem
-    os.environ["LCA_REDIS_URL"] = os.environ.get(
-        "LCA_REDIS_URL", "redis://127.0.0.1:6379/0"
-    )
+    os.environ["LCA_REDIS_URL"] = os.environ.get("LCA_REDIS_URL", "redis://127.0.0.1:6379/0")
     return {"private": private_pem, "public": public_pem}
 
 

@@ -48,7 +48,6 @@ from lca.framework.graph.strategies.node_executor_strategy import (
 )
 from lca.framework.graph.strategy_registry import StrategyRegistry
 
-
 # ---------------------------------------------------------------------------
 # Test executors — record visits; think emits a USE_TOOL routing decision.
 # ---------------------------------------------------------------------------
@@ -138,9 +137,7 @@ class _ActRecorderExecutor:
         return NodeOutput(
             port_values={
                 "act_outcome": {"status": "ok"},
-                "routing": RoutingDecision(
-                    action_type=ActionType.RESPOND, should_terminate=True
-                ),
+                "routing": RoutingDecision(action_type=ActionType.RESPOND, should_terminate=True),
             }
         )
 
@@ -150,18 +147,14 @@ class _ActRecorderExecutor:
 # ---------------------------------------------------------------------------
 
 
-def _make_registry(
-    *, think_executor: object, include_act: bool = True
-) -> StrategyRegistry:
+def _make_registry(*, think_executor: object, include_act: bool = True) -> StrategyRegistry:
     """Build a StrategyRegistry with NODE_EXECUTOR strategy + executor lookup."""
     registry = StrategyRegistry()
     lookup: dict[str, object] = {"think": think_executor}
     if include_act:
         lookup["act"] = _ActRecorderExecutor()
 
-    def executor_lookup(
-        *, binding: BindingKind, node_id: str, region: str | None
-    ):
+    def executor_lookup(*, binding: BindingKind, node_id: str, region: str | None):
         if binding is not BindingKind.NODE_EXECUTOR:
             raise KeyError(f"unexpected binding {binding!r}")
         if node_id not in lookup:
@@ -238,9 +231,7 @@ def test_use_tool_decision_routes_to_act_main() -> None:
         f"USE_TOOL to act.main. visits={[v.node_id for v in result.visits]}"
     )
     visited_ids = [v.node_id for v in result.visits]
-    assert visited_ids[-1] == "act", (
-        f"act should be the terminal node, got sequence={visited_ids}"
-    )
+    assert visited_ids[-1] == "act", f"act should be the terminal node, got sequence={visited_ids}"
 
 
 def test_respond_decision_does_not_route_to_act_main() -> None:
@@ -260,8 +251,7 @@ def test_respond_decision_does_not_route_to_act_main() -> None:
     result = asyncio.run(interpreter.run(plan, port_registry=PortRegistry()))
 
     assert _ACT_VISITED == [], (
-        f"act should NOT have been visited for a RESPOND decision; "
-        f"got visits={_ACT_VISITED}"
+        f"act should NOT have been visited for a RESPOND decision; got visits={_ACT_VISITED}"
     )
     visited_ids = [v.node_id for v in result.visits]
     assert visited_ids == ["think"], (

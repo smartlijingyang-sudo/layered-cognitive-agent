@@ -247,7 +247,7 @@ entries:
   config: {}
 - id: phase.concept.effect_execute.effect_execute
   name: phase_concept_effect_execute_effect_execute
-  $module: lca.nodes.concept.effect.execute.execute
+  $module: lca.nodes.concept.effect.execute
   config: {}
 - id: lca-memory-write-policy-simple
   name: lca_memory_write_policy_simple
