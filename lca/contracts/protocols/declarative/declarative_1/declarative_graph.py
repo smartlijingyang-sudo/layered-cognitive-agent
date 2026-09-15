@@ -91,7 +91,7 @@ class PhaseNode:
     execution_policy: PhaseExecutionPolicy = field(default_factory=PhaseExecutionPolicy)
     precondition: str | None = None
     terminal_predicate: str | None = None
-    sub_spec_ref: "SubgraphReference | None" = None
+    sub_spec_ref: SubgraphReference | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.semantic_phase, SemanticPhase):
