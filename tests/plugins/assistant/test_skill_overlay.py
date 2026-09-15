@@ -63,6 +63,7 @@ def _make_local_skill(root: Path, *, name: str = "demo-skill") -> Path:
         "---\n"
         f"name: {name}\n"
         "description: demo operational skill\n"
+        "references: []\n"
         "---\n"
         "# Demo Skill\n\n按步骤操作。\n",
         encoding="utf-8",
@@ -270,7 +271,7 @@ class TestInstallUrlSource:
         emitted: list[tuple[str, dict[str, Any]]],
         handle: Any,
     ) -> None:
-        text = "---\nname: url-skill\ndescription: fetched\n---\nbody\n"
+        text = "---\nname: url-skill\ndescription: fetched\nreferences: []\n---\nbody\n"
 
         def _factory(staging_root: Path) -> _StagingUrlImporter:
             return _StagingUrlImporter(staging_root, text)
