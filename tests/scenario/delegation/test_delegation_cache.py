@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import unittest
-from datetime import datetime, timezone, UTC
+from datetime import UTC, datetime
 
 from lca.cognition.body.delegation.cache import (
     cached_delegation_observation,

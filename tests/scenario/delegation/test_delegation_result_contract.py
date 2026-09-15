@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import unittest
-from datetime import datetime, timezone, UTC
+from datetime import UTC, datetime
 
 from lca.contracts.models.team.delegation.delegation import DelegationResult, find_result
 from lca.contracts.models.team.team.awareness import TeamAwareness
