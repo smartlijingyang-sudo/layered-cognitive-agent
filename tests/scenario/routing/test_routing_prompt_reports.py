@@ -5,10 +5,9 @@ from __future__ import annotations
 import unittest
 from datetime import datetime, timezone
 
-from lca.cognition.brain.prompts import load_builtin_prompt
-from lca.cognition.brain.reasoner.reasoner import (
-    PromptReasoner,
-    build_member_reports_text,
+from lca.cognition.brain.reasoner.reasoner import PromptReasoner
+from lca.cognition.brain.sections.types import (
+    render_member_reports as build_member_reports_text,
 )
 from lca.contracts.atoms.enums.enums import LLMStreamEventType, MemoryLayer, MemoryRecordKind
 from lca.contracts.atoms.semantic.keys import META_ROLE, META_STEP
