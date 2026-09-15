@@ -81,9 +81,6 @@ def test_select_edge_picks_think_after_successful_perceive(outer_plan) -> None:
 
 def test_select_edge_no_match_when_port_unset() -> None:
     """An edge with a predicate referencing an unset port does not match."""
-    edges = (
-        Predicate.__class__.__mro__[0],  # dummy — not used
-    )
     from lca.contracts.protocols.graph.plan import PlanEdge
 
     edge = PlanEdge(
