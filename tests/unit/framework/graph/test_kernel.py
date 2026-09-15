@@ -7,8 +7,8 @@ strategies registered for the test plan.
 These tests prove the kernel's invariants directly:
 
 - ``terminated()`` is True only after an ``advance(edge=None)``.
-- :meth:`PlanInterpreter.run` visits each node exactly the plan's
-  declared ``max_visits`` times.
+- :meth:`PlanInterpreter.run` walks the plan via edge selection
+  (per-node ``max_visits`` was removed in ADR-0225).
 - The recorder collects one :class:`VisitRecord` per visit.
 - The lifter accepts both v2 graph spec dicts and legacy
   :class:`CognitivePhaseGraphPlan`-shaped objects.
@@ -16,7 +16,7 @@ These tests prove the kernel's invariants directly:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
@@ -97,18 +97,16 @@ class TestPlanTraversal:
         trav = PlanTraversal(plan=plan)
         assert trav.current_id == "a"
 
-    def test_max_visits_enforced(self) -> None:
-        plan = _make_plan(("a", "b"), max_visits=1)
+    def test_visit_increments_count(self) -> None:
+        """ADR-0225: ``visit`` still increments ``visit_counts`` (used
+        by resume replays); it no longer flips ``terminal`` on a
+        per-node ceiling."""
+        plan = _make_plan(("a", "b"))
         trav = PlanTraversal(plan=plan)
-        trav.visit(node_id="a", max_visits=1)
-        # Over-budget visit sets terminal instead of raising.
-        trav.visit(node_id="a", max_visits=1)
-        assert trav.terminal is True
-        assert trav.terminal_reason is not None
-        assert trav.terminal_reason[0] == "budget_exceeded"
-        assert trav.terminal_reason[1] == "a"
-        assert trav.terminal_reason[2] == 1  # max_visits
-        assert trav.terminal_reason[3] == 2  # actual count
+        trav.visit(node_id="a")
+        trav.visit(node_id="a")
+        assert trav.visit_counts["a"] == 2
+        assert trav.terminal is False
 
     def test_advance_with_edge(self) -> None:
         plan = _make_plan(("a", "b"))
@@ -196,7 +194,6 @@ class TestLifter:
             id: str
             binding: str | None
             sub_spec_ref: Any = None
-            max_visits: int = 1
             terminal: bool = False
             entry: bool = False
 
@@ -215,7 +212,7 @@ class TestLifter:
             id="outer",
             phase_graph=_Graph(
                 nodes=[
-                    _Node(id="perceive", binding="node_executor", entry=True, max_visits=8),
+                    _Node(id="perceive", binding="node_executor", entry=True),
                     _Node(id="think", binding=None, sub_spec_ref="sub.yaml"),
                 ],
                 edges=[_Edge(source="perceive", target="think")],
@@ -291,16 +288,6 @@ class TestPlanInterpreter:
         assert result.terminal_node == "a"
         assert interp.recorder.last().dispatch.kind == "terminal"
 
-    async def test_run_uses_max_visits(self) -> None:
-        plan = _make_plan(("a", "b"), max_visits=2)
-        registry = _registry_with_stubs(plan)
-        interp = PlanInterpreter(registry=registry)
-        # Each visit_to_advance pulls once; max_visits=2 is a *limit*
-        # the kernel checks at visit time. Re-running is the
-        # caller's job; the kernel enforces the per-visit cap.
-        result = await interp.run(plan)
-        assert result.terminal_node == "b"
-
     async def test_recorder_collects_visits(self) -> None:
         plan = _make_plan(("a", "b"))
         registry = _registry_with_stubs(plan)
@@ -320,17 +307,18 @@ class TestPlanInterpreter:
         assert visit is not None
         assert visit.outputs["decision"] == "d-from-a"
 
-    async def test_run_terminates_cleanly_on_max_visits_exceeded(self) -> None:
-        """Regression: a self-looping plan that would exceed max_visits
-        terminates cleanly via ``traversal.terminal`` instead of raising
-        RuntimeError.  The kernel records exactly ``max_visits`` successful
-        visits, then the over-budget visit flips terminal and the loop
-        exits without executing the over-budget node.
+    async def test_run_terminates_naturally_on_self_loop(self) -> None:
+        """Regression: a self-looping plan terminates via ``terminal_predicate``,
+        not via a per-node ``max_visits`` cap.
 
-        ADR-0214 PG-007 passive→active.
+        ADR-0225: the kernel no longer trips a per-node ceiling; the
+        interpreter exits the loop because the strategy's
+        ``terminal_predicate`` matches after the second visit (when
+        the strategy emits a ``done`` port).
         """
-        max_visits = 3
-        # Self-looping plan: a → a (always "true" edge back to itself).
+        from lca.contracts.protocols.graph.predicate import PortRef, Predicate
+
+        term_pred = Predicate(kind="exists", port=PortRef(name="done"), value=True)
         plan = Plan(
             id="loop-plan",
             nodes=(
@@ -338,31 +326,42 @@ class TestPlanInterpreter:
                     id="a",
                     binding=BindingKind.TRANSFORM,
                     entry=True,
-                    max_visits=max_visits,
+                    io_schema=NodeIOSchema(terminal_predicate=term_pred),
                 ),
             ),
             edges=(PlanEdge(source="a", target="a"),),
         )
-        registry = StrategyRegistry()
-        registry.register(
-            _StubStrategy(
-                kind=BindingKind.TRANSFORM,
-                schema=NodeIOSchema(),
-                emit={"decision": "d"},
+
+        counter = {"n": 0}
+
+        @dataclass(frozen=True, slots=True)
+        class _Counting(NodeStrategy):
+            kind: BindingKind = BindingKind.TRANSFORM
+            schema: NodeIOSchema = field(
+                default_factory=lambda: NodeIOSchema(terminal_predicate=term_pred)
             )
-        )
+
+            async def execute(self, context: StrategyContext, input: NodeInput) -> NodeOutput:
+                counter["n"] += 1
+                emit: dict[PortName, Any] = {"done": True} if counter["n"] >= 2 else {}
+                return NodeOutput(port_values=emit, producer_node=context.node_id)
+
+        registry = StrategyRegistry()
+        registry.register(_Counting())
         interp = PlanInterpreter(registry=registry)
         result = await interp.run(plan)
-        # Exactly max_visits successful executions — the over-budget
-        # visit is NOT executed.
-        assert len(result.visits) == max_visits
+        assert counter["n"] >= 2, "self-loop should have run at least twice"
         assert result.terminal_node == "a"
+        # None of the recorded visits should mention ``budget_exceeded``:
+        # the kernel never trips a per-node ceiling.
+        assert all(
+            visit.error is None or "budget_exceeded" not in str(visit.error).lower()
+            for visit in result.visits
+        )
 
 
 def _make_plan(
     node_ids: tuple[str, ...],
-    *,
-    max_visits: int = 1,
 ) -> Plan:
     nodes: list[PlanNode] = []
     edges: list[PlanEdge] = []
@@ -372,7 +371,6 @@ def _make_plan(
                 id=nid,
                 binding=BindingKind.TRANSFORM,
                 entry=(idx == 0),
-                max_visits=max_visits,
             )
         )
         if idx > 0:

@@ -51,7 +51,6 @@ class PlanNode(BaseModel):
     binding: BindingKind
     io_schema: NodeIOSchema = Field(default_factory=NodeIOSchema)
     config: Mapping[str, Any] = Field(default_factory=dict)
-    max_visits: int = 1
     terminal: bool = False
     entry: bool = False
     subgraph_ref: SubgraphReference | None = None
@@ -65,11 +64,11 @@ class PlanNode(BaseModel):
     # nodes and for legacy plans whose outer/inner names coincide.
     inner_io_schema: NodeIOSchema | None = None
 
-    @model_validator(mode="after")
-    def _max_visits_positive(self) -> PlanNode:
-        if self.max_visits <= 0:
-            raise ValueError(f"node {self.id!r}: max_visits must be > 0, got {self.max_visits}")
-        return self
+    # ADR-0225: per-node ``max_visits`` field removed. Termination is
+    # now solely via ``Decision(action_type=respond)``, ``should_terminate``
+    # from act.observe, ``AgentState.budget`` (max_steps / max_wall_clock /
+    # max_tokens), and explicit ``terminal_predicate`` matches on node IO
+    # schemas. The kernel never enforces a per-node visit ceiling.
 
 
 class PlanEdge(BaseModel):

@@ -5,7 +5,7 @@ The kernel owns the visit loop:
 ```
 while not traversal.terminated():
     node = plan.node(traversal.current_id)
-    traversal.visit(node_id=node.id, max_visits=node.max_visits)
+    traversal.visit(node_id=node.id)
     strategy = registry.resolve(node.binding)
     input = port_registry.build_input(schema.required_inputs())
     output = await strategy.execute(strategy_context, input)
@@ -24,7 +24,7 @@ while not traversal.terminated():
 The kernel does not implement binding-specific logic. Each strategy
 owns its own execute path. The kernel's job is:
 
-1. Track visits and enforce ``max_visits``.
+1. Track visits (resume checkpoints replay them; no per-node cap).
 2. Build :class:`NodeInput` from the port registry using the
    strategy's declared schema.
 3. Dispatch to the resolved strategy.
@@ -125,28 +125,13 @@ class PlanInterpreter:
         while not traversal.terminated():
             node = plan.node(traversal.current_id)
             self.observer.observe(_visit_start_of(node, plan.id, traversal, depth, self.clock()))
-            traversal.visit(node_id=node.id, max_visits=node.max_visits)
-            # ADR-0214 PG-007 passive→active: over-budget visit flips
-            # ``terminal`` instead of raising.  The over-budget node is
-            # NOT executed — emit a failure visit_end and exit cleanly.
-            if traversal.terminated():
-                self.observer.observe(
-                    _visit_end_of(
-                        node,
-                        plan.id,
-                        traversal.visit_counts.get(node.id, 1),
-                        depth,
-                        outcome="failure",
-                        error=f"budget_exceeded: node {node.id!r} visited "
-                        f"{traversal.visit_counts[node.id]} times "
-                        f"(max_visits={node.max_visits})",
-                        elapsed_ms=0,
-                        inputs={},
-                        outputs={},
-                        occurred_at_ms=self.clock(),
-                    )
-                )
-                break
+            traversal.visit(node_id=node.id)
+            # ADR-0225: per-node ``max_visits`` cap removed. The kernel
+            # no longer flips ``terminal`` on a per-node visit ceiling —
+            # termination is via ``Decision(action_type=respond)``,
+            # ``should_terminate`` from act.observe, ``AgentState.budget``
+            # (max_steps / max_wall_clock / max_tokens), or an explicit
+            # ``terminal_predicate`` match below.
             strategy = self.registry.resolve(node.binding)
             schema = node.io_schema
             inputs = ports.build_input(schema.required_inputs(), consumer_node=node.id)
@@ -349,7 +334,6 @@ def _visit_start_of(
             binding=node.binding,
             purpose=str(node.config.get("purpose", "")),
             region=str(node.config.get("region", "")),
-            max_visits=node.max_visits,
             subgraph_plan_ref=(node.subgraph_ref.plan_ref if node.subgraph_ref else ""),
         ),
     )
@@ -387,7 +371,6 @@ def _visit_end_of(
             binding=node.binding,
             purpose=str(node.config.get("purpose", "")),
             region=str(node.config.get("region", "")),
-            max_visits=node.max_visits,
             subgraph_plan_ref=(node.subgraph_ref.plan_ref if node.subgraph_ref else ""),
         ),
     )

@@ -203,13 +203,18 @@ def node(
     inputs: Sequence[PortSpec] = (),
     outputs: Sequence[PortSpec] = (),
     terminal_predicate: Predicate | None = None,
-    max_visits: int = 1,
     terminal: bool = False,
     entry: bool = False,
     subgraph_ref: SubgraphReference | None = None,
     **config: Any,
 ) -> PlanNode:
-    """Build a :class:`PlanNode` with typed IO schema and config extras."""
+    """Build a :class:`PlanNode` with typed IO schema and config extras.
+
+    ADR-0225: ``max_visits`` kwarg removed. Per-node visit ceilings
+    are no longer first-class on the v2 surface; termination is via
+    ``terminal_predicate`` (per-node), ``Decision(action_type=respond)``
+    from think, or :class:`AgentState.budget` ceilings.
+    """
     if isinstance(binding, str):
         binding = BindingKind(binding)
     return PlanNode(
@@ -221,7 +226,6 @@ def node(
             terminal_predicate=terminal_predicate,
         ),
         config=config,
-        max_visits=max_visits,
         terminal=terminal,
         entry=entry,
         subgraph_ref=subgraph_ref,
@@ -271,7 +275,6 @@ _PLAN_NODE_FIELDS: frozenset[str] = frozenset(
         "binding",
         "io_schema",
         "config",
-        "max_visits",
         "terminal",
         "entry",
         "subgraph_ref",
@@ -330,8 +333,9 @@ def _node_to_dict(n: PlanNode) -> dict[str, Any]:
     d: dict[str, Any] = {"id": n.id, "binding": n.binding.value}
     if n.io_schema.inputs or n.io_schema.outputs or n.io_schema.terminal_predicate:
         d["io_schema"] = _io_schema_to_dict(n.io_schema)
-    if n.max_visits != 1:
-        d["max_visits"] = n.max_visits
+    # ADR-0225: per-node ``max_visits`` no longer serialized. Termination
+    # surfaces via ``terminal_predicate`` on the io_schema (above) plus
+    # the natural Decision/should_terminate paths in the kernel.
     if n.terminal:
         d["terminal"] = True
     if n.entry:
@@ -487,7 +491,6 @@ def _parse_plan_node(raw: Mapping[str, Any]) -> PlanNode:
         binding=binding,
         io_schema=io_schema,
         config=config,
-        max_visits=int(raw.get("max_visits", 1)),
         terminal=bool(raw.get("terminal", False)),
         entry=bool(raw.get("entry", False)),
         subgraph_ref=_parse_subgraph_ref(raw.get("subgraph_ref")),

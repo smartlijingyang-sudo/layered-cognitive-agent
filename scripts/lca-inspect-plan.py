@@ -35,15 +35,15 @@ for i in issues:
 print("=" * 78)
 
 # ---------- 1. 节点视图 --------------------------------------------------------
-print("\n## 1. Nodes (node · phase · binding · executor_capability · max_visits)")
+print("\n## 1. Nodes (node · phase · binding · executor_capability)")
 print("-" * 78)
-print(f"  {'node_id':<14} {'semantic':<10} {'binding':<26} {'exec_cap':<24} visits")
+print(f"  {'node_id':<14} {'semantic':<10} {'binding':<26} {'exec_cap':<24}")
 phase_bindings = {pb.node_id: pb for pb in plan.phase_bindings}
 for n in plan.phase_graph.nodes:
     pb = phase_bindings.get(n.id)
     exec_cap = pb.executor_capability if pb else "-"
     sem = n.semantic_phase.value if hasattr(n.semantic_phase, "value") else n.semantic_phase
-    print(f"  {n.id:<14} {sem:<10} {n.binding:<26} {exec_cap:<24} {n.max_visits}")
+    print(f"  {n.id:<14} {sem:<10} {n.binding:<26} {exec_cap:<24}")
 
 # ---------- 2. 边视图 ----------------------------------------------------------
 print("\n## 2. Edges (source → target gated by when / loop_guard)")

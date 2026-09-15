@@ -175,17 +175,21 @@ def metadata_of(
     binding: BindingKind | str | None = None,
     purpose: str = "",
     region: str = "",
-    max_visits: int = 1,
     subgraph_plan_ref: str = "",
     extras: tuple[tuple[str, Any], ...] = (),
 ) -> tuple[tuple[str, Any], ...]:
-    """Build a metadata tuple from the fields a kernel call site knows."""
+    """Build a metadata tuple from the fields a kernel call site knows.
+
+    ADR-0225: ``max_visits`` parameter removed. The per-node visit
+    ceiling is gone; ``metadata_of`` no longer carries a ``max_visits``
+    pair. Resume replays still surface the per-node visit count via
+    the ``GraphObservation.node_index`` field (set by ``_visit_start_of``).
+    """
     binding_str = BindingKindField.of(binding)
     pairs: list[tuple[str, Any]] = [
         ("binding", binding_str),
         ("purpose", purpose),
         ("region", region),
-        ("max_visits", int(max_visits)),
         ("subgraph_plan_ref", subgraph_plan_ref),
     ]
     pairs.extend(extras)

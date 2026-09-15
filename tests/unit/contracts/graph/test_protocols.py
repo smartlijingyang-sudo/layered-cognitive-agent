@@ -111,13 +111,8 @@ class TestSubgraphReference:
 
 
 class TestPlanNode:
-    def test_max_visits_must_be_positive(self) -> None:
-        with pytest.raises(ValidationError):
-            PlanNode(id="n", binding=BindingKind.NODE_EXECUTOR, max_visits=0)
-
     def test_default_values(self) -> None:
         n = PlanNode(id="n", binding=BindingKind.NODE_EXECUTOR)
-        assert n.max_visits == 1
         assert n.terminal is False
         assert n.entry is False
         assert n.io_schema == NodeIOSchema()

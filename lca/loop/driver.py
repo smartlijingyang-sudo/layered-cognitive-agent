@@ -160,6 +160,8 @@ class DeclarativeExecution:
                 plan=plan_obj,
                 current_id=cursor.current_node_id,
             )
+            # ADR-0225: resume-path ``traversal.visit`` no longer passes
+            # a per-node ``max_visits`` ceiling — the field is gone.
             for node_id in cursor.visited_nodes:
                 traversal.visit(node_id=node_id)
             interpretation = await interpreter.run(

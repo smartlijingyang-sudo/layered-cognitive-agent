@@ -75,12 +75,18 @@ class PhaseNode:
     ``binding`` is retained for backward-compat reading (older
     profile-bundle patches may still emit it) but the production
     execution path consumes ``sub_spec_ref`` only.
+
+    ADR-0225: ``max_visits`` field removed from :class:`PhaseNode`.
+    Termination is via ``Decision(action_type=respond)`` from think,
+    ``should_terminate`` from act.observe, ``AgentState.budget``
+    (max_steps / max_wall_clock / max_tokens), or an explicit
+    ``terminal_predicate`` match on the inner subgraph. Per-node
+    visit ceilings are no longer first-class.
     """
 
     id: str
     semantic_phase: SemanticPhase
     binding: str | None = None
-    max_visits: int = 1
     terminal: bool = False
     execution_policy: PhaseExecutionPolicy = field(default_factory=PhaseExecutionPolicy)
     precondition: str | None = None
@@ -90,10 +96,8 @@ class PhaseNode:
     def __post_init__(self) -> None:
         if not isinstance(self.semantic_phase, SemanticPhase):
             object.__setattr__(self, "semantic_phase", SemanticPhase(self.semantic_phase))
-        if not self.id or self.max_visits <= 0:
-            raise DeclarativeValidationError(
-                "PG-001", "phase node id and positive max_visits required"
-            )
+        if not self.id:
+            raise DeclarativeValidationError("PG-001", "phase node id required")
         if self.precondition is not None and not str(self.precondition).strip():
             raise DeclarativeValidationError(
                 "PG-007", "phase node precondition must be a non-empty name when declared"

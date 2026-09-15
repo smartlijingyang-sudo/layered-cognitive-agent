@@ -3,7 +3,7 @@
 The traversal owns:
 
 - which node the kernel should run next (``current``),
-- which nodes have been visited and how often (for ``max_visits``),
+- which nodes have been visited and how often (for resume checkpoints),
 - when the plan is terminated (no outgoing edges resolve to True).
 
 It is a state machine, not a free-form iterator: ``terminated()`` is
@@ -13,6 +13,10 @@ to move forward, ``fork`` is the only way to recurse into a subgraph.
 D4 cutover: ``select_edge`` now takes a ``reader_factory`` and evaluates
 typed :class:`Predicate` objects via :func:`evaluate_predicate`. The
 legacy string DSL evaluator has been deleted.
+
+ADR-0225: per-node ``max_visits`` cap removed. ``visit_counts`` is
+retained so the resume path can replay prior visits; the kernel no
+longer flips ``terminal`` based on a per-node ceiling.
 """
 
 from __future__ import annotations
@@ -46,25 +50,15 @@ class PlanTraversal:
             if not self.current_id and self.plan.nodes:
                 self.current_id = self.plan.nodes[0].id
 
-    def visit(self, *, node_id: str, max_visits: int) -> int:
+    def visit(self, *, node_id: str) -> int:
         """Record one visit to ``node_id``; return the new count.
 
-        When the count exceeds ``max_visits`` the traversal is marked
-        terminal (``terminal_reason`` is populated) instead of raising.
-        The main loop in :class:`PlanInterpreter` checks ``terminated()``
-        and exits cleanly — see ADR-0214 PG-007 passive→active.
+        ADR-0225: the per-node ``max_visits`` cap has been deleted.
+        ``visit_counts`` is still updated so the resume path can
+        replay prior visits; the kernel no longer flips ``terminal``
+        based on a per-node ceiling.
         """
-        if max_visits <= 0:
-            raise ValueError(f"plan {self.plan.id!r} node {node_id!r}: max_visits must be > 0")
         self.visit_counts[node_id] = self.visit_counts.get(node_id, 0) + 1
-        if self.visit_counts[node_id] > max_visits:
-            self.terminal = True
-            self.terminal_reason = (
-                "budget_exceeded",
-                node_id,
-                max_visits,
-                self.visit_counts[node_id],
-            )
         return self.visit_counts[node_id]
 
     def terminated(self) -> bool:

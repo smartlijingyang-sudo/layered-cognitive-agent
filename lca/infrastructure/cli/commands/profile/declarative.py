@@ -277,7 +277,6 @@ def register(app: typer.Typer) -> None:
                         "semantic_phase": n.get("semantic_phase"),
                         "binding": n.get("binding"),
                         "terminal": bool(n.get("terminal", False)),
-                        "max_visits": n.get("max_visits"),
                         "sub_spec_ref": n.get("sub_spec_ref"),
                     }
                     for n in top_nodes

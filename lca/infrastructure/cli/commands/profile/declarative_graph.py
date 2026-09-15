@@ -25,7 +25,7 @@ def render_declarative_graph(profile: Path) -> str:
         lines.append("  subgraph phase_graph[Phase Graph]")
         for node in plan.phase_graph.nodes:
             node_id = _mermaid_id("phase", node.id)
-            label = f"{node.semantic_phase.value}\\n{node.id}\\nmax={node.max_visits}"
+            label = f"{node.semantic_phase.value}\\n{node.id}"
             if node.terminal:
                 label += "\\nterminal"
             lines.append(f"    {node_id}{_mermaid_label(label)}")

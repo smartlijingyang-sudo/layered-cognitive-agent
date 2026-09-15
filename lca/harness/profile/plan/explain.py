@@ -40,7 +40,6 @@ def explain_compile_plan(plan: CompiledRunPlan) -> dict[str, Any]:
                 "id": node.id,
                 "semantic_phase": node.semantic_phase.value,
                 "binding": node.binding,
-                "max_visits": node.max_visits,
                 "terminal": node.terminal,
             }
             for node in phase_graph.nodes

@@ -197,7 +197,6 @@ def _project_to_phase_graph(
       - ``semantic_phase`` 走 ``region`` 反查(默认 THINK,因为本路径只服务 think)
       - ``binding`` 取自 ``BundleGraphNode.factory``(interpreter 进入节点时按
         ``sub_spec_ref`` 短路走子图,不调用该 binding)
-      - ``max_visits`` 取自 ``config.max_visits``(默认 1)
       - ``purpose`` / ``inputs`` / ``outputs`` 通过 ``sub_spec_ref.metadata``
         透传(interpreter 启动时读)
 
@@ -233,13 +232,15 @@ def _project_to_phase_graph(
                 )
         node_factories.append((n.id, n.factory, node_region))
 
-        max_visits = int(n.config.get("max_visits", 1)) if n.config else 1
+        # ADR-0225: per-node ``max_visits`` projection removed. The
+        # ``config.max_visits`` field is dropped from the projection —
+        # termination is via Decision/should_terminate/budget/
+        # terminal_predicate, not per-node ceilings.
         phase_nodes.append(
             PhaseNode(
                 id=n.id,
                 semantic_phase=SemanticPhase.THINK,
                 binding=n.factory,
-                max_visits=max_visits,
             )
         )
 

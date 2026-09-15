@@ -131,7 +131,6 @@ def _lift_graph_spec_inner(spec: Mapping[str, Any]) -> Plan:
                 io_schema=schema,
                 inner_io_schema=inner_schema if subgraph_ref is not None else None,
                 config=dict(raw),
-                max_visits=int(raw.get("max_visits", 1)),
                 terminal=bool(raw.get("terminal", False)),
                 entry=bool(raw.get("entry", False)) or raw_entry == node_id,
                 subgraph_ref=subgraph_ref,
@@ -216,7 +215,6 @@ def lift_executable_plan(executable: object) -> Plan:
                 binding=binding,
                 io_schema=io_schema,
                 inner_io_schema=io_schema if subgraph_ref is not None else None,
-                max_visits=int(getattr(raw, "max_visits", 1)),
                 terminal=bool(getattr(raw, "terminal", False)),
                 entry=bool(getattr(raw, "entry", False)) or node_id == entry_id,
                 subgraph_ref=subgraph_ref,
@@ -429,10 +427,10 @@ def _binding_from_factory_or_binding(raw: Mapping[str, object]) -> BindingKind:
     1. ``binding:`` — explicit :class:`BindingKind` (v2 schema).
     2. ``sub_spec_ref:`` — nested subgraph; the kernel recurses via
        :class:`SubgraphStrategy`. Legacy think/act yaml nests
-       ``sub_spec_ref:`` under ``config:`` (alongside ``max_visits``),
-       so check both surfaces. Wins over ``factory`` so a node
-       like ``think.reason`` (sub-spec only) recurses instead of
-       dispatching a leaf executor that does not exist.
+       ``sub_spec_ref:`` under ``config:``, so check both surfaces.
+       Wins over ``factory`` so a node like ``think.reason``
+       (sub-spec only) recurses instead of dispatching a leaf
+       executor that does not exist.
     3. ``factory:`` — legacy think/act subgraph style; ``factory:
        think.*`` / ``factory: act.*`` map to
        :class:`BindingKind.NODE_EXECUTOR` so the kernel can dispatch
