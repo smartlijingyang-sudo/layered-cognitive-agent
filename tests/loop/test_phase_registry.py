@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from lca.contracts.protocols.declarative.declarative_1.declarative_common import SemanticPhase
 from lca.loop.phases.registry import (
     PHASE_EXECUTOR_CAPABILITY_PREFIX,
     SEMANTIC_PHASE_ORDER,
@@ -11,6 +10,8 @@ from lca.loop.phases.registry import (
     phase_executor_capability_key,
     semantic_phases,
 )
+
+from lca.contracts.protocols.declarative.declarative_1.declarative_common import SemanticPhase
 
 
 def test_semantic_phase_order_matches_closed_set() -> None:

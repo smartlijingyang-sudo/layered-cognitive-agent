@@ -5,6 +5,11 @@ All errors raised during plan construction carry structured context
 log search. Runtime errors raise :class:`UnsetPortError` /
 :class:`UnknownFieldError`, both subclasses of :class:`PlanLiftError`
 (semantically: "the plan's static contract was violated at runtime").
+
+Plan-lift errors also carry a ``next_command`` hint (single ``lca-ops``
+subcommand to run for diagnosis) so agents / operators that hit the
+error from a kernel restart do not have to map message strings back
+to "which validator failed".
 """
 
 from __future__ import annotations
@@ -20,6 +25,11 @@ class PlanLiftError(ValueError):
     - the plan has no termination policy
     """
 
+    #: Subcommand to run when this error fires during a kernel boot.
+    #: Default is "re-run the validator with explicit JSON output";
+    #: specific raises can override (see ``validate_profile_plans``).
+    next_command: str = "./scripts/lca-ops plan validate {profile}"
+
     def __init__(
         self,
         reason: str,
@@ -28,6 +38,7 @@ class PlanLiftError(ValueError):
         node_id: str | None = None,
         edge_id: str | None = None,
         port_name: str | None = None,
+        next_command: str | None = None,
     ) -> None:
         super().__init__(reason)
         self.reason = reason
@@ -35,6 +46,8 @@ class PlanLiftError(ValueError):
         self.node_id = node_id
         self.edge_id = edge_id
         self.port_name = port_name
+        if next_command is not None:
+            self.next_command = next_command
 
 
 class UnsetPortError(PlanLiftError):

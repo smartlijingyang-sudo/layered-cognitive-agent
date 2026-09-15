@@ -95,6 +95,8 @@ journal_exceptions.register(_journal_group)
 journal_step.register(_journal_group)
 journal_session.register(_journal_group)
 kernel.register(app)
+from lca.infrastructure.cli.commands.kernel import supervisor as kernel_supervisor_mod
+kernel_supervisor_mod.register(app)
 notes.register(app)
 typecheck.register(app)
 observation.register(app)

@@ -107,6 +107,147 @@ def register(app: typer.Typer) -> None:
         else:
             typer.echo(f"compiled: profile={profile_path} keys={sorted(serialized.keys())}")
 
+    @app.command(name="kernel_check")
+    def kernel_check(
+        profile_path: Path = typer.Argument(
+            "profiles/web-standard.yaml",
+            help="Profile YAML path to validate end-to-end without spawning uvicorn",
+        ),
+        as_json: bool = typer.Option(False, "--json", help="Emit canonical JSON"),
+    ) -> None:
+        """Run every plan-lift / profile-resolve validator against ``profile_path``.
+
+        Same checks :class:`KernelServeSpawner` runs at boot, but without
+        spawning ``lca_kernel serve`` or waiting on /health. Used by
+        ``kernel-restart`` failures (``next_command``) and by humans who
+        want a fast yes/no on whether the active profile is bootable.
+
+        Exit code: ``0`` iff every check passed; ``1`` on the first
+        failure (with the failing check's reason and the recommended
+        remediation hint).
+
+        JSON mode redirects stdout to ``/dev/null`` while validators run:
+        ``resolve_profile`` and ``validate_profile_plans`` print progress
+        banners that would otherwise corrupt the JSON stream. ``kernel
+        logs`` reads stderr instead, so progress is still observable.
+        """
+        import contextlib
+        import io
+        import os
+        import time as _time
+
+        start = _time.monotonic()
+        checks: list[dict[str, object]] = []
+        first_failure: dict[str, object] | None = None
+
+        # Silence stdout while validators run; their `print("✅ ...")`
+        # banners would otherwise leak into --json output. Stderr stays
+        # open so humans running interactively still see progress.
+        devnull: io.TextIOBase | None = None
+        saved_stdout: io.TextIOBase | None = None
+        if as_json:
+            devnull = open(os.devnull, "w", encoding="utf-8")
+            saved_stdout = sys.stdout
+            sys.stdout = devnull
+
+        # 1) profile resolve
+        try:
+            from lca.harness.profile.resolve.resolve import resolve_profile
+
+            resolve_profile(profile_path)
+            checks.append({"name": "resolve", "ok": True})
+        except Exception as exc:
+            entry = {
+                "name": "resolve",
+                "ok": False,
+                "error": exc.__class__.__name__,
+                "reason": str(exc),
+                "next_command": (
+                    f"./scripts/lca-ops plan compile {profile_path}"
+                ),
+            }
+            checks.append(entry)
+            first_failure = entry
+
+        # 2) plan lift (only if resolve passed)
+        if first_failure is None:
+            try:
+                from lca.contracts.protocols.graph.errors import PlanLiftError
+                from lca_kernel.boot.plan_validation import validate_profile_plans
+
+                # ``resolve_profile`` succeeded above; re-resolve so we
+                # have the resolved handle for the validator.
+                resolved = resolve_profile(profile_path)
+                validate_profile_plans(resolved)
+                checks.append({"name": "plan_lift", "ok": True})
+            except PlanLiftError as exc:
+                next_cmd = (
+                    getattr(exc, "next_command", None)
+                    or f"./scripts/lca-ops plan validate {profile_path}"
+                )
+                next_cmd = str(next_cmd).replace("{profile}", str(profile_path))
+                entry = {
+                    "name": "plan_lift",
+                    "ok": False,
+                    "error": exc.__class__.__name__,
+                    "reason": exc.reason,
+                    "plan_id": exc.plan_id,
+                    "node_id": exc.node_id,
+                    "edge_id": exc.edge_id,
+                    "port_name": exc.port_name,
+                    "next_command": next_cmd,
+                }
+                checks.append(entry)
+                first_failure = entry
+            except Exception as exc:
+                entry = {
+                    "name": "plan_lift",
+                    "ok": False,
+                    "error": exc.__class__.__name__,
+                    "reason": str(exc),
+                    "next_command": (
+                        f"./scripts/lca-ops plan validate {profile_path}"
+                    ),
+                }
+                checks.append(entry)
+                first_failure = entry
+
+        duration_ms = int((_time.monotonic() - start) * 1000)
+        report = {
+            "profile": str(profile_path),
+            "ok": first_failure is None,
+            "duration_ms": duration_ms,
+            "checks": checks,
+            "next_command": (
+                first_failure["next_command"] if first_failure else None
+            ),
+        }
+
+        # Restore stdout *before* emitting JSON, so the report goes to
+        # the real stdout regardless of the redirect we set above.
+        if saved_stdout is not None:
+            sys.stdout = saved_stdout
+        if devnull is not None:
+            with contextlib.suppress(OSError):
+                devnull.close()
+
+        if as_json:
+            typer.echo(json.dumps(report, indent=2, ensure_ascii=False))
+        else:
+            typer.echo(
+                f"{'OK' if report['ok'] else 'FAIL'} profile={profile_path} "
+                f"duration_ms={duration_ms}"
+            )
+            for entry in checks:
+                marker = "ok" if entry["ok"] else f"FAIL({entry['error']})"
+                typer.echo(f"  [{marker}] {entry['name']}")
+                if not entry["ok"]:
+                    typer.echo(f"    reason : {entry['reason']}")
+                    if entry.get("next_command"):
+                        typer.echo(f"    next   : {entry['next_command']}")
+        if not report["ok"]:
+            raise typer.Exit(1)
+
     @app.command(name="kernel_plugins")
     def kernel_plugins(
         profile_path: Path = typer.Option(

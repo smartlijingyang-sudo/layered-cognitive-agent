@@ -80,62 +80,65 @@ def register(app: typer.Typer) -> None:
         quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
         config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
     ) -> None:
-        """LCA 进程本地便捷重启: SIGTERM 现有 → 等 K6 dispose → spawn 新。
+        """LCA 进程本地便捷重启 — 薄包装 ``kernel-supervisor restart``。
 
         ADR-0119 决定 4: lca-ops 不长管 LCA 进程 (生产由 supervisor 守护)。
-        本命令给"改完代码 / 换 profile / 强制刷新"用的本地快捷方式。
-        旧进程被 SIGTERM,K6 ``run_kernel_lifespan`` LIFO dispose,然后
-        :class:`KernelServeSpawner` 拉起新 worker。
+        本命令给"改完代码 / 换 profile / 强制刷新"用的本地快捷方式,
+        委托给 :class:`KernelSupervisor` 做 SIGTERM → 等 → spawn。
 
-        Implementation (ADR-0213 PR-3):
-        - SIGTERM 旧 PID → 等端口空 → :meth:`KernelServeSpawner.run()`。
-        - 不走 ``stack.heal`` 的全站自愈(infra/lobehub/daemon/onlyboxes)，
-          ``kernel-restart`` 只动 kernel。
-        - 失败信息原样透传 ``SpawnResult.actionable`` 到 operator，不
-          fallback 到 "kernel 没在跑,去 heal"。
+        Output shape (--json): 同 :func:`kernel-supervisor restart` ——
+        ``{verdict, status, detail, next_command}``。失败时 ``status`` 字段
+        给出 last_event + restart_count。
         """
-        import contextlib
-        import time as _time
-        from typing import cast
+        import json as _json
+        import sys as _sys
 
-        from lca.infrastructure.cli.services.process.utils import (
-            find_pid_by_argv,
-            port_listening,
+        from lca.infrastructure.cli.commands.kernel.supervisor import (
+            _supervisor_singleton,
+        )
+        from lca.infrastructure.cli.services.kernel.supervisor import (
+            default_program_config,
         )
 
         ctx = make_context(json_mode, quiet, config)
-
-        # 1) SIGTERM existing kernel PID (let K6 LIFO dispose)
-        existing_pid = find_pid_by_argv("lca_kernel", "serve")
-        if existing_pid is not None:
-            with contextlib.suppress(ProcessLookupError):
-                cast("object", existing_pid).send_signal(15)  # SIGTERM
-            ks = ctx.registry.get("kernel_serve")
-            deadline = _time.monotonic() + 10.0
-            while _time.monotonic() < deadline:
-                if not port_listening(ks._config.port):
-                    break
-                _time.sleep(0.5)
-
-        # 2) Spawn via KernelServeSpawner; surface SpawnResult directly
-        ks = ctx.registry.get("kernel_serve")
-        spawner = ks.spawner()
-        result = spawner.run()
-
-        if not result.ok:
-            failed = result.failed_stage or "unknown"
-            err = next((s.error for s in result.steps if not s.ok), "unknown")
-            ctx.console.verdict(
-                False,
-                f"kernel_restart failed at stage={failed}: {err}",
+        cfg = default_program_config()
+        sup = _supervisor_singleton(cfg)
+        sup.restart()
+        ready = sup.wait_ready(timeout=cfg.readiness_timeout)
+        status = sup.status()
+        if ready:
+            detail = f"LCA kernel restarted (pid={status.pid}, restart_count={status.restart_count})"
+            ctx.console.verdict(True, detail)
+            if json_mode:
+                _sys.stdout.write(
+                    _json.dumps(
+                        {
+                            "verdict": "ready",
+                            "detail": detail,
+                            "status": status.__dict__,
+                            "next_command": (
+                                f"./scripts/lca-ops kernel-supervisor status "
+                                f"--name {cfg.name}"
+                            ),
+                        },
+                        indent=2,
+                    )
+                )
+            return
+        detail = f"restart did not become ready within {cfg.readiness_timeout}s: {status.last_event}"
+        ctx.console.verdict(False, detail)
+        if json_mode:
+            _sys.stdout.write(
+                _json.dumps(
+                    {
+                        "verdict": "failed",
+                        "detail": detail,
+                        "status": status.__dict__,
+                        "next_command": (
+                            f"./scripts/lca-ops kernel-supervisor logs --name {cfg.name}"
+                        ),
+                    },
+                    indent=2,
+                )
             )
-            if result.actionable:
-                ctx.console.info(result.actionable)
-            if result.stderr_path:
-                ctx.console.info(f"inspect stderr: {result.stderr_path}")
-            raise typer.Exit(1)
-
-        ctx.console.verdict(
-            True,
-            f"LCA kernel restarted (pid={result.pid}, {result.duration_ms}ms)",
-        )
+        raise typer.Exit(1)

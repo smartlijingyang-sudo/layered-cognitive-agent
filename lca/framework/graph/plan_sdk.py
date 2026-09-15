@@ -24,7 +24,7 @@ the framework is domain-agnostic. Adding a new business port name requires
 updating this catalog and the D5 mapping in ``docs/adr/0219-phase-graph-unification.md`` §5.1.
 
 Core cognition ports:
-- ``decision``              think.classify / think.gate  →  outer interpreter / act phase
+- ``decision``              think.decision.parse / think.gate  →  outer interpreter / act phase
 - ``observation``           observation nodes           →  outer interpreter
 - ``reflection``            reflect nodes               →  outer interpreter
 - ``response``              think.llm.dispatch          →  think.decision.parse

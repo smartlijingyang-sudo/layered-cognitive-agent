@@ -71,7 +71,6 @@ def test_plan_tree_think_subgraph_profile_text() -> None:
     assert "think.shortcut" in out
     assert "think.route" in out
     assert "think.reason" in out
-    assert "think.classify" in out
     assert "think.gate" in out
     # nested L2
     assert "think.reason.subgraph[L2]" in out
@@ -116,7 +115,6 @@ def test_plan_tree_think_subgraph_profile_json_structure() -> None:
         "think.shortcut",
         "think.route",
         "think.reason",
-        "think.classify",
         "think.gate",
     ]
     # nested L2 child of think.reason

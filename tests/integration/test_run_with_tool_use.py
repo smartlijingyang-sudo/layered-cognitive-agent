@@ -273,15 +273,6 @@ def test_run_with_tool_use_succeeds_on_web_standard() -> None:
             "this test uses a scripted LLM adapter and only asserts the wire shape."
         )
 
-    # Pre-existing plan-validation defect (unrelated to PR2): the
-    # ``think.subgraph`` plan in ``profiles/web-standard.yaml`` reports
-    # ``think.classify`` as unreachable. Verified pre-existing via
-    # ``git stash`` baseline diff in Task 7's report. We bypass it for
-    # the boot seam so the rest of the kernel can run.
-    import lca_kernel.boot.plan_validation as _pv
-
-    _pv.validate_profile_plans = lambda _resolved: None
-
     try:
         from lca.contracts.models.core.conversation.llm import (
             LLMResponse,
