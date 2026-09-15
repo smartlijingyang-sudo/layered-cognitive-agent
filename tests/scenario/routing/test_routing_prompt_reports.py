@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import unittest
-from datetime import datetime, timezone, UTC
+from datetime import UTC, datetime
 
 from lca.cognition.brain.reasoner.reasoner import PromptReasoner
 from lca.cognition.brain.sections.types import (
