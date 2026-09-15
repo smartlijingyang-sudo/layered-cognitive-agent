@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any, cast
 
@@ -169,12 +170,15 @@ def register(app: typer.Typer) -> None:
         payload = compiled_run_plan_to_dict(plan)
         plan_ref = payload.get("plan_ref", "")
         schema_version = payload.get("schema_version", "")
-        declarative = payload.get("declarative", {}) if isinstance(payload, dict) else {}
-        phase_graph = declarative.get("phase_graph", {}) if isinstance(declarative, dict) else {}
-        top_nodes = list(phase_graph.get("nodes", []) or [])
-        top_edges = list(phase_graph.get("edges", []) or [])
+        # ADR-0221 P3: top-level nodes / edges live on the v2 graph_spec
+        # wrapper, not on the retired ``declarative.phase_graph`` region.
+        graph_spec = getattr(plan, "graph_spec", None) or {}
+        top_nodes = list(graph_spec.get("nodes", []) or [])
+        top_edges = list(graph_spec.get("edges", []) or [])
         top_validation = (
-            declarative.get("validation_report", {}) if isinstance(declarative, dict) else {}
+            payload.get("declarative", {}).get("validation_report", {})
+            if isinstance(payload.get("declarative"), dict)
+            else {}
         )
 
         # Per-layer inflate:顶层走 CompiledRunPlan;sub_spec_ref 走 _load_bundle_graph_spec
@@ -189,6 +193,18 @@ def register(app: typer.Typer) -> None:
                 "edge_count": len(spec.edges),
                 "entry": spec.entry,
             }
+
+        def _sub_spec_ref_to_dict(ref: Any) -> dict[str, Any] | None:
+            """Project a ``SubgraphReference`` (dataclass) or pre-dict form
+            into JSON-ready data. Returns ``None`` for ``None`` input.
+            """
+            if ref is None:
+                return None
+            if isinstance(ref, dict):
+                return dict(ref)
+            if is_dataclass(ref):
+                return dict(asdict(ref))
+            return None
 
         def _visit_subgraph(
             plan_ref_path: str, current_depth: int, parent_node_id: str
@@ -231,9 +247,11 @@ def register(app: typer.Typer) -> None:
                         "factory": n.factory,
                         "purpose": n.purpose,
                         "config_keys": sorted(n.config.keys()),
+                        # ADR-0219 §10.11: ``sub_spec_ref`` lives on the node
+                        # itself, not under ``config``.
                         "sub_spec_ref": (
-                            dict(n.config["sub_spec_ref"])
-                            if isinstance(n.config.get("sub_spec_ref"), dict)
+                            _sub_spec_ref_to_dict(n.sub_spec_ref)
+                            if n.sub_spec_ref is not None
                             else None
                         ),
                     }
@@ -247,10 +265,10 @@ def register(app: typer.Typer) -> None:
             children: list[dict[str, Any]] = []
             if current_depth < depth:
                 for n in spec.nodes:
-                    nested = n.config.get("sub_spec_ref") if isinstance(n.config, dict) else None
-                    if not (isinstance(nested, dict) and nested.get("plan_ref")):
+                    nested = n.sub_spec_ref
+                    if nested is None or not getattr(nested, "plan_ref", None):
                         continue
-                    children.append(_visit_subgraph(nested["plan_ref"], current_depth + 1, n.id))
+                    children.append(_visit_subgraph(nested.plan_ref, current_depth + 1, n.id))
             layer["children"] = children
             return layer
 
@@ -268,7 +286,7 @@ def register(app: typer.Typer) -> None:
             "plan_ref": plan_ref,
             "schema_version": schema_version,
             "top": {
-                "entry": phase_graph.get("entry"),
+                "entry": graph_spec.get("entry"),
                 "node_count": len(top_nodes),
                 "edge_count": len(top_edges),
                 "nodes": [

@@ -86,22 +86,28 @@ def scope_sub_plan_hash(plan: CompiledRunPlan) -> str:
 
 
 def compiled_run_plan_to_dict(plan: CompiledRunPlan) -> dict[str, Any]:
-    """Build the complete JSON-ready diagnostic projection for a compiled plan."""
+    """Build the complete JSON-ready diagnostic projection for a compiled plan.
+
+    ADR-0221 P3: ``CompiledRunPlan.phase_graph`` was retired; v2 plans arrive
+    wrapped in ``V2ExecutablePlan`` carrying ``graph_spec``. Unwrap it the
+    same way ``compiled_run_plan_ref`` does so callers see a v1-shaped
+    payload even when the v2 region is the source of truth.
+    """
+    inner = plan.inner if hasattr(plan, "inner") and hasattr(plan, "graph_spec") else plan
 
     result: dict[str, Any] = {
-        "profile_path": plan.profile_path,
-        "plan_version": plan.plan_version,
-        "schema_version": plan.plan_version,
+        "profile_path": inner.profile_path,
+        "plan_version": inner.plan_version,
+        "schema_version": inner.plan_version,
         "plan_ref": compiled_run_plan_ref(plan),
         "plan_hash": compiled_run_plan_ref(plan),
-        "revision": plan.revision,
-        "input_provenance": [{"kind": kind, "path": path} for kind, path in plan.input_provenance],
-        "capability": _capability_plan_to_dict(plan.capability),
-        "control": _control_entries_to_dict(plan),
-        "scope": _scope_plan_to_dict(plan.scope),
+        "revision": inner.revision,
+        "input_provenance": [{"kind": kind, "path": path} for kind, path in inner.input_provenance],
+        "capability": _capability_plan_to_dict(inner.capability),
+        "control": _control_entries_to_dict(inner),
+        "scope": _scope_plan_to_dict(inner.scope),
     }
-    if plan.phase_graph is not None:
-        result["declarative"] = _declarative_payload(plan)
+    result["declarative"] = _declarative_payload(inner)
     return result
 
 
