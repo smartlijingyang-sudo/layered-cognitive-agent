@@ -1,0 +1,26 @@
+# bundles/concept/history_assemble.yaml — Layer 2 概念图
+# Spec §D — think.history.assemble 内部图。
+#
+# 单节点 inner graph:history.derive 从 RunSessionWriter 投影 messages +
+# system + tools,经 orphan-drop 后的 ModelVisibleRequest typed boundary。
+#
+# 跨图引用:
+#   inputs  -> business.reasoning.turn 的 writer port
+#   outputs -> primitive.llm.call 节点的 model_visible_request port
+#
+# delete-when: N/A(纯加法,think.history.assemble 节点在 think.yaml 引用)。
+
+id: concept.history.assemble
+region: concept
+purpose: RunSessionWriter → ModelVisibleRequest typed boundary (orphan-drop applied)
+
+nodes:
+  - id: history.derive
+    factory: history.derive
+    inputs: [writer, state]
+    outputs: [model_visible_request]
+    config:
+      emit_on_enter: []
+      emit_on_exit:  []
+
+edges: []

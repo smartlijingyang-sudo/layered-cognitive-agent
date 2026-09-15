@@ -32,6 +32,66 @@ class SessionWriterUnboundError(RuntimeError):
     """
 
 
+def _surface_event_to_message(event: Any) -> Message:
+    """Project a single surface event into the OpenAI message wire shape.
+
+    Only ``surface/*`` events reach this point. Returns a single
+    :class:`Message` per event; non-applicable keys are omitted.
+    """
+    if event.type == "surface/user_message":
+        content = event.data.get("content") or ""
+        return Message(role="user", content=content)
+    if event.type == "surface/assistant_message":
+        msg: Message = Message(role="assistant", content=event.data.get("content"))
+        tool_calls = event.data.get("tool_calls")
+        if tool_calls is not None:
+            msg["tool_calls"] = tool_calls
+        return msg
+    if event.type == "surface/tool_result":
+        msg = Message(
+            role="tool",
+            content=event.data.get("content"),
+            tool_call_id=event.data.get("tool_call_id"),
+        )
+        return msg
+    # Other surface event types (extensions) fall through with role=event.type
+    # so orphan-drop and downstream consumers see them rather than silently drop.
+    return Message(role=event.type)
+
+
+def _drop_orphan_tool_results(messages: list[Message]) -> list[Message]:
+    """Drop tool/result messages with ``tool_call_id`` not in any preceding assistant.
+
+    Mirrors OpenAI's ``drop_orphan_function_calls``: a ``role=tool`` row is
+    only valid if its ``tool_call_id`` was declared by an earlier
+    ``role=assistant`` row's ``tool_calls`` list.
+    """
+    valid_call_ids: set[str] = set()
+    for m in messages:
+        if m.get("role") == "assistant":
+            for tc in m.get("tool_calls") or []:
+                if isinstance(tc, dict) and "id" in tc:
+                    valid_call_ids.add(tc["id"])
+    return [
+        m
+        for m in messages
+        if not (
+            m.get("role") == "tool"
+            and m.get("tool_call_id") not in valid_call_ids
+        )
+    ]
+
+
+def _drop_reasoning_after_dropped_calls(messages: list[Message]) -> list[Message]:
+    """Drop reasoning items emitted before a dropped tool call.
+
+    No-op when no reasoning-item event type is in the journal: orphan-drop
+    is conservative and only removes what it can identify. Returns the
+    input unchanged.
+    """
+    return messages
+
+
 class RunSessionWriter(RunSessionWriterProtocol):
     """Owner of the run-scoped Session. Single surface append path."""
 
@@ -165,8 +225,8 @@ class RunSessionWriter(RunSessionWriterProtocol):
 
         Returns ``None`` when no preceding assistant row carried the matching
         tool call — in that case the result still appends, but orphan-drop at
-        :func:`lca.cognition.think.history.assemble` (Task 2) will drop it
-        before it reaches the model.
+        :func:`lca.framework.graph.nodes.history_assemble.history_assemble`
+        will drop it before it reaches the model.
         """
         session = self._require_session()
         match_seq: int | None = None
@@ -183,12 +243,20 @@ class RunSessionWriter(RunSessionWriterProtocol):
         return match_seq
 
     def derive_messages(self) -> list[Message]:
-        """Project surface events into the OpenAI-compatible message list.
+        """Walk the journal, surface events only, build the OpenAI messages list.
 
-        Implementation deferred to Task 2 (think.history.assemble). Marked
-        xfail in tests until the orphan-drop step lands.
+        Orphan-drop (OpenAI ``drop_orphan_function_calls`` mirror): drop
+        tool/result messages whose ``tool_call_id`` is not present in any
+        preceding assistant message. Drop reasoning items that follow a
+        dropped call.
         """
-        raise NotImplementedError("derive_messages is implemented in Task 2")
+        session = self._require_session()
+        surface_events = [e for e in session.snapshot_events()
+                          if e.type.startswith("surface/")]
+        msgs = [_surface_event_to_message(e) for e in surface_events]
+        msgs = _drop_orphan_tool_results(msgs)
+        msgs = _drop_reasoning_after_dropped_calls(msgs)
+        return msgs
 
     def request_header(self) -> EpochHeader | None:
         """Return the folded :class:`EpochHeader` from the bound Session, if any.

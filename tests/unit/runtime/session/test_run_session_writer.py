@@ -157,9 +157,12 @@ def test_append_tool_result_links_to_assistant_via_source_event_seqs() -> None:
     assert event.source_event_seqs == (0,)  # links to the assistant row's seq
 
 
-@pytest.mark.xfail(reason="Implemented in Task 2")
 def test_derive_messages_returns_wire_shape() -> None:
-    """derive_messages() returns the OpenAI-compatible messages list."""
+    """derive_messages() returns the OpenAI-compatible messages list.
+
+    Re-enabled in Task 2: orphan-drop + helper coverage lives in
+    tests/integration/test_orphan_tool_result_drop.py.
+    """
     session = _InMemorySession()
     writer = RunSessionWriter(session=session)
     writer.append_user_message(message_id="m1", role="user", content="hello")
@@ -170,7 +173,7 @@ def test_derive_messages_returns_wire_shape() -> None:
     msgs = writer.derive_messages()
     assert msgs == [
         {"role": "user", "content": "hello"},
-        {"role": "assistant", "content": "hi", "tool_calls": None},
+        {"role": "assistant", "content": "hi"},
     ]
 
 

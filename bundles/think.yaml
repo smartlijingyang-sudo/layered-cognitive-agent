@@ -31,6 +31,22 @@ nodes:
       emit_on_enter: []
       emit_on_exit:  []
 
+  - id: think.history.assemble
+    factory: think.history.assemble.ref
+    inputs: [response, state]
+    outputs: [model_visible_request]
+    config:
+      emit_on_enter: []
+      emit_on_exit:  []
+      # Spec §D: think.history.assemble runs immediately before llm.dispatch;
+      # it projects ModelVisibleRequest from RunSessionWriter with orphan-drop
+      # applied. T3 wires think.llm.dispatch + think.decision.parse and
+      # deletes think.reason.complete; T2 lands only the assemble node.
+      sub_spec_ref:
+        plan_ref: bundles/concept/history_assemble.yaml
+        entry_node: history.derive
+        binding_edge: think.history.assemble
+
   - id: think.classify
     factory: think.classify.ref
     inputs: [response]
@@ -77,10 +93,12 @@ edges:
     to: think.gate
     when: { kind: exists, port: { name: decision } }
 
-  # route → reason → classify → gate
+  # route → reason → history.assemble → classify → gate
   - from: think.route
     to: think.reason
   - from: think.reason
+    to: think.history.assemble
+  - from: think.history.assemble
     to: think.classify
   - from: think.classify
     to: think.gate
