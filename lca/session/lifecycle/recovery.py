@@ -70,7 +70,7 @@ def sync_run_status_from_recovery(session: _RunStatusMutable, recovery: LiveAgen
     status_map = {
         LiveAgentStatus.IDLE: RunLifecycleStatus.COMPLETED,
         LiveAgentStatus.WAITING_INPUT: RunLifecycleStatus.WAITING_INPUT,
-        LiveAgentStatus.DISPOSED: RunLifecycleStatus.CANCELED,
+        LiveAgentStatus.DISPOSED: RunLifecycleStatus.CANCELLED,
     }
     mapped = status_map.get(recovery.status)
     if mapped is not None:
