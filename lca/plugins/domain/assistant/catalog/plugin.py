@@ -25,7 +25,7 @@ from __future__ import annotations
 import json
 import uuid
 from collections.abc import Callable, Mapping
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 from typing import Any
 
@@ -129,7 +129,7 @@ class _AssistantCatalogImpl(AssistantCatalog):
         self._root = root
         self._root.mkdir(parents=True, exist_ok=True)
         self._emit = event_emitter
-        self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self._clock = clock or (lambda: datetime.now(UTC))
 
     # ── 公开面 ────────────────────────────────────────────────────────
 
