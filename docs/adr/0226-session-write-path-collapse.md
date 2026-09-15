@@ -157,12 +157,13 @@ Every consumer site listed in the inventory is migrated to the writer or deleted
 A new graph node `think.history.assemble` runs **immediately before** `think.llm.dispatch`:
 
 ```python
-async def assemble_history(state: AgentState, writer: RunSessionWriter) -> ModelVisibleRequest:
+async def assemble_history(state: AgentState, writer: RunSessionWriter, forked_tools: ForkedTools) -> ModelVisibleRequest:
     messages = writer.derive_messages()
     messages = _drop_orphan_tool_results(messages)
     messages = _drop_reasoning_after_dropped_calls(messages)
     system = (writer.request_header() or {}).get("system") or ""
-    return ModelVisibleRequest(messages=messages, system=system, tools=writer.tools())
+    tools = tuple(_tool_to_spec(t) for t in forked_tools.items) if forked_tools.items else ()
+    return ModelVisibleRequest(messages=messages, system=system, tools=tools)
 ```
 
 ```python

@@ -264,21 +264,5 @@ class RunSessionWriter(RunSessionWriterProtocol):
         session = self._require_session()
         return session.request_header()
 
-    def tools(self) -> tuple[dict[str, Any], ...]:
-        """Return per-run OpenAI tool specs (spec §E, ADR-0226 §4).
-
-        Tools are sourced from the per-run
-        :class:`ToolsService.fork_for_run(bindings).list_tools()` fork; the
-        boot-time binder seeds the underlying registry and the writer
-        reads it lazily on the first ``tools()`` call. Empty tuple is the
-        no-tools default for runs that don't materialize a fork (tests,
-        non-tool agents).
-
-        Wired in this PR as a typed-boundary seam. Per-turn materialization
-        (formerly in the retired ``phase.think.reason.complete`` plugin)
-        moves to the runtime loop in PR2 close-out.
-        """
-        return ()
-
 
 __all__ = ["RunSessionWriter", "SessionWriterUnboundError"]

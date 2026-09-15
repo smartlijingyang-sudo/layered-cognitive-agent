@@ -79,8 +79,8 @@ class HistoryDeriveExecutor:
 
     Spec §E: history.assemble projects the LLM-visible slice (messages +
     system + tools) from the typed-boundary inputs. ``tools`` comes from
-    the upstream ``ForkedTools`` (ADR-0220 §4 boundary DTO), NOT from
-    ``writer.tools()`` — that seam stayed a stub.
+    the upstream ``ForkedTools`` port (ADR-0220 §4 boundary DTO); the
+    writer owns the message stream, not the tool schema source.
     """
 
     semantic_name: str = "history.derive"

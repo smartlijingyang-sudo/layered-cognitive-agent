@@ -74,17 +74,5 @@ class RunSessionWriterProtocol(Protocol):
 
     def request_header(self) -> EpochHeader | None: ...
 
-    def tools(self) -> tuple[dict[str, Any], ...]:
-        """Return the per-run OpenAI tool specs for the next LLM call.
-
-        Spec §E + ADR-0226 §4: tools are sourced from the per-run
-        :class:`ToolsService` fork (see
-        :mod:`lca.infrastructure.capability.tools.tools.ToolsService.list_tools`).
-        This seam is the typed-boundary placeholder; the boot-time
-        binder populates the underlying registry via
-        ``fork_for_run(bindings)`` and the writer returns the static
-        tuple to the LLM call.
-        """
-
 
 __all__ = ["RunSessionWriterProtocol"]
