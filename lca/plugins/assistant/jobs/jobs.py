@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable, Mapping
-from datetime import datetime, timezone, UTC
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
