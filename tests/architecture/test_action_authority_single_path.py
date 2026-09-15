@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from lca.cognition.body import action_catalog
+from lca.cognition.body.actions import action_catalog
 from lca.cognition.body.actions.action_registry import ActionRegistry
 from lca.cognition.body.executor.safe_executor import SimpleSafeExecutor
 from lca.cognition.body.executor.simple_body import SimpleBody
