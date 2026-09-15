@@ -9,9 +9,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 
-from lca.contracts.observability.journal.errors import JournalWriteError
 from lca.infrastructure.observability.journal.step.reader import read_step_document
 from lca.plugins.session.derivers.step_tree import (
     StepTreeFoldDeriver,
