@@ -22,7 +22,6 @@ from lca.contracts.protocols.graph.binding import BindingKind
 from lca.contracts.protocols.graph.node_io import (
     NodeInput,
     NodeIOSchema,
-    NodeOutput,
     PortSpec,
 )
 from lca.contracts.protocols.graph.plan import Plan, PlanEdge, PlanNode, SubgraphReference
