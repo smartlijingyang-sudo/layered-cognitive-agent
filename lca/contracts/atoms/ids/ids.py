@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from typing import NewType
 
 # uuid4 hex 截取长度：12 位 hex = 48 bit 随机性，碰撞概率极低且 id 简短
@@ -37,7 +37,7 @@ SessionId = NewType("SessionId", str)
 
 def utc_now() -> datetime:
     """返回当前 UTC 时间（带 timezone）。"""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def new_id(prefix: str) -> str:
