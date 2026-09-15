@@ -23,7 +23,6 @@ if TYPE_CHECKING:
 
     from lca.contracts.harness.composition.composer import AgentGraph
     from lca.contracts.protocols.journal.spec.spec import AgentSpec
-    from lca.contracts.protocols.state.plan import CompiledRunPlan
 
 
 def assemble_runtime_from_graph(
