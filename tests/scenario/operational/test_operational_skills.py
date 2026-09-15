@@ -77,7 +77,7 @@ class TestZipSecurity(unittest.TestCase):
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w") as zf:
             zf.writestr("../evil.txt", "x")
-            zf.writestr("SKILL.md", "---\nname: t\ndescription: d\n---\nbody")
+            zf.writestr("SKILL.md", "---\nname: t\ndescription: d\nreferences: []\n---\nbody")
         with self.assertRaises(SkillImportError):
             extract_zip_bytes(buf.getvalue())
 
@@ -101,7 +101,7 @@ class TestDiskSkillPackageStore(unittest.TestCase):
     def test_install_and_read(self) -> None:
         package = self.store.install_package(
             skill_id="demo-skill",
-            skill_md_text="---\nname: demo\ndescription: summary\n---\n# Body",
+            skill_md_text="---\nname: demo\ndescription: summary\nreferences: []\n---\n# Body",
             resource_files={"REFERENCE.md": b"ref text"},
             source_url="https://example.com/skill.zip",
         )
@@ -130,7 +130,7 @@ class TestSkillsCapability(unittest.TestCase):
 
         package = service.current().install_package(
             skill_id="capability-demo",
-            skill_md_text="---\nname: capability demo\ndescription: seam\n---\nbody",
+            skill_md_text="---\nname: capability demo\ndescription: seam\nreferences: []\n---\nbody",
             resource_files={},
             source_url="file://capability-demo",
         )
@@ -161,7 +161,7 @@ class TestSkillTools(unittest.IsolatedAsyncioTestCase):
     async def test_import_from_market_mock(self) -> None:
         zip_bytes = _make_zip(
             {
-                "SKILL.md": "---\nname: pdf\ndescription: pdf ops\n---\nUse reportlab",
+                "SKILL.md": "---\nname: pdf\ndescription: pdf ops\nreferences: []\n---\nUse reportlab",
                 "REFERENCE.md": "# ref",
             }
         )
@@ -178,7 +178,7 @@ class TestSkillTools(unittest.IsolatedAsyncioTestCase):
     async def test_activate_and_read_reference(self) -> None:
         self.store.install_package(
             skill_id="demo",
-            skill_md_text="---\nname: demo\ndescription: d\n---\nDo work",
+            skill_md_text="---\nname: demo\ndescription: d\nreferences: []\n---\nDo work",
             resource_files={"tips.md": b"tip"},
             source_url="u",
         )
@@ -212,7 +212,7 @@ class TestSkillTools(unittest.IsolatedAsyncioTestCase):
     async def test_search_local_fallback(self) -> None:
         self.store.install_package(
             skill_id="pdf-helper",
-            skill_md_text="---\nname: pdf\ndescription: make pdf\n---\nbody",
+            skill_md_text="---\nname: pdf\ndescription: make pdf\nreferences: []\n---\nbody",
             resource_files={},
             source_url="u",
         )
@@ -237,7 +237,7 @@ class TestSkillTools(unittest.IsolatedAsyncioTestCase):
     async def test_tools_consume_importer_protocol_without_http_store_attribute(self) -> None:
         package = self.store.install_package(
             skill_id="protocol-demo",
-            skill_md_text="---\nname: protocol demo\ndescription: seam\n---\nbody",
+            skill_md_text="---\nname: protocol demo\ndescription: seam\nreferences: []\n---\nbody",
             resource_files={},
             source_url="u",
         )
