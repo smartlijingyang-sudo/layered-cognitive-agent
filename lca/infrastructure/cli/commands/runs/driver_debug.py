@@ -472,8 +472,14 @@ def cmd_debug_driver_chain(run_id: str, json_mode: bool) -> None:
             data = json.loads(manifest.read_text(encoding="utf-8"))
             started_at = data.get("started_at")
             closed_at = data.get("closed_at")
-        except Exception:
-            pass
+        except (OSError, ValueError) as exc:
+            # Without the window the chain below is printed unfiltered; say so
+            # instead of letting the output look like a normal filtered run.
+            typer.echo(
+                f"  ! cannot read {manifest} ({type(exc).__name__}: {exc}); "
+                f"no run-window filtering applied",
+                err=True,
+            )
     run_id_marker = run_id
     chain: list[DriverLogEntry] = []
     seen_run_marker = started_at is None
