@@ -12,7 +12,7 @@ Status: implemented
 
 ## Decision
 
-按 [ADR-0203](../../adr/0203-end-to-end-field-contract.md) 一次闭环两条平行漂移:
+按 [ADR-0203](../../../adr/0203-end-to-end-field-contract.md) 一次闭环两条平行漂移:
 
 ### Effect kind 闭集
 
@@ -121,7 +121,7 @@ Status: implemented
 
 ## 关联
 
-- [ADR-0203 端到端字段契约](../../adr/0203-end-to-end-field-contract.md) — 本 note 的根 ADR
-- [ADR-0185 §2.5 P5 args_digest deprecation 源](../../adr/0185-model-visible-event-bus-alignment.md)
-- [report_stateful_once_tools.md](../../../report_stateful_once_tools.md) — effect_kind 调研
-- [report_digest_inconsistency.md](../../../report_digest_inconsistency.md) — digest 调研
+- [ADR-0203 端到端字段契约](../../../adr/0203-end-to-end-field-contract.md) — 本 note 的根 ADR
+- [ADR-0185 §2.5 P5 args_digest deprecation 源](../../../adr/0185-model-visible-event-bus-alignment.md)
+- [report_stateful_once_tools.md](../../../../report_stateful_once_tools.md) — effect_kind 调研
+- [report_digest_inconsistency.md](../../../../report_digest_inconsistency.md) — digest 调研
