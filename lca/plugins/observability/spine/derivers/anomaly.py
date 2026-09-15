@@ -40,7 +40,7 @@ from __future__ import annotations
 
 import logging
 from collections import deque
-from datetime import datetime, timezone, UTC
+from datetime import UTC, datetime
 from typing import Any
 
 from lca.contracts.observability.canonical_digest import canonical_digest
