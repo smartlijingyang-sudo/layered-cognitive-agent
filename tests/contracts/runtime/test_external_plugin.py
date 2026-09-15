@@ -7,7 +7,6 @@ I-HPC-11.
 
 from __future__ import annotations
 
-import sys
 from typing import get_args
 
 import pytest

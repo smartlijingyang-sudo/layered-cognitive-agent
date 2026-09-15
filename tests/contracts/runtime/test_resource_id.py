@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import dataclasses
 import importlib
-import sys
 from collections.abc import Iterator
 
 import pytest
