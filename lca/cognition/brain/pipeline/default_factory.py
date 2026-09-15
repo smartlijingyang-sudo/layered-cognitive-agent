@@ -14,6 +14,7 @@ from lca.cognition.brain.pipeline.modular_brain import ModularBrain
 from lca.cognition.brain.reasoner.reasoner import PromptReasoner
 from lca.contracts.models.cognition.prompt_assembly import (
     PromptAssembler,
+    PromptSectionRegistry,
     PromptTemplateSelector,
 )
 from lca.contracts.models.team.role.team import RoleProfile
@@ -57,6 +58,7 @@ class SimpleBrainFactory:
         reflection_pipeline: CognitiveReflectionPipeline,
         assembler: PromptAssembler | None = None,
         selector: PromptTemplateSelector | None = None,
+        section_registry: PromptSectionRegistry | None = None,
     ) -> None:
         self._agent_gate_factory = agent_gate_factory
         self._classifier = classifier
@@ -64,6 +66,7 @@ class SimpleBrainFactory:
         self._reasoner_cls = reasoner_cls
         self._assembler = assembler
         self._selector = selector
+        self._section_registry = section_registry
         if not isinstance(think_pipeline, CognitiveThinkPipeline):
             raise TypeError(
                 "think_pipeline must implement CognitiveThinkPipeline, got "
@@ -91,6 +94,7 @@ class SimpleBrainFactory:
             llm,
             selector=self._selector,
             template_provider=template_provider,  # type: ignore[arg-type]
+            section_registry=self._section_registry,
         )
         return ModularBrain(
             reasoner=reasoner,

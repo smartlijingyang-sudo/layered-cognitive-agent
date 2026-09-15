@@ -16,6 +16,7 @@ from lca.contracts.capabilities import (
     COGNITIVE_REFLECTION_PIPELINE,
     COGNITIVE_THINK_PIPELINE,
     PROMPT_ASSEMBLER,
+    PROMPT_SECTION_REGISTRY,
     PROMPT_TEMPLATE_SELECTOR,
 )
 from lca.contracts.protocols import BrainFactory
@@ -33,6 +34,7 @@ STANDARD_COGNITIVE_BRAIN_FACTORY_REQUIREMENTS: tuple[str, ...] = (
     COGNITIVE_THINK_PIPELINE.key,
     COGNITIVE_REFLECTION_PIPELINE.key,
     PROMPT_ASSEMBLER.key,
+    PROMPT_SECTION_REGISTRY.key,
     PROMPT_TEMPLATE_SELECTOR.key,
 )
 """The complete, profile-selected dependency closure of the standard Brain."""
@@ -55,6 +57,7 @@ def build_standard_cognitive_brain_factory(ctx: PluginContext) -> BrainFactory:
         reasoner_cls=ctx.require("reasoner.prompt"),
         assembler=ctx.require(PROMPT_ASSEMBLER.key),
         selector=ctx.require(PROMPT_TEMPLATE_SELECTOR.key),
+        section_registry=ctx.require(PROMPT_SECTION_REGISTRY.key),
         think_pipeline=ctx.require(COGNITIVE_THINK_PIPELINE.key),
         reflection_pipeline=ctx.require(COGNITIVE_REFLECTION_PIPELINE.key),
     )
