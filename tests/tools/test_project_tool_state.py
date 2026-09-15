@@ -366,7 +366,7 @@ def test_skill_activate_observation_payload_is_flattened() -> None:
         store = DiskSkillPackageStore(settings)
         store.install_package(
             skill_id="demo",
-            skill_md_text="---\nname: demo\ndescription: d\n---\nDo work",
+            skill_md_text="---\nname: demo\ndescription: d\nreferences: []\n---\nDo work",
             resource_files={"tips.md": b"tip"},
             source_url="u",
         )
