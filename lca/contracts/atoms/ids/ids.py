@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone, UTC
+from datetime import UTC, datetime
 from typing import NewType
 
 # uuid4 hex 截取长度：12 位 hex = 48 bit 随机性，碰撞概率极低且 id 简短
