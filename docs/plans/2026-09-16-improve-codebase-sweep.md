@@ -28,7 +28,7 @@ in this sweep (per `.agents/skills/lca-improve-codebase/SKILL.md` §Reject when)
 - **`scripts/lca-inspect-plan.py`, `scripts/e2e_smoke_test.py`,
   `scripts/snapshot_capability_tree.py`.** All three import the deleted
   `lca.harness.composition.plan_compiler` *and* read `plan.phase_graph` /
-  `plan.phase_bindings`, which no longer exist on `CompiledRunPlan`. Fixing the
+  `plan.phase_bindings`, which `CompiledRunPlan` does not expose. Fixing the
   import alone leaves each crashing a few lines later, so there is no bounded
   unit here — the candidate is "re-render these three tools onto
   `V2ExecutablePlan.graph_spec`", which is a 1–3 PR plan, not a sweep unit.
@@ -62,17 +62,17 @@ in this sweep (per `.agents/skills/lca-improve-codebase/SKILL.md` §Reject when)
 - **`tests/scenario/llm_0/test_llm_failover.py` (2 sites in
   `tests/scenario/plugin/test_plugin_wiring_e2e.py` too).** Reference
   `lca.plugins.think.llm…` / `lca.plugins.loop.state.stop_policy.plugin`, both
-  gone: `lca/plugins/think/` now has `cognitive|composition|loop|null|reasoner|system`
+  gone: `lca/plugins/think/` holds `cognitive|composition|loop|null|reasoner|system`
   and StopPolicy was retired (docs/plans/2026-09-14-stop-decision-retirement.md).
   Each is a "does this guard still have a subject?" decision.
 - **`tests/infrastructure/cli/test_kernel_serve_probe_lan.py`.** Targets a
-  module-level `_probe_lan` that no longer exists; the current code has
+  module-level `_probe_lan`, a symbol the package does not define; the current code has
   `KernelSupervisor._probe_health`. The test's own header says it was rewritten
   for the module-level function, so reviving it means re-deriving what the LAN
-  fail-fast behavior is now — not an import fix.
+  fail-fast behavior turns out to be — not an import fix.
 - **`tests/infrastructure/test_assistant_merged_skill_store.py` sibling
   `tests/scenario/operational/...::test_file_write_rejects_unwritable_path_as_execution`.**
-  Surfaces only because the module now collects: it asserts a `write_file` to
+  Visible only because the module collects: it asserts a `write_file` to
   `/mnt/data/some-file.py` fails, and the shipped path returns `success=True`.
   Real behavior question (path policy), left failing rather than adjusted.
 - **`profiles/*.yaml: id: lca-llm-resolver` (5+ profiles).**
