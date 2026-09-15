@@ -23,16 +23,35 @@ from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.nodes.think.budget_check import ThinkBudgetCheckExecutor
 
 
-def _ctx() -> NodeContext:
-    """Minimal NodeContext; budget.check node does not read runtime."""
-    return NodeContext(runtime={}, budget={}, metadata={})
-
-
 @dataclass
 class _StateStub:
     """Typed mock for ``AgentState`` exposing only ``budget``."""
 
     budget: Budget
+
+
+class _RuntimeView:
+    """Minimal duck-typed stand-in for ``_NodeRuntimeView``.
+
+    The real kernel-side ``_NodeRuntimeView`` exposes ``state`` as a
+    property forwarding the outer ``AgentState`` plus a capability
+    scope. The budget check node only reads ``state``, so this stub
+    keeps the test surface narrow.
+    """
+
+    __slots__ = ("_state",)
+
+    def __init__(self, state: _StateStub | None) -> None:
+        object.__setattr__(self, "_state", state)
+
+    @property
+    def state(self):
+        return self._state
+
+
+def _ctx(state: _StateStub | None = None) -> NodeContext:
+    """Minimal NodeContext; budget.check reads ``runtime.state``."""
+    return NodeContext(runtime=_RuntimeView(state), budget={}, metadata={})
 
 
 def _state(budget: Budget) -> _StateStub:
@@ -52,8 +71,8 @@ async def test_budget_check_under_caps_continues_to_compact() -> None:
         used_steps=1,
     )
     output = await executor.node_execute(
-        _ctx(),
-        NodeInput(port_values={"state": _state(budget)}),
+        _ctx(_state(budget)),
+        NodeInput(port_values={}),
     )
     routing: RoutingDecision = output.port_values["routing"]
     assert routing.next_node == "think.context.compact"
@@ -74,8 +93,8 @@ async def test_budget_check_max_steps_exceeded_routes_to_terminal_commit() -> No
         used_steps=4,
     )
     output = await executor.node_execute(
-        _ctx(),
-        NodeInput(port_values={"state": _state(budget)}),
+        _ctx(_state(budget)),
+        NodeInput(port_values={}),
     )
     routing: RoutingDecision = output.port_values["routing"]
     assert routing.next_node == "terminal.commit"
@@ -97,8 +116,8 @@ async def test_budget_check_max_tokens_exceeded_routes_to_terminal_commit() -> N
         used_steps=0,
     )
     output = await executor.node_execute(
-        _ctx(),
-        NodeInput(port_values={"state": _state(budget)}),
+        _ctx(_state(budget)),
+        NodeInput(port_values={}),
     )
     routing: RoutingDecision = output.port_values["routing"]
     assert routing.next_node == "terminal.commit"
@@ -123,14 +142,15 @@ async def test_budget_check_is_idempotent() -> None:
         used_cost_usd=0.0,
         used_steps=1,
     )
-    node_input = NodeInput(port_values={"state": _state(budget)})
+    state = _state(budget)
+    node_input = NodeInput(port_values={})
 
-    out_a = await ThinkBudgetCheckExecutor().node_execute(_ctx(), node_input)
-    out_b = await ThinkBudgetCheckExecutor().node_execute(_ctx(), node_input)
+    out_a = await ThinkBudgetCheckExecutor().node_execute(_ctx(state), node_input)
+    out_b = await ThinkBudgetCheckExecutor().node_execute(_ctx(state), node_input)
     assert out_a.port_values["routing"] == out_b.port_values["routing"]
 
-    out_c = await ThinkBudgetCheckExecutor().node_execute(_ctx(), node_input)
-    out_d = await ThinkBudgetCheckExecutor().node_execute(_ctx(), node_input)
+    out_c = await ThinkBudgetCheckExecutor().node_execute(_ctx(state), node_input)
+    out_d = await ThinkBudgetCheckExecutor().node_execute(_ctx(state), node_input)
     assert out_c.port_values["routing"] == out_d.port_values["routing"]
 
 
@@ -152,8 +172,8 @@ async def test_budget_check_first_exceeded_resource_wins() -> None:
         used_steps=2,
     )
     output = await executor.node_execute(
-        _ctx(),
-        NodeInput(port_values={"state": _state(budget)}),
+        _ctx(_state(budget)),
+        NodeInput(port_values={}),
     )
     routing: RoutingDecision = output.port_values["routing"]
     assert routing.next_node == "terminal.commit"
@@ -162,10 +182,21 @@ async def test_budget_check_first_exceeded_resource_wins() -> None:
 
 @pytest.mark.asyncio
 async def test_budget_check_rejects_non_budget_state() -> None:
-    """Missing or wrong-type ``state.budget`` must fail loudly, not silently pass."""
+    """Wrong-type ``state.budget`` must fail loudly, not silently pass."""
     executor = ThinkBudgetCheckExecutor()
     with pytest.raises(TypeError):
         await executor.node_execute(
-            _ctx(),
-            NodeInput(port_values={"state": object()}),
+            _ctx(_StateStub(budget=object())),  # type: ignore[arg-type]
+            NodeInput(port_values={}),
+        )
+
+
+@pytest.mark.asyncio
+async def test_budget_check_rejects_missing_runtime_state() -> None:
+    """``context.runtime.state`` must be present; fail closed, not silent ok."""
+    executor = ThinkBudgetCheckExecutor()
+    with pytest.raises(RuntimeError, match="context.runtime.state"):
+        await executor.node_execute(
+            _ctx(None),
+            NodeInput(port_values={}),
         )

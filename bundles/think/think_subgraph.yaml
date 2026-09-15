@@ -13,6 +13,7 @@ nodes:
     factory: think.shortcut
     inputs: [in_assembled_manifest]
     outputs: [decision]
+    entry: true
     config:
 
   - id: think.route.decide
@@ -23,24 +24,42 @@ nodes:
 
   # PR-3.8.1: budget gate sits between ``think.route.decide`` and the
   # miss-path reasoning chain. Reads ``state.budget`` and either stops
-  # the run (route to ``terminal.commit``) or continues to
-  # ``think.context.compact`` (re-wired by PR-3.8.2 once the
-  # compaction node exists). Honors ADR-0225 (no per-node max_visits).
+  # the run (subgraph terminates here, ``routing.should_terminate=true``
+  # bubbles up to ``phase.main.outer`` which routes ``think.main`` →
+  # ``terminal.commit``) or continues to ``think.context.compact``
+  # (re-wired by PR-3.8.2 once the compaction node exists).
+  #
+  # Not marked ``terminal: true``: this node has one conditional
+  # outgoing edge (→ think.context.compact on should_terminate=false)
+  # and the lift-time validator forbids outgoing edges on terminal
+  # nodes. Termination is edge-driven per ADR-0217 D4 — when the
+  # executor emits ``should_terminate=true`` the only edge's predicate
+  # does not match, ``select_edge`` returns ``None``, and
+  # ``traversal.advance(edge=None)`` terminates the plan. The
+  # think.subgraph terminates cleanly via ``think.gate`` on the
+  # normal path (also edge-driven via no outgoing edges).
+  #
+  # Honors ADR-0225 (no per-node max_visits).
   - id: think.budget.check
     factory: think.budget.check
-    inputs: [state]
+    # state lives on context.runtime (mirrors think.shortcut), not on
+    # the port registry — the executor reads it from
+    # context.runtime.state directly.
     outputs: [routing]
     config:
 
   # PR-3.8.2: typed-boundary context-compaction node. Reads ``writer``
-  # + ``state`` and emits a ``CompactReceipt`` plus a
-  # ``RoutingDecision``. Threshold gate (``used_tokens / max_tokens
-  # >= 0.7``) selects between the noop and ``truncate_oldest`` paths;
-  # the node never raises out of the graph (error path produces an
-  # empty receipt + a ``compact_skipped_error`` re-route).
+  # + ``state`` from ``context.runtime`` (mirrors history.derive pattern)
+  # and emits a ``CompactReceipt`` plus a ``RoutingDecision``. Threshold
+  # gate (``used_tokens / max_tokens >= 0.7``) selects between the noop
+  # and ``truncate_oldest`` paths; the node never raises out of the graph
+  # (error path produces an empty receipt + a ``compact_skipped_error``
+  # re-route).
   - id: think.context.compact
     factory: think.context.compact
-    inputs: [writer, state]
+    # writer and state live on context.runtime (mirrors history.derive),
+    # not on the port registry — the executor reads them from
+    # context.runtime via _resolve_port.
     outputs: [compact_receipt, routing]
     config:
 
@@ -166,18 +185,22 @@ edges:
       kind: eq
       port: { name: routing, field: should_terminate }
       value: false
-  - from: think.budget.check
-    to: terminal.commit
-    when:
-      kind: eq
-      port: { name: routing, field: should_terminate }
-      value: true
-  # PR-3.8.2: context.compact routes to history.assemble on success
+  # When ``routing.should_terminate=true`` no outgoing edge from
+  # ``think.budget.check`` matches; the subgraph terminates naturally
+  # via ``traversal.advance(edge=None)``. The outer ``phase.main.outer``
+  # reads the bubbled ``routing`` port from ``think.main`` and routes
+  # to ``terminal.commit``. We deliberately do NOT wire to
+  # ``terminal.commit`` here — that node is declared in
+  # ``bundles/outer/phase_main.yaml``, not in this subgraph, and a
+  # cross-subgraph edge fails the ``Plan._one_entry`` validator
+  # (``terminal.commit`` is unknown in the inner node set). See
+  # ``tests/unit/test_think_budget_check_wiring.py`` for the pin.
+  # PR-3.8.2: context.compact routes to think.route on success
   # or noop (OR'd predicate over ``next_hint``), and re-routes to
   # ``think.route.decide`` on the error path so Gate can fail-loud
   # downstream.
   - from: think.context.compact
-    to: think.history.assemble
+    to: think.route
     when:
       kind: in
       port: { name: routing, field: next_hint }

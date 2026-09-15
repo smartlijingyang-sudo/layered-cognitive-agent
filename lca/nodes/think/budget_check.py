@@ -87,7 +87,11 @@ class ThinkBudgetCheckExecutor:
 
     semantic_name: str = "think.budget.check"
     region: str = "phase:think"
-    declared_inputs: tuple[PortName, ...] = ("state",)
+    # ``state`` is a runtime carrier, not a typed-port payload — it lives
+    # on ``context.runtime.state`` (mirroring ``think.shortcut``) rather
+    # than on the port registry. ``declared_inputs`` is empty; the
+    # node has no typed-port inputs.
+    declared_inputs: tuple = ()
     declared_outputs: tuple[PortName, ...] = ("routing",)
 
     async def node_execute(
@@ -97,21 +101,30 @@ class ThinkBudgetCheckExecutor:
     ) -> NodeOutput:
         """think 子图节点入口。
 
-        inputs 端口(yaml): state
         outputs 端口(yaml): routing
 
-        Reads ``state.budget`` (``Budget`` dataclass). If any cap is
-        exceeded, emits ``RoutingDecision(next_node="terminal.commit",
-        should_terminate=True, next_hint="budget_exceeded_<resource>")``.
-        Otherwise emits
+        Reads ``state.budget`` (``Budget`` dataclass) from
+        ``context.runtime.state`` (kernel-supplied runtime view). If any
+        cap is exceeded, emits
+        ``RoutingDecision(next_node="terminal.commit", should_terminate=True,
+        next_hint="budget_exceeded_<resource>")``. Otherwise emits
         ``RoutingDecision(next_node="think.context.compact",
         should_terminate=False, next_hint="budget_ok")``.
 
-        Pure function of the ``state`` port. No env / time reads at the
-        node layer; ``Budget.exceeded`` is the SSOT cap check.
+        Pure function of the runtime ``state``. No env / time reads at
+        the node layer; ``Budget.exceeded`` is the SSOT cap check.
         """
-        del context  # unused: pure function of input ports
-        state = input.port_values.get("state")
+        del input  # unused: state comes from runtime
+        state = getattr(context.runtime, "state", None)
+        if state is None:
+            # No runtime state available — fail closed. Budget reads
+            # must always be deterministic; falling through to "ok"
+            # silently would let unbounded runs accumulate.
+            raise RuntimeError(
+                "think.budget.check requires context.runtime.state; "
+                "got None — kernel did not seed AgentState into the "
+                "runtime view"
+            )
         budget = _extract_budget(state)
 
         if budget.exceeded(resource=None):

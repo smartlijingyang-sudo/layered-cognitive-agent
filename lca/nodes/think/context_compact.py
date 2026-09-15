@@ -71,7 +71,12 @@ class ThinkContextCompactExecutor:
 
     semantic_name: str = "think.context.compact"
     region: str = "phase:think"
-    declared_inputs: tuple[PortName, ...] = ("writer", "state")
+    # ``writer`` and ``state`` are kernel-injected runtime ports, not
+    # produced by graph predecessors. They're read from ``context.runtime``
+    # via ``_resolve_port``, mirroring the history.derive pattern.
+    # Declared outputs only — the node has no typed-port inputs from the
+    # port registry.
+    declared_inputs: tuple[PortName, ...] = ()
     declared_outputs: tuple[PortName, ...] = ("compact_receipt", "routing")
 
     async def node_execute(
@@ -96,9 +101,8 @@ class ThinkContextCompactExecutor:
         ``next_hint="compact_skipped_error"``. The graph never sees
         a raised exception out of this node.
         """
-        del context  # unused: pure function of the (writer, state) ports
-        writer = input.port_values.get("writer")
-        state = input.port_values.get("state")
+        writer = _resolve_port("writer", input=input, context=context)
+        state = _resolve_port("state", input=input, context=context)
 
         if writer is None:
             # Missing writer: typed-boundary contract fails loud — an
@@ -224,6 +228,22 @@ def _extract_budget(state: object) -> Budget:
             f"Budget attribute on .budget; got {type(budget_obj).__name__}"
         )
     return budget_obj
+
+
+def _resolve_port(name: str, *, input: NodeInput, context: NodeContext) -> Any:
+    """Read a declared port from ``input.port_values`` or ``context.runtime``.
+
+    Mirrors the history.derive convention: runtime is a namespace object;
+    resolve by attribute first, then mapping-style .get. This allows
+    kernel-injected ports (state, writer) to bypass the port registry
+    while keeping the typed-port contract at the node layer.
+    """
+    value = input.port_values.get(name)
+    if value is None and hasattr(context, "runtime") and context.runtime is not None:
+        value = getattr(context.runtime, name, None)
+        if value is None and hasattr(context.runtime, "get"):
+            value = context.runtime.get(name)
+    return value
 
 
 def _extract_context_payload(state: object) -> tuple[Any, ...]:

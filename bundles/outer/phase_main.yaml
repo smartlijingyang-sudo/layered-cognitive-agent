@@ -48,7 +48,15 @@ nodes:
     # positional translation maps inner_outputs[0] to the outer
     # ``decision`` port. terminal.commit and act.main read this
     # port via the kernel-wide port registry.
-    declared_outputs: [decision]
+    #
+    # ``routing`` is the typed ``RoutingDecision`` from whichever inner
+    # node terminates the subgraph — ``think.gate`` on the normal path
+    # (``should_terminate=false``) or ``think.budget.check`` when the
+    # budget gate trips (``should_terminate=true``). Forwarding it
+    # here lets the outer edges below distinguish "the think phase
+    # answered" from "the think phase stopped because budget ran out"
+    # without leaking inner node ids into the outer plan.
+    declared_outputs: [decision, routing]
 
   - id: act.main
     region: phase:act
@@ -188,6 +196,17 @@ edges:
       children:
         - { kind: eq, port: { name: decision, field: action_type }, value: respond }
         - { kind: ne, port: { name: decision, field: response_text }, value: "" }
+
+  # PR-3.8.1: think → terminal.commit when think.budget.check trips
+  # (``routing.should_terminate=true``). Precedes the
+  # ``decision.action_type == respond`` edge above so a budget-stopped
+  # run never loops back through act on a stale use_tool decision.
+  - from: think.main
+    to: terminal.commit
+    when:
+      kind: eq
+      port: { name: routing, field: should_terminate }
+      value: true
 
   # act → think on USE_TOOL (the re-ask-model loop).
   - from: act.main
