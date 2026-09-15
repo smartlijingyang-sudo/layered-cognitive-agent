@@ -15,7 +15,7 @@ from unittest.mock import MagicMock
 
 from lca.contracts.observability.registry.status import RunLifecycleStatus
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession
-from lca.plugins.transport.webserver.handlers.runs.terminal import registry_commands
+from lca.plugins.transport.webserver.handlers.runs.terminal.registry import commands as registry_commands
 
 if TYPE_CHECKING:
     import pytest
