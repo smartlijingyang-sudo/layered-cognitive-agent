@@ -105,11 +105,11 @@ class LabCarrier:
 
 ## Related
 
-- [ADR-0210](../adr/0210-stage-closure-migration-p7.md) — P7 实施 ADR（**Required follow-up** for ADR-0206 Accepted）
-- [ADR-0206 §10 P7](../adr/0206-information-graph-kernel.md) — P7 原始定义
-- [ADR-0075](../adr/0075-declarative-phase-graph-and-minimal-trusted-kernel.md) — Superseded by 0210 (P7 partial)
-- [ADR-0194](../adr/0194-cognitive-loop-architecture-convergence.md) — Superseded by 0210 (P7 partial)
-- [ADR-0209](../adr/0209-agent-lab-cordis-unification.md) — PR-D final 2/2 已落实 89 个 carrier（region 标签落地）
+- [ADR-0210](../../../adr/0210-stage-closure-migration-p7.md) — P7 实施 ADR（**Required follow-up** for ADR-0206 Accepted）
+- [ADR-0206 §10 P7](../../../adr/0206-information-graph-kernel.md) — P7 原始定义
+- [ADR-0075](../../../adr/0075-declarative-phase-graph-and-minimal-trusted-kernel.md) — Superseded by 0210 (P7 partial)
+- [ADR-0194](../../../adr/0194-cognitive-loop-architecture-convergence.md) — Superseded by 0210 (P7 partial)
+- [ADR-0209](../../../adr/0209-agent-lab-cordis-unification.md) — PR-D final 2/2 已落实 89 个 carrier（region 标签落地）
 - [Note 2026-09-09-lab-cordis-unification-landing.md](2026-09-09-lab-cordis-unification-landing.md) — 0209 落地状态镜像
 - `scripts/generate_lab_carriers.py` — 89 个 carrier 的 generator（`stage` 字段 = region 标签）
 
