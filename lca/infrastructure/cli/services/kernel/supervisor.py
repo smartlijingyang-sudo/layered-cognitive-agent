@@ -1169,10 +1169,9 @@ class KernelSupervisor:
         self._state_changed = threading.Event()  # reset for next waiter
 
     def _emit(self, ev: ProgramEvent) -> None:
-        try:
-            self._events.put_nowait(ev)
-        except queue.Full:  # pragma: no cover — deque with no maxlen
-            pass
+        # ``queue.Queue()`` is constructed with the default ``maxsize=0``, i.e.
+        # unbounded, so ``put_nowait`` cannot raise ``queue.Full``.
+        self._events.put_nowait(ev)
 
     def _state_lock(self) -> threading.Lock:
         """Single mutex for the small mutable state. Status reads +
