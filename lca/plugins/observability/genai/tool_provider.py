@@ -64,4 +64,4 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     provided by ``lca-genai-semantic-mapper-seam``; nothing reads from
     it post-ADR-0192 (Session observers own GenAI attribute emission).
     """
-    return None  # noqa: PLR1711 — explicit no-op for static analysers
+    return None  # explicit no-op for static analysers
