@@ -22,7 +22,6 @@ so the test plugin mocks build just enough of that shape.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from typing import Any
 from unittest.mock import MagicMock
 
