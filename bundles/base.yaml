@@ -562,3 +562,11 @@ entries:
   name: lca_nodes_intervene_interrupt
   $module: lca.nodes.intervene.interrupt
   config: {}
+# PR-3.8.6: act.approve.gate is the act-side typed view of the HITL
+# pause/resume seam (ADR-0228 §Decision 4 + borrowed-nodes spec §2.6).
+# Lives under region:intervene (sibling subgraph, not a 7th phase);
+# reads decision + command ports; emits decision + routing ports.
+- id: lca.nodes.intervene.approve_gate
+  name: lca_nodes_intervene_approve_gate
+  $module: lca.nodes.intervene.approve_gate
+  config: {}
