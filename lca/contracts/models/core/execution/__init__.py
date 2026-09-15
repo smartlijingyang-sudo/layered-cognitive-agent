@@ -2,4 +2,4 @@
 
 from lca.contracts.models.core.execution.verdict import VERDICT_SCHEMA_VERSION, Verdict
 
-__all__ = ["VERDICT_SCHEMA_VERSION", "Verdict"]  # noqa: RUF022
+__all__ = ["VERDICT_SCHEMA_VERSION", "Verdict"]
