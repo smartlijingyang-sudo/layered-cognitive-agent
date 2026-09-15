@@ -1,4 +1,4 @@
-"""Session-required publish helper(ADR-0183)。
+"""Session-required publish helper(ADR-0183 / spec section H).
 
 publisher 单点入口走 ``Session.append``;调用方必须先经
 :func:`set_publish_session` / run bind 绑定 Session。无 active Session
@@ -11,13 +11,15 @@ publisher 单点入口走 ``Session.append``;调用方必须先经
   (ref.category / ref.event_id)。
 - Session 与 EventBus 共用 ``EventRegistry.can_publish``(S1);在
   ``session.append`` 前鉴权,避免 active Session 绕过授权。
-- ContextVar 隔离:Session 跨 asyncio.Task/copy_context 不串。
+- 绑定状态:本模块采用 module-level 变量承载 active Session(SPEC section H
+  删除 ``_current_session`` ContextVar 后;Task 5 删除该 ContextVar,后续 Task
+  把 binding 边界迁到 Body / Run 启动显式注入)。set/reset 仍可调,但仅
+  用于 in-process 测试;生产 run 边界走 Body 注入。
 """
 
 from __future__ import annotations
 
-import contextvars
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
     from lca_kernel.events.bus.bus import EventRef
@@ -40,7 +42,7 @@ def _authorize_producer(payload: Any, producer: Any) -> None:
     if category is None or producer_cls is None:
         return
     registry = bus.registry
-    if not registry.can_publish(cast("type | str", producer_cls), category):
+    if not registry.can_publish(producer_cls, category):
         identifier = getattr(producer_cls, "__name__", str(producer_cls))
         cat_value = getattr(category, "value", category)
         raise UnauthorizedPublishError(identifier, cat_value)
@@ -64,42 +66,35 @@ class _PublishSession(Protocol):
     ) -> EventRef: ...
 
 
-_current_session: contextvars.ContextVar[_PublishSession | None] = contextvars.ContextVar(
-    "lca_publish_session",
-    default=None,
-)
-"""当前上下文的 active Session。
-
-wiring 层通过 :func:`set_publish_session` 在 run / request 边界 set,
-离开时 reset。无 Session 时 ``publish_via_session`` 抛 ``RuntimeError``。
-contextvars 随 asyncio.Task / copy_context 隔离,跨 run 不串。
-"""
+# Module-level state (SPEC section H: replaced ContextVar ``_current_session``).
+# 在 Task 7 Body 注入完成后,本 binding 转为 deprecated;目前保留以让现有测试
+# fixture (``set_publish_session(session)``) 仍可调,不留空白失败。
+_ACTIVE_SESSION: _PublishSession | None = None
 
 
 def set_publish_session(
     session: object | None,
-) -> contextvars.Token[_PublishSession | None]:
-    """设置当前上下文的 active Session;返回 token 供 reset。
+) -> Any:
+    """设置当前上下文的 active Session。
 
-    runtime :class:`~lca.session.append.Session` 自动包成
-    bus Protocol facade；已是 ``append(payload, *, producer)`` 形态的对象
-    原样装载。
+    SPEC section H:_current_session ContextVar 已删除;本函数保留 module-level
+    binding 以兼容现有 ``tests/transport/`` 等 fixture;调用方需自行保证
+    单 run 单上下文语义。返回 ``None``(不再返回 reset token,因无 ContextVar)。
     """
     from lca.plugins.session.runtime.bus.facade import as_bus_facade
 
-    return _current_session.set(cast("_PublishSession | None", as_bus_facade(session)))
+    global _ACTIVE_SESSION
+    _ACTIVE_SESSION = as_bus_facade(session)
+    return None
 
 
 def reset_publish_session(
-    token: contextvars.Token[_PublishSession | None],
+    token: Any,
 ) -> None:
-    """用 set_publish_session 返回的 token 恢复 active Session。"""
-    _current_session.reset(token)
-
-
-def current_publish_session() -> _PublishSession | None:
-    """读当前上下文的 active Session;未设置返回 None。"""
-    return _current_session.get()
+    """释放 ``set_publish_session`` 绑定的 Session(token 参数 deprecated)。"""
+    del token
+    global _ACTIVE_SESSION
+    _ACTIVE_SESSION = None
 
 
 def publish_via_session(
@@ -115,18 +110,18 @@ def publish_via_session(
     - ``producer``:publisher plugin class(EventBus 鉴权用)。
 
     返回:
-    :class:`EventRef`——``Session.append`` 回执（runtime Session 由 bus
-    facade 从 SessionEvent 合成）。
+    :class:`EventRef``——``Session.append`` 回执(runtime Session 由 bus
+    facade 从 SessionEvent 合成)。
 
     抛出:
-    ``MissingPublishSessionError``——当前上下文未绑定 Session(须先
+    ``MissingPublishSessionError``——未绑定 Session(须先
     :func:`set_publish_session` / run bind)。属 ``EventMechanismError``
-    族：装饰性 transport emit 可吞；业务 publish 仍 fail-loud。
+    族:装饰性 transport emit 可吞;业务 publish 仍 fail-loud。
     ``UnauthorizedPublishError``——S1 registry 拒绝该 producer/category。
     """
     from lca_kernel.events.errors.errors import MissingPublishSessionError
 
-    session = _current_session.get()
+    session = _ACTIVE_SESSION
     if session is None:
         raise MissingPublishSessionError()
     _authorize_producer(payload, producer)
@@ -134,7 +129,6 @@ def publish_via_session(
 
 
 __all__ = [
-    "current_publish_session",
     "publish_via_session",
     "reset_publish_session",
     "set_publish_session",

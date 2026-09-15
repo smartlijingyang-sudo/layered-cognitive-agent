@@ -5,8 +5,9 @@
 挂在 LLM adapter 装饰器链（PR-3 装配；PR-2 仅实现类，不主动注册），每次真实
 LLM 调用前后:
 
-1. ``capture_pre_llm(kwargs, prompt)``
-   - 从 :func:`get_current_cursor` + :func:`get_current_reasoner_prompt` 拿真值
+1. ``capture_pre_llm(kwargs, system_prompt_text, cursor)``
+   - 从 caller 显式传入 system_prompt_text + cursor(spec section H
+     ContextVar 删除;无 ContextVar 回退)
    - canonicalHeader 归一化 + headerEquals fold 优化（ADR-0185 §3.5）
    - fold 命中（同 header 且非 resume）→ 跳过 publish
    - 否则 publish :class:`SpineLlmRequestHeaderPayload`,``producer=ModelVisiblePublisher``
@@ -20,7 +21,8 @@ LLM 调用前后:
 透明降级(对齐 ADR-0169 D5 / L10):
 
 - cursor 缺席 → ``capture_pre_llm`` / ``capture_post_llm`` 直接返回
-- prompt 缺席 → ``capture_pre_llm`` 直接返回（旧 capture 走同样路径）
+- system_prompt_text 为空字符串 → ``capture_pre_llm`` 仍 publish(空
+  system 归一化为 absent;对齐 ADR-0185 §3.5 canonicalHeader)
 - 任一 publish 抛错 → 吞错 + log,绝不挡业务(L10)
 
 ADR-0185 PR-4 收口:旧 capture / LLM 装饰器路径全部删除,本 hook
@@ -40,7 +42,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Any
 
 from lca.contracts.observability.cursor.loop_cursor_payloads import ToolSchema
@@ -52,10 +54,6 @@ from lca_kernel.events.payloads.model_visible import (
 )
 
 if TYPE_CHECKING:
-    from lca.contracts.observability.cursor.loop_cursor import LoopCursor
-    from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
-        CurrentReasonerPrompt,
-    )
     from lca_kernel.events.bus.bus import EnvelopeBus, EventRef
 
 _log = logging.getLogger(__name__)
@@ -157,12 +155,10 @@ class ModelVisibleHook:
         self,
         *,
         bus: EnvelopeBus[Any],
-        cursor_provider: Callable[[], LoopCursor | None],
-        prompt_ctx_getter: Callable[[], CurrentReasonerPrompt | None],
     ) -> None:
         self._bus = bus
-        self._cursor_provider = cursor_provider
-        self._prompt_ctx_getter = prompt_ctx_getter
+        # spec section H ContextVar deletion: cursor + system_prompt_text
+        # are explicit args on capture_pre_llm; no ContextVar-backed providers.
         self._last_headers: dict[tuple[str, str], EpochHeader] = {}
         self._resume_run_step: set[tuple[str, str]] = set()
         # step 边界单源(SSOT):本地计数器,每次 capture_pre_llm publish
@@ -217,6 +213,7 @@ class ModelVisibleHook:
         run_id: str,
         incarnation: int,
         kwargs: Mapping[str, Any],
+        system_prompt_text: str | None,
     ) -> EventRef | None:
         """LLM 调用前:fold 优化 + publish ``spine.llm.request.header``(SSOT step 边界)。
 
@@ -225,25 +222,25 @@ class ModelVisibleHook:
             incarnation: cursor.snapshot.incarnation。
             kwargs: LLM adapter 调用的 kwargs;读 ``config`` / ``tools`` /
                 ``messages`` / ``manifest`` / ``system``(若 model 注入)。
+            system_prompt_text: caller 显式传入的 system prompt(原
+                Reasoner 渲染结果);spec section H:无 ContextVar push,
+                adapter 从 LLM kwargs 取出后传进来。空 / None → 仍 publish
+                (system 字段归一为 absent)。
 
         Returns:
-            ``EventRef`` 或 ``None``(透明降级 / fold 跳过)。
+            ``EventRef`` 或 ``None``(fold 跳过)。
 
         失败语义:
 
-        - cursor 缺席 / prompt 缺席 → 透明降级,返回 ``None``,不发盘。
         - fold 命中(headerEquals(prev, current) 且非 resume)→ 跳过,返回 ``None``。
         - payload 构造 / publish 抛错 → 吞错 + log(warning),返回 ``None``(L10)。
         - publish 成功 → ``self._step_counter`` 自增(纯内存);fold 跳过
           分支不增(同 step 重试 attempt,不新开步)。
         """
-        prompt = self._prompt_ctx_getter()
-        if prompt is None:
-            return None
+        system_text = system_prompt_text or ""
 
         self._step_counter += 1
         step_id = _step_id_for(self._step_counter)
-        system_text = prompt.system_prompt_text or ""
 
         current = EpochHeader(
             config=kwargs.get("config"),

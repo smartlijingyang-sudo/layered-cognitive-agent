@@ -11,7 +11,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 from collections.abc import Sequence
-from contextvars import Token
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -33,9 +32,10 @@ RunStatus = RunLifecycleStatus
 from lca.contracts.protocols import JournalProjector
 from lca.infrastructure.observability import BoundObservability
 from lca.infrastructure.observability.facade.run.ambit import RunAmbit
-from lca.infrastructure.observability.loop_cursor import (
-    reset_run_cursor,
-)
+
+# spec section H ContextVar deletion: ``reset_run_cursor`` (ContextVar
+# reset) is gone;cursor lifetime is per-run via ``RunSession.loop_cursor``
+# held explicitly.
 from lca.plugins.transport.webserver.handlers.runs.session.event.session import (
     BoundRunEventSession,
     unbind_run_event_session,
@@ -107,8 +107,8 @@ class RunSession:
     thread_tree_writer: object | None = None  # ADR-0186 PR-3g: per-run StepTreeFoldDeriver
     coordinator: object | None = None  # ADR-0167 D11: StepCoordinator (Agent 唯一写入口)
     loop_cursor: object | None = None  # ADR-0169 §D11 PR-1.5: LoopCursor(写入 cursor 的入口)
-    loop_cursor_token: Token[Any] | None = (
-        None  # ADR-0169 §D11 PR-1.5: ContextVar reset token (close 时释放)
+    loop_cursor_token: object | None = (
+        None  # ADR-0169 §D11 PR-1.5: deprecated;Task 5 删除 ContextVar 后已 no-op
     )
     event_session: BoundRunEventSession | None = None  # ADR-0186: per-run DSH Session 绑定
 
@@ -149,10 +149,10 @@ class RunSession:
         """
         if self._closed:
             return False
-        if self.loop_cursor_token is not None:
-            with contextlib.suppress(Exception):
-                reset_run_cursor(self.loop_cursor_token)
-            self.loop_cursor_token = None
+        # spec section H ContextVar deletion: ``loop_cursor_token`` reset
+        # path is gone. The cursor itself is closed via ``CursorRecord`` /
+        # runtime close hooks below; no ContextVar reset to release.
+        self.loop_cursor_token = None
         bound = getattr(self, "event_session", None)
         with contextlib.suppress(Exception):
             unbind_run_event_session(bound)

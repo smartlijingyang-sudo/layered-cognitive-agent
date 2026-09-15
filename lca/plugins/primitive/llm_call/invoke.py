@@ -3,11 +3,14 @@
 primitive.llm.call 图唯一节点 plugin:typed ``ReasonerTurnRender`` +
 ``ForkedTools`` → ``LLMResponse`` (ADR-0220 §3.2 + §6.3)。
 
-节点职责:ModelVisible ``CurrentReasonerPrompt`` ContextVar 在 LLM 调用前后
-的 bind / reset;把 ``execute_llm_turn`` 的 seam 收口到 typed boundary,不再
-让 ``PromptReasoner.complete_turn`` 持有 ContextVar。所有 LLM 调用未来都
-走本节点(per ADR §6.3 P4) → 完全可观察、可在 spine EP 上挂 model_visible
-hook。
+节点职责:把 ``execute_llm_turn`` 的 seam 收口到 typed boundary,所有 LLM
+调用未来都走本节点(per ADR §6.3 P4) → 完全可观察、可在 spine EP 上挂
+model-visible hook。
+
+spec section H ContextVar deletion: cursor + ``CurrentReasonerPrompt``
+不再经 ContextVar 推送;通过显式 kwargs ``cursor=...`` /
+``reasoner_prompt=...`` 流到 ``llm.complete`` →
+:func:`lca.plugins.events.hooks.model_visible.adapter.ModelVisibleHookAdapter.complete`。
 """
 
 from __future__ import annotations
@@ -92,19 +95,16 @@ class LlmInvokeExecutor:
                 "wire phase.think.reasoner.credentials before primitive.llm.call."
             )
 
+        from lca.cognition.body.executor.cursor_record import CursorRecord
         from lca.cognition.brain.llm_turn import execute_llm_turn
-        from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
-            get_current_cursor,
-        )
         from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
             CurrentReasonerPrompt,
-            bind_current_reasoner_prompt,
-            reset_current_reasoner_prompt,
         )
 
-        token: Any = None
+        cursor: Any = None
+        reasoner_prompt: Any = None
         if render.trace is not None:
-            cursor = get_current_cursor()
+            cursor = CursorRecord.get()
             if cursor is None:
                 step_id = f"step-unknown-{render.trace.template_id}"
             else:
@@ -112,15 +112,13 @@ class LlmInvokeExecutor:
                     step_id = f"step-{cursor.snapshot.step_index + 1:03d}"
                 except Exception:
                     step_id = f"step-unknown-{render.trace.template_id}"
-            token = bind_current_reasoner_prompt(
-                CurrentReasonerPrompt(
-                    step_id=step_id,
-                    template_id=render.trace.template_id,
-                    selector_decision_path=render.trace.selector_decision_path,
-                    system_prompt_text=render.trace.system_prompt_text,
-                    prompt_trace=render.trace,
-                    context_manifest=render.manifest,
-                )
+            reasoner_prompt = CurrentReasonerPrompt(
+                step_id=step_id,
+                template_id=render.trace.template_id,
+                selector_decision_path=render.trace.selector_decision_path,
+                system_prompt_text=render.trace.system_prompt_text,
+                prompt_trace=render.trace,
+                context_manifest=render.manifest,
             )
         try:
             step_index = getattr(state, "step", 0) if state is not None else 0
@@ -132,10 +130,11 @@ class LlmInvokeExecutor:
                 step=step_index,
                 state=state if state is not None else _empty_state(),
                 task=task_text or "",
+                cursor=cursor,
+                reasoner_prompt=reasoner_prompt,
             )
         finally:
-            if token is not None:
-                reset_current_reasoner_prompt(token)
+            pass  # explicit DI; no ContextVar reset needed
 
         return NodeOutput(port_values={"response": response})
 

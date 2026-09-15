@@ -163,9 +163,9 @@ def test_run_session_consumes_profile_selected_journal_factory(tmp_path: Path) -
         assert isinstance(second.thread_tree_writer, StepTreeFoldDeriver)
         assert first.thread_tree_writer is not second.thread_tree_writer
     finally:
-        # builder 的 install_run_cursor 占用 ContextVar;close 释放,
-        # 防止泄漏到后续依赖 ``get_current_cursor() is None`` 的测试。
-        # token 必须按安装逆序释放(LIFO),否则 reset 失败被 close 吞掉。
+        # spec section H ContextVar deletion: ``install_run_cursor`` /
+        # ``get_current_cursor`` 已删除;builder 不再 bind ContextVar。
+        # close 仍按 LIFO 顺序释放,以防残留影响后续 run。
         second.close("completed")
         first.close("completed")
 

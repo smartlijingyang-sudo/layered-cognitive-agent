@@ -20,7 +20,9 @@ from lca.contracts.protocols.loop.spine_publish import (
 )
 from lca.harness.session.emit import emit
 from lca.infrastructure.session.bindings import resolve_raw_session
-from lca.plugins.events.publishers._session_publish import current_publish_session
+from lca.plugins.events.publishers._session_publish import (
+    _ACTIVE_SESSION,
+)
 from lca_kernel.events.payloads.payloads import SpineEventPayload
 from lca_kernel.events.session.session import SessionEvent, SessionProtocol
 
@@ -163,7 +165,7 @@ def append_catalog_bound(
     state; session binding is always contextvar-based today).
     """
     del state
-    writer = session if session is not None else current_publish_session()
+    writer = session if session is not None else _ACTIVE_SESSION
     if writer is None:
         return None
     return DefaultFactGateway(writer).append_catalog(event, actor=actor)
@@ -179,7 +181,7 @@ def publish_ep_bound(
 ) -> AppendReceipt | None:
     """Resolve bound writer; append spine EP event; no-op when unbound."""
     del state
-    writer = session if session is not None else current_publish_session()
+    writer = session if session is not None else _ACTIVE_SESSION
     if writer is None:
         return None
     return DefaultFactGateway(writer).publish_ep(ep, payload, actor=actor)

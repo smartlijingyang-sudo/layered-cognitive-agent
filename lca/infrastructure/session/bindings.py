@@ -19,7 +19,7 @@ from lca.contracts.protocols.session.model.context import (
 from lca.infrastructure.session.context.model_context_assembler import (
     default_model_context_assembler,
 )
-from lca.plugins.events.publishers._session_publish import current_publish_session
+from lca.plugins.events.publishers._session_publish import _ACTIVE_SESSION
 from lca.session.append import Session
 
 _model_context_assembler: contextvars.ContextVar[ModelContextAssembler | None] = (
@@ -51,8 +51,12 @@ def resolve_raw_session(target: object | None) -> Session | None:
 
 
 def resolve_session_reader() -> SessionReader | None:
-    """Bound publish/observe Session as :class:`SessionReader`, or ``None``."""
-    session = resolve_raw_session(current_publish_session())
+    """Bound publish/observe Session as :class:`SessionReader`, or ``None``.
+
+    SPEC section H:_current_publish_session ContextVar 已删除;本读
+    ``_ACTIVE_SESSION`` module-level state(由 ``set_publish_session`` 设置)。
+    """
+    session = resolve_raw_session(_ACTIVE_SESSION)
     if session is None:
         return None
     return session
@@ -60,17 +64,18 @@ def resolve_session_reader() -> SessionReader | None:
 
 def resolve_flushable_session() -> FlushableSession | None:
     """Bound runtime Session for checkpoint ``flush()``, or ``None``."""
-    return resolve_raw_session(current_publish_session())
+    return resolve_raw_session(_ACTIVE_SESSION)
 
 
 def resolve_session_for_emit(state: AgentState | None = None) -> object | None:
     """Bound Session writer for cognitive fact emission, or ``None``.
 
     ``state`` is accepted for call-site symmetry (step metadata lives on
-    state; session binding is always contextvar-based today).
+    state; session binding is now module-level ``_ACTIVE_SESSION``, set by
+    ``set_publish_session`` / run bind boundary).
     """
     _ = state
-    writer = current_publish_session()
+    writer = _ACTIVE_SESSION
     resolved = resolve_raw_session(writer)
     if resolved is not None:
         return resolved

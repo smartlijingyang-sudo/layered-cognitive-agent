@@ -31,7 +31,6 @@ ADR-0169 §D11 PR-1 之后业务路径只允许两件事:``cursor.advance(phase)
 
 from __future__ import annotations
 
-from contextvars import ContextVar, Token
 from typing import Any, get_args
 
 from lca.contracts.models.observability.journal.step import (
@@ -58,30 +57,11 @@ from lca.infrastructure.observability.writable_matrix.coordinator import StepCoo
 
 _VALID_CURSOR_PHASES = frozenset(get_args(PhaseName))
 
-# 当前 cursor 由 CoordinatorAdapter 持有;PR-21~24 业务迁 cursor 期间,
-# 业务路径(perceive_hub / safe_executor / tool_journal_emit)取 cursor 走本
-# ContextVar —— 由 wiring 层在 RunExecutionEnvironment.prepare 阶段 set。
-# 删除条件:业务代码全迁完 cursor 后,直接传 cursor 参数替换 ContextVar 访问。
-_current_cursor: ContextVar[LoopCursor | None] = ContextVar("lca-loop_cursor_current", default=None)
-
-
-def get_current_cursor() -> LoopCursor | None:
-    """取当前 run 绑定的 LoopCursor(PR-26 业务迁 cursor 入口)。"""
-    return _current_cursor.get()
-
-
-def bind_current_cursor(cursor: LoopCursor) -> Token[LoopCursor | None]:
-    """绑定 cursor;返回 reset token,由调用方在 finally 释放。"""
-    return _current_cursor.set(cursor)
-
-
-def reset_current_cursor(token: Any) -> None:
-    _current_cursor.reset(token)
-
-
-# 兼容旧名:PR-26 业务代码用 current_cursor() 访问;保留别名便于增量迁移。
-def current_cursor() -> LoopCursor | None:
-    return _current_cursor.get()
+# spec section H ContextVar deletion: ``_current_cursor`` ContextVar + its
+# ``get_current_cursor`` / ``bind_current_cursor`` / ``reset_current_cursor``
+# / ``current_cursor`` aliases are gone. Cursor now flows through explicit DI
+# on :class:`ModelVisibleHookAdapter` (caller passes via kwargs) and on
+# ``CursorRecord.get()`` (caller passes cursor via constructor).
 
 
 class CoordinatorAdapter:
@@ -264,10 +244,4 @@ class CoordinatorAdapter:
         return getattr(self._coord, name)
 
 
-__all__ = [
-    "CoordinatorAdapter",
-    "bind_current_cursor",
-    "current_cursor",
-    "get_current_cursor",
-    "reset_current_cursor",
-]
+__all__ = ["CoordinatorAdapter"]

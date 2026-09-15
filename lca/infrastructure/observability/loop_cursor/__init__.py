@@ -13,12 +13,10 @@ ADR-0185 PR-4:``CurrentReasonerPrompt`` 已迁出至
 
 import importlib
 
-from lca.infrastructure.observability.loop_cursor.bind.bind import (
-    SpineWritePortAdapter,
-    install_run_cursor,
-    reset_run_cursor,
-)
 from lca.infrastructure.observability.loop_cursor.factory.factory import LoopCursorFactory
+from lca.infrastructure.observability.loop_cursor.spine_port_adapter import (
+    SpineWritePortAdapter,
+)
 
 _in_memory_mod = importlib.import_module(
     "lca.infrastructure.observability.loop_cursor.in.memory"
@@ -39,6 +37,4 @@ __all__ = [
     "PersistenceCoordinator",
     "SpineWritePortAdapter",
     "StdLoopCursor",
-    "install_run_cursor",
-    "reset_run_cursor",
 ]

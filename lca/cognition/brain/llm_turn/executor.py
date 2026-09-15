@@ -9,6 +9,8 @@ text-only stream — that broke G2A Mode A and caused search_skill loops.
 
 from __future__ import annotations
 
+from typing import Any
+
 import structlog
 
 from lca.cognition.brain.llm_turn.mode import LlmTurnMode
@@ -45,10 +47,23 @@ async def execute_llm_turn(
     step: int,
     state: AgentState,
     task: str = "",
+    cursor: Any = None,
+    reasoner_prompt: Any = None,
 ) -> LLMResponse:
-    """Run one LobeHub-aligned ``call_llm`` turn."""
+    """Run one LobeHub-aligned ``call_llm`` turn.
+
+    spec section H ContextVar deletion: ``cursor`` + ``reasoner_prompt``
+    are explicit kwargs forwarded to ``llm.complete`` / ``llm.stream``.
+    :class:`ModelVisibleHookAdapter` pops them from kwargs before passing
+    the rest to the inner LLM, and forwards them to
+    :class:`ModelVisibleHook` for fold + publish.
+    """
     mode = resolve_llm_turn_mode(state)
     llm_kwargs = build_llm_call_kwargs(state=state, task=task)
+    if cursor is not None:
+        llm_kwargs["cursor"] = cursor
+    if reasoner_prompt is not None:
+        llm_kwargs["reasoner_prompt"] = reasoner_prompt
     session = resolve_session_reader()
     llm_kwargs["history"] = (
         RunSessionWriter(session=session).derive_messages() if session is not None else []

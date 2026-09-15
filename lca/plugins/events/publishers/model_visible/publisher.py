@@ -46,18 +46,12 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.infrastructure.observability.loop_cursor.coordinator.adapter import (
-    get_current_cursor,
-)
 
 # Eager import 让 hook 模块的 module-level forward-ref rebuild 在 publisher
 # import 时跑(测试 / 业务方直接调 SpineLlmRequestHeaderPayload 不再需要
 # 先 model_rebuild)。
 from lca.plugins.events.hooks.model_visible import (
     hook as _hook_module,  # noqa: F401  (import for side effect)
-)
-from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
-    get_current_reasoner_prompt,
 )
 
 
@@ -144,16 +138,13 @@ async def setup(ctx: PluginContext, config: _Config) -> None:
 def _build_hook(*, bus: Any) -> Any:
     """构造 :class:`ModelVisibleHook`(函数内 lazy import 避免环)。
 
-    显式函数包裹为 setup 顶层留一行表达意图;内部 lazy import
-    ModelVisibleHook 与 marker 类的相对位置打破。
+    spec section H ContextVar deletion: hook no longer carries
+    ``cursor_provider`` / ``prompt_ctx_getter``;cursor + system_prompt_text
+    are explicit kwargs at LLM call time (via :class:`ModelVisibleHookAdapter`).
     """
     from lca.plugins.events.hooks.model_visible.hook import ModelVisibleHook
 
-    return ModelVisibleHook(
-        bus=bus,
-        cursor_provider=get_current_cursor,
-        prompt_ctx_getter=get_current_reasoner_prompt,
-    )
+    return ModelVisibleHook(bus=bus)
 
 
 __all__ = ["ModelVisiblePublisher", "setup"]

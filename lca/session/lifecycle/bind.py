@@ -23,7 +23,6 @@ from lca.plugins.events._session_observe import (
     set_session,
 )
 from lca.plugins.events.publishers._session_publish import (
-    current_publish_session,
     reset_publish_session,
     set_publish_session,
 )
@@ -261,8 +260,16 @@ class EventSessionBinder:
 
     @contextlib.contextmanager
     def bound(self, run_id: str) -> Iterator[BoundRunEventSession | None]:
-        """Bind for ``run_id`` if publish slot empty; otherwise yield None."""
-        if current_publish_session() is not None:
+        """Bind for ``run_id`` if publish slot empty; otherwise yield None.
+
+        SPEC section H:_current_publish_session ContextVar 已删除;
+        ``set_publish_session`` 改为 module-level binding,本检查仅在
+        in-process 单 run 场景下正确(不跨 asyncio.Task)。
+        """
+        from lca.plugins.events.publishers._session_publish import (
+            _ACTIVE_SESSION,
+        )
+        if _ACTIVE_SESSION is not None:
             yield None
             return
         bound = bind_run_event_session_from_store(self._store, run_id)
