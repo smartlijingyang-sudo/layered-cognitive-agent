@@ -12,7 +12,7 @@ RuntimeError fail-loud。同步直写路径已删除。
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from datetime import datetime, timezone, UTC
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
