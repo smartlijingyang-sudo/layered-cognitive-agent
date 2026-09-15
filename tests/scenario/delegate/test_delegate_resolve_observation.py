@@ -34,6 +34,7 @@ from lca.contracts.models.core.execution.decision import (
 )
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.infrastructure.transport.registry import TransportRegistry
+from datetime import UTC
 
 
 def _state() -> AgentState:
@@ -73,7 +74,7 @@ class TestResolveObservationSeam:
                     error=None,
                     task_id="t1",
                     step=1,
-                    returned_at=datetime.now(tz=timezone.utc),
+                    returned_at=datetime.now(tz=UTC),
                 )
             ]
         )
@@ -174,7 +175,7 @@ class TestExecuteShape:
                     error=None,
                     task_id="t1",
                     step=1,
-                    returned_at=datetime.now(tz=timezone.utc),
+                    returned_at=datetime.now(tz=UTC),
                 )
             ]
         )
