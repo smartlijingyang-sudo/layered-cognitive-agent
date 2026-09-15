@@ -241,16 +241,10 @@ def _profile_explicitly_admits(
         except (OSError, RuntimeError, ValueError):
             plugin_path = None
         if plugin_path is not None:
-            try:
-                plugin_path.relative_to(profile_path_obj.parent)
+            if plugin_path.is_relative_to(profile_path_obj.parent):
                 return True
-            except ValueError:
-                pass
-            try:
-                profile_path_obj.relative_to(plugin_path.parent)
+            if profile_path_obj.is_relative_to(plugin_path.parent):
                 return True
-            except ValueError:
-                pass
     return False
 
 
