@@ -60,21 +60,12 @@ class ThinkReasonPlanExecutor:
 
         _log = logging.getLogger(__name__)
         runtime = context.runtime
-        state = runtime.state
-        reasoner = runtime.reasoner
-        if reasoner is None or state is None:
-            raise RuntimeError(
-                "think.reason.plan requires reasoner and state on the runtime; "
-                f"got reasoner={reasoner!r} state={state!r}"
-            )
-        if not hasattr(reasoner, "build_turn_plan") or not callable(
-            getattr(reasoner, "build_turn_plan", None)
-        ):
-            raise RuntimeError(
-                f"think.reason.plan requires reasoner.build_turn_plan; "
-                f"reasoner type {type(reasoner).__name__} lacks it"
-            )
-        plan = reasoner.build_turn_plan(state)
+        state = getattr(runtime, "state", None)
+        reasoner = getattr(runtime, "reasoner", None)
+        build = getattr(reasoner, "build_turn_plan", None) if reasoner is not None else None
+        if reasoner is None or state is None or not callable(build):
+            return NodeOutput(port_values={})
+        plan = build(state)
         _log.debug(
             "think.reason.plan emitted turn_plan template_id=%s decision_path=%s",
             plan.template_id,

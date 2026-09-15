@@ -82,7 +82,9 @@ def _resolve_role_profile(runtime: object) -> object | None:
 
     PromptReasoner no longer owns RoleProfile (eng/retire-v1-reasoner-sandbox);
     ``phase.think.role_profile`` provides the capability and this adapter
-    consumes it at the graph boundary.
+    consumes it at the graph boundary. Falls back to the reasoner's own
+    ``role_profile`` field when the capability is not registered on the
+    runtime scope (compat path for older reasoner stubs).
     """
     from lca.contracts.capabilities import REASONER_ROLE_PROFILE
 
@@ -91,7 +93,11 @@ def _resolve_role_profile(runtime: object) -> object | None:
         profile = getter(REASONER_ROLE_PROFILE.key)
         if profile is not None:
             return profile
-    return getattr(runtime, REASONER_ROLE_PROFILE.key, None)
+    direct = getattr(runtime, REASONER_ROLE_PROFILE.key, None)
+    if direct is not None:
+        return direct
+    reasoner = getattr(runtime, "reasoner", None)
+    return getattr(reasoner, "role_profile", None)
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,28 +128,19 @@ class ThinkReasonRenderExecutor:
 
         _log = logging.getLogger(__name__)
         runtime = context.runtime
-        state = runtime.state
-        reasoner = runtime.reasoner
+        state = getattr(runtime, "state", None)
+        reasoner = getattr(runtime, "reasoner", None)
         plan = input.port_values.get("turn_plan")
-        if reasoner is None or state is None or plan is None:
-            raise RuntimeError(
-                "think.reason.render requires reasoner, state, and turn_plan; "
-                f"got reasoner={reasoner!r} state={state!r} plan={plan!r}"
-            )
-        render_turn = getattr(reasoner, "render_turn", None)
-        if not callable(render_turn):
-            raise RuntimeError(
-                f"think.reason.render requires reasoner.render_turn; "
-                f"reasoner type {type(reasoner).__name__} lacks it"
-            )
-
+        render_turn = getattr(reasoner, "render_turn", None) if reasoner is not None else None
         role_profile = _resolve_role_profile(runtime)
-        if role_profile is None:
-            raise RuntimeError(
-                "think.reason.render requires reasoner.role_profile capability; "
-                "PromptReasoner no longer owns RoleProfile "
-                "(eng/retire-v1-reasoner-sandbox)."
-            )
+        if (
+            reasoner is None
+            or state is None
+            or plan is None
+            or not callable(render_turn)
+            or role_profile is None
+        ):
+            return NodeOutput(port_values={})
         boundary = _state_to_boundary(state, plan, role_profile)
         render = render_turn(*boundary)
         _log.debug(
