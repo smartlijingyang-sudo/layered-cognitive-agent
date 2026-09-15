@@ -1,10 +1,12 @@
-"""Bounded recovery phase-edge provider for ADR-0075 (HISTORY).
+"""HISTORY: bounded recovery phase-edge provider (ADR-0075) — retired as edge SSOT.
 
-M1 (Issue #14, 2026-09-15): ControlPlan recovery edges live on
-``bundles/outer/phase_main.yaml``. This plugin must not be treated as an
-edge SSOT — reflect nodes emit routing hints only. The
-``declarative-recovery.yaml`` bundle entries are emptied; delete-when
-2026-10-15 once no profile loads this module for edges.
+M1 (Issue #14, 2026-09-15): ControlPlan recovery edges live ONLY on
+``bundles/outer/phase_main.yaml``. Reflect nodes emit routing hints;
+this plugin must NOT register a second ``phase.edge.recovery`` capability.
+
+delete-when: 2026-10-15 — remove this module once no profile/bundle entry
+activates ``phase.edge.reflect_to_think.recovery`` and the anti-backfill
+profile contract remains green.
 """
 
 from __future__ import annotations
@@ -40,7 +42,7 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class RecoveryLoopConfig(BaseModel):
-    """Bounded re-entry policy for one recovery edge."""
+    """Bounded re-entry policy (retained for schema compatibility only)."""
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
     max_iterations: int = Field(default=1, alias="maxIterations")
@@ -52,7 +54,7 @@ class RecoveryLoopConfig(BaseModel):
 
 
 class RecoveryEdgeConfig(BaseModel):
-    """Profile-selected reflect-to-think recovery edge."""
+    """Legacy config shape — ignored; setup is a no-op (M1)."""
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
     source: str = "reflect.main"
@@ -75,14 +77,8 @@ SPEC = PluginSpec(
     configuration=PluginConfiguration(
         schema="lca.plugins.loop.graph.recovery.plugin.RecoveryEdgeConfig",
     ),
-    provides=(
-        CapabilityDeclaration(
-            key="phase.edge.recovery",
-            cardinality="one",
-            protocol="PhaseEdge",
-            scope="profile",
-        ),
-    ),
+    # M1: do not declare PhaseEdge capability — outer YAML is sole edge SSOT.
+    provides=(),
     requires=(),
     effects=("none",),
     ownership=OwnershipDeclaration(state_mutation="forbidden"),
@@ -90,10 +86,10 @@ SPEC = PluginSpec(
         scopes=("profile", "run"), activation="true", disposal="required"
     ),
     relations=(),
-    evidence=EvidenceDeclaration(emits=("RecoveryEdgeDeclared",), replay="required"),
+    evidence=EvidenceDeclaration(emits=(), replay="required"),
     verification=VerificationDeclaration(
-        test_suite="tests/declarative/test_recovery_edge.py",
-        properties=("recovery_edge_contract", "bounded_reentry"),
+        test_suite="tests/lca_kernel/boot/test_m1_edge_ssot_backfill.py",
+        properties=("m1_no_second_recovery_edge_capability",),
     ),
 )
 
@@ -101,11 +97,11 @@ SPEC = PluginSpec(
 @plugin(
     id="phase.edge.reflect_to_think.recovery",
     Config=RecoveryEdgeConfig,
-    provides=("phase.edge.recovery",),
+    provides=(),
     layer="L2",
     kind=PluginKind.PROVIDER,
     effects="none",
-    test_suite="tests/declarative/test_recovery_edge.py",
+    test_suite="tests/lca_kernel/boot/test_m1_edge_ssot_backfill.py",
     spec=SPEC,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
@@ -129,20 +125,13 @@ SPEC = PluginSpec(
     ),
 )
 async def setup(ctx: PluginContext, config: RecoveryEdgeConfig) -> None:
-    """Expose the selected recovery edge as immutable plan data."""
-    ctx.provide(
-        "phase.edge.recovery",
-        {
-            "source": config.source,
-            "target": config.target,
-            "when": config.when,
-            "loop": {
-                "max_iterations": config.loop.max_iterations,
-                "budget": config.loop.budget,
-                "terminal_predicate": config.loop.terminal_predicate,
-            },
-        },
-    )
+    """M1 no-op: do not ``provide(\"phase.edge.recovery\")``.
+
+    Outer ``bundles/outer/phase_main.yaml`` owns the admit_recovery edge.
+    Activating this plugin must not reintroduce a second ControlPlan edge source.
+    delete-when: 2026-10-15
+    """
+    del ctx, config
 
 
 __all__ = ["SPEC", "RecoveryEdgeConfig", "RecoveryLoopConfig", "setup"]
