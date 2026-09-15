@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import io
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 from unittest.mock import patch
 
@@ -39,7 +39,7 @@ def test_is_spine_event_false_for_other_payload() -> None:
 
 
 def test_clock_freeze() -> None:
-    fixed = datetime(2026, 9, 3, 12, 0, 0, tzinfo=timezone.utc)
+    fixed = datetime(2026, 9, 3, 12, 0, 0, tzinfo=UTC)
     SpineClock.freeze(fixed)
     try:
         assert SpineClock.now() == fixed
