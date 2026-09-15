@@ -45,7 +45,7 @@ def _resolve_session_inner(session: RunSession) -> Any:
     if obj is None:
         return None
     inner = getattr(obj, "inner", None)
-    if isinstance(inner, object) and not callable(inner):
+    if inner is not None and not callable(inner):
         return inner
     bridge = getattr(obj, "bridge", None)
     if bridge is not None:
