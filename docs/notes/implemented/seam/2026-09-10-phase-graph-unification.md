@@ -2,7 +2,7 @@
 
 Status: implemented
 
-**关联 ADR:** [ADR-0219](../../../../adr/0219-phase-graph-unification.md)(同 PR 共生)
+**关联 ADR:** [ADR-0219](../../../adr/0219-phase-graph-unification.md)(同 PR 共生)
 
 ## Problem
 
@@ -20,7 +20,7 @@ Status: implemented
 
 ## Decision
 
-按 [ADR-0219](../../../../adr/0219-phase-graph-unification.md) §3-§9 一次性收口。7 个 seam 同时落地,不留 compat shim:
+按 [ADR-0219](../../../adr/0219-phase-graph-unification.md) §3-§9 一次性收口。7 个 seam 同时落地,不留 compat shim:
 
 | 改动 | 位置 | 验证 |
 |---|---|---|
