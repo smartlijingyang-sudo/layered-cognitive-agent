@@ -7,7 +7,7 @@
 #
 # 跨图引用:
 #   inputs  -> act.dispatch 的 envelope port
-#   outputs -> act.observe 的 receipt port
+#   outputs -> act.join 的 receipts port (list[EffectReceipt], length 1)
 #
 # delete-when: N/A(纯加法,act subgraph 引用)。
 
@@ -19,7 +19,12 @@ nodes:
   - id: effect.execute
     factory: effect.execute
     inputs: [envelope]
-    outputs: [receipt]
+    # PR-3.8.5 fix1: emit ``receipts`` (list-of-one) to match the inner
+    # entry's typed ``declared_outputs`` and the downstream ``act.join``'s
+    # ``declared_inputs``. Loader silently ignores yaml outputs for subgraph
+    # nodes (subgraph_resolver.py §154-156), so this field is documentation
+    # only — runtime port names come from the inner entry's typed contract.
+    outputs: [receipts]
     config:
       emit_on_enter: []
       emit_on_exit: []
