@@ -20,7 +20,10 @@ from lca.contracts.protocols.runtime.runtime.lifecycle import (
     RuntimeLifecycleEventType,
     RuntimeLifecycleSubscriberContribution,
 )
-from lca.plugins.state import runtime_lifecycle_logging_provider, runtime_lifecycle_provider
+from lca.plugins.state.runtime import (
+    lifecycle_logging_provider as runtime_lifecycle_logging_provider,
+)
+from lca.plugins.state.runtime import lifecycle_provider as runtime_lifecycle_provider
 from lca.runtime.loop.runtime_event_publisher import (
     CompositeRuntimeLifecyclePublisher,
     InMemoryRuntimeLifecycleSubscriberRegistry,
