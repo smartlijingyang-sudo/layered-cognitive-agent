@@ -503,7 +503,6 @@ def _check_cycle_has_terminal(
 
     def strongconnect(start: int) -> None:
         work = [(start, 0)]
-        call_stack: list[tuple[int, list[int]]] = []
         indices[start] = index_counter[0]
         lowlinks[start] = index_counter[0]
         index_counter[0] += 1
