@@ -248,6 +248,16 @@ edges:
       children:
         - { kind: eq, port: { name: decision, field: action_type }, value: use_tool }
         - { kind: in, port: { name: approval_routing, field: next_hint }, value: [approve_skipped, approve_approved] }
+    loop:
+      # Hard cap on the tool re-ask (LangGraph recursion_limit /
+      # OpenAI max_turns analogue). Without this, a stale ``decision``
+      # port turns act→think into an unbounded empty loop (~880
+      # visits observed 2026-09-16). 8 rounds is enough for a real
+      # multi-tool turn; the kernel fail-louds via
+      # LoopObligationExceededError when the bound is hit and no
+      # fallback edge matches.
+      maxIterations: 8
+      budget: run.steps
 
   # act → reflect.main (reflect reads observation/reflection from the
   # kernel-wide port registry; the wiring edge just routes control).
