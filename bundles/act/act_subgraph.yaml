@@ -51,17 +51,62 @@ nodes:
   - id: act.authorize
     region: act
     factory: act.authorize
-    inputs: [decision]
-    outputs: [decision]
+    # ADR-0235 / PR-5: state 透传到 act.envelope,metadata 不再偷 state。
+    # ADR-0237 / PR-1b: typed ``approval_required: bool`` port replaces the
+    # previous ``decision.extra["needs_approval"]`` metadata grep; this is
+    # the only consumer of the port within the subgraph, so the dead-port
+    # risk is bounded.
+    inputs: [decision, state]
+    outputs: [decision, state, approval_required]
     config:
       emit_on_enter: [think.gate.start]
       emit_on_exit: []
 
+  # ADR-0237 / PR-1b: spec §3.2 原位 — gate stays between act.authorize
+  # (which mints ``approval_required``) and act.envelope (which mints the
+  # effect CommandEnvelope). The interrupt must fire **before** any side
+  # effect; positioning it after envelope/dispatch/observe is the
+  # "irreversible-then-confirm" anti-pattern called out in
+  # `2026-09-16-act-subgraph-tightening` §F-1.
+  #
+  # Routing semantics (typed ``RoutingDecision.next_hint``):
+  #   approve_skipped   → act.envelope (decision.needs_approval=False)
+  #   approve_interrupt → outer intervene.interrupt (no Command yet)
+  #   approve_approved  → act.envelope (Command.kind == "approve")
+  #   approve_rejected  → outer terminal.commit (reject/redirect/resume-timeout)
+  #
+  # Only the approve-skipped/approved branches have an inner edge to
+  # act.envelope; approve_interrupt/approved-rejected don't fan out
+  # inside the subgraph (let the subgraph finish) and rely on the
+  # outer-plan's mutually-exclusive ``act.main.routing`` consumers.
+  - id: act.approve.gate
+    region: intervene
+    factory: act.approve.gate
+    # ``decision`` is the typed upstream Decision (carries
+    # needs_approval); ``approval_required`` is the boolean computed by
+    # act.authorize. ``command`` is optional (consumed only on resume
+    # when the kernel re-projects the persisted Command into the
+    # subgraph's port registry).
+    inputs: [decision, approval_required]
+    # ``approval_routing`` is the typed ``RoutingDecision`` that bubbles
+    # out of the subgraph through ``act.main.declared_outputs``; the
+    # outer-plan's 3 mutually-exclusive edges consume it. Renamed from
+    # ``routing`` to avoid the PortRegistry.last-write-wins collision
+    # with downstream ``act.fanout``'s ``routing`` (fanout runs after
+    # gate in the subgraph; same name would overwrite gate's signal
+    # before the outer plan reads it).
+    outputs: [decision, approval_routing]
+    config:
+      emit_on_enter: [phase.intervene.gate.start]
+      emit_on_exit: [phase.intervene.gate.end]
+
   - id: act.envelope
     region: act
     factory: act.envelope
-    inputs: [decision]
-    outputs: [envelope]
+    # ADR-0235 / PR-5: state 通过 typed port 输入,metadata 不再偷 state。
+    inputs: [decision, state]
+    # state / decision 透传到下游 typed port
+    outputs: [envelope, decision, state]
     config:
       emit_on_enter: []
       emit_on_exit: []
@@ -81,9 +126,25 @@ nodes:
       emit_on_enter: []
       emit_on_exit: []
 
+  # ADR-0234 / PR-2: 5-gate atomic envelope check extracted from
+  # PipelineSafeExecutor into a typed-port graph node. Sits between
+  # act.fanout and act.dispatch; emits ``verdict_refs`` typed-port
+  # consumed by act.dispatch and (transitively) by effect.execute.
+  - id: effect.pre_dispatch.envelope_check
+    region: effect
+    factory: effect.pre_dispatch.envelope_check
+    inputs: [envelope]
+    outputs: [envelope, verdict_refs]
+    config:
+      emit_on_enter: []
+      emit_on_exit: []
+
   - id: act.dispatch
     factory: act.dispatch.ref
-    inputs: [envelope]
+    # ADR-0235 / PR-5: state / decision flow in from act.envelope as
+    # typed ports and are forwarded to effect.execute (subgraph binding
+    # in config.sub_spec_ref).
+    inputs: [envelope, verdict_refs, decision, state]
     outputs: [receipt]
     config:
       emit_on_enter: [body.tool.execute.start]
@@ -93,18 +154,58 @@ nodes:
         entry_node: effect.execute
         binding_edge: act.dispatch
 
+  # PR-3: act.observe 语义收紧为 receipt 归一化(原 act.result.normalize
+  # fold 自 PR-3.8.7)。should_terminate 路由决策由同级 act.observe.terminate_decide
+  # 产出;observation-plane RunFact 落库由同级 act.observe.commit_fact 完成。
+  # 三者各自单一职责(AGENTS.md §2.2 事实/决策分离)。
   - id: act.observe
     region: act
     factory: act.observe
-    # PR-3.8.7: act.observe 同时承担 act.result.normalize 的归一化语义
-    # (schema/spill/coerce/error_reason)。归一化在 node_execute 内部完成,
-    # declared_inputs/declared_outputs 保持不变,typed-boundary port schema
-    # 对外不可见(AGENTS.md §3 C13)。不要把归一化拆成单独的 graph node。
+    inputs: [receipt]
+    outputs: [receipt]
+    config:
+      emit_on_enter: []
+      emit_on_exit: [phase.tool.call.end]
+
+  # PR-3 (L-1): RunFact commit 独立节点。原 act.observe 通过
+  # getattr(context.runtime, "journal") 偷图 runtime capability;改为本节点
+  # 由 kernel 注入 journal,act 业务节点内不再 raw getattr context.runtime。
+  - id: act.observe.commit_fact
+    region: act
+    factory: act.observe.commit_fact
+    inputs: [receipt]
+    outputs: [receipt]
+    config:
+      emit_on_enter: []
+      emit_on_exit: []
+
+  # PR-3 (G-3): should_terminate 路由决策节点。纯决策函数,receipt 只读。
+  - id: act.observe.terminate_decide
+    region: act
+    factory: act.observe.terminate_decide
     inputs: [receipt]
     outputs: [receipt, should_terminate]
     config:
       emit_on_enter: []
-      emit_on_exit: [phase.tool.call.end, phase.act.fold.end]
+      emit_on_exit: [phase.act.fold.end]
+
+  # ADR-0237 / PR-1b: subgraph-internal ``intervene.resume`` stub node.
+  # The subgraph declares a resume edge into ``act.approve.gate`` so the
+  # per-plan resume-edge validator triggers at subgraph lift time. The
+  # stub itself is a factory carrier (no inner edges — the subgraph
+  # exits on entry); the real resume subgraph lives in
+  # ``bundles/intervene/resume_subgraph.yaml`` and is reached via the
+  # outer-level ``intervene.resume`` node when the kernel resumes the
+  # run. The kernel re-projects the persisted ``Command`` into the
+  # subgraph's port registry before entering this stub.
+  - id: intervene.resume
+    region: intervene
+    factory: intervene.resume
+    inputs: [command]
+    outputs: [decision]
+    config:
+      emit_on_enter: []
+      emit_on_exit: []
 
   # PR-3.8.5: 1:1 receipt join typed-boundary node. Consumes the
   # ``receipts`` list port (emitted by effect.execute after PR-3.8.5
@@ -130,20 +231,53 @@ edges:
   - from: act.validate
     to: act.authorize
     when: true
+  # ADR-0237 / PR-1b: gate sits between act.authorize and act.envelope.
+  # The predicate reads typed ``approval_required: bool`` (PR-1b typed
+  # port) — the decision already carries needs_approval but we want a
+  # subgraph-local boolean so the predicate validates without crossing
+  # into Decision's payload_type.
   - from: act.authorize
+    to: act.approve.gate
+    when: true
+  # approve_skipped (no-approval-needed) and approve_approved
+  # (Command.kind == "approve") both route forward to act.envelope;
+  # approve_interrupt and approve_rejected have no inner edge so the
+  # subgraph completes and the outer plan's mutually-exclusive
+  # ``act.main.approval_routing`` consumers take over.
+  - from: act.approve.gate
     to: act.envelope
+    when:
+      kind: in
+      port: { name: approval_routing, field: next_hint }
+      value: [approve_skipped, approve_approved]
+  # ADR-0237 / PR-1b: subgraph-internal resume edge so the per-plan
+  # ``act.approve.gate`` resume-edge validator triggers at subgraph
+  # lift time. ``intervene.resume`` here is a factory stub (no inner
+  # edges — the subgraph ends on entry); the real subgraph lives in
+  # ``bundles/intervene/resume_subgraph.yaml`` and is reached via the
+  # outer-level ``intervene.resume`` node when the kernel resumes.
+  - from: intervene.resume
+    to: act.approve.gate
     when: true
   - from: act.envelope
     to: act.fanout
     when: true
   - from: act.fanout
-    to: act.dispatch
+    to: effect.pre_dispatch.envelope_check
     when:
       kind: eq
       port:
         name: routing
         field: next_hint
       value: fanout_1to1
+
+  # PR-2 / ADR-0234: envelope_check → dispatch passes verdict_refs typed-port.
+  # On any 5-gate failure the node raises and emits no verdict_refs; the
+  # kernel's select_edge returns None and the subgraph dispatch routes to
+  # terminal.commit (fail-loud).
+  - from: effect.pre_dispatch.envelope_check
+    to: act.dispatch
+    when: true
   - from: act.dispatch
     to: act.join
     when: true
@@ -155,3 +289,11 @@ edges:
         name: routing
         field: next_hint
       value: join_1to1
+
+  # PR-3: 归一化 → RunFact 落库 → should_terminate 决策,单向三段。
+  - from: act.observe
+    to: act.observe.commit_fact
+    when: true
+  - from: act.observe.commit_fact
+    to: act.observe.terminate_decide
+    when: true

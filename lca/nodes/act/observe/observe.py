@@ -1,16 +1,27 @@
-"""phase.concept.act_subgraph.act_observe — typed effect observation node.
+"""phase.concept.act_subgraph.act_observe_normalize — typed receipt normalization node.
 
 ``concept.act_subgraph`` 内嵌节点:``EffectReceipt`` → ``EffectReceipt``
-。
+(归一化后透传)。
 
-act 子图最后一个节点,在执行完成后观察回执并写入 journal 一条 ``effect.observed``
-事实(若 ``journal`` capability 可用),让下游 reflect / remember 节点可以做
-typed 推断。
+PR-3 split:本节点从原 ``act.observe`` 剥离 ``should_terminate`` 决策 +
+``RunFact commit`` 两类职责,语义收紧为「receipt 归一化」(schema /
+spill / coerce / error_reason)。决策由同级 ``act.observe.terminate_decide``
+节点承担;observation plane 落库由同级 ``act.observe.commit_fact`` 节点承
+担;两者通过 typed-port 边界串联,act 业务不再混 3 职责。
 
-PR-3.8.7: 本节点同时承担 ``act.result.normalize`` 的归一化语义(merge
-target,见 spec §3.3)。归一化在 ``node_execute`` 内部完成,不改
-``declared_inputs`` / ``declared_outputs``,typed-boundary port schema
-对外不可见(AGENTS.md §3 C13)。不要把归一化拆成单独的 graph node。
+归一化规则(PR-3.8.7 fold from ``act.result.normalize``,Idempotent +
+deterministic):
+
+  1. 剥离不可序列化字段 — ``EffectReceipt`` 字段均为基础类型,no-op。
+  2. bytes ≤ 50_000 → base64-string — receipt 无 inline 字节负载,no-op。
+  3. bytes > 50_000 → spill 到 side artifact,``output_ref`` 改写为
+     ``spill://<invocation_id>`` URI,emit stub receipt。
+  4. ``failure_kind`` 已设置且 ``error_code`` 仍为空时,从 closed-set map
+     推导 ``error_reason`` 并写入 ``error_code``(deterministic,no exception)。
+     已设置的 ``error_code`` 不覆盖(body 已分类更具体)。
+
+typed-boundary port schema(AGENTS.md §3 C13):``declared_inputs`` /
+``declared_outputs`` 都是 ``("receipt",)``,归一化对调用者不可见。
 """
 
 from __future__ import annotations
@@ -57,7 +68,8 @@ _SPILL_URI_PREFIX = "spill://"
 # Closed-set ``failure_kind`` → ``error_reason`` map(PR-3.8.7 merge from
 # ``act.result.normalize``):同一 ``failure_kind`` 多次调用得到同一
 # ``error_reason``(deterministic、idempotent)。未知 ``failure_kind`` 不抛异常、
-# 不修改 ``error_code``(plan §Task 1 第 5 条)。
+# 不修改 ``error_code``(plan §Task 1 第 5 条)。PR-3 不删:PR-4 will 迁到
+# ``lca/contracts/observability/observability/failure_reason_map.py``。
 _FAILURE_KIND_TO_ERROR_REASON: dict[str, str] = {
     FAILURE_KIND_EXECUTION: FAILURE_KIND_EXECUTION,
     FAILURE_KIND_TRANSIENT: FAILURE_KIND_TRANSIENT,
@@ -67,21 +79,13 @@ _FAILURE_KIND_TO_ERROR_REASON: dict[str, str] = {
 
 
 def _normalize_receipt(receipt: EffectReceipt) -> EffectReceipt:
-    """``act.observe`` 内部归一化步骤(PR-3.8.7 fold from ``act.result.normalize``)。
+    """``act.observe.normalize`` 内部归一化步骤。
 
     Idempotent + deterministic:同一 ``receipt`` 多次调用产生结构等价的
     ``EffectReceipt``(字段值相同,允许新实例)。无更新时返回同一实例,
-    保证 ``tests/loop/test_act_observe_should_terminate.py`` 的 ``is``
-    身份断言继续成立。
+    保证归一化单测的 ``is`` 身份断言继续成立。
 
-    归一化规则(plan §Task 1):
-      1. 剥离不可序列化字段 — ``EffectReceipt`` 字段均为基础类型,no-op。
-      2. bytes ≤ 50_000 → base64-string — receipt 无 inline 字节负载,no-op。
-      3. bytes > 50_000 → spill 到 side artifact,``output_ref`` 改写为
-         ``spill://<invocation_id>`` URI,emit stub receipt。
-      4. ``failure_kind`` 已设置且 ``error_code`` 仍为空时,从 closed-set map
-         推导 ``error_reason`` 并写入 ``error_code``(deterministic,no exception)。
-         已设置的 ``error_code`` 不覆盖(body 已分类更具体)。
+    归一化规则:见模块 docstring 第 1-4 条。
     """
     updates: dict[str, Any] = {}
 
@@ -103,9 +107,15 @@ def _normalize_receipt(receipt: EffectReceipt) -> EffectReceipt:
 
 @dataclass(frozen=True, slots=True)
 class ActObserveExecutor:
-    """``concept.act_subgraph`` 节点:EffectReceipt → EffectReceipt(passthrough)。"""
+    """``concept.act_subgraph`` 节点:EffectReceipt → EffectReceipt(passthrough after normalize)。
 
-    semantic_name: str = "act.observe"
+    PR-3:语义改为 normalize only。``should_terminate`` 决策由同级
+    ``act.observe.terminate_decide`` 节点产出;observation plane 落库由同级
+    ``act.observe.commit_fact`` 节点完成。本节点无副作用:不读 context.runtime,
+    不调 journal,不写 journal,只做 receipt 字段归一化后透传。
+    """
+
+    semantic_name: str = "act.observe.normalize"
     region: str = "act"
     declared_inputs: tuple[PortName, ...] = ("receipt", "journal")
     declared_outputs: tuple[PortName, ...] = ("receipt",)
@@ -115,69 +125,25 @@ class ActObserveExecutor:
         context: NodeContext,
         input: NodeInput,
     ) -> NodeOutput:
-        """act.observe 入口。
+        """act.observe.normalize 入口。
 
         inputs 端口(yaml): receipt (EffectReceipt)
-        outputs 端口(yaml): receipt (EffectReceipt)
+        outputs 端口(yaml): receipt (EffectReceipt, normalized passthrough)
 
-        记录一条 ``effect.observed`` RunFact 到 journal(若 runtime 暴露
-        ``journal`` capability),让 reflect/remember 节点可以基于它做
-        typed 推断。
-
-        Deterministic-failure shortcut (plan
-        ``docs/plans/2026-09-14-stop-decision-retirement.md``, PR-3):
-        when the receipt's ``extra[FAILURE_KIND] == EXECUTION``,
-        ``act.observe`` emits a ``should_terminate=true`` payload on
-        the result node, and the outer driver routes the next edge
-        to ``terminal.commit`` instead of looping back to think.
-        Body's deterministic-failure signal (failure_kind=execution)
-        is the single source of truth for "the model cannot make
-        progress on this path".
+        无副作用:归一化是纯函数。无 journal writes、无 should_terminate 计算,
+        无 ``context.runtime`` 读取(observation-plane 落库由下游
+        ``act.observe.commit_fact`` 节点通过 typed-port capability 注入)。
         """
+        del context  # unused: pure function of input port value
         receipt = input.port_values.get("receipt")
         if not isinstance(receipt, EffectReceipt):
             raise TypeError(
-                "act.observe: 'receipt' port must be an EffectReceipt "
+                "act.observe.normalize: 'receipt' port must be an EffectReceipt "
                 f"instance, got {type(receipt).__name__}"
             )
 
-        # PR-3.8.7: normalize before emit (folded from ``act.result.normalize``).
-        # The normalize step is idempotent + deterministic; the typed-boundary port
-        # schema (``declared_inputs`` / ``declared_outputs``) is unchanged.
         normalized = _normalize_receipt(receipt)
-
-        journal = input.port_values.get("journal")
-        plan_ref = context.metadata.get("plan_ref", "unknown")
-        node_id = context.metadata.get("node_id", "act.observe")
-        if journal is not None and hasattr(journal, "commit_fact"):
-            from lca.contracts.protocols.act.command.envelope import RunFact
-
-            fact = RunFact(
-                fact_id=f"{plan_ref}:{node_id}:{normalized.invocation_id}",
-                plan_ref=plan_ref,
-                kind="effect.observed",
-                payload={
-                    "invocation_id": normalized.invocation_id,
-                    "outcome": normalized.outcome.value,
-                    "provider": normalized.provider,
-                    "idempotency_key": normalized.idempotency_key,
-                    "error_code": normalized.error_code,
-                },
-            )
-            journal.commit_fact(fact, plan_ref=plan_ref, node_ref=node_id)
-
-        should_terminate = False
-        if normalized.failure_kind == FAILURE_KIND_EXECUTION or (
-            normalized.failure_kind is None and normalized.outcome.value == "failed"
-        ):
-            should_terminate = True
-
-        return NodeOutput(
-            port_values={
-                "receipt": normalized,
-                "should_terminate": should_terminate,
-            }
-        )
+        return NodeOutput(port_values={"receipt": normalized})
 
 
 @plugin(

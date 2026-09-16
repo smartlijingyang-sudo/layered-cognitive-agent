@@ -107,6 +107,8 @@ from lca.nodes.act.join import ActJoinExecutor
 from lca.nodes.act.observe.observe import ActObserveExecutor
 from lca.nodes.act.validate.validate import ActValidateExecutor
 from lca.nodes.concept.effect.execute import EffectExecuteExecutor
+from lca.nodes.intervene.approve_gate import ApproveGateExecutor
+from lca.nodes.intervene.resume import ResumeExecutor
 
 BUNDLE_PATH = (
     Path(__file__).resolve().parent.parent.parent / "bundles" / "act" / "act_subgraph.yaml"
@@ -374,24 +376,30 @@ def test_no_direct_act_envelope_to_act_dispatch_edge() -> None:
     )
 
 
-def test_lifted_bundle_has_exactly_seven_edges() -> None:
+def test_lifted_bundle_has_exactly_nine_edges() -> None:
     """Pin the bundle's edge count to catch future silent insertions /
     deletions that would silently bypass the typed-boundary contract.
 
-    Expected edges after the round-2 fix:
+    Expected edges after PR-1b (ADR-0237):
       - act.validate -> act.authorize
-      - act.authorize -> act.envelope
+      - act.authorize -> act.approve.gate
+      - act.approve.gate -> act.envelope (predicate on approval_routing)
+      - intervene.resume -> act.approve.gate (resume cycle)
       - act.envelope -> act.fanout
       - act.fanout -> act.dispatch (predicate)
       - act.dispatch -> act.join
       - act.join -> act.observe (predicate)
 
-    Total: 6 edges. (Asserting == 6 — not "at least" — so any future
+    Plus the act.observe chain (PR-3):
+      - act.observe -> act.observe.commit_fact
+      - act.observe.commit_fact -> act.observe.terminate_decide
+
+    Total: 11 edges. (Asserting == 11 — not "at least" — so any future
     addition is an explicit, reviewed change.)
     """
     plan = _lift_bundle()
-    assert len(plan.edges) == 6, (
-        f"lifted act.subgraph must have exactly 6 edges, got "
+    assert len(plan.edges) == 11, (
+        f"lifted act.subgraph must have exactly 11 edges, got "
         f"{len(plan.edges)}: "
         f"{[(e.source, e.target) for e in plan.edges]}"
     )
@@ -515,6 +523,8 @@ def _make_outer_registry(
     executors: dict[str, NodeExecutor] = {
         "act.validate": ActValidateExecutor(),
         "act.authorize": ActAuthorizeExecutor(),
+        "act.approve.gate": ApproveGateExecutor(),
+        "intervene.resume": ResumeExecutor(),
         "act.envelope": ActEnvelopeExecutor(),
         "act.fanout": ActFanoutExecutor(),
         "act.join": ActJoinExecutor(),
@@ -590,7 +600,7 @@ def _outer_state() -> Any:
 
 
 @pytest.mark.asyncio
-async def test_act_subgraph_bundle_full_chain_visits_all_seven_nodes() -> None:
+async def test_act_subgraph_bundle_full_chain_visits_all_eight_nodes() -> None:
     """End-to-end: validate → authorize → envelope → fanout → dispatch →
     join → observe, driven by the *actual* ``bundles/act/act_subgraph.yaml``.
 
@@ -638,9 +648,16 @@ async def test_act_subgraph_bundle_full_chain_visits_all_seven_nodes() -> None:
     )
 
     visited_ids = [v.node_id for v in result.visits]
+    # PR-1b / ADR-0237: gate sits between authorize and envelope.
+    # The default Decision carries needs_approval=False, so the gate
+    # emits approval_routing.next_hint='approve_skipped' which matches
+    # the in [approve_skipped, approve_approved] predicate on the
+    # gate → envelope edge. On approve_skipped the chain continues to
+    # envelope (the full pipeline runs).
     expected = [
         "act.validate",
         "act.authorize",
+        "act.approve.gate",
         "act.envelope",
         "act.fanout",
         "act.dispatch",
@@ -648,12 +665,13 @@ async def test_act_subgraph_bundle_full_chain_visits_all_seven_nodes() -> None:
         "act.observe",
     ]
     assert visited_ids == expected, (
-        f"act subgraph bundle did not drive the full 7-node sequence. "
+        f"act subgraph bundle did not drive the full 8-node sequence. "
         f"expected={expected} got={visited_ids}. If the chain stops at "
         f"'act.fanout' (next node 'act.dispatch' missing), bundle "
         f"edges are broken (Defect 1a). If it stops at 'act.join' "
         f"(next node 'act.observe' missing predicate), bundle edge "
-        f"is broken (Defect 1b)."
+        f"is broken (Defect 1b). If it stops at 'act.approve.gate' "
+        f"the gate → envelope predicate is rejecting (PR-1b)."
     )
 
     # Inner effect gateway was actually invoked by the inner
@@ -678,8 +696,8 @@ __all__ = [
     "test_act_fanout_is_reachable_from_act_validate_in_bundle",
     "test_act_fanout_to_act_dispatch_carries_fanout_1to1_predicate",
     "test_act_join_to_act_observe_carries_join_1to1_predicate_not_true",
-    "test_act_subgraph_bundle_full_chain_visits_all_seven_nodes",
+    "test_act_subgraph_bundle_full_chain_visits_all_eight_nodes",
     "test_bundle_yaml_has_no_duplicate_when_keys",
-    "test_lifted_bundle_has_exactly_seven_edges",
+    "test_lifted_bundle_has_exactly_nine_edges",
     "test_no_direct_act_envelope_to_act_dispatch_edge",
 ]

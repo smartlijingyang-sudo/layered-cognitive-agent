@@ -45,13 +45,23 @@ class ActAuthorizeExecutor:
 
     semantic_name: str = "act.authorize"
     region: str = "act"
-    # ``state`` is optional (authorize reads ``state is not None`` and
-    # skips budget checks when state is absent). Declaring only the
-    # required input ``decision`` keeps the v2 driver's fan-in dispatch
-    # from blocking the chain when the outer drive did not supply an
-    # AgentState port.
-    declared_inputs: tuple[PortName, ...] = ("decision",)
-    declared_outputs: tuple[PortName, ...] = ("decision",)
+    # ADR-0235 / PR-5: state is now an optional declared input — its
+    # absence skips budget checks (preserves the v2 driver's fan-in
+    # dispatch path). When present, it is passed through to downstream
+    # typed ports (``act.envelope``, ``act.dispatch``, ``effect.execute``)
+    # so the kernel does not need to reach into ``context.runtime``
+    # again. The metadata-based smuggle path is closed.
+    declared_inputs: tuple[PortName, ...] = ("decision", "state")
+    # ADR-0237 / PR-1b: typed ``approval_required: bool`` port replaces
+    # the previous ``decision.extra["needs_approval"]`` metadata grep.
+    # Decision itself is a typed DTO; ``approval_required`` is computed
+    # here so we don't widen Decision's contract for one consumer. The
+    # only reader is ``act.approve.gate`` in the same subgraph.
+    declared_outputs: tuple[PortName, ...] = (
+        "decision",
+        "state",
+        "approval_required",
+    )
 
     async def node_execute(
         self,
@@ -61,7 +71,8 @@ class ActAuthorizeExecutor:
         """act.authorize 入口。
 
         inputs 端口(yaml): decision (Decision), state (AgentState)
-        outputs 端口(yaml): decision (Decision)
+        outputs 端口(yaml): decision (Decision), state (AgentState),
+                            approval_required (bool)
         """
         del context
         decision = input.port_values.get("decision")
@@ -114,7 +125,21 @@ class ActAuthorizeExecutor:
                         f"act.authorize: unsafe tool name rejected: {call.tool_name!r}"
                     )
 
-        return NodeOutput(port_values={"decision": decision})
+        # ADR-0237 / PR-1b: typed ``approval_required`` — Decision carries
+        # ``needs_approval`` (typed field, PR-5); we project it onto a
+        # subgraph-local boolean so the inner edge predicate
+        # ``act.authorize → act.approve.gate`` can read it without crossing
+        # into Decision's payload_type. Computed once at the seam, not
+        # re-read on every dispatch.
+        approval_required = bool(decision.needs_approval)
+
+        return NodeOutput(
+            port_values={
+                "decision": decision,
+                "state": state,
+                "approval_required": approval_required,
+            }
+        )
 
 
 @plugin(

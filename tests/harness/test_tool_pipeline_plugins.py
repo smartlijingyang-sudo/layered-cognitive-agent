@@ -158,28 +158,31 @@ async def test_denied_policy_prevents_provider_execution() -> None:
 
 @pytest.mark.asyncio
 async def test_legacy_safe_executor_uses_provider_pipeline_contract() -> None:
-    # PR-7: mint_envelope requires plan_ref (V5 acceptance). Tests must wrap
-    # the call in plan_ref_scope to inject a non-empty plan_ref.
-    from lca.contracts.models.observability.plan.ref import plan_ref_scope
+    # ADR-0235 / PR-5: plan_ref / scope_ref are typed-injection kwargs on
+    # PipelineSafeExecutor. Tests inject literal providers instead of
+    # relying on the observability scope contextvars (the act business
+    # layer no longer reaches into ``lca.infrastructure.observability``).
+    executor = PipelineSafeExecutor(
+        ToolPermissionManifest(allowed_tools=["legacy_echo"]),
+        plan_ref_provider=lambda: "test_plan_ref_for_pipeline_test",
+        scope_ref_provider=lambda: "turn-test",
+    )
 
-    executor = PipelineSafeExecutor(ToolPermissionManifest(allowed_tools=["legacy_echo"]))
-
-    with plan_ref_scope("test_plan_ref_for_pipeline_test"):
-        result = await executor.execute(
-            _LegacyEchoTool(),
-            {"message": "hello"},
-            RetryPolicy(max_retries=0),
-            CacheConfig(enabled=False),
-        )
+    result = await executor.execute(
+        _LegacyEchoTool(),
+        {"message": "hello"},
+        RetryPolicy(max_retries=0),
+        CacheConfig(enabled=False),
+    )
 
     assert result.success is True
     assert result.payload == "hello"
     assert result.extra["policy_verdict_refs"] == [
-        "executor.permission:allow",
-        "executor.reservation:valid",
-        "executor.grant:valid",
-        "executor.plan-boundary:valid",
-        "executor.pipeline:completed",
+        "effect.pre_dispatch.permission:allow",
+        "effect.pre_dispatch.grant:valid",
+        "effect.pre_dispatch.budget:valid",
+        "effect.pre_dispatch.safe-boundary:valid",
+        "effect.pre_dispatch.envelope-shape:valid",
     ]
     envelope = result.extra["command_envelope"]
     assert envelope["plan_ref"] == "test_plan_ref_for_pipeline_test"
@@ -191,6 +194,7 @@ async def test_legacy_safe_executor_uses_provider_pipeline_contract() -> None:
 async def test_legacy_safe_executor_requires_active_compiled_plan_ref() -> None:
     from lca.contracts.models.core.execution.result import ToolExecutionError
 
+    # No plan_ref_provider injected → executor raises "active compiled plan_ref".
     executor = PipelineSafeExecutor(ToolPermissionManifest(allowed_tools=["legacy_echo"]))
 
     with pytest.raises(ToolExecutionError, match="active compiled plan_ref"):
@@ -205,14 +209,13 @@ async def test_legacy_safe_executor_requires_active_compiled_plan_ref() -> None:
 @pytest.mark.asyncio
 async def test_legacy_safe_executor_denies_before_provider_execution() -> None:
     from lca.contracts.models.core.execution.result import ToolExecutionError
-    from lca.contracts.models.observability.plan.ref import plan_ref_scope
 
-    executor = PipelineSafeExecutor(ToolPermissionManifest(allowed_tools=[]))
+    executor = PipelineSafeExecutor(
+        ToolPermissionManifest(allowed_tools=[]),
+        plan_ref_provider=lambda: "denied_plan_ref",
+    )
 
-    with (
-        plan_ref_scope("denied_plan_ref"),
-        pytest.raises(ToolExecutionError, match="未在 ToolPermissionManifest"),
-    ):
+    with pytest.raises(ToolExecutionError, match="未在 ToolPermissionManifest"):
         await executor.execute(
             _LegacyEchoTool(),
             {"message": "must not execute"},

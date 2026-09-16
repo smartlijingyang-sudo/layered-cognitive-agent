@@ -21,6 +21,9 @@ from lca.framework.graph.lift.interface import (
 )
 from lca.framework.graph.lift.parsers import _to_port_specs
 from lca.framework.graph.lift.validators import (
+    _outer_consumes_hitl_routing,
+    _predicate_reads_routing_next_hint,
+    _validate_approval_resume_node,
     _validate_termination,
     validate_predicates,
     validate_termination,
@@ -30,7 +33,10 @@ __all__ = [
     "DefaultPlanLifter",
     "PlanLifter",
     "_lift_graph_spec_inner",
+    "_outer_consumes_hitl_routing",
+    "_predicate_reads_routing_next_hint",
     "_to_port_specs",
+    "_validate_approval_resume_node",
     "_validate_termination",
     "get_plan_lifter",
     "lift_executable_plan",

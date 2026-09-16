@@ -6,12 +6,11 @@ the gate is a typed-boundary node under ``region:intervene`` that
 consumes the ``decision`` + ``command`` ports and emits
 ``decision`` + ``routing`` ports. Four cases pin:
 
-  (1) ``decision.extra["needs_approval"]=True`` + no command → interrupt
-      path (``next_node="intervene.interrupt"``,
+  (1) ``decision.needs_approval=True`` + no command → interrupt path
+      (``next_node="intervene.interrupt"``,
       ``next_hint="approve_interrupt"``).
-  (2) ``decision.extra["needs_approval"]`` absent or False →
-      pass-through (``next_node="act.envelope"``,
-      ``next_hint="approve_skipped"``).
+  (2) ``decision.needs_approval`` is False → pass-through
+      (``next_node="act.envelope"``, ``next_hint="approve_skipped"``).
   (3) ``command.kind in {"reject", "redirect"}`` (or
       ``command.kind == "resume"`` for timeout/abandon) → abort
       (``next_node="terminal.commit"``,
@@ -19,6 +18,11 @@ consumes the ``decision`` + ``command`` ports and emits
   (4) ``command.kind == "approve"`` → envelope
       (``next_node="act.envelope"``,
       ``next_hint="approve_approved"``).
+
+ADR-0235 / PR-5: ``needs_approval`` is a typed field on
+:class:`Decision` (added by L-2 / G-9 follow-through). The gate reads
+typed ports only — the previous ``_resolve_port(context, name)`` graph
+runtime peek is gone.
 
 Idempotency is verified by re-running the same input and asserting the
 typed outputs are equal. The fail-closed contract (missing
@@ -46,17 +50,18 @@ def _ctx() -> NodeContext:
     return NodeContext(runtime={}, budget={}, metadata={})
 
 
-def _decision(*, needs_approval: bool | None = False) -> Decision:
-    """Build a Decision for the test (dataclass — kwargs only)."""
-    extra: dict[str, object] = {}
-    if needs_approval is not None:
-        extra["needs_approval"] = needs_approval
+def _decision(*, needs_approval: bool = False) -> Decision:
+    """Build a Decision for the test (dataclass — kwargs only).
+
+    ADR-0235 / PR-5: ``needs_approval`` is now a typed field on
+    Decision; ``extra`` smuggling is gone.
+    """
     return Decision(
         decision_id="dec_gate_001",
         action_type="use_tool",
         rationale="needs gate",
         confidence=1.0,
-        extra=extra,
+        needs_approval=needs_approval,
     )
 
 
@@ -92,31 +97,18 @@ async def test_gate_needs_approval_without_command_routes_to_interrupt() -> None
         NodeInput(port_values={"decision": _decision(needs_approval=True), "command": None}),
     )
     decision: Decision = output.port_values["decision"]
-    routing: RoutingDecision = output.port_values["routing"]
+    routing: RoutingDecision = output.port_values["approval_routing"]
     assert isinstance(routing, RoutingDecision)
     assert routing.next_node == "intervene.interrupt"
     assert routing.next_hint == "approve_interrupt"
     # Decision is forwarded unchanged — the gate does not mutate it.
-    assert decision.extra["needs_approval"] is True
+    assert decision.needs_approval is True
     assert decision.decision_id == "dec_gate_001"
 
 
 # ---------------------------------------------------------------------------
-# Case 2: needs_approval absent or False → pass-through to act.envelope.
+# Case 2: needs_approval=False → pass-through to act.envelope.
 # ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_gate_needs_approval_absent_passes_through_to_envelope() -> None:
-    """``decision.extra`` lacks ``needs_approval`` → skip, route to envelope."""
-    executor = ApproveGateExecutor()
-    output = await executor.node_execute(
-        _ctx(),
-        NodeInput(port_values={"decision": _decision(needs_approval=None)}),
-    )
-    routing: RoutingDecision = output.port_values["routing"]
-    assert routing.next_node == "act.envelope"
-    assert routing.next_hint == "approve_skipped"
 
 
 @pytest.mark.asyncio
@@ -127,7 +119,7 @@ async def test_gate_needs_approval_false_passes_through_to_envelope() -> None:
         _ctx(),
         NodeInput(port_values={"decision": _decision(needs_approval=False)}),
     )
-    routing: RoutingDecision = output.port_values["routing"]
+    routing: RoutingDecision = output.port_values["approval_routing"]
     assert routing.next_node == "act.envelope"
     assert routing.next_hint == "approve_skipped"
 
@@ -150,7 +142,7 @@ async def test_gate_reject_routes_to_terminal_commit() -> None:
             }
         ),
     )
-    routing: RoutingDecision = output.port_values["routing"]
+    routing: RoutingDecision = output.port_values["approval_routing"]
     assert routing.next_node == "terminal.commit"
     assert routing.next_hint == "approve_rejected"
 
@@ -168,7 +160,7 @@ async def test_gate_redirect_to_abandon_routes_to_terminal_commit() -> None:
             }
         ),
     )
-    routing: RoutingDecision = output.port_values["routing"]
+    routing: RoutingDecision = output.port_values["approval_routing"]
     assert routing.next_node == "terminal.commit"
     assert routing.next_hint == "approve_rejected"
 
@@ -191,7 +183,7 @@ async def test_gate_resume_treated_as_timeout_routes_to_terminal_commit() -> Non
             }
         ),
     )
-    routing: RoutingDecision = output.port_values["routing"]
+    routing: RoutingDecision = output.port_values["approval_routing"]
     assert routing.next_node == "terminal.commit"
     assert routing.next_hint == "approve_rejected"
 
@@ -214,7 +206,7 @@ async def test_gate_approve_routes_to_envelope() -> None:
             }
         ),
     )
-    routing: RoutingDecision = output.port_values["routing"]
+    routing: RoutingDecision = output.port_values["approval_routing"]
     assert routing.next_node == "act.envelope"
     assert routing.next_hint == "approve_approved"
 
@@ -236,7 +228,7 @@ async def test_gate_is_idempotent_across_instances() -> None:
     out_a = await ApproveGateExecutor().node_execute(_ctx(), inp)
     out_b = await ApproveGateExecutor().node_execute(_ctx(), inp)
     assert out_a.port_values["decision"] == out_b.port_values["decision"]
-    assert out_a.port_values["routing"] == out_b.port_values["routing"]
+    assert out_a.port_values["approval_routing"] == out_b.port_values["approval_routing"]
 
 
 # ---------------------------------------------------------------------------
@@ -279,19 +271,20 @@ async def test_gate_rejects_non_command_port() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_gate_resume_edge_is_present_in_outer_plan() -> None:
-    """The ``intervene.resume → act.approve.gate`` resume edge is wired.
+def test_gate_resume_edge_is_present_in_act_subgraph() -> None:
+    """The ``intervene.resume → act.approve.gate`` resume edge is wired in act_subgraph.
 
-    Reads ``bundles/outer/phase_main.yaml`` directly and asserts the
-    resume edge exists with the expected source/target. If a future
-    PR removes the edge, plan validation would fail at boot with an
-    unreachable-node error, so this is a static guard against that.
+    ADR-0237 / PR-1b: gate moved into act_subgraph (spec §3.2 原位), so
+    the resume edge moved with it. The per-plan resume-edge validator
+    fires at subgraph lift when ``intervene.resume → act.approve.gate``
+    is missing. This guard reads ``bundles/act/act_subgraph.yaml``
+    directly and asserts the resume edge exists.
     """
     from pathlib import Path
 
     import yaml
 
-    bundle_path = Path(__file__).resolve().parents[2] / "bundles" / "outer" / "phase_main.yaml"
+    bundle_path = Path(__file__).resolve().parents[2] / "bundles" / "act" / "act_subgraph.yaml"
     spec = yaml.safe_load(bundle_path.read_text(encoding="utf-8"))
     edges = spec.get("edges", ()) or ()
     resume_edges = [
@@ -303,17 +296,19 @@ def test_gate_resume_edge_is_present_in_outer_plan() -> None:
     ]
     assert resume_edges, (
         "intervene.resume → act.approve.gate resume edge missing from "
-        "bundles/outer/phase_main.yaml — plan lift will fail at boot "
+        "bundles/act/act_subgraph.yaml — plan lift will fail at boot "
         "(approve gate unreachable from resume path)"
     )
 
 
-def test_gate_reachable_from_act_main_in_outer_plan() -> None:
-    """``act.main → act.approve.gate`` entry edge is wired.
+def test_gate_consumed_by_outer_routing_edges() -> None:
+    """The outer plan routes ``act.main.routing`` to the 3 HITL targets.
 
-    The gate is positioned in the flow between ``act.main`` and the
-    next phase; without this edge the gate is unreachable and plan
-    lift fails at boot.
+    ADR-0237 / PR-1b: gate emits a typed ``RoutingDecision`` that bubbles
+    out of the subgraph via ``act.main.declared_outputs``. The outer plan
+    owns three mutually-exclusive edges from ``act.main`` to
+    ``{intervene.interrupt, terminal.commit, reflect.main}`` — one of
+    the 4 ``next_hint`` values determines which target fires.
     """
     from pathlib import Path
 
@@ -322,13 +317,13 @@ def test_gate_reachable_from_act_main_in_outer_plan() -> None:
     bundle_path = Path(__file__).resolve().parents[2] / "bundles" / "outer" / "phase_main.yaml"
     spec = yaml.safe_load(bundle_path.read_text(encoding="utf-8"))
     edges = spec.get("edges", ()) or ()
-    entry_edges = [
-        e
+    routing_edges = {
+        e.get("to")
         for e in edges
-        if isinstance(e, dict) and e.get("from") == "act.main" and e.get("to") == "act.approve.gate"
-    ]
-    assert entry_edges, (
-        "act.main → act.approve.gate entry edge missing from "
-        "bundles/outer/phase_main.yaml — plan lift will fail at boot "
-        "(approve gate unreachable from act subgraph completion)"
-    )
+        if isinstance(e, dict) and e.get("from") == "act.main"
+    }
+    for target in ("intervene.interrupt", "terminal.commit", "reflect.main"):
+        assert target in routing_edges, (
+            f"act.main → {target} missing from bundles/outer/phase_main.yaml — "
+            f"the gate's routing hint has no outer consumer"
+        )

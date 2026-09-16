@@ -86,8 +86,21 @@ class _StubEffectGateway:
         self.invocation_id = invocation_id
         self.calls: list[CommandEnvelope] = []
 
-    async def execute(self, envelope: CommandEnvelope, policy: Any) -> dict[str, Any]:
+    async def execute(
+        self,
+        envelope: CommandEnvelope,
+        policy: Any,
+        *,
+        state: Any = None,
+        decision: Any = None,
+    ) -> dict[str, Any]:
+        # ADR-0235 / PR-5: state / decision are typed keyword-only kwargs on
+        # ``EffectDispatcher.execute`` (replacing ``envelope.metadata``
+        # smuggle). The stub accepts them for protocol conformance; it
+        # does not consume their value.
         del policy
+        del state
+        del decision
         self.calls.append(envelope)
         return {
             "invocation_id": self.invocation_id,
@@ -366,8 +379,18 @@ async def test_act_dispatch_emits_receipts_and_act_observe_visits() -> None:
     # the inner ``effect.execute`` entry receives it via ``set_outer_input``
     # (the upstream ``act.envelope`` node is out of scope for this test —
     # the brief targets the dispatch → join → observe boundary).
+    # ADR-0235 / PR-5: ``decision`` / ``state`` are now typed-port inputs;
+    # the upstream ``act.envelope`` is out of scope for this regression
+    # guard, but we must seed the registry with placeholder typed values
+    # so the executor's typed-port check passes.
     registry = PortRegistry()
-    registry.set_outer_input({"envelope": _test_envelope()})
+    registry.set_outer_input(
+        {
+            "envelope": _test_envelope(),
+            "decision": _test_decision(),
+            "state": _outer_state(),
+        }
+    )
     result = await interpreter.run(
         plan,
         port_registry=registry,
@@ -468,6 +491,24 @@ def _test_envelope() -> CommandEnvelope:
         budget_reservation=BudgetReservation(),
         idempotency_key="idem_e2e",
         metadata={"operation": "bash"},
+    )
+
+
+def _test_decision() -> Any:
+    """Minimal typed ``Decision`` for the inner ``effect.execute`` typed ports.
+
+    ADR-0235 / PR-5: ``decision`` / ``state`` are typed-port inputs that
+    cross the act → effect boundary. The act envelope is upstream of
+    this regression guard; the test seeds minimal typed values to keep
+    the dispatch → join → observe boundary under test.
+    """
+    from lca.contracts.models.core.execution.decision import Decision
+
+    return Decision(
+        decision_id="dec_e2e",
+        action_type="use_tool",
+        rationale="e2e",
+        confidence=1.0,
     )
 
 

@@ -23,6 +23,8 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.mechanisms import HookRegistry
+from lca.contracts.models.core.execution.decision import Decision
+from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.act.effect.handler import EffectCapabilities, EffectHandlerRegistry
 from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
     DeltaReducer,
@@ -63,7 +65,12 @@ class Config(BaseModel):
 
 
 class RegistryEffectDispatcherFactory(EffectDispatcherFactory):
-    """Create the standard policy and idempotency governed effect gateway."""
+    """Create the standard policy and idempotency governed effect gateway.
+
+    ADR-0235 / PR-5: factory accepts typed-injection kwargs for
+    ``state`` / ``decision``; the dispatcher forwards them as typed
+    keyword-only args to per-call ``execute``.
+    """
 
     def create(
         self,
@@ -71,11 +78,15 @@ class RegistryEffectDispatcherFactory(EffectDispatcherFactory):
         capabilities: EffectCapabilities,
         effect_handler_registry: EffectHandlerRegistry,
         idempotency_store: IdempotencyStore,
+        state: AgentState | None = None,
+        decision: Decision | None = None,
     ) -> EffectDispatcher:
         return RegistryEffectDispatcher(
             capabilities,
             effect_handler_registry,
             idempotency_store,
+            state=state,
+            decision=decision,
         )
 
 

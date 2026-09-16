@@ -7,10 +7,11 @@ does not reconstruct concrete registry-backed implementations in L2.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from lca.contracts.mechanisms import HookRegistry
+from lca.contracts.models.core.execution.decision import Decision
 from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.act.effect.handler import EffectCapabilities, EffectHandlerRegistry
@@ -146,7 +147,15 @@ class ResultFinalizerFactory(Protocol):
 
 @runtime_checkable
 class EffectDispatcherFactory(Protocol):
-    """Create the selected policy-governed effect execution gateway."""
+    """Create the selected policy-governed effect execution gateway.
+
+    ADR-0235 / PR-5: ``state`` / ``decision`` are typed-injection kwargs
+    so the factory can construct a dispatcher that holds typed Contract
+    references (per ADR-0195 §1.4 C13). Both default to ``None``;
+    profiles that need to thread them through to handler invocations
+    pass them at factory time, and the dispatcher signature preserves
+    them as per-call keyword-only arguments.
+    """
 
     def create(
         self,
@@ -154,6 +163,8 @@ class EffectDispatcherFactory(Protocol):
         capabilities: EffectCapabilities,
         effect_handler_registry: EffectHandlerRegistry,
         idempotency_store: IdempotencyStore,
+        state: AgentState | None = None,
+        decision: Decision | None = None,
     ) -> EffectDispatcher: ...
 
 

@@ -34,6 +34,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.models.core.execution.decision import Decision, Observation
+from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.act.command.envelope import CommandEnvelope
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
@@ -55,7 +56,20 @@ class EffectExecuteExecutor:
 
     semantic_name: str = "effect.execute"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("envelope",)
+    # ADR-0234 / PR-2: verdict_refs is now a typed-port input — produced
+    # by ``effect.pre_dispatch.envelope_check`` and consumed (passthrough)
+    # here so the subgraph keeps a typed binding for the 5-gate verdict
+    # set without re-checking them at this node.
+    # ADR-0235 / PR-5: decision / state flow in as typed ports; they are
+    # passed to ``EffectDispatcher.execute(envelope, policy, *,
+    # decision=..., state=...)`` instead of being smuggled via
+    # ``envelope.metadata``.
+    declared_inputs: tuple[PortName, ...] = (
+        "envelope",
+        "verdict_refs",
+        "decision",
+        "state",
+    )
     # PR-3.8.5 fix1: emit ``receipts`` (list-of-one) so the act subgraph's
     # ``act.join`` typed-boundary node (declared_inputs=("receipts",)) sees
     # the receipt via the kernel port registry. Previously emitted the
@@ -70,7 +84,8 @@ class EffectExecuteExecutor:
     ) -> NodeOutput:
         """effect.execute 入口。
 
-        inputs 端口:envelope (CommandEnvelope)
+        inputs 端口:envelope (CommandEnvelope), verdict_refs (tuple[str, ...]),
+        decision (Decision), state (AgentState)
         outputs 端口:receipts (list[EffectReceipt], length 1)
 
         职责还包括把 Observation 以 ``surface/tool_result`` 追加到 Session。
@@ -86,7 +101,13 @@ class EffectExecuteExecutor:
                 f"instance, got {type(envelope).__name__}"
             )
 
-        receipt, observation = await _dispatch(envelope, context)
+        # ADR-0235 / PR-5: decision / state are typed-port inputs; they
+        # flow into ``gateway.execute(envelope, policy, *, decision=...,
+        # state=...)`` instead of being smuggled via ``envelope.metadata``.
+        decision = input.port_values.get("decision")
+        state = input.port_values.get("state")
+
+        receipt, observation = await _dispatch(envelope, context, decision, state)
         _append_tool_result_surface(context, envelope, receipt, observation)
         return NodeOutput(port_values={"receipts": [receipt]})
 
@@ -235,7 +256,10 @@ def _extract_observation(result: object) -> Observation | None:
 
 
 async def _dispatch(
-    envelope: CommandEnvelope, context: NodeContext
+    envelope: CommandEnvelope,
+    context: NodeContext,
+    decision: Decision | None,
+    state: AgentState | None,
 ) -> tuple[EffectReceipt, Observation | None]:
     """Dispatch the CommandEnvelope through the EffectDispatcher capability.
 
@@ -243,6 +267,10 @@ async def _dispatch(
     result is not an Observation, e.g. ``memory.update``'s dict receipt),
     so the node can project a model-visible ``surface/tool_result`` row
     without re-parsing the stringified ``output_ref``.
+
+    ADR-0235 / PR-5: ``decision`` / ``state`` are typed kwargs forwarded
+    to ``gateway.execute`` as typed keyword-only parameters; the dispatcher
+    does not read them off ``envelope.metadata``.
     """
 
     runtime = context.runtime
@@ -267,7 +295,7 @@ async def _dispatch(
     )
 
     try:
-        output = await gateway.execute(envelope, policy)
+        output = await gateway.execute(envelope, policy, decision=decision, state=state)
     except Exception as exc:
         invocation_id = envelope.idempotency_key or "unknown"
         return (

@@ -290,6 +290,13 @@ entries:
   name: phase_concept_effect_execute_effect_execute
   $module: lca.nodes.concept.effect.execute
   config: {}
+# ADR-0234 / PR-2: 5-gate atomic envelope check extracted from
+# PipelineSafeExecutor into a typed-port graph node. Sits before
+# act.dispatch in the act subgraph.
+- id: phase.concept.effect.pre_dispatch_envelope_check
+  name: phase_concept_effect_pre_dispatch_envelope_check
+  $module: lca.nodes.effect.pre_dispatch_envelope_check
+  config: {}
 - id: lca-memory-write-policy-simple
   name: lca_memory_write_policy_simple
   $module: lca.plugins.memory.policy.write_policy

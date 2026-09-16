@@ -22,18 +22,25 @@ from lca.framework.graph.lift.subgraph_contract import (
     require_subgraph_plan_exists,
     subgraph_entry_schema,
 )
-from lca.framework.graph.lift.validators import validate_predicates, validate_termination
+from lca.framework.graph.lift.validators import (
+    _validate_approval_resume_node,
+    validate_predicates,
+    validate_termination,
+)
 
 
 def lift_graph_spec(spec: Mapping[str, Any]) -> Plan:
     """Lift a v2 BundleGraphSpec-shaped mapping into a :class:`Plan`.
 
-    Runs predicate and termination validation after building the plan.
-    See :func:`validate_predicates` and :func:`validate_termination`.
+    Runs predicate, termination, and approval-resume-node validation
+    after building the plan. See :func:`validate_predicates`,
+    :func:`validate_termination`, and
+    :func:`_validate_approval_resume_node`.
     """
     plan = lift_graph_spec_inner(spec)
     validate_predicates(plan)
     validate_termination(plan)
+    _validate_approval_resume_node(plan)
     return plan
 
 

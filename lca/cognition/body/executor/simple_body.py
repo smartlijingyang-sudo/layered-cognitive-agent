@@ -62,10 +62,6 @@ def _observation_error(observation: Observation) -> dict[str, Any] | None:
 # Body 是 phase=act 执行平面;advance(phase) 是把 cursor 推到对应窗口的 SSOT。
 # ADR-0169 §D1 + PR-26 task-25:phase 推进责任钉死在 SimpleBody,
 # SafeExecutor / 下游 record_* 只在合法 phase 内写证据 EP。
-
-# Body 是 phase=act 执行平面;advance(phase) 是把 cursor 推到对应窗口的 SSOT。
-# ADR-0169 §D1 + PR-26 task-25:phase 推进责任钉死在 SimpleBody,
-# SafeExecutor / 下游 record_* 只在合法 phase 内写证据 EP。
 _ACTION_TO_PHASE: dict[str, PhaseName] = {
     ActionType.USE_TOOL.value: "act",
     ActionType.DELEGATE.value: "act",

@@ -56,7 +56,10 @@ async def test_observe_passes_through_well_formed_receipt() -> None:
     assert normalized.output_ref is None
     assert normalized.error_code is None
     assert normalized.failure_kind is None
-    assert output.port_values["should_terminate"] is False
+    # PR-3: ``should_terminate`` no longer produced by the normalize node.
+    # Routing decision lives on the sibling ``act.observe.terminate_decide``
+    # node; see ``tests/act/test_observe_terminate_decide.py``.
+    assert "should_terminate" not in output.port_values
 
 
 @pytest.mark.asyncio
@@ -115,8 +118,11 @@ async def test_observe_populates_error_reason_from_closed_set() -> None:
     # Closed-set map (failure_kind → error_reason) is identity for known failure_kinds.
     assert normalized.error_code == FAILURE_KIND_EXECUTION
     assert normalized.failure_kind == FAILURE_KIND_EXECUTION
-    # Deterministic-failure shortcut still fires on the normalized receipt.
-    assert output.port_values["should_terminate"] is True
+    # PR-3: the normalize node is pure receipt rewrite; the deterministic-
+    # failure shortcut (should_terminate) is now produced by
+    # ``act.observe.terminate_decide`` and asserted in
+    # ``tests/act/test_observe_terminate_decide.py``.
+    assert "should_terminate" not in output.port_values
 
 
 @pytest.mark.asyncio

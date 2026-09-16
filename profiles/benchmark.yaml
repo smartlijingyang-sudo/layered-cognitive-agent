@@ -34,7 +34,6 @@ bundles:
   - bundles/base.yaml
   - bundles/web-app.yaml
   - bundles/scenario-cordis-creator.yaml
-  - bundles/declarative-phase-graph.yaml
   - bundles/loop_cursor.spine_minimal.yaml
 
 patch:

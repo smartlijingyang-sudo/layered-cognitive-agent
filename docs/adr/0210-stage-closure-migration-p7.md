@@ -1,5 +1,7 @@
 # ADR-0210 — 阶段闭集迁移：0075 CognitivePhaseGraphPlan 与 0194 Loop 收敛退化为 region 标签
 
+Status: Accepted — 2026-09-09. PR-7 (ADR-0236) closed remaining dual lineage debt (deletes `bundles/agent/run_phase.yaml` + `bundles/declarative-phase-graph.yaml` + `bundles/declarative-recovery.yaml`; migrates `profiles/benchmark.yaml` + `profiles/cordis-creator.yaml` to region-tag path).
+
 > **状态：** **Accepted — 2026-09-09**（§6.1 - §6.6 全部段实施完成；production path 经 `profiles/web-assistant.yaml` 的 `regions.declare` 段验证）
 >
 > **一句话**：把 ADR-0075 的 `CognitivePhaseGraphPlan` 六阶段闭集（perceive / think / act / reflect / remember / stop 编译期枚举 + SSOT 锁）和 ADR-0194 的 Loop 收敛（C14 region 标签机制）合并：阶段从「SSOT 锁」退化为 `region = phase:<name>` 的 region 标签值集合，编译器仍校验 region 标签属于已知集但**标签值不绑定调度特权**，用户可在 profile 中扩展自定义 region（`phase:plan` / `phase:replan`），超集由 `region = phase:<name>` 表达。这是 [ADR-0206 §10 P7](../0206-information-graph-kernel.md) 的实施切片。
