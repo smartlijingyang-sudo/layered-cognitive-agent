@@ -98,7 +98,7 @@ def emit_carrier_run_failed(
 
 def ensure_carrier_terminal_observation(session: RunSession) -> StampedEvent | None:
     """Best-effort terminal fact before hub close when the run failed without ``AgentRunFinished``."""
-    failed = session.status in {RunLifecycleStatus.FAILED, RunLifecycleStatus.CANCELED}
+    failed = session.status in {RunLifecycleStatus.FAILED, RunLifecycleStatus.CANCELLED}
     if not failed:
         return None
     if journal_has_terminal_event(session):
