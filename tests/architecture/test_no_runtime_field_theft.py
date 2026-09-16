@@ -47,15 +47,6 @@ ALLOWED_RUNTIME_CARRIERS: frozenset[str] = frozenset(
 )
 
 
-def _iter_node_files() -> list[Path]:
-    """Return every Python file under ``lca/nodes/`` (skip ``__init__``)."""
-    return sorted(
-        path
-        for path in NODES_ROOT.rglob("*.py")
-        if path.is_file() and path.name != "__init__.py"
-    )
-
-
 def _runtime_field_accesses(tree: ast.AST) -> list[tuple[str, str, int]]:
     """Return (file_rel, field, line_no) for every disallowed runtime access.
 
