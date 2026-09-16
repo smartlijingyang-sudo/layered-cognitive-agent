@@ -290,6 +290,18 @@ entries:
   $module: lca.plugins.transport.webserver.jwt_keys_seam.jwt_keys
   config:
     dev_mode: true
+
+# Allowlist counterpart to base's deny-by-default
+# ``lca-effect-permission-manifest-default``. web-standard profile
+# disables the base entry so this allowlist (body.act + memory.update)
+# is the first match ``require_matching("permission_manifest.")`` sees.
+- id: lca-effect-permission-manifest-web-standard
+  name: lca_effect_permission_manifest_web_standard
+  $module: lca.nodes.effect.permission_manifest_web_standard
+  config:
+    allowed_operations:
+      - body.act
+      - memory.update
 - id: lca-web-server
   name: lca_web_server
   $module: lca.plugins.transport.webserver.server.server

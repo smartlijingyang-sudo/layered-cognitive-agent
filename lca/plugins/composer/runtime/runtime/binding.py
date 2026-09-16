@@ -11,6 +11,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 from lca.contracts.mechanisms import consume
+from lca.contracts.models.team.role.team import ToolPermissionManifest
 from lca.contracts.protocols.declarative.declarative_1.node_executor import NodeExecutor
 from lca.contracts.protocols.session.resume.input import ResumeInputAdapter
 from lca.contracts.protocols.state.plan import CompiledRunPlan
@@ -32,6 +33,7 @@ def from_runtime_graph(
     compiled_plan: CompiledRunPlan,
     node_executors: Mapping[str, NodeExecutor],
     resume_input_adapter: ResumeInputAdapter,
+    permission_manifest: ToolPermissionManifest | None = None,
 ) -> ProductionRuntimeDeps:
     """Adapt graph facts to the dependency value at the binding seam."""
     return ProductionRuntimeDeps(
@@ -41,6 +43,8 @@ def from_runtime_graph(
         hooks=graph.hooks,
         state_store=consume("state_store", graph.state_store, from_runtime_graph),
         perceive_hub=graph.perceive_hub,
+        llm=graph.llm,
+        permission_manifest=permission_manifest,
         reducer=capabilities.reducer,
         compiled_plan=compiled_plan,
         node_executors=node_executors,
@@ -110,14 +114,39 @@ def bind_runtime_graph(
         spec,
         capabilities.resume_input_adapters,
     )
+    permission_manifest = _resolve_permission_manifest(scope)
     deps = from_runtime_graph(
         graph=graph,
         capabilities=capabilities,
         compiled_plan=plan,
         node_executors=node_executors,
         resume_input_adapter=resume_input_adapter,
+        permission_manifest=permission_manifest,
     )
     return build_production_runtime_bindings(deps)
+
+
+def _resolve_permission_manifest(scope: Context) -> ToolPermissionManifest | None:
+    """Pick the highest-precedence ``permission_manifest.*`` from booted scope.
+
+    Wildcard ``require_matching`` requires the consumer to declare a
+    ``permission_manifest.*`` requires, but at composition time there is no
+    consumer — we walk the booted ctx bindings directly. ``None`` keeps
+    the historical fail-loud default ("manifest missing → deny") at the
+    envelope gate.
+    """
+    try:
+        from lca.harness.plugin.context import collect_context_bindings
+    except ImportError:
+        return None
+    matches = {
+        key: value
+        for key, value in collect_context_bindings(scope).items()
+        if isinstance(key, str) and key.startswith("permission_manifest.")
+    }
+    if not matches:
+        return None
+    return next(iter(matches.values()))
 
 
 __all__ = [

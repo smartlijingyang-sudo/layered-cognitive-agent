@@ -187,6 +187,8 @@ def test_production_runtime_deps_rejects_conflicting_phase_capabilities() -> Non
         hooks=object(),
         state_store=object(),
         perceive_hub=object(),
+        llm=object(),
+        permission_manifest=cast("ToolPermissionManifest", object()),
         reducer=object(),
         compiled_plan=object(),
         phase_capabilities={"brain": object()},

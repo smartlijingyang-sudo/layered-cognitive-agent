@@ -49,6 +49,8 @@ def _fixture_deps() -> RuntimeDeps:
         hooks=cast("HookRegistry", object()),
         state_store=cast("StateStore", object()),
         perceive_hub=cast("PerceiveHub", object()),
+        llm=cast("LLMAdapter", object()),
+        permission_manifest=cast("ToolPermissionManifest", object()),
         phase_capabilities={},
     )
 
@@ -61,6 +63,8 @@ def _production_deps() -> ProductionRuntimeDeps:
         hooks=cast("HookRegistry", object()),
         state_store=cast("StateStore", object()),
         perceive_hub=cast("PerceiveHub", object()),
+        llm=cast("LLMAdapter", object()),
+        permission_manifest=cast("ToolPermissionManifest", object()),
         reducer=cast("Reducer", DefaultReducer()),
         compiled_plan=cast("CompiledRunPlan", object()),
         phase_capabilities={},
@@ -184,6 +188,8 @@ def test_production_dependency_model_rejects_missing_closure_member() -> None:
             hooks=cast("HookRegistry", object()),
             state_store=cast("StateStore", object()),
             perceive_hub=cast("PerceiveHub", object()),
+            llm=cast("LLMAdapter", object()),
+            permission_manifest=cast("ToolPermissionManifest", object()),
             reducer=cast("Reducer", DefaultReducer()),
             compiled_plan=cast("CompiledRunPlan", object()),
             phase_capabilities={},

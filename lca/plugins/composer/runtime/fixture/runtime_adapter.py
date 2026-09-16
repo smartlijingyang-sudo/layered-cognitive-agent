@@ -92,6 +92,8 @@ class FixtureRuntimeAdapter:
             hooks=resolved.hooks,
             state_store=resolved.state_store,
             perceive_hub=resolved.perceive_hub,
+            llm=resolved.llm,
+            permission_manifest=resolved.permission_manifest,
             reducer=cast("Reducer", resolved.reducer),
             compiled_plan=cast("CompiledRunPlan", resolved.compiled_plan),
             node_executors=resolved.node_executors,

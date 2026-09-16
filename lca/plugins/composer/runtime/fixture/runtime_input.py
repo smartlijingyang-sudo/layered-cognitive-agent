@@ -11,10 +11,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from lca.contracts.mechanisms import HookRegistry
+from lca.contracts.models.team.role.team import ToolPermissionManifest
 from lca.contracts.protocols import (
     ArtifactClosure,
     Body,
     Brain,
+    LLMAdapter,
     MemorySystem,
     PerceiveHub,
     Reducer,
@@ -47,6 +49,8 @@ class RuntimeDeps:
     hooks: HookRegistry
     state_store: StateStore
     perceive_hub: PerceiveHub
+    llm: LLMAdapter
+    permission_manifest: ToolPermissionManifest | None = None
     phase_capabilities: Mapping[str, object]
     reducer: Reducer | None = None
     compiled_plan: CompiledRunPlan | None = None

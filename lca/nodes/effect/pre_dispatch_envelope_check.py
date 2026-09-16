@@ -79,7 +79,6 @@ class EffectPreDispatchEnvelopeCheckExecutor(NodeExecutor):
     permission_manifest: ToolPermissionManifest | None = None
 
     async def execute(self, context: NodeContext, input: NodeInput) -> NodeOutput:
-        del context
         port_values = input.port_values
         envelope = port_values.get("envelope")
 
@@ -101,9 +100,20 @@ class EffectPreDispatchEnvelopeCheckExecutor(NodeExecutor):
                 f"decision_ref={envelope.decision_ref!r}, provider={envelope.provider!r})"
             )
 
-        # permission
+        # permission (ADR-0220 PR-A typed-port read; profile-resolved
+        # manifest is published onto the kernel runtime carrier so the
+        # node reads the active policy at visit time, not the boot-time
+        # snapshot bound on the executor instance).
+        runtime = getattr(context, "runtime", None)
+        manifest = (
+            getattr(runtime, "permission_manifest", None)
+            if runtime is not None
+            else None
+        )
+        if manifest is None:
+            manifest = self.permission_manifest
         allowed = (
-            self.permission_manifest.allowed_tools if self.permission_manifest is not None else None
+            manifest.allowed_tools if manifest is not None else None
         )
         if allowed is None or tool_name not in allowed:
             raise ValueError(

@@ -12,10 +12,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from lca.contracts.mechanisms import HookRegistry
+from lca.contracts.models.team.role.team import ToolPermissionManifest
 from lca.contracts.protocols import (
     ArtifactClosure,
     Body,
     Brain,
+    LLMAdapter,
     MemorySystem,
     PerceiveHub,
     Reducer,
@@ -58,6 +60,7 @@ class ProductionRuntimeDeps:
     hooks: HookRegistry
     state_store: StateStore
     perceive_hub: PerceiveHub
+    llm: LLMAdapter
     reducer: Reducer
     compiled_plan: CompiledRunPlan
     node_executors: Mapping[str, NodeExecutor]
@@ -75,6 +78,7 @@ class ProductionRuntimeDeps:
     result_finalizer_factory: ResultFinalizerFactory
     phase_observer: PhaseObserver
     lifecycle_publisher: RuntimeLifecyclePublisher | None = None
+    permission_manifest: ToolPermissionManifest | None = None
 
     def runtime_phase_capabilities(self) -> RuntimePhaseCapabilities:
         """Project one frozen phase view from the canonical graph facts."""
@@ -84,6 +88,8 @@ class ProductionRuntimeDeps:
             body=self.body,
             memory=self.memory,
             perceive_hub=self.perceive_hub,
+            llm=self.llm,
+            permission_manifest=self.permission_manifest,
         )
 
 

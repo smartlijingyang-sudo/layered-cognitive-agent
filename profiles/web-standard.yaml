@@ -52,3 +52,10 @@ patch:
   # The legacy ``phase.topology.standard`` patch was removed as part
   # of the outer-plan cutover (ADR-0221 P3 + topology-provider
   # retirement).
+
+  # Disable base.yaml's deny-by-default ``permission_manifest.default``
+  # so the web-app-installed allowlist (body.act + memory.update) wins
+  # as the first ``require_matching("permission_manifest.")`` entry
+  # consumed by ``effect.pre_dispatch.envelope_check``.
+  - id: lca-effect-permission-manifest-default
+    disabled: true
