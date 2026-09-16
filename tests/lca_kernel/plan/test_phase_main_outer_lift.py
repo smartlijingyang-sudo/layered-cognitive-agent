@@ -1,4 +1,4 @@
-"""Atomic lift test for ``bundles/phase_main_outer.yaml`` (Task 6).
+"""Atomic lift test for ``bundles/outer/phase_main.yaml`` (Task 6).
 
 The outer plan is the production spine for the six-phase loop
 (perceive → think → act → reflect → remember → terminal). After the
@@ -20,7 +20,7 @@ import yaml
 from lca.framework.graph.lifter import lift_graph_spec
 
 REPO = Path(__file__).resolve().parent.parent.parent.parent
-BUNDLE = REPO / "bundles" / "phase_main_outer.yaml"
+BUNDLE = REPO / "bundles" / "outer" / "phase_main.yaml"
 
 
 def test_phase_main_outer_yaml_lifts() -> None:
