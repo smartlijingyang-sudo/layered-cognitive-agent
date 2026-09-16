@@ -158,3 +158,109 @@ def test_orphan_tool_result_without_assistant_kept_in_journal_but_dropped_at_wir
 
     # But the wire shape drops it (no preceding assistant declared tool_calls).
     assert [m["role"] for m in msgs] == ["user"]
+
+
+def test_orphan_dropped_count_increments_for_orphan() -> None:
+    """Spec §G-17: ``orphan_dropped_count`` increments by 1 per orphan row.
+
+    Pre-PR-2 the count was hidden; PR-2 exposes it on the writer so
+    ``RunHealthReport`` (and on-call engineers) can spot a regression in
+    the upstream ``Body.dispatch_tool_calls`` seam without scraping logs.
+    """
+    session = _InMemorySession()
+    writer = RunSessionWriter(session=session)
+    writer.append_user_message(message_id="u1", role="user", content="hi")
+    writer.append_assistant_message(
+        turn=0,
+        step=0,
+        role="assistant",
+        content=None,
+        tool_calls=[{"id": "X", "name": "bash", "arguments": "{}"}],
+        usage=None,
+    )
+    # Orphan: call_id="Y" never declared.
+    writer.append_tool_result(turn=0, step=0, call_id="Y", content="orphan", error=None, meta=None)
+
+    assert writer.orphan_dropped_count == 0
+    writer.derive_messages()
+    assert writer.orphan_dropped_count == 1
+
+
+def test_orphan_dropped_count_is_zero_for_valid_multi_call() -> None:
+    """Spec §G-17: post-PR-2 a valid multi-call decision leaves the counter at 0.
+
+    Drives ``SimpleBody.dispatch_tool_calls`` end-to-end with 5
+    ``runCommand`` calls (the B-1 scenario from ``run_feb0f21ee770``)
+    and asserts the counter stays at 0 because every ``call_id`` was
+    declared by the single assistant row before any tool ran.
+    """
+    import asyncio
+
+    from lca.cognition.body.executor.simple_body import SimpleBody
+    from lca.contracts.atoms.enums.enums import ActionType
+    from lca.contracts.models.core.execution.decision import Decision, ToolCall
+    from lca.contracts.models.team.role.team import CacheConfig, RetryPolicy
+    from lca.contracts.protocols.runtime.infra.infra import Tool
+
+    @dataclass
+    class _Tool:
+        name: str
+
+        async def execute(self, args: dict[str, Any]) -> Any:
+            from lca.contracts.atoms.ids.ids import new_id
+            from lca.contracts.models.core.execution.decision import Observation
+
+            return Observation(
+                observation_id=new_id("obs"),
+                success=True,
+                payload={"echo": args},
+            )
+
+    @dataclass
+    class _Registry:
+        tools: dict[str, Tool] = field(default_factory=dict)
+
+        def get(self, name: str) -> Tool | None:
+            return self.tools.get(name)
+
+    @dataclass
+    class _SafeExecutor:
+        async def execute(
+            self,
+            tool: Tool,
+            args: dict[str, Any],
+            retry_policy: RetryPolicy,
+            cache_config: CacheConfig,
+            invocation_id: str = "",
+        ) -> Any:
+            del retry_policy, cache_config
+            return await tool.execute(args)
+
+    session = _InMemorySession()
+    writer = RunSessionWriter(session=session)
+    body = SimpleBody(
+        tool_registry=_Registry(tools={"runCommand": _Tool(name="runCommand")}),  # type: ignore[arg-type]
+        safe_executor=_SafeExecutor(),  # type: ignore[arg-type]
+        transport_registry=None,  # type: ignore[arg-type]
+        action_registry=None,  # type: ignore[arg-type]
+        writer=writer,
+    )
+    writer.append_user_message(message_id="u1", role="user", content="do five things")
+    decision = Decision(
+        decision_id="dec-multi-5",
+        action_type=ActionType.USE_TOOL.value,
+        rationale="multi-call",
+        confidence=1.0,
+        tool_calls=[
+            ToolCall(call_id=f"call-{i}", tool_name="runCommand", arguments={"i": i})
+            for i in range(5)
+        ],
+    )
+
+    asyncio.run(body.dispatch_tool_calls(decision=decision))
+    msgs = writer.derive_messages()
+
+    # Wire shape: user, assistant{tool_calls=[5]}, then 5 tool rows.
+    assert [m["role"] for m in msgs] == ["user", "assistant", "tool", "tool", "tool", "tool", "tool"]
+    # PR-2 G-17: orphan_dropped_count stays 0 for any well-formed multi-call.
+    assert writer.orphan_dropped_count == 0

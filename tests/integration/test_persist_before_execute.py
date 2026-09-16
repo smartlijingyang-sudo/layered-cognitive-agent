@@ -1,4 +1,4 @@
-"""Spec §C: persist-before-execute in ``Body.dispatch_tool_call``.
+"""Spec §C: persist-before-execute in ``Body.dispatch_tool_calls``.
 
 The assistant ``tool_calls`` row must land in the journal BEFORE the tool
 runs. If ``Session.append`` fails between the assistant-message write and
@@ -8,6 +8,11 @@ tool execution, the tool never runs and the turn breaks with an
 This is the root-cause fix for the original ``run_cc39610072bf`` bug:
 the orphan cycle cannot start because the assistant row is in the journal
 before the next LLM call sees the history.
+
+PR-2 (G-16): ``dispatch_tool_call`` was renamed to ``dispatch_tool_calls``
+(commit-batch over ``decision.tool_calls``). The persist-before-execute
+invariant is preserved — exactly ONE ``surface/assistant_message`` row
+carrying ALL N declared tool_calls lands BEFORE any tool runs.
 """
 
 from __future__ import annotations
@@ -201,9 +206,12 @@ def test_assistant_message_in_journal_before_tool_execution() -> None:
         writer=writer,
     )
 
-    receipt = asyncio.run(body.dispatch_tool_call(decision=_decision_with_one_tool_call()))
+    receipts = asyncio.run(body.dispatch_tool_calls(decision=_decision_with_one_tool_call()))
 
     # Receipt is rejected: persistence failed before tool execution, tool never ran.
+    assert isinstance(receipts, list)
+    assert len(receipts) == 1
+    receipt = receipts[0]
     assert isinstance(receipt, EffectReceipt)
     assert receipt.outcome is EffectOutcome.FAILED
     assert receipt.error_code == "session_persistence_failed"
@@ -231,8 +239,11 @@ def test_tool_result_persisted_after_tool_execution() -> None:
         writer=writer,
     )
 
-    receipt = asyncio.run(body.dispatch_tool_call(decision=_decision_with_one_tool_call()))
+    receipts = asyncio.run(body.dispatch_tool_calls(decision=_decision_with_one_tool_call()))
 
+    assert isinstance(receipts, list)
+    assert len(receipts) == 1
+    receipt = receipts[0]
     assert isinstance(receipt, EffectReceipt)
     assert receipt.outcome is EffectOutcome.SUCCEEDED
     assert recorder.calls == [{"name": "echo", "args": {"x": 1}}]
@@ -245,8 +256,8 @@ def test_tool_result_persisted_after_tool_execution() -> None:
     ]
 
 
-def test_dispatch_tool_call_without_writer_raises() -> None:
-    """``Body.dispatch_tool_call`` requires a bound RunSessionWriter.
+def test_dispatch_tool_calls_without_writer_raises() -> None:
+    """``Body.dispatch_tool_calls`` requires a bound RunSessionWriter.
 
     Per ADR-0226 §1: writer methods fail loud. No silent None; the
     persist-before-execute path must not run if the writer is unbound.
@@ -264,7 +275,7 @@ def test_dispatch_tool_call_without_writer_raises() -> None:
     )
 
     with pytest.raises(ToolExecutionError):
-        asyncio.run(body.dispatch_tool_call(decision=_decision_with_one_tool_call()))
+        asyncio.run(body.dispatch_tool_calls(decision=_decision_with_one_tool_call()))
     assert recorder.calls == []
 
 
@@ -272,7 +283,7 @@ def test_result_write_failure_reports_persistence_failed_but_tool_ran() -> None:
     """Spec §C: defence-in-depth on the tool-result write.
 
     The assistant row persists (first ``append`` succeeds); the tool runs
-    and returns success; the tool-result ``append`` raises. ``dispatch_tool_call``
+    and returns success; the tool-result ``append`` raises. ``dispatch_tool_calls``
     must:
       - return ``EffectReceipt(FAILED, error_code="session_persistence_failed")``;
       - leave the journal holding ``[surface/user_message,
@@ -310,11 +321,14 @@ def test_result_write_failure_reports_persistence_failed_but_tool_ran() -> None:
         writer=writer,
     )
 
-    receipt = asyncio.run(
-        body.dispatch_tool_call(decision=_decision_with_one_tool_call(), state=_state())
+    receipts = asyncio.run(
+        body.dispatch_tool_calls(decision=_decision_with_one_tool_call(), state=_state())
     )
 
     # Receipt is rejected with the persistence-failure code.
+    assert isinstance(receipts, list)
+    assert len(receipts) == 1
+    receipt = receipts[0]
     assert isinstance(receipt, EffectReceipt)
     assert receipt.outcome is EffectOutcome.FAILED
     assert receipt.error_code == "session_persistence_failed"
