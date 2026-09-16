@@ -2105,3 +2105,78 @@ Plan 已落地到 `docs/superpowers/plans/2026-09-16-act-subgraph-tightening.md`
 2. **Inline Execution** — 当前 session 顺序跑每个 PR,checkpoint review。需要我开 `superpowers:executing-plans`。
 
 **额外提示:** PR-1 P0 立刻可开(无 ADR 阻塞);PR-2 / PR-5 需先写 ADR-0234 / ADR-0235,Accepted 才合 PR。建议先开 PR-1 同时起草 2 份 ADR 草案并行。
+
+---
+
+# 执行期修订(2026-09-16,SDD wave 1 后)
+
+## R-1 PR-1 Step 1.6 是 plan 缺陷,已按实际发布范围重写
+
+Plan 原文断言「act_subgraph 的边引用 outer 的 `intervene.interrupt` / `terminal.commit`
+是允许的,因为 `sub_spec_ref` 把外层节点暴露给内层」。**该断言错误**:
+
+- `bundles/act/act_subgraph.yaml` 由 `lca/harness/declarative/compile/subgraph_resolver.py`
+  的 `_load_bundle_graph_spec` 加载,其中 `factory=str(n["factory"])` 对**每个节点**硬性要求;
+- outer `bundles/outer/phase_main.yaml` 由 `lca/framework/graph/plan_sdk.py` 的
+  `parse_plan_yaml` 加载,`binding` 默认 `node_executor`,允许无 `factory` 节点。
+
+两套 loader 的节点 schema 不同,所以子图**不能**命名其他 plan 的节点;照 Step 1.6 实施会让
+`./scripts/lca-ops plan tree profiles/web-standard.yaml` 直接 `KeyError: 'factory'`。
+实测:基线 `✓ all layers inflated and validated`,按 Step 1.6 改后崩。
+
+**连带风险**:搬迁实现把 outer 的 `act.approve.gate` 变成 delegate 后,删掉了
+`act.main → act.approve.gate` 进边与该 gate 的全部出边,只剩 `intervene.resume →` 一条进边
+——HITL 在 outer 层完全断连(没有边能到达 `intervene.interrupt`)。这比原先「位置错误但连通」
+更危险,且原有单测只断言 yaml 里边存在,测不出来。
+
+**实际发布的 PR-1 范围**(commit `d9deb7952`):
+1. `lift_graph_spec` 加 `_validate_approval_resume_node`:声明 gate 而缺 resume 边 → `PlanLiftError`;
+2. `plan_sdk.plan()` docstring 固化 `approval_resume_node` 字段语义,避免 yaml 与 lifter 双规则;
+3. 新增 5 条 wiring 不变量护栏,把上述两个回归钉死(`tests/act/test_approve_gate_wiring_invariants.py`);
+4. 删 `_ACTION_TO_PHASE` 上方重复的注释块。
+
+## R-2 G-1 是伪问题,已降级
+
+Plan 称 `_ACTION_TO_PHASE` 与「act node waterfall」重复声明。全仓核查:
+`grep -rn "ACTION_TO_PHASE" --include=*.py .` 仅 `simple_body.py:69` 一处定义 + `:309` 一处使用,
+**没有任何第二份**。搬到 `lca/nodes/act/_phase_table.py` 反而会新增 `cognition → nodes` 跨层依赖,
+与 lint-imports 方向相反。真实残渣只是那段注释被逐字复制两遍,已删。G-1 关闭方式改为注释去重。
+
+## R-3 L-1 只完成一半,剩余明确划归 PR-5
+
+PR-3(commit `0377d2ac4`)把 RunFact 落库拆成独立 `act.observe.commit_fact`,
+职责分离达成。但该节点仍以 `getattr(runtime, "journal", None)` 取 kernel capability,
+并在缺失时静默跳过落库——**边界与隐式降级都还在**。已在 Node 与 commit message 中如实记录,
+归 PR-5(ADR-0235)处理,未在 PR-3 里虚报修复。
+
+## 新增 PR-1b:把 gate 移到 act.authorize 与 act.envelope 之间(spec §3.2 原位)
+
+前置 **ADR-0237**(子图输出冒泡 + outer 边互斥判定)。必须解决的设计点:
+
+1. `act.approve.gate` 留在 act_subgraph 内(authorize 之后、envelope 之前),
+   非批准分支(interrupt / rejected)在子图内**不出边**,让子图结束;
+2. gate 的 `routing`(或 `approval_routing`)需冒泡为 `act.main` 的 declared_output
+   ——沿用 PR-3 注释所述 kernel-wide port registry 传播机制,并验证确实可用;
+3. outer 现有 `act.main → think.main`(按 `decision.action_type == use_tool`)与
+   `act.main → reflect.main`(always)必须与新分支**互斥**,否则一次 act 会同时命中
+   「进 interrupt」和「回 think」——这正是本仓反复治理的静默失败类;
+4. `act.authorize` 需产出 typed `approval_required: bool`(替代 `decision.extra["needs_approval"]`
+   的 metadata grep),该端口在本 PR 才有消费者,故不与 PR-1 一起提前发布死端口;
+5. `lifter._validate_approval_resume_node` 改为对 outer plan 求值(resume 边在 outer)。
+
+## 基线失败登记(AGENTS.md §6:以下为既有失败,非本次引入)
+
+| 项 | 现象 | 验证方式 |
+|---|---|---|
+| `tests/loop/test_phase_registry.py` | `ModuleNotFoundError: lca.loop.phases` | 干净提交树同样报错 |
+| `tests/loop/test_fact_gateway.py::test_cognitive_emit_context_manifested_via_gateway` | 失败 | 基线复现 |
+| `tests/loop/test_tool_surface_commit.py::test_commit_body_tool_execute_end_appends_tool_role_message` | `Observation.content` AttributeError | 基线复现 |
+| `tests/architecture/test_learning_review_lifecycle.py` | `ModuleNotFoundError: lca.harness.composition.plan_compiler` | 基线复现 |
+| `ruff check lca/ tests/` | 352 errors | 本次改动 0 新增(3 处命中均在 `lifter.py` 既有行 461/695/707) |
+| `./scripts/lca-ops validate_profile_plans` | 子命令不存在 | 用 `plan tree profiles/web-standard.yaml` 替代 |
+
+## 执行事故登记
+
+控制器一次 `ruff check --fix lca/ tests/` 作用域过宽,自动修复污染 140 个无关文件;
+已用白名单方式还原(保留 7 个本次文件),工作树恢复为 0 意外改动。教训:门禁命令的
+lint/format 修复类操作必须限定在 diff 文件集,不得对全仓跑 `--fix`。
