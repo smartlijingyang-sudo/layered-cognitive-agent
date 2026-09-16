@@ -30,6 +30,14 @@ class MockWebSocket {
   static CLOSING = 2;
   static CLOSED = 3;
 
+  // Mirror the WebSocket statics onto the instance — production code uses
+  // `this.ws.OPEN` for `readyState` comparisons (statics don't inherit on
+  // instance access in JS), so the mock must follow the same shape.
+  OPEN = MockWebSocket.OPEN;
+  CLOSED = MockWebSocket.CLOSED;
+  CLOSING = MockWebSocket.CLOSING;
+  CONNECTING = MockWebSocket.CONNECTING;
+
   readyState = MockWebSocket.CONNECTING;
   onopen: ((ev: unknown) => void) | null = null;
   onmessage: ((ev: { data: string }) => void) | null = null;
