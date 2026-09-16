@@ -24,7 +24,7 @@ _TERMINAL = frozenset(
     {
         RunLifecycleStatus.COMPLETED.value,
         RunLifecycleStatus.FAILED.value,
-        RunLifecycleStatus.CANCELED.value,
+        RunLifecycleStatus.CANCELLED.value,
         "completed",
         "failed",
         "canceled",
