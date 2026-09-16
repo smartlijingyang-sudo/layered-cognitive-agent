@@ -61,6 +61,13 @@ class ToolResultMessage(_WireBase):
     content: str
     state: dict | None = None
     error: str | None = None
+    # Wire byte-compat with the front-end client (lobehub-ui
+    # ``LcaAgentStreamClient.sendToolResult``). The back-end reads this
+    # via ``msg.get("idempotencyKey", "")`` for replay dedup in
+    # ``commands.resume_approval``. Declared here so Pydantic's
+    # ``extra="ignore"`` (see ``_WireBase``) keeps the field instead of
+    # silently stripping it from the parsed dict.
+    idempotencyKey: str | None = None
 
 
 ClientMessage = Annotated[

@@ -67,6 +67,13 @@ interface ClientInterruptMessage {
 interface ClientToolResultMessage {
   content: string;
   error?: string;
+  // Wire byte-compat with the back-end (lca/.../gateway_messages.py:
+  // ToolResultMessage.idempotencyKey). The server's _handle_control_frame
+  // reads this via msg.get('idempotencyKey', '') and forwards it to
+  // RunPort.resume_approval as the replay dedup key. Without the field,
+  // a cross-tab HIL answer is silently re-executed instead of being
+  // deduped (gap D regression guard).
+  idempotencyKey?: string;
   state?: Record<string, unknown>;
   success: boolean;
   toolCallId: string;

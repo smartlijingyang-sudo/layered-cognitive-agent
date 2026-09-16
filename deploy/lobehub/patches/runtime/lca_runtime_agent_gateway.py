@@ -24,6 +24,7 @@ _LCA_GATEWAY_DIR = f"{_UI_TRANSPORTS}/lcaGateway"
 
 _NEW_FILES = (
     "LcaAgentStreamClient.ts",
+    "LcaAgentStreamClient.test.ts",
     "connect.ts",
     "execute.ts",
     "executeGatewayRun.ts",
