@@ -145,7 +145,13 @@ class EffectPreDispatchEnvelopeCheckExecutor(NodeExecutor):
     id="phase.concept.effect.pre_dispatch_envelope_check",
     Config=None,
     provides=("effect::effect.pre_dispatch.envelope_check",),
-    requires=(),
+    # PR-2 close-out: ``permission_manifest`` is provided by the
+    # profile's policy adapters (default: ``lca-effect-permission-manifest-default``
+    # ships a deny-by-default ``ToolPermissionManifest``). The wildcard
+    # ``requires`` accepts any ``permission_manifest.<name>`` provider
+    # so production profiles can swap in their own allowlist without
+    # editing this node.
+    requires=("permission_manifest.*",),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",
@@ -172,7 +178,21 @@ class EffectPreDispatchEnvelopeCheckExecutor(NodeExecutor):
 )
 async def setup(ctx: PluginContext, config: object = None) -> None:
     del config
-    permission_manifest = ctx.inject("permission_manifest")
+    # ``permission_manifest`` is an optional capability: when no
+    # PluginSpec provider is wired into the resolved profile the
+    # permission gate is fail-loud deny-by-default (see
+    # ``EffectPreDispatchEnvelopeCheckExecutor.execute``).
+    # ``require_matching`` walks the ``permission_manifest.*`` binding
+    # chain — empty when no provider is registered.
+    matches = ctx.require_matching("permission_manifest.")
+    if matches:
+        # Pick the first manifest; production profiles that ship
+        # multiple ``permission_manifest.*`` providers should use the
+        # highest-precedence entry (a single ``tool_permission_manifest``
+        # producer is the common case).
+        permission_manifest = next(iter(matches.values()))
+    else:
+        permission_manifest = None
     executor = EffectPreDispatchEnvelopeCheckExecutor(
         permission_manifest=permission_manifest,
     )
