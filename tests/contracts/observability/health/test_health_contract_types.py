@@ -28,7 +28,7 @@ from lca.contracts.observability.health import (
 def _evidence() -> EvidenceRef:
     return EvidenceRef(
         run_id="run_abc",
-        spine_path="/tmp/spines/run_abc.spine.jsonl",
+        spine_path="/var/spines/run_abc.spine.jsonl",
         event_id="run_abc:7",
         execution_point="perceive.phase.fold.end",
         seq=7,
@@ -187,9 +187,12 @@ def test_conditions_is_tuple_not_list() -> None:
     """
     report = _report()
     assert isinstance(report.conditions, tuple)
-    # ``list`` would be mutable; ``tuple`` is not.
-    with pytest.raises((TypeError, ValidationError)):
+    # ``tuple`` is immutable — ``.append`` does not exist (AttributeError),
+    # and ``__setitem__`` raises ``TypeError``. Either proves immutability.
+    with pytest.raises((AttributeError, TypeError)):
         report.conditions.append(_condition(reason="extra"))  # type: ignore[attr-defined]
+    with pytest.raises(TypeError):
+        report.conditions[0] = _condition(reason="extra")  # type: ignore[index]
 
 
 def test_evidence_refs_is_tuple_not_list() -> None:
