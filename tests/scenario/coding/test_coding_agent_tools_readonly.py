@@ -88,7 +88,7 @@ def _write_spine_v3_failure_jsonl(path: Path) -> None:
                 "reason": "'NoneType' object has no attribute 'x'",
                 "traceback_text": (
                     "Traceback (most recent call last):\n"
-                    "  File \"perceive/main.py\", line 12, in perceive\n"
+                    '  File "perceive/main.py", line 12, in perceive\n'
                     "    return node.x\n"
                     "AttributeError: 'NoneType' object has no attribute 'x'\n"
                 ),
@@ -114,13 +114,114 @@ def test_failure_explainer_surfaces_spine_v3_traceback(tmp_path: Path) -> None:
     _write_spine_v3_failure_jsonl(jsonl)
     report = FailureExplainer(jsonl).explain_failure(run_id="run_a")
     assert report["event_count"] == 2
-    failure_events = [
-        event for event in report["events"] if event.get("failure")
-    ]
+    failure_events = [event for event in report["events"] if event.get("failure")]
     assert failure_events, "expected the error event to carry the lifted failure block"
     failure = failure_events[0]["failure"]
     assert failure["exc_type"] == "AttributeError"
     assert "AttributeError" in failure["traceback_text"]
+
+
+def _write_ledger(path: Path, run_id: str, rows: list[tuple[str, dict]]) -> None:
+    """Write spine v3 records in the shape ``<run_id>.spine.jsonl`` uses.
+
+    ``rows`` is ``(execution_point, payload)``; seq comes from position and
+    ``run_id`` lives inside ``event_id`` / ``payload``, never at top level.
+    """
+    with path.open("w", encoding="utf-8") as handle:
+        for seq, (ep, payload) in enumerate(rows, start=1):
+            body = {"run_id": run_id, "trace_id": f"trace_{run_id}", **payload}
+            handle.write(
+                json.dumps(
+                    {
+                        "event_id": f"{run_id}:{seq}",
+                        "category": f"spine.{ep}",
+                        "channel": "fact",
+                        "execution_point": ep,
+                        "payload": body,
+                        "ts": f"2026-09-17T00:00:{seq:02d}.000000+00:00",
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
+
+
+def test_explain_anchors_on_the_failure_the_run_died_on(tmp_path: Path) -> None:
+    """A multi-failure run must anchor on the last substantive failure.
+
+    run_eed09c1df112 failed at step 4 but its step 2 ``import_skill`` had
+    already failed and been recovered from. Anchoring on the first failure
+    made ``explain`` name seq=480 while ``debug-run`` [5/8] named seq=1006
+    for the same ledger — two commands disagreeing about which event killed
+    the run.
+    """
+    jsonl = tmp_path / "run_a.spine.jsonl"
+    _write_ledger(
+        jsonl,
+        "run_a",
+        [
+            ("kernel.run.start", {}),
+            (
+                "step.tool_result.record",
+                {
+                    "outcome": "failure",
+                    "failure_kind": "validation",
+                    "tool_name": "import_skill",
+                    "error": "recovered",
+                },
+            ),
+            (
+                "step.tool_result.record",
+                {
+                    "outcome": "failure",
+                    "failure_kind": "execution",
+                    "tool_name": "runCommand",
+                    "error": "ModuleNotFoundError",
+                },
+            ),
+            ("kernel.run.stop", {"outcome": "failure"}),
+        ],
+    )
+
+    report = FailureExplainer(jsonl).explain_failure(run_id="run_a")
+
+    assert "seq=3" in report["summary"]
+    assert "import_skill" not in report["summary"]
+
+
+def test_explain_does_not_call_a_recovered_run_failed(tmp_path: Path) -> None:
+    """A run that terminated successfully is not a failure, whatever it survived.
+
+    run_dc5a57ef4780 ran a command that raised ModuleNotFoundError, then
+    recovered on the next turn and closed with ``kernel.run.stop
+    outcome=success``. Reporting "失败从 seq=N 开始" for that ledger
+    contradicted ``debug-run``'s status=completed on the same file.
+    """
+    jsonl = tmp_path / "run_b.spine.jsonl"
+    _write_ledger(
+        jsonl,
+        "run_b",
+        [
+            ("kernel.run.start", {}),
+            (
+                "step.tool_result.record",
+                {
+                    "outcome": "failure",
+                    "failure_kind": "execution",
+                    "tool_name": "runCommand",
+                    "error": "ModuleNotFoundError",
+                },
+            ),
+            ("step.tool_result.record", {"outcome": "ok", "tool_name": "runCommand"}),
+            ("kernel.run.stop", {"outcome": "success"}),
+        ],
+    )
+
+    report = FailureExplainer(jsonl).explain_failure(run_id="run_b")
+
+    assert "未失败" in report["summary"]
+    assert "success" in report["summary"]
+    assert "中途失败" in report["summary"]
 
 
 def test_seven_tools_exist(tmp_path: Path) -> None:

@@ -22,6 +22,16 @@ from lca.contracts.models.observability.journal.journal import (
 
 TraceFocus = Literal["all", "error", "latency", "tool", "plugin"]
 
+_RUN_OUTCOME_FAILURES = frozenset({"fail", "failed", "failure", "error"})
+"""``kernel.run.stop`` outcome words that mean the run itself failed.
+
+The kernel's only producer emits ``success`` / ``failure`` / ``cancelled``;
+the synonyms stay because replayed legacy ledgers carry them.
+"""
+
+_TERMINAL_MARKER_EPS = frozenset({"kernel.run.stop", "terminal.commit"})
+"""EPs that announce the run's end rather than carry a substantive failure."""
+
 
 @dataclass(frozen=True)
 class TraceReport:
@@ -74,14 +84,32 @@ class TraceInspector:
         depth: int = 24,
     ) -> TraceReport:
         events = self._select(trace_id=trace_id, run_id=run_id)
-        failure = next((event for event in events if self._is_failure(event)), None)
-        if failure is None:
+        failures = [event for event in events if self._is_failure(event)]
+        if not failures:
             return TraceReport(
                 trace_id=trace_id or "",
                 event_count=len(events),
                 summary="未在所选事件中发现失败终态。",
                 events=(),
             )
+        terminal = self._terminal_outcome(events)
+        if terminal is not None and terminal not in _RUN_OUTCOME_FAILURES:
+            # An intermediate tool failure is evidence about one attempt, not
+            # the run's outcome. Reporting it as "the failure" contradicted
+            # debug-run's status=completed on the very same ledger.
+            return TraceReport(
+                trace_id=trace_id or (str(events[0].scope.trace_id) if events else ""),
+                event_count=len(events),
+                summary=(
+                    f"run 终态为 {terminal},未失败。账本里有 {len(failures)} 条中途失败事件"
+                    f"(首条 seq={failures[0].seq} 的 {failures[0].event_type}),已被后续步骤"
+                    "恢复;下面只列这些中途失败。"
+                ),
+                events=tuple(self._render(event) for event in failures[-max(depth, 1) :]),
+                bottlenecks=tuple(self.find_optimization_candidates(events=events)),
+                plugin_graph=self.plugin_interaction_graph(events=events),
+            )
+        failure = self._terminal_failure_anchor(failures)
         chain = self._causal_chain(failure)
         related = [self._by_seq[seq] for seq in chain if seq in self._by_seq]
         window = [event for event in events if event.scope.run_id == failure.scope.run_id]
@@ -89,7 +117,7 @@ class TraceInspector:
         return TraceReport(
             trace_id=str(failure.scope.trace_id),
             event_count=len(events),
-            summary=f"失败从 seq={failure.seq} 的 {failure.event_type} 开始；报告包含因果祖先和同 run 上下文。",
+            summary=f"失败终于 seq={failure.seq} 的 {failure.event_type};报告包含因果祖先和同 run 上下文。",
             events=tuple(self._render(event) for event in selected),
             causal_chain=chain,
             bottlenecks=tuple(self.find_optimization_candidates(events=events)),
@@ -128,9 +156,15 @@ class TraceInspector:
     ) -> tuple[dict[str, Any], ...]:
         """导出失败路径及其因果祖先，供脱机复现和差分。"""
         events = self._select(trace_id=trace_id, run_id=run_id)
-        failure = next((event for event in events if self._is_failure(event)), None)
-        if failure is None:
+        failures = [event for event in events if self._is_failure(event)]
+        terminal = self._terminal_outcome(events)
+        # A run that terminated successfully has nothing to reproduce: its
+        # intermediate failures were recovered from. Anchoring on one anyway
+        # made ``minimal-repro`` report a failure_seq that disagreed with the
+        # causal_chain it returned beside it.
+        if not failures or (terminal is not None and terminal not in _RUN_OUTCOME_FAILURES):
             return tuple(self._render(event) for event in events)
+        failure = self._terminal_failure_anchor(failures)
         seqs = set(self._causal_chain(failure)) | {failure.seq}
         return tuple(self._render(event) for event in events if event.seq in seqs)
 
@@ -181,6 +215,39 @@ class TraceInspector:
             chain.append(current.seq)
             current = self._by_seq.get(current.parent_seq) if current.parent_seq else None
         return tuple(reversed(chain))
+
+    @staticmethod
+    def _terminal_outcome(events: Sequence[StampedEvent]) -> str | None:
+        """Last ``kernel.run.stop`` outcome, lowercased; ``None`` if absent.
+
+        ``kernel.run.stop`` is the run-outcome authority (the journal fold
+        ranks it above every other terminal EP). ``None`` means the ledger
+        carries no run verdict — a resumed run, or a selection window that
+        stopped before the kernel closed — so the caller must not conclude
+        "the run succeeded".
+        """
+        for stamped in reversed(tuple(events)):
+            if stamped.event_type != "kernel.run.stop":
+                continue
+            data = stamped.data
+            outcome = data.get("outcome") if isinstance(data, Mapping) else None
+            return outcome.strip().lower() if isinstance(outcome, str) else None
+        return None
+
+    @staticmethod
+    def _terminal_failure_anchor(failures: Sequence[StampedEvent]) -> StampedEvent:
+        """The substantive failure the terminal decision saw.
+
+        Last wins. In a multi-failure run the first one is usually an earlier
+        attempt the model already recovered from; anchoring there made
+        ``explain`` name a different seq than ``debug-run`` [5/8] for the same
+        run. Terminal markers are skipped so the anchor stays an event that
+        actually carries the error.
+        """
+        for stamped in reversed(tuple(failures)):
+            if stamped.event_type not in _TERMINAL_MARKER_EPS:
+                return stamped
+        return failures[-1]
 
     @staticmethod
     def _is_failure(stamped: StampedEvent) -> bool:

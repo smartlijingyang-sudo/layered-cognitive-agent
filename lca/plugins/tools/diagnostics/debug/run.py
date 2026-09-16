@@ -38,6 +38,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
+from lca.contracts.atoms.semantic.keys import FAILURE_KIND_TRANSIENT
+from lca.contracts.observability.observability.failure_reason_map import (
+    FAILURE_KIND_TO_ERROR_REASON,
+)
 from lca.contracts.observability.registry.run_locator import RunLocator
 
 
@@ -138,6 +142,11 @@ class DebugRunReport:
         lines.append(f"[5/8] error_ref           {self.error_message or '(none)'}")
         lines.append(f"      error_type:        {self.error_type or '(none)'}")
         lines.append("[6/8] stack frames")
+        if not self.stack_frames:
+            lines.append(
+                "      (none — the ledger has no exception.caught, so no LCA stack was "
+                "captured; `lca-ops journal exceptions <run_id>` is the traceback index)"
+            )
         for frame in self.stack_frames[:8]:
             lines.append(
                 f"      {frame.get('filename', '?')}:{frame.get('lineno', '?')} "
@@ -232,6 +241,8 @@ class DebugRunToolAdapter:
         phase_cursor = _extract_phase_cursor(spine_events)
         attempts = _extract_attempts(manifest_summary)
         stack_frames, suggested = _extract_diagnostic(manifest_summary)
+        if suggested is None and _run_failed(manifest_summary, spine_events):
+            suggested = _suggest_action_from_failure_kind(error_type, error_message)
 
         tail = _tail_lines(kernel_log_path)
 
@@ -386,13 +397,81 @@ def _safe_lines(path: Path) -> list[dict[str, Any]]:
     return out
 
 
+def _run_failed(manifest: dict[str, Any], spine_events: list[dict[str, Any]]) -> bool:
+    """Whether the run is durably recorded as failed.
+
+    Reads the two artifacts that disagree differently: the manifest's
+    ``session_status`` survives a run that died before the kernel wrote
+    its stop event, and the ledger's last ``kernel.run.stop`` outcome is
+    the fact-stream record. Gates the ledger-derived ``error_ref``
+    fallback so a *successful* run that recovered from an intermediate
+    tool failure does not grow an error label.
+    """
+    failure_words = {"fail", "failed", "failure", "error"}
+    status = str(manifest.get("session_status") or "").lower()
+    if status in failure_words:
+        return True
+    doctor = (manifest.get("extra") or {}).get("doctor_report") or {}
+    if isinstance(doctor, dict) and str(doctor.get("status") or "").lower() in failure_words:
+        return True
+    for event in reversed(spine_events):
+        if event.get("execution_point") != "kernel.run.stop":
+            continue
+        payload = event.get("payload") or {}
+        outcome = payload.get("outcome") if isinstance(payload, dict) else None
+        if isinstance(outcome, str) and outcome.lower() in failure_words:
+            return True
+        break
+    return False
+
+
+def _ledger_failure_carrier(
+    spine_events: list[dict[str, Any]],
+) -> tuple[str, str, str | None] | None:
+    """The last failure-carrying ledger event as ``(label, error, kind)``.
+
+    These are the spine carriers that actually hold a failure:
+    ``step.tool_result.record`` (typed tool failure with
+    ``failure_kind``), ``exception.caught``, and ``phase_graph.node.end``
+    with ``outcome="failure"``. The last one wins because it is the
+    failure the terminal decision saw; the label carries its ledger seq
+    so ``lca-ops explain`` can be pointed at the same event.
+    """
+    for event in reversed(spine_events):
+        ep = event.get("execution_point")
+        payload = event.get("payload") or event.get("data") or {}
+        if not isinstance(payload, dict):
+            continue
+        outcome = str(payload.get("outcome") or "").lower()
+        seq = str(event.get("event_id") or "").rpartition(":")[2]
+        if ep == "step.tool_result.record" and outcome in {"failure", "failed", "error"}:
+            error = str(payload.get("error") or "").strip()
+            kind = str(payload.get("failure_kind") or "").strip() or None
+            tool = str(payload.get("tool_name") or "").strip() or "?"
+            return f"tool={tool} failure_kind={kind or '?'} seq={seq}", error, kind
+        if ep == "exception.caught":
+            error = str(payload.get("message") or payload.get("error") or "").strip()
+            kind = str(payload.get("error_type") or payload.get("exception_class") or "").strip()
+            node = str(payload.get("node_id") or "").strip() or "?"
+            return f"node={node} error_kind={kind or '?'} seq={seq}", error, kind or None
+        if ep == "phase_graph.node.end" and outcome == "failure":
+            error = str(payload.get("error") or "").strip()
+            node = str(payload.get("node_id") or "").strip() or "?"
+            return f"node={node} dispatch={payload.get('dispatch') or '?'} seq={seq}", error, None
+    return None
+
+
 def _extract_failure(
     manifest: dict[str, Any], spine_events: list[dict[str, Any]]
 ) -> tuple[str | None, str | None, str | None]:
-    """失败节点 + 错误信息全部从 manifest extra 推导(spine-only)。
+    """失败节点 + 错误信息:manifest doctor 优先,spine ledger 兜底。
 
-    spine 流只有 execution_point 序列,没有 v2 envelope 的 ``descriptor.type``
-    字段,所以失败细节必须从 manifest 的 doctor_report / session_error / flush_errors 抽取。
+    The manifest carries the authoritative error when the doctor hop
+    captured one. When it did not — the common case for a deterministic
+    tool failure, where nothing raised and ``H6`` only records
+    ``outcome=failed`` — the ledger is the only artifact that names the
+    failure, so a failed run reads its carrier from there instead of
+    reporting ``(none)``.
     """
     extra = manifest.get("extra", {}) or {}
     doctor = extra.get("doctor_report", {}) or {}
@@ -421,6 +500,20 @@ def _extract_failure(
         if node:
             failure_node = failure_node or str(node)
         break
+
+    if error_message is None and _run_failed(manifest, spine_events):
+        carrier = _ledger_failure_carrier(spine_events)
+        if carrier is not None:
+            label, error, kind = carrier
+            error_message = f"{label} | {error}" if error else label
+            error_type = error_type or kind
+        else:
+            error_message = (
+                "run failed but no error carrier found — searched "
+                "manifest.extra.doctor_report.hops.H6.error, manifest.session_error, "
+                "extra.flush_errors, and the spine ledger for step.tool_result.record / "
+                "exception.caught / phase_graph.node.end with outcome=failure"
+            )
     return failure_node, error_message, error_type
 
 
@@ -464,6 +557,27 @@ def _extract_diagnostic(
         tuple(f for f in diag.get("stack", []) if isinstance(f, dict)),
         diag.get("suggested_action"),
     )
+
+
+def _suggest_action_from_failure_kind(
+    error_type: str | None, error_message: str | None
+) -> str | None:
+    """Next step derived from the failure's closed-set ``failure_kind``.
+
+    ``SafeExecutor`` retries only ``FAILURE_KIND_TRANSIENT``; every other
+    kind is terminal for that attempt. A failed run whose manifest
+    carries no ``diagnostic`` block still has the classification in the
+    ledger, so the section can state which side of that rule the
+    operator is on instead of printing ``(none)``.
+    """
+    if not error_type and not error_message:
+        return None
+    kind = (error_type or "").strip().lower()
+    if kind == FAILURE_KIND_TRANSIENT:
+        return f"failure_kind={kind} — retryable; SafeExecutor backs off and retries"
+    if kind in FAILURE_KIND_TO_ERROR_REASON:
+        return f"failure_kind={kind} — not retryable per SafeExecutor; fix the cause named in [5/8]"
+    return "run failed — read the error_ref above and `lca-ops journal exceptions <run_id>`"
 
 
 def _tail_lines(path: Path, max_lines: int = 50) -> str:

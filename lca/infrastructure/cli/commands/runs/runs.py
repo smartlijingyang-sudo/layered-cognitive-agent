@@ -59,6 +59,7 @@ from pathlib import Path
 import typer
 
 from lca.contracts.observability.registry.status import RunLifecycleStatus
+from lca.infrastructure.cli.commands.kernel._shared import spine_terminal_outcome
 from lca.plugins.observability.health.run_health_fold import fold_run_health
 
 _DEFAULT_TRACES_ROOT = Path("traces")
@@ -429,42 +430,11 @@ def _build_post_create_report(run_id: str, base_url: str) -> dict:
     return {
         "schema_version": "1.0",
         "run_id": run_id,
-        "terminal_status": _spine_terminal_outcome(spine_path),
+        "terminal_status": spine_terminal_outcome(spine_path),
         "elapsed_s": round(elapsed, 1),
         "health": report.model_dump(mode="json"),
         "health_summary": summary_payload,
     }
-
-
-def _spine_terminal_outcome(spine_path: Path) -> str:
-    """Read the LAST ``kernel.run.stop`` event's ``payload.outcome``.
-
-    Mirrors the durable-terminal logic the deleted live-SOP tail loop
-    used; we read the spine once after terminal lands rather than
-    polling for it. Empty / missing spine returns ``"unknown"`` so
-    the report stays well-formed.
-    """
-    if not spine_path.exists():
-        return "unknown"
-    last_outcome: str | None = None
-    with spine_path.open("rb") as fp:
-        for raw in fp:
-            stripped = raw.strip()
-            if not stripped:
-                continue
-            try:
-                rec = json.loads(stripped)
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(rec, dict):
-                continue
-            if rec.get("execution_point") != "kernel.run.stop":
-                continue
-            payload = rec.get("payload") or {}
-            outcome = payload.get("outcome")
-            if isinstance(outcome, str):
-                last_outcome = outcome
-    return last_outcome or "unknown"
 
 
 def _render_post_create_report(run_id: str, report: dict) -> None:

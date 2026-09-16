@@ -22,15 +22,20 @@ class MinimalReproduction(MinimalReproductionTool):
     def export(self, *, run_id: str) -> MinimalReproductionPackage:
         inspector = _load_inspector_from_jsonl(self._path)
         rendered = inspector.export_minimal_reproduction(run_id=run_id)
-        # rendered: tuple[dict, ...];first entry is the failure itself
-        first = rendered[0] if rendered else {}
-        failure_seq = int(first.get("seq", 0))
-        failure_type = str(first.get("type", ""))
-        causal_chain = inspector.explain_failure(run_id=run_id).causal_chain
+        chain = inspector.explain_failure(run_id=run_id).causal_chain
+        # The anchor is the newest event in its own causal chain, so
+        # ``failure_seq`` and ``causal_chain`` always name the same failure.
+        # Reading ``rendered[0]`` instead reported the ledger's first event
+        # whenever the run had nothing to reproduce.
+        anchor_seq = max(chain) if chain else 0
+        anchor = next(
+            (item for item in rendered if int(item.get("seq", 0)) == anchor_seq),
+            {},
+        )
         return MinimalReproductionPackage(
-            failure_seq=failure_seq,
-            failure_event_type=failure_type,
-            causal_chain=causal_chain,
+            failure_seq=anchor_seq if anchor else 0,
+            failure_event_type=str(anchor.get("type", "")) if anchor else "",
+            causal_chain=chain,
             evidence_refs=(),
         )
 

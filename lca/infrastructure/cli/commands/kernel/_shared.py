@@ -83,6 +83,108 @@ def resolve_journal_path(jsonl: Path | None, run_id: str | None) -> Path:
     raise typer.Exit(1)
 
 
+def resolve_event_ledger_path(jsonl: Path | None, run_id: str | None) -> Path:
+    """Resolve the per-run spine ledger (CLI error on miss).
+
+    ``journal.json`` is a ``lca.journal/3.1`` *document* — the folded
+    step-tree projection. Reading it line-by-line as a ledger yields zero
+    events, so failure-explanation commands that consume
+    ``_load_inspector_from_jsonl`` must be pointed at the append-only
+    ``<run_id>.spine.jsonl`` instead (ADR-0169: the spine ledger is the
+    SSOT). Resolving through :func:`resolve_journal_path` silently handed
+    those commands the projection and they reported "no failure found"
+    for runs that had failed.
+    """
+    if jsonl is not None:
+        if jsonl.exists():
+            return jsonl
+        typer.echo(f"No event ledger at --jsonl path: {jsonl}", err=True)
+        raise typer.Exit(1)
+    if run_id:
+        from lca.infrastructure.observability.spine.sinks.naming import (
+            spine_filename_for_run,
+        )
+
+        spine = Path("traces/runs") / run_id / spine_filename_for_run(run_id)
+        if spine.exists():
+            return spine
+        typer.echo(
+            f"No event ledger for run {run_id!r}: expected {spine}. "
+            "Without it no failure signal can be read; nothing was reported.",
+            err=True,
+        )
+        raise typer.Exit(1)
+    typer.echo("resolve_event_ledger_path requires --jsonl or a run_id", err=True)
+    raise typer.Exit(1)
+
+
+def spine_terminal_outcome(spine_path: Path) -> str:
+    """Read the LAST ``kernel.run.stop`` event's ``payload.outcome``.
+
+    Mirrors the durable-terminal logic the deleted live-SOP tail loop
+    used; we read the spine once after terminal lands rather than
+    polling for it. Empty / missing spine returns ``"unknown"`` so
+    the report stays well-formed.
+    """
+    if not spine_path.exists():
+        return "unknown"
+    last_outcome: str | None = None
+    with spine_path.open("rb") as fp:
+        for raw in fp:
+            stripped = raw.strip()
+            if not stripped:
+                continue
+            try:
+                rec = json.loads(stripped)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(rec, dict):
+                continue
+            if rec.get("execution_point") != "kernel.run.stop":
+                continue
+            payload = rec.get("payload") or {}
+            outcome = payload.get("outcome")
+            if isinstance(outcome, str):
+                last_outcome = outcome
+    return last_outcome or "unknown"
+
+
+_FAILURE_OUTCOMES = frozenset({"fail", "failed", "failure", "error"})
+
+
+def run_failure_evidence(ledger_path: Path) -> str | None:
+    """Return why this run is known to have failed, or ``None``.
+
+    Two durable sources are consulted because they fail differently:
+    the ledger's ``kernel.run.stop`` outcome is the fact-stream record,
+    while the sibling ``manifest.json``'s ``session_status`` survives a
+    run that died before the kernel wrote its stop event. A diagnostic
+    that reports "no failure found" while either says otherwise is the
+    silent fallback AGENTS.md §4 forbids, so callers must fail loud on
+    a hit.
+    """
+    outcome = spine_terminal_outcome(ledger_path)
+    if outcome.lower() in _FAILURE_OUTCOMES:
+        return f"ledger kernel.run.stop outcome={outcome}"
+    manifest_path = ledger_path.parent / "manifest.json"
+    if not manifest_path.exists():
+        return None
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(manifest, dict):
+        return None
+    session_status = str(manifest.get("session_status") or "")
+    if session_status.lower() in _FAILURE_OUTCOMES:
+        return f"manifest session_status={session_status}"
+    doctor = (manifest.get("extra") or {}).get("doctor_report") or {}
+    doctor_status = str(doctor.get("status") or "") if isinstance(doctor, dict) else ""
+    if doctor_status.lower() in _FAILURE_OUTCOMES:
+        return f"manifest doctor_report.status={doctor_status}"
+    return None
+
+
 def emit_report(report: object, *, json_mode: bool) -> None:
     """Render a coding-agent tool report: full JSON or ``str()`` fallback."""
     if json_mode:

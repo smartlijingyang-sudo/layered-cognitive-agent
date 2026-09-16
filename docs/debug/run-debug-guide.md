@@ -33,14 +33,14 @@ is not enough or the user asked for a specific view):
 
 - `./scripts/lca-ops debug-graph <run_id>` - same projection as `runs debug --layer graph`, older entry point.
 - `./scripts/lca-ops timeline <run_id>` - alias for `observation run-replay --show-graph`, lightweight skeleton only.
-- `./scripts/lca-ops debug-run <run_id>` - 8-section diagnostic from `journal.json` / `manifest.json`; useful for runs without observation facts.
+- `./scripts/lca-ops debug-run <run_id>` - 8-section diagnostic from `<run_id>.spine.jsonl` + `manifest.json`; useful for runs without observation facts.
 - `./scripts/lca-ops journal trace <run_id>` - full spine ledger dump, grep-friendly.
 - `./scripts/lca-ops journal trajectory <run_id>` - DSH-style HTML waterfall.
 - `./scripts/lca-ops observation trace-show <run_id>` - filtered observation facts (by node / kind / seq).
 - `./scripts/lca-ops observation run-replay <run_id>` - time-ordered observation replay with per-node inputs / outputs / decisions.
 - `./scripts/lca-ops observation run-explain <run_id>` - structured summary + `root_cause_chain` + `next_actions`.
 - `./scripts/lca-ops observation plan-show <ref>` - expected blueprint graph for a profile.
-- `./scripts/lca-ops explain <run_id>` - failure-path projection (legacy).
+- `./scripts/lca-ops explain <run_id>` - failure-path projection over `<run_id>.spine.jsonl`; exits non-zero when a failed run's ledger carries no failure event.
 
 > **Path convention.** All commands in this SOP are written as
 > `./scripts/lca-ops ...`. From anywhere else invoke it as
@@ -88,7 +88,7 @@ LATEST=$(ls -1t traces/runs | head -1)
 ./scripts/lca-ops debug-graph "$LATEST"
 ```
 
-`debug-graph` 一次性输出:**图骨架 + 每节点真实 input/output payload + reducer 决策序列 + llm 响应 + tool_call 实际参数 + 自动根因标记**(`✗`)。直读 `<run_id>.spine.jsonl`,不依赖 journal.json / manifest.json 物化——本次实测 `run_bc004d84ce51` 走 `lifecycle.finally` 但未触发 terminalize 时,`explain` / `debug-run` 返空,`debug-graph` 仍能出全图并自动标出根因(`apply_error → apply_stop → kernel.run.stop outcome=failure`)。
+`debug-graph` 一次性输出:**图骨架 + 每节点真实 input/output payload + reducer 决策序列 + llm 响应 + tool_call 实际参数 + 自动根因标记**(`✗`)。直读 `<run_id>.spine.jsonl`,不依赖 journal.json / manifest.json 物化——`run_bc004d84ce51` 走 `lifecycle.finally` 但未触发 terminalize,`debug-graph` 出全图并自动标出根因(`apply_error → apply_stop → kernel.run.stop outcome=failure`);`explain` 读同一份 ledger,对该 run 报 `失败从 seq=113 的 kernel.run.stop 开始`。
 
 需要更轻量的纯图骨架 / 单挑细节:
 
@@ -301,7 +301,7 @@ curl -sS http://127.0.0.1:9876/src/path/to/just/changed.ts | grep "你刚加的�
 ./scripts/lca-ops observation run-replay "$LATEST" --show-graph --json
 ```
 
-**Seam note.** `timeline` 直接读 `<run_id>.spine.jsonl`(ADR-0167,每个 run 收尾必生成);`debug-run` / `explain` 读 `journal.json` / `manifest.json`,依赖 `RunTerminalizer.terminalize` 触发物化。Run 走 `lifecycle.finally` 但未触发 terminalize 时(典型:`think` 阶段后 reducer 直接 `agent_loop.iteration.end`),`debug-run` / `explain` 会返空(`event_count: 0` / `no facts for run_id=...`),而 `timeline` 仍能出 phase_graph 全图。**所以 `timeline` 是第一选择**,不是 `debug-run`。
+**Seam note.** `timeline` 和 `explain` 直接读 `<run_id>.spine.jsonl`(ADR-0167,每个 run 收尾必生成);`debug-run` 读同一份 ledger 加 `manifest.json`。三者都不再依赖 `journal.json` 物化(`RunTerminalizer.terminalize`)。Run 走 `lifecycle.finally` 但未触发 terminalize 时(典型:`think` 阶段后 reducer 直接 `agent_loop.iteration.end`),ledger 里可能只有 `phase_graph.*` 拓扑事件、没有任何失败载体:`explain` 以非零退出并写出缺什么,`debug-run [5/8]` 写出已搜过的载体,`timeline` 仍能出 phase_graph 全图。**所以 `timeline` 是第一选择**,不是 `debug-run`。
 
 **OUTPUT.** A phase-graph node/subgraph timeline from the spine ledger (ADR-0167):
 
@@ -341,9 +341,9 @@ phase_graph.subgraph.enter think
 - `[2/8] journal` shows spine event count and `missing_seqs` (gaps in seq numbers).
 - `[3/8] kernel.log` is a tail of `traces/runs/<id>/kernel.log`. **Most runs do not have this file** — its absence is *not* evidence of failure loss. (See sidecar step below.)
 - `[4/8] phase.cursor` — last completed phase.
-- `[5/8] error_ref` — a *typed label* like `node=think.main error_kind=internal attempts=1[1:permanent:ValueError]`, optionally followed by ` | <upstream root cause>` when the failing attempt captured provider error text (e.g. `… | Client error '429 Too Many Requests' for url '…'`). **The label is not the traceback** — the full traceback lives in the sidecar / exceptions index (Step 3).
-- `[6/8] stack frames` — top 8 frames only.
-- `[7/8] suggested_action` — human hint.
+- `[5/8] error_ref` — a *typed label* like `node=think.main error_kind=internal attempts=1[1:permanent:ValueError]`, optionally followed by ` | <upstream root cause>` when the failing attempt captured provider error text (e.g. `… | Client error '429 Too Many Requests' for url '…'`). **The label is not the traceback** — the full traceback lives in the sidecar / exceptions index (Step 3). The label comes from `manifest.extra.doctor_report.hops.H6.error` when the doctor captured one; a deterministic tool failure records nothing there (no Python raise, so no `exception.caught`), and the label is then read from the ledger's last failure carrier — `step.tool_result.record` (`tool=… failure_kind=… seq=…`), `exception.caught`, or `phase_graph.node.end` with `outcome=failure`. On a run the manifest marks failed, `[5/8]` is never `(none)`: with no carrier anywhere it prints what was searched.
+- `[6/8] stack frames` — top 8 frames only. Empty means the ledger has no `exception.caught`, so no LCA stack was captured; the section says so and points at Step 3.
+- `[7/8] suggested_action` — human hint. Without a manifest `diagnostic` block it is derived from the closed-set `failure_kind`: `transient` is the only kind `SafeExecutor` retries, so anything else reads "not retryable".
 - `[8/8] plan_ref + replay commands` — `plan_ref` (16-hex from manifest) + multi-line **copy-paste-runnable** commands:
   - `lca-ops journal replay <run_id> --step K --diff-only` (model-visible 重放)
   - `grep -rl <plan_ref> traces/runs/*/manifest.json` (反查同 plan 所有 run)
@@ -452,11 +452,11 @@ SIDECAR=$(ls traces/runs/"$LATEST"/[0-9a-f]*-*.json 2>/dev/null | head -1)
 ./scripts/lca-ops explain "$LATEST" --json    # you (agent)
 ```
 
-**OUTPUT.** A `FailureExplanation` projection: leaf event, causal ancestors (parent_seq chain), `StopDecision.failure` record, suggested attribution.
+**OUTPUT.** A `FailureExplanation` projection over `<run_id>.spine.jsonl`: first failure event, its causal ancestors (parent_seq chain), a same-run context window ending at the terminal `kernel.run.stop`, and bottleneck candidates. `--jsonl <path>` overrides the ledger.
 
 **NEXT.** If the traceback points at a code path and `explain` shows the calling phase → Step 5 (read code).
 
-**FAIL.** `explain` itself crashes (this happens for some early-fail runs — there is one known `AttributeError: 'int' object has no attribute 'get'` path in `minimal-repro`; if it dies, you have the sidecar traceback anyway, proceed to Step 5).
+**FAIL.** Exit code 1 with `explain: run '<id>' failed (…) but no failure event was projected from <ledger>. Missing: …` means the run is durably recorded as failed (ledger `kernel.run.stop outcome`, else `manifest.session_status` / `doctor_report.status`) while the ledger holds no failure-carrying event — typically a run that died mid-graph leaving only `phase_graph.*` topology. Read `timeline` (Step 1) and the sidecar (Step 3) instead. A missing ledger also exits 1 and names the expected path. `explain` itself crashing is separate (there is one known `AttributeError: 'int' object has no attribute 'get'` path in `minimal-repro`); if it dies, you have the sidecar traceback anyway, proceed to Step 5.
 
 ---
 

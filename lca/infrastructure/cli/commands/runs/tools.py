@@ -13,7 +13,12 @@ from pathlib import Path
 
 import typer
 
-from lca.infrastructure.cli.commands.kernel._shared import emit_report, resolve_journal_path
+from lca.infrastructure.cli.commands.kernel._shared import (
+    emit_report,
+    resolve_event_ledger_path,
+    resolve_journal_path,
+    run_failure_evidence,
+)
 
 
 def register(app: typer.Typer) -> None:
@@ -80,7 +85,7 @@ def register(app: typer.Typer) -> None:
             TraceInspectorToolAdapter,
         )
 
-        path = resolve_journal_path(jsonl, run_id)
+        path = resolve_event_ledger_path(jsonl, run_id)
         report = TraceInspectorToolAdapter(path).inspect_trace(
             run_id=run_id, focus=focus, depth=depth
         )
@@ -161,8 +166,19 @@ def register(app: typer.Typer) -> None:
             FailureExplainer,
         )
 
-        path = resolve_journal_path(jsonl, target)
-        report = FailureExplainer(path).explain_failure(run_id=target, depth=depth)
+        ledger = resolve_event_ledger_path(jsonl, target)
+        report = FailureExplainer(ledger).explain_failure(run_id=target, depth=depth)
+        if not report.get("causal_chain") and not report.get("events"):
+            evidence = run_failure_evidence(ledger)
+            if evidence is not None:
+                print(
+                    f"explain: run {target!r} failed ({evidence}) but no failure event "
+                    f"was projected from {ledger}. Missing: a failure-carrying event "
+                    "(kernel.run.stop / step.tool_result.record / exception.caught) "
+                    "readable by TraceInspector. Refusing to report 'no failure found'.",
+                    file=sys.stderr,
+                )
+                raise typer.Exit(1)
         emit_report(report, json_mode=json_mode)
 
     @app.command(name="optimize")
@@ -177,7 +193,7 @@ def register(app: typer.Typer) -> None:
             OptimizationFinder,
         )
 
-        path = resolve_journal_path(jsonl, run_id)
+        path = resolve_event_ledger_path(jsonl, run_id)
         candidates = OptimizationFinder(path).find_optimization_candidates(
             run_id=run_id, limit=limit
         )
@@ -193,7 +209,7 @@ def register(app: typer.Typer) -> None:
             PluginGraphRenderer,
         )
 
-        path = resolve_journal_path(jsonl, run_id)
+        path = resolve_event_ledger_path(jsonl, run_id)
         mermaid = PluginGraphRenderer(path).render(run_id=run_id)
         typer.echo(mermaid)
 
@@ -208,7 +224,7 @@ def register(app: typer.Typer) -> None:
             MinimalReproduction,
         )
 
-        path = resolve_journal_path(jsonl, run_id)
+        path = resolve_event_ledger_path(jsonl, run_id)
         pkg = MinimalReproduction(path).export(run_id=run_id)
         payload = {
             "schema": "lca.minimal_reproduction/1",
@@ -233,7 +249,7 @@ def register(app: typer.Typer) -> None:
             DiffContext,
         )
 
-        path = resolve_journal_path(jsonl, run_id)
+        path = resolve_event_ledger_path(jsonl, run_id)
         diff = DiffContext(path).diff(run_id=run_id, step=step)
         payload = {
             "run_id": diff.run_id,
@@ -257,7 +273,7 @@ def register(app: typer.Typer) -> None:
             RunDiffToolAdapter,
         )
 
-        path = resolve_journal_path(jsonl, run_id_a)
+        path = resolve_event_ledger_path(jsonl, run_id_a)
         diff = RunDiffToolAdapter(path).diff(run_id_a=run_id_a, run_id_b=run_id_b, step=step)
         payload = {
             "run_id_a": diff.run_id_a,

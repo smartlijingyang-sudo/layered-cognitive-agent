@@ -10,6 +10,7 @@ ADR-2026-09-02-i17-stream-align §C: spine is the SSOT
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from datetime import datetime
 from pathlib import Path
 
 from lca.contracts.atoms.ids.ids import RunId, TraceId
@@ -45,6 +46,43 @@ def _object_to_float(value: object, default: float = 0.0) -> float:
         except ValueError:
             return default
     return default
+
+
+def _to_epoch_seconds(value: object) -> float:
+    """Coerce a spine ``ts`` / ``when`` field to epoch seconds.
+
+    The spine writer emits ISO-8601 with offset; the legacy v2 envelope
+    emitted a numeric ``occurred_at``. Both shapes appear in persisted
+    ledgers, so both parse.
+    """
+    if isinstance(value, (int, float)):
+        return float(value)
+    if not isinstance(value, str) or not value.strip():
+        return 0.0
+    try:
+        return float(value)
+    except ValueError:
+        pass
+    try:
+        return datetime.fromisoformat(value).timestamp()
+    except ValueError:
+        return 0.0
+
+
+def _split_spine_event_id(value: object) -> tuple[str, int | None]:
+    """Split a spine ``event_id`` (``"<run_id>:<seq>"``) into its parts.
+
+    ``event_id`` is the only place the spine v3 record carries the run id
+    and the ledger sequence: there is no top-level ``run_id`` and no
+    ``sequence`` field. Returns ``("", None)`` when the shape does not
+    match so callers fall through to their other sources.
+    """
+    if not isinstance(value, str) or ":" not in value:
+        return "", None
+    run_id, _, seq = value.rpartition(":")
+    if not run_id or not seq.isdigit():
+        return "", None
+    return run_id, int(seq)
 
 
 def _mapping_value(value: object) -> dict[str, object]:
@@ -86,8 +124,11 @@ def _event_from_payload(payload: dict[str, object]) -> StampedEvent | None:
     Recognises two envelopes (ADR-2026-09-02-i17-stream-align §C):
 
     - **spine v3** (preferred): top-level ``execution_point`` /
-      ``channel`` / ``when`` / ``payload`` / ``causality_id`` — what
-      ``traces/runs/<id>/<run_id>.spine.jsonl`` writes today.
+      ``channel`` / ``event_id`` / ``ts`` / ``payload`` /
+      ``causation_id`` — what
+      ``traces/runs/<id>/<run_id>.spine.jsonl`` writes today. ``run_id``
+      and the ledger sequence live inside ``event_id``
+      (``"<run_id>:<seq>"``) and ``payload``, not at top level.
     - **legacy v2**: nested ``scope`` / ``descriptor.type`` /
       ``run_seq`` / ``data`` — what the old ``lca.journal/2`` envelope
       used. Kept for replay compatibility only.
@@ -99,25 +140,36 @@ def _event_from_payload(payload: dict[str, object]) -> StampedEvent | None:
         scope_raw = payload.get("scope")
         if not isinstance(scope_raw, dict):
             scope_raw = {}
+        # ``inner_payload`` first: the spine record carries ``run_id`` /
+        # ``trace_id`` inside ``payload``, not at top level.
+        inner_payload = _mapping_value(payload.get("payload", {}))
+        event_id_run, event_id_seq = _split_spine_event_id(payload.get("event_id"))
         seq_value = payload.get("sequence")
-        seq_field = seq_value if isinstance(seq_value, int) else 0
-        when_field = payload.get("when_corrected") or payload.get("when") or 0.0
-        try:
-            ts_value = _object_to_float(when_field)
-        except (TypeError, ValueError):
-            ts_value = 0.0
+        seq_field = seq_value if isinstance(seq_value, int) else (event_id_seq or 0)
+        when_field = payload.get("when_corrected") or payload.get("when") or payload.get("ts")
+        ts_value = _to_epoch_seconds(when_field)
         event_type = str(payload.get("execution_point", "") or "")
         # Carry the spine top-level ``channel`` / ``outcome`` into the
         # data dict so TraceInspector failure-detection (which keys off
         # ``data["channel"]`` / ``data["outcome"]``) can recognise v3
         # events without forcing every consumer to learn the new envelope.
-        inner_payload = _mapping_value(payload.get("payload", {}))
         channel = payload.get("channel")
         if isinstance(channel, str) and channel:
             inner_payload.setdefault("channel", channel)
         outcome = payload.get("outcome")
         if isinstance(outcome, str) and outcome:
             inner_payload.setdefault("outcome", outcome)
+        run_id_value = (
+            str(scope_raw.get("run_id", "") or "")
+            or str(payload.get("run_id", "") or "")
+            or str(inner_payload.get("run_id", "") or "")
+            or event_id_run
+        )
+        trace_id_value = (
+            str(scope_raw.get("trace_id", "") or "")
+            or str(payload.get("trace_id", "") or "")
+            or str(inner_payload.get("trace_id", "") or "")
+        )
         # Spine parent/child carries via span_id / parent_span_id.
         # ``parent_seq`` is unknown in spine (chain is via causality_id
         # hashing); fall back to None — see ``_causal_chain``.
@@ -129,10 +181,8 @@ def _event_from_payload(payload: dict[str, object]) -> StampedEvent | None:
             seq=seq_field,
             ts=ts_value,
             scope=RunScope(
-                trace_id=TraceId(str(scope_raw.get("trace_id", ""))),
-                run_id=RunId(
-                    str(scope_raw.get("run_id", "")) or str(payload.get("run_id", "") or "")
-                ),
+                trace_id=TraceId(trace_id_value),
+                run_id=RunId(run_id_value),
             ),
             event=JournalEvent(),
             event_type=event_type,
