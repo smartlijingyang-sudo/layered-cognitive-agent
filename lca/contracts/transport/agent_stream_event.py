@@ -203,6 +203,29 @@ class AgentInterventionRequestData(_WireBase):
 
 
 class AgentInterventionRequest(_WireBase):
+    """A producer-side structured-input request.
+
+    NOT EMITTED BY THE LCA RUNTIME. LCA closes the human-in-the-loop
+    round-trip over HTTP (``POST /lca-api/runs/{runId}/answer``
+    bridged via ``deploy/lobehub/patches/runtime/lca_runtime_agent_gateway.py``)
+    plus the durable journal (``approval.persisted.v1`` +
+    ``waiting_input`` checkpoint → ``SpineClose`` → ``agent_runtime_end``).
+    The native hetero executor emits this event to drive its local
+    CLI/MCP ``askUserQuestion`` card; LCA's server-side runtime does
+    not. The Pydantic class is retained here for wire-parity with the
+    native ``AgentStreamEvent`` union; the matching EventTranslator
+    entry is intentionally absent (see
+    ``lca/application/runtime/coordinator/event_translator.py`` and
+    the regression test in
+    ``tests/runtime/coordinator/test_event_translator.py``). If a
+    future producer ever wires one, pair it with a front-end case in
+    ``gatewayEventHandler.ts`` and update both this note and the
+    translator.
+
+    See ``docs/notes/investigating/resume-askuser-flow-2026-09-16.md``
+    Gap B + Gap G.
+    """
+
     type: Literal["agent_intervention_request"] = "agent_intervention_request"
     data: AgentInterventionRequestData
     id: str | None = None

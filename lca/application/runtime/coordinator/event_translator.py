@@ -274,18 +274,21 @@ class EventTranslator:
             },
         }
 
-    @staticmethod
-    def _agent_intervention_request(e: dict) -> dict:
-        return {
-            "type": "agent_intervention_request",
-            "data": {
-                "apiName": e.get("apiName"),
-                "identifier": e.get("identifier"),
-                "arguments": e.get("arguments", {}),
-                "toolCallId": e.get("toolCallId"),
-                "deadline": e.get("deadline", 0),
-            },
-        }
+    # NOTE: ``agent_intervention_request`` is NOT produced by the LCA
+    # runtime. The HIL round-trip is HTTP-based
+    # (``POST /lca-api/runs/{runId}/answer`` bridged via
+    # ``deploy/lobehub/patches/runtime/lca_runtime_agent_gateway.py``),
+    # and the WS pause signal travels through the durable journal
+    # (``approval.persisted.v1`` + ``waiting_input`` checkpoint →
+    # ``SpineClose`` → ``agent_runtime_end``). The native hetero
+    # executor emits ``agent_intervention_request`` to drive its local
+    # CLI/MCP card; LCA's server-side runtime does not. The Pydantic
+    # class remains in ``agent_stream_event.AgentStreamEvent`` for wire
+    # parity, but no translator row exists here. If a future producer
+    # ever wires one, pair it with a front-end case in
+    # ``gatewayEventHandler.ts`` and update this note — see
+    # ``docs/notes/investigating/resume-askuser-flow-2026-09-16.md``
+    # Gap B.
 
     # ── Session spine EP → gateway (ADR-0194 SSOT) ─────────────────
 
@@ -453,7 +456,6 @@ _HANDLERS = {
     "SpineClose": EventTranslator._spine_close,
     "LlmError": EventTranslator._llm_error,
     "LlmRetry": EventTranslator._llm_retry,
-    "AgentInterventionRequest": EventTranslator._agent_intervention_request,
 }
 
 _SPINE_HANDLERS = {
