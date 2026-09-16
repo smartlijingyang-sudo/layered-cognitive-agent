@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
 
 from lca.contracts.models.core.execution.sandbox import (
@@ -46,13 +46,18 @@ print(_j.dumps({{"found": found, "missing": missing}}, ensure_ascii=False))
 ExecuteFn = Callable[..., Awaitable[SandboxResult]]
 
 
-def load_mount_files(store: FileStore, explicit_ids: list[str] | None = None) -> dict[str, bytes]:
+def load_mount_files(
+    store: FileStore,
+    explicit_ids: list[str] | None = None,
+    *,
+    ambient_ids: Sequence[str] | None = None,
+) -> dict[str, bytes]:
     # Lazy import to avoid circular import via ``tools`` package
     # (see module-level note).  All call sites are post-tool-invocation
     # so the package is fully loaded by then.
     from lca.infrastructure.tools.run.attachment_scope import merge_attachment_ids
 
-    ids = merge_attachment_ids(explicit_ids)
+    ids = merge_attachment_ids(explicit_ids, ambient=ambient_ids)
     files: dict[str, bytes] = {}
     for aid in ids:
         meta = store.get(aid)
@@ -63,10 +68,15 @@ def load_mount_files(store: FileStore, explicit_ids: list[str] | None = None) ->
     return files
 
 
-def build_mount_manifest(store: FileStore, mount_files: dict[str, bytes]) -> MountManifest:
+def build_mount_manifest(
+    store: FileStore,
+    mount_files: dict[str, bytes],
+    *,
+    ambient_ids: Sequence[str] | None = None,
+) -> MountManifest:
     from lca.infrastructure.tools.run.attachment_scope import merge_attachment_ids
 
-    ids = merge_attachment_ids(None)
+    ids = merge_attachment_ids(None, ambient=ambient_ids)
     id_by_name: dict[str, str] = {}
     for aid in ids:
         meta = store.get(aid)

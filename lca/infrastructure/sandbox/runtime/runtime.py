@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 import structlog
@@ -114,8 +114,14 @@ class RunBoundSandboxRuntime(SandboxRuntime):
 
     async def ensure_ready(self, explicit_ids: list[str] | None = None) -> SandboxExecResult | None:
         """Mount attachments, verify guest paths, auto-inspect. Returns error result on failure."""
-        self._mount_files = load_mount_files(self._store, explicit_ids)
-        self._manifest = build_mount_manifest(self._store, self._mount_files)
+        self._mount_files = load_mount_files(
+            self._store,
+            explicit_ids,
+            ambient_ids=self._attachment_ids,
+        )
+        self._manifest = build_mount_manifest(
+            self._store, self._mount_files, ambient_ids=self._attachment_ids
+        )
 
         if self._session is None and not self._stateless:
             try:
@@ -131,6 +137,16 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         if workspace_err is not None:
             return workspace_err
 
+        stage_err = await self._stage_files(self._mount_files)
+        if stage_err is not None and not stage_err.success:
+            return sandbox_exec_result_from(
+                stage_err,
+                error_kind=SandboxErrorKind.INFRA,
+                error_summary=stage_err.error or "sandbox attachment staging failed",
+                mount_manifest=self._manifest,
+                environment_ready=False,
+            )
+
         mount_err = await verify_mount_or_error(
             self._execute_raw,
             manifest=self._manifest,
@@ -145,6 +161,30 @@ class RunBoundSandboxRuntime(SandboxRuntime):
 
         self._ready = True
         return None
+
+    async def _stage_files(self, files: Mapping[str, bytes | str]) -> SandboxResult | None:
+        """Write not-yet-staged files to the guest mount root; ``None`` when nothing to do.
+
+        Staged at the canonical mount root rather than a session sub-tree:
+        guest paths are read verbatim by user code, so a session-scoped write
+        would leave ``/mnt/data/<name>`` unresolvable on backends that map the
+        guest root onto a real host directory.
+        """
+        new_files = {
+            name: data for name, data in files.items() if name not in self._staged_file_keys
+        }
+        if not new_files:
+            return None
+        result = await self._sandbox.write_files(
+            new_files,
+            base_dir=self.layout.root,
+            session_id="",
+        )
+        # Only remember keys on success: a failed stage must stay retryable on
+        # the next ``ensure_ready`` instead of being skipped as already staged.
+        if result.success:
+            self._staged_file_keys.update(new_files.keys())
+        return result
 
     async def _ensure_workspace_dirs(self) -> SandboxExecResult | None:
         """Create the harvest directory via staged marker file (all backends)."""
@@ -215,10 +255,14 @@ class RunBoundSandboxRuntime(SandboxRuntime):
             if mount_err is not None:
                 return mount_err
         elif explicit_attachment_ids:
-            merged = load_mount_files(self._store, explicit_attachment_ids)
+            merged = load_mount_files(
+                self._store, explicit_attachment_ids, ambient_ids=self._attachment_ids
+            )
             if merged != self._mount_files:
                 self._mount_files = merged
-                self._manifest = build_mount_manifest(self._store, self._mount_files)
+                self._manifest = build_mount_manifest(
+                    self._store, self._mount_files, ambient_ids=self._attachment_ids
+                )
 
         budget = timeout_s if timeout_s is not None else self._default_timeout_s
         raw = await self._execute_raw(
@@ -441,13 +485,7 @@ class RunBoundSandboxRuntime(SandboxRuntime):
     ) -> SandboxResult:
         # Phase 1: Stage files incrementally (only new files)
         all_files: dict[str, bytes | str] = {**self._mount_files, **(extra_files or {})}
-        new_files = {k: v for k, v in all_files.items() if k not in self._staged_file_keys}
-        if new_files:
-            session_id = self._session.session_id if self._session else ""
-            await self._sandbox.write_files(
-                new_files, base_dir=self.layout.root, session_id=session_id
-            )
-            self._staged_file_keys.update(new_files.keys())
+        await self._stage_files(all_files)
 
         # Phase 2: Execute. Artifact scan is execute_code / harvest only —
         # LobeHub file ops print one JSON object and stop.

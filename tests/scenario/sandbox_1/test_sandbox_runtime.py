@@ -83,7 +83,7 @@ class TestInlineSandboxWriteFiles(unittest.IsolatedAsyncioTestCase):
         result = await sandbox.write_files({"data.csv": b"a,b\n1,2\n"})
         self.assertTrue(result.success)
         self.assertEqual(len(sandbox.write_files_calls), 1)
-        self.assertIn("data.csv", sandbox.write_files_calls[0])
+        self.assertIn("data.csv", sandbox.write_files_calls[0][0])
 
     async def test_write_files_with_session(self) -> None:
         sandbox = InlineSandbox()

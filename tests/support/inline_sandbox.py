@@ -29,7 +29,7 @@ class InlineSandbox:
         self.session_run_calls: list[tuple[str, str]] = []
         self.created_sessions: list[str] = []
         self.destroyed_sessions: list[str] = []
-        self.write_files_calls: list[dict[str, bytes | str]] = []
+        self.write_files_calls: list[tuple[dict[str, bytes | str], str]] = []
         self._counter = 0
         self._sessions: dict[str, dict[str, bytes]] = {}
 
@@ -42,15 +42,15 @@ class InlineSandbox:
         timeout_s: int = 60,
     ) -> SandboxResult:
         del timeout_s
-        self.write_files_calls.append(files)
+        self.write_files_calls.append((files, session_id))
         from lca.infrastructure.sandbox.onlyboxes.bootstrap import safe_rel_name
 
-        vfs = self._sessions[session_id] if session_id and session_id in self._sessions else {}
+        # ``session_id == ""`` addresses the mount root, which is a real place
+        # on every backend (host dir for local, container root for Onlyboxes).
+        vfs = self._sessions.setdefault(session_id, {})
         for name, source in files.items():
             if isinstance(source, bytes):
                 vfs[f"{base_dir}/{safe_rel_name(name)}"] = source
-        if session_id:
-            self._sessions.setdefault(session_id, {}).update(vfs)
         return SandboxResult(success=True, exit_code=0)
 
     async def run(
@@ -62,7 +62,8 @@ class InlineSandbox:
     ) -> SandboxResult:
         del language, timeout_s
         self.run_calls.append(code)
-        return self._exec(code, {}, str(kwargs.get("invocation_id", "") or ""))
+        vfs = self._sessions.setdefault("", {})
+        return self._exec(code, vfs, str(kwargs.get("invocation_id", "") or ""))
 
     async def create_session(self, config: SessionConfig | None = None) -> SessionInfo | None:
         del config
@@ -85,6 +86,10 @@ class InlineSandbox:
         del language, timeout_s
         self.session_run_calls.append((session_id, code))
         vfs = self._sessions.setdefault(session_id, {})
+        # Mount-root files stay readable inside a session: guest paths are
+        # absolute, so a session sub-tree does not shadow them.
+        for path, data in self._sessions.get("", {}).items():
+            vfs.setdefault(path, data)
         return self._exec(code, vfs, str(kwargs.get("invocation_id", "") or ""))
 
     async def destroy_session(self, session_id: str) -> None:
