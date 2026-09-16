@@ -125,7 +125,7 @@ def test_fold_carrier_runtime_observed_canceled() -> None:
         ),
     ]
     state = fold_run_state(events)
-    assert state.status == RunStatus.CANCELED
+    assert state.status == RunStatus.CANCELLED
     assert state.error == "canceled"
 
 
@@ -134,7 +134,7 @@ def test_fold_canceled() -> None:
         _stamped(1, AgentRunFinished(status="canceled")),
     ]
     state = fold_run_state(events)
-    assert state.status == RunStatus.CANCELED
+    assert state.status == RunStatus.CANCELLED
 
 
 # ── EventDescriptorRegistry 完整性 ──────────────────────────

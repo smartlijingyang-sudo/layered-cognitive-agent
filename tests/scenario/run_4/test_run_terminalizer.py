@@ -85,4 +85,4 @@ async def test_terminalize_preserves_cancel_signal_over_success() -> None:
         materializer=lambda _session: None,
     ).terminalize(session, workspace=None, success=True)
 
-    assert session.status == RunStatus.CANCELED
+    assert session.status == RunStatus.CANCELLED

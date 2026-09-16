@@ -183,7 +183,7 @@ class TestRunRegistryDedup(unittest.TestCase):
     def test_prune_drops_old_terminal_sessions(self) -> None:
         registry = RunRegistry(max_terminal=2, terminal_ttl_s=60)
         for i, status in enumerate(
-            (RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELED, RunStatus.RUNNING)
+            (RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED, RunStatus.RUNNING)
         ):
             session = RunSession(
                 run_id=f"run_{i}",

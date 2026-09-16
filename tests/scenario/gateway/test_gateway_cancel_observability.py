@@ -99,5 +99,5 @@ async def test_execute_run_cancel_no_otel_detach_noise(caplog: pytest.LogCapture
 
         # Hub was cleaned up by _finalize_run; check via the journal recorded before close
         # Since _active_hubs is cleaned up, we verify via session state
-        assert session.status == RunStatus.CANCELED
+        assert session.status == RunStatus.CANCELLED
         assert not any("Failed to detach context" in r.message for r in caplog.records)
