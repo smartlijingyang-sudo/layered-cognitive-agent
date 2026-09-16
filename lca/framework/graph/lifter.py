@@ -31,13 +31,60 @@ from lca.contracts.protocols.graph.predicate import PortRef, Predicate
 def lift_graph_spec(spec: Mapping[str, Any]) -> Plan:
     """Lift a v2 BundleGraphSpec-shaped mapping into a :class:`Plan`.
 
-    Runs predicate and termination validation after building the plan.
-    See :func:`validate_predicates` and :func:`_validate_termination`.
+    Runs predicate, termination, and approval-resume-node validation
+    after building the plan. See :func:`validate_predicates`,
+    :func:`_validate_termination`, and
+    :func:`_validate_approval_resume_node`.
     """
     plan = _lift_graph_spec_inner(spec)
     validate_predicates(plan)
     _validate_termination(plan)
+    _validate_approval_resume_node(plan)
     return plan
+
+
+def _validate_approval_resume_node(plan: Plan) -> None:
+    """Fail-loud when ``act.approve.gate`` is declared without a resume edge.
+
+    PR-1 (closes 评审 §6.1 + G-1 hot path): HITL without a resume edge
+    is unsafe — the interrupt can pause a run but never recover, so
+    the next user command is dropped on the floor. This check fires
+    at every ``lift_graph_spec`` call (including the boot-time
+    ``validate_profile_plans`` walk) so the operator sees the
+    failure before the first run.
+
+    The check is per-plan: any plan that declares ``act.approve.gate``
+    as one of its nodes must also declare a cross-subgraph
+    ``intervene.resume → act.approve.gate`` edge in the same plan.
+    Plans without the gate are unaffected (gated on
+    ``act.approve.gate in node_ids``).
+
+    Per-plan (not cross-plan) is intentional: the validator walks
+    every bundle in :func:`validate_profile_plans` independently, so
+    a single per-plan rule keeps the check local and predictable.
+    The outer plan's ``act.approve.gate`` delegate is checked here
+    (the outer delegate needs the resume edge as much as the inner
+    gate does); the inner ``act.subgraph`` plan's gate has its own
+    resume edge added in :file:`bundles/act/act_subgraph.yaml`.
+    """
+    node_ids = {n.id for n in plan.nodes}
+    if "act.approve.gate" not in node_ids:
+        return
+    resume_edge_present = any(
+        e.source == "intervene.resume" and e.target == "act.approve.gate" for e in plan.edges
+    )
+    if resume_edge_present:
+        return
+    raise PlanLiftError(
+        "act.approve.gate is declared but the cross-subgraph resume edge "
+        "``intervene.resume → act.approve.gate`` is missing — HITL without "
+        "a resume edge is unsafe (the interrupt can pause a run but never "
+        "recover; subsequent user commands are dropped). Add the resume "
+        "edge in this plan or remove the gate declaration.",
+        plan_id=plan.id,
+        node_id="act.approve.gate",
+        next_command="./scripts/lca-ops plan validate bundles/outer/phase_main.yaml",
+    )
 
 
 def _lift_graph_spec_inner(spec: Mapping[str, Any]) -> Plan:
@@ -145,13 +192,9 @@ def _lift_graph_spec_inner(spec: Mapping[str, Any]) -> Plan:
         source = str(raw.get("from") or raw.get("source", "")).strip()
         target = str(raw.get("to") or raw.get("target", "")).strip()
         if not source:
-            raise PlanLiftError(
-                f"plan {spec_id!r}: edge missing 'from' (or 'source'): {dict(raw)}"
-            )
+            raise PlanLiftError(f"plan {spec_id!r}: edge missing 'from' (or 'source'): {dict(raw)}")
         if not target:
-            raise PlanLiftError(
-                f"plan {spec_id!r}: edge missing 'to' (or 'target'): {dict(raw)}"
-            )
+            raise PlanLiftError(f"plan {spec_id!r}: edge missing 'to' (or 'target'): {dict(raw)}")
         edges.append(
             PlanEdge(
                 source=source,
@@ -707,4 +750,9 @@ def _validate_termination(plan: Plan) -> None:
     )
 
 
-__all__ = ["lift_executable_plan", "lift_graph_spec", "validate_predicates", "_validate_termination"]
+__all__ = [
+    "_validate_termination",
+    "lift_executable_plan",
+    "lift_graph_spec",
+    "validate_predicates",
+]

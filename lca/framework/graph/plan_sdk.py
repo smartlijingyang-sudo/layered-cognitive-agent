@@ -255,7 +255,13 @@ def plan(
     edges: Sequence[PlanEdge] = (),
     approval_resume_node: str | None = None,
 ) -> Plan:
-    """Build a :class:`Plan`."""
+    """Build a :class:`Plan`.
+
+    ``approval_resume_node`` 字段语义(PR-1 升级):
+    - 当 plan 含 ``act.approve.gate`` 节点时,此字段 MUST 设置(值 = resume 边 target 节点 id)
+    - 当 plan 不含 ``act.approve.gate`` 节点时,此字段 ignored(yaml 可省)
+    - lifter 校验:``_validate_approval_resume_node(plan)`` 强制(Step 1.9)
+    """
     return Plan(
         id=id,
         nodes=tuple(nodes),
@@ -529,6 +535,8 @@ def parse_plan_yaml(text: str) -> Plan:
     nodes = tuple(_parse_plan_node(n) for n in raw.get("nodes", ()))
     edges = tuple(_parse_plan_edge(e) for e in raw.get("edges", ()))
 
+    # PR-1: 字段语义升级——lifter 阶段会强制要求 act.approve.gate 存在时非空。
+    # 这里只读不强制(避免破坏 yaml 解析链;强制在 lifter)。
     return Plan(
         id=str(raw.get("id", "")),
         nodes=nodes,
