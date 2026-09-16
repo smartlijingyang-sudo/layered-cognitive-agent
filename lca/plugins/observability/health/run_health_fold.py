@@ -39,7 +39,10 @@ from lca.contracts.observability.health.report import (
     RunHealthReport,
     RunHealthSummary,
 )
-from lca.plugins.observability.health.derivers._spine import SpineEvent
+from lca.plugins.observability.health.derivers._spine import (
+    SpineEvent,
+    parse_run_id,
+)
 
 # Status severity priority for the worst-status wins aggregation.
 # Higher rank = worse. ``failed`` is the worst; ``ok`` is the best.
@@ -69,13 +72,61 @@ def _discover_derivers() -> tuple[HealthDeriver, ...]:
 _DERIVERS: tuple[HealthDeriver, ...] = _discover_derivers()
 
 
+def _normalize_event(rec: dict[str, object]) -> SpineEvent | None:
+    """Normalize one on-disk spine record into the shape derivers expect.
+
+    Real audit-run spines do NOT carry ``run_id`` at the top level —
+    the producer puts it in ``payload`` for a subset of events and
+    otherwise leaves it implicit in the ``event_id`` prefix
+    (``run_<id>:<seq>``). The original fold required a top-level
+    ``run_id`` and silently dropped every event whose producer
+    omitted it, producing all-``unknown`` reports.
+
+    Resolution order for ``run_id``:
+
+    1. ``parse_run_id(event_id)`` — every event with a well-formed
+       ``run_<id>:<seq>`` event_id carries it here.
+    2. ``payload["run_id"]`` — fallback for legacy / partial producers
+       that duplicate the run_id into the payload.
+
+    Returns ``None`` for records missing ``event_id`` / ``ts`` /
+    ``execution_point`` (the spine EP closed-set is owned by the
+    producer; the fold only filters structurally-malformed lines).
+    """
+    event_id_raw = rec.get("event_id")
+    ts_raw = rec.get("ts")
+    ep_raw = rec.get("execution_point")
+    if not isinstance(event_id_raw, str) or not event_id_raw:
+        return None
+    if not isinstance(ts_raw, str) or not ts_raw:
+        return None
+    if not isinstance(ep_raw, str) or not ep_raw:
+        return None
+
+    payload_obj = rec.get("payload")
+    payload: dict[str, object] = dict(payload_obj) if isinstance(payload_obj, dict) else {}
+
+    parsed = parse_run_id(event_id_raw)
+    run_id = parsed or str(payload.get("run_id") or "")
+
+    return SpineEvent(
+        event_id=event_id_raw,
+        ts=ts_raw,
+        run_id=run_id,
+        execution_point=ep_raw,
+        payload=payload,
+    )
+
+
 def _read_spine_events(path: Path) -> list[SpineEvent]:
     """Read line-delimited JSON spine events from ``path``.
 
     Missing file or empty file -> empty list. Malformed lines are
     skipped silently (the producer is the SSOT; the fold never raises
     on a producer glitch — it just sees fewer events and reports
-    ``unknown`` for the affected dimensions).
+    ``unknown`` for the affected dimensions). Real audit-run spines
+    also lack a top-level ``run_id`` field; ``_normalize_event``
+    synthesizes it from the ``event_id`` prefix.
     """
     if not path.exists():
         return []
@@ -91,18 +142,9 @@ def _read_spine_events(path: Path) -> list[SpineEvent]:
                 continue
             if not isinstance(rec, dict):
                 continue
-            try:
-                out.append(
-                    SpineEvent(
-                        event_id=str(rec["event_id"]),
-                        ts=str(rec["ts"]),
-                        run_id=str(rec["run_id"]),
-                        execution_point=str(rec["execution_point"]),
-                        payload=dict(rec.get("payload") or {}),
-                    )
-                )
-            except KeyError:
-                continue
+            normalized = _normalize_event(rec)
+            if normalized is not None:
+                out.append(normalized)
     return out
 
 
@@ -192,6 +234,7 @@ __all__ = [
     "_DERIVERS",
     "_discover_derivers",
     "_extract_run_id",
+    "_normalize_event",
     "_read_spine_events",
     "_summarize",
     "_worst_status",
