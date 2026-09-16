@@ -37,6 +37,7 @@ class PlanTraversal:
     plan: Plan
     current_id: str = ""
     visit_counts: dict[str, int] = field(default_factory=dict)
+    edge_counts: dict[tuple[str, str], int] = field(default_factory=dict)
     terminal: bool = False
     last_dispatch_kind: str = "init"
     terminal_reason: tuple[str, str, int, int] | None = None
@@ -76,6 +77,8 @@ class PlanTraversal:
         if edge is None:
             self.terminal = True
             return
+        key = (edge.source, edge.target)
+        self.edge_counts[key] = self.edge_counts.get(key, 0) + 1
         self.current_id = edge.target
 
     def fork(self, *, entry: str) -> PlanTraversal:
@@ -91,6 +94,7 @@ def select_edge(
     edges: tuple[PlanEdge, ...],
     current_id: str,
     reader_factory: ReaderFactory,
+    edge_counts: dict[tuple[str, str], int] | None = None,
 ) -> PlanEdge | None:
     """Pick the first outgoing edge whose typed predicate evaluates true.
 
@@ -102,10 +106,20 @@ def select_edge(
     When a predicate references an unset port, the edge does not match
     (returns False) — this preserves the "no edge → terminate" semantics
     without raising on every unset port reference.
+
+    Edges carrying ``loop.maxIterations`` are skipped once
+    ``edge_counts[(source, target)] >= maxIterations`` (LangGraph
+    ``recursion_limit`` analogue). The caller then either takes a
+    fallback edge or fail-louds via :class:`LoopObligationExceededError`.
     """
+    counts = edge_counts or {}
     for edge in edges:
         if edge.source != current_id:
             continue
+        if edge.loop is not None:
+            taken = counts.get((edge.source, edge.target), 0)
+            if taken >= edge.loop.max_iterations:
+                continue
         if edge.when is None:
             return edge
         reader = reader_factory(edge.source)

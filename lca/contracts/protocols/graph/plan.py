@@ -76,20 +76,18 @@ class EdgeLoopObligation(BaseModel):
 
     Mirrors legacy :class:`LoopGuard` semantics (ADR-0075 recovery /
     ADR-0225 edge budgets) without reintroducing per-node
-    ``max_visits``. Present on re-entry edges (e.g. reflect→think
-    ``admit_recovery``) so boot validation can fail loud when the
-    bound is missing. Runtime enforcement remains via
-    ``AgentState.budget`` / guard-stack; this field is the ControlPlan
-    obligation SSOT.
+    ``max_visits``. Present on re-entry edges (reflect→think
+    ``admit_recovery``, act→think use_tool re-ask). Boot validation
+    fails loud when the bound is missing; runtime enforcement is
+    :func:`select_edge` skipping the edge once ``taken >= maxIterations``,
+    then :class:`LoopObligationExceededError` if no fallback matches.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid", populate_by_name=True)
 
     max_iterations: int = Field(default=1, alias="maxIterations", gt=0)
     budget: str = "run.steps"
-    terminal_predicate: Predicate | None = Field(
-        default=None, alias="terminalPredicate"
-    )
+    terminal_predicate: Predicate | None = Field(default=None, alias="terminalPredicate")
 
 
 class PlanEdge(BaseModel):

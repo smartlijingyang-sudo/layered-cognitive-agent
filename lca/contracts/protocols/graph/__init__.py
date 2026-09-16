@@ -30,8 +30,10 @@ What's NOT in here (deferred):
 - Anti-corruption adapter between PortName and cognition close-out
   fields (lives in ``lca.cognition.wire.close_out_adapter``, PR-2).
 """
+
 from lca.contracts.protocols.graph.binding import BindingKind
 from lca.contracts.protocols.graph.errors import (
+    LoopObligationExceededError,
     PlanLiftError,
     UnknownFieldError,
     UnsetPortError,
@@ -60,6 +62,7 @@ __all__ = [
     "BindingKind",
     "DispatchDecision",
     "EdgeLoopObligation",
+    "LoopObligationExceededError",
     "NodeIOSchema",
     "NodeInput",
     "NodeOutput",

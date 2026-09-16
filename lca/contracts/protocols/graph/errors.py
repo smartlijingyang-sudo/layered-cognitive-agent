@@ -61,4 +61,38 @@ class UnknownFieldError(PlanLiftError):
     """
 
 
-__all__ = ["PlanLiftError", "UnknownFieldError", "UnsetPortError"]
+class LoopObligationExceededError(RuntimeError):
+    """Runtime: an edge's ``loop.maxIterations`` was exhausted.
+
+    Analogous to LangGraph ``GraphRecursionError`` / OpenAI Agents
+    ``MaxTurnsExceeded``. Raised when the only matching outgoing edge
+    is a bounded re-entry whose take-count has reached the obligation,
+    and no fallback edge matches. The plan is well-formed; the run
+    failed to converge.
+    """
+
+    def __init__(
+        self,
+        reason: str,
+        *,
+        plan_id: str | None = None,
+        source: str | None = None,
+        target: str | None = None,
+        max_iterations: int | None = None,
+        taken: int | None = None,
+    ) -> None:
+        super().__init__(reason)
+        self.reason = reason
+        self.plan_id = plan_id
+        self.source = source
+        self.target = target
+        self.max_iterations = max_iterations
+        self.taken = taken
+
+
+__all__ = [
+    "LoopObligationExceededError",
+    "PlanLiftError",
+    "UnknownFieldError",
+    "UnsetPortError",
+]
