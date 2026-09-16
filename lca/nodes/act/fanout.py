@@ -59,7 +59,6 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
-
 # next_hint closed set (ADR-0232 §Decision 1).  Routing layer only;
 # never enters ``EXECUTION_POINTS`` (C11 closed set).
 NEXT_HINT_FANOUT_NTOM = "fanout_ntom"

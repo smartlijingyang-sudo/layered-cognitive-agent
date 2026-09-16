@@ -9,7 +9,6 @@ import pytest
 
 from lca.cognition.body.sandbox.pool import (
     PooledSandboxCall,
-    PooledSandboxResult,
     SandboxPool,
     default_max_concurrency,
 )

@@ -18,15 +18,14 @@ import time
 
 import pytest
 
-from lca.contracts.models.core.execution.decision import Observation, ToolCall
-from lca.contracts.models.core.execution.tool import ToolApi, ToolManifest
-from lca.contracts.protocols import SafeExecutor, Tool, ToolRegistry
 from lca.cognition.body.tools.execution_policy import (
     ParallelReadOnlyToolBatchPolicy,
     ReadOnlyToolBatchEntry,
 )
 from lca.cognition.body.tools.tool_batch_executor import ToolBatchExecutor
-
+from lca.contracts.models.core.execution.decision import Observation, ToolCall
+from lca.contracts.models.core.execution.tool import ToolApi, ToolManifest
+from lca.contracts.protocols import Tool
 
 # ----- Test doubles -----------------------------------------------------------
 

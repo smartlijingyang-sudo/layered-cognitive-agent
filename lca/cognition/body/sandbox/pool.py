@@ -161,7 +161,7 @@ class SandboxPool:
                     started_at=start,
                     finished_at=finished,
                 )
-            except BaseException as exc:  # noqa: BLE001 — pool must contain any failure
+            except BaseException as exc:
                 finished = loop.time()
                 return PooledSandboxResult(
                     invocation_id=call.invocation_id,

@@ -51,7 +51,7 @@ def _import_manifests() -> list[tuple[str, ToolManifest]]:
     for module_name in _iter_tool_modules():
         try:
             module = importlib.import_module(module_name)
-        except Exception:  # noqa: BLE001 — discovery should not halt on a broken optional plugin
+        except Exception:  # noqa: S112 — discovery should not halt on a broken optional plugin
             continue
         manifest = getattr(module, "MANIFEST", None)
         if isinstance(manifest, ToolManifest):
