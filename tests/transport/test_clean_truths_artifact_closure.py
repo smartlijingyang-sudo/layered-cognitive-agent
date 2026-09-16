@@ -100,7 +100,7 @@ def test_failed_run_does_not_emit_answer_channel() -> None:
 
 def test_canceled_run_does_not_emit_answer_channel() -> None:
     """决策 二:CANCELED run 同上。"""
-    session = _make_session(status=RunLifecycleStatus.CANCELED)
+    session = _make_session(status=RunLifecycleStatus.CANCELLED)
     events = _run_emit(session)
     answer_events = [
         e
@@ -141,4 +141,4 @@ def test_status_value_lowercase_matches_run_status_enum(status_value: str) -> No
     if status_value == "failed":
         assert RunLifecycleStatus.FAILED.value == "failed"
     else:
-        assert RunLifecycleStatus.CANCELED.value == "canceled"
+        assert RunLifecycleStatus.CANCELLED.value == "canceled"

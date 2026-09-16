@@ -157,8 +157,8 @@ def test_cancel_at_waiting_input_transitions_status(
     async def _scenario() -> None:
         receipt = await commands.cancel("run-idem-1")
         assert receipt.accepted
-        assert receipt.status == RunLifecycleStatus.CANCELED.value
-        assert session.status is RunLifecycleStatus.CANCELED
+        assert receipt.status == RunLifecycleStatus.CANCELLED.value
+        assert session.status is RunLifecycleStatus.CANCELLED
         assert session.cancel_requested
 
     asyncio.run(_scenario())

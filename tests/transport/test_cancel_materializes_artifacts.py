@@ -111,7 +111,7 @@ def test_cancel_paused_run_materializes_derived_artifacts(tmp_path: Path) -> Non
     receipt = asyncio.run(commands.cancel(session.run_id))
 
     assert receipt.accepted
-    assert session.status is RunLifecycleStatus.CANCELED
+    assert session.status is RunLifecycleStatus.CANCELLED
     assert session.closed, "cancel 必须走 terminalize 的 close 钩子"
     assert (run_dir / "journal.json").exists()
     assert (run_dir / "journal.narrative.md").exists()
@@ -208,7 +208,7 @@ def test_second_cancel_is_noop(tmp_path: Path) -> None:
 
     assert first.accepted
     assert second.accepted
-    assert second.status == RunLifecycleStatus.CANCELED.value
+    assert second.status == RunLifecycleStatus.CANCELLED.value
 
 
 def test_pause_flushes_journal_incrementally(tmp_path: Path) -> None:
