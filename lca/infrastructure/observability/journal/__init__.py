@@ -19,13 +19,11 @@ from lca.infrastructure.observability.journal.engine.engine import (
 )
 from lca.infrastructure.observability.journal.engine.reducer import (
     RunState,
-    RunStatus,
     fold_run_state,
 )
 
 __all__ = [
     "RunState",
-    "RunStatus",
     "RunStore",
     "UnregisteredJournalEventError",
     "fold_run_state",
