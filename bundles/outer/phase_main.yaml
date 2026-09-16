@@ -226,14 +226,13 @@ edges:
   # outcomes fall through to the 3 mutually-exclusive routing edges
   # below. This satisfies the brief design point 3 mutual-exclusivity
   # requirement (no silent split between "进 interrupt" and "回 think").
-  - from: act.main
-    to: think.main
-    when:
-      kind: and
-      children:
-        - { kind: eq, port: { name: decision, field: action_type }, value: use_tool }
-        - { kind: in, port: { name: approval_routing, field: next_hint }, value: [approve_skipped, approve_approved] }
-
+  #
+  # Edge-order invariant: ``should_terminate`` must precede the use_tool
+  # re-ask edge so budget exhaustion routes to ``terminal.commit``
+  # instead of re-entering ``think.main``. ``select_edge`` returns the
+  # first matching edge; reversing the order lets the use_tool edge
+  # win on every iteration and the run loops indefinitely without
+  # producing ``manifest.json`` / ``kernel.log``.
   # act → terminal.commit on should_terminate.
   - from: act.main
     to: terminal.commit
@@ -241,6 +240,14 @@ edges:
       kind: eq
       port: { name: should_terminate }
       value: true
+
+  - from: act.main
+    to: think.main
+    when:
+      kind: and
+      children:
+        - { kind: eq, port: { name: decision, field: action_type }, value: use_tool }
+        - { kind: in, port: { name: approval_routing, field: next_hint }, value: [approve_skipped, approve_approved] }
 
   # act → reflect.main (reflect reads observation/reflection from the
   # kernel-wide port registry; the wiring edge just routes control).
