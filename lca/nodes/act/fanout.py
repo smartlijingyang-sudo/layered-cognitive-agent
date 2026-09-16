@@ -1,27 +1,38 @@
 """phase.concept.act_subgraph.act_fanout — typed envelope fan-out boundary.
 
-``concept.act_subgraph`` 内嵌节点:``CommandEnvelope`` →
-``list[CommandEnvelope]`` + ``RoutingDecision``。
+``concept.act_subgraph`` 内嵌节点:``envelopes`` (tuple) →
+``envelopes`` (preserved) + ``RoutingDecision``.
 
-PR-3.8.4:1:1 only wiring。envelope → ``[envelope]``;空 envelope →
-``[]``。N:N fanout 与 partial-failure domain 留后续 PR。
+PR-3 (G-18, ADR-0232): N:N fanout. The node now reads either:
 
-``declared_outputs`` 显式包含 ``envelope`` 作为 1:1 pass-through:当下游
-``act.dispatch`` 仍按 ``envelope`` 单值消费时,fanout 透传原 envelope 以
-保证 runtime wiring 在 1:1 路径上不断;``envelopes`` 列表语义为后续 N:N
-PR 预留(N:N PR 会让 dispatch 改为消费 ``envelopes``)。
+- ``envelopes`` typed port (``tuple[CommandEnvelope, ...]``) — N:N path,
+  emits ``fanout_ntom`` when ``len(envelopes) >= 2``,
+  ``fanout_1to1`` when ``len == 1``, ``fanout_empty`` when 0; or
+- ``envelope`` typed port (``CommandEnvelope | None``) — 1:1 back-compat
+  path, same routing decision as before.
 
-ADR-0219 §5.5 typed-port contract:``declared_inputs`` /
-``declared_outputs`` 是编译期闭集;此节点只读 ``envelope``,写
-``envelope`` / ``envelopes`` / ``routing``,不触碰 Body / Registry /
-SafeExecutor。AGENTS.md §3 C10:execution narrow door 仍由
-``effect.execute → Body → SafeExecutor → Sandbox`` 持有,fanout 仅为
-topology 适配,不改语义。
+Both ports coexist on the typed-port graph; PR-3 wires
+``act.envelope → act.fanout`` via the new ``envelopes`` port while
+keeping the single-value ``envelope`` port for any consumer that has
+not yet been upgraded.  ``declared_inputs`` therefore exposes both
+ports.
+
+``declared_outputs`` keeps ``envelope`` as the 1:1 pass-through so
+``act.dispatch`` can still consume a single envelope; ``envelopes``
+is the N:N surface for future dispatch upgrades.
+
+ADR-0219 §5.5 typed-port contract: ``declared_inputs`` /
+``declared_outputs`` are compile-time closed sets; this node reads
+``envelopes`` (preferred) or ``envelope`` (back-compat) and writes
+``envelopes`` / ``envelope`` / ``routing``.  It does not touch Body /
+Registry / SafeExecutor — execution narrow door (AGENTS.md §3 C10) is
+held by ``effect.execute → Body → SafeExecutor → Sandbox``.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.enums.enums import ActionType
@@ -49,18 +60,32 @@ from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
+# next_hint closed set (ADR-0232 §Decision 1).  Routing layer only;
+# never enters ``EXECUTION_POINTS`` (C11 closed set).
+NEXT_HINT_FANOUT_NTOM = "fanout_ntom"
+NEXT_HINT_FANOUT_1TO1 = "fanout_1to1"
+NEXT_HINT_FANOUT_EMPTY = "fanout_empty"
+
+
 @dataclass(frozen=True, slots=True)
 class ActFanoutExecutor:
-    """``concept.act.fanout`` 节点:1:1 envelope fan-out (typed boundary)。
+    """``concept.act.fanout`` 节点:N:N envelope fan-out (typed boundary)。
 
-    envelope → [envelope];None → []。无副作用;不调用 Body / Registry /
-    SafeExecutor;不构造 envelope;不读取 capability / budget / time。
+    Accepts either an ``envelopes`` tuple (preferred, PR-3) or a single
+    ``envelope`` (1:1 back-compat).  Emits the same three port values
+    on the way out: ``envelopes`` (always a list, possibly empty),
+    ``envelope`` (the first envelope or ``None``), and ``routing``
+    (RoutingDecision with ``next_hint`` ∈ {fanout_ntom, fanout_1to1,
+    fanout_empty}).
+
+    No side effects: no Body / Registry / SafeExecutor calls; no
+    envelope construction; no capability / budget / time reads.
     """
 
     semantic_name: str = "act.fanout"
     region: str = "act"
-    declared_inputs: tuple[PortName, ...] = ("envelope",)
-    declared_outputs: tuple[PortName, ...] = ("envelope", "envelopes", "routing")
+    declared_inputs: tuple[PortName, ...] = ("envelopes", "envelope")
+    declared_outputs: tuple[PortName, ...] = ("envelopes", "envelope", "routing")
 
     async def node_execute(
         self,
@@ -69,32 +94,70 @@ class ActFanoutExecutor:
     ) -> NodeOutput:
         """act.fanout 入口。
 
-        inputs 端口(yaml): envelope (CommandEnvelope | None)
-        outputs 端口(yaml): envelopes (list[CommandEnvelope]), routing (RoutingDecision)
+        inputs 端口(yaml): envelopes (tuple[CommandEnvelope, ...] | None, preferred)
+                            envelope (CommandEnvelope | None, back-compat)
+        outputs 端口(yaml): envelopes (list[CommandEnvelope]), envelope (CommandEnvelope | None),
+                            routing (RoutingDecision)
         """
         del context  # unused: pure function of input port value
-        envelope = input.port_values.get("envelope")
-        if envelope is None:
-            envelopes: list[CommandEnvelope] = []
-            routing = RoutingDecision(
-                action_type=ActionType.USE_TOOL,
-                next_node="act.dispatch",
-                next_hint="fanout_empty",
+        port_values: dict[str, Any] = input.port_values
+
+        # Resolve source: prefer the N:N ``envelopes`` typed port; fall back to 1:1 ``envelope``.
+        envelopes_in: tuple[CommandEnvelope, ...] | None = port_values.get("envelopes")
+        if envelopes_in is not None:
+            if not isinstance(envelopes_in, tuple):
+                # Accept list-shaped values from upstream typed-port adapters.
+                if isinstance(envelopes_in, list):
+                    envelopes_in = tuple(envelopes_in)
+                else:
+                    raise TypeError(
+                        "act.fanout: 'envelopes' port must be a tuple/list of "
+                        f"CommandEnvelope or None, got {type(envelopes_in).__name__}"
+                    )
+            for idx, candidate in enumerate(envelopes_in):
+                if not isinstance(candidate, CommandEnvelope):
+                    raise TypeError(
+                        "act.fanout: 'envelopes' port entry "
+                        f"#{idx} must be a CommandEnvelope, "
+                        f"got {type(candidate).__name__}"
+                    )
+            envelopes_out: list[CommandEnvelope] = list(envelopes_in)
+            envelope_out: CommandEnvelope | None = (
+                envelopes_in[0] if envelopes_in else None
             )
+            if len(envelopes_in) >= 2:
+                next_hint = NEXT_HINT_FANOUT_NTOM
+            elif len(envelopes_in) == 1:
+                next_hint = NEXT_HINT_FANOUT_1TO1
+            else:
+                next_hint = NEXT_HINT_FANOUT_EMPTY
         else:
-            if not isinstance(envelope, CommandEnvelope):
+            # Back-compat: 1:1 single-envelope path.
+            envelope = port_values.get("envelope")
+            if envelope is not None and not isinstance(envelope, CommandEnvelope):
                 raise TypeError(
                     "act.fanout: 'envelope' port must be a CommandEnvelope "
                     f"instance or None, got {type(envelope).__name__}"
                 )
-            envelopes = [envelope]
-            routing = RoutingDecision(
-                action_type=ActionType.USE_TOOL,
-                next_node="act.dispatch",
-                next_hint="fanout_1to1",
+            envelopes_out = [envelope] if envelope is not None else []
+            envelope_out = envelope
+            next_hint = (
+                NEXT_HINT_FANOUT_1TO1
+                if envelope is not None
+                else NEXT_HINT_FANOUT_EMPTY
             )
+
+        routing = RoutingDecision(
+            action_type=ActionType.USE_TOOL,
+            next_node="act.dispatch",
+            next_hint=next_hint,
+        )
         return NodeOutput(
-            port_values={"envelope": envelope, "envelopes": envelopes, "routing": routing}
+            port_values={
+                "envelopes": envelopes_out,
+                "envelope": envelope_out,
+                "routing": routing,
+            }
         )
 
 
