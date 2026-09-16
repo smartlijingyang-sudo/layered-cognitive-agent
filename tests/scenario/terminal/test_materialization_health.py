@@ -26,9 +26,7 @@ the ``_TERMINAL_EVENT_TYPES`` deletion.
 from __future__ import annotations
 
 import json
-import os
 import time
-import unittest
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -51,7 +49,6 @@ from lca.plugins.transport.webserver.read.runs.terminal import materialization
 from lca.plugins.transport.webserver.read.runs.terminal.materialization import (
     record_terminal_materialization,
 )
-
 
 # ── helpers ─────────────────────────────────────────────────────────
 
@@ -230,11 +227,10 @@ def test_materialization_raises_on_partial_flush(tmp_path) -> None:
         materialization,
         "flush_step_tree_artifacts",
         return_value=fake_flush_errors,
+    ), __import__("pytest").raises(
+        materialization.ManifestFlushIncompleteError,
     ):
-        with __import__("pytest").raises(
-            materialization.ManifestFlushIncompleteError,
-        ):
-            record_terminal_materialization(session)
+        record_terminal_materialization(session)
 
     manifest_path = tmp_path / "runs" / run_id / "manifest.json"
     assert not manifest_path.exists(), (
@@ -253,7 +249,7 @@ def test_ter_ev_types_constant_removed() -> None:
     """
     with __import__("pytest").raises(ImportError):
         from lca.plugins.transport.webserver.read.runs.terminal.materialization import (  # noqa: F401
-            _TERMINAL_EVENT_TYPES,  # noqa: F821
+            _TERMINAL_EVENT_TYPES,
         )
 
     # Also verify the module no longer carries it (the symbol may be

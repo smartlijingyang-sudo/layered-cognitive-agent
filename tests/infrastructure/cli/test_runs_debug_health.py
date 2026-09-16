@@ -41,7 +41,6 @@ from typer.testing import CliRunner
 
 from lca.infrastructure.cli.cli.cli import app
 
-
 # ── helpers ─────────────────────────────────────────────────────────
 
 
@@ -49,11 +48,18 @@ def _spine_for(run_id: str, *, llm_tool_messages_missing: bool) -> list[dict]:
     """Synthesize a spine that drives the LlmDeriver to either ok or failed.
 
     Mirrors the audit-run shape (kernel.run.start, llm.request.header,
-    llm.call.end, step.tool_call.record, phase_graph.node.{start,end},
-    kernel.run.stop) but with TOP-LEVEL ``run_id`` so the existing
-    fold parser yields a non-empty ``conditions`` list.
+    llm.call.end, step.tool_call.record, step.tool_result.record,
+    phase_graph.node.{start,end}, kernel.run.stop) but with TOP-LEVEL
+    ``run_id`` so the existing fold parser yields a non-empty
+    ``conditions`` list.
+
+    The first ``llm.request.header`` carries an ``assistant`` message
+    with ``tool_calls=[{id: "tc1"}]``. The healthy run's SECOND
+    ``llm.request.header`` echoes ``role=tool`` for ``tc1`` (B-1
+    closed); the B-1 poisoned run's second header DROPS the tool
+    response, so the LlmDeriver flags ``llm.status=failed``.
     """
-    base = [
+    base: list[dict] = [
         {"event_id": f"{run_id}:1", "ts": "2026-09-16T02:00:00+00:00",
          "run_id": run_id, "execution_point": "kernel.run.start",
          "payload": {"run_id": run_id}},
@@ -65,24 +71,58 @@ def _spine_for(run_id: str, *, llm_tool_messages_missing: bool) -> list[dict]:
          "payload": {"run_id": run_id}},
         {"event_id": f"{run_id}:4", "ts": "2026-09-16T02:00:03+00:00",
          "run_id": run_id, "execution_point": "llm.request.header",
-         "payload": {"run_id": run_id, "messages": [{"role": "user", "content": "hi"}],
+         "payload": {"run_id": run_id,
+                     "messages": [{"role": "user", "content": "hi"}],
                      "tools": [], "step_id": "s1"}},
         {"event_id": f"{run_id}:5", "ts": "2026-09-16T02:00:04+00:00",
          "run_id": run_id, "execution_point": "llm.call.end",
          "payload": {"run_id": run_id, "outcome": "success", "model": "x"}},
         {"event_id": f"{run_id}:6", "ts": "2026-09-16T02:00:05+00:00",
+         "run_id": run_id, "execution_point": "llm.request.header",
+         "payload": {"run_id": run_id,
+                     "messages": [
+                         {"role": "assistant", "content": "",
+                          "tool_calls": [{"id": "tc1", "type": "function",
+                                          "function": {"name": "x",
+                                                       "arguments": "{}"}}]},
+                     ],
+                     "tools": [], "step_id": "s2"}},
+        {"event_id": f"{run_id}:7", "ts": "2026-09-16T02:00:06+00:00",
          "run_id": run_id, "execution_point": "step.tool_call.record",
          "payload": {"run_id": run_id, "tool_call": {"id": "tc1"}}},
-        {"event_id": f"{run_id}:7", "ts": "2026-09-16T02:00:06+00:00",
+        {"event_id": f"{run_id}:8", "ts": "2026-09-16T02:00:07+00:00",
+         "run_id": run_id, "execution_point": "step.tool_result.record",
+         "payload": {"run_id": run_id, "tool_call_id": "tc1", "ok": True}},
+        {"event_id": f"{run_id}:9", "ts": "2026-09-16T02:00:08+00:00",
+         "run_id": run_id, "execution_point": "llm.request.header",
+         "payload": {"run_id": run_id,
+                     "messages": [
+                         {"role": "tool", "content": "ok",
+                          "tool_call_id": "tc1"},
+                         {"role": "user", "content": "follow-up"},
+                     ],
+                     "tools": [], "step_id": "s3"}},
+        {"event_id": f"{run_id}:10", "ts": "2026-09-16T02:00:09+00:00",
+         "run_id": run_id, "execution_point": "llm.call.end",
+         "payload": {"run_id": run_id, "outcome": "success", "model": "x"}},
+        {"event_id": f"{run_id}:11", "ts": "2026-09-16T02:00:10+00:00",
          "run_id": run_id, "execution_point": "phase.act.fold",
          "payload": {"run_id": run_id}},
-        {"event_id": f"{run_id}:8", "ts": "2026-09-16T02:00:07+00:00",
+        {"event_id": f"{run_id}:12", "ts": "2026-09-16T02:00:11+00:00",
          "run_id": run_id, "execution_point": "kernel.run.stop",
          "payload": {"run_id": run_id, "outcome": "success"}},
     ]
-    # When llm_tool_messages_missing=True, drop the tool message that
-    # would normally follow the tool_call.record — the LlmDeriver's
-    # status-failed rule (per spec §4 LlmDeriver) fires.
+    if llm_tool_messages_missing:
+        # Drop the role=tool message in the 3rd header so the LlmDeriver's
+        # "tool_call ids never matched in any header" rule fires (spec §4
+        # LlmDeriver). Drop the tool_result.record too so ToolDeriver stays
+        # happy (we want llm=failed, not tool=failed).
+        base = [e for e in base
+                if not (e.get("execution_point") == "llm.request.header"
+                        and any(m.get("role") == "tool"
+                                 for m in (e.get("payload") or {}).get("messages") or []))]
+        base = [e for e in base
+                if e.get("execution_point") != "step.tool_result.record"]
     return base
 
 
@@ -98,7 +138,7 @@ def _write_spine(tmp_path: Path, run_id: str) -> Path:
 
 
 def _write_b1_spine(tmp_path: Path, run_id: str) -> Path:
-    """B-1 poisoned run: tool_call.record with NO matching tool message."""
+    """B-1 poisoned run: tool_call.record with NO matching tool result."""
     run_dir = tmp_path / "traces" / "runs" / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     spine_path = run_dir / f"{run_id}.spine.jsonl"
