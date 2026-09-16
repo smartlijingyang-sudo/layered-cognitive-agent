@@ -12,7 +12,7 @@ from typing import Any
 from lca.contracts.protocols.graph.binding import BindingKind
 from lca.contracts.protocols.graph.errors import PlanLiftError
 from lca.contracts.protocols.graph.node_io import NodeIOSchema, PortSpec
-from lca.contracts.protocols.graph.plan import SubgraphReference
+from lca.contracts.protocols.graph.plan import EdgeLoopObligation, SubgraphReference
 from lca.contracts.protocols.graph.predicate import PortRef, Predicate
 
 _LEAF_PREDICATE_KINDS = frozenset({"eq", "ne", "in", "exists", "missing"})
@@ -205,6 +205,58 @@ def coerce_when(raw: object) -> Predicate | None:
     return None
 
 
+def coerce_loop(raw: object) -> EdgeLoopObligation | None:
+    """Coerce a YAML ``loop:`` mapping into :class:`EdgeLoopObligation`.
+
+    Accepts both snake_case and camelCase keys (``max_iterations`` /
+    ``maxIterations``, ``terminal_predicate`` / ``terminalPredicate``).
+    ``None`` / empty → no obligation. Missing positive max_iterations or
+    empty budget fail loud at lift (no silent unbound re-entry).
+
+    See ADR-0236 / M1 outer edge SSOT: the outer ``phase.main.outer``
+    plan's bounded reflect→think ``admit_recovery`` edge must carry a
+    loop obligation; :class:`AdmitRecoveryEdgeCheck` enforces this at
+    boot/compile.
+    """
+    if raw is None:
+        return None
+    if isinstance(raw, EdgeLoopObligation):
+        return raw
+    if not isinstance(raw, Mapping):
+        raise PlanLiftError(
+            f"edge loop must be a mapping or EdgeLoopObligation, got {type(raw).__name__}"
+        )
+    max_iterations = raw.get("max_iterations", raw.get("maxIterations", 1))
+    budget = raw.get("budget", "run.steps")
+    terminal_raw = raw.get("terminal_predicate", raw.get("terminalPredicate"))
+    try:
+        max_iterations_int = int(max_iterations)
+    except (TypeError, ValueError) as exc:
+        raise PlanLiftError(
+            f"edge loop.max_iterations must be a positive int, got {max_iterations!r}"
+        ) from exc
+    if max_iterations_int <= 0:
+        raise PlanLiftError(
+            f"edge loop.max_iterations must be > 0, got {max_iterations_int}"
+        )
+    budget_str = str(budget or "").strip()
+    if not budget_str:
+        raise PlanLiftError("edge loop.budget must be a non-empty string")
+    terminal_pred = None
+    if terminal_raw is not None and terminal_raw is not False:
+        if isinstance(terminal_raw, str):
+            raise PlanLiftError(
+                f"edge loop.terminal_predicate string DSL is no longer supported; "
+                f"use a typed Predicate dict (got {terminal_raw!r})"
+            )
+        terminal_pred = coerce_when(terminal_raw)
+    return EdgeLoopObligation(
+        max_iterations=max_iterations_int,
+        budget=budget_str,
+        terminal_predicate=terminal_pred,
+    )
+
+
 def parse_predicate_dict(raw: Mapping[str, Any]) -> Predicate:
     """Parse a dict-shaped predicate into a :class:`Predicate`."""
     kind = str(raw.get("kind", ""))
@@ -244,6 +296,7 @@ _schema_from = schema_from
 _to_port_specs = to_port_specs
 _subgraph_ref_from = subgraph_ref_from
 _coerce_when = coerce_when
+_coerce_loop = coerce_loop
 _parse_predicate_dict = parse_predicate_dict
 _parse_port_ref = parse_port_ref
 
@@ -252,6 +305,7 @@ __all__ = [
     "binding_for_phase_node",
     "binding_from",
     "binding_from_factory_or_binding",
+    "coerce_loop",
     "coerce_when",
     "io_schema_from_mapping",
     "parse_port_ref",

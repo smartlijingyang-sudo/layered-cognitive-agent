@@ -9,7 +9,7 @@ The think subgraph must contain:
 absence from ``bundles/think.yaml`` once Task 3 lands.
 
 ``think.yaml`` is normally loaded as a subgraph from
-``bundles/phase_main_outer.yaml`` with an explicit ``entry_node``
+``bundles/outer/phase_main.yaml`` with an explicit ``entry_node``
 injection; this test mirrors that injection (``think.shortcut`` is the
 declared entry point in the outer file) so the lifter can produce a
 :class:`Plan` for assertion.

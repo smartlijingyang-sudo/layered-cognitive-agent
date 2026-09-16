@@ -1,17 +1,15 @@
-# web-standard-recovery profile — extends web-standard with bounded recovery.
-# ADR-0075: Adds reflect→think recovery edge for failure handling.
+# web-standard-recovery profile — same outer SSOT as web-standard.
+# ADR-0075 / M1 Issue #14: bounded reflect→think recovery lives on
+# ``bundles/outer/phase_main.yaml`` (admit_recovery + loop.maxIterations=1).
+# This profile no longer loads ``declarative-recovery`` / ``declarative-phase-graph``
+# as edge sources — plugins only produce routing hints.
 #
-# Recovery behavior:
-# - When a phase fails (observation.success == False), reflect phase sets admit_recovery
-# - Edge reflect.main → think.main is taken when admit_recovery is True
-# - LoopGuard limits recovery to 1 iteration to prevent infinite loops
+# Recovery behavior (outer-owned):
+# - Reflect admit_recovery sets routing.next_hint = admit_recovery on failure
+# - Outer edge reflect.main → think.main fires when that hint is set
+# - Edge loop obligation bounds re-entry (LoopGuard=1 semantics)
 #
-# This profile demonstrates bounded recovery: agent can retry once after failure,
-# then must stop or escalate to human.
-#
-# ADR-0174 PR-7.3 / S7.3 第三批(与 ADR-0173 halt-resume 联跑):profile 迁到
-# ``loop_cursor.spine_*`` bundle naming(§D1);observability 五缝装配段与 web-standard
-# 同 schema。
+# ADR-0174 PR-7.3 / S7.3: loop_cursor.spine_* + observability五缝与 web-standard 对齐。
 #
 # ADR-0173 §D4 recovery-aware 装配:本 profile 是 halt 可恢复的 opt-in profile;
 # halt_close_policy_override + cursor_factory.resume_protocol 块当前不在
@@ -23,7 +21,7 @@
 # TODO(ADR-0173 §D4, delete-when: Profile schema 接受以下字段):
 #   runtime:
 #     halt_close_policy_override:
-#       user_stop: "halt"                # 默认 halt;web-standard 用 "close"
+#       user_stop: "halt"
 #       loop_guard: "halt"
 #       approval_pending: "halt"
 #     cursor_factory:
@@ -41,18 +39,12 @@
 #   host:
 #     initial: [step_tree, narrative, graph, cost, live_tail]
 
-# ADR-0169 PR-25:observability 五缝装配段(Profile 读取 SSOT,见 ADR-0169 §D8)。
-# LoopCursor 由 LoopCursorFactory.from_profile 装配;ProjectionHost /
-# PersistenceCoordinator / ModelVisibleCapture / CloseBarrier 由
-# ObservabilityRuntime.from_profile 装配。Profile 提供 plan_ref 与
-# initial deriver 列表,实现细节(StdLoopCursor / StdProjectionHost 等)
-# 在 PR-25 阶段尚未拆成独立 plugin,本段先给 wiring 与读路径。
 observability:
   loop_cursor:
-    implementation: std                              # 默认实现(PR-14 LoopCursorFactory)
-    spine_default: loop_cursor.spine_default         # 复用 bundles/loop_cursor.spine_default.yaml 的 bundle
+    implementation: std
+    spine_default: loop_cursor.spine_default
   projection_host:
-    initial: [step_tree, narrative, graph, cost]     # 默认 deriver 注册
+    initial: [step_tree, narrative, graph, cost]
   persistence:
     coalescer: default
     sink: routing_file
@@ -64,13 +56,30 @@ observability:
 
 bundles:
   - bundles/base.yaml
+  - bundles/observability-default.yaml
+  - bundles/observation-9module.yaml
   - bundles/web-app.yaml
   - bundles/scenario-cordis-creator.yaml
-  - bundles/declarative-phase-graph.yaml
-  - bundles/declarative-recovery.yaml                # Adds recovery phase graph edges
-  - bundles/loop_cursor.spine_default.yaml           # ADR-0174 §D1 spine bundle SSOT
+  - bundles/loop_cursor.spine_default.yaml
+  - bundles/session-runtime.yaml
+  - bundles/event-bus-components.yaml
+  - bundles/outer/phase_main.yaml
+  - bundles/think/think_subgraph.yaml
+  - bundles/act/act_subgraph.yaml
+  - bundles/perceive/perceive_subgraph.yaml
+  - bundles/reflect/reflect_subgraph.yaml
+  - bundles/remember/remember_subgraph.yaml
 
 patch:
+  - id: spine.sink.file
+    config:
+      boot_path: .lca/spine/boot-spine.jsonl
+      runs_root: traces/runs
+
+  - id: spine.sink.console
+    config:
+      format: graph_timeline
+
   - id: lca-llm-resolver
     config:
       default_model: qwen3.7-plus

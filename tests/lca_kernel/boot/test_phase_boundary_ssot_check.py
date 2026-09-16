@@ -10,7 +10,6 @@ import pytest
 
 from lca.contracts.protocols.graph.errors import PlanLiftError
 from lca.contracts.protocols.graph.plan import Plan
-
 from lca_kernel.boot.plan_validation.checks.phase_boundary_ssot import (
     PlanIdAliasSuffixCheck,
 )

@@ -23,7 +23,6 @@ from lca.contracts.protocols.graph.errors import PlanLiftError
 from lca.contracts.protocols.graph.node_io import NodeIOSchema, PortSpec
 from lca.contracts.protocols.graph.plan import Plan, PlanEdge, PlanNode, SubgraphReference
 from lca.contracts.protocols.graph.predicate import PortRef, Predicate
-
 from lca_kernel.boot.plan_validation.checks.cycle_port_dependency import (
     CyclePortDependencyCheck,
 )

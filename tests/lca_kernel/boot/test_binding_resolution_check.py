@@ -17,7 +17,6 @@ from __future__ import annotations
 from lca.contracts.protocols.graph.binding import BindingKind
 from lca.contracts.protocols.graph.errors import PlanLiftError
 from lca.contracts.protocols.graph.plan import Plan, PlanNode, SubgraphReference
-
 from lca_kernel.boot.plan_validation.checks.binding_resolution import (
     BindingResolutionCheck,
 )

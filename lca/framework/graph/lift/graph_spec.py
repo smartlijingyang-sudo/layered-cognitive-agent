@@ -12,6 +12,7 @@ from lca.contracts.protocols.graph.node_io import NodeIOSchema
 from lca.contracts.protocols.graph.plan import Plan, PlanEdge, PlanNode
 from lca.framework.graph.lift.parsers import (
     binding_from_factory_or_binding,
+    coerce_loop,
     coerce_when,
     io_schema_from_mapping,
     schema_from,
@@ -170,6 +171,7 @@ def lift_graph_spec_inner(spec: Mapping[str, Any]) -> Plan:
                 target=target,
                 when=coerce_when(raw.get("when")),
                 subgraph_ref=subgraph_ref_from(raw.get("subgraph_ref")),
+                loop=coerce_loop(raw.get("loop")),
             )
         )
     return Plan(

@@ -47,7 +47,7 @@ patch:
 
   # Patch topology to add PR-C (ADR-0214 §6.3) PG-007 preconditions and
   # Outer plan topology is declared declaratively in
-  # ``bundles/phase_main_outer.yaml`` (added above); no Cordis
+  # ``bundles/outer/phase_main.yaml`` (added above); no Cordis
   # topology-provider patch is needed on this profile anymore.
   # The legacy ``phase.topology.standard`` patch was removed as part
   # of the outer-plan cutover (ADR-0221 P3 + topology-provider

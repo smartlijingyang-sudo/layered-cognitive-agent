@@ -19,7 +19,7 @@ from lca.framework.graph.lift.interface import (
     PlanLifter,
     get_plan_lifter,
 )
-from lca.framework.graph.lift.parsers import _to_port_specs
+from lca.framework.graph.lift.parsers import _coerce_loop, _to_port_specs
 from lca.framework.graph.lift.validators import (
     _outer_consumes_hitl_routing,
     _predicate_reads_routing_next_hint,
@@ -32,6 +32,7 @@ from lca.framework.graph.lift.validators import (
 __all__ = [
     "DefaultPlanLifter",
     "PlanLifter",
+    "_coerce_loop",
     "_lift_graph_spec_inner",
     "_outer_consumes_hitl_routing",
     "_predicate_reads_routing_next_hint",

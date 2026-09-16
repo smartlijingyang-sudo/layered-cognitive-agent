@@ -1,6 +1,6 @@
 # 新人向：外环图怎么读 + act 如何调到工具
 
-面向第一次摸 `phase_main_outer.yaml` / `act.yaml` 的工程师。
+面向第一次摸 `bundles/outer/phase_main.yaml` / act 子图的工程师。
 目标：会查类、会跟调用栈、不拿节点 id / `@plugin id` 当契约键。
 
 权威驱动缝（生产单轨）：`DeclarativeExecution` → `PlanInterpreter` + `BundleGraphSpec`（ADR-0217/0218/0220）。
@@ -22,28 +22,31 @@
 
 ---
 
-## 2. 外环总览（`bundles/phase_main_outer.yaml`）
+## 2. 外环总览（`bundles/outer/phase_main.yaml` — M1 edge SSOT）
 
 驱动入口：`DeclarativeExecution` 跑 plan `phase.main.outer`。
+生产只认 `terminal.commit` + 本文件；旧名 `stop.main` / `phase_main_outer.yaml` 已退役。
 
 ```
-perceive.main → think.main → act.main → reflect.main → remember.main → stop.main
-     ↑                                                              │
-     └──────────── stop 若 not should_stop 回环 ─────────────────────┘
+perceive.main → think.main → act.main → reflect.main → remember.main → terminal.commit
+                     ↑                      │
+                     └── admit_recovery（有界）─┘
 ```
 
-各相可经 `should_stop` / `error` 短路进 `stop.main`。
+- think / act 可经 decision / should_terminate 短路进 `terminal.commit`。
+- reflect→think recovery：`routing.next_hint == admit_recovery` + `loop.maxIterations: 1`（缺边 = 编译失败）。
+- 故障域义务附件：`docs/architecture/phase-graph-node-orchestration/04-m1-fault-domain-obligations.md`。
 
-六个 outer 节点都是 `sub_spec_ref`，没有本层 `factory`：
+六个 outer 节点（除 terminal）都是 `sub_spec_ref`，没有本层 `factory`：
 
 | outer 节点 | 子图 | entry | 叶子 factory → 类（路径） |
 |---|---|---|---|
-| `perceive.main` | perceive 子图 | `phase.perceive.observe` | `observe`→`PerceiveObserveExecutor`；`fold`→`PerceiveFoldExecutor`（`lca/plugins/loop/phase/perceive/*/plugin.py`） |
-| `think.main` | `think.yaml` | `think.shortcut` | `shortcut`→`ThinkShortcutExecutor`；`route`→`ThinkRouteExecutor`；`reason`→子图 `think_reason`；`classify.ref` / `gate.ref`→decision 子图 |
-| `act.main` | `act.yaml` | `act.validate` | 见下文 §3–§5 |
+| `perceive.main` | perceive 子图 | `phase.perceive.observe` | `observe`→`PerceiveObserveExecutor`；`fold`→`PerceiveFoldExecutor` |
+| `think.main` | think 子图 | `think.shortcut` | `shortcut` / `route` / `reason` / decision classify+gate |
+| `act.main` | act 子图 | `act.validate` | 见下文 §3–§5 |
 | `reflect.main` | reflect 子图 | `phase.reflect.score` | `score`→`ReflectScoreExecutor`；`admit_recovery`→`ReflectAdmitRecoveryExecutor` |
-| `remember.main` | remember 子图 | `phase.remember.write` | `write`→`RememberWriteExecutor`；`fold`→`RememberFoldExecutor` |
-| `stop.main` | stop 子图 | `phase.stop.should_check` | `should_check`→`StopShouldCheckExecutor`；`focus`→`StopFocusExecutor` |
+| `remember.main` | remember 子图 | `phase.remember.write` | `write`→`RememberWriteExecutor` |
+| `terminal.commit` | （本层 binding: terminate） | — | `TerminateStrategy` → `terminal_outcome` |
 
 ### think.reason 内环（工具面入口，非 act）
 

@@ -3,7 +3,7 @@
 The v2 traversal's `select_edge` reads typed :class:`Predicate` objects
 through :func:`evaluate_predicate` and :class:`PortReader`. This test
 drives the real typed evaluator against the actual
-`bundles/phase_main_outer.yaml` plan after the D4 bundle rewrite.
+`bundles/outer/phase_main.yaml` plan after the D4 bundle rewrite.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from lca.framework.graph.traversal import select_edge
 @pytest.fixture(scope="module")
 def outer_plan():
     spec = yaml.safe_load(
-        Path("bundles/phase_main_outer.yaml").read_text(encoding="utf-8")
+        Path("bundles/outer/phase_main.yaml").read_text(encoding="utf-8")
     )
     return lift_graph_spec(spec)
 

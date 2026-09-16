@@ -31,7 +31,6 @@ from lca.contracts.protocols.graph.plan import (
     PlanNode,
     SubgraphReference,
 )
-
 from lca_kernel.boot.plan_validation.checks.compiled_run_plan import (
     check_compiled_run_plan,
 )

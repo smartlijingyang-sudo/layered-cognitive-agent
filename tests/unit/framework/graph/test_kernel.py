@@ -254,7 +254,7 @@ class TestLifter:
         import yaml as _yaml
 
         repo_root = _Path(__file__).resolve().parents[4]
-        outer_yaml = (repo_root / "bundles" / "phase_main_outer.yaml").read_text(encoding="utf-8")
+        outer_yaml = (repo_root / "bundles" / "outer" / "phase_main.yaml").read_text(encoding="utf-8")
         spec = _yaml.safe_load(outer_yaml)
         plan = lift_graph_spec(spec)
 

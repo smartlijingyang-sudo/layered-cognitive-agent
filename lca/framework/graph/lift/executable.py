@@ -7,6 +7,7 @@ from __future__ import annotations
 from lca.contracts.protocols.graph.plan import Plan, PlanEdge, PlanNode
 from lca.framework.graph.lift.parsers import (
     binding_for_phase_node,
+    coerce_loop,
     coerce_when,
     subgraph_ref_from,
 )
@@ -72,6 +73,7 @@ def lift_executable_plan(executable: object) -> Plan:
                 source=str(getattr(raw, "source", "")),
                 target=str(getattr(raw, "target", "")),
                 when=coerce_when(getattr(raw, "when", "true")),
+                loop=coerce_loop(getattr(raw, "loop", None)),
             )
         )
     return Plan(

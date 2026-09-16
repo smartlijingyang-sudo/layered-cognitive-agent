@@ -71,6 +71,27 @@ class PlanNode(BaseModel):
     # schemas. The kernel never enforces a per-node visit ceiling.
 
 
+class EdgeLoopObligation(BaseModel):
+    """Compile-time loop / budget obligation attached to a control edge.
+
+    Mirrors legacy :class:`LoopGuard` semantics (ADR-0075 recovery /
+    ADR-0225 edge budgets) without reintroducing per-node
+    ``max_visits``. Present on re-entry edges (e.g. reflect→think
+    ``admit_recovery``) so boot validation can fail loud when the
+    bound is missing. Runtime enforcement remains via
+    ``AgentState.budget`` / guard-stack; this field is the ControlPlan
+    obligation SSOT.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid", populate_by_name=True)
+
+    max_iterations: int = Field(default=1, alias="maxIterations", gt=0)
+    budget: str = "run.steps"
+    terminal_predicate: Predicate | None = Field(
+        default=None, alias="terminalPredicate"
+    )
+
+
 class PlanEdge(BaseModel):
     """One directed edge in a plan graph.
 
@@ -82,6 +103,10 @@ class PlanEdge(BaseModel):
     ``subgraph_ref`` on an edge triggers the same nested-execution path
     as :attr:`PlanNode.subgraph_ref`, but keyed off the edge instead of
     the source node.
+
+    ``loop`` is an optional edge obligation (maxIterations + budget) for
+    bounded re-entry. Missing loop on critical recovery edges fails
+    compile (M1 outer edge SSOT).
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -90,6 +115,7 @@ class PlanEdge(BaseModel):
     target: str
     when: Predicate | None = None
     subgraph_ref: SubgraphReference | None = None
+    loop: EdgeLoopObligation | None = None
 
 
 class Plan(BaseModel):
@@ -133,4 +159,4 @@ class Plan(BaseModel):
         return tuple(e for e in self.edges if e.source == node_id)
 
 
-__all__ = ["Plan", "PlanEdge", "PlanNode", "SubgraphReference"]
+__all__ = ["EdgeLoopObligation", "Plan", "PlanEdge", "PlanNode", "SubgraphReference"]

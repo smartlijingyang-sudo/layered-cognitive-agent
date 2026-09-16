@@ -1,4 +1,4 @@
-# bundles/phase_main_outer.yaml — outer plan, explicit phase topology.
+# bundles/outer/phase_main.yaml — outer plan, explicit phase topology (M1 SSOT).
 #
 # ADR-0221 P3 cutover: the v2 driver no longer reads
 # ``phase.topology.standard`` / ``phase.topology.standard`` Cordis
@@ -255,7 +255,25 @@ edges:
       port: { name: approval_routing, field: next_hint }
       value: approve_rejected
 
-  # reflect → remember.
+  # reflect → think recovery (M1): bounded admit_recovery re-entry.
+  # MUST precede the unconditional reflect→remember edge so select_edge
+  # can take recovery when routing.next_hint == admit_recovery (first
+  # matching edge wins). LoopGuard=1 semantics via edge loop obligation.
+  - from: reflect.main
+    to: think.main
+    when:
+      kind: eq
+      port: { name: routing, field: next_hint }
+      value: admit_recovery
+    loop:
+      maxIterations: 1
+      budget: run.steps
+      terminalPredicate:
+        kind: ne
+        port: { name: routing, field: next_hint }
+        value: admit_recovery
+
+  # reflect → remember (default path when recovery is not admitted).
   - from: reflect.main
     to: remember.main
 

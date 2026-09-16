@@ -13,7 +13,6 @@ from lca.contracts.protocols.graph.binding import BindingKind
 from lca.contracts.protocols.graph.errors import PlanLiftError
 from lca.contracts.protocols.graph.node_io import NodeIOSchema, PortSpec
 from lca.contracts.protocols.graph.plan import Plan, PlanNode
-
 from lca_kernel.boot.plan_validation.checks.port_naming import (
     PortNamingConventionCheck,
 )
