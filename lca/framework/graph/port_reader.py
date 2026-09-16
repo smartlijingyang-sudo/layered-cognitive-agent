@@ -45,11 +45,24 @@ class PortReader(BaseModel):
         - ``ref.field is None`` → return the whole port value.
         - ``ref.field is not None`` → navigate into the field.
 
-        Raises :class:`UnsetPortError` if the port is not in the registry.
+        Raises :class:`UnsetPortError` if the port is not in the registry
+        **or** if the port value is ``None`` (cleared by an empty
+        ``NodeOutput`` under the declared-outputs contract).
+        Predicate evaluation treats both as "no match" so cleared ports
+        fall through to the next edge — same shape as LangGraph's
+        ``LastValue` reducer where empty updates also clear the channel.
         Raises :class:`UnknownFieldError` if the field doesn't exist on
         the port's payload (dict key or payload_type attribute).
         """
+        from lca.contracts.protocols.graph.errors import UnsetPortError
+
         value = self.registry.read(ref.name)
+        if value is None:
+            raise UnsetPortError(
+                f"edge from {self.source_node!r} reads port {ref.name!r} "
+                f"as None (cleared by empty NodeOutput)",
+                port_name=ref.name,
+            )
 
         if ref.field is None:
             return value

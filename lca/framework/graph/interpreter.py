@@ -52,7 +52,11 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from lca.contracts.protocols.graph.errors import UnknownFieldError, UnsetPortError
+from lca.contracts.protocols.graph.errors import (
+    LoopObligationExceededError,
+    UnknownFieldError,
+    UnsetPortError,
+)
 from lca.contracts.protocols.graph.node_io import NodeOutput
 from lca.contracts.protocols.graph.plan import Plan, PlanEdge, PlanNode
 from lca.contracts.protocols.graph.strategy import StrategyContext
@@ -140,9 +144,7 @@ class PlanInterpreter:
         port_registry: PortRegistry | None = None,
         outer_state: Any = None,
         traversal: PlanTraversal | None = None,
-        port_registry_seed: (
-            Mapping[str, Any] | Callable[[], Mapping[str, Any]] | None
-        ) = None,
+        port_registry_seed: (Mapping[str, Any] | Callable[[], Mapping[str, Any]] | None) = None,
     ) -> InterpretationResult:
         """Execute ``plan`` and return the typed :class:`InterpretationResult`.
 
@@ -246,8 +248,18 @@ class PlanInterpreter:
                     )
                 )
                 raise
+            # Honor the declared-outputs contract: every port in
+            # ``schema.outputs`` is written this visit. An absent key
+            # in ``port_values`` means ``None`` (cleared), not "keep
+            # the previous iteration". Empty ``NodeOutput`` otherwise
+            # leaves a stale registry value that the next consumer
+            # reads as this visit's output — the act→think re-ask
+            # loop class (2026-09-16).
+            to_merge = dict(output.port_values)
+            for name in schema.output_names():
+                to_merge.setdefault(name, None)
             ports.merge_output(
-                output.port_values,
+                to_merge,
                 payload_types={
                     spec.name: spec.payload_type
                     for spec in schema.outputs
@@ -300,7 +312,31 @@ class PlanInterpreter:
                 edges=plan.edges,
                 current_id=node.id,
                 reader_factory=_reader_factory,
+                edge_counts=traversal.edge_counts,
             )
+            if edge is None:
+                skipped = [
+                    e
+                    for e in plan.edges
+                    if e.source == node.id
+                    and e.loop is not None
+                    and traversal.edge_counts.get((e.source, e.target), 0) >= e.loop.max_iterations
+                ]
+                if skipped:
+                    bound = skipped[0]
+                    taken = traversal.edge_counts.get((bound.source, bound.target), 0)
+                    raise LoopObligationExceededError(
+                        f"plan {plan.id!r}: edge {bound.source!r} → {bound.target!r} "
+                        f"exhausted loop.maxIterations={bound.loop.max_iterations} "
+                        f"(taken={taken}); no fallback edge matched. "
+                        f"This is the act→think re-ask / recovery loop class — "
+                        f"the run failed to converge.",
+                        plan_id=plan.id,
+                        source=bound.source,
+                        target=bound.target,
+                        max_iterations=bound.loop.max_iterations,
+                        taken=taken,
+                    )
             dispatch = self._classify(edge, output)
             self.observer.observe(
                 _visit_end_of(
