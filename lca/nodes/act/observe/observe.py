@@ -149,7 +149,16 @@ class ActObserveExecutor:
 @plugin(
     id="phase.concept.act_subgraph.act_observe",
     Config=None,
-    provides=("act::act.observe",),
+    # PR-3 close-out: ``semantic_name`` on ``ActObserveExecutor`` is
+    # ``act.observe.normalize`` (the receipt-normalisation pass after
+    # the split into commit_fact / terminate_decide). The composite key
+    # registered by ``setup()`` is ``f"{region}::{semantic_name}"`` —
+    # ``provides`` must match that suffix, not the pre-PR-3
+    # ``act.observe`` string, or :class:`AuditedPluginContext`'s
+    # undeclared-interaction guard fails boot with
+    # ``UndeclaredInteractionError: provide('act::act.observe.normalize')
+    # not in PluginSpec provides=['act::act.observe']``.
+    provides=("act::act.observe.normalize",),
     requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

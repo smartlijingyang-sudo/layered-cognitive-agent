@@ -1,194 +1,148 @@
-"""act.observe.commit_fact — typed RunFact journal commit node (PR-3 NEW Task 3.2.7a).
+"""act.observe.commit_fact — receipt passthrough (PR-3 close-out).
 
-Per `docs/superpowers/plans/2026-09-16-act-subgraph-tightening.md` PR-3
-NEW Task 3.2.7a (L-1 / 「act 业务不知道图存在」boundary fix):
+PR-3 close-out: the original ``commit_fact`` node also wrote a
+``RunFact(kind="effect.observed", ...)`` to a journal capability, which
+created a parallel commit path that violated AGENTS.md §2.2 (fact /
+status / decision single-responsibility) and ADR-0192 (FactCommitter
+routes through Session.append as the SSOT). The node now does one job:
+``EffectReceipt`` → ``EffectReceipt`` passthrough. RunFact construction
+and journal commit move to ``reducer.fold`` via ``FactCommitter``
+(ADR-0192 E0/E2, ADR-0194 P1-08).
 
-``act.observe.commit_fact`` consumes the normalized ``receipt`` port,
-constructs a typed ``RunFact(kind="effect.observed", payload={...})``,
-and calls ``journal.commit_fact(fact, plan_ref, node_ref)`` once. The
-``receipt`` is passed through unchanged on the ``receipt`` port.
+These tests assert the new contract:
 
-ADR-0235 / PR-5 R-3 follow-through: ``journal_capability`` is injected by
-the kernel as a typed Contract at construction (fail-loud if absent).
-The node no longer reads ``context.runtime.journal`` via ``getattr(...,
-None)`` silent-skip. Tests inject the capability directly at
-construction.
+1. ``receipt in → receipt out`` identity (no journal, no RunFact).
+2. Non-receipt input → ``TypeError`` (typed-port boundary fail-loud).
+3. ``requires=()`` so the plugin attaches without any journal_capability /
+   journal_backends producer wired into the resolved profile.
 """
 
 from __future__ import annotations
-
-from dataclasses import dataclass, field
 
 import pytest
 
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.harness.act.effect_receipt import EffectOutcome, EffectReceipt
-from lca.contracts.protocols.act.command.envelope import RunFact
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
 )
 
 
-@dataclass
-class FakeJournal:
-    """In-memory journal stand-in for tests.
-
-    Mirrors the contract surface ``act.observe.commit_fact`` relies on:
-    ``commit_fact(fact, plan_ref=..., node_ref=...)``. Records every call
-    so tests can assert side-effects deterministically.
-    """
-
-    committed: list[RunFact] = field(default_factory=list)
-    last_plan_ref: str = ""
-    last_node_ref: str = ""
-
-    def commit_fact(
-        self,
-        fact: RunFact,
-        *,
-        plan_ref: str,
-        node_ref: str,
-    ) -> None:
-        self.committed.append(fact)
-        self.last_plan_ref = plan_ref
-        self.last_node_ref = node_ref
+def _make_receipt(
+    *,
+    invocation_id: str | None = None,
+    outcome: EffectOutcome = EffectOutcome.SUCCEEDED,
+    provider: str = "p",
+    error_code: str = "",
+) -> EffectReceipt:
+    return EffectReceipt(
+        invocation_id=invocation_id or new_id("inv"),
+        outcome=outcome,
+        idempotency_key="k",
+        provider=provider,
+        error_code=error_code,
+    )
 
 
 @pytest.mark.asyncio
-async def test_commit_fact_runs_observed_kind() -> None:
-    """Single receipt in → exactly one ``effect.observed`` RunFact committed."""
+async def test_commit_fact_passes_receipt_through() -> None:
+    """Single receipt in → same receipt out, no journal side-effects."""
     from lca.nodes.act.observe.commit_fact import ActObserveCommitFactExecutor
 
-    receipt = EffectReceipt(
-        invocation_id=new_id("inv"),
-        outcome=EffectOutcome.SUCCEEDED,
-        idempotency_key="k",
-        provider="p",
-    )
-    journal = FakeJournal()
-    node = ActObserveCommitFactExecutor(journal_capability=journal)
+    receipt = _make_receipt()
+    node = ActObserveCommitFactExecutor()
 
     out = await node.node_execute(
-        NodeContext(
-            runtime={},
-            budget={},
-            metadata={"plan_ref": "plan-xyz", "node_id": "act.observe.commit_fact"},
-        ),
+        NodeContext(runtime={}, budget={}, metadata={}),
         NodeInput(port_values={"receipt": receipt}),
     )
 
-    assert out.port_values["receipt"] is receipt
-    assert len(journal.committed) == 1
-    assert journal.committed[0].kind == "effect.observed"
-    assert journal.committed[0].plan_ref == "plan-xyz"
-    assert journal.last_node_ref == "act.observe.commit_fact"
-
-
-@pytest.mark.asyncio
-async def test_commit_fact_payload_includes_receipt_fields() -> None:
-    """RunFact payload carries receipt classifier fields (invocation_id, outcome,
-    provider, idempotency_key, error_code) so reflect / remember nodes can do
-    typed inference on the journal fact without re-reading the receipt.
-    """
-    from lca.nodes.act.observe.commit_fact import ActObserveCommitFactExecutor
-
-    receipt = EffectReceipt(
-        invocation_id="inv_payload_test",
-        outcome=EffectOutcome.FAILED,
-        idempotency_key="idem_payload",
-        provider="body.act",
-        error_code="timeout",
-    )
-    journal = FakeJournal()
-    node = ActObserveCommitFactExecutor(journal_capability=journal)
-
-    await node.node_execute(
-        NodeContext(
-            runtime={},
-            budget={},
-            metadata={"plan_ref": "plan-payload", "node_id": "act.observe.commit_fact"},
-        ),
-        NodeInput(port_values={"receipt": receipt}),
-    )
-
-    fact = journal.committed[0]
-    payload = fact.payload
-    assert payload["invocation_id"] == "inv_payload_test"
-    assert payload["outcome"] == "failed"
-    assert payload["provider"] == "body.act"
-    assert payload["idempotency_key"] == "idem_payload"
-    assert payload["error_code"] == "timeout"
-
-
-@pytest.mark.asyncio
-async def test_commit_fact_fact_id_format() -> None:
-    """``fact_id`` is deterministic: ``f"{plan_ref}:{node_id}:{invocation_id}"``."""
-    from lca.nodes.act.observe.commit_fact import ActObserveCommitFactExecutor
-
-    receipt = EffectReceipt(
-        invocation_id="inv_fid",
-        outcome=EffectOutcome.SUCCEEDED,
-        idempotency_key="k",
-        provider="p",
-    )
-    journal = FakeJournal()
-    node = ActObserveCommitFactExecutor(journal_capability=journal)
-
-    await node.node_execute(
-        NodeContext(
-            runtime={},
-            budget={},
-            metadata={"plan_ref": "plan-1", "node_id": "act.observe.commit_fact"},
-        ),
-        NodeInput(port_values={"receipt": receipt}),
-    )
-
-    assert journal.committed[0].fact_id == "plan-1:act.observe.commit_fact:inv_fid"
+    assert out.port_values == {"receipt": receipt}
+    # No journal / no RunFact — the node has no side-effects.
+    assert "journal" not in out.port_values
+    assert "fact" not in out.port_values
 
 
 @pytest.mark.asyncio
 async def test_commit_fact_rejects_non_receipt_input() -> None:
-    """Non-receipt input → TypeError (typed-port boundary contract)."""
+    """Non-receipt input → ``TypeError`` (typed-port boundary contract)."""
     from lca.nodes.act.observe.commit_fact import ActObserveCommitFactExecutor
 
-    journal = FakeJournal()
-    node = ActObserveCommitFactExecutor(journal_capability=journal)
-    with pytest.raises(TypeError):
+    node = ActObserveCommitFactExecutor()
+    with pytest.raises(TypeError, match="EffectReceipt"):
         await node.node_execute(
-            NodeContext(
-                runtime={},
-                budget={},
-                metadata={"plan_ref": "plan", "node_id": "act.observe.commit_fact"},
-            ),
+            NodeContext(runtime={}, budget={}, metadata={}),
             NodeInput(port_values={"receipt": "not a receipt"}),
         )
-    assert journal.committed == []
 
 
 @pytest.mark.asyncio
-async def test_commit_fact_missing_journal_capability_fails_loud() -> None:
-    """ADR-0235 / PR-5 R-3 follow-through: missing ``journal_capability`` now
-    raises ``RuntimeError`` (typed-contract fail-loud). The previous silent
-    skip (``getattr(..., None)``) closed the observation-plane write
-    silently and was a R-3 boundary violation.
+async def test_commit_fact_rejects_missing_port() -> None:
+    """Missing ``receipt`` port → ``TypeError`` (no silent skip)."""
+    from lca.nodes.act.observe.commit_fact import ActObserveCommitFactExecutor
+
+    node = ActObserveCommitFactExecutor()
+    with pytest.raises(TypeError, match="EffectReceipt"):
+        await node.node_execute(
+            NodeContext(runtime={}, budget={}, metadata={}),
+            NodeInput(port_values={}),
+        )
+
+
+@pytest.mark.asyncio
+async def test_commit_fact_preserves_receipt_on_failed_outcome() -> None:
+    """Failed receipts (timeout, denied, etc.) still pass through unchanged."""
+    from lca.nodes.act.observe.commit_fact import ActObserveCommitFactExecutor
+
+    receipt = _make_receipt(
+        outcome=EffectOutcome.FAILED,
+        provider="body.act",
+        error_code="timeout",
+    )
+    node = ActObserveCommitFactExecutor()
+
+    out = await node.node_execute(
+        NodeContext(runtime={}, budget={}, metadata={}),
+        NodeInput(port_values={"receipt": receipt}),
+    )
+
+    assert out.port_values["receipt"] is receipt
+    assert out.port_values["receipt"].error_code == "timeout"
+
+
+def test_commit_fact_plugin_declares_no_requires() -> None:
+    """Plugin-level capability graph: ``commit_fact`` must not depend on any
+    journal / ``JournalCapability`` / ``journal_backends`` capability — RunFact
+    commit lives in the reducer fold (ADR-0192 SSOT), not the act subgraph.
+    """
+    from lca.nodes.act.observe.commit_fact import setup
+
+    # ``setup`` is the @plugin(...)-decorated Plugin carrier; its
+    # ``_lca_definition`` is the immutable PluginDefinition (required_/
+    # provided_capability_keys / layer / effects are all declared there).
+    definition = setup._lca_definition
+    assert definition.required_capability_keys == ()
+    assert definition.provided_capability_keys == ("act::act.observe.commit_fact",)
+
+
+def test_commit_fact_executor_has_no_capability_field() -> None:
+    """``ActObserveCommitFactExecutor`` carries no ``journal_capability`` slot.
+
+    This pins the post-close-out shape so a future PR cannot re-introduce
+    the parallel commit mechanism by silently adding the field back.
     """
     from lca.nodes.act.observe.commit_fact import ActObserveCommitFactExecutor
 
-    receipt = EffectReceipt(
-        invocation_id=new_id("inv"),
-        outcome=EffectOutcome.SUCCEEDED,
-        idempotency_key="k",
-        provider="p",
+    executor = ActObserveCommitFactExecutor()
+    forbidden = {
+        "journal_capability",
+        "journal_backend",
+        "backend",
+        "fact_committer",
+        "session",
+    }
+    leaked = forbidden & set(executor.__dataclass_fields__)  # type: ignore[attr-defined]
+    assert leaked == set(), (
+        f"commit_fact must stay pure-transform; found forbidden fields {leaked}"
     )
-    node = ActObserveCommitFactExecutor()  # no journal_capability injected
-
-    with pytest.raises(RuntimeError, match="journal_capability"):
-        await node.node_execute(
-            NodeContext(
-                runtime={},
-                budget={},
-                metadata={"plan_ref": "plan", "node_id": "act.observe.commit_fact"},
-            ),
-            NodeInput(port_values={"receipt": receipt}),
-        )

@@ -286,6 +286,22 @@ entries:
   name: phase_concept_act_subgraph_act_observe
   $module: lca.nodes.act.observe.observe
   config: {}
+# PR-3 close-out: the act.observe → commit_fact → terminate_decide split
+# (commit 0377d2ac4) shipped the two new @plugin(...) modules in
+# lca/nodes/act/observe/ but did not register them in base.yaml, so
+# plan_lift's node-executor coverage check rejected the subgraph with
+# "no enabled plugin provides act::act.observe.commit_fact" /
+# "act::act.observe.terminate_decide". These two entries close the
+# AGENTS.md §5 contract loop: split node → plugin module →
+# bundle manifest → enable via profile.
+- id: phase.concept.act_subgraph.act_observe_commit_fact
+  name: phase_concept_act_subgraph_act_observe_commit_fact
+  $module: lca.nodes.act.observe.commit_fact
+  config: {}
+- id: phase.concept.act_subgraph.act_observe_terminate_decide
+  name: phase_concept_act_subgraph_act_observe_terminate_decide
+  $module: lca.nodes.act.observe.terminate_decide
+  config: {}
 - id: phase.concept.effect_execute.effect_execute
   name: phase_concept_effect_execute_effect_execute
   $module: lca.nodes.concept.effect.execute
@@ -296,6 +312,14 @@ entries:
 - id: phase.concept.effect.pre_dispatch_envelope_check
   name: phase_concept_effect_pre_dispatch_envelope_check
   $module: lca.nodes.effect.pre_dispatch_envelope_check
+  config: {}
+# PR-2 close-out: provider for the ``permission_manifest.*`` capability
+# the envelope check requires. Deny-by-default; production profiles
+# ship their own ``permission_manifest.<name>`` provider and disable
+# this one.
+- id: lca-effect-permission-manifest-default
+  name: lca_effect_permission_manifest_default
+  $module: lca.nodes.effect.permission_manifest_default
   config: {}
 - id: lca-memory-write-policy-simple
   name: lca_memory_write_policy_simple

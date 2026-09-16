@@ -1,28 +1,29 @@
-"""phase.concept.act_subgraph.act_observe_commit_fact — typed observation-plane journal commit.
+"""phase.concept.act_subgraph.act_observe_commit_fact — receipt passthrough.
 
 ``concept.act_subgraph`` 内嵌节点:``EffectReceipt`` → ``EffectReceipt``
-(透传)+ 调用 ``journal.commit_fact(RunFact(kind="effect.observed", ...))``
-一次。
+(纯透传)。
 
-PR-3 Task 3.2.7a:从原 ``act.observe`` 节点剥离 ``RunFact commit`` 段,
-让 ``act.observe`` 只承担 receipt 归一化,本节点专门承担 observation plane
-落库职责(AGENTS.md §2.2 事实写入与数据归一化分离)。
+PR-3 close-out: 原本的 ``commit_fact`` 节点同时承担 receipt 归一化与
+``journal.commit_fact(RunFact(kind="effect.observed", ...))`` 副作用
+(observation plane 落库),后者被 PR-5 commit 进一步收紧为 typed
+``JournalCapability.commit_fact`` 注入。两次拆解都把 commit 留在 act 业务
+节点内,与 AGENTS.md §2.2 (事实/状态/决策/许可/回执/投影 单一职责) 冲突
+——``JournalCapability`` 是 PR-3 自造的旁路机制,绕开了 ADR-0192 规定的
+``FactCommitter`` 走 ``Session.append`` 单轨。
 
-ADR-0235 / PR-5 R-3 follow-through: journal capability 由 kernel 通过
-``__init__`` 的 typed ``journal_capability`` kwarg 注入(fail-loud if
-absent);本节点不再 ``getattr(context.runtime, "journal", None)`` 静默
-降级。``journal_capability`` 是 typed Contract per ADR-0195 §1.4 C13;
-缺失时显式 ``RuntimeError``(kernel 必须注入;测试通过构造时传 mock)。
+Redesign-from-first-principles 收尾 (LCA AGENTS.md §1.5 #2 直击本质):
 
-Deterministic + idempotent:同一 receipt 多次调用产生相同 ``fact_id``
-且 ``commit_fact`` 被调用 N 次(节点本身不负责去重;去重由 journal
-capability 实现负责)。
+- 节点只做 receipt passthrough。RunFact 构造 + 落库由上游 ``reducer.fold``
+  走 ``FactCommitter`` / ``Session.append`` 完成,严格单一职责。
+- typed-port wiring 边界 (ADR-0195 §1.4 C13) 保留:``receipt → receipt``
+  不引入 journal capability、Context.runtime peek、或任何旁路。
+- 删除 PR-3 引入的 ``JournalCapability`` Protocol 与 ``JournalBackendAdapter``
+  shim;两者在仓库内不再有消费者。
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol, runtime_checkable
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -36,7 +37,6 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.protocols.act.command.envelope import RunFact
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -49,58 +49,19 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
-@runtime_checkable
-class JournalCapability(Protocol):
-    """Typed-port contract for the journal write seam (ADR-0235 / PR-5 R-3).
-
-    Concrete implementations live in the journal backend packages; the
-    act business layer sees only this Protocol.
-    """
-
-    def commit_fact(
-        self,
-        fact: RunFact,
-        *,
-        plan_ref: str,
-        node_ref: str,
-    ) -> object: ...
-
-
-def _resolve_plan_ref(metadata: dict[str, object]) -> str:
-    value = metadata.get("plan_ref", "unknown")
-    return value if isinstance(value, str) else "unknown"
-
-
-def _resolve_node_ref(metadata: dict[str, object], fallback: str) -> str:
-    value = metadata.get("node_id", fallback)
-    return value if isinstance(value, str) else fallback
-
-
 @dataclass(frozen=True, slots=True)
 class ActObserveCommitFactExecutor:
-    """``concept.act_subgraph`` 节点:EffectReceipt → EffectReceipt + journal commit。
+    """``concept.act_subgraph`` 节点:EffectReceipt → EffectReceipt passthrough。
 
-    Reads the ``receipt`` port, constructs a typed ``RunFact(kind=
-    "effect.observed", payload={...})`` and calls
-    ``journal_capability.commit_fact(fact, plan_ref=..., node_ref=...)``
-    once. The receipt is passed through unchanged on the ``receipt`` port.
-
-    ADR-0235 / PR-5 R-3: ``journal_capability`` is injected by the kernel
-    as a typed Contract at construction (fail-loud if absent). No more
-    ``getattr(context.runtime, "journal", None)`` silent-skip.
+    PR-3 close-out: receipt 透传归一化后,RunFact 落库由 reducer.fold 走
+    ``FactCommitter`` 单轨(ADR-0192)完成,本节点零副作用、不读取
+    ``context.runtime``、不构造 journal/journal_capability dependency。
     """
 
     semantic_name: str = "act.observe.commit_fact"
     region: str = "act"
     declared_inputs: tuple[PortName, ...] = ("receipt",)
     declared_outputs: tuple[PortName, ...] = ("receipt",)
-    journal_capability: JournalCapability | None = None
-
-    def __post_init__(self) -> None:
-        # ``journal_capability`` may legitimately be None at module-import
-        # time (the @plugin setup hook wires it after construction); the
-        # node fails loud at execute time when it is still missing.
-        return
 
     async def node_execute(
         self,
@@ -112,41 +73,16 @@ class ActObserveCommitFactExecutor:
         inputs 端口(yaml): receipt (EffectReceipt)
         outputs 端口(yaml): receipt (EffectReceipt, passthrough)
 
-        副作用: ``journal_capability.commit_fact(RunFact(kind=
-        "effect.observed", ...), ...)`` 一次。journal capability 缺失
-        → ``RuntimeError``(kernel 必须 typed-inject;不接受静默降级)。
+        无副作用。Receipt 类型不匹配 → ``TypeError``(typed-port 边界
+        fail-loud,AGENTS.md §3 C13)。
         """
-        if self.journal_capability is None:
-            raise RuntimeError(
-                "act.observe.commit_fact: 'journal_capability' not injected "
-                "— kernel must inject typed JournalCapability at construction. "
-                "Refusing to silently skip observation-plane writes "
-                "(AGENTS.md §2.3 control/observation split + ADR-0235 R-3)."
-            )
+        del context  # unused: pure function of input ports
         receipt = input.port_values.get("receipt")
         if not isinstance(receipt, EffectReceipt):
             raise TypeError(
                 "act.observe.commit_fact: 'receipt' port must be an EffectReceipt "
                 f"instance, got {type(receipt).__name__}"
             )
-
-        plan_ref = _resolve_plan_ref(context.metadata)
-        node_ref = _resolve_node_ref(context.metadata, self.semantic_name)
-
-        fact = RunFact(
-            fact_id=f"{plan_ref}:{node_ref}:{receipt.invocation_id}",
-            plan_ref=plan_ref,
-            kind="effect.observed",
-            payload={
-                "invocation_id": receipt.invocation_id,
-                "outcome": receipt.outcome.value,
-                "provider": receipt.provider,
-                "idempotency_key": receipt.idempotency_key,
-                "error_code": receipt.error_code,
-            },
-        )
-        self.journal_capability.commit_fact(fact, plan_ref=plan_ref, node_ref=node_ref)
-
         return NodeOutput(port_values={"receipt": receipt})
 
 
@@ -154,7 +90,7 @@ class ActObserveCommitFactExecutor:
     id="phase.concept.act_subgraph.act_observe_commit_fact",
     Config=None,
     provides=("act::act.observe.commit_fact",),
-    requires=("journal_capability",),
+    requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",
@@ -182,15 +118,13 @@ class ActObserveCommitFactExecutor:
 async def setup(ctx: PluginContext, config=None) -> None:
     """Composite-key 注册:``{region}::{semantic_name}``。
 
-    ADR-0235 / PR-5 R-3: kernel injects ``journal_capability`` via
-    ``ctx.require("journal_capability")``. The legacy
-    ``getattr(context.runtime, "journal")`` silent-skip is gone.
+    PR-3 close-out: 不再 require ``journal_capability`` /
+    ``journal_backends`` —— RunFact commit 走 reducer 单轨(ADR-0192)。
     """
     del config
-    journal_capability = ctx.require("journal_capability")
-    executor = ActObserveCommitFactExecutor(journal_capability=journal_capability)
+    executor = ActObserveCommitFactExecutor()
     composite_key = f"{executor.region}::{executor.semantic_name}"
     ctx.provide(composite_key, executor)
 
 
-__all__ = ["ActObserveCommitFactExecutor", "JournalCapability", "setup"]
+__all__ = ["ActObserveCommitFactExecutor", "setup"]

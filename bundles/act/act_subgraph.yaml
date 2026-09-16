@@ -84,10 +84,14 @@ nodes:
     factory: act.approve.gate
     # ``decision`` is the typed upstream Decision (carries
     # needs_approval); ``approval_required`` is the boolean computed by
-    # act.authorize. ``command`` is optional (consumed only on resume
-    # when the kernel re-projects the persisted Command into the
-    # subgraph's port registry).
-    inputs: [decision, approval_required]
+    # act.authorize. ``command`` is optional (consumed only on the
+    # resume path when the outer ``act.resume`` subgraph delegate
+    # re-enters this gate with the persisted Command forwarded via
+    # the kernel-wide port registry).
+    inputs:
+      - decision
+      - approval_required
+      - { name: command, required: false }
     # ``approval_routing`` is the typed ``RoutingDecision`` that bubbles
     # out of the subgraph through ``act.main.declared_outputs``; the
     # outer-plan's 3 mutually-exclusive edges consume it. Renamed from
@@ -158,9 +162,13 @@ nodes:
   # fold 自 PR-3.8.7)。should_terminate 路由决策由同级 act.observe.terminate_decide
   # 产出;observation-plane RunFact 落库由同级 act.observe.commit_fact 完成。
   # 三者各自单一职责(AGENTS.md §2.2 事实/决策分离)。
+  # PR-3 close-out: factory string follows the executor's
+  # ``semantic_name = "act.observe.normalize"`` so the lifter's
+  # node-executor coverage check finds ``act::act.observe.normalize``
+  # under the resolved profile.
   - id: act.observe
     region: act
-    factory: act.observe
+    factory: act.observe.normalize
     inputs: [receipt]
     outputs: [receipt]
     config:
@@ -189,23 +197,20 @@ nodes:
       emit_on_enter: []
       emit_on_exit: [phase.act.fold.end]
 
-  # ADR-0237 / PR-1b: subgraph-internal ``intervene.resume`` stub node.
-  # The subgraph declares a resume edge into ``act.approve.gate`` so the
-  # per-plan resume-edge validator triggers at subgraph lift time. The
-  # stub itself is a factory carrier (no inner edges — the subgraph
-  # exits on entry); the real resume subgraph lives in
-  # ``bundles/intervene/resume_subgraph.yaml`` and is reached via the
-  # outer-level ``intervene.resume`` node when the kernel resumes the
-  # run. The kernel re-projects the persisted ``Command`` into the
-  # subgraph's port registry before entering this stub.
-  - id: intervene.resume
-    region: intervene
-    factory: intervene.resume
-    inputs: [command]
-    outputs: [decision]
-    config:
-      emit_on_enter: []
-      emit_on_exit: []
+  # ADR-0237 / PR-1b close-out: the original subgraph-internal
+  # ``intervene.resume`` stub node + ``intervene.resume → act.approve.gate``
+  # edge were a workaround that relied on an unrealised kernel
+  # re-projection hook (ADR-0237 §6 promised "kernel re-projects the
+  # persisted Command into the subgraph's port registry before
+  # entering this stub" — no such hook exists in
+  # SubgraphStrategy.run / PortRegistry). The resume path now goes
+  # through the outer-level ``act.resume`` subgraph delegate in
+  # bundles/outer/phase_main.yaml, which re-enters this same subgraph
+  # at ``entry_node=act.approve.gate`` with ``command`` forwarded
+  # through the outer ``declared_inputs``. The per-plan resume-edge
+  # validator (PR-1 lifter check) is satisfied because the outer
+  # ``intervene.resume → act.resume`` edge is the resume-edge target
+  # consumed at outer-plan lift time.
 
   # PR-3.8.5: 1:1 receipt join typed-boundary node. Consumes the
   # ``receipts`` list port (emitted by effect.execute after PR-3.8.5
@@ -250,15 +255,6 @@ edges:
       kind: in
       port: { name: approval_routing, field: next_hint }
       value: [approve_skipped, approve_approved]
-  # ADR-0237 / PR-1b: subgraph-internal resume edge so the per-plan
-  # ``act.approve.gate`` resume-edge validator triggers at subgraph
-  # lift time. ``intervene.resume`` here is a factory stub (no inner
-  # edges — the subgraph ends on entry); the real subgraph lives in
-  # ``bundles/intervene/resume_subgraph.yaml`` and is reached via the
-  # outer-level ``intervene.resume`` node when the kernel resumes.
-  - from: intervene.resume
-    to: act.approve.gate
-    when: true
   - from: act.envelope
     to: act.fanout
     when: true
