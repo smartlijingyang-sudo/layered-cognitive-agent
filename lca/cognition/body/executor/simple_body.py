@@ -36,7 +36,7 @@ _PERSISTENCE_FAILURE_REASON = "session_persistence_failed"
 def _default_no_cache() -> Any:
     """Return a CacheConfig with caching disabled.
 
-    ``dispatch_tool_call`` is a single-shot seam — caching is the legacy
+    ``dispatch_tool_calls`` is a single-shot seam — caching is the legacy
     ToolBatchExecutor's job, not ours.
     """
     from lca.contracts.models.team.role.team import CacheConfig
@@ -116,7 +116,7 @@ class SimpleBody(Body):
 
         ``writer`` is the run-scoped :class:`RunSessionWriter` injected by the
         composition root. It is required by
-        :meth:`dispatch_tool_call` (spec §C persist-before-execute) and
+        :meth:`dispatch_tool_calls` (spec §C persist-before-execute) and
         optional for legacy :meth:`act` callers that go through the
         action registry's ToolBatchExecutor instead.
         """
@@ -155,27 +155,34 @@ class SimpleBody(Body):
         observation = await handler.execute(decision, state)
         return self._propagate_degradation(decision, observation)
 
-    async def dispatch_tool_call(
+    async def dispatch_tool_calls(
         self,
         decision: Decision,
         state: AgentState | None = None,
-    ) -> EffectReceipt:
-        """Persist-before-execute a single tool call (spec §C).
+    ) -> list[EffectReceipt]:
+        """Persist-before-execute all tool calls in a decision (spec §C, G-16).
 
         The act subgraph's responsibility for one ``use_tool`` decision:
 
-        1. Persist ``surface/assistant_message{tool_calls=[...]}`` to the
-           journal BEFORE executing the tool. The assistant row must be in
-           the journal before the next LLM call sees the history.
-        2. If step 1 raises (e.g. ``Session.append`` fails), return
-           ``EffectReceipt(FAILED, error_code="session_persistence_failed")``
-           and the tool never runs.
-        3. Execute the tool via :class:`SafeExecutor`.
-        4. Persist ``surface/tool_result`` linked by ``call_id``. If step 4
-           raises, return the same persistence-failed receipt (the orphan
-           path is closed by :meth:`RunSessionWriter.derive_messages`
-           anyway, but we surface the failure explicitly).
-        5. On success, return ``EffectReceipt(SUCCEEDED)``.
+        1. Persist exactly ONE ``surface/assistant_message`` carrying ALL
+           ``decision.tool_calls`` BEFORE any tool runs. The assistant
+           row must be in the journal before the next LLM call sees the
+           history (persist-before-execute).
+        2. If step 1 raises (e.g. ``Session.append`` fails), return a
+           single ``EffectReceipt(FAILED, error_code="session_persistence_failed")``
+           per call and no tool runs.
+        3. For each call: execute via :class:`SafeExecutor`, then persist
+           ``surface/tool_result`` linked by ``call_id``. Each iteration
+           produces its own ``EffectReceipt`` (per-call semantics).
+        4. Return ``list[EffectReceipt]`` of length ``len(decision.tool_calls)``.
+
+        Wire invariant (spec §G-16): for a decision with N>=1
+        ``tool_calls``, the Session contains exactly 1
+        ``surface/assistant_message`` (carrying all N tool_calls) followed
+        by N ``surface/tool_result`` messages. Closing this invariant is
+        the root-cause fix for B-1 (orphan-drop eating 4/5 tool_results
+        in a 5-``runCommand`` decision cycle, leaving the LLM feedback
+        chain incomplete).
 
         ``state`` is optional — the writer is state-less and only the
         cursor advance (not relevant for this path) needs it. We accept it
@@ -188,11 +195,6 @@ class SimpleBody(Body):
         ``state`` is ``None`` or the slot is unset, so single-shot tests
         without a session-bound agent still produce a deterministic
         turn/step on the journal rows.
-
-        This is the root-cause fix for ``run_cc39610072bf``: with
-        persist-before-execute, the assistant ``tool_calls`` row is in the
-        journal before the next LLM call sees the history, so an orphan
-        tool row cannot precede the assistant row that declared the call.
         """
         # ``AgentState`` exposes ``step`` directly; the matching ``turn`` is
         # carried in ``state.extra["current_turn"]`` (projection-driven;
@@ -201,32 +203,28 @@ class SimpleBody(Body):
         step = state.step if state is not None else 0
         if self.writer is None:
             raise ToolExecutionError(
-                "Body.dispatch_tool_call requires a bound RunSessionWriter; "
+                "Body.dispatch_tool_calls requires a bound RunSessionWriter; "
                 "construct SimpleBody(writer=...) at composition time."
             )
         if not decision.tool_calls:
-            raise ToolExecutionError("dispatch_tool_call: decision has no tool_calls")
-        # Single-call dispatch; the multi-call batch path is the action
-        # registry's responsibility (UseToolOperation → ToolBatchExecutor).
-        call = decision.tool_calls[0]
-        tool = self.tool_registry.get(call.tool_name)
-        if tool is None:
-            raise ToolExecutionError(f"dispatch_tool_call: tool {call.tool_name!r} not registered")
+            raise ToolExecutionError("dispatch_tool_calls: decision has no tool_calls")
 
-        # 1. Stage the assistant(tool_calls) row in memory; the wire shape
-        #    matches ``surface/assistant_message`` (id / name / arguments
-        #    as JSON-encoded str, per OpenAI function-calling).
+        # 1. Stage the assistant(tool_calls) row carrying ALL N calls. The
+        #    wire shape matches ``surface/assistant_message`` (id / name /
+        #    arguments as JSON-encoded str, per OpenAI function-calling).
         tool_calls_payload: list[dict[str, Any]] = [
             {
                 "id": call.call_id,
                 "name": call.tool_name,
                 "arguments": json.dumps(call.arguments, ensure_ascii=False),
             }
+            for call in decision.tool_calls
         ]
+
         # 2. Persist BEFORE executing. ``append_assistant_message`` raises
         #    ``SessionWriterUnboundError`` if the Session is unbound; any
         #    exception from ``session.append`` propagates as a persistence
-        #    failure → the tool never runs.
+        #    failure → no tool runs.
         try:
             self.writer.append_assistant_message(
                 turn=turn,
@@ -237,64 +235,92 @@ class SimpleBody(Body):
                 usage=None,
             )
         except Exception:
-            return EffectReceipt(
+            return [
+                EffectReceipt(
+                    invocation_id=call.call_id,
+                    outcome=EffectOutcome.FAILED,
+                    idempotency_key=f"{call.call_id}:persist_assistant",
+                    provider="body.dispatch_tool_calls",
+                    error_code=_PERSISTENCE_FAILURE_REASON,
+                )
+                for call in decision.tool_calls
+            ]
+
+        # 3. Execute + persist per call. Each iteration produces its own
+        #    EffectReceipt (per-call semantics: one tool's success does
+        #    not mask another's failure).
+        receipts: list[EffectReceipt] = []
+        for call in decision.tool_calls:
+            tool = self.tool_registry.get(call.tool_name)
+            if tool is None:
+                receipts.append(
+                    EffectReceipt(
+                        invocation_id=call.call_id,
+                        outcome=EffectOutcome.FAILED,
+                        idempotency_key=call.call_id,
+                        provider="body.dispatch_tool_calls",
+                        error_code=f"tool_not_registered:{call.tool_name}",
+                    )
+                )
+                continue
+
+            # Execute the tool. The executor does not persist; we append
+            # the tool_result explicitly so the journal has a guaranteed
+            # surface/tool_result per call (one receipt per iteration).
+            observation = await self.safe_executor.execute(
+                tool,
+                dict(call.arguments),
+                retry_policy=RetryPolicy(max_retries=0),
+                cache_config=_default_no_cache(),
                 invocation_id=call.call_id,
-                outcome=EffectOutcome.FAILED,
-                idempotency_key=f"{call.call_id}:persist_assistant",
-                provider="body.dispatch_tool_call",
-                error_code=_PERSISTENCE_FAILURE_REASON,
             )
 
-        # 3. Now execute the tool. The executor persists the tool_result
-        #    via ``commit_body_tool_execute_end`` (Task 4 migration to
-        #    ``RunSessionWriter.append_tool_result``); we also append
-        #    explicitly here so a missing migration in some other executor
-        #    does not leave the journal without the result row.
-        observation = await self.safe_executor.execute(
-            tool,
-            dict(call.arguments),
-            retry_policy=RetryPolicy(max_retries=0),
-            cache_config=_default_no_cache(),
-            invocation_id=call.call_id,
-        )
+            # 4. Persist the tool result linked by call_id. ``meta`` carries
+            #    tool_name for downstream consumers; orphan-drop at
+            #    ``derive_messages`` will drop the result if the assistant
+            #    row never landed (defence in depth).
+            try:
+                self.writer.append_tool_result(
+                    turn=turn,
+                    step=step,
+                    call_id=call.call_id,
+                    content=_observation_content(observation),
+                    error=_observation_error(observation),
+                    meta={"tool_name": call.tool_name},
+                )
+            except Exception:
+                receipts.append(
+                    EffectReceipt(
+                        invocation_id=call.call_id,
+                        outcome=EffectOutcome.FAILED,
+                        idempotency_key=f"{call.call_id}:persist_result",
+                        provider="body.dispatch_tool_calls",
+                        error_code=_PERSISTENCE_FAILURE_REASON,
+                    )
+                )
+                continue
 
-        # 4. Persist the tool result linked by call_id. ``meta`` carries
-        #    tool_name for downstream consumers; orphan-drop at
-        #    ``derive_messages`` will drop the result if the assistant
-        #    row never landed (defence in depth).
-        try:
-            self.writer.append_tool_result(
-                turn=turn,
-                step=step,
-                call_id=call.call_id,
-                content=_observation_content(observation),
-                error=_observation_error(observation),
-                meta={"tool_name": call.tool_name},
-            )
-        except Exception:
-            return EffectReceipt(
-                invocation_id=call.call_id,
-                outcome=EffectOutcome.FAILED,
-                idempotency_key=f"{call.call_id}:persist_result",
-                provider="body.dispatch_tool_call",
-                error_code=_PERSISTENCE_FAILURE_REASON,
-            )
-
-        # 5. Success path.
-        if observation.success:
-            return EffectReceipt(
-                invocation_id=call.call_id,
-                outcome=EffectOutcome.SUCCEEDED,
-                idempotency_key=call.call_id,
-                provider="body.dispatch_tool_call",
-            )
-        return EffectReceipt(
-            invocation_id=call.call_id,
-            outcome=EffectOutcome.FAILED,
-            idempotency_key=call.call_id,
-            provider="body.dispatch_tool_call",
-            error_code="tool_execution_failed",
-        )
+            # 5. Per-call success/failure.
+            if observation.success:
+                receipts.append(
+                    EffectReceipt(
+                        invocation_id=call.call_id,
+                        outcome=EffectOutcome.SUCCEEDED,
+                        idempotency_key=call.call_id,
+                        provider="body.dispatch_tool_calls",
+                    )
+                )
+            else:
+                receipts.append(
+                    EffectReceipt(
+                        invocation_id=call.call_id,
+                        outcome=EffectOutcome.FAILED,
+                        idempotency_key=call.call_id,
+                        provider="body.dispatch_tool_calls",
+                        error_code="tool_execution_failed",
+                    )
+                )
+        return receipts
 
     @staticmethod
     def _advance_cursor_for_action(action_type: str) -> None:
