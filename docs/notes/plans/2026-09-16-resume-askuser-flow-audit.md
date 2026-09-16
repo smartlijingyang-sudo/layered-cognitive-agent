@@ -1,6 +1,7 @@
-# Agent Note: Resume + ask-user-question WS flow — audit & gap inventory
+# Resume + ask-user-question WS flow — 审计与缺口清单
 
-Status: proposed
+> **状态**：plans（只读审计 + 缺口登记，非 note lifecycle）
+> **日期**：2026-09-16
 
 ## Problem
 
@@ -8,7 +9,7 @@ The user reports the LCA front-end ↔ back-end "resume / ask user question"
 (HIL: human-in-the-loop approval) interaction has gaps. The lobehub
 native flow uses `agent_intervention_request` /
 `agent_intervention_response` events (see
-[lca/contracts/transport/agent_stream_event.py:194-227](../../lca/contracts/transport/agent_stream_event.py))
+[lca/contracts/transport/agent_stream_event.py:194-227](../../../lca/contracts/transport/agent_stream_event.py))
 plus a `tool_execute` event for client-side tool execution
 (lines 188-193). The task is to audit whether LCA implements this
 round-trip end-to-end, list concrete gaps with file:line, and order
@@ -290,14 +291,14 @@ E all touch the wire contract.
    `SafeExecutor._commit_approval_requested`
    [safe_executor.py:217-222] and add the front-end cases
    [gatewayEventHandler.ts:998] (mirroring
-   [heterogeneousAgentExecutor.ts:2009-2073]). If the HTTP bridge is
-   the SSOT, document this in
-   `docs/notes/investigating/` (promote this audit to
-   `proposed/contract/`) and delete the `_agent_intervention_request`
-   translator [event_translator.py:266-278, 433] AND the
+   [heterogeneousAgentExecutor.ts:2009-2073]). The HTTP bridge is the
+   SSOT, so this audit stays in `docs/notes/plans/` and the dead
+   `_agent_intervention_request` translator row is deleted
+   [event_translator.py:266-278, 433]. The
    `AgentInterventionRequest`/`Response` schema classes
-   [agent_stream_event.py:197-228, 312-316] to keep the union
-   honest.
+   [agent_stream_event.py:197-228, 312-316] are KEPT — the
+   `AgentStreamEvent` union is byte-compat with native, and removing
+   members would break the wire contract for hetero consumers.
 
 4. **Wire parity test gap** —
    `tests/e2e/p1/test_lca_p1_01_user_books_flight.py:37-90` asserts

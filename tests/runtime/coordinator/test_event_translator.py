@@ -232,7 +232,7 @@ def test_agent_intervention_request_is_not_emitted_by_lca() -> None:
 
     Pin this absence so a future refactor cannot silently re-enable a
     wire event with zero consumers in LCA. See
-    ``docs/notes/investigating/resume-askuser-flow-2026-09-16.md``
+    ``docs/notes/plans/2026-09-16-resume-askuser-flow-audit.md``
     Gap B + Gap G.
     """
     assert "AgentInterventionRequest" not in event_translator._HANDLERS

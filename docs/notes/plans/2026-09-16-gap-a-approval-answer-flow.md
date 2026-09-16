@@ -1,6 +1,7 @@
-# Gap A — LCA HIL approval: HTTP /answer bridge vs WS intervention
+# Gap A — LCA HIL approval：HTTP /answer 桥接 vs WS intervention
 
-Status: investigating (READ-ONLY scoping; no implementation in this branch)
+> **状态**：plans（只读范围界定，本分支不含实现）
+> **日期**：2026-09-16
 
 ## Problem
 
@@ -10,9 +11,9 @@ paths:
 1. **HTTP** — `POST /lca-api/runs/{runId}/answer` body
    `{approval_id, idempotency_key, payload}`. Bridged by the lobehub
    runtime patch
-   [`deploy/lobehub/patches/runtime/lca_runtime_agent_gateway.py:323-336`](../../deploy/lobehub/patches/runtime/lca_runtime_agent_gateway.py)
+   [`deploy/lobehub/patches/runtime/lca_runtime_agent_gateway.py:323-336`](../../../deploy/lobehub/patches/runtime/lca_runtime_agent_gateway.py)
    for `askUserQuestion` and the `conversationControl` skip path
-   [`:453-468`](../../deploy/lobehub/patches/runtime/lca_runtime_agent_gateway.py).
+   [`:453-468`](../../../deploy/lobehub/patches/runtime/lca_runtime_agent_gateway.py).
 2. **WS** — `agent_intervention_request` / `agent_intervention_response`
    events on the LCA gateway socket, mirroring lobehub's native flow.
 
@@ -34,16 +35,16 @@ intentionally outside the lifecycle four-state set; see
 - **Idempotency-key dedup is implemented at the back-end port layer.**
   `RegistryRunCommands.resume_approval` short-circuits a replay before any
   state transition:
-  [`lca/plugins/transport/webserver/handlers/runs/terminal/registry/commands.py:169-176`](../../lca/plugins/transport/webserver/handlers/runs/terminal/registry/commands.py).
+  [`lca/plugins/transport/webserver/handlers/runs/terminal/registry/commands.py:169-176`](../../../lca/plugins/transport/webserver/handlers/runs/terminal/registry/commands.py).
   The set lives on `RunSession.accepted_answer_keys`
-  [`session/session/session.py:96`](../../lca/plugins/transport/webserver/handlers/runs/session/session/session.py)
+  [`session/session/session.py:96`](../../../lca/plugins/transport/webserver/handlers/runs/session/session/session.py)
   and is recorded as a 200 with `status: "resumed"` (no second resume
   task). Regression locked in
-  [`tests/transport/test_resume_idempotency.py:55-89`](../../tests/transport/test_resume_idempotency.py).
+  [`tests/transport/test_resume_idempotency.py:55-89`](../../../tests/transport/test_resume_idempotency.py).
 - **HTTP route wired and required-fields validated.**
   `POST /runs/{run_id}/answer` mounted in
-  [`routes_2/routes_runs_sessions.py:57`](../../lca/plugins/transport/webserver/routes_2/routes_runs_sessions.py)
-  → handler [`command_endpoints.py:364-399`](../../lca/plugins/transport/webserver/handlers/runs/api/command_endpoints.py).
+  [`routes_2/routes_runs_sessions.py:57`](../../../lca/plugins/transport/webserver/routes_2/routes_runs_sessions.py)
+  → handler [`command_endpoints.py:364-399`](../../../lca/plugins/transport/webserver/handlers/runs/api/command_endpoints.py).
   Missing `idempotency_key` returns 400 before reaching the port
   (line 375-380). Successful accept also records into
   `running_operation_store.record_answer_key` (line 393-395) so a
@@ -63,13 +64,13 @@ intentionally outside the lifecycle four-state set; see
   HTTP path inherits the same dedup.
 - **Front-end intervention card flows through the same HTTP route.**
   `presentAskUserCard`
-  [`deploy/lobehub/patches/runtime/lcaRunHil.ts:40-72`](../../deploy/lobehub/patches/runtime/lcaRunHil.ts)
+  [`deploy/lobehub/patches/runtime/lcaRunHil.ts:40-72`](../../../deploy/lobehub/patches/runtime/lcaRunHil.ts)
   materialises a tool-call row; the lobehub `customInteractionSubmit`
   patch forwards the answer via `fetch(/lca-api/runs/.../answer, ...)`.
 - **No native WS path exists for `agent_intervention_response` today.**
   Both back-end (`EventTranslator` has the `_agent_intervention_request`
   handler but no producer fires it
-  [`event_translator.py:277-284, 433-457`](../../lca/application/runtime/coordinator/event_translator.py))
+  [`event_translator.py:277-284, 433-457`](../../../lca/application/runtime/coordinator/event_translator.py))
   and front-end (`gatewayEventHandler.ts` has no `case` for either
   intervention event) are dead on the LCA gateway. So WS path is not
   available regardless of HTTP behaviour.
@@ -78,7 +79,7 @@ intentionally outside the lifecycle four-state set; see
 
 - **No lock around `resume_approval` to serialise concurrent
   approvals.** The method
-  [`commands.py:138-273`](../../lca/plugins/transport/webserver/handlers/runs/terminal/registry/commands.py)
+  [`commands.py:138-273`](../../../lca/plugins/transport/webserver/handlers/runs/terminal/registry/commands.py)
   reads `session.status`, mutates `session.status = RUNNING` (line 233),
   and adds to `session.accepted_answer_keys` (line 235) without an
   `asyncio.Lock` per session. Two concurrent invocations (Tab A and
@@ -90,7 +91,7 @@ intentionally outside the lifecycle four-state set; see
   the same hazard.
 - **WS path bypasses the resume outcome.** `_handle_control_frame` for
   `tool_result`
-  [`agent_gateway.py:327-338`](../../lca/plugins/transport/webserver/handlers/runs/terminal/streaming/agent_gateway.py)
+  [`agent_gateway.py:327-338`](../../../lca/plugins/transport/webserver/handlers/runs/terminal/streaming/agent_gateway.py)
   `await run_port.resume_approval(...)` and returns `"ok"` without
   surfacing the resume's outcome to the client. The client has no
   per-tab "did my answer win" signal — it only sees the next
@@ -99,7 +100,7 @@ intentionally outside the lifecycle four-state set; see
 - **HTTP bridge is sole SSOT for cross-tab HIL today; no fallback if
   the gateway pod restarts mid-resume.** `running_operation_store` is
   in-memory by default (per
-  [`command_endpoints.py:393-395`](../../lca/plugins/transport/webserver/handlers/runs/api/command_endpoints.py));
+  [`command_endpoints.py:393-395`](../../../lca/plugins/transport/webserver/handlers/runs/api/command_endpoints.py));
   if the pod dies between record_answer_key and the resume landing,
   the dedup key may be lost. The session-level
   `accepted_answer_keys` set is also in-memory (RunSession attribute).
@@ -108,13 +109,13 @@ intentionally outside the lifecycle four-state set; see
   pending approval carries the derived `<plan_ref>:<node>:<visit>` id.
   Mismatch is logged at line 247-251 but accepted
   (regression locked in
-  [`tests/transport/test_resume_idempotency.py:122-139`](../../tests/transport/test_resume_idempotency.py)).
+  [`tests/transport/test_resume_idempotency.py:122-139`](../../../tests/transport/test_resume_idempotency.py)).
   This is fine for the askUserQuestion round-trip but means the
   cross-tab test's `toolCallId="tc1"` (the unit harness) is not
   representative of real production ids.
 - **The cross-tab e2e test only covers sequential replay, not
   concurrent approvals.**
-  [`tests/e2e/p1/test_lca_p1_05_hil_cross_tab.py:115-140`](../../tests/e2e/p1/test_lca_p1_05_hil_cross_tab.py)
+  [`tests/e2e/p1/test_lca_p1_05_hil_cross_tab.py:115-140`](../../../tests/e2e/p1/test_lca_p1_05_hil_cross_tab.py)
   reconnects Tab 2 only **after** Tab 1's first `tool_result` has
   landed (`len(port.calls) >= 1`). It does NOT exercise the "two
   tabs both POST simultaneously with different payloads" race that
@@ -215,9 +216,9 @@ once, A1 documents the limit without changing semantics.
 - Gap D fix commit — `66c563cd9 fix(transport): declare
   ToolResultMessage.idempotencyKey on the wire`.
 - WS resume replay test —
-  [`tests/e2e/p1/test_lca_p1_05_hil_cross_tab.py`](../../tests/e2e/p1/test_lca_p1_05_hil_cross_tab.py).
+  [`tests/e2e/p1/test_lca_p1_05_hil_cross_tab.py`](../../../tests/e2e/p1/test_lca_p1_05_hil_cross_tab.py).
 - HTTP port dedup test —
-  [`tests/transport/test_resume_idempotency.py`](../../tests/transport/test_resume_idempotency.py).
+  [`tests/transport/test_resume_idempotency.py`](../../../tests/transport/test_resume_idempotency.py).
 - Wire schema —
-  [`lca/contracts/transport/gateway_messages.py:56-68`](../../lca/contracts/transport/gateway_messages.py)
-  + [`lca/contracts/transport/agent_stream_event.py:194-228`](../../lca/contracts/transport/agent_stream_event.py).
+  [`lca/contracts/transport/gateway_messages.py:56-68`](../../../lca/contracts/transport/gateway_messages.py)
+  + [`lca/contracts/transport/agent_stream_event.py:194-228`](../../../lca/contracts/transport/agent_stream_event.py).

@@ -287,7 +287,7 @@ class EventTranslator:
     # parity, but no translator row exists here. If a future producer
     # ever wires one, pair it with a front-end case in
     # ``gatewayEventHandler.ts`` and update this note — see
-    # ``docs/notes/investigating/resume-askuser-flow-2026-09-16.md``
+    # ``docs/notes/plans/2026-09-16-resume-askuser-flow-audit.md``
     # Gap B.
 
     # ── Session spine EP → gateway (ADR-0194 SSOT) ─────────────────

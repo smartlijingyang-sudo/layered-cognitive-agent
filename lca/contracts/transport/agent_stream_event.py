@@ -222,7 +222,7 @@ class AgentInterventionRequest(_WireBase):
     ``gatewayEventHandler.ts`` and update both this note and the
     translator.
 
-    See ``docs/notes/investigating/resume-askuser-flow-2026-09-16.md``
+    See ``docs/notes/plans/2026-09-16-resume-askuser-flow-audit.md``
     Gap B + Gap G.
     """
 
