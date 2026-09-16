@@ -34,6 +34,8 @@ def test_tool_invoked_v1_maps_with_projected_state() -> None:
 
 
 def test_tool_started_v1_maps_to_tool_started() -> None:
+    import json
+
     stamped = catalog_session_event_to_stamped(
         "tool.started.v1",
         {
@@ -46,7 +48,27 @@ def test_tool_started_v1_maps_to_tool_started() -> None:
     assert stamped is not None
     assert stamped["event"]["type"] == "ToolStarted"
     assert stamped["event"]["payload"]["apiName"] == "runCommand"
-    assert stamped["event"]["payload"]["arguments"] == {"command": "echo hi"}
+    # arguments is JSON-encoded per wire_tool_call contract; description is
+    # auto-injected so the front-end chip is never blank.
+    args = json.loads(stamped["event"]["payload"]["arguments"])
+    assert args == {"command": "echo hi", "description": "runCommand"}
+
+
+def test_tool_started_v1_preserves_caller_supplied_description() -> None:
+    import json
+
+    stamped = catalog_session_event_to_stamped(
+        "tool.started.v1",
+        {
+            "tool_name": "runCommand",
+            "invocation_id": "tc1",
+            "arguments": {"command": "echo hi", "description": "Custom label"},
+        },
+        assistant_message_id="msg_a",
+    )
+    assert stamped is not None
+    args = json.loads(stamped["event"]["payload"]["arguments"])
+    assert args["description"] == "Custom label"
 
 
 def test_session_checkpoint_waiting_input_maps_to_spine_close() -> None:

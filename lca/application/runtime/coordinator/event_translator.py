@@ -48,11 +48,22 @@ def wire_tool_call(
     # refetch runs before the failed write resolves). Mirrors the OpenAI
     # compat / Anthropic adapter convention (see
     # ``lca/infrastructure/llm_adapter/openai_compat/anthropic/_anthropic_stream.py``).
+    #
+    # Front-end's RunCommandInspector renders ``args.description || args.command``;
+    # when both are empty the collapsed chip is blank. LCA owns the wire shape
+    # at this seam — default ``description`` to the tool name so every tool
+    # card header is populated. Caller-supplied description still wins.
+    args_dict: dict[str, Any] = dict(arguments or {})
+    if not args_dict.get("description"):
+        # Fall back to the resolved api_name; for unknown tools (resolve
+        # returned None) api_name equals tool_name. Either way the fallback
+        # is non-empty — never produce a blank chip.
+        args_dict["description"] = api_name or tool_name or "tool call"
     return {
         "id": invocation_id or tool_name,
         "identifier": identifier,
         "apiName": api_name,
-        "arguments": json.dumps(arguments or {}, ensure_ascii=False),
+        "arguments": json.dumps(args_dict, ensure_ascii=False),
         "type": "builtin",
     }
 

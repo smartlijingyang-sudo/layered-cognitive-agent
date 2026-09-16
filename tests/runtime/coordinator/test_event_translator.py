@@ -1,6 +1,11 @@
 """EventTranslator unit tests — StampedEvent → AgentStreamEvent.data."""
 
-from lca.application.runtime.coordinator.event_translator import EventTranslator
+import json
+
+from lca.application.runtime.coordinator.event_translator import (
+    EventTranslator,
+    wire_tool_call,
+)
 
 
 def test_llm_call_started_becomes_stream_start() -> None:
@@ -209,3 +214,102 @@ def test_unknown_event_returns_none() -> None:
 def test_unknown_event_kind_returns_none() -> None:
     t = EventTranslator()
     assert t.translate({"event": {"type": "LlmCallTextDelta", "kind": "ignore"}}) is None
+
+
+# ── description fallback (collapsed tool chip must never be empty) ─────────
+#
+# Front-end RunCommandInspector renders `args.description || args.command`.
+# When neither is populated, the chip is empty. LCA's wire_tool_call is the
+# sole seam between runtime args and the LobeHub wire shape — guaranteeing a
+# non-empty description there keeps the front-end's chip populated for every
+# tool, regardless of whether the LLM supplied a description or not.
+
+
+def test_wire_tool_call_guarantees_non_empty_description() -> None:
+    """description defaults to the apiName when caller omits it."""
+    wire = wire_tool_call("runCommand", "tc1", {"command": "ls"})
+    args = json.loads(wire["arguments"])
+    assert args["description"]
+    assert args["description"] == "runCommand"
+    assert args["command"] == "ls"
+
+
+def test_wire_tool_call_preserves_explicit_description() -> None:
+    """When caller supplies a description, it wins over the default."""
+    wire = wire_tool_call(
+        "runCommand",
+        "tc1",
+        {"command": "ls", "description": "List home directory"},
+    )
+    args = json.loads(wire["arguments"])
+    assert args["description"] == "List home directory"
+
+
+def test_wire_tool_call_falls_back_to_identifier_when_api_name_missing() -> None:
+    """Edge: caller passes no tool name. description must still be non-empty."""
+    wire = wire_tool_call("", "tc1", {"command": "ls"})
+    args = json.loads(wire["arguments"])
+    assert args["description"]
+
+
+def test_spine_tool_call_record_passes_description_through_to_wire() -> None:
+    """End-to-end: step.tool_call.record → stream_chunk tools_calling chip."""
+    t = EventTranslator()
+    stamped = {
+        "event": {
+            "execution_point": "step.tool_call.record",
+            "payload": {
+                "tool_name": "runCommand",
+                "invocation_id": "tc1",
+                "arguments": {"command": "ls"},  # no description
+            },
+        }
+    }
+    out = t.translate(stamped)
+    assert out is not None
+    args = json.loads(out["data"]["toolsCalling"][0]["arguments"])
+    assert args["description"] == "runCommand"
+
+
+def test_tool_started_event_propagates_description_fallback() -> None:
+    """ToolStarted receives a pre-shaped ChatToolPayload — description is set
+    upstream by ``session_catalog_map._map_tool_started`` via ``wire_tool_call``,
+    so this test pins the contract: the handler preserves whatever it gets.
+    """
+    t = EventTranslator()
+    stamped = {
+        "event": {
+            "type": "ToolStarted",
+            "parentMessageId": "m1",
+            "payload": {
+                "identifier": "lobe-local-system",
+                "apiName": "runCommand",
+                "id": "tc1",
+                "arguments": json.dumps({"command": "ls", "description": "runCommand"}),
+                "type": "builtin",
+            },
+        }
+    }
+    out = t.translate(stamped)
+    assert out is not None
+    args = json.loads(out["data"]["toolCalling"]["arguments"])
+    assert args["description"] == "runCommand"
+
+
+def test_catalog_session_event_tool_started_injects_description() -> None:
+    """Catalog path: tool.started.v1 with raw arguments → ChatToolPayload gets
+    the description fallback before reaching the translator.
+    """
+    from lca.application.runtime.coordinator.session_catalog_map import (
+        catalog_session_event_to_stamped,
+    )
+
+    stamped = catalog_session_event_to_stamped(
+        "tool.started.v1",
+        {"tool_name": "runCommand", "invocation_id": "tc1", "arguments": {"command": "ls"}},
+    )
+    assert stamped is not None
+    out = EventTranslator().translate(stamped)
+    assert out is not None
+    args = json.loads(out["data"]["toolCalling"]["arguments"])
+    assert args["description"] == "runCommand"
