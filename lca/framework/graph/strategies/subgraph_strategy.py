@@ -57,6 +57,7 @@ from lca.framework.graph.observation import (
     GraphObservation,
     GraphObserver,
     NullGraphObserver,
+    phase_of,
 )
 from lca.framework.graph.port_registry import PortRegistry
 from lca.framework.graph.strategy_registry import register_strategy
@@ -192,7 +193,7 @@ class SubgraphStrategy(NodeStrategy):
         # ``admit_recovery``, and so on.
         outer_output: dict[str, Any] = dict(merged_output)
         outer_declared_outputs = _outer_declared_outputs(context)
-        
+
         # First, try to use inner_io_schema for translation (backward compatibility)
         inner_schema = context.inner_io_schema
         if inner_schema is not None and inner_schema.outputs and outer_declared_outputs:
@@ -206,7 +207,7 @@ class SubgraphStrategy(NodeStrategy):
                 # Only use translated if we got some outputs
                 if translated:
                     outer_output = translated
-        
+
         # If translation didn't work or wasn't applicable, try direct mapping
         # from merged_output to outer_declared_outputs by matching names
         if outer_declared_outputs and len(outer_output) != len(outer_declared_outputs):
@@ -217,7 +218,7 @@ class SubgraphStrategy(NodeStrategy):
                     direct_mapped[outer_name] = merged_output[outer_name]
             if direct_mapped:
                 outer_output = direct_mapped
-        
+
         self._observe_exit(context, ref, depth, outcome="success", error="")
         if depth_token is not None:
             from lca.framework.graph.adapter import _exit_subgraph
@@ -241,6 +242,7 @@ class SubgraphStrategy(NodeStrategy):
                 occurred_at_ms=_now_ms(self.clock),
                 node_id=context.node_id,
                 depth=depth,
+                phase=phase_of(context.node_id),
                 metadata=(
                     ("entry_node", ref.entry_node),
                     ("subgraph_plan_ref", ref.plan_ref),
@@ -266,6 +268,7 @@ class SubgraphStrategy(NodeStrategy):
                 occurred_at_ms=_now_ms(self.clock),
                 node_id=context.node_id,
                 depth=depth,
+                phase=phase_of(context.node_id),
                 outcome=outcome,
                 error=error,
                 metadata=(

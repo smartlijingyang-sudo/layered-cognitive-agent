@@ -66,6 +66,7 @@ from lca.framework.graph.observation import (
     NullGraphObserver,
     inputs_of,
     metadata_of,
+    phase_of,
 )
 from lca.framework.graph.port_reader import PortReader
 from lca.framework.graph.port_registry import PortRegistry
@@ -334,6 +335,7 @@ def _visit_start_of(
         node_index=node_index,
         depth=depth,
         binding=node.binding.value,
+        phase=phase_of(node.id),
         metadata=metadata_of(
             binding=node.binding,
             purpose=str(node.config.get("purpose", "")),

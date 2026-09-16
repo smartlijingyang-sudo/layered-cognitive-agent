@@ -65,6 +65,13 @@ class GraphObservation:
     outcome: str = ""
     error: str = ""
     elapsed_ms: int = 0
+    # Phase is the canonical LCA lifecycle stage that owns the
+    # node (``perceive`` / ``think`` / ``act`` / ``reflect`` /
+    # ``remember`` / ``stop``). Producers derive it from the
+    # node_id naming convention (``<phase>.<subnode>``) so the
+    # kernel does not need a separate ``PlanNode.phase`` field —
+    # the graph names itself. Empty string means "phase unknown".
+    phase: str = ""
     inputs: tuple[tuple[str, Any], ...] = ()
     outputs: tuple[tuple[str, Any], ...] = ()
     metadata: tuple[tuple[str, Any], ...] = ()
@@ -159,6 +166,7 @@ def payload_of(event: GraphObservation) -> dict[str, Any]:
         "outcome": event.outcome,
         "error": event.error,
         "elapsed_ms": event.elapsed_ms,
+        "phase": event.phase,
         "inputs": {str(k): _json_safe(v) for k, v in event.inputs},
         "outputs": {str(k): _json_safe(v) for k, v in event.outputs},
         "metadata": {str(k): _json_safe(v) for k, v in event.metadata},
@@ -168,6 +176,56 @@ def payload_of(event: GraphObservation) -> dict[str, Any]:
 def inputs_of(port_values: Mapping[str, Any]) -> tuple[tuple[str, Any], ...]:
     """Convert a port-value mapping into the frozen carrier form."""
     return tuple(port_values.items())
+
+
+# LCA 顶层 phase 闭集（ADR-0161 六语义 + terminal commit）。
+# 命名约定：``<phase>.<subnode>``；phase_of 第一段必须落在本集合，
+# 否则按 :data:`_PHASE_ALIAS_OF` 表归类到正确顶层。
+LCA_TOP_PHASES: frozenset[str] = frozenset(
+    {"perceive", "think", "act", "reflect", "remember", "stop", "terminal"}
+)
+
+# 节点命名缺顶层 phase 前缀时的归类映射 —— 收敛在此,不再散布到 caller。
+# 每条注释说明来源(哪个 plan / spec / factory)。
+_PHASE_ALIAS_OF: dict[str, str] = {
+    # 历史 fold EP 用了 ``phase.<top>.<stage>`` 双前缀(应该是 ``<top>.phase.fold``);
+    # alias 集中归到 top phase,顶层 phase 才是 LCA 六语义之一。
+    "phase": "perceive",  # phase.perceive.observe / phase.think.fold / 等
+    # think subgraph 节点命名缺 ``think.`` 前缀 —— 全部归到 think。
+    "tool": "think",       # tool.fork.dispatch  ── think.tool.fork_dispatch(计划中改名)
+    "history": "think",    # history.derive      ── think.history.assemble subgraph
+    "llm": "think",        # llm.call            ── think.llm.dispatch subgraph
+    "decision": "think",   # decision.parse / decision.repair ── think.decision.*
+    "gate": "think",       # gate.chain.run / gate.chain.reject ── think.gate subgraph
+    # act subgraph 节点命名缺 ``act.`` 前缀。
+    "effect": "act",       # effect.execute      ── act.effect.execute
+}
+
+
+def phase_of(node_id: str) -> str:
+    """Derive the LCA lifecycle phase from a node_id.
+
+    Canonical naming is ``<phase>.<subnode>`` (e.g. ``think.main``,
+    ``perceive.observe``, ``terminal.commit``). The graph framework
+    does not own phase semantics — it only derives them from the
+    convention — so the kernel never stores phase as a separate
+    field on PlanNode.
+
+    Convention violations (legacy ``phase.<>.<>`` fold EPs, or
+    subnodes that dropped their top-level prefix) are mapped to the
+    correct LCA top phase via :data:`_PHASE_ALIAS_OF`. This keeps
+    downstream consumers (observers, NodeEnter/Exit facts) on the
+    canonical six-phase vocabulary regardless of historical naming
+    drift; renaming the plan YAML is a separate cleanup.
+    Returns ``""`` when node_id is empty or the first segment is
+    not a recognised top phase or alias.
+    """
+    if not node_id:
+        return ""
+    head = node_id.split(".", 1)[0]
+    if head in LCA_TOP_PHASES:
+        return head
+    return _PHASE_ALIAS_OF.get(head, "")
 
 
 def metadata_of(
