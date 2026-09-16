@@ -1,9 +1,16 @@
 """End-to-end smoke commands — wrappers for ``scripts/e2e_*.py``.
 
-Exposes the existing ``scripts/e2e_timeline_smoke.py`` and
-``scripts/e2e_smoke_test.py`` as ``lca-ops e2e timeline`` and
-``lca-ops e2e boot`` so coding agents have one CLI surface for e2e
-verification.
+Exposes the existing ``scripts/e2e_timeline_smoke.py`` as
+``lca-ops e2e timeline``. ``lca-ops e2e boot`` is RETIRED — it wrapped
+``scripts/e2e_smoke_test.py`` which depended on v1 ``CompiledRunPlan``
+fields (``phase_graph`` / ``phase_bindings`` / ``semantic_phase`` /
+loop edges) retired by ADR-0221 P3. The boot check, plan projection,
+and wire smoke that ``e2e boot`` approximated now have dedicated
+commands:
+
+  - ``lca-ops kernel-restart`` — boot check + fiber report + health probe
+  - ``lca-ops plan compile``    — v2 CompiledRunPlan projection
+  - ``lca-ops e2e timeline``    — browser wire smoke
 
 Both commands forward ``LCA_FRONTEND_URL`` / ``LCA_TOKEN`` to the
 subprocess — the same envs the underlying scripts read — and inherit the
@@ -95,42 +102,43 @@ def _boot(
         False,
         "--http",
         envvar="LCA_E2E_HTTP",
-        help="Run Step 7 frontend wire smoke (sets LCA_E2E_HTTP=1).",
+        help="RETIRED — ignored",
     ),
     frontend_url: str = typer.Option(
         "http://10.36.6.252:3010",
         "--frontend-url",
         envvar="LCA_FRONTEND_URL",
-        help="LobeHub Next app base; only used when --http.",
+        help="RETIRED — ignored",
     ),
     token: str = typer.Option(
         "lca-local",
         "--token",
         envvar="LCA_TOKEN",
-        help="Bearer token; only used when --http.",
+        help="RETIRED — ignored",
     ),
     json_mode: bool = typer.Option(False, "--json", help="Print env summary as JSON."),
 ) -> None:
-    """Boot + compile + spawn + (opt-in HTTP) frontend wire smoke.
+    """RETIRED — use ``lca-ops kernel-restart`` + ``lca-ops plan compile``.
 
-    Default is in-process (Steps 1–6). Add ``--http`` to append Step 7
-    that POSTs to ``{frontend_url}/lca-api/runs`` and streams ``/live``,
-    matching the browser wire.
+    ``scripts/e2e_smoke_test.py`` depended on v1 ``CompiledRunPlan`` fields
+    retired by ADR-0221 P3 (phase_graph / phase_bindings / loop edges).
+    The boot check + plan projection + wire smoke it approximated now have
+    dedicated commands:
+
+      ./scripts/lca-ops kernel-restart    # boot check + fiber report + health
+      ./scripts/lca-ops plan compile      # v2 CompiledRunPlan projection
+      ./scripts/lca-ops e2e timeline      # browser wire smoke
     """
-    script = _script_path("e2e_smoke_test.py")
-    extra: dict[str, str] = {}
-    if http_mode:
-        extra["LCA_E2E_HTTP"] = "1"
-    extra["LCA_FRONTEND_URL"] = frontend_url
-    extra["LCA_TOKEN"] = token
-    if json_mode:
-        typer.echo(
-            json.dumps(
-                {"script": script.name, "env": extra},
-                ensure_ascii=False,
-            )
-        )
-    raise typer.Exit(_spawn(script, extra))
+    typer.echo(
+        """[retired] lca-ops e2e boot 已退役。
+  等价命令:
+    ./scripts/lca-ops kernel-restart     # 自动 boot_check + fiber_report + health_probe
+    ./scripts/lca-ops plan compile       # v2 CompiledRunPlan 投影
+    ./scripts/lca-ops e2e timeline       # 浏览器线路 smoke
+""",
+        err=True,
+    )
+    raise typer.Exit(2)
 
 
 __all__ = ["register"]

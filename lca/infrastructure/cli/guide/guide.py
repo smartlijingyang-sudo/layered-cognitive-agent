@@ -22,8 +22,8 @@ LCA 开发平台编排  ./scripts/lca-ops
 status
   看 kernel_serve / infra / lobehub / daemon / onlyboxes。异常会写出原因。
   onlyboxes 未钉 LCA terminal 镜像时会提示 configure-terminal-runtime。
-  kernel_serve 是 LCA 进程 (lca_kernel serve :8765)。
-  本地便捷: lca-ops kernel-restart。 supervisor 长管: kill + heal 自愈。
+  kernel_serve 是 LCA 后端进程 (lca_kernel serve :8765)。
+  本地便捷入口只有一个: lca-ops kernel-restart(自动跑 boot check + fiber 报告 + health probe)。
   ./scripts/lca-ops status
   ./scripts/lca-ops status --json          给 agent 用
 
@@ -90,28 +90,29 @@ LCA 进程 (kernel serve)  ADR-0119 决定 4
 lca-ops 不长管 LCA 进程(K6 ``lca_kernel.lifecycle`` 只负责
 SIGTERM/SIGINT LIFO dispose)。本地改完代码 / 换 profile / 强制刷新:
 
-  ./scripts/lca-ops kernel-restart   # 一行重启: SIGTERM → 等 K6 dispose → spawn 新进程
+  ./scripts/lca-ops kernel-restart   # 唯一便捷入口: SIGTERM → 等 K6 dispose
+                                     # → spawn → 自动跑 boot check + fiber
+                                     # report + health probe,失败 fail-loud
 
-  # 启动(前台)
-  uv run python -m lca_kernel serve \\
-      --profile profiles/web-standard.yaml \\
-      --host 0.0.0.0 --port 8765 --allow-unknown-env
+  # 只校验 profile(不拉起进程)
+  ./scripts/lca-ops kernel_check [profile_path] [--json]
 
-  # 打印启动命令(脚本化集成用)
-  ./scripts/lca-ops kernel_serve [--host H] [--port P] [profile_path]
+  # 导出 CompiledRunPlan
+  ./scripts/lca-ops kernel_compose [profile_path] [--json]
 
-  # 仅 boot profile 并 block 到 SIGINT(无 transport)
-  ./scripts/lca-ops kernel-boot [profile_path]
-
-  # 列出某 profile 会加载的 plugin 目录(按 layer 分组,不实际 boot)
+  # 列 profile 会加载的 plugin(按 layer 分组)
   ./scripts/lca-ops kernel_plugins [-p profile] [--layer L0,L1] [--id <plugin_id>] [--json]
-  # 读最新 kernel stderr(默认 /tmp/lca-kernel.stderr.*.log),只解析 boot.pending_event
+  # 读最新 kernel stderr,只解析 boot.pending_event
   ./scripts/lca-ops kernel_boot_log [--stderr <path>] [--failed-only] [--json]
 
   # LCA 进程出问题 → 看 journal 而非 restart
   ./scripts/lca-ops logs
   ./scripts/lca-ops explain <run_id>
   ./scripts/lca-ops diagnose <alias>
+
+  已退役(跑会 fail-loud 提示换 kernel-restart):
+    lca-ops kernel_serve   # 只 print 命令,从未真启动 — 已合并进 kernel-restart
+    lca-ops kernel-boot    # block 到 SIGINT、无 HTTP — 调试 profile 用 kernel_check
 
 ────────────────────────────────
 Run 触发  创建新 run（carrier-aligned，唯一入口）
@@ -156,8 +157,13 @@ Run 端到端  验证浏览器 wire 是否可达(ADR-0100)
 ────────────────────────────────
   ./scripts/lca-ops e2e timeline            # POST {frontend}/lca-api/runs + SSE /live
   ./scripts/lca-ops e2e timeline --json     # 先打印 env,再驱动脚本
-  ./scripts/lca-ops e2e boot                # boot + compile + spawn + (默认无 HTTP)
-  ./scripts/lca-ops e2e boot --http         # 加 Step 7 走前端 wire
+
+  # 已退役(跑会 fail-loud 指向等价命令):
+  #   lca-ops e2e boot       # boot + compile + spawn + (默认无 HTTP)
+  #                          # 等价三件套:
+  #                          #   ./scripts/lca-ops kernel-restart    # boot check + fiber + health
+  #                          #   ./scripts/lca-ops plan compile      # v2 CompiledRunPlan 投影
+  #                          #   ./scripts/lca-ops e2e timeline      # 浏览器 wire smoke
 
   默认 LCA_FRONTEND_URL=http://10.36.6.252:3010、LCA_TOKEN=lca-local。
   /lca-api/runs 前缀经 Next rewrite → gateway /runs;纯 gateway 端口

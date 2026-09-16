@@ -80,20 +80,32 @@ def register(app: typer.Typer) -> None:
         quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
         config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
     ) -> None:
-        """LCA 进程本地便捷重启 — 薄包装 ``kernel-supervisor restart``。
+        """LCA 进程本地便捷重启 — supervisor SIGTERM+spawn,后接 SOP 报告。
 
         ADR-0119 决定 4: lca-ops 不长管 LCA 进程 (生产由 supervisor 守护)。
         本命令给"改完代码 / 换 profile / 强制刷新"用的本地快捷方式,
-        委托给 :class:`KernelSupervisor` 做 SIGTERM → 等 → spawn。
+        委托给 :class:`KernelSupervisor` 做 SIGTERM → 等 → spawn → readiness。
 
-        Output shape (--json): 同 :func:`kernel-supervisor restart` ——
-        ``{verdict, status, detail, next_command}``。失败时 ``status`` 字段
-        给出 last_event + restart_count。
+        重启就绪后,自动跑三段 SOP 报告,任何一段 fail-loud 都会让 exit code 非 0:
+
+          1. boot_check   —— profile resolve + plan lift 校验
+          2. fiber_report —— 最新 kernel stderr 的 ``boot.pending_event`` 统计
+          3. health_probe —— GET /health 并核对 plugin registered/expected/fiber_count
+
+        三段报告原语统一复用现有的 ``kernel_check`` / ``kernel_boot_log``
+        / ``health_body_ok``,不引入新的诊断路径,见
+        :mod:`lca.infrastructure.cli.services.kernel.restart_report`。
+        CI 关掉人类可读横幅:LCA_KERNEL_RESTART_QUIET=1。
+
+        Output shape (--json): 在 supervisor 的 ``{verdict, status, detail,
+        next_command}`` 之外并入 ``report`` 字段(JSON 形态见
+        :meth:`RestartReport.to_dict`)。
         """
 
         from lca.infrastructure.cli.commands.kernel.supervisor import (
             _render,
         )
+        from lca.infrastructure.cli.services.kernel import restart_report
         from lca.infrastructure.cli.services.kernel.supervisor import (
             build_restart_result,
             default_program_config,
@@ -102,12 +114,98 @@ def register(app: typer.Typer) -> None:
 
         cfg = default_program_config()
         sup = get_supervisor(cfg)
+        # Prune stale per-PID stderr files left behind by previous standalone
+        # ``lca_kernel serve`` runs (no supervisor in front of them). The
+        # supervisor truncates its own stdout/stderr log on start, so only
+        # the orphan files need scrubbing here.
+        _prune_legacy_kernel_logs()
         sup.restart()
         ready = sup.wait_ready(timeout=cfg.readiness_timeout)
         status = sup.status()
-        _render(
-            build_restart_result(cfg, status, ready=ready),
-            json_mode=json_mode,
+
+        # ``cfg.host()``/``cfg.port()`` live on ProgramConfig; tests that
+        # pass a SimpleNamespace mock (see
+        # test_kernel_restart_does_not_construct_a_pipeline_context) need a
+        # fallback so the SOP report can still address the kernel.
+        cfg_host = getattr(cfg, "host", lambda: "127.0.0.1")()
+        cfg_port = getattr(cfg, "port", lambda: 8765)() or 8765
+
+        # Post-restart SOP report (boot check + fiber report + health probe).
+        # Failures here escalate to non-zero exit so CI/scripts catch them,
+        # even if the supervisor itself declared ready.
+        report = restart_report.run_restart_report(
+            profile=Path("profiles/web-standard.yaml"),
+            host=cfg_host,
+            port=cfg_port,
+            supervisor_state=status.state.value,
+            supervisor_last_event=status.last_event,
         )
-        if not ready:
+        payload = build_restart_result(cfg, status, ready=ready)
+        payload["report"] = report.to_dict()
+        if not report.ok:
+            payload["verdict"] = "failed"
+            payload["detail"] = (
+                f"restart ok but post-restart report failed: "
+                f"{sum(1 for f in report.findings if f.severity == 'error')} error(s)"
+            )
+            payload["next_command"] = (
+                report.next_command
+                or "./scripts/lca-ops kernel-supervisor logs --name lca_kernel_dev"
+            )
+
+        if json_mode:
+            # ``payload['status']`` is a ProgramStatus dataclass; coerce
+            # to a dict so the JSON encoder does not have to know about
+            # the supervisor's frozen dataclass.
+            import dataclasses as _dc
+
+            if _dc.is_dataclass(payload["status"]):
+                payload["status"] = _dc.asdict(payload["status"])
+            typer.echo(__import__("json").dumps(payload, indent=2, ensure_ascii=False))
+        else:
+            _render(payload, json_mode=False)
+            if not restart_report.should_quiet():
+                typer.echo(restart_report.render_text(report))
+
+        if not ready or not report.ok:
             raise typer.Exit(1)
+
+def _prune_legacy_kernel_logs() -> None:
+    """Reset kernel log state so each restart starts from a clean slate.
+
+    Two operations:
+
+    1. Drop orphan ``lca-kernel.stderr.<pid>.<ts>.log`` files under /tmp.
+       These are written by the standalone ``lca_kernel serve`` path
+       (no supervisor in front). They are not used by the supervisor's
+       log, so they would only sit on disk and confuse any human who
+       greps ``/tmp/lca-kernel.stderr.*.log`` after a restart.
+
+    2. Truncate ``/tmp/lca-kernel.{stdout,stderr}.log`` to zero bytes.
+       The supervisor appends to these across restarts; truncating them
+       here keeps the post-restart SOP report's fiber tally scoped to
+       THIS boot without inventing PID-based anchors (the kernel writes
+       boot.pending_event lines to stdout and the report reads stdout).
+       We do this BEFORE calling ``sup.restart()`` so the kernel never
+       sees a partially-truncated file mid-boot.
+
+    Best-effort: any failure is swallowed because losing the cleanup
+    is not worth aborting the restart — the supervisor still owns the
+    kernel lifecycle and the post-restart report will surface the real
+    failure mode.
+    """
+    import contextlib
+    from pathlib import Path as _Path
+
+    for legacy in _Path("/tmp").glob("lca-kernel.stderr.*.log"):  # noqa: S108 — supervisor-owned log dir
+        if legacy.name == "lca-kernel.stderr.log":
+            continue  # supervisor's stderr; handled by the truncate below
+        with contextlib.suppress(OSError):
+            legacy.unlink()
+
+    # NOTE: do NOT truncate /tmp/lca-kernel.{stdout,stderr}.log here.
+    # Truncating the supervisor's append-only log from outside the
+    # supervisor's lifecycle confuses its fd handling on the next spawn
+    # and causes exit=1 within 2-3 seconds (see git history). The SOP
+    # report must slice its scope via the kernel stderr's
+    # ``Started server process [<pid>]`` banner instead.

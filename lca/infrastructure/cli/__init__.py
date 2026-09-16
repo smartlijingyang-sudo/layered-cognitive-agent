@@ -1,7 +1,10 @@
 """LCA Ops — unified platform orchestration.
 
 One package manages the entire LCA development platform:
-kernel_serve (lca_kernel serve, ADR-0119 决定 4), LobeHub frontend, infrastructure, and agent daemon.
+the LCA kernel process (lca_kernel serve, ADR-0119 决定 4, owned by the
+supervisor), LobeHub frontend, infrastructure, and agent daemon. The
+single local entry point for the kernel is ``lca-ops kernel-restart``;
+``lca-ops kernel_serve`` and ``lca-ops kernel-boot`` are retired.
 
 Architecture:
     Service Protocol  — every managed component implements the same interface

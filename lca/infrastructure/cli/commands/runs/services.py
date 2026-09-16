@@ -37,7 +37,7 @@ def register(app: typer.Typer) -> None:
                 "  排障    docs/debug/lobehub-frontend-debug.md\n"
                 "  动作    start | stop | restart | status | ensure\n"
                 "  ensure  同步源码、打补丁、写 .env、bun install\n"
-                "  注意    lobehub 自身不带 LCA 后端;后端进程见 ./scripts/lca-ops kernel_serve\n"
+                "  注意    lobehub 自身不带 LCA 后端;后端进程见 ./scripts/lca-ops kernel-restart\n"
                 "  例子    ./scripts/lca-ops lobehub restart\n"
                 "          ./scripts/lca-ops journal logs lobehub-spa\n"
             )

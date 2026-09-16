@@ -109,15 +109,15 @@ class KernelServeService:
 
     def start(self) -> ServiceState:  # pragma: no cover - intentional stub
         raise NotImplementedError(
-            "lca-ops 不提供 `lca-ops kernel_serve start`。"
-            "请直接 `uv run python -m lca_kernel serve ...` "
-            "或跑 `./scripts/lca-ops kernel-restart`。"
+            "KernelServeService 不提供 start()。改用 `./scripts/lca-ops "
+            "kernel-restart`(supervisor SIGTERM + spawn + SOP 报告)。"
         )
 
     def stop(self) -> ServiceState:  # pragma: no cover - intentional stub
         raise NotImplementedError(
-            "lca-ops 不提供 `lca-ops kernel_serve stop`。"
-            "SIGTERM 由 K6 ``lca_kernel.lifecycle`` 守护。"
+            "KernelServeService 不提供 stop()。SIGTERM 由 supervisor 长管 "
+            "(K6 ``lca_kernel.lifecycle`` LIFO dispose);如需本地拉停,跑 "
+            "`./scripts/lca-ops kernel-supervisor stop --name lca_kernel_dev`。"
         )
 
     def heal(self) -> ServiceState:  # pragma: no cover - intentional stub

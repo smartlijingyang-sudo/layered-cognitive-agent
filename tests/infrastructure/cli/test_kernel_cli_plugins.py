@@ -43,7 +43,7 @@ def test_kernel_plugins_lists_all_enabled(runner: CliRunner) -> None:
     assert result.exit_code == 0, result.stdout + result.stderr
     assert "L0 (62)" in result.stdout, result.stdout
     assert "L1 (82)" in result.stdout, result.stdout
-    assert "L2 (68)" in result.stdout, result.stdout
+    assert "L2 (82)" in result.stdout, result.stdout
     # Sample plugin ids from each layer appear under their group.
     assert "lca-decision-classifier-seam" in result.stdout
     assert "events.subscriber.exception_index_writer" in result.stdout

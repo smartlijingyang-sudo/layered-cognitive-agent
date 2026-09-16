@@ -7,16 +7,26 @@ subcommand resolves to a call into :mod:`lca_kernel` only.
 
 Subcommands
 -----------
-- ``boot`` — compile + run the kernel, block until SIGINT/SIGTERM.
-- ``serve`` — compile + boot + run uvicorn with the kernel lifespan.
-- ``stop`` — send SIGTERM to a previously-started ``serve`` process.
+- ``restart`` (top-level ``lca-ops kernel-restart``) — SIGTERM + spawn via
+  supervisor; the only local-spawn entry point. Auto-runs boot check +
+  fiber report + health probe.
 - ``compose`` — dump the compiled run plan (YAML or JSON).
-- ``inspect`` — show boot trace + K8 HMR patch state.
+- ``check`` — run profile resolve + plan lift validators (no spawn).
+- ``plugins`` — list plugin catalog a profile would load.
+- ``boot_log`` — parse boot.pending_event lines from kernel stderr.
+
+Retired commands
+----------------
+- ``boot`` — only blocks until SIGINT/SIGTERM (no HTTP). Use
+  ``kernel-restart`` so the supervisor owns the lifecycle; for profile
+  inspection use ``kernel_check`` / ``kernel_plugins`` / ``kernel_compose``.
+- ``serve`` — only prints the ``lca_kernel serve`` command. Use
+  ``kernel-restart`` to actually run the kernel; the supervisor-managed
+  process is what the rest of LCA depends on.
 """
 
 from __future__ import annotations
 
-import asyncio
 import json
 import sys
 from dataclasses import asdict, is_dataclass
@@ -38,54 +48,51 @@ def register(app: typer.Typer) -> None:
     def kernel_boot(
         profile_path: Path = typer.Argument(
             "profiles/web-standard.yaml",
-            help="Profile YAML path to compile and boot",
-        ),
-        dry_run: bool = typer.Option(
-            False,
-            "--dry-run",
-            help="compile_profile only; skip the actual boot",
+            help="RETIRED — kept as fail-loud stub",
         ),
     ) -> None:
-        """Boot a profile and block until SIGINT/SIGTERM."""
-        if dry_run:
-            _compile_only(profile_path)
-            return
-        _boot_blocking(profile_path)
+        """RETIRED — do not use. Use ``./scripts/lca-ops kernel-restart``.
+
+        Why retired: blocking on SIGINT/SIGTERM without HTTP kept a separate
+        code path that the supervisor does not own, and made it easy to
+        leave an orphaned ``lca_kernel`` process behind. The
+        supervisor-managed kernel started by ``kernel-restart`` is the only
+        kernel lifecycle the rest of LCA tolerates.
+        """
+        typer.echo(
+            "[retired] kernel-boot 已退役。\n"
+            "  拉起 kernel:    ./scripts/lca-ops kernel-restart\n"
+            "  只校验 profile: ./scripts/lca-ops kernel_check\n"
+            "  只看 plugin:   ./scripts/lca-ops kernel_plugins\n",
+            err=True,
+        )
+        raise typer.Exit(2)
 
     @app.command(name="kernel_serve")
     def kernel_serve(
         profile_path: Path = typer.Argument(
             "profiles/web-standard.yaml",
-            help="Profile YAML path the LCA kernel should boot",
+            help="RETIRED — kept as fail-loud stub",
         ),
-        # Default aligned with KernelServeConfig.host (binding all interfaces) —
-        # Next.js proxy in lobehub-ui hits the LAN address (e.g.
-        # http://10.36.6.252:8765/runs); binding loopback causes ECONNREFUSED →
-        # 500 on every /lca-api/* call. noqa reference at the literal site.
         host: str = typer.Option(
-            _LAN_BIND_DEFAULT, "--host", help="lca_kernel serve host (LAN: 0.0.0.0; loopback only: 127.0.0.1)"
+            _LAN_BIND_DEFAULT, "--host", help="RETIRED — ignored"
         ),
-        port: int = typer.Option(8765, "--port", help="lca_kernel serve port"),
+        port: int = typer.Option(8765, "--port", help="RETIRED — ignored"),
     ) -> None:
-        """Print the command to start the LCA kernel (ADR-0119 决定 4).
+        """RETIRED — do not use. Use ``./scripts/lca-ops kernel-restart``.
 
-        ``lca-ops`` 不再管理 LCA 进程 — LCA :8765 由 ``lca_kernel serve`` 自管,
-        SIGTERM/SIGINT 由 K6 ``lca_kernel.lifecycle`` 守护。本子命令只打印
-        启动命令供脚本化集成使用;要拉起进程请直接运行打印的命令,或跑
-        ``./scripts/lca-ops heal`` 让 KernelServeService 自愈。
-
-        命令:
-
-            uv run python -m lca_kernel serve \\
-                --profile <profile_path> --host <h> --port <p> --allow-unknown-env
+        Why retired: the only consumer ever called this for the printed
+        argv, but every shell history entry became a divergence from the
+        supervisor's spawn command. ``kernel-restart`` now runs the
+        supervisor and the supervisor owns the canonical argv.
         """
-        typer.echo(f"运行模式 OK · kernel_serve profile={profile_path} host={host} port={port}")
-        typer.echo("To start, run (in another shell):")
         typer.echo(
-            f"  uv run python -m lca_kernel serve "
-            f"--profile {profile_path} "
-            f"--host {host} --port {port} --allow-unknown-env"
+            "[retired] kernel_serve 已退役。\n"
+            "  拉起 kernel: ./scripts/lca-ops kernel-restart\n"
+            "  (host/port 仍走 KernelServeConfig,见 ./scripts/lca-ops kernel-supervisor status)",
+            err=True,
         )
+        raise typer.Exit(2)
 
     @app.command(name="kernel_compose")
     def kernel_compose(
@@ -146,7 +153,12 @@ def register(app: typer.Typer) -> None:
         devnull: io.TextIOBase | None = None
         saved_stdout: io.TextIOBase | None = None
         if as_json:
-            devnull = open(os.devnull, "w", encoding="utf-8")
+            # Stdout is replaced for the duration of the validator pass so
+            # its `print("✅ ...")` banners do not corrupt the JSON stream,
+            # then restored before the JSON report itself is emitted. Using
+            # `with` would close the handle we want to swap in and out, so
+            # the open() is intentionally not inside a context manager.
+            devnull = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115 — see comment above
             saved_stdout = sys.stdout
             sys.stdout = devnull
 
@@ -387,44 +399,6 @@ def register(app: typer.Typer) -> None:
                     f"{float(row['duration_ms']):.1f}ms"
                 )
         typer.echo(f"total: {len(entries)}")
-
-
-def _compile_only(profile_path: Path) -> None:
-    """Compile a profile without booting — for ``--dry-run`` / inspect."""
-    from lca.harness.profile.resolve.resolve import resolve_profile
-    from lca_kernel import compile_profile
-
-    resolved = resolve_profile(profile_path)
-    plan = compile_profile(resolved)
-    serialized = _serialize_plan(plan)
-    typer.echo(
-        f"运行模式 OK · kernel_compile profile={profile_path} "
-        f"plugins={serialized.get('plugin_count', '?')}"
-    )
-
-
-def _boot_blocking(profile_path: Path) -> None:
-    """Compile + boot a profile; block until SIGINT/SIGTERM via kernel CM.
-
-    The kernel lifespan installs signal handlers (K6) and exits with
-    the signal's exit code on disposal. We just drive the CM on the
-    main asyncio loop — no thread, no signal.pause() hack.
-    """
-    from lca_kernel import run_kernel_lifespan
-
-    async def _run() -> None:
-        async with run_kernel_lifespan(profile_path) as state:
-            ctx = state["ctx"]
-            plugin_count = len(getattr(ctx, "_plugins", {}) or {})
-            typer.echo(f"运行模式 OK · kernel_boot profile={profile_path} plugins={plugin_count}")
-            typer.echo("  press Ctrl+C to stop (SIGINT/SIGTERM)")
-            await asyncio.Event().wait()  # block; SIGTERM tears down via K6
-
-    try:
-        asyncio.run(_run())
-    except KeyboardInterrupt:
-        typer.echo("kernel_boot interrupted", err=True)
-        sys.exit(130)
 
 
 def _serialize_plan(plan: object) -> dict[str, object]:

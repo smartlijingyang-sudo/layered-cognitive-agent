@@ -74,9 +74,13 @@ def register(app: typer.Typer, group: typer.Typer | None = None) -> None:
         ),
         config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
     ) -> None:
-        """事实流。默认 follow 最新 run 的 spine SSOT,不是 kernel_serve.log。"""
+        """事实流。默认 follow 最新 run 的 spine SSOT,不是 kernel.log。
+
+        ``target="kernel"`` / ``"kernel_serve"`` 是同一文件的两个 alias;
+        保留 ``"kernel_serve"`` 让老脚本零成本过渡,新代码请用 ``"kernel"``。
+        """
         ops_config = OpsConfig.load(config)
-        if target in {"", "journal", "kernel_serve"}:
+        if target in {"", "journal", "kernel", "kernel_serve"}:
             _follow_spine_ssot(replay=replay, verbose=verbose)
             return
         import subprocess
@@ -86,11 +90,11 @@ def register(app: typer.Typer, group: typer.Typer | None = None) -> None:
             "lobehub-spa": ops_config.state_dir / "lobehub-spa.log",
             "daemon": Path(f"/home/{ops_config.daemon.user}/.lca/daemon.log"),
             # `kernel` is the kernel process stdout/stderr, written by
-            # `lca-ops kernel_serve` spawn. This is the FIRST place to look
-            # when an endpoint returns 5xx: see docs/debug/README.md
-            # ("后端 5xx 的快速分流"). Distinct from
-            # traces/runs/<id>/kernel.log, which is the per-run
-            # terminal-failure fallback (mostly absent).
+            # `lca-ops kernel-restart` (which owns the supervisor-managed
+            # kernel process). This is the FIRST place to look when an
+            # endpoint returns 5xx: see docs/debug/README.md ("后端 5xx 的
+            # 快速分流"). Distinct from traces/runs/<id>/kernel.log, which
+            # is the per-run terminal-failure fallback (mostly absent).
             "kernel": Path("/tmp/lca-kernel.log"),
         }
         if target not in log_map:

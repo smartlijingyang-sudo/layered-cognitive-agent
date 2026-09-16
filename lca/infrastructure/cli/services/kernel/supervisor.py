@@ -1182,14 +1182,18 @@ class KernelSupervisor:
     def _open_log_files(self) -> None:
         if self._config.stdout_logfile:
             try:
-                self._stdout_f = open(
+                # The handle must outlive the function: the subprocess
+                # inherits it and we want every kernel stdout byte flushed
+                # through it until the supervisor's stop()/close cycle.
+                self._stdout_f = open(  # noqa: SIM115 — see comment above
                     self._config.stdout_logfile, "ab", buffering=0
                 )
             except OSError:
                 self._stdout_f = None
         if self._config.stderr_logfile:
             try:
-                self._stderr_f = open(
+                # Same rationale as _stdout_f above.
+                self._stderr_f = open(  # noqa: SIM115 — see comment above
                     self._config.stderr_logfile, "ab", buffering=0
                 )
             except OSError:
