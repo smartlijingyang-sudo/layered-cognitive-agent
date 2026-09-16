@@ -54,12 +54,17 @@ class RegistryRunAdapter:
         approval_id: str,
         payload: str,
         idempotency_key: str,
+        *,
+        plugin_state: dict[str, Any] | None = None,
+        parent_message_id: str = "",
     ) -> RunCommandReceipt:
         return await self._commands.resume_approval(
             run_id,
             approval_id,
             payload,
             idempotency_key,
+            plugin_state=plugin_state,
+            parent_message_id=parent_message_id,
         )
 
     async def summary(self, run_id: str) -> dict[str, Any] | None:

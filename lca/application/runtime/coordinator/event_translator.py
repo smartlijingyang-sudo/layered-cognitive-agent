@@ -48,11 +48,22 @@ def wire_tool_call(
     # refetch runs before the failed write resolves). Mirrors the OpenAI
     # compat / Anthropic adapter convention (see
     # ``lca/infrastructure/llm_adapter/openai_compat/anthropic/_anthropic_stream.py``).
+    #
+    # Front-end's RunCommandInspector renders ``args.description || args.command``;
+    # when both are empty the collapsed chip is blank. LCA owns the wire shape
+    # at this seam — default ``description`` to the tool name so every tool
+    # card header is populated. Caller-supplied description still wins.
+    args_dict: dict[str, Any] = dict(arguments or {})
+    if not args_dict.get("description"):
+        # Fall back to the resolved api_name; for unknown tools (resolve
+        # returned None) api_name equals tool_name. Either way the fallback
+        # is non-empty — never produce a blank chip.
+        args_dict["description"] = api_name or tool_name or "tool call"
     return {
         "id": invocation_id or tool_name,
         "identifier": identifier,
         "apiName": api_name,
-        "arguments": json.dumps(arguments or {}, ensure_ascii=False),
+        "arguments": json.dumps(args_dict, ensure_ascii=False),
         "type": "builtin",
     }
 
@@ -263,18 +274,21 @@ class EventTranslator:
             },
         }
 
-    @staticmethod
-    def _agent_intervention_request(e: dict) -> dict:
-        return {
-            "type": "agent_intervention_request",
-            "data": {
-                "apiName": e.get("apiName"),
-                "identifier": e.get("identifier"),
-                "arguments": e.get("arguments", {}),
-                "toolCallId": e.get("toolCallId"),
-                "deadline": e.get("deadline", 0),
-            },
-        }
+    # NOTE: ``agent_intervention_request`` is NOT produced by the LCA
+    # runtime. The HIL round-trip is HTTP-based
+    # (``POST /lca-api/runs/{runId}/answer`` bridged via
+    # ``deploy/lobehub/patches/runtime/lca_runtime_agent_gateway.py``),
+    # and the WS pause signal travels through the durable journal
+    # (``approval.persisted.v1`` + ``waiting_input`` checkpoint →
+    # ``SpineClose`` → ``agent_runtime_end``). The native hetero
+    # executor emits ``agent_intervention_request`` to drive its local
+    # CLI/MCP card; LCA's server-side runtime does not. The Pydantic
+    # class remains in ``agent_stream_event.AgentStreamEvent`` for wire
+    # parity, but no translator row exists here. If a future producer
+    # ever wires one, pair it with a front-end case in
+    # ``gatewayEventHandler.ts`` and update this note — see
+    # ``docs/notes/plans/2026-09-16-resume-askuser-flow-audit.md``
+    # Gap B.
 
     # ── Session spine EP → gateway (ADR-0194 SSOT) ─────────────────
 
@@ -350,6 +364,11 @@ class EventTranslator:
         payload = _inner_payload(e)
         tool_name = str(payload.get("tool_name") or "")
         invocation_id = str(payload.get("invocation_id") or "")
+        # Without tool identity there is nothing to publish; the legacy
+        # ``emit_*_for_state`` shape carries only ``state_id`` and is
+        # silently dropped. ``SUPPRESSED_SPINE_EPS`` filters these at the
+        # pump today, but the translator must remain defensible on its
+        # own so a future relaxation does not emit a malformed wire.
         if not tool_name:
             return None
         tool_calling = wire_tool_call(tool_name, invocation_id, {})
@@ -366,6 +385,13 @@ class EventTranslator:
         payload = _inner_payload(e)
         invocation_id = str(payload.get("invocation_id") or "")
         tool_name = str(payload.get("tool_name") or "")
+        # Mirror ``_spine_phase_tool_start``: the legacy ``emit_*_for_state``
+        # shape carries only ``state_id`` and has no tool identity to
+        # publish. Returning ``None`` is safe and prevents a fall-through
+        # to ``wire_tool_call("", ...)`` which would emit ``id=""`` /
+        # ``apiName=""`` if ``SUPPRESSED_SPINE_EPS`` is ever relaxed.
+        if not tool_name:
+            return None
         outcome = str(payload.get("outcome") or "")
         ok = payload.get("ok")
         is_success = ok if isinstance(ok, bool) else outcome not in ("failure", "failed", "error")
@@ -430,7 +456,6 @@ _HANDLERS = {
     "SpineClose": EventTranslator._spine_close,
     "LlmError": EventTranslator._llm_error,
     "LlmRetry": EventTranslator._llm_retry,
-    "AgentInterventionRequest": EventTranslator._agent_intervention_request,
 }
 
 _SPINE_HANDLERS = {

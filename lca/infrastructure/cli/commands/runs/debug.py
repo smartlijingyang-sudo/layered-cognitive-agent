@@ -8,6 +8,11 @@
 - 每个 layer 是独立 projection 函数;orchestrator 只调度,不持有逻辑。
 - 旧命令(``observation plan-show`` / ``trace-show`` / ``run-replay`` /
   ``run-explain`` / ``debug-graph``)完全保留;新命令是**增量入口**,非合并。
+- PR-1 / Task 1.6: per-layer ad-hoc 判定被 ``fold_run_health`` 取代;
+  每个 layer 在原有 raw 视图上挂一个 ``health_summary`` 字段,且
+  ``anomalies_present`` / ``root_cause_present`` / hint 都从
+  ``RunHealthReport.summary`` 派生。这恢复了 AGENTS.md §3 C13
+  (information bloodline closure):所有 layer 共享一个 SSOT。
 """
 
 from __future__ import annotations
@@ -26,7 +31,9 @@ from lca.infrastructure.cli.commands._shared.projection import (
     SpineRow,
     filter_by_domain,
     load_spine_events,
+    spine_filename_for_run_cwd,
 )
+from lca.plugins.observability.health.run_health_fold import fold_run_health
 
 _TRACES_ROOT_DEFAULT = Path("traces")
 
@@ -40,24 +47,26 @@ _DEFAULT_OUTPUT = OutputMode.JSON
 # what this layer surfaced (e.g. anomaly found → explain).
 _NEXT_HINT: dict[str, dict[str, str]] = {
     "summary": {
-        "anomalies_present": "next_layer=explain to get a root-cause narrative",
+        "anomalies_present": "next_layer=explain to root-cause via RunHealthReport",
         "no_anomalies": "next_layer=events to inspect raw spine rows",
         "spine_missing": "stop: run never produced a spine; check runs create receipt",
     },
     "graph": {
-        "anomalies_present": "next_layer=explain to root-cause the failed node",
+        "anomalies_present": "next_layer=explain to root-cause the failed condition",
         "no_anomalies": "next_layer=summary for run-level counts",
         "spine_missing": "stop: spine ledger not found under traces/runs/",
     },
     "events": {
         "rows_present": "next_layer=graph for skeleton view, or filter --domain <name>",
         "rows_empty": "next_layer=summary to confirm the run reached the spine",
+        "health_failed": "next_layer=explain to root-cause via RunHealthReport",
         "spine_missing": "stop: spine ledger not found under traces/runs/",
     },
     "diff": {
         "blueprint_missing": "next_layer=summary: plan not materialised; only execution trace available",
         "deviations_present": "next_layer=explain to root-cause unexpected nodes",
         "no_deviations": "next_layer=summary for run-level verdict",
+        "health_failed": "next_layer=explain to root-cause via RunHealthReport",
         "spine_missing": "stop: spine ledger not found under traces/runs/",
     },
     "explain": {
@@ -68,16 +77,89 @@ _NEXT_HINT: dict[str, dict[str, str]] = {
 }
 
 
+def _resolve_spine_path(events: list[SpineRow]) -> Path | None:
+    """Resolve the spine file backing the loaded ``events``.
+
+    Reads ``run_id`` from the first row and looks under the default
+    traces root (``traces/runs/<run_id>/<run_id>.spine.jsonl``).
+    Returns ``None`` if events is empty (the CLI surface already
+    handles the "spine missing" branch before this helper fires).
+    """
+    if not events:
+        return None
+    run_id = events[0].get("run_id") or ""
+    if not run_id:
+        return None
+    return spine_filename_for_run_cwd(run_id)
+
+
+def _fold_health(events: list[SpineRow]):
+    """Fold the run's spine once per layer invocation.
+
+    Memoising across layers is the orchestrator's job; per-layer
+    fold is cheap (8 derivers, sub-millisecond on a 1k-event spine).
+    """
+    spine_path = _resolve_spine_path(events)
+    if spine_path is None or not spine_path.exists():
+        # No spine file (events were loaded from a different path or
+        # the producer never wrote one). Return a frozen empty
+        # report so per-layer code can still access ``.summary``
+        # without conditional checks.
+        from lca.contracts.observability.health.report import (
+            RunHealthReport,
+            RunHealthSummary,
+        )
+
+        return RunHealthReport(
+            schema_version="1.0",
+            run_id="",
+            generated_at=0.0,
+            conditions=(),
+            summary=RunHealthSummary(
+                conditions_ok=0,
+                conditions_degraded=0,
+                conditions_failed=0,
+                conditions_unknown=0,
+                by_type={},
+            ),
+        )
+    return fold_run_health(spine_path)
+
+
+def _health_summary_block(health) -> dict[str, Any]:
+    """Serialise ``report.summary`` + the overall worst status for JSON output."""
+    overall = "ok"
+    if health.summary.conditions_failed > 0:
+        overall = "failed"
+    elif health.summary.conditions_degraded > 0:
+        overall = "degraded"
+    elif health.summary.conditions_unknown > 0:
+        overall = "unknown"
+    return {
+        "overall": overall,
+        "by_type": dict(health.summary.by_type),
+        "conditions_ok": health.summary.conditions_ok,
+        "conditions_degraded": health.summary.conditions_degraded,
+        "conditions_failed": health.summary.conditions_failed,
+        "conditions_unknown": health.summary.conditions_unknown,
+    }
+
+
 def _layer_summary(events: list[SpineRow]) -> dict[str, Any]:
+    """Run-level summary; verdict comes from ``RunHealthReport.summary``.
+
+    Pre-PR-1 logic inspected ``kernel.run.stop.outcome`` for "fail"-ish
+    strings only. PR-1 / Task 1.6: the verdict comes from
+    ``report.summary.conditions_failed`` (failed > degraded > unknown
+    > ok). The terminal outcome is still surfaced for human readers
+    but no longer drives ``anomalies_present``.
+    """
     counts = {d: len(filter_by_domain(events, d)) for d in ("llm", "tool", "graph", "phase")}
     lifecycle = next((e for e in events if e.get("execution_point") == "kernel.run.stop"), None)
-    terminal = None
-    anomalies = False
-    if lifecycle is not None:
-        payload = lifecycle.get("payload") or {}
-        terminal = payload.get("outcome")
-        if isinstance(terminal, str) and terminal.lower() in {"fail", "failed", "failure", "error"}:
-            anomalies = True
+    terminal = (lifecycle.get("payload") or {}).get("outcome") if lifecycle is not None else None
+    health = _fold_health(events)
+    health_summary = _health_summary_block(health)
+    anomalies = health.summary.conditions_failed > 0 or health.summary.conditions_degraded > 0
     return {
         "layer": "summary",
         "run_id": events[0].get("run_id") if events else None,
@@ -85,6 +167,11 @@ def _layer_summary(events: list[SpineRow]) -> dict[str, Any]:
         "domain_counts": counts,
         "terminal_outcome": terminal,
         "anomalies_present": anomalies,
+        "health_summary": health_summary,
+        "hint": (
+            _NEXT_HINT["summary"]["anomalies_present"] if anomalies
+            else _NEXT_HINT["summary"]["no_anomalies"]
+        ),
     }
 
 
@@ -128,13 +215,26 @@ def _layer_graph(events: list[SpineRow]) -> dict[str, Any]:
             node["ts_in"] = ts_in
             node["ts_out"] = ts_out
 
+    health = _fold_health(events)
+    health_summary = _health_summary_block(health)
+    health_anomalies = (
+        health.summary.conditions_failed > 0 or health.summary.conditions_degraded > 0
+    )
+    raw_anomalies = bool(report.get("anomalies"))
+
     report["layer"] = "graph"
-    report["anomalies_present"] = bool(report.get("anomalies"))
+    report["anomalies_present"] = raw_anomalies or health_anomalies
     report["edges"] = edges
     report["data_flow"] = [
         {"from": frm, "to": to} for frm, tos in flow_edges.items() for to in tos
     ]
     report["llm_prompts"] = llm_prompts
+    report["health_summary"] = health_summary
+    if health_anomalies and not raw_anomalies:
+        # Health surfaced a condition the raw graph missed (B-1 case):
+        # steer the agent toward ``explain`` instead of leaving a flat
+        # "no_anomalies" verdict.
+        report["hint"] = _NEXT_HINT["graph"]["anomalies_present"]
     return report
 
 
@@ -358,6 +458,7 @@ def _extract_llm_prompts(events: list[SpineRow]) -> list[dict[str, Any]]:
 
 
 def _layer_events(events: list[SpineRow]) -> dict[str, Any]:
+    """Raw spine rows + ``health_summary`` so agents can correlate."""
     rows = [
         {
             "seq": e.get("sequence") or e.get("event_seq") or 0,
@@ -369,16 +470,23 @@ def _layer_events(events: list[SpineRow]) -> dict[str, Any]:
         for e in events
     ]
     rows.sort(key=lambda r: (r["seq"] or 0, str(r["when"] or "")))
+    health = _fold_health(events)
+    health_summary = _health_summary_block(health)
+    rows_present = bool(rows)
+    health_failed = health.summary.conditions_failed > 0
+    if health_failed:
+        hint = _NEXT_HINT["events"]["health_failed"]
+    elif rows_present:
+        hint = _NEXT_HINT["events"]["rows_present"]
+    else:
+        hint = _NEXT_HINT["events"]["rows_empty"]
     return {
         "layer": "events",
         "run_id": events[0].get("run_id") if events else None,
         "rows": rows,
-        "rows_present": bool(rows),
-        "hint": (
-            "next_layer=graph for skeleton view, or filter --domain <name>"
-            if rows
-            else "next_layer=summary to confirm the run reached the spine"
-        ),
+        "rows_present": rows_present,
+        "health_summary": health_summary,
+        "hint": hint,
     }
 
 
@@ -388,11 +496,15 @@ def _layer_diff(events: list[SpineRow]) -> dict[str, Any]:
 
     run_id = events[0].get("run_id", "") if events else ""
     blueprint_path = _TRACES_ROOT_DEFAULT / "runs" / run_id / "blueprint.json"
+    health = _fold_health(events)
+    health_summary = _health_summary_block(health)
+    health_failed = health.summary.conditions_failed > 0
     if not blueprint_path.exists():
         return {
             "layer": "diff",
             "blueprint_missing": True,
             "deviations_present": False,
+            "health_summary": health_summary,
             "hint": _NEXT_HINT["diff"]["blueprint_missing"],
         }
     blueprint = json.loads(blueprint_path.read_text(encoding="utf-8"))
@@ -405,29 +517,33 @@ def _layer_diff(events: list[SpineRow]) -> dict[str, Any]:
     executed_nodes.discard(None)
     missing = sorted(expected_nodes - executed_nodes)
     unexpected = sorted(executed_nodes - expected_nodes)
+    deviations = bool(missing or unexpected)
+    if health_failed:
+        hint = _NEXT_HINT["diff"]["health_failed"]
+    elif deviations:
+        hint = _NEXT_HINT["diff"]["deviations_present"]
+    else:
+        hint = _NEXT_HINT["diff"]["no_deviations"]
     return {
         "layer": "diff",
         "blueprint_missing": False,
-        "deviations_present": bool(missing or unexpected),
+        "deviations_present": deviations,
         "missing_nodes": missing,
         "unexpected_nodes": unexpected,
-        "hint": _NEXT_HINT["diff"]["deviations_present" if missing or unexpected else "no_deviations"],
+        "health_summary": health_summary,
+        "hint": hint,
     }
 
 
 def _layer_explain(events: list[SpineRow]) -> dict[str, Any]:
-    """Root-cause narrative grounded in actual evidence.
+    """Root-cause narrative grounded in ``RunHealthReport``.
 
-    Walks the spine for:
-    1. node-level failures (phase_graph.node.end with outcome=fail)
-    2. reducer teardown sequence (apply_error -> apply_stop ->
-       apply_terminal_outcome) when no node failed but the run still
-       terminated as failure (C12 normal teardown path)
-    3. llm.request.header to surface the prompt when an LLM call's
-       outcome is error (rare; most LLM failures arrive via node outcome)
-
-    The summary is concrete: it names the earliest failure signal and
-    points the agent at the events layer for raw context.
+    PR-1 / Task 1.6: the primary verdict comes from
+    ``report.summary.conditions_failed`` (B-1 case: ``llm.status=failed``
+    even when ``kernel.run.stop.outcome="success"`` and no node failed).
+    We keep the legacy raw-walk as a *secondary* narrative for reducer
+    teardown, but it is no longer the entry point for
+    ``root_cause_present``.
     """
     def _is_fail(v: object) -> bool:
         return isinstance(v, str) and v.lower() in {"fail", "failed", "failure", "error"}
@@ -445,6 +561,47 @@ def _layer_explain(events: list[SpineRow]) -> dict[str, Any]:
         terminal is not None
         and _is_fail((terminal.get("payload") or {}).get("outcome"))
     )
+
+    health = _fold_health(events)
+    health_summary = _health_summary_block(health)
+    failed_types = sorted(
+        t for t, s in health.summary.by_type.items() if s == "failed"
+    )
+    degraded_types = sorted(
+        t for t, s in health.summary.by_type.items() if s == "degraded"
+    )
+
+    if failed_types:
+        first_ref = next(
+            (ref for c in health.conditions if c.status == "failed" for ref in c.evidence_refs),
+            None,
+        )
+        return {
+            "layer": "explain",
+            "root_cause_present": True,
+            "root_cause_kind": "health_conditions_failed",
+            "summary": (
+                f"RunHealthReport reports failed conditions: "
+                f"{', '.join(failed_types)}. See evidence_refs to jump to spine."
+            ),
+            "failed_types": failed_types,
+            "degraded_types": degraded_types,
+            "first_evidence": (
+                {
+                    "event_id": first_ref.event_id,
+                    "execution_point": first_ref.execution_point,
+                    "seq": first_ref.seq,
+                }
+                if first_ref is not None
+                else None
+            ),
+            "health_summary": health_summary,
+            "next_actions": [
+                "next_layer=events to grep for the failed condition's evidence_refs[*].event_id",
+                "next_layer=graph to see the spine topology around the failure",
+            ],
+            "hint": _NEXT_HINT["explain"]["root_cause_present"],
+        }
 
     node_failures = [
         e for e in sorted_events
@@ -466,11 +623,12 @@ def _layer_explain(events: list[SpineRow]) -> dict[str, Any]:
                 "outcome": payload.get("outcome"),
                 "error": payload.get("error"),
             },
+            "health_summary": health_summary,
             "next_actions": [
                 "next_layer=events to grep for this node_id and surrounding rows",
                 "next_layer=graph to see effects attached to this node",
             ],
-            "hint": "next_layer=events to grep for this node_id",
+            "hint": _NEXT_HINT["explain"]["root_cause_present"],
         }
 
     if terminal_failed:
@@ -519,6 +677,7 @@ def _layer_explain(events: list[SpineRow]) -> dict[str, Any]:
             ],
             "first_prompt": prompt_summary,
             "terminal_outcome": (terminal.get("payload") or {}).get("outcome"),
+            "health_summary": health_summary,
             "next_actions": actions,
             "hint": actions[0],
         }
@@ -526,12 +685,13 @@ def _layer_explain(events: list[SpineRow]) -> dict[str, Any]:
     return {
         "layer": "explain",
         "root_cause_present": False,
-        "summary": "no failed nodes / lifecycle events in spine",
+        "summary": "no failed conditions; all derivers ok/unknown/degraded",
         "terminal_outcome": (
             (terminal.get("payload") or {}).get("outcome") if terminal else None
         ),
+        "health_summary": health_summary,
         "next_actions": ["next_layer=summary to confirm run reached terminal"],
-        "hint": "next_layer=summary to confirm run reached terminal",
+        "hint": _NEXT_HINT["explain"]["no_root_cause"],
     }
 
 

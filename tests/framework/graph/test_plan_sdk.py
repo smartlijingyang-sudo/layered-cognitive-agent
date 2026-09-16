@@ -336,8 +336,16 @@ class TestRoundTrip:
         p = plan(
             "complex",
             nodes=[
-                node("a", "node_executor", entry=True),
-                node("b", "node_executor"),
+                node(
+                    "a",
+                    "node_executor",
+                    entry=True,
+                    outputs=[
+                        PortSpec(name="decision"),
+                        PortSpec(name="response"),
+                    ],
+                ),
+                node("b", "node_executor", terminal=True),
             ],
             edges=[edge("a", "b", when=pred)],
         )
@@ -359,8 +367,13 @@ class TestRoundTrip:
             p = plan(
                 "leaf",
                 nodes=[
-                    node("x", "node_executor", entry=True),
-                    node("y", "node_executor"),
+                    node(
+                        "x",
+                        "node_executor",
+                        entry=True,
+                        outputs=[PortSpec(name="decision")],
+                    ),
+                    node("y", "node_executor", terminal=True),
                 ],
                 edges=[edge("x", "y", when=pred)],
             )

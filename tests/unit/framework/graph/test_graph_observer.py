@@ -68,8 +68,6 @@ def _make_stub(*, emit: dict[PortName, object], next_target: str | None = None) 
             return NodeOutput(
                 port_values=dict(emit),
                 producer_node=context.node_id,
-                result_kind="decision",
-                next_hints={"next": next_target or ""},
             )
 
     return _Stub()
@@ -170,7 +168,7 @@ async def test_kernel_emits_start_end_edge_for_two_node_plan() -> None:
     assert edge.from_node == "a"
     assert edge.to_node == "b"
     assert edge.edge_id == "a->b"
-    assert edge.metadata == (("when", "true"),)
+    assert edge.metadata == (("when", "None"),)  # unconditional edge.when is None; interpreter records str(None)
 
 
 def test_spine_observer_resolves_default_table() -> None:
@@ -287,7 +285,7 @@ async def test_subgraph_strategy_emits_enter_exit(monkeypatch) -> None:
 
     rec = RecordingObserver()
     monkeypatch.setattr(
-        "lca.framework.graph.strategies.subgraph_strategy._load_subgraph_plan",
+        "lca.framework.graph.strategies.subgraph_run.load_subgraph_plan",
         lambda ref, entry: _make_plan(),
     )
 
@@ -312,7 +310,7 @@ async def test_subgraph_strategy_emits_failure_exit(monkeypatch) -> None:
 
     rec = RecordingObserver()
     monkeypatch.setattr(
-        "lca.framework.graph.strategies.subgraph_strategy._load_subgraph_plan",
+        "lca.framework.graph.strategies.subgraph_run.load_subgraph_plan",
         lambda ref, entry: _make_plan(),
     )
 

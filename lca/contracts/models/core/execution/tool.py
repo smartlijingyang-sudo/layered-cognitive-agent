@@ -59,6 +59,12 @@ class ToolApi:
     is_idempotent: bool = False
     effect_kind: Literal["ephemeral", "persistent", "stateful_once"] = "ephemeral"
     default_timeout_ms: int = 30_000
+    # PR-3 (G-21, ADR-0232): batch scheduling taxonomy.  ``"read"`` calls
+    # may overlap inside a single decision batch (ParallelReadOnly default);
+    # ``"write"`` / ``"external"`` calls must run sequentially so a partial
+    # failure cannot leave the world in an unrecoverable interleaving.
+    # Mirrors ADR-0232 §Decision 2 and AGENTS.md §3 C10 narrow door.
+    effects: Literal["read", "write", "external"] = "external"
 
 
 @dataclass(frozen=True)

@@ -1,4 +1,4 @@
-"""Atomic lift test for ``bundles/phase_main_outer.yaml`` (Task 6).
+"""Atomic lift test for ``bundles/outer/phase_main.yaml`` (Task 6).
 
 The outer plan is the production spine for the six-phase loop
 (perceive → think → act → reflect → remember → terminal). After the

@@ -165,11 +165,16 @@ def emit_diagnostic(
     plugin: str = "",
     attributes: dict[str, Any] | None = None,
     output: dict[str, Any] | None = None,
-    status: str = "failed",
+    status: str = "info",
 ) -> None:
     """Structured diagnostic when Session unbound; spine EP when bound (ADR-0192).
 
     Replaces direct ``record_runtime`` from cognition for non-catalog diagnostics.
+
+    G-14 (Task 1.8): 默认 status 改为 ``"info"``,no-op 语义;调用方必须按
+    操作的终态显式传 ``DiagnosticStatus.{STARTED|SUCCEEDED|FAILED}``,避免
+    成功诊断被默认标记为 ``"failed"``(会让 tool_deriver 把 ``tool.complete``
+    误判为工具失败)。
     """
     session = resolve_session_reader()
     payload = {

@@ -59,7 +59,14 @@ def test_runs_debug_summary_layer(run_dir: Path) -> None:
     assert payload["layer"] == "summary"
     assert payload["total_events"] == 2
     assert payload["terminal_outcome"] == "failure"
-    assert payload["anomalies_present"] is True
+    # PR-1 / Task 1.6: anomalies_present is now driven by
+    # RunHealthReport.summary.conditions_failed, not by raw
+    # kernel.run.stop.outcome inspection. The fixture has no
+    # deriver-detectable events (only kernel.run.start and stop),
+    # so the fold yields conditions_failed=0 and anomalies=False.
+    # The hint still points to the next layer.
+    assert payload["anomalies_present"] is False
+    assert "health_summary" in payload
     assert "next_layer" in payload["hint"]
 
 

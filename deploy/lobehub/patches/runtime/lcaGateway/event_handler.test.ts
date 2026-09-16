@@ -50,6 +50,11 @@ const createStore = (dbMessagesMap: Record<string, UIChatMessage[]> = { [topicKe
     associateMessageWithOperation: vi.fn(),
     completeOperation: vi.fn(),
     dbMessagesMap,
+    // Mirror the native gateway action surface so any stray
+    // `internal_executeClientTool` invocation shows up in the spy. The LCA
+    // factory is expected to drop `tool_execute` events before they reach the
+    // shared handler — the spy must NOT be called.
+    internal_executeClientTool: vi.fn().mockResolvedValue(undefined),
     internal_dispatchMessage: vi.fn(),
     internal_toggleToolCallingStreaming: vi.fn(),
     operations: {},
@@ -125,5 +130,60 @@ describe('createLcaGatewayEventHandler', () => {
     // The LCA reader would otherwise be called too — what we are pinning here
     // is that the LCA path short-circuits BEFORE the fetch.
     expect(dbSpy).not.toHaveBeenCalled();
+  });
+
+  it('drops tool_execute events without invoking internal_executeClientTool', async () => {
+    // The shared `gatewayEventHandler` switch carries a `case 'tool_execute':`
+    // that forwards to `internal_executeClientTool` (used by the native hetero
+    // path for client-executable tools). LCA's server-side runtime
+    // (lobe-cloud-sandbox) executes tools itself and never emits
+    // `tool_execute` on the wire — see event_translator.py (no handler) and
+    // contracts/transport/agent_stream_event.py:188 (schema declared but
+    // unused). The LCA factory must intercept and drop the event before the
+    // shared switch sees it, so the spy here MUST NOT be called.
+    const store = createStore();
+    const handler = createLcaGatewayEventHandler(() => store, {
+      assistantMessageId: 'seed-msg',
+      context,
+      gatewayOperationId: 'op-1',
+      operationId: 'op-1',
+    });
+
+    handler(
+      makeEvent('tool_execute', {
+        apiName: 'local-shell',
+        arguments: '{"cmd":"ls"}',
+        identifier: 'local-system',
+        toolCallId: 'call-x',
+      }),
+    );
+    await flush();
+
+    expect(store.internal_executeClientTool).not.toHaveBeenCalled();
+  });
+
+  it('still forwards non-tool_execute events through the shared handler', async () => {
+    // The LCA wrapper must NOT swallow the rest of the event stream — only
+    // `tool_execute` is the LCA-irrelevant case. A `stream_chunk` carries
+    // text content; the shared handler's optimistic dispatch must still fire.
+    const store = createStore();
+    const handler = createLcaGatewayEventHandler(() => store, {
+      assistantMessageId: 'seed-msg',
+      context,
+      operationId: 'op-1',
+    });
+
+    handler(
+      makeEvent('stream_chunk', {
+        chunkType: 'text',
+        content: 'hello from LCA',
+      }),
+    );
+    await flush();
+
+    expect(store.internal_dispatchMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ value: { content: 'hello from LCA' } }),
+      expect.any(Object),
+    );
   });
 });

@@ -106,6 +106,7 @@ from lca.contracts.protocols.graph.plan import Plan, PlanEdge, PlanNode, Subgrap
 from lca.contracts.protocols.graph.ports import PortName
 from lca.contracts.protocols.graph.predicate import PortRef, Predicate
 from lca.contracts.protocols.graph.routing import RoutingDecision
+from lca.framework.graph.lift.interface import PlanLifter, get_plan_lifter
 
 # ---------------------------------------------------------------------------
 # Port construction
@@ -363,6 +364,8 @@ def _edge_to_dict(e: PlanEdge) -> dict[str, Any]:
     d: dict[str, Any] = {"from": e.source, "to": e.target}
     if isinstance(e.when, Predicate):
         d["when"] = _predicate_to_dict(e.when)
+    elif e.when is None:
+        d["when"] = "true"
     else:
         d["when"] = str(e.when) if e.when != "true" else "true"
     if e.subgraph_ref is not None:
@@ -387,170 +390,43 @@ def serialize_plan(p: Plan) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Parsing: YAML → Plan (preserves typed Predicate on when)
+# Parsing: YAML → Plan (via Lift interface — no duplicated parsers)
 # ---------------------------------------------------------------------------
 
 
-def _parse_predicate(raw: Any) -> Predicate:
-    """Parse a structured-predicate dict into a :class:`Predicate`."""
-    if isinstance(raw, Predicate):
-        return raw
-    if isinstance(raw, str):
-        # Legacy string when clause — wrap as exists(True) placeholder.
-        return Predicate(kind="exists", value=True)
-    if not isinstance(raw, Mapping):
-        raise PlanLiftError(f"predicate must be a mapping or string, got {type(raw).__name__}")
-    kind = raw["kind"]
-    if kind in ("and", "or"):
-        children = tuple(_parse_predicate(c) for c in raw.get("children", ()))
-        return Predicate(kind=kind, children=children)
-    if kind == "not":
-        kids = raw.get("children", [])
-        return Predicate(kind="not", children=(_parse_predicate(kids[0]),))
-    # Leaf kinds.
-    port_raw = raw.get("port")
-    port_ref: PortRef | None = None
-    if isinstance(port_raw, Mapping):
-        port_ref = PortRef(
-            name=port_raw["name"],
-            field=port_raw.get("field"),
-        )
-    elif isinstance(port_raw, PortRef):
-        port_ref = port_raw
-    return Predicate(
-        kind=kind,
-        port=port_ref,
-        value=raw.get("value"),
-    )
+def lift_via_interface(spec: Mapping[str, Any], *, lifter: PlanLifter | None = None) -> Plan:
+    """Lift a BundleGraphSpec / SDK-serialized mapping through :class:`PlanLifter`.
 
-
-def _parse_port_specs(raw: Any) -> tuple[PortSpec, ...]:
-    if raw is None:
-        return ()
-    if isinstance(raw, str):
-        raw = [raw]
-    if not isinstance(raw, Sequence):
-        return ()
-    out: list[PortSpec] = []
-    for item in raw:
-        if isinstance(item, str):
-            out.append(PortSpec(name=item))
-        elif isinstance(item, Mapping):
-            out.append(
-                PortSpec(
-                    name=item["name"],
-                    required=item.get("required", True),
-                    payload_type=None,  # string names only in YAML
-                )
-            )
-    return tuple(out)
-
-
-def _parse_io_schema(raw: Any) -> NodeIOSchema:
-    if raw is None:
-        return NodeIOSchema()
-    if isinstance(raw, NodeIOSchema):
-        return raw
-    if not isinstance(raw, Mapping):
-        return NodeIOSchema()
-    tp_raw = raw.get("terminal_predicate")
-    return NodeIOSchema(
-        inputs=_parse_port_specs(raw.get("inputs")),
-        outputs=_parse_port_specs(raw.get("outputs")),
-        terminal_predicate=_parse_predicate(tp_raw) if tp_raw is not None else None,
-    )
-
-
-def _parse_subgraph_ref(raw: Any) -> SubgraphReference | None:
-    if raw is None:
-        return None
-    if isinstance(raw, SubgraphReference):
-        return raw
-    if isinstance(raw, Mapping):
-        return SubgraphReference(
-            plan_ref=str(raw["plan_ref"]),
-            entry_node=str(raw["entry_node"]),
-            binding_edge=str(raw["binding_edge"]),
-            return_on=str(raw.get("return_on", "next")),
-        )
-    return None
-
-
-def _parse_plan_node(raw: Mapping[str, Any]) -> PlanNode:
-    nid = str(raw["id"])
-    binding_raw = raw.get("binding", "node_executor")
-    binding = BindingKind(binding_raw) if isinstance(binding_raw, str) else binding_raw
-
-    # io_schema from explicit key, or legacy inputs/outputs lists at top level.
-    if "io_schema" in raw:
-        io_schema = _parse_io_schema(raw["io_schema"])
-    else:
-        io_schema = NodeIOSchema(
-            inputs=_parse_port_specs(raw.get("inputs")),
-            outputs=_parse_port_specs(raw.get("outputs")),
-        )
-
-    config = {k: v for k, v in raw.items() if k not in _PLAN_NODE_FIELDS}
-
-    return PlanNode(
-        id=nid,
-        binding=binding,
-        io_schema=io_schema,
-        config=config,
-        terminal=bool(raw.get("terminal", False)),
-        entry=bool(raw.get("entry", False)),
-        subgraph_ref=_parse_subgraph_ref(raw.get("subgraph_ref")),
-    )
-
-
-def _parse_plan_edge(raw: Mapping[str, Any]) -> PlanEdge:
-    source = str(raw.get("from") or raw.get("source", ""))
-    target = str(raw.get("to") or raw.get("target", ""))
-    when_raw = raw.get("when")
-    when: Predicate | str
-    if isinstance(when_raw, Predicate):
-        when = when_raw
-    elif isinstance(when_raw, Mapping):
-        when = _parse_predicate(when_raw)
-    else:
-        when = str(when_raw) if when_raw is not None else "true"
-    return PlanEdge(
-        source=source,
-        target=target,
-        when=when,
-        subgraph_ref=_parse_subgraph_ref(raw.get("subgraph_ref")),
-    )
+    plan_sdk produces Plan from YAML-like structures only through this
+    seam (predicate + termination validation included). Do not
+    re-implement lift parsers here.
+    """
+    return (lifter or get_plan_lifter()).lift_graph_spec(spec)
 
 
 def parse_plan_yaml(text: str) -> Plan:
-    """Parse YAML into a :class:`Plan`, preserving typed Predicate on edges.
+    """Parse YAML into a :class:`Plan` via the Lift interface.
 
-    Complements :func:`lift_graph_spec` (which stores ``when`` as a
-    string) by keeping the structured :class:`Predicate` objects.
+    Complements :func:`serialize_plan`: ``parse_plan_yaml(serialize_plan(p))``
+    recovers the same :class:`Plan` with typed :class:`Predicate` edges.
+    Production validation (predicates + termination) runs inside
+    :meth:`PlanLifter.lift_graph_spec`.
     """
     raw = yaml.safe_load(text)
     if not isinstance(raw, Mapping):
         raise PlanLiftError("plan YAML must be a mapping at the top level")
-
-    nodes = tuple(_parse_plan_node(n) for n in raw.get("nodes", ()))
-    edges = tuple(_parse_plan_edge(e) for e in raw.get("edges", ()))
-
-    # PR-1: 字段语义升级——lifter 阶段会强制要求 act.approve.gate 存在时非空。
-    # 这里只读不强制(避免破坏 yaml 解析链;强制在 lifter)。
-    return Plan(
-        id=str(raw.get("id", "")),
-        nodes=nodes,
-        edges=edges,
-        approval_resume_node=raw.get("approval_resume_node"),
-    )
+return lift_via_interface(dict(raw))
 
 
 __all__ = [
+    "PlanLifter",
     "and_",
     "edge",
     "eq",
     "exists",
+    "get_plan_lifter",
     "in_",
+    "lift_via_interface",
     "missing",
     "ne",
     "node",
