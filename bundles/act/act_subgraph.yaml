@@ -51,8 +51,9 @@ nodes:
   - id: act.authorize
     region: act
     factory: act.authorize
-    inputs: [decision]
-    outputs: [decision]
+    # ADR-0235 / PR-5: state 透传到 act.envelope,metadata 不再偷 state。
+    inputs: [decision, state]
+    outputs: [decision, state]
     config:
       emit_on_enter: [think.gate.start]
       emit_on_exit: []
@@ -60,8 +61,10 @@ nodes:
   - id: act.envelope
     region: act
     factory: act.envelope
-    inputs: [decision]
-    outputs: [envelope]
+    # ADR-0235 / PR-5: state 通过 typed port 输入,metadata 不再偷 state。
+    inputs: [decision, state]
+    # state / decision 透传到下游 typed port
+    outputs: [envelope, decision, state]
     config:
       emit_on_enter: []
       emit_on_exit: []
@@ -96,7 +99,10 @@ nodes:
 
   - id: act.dispatch
     factory: act.dispatch.ref
-    inputs: [envelope, verdict_refs]
+    # ADR-0235 / PR-5: state / decision flow in from act.envelope as
+    # typed ports and are forwarded to effect.execute (subgraph binding
+    # in config.sub_spec_ref).
+    inputs: [envelope, verdict_refs, decision, state]
     outputs: [receipt]
     config:
       emit_on_enter: [body.tool.execute.start]

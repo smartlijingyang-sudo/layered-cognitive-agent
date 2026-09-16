@@ -1,9 +1,16 @@
 """phase.concept.act_subgraph.act_envelope — typed envelope constructor.
 
-``concept.act_subgraph`` 内嵌节点:``Decision`` → ``CommandEnvelope``。
+``concept.act_subgraph`` 内嵌节点:``Decision`` + ``AgentState`` →
+``CommandEnvelope``(decision / state 通过 typed port 透传)。
 
 从 ``StandardActExecutor`` (lca/plugins/loop/phase/act/standard/plugin.py
 lines 50-75) 提取信封构造逻辑,作为 act 子图的独立概念节点。
+
+ADR-0235 / PR-5: state 不再从 ``context.runtime.state`` 偷图;改读 typed
+port ``state``(由图 kernel 通过 typed port 透传);metadata 仅保留
+op-relative 字段 ``effect_class`` / ``operation``(typed-port 难表达的
+envelope 标识字段,符合 C2 双平面 — envelope 是 effect gateway 单据,
+不应承载 cognition 内部 state)。
 """
 
 from __future__ import annotations
@@ -22,6 +29,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.models.core.execution.decision import Decision
+from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.act.command.envelope import (
     CapabilityGrant,
     CommandEnvelope,
@@ -41,12 +49,16 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 @dataclass(frozen=True, slots=True)
 class ActEnvelopeExecutor:
-    """``concept.act_subgraph`` 节点:Decision → CommandEnvelope。"""
+    """``concept.act_subgraph`` 节点:Decision + AgentState → CommandEnvelope。
+
+    state / decision 通过 typed port 输入,不在 metadata 偷读
+    (ADR-0235 / PR-5)。
+    """
 
     semantic_name: str = "act.envelope"
     region: str = "act"
-    declared_inputs: tuple[PortName, ...] = ("decision",)
-    declared_outputs: tuple[PortName, ...] = ("envelope",)
+    declared_inputs: tuple[PortName, ...] = ("decision", "state")
+    declared_outputs: tuple[PortName, ...] = ("envelope", "decision", "state")
 
     async def node_execute(
         self,
@@ -55,14 +67,21 @@ class ActEnvelopeExecutor:
     ) -> NodeOutput:
         """act.envelope 入口。
 
-        inputs 端口(yaml): decision (Decision)
-        outputs 端口(yaml): envelope (CommandEnvelope)
+        inputs 端口(yaml): decision (Decision), state (AgentState)
+        outputs 端口(yaml): envelope (CommandEnvelope), decision (passthrough),
+        state (passthrough)
         """
         decision = input.port_values.get("decision")
         if not isinstance(decision, Decision):
             raise TypeError(
                 "act.envelope: 'decision' port must be a Decision "
                 f"instance, got {type(decision).__name__}"
+            )
+        state = input.port_values.get("state")
+        if state is not None and not isinstance(state, AgentState):
+            raise TypeError(
+                "act.envelope: 'state' port must be an AgentState or None, "
+                f"got {type(state).__name__}"
             )
 
         plan_ref = context.metadata["plan_ref"]
@@ -79,15 +98,21 @@ class ActEnvelopeExecutor:
                 effect_class="tools",
             ),
             idempotency_key=f"{plan_ref}:{node_ref}:{decision.decision_id}",
+            # ADR-0235 / PR-5: metadata 仅保留 op-relative 字段;state / decision
+            # 通过 typed port 透传(env.output.port_values),不再进 metadata。
             metadata={
                 "effect_class": "tools",
                 "operation": "body.act",
-                "state": context.runtime.state,
-                "decision": decision,
             },
         )
 
-        return NodeOutput(port_values={"envelope": envelope})
+        return NodeOutput(
+            port_values={
+                "envelope": envelope,
+                "decision": decision,
+                "state": state,
+            }
+        )
 
 
 @plugin(

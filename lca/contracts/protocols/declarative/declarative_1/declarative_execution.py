@@ -18,13 +18,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from lca.contracts.models.core.policy.stop import StopDecision
-from lca.contracts.protocols.act.command.envelope import RunFact
+from lca.contracts.protocols.act.command.envelope import CommandEnvelope, RunFact
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
     DeclarativeValidationError,
 )
+from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
+    EffectPolicyPlan,
+)
+
+if TYPE_CHECKING:
+    from lca.contracts.models.core.execution.decision import Decision
+    from lca.contracts.models.core.state.state import AgentState
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,7 +102,26 @@ class DeltaReducer(Protocol):
 
 
 class EffectDispatcher(Protocol):
-    """Runtime Protocol for effect dispatch — concrete impl lives at runtime_bindings."""
+    """Runtime Protocol for effect dispatch — concrete impl lives at runtime_bindings.
+
+    ADR-0235 / PR-5: ``state`` and ``decision`` are typed keyword-only
+    parameters that carry cognition-internal data across the act →
+    effect boundary (replacing the previous ``envelope.metadata`` smuggle
+    path). They are typed-Contract-bearing per ADR-0195 §1.4 C13 — the
+    consumer (``effect.execute``) passes the same ``Decision`` /
+    ``AgentState`` it received on its typed ports, so no field
+    re-encoding is required. Both default to ``None``; consumers that
+    do not need typed state (e.g. memory.update) pass through.
+    """
+
+    async def execute(
+        self,
+        envelope: CommandEnvelope,
+        policy: EffectPolicyPlan,
+        *,
+        state: AgentState | None = None,
+        decision: Decision | None = None,
+    ) -> object: ...
 
 
 @runtime_checkable

@@ -90,6 +90,12 @@ class Decision:
     # 旧测试的占位;cognition emit 方必须显式构造(由
     # tests/integration/test_decision_emit_consume.py 守卫)。
     task_progress: TaskProgress = field(default_factory=TaskProgress)
+    # ADR-0235 / PR-5 (L-2 / G-9): typed ``needs_approval`` flag replaces
+    # the previous ``extra["needs_approval"]`` metadata smuggle across
+    # the cognition → act subgraph boundary. ``False`` means the decision
+    # may dispatch directly; ``True`` means ``act.approve.gate`` routes
+    # through the HITL interrupt seam (ADR-0228 §2.6).
+    needs_approval: bool = False
 
 
 @dataclass

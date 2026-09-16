@@ -45,13 +45,14 @@ class ActAuthorizeExecutor:
 
     semantic_name: str = "act.authorize"
     region: str = "act"
-    # ``state`` is optional (authorize reads ``state is not None`` and
-    # skips budget checks when state is absent). Declaring only the
-    # required input ``decision`` keeps the v2 driver's fan-in dispatch
-    # from blocking the chain when the outer drive did not supply an
-    # AgentState port.
-    declared_inputs: tuple[PortName, ...] = ("decision",)
-    declared_outputs: tuple[PortName, ...] = ("decision",)
+    # ADR-0235 / PR-5: state is now an optional declared input — its
+    # absence skips budget checks (preserves the v2 driver's fan-in
+    # dispatch path). When present, it is passed through to downstream
+    # typed ports (``act.envelope``, ``act.dispatch``, ``effect.execute``)
+    # so the kernel does not need to reach into ``context.runtime``
+    # again. The metadata-based smuggle path is closed.
+    declared_inputs: tuple[PortName, ...] = ("decision", "state")
+    declared_outputs: tuple[PortName, ...] = ("decision", "state")
 
     async def node_execute(
         self,
@@ -114,7 +115,7 @@ class ActAuthorizeExecutor:
                         f"act.authorize: unsafe tool name rejected: {call.tool_name!r}"
                     )
 
-        return NodeOutput(port_values={"decision": decision})
+        return NodeOutput(port_values={"decision": decision, "state": state})
 
 
 @plugin(

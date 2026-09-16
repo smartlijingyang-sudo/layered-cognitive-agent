@@ -2,18 +2,26 @@
 
 Per ADR-0228 §Decision 4 + `2026-09-15-pr3.8-borrowed-nodes-design.md` §2.6:
 ``act.approve.gate`` is the act-side typed view of the HITL pause/resume
-seam. It reads the ``decision`` produced upstream by ``act.authorize``
-(``decision.extra["needs_approval"]`` flag), and on resume the kernel
+seam. It reads the typed ``decision`` produced upstream by ``act.authorize``
+(``decision.needs_approval`` typed field), and on resume the kernel
 re-projects the persisted ``Command`` as a typed ``command`` port.
+
+ADR-0235 / PR-5 (L-2 / G-9): the previous ``_resolve_port(context, name)``
+helper used ``getattr(context.runtime, name, None)`` to peek at graph
+runtime. That was a ``getattr(..., None)`` silent-skip on the graph /
+act boundary. The helper is removed; the gate now reads declared typed
+ports only. The previous ``decision.extra["needs_approval"]`` flag is
+also gone — replaced by typed ``Decision.needs_approval`` (added by
+this PR).
 
 Boundary discipline:
 
 - AGENTS.md §3 C1 — no new phase, no new EP name. The node lives in the
   existing ``region:intervene`` sibling subgraph (ADR-0228 §3).
 - AGENTS.md §3 C5 — capability monotonicity. The node reads
-  ``decision.extra["needs_approval"]``; it does not grant capabilities,
-  and the ``Command.resume`` flow handles capability re-check at
-  ``act.envelope`` re-entry.
+  ``decision.needs_approval`` (typed field); it does not grant
+  capabilities, and the ``Command.resume`` flow handles capability
+  re-check at ``act.envelope`` re-entry.
 - AGENTS.md §3 C7 — control / observation split. ``Command`` is a
   control-plane artifact, but every emission lands in the journal as
   a ``SessionEvent`` first (observation); this node returns a typed
@@ -25,7 +33,8 @@ Boundary discipline:
 - AGENTS.md §3 C13 — ``Command`` is the existing Pydantic-frozen
   ``extra="forbid"`` cross-graph DTO at
   ``lca.contracts.protocols.graph.command``; the gate reuses it for the
-  resume payload.
+  resume payload. ``Decision.needs_approval`` is the typed Contract for
+  the HITL signal (replaces ``extra["needs_approval"]``).
 
 Canonical node shape (ADR-0228 §Decision 2): hand-written
 ``@dataclass(frozen=True, slots=True)`` + ``@plugin(...)`` carrier.
@@ -34,7 +43,6 @@ Canonical node shape (ADR-0228 §Decision 2): hand-written
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.enums.enums import ActionType
@@ -62,8 +70,6 @@ from lca.contracts.protocols.graph.command import Command
 from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
-_NEEDS_APPROVAL_KEY = "needs_approval"
-
 # ``next_hint`` values consumed by the outer bundle edges in
 # ``bundles/outer/phase_main.yaml``. They are control-plane metadata;
 # the kernel uses ``next_node`` to route and ignores ``next_hint`` for
@@ -74,34 +80,19 @@ _NEXT_HINT_APPROVE_APPROVED = "approve_approved"
 _NEXT_HINT_APPROVE_REJECTED = "approve_rejected"
 
 
-def _resolve_port(name: str, *, input: NodeInput, context: NodeContext) -> Any:
-    """Read a declared port from ``input.port_values`` or ``context.runtime``.
-
-    Mirrors the seam used by ``intervene.interrupt`` / ``intervene.resume``
-    so the typed-boundary contract is uniform across the intervene subgraph.
-    """
-    value = input.port_values.get(name)
-    if value is None and getattr(context, "runtime", None) is not None:
-        value = getattr(context.runtime, name, None)
-        if value is None and hasattr(context.runtime, "get"):
-            value = context.runtime.get(name)
-    return value
-
-
 @dataclass(frozen=True, slots=True)
 class ApproveGateExecutor:
     """intervene node: gate ``decision`` flow on HITL approval semantics.
 
-    The node is a pure transform of the ``decision`` + ``command``
+    The node is a pure transform of the typed ``decision`` + ``command``
     ports. It never reads runtime state, never mutates ``AgentState``,
     and never touches I/O. The four routing outcomes:
 
-    - ``approve_skipped`` — ``decision.extra.needs_approval`` is absent
-      or False → pass-through to ``act.envelope`` with the original
-      decision.
-    - ``approve_interrupt`` — ``decision.extra.needs_approval`` is True
-      and no ``command`` is present → route to ``intervene.interrupt``
-      to collect the user's typed ``Command``.
+    - ``approve_skipped`` — ``decision.needs_approval`` is False →
+      pass-through to ``act.envelope`` with the original decision.
+    - ``approve_interrupt`` — ``decision.needs_approval`` is True and no
+      ``command`` is present → route to ``intervene.interrupt`` to
+      collect the user's typed ``Command``.
     - ``approve_approved`` — ``command.kind == "approve"`` → resume to
       ``act.envelope`` with the original decision.
     - ``approve_rejected`` — ``command.kind`` is ``"reject"`` /
@@ -124,21 +115,26 @@ class ApproveGateExecutor:
 
         inputs 端口(yaml): decision (Decision), command (Command, optional)
         outputs 端口(yaml): decision (Decision), routing (RoutingDecision)
+
+        ADR-0235 / PR-5: reads typed ports only. No more
+        ``_resolve_port(context, name)`` that peeked at
+        ``context.runtime``. ``needs_approval`` is read from the typed
+        ``Decision.needs_approval`` field (L-2 / G-9 follow-through).
         """
-        decision = _resolve_port("decision", input=input, context=context)
+        decision = input.port_values.get("decision")
         if not isinstance(decision, Decision):
             raise TypeError(
                 "act.approve.gate: 'decision' port must be a Decision "
                 f"instance, got {type(decision).__name__}"
             )
-        command = _resolve_port("command", input=input, context=context)
+        command = input.port_values.get("command")
         if command is not None and not isinstance(command, Command):
             raise TypeError(
                 "act.approve.gate: 'command' port must be a Command or None, "
                 f"got {type(command).__name__}"
             )
 
-        needs_approval = bool(decision.extra.get(_NEEDS_APPROVAL_KEY, False))
+        needs_approval = bool(decision.needs_approval)
 
         if not needs_approval:
             next_hint = _NEXT_HINT_APPROVE_SKIPPED

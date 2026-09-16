@@ -20,10 +20,12 @@ nodes:
     factory: effect.execute
     # ADR-0234 / PR-2: verdict_refs flows in from
     # ``effect.pre_dispatch.envelope_check`` (5-gate atomic check).
+    # ADR-0235 / PR-5: decision / state flow in from act.dispatch as typed
+    # ports — they replace the previous ``envelope.metadata`` smuggle path.
     # Loader silently ignores yaml inputs for subgraph nodes
     # (subgraph_resolver.py §154-156); runtime port names come from the
     # inner entry's typed ``declared_inputs``.
-    inputs: [envelope, verdict_refs]
+    inputs: [envelope, verdict_refs, decision, state]
     # PR-3.8.5 fix1: emit ``receipts`` (list-of-one) to match the inner
     # entry's typed ``declared_outputs`` and the downstream ``act.join``'s
     # ``declared_inputs``. Loader silently ignores yaml outputs for subgraph

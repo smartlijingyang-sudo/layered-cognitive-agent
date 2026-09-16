@@ -6,12 +6,11 @@ the gate is a typed-boundary node under ``region:intervene`` that
 consumes the ``decision`` + ``command`` ports and emits
 ``decision`` + ``routing`` ports. Four cases pin:
 
-  (1) ``decision.extra["needs_approval"]=True`` + no command → interrupt
-      path (``next_node="intervene.interrupt"``,
+  (1) ``decision.needs_approval=True`` + no command → interrupt path
+      (``next_node="intervene.interrupt"``,
       ``next_hint="approve_interrupt"``).
-  (2) ``decision.extra["needs_approval"]`` absent or False →
-      pass-through (``next_node="act.envelope"``,
-      ``next_hint="approve_skipped"``).
+  (2) ``decision.needs_approval`` is False → pass-through
+      (``next_node="act.envelope"``, ``next_hint="approve_skipped"``).
   (3) ``command.kind in {"reject", "redirect"}`` (or
       ``command.kind == "resume"`` for timeout/abandon) → abort
       (``next_node="terminal.commit"``,
@@ -19,6 +18,11 @@ consumes the ``decision`` + ``command`` ports and emits
   (4) ``command.kind == "approve"`` → envelope
       (``next_node="act.envelope"``,
       ``next_hint="approve_approved"``).
+
+ADR-0235 / PR-5: ``needs_approval`` is a typed field on
+:class:`Decision` (added by L-2 / G-9 follow-through). The gate reads
+typed ports only — the previous ``_resolve_port(context, name)`` graph
+runtime peek is gone.
 
 Idempotency is verified by re-running the same input and asserting the
 typed outputs are equal. The fail-closed contract (missing
@@ -46,17 +50,18 @@ def _ctx() -> NodeContext:
     return NodeContext(runtime={}, budget={}, metadata={})
 
 
-def _decision(*, needs_approval: bool | None = False) -> Decision:
-    """Build a Decision for the test (dataclass — kwargs only)."""
-    extra: dict[str, object] = {}
-    if needs_approval is not None:
-        extra["needs_approval"] = needs_approval
+def _decision(*, needs_approval: bool = False) -> Decision:
+    """Build a Decision for the test (dataclass — kwargs only).
+
+    ADR-0235 / PR-5: ``needs_approval`` is now a typed field on
+    Decision; ``extra`` smuggling is gone.
+    """
     return Decision(
         decision_id="dec_gate_001",
         action_type="use_tool",
         rationale="needs gate",
         confidence=1.0,
-        extra=extra,
+        needs_approval=needs_approval,
     )
 
 
@@ -97,26 +102,13 @@ async def test_gate_needs_approval_without_command_routes_to_interrupt() -> None
     assert routing.next_node == "intervene.interrupt"
     assert routing.next_hint == "approve_interrupt"
     # Decision is forwarded unchanged — the gate does not mutate it.
-    assert decision.extra["needs_approval"] is True
+    assert decision.needs_approval is True
     assert decision.decision_id == "dec_gate_001"
 
 
 # ---------------------------------------------------------------------------
-# Case 2: needs_approval absent or False → pass-through to act.envelope.
+# Case 2: needs_approval=False → pass-through to act.envelope.
 # ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_gate_needs_approval_absent_passes_through_to_envelope() -> None:
-    """``decision.extra`` lacks ``needs_approval`` → skip, route to envelope."""
-    executor = ApproveGateExecutor()
-    output = await executor.node_execute(
-        _ctx(),
-        NodeInput(port_values={"decision": _decision(needs_approval=None)}),
-    )
-    routing: RoutingDecision = output.port_values["routing"]
-    assert routing.next_node == "act.envelope"
-    assert routing.next_hint == "approve_skipped"
 
 
 @pytest.mark.asyncio

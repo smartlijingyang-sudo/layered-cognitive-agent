@@ -79,8 +79,23 @@ class PipelineSafeExecutor(SafeExecutor):
     使得每个阶段都可以独立扩展和测试。
     """
 
-    def __init__(self, permission_manifest: ToolPermissionManifest):
+    def __init__(
+        self,
+        permission_manifest: ToolPermissionManifest,
+        *,
+        plan_ref_provider: Callable[[], str | None] | None = None,
+        scope_ref_provider: Callable[[], str] | None = None,
+    ):
         self.permission_manifest = permission_manifest
+        # ADR-0235 / PR-5: typed-injection seams for plan_ref / scope_ref.
+        # Production adapters wrap the observability scope contextvars;
+        # tests inject literal providers. The executor no longer reads
+        # ``get_current_plan_ref()`` / ``get_current_run_scope()`` from
+        # ``lca.infrastructure.observability`` — those are observability
+        # surface, not act business; ``PipelineSafeExecutor`` is act
+        # business.
+        self._plan_ref_provider = plan_ref_provider
+        self._scope_ref_provider = scope_ref_provider
         self._cache: dict[str, Observation] = {}
 
     def _pipeline_for(
@@ -286,22 +301,25 @@ class PipelineSafeExecutor(SafeExecutor):
         ``mint_envelope`` stays in the stack trace by design — it is the
         architecture test gate (PR-7 V4 hard constraint). This helper
         delegates to the canonical factory.
+
+        ADR-0235 / PR-5: plan_ref / scope_ref come from typed providers
+        injected at construction (``__init__``); the executor no longer
+        reaches into ``lca.infrastructure.observability`` to read scope
+        contextvars (that would be the act business layer peeking at the
+        graph / observability surface — exactly the boundary this PR
+        closes). Production wires adapters that wrap contextvars; tests
+        inject literal providers.
         """
-        from lca.contracts.models.observability.plan.ref import get_current_plan_ref
         from lca.contracts.protocols.act.command.envelope import (
             BudgetReservation,
             CapabilityGrant,
             mint_envelope,
         )
-        from lca.infrastructure.observability import get_current_run_scope
 
-        plan_ref = get_current_plan_ref()
+        plan_ref = self._plan_ref_provider() if self._plan_ref_provider else None
         if not plan_ref:
             raise ToolExecutionError("tool execution requires an active compiled plan_ref")
-        current_scope = get_current_run_scope()
-        scope_ref = (
-            str(current_scope.run_id) if current_scope and current_scope.run_id else "default"
-        )
+        scope_ref = self._scope_ref_provider() if self._scope_ref_provider else "default"
         return mint_envelope(
             plan_ref=plan_ref,
             scope_ref=scope_ref,

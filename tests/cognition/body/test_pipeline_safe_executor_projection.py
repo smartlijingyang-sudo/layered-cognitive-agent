@@ -91,26 +91,22 @@ def _capture_record_step_tool_result() -> tuple[list[dict[str, Any]], Any]:
 async def _execute_with_text_tool() -> list[dict[str, Any]]:
     captured, fake = _capture_record_step_tool_result()
     tool = _TextTool()
-    executor = PipelineSafeExecutor(_permission("search"))
-
-    from lca.contracts.models.observability import (
-        reset_current_plan_ref,
-        set_current_plan_ref,
+    # ADR-0235 / PR-5: plan_ref / scope_ref are typed-injection kwargs.
+    executor = PipelineSafeExecutor(
+        _permission("search"),
+        plan_ref_provider=lambda: "plan_test_search",
+        scope_ref_provider=lambda: "turn-text",
     )
 
-    plan_token = set_current_plan_ref("plan_test_search")
     target = "lca.loop.commit.tool_journal.record_step_tool_result"
-    try:
-        with patch(target, side_effect=fake):
-            await executor.execute(
-                tool,
-                {"query": "vibe coding"},
-                retry_policy=RetryPolicy(),
-                cache_config=CacheConfig(enabled=False),
-                invocation_id="inv-text-1",
-            )
-    finally:
-        reset_current_plan_ref(plan_token)
+    with patch(target, side_effect=fake):
+        await executor.execute(
+            tool,
+            {"query": "vibe coding"},
+            retry_policy=RetryPolicy(),
+            cache_config=CacheConfig(enabled=False),
+            invocation_id="inv-text-1",
+        )
     return captured
 
 
@@ -130,26 +126,21 @@ def test_pipeline_safe_executor_projects_text_payload_total_chars() -> None:
 async def _execute_with_output_tool() -> list[dict[str, Any]]:
     captured, fake = _capture_record_step_tool_result()
     tool = _OutputTool()
-    executor = PipelineSafeExecutor(_permission("runCommand"))
-
-    from lca.contracts.models.observability import (
-        reset_current_plan_ref,
-        set_current_plan_ref,
+    executor = PipelineSafeExecutor(
+        _permission("runCommand"),
+        plan_ref_provider=lambda: "plan_test_output",
+        scope_ref_provider=lambda: "turn-output",
     )
 
-    plan_token = set_current_plan_ref("plan_test_output")
     target = "lca.loop.commit.tool_journal.record_step_tool_result"
-    try:
-        with patch(target, side_effect=fake):
-            await executor.execute(
-                tool,
-                {"command": "ls"},
-                retry_policy=RetryPolicy(),
-                cache_config=CacheConfig(enabled=False),
-                invocation_id="inv-output-1",
-            )
-    finally:
-        reset_current_plan_ref(plan_token)
+    with patch(target, side_effect=fake):
+        await executor.execute(
+            tool,
+            {"command": "ls"},
+            retry_policy=RetryPolicy(),
+            cache_config=CacheConfig(enabled=False),
+            invocation_id="inv-output-1",
+        )
     return captured
 
 
@@ -165,26 +156,21 @@ def test_pipeline_safe_executor_projects_output_payload_total_chars() -> None:
 async def _execute_with_failing_tool() -> list[dict[str, Any]]:
     captured, fake = _capture_record_step_tool_result()
     tool = _TextTool(fail=True)
-    executor = PipelineSafeExecutor(_permission("search"))
-
-    from lca.contracts.models.observability import (
-        reset_current_plan_ref,
-        set_current_plan_ref,
+    executor = PipelineSafeExecutor(
+        _permission("search"),
+        plan_ref_provider=lambda: "plan_test_fail",
+        scope_ref_provider=lambda: "turn-fail",
     )
 
-    plan_token = set_current_plan_ref("plan_test_fail")
     target = "lca.loop.commit.tool_journal.record_step_tool_result"
-    try:
-        with patch(target, side_effect=fake), suppress(ToolExecutionError):
-            await executor.execute(
-                tool,
-                {"query": "x"},
-                retry_policy=RetryPolicy(),
-                cache_config=CacheConfig(enabled=False),
-                invocation_id="inv-fail-1",
-            )
-    finally:
-        reset_current_plan_ref(plan_token)
+    with patch(target, side_effect=fake), suppress(ToolExecutionError):
+        await executor.execute(
+            tool,
+            {"query": "x"},
+            retry_policy=RetryPolicy(),
+            cache_config=CacheConfig(enabled=False),
+            invocation_id="inv-fail-1",
+        )
     return captured
 
 

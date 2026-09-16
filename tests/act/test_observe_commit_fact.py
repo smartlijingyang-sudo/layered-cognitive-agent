@@ -8,12 +8,11 @@ constructs a typed ``RunFact(kind="effect.observed", payload={...})``,
 and calls ``journal.commit_fact(fact, plan_ref, node_ref)`` once. The
 ``receipt`` is passed through unchanged on the ``receipt`` port.
 
-The node reads ``context.runtime.journal`` — but per AGENTS.md §2.3
-typed-port D4 boundary, the journal capability is injected by the graph
-kernel as a typed capability on ``context.runtime``. The act business
-layer no longer reaches for ``getattr(context.runtime, "journal", None)``
-inside the normalize path; the commit_fact node is the single typed-port
-boundary for observation-plane journal writes inside the act subgraph.
+ADR-0235 / PR-5 R-3 follow-through: ``journal_capability`` is injected by
+the kernel as a typed Contract at construction (fail-loud if absent).
+The node no longer reads ``context.runtime.journal`` via ``getattr(...,
+None)`` silent-skip. Tests inject the capability directly at
+construction.
 """
 
 from __future__ import annotations
@@ -56,10 +55,6 @@ class FakeJournal:
         self.last_node_ref = node_ref
 
 
-def _runtime_with_journal(journal: FakeJournal) -> object:
-    return type("R", (), {"journal": journal})()
-
-
 @pytest.mark.asyncio
 async def test_commit_fact_runs_observed_kind() -> None:
     """Single receipt in → exactly one ``effect.observed`` RunFact committed."""
@@ -72,11 +67,11 @@ async def test_commit_fact_runs_observed_kind() -> None:
         provider="p",
     )
     journal = FakeJournal()
-    node = ActObserveCommitFactExecutor()
+    node = ActObserveCommitFactExecutor(journal_capability=journal)
 
     out = await node.node_execute(
         NodeContext(
-            runtime=_runtime_with_journal(journal),
+            runtime={},
             budget={},
             metadata={"plan_ref": "plan-xyz", "node_id": "act.observe.commit_fact"},
         ),
@@ -106,11 +101,11 @@ async def test_commit_fact_payload_includes_receipt_fields() -> None:
         error_code="timeout",
     )
     journal = FakeJournal()
-    node = ActObserveCommitFactExecutor()
+    node = ActObserveCommitFactExecutor(journal_capability=journal)
 
     await node.node_execute(
         NodeContext(
-            runtime=_runtime_with_journal(journal),
+            runtime={},
             budget={},
             metadata={"plan_ref": "plan-payload", "node_id": "act.observe.commit_fact"},
         ),
@@ -138,11 +133,11 @@ async def test_commit_fact_fact_id_format() -> None:
         provider="p",
     )
     journal = FakeJournal()
-    node = ActObserveCommitFactExecutor()
+    node = ActObserveCommitFactExecutor(journal_capability=journal)
 
     await node.node_execute(
         NodeContext(
-            runtime=_runtime_with_journal(journal),
+            runtime={},
             budget={},
             metadata={"plan_ref": "plan-1", "node_id": "act.observe.commit_fact"},
         ),
@@ -157,12 +152,12 @@ async def test_commit_fact_rejects_non_receipt_input() -> None:
     """Non-receipt input → TypeError (typed-port boundary contract)."""
     from lca.nodes.act.observe.commit_fact import ActObserveCommitFactExecutor
 
-    node = ActObserveCommitFactExecutor()
     journal = FakeJournal()
+    node = ActObserveCommitFactExecutor(journal_capability=journal)
     with pytest.raises(TypeError):
         await node.node_execute(
             NodeContext(
-                runtime=_runtime_with_journal(journal),
+                runtime={},
                 budget={},
                 metadata={"plan_ref": "plan", "node_id": "act.observe.commit_fact"},
             ),
@@ -172,11 +167,11 @@ async def test_commit_fact_rejects_non_receipt_input() -> None:
 
 
 @pytest.mark.asyncio
-async def test_commit_fact_missing_journal_capability_does_not_raise() -> None:
-    """If the runtime does not expose ``journal``, the node still passes the
-    receipt through (no journal writes). The observation-plane commit is
-    best-effort: act business does not depend on a journal capability to
-    route its outputs.
+async def test_commit_fact_missing_journal_capability_fails_loud() -> None:
+    """ADR-0235 / PR-5 R-3 follow-through: missing ``journal_capability`` now
+    raises ``RuntimeError`` (typed-contract fail-loud). The previous silent
+    skip (``getattr(..., None)``) closed the observation-plane write
+    silently and was a R-3 boundary violation.
     """
     from lca.nodes.act.observe.commit_fact import ActObserveCommitFactExecutor
 
@@ -186,15 +181,14 @@ async def test_commit_fact_missing_journal_capability_does_not_raise() -> None:
         idempotency_key="k",
         provider="p",
     )
-    node = ActObserveCommitFactExecutor()
+    node = ActObserveCommitFactExecutor()  # no journal_capability injected
 
-    out = await node.node_execute(
-        NodeContext(
-            runtime={},
-            budget={},
-            metadata={"plan_ref": "plan", "node_id": "act.observe.commit_fact"},
-        ),
-        NodeInput(port_values={"receipt": receipt}),
-    )
-
-    assert out.port_values["receipt"] is receipt
+    with pytest.raises(RuntimeError, match="journal_capability"):
+        await node.node_execute(
+            NodeContext(
+                runtime={},
+                budget={},
+                metadata={"plan_ref": "plan", "node_id": "act.observe.commit_fact"},
+            ),
+            NodeInput(port_values={"receipt": receipt}),
+        )
