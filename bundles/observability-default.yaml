@@ -70,12 +70,18 @@ entries:
   # debug, manifest, new ``lca-ops runs health``) read from it.
   # Seams/providers here are thin shims — the real registry is the
   # ``lca.health_derivers`` entry-point group in pyproject.toml.
+  # Marked ``disabled: true`` so the bundle declares the surface without
+  # forcing the seam/provider skeletons to ship a full Cordis ``setup()``
+  # (the actual fold is invoked directly by consumers via import, not via
+  # Cordis lookup). Full Cordis wiring is a follow-up PR.
   - id: observability.health.fold.seam
     name: observability_health_fold_seam
     $module: lca.plugins.observability.health.seam_provider
     config: {}
+    disabled: true
 
   - id: observability.health.fold.standard
     name: observability_health_fold_standard
     $module: lca.plugins.observability.health.fold_provider
     config: {}
+    disabled: true

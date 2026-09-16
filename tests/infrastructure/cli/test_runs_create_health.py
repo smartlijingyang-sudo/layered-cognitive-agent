@@ -50,9 +50,11 @@ def _runs_module():
 
 
 def _write_spine(tmp_path: Path, run_id: str, outcome: str = "success") -> Path:
-    """Write a minimal spine with ``kernel.run.stop`` so the live-SOP
-    tail loop (pre-rewrite) exits cleanly with the outcome."""
-    spine_path = tmp_path / f"{run_id}.spine.jsonl"
+    """Write a minimal spine at the canonical path the rewritten
+    ``_build_post_create_report`` reads (``_DEFAULT_TRACES_ROOT/runs/<run_id>/<run_id>.spine.jsonl``)."""
+    run_dir = tmp_path / "runs" / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    spine_path = run_dir / f"{run_id}.spine.jsonl"
     spine_path.write_text(
         json.dumps(
             {
@@ -65,8 +67,6 @@ def _write_spine(tmp_path: Path, run_id: str, outcome: str = "success") -> Path:
         )
         + "\n"
     )
-    # The sidecar is empty in these tests; the live-SOP loop tolerates
-    # a missing file (returns empty bytes).
     return spine_path
 
 
@@ -85,16 +85,11 @@ def test_post_create_report_has_health_field() -> None:
 
     runs = _runs_module()
 
-    # Stub the deleted/legacy live-SOP loop in the RED phase so the
-    # function returns quickly without spinning on tail.
-    no_op = patch.object(
-        runs, "_live_sop_run", return_value=(0, "success", 0), create=True
-    )
     with tempfile.TemporaryDirectory() as td:
         td_path = Path(td)
         run_id = "run_x"
         _write_spine(td_path, run_id)
-        with patch.object(runs, "_DEFAULT_TRACES_ROOT", td_path), no_op:
+        with patch.object(runs, "_DEFAULT_TRACES_ROOT", td_path):
             report = runs._build_post_create_report(run_id, "http://x")
 
     assert "health" in report, f"expected 'health' key, got {list(report.keys())}"
@@ -109,15 +104,12 @@ def test_post_create_report_has_health_summary() -> None:
     from lca.contracts.observability.health.condition import RunHealthStatus
 
     runs = _runs_module()
-    no_op = patch.object(
-        runs, "_live_sop_run", return_value=(0, "success", 0), create=True
-    )
 
     with tempfile.TemporaryDirectory() as td:
         td_path = Path(td)
         run_id = "run_y"
         _write_spine(td_path, run_id)
-        with patch.object(runs, "_DEFAULT_TRACES_ROOT", td_path), no_op:
+        with patch.object(runs, "_DEFAULT_TRACES_ROOT", td_path):
             report = runs._build_post_create_report(run_id, "http://x")
 
     assert "health_summary" in report, (
@@ -141,15 +133,12 @@ def test_post_create_report_no_longer_references_ep_formatting() -> None:
     asserting the keys are absent.
     """
     runs = _runs_module()
-    no_op = patch.object(
-        runs, "_live_sop_run", return_value=(0, "success", 0), create=True
-    )
 
     with tempfile.TemporaryDirectory() as td:
         td_path = Path(td)
         run_id = "run_z"
         _write_spine(td_path, run_id)
-        with patch.object(runs, "_DEFAULT_TRACES_ROOT", td_path), no_op:
+        with patch.object(runs, "_DEFAULT_TRACES_ROOT", td_path):
             report = runs._build_post_create_report(run_id, "http://x")
 
     for forbidden in ("events_streamed", "new_exceptions_streamed", "tail_cap_s"):
