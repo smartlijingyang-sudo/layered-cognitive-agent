@@ -2,6 +2,7 @@
 
 import json
 
+from lca.application.runtime.coordinator import event_translator
 from lca.application.runtime.coordinator.event_translator import (
     EventTranslator,
     wire_tool_call,
@@ -214,6 +215,30 @@ def test_unknown_event_returns_none() -> None:
 def test_unknown_event_kind_returns_none() -> None:
     t = EventTranslator()
     assert t.translate({"event": {"type": "LlmCallTextDelta", "kind": "ignore"}}) is None
+
+
+def test_agent_intervention_request_is_not_emitted_by_lca() -> None:
+    """LCA does not produce ``AgentInterventionRequest``.
+
+    The HIL pause round-trip is HTTP-based
+    (``POST /lca-api/runs/{runId}/answer`` bridged via
+    ``deploy/lobehub/patches/runtime/lca_runtime_agent_gateway.py``), not
+    WS-based. The native hetero executor emits ``agent_intervention_request``
+    to drive its local CLI/MCP card, but the LCA server-side runtime
+    closes the round-trip through the durable journal
+    (``approval.persisted.v1`` + ``waiting_input`` checkpoint) plus the
+    HTTP answer endpoint — no producer ever fires
+    ``kind="AgentInterventionRequest"``.
+
+    Pin this absence so a future refactor cannot silently re-enable a
+    wire event with zero consumers in LCA. See
+    ``docs/notes/investigating/resume-askuser-flow-2026-09-16.md``
+    Gap B + Gap G.
+    """
+    assert "AgentInterventionRequest" not in event_translator._HANDLERS
+    assert "AgentInterventionRequest" not in event_translator._SPINE_HANDLERS
+    t = EventTranslator()
+    assert t.translate({"event": {"type": "AgentInterventionRequest"}}) is None
 
 
 # ── description fallback (collapsed tool chip must never be empty) ─────────
