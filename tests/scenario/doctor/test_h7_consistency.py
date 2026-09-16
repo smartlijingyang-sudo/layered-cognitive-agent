@@ -155,8 +155,14 @@ def test_h7_passes_when_journal_and_spine_agree(tmp_path: Path) -> None:
         tmp_path,
         "run_x",
         [
-            {"execution_point": "phase.tool.call.end", "payload": {"tool_name": "runCommand", "ok": True, "step": 1}},
-            {"execution_point": "phase.tool.call.end", "payload": {"tool_name": "runCommand", "ok": True, "step": 2}},
+            {
+                "execution_point": "phase.tool.call.end",
+                "payload": {"tool_name": "runCommand", "ok": True, "step": 1},
+            },
+            {
+                "execution_point": "phase.tool.call.end",
+                "payload": {"tool_name": "runCommand", "ok": True, "step": 2},
+            },
         ],
     )
     report = diagnose_step_tree(path)
@@ -186,7 +192,10 @@ def test_h7_detects_journal_ok_true_with_error_residue(tmp_path: Path) -> None:
         tmp_path,
         "run_x",
         [
-            {"execution_point": "phase.tool.call.end", "payload": {"tool_name": "runCommand", "ok": False, "step": 1}},
+            {
+                "execution_point": "phase.tool.call.end",
+                "payload": {"tool_name": "runCommand", "ok": False, "step": 1},
+            },
         ],
     )
     report = diagnose_step_tree(path)
@@ -217,7 +226,10 @@ def test_h7_low_success_rate_remains_a_failure(tmp_path: Path) -> None:
         tmp_path,
         "run_x",
         [
-            {"execution_point": "phase.tool.call.end", "payload": {"tool_name": "runCommand", "ok": (i == 3), "step": i}}
+            {
+                "execution_point": "phase.tool.call.end",
+                "payload": {"tool_name": "runCommand", "ok": (i == 3), "step": i},
+            }
             for i in (1, 2, 3)
         ],
     )
@@ -333,6 +345,86 @@ def test_h7_journal_spine_tool_total_mismatch(tmp_path: Path) -> None:
     extra = h7.extra or {}
     assert extra.get("journal_tool_total") == 3
     assert extra.get("spine_phase_tool_call_end_total") == 2
+
+
+def test_h7_forked_tool_calls_reported_as_projection_limit(tmp_path: Path) -> None:
+    """一个 Decision 并发多个工具调用 → H7.ok=None,不是事实不一致。
+
+    回归场景 run_eed09c1df112:step 4 一次 fork 出 executeCode + runCommand,
+    spine 记 5 次 ``phase.tool.call.end``,但 ``StepRecord.tool_call`` 是单数,
+    journal 只能投影 4 个 invocation_id。修复前 H7 报 ok=False
+    "tool_total mismatch (4 vs 5)",把投影上限说成事实层损坏,并把
+    broken_hop 从真实的 H6 上引开。
+    """
+    meta = JournalMetadata(agent_role="x", strategy_key="solo", plan_ref="p", objective="t")
+    doc = empty_document(run_id="run_x", trace_id="t", metadata=meta, started_at=0.0)
+    for i in (1, 2, 3, 4):
+        doc = append_step(
+            doc,
+            _step_with_tool_result(
+                i, tool_ok=i < 4, error=None if i < 4 else "boom", outcome="ok" if i < 4 else "fail"
+            ),
+        )
+    doc = close_document(doc, outcome="failed", closed_at=10.0)
+    path = _write_doc(tmp_path, doc)
+
+    # spine: step 4 forked two calls, so 5 invocation-level ends for 4 steps.
+    _write_spine(
+        tmp_path,
+        "run_x",
+        [
+            {
+                "execution_point": "phase.tool.call.end",
+                "payload": {"tool_name": "runCommand", "ok": i < 3, "step": i},
+            }
+            for i in (1, 2, 3, 4)
+        ]
+        + [
+            {
+                "execution_point": "phase.tool.call.end",
+                "payload": {"tool_name": "executeCode", "ok": False, "step": 4},
+            }
+        ],
+    )
+
+    report = diagnose_step_tree(path)
+    h7 = report.hops["H7"]
+    assert h7.ok is None
+    assert (h7.extra or {}).get("forked_tool_calls") is True
+    assert "并发工具调用" in h7.detail
+
+
+def test_h7_lost_tool_call_still_fails(tmp_path: Path) -> None:
+    """有 step 丢了 tool_call 时,spine 多出来的调用是真丢失 → H7.ok=False。
+
+    与 forked 场景区别:这里 step 数 ≠ journal invocation 数(4 步只有 3 个
+    非空 invocation_id),说明投影确实掉了记录,不能归因为并发上限。
+    """
+    meta = JournalMetadata(agent_role="x", strategy_key="solo", plan_ref="p", objective="t")
+    doc = empty_document(run_id="run_x", trace_id="t", metadata=meta, started_at=0.0)
+    doc = append_step(doc, _phantom_step(0))
+    for i in (1, 2, 3):
+        doc = append_step(doc, _step_with_tool_result(i, tool_ok=True, error=None, outcome="ok"))
+    doc = close_document(doc, outcome="failed", closed_at=10.0)
+    path = _write_doc(tmp_path, doc)
+
+    _write_spine(
+        tmp_path,
+        "run_x",
+        [
+            {
+                "execution_point": "phase.tool.call.end",
+                "payload": {"tool_name": "runCommand", "ok": True, "step": i},
+            }
+            for i in (1, 2, 3, 4)
+        ],
+    )
+
+    report = diagnose_step_tree(path)
+    h7 = report.hops["H7"]
+    assert h7.ok is False
+    assert (h7.extra or {}).get("forked_tool_calls") is False
+    assert "mismatch" in h7.detail.lower()
 
 
 # ── PR-B: H3 step-tree integrity ────────────────────────────────────────

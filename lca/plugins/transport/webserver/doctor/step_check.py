@@ -695,16 +695,27 @@ def _hop_h7(scan: StepScan) -> HopVerdict:
         # PR-D: parity check — journal distinct invocation count must match
         # spine phase.tool.call.end total.
         if scan.tool_total != spine_total:
+            # StepRecord.tool_call is singular, so a Decision that forked N
+            # parallel tool calls projects to one step holding one of them.
+            # Every step carrying exactly one invocation_id means none lost
+            # its record, so a spine surplus can only be forked calls — a
+            # projection limit, not a fact-level inconsistency.
+            forked = scan.total_steps == scan.tool_total < spine_total
             return HopVerdict(
-                ok=False,
+                ok=None if forked else False,
                 detail=(
-                    f"H7 journal/spine tool_total mismatch "
+                    f"H7 step-tree 每步只投影一个 tool_call,本 run 有并发工具调用 "
+                    f"({scan.tool_total} steps 承载 {spine_total} 次调用);"
+                    f"事实层 step.tool_call.record 完整"
+                    if forked
+                    else f"H7 journal/spine tool_total mismatch "
                     f"({scan.tool_total} vs {spine_total})"
                 ),
                 extra={
                     **extra,
                     "spine_phase_tool_call_end_total": spine_total,
                     "journal_tool_total": scan.tool_total,
+                    "forked_tool_calls": forked,
                 },
             )
         spine_fail = scan.spine_phase_tool_call_end_failure_count
