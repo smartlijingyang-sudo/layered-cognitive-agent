@@ -3,10 +3,18 @@
 #
 # D4 typed-port cutover: edge predicates use typed :class:`Predicate`
 # dicts. The legacy string-DSL edge conditions are gone.
+#
+# PR-B (typed-port cutover): ``think.llm.dispatch`` is split into
+# ``think.llm.invoke`` (adapter call) + ``think.llm.persist`` (writer
+# append), and ``think.context.compact`` is split into
+# ``think.budget.gate`` (typed budget gate) + ``think.context.truncate``
+# (truncate strategy). Each new node owns exactly one responsibility;
+# routing decisions live in gate, journal writes live in persist,
+# truncation lives in truncate.
 
 id: think.subgraph
 region: think
-purpose: think 5 步执行 — shortcut 可 short-circuit,route → reason → history.assemble → llm.dispatch → decision.parse → gate 收敛
+purpose: think 11 节点执行 — shortcut → route.decide → budget.gate → context.truncate → route → reason → history.assemble → llm.invoke → llm.persist → decision.parse → gate
 
 nodes:
   - id: think.shortcut
@@ -22,15 +30,16 @@ nodes:
     outputs: [routing]
     config:
 
-  # PR-3.8.1: budget gate sits between ``think.route.decide`` and the
-  # miss-path reasoning chain. Reads ``state.budget`` and either stops
-  # the run (subgraph terminates here, ``routing.should_terminate=true``
-  # bubbles up to ``phase.main.outer`` which routes ``think.main`` →
-  # ``terminal.commit``) or continues to ``think.context.compact``
-  # (re-wired by PR-3.8.2 once the compaction node exists).
+  # PR-B typed-port rewrite: budget gate sits between
+  # ``think.route.decide`` and the miss-path reasoning chain. Reads
+  # the typed ``budget`` port (no more ``context.runtime.state`` theft)
+  # and either stops the run (subgraph terminates here,
+  # ``routing.should_terminate=true`` bubbles up to
+  # ``phase.main.outer`` which routes ``think.main`` →
+  # ``terminal.commit``) or continues to ``think.context.truncate``.
   #
   # Not marked ``terminal: true``: this node has one conditional
-  # outgoing edge (→ think.context.compact on should_terminate=false)
+  # outgoing edge (→ think.context.truncate on should_terminate=false)
   # and the lift-time validator forbids outgoing edges on terminal
   # nodes. Termination is edge-driven per ADR-0217 D4 — when the
   # executor emits ``should_terminate=true`` the only edge's predicate
@@ -40,27 +49,23 @@ nodes:
   # normal path (also edge-driven via no outgoing edges).
   #
   # Honors ADR-0225 (no per-node max_visits).
-  - id: think.budget.check
-    factory: think.budget.check
-    # state lives on context.runtime (mirrors think.shortcut), not on
-    # the port registry — the executor reads it from
-    # context.runtime.state directly.
+  - id: think.budget.gate
+    factory: think.budget.gate
+    inputs: [budget]
     outputs: [routing]
     config:
 
-  # PR-3.8.2: typed-boundary context-compaction node. Reads ``writer``
-  # + ``state`` from ``context.runtime`` (mirrors history.derive pattern)
-  # and emits a ``CompactReceipt`` plus a ``RoutingDecision``. Threshold
-  # gate (``used_tokens / max_tokens >= 0.7``) selects between the noop
-  # and ``truncate_oldest`` paths; the node never raises out of the graph
-  # (error path produces an empty receipt + a ``compact_skipped_error``
-  # re-route).
-  - id: think.context.compact
-    factory: think.context.compact
-    # writer and state live on context.runtime (mirrors history.derive),
-    # not on the port registry — the executor reads them from
-    # context.runtime via _resolve_port.
-    outputs: [compact_receipt, routing]
+  # PR-B typed-port rewrite: truncation node now takes the typed
+  # ``budget`` + ``context_payload`` ports and emits only a
+  # ``CompactReceipt`` (no routing). The gate decision moved up to
+  # ``think.budget.gate``; this node owns only the
+  # ``truncate_oldest`` strategy. The error path emits a
+  # ``skipped`` receipt so the typed-boundary contract is preserved
+  # downstream (consumers never see ``None``).
+  - id: think.context.truncate
+    factory: think.context.truncate
+    inputs: [budget, context_payload]
+    outputs: [compact_receipt]
     config:
 
   - id: think.route
@@ -97,22 +102,29 @@ nodes:
         entry_node: history.derive
         binding_edge: think.history.assemble
 
-  - id: think.llm.dispatch
-    factory: think.llm.dispatch.ref
-    inputs: [state, writer, model_visible_request]
+  - id: think.llm.invoke
+    factory: llm.invoke
+    inputs: [model_visible_request, adapter]
     outputs: [llm_response, usage]
     config:
+      # PR-B: typed-port typed-only node. Drives the LLM adapter once
+      # per think turn and forwards (LLMResponse, TokenUsage). Does
+      # NOT write the journal — that lives in the sibling persist
+      # node (spec §C persist-before-execute split).
       emit_on_enter: []
       emit_on_exit:  []
-      # Spec §E: think.llm.dispatch is one of three single-responsibility
-      # nodes that replace think.reason.complete. It calls the LLM adapter
-      # with the ModelVisibleRequest, persists the assistant row + tool_calls
-      # to RunSessionWriter (persist-before-execute, spec §C), and forwards
-      # (LLMResponse, TokenUsage) to think.decision.parse.
-      sub_spec_ref:
-        plan_ref: bundles/concept/llm_dispatch.yaml
-        entry_node: llm.call
-        binding_edge: think.llm.dispatch
+
+  - id: think.llm.persist
+    factory: llm.persist
+    inputs: [llm_response, writer, step]
+    outputs: [journaled]
+    config:
+      # PR-B: typed-port journal side-effect node. Persists the
+      # assistant row + tool_calls to RunSessionWriter and emits a
+      # ``journaled`` boolean. Does NOT call the adapter — that
+      # path lives in the sibling invoke node.
+      emit_on_enter: []
+      emit_on_exit:  []
 
   - id: think.decision.parse
     factory: think.decision.parse.ref
@@ -165,52 +177,40 @@ nodes:
         binding_edge: think.gate
 
 edges:
-  # shortcut → route.decide → {budget.check → context.compact, gate}: think.route.decide
+  # shortcut → route.decide → {budget.gate → context.truncate, gate}: think.route.decide
   # 读 decision 端口并 emit RoutingDecision typed port,next_node 决定下游图
   # 节点。miss-path (routing.next_node == "think.route") 改道先经
-  # budget.check, 由 budget.check 决定继续到 think.context.compact
-  # (PR-3.8.2 wiring) 还是 terminal.commit (should_terminate)。
+  # budget.gate, 由 budget.gate 决定继续到 think.context.truncate
+  # 还是 terminal.commit (should_terminate)。
   # short-circuit path 不变。
   - from: think.shortcut
     to: think.route.decide
   - from: think.route.decide
-    to: think.budget.check
+    to: think.budget.gate
     when:
       kind: eq
       port: { name: routing, field: next_node }
       value: think.route
-  - from: think.budget.check
-    to: think.context.compact
+  - from: think.budget.gate
+    to: think.context.truncate
     when:
       kind: eq
       port: { name: routing, field: should_terminate }
       value: false
   # When ``routing.should_terminate=true`` no outgoing edge from
-  # ``think.budget.check`` matches; the subgraph terminates naturally
+  # ``think.budget.gate`` matches; the subgraph terminates naturally
   # via ``traversal.advance(edge=None)``. The outer ``phase.main.outer``
   # reads the bubbled ``routing`` port from ``think.main`` and routes
   # to ``terminal.commit``. We deliberately do NOT wire to
   # ``terminal.commit`` here — that node is declared in
   # ``bundles/outer/phase_main.yaml``, not in this subgraph, and a
   # cross-subgraph edge fails the ``Plan._one_entry`` validator
-  # (``terminal.commit`` is unknown in the inner node set). See
-  # ``tests/unit/test_think_budget_check_wiring.py`` for the pin.
-  # PR-3.8.2: context.compact routes to think.route on success
-  # or noop (OR'd predicate over ``next_hint``), and re-routes to
-  # ``think.route.decide`` on the error path so Gate can fail-loud
-  # downstream.
-  - from: think.context.compact
+  # (``terminal.commit`` is unknown in the inner node set).
+  # PR-B: context.truncate no longer emits a routing port; it
+  # always advances to think.route after emitting its receipt
+  # (the budget gate already routed the should-terminate case).
+  - from: think.context.truncate
     to: think.route
-    when:
-      kind: in
-      port: { name: routing, field: next_hint }
-      value: [compact_done, compact_noop]
-  - from: think.context.compact
-    to: think.route.decide
-    when:
-      kind: eq
-      port: { name: routing, field: next_hint }
-      value: compact_skipped_error
   - from: think.route.decide
     to: think.gate
     when:
@@ -218,14 +218,16 @@ edges:
       port: { name: routing, field: next_node }
       value: think.gate
 
-  # route → reason → history.assemble → llm.dispatch → decision.parse → gate
+  # route → reason → history.assemble → llm.invoke → llm.persist → decision.parse → gate
   - from: think.route
     to: think.reason
   - from: think.reason
     to: think.history.assemble
   - from: think.history.assemble
-    to: think.llm.dispatch
-  - from: think.llm.dispatch
+    to: think.llm.invoke
+  - from: think.llm.invoke
+    to: think.llm.persist
+  - from: think.llm.persist
     to: think.decision.parse
   - from: think.decision.parse
     to: think.decision.repair
