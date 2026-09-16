@@ -401,9 +401,9 @@ def emit_phase_tool_call_end_for_state(
 # ---------------------------------------------------------------------------
 # Node-level emit dispatch (ADR-0240).
 #
-# These helpers back the ``_EP_DISPATCH`` entries that
-# :class:`lca.framework.graph.strategies.NodeExecutorStrategy` fires
-# from ``emit_on_enter`` / ``emit_on_exit`` declarations on BundleGraphSpec
+# These helpers back the ``_EP_DISPATCH`` entries that the graph driver
+# (:class:`lca.framework.graph.interpreter.PlanInterpreter`) fires from
+# ``emit_on_enter`` / ``emit_on_exit`` declarations on BundleGraphSpec
 # v2 nodes. Payload is intentionally minimal (``state_id``); richer
 # fields (decision_id, tool_name, error class) stay with the imperative
 # ``publish_ep_bound`` call sites in tool_journal / safe_executor /
@@ -772,6 +772,7 @@ __all__ = [
     "emit_critic_eval_start_for_state",
     "emit_gate_decided",
     "emit_gate_decided_from_policy",
+    "emit_phase_act_fold_end_for_state",
     "emit_phase_act_fold_start_for_state",
     "emit_phase_graph_subgraph_enter_for_state",
     "emit_phase_graph_subgraph_exit_for_state",
@@ -782,7 +783,6 @@ __all__ = [
     "emit_phase_think_fold_for_state",
     "emit_phase_tool_call_end_for_state",
     "emit_phase_tool_call_start_for_state",
-    "emit_phase_act_fold_end_for_state",
     "emit_prompt_assembler_end_for_state",
     "emit_prompt_assembler_start_for_state",
     "emit_reasoner_reason_end_for_state",

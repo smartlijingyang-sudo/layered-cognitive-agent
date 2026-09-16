@@ -18,8 +18,10 @@ fallback when the schema is empty) and emits a :class:`StopPayload`
 on the schema-declared ``terminal_outcome`` output port (with the
 same fallback). The outer driver maps the payload to a
 :class:`StopDecision` and runs ``apply_stop`` then
-``apply_terminal_outcome``. The driver also emits
-``SPINE_TERMINAL_COMMIT`` to the spine.
+``apply_terminal_outcome``. This strategy emits nothing itself: the
+driver dispatches the node's declared ``emit_on_exit`` list, which is
+how the outer plan's ``terminal.commit`` node produces
+``spine.terminal.commit``.
 
 Post-retirement (plan ``docs/plans/2026-09-14-stop-decision-retirement.md``):
 the previous ``should_stop`` boolean and ``focus_converged`` flag are
@@ -27,6 +29,7 @@ gone. Termination is the terminal outcome itself, decided by the data
 shape (``reason`` and ``final_output_ref`` presence), not by a separate
 predicate.
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -62,14 +65,8 @@ def _resolve_terminate_ports(schema: NodeIOSchema) -> tuple[str, str, str]:
     """
     required = schema.required_inputs()
     decision_port = required[0] if len(required) >= 1 else _DEFAULT_DECISION_PORT
-    act_outcome_port = (
-        required[1] if len(required) >= 2 else _DEFAULT_ACT_OUTCOME_PORT
-    )
-    terminal_port = (
-        schema.outputs[0].name
-        if schema.outputs
-        else _DEFAULT_TERMINAL_OUTCOME_PORT
-    )
+    act_outcome_port = required[1] if len(required) >= 2 else _DEFAULT_ACT_OUTCOME_PORT
+    terminal_port = schema.outputs[0].name if schema.outputs else _DEFAULT_TERMINAL_OUTCOME_PORT
     return decision_port, act_outcome_port, terminal_port
 
 
@@ -79,14 +76,10 @@ class TerminateStrategy(NodeStrategy):
     schema: NodeIOSchema = field(default_factory=NodeIOSchema)
     terminate: TerminateFn | None = None
 
-    async def execute(
-        self, context: StrategyContext, input: NodeInput
-    ) -> NodeOutput:
+    async def execute(self, context: StrategyContext, input: NodeInput) -> NodeOutput:
         if self.terminate is None:
             return NodeOutput(
-                port_values=_default_terminate(
-                    self.schema, dict(input.port_values), context
-                ),
+                port_values=_default_terminate(self.schema, dict(input.port_values), context),
                 producer_node=context.node_id,
             )
         return NodeOutput(

@@ -42,6 +42,12 @@ The kernel emits one :class:`GraphObservation` per lifecycle event
 through the configured :class:`GraphObserver`. The kernel does
 not know EP names; :class:`GraphEpTable` is the only place that
 maps observation kinds to execution points.
+
+Node-declared ``emit_on_enter`` / ``emit_on_exit`` lists are a
+separate contract: the kernel forwards each opaque id to
+:func:`lca.loop.emit.node_emitter.dispatch_node_emits` around
+``strategy.execute``. Driving it here rather than inside a strategy
+is what makes a declaration fire for every binding (ADR-0240).
 """
 
 from __future__ import annotations
@@ -78,6 +84,7 @@ from lca.framework.graph.predicate_evaluator import evaluate_predicate
 from lca.framework.graph.recorder import VisitRecorder
 from lca.framework.graph.strategy_registry import StrategyRegistry
 from lca.framework.graph.traversal import PlanTraversal, select_edge
+from lca.loop.emit.node_emitter import dispatch_node_emits
 
 Clock = Callable[[], int]
 """Monotonic millisecond clock. Default is ``time.monotonic_ns // 1_000_000``."""
@@ -230,6 +237,7 @@ class PlanInterpreter:
                 inner_io_schema=node.inner_io_schema,
             )
             visit_started = self.clock()
+            dispatch_node_emits(context.node_config, "emit_on_enter", outer_state)
             try:
                 output: NodeOutput = await strategy.execute(context, inputs)
             except BaseException as exc:
@@ -248,6 +256,10 @@ class PlanInterpreter:
                     )
                 )
                 raise
+            # Success-path only: a raising strategy exits through the
+            # ``visit_end(outcome="failure")`` observation above, which is
+            # the anchor for that case.
+            dispatch_node_emits(context.node_config, "emit_on_exit", outer_state)
             # Honor the declared-outputs contract: every port in
             # ``schema.outputs`` is written this visit. An absent key
             # in ``port_values`` means ``None`` (cleared), not "keep

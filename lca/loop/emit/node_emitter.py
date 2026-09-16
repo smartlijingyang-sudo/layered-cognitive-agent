@@ -9,6 +9,7 @@ node executors stay free of EP coupling.
 from __future__ import annotations
 
 import contextlib
+from collections.abc import Mapping
 from typing import Any
 
 from lca.contracts.models.core.state.state import AgentState
@@ -79,6 +80,37 @@ def emit_for_node(ep_id: str, state: AgentState, **kwargs: Any) -> None:
         fn(state, **kwargs)
 
 
+def dispatch_node_emits(node_config: Mapping[str, Any] | None, key: str, state: Any) -> None:
+    """Fire one node's declared ``emit_on_enter`` / ``emit_on_exit`` list.
+
+    Called by the graph driver around every ``strategy.execute`` so the
+    declaration fires for *every* binding. Dispatch that lives in one
+    strategy class silently skips the others: ``terminal.commit``
+    declares ``emit_on_exit`` and binds to ``terminate``, so a
+    strategy-local dispatcher never fired it and the anchor the
+    ``node_event_emission`` boot check requires was never written.
+
+    Reads the list from ``node_config["config"][key]`` (the yaml shape
+    the lifter hands over), falling back to ``node_config[key]`` for
+    hand-built plans. A non-list value is a no-op; per-EP failures are
+    contained so a misconfigured EP does not abort the graph
+    (ADR-0240 §Decision).
+    """
+    if not isinstance(node_config, Mapping):
+        return
+    emits: Any = None
+    inner = node_config.get("config")
+    if isinstance(inner, Mapping):
+        emits = inner.get(key)
+    if emits is None:
+        emits = node_config.get(key)
+    if not isinstance(emits, (list, tuple)):
+        return
+    for ep_id in emits:
+        with contextlib.suppress(Exception):
+            emit_for_node(ep_id, state)
+
+
 def emit_reasoner_meta_for_node(state: AgentState, plan: Any, render: Any) -> None:
     """Special helper for the ``reasoner_meta`` EP.
 
@@ -96,4 +128,4 @@ def emit_reasoner_meta_for_node(state: AgentState, plan: Any, render: Any) -> No
         _emit_reasoner_meta_from_render(plan, render)
 
 
-__all__ = ["emit_for_node", "emit_reasoner_meta_for_node"]
+__all__ = ["dispatch_node_emits", "emit_for_node", "emit_reasoner_meta_for_node"]
