@@ -55,18 +55,21 @@ class LlmDeriver:
             ]
 
         headers = filter_by_ep(events, LLM_REQUEST_HEADER_EP)
-        # Walk consecutive header pairs (header N -> header N+1).
-        total = 0
-        matched = 0
-        orphan_ids: list[str] = []
-        for prev, nxt in zip(headers, headers[1:]):
-            call_ids = _extract_tool_call_ids(prev)
-            if not call_ids:
-                continue
-            response_ids = _extract_response_tool_call_ids(nxt)
-            total += len(call_ids)
-            matched += sum(1 for cid in call_ids if cid in response_ids)
-            orphan_ids.extend(cid for cid in call_ids if cid not in response_ids)
+        # Collect every tool_call id emitted in any assistant message across
+        # all headers, then match against the union of role=tool /
+        # role=user-with-tool-payload ids from every header. This catches
+        # tool_calls emitted in the LAST header (no subsequent header to
+        # walk forward from) — they can still be matched if any header
+        # in the run answers them.
+        all_call_ids: list[str] = []
+        for h in headers:
+            all_call_ids.extend(_extract_tool_call_ids(h))
+        all_response_ids: set[str] = set()
+        for h in headers:
+            all_response_ids.update(_extract_response_tool_call_ids(h))
+
+        total = len(all_call_ids)
+        matched = sum(1 for cid in all_call_ids if cid in all_response_ids)
 
         # Vacuous: no tool_calls across all turns -> ok (no holes to detect).
         if total == 0:

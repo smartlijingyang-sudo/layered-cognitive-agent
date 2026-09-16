@@ -132,33 +132,27 @@ def test_entry_point_targets_match_documented_path() -> None:
 
 
 def test_entry_point_load_can_be_called() -> None:
-    """Each entry-point is loadable — but the target module does not exist yet.
+    """Each entry-point loads successfully and returns a ``HealthDeriver`` instance.
 
-    Task 1.3 creates the 8 deriver classes. Until then, ``ep.load()`` must
-    raise ``ImportError`` whose message references the expected target
-    (or any prefix of it — Python may report only the missing parent
-    package, e.g. ``No module named 'lca.plugins.observability.health'``
-    if the whole ``health/`` package is missing). This proves the
-    registration is wired correctly (the metadata parses, the path
-    resolves, the module is missing on purpose).
+    Task 1.2 wrote this test in its RED phase to prove the registration
+    was wired correctly by capturing the expected ``ImportError`` on
+    the not-yet-existing target module. Task 1.3 has now created the
+    eight deriver classes, so the green-phase check is that ``ep.load()``
+    succeeds and returns an object that satisfies the ``HealthDeriver``
+    Protocol (``isinstance(obj, HealthDeriver)``).
+
+    This is the natural flip of the Task 1.2 red-phase assertion — the
+    test was written to be brittle on purpose so a future maintainer
+    who breaks the wiring will see this test go red.
     """
+    from lca.contracts.observability.health.deriver import HealthDeriver
+
     eps = importlib.metadata.entry_points(group="lca.health_derivers")
     for ep in eps:
-        expected_module = ep.value.split(":", 1)[0]
-        with pytest.raises(ImportError) as excinfo:
-            ep.load()
-        # The ImportError should reference SOME prefix of the expected
-        # module path. Python may report only the highest-level missing
-        # parent (e.g. ``lca.plugins.observability.health`` if the whole
-        # ``health/`` package hasn't been created yet).
-        expected_prefixes = [
-            expected_module,
-            "lca.plugins.observability",
-            "lca.plugins",
-            "lca",
-        ]
-        msg = str(excinfo.value)
-        assert any(prefix in msg for prefix in expected_prefixes), (
-            f"entry-point {ep.name!r} load failed but the error "
-            f"does not reference any prefix of {expected_module!r}: {msg!r}"
+        obj = ep.load()()
+        assert isinstance(obj, HealthDeriver), (
+            f"entry-point {ep.name!r} loaded object is not a HealthDeriver instance"
+        )
+        assert hasattr(obj, "evaluate"), (
+            f"entry-point {ep.name!r} loaded object lacks evaluate() method"
         )

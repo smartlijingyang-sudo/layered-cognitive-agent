@@ -90,9 +90,17 @@ def make_evidence_ref(event: SpineEvent) -> EvidenceRef:
     because the fold owns the absolute path, not the deriver. Derivers
     pass back the *index* of the event in the spine sequence; the fold
     resolves that to a path during report assembly.
+
+    ``run_id`` is read from ``event["run_id"]`` if present (the fold
+    injects it for the derivers), or extracted from the ``event_id``
+    prefix as a fallback. The audit runs on disk do not carry a
+    top-level ``run_id`` — they only have it in the payload — so the
+    fallback keeps the derivers runnable against raw JSONL without
+    requiring a pre-processor.
     """
+    run_id = event.get("run_id") or parse_run_id(event["event_id"])
     return EvidenceRef(
-        run_id=event["run_id"],
+        run_id=run_id,
         spine_path="",  # resolved by fold layer post-evaluate
         event_id=event["event_id"],
         execution_point=event["execution_point"],
