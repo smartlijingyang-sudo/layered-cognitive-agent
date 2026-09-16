@@ -187,13 +187,23 @@ def test_negative_grep_outside_this_file_has_zero_hits() -> None:
     这些 pattern 即为 PR-C 残留。
     """
     roots = [REPO / "lca", REPO / "tests"]
-    allowed_file = Path(__file__).resolve()
+    # Forward-compat guards that *document* the deleted traces as part of their
+    # purpose may mention the patterns. The dead-reasoner-fallback test is one
+    # such guard: it has to name the symbols it polices so future readers can
+    # tell what regression it covers. Adding to this allow-list requires the
+    # added file to be a reverse guard whose docstring cites the pattern.
+    allowed_files: tuple[Path, ...] = (
+        Path(__file__).resolve(),
+        (
+            REPO / "tests" / "architecture" / "test_loop_driver_no_dead_reasoner_fallback.py"
+        ).resolve(),
+    )
     offenders: dict[str, list[str]] = {name: [] for name in _NEGATIVE_GREP_PATTERNS}
     for root in roots:
         if not root.exists():
             continue
         for py in sorted(root.rglob("*.py")):
-            if py.resolve() == allowed_file:
+            if py.resolve() in allowed_files:
                 continue
             try:
                 text = py.read_text(encoding="utf-8")
@@ -205,21 +215,21 @@ def test_negative_grep_outside_this_file_has_zero_hits() -> None:
     leaking = {name: paths for name, paths in offenders.items() if paths}
     assert not leaking, (
         "PR-C deleted traces still present outside "
-        f"tests/architecture/test_no_compat_residue.py:\n"
+        "tests/architecture/test_no_compat_residue.py:\n"
         + "\n".join(f"  {name}: {paths}" for name, paths in sorted(leaking.items()))
     )
 
 
 __all__ = [
-    "test_no_role_profile_capability",
-    "test_no_reasoner_compose_plugin_registered",
+    "test_cordis_composer_relocated_outside_think_composition",
+    "test_negative_grep_outside_this_file_has_zero_hits",
     "test_no_composer_provider_plugin_registered",
     "test_no_composition_compose_factory_capability",
     "test_no_composition_invariant_checker_capability",
-    "test_no_phase_think_role_profile_plugin_file",
-    "test_no_phase_think_reasoner_compose_plugin_file",
     "test_no_lca_composer_provider_plugin_files",
     "test_no_lca_composition_invariant_default_plugin_file",
-    "test_cordis_composer_relocated_outside_think_composition",
-    "test_negative_grep_outside_this_file_has_zero_hits",
+    "test_no_phase_think_reasoner_compose_plugin_file",
+    "test_no_phase_think_role_profile_plugin_file",
+    "test_no_reasoner_compose_plugin_registered",
+    "test_no_role_profile_capability",
 ]

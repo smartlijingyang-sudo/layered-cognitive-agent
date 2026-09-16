@@ -19,7 +19,6 @@ from itertools import count
 from typing import TYPE_CHECKING, Any, Protocol
 
 from lca.application.api.api import Agent
-from lca.contracts.mechanisms.capability.capability import require_capability
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.team.run.context import RunContext
 from lca.infrastructure.observability import BoundObservability
@@ -67,43 +66,24 @@ class RunLoopDriver(Protocol):
     ) -> DriverOutcome: ...
 
 
-class _BoundReasonerResolver:
-    """Adapter that satisfies :class:`LlmResolver` from a bound ``PromptReasoner``.
+class CognitiveRunDriver:
+    """Default driver — assembles via ``run_mode_registry``, then ``.run()`` only.
 
-    The ``llm_resolver`` capability has no provider; the boot-time
-    LLM-aware wiring lives in :class:`BrainComposer` and binds
-    ``reasoner`` with the adapter already materialised. Wrapping
-    ``reasoner.llm`` lets the runnable assembly call ``.resolve()``
-    exactly as if a real resolver were provided, without re-reading
-    ``.env`` at run time.
+    The LLM resolver is supplied at construction time by the
+    composition root (see ``lca-loop-cognitive`` plugin); the driver
+    never reads Cordis state to invent one. A profile that boots
+    without an ``llm_resolver`` provider fails profile resolution
+    before any run is created.
     """
 
-    __slots__ = ("_adapter",)
-
-    def __init__(self, adapter: Any) -> None:
-        self._adapter = adapter
-
-    def resolve(self) -> Any:
-        return self._adapter
-
-
-def _resolve_resolver_from_reasoner(ctx: Any) -> _BoundReasonerResolver:
-    """Build a resolver-shaped object from the ``reasoner`` capability."""
-    reasoner = require_capability(ctx, "reasoner")
-    adapter = getattr(reasoner, "llm", None)
-    if adapter is None:
-        raise TypeError(
-            "reasoner capability is missing its bound LLMAdapter; "
-            "BrainComposer.compose_agent did not seed reasoner on the run scope"
-        )
-    return _BoundReasonerResolver(adapter)
-
-
-class CognitiveRunDriver:
-    """Default driver — assembles via ``run_mode_registry``, then ``.run()`` only."""
-
-    def __init__(self, assembler: CognitiveRunnableAssembler | None = None) -> None:
+    def __init__(
+        self,
+        assembler: CognitiveRunnableAssembler | None = None,
+        *,
+        llm_resolver: Any,
+    ) -> None:
         self._assembler = assembler
+        self._llm_resolver = llm_resolver
 
     async def execute(
         self,
@@ -115,26 +95,11 @@ class CognitiveRunDriver:
         bindings: Any,
         run_context: RunContext,
         ctx: Context | None = None,
-        llm_resolver: Any | None = None,
         machine_resolver: Any | None = None,
     ) -> DriverOutcome:
         _record_inbox_followup(session=session, question=question, mode=mode)
         if self._assembler is None:
             raise TypeError("CognitiveRunDriver requires CognitiveRunnableAssembler")
-        if llm_resolver is None:
-            if ctx is None:
-                raise TypeError("CognitiveRunDriver.execute requires ctx or llm_resolver")
-            # ``llm_resolver`` capability has no provider in this tree
-            # (BrainComposer is the only LLM-aware setup path and it
-            # binds ``reasoner``, not ``llm_resolver``). Recover by
-            # pulling the already-bound reasoner and wrapping its ``.llm``
-            # LLMAdapter in a resolver-shaped object so the
-            # downstream ``RunnableBuildRequest.llm`` path stays intact.
-            resolver = _resolve_resolver_from_reasoner(ctx)
-            scope: Context | None = ctx
-        else:
-            resolver = llm_resolver
-            scope = None
         runnable = await self._assembler.assemble(
             RunnableAssemblyRequest(
                 session=session,
@@ -142,8 +107,8 @@ class CognitiveRunDriver:
                 mode=mode,
                 observability=hub,
                 bindings=bindings,
-                scope=scope,
-                llm_resolver=resolver,
+                scope=ctx,
+                llm_resolver=self._llm_resolver,
                 machine_resolver=machine_resolver,
             )
         )

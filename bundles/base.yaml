@@ -55,6 +55,10 @@ entries:
   name: phase_think_reasoner_credentials
   $module: lca.plugins.think.reasoner.credentials
   config: {}
+- id: lca-llm-resolver
+  name: lca_llm_resolver
+  $module: lca.plugins.think.reasoner.llm_resolver
+  config: {}
 - id: phase.think.shortcut
   name: phase_think_shortcut
   $module: lca.nodes.think.route.shortcut

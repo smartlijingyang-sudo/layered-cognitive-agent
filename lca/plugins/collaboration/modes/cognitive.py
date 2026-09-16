@@ -34,14 +34,19 @@ class Config(BaseModel):
 def _cognitive_driver_factory(ctx: object) -> CognitiveRunDriver:
     """Build the Gateway driver with the Profile's declared mode registry.
 
-    ``lca-loop-cognitive`` declares ``run_mode_registry`` as a required
-    capability. Resolving it here keeps the executable driver aligned with
-    that manifest: a profile that boots cannot silently select compatibility
-    mode adapters through an absent registry.
+    ``lca-loop-cognitive`` declares ``run_mode_registry`` and
+    ``llm_resolver`` as required capabilities. Resolving both here keeps
+    the executable driver aligned with the manifest: a profile that
+    boots cannot silently select compatibility mode adapters through
+    an absent registry, nor invent a resolver from Cordis state.
     """
 
     registry = cast("RunModeRegistryProtocol", require_capability(ctx, RUN_MODE_REGISTRY.key))
-    return CognitiveRunDriver(CognitiveRunnableAssembler(mode_registry=registry))
+    llm_resolver = require_capability(ctx, "llm_resolver")
+    return CognitiveRunDriver(
+        CognitiveRunnableAssembler(mode_registry=registry),
+        llm_resolver=llm_resolver,
+    )
 
 
 @plugin(
@@ -50,6 +55,7 @@ def _cognitive_driver_factory(ctx: object) -> CognitiveRunDriver:
     requires=[
         "run_loop_driver_registry",
         RUN_MODE_REGISTRY.key,
+        "llm_resolver",
     ],
     provides=["run_loop_driver_registry[cognitive]"],
     implements=[],
