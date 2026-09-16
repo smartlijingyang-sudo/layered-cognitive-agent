@@ -5,8 +5,9 @@
 - I-FW-SSOT-2: ``RunLifecycleStatus`` 是状态机唯一 enum;
   lca/ 内不允许再出现独立的 ``class RunStatus`` / ``class JournalRunStatus``
   enum 定义,遗留名字只能是别名。
-- 别名对象同一性: ``RunStatus``(journal reducer / webserver session)与
-  ``JournalRunStatus`` 均为 ``RunLifecycleStatus`` 同一对象。
+- 别名对象同一性: 仍在窗口内的 ``RunStatus``(webserver session)与
+  ``JournalRunStatus`` 均为 ``RunLifecycleStatus`` 同一对象;journal reducer 的同名
+  别名已随其 delete-when 条件成立而删除。
 """
 
 from __future__ import annotations
@@ -55,8 +56,17 @@ class TestIFwSsot2:
         )
 
     def test_legacy_names_are_aliases(self) -> None:
-        """遗留名字与 RunLifecycleStatus 是同一对象(别名,非平行 enum)。"""
+        """仍在迁移窗口内的遗留名字必须是别名,不能是平行 enum。
+
+        journal reducer 的 ``RunStatus`` 别名已删除:它的两个条件
+        (``RunStatus.`` 生产引用归零、全部改走 ``RunLifecycleStatus``)都成立后,
+        连 journal / observability 两个 barrel 的再导出一起撤掉了。
+        这里守住剩下的那一个 —— webserver session 的 ``RunStatus``,它仍被
+        transport 测试使用,所以必须是同一对象而不是第二个 enum。
+        """
         from lca.contracts.observability.registry.status import RunLifecycleStatus
-        from lca.infrastructure.observability.journal.engine.reducer import RunStatus
+        from lca.plugins.transport.webserver.handlers.runs.session.session.session import (
+            RunStatus,
+        )
 
         assert RunStatus is RunLifecycleStatus

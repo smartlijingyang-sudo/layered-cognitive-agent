@@ -20,11 +20,6 @@ from lca.contracts.observability.registry.status import RunLifecycleStatus
 
 _CARRIER_TERMINAL_OPERATION = "run.lifecycle.failed"
 
-# COMPAT(delete-when: rg "\bRunStatus\." 生产引用归零、全部改走 RunLifecycleStatus,
-# tracking: ADR-0183 PR-11)
-RunStatus = RunLifecycleStatus
-
-
 @dataclass(frozen=True)
 class RunState:
     """Run 的派生状态——纯函数 fold(events) 的结果。"""
@@ -81,4 +76,4 @@ def _is_carrier_terminal_observed(event: RuntimeObserved) -> bool:
     )
 
 
-__all__ = ["RunState", "RunStatus", "fold_run_state"]
+__all__ = ["RunState", "fold_run_state"]
