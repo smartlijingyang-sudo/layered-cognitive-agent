@@ -74,6 +74,9 @@ class RunPort(Protocol):
         approval_id: str,
         payload: str,
         idempotency_key: str,
+        *,
+        plugin_state: dict[str, Any] | None = None,
+        parent_message_id: str = "",
     ) -> RunCommandReceipt: ...
 
     async def summary(self, run_id: str) -> dict[str, Any] | None: ...

@@ -141,6 +141,9 @@ class RegistryRunCommands:
         approval_id: str,
         payload: str,
         idempotency_key: str,
+        *,
+        plugin_state: dict[str, Any] | None = None,
+        parent_message_id: str = "",
     ) -> RunCommandReceipt:
         if not isinstance(payload, str):
             _log.warning(
@@ -244,6 +247,8 @@ class RegistryRunCommands:
             pending_approval_id=pending_approval_id,
             approval_id_matched=bool(pending_approval_id) and approval_id == pending_approval_id,
             payload_chars=len(payload),
+            has_plugin_state=bool(plugin_state),
+            parent_message_id=parent_message_id,
         )
         # Resume 是新请求 = 新 context：create 时的 Session 绑定不在场。
         # create_task 拷贝当前 context，run task 继承这里的绑定；

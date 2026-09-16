@@ -40,6 +40,9 @@ from lca.plugins.transport.webserver.handlers.runs.terminal.port.port import (
     RunReceipt,
     RunRequest,
 )
+from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.gateway_lifecycle import (
+    topic_id_from_body,
+)
 from lca.plugins.transport.webserver.read.runs.identity.identity import (
     AgentRef,
     parse_agent_ref,
@@ -93,6 +96,15 @@ class CreateRunRequest:
     ctx: object
     assistant_id: str = ""
     """ADR-0187 §3 D7 一次性 run 绑定（``asst_*``）；空 = 遗留默认 agent。"""
+    resume_approval: dict[str, Any] | None = None
+    """Gap C: front-end ``LcaStartRunBody.resume_approval`` (deploy patch).
+    Non-``None`` ⇒ POST is an approval-resume of a paused run; ``create_run``
+    routes it to ``RunPort.resume_approval`` instead of ``create_and_dispatch``."""
+    resume_tool_result: dict[str, Any] | None = None
+    """Gap C: front-end ``LcaStartRunBody.resume_tool_result`` (deploy patch).
+    Non-``None`` ⇒ POST is a tool-result resume; the human answer is forwarded
+    to ``RunPort.resume_approval`` as ``payload`` + ``plugin_state`` so the
+    existing paused run continues from ``phase: 'tool_result'``."""
 
 
 async def decode_create_run(
@@ -132,6 +144,13 @@ async def decode_create_run(
     if not run_input.user_text.strip():
         return _err("messages must include a non-empty user message", status_code=400)
 
+    resume_approval = _decode_resume_approval(body.get("resume_approval"))
+    if isinstance(resume_approval, JSONResponse):
+        return resume_approval
+    resume_tool_result = _decode_resume_tool_result(body.get("resume_tool_result"))
+    if isinstance(resume_tool_result, JSONResponse):
+        return resume_tool_result
+
     return CreateRunRequest(
         profile=str(body.get("profile") or "web-standard"),
         question=run_input.question,
@@ -147,7 +166,84 @@ async def decode_create_run(
         options=dict(body.get("options") or {}),
         ctx=ctx,
         assistant_id=assistant_id,
+        resume_approval=resume_approval,
+        resume_tool_result=resume_tool_result,
     )
+
+
+def _decode_resume_approval(raw: Any) -> dict[str, Any] | JSONResponse | None:
+    """Normalize ``resume_approval`` body field (camelCase keys).
+
+    Returns the dict on success, ``None`` when the field is absent, or a
+    JSON 400 response when the field is present but malformed.
+    """
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        return _err("resume_approval must be an object", status_code=400, code="invalid_resume_approval")
+    approval_id = str(raw.get("approvalId") or raw.get("approval_id") or "").strip()
+    tool_call_id = str(raw.get("toolCallId") or raw.get("tool_call_id") or "").strip()
+    rejection_reason = raw.get("rejectionReason") or raw.get("rejection_reason")
+    if not approval_id and not tool_call_id:
+        return _err(
+            "resume_approval requires approvalId or toolCallId",
+            status_code=400,
+            code="invalid_resume_approval",
+        )
+    return {
+        "approval_id": approval_id or tool_call_id,
+        "tool_call_id": tool_call_id,
+        "parent_message_id": str(raw.get("parentMessageId") or raw.get("parent_message_id") or ""),
+        "rejection_reason": str(rejection_reason) if rejection_reason is not None else "",
+    }
+
+
+def _decode_resume_tool_result(raw: Any) -> dict[str, Any] | JSONResponse | None:
+    """Normalize ``resume_tool_result`` body field (camelCase keys).
+
+    Returns the dict on success, ``None`` when the field is absent, or a
+    JSON 400 response when the field is present but malformed.
+    """
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        return _err(
+            "resume_tool_result must be an object", status_code=400, code="invalid_resume_tool_result"
+        )
+    tool_call_id = str(raw.get("toolCallId") or raw.get("tool_call_id") or "").strip()
+    content = raw.get("content")
+    if not tool_call_id:
+        return _err(
+            "resume_tool_result requires toolCallId",
+            status_code=400,
+            code="invalid_resume_tool_result",
+        )
+    if not isinstance(content, str):
+        return _err(
+            "resume_tool_result.content must be a string",
+            status_code=400,
+            code="invalid_resume_tool_result",
+        )
+    plugin_state_raw = raw.get("pluginState")
+    plugin_state: dict[str, Any] | None
+    if plugin_state_raw is None or plugin_state_raw == {}:
+        plugin_state = None
+    elif isinstance(plugin_state_raw, dict):
+        plugin_state = plugin_state_raw
+    else:
+        return _err(
+            "resume_tool_result.pluginState must be an object",
+            status_code=400,
+            code="invalid_resume_tool_result",
+        )
+    return {
+        "tool_call_id": tool_call_id,
+        "parent_message_id": str(
+            raw.get("parentMessageId") or raw.get("parent_message_id") or ""
+        ),
+        "content": content,
+        "plugin_state": plugin_state,
+    }
 
 
 async def _decode_json_body(request: Request) -> dict[str, Any] | JSONResponse:
@@ -271,6 +367,12 @@ async def create_run(request: Request) -> JSONResponse:
     Thin orchestrator:parse body → decode carrier request → dispatch via
     ``RunPort`` → render receipt. Capability readiness lives in the routes
     plugin and the LLM-resolver plugin, not here.
+
+    Resume routing (Gap C): when the body carries ``resume_approval`` or
+    ``resume_tool_result`` the request is an HIL resume of an existing
+    paused run. ``create_run`` looks up the run by ``topic_id`` via
+    ``running_operation_store`` and forwards the human answer through
+    :meth:`RunPort.resume_approval` instead of dispatching a fresh run.
     """
     if request.method == "OPTIONS":
         return JSONResponse({}, headers=cors_headers())
@@ -292,13 +394,15 @@ async def create_run(request: Request) -> JSONResponse:
     if binding_error is not None:
         return binding_error
 
+    if decoded.resume_approval is not None or decoded.resume_tool_result is not None:
+        return await _dispatch_resume(request, body, decoded)
+
     receipt = await _run_port_of(request).create_and_dispatch(_to_run_request(decoded))
     if not receipt.accepted:
         return _err(receipt.rejection_reason or "run creation rejected", status_code=400)
 
     from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.gateway_lifecycle import (
         register_gateway_run,
-        topic_id_from_body,
     )
 
     await register_gateway_run(
@@ -310,6 +414,72 @@ async def create_run(request: Request) -> JSONResponse:
     )
     jwt_keys = getattr(request.app.state, "jwt_keys", None)
     return render_create_run_receipt(receipt, decoded.agent, jwt_keys=jwt_keys)
+
+
+async def _dispatch_resume(
+    request: Request,
+    body: dict[str, Any],
+    decoded: CreateRunRequest,
+) -> JSONResponse:
+    """Route a resume body to :meth:`RunPort.resume_approval`.
+
+    Looks up the existing run via ``running_operation_store`` keyed by
+    ``topic_id``; the front-end LCA flow publishes the running operation
+    row on ``POST /runs`` create and reuses it on resume.
+    """
+    topic_id = topic_id_from_body(body)
+    if not topic_id:
+        return _err(
+            "resume requires topic_id to locate the existing run",
+            status_code=400,
+            code="missing_topic_id",
+        )
+    store = getattr(request.app.state, "running_operation_store", None)
+    if store is None:
+        return _err("running operation store not available", status_code=503)
+    row = await store.get_latest_for_topic(topic_id)
+    if row is None:
+        return _err(
+            f"no running operation for topic {topic_id!r}",
+            status_code=404,
+            code="run_not_found",
+        )
+    run_id = str(row.get("run_id") or "")
+    if not run_id:
+        return _err("running operation row missing run_id", status_code=500)
+
+    payload_dict = decoded.resume_tool_result or decoded.resume_approval or {}
+    approval_id = str(payload_dict.get("tool_call_id") or payload_dict.get("approval_id") or "")
+    if not approval_id:
+        return _err(
+            "resume payload missing toolCallId/approvalId",
+            status_code=400,
+            code="invalid_resume_payload",
+        )
+    content = str(payload_dict.get("content") or payload_dict.get("rejection_reason") or "")
+    plugin_state = payload_dict.get("plugin_state")
+    parent_message_id = str(payload_dict.get("parent_message_id") or "")
+    idempotency_key = f"{run_id}:{approval_id}:resume:{parent_message_id or 'topic'}"
+
+    receipt = await _run_port_of(request).resume_approval(
+        run_id,
+        approval_id,
+        content,
+        idempotency_key,
+        plugin_state=plugin_state,
+        parent_message_id=parent_message_id,
+    )
+    if not receipt.accepted:
+        return _err(
+            receipt.error or "approval resume rejected",
+            status_code=receipt.error_status,
+        )
+    if idempotency_key and hasattr(store, "record_answer_key"):
+        await store.record_answer_key(run_id, idempotency_key)
+    return JSONResponse(
+        {"run_id": run_id, "status": receipt.status or "resumed"},
+        headers=cors_headers(),
+    )
 
 
 async def cancel_run(request: Request) -> JSONResponse:
