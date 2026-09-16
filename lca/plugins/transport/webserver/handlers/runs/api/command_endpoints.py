@@ -180,7 +180,9 @@ def _decode_resume_approval(raw: Any) -> dict[str, Any] | JSONResponse | None:
     if raw is None:
         return None
     if not isinstance(raw, dict):
-        return _err("resume_approval must be an object", status_code=400, code="invalid_resume_approval")
+        return _err(
+            "resume_approval must be an object", status_code=400, code="invalid_resume_approval"
+        )
     approval_id = str(raw.get("approvalId") or raw.get("approval_id") or "").strip()
     tool_call_id = str(raw.get("toolCallId") or raw.get("tool_call_id") or "").strip()
     rejection_reason = raw.get("rejectionReason") or raw.get("rejection_reason")
@@ -208,7 +210,9 @@ def _decode_resume_tool_result(raw: Any) -> dict[str, Any] | JSONResponse | None
         return None
     if not isinstance(raw, dict):
         return _err(
-            "resume_tool_result must be an object", status_code=400, code="invalid_resume_tool_result"
+            "resume_tool_result must be an object",
+            status_code=400,
+            code="invalid_resume_tool_result",
         )
     tool_call_id = str(raw.get("toolCallId") or raw.get("tool_call_id") or "").strip()
     content = raw.get("content")
@@ -238,9 +242,7 @@ def _decode_resume_tool_result(raw: Any) -> dict[str, Any] | JSONResponse | None
         )
     return {
         "tool_call_id": tool_call_id,
-        "parent_message_id": str(
-            raw.get("parentMessageId") or raw.get("parent_message_id") or ""
-        ),
+        "parent_message_id": str(raw.get("parentMessageId") or raw.get("parent_message_id") or ""),
         "content": content,
         "plugin_state": plugin_state,
     }
