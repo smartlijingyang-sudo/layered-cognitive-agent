@@ -39,6 +39,8 @@ from pathlib import Path
 
 import pytest
 
+from lca.plugins.observability.health.run_health_fold import fold_run_health
+
 # Audit-run locations. The data lives in the main repo (gitignored);
 # the integration test reads it from there directly. When the test
 # runs in a fresh CI container without that directory mounted, the
@@ -281,3 +283,95 @@ def test_audit_run_evidence_refs_come_from_spine(run_id: str) -> None:
                 assert ref.seq == int(spine_event["event_id"].split(":")[1]), (
                     f"{run_id}/{name}: ref.seq {ref.seq} != parsed seq"
                 )
+
+
+# ---------------------------------------------------------------------------
+# Real-run fold integration (Task 1.4 bug-fix regression).
+#
+# The per-deriver integration tests above call each deriver directly with
+# raw JSONL dicts, so they pass even when ``run_id`` is missing from the
+# top level — the deriver's own ``make_evidence_ref`` falls back to
+# ``parse_run_id(event_id)``.
+#
+# ``fold_run_health`` (Task 1.4) is the composition layer, and it MUST
+# also survive the real audit-run shape: the on-disk spine has no
+# top-level ``run_id`` (the producer writes ``run_id`` only into the
+# payload of a subset of events). The regression guard below exercises
+# the fold end-to-end against the three audit runs.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("run_id", "expected_llm_status"),
+    [
+        ("run_3383288d63e7", {"degraded"}),  # 1-of-2 partial match
+        ("run_3cf6e7c036b3", {"failed"}),  # zero-match B-1 symptom
+        ("run_feb0f21ee770", {"failed"}),  # 16 tool_calls, all dropped
+    ],
+)
+def test_fold_run_health_on_real_audit_run_produces_real_conditions(
+    run_id: str, expected_llm_status: set[str]
+) -> None:
+    """End-to-end fold on a real audit run produces real conditions.
+
+    Regression for the PR-1 / Task 1.4 bug: ``_read_spine_events``
+    required a top-level ``run_id`` field that real spines don't carry.
+    Every event was silently dropped (KeyError -> ``continue``), all 8
+    derivers saw an empty list and returned ``unknown``, and
+    ``report.run_id`` ended up empty.
+
+    After the fix:
+
+    * ``report.conditions`` is non-empty (>= 8, one per deriver).
+    * At least one ``EvidenceRef.run_id`` equals the real run_id
+      (proves the fold injected it into the normalized event shape
+      the derivers consume).
+    * ``report.summary.by_type["lifecycle"] == "ok"`` — all three
+      audit runs reach a clean ``kernel.run.stop`` with
+      ``outcome == "success"``.
+    * ``report.summary.by_type["tool"] != "unknown"`` — every audit
+      run made tool calls; the tool deriver MUST classify them
+      (the brief records ``ok`` for all three).
+    * ``report.summary.by_type["llm"]`` matches the per-run expectation
+      below — this is the audit gap (B-1) the report must surface.
+    """
+    spine_path = AUDIT_DIR / run_id / f"{run_id}.spine.jsonl"
+    report = fold_run_health(spine_path)
+
+    # 1. Conditions are produced (not just 8 unknowns).
+    assert len(report.conditions) >= 8, (
+        f"{run_id}: expected >=8 conditions, got {len(report.conditions)}; "
+        f"by_type={report.summary.by_type}"
+    )
+
+    # 2. Every EvidenceRef carries the real run_id (not empty string).
+    refs_with_real_run_id = [
+        ref for cond in report.conditions for ref in cond.evidence_refs if ref.run_id == run_id
+    ]
+    assert refs_with_real_run_id, (
+        f"{run_id}: no EvidenceRef.run_id == {run_id!r}; "
+        f"report.run_id={report.run_id!r}; "
+        f"sample_refs={[ref.run_id for cond in report.conditions for ref in cond.evidence_refs][:5]}"
+    )
+
+    # 3. Top-level report.run_id is populated (used by 4 PR-1 surfaces).
+    assert report.run_id == run_id, f"{run_id}: report.run_id={report.run_id!r} != {run_id!r}"
+
+    # 4. Lifecycle is ok (clean completion per audit-run manifests).
+    assert report.summary.by_type["lifecycle"] == "ok", (
+        f"{run_id}: lifecycle expected ok, got {report.summary.by_type['lifecycle']!r}; "
+        f"by_type={report.summary.by_type}"
+    )
+
+    # 5. Tool deriver is not unknown — the run made tool calls.
+    assert report.summary.by_type["tool"] != "unknown", (
+        f"{run_id}: tool deriver returned unknown despite tool calls; "
+        f"by_type={report.summary.by_type}"
+    )
+
+    # 6. LLM deriver reflects the per-run B-1 expectation.
+    assert report.summary.by_type["llm"] in expected_llm_status, (
+        f"{run_id}: llm expected {expected_llm_status}, "
+        f"got {report.summary.by_type['llm']!r}; "
+        f"by_type={report.summary.by_type}"
+    )
