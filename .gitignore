@@ -40,9 +40,10 @@ node_modules/
 .worktrees/
 worktrees/
 
-# Creator scenario scratch dirs (test output, regenerated on run)
-tests/.scratch_cordis_creator/
-tests/.scratch_cordis_creator_real/
+# Creator scenario scratch dirs (test output, regenerated on run).
+# Tests resolve SCRATCH next to themselves under tests/scenario/cordis/.
+tests/scenario/cordis/.scratch_cordis_creator/
+tests/scenario/cordis/.scratch_cordis_creator_real/
 .records/
 .archify-out/
 # vim swap files
