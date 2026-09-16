@@ -22,12 +22,7 @@ from typing import Any
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
-from lca.contracts.atoms.semantic.keys import (
-    FAILURE_KIND_EXECUTION,
-    FAILURE_KIND_TOOL_WIRE,
-    FAILURE_KIND_TRANSIENT,
-    FAILURE_KIND_VALIDATION,
-)
+from lca.contracts.atoms.semantic.keys import FAILURE_KIND_EXECUTION
 from lca.contracts.harness.act.effect_receipt import EffectReceipt
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -36,6 +31,9 @@ from lca.contracts.harness.composition.plugin_contract import (
     LifecycleContract,
     PluginContract,
     PluginIdentity,
+)
+from lca.contracts.observability.observability.failure_reason_map import (
+    resolve_error_reason,
 )
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
@@ -54,17 +52,6 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 _MAX_OUTPUT_REF_BYTES = 50_000
 _SPILL_URI_PREFIX = "spill://"
 
-# Closed-set ``failure_kind`` → ``error_reason`` map(PR-3.8.7 merge from
-# ``act.result.normalize``):同一 ``failure_kind`` 多次调用得到同一
-# ``error_reason``(deterministic、idempotent)。未知 ``failure_kind`` 不抛异常、
-# 不修改 ``error_code``(plan §Task 1 第 5 条)。
-_FAILURE_KIND_TO_ERROR_REASON: dict[str, str] = {
-    FAILURE_KIND_EXECUTION: FAILURE_KIND_EXECUTION,
-    FAILURE_KIND_TRANSIENT: FAILURE_KIND_TRANSIENT,
-    FAILURE_KIND_VALIDATION: FAILURE_KIND_VALIDATION,
-    FAILURE_KIND_TOOL_WIRE: FAILURE_KIND_TOOL_WIRE,
-}
-
 
 def _normalize_receipt(receipt: EffectReceipt) -> EffectReceipt:
     """``act.observe`` 内部归一化步骤(PR-3.8.7 fold from ``act.result.normalize``)。
@@ -79,9 +66,10 @@ def _normalize_receipt(receipt: EffectReceipt) -> EffectReceipt:
       2. bytes ≤ 50_000 → base64-string — receipt 无 inline 字节负载,no-op。
       3. bytes > 50_000 → spill 到 side artifact,``output_ref`` 改写为
          ``spill://<invocation_id>`` URI,emit stub receipt。
-      4. ``failure_kind`` 已设置且 ``error_code`` 仍为空时,从 closed-set map
-         推导 ``error_reason`` 并写入 ``error_code``(deterministic,no exception)。
-         已设置的 ``error_code`` 不覆盖(body 已分类更具体)。
+      4. ``failure_kind`` 已设置且 ``error_code`` 仍为空时,从 contracts
+         closed-set map 推导 ``error_reason`` 并写入 ``error_code``
+         (deterministic, no exception; PR-4 single-source)。已设置的
+         ``error_code`` 不覆盖(body 已分类更具体)。
     """
     updates: dict[str, Any] = {}
 
@@ -92,7 +80,7 @@ def _normalize_receipt(receipt: EffectReceipt) -> EffectReceipt:
         updates["output_ref"] = f"{_SPILL_URI_PREFIX}{receipt.invocation_id}"
 
     if receipt.failure_kind is not None and receipt.error_code is None:
-        reason = _FAILURE_KIND_TO_ERROR_REASON.get(receipt.failure_kind)
+        reason = resolve_error_reason(receipt.failure_kind)
         if reason is not None:
             updates["error_code"] = reason
 
