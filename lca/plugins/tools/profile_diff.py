@@ -114,6 +114,9 @@ MANIFEST = ToolManifest(
             },
             is_idempotent=True,
             default_timeout_ms=5_000,
+            # PR-3 G-21 (ADR-0232): pure in-memory diff; declare ``read``
+            # so ParallelReadOnly batch policy parallelises.
+            effects="read",
         ),
     ),
     meta=ToolMeta(

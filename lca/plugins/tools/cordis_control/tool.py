@@ -45,6 +45,12 @@ MANIFEST = ToolManifest(
             },
             is_idempotent=False,
             default_timeout_ms=30_000,
+            # PR-3 G-21 (ADR-0232): creator control surface; ``promote``
+            # mutates profile state.  Default to ``external`` so the batch
+            # policy keeps cordis_control serial — preserve pre-PR-3
+            # behaviour for any composite Creator action that has not
+            # been individually audited as ``read``.
+            effects="external",
         ),
     ),
     meta=ToolMeta(

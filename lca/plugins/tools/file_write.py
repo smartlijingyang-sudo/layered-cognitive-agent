@@ -72,6 +72,9 @@ MANIFEST = ToolManifest(
             },
             is_idempotent=True,
             default_timeout_ms=10_000,
+            # PR-3 G-21 (ADR-0232): file_write mutates host fs; declare
+            # ``write`` so ParallelReadOnly batch policy keeps it serial.
+            effects="write",
         ),
     ),
     meta=ToolMeta(

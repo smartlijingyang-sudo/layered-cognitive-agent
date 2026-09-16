@@ -121,6 +121,9 @@ MANIFEST = ToolManifest(
             },
             is_idempotent=True,
             default_timeout_ms=5_000,
+            # PR-3 G-21 (ADR-0232): dry-run-only preview; declare ``read``
+            # so a batch of profile_apply calls parallelises.
+            effects="read",
         ),
     ),
     meta=ToolMeta(

@@ -68,6 +68,10 @@ MANIFEST = ToolManifest(
             },
             is_idempotent=False,
             default_timeout_ms=30_000,
+            # PR-3 G-21 (ADR-0232): bash can read or write depending on
+            # the command; declare ``external`` so ParallelReadOnly batch
+            # policy keeps bash serial.
+            effects="external",
         ),
     ),
     meta=ToolMeta(
