@@ -54,7 +54,7 @@ def test_health_deriver_protocol_is_importable() -> None:
 
     Until Task 1.2 lands, this import raises ``ImportError`` (red phase).
     """
-    from lca.contracts.observability.health.deriver import (  # noqa: F401
+    from lca.contracts.observability.health.deriver import (
         HealthDeriver as HealthDeriver,
     )
 
@@ -79,9 +79,11 @@ def test_health_deriver_protocol_evaluate_signature() -> None:
 def test_health_deriver_is_runtime_checkable() -> None:
     """``isinstance(obj, HealthDeriver)`` works for duck-typed objects.
 
-    An object whose ``evaluate`` returns ``list[RunHealthCondition]`` must
-    be recognized as a ``HealthDeriver`` instance even though it never
-    subclasses the Protocol.
+    An object that defines ``evaluate(events)`` (regardless of return type
+    or parameter annotation — ``runtime_checkable`` only checks method
+    presence) must be recognized as a ``HealthDeriver`` instance even
+    though it never subclasses the Protocol. Objects lacking ``evaluate``
+    must NOT be recognized.
     """
     from lca.contracts.observability.health.deriver import HealthDeriver
 
@@ -89,12 +91,11 @@ def test_health_deriver_is_runtime_checkable() -> None:
         def evaluate(self, events: list) -> list[RunHealthCondition]:
             return []
 
-    class _BadDeriver:
-        def evaluate(self, events: list) -> int:  # wrong return type
-            return 0
+    class _NoEvaluate:
+        pass
 
     assert isinstance(_GoodDeriver(), HealthDeriver)
-    assert not isinstance(_BadDeriver(), HealthDeriver)
+    assert not isinstance(_NoEvaluate(), HealthDeriver)
 
 
 # ---------------------------------------------------------------------------
@@ -134,17 +135,30 @@ def test_entry_point_load_can_be_called() -> None:
     """Each entry-point is loadable — but the target module does not exist yet.
 
     Task 1.3 creates the 8 deriver classes. Until then, ``ep.load()`` must
-    raise ``ImportError`` whose message references the expected module
-    path. This proves the registration is wired correctly (the metadata
-    parses, the path resolves, the module is missing on purpose).
+    raise ``ImportError`` whose message references the expected target
+    (or any prefix of it — Python may report only the missing parent
+    package, e.g. ``No module named 'lca.plugins.observability.health'``
+    if the whole ``health/`` package is missing). This proves the
+    registration is wired correctly (the metadata parses, the path
+    resolves, the module is missing on purpose).
     """
     eps = importlib.metadata.entry_points(group="lca.health_derivers")
     for ep in eps:
         expected_module = ep.value.split(":", 1)[0]
         with pytest.raises(ImportError) as excinfo:
             ep.load()
-        # The ImportError should mention the not-yet-existing module path.
-        assert expected_module in str(excinfo.value), (
+        # The ImportError should reference SOME prefix of the expected
+        # module path. Python may report only the highest-level missing
+        # parent (e.g. ``lca.plugins.observability.health`` if the whole
+        # ``health/`` package hasn't been created yet).
+        expected_prefixes = [
+            expected_module,
+            "lca.plugins.observability",
+            "lca.plugins",
+            "lca",
+        ]
+        msg = str(excinfo.value)
+        assert any(prefix in msg for prefix in expected_prefixes), (
             f"entry-point {ep.name!r} load failed but the error "
-            f"does not reference {expected_module!r}: {excinfo.value!r}"
+            f"does not reference any prefix of {expected_module!r}: {msg!r}"
         )
