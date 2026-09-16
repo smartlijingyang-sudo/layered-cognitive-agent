@@ -1,9 +1,21 @@
 """phase.concept.act_subgraph.act_envelope — typed envelope constructor.
 
-``concept.act_subgraph`` 内嵌节点:``Decision`` → ``CommandEnvelope``。
+``concept.act_subgraph`` 内嵌节点:``Decision`` → ``tuple[CommandEnvelope, ...]``。
 
-从 ``StandardActExecutor`` (lca/plugins/loop/phase/act/standard/plugin.py
-lines 50-75) 提取信封构造逻辑,作为 act 子图的独立概念节点。
+PR-3 (G-20, ADR-0232): a single ``Decision`` carrying ``N``
+``tool_calls`` produces ``N`` envelopes, one per call.  The legacy
+``envelope`` single-value port is preserved as a back-compat alias for
+the first envelope (``envelopes[0]``) so downstream consumers that
+have not yet been upgraded to read ``envelopes`` keep working.  When
+``decision.tool_calls`` is empty the node produces an empty tuple and
+an ``envelope=None`` pass-through — matching the pre-PR-3 contract.
+
+ADR-0219 §5.5 typed-port contract: ``declared_inputs`` /
+``declared_outputs`` are compile-time closed sets; this node writes
+``envelopes`` (tuple) and ``envelope`` (single) and reads ``decision``
+only.  No Body / Registry / SafeExecutor calls — execution narrow
+door (AGENTS.md §3 C10) is held by ``effect.execute → Body →
+SafeExecutor → Sandbox``.
 """
 
 from __future__ import annotations
@@ -41,12 +53,17 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 @dataclass(frozen=True, slots=True)
 class ActEnvelopeExecutor:
-    """``concept.act_subgraph`` 节点:Decision → CommandEnvelope。"""
+    """``concept.act_subgraph`` 节点:Decision → tuple[CommandEnvelope, ...]。
+
+    One ``Decision.tool_calls[i]`` ⇒ one ``CommandEnvelope``.  Idempotency
+    key includes the call index so a retry of the same decision does
+    not collide envelopes from different calls in the same batch.
+    """
 
     semantic_name: str = "act.envelope"
     region: str = "act"
     declared_inputs: tuple[PortName, ...] = ("decision",)
-    declared_outputs: tuple[PortName, ...] = ("envelope",)
+    declared_outputs: tuple[PortName, ...] = ("envelopes", "envelope")
 
     async def node_execute(
         self,
@@ -56,7 +73,8 @@ class ActEnvelopeExecutor:
         """act.envelope 入口。
 
         inputs 端口(yaml): decision (Decision)
-        outputs 端口(yaml): envelope (CommandEnvelope)
+        outputs 端口(yaml): envelopes (tuple[CommandEnvelope, ...]),
+                            envelope (CommandEnvelope | None — back-compat)
         """
         decision = input.port_values.get("decision")
         if not isinstance(decision, Decision):
@@ -68,26 +86,43 @@ class ActEnvelopeExecutor:
         plan_ref = context.metadata["plan_ref"]
         node_ref = context.metadata["node_id"]
 
-        envelope: CommandEnvelope = mint_envelope(
-            plan_ref=plan_ref,
-            scope_ref=node_ref,
-            decision=decision,
-            provider="effect.body",
-            grant=CapabilityGrant(
-                capability="body.act",
-                scope="run",
-                effect_class="tools",
-            ),
-            idempotency_key=f"{plan_ref}:{node_ref}:{decision.decision_id}",
-            metadata={
-                "effect_class": "tools",
-                "operation": "body.act",
-                "state": context.runtime.state,
-                "decision": decision,
-            },
+        envelopes: tuple[CommandEnvelope, ...] = tuple(
+            mint_envelope(
+                plan_ref=plan_ref,
+                scope_ref=node_ref,
+                decision=decision,
+                provider="effect.body",
+                grant=CapabilityGrant(
+                    capability="body.act",
+                    scope="run",
+                    effect_class="tools",
+                ),
+                # Idempotency key includes the call index so a multi-call
+                # decision does not collapse N envelopes into one cached
+                # entry (PR-2 already separated BodySurfaceEventContract;
+                # this is the matching envelope-side guard).
+                idempotency_key=(
+                    f"{plan_ref}:{node_ref}:{decision.decision_id}:{call_index}"
+                ),
+                metadata={
+                    "effect_class": "tools",
+                    "operation": "body.act",
+                    "state": context.runtime.get("state"),
+                    "decision": decision,
+                    "tool_call_index": call_index,
+                },
+            )
+            for call_index in range(len(decision.tool_calls))
         )
 
-        return NodeOutput(port_values={"envelope": envelope})
+        return NodeOutput(
+            port_values={
+                "envelopes": envelopes,
+                # Back-compat: downstream 1:1 wiring reads ``envelope``;
+                # populate it with the first envelope (or None).
+                "envelope": envelopes[0] if envelopes else None,
+            }
+        )
 
 
 @plugin(
