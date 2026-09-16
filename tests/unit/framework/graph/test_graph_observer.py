@@ -287,7 +287,7 @@ async def test_subgraph_strategy_emits_enter_exit(monkeypatch) -> None:
 
     rec = RecordingObserver()
     monkeypatch.setattr(
-        "lca.framework.graph.strategies.subgraph_strategy._load_subgraph_plan",
+        "lca.framework.graph.strategies.subgraph_run.load_subgraph_plan",
         lambda ref, entry: _make_plan(),
     )
 
@@ -312,7 +312,7 @@ async def test_subgraph_strategy_emits_failure_exit(monkeypatch) -> None:
 
     rec = RecordingObserver()
     monkeypatch.setattr(
-        "lca.framework.graph.strategies.subgraph_strategy._load_subgraph_plan",
+        "lca.framework.graph.strategies.subgraph_run.load_subgraph_plan",
         lambda ref, entry: _make_plan(),
     )
 

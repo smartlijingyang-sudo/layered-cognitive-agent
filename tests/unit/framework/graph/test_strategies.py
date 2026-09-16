@@ -123,7 +123,7 @@ class TestSubgraphStrategy:
     async def test_execute_seeds_inner_port_registry_with_outer_input(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        from lca.framework.graph.strategies import subgraph_strategy as sg_mod
+        from lca.framework.graph.strategies import subgraph_run as sg_mod
 
         captured: dict[str, Any] = {}
 
@@ -142,7 +142,7 @@ class TestSubgraphStrategy:
 
         monkeypatch.setattr(
             sg_mod,
-            "_load_subgraph_plan",
+            "load_subgraph_plan",
             lambda plan_ref, entry_node: Plan(
                 id="inner",
                 nodes=(),
@@ -173,11 +173,11 @@ class TestSubgraphStrategy:
         assert ports.snapshot()["response"] == "fake_llm_response_object"
 
     async def test_max_depth_enforced(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from lca.framework.graph.strategies import subgraph_strategy as sg_mod
+        from lca.framework.graph.strategies import subgraph_run as sg_mod
 
         monkeypatch.setattr(
             sg_mod,
-            "_load_subgraph_plan",
+            "load_subgraph_plan",
             lambda plan_ref, entry_node: Plan(
                 id="inner",
                 nodes=(),
