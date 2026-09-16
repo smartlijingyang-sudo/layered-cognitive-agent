@@ -59,12 +59,23 @@ def _surface_event_to_message(event: Any) -> Message:
     return Message(role=event.type)
 
 
-def _drop_orphan_tool_results(messages: list[Message]) -> list[Message]:
+def _drop_orphan_tool_results(
+    messages: list[Message], counter: list[int] | None = None
+) -> list[Message]:
     """Drop tool/result messages with ``tool_call_id`` not in any preceding assistant.
 
     Mirrors OpenAI's ``drop_orphan_function_calls``: a ``role=tool`` row is
     only valid if its ``tool_call_id`` was declared by an earlier
     ``role=assistant`` row's ``tool_calls`` list.
+
+    ``counter`` (PR-2 G-17) is an optional 1-element list the caller can
+    supply to observe how many orphans were dropped. Pre-PR-2 the count
+    was 4/5 in a 5-``runCommand`` decision; post-PR-2 the count stays 0
+    for any valid multi-call decision (the Body commits every declared
+    call, so orphan-drop has no work to do). Wired through
+    :meth:`RunSessionWriter.derive_messages` so the writer exposes
+    ``orphan_dropped_count`` as a per-run metric for
+    :class:`RunHealthReport`.
     """
     valid_call_ids: set[str] = set()
     for m in messages:
@@ -72,11 +83,14 @@ def _drop_orphan_tool_results(messages: list[Message]) -> list[Message]:
             for tc in m.get("tool_calls") or []:
                 if isinstance(tc, dict) and "id" in tc:
                     valid_call_ids.add(tc["id"])
-    return [
-        m
-        for m in messages
-        if not (m.get("role") == "tool" and m.get("tool_call_id") not in valid_call_ids)
-    ]
+    kept: list[Message] = []
+    for m in messages:
+        if m.get("role") == "tool" and m.get("tool_call_id") not in valid_call_ids:
+            if counter is not None:
+                counter[0] += 1
+            continue
+        kept.append(m)
+    return kept
 
 
 def _drop_reasoning_after_dropped_calls(messages: list[Message]) -> list[Message]:
@@ -94,6 +108,12 @@ class RunSessionWriter(RunSessionWriterProtocol):
 
     def __init__(self, *, session: SessionProtocol | None) -> None:
         self._session = session
+        # PR-2 G-17: per-run counter incremented each time
+        # ``_drop_orphan_tool_results`` removes a ``role=tool`` row whose
+        # ``tool_call_id`` was not declared by any preceding assistant row.
+        # Post-PR-2 this stays 0 for any well-formed multi-call decision
+        # (Body commits every declared call before any tool runs).
+        self._orphan_dropped_count: int = 0
 
     def _require_session(self) -> SessionProtocol:
         if self._session is None:
@@ -246,13 +266,33 @@ class RunSessionWriter(RunSessionWriterProtocol):
         tool/result messages whose ``tool_call_id`` is not present in any
         preceding assistant message. Drop reasoning items that follow a
         dropped call.
+
+        PR-2 G-17: each call increments ``orphan_dropped_count`` for any
+        ``role=tool`` row removed by orphan-drop. Read via the
+        ``orphan_dropped_count`` property for the
+        :class:`RunHealthReport` deriver.
         """
         session = self._require_session()
         surface_events = [e for e in session.snapshot_events() if e.type.startswith("surface/")]
         msgs = [_surface_event_to_message(e) for e in surface_events]
-        msgs = _drop_orphan_tool_results(msgs)
+        counter: list[int] = [0]
+        msgs = _drop_orphan_tool_results(msgs, counter=counter)
+        self._orphan_dropped_count += counter[0]
         msgs = _drop_reasoning_after_dropped_calls(msgs)
         return msgs
+
+    @property
+    def orphan_dropped_count(self) -> int:
+        """Lifetime count of orphan ``role=tool`` rows dropped at ``derive_messages``.
+
+        PR-2 G-17 instrumentation: post-PR-2 this stays 0 for any
+        well-formed multi-call decision because ``Body.dispatch_tool_calls``
+        commits the assistant row (declaring every ``call_id``) BEFORE any
+        tool runs, so orphan-drop never has work to do. Non-zero indicates
+        the upstream seam regressed and the LLM feedback chain has been
+        silently truncated.
+        """
+        return self._orphan_dropped_count
 
     def request_header(self) -> EpochHeader | None:
         """Return the folded :class:`EpochHeader` from the bound Session, if any.

@@ -32,12 +32,10 @@ from typing import Any
 
 from lca.cognition.body.executor.simple_body import SimpleBody
 from lca.contracts.atoms.enums.enums import ActionType
-from lca.contracts.harness.act.effect_receipt import EffectReceipt
 from lca.contracts.models.core.execution.decision import Decision, ToolCall
 from lca.contracts.models.team.role.team import CacheConfig, RetryPolicy
 from lca.contracts.protocols.runtime.infra.infra import Tool
 from lca.runtime.session.run_session_writer import RunSessionWriter
-
 
 # ── Minimal in-memory SessionProtocol fixture ──────────────────────────────
 
