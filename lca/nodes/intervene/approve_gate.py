@@ -104,7 +104,13 @@ class ApproveGateExecutor:
     semantic_name: str = "act.approve.gate"
     region: str = "intervene"
     declared_inputs: tuple[PortName, ...] = ("decision", "command")
-    declared_outputs: tuple[PortName, ...] = ("decision", "routing")
+    # ADR-0237 / PR-1b: emit ``approval_routing`` (not ``routing``) so
+    # the typed port does not collide with downstream ``act.fanout``'s
+    # ``routing`` in the kernel-wide :class:`PortRegistry`
+    # (last-write-wins would overwrite the gate's signal before the
+    # outer plan reads it). The outer plan reads via
+    # ``act.main.declared_outputs: [approval_routing]``.
+    declared_outputs: tuple[PortName, ...] = ("decision", "approval_routing")
 
     async def node_execute(
         self,
@@ -114,7 +120,7 @@ class ApproveGateExecutor:
         """act.approve.gate 入口。
 
         inputs 端口(yaml): decision (Decision), command (Command, optional)
-        outputs 端口(yaml): decision (Decision), routing (RoutingDecision)
+        outputs 端口(yaml): decision (Decision), approval_routing (RoutingDecision)
 
         ADR-0235 / PR-5: reads typed ports only. No more
         ``_resolve_port(context, name)`` that peeked at
@@ -160,7 +166,9 @@ class ApproveGateExecutor:
             next_node=next_node,
             next_hint=next_hint,
         )
-        return NodeOutput(port_values={"decision": decision, "routing": routing})
+        return NodeOutput(
+            port_values={"decision": decision, "approval_routing": routing}
+        )
 
 
 @plugin(

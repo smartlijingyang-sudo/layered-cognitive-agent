@@ -143,14 +143,24 @@ def _outer_consumes_hitl_routing(plan: Plan) -> bool:
 
 
 def _predicate_reads_routing_next_hint(pred: Predicate) -> bool:
-    """Walk a predicate tree and report whether any leaf reads ``routing.next_hint``."""
+    """Walk a predicate tree and report whether any leaf reads the routing port's
+    ``next_hint`` field.
+
+    The port name on the outer plan is ``approval_routing`` (renamed
+    from ``routing`` per ADR-0237 / PR-1b to avoid the
+    ``PortRegistry.last-write-wins`` collision with the inner
+    ``act.fanout``'s ``routing``). The check accepts either name so a
+    future rename can swap back without rewriting the validator.
+    """
     if pred.kind in ("and", "or"):
         return any(_predicate_reads_routing_next_hint(c) for c in pred.children)
     if pred.kind == "not":
         return bool(pred.children) and _predicate_reads_routing_next_hint(pred.children[0])
-    if pred.port is not None and pred.port.name == "routing" and pred.port.field == "next_hint":
-        return True
-    return False
+    return (
+        pred.port is not None
+        and pred.port.name in ("routing", "approval_routing")
+        and pred.port.field == "next_hint"
+    )
 
 
 def _lift_graph_spec_inner(spec: Mapping[str, Any]) -> Plan:
