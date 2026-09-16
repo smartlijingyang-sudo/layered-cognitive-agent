@@ -111,7 +111,7 @@ class ReflectAdmitRecoveryExecutor:
 )
 async def setup(ctx: PluginContext, config: object) -> None:
     del config
-    ctx.provide("phase:reflect::phase.reflect.admit_recovery", ReflectAdmitRecoveryExecutor())
+    ctx.provide("reflect::phase.reflect.admit_recovery", ReflectAdmitRecoveryExecutor())
 
 
 __all__ = ["ReflectAdmitRecoveryExecutor", "_is_failure", "setup"]

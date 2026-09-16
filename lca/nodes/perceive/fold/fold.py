@@ -90,7 +90,7 @@ class PerceiveFoldExecutor:
 )
 async def setup(ctx: PluginContext, config: object) -> None:
     del config
-    ctx.provide("phase:perceive::phase.perceive.fold", PerceiveFoldExecutor())
+    ctx.provide("perceive::phase.perceive.fold", PerceiveFoldExecutor())
 
 
 __all__ = ["PerceiveFoldExecutor", "setup"]

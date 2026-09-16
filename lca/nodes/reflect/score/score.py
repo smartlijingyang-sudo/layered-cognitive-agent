@@ -138,7 +138,7 @@ class ReflectScoreExecutor:
 )
 async def setup(ctx: PluginContext, config: object) -> None:
     del config
-    ctx.provide("phase:reflect::phase.reflect.score", ReflectScoreExecutor())
+    ctx.provide("reflect::phase.reflect.score", ReflectScoreExecutor())
 
 
 __all__ = ["ReflectScoreExecutor", "setup"]

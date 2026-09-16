@@ -134,3 +134,88 @@ def test_validate_file_skips_non_plugin_file(tmp_path):
         mod.NODES_DIR = original_root
 
     assert issues == []
+
+
+def test_collect_provide_literals_picks_ctx_provide():
+    """Rule 3 helper must extract every ``ctx.provide("<key>", ...)`` literal."""
+    import ast
+
+    from check_plugin_region_prefix import _collect_provide_literals
+
+    text = (
+        "async def setup(ctx, config):\n"
+        "    ctx.provide('think::think.x', object())\n"
+        "    ctx.require('think::think.y')\n"
+        "    ctx.provide('think::think.z')\n"
+    )
+    tree = ast.parse(text)
+    literals = _collect_provide_literals(tree.body[0].body)
+    keys = [k for k, _ in literals]
+    assert "think::think.x" in keys
+    assert "think::think.z" in keys
+    # ``ctx.require`` is not ``provide`` — must be filtered out.
+    assert all("think.y" not in k for k in keys)
+
+
+def test_validate_file_rule3_flags_undeclared_provide_literal(tmp_path):
+    """``ctx.provide('a::b', ...)`` whose key is missing from declared ``provides=``
+    must be flagged. Regression for commit 89a7b256c drift.
+    """
+    fixture_root = tmp_path
+    nodes_dir = fixture_root / "lca" / "nodes" / "perceive"
+    nodes_dir.mkdir(parents=True)
+    fixture = nodes_dir / "fake.py"
+    fixture.write_text(
+        "from lca.harness.plugin_api import plugin\n"
+        "\n"
+        "@plugin(\n"
+        "    id='perceive.fake',\n"
+        "    provides=('perceive::perceive.fake',),\n"
+        ")\n"
+        "async def setup(ctx, config):\n"
+        "    ctx.provide('phase:perceive::perceive.fake', object())\n"
+    )
+
+    import check_plugin_region_prefix as mod
+
+    original_root = mod.NODES_DIR
+    mod.NODES_DIR = fixture_root / "lca" / "nodes"
+    try:
+        issues = validate_file(fixture)
+    finally:
+        mod.NODES_DIR = original_root
+
+    rule3 = [i for i in issues if "not in declared" in i.message]
+    assert len(rule3) == 1
+    assert "phase:perceive::perceive.fake" in rule3[0].message
+    assert "perceive::perceive.fake" in rule3[0].message  # suggestion hint
+
+
+def test_validate_file_rule3_passes_when_literal_matches_declared(tmp_path):
+    """The happy path: ``ctx.provide`` key is a member of declared ``provides=``."""
+    fixture_root = tmp_path
+    nodes_dir = fixture_root / "lca" / "nodes" / "perceive"
+    nodes_dir.mkdir(parents=True)
+    fixture = nodes_dir / "ok.py"
+    fixture.write_text(
+        "from lca.harness.plugin_api import plugin\n"
+        "\n"
+        "@plugin(\n"
+        "    id='perceive.ok',\n"
+        "    provides=('perceive::perceive.ok',),\n"
+        ")\n"
+        "async def setup(ctx, config):\n"
+        "    ctx.provide('perceive::perceive.ok', object())\n"
+    )
+
+    import check_plugin_region_prefix as mod
+
+    original_root = mod.NODES_DIR
+    mod.NODES_DIR = fixture_root / "lca" / "nodes"
+    try:
+        issues = validate_file(fixture)
+    finally:
+        mod.NODES_DIR = original_root
+
+    rule3 = [i for i in issues if "not in declared" in i.message]
+    assert rule3 == []

@@ -125,7 +125,7 @@ class RememberWriteExecutor:
 )
 async def setup(ctx: PluginContext, config: object) -> None:
     del config
-    ctx.provide("phase:remember::phase.remember.write", RememberWriteExecutor())
+    ctx.provide("remember::phase.remember.write", RememberWriteExecutor())
 
 
 __all__ = ["RememberWriteExecutor", "setup"]

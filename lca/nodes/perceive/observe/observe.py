@@ -89,7 +89,7 @@ class PerceiveObserveExecutor:
 )
 async def setup(ctx: PluginContext, config: object) -> None:
     del config
-    ctx.provide("phase:perceive::phase.perceive.observe", PerceiveObserveExecutor())
+    ctx.provide("perceive::phase.perceive.observe", PerceiveObserveExecutor())
 
 
 __all__ = ["PerceiveObserveExecutor", "setup"]

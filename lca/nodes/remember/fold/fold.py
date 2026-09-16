@@ -86,7 +86,7 @@ class RememberFoldExecutor:
 )
 async def setup(ctx: PluginContext, config: object) -> None:
     del config
-    ctx.provide("phase:remember::phase.remember.fold", RememberFoldExecutor())
+    ctx.provide("remember::phase.remember.fold", RememberFoldExecutor())
 
 
 __all__ = ["RememberFoldExecutor", "setup"]
