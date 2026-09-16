@@ -79,7 +79,7 @@ async def test_approve_gate_does_not_touch_context_runtime() -> None:
             }
         ),
     )
-    routing: RoutingDecision = out.port_values["routing"]
+    routing: RoutingDecision = out.port_values["approval_routing"]
     assert routing.next_node == "intervene.interrupt"
     assert routing.next_hint == "approve_interrupt"
 
@@ -101,7 +101,7 @@ async def test_approve_gate_skipped_path_uses_typed_needs_approval() -> None:
             }
         ),
     )
-    routing = out.port_values["routing"]
+    routing = out.port_values["approval_routing"]
     assert routing.next_node == "act.envelope"
     assert routing.next_hint == "approve_skipped"
 
@@ -119,7 +119,7 @@ async def test_approve_gate_approve_path_uses_typed_command() -> None:
             }
         ),
     )
-    routing = out.port_values["routing"]
+    routing = out.port_values["approval_routing"]
     assert routing.next_node == "act.envelope"
     assert routing.next_hint == "approve_approved"
 
@@ -137,6 +137,6 @@ async def test_approve_gate_rejected_path() -> None:
             }
         ),
     )
-    routing = out.port_values["routing"]
+    routing = out.port_values["approval_routing"]
     assert routing.next_node == "terminal.commit"
     assert routing.next_hint == "approve_rejected"

@@ -97,7 +97,7 @@ async def test_gate_needs_approval_without_command_routes_to_interrupt() -> None
         NodeInput(port_values={"decision": _decision(needs_approval=True), "command": None}),
     )
     decision: Decision = output.port_values["decision"]
-    routing: RoutingDecision = output.port_values["routing"]
+    routing: RoutingDecision = output.port_values["approval_routing"]
     assert isinstance(routing, RoutingDecision)
     assert routing.next_node == "intervene.interrupt"
     assert routing.next_hint == "approve_interrupt"
@@ -119,7 +119,7 @@ async def test_gate_needs_approval_false_passes_through_to_envelope() -> None:
         _ctx(),
         NodeInput(port_values={"decision": _decision(needs_approval=False)}),
     )
-    routing: RoutingDecision = output.port_values["routing"]
+    routing: RoutingDecision = output.port_values["approval_routing"]
     assert routing.next_node == "act.envelope"
     assert routing.next_hint == "approve_skipped"
 
@@ -142,7 +142,7 @@ async def test_gate_reject_routes_to_terminal_commit() -> None:
             }
         ),
     )
-    routing: RoutingDecision = output.port_values["routing"]
+    routing: RoutingDecision = output.port_values["approval_routing"]
     assert routing.next_node == "terminal.commit"
     assert routing.next_hint == "approve_rejected"
 
@@ -160,7 +160,7 @@ async def test_gate_redirect_to_abandon_routes_to_terminal_commit() -> None:
             }
         ),
     )
-    routing: RoutingDecision = output.port_values["routing"]
+    routing: RoutingDecision = output.port_values["approval_routing"]
     assert routing.next_node == "terminal.commit"
     assert routing.next_hint == "approve_rejected"
 
@@ -183,7 +183,7 @@ async def test_gate_resume_treated_as_timeout_routes_to_terminal_commit() -> Non
             }
         ),
     )
-    routing: RoutingDecision = output.port_values["routing"]
+    routing: RoutingDecision = output.port_values["approval_routing"]
     assert routing.next_node == "terminal.commit"
     assert routing.next_hint == "approve_rejected"
 
@@ -206,7 +206,7 @@ async def test_gate_approve_routes_to_envelope() -> None:
             }
         ),
     )
-    routing: RoutingDecision = output.port_values["routing"]
+    routing: RoutingDecision = output.port_values["approval_routing"]
     assert routing.next_node == "act.envelope"
     assert routing.next_hint == "approve_approved"
 
@@ -228,7 +228,7 @@ async def test_gate_is_idempotent_across_instances() -> None:
     out_a = await ApproveGateExecutor().node_execute(_ctx(), inp)
     out_b = await ApproveGateExecutor().node_execute(_ctx(), inp)
     assert out_a.port_values["decision"] == out_b.port_values["decision"]
-    assert out_a.port_values["routing"] == out_b.port_values["routing"]
+    assert out_a.port_values["approval_routing"] == out_b.port_values["approval_routing"]
 
 
 # ---------------------------------------------------------------------------
