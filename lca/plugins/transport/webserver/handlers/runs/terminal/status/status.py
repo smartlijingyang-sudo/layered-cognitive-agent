@@ -28,11 +28,11 @@ def derive_terminal_status(session: RunSession, success: bool) -> None:
     """Derive terminal status: cancellation / errors / carrier fallback (Session is SSOT)."""
     if session.cancel_requested or task_cancelled(session.task) or current_task_cancelled():
         session.cancel_requested = True
-        session.status = RunLifecycleStatus.CANCELED
+        session.status = RunLifecycleStatus.CANCELLED
     else:
         fallback_terminal_status(session, success)
     if session.status in {
-        RunLifecycleStatus.CANCELED,
+        RunLifecycleStatus.CANCELLED,
         RunLifecycleStatus.FAILED,
         RunLifecycleStatus.COMPLETED,
     }:
