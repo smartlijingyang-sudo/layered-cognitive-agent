@@ -24,6 +24,11 @@
 //   - Heartbeat 30s / 3 missed / 1→30s exponential backoff (ADR-0200 I-AGB-8).
 //   - Auto-reconnect with lastEventId resume (server replays from
 //     lastEventId; client dedupes by trusting server stream order).
+//   - isOwnTerminal parity with upstream `AgentStreamClient.handleFrame`:
+//     a terminal `agent_event` (`agent_runtime_end` / `error`) only ends
+//     the session when its operationId matches this client or is
+//     absent. A forwarded sibling terminal is still emitted but must
+//     NOT tear down this client's WS.
 //
 // Deferred to Step B:
 //   - Resume-buffer dedup window (native `resumeMode` + `resumeBuffer`):
@@ -343,7 +348,22 @@ export class LcaAgentStreamClient {
       }
       case 'agent_event': {
         if (typeof message.id === 'string') this.lastEventId = message.id;
+        const agentEvent = message.event as { operationId?: unknown; type?: unknown };
         this.emit('agent_event', message.event);
+        // Mirrors upstream AgentStreamClient.isOwnTerminal: a terminal
+        // agent_event ends the session only when it belongs to THIS op.
+        // A forwarded sibling terminal must still emit (so a future
+        // hetero member handler can finalize that op) but must NOT
+        // tear down this client's WS. Events with no operationId
+        // (legacy single-op gateway) are treated as this op's.
+        const isOwnTerminal =
+          (agentEvent.type === 'agent_runtime_end' || agentEvent.type === 'error') &&
+          (agentEvent.operationId === undefined ||
+            agentEvent.operationId === this.options.operationId);
+        if (isOwnTerminal) {
+          this.sessionEnded = true;
+          this.disconnect();
+        }
         return;
       }
       case 'resume_complete': {
