@@ -18,9 +18,10 @@
     ./scripts/lca-ops journal exceptions --raw                 # 完整 payload
     ./scripts/lca-ops journal exceptions --grep AttributeError # 按 class 过滤
 
-设计上优先读 ``<run_id>.exceptions.jsonl``(旧 FileSink 双写索引)。
-ADR-0183 ``SpineSink`` 路径只写 ``<run_id>.spine.jsonl`` 时,本命令回退扫描
-spine 主 ledger 中的 ``exception.caught`` 行,避免"有异常但 CLI 报无异常"。
+设计上只读 ``<run_id>.exceptions.jsonl`` sidecar 文件(唯一 source of truth)。
+Per spec §15 G-11 / Task 1.10:spine-scan fallback 已删除;sidecar 缺失时直接
+报 count=0。避免 spine 扫描产生误导性的"有异常但 CLI 报有异常"结果(当实际
+sidecar 缺失时)。
 """
 
 from __future__ import annotations
@@ -46,31 +47,6 @@ def _find_run_dir(run_id: str | None, traces_root: Path) -> Path:
     return traces_root / "runs" / resolved_run_id
 
 
-def _iter_spine_exception_records(spine_path: Path) -> list[dict[str, Any]]:
-    if not spine_path.exists():
-        return []
-    out: list[dict[str, Any]] = []
-    for line in spine_path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            rec = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if rec.get("execution_point") != "exception.caught":
-            continue
-        payload = rec.get("payload")
-        if not isinstance(payload, dict):
-            continue
-        # 兼容旧 offload 占位符:只有 offloaded digest 时跳过,交给 sidecar 路径。
-        if payload.keys() <= {"offloaded", "execution_point"} or payload.get("offloaded"):
-            continue
-        out.append(rec)
-    return out
-
-
-def _iter_records(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
     out: list[dict[str, Any]] = []
@@ -165,17 +141,16 @@ def register(app: typer.Typer) -> None:
             _DEFAULT_TRACES_ROOT, "--traces-root", help="traces 根目录"
         ),
     ) -> None:
-        """列出 run 的所有 traceback(优先 exceptions.jsonl,回退 spine.jsonl)。"""
+        """列出 run 的所有 traceback(只读 exceptions.jsonl sidecar)。"""
         run_dir = _find_run_dir(run_id, traces_root)
         exc_path = run_dir / f"{run_dir.name}.exceptions.jsonl"
         spine_path = run_dir / f"{run_dir.name}.spine.jsonl"
-        source = "exceptions_index"
-        if exc_path.exists():
-            records = _iter_records(exc_path)
-        else:
-            records = _iter_spine_exception_records(spine_path)
-            source = "spine_fallback"
-        if not records and not exc_path.exists() and not spine_path.exists():
+        # Task 1.10 / G-11: sidecar is the ONLY source of truth.
+        # Spine-scan fallback removed — it produced misleading counts when
+        # the sidecar was missing but spine had exception.caught events.
+        source = "exceptions_index" if exc_path.exists() else "no_sidecar"
+        records = _iter_records(exc_path) if exc_path.exists() else []
+        if not records and not exc_path.exists():
             if json_output:
                 sys.stdout.write(
                     json.dumps(
@@ -193,7 +168,7 @@ def register(app: typer.Typer) -> None:
                 )
             else:
                 print(
-                    f"无异常:{exc_path} 不存在且 {spine_path} 不存在 "
+                    f"无异常:{exc_path} 不存在 (sidecar 缺失;per spec G-11,本命令只读 sidecar) "
                     "(该 run 无 exception.caught 事件)"
                 )
             return

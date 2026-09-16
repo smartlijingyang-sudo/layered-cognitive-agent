@@ -24,7 +24,10 @@ import structlog
 from lca.cognition.body.emit._args_summary import summarize_args
 from lca.cognition.body.tools.tool_result_preview import tool_files
 from lca.contracts.models.core.execution.decision import Observation, ToolCall  # noqa: F401
-from lca.contracts.models.observability.diagnostic.diagnostic import DiagnosticCategory
+from lca.contracts.models.observability.diagnostic.diagnostic import (
+    DiagnosticCategory,
+    DiagnosticStatus,
+)
 from lca.contracts.models.observability.tool.journal_receipt import (
     ToolJournalReceipt,
     tool_denied_receipt,
@@ -136,6 +139,7 @@ def record_tool_started_diagnostic(
             "tool_name": tool.name,
             "invocation_id": invocation_id,
         },
+        status=DiagnosticStatus.STARTED.value,
     )
 
 
@@ -215,6 +219,7 @@ def record_tool_denied_observability(tool: Tool, reason: str) -> None:
         operation="tool.denied",
         plugin=type(tool).__name__,
         attributes={"tool_name": tool.name, "reason": reason},
+        status=DiagnosticStatus.FAILED.value,
     )
     from lca.loop.commit.tool_journal import (
         record_step_tool_result,
@@ -329,6 +334,7 @@ def record_tool_invoked_diagnostic(
             "latency_ms": latency_ms,
             "error": "" if obs.success else (obs.error or ""),
         },
+        status=DiagnosticStatus.SUCCEEDED.value if obs.success else DiagnosticStatus.FAILED.value,
     )
 
 

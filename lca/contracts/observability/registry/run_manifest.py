@@ -12,6 +12,12 @@
 P3(slim):删 ``materializer_version`` / ``evidence_integrity`` / ``pricing_ref``;
 前两者从未在 reader 中被消费,后者语义与 ``CostProjector.pricing_ref``
 (``lca/contracts/observability/cost.py``)无关 —— manifest 字段空串从未承载真值。
+
+PR-1 / Task 1.7: 新增 ``health_summary`` + ``health_hash`` 两个**必备**
+字段(取代 ``terminal_event_seq`` / ``ledger_high_watermark`` /
+``ledger_summary`` 作为完整性真值),同时把后三个标 ``@deprecated``。
+delete-when: 2027-01-01(per AGENTS.md §5;旧 reader 必须继续解析,
+所以字段仍存在,只是 ``manifest.json`` 不再以它们为完整性 source)。
 """
 
 from __future__ import annotations
@@ -20,6 +26,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
+
+from lca.contracts.observability.health.report import RunHealthSummary
 
 
 class IntegrityState(str, Enum):
@@ -48,6 +56,12 @@ class RunManifest:
     ADR-0068 §决策二:``plan_ref`` 是 CompiledRunPlan 的 16-hex 稳定 ID,
     终端 manifest 必须以顶层字段携带(不是 ``extra.plan_ref``),
     让任何 reader 一行 grep 就能拿到图指纹、按 plan 复现/对比。
+
+    PR-1 / Task 1.7: 完整性真值由 ``health_summary`` + ``health_hash``
+    提供;``terminal_event_seq`` / ``ledger_high_watermark`` /
+    ``ledger_summary`` 标 ``@deprecated``(delete-when: 2027-01-01),
+    保留字段以维持旧 reader,但不再以它们为 SSOT。 ``health_summary``
+    和 ``health_hash`` 是 REQUIRED,生产路径缺失即视为非法 manifest。
     """
 
     schema: str = "lca.run_manifest/1"
@@ -55,8 +69,14 @@ class RunManifest:
     plan_ref: str = ""  # ADR-0068 §决策二:CompiledRunPlan.plan_ref,16-hex 稳定 ID
     session_error: str = ""  # 终态 carrier 错误;顶层可读(ADR-0165.1 / ADR-0122)
     session_status: str = ""  # RunSession.status.value 物化快照
+    # PR-1 / Task 1.7: 新字段 — 取代 legacy 字段作为完整性 source.
+    health_summary: RunHealthSummary = field(default_factory=RunHealthSummary)
+    health_hash: str = ""
+    # @deprecated — delete-when: 2027-01-01;保留以维持旧 reader 解析。
     terminal_event_seq: int = 0
+    # @deprecated — delete-when: 2027-01-01.
     ledger_high_watermark: int = 0
+    # @deprecated — delete-when: 2027-01-01.
     ledger_summary: str = ""
     started_at: float = 0.0
     closed_at: float = 0.0
@@ -69,6 +89,8 @@ class RunManifest:
             "plan_ref": self.plan_ref,
             "session_error": self.session_error,
             "session_status": self.session_status,
+            "health_summary": self.health_summary.model_dump(mode="json"),
+            "health_hash": self.health_hash,
             "terminal_event_seq": self.terminal_event_seq,
             "ledger_high_watermark": self.ledger_high_watermark,
             "ledger_summary": self.ledger_summary,
@@ -80,12 +102,21 @@ class RunManifest:
     @classmethod
     def from_dict(cls, payload: Mapping[str, Any]) -> RunManifest:
         extra = dict(payload.get("extra", {}) or {})
+        hs_raw = payload.get("health_summary")
+        if isinstance(hs_raw, RunHealthSummary):
+            health_summary = hs_raw
+        elif isinstance(hs_raw, Mapping):
+            health_summary = RunHealthSummary.model_validate(hs_raw)
+        else:
+            health_summary = RunHealthSummary()
         return cls(
             schema=str(payload.get("schema", "lca.run_manifest/1")),
             run_id=str(payload.get("run_id", "")),
             plan_ref=str(payload.get("plan_ref", "")),
             session_error=str(payload.get("session_error") or extra.get("session_error") or ""),
             session_status=str(payload.get("session_status") or extra.get("session_status") or ""),
+            health_summary=health_summary,
+            health_hash=str(payload.get("health_hash", "")),
             terminal_event_seq=int(payload.get("terminal_event_seq", 0)),
             ledger_high_watermark=int(payload.get("ledger_high_watermark", 0)),
             ledger_summary=str(payload.get("ledger_summary", "")),

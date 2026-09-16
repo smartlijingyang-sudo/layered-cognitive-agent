@@ -25,6 +25,24 @@ dependencies = [
     "cryptography>=50.0.1",
 ]
 
+# Health deriver entry-point group (PR-1 / Task 1.2). Discovery goes
+# through ``importlib.metadata.entry_points(group="lca.health_derivers")``
+# in ``lca/plugins/observability/health/run_health_fold.py``. Adding a
+# new deriver = one new file in ``derivers/`` + one line here. No
+# contract change, no fold change, no consumer change. Spec:
+# docs/superpowers/specs/2026-09-16-run-health-and-execution-closure-design.md
+# §2.2 (derivers, entry-point pattern) and §4 (deriver table). Sandbox
+# is folded into ``tool`` as a sub-rule per spec §15 G-21.
+[project.entry-points."lca.health_derivers"]
+perceive = "lca.plugins.observability.health.derivers.perceive_deriver:PerceiveDeriver"
+think = "lca.plugins.observability.health.derivers.think_deriver:ThinkDeriver"
+act = "lca.plugins.observability.health.derivers.act_deriver:ActDeriver"
+tool = "lca.plugins.observability.health.derivers.tool_deriver:ToolDeriver"
+llm = "lca.plugins.observability.health.derivers.llm_deriver:LlmDeriver"
+reflect = "lca.plugins.observability.health.derivers.reflect_deriver:ReflectDeriver"
+remember = "lca.plugins.observability.health.derivers.remember_deriver:RememberDeriver"
+lifecycle = "lca.plugins.observability.health.derivers.lifecycle_deriver:LifecycleDeriver"
+
 [tool.uv.sources]
 taiyi-cordis      = { path = "vendor/cordis" }
 taiyi-cosmokit    = { path = "vendor/cosmokit" }

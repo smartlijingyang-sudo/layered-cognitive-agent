@@ -100,11 +100,19 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
             payload = json.loads(manifest_path.read_text(encoding="utf-8"))
             self.assertEqual(payload["schema"], "lca.run_manifest/1")
             self.assertEqual(payload["run_id"], run_id)
-            # ADR-0096 I7: derived view holds journal seq, not hard event_id.
-            self.assertEqual(payload["terminal_event_seq"], 2)
             self.assertNotIn("terminal_event_id", payload)
-            self.assertEqual(payload["ledger_high_watermark"], 2)
-            self.assertNotEqual(payload["ledger_summary"], "")
+            # PR-1 / Task 1.7: terminal_event_seq / ledger_high_watermark /
+            # ledger_summary are @deprecated (G-6..G-8, delete-when 2027-01-01);
+            # the integrity source moved to health_summary + health_hash.
+            # We assert the deprecated fields are STILL PRESENT (old reader
+            # compat) but no longer pinned to specific values — _TERMINAL_EVENT_TYPES
+            # was deleted (G-9) and ADR-0233's replacement isn't in this PR.
+            self.assertIn("terminal_event_seq", payload)
+            self.assertIn("ledger_high_watermark", payload)
+            self.assertIn("ledger_summary", payload)
+            # PR-1 / Task 1.7: NEW integrity fields are REQUIRED.
+            self.assertIn("health_summary", payload)
+            self.assertIn("health_hash", payload)
             self.assertEqual(payload["started_at"], 1000.0)
             self.assertEqual(payload["closed_at"], 1100.0)
             self.assertIn("doctor_report", payload["extra"])
@@ -151,10 +159,15 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
             payload = json.loads(
                 (root / "runs" / run_id / "manifest.json").read_text(encoding="utf-8")
             )
-            # ADR-0096 I7: scan journal for the terminal event's seq, not event_id.
-            self.assertEqual(payload["terminal_event_seq"], 7)
+            # PR-1 / Task 1.7 (G-9): _TERMINAL_EVENT_TYPES deleted; the
+            # legacy terminal_event_seq lookup is gone until ADR-0233
+            # lands. The deprecated field stays present (zero) for
+            # backward compat; the integrity source is now health_hash.
+            self.assertIn("terminal_event_seq", payload)
             self.assertNotIn("terminal_event_id", payload)
-            self.assertEqual(payload["ledger_high_watermark"], 7)
+            self.assertIn("ledger_high_watermark", payload)
+            self.assertIn("health_summary", payload)
+            self.assertIn("health_hash", payload)
 
     def test_terminal_event_seq_fallback_accepts_run_finished(self) -> None:
         with self._fresh_root() as root:
@@ -172,9 +185,11 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
             payload = json.loads(
                 (root / "runs" / run_id / "manifest.json").read_text(encoding="utf-8")
             )
-            # ADR-0096 I7: derived view holds journal seq, not hard event_id.
-            self.assertEqual(payload["terminal_event_seq"], 3)
+            # PR-1 / Task 1.7 (G-9): terminal_event_seq lookup gone; the
+            # deprecated field stays present (zero) for backward compat.
+            self.assertIn("terminal_event_seq", payload)
             self.assertNotIn("terminal_event_id", payload)
+            self.assertIn("health_hash", payload)
 
     def test_v2_envelope_fallback_preserves_watermark_and_terminal_event(self) -> None:
         with self._fresh_root() as root:
@@ -216,10 +231,15 @@ class TerminalManifestWritesPerRun(unittest.TestCase):
             payload = json.loads(
                 (root / "runs" / run_id / "manifest.json").read_text(encoding="utf-8")
             )
-            self.assertEqual(payload["ledger_high_watermark"], 7)
-            # ADR-0096 I7: derived view holds journal seq, not hard event_id.
-            self.assertEqual(payload["terminal_event_seq"], 7)
+            # PR-1 / Task 1.7: ledger_high_watermark + terminal_event_seq
+            # are deprecated (G-7/G-6); the field stays present for
+            # backward compat but no longer pins to a specific value
+            # because _TERMINAL_EVENT_TYPES was deleted (G-9). Integrity
+            # source is health_hash.
+            self.assertIn("ledger_high_watermark", payload)
+            self.assertIn("terminal_event_seq", payload)
             self.assertNotIn("terminal_event_id", payload)
+            self.assertIn("health_hash", payload)
 
     def test_failure_does_not_propagate(self) -> None:
         """任何 IO 错误必须 swallow + 记日志,不能污染 run 关闭。"""

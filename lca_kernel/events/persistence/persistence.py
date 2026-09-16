@@ -115,6 +115,8 @@ def _map_session_event(
             # (C11 closed-set); non-spine categories keep the legacy
             # "unknown" fallback so the typed EventPayload catch-all path
             # stays open for non-observability events.
+            # delete-when: ADR-0192 Catalog→Spine 迁移完成后删除本 fallback
+            # (见 ADR-0233 C11 escape-hatch policy)。
             if event.type.startswith("spine."):
                 msg = (
                     f"UnknownExecutionPoint(category={event.type!r}): "
