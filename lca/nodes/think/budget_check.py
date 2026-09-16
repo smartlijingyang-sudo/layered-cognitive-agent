@@ -86,7 +86,7 @@ class ThinkBudgetCheckExecutor:
     """think 节点: read ``state.budget`` -> emit ``RoutingDecision`` typed port."""
 
     semantic_name: str = "think.budget.check"
-    region: str = "phase:think"
+    region: str = "think"
     # ``state`` is a runtime carrier, not a typed-port payload — it lives
     # on ``context.runtime.state`` (mirroring ``think.shortcut``) rather
     # than on the port registry. ``declared_inputs`` is empty; the
@@ -165,7 +165,7 @@ def _extract_budget(state: object) -> Budget:
 @plugin(
     id="phase.think.budget.check",
     Config=None,
-    provides=("phase:think::think.budget.check",),
+    provides=("think::think.budget.check",),
     requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

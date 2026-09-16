@@ -70,7 +70,7 @@ class DelegateComposeExecutor:
     """delegate.compose: Decision + capability_grant → tuple[DelegationRequest]."""
 
     semantic_name: str = "delegate.compose"
-    region: str = "region:delegate"
+    region: str = "delegate"
     declared_inputs: tuple[PortName, ...] = ("decision", "capability_grant")
     declared_outputs: tuple[PortName, ...] = ("delegation_request",)
 
@@ -186,7 +186,7 @@ def _enforce_delegate_capability(grant: Any) -> None:
 @plugin(
     id="lca.nodes.delegate.compose",
     Config=None,
-    provides=("region:delegate::delegate.compose",),
+    provides=("delegate::delegate.compose",),
     requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

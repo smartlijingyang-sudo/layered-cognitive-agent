@@ -104,7 +104,7 @@ class HistoryDeriveExecutor:
     """
 
     semantic_name: str = "history.derive"
-    region: str = "phase:think"
+    region: str = "think"
     declared_inputs: tuple[PortName, ...] = (
         "state",
         "writer",
@@ -265,7 +265,7 @@ def _resolve_system(
 @plugin(
     id="phase.think.history.derive",
     Config=None,
-    provides=("phase:think::history.derive",),
+    provides=("think::history.derive",),
     requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

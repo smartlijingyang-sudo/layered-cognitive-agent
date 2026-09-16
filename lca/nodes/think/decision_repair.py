@@ -101,7 +101,7 @@ class ThinkDecisionRepairExecutor:
     """think 节点: validate / repair ``Decision.tool_calls[*].arguments`` -> forward or re-route."""
 
     semantic_name: str = "think.decision.repair"
-    region: str = "phase:think"
+    region: str = "think"
     declared_inputs: tuple[PortName, ...] = ("decision",)
     declared_outputs: tuple[PortName, ...] = ("decision", "routing")
 
@@ -543,7 +543,7 @@ def _route_rejected_truncated() -> RoutingDecision:
 @plugin(
     id="phase.think.decision.repair",
     Config=None,
-    provides=("phase:think::think.decision.repair",),
+    provides=("think::think.decision.repair",),
     requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

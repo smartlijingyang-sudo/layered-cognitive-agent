@@ -70,7 +70,7 @@ class DecisionParseExecutor:
     """think.decision.parse 节点:LLMResponse → :class:`Decision`."""
 
     semantic_name: str = "decision.parse"
-    region: str = "phase:think"
+    region: str = "think"
     declared_inputs: tuple[PortName, ...] = ("state", "llm_response")
     declared_outputs: tuple[PortName, ...] = ("decision",)
 
@@ -168,7 +168,7 @@ def _infer_action_type(
 @plugin(
     id="phase.think.decision.parse",
     Config=None,
-    provides=("phase:think::decision.parse",),
+    provides=("think::decision.parse",),
     requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

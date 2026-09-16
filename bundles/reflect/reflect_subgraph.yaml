@@ -11,7 +11,7 @@
 # in ``declarative-recovery.yaml`` reads this port.
 
 id: reflect.subgraph
-region: phase:reflect
+region: reflect
 purpose: reflect 双步执行 — score (reflection pipeline) → admit_recovery (recovery hint)
 
 nodes:

@@ -17,6 +17,7 @@ purpose: ModelVisibleRequest → LLMResponse typed boundary (persist-before-exec
 
 nodes:
   - id: llm.call
+    region: think
     factory: llm.call
     inputs: [state, writer, model_visible_request]
     outputs: [llm_response, usage]

@@ -106,7 +106,7 @@ class ActObserveExecutor:
     """``concept.act_subgraph`` 节点:EffectReceipt → EffectReceipt(passthrough)。"""
 
     semantic_name: str = "act.observe"
-    region: str = "concept"
+    region: str = "act"
     declared_inputs: tuple[PortName, ...] = ("receipt",)
     declared_outputs: tuple[PortName, ...] = ("receipt",)
 
@@ -183,7 +183,7 @@ class ActObserveExecutor:
 @plugin(
     id="phase.concept.act_subgraph.act_observe",
     Config=None,
-    provides=("concept::act.observe",),
+    provides=("act::act.observe",),
     requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

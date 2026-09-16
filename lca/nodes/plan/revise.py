@@ -113,7 +113,7 @@ class PlanReviseExecutor:
     """
 
     semantic_name: str = "plan.revise"
-    region: str = "region:plan"
+    region: str = "plan"
     declared_inputs: tuple[PortName, ...] = ("state", "reflection")
     declared_outputs: tuple[PortName, ...] = ("task_list",)
 
@@ -176,7 +176,7 @@ def _extract_task_list(state: object) -> TaskList:
 @plugin(
     id="lca.nodes.plan.revise",
     Config=None,
-    provides=("region:plan::plan.revise",),
+    provides=("plan::plan.revise",),
     requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

@@ -44,7 +44,7 @@ class ActEnvelopeExecutor:
     """``concept.act_subgraph`` 节点:Decision → CommandEnvelope。"""
 
     semantic_name: str = "act.envelope"
-    region: str = "concept"
+    region: str = "act"
     declared_inputs: tuple[PortName, ...] = ("decision",)
     declared_outputs: tuple[PortName, ...] = ("envelope",)
 
@@ -93,7 +93,7 @@ class ActEnvelopeExecutor:
 @plugin(
     id="phase.concept.act_subgraph.act_envelope",
     Config=None,
-    provides=("concept::act.envelope",),
+    provides=("act::act.envelope",),
     requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

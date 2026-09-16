@@ -42,7 +42,7 @@ class ThinkShortcutExecutor:
     """think 节点:在 LLM 推理前调用 SupportsShortcut.try_shortcut。"""
 
     semantic_name: str = "think.shortcut"
-    region: str = "phase:think"
+    region: str = "think"
     # ADR-0219 §5.5: typed port contract declared on the plugin (graph
     # layer does not know port names; it only knows topology).
     declared_inputs: tuple[PortName, ...] = ("in_assembled_manifest",)
@@ -87,7 +87,7 @@ class ThinkShortcutExecutor:
 @plugin(
     id="phase.think.shortcut",
     Config=None,
-    provides=("phase:think::think.shortcut",),
+    provides=("think::think.shortcut",),
     requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

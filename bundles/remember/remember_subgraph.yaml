@@ -6,7 +6,7 @@
 # ``memory_receipt`` port 到 outer。
 
 id: remember.subgraph
-region: phase:remember
+region: remember
 purpose: remember 双步执行 — write (mint envelope + dispatch) → fold (memory_receipt)
 
 nodes:

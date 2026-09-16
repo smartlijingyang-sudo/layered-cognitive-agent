@@ -13,7 +13,7 @@
 # topology — both shapes are valid per ADR-0228 §Decision 6).
 
 id: plan.compose.subgraph
-region: region:plan
+region: plan
 purpose: plan 1 节点执行 — seed TaskList from inbound Decision
 
 nodes:

@@ -59,7 +59,7 @@ class LlmCallExecutor:
     """think.llm.dispatch 节点:ModelVisibleRequest → (LLMResponse, TokenUsage)."""
 
     semantic_name: str = "llm.call"
-    region: str = "phase:think"
+    region: str = "think"
     declared_inputs: tuple[PortName, ...] = (
         "state",
         "writer",
@@ -193,7 +193,7 @@ def _resolve_port(name: str, *, input: NodeInput, context: NodeContext) -> Any:
 @plugin(
     id="phase.think.llm.call",
     Config=None,
-    provides=("phase:think::llm.call",),
+    provides=("think::llm.call",),
     requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

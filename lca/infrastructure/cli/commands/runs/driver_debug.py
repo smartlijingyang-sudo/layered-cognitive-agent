@@ -243,31 +243,47 @@ def cmd_debug_credentials(json_mode: bool) -> None:
 def _build_factory_index() -> dict[str, list[str]]:
     """Walk plugin directory tree and harvest composite-key ``region::factory``.
 
-    Best-effort static parse: scans ``lca/plugins/**/*.py`` for ``@plugin``
-    decorated callables whose args include ``provides=...``. The
-    decorator hides provides on the function itself; this walks the
+    Best-effort static parse: scans ``lca/plugins/**/*.py`` AND
+    ``lca/nodes/**/*.py`` (ADR-0231 D3 — region SSOT = ``lca/nodes/<region>/``)
+    for ``@plugin`` decorated callables whose args include ``provides=...``.
+    The decorator hides provides on the function itself; this walks the
     source text instead.
+
+    Both trees are scanned because production profile resolution loads
+    ``lca/plugins/`` entries from ``bundles/*.yaml``'s ``$module:`` references
+    (which ``resolve_profile`` includes in its resolved tree) but does NOT
+    load ``lca/nodes/`` entries — those graph-node plugins are auto-resolved
+    at plan execution time via factory name (see
+    ``lca/plugins/composer/runtime/runtime/capabilities.py::resolve_node_executor_bindings``).
+    Boot-time ``inspect_profile_tree`` therefore cannot see ``lca/nodes/`` plugins
+    via capability_graph; the static scan is the only path that covers both.
     """
     import re
 
     registry: dict[str, list[str]] = {}
     pattern = re.compile(r"provides\s*=\s*\(([^)]*)\)")
-    for path in Path("lca/plugins").rglob("*.py"):
-        if path.name == "__init__.py":
+    # ADR-0231 D3: scan both lca/plugins/ (loaded via bundles/$module) and
+    # lca/nodes/ (graph-node registry, not loaded into resolved profile).
+    for root in ("lca/plugins", "lca/nodes"):
+        if not Path(root).is_dir():
             continue
-        try:
-            text = path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
-            # A file can vanish mid-rglob or be a non-UTF-8 artifact; the
-            # capability attribution simply does not see it. Any other error is
-            # a bug and must surface rather than silently shrink the registry.
-            continue
-        for m in pattern.finditer(text):
-            inner = m.group(1)
-            for cap_match in re.finditer(r"""['"]([^'"]+::[^'"]+)['"]""", inner):
-                cap_str = cap_match.group(1)
-                registry.setdefault(cap_str, []).append(path.stem)
-                registry.setdefault(f"{cap_str}.ref", []).append(path.stem)
+        for path in Path(root).rglob("*.py"):
+            if path.name == "__init__.py":
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                # A file can vanish mid-rglob or be a non-UTF-8 artifact; the
+                # capability attribution simply does not see it. Any other
+                # error is a bug and must surface rather than silently shrink
+                # the registry.
+                continue
+            for m in pattern.finditer(text):
+                inner = m.group(1)
+                for cap_match in re.finditer(r"""['"]([^'"]+::[^'"]+)['"]""", inner):
+                    cap_str = cap_match.group(1)
+                    registry.setdefault(cap_str, []).append(path.stem)
+                    registry.setdefault(f"{cap_str}.ref", []).append(path.stem)
     return registry
 
 
@@ -417,18 +433,45 @@ def cmd_debug_factories(profile: Path, json_mode: bool) -> None:
                     ),
                 }
             )
-        else:
+            continue
+        # ADR-0231 D4: distinguish "region not in canonical set" from "factory
+        # not provided under that region". The former is a bundle YAML bug
+        # (typo / pre-migration prefix); the latter is a real missing provider.
+        try:
+            from lca.contracts.atoms.enums.region_prefix import RegionPrefix
+
+            region_known = RegionPrefix.contains(region)
+        except Exception:
+            region_known = True  # be conservative if the contracts module is unavailable
+        if not region_known:
             rows.append(
                 {
                     "bundle": bundle_path,
                     "node_id": node_id,
                     "factory": factory,
                     "region": region,
-                    "status": "missing",
+                    "status": "unrecognized_region",
                     "tried_keys": candidates,
+                    "note": (
+                        f"region {region!r} is not in lca/nodes/ canonical set "
+                        "(ADR-0231 D1/D4); check for `phase:` / `region:` prefix "
+                        "or typo"
+                    ),
                 }
             )
             miss_count += 1
+            continue
+        rows.append(
+            {
+                "bundle": bundle_path,
+                "node_id": node_id,
+                "factory": factory,
+                "region": region,
+                "status": "missing",
+                "tried_keys": candidates,
+            }
+        )
+        miss_count += 1
     report = {
         "profile": str(profile),
         "bundles_visited": sorted(visited),

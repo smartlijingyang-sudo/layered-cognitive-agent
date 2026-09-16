@@ -5,7 +5,7 @@
 # dicts. The legacy string-DSL edge conditions are gone.
 
 id: think.subgraph
-region: phase:think
+region: think
 purpose: think 5 步执行 — shortcut 可 short-circuit,route → reason → history.assemble → llm.dispatch → decision.parse → gate 收敛
 
 nodes:

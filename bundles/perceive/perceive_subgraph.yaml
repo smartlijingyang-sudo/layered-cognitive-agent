@@ -9,7 +9,7 @@
 # :class:`RoutingDecision` for downstream edge predicate evaluation.
 
 id: perceive.subgraph
-region: phase:perceive
+region: perceive
 purpose: perceive 双步执行 — observe (PerceiveHub) → fold (manifest → observation)
 
 nodes:

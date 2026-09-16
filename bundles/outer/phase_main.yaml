@@ -13,7 +13,7 @@
 # ad-hoc fields.
 
 id: phase.main.outer
-region: phase:agent
+region: agent
 purpose: Six-phase outer plan (perceive → think → act → reflect → remember → terminal.commit) wired through sub_spec_ref into per-phase subgraphs.
 
 nodes:
@@ -135,7 +135,7 @@ nodes:
   #   - approve_rejected → terminal.commit (reject/redirect/resume-abandon)
   - id: act.approve.gate
     factory: act.approve.gate
-    region: phase:intervene
+    region: intervene
     # The gate is a pure transform of the ``decision`` port; the
     # ``command`` port is optional (consumed only on resume re-entry
     # when the kernel re-projects a persisted Command into the

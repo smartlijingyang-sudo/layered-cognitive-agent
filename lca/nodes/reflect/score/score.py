@@ -68,7 +68,7 @@ class ReflectScoreExecutor:
     """Primitive: invoke the selected reflection seam, emit ``reflection``."""
 
     semantic_name: str = "phase.reflect.score"
-    region: str = "phase:reflect"
+    region: str = "reflect"
     declared_inputs: tuple[PortName, ...] = ("observation",)
     declared_outputs: tuple[PortName, ...] = ("reflection",)
 
@@ -112,7 +112,7 @@ class ReflectScoreExecutor:
 
 @plugin(
     id="phase.reflect.score",
-    provides=("phase:reflect::phase.reflect.score",),
+    provides=("reflect::phase.reflect.score",),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",

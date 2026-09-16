@@ -10,7 +10,7 @@
 # sees per-run tool schemas — closes spec §E.
 
 id: think.reason.subgraph
-region: phase:think
+region: think
 purpose: think.reason 内部执行 — fork tools then plan → render (LLM call moved to think.llm.dispatch)
 entry: think.reason.fork_tools
 

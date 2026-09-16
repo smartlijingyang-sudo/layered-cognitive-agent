@@ -39,7 +39,7 @@ class PerceiveFoldExecutor:
     """Terminal-of-typing node: ``manifest`` → ``observation``."""
 
     semantic_name: str = "phase.perceive.fold"
-    region: str = "phase:perceive"
+    region: str = "perceive"
     declared_inputs: tuple[PortName, ...] = ("manifest",)
     declared_outputs: tuple[PortName, ...] = (
         "in_assembled_manifest",
@@ -64,7 +64,7 @@ class PerceiveFoldExecutor:
 
 @plugin(
     id="phase.perceive.fold",
-    provides=("phase:perceive::phase.perceive.fold",),
+    provides=("perceive::phase.perceive.fold",),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",

@@ -12,7 +12,7 @@
 # {perceive, think, act, remember, reflect, stop}.
 
 id: delegate.subgraph
-region: region:delegate
+region: delegate
 purpose: delegate 跨 phase fan-out — compose(Decision → tuple[DelegationRequest])
 
 nodes:

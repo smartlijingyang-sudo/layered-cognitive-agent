@@ -18,6 +18,7 @@ purpose: LLMResponse → Decision typed boundary — single-pass parse + action_
 
 nodes:
   - id: decision.parse
+    region: think
     factory: decision.parse
     inputs: [state, llm_response]
     outputs: [decision]

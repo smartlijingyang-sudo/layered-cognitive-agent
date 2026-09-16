@@ -109,7 +109,7 @@ class ResumeExecutor:
     """
 
     semantic_name: str = "intervene.resume"
-    region: str = "region:intervene"
+    region: str = "intervene"
     declared_inputs: tuple[PortName, ...] = ("command",)
     declared_outputs: tuple[PortName, ...] = ("decision",)
 
@@ -158,7 +158,7 @@ class ResumeExecutor:
 @plugin(
     id="lca.nodes.intervene.resume",
     Config=None,
-    provides=("region:intervene::intervene.resume",),
+    provides=("intervene::intervene.resume",),
     requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

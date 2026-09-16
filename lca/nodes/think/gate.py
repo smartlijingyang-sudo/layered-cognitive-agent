@@ -47,7 +47,7 @@ class ThinkGateExecutor:
     """think 节点:把 Decision 经 DecisionGate 收敛。"""
 
     semantic_name: str = "think.gate"
-    region: str = "phase:think"
+    region: str = "think"
     # ADR-0219 §5.5: typed port contract declared on the plugin (graph
     # layer does not know port names; it only knows topology).
     declared_inputs: tuple[PortName, ...] = ("decision",)
@@ -80,7 +80,7 @@ class ThinkGateExecutor:
 @plugin(
     id="phase.think.gate",
     Config=None,
-    provides=("phase:think::think.gate",),
+    provides=("think::think.gate",),
     requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

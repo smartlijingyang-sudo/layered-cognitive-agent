@@ -40,7 +40,7 @@ class RememberFoldExecutor:
     """Terminal-of-typing: forward the typed ``memory_receipt`` port."""
 
     semantic_name: str = "phase.remember.fold"
-    region: str = "phase:remember"
+    region: str = "remember"
     declared_inputs: tuple[PortName, ...] = ("memory_receipt",)
     declared_outputs: tuple[PortName, ...] = ("memory_receipt",)
 
@@ -60,7 +60,7 @@ class RememberFoldExecutor:
 
 @plugin(
     id="phase.remember.fold",
-    provides=("phase:remember::phase.remember.fold",),
+    provides=("remember::phase.remember.fold",),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="memory",

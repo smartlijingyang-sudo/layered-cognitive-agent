@@ -28,6 +28,7 @@ purpose: act 5 步执行 — validate → authorize → envelope → dispatch �
 
 nodes:
   - id: act.validate
+    region: act
     factory: act.validate
     # Inner entry reads ``decision`` from the kernel-wide port
     # registry (forwarded by the outer :class:`SubgraphStrategy`
@@ -48,6 +49,7 @@ nodes:
       emit_on_exit: []
 
   - id: act.authorize
+    region: act
     factory: act.authorize
     inputs: [decision]
     outputs: [decision]
@@ -56,6 +58,7 @@ nodes:
       emit_on_exit: []
 
   - id: act.envelope
+    region: act
     factory: act.envelope
     inputs: [decision]
     outputs: [envelope]
@@ -70,6 +73,7 @@ nodes:
   # downstream ``act.dispatch`` keeps its single-envelope input wired;
   # N:N wiring + dispatch consumes ``envelopes`` is a separate follow-up PR.
   - id: act.fanout
+    region: act
     factory: act.fanout
     inputs: [envelope]
     outputs: [envelope, envelopes, routing]
@@ -90,6 +94,7 @@ nodes:
         binding_edge: act.dispatch
 
   - id: act.observe
+    region: act
     factory: act.observe
     # PR-3.8.7: act.observe 同时承担 act.result.normalize 的归一化语义
     # (schema/spill/coerce/error_reason)。归一化在 node_execute 内部完成,
@@ -113,6 +118,7 @@ nodes:
   # is classified as ``terminal`` (fail-loud -- N:N partial-failure
   # policy is a follow-up PR).
   - id: act.join
+    region: act
     factory: act.join
     inputs: [receipts]
     outputs: [receipt, routing]

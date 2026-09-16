@@ -40,7 +40,7 @@ class ThinkReasonPlanExecutor:
     """think.reason inner_graph 第 1 节点:从 state 算 ReasonerTurnPlan。"""
 
     semantic_name: str = "think.reason.plan"
-    region: str = "phase:think"
+    region: str = "think"
     # ADR-0219 §5.5: typed port contract declared on the plugin (graph
     # layer does not know port names; it only knows topology).
     declared_inputs: tuple[PortName, ...] = ()
@@ -77,7 +77,7 @@ class ThinkReasonPlanExecutor:
 @plugin(
     id="phase.think.reason.plan",
     Config=None,
-    provides=("phase:think::think.reason.plan",),
+    provides=("think::think.reason.plan",),
     requires=("reasoner",),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

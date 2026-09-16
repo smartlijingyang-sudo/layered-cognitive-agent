@@ -64,7 +64,7 @@ class ActJoinExecutor:
     """
 
     semantic_name: str = "act.join"
-    region: str = "concept"
+    region: str = "act"
     declared_inputs: tuple[PortName, ...] = ("receipts",)
     declared_outputs: tuple[PortName, ...] = ("receipt", "routing")
 
@@ -125,7 +125,7 @@ class ActJoinExecutor:
 @plugin(
     id="phase.concept.act_subgraph.act_join",
     Config=None,
-    provides=("concept::act.join",),
+    provides=("act::act.join",),
     requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

@@ -73,7 +73,7 @@ class DelegateAwaitExecutor:
     """
 
     semantic_name: str = "delegate.await"
-    region: str = "region:delegate"
+    region: str = "delegate"
     declared_inputs: tuple[PortName, ...] = ("delegation_request", "delegation_receipt")
     declared_outputs: tuple[PortName, ...] = ("delegation_receipt",)
 
@@ -90,7 +90,7 @@ class DelegateAwaitExecutor:
 @plugin(
     id="lca.nodes.delegate.await",
     Config=None,
-    provides=("region:delegate::delegate.await",),
+    provides=("delegate::delegate.await",),
     requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

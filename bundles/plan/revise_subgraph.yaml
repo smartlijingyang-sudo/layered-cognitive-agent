@@ -13,7 +13,7 @@
 # topology — both shapes are valid per ADR-0228 §Decision 6).
 
 id: plan.revise.subgraph
-region: region:plan
+region: plan
 purpose: plan 1 节点执行 — replan TaskList based on Reflection
 
 nodes:

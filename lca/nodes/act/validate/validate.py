@@ -45,7 +45,7 @@ class ActValidateExecutor:
     """``concept.act.validate`` 节点:校验 Decision shape 后透传。"""
 
     semantic_name: str = "act.validate"
-    region: str = "concept"
+    region: str = "act"
     declared_inputs: tuple[PortName, ...] = ("decision",)
     declared_outputs: tuple[PortName, ...] = ("decision",)
 
@@ -93,7 +93,7 @@ class ActValidateExecutor:
 @plugin(
     id="phase.concept.act_subgraph.act_validate",
     Config=None,
-    provides=("concept::act.validate",),
+    provides=("act::act.validate",),
     requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

@@ -10,7 +10,7 @@
 # typed ``decision`` port for the think phase.
 
 id: interrupt.subgraph
-region: region:intervene
+region: intervene
 purpose: intervene 暂停端 — Decision + spine_seq → typed Command + terminate routing
 
 nodes:

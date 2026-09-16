@@ -156,7 +156,7 @@ class PlanComposeExecutor:
     """
 
     semantic_name: str = "plan.compose"
-    region: str = "region:plan"
+    region: str = "plan"
     declared_inputs: tuple[PortName, ...] = ("state", "decision", "observation")
     declared_outputs: tuple[PortName, ...] = ("task_list",)
 
@@ -215,7 +215,7 @@ def _extract_current_step(state: object) -> int:
 @plugin(
     id="lca.nodes.plan.compose",
     Config=None,
-    provides=("region:plan::plan.compose",),
+    provides=("plan::plan.compose",),
     requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

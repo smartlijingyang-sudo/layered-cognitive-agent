@@ -7,7 +7,7 @@
 # ``decision`` port that the think phase already understands.
 
 id: intervene.subgraph
-region: region:intervene
+region: intervene
 purpose: intervene 1 节点执行 — re-feed persisted Command → typed Decision port
 
 nodes:

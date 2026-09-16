@@ -10,7 +10,7 @@
 # ``delegation_receipt`` port; this node is a pure typed pass-through.
 
 id: delegate.await.subgraph
-region: region:delegate
+region: delegate
 purpose: delegate await — pass-through of kernel-collected child receipts
 
 nodes:

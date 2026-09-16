@@ -58,7 +58,7 @@ class ActFanoutExecutor:
     """
 
     semantic_name: str = "act.fanout"
-    region: str = "concept"
+    region: str = "act"
     declared_inputs: tuple[PortName, ...] = ("envelope",)
     declared_outputs: tuple[PortName, ...] = ("envelope", "envelopes", "routing")
 
@@ -101,7 +101,7 @@ class ActFanoutExecutor:
 @plugin(
     id="phase.concept.act_subgraph.act_fanout",
     Config=None,
-    provides=("concept::act.fanout",),
+    provides=("act::act.fanout",),
     requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

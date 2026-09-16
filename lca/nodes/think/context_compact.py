@@ -70,7 +70,7 @@ class ThinkContextCompactExecutor:
     """think 节点: read ``writer`` + ``state`` -> emit ``CompactReceipt`` + ``RoutingDecision``."""
 
     semantic_name: str = "think.context.compact"
-    region: str = "phase:think"
+    region: str = "think"
     # ``writer`` and ``state`` are kernel-injected runtime ports, not
     # produced by graph predecessors. They're read from ``context.runtime``
     # via ``_resolve_port``, mirroring the history.derive pattern.
@@ -306,7 +306,7 @@ def _truncate_oldest_to_byte_budget(
 @plugin(
     id="phase.think.context.compact",
     Config=None,
-    provides=("phase:think::think.context.compact",),
+    provides=("think::think.context.compact",),
     requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

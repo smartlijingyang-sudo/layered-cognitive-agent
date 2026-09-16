@@ -44,7 +44,7 @@ class ActAuthorizeExecutor:
     """``concept.act.authorize`` 节点:策略级授权检查 (policy-level authorization)。"""
 
     semantic_name: str = "act.authorize"
-    region: str = "concept"
+    region: str = "act"
     # ``state`` is optional (authorize reads ``state is not None`` and
     # skips budget checks when state is absent). Declaring only the
     # required input ``decision`` keeps the v2 driver's fan-in dispatch
@@ -120,7 +120,7 @@ class ActAuthorizeExecutor:
 @plugin(
     id="phase.concept.act_subgraph.act_authorize",
     Config=None,
-    provides=("concept::act.authorize",),
+    provides=("act::act.authorize",),
     requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

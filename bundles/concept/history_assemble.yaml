@@ -25,6 +25,7 @@ purpose: RunSessionWriter + ForkedTools → ModelVisibleRequest typed boundary (
 
 nodes:
   - id: history.derive
+    region: think
     factory: history.derive
     # Spec §G: ``response`` port added so the system prompt can fall back
     # to the live render when the folded header is empty (run_a0cdcd40d8b9

@@ -44,7 +44,7 @@ class ThinkRouteDecideExecutor:
     """think 节点:将 shortcut 的 decision 端口转为 RoutingDecision typed port。"""
 
     semantic_name: str = "think.route.decide"
-    region: str = "phase:think"
+    region: str = "think"
     declared_inputs: tuple[PortName, ...] = ("decision",)
     declared_outputs: tuple[PortName, ...] = ("routing",)
 
@@ -78,7 +78,7 @@ class ThinkRouteDecideExecutor:
 @plugin(
     id="phase.think.route.decide",
     Config=None,
-    provides=("phase:think::think.route.decide",),
+    provides=("think::think.route.decide",),
     requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

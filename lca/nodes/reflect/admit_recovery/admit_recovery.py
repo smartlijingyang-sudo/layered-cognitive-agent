@@ -57,7 +57,7 @@ class ReflectAdmitRecoveryExecutor:
     """Decide whether the outer loop may route through recovery edges."""
 
     semantic_name: str = "phase.reflect.admit_recovery"
-    region: str = "phase:reflect"
+    region: str = "reflect"
     declared_inputs: tuple[PortName, ...] = ("observation", "reflection")
     declared_outputs: tuple[PortName, ...] = ("reflection", "routing")
 
@@ -82,7 +82,7 @@ class ReflectAdmitRecoveryExecutor:
 
 @plugin(
     id="phase.reflect.admit_recovery",
-    provides=("phase:reflect::phase.reflect.admit_recovery",),
+    provides=("reflect::phase.reflect.admit_recovery",),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",

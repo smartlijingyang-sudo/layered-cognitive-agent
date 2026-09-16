@@ -41,7 +41,7 @@ class PerceiveObserveExecutor:
     """Primitive: invoke the PerceiveHub capability; emit raw ``manifest``."""
 
     semantic_name: str = "phase.perceive.observe"
-    region: str = "phase:perceive"
+    region: str = "perceive"
     declared_inputs: tuple[PortName, ...] = ()
     declared_outputs: tuple[PortName, ...] = ("manifest",)
 
@@ -63,7 +63,7 @@ class PerceiveObserveExecutor:
 
 @plugin(
     id="phase.perceive.observe",
-    provides=("phase:perceive::phase.perceive.observe",),
+    provides=("perceive::phase.perceive.observe",),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",

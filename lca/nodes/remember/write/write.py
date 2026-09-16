@@ -46,7 +46,7 @@ class RememberWriteExecutor:
     """Primitive: mint envelope + dispatch to ``effect_gateway``; emit envelope."""
 
     semantic_name: str = "phase.remember.write"
-    region: str = "phase:remember"
+    region: str = "remember"
     declared_inputs: tuple[PortName, ...] = ("decision", "observation", "reflection")
     declared_outputs: tuple[PortName, ...] = ("envelope",)
 
@@ -99,7 +99,7 @@ class RememberWriteExecutor:
 
 @plugin(
     id="phase.remember.write",
-    provides=("phase:remember::phase.remember.write",),
+    provides=("remember::phase.remember.write",),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="memory",

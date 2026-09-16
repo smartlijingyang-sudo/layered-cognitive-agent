@@ -100,7 +100,7 @@ class InterruptExecutor:
     """
 
     semantic_name: str = "intervene.interrupt"
-    region: str = "region:intervene"
+    region: str = "intervene"
     declared_inputs: tuple[PortName, ...] = ("decision", "spine_seq")
     declared_outputs: tuple[PortName, ...] = ("command", "routing")
 
@@ -142,7 +142,7 @@ class InterruptExecutor:
 @plugin(
     id="lca.nodes.intervene.interrupt",
     Config=None,
-    provides=("region:intervene::intervene.interrupt",),
+    provides=("intervene::intervene.interrupt",),
     requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

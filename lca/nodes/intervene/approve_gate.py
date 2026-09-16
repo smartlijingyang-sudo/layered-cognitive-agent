@@ -111,7 +111,7 @@ class ApproveGateExecutor:
     """
 
     semantic_name: str = "act.approve.gate"
-    region: str = "region:intervene"
+    region: str = "intervene"
     declared_inputs: tuple[PortName, ...] = ("decision", "command")
     declared_outputs: tuple[PortName, ...] = ("decision", "routing")
 
@@ -170,7 +170,7 @@ class ApproveGateExecutor:
 @plugin(
     id="lca.nodes.intervene.approve_gate",
     Config=None,
-    provides=("region:intervene::act.approve.gate",),
+    provides=("intervene::act.approve.gate",),
     requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

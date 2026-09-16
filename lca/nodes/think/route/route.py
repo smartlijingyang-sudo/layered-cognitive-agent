@@ -42,7 +42,7 @@ class ThinkRouteExecutor:
     """think 节点:从 SkillRouter 选 active template,由 Reducer 折叠 state。"""
 
     semantic_name: str = "think.route"
-    region: str = "phase:think"
+    region: str = "think"
     # ADR-0219 §5.5: typed port contract declared on the plugin (graph
     # layer does not know port names; it only knows topology).
     declared_inputs: tuple[PortName, ...] = ("in_assembled_manifest",)
@@ -99,7 +99,7 @@ class ThinkRouteExecutor:
 @plugin(
     id="phase.think.route",
     Config=None,
-    provides=("phase:think::think.route",),
+    provides=("think::think.route",),
     requires=("reducer",),
     layer="L2",
     kind=PluginKind.PRIMITIVE,

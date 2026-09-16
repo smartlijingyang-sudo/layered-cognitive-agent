@@ -108,7 +108,7 @@ class ThinkReasonRenderExecutor:
     """
 
     semantic_name: str = "think.reason.render"
-    region: str = "phase:think"
+    region: str = "think"
     # ADR-0219 §5.5: typed port contract declared on the plugin (graph
     # layer does not know port names; it only knows topology).
     declared_inputs: tuple[PortName, ...] = ("turn_plan",)
@@ -154,7 +154,7 @@ class ThinkReasonRenderExecutor:
 @plugin(
     id="phase.think.reason.render",
     Config=None,
-    provides=("phase:think::think.reason.render",),
+    provides=("think::think.reason.render",),
     requires=("reasoner", "reasoner.role_profile"),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
