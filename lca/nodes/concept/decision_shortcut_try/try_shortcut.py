@@ -9,7 +9,7 @@ Protocol 在概念图层的 typed 投影。返回 ``None`` 不算错误,是"这�
 ``None`` 语义)。
 
 ``requires=("supports_shortcut",)`` 通过 Cordis 校验,运行时从
-``context.runtime.supports_shortcut`` 拿 capability 实例(``SupportsShortcut``
+``context.runtime.brain.supports_shortcut`` 拿 capability 实例(``SupportsShortcut``
 duck-type Protocol,无需运行时强制 isinstance)。
 """
 
@@ -71,7 +71,8 @@ class ShortcutTryExecutor:
         if state is None or not isinstance(state, AgentState):
             return NodeOutput(port_values={})
 
-        shortcut = getattr(runtime, "supports_shortcut", None)
+        brain = getattr(runtime, "brain", None)
+        shortcut = getattr(brain, "supports_shortcut", None) if brain is not None else None
         if not isinstance(shortcut, SupportsShortcut):
             return NodeOutput(port_values={})
 

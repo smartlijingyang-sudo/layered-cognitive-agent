@@ -14,13 +14,19 @@ System prompt seam (spec §G — fix duplication + ensure LLM has identity):
 The folded ``EpochHeader.system`` only becomes non-empty when
 ``ModelVisibleHook.capture_pre_llm`` runs *inside* the LLM adapter — too
 late for history.assemble, which prepares the request before
-``think.llm.dispatch``. Three-tier fallback at this seam:
+``think.llm.invoke``. Two-tier fallback at this seam:
 
   1. folded header (``writer.request_header().system``) — replay-safe
   2. live render (``response.trace.system_prompt_text`` from
      ``think.reason.render`` one node earlier) — fixes the
      ``system=""`` regression (run_a0cdcd40d8b9)
-  3. ``role_profile`` composition — last-resort for legacy runtimes
+
+The prior third tier (``role_profile`` composition) is removed: the
+role identity lives on the Brain (``brain.role_profile``, consumed by
+``think.reason.render``), so this node no longer falls back to a
+runtime-cached profile. If both header and response are empty the LLM
+is dispatched without an explicit system prompt — the same behavior
+the live render path produces when ``system_prompt_text`` is empty.
 
 Canonical shape: hand-written ``@dataclass(frozen=True, slots=True)`` +
 ``@plugin(...)`` carrier, per ADR-0228 D2.
@@ -96,11 +102,10 @@ class HistoryDeriveExecutor:
     the upstream ``ForkedTools`` port (ADR-0220 §4 boundary DTO); the
     writer owns the message stream, not the tool schema source.
 
-    Spec §G: ``system`` is sourced via a three-tier fallback
-    (folded header → live render from ``response.trace`` →
-    ``role_profile`` composition). The fallback exists because the
-    folded header publishes during the LLM call itself (too late for
-    this node); see module docstring for details.
+    Spec §G: ``system`` is sourced via a two-tier fallback
+    (folded header → live render from ``response.trace``). The fallback
+    exists because the folded header publishes during the LLM call
+    itself (too late for this node); see module docstring for details.
     """
 
     semantic_name: str = "history.derive"
@@ -127,7 +132,6 @@ class HistoryDeriveExecutor:
         system = _resolve_system(
             header=header,
             response=input.port_values.get("response"),
-            runtime=getattr(context, "runtime", None),
         )
         tools = _forked_to_tools(input.port_values.get("forked_tools"))
         return NodeOutput(
@@ -181,56 +185,12 @@ def _system_from_response(response: Any) -> str:
     return text if isinstance(text, str) else ""
 
 
-def _system_from_role_profile(runtime: Any) -> str:
-    """Compose a minimal system prompt from a :class:`RoleProfile` on the runtime.
-
-    Last-resort fallback when neither the folded header nor the upstream
-    render are available. The Reasoner sections normally assemble richer
-    text; this fallback just stitches the role's identity + goal so the
-    LLM has at least an identity in legacy / minimal-render runs.
-
-    Looks up the profile via either the canonical capability key
-    ``reasoner.role_profile`` (declared in :data:`lca.contracts.capabilities
-    .REASONER_ROLE_PROFILE`) or a plain ``role_profile`` attribute on the
-    runtime namespace — the latter covers tests that bypass the
-    capability registry.
-    """
-    if runtime is None:
-        return ""
-    getter = getattr(runtime, "get", None)
-    profile: Any = None
-    if callable(getter):
-        profile = getter("reasoner.role_profile")
-        if profile is None:
-            profile = getter("role_profile")
-    if profile is None:
-        profile = getattr(runtime, "reasoner", None)
-        if profile is not None:
-            profile = getattr(profile, "role_profile", None)
-    if profile is None:
-        profile = getattr(runtime, "role_profile", None)
-    if profile is None:
-        return ""
-    parts: list[str] = []
-    role = getattr(profile, "role", None)
-    if isinstance(role, str) and role.strip():
-        parts.append(f"你是{role}.")
-    goal = getattr(profile, "goal", None)
-    if isinstance(goal, str) and goal.strip():
-        parts.append(f"目标:{goal}")
-    backstory = getattr(profile, "backstory", None)
-    if isinstance(backstory, str) and backstory.strip():
-        parts.append(backstory)
-    return " ".join(parts)
-
-
 def _resolve_system(
     *,
     header: Any,
     response: Any,
-    runtime: Any,
 ) -> str:
-    """Pick the system prompt using spec §G's three-tier fallback.
+    """Pick the system prompt using spec §G's two-tier fallback.
 
     Priority (highest wins):
 
@@ -243,23 +203,19 @@ def _resolve_system(
        because ``spine.llm.request.header`` had not yet been published
        (the publish happens *inside* the LLM adapter call, after
        history.assemble prepares the request).
-    3. ``role_profile``-derived composition — last resort for legacy
-       runtimes / tests that do not pass a render. The rendered
-       section-joined text is the authoritative system prompt; this
-       fallback only ensures the LLM has at least an identity when
-       the render seam is absent.
 
     Header None / empty / non-string is treated as "no header" so the
     fallback chain runs even when fold produced a header object with
     no system field (canonical normalization drops absent strings).
+
+    The prior third tier (``role_profile`` composition) was removed:
+    ``brain.role_profile`` is the sole authority — consumed by
+    ``think.reason.render`` and reflected via ``response.trace.system_prompt_text``.
     """
     from_header = _system_from_header(header)
     if from_header:
         return from_header
-    from_response = _system_from_response(response)
-    if from_response:
-        return from_response
-    return _system_from_role_profile(runtime)
+    return _system_from_response(response)
 
 
 @plugin(

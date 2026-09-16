@@ -69,7 +69,11 @@ class ReflectScoreExecutor:
 
     semantic_name: str = "phase.reflect.score"
     region: str = "reflect"
-    declared_inputs: tuple[PortName, ...] = ("observation",)
+    declared_inputs: tuple[PortName, ...] = (
+        "observation",
+        "state",
+        "cognitive_reflection_pipeline",
+    )
     declared_outputs: tuple[PortName, ...] = ("reflection",)
 
     async def node_execute(
@@ -79,8 +83,13 @@ class ReflectScoreExecutor:
     ) -> NodeOutput:
         runtime = context.runtime or {}
         observation = _normalize_observation(input.port_values.get("observation"))
-        brain = runtime.get("brain")
-        pipeline = runtime.get("cognitive_reflection_pipeline")
+        brain = getattr(runtime, "brain", None)
+        if brain is None and hasattr(runtime, "get"):
+            brain = runtime.get("brain")
+        pipeline = input.port_values.get("cognitive_reflection_pipeline")
+        state = input.port_values.get("state")
+        if state is None and hasattr(runtime, "get"):
+            state = runtime.get("agent_state")
         payload: object | None = None
         # Prefer ``brain.reflect`` when the profile wired one: ``ModularBrain``
         # owns the canonical critic → pipeline wiring, so this path reaches
@@ -91,14 +100,14 @@ class ReflectScoreExecutor:
         # never learned a tool had succeeded, so the agent re-issued the
         # same tool call every step (run-time loop until budget exhaustion).
         if isinstance(brain, Brain) and observation is not None:
-            payload = await brain.reflect(runtime.get("agent_state"), observation)
+            payload = await brain.reflect(state, observation)
         elif pipeline is not None and observation is not None:
             # Backward-compat: profiles that expose the reflection pipeline
             # capability but not a brain (lab / fixture paths). Without a
             # brain, there is no profile-selected critic to pass — preserve
             # the original short-circuit rather than silently injecting one.
             payload = await pipeline.reflect(
-                state=runtime.get("agent_state"),
+                state=state,
                 observation=observation,
                 critic=None,
             )

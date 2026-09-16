@@ -105,11 +105,20 @@ def test_score_node_prefers_brain_over_pipeline_when_brain_present() -> None:
     runtime = _FakeRuntime(brain=brain, pipeline=pipeline, agent_state=_agent_state())
     executor = ReflectScoreExecutor()
 
-    # The executor reads ``input.port_values.get("observation")``.
     output = asyncio.run(
         executor.node_execute(
             context=type("_C", (), {"runtime": runtime})(),
-            input=type("_I", (), {"port_values": {"observation": _observation()}})(),
+            input=type(
+                "_I",
+                (),
+                {
+                    "port_values": {
+                        "observation": _observation(),
+                        "state": _agent_state(),
+                        "cognitive_reflection_pipeline": pipeline,
+                    }
+                },
+            )(),
         )
     )
 
@@ -146,7 +155,17 @@ def test_score_node_falls_back_to_pipeline_when_brain_missing() -> None:
     output = asyncio.run(
         executor.node_execute(
             context=type("_C", (), {"runtime": runtime})(),
-            input=type("_I", (), {"port_values": {"observation": _observation()}})(),
+            input=type(
+                "_I",
+                (),
+                {
+                    "port_values": {
+                        "observation": _observation(),
+                        "state": _agent_state(),
+                        "cognitive_reflection_pipeline": pipeline,
+                    }
+                },
+            )(),
         )
     )
 
@@ -162,7 +181,16 @@ def test_score_node_returns_none_payload_when_brain_and_pipeline_missing() -> No
     output = asyncio.run(
         executor.node_execute(
             context=type("_C", (), {"runtime": runtime})(),
-            input=type("_I", (), {"port_values": {"observation": _observation()}})(),
+            input=type(
+                "_I",
+                (),
+                {
+                    "port_values": {
+                        "observation": _observation(),
+                        "state": _agent_state(),
+                    }
+                },
+            )(),
         )
     )
 

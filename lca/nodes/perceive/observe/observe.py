@@ -42,7 +42,7 @@ class PerceiveObserveExecutor:
 
     semantic_name: str = "phase.perceive.observe"
     region: str = "perceive"
-    declared_inputs: tuple[PortName, ...] = ()
+    declared_inputs: tuple[PortName, ...] = ("state",)
     declared_outputs: tuple[PortName, ...] = ("manifest",)
 
     async def node_execute(
@@ -50,13 +50,14 @@ class PerceiveObserveExecutor:
         context: NodeContext,
         input: NodeInput,
     ) -> NodeOutput:
-        del input
         runtime = context.runtime or {}
-        hub = runtime.get("perceive_hub")
+        hub = getattr(runtime, "perceive_hub", None)
         routing = RoutingDecision(action_type=ActionType.RESPOND)
         if not isinstance(hub, PerceiveHub):
             return NodeOutput(port_values={"manifest": None, "routing": routing})
-        agent_state = runtime.get("agent_state")
+        agent_state = input.port_values.get("state")
+        if agent_state is None and hasattr(runtime, "get"):
+            agent_state = runtime.get("agent_state")
         manifest = await hub.perceive(agent_state)  # type: ignore[arg-type]
         return NodeOutput(port_values={"manifest": manifest, "routing": routing})
 

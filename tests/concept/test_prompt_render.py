@@ -264,7 +264,6 @@ def test_reasoner_has_no_legacy_dead_path() -> None:
 
 @dataclass
 class _StubRuntime:
-    prompt_template_provider: PromptTemplateProvider | None = None
     tools_provider: object | None = None
 
 
@@ -272,19 +271,25 @@ def _node_ctx() -> NodeContext:
     return NodeContext(runtime=_StubRuntime(), budget={}, metadata={})
 
 
+def _assemble_input(
+    selection: TemplateSelection | None = None,
+    *,
+    provider: PromptTemplateProvider | None = None,
+) -> NodeInput:
+    port_values: dict[str, Any] = {"template_selection": selection or _selection()}
+    if provider is not None:
+        port_values["prompt_template_provider"] = provider
+    return NodeInput(port_values=port_values)
+
+
 @pytest.mark.asyncio
 async def test_prompt_sections_assemble_returns_prompt_template() -> None:
     """typed ``TemplateSelection`` → ``PromptTemplate``。"""
     provider = _Provider(_template())
-    ctx = NodeContext(
-        runtime=_StubRuntime(prompt_template_provider=provider),
-        budget={},
-        metadata={},
-    )
     executor = PromptSectionsAssembleExecutor()
     result = await executor.node_execute(
-        ctx,
-        NodeInput(port_values={"template_selection": _selection()}),
+        _node_ctx(),
+        _assemble_input(provider=provider),
     )
     template = result.port_values.get("prompt_template")
     assert isinstance(template, PromptTemplate)
@@ -293,12 +298,12 @@ async def test_prompt_sections_assemble_returns_prompt_template() -> None:
 
 @pytest.mark.asyncio
 async def test_prompt_sections_assemble_rejects_missing_provider() -> None:
-    """缺 ``prompt_template_provider`` → RuntimeError。"""
+    """缺 ``prompt_template_provider`` typed port → RuntimeError。"""
     executor = PromptSectionsAssembleExecutor()
     with pytest.raises(RuntimeError, match="prompt_template_provider"):
         await executor.node_execute(
             _node_ctx(),
-            NodeInput(port_values={"template_selection": _selection()}),
+            _assemble_input(),
         )
 
 
@@ -318,18 +323,15 @@ async def test_prompt_sections_fill_renders_prompt_and_trace() -> None:
             "register": lambda self, *_, **__: None,
         },
     )()
-    runtime = _StubRuntime(tools_provider=None)
-    runtime.prompt_section_registry = registry  # type: ignore[attr-defined]
-    ctx = NodeContext(runtime=runtime, budget={}, metadata={})
     executor = PromptSectionsFillExecutor()
-
     result = await executor.node_execute(
-        ctx,
+        _node_ctx(),
         NodeInput(
             port_values={
                 "prompt_template": template,
                 "context": _context(),
                 "role": _role_snapshot(),
+                "prompt_section_registry": registry,
             }
         ),
     )

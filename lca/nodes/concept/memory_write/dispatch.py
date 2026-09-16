@@ -45,7 +45,7 @@ class MemoryWriteDispatchExecutor:
 
     semantic_name = "memory.write.dispatch"
     region = "concept"
-    declared_inputs = ("memory_receipt", "observation", "reflection", "state")
+    declared_inputs = ("memory_receipt", "observation", "reflection", "state", "memory")
     declared_outputs = ("memory_receipt",)
 
     async def node_execute(
@@ -89,29 +89,23 @@ class MemoryWriteDispatchExecutor:
         if not receipt.admitted or state is None:
             return NodeOutput(port_values={"memory_receipt": receipt})
 
-        memory = _resolve_memory(runtime_obj)
+        memory = input.port_values.get("memory")
+        if not isinstance(memory, MemorySystem):
+            raise RuntimeError(
+                "memory.write.dispatch: 'memory' typed port missing from input "
+                "ports — wire a MemorySystem provider before concept.memory.write "
+                "runs (the default MemoryService is published under 'memory')."
+            )
         await memory.update(state, observation, reflection)
         stamped = replace(receipt, memory_ref=new_id("mem"))
         return NodeOutput(port_values={"memory_receipt": stamped})
-
-
-def _resolve_memory(runtime_obj) -> MemorySystem:
-    """Resolve the MemorySystem capability from runtime context."""
-    memory = getattr(runtime_obj, "memory", None)
-    if not isinstance(memory, MemorySystem):
-        raise RuntimeError(
-            "memory.write.dispatch: 'memory' capability missing from runtime "
-            "scope — wire a MemorySystem provider before concept.memory.write "
-            "runs (the default MemoryService is published under 'memory')."
-        )
-    return memory
 
 
 @plugin(
     id="phase.concept.memory_write.memory_write_dispatch",
     Config=None,
     provides=("concept::memory.write.dispatch",),
-    requires=("memory",),
+    requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",
@@ -131,7 +125,7 @@ def _resolve_memory(runtime_obj) -> MemorySystem:
         ),
     ),
     ownership=OwnershipDeclaration(
-        reads=("plugin.serve", "memory"),
+        reads=("plugin.serve",),
         emits=("plugin.served"),
         state_mutation="forbidden",
     ),

@@ -47,7 +47,12 @@ class RememberWriteExecutor:
 
     semantic_name: str = "phase.remember.write"
     region: str = "remember"
-    declared_inputs: tuple[PortName, ...] = ("decision", "observation", "reflection")
+    declared_inputs: tuple[PortName, ...] = (
+        "decision",
+        "observation",
+        "reflection",
+        "effect_gateway",
+    )
     declared_outputs: tuple[PortName, ...] = ("envelope",)
 
     async def node_execute(
@@ -82,7 +87,9 @@ class RememberWriteExecutor:
                 "reflection": reflection,
             },
         )
-        gateway = runtime.get("effect_gateway")
+        gateway = input.port_values.get("effect_gateway")
+        if gateway is None:
+            gateway = runtime.get("effect_gateway")
         receipt: object | None = None
         if gateway is not None:
             receipt = await gateway.dispatch(envelope)

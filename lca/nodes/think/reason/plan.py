@@ -2,7 +2,7 @@
 
 think.reason inner_graph 第 1 节点 plugin:调 ``Reasoner.build_turn_plan``
 算 plan,不调 LLM、不感知 EP。``requires=("reasoner",)`` 通过 Cordis 校验,
-运行时从 ``context.runtime.reasoner`` 拿 capability 实例。
+运行时从 ``context.runtime.brain.reasoner`` 拿 capability 实例。
 
 ADR-0218 §3.3:节点 plugin 由作者显式书写完整 ``@plugin(...)`` 装饰器,
 工厂 ``setup(ctx)`` 通过 Cordis ``ctx.provide`` 单键注册 composite key。
@@ -61,7 +61,8 @@ class ThinkReasonPlanExecutor:
         _log = logging.getLogger(__name__)
         runtime = context.runtime
         state = getattr(runtime, "state", None)
-        reasoner = getattr(runtime, "reasoner", None)
+        brain = getattr(runtime, "brain", None)
+        reasoner = getattr(brain, "reasoner", None) if brain is not None else None
         build = getattr(reasoner, "build_turn_plan", None) if reasoner is not None else None
         if reasoner is None or state is None or not callable(build):
             return NodeOutput(port_values={})
@@ -78,7 +79,10 @@ class ThinkReasonPlanExecutor:
     id="phase.think.reason.plan",
     Config=None,
     provides=("think::think.reason.plan",),
-    requires=("reasoner",),
+    # PR-C: legacy ``requires=("reasoner",)`` removed — the typed-port
+    # refactor (PR-A) routes ``runtime.brain.reasoner`` instead of a Cordis
+    # capability.
+    requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",

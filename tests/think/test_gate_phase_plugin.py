@@ -34,17 +34,21 @@ class _Gate:
 
 
 @dataclass
+class _StubBrain:
+    decision_gate: Any
+
+
+@dataclass
 class _StubRuntime:
     state: AgentState | None
-    decision_gate: Any
+    brain: _StubBrain | None
 
 
 def _ctx(caps: dict[str, Any], decision: Decision | None = None) -> NodeContext:
     state = AgentState(trace_id="t", task="x", budget=Budget())
-    runtime = _StubRuntime(
-        state=state,
-        decision_gate=caps.get("phase.think.gate"),
-    )
+    gate = caps.get("phase.think.gate")
+    brain = _StubBrain(decision_gate=gate) if gate is not None else None
+    runtime = _StubRuntime(state=state, brain=brain)
     return NodeContext(runtime=runtime, budget={}, metadata={})
 
 

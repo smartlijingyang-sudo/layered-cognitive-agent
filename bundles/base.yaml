@@ -51,17 +51,9 @@ entries:
   name: lca_state_store_service
   $module: lca.plugins.state.state.store_seam
   config: {}
-- id: phase.think.role_profile
-  name: phase_think_role_profile
-  $module: lca.plugins.think.role_profile_provider
-  config: {}
 - id: phase.think.reasoner.credentials
   name: phase_think_reasoner_credentials
   $module: lca.plugins.think.reasoner.credentials
-  config: {}
-- id: phase.think.reasoner.compose
-  name: phase_think_reasoner_compose
-  $module: lca.plugins.think.reasoner.compose
   config: {}
 - id: phase.think.shortcut
   name: phase_think_shortcut
@@ -75,21 +67,21 @@ entries:
   name: phase_think_route_decide
   $module: lca.nodes.think.route.decide
   config: {}
-# PR-3.8.1: typed budget gate between route.decide and the miss-path
-# reasoning chain. Reads ``state.budget`` and emits a ``RoutingDecision``
-# typed port (ADR-0219 §5.5, ADR-0225, ADR-0228).
-- id: phase.think.budget.check
-  name: phase_think_budget_check
-  $module: lca.nodes.think.budget_check
+# PR-B typed-port rewrite: budget gate now reads a typed ``budget``
+# port (no more ``context.runtime.state`` theft). Same SSOT
+# (``Budget.exceeded``), same declaration-order tie break — emits a
+# ``RoutingDecision`` typed port (ADR-0219 §5.5, ADR-0225, ADR-0228).
+- id: phase.think.budget.gate
+  name: phase_think_budget_gate
+  $module: lca.nodes.think.budget.threshold_gate
   config: {}
-# PR-3.8.2: typed-boundary context-compaction node that lifts the
-# off-graph compaction step into a typed node. Reads ``writer`` +
-# ``state`` and emits ``CompactReceipt`` + ``RoutingDecision``. Sits
-# between ``think.budget.check`` and ``think.history.assemble`` (PR-3.8.2
-# also re-wires ``budget.check`` downstream edge to this node).
-- id: phase.think.context.compact
-  name: phase_think_context_compact
-  $module: lca.nodes.think.context_compact
+# PR-B: truncation node owns only the ``truncate_oldest`` strategy.
+# Reads the typed ``budget`` + ``context_payload`` ports; emits a
+# ``CompactReceipt`` (no routing — the gate decision moved up to
+# ``phase.think.budget.gate``).
+- id: phase.think.context.truncate
+  name: phase_think_context_truncate
+  $module: lca.nodes.think.context.truncate
   config: {}
 - id: lca.nodes.plan.compose
   name: lca_nodes_plan_compose
@@ -125,9 +117,17 @@ entries:
   name: phase_think_history_derive
   $module: lca.nodes.think.history.assemble
   config: {}
-- id: phase.think.llm.call
-  name: phase_think_llm_call
-  $module: lca.nodes.think.dispatch.llm
+# PR-B: typed-port split of the prior ``phase.think.llm.call``
+# (which mixed adapter.stream + writer.append). Two single-responsibility
+# nodes — ``invoke`` drives the LLM adapter, ``persist`` writes the
+# journal — both pure typed-port nodes (no runtime theft).
+- id: phase.think.llm.invoke
+  name: phase_think_llm_invoke
+  $module: lca.nodes.think.llm.invoke
+  config: {}
+- id: phase.think.llm.persist
+  name: phase_think_llm_persist
+  $module: lca.nodes.think.llm.persist
   config: {}
 - id: phase.think.decision.parse
   name: phase_think_decision_parse

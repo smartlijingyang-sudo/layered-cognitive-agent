@@ -47,7 +47,7 @@ class PromptSectionsAssembleExecutor:
 
     semantic_name: str = "prompt.sections.assemble"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("template_selection",)
+    declared_inputs: tuple[PortName, ...] = ("template_selection", "prompt_template_provider")
     declared_outputs: tuple[PortName, ...] = ("prompt_template",)
 
     async def node_execute(
@@ -57,7 +57,8 @@ class PromptSectionsAssembleExecutor:
     ) -> NodeOutput:
         """prompt.sections.assemble 入口。
 
-        inputs 端口(yaml):template_selection (TemplateSelection)
+        inputs 端口(yaml):template_selection (TemplateSelection),
+        prompt_template_provider (PromptTemplateProvider)
         outputs 端口(yaml):prompt_template (PromptTemplate)
         """
         selection = input.port_values.get("template_selection")
@@ -67,11 +68,11 @@ class PromptSectionsAssembleExecutor:
                 f"TemplateSelection instance, got {type(selection).__name__}"
             )
 
-        provider = getattr(context.runtime, "prompt_template_provider", None)
+        provider = input.port_values.get("prompt_template_provider")
         if not isinstance(provider, PromptTemplateProvider):
             raise RuntimeError(
-                "prompt.sections.assemble: 'prompt_template_provider' capability "
-                "missing from runtime scope — wire PROMPT_TEMPLATE_PROVIDER before "
+                "prompt.sections.assemble: 'prompt_template_provider' typed port "
+                "missing from input ports — wire PROMPT_TEMPLATE_PROVIDER before "
                 "concept.prompt.render runs."
             )
 
@@ -85,7 +86,7 @@ class PromptSectionsAssembleExecutor:
     id="phase.concept.prompt_render.prompt_sections_assemble",
     Config=None,
     provides=("concept::prompt.sections.assemble",),
-    requires=("prompt_template_provider",),
+    requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",
@@ -105,7 +106,7 @@ class PromptSectionsAssembleExecutor:
         ),
     ),
     ownership=OwnershipDeclaration(
-        reads=("plugin.serve", "prompt_template_provider"),
+        reads=("plugin.serve",),
         emits=("plugin.served",),
         state_mutation="forbidden",
     ),

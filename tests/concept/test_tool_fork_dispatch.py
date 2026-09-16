@@ -73,13 +73,21 @@ class _ToolsServiceStub:
 
 @dataclass
 class _Runtime:
-    tools: _ToolsServiceStub | None = None
     state: Any = None
 
 
-def _ctx(tools: _ToolsServiceStub | None) -> NodeContext:
-    runtime = _Runtime(tools=tools, state=None)
+def _ctx() -> NodeContext:
+    runtime = _Runtime(state=None)
     return NodeContext(runtime=runtime, budget={}, metadata={})
+
+
+def _input(bindings: BindingsView | None = None, *, tools: _ToolsServiceStub | None = None) -> NodeInput:
+    port_values: dict[str, Any] = {}
+    if bindings is not None:
+        port_values["bindings"] = bindings
+    if tools is not None:
+        port_values["tools"] = tools
+    return NodeInput(port_values=port_values)
 
 
 def _explicit_bindings() -> BindingsView:
@@ -100,15 +108,15 @@ async def test_explicit_bindings_port_used_directly_seam_unbound() -> None:
     tools = _ToolsServiceStub(tools={"x": _ToolStub(name="x")})
     executor = ToolForkDispatchExecutor()
     result = await executor.node_execute(
-        _ctx(tools),
-        NodeInput(port_values={"bindings": _explicit_bindings()}),
+        _ctx(),
+        _input(_explicit_bindings(), tools=tools),
     )
     assert "forked_tools" in result.port_values
 
 
 @pytest.mark.asyncio
 async def test_fallback_seam_used_when_port_missing() -> None:
-    """P7 fallback path: empty input ports + seam bound → uses seam."""
+    """P7 fallback path: bindings port empty + seam bound → uses seam."""
     tools = _ToolsServiceStub(tools={"x": _ToolStub(name="x")})
     fs = object()
     builder = BindingsViewBuilder(file_store=fs)
@@ -116,8 +124,8 @@ async def test_fallback_seam_used_when_port_missing() -> None:
     try:
         executor = ToolForkDispatchExecutor()
         result = await executor.node_execute(
-            _ctx(tools),
-            NodeInput(port_values={}),
+            _ctx(),
+            _input(tools=tools),
         )
         assert "forked_tools" in result.port_values
     finally:
@@ -143,8 +151,8 @@ async def test_explicit_port_wins_over_seam_when_both_bound() -> None:
             bindings=None,
         )
         await executor.node_execute(
-            _ctx(tools),
-            NodeInput(port_values={"bindings": explicit}),
+            _ctx(),
+            _input(explicit, tools=tools),
         )
         # ToolsService.fork_for_run receives the explicit port's BindingsView.
         # We assert by tracking which object the stub saw.
@@ -159,20 +167,20 @@ async def test_no_port_no_seam_fails_loud() -> None:
     executor = ToolForkDispatchExecutor()
     with pytest.raises(TypeError, match="BindingsView"):
         await executor.node_execute(
-            _ctx(tools),
-            NodeInput(port_values={}),
+            _ctx(),
+            _input(tools=tools),
         )
 
 
 @pytest.mark.asyncio
 async def test_tools_capability_missing_fails_loud() -> None:
-    """``runtime.tools is None`` → RuntimeError, no silent fallback."""
+    """``tools`` typed port missing → RuntimeError, no silent fallback."""
     executor = ToolForkDispatchExecutor()
     explicit = _explicit_bindings()
     with pytest.raises(RuntimeError, match="tools"):
         await executor.node_execute(
-            _ctx(tools=None),
-            NodeInput(port_values={"bindings": explicit}),
+            _ctx(),
+            _input(explicit),
         )
 
 
@@ -240,8 +248,8 @@ async def test_solo_mode_drops_creator_host_tools_regardless_of_sandbox(
     executor = ToolForkDispatchExecutor()
     bindings = _bindings_with(mode="solo", sandbox=sandbox)
     result = await executor.node_execute(
-        _ctx(tools),
-        NodeInput(port_values={"bindings": bindings}),
+        _ctx(),
+        _input(bindings, tools=tools),
     )
     forked: _ToolsServiceStub = result.port_values["forked_tools"].items  # type: ignore[assignment]
     names = {t.name for t in forked}
@@ -269,8 +277,8 @@ async def test_cordis_creator_mode_keeps_creator_host_tools(
     executor = ToolForkDispatchExecutor()
     bindings = _bindings_with(mode="cordis-creator", sandbox=sandbox)
     result = await executor.node_execute(
-        _ctx(tools),
-        NodeInput(port_values={"bindings": bindings}),
+        _ctx(),
+        _input(bindings, tools=tools),
     )
     forked: _ToolsServiceStub = result.port_values["forked_tools"].items  # type: ignore[assignment]
     names = {t.name for t in forked}
@@ -285,8 +293,8 @@ async def test_team_mode_keeps_creator_host_tools() -> None:
     executor = ToolForkDispatchExecutor()
     bindings = _bindings_with(mode="team", sandbox=False)
     result = await executor.node_execute(
-        _ctx(tools),
-        NodeInput(port_values={"bindings": bindings}),
+        _ctx(),
+        _input(bindings, tools=tools),
     )
     forked: _ToolsServiceStub = result.port_values["forked_tools"].items  # type: ignore[assignment]
     names = {t.name for t in forked}

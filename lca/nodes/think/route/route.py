@@ -2,7 +2,7 @@
 
 think 子图节点 plugin:运行时动态选择 Prompt 模板并折叠 AgentState。
 ``requires=("skill_router",)`` 通过 Cordis 校验,
-运行时从 ``context.runtime.skill_router`` 拿 capability 实例。
+运行时从 ``context.runtime.brain.skill_router`` 拿 capability 实例。
 
 ADR-0218 §3.3:节点 plugin 由作者显式书写完整 ``@plugin(...)`` 装饰器,
 工厂 ``setup(ctx)`` 通过 Cordis ``ctx.provide`` 双键注册
@@ -63,7 +63,8 @@ class ThinkRouteExecutor:
         _log = logging.getLogger(__name__)
         runtime = context.runtime
         state = runtime.state
-        router = runtime.skill_router
+        brain = getattr(runtime, "brain", None)
+        router = getattr(brain, "skill_router", None) if brain is not None else None
         reducer = runtime.reducer
 
         if state is None:

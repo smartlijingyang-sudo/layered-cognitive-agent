@@ -354,14 +354,17 @@ async def test_system_prefers_header_when_folded() -> None:
     assert request.system == "from-fold"
 
 
-async def test_system_role_profile_fallback_when_no_render() -> None:
-    """No header AND no ``response`` port ⇒ compose from ``role_profile``.
+async def test_system_role_profile_no_longer_falls_back() -> None:
+    """PR-B: ``_system_from_role_profile`` was removed — no header + no
+    response ⇒ empty system prompt.
 
-    Older runtimes / tests pass only the writer + state; the
-    ``role_profile`` is still available via ``context.runtime`` (it is a
-    boot-time singleton, not a per-turn render). Composing a system
-    prompt from ``role`` / ``goal`` / ``backstory`` ensures the LLM has
-    at least an identity even when the render seam is absent.
+    The third-tier ``role_profile`` fallback was retired. ``brain.role_profile``
+    is the sole authority and is consumed by ``think.reason.render``,
+    which surfaces the rendered prompt through ``response.trace.system_prompt_text``.
+    If the writer's request header is empty AND the response port
+    carries no rendered system prompt, the LLM is dispatched with
+    ``system=""`` — the same outcome the live render path produces
+    when ``system_prompt_text`` is empty.
     """
     from lca.contracts.models.team.role.team import (
         RoleProfile,
@@ -381,8 +384,9 @@ async def test_system_role_profile_fallback_when_no_render() -> None:
         input=NodeInput(port_values={"state": _make_state(), "writer": writer}),
     )
     request = out.port_values["model_visible_request"]
-    assert "LobeHub 助手" in request.system
-    assert "帮助用户" in request.system
+    assert request.system == ""
+    assert "LobeHub 助手" not in request.system
+    assert "帮助用户" not in request.system
 
 
 async def test_system_empty_when_no_header_no_render_no_role_profile() -> None:
@@ -397,12 +401,14 @@ async def test_system_empty_when_no_header_no_render_no_role_profile() -> None:
     assert request.system == ""
 
 
-async def test_system_ignores_response_without_trace() -> None:
-    """``response.trace is None`` (render missing registry) ⇒ fall through to role.
+async def test_system_empty_when_response_trace_is_none() -> None:
+    """PR-B: ``response.trace is None`` ⇒ empty system prompt (no fallback).
 
     When the Reasoner renders without a section registry the trace is
-    ``None`` and ``system_prompt_text == ""``. We must not propagate an
-    empty string that would clobber a usable ``role_profile`` fallback.
+    ``None`` and ``system_prompt_text == ""``. The prior role_profile
+    fallback (now removed) used to mask this; the new 2-tier contract
+    propagates the empty string so downstream observers see the real
+    reason the LLM had no system prompt.
     """
     from lca.contracts.models.team.role.team import (
         RoleProfile,
@@ -428,4 +434,5 @@ async def test_system_ignores_response_without_trace() -> None:
         ),
     )
     request = out.port_values["model_visible_request"]
-    assert "LobeHub 助手" in request.system
+    assert request.system == ""
+    assert "LobeHub 助手" not in request.system

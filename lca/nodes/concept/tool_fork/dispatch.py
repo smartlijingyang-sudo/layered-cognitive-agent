@@ -134,7 +134,7 @@ class ToolForkDispatchExecutor:
     semantic_name: str = "tool.fork.dispatch"
     region: str = "concept"
     # ADR-0219 §5.5: typed port contract declared on the plugin.
-    declared_inputs: tuple[PortName, ...] = ("bindings",)
+    declared_inputs: tuple[PortName, ...] = ("bindings", "tools")
     declared_outputs: tuple[PortName, ...] = ("forked_tools",)
 
     async def node_execute(
@@ -144,10 +144,10 @@ class ToolForkDispatchExecutor:
     ) -> NodeOutput:
         """tool.fork.dispatch 入口。
 
-        inputs 端口(yaml):bindings (BindingsView)
+        inputs 端口(yaml):bindings (BindingsView), tools (ToolsService)
         outputs 端口(yaml):forked_tools (ForkedTools)
 
-        ADR-0220 P7 fallback 路径:端口未传 → 读
+        ADR-0220 P7 fallback 路径:bindings 端口未传 → 读
         ``RuntimePlane.current_bindings()`` typed seam,不再反射 state。
         两路都空 → fail loud,要求运行时显式 set
         ``BindingsViewBuilder``。
@@ -161,9 +161,9 @@ class ToolForkDispatchExecutor:
                 f"instance, got {type(bindings).__name__}"
             )
 
-        tools_service = getattr(context.runtime, "tools", None)
+        tools_service = input.port_values.get("tools")
         if tools_service is None:
-            raise RuntimeError("tool.fork.dispatch: 'tools' capability missing from runtime scope")
+            raise RuntimeError("tool.fork.dispatch: 'tools' typed port missing from input ports")
 
         forked = tools_service.fork_for_run(bindings)
         items = tuple(forked.list_tools())
@@ -187,7 +187,7 @@ class ToolForkDispatchExecutor:
     id="phase.concept.tool.fork.dispatch",
     Config=None,
     provides=("concept::tool.fork.dispatch",),
-    requires=("tools",),
+    requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",
@@ -207,7 +207,7 @@ class ToolForkDispatchExecutor:
         ),
     ),
     ownership=OwnershipDeclaration(
-        reads=("plugin.serve", "tools"),
+        reads=("plugin.serve",),
         emits=("plugin.served",),
         state_mutation="forbidden",
     ),

@@ -1,8 +1,8 @@
-"""CordisComposer —— Creator §13.3 Composer 的默认 cordis 实现。
+"""CordisComposer —— Creator §13.3 Composer 的默认 cordis 实现(非 plugin 模块)。
 
-本文件聚焦 Composer 类本身（mount / unmount / inspect / list_presets）
-与其依赖的 §23.2 默认 invariant。Tier-2 plugin 注册（``@plugin`` +
-``build_composer_factory``）见 :mod:`composition_provider`。
+PR-C 起:``CordisComposer`` 不再通过 Cordis capability seam 暴露,而是由装配
+根(api 层 / ``cordis_control`` 工厂)直接构造。本模块保留
+:class:`CordisComposer` + 默认 invariant 检查器实现,供两个 caller 复用。
 """
 
 from __future__ import annotations
@@ -12,7 +12,6 @@ from contextlib import suppress
 from typing import Any
 
 from lca.contracts.atoms.artifact.state import ArtifactState
-from lca.contracts.harness.composition.plugin_meta import PluginMeta
 from lca.contracts.harness.journal.artifact import (
     ArtifactController,
     CapabilityArtifact,
@@ -35,17 +34,11 @@ from lca.contracts.mechanisms.composition.composition import (
     PluginMetaMissing,
     UnmountResult,
 )
-
-# ── §23.2 默认 invariant ───────────────────────────────────────
+from lca.contracts.harness.composition.plugin_meta import PluginMeta
 
 
 def build_default_invariant_checker() -> InvariantChecker:
-    """§23.2 默认 invariant —— ``policy_class != "control"`` 之外的 plugin 都允许 mount。
-
-    Plugin-thinking：把 §23.2 invariant 实现为可注入 Protocol，默认实现遵循
-    宪法 §13.3.1「invariant 检查必跑」 + 「缺省最小化（§C7）」；测试可注入
-    自定义 checker 模拟失败路径。
-    """
+    """§23.2 默认 invariant —— ``policy_class != "control"`` 之外的 plugin 都允许 mount。"""
 
     class _DefaultInvariantChecker:
         def check_mount(self, name: str, meta: PluginMeta) -> None:
@@ -62,14 +55,11 @@ def build_default_invariant_checker() -> InvariantChecker:
     return _DefaultInvariantChecker()
 
 
-# ── Composer 实现 ─────────────────────────────────────────────
-
-
 class CordisComposer(Composer):
-    """Creator §13.3 Composer 的 cordis 默认实现（纯逻辑）。
+    """Creator §13.3 Composer 的 cordis 默认实现(纯逻辑)。
 
-    所有 mount / unmount / inspect 操作的副作用仅限 cordis Context（own_bindings
-    + 内部 meta / factory 索引）；不调 ``record(...)``，不写 AgentState。
+    所有 mount / unmount / inspect 操作的副作用仅限 cordis Context(own_bindings
+    + 内部 meta / factory 索引);不调 ``record(...)``,不写 AgentState。
     调用方在接住结果 / 异常后自行决定是否写 journal。
     """
 
@@ -87,8 +77,6 @@ class CordisComposer(Composer):
         self._artifact_by_key: dict[str, CapabilityArtifact] = {}
         self._retired_artifact_by_key: dict[str, CapabilityArtifact] = {}
 
-    # ── Public API ──
-
     def mount(
         self,
         factory: PluginFactory,
@@ -98,7 +86,6 @@ class CordisComposer(Composer):
         step: int = 0,
     ) -> MountResult:
         meta = factory.plugin_meta
-        # ── PR12 闸 ──
         if not meta:
             raise PluginMetaMissing(
                 f"plugin {factory.name!r} 缺少 plugin_meta (PR12 强制)",
@@ -106,7 +93,6 @@ class CordisComposer(Composer):
             )
 
         capabilities: tuple[str, ...] = tuple(meta.get("capabilities") or ())
-        # ── C5 闸：grant ⊇ capabilities（空 capabilities 视为不需要 grant）──
         if capabilities:
             granted_set = set(caller_grant)
             required_set = set(capabilities)
@@ -118,7 +104,6 @@ class CordisComposer(Composer):
                     required=capabilities,
                 )
 
-        # ── §23.2 闸 ──
         self._invariant.check_mount(factory.name, meta)
 
         artifact = make_capability_artifact(
@@ -129,7 +114,6 @@ class CordisComposer(Composer):
         )
         artifact = controller_migrate(self._artifact_controller, artifact, ArtifactState.VERIFIED)
 
-        # ── 重复名校验 ──
         ctx_key = f"plugin:{factory.name}"
         if ctx_key in self._meta_by_key:
             raise NameConflict(
@@ -137,7 +121,6 @@ class CordisComposer(Composer):
                 plugin_name=factory.name,
             )
 
-        # ── 实例化 ──
         try:
             instance = self._instantiate(factory.factory)
         except ComposerError:
@@ -148,7 +131,6 @@ class CordisComposer(Composer):
                 code=ComposerErrorCode.INVALID_PAYLOAD,
             ) from exc
 
-        # ── ctx.provide ──
         self._ctx.provide(ctx_key, instance)
         self._meta_by_key[ctx_key] = meta
         self._factory_by_key[ctx_key] = factory
@@ -223,12 +205,7 @@ class CordisComposer(Composer):
         )
 
     def list_presets(self) -> tuple[str, ...]:
-        """返回当前进程可见的 preset id 列表（§13.3 publish 持久化层）。
-
-        实现委托给 :class:`PresetAuthoring`，避免本模块硬编码 I/O 路径。
-        委托失败（如 PresetAuthoring 尚未装配）返回空 tuple，调用方按
-        空集合优雅降级（inspect 不依赖 preset 列表）。
-        """
+        """返回当前进程可见的 preset id 列表(§13.3 publish 持久化层)。"""
         try:
             from lca.application.authoring.preset_authoring import PresetAuthoring
         except Exception:
@@ -238,8 +215,6 @@ class CordisComposer(Composer):
         except Exception:
             return ()
 
-    # ── Internal helpers ──
-
     def _safe_context_keys(self) -> tuple[str, ...]:
         try:
             keys = list(getattr(self._ctx, "own_bindings", {}).keys())
@@ -248,11 +223,7 @@ class CordisComposer(Composer):
         return tuple(sorted(keys))
 
     def _instantiate(self, factory: Any) -> Any:
-        """调用 factory 创建 plugin 实例；接受 sync factory。
-
-        只允许零必填位置参数；额外参数通过 factory 闭包注入（PR12
-        PluginMeta 不允许传 args，因为 plugin meta 应能静态校验）。
-        """
+        """调用 factory 创建 plugin 实例;接受 sync factory。"""
         sig = inspect.signature(factory)
         required_params = [
             p
