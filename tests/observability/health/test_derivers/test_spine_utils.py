@@ -102,9 +102,11 @@ def test_make_evidence_ref_round_trips_required_fields() -> None:
 
 
 def test_make_evidence_ref_is_frozen() -> None:
-    """``EvidenceRef`` is frozen; mutation must raise."""
+    """``EvidenceRef`` is frozen; mutation must raise ``ValidationError``."""
+    from pydantic import ValidationError
+
     ref = make_evidence_ref(_event())
-    with pytest.raises(Exception):  # ValidationError from Pydantic frozen
+    with pytest.raises(ValidationError):
         ref.seq = 999  # type: ignore[misc]
 
 
@@ -138,12 +140,21 @@ def test_filter_by_ep_no_match_returns_empty() -> None:
 def test_group_by_invocation_keys_by_invocation_id() -> None:
     """Multiple events with the same invocation_id land in the same bucket."""
     events = [
-        _event(event_id="run_x:1", execution_point="step.tool_call.record",
-               payload={"invocation_id": "toolu_abc"}),
-        _event(event_id="run_x:2", execution_point="step.tool_call.record",
-               payload={"invocation_id": "toolu_abc"}),
-        _event(event_id="run_x:3", execution_point="step.tool_call.record",
-               payload={"invocation_id": "toolu_def"}),
+        _event(
+            event_id="run_x:1",
+            execution_point="step.tool_call.record",
+            payload={"invocation_id": "toolu_abc"},
+        ),
+        _event(
+            event_id="run_x:2",
+            execution_point="step.tool_call.record",
+            payload={"invocation_id": "toolu_abc"},
+        ),
+        _event(
+            event_id="run_x:3",
+            execution_point="step.tool_call.record",
+            payload={"invocation_id": "toolu_def"},
+        ),
     ]
     grouped = group_by_invocation(events, "step.tool_call.record")
     assert set(grouped.keys()) == {"toolu_abc", "toolu_def"}
@@ -159,10 +170,14 @@ def test_group_by_invocation_drops_events_without_invocation_id() -> None:
     should not be passed through this helper.
     """
     events = [
-        _event(event_id="run_x:1", execution_point="step.tool_call.record",
-               payload={"invocation_id": "toolu_abc"}),
-        _event(event_id="run_x:2", execution_point="step.tool_call.record",
-               payload={}),  # no invocation_id
+        _event(
+            event_id="run_x:1",
+            execution_point="step.tool_call.record",
+            payload={"invocation_id": "toolu_abc"},
+        ),
+        _event(
+            event_id="run_x:2", execution_point="step.tool_call.record", payload={}
+        ),  # no invocation_id
         _event(event_id="run_x:3", execution_point="phase.perceive.fold"),
     ]
     grouped = group_by_invocation(events, "step.tool_call.record")
@@ -172,10 +187,16 @@ def test_group_by_invocation_drops_events_without_invocation_id() -> None:
 def test_group_by_invocation_only_matches_target_ep() -> None:
     """Events of other EPs are skipped even if they carry an invocation_id."""
     events = [
-        _event(event_id="run_x:1", execution_point="step.tool_call.record",
-               payload={"invocation_id": "toolu_abc"}),
-        _event(event_id="run_x:2", execution_point="body.sandbox.enter",
-               payload={"invocation_id": "toolu_abc"}),
+        _event(
+            event_id="run_x:1",
+            execution_point="step.tool_call.record",
+            payload={"invocation_id": "toolu_abc"},
+        ),
+        _event(
+            event_id="run_x:2",
+            execution_point="body.sandbox.enter",
+            payload={"invocation_id": "toolu_abc"},
+        ),
     ]
     grouped = group_by_invocation(events, "step.tool_call.record")
     assert set(grouped.keys()) == {"toolu_abc"}

@@ -30,7 +30,6 @@ from lca.contracts.observability.health import RunHealthCondition
 from lca.plugins.observability.health.derivers._spine import (
     SpineEvent,
     filter_by_ep,
-    group_by_invocation,
     make_evidence_ref,
     parse_observed_at,
 )
@@ -58,11 +57,7 @@ class ToolDeriver:
         results = filter_by_ep(events, TOOL_RESULT_EP)
         enters = filter_by_ep(events, SANDBOX_ENTER_EP)
         exits = filter_by_ep(events, SANDBOX_EXIT_EP)
-        diagnostics = [
-            e
-            for e in filter_by_ep(events, DIAGNOSTIC_EP)
-            if _is_tool_diagnostic(e)
-        ]
+        diagnostics = [e for e in filter_by_ep(events, DIAGNOSTIC_EP) if _is_tool_diagnostic(e)]
 
         has_any = any([calls, results, enters, exits, diagnostics])
         if not has_any:
@@ -134,10 +129,7 @@ def _check_tool_calls(
     if not calls:
         return out
     result_ids = {r["payload"].get("invocation_id") for r in results}
-    orphans = [
-        c for c in calls
-        if c["payload"].get("invocation_id") not in result_ids
-    ]
+    orphans = [c for c in calls if c["payload"].get("invocation_id") not in result_ids]
     if not orphans:
         return out
     evidence = tuple(make_evidence_ref(c) for c in orphans)
@@ -163,10 +155,7 @@ def _check_sandbox(
     if not enters and not exits:
         return out
     exit_ids = {x["payload"].get("invocation_id") for x in exits}
-    orphans = [
-        e for e in enters
-        if e["payload"].get("invocation_id") not in exit_ids
-    ]
+    orphans = [e for e in enters if e["payload"].get("invocation_id") not in exit_ids]
     if not orphans:
         return out
     evidence = tuple(make_evidence_ref(e) for e in orphans)

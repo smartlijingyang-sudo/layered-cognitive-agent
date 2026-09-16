@@ -15,8 +15,6 @@ derivers, but assert the v1 behaviour explicitly.
 
 from __future__ import annotations
 
-import pytest
-
 from lca.contracts.observability.health.condition import (
     RunHealthCondition as RunHealthCondition,
 )

@@ -50,10 +50,13 @@ def test_llm_returns_ok_when_all_tool_calls_have_matching_tool_messages() -> Non
         _llm_header(
             event_id="run_x:1",
             messages=[
-                {"role": "assistant", "tool_calls": [
-                    {"id": "toolu_a"},
-                    {"id": "toolu_b"},
-                ]},
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {"id": "toolu_a"},
+                        {"id": "toolu_b"},
+                    ],
+                },
             ],
         ),
         _llm_header(
@@ -80,10 +83,13 @@ def test_llm_returns_degraded_when_partial_match() -> None:
         _llm_header(
             event_id="run_x:1",
             messages=[
-                {"role": "assistant", "tool_calls": [
-                    {"id": "toolu_a"},
-                    {"id": "toolu_b"},
-                ]},
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {"id": "toolu_a"},
+                        {"id": "toolu_b"},
+                    ],
+                },
             ],
         ),
         _llm_header(

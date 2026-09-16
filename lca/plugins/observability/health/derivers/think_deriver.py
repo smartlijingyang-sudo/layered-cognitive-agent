@@ -61,12 +61,10 @@ class ThinkDeriver:
 
         # Decision-repair events take priority over fold/gate presence.
         failed_repairs = [
-            e for e in repair_events
-            if _routing_is_error(e["payload"].get("routing", {}))
+            e for e in repair_events if _routing_is_error(e["payload"].get("routing", {}))
         ]
         empty_repairs = [
-            e for e in repair_events
-            if _routing_is_empty(e["payload"].get("routing", {}))
+            e for e in repair_events if _routing_is_empty(e["payload"].get("routing", {}))
         ]
         if failed_repairs:
             return _emit("failed", "think_decision_error", failed_repairs)
@@ -75,14 +73,14 @@ class ThinkDeriver:
         return _emit("ok", "think_fold_closed", think_events)
 
 
-def _routing_is_empty(routing: dict) -> bool:
+def _routing_is_empty(routing: dict) -> bool:  # type: ignore[type-arg]
     """Routing is empty when no keys, or only empty-valued keys."""
     if not routing:
         return True
     return all(v in (None, "", [], {}) for v in routing.values())
 
 
-def _routing_is_error(routing: dict) -> bool:
+def _routing_is_error(routing: dict) -> bool:  # type: ignore[type-arg]
     """Routing signals error when ``action_type == "error"`` or similar."""
     if not routing:
         return False
@@ -91,9 +89,7 @@ def _routing_is_error(routing: dict) -> bool:
         return True
     # some producers emit {"status": "error"} instead
     status = routing.get("status")
-    if isinstance(status, str) and status.lower() in {"error", "failed", "failure"}:
-        return True
-    return False
+    return bool(isinstance(status, str) and status.lower() in {"error", "failed", "failure"})
 
 
 def _emit(

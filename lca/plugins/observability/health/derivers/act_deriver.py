@@ -45,9 +45,7 @@ class ActDeriver:
         fanouts = filter_by_ep(events, ACT_FANOUT_EP)
         if fanouts:
             return _classify_fanout(fanouts)
-        phase_events = [
-            e for e in events if e["execution_point"] in _ACT_PHASE_EPS
-        ]
+        phase_events = [e for e in events if e["execution_point"] in _ACT_PHASE_EPS]
         if not phase_events:
             return [
                 RunHealthCondition(
@@ -73,10 +71,7 @@ class ActDeriver:
 
 def _classify_fanout(fanouts: list[SpineEvent]) -> list[RunHealthCondition]:
     """Map fanout ``next_hint`` values to the closed status alphabet."""
-    hints = [
-        f["payload"].get("routing", {}).get("next_hint")
-        for f in fanouts
-    ]
+    hints = [f["payload"].get("routing", {}).get("next_hint") for f in fanouts]
     worst_hint: str | None = None
     for h in hints:
         if h == "fanout_empty":

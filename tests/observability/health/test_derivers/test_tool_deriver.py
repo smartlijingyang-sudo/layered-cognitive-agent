@@ -134,10 +134,7 @@ def test_tool_returns_failed_when_sandbox_enter_unmatched() -> None:
         ),
     ]
     conditions = deriver.evaluate(events)
-    assert any(
-        c.status == "failed" and c.reason == "sandbox_enter_unmatched"
-        for c in conditions
-    )
+    assert any(c.status == "failed" and c.reason == "sandbox_enter_unmatched" for c in conditions)
 
 
 def test_tool_returns_failed_when_diagnostic_output_ok_false() -> None:
@@ -163,10 +160,7 @@ def test_tool_returns_failed_when_diagnostic_output_ok_false() -> None:
         ),
     ]
     conditions = deriver.evaluate(events)
-    assert any(
-        c.status == "failed" and c.reason == "tool_diagnostic_failed"
-        for c in conditions
-    )
+    assert any(c.status == "failed" and c.reason == "tool_diagnostic_failed" for c in conditions)
 
 
 def test_tool_returns_unknown_when_no_tool_events() -> None:

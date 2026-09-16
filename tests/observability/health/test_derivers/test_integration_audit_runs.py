@@ -43,9 +43,7 @@ import pytest
 # the integration test reads it from there directly. When the test
 # runs in a fresh CI container without that directory mounted, the
 # entire module is skipped.
-AUDIT_DIR = Path(
-    "/home/lichao/layered-cognitive-agent/traces/runs"
-)
+AUDIT_DIR = Path("/home/lichao/layered-cognitive-agent/traces/runs")
 AUDIT_RUN_IDS: tuple[str, ...] = (
     "run_3383288d63e7",
     "run_3cf6e7c036b3",
@@ -127,9 +125,7 @@ def test_audit_run_every_deriver_emits_at_least_one_condition(run_id: str) -> No
     derivers = _all_derivers()
     for name, deriver in derivers.items():
         conditions = deriver.evaluate(events)  # type: ignore[attr-defined]
-        assert len(conditions) >= 1, (
-            f"deriver {name!r} on {run_id} emitted zero conditions"
-        )
+        assert len(conditions) >= 1, f"deriver {name!r} on {run_id} emitted zero conditions"
 
 
 # ---------------------------------------------------------------------------
@@ -152,7 +148,8 @@ def test_audit_run_3383288d63e7_only_ok_or_unknown() -> None:
     did not anticipate. Recording the observed behavior so future
     refactors can detect drift either way.
     """
-    events = _load_spine_events("run_3383288d63e7")
+    run_id = "run_3383288d63e7"
+    events = _load_spine_events(run_id)
     derivers = _all_derivers()
     expected_statuses: dict[str, set[str]] = {
         "perceive": {"ok"},
@@ -274,8 +271,7 @@ def test_audit_run_evidence_refs_come_from_spine(run_id: str) -> None:
         for cond in conditions:
             for ref in cond.evidence_refs:
                 assert ref.event_id in seqs_by_id, (
-                    f"{run_id}/{name}: evidence_ref {ref.event_id!r} "
-                    f"not present in spine"
+                    f"{run_id}/{name}: evidence_ref {ref.event_id!r} not present in spine"
                 )
                 spine_event = seqs_by_id[ref.event_id]
                 assert ref.execution_point == spine_event["execution_point"], (

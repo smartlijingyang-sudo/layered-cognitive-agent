@@ -16,7 +16,6 @@ distinction is a pure addition when the producer grows the EPs.
 from __future__ import annotations
 
 from lca.contracts.observability.health import (
-    EvidenceRef,
     RunHealthCondition,
 )
 from lca.plugins.observability.health.derivers._spine import (
@@ -75,6 +74,7 @@ class PerceiveDeriver:
 
 def _to_epoch(ts: str) -> float:
     from lca.plugins.observability.health.derivers._spine import parse_observed_at
+
     return parse_observed_at(ts)
 
 

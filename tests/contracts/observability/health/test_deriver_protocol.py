@@ -22,8 +22,6 @@ from __future__ import annotations
 
 import importlib.metadata
 
-import pytest
-
 from lca.contracts.observability.health import (
     RunHealthCondition as RunHealthCondition,
 )

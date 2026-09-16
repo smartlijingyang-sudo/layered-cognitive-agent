@@ -39,7 +39,7 @@ class SpineEvent(TypedDict):
     ts: str
     run_id: str
     execution_point: str
-    payload: dict
+    payload: dict  # type: ignore[type-arg]
 
 
 def parse_run_id(event_id: str) -> str:
