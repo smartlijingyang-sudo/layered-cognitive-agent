@@ -154,3 +154,85 @@ def test_subgraph_delegate_with_config_sub_spec_ref_is_not_a_leaf() -> None:
     # factory is unregistered, but the node delegates to a subgraph
     # so the check must skip it — the inner plan's own pass owns it.
     assert check_node_executor_coverage([bundle], resolved) == []
+
+
+def test_node_id_factory_mismatch_rejected() -> None:
+    """A leaf whose ``id`` differs from ``factory`` fails boot.
+
+    Reproduces the ``bundles/think/think_subgraph.yaml``
+    ``think.llm.invoke`` regression (``run_cb35e39f1e39``,
+    broken_hop=H6): the factory is provided by an enabled plugin,
+    so the factory-→provider check passes, but run-time lookup
+    keyed on ``node_id`` raises ``NodeExecutor lookup miss``. The
+    symmetry rule rejects the mismatch at boot time.
+    """
+    spec = _spec("think::llm.invoke")
+    resolved = _resolved(_plugin("phase.think.llm.invoke", spec))
+    bundle: dict[str, Any] = {
+        "id": "think.subgraph",
+        "nodes": [
+            {
+                "id": "think.llm.invoke",
+                "factory": "llm.invoke",
+            }
+        ],
+        "edges": [],
+    }
+
+    errors = check_node_executor_coverage([bundle], resolved)
+
+    assert len(errors) == 1
+    err = errors[0]
+    assert "think.llm.invoke" in str(err)
+    assert "llm.invoke" in str(err)
+    assert err.plan_id == "think.subgraph"
+    assert err.node_id == "think.llm.invoke"
+
+
+def test_node_id_equals_factory_passes() -> None:
+    """A leaf whose ``id`` equals ``factory`` byte-for-byte passes silently."""
+    spec = _spec("think::llm.invoke")
+    resolved = _resolved(_plugin("phase.think.llm.invoke", spec))
+    bundle: dict[str, Any] = {
+        "id": "think.subgraph",
+        "nodes": [
+            {
+                "id": "llm.invoke",
+                "factory": "llm.invoke",
+            }
+        ],
+        "edges": [],
+    }
+
+    assert check_node_executor_coverage([bundle], resolved) == []
+
+
+def test_node_id_mismatch_does_not_mask_missing_factory_error() -> None:
+    """When ``factory`` is missing AND ``id`` does not match, factory error wins.
+
+    The symmetry rule only fires after the factory-→provider check
+    passes; a leaf that names a factory no plugin provides still
+    gets the factory-missing error (preserves the original message
+    and ``plan_id`` / ``node_id`` payload that operators rely on).
+    """
+    spec = _spec("think::think.shortcut")
+    resolved = _resolved(_plugin("phase.think.shortcut", spec))
+    bundle: dict[str, Any] = {
+        "id": "plan.with.both.wrong",
+        "nodes": [
+            {
+                "id": "orphan.id",
+                "factory": "other.thing",
+            }
+        ],
+        "edges": [],
+    }
+
+    errors = check_node_executor_coverage([bundle], resolved)
+
+    assert len(errors) == 1
+    err = errors[0]
+    assert "other.thing" in str(err)
+    assert "factory" in str(err)
+    assert err.plan_id == "plan.with.both.wrong"
+    assert err.node_id == "orphan.id"

@@ -10,7 +10,7 @@ region: primitive
 purpose: 纯 typed DTO 映射(无 I/O) — 1 节点
 
 nodes:
-  - id: dto.map.apply
+  - id: primitive.dto.map
     factory: primitive.dto.map
     inputs: [input_dto]
     outputs: [output_dto]

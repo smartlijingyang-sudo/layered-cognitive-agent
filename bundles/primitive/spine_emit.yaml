@@ -10,7 +10,7 @@ region: primitive
 purpose: typed fact → spine EP — 2 节点 compose + dispatch
 
 nodes:
-  - id: spine.event.compose
+  - id: primitive.spine.compose
     factory: primitive.spine.compose
     inputs: [fact]
     outputs: [envelope]
@@ -18,7 +18,7 @@ nodes:
       emit_on_enter: []
       emit_on_exit: []
 
-  - id: spine.event.dispatch
+  - id: primitive.spine.dispatch
     factory: primitive.spine.dispatch
     inputs: [envelope]
     outputs: [receipt]
@@ -27,5 +27,5 @@ nodes:
       emit_on_exit: []
 
 edges:
-  - source: spine.event.compose
-    target: spine.event.dispatch
+  - source: primitive.spine.compose
+    target: primitive.spine.dispatch

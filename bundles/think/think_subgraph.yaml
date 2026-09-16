@@ -5,7 +5,7 @@
 # dicts. The legacy string-DSL edge conditions are gone.
 #
 # PR-B (typed-port cutover): ``think.llm.dispatch`` is split into
-# ``think.llm.invoke`` (adapter call) + ``think.llm.persist`` (writer
+# ``llm.invoke`` (adapter call) + ``llm.persist`` (writer
 # append), and ``think.context.compact`` is split into
 # ``think.budget.gate`` (typed budget gate) + ``think.context.truncate``
 # (truncate strategy). Each new node owns exactly one responsibility;
@@ -94,13 +94,13 @@ nodes:
       emit_on_exit:  []
       # Spec §D: think.history.assemble runs immediately before llm.dispatch;
       # it projects ModelVisibleRequest from RunSessionWriter with orphan-drop
-      # applied. T3 wires think.llm.dispatch + think.decision.parse after it.
+      # applied. T3 wires llm.invoke + think.decision.parse after it.
       sub_spec_ref:
         plan_ref: bundles/concept/history_assemble.yaml
         entry_node: history.derive
         binding_edge: think.history.assemble
 
-  - id: think.llm.invoke
+  - id: llm.invoke
     factory: llm.invoke
     inputs: [model_visible_request]
     outputs: [llm_response, usage]
@@ -112,7 +112,7 @@ nodes:
       emit_on_enter: []
       emit_on_exit:  []
 
-  - id: think.llm.persist
+  - id: llm.persist
     factory: llm.persist
     inputs: [llm_response]
     outputs: [journaled]
@@ -222,10 +222,10 @@ edges:
   - from: think.reason
     to: think.history.assemble
   - from: think.history.assemble
-    to: think.llm.invoke
-  - from: think.llm.invoke
-    to: think.llm.persist
-  - from: think.llm.persist
+    to: llm.invoke
+  - from: llm.invoke
+    to: llm.persist
+  - from: llm.persist
     to: think.decision.parse
   - from: think.decision.parse
     to: think.decision.repair

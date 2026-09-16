@@ -166,7 +166,7 @@ nodes:
   # ``semantic_name = "act.observe.normalize"`` so the lifter's
   # node-executor coverage check finds ``act::act.observe.normalize``
   # under the resolved profile.
-  - id: act.observe
+  - id: act.observe.normalize
     region: act
     factory: act.observe.normalize
     inputs: [receipt]
@@ -278,7 +278,7 @@ edges:
     to: act.join
     when: true
   - from: act.join
-    to: act.observe
+    to: act.observe.normalize
     when:
       kind: eq
       port:
@@ -287,7 +287,7 @@ edges:
       value: join_1to1
 
   # PR-3: 归一化 → RunFact 落库 → should_terminate 决策,单向三段。
-  - from: act.observe
+  - from: act.observe.normalize
     to: act.observe.commit_fact
     when: true
   - from: act.observe.commit_fact

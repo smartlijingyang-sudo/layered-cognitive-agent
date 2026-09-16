@@ -26,6 +26,19 @@ factory. It complements :func:`check_compiled_run_plan` (post-lift
 K2 projection invariants) and the per-plan checks in
 :data:`lca_kernel.boot.plan_validation._PLAN_CHECKS` (post-lift
 graph-structural invariants).
+
+The check also asserts ``node.id`` ↔ ``node.factory`` symmetry:
+for each leaf node, ``id`` and ``factory`` must be byte-equal
+strings. The run-time interpreter resolves NodeExecutors via
+``node_executors.get(node_id)`` (see
+:func:`lca.framework.graph.host_wiring.make_node_executor_lookup`),
+while the registry keys are derived from plugin
+``provides="<region>::<factory>"`` suffixes — a mismatch silently
+passes the factory-→provider check but explodes as
+``NodeExecutor lookup miss`` mid-run (see
+``docs/notes/implemented/contract/2026-09-16-plan-node-id-factory-symmetry.md``).
+The symmetry rule closes that gap at boot time and has its own
+delete-when recorded in that note.
 """
 
 from __future__ import annotations
@@ -112,6 +125,31 @@ def check_node_executor_coverage(
             factory = factory.strip()
             provider = provided.get(factory)
             if provider is not None:
+                # ID ↔ factory symmetry: ``node.id`` must equal
+                # ``factory`` byte-for-byte. The runtime lookup uses
+                # ``node_id`` while the registry key comes from the
+                # plugin ``provides='<region>::<factory>'`` suffix;
+                # a mismatch passes this check yet dies mid-run as
+                # ``NodeExecutor lookup miss``. See
+                # ``docs/notes/implemented/contract/2026-09-16-plan-node-id-factory-symmetry.md``.
+                node_id = str(raw.get("id", "<unnamed>")).strip()
+                if node_id != factory:
+                    errors.append(
+                        PlanLiftError(
+                            f"plan {plan_id!r}: node {node_id!r} has "
+                            f"id={node_id!r} that does not match "
+                            f"factory={factory!r}. Run-time NodeExecutor "
+                            f"lookup is keyed by ``node_id`` while the "
+                            f"registry key comes from plugin "
+                            f"``provides='<region>::<factory>'`` — a "
+                            f"mismatch passes the factory-→provider check "
+                            f"yet raises ``NodeExecutor lookup miss`` "
+                            f"mid-run. Set ``id`` equal to ``factory`` "
+                            f"(rename the node, do not extend the factory).",
+                            plan_id=plan_id,
+                            node_id=node_id,
+                        )
+                    )
                 continue
             errors.append(
                 PlanLiftError(
