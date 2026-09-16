@@ -45,11 +45,19 @@ class ToolBatchExecutor:
         tool_registry: ToolRegistry,
         safe_executor: SafeExecutor,
         *,
-        policy: ToolBatchExecutionPolicy,
+        policy: ToolBatchExecutionPolicy | None = None,
     ) -> None:
+        # PR-3 (G-19, ADR-0232): default policy is the parallel-read-only
+        # strategy.  Callers may still inject an explicit policy (tests,
+        # specialised bundles); the ``None`` path resolves to the new
+        # default rather than the pre-PR-3 ``SequentialToolBatchExecutionPolicy``.
+        from lca.cognition.body.tools.execution_policy import (
+            default_tool_batch_policy,
+        )
+
         self._tool_registry = tool_registry
         self._safe_executor = safe_executor
-        self._policy = policy
+        self._policy = policy if policy is not None else default_tool_batch_policy()
 
     async def execute(self, tool_calls: Sequence[ToolCall]) -> Observation:
         """Resolve, schedule, dispatch, and package one non-empty tool batch."""
@@ -69,10 +77,46 @@ class ToolBatchExecutor:
             )
             for tool_call, tool in resolved
         )
+        # PR-3 (G-19, ADR-0232): if the policy exposes the audit-aware
+        # ``select_mode_with_audit`` overload (new in PR-3), prefer it so
+        # the parallel default can see per-entry ``effects`` and grant
+        # metadata.  Fall back to the protocol-level ``select_mode`` for
+        # any pre-existing policy that has not been upgraded.
+        selected_mode = self._select_mode_with_optional_audit(entries, resolved)
         observations: list[Observation] = []
-        for segment in self._select_segments(entries):
+        for segment in self._select_segments(entries, override_mode=selected_mode):
             observations.extend(await self._execute_segment(resolved, segment))
         return self._combine_observations(observations, tool_calls)
+
+    def _select_mode_with_optional_audit(
+        self,
+        entries: tuple[ToolBatchEntry, ...],
+        resolved: Sequence[tuple[ToolCall, Tool]],
+    ) -> ToolBatchExecutionMode | None:
+        """Resolve the batch mode, preferring the audit-aware overload when present.
+
+        Returns ``None`` when the policy only exposes the protocol-level
+        ``select_mode`` (no audit channel); the caller then defers to
+        ``_select_segments`` which uses that legacy path.
+        """
+
+        select_with_audit = getattr(self._policy, "select_mode_with_audit", None)
+        if select_with_audit is None:
+            return None
+        from lca.cognition.body.tools.execution_policy import (
+            ReadOnlyToolBatchEntry,
+        )
+
+        audited = tuple(
+            ReadOnlyToolBatchEntry(
+                call_id=entry.call_id,
+                tool_name=entry.tool_name,
+                effects=_resolve_tool_effects(tool),
+                grant=_resolve_tool_grant(tool),
+            )
+            for entry, (_call, tool) in zip(entries, resolved, strict=True)
+        )
+        return select_with_audit(audited)
 
     def _resolve_tools(self, tool_calls: Sequence[ToolCall]) -> list[tuple[ToolCall, Tool]]:
         """Resolve every tool before dispatching any world effect.
@@ -98,17 +142,32 @@ class ToolBatchExecutor:
     def _select_segments(
         self,
         entries: tuple[ToolBatchEntry, ...],
+        *,
+        override_mode: ToolBatchExecutionMode | None = None,
     ) -> tuple[ToolBatchExecutionSegment, ...]:
-        """Select and validate contiguous dispatch segments before execution."""
+        """Select and validate contiguous dispatch segments before execution.
+
+        ``override_mode`` is the audit-aware mode resolved by
+        ``_select_mode_with_optional_audit``; when present it replaces
+        the protocol-level ``select_mode`` call so PR-3's
+        ``ParallelReadOnlyToolBatchPolicy`` can gate on per-entry
+        ``effects`` / ``grant`` metadata.  When ``None`` the legacy
+        path is used.
+        """
 
         if isinstance(self._policy, ToolBatchSegmentPlanningPolicy):
             segments = self._policy.select_segments(entries)
         else:
+            mode = (
+                override_mode
+                if override_mode is not None
+                else self._policy.select_mode(entries)
+            )
             segments = (
                 ToolBatchExecutionSegment(
                     start=0,
                     stop=len(entries),
-                    mode=self._policy.select_mode(entries),
+                    mode=mode,
                 ),
             )
         try:
@@ -222,3 +281,41 @@ def _canonicalise_tool_name(name: str) -> str:
         # camelCase → snake_case: exportFile → export_file
         return _CAMEL_BOUNDARY_RE.sub("_", name).lower()
     return name
+
+
+def _resolve_tool_effects(tool: Tool) -> str:
+    """Return the declared ``effects`` value for ``tool``, defaulting to ``external``.
+
+    The lookup prefers the manifest's first ``ToolApi.effects`` value
+    because most tools expose exactly one API; for multi-API tools
+    the first declared effect wins (the audit must opt the whole tool
+    in to a non-default value at registration time, see
+    ``lca/contracts/cognition/body/tools/registry.py``).
+    """
+
+    manifest = getattr(tool, "manifest", None)
+    if manifest is not None and getattr(manifest, "api", None):
+        effects = getattr(manifest.api[0], "effects", "external")
+        if effects in ("read", "write", "external"):
+            return effects
+    # Fallback: tools without a manifest (legacy Protocol-only shape)
+    # are conservatively treated as ``external`` so the parallel
+    # default refuses to overlap an unaudited tool.
+    return "external"
+
+
+def _resolve_tool_grant(tool: Tool) -> dict[str, object]:
+    """Return the per-tool grant map used to check ``concurrent``.
+
+    The Body owns the authoritative capability grant; this helper only
+    surfaces the static ``tool.grant`` map (defaults to ``{}``) so the
+    policy's ``grant.concurrent`` check degrades to ``False`` for
+    tools that have not been wired with a grant channel.  This keeps
+    the parallel default safe-by-default: any tool whose grant is not
+    explicitly granted ``concurrent`` falls back to sequential.
+    """
+
+    grant = getattr(tool, "grant", None)
+    if isinstance(grant, dict):
+        return grant
+    return {}
