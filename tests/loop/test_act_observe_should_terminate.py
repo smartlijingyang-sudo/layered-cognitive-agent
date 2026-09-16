@@ -1,18 +1,26 @@
-"""Pin act.observe deterministic-failure shortcut behavior.
+"""Pin act.observe.terminate_decide deterministic-failure shortcut behavior.
 
 Locks in the post-retirement (plan
 `docs/plans/2026-09-14-stop-decision-retirement.md`, PR-3) contract:
-when `EffectReceipt.failure_kind == "execution"`, `act.observe` emits
-`should_terminate=True` so the outer driver routes the next edge to
-`terminal.commit` instead of looping back to `think.main`. This
+when `EffectReceipt.failure_kind == "execution"`, the act subgraph
+emits `should_terminate=True` so the outer driver routes the next edge
+to `terminal.commit` instead of looping back to `think.main`. This
 replaces the retired `DefaultStopPolicy._deterministic_failure_stop`
 shortcut.
+
+PR-3 split: the decision was previously produced by the `act.observe`
+node; it now lives on the dedicated `act.observe.terminate_decide` node
+that sits between `act.observe.commit_fact` and `reflect.main` /
+`terminal.commit` in the act subgraph wiring. This file targets the
+new node (the same typed-port contract — `receipt` in, `receipt` +
+`should_terminate` out).
 """
 
 from __future__ import annotations
 
 import pytest
 
+from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.atoms.semantic.keys import (
     FAILURE_KIND_EXECUTION,
     FAILURE_KIND_TRANSIENT,
@@ -22,7 +30,7 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
 )
-from lca.nodes.act.observe.observe import ActObserveExecutor
+from lca.nodes.act.observe.terminate_decide import ActObserveTerminateDecideExecutor
 
 
 def _make_context() -> NodeContext:
@@ -33,7 +41,7 @@ def _receipt(*, failure_kind: str | None) -> EffectReceipt:
     outcome = EffectOutcome.FAILED if failure_kind else EffectOutcome.SUCCEEDED
     error_code = "tool_failed" if failure_kind else None
     return EffectReceipt(
-        invocation_id="inv_test",
+        invocation_id=new_id("inv"),
         outcome=outcome,
         idempotency_key="idem_test",
         provider="body.act",
@@ -44,7 +52,7 @@ def _receipt(*, failure_kind: str | None) -> EffectReceipt:
 
 @pytest.mark.asyncio
 async def test_act_observe_emits_should_terminate_on_execution_failure() -> None:
-    executor = ActObserveExecutor()
+    executor = ActObserveTerminateDecideExecutor()
     receipt = _receipt(failure_kind=FAILURE_KIND_EXECUTION)
 
     output = await executor.node_execute(_make_context(), NodeInput({"receipt": receipt}))
@@ -55,7 +63,7 @@ async def test_act_observe_emits_should_terminate_on_execution_failure() -> None
 
 @pytest.mark.asyncio
 async def test_act_observe_does_not_terminate_on_transient_failure() -> None:
-    executor = ActObserveExecutor()
+    executor = ActObserveTerminateDecideExecutor()
     receipt = _receipt(failure_kind=FAILURE_KIND_TRANSIENT)
 
     output = await executor.node_execute(_make_context(), NodeInput({"receipt": receipt}))
@@ -65,7 +73,7 @@ async def test_act_observe_does_not_terminate_on_transient_failure() -> None:
 
 @pytest.mark.asyncio
 async def test_act_observe_does_not_terminate_on_success() -> None:
-    executor = ActObserveExecutor()
+    executor = ActObserveTerminateDecideExecutor()
     receipt = _receipt(failure_kind=None)
 
     output = await executor.node_execute(_make_context(), NodeInput({"receipt": receipt}))
@@ -83,7 +91,7 @@ async def test_act_observe_emits_should_terminate_on_legacy_failed_receipt() -> 
     terminal.commit so the loop never cycles the same tool call.
     """
     receipt = EffectReceipt(
-        invocation_id="inv_legacy",
+        invocation_id=new_id("inv"),
         outcome=EffectOutcome.FAILED,
         idempotency_key="idem_legacy",
         provider="body.act",
@@ -91,7 +99,7 @@ async def test_act_observe_emits_should_terminate_on_legacy_failed_receipt() -> 
     )
     assert receipt.failure_kind is None
 
-    output = await ActObserveExecutor().node_execute(
+    output = await ActObserveTerminateDecideExecutor().node_execute(
         _make_context(), NodeInput({"receipt": receipt})
     )
 
@@ -100,6 +108,6 @@ async def test_act_observe_emits_should_terminate_on_legacy_failed_receipt() -> 
 
 @pytest.mark.asyncio
 async def test_act_observe_rejects_non_receipt_input() -> None:
-    executor = ActObserveExecutor()
+    executor = ActObserveTerminateDecideExecutor()
     with pytest.raises(TypeError):
         await executor.node_execute(_make_context(), NodeInput({"receipt": "not a receipt"}))

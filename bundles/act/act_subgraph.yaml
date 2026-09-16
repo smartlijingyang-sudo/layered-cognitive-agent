@@ -93,18 +93,40 @@ nodes:
         entry_node: effect.execute
         binding_edge: act.dispatch
 
+  # PR-3: act.observe 语义收紧为 receipt 归一化(原 act.result.normalize
+  # fold 自 PR-3.8.7)。should_terminate 路由决策由同级 act.observe.terminate_decide
+  # 产出;observation-plane RunFact 落库由同级 act.observe.commit_fact 完成。
+  # 三者各自单一职责(AGENTS.md §2.2 事实/决策分离)。
   - id: act.observe
     region: act
     factory: act.observe
-    # PR-3.8.7: act.observe 同时承担 act.result.normalize 的归一化语义
-    # (schema/spill/coerce/error_reason)。归一化在 node_execute 内部完成,
-    # declared_inputs/declared_outputs 保持不变,typed-boundary port schema
-    # 对外不可见(AGENTS.md §3 C13)。不要把归一化拆成单独的 graph node。
+    inputs: [receipt]
+    outputs: [receipt]
+    config:
+      emit_on_enter: []
+      emit_on_exit: [phase.tool.call.end]
+
+  # PR-3 (L-1): RunFact commit 独立节点。原 act.observe 通过
+  # getattr(context.runtime, "journal") 偷图 runtime capability;改为本节点
+  # 由 kernel 注入 journal,act 业务节点内不再 raw getattr context.runtime。
+  - id: act.observe.commit_fact
+    region: act
+    factory: act.observe.commit_fact
+    inputs: [receipt]
+    outputs: [receipt]
+    config:
+      emit_on_enter: []
+      emit_on_exit: []
+
+  # PR-3 (G-3): should_terminate 路由决策节点。纯决策函数,receipt 只读。
+  - id: act.observe.terminate_decide
+    region: act
+    factory: act.observe.terminate_decide
     inputs: [receipt]
     outputs: [receipt, should_terminate]
     config:
       emit_on_enter: []
-      emit_on_exit: [phase.tool.call.end, phase.act.fold.end]
+      emit_on_exit: [phase.act.fold.end]
 
   # PR-3.8.5: 1:1 receipt join typed-boundary node. Consumes the
   # ``receipts`` list port (emitted by effect.execute after PR-3.8.5
@@ -155,3 +177,11 @@ edges:
         name: routing
         field: next_hint
       value: join_1to1
+
+  # PR-3: 归一化 → RunFact 落库 → should_terminate 决策,单向三段。
+  - from: act.observe
+    to: act.observe.commit_fact
+    when: true
+  - from: act.observe.commit_fact
+    to: act.observe.terminate_decide
+    when: true
