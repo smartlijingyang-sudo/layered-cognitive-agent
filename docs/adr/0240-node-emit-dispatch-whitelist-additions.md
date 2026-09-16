@@ -74,7 +74,7 @@ These are private dispatcher aliases consumed by `bundles/think_reason.yaml`. Th
 ### Positive
 
 - **C11 closed-set integrity**: each of the 10 new dispatchable EPs has a documented whitelist entry, category mapping, yaml registration, handler, and test path. No EP enters the dispatch table without all four legs.
-- **yaml becomes trigger, not documentation**: `emit_on_enter` / `emit_on_exit` values in production yaml start producing spine events once the driver calls `emit_for_node`. The mental model between "declared EP" and "spine event" closes the gap identified in the [spec](../notes/proposed/seam/2026-09-15-node-emit-dispatcher-wiring.md).
+- **yaml becomes trigger, not documentation**: `emit_on_enter` / `emit_on_exit` values in production yaml start producing spine events once the driver calls `emit_for_node`. The mental model between "declared EP" and "spine event" closes the gap identified in the [spec](../notes/implemented/seam/2026-09-15-node-emit-dispatcher-wiring.md).
 - **No whitelist drift**: all 10 EP names pre-exist in `SPINE_EXECUTION_POINTS`. This ADR adds zero new strings to the closed set — it records the mapping from yaml-declared EP ids to their existing whitelist entries.
 
 ### Risks
@@ -92,8 +92,8 @@ These are private dispatcher aliases consumed by `bundles/think_reason.yaml`. Th
 ## Related
 
 - [ADR-0230](0230-stop-decision-retirement.md) — `terminal.commit` node replaces `stop.main`; introduced `spine.terminal.commit` EP.
-- [ADR-0220](0220-concept-decision-classify-parse-merge.md) §3.3 — act-subgraph observation surface; existing `phase.tool.call.*` and `phase.act.fold.end` EPs.
-- [ADR-0217](0217-plan-intervene-delegate-subgraphs.md) — BundleGraphSpec v2 `emit_on_enter` / `emit_on_exit` schema.
+- [ADR-0220](0220-three-tier-graph-and-boundary-typing.md) §3.3 — act-subgraph observation surface; existing `phase.tool.call.*` and `phase.act.fold.end` EPs.
+- [ADR-0217](0217-bundle-graph-schema-v2.md) — BundleGraphSpec v2 `emit_on_enter` / `emit_on_exit` schema.
 - [ADR-0194](0194-cognitive-loop-architecture-convergence.md) — FactGateway single-entry fact production; six-phase closed set.
 - [ADR-0165](0165-execution-point-enforcement.md) — EXECUTION_POINTS whitelist enforcement and I8 closed-set invariant.
-- Spec (Agent Note): [`docs/notes/proposed/seam/2026-09-15-node-emit-dispatcher-wiring.md`](../notes/proposed/seam/2026-09-15-node-emit-dispatcher-wiring.md)
+- Spec (Agent Note): [`docs/notes/implemented/seam/2026-09-15-node-emit-dispatcher-wiring.md`](../notes/implemented/seam/2026-09-15-node-emit-dispatcher-wiring.md)
