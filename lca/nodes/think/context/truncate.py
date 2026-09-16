@@ -48,6 +48,13 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
+# Soft compaction threshold: only truncate once the working context has
+# grown past this fraction of the token budget. Below it the node emits a
+# ``noop`` receipt (the prior single ``context.compact`` gated the same way;
+# PR-B keeps that behaviour here rather than truncating every turn). The
+# hard "budget exceeded → terminate" check is the separate
+# ``think.budget.gate`` node.
+_COMPACTION_THRESHOLD_RATIO: float = 0.7
 # Conservative target: leave the working payload at ~50% of max_tokens after
 # compaction so the next turn has headroom before re-entering the node.
 _TARGET_AFTER_RATIO: float = 0.5
@@ -67,23 +74,27 @@ class ThinkContextTruncateExecutor:
         context: NodeContext,
         input: NodeInput,
     ) -> NodeOutput:
-        """Apply ``truncate_oldest`` and emit the receipt.
+        """Apply ``truncate_oldest`` (past the soft gate) and emit the receipt.
 
-        The upstream ``think.budget.gate`` decides whether to even
-        enter this node; this node always runs the strategy and
-        reports what happened via the receipt. On any exception
-        (including payload projection failures) the node emits a
-        ``skipped`` receipt — never raises out of the graph.
+        The upstream ``think.budget.gate`` owns the hard termination
+        check; this node owns the soft compaction decision + strategy.
+        Below ``_COMPACTION_THRESHOLD_RATIO`` the working context is left
+        untouched (``noop`` receipt); at/above it the oldest payload is
+        truncated toward ``_TARGET_AFTER_RATIO``. On any exception the
+        node emits a ``skipped`` receipt — never raises out of the graph.
 
-        ``budget`` comes from the typed port when the orchestrator
-        projects ``state.budget`` upstream, otherwise from the
-        runtime fallback chain (``state.budget`` is reached via the
-        whitelisted ``state`` carrier).
+        ``budget`` / ``context_payload`` come from typed ports when the
+        orchestrator projects them, otherwise via the whitelisted
+        ``state`` runtime carrier (``state.budget`` /
+        ``state.retrieved_context``), mirroring the prior single node.
         """
         budget = _resolve_budget(input=input, context=context)
-        payload = _resolve_context_payload(input=input)
+        payload = _resolve_context_payload(input=input, context=context)
         try:
-            receipt = self._apply_truncate(payload=payload, budget=budget)
+            if not _should_compact(budget):
+                receipt = CompactReceipt.noop(bytes_seen=_payload_byte_size(payload))
+            else:
+                receipt = self._apply_truncate(payload=payload, budget=budget)
         except Exception:
             receipt = CompactReceipt.skipped(bytes_seen=0)
         return NodeOutput(port_values={"compact_receipt": receipt})
@@ -121,9 +132,10 @@ def _resolve_budget(*, input: NodeInput, context: NodeContext) -> Budget:
     runtime = getattr(context, "runtime", None)
     if runtime is not None:
         state = getattr(runtime, "state", None)
-        candidate = getattr(state, "budget", None) if state is not None else None
-        if isinstance(candidate, Budget):
-            return candidate
+        if state is not None:
+            candidate = getattr(state, "budget", None)
+            if isinstance(candidate, Budget):
+                return candidate
     raise TypeError(
         "think.context.truncate expects a typed Budget port value (or "
         "context.runtime.state.budget fallback); got "
@@ -131,14 +143,35 @@ def _resolve_budget(*, input: NodeInput, context: NodeContext) -> Budget:
     )
 
 
-def _resolve_context_payload(*, input: NodeInput) -> tuple[Any, ...]:
-    """Return the typed ``context_payload`` value as an immutable tuple."""
+def _resolve_context_payload(*, input: NodeInput, context: NodeContext) -> tuple[Any, ...]:
+    """Return the typed ``context_payload`` as a tuple.
+
+    Falls back to ``context.runtime.state.retrieved_context`` when no
+    projector has supplied the port — the whitelisted ``state`` carrier is
+    the same source the prior single ``context.compact`` node read, so the
+    split stays behavior-preserving. Missing on both ⇒ empty payload.
+    """
     value = input.port_values.get("context_payload")
+    if value is None:
+        runtime = getattr(context, "runtime", None)
+        state = getattr(runtime, "state", None) if runtime is not None else None
+        value = getattr(state, "retrieved_context", None)
     if value is None:
         return ()
     if isinstance(value, tuple):
         return value
     return tuple(value)
+
+
+def _should_compact(budget: Budget) -> bool:
+    """Soft compaction gate: ``used_tokens`` past ``_COMPACTION_THRESHOLD_RATIO``.
+
+    ``max_tokens`` unset / non-positive ⇒ no compaction (a step-bounded run
+    keeps a ``noop`` receipt so downstream stays deterministic).
+    """
+    if budget.max_tokens is None or budget.max_tokens <= 0:
+        return False
+    return budget.used_tokens >= _COMPACTION_THRESHOLD_RATIO * budget.max_tokens
 
 
 def _payload_byte_size(payload: tuple[Any, ...]) -> int:

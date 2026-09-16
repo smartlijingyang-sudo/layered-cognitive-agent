@@ -9,12 +9,14 @@ Verifies the typed ``context.truncate`` node that owns only the
 Payload shapes exercised:
 
 1. empty payload — receipts stays ``noop`` and unchanged
-2. payload smaller than target — ``noop`` (kept == payload)
-3. payload larger than target — ``applied(truncate_oldest)`` with
+2. below the 0.7 soft gate — ``noop`` even with a large payload
+3. payload under the byte target (past the gate) — ``noop`` (kept == payload)
+4. payload over the target — ``applied(truncate_oldest)`` with
    ``bytes_after < bytes_before``
-4. multi-element mixed-size payload — only the tail is kept,
-   oldest entries drop first
-5. exception swallowing — exception in byte sizing ⇒ ``skipped`` receipt
+5. multi-element mixed-size payload — only the tail is kept, oldest drop first
+6. exception swallowing — past the gate, sizing raises ⇒ ``skipped`` receipt
+7. payload resolved from the ``state.retrieved_context`` carrier when the
+   port is absent (behavior-preserving vs the prior single node)
 """
 
 from __future__ import annotations
@@ -50,6 +52,21 @@ def _budget(*, max_tokens: int | None = 100, used_tokens: int = 0) -> Budget:
     )
 
 
+def _state_with_payload(payload: tuple[Any, ...]) -> Any:
+    """Lightweight ``AgentState``-shaped carrier for the truncate fallback test."""
+    state = Budget(
+        max_tokens=100,
+        used_tokens=0,
+        max_steps=10,
+        used_steps=0,
+        max_cost_usd=None,
+        used_cost_usd=0.0,
+        max_wall_clock_seconds=None,
+    )
+    state.retrieved_context = payload
+    return state
+
+
 @pytest.mark.asyncio
 async def test_truncate_empty_payload_emits_noop() -> None:
     """Empty payload ⇒ ``noop`` receipt (kept is empty)."""
@@ -67,11 +84,11 @@ async def test_truncate_empty_payload_emits_noop() -> None:
 
 @pytest.mark.asyncio
 async def test_truncate_payload_smaller_than_target_emits_noop() -> None:
-    """Payload under the byte budget ⇒ ``noop`` (nothing to compact)."""
+    """Past the gate but payload under the byte target ⇒ ``noop``."""
     executor = ThinkContextTruncateExecutor()
-    # max_tokens=100 → target = 50% of 100 = 50 bytes; payload below target.
-    budget = _budget(max_tokens=100)
-    payload = ("short",)  # bytes_before = len(repr("short")) == 7
+    # past the gate (used=80 ≥ 70); target = 50 bytes; payload is 7 bytes.
+    budget = _budget(max_tokens=100, used_tokens=80)
+    payload = ("short",)
 
     output = await executor.node_execute(
         _ctx(),
@@ -85,11 +102,33 @@ async def test_truncate_payload_smaller_than_target_emits_noop() -> None:
 
 
 @pytest.mark.asyncio
-async def test_truncate_payload_larger_than_target_emits_applied() -> None:
-    """Payload over the byte budget ⇒ ``applied(truncate_oldest)`` shrinks it."""
+async def test_truncate_below_soft_gate_emits_noop_despite_large_payload() -> None:
+    """Past-payload but under the 0.7 token gate ⇒ ``noop`` (don't compact yet).
+
+    Guards the soft compaction threshold the prior single ``context.compact``
+    node enforced: compaction must not fire on every turn, only once the
+    working context crosses ``_COMPACTION_THRESHOLD_RATIO``.
+    """
     executor = ThinkContextTruncateExecutor()
-    # max_tokens=20 → target = 10 bytes; payload > 10 bytes shrinks.
-    budget = _budget(max_tokens=20)
+    budget = _budget(max_tokens=1000, used_tokens=100)  # 10% < 70%
+    payload = ("a" * 40, "b" * 40, "c" * 40)  # would shrink if the gate ran
+
+    output = await executor.node_execute(
+        _ctx(),
+        NodeInput(port_values={"budget": budget, "context_payload": payload}),
+    )
+
+    receipt: CompactReceipt = output.port_values["compact_receipt"]
+    assert receipt.compacted is False
+    assert receipt.strategy == "noop"
+
+
+@pytest.mark.asyncio
+async def test_truncate_payload_larger_than_target_emits_applied() -> None:
+    """Payload over the byte budget (past the gate) ⇒ ``applied`` shrinks it."""
+    executor = ThinkContextTruncateExecutor()
+    # max_tokens=20, used=18 (≥14 ⇒ past the 0.7 gate); target = 10 bytes.
+    budget = _budget(max_tokens=20, used_tokens=18)
     payload = ("alpha-alpha", "beta-beta", "gamma-gamma")  # each ≥ 13 bytes
 
     output = await executor.node_execute(
@@ -108,8 +147,8 @@ async def test_truncate_payload_larger_than_target_emits_applied() -> None:
 async def test_truncate_mixed_multi_element_keeps_tail() -> None:
     """Mixed-size payload: oldest entries drop, most recent are kept."""
     executor = ThinkContextTruncateExecutor()
-    # target = 10 bytes; tail ("small") = 7 bytes fits; head ("a"*40) won't.
-    budget = _budget(max_tokens=20)
+    # past the gate (used=18 ≥ 0.7*20=14); target = 10 bytes.
+    budget = _budget(max_tokens=20, used_tokens=18)
     payload = ("a" * 40, "b" * 40, "small")
 
     output = await executor.node_execute(
@@ -126,7 +165,7 @@ async def test_truncate_mixed_multi_element_keeps_tail() -> None:
 async def test_truncate_handles_list_payload_as_tuple() -> None:
     """``context_payload`` may arrive as a list; node coerces to tuple."""
     executor = ThinkContextTruncateExecutor()
-    budget = _budget(max_tokens=20)
+    budget = _budget(max_tokens=20, used_tokens=18)
     payload = ["alpha-alpha", "beta-beta", "gamma-gamma"]
 
     output = await executor.node_execute(
@@ -151,7 +190,8 @@ class _ExplodingRepr:
 async def test_truncate_exception_swallowed_emits_skipped_receipt() -> None:
     """Exception during sizing ⇒ ``skipped`` receipt (no raise out of graph)."""
     executor = ThinkContextTruncateExecutor()
-    budget = _budget(max_tokens=100)
+    # past the gate so the strategy runs and __repr__ actually fires.
+    budget = _budget(max_tokens=100, used_tokens=90)
     payload: tuple[Any, ...] = (_ExplodingRepr(),)
 
     output = await executor.node_execute(
@@ -195,8 +235,45 @@ async def test_truncate_wrong_budget_type_raises() -> None:
 
 
 @pytest.mark.asyncio
+async def test_truncate_resolves_payload_from_state_carrier() -> None:
+    """Missing ``context_payload`` port ⇒ resolved via whitelisted ``state`` carrier.
+
+    Behavior-preserving fallback: the prior single ``context.compact`` node
+    read ``state.retrieved_context``; the split must too.
+    """
+    executor = ThinkContextTruncateExecutor()
+    state = _state_with_payload(("a" * 40, "b" * 40, "small"))
+    state.budget = Budget(
+        max_tokens=20,
+        used_tokens=18,
+        max_steps=10,
+        used_steps=0,
+        max_cost_usd=None,
+        used_cost_usd=0.0,
+        max_wall_clock_seconds=None,
+    )
+    # Make the carrier's `.get("state")` lookup find the state. The
+    # AST guard whitelists "state", so read it via runtime.get so the
+    # test mirrors how the kernel exposes the per-turn carrier.
+    class _Carrier(dict):
+        def __getattr__(self, name: str) -> object:
+            return self.get(name)
+
+    runtime = _Carrier({"state": state})
+    ctx = NodeContext(runtime=runtime, budget={}, metadata={})
+
+    output = await executor.node_execute(
+        ctx,
+        NodeInput(port_values={}),
+    )
+    receipt: CompactReceipt = output.port_values["compact_receipt"]
+    assert receipt.compacted is True
+    assert receipt.strategy == "truncate_oldest"
+
+
+@pytest.mark.asyncio
 async def test_truncate_missing_context_payload_is_empty() -> None:
-    """Missing ``context_payload`` port → empty tuple (no crash)."""
+    """Missing ``context_payload`` port and no runtime carrier → empty tuple."""
     executor = ThinkContextTruncateExecutor()
     output = await executor.node_execute(
         _ctx(),
@@ -216,7 +293,7 @@ async def test_truncate_is_idempotent() -> None:
     excludes the per-call timestamp.
     """
     executor = ThinkContextTruncateExecutor()
-    budget = _budget(max_tokens=100)
+    budget = _budget(max_tokens=100, used_tokens=90)
     payload = ("alpha", "beta", "gamma", "delta")
     port_values = {"budget": budget, "context_payload": payload}
 
