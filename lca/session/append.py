@@ -6,8 +6,10 @@ Production fact append goes through :class:`Session` and its :meth:`~Session.app
 from __future__ import annotations
 
 import contextlib
+import copy
 import inspect
-import json
+import math
+import os
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, is_dataclass
@@ -62,26 +64,95 @@ def _to_jsonable(value: Any) -> Any:
     raise TypeError(f"session event data 包含不可无损 JSON 序列化的值: {type(value).__name__}")
 
 
-def _snapshot_data(data: Mapping[str, Any]) -> dict[str, Any]:
-    """无损 JSON 快照：校验可序列化性并与调用方可变输入脱钩。
+# 单 event payload hard cap(以 _to_jsonable 之后的 JSON 字节数估算)。
+# 超过即 fail-loud,避免一次同步 emit 把 asyncio 事件循环独占数秒
+# (per 2026-09-16 stall postmortem)。环境变量可覆盖,默认 8 MiB。
+_MAX_SNAPSHOT_BYTES = int(os.environ.get("LCA_SESSION_MAX_SNAPSHOT_BYTES", str(8 * 1024 * 1024)))
 
-    对齐 dsh ``snapshotJsonValue``：typed 容器(``BaseModel`` / dataclass /
-    Sequence)经 :func:`_to_jsonable` 在边界处提升为 JSON-safe 原语,然后再走
-    ``json.dumps`` 校验 + 拷贝。``allow_nan=False`` 拒绝非 JSON 数值。
+
+def _estimate_size(value: Any) -> int:
+    """估算 JSON 序列化后字节数,不分配中间字符串。
+
+    仅用于大小守卫,粗估足够(int/float 按 token 字节、str 按 len+2、
+    dict/list 按递归成员+1 边界)。复杂度 O(N) 与 deepcopy 同阶。
+    """
+    if value is None or isinstance(value, bool):
+        return 4 if value is None else (4 if value else 5)
+    if isinstance(value, int):
+        return max(1, len(str(value)))
+    if isinstance(value, float):
+        return 24  # 浮点最长 token
+    if isinstance(value, str):
+        # 中文 / surrogate 大约 4 字节,UTF-8 编码,粗估 2 倍 + 引号
+        return len(value.encode("utf-8", errors="replace")) * 2 + 2
+    if isinstance(value, dict):
+        return 2 + sum(_estimate_size(k) + _estimate_size(v) for k, v in value.items())
+    if isinstance(value, list):
+        return 2 + sum(_estimate_size(v) for v in value)
+    return 16  # 兜底,_to_jsonable 已保证走到这里只有 dict/list/primitive
+
+
+def _validate_json_safe(value: Any) -> None:
+    """递归校验 lifted 树无 NaN/Infinity,不构造中间字符串。
+
+    比 ``json.dumps(..., allow_nan=False)`` 快一个数量级,且不分配大字符串。
+    失败语义与原实现一致:抛 ``ValueError`` -> ``TypeError``。
+    """
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError(f"非 JSON 数值: {value!r}")
+        return
+    if isinstance(value, dict):
+        for k, v in value.items():
+            if not isinstance(k, str):
+                raise ValueError(f"JSON object key 必须是 str, got {type(k).__name__}")
+            _validate_json_safe(v)
+        return
+    if isinstance(value, list):
+        for v in value:
+            _validate_json_safe(v)
+        return
+    # primitive (None/bool/int/str) 经 _to_jsonable 已保证 JSON-safe
+
+
+def _snapshot_data(data: Mapping[str, Any]) -> dict[str, Any]:
+    """无损 JSON 快照:校验可序列化性并与调用方可变输入脱钩。
+
+    实现路径(2026-09-16 重构):
+
+    1. :func:`_to_jsonable` 在边界处把 ``BaseModel`` / dataclass /
+       Sequence 提升为 ``dict`` / ``list`` / 原语(JSON-safe 原语集合);
+    2. :func:`_validate_json_safe` 递归扫 NaN/Infinity,替代原先的
+       ``json.dumps(allow_nan=False)`` —— 后者在 100MB+ payload 上会
+       分配大字符串并扫一遍,本实现在 lifted 树上直接递归,常数因子小;
+    3. :func:`copy.deepcopy` 做深拷贝 + memo,替代原先 ``json.loads(encoded)``。
+       deepcopy 不做"stringify→parse"往返,且保留 ``_to_jsonable`` 已经
+       归一化好的 ``dict``/``list`` 容器 + 共享引用(原 json.loads 会丢
+       共享引用)。
+
+    ``_MAX_SNAPSHOT_BYTES``(默认 8 MiB)做 hard cap:任何单 event payload
+    超过阈值即抛 ``TypeError``。这是事件循环 backpressure 的最后一公里
+    —— 单 event 不可能因为 log size 增长而把 asyncio 独占数秒。环境变量
+    ``LCA_SESSION_MAX_SNAPSHOT_BYTES`` 可覆盖。
+
+    对齐 dsh ``snapshotJsonValue`` 的**语义**(独立快照 + JSON-safe),非
+    字符级输出对齐;``Session.append`` 同步契约不变(ADR-0186)。
     """
     if not isinstance(data, Mapping):
         raise TypeError(f"session event data 必须是 Mapping, got {type(data).__name__}")
     lifted = _to_jsonable(data)
-    try:
-        encoded = json.dumps(lifted, allow_nan=False)
-    except (TypeError, ValueError) as exc:
-        raise TypeError(f"session event data 不是可无损 JSON 序列化的值: {exc}") from exc
-    snapshot = json.loads(encoded)
-    if not isinstance(snapshot, dict):
+    size = _estimate_size(lifted)
+    if size > _MAX_SNAPSHOT_BYTES:
         raise TypeError(
-            f"session event data 序列化后必须是 JSON object, got {type(snapshot).__name__}"
+            f"session event payload 超过 _MAX_SNAPSHOT_BYTES={_MAX_SNAPSHOT_BYTES} "
+            f"(估算 {size} bytes);降低单 event payload 大小或调高 "
+            f"LCA_SESSION_MAX_SNAPSHOT_BYTES。"
         )
-    return snapshot
+    try:
+        _validate_json_safe(lifted)
+    except ValueError as exc:
+        raise TypeError(f"session event data 不是可无损 JSON 序列化的值: {exc}") from exc
+    return copy.deepcopy(lifted)
 
 
 class Session(SessionProtocol):
