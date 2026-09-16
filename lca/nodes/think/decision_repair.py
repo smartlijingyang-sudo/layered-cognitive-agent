@@ -116,14 +116,30 @@ class ThinkDecisionRepairExecutor:
         ``next_node`` steers the waterfall toward ``think.gate``
         (ok / repaired) or ``think.route.decide`` (rejected).
 
-        Empty ``decision`` (None or no tool_calls) yields an empty
-        ``NodeOutput`` so the bundle edge decides routing — typical
-        wiring: ``when: eq port.decision value: None`` re-routes to
+        Empty ``decision`` (None) yields an empty ``NodeOutput`` so the
+        bundle edge decides routing — typical wiring:
+        ``when: eq port.decision value: None`` re-routes to
         ``think.route.decide`` for a full re-reason.
+
+        ``respond`` decisions (no tool_calls but a populated
+        ``response_text``) are passed through untouched: ``repair``
+        is a use_tool-only concern (tool-call argument validation),
+        and clearing the carry-in ``decision`` here would strip the
+        outer plan's edge predicate (``decision.action_type ==
+        respond``) of the very signal that lets the run complete.
         """
         decision = input.port_values.get("decision")
-        if not _has_tool_calls(decision):
+        if decision is None:
             return NodeOutput(port_values={})
+        if not _has_tool_calls(decision):
+            # ``respond`` (or any non-use_tool) decision → pass through
+            # unchanged; only use_tool paths need repair below.
+            return NodeOutput(
+                port_values={
+                    "decision": decision,
+                    "routing": _route_ok(),
+                }
+            )
 
         registry = input.port_values.get("tools")
 

@@ -266,13 +266,21 @@ async def test_decision_repair_is_idempotent() -> None:
 
 @pytest.mark.asyncio
 async def test_decision_repair_empty_decision_returns_empty_output() -> None:
-    """``decision is None`` or has no tool_calls → empty ``NodeOutput``.
+    """``decision is None`` → empty ``NodeOutput``.
 
-    The bundle edge decides routing for the empty case; the repair
-    node stays out of the way so the bundle predicate on the
+    The bundle edge decides routing for the truly empty case; the
+    repair node stays out of the way so the bundle predicate on the
     ``parse → repair`` edge can re-route to ``think.route.decide``
-    when the LLM chose ``respond`` / ``ask_user`` (Decision with
-    no tool_calls) or when ``decision.parse`` returned ``None``.
+    when ``decision.parse`` returned ``None``.
+
+    A populated ``Decision`` with no ``tool_calls`` (a ``respond``
+    or other non-use_tool action) is a different shape: ``repair``
+    is a use_tool-only concern, so the node passes the carry-in
+    ``decision`` through with ``decision_ok`` routing rather than
+    emit an empty output. Clearing it would strip the outer plan's
+    edge predicate (``decision.action_type == respond``) of the
+    signal that lets the run complete — see the 2026-09-16
+    act→think re-ask loop guard note.
     """
     executor = ThinkDecisionRepairExecutor()
     registry = _registry_with_echo()
@@ -284,13 +292,16 @@ async def test_decision_repair_empty_decision_returns_empty_output() -> None:
     )
     assert out_none.port_values == {}
 
-    # Decision with an empty tool_calls list.
+    # Decision with an empty tool_calls list — a ``respond`` action;
+    # the executor must forward it (do not strip the carry-in signal).
     empty_decision = _decision()
     out_empty = await executor.node_execute(
         _ctx(),
         _input(empty_decision, tools=registry),
     )
-    assert out_empty.port_values == {}
+    assert out_empty.port_values["decision"] is empty_decision
+    routing = out_empty.port_values["routing"]
+    assert routing.next_hint == "decision_ok"
 
 
 @pytest.mark.asyncio
