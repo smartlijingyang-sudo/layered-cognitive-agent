@@ -44,47 +44,113 @@ def lift_graph_spec(spec: Mapping[str, Any]) -> Plan:
 
 
 def _validate_approval_resume_node(plan: Plan) -> None:
-    """Fail-loud when ``act.approve.gate`` is declared without a resume edge.
+    """Fail-loud when HITL resume path is missing — outer + per-plan.
 
     PR-1 (closes 评审 §6.1 + G-1 hot path): HITL without a resume edge
     is unsafe — the interrupt can pause a run but never recover, so
-    the next user command is dropped on the floor. This check fires
-    at every ``lift_graph_spec`` call (including the boot-time
-    ``validate_profile_plans`` walk) so the operator sees the
-    failure before the first run.
+    the next user command is dropped on the floor.
 
-    The check is per-plan: any plan that declares ``act.approve.gate``
-    as one of its nodes must also declare a cross-subgraph
-    ``intervene.resume → act.approve.gate`` edge in the same plan.
-    Plans without the gate are unaffected (gated on
-    ``act.approve.gate in node_ids``).
+    PR-1b (ADR-0237) refines the check into two pieces because the
+    gate moved into act_subgraph (spec §3.2 原位):
 
-    Per-plan (not cross-plan) is intentional: the validator walks
-    every bundle in :func:`validate_profile_plans` independently, so
-    a single per-plan rule keeps the check local and predictable.
-    The outer plan's ``act.approve.gate`` delegate is checked here
-    (the outer delegate needs the resume edge as much as the inner
-    gate does); the inner ``act.subgraph`` plan's gate has its own
-    resume edge added in :file:`bundles/act/act_subgraph.yaml`.
+    (a) **Per-plan rule (preserved from PR-1)** — any plan that
+        declares ``act.approve.gate`` as one of its nodes must also
+        declare ``intervene.resume → act.approve.gate`` in the same
+        plan. This is the subgraph-level invariant: a plan with a
+        gate but no resume edge is unreachable. Triggered for
+        ``bundles/act/act_subgraph.yaml`` (where the gate now lives).
+
+    (b) **Outer-plan rule (PR-1b / R-1)** — when an outer plan owns
+        the 3 mutually-exclusive ``act.main.routing`` consumer edges
+        (i.e. routes HITL outcomes from the act subgraph into
+        ``intervene.interrupt`` / ``terminal.commit`` /
+        ``reflect.main``), it must close the resume cycle at outer
+        level: ``intervene.interrupt → intervene.resume``. The
+        kernel re-projects the persisted Command and re-enters the
+        subgraph's gate; without the outer-level resume edge a
+        paused run can never come back.
+
+    Per-plan (a) walks every bundle independently; outer-plan (b)
+    detects plans that route HITL outcomes (via ``act.main.routing``
+    or ``act.approve.gate``) without closing the cycle. The two
+    rules together cover both placements of the gate.
     """
     node_ids = {n.id for n in plan.nodes}
-    if "act.approve.gate" not in node_ids:
-        return
-    resume_edge_present = any(
-        e.source == "intervene.resume" and e.target == "act.approve.gate" for e in plan.edges
-    )
-    if resume_edge_present:
-        return
-    raise PlanLiftError(
-        "act.approve.gate is declared but the cross-subgraph resume edge "
-        "``intervene.resume → act.approve.gate`` is missing — HITL without "
-        "a resume edge is unsafe (the interrupt can pause a run but never "
-        "recover; subsequent user commands are dropped). Add the resume "
-        "edge in this plan or remove the gate declaration.",
-        plan_id=plan.id,
-        node_id="act.approve.gate",
-        next_command="./scripts/lca-ops plan validate bundles/outer/phase_main.yaml",
-    )
+    # (a) Per-plan rule — preserved from PR-1.
+    if "act.approve.gate" in node_ids:
+        resume_edge_present = any(
+            e.source == "intervene.resume" and e.target == "act.approve.gate"
+            for e in plan.edges
+        )
+        if not resume_edge_present:
+            raise PlanLiftError(
+                "act.approve.gate is declared but the cross-subgraph "
+                "resume edge ``intervene.resume → act.approve.gate`` is "
+                "missing — HITL without a resume edge is unsafe (the "
+                "interrupt can pause a run but never recover; subsequent "
+                "user commands are dropped). Add the resume edge in this "
+                "plan or remove the gate declaration.",
+                plan_id=plan.id,
+                node_id="act.approve.gate",
+                next_command="./scripts/lca-ops plan validate bundles/outer/phase_main.yaml",
+            )
+
+    # (b) Outer-plan rule (PR-1b / R-1) — validate the resume cycle at
+    # the outer level when the outer plan consumes ``routing`` from the
+    # act subgraph. The check is heuristic: a plan whose outgoing
+    # edges from ``act.main`` reference ``routing.next_hint`` is
+    # presumed to be the outer HITL routing plan and must close the
+    # interrupt → resume cycle at outer level.
+    if _outer_consumes_hitl_routing(plan):
+        resume_cycle_present = any(
+            e.source == "intervene.interrupt" and e.target == "intervene.resume"
+            for e in plan.edges
+        )
+        if not resume_cycle_present:
+            raise PlanLiftError(
+                "outer plan consumes act.main.routing for HITL "
+                "(act.main → {intervene.interrupt, terminal.commit, "
+                "reflect.main}) but the resume cycle "
+                "``intervene.interrupt → intervene.resume`` is missing — "
+                "a paused run can never come back. Add the resume edge "
+                "in this plan.",
+                plan_id=plan.id,
+                node_id="intervene.interrupt",
+                next_command="./scripts/lca-ops plan validate bundles/outer/phase_main.yaml",
+            )
+
+
+def _outer_consumes_hitl_routing(plan: Plan) -> bool:
+    """True iff *plan* is the outer HITL routing plan (PR-1b / R-1).
+
+    A plan counts as the outer HITL routing plan when at least one of
+    its outgoing edges from ``act.main`` reads ``routing.next_hint``,
+    i.e. consumes the typed ``RoutingDecision`` emitted by the inner
+    act subgraph's gate. The check is per-edge predicate inspection;
+    if any single edge from ``act.main`` references
+    ``{ name: routing, field: next_hint }`` we treat the plan as the
+    HITL owner.
+    """
+    for edge in plan.edges:
+        if edge.source != "act.main":
+            continue
+        pred = edge.when
+        if not isinstance(pred, Predicate):
+            continue
+        if _predicate_reads_routing_next_hint(pred):
+            return True
+    return False
+
+
+def _predicate_reads_routing_next_hint(pred: Predicate) -> bool:
+    """Walk a predicate tree and report whether any leaf reads ``routing.next_hint``."""
+    if pred.kind in ("and", "or"):
+        return any(_predicate_reads_routing_next_hint(c) for c in pred.children)
+    if pred.kind == "not":
+        return bool(pred.children) and _predicate_reads_routing_next_hint(pred.children[0])
+    if pred.port is not None and pred.port.name == "routing" and pred.port.field == "next_hint":
+        return True
+    return False
 
 
 def _lift_graph_spec_inner(spec: Mapping[str, Any]) -> Plan:

@@ -52,11 +52,53 @@ nodes:
     region: act
     factory: act.authorize
     # ADR-0235 / PR-5: state 透传到 act.envelope,metadata 不再偷 state。
+    # ADR-0237 / PR-1b: typed ``approval_required: bool`` port replaces the
+    # previous ``decision.extra["needs_approval"]`` metadata grep; this is
+    # the only consumer of the port within the subgraph, so the dead-port
+    # risk is bounded.
     inputs: [decision, state]
-    outputs: [decision, state]
+    outputs: [decision, state, approval_required]
     config:
       emit_on_enter: [think.gate.start]
       emit_on_exit: []
+
+  # ADR-0237 / PR-1b: spec §3.2 原位 — gate stays between act.authorize
+  # (which mints ``approval_required``) and act.envelope (which mints the
+  # effect CommandEnvelope). The interrupt must fire **before** any side
+  # effect; positioning it after envelope/dispatch/observe is the
+  # "irreversible-then-confirm" anti-pattern called out in
+  # `2026-09-16-act-subgraph-tightening` §F-1.
+  #
+  # Routing semantics (typed ``RoutingDecision.next_hint``):
+  #   approve_skipped   → act.envelope (decision.needs_approval=False)
+  #   approve_interrupt → outer intervene.interrupt (no Command yet)
+  #   approve_approved  → act.envelope (Command.kind == "approve")
+  #   approve_rejected  → outer terminal.commit (reject/redirect/resume-timeout)
+  #
+  # Only the approve-skipped/approved branches have an inner edge to
+  # act.envelope; approve_interrupt/approved-rejected don't fan out
+  # inside the subgraph (let the subgraph finish) and rely on the
+  # outer-plan's mutually-exclusive ``act.main.routing`` consumers.
+  - id: act.approve.gate
+    region: intervene
+    factory: act.approve.gate
+    # ``decision`` is the typed upstream Decision (carries
+    # needs_approval); ``approval_required`` is the boolean computed by
+    # act.authorize. ``command`` is optional (consumed only on resume
+    # when the kernel re-projects the persisted Command into the
+    # subgraph's port registry).
+    inputs: [decision, approval_required]
+    # ``approval_routing`` is the typed ``RoutingDecision`` that bubbles
+    # out of the subgraph through ``act.main.declared_outputs``; the
+    # outer-plan's 3 mutually-exclusive edges consume it. Renamed from
+    # ``routing`` to avoid the PortRegistry.last-write-wins collision
+    # with downstream ``act.fanout``'s ``routing`` (fanout runs after
+    # gate in the subgraph; same name would overwrite gate's signal
+    # before the outer plan reads it).
+    outputs: [decision, approval_routing]
+    config:
+      emit_on_enter: [phase.intervene.gate.start]
+      emit_on_exit: [phase.intervene.gate.end]
 
   - id: act.envelope
     region: act
@@ -147,6 +189,24 @@ nodes:
       emit_on_enter: []
       emit_on_exit: [phase.act.fold.end]
 
+  # ADR-0237 / PR-1b: subgraph-internal ``intervene.resume`` stub node.
+  # The subgraph declares a resume edge into ``act.approve.gate`` so the
+  # per-plan resume-edge validator triggers at subgraph lift time. The
+  # stub itself is a factory carrier (no inner edges — the subgraph
+  # exits on entry); the real resume subgraph lives in
+  # ``bundles/intervene/resume_subgraph.yaml`` and is reached via the
+  # outer-level ``intervene.resume`` node when the kernel resumes the
+  # run. The kernel re-projects the persisted ``Command`` into the
+  # subgraph's port registry before entering this stub.
+  - id: intervene.resume
+    region: intervene
+    factory: intervene.resume
+    inputs: [command]
+    outputs: [decision]
+    config:
+      emit_on_enter: []
+      emit_on_exit: []
+
   # PR-3.8.5: 1:1 receipt join typed-boundary node. Consumes the
   # ``receipts`` list port (emitted by effect.execute after PR-3.8.5
   # fix1 commit 3b17af47f changed declared_outputs from 'receipt' to
@@ -171,8 +231,33 @@ edges:
   - from: act.validate
     to: act.authorize
     when: true
+  # ADR-0237 / PR-1b: gate sits between act.authorize and act.envelope.
+  # The predicate reads typed ``approval_required: bool`` (PR-1b typed
+  # port) — the decision already carries needs_approval but we want a
+  # subgraph-local boolean so the predicate validates without crossing
+  # into Decision's payload_type.
   - from: act.authorize
+    to: act.approve.gate
+    when: true
+  # approve_skipped (no-approval-needed) and approve_approved
+  # (Command.kind == "approve") both route forward to act.envelope;
+  # approve_interrupt and approve_rejected have no inner edge so the
+  # subgraph completes and the outer plan's mutually-exclusive
+  # ``act.main.approval_routing`` consumers take over.
+  - from: act.approve.gate
     to: act.envelope
+    when:
+      kind: in
+      port: { name: approval_routing, field: next_hint }
+      value: [approve_skipped, approve_approved]
+  # ADR-0237 / PR-1b: subgraph-internal resume edge so the per-plan
+  # ``act.approve.gate`` resume-edge validator triggers at subgraph
+  # lift time. ``intervene.resume`` here is a factory stub (no inner
+  # edges — the subgraph ends on entry); the real subgraph lives in
+  # ``bundles/intervene/resume_subgraph.yaml`` and is reached via the
+  # outer-level ``intervene.resume`` node when the kernel resumes.
+  - from: intervene.resume
+    to: act.approve.gate
     when: true
   - from: act.envelope
     to: act.fanout

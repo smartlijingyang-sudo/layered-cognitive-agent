@@ -107,6 +107,8 @@ from lca.nodes.act.join import ActJoinExecutor
 from lca.nodes.act.observe.observe import ActObserveExecutor
 from lca.nodes.act.validate.validate import ActValidateExecutor
 from lca.nodes.concept.effect.execute import EffectExecuteExecutor
+from lca.nodes.intervene.approve_gate import ApproveGateExecutor
+from lca.nodes.intervene.resume import ResumeExecutor
 
 BUNDLE_PATH = (
     Path(__file__).resolve().parent.parent.parent / "bundles" / "act" / "act_subgraph.yaml"
@@ -374,24 +376,30 @@ def test_no_direct_act_envelope_to_act_dispatch_edge() -> None:
     )
 
 
-def test_lifted_bundle_has_exactly_seven_edges() -> None:
+def test_lifted_bundle_has_exactly_nine_edges() -> None:
     """Pin the bundle's edge count to catch future silent insertions /
     deletions that would silently bypass the typed-boundary contract.
 
-    Expected edges after the round-2 fix:
+    Expected edges after PR-1b (ADR-0237):
       - act.validate -> act.authorize
-      - act.authorize -> act.envelope
+      - act.authorize -> act.approve.gate
+      - act.approve.gate -> act.envelope (predicate on approval_routing)
+      - intervene.resume -> act.approve.gate (resume cycle)
       - act.envelope -> act.fanout
       - act.fanout -> act.dispatch (predicate)
       - act.dispatch -> act.join
       - act.join -> act.observe (predicate)
 
-    Total: 6 edges. (Asserting == 6 — not "at least" — so any future
+    Plus the act.observe chain (PR-3):
+      - act.observe -> act.observe.commit_fact
+      - act.observe.commit_fact -> act.observe.terminate_decide
+
+    Total: 10 edges. (Asserting == 10 — not "at least" — so any future
     addition is an explicit, reviewed change.)
     """
     plan = _lift_bundle()
-    assert len(plan.edges) == 6, (
-        f"lifted act.subgraph must have exactly 6 edges, got "
+    assert len(plan.edges) == 10, (
+        f"lifted act.subgraph must have exactly 10 edges, got "
         f"{len(plan.edges)}: "
         f"{[(e.source, e.target) for e in plan.edges]}"
     )
@@ -515,6 +523,8 @@ def _make_outer_registry(
     executors: dict[str, NodeExecutor] = {
         "act.validate": ActValidateExecutor(),
         "act.authorize": ActAuthorizeExecutor(),
+        "act.approve.gate": ApproveGateExecutor(),
+        "intervene.resume": ResumeExecutor(),
         "act.envelope": ActEnvelopeExecutor(),
         "act.fanout": ActFanoutExecutor(),
         "act.join": ActJoinExecutor(),
