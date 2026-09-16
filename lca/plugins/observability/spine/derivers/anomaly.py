@@ -105,6 +105,13 @@ class AnomalyDetector(Deriver):
     def __init__(self) -> None:
         # Rolling window of recent execution_points for cycle detection.
         self._recent_points: deque[str] = deque(maxlen=self.CYCLE_WINDOW)
+        # Consecutive-count for the head of the window: how many times
+        # in a row the *same* ``execution_point`` has fired. Used by
+        # ``_check_cycle`` so a single spine event can answer "are we
+        # in a tight loop?" instead of just "did this EP repeat once
+        # in a 100-event window?".
+        self._consecutive_count: int = 0
+        self._last_point: str | None = None
         # Last observed sequence number for stalled detection.
         self._last_sequence: int | None = None
         # Open spans keyed by span_id; populated by ``_check_stuck``.
@@ -137,12 +144,27 @@ class AnomalyDetector(Deriver):
         return duration > timeout_ms * self.NEAR_TIMEOUT_RATIO
 
     def _check_cycle(self, event: EventRecord) -> bool:
-        """Trip when the same ``execution_point`` repeats within ``CYCLE_WINDOW``."""
+        """Trip when the same ``execution_point`` repeats within ``CYCLE_WINDOW``.
+
+        Tracks a consecutive-count so a single spine event can answer
+        "we're in a tight loop on EP X" rather than just "EP X
+        appeared twice somewhere in the last 100 events". The 2026-09-16
+        act→think re-ask stalled with ``phase.act.fold.end`` repeating
+        879 times in a row; the old detector only logged a single
+        WARNING per repeat (and the diagnostic never explained *why*).
+        """
         point = event.execution_point
-        if point in self._recent_points:
-            return True
+        if self._last_point == point:
+            self._consecutive_count += 1
+        else:
+            self._last_point = point
+            self._consecutive_count = 1
         self._recent_points.append(point)
-        return False
+        # Trip on the SECOND consecutive repeat: the first emission of
+        # an EP is not a loop signal; the second consecutive emission
+        # is the smallest evidence of a tight loop, surfaced loud
+        # before the run burns more budget on it.
+        return self._consecutive_count >= 2 and point in self._recent_points
 
     def _check_stuck(self, event: EventRecord) -> bool:
         """Trip when an open span has aged past ``STUCK_THRESHOLD_S`` seconds.
@@ -243,7 +265,7 @@ class AnomalyDetector(Deriver):
                 continue
             if not tripped:
                 continue
-            evidence = self._evidence_for(kind, event)
+            evidence = self._evidence_for(kind, event, detector=self)
             payload = _make_anomaly_payload(kind=kind, event=event, evidence=evidence)
             if self._anomaly_sink is not None:
                 try:
@@ -265,7 +287,12 @@ class AnomalyDetector(Deriver):
                 )
 
     @staticmethod
-    def _evidence_for(kind: str, event: EventRecord) -> dict[str, Any]:
+    def _evidence_for(
+        kind: str,
+        event: EventRecord,
+        *,
+        detector: AnomalyDetector | None = None,
+    ) -> dict[str, Any]:
         """Render a small per-kind evidence dict for the anomaly record."""
         payload = event.payload
         if kind == "near_timeout":
@@ -291,7 +318,16 @@ class AnomalyDetector(Deriver):
         if kind == "state_machine_violation":
             return {"marker": payload.get("state_machine_violation")}
         if kind == "cycle":
-            return {"execution_point": event.execution_point}
+            # EP-level evidence only. The detector must not interpret
+            # payload semantics (decision / tool_call schema); domain
+            # detection (which tool+args are repeating) belongs in
+            # RepeatToolCallGate / similar.
+            return {
+                "execution_point": event.execution_point,
+                "consecutive_count": getattr(detector, "_consecutive_count", 0)
+                if detector is not None
+                else 0,
+            }
         if kind == "collision":
             return {"span_id": event.span_id}
         if kind == "orphan_side_effect":
