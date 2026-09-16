@@ -1,9 +1,11 @@
 """L2 Runtime 协议 —— 认知循环入口。
 
 The retired `StopPolicy` Protocol previously lived here; loop termination
-now flows through `TerminalCommitExecutor` reading `decision.action_type`
-or Body raising `DeterministicToolError`. See plan
-`docs/plans/2026-09-14-stop-decision-retirement.md`.
+now flows through the outer plan's `terminal.commit` node (`TerminateStrategy`)
+reached by edge predicates over `decision.action_type`,
+`act.observe.terminate_decide`'s `should_terminate`, and the budget guard.
+See plan `docs/plans/2026-09-14-stop-decision-retirement.md` and
+`docs/specs/tool-failure-recovery.md` §7.
 """
 
 from __future__ import annotations

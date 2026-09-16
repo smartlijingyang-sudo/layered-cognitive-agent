@@ -36,14 +36,20 @@ class EffectReceipt:
     """Body-classifier tag forwarded to the cognition seam.
 
     Mirrors ``Observation.extra[FAILURE_KIND]``: ``"execution"`` for
-    deterministic failures the agent cannot retry into success,
-    ``"transient"`` for retryable infra errors, ``None`` for success or
-    any failure class the body has not yet classified. The cognition
-    seam (``act.observe.should_terminate`` propagation and
-    ``ReflectObservationBuildExecutor._build_observation``) reads
-    this field directly — keeping it on the EffectReceipt is the
-    single SSOT for failure classification across the Body↔Cognition
-    boundary; do not derive it from ``error_code`` text at the seam.
+    deterministic failures the agent cannot retry into success *with the
+    same args* — it may still change approach or tool; ``"transient"``
+    for retryable infra errors; ``None`` for success, or for a failure
+    the body never classified because no tool ran (the host could not
+    dispatch the effect). Keeping it on the EffectReceipt is the single
+    SSOT for failure classification across the Body↔Cognition boundary;
+    do not derive it from ``error_code`` text at the seam.
+
+    Consumers read it for two distinct questions.
+    ``ReflectObservationBuildExecutor._build_observation`` maps the tag
+    value to a reflection prompt. ``act.observe.terminate_decide`` reads
+    only the tag's *absence*: an unclassified failure is host-side and
+    terminates the run, while any classified tag is the tool's report
+    about its own subject and goes back to the model.
     """
 
     def __post_init__(self) -> None:

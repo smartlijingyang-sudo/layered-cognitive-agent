@@ -85,7 +85,8 @@ class StopPayload(BaseModel):
 
     Carries the loop's terminal payload. ``reason`` is set by the model
     (RESPOND with non-empty response_text maps to a focused payload),
-    by Body raising ``DeterministicToolError`` (ERROR), or by the
+    by ``act.observe.terminate_decide`` routing an unclassified
+    host-side dispatch failure to ``terminal.commit`` (ERROR), or by the
     budget guard (BUDGET_EXCEEDED). ``final_output_ref`` is the optional
     pointer to the model's answer text; the reducer resolves it into
     ``TerminalOutcome.final_output``.

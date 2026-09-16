@@ -23,16 +23,15 @@ think
   → _execute_with_retry
   → ToolInvoked
   → Observation
-  → reflect
-  → remember
-  → stop
+  → act.observe（normalize → commit_fact → terminate_decide）
+  → think（USE_TOOL 失败回到 think，不经 reflect / remember）
 ```
 
 声明式运行路径由 [`CognitiveRuntime`](../../lca/runtime/loop/runtime_loop.py) 绑定 `CompiledRunPlan`、phase executors、effect handler registry 和 delta handler registry，然后交给 [`DeclarativeRuntimeDriver`](../../lca/loop/driver.py)。通用解释器位于 [`PlanInterpreter`](../../lca/framework/graph/interpreter.py)。
 
 ## 3. SafeExecutor 的错误分型
 
-[`SimpleSafeExecutor`](../../lca/cognition/body/executor/safe_executor.py) 的执行顺序是权限检查、参数校验、`ToolStarted`、缓存检查、局部重试、`ToolInvoked`。默认 [`RetryPolicy`](../../lca/contracts/models/team/role_team.py) 允许最多三次重试，并使用指数退避。
+[`SimpleSafeExecutor`](../../lca/cognition/body/executor/safe_executor.py) 的执行顺序是权限检查、参数校验、`ToolStarted`、缓存检查、局部重试、`ToolInvoked`。默认 [`RetryPolicy`](../../lca/contracts/models/team/role/team.py) 允许最多三次重试，并使用指数退避。
 
 | 错误类型 | `failure_kind` | SafeExecutor 行为 | Agent 是否重新思考 |
 |---|---|---|---|
@@ -69,11 +68,13 @@ for attempt in range(retry_policy.max_retries + 1):
 
 声明式解释器还会通过 [`RuntimeJournalCommitter`](../../lca/loop/driver.py) 记录 `phase.result` 和 `effect.receipt`，并携带 `plan_ref`、`node_ref` 和 operation。工具 Journal 事实回答“工具发生了什么”，phase 事实回答“执行图走到了哪里”。两者不能互相替代。
 
-## 5. 失败如何进入 Reflect
+**事实层按 invocation 记，step-tree 投影按 step 记，两者不是一对一。** 一个 `Decision` 可以 fork 出多个并行工具调用（`Decision.tool_calls` 是列表），事实层的 `step.tool_call.record` / `step.tool_result.record` 每个 invocation 一条，完整；但投影侧 [`StepRecord.tool_call`](../../lca/contracts/models/observability/journal/step.py) 是单数，一个 step 只能承载一个 invocation。因此并发工具调用的 run 里，`journal.json` 的 distinct invocation 数会少于事实层，doctor H7 会把这种情况判为 `ok=null`（投影上限）而不是 `ok=false`（事实不一致）。要对账并发调用必须读 spine 事实层，不能读 step-tree。
 
-`ACT` 阶段的 [`StandardPhaseExecutor`](../../lca/plugins/phase_executors/common.py) 只创建 `CommandEnvelope`。[`BodyActEffectHandler`](../../lca/plugins/providers/effect_handlers.py) 调用 Body，返回的 Observation 被解释器放入 `artifact_map["observation"]` 和 `artifact_map["act"]`，然后沿 `act.main → reflect.main` 继续。
+## 5. 失败如何回到模型
 
-如果使用 [`SimpleCritic`](../../lca/cognition/brain/critic.py)，它会根据 `failure_kind` 生成可解释的 Reflection：
+act 子图的 [`act.envelope`](../../lca/nodes/act/envelope/envelope.py) 只创建 `CommandEnvelope`（一个 `Decision.tool_calls[i]` 对应一个 envelope）。[`BodyActEffectHandler`](../../lca/plugins/act/effect/handlers_provider.py) 调用 Body，返回的 Observation 由 [`concept.effect.execute`](../../lca/nodes/concept/effect/execute.py) 折成 `EffectReceipt`，再经 `act.observe.normalize → commit_fact → terminate_decide` 决定回 `think.main` 还是收口（§7）。`decision.action_type == use_tool` 时回 `think.main`，不经 reflect；其余情况才沿 `act.main → reflect.main` 继续。
+
+走 reflect 时，[`SimpleCritic`](../../lca/cognition/brain/reasoner/critic.py) 会根据 `failure_kind` 生成可解释的 Reflection：
 
 | 类型 | 反思提示 |
 |---|---|
@@ -87,26 +88,16 @@ Reflect 不负责直接修改 State。它产生 Reflection；后续阶段将 Ref
 
 ### 6.1 标准闭环恢复
 
-默认阶段图由 [`declarative-phase-graph.yaml`](../../bundles/declarative-phase-graph.yaml) 声明：
+外层计划由 [`phase_main.yaml`](../../bundles/outer/phase_main.yaml) 声明，首个匹配边生效：
 
 ```text
-perceive → think → act → reflect → remember → stop
-stop → perceive（当 should_stop=false）
+perceive → think → act → think            （decision.action_type == use_tool）
+                   act → reflect → remember → terminal.commit
+                   act → terminal.commit   （should_terminate / approve_rejected）
+                   think → terminal.commit （respond 且 response_text 非空 / 预算耗尽）
 ```
 
-失败工具沿标准路径执行时：
-
-```text
-act 失败
-  → reflect 生成 NEEDS_CORRECTION
-  → remember 生成 turn delta
-  → Reducer.apply_turn
-  → state.history.append(turn)
-  → stop 判断继续
-  → 下一轮 perceive / think
-```
-
-[`TurnDeltaHandler`](../../lca/plugins/providers/delta_handlers.py) 将 `decision`、`observation` 和 `reflection` 组成 Turn，并调用 `Reducer.apply_turn`。下一次 Think 由 [`build_tool_history`](../../lca/cognition/brain/tool_conversation.py) 将失败结果恢复成模型原生消息：
+失败工具走的是第一条：`act.main → think.main`，不经 reflect / remember。失败 Observation 因此**不会**经 [`TurnDeltaHandler`](../../lca/plugins/act/delta/handlers_provider.py) 进入 `state.history`，它靠下一次 Think 的 [`think.history.assemble`](../../lca/nodes/think/history/assemble.py) 从 `RunSessionWriter.derive_messages` 恢复成模型原生消息（同一处做 orphan-drop，丢弃没有配对结果的 tool_call）：
 
 ```text
 assistant.tool_calls: file_write(...)
@@ -117,25 +108,47 @@ role=tool: permission denied: workspace is read-only
 
 ### 6.2 显式 Recovery Edge
 
-Recovery profile 可以声明：
+外层计划声明的恢复边（[`phase_main.yaml`](../../bundles/outer/phase_main.yaml)）：
 
-```text
-reflect.main ── result.next_hints.admit_recovery ──→ think.main
+```yaml
+- from: reflect.main
+  to: think.main
+  when: { kind: eq, port: { name: routing, field: next_hint }, value: admit_recovery }
+  loop:
+    maxIterations: 1
+    budget: run.steps
+    terminalPredicate: { kind: ne, port: { name: routing, field: next_hint }, value: admit_recovery }
 ```
 
-[`RecoveryReflectExecutor`](../../lca/plugins/phase_executors/reflect.py) 在 Observation 缺失或 `success=false` 时设置 `admit_recovery=true`。恢复边必须带 `max_iterations` 和预算来源；默认 recovery 插件配置最多允许一次 reflect→think 重入，避免无限自我修正。[`recovery.py`](../../lca/plugins/phase_edges/recovery.py)
+[`phase.reflect.admit_recovery`](../../lca/nodes/reflect/admit_recovery/admit_recovery.py) 在 Observation 缺失或 `success=false` 时把 `routing.next_hint` 置为 `admit_recovery`；它只做路由判定，不改 `reflection` payload。恢复边必须带 `maxIterations` 与预算来源，默认最多一次 reflect→think 重入（插件默认见 [`recovery/plugin.py`](../../lca/plugins/loop/graph/recovery/plugin.py)）。
 
-Recovery edge 解决的是“是否允许回到 Think”。如果该边跳过 Remember，失败 Turn 必须由额外的 Delta、Contribution 或自定义 Think executor 显式持久化或读取；否则失败 Observation 可能只存在于解释器的 `artifact_map`，尚未进入 `state.history`。标准闭环路径经过 Remember，因此默认情况下更容易保证下一次 Prompt 能看到失败原因。
+这条边只在 `decision.action_type != use_tool` 时才可能到达（USE_TOOL 失败在 §6.1 已直接回 think），因此它覆盖的是「模型已经收尾、但 Observation 说明没收尾成功」这一类。两条路径都跳过 Remember，失败 Observation 都不进 `state.history`；下一次 Prompt 能看到失败原因，靠的是 §6.1 的 `derive_messages`，不是 Turn 持久化。新增恢复路径时若依赖 `state.history`，必须自己显式写入。
 
-## 7. StopPolicy 的终止判断
+## 7. 终止判断
 
-[`DefaultStopPolicy`](../../lca/plugins/state/stop_policy.py) 是 State 群提供给固定 Stop 阶段的局部策略。它只返回 `StopDecision`，由 Reducer 写入状态；完成、预算耗尽与 artifact closure 收口均在该单一深模块内完成。对失败工具的基本规则是：
+`StopPolicy` / `DefaultStopPolicy` 已按 ADR-0230 删除。终止不再由 host 侧策略类判断模型输出，而是 [`terminal.commit`](../../bundles/outer/phase_main.yaml) 节点收口：边谓词决定谁能到达它，[`TerminateStrategy`](../../lca/framework/graph/strategies/terminate_strategy.py) 由 `decision` / `act_outcome` 端口构造 `StopPayload`，driver 的 `_stop_from_interpretation_output` 把它提升为 `StopDecision`，再由 Reducer 依 C12 顺序 `apply_stop` → `apply_terminal_outcome`。
+
+到达 `terminal.commit` 的边只有五条：
+
+| 来源 | 条件 | 语义 |
+|---|---|---|
+| `think.main` | `decision.action_type == respond` 且 `response_text != ""` | 模型自己收尾（不再发 tool call），唯一的成功出口 |
+| `think.main` | `routing.should_terminate == true`（`think.budget.threshold_gate`） | 预算耗尽 |
+| `act.main` | `should_terminate == true`（`act.observe.terminate_decide`） | host 侧派发失败：receipt 无 `failure_kind`，说明没有工具报告过任何结果 |
+| `act.main` | `approval_routing.next_hint == approve_rejected` | 审批被拒 |
+| `remember.main` | 无条件 | 闭环收口 |
+
+对失败工具的基本规则是：
 
 ```text
-USE_TOOL + failed Observation → 通常继续
+USE_TOOL + failed Observation → 继续（act.main → think.main）
 ```
 
-如果模型在最近多次工具失败后直接输出“已完成”，策略会检查连续失败窗口，防止把放弃误判为成功。达到 step 或 wall-clock 预算后，系统停止；最后有有效结果或交付物时可以完成，否则标记失败。
+带 `failure_kind` 标签的失败（`execution` / `transient` / `validation` / `tool_wire`）都是工具对*自己标的物*的报告，必须回到模型手里；`execution` 的含义是「同样参数重试无意义」（基础设施级不重试由 `SafeExecutor` 保证），不是「run 不能继续」。
+
+兜住卡死循环的是 [`think.budget.gate`](../../lca/nodes/think/budget/threshold_gate.py)：它每轮 think 都执行，`Budget.exceeded()` 为真就发 `should_terminate=true` 收口。[`create_budget`](../../lca/contracts/models/core/policy/budget.py) 默认 `max_steps=50`、`max_wall_clock_seconds=300`。ADR-0225 已删除 per-node `max_visits`。
+
+另外两道界**目前在 `act.main → think.main` 这条路上失效**：[`ToolLoopBreakerGate`](../../lca/cognition/brain/decision_gates/tool/loop_breaker.py)（同一工具连续失败 3 次阻断）与 [`ProgressLoopDetector`](../../lca/cognition/brain/decision_gates/progress/loop_detector.py)（连续 6 步无进展强制 RESPOND）都读 `control_turns(state)`，而它只由 remember 阶段的 `TurnDeltaHandler` 经 `Reducer.apply_turn` 写入；失败工具路径跳过 remember，两个 gate 因此读到 0 条 turn。durable `turn.control.v1` 的生产入口 `append_turn_control_fact` 也没有调用方。这是既有缺陷，成功的工具循环同样受影响；详见 ADR-0230 Amendment。
 
 ## 8. 暂停、恢复和幂等
 
@@ -189,7 +202,10 @@ effect_uncertain
 
 - [`runtime_loop.py`](../../lca/runtime/loop/runtime_loop.py)
 - [`driver.py`](../../lca/loop/driver.py)
-- [`interpreter.py`](../../lca/harness/declarative/interpreter.py)
+- [`interpreter.py`](../../lca/framework/graph/interpreter.py)
 - [`safe_executor.py`](../../lca/cognition/body/executor/safe_executor.py)
 - [`tool_journal.py`](../../lca/cognition/body/emit/tool_journal.py)
-- [`declarative-phase-graph.yaml`](../../bundles/declarative-phase-graph.yaml)
+- [`phase_main.yaml`](../../bundles/outer/phase_main.yaml)
+- [`terminate_decide.py`](../../lca/nodes/act/observe/terminate_decide.py)
+- [`terminate_strategy.py`](../../lca/framework/graph/strategies/terminate_strategy.py)
+- [`loop_detector.py`](../../lca/cognition/brain/decision_gates/progress/loop_detector.py)

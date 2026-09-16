@@ -8,12 +8,20 @@ PR-3 split:本节点从原 ``act.observe`` 中剥离 ``should_terminate`` 决策
 ``act.observe.commit_fact`` 节点承担),节点职责符合 AGENTS.md §2.2
 「事实源 ≠ 决策」分类。
 
-决策规则(从原 ``act.observe`` 段平移,确定性 + 幂等):
+决策规则(确定性 + 幂等):
 
-    should_terminate = (
-        receipt.failure_kind == FAILURE_KIND_EXECUTION
-        or (receipt.failure_kind is None and receipt.outcome.value == "failed")
-    )
+    should_terminate = receipt.failure_kind is None and receipt.outcome.value == "failed"
+
+只有*未分类*的失败才终止 run —— 那是 host 侧根本没能把 effect 派出去
+(``concept.effect.execute`` 捕获 gateway 异常时产出的 receipt 无
+``failure_kind``)。带分类标签的失败是工具对*自己标的物*的报告,必须回到
+模型手里让它换方案(docs/specs/tool-failure-recovery.md §3/§6.1/§7)。
+卡死的循环由 ``think.budget.gate`` 兜住(每轮 think 都跑,``max_steps=50`` /
+300s 墙钟);ADR-0225 已删除 per-node ``max_visits``,ADR-0230 当初为省掉
+``max_visits=8`` 空转而在这一节点加的 deterministic-failure 短路已无前提。
+``ToolLoopBreakerGate`` / ``ProgressLoopDetector`` 本应是更紧的界,但两者都读
+``control_turns``,而失败工具走的 ``act.main → think.main`` 跳过 remember、
+不写 turn,所以在这条路上读不到东西 —— 详见 ADR-0230 Amendment。
 
 无副作用:不调 journal,不调 Body / Registry / SafeExecutor,不构造 envelope。
 typed-port 边界:输入 ``receipt``、输出 ``receipt`` + ``should_terminate``。
@@ -26,7 +34,6 @@ from dataclasses import dataclass
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
-from lca.contracts.atoms.semantic.keys import FAILURE_KIND_EXECUTION
 from lca.contracts.harness.act.effect_receipt import EffectReceipt
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -74,10 +81,11 @@ class ActObserveTerminateDecideExecutor:
         outputs 端口(yaml): receipt (EffectReceipt, passthrough),
                             should_terminate (bool)
 
-        决策规则:deterministic-failure shortcut 当 ``failure_kind ==
-        execution`` 或 pre-classifier ``outcome == failed`` 时,emit
-        ``should_terminate=True``;其他情况 ``False``(包括 transient /
-        validation / tool_wire 等可重试失败)。
+        决策规则:仅当 receipt 是*未分类*失败(``failure_kind is None`` 且
+        ``outcome == failed``,即 host 侧派发失败)时 emit
+        ``should_terminate=True``;任何带分类标签的失败(execution /
+        transient / validation / tool_wire)都 emit ``False``,让失败
+        Observation 回到模型。
         """
         del context  # unused: pure function of input port value
         receipt = input.port_values.get("receipt")
@@ -87,9 +95,7 @@ class ActObserveTerminateDecideExecutor:
                 f"EffectReceipt instance, got {type(receipt).__name__}"
             )
 
-        should_terminate = receipt.failure_kind == FAILURE_KIND_EXECUTION or (
-            receipt.failure_kind is None and receipt.outcome.value == "failed"
-        )
+        should_terminate = receipt.failure_kind is None and receipt.outcome.value == "failed"
 
         return NodeOutput(
             port_values={

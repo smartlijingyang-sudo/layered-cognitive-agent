@@ -2,7 +2,8 @@
 
 Persisted projection of a tool execution error carried on
 ``surface/tool_result``. Distinct from the runtime
-:class:`DeterministicToolError`; this is the journal-side wire shape.
+``EffectReceipt.failure_kind`` classifier tag; this is the journal-side
+wire shape.
 """
 
 from __future__ import annotations

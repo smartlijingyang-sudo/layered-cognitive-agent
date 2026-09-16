@@ -1,12 +1,13 @@
-"""Pin act.observe.terminate_decide deterministic-failure shortcut behavior.
+"""Pin act.observe.terminate_decide routing behavior.
 
 Locks in the post-retirement (plan
 `docs/plans/2026-09-14-stop-decision-retirement.md`, PR-3) contract:
-when `EffectReceipt.failure_kind == "execution"`, the act subgraph
-emits `should_terminate=True` so the outer driver routes the next edge
-to `terminal.commit` instead of looping back to `think.main`. This
-replaces the retired `DefaultStopPolicy._deterministic_failure_stop`
-shortcut.
+only an *unclassified* failed receipt — the host never got the effect
+out of the door — emits `should_terminate=True` and routes the outer
+edge to `terminal.commit`. Every classified failure (`execution`,
+`transient`, `validation`, `tool_wire`) loops back to `think.main` so
+the model sees the tool's report, per
+`docs/specs/tool-failure-recovery.md` §3/§6.1/§7.
 
 PR-3 split: the decision was previously produced by the `act.observe`
 node; it now lives on the dedicated `act.observe.terminate_decide` node
@@ -51,13 +52,21 @@ def _receipt(*, failure_kind: str | None) -> EffectReceipt:
 
 
 @pytest.mark.asyncio
-async def test_act_observe_emits_should_terminate_on_execution_failure() -> None:
+async def test_act_observe_does_not_terminate_on_execution_failure() -> None:
+    """A classified tool failure goes back to the model, not to terminal.commit.
+
+    ``execution`` means "retrying the same args is pointless", not "the run
+    cannot continue" — SafeExecutor already refuses the infra-level retry, and
+    docs/specs/tool-failure-recovery.md §3 keeps the cognitive retry (换方案或
+    换工具) open. Terminating here is what ended run_eed09c1df112 after its
+    sandbox reported ``ModuleNotFoundError``, before the model could react.
+    """
     executor = ActObserveTerminateDecideExecutor()
     receipt = _receipt(failure_kind=FAILURE_KIND_EXECUTION)
 
     output = await executor.node_execute(_make_context(), NodeInput({"receipt": receipt}))
 
-    assert output.port_values["should_terminate"] is True
+    assert output.port_values["should_terminate"] is False
     assert output.port_values["receipt"] is receipt
 
 
@@ -83,12 +92,11 @@ async def test_act_observe_does_not_terminate_on_success() -> None:
 
 @pytest.mark.asyncio
 async def test_act_observe_emits_should_terminate_on_legacy_failed_receipt() -> None:
-    """Pre-classifier failure (failure_kind=None but outcome=failed).
+    """Unclassified failure (failure_kind=None but outcome=failed).
 
-    Mirrors the historical `run_0d71855ae274` regression class: the
-    receipt has no classifier tag (Body pre-classifier code path) but
-    the error_code is non-empty. The terminator still routes to
-    terminal.commit so the loop never cycles the same tool call.
+    No classifier tag means no tool reported anything: the host failed
+    to dispatch the effect at all. The run terminates rather than ask
+    the model to reason about a side effect whose state is unknown.
     """
     receipt = EffectReceipt(
         invocation_id=new_id("inv"),
