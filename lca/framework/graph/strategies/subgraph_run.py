@@ -4,6 +4,7 @@ Architecture review C3 (Worth exploring): nested-run policy, port
 merge, and observation live behind :class:`SubgraphRun`. The strategy
 is a thin dispatcher.
 """
+
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Mapping
@@ -13,8 +14,9 @@ from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
 from lca.contracts.models.core.state.state import AgentState, Budget
-from lca.contracts.protocols.graph.node_io import NodeInput, NodeIOSchema, NodeOutput
+from lca.contracts.protocols.graph.node_io import NodeInput, NodeOutput
 from lca.contracts.protocols.graph.plan import Plan
+from lca.contracts.protocols.graph.ports import PortName
 from lca.contracts.protocols.graph.strategy import StrategyContext
 from lca.framework.graph.observation import (
     KIND_SUBGRAPH_ENTER,
@@ -47,9 +49,7 @@ class DefaultSubgraphRun:
     async def run(self, context: StrategyContext, input: NodeInput) -> NodeOutput:
         ref = context.subgraph_ref
         if ref is None:
-            raise RuntimeError(
-                f"node {context.node_id!r} has binding=SUBGRAPH but no subgraph_ref"
-            )
+            raise RuntimeError(f"node {context.node_id!r} has binding=SUBGRAPH but no subgraph_ref")
         outer_state = context.node_config.get("agent_state")
         if not isinstance(outer_state, AgentState):
             outer_state = AgentState(trace_id="", task="", budget=_empty_budget())
@@ -58,11 +58,13 @@ class DefaultSubgraphRun:
         depth_token: Any = None
         if self.depth_counter is not None:
             from lca.framework.graph.host_wiring import enter_subgraph, exit_subgraph
+
             current_depth, depth_token = enter_subgraph()
             depth = current_depth + 1
         if depth > self.max_depth:
             if depth_token is not None:
                 from lca.framework.graph.host_wiring import exit_subgraph
+
                 exit_subgraph(depth_token)
             raise RuntimeError(
                 f"subgraph recursion exceeded max_depth={self.max_depth} at "
@@ -70,54 +72,100 @@ class DefaultSubgraphRun:
             )
         sub_plan = load_subgraph_plan(ref.plan_ref, ref.entry_node)
         translated_input = translate_inputs(context, input)
+        # ADR-0241 §4: seed the inner plan's port_registry so inner nodes
+        # can read by name any port the outer kernel or upstream nodes
+        # wrote. The outer node's projected ``input`` only carries the
+        # subgraph delegate's declared inputs (e.g. ``in_assembled_manifest``
+        # for think.main) — it does NOT carry kernel-seeded ports like
+        # ``tools`` / ``bindings``. The interpreter stashes the outer
+        # plan's full ``PortRegistry`` on ``context.node_config["_port_registry"]``
+        # (a kernel-private key that ``StrategyContext`` allows via its
+        # ``node_config`` mapping — no Protocol change required). We
+        # layer the full outer registry first, then the projected
+        # declared inputs on top via ``setdefault`` (which preserves
+        # outer values when keys collide — iron rule 1).
         outer_ports: PortRegistry | None = None
-        if translated_input:
+        outer_registry = context.node_config.get("_port_registry") if context.node_config else None
+        outer_snapshot: Mapping[PortName, Any] = (
+            outer_registry.snapshot() if isinstance(outer_registry, PortRegistry) else {}
+        )
+        if outer_snapshot or translated_input or input.port_values:
             outer_ports = PortRegistry()
-            outer_ports.set_outer_input(translated_input)
+            if outer_snapshot:
+                outer_ports.set_outer_input(outer_snapshot)
+            if input.port_values:
+                # input.port_values is Mapping[PortName, Any] at runtime;
+                # the static type alias keys it as str. The runtime keys
+                # are PortName values, so the cast is safe.
+                outer_ports.set_outer_input(input.port_values)  # type: ignore[arg-type]
+            if translated_input:
+                # translated_input keys are port names declared on the
+                # inner entry node; the type alias is loose at this seam.
+                outer_ports.set_outer_input(translated_input)  # type: ignore[arg-type]
         observe_enter(self.observer, self.clock, context, ref, depth)
         try:
-            outcome = self.recursive_runner(
-                sub_plan, outer_state, depth, outer_ports, outer_mirror
-            )
+            outcome = self.recursive_runner(sub_plan, outer_state, depth, outer_ports, outer_mirror)
             if isawaitable(outcome):
                 outcome = await outcome
         except BaseException as exc:
             observe_exit(
-                self.observer, self.clock, context, ref, depth,
-                outcome="failure", error=repr(exc),
+                self.observer,
+                self.clock,
+                context,
+                ref,
+                depth,
+                outcome="failure",
+                error=repr(exc),
             )
             if depth_token is not None:
                 from lca.framework.graph.host_wiring import exit_subgraph
+
                 exit_subgraph(depth_token)
             raise
         merged_output: Mapping[str, Any] = outcome  # type: ignore[assignment]
         outer_output = translate_outputs(context, merged_output)
         observe_exit(
-            self.observer, self.clock, context, ref, depth,
-            outcome="success", error="",
+            self.observer,
+            self.clock,
+            context,
+            ref,
+            depth,
+            outcome="success",
+            error="",
         )
         if depth_token is not None:
             from lca.framework.graph.host_wiring import exit_subgraph
+
             exit_subgraph(depth_token)
         return NodeOutput(port_values=outer_output, producer_node=context.node_id)
 
 
 def translate_inputs(context: StrategyContext, input: NodeInput) -> dict[str, Any]:
+    """Project outer input ports onto inner declared inputs by name (ADR-0241 §1).
+
+    Name-based projection semantics:
+
+    - When ``inner_io_schema`` is ``None`` or declares no inputs, the
+      outer feed passes through unchanged (identity translation; the
+      legacy positional path is preserved for subgraphs that opt out of
+      declaring an inner IO schema).
+    - When inner declares N ports, the returned dict contains at most N
+      entries: one for each inner declared name that is also present in
+      outer. Names absent from outer are dropped; the kernel is
+      expected to seed those missing ports at the outer plan entry
+      (see ``PlanInterpreterAdapter.run`` kernel seed).
+    - Outer ports whose names are not in the inner declared set are
+      dropped from this projection — they do not leak across the seam
+      (no information leakage). The caller (``DefaultSubgraphRun.run``)
+      separately seeds them into the inner ``PortRegistry`` so a deeper
+      subgraph can read them by name on any downstream node.
+    """
     inner_schema = context.inner_io_schema
-    outer_input_names: tuple[str, ...] = tuple(input.port_values.keys())
-    translated_input: dict[str, Any] = dict(input.port_values)
-    if inner_schema is not None and inner_schema.inputs:
-        inner_input_names = tuple(p.name for p in inner_schema.inputs)
-        if len(outer_input_names) == len(inner_input_names):
-            translated_input = {
-                inner_input_names[i]: input.port_values[outer_input_names[i]]
-                for i in range(len(outer_input_names))
-            }
-        elif outer_input_names and not inner_input_names:
-            translated_input = dict(input.port_values)
-        elif inner_input_names and not outer_input_names:
-            translated_input = {}
-    return translated_input
+    outer_ports = dict(input.port_values)
+    if inner_schema is None or not inner_schema.inputs:
+        return outer_ports
+    inner_input_names = tuple(p.name for p in inner_schema.inputs)
+    return {name: outer_ports[name] for name in inner_input_names if name in outer_ports}
 
 
 def translate_outputs(context: StrategyContext, merged_output: Mapping[str, Any]) -> dict[str, Any]:
@@ -153,7 +201,9 @@ def outer_declared_outputs_of(context: StrategyContext) -> tuple[str, ...]:
 
 def load_subgraph_plan(plan_ref: str, entry_node: str) -> Plan:
     import yaml
+
     from lca.framework.graph.lifter import _lift_graph_spec_inner, validate_predicates
+
     path = repo_root() / plan_ref
     if not path.is_file():
         raise FileNotFoundError(f"bundle graph yaml not found: {plan_ref}")
@@ -218,6 +268,7 @@ def observe_exit(observer, clock, context, ref, depth, *, outcome, error) -> Non
 def _now_ms(clock):
     if clock is None:
         import time as _time
+
         return _time.monotonic_ns() // 1_000_000
     return clock()
 
@@ -231,8 +282,15 @@ _outer_declared_outputs = outer_declared_outputs_of
 _repo_root = repo_root
 
 __all__ = [
-    "DefaultSubgraphRun", "RecursiveRunner", "SubgraphRun",
-    "load_subgraph_plan", "outer_declared_outputs_of", "repo_root",
-    "translate_inputs", "translate_outputs",
-    "_load_subgraph_plan", "_outer_declared_outputs", "_repo_root",
+    "DefaultSubgraphRun",
+    "RecursiveRunner",
+    "SubgraphRun",
+    "_load_subgraph_plan",
+    "_outer_declared_outputs",
+    "_repo_root",
+    "load_subgraph_plan",
+    "outer_declared_outputs_of",
+    "repo_root",
+    "translate_inputs",
+    "translate_outputs",
 ]

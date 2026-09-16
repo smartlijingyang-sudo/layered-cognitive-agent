@@ -3,6 +3,7 @@
 C1 lift interface covered by tests/framework/graph/test_lift_interface.py.
 No intended outer-loop behavior change.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -86,18 +87,51 @@ class TestAdapterHostWiringSplit:
 
 
 class TestSubgraphRunDeepen:
-    def test_translate_inputs_positional(self) -> None:
+    def test_translate_inputs_name_based(self) -> None:
+        """ADR-0241 §1 — name-based projection at the subgraph seam.
+
+        Outer ``observation`` matches inner declared ``observation`` by
+        name; the old positional swap that renamed ``act_outcome`` to
+        ``observation`` is no longer supported (it conflated two
+        distinct ports and was the root cause of the slim-composer
+        regression).
+        """
         context = StrategyContext(
             plan_ref="outer",
             node_id="n",
             binding_kind=BindingKind.SUBGRAPH,
             node_config={},
-            subgraph_ref=SubgraphReference(plan_ref="bundles/x.yaml", entry_node="entry", binding_edge="next"),
+            subgraph_ref=SubgraphReference(
+                plan_ref="bundles/x.yaml", entry_node="entry", binding_edge="next"
+            ),
+            chain=(),
+            inner_io_schema=NodeIOSchema(inputs=(PortSpec(name="observation"),)),
+        )
+        inp = NodeInput(port_values={"observation": {"v": 1}}, consumer_node="n")
+        assert translate_inputs(context, inp) == {"observation": {"v": 1}}
+
+    def test_translate_inputs_drops_outer_port_not_named_in_inner(self) -> None:
+        """Outer port whose name is not in inner declared inputs is dropped.
+
+        ADR-0241 §1: information leakage across the seam is forbidden.
+        The outer port still reaches the inner ``PortRegistry`` via
+        ``DefaultSubgraphRun`` seeding (separate code path), but the
+        translator itself returns only the declared-named subset.
+        """
+        context = StrategyContext(
+            plan_ref="outer",
+            node_id="n",
+            binding_kind=BindingKind.SUBGRAPH,
+            node_config={},
+            subgraph_ref=SubgraphReference(
+                plan_ref="bundles/x.yaml", entry_node="entry", binding_edge="next"
+            ),
             chain=(),
             inner_io_schema=NodeIOSchema(inputs=(PortSpec(name="observation"),)),
         )
         inp = NodeInput(port_values={"act_outcome": {"v": 1}}, consumer_node="n")
-        assert translate_inputs(context, inp) == {"observation": {"v": 1}}
+        # act_outcome is not in inner declared → dropped at translator.
+        assert translate_inputs(context, inp) == {}
 
     def test_translate_outputs_positional(self) -> None:
         context = StrategyContext(
@@ -139,9 +173,7 @@ class TestSubgraphRunDeepen:
                 chain=(),
                 inner_io_schema=NodeIOSchema(outputs=(PortSpec(name="receipt"),)),
             )
-            result = await run.run(
-                context, NodeInput(port_values={}, consumer_node="sub")
-            )
+            result = await run.run(context, NodeInput(port_values={}, consumer_node="sub"))
             assert result.port_values == {"act_outcome": 7}
         finally:
             mod.load_subgraph_plan = orig

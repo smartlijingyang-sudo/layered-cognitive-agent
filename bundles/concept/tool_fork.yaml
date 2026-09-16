@@ -16,7 +16,7 @@ purpose: ToolsService + BindingsView → ForkedTools typed boundary (cross-graph
 nodes:
   - id: tool.fork.dispatch
     factory: tool.fork.dispatch
-    inputs: [bindings]
+    inputs: [bindings, tools]
     outputs: [forked_tools]
     config:
       emit_on_enter: []

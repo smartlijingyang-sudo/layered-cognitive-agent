@@ -155,6 +155,14 @@ class PlanInterpreter:
                 node_config={
                     "agent_state": outer_state,
                     "results_by_phase": results_so_far,
+                    # ADR-0241 §4: kernel exposes the outer plan's
+                    # port registry to subgraph delegates via
+                    # ``node_config`` so nested subgraph strategies can
+                    # seed the inner ``PortRegistry`` with the full
+                    # outer port set (kernel-seeded ``tools`` /
+                    # ``bindings`` included). Subgraph strategies read
+                    # this key — non-subgraph strategies ignore it.
+                    "_port_registry": ports,
                     **dict(node.config),
                 },
                 subgraph_ref=node.subgraph_ref,
