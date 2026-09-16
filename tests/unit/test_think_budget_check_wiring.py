@@ -77,19 +77,23 @@ def test_think_budget_check_terminates_via_edge_predicate() -> None:
     edge-driven termination here. ``think.gate`` (no outgoing edges)
     is the plan's sole ``terminal: true`` node and satisfies
     ``_validate_termination``.
+
+    PR-B renamed ``think.budget.check`` → ``think.budget.gate`` (the
+    gate-only half of the split ``context.compact`` node); the invariant
+    is unchanged under the new name.
     """
     plan = _load_think_subgraph_plan()
-    budget = plan.node("think.budget.check")
+    budget = plan.node("think.budget.gate")
     assert budget.terminal is False, (
-        "think.budget.check must NOT be marked terminal: true — it "
-        "has an outgoing edge to think.context.compact and the "
+        "think.budget.gate must NOT be marked terminal: true — it "
+        "has an outgoing edge to think.context.truncate and the "
         "lifter forbids outgoing edges on terminal nodes. "
         "Termination is edge-driven (no edge match → terminate)."
     )
     gate = plan.node("think.gate")
     assert gate.terminal is True, (
         "think.gate must remain terminal: true so _validate_termination "
-        "accepts the plan (think.budget.check is no longer terminal)"
+        "accepts the plan (think.budget.gate is no longer terminal)"
     )
 
 
@@ -115,17 +119,19 @@ def test_think_budget_check_routing_output_keeps_think_context_compact_path() ->
     """Under-cap edge stays wired so the happy path still works.
 
     Guards against a regression where someone deletes both the
-    terminal.commit edge AND the think.context.compact edge while
-    "cleaning up" the budget.check wiring.
+    terminal.commit edge AND the truncate edge while "cleaning up" the
+    budget-gate wiring. PR-B renamed the target
+    ``think.context.compact`` → ``think.context.truncate`` (the truncate
+    half of the split node); the under-cap edge must still exist.
     """
     plan = _load_think_subgraph_plan()
     compact_edges = [
         e
         for e in plan.edges
-        if e.source == "think.budget.check" and e.target == "think.context.compact"
+        if e.source == "think.budget.gate" and e.target == "think.context.truncate"
     ]
     assert compact_edges, (
-        "the under-cap edge think.budget.check → think.context.compact "
+        "the under-cap edge think.budget.gate → think.context.truncate "
         "must remain so the normal think waterfall still routes through "
-        "the context-compaction node"
+        "the context-truncation node"
     )

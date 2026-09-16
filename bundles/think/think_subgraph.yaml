@@ -104,7 +104,7 @@ nodes:
 
   - id: think.llm.invoke
     factory: llm.invoke
-    inputs: [model_visible_request, adapter]
+    inputs: [state, model_visible_request, adapter]
     outputs: [llm_response, usage]
     config:
       # PR-B: typed-port typed-only node. Drives the LLM adapter once
@@ -116,7 +116,7 @@ nodes:
 
   - id: think.llm.persist
     factory: llm.persist
-    inputs: [llm_response, writer, step]
+    inputs: [state, llm_response, writer]
     outputs: [journaled]
     config:
       # PR-B: typed-port journal side-effect node. Persists the

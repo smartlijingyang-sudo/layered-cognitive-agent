@@ -55,7 +55,7 @@ class LlmPersistExecutor:
 
     semantic_name: str = "llm.persist"
     region: str = "think"
-    declared_inputs: tuple[PortName, ...] = ("llm_response", "writer", "step")
+    declared_inputs: tuple[PortName, ...] = ("state", "llm_response", "writer")
     declared_outputs: tuple[PortName, ...] = ("journaled",)
 
     async def node_execute(
@@ -65,15 +65,16 @@ class LlmPersistExecutor:
     ) -> NodeOutput:
         """Persist the assistant message + tool calls to the Session.
 
-        ``step`` arrives as a typed port value (the orchestrator
-        projects ``state.step`` upstream), so the node never reads
-        ``context.runtime.state``. ``adapter`` is NOT in the port
-        set — that path lives in the sibling ``think.llm.invoke``.
+        ``step``/``turn`` derive from the ``state`` kernel carrier (the
+        old single node used ``state.step`` for both writer rows), so the
+        node reads ``state`` via typed port or whitelisted runtime
+        fallback. ``adapter`` is NOT in the port set — that path lives in
+        the sibling ``think.llm.invoke``.
         """
-        del context
+        state = _resolve_port("state", input=input, context=context)
         response = _resolve_port("llm_response", input=input)
         writer = _resolve_port_writer(input=input)
-        step = _resolve_port_step(input=input)
+        step = int(getattr(state, "step", 0) or 0)
         _persist_assistant(writer=writer, response=response, step=step)
         return NodeOutput(port_values={"journaled": True})
 
@@ -120,9 +121,20 @@ def _persist_assistant(
         )
 
 
-def _resolve_port(name: str, *, input: NodeInput) -> Any:
-    """Read a typed-only port from ``input.port_values``."""
+def _resolve_port(name: str, *, input: NodeInput, context: NodeContext | None = None) -> Any:
+    """Read a port: typed ``input.port_values`` first, then whitelisted runtime.
+
+    ``state`` is a kernel-injected runtime carrier, so it resolves via
+    ``context.runtime`` when not supplied as an explicit typed port. The
+    other inputs are typed-only.
+    """
     value = input.port_values.get(name)
+    if value is None and name == "state" and context is not None:
+        runtime = getattr(context, "runtime", None)
+        if runtime is not None:
+            value = getattr(runtime, name, None)
+            if value is None and hasattr(runtime, "get"):
+                value = runtime.get(name)
     if value is None:
         raise TypeError(f"llm.persist: '{name}' port must be supplied via input.port_values")
     return value
@@ -134,14 +146,6 @@ def _resolve_port_writer(*, input: NodeInput) -> RunSessionWriterProtocol:
     if value is None:
         raise TypeError("llm.persist: 'writer' port must be supplied via input.port_values")
     return value  # type: ignore[no-any-return]
-
-
-def _resolve_port_step(*, input: NodeInput) -> int:
-    """Coerce the ``step`` port value into an int."""
-    value = input.port_values.get("step")
-    if value is None:
-        raise TypeError("llm.persist: 'step' port must be supplied via input.port_values")
-    return int(value)
 
 
 @plugin(

@@ -22,11 +22,19 @@ from lca.contracts.models.core.conversation.llm import (
     NativeToolCall,
     TokenUsage,
 )
+from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
 )
 from lca.nodes.think.llm.persist import LlmPersistExecutor
+
+
+def _state(step: int = 1) -> AgentState:
+    """``AgentState`` carrying ``step`` (persist derives turn/step from it)."""
+    state = AgentState(trace_id="trace-llm-persist", task="", budget=Budget())
+    state.step = step
+    return state
 
 
 @dataclass
@@ -81,9 +89,9 @@ async def test_persist_writes_assistant_message_only() -> None:
         _ctx(),
         NodeInput(
             port_values={
+                "state": _state(3),
                 "llm_response": response,
                 "writer": writer,
-                "step": 3,
             }
         ),
     )
@@ -117,7 +125,7 @@ async def test_persist_writes_one_tool_call_row_per_call() -> None:
             NativeToolCall(
                 call_id="call-2",
                 name="write",
-                arguments={"path": "/tmp/x"},
+                arguments={"path": "out/x"},
             ),
         ),
     )
@@ -126,9 +134,9 @@ async def test_persist_writes_one_tool_call_row_per_call() -> None:
         _ctx(),
         NodeInput(
             port_values={
+                "state": _state(7),
                 "llm_response": response,
                 "writer": writer,
-                "step": 7,
             }
         ),
     )
@@ -180,9 +188,9 @@ async def test_persist_does_not_call_adapter() -> None:
         _ctx(),
         NodeInput(
             port_values={
+                "state": _state(1),
                 "llm_response": response,
                 "writer": writer,
-                "step": 1,
                 "adapter": _AdapterSentinel(),
             }
         ),
@@ -201,8 +209,8 @@ async def test_persist_missing_writer_raises() -> None:
             _ctx(),
             NodeInput(
                 port_values={
+                    "state": _state(1),
                     "llm_response": _response(),
-                    "step": 1,
                 }
             ),
         )
@@ -217,18 +225,18 @@ async def test_persist_missing_response_raises() -> None:
             _ctx(),
             NodeInput(
                 port_values={
+                    "state": _state(1),
                     "writer": _FakeWriter(),
-                    "step": 1,
                 }
             ),
         )
 
 
 @pytest.mark.asyncio
-async def test_persist_missing_step_raises() -> None:
-    """``step`` is a typed-only port; missing ⇒ TypeError."""
+async def test_persist_missing_state_raises() -> None:
+    """``state`` is a required carrier; missing (typed port + runtime) ⇒ TypeError."""
     executor = LlmPersistExecutor()
-    with pytest.raises(TypeError, match="step"):
+    with pytest.raises(TypeError, match="state"):
         await executor.node_execute(
             _ctx(),
             NodeInput(
@@ -241,22 +249,22 @@ async def test_persist_missing_step_raises() -> None:
 
 
 @pytest.mark.asyncio
-async def test_persist_step_coerces_to_int() -> None:
-    """``step`` accepts ints or string-coercible ints (typed port value)."""
+async def test_persist_resolves_state_from_runtime_carrier() -> None:
+    """``state`` absent from typed ports ⇒ resolved via whitelisted runtime carrier."""
     executor = LlmPersistExecutor()
     writer = _FakeWriter()
+    ctx = NodeContext(runtime={"state": _state(4)}, budget={}, metadata={})
     await executor.node_execute(
-        _ctx(),
+        ctx,
         NodeInput(
             port_values={
                 "llm_response": _response(),
                 "writer": writer,
-                "step": "5",
             }
         ),
     )
-    assert writer.calls[0].kwargs["turn"] == 5
-    assert writer.calls[0].kwargs["step"] == 5
+    assert writer.calls[0].kwargs["turn"] == 4
+    assert writer.calls[0].kwargs["step"] == 4
 
 
 @pytest.mark.asyncio
@@ -265,12 +273,57 @@ async def test_persist_is_idempotent() -> None:
     executor = LlmPersistExecutor()
     response = _response(text="ok")
     port_values = {
+        "state": _state(2),
         "llm_response": response,
         "writer": _FakeWriter(),
-        "step": 2,
     }
 
     out_a = await executor.node_execute(_ctx(), NodeInput(port_values=port_values))
     out_b = await executor.node_execute(_ctx(), NodeInput(port_values=port_values))
 
     assert out_a.port_values == out_b.port_values == {"journaled": True}
+
+
+@pytest.mark.asyncio
+async def test_persist_does_not_commit_step_tool_call_record(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Single-owner guard (migrated from pre-split ``test_dispatch_llm``).
+
+    ``step.tool_call.record`` has exactly one producer: the body executor
+    that starts the invocation. The persist node writes the conversation
+    rows only — a second emit here double-counts
+    ``metrics_projection.tool_call_count``.
+    """
+    import lca.loop.commit.tool_journal as tool_journal
+
+    calls: list[dict[str, Any]] = []
+    monkeypatch.setattr(tool_journal, "record_step_tool_call", lambda **kw: calls.append(kw))
+
+    executor = LlmPersistExecutor()
+    writer = _FakeWriter()
+    response = _response(
+        tool_calls=(NativeToolCall(call_id="call-1", name="echo", arguments={"msg": "x"}),)
+    )
+    await executor.node_execute(
+        _ctx(),
+        NodeInput(
+            port_values={"state": _state(4), "llm_response": response, "writer": writer}
+        ),
+    )
+
+    assert calls == [], f"persist must not commit step.tool_call.record: {calls!r}"
+    assert writer.tool_call_calls == 1
+
+
+def test_persist_module_has_no_tool_journal_commit_reference() -> None:
+    """Structural lock behind the behavioural spy above."""
+    from pathlib import Path
+
+    import lca.nodes.think.llm.persist as persist_module
+
+    source = Path(persist_module.__file__).read_text(encoding="utf-8")
+    assert "record_step_tool_call" not in source, (
+        "persist re-gained a second step.tool_call.record producer; the body "
+        "executor is the single owner"
+    )

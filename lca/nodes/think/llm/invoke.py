@@ -56,7 +56,7 @@ class LlmInvokeExecutor:
 
     semantic_name: str = "llm.invoke"
     region: str = "think"
-    declared_inputs: tuple[PortName, ...] = ("model_visible_request", "adapter")
+    declared_inputs: tuple[PortName, ...] = ("state", "model_visible_request", "adapter")
     declared_outputs: tuple[PortName, ...] = ("llm_response", "usage")
 
     async def node_execute(
@@ -70,13 +70,22 @@ class LlmInvokeExecutor:
         adapter wire shape is ``stream(prompt, system=..., history=...,
         tools=...)``. The node owns this typed-boundary translation —
         last message becomes the prompt, prior messages become history.
+
+        ``state`` (kernel-injected carrier) and the ``cursor`` /
+        ``reasoner_prompt`` identity are forwarded to the streaming
+        boundary: ``ModelVisibleHookAdapter`` needs them to publish
+        ``llm.request.header`` — the single fact that opens a journal
+        step — and streaming is what emits ``llm.stream.token``. A
+        non-streaming or identity-less call leaves ``journal.steps``
+        empty (regression guarded by ``test_invoke``).
         """
-        del context
+        state = _resolve_port("state", input=input, context=context)
         request = _resolve_port("model_visible_request", input=input)
         adapter = _resolve_port("adapter", input=input)
 
         prompt = request.messages[-1]["content"] if request.messages else ""
         history = request.messages[:-1] if len(request.messages) > 1 else []
+        cursor, reasoner_prompt = _model_visible_identity(state, request)
 
         response: LLMResponse = LLMResponse(text="")
         async for event in adapter.stream(
@@ -84,6 +93,11 @@ class LlmInvokeExecutor:
             system=request.system,
             history=history,
             tools=list(request.tools) if request.tools else None,
+            state=state,
+            turn=int(state.extra.get("current_turn", 0)),
+            step=state.step,
+            cursor=cursor,
+            reasoner_prompt=reasoner_prompt,
         ):
             if event.type is LLMStreamEventType.COMPLETED and event.response is not None:
                 response = event.response
@@ -96,14 +110,47 @@ class LlmInvokeExecutor:
         )
 
 
-def _resolve_port(name: str, *, input: NodeInput) -> Any:
-    """Read a typed-only port from ``input.port_values``.
+def _model_visible_identity(state: Any, request: Any) -> tuple[Any, Any]:
+    """Build the ``(cursor, reasoner_prompt)`` pair for the model-visible hook.
 
-    Invoke is a pure typed-port node: it never reads from
-    ``context.runtime``. The journal write path (``writer`` / ``step``)
-    belongs to the sibling ``think.llm.persist`` node.
+    ``cursor`` comes from the per-turn :class:`CursorRecord` binding; without a
+    cursor there is no step identity, so the hook stays transparent (same
+    degradation as ``primitive.llm.call``).
+    """
+    from lca.cognition.body.executor.cursor_record import CursorRecord
+    from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
+        CurrentReasonerPrompt,
+    )
+
+    cursor = CursorRecord.get()
+    step = int(getattr(state, "step", 0) or 0)
+    if cursor is not None:
+        step_index = getattr(getattr(cursor, "snapshot", None), "step_index", None)
+        if isinstance(step_index, int):
+            step = step_index + 1
+    reasoner_prompt = CurrentReasonerPrompt(
+        step_id=f"step-{step:03d}",
+        template_id="",
+        selector_decision_path="",
+        system_prompt_text=str(request.system or ""),
+    )
+    return cursor, reasoner_prompt
+
+
+def _resolve_port(name: str, *, input: NodeInput, context: NodeContext | None = None) -> Any:
+    """Read a port: typed ``input.port_values`` first, then whitelisted runtime.
+
+    ``state`` is a kernel-injected runtime carrier, so it resolves via
+    ``context.runtime`` when not supplied as an explicit typed port. The
+    other inputs (``model_visible_request`` / ``adapter``) are typed-only.
     """
     value = input.port_values.get(name)
+    if value is None and name == "state" and context is not None:
+        runtime = getattr(context, "runtime", None)
+        if runtime is not None:
+            value = getattr(runtime, name, None)
+            if value is None and hasattr(runtime, "get"):
+                value = runtime.get(name)
     if value is None:
         raise TypeError(f"llm.invoke: '{name}' port must be supplied via input.port_values")
     return value
