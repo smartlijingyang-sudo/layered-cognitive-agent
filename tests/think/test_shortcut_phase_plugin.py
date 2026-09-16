@@ -31,17 +31,21 @@ class _HitShortcut:
 
 
 @dataclass
+class _StubBrain:
+    supports_shortcut: Any
+
+
+@dataclass
 class _StubRuntime:
     state: AgentState | None
-    supports_shortcut: Any
+    brain: _StubBrain | None
 
 
 def _ctx(caps: dict[str, Any]) -> NodeContext:
     state = AgentState(trace_id="t", task="x", budget=Budget())
-    runtime = _StubRuntime(
-        state=state,
-        supports_shortcut=caps.get("phase.think.shortcut"),
-    )
+    shortcut = caps.get("phase.think.shortcut")
+    brain = _StubBrain(supports_shortcut=shortcut) if shortcut is not None else None
+    runtime = _StubRuntime(state=state, brain=brain)
     return NodeContext(runtime=runtime, budget={}, metadata={})
 
 

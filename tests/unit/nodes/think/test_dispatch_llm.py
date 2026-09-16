@@ -123,12 +123,13 @@ async def test_node_execute_forwards_identity_to_streaming_boundary() -> None:
     adapter = _RecordingAdapter(response=_response())
 
     await executor.node_execute(
-        context=_node_context(runtime={"adapter": adapter}),
+        context=_node_context(runtime={"session": object()}),
         input=NodeInput(
             port_values={
                 "state": state,
                 "writer": writer,
                 "model_visible_request": _request(),
+                "adapter": adapter,
             }
         ),
     )
@@ -152,12 +153,13 @@ async def test_node_execute_does_not_inject_a_publish_writer() -> None:
     adapter = _RecordingAdapter(response=_response())
 
     await executor.node_execute(
-        context=_node_context(runtime={"adapter": adapter, "session": object()}),
+        context=_node_context(runtime={"session": object()}),
         input=NodeInput(
             port_values={
                 "state": state,
                 "writer": _FakeWriter(),
                 "model_visible_request": _request(),
+                "adapter": adapter,
             }
         ),
     )
@@ -174,12 +176,13 @@ async def test_node_execute_uses_state_step_when_turn_slot_missing() -> None:
     adapter = _RecordingAdapter(response=_response())
 
     await executor.node_execute(
-        context=_node_context(runtime={"adapter": adapter}),
+        context=_node_context(runtime={}),
         input=NodeInput(
             port_values={
                 "state": state,
                 "writer": _FakeWriter(),
                 "model_visible_request": _request(),
+                "adapter": adapter,
             }
         ),
     )
@@ -199,11 +202,12 @@ async def test_node_execute_missing_state_raises_type_error() -> None:
 
     with pytest.raises(TypeError, match="'state' port must be"):
         await executor.node_execute(
-            context=_node_context(runtime={"adapter": adapter}),
+            context=_node_context(runtime={}),
             input=NodeInput(
                 port_values={
                     "writer": _FakeWriter(),
                     "model_visible_request": _request(),
+                    "adapter": adapter,
                 }
             ),
         )
@@ -237,12 +241,13 @@ async def test_node_execute_does_not_commit_step_tool_call_record(
     )
 
     await executor.node_execute(
-        context=_node_context(runtime={"adapter": adapter}),
+        context=_node_context(runtime={}),
         input=NodeInput(
             port_values={
                 "state": _state(step=4, turn=9),
                 "writer": _FakeWriter(),
                 "model_visible_request": _request(),
+                "adapter": adapter,
             }
         ),
     )
@@ -284,12 +289,13 @@ async def test_node_execute_persists_declared_tool_calls_to_the_writer() -> None
     )
 
     await executor.node_execute(
-        context=_node_context(runtime={"adapter": adapter}),
+        context=_node_context(runtime={}),
         input=NodeInput(
             port_values={
                 "state": _state(step=4, turn=9),
                 "writer": writer,
                 "model_visible_request": _request(),
+                "adapter": adapter,
             }
         ),
     )

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.cognition.brain.pipeline.modular_brain import ModularBrain
 from lca.cognition.brain.reasoner.reasoner import PromptReasoner
 from lca.contracts.capabilities import (
     BRAIN_PROMPT_CATALOG_FACTORY,
@@ -17,7 +16,6 @@ from lca.contracts.protocols import (
     Brain,
     BrainPromptCatalog,
     BrainPromptCatalogFactory,
-    DecisionGate,
     LLMAdapter,
 )
 from lca.contracts.protocols.journal.spec.spec import AgentSpec
@@ -36,9 +34,9 @@ def instrument_llm(
     *,
     ctx: object | None = None,
 ) -> LLMAdapter:
-    """Wrap ``llm`` with model-visible + telemetry decorators (组合根)。
+    """Wrap ``llm`` with model-visible + telemetry decorators (composition root helper).
 
-    装配顺序(外 → 内):
+    Layering (outer → inner):
         ModelVisibleHookAdapter → TelemetryLLMAdapter → inner
 
     ADR-0185 PR-4 收口:当 ``ctx`` 非 None 且能从
@@ -158,22 +156,4 @@ def resolve_brain(spec: AgentSpec, llm: LLMAdapter, *, scope: object) -> Brain:
     return brain
 
 
-def apply_lead_brain(brain: Brain, decision_gate: DecisionGate) -> Brain:
-    """Return a lead Brain whose closed-set gate is installed explicitly."""
-
-    if not isinstance(brain, ModularBrain):
-        raise TypeError(f"lead composition requires ModularBrain (got {type(brain).__name__})")
-    return ModularBrain(
-        reasoner=brain.reasoner,
-        reducer=brain.reducer,
-        classifier=brain.classifier,
-        critic=brain.critic,
-        skill_router=brain.skill_router,
-        decision_gate=decision_gate,
-        agent_gates=brain.agent_gates,
-        think_pipeline=brain.think_pipeline,
-        reflection_pipeline=brain.reflection_pipeline,
-    )
-
-
-__all__ = ["apply_lead_brain", "instrument_llm", "resolve_brain"]
+__all__ = ["instrument_llm", "resolve_brain"]

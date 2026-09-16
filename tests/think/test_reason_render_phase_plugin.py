@@ -67,17 +67,22 @@ class _Reasoner:
 
 
 @dataclass
+class _StubBrain:
+    reasoner: Any
+    role_profile: Any = None
+
+
+@dataclass
 class _StubRuntime:
     state: AgentState | None
-    reasoner: Any
+    brain: _StubBrain | None
 
 
 def _ctx(caps: dict[str, Any]) -> NodeContext:
     state = AgentState(trace_id="t", task="x", budget=Budget())
-    runtime = _StubRuntime(
-        state=state,
-        reasoner=caps.get("phase.think.reason.render"),
-    )
+    reasoner = caps.get("phase.think.reason.render")
+    brain = _StubBrain(reasoner=reasoner, role_profile=reasoner.role_profile if reasoner is not None else None)
+    runtime = _StubRuntime(state=state, brain=brain)
     return NodeContext(runtime=runtime, budget={}, metadata={})
 
 

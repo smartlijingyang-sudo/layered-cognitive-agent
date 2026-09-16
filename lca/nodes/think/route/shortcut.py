@@ -2,7 +2,7 @@
 
 think 子图节点 plugin:在 LLM 推理之前尝试确定性快速路径。
 ``requires=("supports_shortcut",)`` 通过 Cordis 校验,
-运行时从 ``context.runtime.supports_shortcut`` 拿 capability 实例。
+运行时从 ``context.runtime.brain.supports_shortcut`` 拿 capability 实例。
 
 ADR-0218 §3.3:节点 plugin 由作者显式书写完整 ``@plugin(...)`` 装饰器,
 工厂 ``setup(ctx)`` 通过 Cordis ``ctx.provide`` 单键注册 composite key,
@@ -63,7 +63,8 @@ class ThinkShortcutExecutor:
         _log = logging.getLogger(__name__)
         runtime = context.runtime
         state = runtime.state
-        cap = runtime.supports_shortcut
+        brain = getattr(runtime, "brain", None)
+        cap = getattr(brain, "supports_shortcut", None) if brain is not None else None
 
         if state is None:
             raise RuntimeError("think.shortcut requires runtime.state; got None")

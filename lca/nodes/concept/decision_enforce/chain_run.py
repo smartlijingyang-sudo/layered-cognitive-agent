@@ -4,9 +4,9 @@ concept.decision.enforce 图节点 1:typed ``Decision`` + ``AgentState``
 → enforced ``Decision``(ADR-0220 §3.3)。
 
 节点职责:把 ``DecisionGate`` chain 跑一遍,产出一个可能被 rewrite 的
-typed ``Decision``。gate 列表从 ``context.runtime.decision_gates`` 拿
-(typed list,运行时由 ``ChainedDecisionGate`` 装配);空 chain → 直接
-透传 Decision,等同 "no-op gate"。
+typed ``Decision``。gate 列表从 ``context.runtime.brain.agent_gates``
+读(typed Brain attribute);空 chain → 直接透传 Decision,等同
+"no-op gate"。
 """
 
 from __future__ import annotations
@@ -80,17 +80,23 @@ class GateChainRunExecutor:
 
 
 def _resolve_gates(context: NodeContext) -> tuple[DecisionGate, ...]:
-    """Resolve the DecisionGate chain from runtime context.
+    """Resolve the DecisionGate chain from ``runtime.brain``.
 
-    Accepts either a single ``DecisionGate`` (typically the
-    ``ChainedDecisionGate`` from ``lca.cognition.brain.decision_gates.chained``)
-    or an iterable of gates; both shapes are common depending on how the
+    Reads ``runtime.brain.agent_gates`` (typed Brain attribute). When
+    that is missing (compat path for older profiles), fall back to a
+    single ``runtime.brain.decision_gate`` lookup. Accepts either a
+    single ``DecisionGate`` (typically ``ChainedDecisionGate``) or an
+    iterable of gates; both shapes are common depending on how the
     parent profile wires the capability.
     """
     runtime = context.runtime
-    raw = getattr(runtime, "decision_gates", None)
-    if raw is None:
-        raw = getattr(runtime, "decision_gate", None)
+    brain = getattr(runtime, "brain", None)
+    if brain is not None:
+        raw: object = getattr(brain, "agent_gates", None)
+        if raw is None:
+            raw = getattr(brain, "decision_gate", None)
+    else:
+        raw = None
     if raw is None:
         return ()
     if isinstance(raw, DecisionGate):

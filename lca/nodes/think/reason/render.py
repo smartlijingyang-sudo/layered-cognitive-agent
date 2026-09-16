@@ -7,9 +7,9 @@ think.reason inner_graph 第 2 节点 plugin:把 compat-era ``(state, plan)``
 ``concept.prompt.render`` 图,这里只是 inner_graph 的过渡适配,被 P5
 ``agent.reasoning.turn`` 取代。
 
-``requires=("reasoner", "reasoner.role_profile")``：role 从 Cordis
-capability 注入，不再从 ``PromptReasoner.role_profile`` 读取
-(eng/retire-v1-reasoner-sandbox)。
+``requires=("reasoner", "reasoner.role_profile")``：role 从
+``context.runtime.brain.role_profile`` 读，不再从
+``PromptReasoner.role_profile`` 字段读（eng/retire-v1-reasoner-sandbox）。
 """
 
 from __future__ import annotations
@@ -78,25 +78,25 @@ def _state_to_boundary(
 
 
 def _resolve_role_profile(runtime: object) -> object | None:
-    """Read ``reasoner.role_profile`` from the node runtime capability scope.
+    """Read ``role_profile`` off ``runtime.brain`` (typed Brain attribute).
 
     PromptReasoner no longer owns RoleProfile (eng/retire-v1-reasoner-sandbox);
-    ``phase.think.role_profile`` provides the capability and this adapter
-    consumes it at the graph boundary. Falls back to the reasoner's own
-    ``role_profile`` field when the capability is not registered on the
-    runtime scope (compat path for older reasoner stubs).
+    ``phase.think.role_profile`` provides the capability and the Brain Protocol
+    exposes it as a typed attribute. This adapter reads it via the Brain
+    attribute, which is the typed single-step access path. Falls back to the
+    reasoner's own ``role_profile`` field when the brain is not wired or when
+    Brain is not a typed instance (compat path for older reasoner stubs).
     """
-    from lca.contracts.capabilities import REASONER_ROLE_PROFILE
-
-    getter = getattr(runtime, "get", None)
-    if callable(getter):
-        profile = getter(REASONER_ROLE_PROFILE.key)
-        if profile is not None:
-            return profile
-    direct = getattr(runtime, REASONER_ROLE_PROFILE.key, None)
-    if direct is not None:
-        return direct
+    brain = getattr(runtime, "brain", None)
+    if brain is not None:
+        direct = getattr(brain, "role_profile", None)
+        if direct is not None:
+            return direct
     reasoner = getattr(runtime, "reasoner", None)
+    if reasoner is None:
+        brain = getattr(runtime, "brain", None)
+        if brain is not None:
+            reasoner = getattr(brain, "reasoner", None)
     return getattr(reasoner, "role_profile", None)
 
 
@@ -129,7 +129,8 @@ class ThinkReasonRenderExecutor:
         _log = logging.getLogger(__name__)
         runtime = context.runtime
         state = getattr(runtime, "state", None)
-        reasoner = getattr(runtime, "reasoner", None)
+        brain = getattr(runtime, "brain", None)
+        reasoner = getattr(brain, "reasoner", None) if brain is not None else None
         plan = input.port_values.get("turn_plan")
         render_turn = getattr(reasoner, "render_turn", None) if reasoner is not None else None
         role_profile = _resolve_role_profile(runtime)

@@ -59,7 +59,7 @@ class ContextLinesCollectExecutor:
         """
         state = input.port_values.get("state")
         if state is None:
-            state = context.runtime.get("state") if hasattr(context, "runtime") else None
+            state = context.runtime.get("state")
         if state is not None and not isinstance(state, AgentState):
             raise TypeError(
                 "context.lines.collect: 'state' port must be an AgentState "

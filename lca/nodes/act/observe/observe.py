@@ -107,7 +107,7 @@ class ActObserveExecutor:
 
     semantic_name: str = "act.observe"
     region: str = "act"
-    declared_inputs: tuple[PortName, ...] = ("receipt",)
+    declared_inputs: tuple[PortName, ...] = ("receipt", "journal")
     declared_outputs: tuple[PortName, ...] = ("receipt",)
 
     async def node_execute(
@@ -146,7 +146,7 @@ class ActObserveExecutor:
         # schema (``declared_inputs`` / ``declared_outputs``) is unchanged.
         normalized = _normalize_receipt(receipt)
 
-        journal = getattr(context.runtime, "journal", None)
+        journal = input.port_values.get("journal")
         plan_ref = context.metadata.get("plan_ref", "unknown")
         node_id = context.metadata.get("node_id", "act.observe")
         if journal is not None and hasattr(journal, "commit_fact"):

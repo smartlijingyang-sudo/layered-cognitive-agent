@@ -1,21 +1,14 @@
-﻿"""Plan-bound composition for the cognitive think cluster."""
+"""Plan-bound composition for the cognitive think cluster."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from lca.contracts.capabilities import GATES, REASONER_ROLE_PROFILE
 from lca.contracts.harness.composition.composer import (
     AgentCompositionRequest,
     AgentGraphContribution,
 )
-from lca.contracts.mechanisms.capability.capability import require_capability
-from lca.contracts.protocols import Brain, DecisionGate
-from lca.contracts.protocols.think.cognition import (
-    DecisionGateAssembler,
-)
 from lca.plugins.composer.think.brain import (
-    apply_lead_brain,
     instrument_llm,
     resolve_brain,
 )
@@ -24,33 +17,19 @@ if TYPE_CHECKING:
     from cordis import Context
 
 
-def _resolve_decision_gate(
-    brain: Brain,
-    gates: DecisionGateAssembler,
-) -> DecisionGate | None:
-    """Tri-source decision gate resolution for the Think phase.
-
-    Resolution order:
-    1. ``brain.decision_gate`` — Brain's own gate (if publicly exposed).
-    2. ``brain.agent_gates`` — Brain's agent-scope gate chain.
-    3. ``gates.assemble()`` — Scope-level gate assembler from the GATES capability.
-    """
-
-    own_gate = getattr(brain, "decision_gate", None)
-    if own_gate is not None:
-        return own_gate
-    agent_gates = getattr(brain, "agent_gates", None)
-    if agent_gates is not None:
-        return agent_gates
-    return gates.assemble()
-
-
 class BrainComposer:
     """Compose only the think cluster of a plan-bound AgentGraph.
 
     The narrow module is the cognitive-plane seam: it owns LLM instrumentation,
     Brain resolution, and the optional lead decision gate, while leaving every
     execution, state, and collaboration choice to their dedicated modules.
+
+    PR-A (typed-port refactor): brain internals (reasoner, skill_router,
+    classifier, decision_gate, role_profile, tools, adapter) are no longer
+    projected onto ``phase_capabilities``. Nodes read them via typed ports
+    or ``runtime.brain.*`` single-step access; the kernel-injected runtime
+    carriers (``state``, ``writer``, ``effect_gateway``, ``cursor``,
+    ``brain``, ``body``, ``memory``, ``perceive_hub``) carry the rest.
     """
 
     key = "brain"
@@ -62,47 +41,8 @@ class BrainComposer:
 
         llm = instrument_llm(request.spec.llm, ctx=scope)
         brain = resolve_brain(request.spec, llm, scope=scope)
-        if request.decision_gate is not None:
-            brain = apply_lead_brain(brain, request.decision_gate)
-        gates = require_capability(scope, GATES.key)
-        phase_capabilities: dict[str, object] = {"gates": gates}
-        for key, attr in (
-            ("phase.think.route", "skill_router"),
-            ("phase.think.reason", "reasoner"),
-            ("phase.think.classify", "classifier"),
-        ):
-            value = getattr(brain, attr, None)
-            if value is not None:
-                phase_capabilities[key] = value
-        # Bare-name aliases so legacy think plugins reading
-        # ``context.runtime.<name>`` (e.g. ``runtime.reasoner``,
-        # ``runtime.skill_router``, ``runtime.classifier``) resolve
-        # against the same instances. These names match what the
-        # node plugins expect in :mod:`lca.plugins.think.reason.*`.
-        for alias_attr, alias_key in (
-            ("reasoner", "reasoner"),
-            ("skill_router", "skill_router"),
-            ("classifier", "decision_classifier"),
-            ("decision_gate", "decision_gate"),
-        ):
-            value = getattr(brain, alias_attr, None)
-            if value is not None and alias_key not in phase_capabilities:
-                phase_capabilities[alias_key] = value
-        # Project boot-time Cordis capabilities onto the phase map so node
-        # plugins resolve them via runtime.get / runtime.<name>
-        # (RuntimePhaseCapabilities is the node scope — not Cordis ctx).
-        role_profile = require_capability(scope, REASONER_ROLE_PROFILE.key)
-        phase_capabilities[REASONER_ROLE_PROFILE.key] = role_profile
-        # concept.tool.fork (think.reason.fork_tools) needs ToolsService.
-        tools = require_capability(scope, "tools")
-        phase_capabilities["tools"] = tools
-        # think.llm.dispatch reads ``adapter`` from the runtime scope
-        # (``context.runtime.adapter``); expose the per-Agent LLM under
-        # the bare alias so the typed-boundary node can resolve it.
-        phase_capabilities["adapter"] = llm
-        decision_gate = _resolve_decision_gate(brain, gates)
-        if decision_gate is not None:
-            phase_capabilities["phase.think.decision_gate"] = decision_gate
+        if request.decision_gate is not None and hasattr(brain, "with_gate"):
+            brain = brain.with_gate(request.decision_gate)
         return AgentGraphContribution(
             brain=brain,
             body=None,
@@ -112,7 +52,7 @@ class BrainComposer:
             hooks=None,
             observability=None,
             llm=llm,
-            phase_capabilities=phase_capabilities,
+            phase_capabilities={},
             metadata={"composer": self.key},
         )
 

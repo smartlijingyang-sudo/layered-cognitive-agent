@@ -37,17 +37,21 @@ class _Reasoner:
 
 
 @dataclass
+class _StubBrain:
+    reasoner: Any
+
+
+@dataclass
 class _StubRuntime:
     state: AgentState | None
-    reasoner: Any
+    brain: _StubBrain | None
 
 
 def _ctx(caps: dict[str, Any]) -> NodeContext:
     state = AgentState(trace_id="t", task="x", budget=Budget())
-    runtime = _StubRuntime(
-        state=state,
-        reasoner=caps.get("phase.think.reason.plan"),
-    )
+    reasoner = caps.get("phase.think.reason.plan")
+    brain = _StubBrain(reasoner=reasoner) if reasoner is not None else None
+    runtime = _StubRuntime(state=state, brain=brain)
     return NodeContext(runtime=runtime, budget={}, metadata={})
 
 
@@ -90,7 +94,7 @@ async def test_reason_plan_missing_state_returns_empty_ports() -> None:
     """注入 None state(runtime.state=None)→ 返回空 ports。"""
     executor = ThinkReasonPlanExecutor()
     reasoner = _Reasoner(plan=_plan())
-    runtime = _StubRuntime(state=None, reasoner=reasoner)
+    runtime = _StubRuntime(state=None, brain=_StubBrain(reasoner=reasoner))
     ctx = NodeContext(runtime=runtime, budget={}, metadata={})
     result = await executor.node_execute(ctx, NodeInput(port_values={}))
     assert result.port_values == {}

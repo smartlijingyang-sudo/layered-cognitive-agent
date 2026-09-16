@@ -74,11 +74,6 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
-# Runtime key the typed-boundary convention uses to expose the
-# forked-per-run ``ToolRegistry``. Kept as a single SSOT constant so
-# the test fixtures and any future wiring land on the same string.
-_RUNTIME_TOOLS_KEY: str = "tools"
-
 # Routing reasons emitted by this node. Kept as module constants so
 # the bundle predicate and the unit tests can refer to them without
 # duplicating string literals.
@@ -102,7 +97,7 @@ class ThinkDecisionRepairExecutor:
 
     semantic_name: str = "think.decision.repair"
     region: str = "think"
-    declared_inputs: tuple[PortName, ...] = ("decision",)
+    declared_inputs: tuple[PortName, ...] = ("decision", "tools")
     declared_outputs: tuple[PortName, ...] = ("decision", "routing")
 
     async def node_execute(
@@ -112,15 +107,14 @@ class ThinkDecisionRepairExecutor:
     ) -> NodeOutput:
         """think 子图节点入口。
 
-        inputs 端口(yaml): decision
+        inputs 端口(yaml): decision, tools
         outputs 端口(yaml): decision, routing
 
-        Reads the ``decision`` port and the optional ``tools`` runtime
-        registry (``context.runtime["tools"]``, a ``ToolRegistry`` per
-        ADR-0047). Emits the original or repaired ``Decision`` plus a
-        ``RoutingDecision`` whose ``next_node`` steers the waterfall
-        toward ``think.gate`` (ok / repaired) or
-        ``think.route.decide`` (rejected).
+        Reads the ``decision`` port and the optional ``tools`` typed
+        port (a ``ToolRegistry`` per ADR-0047). Emits the original or
+        repaired ``Decision`` plus a ``RoutingDecision`` whose
+        ``next_node`` steers the waterfall toward ``think.gate``
+        (ok / repaired) or ``think.route.decide`` (rejected).
 
         Empty ``decision`` (None or no tool_calls) yields an empty
         ``NodeOutput`` so the bundle edge decides routing — typical
@@ -131,10 +125,7 @@ class ThinkDecisionRepairExecutor:
         if not _has_tool_calls(decision):
             return NodeOutput(port_values={})
 
-        registry = _resolve_registry(context.runtime)
-        # Past this point the executor body operates on ``decision`` /
-        # ``registry`` only; ``context`` is held only so we can read
-        # the runtime tools map.
+        registry = input.port_values.get("tools")
 
         outcome, repaired_calls = _validate_or_repair_calls(
             decision.tool_calls,
@@ -192,19 +183,16 @@ def _has_tool_calls(decision: object) -> bool:
     return bool(decision.tool_calls)
 
 
-def _resolve_registry(runtime: Mapping[str, Any] | None) -> Any | None:
-    """Return the ``ToolRegistry`` exposed on the node runtime, or ``None``.
+def _resolve_registry(tools_obj: Any | None) -> Any | None:
+    """Return the ``ToolRegistry`` from the ``tools`` typed port, or ``None``.
 
-    Typed-boundary convention (PR-3.7.c): registries travel via
-    ``context.runtime`` so the node stays free of import-time
+    Typed-boundary convention (PR-3.7.c): registries travel via the
+    typed ``tools`` port so the node stays free of import-time
     coupling to the act layer. Returns ``None`` when no registry is
     available so the schema-validation path can short-circuit
     gracefully — empty / unknown tool names still reject per the
     spec, but a missing registry only weakens the unknown-name check.
     """
-    if runtime is None:
-        return None
-    tools_obj = runtime.get(_RUNTIME_TOOLS_KEY)
     if tools_obj is None:
         return None
     return tools_obj

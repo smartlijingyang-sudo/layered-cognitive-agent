@@ -49,7 +49,13 @@ class PromptSectionsFillExecutor:
 
     semantic_name: str = "prompt.sections.fill"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("prompt_template", "context", "role")
+    declared_inputs: tuple[PortName, ...] = (
+        "prompt_template",
+        "context",
+        "role",
+        "tools_provider",
+        "prompt_section_registry",
+    )
     declared_outputs: tuple[PortName, ...] = ("prompt_text", "prompt_trace")
 
     async def node_execute(
@@ -60,7 +66,7 @@ class PromptSectionsFillExecutor:
         """prompt.sections.fill 入口。
 
         inputs 端口(yaml):prompt_template (PromptTemplate), context (ReasonerContext),
-        role (RoleSnapshot)
+        role (RoleSnapshot), tools_provider, prompt_section_registry
         outputs 端口(yaml):prompt_text (str), prompt_trace (PromptTrace)
         """
         template = input.port_values.get("prompt_template")
@@ -82,14 +88,14 @@ class PromptSectionsFillExecutor:
                 f"instance, got {type(role).__name__}"
             )
 
-        tools_provider = getattr(context.runtime, "tools_provider", None)
+        tools_provider = input.port_values.get("tools_provider")
         tools_seq: tuple[Any, ...] = ()
         if tools_provider is not None:
             listed = getattr(tools_provider, "list_tools", None)
             if callable(listed):
                 tools_seq = tuple(listed())
 
-        registry = getattr(context.runtime, "prompt_section_registry", None)
+        registry = input.port_values.get("prompt_section_registry")
 
         prompt, trace = render_template(
             template=template,

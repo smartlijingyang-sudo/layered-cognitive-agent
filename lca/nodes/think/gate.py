@@ -2,7 +2,7 @@
 
 think 子图节点 plugin:用 DecisionGate 收敛候选 Decision。
 ``requires=("decision_gate",)`` 通过 Cordis 校验,
-运行时从 ``context.runtime.decision_gate`` 拿 capability 实例。
+运行时从 ``context.runtime.brain.decision_gate`` 拿 capability 实例。
 
 ADR-0218 §3.3:节点 plugin 由作者显式书写完整 ``@plugin(...)`` 装饰器,
 工厂 ``setup(ctx)`` 通过 Cordis ``ctx.provide`` 双键注册
@@ -65,7 +65,8 @@ class ThinkGateExecutor:
         """
         runtime = context.runtime
         state = runtime.state
-        gate = runtime.decision_gate
+        brain = getattr(runtime, "brain", None)
+        gate = getattr(brain, "decision_gate", None) if brain is not None else None
         decision = input.port_values.get("decision")
 
         if decision is None:

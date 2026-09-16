@@ -177,17 +177,33 @@ def _model_visible_identity(state: Any, request: Any) -> tuple[Any, Any]:
 
 
 def _resolve_port(name: str, *, input: NodeInput, context: NodeContext) -> Any:
-    """Read a declared port from ``input.port_values`` or ``context.runtime``."""
+    """Read a declared port from ``input.port_values`` only.
+
+    The ``state`` and ``writer`` ports are also exposed as kernel-injected
+    runtime carriers; we fall back to ``context.runtime`` so callers
+    wiring the node via the runtime scope (test fixtures + legacy
+    bundle predicates) continue to work. ``adapter`` is NOT a runtime
+    carrier — it travels strictly via the typed ``adapter`` port.
+    """
     value = input.port_values.get(name)
-    if value is None and hasattr(context, "runtime") and context.runtime is not None:
-        value = getattr(context.runtime, name, None)
-        if value is None and hasattr(context.runtime, "get"):
-            value = context.runtime.get(name)
+    if value is None and name in _RUNTIME_FALLBACK_PORTS:
+        runtime = getattr(context, "runtime", None)
+        if runtime is not None:
+            value = getattr(runtime, name, None)
+            if value is None and hasattr(runtime, "get"):
+                value = runtime.get(name)
     if value is None:
         raise TypeError(
-            f"llm.call: '{name}' port must be supplied via input.port_values or context.runtime"
+            f"llm.call: '{name}' port must be supplied via input.port_values"
+            + (" or context.runtime" if name in _RUNTIME_FALLBACK_PORTS else "")
         )
     return value
+
+
+# Kernel-injected runtime carriers the existing fixtures rely on. New
+# typed-only ports (``adapter``, ``model_visible_request``) never fall
+# back to the runtime scope — they travel only via declared inputs.
+_RUNTIME_FALLBACK_PORTS = frozenset({"state", "writer"})
 
 
 @plugin(

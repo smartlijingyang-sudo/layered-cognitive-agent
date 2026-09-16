@@ -105,6 +105,28 @@ class ModularBrain(Brain):
             critic=self.critic,
         )
 
+    def with_gate(self, decision_gate: DecisionGate) -> ModularBrain:
+        """Return a new ``ModularBrain`` with the lead decision gate installed.
+
+        PR-A helper (replaces ``lca.plugins.composer.think.apply_lead_brain``):
+        the lead composition only differs from a member by which gate is
+        installed at the closed-set slot — same reasoner / classifier /
+        critic / pipelines. Returns a fresh ``ModularBrain`` instance so
+        call-sites stay immutable.
+        """
+
+        return ModularBrain(
+            reasoner=self.reasoner,
+            classifier=self.classifier,
+            critic=self.critic,
+            skill_router=self.skill_router,
+            decision_gate=decision_gate,
+            agent_gates=self._agent_gates,
+            reducer=self.reducer,
+            think_pipeline=self._think_pipeline,
+            reflection_pipeline=self._reflection_pipeline,
+        )
+
 
 def _standalone_think_pipeline() -> CognitiveThinkPipeline:
     """Return the legacy-compatible default for callers outside profile boot."""

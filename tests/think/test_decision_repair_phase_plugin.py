@@ -25,9 +25,19 @@ from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.nodes.think.decision_repair import ThinkDecisionRepairExecutor
 
 
-def _ctx(runtime: Mapping[str, Any] | None = None) -> NodeContext:
-    """Minimal NodeContext; the repair node only reads ``runtime['tools']``."""
-    return NodeContext(runtime=dict(runtime or {}), budget={}, metadata={})
+def _ctx() -> NodeContext:
+    """Minimal NodeContext; the repair node reads the ``tools`` typed port."""
+    return NodeContext(runtime={}, budget={}, metadata={})
+
+
+def _input(decision: Decision | None = None, *, tools: Any | None = None) -> NodeInput:
+    """Build a NodeInput with the ``decision`` + ``tools`` typed ports populated."""
+    port_values: dict[str, Any] = {}
+    if decision is not None:
+        port_values["decision"] = decision
+    if tools is not None:
+        port_values["tools"] = tools
+    return NodeInput(port_values=port_values)
 
 
 class _FakeTool:
@@ -105,8 +115,8 @@ async def test_decision_repair_well_formed_passes_through_to_gate() -> None:
     decision = _decision(_call(arguments={"text": "hello", "count": 1}))
 
     output = await executor.node_execute(
-        _ctx({"tools": _registry_with_echo()}),
-        NodeInput(port_values={"decision": decision}),
+        _ctx(),
+        _input(decision, tools=_registry_with_echo()),
     )
 
     forwarded: Decision = output.port_values["decision"]
@@ -140,8 +150,8 @@ async def test_decision_repair_truncated_json_repairs_then_forwards_to_gate() ->
     decision.extra["tool_wire_raw_preview"] = raw_preview
 
     output = await executor.node_execute(
-        _ctx({"tools": _registry_with_echo()}),
-        NodeInput(port_values={"decision": decision}),
+        _ctx(),
+        _input(decision, tools=_registry_with_echo()),
     )
 
     forwarded: Decision = output.port_values["decision"]
@@ -172,8 +182,8 @@ async def test_decision_repair_unknown_tool_name_rejects_to_route_decide() -> No
     decision = _decision(_call(name="mystery_tool", arguments={"text": "x", "count": 1}))
 
     output = await executor.node_execute(
-        _ctx({"tools": _registry_with_echo()}),
-        NodeInput(port_values={"decision": decision}),
+        _ctx(),
+        _input(decision, tools=_registry_with_echo()),
     )
 
     forwarded: Decision = output.port_values["decision"]
@@ -214,8 +224,8 @@ async def test_decision_repair_irreparable_arguments_rejects_to_route_decide() -
     decision.extra["tool_wire_raw_preview"] = raw_preview
 
     output = await executor.node_execute(
-        _ctx({"tools": bad_schema_registry}),
-        NodeInput(port_values={"decision": decision}),
+        _ctx(),
+        _input(decision, tools=bad_schema_registry),
     )
 
     forwarded: Decision = output.port_values["decision"]
@@ -240,22 +250,16 @@ async def test_decision_repair_is_idempotent() -> None:
     """
     executor = ThinkDecisionRepairExecutor()
     decision = _decision(_call(arguments={"text": "hello", "count": 1}))
-    port_values = {
-        "decision": decision,
-    }
-    runtime = {"tools": _registry_with_echo()}
+    registry = _registry_with_echo()
+    inp = _input(decision, tools=registry)
 
-    out_a = await executor.node_execute(_ctx(runtime), NodeInput(port_values=port_values))
-    out_b = await executor.node_execute(_ctx(runtime), NodeInput(port_values=port_values))
+    out_a = await executor.node_execute(_ctx(), inp)
+    out_b = await executor.node_execute(_ctx(), inp)
     assert out_a.port_values["routing"] == out_b.port_values["routing"]
     assert out_a.port_values["decision"] is out_b.port_values["decision"]
 
-    out_c = await ThinkDecisionRepairExecutor().node_execute(
-        _ctx(runtime), NodeInput(port_values=port_values)
-    )
-    out_d = await ThinkDecisionRepairExecutor().node_execute(
-        _ctx(runtime), NodeInput(port_values=port_values)
-    )
+    out_c = await ThinkDecisionRepairExecutor().node_execute(_ctx(), inp)
+    out_d = await ThinkDecisionRepairExecutor().node_execute(_ctx(), inp)
     assert out_c.port_values["routing"] == out_d.port_values["routing"]
     assert out_c.port_values["decision"] is out_d.port_values["decision"]
 
@@ -271,19 +275,20 @@ async def test_decision_repair_empty_decision_returns_empty_output() -> None:
     no tool_calls) or when ``decision.parse`` returned ``None``.
     """
     executor = ThinkDecisionRepairExecutor()
+    registry = _registry_with_echo()
 
     # ``None`` decision.
     out_none = await executor.node_execute(
-        _ctx({"tools": _registry_with_echo()}),
-        NodeInput(port_values={"decision": None}),
+        _ctx(),
+        _input(decision=None, tools=registry),
     )
     assert out_none.port_values == {}
 
     # Decision with an empty tool_calls list.
     empty_decision = _decision()
     out_empty = await executor.node_execute(
-        _ctx({"tools": _registry_with_echo()}),
-        NodeInput(port_values={"decision": empty_decision}),
+        _ctx(),
+        _input(empty_decision, tools=registry),
     )
     assert out_empty.port_values == {}
 
@@ -302,8 +307,8 @@ async def test_decision_repair_no_registry_passes_known_calls() -> None:
     decision = _decision(_call(arguments={"text": "hello", "count": 1}))
 
     output = await executor.node_execute(
-        _ctx(),  # no ``tools`` key on runtime
-        NodeInput(port_values={"decision": decision}),
+        _ctx(),  # no ``tools`` typed port either
+        _input(decision),
     )
 
     forwarded: Decision = output.port_values["decision"]
@@ -326,7 +331,7 @@ async def test_decision_repair_empty_tool_name_rejects() -> None:
 
     output = await executor.node_execute(
         _ctx(),
-        NodeInput(port_values={"decision": decision}),
+        _input(decision),
     )
 
     routing: RoutingDecision = output.port_values["routing"]
@@ -359,8 +364,8 @@ async def test_decision_repair_multi_call_one_repair_emits_repaired_decision() -
     decision.extra["tool_wire_raw_preview"] = '{"text": "fine", "count": 7'
 
     output = await executor.node_execute(
-        _ctx({"tools": _registry_with_echo()}),
-        NodeInput(port_values={"decision": decision}),
+        _ctx(),
+        _input(decision, tools=_registry_with_echo()),
     )
 
     forwarded: Decision = output.port_values["decision"]

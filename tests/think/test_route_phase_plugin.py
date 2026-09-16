@@ -35,17 +35,24 @@ class _Reducer:
 
 
 @dataclass
+class _StubBrain:
+    skill_router: Any
+
+
+@dataclass
 class _StubRuntime:
     state: AgentState | None
-    skill_router: Any
+    brain: _StubBrain | None
     reducer: Any
 
 
 def _ctx(caps: dict[str, Any]) -> NodeContext:
     state = AgentState(trace_id="t", task="x", budget=Budget())
+    router = caps.get("phase.think.route")
+    brain = _StubBrain(skill_router=router) if router is not None else None
     runtime = _StubRuntime(
         state=state,
-        skill_router=caps.get("phase.think.route"),
+        brain=brain,
         reducer=caps.get("phase.think.reducer"),
     )
     return NodeContext(runtime=runtime, budget={}, metadata={})
