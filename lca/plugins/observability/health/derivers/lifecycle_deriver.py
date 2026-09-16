@@ -11,9 +11,10 @@ Spec §10.4 status rules:
     unknown  if no ``kernel.run.stop`` event
     degraded reserved for ``outcome == "degraded"`` (not emitted in v1)
 
-Only ``kernel.run.stop`` drives this deriver; ``lifecycle.finally`` is
-consumed by the fold's lifecycle normalization layer (per spec §10.4
-"Consumes EPs" column) and is intentionally not read here.
+Only ``kernel.run.stop`` drives this deriver. ``lifecycle.finally`` reports
+teardown-boundary success (``emit_lifecycle_finally`` hardcodes
+``outcome="success"``), so it carries no run outcome and the journal fold does
+not read it either.
 """
 
 from __future__ import annotations

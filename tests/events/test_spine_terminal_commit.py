@@ -1,16 +1,15 @@
-"""Pin the new terminal spine EPs after retiring the stop-decision half.
+"""Pin the terminal spine EPs' catalog membership after the stop-decision retirement.
 
-Locks in the contract after retiring the stop-decision half of the stop phase
-(plan `docs/plans/2026-09-14-stop-decision-retirement.md`, PR-2):
+Plan `docs/plans/2026-09-14-stop-decision-retirement.md` PR-2 added two EPs to
+the closed catalog:
 
-- `spine.terminal.commit` is the carrier for `TerminalCommitExecutor`. The
-  fold reads `outcome` and `reason` to set `terminal_outcome`.
-- `spine.body.deterministic_fail` is the carrier for Body's
-  `DeterministicToolError` raise. The fold reads the EP and stamps
-  `terminal_outcome="failed"`.
+- `terminal.commit` — emitted by the outer plan's terminal node via its
+  declared `emit_on_exit`. Its payload is `{"state_id": ...}` only.
+- `body.deterministic_fail` — reserved. No producer exists: the
+  `DeterministicToolError` raise path was never built.
 
-The session catalog admits these EPs via the merged `SPINE_EXECUTION_POINTS`
-set; this test pins the catalog membership and the fold's outcome mapping.
+Neither maps the run outcome. `kernel.run.stop` is the fold's sole run-outcome
+authority, so these EPs must not be able to move `terminal_outcome`.
 """
 
 from __future__ import annotations
@@ -34,34 +33,34 @@ def test_body_deterministic_fail_in_event_categories() -> None:
     assert "spine.body.deterministic_fail" in SPINE_EVENT_CATEGORIES
 
 
-def test_terminal_commit_completed_maps_to_completed_outcome() -> None:
-    from lca.plugins.session.derivers.step_tree.journal_fold import (
-        _StepTreeState,
-        _capture_outcome,
-    )
+def test_terminal_commit_emission_does_not_move_the_folded_outcome() -> None:
+    """`terminal.commit` carries no outcome, so it must not decide the run's.
 
-    state = _StepTreeState()
-    _capture_outcome(state, "spine.terminal.commit", {"outcome": "completed", "reason": ""})
-    assert state.terminal_outcome == "completed"
+    Its payload is `{"state_id": ...}` only, so any fold branch keyed on this
+    EP has no outcome to read and would fall through to a default. Guarding
+    the reachable case: the event is emitted in production, and re-adding a
+    branch for it without giving it an outcome payload would stamp every
+    successful run `failed`. `kernel.run.stop` is the authority. This drives
+    the public fold over a real-shaped ledger rather than calling
+    `_capture_outcome` with a category-prefixed EP, which the spine whitelist
+    never admits and `_coerce` never produces.
+    """
+    from lca.plugins.session.derivers.step_tree.journal_fold import fold_step_tree
 
+    def _rec(seq: int, ep: str, payload: dict) -> dict:
+        return {
+            "event_id": f"run_t:{seq}",
+            "category": f"spine.{ep}",
+            "channel": "fact",
+            "execution_point": ep,
+            "payload": {"run_id": "run_t", "trace_id": "trace_t", **payload},
+            "ts": f"2026-09-17T00:00:{seq:02d}.000000+00:00",
+        }
 
-def test_terminal_commit_budget_exhausted_maps_to_budget_exhausted() -> None:
-    from lca.plugins.session.derivers.step_tree.journal_fold import (
-        _StepTreeState,
-        _capture_outcome,
-    )
+    events = [
+        _rec(1, "kernel.run.start", {}),
+        _rec(2, "terminal.commit", {"state_id": "trace_t"}),
+        _rec(3, "kernel.run.stop", {"outcome": "success"}),
+    ]
 
-    state = _StepTreeState()
-    _capture_outcome(state, "spine.terminal.commit", {"outcome": "failed", "reason": "budget_exceeded"})
-    assert state.terminal_outcome == "budget_exhausted"
-
-
-def test_body_deterministic_fail_maps_to_failed() -> None:
-    from lca.plugins.session.derivers.step_tree.journal_fold import (
-        _StepTreeState,
-        _capture_outcome,
-    )
-
-    state = _StepTreeState()
-    _capture_outcome(state, "spine.body.deterministic_fail", {"tool_name": "cat", "error": "No such file"})
-    assert state.terminal_outcome == "failed"
+    assert fold_step_tree(events, run_id="run_t").metadata.outcome == "completed"

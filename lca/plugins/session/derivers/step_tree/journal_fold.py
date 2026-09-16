@@ -28,6 +28,9 @@ Step 边界语法(闭集,不引入新词表):
    :class:`StepTreeFoldDeriver` (ADR-0212 §5 fail-loud) 负责,
    失败抛 :class:`JournalWriteError`,不 swallow。
 2. **单一真值表** — ``PHASE_FOLD_EPS`` 闭集(ADR-0166 D4),不引入平行词汇。
+   run 终态同理只有一个权威:``kernel.run.stop``(唯一 producer
+   :func:`lca.loop.transport.emit_kernel_run_stop`),其余 terminal EP 只是
+   证据,不得覆盖它(见 :data:`_RUN_OUTCOME_AUTHORITY`)。
 3. **可测试** — 任何测试 fixture 传 list[dict] 即可驱动 fold,不需要
    SpineReader / EventSpine / 运行中的 run。
 
@@ -275,46 +278,59 @@ class _StepTreeState:
     first_ts: float | None = None
     last_ts: float | None = None
     terminal_outcome: str | None = None
+    terminal_outcome_rank: int = 0
     open_step: _Frame | None = None
     closed_frames: list[_Frame] = field(default_factory=list)
     phases: list[PhaseRecord] = field(default_factory=list)
 
 
+# run 终态两级权威。kernel.run.stop 是唯一 run-outcome producer
+# (lca.loop.transport.emit_kernel_run_stop);其余 terminal EP 只是证据。
+# 证据不覆盖权威,权威也不靠到达顺序取胜(recovery spine 可含多份)。
+_RUN_OUTCOME_AUTHORITY = 2
+_RUN_OUTCOME_EVIDENCE = 1
+
+# producer 词表只有 success / failure / cancelled(现场 spine 实测无第四种)。
+# 词表外一律 failed:同 EP 的 LifecycleDeriver 也把 non-success 判 failed,
+# 而 fold 契约「永不抛」会让 raise 被 _apply 的 swallow 吃掉 —— 只有悲观
+# 映射不会静默放过。
+_KERNEL_RUN_STOP_OUTCOMES: dict[str, str] = {"success": "completed", "cancelled": "stopped"}
+
+
+def _event_outcome(event: Mapping[str, Any]) -> str:
+    """读事件 outcome 词:spine 记录放在 payload 里,EventRecord 放在顶层。"""
+    raw = event.get("outcome")
+    if not raw:
+        payload = event.get("payload")
+        if isinstance(payload, Mapping):
+            raw = payload.get("outcome")
+    return str(raw or "").strip().lower()
+
+
+def _stamp_terminal(state: _StepTreeState, outcome: str, rank: int) -> None:
+    """写 run 终态;低 rank 不得覆盖高 rank,同 rank last-write-wins。"""
+    if rank < state.terminal_outcome_rank:
+        return
+    state.terminal_outcome = outcome
+    state.terminal_outcome_rank = rank
+
+
 def _capture_outcome(state: _StepTreeState, ep: str, event: Mapping[str, Any]) -> None:
     """从 terminal EP 捕获 run 终态。"""
     if ep == "exception.caught":
-        state.terminal_outcome = "failed"
+        _stamp_terminal(state, "failed", _RUN_OUTCOME_EVIDENCE)
         return
-    if ep == "spine.terminal.commit":
-        ev_outcome = str(event.get("outcome") or "").strip().lower()
-        ev_reason = str(event.get("reason") or "").strip().lower()
-        if ev_outcome == "completed":
-            state.terminal_outcome = "completed"
-        elif ev_reason == "budget_exceeded":
-            state.terminal_outcome = "budget_exhausted"
-        else:
-            state.terminal_outcome = "failed"
+    if ep == "kernel.run.stop":
+        outcome = _KERNEL_RUN_STOP_OUTCOMES.get(_event_outcome(event), "failed")
+        _stamp_terminal(state, outcome, _RUN_OUTCOME_AUTHORITY)
         return
-    if ep == "spine.body.deterministic_fail":
-        state.terminal_outcome = "failed"
-        return
-    if ep in {"kernel.run.stop", "lifecycle.finally"}:
-        ev_outcome = str(event.get("outcome") or "").strip().lower()
-        if ev_outcome in {"success", "completed"}:
-            state.terminal_outcome = "completed"
-        elif ev_outcome in {"fail", "failed", "error"}:
-            state.terminal_outcome = "failed"
-        elif ev_outcome in {"stop", "stopped", "cancelled", "canceled"}:
-            state.terminal_outcome = "stopped"
-        elif ev_outcome in {"paused", "waiting_input"}:
-            state.terminal_outcome = "paused"
     if ep == "runtime.event_publisher.publish":
         payload = event.get("payload") or {}
         event_type = payload.get("event_type") if isinstance(payload, Mapping) else None
         if event_type == "completed":
-            state.terminal_outcome = "completed"
+            _stamp_terminal(state, "completed", _RUN_OUTCOME_EVIDENCE)
         elif event_type == "failed":
-            state.terminal_outcome = "failed"
+            _stamp_terminal(state, "failed", _RUN_OUTCOME_EVIDENCE)
 
 
 def _open_step(
@@ -387,7 +403,7 @@ def _assign_tool_result(target: _Frame, payload: Mapping[str, Any], ep: str) -> 
 
 def _capture_exception(state: _StepTreeState, payload: Mapping[str, Any], ts: float) -> None:
     """``exception.caught`` → 关联 step 错误 + run 终态 failed。"""
-    state.terminal_outcome = "failed"
+    _stamp_terminal(state, "failed", _RUN_OUTCOME_EVIDENCE)
     msg = str(payload.get("exception_message") or payload.get("reason") or "").strip()
     if not msg:
         exc_type = str(payload.get("exception_class") or payload.get("exc_type") or "Error")
