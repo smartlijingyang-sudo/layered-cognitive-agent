@@ -169,6 +169,15 @@ class RegistryRunCommands:
                 idempotency_key=idempotency_key,
             )
             return RunCommandReceipt(accepted=False, error="run not found")
+        # Check-then-act below is one uninterruptible step, and that is the only
+        # thing keeping two competing answers from both resuming this run: the
+        # replay dedup keys on ``idempotency_key``, so different keys do not
+        # dedup and the WAITING_INPUT gate is what rejects the loser. This
+        # coroutine has no suspension point, so the event loop cannot interleave
+        # two calls; adding an ``await`` anywhere below makes the race real and
+        # requires a per-session lock. ``validate_durable_resume`` cannot back
+        # this up today (it no-ops unless the binding exposes ``inner`` directly).
+        # Pinned by ``tests/transport/test_resume_concurrency.py``.
         if idempotency_key and idempotency_key in session.accepted_answer_keys:
             _log.info(
                 "run_resume_replayed",
