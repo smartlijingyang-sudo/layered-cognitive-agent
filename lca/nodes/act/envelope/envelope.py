@@ -62,8 +62,21 @@ class ActEnvelopeExecutor:
 
     semantic_name: str = "act.envelope"
     region: str = "act"
-    declared_inputs: tuple[PortName, ...] = ("decision",)
-    declared_outputs: tuple[PortName, ...] = ("envelopes", "envelope")
+    declared_inputs: tuple[PortName, ...] = ("decision", "state")
+    # YAML ``outputs`` declares ``envelope, decision, state`` (ADR-0235 / PR-5
+    # typed-port passthrough: state / decision carry into the dispatch chain
+    # via the kernel-wide port registry). The executor must actually emit
+    # those ports — otherwise the interpreter's ``setdefault(name, None)``
+    # contract enforcement clears the carry-in ``decision`` port to None at
+    # this visit, which breaks the outer act→think re-ask edge predicate
+    # ``decision.action_type == use_tool`` and yields a silent H6 failure
+    # (class: 2026-09-16-act-think-reask-loop-guard §"yaml executor mismatch").
+    declared_outputs: tuple[PortName, ...] = (
+        "envelopes",
+        "envelope",
+        "decision",
+        "state",
+    )
 
     async def node_execute(
         self,
@@ -101,9 +114,7 @@ class ActEnvelopeExecutor:
                 # decision does not collapse N envelopes into one cached
                 # entry (PR-2 already separated BodySurfaceEventContract;
                 # this is the matching envelope-side guard).
-                idempotency_key=(
-                    f"{plan_ref}:{node_ref}:{decision.decision_id}:{call_index}"
-                ),
+                idempotency_key=(f"{plan_ref}:{node_ref}:{decision.decision_id}:{call_index}"),
                 metadata={
                     "effect_class": "tools",
                     "operation": "body.act",
@@ -121,6 +132,13 @@ class ActEnvelopeExecutor:
                 # Back-compat: downstream 1:1 wiring reads ``envelope``;
                 # populate it with the first envelope (or None).
                 "envelope": envelopes[0] if envelopes else None,
+                # ADR-0235 / PR-5: state / decision carry through into the
+                # dispatch chain as typed ports. Without these passthroughs,
+                # ``interpreter.setdefault(name, None)`` clears the carry-in
+                # ``decision`` here, and the outer act→think re-ask edge's
+                # ``decision.action_type`` predicate fails on the next hop.
+                "decision": decision,
+                "state": input.port_values.get("state"),
             }
         )
 
