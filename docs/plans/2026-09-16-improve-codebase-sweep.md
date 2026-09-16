@@ -126,3 +126,37 @@ in this sweep (per `.agents/skills/lca-improve-codebase/SKILL.md` §Reject when)
   `build_turn_plan` / `render_turn` / `complete_turn` over `ReasonerContext`,
   `TemplateSelection`, `RoleSnapshot`. Rewiring needs the prompt-template provider,
   so it is a candidate, not a sweep unit.
+
+## Marker triage (COMPAT / delete-when), run against each marker's own clause
+
+Executed, condition met:
+- `lca/contracts/observability/registry/status.py` `CANCELED = CANCELLED`
+  (clause: `rg "\.CANCELED\b"` 生产引用归零). 12 production + 11 test readers
+  migrated to the canonical member first, then the alias deleted; members,
+  `_name_`, `str()` and the `"canceled"` wire value were verified unchanged, and
+  `RunLifecycleStatus.CANCELED` now raises `AttributeError`.
+
+Evaluated, condition NOT met (kept, with the measurement that says so):
+- `journal/engine/reducer.py` `RunStatus` alias — the *statement* reads
+  `rg "\bRunStatus\." 生产引用归零`, which is 0, but the same clause continues
+  "全部改走 RunLifecycleStatus", and the name is still re-exported by two
+  production barrels (`journal/__init__.py` import + `__all__`, and the
+  `observability/__init__.py` PEP 562 lazy map) that ~20 test modules import
+  through. Deleting it without those barrels is a half-migration, so the shim
+  stays; the barrel sweep is the unit that unlocks it.
+- `handlers/runs/session/session/session.py` `RunStatus` — clause asks for
+  `rg 'RunStatus' tests/ lca/plugins/transport/ = 0 except alias`; 71 hits.
+- `spine/sinks/naming.py` — clause is "默认稳定 ≥ 14 天"; the file's last change
+  is 2026-09-03, i.e. 13 days at this writing. One day short, so not deleted.
+- `journal/step.py` deprecated `arguments_summary` — clause "所有 caller 迁移完毕";
+  55 references remain.
+- `sinks/{file_sink,routing_file_sink,tracing_file_sink}.py` — clause "PR-9";
+  consumers are 118 / 6 / 5, and these are live implementations, not shims.
+- `contracts/protocols/assistant/evolve.py`, `plugins/domain/assistant/catalog/plugin.py`,
+  `routes_assistants.py`, `assistant/evolve/evolve.py` — fixed date
+  `delete-when: 2026-12-31`, in the future.
+- `cli/cli.py:138,174` — explicit `delete-when: never` (documented entry points).
+- `prompt_assembly.py:189`, `loop_cursor_payloads.py:52` — explicit
+  `delete-when: N/A(纯加法)`.
+- `harness/declarative/__init__.py:67` — the string is inside a fail-loud
+  `AttributeError` message for already-retired v1 symbols, not a live shim.
