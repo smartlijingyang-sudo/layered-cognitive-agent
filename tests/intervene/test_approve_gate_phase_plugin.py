@@ -271,33 +271,80 @@ async def test_gate_rejects_non_command_port() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_gate_resume_edge_is_present_in_act_subgraph() -> None:
-    """The ``intervene.resume → act.approve.gate`` resume edge is wired in act_subgraph.
+def test_gate_resume_path_is_outer_level_act_resume_delegate() -> None:
+    """m1 outer-edge-SSOT close-out: the resume path reaches
+    ``act.approve.gate`` via the outer ``act.resume`` subgraph delegate
+    (``entry_node=act.approve.gate`` in ``bundles/outer/phase_main.yaml``),
+    NOT via a subgraph-internal ``intervene.resume`` stub.
 
-    ADR-0237 / PR-1b: gate moved into act_subgraph (spec §3.2 原位), so
-    the resume edge moved with it. The per-plan resume-edge validator
-    fires at subgraph lift when ``intervene.resume → act.approve.gate``
-    is missing. This guard reads ``bundles/act/act_subgraph.yaml``
-    directly and asserts the resume edge exists.
+    The previous PR-1b design relied on a kernel re-projection hook
+    (``ADR-0237 §6`` promised but never implemented) that would feed the
+    outer ``intervene.resume``'s ``command`` / ``decision`` into the
+    stub's port registry. Without that hook the stub was unreachable
+    from the subgraph entry — the lifter flagged it at boot. The new
+    design routes the resume cycle through outer edges that the kernel
+    actually drives, with the per-plan resume-edge validator satisfied
+    by the outer ``intervene.resume → act.resume`` edge.
+
+    This guard pins the close-out: ``act_subgraph.yaml`` must NOT carry
+    the ``intervene.resume → act.approve.gate`` inner edge (the design
+    that never worked), and ``phase_main.yaml`` MUST carry the
+    ``act.resume`` subgraph delegate.
     """
     from pathlib import Path
 
     import yaml
 
-    bundle_path = Path(__file__).resolve().parents[2] / "bundles" / "act" / "act_subgraph.yaml"
-    spec = yaml.safe_load(bundle_path.read_text(encoding="utf-8"))
-    edges = spec.get("edges", ()) or ()
-    resume_edges = [
+    repo_root = Path(__file__).resolve().parents[2]
+
+    act_bundle = yaml.safe_load(
+        (repo_root / "bundles" / "act" / "act_subgraph.yaml").read_text(encoding="utf-8")
+    )
+    act_edges = act_bundle.get("edges", ()) or ()
+    inner_resume_edges = [
         e
-        for e in edges
+        for e in act_edges
         if isinstance(e, dict)
         and e.get("from") == "intervene.resume"
         and e.get("to") == "act.approve.gate"
     ]
-    assert resume_edges, (
-        "intervene.resume → act.approve.gate resume edge missing from "
-        "bundles/act/act_subgraph.yaml — plan lift will fail at boot "
-        "(approve gate unreachable from resume path)"
+    assert not inner_resume_edges, (
+        "intervene.resume → act.approve.gate inner edge present in "
+        "bundles/act/act_subgraph.yaml; m1 close-out removed it because "
+        "the kernel re-projection hook ADR-0237 §6 promised was never "
+        "implemented. Resume reaches act.approve.gate via the outer "
+        "act.resume subgraph delegate (entry_node override)."
+    )
+
+    outer_spec = yaml.safe_load(
+        (repo_root / "bundles" / "outer" / "phase_main.yaml").read_text(encoding="utf-8")
+    )
+    outer_nodes = outer_spec.get("nodes", ()) or ()
+    act_resume_nodes = [
+        n for n in outer_nodes
+        if isinstance(n, dict) and n.get("id") == "act.resume"
+    ]
+    assert act_resume_nodes, (
+        "act.resume outer subgraph delegate missing from "
+        "bundles/outer/phase_main.yaml; resume path lost its outer entry."
+    )
+    resume_node = act_resume_nodes[0]
+    sub_spec_ref = resume_node.get("sub_spec_ref") or {}
+    assert sub_spec_ref.get("entry_node") == "act.approve.gate", (
+        f"act.resume entry_node must be 'act.approve.gate', "
+        f"got {sub_spec_ref.get('entry_node')!r}"
+    )
+
+    outer_edges = outer_spec.get("edges", ()) or ()
+    resume_cycle_edges = [
+        e for e in outer_edges
+        if isinstance(e, dict)
+        and e.get("from") == "intervene.resume"
+        and e.get("to") == "act.resume"
+    ]
+    assert resume_cycle_edges, (
+        "intervene.resume → act.resume outer edge missing; the resume "
+        "cycle is broken — a paused run cannot re-enter act.approve.gate."
     )
 
 

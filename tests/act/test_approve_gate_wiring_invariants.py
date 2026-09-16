@@ -156,18 +156,34 @@ def test_outer_plan_does_not_declare_act_approve_gate() -> None:
     )
 
 
-def test_act_subgraph_resume_edge_targets_gate() -> None:
-    """``intervene.resume → act.approve.gate`` lives inside act_subgraph.
+def test_act_subgraph_does_not_carry_resume_stub() -> None:
+    """m1 outer-edge-SSOT close-out: act_subgraph.yaml must NOT carry
+    the ``intervene.resume → act.approve.gate`` inner stub edge.
 
-    The per-plan resume-edge validator at ``lifter.lift_graph_spec``
-    fires at subgraph lift and requires both endpoints in the same
-    plan. PR-1b moves this edge into the subgraph so the validator
-    triggers on the act_subgraph plan, not the outer plan.
+    The original PR-1b design wired a subgraph-internal stub node + edge
+    that depended on an unrealised kernel re-projection hook (ADR-0237
+    §6 promised but never implemented). The resume path now reaches
+    ``act.approve.gate`` via the outer ``act.resume`` subgraph
+    delegate (``entry_node=act.approve.gate``) — see
+    tests/intervene/test_approve_gate_phase_plugin.py for the
+    positive guard.
+
+    This test pins the close-out so a future regression that
+    reintroduces the stub edge + factory carrier fails boot loudly.
     """
     edges = _edges(ACT_SUBGRAPH)
-    assert ("intervene.resume", "act.approve.gate") in edges, (
-        "intervene.resume → act.approve.gate resume edge must live in "
-        "act_subgraph.yaml (PR-1b / ADR-0237)"
+    assert ("intervene.resume", "act.approve.gate") not in edges, (
+        "intervene.resume → act.approve.gate inner edge reappeared in "
+        "act_subgraph.yaml; m1 close-out removed it because the kernel "
+        "re-projection hook ADR-0237 §6 promised was never implemented. "
+        "Resume reaches act.approve.gate via the outer act.resume "
+        "subgraph delegate (entry_node override)."
+    )
+    nodes = _nodes(ACT_SUBGRAPH)
+    assert "intervene.resume" not in nodes, (
+        "intervene.resume stub node reappeared in act_subgraph.yaml; "
+        "m1 close-out removed it — the resume cycle goes through outer "
+        "act.resume, not an inner stub factory carrier."
     )
 
 
