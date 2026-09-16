@@ -312,7 +312,6 @@ if TYPE_CHECKING:
     )
     from lca.infrastructure.observability.journal.engine.reducer import (
         RunState,
-        RunStatus,
         fold_run_state,
     )
     from lca.infrastructure.observability.journal.engine.serialization import (
@@ -325,7 +324,6 @@ _LAZY_JOURNAL_SYMBOLS: dict[str, tuple[str, str]] = {
         "InMemoryJournalStore",
     ),
     "RunState": ("lca.infrastructure.observability.journal", "RunState"),
-    "RunStatus": ("lca.infrastructure.observability.journal", "RunStatus"),
     "RunStore": ("lca.infrastructure.observability.journal", "RunStore"),
     "UnregisteredJournalEventError": (
         "lca.infrastructure.observability.journal",
