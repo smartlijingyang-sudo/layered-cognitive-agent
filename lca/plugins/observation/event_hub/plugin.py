@@ -57,6 +57,8 @@ def _invoke_observer(observer: Callable[..., None], record: Any) -> None:
     Each observer has its own signature; use a small switch keyed by
     execution_point. 这是唯一把 record payload dict 拆成 kwargs 的地方;
     plugin 间不直接 import —— 只拿 observer callable, 不拿它的 module.
+    Observer 在内部用 :func:`current_session` 拿到 Session 单轨,
+    hub 不透传 session —— 单一真值源。
     """
     ep = getattr(record, "execution_point", "")
     payload = getattr(record, "payload", {}) or {}
@@ -87,10 +89,13 @@ def _invoke_observer(observer: Callable[..., None], record: Any) -> None:
     elif ep == "runtime.reducer.apply":
         observer(
             run_id=getattr(record, "run_id", None),
-            reducer=payload.get("reducer"),
-            phase=payload.get("phase"),
-            seq=payload.get("seq"),
-            payload=payload,
+            method=payload.get("reducer") or payload.get("method", ""),
+            outcome=payload.get("outcome", ""),
+            args_digest=payload.get("args_digest"),
+            state_diff_digest=payload.get("state_diff_digest"),
+            exception_class=payload.get("exception_class"),
+            phase_boundary=payload.get("phase_boundary", False),
+            elapsed_ms=payload.get("elapsed_ms", 0),
         )
     else:
         log.warning("event_hub: unknown EP %s reached _invoke_observer", ep)

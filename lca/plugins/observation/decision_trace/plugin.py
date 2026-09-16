@@ -1,6 +1,8 @@
 """observation.decision_trace —— 决策产生 / 拒绝的观察者。
 
 module M5: lca/contracts/observability/observation/m5_event_traces/
+
+Emit 走 :func:`append_catalog_bound` —— Session 单轨（ADR-0186）。
 """
 
 from __future__ import annotations
@@ -10,9 +12,9 @@ from typing import Any
 
 from lca.contracts.observability.observation import DecisionTrace
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.loop.fact_gateway import publish_ep_bound
+from lca.loop.fact_gateway import append_catalog_bound
+from lca.plugins.events._session_observe import current_session
 
-_EV_DECISION = "observation.decision"
 _OBSERVER_ACTOR = "observation"
 
 
@@ -44,11 +46,7 @@ def observe_decision(
         accepted=accepted,
         occurred_at=_now_iso(),
     )
-    publish_ep_bound(
-        _EV_DECISION,
-        fact.model_dump(mode="json"),
-        actor=_OBSERVER_ACTOR,
-    )
+    append_catalog_bound(fact, session=current_session(), actor=_OBSERVER_ACTOR)
 
 
 @plugin(

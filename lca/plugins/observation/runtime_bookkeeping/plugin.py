@@ -3,6 +3,7 @@
 module M5: lca/contracts/observability/observation/m5_event_traces/
 
 verbose 默认 = 全量 emit。用户原则:"日志多没事,agent-friendly"。
+Emit 走 :func:`append_catalog_bound` —— Session 单轨（ADR-0186）。
 """
 
 from __future__ import annotations
@@ -12,9 +13,9 @@ from typing import Any
 
 from lca.contracts.observability.observation import ReducerApply
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.loop.fact_gateway import publish_ep_bound
+from lca.loop.fact_gateway import append_catalog_bound
+from lca.plugins.events._session_observe import current_session
 
-_EV_REDUCER = "observation.reducer_apply"
 _OBSERVER_ACTOR = "observation"
 
 
@@ -44,11 +45,7 @@ def observe_reducer_apply(
         elapsed_ms=elapsed_ms,
         occurred_at=_now_iso(),
     )
-    publish_ep_bound(
-        _EV_REDUCER,
-        fact.model_dump(mode="json"),
-        actor=_OBSERVER_ACTOR,
-    )
+    append_catalog_bound(fact, session=current_session(), actor=_OBSERVER_ACTOR)
 
 
 @plugin(

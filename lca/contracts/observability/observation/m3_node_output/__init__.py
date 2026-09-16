@@ -10,6 +10,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from lca.contracts.harness.tasks.session import session_event
+
 
 class NodeException(BaseModel):
     """节点退出时抛出的异常:类型 + 消息 + traceback(完整)。"""
@@ -22,6 +24,7 @@ class NodeException(BaseModel):
     source_location: str | None = None
 
 
+@session_event("observation.node_exit", visibility="audit")
 class NodeExit(BaseModel):
     """节点退出时的完整现场:outputs payload + exit status + exception。
 
@@ -34,7 +37,8 @@ class NodeExit(BaseModel):
 
     run_id: str
     node_id: str
-    phase: str
+    # LCA lifecycle phase owning the node. Empty string when unknown.
+    phase: str = ""
     binding: str | None = None
     parent_node_id: str | None = None
     sub_graph_id: str | None = None

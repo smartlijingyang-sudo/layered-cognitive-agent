@@ -1,8 +1,7 @@
 """统一发射 helper —— typed session 事件对象 → ``Session.append`` 的唯一出口。
 
 Session 平面只允许一个写入口(``Session.append``)。业务侧持有的 typed
-dataclass 事件(:mod:`lca.contracts.harness.memory.events`)经本 helper
-转换为 ``(event_type, data)`` 形态入日志:
+dataclass / Pydantic 事件经本 helper 转换为 ``(event_type, data)`` 形态入日志:
 
 - ``event_type`` 来自 ``@session_event`` 注册表(``event_type_of``),不手写字符串;
 - ``visibility`` 来自事件类的注册档位,不在发射点重复声明;
@@ -14,11 +13,29 @@ dataclass 事件(:mod:`lca.contracts.harness.memory.events`)经本 helper
 
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, is_dataclass
 from typing import Any
 
 from lca.contracts.harness.tasks.session import SessionEvent, event_type_of
 from lca_kernel.events.session.session import SessionProtocol
+
+
+def _to_jsonable(event_data: Any) -> dict[str, Any]:
+    """序列化一个 typed session 事件为可 JSON 写入的 dict。
+
+    Pydantic BaseModel 优先用 ``model_dump``(支持 nested Pydantic / validators);
+    dataclass 走 ``dataclasses.asdict``;其余类型假设已可 JSON 化。
+    """
+    if hasattr(event_data, "model_dump"):
+        return event_data.model_dump(mode="json")
+    if is_dataclass(event_data) and not isinstance(event_data, type):
+        return asdict(event_data)
+    if isinstance(event_data, dict):
+        return event_data
+    raise TypeError(
+        f"emit() requires dataclass, Pydantic BaseModel, or dict; "
+        f"got {type(event_data).__name__}"
+    )
 
 
 def emit(
@@ -29,12 +46,15 @@ def emit(
 ) -> SessionEvent:
     """把一个 typed session 事件对象提交进 Session 日志。
 
-    ``event_data`` 必须是经 ``@session_event`` 注册的 frozen dataclass 实例;
-    未注册类型由 ``event_type_of`` 抛错(fail-loud,禁止绕词表发射)。
+    ``event_data`` 必须是经 ``@session_event`` 注册的 frozen dataclass 或
+    Pydantic BaseModel 实例;未注册类型由 ``event_type_of`` 抛错(fail-loud,
+    禁止绕词表发射)。
     """
     event_type = event_type_of(event_data)
     visibility = getattr(type(event_data), "_visibility", "model")
-    return session.append(event_type, asdict(event_data), actor=actor, visibility=visibility)
+    return session.append(
+        event_type, _to_jsonable(event_data), actor=actor, visibility=visibility
+    )
 
 
 __all__ = ["emit"]

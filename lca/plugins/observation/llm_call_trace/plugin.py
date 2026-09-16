@@ -1,6 +1,8 @@
 """observation.llm_call_trace —— LLM 调用观察者。
 
 module M5: lca/contracts/observability/observation/m5_event_traces/
+
+Emit 走 :func:`append_catalog_bound` —— Session 单轨（ADR-0186）。
 """
 
 from __future__ import annotations
@@ -10,9 +12,9 @@ from typing import Any
 
 from lca.contracts.observability.observation import LLMCallTrace
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.loop.fact_gateway import publish_ep_bound
+from lca.loop.fact_gateway import append_catalog_bound
+from lca.plugins.events._session_observe import current_session
 
-_EV_LLM_CALL = "observation.llm_call"
 _OBSERVER_ACTOR = "observation"
 
 
@@ -44,11 +46,7 @@ def observe_llm_call(
         success=success,
         occurred_at=_now_iso(),
     )
-    publish_ep_bound(
-        _EV_LLM_CALL,
-        fact.model_dump(mode="json"),
-        actor=_OBSERVER_ACTOR,
-    )
+    append_catalog_bound(fact, session=current_session(), actor=_OBSERVER_ACTOR)
 
 
 @plugin(
@@ -58,7 +56,7 @@ def observe_llm_call(
     layer="L1",
     kind=PluginKind.PROVIDER,
     effects="none",
-    description="LLM call observer —— emit LLMCallTrace fact on each LLM call.",
+    description="LLM call observer —— emit LLMCallTrace fact via Session SSOT.",
 )
 async def setup(ctx: PluginContext, config: Any) -> None:
     del config

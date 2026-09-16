@@ -5,6 +5,7 @@ modules M2 (NodeEnter) + M3 (NodeExit):
   lca/contracts/observability/observation/m3_node_output/
 
 Observer 函数,零 class wrapper;caller 直接调用。
+Emit 走 :func:`append_catalog_bound` —— Session 单轨（ADR-0186）。
 """
 
 from __future__ import annotations
@@ -18,10 +19,9 @@ from lca.contracts.observability.observation import (
     NodeExit,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.loop.fact_gateway import publish_ep_bound
+from lca.loop.fact_gateway import append_catalog_bound
+from lca.plugins.events._session_observe import current_session
 
-_EV_NODE_ENTER = "observation.node_enter"
-_EV_NODE_EXIT = "observation.node_exit"
 _OBSERVER_ACTOR = "observation"
 
 
@@ -33,7 +33,7 @@ def observe_node_enter(
     *,
     run_id: str,
     node_id: str,
-    phase: str,
+    phase: str = "",
     binding: str | None = None,
     parent_node_id: str | None = None,
     sub_graph_id: str | None = None,
@@ -53,18 +53,14 @@ def observe_node_enter(
         entered_at=_now_iso(),
         inputs=inputs or {},
     )
-    publish_ep_bound(
-        _EV_NODE_ENTER,
-        fact.model_dump(mode="json"),
-        actor=_OBSERVER_ACTOR,
-    )
+    append_catalog_bound(fact, session=current_session(), actor=_OBSERVER_ACTOR)
 
 
 def observe_node_exit(
     *,
     run_id: str,
     node_id: str,
-    phase: str,
+    phase: str = "",
     binding: str | None = None,
     parent_node_id: str | None = None,
     sub_graph_id: str | None = None,
@@ -86,11 +82,7 @@ def observe_node_exit(
         exception=exception,
         exited_at=_now_iso(),
     )
-    publish_ep_bound(
-        _EV_NODE_EXIT,
-        fact.model_dump(mode="json"),
-        actor=_OBSERVER_ACTOR,
-    )
+    append_catalog_bound(fact, session=current_session(), actor=_OBSERVER_ACTOR)
 
 
 @plugin(
@@ -100,7 +92,7 @@ def observe_node_exit(
     layer="L1",
     kind=PluginKind.PROVIDER,
     effects="none",
-    description="Node enter/exit observer —— emit NodeEnter / NodeExit fact.",
+    description="Node enter/exit observer —— emit NodeEnter / NodeExit fact via Session SSOT.",
 )
 async def setup(ctx: PluginContext, config: Any) -> None:
     del config

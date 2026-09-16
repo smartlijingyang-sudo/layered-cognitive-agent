@@ -10,7 +10,10 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from lca.contracts.harness.tasks.session import session_event
 
+
+@session_event("observation.node_enter", visibility="audit")
 class NodeEnter(BaseModel):
     """节点进入时的完整现场:identity + input payload + time。
 
@@ -22,7 +25,11 @@ class NodeEnter(BaseModel):
 
     run_id: str
     node_id: str
-    phase: str
+    # LCA lifecycle phase owning the node (``perceive`` / ``think`` /
+    # ``act`` / ``reflect`` / ``remember`` / ``stop``). Derived from
+    # node_id by the kernel; empty string means "phase unknown" (e.g.
+    # ad-hoc test plans that bypass the canonical naming convention).
+    phase: str = ""
     binding: str | None = None
     parent_node_id: str | None = None
     sub_graph_id: str | None = None

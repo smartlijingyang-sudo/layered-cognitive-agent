@@ -4,6 +4,8 @@ Producers: observation.decision_trace, observation.control_trace,
           observation.tool_call_trace, observation.llm_call_trace,
           observation.runtime_bookkeeping
 Consumers: lca-ops trace show --filter kind=..., diagnosis.failure_explainer
+
+每个 trace 都注册为 :func:`session_event`,走 Session 单轨（ADR-0186）。
 """
 
 from __future__ import annotations
@@ -12,7 +14,10 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from lca.contracts.harness.tasks.session import session_event
 
+
+@session_event("observation.decision", visibility="audit")
 class DecisionTrace(BaseModel):
     """决策产生 / 拒绝。"""
 
@@ -30,6 +35,7 @@ class DecisionTrace(BaseModel):
     occurred_at: str
 
 
+@session_event("observation.control", visibility="audit")
 class ControlTrace(BaseModel):
     """控制面事件:allow / deny / stop。"""
 
@@ -45,6 +51,7 @@ class ControlTrace(BaseModel):
     occurred_at: str
 
 
+@session_event("observation.tool_call", visibility="audit")
 class ToolCallTrace(BaseModel):
     """tool 调用 + 结果。"""
 
@@ -61,6 +68,7 @@ class ToolCallTrace(BaseModel):
     occurred_at: str
 
 
+@session_event("observation.llm_call", visibility="audit")
 class LLMCallTrace(BaseModel):
     """LLM 请求 + 响应。"""
 
@@ -78,6 +86,7 @@ class LLMCallTrace(BaseModel):
     occurred_at: str
 
 
+@session_event("observation.reducer_apply", visibility="audit")
 class ReducerApply(BaseModel):
     """reducer apply_* 事件,默认 verbose。"""
 
