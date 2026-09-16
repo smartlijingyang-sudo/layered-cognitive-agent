@@ -128,10 +128,48 @@ def current_bindings_view() -> BindingsView | None:
     return builder.build()
 
 
+_tools_service: ContextVar[object | None] = ContextVar(
+    "lca_runtime_tools_service",
+    default=None,
+)
+
+
+def set_current_tools_service(tools_service: object) -> Token[object | None]:
+    """Bind the per-turn ``ToolsService`` to the runtime plane seam.
+
+    Mirror of :func:`set_capability_bindings`: the kernel reads this
+    ContextVar at the outer plan entry to seed the typed ``tools``
+    port on every plan.  Returns the reset token; the caller MUST
+    reset it.  Re-binding without resetting leaks the previous
+    turn's ToolsService into the next turn — a hard runtime bug, not
+    a silent fall-through.
+    """
+    return _tools_service.set(tools_service)
+
+
+def reset_current_tools_service(token: Token[object | None]) -> None:
+    """Release the per-turn ``ToolsService`` token."""
+    _tools_service.reset(token)
+
+
+def current_tools_service() -> object | None:
+    """Return the active per-turn ``ToolsService``, or ``None``.
+
+    ``None`` means the carrier did not publish a ToolsService for
+    this turn — kernel falls back to a typed-port-missing failure at
+    any node that declares ``tools``.  The kernel never fabricates a
+    default ToolsService; missing = fail loud.
+    """
+    return _tools_service.get()
+
+
 __all__ = [
     "BindingsViewBuilder",
     "current_bindings",
     "current_bindings_view",
+    "current_tools_service",
     "reset_capability_bindings",
+    "reset_current_tools_service",
     "set_capability_bindings",
+    "set_current_tools_service",
 ]

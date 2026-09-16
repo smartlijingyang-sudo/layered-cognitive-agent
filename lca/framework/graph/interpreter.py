@@ -79,6 +79,40 @@ Clock = Callable[[], int]
 """Monotonic millisecond clock. Default is ``time.monotonic_ns // 1_000_000``."""
 
 
+def _port_registry_seed_from_runtime_plane() -> dict[str, Any]:
+    """Read kernel-owned typed ports from the typed ``RuntimePlane``.
+
+    The kernel owns two typed ports that flow through every outer plan:
+
+    - ``tools`` — the per-turn ``ToolsService`` published by the carrier
+      via ``set_current_tools_service``.
+    - ``bindings`` — the per-turn ``BindingsView`` published by the
+      carrier via ``set_capability_bindings``.
+
+    Either may be absent; the kernel only seeds what is bound.  Both
+    lookups are local and idempotent, safe to call at every outer plan
+    entry.  This is the canonical production seam — the
+    ``PlanInterpreterAdapter`` falls back to the same reader after
+    checking ``node_executor_runtime_scope`` for backwards compat with
+    tests that bind a Cordis-style scope directly.
+    """
+    seed: dict[str, Any] = {}
+    try:
+        from lca.infrastructure.runtime_plane.capability_bindings import (
+            current_bindings_view,
+            current_tools_service,
+        )
+    except Exception:
+        return seed
+    tools_service = current_tools_service()
+    if tools_service is not None:
+        seed["tools"] = tools_service
+    bindings_view = current_bindings_view()
+    if bindings_view is not None:
+        seed["bindings"] = bindings_view
+    return seed
+
+
 def _default_clock() -> int:
     return time.monotonic_ns() // 1_000_000
 
@@ -106,8 +140,24 @@ class PlanInterpreter:
         port_registry: PortRegistry | None = None,
         outer_state: Any = None,
         traversal: PlanTraversal | None = None,
+        port_registry_seed: (
+            Mapping[str, Any] | Callable[[], Mapping[str, Any]] | None
+        ) = None,
     ) -> InterpretationResult:
         """Execute ``plan`` and return the typed :class:`InterpretationResult`.
+
+        ``port_registry_seed`` is the canonical seam by which the kernel
+        publishes typed ports (``tools`` / ``bindings``) to every plan
+        it interprets.  Mirrors :meth:`PlanInterpreterAdapter.run`:
+
+        - ``Mapping`` → used directly (test injection).
+        - ``Callable`` → invoked once at outer plan entry.
+        - ``None`` → fall back to the production seam
+          ``RuntimePlane.current_tools_service()`` +
+          ``RuntimePlane.current_bindings_view()``.
+
+        The seed runs **before** the visit loop; kernel-seeded ports
+        are visible to every node that declares them.
 
         When ``traversal`` is provided, the kernel resumes from
         ``traversal.current_id`` instead of starting at the plan's
@@ -117,6 +167,14 @@ class PlanInterpreter:
         if traversal is None:
             traversal = PlanTraversal(plan=plan)
         ports = port_registry or PortRegistry()
+        if port_registry_seed is None:
+            seed = _port_registry_seed_from_runtime_plane()
+        elif callable(port_registry_seed):
+            seed = dict(port_registry_seed())
+        else:
+            seed = dict(port_registry_seed)
+        if seed:
+            ports.set_outer_input(seed)  # type: ignore[arg-type]
         visits: list[VisitRecord] = []
         facts: list = []
         terminal_node = traversal.current_id

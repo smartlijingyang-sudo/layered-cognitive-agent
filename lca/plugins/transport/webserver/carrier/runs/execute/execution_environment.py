@@ -32,7 +32,9 @@ from lca.infrastructure.observability.facade.run.ambit import (
 from lca.infrastructure.runtime_plane.capability_bindings import (
     BindingsViewBuilder,
     reset_capability_bindings,
+    reset_current_tools_service,
     set_capability_bindings,
+    set_current_tools_service,
 )
 from lca.infrastructure.runtime_plane.scope.scope import plane_bindings_scope
 from lca.infrastructure.sandbox.runtime.scope import bind_sandbox_runtime
@@ -200,6 +202,15 @@ class RunExecutionEnvironment:
                         mode=(getattr(session, "mode", "") or "solo").strip() or "solo",
                     )
                 )
+                # ADR-0241 §Consequences R-1 follow-up: publish the
+                # per-turn ToolsService to the typed RuntimePlane so the
+                # v2 driver (PlanInterpreter) can seed the typed ``tools``
+                # port at the outer plan entry.  Mirror of the bindings
+                # ContextVar pattern — both are per-turn typed values
+                # that the kernel reads once at outer-plan entry.
+                tools_token = set_current_tools_service(
+                    require_capability(self._ctx, "tools")
+                )
                 with (
                     run_workspace_scope(session.run_id) as workspace,
                     run_scope(ambit.scope) if ambit.scope is not None else nullcontext(),
@@ -222,6 +233,8 @@ class RunExecutionEnvironment:
             finally:
                 if capability_token is not None:
                     reset_capability_bindings(capability_token)
+                if tools_token is not None:
+                    reset_current_tools_service(tools_token)
                 structlog.contextvars.clear_contextvars()
                 if coordinator_token is not None:
                     reset_current_coordinator(coordinator_token)

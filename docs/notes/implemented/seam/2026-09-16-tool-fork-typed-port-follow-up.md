@@ -88,11 +88,34 @@ uv run mypy lca/framework/graph/strategies/subgraph_run.py lca/framework/graph/a
 
 ## Consequences
 
-ADR-0241 §Consequences 已完整回填(包含 R-1 命中 + 缓解)。关键事实:
+ADR-0241 R-1 follow-up 已实现。
 
-- 本 PR 落地 6 处代码改动 + 11 个测试(7 architecture + 4 runtime)+ 1 处 yaml 防御性对齐,`tests/architecture/` 全集 94 失败 vs 96 baseline(本 PR 净减 2 个无关失败)。
-- e2e 仍未修复 —— R-1 命中:production `RuntimePhaseCapabilities.values` 不含 `tools`(`tools` 由 `lca-tools-service` plugin 经 `ctx.provide("tools", ...)` 提供到 Cordis ctx,**不经过 phase_capabilities**)。kernel seed 机制已就位,但需要新增 `tools_service` 构造参数到 `PlanInterpreterAdapter` + `runtime_bindings.new_tools_service()` 工厂,**触及 capability/SSOT,留独立 follow-up ADR**。
-- 既有的 4 个回归测试(`test_tool_fork_dispatch` / `test_no_runtime_field_theft` / `test_runtime_phase_capabilities` / `test_run_with_tool_use`)全绿。
+**根因重述**:kernel 的 typed-port 投影机制在 ADR-0241 已落地,但**填值动作只发生在测试与旧 `PlanInterpreterAdapter.run` 路径上**。生产 v2 driver(`lca/loop/driver.py::DeclarativeExecution.execute`)绕过 adapter,直接调 `PlanInterpreter.run(plan_obj, outer_state=state)`,不传 `port_registry_seed`。`tools` 由 `lca-tools-service` plugin 经 `ctx.provide("tools", ...)` 提供到 Cordis ctx,不经过 phase_capabilities;`current_bindings_view()` 在生产未填充。
+
+**改动**(5 处):
+
+1. `lca/infrastructure/runtime_plane/capability_bindings.py` — 新增 `set_current_tools_service(token)` / `reset_current_tools_service(token)` / `current_tools_service()`,对称现有 bindings ContextVar 协议(re-binding 不 reset 会跨 turn 泄漏,fail-loud)。
+2. `lca/framework/graph/interpreter.py` — `PlanInterpreter.run` 新增 `port_registry_seed` 参数(对称 `PlanInterpreterAdapter.run` 同一签名)。`port_registry_seed=None` 默认从 `RuntimePlane.current_tools_service()` + `RuntimePlane.current_bindings_view()` 拉取,作为 canonical production seam。
+3. `lca/plugins/transport/webserver/carrier/runs/execute/execution_environment.py::RunExecutionEnvironment.prepare` — 在已有的 `set_capability_bindings(...)` 之后追加 `set_current_tools_service(require_capability(self._ctx, "tools"))`,finally 块配套 `reset_current_tools_service(token)`。同一 task、同一次 enter/exit 边界,ContextVar 在 `prepared.driver.execute` 调用栈上保持 live。
+4. 新增测试 `tests/architecture/test_typed_port_seeding_runtime_plane.py`(4 case)— 锁住 `PlanInterpreter.run` 的三种 seed 输入模式(Mapping / Callable / RuntimePlane default)+ 空 seam 边界。
+5. 新增测试 `tests/runtime/test_runtime_plane_tools.py`(4 case)— 锁住 ContextVar API 契约(default None / set+current / nested reset / 双 reset fail-loud)。
+
+**验证**:
+
+- 新增 8 个测试 + 既有的 4 个回归测试 + 既有的 7 个 typed-port projection 测试 + 23 个 no-runtime-field-theft 测试 + 3 个 phase_capabilities 测试 + 11 个 tool_fork_dispatch 测试全绿。
+- ruff check 全绿。
+- mypy:`lca/framework/graph/interpreter.py` 17 errors(baseline 17,本 PR net 0);`lca/infrastructure/runtime_plane/capability_bindings.py` 0 errors;`lca/plugins/transport/webserver/carrier/runs/execute/execution_environment.py` 0 errors。
+- e2e 端到端:`./scripts/lca-ops runs create --user-text "echo hello via tool"` 在 `tool.fork.dispatch` 节点 `node.end ok 1ms dispatch=terminal in=bindings,tools out=forked_tools`,**typed port `tools` 第一次到达 dispatch 节点**。后续 `think.reason.plan` / `think.reason.render` / `think.history.assemble` 全部 `node.end ok`。
+
+**剩余**:下游 `think.llm.invoke` 节点在新 run 中失败(`NodeExecutor lookup miss: 'think.llm.invoke' not in node_executors`)——这是 *独立 bug*:think subgraph 节点的 executor 注册路径(PR-A 留下的另一条缝),不在本 note 范围。
+
+**关键设计决定**:
+
+- **不修改 `RuntimePhaseCapabilities.with_extra`**:phase_capabilities 是 composition-time 闭集,`with_extra` 语义是"post-composition 一次性 layer per-run 单例"(如 writer)。`tools` 是 per-turn mutable typed reference,放 phase_capabilities 会污染闭集语义。RuntimePlane 是已有的 per-turn typed carrier,职责正确。
+- **不修改 `lca/loop/driver.py`**:PlanInterpreter.run 的 production-seam 默认已经读取 RuntimePlane,无需 v2 driver 显式传 seed。driver 的"传 / 不传 `port_registry_seed`"对称不变。
+- **不修改 `lca/runtime/loop/runtime_loop.py`**:CognitiveRuntime 不持有 Cordis ctx,无法直接读 `tools`。carrier (RunExecutionEnvironment) 是唯一同时持有 ctx + 同 task 内 set ContextVar 的位置。
+- **不新增 Protocol / 不新增 module**:RuntimePlane 已有 ContextVar + token reset 协议范式,mirror `tools_service` 是同协议扩展。
+- **保留 adapter 的 `node_executor_runtime_scope` fallback**:既有 `test_kernel_seeds_typed_ports.py` 4 case + 旧 v1 兼容路径不破坏,adapter 默认 seam 与 interpreter 默认 seam 双轨存在(ranked: RuntimePlane > scope)。
 
 ## Related
 
@@ -103,4 +126,4 @@ ADR-0241 §Consequences 已完整回填(包含 R-1 命中 + 缓解)。关键事�
 - ADR-0235 act.envelope typed-port hygiene
 - 回归 commit `0c7f33a48`(slim-composer PR-A)
 - Note [`../implemented/seam/2026-09-16-dead-reasoner-fallback-close-out.md`](../implemented/seam/2026-09-16-dead-reasoner-fallback-close-out.md) §Consequences 标记的 "第二个 bug,plan yaml 拓扑问题,触及 plan bundle 闭集,需独立 PR"——本 note + ADR-0241 是该 follow-up 的正式化
-- 现场 run:`run_2b2f4548f3e5`(trace `trace_e145f0bb6f8c`,2026-09-16 09:38:22 UTC+8)、`run_92ac56ef97d6`、`run_0095644d4265`、`run_c2bbbd46a20e`(皆同根因,plan 改动未达 framework 闭集)
+- 现场 run:`run_2b2f4548f3e5`(trace `trace_e145f0bb6f8c`,2026-09-16 09:38:22 UTC+8)、`run_92ac56ef97d6`、`run_0095644d4265`、`run_c2bbbd46a20e`(皆同根因,plan 改动未达 framework 闭集);`run_e05ba0d415f7`(本 follow-up 修复后 `tool.fork.dispatch` 节点 ok,验证 typed port `tools` 第一次到达 dispatch)
