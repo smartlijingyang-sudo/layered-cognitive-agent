@@ -19,6 +19,7 @@ from lca.framework.graph.lift.interface import (
     PlanLifter,
     get_plan_lifter,
 )
+from lca.framework.graph.lift.parsers import _to_port_specs
 from lca.framework.graph.lift.validators import (
     _validate_termination,
     validate_predicates,
@@ -29,6 +30,7 @@ __all__ = [
     "DefaultPlanLifter",
     "PlanLifter",
     "_lift_graph_spec_inner",
+    "_to_port_specs",
     "_validate_termination",
     "get_plan_lifter",
     "lift_executable_plan",
