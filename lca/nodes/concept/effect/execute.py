@@ -55,7 +55,11 @@ class EffectExecuteExecutor:
 
     semantic_name: str = "effect.execute"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("envelope",)
+    # ADR-0234 / PR-2: verdict_refs is now a typed-port input — produced
+    # by ``effect.pre_dispatch.envelope_check`` and consumed (passthrough)
+    # here so the subgraph keeps a typed binding for the 5-gate verdict
+    # set without re-checking them at this node.
+    declared_inputs: tuple[PortName, ...] = ("envelope", "verdict_refs")
     # PR-3.8.5 fix1: emit ``receipts`` (list-of-one) so the act subgraph's
     # ``act.join`` typed-boundary node (declared_inputs=("receipts",)) sees
     # the receipt via the kernel port registry. Previously emitted the
@@ -70,7 +74,7 @@ class EffectExecuteExecutor:
     ) -> NodeOutput:
         """effect.execute 入口。
 
-        inputs 端口:envelope (CommandEnvelope)
+        inputs 端口:envelope (CommandEnvelope), verdict_refs (tuple[str, ...])
         outputs 端口:receipts (list[EffectReceipt], length 1)
 
         职责还包括把 Observation 以 ``surface/tool_result`` 追加到 Session。
