@@ -104,12 +104,12 @@ class RegistryRunCommands:
         if session is None:
             _log.warning("run_cancel_rejected", run_id=run_id, reason="run_not_found")
             return RunCommandReceipt(accepted=False, error="run not found")
-        if session.status in (RunLifecycleStatus.COMPLETED, RunLifecycleStatus.FAILED, RunLifecycleStatus.CANCELED):
+        if session.status in (RunLifecycleStatus.COMPLETED, RunLifecycleStatus.FAILED, RunLifecycleStatus.CANCELLED):
             _log.info("run_cancel_noop", run_id=run_id, status=session.status.value)
             return RunCommandReceipt(accepted=True, status=session.status.value)
         prior_status = session.status
         session.cancel_requested = True
-        session.status = RunLifecycleStatus.CANCELED
+        session.status = RunLifecycleStatus.CANCELLED
         if session.task is not None and not session.task.done():
             session.task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -133,7 +133,7 @@ class RegistryRunCommands:
             prior_status=prior_status.value,
             canceled_at_waiting_input=prior_status is RunLifecycleStatus.WAITING_INPUT,
         )
-        return RunCommandReceipt(accepted=True, status=RunLifecycleStatus.CANCELED.value)
+        return RunCommandReceipt(accepted=True, status=RunLifecycleStatus.CANCELLED.value)
 
     async def resume_approval(
         self,
