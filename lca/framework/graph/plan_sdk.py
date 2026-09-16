@@ -415,7 +415,7 @@ def parse_plan_yaml(text: str) -> Plan:
     raw = yaml.safe_load(text)
     if not isinstance(raw, Mapping):
         raise PlanLiftError("plan YAML must be a mapping at the top level")
-return lift_via_interface(dict(raw))
+    return lift_via_interface(dict(raw))
 
 
 __all__ = [
