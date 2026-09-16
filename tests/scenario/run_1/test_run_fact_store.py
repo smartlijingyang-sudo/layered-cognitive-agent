@@ -28,10 +28,8 @@ from lca.contracts.models.observability.journal.journal import (
     TeamRunStarted,
 )
 from lca.infrastructure.observability.events.event.catalog import EVENT_DESCRIPTOR_REGISTRY
-from lca.infrastructure.observability.journal.engine.reducer import (
-    RunStatus,
-    fold_run_state,
-)
+from lca.contracts.observability.registry.status import RunLifecycleStatus
+from lca.infrastructure.observability.journal.engine.reducer import fold_run_state
 
 # ── fold_run_state ───────────────────────────────────────
 
@@ -47,7 +45,7 @@ def _stamped(seq: int, event: object, *, parent_run_id: str | None = None) -> St
 
 def test_fold_empty_events_is_running() -> None:
     state = fold_run_state([])
-    assert state.status == RunStatus.RUNNING
+    assert state.status == RunLifecycleStatus.RUNNING
     assert state.finished_at is None
 
 
@@ -57,7 +55,7 @@ def test_fold_agent_finished_completed() -> None:
         _stamped(2, AgentRunFinished(status="completed", steps=3)),
     ]
     state = fold_run_state(events)
-    assert state.status == RunStatus.COMPLETED
+    assert state.status == RunLifecycleStatus.COMPLETED
     assert state.error is None
 
 
@@ -67,7 +65,7 @@ def test_fold_agent_finished_error() -> None:
         _stamped(2, AgentRunFinished(status="error", error="boom")),
     ]
     state = fold_run_state(events)
-    assert state.status == RunStatus.FAILED
+    assert state.status == RunLifecycleStatus.FAILED
     assert state.error == "boom"
 
 
@@ -78,7 +76,7 @@ def test_fold_team_finished_overrides_agent() -> None:
         _stamped(3, TeamRunFinished(status="error", error="team failed")),
     ]
     state = fold_run_state(events)
-    assert state.status == RunStatus.FAILED
+    assert state.status == RunLifecycleStatus.FAILED
     assert state.error == "team failed"
 
 
@@ -89,7 +87,7 @@ def test_fold_member_agent_finished_ignored() -> None:
         _stamped(2, AgentRunFinished(status="completed"), parent_run_id="root"),
     ]
     state = fold_run_state(events)
-    assert state.status == RunStatus.RUNNING  # 没有根 finish 事件
+    assert state.status == RunLifecycleStatus.RUNNING  # 没有根 finish 事件
 
 
 def test_fold_carrier_runtime_observed_failed() -> None:
@@ -106,7 +104,7 @@ def test_fold_carrier_runtime_observed_failed() -> None:
         ),
     ]
     state = fold_run_state(events)
-    assert state.status == RunStatus.FAILED
+    assert state.status == RunLifecycleStatus.FAILED
     assert state.error == "bad input"
 
 
@@ -125,7 +123,7 @@ def test_fold_carrier_runtime_observed_canceled() -> None:
         ),
     ]
     state = fold_run_state(events)
-    assert state.status == RunStatus.CANCELLED
+    assert state.status == RunLifecycleStatus.CANCELLED
     assert state.error == "canceled"
 
 
@@ -134,7 +132,7 @@ def test_fold_canceled() -> None:
         _stamped(1, AgentRunFinished(status="canceled")),
     ]
     state = fold_run_state(events)
-    assert state.status == RunStatus.CANCELLED
+    assert state.status == RunLifecycleStatus.CANCELLED
 
 
 # ── EventDescriptorRegistry 完整性 ──────────────────────────
