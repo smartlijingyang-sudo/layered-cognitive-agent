@@ -40,8 +40,6 @@ class RunLifecycleStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "canceled"
-    # COMPAT(delete-when: rg "\.CANCELED\b" 生产引用归零, tracking: ADR-0183 PR-11)
-    CANCELED = CANCELLED
     TIMEOUT = "timeout"
 
     @classmethod
