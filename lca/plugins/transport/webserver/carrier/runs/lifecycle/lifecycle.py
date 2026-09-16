@@ -164,7 +164,7 @@ class RunLifecycleCoordinator:
             )
         except asyncio.CancelledError:
             session.cancel_requested = True
-            session.status = RunLifecycleStatus.CANCELED
+            session.status = RunLifecycleStatus.CANCELLED
             emit_kernel_run_cancelled(run_id=session.run_id, trace_id=session.trace_id)
             run_outcome = "cancelled"
             raise
@@ -232,7 +232,7 @@ class RunLifecycleCoordinator:
             success = result.status == TaskStatus.COMPLETED
         except asyncio.CancelledError:
             session.cancel_requested = True
-            session.status = RunLifecycleStatus.CANCELED
+            session.status = RunLifecycleStatus.CANCELLED
             raise
         except Exception as exc:
             _log.exception(
