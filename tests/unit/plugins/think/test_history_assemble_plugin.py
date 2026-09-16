@@ -358,8 +358,7 @@ async def test_system_role_profile_no_longer_falls_back() -> None:
     """PR-B: ``_system_from_role_profile`` was removed — no header + no
     response ⇒ empty system prompt.
 
-    The third-tier ``role_profile`` fallback was retired alongside the
-    ``REASONER_ROLE_PROFILE`` capability in PR-A. ``brain.role_profile``
+    The third-tier ``role_profile`` fallback was retired. ``brain.role_profile``
     is the sole authority and is consumed by ``think.reason.render``,
     which surfaces the rendered prompt through ``response.trace.system_prompt_text``.
     If the writer's request header is empty AND the response port

@@ -21,13 +21,12 @@ late for history.assemble, which prepares the request before
      ``think.reason.render`` one node earlier) — fixes the
      ``system=""`` regression (run_a0cdcd40d8b9)
 
-The prior third tier (``role_profile`` composition) is removed in
-PR-B: ``REASONER_ROLE_PROFILE`` was deleted and the only remaining
-path is ``brain.role_profile`` (consumed by ``think.reason.render``),
-so this node no longer falls back to a runtime-cached profile. If
-both header and response are empty the LLM is dispatched without an
-explicit system prompt — the same behavior the live render path
-produces when ``system_prompt_text`` is empty.
+The prior third tier (``role_profile`` composition) is removed: the
+role identity lives on the Brain (``brain.role_profile``, consumed by
+``think.reason.render``), so this node no longer falls back to a
+runtime-cached profile. If both header and response are empty the LLM
+is dispatched without an explicit system prompt — the same behavior
+the live render path produces when ``system_prompt_text`` is empty.
 
 Canonical shape: hand-written ``@dataclass(frozen=True, slots=True)`` +
 ``@plugin(...)`` carrier, per ADR-0228 D2.
@@ -209,10 +208,9 @@ def _resolve_system(
     fallback chain runs even when fold produced a header object with
     no system field (canonical normalization drops absent strings).
 
-    The prior third tier (``role_profile`` composition) was removed in
-    PR-B: ``REASONER_ROLE_PROFILE`` was deleted and ``brain.role_profile``
-    is the sole authority — consumed by ``think.reason.render`` and
-    reflected via ``response.trace.system_prompt_text``.
+    The prior third tier (``role_profile`` composition) was removed:
+    ``brain.role_profile`` is the sole authority — consumed by
+    ``think.reason.render`` and reflected via ``response.trace.system_prompt_text``.
     """
     from_header = _system_from_header(header)
     if from_header:

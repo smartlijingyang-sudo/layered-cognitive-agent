@@ -79,7 +79,10 @@ class ThinkReasonPlanExecutor:
     id="phase.think.reason.plan",
     Config=None,
     provides=("think::think.reason.plan",),
-    requires=("reasoner",),
+    # PR-C: legacy ``requires=("reasoner",)`` removed — the typed-port
+    # refactor (PR-A) routes ``runtime.brain.reasoner`` instead of a Cordis
+    # capability.
+    requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",

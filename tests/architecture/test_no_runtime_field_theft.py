@@ -43,6 +43,12 @@ ALLOWED_RUNTIME_CARRIERS: frozenset[str] = frozenset(
         "body",
         "memory",
         "perceive_hub",
+        # PR-C: BrainComposer publishes the LLMAdapter onto the per-Agent
+        # runtime scope under ``adapter`` so the typed-port-driven
+        # ``think.llm.invoke`` node can read it without declaring a
+        # producer edge (the plan validator does not model runtime
+        # provides; the kernel seeds the carrier on every visit).
+        "adapter",
     }
 )
 

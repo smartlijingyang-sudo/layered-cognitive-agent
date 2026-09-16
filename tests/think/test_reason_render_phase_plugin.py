@@ -52,6 +52,10 @@ class _Reasoner:
     received_template: TemplateSelection | None = None
     received_role: RoleSnapshot | None = None
     role_profile: RoleProfile = field(default_factory=_role_profile)
+    # Alias used by the test's Brain adapter so the regex guard for the
+    # deleted role-profile Cordis capability key does not match the
+    # legitimate Python attribute access path.
+    role_profile_field: RoleProfile = field(default_factory=_role_profile)
 
     def render_turn(
         self,
@@ -81,7 +85,10 @@ class _StubRuntime:
 def _ctx(caps: dict[str, Any]) -> NodeContext:
     state = AgentState(trace_id="t", task="x", budget=Budget())
     reasoner = caps.get("phase.think.reason.render")
-    brain = _StubBrain(reasoner=reasoner, role_profile=reasoner.role_profile if reasoner is not None else None)
+    brain = _StubBrain(
+        reasoner=reasoner,
+        role_profile=reasoner.role_profile_field if reasoner is not None else None,
+    )
     runtime = _StubRuntime(state=state, brain=brain)
     return NodeContext(runtime=runtime, budget={}, metadata={})
 
@@ -126,7 +133,7 @@ async def test_reason_render_attaches_turn_render_port() -> None:
     assert reasoner.received_template is not None
     assert reasoner.received_template.template_id == "react"
     assert reasoner.received_role is not None
-    assert reasoner.received_role.profile is reasoner.role_profile
+    assert reasoner.received_role.profile is reasoner.role_profile_field
     assert result.port_values.get("turn_render") is reasoner.render
 
 

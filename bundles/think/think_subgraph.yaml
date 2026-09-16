@@ -51,7 +51,6 @@ nodes:
   # Honors ADR-0225 (no per-node max_visits).
   - id: think.budget.gate
     factory: think.budget.gate
-    inputs: [budget]
     outputs: [routing]
     config:
 
@@ -64,7 +63,6 @@ nodes:
   # downstream (consumers never see ``None``).
   - id: think.context.truncate
     factory: think.context.truncate
-    inputs: [budget, context_payload]
     outputs: [compact_receipt]
     config:
 
@@ -104,7 +102,7 @@ nodes:
 
   - id: think.llm.invoke
     factory: llm.invoke
-    inputs: [state, model_visible_request, adapter]
+    inputs: [model_visible_request]
     outputs: [llm_response, usage]
     config:
       # PR-B: typed-port typed-only node. Drives the LLM adapter once
@@ -116,7 +114,7 @@ nodes:
 
   - id: think.llm.persist
     factory: llm.persist
-    inputs: [state, llm_response, writer]
+    inputs: [llm_response]
     outputs: [journaled]
     config:
       # PR-B: typed-port journal side-effect node. Persists the

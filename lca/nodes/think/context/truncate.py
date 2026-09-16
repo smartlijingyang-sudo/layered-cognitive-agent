@@ -66,7 +66,11 @@ class ThinkContextTruncateExecutor:
 
     semantic_name: str = "think.context.truncate"
     region: str = "think"
-    declared_inputs: tuple[PortName, ...] = ("budget", "context_payload")
+    # Runtime-carrier read; matches the convention used by the rest of
+    # the think subgraph (see ``think.budget.gate`` and ``think.decision.
+    # repair``). The plan validator does not model runtime carriers as
+    # port producers, so a typed ``state`` input would fail to lift.
+    declared_inputs: tuple = ()
     declared_outputs: tuple[PortName, ...] = ("compact_receipt",)
 
     async def node_execute(
@@ -88,8 +92,8 @@ class ThinkContextTruncateExecutor:
         ``state`` runtime carrier (``state.budget`` /
         ``state.retrieved_context``), mirroring the prior single node.
         """
-        budget = _resolve_budget(input=input, context=context)
-        payload = _resolve_context_payload(input=input, context=context)
+        budget = _resolve_budget(context=context)
+        payload = _resolve_context_payload(context=context)
         try:
             if not _should_compact(budget):
                 receipt = CompactReceipt.noop(bytes_seen=_payload_byte_size(payload))
@@ -118,44 +122,39 @@ class ThinkContextTruncateExecutor:
         )
 
 
-def _resolve_budget(*, input: NodeInput, context: NodeContext) -> Budget:
-    """Pull the typed ``Budget`` value from the port registry.
+def _resolve_state(*, context: NodeContext) -> object:
+    """Pull ``state`` from the whitelisted runtime carrier.
 
-    Falls back to ``context.runtime.state.budget`` when the orchestrator
-    has not projected ``state.budget`` upstream — the AST guard allows
-    this because the outermost runtime access is ``state`` (a whitelisted
-    runtime carrier), not ``budget`` itself.
+    Runtime-carrier read; matches the convention used by
+    ``think.budget.gate`` and ``think.decision.repair``.
     """
-    value = input.port_values.get("budget")
-    if isinstance(value, Budget):
-        return value
     runtime = getattr(context, "runtime", None)
-    if runtime is not None:
-        state = getattr(runtime, "state", None)
-        if state is not None:
-            candidate = getattr(state, "budget", None)
-            if isinstance(candidate, Budget):
-                return candidate
+    state_obj = getattr(runtime, "state", None) if runtime is not None else None
+    if state_obj is None and runtime is not None and hasattr(runtime, "get"):
+        state_obj = runtime.get("state")
+    return state_obj
+
+
+def _resolve_budget(*, context: NodeContext) -> Budget:
+    """Pull ``Budget`` from ``state.budget`` via the runtime carrier."""
+    state_obj = _resolve_state(context=context)
+    budget = getattr(state_obj, "budget", None) if state_obj is not None else None
+    if isinstance(budget, Budget):
+        return budget
     raise TypeError(
-        "think.context.truncate expects a typed Budget port value (or "
-        "context.runtime.state.budget fallback); got "
-        f"{type(value).__name__ if value is not None else 'None'}"
+        "think.context.truncate expects state.budget via the runtime carrier; got "
+        f"{type(budget).__name__ if budget is not None else 'None'}"
     )
 
 
-def _resolve_context_payload(*, input: NodeInput, context: NodeContext) -> tuple[Any, ...]:
-    """Return the typed ``context_payload`` as a tuple.
+def _resolve_context_payload(*, context: NodeContext) -> tuple[Any, ...]:
+    """Return the retrieved_context payload as an immutable tuple.
 
-    Falls back to ``context.runtime.state.retrieved_context`` when no
-    projector has supplied the port — the whitelisted ``state`` carrier is
-    the same source the prior single ``context.compact`` node read, so the
-    split stays behavior-preserving. Missing on both ⇒ empty payload.
+    Behavior-preserving fallback to ``state.retrieved_context`` (the
+    same source the prior single ``context.compact`` node read).
     """
-    value = input.port_values.get("context_payload")
-    if value is None:
-        runtime = getattr(context, "runtime", None)
-        state = getattr(runtime, "state", None) if runtime is not None else None
-        value = getattr(state, "retrieved_context", None)
+    state_obj = _resolve_state(context=context)
+    value = getattr(state_obj, "retrieved_context", None) if state_obj is not None else None
     if value is None:
         return ()
     if isinstance(value, tuple):

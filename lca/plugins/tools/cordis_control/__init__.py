@@ -10,14 +10,17 @@ profile's generic tool set.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from lca.contracts.capabilities import COMPOSITION_COMPOSE_FACTORY, CORDIS_CONTROL_TOOL_FACTORY
-from lca.contracts.mechanisms.capability.capability import require_capability
+from lca.contracts.capabilities import CORDIS_CONTROL_TOOL_FACTORY
 from lca.contracts.protocols import Tool
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.plugins.composer.composition.cordis_composer import (
+    CordisComposer,
+    build_default_invariant_checker,
+)
 from lca.plugins.tools.cordis_control.tool import (
     ALLOWED_ACTIONS,
     IDENTIFIER,
@@ -28,12 +31,6 @@ from lca.plugins.tools.cordis_control.tool import (
 
 if TYPE_CHECKING:
     from cordis import Context
-
-
-class ComposerFactory(Protocol):
-    """Factory selected by the active profile for one governed Composer."""
-
-    def __call__(self, context: object | None = None, **kwargs: Any) -> object: ...
 
 
 class CordisControlToolFactoryProtocol(Protocol):
@@ -49,18 +46,22 @@ class CordisControlToolFactory:
     The plugin configuration owns the maximum caller grant.  The factory does
     not choose a role, tool set, or Composer implementation; those decisions
     remain respectively with the role capability, the generic tools capability,
-    and ``composition.compose_factory``.
+    and the run-scoped ``CordisComposer`` (constructed inline post-PR-C).
     """
 
     caller_grant: tuple[str, ...]
 
     def create(self, *, scope: Context | None, actor_role: str) -> Tool:
-        """Build the tool from the Composer factory bound in the active scope."""
+        """Build the tool with a ``CordisComposer`` constructed inline.
 
-        composer_factory = cast(
-            "ComposerFactory", require_capability(scope, COMPOSITION_COMPOSE_FACTORY.key)
+        PR-C: the Composer factory is no longer a runtime-bound capability;
+        the cordis_control factory constructs :class:`CordisComposer`
+        directly at the assembly root, with the default invariant checker.
+        """
+
+        composer = CordisComposer(
+            scope, invariant_checker=build_default_invariant_checker()
         )
-        composer = composer_factory(scope)
         return build_cordis_control_tool(
             composer=composer,
             caller_grant=self.caller_grant,

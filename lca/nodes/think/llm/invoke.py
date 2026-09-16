@@ -56,7 +56,10 @@ class LlmInvokeExecutor:
 
     semantic_name: str = "llm.invoke"
     region: str = "think"
-    declared_inputs: tuple[PortName, ...] = ("state", "model_visible_request", "adapter")
+    # Runtime-carrier read for ``state`` + ``adapter`` (the plan validator
+    # does not model runtime carriers as port producers, and the rest
+    # of the think subgraph uses the same pattern).
+    declared_inputs: tuple[PortName, ...] = ("model_visible_request",)
     declared_outputs: tuple[PortName, ...] = ("llm_response", "usage")
 
     async def node_execute(
@@ -79,9 +82,9 @@ class LlmInvokeExecutor:
         non-streaming or identity-less call leaves ``journal.steps``
         empty (regression guarded by ``test_invoke``).
         """
-        state = _resolve_port("state", input=input, context=context)
+        state = _resolve_state(context=context)
         request = _resolve_port("model_visible_request", input=input)
-        adapter = _resolve_port("adapter", input=input)
+        adapter = _resolve_adapter(context=context)
 
         prompt = request.messages[-1]["content"] if request.messages else ""
         history = request.messages[:-1] if len(request.messages) > 1 else []
@@ -137,23 +140,40 @@ def _model_visible_identity(state: Any, request: Any) -> tuple[Any, Any]:
     return cursor, reasoner_prompt
 
 
-def _resolve_port(name: str, *, input: NodeInput, context: NodeContext | None = None) -> Any:
-    """Read a port: typed ``input.port_values`` first, then whitelisted runtime.
+def _resolve_port(name: str, *, input: NodeInput) -> Any:
+    """Read a typed port from ``input.port_values``.
 
-    ``state`` is a kernel-injected runtime carrier, so it resolves via
-    ``context.runtime`` when not supplied as an explicit typed port. The
-    other inputs (``model_visible_request`` / ``adapter``) are typed-only.
+    Typed-port-only read. Runtime-carrier resources (e.g. ``state``)
+    use :func:`_resolve_state` instead so the plan validator sees an
+    empty ``declared_inputs`` set and the kernel-carrier flow remains
+    unimpeded.
     """
     value = input.port_values.get(name)
-    if value is None and name == "state" and context is not None:
-        runtime = getattr(context, "runtime", None)
-        if runtime is not None:
-            value = getattr(runtime, name, None)
-            if value is None and hasattr(runtime, "get"):
-                value = runtime.get(name)
     if value is None:
         raise TypeError(f"llm.invoke: '{name}' port must be supplied via input.port_values")
     return value
+
+
+def _resolve_state(*, context: NodeContext) -> Any:
+    """Pull ``state`` from the whitelisted kernel runtime carrier."""
+    runtime = getattr(context, "runtime", None)
+    state_obj = getattr(runtime, "state", None) if runtime is not None else None
+    if state_obj is None and runtime is not None and hasattr(runtime, "get"):
+        state_obj = runtime.get("state")
+    if state_obj is None:
+        raise TypeError("llm.invoke: 'state' must be supplied via context.runtime")
+    return state_obj
+
+
+def _resolve_adapter(*, context: NodeContext) -> Any:
+    """Pull the LLMAdapter from the runtime carrier (``adapter`` key)."""
+    runtime = getattr(context, "runtime", None)
+    adapter = getattr(runtime, "adapter", None) if runtime is not None else None
+    if adapter is None and runtime is not None and hasattr(runtime, "get"):
+        adapter = runtime.get("adapter")
+    if adapter is None:
+        raise TypeError("llm.invoke: 'adapter' must be supplied via context.runtime")
+    return adapter
 
 
 @plugin(

@@ -71,11 +71,18 @@ def _pick_exceeded_reason(budget: Budget) -> str:
 
 @dataclass(frozen=True, slots=True)
 class ThinkBudgetThresholdGateExecutor:
-    """think.budget.gate 节点: typed ``Budget`` port → ``RoutingDecision``."""
+    """think.budget.gate 节点: ``state.budget`` (runtime carrier) → ``RoutingDecision``.
+
+    PR-B + PR-C: matches the convention of ``think.decision.repair``
+    and other think nodes that read ``state`` through the whitelisted
+    runtime carrier instead of declaring it as a typed input port —
+    the plan validator does not currently understand runtime carriers
+    as port producers, so a typed ``state`` input would fail to lift.
+    """
 
     semantic_name: str = "think.budget.gate"
     region: str = "think"
-    declared_inputs: tuple[PortName, ...] = ("budget",)
+    declared_inputs: tuple = ()
     declared_outputs: tuple[PortName, ...] = ("routing",)
 
     async def node_execute(
@@ -83,16 +90,9 @@ class ThinkBudgetThresholdGateExecutor:
         context: NodeContext,
         input: NodeInput,
     ) -> NodeOutput:
-        """Read typed ``budget`` port; emit the routing decision.
-
-        Primary read is the typed ``budget`` port value. When the
-        orchestrator has not projected ``state.budget`` upstream, the
-        node falls back to ``context.runtime.state.budget`` — the
-        AST guard allows this because the outermost runtime access is
-        ``state`` (a whitelisted runtime carrier), not ``budget``
-        itself.
-        """
-        budget = _resolve_budget(input=input, context=context)
+        """Read ``state.budget`` via the runtime carrier; emit the routing decision."""
+        del input  # state arrives via the runtime carrier
+        budget = _resolve_budget(context=context)
         return NodeOutput(port_values={"routing": _decide(budget)})
 
 
@@ -113,27 +113,23 @@ def _decide(budget: Budget) -> RoutingDecision:
     )
 
 
-def _resolve_budget(*, input: NodeInput, context: NodeContext) -> Budget:
-    """Pull the typed ``Budget`` value from the port registry.
+def _resolve_budget(*, context: NodeContext) -> Budget:
+    """Pull ``state.budget`` from the whitelisted runtime carrier.
 
-    Falls back to ``context.runtime.state.budget`` when the orchestrator
-    has not projected ``state.budget`` upstream — the AST guard allows
-    this because the outermost runtime access is ``state`` (a whitelisted
-    runtime carrier), not ``budget`` itself.
+    Runtime-carrier read; no typed port — matches the convention used
+    by ``think.decision.repair`` and the rest of the think subgraph.
+    The plan validator treats runtime carriers as always-available.
     """
-    value = input.port_values.get("budget")
-    if isinstance(value, Budget):
-        return value
     runtime = getattr(context, "runtime", None)
-    if runtime is not None:
-        state = getattr(runtime, "state", None)
-        candidate = getattr(state, "budget", None) if state is not None else None
-        if isinstance(candidate, Budget):
-            return candidate
+    state_obj = getattr(runtime, "state", None) if runtime is not None else None
+    if state_obj is None and runtime is not None and hasattr(runtime, "get"):
+        state_obj = runtime.get("state")
+    budget = getattr(state_obj, "budget", None) if state_obj is not None else None
+    if isinstance(budget, Budget):
+        return budget
     raise TypeError(
-        "think.budget.gate expects a typed Budget port value (or "
-        "context.runtime.state.budget fallback); got "
-        f"{type(value).__name__ if value is not None else 'None'}"
+        "think.budget.gate expects state.budget via the runtime carrier; got "
+        f"{type(budget).__name__ if budget is not None else 'None'}"
     )
 
 

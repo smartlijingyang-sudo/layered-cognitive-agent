@@ -1,12 +1,4 @@
 entries:
-- id: lca-composition-invariant-default
-  name: lca_composition_invariant_default
-  $module: lca.plugins.journal.composition.invariant_seam
-  config: {}
-- id: lca-composer-provider
-  name: lca_composer_provider
-  $module: lca.plugins.think.composition.provider_provider
-  config: {}
 - id: lca-role-cordis-creator
   name: lca_role_cordis_creator
   $module: lca.plugins.roles.cordis_creator

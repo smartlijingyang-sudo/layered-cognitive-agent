@@ -3,9 +3,9 @@
 Reads ``LLM_API_KEY`` / ``LLM_BASE_URL`` / ``LLM_MODEL`` from process env
 (via :func:`llm_credentials`, BOOTSTRAP-prefixed ``LLM_``) and produces a
 configured :class:`LLMAdapter` through :class:`ProductionLLMResolver`.
-The adapter is published as ``llm_adapter`` for the downstream
-``phase.think.reasoner.compose`` plugin (and any other consumer that needs
-a runtime LLM instance).
+The adapter is published as ``llm_adapter`` for downstream consumers
+(the typed ``think.llm.invoke`` node and the legacy primitive
+``llm_call`` path).
 
 ``llm_resolver`` capability seam 已被本仓库的 think-subgraph 迁移退役,
 本 plugin 不重新声明这条 requires。

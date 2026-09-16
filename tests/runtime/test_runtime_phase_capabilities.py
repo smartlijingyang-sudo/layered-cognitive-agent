@@ -15,7 +15,6 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-
 from lca.contracts.protocols.act.effect.handler import EffectHandlerRegistry
 from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyStore
 from lca.contracts.protocols.runtime.runtime.composition import (

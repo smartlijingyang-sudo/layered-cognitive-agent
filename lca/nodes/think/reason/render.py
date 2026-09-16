@@ -7,9 +7,9 @@ think.reason inner_graph 第 2 节点 plugin:把 compat-era ``(state, plan)``
 ``concept.prompt.render`` 图,这里只是 inner_graph 的过渡适配,被 P5
 ``agent.reasoning.turn`` 取代。
 
-``requires=("reasoner", "reasoner.role_profile")``：role 从
-``context.runtime.brain.role_profile`` 读，不再从
-``PromptReasoner.role_profile`` 字段读（eng/retire-v1-reasoner-sandbox）。
+``requires``(无 Cordis capability 读):role 从
+``context.runtime.brain.role_profile`` 读,不再从
+``PromptReasoner.role_profile`` 字段读(eng/retire-v1-reasoner-sandbox)。
 """
 
 from __future__ import annotations
@@ -81,11 +81,12 @@ def _resolve_role_profile(runtime: object) -> object | None:
     """Read ``role_profile`` off ``runtime.brain`` (typed Brain attribute).
 
     PromptReasoner no longer owns RoleProfile (eng/retire-v1-reasoner-sandbox);
-    ``phase.think.role_profile`` provides the capability and the Brain Protocol
-    exposes it as a typed attribute. This adapter reads it via the Brain
-    attribute, which is the typed single-step access path. Falls back to the
-    reasoner's own ``role_profile`` field when the brain is not wired or when
-    Brain is not a typed instance (compat path for older reasoner stubs).
+    the Brain Protocol exposes it as a typed ``brain.role_profile`` attribute,
+    populated at AgentSpec composition time. This adapter reads it via the
+    Brain attribute, which is the typed single-step access path. Falls back
+    to the reasoner's own ``role_profile`` field when the brain is not wired
+    or when Brain is not a typed instance (compat path for older reasoner
+    stubs).
     """
     brain = getattr(runtime, "brain", None)
     if brain is not None:
@@ -156,7 +157,10 @@ class ThinkReasonRenderExecutor:
     id="phase.think.reason.render",
     Config=None,
     provides=("think::think.reason.render",),
-    requires=("reasoner", "reasoner.role_profile"),
+    # PR-C: legacy Cordis requires removed —
+    # PR-A routes via ``runtime.brain.reasoner`` and
+    # ``runtime.brain.role_profile`` (typed Protocol access), no Cordis seam.
+    requires=(),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",
@@ -176,7 +180,10 @@ class ThinkReasonRenderExecutor:
         ),
     ),
     ownership=OwnershipDeclaration(
-        reads=("plugin.serve", "reasoner", "reasoner.role_profile"),
+        # PR-C: the legacy Cordis capability reads were dropped; the node
+        # reads ``runtime.brain.reasoner`` and ``runtime.brain.role_profile``
+        # (typed Protocol access).
+        reads=("plugin.serve",),
         emits=("plugin.served",),
         state_mutation="forbidden",
     ),

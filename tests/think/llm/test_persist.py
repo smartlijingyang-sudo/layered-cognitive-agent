@@ -2,12 +2,14 @@
 
 Verifies the typed ``llm.persist`` node owns only the journal-write
 side-effect of the LLM turn. Drives a ``RunSessionWriterProtocol``
-mock and asserts that:
+mock (passed via the whitelisted runtime carrier, like every other
+think subgraph node) and asserts that:
 
 1. the assistant row + one ``log/tool_call`` row per call are appended
 2. the node never calls the LLM adapter (no adapter port in scope)
 3. the typed-port inputs are required
 4. the typed ``journaled`` boolean port reflects the write
+5. ``state.step`` drives the writer rows via the runtime carrier
 """
 
 from __future__ import annotations
@@ -30,11 +32,22 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
 from lca.nodes.think.llm.persist import LlmPersistExecutor
 
 
+class _RuntimeCarrier(dict):
+    def __getattr__(self, name: str) -> object:
+        return self.get(name)
+
+
 def _state(step: int = 1) -> AgentState:
-    """``AgentState`` carrying ``step`` (persist derives turn/step from it)."""
     state = AgentState(trace_id="trace-llm-persist", task="", budget=Budget())
     state.step = step
     return state
+
+
+def _ctx(state: AgentState, writer: Any | None = None) -> NodeContext:
+    runtime = _RuntimeCarrier(state=state)
+    if writer is not None:
+        runtime["writer"] = writer
+    return NodeContext(runtime=runtime, budget={}, metadata={})
 
 
 @dataclass
@@ -64,11 +77,6 @@ class _FakeWriter:
         return f"ref-tool-{self.tool_call_calls}"
 
 
-def _ctx() -> NodeContext:
-    """Persist is typed-only — never reads runtime."""
-    return NodeContext(runtime={}, budget={}, metadata={})
-
-
 def _response(
     *,
     text: str = "hello",
@@ -86,14 +94,8 @@ async def test_persist_writes_assistant_message_only() -> None:
     response = _response(text="hello", usage=TokenUsage(prompt_tokens=1, completion_tokens=2))
 
     output = await executor.node_execute(
-        _ctx(),
-        NodeInput(
-            port_values={
-                "state": _state(3),
-                "llm_response": response,
-                "writer": writer,
-            }
-        ),
+        _ctx(_state(step=3), writer=writer),
+        NodeInput(port_values={"llm_response": response}),
     )
 
     assert output.port_values == {"journaled": True}
@@ -117,32 +119,17 @@ async def test_persist_writes_one_tool_call_row_per_call() -> None:
     response = _response(
         text="",
         tool_calls=(
-            NativeToolCall(
-                call_id="call-1",
-                name="search",
-                arguments={"q": "lc"},
-            ),
-            NativeToolCall(
-                call_id="call-2",
-                name="write",
-                arguments={"path": "out/x"},
-            ),
+            NativeToolCall(call_id="call-1", name="search", arguments={"q": "lc"}),
+            NativeToolCall(call_id="call-2", name="write", arguments={"path": "out/x"}),
         ),
     )
 
     output = await executor.node_execute(
-        _ctx(),
-        NodeInput(
-            port_values={
-                "state": _state(7),
-                "llm_response": response,
-                "writer": writer,
-            }
-        ),
+        _ctx(_state(step=7), writer=writer),
+        NodeInput(port_values={"llm_response": response}),
     )
 
     assert output.port_values == {"journaled": True}
-    # 1 assistant row + 2 tool_call rows
     assert writer.append_calls == 1
     assert writer.tool_call_calls == 2
     methods = [c.method for c in writer.calls]
@@ -156,7 +143,6 @@ async def test_persist_writes_one_tool_call_row_per_call() -> None:
     assert tool_rows[0].kwargs["name"] == "search"
     assert tool_rows[1].kwargs["call_id"] == "call-2"
     assert tool_rows[1].kwargs["name"] == "write"
-    # Assistant row carries tool_calls array so the projection sees both.
     assistant_row = writer.calls[0]
     assert assistant_row.kwargs["tool_calls"] is not None
     assert len(assistant_row.kwargs["tool_calls"]) == 2
@@ -164,19 +150,11 @@ async def test_persist_writes_one_tool_call_row_per_call() -> None:
 
 @pytest.mark.asyncio
 async def test_persist_does_not_call_adapter() -> None:
-    """PR-B invariant: ``persist`` owns only the writer — no adapter in scope.
-
-    The node declares ``adapter`` outside its ``declared_inputs`` tuple
-    and never imports ``LLMAdapter``. A dummy adapter-like object in
-    the test fixture must remain untouched.
-    """
+    """PR-B invariant: ``persist`` owns only the writer — no adapter in scope."""
     executor = LlmPersistExecutor()
     writer = _FakeWriter()
     response = _response()
 
-    # A sentinel "adapter" placed in port_values but NOT declared by
-    # the node. The node must not read it (the typed-port contract
-    # only consumes declared inputs).
     sentinel_called = {"value": False}
 
     class _AdapterSentinel:
@@ -185,12 +163,10 @@ async def test_persist_does_not_call_adapter() -> None:
             yield None  # pragma: no cover
 
     await executor.node_execute(
-        _ctx(),
+        _ctx(_state(step=1), writer=writer),
         NodeInput(
             port_values={
-                "state": _state(1),
                 "llm_response": response,
-                "writer": writer,
                 "adapter": _AdapterSentinel(),
             }
         ),
@@ -202,17 +178,12 @@ async def test_persist_does_not_call_adapter() -> None:
 
 @pytest.mark.asyncio
 async def test_persist_missing_writer_raises() -> None:
-    """``writer`` is a typed-only port; missing ⇒ TypeError."""
+    """``writer`` not on the runtime carrier ⇒ TypeError (fail-loud)."""
     executor = LlmPersistExecutor()
     with pytest.raises(TypeError, match="writer"):
         await executor.node_execute(
-            _ctx(),
-            NodeInput(
-                port_values={
-                    "state": _state(1),
-                    "llm_response": _response(),
-                }
-            ),
+            _ctx(_state(step=1)),  # no writer
+            NodeInput(port_values={"llm_response": _response()}),
         )
 
 
@@ -220,81 +191,43 @@ async def test_persist_missing_writer_raises() -> None:
 async def test_persist_missing_response_raises() -> None:
     """``llm_response`` is a typed-only port; missing ⇒ TypeError."""
     executor = LlmPersistExecutor()
+    writer = _FakeWriter()
     with pytest.raises(TypeError, match="llm_response"):
         await executor.node_execute(
-            _ctx(),
-            NodeInput(
-                port_values={
-                    "state": _state(1),
-                    "writer": _FakeWriter(),
-                }
-            ),
+            _ctx(_state(step=1), writer=writer),
+            NodeInput(port_values={}),
         )
 
 
 @pytest.mark.asyncio
-async def test_persist_missing_state_raises() -> None:
-    """``state`` is a required carrier; missing (typed port + runtime) ⇒ TypeError."""
+async def test_persist_no_state_in_runtime_raises() -> None:
+    """No ``state`` on the runtime carrier ⇒ TypeError (fail-loud)."""
     executor = LlmPersistExecutor()
     with pytest.raises(TypeError, match="state"):
         await executor.node_execute(
-            _ctx(),
-            NodeInput(
-                port_values={
-                    "llm_response": _response(),
-                    "writer": _FakeWriter(),
-                }
-            ),
+            NodeContext(runtime={}, budget={}, metadata={}),
+            NodeInput(port_values={}),
         )
 
 
 @pytest.mark.asyncio
-async def test_persist_resolves_state_from_runtime_carrier() -> None:
-    """``state`` absent from typed ports ⇒ resolved via whitelisted runtime carrier."""
+async def test_persist_step_from_state_carrier() -> None:
+    """``state.step`` (runtime carrier) drives the writer row turn/step."""
     executor = LlmPersistExecutor()
     writer = _FakeWriter()
-    ctx = NodeContext(runtime={"state": _state(4)}, budget={}, metadata={})
     await executor.node_execute(
-        ctx,
-        NodeInput(
-            port_values={
-                "llm_response": _response(),
-                "writer": writer,
-            }
-        ),
+        _ctx(_state(step=4), writer=writer),
+        NodeInput(port_values={"llm_response": _response()}),
     )
     assert writer.calls[0].kwargs["turn"] == 4
     assert writer.calls[0].kwargs["step"] == 4
 
 
 @pytest.mark.asyncio
-async def test_persist_is_idempotent() -> None:
-    """Same inputs ⇒ identical writer calls (C9)."""
-    executor = LlmPersistExecutor()
-    response = _response(text="ok")
-    port_values = {
-        "state": _state(2),
-        "llm_response": response,
-        "writer": _FakeWriter(),
-    }
-
-    out_a = await executor.node_execute(_ctx(), NodeInput(port_values=port_values))
-    out_b = await executor.node_execute(_ctx(), NodeInput(port_values=port_values))
-
-    assert out_a.port_values == out_b.port_values == {"journaled": True}
-
-
-@pytest.mark.asyncio
 async def test_persist_does_not_commit_step_tool_call_record(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Single-owner guard (migrated from pre-split ``test_dispatch_llm``).
-
-    ``step.tool_call.record`` has exactly one producer: the body executor
-    that starts the invocation. The persist node writes the conversation
-    rows only — a second emit here double-counts
-    ``metrics_projection.tool_call_count``.
-    """
+    """Single-owner guard: persist must not emit ``step.tool_call.record``."""
     import lca.loop.commit.tool_journal as tool_journal
 
     calls: list[dict[str, Any]] = []
@@ -306,10 +239,8 @@ async def test_persist_does_not_commit_step_tool_call_record(
         tool_calls=(NativeToolCall(call_id="call-1", name="echo", arguments={"msg": "x"}),)
     )
     await executor.node_execute(
-        _ctx(),
-        NodeInput(
-            port_values={"state": _state(4), "llm_response": response, "writer": writer}
-        ),
+        _ctx(_state(step=4), writer=writer),
+        NodeInput(port_values={"llm_response": response}),
     )
 
     assert calls == [], f"persist must not commit step.tool_call.record: {calls!r}"
@@ -327,3 +258,21 @@ def test_persist_module_has_no_tool_journal_commit_reference() -> None:
         "persist re-gained a second step.tool_call.record producer; the body "
         "executor is the single owner"
     )
+
+
+@pytest.mark.asyncio
+async def test_persist_is_idempotent() -> None:
+    """Same ``state`` + inputs ⇒ identical writer calls (C9)."""
+    executor = LlmPersistExecutor()
+    state = _state(step=2)
+    writer = _FakeWriter()
+    port_values = {"llm_response": _response(text="ok")}
+
+    out_a = await executor.node_execute(
+        _ctx(state, writer=writer), NodeInput(port_values=port_values)
+    )
+    out_b = await executor.node_execute(
+        _ctx(state, writer=writer), NodeInput(port_values=port_values)
+    )
+
+    assert out_a.port_values == out_b.port_values == {"journaled": True}

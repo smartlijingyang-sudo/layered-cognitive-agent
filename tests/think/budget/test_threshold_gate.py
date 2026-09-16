@@ -1,10 +1,10 @@
 """Tests for phase.think.budget.gate plugin (PR-B typed-port rewrite).
 
-Verifies the typed ``budget.gate`` node that reads a typed ``Budget``
-from the upstream port and emits a ``RoutingDecision`` typed port
-whose ``next_node`` steers the think waterfall either to
-``terminal.commit`` (cap tripped) or ``think.context.truncate``
-(under cap). Honors ADR-0225 (no per-node ``max_visits``).
+Verifies the typed ``budget.gate`` node that reads ``state.budget`` via
+the whitelisted kernel runtime carrier and emits a ``RoutingDecision``
+typed port whose ``next_node`` steers the think waterfall either to
+``terminal.commit`` (cap tripped) or ``think.context.truncate`` (under
+cap). Honors ADR-0225 (no per-node ``max_visits``).
 
 Each of the four resources (``steps`` / ``tokens`` / ``cost_usd`` /
 ``wall_clock_seconds``) is exercised in both under- and over-cap
@@ -19,7 +19,7 @@ import pytest
 
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.ids.ids import utc_now
-from lca.contracts.models.core.state.state import Budget
+from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -28,14 +28,16 @@ from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.nodes.think.budget.threshold_gate import ThinkBudgetThresholdGateExecutor
 
 
-def _ctx() -> NodeContext:
-    """Budget gate reads only the typed ``budget`` port; runtime is empty.
+class _RuntimeCarrier(dict):
+    """Dict that also exposes attributes (the kernel runtime carrier shape)."""
 
-    Tests pass the typed ``budget`` port explicitly; the node also
-    falls back to ``context.runtime.state.budget`` when the port is
-    absent (kernel-injected ``state`` carrier).
-    """
-    return NodeContext(runtime={}, budget={}, metadata={})
+    def __getattr__(self, name: str) -> object:
+        return self.get(name)
+
+
+def _ctx(state: AgentState) -> NodeContext:
+    """The kernel runtime carrier carries ``state``; budget.gate reads it."""
+    return NodeContext(runtime=_RuntimeCarrier(state=state), budget={}, metadata={})
 
 
 def _budget(
@@ -61,15 +63,16 @@ def _budget(
     )
 
 
+def _state_with(budget: Budget) -> AgentState:
+    state = AgentState(trace_id="t-gate", task="", budget=budget)
+    return state
+
+
 @pytest.mark.asyncio
 async def test_gate_under_all_caps_routes_to_context_truncate() -> None:
     """Under caps ⇒ continue to ``think.context.truncate`` (the truncate node)."""
     executor = ThinkBudgetThresholdGateExecutor()
-    budget = _budget()
-    output = await executor.node_execute(
-        _ctx(),
-        NodeInput(port_values={"budget": budget}),
-    )
+    output = await executor.node_execute(_ctx(_state_with(_budget())), NodeInput(port_values={}))
     routing: RoutingDecision = output.port_values["routing"]
     assert routing.next_node == "think.context.truncate"
     assert routing.should_terminate is False
@@ -81,10 +84,8 @@ async def test_gate_under_all_caps_routes_to_context_truncate() -> None:
 async def test_gate_steps_exceeded_routes_to_terminal_commit() -> None:
     """``max_steps`` exceeded ⇒ stop, hint ``budget_exceeded_steps``."""
     executor = ThinkBudgetThresholdGateExecutor()
-    budget = _budget(max_steps=3, used_steps=4)
     output = await executor.node_execute(
-        _ctx(),
-        NodeInput(port_values={"budget": budget}),
+        _ctx(_state_with(_budget(max_steps=3, used_steps=4))), NodeInput(port_values={})
     )
     routing: RoutingDecision = output.port_values["routing"]
     assert routing.next_node == "terminal.commit"
@@ -97,10 +98,8 @@ async def test_gate_steps_exceeded_routes_to_terminal_commit() -> None:
 async def test_gate_tokens_exceeded_routes_to_terminal_commit() -> None:
     """``max_tokens`` exceeded ⇒ stop, hint ``budget_exceeded_tokens``."""
     executor = ThinkBudgetThresholdGateExecutor()
-    budget = _budget(max_tokens=100, used_tokens=101)
     output = await executor.node_execute(
-        _ctx(),
-        NodeInput(port_values={"budget": budget}),
+        _ctx(_state_with(_budget(max_tokens=100, used_tokens=101))), NodeInput(port_values={})
     )
     routing: RoutingDecision = output.port_values["routing"]
     assert routing.next_node == "terminal.commit"
@@ -112,10 +111,8 @@ async def test_gate_tokens_exceeded_routes_to_terminal_commit() -> None:
 async def test_gate_cost_exceeded_routes_to_terminal_commit() -> None:
     """``max_cost_usd`` exceeded ⇒ stop, hint ``budget_exceeded_cost_usd``."""
     executor = ThinkBudgetThresholdGateExecutor()
-    budget = _budget(max_cost_usd=1.0, used_cost_usd=1.5)
     output = await executor.node_execute(
-        _ctx(),
-        NodeInput(port_values={"budget": budget}),
+        _ctx(_state_with(_budget(max_cost_usd=1.0, used_cost_usd=1.5))), NodeInput(port_values={})
     )
     routing: RoutingDecision = output.port_values["routing"]
     assert routing.next_node == "terminal.commit"
@@ -134,10 +131,9 @@ async def test_gate_wall_clock_exceeded_routes_to_terminal_commit() -> None:
     """
     executor = ThinkBudgetThresholdGateExecutor()
     old_started = utc_now() - timedelta(seconds=400)
-    budget = _budget(max_wall_clock_seconds=300.0, started_at=old_started)
     output = await executor.node_execute(
-        _ctx(),
-        NodeInput(port_values={"budget": budget}),
+        _ctx(_state_with(_budget(max_wall_clock_seconds=300.0, started_at=old_started))),
+        NodeInput(port_values={}),
     )
     routing: RoutingDecision = output.port_values["routing"]
     assert routing.next_node == "terminal.commit"
@@ -149,15 +145,9 @@ async def test_gate_wall_clock_exceeded_routes_to_terminal_commit() -> None:
 async def test_gate_declaration_order_steps_wins_over_tokens() -> None:
     """When multiple caps trip on the same turn, ``steps`` wins the hint."""
     executor = ThinkBudgetThresholdGateExecutor()
-    budget = _budget(
-        max_steps=1,
-        used_steps=2,
-        max_tokens=10,
-        used_tokens=20,
-    )
     output = await executor.node_execute(
-        _ctx(),
-        NodeInput(port_values={"budget": budget}),
+        _ctx(_state_with(_budget(max_steps=1, used_steps=2, max_tokens=10, used_tokens=20))),
+        NodeInput(port_values={}),
     )
     routing: RoutingDecision = output.port_values["routing"]
     assert routing.next_hint == "budget_exceeded_steps"
@@ -167,50 +157,37 @@ async def test_gate_declaration_order_steps_wins_over_tokens() -> None:
 async def test_gate_declaration_order_tokens_wins_over_cost() -> None:
     """``tokens`` beats ``cost_usd`` in the declaration order."""
     executor = ThinkBudgetThresholdGateExecutor()
-    budget = _budget(
-        max_tokens=10,
-        used_tokens=20,
-        max_cost_usd=1.0,
-        used_cost_usd=1.5,
-    )
     output = await executor.node_execute(
-        _ctx(),
-        NodeInput(port_values={"budget": budget}),
+        _ctx(_state_with(_budget(max_tokens=10, used_tokens=20, max_cost_usd=1.0, used_cost_usd=1.5))),
+        NodeInput(port_values={}),
     )
     routing: RoutingDecision = output.port_values["routing"]
     assert routing.next_hint == "budget_exceeded_tokens"
 
 
 @pytest.mark.asyncio
-async def test_gate_missing_budget_port_raises() -> None:
-    """``budget`` is a typed-only port; missing ⇒ TypeError."""
+async def test_gate_no_state_in_runtime_raises() -> None:
+    """No ``state`` on the runtime carrier ⇒ TypeError (fail-loud)."""
     executor = ThinkBudgetThresholdGateExecutor()
-    with pytest.raises(TypeError, match="budget"):
-        await executor.node_execute(
-            _ctx(),
-            NodeInput(port_values={}),
-        )
+    with pytest.raises(TypeError, match="state"):
+        await executor.node_execute(NodeContext(runtime={}, budget={}, metadata={}), NodeInput(port_values={}))
 
 
 @pytest.mark.asyncio
-async def test_gate_wrong_budget_type_raises() -> None:
-    """Wrong-type ``budget`` port value ⇒ TypeError (fail-loud, no silent pass)."""
+async def test_gate_state_without_budget_raises() -> None:
+    """``state`` present but missing ``.budget`` ⇒ TypeError (fail-loud)."""
     executor = ThinkBudgetThresholdGateExecutor()
-    with pytest.raises(TypeError, match="Budget"):
-        await executor.node_execute(
-            _ctx(),
-            NodeInput(port_values={"budget": object()}),
-        )
+    bad_state = AgentState(trace_id="t", task="", budget=Budget())  # default Budget is empty-ish
+    # override to an invalid type
+    object.__setattr__(bad_state, "budget", object())  # type: ignore[attr-defined]
+    with pytest.raises(TypeError, match="budget"):
+        await executor.node_execute(_ctx(bad_state), NodeInput(port_values={}))
 
 
 @pytest.mark.asyncio
 async def test_gate_is_idempotent() -> None:
-    """Same ``budget`` ⇒ same routing across repeated calls (C9)."""
-    budget = _budget(max_tokens=50, used_tokens=10, max_steps=2, used_steps=1)
-    out_a = await ThinkBudgetThresholdGateExecutor().node_execute(
-        _ctx(), NodeInput(port_values={"budget": budget})
-    )
-    out_b = await ThinkBudgetThresholdGateExecutor().node_execute(
-        _ctx(), NodeInput(port_values={"budget": budget})
-    )
+    """Same ``state.budget`` ⇒ same routing across repeated calls (C9)."""
+    state = _state_with(_budget(max_tokens=50, used_tokens=10, max_steps=2, used_steps=1))
+    out_a = await ThinkBudgetThresholdGateExecutor().node_execute(_ctx(state), NodeInput(port_values={}))
+    out_b = await ThinkBudgetThresholdGateExecutor().node_execute(_ctx(state), NodeInput(port_values={}))
     assert out_a.port_values["routing"] == out_b.port_values["routing"]

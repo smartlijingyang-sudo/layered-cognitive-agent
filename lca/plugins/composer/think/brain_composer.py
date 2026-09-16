@@ -43,6 +43,17 @@ class BrainComposer:
         brain = resolve_brain(request.spec, llm, scope=scope)
         if request.decision_gate is not None and hasattr(brain, "with_gate"):
             brain = brain.with_gate(request.decision_gate)
+        # PR-C: the deleted reasoner-composer plugin used to publish
+        # ``reasoner`` and ``llm_adapter`` capabilities at boot. The typed
+        # think nodes (``think.llm.invoke``, ``think.llm.persist``,
+        # ``think.budget.gate``, ``think.context.truncate``) now read
+        # ``state``, ``writer``, and ``adapter`` from the whitelisted
+        # kernel runtime carrier; the kernel seeds the carrier on every
+        # node visit, so BrainComposer does not need to publish anything.
+        # The primitive ``llm_call`` path resolves ``llm_adapter`` via the
+        # same runtime carrier (``runtime.get("llm_adapter")``) so the
+        # historical key remains available through the kernel's existing
+        # per-run carrier wiring.
         return AgentGraphContribution(
             brain=brain,
             body=None,

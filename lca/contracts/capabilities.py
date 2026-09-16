@@ -209,11 +209,6 @@ catalog themselves, so a deployment may replace role ownership without changing
 Gateway mode assembly.
 """
 
-COMPOSITION_INVARIANT_CHECKER = Capability[object](
-    "composition.invariant_checker", cardinality="one"
-)
-"""Profile-selected invariant checker used by CordisComposer mount operations."""
-
 MEMORY_WRITE_POLICY = Capability[object]("memory.write_policy", cardinality="one")
 """Profile-selected admission policy for writes to a MemorySystem."""
 
@@ -337,15 +332,7 @@ ACT_EXECUTION_SPACE = Capability[object]("act.execution_space", cardinality="one
 LLM_RESOLVER = Capability[object]("llm_resolver", cardinality="one")
 SAFE_EXECUTOR_SIMPLE = Capability[object]("safe_executor.simple", cardinality="factory")
 REASONER_PROMPT = Capability[object]("reasoner.prompt", cardinality="factory")
-REASONER_ROLE_PROFILE = Capability[object]("reasoner.role_profile", cardinality="one")
-"""Profile-selected ``RoleProfile`` consumed by ``phase.think.reasoner.compose``.
 
-The inner think subgraph reuses a single ``PromptReasoner`` instance across
-``plan`` / ``render`` / ``complete`` reason nodes, so the role identity
-(role / goal / backstory / tool permission manifest) must be resolved once
-at boot and provided as a typed capability — never hard-coded inside the
-reasoner provider.
-"""
 BRAIN_PROMPT_CATALOG_FACTORY = Capability[object](
     "brain_prompt_catalog_factory", cardinality="factory"
 )
@@ -361,17 +348,6 @@ CRITIC_SIMPLE = Capability[object]("critic.simple", cardinality="factory")
 JOURNAL_STORE = Capability[object]("journal_store", cardinality="factory")
 TOOLS_COMPOSE_SERVICE = Capability[object]("tools.compose_service", cardinality="factory")
 TRANSPORT_COMPOSE_SERVICE = Capability[object]("transport.compose_service", cardinality="factory")
-
-# ── Creator (§13.3) capability keys ────────────────────────────────
-#
-# 单进程内「群 Composition」组装者的命名工厂。它不参与 AgentGraph/TeamGraph
-# 的计划绑定，因此独立于 ``composer.*`` 图组合器 capability 命名空间；Tier-2
-# provider 挂载 ``composition.compose_factory``，Tier-3 ``cordis_control`` 工具通过
-# ``ctx.inject("composition.compose_factory")`` 取工厂。
-COMPOSITION_COMPOSE_FACTORY = Capability[object](
-    "composition.compose_factory", cardinality="factory"
-)
-
 
 # ── Auto-derived key → Capability index ───────────────────────────
 #

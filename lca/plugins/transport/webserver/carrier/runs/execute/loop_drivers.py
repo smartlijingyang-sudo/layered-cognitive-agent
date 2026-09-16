@@ -70,11 +70,12 @@ class RunLoopDriver(Protocol):
 class _BoundReasonerResolver:
     """Adapter that satisfies :class:`LlmResolver` from a bound ``PromptReasoner``.
 
-    The ``llm_resolver`` capability has no provider; ``phase.think.reasoner.compose``
-    is the single boot-time LLM-aware plugin and binds ``reasoner`` with the
-    adapter already materialised. Wrapping ``reasoner.llm`` lets the runnable
-    assembly call ``.resolve()`` exactly as if a real resolver were provided,
-    without re-reading ``.env`` at run time.
+    The ``llm_resolver`` capability has no provider; the boot-time
+    LLM-aware wiring lives in :class:`BrainComposer` and binds
+    ``reasoner`` with the adapter already materialised. Wrapping
+    ``reasoner.llm`` lets the runnable assembly call ``.resolve()``
+    exactly as if a real resolver were provided, without re-reading
+    ``.env`` at run time.
     """
 
     __slots__ = ("_adapter",)
@@ -93,7 +94,7 @@ def _resolve_resolver_from_reasoner(ctx: Any) -> _BoundReasonerResolver:
     if adapter is None:
         raise TypeError(
             "reasoner capability is missing its bound LLMAdapter; "
-            "phase.think.reasoner.compose.setup() did not run correctly"
+            "BrainComposer.compose_agent did not seed reasoner on the run scope"
         )
     return _BoundReasonerResolver(adapter)
 
@@ -124,10 +125,10 @@ class CognitiveRunDriver:
             if ctx is None:
                 raise TypeError("CognitiveRunDriver.execute requires ctx or llm_resolver")
             # ``llm_resolver`` capability has no provider in this tree
-            # (``phase.think.reasoner.compose`` is the only LLM-aware setup
-            # plugin and it binds ``reasoner``, not ``llm_resolver``).
-            # Recover by pulling the already-bound reasoner and wrapping its
-            # ``.llm`` LLMAdapter in a resolver-shaped object so the
+            # (BrainComposer is the only LLM-aware setup path and it
+            # binds ``reasoner``, not ``llm_resolver``). Recover by
+            # pulling the already-bound reasoner and wrapping its ``.llm``
+            # LLMAdapter in a resolver-shaped object so the
             # downstream ``RunnableBuildRequest.llm`` path stays intact.
             resolver = _resolve_resolver_from_reasoner(ctx)
             scope: Context | None = ctx

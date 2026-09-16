@@ -19,8 +19,6 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-import pytest
-
 from lca.contracts.harness.composition.composer import (
     AgentCompositionRequest,
     AgentGraphContribution,
@@ -108,7 +106,9 @@ def test_brain_composer_module_has_no_phase_capability_projection_call() -> None
         'phase_capabilities["decision_gate"]',
         'phase_capabilities["adapter"]',
         'phase_capabilities["tools"]',
-        "phase_capabilities[REASONER_ROLE_PROFILE.key]",
+        # PR-C: the role-profile Cordis capability was removed
+        # (see progress.md Ruling 11); the Brain owns role_profile as a
+        # typed Protocol attribute instead. The test no longer guards it.
     )
     leaks = [snippet for snippet in forbidden if snippet in src_path]
     assert leaks == [], (

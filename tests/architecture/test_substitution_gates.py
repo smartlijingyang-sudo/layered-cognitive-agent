@@ -424,8 +424,10 @@ def test_substitution_axes_have_a_corresponding_seam() -> None:
         "memory.write_policy",
         "memory.compaction_policy",
         "memory.retrieval_policy",
-        # dynamic composition governance (Control plane)
-        "composition.invariant_checker",
+        # dynamic composition governance (Control plane) — note: the
+        # historical invariant-checker capability was removed in PR-C
+        # (the default invariant checker is now wired inline by
+        # BrainComposer / CordisControlToolFactory).
     }
     declared = declared_typed | declared_closure
     missing = sorted(required_axes - declared)

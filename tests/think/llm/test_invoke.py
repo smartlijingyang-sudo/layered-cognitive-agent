@@ -1,7 +1,8 @@
 """Tests for phase.think.llm.invoke plugin (PR-B typed-port split).
 
 Verifies the typed ``llm.invoke`` node owns only the LLM adapter call.
-Drives the adapter via a mock and asserts that:
+Drives the adapter via a mock (passed via the whitelisted runtime
+carrier, like every other think subgraph node) and asserts that:
 
 1. the node forwards ``LLMResponse`` + ``TokenUsage`` to the typed ports
 2. the node never touches the journal — there is no writer in scope
@@ -34,6 +35,13 @@ from lca.contracts.protocols.session.model.context import ModelVisibleRequest
 from lca.nodes.think.llm.invoke import LlmInvokeExecutor
 
 
+class _RuntimeCarrier(dict):
+    """Dict + attribute proxy — the kernel runtime carrier shape."""
+
+    def __getattr__(self, name: str) -> object:
+        return self.get(name)
+
+
 def _state(step: int = 3, turn: int = 7) -> AgentState:
     """AgentState with ``step`` and ``extra['current_turn']`` set."""
     state = AgentState(trace_id="trace-llm-invoke", task="", budget=Budget())
@@ -42,13 +50,15 @@ def _state(step: int = 3, turn: int = 7) -> AgentState:
     return state
 
 
-class _FakeAdapter:
-    """Minimal ``LLMAdapter`` stub capturing the call args.
+def _ctx(state: AgentState, adapter: Any | None = None) -> NodeContext:
+    runtime = _RuntimeCarrier(state=state)
+    if adapter is not None:
+        runtime["adapter"] = adapter
+    return NodeContext(runtime=runtime, budget={}, metadata={})
 
-    The invoke node only depends on ``stream(prompt, system, history,
-    tools, **kwargs)``; the fake exposes a single ``COMPLETED`` event
-    carrying the supplied response.
-    """
+
+class _FakeAdapter:
+    """Minimal ``LLMAdapter`` stub capturing the call args."""
 
     def __init__(self, response: LLMResponse) -> None:
         self._response = response
@@ -64,11 +74,6 @@ class _FakeAdapter:
             type=LLMStreamEventType.COMPLETED,
             response=self._response,
         )
-
-
-def _ctx() -> NodeContext:
-    """Empty context — invoke is pure typed-port, never reads runtime."""
-    return NodeContext(runtime={}, budget={}, metadata={})
 
 
 def _request(*messages: str, system: str | None = "system") -> ModelVisibleRequest:
@@ -88,14 +93,8 @@ async def test_invoke_returns_response_and_usage_on_completed_event() -> None:
     adapter = _FakeAdapter(response=response)
 
     output = await executor.node_execute(
-        _ctx(),
-        NodeInput(
-            port_values={
-                "state": _state(),
-                "model_visible_request": _request("hi"),
-                "adapter": adapter,
-            }
-        ),
+        _ctx(_state(), adapter=adapter),
+        NodeInput(port_values={"model_visible_request": _request("hi")}),
     )
 
     assert output.port_values["llm_response"] is response
@@ -105,27 +104,15 @@ async def test_invoke_returns_response_and_usage_on_completed_event() -> None:
 @pytest.mark.asyncio
 async def test_invoke_forwards_model_visible_identity_to_stream() -> None:
     """PR-B regression guard: invoke forwards ``state``/``turn``/``step``/
-    ``reasoner_prompt`` to ``adapter.stream``.
-
-    ``ModelVisibleHookAdapter`` needs the identity to publish
-    ``llm.request.header`` — the only fact that opens a journal step. A
-    split that drops these kwargs leaves ``journal.steps`` empty (the bug
-    the pre-split ``test_dispatch_llm`` locked behind).
-    """
+    ``reasoner_prompt`` to ``adapter.stream`` via the runtime carrier."""
     executor = LlmInvokeExecutor()
     response = LLMResponse(text="ok", usage=TokenUsage())
     adapter = _FakeAdapter(response=response)
     state = _state(step=3, turn=7)
 
     await executor.node_execute(
-        _ctx(),
-        NodeInput(
-            port_values={
-                "state": state,
-                "model_visible_request": _request("hi", system="sys"),
-                "adapter": adapter,
-            }
-        ),
+        _ctx(state, adapter=adapter),
+        NodeInput(port_values={"model_visible_request": _request("hi", system="sys")}),
     )
 
     call = adapter.calls[0]
@@ -134,39 +121,25 @@ async def test_invoke_forwards_model_visible_identity_to_stream() -> None:
     assert call["step"] == 3
     assert call["reasoner_prompt"] is not None
     assert call["reasoner_prompt"].system_prompt_text == "sys"
-    assert "session" not in call  # never inject a publish writer into the seam
+    assert "session" not in call
 
 
 @pytest.mark.asyncio
 async def test_invoke_does_not_write_journal() -> None:
-    """PR-B invariant: ``invoke`` owns only the adapter call.
-
-    The journal path lives in the sibling ``think.llm.persist`` node.
-    The invoke executor must not call any writer / append method, so
-    the fake adapter contract has no journal surface and the test
-    asserts no extra attributes were touched.
-    """
+    """PR-B invariant: ``invoke`` owns only the adapter call."""
     executor = LlmInvokeExecutor()
     response = LLMResponse(text="ok", usage=TokenUsage())
     adapter = _FakeAdapter(response=response)
 
     await executor.node_execute(
-        _ctx(),
-        NodeInput(
-            port_values={
-                "state": _state(step=1, turn=2),
-                "model_visible_request": _request("hi"),
-                "adapter": adapter,
-            }
-        ),
+        _ctx(_state(step=1, turn=2), adapter=adapter),
+        NodeInput(port_values={"model_visible_request": _request("hi")}),
     )
 
-    # Adapter call capture is the only observable side effect.
     assert len(adapter.calls) == 1
     call = adapter.calls[0]
     assert call["prompt"] == "hi"
     assert call["system"] == "system"
-    # History is the messages before the last one (empty in this case).
     assert call["history"] == []
 
 
@@ -187,14 +160,8 @@ async def test_invoke_unpacks_history_from_request_messages() -> None:
     )
 
     await executor.node_execute(
-        _ctx(),
-        NodeInput(
-            port_values={
-                "state": _state(),
-                "model_visible_request": request,
-                "adapter": adapter,
-            }
-        ),
+        _ctx(_state(), adapter=adapter),
+        NodeInput(port_values={"model_visible_request": request}),
     )
 
     call = adapter.calls[0]
@@ -213,14 +180,8 @@ async def test_invoke_returns_default_usage_when_response_has_none() -> None:
     adapter = _FakeAdapter(response=response)
 
     output = await executor.node_execute(
-        _ctx(),
-        NodeInput(
-            port_values={
-                "state": _state(),
-                "model_visible_request": _request("hi"),
-                "adapter": adapter,
-            }
-        ),
+        _ctx(_state(), adapter=adapter),
+        NodeInput(port_values={"model_visible_request": _request("hi")}),
     )
 
     usage = output.port_values["usage"]
@@ -234,57 +195,36 @@ async def test_invoke_missing_model_visible_request_raises() -> None:
     """``model_visible_request`` is a typed-only port; missing ⇒ TypeError."""
     executor = LlmInvokeExecutor()
     response = LLMResponse(text="ok", usage=TokenUsage())
+    adapter = _FakeAdapter(response=response)
     with pytest.raises(TypeError, match="model_visible_request"):
         await executor.node_execute(
-            _ctx(),
-            NodeInput(
-                port_values={"state": _state(), "adapter": _FakeAdapter(response=response)}
-            ),
+            _ctx(_state(), adapter=adapter),
+            NodeInput(port_values={}),
         )
 
 
 @pytest.mark.asyncio
 async def test_invoke_missing_adapter_raises() -> None:
-    """``adapter`` is a typed-only port; missing ⇒ TypeError."""
+    """``adapter`` not on the runtime carrier ⇒ TypeError."""
     executor = LlmInvokeExecutor()
     with pytest.raises(TypeError, match="adapter"):
         await executor.node_execute(
-            _ctx(),
-            NodeInput(port_values={"state": _state(), "model_visible_request": _request("hi")}),
+            _ctx(_state()),  # no adapter
+            NodeInput(port_values={"model_visible_request": _request("hi")}),
         )
 
 
 @pytest.mark.asyncio
-async def test_invoke_missing_state_raises() -> None:
-    """No ``state`` port and no runtime carrier ⇒ TypeError (fail-loud)."""
+async def test_invoke_no_state_in_runtime_raises() -> None:
+    """No ``state`` on the runtime carrier ⇒ TypeError (fail-loud)."""
     executor = LlmInvokeExecutor()
     response = LLMResponse(text="ok", usage=TokenUsage())
     adapter = _FakeAdapter(response=response)
     with pytest.raises(TypeError, match="state"):
         await executor.node_execute(
             NodeContext(runtime={}, budget={}, metadata={}),
-            NodeInput(
-                port_values={"model_visible_request": _request("hi"), "adapter": adapter}
-            ),
+            NodeInput(port_values={"model_visible_request": _request("hi")}),
         )
-
-
-@pytest.mark.asyncio
-async def test_invoke_resolves_state_from_runtime_carrier() -> None:
-    """``state`` absent from typed ports ⇒ resolved via whitelisted runtime carrier."""
-    executor = LlmInvokeExecutor()
-    response = LLMResponse(text="ok", usage=TokenUsage())
-    adapter = _FakeAdapter(response=response)
-    state = _state(step=5, turn=2)
-    ctx = NodeContext(runtime={"state": state}, budget={}, metadata={})
-
-    await executor.node_execute(
-        ctx,
-        NodeInput(port_values={"model_visible_request": _request("hi"), "adapter": adapter}),
-    )
-
-    assert adapter.calls[0]["state"] is state
-    assert adapter.calls[0]["step"] == 5
 
 
 @pytest.mark.asyncio
@@ -293,14 +233,15 @@ async def test_invoke_is_idempotent() -> None:
     executor = LlmInvokeExecutor()
     response = LLMResponse(text="ok", usage=TokenUsage())
     adapter = _FakeAdapter(response=response)
-    port_values = {
-        "state": _state(),
-        "model_visible_request": _request("hi"),
-        "adapter": adapter,
-    }
+    state = _state()
+    port_values = {"model_visible_request": _request("hi")}
 
-    out_a = await executor.node_execute(_ctx(), NodeInput(port_values=port_values))
-    out_b = await executor.node_execute(_ctx(), NodeInput(port_values=port_values))
+    out_a = await executor.node_execute(
+        _ctx(state, adapter=adapter), NodeInput(port_values=port_values)
+    )
+    out_b = await executor.node_execute(
+        _ctx(state, adapter=adapter), NodeInput(port_values=port_values)
+    )
 
     assert out_a.port_values["llm_response"] == out_b.port_values["llm_response"]
     assert out_a.port_values["usage"] == out_b.port_values["usage"]

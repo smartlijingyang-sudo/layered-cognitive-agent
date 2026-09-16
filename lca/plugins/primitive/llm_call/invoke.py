@@ -143,7 +143,7 @@ def _resolve_llm(context: NodeContext) -> LLMAdapter | None:
     """Resolve the LLMAdapter from the node context's runtime.
 
     Cordis capability ``llm_adapter`` (or ``llm`` alias for back-compat
-    with the ``phase.think.reasoner.compose`` plugin) is the boot-time
+    with the historical reasoner-composer plugin) is the boot-time
     seam. The runtime attribute on the node context is whichever the
     SubgraphRuntime exposes; both names are tried because the legacy
     inner-subgraph tests still inject ``runtime.llm``.
