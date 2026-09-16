@@ -66,7 +66,7 @@ def schedule_run(
 
     def _mark_cancelled(done: asyncio.Task[Any]) -> None:
         if done.cancelled() or done.cancelling() > 0:
-            session.status = RunLifecycleStatus.CANCELED
+            session.status = RunLifecycleStatus.CANCELLED
             session.cancel_requested = True
 
     task.add_done_callback(_mark_cancelled)
