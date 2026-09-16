@@ -64,3 +64,18 @@ entries:
     name: observability_persistence_null
     $module: lca.plugins.observability.providers.persistence_coordinator.null
     config: {}
+
+  # ── Run-health fold (PR-1 / Task 1.4) ─────────────────────────────
+  # Fold function is the SSOT for run-health; consumers (CLI post-create,
+  # debug, manifest, new ``lca-ops runs health``) read from it.
+  # Seams/providers here are thin shims — the real registry is the
+  # ``lca.health_derivers`` entry-point group in pyproject.toml.
+  - id: observability.health.fold.seam
+    name: observability_health_fold_seam
+    $module: lca.plugins.observability.health.seam_provider
+    config: {}
+
+  - id: observability.health.fold.standard
+    name: observability_health_fold_standard
+    $module: lca.plugins.observability.health.fold_provider
+    config: {}
