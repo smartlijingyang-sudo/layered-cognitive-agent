@@ -313,3 +313,45 @@ def test_catalog_session_event_tool_started_injects_description() -> None:
     assert out is not None
     args = json.loads(out["data"]["toolCalling"]["arguments"])
     assert args["description"] == "runCommand"
+
+
+def test_spine_phase_tool_start_empty_payload_returns_none() -> None:
+    """Empty-payload ``phase.tool.call.start`` returns ``None``.
+
+    Spine EPs that historically carried only ``state_id`` (legacy
+    ``emit_*_for_state`` shape) have no tool identity to translate.
+    Returning ``None`` is safe — the gateway treats it as a no-op — and
+    prevents a fall-through to ``wire_tool_call("", ...)`` which would
+    publish a malformed event if ``SUPPRESSED_SPINE_EPS`` is ever
+    relaxed. This contract is shared with ``_spine_body_tool_end`` (see
+    ``test_spine_body_tool_end_empty_payload_returns_none``).
+    """
+    t = EventTranslator()
+    stamped = {
+        "event": {
+            "execution_point": "phase.tool.call.start",
+            "payload": {"state_id": "trace_x"},
+        }
+    }
+    assert t.translate(stamped) is None
+
+
+def test_spine_body_tool_end_empty_payload_returns_none() -> None:
+    """Empty-payload ``body.tool.execute.end`` returns ``None``.
+
+    Mirrors the ``_spine_phase_tool_start`` contract: with no
+    ``tool_name`` there is no tool identity, so producing a
+    ``tool_end`` with ``apiName=""`` / ``id=""`` would be a malformed
+    wire. ``SUPPRESSED_SPINE_EPS`` currently filters these out at the
+    pump, but the translator must be defensible on its own — see
+    ``test_spine_phase_tool_start_empty_payload_returns_none`` for the
+    matching rationale.
+    """
+    t = EventTranslator()
+    stamped = {
+        "event": {
+            "execution_point": "body.tool.execute.end",
+            "payload": {"state_id": "trace_x", "outcome": "ok"},
+        }
+    }
+    assert t.translate(stamped) is None
