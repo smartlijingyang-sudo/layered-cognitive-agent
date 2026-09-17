@@ -7,6 +7,7 @@ from lca.contracts.atoms.semantic.cli_diagnostic import is_cli_diagnostic_output
 from lca.contracts.models.core.execution.decision import Observation
 
 _STDOUT_KEYS = ("output", "stdout", "content", "text")
+_FILE_KEYS = ("files_created", "files")
 
 
 def payload_stdout(payload: object | None, *, limit: int = 4000) -> str:
@@ -19,13 +20,31 @@ def payload_stdout(payload: object | None, *, limit: int = 4000) -> str:
     return ""
 
 
+def _file_names(value: object | None) -> tuple[str, ...]:
+    """Normalize harvested file entries to names.
+
+    The sandbox harvest carries A2A file metadata dicts (``name`` / ``url`` /
+    ``mimeType``; see ``infrastructure/tools/sandbox/observation.py``), while
+    writeFile-shaped producers carry plain name strings. Stringifying a dict
+    entry would surface its repr as a filename.
+    """
+    if not isinstance(value, (list, tuple)):
+        return ()
+    names: list[str] = []
+    for item in value:
+        name = str(item.get("name") or "") if isinstance(item, dict) else str(item or "")
+        if name:
+            names.append(name)
+    return tuple(names)
+
+
 def payload_files_created(payload: object | None) -> tuple[str, ...]:
     if not isinstance(payload, dict):
         return ()
-    for key in ("files_created", "files"):
-        value = payload.get(key)
-        if isinstance(value, (list, tuple)):
-            return tuple(str(item) for item in value if str(item))
+    for key in _FILE_KEYS:
+        names = _file_names(payload.get(key))
+        if names:
+            return names
     return ()
 
 
@@ -33,11 +52,10 @@ def observation_files_created(observation: Observation | None) -> tuple[str, ...
     if observation is None:
         return ()
     extra = observation.extra if isinstance(observation.extra, dict) else {}
-    files = extra.get("files_created")
-    if isinstance(files, (list, tuple)):
-        from_extra = tuple(str(item) for item in files if str(item))
-        if from_extra:
-            return from_extra
+    for key in _FILE_KEYS:
+        names = _file_names(extra.get(key))
+        if names:
+            return names
     return payload_files_created(observation.payload)
 
 

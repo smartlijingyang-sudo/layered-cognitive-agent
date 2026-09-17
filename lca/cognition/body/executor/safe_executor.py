@@ -49,6 +49,29 @@ def _elapsed_ms(started: float) -> int:
 # folded into safe_executor (single owner of the contract).
 _STDOUT_KEYS = ("output", "stdout", "content", "text")
 
+# Body-layer SSOT for harvested-file keys and entry shape, kept in sync with
+# the convergence layer's ``_FILE_KEYS`` / ``_file_names`` for the same reason
+# and under the same delete-when as ``_STDOUT_KEYS`` above.
+_FILE_KEYS = ("files_created", "files")
+
+
+def _file_names(value: Any) -> tuple[str, ...]:
+    """Normalize harvested file entries to names.
+
+    The sandbox harvest carries A2A file metadata dicts (``name`` / ``url`` /
+    ``mimeType``; see ``infrastructure/tools/sandbox/observation.py``), while
+    writeFile-shaped producers carry plain name strings. Stringifying a dict
+    entry would surface its repr as a filename.
+    """
+    if not isinstance(value, (list, tuple)):
+        return ()
+    names: list[str] = []
+    for item in value:
+        name = str(item.get("name") or "") if isinstance(item, dict) else str(item or "")
+        if name:
+            names.append(name)
+    return tuple(names)
+
 
 def _extract_stdout_head(observation: Any, *, limit: int = 2000) -> str:
     """从 Observation.payload 抽 stdout-like 文本;空 observation 返回空串。"""
@@ -91,13 +114,18 @@ def _extract_stderr(observation: Any, *, limit: int = 2000) -> str:
 
 
 def _extract_files_created(observation: Any) -> tuple[str, ...]:
-    """从 Observation 抽 files_created 元组;失败兜底空 tuple。"""
-    extra = getattr(observation, "extra", None)
-    if not isinstance(extra, dict):
-        return ()
-    files = extra.get("files_created")
-    if isinstance(files, (list, tuple)):
-        return tuple(str(f) for f in files)
+    """从 Observation 抽产出文件名;失败兜底空 tuple。
+
+    ``extra`` 先于 ``payload``:sandbox harvest 两处写同一份 file_parts
+    (``infrastructure/tools/sandbox/exec_observation.py``)。
+    """
+    for container in (getattr(observation, "extra", None), getattr(observation, "payload", None)):
+        if not isinstance(container, dict):
+            continue
+        for key in _FILE_KEYS:
+            names = _file_names(container.get(key))
+            if names:
+                return names
     return ()
 
 
