@@ -53,13 +53,19 @@ export async function persistAssistantRow(
     ctx,
   );
 
-  if (result?.success && result.messages) {
-    get().replaceMessages(result.messages, {
-      action: 'optimisticUpdateMessageContent',
-      context: ctx,
-    });
-  } else {
-    await get().refreshMessages();
+  // The mutation response (and refreshMessages) returns hollow tool rows —
+  // pluginState / result never round-trip. Replacing the store with that
+  // snapshot empties every tool card after the run ends. The dispatch
+  // above already wrote the in-memory tools we want to keep.
+  if (!row.tools?.length) {
+    if (result?.success && result.messages) {
+      get().replaceMessages(result.messages, {
+        action: 'optimisticUpdateMessageContent',
+        context: ctx,
+      });
+    } else {
+      await get().refreshMessages();
+    }
   }
 
   if (row.error) {

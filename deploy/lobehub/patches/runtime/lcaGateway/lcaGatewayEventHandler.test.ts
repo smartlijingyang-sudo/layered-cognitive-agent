@@ -252,7 +252,7 @@ describe('createLcaGatewayEventHandler (multi-run / multi-LLM)', () => {
     // ── Assertion 2: final tools array has all three tool calls, each with result.content
     expect(finalAssistant?.tools).toHaveLength(3);
     const toolIds = (finalAssistant?.tools as Array<{ id: string }>).map((t) => t.id);
-    expect(toolIds).toEqual(['call-1', 'call-2', 'call-3']);
+    expect(toolIds).toEqual(['call-1', 'call-2', 'call-3']); // chronological
     for (const tool of finalAssistant?.tools as Array<{
       result?: { content?: string };
     }>) {
@@ -267,11 +267,8 @@ describe('createLcaGatewayEventHandler (multi-run / multi-LLM)', () => {
     expect(dbSpy).not.toHaveBeenCalled();
 
     // ── Pin the per-chunk-single accumulation that the LCA wire relies on.
-    // The shared handler's `preserveToolResultMessageIds` (gatewayEventHandler.ts:121)
-    // must merge each new tool into the assistant's existing tools array —
-    // not replace it. After three chunks the in-memory tools array is
-    // [call-3, call-2, call-1] (newest-first post-fix order; the brief locks
-    // this order rather than risk a loop-reorder at this stage).
+    // preserveToolResultMessageIds keeps first-seen order so activateSkill
+    // stays above later runCommand cards.
     const updateToolCalls = (store.internal_dispatchMessage as ReturnType<typeof vi.fn>).mock.calls
       .map(([payload]) => payload)
       .filter(
@@ -282,7 +279,7 @@ describe('createLcaGatewayEventHandler (multi-run / multi-LLM)', () => {
       );
     expect(updateToolCalls.map((c: { value: { tools: Array<{ id: string }> } }) =>
       c.value.tools.map((t) => t.id),
-    )).toEqual([['call-1'], ['call-2', 'call-1'], ['call-3', 'call-2', 'call-1']]);
+    )).toEqual([['call-1'], ['call-1', 'call-2'], ['call-1', 'call-2', 'call-3']]);
   });
 
   // Mirrors Case A's event sequence, but the LCA wire's actual `agent_runtime_end`
@@ -383,10 +380,10 @@ describe('createLcaGatewayEventHandler (multi-run / multi-LLM)', () => {
     // `dbMessagesMap[topicKey]` array, where the assistant row has been
     // mutated in place by the mock `internal_dispatchMessage` after each
     // `tools_calling` chunk. After three chunks the assistant's tools are
-    // `[call-3, call-2, call-1]` (newest-first post-fix order).
+    // `[call-1, call-2, call-3]` (first-seen order).
     expect(finalAssistant?.tools).toHaveLength(3);
     const toolIds = (finalAssistant?.tools as Array<{ id: string }>).map((t) => t.id);
-    expect(toolIds).toEqual(['call-3', 'call-2', 'call-1']);
+    expect(toolIds).toEqual(['call-1', 'call-2', 'call-3']);
 
     // ── Invariant 4: the singleton `messageService.getMessages` was never
     // called. The LCA factory overrides `params.messageService` with the

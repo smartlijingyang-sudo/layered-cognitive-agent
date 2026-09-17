@@ -847,6 +847,98 @@ def _apply_tool_end_in_memory_result(text: str) -> str | None:
     return text.replace(_TOOL_END_ENQUEUE_ANCHOR, _TOOL_END_ENQUEUE_REPLACEMENT, 1)
 
 
+_MERGE_LEFTOVER_ANCHOR = """  for (const [id, tool] of existingById) {
+    if (!incomingIds.has(id)) merged.push(tool);
+  }
+
+  return merged;
+};"""
+
+_MERGE_LEFTOVER_REPLACEMENT = """  const existingList = Array.isArray(existingTools) ? existingTools : [];
+  const incomingById = new Map<string, Record<string, unknown>>();
+  for (const tool of toolsCalling) {
+    const id = getToolId(tool);
+    if (id && isRecord(tool)) incomingById.set(id, tool);
+  }
+
+  const resultMsgIdByToolId2 = new Map<string, string>();
+  for (const tool of existingList) {
+    const id = getToolId(tool);
+    if (!id || !isRecord(tool)) continue;
+    const resultMsgId = getToolResultMessageId(tool);
+    if (resultMsgId) resultMsgIdByToolId2.set(id, resultMsgId);
+  }
+
+  const ordered: unknown[] = [];
+  const seen = new Set<string>();
+  for (const tool of existingList) {
+    const id = getToolId(tool);
+    if (!id) {
+      ordered.push(tool);
+      continue;
+    }
+    seen.add(id);
+    const incoming = incomingById.get(id);
+    const existing = isRecord(tool) ? tool : undefined;
+    if (incoming) {
+      const incomingResultMsgId = getToolResultMessageId(incoming);
+      ordered.push({
+        ...existing,
+        ...incoming,
+        ...(incomingResultMsgId ? {} : { result_msg_id: resultMsgIdByToolId2.get(id) }),
+        ...(incoming.result ? {} : existing?.result ? { result: existing.result } : {}),
+      });
+    } else {
+      ordered.push(tool);
+    }
+  }
+  for (const tool of toolsCalling) {
+    const id = getToolId(tool);
+    if (id && seen.has(id)) continue;
+    if (id) seen.add(id);
+    ordered.push(tool);
+  }
+
+  return ordered;
+};"""
+
+
+def _apply_tool_merge_first_seen_order(text: str) -> str | None:
+    """Keep tools in first-seen order instead of newest-first leftover append."""
+    if "Keep the order tools first appeared" in text or "const ordered: unknown[] = [];" in text:
+        return None
+    if _MERGE_LEFTOVER_ANCHOR not in text:
+        msg = "[lca_runtime_agent_gateway] tool merge leftover anchor not found"
+        raise SystemExit(msg)
+    return text.replace(_MERGE_LEFTOVER_ANCHOR, _MERGE_LEFTOVER_REPLACEMENT, 1)
+
+
+_STREAM_START_RESET_ANCHOR = """          // Reset accumulators for the new stream
+          accumulatedContent = '';
+          accumulatedReasoning = '';
+          get().updateOperationMetadata(operationId, { visibleLoadingDone: false });"""
+
+_STREAM_START_RESET_REPLACEMENT = """          // Reset accumulators for the new stream
+          accumulatedContent = '';
+          accumulatedReasoning = '';
+          get().updateOperationMetadata(operationId, { visibleLoadingDone: false });
+          // LCA does not emit stream_end between LLM steps, so the previous
+          // tools_calling animation would stay on until agent_runtime_end.
+          if (runtimeType === 'lca-gateway') {
+            get().internal_toggleToolCallingStreaming(currentAssistantMessageId, undefined);
+          }"""
+
+
+def _apply_stream_start_clear_tool_streaming(text: str) -> str | None:
+    """Clear the tool-calling animation at each new LCA LLM step."""
+    if "tools_calling animation would stay on until agent_runtime_end" in text:
+        return None
+    if _STREAM_START_RESET_ANCHOR not in text:
+        msg = "[lca_runtime_agent_gateway] stream_start reset anchor not found"
+        raise SystemExit(msg)
+    return text.replace(_STREAM_START_RESET_ANCHOR, _STREAM_START_RESET_REPLACEMENT, 1)
+
+
 def _patch_gateway_event_handler_lca(ctx: PatchContext) -> bool:
     """Emit the LCA-flavored gatewayEventHandler with the runtimeType
     enum, the messageService override, the merge-by-id
@@ -876,10 +968,16 @@ def _patch_gateway_event_handler_lca(ctx: PatchContext) -> bool:
         ctx.write(rel, new_content)
         text = new_content
         changed = True
-    patched = _apply_tool_end_in_memory_result(text)
-    if patched is not None:
-        ctx.write(rel, patched)
-        changed = True
+    for apply_fn in (
+        _apply_tool_end_in_memory_result,
+        _apply_tool_merge_first_seen_order,
+        _apply_stream_start_clear_tool_streaming,
+    ):
+        patched = apply_fn(text)
+        if patched is not None:
+            text = patched
+            ctx.write(rel, text)
+            changed = True
     return changed
 
 
