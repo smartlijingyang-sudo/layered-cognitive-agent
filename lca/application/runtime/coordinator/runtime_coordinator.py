@@ -115,12 +115,21 @@ class LcaAgentRuntimeCoordinator:
         """Build a single ``stream_chunk text`` follow-up for a textual tool
         result. Returns ``None`` when the tool result has no usable text, so
         the front-end keeps waiting for the LLM's real follow-up.
+
+        Tools that already projected a card-owned ``result.state`` (skills,
+        sandbox stdout, file bodies) must not dump that payload into the
+        assistant bubble — the inspector/render reads it from the tool
+        card. The follow-up exists only for tools whose entire answer is
+        ``result.content`` and that have no renderer state (e.g. search).
         """
         data = envelope.get("data") or {}
         if data.get("isSuccess") is False:
             return None
         result = data.get("result")
         if not isinstance(result, dict):
+            return None
+        state = result.get("state")
+        if isinstance(state, dict) and state:
             return None
         text = result.get("content")
         if not isinstance(text, str) or not text.strip():

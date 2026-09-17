@@ -312,6 +312,7 @@ def test_activate_skill_projects_real_skill_observation() -> None:
     assert proj == {
         "name": "anthropics-skills-xlsx",
         "title": "anthropics-skills-xlsx",
+        "description": "summary text",
         "hasResources": False,
         "content": "<body>",
     }
@@ -659,6 +660,7 @@ def test_activate_skill_render_contract_uses_snake_case_payload() -> None:
     assert proj == {
         "name": "demo",
         "title": "demo",
+        "description": "d",
         "hasResources": True,
         "content": "<body>",
     }

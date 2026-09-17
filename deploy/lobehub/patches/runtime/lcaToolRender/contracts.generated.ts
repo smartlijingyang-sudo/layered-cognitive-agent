@@ -28,7 +28,7 @@ export const CONTRACTS: Readonly<Record<string, ToolRenderContract>> =   {
       state: [
         { pythonKey: "name", wireKey: "name", kind: "string", source: "observation", required: true },
         { pythonKey: "title", wireKey: "title", kind: "string", source: "observation", required: true },
-        { pythonKey: "description", wireKey: "description", kind: "string", source: "argument", required: true },
+        { pythonKey: "description", wireKey: "description", kind: "string", source: "observation", required: false },
         { pythonKey: "has_resources", wireKey: "hasResources", kind: "bool", source: "observation", required: true },
         { pythonKey: "content", wireKey: "content", kind: "string", source: "observation", required: true },
       ],

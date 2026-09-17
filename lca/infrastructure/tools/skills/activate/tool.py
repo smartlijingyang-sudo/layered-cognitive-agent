@@ -19,7 +19,7 @@ from lca.contracts.protocols.memory.operational_skills import (
 from lca.infrastructure.search.service.service import any_search_provider_available
 from lca.infrastructure.search.skill.policy import is_redundant_cli_search_skill
 from lca.infrastructure.skills.activation.scope import register_activated
-from lca.infrastructure.tools.contract.render.render import RenderContract, contract
+from lca.infrastructure.tools.contract.render.render import FieldSpec, RenderContract, contract
 from lca.infrastructure.tools.contract.schema.schema import COMMON
 
 ACTIVATE_SKILL_TOOL = "activate_skill"
@@ -69,7 +69,7 @@ def build_skill_references_section(package: SkillPackage) -> str:
         state=(
             COMMON["name"],
             COMMON["title"],
-            COMMON["description"],
+            FieldSpec("description", "description", "string", "observation", required=False),
             COMMON["has_resources"],
             COMMON["content"],
         ),

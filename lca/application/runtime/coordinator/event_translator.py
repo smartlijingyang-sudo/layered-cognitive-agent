@@ -34,6 +34,7 @@ def wire_tool_call(
     invocation_id: str,
     arguments: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    from lca.infrastructure.tools.contract.project.project import project_args
     from lca.plugins.transport.webserver.wire.wire import resolve
 
     coords = resolve(tool_name)
@@ -49,15 +50,17 @@ def wire_tool_call(
     # compat / Anthropic adapter convention (see
     # ``lca/infrastructure/llm_adapter/openai_compat/anthropic/_anthropic_stream.py``).
     #
+    # RenderContract remaps python keys onto LobeHub inspector keys
+    # (``skill_id`` → ``name`` for activateSkill). executeCode/runCommand
+    # keys already match, so the projection is a no-op. Unknown tools
+    # keep the raw dict.
+    raw_args: dict[str, Any] = dict(arguments or {})
+    projected = project_args(tool_name, raw_args)
+    args_dict: dict[str, Any] = dict(projected) if projected else raw_args
     # Front-end's RunCommandInspector renders ``args.description || args.command``;
-    # when both are empty the collapsed chip is blank. LCA owns the wire shape
-    # at this seam — default ``description`` to the tool name so every tool
-    # card header is populated. Caller-supplied description still wins.
-    args_dict: dict[str, Any] = dict(arguments or {})
+    # activateSkill reads ``args.name``. When description is empty the
+    # collapsed chip is blank for command tools. Default to the apiName.
     if not args_dict.get("description"):
-        # Fall back to the resolved api_name; for unknown tools (resolve
-        # returned None) api_name equals tool_name. Either way the fallback
-        # is non-empty — never produce a blank chip.
         args_dict["description"] = api_name or tool_name or "tool call"
     return {
         "id": invocation_id or tool_name,

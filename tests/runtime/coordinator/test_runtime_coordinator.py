@@ -205,6 +205,56 @@ async def test_tool_end_with_content_publishes_followup_text_chunk(
     )
 
 
+async def test_tool_end_with_projected_state_does_not_dump_content_into_assistant(
+    manager: LcaStreamEventLog, clean_run_id: str
+) -> None:
+    """activate_skill (and other card-owned tools) put SKILL.md / stdout in
+    ``result.content`` AND ``result.state``. Mirroring that onto a
+    ``stream_chunk text`` dumps the card body into the assistant reply.
+    """
+    coord = LcaAgentRuntimeCoordinator(
+        stream_manager=manager,
+        translator=EventTranslator(),
+        metadata_writer=AsyncMock(),
+        tool_state_writer=AsyncMock(),
+    )
+    await coord.start(clean_run_id, ctx={})
+    skill_md = "# Office CLI\n\nUse officecli --json."
+    await coord.handle_stamped(
+        clean_run_id,
+        {
+            "event": {
+                "type": "ToolInvoked",
+                "isSuccess": True,
+                "output_text": skill_md,
+                "projected_state": {
+                    "name": "officecli",
+                    "title": "officecli",
+                    "content": skill_md,
+                },
+                "payload": {
+                    "toolCalling": {
+                        "id": "tc_skill",
+                        "identifier": "lobe-skills",
+                        "apiName": "activateSkill",
+                    }
+                },
+            }
+        },
+    )
+    history = await manager.read_history(clean_run_id, count=20)
+    tool_ends = [e for e in history if e["type"] == "tool_end"]
+    assert len(tool_ends) == 1
+    assert tool_ends[0]["data"]["result"]["content"] == skill_md
+    assert tool_ends[0]["data"]["result"]["state"]["name"] == "officecli"
+    assert not any(
+        e["type"] == "stream_chunk"
+        and e["data"].get("chunkType") == "text"
+        and e["data"].get("content") == skill_md
+        for e in history
+    )
+
+
 async def test_tool_end_without_content_does_not_emit_text_chunk(
     manager: LcaStreamEventLog, clean_run_id: str
 ) -> None:

@@ -277,6 +277,22 @@ def test_wire_tool_call_falls_back_to_identifier_when_api_name_missing() -> None
     assert args["description"]
 
 
+def test_wire_tool_call_renames_activate_skill_id_to_name() -> None:
+    """LobeHub activateSkill inspector reads ``args.name``, not skill_id.
+
+    Import registers the RenderContract so project_args remaps the python
+    key. Without this, the collapsed chip is "Activate Skill:" with no
+    skill name and the expanded card returns null.
+    """
+    import lca.infrastructure.tools.skills.activate.tool  # noqa: F401
+
+    wire = wire_tool_call("activate_skill", "tc1", {"skill_id": "officecli"})
+    args = json.loads(wire["arguments"])
+    assert args["name"] == "officecli"
+    assert "skill_id" not in args
+    assert args["description"] == "activateSkill"
+
+
 def test_spine_tool_call_record_passes_description_through_to_wire() -> None:
     """End-to-end: step.tool_call.record → stream_chunk tools_calling chip."""
     t = EventTranslator()

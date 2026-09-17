@@ -393,4 +393,63 @@ describe('createLcaGatewayEventHandler (multi-run / multi-LLM)', () => {
     // LCA in-memory reader, so the singleton is bypassed entirely.
     expect(dbSpy).not.toHaveBeenCalled();
   });
+
+  it('writes tool_end result onto in-memory tools so activateSkill can render', async () => {
+    const { store } = createStore();
+    const handler = createLcaGatewayEventHandler(() => store, {
+      assistantMessageId: 'assistant-msg',
+      context,
+      operationId: 'op-1',
+    });
+
+    handler(
+      makeEvent(
+        'stream_chunk',
+        {
+          chunkType: 'tools_calling',
+          toolsCalling: [
+            {
+              apiName: 'activateSkill',
+              arguments: JSON.stringify({ name: 'officecli' }),
+              id: 'tc-skill',
+              identifier: 'lobe-skills',
+              type: 'builtin',
+            },
+          ],
+        } as never,
+        1,
+      ),
+    );
+    handler(
+      makeEvent(
+        'tool_end',
+        {
+          isSuccess: true,
+          payload: {
+            toolCalling: {
+              apiName: 'activateSkill',
+              id: 'tc-skill',
+              identifier: 'lobe-skills',
+            },
+          },
+          result: {
+            content: '# Office CLI',
+            state: { content: '# Office CLI', name: 'officecli', title: 'officecli' },
+          },
+        } as never,
+        1,
+      ),
+    );
+    await flush();
+
+    const assistant = store.dbMessagesMap[topicKey].find((m) => m.id === 'assistant-msg');
+    const tools = assistant?.tools as Array<{
+      id: string;
+      result?: { content?: string; state?: { name?: string } };
+    }>;
+    expect(tools).toHaveLength(1);
+    expect(tools[0].id).toBe('tc-skill');
+    expect(tools[0].result?.state?.name).toBe('officecli');
+    expect(tools[0].result?.content).toBe('# Office CLI');
+  });
 });
