@@ -292,6 +292,7 @@ class SimpleSafeExecutor(SafeExecutor):
             arguments_summary=summarize_args(arguments_for_record),
         )
         act_closed = False
+        invocation_started = time.perf_counter()
         try:
             if tool.name == "askUserQuestion":
                 # HIL requests pause before any external effect starts. Keep the
@@ -322,6 +323,9 @@ class SimpleSafeExecutor(SafeExecutor):
                 invocation_id=invocation_id,
                 tool_name=tool.name,
             )
+            # Defaults to failure so an escaping exception (ApprovalPendingError,
+            # cancellation) cannot record a world effect that never completed.
+            sandbox_outcome = "failure"
             try:
                 with tool_invocation_scope(invocation_id):
                     observation = await self._execute_with_retry(
@@ -331,10 +335,12 @@ class SimpleSafeExecutor(SafeExecutor):
                         cache_config=cache_config,
                         invocation_id=invocation_id,
                     )
+                sandbox_outcome = "success" if observation.success else "failure"
             finally:
                 commit_body_sandbox_exit(
                     invocation_id=invocation_id,
                     tool_name=tool.name,
+                    outcome=sandbox_outcome,
                 )
             from lca.loop.commit.tool_journal import (
                 record_step_tool_result,
@@ -345,6 +351,7 @@ class SimpleSafeExecutor(SafeExecutor):
                 invocation_id=invocation_id,
                 outcome="ok" if observation.success else "failure",
                 ok=observation.success,
+                latency_ms=_elapsed_ms(invocation_started),
                 error=observation.error or None,
                 stdout_head=_extract_stdout_head(observation),
                 stdout_chars_total=_extract_stdout_chars_total(observation),
@@ -371,6 +378,7 @@ class SimpleSafeExecutor(SafeExecutor):
                     invocation_id=invocation_id,
                     outcome="failure",
                     ok=False,
+                    latency_ms=_elapsed_ms(invocation_started),
                     error=str(exc),
                     delta_summary=str(exc)[:120],
                 )
