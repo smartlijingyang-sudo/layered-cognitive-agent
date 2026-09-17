@@ -50,16 +50,13 @@ def wire_tool_call(
     # compat / Anthropic adapter convention (see
     # ``lca/infrastructure/llm_adapter/openai_compat/anthropic/_anthropic_stream.py``).
     #
-    # RenderContract remaps python keys onto LobeHub inspector keys
-    # (``skill_id`` → ``name`` for activateSkill). executeCode/runCommand
-    # keys already match, so the projection is a no-op. Unknown tools
-    # keep the raw dict.
+    # RenderContract remaps python keys onto LobeHub inspector keys.
+    # Tools whose python keys already match the inspector are a no-op.
     raw_args: dict[str, Any] = dict(arguments or {})
     projected = project_args(tool_name, raw_args)
     args_dict: dict[str, Any] = dict(projected) if projected else raw_args
-    # Front-end's RunCommandInspector renders ``args.description || args.command``;
-    # activateSkill reads ``args.name``. When description is empty the
-    # collapsed chip is blank for command tools. Default to the apiName.
+    # Collapsed chips read ``args.description`` (falling back to command/code).
+    # An empty description leaves the chip blank; default to the apiName.
     if not args_dict.get("description"):
         args_dict["description"] = api_name or tool_name or "tool call"
     return {

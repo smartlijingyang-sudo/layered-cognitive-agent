@@ -297,12 +297,7 @@ def test_wire_tool_call_falls_back_to_identifier_when_api_name_missing() -> None
 
 
 def test_wire_tool_call_renames_activate_skill_id_to_name() -> None:
-    """LobeHub activateSkill inspector reads ``args.name``, not skill_id.
-
-    Import registers the RenderContract so project_args remaps the python
-    key. Without this, the collapsed chip is "Activate Skill:" with no
-    skill name and the expanded card returns null.
-    """
+    """RenderContract projects python ``skill_id`` onto inspector ``name``."""
     import lca.infrastructure.tools.skills.activate.tool  # noqa: F401
 
     wire = wire_tool_call("activate_skill", "tc1", {"skill_id": "officecli"})

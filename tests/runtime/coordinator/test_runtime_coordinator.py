@@ -139,18 +139,12 @@ async def test_handle_stamped_writes_projected_state_to_db_before_tool_end(
     assert any(e["type"] == "tool_end" for e in history)
 
 
-async def test_tool_end_with_content_publishes_followup_text_chunk(
+async def test_tool_end_never_mirrors_result_into_assistant_text(
     manager: LcaStreamEventLog, clean_run_id: str
 ) -> None:
-    """spine body.tool.execute.end with textual result must surface the answer
-    to the LobeHub client as an assistant bubble.
-
-    Replicates the live run ``run_634aefcbb06f`` failure: after a tool returns
-    ``result.content = "Example Domain"``, the LLM driver stops without
-    re-emitting text, so the assistant bubble stays empty. The coordinator
-    follows up ``tool_end`` with a single ``stream_chunk chunkType=text``
-    carrying the tool result, so the front-end ``accumulatedContent``
-    accumulator has the answer when ``agent_runtime_end`` lands.
+    """Every tool result belongs on the tool card. Mirroring ``result.content``
+    into a ``stream_chunk text`` dumps stdout / SKILL.md into the assistant
+    bubble. Native LobeHub never does this.
     """
     coord = LcaAgentRuntimeCoordinator(
         stream_manager=manager,
@@ -159,6 +153,7 @@ async def test_tool_end_with_content_publishes_followup_text_chunk(
         tool_state_writer=AsyncMock(),
     )
     await coord.start(clean_run_id, ctx={})
+    stdout = "Example Domain\n"
     await coord.handle_stamped(
         clean_run_id,
         {
@@ -172,7 +167,7 @@ async def test_tool_end_with_content_publishes_followup_text_chunk(
                     "message": {
                         "role": "tool",
                         "tool_call_id": "tc1",
-                        "content": "Example Domain\n",
+                        "content": stdout,
                     },
                 },
             }
@@ -181,77 +176,9 @@ async def test_tool_end_with_content_publishes_followup_text_chunk(
     history = await manager.read_history(clean_run_id, count=20)
     tool_ends = [e for e in history if e["type"] == "tool_end"]
     assert len(tool_ends) == 1
-    assert tool_ends[0]["data"]["result"]["content"] == "Example Domain\n"
-
-    text_chunks_after_tool_end = [
-        e
-        for e in history
-        if e["type"] == "stream_chunk"
-        and e["data"]["chunkType"] == "text"
-        and e["data"]["content"] == "Example Domain\n"
-    ]
-    assert len(text_chunks_after_tool_end) == 1, (
-        "tool_end with textual result must emit a follow-up stream_chunk text "
-        "so the assistant bubble renders the answer when the LLM driver stops"
-    )
-    # read_history returns newest-first; the follow-up text chunk must be
-    # NEWER than tool_end (i.e. appear earlier in the list), since the
-    # coordinator publishes tool_end first and the follow-up immediately after.
-    text_index = history.index(text_chunks_after_tool_end[0])
-    tool_end_index = history.index(tool_ends[0])
-    assert text_index < tool_end_index, (
-        "the follow-up text chunk must publish AFTER tool_end so the front-end "
-        "sees the answer after the tool card"
-    )
-
-
-async def test_tool_end_with_projected_state_does_not_dump_content_into_assistant(
-    manager: LcaStreamEventLog, clean_run_id: str
-) -> None:
-    """Card-owned tools put their body in ``result.content`` AND ``result.state``.
-    Mirroring that onto a ``stream_chunk text`` dumps the card body into the
-    assistant reply.
-    """
-    coord = LcaAgentRuntimeCoordinator(
-        stream_manager=manager,
-        translator=EventTranslator(),
-        metadata_writer=AsyncMock(),
-        tool_state_writer=AsyncMock(),
-    )
-    await coord.start(clean_run_id, ctx={})
-    skill_md = "# Office CLI\n\nUse officecli --json."
-    await coord.handle_stamped(
-        clean_run_id,
-        {
-            "event": {
-                "type": "ToolInvoked",
-                "isSuccess": True,
-                "output_text": skill_md,
-                "projected_state": {
-                    "name": "officecli",
-                    "title": "officecli",
-                    "content": skill_md,
-                },
-                "payload": {
-                    "toolCalling": {
-                        "id": "tc_skill",
-                        "identifier": "lobe-skills",
-                        "apiName": "activateSkill",
-                    }
-                },
-            }
-        },
-    )
-    history = await manager.read_history(clean_run_id, count=20)
-    tool_ends = [e for e in history if e["type"] == "tool_end"]
-    assert len(tool_ends) == 1
-    assert tool_ends[0]["data"]["result"]["content"] == skill_md
-    assert tool_ends[0]["data"]["result"]["state"]["name"] == "officecli"
+    assert tool_ends[0]["data"]["result"]["content"] == stdout
     assert not any(
-        e["type"] == "stream_chunk"
-        and e["data"].get("chunkType") == "text"
-        and e["data"].get("content") == skill_md
-        for e in history
+        e["type"] == "stream_chunk" and e["data"].get("chunkType") == "text" for e in history
     )
 
 

@@ -272,8 +272,7 @@ describe('createLcaGatewayEventHandler (multi-run / multi-LLM)', () => {
     expect(dbSpy).not.toHaveBeenCalled();
 
     // ── Pin the per-chunk-single accumulation that the LCA wire relies on.
-    // preserveToolResultMessageIds keeps first-seen order so activateSkill
-    // stays above later runCommand cards.
+    // preserveToolResultMessageIds keeps first-seen order.
     const updateToolCalls = (store.internal_dispatchMessage as ReturnType<typeof vi.fn>).mock.calls
       .map(([payload]) => payload)
       .filter(
@@ -449,10 +448,10 @@ describe('createLcaGatewayEventHandler (multi-run / multi-LLM)', () => {
           chunkType: 'tools_calling',
           toolsCalling: [
             {
-              apiName: 'activateSkill',
-              arguments: JSON.stringify({ name: 'officecli' }),
-              id: 'tc-skill',
-              identifier: 'lobe-skills',
+              apiName: 'runCommand',
+              arguments: JSON.stringify({ command: 'ls', description: 'runCommand' }),
+              id: 'tc-1',
+              identifier: 'lobe-cloud-sandbox',
               type: 'builtin',
             },
           ],
@@ -467,14 +466,14 @@ describe('createLcaGatewayEventHandler (multi-run / multi-LLM)', () => {
           isSuccess: true,
           payload: {
             toolCalling: {
-              apiName: 'activateSkill',
-              id: 'tc-skill',
-              identifier: 'lobe-skills',
+              apiName: 'runCommand',
+              id: 'tc-1',
+              identifier: 'lobe-cloud-sandbox',
             },
           },
           result: {
-            content: '# Office CLI',
-            state: { content: '# Office CLI', name: 'officecli', title: 'officecli' },
+            content: 'ok',
+            state: { stdout: 'ok', exitCode: 0 },
           },
         } as never,
         1,
@@ -485,11 +484,11 @@ describe('createLcaGatewayEventHandler (multi-run / multi-LLM)', () => {
     const assistant = store.dbMessagesMap[topicKey].find((m) => m.id === 'assistant-msg');
     const tools = assistant?.tools as Array<{
       id: string;
-      result?: { content?: string; state?: { name?: string } };
+      result?: { content?: string; state?: { stdout?: string } };
     }>;
     expect(tools).toHaveLength(1);
-    expect(tools[0].id).toBe('tc-skill');
-    expect(tools[0].result?.state?.name).toBe('officecli');
-    expect(tools[0].result?.content).toBe('# Office CLI');
+    expect(tools[0].id).toBe('tc-1');
+    expect(tools[0].result?.state?.stdout).toBe('ok');
+    expect(tools[0].result?.content).toBe('ok');
   });
 });
