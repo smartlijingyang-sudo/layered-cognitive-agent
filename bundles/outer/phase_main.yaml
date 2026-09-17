@@ -252,11 +252,17 @@ edges:
       # Hard cap on the tool re-ask (LangGraph recursion_limit /
       # OpenAI max_turns analogue). Without this, a stale ``decision``
       # port turns act→think into an unbounded empty loop (~880
-      # visits observed 2026-09-16). 8 rounds is enough for a real
-      # multi-tool turn; the kernel fail-louds via
-      # LoopObligationExceededError when the bound is hit and no
-      # fallback edge matches.
-      maxIterations: 8
+      # visits observed 2026-09-16). ``budget: run.steps`` is meant as
+      # the second bound, but ``Budget.max_steps`` is unset in the
+      # shipped profiles, so this cap is the only one — small enough to
+      # fail loud on a spin, large enough for a real multi-tool task.
+      # 24 rounds covers a document task that activates skills, reads
+      # and analyses an attachment, and generates a deliverable
+      # (run_82cf618a97f1: 11 distinct productive calls, no duplicates,
+      # killed mid-generation by the previous cap of 8). The kernel
+      # fail-louds via LoopObligationExceededError when the bound is
+      # hit and no fallback edge matches.
+      maxIterations: 24
       budget: run.steps
 
   # act → reflect.main (reflect reads observation/reflection from the
