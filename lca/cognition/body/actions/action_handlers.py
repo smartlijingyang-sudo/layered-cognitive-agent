@@ -19,7 +19,10 @@ from lca.cognition.body.delegation.cache import (
 )
 from lca.cognition.body.delegation.target import resolve_delegation_target
 from lca.cognition.body.tools.tool_batch_executor import ToolBatchExecutor
-from lca.cognition.body.tools.tool_wire_gate import tool_wire_block_observation
+from lca.cognition.body.tools.tool_wire_gate import (
+    missing_arguments_block_observation,
+    tool_wire_block_observation,
+)
 from lca.cognition.member_status.consult_policy import (
     classify_synthesis,
     run_wall_clock_remaining_s,
@@ -177,6 +180,7 @@ class UseToolOperation(Action):
         *,
         batch_execution_policy: ToolBatchExecutionPolicy,
     ) -> None:
+        self._tool_registry = tool_registry
         self._batch_executor = ToolBatchExecutor(
             tool_registry,
             safe_executor,
@@ -189,6 +193,12 @@ class UseToolOperation(Action):
         wire_block = tool_wire_block_observation(decision)
         if wire_block is not None:
             return wire_block
+        # ADR-0047: a call whose required arguments never arrived must not
+        # execute with an empty payload; the model gets the retry instruction
+        # instead of the tool's downstream error.
+        missing_block = missing_arguments_block_observation(decision, self._tool_registry)
+        if missing_block is not None:
+            return missing_block
 
         # PR-3.3: emit body.tool.execute.start/end at the action-handler layer
         # so the spine sees one ``start``/``end`` pair per ``use_tool`` decision

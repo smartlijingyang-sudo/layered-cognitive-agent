@@ -25,11 +25,22 @@ class NativeToolCall:
     """OpenAI 原生 function calling 返回的工具调用。
 
     直接透传 API 的 ``tool_calls`` 字段，不做任何编解码。
+
+    ``arguments`` 是不可信外部字符串解析后的结果：截断或非法时解析为
+    ``{}``，原始事实不能就此消失，否则调用方无法区分「模型没给参数」和
+    「参数在 wire 上被截断」。ADR-0047 的三态分类随调用一起透传:
+
+    - ``wire_status``: ``ok`` / ``incomplete`` / ``invalid``
+    - ``wire_reason``: 分类原因(如 ``unterminated_or_truncated_json``)
+    - ``wire_raw_preview``: 原始 arguments 的有界预览(诊断用)
     """
 
     call_id: str
     name: str
     arguments: dict[str, Any]
+    wire_status: str = "ok"
+    wire_reason: str = ""
+    wire_raw_preview: str = ""
 
 
 @dataclass(frozen=True)

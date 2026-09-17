@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any, NamedTuple
 
 from lca.contracts.models.core.conversation.llm import LLMResponse, NativeToolCall, TokenUsage
@@ -12,7 +11,11 @@ from lca.infrastructure.llm_adapter.settings.settings import (
     build_generation_kwargs,
 )
 from lca.infrastructure.llm_adapter.tool.arguments import (
+    ToolArgumentsIncomplete,
+    ToolArgumentsOk,
     finish_reason_value,
+    raw_preview,
+    resolve_tool_arguments,
 )
 
 # 再导出，供策略模块与测试引用
@@ -206,13 +209,26 @@ class _RawToolCall(NamedTuple):
     call_id: str
 
 
-def _parse_tool_arguments(arguments_json: str) -> dict[str, Any]:
-    """Parse tool call arguments JSON; return empty dict on failure."""
-    try:
-        parsed = json.loads(arguments_json or "{}")
-        return parsed if isinstance(parsed, dict) else {}
-    except (json.JSONDecodeError, ValueError):
-        return {}
+def _native_tool_call(raw: _RawToolCall, *, finish_reason: str | None) -> NativeToolCall:
+    """Classify one tool call's ``arguments`` wire payload (ADR-0047).
+
+    A truncated or malformed arguments stream yields no usable arguments;
+    the verdict travels with the call so the Body gate can refuse to
+    execute it and tell the model to shorten the payload, instead of the
+    tool running with an empty argument dict and handing back a confusing
+    downstream error.
+    """
+    outcome = resolve_tool_arguments(raw.arguments_json, finish_reason=finish_reason)
+    if isinstance(outcome, ToolArgumentsOk):
+        return NativeToolCall(call_id=raw.call_id, name=raw.name, arguments=outcome.arguments)
+    return NativeToolCall(
+        call_id=raw.call_id,
+        name=raw.name,
+        arguments={},
+        wire_status="incomplete" if isinstance(outcome, ToolArgumentsIncomplete) else "invalid",
+        wire_reason=outcome.reason,
+        wire_raw_preview=raw_preview(outcome.raw),
+    )
 
 
 def build_llm_response(
@@ -233,14 +249,9 @@ def build_llm_response(
     native_tool_calls: list[NativeToolCall] = []
     raw_list = tool_calls if tool_calls is not None else ([tool_call] if tool_call else [])
     for raw in raw_list:
-        if raw is not None:
-            native_tool_calls.append(
-                NativeToolCall(
-                    call_id=raw.call_id,
-                    name=raw.name,
-                    arguments=_parse_tool_arguments(raw.arguments_json),
-                )
-            )
+        if raw is None:
+            continue
+        native_tool_calls.append(_native_tool_call(raw, finish_reason=fr_norm))
     return LLMResponse(
         text=text,
         model=model,
