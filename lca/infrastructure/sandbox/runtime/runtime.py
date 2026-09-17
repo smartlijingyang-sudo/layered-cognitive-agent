@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from typing import Any
 
 import structlog
@@ -148,7 +149,7 @@ class RunBoundSandboxRuntime(SandboxRuntime):
             )
 
         mount_err = await verify_mount_or_error(
-            self._execute_raw,
+            self._execute_probe,
             manifest=self._manifest,
             timeout_s=min(30, self._default_timeout_s),
         )
@@ -160,6 +161,7 @@ class RunBoundSandboxRuntime(SandboxRuntime):
             return inspect_result
 
         self._ready = True
+        await self._baseline_outputs()
         return None
 
     async def _stage_files(self, files: Mapping[str, bytes | str]) -> SandboxResult | None:
@@ -246,9 +248,8 @@ class RunBoundSandboxRuntime(SandboxRuntime):
     ) -> SandboxExecResult:
         """Execute user code in the run-bound environment.
 
-        ``harvest_artifacts`` is for ``execute_code`` only. Structured computer
-        ops (read/list/edit) must pass False — they are JSON RPCs, not
-        deliverable producers, and the scanner would pollute their stdout.
+        User stdout is a text channel. Files leave through a later harvest
+        scan when ``harvest_artifacts`` is True. Computer JSON ops pass False.
         """
         if not self._ready:
             mount_err = await self.ensure_ready(explicit_attachment_ids)
@@ -271,31 +272,13 @@ class RunBoundSandboxRuntime(SandboxRuntime):
             timeout_s=budget,
             invocation_id=invocation_id,
             extra_files=extra_files,
-            harvest_artifacts=harvest_artifacts,
+            harvest_artifacts=False,
         )
-        # Track fingerprints so a later run_terminal harvest does not re-emit
-        # the same outputs/ bytes as this execute_code call.
-        self._remember_generated(raw.generated_files)
-        if raw.success:
-            return sandbox_exec_result_from(
-                raw,
-                mount_manifest=self._manifest,
-                environment_ready=True,
-                inspect_profile=self._inspect_profile,
-            )
-
-        kind, summary, fix, line_no, partial = classify_execution_error(raw)
-        return sandbox_exec_result_from(
-            raw,
-            error_kind=kind,
-            error_summary=summary,
-            suggested_fix=fix,
-            mount_manifest=self._manifest,
-            environment_ready=self._ready,
-            partial=partial,
-            failed_at_line=line_no,
-            inspect_profile=self._inspect_profile,
-        )
+        if harvest_artifacts:
+            generated = await self._harvest_execute_delta(invocation_id, budget)
+        else:
+            generated = self._delta_generated(raw.generated_files)
+        return self._exec_result(raw, generated)
 
     async def run_terminal(
         self,
@@ -411,6 +394,61 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         except Exception:
             _log.debug("office_resident_flush_skipped", run_id=self._run_id, exc_info=True)
 
+    async def _execute_probe(
+        self, code: str, *, timeout_s: int = DEFAULT_SANDBOX_TIMEOUT_S
+    ) -> SandboxResult:
+        return await self._execute_raw(code, timeout_s=timeout_s, harvest_artifacts=False)
+
+    async def _baseline_outputs(self) -> None:
+        """Fingerprint outputs already on disk so this run does not re-publish them."""
+        try:
+            existing = await self.scan_output_files(invocation_id="baseline_outputs")
+        except Exception:
+            _log.debug("sandbox_output_baseline_skipped", run_id=self._run_id, exc_info=True)
+            return
+        self._remember_generated(existing)
+
+    async def _harvest_execute_delta(
+        self, invocation_id: str, budget: int
+    ) -> tuple[SandboxFile, ...]:
+        try:
+            return await self.harvest_output_delta(
+                invocation_id=invocation_id or "execute_harvest",
+                timeout_s=min(60, budget, self._default_timeout_s),
+            )
+        except Exception:
+            _log.warning(
+                "execute_harvest_failed",
+                run_id=self._run_id,
+                inv=invocation_id,
+                exc_info=True,
+            )
+            return ()
+
+    def _exec_result(
+        self, raw: SandboxResult, generated: tuple[SandboxFile, ...]
+    ) -> SandboxExecResult:
+        merged = replace(raw, generated_files=generated)
+        if merged.success:
+            return sandbox_exec_result_from(
+                merged,
+                mount_manifest=self._manifest,
+                environment_ready=True,
+                inspect_profile=self._inspect_profile,
+            )
+        kind, summary, fix, line_no, partial = classify_execution_error(merged)
+        return sandbox_exec_result_from(
+            merged,
+            error_kind=kind,
+            error_summary=summary,
+            suggested_fix=fix,
+            mount_manifest=self._manifest,
+            environment_ready=self._ready,
+            partial=partial,
+            failed_at_line=line_no,
+            inspect_profile=self._inspect_profile,
+        )
+
     def _remember_generated(self, files: Sequence[SandboxFile]) -> None:
         for sf in files:
             self._output_fingerprints[sf.name] = _file_fingerprint(sf.data)
@@ -439,10 +477,9 @@ class RunBoundSandboxRuntime(SandboxRuntime):
     async def _run_inspect_internal(self, *, force: bool = False) -> SandboxExecResult | None:
         if self._inspect_profile is not None and not force:
             return None
-        raw = await self._execute_raw(
+        raw = await self._execute_probe(
             INSPECT_SCRIPT,
             timeout_s=min(60, self._default_timeout_s),
-            harvest_artifacts=False,
         )
         profile = parse_inspect_stdout(raw.stdout)
         if profile is None:
@@ -487,8 +524,8 @@ class RunBoundSandboxRuntime(SandboxRuntime):
         all_files: dict[str, bytes | str] = {**self._mount_files, **(extra_files or {})}
         await self._stage_files(all_files)
 
-        # Phase 2: Execute. Artifact scan is execute_code / harvest only —
-        # LobeHub file ops print one JSON object and stop.
+        # Phase 2: Execute. The scanner is for harvest stubs only.
+        # User code and JSON probes keep stdout as a text channel.
         lang_key = language.lower() if language else "python"
         if harvest_artifacts and lang_key in PYTHON_LANGUAGES:
             code = _append_artifact_scanner(code)

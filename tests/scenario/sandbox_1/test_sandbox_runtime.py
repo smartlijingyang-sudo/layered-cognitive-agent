@@ -6,7 +6,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from lca.contracts.models.core.execution.sandbox import (
+    SANDBOX_MOUNT_ROOT,
+    SANDBOX_OUTPUT_SUBDIR,
+)
 from lca.infrastructure.file.store import LocalFileStore
+from lca.infrastructure.sandbox.onlyboxes.artifacts import ARTIFACT_BEGIN
 from lca.infrastructure.sandbox.runtime.scope import bind_sandbox_runtime, get_sandbox_runtime
 from lca.infrastructure.tools.run.finalizer import finalize_run, run_id_scope
 from lca.infrastructure.tools.sandbox.runtime_tools import SandboxExecuteTool
@@ -15,8 +20,6 @@ from tests.support.inline_sandbox import InlineSandbox
 
 class TestSandboxRuntimeLifecycle(unittest.IsolatedAsyncioTestCase):
     async def test_harvest_flag_controls_artifact_scanner(self) -> None:
-        from lca.infrastructure.sandbox.onlyboxes.artifacts import ARTIFACT_BEGIN
-
         tmp = tempfile.TemporaryDirectory()
         store = LocalFileStore(Path(tmp.name))
         sandbox = InlineSandbox()
@@ -25,9 +28,15 @@ class TestSandboxRuntimeLifecycle(unittest.IsolatedAsyncioTestCase):
             err = await runtime.ensure_ready()
             self.assertIsNone(err)
             await runtime.execute("print(1)", harvest_artifacts=False)
-            self.assertNotIn(ARTIFACT_BEGIN, sandbox.session_run_calls[-1][1])
+            user_off = sandbox.session_run_calls[-1][1]
+            self.assertIn("print(1)", user_off)
+            self.assertNotIn(ARTIFACT_BEGIN, user_off)
             await runtime.execute("print(2)", harvest_artifacts=True)
-            self.assertIn(ARTIFACT_BEGIN, sandbox.session_run_calls[-1][1])
+            harvest = sandbox.session_run_calls[-1][1]
+            user_on = sandbox.session_run_calls[-2][1]
+            self.assertIn("print(2)", user_on)
+            self.assertNotIn(ARTIFACT_BEGIN, user_on)
+            self.assertIn(ARTIFACT_BEGIN, harvest)
         finally:
             await runtime.destroy()
             tmp.cleanup()
@@ -47,8 +56,9 @@ class TestSandboxRuntimeLifecycle(unittest.IsolatedAsyncioTestCase):
             with run_id_scope("run_lc"):
                 obs = await tool.execute({"code": 'print("hello")'})
             self.assertTrue(obs.success)
-            # 2 calls: 1 from _run_inspect_internal pre-check + 1 user code
-            self.assertEqual(len(sandbox.session_run_calls), 2)
+            codes = [c[1] for c in sandbox.session_run_calls]
+            self.assertTrue(any('print("hello")' in c and ARTIFACT_BEGIN not in c for c in codes))
+            self.assertTrue(any(ARTIFACT_BEGIN in c for c in codes))
 
             await finalize_run("run_lc")
             self.assertEqual(sandbox.destroyed_sessions, ["sess_1"])
@@ -68,10 +78,42 @@ class TestSandboxRuntimeLifecycle(unittest.IsolatedAsyncioTestCase):
                 tool = SandboxExecuteTool(sandbox=sandbox, store=store)
                 obs = await tool.execute({"code": 'print("stateless")'})
             self.assertTrue(obs.success)
-            # 2 calls: 1 from _run_inspect_internal pre-check + 1 user code
-            self.assertEqual(len(sandbox.run_calls), 2)
+            self.assertTrue(
+                any(
+                    'print("stateless")' in c and ARTIFACT_BEGIN not in c for c in sandbox.run_calls
+                )
+            )
+            self.assertTrue(any(ARTIFACT_BEGIN in c for c in sandbox.run_calls))
             self.assertEqual(len(sandbox.created_sessions), 0)
         finally:
+            tmp.cleanup()
+
+
+class TestOutputChannelSplit(unittest.IsolatedAsyncioTestCase):
+    async def test_preexisting_output_is_not_republished(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        store = LocalFileStore(Path(tmp.name))
+        sandbox = InlineSandbox()
+        try:
+            await sandbox.write_files(
+                {"old.pdf": b"%PDF-1.4 leftover"},
+                base_dir=f"{SANDBOX_MOUNT_ROOT}/{SANDBOX_OUTPUT_SUBDIR}",
+            )
+            runtime = await bind_sandbox_runtime("run_base", sandbox, store, ())
+            err = await runtime.ensure_ready()
+            self.assertIsNone(err)
+            result = await runtime.execute('print("ok")')
+            self.assertTrue(result.success)
+            self.assertEqual(result.stdout.strip(), "ok")
+            self.assertNotIn("old.pdf", [f.name for f in result.generated_files])
+            written = await runtime.execute(
+                'open("/mnt/data/outputs/new.txt", "wb").write(b"hi")\n'
+            )
+            names = [f.name for f in written.generated_files]
+            self.assertIn("new.txt", names)
+            self.assertNotIn("old.pdf", names)
+        finally:
+            await runtime.destroy()
             tmp.cleanup()
 
 

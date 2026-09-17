@@ -46,6 +46,44 @@ print(_j.dumps({{"found": found, "missing": missing}}, ensure_ascii=False))
 ExecuteFn = Callable[..., Awaitable[SandboxResult]]
 
 
+def parse_mount_verify_stdout(stdout: str) -> list[str]:
+    """Return missing attachment names from a guest verify script.
+
+    Guest stdout is untrusted. A leftover artifact dump after the JSON
+    object must not be treated as the control document.
+    """
+    text = (stdout or "").strip()
+    if not text:
+        return ["<parse error>"]
+    payload = _load_mount_verify_payload(text)
+    if payload is None:
+        return ["<parse error>"]
+    missing = payload.get("missing") or []
+    if not isinstance(missing, list):
+        return ["<parse error>"]
+    return [str(name) for name in missing]
+
+
+def _load_mount_verify_payload(text: str) -> dict[str, Any] | None:
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            val: Any = json.loads(stripped)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(val, dict) and "missing" in val:
+            return val
+    try:
+        val = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    if isinstance(val, dict) and "missing" in val:
+        return val
+    return None
+
+
 def load_mount_files(
     store: FileStore,
     explicit_ids: list[str] | None = None,
@@ -123,11 +161,7 @@ async def verify_mount_or_error(
             mount_manifest=manifest,
             environment_ready=False,
         )
-    try:
-        payload: dict[str, Any] = json.loads(verify.stdout.strip().splitlines()[-1])
-        missing = payload.get("missing") or []
-    except (json.JSONDecodeError, IndexError, AttributeError):
-        missing = ["<parse error>"]
+    missing = parse_mount_verify_stdout(verify.stdout)
     if missing:
         return SandboxExecResult(
             success=False,

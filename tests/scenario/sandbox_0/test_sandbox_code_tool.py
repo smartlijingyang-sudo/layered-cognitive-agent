@@ -147,8 +147,9 @@ class SandboxRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
             await tool.execute({"code": 'print("one")'})
             await tool.execute({"code": 'print("two")'})
         self.assertEqual(len(self.sandbox.created_sessions), 1)
-        # 3 calls: 1 inspect (ensure_ready) + 2 user code
-        self.assertEqual(len(self.sandbox.session_run_calls), 3)
+        codes = [c[1] for c in self.sandbox.session_run_calls]
+        self.assertTrue(any('print("one")' in c for c in codes))
+        self.assertTrue(any('print("two")' in c for c in codes))
         await unbind_sandbox_runtime(rid)
         self.assertEqual(self.sandbox.destroyed_sessions, ["sess_1"])
 
