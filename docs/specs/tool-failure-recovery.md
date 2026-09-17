@@ -148,7 +148,7 @@ USE_TOOL + failed Observation → 继续（act.main → think.main）
 
 兜住卡死循环的是 [`think.budget.gate`](../../lca/nodes/think/budget/threshold_gate.py)：它每轮 think 都执行，`Budget.exceeded()` 为真就发 `should_terminate=true` 收口。[`create_budget`](../../lca/contracts/models/core/policy/budget.py) 默认 `max_steps=50`、`max_wall_clock_seconds=300`。ADR-0225 已删除 per-node `max_visits`。
 
-另外两道界**目前在 `act.main → think.main` 这条路上失效**：[`ToolLoopBreakerGate`](../../lca/cognition/brain/decision_gates/tool/loop_breaker.py)（同一工具连续失败 3 次阻断）与 [`ProgressLoopDetector`](../../lca/cognition/brain/decision_gates/progress/loop_detector.py)（连续 6 步无进展强制 RESPOND）都读 `control_turns(state)`，而它只由 remember 阶段的 `TurnDeltaHandler` 经 `Reducer.apply_turn` 写入；失败工具路径跳过 remember，两个 gate 因此读到 0 条 turn。durable `turn.control.v1` 的生产入口 `append_turn_control_fact` 也没有调用方。这是既有缺陷，成功的工具循环同样受影响；详见 ADR-0230 Amendment。
+另外两道界**目前在所有 run 上都失效**：[`ToolLoopBreakerGate`](../../lca/cognition/brain/decision_gates/tool/loop_breaker.py)（同一工具连续失败 3 次阻断）与 [`ProgressLoopDetector`](../../lca/cognition/brain/decision_gates/progress/loop_detector.py)（连续 6 步无进展强制 RESPOND）都读 `control_turns(state)`。该 reader 优先取 durable `turn.control.v1` 折叠，回退到 `state.control_turns`（由 `Reducer.apply_turn` 写）。生产里通往 `apply_turn` 的唯一路径是 `TurnDeltaHandler.apply` → `Reducer.commit_turn`，而 `lca/` 下没有任何一处构造 `RunDelta`，这条链从不执行。两个 gate 因此每次都读到 0 条 turn。两个实盘工具循环 run 实测：`remember` 与 `reflect` 节点访问各 0 次，账本里没有 `turn.*` 事实。这是既有缺陷，详见 ADR-0230 Amendment。
 
 ## 8. 暂停、恢复和幂等
 

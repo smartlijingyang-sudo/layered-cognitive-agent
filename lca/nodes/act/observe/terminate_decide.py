@@ -20,8 +20,8 @@ PR-3 split:本节点从原 ``act.observe`` 中剥离 ``should_terminate`` 决策
 300s 墙钟);ADR-0225 已删除 per-node ``max_visits``,ADR-0230 当初为省掉
 ``max_visits=8`` 空转而在这一节点加的 deterministic-failure 短路已无前提。
 ``ToolLoopBreakerGate`` / ``ProgressLoopDetector`` 本应是更紧的界,但两者都读
-``control_turns``,而失败工具走的 ``act.main → think.main`` 跳过 remember、
-不写 turn,所以在这条路上读不到东西 —— 详见 ADR-0230 Amendment。
+``control_turns``,而生产里没有任何一处构造 ``RunDelta``,通往 ``apply_turn``
+的链从不执行,所以它们每次都读到 0 条 turn —— 详见 ADR-0230 Amendment。
 
 无副作用:不调 journal,不调 Body / Registry / SafeExecutor,不构造 envelope。
 typed-port 边界:输入 ``receipt``、输出 ``receipt`` + ``should_terminate``。
