@@ -72,7 +72,8 @@ class LlmInvokeExecutor:
         The typed ``ModelVisibleRequest`` is the in-process view; the
         adapter wire shape is ``stream(prompt, system=..., history=...,
         tools=...)``. The node owns this typed-boundary translation —
-        last message becomes the prompt, prior messages become history.
+        a trailing user turn becomes the prompt, every other row stays in
+        history (see :func:`_split_wire_turn`).
 
         ``state`` (kernel-injected carrier) and the ``cursor`` /
         ``reasoner_prompt`` identity are forwarded to the streaming
@@ -86,8 +87,7 @@ class LlmInvokeExecutor:
         request = _resolve_port("model_visible_request", input=input)
         adapter = _resolve_adapter(context=context)
 
-        prompt = request.messages[-1]["content"] if request.messages else ""
-        history = request.messages[:-1] if len(request.messages) > 1 else []
+        prompt, history = _split_wire_turn(request.messages)
         cursor, reasoner_prompt = _model_visible_identity(state, request)
 
         response: LLMResponse = LLMResponse(text="")
@@ -111,6 +111,30 @@ class LlmInvokeExecutor:
                 "usage": response.usage or TokenUsage(),
             }
         )
+
+
+def _split_wire_turn(messages: Any) -> tuple[str, list[Any]]:
+    """Split the derived message list onto the adapter's ``(prompt, history)`` seam.
+
+    Only a trailing ``role=user`` row with text becomes the prompt. Any
+    other trailing row stays in ``history``: the wire builder renders the
+    prompt as a *new* user turn, so handing it a ``role=tool`` row would
+    strip that row's ``tool_call_id`` and leave the assistant's
+    ``tool_calls`` unanswered, and handing it a ``role=assistant`` row
+    would drop the declared calls outright.
+    """
+    rows: list[Any] = list(messages or ())
+    if rows:
+        last = rows[-1]
+        content = last.get("content") if isinstance(last, dict) else None
+        if (
+            isinstance(last, dict)
+            and last.get("role") == "user"
+            and isinstance(content, str)
+            and content.strip()
+        ):
+            return content, rows[:-1]
+    return "", rows
 
 
 def _model_visible_identity(state: Any, request: Any) -> tuple[Any, Any]:

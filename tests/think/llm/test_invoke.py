@@ -173,6 +173,70 @@ async def test_invoke_unpacks_history_from_request_messages() -> None:
 
 
 @pytest.mark.asyncio
+async def test_invoke_keeps_trailing_tool_row_in_history() -> None:
+    """A trailing ``role=tool`` row must not be re-rendered as the user prompt.
+
+    The wire builder turns ``prompt`` into a *new* ``role=user`` turn, so
+    handing it the last tool row strips that row's ``tool_call_id`` and
+    leaves the assistant's ``tool_calls`` unanswered — the exact shape
+    ``run_71456ce99914`` sent for every tool turn.
+    """
+    executor = LlmInvokeExecutor()
+    adapter = _FakeAdapter(response=LLMResponse(text="ok"))
+    messages = [
+        {"role": "user", "content": "read the file"},
+        {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [{"id": "c1", "name": "runCommand", "arguments": "{}"}],
+        },
+        {"role": "tool", "tool_call_id": "c1", "content": "file contents"},
+    ]
+    request = ModelVisibleRequest(messages=messages, system="sys", tools=())
+
+    await executor.node_execute(
+        _ctx(_state(), adapter=adapter),
+        NodeInput(port_values={"model_visible_request": request}),
+    )
+
+    call = adapter.calls[0]
+    assert call["prompt"] == ""
+    assert call["history"] == messages
+
+
+@pytest.mark.asyncio
+async def test_invoke_keeps_trailing_assistant_tool_calls_in_history() -> None:
+    """A trailing assistant row keeps its declared calls instead of vanishing.
+
+    ``messages[-1]["content"]`` is ``None`` for a tool-calling turn, so the
+    old split produced ``prompt=None`` and dropped the row (and its call
+    ids) from the request entirely.
+    """
+    executor = LlmInvokeExecutor()
+    adapter = _FakeAdapter(response=LLMResponse(text="ok"))
+    messages = [
+        {"role": "user", "content": "activate the skills"},
+        {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [{"id": "c1", "name": "activate_skill", "arguments": "{}"}],
+        },
+    ]
+    request = ModelVisibleRequest(messages=messages, system="sys", tools=())
+
+    await executor.node_execute(
+        _ctx(_state(), adapter=adapter),
+        NodeInput(port_values={"model_visible_request": request}),
+    )
+
+    call = adapter.calls[0]
+    assert call["prompt"] == ""
+    assert call["history"][-1]["tool_calls"] == [
+        {"id": "c1", "name": "activate_skill", "arguments": "{}"}
+    ]
+
+
+@pytest.mark.asyncio
 async def test_invoke_returns_default_usage_when_response_has_none() -> None:
     """``response.usage is None`` ⇒ typed port receives an empty ``TokenUsage``."""
     executor = LlmInvokeExecutor()
@@ -218,8 +282,6 @@ async def test_invoke_missing_adapter_raises() -> None:
 async def test_invoke_no_state_in_runtime_raises() -> None:
     """No ``state`` on the runtime carrier ⇒ TypeError (fail-loud)."""
     executor = LlmInvokeExecutor()
-    response = LLMResponse(text="ok", usage=TokenUsage())
-    adapter = _FakeAdapter(response=response)
     with pytest.raises(TypeError, match="state"):
         await executor.node_execute(
             NodeContext(runtime={}, budget={}, metadata={}),

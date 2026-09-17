@@ -19,7 +19,10 @@ def openai_messages_with_history(
     """OpenAI-compatible messages with optional ``role=system`` header.
 
     ``system`` (when truthy) becomes the first message with ``role=system``.
-    ``history`` items follow, then ``prompt`` becomes the final user turn.
+    ``history`` items follow; ``prompt`` becomes the final user turn only
+    when it carries text — a caller whose message list is already complete
+    passes an empty prompt, and appending an empty user turn would leave a
+    trailing ``role=tool`` row stripped of its ``tool_call_id``.
     """
     messages: list[dict[str, Any]] = []
     if system:
@@ -45,8 +48,12 @@ def openai_messages_with_history(
                         },
                     }
                 )
+            text = item.get("content")
+            text = text if isinstance(text, str) and text.strip() else None
             if openai_calls:
-                messages.append({"role": "assistant", "content": None, "tool_calls": openai_calls})
+                messages.append({"role": "assistant", "content": text, "tool_calls": openai_calls})
+            elif text is not None:
+                messages.append({"role": "assistant", "content": text})
         elif role == "tool":
             messages.append(
                 {
@@ -59,7 +66,8 @@ def openai_messages_with_history(
             content = item.get("content")
             if isinstance(content, str) and content.strip():
                 messages.append({"role": "user", "content": content})
-    messages.append({"role": "user", "content": prompt})
+    if prompt and prompt.strip():
+        messages.append({"role": "user", "content": prompt})
     return messages
 
 
@@ -100,6 +108,9 @@ def anthropic_messages_with_history(
                         "input": arguments,
                     }
                 )
+            text = item.get("content")
+            if isinstance(text, str) and text.strip():
+                blocks.insert(0, {"type": "text", "text": text})
             if blocks:
                 messages.append({"role": "assistant", "content": blocks})
         elif role == "tool":
@@ -119,5 +130,6 @@ def anthropic_messages_with_history(
             content = item.get("content")
             if isinstance(content, str) and content.strip():
                 messages.append({"role": "user", "content": content})
-    messages.append({"role": "user", "content": prompt})
+    if prompt and prompt.strip():
+        messages.append({"role": "user", "content": prompt})
     return messages

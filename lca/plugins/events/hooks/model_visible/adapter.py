@@ -86,8 +86,8 @@ def _kwargs_for_hook(
 ) -> dict[str, Any]:
     out = dict(kwargs)
     history = out.get("history")
+    wire_prompt = (prompt or str(out.get("prompt") or "")).strip()
     if isinstance(history, (list, tuple)) and history:
-        wire_prompt = (prompt or str(out.get("prompt") or "")).strip()
         if wire_prompt:
             from lca.infrastructure.llm_adapter.openai_compat.history import (
                 openai_messages_with_history,
@@ -99,7 +99,13 @@ def _kwargs_for_hook(
         elif "messages" not in out:
             out["messages"] = tuple(history)
     elif "messages" not in out and "history" in out:
-        out["messages"] = out["history"]
+        # First turn of a run: the derived history is still empty and the
+        # whole request is the prompt. Record the user row the wire builder
+        # emits, so the header shows what the model saw instead of ``[]``.
+        rows = list(history or ())
+        if wire_prompt:
+            rows.append({"role": "user", "content": wire_prompt})
+        out["messages"] = tuple(rows)
     cfg = _resolve_model_config(inner)
     if cfg is not None:
         existing = out.get("config")
