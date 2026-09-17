@@ -38,6 +38,7 @@ from lca.contracts.models.core.conversation.llm import (
     LLMStreamEventType,
     TokenUsage,
 )
+from lca.contracts.models.core.state.state import remaining_wall_clock_seconds
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -91,6 +92,7 @@ class LlmInvokeExecutor:
         cursor, reasoner_prompt = _model_visible_identity(state, request)
 
         response: LLMResponse = LLMResponse(text="")
+        aborted = False
         async for event in adapter.stream(
             prompt,
             system=request.system,
@@ -102,8 +104,19 @@ class LlmInvokeExecutor:
             cursor=cursor,
             reasoner_prompt=reasoner_prompt,
         ):
+            if _wall_clock_exhausted(state):
+                aborted = True
+                break
             if event.type is LLMStreamEventType.COMPLETED and event.response is not None:
                 response = event.response
+
+        if aborted and not response.tool_calls and not (response.text or "").strip():
+            response = LLMResponse(
+                text=_wall_clock_abort_text(state),
+                finish_reason="length",
+                model=response.model,
+                usage=response.usage,
+            )
 
         return NodeOutput(
             port_values={
@@ -111,6 +124,23 @@ class LlmInvokeExecutor:
                 "usage": response.usage or TokenUsage(),
             }
         )
+
+
+def _wall_clock_exhausted(state: Any) -> bool:
+    budget = getattr(state, "budget", None)
+    if budget is None:
+        return False
+    remaining = remaining_wall_clock_seconds(budget)
+    return remaining is not None and remaining <= 0
+
+
+def _wall_clock_abort_text(state: Any) -> str:
+    budget = getattr(state, "budget", None)
+    cap = getattr(budget, "max_wall_clock_seconds", None)
+    return (
+        f"运行已停止（budget_exceeded_wall_clock_seconds，上限 {cap}s），"
+        "未完成最终交付。请缩短工具参数或改用 executeCode 后重试。"
+    )
 
 
 def _split_wire_turn(messages: Any) -> tuple[str, list[Any]]:

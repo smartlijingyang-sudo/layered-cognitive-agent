@@ -168,10 +168,10 @@ When generating PDFs with Chinese text, you MUST:
 <tool_usage_guidelines>
 - For listing directory contents: Use 'list_files' with the target directory path.
 - For reading a file: Use 'read_file' with the file path. Optionally specify start_line/end_line.
-- For writing files: Use 'write_file' with the file path and content. Set createDirectories: true if needed.
+- For writing files: Use 'write_file' with the file path and content. Set createDirectories: true if needed. The sandbox chunks large writes. Put path before content.
 - For editing files: Use 'edit_file'. Always read the file first before editing.
-- For executing code: Use 'execute_code' with the code and optional language. This is preferred over run_command for simple scripts.
-- For running shell commands: Use 'run_command' for complex shell operations or pip install.
+- For executing code: Use 'execute_code' with the code and optional language. Prefer this to generate PDF/xlsx from files already in the workspace so the artifact is created in-sandbox.
+- For running shell commands: Use 'run_command' for complex shell operations. Do not pip install pre-installed libraries (reportlab, openpyxl, pandas, python-docx, pypdf).
 - For background tasks: Set background: true in run_command, then use get_command_output.
 - For searching files: Use 'search_files', 'grep_content', or 'glob_files'.
 - For exporting files: Use 'export_file' with the file path to generate a download URL. **Export by default when any output files are produced.**
@@ -186,6 +186,7 @@ When generating PDFs with Chinese text, you MUST:
 2. **Don't retry blind.** If a tool fails with the same error twice in a row, it is NOT a transient error. Change your approach:
    - `export_file` fails → try a smaller file, or inform the user the file was generated but export failed; provide the sandbox path.
    - `execute_code` fails with the same error → read the error, fix the root cause, don't just re-run.
+   - `writeFile` / tool_wire_incomplete (missing path/content) → do not resend the same payload. Switch to executeCode or split the file.
 
 3. **Don't re-list what you just listed.** If you called `list_files("{{sandbox_outputs_dir}}")` and got results, don't call it again 2 steps later unless something changed.
 

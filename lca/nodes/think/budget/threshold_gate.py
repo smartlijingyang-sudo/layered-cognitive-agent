@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.functional.group import FunctionalGroup
+from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -32,6 +33,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
+from lca.contracts.models.core.execution.decision import Decision
 from lca.contracts.models.core.state.state import Budget
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
@@ -83,7 +85,7 @@ class ThinkBudgetThresholdGateExecutor:
     semantic_name: str = "think.budget.gate"
     region: str = "think"
     declared_inputs: tuple = ()
-    declared_outputs: tuple[PortName, ...] = ("routing",)
+    declared_outputs: tuple[PortName, ...] = ("routing", "decision")
 
     async def node_execute(
         self,
@@ -93,7 +95,11 @@ class ThinkBudgetThresholdGateExecutor:
         """Read ``state.budget`` via the runtime carrier; emit the routing decision."""
         del input  # state arrives via the runtime carrier
         budget = _resolve_budget(context=context)
-        return NodeOutput(port_values={"routing": _decide(budget)})
+        routing = _decide(budget)
+        ports: dict[str, object] = {"routing": routing}
+        if routing.should_terminate:
+            ports["decision"] = _harvest_decision(budget, context=context)
+        return NodeOutput(port_values=ports)
 
 
 def _decide(budget: Budget) -> RoutingDecision:
@@ -111,6 +117,44 @@ def _decide(budget: Budget) -> RoutingDecision:
         next_node="think.context.truncate",
         next_hint="budget_ok",
     )
+
+
+def _harvest_decision(budget: Budget, *, context: NodeContext) -> Decision:
+    """User-visible stop text so terminal.commit is not ``reason=continue``."""
+    reason = _pick_exceeded_reason(budget)
+    last_error = _last_tool_error(context)
+    lines = [
+        f"运行已停止（{reason}），未完成最终交付。",
+        "生成 PDF/表格时用 executeCode 读取工作区已有文件；writeFile 会把已抽出的 path/content 写入沙箱。",
+        "预装库（reportlab / openpyxl 等）不要再 pip install。",
+    ]
+    if last_error:
+        lines.insert(1, f"最后一次工具失败：{last_error[:500]}")
+    return Decision(
+        decision_id=new_id("dec"),
+        action_type=ActionType.RESPOND.value,
+        rationale=reason,
+        confidence=1.0,
+        response_text="\n".join(lines),
+    )
+
+
+def _last_tool_error(context: NodeContext) -> str:
+    runtime = getattr(context, "runtime", None)
+    state_obj = getattr(runtime, "state", None) if runtime is not None else None
+    if state_obj is None and runtime is not None and hasattr(runtime, "get"):
+        state_obj = runtime.get("state")
+    if state_obj is None:
+        return ""
+    from lca.infrastructure.session.context.turn_control_reader import (
+        iter_control_turns_reversed,
+    )
+
+    for turn in iter_control_turns_reversed(state_obj):
+        error = (turn.observation_error or "").strip()
+        if error:
+            return error
+    return ""
 
 
 def _resolve_budget(*, context: NodeContext) -> Budget:

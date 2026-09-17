@@ -19,6 +19,11 @@ from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.atoms.scope.scope import Scope
+from lca.contracts.atoms.semantic.keys import (
+    TOOL_WIRE_RAW_PREVIEW,
+    TOOL_WIRE_REASON,
+    TOOL_WIRE_STATUS,
+)
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
     AuthorityContract,
@@ -113,6 +118,7 @@ def _compose(
             rationale="",
             confidence=1.0,
             tool_calls=list(tool_calls),
+            extra=_wire_extra(tool_calls),
         )
     if intent:
         return Decision(
@@ -129,6 +135,27 @@ def _compose(
         confidence=0.0,
         response_text=_PARSE_FAILURE_USER_MESSAGE,
     )
+
+
+def _wire_extra(tool_calls: tuple[ToolCall, ...]) -> dict[str, object]:
+    """Copy the first non-ok ADR-0047 wire verdict onto Decision.extra.
+
+    Body's ``tool_wire_block_observation`` reads extra, not ToolCall.
+    Parser used to drop NativeToolCall.wire_* so a truncated writeFile
+    reached act as ``arguments={}`` with status ok.
+    """
+    for call in tool_calls:
+        status = (call.wire_status or "ok").strip() or "ok"
+        if status == "ok":
+            continue
+        extra: dict[str, object] = {
+            TOOL_WIRE_STATUS: status,
+            TOOL_WIRE_REASON: call.wire_reason or status,
+        }
+        if call.wire_raw_preview:
+            extra[TOOL_WIRE_RAW_PREVIEW] = call.wire_raw_preview
+        return extra
+    return {}
 
 
 @plugin(

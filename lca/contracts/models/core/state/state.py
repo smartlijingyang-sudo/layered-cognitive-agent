@@ -16,8 +16,8 @@ from lca.contracts.models.core.workspace.activation import ActivatedSkill
 from lca.contracts.models.team.team.awareness import TeamAwareness
 
 if TYPE_CHECKING:
-    from lca.framework.graph.adapter import PhaseRunCursor
     from lca.contracts.models.cognition.task import TaskList
+    from lca.framework.graph.adapter import PhaseRunCursor
 
 
 @dataclass
@@ -62,13 +62,20 @@ def _budget_limit_exceeded(used: int | float, maximum: int | float | None) -> bo
     return maximum is not None and used > maximum
 
 
+def remaining_wall_clock_seconds(budget: Budget) -> float | None:
+    """Seconds left on the wall-clock cap; ``None`` when no cap is set."""
+
+    if budget.max_wall_clock_seconds is None:
+        return None
+    elapsed = (utc_now() - budget.started_at).total_seconds()
+    return float(budget.max_wall_clock_seconds) - elapsed
+
+
 def _wall_clock_exceeded(budget: Budget) -> bool:
     """Return whether the budget's elapsed wall-clock has exceeded its maximum."""
 
-    if budget.max_wall_clock_seconds is None:
-        return False
-    elapsed = (utc_now() - budget.started_at).total_seconds()
-    return bool(elapsed > budget.max_wall_clock_seconds)
+    remaining = remaining_wall_clock_seconds(budget)
+    return remaining is not None and remaining < 0
 
 
 @dataclass

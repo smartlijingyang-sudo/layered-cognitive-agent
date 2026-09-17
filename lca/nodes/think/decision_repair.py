@@ -247,21 +247,33 @@ def _validate_or_repair_calls(
             return _SCHEMA_REJECTED, list(tool_calls)
 
         schema = _lookup_schema(call.tool_name, registry=registry)
-        if schema is None:
+        wire_bad = (call.wire_status or "ok") in {"incomplete", "invalid"}
+        if schema is None and not wire_bad:
             # No schema available — pass the call through unchanged.
             repaired.append(call)
             continue
 
-        if _matches_schema(call.arguments, schema):
+        if not wire_bad and schema is not None and _matches_schema(call.arguments, schema):
             repaired.append(call)
             continue
 
-        # Schema mismatch → attempt one deterministic repair over the
-        # raw preview if present on the parent Decision; the raw
-        # preview is the ADR-0047 wire-side artifact that records
-        # the truncated arguments string.
+        if schema is None:
+            # Incomplete wire and no schema to repair against — Body
+            # keeps the ADR-0047 execute block so the model sees the
+            # Observation instead of a silent re-route.
+            repaired.append(call)
+            continue
+
+        # Schema mismatch or incomplete wire → one deterministic repair
+        # over the raw preview (Decision.extra or ToolCall.wire_raw_preview).
         repaired_args = _attempt_repair(call, schema=schema, raw_preview=raw_preview)
         if repaired_args is None:
+            if wire_bad:
+                # Keep the incomplete call so Body can emit the ADR-0047
+                # Observation; re-routing here would skip the error the
+                # model needs in order to stop repeating the same payload.
+                repaired.append(call)
+                continue
             return _REPAIR_REJECTED, list(tool_calls)
 
         repaired.append(_with_arguments(call, repaired_args))
@@ -456,6 +468,10 @@ def _raw_preview_from_decision(decision: Decision) -> str | None:
     raw = decision.extra.get(TOOL_WIRE_RAW_PREVIEW)
     if isinstance(raw, str) and raw:
         return raw
+    for call in decision.tool_calls:
+        preview = call.wire_raw_preview
+        if isinstance(preview, str) and preview:
+            return preview
     return None
 
 

@@ -239,6 +239,38 @@ async def test_decision_repair_irreparable_arguments_rejects_to_route_decide() -
 
 
 @pytest.mark.asyncio
+async def test_incomplete_wire_passes_through_so_body_can_observe() -> None:
+    """Truncated writeFile must reach Body, not skip act via re-route."""
+    executor = ThinkDecisionRepairExecutor()
+    write_schema = {
+        "type": "object",
+        "properties": {
+            "path": {"type": "string"},
+            "content": {"type": "string"},
+        },
+        "required": ["path", "content"],
+    }
+    registry = _FakeRegistry({"writeFile": _FakeTool("writeFile", write_schema)})
+    decision = _decision(
+        ToolCall(
+            call_id="call_wf",
+            tool_name="writeFile",
+            arguments={},
+            wire_status="incomplete",
+            wire_reason="unterminated_or_truncated_json",
+            wire_raw_preview='{"content": "from reportlab',
+        )
+    )
+
+    output = await executor.node_execute(_ctx(), _input(decision, tools=registry))
+    routing: RoutingDecision = output.port_values["routing"]
+    forwarded: Decision = output.port_values["decision"]
+
+    assert routing.next_hint == "decision_ok"
+    assert forwarded.tool_calls[0].wire_status == "incomplete"
+
+
+@pytest.mark.asyncio
 async def test_decision_repair_is_idempotent() -> None:
     """Same ``decision`` input → identical ``(decision, routing)`` across calls.
 

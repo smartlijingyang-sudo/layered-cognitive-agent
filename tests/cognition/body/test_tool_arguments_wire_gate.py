@@ -55,9 +55,9 @@ def _decision(*calls: ToolCall) -> Decision:
     )
 
 
-def test_truncated_arguments_are_classified_not_silently_emptied() -> None:
-    """A truncated JSON payload keeps its verdict and a bounded raw preview."""
-    truncated = '{"path": "outputs/report.pdf", "content": "from reportlab.platypus import'
+def test_truncated_writefile_json_recovers_path_and_content() -> None:
+    """Sandbox Write lands recovered path+content; it does not execute ``{}``."""
+    truncated = '{"path": "outputs/report.py", "content": "from reportlab.platypus import'
     response: LLMResponse = build_llm_response(
         text="",
         tool_calls=[_RawToolCall(name="writeFile", arguments_json=truncated, call_id="c1")],
@@ -67,23 +67,39 @@ def test_truncated_arguments_are_classified_not_silently_emptied() -> None:
     )
 
     call = response.tool_calls[0]
-    assert call.arguments == {}
-    assert call.wire_status == "incomplete"
-    assert call.wire_reason == "unterminated_or_truncated_json"
-    assert call.wire_raw_preview.startswith('{"path"')
+    assert call.wire_status == "ok"
+    assert call.arguments["path"] == "outputs/report.py"
+    assert call.arguments["content"].startswith("from reportlab.platypus import")
 
 
-def test_length_finish_reason_marks_arguments_incomplete() -> None:
+def test_length_finish_reason_with_valid_json_still_executes() -> None:
     response = build_llm_response(
         text="",
         tool_calls=[
-            _RawToolCall(name="writeFile", arguments_json='{"path": "a.pdf"}', call_id="c1")
+            _RawToolCall(
+                name="writeFile", arguments_json='{"path": "a.pdf", "content": "x"}', call_id="c1"
+            )
         ],
         model="m",
         usage=None,
         finish_reason="length",
     )
 
+    call = response.tool_calls[0]
+    assert call.wire_status == "ok"
+    assert call.arguments == {"path": "a.pdf", "content": "x"}
+
+
+def test_length_finish_reason_without_recoverable_fields_is_incomplete() -> None:
+    response = build_llm_response(
+        text="",
+        tool_calls=[_RawToolCall(name="writeFile", arguments_json="{", call_id="c1")],
+        model="m",
+        usage=None,
+        finish_reason="length",
+    )
+
+    assert response.tool_calls[0].arguments == {}
     assert response.tool_calls[0].wire_status == "incomplete"
     assert response.tool_calls[0].wire_reason == "finish_reason_length"
 
@@ -145,3 +161,51 @@ def test_native_tool_call_defaults_to_ok() -> None:
     call = NativeToolCall(call_id="c1", name="readFile", arguments={"path": "a"})
 
     assert (call.wire_status, call.wire_reason, call.wire_raw_preview) == ("ok", "", "")
+
+
+def test_large_truncated_writefile_json_still_lands_in_sandbox_args() -> None:
+    huge = '{"path": "outputs/a.py", "content": "' + ("x" * 20_000)
+    response = build_llm_response(
+        text="",
+        tool_calls=[_RawToolCall(name="writeFile", arguments_json=huge, call_id="c1")],
+        model="m",
+        usage=None,
+        finish_reason="tool_calls",
+    )
+    call = response.tool_calls[0]
+    assert call.wire_status == "ok"
+    assert call.arguments["path"] == "outputs/a.py"
+    assert len(call.arguments["content"]) == 20_000
+
+
+def test_empty_arguments_with_tool_calls_finish_are_incomplete() -> None:
+    response = build_llm_response(
+        text="",
+        tool_calls=[_RawToolCall(name="writeFile", arguments_json="", call_id="c1")],
+        model="m",
+        usage=None,
+        finish_reason="tool_calls",
+    )
+    call = response.tool_calls[0]
+    assert call.arguments == {}
+    assert call.wire_status == "incomplete"
+    assert call.wire_reason == "empty_arguments"
+
+
+def test_gate_blocks_tool_call_wire_status_even_without_decision_extra() -> None:
+    decision = _decision(
+        ToolCall(
+            call_id="c1",
+            tool_name="writeFile",
+            arguments={},
+            wire_status="incomplete",
+            wire_reason="unterminated_or_truncated_json",
+            wire_raw_preview='{"content": "from reportlab',
+        )
+    )
+    from lca.cognition.body.tools.tool_wire_gate import tool_wire_block_observation
+
+    observation = tool_wire_block_observation(decision)
+    assert observation is not None
+    assert observation.success is False
+    assert "writeFile" in (observation.error or "")

@@ -26,6 +26,21 @@ from lca.contracts.atoms.enums.enums import FinishReason
 # 诊断预览上限，防止超大 raw 污染 journal / Decision.extra
 _RAW_PREVIEW_MAX = 2000
 
+# Keys whose values are opaque text bodies. Truncated JSON still carries
+# these as unclosed strings; recovering them is how coding agents land a
+# Write/Bash/execute call instead of executing ``{}``.
+_PARTIAL_STRING_KEYS = (
+    "path",
+    "name",
+    "content",
+    "code",
+    "command",
+    "description",
+    "language",
+    "skill_id",
+    "query",
+)
+
 ToolWireReason = Literal[
     "finish_reason_length",
     "unterminated_or_truncated_json",
@@ -96,6 +111,79 @@ def raw_preview(raw: str, *, max_len: int = _RAW_PREVIEW_MAX) -> str:
     return raw[:max_len]
 
 
+def extract_partial_json_string(raw: str, key: str) -> str | None:
+    """Return the decoded JSON string value for ``key``, even if unclosed."""
+    marker = f'"{key}"'
+    idx = raw.find(marker)
+    if idx < 0:
+        return None
+    colon = raw.find(":", idx + len(marker))
+    if colon < 0:
+        return None
+    rest = raw[colon + 1 :].lstrip()
+    if not rest.startswith('"'):
+        return None
+    return _decode_json_string_prefix(rest, 1)
+
+
+def recover_partial_tool_arguments(raw: str) -> dict[str, Any]:
+    """Recover ``path`` / ``content`` / ``code`` from truncated tool JSON.
+
+    Strict ``json.loads`` fails on an unterminated string. Coding-agent
+    Write/execute paths still need the destination and the body so the
+    sandbox can land the file (it already chunks large writes). Empty
+    recovery stays empty.
+    """
+    stripped = (raw or "").strip()
+    if not stripped:
+        return {}
+    try:
+        parsed: Any = json.loads(stripped)
+    except json.JSONDecodeError:
+        parsed = None
+    if isinstance(parsed, dict):
+        return dict(parsed)
+    if parsed is not None:
+        return {"_value": parsed}
+    out: dict[str, Any] = {}
+    for key in _PARTIAL_STRING_KEYS:
+        value = extract_partial_json_string(raw, key)
+        if value is not None:
+            out[key] = value
+    return out
+
+
+def _usable_recovered_arguments(arguments: dict[str, Any]) -> bool:
+    return any(
+        isinstance(arguments.get(key), str) and str(arguments[key]).strip()
+        for key in _PARTIAL_STRING_KEYS
+    )
+
+
+def _decode_json_string_prefix(source: str, start: int) -> str:
+    parts: list[str] = []
+    escaped = False
+    for ch in source[start:]:
+        if escaped:
+            if ch == "n":
+                parts.append("\n")
+            elif ch == "t":
+                parts.append("\t")
+            elif ch == "r":
+                parts.append("\r")
+            else:
+                parts.append(ch)
+            escaped = False
+            continue
+        if ch == "\\":
+            escaped = True
+            continue
+        if ch == '"':
+            break
+        parts.append(ch)
+    return "".join(parts)
+
+
 def resolve_tool_arguments(
     arguments_json: str | None,
     *,
@@ -105,38 +193,42 @@ def resolve_tool_arguments(
 
     规则（按优先级）::
 
-        1. finish_reason ≡ LENGTH  → Incomplete（即使 JSON 碰巧可 parse）
-        2. 空 arguments            → Ok({})
-        3. json.loads 成功且 dict  → Ok
-        4. json.loads 成功非 dict  → Ok({"_value": ...})  # 极少数 provider 形态
-        5. JSONDecodeError         → Incomplete（截断信号）或 Invalid
+        1. 空 arguments + tool_calls 结束 → Incomplete(empty_arguments)
+        2. 空 arguments（其它结束原因）   → Ok({})
+        3. json.loads 成功且 dict         → Ok（含 finish_reason=length）
+        4. json.loads 成功非 dict         → Ok({"_value": ...})
+        5. JSONDecodeError 且能抽出 path/content/code 等 → Ok(recovered)
+        6. 其余 JSONDecodeError / length 且无法抽出     → Incomplete
     """
     fr = normalize_finish_reason(finish_reason)
     raw = arguments_json if arguments_json is not None else ""
+
+    if not str(raw).strip():
+        if fr is FinishReason.TOOL_CALLS or fr is FinishReason.LENGTH:
+            return ToolArgumentsIncomplete(
+                raw=raw,
+                reason="empty_arguments"
+                if fr is FinishReason.TOOL_CALLS
+                else "finish_reason_length",
+                detail="provider ended a tool call with empty arguments JSON",
+            )
+        return ToolArgumentsOk(arguments={})
+
+    recovered = recover_partial_tool_arguments(raw)
+    if _usable_recovered_arguments(recovered):
+        return ToolArgumentsOk(arguments=recovered)
 
     if fr is FinishReason.LENGTH:
         return ToolArgumentsIncomplete(
             raw=raw,
             reason="finish_reason_length",
-            detail="provider finish_reason=length; tool arguments treated as incomplete",
+            detail="provider finish_reason=length and no recoverable tool fields",
         )
-
-    if not str(raw).strip():
-        return ToolArgumentsOk(arguments={})
-
-    try:
-        parsed: Any = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        # Unterminated string / Extra data 等均视为不完整 wire，禁止执行
-        return ToolArgumentsIncomplete(
-            raw=raw,
-            reason="unterminated_or_truncated_json",
-            detail=f"{exc.msg} (pos {exc.pos})",
-        )
-
-    if isinstance(parsed, dict):
-        return ToolArgumentsOk(arguments=dict(parsed))
-    return ToolArgumentsOk(arguments={"_value": parsed})
+    return ToolArgumentsIncomplete(
+        raw=raw,
+        reason="unterminated_or_truncated_json",
+        detail="arguments JSON is not an object and no path/content/code fields recovered",
+    )
 
 
 def finish_reason_value(raw: str | None) -> str | None:

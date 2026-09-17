@@ -139,6 +139,11 @@ async def test_gate_wall_clock_exceeded_routes_to_terminal_commit() -> None:
     assert routing.next_node == "terminal.commit"
     assert routing.should_terminate is True
     assert routing.next_hint == "budget_exceeded_wall_clock_seconds"
+    harvest = output.port_values["decision"]
+    assert harvest.action_type == ActionType.RESPOND.value
+    assert harvest.response_text
+    assert "budget_exceeded_wall_clock_seconds" in harvest.response_text
+    assert "writeFile" in harvest.response_text
 
 
 @pytest.mark.asyncio

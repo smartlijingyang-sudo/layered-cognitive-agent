@@ -12,3 +12,6 @@ from lca.plugins.prompts.sections import _REACT_TOOL_USAGE_TEXT
 def test_tool_usage_guidelines_contain_anti_loop_directive() -> None:
     assert "rejected" in _REACT_TOOL_USAGE_TEXT
     assert "do not repeat" in _REACT_TOOL_USAGE_TEXT
+    assert "writeFile" in _REACT_TOOL_USAGE_TEXT
+    assert "executeCode" in _REACT_TOOL_USAGE_TEXT
+    assert "pip install" in _REACT_TOOL_USAGE_TEXT

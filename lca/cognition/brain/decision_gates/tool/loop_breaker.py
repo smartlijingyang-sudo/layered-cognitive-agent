@@ -55,7 +55,11 @@ class ToolLoopBreakerGate(DecisionGate):
 
         tool_call = decision.tool_calls[0]
         failure_count = self._consecutive_failures(state, tool_call.tool_name)
-        if failure_count >= self._thresholds.break_failures:
+        last_error = self._last_tool_error(state, tool_call.tool_name)
+        wire_repeat_limit = 2
+        if failure_count >= self._thresholds.break_failures or (
+            failure_count >= wire_repeat_limit and last_error.startswith("tool_wire")
+        ):
             return self._block(
                 state,
                 decision,
@@ -63,7 +67,7 @@ class ToolLoopBreakerGate(DecisionGate):
                 rationale=_BLOCKED_FAILURE_RATIONALE,
                 response=self._failure_response(
                     tool_call.tool_name,
-                    self._last_tool_error(state, tool_call.tool_name),
+                    last_error,
                 ),
             )
 
@@ -169,10 +173,7 @@ class ToolLoopBreakerGate(DecisionGate):
         """Create a useful terminal response for the established failure condition."""
         limit = self._thresholds.break_failures
         if last_error:
-            return (
-                f"{tool_name} 连续失败 {limit} 次，已停止重试。\n"
-                f"最后错误：{last_error}"
-            )
+            return f"{tool_name} 连续失败 {limit} 次，已停止重试。\n最后错误：{last_error}"
         return f"{tool_name} 连续失败 {limit} 次，已停止重试。"
 
     @staticmethod

@@ -11,20 +11,11 @@ ToolCallResolved 后做本地 prefix 截断渲染,或订阅 provider 的 hint �
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
+from lca.infrastructure.llm_adapter.tool.arguments import recover_partial_tool_arguments
+
 _EMIT_EVERY_CHARS = 160
-_PARTIAL_STRING_KEYS = (
-    "code",
-    "command",
-    "content",
-    "description",
-    "language",
-    "skill_id",
-    "path",
-    "query",
-)
 
 
 def push_tool_call_stream(
@@ -97,77 +88,9 @@ def pop_completed_slots(slots: dict[str, dict[str, Any]]) -> list[dict[str, Any]
 
 
 def parse_completed_slot_args(raw: str) -> dict[str, Any]:
-    """Args 收齐后 parse。优先 strict JSON,失败时回退 partial extractor。
-
-    为什么需要回退:LLM 流式发工具调用参数时,长 string value(尤其
-    Python 代码)在 JSON 里需要 escape 引号 —— LLM 不严格转义时 strict
-    JSON parse 会失败。回退到 ``parse_partial_tool_args`` 用正则定位
-    key 起点逐字符读到下一个未转义 ``"``;对 ``code`` 等 partial-string
-    字段,即便 raw 不是合法 JSON 也能拿到 value(可能不完整,作为兜底)。
-    """
-    stripped = (raw or "").strip()
-    if not stripped:
-        return {}
-    try:
-        parsed = json.loads(stripped)
-    except json.JSONDecodeError:
-        parsed = None
-    if isinstance(parsed, dict):
-        return parsed
-    return parse_partial_tool_args(stripped)
+    """Args 收齐后 parse。与执行路径共用 ``recover_partial_tool_arguments``."""
+    return recover_partial_tool_arguments(raw)
 
 
 def parse_partial_tool_args(raw: str) -> dict[str, Any]:
-    stripped = (raw or "").strip()
-    if not stripped:
-        return {}
-    try:
-        parsed = json.loads(stripped)
-    except json.JSONDecodeError:
-        parsed = None
-    if isinstance(parsed, dict):
-        return parsed
-    out: dict[str, Any] = {}
-    for key in _PARTIAL_STRING_KEYS:
-        value = extract_partial_json_string(raw, key)
-        if value is not None:
-            out[key] = value
-    return out
-
-
-def extract_partial_json_string(raw: str, key: str) -> str | None:
-    marker = f'"{key}"'
-    idx = raw.find(marker)
-    if idx < 0:
-        return None
-    colon = raw.find(":", idx + len(marker))
-    if colon < 0:
-        return None
-    rest = raw[colon + 1 :].lstrip()
-    if not rest.startswith('"'):
-        return None
-    return _decode_json_string_prefix(rest, 1)
-
-
-def _decode_json_string_prefix(source: str, start: int) -> str:
-    parts: list[str] = []
-    escaped = False
-    for ch in source[start:]:
-        if escaped:
-            if ch == "n":
-                parts.append("\n")
-            elif ch == "t":
-                parts.append("\t")
-            elif ch == "r":
-                parts.append("\r")
-            else:
-                parts.append(ch)
-            escaped = False
-            continue
-        if ch == "\\":
-            escaped = True
-            continue
-        if ch == '"':
-            break
-        parts.append(ch)
-    return "".join(parts)
+    return recover_partial_tool_arguments(raw)

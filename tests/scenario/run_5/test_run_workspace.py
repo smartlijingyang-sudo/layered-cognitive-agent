@@ -205,6 +205,42 @@ class TestToolLoopBreakerGate:
         assert err in (out.response_text or "")
         assert "任务已完成" not in (out.response_text or "")
 
+    async def test_blocks_second_tool_wire_failure(self) -> None:
+        gate = ToolLoopBreakerGate()
+        state = AgentState(trace_id="t", task="x", budget=Budget(max_steps=10), step=3)
+        err = (
+            "tool_wire_incomplete; tool=writeFile; reason=missing_required_arguments; "
+            "required=path,content"
+        )
+        for _ in range(2):
+            state.history.append(
+                Turn(
+                    decision=Decision(
+                        decision_id="d",
+                        action_type="use_tool",
+                        rationale="test",
+                        confidence=0.9,
+                        tool_calls=[
+                            ToolCall(call_id="c0", tool_name="writeFile", arguments={})
+                        ],
+                    ),
+                    observation=Observation(
+                        observation_id="o", success=False, payload=None, error=err
+                    ),
+                )
+            )
+        decision = Decision(
+            decision_id="d2",
+            action_type="use_tool",
+            rationale="test",
+            confidence=0.9,
+            tool_calls=[ToolCall(call_id="c2", tool_name="writeFile", arguments={})],
+        )
+        out = await gate.enforce(state, decision)
+        assert out.action_type == "respond"
+        assert "writeFile" in (out.response_text or "")
+        assert "tool_wire" in (out.response_text or "")
+
     async def test_blocks_identical_successful_calls_without_progress(self) -> None:
         gate = ToolLoopBreakerGate()
         state = AgentState(trace_id="t", task="x", budget=Budget(max_steps=10), step=3)

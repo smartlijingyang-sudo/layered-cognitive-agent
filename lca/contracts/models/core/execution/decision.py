@@ -27,13 +27,22 @@ __all__ = [
 
 @dataclass
 class ToolCall:
-    """Single tool invocation: name + arguments + optional idempotency key."""
+    """Single tool invocation: name + arguments + optional idempotency key.
+
+    ``wire_status`` / ``wire_reason`` / ``wire_raw_preview`` are the
+    ADR-0047 classification copied from :class:`NativeToolCall`. Empty
+    ``arguments`` is not enough to tell "model omitted args" from
+    "stream truncated"; Body and repair read these fields.
+    """
 
     call_id: str
     tool_name: str
     arguments: dict[str, Any]
     idempotency_key: str | None = None
     timeout_s: int | None = None
+    wire_status: str = "ok"
+    wire_reason: str = ""
+    wire_raw_preview: str = ""
 
 
 @dataclass

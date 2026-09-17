@@ -16,6 +16,7 @@ from pathlib import Path
 import yaml as _yaml
 
 from lca.contracts.atoms.enums.enums import ActionType
+from lca.contracts.atoms.semantic.keys import TOOL_WIRE_REASON, TOOL_WIRE_STATUS
 from lca.contracts.models.core.conversation.llm import (
     LLMResponse,
     NativeToolCall,
@@ -99,6 +100,28 @@ def test_graph_has_two_nodes_and_one_edge() -> None:
     edge = plan.edges[0]
     assert edge.source == "decision.parse.response"
     assert edge.target == "decision.compose.action"
+
+
+def test_graph_run_copies_incomplete_wire_onto_decision_extra() -> None:
+    response = LLMResponse(
+        text="",
+        finish_reason="tool_calls",
+        tool_calls=[
+            NativeToolCall(
+                call_id="c1",
+                name="writeFile",
+                arguments={},
+                wire_status="incomplete",
+                wire_reason="unterminated_or_truncated_json",
+                wire_raw_preview='{"path": "a.py"',
+            )
+        ],
+    )
+    decision = _run_graph(response)["decision"]
+    assert isinstance(decision, Decision)
+    assert decision.tool_calls[0].wire_status == "incomplete"
+    assert decision.extra[TOOL_WIRE_STATUS] == "incomplete"
+    assert decision.extra[TOOL_WIRE_REASON] == "unterminated_or_truncated_json"
 
 
 def test_graph_run_produces_use_tool_decision() -> None:

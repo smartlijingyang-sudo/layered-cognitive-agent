@@ -66,6 +66,32 @@ async def test_happy_path_tool_calls_and_intent() -> None:
     assert tool_calls[0].arguments == {"path": "/example"}
     assert len(delegations) == 0
     assert intent == "我先看下文件。"
+    assert tool_calls[0].wire_status == "ok"
+
+
+@pytest.mark.asyncio
+async def test_incomplete_native_tool_call_keeps_wire_fields() -> None:
+    response = LLMResponse(
+        text="",
+        finish_reason="tool_calls",
+        tool_calls=[
+            NativeToolCall(
+                call_id="c1",
+                name="writeFile",
+                arguments={},
+                wire_status="incomplete",
+                wire_reason="unterminated_or_truncated_json",
+                wire_raw_preview='{"content": "print(1)"',
+            ),
+        ],
+    )
+    out = await _run(response)
+    call = out.port_values["tool_calls"][0]
+    assert call.tool_name == "writeFile"
+    assert call.arguments == {}
+    assert call.wire_status == "incomplete"
+    assert call.wire_reason == "unterminated_or_truncated_json"
+    assert call.wire_raw_preview.startswith('{"content"')
 
 
 @pytest.mark.asyncio

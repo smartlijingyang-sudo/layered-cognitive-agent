@@ -29,7 +29,7 @@ class ModelDefinition:
     provider: str
     capabilities: frozenset[str]
     context_window: int = 131_072
-    max_output_tokens: int = 8192
+    max_output_tokens: int = 32768
 
 
 _QWEN_CHAT_CAPS: frozenset[str] = frozenset(

@@ -128,6 +128,9 @@ def _parse_response(
                 call_id=tc.call_id or new_id("call"),
                 tool_name=tc.name,
                 arguments=dict(tc.arguments),
+                wire_status=str(getattr(tc, "wire_status", None) or "ok"),
+                wire_reason=str(getattr(tc, "wire_reason", None) or ""),
+                wire_raw_preview=str(getattr(tc, "wire_raw_preview", None) or ""),
             )
         )
     return tuple(tool_calls), tuple(delegations), leftover

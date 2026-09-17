@@ -28,6 +28,8 @@ _BLOCKING: frozenset[str] = frozenset({TOOL_WIRE_INCOMPLETE, TOOL_WIRE_INVALID})
 def tool_wire_block_observation(decision: Decision) -> Observation | None:
     """若 wire 状态禁止执行，返回失败观测；否则 None（继续正常工具路径）。"""
     status = str(decision.extra.get(TOOL_WIRE_STATUS) or "")
+    if status not in _BLOCKING and decision.tool_calls:
+        status = str(decision.tool_calls[0].wire_status or "")
     if status not in _BLOCKING:
         return None
     if not decision.tool_calls:

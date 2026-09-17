@@ -16,11 +16,13 @@ carrier, like every other think subgraph node) and asserts that:
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from datetime import timedelta
 from typing import Any
 
 import pytest
 
 from lca.contracts.atoms.enums.enums import LLMStreamEventType
+from lca.contracts.atoms.ids.ids import utc_now
 from lca.contracts.models.core.conversation.llm import (
     LLMResponse,
     LLMStreamEvent,
@@ -141,6 +143,26 @@ async def test_invoke_does_not_write_journal() -> None:
     assert call["prompt"] == "hi"
     assert call["system"] == "system"
     assert call["history"] == []
+
+
+@pytest.mark.asyncio
+async def test_invoke_aborts_stream_when_wall_clock_already_exceeded() -> None:
+    executor = LlmInvokeExecutor()
+    response = LLMResponse(text="should not land", usage=TokenUsage())
+    adapter = _FakeAdapter(response=response)
+    state = _state()
+    state.budget.max_wall_clock_seconds = 1
+    state.budget.started_at = utc_now() - timedelta(seconds=5)
+
+    output = await executor.node_execute(
+        _ctx(state, adapter=adapter),
+        NodeInput(port_values={"model_visible_request": _request("hi")}),
+    )
+
+    landed = output.port_values["llm_response"]
+    assert landed is not response
+    assert "budget_exceeded_wall_clock_seconds" in landed.text
+    assert landed.finish_reason == "length"
 
 
 @pytest.mark.asyncio

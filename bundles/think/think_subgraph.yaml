@@ -51,7 +51,7 @@ nodes:
   # Honors ADR-0225 (no per-node max_visits).
   - id: think.budget.gate
     factory: think.budget.gate
-    outputs: [routing]
+    outputs: [routing, decision]
     config:
 
   # PR-B typed-port rewrite: truncation node now takes the typed
