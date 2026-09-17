@@ -9,10 +9,7 @@ entries:
 - id: lca-composio-provider
   name: lca_composio_provider
   $module: lca.plugins.integrations.composio_provider
-  config:
-    database_url:
-      from_env: DATABASE_URL
-      required: false
+  config: {}
 - id: lca-composio-tools
   name: lca_composio_tools
   $module: lca.plugins.tools.composio_tools

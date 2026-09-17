@@ -17,9 +17,10 @@ kernel_serve:
   health_path: /health
   # 助理域（ADR-0187）：web-assistant = web-standard + assistant-runtime bundle。
   # 换回 profiles/web-standard.yaml 即关闭助理能力（存量路径不受影响，I-A1）。
-  # 2026-09-09 临时回滚:web-assistant 当前 plugin 树 boot 失败,先用 web-standard
-  # 拉起 kernel;后续按 ADR-0187 修复 web-assistant plugin 集后切回。
-  profile: profiles/web-standard.yaml
+  # web-assistant 比 web-standard 多一条部署前置:COMPOSIO_API_KEY 必须在 env
+  # 或 .env 中(composio-tools 的 provider 配置 required),缺失则 profile resolve
+  # 失败、kernel 不 listen /health。
+  profile: profiles/web-assistant.yaml
 
 # ── LobeHub (Next.js frontend) ────────────────────────────────────────
 lobehub:

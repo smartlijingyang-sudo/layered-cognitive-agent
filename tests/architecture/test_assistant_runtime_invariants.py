@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
 REPO = Path(__file__).resolve().parents[2]
 LCA = REPO / "lca"
@@ -33,6 +34,34 @@ PR4_PLUGIN_IDS: tuple[str, ...] = (
     "lca.plugins.assistant.workspace.workspace",
 )
 
+# 三 plugin 的 import 路径(assistant-runtime bundle 的 ``$module`` 必须逐字相同)
+CATALOG_MODULE = "lca.plugins.domain.assistant.catalog.plugin"
+BOOTSTRAP_MODULE = "lca.plugins.assistant.bootstrap.bootstrap"
+WORKSPACE_MODULE = "lca.plugins.assistant.workspace.workspace"
+PR4_PLUGIN_MODULES: tuple[str, ...] = (CATALOG_MODULE, BOOTSTRAP_MODULE, WORKSPACE_MODULE)
+
+
+def _module_file(dotted: str) -> Path:
+    """``lca.plugins.x.y`` → ``<repo>/lca/plugins/x/y.py``。"""
+    parts = dotted.split(".")
+    return REPO.joinpath(*parts[:-1]) / f"{parts[-1]}.py"
+
+
+CATALOG_FILE = _module_file(CATALOG_MODULE)
+BOOTSTRAP_FILE = _module_file(BOOTSTRAP_MODULE)
+WORKSPACE_FILE = _module_file(WORKSPACE_MODULE)
+
+
+def _bundle_plugin_ids(bundle: Path) -> frozenset[str]:
+    data = yaml.safe_load(bundle.read_text(encoding="utf-8"))
+    return frozenset(entry["id"] for entry in data["entries"])
+
+
+# 助理域部署相对 web-standard 的全部增量 = 两条 bundle 的 entry(不另立 id 清单)
+ASSISTANT_DOMAIN_PLUGIN_IDS = _bundle_plugin_ids(ASSISTANT_RUNTIME_BUNDLE) | _bundle_plugin_ids(
+    BUNDLES / "composio-tools.yaml"
+)
+
 
 # ── I-A10 / I-A1:web-standard 不挂 assistant;web-assistant 挂三个 ──
 
@@ -41,9 +70,12 @@ class TestWebAssistantProfileContainsAssistantPlugins:
     """web-assistant profile 解析后 plugin 列表必须含 catalog/bootstrap/workspace。"""
 
     @pytest.fixture
-    def resolved_web_assistant(self) -> Any:
+    def resolved_web_assistant(self, monkeypatch: pytest.MonkeyPatch) -> Any:
         from lca.harness.profile.resolve.resolve import resolve_profile
 
+        # composio-tools 的 provider 把 api_key 声明为 required env;本类锁的是
+        # profile 形状,不是凭证,所以注入占位值让 resolve 不依赖开发者 .env。
+        monkeypatch.setenv("COMPOSIO_API_KEY", "placeholder-not-a-credential")
         return resolve_profile(WEB_ASSISTANT)
 
     @pytest.fixture
@@ -76,6 +108,33 @@ class TestWebAssistantProfileContainsAssistantPlugins:
                     or "assistant.workspace" in caps
                 ), f"plugin {plugin.id} 应至少提供一个 assistant.* capability"
 
+    def test_web_assistant_resolves_every_web_standard_plugin(
+        self,
+        resolved_web_assistant: Any,
+        resolved_web_standard: Any,
+    ) -> None:
+        """切到 web-assistant 的部署 = web-standard + 助理域,逐项相等。
+
+        只比 plugin id 集不够:``disabled`` 漂移看不出来 —— base.yaml 的
+        deny-by-default permission manifest 没关时,id 集完全正常,而每个工具
+        调用都在 ``effect.pre_dispatch.envelope_check`` 被拒。bundle 缺失同样
+        只在 plan 拓扑上显形(参见 test_p7_profile_regions_declare.py 的
+        bundle 锁)。
+        """
+
+        def effective(resolved: Any) -> set[str]:
+            return {plugin.id for plugin in resolved.plugins if not plugin.disabled}
+
+        standard_ids = effective(resolved_web_standard)
+        assistant_ids = effective(resolved_web_assistant)
+        assert not standard_ids - assistant_ids, (
+            f"web-assistant 相对 web-standard 缺 plugin:{sorted(standard_ids - assistant_ids)}"
+        )
+        assert assistant_ids - standard_ids == ASSISTANT_DOMAIN_PLUGIN_IDS, (
+            "web-assistant 的增量 plugin 应恰好是助理域 + composio:"
+            f"{sorted(assistant_ids - standard_ids)}"
+        )
+
     def test_web_standard_does_not_contain_assistant_runtime(
         self,
         resolved_web_standard: Any,
@@ -106,13 +165,15 @@ class TestAssistantRuntimeBundleShape:
             assert f"id: {pid}" in text, f"assistant-runtime bundle 应包含 plugin id {pid!r}"
 
     def test_bundle_modules_use_dotted_path(self) -> None:
+        """bundle 的 ``$module`` 必须指向真实存在的模块文件。
+
+        路径写错时 resolve 才报错,本锁让漂移在静态层就红。
+        """
         text = ASSISTANT_RUNTIME_BUNDLE.read_text(encoding="utf-8")
-        for module in (
-            "lca.plugins.assistant.catalog.catalog",
-            "lca.plugins.assistant.bootstrap.bootstrap",
-            "lca.plugins.assistant.workspace.workspace",
-        ):
+        for module in PR4_PLUGIN_MODULES:
             assert f"$module: {module}" in text, f"assistant-runtime bundle 应 import {module!r}"
+        for path in (CATALOG_FILE, BOOTSTRAP_FILE, WORKSPACE_FILE):
+            assert path.is_file(), f"assistant plugin 模块文件不存在:{path}"
 
 
 # ── assistant 插件代码静态 grep 锁(不直读 env)─────────────────────
@@ -123,11 +184,7 @@ class TestAssistantPluginsDoNotReadOsEnviron:
 
     @pytest.mark.parametrize(
         "plugin_path",
-        [
-            LCA / "plugins" / "assistant" / "catalog.py",
-            LCA / "plugins" / "assistant" / "bootstrap.py",
-            LCA / "plugins" / "assistant" / "workspace.py",
-        ],
+        [CATALOG_FILE, BOOTSTRAP_FILE, WORKSPACE_FILE],
     )
     def test_plugin_does_not_read_env(self, plugin_path: Path) -> None:
         text = plugin_path.read_text(encoding="utf-8")
@@ -176,7 +233,7 @@ class TestBootstrapProjectionOnlyFromConfigFace:
     """bootstrap.project 输出 ContextManifest 不含 MEMORY 字面(I-A13 + PR-4)。"""
 
     def test_bootstrap_module_no_memory_string(self) -> None:
-        text = (LCA / "plugins" / "assistant" / "bootstrap.py").read_text(encoding="utf-8")
+        text = BOOTSTRAP_FILE.read_text(encoding="utf-8")
         # 去除 docstring + 行注释 + @plugin 装饰器 description 字段
         # (description 是文档 metadata,可以提 I-A13 引用)
         code_only = re.sub(r'"""[\s\S]*?"""', "", text)
@@ -214,7 +271,7 @@ class TestBootstrapProjectionOnlyFromConfigFace:
         )
 
     def test_workspace_module_no_memory_string(self) -> None:
-        text = (LCA / "plugins" / "assistant" / "workspace.py").read_text(encoding="utf-8")
+        text = WORKSPACE_FILE.read_text(encoding="utf-8")
         code_only = re.sub(r'"""[\s\S]*?"""', "", text)
         code_only = re.sub(r"'''[\s\S]*?'''", "", code_only)
         code_lines = [line for line in code_only.splitlines() if not line.lstrip().startswith("#")]
@@ -231,10 +288,7 @@ class TestBootstrapProjectionOnlyFromConfigFace:
 class TestCompatMarkersHaveDeleteWhen:
     def test_no_bare_compat_in_assistant_pr4_plugins(self) -> None:
         offenders: list[tuple[Path, str]] = []
-        for path in (
-            LCA / "plugins" / "assistant" / "bootstrap.py",
-            LCA / "plugins" / "assistant" / "workspace.py",
-        ):
+        for path in (BOOTSTRAP_FILE, WORKSPACE_FILE):
             text = path.read_text(encoding="utf-8")
             for line in text.splitlines():
                 if "COMPAT" in line and "delete-when" not in line:

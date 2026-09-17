@@ -18,6 +18,10 @@ import yaml
 
 REGIONS_DECLARED = ("phase:plan", "phase:replan", "control:safety")
 
+PROFILES = pathlib.Path("profiles")
+WEB_STANDARD = PROFILES / "web-standard.yaml"
+WEB_ASSISTANT = PROFILES / "web-assistant.yaml"
+
 
 class TestWebAssistantRegionsDeclared:
     """The web-assistant profile must declare the 3 P7 custom regions."""
@@ -26,9 +30,7 @@ class TestWebAssistantRegionsDeclared:
         f = pathlib.Path("profiles/web-assistant.yaml")
         data = yaml.safe_load(f.read_text(encoding="utf-8"))
         assert isinstance(data, dict), f"profile parse failed: {data!r}"
-        assert "regions" in data, (
-            "web-assistant.yaml must declare 'regions:' (ADR-0210 §6.6)"
-        )
+        assert "regions" in data, "web-assistant.yaml must declare 'regions:' (ADR-0210 §6.6)"
 
     def test_regions_declare_section_exists(self):
         f = pathlib.Path("profiles/web-assistant.yaml")
@@ -83,6 +85,7 @@ class TestParseRegionsDeclareIsolated:
         import ast
         import typing
         from pathlib import Path as _P
+
         text = _P("lca/harness/profile/resolve/source.py").read_text(encoding="utf-8")
         tree = ast.parse(text)
         # Find the function definition
@@ -95,9 +98,7 @@ class TestParseRegionsDeclareIsolated:
         raise RuntimeError("_parse_regions_declare not found in source.py")
 
     def test_valid_declare(self):
-        result = self._extract_and_call({
-            "regions": {"declare": ["phase:plan", "phase:replan"]}
-        })
+        result = self._extract_and_call({"regions": {"declare": ["phase:plan", "phase:replan"]}})
         assert result == ("phase:plan", "phase:replan")
 
     def test_missing_regions_section_returns_empty(self):
@@ -118,9 +119,9 @@ class TestParseRegionsDeclareIsolated:
 
     def test_filters_non_string_entries(self):
         """Non-string entries (None, dict, int) are silently filtered out."""
-        result = self._extract_and_call({
-            "regions": {"declare": ["phase:plan", None, "", 42, {"foo": "bar"}, "phase:replan"]}
-        })
+        result = self._extract_and_call(
+            {"regions": {"declare": ["phase:plan", None, "", 42, {"foo": "bar"}, "phase:replan"]}}
+        )
         assert result == ("phase:plan", "phase:replan")
 
     def test_empty_string_filtered(self):
@@ -174,15 +175,23 @@ class TestWebAssistantOnP7Path:
             "control:safety for the P7 path"
         )
 
-    def test_nine_bundles_remaining(self):
-        """web-assistant now loads 9 bundles (down from 10 after dropping
-        declarative-phase-graph.yaml)."""
-        f = pathlib.Path("profiles/web-assistant.yaml")
-        data = yaml.safe_load(f.read_text(encoding="utf-8"))
-        assert len(data["bundles"]) == 9, (
-            f"web-assistant expected 9 bundles after P7 switch, "
-            f"got {len(data['bundles'])}"
+    def test_bundle_set(self):
+        """web-assistant 的 bundles = web-standard 的列表(同序)+ 助理域两条。
+
+        bundle 不只带 plugin entry,还带 plan 拓扑(outer/phase_main + phase
+        subgraph)与观测面;少一条,run 在 plan lift 或运维命令上失败,而
+        resolve 出的 plugin 集看不出来。
+        """
+        standard = yaml.safe_load(WEB_STANDARD.read_text(encoding="utf-8"))["bundles"]
+        assistant = yaml.safe_load(WEB_ASSISTANT.read_text(encoding="utf-8"))["bundles"]
+        assert assistant[: len(standard)] == standard, (
+            f"web-assistant 前 {len(standard)} 条 bundle 必须与 web-standard 同序一致;"
+            f"实际:{assistant}"
         )
+        assert set(assistant[len(standard) :]) == {
+            "bundles/assistant-runtime.yaml",
+            "bundles/composio-tools.yaml",
+        }, f"助理域增量 bundle 漂移:{assistant[len(standard) :]}"
 
     def test_docstring_documents_p7_path(self):
         """The header docstring must explain the P7 switch."""

@@ -5,28 +5,19 @@
 # 启用助理能力的部署 = 显式加载本 profile(``lca-ops runs create --profile
 # web-assistant`` 或 webserver ``POST /runs`` body ``profile=web-assistant``)。
 #
-# 三层结构:
-#   bundles:
-#     - bundles/base.yaml(继承 web-standard 的所有基础设施)
-#     - bundles/observability-default.yaml
-#     - bundles/web-app.yaml
-#     - bundles/scenario-cordis-creator.yaml
-#   #     - bundles/loop_cursor.spine_default.yaml
-#     - bundles/session-runtime.yaml
-#     - bundles/event-bus-components.yaml
-#     - bundles/assistant-runtime.yaml(PR-4 增量)
-#   patch:
-#     - id: lca-plugins-assistant-catalog
-#       config: { assistants_root: ~/.lca/assistants }
-#       兜底当 LCA_ASSISTANTS_ROOT 未设置时,落到用户数据盘默认路径。
+# bundles 必须 = web-standard 的列表(同序)+ assistant-runtime + composio-tools
+# (锁:``tests/architecture/test_p7_profile_regions_declare.py``)。bundle 不只带
+# plugin entry,还带 plan 拓扑与观测面:缺 ``outer/phase_main`` + 六个 phase
+# subgraph,plan lift 报 "no termination policy",每个 run 直接失败;缺
+# observation-9module,``lca-ops timeline`` / ``debug-run`` 在助理部署上失效。
+# 两者都不在 resolve 出的 plugin 集里显形,所以只比 plugin 集看不出来。
 #
-# 启用后 plugin 列表新增 4 个:
-#   - lca.plugins.assistant.catalog
-#   - lca.plugins.assistant.bootstrap
-#   - lca.plugins.assistant.workspace
-#   - lca.plugins.assistant.skill_overlay(PR-6 增量)
-# 验证: ``tests/architecture/test_assistant_runtime_invariants.py::TestWebAssistantProfileContains
-# AssistantPlugins`` 静态扫描 + ``resolve_profile('profiles/web-assistant.yaml')`` 双重锁。
+# 部署前置:``COMPOSIO_API_KEY`` 必须在 env 或 ``.env`` 中(composio-tools 的
+# provider config ``required: true``,缺失 = resolve 期 ProfileResolveError,
+# kernel 不 listen /health)。``COMPOSIO_`` 已在 BOOTSTRAP_PREFIXES 白名单内。
+#
+# 验证: ``tests/architecture/test_assistant_runtime_invariants.py`` 静态扫描 +
+# ``resolve_profile('profiles/web-assistant.yaml')`` 双重锁。
 
 name: web-assistant
 description: |
@@ -51,15 +42,34 @@ regions:
 bundles:
   - bundles/base.yaml
   - bundles/observability-default.yaml
+  - bundles/observation-9module.yaml
   - bundles/web-app.yaml
   - bundles/scenario-cordis-creator.yaml
   - bundles/loop_cursor.spine_default.yaml
   - bundles/session-runtime.yaml
   - bundles/event-bus-components.yaml
+  - bundles/outer/phase_main.yaml
+  - bundles/think/think_subgraph.yaml
+  - bundles/act/act_subgraph.yaml
+  - bundles/perceive/perceive_subgraph.yaml
+  - bundles/reflect/reflect_subgraph.yaml
+  - bundles/remember/remember_subgraph.yaml
   - bundles/assistant-runtime.yaml
   - bundles/composio-tools.yaml
 
 patch:
+  # ── web-standard 部署基线(两份 profile 必须一致)──────────────────
+  # base.yaml 的 deny-by-default manifest 不关,web-app 装的 allowlist
+  # (body.act + memory.update)就不是 ``require_matching("permission_manifest.")``
+  # 的第一条命中,每个工具调用都在 ``effect.pre_dispatch.envelope_check`` 被拒。
+  - id: lca-effect-permission-manifest-default
+    disabled: true
+  # 操作员盯 live run 的 console 格式(bundle 默认是 jsonl,给机器消费者)。
+  - id: spine.sink.console
+    config:
+      format: graph_timeline
+
+  # ── 助理域增量 ─────────────────────────────────────────────────
   # 兜底:LCA_ASSISTANTS_ROOT 未设置时落到用户数据盘默认路径;
   # Profile 装配期优先 env,然后 patch literal。
   - id: lca.plugins.assistant.catalog.catalog
@@ -87,6 +97,3 @@ patch:
       connections_path:
         from_env: LCA_COMPOSIO_CONNECTIONS_PATH
         required: false
-  - id: lca-llm-resolver
-    config:
-      load_dotenv: true
