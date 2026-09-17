@@ -105,20 +105,20 @@ def test_executor_declares_history_derive_semantic_name_in_think_region() -> Non
     """``semantic_name`` must match ``factory: history.derive`` in the bundle.
 
     ``declared_inputs`` grew from ``(state, writer)`` to
-    ``(state, writer, forked_tools, response)`` — ``forked_tools`` was
-    added by PR-3.8.borrow-tools-wire (spec §E) and ``response`` was
-    added by the spec §G system-prompt seam fix (run_a0cdcd40d8b9
-    regression). Both ports are optional in the wiring seam — see
-    ``test_node_execute_tools_empty_when_forked_tools_missing`` and
+    ``(state, writer, forked_tools, turn_render)`` — ``forked_tools`` was
+    added by PR-3.8.borrow-tools-wire (spec §E) and ``turn_render`` is the
+    spec §G system-prompt seam, named after its producer
+    (``think.reason.render``). Both ports are optional in the wiring seam —
+    see ``test_node_execute_tools_empty_when_forked_tools_missing`` and
     ``test_system_empty_when_no_header_no_render_no_role_profile``.
     """
     assert HistoryDeriveExecutor().semantic_name == "history.derive"
-    assert HistoryDeriveExecutor().region == "phase:think"
+    assert HistoryDeriveExecutor().region == "think"
     assert HistoryDeriveExecutor().declared_inputs == (
         "state",
         "writer",
         "forked_tools",
-        "response",
+        "turn_render",
     )
     assert HistoryDeriveExecutor().declared_outputs == ("model_visible_request",)
 
@@ -207,15 +207,15 @@ async def test_node_execute_wrong_state_type_propagates_to_user_fn() -> None:
 
 
 async def test_setup_registers_executor_under_composite_key() -> None:
-    """``setup.setup()`` calls ``ctx.provide('phase:think::history.derive', executor)``."""
+    """``setup.setup()`` calls ``ctx.provide('think::history.derive', executor)``."""
     captured: dict[str, Any] = {}
     ctx = MagicMock()
     ctx.provide = MagicMock(side_effect=lambda key, value: captured.__setitem__(key, value))
 
     await history_module.setup.setup(ctx, config=None)
 
-    assert list(captured) == ["phase:think::history.derive"]
-    assert isinstance(captured["phase:think::history.derive"], HistoryDeriveExecutor)
+    assert list(captured) == ["think::history.derive"]
+    assert isinstance(captured["think::history.derive"], HistoryDeriveExecutor)
 
 
 # ── ForkedTools → ModelVisibleRequest.tools (spec §E) ────────────
@@ -303,8 +303,8 @@ def _render(system_text: str) -> _StubReasonerTurnRender:
     return _StubReasonerTurnRender(trace=_StubPromptTrace(system_prompt_text=system_text))
 
 
-async def test_system_falls_back_to_response_trace_when_header_missing() -> None:
-    """``writer.request_header() is None`` ⇒ system sourced from ``response.trace``.
+async def test_system_falls_back_to_turn_render_trace_when_header_missing() -> None:
+    """``writer.request_header() is None`` ⇒ system sourced from ``turn_render.trace``.
 
     Per-run Session journals do not yet contain ``spine.llm.request.header``
     at history.assemble time; the only authoritative source at this seam
@@ -321,7 +321,7 @@ async def test_system_falls_back_to_response_trace_when_header_missing() -> None
             port_values={
                 "state": _make_state(),
                 "writer": writer,
-                "response": _render("You are LobeHub 助手."),
+                "turn_render": _render("You are LobeHub 助手."),
             }
         ),
     )
@@ -330,11 +330,11 @@ async def test_system_falls_back_to_response_trace_when_header_missing() -> None
 
 
 async def test_system_prefers_header_when_folded() -> None:
-    """``header.system`` wins over ``response.trace`` (replay-safe fold path).
+    """``header.system`` wins over ``turn_render.trace`` (replay-safe fold path).
 
     On second turns / replay the Session fold has populated
     ``EpochHeader.system``; the fold is the SSOT for *reconstructed* runs.
-    The response port only carries the latest render — older turns in
+    The render port only carries the latest render — older turns in
     the journal replay must keep the historical header even if a newer
     render is in flight.
     """
@@ -346,7 +346,7 @@ async def test_system_prefers_header_when_folded() -> None:
             port_values={
                 "state": _make_state(),
                 "writer": writer,
-                "response": _render("from-render"),
+                "turn_render": _render("from-render"),
             }
         ),
     )
@@ -356,12 +356,12 @@ async def test_system_prefers_header_when_folded() -> None:
 
 async def test_system_role_profile_no_longer_falls_back() -> None:
     """PR-B: ``_system_from_role_profile`` was removed — no header + no
-    response ⇒ empty system prompt.
+    render ⇒ empty system prompt.
 
     The third-tier ``role_profile`` fallback was retired. ``brain.role_profile``
     is the sole authority and is consumed by ``think.reason.render``,
-    which surfaces the rendered prompt through ``response.trace.system_prompt_text``.
-    If the writer's request header is empty AND the response port
+    which surfaces the rendered prompt through ``turn_render.trace.system_prompt_text``.
+    If the writer's request header is empty AND the render port
     carries no rendered system prompt, the LLM is dispatched with
     ``system=""`` — the same outcome the live render path produces
     when ``system_prompt_text`` is empty.
@@ -401,8 +401,8 @@ async def test_system_empty_when_no_header_no_render_no_role_profile() -> None:
     assert request.system == ""
 
 
-async def test_system_empty_when_response_trace_is_none() -> None:
-    """PR-B: ``response.trace is None`` ⇒ empty system prompt (no fallback).
+async def test_system_empty_when_turn_render_trace_is_none() -> None:
+    """PR-B: ``turn_render.trace is None`` ⇒ empty system prompt (no fallback).
 
     When the Reasoner renders without a section registry the trace is
     ``None`` and ``system_prompt_text == ""``. The prior role_profile
@@ -429,7 +429,7 @@ async def test_system_empty_when_response_trace_is_none() -> None:
             port_values={
                 "state": _make_state(),
                 "writer": writer,
-                "response": _StubReasonerTurnRender(trace=None),
+                "turn_render": _StubReasonerTurnRender(trace=None),
             }
         ),
     )

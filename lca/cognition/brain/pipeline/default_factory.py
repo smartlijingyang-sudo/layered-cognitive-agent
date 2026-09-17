@@ -89,7 +89,7 @@ class SimpleBrainFactory:
         tools: list[Tool] | None = None,
         template_provider: object | None = None,
     ) -> Brain:
-        del role_profile, tools  # RoleSnapshot / ForkedTools are turn DTOs
+        del tools  # ForkedTools is a turn DTO materialised by concept.tool.fork
         reasoner = self._reasoner_cls(
             llm,
             selector=self._selector,
@@ -99,8 +99,14 @@ class SimpleBrainFactory:
         return ModularBrain(
             reasoner=reasoner,
             critic=self._critic_factory(),
-            agent_gates=self._agent_gate_factory() if self._agent_gate_factory is not None else None,
+            agent_gates=self._agent_gate_factory()
+            if self._agent_gate_factory is not None
+            else None,
             classifier=self._classifier,
             think_pipeline=self._think_pipeline,
             reflection_pipeline=self._reflection_pipeline,
+            # ``think.reason.render`` builds each turn's RoleSnapshot from
+            # ``brain.role_profile``; dropping it here left every request
+            # without a system prompt.
+            role_profile=role_profile,
         )

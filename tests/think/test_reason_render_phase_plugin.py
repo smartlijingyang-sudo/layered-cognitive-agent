@@ -138,27 +138,32 @@ async def test_reason_render_attaches_turn_render_port() -> None:
 
 
 @pytest.mark.asyncio
-async def test_reason_render_missing_upstream_plan_returns_empty_ports() -> None:
-    """上游 port 缺 ``turn_plan`` → 返回空 ports(铁律 2:缺失输入 = 空 NodeOutput)。"""
+async def test_reason_render_missing_upstream_plan_raises() -> None:
+    """上游 port 缺 ``turn_plan`` → fail-loud,并点名缺失依赖。
+
+    静默返回空 ports 会让 history.assemble 拿不到 render,整个 run 的每次
+    LLM 请求都 ``system=""``(run_71456ce99914:8 次请求全无 system prompt)。
+    """
     executor = ThinkReasonRenderExecutor()
     reasoner = _Reasoner(render=_render())
-    result = await executor.node_execute(
-        _ctx({"phase.think.reason.render": reasoner}),
-        NodeInput(port_values={}),
-    )
+    with pytest.raises(RuntimeError, match="turn_plan"):
+        await executor.node_execute(
+            _ctx({"phase.think.reason.render": reasoner}),
+            NodeInput(port_values={}),
+        )
     assert reasoner.call_count == 0
-    assert result.port_values == {}
 
 
 @pytest.mark.asyncio
-async def test_reason_render_missing_capability_returns_empty_ports() -> None:
-    """注入 None reasoner → 返回空 ports。"""
+async def test_reason_render_missing_reasoner_raises() -> None:
+    """注入 None reasoner → fail-loud,并点名 ``brain.role_profile`` 一并缺失。"""
     executor = ThinkReasonRenderExecutor()
-    result = await executor.node_execute(
-        _ctx({}),
-        NodeInput(port_values={"turn_plan": _plan()}),
-    )
-    assert result.port_values == {}
+    with pytest.raises(RuntimeError, match="role_profile") as excinfo:
+        await executor.node_execute(
+            _ctx({}),
+            NodeInput(port_values={"turn_plan": _plan()}),
+        )
+    assert "reasoner" in str(excinfo.value)
 
 
 def test_reason_render_module_does_not_import_emit() -> None:
@@ -171,3 +176,82 @@ def test_reason_render_module_does_not_import_emit() -> None:
         text = f.read()
     assert "from lca.infrastructure.session.emit" not in text
     assert "from lca.loop.emit" not in text
+
+
+@pytest.mark.asyncio
+async def test_render_output_reaches_history_assemble_as_system_prompt() -> None:
+    """Two shipped nodes, one port name: ``turn_render`` must carry the prompt.
+
+    ``think.reason.render`` emits ``turn_render``; ``think.history.assemble``
+    declares it as an input and sources ``ModelVisibleRequest.system`` from
+    ``turn_render.trace.system_prompt_text``. While the subgraph surface
+    declared ``response`` — a port no node produces — both system-prompt
+    tiers resolved empty and every request of ``run_71456ce99914`` went out
+    with ``system=""``.
+    """
+    from lca.contracts.models.cognition.prompt_assembly import PromptTrace
+    from lca.nodes.think.history.assemble import HistoryDeriveExecutor
+
+    text = "You are LobeHub 助手. Read the attachment before answering."
+    render = ReasonerTurnRender(
+        prompt="p",
+        trace=PromptTrace(
+            template_id="react",
+            variant="react",
+            selector_decision_path="profile_default",
+            sections=(),
+            total_chars=len(text),
+            activated_skill_ids=(),
+            tools_count=0,
+            available_skills_count=0,
+            system_prompt_text=text,
+        ),
+        section_count=0,
+        manifest=None,
+        activated_skill_ids=(),
+        section_outputs=None,
+        total_chars=None,
+        variant=None,
+    )
+    reasoner = _Reasoner(render=render)
+    rendered = await ThinkReasonRenderExecutor().node_execute(
+        _ctx({"phase.think.reason.render": reasoner}),
+        NodeInput(port_values={"turn_plan": _plan()}),
+    )
+    turn_render = rendered.port_values["turn_render"]
+    assert turn_render is render
+
+    assert "turn_render" in HistoryDeriveExecutor().declared_inputs
+
+    @dataclass
+    class _Writer:
+        messages: list[dict[str, Any]]
+
+        def derive_messages(self) -> list[dict[str, Any]]:
+            return list(self.messages)
+
+        def request_header(self) -> None:
+            return None
+
+    @dataclass
+    class _AssembleRuntime:
+        writer: _Writer
+
+        def get(self, key: str, default: Any = None) -> Any:
+            return getattr(self, key, default)
+
+    writer = _Writer(messages=[{"role": "user", "content": "分析并输出pdf版本报告"}])
+    assembled = await HistoryDeriveExecutor().node_execute(
+        NodeContext(runtime=_AssembleRuntime(writer=writer), budget={}, metadata={}),
+        NodeInput(
+            port_values={
+                "state": AgentState(trace_id="t", task="x", budget=Budget()),
+                "writer": writer,
+                "turn_render": turn_render,
+            }
+        ),
+    )
+
+    request = assembled.port_values["model_visible_request"]
+    assert request.system == text
+    assert request.messages == writer.messages

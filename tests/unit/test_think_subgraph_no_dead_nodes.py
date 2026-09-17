@@ -1,6 +1,6 @@
 """Regression test for retired ``think.classify`` dead node.
 
-Background: ``bundles/think.yaml`` previously declared ``think.classify``
+Background: the think subgraph bundle previously declared ``think.classify``
 as a node, but commit ``2ee56fdc8`` rewired ``think.reason`` →
 ``think.history.assemble`` → ``think.llm.dispatch`` → ``think.decision.parse``
 → ``think.gate`` and removed the only edges that reached
@@ -15,6 +15,8 @@ See ``docs/notes/implemented/primitive/2026-09-15-think-classify-retire.md``.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import yaml
 
 from lca.contracts.protocols.graph.binding import BindingKind
@@ -22,6 +24,8 @@ from lca.contracts.protocols.graph.plan import Plan, PlanEdge, PlanNode
 from lca_kernel.boot.plan_validation.checks.reachability import (
     ReachabilityCheck,
 )
+
+BUNDLE = Path(__file__).resolve().parents[2] / "bundles" / "think" / "think_subgraph.yaml"
 
 
 def test_think_subgraph_reachability_passes() -> None:
@@ -33,7 +37,7 @@ def test_think_subgraph_reachability_passes() -> None:
     and the integration test had to monkey-patch
     ``validate_profile_plans`` to bypass the invariant.
     """
-    with open("bundles/think.yaml", encoding="utf-8") as fh:
+    with BUNDLE.open(encoding="utf-8") as fh:
         bundle = yaml.safe_load(fh)
     nodes = tuple(
         PlanNode(
@@ -44,9 +48,7 @@ def test_think_subgraph_reachability_passes() -> None:
         )
         for n in bundle["nodes"]
     )
-    edges = tuple(
-        PlanEdge(source=e["from"], target=e["to"]) for e in bundle.get("edges", [])
-    )
+    edges = tuple(PlanEdge(source=e["from"], target=e["to"]) for e in bundle.get("edges", []))
     plan = Plan(id=bundle["id"], nodes=nodes, edges=edges)
 
     err = ReachabilityCheck().run(plan, plan_id="think.subgraph")
@@ -58,7 +60,7 @@ def test_think_subgraph_bundle_has_no_classify_node() -> None:
     its in-edges; it was retired because ``decision.parse`` covers the
     same responsibility (see 2026-09-15-think-classify-retire note).
     """
-    with open("bundles/think.yaml", encoding="utf-8") as fh:
+    with BUNDLE.open(encoding="utf-8") as fh:
         bundle = yaml.safe_load(fh)
     node_ids = [n["id"] for n in bundle["nodes"]]
     assert "think.classify" not in node_ids

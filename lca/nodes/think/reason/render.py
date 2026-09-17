@@ -14,6 +14,7 @@ think.reason inner_graph 第 2 节点 plugin:把 compat-era ``(state, plan)``
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from lca.contracts.atoms.control.slot import ControlSlot
@@ -42,6 +43,8 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+
+_log = logging.getLogger(__name__)
 
 
 def _state_to_boundary(
@@ -125,9 +128,6 @@ class ThinkReasonRenderExecutor:
         inputs 端口(yaml):turn_plan
         outputs 端口(yaml):turn_render
         """
-        import logging
-
-        _log = logging.getLogger(__name__)
         runtime = context.runtime
         state = getattr(runtime, "state", None)
         brain = getattr(runtime, "brain", None)
@@ -135,14 +135,25 @@ class ThinkReasonRenderExecutor:
         plan = input.port_values.get("turn_plan")
         render_turn = getattr(reasoner, "render_turn", None) if reasoner is not None else None
         role_profile = _resolve_role_profile(runtime)
-        if (
-            reasoner is None
-            or state is None
-            or plan is None
-            or not callable(render_turn)
-            or role_profile is None
-        ):
-            return NodeOutput(port_values={})
+        missing = [
+            name
+            for name, value in (
+                ("context.runtime.state", state),
+                ("context.runtime.brain.reasoner", reasoner),
+                ("reasoner.render_turn", render_turn if callable(render_turn) else None),
+                ("brain.role_profile", role_profile),
+                ("'turn_plan' port", plan),
+            )
+            if value is None
+        ]
+        if missing:
+            # Fail loud: an unrendered turn means history.assemble has no
+            # system prompt to source, and the model would be dispatched
+            # without identity or rules (spec §G). Returning empty ports
+            # here hid exactly that for a whole run.
+            raise RuntimeError(
+                f"think.reason.render: cannot render the turn prompt — missing {', '.join(missing)}"
+            )
         boundary = _state_to_boundary(state, plan, role_profile)
         render = render_turn(*boundary)
         _log.debug(

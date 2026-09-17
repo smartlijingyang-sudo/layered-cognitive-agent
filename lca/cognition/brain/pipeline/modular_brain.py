@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.models.team.role.team import RoleProfile
 from lca.contracts.protocols import (
     Brain,
     Critic,
@@ -44,8 +45,13 @@ class ModularBrain(Brain):
         reducer: Reducer | None = None,
         think_pipeline: CognitiveThinkPipeline | None = None,
         reflection_pipeline: CognitiveReflectionPipeline | None = None,
+        role_profile: RoleProfile | None = None,
     ) -> None:
         self.reasoner = reasoner
+        # Role identity the composition root selected for this agent.
+        # ``think.reason.render`` reads it as ``brain.role_profile`` to build
+        # the per-turn ``RoleSnapshot``; without it no system prompt renders.
+        self.role_profile = role_profile
         self.critic = critic
         self.skill_router = skill_router
         self._decision_gate: DecisionGate | None = decision_gate

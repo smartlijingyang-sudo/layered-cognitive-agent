@@ -17,14 +17,13 @@ late for history.assemble, which prepares the request before
 ``think.llm.invoke``. Two-tier fallback at this seam:
 
   1. folded header (``writer.request_header().system``) — replay-safe
-  2. live render (``response.trace.system_prompt_text`` from
-     ``think.reason.render`` one node earlier) — fixes the
-     ``system=""`` regression (run_a0cdcd40d8b9)
+  2. live render (``turn_render.trace.system_prompt_text`` from
+     ``think.reason.render`` one node earlier)
 
 The prior third tier (``role_profile`` composition) is removed: the
 role identity lives on the Brain (``brain.role_profile``, consumed by
 ``think.reason.render``), so this node no longer falls back to a
-runtime-cached profile. If both header and response are empty the LLM
+runtime-cached profile. If both header and render are empty the LLM
 is dispatched without an explicit system prompt — the same behavior
 the live render path produces when ``system_prompt_text`` is empty.
 
@@ -103,7 +102,7 @@ class HistoryDeriveExecutor:
     writer owns the message stream, not the tool schema source.
 
     Spec §G: ``system`` is sourced via a two-tier fallback
-    (folded header → live render from ``response.trace``). The fallback
+    (folded header → live render from ``turn_render.trace``). The fallback
     exists because the folded header publishes during the LLM call
     itself (too late for this node); see module docstring for details.
     """
@@ -114,7 +113,7 @@ class HistoryDeriveExecutor:
         "state",
         "writer",
         "forked_tools",
-        "response",
+        "turn_render",
     )
     declared_outputs: tuple[PortName, ...] = ("model_visible_request",)
 
@@ -131,7 +130,7 @@ class HistoryDeriveExecutor:
         header = writer.request_header()
         system = _resolve_system(
             header=header,
-            response=input.port_values.get("response"),
+            render=input.port_values.get("turn_render"),
         )
         tools = _forked_to_tools(input.port_values.get("forked_tools"))
         return NodeOutput(
@@ -169,8 +168,8 @@ def _system_from_header(header: Any) -> str:
     return ""
 
 
-def _system_from_response(response: Any) -> str:
-    """Pull the rendered system prompt from an upstream ``ReasonerTurnRender``.
+def _system_from_render(render: Any) -> str:
+    """Pull the rendered system prompt from the upstream ``turn_render`` port.
 
     ``think.reason.render`` runs one step earlier in the subgraph and
     emits a typed-boundary :class:`ReasonerTurnRender` whose ``trace``
@@ -178,7 +177,7 @@ def _system_from_response(response: Any) -> str:
     per-turn render — spec §G mandates the LLM see the assembled prompt
     as ``role=system``, never as ``role=user`` and never omitted.
     """
-    trace = getattr(response, "trace", None)
+    trace = getattr(render, "trace", None)
     if trace is None:
         return ""
     text = getattr(trace, "system_prompt_text", None)
@@ -188,7 +187,7 @@ def _system_from_response(response: Any) -> str:
 def _resolve_system(
     *,
     header: Any,
-    response: Any,
+    render: Any,
 ) -> str:
     """Pick the system prompt using spec §G's two-tier fallback.
 
@@ -197,25 +196,25 @@ def _resolve_system(
     1. ``writer.request_header().system`` — folded journal state.
        Replay-safe path: a run reconstructed from ``spine.jsonl`` keeps
        the historical header even when the live render emits newer text.
-    2. ``response.trace.system_prompt_text`` — the live per-turn render
-       produced by ``think.reason.render`` one node earlier. Fixes
-       run_a0cdcd40d8b9 where ``writer.request_header()`` was ``None``
-       because ``spine.llm.request.header`` had not yet been published
-       (the publish happens *inside* the LLM adapter call, after
-       history.assemble prepares the request).
+    2. ``turn_render.trace.system_prompt_text`` — the live per-turn render
+       produced by ``think.reason.render`` one node earlier. Needed because
+       ``spine.llm.request.header`` is published *inside* the LLM adapter
+       call, after this node prepares the request, so the folded header is
+       always one turn behind (or absent on the first turn).
 
     Header None / empty / non-string is treated as "no header" so the
     fallback chain runs even when fold produced a header object with
     no system field (canonical normalization drops absent strings).
 
-    The prior third tier (``role_profile`` composition) was removed:
-    ``brain.role_profile`` is the sole authority — consumed by
-    ``think.reason.render`` and reflected via ``response.trace.system_prompt_text``.
+    ``brain.role_profile`` is the sole authority for role identity —
+    consumed by ``think.reason.render`` and reflected via
+    ``turn_render.trace.system_prompt_text``; this node does not compose a
+    prompt of its own.
     """
     from_header = _system_from_header(header)
     if from_header:
         return from_header
-    return _system_from_response(response)
+    return _system_from_render(render)
 
 
 @plugin(

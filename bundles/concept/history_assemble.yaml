@@ -2,20 +2,20 @@
 # Spec §D + §G — think.history.assemble 内部图。
 #
 # 单节点 inner graph:history.derive 从 RunSessionWriter + ForkedTools +
-# Response 投影 messages + system + tools,经 orphan-drop 后的
+# ReasonerTurnRender 投影 messages + system + tools,经 orphan-drop 后的
 # ModelVisibleRequest typed boundary。
 #
 # 跨图引用:
-#   inputs  -> business.reasoning.turn 的 writer + forked_tools + response port
+#   inputs  -> business.reasoning.turn 的 writer + forked_tools + turn_render port
 #   outputs -> primitive.llm.call 节点的 model_visible_request port
 #
 # PR-3.8.borrow-tools-wire: forked_tools added as a typed input port;
 # before this, history.derive emitted ``tools=()`` regardless of fork,
 # so the LLM never saw the per-run tool schema (spec §E / §J).
 #
-# Spec §G fix: response added as a typed input port so the system
+# Spec §G fix: turn_render added as a typed input port so the system
 # prompt can fall back to ``ReasonerTurnRender.trace.system_prompt_text``
-# when the folded header is empty (run_a0cdcd40d8b9 regression).
+# when the folded header is empty.
 #
 # delete-when: N/A(纯加法,think.history.assemble 节点在 think.yaml 引用)。
 
@@ -27,11 +27,14 @@ nodes:
   - id: history.derive
     region: think
     factory: history.derive
-    # Spec §G: ``response`` port added so the system prompt can fall back
-    # to the live render when the folded header is empty (run_a0cdcd40d8b9
-    # regression — ModelVisibleHook.publish runs *inside* the LLM adapter,
-    # after history.assemble prepares the request).
-    inputs: [writer, state, forked_tools, response]
+    # Spec §G: the render port carries the live ``ReasonerTurnRender`` so the
+    # system prompt can fall back to ``trace.system_prompt_text`` when the
+    # folded header is empty (ModelVisibleHook.publish runs *inside* the LLM
+    # adapter, after history.assemble prepares the request). Named after its
+    # producer ``think.reason.render``; a ``response`` port here matched no
+    # producer, so both tiers resolved empty and requests went out with
+    # ``system=""``.
+    inputs: [writer, state, forked_tools, turn_render]
     outputs: [model_visible_request]
     config:
       emit_on_enter: []
