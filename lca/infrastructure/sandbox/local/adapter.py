@@ -1,4 +1,4 @@
-﻿"""Host-backed local Sandbox — SANDBOX plane without Onlyboxes.
+"""Host-backed local Sandbox — SANDBOX plane without Onlyboxes.
 
 Implements the ``Sandbox`` protocol against a real workspace directory that
 presents the guest contract root ``/mnt/data`` (or ``LCA_LOCAL_SANDBOX_ROOT``).
@@ -228,7 +228,9 @@ class LocalSandboxAdapter:
         timeout_s: int = DEFAULT_SANDBOX_TIMEOUT_S,
         **kwargs: Any,
     ) -> SandboxResult:
-        return await self._run_code(code, language=language, timeout_s=timeout_s, session_id="", **kwargs)
+        return await self._run_code(
+            code, language=language, timeout_s=timeout_s, session_id="", **kwargs
+        )
 
     async def create_session(self, config: SessionConfig | None = None) -> SessionInfo | None:
         del config
