@@ -307,6 +307,11 @@ class EventTranslator:
         }
 
     @staticmethod
+    def _spine_llm_call_end(e: dict) -> dict:
+        del e
+        return {"type": "stream_end", "data": {}}
+
+    @staticmethod
     def _spine_llm_stream_token(e: dict) -> dict | None:
         payload = _inner_payload(e)
         delta = str(payload.get("text_delta") or "")
@@ -463,6 +468,7 @@ _HANDLERS = {
 
 _SPINE_HANDLERS = {
     "llm.call.start": EventTranslator._spine_llm_call_start,
+    "llm.call.end": EventTranslator._spine_llm_call_end,
     "llm.stream.token": EventTranslator._spine_llm_stream_token,
     "llm.request.header.assistant": EventTranslator._spine_llm_header_assistant,
     "step.tool_call.record": EventTranslator._spine_tool_call_record,

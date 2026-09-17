@@ -69,6 +69,25 @@ def test_spine_llm_call_start_becomes_stream_start_with_parent() -> None:
     assert out["data"]["assistantMessage"]["id"] == "msg_assistant"
 
 
+def test_spine_llm_call_end_becomes_stream_end() -> None:
+    """Native call_llm publishes stream_end when the model turn finishes.
+
+    LCA must do the same on ``llm.call.end`` so the Thinking block closes and
+    the next ``stream_start`` can open a new assistant row instead of wiping
+    the previous step's reasoning on the same message.
+    """
+    t = EventTranslator()
+    stamped = {
+        "event": {
+            "execution_point": "llm.call.end",
+            "payload": {"model": "solo", "outcome": "success"},
+        }
+    }
+    out = t.translate(stamped)
+    assert out is not None
+    assert out["type"] == "stream_end"
+
+
 def test_spine_llm_stream_token_reasoning() -> None:
     t = EventTranslator()
     stamped = {

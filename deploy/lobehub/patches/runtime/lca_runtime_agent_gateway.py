@@ -33,6 +33,8 @@ _NEW_FILES = (
     "reconnect.ts",
     "event_handler.ts",
     "event_handler.test.ts",
+    "lcaStepPersist.ts",
+    "lcaStepPersist.test.ts",
     "lcaGatewayEventHandler.test.ts",
     "event_router.ts",
     "client.ts",

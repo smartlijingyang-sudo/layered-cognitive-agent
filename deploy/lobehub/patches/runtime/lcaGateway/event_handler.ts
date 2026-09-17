@@ -34,6 +34,12 @@ import debug from 'debug';
 
 import { createGatewayEventHandler } from '@/store/chat/slices/agentRun/actions/transports/gateway/gatewayEventHandler';
 
+import {
+  ensureLcaToolMessages,
+  findChildAssistant,
+  openLcaAssistantStep,
+  persistLcaToolResult,
+} from './lcaStepPersist';
 import { createLcaInMemoryMessagesReader } from './messageService';
 
 const log = debug('lobe-client:lca-gateway');
@@ -56,6 +62,9 @@ export const createLcaGatewayEventHandler: typeof createGatewayEventHandler = (g
     runtimeType: 'lca-gateway',
   });
 
+  let currentAssistantId = params.assistantMessageId;
+  let llmStepOpened = false;
+
   return (event: AgentStreamEvent) => {
     if (event.type === 'tool_execute') {
       // LCA never emits `tool_execute` on the wire; if one arrives it is
@@ -70,6 +79,76 @@ export const createLcaGatewayEventHandler: typeof createGatewayEventHandler = (g
       );
       return;
     }
-    handler(event);
+
+    let nextEvent = event;
+    const store = get();
+
+    if (event.type === 'stream_start') {
+      const incomingId = (event.data as { assistantMessage?: { id?: string } } | undefined)
+        ?.assistantMessage?.id;
+      if (llmStepOpened && currentAssistantId) {
+        const existing = findChildAssistant(store, params.context, currentAssistantId);
+        const stepId = existing?.id
+          ? existing.id
+          : openLcaAssistantStep(store, {
+              context: params.context,
+              operationId: params.operationId,
+              parentAssistantId: currentAssistantId,
+            }).id;
+        currentAssistantId = stepId;
+        nextEvent = {
+          ...event,
+          data: {
+            ...(event.data as object),
+            assistantMessage: {
+              ...((event.data as { assistantMessage?: object } | undefined)?.assistantMessage ??
+                {}),
+              id: stepId,
+            },
+          },
+        } as AgentStreamEvent;
+      } else {
+        llmStepOpened = true;
+        if (incomingId) currentAssistantId = incomingId;
+      }
+    }
+
+    if (
+      event.type === 'stream_chunk' &&
+      (event.data as { chunkType?: string } | undefined)?.chunkType === 'tools_calling'
+    ) {
+      const data = event.data as { toolsCalling?: Array<Record<string, unknown>> };
+      if (currentAssistantId && Array.isArray(data.toolsCalling)) {
+        const toolsCalling = ensureLcaToolMessages(store, {
+          assistantId: currentAssistantId,
+          context: params.context,
+          operationId: params.operationId,
+          toolsCalling: data.toolsCalling,
+        });
+        nextEvent = {
+          ...event,
+          data: { ...data, toolsCalling },
+        } as AgentStreamEvent;
+      }
+    }
+
+    if (event.type === 'tool_end') {
+      const data = event.data as {
+        payload?: { toolCalling?: { id?: string } };
+        result?: { content?: unknown; error?: unknown; state?: unknown };
+        toolCallId?: string;
+      };
+      const toolCallId = data.payload?.toolCalling?.id || data.toolCallId;
+      if (toolCallId) {
+        persistLcaToolResult(store, {
+          context: params.context,
+          operationId: params.operationId,
+          result: data.result,
+          toolCallId,
+        });
+      }
+    }
+
+    handler(nextEvent);
   };
 };

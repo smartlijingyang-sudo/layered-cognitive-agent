@@ -208,9 +208,9 @@ async def test_tool_end_with_content_publishes_followup_text_chunk(
 async def test_tool_end_with_projected_state_does_not_dump_content_into_assistant(
     manager: LcaStreamEventLog, clean_run_id: str
 ) -> None:
-    """activate_skill (and other card-owned tools) put SKILL.md / stdout in
-    ``result.content`` AND ``result.state``. Mirroring that onto a
-    ``stream_chunk text`` dumps the card body into the assistant reply.
+    """Card-owned tools put their body in ``result.content`` AND ``result.state``.
+    Mirroring that onto a ``stream_chunk text`` dumps the card body into the
+    assistant reply.
     """
     coord = LcaAgentRuntimeCoordinator(
         stream_manager=manager,

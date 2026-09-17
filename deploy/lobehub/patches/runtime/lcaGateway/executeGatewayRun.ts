@@ -11,6 +11,7 @@ import type { RunScope } from '@/store/chat/slices/agentRun/actions/lifecycle/ty
 import { createGatewayEventRouter } from '@/store/chat/slices/agentRun/actions/transports/gateway/gatewayEventRouter';
 import { dbMessageSelectors } from '@/store/chat/slices/message/selectors/dbMessage';
 import type { ChatStore } from '@/store/chat/store';
+import { messageMapKey } from '@/store/chat/utils/messageMapKey';
 
 import { getLcaGatewayUrl } from './client';
 import { createLcaGatewayEventHandler } from './event_handler';
@@ -18,6 +19,33 @@ import { lcaStartRun } from './execute';
 import { persistAssistantRow } from '../lcaPersist';
 
 type MessageLike = { id?: string; parentId?: string; role?: string };
+
+/** Walk assistant-anchored children from the seed placeholder (native spine). */
+function collectAssistantChain<T extends { id: string; parentId?: string | null; role?: string }>(
+  messages: T[],
+  seedId: string,
+): T[] {
+  const byParent = new Map<string, Array<(typeof messages)[number]>>();
+  for (const message of messages) {
+    if (message.role !== 'assistant' || !message.parentId) continue;
+    const siblings = byParent.get(message.parentId) ?? [];
+    siblings.push(message);
+    byParent.set(message.parentId, siblings);
+  }
+  const seed = messages.find((message) => message.id === seedId);
+  if (!seed) return [];
+  const chain = [seed];
+  const seen = new Set<string>([seedId]);
+  let cursor = seedId;
+  while (true) {
+    const next = (byParent.get(cursor) ?? []).find((message) => !seen.has(message.id));
+    if (!next) break;
+    chain.push(next);
+    seen.add(next.id);
+    cursor = next.id;
+  }
+  return chain;
+}
 
 /** Map a user-turn parent id to the assistant placeholder LobeHub created for this reply. */
 function resolveAssistantMessageId(
@@ -179,11 +207,16 @@ export async function lcaExecuteGatewayRun(
       if (!terminalReceived) state.completeOperation(gatewayOpId);
       if (authFailed) state.completeOperation(gatewayOpId);
       if (terminalReceived && succeeded && assistantMessageId) {
-        const msg = dbMessageSelectors.getDbMessageById(assistantMessageId)(get());
-        const text = typeof msg?.content === 'string' ? msg.content : '';
-        const tools = msg?.tools;
-        if (msg && (msg.reasoning?.content || text || tools?.length)) {
-          void persistAssistantRow(get, assistantMessageId, {
+        const seed = dbMessageSelectors.getDbMessageById(assistantMessageId)(get());
+        const topicMessages =
+          get().dbMessagesMap[messageMapKey({ agentId: context.agentId, topicId })] ?? [];
+        const chain = collectAssistantChain(topicMessages, assistantMessageId);
+        const rows = chain.length > 0 ? chain : seed ? [seed] : [];
+        for (const msg of rows) {
+          const text = typeof msg.content === 'string' ? msg.content : '';
+          const tools = msg.tools;
+          if (!(msg.reasoning?.content || text || tools?.length)) continue;
+          void persistAssistantRow(get, msg.id, {
             content: text,
             model: params.model,
             operationId: gatewayOpId,

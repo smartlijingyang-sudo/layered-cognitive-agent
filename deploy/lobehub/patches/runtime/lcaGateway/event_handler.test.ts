@@ -73,6 +73,8 @@ const flush = async () => {
 describe('createLcaGatewayEventHandler', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.spyOn(messageService, 'createMessage').mockResolvedValue({ id: 'x', messages: [] } as never);
+    vi.spyOn(messageService, 'updateToolMessage').mockResolvedValue({ success: true } as never);
   });
 
   it('reconciles against the in-memory reader, not the DB service', async () => {

@@ -125,14 +125,6 @@ const createStore = () => {
     ],
   };
 
-  const updateAssistantTools = (tools: unknown[]) => {
-    const bucket = dbMessagesMap[topicKey];
-    const idx = bucket.findIndex((m) => m.id === 'assistant-msg');
-    if (idx >= 0) {
-      bucket[idx] = { ...bucket[idx], tools } as UIChatMessage;
-    }
-  };
-
   const replaceMessages = vi.fn((messages: UIChatMessage[]) => {
     dbMessagesMap[topicKey] = messages;
   });
@@ -143,11 +135,21 @@ const createStore = () => {
     associateMessageWithOperation: vi.fn(),
     completeOperation: vi.fn(),
     dbMessagesMap,
-    internal_dispatchMessage: vi.fn((payload: { type?: string; value?: { tools?: unknown[] } }) => {
-      if (payload?.type === 'updateMessage' && Array.isArray(payload.value?.tools)) {
-        updateAssistantTools(payload.value.tools);
-      }
-    }),
+    internal_dispatchMessage: vi.fn(
+      (payload: { id?: string; type?: string; value?: Record<string, unknown> }) => {
+        const bucket = dbMessagesMap[topicKey];
+        if (payload.type === 'createMessage' && payload.id && payload.value) {
+          bucket.push({ ...payload.value, id: payload.id } as UIChatMessage);
+          return;
+        }
+        if (payload.type === 'updateMessage' && payload.id) {
+          const idx = bucket.findIndex((m) => m.id === payload.id);
+          if (idx >= 0) {
+            bucket[idx] = { ...bucket[idx], ...payload.value } as UIChatMessage;
+          }
+        }
+      },
+    ),
     internal_toggleToolCallingStreaming: vi.fn(),
     operations: {},
     replaceMessages,
@@ -170,6 +172,9 @@ const flush = async () => {
 describe('createLcaGatewayEventHandler (multi-run / multi-LLM)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.spyOn(messageService, 'createMessage').mockResolvedValue({ id: 'x', messages: [] } as never);
+    vi.spyOn(messageService, 'updateToolMessage').mockResolvedValue({ success: true } as never);
+    vi.spyOn(messageService, 'updateMessage').mockResolvedValue({ success: true } as never);
   });
 
   it('drives three steps and a terminal snapshot with one tool per tools_calling chunk', async () => {
@@ -372,14 +377,12 @@ describe('createLcaGatewayEventHandler (multi-run / multi-LLM)', () => {
       UIChatMessage[],
       Record<string, unknown>,
     ];
-    expect(terminalMessages).toHaveLength(2);
-    const finalAssistant = terminalMessages.find((m) => m.role === 'assistant');
+    expect(terminalMessages.length).toBeGreaterThanOrEqual(2);
+    const finalAssistant = terminalMessages.find((m) => m.id === 'assistant-msg');
 
     // ── Invariant 3: terminal assistant row carries all three tools in
-    // the in-memory accumulation order. The LCA reader returns the live
-    // `dbMessagesMap[topicKey]` array, where the assistant row has been
-    // mutated in place by the mock `internal_dispatchMessage` after each
-    // `tools_calling` chunk. After three chunks the assistant's tools are
+    // the in-memory accumulation order. Tool result rows sit beside it
+    // (native dual-form). After three chunks the assistant's tools are
     // `[call-1, call-2, call-3]` (first-seen order).
     expect(finalAssistant?.tools).toHaveLength(3);
     const toolIds = (finalAssistant?.tools as Array<{ id: string }>).map((t) => t.id);
@@ -391,7 +394,47 @@ describe('createLcaGatewayEventHandler (multi-run / multi-LLM)', () => {
     expect(dbSpy).not.toHaveBeenCalled();
   });
 
-  it('writes tool_end result onto in-memory tools so activateSkill can render', async () => {
+  it('opens a new assistant row on the second stream_start so thinking and tools stay in step order', async () => {
+    const { store } = createStore();
+    const handler = createLcaGatewayEventHandler(() => store, {
+      assistantMessageId: 'assistant-msg',
+      context,
+      operationId: 'op-1',
+    });
+
+    handler(makeEvent('stream_start', { assistantMessage: { id: 'assistant-msg' } } as never, 1));
+    handler(
+      makeEvent(
+        'stream_chunk',
+        { chunkType: 'reasoning', reasoning: 'need the skill first', snapshotMode: 'append' } as never,
+        1,
+      ),
+    );
+    handler(makeEvent('stream_chunk', oneToolChunk('call-1', 'runCommand'), 1));
+    handler(makeEvent('stream_end', {} as never, 1));
+    handler(makeEvent('stream_start', { assistantMessage: { id: 'assistant-msg' } } as never, 2));
+    handler(
+      makeEvent(
+        'stream_chunk',
+        { chunkType: 'reasoning', reasoning: 'now inspect the file', snapshotMode: 'append' } as never,
+        2,
+      ),
+    );
+    handler(makeEvent('stream_chunk', oneToolChunk('call-2', 'runCommand'), 2));
+    await flush();
+
+    const assistants = store.dbMessagesMap[topicKey].filter((m) => m.role === 'assistant');
+    expect(assistants.length).toBeGreaterThanOrEqual(2);
+    const first = assistants.find((m) => m.id === 'assistant-msg');
+    const second = assistants.find((m) => m.id !== 'assistant-msg');
+    expect(first?.reasoning?.content).toContain('need the skill first');
+    expect((first?.tools as Array<{ id: string }> | undefined)?.map((t) => t.id)).toEqual(['call-1']);
+    expect(second?.parentId).toBe('assistant-msg');
+    expect(second?.reasoning?.content).toContain('now inspect the file');
+    expect((second?.tools as Array<{ id: string }> | undefined)?.map((t) => t.id)).toEqual(['call-2']);
+  });
+
+  it('writes tool_end result onto in-memory tools so the card can render', async () => {
     const { store } = createStore();
     const handler = createLcaGatewayEventHandler(() => store, {
       assistantMessageId: 'assistant-msg',
