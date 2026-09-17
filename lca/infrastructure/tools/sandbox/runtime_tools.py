@@ -73,7 +73,7 @@ class SandboxExecuteTool(Tool):
         "产出写到 outputs/ 自动收集。\n"
         f"预装包: {_PACKAGES_HINT}\n"
         "先 sandbox_inspect 了解列名与 NaN；字符串操作前 dropna().astype(str)。"
-        "画图中文：已预置 WenQuanYi/CJK 字体。"
+        "画图中文已由沙箱配置，不要改 font.sans-serif，不要 fc-list。"
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",

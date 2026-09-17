@@ -18,8 +18,8 @@ def parameters() -> dict[str, Any]:
 
 
 DESCRIPTION = (
-    "执行代码（支持 machine 和 sandbox 模式）。"
-    "参数：description，language（python/javascript/typescript），code。"
-    "在 machine 模式下通过临时文件 + 解释器执行；sandbox 模式使用原生沙箱运行时。"
+    "在沙箱执行代码。每次调用是新的解释器（上一轮变量不在内存里）；工作区文件会保留。"
+    "产出写到 outputs/ 后自动收集。画图中文已预配置，不要改 font.sans-serif，不要 fc-list。"
+    "PDF 用 reportlab 的 STSong-Light。参数：description，language（python/javascript/typescript），code。"
 )
 IS_IDEMPOTENT = False

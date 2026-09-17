@@ -28,6 +28,7 @@ from lca.contracts.protocols import Sandbox, SandboxRuntime
 from lca.infrastructure.file.store import FileStore
 from lca.infrastructure.sandbox.artifact.scanner import GUEST_ARTIFACT_SCANNER
 from lca.infrastructure.sandbox.bootstrap.bootstrap import SANDBOX_INIT_TIMEOUT_S
+from lca.infrastructure.sandbox.cjk.matplotlib_guest import guest_bootstrap_source
 from lca.infrastructure.sandbox.error.parse import classify_execution_error
 from lca.infrastructure.sandbox.exec.result import sandbox_exec_result_from
 from lca.infrastructure.sandbox.inspect.prelude import INSPECT_SCRIPT, parse_inspect_stdout
@@ -272,8 +273,11 @@ class RunBoundSandboxRuntime(SandboxRuntime):
                 )
 
         budget = timeout_s if timeout_s is not None else self._default_timeout_s
+        body = code
+        if language.lower() in PYTHON_LANGUAGES:
+            body = guest_bootstrap_source() + "\n" + code
         raw = await self._execute_raw(
-            code,
+            body,
             language=language,
             timeout_s=budget,
             invocation_id=invocation_id,

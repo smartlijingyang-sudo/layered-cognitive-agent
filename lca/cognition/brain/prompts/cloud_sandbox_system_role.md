@@ -38,9 +38,8 @@ Always prioritize using pre-installed tools over pip install.
   - PDF still uses reportlab / pypdf / pdf skill — not officecli.
 
 **Fonts:**
-- STSong-Light (serif CJK) — reportlab built-in CID font, always available (no file needed)
-- WenQuanYi Zen Hei (sans-serif CJK) — available on the system
-- Noto Sans CJK (sans-serif CJK) — available on the system
+- PDF Chinese: reportlab CID font STSong-Light (always available). Do not fc-list.
+- matplotlib CJK is preconfigured in the guest. Do not set font.sans-serif. Do not fc-list.
 
 **NOT Available (do not attempt to use):**
 - Tesseract (OCR) — Not installed
@@ -147,7 +146,8 @@ When executing Python code:
 **Visualization with Matplotlib:**
 - matplotlib is pre-installed — use directly without installation
 - Never use seaborn library
-- Save plots using `plt.savefig('{{sandbox_outputs_dir}}/chart.png')` then **automatically export for user download**
+- Do not set font.sans-serif and do not call fc-list. CJK is already configured.
+- Save plots using `plt.savefig('{{sandbox_outputs_dir}}/chart.png')`. Files under the output directory are auto-collected.
 
 **Generating Document Files:**
 You MUST use the following libraries for each supported file format:

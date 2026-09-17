@@ -411,6 +411,7 @@ _REACT_TOOL_USAGE_TEXT = """<tool_usage_guidelines>
 - writeFile lands text in the sandbox (large files are chunked there). Put path before content. For generating PDF/xlsx from files already in the workspace, prefer executeCode so the artifact is created in-sandbox instead of inlining the dataset into a script.
 - Do not pip install packages listed as pre-installed (reportlab, openpyxl, pandas, python-docx, pypdf). Use them directly.
 - PDF Chinese text: use reportlab's built-in STSong-Light CID font; do not fc-list or download fonts.
+- matplotlib CJK is preconfigured; do not set font.sans-serif; do not fc-list.
 </tool_usage_guidelines>"""
 
 _ROUTING_INSTRUCTIONS_TEXT = """你是团队主导者（lead，自由路由模式）。

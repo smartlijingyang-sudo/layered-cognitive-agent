@@ -4,9 +4,9 @@
 shared:
   notes:
     - >-
-      Chinese PDF/charts: reportlab CID font STSong-Light
-      (`UnicodeCIDFont('STSong-Light')` — no TTF hunt, no /usr/share/fonts scan).
-      matplotlib: 'WenQuanYi Micro Hei' if present.
+      Chinese PDF: reportlab CID font STSong-Light
+      (`UnicodeCIDFont('STSong-Light')` — no TTF hunt, no fc-list).
+      matplotlib CJK is preconfigured. Do not set font.sans-serif.
 
 planes:
   machine:
