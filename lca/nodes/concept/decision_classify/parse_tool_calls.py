@@ -26,9 +26,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from lca.cognition.brain.llm_turn.response_projection import project_llm_response
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
-from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -50,8 +50,6 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-
-_DELEGATE_TOOL_NAME = "delegate"
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,45 +93,9 @@ class DecisionParseResponseExecutor:
 def _parse_response(
     response: LLMResponse,
 ) -> tuple[tuple[ToolCall, ...], tuple[Any, ...], str]:
-    """Project native tool calls + extract intent from a single ``LLMResponse``.
-
-    Leak recovery must run BEFORE intent extraction: ``recover_leaked_tool_calls``
-    returns a new tuple ``(leftover, recovered)`` without mutating ``response.text``,
-    so ``intent`` is computed from the post-recovery ``leftover`` (otherwise leaked
-    JSON would be double-counted as intent text).
-    """
-    from lca.cognition.brain.prompt.leaked_tool_call import recover_leaked_tool_calls
-    from lca.contracts.models.core.execution.decision import DelegationSpec
-
-    leftover = (response.text or "").strip()
-    native_calls = list(response.tool_calls or ())
-    if not native_calls and leftover:
-        leftover, recovered = recover_leaked_tool_calls(leftover)
-        native_calls = recovered
-
-    delegations: list[DelegationSpec] = []
-    tool_calls: list[ToolCall] = []
-    for tc in native_calls:
-        if tc.name == _DELEGATE_TOOL_NAME:
-            delegations.append(
-                DelegationSpec(
-                    subtask=str(tc.arguments.get("subtask", "")),
-                    target_role=tc.arguments.get("target_role") or None,
-                    target_agent_id=tc.arguments.get("target_agent_id") or None,
-                )
-            )
-            continue
-        tool_calls.append(
-            ToolCall(
-                call_id=tc.call_id or new_id("call"),
-                tool_name=tc.name,
-                arguments=dict(tc.arguments),
-                wire_status=str(getattr(tc, "wire_status", None) or "ok"),
-                wire_reason=str(getattr(tc, "wire_reason", None) or ""),
-                wire_raw_preview=str(getattr(tc, "wire_raw_preview", None) or ""),
-            )
-        )
-    return tuple(tool_calls), tuple(delegations), leftover
+    """Project native tool calls + extract intent from a single ``LLMResponse``."""
+    projected = project_llm_response(response)
+    return projected.tool_calls, projected.delegations, projected.intent
 
 
 @plugin(

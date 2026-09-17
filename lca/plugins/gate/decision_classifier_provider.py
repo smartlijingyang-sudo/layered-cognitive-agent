@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from lca.cognition.brain.prompt.leaked_tool_call import recover_leaked_tool_calls
+from lca.cognition.brain.llm_turn.response_projection import project_llm_response
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -19,7 +19,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.models.core.conversation.llm import LLMResponse
-from lca.contracts.models.core.execution.decision import Decision, DelegationSpec, ToolCall
+from lca.contracts.models.core.execution.decision import Decision
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
@@ -27,7 +27,6 @@ from lca.contracts.protocols.gate.decision_classifier import DecisionClassifier
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 _PARSE_FAILURE_USER_MESSAGE = "抱歉，模型未返回有效决策，请重试。"
-_DELEGATE_TOOL_NAME = "delegate"
 
 
 class Config(BaseModel):
@@ -43,52 +42,30 @@ class DefaultDecisionClassifier(DecisionClassifier):
 
     def classify(self, response: LLMResponse) -> Decision:
         """Map native function-calling output to LCA Decision (LobeHub tool wire parity)."""
-        tool_calls = list(response.tool_calls)
-        leftover = (response.text or "").strip()
-        if not tool_calls and leftover:
-            leftover, recovered = recover_leaked_tool_calls(leftover)
-            tool_calls = recovered
-        if tool_calls:
-            delegates = [tc for tc in tool_calls if tc.name == _DELEGATE_TOOL_NAME]
-            if delegates:
-                specs = [
-                    DelegationSpec(
-                        subtask=tc.arguments.get("subtask", ""),
-                        target_role=tc.arguments.get("target_role") or None,
-                        target_agent_id=tc.arguments.get("target_agent_id") or None,
-                    )
-                    for tc in delegates
-                ]
-                return Decision(
-                    decision_id=new_id("dec"),
-                    action_type=ActionType.DELEGATE.value,
-                    rationale="",
-                    confidence=1.0,
-                    delegations=specs,
-                )
-            mapped = [
-                ToolCall(
-                    call_id=tc.call_id or new_id("call"),
-                    tool_name=tc.name,
-                    arguments=tc.arguments,
-                )
-                for tc in tool_calls
-            ]
+        projected = project_llm_response(response)
+        if projected.delegations:
+            return Decision(
+                decision_id=new_id("dec"),
+                action_type=ActionType.DELEGATE.value,
+                rationale="",
+                confidence=1.0,
+                delegations=list(projected.delegations),
+            )
+        if projected.tool_calls:
             return Decision(
                 decision_id=new_id("dec"),
                 action_type=ActionType.USE_TOOL.value,
                 rationale="",
                 confidence=1.0,
-                tool_calls=mapped,
+                tool_calls=list(projected.tool_calls),
             )
-        text = leftover
-        if text:
+        if projected.intent:
             return Decision(
                 decision_id=new_id("dec"),
                 action_type=ActionType.RESPOND.value,
                 rationale="",
                 confidence=1.0,
-                response_text=text,
+                response_text=projected.intent,
             )
         return Decision(
             decision_id=new_id("dec"),

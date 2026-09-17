@@ -214,6 +214,19 @@ def resolve_tool_arguments(
             )
         return ToolArgumentsOk(arguments={})
 
+    try:
+        parsed: Any = json.loads(raw)
+    except json.JSONDecodeError:
+        parsed = None
+    else:
+        if isinstance(parsed, dict):
+            return ToolArgumentsOk(arguments=dict(parsed))
+        return ToolArgumentsOk(arguments={"_value": parsed})
+
+    # Strict parse failed: ``raw`` is a truncated stream. Recovery is keyed on
+    # opaque text bodies because those are the arguments a coding agent cannot
+    # afford to lose; a payload that parses never reaches this branch, so its
+    # key names are not gated by ``_PARTIAL_STRING_KEYS``.
     recovered = recover_partial_tool_arguments(raw)
     if _usable_recovered_arguments(recovered):
         return ToolArgumentsOk(arguments=recovered)

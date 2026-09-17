@@ -138,11 +138,11 @@ def _compose(
 
 
 def _wire_extra(tool_calls: tuple[ToolCall, ...]) -> dict[str, object]:
-    """Copy the first non-ok ADR-0047 wire verdict onto Decision.extra.
+    """Mirror the first non-ok ADR-0047 wire verdict onto ``Decision.extra``.
 
-    Body's ``tool_wire_block_observation`` reads extra, not ToolCall.
-    Parser used to drop NativeToolCall.wire_* so a truncated writeFile
-    reached act as ``arguments={}`` with status ok.
+    ``ToolCall`` owns the verdict and ``tool_wire_gate`` reads it there; this
+    mirror keeps the verdict visible on the Decision itself for consumers that
+    do not walk the call list.
     """
     for call in tool_calls:
         status = (call.wire_status or "ok").strip() or "ok"

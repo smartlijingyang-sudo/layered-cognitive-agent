@@ -14,9 +14,12 @@ This is the third of three single-responsibility nodes that replace
 The orchestrator ``think.reason`` wires them via edges; the deleted
 ``complete`` node used to do all three jobs inline.
 
-The parse mirrors ``decision_classify.decision.parse.response`` but emits
-a single :class:`Decision` (the spec §E node emits ``decision`` as one
-typed port, not the typed-port split used by ``concept.decision.classify``).
+The native-call → ``ToolCall`` projection is shared with
+``decision_classify.decision.parse.response`` via
+:func:`lca.cognition.brain.llm_turn.response_projection.project_llm_response`;
+this node emits a single :class:`Decision` (the spec §E node emits
+``decision`` as one typed port, not the typed-port split used by
+``concept.decision.classify``).
 
 Canonical shape: hand-written ``@dataclass(frozen=True, slots=True)`` +
 ``@plugin(...)`` carrier, per ADR-0228 D2.
@@ -28,6 +31,7 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from lca.cognition.brain.llm_turn.response_projection import project_llm_response
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.ids.ids import new_id
@@ -61,8 +65,6 @@ if TYPE_CHECKING:
 
 
 _log = logging.getLogger(__name__)
-
-_DELEGATE_TOOL_NAME = "delegate"
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,9 +102,7 @@ class DecisionParseExecutor:
         )
 
 
-def _resolve_port(
-    name: str, *, input: NodeInput, context: NodeContext
-) -> Any:
+def _resolve_port(name: str, *, input: NodeInput, context: NodeContext) -> Any:
     """Read a declared port from ``input.port_values`` or ``context.runtime``."""
     value = input.port_values.get(name)
     if value is None and hasattr(context, "runtime") and context.runtime is not None:
@@ -120,36 +120,8 @@ def _project_response(
     response: LLMResponse,
 ) -> tuple[list[ToolCall], list[DelegationSpec], str]:
     """Split native tool calls + delegations and recover leaked JSON from text."""
-    from lca.cognition.brain.prompt.leaked_tool_call import (
-        recover_leaked_tool_calls,
-    )
-
-    leftover = (response.text or "").strip()
-    native_calls = list(response.tool_calls or ())
-    if not native_calls and leftover:
-        leftover, recovered = recover_leaked_tool_calls(leftover)
-        native_calls = recovered
-
-    delegations: list[DelegationSpec] = []
-    tool_calls: list[ToolCall] = []
-    for tc in native_calls:
-        if tc.name == _DELEGATE_TOOL_NAME:
-            delegations.append(
-                DelegationSpec(
-                    subtask=str(tc.arguments.get("subtask", "")),
-                    target_role=tc.arguments.get("target_role") or None,
-                    target_agent_id=tc.arguments.get("target_agent_id") or None,
-                )
-            )
-            continue
-        tool_calls.append(
-            ToolCall(
-                call_id=tc.call_id or new_id("call"),
-                tool_name=tc.name,
-                arguments=dict(tc.arguments),
-            )
-        )
-    return tool_calls, delegations, leftover
+    projected = project_llm_response(response)
+    return list(projected.tool_calls), list(projected.delegations), projected.intent
 
 
 def _infer_action_type(

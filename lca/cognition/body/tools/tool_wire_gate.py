@@ -26,18 +26,21 @@ _BLOCKING: frozenset[str] = frozenset({TOOL_WIRE_INCOMPLETE, TOOL_WIRE_INVALID})
 
 
 def tool_wire_block_observation(decision: Decision) -> Observation | None:
-    """若 wire 状态禁止执行，返回失败观测；否则 None（继续正常工具路径）。"""
-    status = str(decision.extra.get(TOOL_WIRE_STATUS) or "")
-    if status not in _BLOCKING and decision.tool_calls:
-        status = str(decision.tool_calls[0].wire_status or "")
-    if status not in _BLOCKING:
-        return None
+    """若 wire 状态禁止执行，返回失败观测；否则 None（继续正常工具路径）。
+
+    判定读 ``ToolCall`` 自带的 ADR-0047 字段(判定随调用透传的唯一真值),
+    ``Decision.extra`` 只作回退:think 侧的 ``decision.parse`` 不写 extra,
+    只认 extra 会把真实截断原因降级成 status 字面量回灌给模型。
+    """
     if not decision.tool_calls:
         return None
     tc = decision.tool_calls[0]
-    reason = str(decision.extra.get(TOOL_WIRE_REASON) or status)
+    status = (tc.wire_status or "").strip() or str(decision.extra.get(TOOL_WIRE_STATUS) or "")
+    if status not in _BLOCKING:
+        return None
+    reason = (tc.wire_reason or "").strip() or str(decision.extra.get(TOOL_WIRE_REASON) or status)
     finish = decision.extra.get(TOOL_WIRE_FINISH_REASON)
-    preview = decision.extra.get(TOOL_WIRE_RAW_PREVIEW)
+    preview = (tc.wire_raw_preview or "").strip() or decision.extra.get(TOOL_WIRE_RAW_PREVIEW)
     parts = [
         f"tool_wire_{status}",
         f"tool={tc.tool_name}",
