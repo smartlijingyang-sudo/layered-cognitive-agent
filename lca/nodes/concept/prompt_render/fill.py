@@ -30,7 +30,10 @@ from lca.contracts.models.cognition.boundary import (
     ReasonerContext,
     RoleSnapshot,
 )
-from lca.contracts.models.cognition.prompt_assembly import PromptTemplate
+from lca.contracts.models.cognition.prompt_assembly import (
+    PromptSectionRegistry,
+    PromptTemplate,
+)
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -96,11 +99,17 @@ class PromptSectionsFillExecutor:
                 tools_seq = tuple(listed())
 
         registry = input.port_values.get("prompt_section_registry")
+        if not isinstance(registry, PromptSectionRegistry):
+            raise TypeError(
+                "prompt.sections.fill: 'prompt_section_registry' port must be a "
+                f"PromptSectionRegistry instance, got {type(registry).__name__}"
+            )
 
         prompt, trace = render_template(
             template=template,
             registry=registry,
             role_profile=role.profile,
+            task=ctx_dto.task,
             awareness=role.team_awareness,
             manifest=ctx_dto.manifest,
             tools=tools_seq,

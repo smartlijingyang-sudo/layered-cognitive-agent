@@ -99,9 +99,7 @@ class PromptReasoner:
                 "is not wired; concept.template.select must populate "
                 "TemplateSelection before build_turn_plan."
             )
-        template_id, decision_path = normalize_selector_result(
-            self.selector.select(state=state)
-        )
+        template_id, decision_path = normalize_selector_result(self.selector.select(state=state))
         if not template_id:
             raise RuntimeError(
                 "PromptReasoner.build_turn_plan: selector returned empty "
@@ -158,6 +156,7 @@ class PromptReasoner:
             template=tpl,
             registry=self._section_registry,
             role_profile=role.profile,
+            task=context.task,
             awareness=role.team_awareness,
             manifest=context.manifest,
             tools=(),
@@ -169,7 +168,7 @@ class PromptReasoner:
                 prompt=prompt,
                 trace=None,
                 section_count=0,
-                manifest=None,
+                manifest=context.manifest,
                 activated_skill_ids=(),
                 section_outputs=None,
                 total_chars=None,
@@ -179,7 +178,7 @@ class PromptReasoner:
             prompt=prompt,
             trace=trace,
             section_count=len(trace.sections),
-            manifest=None,
+            manifest=context.manifest,
             activated_skill_ids=trace.activated_skill_ids,
             section_outputs=_section_output_dicts(trace),
             total_chars=trace.total_chars,

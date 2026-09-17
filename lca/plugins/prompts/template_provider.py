@@ -51,12 +51,11 @@ def _builtin_section_refs() -> tuple[tuple[str, str, bool, str | None], ...]:
         ("role", "pure", False, None),
         ("goal", "pure", False, None),
         ("backstory", "pure", False, None),
-        ("current_date", "stateful", True, None),
+        ("current_date", "stateful", False, None),
         ("tools", "stateful", False, None),
         ("available_skills", "pure", False, None),
         ("activated_skills", "stateful", False, None),
         ("task", "stateful", False, None),
-        ("prior_conversation", "stateful", False, None),
         ("context", "stateful", False, None),
         # react template's static instruction blocks
         ("react_workflow", "pure", True, ""),
@@ -96,7 +95,7 @@ def _builtin_templates() -> Mapping[str, _PromptTemplate]:
             for (n, k, o, f) in sl
         )
 
-    react_section_count = 13  # through react_tool_usage_guidelines
+    react_section_count = 12  # through react_tool_usage_guidelines
     routing_extra = 4  # teammates, assigned_roles, member_reports, routing_instructions
     hierarchical_extra = 4  # member_status, evidence_pack, hierarchical_instructions (+ extra)
     return {
@@ -108,14 +107,21 @@ def _builtin_templates() -> Mapping[str, _PromptTemplate]:
         "routing_prompt": _PromptTemplate(
             id="routing_prompt",
             variant=_variant_for("routing_prompt"),
-            sections=refs(base[:react_section_count] + base[react_section_count : react_section_count + routing_extra]),
+            sections=refs(
+                base[:react_section_count]
+                + base[react_section_count : react_section_count + routing_extra]
+            ),
         ),
         "hierarchical_prompt": _PromptTemplate(
             id="hierarchical_prompt",
             variant=_variant_for("hierarchical_prompt"),
             sections=refs(
                 base[:react_section_count]
-                + base[react_section_count + routing_extra : react_section_count + routing_extra + hierarchical_extra]
+                + base[
+                    react_section_count + routing_extra : react_section_count
+                    + routing_extra
+                    + hierarchical_extra
+                ]
             ),
         ),
     }

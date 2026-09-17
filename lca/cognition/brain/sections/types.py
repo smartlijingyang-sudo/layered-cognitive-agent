@@ -7,16 +7,16 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from lca.cognition.brain.prompt.conversation_prompt import format_prior_conversation
 from lca.contracts.atoms.enums.enums import MemoryLayer, MemoryRecordKind
-from lca.contracts.models.core.conversation.conversation import (
-    PRIOR_CONVERSATION_WM_KEY,
-    ConversationTurn,
-)
 from lca.contracts.models.core.conversation.memory import MemoryRecord, MemoryTrust
+from lca.contracts.models.core.perceive.perception import (
+    ContextItem,
+    ContextManifest,
+    ItemKind,
+)
+from lca.contracts.models.core.workspace.activation import ActivatedSkill
 
 if TYPE_CHECKING:
-    from lca.contracts.models.core.state.state import AgentState
     from lca.contracts.models.team.delegation.delegation import DelegationResult
     from lca.contracts.models.team.role.team import RoleProfile
     from lca.contracts.models.team.team.awareness import TeamAwareness
@@ -84,28 +84,10 @@ def render_assigned_roles(roles: Sequence[str]) -> str:
     return ", ".join(roles)
 
 
-def render_prior_conversation_from_state(state: AgentState) -> str:
-    raw = state.working_memory.get(PRIOR_CONVERSATION_WM_KEY)
-    if not isinstance(raw, list) or not raw:
-        return format_prior_conversation(())
-    turns: list[ConversationTurn] = []
-    for item in raw:
-        if not isinstance(item, dict):
-            continue
-        role = str(item.get("role", "")).strip()
-        content = str(item.get("content", "")).strip()
-        if role and content:
-            turns.append(ConversationTurn(role=role, content=content))
-    return format_prior_conversation(tuple(turns))
-
-
-def render_activated_skills(state: AgentState) -> str:
-    if not state.activated_skills:
+def render_activated_skills(skills: Sequence[ActivatedSkill]) -> str:
+    if not skills:
         return "（无）"
-    return "\n".join(
-        f"- {s.name} ({s.skill_id}, step {s.activated_at_step} 激活)"
-        for s in state.activated_skills
-    )
+    return "\n".join(f"- {s.name} ({s.skill_id}, step {s.activated_at_step} 激活)" for s in skills)
 
 
 _KIND_EXCLUDE_NONE: frozenset[MemoryRecordKind] = frozenset()
@@ -166,16 +148,14 @@ def format_record_line(record: MemoryRecord) -> str:
 
 
 def render_context_lines(
-    state: AgentState,
+    manifest: ContextManifest | None,
     *,
     exclude_kinds: frozenset[MemoryRecordKind] = _KIND_EXCLUDE_NONE,
 ) -> str:
     records = [
         record
-        for record in state.retrieved_context
-        if isinstance(record, MemoryRecord)
-        and record.kind not in exclude_kinds
-        and is_prompt_context_record(record)
+        for record in memory_records_from_manifest(manifest)
+        if record.kind not in exclude_kinds and is_prompt_context_record(record)
     ]
     trusted = [
         format_record_line(record)
@@ -200,55 +180,51 @@ def render_context_lines(
     return "\n\n".join(sections) or _EMPTY_CONTEXT
 
 
-def clock_from_state(state: AgentState) -> ManifestClock | None:
-    from lca.contracts.models.core.perceive.projection import current_manifest_from_state
-
-    manifest = current_manifest_from_state(state)
+def _manifest_items(manifest: ContextManifest | None, kind: ItemKind) -> tuple[ContextItem, ...]:
     if manifest is None:
-        return None
-    for item in manifest.items:
-        if item.kind == "clock" and isinstance(item.payload, str):
+        return ()
+    return tuple(item for item in manifest.items if item.kind == kind)
+
+
+def clock_from_manifest(manifest: ContextManifest | None) -> ManifestClock | None:
+    for item in _manifest_items(manifest, "clock"):
+        if isinstance(item.payload, str):
             return ManifestClock(text=item.payload)
     return None
 
 
-def subtasks_from_state(state: AgentState) -> ManifestSubtasks:
-    from lca.contracts.models.core.perceive.projection import current_manifest_from_state
-
-    manifest = current_manifest_from_state(state)
-    if manifest is None:
-        return ManifestSubtasks(items=())
-    for item in manifest.items:
-        if item.kind == "subtasks" and isinstance(item.payload, list):
+def subtasks_from_manifest(manifest: ContextManifest | None) -> ManifestSubtasks:
+    for item in _manifest_items(manifest, "subtasks"):
+        if isinstance(item.payload, list):
             return ManifestSubtasks(items=tuple(str(x) for x in item.payload))
     return ManifestSubtasks(items=())
 
 
-def artifacts_from_state(state: AgentState) -> ManifestArtifacts:
-    from lca.contracts.models.core.perceive.projection import current_manifest_from_state
-
-    manifest = current_manifest_from_state(state)
-    if manifest is None:
-        return ManifestArtifacts(items=())
-    for item in manifest.items:
-        if item.kind == "workspace_artifacts" and isinstance(item.payload, list):
-            entries: list[Mapping[str, object]] = []
-            for art in item.payload:
-                if isinstance(art, Mapping):
-                    entries.append(art)
-            return ManifestArtifacts(items=tuple(entries))
-    return ManifestArtifacts(items=())
+def artifacts_from_manifest(manifest: ContextManifest | None) -> ManifestArtifacts:
+    entries: list[Mapping[str, object]] = []
+    for item in _manifest_items(manifest, "workspace_artifacts"):
+        if isinstance(item.payload, list):
+            entries.extend(art for art in item.payload if isinstance(art, Mapping))
+    return ManifestArtifacts(items=tuple(entries))
 
 
-def render_subtasks_block(state: AgentState) -> str:
-    subtasks = subtasks_from_state(state).items
+def memory_records_from_manifest(manifest: ContextManifest | None) -> tuple[MemoryRecord, ...]:
+    records: list[MemoryRecord] = []
+    for item in _manifest_items(manifest, "memory"):
+        if isinstance(item.payload, list):
+            records.extend(r for r in item.payload if isinstance(r, MemoryRecord))
+    return tuple(records)
+
+
+def render_subtasks_block(manifest: ContextManifest | None) -> str:
+    subtasks = subtasks_from_manifest(manifest).items
     if not subtasks:
         return ""
     return "Subtasks:\n" + "\n".join(f"- {s}" for s in subtasks)
 
 
-def render_artifacts_block(state: AgentState) -> str:
-    entries = artifacts_from_state(state).items
+def render_artifacts_block(manifest: ContextManifest | None) -> str:
+    entries = artifacts_from_manifest(manifest).items
     if not entries:
         return ""
     lines: list[str] = []
@@ -272,22 +248,22 @@ __all__ = [
     "ManifestArtifacts",
     "ManifestClock",
     "ManifestSubtasks",
-    "artifacts_from_state",
+    "artifacts_from_manifest",
     "block",
-    "clock_from_state",
+    "clock_from_manifest",
     "context_exclusions_for",
     "format_record_line",
     "is_prompt_context_record",
     "join_lines",
     "label_line",
+    "memory_records_from_manifest",
     "render_activated_skills",
     "render_artifacts_block",
     "render_assigned_roles",
     "render_context_lines",
     "render_member_reports",
-    "render_prior_conversation_from_state",
     "render_subtasks_block",
     "render_teammates",
     "strip_empty_labeled_lines",
-    "subtasks_from_state",
+    "subtasks_from_manifest",
 ]

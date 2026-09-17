@@ -5,15 +5,7 @@ from __future__ import annotations
 import unittest
 
 from lca.cognition.brain.prompt.conversation_prompt import format_prior_conversation
-from lca.cognition.brain.sections.types import (
-    render_prior_conversation_from_state as _prior_conversation_text,
-)
-from lca.contracts.models.core.conversation.conversation import (
-    PRIOR_CONVERSATION_WM_KEY,
-    ConversationTurn,
-)
-from lca.contracts.models.core.policy.budget import create_budget
-from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.models.core.conversation.conversation import ConversationTurn
 
 
 class TestConversationPrompt(unittest.TestCase):
@@ -29,20 +21,6 @@ class TestConversationPrompt(unittest.TestCase):
         )
         self.assertIn("user: hi", text)
         self.assertIn("assistant: hello", text)
-
-    def test_prior_conversation_from_working_memory(self) -> None:
-        state = AgentState(
-            trace_id="t",
-            task="继续",
-            budget=create_budget(max_steps=5),
-        )
-        state.working_memory[PRIOR_CONVERSATION_WM_KEY] = [
-            {"role": "user", "content": "第一轮"},
-            {"role": "assistant", "content": "收到"},
-        ]
-        text = _prior_conversation_text(state)
-        self.assertIn("user: 第一轮", text)
-        self.assertIn("assistant: 收到", text)
 
 
 if __name__ == "__main__":

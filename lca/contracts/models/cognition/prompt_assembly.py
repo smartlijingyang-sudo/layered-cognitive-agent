@@ -8,7 +8,7 @@ implementation can both depend on them without crossing a higher layer.
 The seam replaces the prompt-rendering surface that previously lived in
 ``cognition/brain/reasoner.py``. Each section is a small typed provider:
 ``PureSection`` for static/profile-derived content, ``StatefulSection`` for
-content that reads ``AgentState`` / ``TeamAwareness`` / ``ContextManifest``.
+content that reads the turn's ``ContextManifest`` / ``TeamAwareness``.
 The assembler resolves them through the registry, never by re-reading
 configuration or recomputing template variables inline.
 """
@@ -216,7 +216,12 @@ class PureSection(Protocol):
 
 @runtime_checkable
 class StatefulSection(Protocol):
-    """A section that reads run state and (optionally) team awareness."""
+    """A section that reads the turn's context manifest and team awareness.
+
+    ``AgentState`` is deliberately absent: the manifest the perceive phase
+    produced is the only run-state channel a section may read, so a section
+    cannot reach past the turn boundary into reducer-owned state.
+    """
 
     name: ClassVar[str]
 
@@ -224,7 +229,7 @@ class StatefulSection(Protocol):
         self,
         *,
         role_profile: RoleProfile,
-        state: AgentState,
+        task: str,
         awareness: TeamAwareness | None,
         manifest: ContextManifest | None,
         tools: Sequence[Tool],
@@ -283,7 +288,7 @@ class PromptAssembler(Protocol):
         *,
         template_id: str,
         role_profile: RoleProfile,
-        state: AgentState,
+        task: str,
         awareness: TeamAwareness | None,
         manifest: ContextManifest | None,
         tools: Sequence[Tool],
@@ -299,35 +304,6 @@ class BrainPromptCatalog(Protocol):
     def render_tools_xml(self) -> str: ...
     def render_brain_skills(self) -> str: ...
     def render_skill_discovery(self) -> str: ...
-
-
-# Legacy ReasonerTemplateCatalog Protocol preserved for back-compat imports.
-
-
-@runtime_checkable
-class ReasonerTemplateCatalog(Protocol):
-    """Legacy Protocol preserved for back-compat imports."""
-
-    def templates(self) -> Mapping[str, str]: ...
-
-
-def templates_from_provider(provider: PromptTemplateProvider) -> Mapping[str, str]:
-    """Render a section-joined prompt per template id for legacy callers."""
-    from lca.cognition.brain.sections.assembler import render_template
-
-    out: dict[str, str] = {}
-    for _tid, _template in provider.list_templates():
-        _prompt, _trace = render_template(
-            template=_template,
-            registry=None,
-            role_profile=None,
-            state=None,
-            awareness=None,
-            manifest=None,
-            tools=(),
-            activated_skills=(),
-        )
-    return out
 
 
 def normalize_selector_result(
@@ -386,7 +362,6 @@ __all__ = [
     "PromptTemplateVariant",
     "PromptTrace",
     "PureSection",
-    "ReasonerTemplateCatalog",
     "SectionKind",
     "SectionManifest",
     "SectionOutput",
@@ -396,5 +371,4 @@ __all__ = [
     "StatefulSection",
     "normalize_assembler_result",
     "normalize_selector_result",
-    "templates_from_provider",
 ]

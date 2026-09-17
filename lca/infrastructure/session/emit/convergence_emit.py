@@ -5,7 +5,6 @@ from __future__ import annotations
 from lca.contracts.harness.memory.events import (
     ConvergenceEvaluatedCommitted,
     DeliveryEvidenceCommitted,
-    PromptSurfaceRenderedCommitted,
 )
 from lca.contracts.models.core.policy.convergence import ConvergenceVerdict, DeliveryEvidence
 from lca.contracts.models.core.state.state import AgentState
@@ -55,31 +54,7 @@ def emit_convergence_evaluated(
     )
 
 
-def emit_prompt_surface_rendered(
-    state: AgentState,
-    *,
-    step: int,
-    tool_count: int,
-    include_full_sandbox: bool,
-    digest: str,
-    session: object | None = None,
-    actor: str = "prompt_surface",
-) -> AppendReceipt | None:
-    return append_catalog_bound(
-        PromptSurfaceRenderedCommitted(
-            step=step,
-            tool_count=tool_count,
-            include_full_sandbox=include_full_sandbox,
-            digest=digest,
-        ),
-        state=state,
-        session=session,
-        actor=actor,
-    )
-
-
 __all__ = [
     "emit_convergence_evaluated",
     "emit_delivery_evidence",
-    "emit_prompt_surface_rendered",
 ]

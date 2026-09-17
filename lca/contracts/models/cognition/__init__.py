@@ -13,7 +13,6 @@ from lca.contracts.models.cognition.prompt_assembly import (
     PromptTemplateVariant,
     PromptTrace,
     PureSection,
-    ReasonerTemplateCatalog,
     SectionKind,
     SectionManifest,
     SectionOutput,
@@ -23,7 +22,6 @@ from lca.contracts.models.cognition.prompt_assembly import (
     StatefulSection,
     normalize_assembler_result,
     normalize_selector_result,
-    templates_from_provider,
 )
 from lca.contracts.models.cognition.task import (
     Reflection,
@@ -46,7 +44,6 @@ __all__ = [
     "PromptTemplateVariant",
     "PromptTrace",
     "PureSection",
-    "ReasonerTemplateCatalog",
     "Reflection",
     "SectionKind",
     "SectionManifest",
@@ -61,5 +58,4 @@ __all__ = [
     "TaskStatus",
     "normalize_assembler_result",
     "normalize_selector_result",
-    "templates_from_provider",
 ]

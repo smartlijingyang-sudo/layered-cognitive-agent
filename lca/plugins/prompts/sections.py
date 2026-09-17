@@ -1,4 +1,4 @@
-"""Prompt sections — one Cordis plugin that registers 17 typed sections.
+"""Prompt sections — one Cordis plugin that registers 16 typed sections.
 
 The brain prompt is composed entirely from typed section providers. Each
 section is a small class implementing ``PureSection`` or ``StatefulSection``;
@@ -23,7 +23,8 @@ from pydantic import BaseModel, ConfigDict
 from lca.cognition.brain.prompt.surface import PromptSurface
 from lca.cognition.brain.sections.types import (
     block,
-    clock_from_state,
+    clock_from_manifest,
+    context_exclusions_for,
     join_lines,
     label_line,
     render_activated_skills,
@@ -31,7 +32,6 @@ from lca.cognition.brain.sections.types import (
     render_assigned_roles,
     render_context_lines,
     render_member_reports,
-    render_prior_conversation_from_state,
     render_subtasks_block,
     render_teammates,
 )
@@ -51,7 +51,6 @@ from lca.contracts.models.cognition.prompt_assembly import (
     SectionOutput,
 )
 from lca.contracts.models.core.perceive.perception import ContextManifest
-from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.core.workspace.activation import ActivatedSkill
 from lca.contracts.models.team.role.team import RoleProfile
 from lca.contracts.models.team.team.awareness import TeamAwareness
@@ -60,7 +59,6 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.runtime.infra.infra import Tool
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.infrastructure.session.emit.convergence_emit import emit_prompt_surface_rendered
 
 # ── Per-section Pydantic Config ────────────────────────────────────
 
@@ -120,22 +118,14 @@ class ToolsSection:
         self,
         *,
         role_profile: RoleProfile,
-        state: AgentState,
+        task: str,
         awareness: TeamAwareness | None,
         manifest: ContextManifest | None,
         tools: Sequence[Tool],
         activated_skills: tuple[ActivatedSkill, ...],
     ) -> SectionOutput:
-        del role_profile, awareness, manifest, activated_skills
-        surface = PromptSurface.default()
-        rendered = surface.render_tools_block(tools)
-        emit_prompt_surface_rendered(
-            state,
-            step=state.step,
-            tool_count=rendered.tool_count,
-            include_full_sandbox=rendered.include_full_sandbox,
-            digest=rendered.digest,
-        )
+        del role_profile, task, awareness, manifest, activated_skills
+        rendered = PromptSurface.default().render_tools_block(tools)
         return SectionOutput(text=block("tools", rendered.body))
 
 
@@ -185,16 +175,22 @@ class CurrentDateSection:
         self,
         *,
         role_profile: RoleProfile,
-        state: AgentState,
+        task: str,
         awareness: TeamAwareness | None,
         manifest: ContextManifest | None,
         tools: Sequence[Tool],
         activated_skills: tuple[ActivatedSkill, ...],
     ) -> SectionOutput:
-        # Prefer the manifest's typed clock item over a parameter.
-        clock = clock_from_state(state)
-        text = clock.text if clock else "(未知当前时间)"
-        return SectionOutput(text=label_line("CURRENT_DATE", text))
+        del role_profile, task, awareness, tools, activated_skills
+        clock = clock_from_manifest(manifest)
+        if clock is None:
+            # An absent CURRENT_DATE line is indistinguishable from "no clock
+            # was ever wired", and a model with no date anchor answers from its
+            # training cutoff. State the gap instead of hiding it.
+            return SectionOutput(
+                text=label_line("CURRENT_DATE", "(未知当前时间)"), used_fallback=True
+            )
+        return SectionOutput(text=label_line("CURRENT_DATE", clock.text))
 
 
 class TaskSection:
@@ -204,30 +200,14 @@ class TaskSection:
         self,
         *,
         role_profile: RoleProfile,
-        state: AgentState,
+        task: str,
         awareness: TeamAwareness | None,
         manifest: ContextManifest | None,
         tools: Sequence[Tool],
         activated_skills: tuple[ActivatedSkill, ...],
     ) -> SectionOutput:
-        return SectionOutput(text=label_line("USER_TASK", state.task or ""))
-
-
-class PriorConversationSection:
-    name: ClassVar[str] = "prior_conversation"
-
-    def render(
-        self,
-        *,
-        role_profile: RoleProfile,
-        state: AgentState,
-        awareness: TeamAwareness | None,
-        manifest: ContextManifest | None,
-        tools: Sequence[Tool],
-        activated_skills: tuple[ActivatedSkill, ...],
-    ) -> SectionOutput:
-        text = render_prior_conversation_from_state(state)
-        return SectionOutput(text=label_line("PRIOR_CONVERSATION", text))
+        del role_profile, awareness, manifest, tools, activated_skills
+        return SectionOutput(text=label_line("USER_TASK", task))
 
 
 class ActivatedSkillsSection:
@@ -237,13 +217,16 @@ class ActivatedSkillsSection:
         self,
         *,
         role_profile: RoleProfile,
-        state: AgentState,
+        task: str,
         awareness: TeamAwareness | None,
         manifest: ContextManifest | None,
         tools: Sequence[Tool],
         activated_skills: tuple[ActivatedSkill, ...],
     ) -> SectionOutput:
-        return SectionOutput(text=block("activated_skills", render_activated_skills(state)))
+        del role_profile, task, awareness, manifest, tools
+        return SectionOutput(
+            text=block("activated_skills", render_activated_skills(activated_skills))
+        )
 
 
 class ContextSection:
@@ -253,19 +236,21 @@ class ContextSection:
         self,
         *,
         role_profile: RoleProfile,
-        state: AgentState,
+        task: str,
         awareness: TeamAwareness | None,
         manifest: ContextManifest | None,
         tools: Sequence[Tool],
         activated_skills: tuple[ActivatedSkill, ...],
     ) -> SectionOutput:
-        from lca.cognition.brain.sections.types import context_exclusions_for
-
+        del role_profile, task, tools, activated_skills
         exclude = context_exclusions_for(awareness)
-        base = render_context_lines(state, exclude_kinds=exclude)
-        subtasks_block = render_subtasks_block(state)
-        artifacts_block = render_artifacts_block(state)
-        body = join_lines([base, subtasks_block, artifacts_block])
+        body = join_lines(
+            [
+                render_context_lines(manifest, exclude_kinds=exclude),
+                render_subtasks_block(manifest),
+                render_artifacts_block(manifest),
+            ]
+        )
         return SectionOutput(text=label_line("CONTEXT", body))
 
 
@@ -276,7 +261,7 @@ class TeammatesSection:
         self,
         *,
         role_profile: RoleProfile,
-        state: AgentState,
+        task: str,
         awareness: TeamAwareness | None,
         manifest: ContextManifest | None,
         tools: Sequence[Tool],
@@ -293,7 +278,7 @@ class AssignedRolesSection:
         self,
         *,
         role_profile: RoleProfile,
-        state: AgentState,
+        task: str,
         awareness: TeamAwareness | None,
         manifest: ContextManifest | None,
         tools: Sequence[Tool],
@@ -310,7 +295,7 @@ class MemberReportsSection:
         self,
         *,
         role_profile: RoleProfile,
-        state: AgentState,
+        task: str,
         awareness: TeamAwareness | None,
         manifest: ContextManifest | None,
         tools: Sequence[Tool],
@@ -332,7 +317,7 @@ class MemberStatusSection:
         self,
         *,
         role_profile: RoleProfile,
-        state: AgentState,
+        task: str,
         awareness: TeamAwareness | None,
         manifest: ContextManifest | None,
         tools: Sequence[Tool],
@@ -352,7 +337,7 @@ class EvidencePackSection:
         self,
         *,
         role_profile: RoleProfile,
-        state: AgentState,
+        task: str,
         awareness: TeamAwareness | None,
         manifest: ContextManifest | None,
         tools: Sequence[Tool],
@@ -438,7 +423,7 @@ _HIERARCHICAL_INSTRUCTIONS_TEXT = """你是团队主导者（lead）。
 - 回复使用标准 Markdown 格式"""
 
 
-# ── Built-in section factories (closed set, 17 sections) ──────────
+# ── Built-in section factories (closed set, 16 sections) ──────────
 
 
 def build_role_section(config: BaseModel) -> RoleSection:
@@ -504,11 +489,6 @@ def build_current_date(config: BaseModel) -> CurrentDateSection:
 def build_task(config: BaseModel) -> TaskSection:
     del config
     return TaskSection()
-
-
-def build_prior_conversation(config: BaseModel) -> PriorConversationSection:
-    del config
-    return PriorConversationSection()
 
 
 def build_activated_skills(config: BaseModel) -> ActivatedSkillsSection:
@@ -695,7 +675,6 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     stateful_sections: list[tuple[str, object]] = [
         ("current_date", build_current_date(Config())),
         ("task", build_task(Config())),
-        ("prior_conversation", build_prior_conversation(Config())),
         ("activated_skills", build_activated_skills(Config())),
         ("context", build_context(Config())),
         ("teammates", build_teammates(Config())),
@@ -721,7 +700,6 @@ __all__ = [
     "HierarchicalInstructionsSection",
     "MemberReportsSection",
     "MemberStatusSection",
-    "PriorConversationSection",
     "ReactToolUsageSection",
     "ReactWorkflowSection",
     "RoleSection",

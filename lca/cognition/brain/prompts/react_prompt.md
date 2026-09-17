@@ -18,9 +18,6 @@ CURRENT_DATE: {current_date}
 
 USER_TASK: {task}
 
-PRIOR_CONVERSATION:
-{prior_conversation}
-
 CONTEXT:
 {context}
 

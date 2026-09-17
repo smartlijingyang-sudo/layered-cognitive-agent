@@ -2,8 +2,8 @@
 
 Case 矩阵(ADR-0220 §6.1 / §3.3 / §0.4 N10):
 1. ``PromptReasoner.render_turn`` 签名 = ``(context, template, role) -> ReasonerTurnRender``
-2. ``render_turn`` 不读 ``AgentState``(返回 ``ReasonerTurnRender`` 时 manifest=None,
-   因 manifest 仅来自 typed ``ReasonerContext``)
+2. ``render_turn`` 不读 ``AgentState``(manifest 只来自 typed ``ReasonerContext``,
+   原样透传到 ``ReasonerTurnRender.manifest``)
 3. ``reasoner.py`` 行数 ≤ 280(N10)
 4. ``reasoner.py`` 方法 def 数 = 4(__init__ + render_turn + _render_with_template + complete_turn)
 5. ``render_turn`` 拒绝空 template_id 当 selector 也没接
@@ -18,6 +18,7 @@ Case 矩阵(ADR-0220 §6.1 / §3.3 / §0.4 N10):
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 from pathlib import Path
 
 import pytest
@@ -39,6 +40,7 @@ from lca.contracts.models.cognition.prompt_assembly import (
     SectionTrace,
 )
 from lca.contracts.models.cognition.reasoner_turn import ReasonerTurnRender
+from lca.contracts.models.core.perceive.perception import ContextItem, ContextManifest
 from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
 from lca.contracts.protocols import LLMAdapter
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
@@ -129,6 +131,7 @@ def test_render_turn_signature_matches_p4_dto_contract() -> None:
     reasoner = PromptReasoner(
         llm=_StubLLM(),
         template_provider=_Provider(_template()),
+        section_registry=_StubRegistry(),
     )
     render = reasoner.render_turn(_context(), _selection(), _role_snapshot())
     assert isinstance(render, ReasonerTurnRender)
@@ -138,16 +141,24 @@ def test_render_turn_signature_matches_p4_dto_contract() -> None:
     assert render.activated_skill_ids == ()
 
 
-def test_render_turn_does_not_touch_agent_state_manifest() -> None:
-    """``render_turn`` 不读 AgentState 上的 manifest;输出 ``manifest=None``。"""
+def test_render_turn_passes_the_context_manifest_through_untouched() -> None:
+    """``render_turn`` 的 manifest 只来自 typed ``ReasonerContext``,原样透传。
+
+    ``complete_turn`` 把它交给 ``CurrentReasonerPrompt.context_manifest``,
+    journal 的 ``context_manifest`` 由这一路供给;在这里丢弃它会让 section
+    渲染退化成空且无可观测痕迹(run_e204465f48d6)。
+    """
+    manifest = ContextManifest(
+        items=(ContextItem(kind="clock", payload="2026-09-17 Thursday", provenance="clock_sensor"),)
+    )
+    context = ReasonerContext(task="hi", activated_skills=(), manifest=manifest)
     reasoner = PromptReasoner(
         llm=_StubLLM(),
         template_provider=_Provider(_template()),
+        section_registry=_StubRegistry(),
     )
-    render = reasoner.render_turn(_context(), _selection(), _role_snapshot())
-    # ReasonerTurnRender.manifest 永远是 None(typed reasoner 不跨过 state 读 perceive),
-    # 这是 ADR §7 "AgentState 不持 ref" 的下游保证。
-    assert render.manifest is None
+    render = reasoner.render_turn(context, _selection(), _role_snapshot())
+    assert render.manifest is manifest
 
 
 def test_render_turn_rejects_empty_template_without_selector() -> None:

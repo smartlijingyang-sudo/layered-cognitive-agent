@@ -60,7 +60,7 @@ class _StaticSection:
 class _EmptySection:
     name = "empty"
 
-    def render(self, *, role_profile, state, awareness, manifest, tools, activated_skills):
+    def render(self, *, role_profile, task, awareness, manifest, tools, activated_skills):
         from lca.contracts.models.cognition.prompt_assembly import SectionOutput
 
         return SectionOutput(text="")
@@ -145,7 +145,7 @@ def test_section_manifest_prompt_assembler_returns_tuple_with_template_id():
     prompt, trace = assembler.render(
         template_id="react_prompt",
         role_profile=_role_profile(),
-        state=None,  # type: ignore[arg-type]
+        task="",
         awareness=None,
         manifest=None,
         tools=(),
@@ -191,20 +191,3 @@ def test_section_trace_text_field_carries_section_body() -> None:
     )
     assert trace.text == "hello from static section"
     assert trace.text_chars == len(trace.text)
-
-def test_section_trace_text_equals_zero_when_registry_none() -> None:
-    """ADR-0176 D3 §2:registry=None 时(text="")占位。"""
-    from lca.cognition.brain.sections.assembler import render_template
-    from lca.contracts.models.cognition.prompt_assembly import (
-        PromptTemplate,
-        SectionReference,
-    )
-
-    template = PromptTemplate(
-        id="t1",
-        variant="react",
-        sections=(SectionReference(name="x", kind="pure"),),
-    )
-    _, trace = render_template(template=template, registry=None)
-    assert trace.sections[0].text == ""
-    assert trace.sections[0].text_chars == 0

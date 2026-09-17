@@ -33,6 +33,7 @@ from lca.contracts.models.cognition.boundary import (
     RoleSnapshot,
     TemplateSelection,
 )
+from lca.contracts.models.core.perceive.projection import current_manifest_from_state
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -61,7 +62,7 @@ def _state_to_boundary(
     """
     task = getattr(state, "task", "") or ""
     activated = getattr(state, "activated_skills", ()) or ()
-    manifest = getattr(state, "manifest", None)
+    manifest = current_manifest_from_state(state) if state is not None else None
     awareness = getattr(state, "team_awareness", None)
     template_id = getattr(plan, "template_id", "") or ""
     decision_path = getattr(plan, "decision_path", "legacy")
