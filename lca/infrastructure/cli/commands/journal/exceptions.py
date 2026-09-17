@@ -47,6 +47,8 @@ def _find_run_dir(run_id: str | None, traces_root: Path) -> Path:
     return traces_root / "runs" / resolved_run_id
 
 
+def _iter_records(path: Path) -> list[dict[str, Any]]:
+    """Read the sidecar exceptions ledger, skipping undecodable lines."""
     if not path.exists():
         return []
     out: list[dict[str, Any]] = []
