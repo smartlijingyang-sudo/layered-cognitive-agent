@@ -108,13 +108,21 @@ class LocalSandboxAdapter:
             return guest
         return str(root / guest.lstrip("/"))
 
-    def _rewrite_command(self, command: str, *, session_id: str = "") -> str:
-        """Map guest ``/mnt/data`` references onto the host workspace."""
-        host = str(self._session_root(session_id))
-        mount = self._layout.root
-        if host.rstrip("/") == mount.rstrip("/"):
+    def _rewrite_command(self, command: str) -> str:
+        """Map guest ``/mnt/data`` references onto the host directory backing the mount.
+
+        Absolute guest paths resolve against the mount root — that is where
+        ``SandboxRuntime._stage_files`` writes run attachments, and what the
+        tool surface advertises to the model. Mapping them onto the per-session
+        cwd instead left ``runCommand`` unable to open an attachment that
+        ``executeCode`` (whose paths live in the code body, never rewritten)
+        could read fine. The session root stays the cwd, so relative writes
+        such as ``outputs/report.pdf`` remain per-session.
+        """
+        mount = self._layout.root.rstrip("/")
+        if self._host_root == mount:
             return command
-        return command.replace(mount, host)
+        return command.replace(mount, self._host_root)
 
     async def _exec_shell(
         self,
@@ -128,7 +136,7 @@ class LocalSandboxAdapter:
         emitter = SandboxStreamEmitter(invocation_id)
         work = cwd or str(self._session_root(session_id))
         Path(work).mkdir(parents=True, exist_ok=True)
-        rewritten = self._rewrite_command(command, session_id=session_id)
+        rewritten = self._rewrite_command(command)
         wrapped = f"cd {shlex.quote(work)} && {rewritten}"
         try:
             proc = await asyncio.create_subprocess_shell(
