@@ -22,6 +22,7 @@ from lca.contracts.protocols import Tool
 from lca.infrastructure.attachment.system.role_renderer import render_system_role
 from lca.infrastructure.file.store import FileStore
 from lca.infrastructure.observability import current_file_store as get_current_run_file_store
+from lca.infrastructure.runtime_plane.scope.scope import current_primary
 from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
 from lca.infrastructure.sandbox.surface.surface import plane_system_role
 from lca.infrastructure.tools.lca_computer.manifest import LOCAL_SYSTEM_ID as _LOCAL_SYSTEM_ID
@@ -32,18 +33,33 @@ _CLOUD_SANDBOX_TOOL_NAME = _CLOUD_SANDBOX_ID
 _LOCAL_SYSTEM_TOOL_NAME = _LOCAL_SYSTEM_ID
 
 
-def build_cloud_sandbox_prompt(tools: Sequence[Tool], store: FileStore | None = None) -> str:
-    """Computer-environment ``<tool>`` blocks. One per registered face."""
-    names = {t.name for t in tools}
+def build_cloud_sandbox_prompt(tools: Sequence[Tool] = (), store: FileStore | None = None) -> str:
+    """Computer-environment ``<tool>`` blocks. One per bound face.
+
+    Native ``tool_calls`` schemas travel on the request, so the XML catalog
+    argument is often empty. Addressing still comes from the bound plane
+    (sandbox unless the primary plane is the machine).
+    """
+    names = {getattr(t, "name", "") for t in tools}
     blocks: list[str] = []
     cloud_values = {api.value for api in CLOUD_SANDBOX_APIS}
-    if any(name in cloud_values for name in names):
+    machine_values = {f"local_{api.value}" for api in MACHINE_APIS}
+    bound = current_primary()
+    if names:
+        want_cloud = any(name in cloud_values for name in names)
+        want_machine = any(name in machine_values for name in names)
+    elif bound is not None:
+        want_cloud = bound.kind is PlaneKind.SANDBOX
+        want_machine = bound.kind is PlaneKind.MACHINE
+    else:
+        want_cloud = True
+        want_machine = False
+    if want_cloud:
         effective_store = store if store is not None else get_current_run_file_store()
         rendered = _render_cloud_sandbox_block(effective_store)
         if rendered:
             blocks.append(_tool_block(_CLOUD_SANDBOX_TOOL_NAME, rendered))
-    machine_values = {f"local_{api.value}" for api in MACHINE_APIS}
-    if any(name in machine_values for name in names):
+    if want_machine:
         rendered = _machine_role()
         if rendered:
             blocks.append(_tool_block(_LOCAL_SYSTEM_TOOL_NAME, rendered))

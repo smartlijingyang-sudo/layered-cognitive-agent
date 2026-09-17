@@ -62,3 +62,29 @@ def test_trace_run_75e88a76899b_does_not_recur(tmp_path: Path) -> None:
         isinstance(r, FileRef) and r.process_path == "/mnt/data/Clash_1752915628.yaml"
         for r in result.refs_rendered
     )
+
+
+def test_empty_tool_catalog_still_lists_uploaded_guest_path(tmp_path: Path) -> None:
+    """Production ``render_turn`` passes ``tools=()``; addressing must not follow.
+
+    ``run_c8fe0e2c8083`` had ``<files_info url="/files/<id>">`` and no
+    ``/mnt/data`` in the system prompt, so the model ``find /`` for the xlsx.
+    """
+
+    from lca.cognition.brain.prompt.sandbox_prompt import build_cloud_sandbox_prompt
+    from lca.cognition.brain.prompt.surface import PromptSurface
+
+    store = LocalFileStore(root=tmp_path)
+    store.put(
+        data=b"not-a-real-xlsx",
+        name="可以合为一个表格吗 能兼容这些所有内容.xlsx",
+        mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    aid = _first_id(store)
+    with bind_run_ambit(RunAmbit(file_store=store)), run_attachment_scope([aid]):
+        built = build_cloud_sandbox_prompt(())
+        rendered = PromptSurface.default().render_sandbox_block(())
+    guest = "/mnt/data/可以合为一个表格吗 能兼容这些所有内容.xlsx"
+    assert guest in built
+    assert guest in rendered
+    assert "Workspace root: /mnt/data" in rendered

@@ -17,8 +17,9 @@ lobehub UI POST /files/{id}
   ↓ run_attachment_scope([id])    [CreateRun entry]
 
 CognitiveRuntime._loop
-  ↓ reasoner._cloud_sandbox_block(tools)
-  ↓ build_cloud_sandbox_prompt(tools)
+  ↓ CloudSandboxSection (independent of the XML tool catalog)
+  ↓ PromptSurface.render_sandbox_block
+  ↓ build_cloud_sandbox_prompt (bound plane; tools may be empty)
   ↓ _render_cloud_sandbox_block → render_system_role(plane, template_name)
     ↓ DefaultAttachmentPromptRenderer.identity_block(refs)   (current turn)
     ↓ DefaultAttachmentPromptRenderer.guest_path_block(refs, plane)

@@ -1,4 +1,4 @@
-"""Prompt sections — one Cordis plugin that registers 16 typed sections.
+"""Prompt sections — one Cordis plugin that registers the typed section set.
 
 The brain prompt is composed entirely from typed section providers. Each
 section is a small class implementing ``PureSection`` or ``StatefulSection``;
@@ -108,12 +108,13 @@ class BackstorySection:
 
 
 class ToolsSection:
-    """Renders the model's <tools> block from the tools this turn actually has.
+    """Renders the model's <tools> XML catalog for this turn.
 
     Native ``tool_calls`` schemas on the same request are the availability
     SSOT. A placeholder that says there are no tools would contradict that
     wire, so an empty catalog renders nothing; the gap is recorded on the
-    observation plane via ``used_fallback``.
+    observation plane via ``used_fallback``. Workspace addressing lives in
+    ``CloudSandboxSection``, not here.
     """
 
     name: ClassVar[str] = "tools"
@@ -129,11 +130,34 @@ class ToolsSection:
         activated_skills: tuple[ActivatedSkill, ...],
     ) -> SectionOutput:
         del role_profile, task, awareness, manifest, activated_skills
-        rendered = PromptSurface.default().render_tools_block(tools)
+        xml = PromptSurface.default().render_tools_xml(tools)
         return SectionOutput(
-            text=block("tools", rendered.body),
-            used_fallback=rendered.tool_count == 0,
+            text=block("tools", xml),
+            used_fallback=not xml,
         )
+
+
+class CloudSandboxSection:
+    """Workspace root, outputs, and staged uploads for the bound plane.
+
+    Independent of the XML tool catalog. ``render_turn`` passes ``tools=()``
+    because native schemas travel on the request; this section still renders.
+    """
+
+    name: ClassVar[str] = "cloud_sandbox"
+
+    def render(
+        self,
+        *,
+        role_profile: RoleProfile,
+        task: str,
+        awareness: TeamAwareness | None,
+        manifest: ContextManifest | None,
+        tools: Sequence[Tool],
+        activated_skills: tuple[ActivatedSkill, ...],
+    ) -> SectionOutput:
+        del role_profile, task, awareness, manifest, activated_skills
+        return SectionOutput(text=PromptSurface.default().render_sandbox_block(tools))
 
 
 @dataclass
@@ -453,6 +477,11 @@ def build_tools_section(config: BaseModel) -> ToolsSection:
     return ToolsSection()
 
 
+def build_cloud_sandbox_section(config: BaseModel) -> CloudSandboxSection:
+    del config
+    return CloudSandboxSection()
+
+
 def build_available_skills_section(
     config: BaseModel, *, catalog: Callable[[], str]
 ) -> AvailableSkillsSection:
@@ -558,7 +587,7 @@ class Config(BaseModel):
     requires=[PROMPT_SECTION_REGISTRY.key],
     layer="L1",
     effects="none",
-    description="Provide the 17 typed prompt sections (pure + stateful).",
+    description="Provide the typed prompt sections (pure + stateful).",
     test_suite="tests/architecture/test_prompt_section_registry.py",
     kind=PluginKind.PRIMITIVE,
     contract=PluginContract(
@@ -584,7 +613,7 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    """Register every section in the closed 17-section set.
+    """Register every section in the closed typed set.
 
     The assembler resolves ``available_skills`` through the active
     ``BrainPromptCatalog`` at render time. Tools come from the turn's
@@ -675,6 +704,9 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         registry.register(section, kind="pure", name=name)
 
     registry.register(build_tools_section(_ToolsConfig()), kind="stateful", name="tools")
+    registry.register(
+        build_cloud_sandbox_section(_ToolsConfig()), kind="stateful", name="cloud_sandbox"
+    )
     stateful_sections: list[tuple[str, object]] = [
         ("current_date", build_current_date(Config())),
         ("task", build_task(Config())),
@@ -695,6 +727,7 @@ __all__ = [
     "AssignedRolesSection",
     "AvailableSkillsSection",
     "BackstorySection",
+    "CloudSandboxSection",
     "Config",
     "ContextSection",
     "CurrentDateSection",

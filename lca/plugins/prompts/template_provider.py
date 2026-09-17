@@ -53,6 +53,7 @@ def _builtin_section_refs() -> tuple[tuple[str, str, bool, str | None], ...]:
         ("backstory", "pure", False, None),
         ("current_date", "stateful", False, None),
         ("tools", "stateful", False, None),
+        ("cloud_sandbox", "stateful", False, None),
         ("available_skills", "pure", False, None),
         ("activated_skills", "stateful", False, None),
         ("task", "stateful", False, None),
@@ -95,7 +96,7 @@ def _builtin_templates() -> Mapping[str, _PromptTemplate]:
             for (n, k, o, f) in sl
         )
 
-    react_section_count = 12  # through react_tool_usage_guidelines
+    react_section_count = 13  # through react_tool_usage_guidelines
     routing_extra = 4  # teammates, assigned_roles, member_reports, routing_instructions
     hierarchical_extra = 4  # member_status, evidence_pack, hierarchical_instructions (+ extra)
     return {

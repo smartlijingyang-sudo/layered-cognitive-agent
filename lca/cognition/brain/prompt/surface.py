@@ -48,20 +48,22 @@ class PromptSurface:
             f'<tool name="{tool.name}">{tool.description or tool.name}</tool>' for tool in tools
         )
 
-    def render_sandbox_block(self, tools: Sequence[Tool]) -> str:
-        if not tools:
-            return ""
+    def render_sandbox_block(self, tools: Sequence[Tool] = ()) -> str:
+        """Workspace root, outputs, and staged uploads for the bound plane.
+
+        Native ``tool_calls`` leave ``tools`` empty here. That catalog is
+        not the environment: an empty sequence still renders addressing.
+        """
         return build_cloud_sandbox_prompt(list(tools))
 
     def render_tools_block(self, tools: Sequence[Tool]) -> PromptSurfaceRender:
         tools_xml = self.render_tools_xml(tools)
-        include_full = bool(tools)
         sandbox_block = self.render_sandbox_block(tools)
         return PromptSurfaceRender(
             tools_xml=tools_xml,
             sandbox_block=sandbox_block,
             tool_count=len(tuple(tools)),
-            include_full_sandbox=include_full,
+            include_full_sandbox=bool(sandbox_block),
         )
 
 

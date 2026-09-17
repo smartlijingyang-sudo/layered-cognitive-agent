@@ -43,6 +43,7 @@ from lca.plugins.prompts.sections import (
     AssignedRolesSection,
     AvailableSkillsSection,
     BackstorySection,
+    CloudSandboxSection,
     ContextSection,
     CurrentDateSection,
     EvidencePackSection,
@@ -104,6 +105,7 @@ def _registry_with_builtins() -> _RegistryImpl:
         kind="stateful",
         name="tools",
     )
+    registry.register(CloudSandboxSection(), kind="stateful", name="cloud_sandbox")
     registry.register(
         AvailableSkillsSection(catalog_skills_provider=lambda: "（无技能库）"),
         kind="pure",
@@ -457,3 +459,37 @@ def test_every_builtin_template_anchors_the_model_to_today(template_id: str) -> 
 
     assert "CURRENT_DATE: 2026-09-17 Thursday" in prompt
     assert "current_date" in {section.name for section in trace.sections}
+
+
+def test_think_reason_render_keeps_sandbox_addressing_when_tools_are_native() -> None:
+    """XML catalog is empty on the production path; workspace root must still appear.
+
+    ``PromptReasoner.render_turn`` passes ``tools=()`` because native
+    ``tool_calls`` schemas travel on the same request. Sandbox addressing
+    is a separate section and does not follow that empty catalog.
+    """
+
+    render = _drive_render(_empty_state(), "react_prompt")
+    names = {section["name"] for section in (render.section_outputs or ())}
+
+    assert "（无可用工具）" not in render.prompt
+    assert "cloud_sandbox" in names
+    assert "/mnt/data" in render.prompt
+    tools_text = next(
+        (
+            section["text"]
+            for section in (render.section_outputs or ())
+            if section["name"] == "tools"
+        ),
+        "",
+    )
+    sandbox_text = next(
+        (
+            section["text"]
+            for section in (render.section_outputs or ())
+            if section["name"] == "cloud_sandbox"
+        ),
+        "",
+    )
+    assert "/mnt/data" not in tools_text
+    assert "Workspace root: /mnt/data" in sandbox_text

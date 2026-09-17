@@ -35,12 +35,17 @@ def test_render_tools_block_emits_full_sandbox_when_tools_present() -> None:
     assert rendered.tool_count == 1
 
 
-def test_render_tools_block_omits_sandbox_when_no_tools() -> None:
+def test_render_tools_block_keeps_sandbox_when_catalog_empty() -> None:
+    """Native tool_calls leave the XML catalog empty; the workspace still exists."""
+
     surface = PromptSurface.default()
-    rendered = surface.render_tools_block(())
-    assert rendered.include_full_sandbox is False
-    assert rendered.sandbox_block == ""
-    # The native tool_calls schemas are the SSOT for availability; an empty
-    # catalog renders nothing rather than asserting the opposite of the wire.
+    with patch(
+        "lca.cognition.brain.prompt.surface.build_cloud_sandbox_prompt",
+        return_value="X" * 300,
+    ) as builder:
+        rendered = surface.render_tools_block(())
+    builder.assert_called_once_with([])
     assert rendered.tools_xml == ""
-    assert rendered.body == ""
+    assert rendered.include_full_sandbox is True
+    assert rendered.sandbox_block == "X" * 300
+    assert rendered.body == "X" * 300

@@ -17,7 +17,6 @@ signature: only the providers it composes change.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass
 from importlib import resources
 from typing import Protocol
@@ -76,12 +75,16 @@ def render_system_role(
     effective_store = store if store is not None else get_current_run_file_store()
     policy = get_attachment_policy()
     refs = _resolve_refs(effective_store)
-    resolved_refs = tuple(_resolver().resolve_for_plane(r, plane) for r in refs)
-
-    rendered_provider = DefaultAttachmentPromptRenderer(
-        resolver=_resolver(),
-        policy=policy,
-    )
+    if effective_store is None:
+        uploaded = ""
+        resolved_refs: tuple[FileRef, ...] = ()
+    else:
+        resolver = DefaultAttachmentResolver(store=effective_store)
+        resolved_refs = tuple(resolver.resolve_for_plane(r, plane) for r in refs)
+        uploaded = DefaultAttachmentPromptRenderer(
+            resolver=resolver,
+            policy=policy,
+        ).guest_path_block(refs, plane)
 
     template = _load_template(template_name)
     text = template
@@ -92,10 +95,10 @@ def render_system_role(
             plane,
         ),
     )
-    text = text.replace("{{uploaded_files}}", rendered_provider.guest_path_block(refs, plane))
+    text = text.replace("{{uploaded_files}}", uploaded)
     text = text.replace(
         "{{sandbox_uploaded_files}}",
-        rendered_provider.guest_path_block(refs, plane),
+        uploaded,
     )
     text = text.replace("{{sandbox_environment_note}}", _environment_note(plane))
     text = text.replace(
@@ -119,16 +122,6 @@ def render_system_role(
         plane_kind=(plane.kind.name if plane is not None else "NONE"),
         refs_rendered=resolved_refs,
     )
-
-
-def _resolver() -> DefaultAttachmentResolver:
-    store = get_current_run_file_store()
-    if store is None:  # pragma: no cover - covered by tests
-        raise RuntimeError(
-            "render_system_role: no FileStore in ambient scope; "
-            "bind via run_file_store_scope() before reasoning"
-        )
-    return DefaultAttachmentResolver(store=store)
 
 
 def _resolve_refs(store: FileStore | None) -> tuple[FileRef, ...]:
@@ -183,4 +176,4 @@ __all__ = ["SystemRoleResult", "render_system_role"]
 
 # Re-exported to keep the public surface of the default provider package
 # discoverable from a single import for plugin / scaffolding code.
-_ = (DefaultAttachmentPromptRenderer, DefaultAttachmentResolver, DefaultAttachmentStager, Sequence)
+_ = (DefaultAttachmentPromptRenderer, DefaultAttachmentResolver, DefaultAttachmentStager)

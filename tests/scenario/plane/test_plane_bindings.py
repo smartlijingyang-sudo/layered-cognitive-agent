@@ -124,6 +124,18 @@ def test_machine_tools_inject_local_system_role() -> None:
     assert "CLOUD SANDBOX" not in text
 
 
+def test_empty_catalog_follows_bound_machine_plane() -> None:
+    from lca.cognition.brain.prompt.sandbox_prompt import build_cloud_sandbox_prompt
+    from lca.infrastructure.runtime_plane.resolve.resolve import PlaneBindings
+    from lca.infrastructure.runtime_plane.scope.scope import plane_bindings_scope
+
+    plane = _machine()
+    with plane_bindings_scope(PlaneBindings(primary=plane)):
+        text = build_cloud_sandbox_prompt(())
+    assert "lobe-local-system" in text
+    assert "CLOUD SANDBOX" not in text
+
+
 def test_dotdot_escape_needs_approval() -> None:
     plane = _machine()
     assert path_needs_approval("/home/lca-sandbox/../.ssh/id_rsa", plane)

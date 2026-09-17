@@ -159,6 +159,8 @@ class PromptReasoner:
             task=context.task,
             awareness=role.team_awareness,
             manifest=context.manifest,
+            # Native tool_calls schemas travel on the LLM request. The XML
+            # catalog stays empty. Workspace addressing is CloudSandboxSection.
             tools=(),
             activated_skills=context.activated_skills,
             selector_decision_path=decision_path,
