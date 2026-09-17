@@ -186,6 +186,63 @@ def test_orphan_dropped_count_increments_for_orphan() -> None:
     assert writer.orphan_dropped_count == 1
 
 
+def test_empty_tool_payload_renders_its_classified_error() -> None:
+    """A zero-length result must reach the model as the error text.
+
+    ``run_71456ce99914`` appended two ``role=tool`` rows with empty
+    content for two ~33 s sandbox timeouts. The journal keeps payload and
+    classification split; ``derive_messages`` is the single projection
+    that joins them, and an empty row is indistinguishable from an
+    unanswered call — the model re-issues it.
+    """
+    session = _InMemorySession()
+    writer = RunSessionWriter(session=session)
+    writer.append_user_message(message_id="u1", role="user", content="find the file")
+    writer.append_assistant_message(
+        turn=0,
+        step=0,
+        role="assistant",
+        content=None,
+        tool_calls=[{"id": "X", "name": "runCommand", "arguments": "{}"}],
+        usage=None,
+    )
+    writer.append_tool_result(
+        turn=0,
+        step=0,
+        call_id="X",
+        content="",
+        error={"kind": "execution", "message": "sandbox timed out after 33s", "retryable": True},
+        meta=None,
+    )
+
+    row = writer.derive_messages()[-1]
+
+    assert row["role"] == "tool"
+    assert row["tool_call_id"] == "X"
+    assert row["content"].strip()
+    assert "sandbox timed out after 33s" in row["content"]
+    assert "retryable=True" in row["content"]
+
+
+def test_successful_tool_without_output_states_it_explicitly() -> None:
+    """Success with no payload is a fact, not a blank the model must guess at."""
+    session = _InMemorySession()
+    writer = RunSessionWriter(session=session)
+    writer.append_assistant_message(
+        turn=0,
+        step=0,
+        role="assistant",
+        content=None,
+        tool_calls=[{"id": "X", "name": "writeFile", "arguments": "{}"}],
+        usage=None,
+    )
+    writer.append_tool_result(turn=0, step=0, call_id="X", content="", error=None, meta=None)
+
+    row = writer.derive_messages()[-1]
+
+    assert row["content"] == "[tool_result] (no output)"
+
+
 def test_orphan_dropped_count_is_zero_for_valid_multi_call() -> None:
     """Spec §G-17: post-PR-2 a valid multi-call decision leaves the counter at 0.
 
@@ -261,6 +318,156 @@ def test_orphan_dropped_count_is_zero_for_valid_multi_call() -> None:
     msgs = writer.derive_messages()
 
     # Wire shape: user, assistant{tool_calls=[5]}, then 5 tool rows.
-    assert [m["role"] for m in msgs] == ["user", "assistant", "tool", "tool", "tool", "tool", "tool"]
+    assert [m["role"] for m in msgs] == [
+        "user",
+        "assistant",
+        "tool",
+        "tool",
+        "tool",
+        "tool",
+        "tool",
+    ]
     # PR-2 G-17: orphan_dropped_count stays 0 for any well-formed multi-call.
+    assert writer.orphan_dropped_count == 0
+
+
+def test_multi_call_turn_via_effect_execute_answers_every_call_id() -> None:
+    """Production seam, end to end: N declared calls ⇒ N ``role=tool`` rows.
+
+    Drives the shipped nodes — ``act.envelope`` mints one envelope per
+    call, ``ToolBatchExecutor`` executes the batch and packages per-call
+    facts, ``effect.execute`` surfaces them, and the real
+    ``RunSessionWriter.derive_messages`` projects the wire shape. This is
+    the loop ``run_71456ce99914`` broke: two ``activate_skill`` calls
+    executed, neither result reached the next request, so the model
+    re-issued the identical pair.
+    """
+    import asyncio
+
+    from lca.cognition.body.tools.tool_batch_executor import ToolBatchExecutor
+    from lca.contracts.atoms.enums.enums import ActionType
+    from lca.contracts.models.core.execution.decision import Decision, Observation, ToolCall
+    from lca.contracts.protocols.declarative.declarative_1.node_executor import (
+        NodeContext,
+        NodeInput,
+    )
+    from lca.nodes.act.envelope.envelope import ActEnvelopeExecutor
+    from lca.nodes.concept.effect.execute import EffectExecuteExecutor
+
+    @dataclass
+    class _Tool:
+        name: str
+        description: str = ""
+        parameters: dict[str, Any] = field(default_factory=dict)
+        is_idempotent: bool = True
+
+    @dataclass
+    class _Registry:
+        tools: dict[str, Any] = field(default_factory=dict)
+
+        def get(self, name: str) -> Any:
+            return self.tools.get(name)
+
+    @dataclass
+    class _SafeExecutor:
+        async def execute(
+            self,
+            tool: Any,
+            args: dict[str, Any],
+            retry_policy: Any,
+            cache_config: Any,
+            invocation_id: str = "",
+        ) -> Observation:
+            del retry_policy, cache_config
+            from lca.contracts.atoms.ids.ids import new_id
+
+            return Observation(
+                observation_id=new_id("obs"),
+                success=True,
+                payload=f"activated {args.get('skill_id')} via {tool.name}",
+                tool_call_id=invocation_id,
+            )
+
+    @dataclass
+    class _Gateway:
+        aggregate: Any
+
+        async def execute(self, envelope: Any, policy: Any, **kwargs: Any) -> Any:
+            return {"result": self.aggregate, "invocation_id": "inv"}
+
+    @dataclass
+    class _Runtime:
+        writer: Any
+        effect_gateway: Any
+        state: Any = None
+
+        def get(self, key: str, default: Any = None) -> Any:
+            return getattr(self, key, default)
+
+    session = _InMemorySession()
+    writer = RunSessionWriter(session=session)
+    decision = Decision(
+        decision_id="dec-multi-2",
+        action_type=ActionType.USE_TOOL.value,
+        rationale="activate both skills",
+        confidence=1.0,
+        tool_calls=[
+            ToolCall(
+                call_id="call-office",
+                tool_name="activate_skill",
+                arguments={"skill_id": "officecli"},
+            ),
+            ToolCall(call_id="call-pdf", tool_name="activate_skill", arguments={"skill_id": "pdf"}),
+        ],
+    )
+
+    async def _drive() -> None:
+        envelope_ctx = NodeContext(
+            runtime=_Runtime(writer=writer, effect_gateway=None),
+            budget={},
+            metadata={"plan_ref": "act.subgraph", "node_id": "act.envelope"},
+        )
+        envelopes = (
+            await ActEnvelopeExecutor().node_execute(
+                envelope_ctx, NodeInput(port_values={"decision": decision, "state": None})
+            )
+        ).port_values["envelopes"]
+
+        aggregate = await ToolBatchExecutor(
+            _Registry(tools={"activate_skill": _Tool(name="activate_skill")}),
+            _SafeExecutor(),
+        ).execute(decision.tool_calls)
+
+        # The think side stages the assistant row declaring both calls
+        # before any tool runs (persist-before-execute).
+        writer.append_assistant_message(
+            turn=0,
+            step=0,
+            role="assistant",
+            content=None,
+            tool_calls=[
+                {"id": call.call_id, "name": call.tool_name, "arguments": "{}"}
+                for call in decision.tool_calls
+            ],
+            usage=None,
+        )
+        # Production dispatches envelopes[0] per act visit while the batch
+        # executor runs every declared call.
+        await EffectExecuteExecutor().node_execute(
+            NodeContext(
+                runtime=_Runtime(writer=writer, effect_gateway=_Gateway(aggregate)),
+                budget={},
+                metadata={"plan_ref": "act.subgraph", "node_id": "effect.execute"},
+            ),
+            NodeInput(port_values={"envelope": envelopes[0], "decision": decision, "state": None}),
+        )
+
+    asyncio.run(_drive())
+    msgs = writer.derive_messages()
+
+    assert [m["role"] for m in msgs] == ["assistant", "tool", "tool"]
+    assert [m["tool_call_id"] for m in msgs[1:]] == ["call-office", "call-pdf"]
+    assert all(m["content"].strip() for m in msgs[1:])
+    assert "officecli" in msgs[1]["content"]
+    assert "pdf" in msgs[2]["content"]
     assert writer.orphan_dropped_count == 0

@@ -21,6 +21,7 @@ from lca.cognition.body.emit.observation_surface import (
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
+from lca.contracts.atoms.semantic.keys import OBS_TOOL_RESULTS
 from lca.contracts.harness.act.effect_receipt import (
     EffectOutcome,
     EffectReceipt,
@@ -107,8 +108,8 @@ class EffectExecuteExecutor:
         decision = input.port_values.get("decision")
         state = input.port_values.get("state")
 
-        receipt, observation = await _dispatch(envelope, context, decision, state)
-        _append_tool_result_surface(context, envelope, receipt, observation)
+        receipt, observation, dispatch_error = await _dispatch(envelope, context, decision, state)
+        _append_tool_result_surface(context, envelope, receipt, observation, dispatch_error)
         return NodeOutput(port_values={"receipts": [receipt]})
 
 
@@ -128,28 +129,104 @@ def _resolve_writer(context: NodeContext) -> Any:
     return writer
 
 
-def _tool_call_id(envelope: CommandEnvelope, observation: Observation | None) -> str | None:
-    """Resolve the OpenAI ``call_id`` this result answers.
+class ToolResultAttributionError(RuntimeError):
+    """An executed tool result cannot be attributed to a declared ``call_id``.
 
-    ``derive_messages`` orphan-drops any ``role=tool`` row whose
-    ``tool_call_id`` was not declared by an earlier
-    ``assistant.tool_calls[].id`` (the id ``llm.call`` writes). The
-    envelope's ``idempotency_key`` is ``plan:node:decision_id`` and never
-    matches that id space, so using it would append a row that is then
-    silently dropped — reintroducing the same retry loop through a
-    different door.
+    Attribution is a contract, not a best effort: ``derive_messages``
+    orphan-drops a ``role=tool`` row whose ``tool_call_id`` was not
+    declared by an earlier ``assistant.tool_calls[].id``, so an
+    unattributed result leaves the model staring at its own unanswered
+    call and re-issuing it (``run_5857095cb3e9``, ``run_71456ce99914``).
     """
-    if observation is not None:
-        obs_call_id = getattr(observation, "tool_call_id", None)
-        if obs_call_id:
-            return str(obs_call_id)
-    decision = envelope.metadata.get("decision")
-    if isinstance(decision, Decision) and len(decision.tool_calls) == 1:
-        return decision.tool_calls[0].call_id
-    # Multiple declared calls collapse to a single Observation on this
-    # seam (per-call fan-out is the action registry's batch path), so no
-    # id can be attributed without guessing.
-    return None
+
+
+@dataclass(frozen=True, slots=True)
+class _ToolResultRow:
+    """One model-visible result: the declared ``call_id`` it answers."""
+
+    call_id: str
+    observation: Observation | None
+    dispatch_error: str | None
+
+
+def _batch_rows(observation: Observation | None) -> tuple[_ToolResultRow, ...]:
+    """Read the batch executor's per-call packaging, when present.
+
+    ``ToolBatchExecutor`` collapses N executed calls into one aggregate
+    ``Observation`` but keeps the per-call facts in
+    ``extra[OBS_TOOL_RESULTS]`` — one entry per declared call, each with
+    its own ``call_id``. That is the only place where a multi-call turn's
+    results stay separable, so it is the only source this seam reads.
+    """
+    if observation is None:
+        return ()
+    entries = (observation.extra or {}).get(OBS_TOOL_RESULTS)
+    if not isinstance(entries, (list, tuple)) or not entries:
+        return ()
+    rows: list[_ToolResultRow] = []
+    for entry in entries:
+        call_id = entry.get("call_id") if isinstance(entry, dict) else None
+        if not call_id:
+            raise ToolResultAttributionError(
+                f"effect.execute: {OBS_TOOL_RESULTS} entry without call_id: {entry!r}"
+            )
+        inner = entry.get("observation") if isinstance(entry, dict) else None
+        rows.append(
+            _ToolResultRow(
+                call_id=str(call_id),
+                observation=inner if isinstance(inner, Observation) else observation,
+                dispatch_error=None,
+            )
+        )
+    return tuple(rows)
+
+
+def _owed_rows(
+    envelope: CommandEnvelope,
+    receipt: EffectReceipt,
+    observation: Observation | None,
+    dispatch_error: str | None,
+) -> tuple[_ToolResultRow, ...]:
+    """Resolve every ``surface/tool_result`` row this dispatch owes the model.
+
+    Total by construction: a batch yields one row per executed call, a
+    single call yields one row attributed by the envelope's own
+    ``tool_call_id`` (minted at the dispatch site), and a dispatch that
+    raised still owes its call an error row. An empty tuple means the
+    effect was not a tool call (``memory.update`` returns a dict receipt
+    and no Observation), so nothing model-visible is owed.
+    """
+    rows = _batch_rows(observation)
+    if rows:
+        return rows
+    call_id = envelope.metadata.get("tool_call_id") or getattr(observation, "tool_call_id", None)
+    if call_id:
+        return (_ToolResultRow(str(call_id), observation, dispatch_error),)
+    if observation is None and dispatch_error is None:
+        return ()
+    raise ToolResultAttributionError(
+        "effect.execute: cannot attribute tool result to a declared call_id "
+        f"(invocation_id={receipt.invocation_id}, outcome={receipt.outcome.value}); "
+        "act.envelope must mint each envelope with metadata['tool_call_id']"
+    )
+
+
+def _row_surface(row: _ToolResultRow, receipt: EffectReceipt) -> tuple[str, dict[str, Any] | None]:
+    """Project one row onto the writer's ``(content, error)`` pair.
+
+    A dispatch that raised has no Observation, so the receipt's classified
+    error becomes the fact; ``derive_messages`` renders it as the
+    model-visible text (an empty tool row is indistinguishable from an
+    unanswered call).
+    """
+    if row.observation is not None:
+        return observation_content(row.observation), observation_error(row.observation)
+    message = row.dispatch_error or f"dispatch failed: {receipt.error_code or 'unknown'}"
+    return "", {
+        "kind": receipt.failure_kind or "execution",
+        "message": message,
+        "retryable": bool(receipt.retryable),
+    }
 
 
 def _append_tool_result_surface(
@@ -157,16 +234,18 @@ def _append_tool_result_surface(
     envelope: CommandEnvelope,
     receipt: EffectReceipt,
     observation: Observation | None,
+    dispatch_error: str | None,
 ) -> None:
-    """Append ``surface/tool_result`` so the next think turn can see the result.
+    """Append one ``surface/tool_result`` per executed call id.
 
-    Best-effort by design: the side effect already happened, so a journal
-    failure must not rewrite the receipt or roll back the tool. The
-    failure is logged because an unappended result is exactly the
-    invisible condition that made the model retry a tool call twenty
-    times in ``run_5857095cb3e9``.
+    This is the only path by which a tool result becomes model-visible,
+    so every declared call must be answered — including the calls of a
+    multi-call turn and the call whose dispatch raised. Journal-write
+    failures stay best-effort (the side effect already happened and must
+    not be rolled back); attribution failures raise instead.
     """
-    if observation is None:
+    rows = _owed_rows(envelope, receipt, observation, dispatch_error)
+    if not rows:
         return
     writer = _resolve_writer(context)
     if writer is None:
@@ -175,34 +254,28 @@ def _append_tool_result_surface(
             receipt.invocation_id,
         )
         return
-    call_id = _tool_call_id(envelope, observation)
-    if call_id is None:
-        _log.warning(
-            "effect.execute: cannot attribute tool result to a call_id; "
-            "skipping surface append (invocation_id=%s)",
-            receipt.invocation_id,
-        )
-        return
     state = getattr(context.runtime, "state", None)
     step = getattr(state, "step", 0) or 0
-    try:
-        writer.append_tool_result(
-            turn=step,
-            step=step,
-            call_id=call_id,
-            content=observation_content(observation),
-            error=observation_error(observation),
-            meta={
-                "tool_name": receipt.provider,
-                "outcome": receipt.outcome.value,
-                "invocation_id": receipt.invocation_id,
-            },
-        )
-    except Exception:
-        _log.exception(
-            "effect.execute: failed to append surface/tool_result (call_id=%s)",
-            call_id,
-        )
+    for row in rows:
+        content, error = _row_surface(row, receipt)
+        try:
+            writer.append_tool_result(
+                turn=step,
+                step=step,
+                call_id=row.call_id,
+                content=content,
+                error=error,
+                meta={
+                    "tool_name": receipt.provider,
+                    "outcome": receipt.outcome.value,
+                    "invocation_id": receipt.invocation_id,
+                },
+            )
+        except Exception:
+            _log.exception(
+                "effect.execute: failed to append surface/tool_result (call_id=%s)",
+                row.call_id,
+            )
 
 
 def _derive_outcome(
@@ -260,13 +333,15 @@ async def _dispatch(
     context: NodeContext,
     decision: Decision | None,
     state: AgentState | None,
-) -> tuple[EffectReceipt, Observation | None]:
+) -> tuple[EffectReceipt, Observation | None, str | None]:
     """Dispatch the CommandEnvelope through the EffectDispatcher capability.
 
-    Returns the receipt plus the executed Observation (``None`` when the
+    Returns the receipt, the executed Observation (``None`` when the
     result is not an Observation, e.g. ``memory.update``'s dict receipt),
-    so the node can project a model-visible ``surface/tool_result`` row
-    without re-parsing the stringified ``output_ref``.
+    and the classified dispatch error text (``None`` when the gateway
+    returned normally), so the node can project a model-visible
+    ``surface/tool_result`` row without re-parsing the stringified
+    ``output_ref`` — including for a dispatch that raised.
 
     ADR-0235 / PR-5: ``decision`` / ``state`` are typed kwargs forwarded
     to ``gateway.execute`` as typed keyword-only parameters; the dispatcher
@@ -308,6 +383,7 @@ async def _dispatch(
                 retryable=True,
             ),
             None,
+            f"{type(exc).__name__}: {exc}",
         )
 
     # output may be a dict receipt or a raw Observation
@@ -330,6 +406,7 @@ async def _dispatch(
             failure_kind=failure_kind,
         ),
         _extract_observation(result),
+        None,
     )
 
 
@@ -370,4 +447,4 @@ async def setup(ctx: PluginContext, config=None) -> None:
     ctx.provide(composite_key, executor)
 
 
-__all__ = ["EffectExecuteExecutor", "setup"]
+__all__ = ["EffectExecuteExecutor", "ToolResultAttributionError", "setup"]

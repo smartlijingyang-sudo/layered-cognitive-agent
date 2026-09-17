@@ -32,6 +32,29 @@ class SessionWriterUnboundError(RuntimeError):
     """
 
 
+def _tool_result_content(data: dict[str, Any]) -> str:
+    """Render a tool result's model-visible text; never empty.
+
+    An empty ``role=tool`` row is indistinguishable from an unanswered
+    call, so the model re-issues it (``run_71456ce99914``: two sandbox
+    timeouts came back zero-length and the model kept guessing file
+    paths). The journal keeps the fact split — payload in ``content``,
+    classification in ``error`` — and this projection is the single place
+    that joins them into what the model reads.
+    """
+    content = data.get("content")
+    text = content if isinstance(content, str) else ("" if content is None else str(content))
+    if text.strip():
+        return text
+    error = data.get("error")
+    if isinstance(error, dict):
+        kind = error.get("kind") or "execution"
+        message = str(error.get("message") or "").strip() or "unknown error"
+        retryable = bool(error.get("retryable"))
+        return f"[tool_error kind={kind} retryable={retryable}] {message}"
+    return "[tool_result] (no output)"
+
+
 def _surface_event_to_message(event: Any) -> Message:
     """Project a single surface event into the OpenAI message wire shape.
 
@@ -50,7 +73,7 @@ def _surface_event_to_message(event: Any) -> Message:
     if event.type == "surface/tool_result":
         msg = Message(
             role="tool",
-            content=event.data.get("content"),
+            content=_tool_result_content(event.data),
             tool_call_id=event.data.get("tool_call_id"),
         )
         return msg

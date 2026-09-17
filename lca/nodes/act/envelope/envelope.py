@@ -121,6 +121,12 @@ class ActEnvelopeExecutor:
                     "state": context.runtime.get("state"),
                     "decision": decision,
                     "tool_call_index": call_index,
+                    # The dispatch site is the only place that knows which
+                    # declared call this envelope carries. ``effect.execute``
+                    # reads this id to attribute the model-visible
+                    # ``surface/tool_result`` row; reconstructing it downstream
+                    # from ``decision`` only works for a single-call turn.
+                    "tool_call_id": decision.tool_calls[call_index].call_id,
                 },
             )
             for call_index in range(len(decision.tool_calls))
