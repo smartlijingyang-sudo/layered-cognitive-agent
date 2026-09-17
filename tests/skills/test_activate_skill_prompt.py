@@ -20,6 +20,7 @@ from lca.infrastructure.skills.settings.settings import SkillSettings
 from lca.infrastructure.tools.skills.activate.tool import (
     SkillActivateTool,
     build_skill_references_section,
+    usable_skill_resources,
 )
 
 
@@ -109,6 +110,35 @@ class TestBuildSkillReferencesSection(unittest.TestCase):
         self.assertIn("<skill_references", section)
         self.assertIn("无可用 references", section)
         self.assertIn("read_skill_reference_once", section)
+
+    def test_market_package_lists_scripts_from_resource_paths(self) -> None:
+        pkg = SkillPackage(
+            skill_id="anthropics-skills-pdf",
+            name="pdf",
+            summary="",
+            content="body",
+            resource_paths=(
+                "LICENSE.txt",
+                "forms.md",
+                "scripts/fill_fillable_fields.py",
+                "scripts/office/schemas/ISO/sml.xsd",
+            ),
+            source_url="",
+            content_hash="h",
+            version="1.0.4",
+            references=(),
+        )
+        self.assertEqual(
+            usable_skill_resources(pkg),
+            ("forms.md", "scripts/fill_fillable_fields.py"),
+        )
+        section = build_skill_references_section(pkg)
+        self.assertIn("forms.md", section)
+        self.assertIn("scripts/fill_fillable_fields.py", section)
+        self.assertIn("run_skill_script", section)
+        self.assertNotIn("sml.xsd", section)
+        self.assertNotIn("LICENSE.txt", section)
+        self.assertNotIn("无可用 references", section)
 
 
 if __name__ == "__main__":

@@ -158,7 +158,13 @@ class RunBoundSandboxRuntime(SandboxRuntime):
 
         inspect_result = await self._run_inspect_internal()
         if inspect_result is not None and not inspect_result.success:
-            return inspect_result
+            # Inspect is an observation of the guest tree. A profile dump
+            # that cannot serialize must not block execute / harvest.
+            _log.warning(
+                "sandbox_inspect_failed",
+                run_id=self._run_id,
+                error=inspect_result.error_summary or inspect_result.error,
+            )
 
         self._ready = True
         await self._baseline_outputs()

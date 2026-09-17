@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from pathlib import PurePosixPath
 from typing import Any, ClassVar
 
 from lca.contracts.atoms.enums.enums import ContentType
@@ -30,31 +31,71 @@ _REDIRECT_WEB_SEARCH_MESSAGE = (
 )
 
 
-def build_skill_references_section(package: SkillPackage) -> str:
-    """构建 references 列表注入段(ADR-0214 §7.4)。
+_SCRIPT_SUFFIXES = frozenset({".py", ".sh", ".bash", ".js", ".mjs"})
+_DOC_SUFFIXES = frozenset({".md", ".txt"})
+_SKIP_NAMES = frozenset({"license", "license.txt", "licence.txt"})
 
-    注入位置:SKILL.md body 之后,``<skill_references>`` 标记内。
-    列表为空时显式声明「无可用 references」,避免模型猜测 SKILL.md
-    body 暗示的路径而误调 ``read_skill_reference_once``。
+
+def usable_skill_resources(package: SkillPackage) -> tuple[str, ...]:
+    """Paths the agent may read or run.
+
+    Frontmatter ``references`` wins. Market packages often omit that field
+    and only list ``resource_paths`` (including xsd / license noise).
+    """
+    if package.references:
+        return package.references
+    return tuple(path for path in package.resource_paths if _is_agent_usable(path))
+
+
+def _is_agent_usable(rel: str) -> bool:
+    posix = rel.replace("\\", "/")
+    name = posix.rsplit("/", 1)[-1].lower()
+    if name in _SKIP_NAMES:
+        return False
+    if "/schemas/" in f"/{posix.lower()}/":
+        return False
+    suffix = PurePosixPath(name).suffix.lower()
+    return suffix in _SCRIPT_SUFFIXES or suffix in _DOC_SUFFIXES
+
+
+def _script_paths(paths: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(
+        path
+        for path in paths
+        if PurePosixPath(path.replace("\\", "/")).suffix.lower() in _SCRIPT_SUFFIXES
+    )
+
+
+def build_skill_references_section(package: SkillPackage) -> str:
+    """SKILL.md 之后的包内索引：可读文档 + 可运行脚本。
+
+    不把脚本正文塞进 prompt。模型用 ``run_skill_script`` 在 skill 工作目录执行。
     """
     version = (package.version or "").strip() or "?"
-    refs = package.references
+    usable = usable_skill_resources(package)
+    scripts = _script_paths(usable)
+    docs = tuple(path for path in usable if path not in scripts)
     lines: list[str] = [
         f"<skill_references skill_id={package.skill_id!r} version={version!r}>",
-        "SKILL.md frontmatter references 字段声明的包内可读路径:",
     ]
-    if refs:
-        for rel in refs:
+    if docs:
+        lines.append("包内可读文档（read_skill_reference_once，不要重复读同一路径）:")
+        for rel in docs:
             lines.append(f"- {rel}")
-        lines.append(
-            "上述路径已通过加载期校验(文件存在);"
-            "read_skill_reference_once(path) 仅用于正文未涵盖的子文档,"
-            "不要重复读。"
-        )
-    else:
+    elif not scripts:
         lines.append(
             "(无可用 references — SKILL.md 正文已是完整指南,"
             "不要调 read_skill_reference_once;读不存在的路径会被节流熔断)"
+        )
+    if scripts:
+        lines.append(
+            "包内脚本（在 skill 工作目录用 run_skill_script 执行，不要把源码抄进 executeCode）:"
+        )
+        for rel in scripts:
+            lines.append(f"- {rel}")
+        lines.append(
+            f'例: run_skill_script({{"command": "python {scripts[0]}", '
+            f'"skill_id": {package.skill_id!r}}})'
         )
     lines.append("</skill_references>")
     return "\n".join(lines)
@@ -80,6 +121,7 @@ class SkillActivateTool(Tool):
     name = ACTIVATE_SKILL_TOOL
     description = (
         "激活已安装的操作 skill，将其 SKILL.md 操作指南注入当前上下文。"
+        "包内 scripts/ 用 run_skill_script 在 skill 工作目录执行，不要把脚本抄进 executeCode。"
         "Office 文档（.docx/.xlsx/.pptx）优先 activate_skill('officecli')，"
         "再 run_command 调用预装 officecli CLI（--json）。"
         "PDF 用 anthropics-skills-pdf；纯表分析可用 pandas 无需 skill。"
@@ -166,11 +208,9 @@ class SkillActivateTool(Tool):
         }
         if summary:
             state["description"] = summary
-        if package.references:
-            state["references"] = list(package.references)
-        elif package.resource_paths:
-            # 向后兼容:旧 manifest 没存 references,但有 resource_paths。
-            state["references"] = list(package.resource_paths)
+        usable = usable_skill_resources(package)
+        if usable:
+            state["references"] = list(usable)
         if package.resource_paths:
             state["resources"] = list(package.resource_paths)
         latency_ms = int((time.monotonic() - start) * 1000)

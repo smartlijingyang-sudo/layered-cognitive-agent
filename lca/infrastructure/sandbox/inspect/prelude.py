@@ -5,9 +5,31 @@ from __future__ import annotations
 from lca.contracts.models.core.execution.sandbox import SANDBOX_OUTPUT_SUBDIR
 from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
 
-INSPECT_SCRIPT = """
-import json as _j
-import os as _o
+# Inlined into the guest inspect script. Datetime / pandas Timestamp / numpy
+# scalars in Excel samples must not fail json.dumps (run_8e2a1e79c0a4).
+INSPECT_JSONABLE_SRC = """
+def _jsonable(o):
+    iso = getattr(o, "isoformat", None)
+    if callable(iso):
+        try:
+            return iso()
+        except Exception:
+            return str(o)
+    item = getattr(o, "item", None)
+    if callable(item):
+        try:
+            return item()
+        except Exception:
+            return str(o)
+    return str(o)
+""".strip()
+
+INSPECT_SCRIPT = (
+    (
+        "import json as _j\n"
+        "import os as _o\n"
+        + INSPECT_JSONABLE_SRC
+        + """
 root = __SANDBOX_ROOT__
 out = {"files": [], "profiles": {}}
 for dirpath, _, filenames in _o.walk(root):
@@ -82,9 +104,11 @@ for dirpath, _, filenames in _o.walk(root):
                 }
             except Exception as exc:
                 out["profiles"][fn] = {"type": "csv", "error": str(exc)}
-print("__LCA_INSPECT__" + _j.dumps(out, ensure_ascii=False) + "__END_INSPECT__")
-""".replace("__SANDBOX_ROOT__", repr(ONLYBOXES.root)).replace(
-    "__OUTPUTS_SUBDIR__", SANDBOX_OUTPUT_SUBDIR
+print("__LCA_INSPECT__" + _j.dumps(out, ensure_ascii=False, default=_jsonable) + "__END_INSPECT__")
+"""
+    )
+    .replace("__SANDBOX_ROOT__", repr(ONLYBOXES.root))
+    .replace("__OUTPUTS_SUBDIR__", SANDBOX_OUTPUT_SUBDIR)
 )
 
 INSPECT_BEGIN = "__LCA_INSPECT__"
