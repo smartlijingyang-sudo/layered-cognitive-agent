@@ -16,6 +16,9 @@ PR-3 split:本节点从原 ``act.observe`` 中剥离 ``should_terminate`` 决策
 (``concept.effect.execute`` 捕获 gateway 异常时产出的 receipt 无
 ``failure_kind``)。带分类标签的失败是工具对*自己标的物*的报告,必须回到
 模型手里让它换方案(docs/specs/tool-failure-recovery.md §3/§6.1/§7)。
+一个 turn fork 出的 N 个工具调用只产出一张 receipt,其标签由
+``fold_failure_kinds`` 从失败分量折出(``ToolBatchExecutor``),所以「批里
+有工具失败」不会被读成「没有工具报告过结果」。
 卡死的循环由 ``think.budget.gate`` 兜住(每轮 think 都跑,``max_steps=50`` /
 300s 墙钟);ADR-0225 已删除 per-node ``max_visits``,ADR-0230 当初为省掉
 ``max_visits=8`` 空转而在这一节点加的 deterministic-failure 短路已无前提。

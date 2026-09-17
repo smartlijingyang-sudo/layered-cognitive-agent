@@ -12,8 +12,16 @@ from lca.cognition.body.tools.tool_batch_execution import (
     SegmentedSafeToolBatchExecutionPolicy,
     SequentialToolBatchExecutionPolicy,
 )
+from lca.cognition.body.tools.tool_batch_executor import ToolBatchExecutor
 from lca.contracts.atoms.enums.enums import ActionType, MemoryRecordKind
-from lca.contracts.atoms.semantic.keys import OBS_RESULT_KIND
+from lca.contracts.atoms.semantic.keys import (
+    FAILURE_KIND,
+    FAILURE_KIND_EXECUTION,
+    FAILURE_KIND_TRANSIENT,
+    OBS_RESULT_KIND,
+    OBS_TOOL_RESULTS,
+)
+from lca.contracts.harness.act.effect_receipt import EffectReceipt
 from lca.contracts.models.core.execution.decision import Decision, Observation, ToolCall
 from lca.contracts.models.core.execution.result import ToolExecutionError
 from lca.contracts.models.core.policy.budget import create_budget
@@ -22,6 +30,10 @@ from lca.contracts.protocols.act.tool.batch_execution import (
     ToolBatchEntry,
     ToolBatchExecutionMode,
     ToolBatchExecutionSegment,
+)
+from lca.contracts.protocols.declarative.declarative_1.node_executor import (
+    NodeContext,
+    NodeInput,
 )
 from lca.plugins.act.tool.batch_execution_policy_provider import build_tool_batch_execution_policy
 
@@ -281,8 +293,6 @@ def test_provider_rejects_unknown_policy_mode() -> None:
 async def test_batch_executor_resolves_every_tool_before_dispatch() -> None:
     """缺少任一工具时，批次接缝不得启动部分世界副作用。"""
 
-    from lca.cognition.body.tools.tool_batch_executor import ToolBatchExecutor
-
     available = _Tool("available", is_idempotent=True)
     executor = _RecordingSafeExecutor()
     batch_executor = ToolBatchExecutor(
@@ -309,8 +319,6 @@ async def test_batch_executor_falls_back_to_canonicalised_name() -> None:
     snake_case 进 journal),只在 dispatch 前 normalize 解析。
     """
 
-    from lca.cognition.body.tools.tool_batch_executor import ToolBatchExecutor
-
     camel_tool = _Tool("exportFile", is_idempotent=True)
     safe_executor = _RecordingSafeExecutor()
     batch_executor = ToolBatchExecutor(
@@ -331,8 +339,6 @@ async def test_batch_executor_falls_back_to_canonicalised_name() -> None:
 async def test_batch_executor_marks_single_result_as_tool_result() -> None:
     """单工具路径与批次路径共享工具结果类别这一测试表面。"""
 
-    from lca.cognition.body.tools.tool_batch_executor import ToolBatchExecutor
-
     read = _Tool("read", is_idempotent=True)
     executor = _RecordingSafeExecutor()
     batch_executor = ToolBatchExecutor(
@@ -346,3 +352,156 @@ async def test_batch_executor_marks_single_result_as_tool_result() -> None:
     assert observation.success
     assert observation.extra[OBS_RESULT_KIND] is MemoryRecordKind.TOOL_RESULT
     assert executor.invocations == ["read"]
+
+
+class _ScriptedSafeExecutor:
+    """SafeExecutor stub returning a scripted Observation per tool name."""
+
+    def __init__(self, outcomes: dict[str, Observation]) -> None:
+        self._outcomes = outcomes
+
+    async def execute(
+        self,
+        tool: _Tool,
+        args: dict[str, Any],
+        retry_policy: object,
+        cache_config: object,
+        invocation_id: str = "",
+    ) -> Observation:
+        del args, retry_policy, cache_config, invocation_id
+        return self._outcomes[tool.name]
+
+
+def _ok(name: str) -> Observation:
+    return Observation(
+        observation_id=f"obs-{name}", success=True, payload=name, tool_call_id=f"call-{name}"
+    )
+
+
+def _failed(name: str, *, failure_kind: str | None, error: str = "boom") -> Observation:
+    return Observation(
+        observation_id=f"obs-{name}",
+        success=False,
+        payload=None,
+        tool_call_id=f"call-{name}",
+        error=error,
+        extra={} if failure_kind is None else {FAILURE_KIND: failure_kind},
+    )
+
+
+async def _run_batch(outcomes: dict[str, Observation], *names: str) -> Observation:
+    tools = tuple(_Tool(name, is_idempotent=True) for name in names)
+    executor = ToolBatchExecutor(
+        _ToolRegistry(*tools),
+        _ScriptedSafeExecutor(outcomes),
+        policy=ParallelToolBatchExecutionPolicy(),
+    )
+    return await executor.execute(_decision(*names).tool_calls)
+
+
+@pytest.mark.asyncio
+async def test_forked_batch_keeps_the_failing_tools_classification() -> None:
+    """run_136671e2ff8a:一个 turn fork 出 2 个调用,其中一个确定性失败。
+
+    聚合体丢掉分类 → receipt.failure_kind=None →
+    ``act.observe.terminate_decide`` 把它读成「host 没能把 effect 派出去」→
+    run 在第 1 步收口(``terminal.commit`` 拿到的却还是
+    ``StopPayload(reason='continue')``)。模型从没看到那条
+    ``cd: /files: No such file or directory``,也就没有换路径的机会。
+    """
+
+    observation = await _run_batch(
+        {
+            "runCommand": _failed(
+                "runCommand",
+                failure_kind=FAILURE_KIND_EXECUTION,
+                error="/bin/sh: line 0: cd: /files: No such file or directory",
+            ),
+            "activate_skill": _ok("activate_skill"),
+        },
+        "runCommand",
+        "activate_skill",
+    )
+
+    assert not observation.success
+    assert observation.extra[FAILURE_KIND] == FAILURE_KIND_EXECUTION
+    # 聚合分类不替代每调用明细:surface/tool_result 与 critic 仍读这个袋子。
+    assert [entry["tool_name"] for entry in observation.extra[OBS_TOOL_RESULTS]] == [
+        "runCommand",
+        "activate_skill",
+    ]
+
+
+@pytest.mark.parametrize("order", [("flaky", "broken"), ("broken", "flaky")])
+@pytest.mark.asyncio
+async def test_forked_batch_classification_is_order_independent(order: tuple[str, str]) -> None:
+    """同批出现多种分类时取优先级更高者,与模型 emit 顺序和并发调度无关(C8)。"""
+
+    observation = await _run_batch(
+        {
+            "flaky": _failed("flaky", failure_kind=FAILURE_KIND_TRANSIENT),
+            "broken": _failed("broken", failure_kind=FAILURE_KIND_EXECUTION),
+        },
+        *order,
+    )
+
+    assert observation.extra[FAILURE_KIND] == FAILURE_KIND_EXECUTION
+
+
+@pytest.mark.asyncio
+async def test_successful_batch_carries_no_failure_kind() -> None:
+    observation = await _run_batch({"read": _ok("read"), "search": _ok("search")}, "read", "search")
+
+    assert observation.success
+    assert FAILURE_KIND not in observation.extra
+
+
+@pytest.mark.asyncio
+async def test_batch_of_unclassified_failures_stays_unclassified() -> None:
+    """没有分量带分类时聚合体也不带 —— 不能把「无工具报告」伪造成别的读数。"""
+
+    observation = await _run_batch(
+        {"read": _failed("read", failure_kind=None), "search": _ok("search")},
+        "read",
+        "search",
+    )
+
+    assert not observation.success
+    assert FAILURE_KIND not in observation.extra
+
+
+@pytest.mark.asyncio
+async def test_forked_batch_failure_does_not_terminate_the_run() -> None:
+    """跨边界不变量:Body 聚合 → ``_derive_outcome`` → receipt → terminate_decide。
+
+    两侧各自的单测都曾通过,坏在中间那一跳,所以这条链必须整体钉住。
+    """
+    from lca.nodes.act.observe.terminate_decide import ActObserveTerminateDecideExecutor
+    from lca.nodes.concept.effect.execute import _derive_outcome
+
+    aggregate = await _run_batch(
+        {
+            "runCommand": _failed("runCommand", failure_kind=FAILURE_KIND_EXECUTION),
+            "activate_skill": _ok("activate_skill"),
+        },
+        "runCommand",
+        "activate_skill",
+    )
+    outcome, error_code, failure_kind = _derive_outcome(aggregate)
+
+    receipt = EffectReceipt(
+        invocation_id="inv_batch",
+        outcome=outcome,
+        idempotency_key="idem_batch",
+        provider="body.act",
+        error_code=error_code,
+        failure_kind=failure_kind,
+    )
+    assert receipt.failure_kind == FAILURE_KIND_EXECUTION
+
+    output = await ActObserveTerminateDecideExecutor().node_execute(
+        NodeContext(runtime={}, budget={}, metadata={"plan_ref": "test"}),
+        NodeInput({"receipt": receipt}),
+    )
+
+    assert output.port_values["should_terminate"] is False

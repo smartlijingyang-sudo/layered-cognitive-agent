@@ -17,11 +17,14 @@ R89 introduces ``_resolve_observation`` and ``_aggregate_observations``:
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC
 
 from lca.cognition.body.actions.action_handlers import DelegateOperation
 from lca.contracts.atoms.enums.enums import ActionType, MemoryRecordKind
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.atoms.semantic.keys import (
+    FAILURE_KIND,
+    FAILURE_KIND_TRANSIENT,
     OBS_MEMBER_RESULTS,
     OBS_MEMBER_SUBTASKS,
     OBS_RESULT_KIND,
@@ -34,7 +37,6 @@ from lca.contracts.models.core.execution.decision import (
 )
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.infrastructure.transport.registry import TransportRegistry
-from datetime import UTC
 
 
 def _state() -> AgentState:
@@ -55,7 +57,7 @@ class TestResolveObservationSeam:
 
     def test_resolve_returns_cache_when_present(self) -> None:
         """Cache hit short-circuits the transport path."""
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from lca.contracts.models.team.delegation.delegation import DelegationResult
         from lca.contracts.models.team.team.awareness import TeamAwareness
@@ -132,6 +134,38 @@ class TestAggregateObservationsShape:
         assert out.success is True
         assert out.error is None
 
+    def test_failed_member_classification_survives_the_fold(self) -> None:
+        """聚合体必须保住分量的 ``failure_kind``。
+
+        丢掉它 → receipt.failure_kind=None → ``act.observe.terminate_decide``
+        读成「host 没能把 effect 派出去」并收口 run(ADR-0230 Amendment)。
+        与 ``ToolBatchExecutor._combine_observations`` 同一条不变量。
+        """
+        op = DelegateOperation(TransportRegistry())
+        specs = [_spec("writer"), _spec("reviewer")]
+        observations = [
+            Observation(observation_id=new_id("obs"), success=True, payload="w-out"),
+            Observation(
+                observation_id=new_id("obs"),
+                success=False,
+                payload=None,
+                error="r-fail",
+                extra={FAILURE_KIND: FAILURE_KIND_TRANSIENT},
+            ),
+        ]
+        out = op._aggregate_observations(specs, observations)
+        assert out.extra[FAILURE_KIND] == FAILURE_KIND_TRANSIENT
+
+    def test_successful_fold_carries_no_failure_kind(self) -> None:
+        op = DelegateOperation(TransportRegistry())
+        specs = [_spec("writer"), _spec("reviewer")]
+        observations = [
+            Observation(observation_id=new_id("obs"), success=True, payload="ok1"),
+            Observation(observation_id=new_id("obs"), success=True, payload="ok2"),
+        ]
+        out = op._aggregate_observations(specs, observations)
+        assert FAILURE_KIND not in out.extra
+
 
 class TestExecuteShape:
     """Sanity: execute() wires the new helpers correctly."""
@@ -156,7 +190,7 @@ class TestExecuteShape:
 
     def test_single_delegation_uses_tag_delegation_extra(self) -> None:
         """The single-path branch must still call tag_delegation_extra."""
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from lca.contracts.models.team.delegation.delegation import DelegationResult
         from lca.contracts.models.team.team.awareness import TeamAwareness

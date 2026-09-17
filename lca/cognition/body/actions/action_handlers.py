@@ -48,6 +48,7 @@ from lca.contracts.atoms.semantic.keys import (
     OBS_RESULT_KIND,
     OBS_TASK_ID,
     OBS_TASK_IDS,
+    fold_failure_kinds,
 )
 from lca.contracts.models.core.execution.decision import Decision, DelegationSpec, Observation
 from lca.contracts.models.core.execution.result import ToolExecutionError
@@ -286,17 +287,26 @@ class DelegateOperation(Action):
             task_ids.append(str(obs.extra.get(OBS_TASK_ID, obs.observation_id)))
 
         all_ok = all(o.success for o in observations)
+        extra: dict[str, object] = {
+            OBS_TASK_IDS: task_ids,
+            OBS_MEMBER_RESULTS: member_payload,
+            OBS_MEMBER_SUBTASKS: member_subtasks,
+            OBS_RESULT_KIND: MemoryRecordKind.DELEGATION_RESULT,
+        }
+        # 与 ToolBatchExecutor 同一条不变量:聚合体必须保住分量的分类,否则
+        # failure_kind=None 会被 act.observe.terminate_decide 读成「host 没能
+        # 把 effect 派出去」而收口 run(ADR-0230 Amendment)。
+        failure_kind = fold_failure_kinds(
+            (o.extra or {}).get(FAILURE_KIND) for o in observations if not o.success
+        )
+        if failure_kind is not None:
+            extra[FAILURE_KIND] = failure_kind
         return Observation(
             observation_id=new_id("obs"),
             success=all_ok,
             payload=member_payload,
             error=None if all_ok else "one or more delegates failed",
-            extra={
-                OBS_TASK_IDS: task_ids,
-                OBS_MEMBER_RESULTS: member_payload,
-                OBS_MEMBER_SUBTASKS: member_subtasks,
-                OBS_RESULT_KIND: MemoryRecordKind.DELEGATION_RESULT,
-            },
+            extra=extra,
         )
 
     def _record_return(

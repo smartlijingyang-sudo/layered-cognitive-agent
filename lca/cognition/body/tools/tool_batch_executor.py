@@ -16,7 +16,12 @@ from collections.abc import Sequence
 
 from lca.contracts.atoms.enums.enums import MemoryRecordKind
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.atoms.semantic.keys import OBS_RESULT_KIND, OBS_TOOL_RESULTS
+from lca.contracts.atoms.semantic.keys import (
+    FAILURE_KIND,
+    OBS_RESULT_KIND,
+    OBS_TOOL_RESULTS,
+    fold_failure_kinds,
+)
 from lca.contracts.models.core.execution.decision import Observation, ToolCall
 from lca.contracts.models.core.execution.result import ToolExecutionError
 from lca.contracts.models.team.role.team import CacheConfig, RetryPolicy
@@ -158,11 +163,7 @@ class ToolBatchExecutor:
         if isinstance(self._policy, ToolBatchSegmentPlanningPolicy):
             segments = self._policy.select_segments(entries)
         else:
-            mode = (
-                override_mode
-                if override_mode is not None
-                else self._policy.select_mode(entries)
-            )
+            mode = override_mode if override_mode is not None else self._policy.select_mode(entries)
             segments = (
                 ToolBatchExecutionSegment(
                     start=0,
@@ -219,16 +220,37 @@ class ToolBatchExecutor:
         observations: Sequence[Observation],
         tool_calls: Sequence[ToolCall],
     ) -> Observation:
-        """Package ordered batch results for the tool-history projection."""
+        """Package ordered batch results for the tool-history projection.
+
+        The aggregate carries the highest-precedence ``failure_kind`` of its
+        failing parts. Dropping it here reads as "no tool reported a result"
+        one hop downstream — ``concept.effect.execute._derive_outcome`` only
+        inspects the top level — and ``act.observe.terminate_decide`` ends the
+        run on that reading, which is the host-dispatch-failure branch
+        (ADR-0230 Amendment). Per-call detail stays in
+        ``extra[OBS_TOOL_RESULTS]``; the single-call path needs no fold because
+        ``_as_tool_result`` passes the tool's own ``extra`` through untouched.
+        """
 
         all_ok = all(observation.success for observation in observations)
-        errors = [
-            error
-            for error in (
-                observation.error for observation in observations if not observation.success
-            )
-            if error
-        ]
+        failed = [observation for observation in observations if not observation.success]
+        errors = [error for error in (observation.error for observation in failed) if error]
+        extra: dict[str, object] = {
+            OBS_RESULT_KIND: MemoryRecordKind.TOOL_RESULT,
+            OBS_TOOL_RESULTS: [
+                {
+                    "call_id": tool_call.call_id,
+                    "tool_name": tool_call.tool_name,
+                    "observation": observation,
+                }
+                for tool_call, observation in zip(tool_calls, observations, strict=True)
+            ],
+        }
+        failure_kind = fold_failure_kinds(
+            (observation.extra or {}).get(FAILURE_KIND) for observation in failed
+        )
+        if failure_kind is not None:
+            extra[FAILURE_KIND] = failure_kind
         return Observation(
             observation_id=new_id("obs"),
             success=all_ok,
@@ -237,17 +259,7 @@ class ToolBatchExecutor:
                 "all_success": all_ok,
             },
             error="; ".join(errors) if errors else "",
-            extra={
-                OBS_RESULT_KIND: MemoryRecordKind.TOOL_RESULT,
-                OBS_TOOL_RESULTS: [
-                    {
-                        "call_id": tool_call.call_id,
-                        "tool_name": tool_call.tool_name,
-                        "observation": observation,
-                    }
-                    for tool_call, observation in zip(tool_calls, observations, strict=True)
-                ],
-            },
+            extra=extra,
         )
 
 

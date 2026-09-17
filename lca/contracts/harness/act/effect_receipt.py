@@ -44,6 +44,12 @@ class EffectReceipt:
     SSOT for failure classification across the Body↔Cognition boundary;
     do not derive it from ``error_code`` text at the seam.
 
+    A turn that forked N tool calls yields one receipt for the whole
+    batch, so the tag is the highest-precedence classification among the
+    failing calls (``fold_failure_kinds``). That fold is what keeps
+    ``None`` readable as "no tool ran" for a batch; a batch that lost its
+    parts' tags would look like a host dispatch failure and end the run.
+
     Consumers read it for two distinct questions.
     ``ReflectObservationBuildExecutor._build_observation`` maps the tag
     value to a reflection prompt. ``act.observe.terminate_decide`` reads
