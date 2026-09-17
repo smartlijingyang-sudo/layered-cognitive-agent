@@ -31,6 +31,7 @@ from lca.contracts.models.core.execution.sandbox import (
 )
 from lca.contracts.models.core.state.guest_layout import GuestLayout
 from lca.infrastructure.sandbox.onlyboxes.bootstrap import safe_rel_name
+from lca.infrastructure.sandbox.output.collect import try_append_generated_file
 from lca.infrastructure.sandbox.streaming.streaming import SandboxStreamEmitter
 
 _log = structlog.get_logger(__name__)
@@ -180,6 +181,7 @@ class LocalSandboxAdapter:
         if not out_dir.is_dir():
             return ()
         files: list[SandboxFile] = []
+        diagnostics: list[str] = []
         for path in sorted(out_dir.rglob("*")):
             if not path.is_file() or path.name.startswith("."):
                 continue
@@ -187,9 +189,10 @@ class LocalSandboxAdapter:
                 data = path.read_bytes()
             except OSError:
                 continue
-            files.append(
-                SandboxFile(name=path.name, mime_type="application/octet-stream", data=data)
-            )
+            if not try_append_generated_file(files, diagnostics, name=path.name, data=data):
+                break
+        if diagnostics:
+            _log.warning("local_sandbox_output_capped", diagnostics="".join(diagnostics))
         return tuple(files)
 
     async def write_files(
