@@ -9,8 +9,6 @@ from lca.cognition.brain.prompt.sandbox_prompt import build_cloud_sandbox_prompt
 from lca.contracts.observability.canonical_digest import canonical_digest
 from lca.contracts.protocols.runtime.infra.infra import Tool
 
-_EMPTY_TOOLS = "（无可用工具）"
-
 
 @dataclass(frozen=True, slots=True)
 class PromptSurfaceRender:
@@ -39,10 +37,16 @@ class PromptSurface:
         return cls()
 
     def render_tools_xml(self, tools: Sequence[Tool]) -> str:
-        lines = tuple(
+        """Render the model-visible tool catalog; empty when there are no tools.
+
+        Native ``tool_calls`` schemas are the SSOT for tool availability and
+        travel on the same request. A placeholder here would assert the
+        opposite of what the wire carries, so an empty catalog renders nothing
+        and ``block`` drops the section.
+        """
+        return "\n".join(
             f'<tool name="{tool.name}">{tool.description or tool.name}</tool>' for tool in tools
         )
-        return "\n".join(lines) if lines else _EMPTY_TOOLS
 
     def render_sandbox_block(self, tools: Sequence[Tool]) -> str:
         if not tools:

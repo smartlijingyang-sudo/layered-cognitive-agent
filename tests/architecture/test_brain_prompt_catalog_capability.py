@@ -103,7 +103,7 @@ def test_default_factory_freezes_selected_skills_and_tools() -> None:
     catalog = DefaultBrainPromptCatalogFactory().create(skill_store=_SkillStore(), tools=())
 
     assert catalog.render_brain_skills() == "（无可用技能）"
-    assert catalog.render_tools_xml() == "（无可用工具）"
+    assert catalog.render_tools_xml() == ""
 
 
 def test_standard_profile_provides_brain_prompt_catalog_factory() -> None:

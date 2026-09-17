@@ -107,3 +107,48 @@ def test_wire_status_reaches_the_decision_extra_used_by_the_body_gate() -> None:
     assert extra[TOOL_WIRE_STATUS] == "incomplete"
     assert extra[TOOL_WIRE_REASON] == _WIRE_REASON
     assert extra[TOOL_WIRE_RAW_PREVIEW] == _WIRE_PREVIEW
+
+
+# ── Regression: undecodable markup is a wire failure, not an answer ───────
+#
+# run_c6df7c01ccae returned 15 completion tokens whose whole text was the
+# trailing close of an invoke/parameter block. The projection put it in
+# ``intent``, ``decision.parse`` classified it ``respond``, and the loop
+# committed the fragment as a successful final answer.
+
+_CLOSE_PARAM = "</" + "parameter>"
+_CLOSE_FUNC = "</" + "function>"
+
+
+def test_undecodable_markup_projects_as_an_incomplete_wire_call() -> None:
+    projected = project_llm_response(_response(text="`\n\n" + _CLOSE_PARAM + "\n" + _CLOSE_FUNC))
+    assert projected.intent == ""
+    assert len(projected.tool_calls) == 1
+    call = projected.tool_calls[0]
+    assert call.tool_name == ""
+    assert call.wire_status == "incomplete"
+    assert call.wire_reason == _WIRE_REASON
+    assert _CLOSE_PARAM in call.wire_raw_preview
+
+
+def test_decoded_markup_projects_as_a_real_call_not_a_wire_failure() -> None:
+    text = (
+        'Reading now.\n<tool_calls>\n<invoke name="listFiles">\n'
+        '<parameter name="directoryPath">.' + _CLOSE_PARAM + "\n</invoke>\n</tool_calls>"
+    )
+    projected = project_llm_response(_response(text=text))
+    assert projected.intent == "Reading now."
+    assert [c.tool_name for c in projected.tool_calls] == ["listFiles"]
+    assert projected.tool_calls[0].arguments == {"directoryPath": "."}
+    assert projected.tool_calls[0].wire_status == "ok"
+
+
+def test_native_calls_are_never_reclassified_by_the_text_channel() -> None:
+    projected = project_llm_response(
+        _response(
+            NativeToolCall(call_id="c", name="listFiles", arguments={"directoryPath": "."}),
+            text="done " + _CLOSE_FUNC,
+        )
+    )
+    assert [c.tool_name for c in projected.tool_calls] == ["listFiles"]
+    assert projected.intent == "done " + _CLOSE_FUNC

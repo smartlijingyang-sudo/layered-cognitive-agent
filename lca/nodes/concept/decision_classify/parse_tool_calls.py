@@ -9,8 +9,8 @@ concept.decision.classify 图节点 1(ADR-0221,合并 ADR-0220 §3.3 的
 
 1. native ``NativeToolCall`` 列表 → typed ``ToolCall`` 列表;``delegate``
    工具名过滤到 ``DelegationSpec`` 列表
-2. leak recovery(``recover_leaked_tool_calls`` 解析 LLM 在 text 里
-   偷偷放的 function-call JSON),把剥离后的剩余文本作为 ``intent``
+2. leak recovery(``parse_text_channel`` 解析 LLM 在 text 里
+   偷偷放的 function-call JSON / XML),把剥离后的剩余文本作为 ``intent``
 
 失败 / 无调用 → 返回空 tuple + 空 intent,不静默降级到 RESPOND
 —— 下游 ``decision.compose.action`` 显式拿三路入参组装,语义边界清晰。

@@ -7,10 +7,21 @@ verdict and ``think.decision.repair`` reads it to attempt a repair; a
 projection that drops the fields downgrades a truncated payload to a generic
 ``missing_required_arguments`` error that does not name the real cause.
 
-Leak recovery runs before intent extraction: ``recover_leaked_tool_calls``
-returns new prose plus recovered calls without mutating ``response.text``, so
-the intent is computed from the stripped leftover and leaked JSON is not
-double-counted as answer text.
+Leak recovery runs before intent extraction: :func:`parse_text_channel` returns
+prose plus recovered calls without mutating ``response.text``, so the intent is
+computed from the stripped leftover and leaked JSON is not double-counted as
+answer text.
+
+The text channel has a third outcome besides prose and a decoded call: protocol
+markup that decoded to nothing. This mapping is the single home for that rule,
+so all four consumers (``think.decision.parse``, ``decision.parse.response``,
+``DefaultDecisionClassifier``, ``compose_action``) get it without each having to
+remember it. Undecodable markup becomes an ADR-0047 incomplete-wire ``ToolCall``
+with an empty name and the fragment in ``wire_raw_preview``: ``tool_wire_gate``
+refuses to execute it and ``think.decision.repair`` rejects it on schema grounds,
+which re-routes to a re-reason. The alternative — leaving it in ``intent`` — is
+what lets a wire failure reach the user as a final answer and stop the loop on
+``StopReason.CONTINUE``.
 """
 
 from __future__ import annotations
@@ -18,7 +29,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from lca.cognition.brain.prompt.leaked_tool_call import recover_leaked_tool_calls
+from lca.cognition.brain.prompt.leaked_tool_call import parse_text_channel
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.execution.decision import DelegationSpec, ToolCall
 
@@ -26,6 +37,7 @@ if TYPE_CHECKING:
     from lca.contracts.models.core.conversation.llm import LLMResponse
 
 _DELEGATE_TOOL_NAME = "delegate"
+_PREVIEW_CHARS = 400
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,13 +49,32 @@ class ResponseProjection:
     intent: str
 
 
+def _undecodable_wire_call(markup: str) -> ToolCall:
+    """Express unreadable tool-call markup as an incomplete wire call.
+
+    ``tool_name`` stays empty: the name is exactly what could not be read, and
+    an empty name is what ``think.decision.repair`` rejects on schema grounds.
+    """
+    return ToolCall(
+        call_id=new_id("call"),
+        tool_name="",
+        arguments={},
+        wire_status="incomplete",
+        wire_reason="unterminated_or_truncated_json",
+        wire_raw_preview=markup[:_PREVIEW_CHARS],
+    )
+
+
 def project_llm_response(response: LLMResponse) -> ResponseProjection:
     """Map ``response.tool_calls`` + ``response.text`` onto Decision parts."""
     intent = (response.text or "").strip()
     native_calls = list(response.tool_calls or ())
+    undecodable = ""
     if not native_calls and intent:
-        intent, recovered = recover_leaked_tool_calls(intent)
-        native_calls = recovered
+        channel = parse_text_channel(intent)
+        intent = channel.prose
+        native_calls = list(channel.calls)
+        undecodable = channel.undecodable
 
     delegations: list[DelegationSpec] = []
     tool_calls: list[ToolCall] = []
@@ -66,6 +97,12 @@ def project_llm_response(response: LLMResponse) -> ResponseProjection:
                 wire_reason=str(getattr(call, "wire_reason", None) or ""),
                 wire_raw_preview=str(getattr(call, "wire_raw_preview", None) or ""),
             )
+        )
+    if undecodable and not tool_calls and not delegations:
+        return ResponseProjection(
+            tool_calls=(_undecodable_wire_call(undecodable),),
+            delegations=(),
+            intent="",
         )
     return ResponseProjection(
         tool_calls=tuple(tool_calls),

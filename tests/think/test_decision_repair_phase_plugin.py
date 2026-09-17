@@ -16,12 +16,14 @@ from typing import Any
 import pytest
 
 from lca.contracts.atoms.enums.enums import ActionType
+from lca.contracts.models.core.conversation.llm import LLMResponse
 from lca.contracts.models.core.execution.decision import Decision, ToolCall
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
 )
 from lca.contracts.protocols.graph.routing import RoutingDecision
+from lca.nodes.think.decision.parse import DecisionParseExecutor
 from lca.nodes.think.decision_repair import ThinkDecisionRepairExecutor
 
 
@@ -424,3 +426,90 @@ async def test_decision_repair_multi_call_one_repair_emits_repaired_decision() -
     # had dropped.
     assert forwarded.tool_calls[1] is not truncated_call
     assert forwarded.tool_calls[1].arguments == {"text": "fine", "count": 7}
+
+
+# ── Regression: undecodable tool-call markup must re-ask, not answer ──────
+#
+# run_c6df7c01ccae: qwen3.7-plus returned finish_reason=stop with 15 completion
+# tokens whose entire text was the trailing close of an invoke/parameter block.
+# No native tool_calls, so the text was classified ``respond``, the fragment
+# became ``response_text``, and the loop committed it as a successful final
+# answer. run_b695b0b85115 lost a *well-formed* block the same way — the model
+# asked for ``search_skill`` and the tool never ran.
+
+_CLOSE_PARAM = "</" + "parameter>"
+_CLOSE_FUNC = "</" + "function>"
+_DEGENERATE = "`\n\n" + _CLOSE_PARAM + "\n" + _CLOSE_FUNC + "\n"
+_WELL_FORMED = (
+    "Now let me activate the PDF skill and generate the report.\n"
+    '<tool_calls>\n<invoke name="echo">\n'
+    '<parameter name="text">hi' + _CLOSE_PARAM + "\n"
+    "</invoke>\n</tool_calls>"
+)
+
+
+def _response(text: str) -> LLMResponse:
+    return LLMResponse(text=text, tool_calls=(), model="qwen3.7-plus", finish_reason="stop")
+
+
+async def _parse(response: LLMResponse) -> Decision:
+    output = await DecisionParseExecutor().node_execute(
+        _ctx(),
+        NodeInput(port_values={"state": _ctx(), "llm_response": response}),
+    )
+    decision = output.port_values.get("decision")
+    assert isinstance(decision, Decision)
+    return decision
+
+
+@pytest.mark.asyncio
+async def test_degenerate_markup_fragment_reroutes_instead_of_answering() -> None:
+    decision = await _parse(_response(_DEGENERATE))
+
+    assert decision.action_type == ActionType.USE_TOOL.value
+    assert decision.response_text is None
+    assert decision.tool_calls[0].tool_name == ""
+    assert decision.tool_calls[0].wire_status == "incomplete"
+    assert _CLOSE_PARAM in decision.tool_calls[0].wire_raw_preview
+
+    output = await ThinkDecisionRepairExecutor().node_execute(
+        _ctx(), _input(decision, tools=_registry_with_echo())
+    )
+    routing = output.port_values.get("routing")
+    assert isinstance(routing, RoutingDecision)
+    assert routing.next_node == "think.route.decide"
+    assert routing.next_hint == "decision_rejected_schema"
+    assert routing.should_terminate is False
+
+
+@pytest.mark.asyncio
+async def test_well_formed_markup_block_becomes_an_executable_call() -> None:
+    decision = await _parse(_response(_WELL_FORMED))
+
+    assert decision.action_type == ActionType.USE_TOOL.value
+    assert [c.tool_name for c in decision.tool_calls] == ["echo"]
+    assert decision.tool_calls[0].arguments == {"text": "hi"}
+    assert decision.tool_calls[0].wire_status == "ok"
+
+    # An invoke/parameter block carries strings only, so validate against a
+    # schema the encoding can actually satisfy; _ECHO_SCHEMA also requires an
+    # integer and would reject on grounds unrelated to this test.
+    registry = _FakeRegistry(
+        {
+            "echo": _FakeTool(
+                "echo",
+                {
+                    "type": "object",
+                    "properties": {"text": {"type": "string"}},
+                    "required": ["text"],
+                },
+            )
+        }
+    )
+    output = await ThinkDecisionRepairExecutor().node_execute(
+        _ctx(), _input(decision, tools=registry)
+    )
+    routing = output.port_values.get("routing")
+    assert isinstance(routing, RoutingDecision)
+    assert routing.next_node == "think.gate"
+    assert routing.next_hint == "decision_ok"

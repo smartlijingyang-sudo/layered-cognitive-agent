@@ -107,11 +107,15 @@ class BackstorySection:
         return SectionOutput(text=label_line("BACKSTORY", role_profile.backstory))
 
 
-@dataclass
 class ToolsSection:
-    """Renders the model's <tools> block via PromptSurface (ADR-0196)."""
+    """Renders the model's <tools> block from the tools this turn actually has.
 
-    catalog_tools_xml_provider: Callable[[], str]
+    Native ``tool_calls`` schemas on the same request are the availability
+    SSOT. A placeholder that says there are no tools would contradict that
+    wire, so an empty catalog renders nothing; the gap is recorded on the
+    observation plane via ``used_fallback``.
+    """
+
     name: ClassVar[str] = "tools"
 
     def render(
@@ -126,7 +130,10 @@ class ToolsSection:
     ) -> SectionOutput:
         del role_profile, task, awareness, manifest, activated_skills
         rendered = PromptSurface.default().render_tools_block(tools)
-        return SectionOutput(text=block("tools", rendered.body))
+        return SectionOutput(
+            text=block("tools", rendered.body),
+            used_fallback=rendered.tool_count == 0,
+        )
 
 
 @dataclass
@@ -441,9 +448,9 @@ def build_backstory_section(config: BaseModel) -> BackstorySection:
     return BackstorySection()
 
 
-def build_tools_section(config: BaseModel, *, catalog: Callable[[], str]) -> ToolsSection:
+def build_tools_section(config: BaseModel) -> ToolsSection:
     del config
-    return ToolsSection(catalog_tools_xml_provider=catalog)
+    return ToolsSection()
 
 
 def build_available_skills_section(
@@ -579,10 +586,10 @@ class Config(BaseModel):
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Register every section in the closed 17-section set.
 
-    The assembler resolves ``tools`` / ``available_skills`` through the
-    active ``BrainPromptCatalog`` at render time, so the section module
-    takes a ``catalog_provider`` callable bound at registration time
-    (typically a closure over ``ctx.require(BRAIN_PROMPT_CATALOG_FACTORY.key)``).
+    The assembler resolves ``available_skills`` through the active
+    ``BrainPromptCatalog`` at render time. Tools come from the turn's
+    ``tools`` argument, the same sequence the LLM request carries as
+    native schemas.
     """
 
     registry = ctx.require(PROMPT_SECTION_REGISTRY.key)
@@ -667,11 +674,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     for name, section, _kind in pure_sections:
         registry.register(section, kind="pure", name=name)
 
-    registry.register(
-        build_tools_section(_ToolsConfig(), catalog=_catalog_render("render_tools_xml")),
-        kind="stateful",
-        name="tools",
-    )
+    registry.register(build_tools_section(_ToolsConfig()), kind="stateful", name="tools")
     stateful_sections: list[tuple[str, object]] = [
         ("current_date", build_current_date(Config())),
         ("task", build_task(Config())),

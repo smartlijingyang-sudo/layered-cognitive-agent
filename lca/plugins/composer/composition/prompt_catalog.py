@@ -35,7 +35,6 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 _EMPTY_SKILLS = "（无可用技能；可使用 search_skill 查找）"
 _EMPTY_BRAIN_SKILLS = "（无可用技能）"
-_EMPTY_TOOLS = "（无可用工具）"
 
 
 @dataclass(frozen=True)

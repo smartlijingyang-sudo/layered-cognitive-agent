@@ -40,4 +40,7 @@ def test_render_tools_block_omits_sandbox_when_no_tools() -> None:
     rendered = surface.render_tools_block(())
     assert rendered.include_full_sandbox is False
     assert rendered.sandbox_block == ""
-    assert "（无可用工具）" in rendered.tools_xml
+    # The native tool_calls schemas are the SSOT for availability; an empty
+    # catalog renders nothing rather than asserting the opposite of the wire.
+    assert rendered.tools_xml == ""
+    assert rendered.body == ""

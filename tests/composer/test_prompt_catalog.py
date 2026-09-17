@@ -59,7 +59,7 @@ def test_catalog_uses_stable_empty_renderings() -> None:
 
     assert catalog.render_skill_discovery() == "（无可用技能；可使用 search_skill 查找）"
     assert catalog.render_brain_skills() == "（无可用技能）"
-    assert catalog.render_tools_xml() == "（无可用工具）"
+    assert catalog.render_tools_xml() == ""
 
 
 def test_catalog_does_not_hide_skill_store_failure() -> None:

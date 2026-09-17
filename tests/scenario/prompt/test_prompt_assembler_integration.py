@@ -100,7 +100,7 @@ def _registry_with_builtins() -> _RegistryImpl:
     registry.register(GoalSection(), kind="pure", name="goal")
     registry.register(BackstorySection(), kind="pure", name="backstory")
     registry.register(
-        ToolsSection(catalog_tools_xml_provider=lambda: '<tool name="x">x</tool>'),
+        ToolsSection(),
         kind="stateful",
         name="tools",
     )
@@ -199,6 +199,7 @@ def test_assembler_walks_template_section_refs() -> None:
     assert "GOAL: goal of solo" in prompt
     assert "BACKSTORY: backstory of solo" in prompt
     assert "USER_TASK: probe" in prompt
+    assert "（无可用工具）" not in prompt
 
 
 def test_selector_routes_to_hierarchical_when_consult_duty_set() -> None:
