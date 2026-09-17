@@ -105,6 +105,7 @@ def register(app: typer.Typer) -> None:
         from lca.infrastructure.cli.commands.kernel.supervisor import (
             _render,
         )
+        from lca.infrastructure.cli.config.config import OpsConfig
         from lca.infrastructure.cli.services.kernel import restart_report
         from lca.infrastructure.cli.services.kernel.supervisor import (
             build_restart_result,
@@ -112,7 +113,14 @@ def register(app: typer.Typer) -> None:
             get_supervisor,
         )
 
-        cfg = default_program_config()
+        # profile/host/port 取 lca-ops.yaml 的 ``kernel_serve``(SSOT),与 heal
+        # 的 KernelServeSpawner 同源:只读 OpsConfig,不建 PipelineContext。
+        kernel_serve = OpsConfig.load(config).kernel_serve
+        cfg = default_program_config(
+            profile=kernel_serve.profile,
+            host=kernel_serve.host,
+            port=kernel_serve.port,
+        )
         sup = get_supervisor(cfg)
         # Prune stale per-PID stderr files left behind by previous standalone
         # ``lca_kernel serve`` runs (no supervisor in front of them). The
@@ -134,7 +142,7 @@ def register(app: typer.Typer) -> None:
         # Failures here escalate to non-zero exit so CI/scripts catch them,
         # even if the supervisor itself declared ready.
         report = restart_report.run_restart_report(
-            profile=Path("profiles/web-standard.yaml"),
+            profile=Path(kernel_serve.profile),
             host=cfg_host,
             port=cfg_port,
             supervisor_state=status.state.value,
@@ -169,6 +177,7 @@ def register(app: typer.Typer) -> None:
 
         if not ready or not report.ok:
             raise typer.Exit(1)
+
 
 def _prune_legacy_kernel_logs() -> None:
     """Reset kernel log state so each restart starts from a clean slate.

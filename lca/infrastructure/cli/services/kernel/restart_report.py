@@ -44,7 +44,10 @@ import urllib.request
 from collections import Counter
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from lca.harness.profile.resolve.resolve import ResolvedProfile
 
 # boot.pending_event lines are emitted on stdout (structlog → root logger
 # → sys.stdout when lca_kernel serve runs under the supervisor). The
@@ -160,11 +163,14 @@ def _run_boot_check(profile: Path, findings: list[Finding]) -> PhaseResult:
     start = time.monotonic()
     checks: list[dict[str, Any]] = []
     first_failure: dict[str, Any] | None = None
+    resolved: ResolvedProfile | None = None
 
     try:
-        from lca.harness.profile.resolve.resolve import resolve_profile
+        from lca.infrastructure.cli.services.kernel.deployment_env import (
+            resolve_profile_with_deployment_env,
+        )
 
-        resolve_profile(profile)
+        resolved = resolve_profile_with_deployment_env(profile)
         checks.append({"name": "resolve", "ok": True})
     except Exception as exc:
         entry = {
@@ -190,7 +196,7 @@ def _run_boot_check(profile: Path, findings: list[Finding]) -> PhaseResult:
             from lca.contracts.protocols.graph.errors import PlanLiftError
             from lca_kernel.boot.plan_validation import validate_profile_plans
 
-            resolved = resolve_profile(profile)
+            assert resolved is not None  # resolve check passed above
             validate_profile_plans(resolved)
             checks.append({"name": "plan_lift", "ok": True})
         except PlanLiftError as exc:
@@ -349,9 +355,7 @@ def _run_fiber_report(findings: list[Finding]) -> PhaseResult:
                 phase="fiber_report",
                 severity="error",
                 code="fiber.failures",
-                message=(
-                    f"{len(failures)}/{len(entries)} plugin fibers failed to spawn"
-                ),
+                message=(f"{len(failures)}/{len(entries)} plugin fibers failed to spawn"),
                 detail={
                     "log": str(target),
                     "failures": failures,
@@ -471,10 +475,7 @@ def _run_health_probe(host: str, port: int, findings: list[Finding]) -> PhaseRes
                 phase="health_probe",
                 severity="info",
                 code="health.ok",
-                message=(
-                    f"/health ok (plugin {registered}/{expected}, "
-                    f"fiber_count={fiber_count})"
-                ),
+                message=(f"/health ok (plugin {registered}/{expected}, fiber_count={fiber_count})"),
                 detail={"url": url, "body": body},
             )
         )
@@ -562,15 +563,11 @@ def run_restart_report(
                     phase=phase_name,
                     ok=False,
                     duration_ms=0,
-                    findings=[
-                        f for f in findings if f.phase == phase_name
-                    ],
+                    findings=[f for f in findings if f.phase == phase_name],
                     summary={"skipped": True, "reason": supervisor_last_event},
                 )
             )
-        next_command = (
-            "./scripts/lca-ops kernel-supervisor logs --name lca_kernel_dev"
-        )
+        next_command = "./scripts/lca-ops kernel-supervisor logs --name lca_kernel_dev"
     else:
         fiber_report = _run_fiber_report(findings)
         phases.append(fiber_report)
@@ -623,9 +620,7 @@ def _format_summary(summary: dict[str, Any]) -> str:
     if not summary:
         return ""
     if "checks" in summary:
-        return "checks=" + ",".join(
-            f"{c['name']}={c['ok']}" for c in summary["checks"]
-        )
+        return "checks=" + ",".join(f"{c['name']}={c['ok']}" for c in summary["checks"])
     if "by_layer" in summary:
         layers = ",".join(f"{k}={v}" for k, v in sorted(summary["by_layer"].items()))
         return f"total={summary.get('total', 0)} fail={summary.get('fail', 0)} layers=[{layers}]"

@@ -76,9 +76,14 @@ def _boot_event(
 def test_boot_check_passes_when_validators_pass(
     monkeypatch: _pytest.MonkeyPatch,
 ) -> None:
+    captured: dict[str, object] = {}
+
+    def _stub_resolve(_profile: object, **kwargs: object) -> object:
+        captured.update(kwargs)
+        return object()
+
     monkeypatch.setattr(
-        "lca.harness.profile.resolve.resolve.resolve_profile",
-        lambda _p: object(),
+        "lca.harness.profile.resolve.resolve.resolve_profile", _stub_resolve
     )
     monkeypatch.setattr(
         "lca_kernel.boot.plan_validation.validate_profile_plans",
@@ -92,12 +97,15 @@ def test_boot_check_passes_when_validators_pass(
     assert [c["name"] for c in result.summary["checks"]] == ["resolve", "plan_lift"]
     assert all(c["ok"] for c in result.summary["checks"])
     assert any(f.severity == "info" for f in findings)
+    # resolve 必须带部署 env(ambient + 白名单 .env),否则 required 的
+    # ``{from_env: ...}`` 在检查里假失败,而 kernel 实际起得来。
+    assert "env" in captured
 
 
 def test_boot_check_fails_when_profile_does_not_resolve(
     monkeypatch: _pytest.MonkeyPatch,
 ) -> None:
-    def _raise(_p: object) -> None:
+    def _raise(_p: object, **_kw: object) -> None:
         raise RuntimeError("bad yaml")
 
     monkeypatch.setattr(
@@ -237,7 +245,7 @@ def test_run_restart_report_skips_phases_when_supervisor_not_running(
     """Kernel never came up: only boot_check runs; fiber/health fail-loud."""
     monkeypatch.setattr(
         "lca.harness.profile.resolve.resolve.resolve_profile",
-        lambda _p: object(),
+        lambda _p, **_kw: object(),
     )
     monkeypatch.setattr(
         "lca_kernel.boot.plan_validation.validate_profile_plans",

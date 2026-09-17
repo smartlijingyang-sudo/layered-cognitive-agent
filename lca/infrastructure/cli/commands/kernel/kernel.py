@@ -31,9 +31,12 @@ import json
 import sys
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import typer
+
+if TYPE_CHECKING:
+    from lca.harness.profile.resolve.resolve import ResolvedProfile
 
 # Matches KernelServeConfig.host default — referenced from typer Option to
 # keep the printed command and the actual config value in lockstep, and to
@@ -74,9 +77,7 @@ def register(app: typer.Typer) -> None:
             "profiles/web-standard.yaml",
             help="RETIRED — kept as fail-loud stub",
         ),
-        host: str = typer.Option(
-            _LAN_BIND_DEFAULT, "--host", help="RETIRED — ignored"
-        ),
+        host: str = typer.Option(_LAN_BIND_DEFAULT, "--host", help="RETIRED — ignored"),
         port: int = typer.Option(8765, "--port", help="RETIRED — ignored"),
     ) -> None:
         """RETIRED — do not use. Use ``./scripts/lca-ops kernel-restart``.
@@ -103,10 +104,12 @@ def register(app: typer.Typer) -> None:
         as_json: bool = typer.Option(False, "--json", help="Emit canonical JSON"),
     ) -> None:
         """Dump CompiledRunPlan as YAML/JSON for diff/audit."""
-        from lca.harness.profile.resolve.resolve import resolve_profile
+        from lca.infrastructure.cli.services.kernel.deployment_env import (
+            resolve_profile_with_deployment_env,
+        )
         from lca_kernel import compile_profile
 
-        resolved = resolve_profile(profile_path)
+        resolved = resolve_profile_with_deployment_env(profile_path)
         plan = compile_profile(resolved)
         serialized = _serialize_plan(plan)
         if as_json:
@@ -163,10 +166,13 @@ def register(app: typer.Typer) -> None:
             sys.stdout = devnull
 
         # 1) profile resolve
+        resolved: ResolvedProfile | None = None
         try:
-            from lca.harness.profile.resolve.resolve import resolve_profile
+            from lca.infrastructure.cli.services.kernel.deployment_env import (
+                resolve_profile_with_deployment_env,
+            )
 
-            resolve_profile(profile_path)
+            resolved = resolve_profile_with_deployment_env(profile_path)
             checks.append({"name": "resolve", "ok": True})
         except Exception as exc:
             entry = {
@@ -174,9 +180,7 @@ def register(app: typer.Typer) -> None:
                 "ok": False,
                 "error": exc.__class__.__name__,
                 "reason": str(exc),
-                "next_command": (
-                    f"./scripts/lca-ops plan compile {profile_path}"
-                ),
+                "next_command": (f"./scripts/lca-ops plan compile {profile_path}"),
             }
             checks.append(entry)
             first_failure = entry
@@ -187,9 +191,7 @@ def register(app: typer.Typer) -> None:
                 from lca.contracts.protocols.graph.errors import PlanLiftError
                 from lca_kernel.boot.plan_validation import validate_profile_plans
 
-                # ``resolve_profile`` succeeded above; re-resolve so we
-                # have the resolved handle for the validator.
-                resolved = resolve_profile(profile_path)
+                assert resolved is not None  # resolve check passed above
                 validate_profile_plans(resolved)
                 checks.append({"name": "plan_lift", "ok": True})
             except PlanLiftError as exc:
@@ -217,9 +219,7 @@ def register(app: typer.Typer) -> None:
                     "ok": False,
                     "error": exc.__class__.__name__,
                     "reason": str(exc),
-                    "next_command": (
-                        f"./scripts/lca-ops plan validate {profile_path}"
-                    ),
+                    "next_command": (f"./scripts/lca-ops plan validate {profile_path}"),
                 }
                 checks.append(entry)
                 first_failure = entry
@@ -230,9 +230,7 @@ def register(app: typer.Typer) -> None:
             "ok": first_failure is None,
             "duration_ms": duration_ms,
             "checks": checks,
-            "next_command": (
-                first_failure["next_command"] if first_failure else None
-            ),
+            "next_command": (first_failure["next_command"] if first_failure else None),
         }
 
         # Restore stdout *before* emitting JSON, so the report goes to
@@ -286,13 +284,15 @@ def register(app: typer.Typer) -> None:
         agents and operators can answer "what loaded" without booting the
         kernel or parsing ``kernel_compose --json``.
         """
-        from lca.harness.profile.resolve.resolve import resolve_profile
+        from lca.infrastructure.cli.services.kernel.deployment_env import (
+            resolve_profile_with_deployment_env,
+        )
         from lca_kernel.plan.plan_compile import compile_plan
 
         if not profile_path.exists():
             typer.echo(f"Profile not found: {profile_path}", err=True)
             raise typer.Exit(2)
-        resolved = resolve_profile(profile_path)
+        resolved = resolve_profile_with_deployment_env(profile_path)
         plan = compile_plan(resolved)
         specs = list(plan.plugin_specs)
 
@@ -414,7 +414,9 @@ def _serialize_plan(plan: object) -> dict[str, object]:
         data["plugin_count"] = len(data["plugins"])
     elif "entries" in data and isinstance(data["entries"], list):
         data["plugin_count"] = len(data["entries"])
-    elif ("plugin_specs" in data and isinstance(data["plugin_specs"], tuple)) or ("plugin_specs" in data and isinstance(data["plugin_specs"], list)):
+    elif ("plugin_specs" in data and isinstance(data["plugin_specs"], tuple)) or (
+        "plugin_specs" in data and isinstance(data["plugin_specs"], list)
+    ):
         data["plugin_count"] = len(data["plugin_specs"])
     else:
         data["plugin_count"] = data.get("plugin_count", 0)
