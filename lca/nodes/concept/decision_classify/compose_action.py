@@ -112,12 +112,14 @@ def _compose(
             delegations=list(delegations),
         )
     if tool_calls:
+        needs_approval = _requires_human_input(tool_calls)
         return Decision(
             decision_id=new_id("dec"),
             action_type=ActionType.USE_TOOL.value,
             rationale="",
             confidence=1.0,
             tool_calls=list(tool_calls),
+            needs_approval=needs_approval,
             extra=_wire_extra(tool_calls),
         )
     if intent:
@@ -135,6 +137,16 @@ def _compose(
         confidence=0.0,
         response_text=_PARSE_FAILURE_USER_MESSAGE,
     )
+
+
+def _requires_human_input(tool_calls: tuple[ToolCall, ...]) -> bool:
+    """True when any tool call requires human input before execution.
+
+    ``askUserQuestion`` is the sole HITL tool. When present, the graph
+    routes through ``act.approve.gate`` → ``intervene.interrupt`` to
+    pause and collect user input before the tool executes.
+    """
+    return any(call.tool_name == "askUserQuestion" for call in tool_calls)
 
 
 def _wire_extra(tool_calls: tuple[ToolCall, ...]) -> dict[str, object]:

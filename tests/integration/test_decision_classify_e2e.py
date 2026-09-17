@@ -187,3 +187,63 @@ def test_graph_run_with_leaked_text_decision_compose_unaffected() -> None:
     decision = output["decision"]
     assert decision.action_type == ActionType.USE_TOOL.value
     assert decision.tool_calls[0].tool_name == "listFiles"
+
+
+def test_graph_run_ask_user_question_sets_needs_approval() -> None:
+    """askUserQuestion routes through graph HITL path.
+
+    When the model calls askUserQuestion, Decision.needs_approval must be
+    True so the graph routes through act.approve.gate → intervene.interrupt
+    to pause and collect user input. This is the cooperative HITL path
+    (ADR-0228), not the exception-based bypass.
+    """
+    response = LLMResponse(
+        text="",
+        finish_reason="tool_calls",
+        tool_calls=[
+            NativeToolCall(
+                call_id="c1",
+                name="askUserQuestion",
+                arguments={
+                    "questions": [
+                        {
+                            "question": "Which color scheme?",
+                            "header": "Theme",
+                            "options": [
+                                {"label": "Dark", "description": "Dark mode"},
+                                {"label": "Light", "description": "Light mode"},
+                            ],
+                        }
+                    ]
+                },
+            )
+        ],
+    )
+    output = _run_graph(response)
+    decision = output["decision"]
+    assert isinstance(decision, Decision)
+    assert decision.action_type == ActionType.USE_TOOL.value
+    assert decision.tool_calls[0].tool_name == "askUserQuestion"
+    assert decision.needs_approval is True, (
+        "askUserQuestion must set needs_approval=True to route through "
+        "act.approve.gate → intervene.interrupt (graph HITL path)"
+    )
+
+
+def test_graph_run_other_tools_do_not_set_needs_approval() -> None:
+    """Normal tools bypass the HITL gate.
+
+    Tools other than askUserQuestion must have needs_approval=False so they
+    execute directly through act.envelope without pausing for human input.
+    """
+    response = LLMResponse(
+        text="",
+        finish_reason="tool_calls",
+        tool_calls=[
+            NativeToolCall(call_id="c1", name="listFiles", arguments={}),
+        ],
+    )
+    output = _run_graph(response)
+    decision = output["decision"]
+    assert decision.action_type == ActionType.USE_TOOL.value
+    assert decision.needs_approval is False
