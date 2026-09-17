@@ -589,6 +589,22 @@
   body.low-power #hint{color:var(--accent);opacity:.72}
   body.dark-bg.low-power #hint{color:var(--paper);opacity:.72}
 
+  /* 跳出本 deck 的外链: 必须自带边框,否则在满版 Swiss 排版里读不出可点 */
+  .ext-link{
+    display:inline-flex;align-items:center;gap:.5em;white-space:nowrap;
+    font-family:var(--mono);font-size:14px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);text-decoration:none;
+    border:1px solid var(--accent);padding:5px 10px;
+    transition:background var(--dur-mod-1) var(--ease-prod),color var(--dur-mod-1) var(--ease-prod)
+  }
+  .ext-link:hover{background:var(--accent);color:var(--accent-on)}
+  .ext-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  /* 窄屏放不下一行时整块换行,并抬到固定 #hint 工具条之上 */
+  .legend-row{flex-wrap:wrap;row-gap:1.2vh}
+  @media (max-width:900px){
+    .legend-row{padding-bottom:6vh}
+  }
+
   /* ============ 演讲者模式 ============ */
   body.ppt-audience #hint,body.ppt-audience #nav,
   body.ppt-preview #hint,body.ppt-preview #nav{display:none!important}
@@ -1457,8 +1473,9 @@
     </div>
 
     <!-- legend -->
-    <div style="margin-top:1.6vh;display:flex;justify-content:flex-start;align-items:center;gap:3vw;padding-left:1vw;padding-right:18vw">
+    <div class="legend-row" style="margin-top:1.6vh;display:flex;justify-content:flex-start;align-items:center;gap:3vw;padding-left:1vw;padding-right:18vw">
       <div class="t-meta" style="color:var(--text-helper)">— 每个 phase 是一个 seam,内部子节点可替换</div>
+      <a class="ext-link" href="https://cogflowmap-axremhf4.manus.space/" target="_blank" rel="noopener noreferrer">打开 LCA / Flow 实时运行图<span aria-hidden="true">↗</span></a>
     </div>
   </div>
 </section>
