@@ -24,12 +24,20 @@
 export const LCA_GATEWAY_WS_URL: string = '__LCA_GATEWAY_WS_URL__:ws://lca-gateway-unset:0000__';
 // LCA_PATCH_END
 
+const UNSET_GATEWAY_MARKERS = ['lca-gateway-unset', '__LCA_GATEWAY_WS_URL__'] as const;
+
+export function isUsableLcaGatewayUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  return !UNSET_GATEWAY_MARKERS.some((marker) => url.includes(marker));
+}
+
 let cachedUrl: string | null = null;
 
 export function getLcaGatewayUrl(): string {
   if (cachedUrl) return cachedUrl;
-  // 1. build-time literal (Vite-friendly).
-  if (LCA_GATEWAY_WS_URL && LCA_GATEWAY_WS_URL.length > 0) {
+  // 1. build-time literal (Vite-friendly). The source placeholder is a
+  // non-empty string, so a raw copy of this file must not win over env.
+  if (isUsableLcaGatewayUrl(LCA_GATEWAY_WS_URL)) {
     cachedUrl = LCA_GATEWAY_WS_URL;
     return cachedUrl;
   }
@@ -39,8 +47,8 @@ export function getLcaGatewayUrl(): string {
       ? (process as { env?: Record<string, string | undefined> }).env
           ?.NEXT_PUBLIC_LCA_GATEWAY_URL
       : undefined;
-  if (envUrl && envUrl.length > 0) {
-    cachedUrl = envUrl;
+  if (isUsableLcaGatewayUrl(envUrl)) {
+    cachedUrl = envUrl as string;
     return cachedUrl;
   }
   throw new Error(

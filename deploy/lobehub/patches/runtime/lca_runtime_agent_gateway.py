@@ -33,6 +33,7 @@ _NEW_FILES = (
     "reconnect.ts",
     "event_handler.ts",
     "event_handler.test.ts",
+    "client.test.ts",
     "lcaStepPersist.ts",
     "lcaStepPersist.test.ts",
     "lcaGatewayEventHandler.test.ts",
@@ -79,19 +80,11 @@ _RUN_BLOCK = """    /* LCA: every chat is a Run */
 
 _IS_LCA_GATEWAY_MODE = (
     "/* LCA-P1: lcaGateway runtime mode */\n"
-    "// ``LCA_GATEWAY_WS_URL`` is the build-time literal baked into\n"
-    "// ``lcaGateway/client.ts`` by the LCA patch engine (see that\n"
-    "// file's LCA_PATCH_BEGIN/END markers). Reading it here avoids the\n"
-    "// ``process.env.NEXT_PUBLIC_*`` reference that Vite dev mode does\n"
-    "// not expose to the browser bundle.\n"
-    "import { LCA_GATEWAY_WS_URL as LCA_GATEWAY_URL } from "
-    "'@/store/chat/agents/transports/lcaGateway/client';\n"
+    "// This checkout is the LCA UI: every chat is a Run through the LCA\n"
+    "// agent-gateway WS. A missing URL is a connect-time error, not a\n"
+    "// signal to fall back to native execAgentTask.\n"
     "export function isLcaGatewayMode(_agentId?: string): boolean {\n"
-    "  try {\n"
-    "    return !!(LCA_GATEWAY_URL && LCA_GATEWAY_URL.length > 0);\n"
-    "  } catch {\n"
-    "    return false;\n"
-    "  }\n"
+    "  return true;\n"
     "}\n"
 )
 
@@ -204,7 +197,29 @@ def _patch_streaming_executor(ctx: PatchContext) -> bool:
 def _patch_agent_dispatcher(ctx: PatchContext) -> bool:
     rel = "src/store/chat/slices/agentRun/actions/dispatch/agentDispatcher.ts"
     text = ctx.read(rel)
-    if "export function isLcaGatewayMode" in text:
+    old_gated = (
+        "export function isLcaGatewayMode(_agentId?: string): boolean {\n"
+        "  try {\n"
+        "    return !!(LCA_GATEWAY_URL && LCA_GATEWAY_URL.length > 0);\n"
+        "  } catch {\n"
+        "    return false;\n"
+        "  }\n"
+        "}"
+    )
+    if old_gated in text:
+        text = text.replace(old_gated, "export function isLcaGatewayMode(_agentId?: string): boolean {\n  return true;\n}", 1)
+        # Drop the URL import; mode no longer reads it.
+        text = text.replace(
+            "import { LCA_GATEWAY_WS_URL as LCA_GATEWAY_URL } from "
+            "'@/store/chat/agents/transports/lcaGateway/client';\n",
+            "",
+            1,
+        )
+        ctx.write(rel, text)
+        return True
+    if "export function isLcaGatewayMode" in text and "return true;" in text.split(
+        "export function isLcaGatewayMode", 1
+    )[1][:200]:
         return False
     ctx.write(rel, text + "\n" + _IS_LCA_GATEWAY_MODE)
     return True

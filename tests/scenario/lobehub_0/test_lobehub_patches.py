@@ -237,6 +237,12 @@ def test_apply_injects_gateway_block(tmp_path: Path) -> None:
     assert meta.verify_marker == "export function lcaConnectToGateway"
     assert meta.name == "lca_runtime_agent_gateway"
 
+    dispatcher = (
+        ui / "src/store/chat/slices/agentRun/actions/dispatch/agentDispatcher.ts"
+    ).read_text(encoding="utf-8")
+    assert "export function isLcaGatewayMode" in dispatcher
+    assert "return true;" in dispatcher.split("export function isLcaGatewayMode", 1)[1]
+
 
 def test_apply_is_idempotent_when_marker_present(tmp_path: Path) -> None:
     ui = _seed_ui(tmp_path)
