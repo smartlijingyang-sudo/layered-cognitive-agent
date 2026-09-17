@@ -284,10 +284,8 @@ class RunBoundSandboxRuntime(SandboxRuntime):
             extra_files=extra_files,
             harvest_artifacts=False,
         )
-        if harvest_artifacts:
-            generated = await self._harvest_execute_delta(invocation_id, budget)
-        else:
-            generated = self._delta_generated(raw.generated_files)
+        # Adapter collects outputs after every command; no second harvest needed.
+        generated = self._delta_generated(raw.generated_files)
         return self._exec_result(raw, generated)
 
     async def run_terminal(
@@ -316,30 +314,16 @@ class RunBoundSandboxRuntime(SandboxRuntime):
             invocation_id=invocation_id,
             session_id=session_id,
         )
+        # Adapter collects outputs after every command; no second harvest needed.
         if not harvest_outputs:
             return result
-        try:
-            delta = await self.harvest_output_delta(
-                invocation_id=invocation_id or "run_terminal_harvest",
-                timeout_s=min(60, timeout_s, self._default_timeout_s),
-            )
-        except Exception:
-            _log.warning(
-                "run_terminal_harvest_failed",
-                run_id=self._run_id,
-                inv=invocation_id,
-                exc_info=True,
-            )
-            return result
-        if not delta:
-            return result
-        merged = tuple(result.generated_files) + delta
+        delta = self._delta_generated(result.generated_files)
         return SandboxResult(
             stdout=result.stdout,
             stderr=result.stderr,
             exit_code=result.exit_code,
             success=result.success,
-            generated_files=merged,
+            generated_files=delta,
             error=result.error,
         )
 

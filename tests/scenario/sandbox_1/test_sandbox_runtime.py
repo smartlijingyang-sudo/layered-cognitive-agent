@@ -19,7 +19,7 @@ from tests.support.inline_sandbox import InlineSandbox
 
 
 class TestSandboxRuntimeLifecycle(unittest.IsolatedAsyncioTestCase):
-    async def test_harvest_flag_controls_artifact_scanner(self) -> None:
+    async def test_execute_collects_outputs_from_adapter(self) -> None:
         tmp = tempfile.TemporaryDirectory()
         store = LocalFileStore(Path(tmp.name))
         sandbox = InlineSandbox()
@@ -27,16 +27,15 @@ class TestSandboxRuntimeLifecycle(unittest.IsolatedAsyncioTestCase):
             runtime = await bind_sandbox_runtime("run_hv", sandbox, store, ())
             err = await runtime.ensure_ready()
             self.assertIsNone(err)
-            await runtime.execute("print(1)", harvest_artifacts=False)
-            user_off = sandbox.session_run_calls[-1][1]
-            self.assertIn("print(1)", user_off)
-            self.assertNotIn(ARTIFACT_BEGIN, user_off)
-            await runtime.execute("print(2)", harvest_artifacts=True)
-            harvest = sandbox.session_run_calls[-1][1]
-            user_on = sandbox.session_run_calls[-2][1]
-            self.assertIn("print(2)", user_on)
-            self.assertNotIn(ARTIFACT_BEGIN, user_on)
-            self.assertIn(ARTIFACT_BEGIN, harvest)
+            # InlineSandbox returns all files from vfs; runtime delta-filters them.
+            await sandbox.write_files({"chart.png": b"PNG_DATA"}, base_dir="/mnt/data/outputs")
+            result = await runtime.execute('print("ok")')
+            self.assertTrue(result.success)
+            self.assertEqual(len(result.generated_files), 1)
+            self.assertEqual(result.generated_files[0].name, "chart.png")
+            # Second execute: same file not re-published (delta filtering).
+            result2 = await runtime.execute('print("ok2")')
+            self.assertEqual(len(result2.generated_files), 0)
         finally:
             await runtime.destroy()
             tmp.cleanup()
@@ -56,9 +55,10 @@ class TestSandboxRuntimeLifecycle(unittest.IsolatedAsyncioTestCase):
             with run_id_scope("run_lc"):
                 obs = await tool.execute({"code": 'print("hello")'})
             self.assertTrue(obs.success)
-            codes = [c[1] for c in sandbox.session_run_calls]
-            self.assertTrue(any('print("hello")' in c and ARTIFACT_BEGIN not in c for c in codes))
-            self.assertTrue(any(ARTIFACT_BEGIN in c for c in codes))
+            # Single user execute; no second harvest execute.
+            user_calls = [c[1] for c in sandbox.session_run_calls if 'print("hello")' in c[1]]
+            self.assertEqual(len(user_calls), 1)
+            self.assertNotIn(ARTIFACT_BEGIN, user_calls[0])
 
             await finalize_run("run_lc")
             self.assertEqual(sandbox.destroyed_sessions, ["sess_1"])

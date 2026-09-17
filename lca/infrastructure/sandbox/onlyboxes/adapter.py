@@ -15,6 +15,8 @@ appropriate interpreter, avoiding ``ARG_MAX`` crashes from inline base64.
 from __future__ import annotations
 
 import base64
+import json
+from dataclasses import replace
 from typing import Any
 
 import httpx
@@ -23,6 +25,7 @@ import structlog
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.execution.sandbox import (
     DEFAULT_SANDBOX_TIMEOUT_S,
+    SandboxFile,
     SandboxResult,
     SessionConfig,
     SessionInfo,
@@ -40,6 +43,13 @@ from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
 from lca.infrastructure.sandbox.streaming.streaming import SandboxStreamEmitter
 
 _log = structlog.get_logger(__name__)
+
+
+def _guess_mime(name: str) -> str:
+    import mimetypes
+
+    mime, _ = mimetypes.guess_type(name)
+    return mime or "application/octet-stream"
 
 # ── constants ───────────────────────────────────────────────────────
 
@@ -118,7 +128,12 @@ class OnlyboxesSandboxAdapter(Sandbox):
                 emitter.emit_stderr(err + "\n")
                 return SandboxResult(success=False, exit_code=1, error=err, stderr=err + "\n")
 
-            return parse_terminal_response(response, emitter)
+            result = parse_terminal_response(response, emitter)
+            if result.success:
+                collected = await self._collect_outputs(session_id=session_id)
+                if collected:
+                    result = replace(result, generated_files=collected)
+            return result
         finally:
             if owns_client:
                 await client.aclose()
@@ -274,6 +289,47 @@ class OnlyboxesSandboxAdapter(Sandbox):
         finally:
             if owns_client:
                 await client.aclose()
+
+    # ── Extended: outputs collection ──────────────────────────────
+
+    async def _collect_outputs(self, *, session_id: str = "") -> tuple[SandboxFile, ...]:
+        """List outputs dir and read each new file via base64. Empty on error."""
+        output_dir = ONLYBOXES.outputs_dir
+        try:
+            ls = await self._exec_terminal(
+                f"ls -1p '{output_dir}' 2>/dev/null | grep -v '/$' || true",
+                session_id=session_id,
+                timeout_s=10,
+            )
+        except Exception:
+            _log.debug("onlyboxes_outputs_ls_failed", exc_info=True)
+            return ()
+        if not ls.success:
+            return ()
+        names = [line.strip() for line in ls.stdout.splitlines() if line.strip()]
+        files: list[SandboxFile] = []
+        for name in names:
+            if not name or name.startswith("."):
+                continue
+            try:
+                read = await self._exec_terminal(
+                    f"base64 -w0 '{output_dir}/{name}'",
+                    session_id=session_id,
+                    timeout_s=30,
+                )
+                if not read.success:
+                    continue
+                data = base64.b64decode(read.stdout.strip() or "")
+                files.append(
+                    SandboxFile(
+                        name=name,
+                        mime_type=_guess_mime(name),
+                        data=data,
+                    )
+                )
+            except Exception:
+                _log.debug("onlyboxes_outputs_read_failed", name=name, exc_info=True)
+        return tuple(files)
 
     # ── Extended: run_terminal (backward compat for computer runtime) ─
 
