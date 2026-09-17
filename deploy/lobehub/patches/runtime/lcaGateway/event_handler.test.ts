@@ -164,6 +164,26 @@ describe('createLcaGatewayEventHandler', () => {
     expect(store.internal_executeClientTool).not.toHaveBeenCalled();
   });
 
+  it('folds tool_end file parts into the deliverable sink', async () => {
+    const store = createStore();
+    const collected: unknown[] = [];
+    const handler = createLcaGatewayEventHandler(
+      () => store,
+      {
+        assistantMessageId: 'seed-msg',
+        context,
+        operationId: 'op-1',
+      },
+      { collect: (result) => collected.push(result), lists: () => ({ fileList: [], imageList: [] }) },
+    );
+
+    const result = { content: 'ok', state: { files: [{ name: 'a.pdf', url: '/files/file_1' }] } };
+    handler(makeEvent('tool_end', { isSuccess: true, result } as never));
+    await flush();
+
+    expect(collected).toEqual([result]);
+  });
+
   it('still forwards non-tool_execute events through the shared handler', async () => {
     // The LCA wrapper must NOT swallow the rest of the event stream — only
     // `tool_execute` is the LCA-irrelevant case. A `stream_chunk` carries

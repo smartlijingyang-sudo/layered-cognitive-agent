@@ -75,7 +75,7 @@ export async function persistAssistantRow(
     );
   }
 
-  if (!row.tools?.length && (row.imageList?.length || row.fileList?.length)) {
+  if (row.imageList?.length || row.fileList?.length) {
     get().internal_dispatchMessage(
       {
         id,

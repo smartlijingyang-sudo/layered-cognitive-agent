@@ -34,6 +34,7 @@ import debug from 'debug';
 
 import { createGatewayEventHandler } from '@/store/chat/slices/agentRun/actions/transports/gateway/gatewayEventHandler';
 
+import type { LcaDeliverables } from './deliverables';
 import {
   ensureLcaToolMessages,
   findChildAssistant,
@@ -43,6 +44,12 @@ import {
 import { createLcaInMemoryMessagesReader } from './messageService';
 
 const log = debug('lobe-client:lca-gateway');
+
+const noopDeliverables: LcaDeliverables = {
+  collect: () => undefined,
+  files: () => [],
+  lists: () => ({ fileList: [], imageList: [] }),
+};
 
 /**
  * Build the LCA gateway event handler. Delegates to the shared native
@@ -54,8 +61,15 @@ const log = debug('lobe-client:lca-gateway');
  * it drops `tool_execute` events before they reach the shared switch
  * (the LCA runtime never emits them — see file header). The shared case
  * remains intact for the native hetero path.
+ *
+ * `deliverables` optionally folds each `tool_end` result's harvested file
+ * parts so the caller can attach them to the answer row when the run ends.
  */
-export const createLcaGatewayEventHandler: typeof createGatewayEventHandler = (get, params) => {
+export const createLcaGatewayEventHandler = (
+  get: Parameters<typeof createGatewayEventHandler>[0],
+  params: Parameters<typeof createGatewayEventHandler>[1],
+  deliverables: LcaDeliverables = noopDeliverables,
+) => {
   const handler = createGatewayEventHandler(get, {
     ...params,
     messageService: { getMessages: createLcaInMemoryMessagesReader(get) },
@@ -139,6 +153,7 @@ export const createLcaGatewayEventHandler: typeof createGatewayEventHandler = (g
         toolCallId?: string;
       };
       const toolCallId = data.payload?.toolCalling?.id || data.toolCallId;
+      deliverables.collect(data.result);
       if (toolCallId) {
         persistLcaToolResult(store, {
           context: params.context,

@@ -144,6 +144,28 @@ export function rewriteArtifactMarkdown(text: string, files: ArtifactFile[]): st
   return next;
 }
 
+/** Answer-bubble download list — same shape as the backend ledger closure. */
+const CLOSURE_HEADING = '已生成以下文件：';
+
+/**
+ * Append the deliverable list to the answer text.
+ *
+ * `fileList` lives only in the store (LobeHub derives it from the
+ * `messages_files` relation, which LCA's `/files` artifacts are not part of),
+ * so the persisted answer text is what still carries the download after a
+ * reload. Mirrors `artifact_closure_text` in
+ * `lca/infrastructure/workspace/artifact_ledger.py`; delete this when that
+ * closure reaches the gateway wire (today the runtime appends it after the
+ * terminal fact, so the WS is already closed).
+ */
+export function appendDeliverableClosure(text: string, files: ArtifactFile[]): string {
+  const missing = latestDeliverables(files).filter((file) => !text.includes(file.url));
+  if (!missing.length) return text;
+  const lines = missing.map((file) => `- [📥 ${file.name}](${file.url})`);
+  const closure = [CLOSURE_HEADING, ...lines].join('\n');
+  return text.trim() ? `${text.trimEnd()}\n\n${closure}` : closure;
+}
+
 export function toImageList(files: ArtifactFile[]): ImageRow[] {
   return latestDeliverables(files)
     .filter(isImageArtifact)

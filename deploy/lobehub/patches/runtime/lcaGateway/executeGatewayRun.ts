@@ -13,10 +13,12 @@ import { dbMessageSelectors } from '@/store/chat/slices/message/selectors/dbMess
 import type { ChatStore } from '@/store/chat/store';
 import { messageMapKey } from '@/store/chat/utils/messageMapKey';
 
+import { appendDeliverableClosure } from '../lcaArtifacts';
+import { persistAssistantRow } from '../lcaPersist';
 import { getLcaGatewayUrl } from './client';
+import { createLcaDeliverables } from './deliverables';
 import { createLcaGatewayEventHandler } from './event_handler';
 import { lcaStartRun } from './execute';
-import { persistAssistantRow } from '../lcaPersist';
 
 type MessageLike = { id?: string; parentId?: string; role?: string };
 
@@ -179,20 +181,25 @@ export async function lcaExecuteGatewayRun(
   });
 
   const runScope: RunScope = params.scope === 'sub_agent' ? 'sub_agent' : 'top_level';
-  const eventHandler = createLcaGatewayEventHandler(get, {
-    assistantMessageId,
-    context,
-    gatewayOperationId: receipt.runId,
-    operationId: gatewayOpId,
-    runLifecycle: buildRunLifecycle(get, {
+  const deliverables = createLcaDeliverables();
+  const eventHandler = createLcaGatewayEventHandler(
+    get,
+    {
+      assistantMessageId,
       context,
-      parentMessageId: assistantMessageId,
-      parentMessageType: 'assistant',
-      runId: gatewayOpId,
-      runScope,
-      runtimeType: 'gateway',
-    }),
-  });
+      gatewayOperationId: receipt.runId,
+      operationId: gatewayOpId,
+      runLifecycle: buildRunLifecycle(get, {
+        context,
+        parentMessageId: assistantMessageId,
+        parentMessageType: 'assistant',
+        runId: gatewayOpId,
+        runScope,
+        runtimeType: 'gateway',
+      }),
+    },
+    deliverables,
+  );
 
   const eventRouter = createGatewayEventRouter({
     createMemberHandler: () => () => undefined,
@@ -212,16 +219,30 @@ export async function lcaExecuteGatewayRun(
           get().dbMessagesMap[messageMapKey({ agentId: context.agentId, topicId })] ?? [];
         const chain = collectAssistantChain(topicMessages, assistantMessageId);
         const rows = chain.length > 0 ? chain : seed ? [seed] : [];
+        // Harvested sandbox files ride the tool cards; the answer row is the
+        // one place a user expects the download list, so the turn's last
+        // persisted row carries it — as a native card, and as markdown in the
+        // answer text, because LobeHub only persists file rows it owns.
+        const harvested = deliverables.files();
+        const { fileList, imageList } = deliverables.lists();
+        const answerRowId = rows
+          .findLast((msg) => {
+            const text = typeof msg.content === 'string' ? msg.content : '';
+            return Boolean(msg.reasoning?.content || text || msg.tools?.length);
+          })?.id;
         for (const msg of rows) {
           const text = typeof msg.content === 'string' ? msg.content : '';
           const tools = msg.tools;
           if (!(msg.reasoning?.content || text || tools?.length)) continue;
+          const isAnswerRow = msg.id === answerRowId;
           void persistAssistantRow(get, msg.id, {
-            content: text,
+            content: isAnswerRow ? appendDeliverableClosure(text, harvested) : text,
             model: params.model,
             operationId: gatewayOpId,
             ...(msg.reasoning ? { reasoning: msg.reasoning } : {}),
             ...(tools?.length ? { tools } : {}),
+            ...(isAnswerRow && fileList.length ? { fileList } : {}),
+            ...(isAnswerRow && imageList.length ? { imageList } : {}),
           }).catch(console.error);
         }
       }
