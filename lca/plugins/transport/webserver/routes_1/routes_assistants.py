@@ -277,7 +277,9 @@ async def create_assistant(request: Request) -> JSONResponse:
                 description=description.strip(),
                 template_id=template_id,
                 seed_user_md=seed_user_md,
-                from_role=from_role.strip() if isinstance(from_role, str) and from_role.strip() else None,
+                from_role=from_role.strip()
+                if isinstance(from_role, str) and from_role.strip()
+                else None,
             )
         )
     except AssistantCatalogError as exc:
@@ -559,7 +561,7 @@ async def import_lobehub_agent(request: Request) -> JSONResponse:
             encoding="utf-8",
         )
 
-    from lca.plugins.domain.assistant._home_layout import (
+    from lca.plugins.assistant.home._home_layout import (
         build_manifest,
         load_manifest,
         write_manifest,
@@ -698,9 +700,7 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
     layer="L1",
     kind=PluginKind.PROVIDER,
     effects="none",
-    description=(
-        "Register /v1/assistants CRUD REST surface (ADR-0187 §3 D7 + PR-5). "
-    ),
+    description=("Register /v1/assistants CRUD REST surface (ADR-0187 §3 D7 + PR-5). "),
     test_suite="tests.lca_plugins.transport.webserver.test_routes_assistants",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

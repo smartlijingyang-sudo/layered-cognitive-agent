@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lca.plugins.domain.assistant._home_layout import render_template, write_home_files
+from lca.plugins.assistant.home._home_layout import render_template, write_home_files
 from lca.plugins.assistant.persona.persona import persona_from_home
 
 

@@ -229,7 +229,7 @@ class Config(BaseModel):
     kind=PluginKind.SEAM,
     effects=(EffectClass.NONE,),
     description=(
-        "把 AssistantHome 的 SOUL/IDENTITY/USER/AGENTS + goals.yaml 投影进 "
+        "把 AssistantHome 的 SOUL/USER/AGENTS + goals.yaml 投影进 "
         "ContextManifest;MEMORY.md / memory/ 不参与投影(I-A13)"
     ),
     test_suite="tests/plugins/assistant/test_bootstrap.py",

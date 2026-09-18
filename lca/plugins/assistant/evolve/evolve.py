@@ -59,9 +59,9 @@ from lca.contracts.protocols.assistant.catalog import AssistantCatalog
 from lca.contracts.protocols.assistant.evolve import (
     AssistantEvolve,
     ObservationDigest,
-    SkillInstallReceipt,
     WriteApproval,
 )
+from lca.contracts.protocols.assistant.skill_overlay import SkillInstallReceipt
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
@@ -87,6 +87,9 @@ log = structlog.get_logger(__name__)
 
 _EXPERIMENT_SCOPE: str = "experiment"
 """候选提升前一律 experiment 状态（I-A8：默认非 ACTIVE）。"""
+
+_RECEIPT_VERSION: str = "1.0.0"
+"""evolve 提升回执的版本字段（overlay SkillInstallReceipt 必填）。"""
 
 _PENDING_DIR: str = ".evolve/pending"
 """提案卡目录（元数据 + 草稿）；不是生产 ``skills/`` 面。"""
@@ -351,12 +354,16 @@ class _AssistantEvolveImpl(AssistantEvolve, SkillAcquirer):
         )
         return SkillInstallReceipt(
             assistant_id=assistant_id,
-            candidate_id=candidate_id,
-            skill_name=skill_name,
-            skill_path=str(skill_dir),
-            state=artifact.state.value,
-            approved_by=approval.approved_by,
-            promoted_at=promoted_at,
+            skill_id=skill_name,
+            version=_RECEIPT_VERSION,
+            digest=artifact.revision_digest,
+            artifact_state=artifact.state.value,
+            installed_at=promoted_at,
+            revision_seq=new_revision_seq,
+            manifest_digest=str(new_manifest["manifest_digest"]),
+            actor=approval.approved_by,
+            source=f"evolve:{candidate_id}",
+            install_path=str(skill_dir),
         )
 
     # ── 0067 三闸 ────────────────────────────────────────────────────

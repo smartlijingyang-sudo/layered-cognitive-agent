@@ -72,7 +72,7 @@ from lca.plugins.assistant.events._events import (
     AssistantBootstrapCompletedEventPayload,
     AssistantCreatedEventPayload,
 )
-from lca.plugins.domain.assistant._home_layout import (
+from lca.plugins.assistant.home._home_layout import (
     DEFAULT_TEMPLATE_ID,
     TEMPLATE_REGISTRY,
     HomePaths,
@@ -377,7 +377,7 @@ def _build_agent_spec(home_path: str) -> AgentSpec:
 # ── 局部异常别名(让 catalog.py 不直接 import _home_layout 的所有异常)──
 
 
-from lca.plugins.domain.assistant._home_layout import (  # noqa: E402
+from lca.plugins.assistant.home._home_layout import (  # noqa: E402
     AssistantAlreadyExists,
     AssistantCatalogError,
     AssistantDigestMismatch,
@@ -420,7 +420,7 @@ def _new_assistant_id() -> str:
 
 def _sha256_digest(path: Path) -> str:
     """manifest 外部字段 digest(grants / tools policy);复用 _home_layout 的实现。"""
-    from lca.plugins.domain.assistant._home_layout import sha256_digest
+    from lca.plugins.assistant.home._home_layout import sha256_digest
 
     return sha256_digest(path)
 

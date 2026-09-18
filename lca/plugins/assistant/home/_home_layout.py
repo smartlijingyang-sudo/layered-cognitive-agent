@@ -233,8 +233,8 @@ def known_template_ids() -> tuple[str, ...]:
 
 
 def _templates_root() -> Path:
-    """模板根目录（``templates/``）：data 与插件 module 同目录，不打包成 module。"""
-    return Path(__file__).resolve().parent / "templates"
+    """模板根目录（``lca/plugins/assistant/templates/``）：data 与插件 module 同级。"""
+    return Path(__file__).resolve().parent.parent / "templates"
 
 
 def _template_dir(template_id: str = DEFAULT_TEMPLATE_ID) -> Path:

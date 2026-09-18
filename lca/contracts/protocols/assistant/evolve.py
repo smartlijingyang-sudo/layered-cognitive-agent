@@ -15,6 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
+from lca.contracts.protocols.assistant.skill_overlay import SkillInstallReceipt
 from lca.contracts.protocols.think.learning import SkillAcquisitionCandidate
 
 __all__ = [
@@ -69,38 +70,6 @@ class WriteApproval:
             raise ValueError("WriteApproval.reason 必须为非空字符串")
 
 
-# COMPAT(delete-when: 2026-12-31, scope: PR-6 skill_overlay 合入后改复用其 SkillInstallReceipt)
-@dataclass(frozen=True)
-class SkillInstallReceipt:
-    """``promote`` 的不可变回执 —— 技能包写入 Home 后的元数据。
-
-    PR-6 ``assistant.skill_overlay`` 合入后本形状改复用 overlay 的回执定义；
-    当前为 evolve 专用最小形状（只含元数据，不含 SKILL 全文）。
-    """
-
-    assistant_id: str
-    candidate_id: str
-    skill_name: str
-    skill_path: str  # {home}/skills/{skill_name} 目录
-    state: str  # ArtifactState 值（promote 成功后 = active）
-    approved_by: str
-    promoted_at: str  # ISO-8601
-
-    def __post_init__(self) -> None:
-        for field_name in (
-            "assistant_id",
-            "candidate_id",
-            "skill_name",
-            "skill_path",
-            "approved_by",
-        ):
-            value = getattr(self, field_name)
-            if not isinstance(value, str) or not value.strip():
-                raise ValueError(f"SkillInstallReceipt.{field_name} 必须为非空字符串")
-        if not self.state.strip():
-            raise ValueError("SkillInstallReceipt.state 必须为非空 ArtifactState 值")
-
-
 @runtime_checkable
 class AssistantEvolve(Protocol):
     """助理域技能进化面（capability ``assistant.evolve``）。
@@ -117,12 +86,15 @@ class AssistantEvolve(Protocol):
     def observe(self, assistant_id: str, run_ids: tuple[str, ...]) -> ObservationDigest:
         """从 run 轨迹产观察摘要；助理不存在 / digest 不一致 ⇒ fail-closed。"""
         ...
+
     def distill(self, assistant_id: str, digest: ObservationDigest) -> SkillAcquisitionCandidate:
         """蒸馏候选（experiment）；发 ``assistant.skill.evolved.proposed`` EP。"""
         ...
+
     def list_pending(self, assistant_id: str) -> tuple[SkillAcquisitionCandidate, ...]:
         """列当前待提升候选（按 candidate_id 排序）。"""
         ...
+
     def promote(
         self, assistant_id: str, candidate_id: str, approval: WriteApproval
     ) -> SkillInstallReceipt:

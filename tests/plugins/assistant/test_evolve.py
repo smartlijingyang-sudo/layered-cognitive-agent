@@ -309,14 +309,14 @@ class TestPromoteWithApproval:
         candidate = evolve.distill(assistant_id, digest)
         receipt = evolve.promote(assistant_id, candidate.candidate_id, approval)
         home = Path(catalog.get(assistant_id).home_path)
-        skill_dir = home / "skills" / receipt.skill_name
+        skill_dir = home / "skills" / receipt.skill_id
         assert (skill_dir / "SKILL.md").is_file()
         install = json.loads((skill_dir / "install.json").read_text(encoding="utf-8"))
         assert install["state"] == "active"
         assert install["logical_id"] == candidate.candidate_id
         assert install["approved_by"] == "lichao"
-        assert receipt.state == "active"
-        assert receipt.skill_path == str(skill_dir)
+        assert receipt.artifact_state == "active"
+        assert receipt.install_path == str(skill_dir)
 
     def test_promote_increments_revision_seq(
         self,

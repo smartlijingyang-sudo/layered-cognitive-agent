@@ -3,7 +3,7 @@
 当前包含：
 
 - ``lca.plugins.domain.assistant.catalog`` —— Home CRUD + manifest digest 校验（PR-3）
-- ``lca.plugins.assistant.bootstrap`` —— SOUL/IDENTITY/USER/AGENTS 投影进
+- ``lca.plugins.assistant.bootstrap`` —— SOUL/USER/AGENTS 投影进
   ContextManifest（PR-4）
 - ``lca.plugins.assistant.workspace`` —— 物化 ExecutionSpace 事实（PR-4）
 - ``lca.plugins.assistant.skill_overlay`` —— 0048 拉取 + 0067 三闸的

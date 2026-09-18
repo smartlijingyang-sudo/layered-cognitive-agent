@@ -1,7 +1,7 @@
 """助理人设解析 —— AssistantHome → RoleProfile 三元组（ADR-0187 §3 D3/D12）。
 
 run 期人设注入的唯一入口：``persona_from_home`` 把 Home 的配置面文件
-（profile.json / SOUL / IDENTITY / USER / goals.yaml）收敛成
+（profile.json / SOUL / USER / goals.yaml）收敛成
 ``(role, goal, backstory)``，由 run 装配侧覆盖 solo agent 的 RoleProfile。
 模型可见通道 = 既有 prompt 模板的 ROLE/GOAL/BACKSTORY 行（不加 section、
 不改闭集）。

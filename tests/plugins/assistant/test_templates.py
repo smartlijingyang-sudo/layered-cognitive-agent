@@ -24,7 +24,7 @@ from lca.contracts.observability.closure.assistant_ep_closure import (
     ASSISTANT_CREATED,
 )
 from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
-from lca.plugins.domain.assistant._home_layout import (
+from lca.plugins.assistant.home._home_layout import (
     CONFIG_FACE_FILES,
     TEMPLATE_REGISTRY,
     AssistantCatalogError,
