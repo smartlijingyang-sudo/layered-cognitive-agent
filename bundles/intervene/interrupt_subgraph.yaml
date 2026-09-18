@@ -1,13 +1,12 @@
 # bundles/intervene/interrupt_subgraph.yaml — intervene 暂停端子图纯图描述。
 #
-# ADR-0228 §Decision 4 + §Decision 6: intervene is a cross-phase
-# subgraph, not a six-phase primitive. The kernel reads the upstream
-# ``decision`` + ``spine_seq`` ports, ``intervene.interrupt`` emits a
-# typed ``Command`` plus ``RoutingDecision(should_terminate=True,
-# next_hint="intervene.resume")``. The kernel pauses, persists the
-# ``Command`` to the spine, and the next run resumes through
-# ``intervene.resume`` which re-projects the persisted command as a
-# typed ``decision`` port for the think phase.
+# ADR-0228 §Decision 4: intervene is a cross-phase subgraph.
+# The kernel reads the upstream ``decision`` + ``spine_seq`` ports,
+# ``intervene.interrupt`` emits a typed ``Command`` plus
+# ``RoutingDecision(should_terminate=True, next_hint="intervene.resume")``.
+# The kernel pauses. The driver (driver.py) detects the pause signal
+# and restarts the graph from ``perceive.main`` with the human answer
+# folded into state via ``HumanAnswerResumeInputAdapter``.
 
 id: interrupt.subgraph
 region: intervene
@@ -21,6 +20,6 @@ nodes:
     terminal: true
     config:
 
-# terminal: intervene.interrupt 是 subgraph 的 terminal node;kernel 看到
-#           RoutingDecision.should_terminate=True 后 pause 并持久化 Command,
-#           恢复时进入 intervene.resume 节点。
+# terminal: intervene.interrupt 是 subgraph 的 terminal node。
+#           kernel 看到 RoutingDecision.should_terminate=True 后 pause。
+#           driver.py 将 cursor 指向 perceive.main 实现全图重启。

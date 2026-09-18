@@ -81,30 +81,6 @@ nodes:
     # ``act.fanout``'s ``routing`` (last-write-wins would overwrite).
     declared_outputs: [decision, should_terminate, approval_routing]
 
-  # ADR-0237 / PR-1b close-out: act.resume is the resume-path outer
-  # delegate that re-enters the act subgraph at ``act.approve.gate``
-  # with the persisted ``Command`` forwarded as a typed port. The
-  # gate itself (lca.nodes.intervene.approve_gate) already handles
-  # the ``command`` input — approve / interrupt / rejected routing
-  # is internal to the gate, so this delegate only needs to forward
-  # ``decision`` (carried through the kernel-wide port registry) and
-  # ``command`` (the persisted Command produced by the
-  # ``intervene.resume`` outer subgraph delegate) into the subgraph.
-  #
-  # PlanInterpreter runs the subgraph from ``entry_node=act.approve.gate``
-  # (overrides any top-level entry in act_subgraph.yaml), so the
-  # resume path skips validate / authorize and re-enters at the gate
-  # — same as the original spec, just via a clean outer edge instead
-  # of the dropped subgraph-internal ``intervene.resume`` stub.
-  - id: act.resume
-    region: phase:act
-    sub_spec_ref:
-      plan_ref: bundles/act/act_subgraph.yaml
-      entry_node: act.approve.gate
-      binding_edge: act.resume
-    declared_inputs: [decision, command]
-    declared_outputs: [decision, should_terminate, approval_routing]
-
   - id: reflect.main
     region: phase:reflect
     sub_spec_ref:
@@ -167,19 +143,6 @@ nodes:
       binding_edge: intervene.interrupt
     declared_inputs: [decision]
     declared_outputs: [command, routing]
-
-  # PR-3.8.6: intervene.resume outer-level wiring stub — on resume
-  # the kernel re-projects the persisted Command into the
-  # kernel-wide port registry, then routes back to act.approve.gate
-  # with the command port populated.
-  - id: intervene.resume
-    region: phase:intervene
-    sub_spec_ref:
-      plan_ref: bundles/intervene/resume_subgraph.yaml
-      entry_node: intervene.resume
-      binding_edge: intervene.resume
-    declared_inputs: [command]
-    declared_outputs: [decision]
 
 edges:
   # perceive → think (model-driven continuation).
@@ -327,21 +290,3 @@ edges:
   # remember → terminal.commit (always; commit closes the loop).
   - from: remember.main
     to: terminal.commit
-
-  # PR-3.8.6 + ADR-0237 / PR-1b close-out: resume cycle at outer level.
-  # ``intervene.interrupt`` pauses the run; on resume
-  # ``intervene.resume`` reads the persisted Command and emits a
-  # typed ``decision``; ``act.resume`` (this PR) re-enters the act
-  # subgraph at ``act.approve.gate`` with both ``command`` and
-  # ``decision`` forwarded, so the gate's resume logic (approve /
-  # reject / redirect) is the single source of truth for the user's
-  # reply. The previous "subgraph-internal ``intervene.resume`` stub
-  # forwards via kernel re-projection" workaround is gone — the
-  # outer edge below is the resume edge consumed by the per-plan
-  # validator (PR-1 lifter check).
-  - from: intervene.interrupt
-    to: intervene.resume
-    when: true
-  - from: intervene.resume
-    to: act.resume
-    when: true

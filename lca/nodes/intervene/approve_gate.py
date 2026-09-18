@@ -1,43 +1,19 @@
 """region:intervene.act_approve_gate — typed-boundary HITL gate node.
 
-Per ADR-0228 §Decision 4 + `2026-09-15-pr3.8-borrowed-nodes-design.md` §2.6:
-``act.approve.gate`` is the act-side typed view of the HITL pause/resume
-seam. It reads the typed ``decision`` produced upstream by ``act.authorize``
-(``decision.needs_approval`` typed field), and on resume the kernel
-re-projects the persisted ``Command`` as a typed ``command`` port.
-
-ADR-0235 / PR-5 (L-2 / G-9): the previous ``_resolve_port(context, name)``
-helper used ``getattr(context.runtime, name, None)`` to peek at graph
-runtime. That was a ``getattr(..., None)`` silent-skip on the graph /
-act boundary. The helper is removed; the gate now reads declared typed
-ports only. The previous ``decision.extra["needs_approval"]`` flag is
-also gone — replaced by typed ``Decision.needs_approval`` (added by
-this PR).
+Per ADR-0228: ``act.approve.gate`` is the act-side typed view of the
+HITL pause/resume seam. It reads the typed ``decision`` produced
+upstream by ``act.authorize`` (``decision.needs_approval`` typed field).
+On resume the driver restarts from ``perceive.main`` with the human
+answer folded into state (no ``command`` port re-entry).
 
 Boundary discipline:
 
-- AGENTS.md §3 C1 — no new phase, no new EP name. The node lives in the
-  existing ``region:intervene`` sibling subgraph (ADR-0228 §3).
-- AGENTS.md §3 C5 — capability monotonicity. The node reads
-  ``decision.needs_approval`` (typed field); it does not grant
-  capabilities, and the ``Command.resume`` flow handles capability
-  re-check at ``act.envelope`` re-entry.
-- AGENTS.md §3 C7 — control / observation split. ``Command`` is a
-  control-plane artifact, but every emission lands in the journal as
-  a ``SessionEvent`` first (observation); this node returns a typed
-  ``RoutingDecision`` and lets the kernel persist, it does not mutate
-  state directly.
-- AGENTS.md §3 C10 — interrupt before envelope mint. The
-  ``approve_interrupt`` branch routes to ``intervene.interrupt`` which
-  pauses before any ``act.envelope`` mint.
-- AGENTS.md §3 C13 — ``Command`` is the existing Pydantic-frozen
-  ``extra="forbid"`` cross-graph DTO at
-  ``lca.contracts.protocols.graph.command``; the gate reuses it for the
-  resume payload. ``Decision.needs_approval`` is the typed Contract for
-  the HITL signal (replaces ``extra["needs_approval"]``).
-
-Canonical node shape (ADR-0228 §Decision 2): hand-written
-``@dataclass(frozen=True, slots=True)`` + ``@plugin(...)`` carrier.
+- AGENTS.md C4: Reducer single-write. The node only emits typed ports.
+- AGENTS.md C10: interrupt before envelope mint. The ``approve_interrupt``
+  branch routes to ``intervene.interrupt`` which pauses before any
+  ``act.envelope`` mint.
+- AGENTS.md C13: ``Command`` is the Pydantic-frozen cross-graph DTO.
+  ``Decision.needs_approval`` is the typed Contract for the HITL signal.
 """
 
 from __future__ import annotations
@@ -93,12 +69,11 @@ class ApproveGateExecutor:
     - ``approve_interrupt`` — ``decision.needs_approval`` is True and no
       ``command`` is present → route to ``intervene.interrupt`` to
       collect the user's typed ``Command``.
-    - ``approve_approved`` — ``command.kind == "approve"`` → resume to
-      ``act.envelope`` with the original decision.
+    - ``approve_approved`` — reserved for future surgical resume.
+      Currently unreachable (full-restart resume enters at perceive.main).
     - ``approve_rejected`` — ``command.kind`` is ``"reject"`` /
-      ``"redirect"`` (redirect treated as abandon per spec §2.6) or
-      ``command.kind == "resume"`` (timeout / abandon per the same
-      clause) → route to ``terminal.commit`` to abort cleanly.
+      ``"redirect"`` or ``"resume"`` → route to ``terminal.commit``
+      to abort cleanly.
     """
 
     semantic_name: str = "act.approve.gate"

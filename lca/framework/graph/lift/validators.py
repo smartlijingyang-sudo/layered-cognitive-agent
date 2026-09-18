@@ -136,51 +136,18 @@ __all__ = [
 
 
 def _validate_approval_resume_node(plan: Plan) -> None:
-    """Fail-loud when HITL resume path is missing — outer + per-plan.
+    """Fail-loud when HITL routing is not consumed by the outer plan.
 
-    PR-1 (closes 评审 §6.1 + G-1 hot path): HITL without a resume edge
-    is unsafe — an interrupt can pause a run but never recover, so the
-    next user command is dropped on the floor. This check fires at every
-    ``lift_graph_spec`` call (including the boot-time ``validate_profile_plans``
-    walk) so the operator sees the failure before the first run.
-
-    PR-1b (ADR-0237) refines the check into two pieces because the
-    gate moved into act_subgraph (spec §3.2 原位):
-
-    (a) **Per-plan rule** — any plan that declares ``act.approve.gate``
-        as one of its nodes must also declare
-        ``intervene.resume → act.approve.gate`` in the same plan.
-        The inner subgraph's gate has its own resume edge in
-        :file:`bundles/act/act_subgraph.yaml`.
-
-    (b) **Outer-level rule** — once the outer ``act.approve.gate``
-        delegate is gone (PR-1b), the typed ``approval_routing`` port
-        (bubbled out of act_subgraph via :class:`PortRegistry.exit_subgraph`,
-        ADR-0217 §3.3.3) must be consumed by the outer plan. Otherwise
-        an approve-rejected outcome has nowhere to land.
+    The full-restart resume design (driver.py restarts from perceive.main
+    with the human answer folded into state) does not require an
+    ``intervene.resume → act.approve.gate`` edge. The outer plan must
+    still consume ``approval_routing.next_hint`` via edge predicates so
+    approve-interrupt and approve-rejected outcomes have somewhere to land.
     """
     node_ids = {n.id for n in plan.nodes}
-    if "act.approve.gate" in node_ids:
-        resume_edge_present = any(
-            e.source == "intervene.resume" and e.target == "act.approve.gate"
-            for e in plan.edges
-        )
-        if not resume_edge_present:
-            raise PlanLiftError(
-                "act.approve.gate is declared but the cross-subgraph resume "
-                "edge intervene.resume -> act.approve.gate is missing. "
-                "Without it the HITL interrupt can pause a run but never recover.",
-                plan_id=plan.id,
-            )
 
-    # Outer-level check (PR-1b): the outer plan (the one whose node set
-    # does NOT contain act.approve.gate — only act.main does) must consume
-    # approval_routing via at least one edge predicate. Detect by walking
-    # every edge's predicate.
     if _outer_consumes_hitl_routing(plan):
         return
-    # If the plan has no act.main node either, this is the inner subgraph
-    # and there's no outer routing obligation.
     if "act.main" not in node_ids and "act.approve.gate" not in node_ids:
         return
     raise PlanLiftError(
