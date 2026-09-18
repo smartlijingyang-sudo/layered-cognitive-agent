@@ -16,9 +16,10 @@ import { messageMapKey } from '@/store/chat/utils/messageMapKey';
 import { appendDeliverableClosure } from '../lcaArtifacts';
 import { persistAssistantRow } from '../lcaPersist';
 import { getLcaGatewayUrl } from './client';
-import { createLcaDeliverables } from './deliverables';
+import { createLcaDeliverables, type LcaDeliverables } from './deliverables';
 import { createLcaGatewayEventHandler } from './event_handler';
 import { lcaStartRun } from './execute';
+import { lcaRefreshWsToken } from './reconnect';
 
 type MessageLike = { id?: string; parentId?: string; role?: string };
 
@@ -80,6 +81,75 @@ function resolveAssistantMessageId(
   }
 
   return parentMessageId ?? '';
+}
+
+/**
+ * Shared terminal-cleanup closure for LCA gateway runs (initial run AND
+ * askUserQuestion resume). Persists the streamed assistant chain, folds
+ * harvested sandbox files onto the answer row, and resets the topic status.
+ */
+function createLcaRunOnSessionComplete(
+  get: () => ChatStore,
+  params: {
+    assistantMessageId: string;
+    context: ConversationContext;
+    deliverables: LcaDeliverables;
+    gatewayOpId: string;
+    model: string;
+    topicId: string;
+  },
+): (info: { authFailed: boolean; succeeded: boolean; terminalReceived: boolean }) => void {
+  const { assistantMessageId, context, deliverables, gatewayOpId, model, topicId } = params;
+
+  return ({ terminalReceived, authFailed, succeeded }) => {
+    const state = get();
+    if (!terminalReceived) state.completeOperation(gatewayOpId);
+    if (authFailed) state.completeOperation(gatewayOpId);
+    if (terminalReceived && succeeded && assistantMessageId) {
+      const seed = dbMessageSelectors.getDbMessageById(assistantMessageId)(get());
+      const topicMessages =
+        get().dbMessagesMap[messageMapKey({ agentId: context.agentId, topicId })] ?? [];
+      const chain = collectAssistantChain(topicMessages, assistantMessageId);
+      const rows = chain.length > 0 ? chain : seed ? [seed] : [];
+      // Harvested sandbox files ride the tool cards; the answer row is the
+      // one place a user expects the download list, so the turn's last
+      // persisted row carries it — as a native card, and as markdown in the
+      // answer text, because LobeHub only persists file rows it owns.
+      const harvested = deliverables.files();
+      const { fileList, imageList } = deliverables.lists();
+      const answerRowId = rows
+        .findLast((msg) => {
+          const text = typeof msg.content === 'string' ? msg.content : '';
+          return Boolean(msg.reasoning?.content || text || msg.tools?.length);
+        })?.id;
+      for (const msg of rows) {
+        const text = typeof msg.content === 'string' ? msg.content : '';
+        const tools = msg.tools;
+        if (!(msg.reasoning?.content || text || tools?.length)) continue;
+        const isAnswerRow = msg.id === answerRowId;
+        void persistAssistantRow(get, msg.id, {
+          content: isAnswerRow ? appendDeliverableClosure(text, harvested) : text,
+          model,
+          operationId: gatewayOpId,
+          ...(msg.reasoning ? { reasoning: msg.reasoning } : {}),
+          ...(tools?.length ? { tools } : {}),
+          ...(isAnswerRow && fileList.length ? { fileList } : {}),
+          ...(isAnswerRow && imageList.length ? { imageList } : {}),
+        }).catch(console.error);
+      }
+    }
+    if (topicId) {
+      const viewing = state.activeTopicId === topicId;
+      if (viewing || !succeeded) {
+        void state.updateTopicStatus?.({
+          agentId: context.agentId,
+          groupId: context.groupId,
+          status: 'active',
+          topicId,
+        });
+      }
+    }
+  };
 }
 
 export async function lcaExecuteGatewayRun(
@@ -210,58 +280,123 @@ export async function lcaExecuteGatewayRun(
   state.connectToGateway({
     gatewayUrl: getLcaGatewayUrl(),
     onEvent: eventRouter,
-    onSessionComplete: ({ terminalReceived, authFailed, succeeded }) => {
-      if (!terminalReceived) state.completeOperation(gatewayOpId);
-      if (authFailed) state.completeOperation(gatewayOpId);
-      if (terminalReceived && succeeded && assistantMessageId) {
-        const seed = dbMessageSelectors.getDbMessageById(assistantMessageId)(get());
-        const topicMessages =
-          get().dbMessagesMap[messageMapKey({ agentId: context.agentId, topicId })] ?? [];
-        const chain = collectAssistantChain(topicMessages, assistantMessageId);
-        const rows = chain.length > 0 ? chain : seed ? [seed] : [];
-        // Harvested sandbox files ride the tool cards; the answer row is the
-        // one place a user expects the download list, so the turn's last
-        // persisted row carries it — as a native card, and as markdown in the
-        // answer text, because LobeHub only persists file rows it owns.
-        const harvested = deliverables.files();
-        const { fileList, imageList } = deliverables.lists();
-        const answerRowId = rows
-          .findLast((msg) => {
-            const text = typeof msg.content === 'string' ? msg.content : '';
-            return Boolean(msg.reasoning?.content || text || msg.tools?.length);
-          })?.id;
-        for (const msg of rows) {
-          const text = typeof msg.content === 'string' ? msg.content : '';
-          const tools = msg.tools;
-          if (!(msg.reasoning?.content || text || tools?.length)) continue;
-          const isAnswerRow = msg.id === answerRowId;
-          void persistAssistantRow(get, msg.id, {
-            content: isAnswerRow ? appendDeliverableClosure(text, harvested) : text,
-            model: params.model,
-            operationId: gatewayOpId,
-            ...(msg.reasoning ? { reasoning: msg.reasoning } : {}),
-            ...(tools?.length ? { tools } : {}),
-            ...(isAnswerRow && fileList.length ? { fileList } : {}),
-            ...(isAnswerRow && imageList.length ? { imageList } : {}),
-          }).catch(console.error);
-        }
-      }
-      if (topicId) {
-        const viewing = state.activeTopicId === topicId;
-        if (viewing || !succeeded) {
-          void state.updateTopicStatus?.({
-            agentId: context.agentId,
-            groupId: context.groupId,
-            status: 'active',
-            topicId,
-          });
-        }
-      }
-    },
+    onSessionComplete: createLcaRunOnSessionComplete(get, {
+      assistantMessageId,
+      context,
+      deliverables,
+      gatewayOpId,
+      model: params.model,
+      topicId,
+    }),
     operationId: receipt.runId,
     token: receipt.token,
     topicId: topicId || undefined,
   });
 
   return { model: params.model, provider: 'openai' };
+}
+
+/**
+ * Resume a parked LCA run after the user answers an askUserQuestion card.
+ *
+ * The answer ships as a `resume_tool_result` run command (POST /lca-api/runs
+ * returns the SAME run_id — backend `_dispatch_resume`). A NEW gateway
+ * operation reconnects to that run's WS from `lastEventId`, so steps 2..n and
+ * the final answer reach the UI. This replaces the old `/answer` POST which
+ * resumed the run server-side but never reopened the WS.
+ */
+export async function lcaResumeGatewayRun(
+  get: () => ChatStore,
+  params: {
+    context: ConversationContext;
+    runId: string;
+    lastEventId: string;
+    parentMessageId: string;
+    topicId: string;
+    toolCallId: string;
+    content: string;
+  },
+): Promise<void> {
+  const state = get();
+  const { context, runId, lastEventId, parentMessageId, topicId, toolCallId, content } = params;
+
+  // The tool message owns the question card; its parent is the assistant
+  // message that called askUserQuestion. Fall back to the tool message id.
+  const toolMessage = dbMessageSelectors.getDbMessageById(parentMessageId)(get());
+  const assistantMessageId = toolMessage?.parentId || parentMessageId;
+
+  // Resume through the native-aligned path: POST /lca-api/runs with
+  // resume_tool_result returns the SAME run_id (backend _dispatch_resume).
+  await lcaStartRun({
+    agent: { id: 'solo', name: 'solo' },
+    messages: [],
+    parent_message_id: parentMessageId,
+    topic_id: topicId || undefined,
+    resume_tool_result: { content, parentMessageId, toolCallId },
+  });
+
+  // The resume receipt does not carry a fresh ws_token; mint one for this run.
+  const token = await lcaRefreshWsToken(runId, 'lca-local');
+
+  const { operationId: gatewayOpId } = state.startOperation({
+    context,
+    metadata: { serverOperationId: runId },
+    type: 'execServerAgentRuntime',
+  });
+
+  if (assistantMessageId) {
+    state.associateMessageWithOperation(assistantMessageId, gatewayOpId);
+  }
+
+  state.onOperationCancel(gatewayOpId, async () => {
+    await fetch(`/lca-api/runs/${runId}/cancel`, {
+      headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local'}` },
+      method: 'POST',
+    }).catch((err) => console.error('[LCA] cancel failed:', err));
+  });
+
+  const runScope: RunScope = context.scope === 'sub_agent' ? 'sub_agent' : 'top_level';
+  const deliverables = createLcaDeliverables();
+  const eventHandler = createLcaGatewayEventHandler(
+    get,
+    {
+      assistantMessageId,
+      context,
+      gatewayOperationId: runId,
+      operationId: gatewayOpId,
+      resuming: true,
+      runLifecycle: buildRunLifecycle(get, {
+        context,
+        parentMessageId: assistantMessageId,
+        parentMessageType: 'assistant',
+        runId: gatewayOpId,
+        runScope,
+        runtimeType: 'gateway',
+      }),
+    },
+    deliverables,
+  );
+
+  const eventRouter = createGatewayEventRouter({
+    createMemberHandler: () => () => undefined,
+    ownerHandler: eventHandler,
+    ownerOperationId: runId,
+  });
+
+  state.connectToGateway({
+    gatewayUrl: getLcaGatewayUrl(),
+    onEvent: eventRouter,
+    onSessionComplete: createLcaRunOnSessionComplete(get, {
+      assistantMessageId,
+      context,
+      deliverables,
+      gatewayOpId,
+      model: 'solo',
+      topicId,
+    }),
+    operationId: runId,
+    token,
+    topicId: topicId || undefined,
+    lastEventId,
+  });
 }

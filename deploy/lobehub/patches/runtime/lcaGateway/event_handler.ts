@@ -67,7 +67,7 @@ const noopDeliverables: LcaDeliverables = {
  */
 export const createLcaGatewayEventHandler = (
   get: Parameters<typeof createGatewayEventHandler>[0],
-  params: Parameters<typeof createGatewayEventHandler>[1],
+  params: Parameters<typeof createGatewayEventHandler>[1] & { resuming?: boolean },
   deliverables: LcaDeliverables = noopDeliverables,
 ) => {
   const handler = createGatewayEventHandler(get, {
@@ -77,7 +77,10 @@ export const createLcaGatewayEventHandler = (
   });
 
   let currentAssistantId = params.assistantMessageId;
-  let llmStepOpened = false;
+  // A resume op's first stream_start opens a CHILD assistant step under the
+  // previous step's assistant (correct for a resumed run), rather than being
+  // treated as the first step of a fresh run.
+  let llmStepOpened = params.resuming ?? false;
 
   return (event: AgentStreamEvent) => {
     if (event.type === 'tool_execute') {
