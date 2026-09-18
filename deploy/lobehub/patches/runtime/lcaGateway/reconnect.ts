@@ -1,7 +1,7 @@
 // LCA-P1: cross-refresh reconnect.
 //
 // Reads the running LCA operation for a topic from
-// `GET /lca-api/topics/{topicId}/running-op` (plain HTTP), returns
+// `GET /lca-api/v1/topics/{topicId}/running-op` (plain HTTP), returns
 // the operationId + ws_token pair so the caller can re-open the WS.
 // Mirrors the legacy useGatewayReconnect shape (a SWR fetcher that
 // returns the running op for a topic) but swaps the data source.
@@ -27,7 +27,7 @@ export async function lcaReconnectToGatewayOperation(
   fetchImpl: typeof fetch = fetch,
 ): Promise<LcaReconnectHandle | null> {
   const resp = await fetchImpl(
-    `/lca-api/topics/${encodeURIComponent(topicId)}/running-op`,
+    `/lca-api/v1/topics/${encodeURIComponent(topicId)}/running-op`,
     {
       headers: { Authorization: `Bearer ${bearer()}` },
     },
@@ -48,7 +48,9 @@ export async function lcaReconnectToGatewayOperation(
 /**
  * Mint a fresh ws_token for an existing run.
  *
- * Endpoint: `POST /lca-api/runs/{run_id}/ws-token` body `{userId}`.
+ * Endpoint: `POST /lca-api/v1/runs/{run_id}/ws-token` body `{userId}`.
+ * The `/lca-api` prefix maps to the gateway root, so the backend route
+ * (`/v1/runs/{run_id}/ws-token`) is preserved through the proxy.
  */
 export async function lcaRefreshWsToken(
   runId: string,
@@ -56,7 +58,7 @@ export async function lcaRefreshWsToken(
   fetchImpl: typeof fetch = fetch,
 ): Promise<string> {
   const resp = await fetchImpl(
-    `/lca-api/runs/${encodeURIComponent(runId)}/ws-token`,
+    `/lca-api/v1/runs/${encodeURIComponent(runId)}/ws-token`,
     {
       method: 'POST',
       headers: {
