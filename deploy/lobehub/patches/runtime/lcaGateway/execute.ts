@@ -10,6 +10,10 @@ import type { LcaRunReceipt } from './types';
 
 export interface LcaStartRunBody {
   agent: { id: string; name: string };
+  // LCA assistant row id (from the agent's `agencyConfig.lcaAssistantId`).
+  // When present the backend assembles the run's persona from the
+  // assistant Home (ADR-0242 D3) instead of the default empty profile.
+  assistant_id?: string;
   // ``imageList`` / ``fileList`` / ``files`` mirror the LobeHub
   // ``UIChatMessage`` shape so the LCA ingress can hydrate attachments
   // before they reach the prompt assembler (ADR-0099-compatible schema).
@@ -67,6 +71,7 @@ export async function lcaStartRun(
     body: JSON.stringify({
       agent: body.agent,
       messages: body.messages,
+      ...(body.assistant_id ? { assistant_id: body.assistant_id } : {}),
       ...(body.parent_message_id ? { parent_message_id: body.parent_message_id } : {}),
       ...(body.topic_id ? { topic_id: body.topic_id } : {}),
       ...(body.resume_approval ? { resume_approval: body.resume_approval } : {}),

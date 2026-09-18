@@ -6,6 +6,7 @@
 
 import type { ConversationContext } from '@lobechat/types';
 
+import { useAgentStore } from '@/store/agent';
 import { buildRunLifecycle } from '@/store/chat/slices/agentRun/actions/lifecycle/buildRunLifecycle';
 import type { RunScope } from '@/store/chat/slices/agentRun/actions/lifecycle/types';
 import { createGatewayEventRouter } from '@/store/chat/slices/agentRun/actions/transports/gateway/gatewayEventRouter';
@@ -221,11 +222,21 @@ export async function lcaExecuteGatewayRun(
     nested,
   );
 
+  // The LCA assistant row stores the backend assistant_id in
+  // `agencyConfig.lcaAssistantId`; forward it so the run assembles the
+  // agent persona from its Home (ADR-0242 D3). `params.model` is the run
+  // mode ('solo'/'team'), so the agent row lookup uses `context.agentId`.
+  const agentRow: unknown = useAgentStore.getState().agentMap[context.agentId];
+  const assistantId = (
+    agentRow as { agencyConfig?: { lcaAssistantId?: string } | null } | undefined
+  )?.agencyConfig?.lcaAssistantId;
+
   const receipt = await lcaStartRun({
     agent: { id: params.model, name: params.model },
     messages: [{ role: 'user', content, ...attachmentExtras }],
     parent_message_id: assistantMessageId || params.parentMessageId,
     topic_id: topicId || undefined,
+    ...(assistantId ? { assistant_id: assistantId } : {}),
   });
 
   const { operationId: gatewayOpId } = state.startOperation({

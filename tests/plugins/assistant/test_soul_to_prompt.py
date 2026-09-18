@@ -14,17 +14,23 @@ Chain:
 from __future__ import annotations
 
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
+from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
 from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
 from lca.contracts.protocols.assistant.role_resolver import RoleCard
+from lca.plugins.assistant.persona.persona import persona_from_home
+from lca.plugins.collaboration.modes.solo import build_solo_agent
 from lca.plugins.domain.assistant.catalog.plugin import AssistantCatalogImpl
-from lca.plugins.prompts.sections import BackstorySection, RoleSection, GoalSection
+from lca.plugins.prompts.sections import BackstorySection, GoalSection, RoleSection
+from tests.harness.collector import InMemoryObservability
+from tests.harness.scripted_llm import ScriptedLLMAdapter
 
 
 class _StubRoleResolver:
-    _CARDS = {
+    _CARDS: ClassVar[dict[str, RoleCard]] = {
         "engineering/architect": RoleCard(
             role_id="engineering/architect",
             title="软件架构师",
@@ -130,12 +136,46 @@ class TestSoulReachesSystemPrompt:
 
     def test_template_only_creation_also_has_soul(self, catalog: AssistantCatalogImpl) -> None:
         """Even without from_role, the template SOUL.md reaches the prompt."""
-        handle = catalog.create(
-            CreateAssistantRequest(name="通用", description="通用助理")
-        )
+        handle = catalog.create(CreateAssistantRequest(name="通用", description="通用助理"))
         spec = catalog.get(handle.assistant_id)
         role_profile = spec.agent_spec.profile
 
         output = BackstorySection().render(role_profile=role_profile, tools=[])
         assert "BACKSTORY:" in output.text
         assert len(output.text) > len("BACKSTORY: ")
+
+
+class TestPersonaReachesSoloAgent:
+    """ADR-0242 D3 集成：catalog → persona_from_home → build_solo_agent 非空。"""
+
+    def test_role_profile_from_home_yields_non_empty_backstory(
+        self, catalog: AssistantCatalogImpl
+    ) -> None:
+        handle = catalog.create(
+            CreateAssistantRequest(
+                name="小架",
+                description="架构顾问",
+                from_role="engineering/architect",
+            )
+        )
+        spec = catalog.get(handle.assistant_id)
+        persona = persona_from_home(spec.home_path)
+        assert persona.role == "小架"
+        assert persona.goal == "架构顾问"
+        assert "系统架构专家" in persona.backstory
+
+        role_profile = RoleProfile(
+            role=persona.role,
+            goal=persona.goal,
+            backstory=persona.backstory,
+            tool_permission_manifest=ToolPermissionManifest(allowed_tools=()),
+        )
+        llm = ScriptedLLMAdapter({}, default_respond=True)
+        agent = build_solo_agent(
+            llm,
+            observability=InMemoryObservability(),
+            role_profile=role_profile,
+        )
+        assert agent.role_profile.role == "小架"
+        assert agent.role_profile.goal == "架构顾问"
+        assert "系统架构专家" in agent.role_profile.backstory

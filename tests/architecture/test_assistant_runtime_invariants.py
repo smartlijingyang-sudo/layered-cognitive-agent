@@ -51,6 +51,11 @@ CATALOG_FILE = _module_file(CATALOG_MODULE)
 BOOTSTRAP_FILE = _module_file(BOOTSTRAP_MODULE)
 WORKSPACE_FILE = _module_file(WORKSPACE_MODULE)
 
+# ADR-0242 D3：run 装配路径（persona_from_home 调用点）
+RUNNABLE_ASSEMBLY_FILE = (
+    REPO / "lca/plugins/transport/webserver/carrier/runs/lifecycle/runnable_assembly.py"
+)
+
 
 def _bundle_plugin_ids(bundle: Path) -> frozenset[str]:
     data = yaml.safe_load(bundle.read_text(encoding="utf-8"))
@@ -294,6 +299,20 @@ class TestCompatMarkersHaveDeleteWhen:
                 if "COMPAT" in line and "delete-when" not in line:
                     offenders.append((path, line.strip()))
         assert offenders == [], f"PR-4 新 plugin 不应有裸 COMPAT(无 delete-when):{offenders}"
+
+
+# ── ADR-0242 D3 防复发：运行路径必须调用 persona_from_home ─────────
+
+
+class TestRuntimePersonaInjection:
+    """「设计写了实现缺失」回归护栏：run 装配必须消费 Home 人设。"""
+
+    def test_runnable_assembly_calls_persona_from_home(self) -> None:
+        text = RUNNABLE_ASSEMBLY_FILE.read_text(encoding="utf-8")
+        assert "persona_from_home" in text, (
+            "runnable_assembly.py 必须调用 persona_from_home（ADR-0242 D3）"
+        )
+        assert "role_profile" in text, "RunnableBuildRequest 必须携带 role_profile（ADR-0242 D3）"
 
 
 # ── 辅助 ──────────────────────────────────────────────────────────

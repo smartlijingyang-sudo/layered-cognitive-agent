@@ -12,8 +12,14 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, cast
 
 from lca.application.api.api import Agent, Team
-from lca.contracts.mechanisms.capability.capability import provider_current, require_capability
+from lca.contracts.capabilities import ASSISTANT_CATALOG
+from lca.contracts.mechanisms.capability.capability import (
+    MissingCapabilityError,
+    provider_current,
+    require_capability,
+)
 from lca.contracts.models.core.state.plane import PlaneBindings
+from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
 from lca.contracts.protocols import LLMAdapter
 from lca.contracts.protocols.runtime.infra.infra import MachineResolver, Tool
 from lca.contracts.protocols.session.run.mode import RunModeRegistryProtocol
@@ -51,6 +57,8 @@ class RunnableBuildRequest:
     assembly: RunnableAssemblyRequest
     llm: LLMAdapter
     tools: tuple[Tool, ...]
+    role_profile: RoleProfile | None = None
+    """Assistant Home persona (ADR-0242 D3); None when no assistant_id."""
 
 
 class CognitiveRunnableAssembler:
@@ -67,6 +75,7 @@ class CognitiveRunnableAssembler:
 
     async def assemble(self, request: RunnableAssemblyRequest) -> Agent | Team:
         """Materialize common dependencies and delegate to the selected adapter."""
+        assistant_id = str(getattr(request.session, "assistant_id", "") or "").strip()
 
         prepared = RunnableBuildRequest(
             assembly=request,
@@ -75,11 +84,40 @@ class CognitiveRunnableAssembler:
                 request.scope,
                 request.bindings,
                 machine_resolver=request.machine_resolver,
-                assistant_id=str(getattr(request.session, "assistant_id", "") or "").strip(),
+                assistant_id=assistant_id,
             ),
+            role_profile=_role_profile_for_assistant(request.scope, assistant_id),
         )
         adapter = self._mode_registry.resolve(request.mode)
         return cast("Agent | Team", await adapter.build(prepared))
+
+
+def _role_profile_for_assistant(scope: Context | None, assistant_id: str) -> RoleProfile | None:
+    """Resolve an assistant's Home persona into a ``RoleProfile`` (ADR-0242 D3).
+
+    A non-empty ``assistant_id`` must resolve through the assistant catalog;
+    a missing catalog is a run-assembly error rather than a silent persona
+    drop. ``POST /runs`` already validates the binding, so this is defensive.
+    """
+    if not assistant_id:
+        return None
+    try:
+        catalog = require_capability(scope, ASSISTANT_CATALOG.key)
+    except MissingCapabilityError as exc:
+        raise RuntimeError(
+            "assistant_id is set but the assistant.catalog capability is missing; "
+            "cannot resolve the assistant Home persona"
+        ) from exc
+    spec = catalog.get(assistant_id)
+    from lca.plugins.assistant.persona.persona import persona_from_home
+
+    persona = persona_from_home(spec.home_path)
+    return RoleProfile(
+        role=persona.role,
+        goal=persona.goal,
+        backstory=persona.backstory,
+        tool_permission_manifest=ToolPermissionManifest(allowed_tools=()),
+    )
 
 
 def tools_from_scope(

@@ -4,8 +4,7 @@
  * harvested from `outputs/` (name / url / mimeType / attachmentId). The
  * gateway stream has no answer-level artifact fact, so the transport folds
  * them here and hands the final assistant row a native `fileList` /
- * `imageList` — the same surface `LcaRunDriver` publishes on the
- * non-gateway path.
+ * `imageList`.
  */
 
 import {

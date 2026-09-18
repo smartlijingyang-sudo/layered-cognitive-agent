@@ -1,4 +1,4 @@
-﻿"""Profile-registerable default adapter and builder for the Solo run mode."""
+"""Profile-registerable default adapter and builder for the Solo run mode."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from lca.application.api.api import Agent
 from lca.contracts.capabilities import RUN_MODE_REGISTRY
 from lca.contracts.mechanisms.capability.capability import require_capability
+from lca.contracts.models.team.role.team import RoleProfile
 from lca.contracts.protocols import LLMAdapter
 from lca.contracts.protocols.runtime.infra.infra import Tool
 from lca.contracts.protocols.session.run.mode import ModeAdapter
@@ -60,16 +61,29 @@ def build_solo_agent(
     *,
     observability: BoundObservability,
     role: str = _SOLO_ROLE,
+    role_profile: RoleProfile | None = None,
     bindings: PlaneBindings | None = None,
     scope: Context | None = None,
     tools: Sequence[Tool] | None = None,
 ) -> Agent:
-    """Build the single-Agent runnable selected by the Solo mode adapter."""
+    """Build the single-Agent runnable selected by the Solo mode adapter.
+
+    ``role_profile`` (ADR-0242 D3) carries the assistant's Home persona; when
+    present it fills role/goal/backstory. The no-assistant path keeps the
+    historical empty goal/backstory.
+    """
     del bindings
+    if role_profile is not None:
+        role = role_profile.role or role
+        goal = role_profile.goal
+        backstory = role_profile.backstory
+    else:
+        goal = ""
+        backstory = ""
     return Agent(
         role=role,
-        goal="",
-        backstory="",
+        goal=goal,
+        backstory=backstory,
         tools=filter_solo_tools(tools if tools is not None else ()),
         llm=llm,
         observability=observability,
@@ -100,6 +114,7 @@ class _SoloModeAdapter(ModeAdapter):
             build_request.llm,
             observability=build_request.assembly.observability,
             role=session.agent.name or _SOLO_ROLE,
+            role_profile=build_request.role_profile,
             scope=build_request.assembly.scope,
             tools=build_request.tools,
         )
