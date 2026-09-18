@@ -191,26 +191,29 @@ class RunExecutionEnvironment:
                     profile=str(getattr(session, "profile", "") or ""),
                 )
             try:
-                capability_token = set_capability_bindings(
-                    BindingsViewBuilder(
-                        file_store=providers.file_store,
-                        bindings=bindings,
-                        sandbox=providers.sandbox,
-                        search=require_capability(self._ctx, "search"),
-                        skill_store=provider_current(require_capability(self._ctx, "skills")),
-                        machine_resolver=self._machine_resolver,
-                        mode=(getattr(session, "mode", "") or "solo").strip() or "solo",
-                    )
+                bindings_view = BindingsViewBuilder(
+                    file_store=providers.file_store,
+                    bindings=bindings,
+                    sandbox=providers.sandbox,
+                    search=require_capability(self._ctx, "search"),
+                    skill_store=provider_current(require_capability(self._ctx, "skills")),
+                    machine_resolver=self._machine_resolver,
+                    mode=(getattr(session, "mode", "") or "solo").strip() or "solo",
                 )
+                tools_service = require_capability(self._ctx, "tools")
+                # Hot-resume cache (same class as session.ambit): the HIL
+                # resume task has no execution environment, so it
+                # re-publishes these handles instead of re-resolving.
+                session.capability_bindings = bindings_view
+                session.tools_service = tools_service
+                capability_token = set_capability_bindings(bindings_view)
                 # ADR-0241 §Consequences R-1 follow-up: publish the
                 # per-turn ToolsService to the typed RuntimePlane so the
                 # v2 driver (PlanInterpreter) can seed the typed ``tools``
                 # port at the outer plan entry.  Mirror of the bindings
                 # ContextVar pattern — both are per-turn typed values
                 # that the kernel reads once at outer-plan entry.
-                tools_token = set_current_tools_service(
-                    require_capability(self._ctx, "tools")
-                )
+                tools_token = set_current_tools_service(tools_service)
                 with (
                     run_workspace_scope(session.run_id) as workspace,
                     run_scope(ambit.scope) if ambit.scope is not None else nullcontext(),

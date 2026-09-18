@@ -50,7 +50,7 @@ class DeclarativeCheckpoint:
         emit_runtime_checkpoint_create(
             plan_ref=self.plan_ref,
             state_ref=self.state_snapshot.state_ref,
-            node_id=self.cursor.node_id,
+            node_id=self.cursor.current_node_id,
             outcome="success",
         )
 

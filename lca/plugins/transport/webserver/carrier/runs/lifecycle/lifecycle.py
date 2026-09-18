@@ -219,13 +219,37 @@ class RunLifecycleCoordinator:
         try:
             bindings = session.bindings
             ambit = session.ambit
-            # P3-06: snapshot/runnable are hot-path cache; authority is Session facts.
-            with (
-                bind_run_ambit(ambit) if ambit is not None else nullcontext(),
-                run_workspace_scope(session.run_id),
-                plane_bindings_scope(bindings) if bindings is not None else nullcontext(),
-            ):
-                result = await session.runnable.resume(session.snapshot, input=answer)
+            # HIL resume runs without the execution environment that
+            # publishes the per-turn RuntimePlane handles. Re-publish the
+            # hot-cached handles so think/fork nodes resolve typed
+            # ``bindings`` / ``tools`` ports on the resumed traversal.
+            # Missing cache (pre-pause-code runs) leaves ports unseeded —
+            # same as before this change.
+            capability_token = tools_token = None
+            if getattr(session, "capability_bindings", None) is not None:
+                from lca.infrastructure.runtime_plane.capability_bindings import (
+                    reset_capability_bindings,
+                    reset_current_tools_service,
+                    set_capability_bindings,
+                    set_current_tools_service,
+                )
+
+                capability_token = set_capability_bindings(session.capability_bindings)
+                if getattr(session, "tools_service", None) is not None:
+                    tools_token = set_current_tools_service(session.tools_service)
+            try:
+                # P3-06: snapshot/runnable are hot-path cache; authority is Session facts.
+                with (
+                    bind_run_ambit(ambit) if ambit is not None else nullcontext(),
+                    run_workspace_scope(session.run_id),
+                    plane_bindings_scope(bindings) if bindings is not None else nullcontext(),
+                ):
+                    result = await session.runnable.resume(session.snapshot, input=answer)
+            finally:
+                if capability_token is not None:
+                    reset_capability_bindings(capability_token)
+                if tools_token is not None:
+                    reset_current_tools_service(tools_token)
             if self._outcomes.apply_resume(session, result):
                 self._registry.mark_paused(session)
                 return

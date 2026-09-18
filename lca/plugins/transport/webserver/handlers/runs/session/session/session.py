@@ -90,6 +90,12 @@ class RunSession:
     snapshot: Any = None
     runnable: Any = None
     approval_request: dict[str, Any] | None = None
+    # Same hot-cache class: RuntimePlane handles published per-turn by the
+    # execution environment. A HIL resume runs in a new task without the
+    # environment, so it re-publishes these instead of re-resolving
+    # providers.
+    capability_bindings: Any = None
+    tools_service: Any = None
     # Idempotency keys of answer commands already accepted for this run.
     # A repeat POST /runs/<id>/answer with a recorded key replays the original
     # receipt instead of resuming again.

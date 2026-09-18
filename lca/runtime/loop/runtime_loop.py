@@ -261,9 +261,24 @@ class CognitiveRuntime(Runtime):
                 "Legacy runtime loop has been removed (ADR-0074/0075 declarative cutover)."
             )
 
+        # ``StateSnapshot.phase_cursor`` is the declarative_1 shape
+        # (``node_id`` + visit counts); ``DeclarativeCheckpoint`` declares
+        # the adapter shape (``current_node_id`` + visited nodes). Project
+        # here — the violator — instead of teaching every consumer both.
+        # A resumed pause restarts the turn (visited budgets reset; the
+        # terminated pre-pause traversal must not constrain the new one).
+        from lca.framework.graph.adapter import PhaseRunCursor as _AdapterCursor
+
+        adapter_cursor = _AdapterCursor(
+            current_node_id=str(getattr(phase_cursor, "node_id", "")),
+            visited_nodes=(),
+        )
+        if not adapter_cursor.current_node_id:
+            raise ValueError("resume cursor must carry a node_id to re-enter at")
+
         checkpoint = DeclarativeCheckpoint(
             state_snapshot=snapshot,
-            cursor=phase_cursor,
+            cursor=adapter_cursor,
             plan_ref=phase_cursor.plan_ref,
             resume_state=state,
         )
@@ -382,14 +397,14 @@ class CognitiveRuntime(Runtime):
         await self._lifecycle.publish_terminal(state, result)
         from lca.infrastructure.session.emit.lifecycle_emit import (
             checkpoint,
-            emit_approval_pause_from_result,
             end_turn,
             terminal_checkpoint_status,
         )
 
-        if result.status is TaskStatus.INPUT_REQUIRED:
-            emit_approval_pause_from_result(result)
-        else:
+        # Pause facts (approval.persisted + waiting_input checkpoint)
+        # are written by RuntimeResultFinalizer during finalize on this
+        # same Result; emitting here as well double-appends the pair.
+        if result.status is not TaskStatus.INPUT_REQUIRED:
             terminal_status = terminal_checkpoint_status(result.status)
             if terminal_status is not None:
                 checkpoint(terminal_status)
