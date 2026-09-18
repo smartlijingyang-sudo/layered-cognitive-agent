@@ -33,6 +33,9 @@ from lca.infrastructure.tools.assistant.create_skill_tool import (
     assistant_create_skill_tool_from_run,
 )
 from lca.infrastructure.tools.assistant.create_tool import AssistantCreateTool
+from lca.infrastructure.tools.assistant.self_manage_tools import (
+    assistant_self_manage_tools_from_run,
+)
 
 
 @plugin(
@@ -92,6 +95,10 @@ async def setup(ctx: PluginContext, config: Any) -> None:
         create_skill = assistant_create_skill_tool_from_run(bindings, overlay=overlay)
         if create_skill is not None:
             tools.append(create_skill)
+        # 自我管理工具族（ADR-0242 D6）：只在 run 绑定 assistant_id 时出现。
+        tools.extend(
+            assistant_self_manage_tools_from_run(bindings, catalog=catalog, overlay=overlay)
+        )
         return tools
 
     ctx.require("tools").register_factory("assistant", _assistant_tools_factory)

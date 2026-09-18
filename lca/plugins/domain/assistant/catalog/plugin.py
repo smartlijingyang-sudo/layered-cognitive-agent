@@ -55,6 +55,7 @@ from lca.contracts.models.team.role.team import (
 from lca.contracts.observability.closure.assistant_ep_closure import (
     ASSISTANT_BOOTSTRAP_COMPLETED,
     ASSISTANT_CREATED,
+    ASSISTANT_PROFILE_REVISED,
 )
 from lca.contracts.protocols.assistant.catalog import (
     AssistantCatalog,
@@ -73,6 +74,7 @@ from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugi
 from lca.plugins.assistant.events._events import (
     AssistantBootstrapCompletedEventPayload,
     AssistantCreatedEventPayload,
+    AssistantProfileRevisedEventPayload,
 )
 from lca.plugins.assistant.home._home_layout import (
     DEFAULT_TEMPLATE_ID,
@@ -320,25 +322,137 @@ class _AssistantCatalogImpl(AssistantCatalog):
                 summaries.append(summary)
         return tuple(summaries)
 
-    # COMPAT(delete-when: 2026-12-31, scope: revise_profile / reimport 落实现并补 I-A7 验收)
-    def revise_profile(self, assistant_id: str, patch: ProfilePatch) -> PlanRevision:
-        del assistant_id, patch  # PR-3 占位;待 ProfilePatch 语义 + I-A7 验收的 PR 落地
-        raise NotImplementedError(
-            "AssistantCatalog.revise_profile 在 PR-3 范围不实现;待 revise/reimport 落地后删除本占位"
-        )
-
-    # COMPAT(delete-when: 2026-12-31, scope: revise_profile / reimport 落实现并补 I-A7 验收)
-    def reimport(self, assistant_id: str, reason: str) -> PlanRevision:
-        del assistant_id, reason  # PR-3 占位;待裸改恢复路径落地
-        raise NotImplementedError(
-            "AssistantCatalog.reimport 在 PR-3 范围不实现;待 reimport 路径落地后删除本占位"
-        )
-
-    # COMPAT(delete-when: 2026-12-31, scope: retire 入口 + create-assistant skill 落实现)
+    # COMPAT(delete-when: 2026-12-31, scope: retire 入口落地后删除)
     def retire(self, assistant_id: str, reason: str) -> None:
         del assistant_id, reason  # PR-3 占位;待 retire 入口落地
         raise NotImplementedError(
             "AssistantCatalog.retire 在 PR-3 范围不实现;待 retire 入口落地后删除本占位"
+        )
+
+    def revise_profile(
+        self,
+        assistant_id: str,
+        patch: ProfilePatch,
+        *,
+        actor: str = "system",
+    ) -> PlanRevision:
+        """配置面唯一写入口（ADR-0187 §3 D2 + ADR-0242 D6）。
+
+        字段级 patch：应用变更 → digest 重算 → ``revision_seq++`` →
+        ``revisions/`` 快照 → 写 manifest → 发 ``assistant.profile.revised`` EP。
+        未知 ``extra`` 键 / 空 patch / SOUL 不完整 ⇒ fail-closed。
+        """
+        home = HomePaths(root=self._root / assistant_id)
+        manifest = load_manifest(home.root, assistant_id)
+        self._check_digests(home.root, assistant_id, manifest)
+
+        changes: list[str] = []
+        profile = _read_json(home.root / "profile.json")
+        profile_patched = False
+        if patch.profile_name is not None:
+            profile["name"] = patch.profile_name
+            profile_patched = True
+        if patch.profile_description is not None:
+            profile["description"] = patch.profile_description
+            profile_patched = True
+        if profile_patched:
+            _write_json(home.root / "profile.json", profile)
+            changes.append("profile.json")
+
+        if patch.soul_md is not None:
+            _validate_soul(patch.soul_md)
+            (home.root / "SOUL.md").write_text(patch.soul_md, encoding="utf-8")
+            changes.append("SOUL.md")
+        if patch.user_md is not None:
+            (home.root / "USER.md").write_text(patch.user_md, encoding="utf-8")
+            changes.append("USER.md")
+        if patch.agents_md is not None:
+            (home.root / "AGENTS.md").write_text(patch.agents_md, encoding="utf-8")
+            changes.append("AGENTS.md")
+        if patch.goals_yaml is not None:
+            (home.root / "goals.yaml").write_text(patch.goals_yaml, encoding="utf-8")
+            changes.append("goals.yaml")
+        if patch.grants_yaml is not None:
+            (home.root / "grants.yaml").write_text(patch.grants_yaml, encoding="utf-8")
+            changes.append("grants.yaml")
+        if patch.tools_yaml is not None:
+            (home.root / "tools.yaml").write_text(patch.tools_yaml, encoding="utf-8")
+            changes.append("tools.yaml")
+        if patch.extra:
+            raise _CatalogConfigError(
+                f"ProfilePatch 不支持 extra 字段: {', '.join(sorted(patch.extra))}"
+            )
+        if not changes:
+            raise _CatalogConfigError("ProfilePatch 未指定任何变更")
+
+        new_revision_seq = int(manifest.get("revision_seq") or 0) + 1
+        new_manifest = build_manifest(
+            assistant_id=assistant_id,
+            template_id=str(manifest.get("template_id", "")),
+            revision_seq=new_revision_seq,
+            home=home.root,
+            created_at=str(manifest.get("created_at") or ""),
+        )
+        _copy_manifest_extras(manifest, new_manifest)
+        _write_revision_snapshot(home.root, new_revision_seq, new_manifest)
+        write_manifest(home.root, new_manifest)
+
+        self._emit_profile_revised(
+            AssistantProfileRevisedEventPayload(
+                assistant_id=assistant_id,
+                revision_seq=new_revision_seq,
+                manifest_digest=str(new_manifest["manifest_digest"]),
+                actor=actor,
+                reason="revise_profile",
+                changes=tuple(changes),
+            )
+        )
+        return PlanRevision(
+            assistant_id=assistant_id,
+            revision_seq=new_revision_seq,
+            manifest_digest=str(new_manifest["manifest_digest"]),
+            actor=actor,
+            snapshot_path=str(home.root / "revisions" / f"{new_revision_seq}.json"),
+            revised_at=_iso_now(self._clock),
+        )
+
+    def reimport(self, assistant_id: str, reason: str) -> PlanRevision:
+        """裸改恢复模式（ADR-0187 §3 D2）：以磁盘当前内容重算 digest。
+
+        不校验现有 digest（正是恢复路径的用途）；重算后 ``revision_seq++``、
+        写 ``revisions/`` 快照与 manifest、发 ``assistant.profile.revised`` EP。
+        """
+        home = HomePaths(root=self._root / assistant_id)
+        manifest = load_manifest(home.root, assistant_id)
+        new_revision_seq = int(manifest.get("revision_seq") or 0) + 1
+        new_manifest = build_manifest(
+            assistant_id=assistant_id,
+            template_id=str(manifest.get("template_id", "")),
+            revision_seq=new_revision_seq,
+            home=home.root,
+            created_at=str(manifest.get("created_at") or ""),
+        )
+        _copy_manifest_extras(manifest, new_manifest)
+        _write_revision_snapshot(home.root, new_revision_seq, new_manifest)
+        write_manifest(home.root, new_manifest)
+
+        self._emit_profile_revised(
+            AssistantProfileRevisedEventPayload(
+                assistant_id=assistant_id,
+                revision_seq=new_revision_seq,
+                manifest_digest=str(new_manifest["manifest_digest"]),
+                actor="reimport",
+                reason=reason,
+                changes=tuple(sorted(compute_digests(home.root))),
+            )
+        )
+        return PlanRevision(
+            assistant_id=assistant_id,
+            revision_seq=new_revision_seq,
+            manifest_digest=str(new_manifest["manifest_digest"]),
+            actor="reimport",
+            snapshot_path=str(home.root / "revisions" / f"{new_revision_seq}.json"),
+            revised_at=_iso_now(self._clock),
         )
 
     # ── 内部 ──────────────────────────────────────────────────────────
@@ -364,6 +478,28 @@ class _AssistantCatalogImpl(AssistantCatalog):
             )
             return
         self._emit(ASSISTANT_BOOTSTRAP_COMPLETED, payload.to_dict())
+
+    def _emit_profile_revised(self, payload: AssistantProfileRevisedEventPayload) -> None:
+        """发 ``assistant.profile.revised`` EP;无 emitter 时仅 log。"""
+        if self._emit is None:
+            log.info(
+                "assistant.catalog.ep.no_emitter",
+                ep=ASSISTANT_PROFILE_REVISED,
+                payload=payload.to_dict(),
+            )
+            return
+        self._emit(ASSISTANT_PROFILE_REVISED, payload.to_dict())
+
+    def _check_digests(self, home: Path, assistant_id: str, manifest: Mapping[str, Any]) -> None:
+        """重算配置面 digest 并与 manifest 比对（I-A3 fail-closed）。"""
+        actual_digests = compute_digests(home)
+        declared_raw = manifest.get("digests") or {}
+        declared: dict[str, str] = {
+            str(name): str(value) for name, value in declared_raw.items() if isinstance(value, str)
+        }
+        mismatches = diff_digests(declared, actual_digests)
+        if mismatches:
+            raise _DigestMismatch(home, assistant_id, mismatches)
 
     def _copy_inherited_snapshot(self, source_id: str, dest_home: Path) -> None:
         """把来源 Home 的 ``skills/`` + ``tools.yaml`` / ``grants.yaml`` 复制为快照。
@@ -569,6 +705,35 @@ def _read_json(path: Path) -> dict[str, object]:
     if not isinstance(data, dict):
         raise ValueError(f"{path}: 顶层不是 JSON object")
     return data
+
+
+def _write_json(path: Path, data: Mapping[str, object]) -> None:
+    """写 JSON 文件（UTF-8 + 缩进 + sort_keys）。"""
+    path.write_text(
+        json.dumps(dict(data), ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8"
+    )
+
+
+def _write_revision_snapshot(home: Path, revision_seq: int, manifest: Mapping[str, object]) -> None:
+    """把修订后的 manifest 快照写入 ``revisions/{revision_seq}.json``（ADR-0242 D6）。"""
+    revisions_dir = home / "revisions"
+    revisions_dir.mkdir(parents=True, exist_ok=True)
+    (revisions_dir / f"{revision_seq}.json").write_text(
+        json.dumps(dict(manifest), ensure_ascii=False, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+
+
+def _copy_manifest_extras(source: Mapping[str, object], target: dict[str, object]) -> None:
+    """把 manifest 中非 digest 派生字段（role_id / skills 索引等）复制到修订版。"""
+    for key in ("role_id", "skills"):
+        if key in source:
+            target[key] = source[key]
+
+
+def _iso_now(clock: Callable[[], datetime]) -> str:
+    """ISO-8601 UTC 时间字符串（复用注入时钟）。"""
+    return clock().strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _summary_from_home(home_dir: Path) -> AssistantSummary | None:

@@ -48,6 +48,7 @@ from lca.contracts.harness.journal.artifact import (
     migrate_to_verified,
 )
 from lca.contracts.observability.closure.assistant_ep_closure import (
+    ASSISTANT_PROFILE_REVISED,
     ASSISTANT_SKILL_ACTIVATED,
     ASSISTANT_SKILL_INSTALLED,
 )
@@ -80,6 +81,7 @@ from lca.infrastructure.skills.frontmatter.frontmatter import skill_title, split
 from lca.infrastructure.skills.http.importer import HttpSkillImporter
 from lca.infrastructure.skills.settings.settings import SkillSettings
 from lca.plugins.assistant.events._events import (
+    AssistantProfileRevisedEventPayload,
     AssistantSkillActivatedEventPayload,
     AssistantSkillInstalledEventPayload,
 )
@@ -393,6 +395,53 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
         )
         return receipt
 
+    async def remove(
+        self,
+        assistant_id: str,
+        skill_id: str,
+        *,
+        actor: str = "system",
+    ) -> None:
+        """删除已安装 skill（ADR-0242 D6）：删盘 + manifest 修订 + EP。
+
+        ``catalog.get`` 先做 digest 校验（fail-closed）；未知 skill 抛
+        ``SkillNotInstalled``，不删盘、不发 EP。配置变更统一发
+        ``assistant.profile.revised`` EP（12 EP 闭集内）。
+        """
+        spec = self._catalog.get(assistant_id)  # digest 校验 fail-closed
+        home = Path(spec.home_path)
+        skill_dir = home / "skills" / skill_id
+        if not skill_dir.is_dir():
+            raise SkillNotInstalled(f"skill 未安装: {skill_id}")
+
+        shutil.rmtree(skill_dir)
+
+        manifest = load_manifest(home, assistant_id)
+        new_revision_seq = _revision_of(manifest) + 1
+        new_manifest = build_manifest(
+            assistant_id=assistant_id,
+            template_id=str(manifest.get("template_id") or DEFAULT_TEMPLATE_ID),
+            revision_seq=new_revision_seq,
+            home=home,
+            created_at=str(manifest.get("created_at") or "") or None,
+        )
+        skills_section = manifest.get("skills")
+        section: dict[str, Any] = dict(skills_section) if isinstance(skills_section, dict) else {}
+        section.pop(skill_id, None)
+        new_manifest["skills"] = section
+        write_manifest(home, new_manifest)
+
+        self._emit_profile_revised(
+            AssistantProfileRevisedEventPayload(
+                assistant_id=assistant_id,
+                revision_seq=new_revision_seq,
+                manifest_digest=str(new_manifest["manifest_digest"]),
+                actor=actor,
+                reason=f"remove_skill:{skill_id}",
+                changes=(f"skills/{skill_id}",),
+            )
+        )
+
     # ── 内部 ──────────────────────────────────────────────────────────
 
     async def _fetch(self, staging_root: Path, source: SkillSource) -> SkillPackage:
@@ -457,6 +506,17 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
             )
             return
         self._emit(ASSISTANT_SKILL_INSTALLED, payload.to_dict())
+
+    def _emit_profile_revised(self, payload: AssistantProfileRevisedEventPayload) -> None:
+        """发 ``assistant.profile.revised`` EP（删除 skill 的配置变更）；无 emitter 时仅 log。"""
+        if self._emit is None:
+            log.info(
+                "assistant.skill_overlay.ep.no_emitter",
+                ep=ASSISTANT_PROFILE_REVISED,
+                payload=payload.to_dict(),
+            )
+            return
+        self._emit(ASSISTANT_PROFILE_REVISED, payload.to_dict())
 
     def _emit_activated(self, payload: AssistantSkillActivatedEventPayload) -> None:
         """发 ``assistant.skill.activated`` EP;无 emitter 时仅 log(单元测试路径)。"""

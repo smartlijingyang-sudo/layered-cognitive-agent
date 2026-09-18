@@ -77,11 +77,17 @@ async def test_factory_adds_create_skill_tool_when_assistant_id_bound() -> None:
     await tools_plugin.setup.setup(ctx, None)
 
     produced = tools_service.factories["assistant"]({"assistant_id": "asst_demo"})
-    assert isinstance(produced, list) and len(produced) == 2
+    # create_assistant + create_assistant_skill + 6 个自我管理工具（ADR-0242 D6）
+    assert isinstance(produced, list) and len(produced) == 8
     assert isinstance(produced[0], AssistantCreateTool)
     assert isinstance(produced[1], AssistantCreateSkillTool)
     assert produced[1]._overlay is overlay
     assert produced[1]._assistant_id == "asst_demo"
+    from lca.infrastructure.tools.assistant.self_manage_tools import (
+        UpdateAssistantSoulTool,
+    )
+
+    assert any(isinstance(t, UpdateAssistantSoulTool) for t in produced)
 
 
 def test_plugin_manifest_declares_no_provides() -> None:

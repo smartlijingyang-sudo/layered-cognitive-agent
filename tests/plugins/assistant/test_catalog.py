@@ -10,7 +10,8 @@
 - assistant.created EP payload 必含 4 件套
 - plugin Manifest:provides=assistant.catalog / requires=event.bus / layer=L4 /
   effects=FILESYSTEM / test_suite 字符串对齐
-- revise_profile / reimport / retire 抛 NotImplementedError + 注释存在
+- retire 抛 NotImplementedError + 注释存在（revise_profile / reimport 已在
+  ADR-0242 PR-5 实现，见 test_self_manage.py）
 """
 
 from __future__ import annotations
@@ -31,7 +32,6 @@ from lca.contracts.observability.closure.assistant_ep_closure import (
 )
 from lca.contracts.protocols.assistant.catalog import (
     CreateAssistantRequest,
-    ProfilePatch,
 )
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import PluginSpecKind
 from lca.harness.plugin.manifest import EffectClass
@@ -325,33 +325,10 @@ class TestMemoryLayerDigestPolicy:
             catalog.get(handle.assistant_id)
 
 
-# ── revise / reimport / retire:PR-3 占位 ─────────────────────────────
+# ── revise / reimport 已实现(ADR-0242 PR-5);retire 仍占位 ──────────
 
 
-class TestNotImplementedRevisionAPI:
-    def test_revise_profile_raises_with_compat_marker(
-        self,
-        catalog: AssistantCatalogImpl,
-        request_default: CreateAssistantRequest,
-    ) -> None:
-        handle = catalog.create(request_default)
-        with pytest.raises(NotImplementedError):
-            catalog.revise_profile(handle.assistant_id, ProfilePatch())
-        # COMPAT 注释必须在 source(被 grep 守住,见 architecture tests)
-        source = Path(catalog.revise_profile.__code__.co_filename).read_text(encoding="utf-8")
-        assert "COMPAT(delete-when:" in source
-
-    def test_reimport_raises_with_compat_marker(
-        self,
-        catalog: AssistantCatalogImpl,
-        request_default: CreateAssistantRequest,
-    ) -> None:
-        handle = catalog.create(request_default)
-        with pytest.raises(NotImplementedError):
-            catalog.reimport(handle.assistant_id, reason="manual reimport")
-        source = Path(catalog.reimport.__code__.co_filename).read_text(encoding="utf-8")
-        assert "COMPAT(delete-when:" in source
-
+class TestRetirePlaceholder:
     def test_retire_raises_with_compat_marker(
         self,
         catalog: AssistantCatalogImpl,
@@ -360,6 +337,7 @@ class TestNotImplementedRevisionAPI:
         handle = catalog.create(request_default)
         with pytest.raises(NotImplementedError):
             catalog.retire(handle.assistant_id, reason="end of life")
+        # COMPAT 注释必须在 source(被 grep 守住,见 architecture tests)
         source = Path(catalog.retire.__code__.co_filename).read_text(encoding="utf-8")
         assert "COMPAT(delete-when:" in source
 

@@ -21,6 +21,7 @@ __all__ = [
     "AssistantCreatedEventPayload",
     "AssistantJobFiredEventPayload",
     "AssistantJobRegisteredEventPayload",
+    "AssistantProfileRevisedEventPayload",
     "AssistantSkillActivatedEventPayload",
     "AssistantSkillEvolvedPromotedEventPayload",
     "AssistantSkillEvolvedProposedEventPayload",
@@ -103,6 +104,35 @@ class AssistantBootstrapCompletedEventPayload:
         payload: dict[str, Any] = _required_dict(self)
         if self.home_path:
             payload["home_path"] = self.home_path
+        return payload
+
+
+@dataclass(frozen=True)
+class AssistantProfileRevisedEventPayload:
+    """``assistant.profile.revised`` EP payload（ADR-0187 §3 D8 + ADR-0242 D6）。
+
+    配置面任何变更（revise_profile / reimport / skill 删除）经唯一写入口
+    落盘后发射；四个必含字段与 ``ASSISTANT_REQUIRED_FIELDS`` 对齐。
+    """
+
+    assistant_id: str
+    revision_seq: int
+    manifest_digest: str
+    actor: str
+    reason: str = ""
+    """变更原因（工具语义 / ``"reimport"`` 等）；空 = 未提供。"""
+    changes: tuple[str, ...] = ()
+    """本次变更涉及的配置面文件名（如 ``("SOUL.md",)``），供审计。"""
+
+    def __post_init__(self) -> None:
+        _validate_required_fields(self, "AssistantProfileRevisedEventPayload")
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = _required_dict(self)
+        if self.reason:
+            payload["reason"] = self.reason
+        if self.changes:
+            payload["changes"] = list(self.changes)
         return payload
 
 

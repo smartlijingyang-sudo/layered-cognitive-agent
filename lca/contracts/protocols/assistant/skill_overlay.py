@@ -242,3 +242,25 @@ class AssistantSkillOverlay(Protocol):
         不写 Home（run 级事实,见 ``SkillActivationReceipt``）。
         """
         ...
+
+    async def remove(
+        self,
+        assistant_id: str,
+        skill_id: str,
+        *,
+        actor: str = "system",
+    ) -> None:
+        """删除本助理已安装的 skill（ADR-0242 D6）。
+
+        时序：``catalog.get`` digest 校验（fail-closed）⇒ 删除
+        ``{home}/skills/<skill_id>/`` ⇒ manifest 重算 + ``revision_seq++``
+        ⇒ 发 ``assistant.profile.revised`` EP（配置变更统一走该 EP）。
+
+        失败语义：
+        - ``assistant_id`` 不存在 / digest 不匹配 ⇒ Catalog 异常透传；
+        - 包未落盘 ⇒ ``SkillNotInstalled``（不删盘、不发 EP）。
+
+        外部后果：``{home}/skills/<skill_id>/`` 消失 + manifest 修订 +
+        一条 ``assistant.profile.revised`` Spine 事件。
+        """
+        ...
