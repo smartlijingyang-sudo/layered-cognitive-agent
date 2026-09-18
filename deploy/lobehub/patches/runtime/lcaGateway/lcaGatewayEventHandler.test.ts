@@ -26,6 +26,7 @@ import type { ConversationContext, UIChatMessage } from '@lobechat/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { messageService } from '@/services/message';
+import type { AgentRunLifecycle } from '@/store/chat/slices/agentRun/actions/lifecycle/types';
 import { dbMessageSelectors } from '@/store/chat/slices/message/selectors/dbMessage';
 import type { ChatStore } from '@/store/chat/store';
 import { messageMapKey } from '@/store/chat/utils/messageMapKey';
@@ -490,5 +491,36 @@ describe('createLcaGatewayEventHandler (multi-run / multi-LLM)', () => {
     expect(tools[0].id).toBe('tc-1');
     expect(tools[0].result?.state?.stdout).toBe('ok');
     expect(tools[0].result?.content).toBe('ok');
+  });
+
+  it('parks on waiting_for_human without firing terminal lifecycle effects', async () => {
+    const { store } = createStore();
+    const runLifecycle = {
+      afterRunComplete: vi.fn(),
+      beforeRunComplete: vi.fn(),
+      completeRun: vi.fn().mockResolvedValue({ requeued: false }),
+      onRunError: vi.fn(),
+      onRunParked: vi.fn().mockResolvedValue(undefined),
+      onRunResumed: vi.fn(),
+      onRunStarted: vi.fn(),
+      onTerminalPersisted: vi.fn(),
+    } as unknown as AgentRunLifecycle;
+    const handler = createLcaGatewayEventHandler(() => store, {
+      assistantMessageId: 'assistant-msg',
+      context,
+      operationId: 'op-1',
+      runLifecycle,
+    });
+
+    handler(makeEvent('agent_runtime_end', { reason: 'waiting_for_human' } as never, 3));
+    await flush();
+
+    // A parked run is NOT terminal: the op completes so the spinner clears,
+    // but no unread / queue drain / notification side effects fire.
+    expect(runLifecycle.onRunParked).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: 'waiting_for_human' }),
+    );
+    expect(runLifecycle.completeRun).not.toHaveBeenCalled();
+    expect(store.completeOperation).not.toHaveBeenCalled();
   });
 });

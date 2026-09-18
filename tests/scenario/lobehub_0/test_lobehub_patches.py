@@ -165,6 +165,131 @@ export const ensureBuiltinToolSurfaces = (): Promise<void> => {
 };
 """
 
+_STUB_GATEWAY = """import { AgentStreamClient, type AgentStreamClientOptions } from '@lobechat/agent-gateway-client';
+import type { ConversationContext } from '@lobechat/types';
+import { aiAgentService } from '@/services/aiAgent';
+import { isTrpcErrorCode } from '@/utils/trpcError';
+import { messageMapKey } from '@/store/chat/utils/messageMapKey';
+import { isLcaGatewayMode } from '@/store/chat/slices/agentRun/actions/dispatch/agentDispatcher';
+import { buildRunLifecycle } from '../../lifecycle/buildRunLifecycle';
+import type { RunScope } from '../../lifecycle/types';
+import { createGatewayEventHandler } from './gatewayEventHandler';
+
+export interface GatewayConnection {
+  client: Pick<
+    AgentStreamClient,
+    | 'connect'
+    | 'disconnect'
+    | 'on'
+    | 'reconnect'
+    | 'sendInterrupt'
+    | 'sendToolResult'
+    | 'updateToken'
+  >;
+  status: string;
+}
+
+export interface ConnectGatewayParams {
+  gatewayUrl: string;
+  onEvent?: (event: unknown) => void;
+  onSessionComplete?: (info: { authFailed: boolean; succeeded: boolean; terminalReceived: boolean }) => void;
+  operationId: string;
+  /**
+   * Enable resume buffering for reconnect scenarios (default: false)
+   */
+  resumeOnConnect?: boolean;
+  /**
+   * Auth token for the Gateway
+   */
+  token: string;
+  topicId: string;
+}
+
+export class GatewayActionImpl {
+  readonly #get: () => any;
+  readonly #set: (fn: (state: unknown) => unknown, flush?: boolean, action?: string) => void;
+
+  /** Overridable factory for testing */
+  createClient: (options: AgentStreamClientOptions) => GatewayConnection['client'] = (options) =>
+    new AgentStreamClient(options);
+
+  isGatewayModeEnabled = (agentId?: string): boolean => {
+    const serverConfig = window.global_serverConfigStore?.getState()?.serverConfig;
+    void agentId;
+    return Boolean(serverConfig?.agentGatewayUrl);
+  };
+
+  connectToGateway = (params: ConnectGatewayParams): void => {
+    const { operationId, gatewayUrl, token, topicId, onEvent, onSessionComplete, resumeOnConnect } =
+      params;
+    this.disconnectFromGateway(operationId);
+    const client = this.createClient({ gatewayUrl, operationId, resumeOnConnect, token });
+    void client;
+  };
+
+  disconnectFromGateway = (_operationId: string): void => {};
+
+  reconnectToGatewayOperation = async (params: {
+    assistantMessageId: string;
+    operationId: string;
+    scope?: string;
+    threadId?: string | null;
+    topicId: string;
+  }): Promise<void> => {
+    const { assistantMessageId, operationId, topicId, scope, threadId } = params;
+
+    const agentGatewayUrl =
+      window.global_serverConfigStore?.getState()?.serverConfig?.agentGatewayUrl;
+    if (!agentGatewayUrl) return;
+
+    // Get a fresh JWT token (original expired after 5 min). The server throws
+    // TRPCError NOT_FOUND when it has no running operation on this topic — our
+    // local marker is stale (e.g. an error run cleared the server marker but not
+    // the store). Clear it and bail silently so the reconnect SWR fetcher resolves
+    // and does not retry the 404 forever.
+    let token: string;
+    try {
+      ({ token } = await aiAgentService.refreshGatewayToken(topicId));
+    } catch (error) {
+      if (isTrpcErrorCode(error, 'NOT_FOUND')) {
+        this.clearLocalRunningOperation({ operationId, topicId });
+        return;
+      }
+      throw error;
+    }
+
+    const context = { agentId: 'agent-1', topicId } as ConversationContext;
+    const gatewayOpId = 'gateway-op';
+    this.#get().onOperationCancel(gatewayOpId, async () => {
+      await aiAgentService
+        .interruptTask({ operationId })
+        .catch((err) => console.error('[Gateway] interruptTask failed:', err));
+    });
+
+    const eventHandler = createGatewayEventHandler(this.#get, {
+      assistantMessageId,
+      context,
+      // Server-side operation id — needed for tool_result dispatch back over
+      // the same WS that gatewayConnections is keyed on.
+      gatewayOperationId: operationId,
+      operationId: gatewayOpId,
+      runLifecycle: buildRunLifecycle(this.#get, {
+        context,
+        parentMessageId: assistantMessageId,
+        parentMessageType: 'assistant',
+        runId: gatewayOpId,
+        runScope: (context.scope === 'sub_agent' ? 'sub_agent' : 'top_level') as RunScope,
+        runtimeType: 'gateway',
+      }),
+    });
+
+    // Same demux as the initial-run path: a reconnected supervisor WS can also
+  };
+
+  clearLocalRunningOperation = (_params: { operationId: string; topicId: string }): void => {};
+}
+"""
+
 
 def _seed_ui(tmp_path: Path) -> Path:
     executor = tmp_path / _EXECUTOR
@@ -197,6 +322,19 @@ def _seed_ui(tmp_path: Path) -> Path:
     )
     dispatcher.parent.mkdir(parents=True, exist_ok=True)
     dispatcher.write_text("export const dispatchAgent = () => {};\n", encoding="utf-8")
+
+    gateway = (
+        tmp_path / "src/store/chat/slices/agentRun/actions/transports/gateway/gateway.ts"
+    )
+    gateway.parent.mkdir(parents=True, exist_ok=True)
+    gateway.write_text(_STUB_GATEWAY, encoding="utf-8")
+
+    gateway_handler = (
+        tmp_path
+        / "src/store/chat/slices/agentRun/actions/transports/gateway/gatewayEventHandler.ts"
+    )
+    gateway_handler.parent.mkdir(parents=True, exist_ok=True)
+    gateway_handler.write_text("export {};\n", encoding="utf-8")
 
     # Mirror what ``lobehub.py::_ensure_dev_env`` produces on real starts:
     # a ``.env`` carrying the gateway URL is the source of truth for the
@@ -358,3 +496,81 @@ def test_patch_source_forwards_attachment_extras_in_driver() -> None:
     assert "imageList.length > 0" in driver
     assert "fileList.length > 0" in driver
     assert "files.length > 0" in driver
+
+
+# ── Option B: askUserQuestion resume closed loop ──────────────────────
+
+
+def test_patch_source_declares_lca_resume_gateway_run() -> None:
+    """``lcaResumeGatewayRun`` must exist in the patch source and reuse the
+    shared ``onSessionComplete`` helper."""
+    driver = _DRIVER_PATCH_PATH.read_text(encoding="utf-8")
+    assert "export async function lcaResumeGatewayRun" in driver
+    assert "createLcaRunOnSessionComplete" in driver
+    assert "lcaRefreshWsToken" in driver
+    assert "lastEventId" in driver
+    assert "resuming: true" in driver
+
+
+def test_apply_removes_answer_post_and_carries_lca_run_id(tmp_path: Path) -> None:
+    """The injected askUserQuestion handler must no longer POST /answer and
+    must carry ``lcaRunId`` + ``toolResultContent`` for the resume op."""
+    ui = _seed_ui(tmp_path)
+    ctx = PatchContext(ui_dir=ui)
+    assert apply(ctx) is True
+
+    handlers = (
+        ui
+        / "src/features/Conversation/Messages/AssistantGroup/Tool/Detail/Intervention/customInteractionHandlers.ts"
+    ).read_text(encoding="utf-8")
+    assert "lcaRunId" in handlers
+    assert "handleLcaAskUserSubmit" in handlers
+    assert "fetch(" not in handlers
+    assert "lcaRunId: runId" in handlers
+    assert "toolResultContent: answerText" in handlers
+
+
+def test_apply_wires_lca_resume_op_in_conversation_control(tmp_path: Path) -> None:
+    """``submitToolInteraction`` must open the LCA resume op when
+    ``skipResume`` + ``lcaRunId`` are present."""
+    ui = _seed_ui(tmp_path)
+    ctx = PatchContext(ui_dir=ui)
+    assert apply(ctx) is True
+
+    control = (
+        ui / "src/store/chat/slices/agentRun/actions/entries/conversationControl.ts"
+    ).read_text(encoding="utf-8")
+    assert "lcaRunId?: string;" in control
+    assert "lcaResumeGatewayRun" in control
+    assert "getLcaStreamPosition" in control
+    assert "resume_tool_result" in control
+
+
+def test_apply_threads_last_event_id_through_gateway(tmp_path: Path) -> None:
+    """``gateway.ts`` must accept ``lastEventId`` and forward it to the LCA
+    client."""
+    ui = _seed_ui(tmp_path)
+    ctx = PatchContext(ui_dir=ui)
+    assert apply(ctx) is True
+
+    gateway = (
+        ui / "src/store/chat/slices/agentRun/actions/transports/gateway/gateway.ts"
+    ).read_text(encoding="utf-8")
+    assert "lastEventId?: string;" in gateway
+    assert "lastEventId," in gateway
+    assert "lastEventId: options.lastEventId" in gateway
+
+
+def test_apply_parks_waiting_for_human_in_gateway_event_handler(tmp_path: Path) -> None:
+    """``agent_runtime_end(reason=waiting_for_human)`` must park via
+    ``onRunParked`` instead of completing the run."""
+    ui = _seed_ui(tmp_path)
+    ctx = PatchContext(ui_dir=ui)
+    assert apply(ctx) is True
+
+    handler = (
+        ui / "src/store/chat/slices/agentRun/actions/transports/gateway/gatewayEventHandler.ts"
+    ).read_text(encoding="utf-8")
+    assert "waiting_for_human" in handler
+    assert "onRunParked" in handler
+    assert "LCA park: the run is paused waiting for human input" in handler
