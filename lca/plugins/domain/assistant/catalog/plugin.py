@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Any
 
 import structlog
+import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -44,6 +45,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
+from lca.contracts.models.assistant.plan_overlay import PlanOverlay
 from lca.contracts.models.assistant.spec import (
     AssistantBootstrapRefs,
     AssistantSpec,
@@ -310,6 +312,8 @@ class _AssistantCatalogImpl(AssistantCatalog):
             profile_runtime=(
                 dict(profile["runtime"]) if isinstance(profile.get("runtime"), dict) else {}
             ),
+            manifest_digest=str(manifest.get("manifest_digest") or ""),
+            plan_overlay=_load_plan_overlay(home.root),
         )
 
     def list(self) -> tuple[AssistantSummary, ...]:
@@ -395,6 +399,10 @@ class _AssistantCatalogImpl(AssistantCatalog):
         if patch.tools_yaml is not None:
             (home.root / "tools.yaml").write_text(patch.tools_yaml, encoding="utf-8")
             changes.append("tools.yaml")
+        if patch.plan_yaml is not None:
+            _validate_plan_yaml_text(patch.plan_yaml)
+            (home.root / "plan.yaml").write_text(patch.plan_yaml, encoding="utf-8")
+            changes.append("plan.yaml")
         if patch.extra:
             raise _CatalogConfigError(
                 f"ProfilePatch 不支持 extra 字段: {', '.join(sorted(patch.extra))}"
@@ -613,6 +621,14 @@ class _CatalogConfigError(AssistantCatalogError):
         self.message = message
 
 
+class PlanOverlayValidationError(AssistantCatalogError):
+    """``{home}/plan.yaml`` schema 校验失败（fail-closed，ADR-0242 I-B11）。
+
+    消息必须指出文件路径与底层校验错误，便于用户经 ``revise_profile``
+    修正后重试；不允许静默忽略损坏的覆盖。
+    """
+
+
 # ── helpers ──────────────────────────────────────────────────────────
 
 
@@ -722,6 +738,43 @@ def _read_json(path: Path) -> dict[str, object]:
     if not isinstance(data, dict):
         raise ValueError(f"{path}: 顶层不是 JSON object")
     return data
+
+
+def _load_plan_overlay(home: Path) -> PlanOverlay | None:
+    """读 ``{home}/plan.yaml`` 并校验为 ``PlanOverlay``；文件缺失返回 None。
+
+    旧助理（创建于 plan.yaml 进 digest 之前）无该文件 ⇒ 返回 None（无覆盖，
+    I-B8 无 overlay 路径行为不变）。文件存在但 schema 非法 ⇒ fail-closed，
+    防止损坏的覆盖静默进入 Resolve → Compile 管线。
+    """
+    plan_path = home / "plan.yaml"
+    if not plan_path.is_file():
+        return None
+    return _parse_plan_overlay(plan_path.read_text(encoding="utf-8"), source=str(plan_path))
+
+
+def _validate_plan_yaml_text(text: str) -> PlanOverlay:
+    """校验 ``revise_profile`` 传入的 plan.yaml 原始文本（ADR-0242 D10）。"""
+    return _parse_plan_overlay(text, source="plan.yaml")
+
+
+def _parse_plan_overlay(text: str, *, source: str) -> PlanOverlay:
+    """YAML 文本 → ``PlanOverlay``；形状非法抛 ``PlanOverlayValidationError``。
+
+    只做 schema 形状校验（未知字段 fail-closed）；模板 / section / bundle
+    的「已登记」校验在 compile 层（持有注册表的层）。
+    """
+    try:
+        raw = yaml.safe_load(text) or {}
+        if not isinstance(raw, dict):
+            raise PlanOverlayValidationError(
+                f"{source}: 顶层必须是 mapping，得到 {type(raw).__name__}"
+            )
+        return PlanOverlay.model_validate(raw)
+    except PlanOverlayValidationError:
+        raise
+    except Exception as exc:
+        raise PlanOverlayValidationError(f"{source}: plan.yaml 校验失败: {exc}") from exc
 
 
 def _write_json(path: Path, data: Mapping[str, object]) -> None:
@@ -934,6 +987,7 @@ __all__ = [
     "AssistantCatalogImpl",
     "AssistantDigestMismatch",
     "Config",
+    "PlanOverlayValidationError",
     "SoulValidationError",
     "setup",
 ]

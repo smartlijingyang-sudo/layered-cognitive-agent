@@ -122,6 +122,11 @@ class ProfilePatch:
     goals_yaml: str | None = None
     grants_yaml: str | None = None
     tools_yaml: str | None = None
+    plan_yaml: str | None = None
+    """``{home}/plan.yaml`` 的原始 YAML 文本（ADR-0242 D10）。
+
+    None = 不动；非 None = 覆盖整个 plan.yaml（须通过 ``PlanOverlay``
+    schema 校验，未知字段 fail-closed），digest 重算并 ``revision_seq++``。"""
     skills: tuple[str, ...] | None = None  # skill_ids 覆盖
     routines: tuple[str, ...] | None = None  # job_ids 覆盖
     extra: dict[str, str] = field(default_factory=dict)

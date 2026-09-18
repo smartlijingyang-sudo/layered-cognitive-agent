@@ -124,6 +124,12 @@ def compiled_run_plan_to_dict(plan: CompiledRunPlan) -> dict[str, Any]:
         "capability": _capability_plan_to_dict(inner.capability),
         "control": _control_entries_to_dict(inner),
         "scope": _scope_plan_to_dict(inner.scope),
+        # ADR-0242 D10：per-agent prompt 覆盖（诊断投影可见）。
+        "prompt_template_id": inner.prompt_template_id,
+        "prompt_section_overrides": [
+            {"name": section.name, "content": section.content}
+            for section in inner.prompt_section_overrides
+        ],
     }
     result["declarative"] = _declarative_payload(inner)
     return result

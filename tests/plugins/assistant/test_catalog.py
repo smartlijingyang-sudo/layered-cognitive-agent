@@ -44,6 +44,7 @@ from lca.plugins.domain.assistant.catalog.plugin import (
     AssistantCatalogImpl,
     AssistantDigestMismatch,
     Config,
+    PlanOverlayValidationError,
     setup,
 )
 
@@ -263,6 +264,50 @@ class TestGet:
         with pytest.raises(AssistantDigestMismatch):
             catalog.get(handle.assistant_id)
 
+    def test_get_returns_plan_overlay_and_manifest_digest(
+        self,
+        catalog: AssistantCatalogImpl,
+        request_default: CreateAssistantRequest,
+    ) -> None:
+        """get() 必须返回 plan_overlay（默认空覆盖）与 manifest_digest（缓存键）。"""
+        handle = catalog.create(request_default)
+        spec = catalog.get(handle.assistant_id)
+        assert spec.manifest_digest.startswith("sha256:")
+        assert spec.plan_overlay is not None
+        assert spec.plan_overlay.prompt.template is None
+        assert spec.plan_overlay.graph.subgraphs == {}
+
+    def test_get_returns_plan_overlay_from_plan_yaml(
+        self,
+        catalog: AssistantCatalogImpl,
+        request_default: CreateAssistantRequest,
+    ) -> None:
+        """Home 的 plan.yaml 解析为 ``plan_overlay`` 进入 AssistantSpec。"""
+        handle = catalog.create(request_default)
+        home = Path(handle.home_path)
+        (home / "plan.yaml").write_text(
+            "prompt:\n  template: react_prompt\n  sections:\n    - name: role\n",
+            encoding="utf-8",
+        )
+        catalog.reimport(handle.assistant_id, reason="plan.yaml 测试")
+        spec = catalog.get(handle.assistant_id)
+        assert spec.plan_overlay is not None
+        assert spec.plan_overlay.prompt.template == "react_prompt"
+        assert [s.name for s in spec.plan_overlay.prompt.sections] == ["role"]
+
+    def test_get_invalid_plan_yaml_fails_closed(
+        self,
+        catalog: AssistantCatalogImpl,
+        request_default: CreateAssistantRequest,
+    ) -> None:
+        """plan.yaml 形状非法 ⇒ fail-closed（ADR-0242 I-B11）。"""
+        handle = catalog.create(request_default)
+        home = Path(handle.home_path)
+        (home / "plan.yaml").write_text("prompt:\n  bogus_field: x\n", encoding="utf-8")
+        catalog.reimport(handle.assistant_id, reason="plan.yaml 测试")
+        with pytest.raises(PlanOverlayValidationError, match=r"plan\.yaml"):
+            catalog.get(handle.assistant_id)
+
 
 # ── revise_profile: model/runtime 写盘（ADR-0242 D9/PR-8）───────────
 
@@ -398,6 +443,31 @@ class TestMemoryLayerDigestPolicy:
         (Path(handle.home_path) / "USER.md").write_text("tampered", encoding="utf-8")
         with pytest.raises(AssistantDigestMismatch):
             catalog.get(handle.assistant_id)
+
+
+# ── plan.yaml 进 manifest digest（ADR-0242 D10 / I-B10）──────────────
+
+
+class TestPlanYamlDigest:
+    def test_plan_yaml_tamper_breaks_get(self, catalog: AssistantCatalogImpl) -> None:
+        """plan.yaml 是配置面：直接改文件 ⇒ digest 不匹配 ⇒ fail-closed。"""
+        handle = catalog.create(CreateAssistantRequest(name="Plan实验"))
+        (Path(handle.home_path) / "plan.yaml").write_text(
+            "prompt:\n  template: react_prompt\n", encoding="utf-8"
+        )
+        with pytest.raises(AssistantDigestMismatch):
+            catalog.get(handle.assistant_id)
+
+    def test_plan_yaml_present_in_manifest_digests(
+        self,
+        catalog: AssistantCatalogImpl,
+        request_default: CreateAssistantRequest,
+    ) -> None:
+        """manifest.digests 必须包含 plan.yaml 的 sha256。"""
+        handle = catalog.create(request_default)
+        manifest = json.loads((Path(handle.home_path) / "manifest.json").read_text())
+        assert "plan.yaml" in manifest["digests"]
+        assert manifest["digests"]["plan.yaml"].startswith("sha256:")
 
 
 # ── revise / reimport 已实现(ADR-0242 PR-5);retire 仍占位 ──────────

@@ -126,6 +126,44 @@ class TestReviseProfile:
         with pytest.raises(AssistantCatalogError, match="未指定"):
             catalog.revise_profile(assistant_id, ProfilePatch())
 
+    def test_plan_yaml_patch_revises_digest_seq_snapshot_and_ep(
+        self,
+        catalog: AssistantCatalogImpl,
+        emitted: list[tuple[str, dict[str, Any]]],
+    ) -> None:
+        """plan.yaml patch：写盘 + digest 重算 + revision_seq++ + revisions 快照 + EP。"""
+        assistant_id = _create(catalog)
+        old_seq = catalog.get(assistant_id).revision_seq
+        old_digest = catalog.get(assistant_id).manifest_digest
+
+        revision = catalog.revise_profile(
+            assistant_id,
+            ProfilePatch(plan_yaml="prompt:\n  template: react_prompt\n"),
+            actor="agent",
+        )
+
+        assert revision.revision_seq == old_seq + 1
+        home = Path(catalog.get(assistant_id).home_path)
+        assert (home / "plan.yaml").read_text(encoding="utf-8") == (
+            "prompt:\n  template: react_prompt\n"
+        )
+        snapshot = home / "revisions" / f"{revision.revision_seq}.json"
+        assert snapshot.is_file()
+
+        new_spec = catalog.get(assistant_id)
+        assert new_spec.manifest_digest != old_digest
+        assert new_spec.plan_overlay is not None
+        assert new_spec.plan_overlay.prompt.template == "react_prompt"
+
+        ep_events = [e for e in emitted if e[0] == ASSISTANT_PROFILE_REVISED]
+        assert len(ep_events) == 1
+        assert "plan.yaml" in ep_events[0][1]["changes"]
+
+    def test_plan_yaml_patch_invalid_fails_closed(self, catalog: AssistantCatalogImpl) -> None:
+        assistant_id = _create(catalog)
+        with pytest.raises(AssistantCatalogError, match=r"plan\.yaml"):
+            catalog.revise_profile(assistant_id, ProfilePatch(plan_yaml="prompt:\n  bogus: x\n"))
+
 
 class TestReimport:
     def test_reimport_recomputes_digests(self, catalog: AssistantCatalogImpl) -> None:

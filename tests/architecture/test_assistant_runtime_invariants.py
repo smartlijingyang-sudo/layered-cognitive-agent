@@ -315,6 +315,74 @@ class TestRuntimePersonaInjection:
         assert "role_profile" in text, "RunnableBuildRequest 必须携带 role_profile（ADR-0242 D3）"
 
 
+# ── ADR-0242 PR-7：plan.yaml 配置面 + 17-section 闭集不变 ─────────────
+
+
+class TestPlanYamlConfigFace:
+    """plan.yaml 进配置面 digest；模板目录必须带默认文件（I-B10/I-B11）。"""
+
+    def test_plan_yaml_in_config_face_files(self) -> None:
+        from lca.plugins.assistant.home._home_layout import CONFIG_FACE_FILES
+
+        assert "plan.yaml" in CONFIG_FACE_FILES
+
+    def test_all_template_dirs_have_plan_yaml(self) -> None:
+        from lca.plugins.assistant.home._home_layout import TEMPLATE_REGISTRY
+
+        templates_root = REPO / "lca/plugins/assistant/templates"
+        for dir_name in TEMPLATE_REGISTRY.values():
+            assert (templates_root / dir_name / "plan.yaml").is_file(), f"{dir_name}/plan.yaml 缺失"
+
+
+class TestPromptSectionRegistryUnchanged:
+    """plan.yaml 只能引用既有 section 注册表闭集（ADR-0242 I-B11 / C1）。
+
+    新增 section 类型必须走 ADR 闭集扩展流程并同步本闭集常量。
+    """
+
+    def test_registered_prompt_section_names_unchanged(self) -> None:
+        from lca.contracts.models.cognition.prompt_assembly import (
+            REGISTERED_PROMPT_SECTION_NAMES,
+        )
+
+        assert (
+            frozenset(
+                {
+                    "role",
+                    "goal",
+                    "backstory",
+                    "available_skills",
+                    "react_workflow",
+                    "react_tool_usage_guidelines",
+                    "routing_instructions",
+                    "hierarchical_instructions",
+                    "tools",
+                    "cloud_sandbox",
+                    "current_date",
+                    "task",
+                    "activated_skills",
+                    "context",
+                    "teammates",
+                    "assigned_roles_text",
+                    "member_reports_text",
+                    "member_status_text",
+                    "evidence_pack_text",
+                }
+            )
+            == REGISTERED_PROMPT_SECTION_NAMES
+        )
+
+    def test_builtin_template_ids_unchanged(self) -> None:
+        from lca.contracts.models.cognition.prompt_assembly import (
+            BUILTIN_PROMPT_TEMPLATE_IDS,
+        )
+
+        assert (
+            frozenset({"react_prompt", "routing_prompt", "hierarchical_prompt"})
+            == BUILTIN_PROMPT_TEMPLATE_IDS
+        )
+
+
 # ── 辅助 ──────────────────────────────────────────────────────────
 
 

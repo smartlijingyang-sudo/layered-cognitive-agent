@@ -26,6 +26,12 @@ from lca.application.runtime.plan_resolution import (
     PlanResolutionResult,
     PlanResolutionService,
 )
+from lca.contracts.models.assistant.plan_overlay import (
+    GraphOverride,
+    PlanOverlay,
+    PromptOverride,
+    SectionOverride,
+)
 from lca.harness.composition import (
     CompileOptions,
     PlanCompilerError,
@@ -353,7 +359,144 @@ def test_module_imports_real_symbols() -> None:
     import lca.application.runtime.plan_resolution as mod
 
     assert mod.resolve_profile is _real_resolve_profile
-    from lca.harness.composition import plan_compiler
+    from lca.harness.composition import PlanCompilerError, compile_plan
 
-    assert mod.compile_plan is plan_compiler.compile_plan
-    assert mod.PlanCompilerError is plan_compiler.PlanCompilerError
+    assert mod.compile_plan is compile_plan
+    assert mod.PlanCompilerError is PlanCompilerError
+
+
+# ── ADR-0242 I-B10：per-agent 编译缓存 (assistant_id, manifest_digest) ──
+
+
+class TestPerAgentCompileCache:
+    """真实 resolve+compile 路径：缓存键 = (assistant_id, manifest_digest)。
+
+    改 agent A 的 plan.yaml（digest D1→D2）只重编译 A；B 的缓存不受影响。
+    """
+
+    WEB_STANDARD = "profiles/web-standard.yaml"
+
+    def _overlay_d1(self) -> PlanOverlay:
+        return PlanOverlay(prompt=PromptOverride(template="react_prompt"))
+
+    def _overlay_d2(self) -> PlanOverlay:
+        return PlanOverlay(
+            prompt=PromptOverride(
+                template="hierarchical_prompt",
+                sections=(SectionOverride(name="role"),),
+            )
+        )
+
+    def test_cache_hit_returns_same_refs_and_cached_flag(self) -> None:
+        service = PlanResolutionService()
+        d1 = self._overlay_d1()
+
+        r1 = service.resolve_refs(
+            self.WEB_STANDARD, assistant_id="A", manifest_digest="D1", plan_overlay=d1
+        )
+        assert r1.cached is False
+
+        r1_again = service.resolve_refs(
+            self.WEB_STANDARD, assistant_id="A", manifest_digest="D1", plan_overlay=d1
+        )
+        assert r1_again.cached is True
+        assert r1_again.plan_ref == r1.plan_ref
+        assert r1_again.graph_ref == r1.graph_ref
+        assert r1_again.plugin_set_ref == r1.plugin_set_ref
+
+    def test_digest_change_recompiles_same_assistant(self) -> None:
+        service = PlanResolutionService()
+        d1 = self._overlay_d1()
+        d2 = self._overlay_d2()
+
+        r1 = service.resolve_refs(
+            self.WEB_STANDARD, assistant_id="A", manifest_digest="D1", plan_overlay=d1
+        )
+        r2 = service.resolve_refs(
+            self.WEB_STANDARD, assistant_id="A", manifest_digest="D2", plan_overlay=d2
+        )
+        assert r2.cached is False
+        # D2 的 prompt 覆盖不同 ⇒ 编译产物不同
+        assert r2.compiled_plan.prompt_template_id == "hierarchical_prompt"
+        assert r1.compiled_plan.prompt_template_id == "react_prompt"
+        # 子图覆盖不同才必然改变 graph_ref；这里至少 plan 内容不同
+        assert r2.compiled_plan is not r1.compiled_plan
+
+    def test_other_assistant_cache_independent(self) -> None:
+        service = PlanResolutionService()
+        d1 = self._overlay_d1()
+
+        r_a = service.resolve_refs(
+            self.WEB_STANDARD, assistant_id="A", manifest_digest="D1", plan_overlay=d1
+        )
+        assert r_a.cached is False
+        r_b = service.resolve_refs(
+            self.WEB_STANDARD, assistant_id="B", manifest_digest="D1", plan_overlay=d1
+        )
+        assert r_b.cached is False
+        # B 的缓存独立：再次调用 B,D1 命中，不影响 A 的缓存
+        r_b_again = service.resolve_refs(
+            self.WEB_STANDARD, assistant_id="B", manifest_digest="D1", plan_overlay=d1
+        )
+        assert r_b_again.cached is True
+        r_a_again = service.resolve_refs(
+            self.WEB_STANDARD, assistant_id="A", manifest_digest="D1", plan_overlay=d1
+        )
+        assert r_a_again.cached is True
+
+    def test_subgraph_override_changes_graph_ref(self) -> None:
+        service = PlanResolutionService()
+        d1 = PlanOverlay(
+            graph=GraphOverride(subgraphs={"think": "bundles/think/think_subgraph.yaml"})
+        )
+        d2 = PlanOverlay(graph=GraphOverride(subgraphs={"think": "bundles/act/act_subgraph.yaml"}))
+
+        r1 = service.resolve_refs(
+            self.WEB_STANDARD, assistant_id="A", manifest_digest="D1", plan_overlay=d1
+        )
+        r2 = service.resolve_refs(
+            self.WEB_STANDARD, assistant_id="A", manifest_digest="D2", plan_overlay=d2
+        )
+        assert r2.cached is False
+        assert r2.graph_ref != r1.graph_ref
+
+    def test_no_overlay_skips_cache(self) -> None:
+        service = PlanResolutionService()
+        r1 = service.resolve_refs(self.WEB_STANDARD)
+        r2 = service.resolve_refs(self.WEB_STANDARD)
+        assert r1.cached is False
+        assert r2.cached is False
+
+    def test_empty_assistant_or_digest_skips_cache(self) -> None:
+        service = PlanResolutionService()
+        overlay = self._overlay_d1()
+        r = service.resolve_refs(
+            self.WEB_STANDARD, assistant_id="", manifest_digest="", plan_overlay=overlay
+        )
+        assert r.cached is False
+        r2 = service.resolve_refs(
+            self.WEB_STANDARD, assistant_id="A", manifest_digest="", plan_overlay=overlay
+        )
+        assert r2.cached is False
+
+    def test_assistant_spec_provider_feeds_digest_and_overlay(self) -> None:
+        """composition root 注入 catalog 解析器后，facade 路径可走 per-agent 缓存。"""
+        from types import SimpleNamespace
+
+        overlay = self._overlay_d1()
+        spec = SimpleNamespace(manifest_digest="D1", plan_overlay=overlay)
+        service = PlanResolutionService(
+            assistant_spec_provider=lambda aid: spec if aid == "A" else None
+        )
+
+        r1 = service.resolve_refs(self.WEB_STANDARD, assistant_id="A")
+        assert r1.cached is False
+        assert r1.compiled_plan.prompt_template_id == "react_prompt"
+
+        r2 = service.resolve_refs(self.WEB_STANDARD, assistant_id="A")
+        assert r2.cached is True
+
+        # 未知 assistant ⇒ provider 返回 None ⇒ 无缓存、无覆盖
+        r_unknown = service.resolve_refs(self.WEB_STANDARD, assistant_id="ghost")
+        assert r_unknown.cached is False
+        assert r_unknown.compiled_plan.prompt_template_id is None

@@ -163,6 +163,29 @@ class TestCompiledRunPlan:
         )
         assert scope_sub_plan_hash(plan) == scope_plan_hash(scope)
 
+    def test_prompt_override_fields_default_and_normalize(self) -> None:
+        """ADR-0242 D10：prompt 覆盖字段有默认值，且 tuple 归一化。"""
+        from lca.contracts.models.assistant.plan_overlay import SectionOverride
+
+        capability, scope = _minimal_plan_inputs()
+        plan = CompiledRunPlan(
+            profile_path="x.yaml",
+            capability=capability,
+            scope=scope,
+        )
+        assert plan.prompt_template_id is None
+        assert plan.prompt_section_overrides == ()
+
+        plan2 = CompiledRunPlan(
+            profile_path="x.yaml",
+            capability=capability,
+            scope=scope,
+            prompt_template_id="react_prompt",
+            prompt_section_overrides=[SectionOverride(name="role")],
+        )
+        assert plan2.prompt_template_id == "react_prompt"
+        assert plan2.prompt_section_overrides == (SectionOverride(name="role"),)
+
 
 class TestCompiledRunPlanHash:
     def test_plan_ref_is_stable(self) -> None:

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from lca.contracts.models.assistant.plan_overlay import SectionOverride
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
     DECLARATIVE_PLAN_VERSION,
 )
@@ -23,15 +24,16 @@ from lca.contracts.protocols.declarative.declarative_1.declarative_graph import 
     ReplacementDecision,
     ValidationReport,
 )
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import PluginSpec
+from lca.contracts.protocols.perceive.capability_plan import CapabilityPlan
+from lca.contracts.protocols.state.scope_plan import ScopePlan
+
 # PhaseBinding / ControlEntry / CognitivePhaseGraphPlan retired in ADR-0221 P3:
 # the v2 runtime builds its executable plan directly from
 # ``PlanInterpreter`` + NodeExecutor subgraphs, so the plan no longer
 # carries the v1 declarative phase graph region.
 DeclarativeControlEntry = None  # type: ignore[misc]
 PhaseBinding = None  # type: ignore[misc]
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import PluginSpec
-from lca.contracts.protocols.perceive.capability_plan import CapabilityPlan
-from lca.contracts.protocols.state.scope_plan import ScopePlan
 
 # Schema version for CompiledRunPlan. v2 evolves v1; it is not a parallel plan.
 COMPILED_RUN_PLAN_VERSION: str = DECLARATIVE_PLAN_VERSION
@@ -62,6 +64,12 @@ class CompiledRunPlan:
     action_authority: ActionAuthorityPlan | None = None
     provenance: PlanProvenance | None = None
     validation_report: ValidationReport = field(default_factory=ValidationReport)
+    prompt_template_id: str | None = None
+    """per-agent ``plan.yaml`` 选择的模板 id（ADR-0242 D10）；None = 继承 profile 默认。"""
+    prompt_section_overrides: tuple[SectionOverride, ...] = ()
+    """per-agent ``plan.yaml`` 的 section 内容覆盖（ADR-0242 D10）。
+
+    只携带数据覆盖；渲染期消费由 prompt 装配层读取。空 = 无覆盖。"""
 
     def __post_init__(self) -> None:
         if not self.profile_path:
@@ -80,6 +88,7 @@ class CompiledRunPlan:
             "capability_bindings",
             "control_entries",
             "replacement_map",
+            "prompt_section_overrides",
         ):
             value = getattr(self, name)
             if not isinstance(value, tuple):

@@ -170,6 +170,10 @@ class DefaultRuntimeFacade(RuntimeFacade):
         result: PlanResolutionResult = self._plans.resolve_refs(
             intent.profile_path,
             session_id=session_id,
+            # ADR-0242 D10: facade 路径透传 assistant_id；PlanResolutionService
+            # 在 composition root 注入 catalog 解析器时据此走 per-agent 缓存。
+            # 无 assistant_id / 无 provider 时行为与启用前一致（I-B8）。
+            assistant_id=intent.assistant_id or "",
         )
 
         activation_ref = compute_activation_ref(

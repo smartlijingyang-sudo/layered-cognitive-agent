@@ -21,6 +21,11 @@ from pathlib import Path
 import yaml
 
 from lca.contracts.atoms.scope.scope import Scope
+from lca.contracts.models.assistant.plan_overlay import PlanOverlay
+from lca.contracts.models.cognition.prompt_assembly import (
+    BUILTIN_PROMPT_TEMPLATE_IDS,
+    REGISTERED_PROMPT_SECTION_NAMES,
+)
 from lca.contracts.protocols.state.plan import (
     COMPILED_RUN_PLAN_VERSION,
     CompiledRunPlan,
@@ -65,27 +70,60 @@ class V2ExecutablePlan:
     plugin_specs: tuple = ()  # delegated to ``inner.plugin_specs`` at construction; surfaced here so CLI / introspection see the catalog without reaching into ``inner``.
 
 
-def _wrap_v2_plan(plan, *, resolved):
+def _resolve_bundle_path(entry: str, resolved: ResolvedProfile) -> Path:
+    """把 bundle 引用解析为文件路径（相对 profile 目录的条目先归一化）。"""
+    path = Path(entry)
+    if not path.exists():
+        profile = Path(resolved.profile_path or ".")
+        candidate = profile.parent / entry
+        if candidate.exists():
+            path = candidate
+    return path
+
+
+def _apply_subgraph_overrides(graph_spec: dict, subgraph_overrides: dict[str, str]) -> None:
+    """把 outer plan 中 ``region: phase:<name>`` 节点的 ``sub_spec_ref.plan_ref``
+    改写为 plan.yaml 声明的实验 bundle 路径（ADR-0242 D10）。
+
+    ``graph_spec`` 是每次编译从 yaml 新读出的 dict，原地改写安全；运行期
+    ``BundleSubgraphResolver`` 按 ``sub_spec_ref.plan_ref`` 解析子图，因此
+    改这里即改运行期 phase 子图组合。
+    """
+    for node in graph_spec.get("nodes") or []:
+        if not isinstance(node, dict):
+            continue
+        region = str(node.get("region", ""))
+        if not region.startswith("phase:"):
+            continue
+        phase = region[len("phase:") :]
+        new_path = subgraph_overrides.get(phase)
+        if new_path is None:
+            continue
+        sub_spec_ref = node.get("sub_spec_ref")
+        if isinstance(sub_spec_ref, dict):
+            sub_spec_ref["plan_ref"] = new_path
+
+
+def _wrap_v2_plan(plan, *, resolved, overlay: PlanOverlay | None = None):
     """Read the v2 graph spec from the resolved bundle yaml.
 
     Falls back to an empty graph when no bundle carries ``nodes``/
     ``edges`` — the interpreter will terminate immediately, which is
     the desired fail-loud signal for a missing bundle.
+
+    ``overlay`` 非空时（ADR-0242 D10）：把 phase 子图 bundle 路径替换为
+    plan.yaml 声明的实验路径，并改写 outer plan 的 ``sub_spec_ref``。
     """
 
     graph_spec = {"id": resolved.profile_path, "nodes": [], "edges": []}
     bundles = getattr(resolved, "bundles", ()) or ()
+    subgraph_overrides = dict(overlay.graph.subgraphs) if overlay is not None else {}
     for entry in bundles:
         if not isinstance(entry, str):
             continue
-        path = Path(entry)
+        path = _resolve_bundle_path(entry, resolved)
         if not path.exists():
-            profile = Path(resolved.profile_path or ".")
-            candidate = profile.parent / entry
-            if candidate.exists():
-                path = candidate
-            else:
-                continue
+            continue
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         if not (isinstance(data, dict) and ("nodes" in data or "edges" in data)):
             continue
@@ -97,9 +135,25 @@ def _wrap_v2_plan(plan, *, resolved):
         # ``.subgraph``) is selected as the v2 graph spec.
         bundle_id = str(data.get("id", ""))
         if bundle_id.endswith(".subgraph"):
+            region = str(data.get("region", "")) or bundle_id[: -len(".subgraph")]
+            if region in subgraph_overrides:
+                # 覆盖路径必须可解析为 v2 bundle graph（fail-closed）。
+                entry = subgraph_overrides[region]
+                path = _resolve_bundle_path(entry, resolved)
+                if not path.is_file():
+                    raise PlanCompilerError(
+                        f"plan.yaml 子图覆盖 bundle 不存在: {entry!r} (phase={region!r})"
+                    )
+                data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+                if not (isinstance(data, dict) and "nodes" in data):
+                    raise PlanCompilerError(
+                        f"plan.yaml 子图覆盖不是 v2 bundle graph: {entry!r} (phase={region!r})"
+                    )
             continue
         graph_spec = data
         break
+    if subgraph_overrides:
+        _apply_subgraph_overrides(graph_spec, subgraph_overrides)
     # ADR-0221 P3: when no node carries ``entry: true``, mark the first
     # node as the entry so the v2 traversal has a starting point.
     nodes = graph_spec.get("nodes") or []
@@ -155,25 +209,84 @@ class CompileOptions:
             raise TypeError("require_executable_phase_graph must be a boolean")
 
 
+def _known_template_ids(resolved: ResolvedProfile) -> frozenset[str]:
+    """返回可登记的模板 id 闭集：内建模板 + profile 声明的扩展模板。"""
+    ids = set(BUILTIN_PROMPT_TEMPLATE_IDS)
+    for plugin in getattr(resolved, "plugins", ()):
+        cfg = getattr(plugin, "config", None)
+        profile_templates = getattr(cfg, "profile_templates", None)
+        if not profile_templates:
+            continue
+        for tpl in profile_templates:
+            tid = getattr(tpl, "id", None)
+            if tid:
+                ids.add(tid)
+    return frozenset(ids)
+
+
+def _validate_overlay_registrations(resolved: ResolvedProfile, overlay: PlanOverlay) -> None:
+    """plan.yaml 只能组合**已登记**模板 / section / bundle（ADR-0242 I-B11）。
+
+    - 模板 id ∈ 内建 + profile 声明模板注册表；
+    - section 名 ∈ 既有 section 注册表闭集；
+    - 子图 bundle 路径可解析为 v2 bundle graph（``nodes`` 存在）。
+
+    任一项不满足 ⇒ ``PlanCompilerError``（fail-closed），不静默忽略。
+    """
+    if overlay.prompt.template is not None:
+        known = _known_template_ids(resolved)
+        if overlay.prompt.template not in known:
+            raise PlanCompilerError(
+                f"plan.yaml 模板未登记: {overlay.prompt.template!r};"
+                f"已知模板: {', '.join(sorted(known))}"
+            )
+    for section in overlay.prompt.sections:
+        if section.name not in REGISTERED_PROMPT_SECTION_NAMES:
+            raise PlanCompilerError(
+                f"plan.yaml section 未登记: {section.name!r};"
+                f"已知 section: {', '.join(sorted(REGISTERED_PROMPT_SECTION_NAMES))}"
+            )
+    for phase, bundle_path in overlay.graph.subgraphs.items():
+        path = _resolve_bundle_path(bundle_path, resolved)
+        if not path.is_file():
+            raise PlanCompilerError(
+                f"plan.yaml 子图覆盖 bundle 不存在: {bundle_path!r} (phase={phase!r})"
+            )
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        if not (isinstance(data, dict) and "nodes" in data):
+            raise PlanCompilerError(
+                f"plan.yaml 子图覆盖不是 v2 bundle graph: {bundle_path!r} (phase={phase!r})"
+            )
+
+
 def compile_plan(
     resolved: ResolvedProfile,
     *,
     options: CompileOptions | None = None,
+    overlay: PlanOverlay | None = None,
 ) -> CompiledRunPlan:
     """Compile ``ResolvedProfile`` into an immutable ``CompiledRunPlan``.
 
-    v2 shape: ``phase_graph`` is always ``None`` and ``phase_bindings``
-    is always empty. Callers that need the executable graph ask
-    ``PlanInterpreter`` for it at boot.
+    v2 shape: ``phase_graph`` 永远是 None、``phase_bindings`` 永远为空。
+    需要可执行图的调用方在 boot 时向 ``PlanInterpreter`` 索取。
 
-    ``plugin_specs`` is the projection of every enabled
+    ``plugin_specs`` 是 resolved profile 上每个启用
     :class:`~lca.contracts.protocols.declarative.declarative_2.declarative_plugin.PluginSpec`
-    on the resolved profile (ADR-0221 P3). CLI surfaces such as
-    ``lca-ops kernel_compose --json`` and the ``V2ExecutablePlan.plugin_specs``
-    field surface this list so operators can enumerate the loaded plugin
-    catalog without re-running ``resolve_profile``.
+    的投影（ADR-0221 P3）。CLI 面（``lca-ops kernel_compose --json``、
+    ``V2ExecutablePlan.plugin_specs``）据此枚举已加载插件目录而无需重跑
+    ``resolve_profile``。
+
+    ``overlay``（ADR-0242 D10）：per-agent ``plan.yaml`` 覆盖。非空时：
+    1. 校验模板 / section / bundle 均已登记（I-B11 fail-closed）；
+    2. 子图覆盖改写 v2 bundle walk 与 outer plan 的 ``sub_spec_ref``；
+    3. prompt 覆盖附着到 ``CompiledRunPlan`` 的新字段。
+
+    ``overlay=None`` 时行为与启用前完全一致（I-B8：无 assistant 路径
+    byte-identical）。
     """
     opts = options or CompileOptions()
+    if overlay is not None:
+        _validate_overlay_registrations(resolved, overlay)
     cap_options = CapabilityPlanOptions(include_disabled=opts.include_disabled)
     capability = project_capability_plan(resolved, options=cap_options)
     scope = ScopePlan(
@@ -205,8 +318,12 @@ def compile_plan(
             # max_visits per-node ceiling is gone).
             # Empty plugin_specs => SOLO defaults (respond/use_tool/stop/ask_human).
             action_authority=compile_action_authority(()),
+            # ADR-0242 D10: per-agent prompt 覆盖附着到编译计划（L3 数据变换）。
+            prompt_template_id=overlay.prompt.template if overlay is not None else None,
+            prompt_section_overrides=overlay.prompt.sections if overlay is not None else (),
         ),
         resolved=resolved,
+        overlay=overlay,
     )
 
 

@@ -54,6 +54,9 @@ DEFAULT_TEMPLATE_DIR_NAME: str = "assistant_default"
 SCHEMA_VERSION: int = 1
 
 # 配置面参与 manifest digest 的文件清单(MEMORY.md / memory/ 不在列:I-A13)
+# plan.yaml 是 per-agent plan/prompt 覆盖(ADR-0242 D10),进 digest:
+# 修改 plan.yaml ⇒ manifest_digest 变化 ⇒ (assistant_id, manifest_digest)
+# 缓存键变化 ⇒ 下一 run 重新编译(I-B10)。
 CONFIG_FACE_FILES: tuple[str, ...] = (
     "profile.json",
     "SOUL.md",
@@ -62,6 +65,7 @@ CONFIG_FACE_FILES: tuple[str, ...] = (
     "goals.yaml",
     "grants.yaml",
     "tools.yaml",
+    "plan.yaml",
 )
 
 # Home 占位子目录(空目录占位)

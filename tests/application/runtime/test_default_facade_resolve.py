@@ -127,6 +127,7 @@ class TestSessionIdHandling:
         service.resolve_refs.assert_called_once_with(
             "/abs/profiles/sample.yaml",
             session_id="sess_explicit",
+            assistant_id="",
         )
 
     def test_resolve_generates_session_id_when_missing(self) -> None:
@@ -180,6 +181,7 @@ class TestPlanServiceInteraction:
         service.resolve_refs.assert_called_once_with(
             "/abs/profiles/x.yaml",
             session_id="s",
+            assistant_id="",
         )
 
     def test_resolve_passes_session_id_to_plan_service(self) -> None:
@@ -192,6 +194,7 @@ class TestPlanServiceInteraction:
         service.resolve_refs.assert_called_once_with(
             "/abs/profiles/sample.yaml",
             session_id="sess_fixed",
+            assistant_id="",
         )
         assert act.session_id == "sess_fixed"
 
@@ -306,6 +309,7 @@ class TestMagicMockSpecContract:
         service.resolve_refs.assert_called_once_with(
             "/abs/profiles/sample.yaml",
             session_id="sess-1",
+            assistant_id="",
         )
         assert act.session_id == "sess-1"
 

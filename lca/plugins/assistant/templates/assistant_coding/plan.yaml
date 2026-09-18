@@ -1,0 +1,4 @@
+# plan.yaml — per-agent plan/prompt 覆盖（ADR-0242 D10）。
+# 留空 = 继承 profile 默认 plan/prompt；修改须经 revise_profile。
+prompt: {}
+graph: {}

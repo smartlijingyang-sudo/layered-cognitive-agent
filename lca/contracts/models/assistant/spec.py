@@ -22,6 +22,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from lca.contracts.models.assistant.plan_overlay import PlanOverlay
+
 if TYPE_CHECKING:
     from lca.contracts.protocols.journal.spec.spec import AgentSpec
 
@@ -70,7 +72,8 @@ class AssistantSpec:
     失败（fail-closed，由 Catalog 调用方抛出）。
 
     时序：Catalog 解析 Home ⇒ 校验 manifest 配置面 digest ⇒ 产 ``AssistantSpec``
-    ⇒ 与 ``(assistant_id, manifest_digest)`` 一起缓存 CompiledRunPlan。
+    （含 ``manifest_digest`` 与 ``plan_overlay``）⇒ 与
+    ``(assistant_id, manifest_digest)`` 一起缓存 CompiledRunPlan。
 
     Ownership：助理域 SSOT 由 ``AssistantCatalog`` 持有；运行期 Runtime 不持有
     可变引用，只读消费 dataclass 字段。
@@ -103,6 +106,14 @@ class AssistantSpec:
     """profile.json 的 ``model``（ADR-0242 D9）；空 = 使用运行时/全局默认模型。"""
     profile_runtime: dict[str, object] = field(default_factory=dict)
     """profile.json 的 ``runtime``（ADR-0242 D9）；空 dict = 运行参数全部用默认值。"""
+    manifest_digest: str = ""
+    """manifest.json 的 ``manifest_digest``；与 ``(assistant_id, manifest_digest)``
+    一起作为 CompiledRunPlan 缓存键（ADR-0242 D10 / I-B10）。"""
+    plan_overlay: PlanOverlay | None = None
+    """``{home}/plan.yaml`` 解析出的覆盖（ADR-0242 D10）。
+
+    None = Home 无 plan.yaml（旧助理）或文件为空覆盖；非 None 时进入
+    Resolve → Compile 管线的 per-agent plan 合并（L3 编译）。"""
 
     def __post_init__(self) -> None:
         if not self.assistant_id or not self.assistant_id.strip():

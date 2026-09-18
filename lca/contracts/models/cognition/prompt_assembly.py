@@ -29,6 +29,40 @@ from lca.contracts.protocols.runtime.infra.infra import Tool
 SectionKind = Literal["pure", "stateful"]
 """Closed vocabulary for the kind of section a section plugin contributes."""
 
+# 内建模板注册表（lca.plugins.prompts.template_provider 的 built-ins）。
+# plan.yaml 的 ``prompt.template`` 只能选择已登记模板（ADR-0242 I-B11）；
+# 编译层用本闭集 + profile 声明的扩展模板做静态校验。
+BUILTIN_PROMPT_TEMPLATE_IDS: frozenset[str] = frozenset(
+    {"react_prompt", "routing_prompt", "hierarchical_prompt"}
+)
+
+# 内建 section 注册表（lca.plugins.prompts.sections 登记的名字闭集）。
+# plan.yaml 的 ``prompt.sections[*].name`` 必须落在本闭集内；``content``
+# 只是渲染数据覆盖，不是新 section 类型（ADR-0242 I-B11 / C1）。
+REGISTERED_PROMPT_SECTION_NAMES: frozenset[str] = frozenset(
+    {
+        "role",
+        "goal",
+        "backstory",
+        "available_skills",
+        "react_workflow",
+        "react_tool_usage_guidelines",
+        "routing_instructions",
+        "hierarchical_instructions",
+        "tools",
+        "cloud_sandbox",
+        "current_date",
+        "task",
+        "activated_skills",
+        "context",
+        "teammates",
+        "assigned_roles_text",
+        "member_reports_text",
+        "member_status_text",
+        "evidence_pack_text",
+    }
+)
+
 
 @dataclass(frozen=True, slots=True)
 class SectionOutput:

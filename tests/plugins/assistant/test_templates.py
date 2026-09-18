@@ -41,6 +41,8 @@ ROLE_TEMPLATES: tuple[str, ...] = (
     "assistant.daily",
 )
 
+TEMPLATES_DIR = Path(__file__).resolve().parents[3] / "lca/plugins/assistant/templates"
+
 
 @pytest.fixture
 def emitted() -> list[tuple[str, dict[str, Any]]]:
@@ -82,6 +84,24 @@ class TestTemplateRegistry:
     def test_render_unknown_template_raises(self) -> None:
         with pytest.raises(AssistantCatalogError, match="template_id"):
             render_template("assistant.nonexistent", name="x", description="")
+
+
+class TestPlanYamlTemplate:
+    """每个模板目录都必须有默认 plan.yaml（render_template 依赖它）。"""
+
+    @pytest.mark.parametrize("template_id", sorted(TEMPLATE_REGISTRY))
+    def test_template_dir_has_default_plan_yaml(self, template_id: str) -> None:
+        dir_name = TEMPLATE_REGISTRY[template_id]
+        plan_yaml = TEMPLATES_DIR / dir_name / "plan.yaml"
+        assert plan_yaml.is_file(), f"{dir_name}/plan.yaml 缺失"
+        text = plan_yaml.read_text(encoding="utf-8")
+        assert "prompt" in text and "graph" in text
+
+    @pytest.mark.parametrize("template_id", sorted(TEMPLATE_REGISTRY))
+    def test_rendered_home_includes_plan_yaml(self, template_id: str) -> None:
+        rendered = render_template(template_id, name="小助", description="测试职责")
+        assert "plan.yaml" in rendered.files, f"{template_id} 渲染结果缺 plan.yaml"
+        assert rendered.files["plan.yaml"].strip()
 
 
 class TestStructuredSoulTemplate:

@@ -679,8 +679,8 @@ flowchart TB
 - [ ] 创建后结构化汇报 + skill 强制复述
 - [ ] `profile.json` 支持 `model` / `opening_message` / `locale` / `runtime` 字段，契约测试
 - [ ] bridge 注册从 Home 读 `opening_message`，不再由 create 工具临时拼
-- [ ] `plan.yaml` schema（frozen 模型，未知字段 fail-closed）+ 进 manifest digest
-- [ ] `CompiledRunPlan` 缓存键升级为 `(assistant_id, manifest_digest)`，`plan.yaml` 变更触发重编译
+- [x] `plan.yaml` schema（frozen 模型，未知字段 fail-closed）+ 进 manifest digest
+- [x] `CompiledRunPlan` 缓存键升级为 `(assistant_id, manifest_digest)`，`plan.yaml` 变更触发重编译
 - [ ] `create_assistant_skill` / `skill_overlay.install` 只写 `{home}/skills/`，回归测试确认不写全局 store
 - [ ] 合并 `_home_layout.py` 唯一副本，删空壳包，清理 IDENTITY 残留（D12）
 - [ ] 删除 `evolve.py` COMPAT `SkillInstallReceipt`，复用 overlay 回执（D12）

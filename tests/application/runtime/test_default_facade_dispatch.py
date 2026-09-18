@@ -255,6 +255,7 @@ class TestResolveStillWorksAfterDispatchOverwrite:
         service.resolve_refs.assert_called_once_with(
             "/abs/profiles/sample.yaml",
             session_id="sess-regression",
+            assistant_id="",
         )
         # The dispatcher was NOT consulted during resolve.
         assert dispatcher.run_calls == []
