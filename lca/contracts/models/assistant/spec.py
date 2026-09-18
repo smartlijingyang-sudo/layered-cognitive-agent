@@ -19,7 +19,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -52,6 +52,11 @@ class AssistantBootstrapRefs:
 @dataclass(frozen=True)
 class AssistantSpec:
     """助理域 SSOT 冻结视图（ADR-0187 §3 D3）。
+
+    一切使一个 assistant 区别于另一个 assistant 的配置都是 Home 数据
+    （ADR-0242 D9）：``profile_model`` / ``profile_locale`` /
+    ``profile_runtime`` 与 name/description 一样来自 ``profile.json``，
+    运行时与全局配置只提供默认值。
 
     Precondition：
       - ``assistant_id`` 非空；
@@ -94,6 +99,10 @@ class AssistantSpec:
     """profile.json 的 ``opening_message``（ADR-0242 D9）；空 = 未配置。"""
     profile_locale: str = ""
     """profile.json 的 ``locale``（ADR-0242 D9）；空 = 未配置（默认 zh-CN 由模板提供）。"""
+    profile_model: str = ""
+    """profile.json 的 ``model``（ADR-0242 D9）；空 = 使用运行时/全局默认模型。"""
+    profile_runtime: dict[str, object] = field(default_factory=dict)
+    """profile.json 的 ``runtime``（ADR-0242 D9）；空 dict = 运行参数全部用默认值。"""
 
     def __post_init__(self) -> None:
         if not self.assistant_id or not self.assistant_id.strip():

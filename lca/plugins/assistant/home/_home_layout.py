@@ -278,8 +278,36 @@ class TemplateRender:
     """{相对路径: 文本内容};相对根 = AssistantHome。"""
 
 
+_TEMPLATE_PLACEHOLDER_DEFAULTS: dict[str, str] = {
+    "{{ locale }}": "zh-CN",
+    "{{ role }}": "",
+    "{{ capabilities }}": "",
+    "{{ boundaries }}": "",
+    "{{ tone }}": "",
+    "{{ emoji_style }}": "",
+    "{{ tech_style }}": "",
+}
+"""SOUL 模板占位符默认值（ADR-0242 D9/PR-8）。
+
+``locale`` 默认 zh-CN（模板 profile.json 同值）；其余占位符由创建向导经
+``soul`` 覆盖填充，裸创建时替换为空串，避免字面 mustache 标签进入 SOUL。
+"""
+
+
+def _substitute_template_placeholders(text: str) -> str:
+    """替换模板中已登记的额外占位符；未出现的占位符原样不动。"""
+    for placeholder, value in _TEMPLATE_PLACEHOLDER_DEFAULTS.items():
+        text = text.replace(placeholder, value)
+    return text
+
+
 def render_template(template_id: str, *, name: str, description: str) -> TemplateRender:
     """物化指定模板:替换 ``{{ name }}`` / ``{{ description }}`` 占位。
+
+    同时替换 SOUL 模板的 ``{{ locale }}``（默认 ``zh-CN``）与
+    ``{{ role }}`` / ``{{ capabilities }}`` / ``{{ boundaries }}`` /
+    ``{{ tone }}`` / ``{{ emoji_style }}`` / ``{{ tech_style }}``
+    （默认空串，避免字面 mustache 标签进入 BACKSTORY；ADR-0242 D9/PR-8）。
 
     不复制文件目录本身;只生成需要写入 Home 的 file payload 字典。
     模板目录由 :func:`_template_dir` 解析,**不**走 ``os.environ``。
@@ -295,6 +323,7 @@ def render_template(template_id: str, *, name: str, description: str) -> Templat
         src = tpl_dir / entry
         text = src.read_text(encoding="utf-8")
         text = text.replace("{{ name }}", name).replace("{{ description }}", description)
+        text = _substitute_template_placeholders(text)
         files[entry] = text
 
     # BOOTSTRAP.md 创建时存在;引导式创建（带 seed_user_md）完成流删除并发 EP。

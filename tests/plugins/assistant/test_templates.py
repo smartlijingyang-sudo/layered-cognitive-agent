@@ -122,6 +122,18 @@ class TestStructuredSoulTemplate:
         assert "opening_message" in profile, f"{template_id}/profile.json 缺 opening_message"
         assert "locale" in profile, f"{template_id}/profile.json 缺 locale"
         assert profile["locale"] == "zh-CN"
+        assert "model" in profile, f"{template_id}/profile.json 缺 model"
+        assert "runtime" in profile, f"{template_id}/profile.json 缺 runtime"
+        assert profile["model"] == ""
+        assert profile["runtime"] == {}
+
+    @pytest.mark.parametrize("template_id", sorted(TEMPLATE_REGISTRY))
+    def test_soul_renders_locale_placeholder(self, template_id: str) -> None:
+        """SOUL 模板的 ``主要语言：{{ locale }}`` 必须渲染为 zh-CN（PR-8）。"""
+        rendered = render_template(template_id, name="小助", description="测试职责")
+        soul = rendered.files["SOUL.md"]
+        assert "主要语言：{{ locale }}" not in soul
+        assert "主要语言：zh-CN" in soul
 
     def test_bootstrap_md_has_no_identity_reference(self) -> None:
         for template_id in TEMPLATE_REGISTRY:

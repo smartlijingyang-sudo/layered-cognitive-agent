@@ -130,6 +130,28 @@ class TestProjectHomeToContextManifest:
         assert isinstance(manifest, ContextManifest)
         assert len(manifest.items) == 4  # SOUL/USER/AGENTS/goals
 
+    def test_locale_seeded_into_manifest_extra(
+        self,
+        assistant_a: Any,
+    ) -> None:
+        """ADR-0242 D9/PR-8:locale 非空时写入 manifest.extra。"""
+        manifest = project_home_to_context_manifest(
+            spec_home=Path(assistant_a.home_path),
+            assistant_id=assistant_a.assistant_id,
+            locale="zh-CN",
+        )
+        assert manifest.extra.get("locale") == "zh-CN"
+
+    def test_no_locale_leaves_extra_empty(
+        self,
+        assistant_a: Any,
+    ) -> None:
+        manifest = project_home_to_context_manifest(
+            spec_home=Path(assistant_a.home_path),
+            assistant_id=assistant_a.assistant_id,
+        )
+        assert manifest.extra.get("locale") is None
+
     def test_items_have_assistant_provenance(
         self,
         assistant_a: Any,
@@ -268,6 +290,15 @@ class TestBootstrapProjectionService:
         assert projection.assistant_id == assistant_a.assistant_id
         assert isinstance(projection.manifest, ContextManifest)
         assert projection.items() == projection.manifest.items
+
+    def test_project_seeds_locale_from_spec(
+        self,
+        bootstrap_service: BootstrapProjectionService,
+        assistant_a: Any,
+    ) -> None:
+        """service.project 从 catalog spec 的 profile_locale 播种 locale。"""
+        projection = bootstrap_service.project(assistant_a.assistant_id)
+        assert projection.manifest.extra.get("locale") == "zh-CN"  # 模板默认 locale
 
     def test_project_unknown_assistant_raises(
         self,

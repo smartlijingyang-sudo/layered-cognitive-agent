@@ -305,6 +305,11 @@ class _AssistantCatalogImpl(AssistantCatalog):
             role_id=str(manifest["role_id"]) if manifest.get("role_id") else None,
             profile_opening_message=str(profile.get("opening_message") or ""),
             profile_locale=str(profile.get("locale") or ""),
+            profile_model=str(profile.get("model") or ""),
+            # runtime 是 JSON object;非 dict 视作未配置,不阻断 resolve。
+            profile_runtime=(
+                dict(profile["runtime"]) if isinstance(profile.get("runtime"), dict) else {}
+            ),
         )
 
     def list(self) -> tuple[AssistantSummary, ...]:
@@ -354,6 +359,18 @@ class _AssistantCatalogImpl(AssistantCatalog):
             profile_patched = True
         if patch.profile_description is not None:
             profile["description"] = patch.profile_description
+            profile_patched = True
+        if patch.profile_opening_message is not None:
+            profile["opening_message"] = patch.profile_opening_message
+            profile_patched = True
+        if patch.profile_locale is not None:
+            profile["locale"] = patch.profile_locale
+            profile_patched = True
+        if patch.profile_model is not None:
+            profile["model"] = patch.profile_model
+            profile_patched = True
+        if patch.profile_runtime is not None:
+            profile["runtime"] = patch.profile_runtime
             profile_patched = True
         if profile_patched:
             _write_json(home.root / "profile.json", profile)

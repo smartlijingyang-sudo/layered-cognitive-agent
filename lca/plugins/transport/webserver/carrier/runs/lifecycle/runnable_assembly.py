@@ -18,11 +18,13 @@ from lca.contracts.mechanisms.capability.capability import (
     provider_current,
     require_capability,
 )
+from lca.contracts.models.assistant.spec import AssistantSpec
 from lca.contracts.models.core.state.plane import PlaneBindings
 from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
 from lca.contracts.protocols import LLMAdapter
 from lca.contracts.protocols.runtime.infra.infra import MachineResolver, Tool
 from lca.contracts.protocols.session.run.mode import RunModeRegistryProtocol
+from lca.infrastructure.llm_adapter.model_override import ModelOverridingLLMAdapter
 from lca.infrastructure.observability import BoundObservability
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession
 
@@ -78,13 +80,19 @@ class CognitiveRunnableAssembler:
     async def assemble(self, request: RunnableAssemblyRequest) -> Agent | Team:
         """Materialize common dependencies and delegate to the selected adapter."""
         assistant_id = str(getattr(request.session, "assistant_id", "") or "").strip()
-        # Resolve the Home path once; both the persona and the tool set read
-        # the same Home, so a single catalog lookup serves both (ADR-0242 D3/D4).
-        home_path = _home_path_for_assistant(request.scope, assistant_id) if assistant_id else None
+        # Resolve the Home spec once; the persona, the tool set, and the
+        # per-assistant model all read the same Home (ADR-0242 D3/D4/D9).
+        spec = _assistant_spec_for_run(request.scope, assistant_id)
+        home_path = spec.home_path if spec is not None else None
+
+        llm = request.llm_resolver.resolve()
+        if spec is not None and spec.profile_model:
+            # I-B9: 模型选择是 Home 数据;boot resolver 只提供默认值。
+            llm = ModelOverridingLLMAdapter(inner=llm, model=spec.profile_model)
 
         prepared = RunnableBuildRequest(
             assembly=request,
-            llm=request.llm_resolver.resolve(),
+            llm=llm,
             tools=tools_from_scope(
                 request.scope,
                 request.bindings,
@@ -101,13 +109,16 @@ class CognitiveRunnableAssembler:
         return cast("Agent | Team", await adapter.build(prepared))
 
 
-def _home_path_for_assistant(scope: Context | None, assistant_id: str) -> str:
-    """Resolve an assistant's Home path through the catalog (ADR-0242 D4).
+def _assistant_spec_for_run(scope: Context | None, assistant_id: str) -> AssistantSpec | None:
+    """Resolve an assistant's Home spec through the catalog (ADR-0242 D4/D9).
 
     A non-empty ``assistant_id`` must resolve through the assistant catalog;
     a missing catalog is a run-assembly error rather than a silent policy
     drop. ``POST /runs`` already validates the binding, so this is defensive.
+    Returns ``None`` when ``assistant_id`` is empty (I-B8 no-assistant path).
     """
+    if not assistant_id:
+        return None
     try:
         catalog = require_capability(scope, ASSISTANT_CATALOG.key)
     except MissingCapabilityError as exc:
@@ -115,7 +126,7 @@ def _home_path_for_assistant(scope: Context | None, assistant_id: str) -> str:
             "assistant_id is set but the assistant.catalog capability is missing; "
             "cannot resolve the assistant Home"
         ) from exc
-    return catalog.get(assistant_id).home_path
+    return catalog.get(assistant_id)
 
 
 def _role_profile_for_assistant(
@@ -133,7 +144,8 @@ def _role_profile_for_assistant(
     if not assistant_id:
         return None
     if home_path is None:
-        home_path = _home_path_for_assistant(scope, assistant_id)
+        spec = _assistant_spec_for_run(scope, assistant_id)
+        home_path = spec.home_path if spec is not None else None
     from lca.plugins.assistant.persona.persona import persona_from_home
 
     persona = persona_from_home(home_path)
@@ -184,7 +196,8 @@ def tools_from_scope(
     if not assistant_id:
         return tools
     if home_path is None:
-        home_path = _home_path_for_assistant(scope, assistant_id)
+        spec = _assistant_spec_for_run(scope, assistant_id)
+        home_path = spec.home_path if spec is not None else None
     from lca.plugins.assistant.tools import filter_tools_by_assistant
 
     return filter_tools_by_assistant(tools, home_path)

@@ -4,5 +4,7 @@
   "emoji": "🌐",
   "status": "active",
   "opening_message": "",
-  "locale": "zh-CN"
+  "locale": "zh-CN",
+  "model": "",
+  "runtime": {}
 }

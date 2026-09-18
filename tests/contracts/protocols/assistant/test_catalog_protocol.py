@@ -202,6 +202,8 @@ class TestAssistantSpec:
         spec = _assistant_spec()
         assert spec.profile_opening_message == ""
         assert spec.profile_locale == ""
+        assert spec.profile_model == ""
+        assert spec.profile_runtime == {}
 
     def test_profile_opening_message_and_locale_accept_values(self) -> None:
         spec = _assistant_spec()
@@ -210,10 +212,14 @@ class TestAssistantSpec:
                 **spec.__dict__,
                 "profile_opening_message": "你好，我是 Demo。",
                 "profile_locale": "zh-CN",
+                "profile_model": "model-x",
+                "profile_runtime": {"max_steps": 42},
             }
         )
         assert spec.profile_opening_message == "你好，我是 Demo。"
         assert spec.profile_locale == "zh-CN"
+        assert spec.profile_model == "model-x"
+        assert spec.profile_runtime == {"max_steps": 42}
 
 
 # ── AssistantHandle / AssistantSummary ───────────────────────
@@ -254,6 +260,10 @@ class TestProfilePatch:
         patch = ProfilePatch()
         assert patch.profile_name is None
         assert patch.profile_description is None
+        assert patch.profile_opening_message is None
+        assert patch.profile_locale is None
+        assert patch.profile_model is None
+        assert patch.profile_runtime is None
         assert patch.soul_md is None
         assert patch.user_md is None
         assert patch.agents_md is None
@@ -263,6 +273,10 @@ class TestProfilePatch:
         assert patch.skills is None
         assert patch.routines is None
         assert patch.extra == {}
+
+    def test_profile_runtime_accepts_dict(self) -> None:
+        patch = ProfilePatch(profile_runtime={"max_steps": 10})
+        assert patch.profile_runtime == {"max_steps": 10}
 
 
 # ── PlanRevision ───────────────────────────────────────────

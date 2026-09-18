@@ -101,10 +101,21 @@ class ProfilePatch:
     """``revise_profile`` 的 patch 载荷 —— 仅声明意图，不含 digest 重算。
 
     字段为 ``None`` 表示不动；空字符串视为「清空字段」（语义由 Catalog 决定）。
+    ``profile_opening_message`` / ``profile_locale`` / ``profile_model`` /
+    ``profile_runtime`` 是 ADR-0242 D9 的 Home 数据行，与其他 profile 字段
+    一样经 ``revise_profile`` 写盘并进 manifest digest。
     """
 
     profile_name: str | None = None
     profile_description: str | None = None
+    profile_opening_message: str | None = None
+    """``profile.json.opening_message``（ADR-0242 D9）；None = 不动。"""
+    profile_locale: str | None = None
+    """``profile.json.locale``（ADR-0242 D9）；None = 不动。"""
+    profile_model: str | None = None
+    """``profile.json.model``（ADR-0242 D9）；None = 不动。"""
+    profile_runtime: dict[str, object] | None = None
+    """``profile.json.runtime``（ADR-0242 D9）；None = 不动。"""
     soul_md: str | None = None
     user_md: str | None = None
     agents_md: str | None = None

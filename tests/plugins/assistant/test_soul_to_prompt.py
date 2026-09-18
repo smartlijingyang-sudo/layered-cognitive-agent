@@ -14,17 +14,24 @@ Chain:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, cast
 
 import pytest
 
+from lca.contracts.models.cognition.prompt_assembly import SectionOutput
+from lca.contracts.models.core.perceive.perception import ContextItem, ContextManifest
 from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
 from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
 from lca.contracts.protocols.assistant.role_resolver import RoleCard
 from lca.plugins.assistant.persona.persona import persona_from_home
 from lca.plugins.collaboration.modes.solo import build_solo_agent
 from lca.plugins.domain.assistant.catalog.plugin import AssistantCatalogImpl
-from lca.plugins.prompts.sections import BackstorySection, GoalSection, RoleSection
+from lca.plugins.prompts.sections import (
+    BackstorySection,
+    CurrentDateSection,
+    GoalSection,
+    RoleSection,
+)
 from tests.harness.collector import InMemoryObservability
 from tests.harness.scripted_llm import ScriptedLLMAdapter
 
@@ -179,3 +186,38 @@ class TestPersonaReachesSoloAgent:
         assert agent.role_profile.role == "小架"
         assert agent.role_profile.goal == "架构顾问"
         assert "系统架构专家" in agent.role_profile.backstory
+
+
+class TestCurrentDateSectionLocale:
+    """ADR-0242 D9/PR-8：CurrentDateSection 按 manifest.extra['locale'] 渲染星期。"""
+
+    def _render(self, *, locale: str = "") -> SectionOutput:
+        items = (
+            ContextItem(
+                kind="clock",
+                payload="2026-09-18 Friday",
+                provenance="clock_sensor",
+            ),
+        )
+        extra = {"locale": locale} if locale else {}
+        manifest = ContextManifest(items=items, extra=extra)
+        return CurrentDateSection().render(
+            role_profile=cast("RoleProfile", object()),
+            task="",
+            awareness=None,
+            manifest=manifest,
+            tools=[],
+            activated_skills=(),
+        )
+
+    def test_zh_cn_localizes_weekday(self) -> None:
+        output = self._render(locale="zh-CN")
+        assert "CURRENT_DATE: 2026-09-18 星期五" in output.text
+
+    def test_no_locale_keeps_english_weekday(self) -> None:
+        output = self._render()
+        assert "CURRENT_DATE: 2026-09-18 Friday" in output.text
+
+    def test_unknown_locale_falls_back_to_english(self) -> None:
+        output = self._render(locale="fr-FR")
+        assert "CURRENT_DATE: 2026-09-18 Friday" in output.text

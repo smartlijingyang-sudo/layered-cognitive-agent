@@ -198,6 +198,34 @@ class HierarchicalInstructionsSection(StaticTextSection):
 
 # ── StatefulSection implementations ────────────────────────────────
 
+# 英文星期 → 本地化星期（ADR-0242 D9/PR-8）。新增 locale 在此扩展；
+# 未知 locale 回退当前英文行为，不新增 prompt section。
+_WEEKDAY_LOCALIZATIONS: dict[str, dict[str, str]] = {
+    "zh-CN": {
+        "Monday": "星期一",
+        "Tuesday": "星期二",
+        "Wednesday": "星期三",
+        "Thursday": "星期四",
+        "Friday": "星期五",
+        "Saturday": "星期六",
+        "Sunday": "星期日",
+    },
+}
+
+
+def _localize_clock_text(text: str, locale: str) -> str:
+    """把 ``clock`` payload 的英文星期按 locale 翻译；未知 locale 原样返回。"""
+    mapping = _WEEKDAY_LOCALIZATIONS.get(locale)
+    if not mapping:
+        return text
+    parts = text.split()
+    if not parts:
+        return text
+    weekday = mapping.get(parts[-1])
+    if weekday is None:
+        return text
+    return " ".join([*parts[:-1], weekday])
+
 
 class CurrentDateSection:
     name: ClassVar[str] = "current_date"
@@ -221,7 +249,9 @@ class CurrentDateSection:
             return SectionOutput(
                 text=label_line("CURRENT_DATE", "(未知当前时间)"), used_fallback=True
             )
-        return SectionOutput(text=label_line("CURRENT_DATE", clock.text))
+        locale = (manifest.extra.get("locale") if manifest is not None else "") or ""
+        text = _localize_clock_text(clock.text, locale) if locale else clock.text
+        return SectionOutput(text=label_line("CURRENT_DATE", text))
 
 
 class TaskSection:

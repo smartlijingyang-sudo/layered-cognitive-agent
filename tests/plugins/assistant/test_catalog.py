@@ -32,6 +32,7 @@ from lca.contracts.observability.closure.assistant_ep_closure import (
 )
 from lca.contracts.protocols.assistant.catalog import (
     CreateAssistantRequest,
+    ProfilePatch,
 )
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import PluginSpecKind
 from lca.harness.plugin.manifest import EffectClass
@@ -208,6 +209,31 @@ class TestGet:
         assert spec.grant_digest.startswith("sha256:")
         assert spec.tools_policy_digest.startswith("sha256:")
 
+    def test_get_reads_profile_model_and_runtime(
+        self,
+        catalog: AssistantCatalogImpl,
+        request_default: CreateAssistantRequest,
+    ) -> None:
+        """ADR-0242 D9:get() 把 profile.json 的 model/runtime 读进 AssistantSpec。"""
+        handle = catalog.create(request_default)
+        spec = catalog.get(handle.assistant_id)
+        assert spec.profile_model == ""  # 模板默认无 model
+        assert spec.profile_runtime == {}
+
+    def test_get_reads_profile_model_and_runtime_after_revise(
+        self,
+        catalog: AssistantCatalogImpl,
+        request_default: CreateAssistantRequest,
+    ) -> None:
+        handle = catalog.create(request_default)
+        catalog.revise_profile(
+            handle.assistant_id,
+            ProfilePatch(profile_model="model-x", profile_runtime={"max_steps": 7}),
+        )
+        spec = catalog.get(handle.assistant_id)
+        assert spec.profile_model == "model-x"
+        assert spec.profile_runtime == {"max_steps": 7}
+
     def test_get_unknown_assistant_raises(
         self,
         catalog: AssistantCatalogImpl,
@@ -236,6 +262,55 @@ class TestGet:
         (Path(handle.home_path) / "goals.yaml").write_text("tampered: true\n", encoding="utf-8")
         with pytest.raises(AssistantDigestMismatch):
             catalog.get(handle.assistant_id)
+
+
+# ── revise_profile: model/runtime 写盘（ADR-0242 D9/PR-8）───────────
+
+
+class TestReviseProfileModelRuntime:
+    def test_revise_writes_model_runtime_and_bumps_revision(
+        self,
+        catalog: AssistantCatalogImpl,
+        request_default: CreateAssistantRequest,
+    ) -> None:
+        handle = catalog.create(request_default)
+        old_seq = catalog.get(handle.assistant_id).revision_seq
+
+        revision = catalog.revise_profile(
+            handle.assistant_id,
+            ProfilePatch(profile_model="model-x", profile_runtime={"max_steps": 7}),
+        )
+
+        assert revision.revision_seq == old_seq + 1
+        home = Path(handle.home_path)
+        profile = json.loads((home / "profile.json").read_text(encoding="utf-8"))
+        assert profile["model"] == "model-x"
+        assert profile["runtime"] == {"max_steps": 7}
+        spec = catalog.get(handle.assistant_id)
+        assert spec.revision_seq == old_seq + 1
+        assert spec.profile_model == "model-x"
+        assert spec.profile_runtime == {"max_steps": 7}
+
+    def test_revise_writes_opening_message_and_locale(
+        self,
+        catalog: AssistantCatalogImpl,
+        request_default: CreateAssistantRequest,
+    ) -> None:
+        handle = catalog.create(request_default)
+
+        revision = catalog.revise_profile(
+            handle.assistant_id,
+            ProfilePatch(profile_opening_message="你好", profile_locale="en-US"),
+        )
+
+        home = Path(handle.home_path)
+        profile = json.loads((home / "profile.json").read_text(encoding="utf-8"))
+        assert profile["opening_message"] == "你好"
+        assert profile["locale"] == "en-US"
+        spec = catalog.get(handle.assistant_id)
+        assert spec.profile_opening_message == "你好"
+        assert spec.profile_locale == "en-US"
+        assert revision.revision_seq == spec.revision_seq
 
 
 # ── list ────────────────────────────────────────────────────────────

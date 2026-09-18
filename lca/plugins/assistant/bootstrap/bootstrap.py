@@ -77,12 +77,16 @@ def project_home_to_context_manifest(
     spec_home: Path,
     *,
     assistant_id: str,
+    locale: str = "",
 ) -> ContextManifest:
     """从 AssistantHome 物化 ContextManifest（PR-4 投影函数）。
 
     只读 ``SOUL.md`` / ``USER.md`` / ``AGENTS.md`` + ``goals.yaml``
     四个文件；MEMORY.md / memory/ 不读取。失败（文件缺失 / 读错误 / goals.yaml
     非 dict）⇒ ``ValueError``（fail-closed；不允许回落空 manifest）。
+
+    ``locale`` 非空时写入 ``manifest.extra["locale"]``，供日期等 prompt
+    section 按助理语言渲染（ADR-0242 D9 / PR-8）。
 
     Precondition：``spec_home`` 是 AssistantHome 根路径（assistant_id 子目录）；
     digest 校验由 catalog 在 ``spec_home`` 之前完成；本函数不重算 digest，只读
@@ -160,7 +164,10 @@ def project_home_to_context_manifest(
         )
     )
 
-    return ContextManifest(items=tuple(items))
+    extra: dict[str, Any] = {}
+    if locale:
+        extra["locale"] = locale
+    return ContextManifest(items=tuple(items), extra=extra)
 
 
 def _memory_layer_excluded_from_items(items: tuple[ContextItem, ...]) -> bool:
@@ -206,6 +213,7 @@ class _BootstrapProjectionService:
         manifest = project_home_to_context_manifest(
             spec_home=Path(spec.home_path),
             assistant_id=assistant_id,
+            locale=spec.profile_locale,
         )
         if not _memory_layer_excluded_from_items(manifest.items):
             raise ValueError(
