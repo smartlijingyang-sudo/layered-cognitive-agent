@@ -134,25 +134,33 @@ def _map_session_checkpoint(data: dict[str, Any], *, parent: str | None) -> dict
     else:
         return None
     del parent
-    return {
+    stamped: dict[str, Any] = {
         "event": {
             "type": "SpineClose",
             "reason": reason,
             "final_state": {"status": final_status},
         }
     }
+    pending = data.get("pending_tools_calling")
+    if isinstance(pending, list) and pending:
+        stamped["event"]["pending_tools_calling"] = pending
+    return stamped
 
 
 def _map_approval_persisted(data: dict[str, Any], *, parent: str | None) -> dict[str, Any] | None:
     """Checkpoint pause — ``approval.persisted.v1`` always pairs with waiting_input."""
-    del data, parent
-    return {
+    del parent
+    stamped: dict[str, Any] = {
         "event": {
             "type": "SpineClose",
             "reason": "waiting_for_human",
             "final_state": {"status": "waiting_for_human"},
         }
     }
+    pending = data.get("pending_tools_calling")
+    if isinstance(pending, list) and pending:
+        stamped["event"]["pending_tools_calling"] = pending
+    return stamped
 
 
 _CATALOG_HANDLERS = {

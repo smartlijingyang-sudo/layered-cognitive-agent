@@ -199,6 +199,7 @@ def test_step_start_with_human_approval_has_requires_approval() -> None:
 
 
 def test_spine_close_with_waiting_human_becomes_agent_runtime_end() -> None:
+    """HITL pause emits ``step_start`` + ``agent_runtime_end`` in order (spec §5.2)."""
     t = EventTranslator()
     stamped = {
         "event": {
@@ -208,11 +209,34 @@ def test_spine_close_with_waiting_human_becomes_agent_runtime_end() -> None:
         }
     }
     out = t.translate(stamped)
-    assert out is not None
-    assert out["type"] == "agent_runtime_end"
-    assert out["data"]["reason"] == "waiting_for_human"
-    assert out["data"]["finalState"]["status"] == "waiting_for_human"
-    assert out["data"]["phase"] == "execution_complete"
+    assert isinstance(out, list) and len(out) == 2
+    step_start, runtime_end = out
+    assert step_start["type"] == "step_start"
+    assert step_start["data"]["phase"] == "human_approval"
+    assert step_start["data"]["requiresApproval"] is True
+    assert step_start["data"]["pendingToolsCalling"] == []
+    assert runtime_end["type"] == "agent_runtime_end"
+    assert runtime_end["data"]["reason"] == "waiting_for_human"
+    assert runtime_end["data"]["finalState"]["status"] == "waiting_for_human"
+    assert runtime_end["data"]["phase"] == "execution_complete"
+
+
+def test_spine_close_with_waiting_input_becomes_step_start_then_runtime_end() -> None:
+    t = EventTranslator()
+    stamped = {
+        "event": {
+            "type": "SpineClose",
+            "reason": "waiting_input",
+            "final_state": {"status": "waiting_input"},
+            "pending_tools_calling": [{"id": "tc1"}],
+        }
+    }
+    out = t.translate(stamped)
+    assert isinstance(out, list) and len(out) == 2
+    assert out[0]["type"] == "step_start"
+    assert out[0]["data"]["pendingToolsCalling"] == [{"id": "tc1"}]
+    assert out[1]["type"] == "agent_runtime_end"
+    assert out[1]["data"]["reason"] == "waiting_input"
 
 
 def test_spine_close_with_done_becomes_agent_runtime_end_completed() -> None:

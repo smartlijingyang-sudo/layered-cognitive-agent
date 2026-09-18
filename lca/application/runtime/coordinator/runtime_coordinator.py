@@ -86,9 +86,11 @@ class LcaAgentRuntimeCoordinator:
         envelope = self._translator.translate(stamped)
         if envelope is None:
             return
-        await self._mgr.publish(run_id, envelope["type"], envelope["data"], step_index=step_index)
+        envelopes = envelope if isinstance(envelope, list) else [envelope]
+        for one in envelopes:
+            await self._mgr.publish(run_id, one["type"], one["data"], step_index=step_index)
 
-        if envelope["type"] == "agent_runtime_end":
+        if any(one["type"] == "agent_runtime_end" for one in envelopes):
             self._natural_terminal_published.add(run_id)
 
     async def _persist_tool_plugin_state(

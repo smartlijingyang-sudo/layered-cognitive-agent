@@ -69,10 +69,14 @@ def wire_tool_call(
 
 
 class EventTranslator:
-    """Pure fold from a StampedEvent to an AgentStreamEvent payload."""
+    """Pure fold from a StampedEvent to an AgentStreamEvent payload.
 
-    def translate(self, stamped: dict) -> dict | None:
-        """Return the AgentStreamEvent envelope (type + data) or None to ignore."""
+    Returns a single event dict, a list of event dicts (for multi-event
+    translations like HITL pause), or None to ignore.
+    """
+
+    def translate(self, stamped: dict) -> list[dict] | dict | None:
+        """Return the AgentStreamEvent envelope(s) or None to ignore."""
         event = stamped.get("event") or {}
         kind = event.get("kind")
         if kind == "ignore":
@@ -237,18 +241,33 @@ class EventTranslator:
         }
 
     @staticmethod
-    def _spine_close(e: dict) -> dict:
+    def _spine_close(e: dict) -> list[dict] | dict:
         final_state = e.get("final_state") or {}
         status = final_state.get("status", "done")
-        return {
+        reason = e.get("reason", status)
+
+        runtime_end = {
             "type": "agent_runtime_end",
             "data": {
                 "finalState": final_state,
-                "reason": e.get("reason", status),
+                "reason": reason,
                 "reasonDetail": e.get("reasonDetail", ""),
                 "phase": "execution_complete",
             },
         }
+
+        if reason in ("waiting_for_human", "waiting_input"):
+            step_start = {
+                "type": "step_start",
+                "data": {
+                    "phase": "human_approval",
+                    "requiresApproval": True,
+                    "pendingToolsCalling": e.get("pending_tools_calling", []),
+                },
+            }
+            return [step_start, runtime_end]
+
+        return runtime_end
 
     @staticmethod
     def _llm_error(e: dict) -> dict:

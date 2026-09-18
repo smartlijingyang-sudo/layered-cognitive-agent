@@ -307,3 +307,48 @@ async def test_watchdog_no_op_when_session_still_running(
     await coord.synthesize_terminal_if_pending(clean_run_id, session=session)
     history = await manager.read_history(clean_run_id, count=10)
     assert not any(e["type"] == "agent_runtime_end" for e in history)
+
+
+async def test_handle_stamped_hitl_pause_publishes_step_start_then_runtime_end(
+    manager: LcaStreamEventLog, clean_run_id: str
+) -> None:
+    """HITL pause (spec §5.2): ``step_start{human_approval}`` precedes ``agent_runtime_end``.
+
+    The front-end replays the stream in order; the approval card state must
+    exist before the terminal event closes the live run.
+    """
+    coord = LcaAgentRuntimeCoordinator(
+        stream_manager=manager,
+        translator=EventTranslator(),
+        metadata_writer=AsyncMock(),
+        tool_state_writer=AsyncMock(),
+    )
+    await coord.start(clean_run_id, ctx={})
+    await coord.handle_stamped(
+        clean_run_id,
+        {
+            "event": {
+                "type": "SpineClose",
+                "reason": "waiting_for_human",
+                "final_state": {"status": "waiting_for_human"},
+            }
+        },
+    )
+    history = await manager.read_history(clean_run_id, count=10)
+    # read_history returns newest first; reverse to delivery order.
+    ordered = list(reversed(history))
+    types = [e["type"] for e in ordered if e["type"] in ("step_start", "agent_runtime_end")]
+    assert types == ["step_start", "agent_runtime_end"]
+    step_start = next(e for e in history if e["type"] == "step_start")
+    assert step_start["data"]["phase"] == "human_approval"
+    assert step_start["data"]["requiresApproval"] is True
+    end = next(e for e in history if e["type"] == "agent_runtime_end")
+    assert end["data"]["reason"] == "waiting_for_human"
+    # The natural terminal is recorded so the watchdog does not double-publish.
+    session = MagicMock()
+    session.status = "done"
+    session.error = None
+    session.final_state = {"status": "done"}
+    await coord.synthesize_terminal_if_pending(clean_run_id, session=session)
+    after = await manager.read_history(clean_run_id, count=10)
+    assert len([e for e in after if e["type"] == "agent_runtime_end"]) == 1

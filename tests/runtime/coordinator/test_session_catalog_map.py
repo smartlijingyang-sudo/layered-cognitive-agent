@@ -81,6 +81,23 @@ def test_session_checkpoint_waiting_input_maps_to_spine_close() -> None:
     assert stamped["event"]["reason"] == "waiting_for_human"
 
 
+def test_session_checkpoint_forwards_pending_tools_calling_when_present() -> None:
+    """HITL card data flows through when the checkpoint carries it; absent → omitted."""
+    stamped = catalog_session_event_to_stamped(
+        "session.checkpoint.v1",
+        {"status": "waiting_input", "pending_tools_calling": [{"id": "tc1"}]},
+    )
+    assert stamped is not None
+    assert stamped["event"]["pending_tools_calling"] == [{"id": "tc1"}]
+
+    bare = catalog_session_event_to_stamped(
+        "session.checkpoint.v1",
+        {"status": "waiting_input"},
+    )
+    assert bare is not None
+    assert "pending_tools_calling" not in bare["event"]
+
+
 def test_body_tool_execute_end_spine_is_suppressed() -> None:
     assert is_suppressed_spine_ep("body.tool.execute.end")
     assert (
