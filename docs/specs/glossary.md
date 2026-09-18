@@ -156,7 +156,6 @@ IngestCache, LLMResolver, ModeDefinition, ModelDefinition, ParsedMessages
 | **SimpleSafeExecutor** | SafeExecutor 默认实现 |
 | **SimpleToolRegistry** | ToolRegistry 默认实现 |
 | **InMemoryStateStore** | StateStore 内存实现 |
-| **calculator** / **weather** | 内置示例 Tool 模块（manifest + executor） |
 | **ArtifactLedger** | 工作区产物账本：路径 → url 映射 + MIME / 大小元数据；Body finalize 写、LobeHub 渲染读 |
 | **CLIConfig** / **CLIProvider** | lca-ops CLI 配置 + provider 解析（基于 pydantic-settings） |
 | **ChangeReport** | 升级 / patch 应用的结果报告（lobehub stack 部署侧） |

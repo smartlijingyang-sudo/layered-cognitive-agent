@@ -138,7 +138,7 @@ The audit happens *as part of* the deletion: grep verifies zero references, then
 - `LEGACY_WHITELIST` in `scripts/check_framework_cognition_boundary.py` is `()` and the script exits 0.
 - `lca/plugins/journal/declarative/runtime_seams_provider.py::DefaultDeclarativeInterpreterFactory.create` returns `PlanInterpreterAdapter(...)` constructed with the five runtime closures.
 - `lca/framework/graph/adapter.py::PlanInterpreterAdapter.resume` accepts a `PhaseRunCursor` and resumes from the checkpointed node rather than calling `run` from scratch.
-- `scripts/lca-ops kernel-restart && scripts/lca-ops runs create --user-text "use a tool to look up the current weather"` produces a run whose journal spine contains `body.tool.execute.start → step.tool_call.record → step.tool_result.record → body.tool.execute.end → phase.tool.call.end → phase.act.fold.end`.
+- `scripts/lca-ops kernel-restart && scripts/lca-ops runs create --user-text "use a tool to search today's news"` produces a run whose journal spine contains `body.tool.execute.start → step.tool_call.record → step.tool_result.record → body.tool.execute.end → phase.tool.call.end → phase.act.fold.end`.
 - `scripts/lca-ops status --json` reports `kernel_serve` healthy before and after the run.
 - `uv run pytest tests/unit/contracts/graph tests/unit/cognition/wire tests/unit/framework/graph tests/contracts/test_protocols_package_contract.py tests/integration/cutover/test_tool_call_e2e.py` exits 0.
 
