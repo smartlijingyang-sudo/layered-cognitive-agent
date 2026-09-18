@@ -280,7 +280,10 @@ _USER_CONTRACTS: dict[str, RenderContract] = {
         tool_name="askUserQuestion",
         identifier="lobe-user-interaction",
         api_name="askUserQuestion",
-        args=(COMMON["questions"],),
+        args=(
+            COMMON["questions"],
+            FieldSpec("lca_run_id", "lca_run_id", "string", "argument", required=False),
+        ),
         state=(),
     ),
 }

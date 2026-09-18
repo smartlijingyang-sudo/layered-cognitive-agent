@@ -375,11 +375,17 @@ class EventTranslator:
         if not tool_name or not invocation_id:
             return None
         arguments = payload.get("arguments") if isinstance(payload.get("arguments"), dict) else {}
+        tool_calling = wire_tool_call(tool_name, invocation_id, arguments)
+        # Calls observed but not yet authorized (HITL pause) carry the native
+        # intervention marker so LobeHub renders its pending-approval panel
+        # (getPendingInterventions scans tool.intervention.status === 'pending').
+        if payload.get("status") == "pending_approval":
+            tool_calling["intervention"] = {"status": "pending"}
         return {
             "type": "stream_chunk",
             "data": {
                 "chunkType": "tools_calling",
-                "toolsCalling": [wire_tool_call(tool_name, invocation_id, arguments)],
+                "toolsCalling": [tool_calling],
             },
         }
 

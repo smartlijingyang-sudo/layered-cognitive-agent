@@ -136,6 +136,40 @@ def test_spine_tool_call_record_becomes_tools_calling() -> None:
     assert tools[0]["id"] == "tc1"
     assert tools[0]["apiName"] == "runCommand"
     assert tools[0]["identifier"] == "lobe-cloud-sandbox"
+    assert "intervention" not in tools[0]
+
+
+def test_spine_tool_call_record_pending_approval_carries_intervention_marker() -> None:
+    """A gate-blocked call must carry the native ``intervention.status='pending'`` marker
+    so LobeHub's getPendingInterventions renders its approval panel."""
+    import json
+
+    t = EventTranslator()
+    stamped = {
+        "event": {
+            "execution_point": "step.tool_call.record",
+            "payload": {
+                "tool_name": "askUserQuestion",
+                "invocation_id": "toolu_1",
+                "arguments": {
+                    "questions": [{"question": "name"}],
+                    "lca_run_id": "run_1",
+                },
+                "status": "pending_approval",
+            },
+        }
+    }
+    out = t.translate(stamped)
+    assert out is not None
+    assert out["data"]["chunkType"] == "tools_calling"
+    tools = out["data"]["toolsCalling"]
+    assert tools[0]["id"] == "toolu_1"
+    assert tools[0]["apiName"] == "askUserQuestion"
+    assert tools[0]["identifier"] == "lobe-user-interaction"
+    assert tools[0]["intervention"] == {"status": "pending"}
+    args = json.loads(tools[0]["arguments"])
+    assert args["lca_run_id"] == "run_1"
+    assert args["questions"] == [{"question": "name"}]
 
 
 def test_tool_started_becomes_tool_start_with_parent_message_id() -> None:

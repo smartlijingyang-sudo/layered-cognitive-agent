@@ -14,6 +14,7 @@ export type LcaToolCalling = {
   arguments?: string;
   id?: string;
   identifier?: string;
+  intervention?: { status?: string };
   result_msg_id?: string;
   type?: string;
 };
@@ -116,6 +117,7 @@ export const ensureLcaToolMessages = (
         identifier: tool.identifier,
         type: tool.type,
       },
+      ...(tool.intervention ? { pluginIntervention: tool.intervention } : {}),
       role: 'tool' as const,
       threadId: params.context.threadId,
       tool_call_id: callId,

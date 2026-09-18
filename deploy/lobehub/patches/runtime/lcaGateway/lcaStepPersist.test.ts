@@ -123,6 +123,37 @@ describe('lcaStepPersist', () => {
     );
   });
 
+  it('stamps pluginIntervention pending onto tool rows for human-approval calls', () => {
+    const store = createStore();
+    const tools = ensureLcaToolMessages(store, {
+      assistantId: 'asst-1',
+      context,
+      operationId: 'op-1',
+      toolsCalling: [
+        {
+          apiName: 'askUserQuestion',
+          arguments: '{"lca_run_id":"run-1","questions":[]}',
+          id: 'tc-ask',
+          identifier: 'lobe-user-interaction',
+          intervention: { status: 'pending' },
+          type: 'builtin',
+        },
+      ],
+    });
+
+    expect(tools[0]?.result_msg_id).toBeTruthy();
+    const toolRow = store.dbMessagesMap[topicKey].find((m) => m.id === tools[0]?.result_msg_id);
+    expect(toolRow?.pluginIntervention).toEqual({ status: 'pending' });
+    expect(messageService.createMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        parentId: 'asst-1',
+        role: 'tool',
+        tool_call_id: 'tc-ask',
+        pluginIntervention: { status: 'pending' },
+      }),
+    );
+  });
+
   it('writes tool_end content and pluginState onto the tool message, not only assistant.tools', async () => {
     const store = createStore();
     const tools = ensureLcaToolMessages(store, {
