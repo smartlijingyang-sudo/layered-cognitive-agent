@@ -12,6 +12,7 @@ from lca.contracts.capabilities import RUN_MODE_REGISTRY
 from lca.contracts.mechanisms.capability.capability import require_capability
 from lca.contracts.models.team.role.team import RoleProfile
 from lca.contracts.protocols import LLMAdapter
+from lca.contracts.protocols.memory.memory import MemorySystem
 from lca.contracts.protocols.runtime.infra.infra import Tool
 from lca.contracts.protocols.session.run.mode import ModeAdapter
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
@@ -65,12 +66,14 @@ def build_solo_agent(
     bindings: PlaneBindings | None = None,
     scope: Context | None = None,
     tools: Sequence[Tool] | None = None,
+    memory: MemorySystem | None = None,
 ) -> Agent:
     """Build the single-Agent runnable selected by the Solo mode adapter.
 
     ``role_profile`` (ADR-0242 D3) carries the assistant's Home persona; when
-    present it fills role/goal/backstory. The no-assistant path keeps the
-    historical empty goal/backstory.
+    present it fills role/goal/backstory. ``memory`` (ADR-0242 D5) selects a
+    persistent per-assistant MemorySystem; the no-assistant path keeps the
+    historical empty goal/backstory and the default per-run memory.
     """
     del bindings
     if role_profile is not None:
@@ -80,15 +83,18 @@ def build_solo_agent(
     else:
         goal = ""
         backstory = ""
-    return Agent(
-        role=role,
-        goal=goal,
-        backstory=backstory,
-        tools=filter_solo_tools(tools if tools is not None else ()),
-        llm=llm,
-        observability=observability,
-        scope=scope,
-    )
+    kwargs: dict[str, object] = {
+        "role": role,
+        "goal": goal,
+        "backstory": backstory,
+        "tools": filter_solo_tools(tools if tools is not None else ()),
+        "llm": llm,
+        "observability": observability,
+        "scope": scope,
+    }
+    if memory is not None:
+        kwargs["memory"] = memory
+    return Agent(**kwargs)
 
 
 class _SoloModeAdapter(ModeAdapter):
@@ -110,6 +116,11 @@ class _SoloModeAdapter(ModeAdapter):
         """Materialize the Solo Agent from the carrier-neutral build request."""
         build_request = cast("RunnableBuildRequest", request)
         session = build_request.assembly.session
+        memory = None
+        if build_request.role_profile is not None and build_request.assistant_home_path:
+            from lca.infrastructure.memory.assistant_memory import AssistantMemory
+
+            memory = AssistantMemory(build_request.assistant_home_path)
         return build_solo_agent(
             build_request.llm,
             observability=build_request.assembly.observability,
@@ -117,6 +128,7 @@ class _SoloModeAdapter(ModeAdapter):
             role_profile=build_request.role_profile,
             scope=build_request.assembly.scope,
             tools=build_request.tools,
+            memory=memory,
         )
 
 

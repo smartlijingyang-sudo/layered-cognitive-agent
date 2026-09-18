@@ -59,6 +59,8 @@ class RunnableBuildRequest:
     tools: tuple[Tool, ...]
     role_profile: RoleProfile | None = None
     """Assistant Home persona (ADR-0242 D3); None when no assistant_id."""
+    assistant_home_path: str | None = None
+    """Assistant Home 绝对路径 (ADR-0242 D4/D5); None when no assistant_id."""
 
 
 class CognitiveRunnableAssembler:
@@ -93,6 +95,7 @@ class CognitiveRunnableAssembler:
             role_profile=_role_profile_for_assistant(
                 request.scope, assistant_id, home_path=home_path
             ),
+            assistant_home_path=home_path,
         )
         adapter = self._mode_registry.resolve(request.mode)
         return cast("Agent | Team", await adapter.build(prepared))
