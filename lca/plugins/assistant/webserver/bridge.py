@@ -102,6 +102,8 @@ class AssistantFrontendBridge:
         """投影一个助理到前端；成功返回 ``agt_*`` agent id，失败返回 ``None``。
 
         Precondition：``assistant_id`` / ``name`` 非空（catalog.create 已保证）。
+        ``opening_message`` 由调用方从 Home 的 ``profile.json`` 读取（ADR-0242 D9），
+        本桥不再拼装开场白。
         Failure：未启用 / 网络错误 / 非 200 / 响应缺 ``agentId`` ⇒ ``None``
         + warning log（fail-soft；创建真值不受影响）。
         """

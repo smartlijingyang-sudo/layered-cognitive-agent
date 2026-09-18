@@ -90,6 +90,10 @@ class AssistantSpec:
     role_id: str | None = None
     """创建时引用的角色档案 role_id（如 'engineering/engineering-software-architect'）。
     None 表示用模板默认 SOUL 创建。"""
+    profile_opening_message: str = ""
+    """profile.json 的 ``opening_message``（ADR-0242 D9）；空 = 未配置。"""
+    profile_locale: str = ""
+    """profile.json 的 ``locale``（ADR-0242 D9）；空 = 未配置（默认 zh-CN 由模板提供）。"""
 
     def __post_init__(self) -> None:
         if not self.assistant_id or not self.assistant_id.strip():

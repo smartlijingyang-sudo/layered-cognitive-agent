@@ -21,9 +21,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
 from lca.contracts.capabilities import ASSISTANT_CATALOG
 from lca.contracts.observability.closure.assistant_ep_closure import (
+    ASSISTANT_BOOTSTRAP_COMPLETED,
     ASSISTANT_CREATED,
     ASSISTANT_REQUIRED_FIELDS,
 )
@@ -497,3 +499,242 @@ def test_create_cleans_up_on_failure(
         catalog.create(CreateAssistantRequest(name="x"))
     # 半成品 home 应被清理
     assert not (root / "asst_failtest").exists()
+
+
+# ── SOUL 完整度校验（ADR-0242 D1 / I-B2）────────────────────────────
+
+
+class TestSoulValidation:
+    def test_bare_creation_without_soul_still_succeeds(self, catalog: AssistantCatalogImpl) -> None:
+        """回归：裸创建（无 soul、无 from_role）仍成功（I-B8）。"""
+        handle = catalog.create(CreateAssistantRequest(name="裸创建"))
+        assert handle.assistant_id.startswith("asst_")
+        assert (Path(handle.home_path) / "SOUL.md").is_file()
+
+    @pytest.mark.parametrize(
+        "missing_marker",
+        ["## 🧠 身份", "## 🎭 性格", "## 🛠 能力", "## 🗣 语气"],
+    )
+    def test_soul_missing_core_section_raises(
+        self,
+        catalog: AssistantCatalogImpl,
+        missing_marker: str,
+    ) -> None:
+        markers = ["## 🧠 身份", "## 🎭 性格", "## 🛠 能力", "## 🗣 语气"]
+        sections = [
+            f"{marker}\n" + ("内容填充。" * 30) for marker in markers if marker != missing_marker
+        ]
+        soul = "\n".join(sections)
+        with pytest.raises(AssistantCatalogError, match=missing_marker):
+            catalog.create(CreateAssistantRequest(name="x", soul=soul))
+
+    def test_soul_too_short_raises(self, catalog: AssistantCatalogImpl) -> None:
+        soul = "## 🧠 身份\n你是测试助理。\n## 🎭 性格\n直接坦诚。\n## 🛠 能力\n擅长测试。\n## 🗣 语气\n专业。"
+        with pytest.raises(AssistantCatalogError, match="200 字符"):
+            catalog.create(CreateAssistantRequest(name="x", soul=soul))
+
+    def test_valid_soul_creates_home_with_soul_content(self, catalog: AssistantCatalogImpl) -> None:
+        soul = _valid_soul()
+        handle = catalog.create(CreateAssistantRequest(name="向导创建", soul=soul))
+        written = (Path(handle.home_path) / "SOUL.md").read_text(encoding="utf-8")
+        assert written == soul
+
+    def test_soul_overrides_from_role_backstory(
+        self,
+        catalog: AssistantCatalogImpl,
+    ) -> None:
+        """soul 非空时覆盖 from_role backstory；role_id / emoji 仍来自卡片。"""
+        from lca.contracts.protocols.assistant.role_resolver import RoleCard
+
+        class _Resolver:
+            def resolve(self, role_id: str) -> RoleCard:
+                return RoleCard(
+                    role_id="engineering/architect",
+                    title="软件架构师",
+                    department="engineering",
+                    summary="系统设计",
+                    backstory="## 核心使命\n### 系统设计\n### 架构评审",
+                    emoji="🏛️",
+                )
+
+        cat = AssistantCatalogImpl(root=catalog._root, role_resolver=_Resolver())
+        soul = _valid_soul()
+        handle = cat.create(
+            CreateAssistantRequest(
+                name="向导",
+                from_role="engineering/architect",
+                soul=soul,
+            )
+        )
+        home = Path(handle.home_path)
+        assert (home / "SOUL.md").read_text(encoding="utf-8") == soul
+        profile = json.loads((home / "profile.json").read_text(encoding="utf-8"))
+        assert profile["role_id"] == "engineering/architect"
+        assert profile["emoji"] == "🏛️"
+        goals = (home / "goals.yaml").read_text(encoding="utf-8")
+        assert "系统设计" in goals
+
+
+# ── inherit_from 快照（ADR-0242 D1/D2）──────────────────────────────
+
+
+def _make_source_with_snapshot(catalog: AssistantCatalogImpl) -> str:
+    """造一个 digest 一致的来源 Home：含技能目录 + 自定义 tools/grants。"""
+    source = catalog.create(CreateAssistantRequest(name="来源助理"))
+    src = Path(source.home_path)
+    skill_dir = src / "skills" / "src-skill"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text("---\nname: src-skill\n---\nbody", encoding="utf-8")
+    (src / "tools.yaml").write_text(
+        "tools:\n  allow: [workspace.read]\n  deny: [web_search]\n", encoding="utf-8"
+    )
+    (src / "grants.yaml").write_text("grants: [workspace.write]\n", encoding="utf-8")
+    from lca.plugins.assistant.home._home_layout import sha256_digest
+
+    manifest_path = src / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    for name in ("tools.yaml", "grants.yaml"):
+        manifest["digests"][name] = sha256_digest(src / name)
+    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    return source.assistant_id
+
+
+class TestInheritFromSnapshot:
+    def test_inherit_from_copies_skills_tools_grants(self, catalog: AssistantCatalogImpl) -> None:
+        source_id = _make_source_with_snapshot(catalog)
+        handle = catalog.create(CreateAssistantRequest(name="继承助理", inherit_from=source_id))
+        home = Path(handle.home_path)
+        # skills：只复制含 SKILL.md 的目录
+        assert (home / "skills" / "src-skill" / "SKILL.md").is_file()
+        # tools / grants 策略快照
+        assert (home / "tools.yaml").read_text(encoding="utf-8") == (
+            "tools:\n  allow: [workspace.read]\n  deny: [web_search]\n"
+        )
+        assert (home / "grants.yaml").read_text(encoding="utf-8") == "grants: [workspace.write]\n"
+        # 快照 Home digest 一致，可 get
+        spec = catalog.get(handle.assistant_id)
+        assert spec.assistant_id == handle.assistant_id
+
+    def test_inherit_from_no_skills_scaffolds_empty(self, catalog: AssistantCatalogImpl) -> None:
+        source = catalog.create(CreateAssistantRequest(name="无技能来源"))
+        handle = catalog.create(
+            CreateAssistantRequest(name="继承助理", inherit_from=source.assistant_id)
+        )
+        home = Path(handle.home_path)
+        assert (home / "skills").is_dir()
+        assert list((home / "skills").iterdir()) == []
+
+    def test_inherit_from_unknown_raises(self, catalog: AssistantCatalogImpl) -> None:
+        with pytest.raises(AssistantCatalogError):
+            catalog.create(CreateAssistantRequest(name="x", inherit_from="asst_does_not_exist"))
+
+    def test_inherit_from_digest_mismatch_raises(self, catalog: AssistantCatalogImpl) -> None:
+        source = catalog.create(CreateAssistantRequest(name="篡改来源"))
+        (Path(source.home_path) / "SOUL.md").write_text("tampered", encoding="utf-8")
+        with pytest.raises(AssistantCatalogError):
+            catalog.create(CreateAssistantRequest(name="x", inherit_from=source.assistant_id))
+
+
+# ── Home 卫生（ADR-0242 D2）─────────────────────────────────────────
+
+
+class TestHomeHygiene:
+    def test_guided_creation_deletes_bootstrap_and_emits_ep(
+        self,
+        catalog: AssistantCatalogImpl,
+        emitted: list[tuple[str, dict[str, Any]]],
+    ) -> None:
+        handle = catalog.create(CreateAssistantRequest(name="向导创建", soul=_valid_soul()))
+        assert not (Path(handle.home_path) / "BOOTSTRAP.md").exists()
+        events = [event for event, _ in emitted]
+        assert ASSISTANT_BOOTSTRAP_COMPLETED in events
+
+    def test_guided_creation_writes_non_empty_user_md(self, catalog: AssistantCatalogImpl) -> None:
+        handle = catalog.create(CreateAssistantRequest(name="向导创建", soul=_valid_soul()))
+        user_md = (Path(handle.home_path) / "USER.md").read_text(encoding="utf-8")
+        assert user_md.strip() != ""
+
+    def test_wizard_creation_home_has_no_empty_shells(self, catalog: AssistantCatalogImpl) -> None:
+        """集成：向导创建后 USER/goals/tools/grants 全部非空，且无 BOOTSTRAP。"""
+        handle = catalog.create(CreateAssistantRequest(name="向导创建", soul=_valid_soul()))
+        home = Path(handle.home_path)
+        assert (home / "USER.md").read_text(encoding="utf-8").strip()
+        assert yaml.safe_load((home / "goals.yaml").read_text(encoding="utf-8"))["goals"]
+        assert (home / "tools.yaml").read_text(encoding="utf-8").strip()
+        assert (home / "grants.yaml").read_text(encoding="utf-8").strip()
+        assert not (home / "BOOTSTRAP.md").exists()
+
+    def test_from_role_goals_non_empty_from_mission(
+        self,
+        catalog: AssistantCatalogImpl,
+    ) -> None:
+        from lca.contracts.protocols.assistant.role_resolver import RoleCard
+
+        class _Resolver:
+            def resolve(self, role_id: str) -> RoleCard:
+                return RoleCard(
+                    role_id="engineering/architect",
+                    title="软件架构师",
+                    department="engineering",
+                    summary="系统设计",
+                    backstory=(
+                        "# 软件架构师\n\n## 核心使命\n### 系统设计\n### 架构评审\n### 技术选型\n### 性能优化\n"
+                    ),
+                    emoji="🏛️",
+                )
+
+        cat = AssistantCatalogImpl(root=catalog._root, role_resolver=_Resolver())
+        handle = cat.create(CreateAssistantRequest(name="角色", from_role="engineering/architect"))
+        goals = yaml.safe_load((Path(handle.home_path) / "goals.yaml").read_text(encoding="utf-8"))
+        names = [g["name"] for g in goals["goals"]]
+        assert names == ["系统设计", "架构评审", "技术选型"]  # 最多前 3 个
+
+    def test_bare_creation_keeps_bootstrap(
+        self,
+        catalog: AssistantCatalogImpl,
+        emitted: list[tuple[str, dict[str, Any]]],
+    ) -> None:
+        handle = catalog.create(CreateAssistantRequest(name="裸创建"))
+        assert (Path(handle.home_path) / "BOOTSTRAP.md").exists()
+        events = [event for event, _ in emitted]
+        assert ASSISTANT_BOOTSTRAP_COMPLETED not in events
+
+    def test_all_creation_paths_have_non_empty_goals(self, catalog: AssistantCatalogImpl) -> None:
+        """裸创建 / 角色创建 / 向导创建 / 继承创建的 goals.yaml 都必须非空。"""
+        bare = catalog.create(CreateAssistantRequest(name="裸"))
+        assert yaml.safe_load((Path(bare.home_path) / "goals.yaml").read_text())["goals"]
+
+        from lca.contracts.protocols.assistant.role_resolver import RoleCard
+
+        class _Resolver:
+            def resolve(self, role_id: str) -> RoleCard:
+                return RoleCard(
+                    role_id="design/ux",
+                    title="UX 设计师",
+                    department="design",
+                    summary="体验设计",
+                    backstory="## 核心使命\n### 用户研究\n### 原型设计",
+                    emoji="🎨",
+                )
+
+        cat = AssistantCatalogImpl(root=catalog._root, role_resolver=_Resolver())
+        role = cat.create(CreateAssistantRequest(name="角色", from_role="design/ux"))
+        assert yaml.safe_load((Path(role.home_path) / "goals.yaml").read_text())["goals"]
+
+        wizard = cat.create(CreateAssistantRequest(name="向导", soul=_valid_soul()))
+        assert yaml.safe_load((Path(wizard.home_path) / "goals.yaml").read_text())["goals"]
+
+
+def _valid_soul() -> str:
+    """构造一个能通过完整度校验的 SOUL（四核心段 + 去空白 >= 200 字符）。"""
+    return (
+        "## 🧠 身份\n"
+        "你是向导助理，服务用户完成深度研究。\n"
+        + "你是一位资深研究员。" * 20
+        + "\n## 🎭 性格\n"
+        + "结论先行，直接坦诚。" * 20
+        + "\n## 🛠 能力\n"
+        + "擅长资料搜集与交叉核验。" * 20
+        + "\n## 🗣 语气\n"
+        + "专业务实，简洁量化。" * 20
+    )

@@ -84,6 +84,52 @@ class TestTemplateRegistry:
             render_template("assistant.nonexistent", name="x", description="")
 
 
+class TestStructuredSoulTemplate:
+    """ADR-0242 D2 / 附录 C：SOUL 模板必须是八段结构，且裸模板能通过自我校验。"""
+
+    _ALL_MARKERS: tuple[str, ...] = (
+        "## 🧠 身份",
+        "## 🎭 性格",
+        "## 🛠 能力",
+        "## 🗣 语气",
+        "## 🔒 安全边界",
+        "## 💾 记忆规则",
+        "## ⚠️ 错误处理",
+        "## 🚫 红线",
+    )
+
+    @pytest.mark.parametrize("template_id", sorted(TEMPLATE_REGISTRY))
+    def test_soul_has_eight_sections(self, template_id: str) -> None:
+        rendered = render_template(template_id, name="小助", description="测试职责")
+        soul = rendered.files["SOUL.md"]
+        for marker in self._ALL_MARKERS:
+            assert marker in soul, f"{template_id}/SOUL.md 缺 {marker}"
+
+    @pytest.mark.parametrize("template_id", sorted(TEMPLATE_REGISTRY))
+    def test_soul_template_passes_self_check(self, template_id: str) -> None:
+        """模板本身 >= 200 字符（去空白）且含四核心标记。"""
+        rendered = render_template(template_id, name="小助", description="测试职责")
+        soul = rendered.files["SOUL.md"]
+        compact = "".join(soul.split())
+        assert len(compact) >= 200, f"{template_id}/SOUL.md 去空白后不足 200 字符"
+        for marker in ("## 🧠 身份", "## 🎭 性格", "## 🛠 能力", "## 🗣 语气"):
+            assert marker in soul, f"{template_id}/SOUL.md 缺核心段 {marker}"
+
+    @pytest.mark.parametrize("template_id", sorted(TEMPLATE_REGISTRY))
+    def test_profile_carries_opening_message_and_locale(self, template_id: str) -> None:
+        rendered = render_template(template_id, name="小助", description="测试职责")
+        profile = json.loads(rendered.files["profile.json"])
+        assert "opening_message" in profile, f"{template_id}/profile.json 缺 opening_message"
+        assert "locale" in profile, f"{template_id}/profile.json 缺 locale"
+        assert profile["locale"] == "zh-CN"
+
+    def test_bootstrap_md_has_no_identity_reference(self) -> None:
+        for template_id in TEMPLATE_REGISTRY:
+            rendered = render_template(template_id, name="小助", description="测试职责")
+            bootstrap = rendered.files["BOOTSTRAP.md"]
+            assert "IDENTITY" not in bootstrap, f"{template_id}/BOOTSTRAP.md 仍引用 IDENTITY"
+
+
 class TestCreateWithRoleTemplates:
     @pytest.mark.parametrize("template_id", ROLE_TEMPLATES)
     def test_create_accepts_role_templates(

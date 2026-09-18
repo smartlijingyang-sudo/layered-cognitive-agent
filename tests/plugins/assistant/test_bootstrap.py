@@ -165,9 +165,14 @@ class TestProjectHomeToContextManifest:
             item for item in manifest.items if item.payload.get("name") == "goals.yaml"
         )
         assert "goals" in goals_item.payload
-        # default goals.yaml 模板 = ``goals: []`` + ``notes``;``goals`` 解析为 []
-        # notes 是顶层额外字段,也透传(整 dict 形态);断言 goals 字段 = []
-        assert goals_item.payload["goals"] == []
+        # 模板 goals.yaml 已升级为示例目标（ADR-0242 D2）：goals 是非空列表，
+        # 每项含 name / description / success_criteria
+        goals = goals_item.payload["goals"]
+        assert isinstance(goals, list) and goals
+        for goal in goals:
+            assert goal["name"]
+            assert goal["description"]
+            assert goal["success_criteria"]
 
     def test_missing_config_face_raises(
         self,
@@ -226,10 +231,16 @@ class TestMemoryLayerExcluded:
             assistant_id=assistant_a.assistant_id,
         )
         for item in manifest.items:
-            text_repr = str(item.payload) + item.provenance
-            assert "MEMORY" not in text_repr, (
-                f"item {item.payload.get('name')!r} 含 MEMORY 字面(I-A13):{text_repr[:80]}"
+            payload = item.payload
+            # 记忆面文件本身不得作为投影 item 出现；SOUL/USER 配置面正文引用
+            # 记忆规则（MEMORY.md / memory/）是合法配置内容（ADR-0242 附录 C）。
+            assert payload.get("name") not in {"MEMORY.md", "memory"}, (
+                f"item {payload.get('name')!r} 是记忆面文件(I-A13):{payload!r}"
             )
+            assert "/memory/" not in str(payload), (
+                f"item {payload.get('name')!r} 含 memory 目录引用(I-A13):{str(payload)[:80]}"
+            )
+            assert "memory" not in item.provenance.lower()
 
     def test_bootstrap_propagates_memory_exclusion_check(
         self,
@@ -238,10 +249,10 @@ class TestMemoryLayerExcluded:
     ) -> None:
         projection = bootstrap_service.project(assistant_a.assistant_id)
         assert isinstance(projection, BootstrapProjection)
-        # 即使将来 ``project_home_to_context_manifest`` 误引入 memory 字面,
-        # bootstrap service 的内置 check 也会抛 ValueError
+        # 记忆面文件不得作为投影 item 出现（配置面正文引用记忆规则不在此列）
         for item in projection.manifest.items:
-            assert "MEMORY" not in str(item.payload)
+            assert item.payload.get("name") not in {"MEMORY.md", "memory"}
+            assert "/memory/" not in str(item.payload)
 
 
 # ── Service.project(assistant_id) 集成路径 ──────────────────────────
@@ -371,6 +382,7 @@ class TestMemoryTamperDoesNotAffectBootstrap:
         (home / "memory" / "notes.json").write_text("{}", encoding="utf-8")
         projection = bootstrap_service.project(assistant_a.assistant_id)
         assert projection.manifest is not None
-        # bootstrap items 不含 MEMORY 字面(隔离)
+        # 记忆面文件本身不作为投影 item 出现
         for item in projection.manifest.items:
-            assert "MEMORY.md" not in str(item.payload)
+            assert item.payload.get("name") not in {"MEMORY.md", "memory"}
+            assert "/memory/" not in str(item.payload)

@@ -172,6 +172,49 @@ class TestCreateAssistantRequest:
         req = CreateAssistantRequest(name="Demo", initial_skills=("pdf", "docx"))
         assert req.initial_skills == ("pdf", "docx")
 
+    def test_soul_defaults_to_none(self) -> None:
+        req = CreateAssistantRequest(name="Demo")
+        assert req.soul is None
+
+    def test_soul_accepts_text(self) -> None:
+        req = CreateAssistantRequest(name="Demo", soul="## 🧠 身份\n你是测试助理。")
+        assert req.soul == "## 🧠 身份\n你是测试助理。"
+
+    def test_soul_empty_string_normalized_to_none(self) -> None:
+        req = CreateAssistantRequest(name="Demo", soul="   ")
+        assert req.soul is None
+
+    def test_inherit_from_defaults_to_none(self) -> None:
+        req = CreateAssistantRequest(name="Demo")
+        assert req.inherit_from is None
+
+    def test_inherit_from_accepts_id(self) -> None:
+        req = CreateAssistantRequest(name="Demo", inherit_from="asst_source")
+        assert req.inherit_from == "asst_source"
+
+    def test_inherit_from_empty_string_normalized_to_none(self) -> None:
+        req = CreateAssistantRequest(name="Demo", inherit_from="")
+        assert req.inherit_from is None
+
+
+class TestAssistantSpec:
+    def test_profile_opening_message_and_locale_default_to_empty(self) -> None:
+        spec = _assistant_spec()
+        assert spec.profile_opening_message == ""
+        assert spec.profile_locale == ""
+
+    def test_profile_opening_message_and_locale_accept_values(self) -> None:
+        spec = _assistant_spec()
+        spec = AssistantSpec(
+            **{
+                **spec.__dict__,
+                "profile_opening_message": "你好，我是 Demo。",
+                "profile_locale": "zh-CN",
+            }
+        )
+        assert spec.profile_opening_message == "你好，我是 Demo。"
+        assert spec.profile_locale == "zh-CN"
+
 
 # ── AssistantHandle / AssistantSummary ───────────────────────
 
