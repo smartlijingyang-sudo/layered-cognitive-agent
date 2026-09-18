@@ -20,7 +20,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { LcaAgentStreamClient } from './LcaAgentStreamClient';
+import { getLcaStreamPosition, LcaAgentStreamClient } from './LcaAgentStreamClient';
 
 // ─── Mock WebSocket ────────────────────────────────────────────────
 
@@ -362,5 +362,48 @@ describe('LcaAgentStreamClient.isOwnTerminal guard', () => {
     expect(events).toHaveLength(1);
     expect(client.connectionStatus).toBe('connected');
     expect((client as unknown as { sessionEnded: boolean }).sessionEnded).toBe(false);
+  });
+});
+
+// ─── C: resume position + lastEventId wire contract ─────────────────
+
+describe('LcaAgentStreamClient resume position', () => {
+  it('sends a resume frame with the configured lastEventId after auth_success', async () => {
+    const client = new LcaAgentStreamClient({
+      gatewayBase: 'ws://test.local',
+      lastEventId: 'ev-10',
+      operationId: 'op-1',
+      token: 't',
+    });
+    await connectAndAuth(client);
+
+    const resumeFrames = getLatestWs()
+      .sent.map((s) => JSON.parse(s))
+      .filter((f) => f.type === 'resume');
+    expect(resumeFrames).toHaveLength(1);
+    expect(resumeFrames[0]).toMatchObject({ type: 'resume', lastEventId: 'ev-10' });
+  });
+
+  it('records the last agent_event id per operationId in the shared registry', async () => {
+    const client = new LcaAgentStreamClient({
+      gatewayBase: 'ws://test.local',
+      operationId: 'op-1',
+      token: 't',
+    });
+    const ws = await connectAndAuth(client);
+
+    ws.simulateMessage({
+      event: {
+        data: { chunkType: 'text', content: 'hello' },
+        operationId: 'op-1',
+        stepIndex: 0,
+        timestamp: 1,
+        type: 'stream_chunk',
+      },
+      id: 'ev-9',
+      type: 'agent_event',
+    });
+
+    expect(getLcaStreamPosition('op-1')).toBe('ev-9');
   });
 });

@@ -23,6 +23,8 @@ export interface LcaConnectParams {
    * buffering deferral).
    */
   resumeOnConnect?: boolean;
+  /** Last stream event id seen for this run; the client resumes from it. */
+  lastEventId?: string;
 }
 
 export function lcaConnectToGateway(params: LcaConnectParams): LcaAgentStreamClient {
@@ -31,6 +33,7 @@ export function lcaConnectToGateway(params: LcaConnectParams): LcaAgentStreamCli
     operationId: params.operationId,
     resumeOnConnect: params.resumeOnConnect,
     token: params.token,
+    lastEventId: params.lastEventId,
   });
 }
 

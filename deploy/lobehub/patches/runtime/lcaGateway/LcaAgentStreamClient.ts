@@ -140,6 +140,17 @@ const HEARTBEAT_MISSED_THRESHOLD = 3;
 const RECONNECT_INITIAL_MS = 1_000;
 const RECONNECT_MAX_MS = 30_000;
 
+// ─── Stream position registry ────────────────────────────────────────
+//
+// Last agent_event id seen per run, shared across WS sessions (module-level).
+// When the user answers a parked run, the resume op reconnects to the SAME
+// run from this position instead of replaying the whole stream.
+const lcaStreamPositions = new Map<string, string>();
+
+export function getLcaStreamPosition(runId: string): string {
+  return lcaStreamPositions.get(runId) ?? '0';
+}
+
 // ─── Public options + helpers ────────────────────────────────────────
 
 export interface LcaAgentStreamClientOptions {
@@ -151,6 +162,8 @@ export interface LcaAgentStreamClientOptions {
   resumeOnConnect?: boolean;
   /** JWT minted by POST /v1/runs/{run_id}/ws-token. */
   token: string;
+  /** Last stream event id seen for this run; a resume session replays from here. */
+  lastEventId?: string;
 }
 
 type Listener<K extends keyof AgentStreamClientEvents> = AgentStreamClientEvents[K];
@@ -174,7 +187,9 @@ export class LcaAgentStreamClient {
 
   private readonly listeners = new Map<keyof AgentStreamClientEvents, Set<(arg: unknown) => void>>();
 
-  constructor(private readonly options: LcaAgentStreamClientOptions) {}
+  constructor(private readonly options: LcaAgentStreamClientOptions) {
+    this.lastEventId = options.lastEventId || '0';
+  }
 
   // ─── Public API (mirrors upstream AgentStreamClient) ─────────────
 
@@ -354,7 +369,10 @@ export class LcaAgentStreamClient {
         return;
       }
       case 'agent_event': {
-        if (typeof message.id === 'string') this.lastEventId = message.id;
+        if (typeof message.id === 'string') {
+          this.lastEventId = message.id;
+          lcaStreamPositions.set(this.options.operationId, message.id);
+        }
         const agentEvent = message.event as { operationId?: unknown; type?: unknown };
         this.emit('agent_event', message.event);
         // Mirrors upstream AgentStreamClient.isOwnTerminal: a terminal
