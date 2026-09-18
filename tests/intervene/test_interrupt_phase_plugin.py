@@ -169,3 +169,51 @@ async def test_interrupt_is_pure_across_instances() -> None:
     out_b = await InterruptExecutor().node_execute(_ctx(), inp)
     assert out_a.port_values["command"] == out_b.port_values["command"]
     assert out_a.port_values["routing"] == out_b.port_values["routing"]
+
+
+@pytest.mark.asyncio
+async def test_interrupt_use_tool_ask_user_emits_approve_command() -> None:
+    """Producers emit USE_TOOL + tool_calls, not action_type='ask_user'.
+
+    ``think.decision.parse`` / ``decision.compose.action`` set
+    ``needs_approval`` on a USE_TOOL decision carrying askUserQuestion;
+    the interrupt kind must follow the tool calls, else resume aborts.
+    """
+    from lca.contracts.models.core.execution.decision import ToolCall
+
+    decision = Decision(
+        decision_id="dec_live",
+        action_type="use_tool",
+        rationale="",
+        confidence=1.0,
+        tool_calls=[ToolCall(call_id="c1", tool_name="askUserQuestion", arguments={})],
+        needs_approval=True,
+    )
+    output = await InterruptExecutor().node_execute(
+        _ctx(),
+        NodeInput(port_values={"decision": decision, "spine_seq": 9}),
+    )
+    cmd: Command = output.port_values["command"]
+    routing: RoutingDecision = output.port_values["routing"]
+    assert cmd.kind == "approve"
+    assert routing.should_terminate is True
+
+
+@pytest.mark.asyncio
+async def test_interrupt_missing_spine_seq_falls_back_to_live_tail() -> None:
+    """No bundle wires ``spine_seq`` live; the pause must not fail.
+
+    The node anchors on the live spine tail instead of raising, so the
+    graph HITL path pauses instead of dying with TypeError (run_115326f1c7ce).
+    """
+    from lca.infrastructure.observability.spine.context.context import SpineContext
+
+    output = await InterruptExecutor().node_execute(
+        _ctx(),
+        NodeInput(port_values={"decision": _decision()}),
+    )
+    cmd: Command = output.port_values["command"]
+    assert cmd.kind == "approve"
+    assert cmd.issued_at_seq == SpineContext.current_sequence()
+    routing: RoutingDecision = output.port_values["routing"]
+    assert routing.should_terminate is True

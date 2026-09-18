@@ -10,7 +10,11 @@ test boundary.
 
 from __future__ import annotations
 
-from lca.contracts.models.core.execution.decision import Decision
+from lca.contracts.models.core.execution.decision import (
+    Decision,
+    ToolCall,
+    requires_human_input,
+)
 
 
 def test_decision_has_typed_needs_approval_field() -> None:
@@ -67,3 +71,21 @@ def test_decision_extra_smuggling_is_no_longer_required() -> None:
     # unrelated keys but ``needs_approval`` is the typed path.
     assert d.needs_approval is True
     assert d.extra == {}
+
+
+def _call(name: str) -> ToolCall:
+    return ToolCall(call_id="tc-1", tool_name=name, arguments={})
+
+
+def test_requires_human_input_true_for_ask_user_question() -> None:
+    """Single home for the flag predicate: every producer classifies alike."""
+    assert requires_human_input([_call("askUserQuestion")]) is True
+    assert requires_human_input([_call("listFiles"), _call("askUserQuestion")]) is True
+    assert requires_human_input((_call("askUserQuestion"),)) is True
+
+
+def test_requires_human_input_false_without_hitl_tool() -> None:
+    assert requires_human_input([_call("listFiles")]) is False
+    assert requires_human_input([]) is False
+    assert requires_human_input(None) is False
+    assert requires_human_input("askUserQuestion") is False

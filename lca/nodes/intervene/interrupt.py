@@ -49,7 +49,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.models.core.execution.decision import Decision
+from lca.contracts.models.core.execution.decision import Decision, requires_human_input
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -62,6 +62,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 from lca.contracts.protocols.graph.command import Command
 from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.infrastructure.observability.spine.context.context import SpineContext
 
 # ``Decision.action_type`` value that opts into the HITL pause path.
 # The upstream ``think.decision.parse`` (and the legacy code path) emit
@@ -85,6 +86,16 @@ def _resolve_port(name: str, *, input: NodeInput, context: NodeContext) -> Any:
         raise TypeError(
             f"intervene.interrupt: '{name}' port must be supplied via input.port_values or context.runtime"
         )
+    return value
+
+
+def _peek_port(name: str, *, input: NodeInput, context: NodeContext) -> Any:
+    """Read an optional port; ``None`` when no producer wired it live."""
+    value = input.port_values.get(name)
+    if value is None and getattr(context, "runtime", None) is not None:
+        value = getattr(context.runtime, name, None)
+        if value is None and hasattr(context.runtime, "get"):
+            value = context.runtime.get(name)
     return value
 
 
@@ -119,12 +130,21 @@ class InterruptExecutor:
             raise TypeError(
                 f"intervene.interrupt expects Decision on port 'decision', got {type(decision).__name__}"
             )
-        seq = _resolve_port("spine_seq", input=input, context=context)
-        if not isinstance(seq, int):
+        seq = _peek_port("spine_seq", input=input, context=context)
+        if seq is None:
+            # No producer wires ``spine_seq`` live (outer edge carries only
+            # the approval routing predicate). Anchor on the live spine tail
+            # instead of failing the pause: the kernel persists this Command
+            # immediately after, so the tail is the issuance point.
+            seq = SpineContext.current_sequence()
+        if not isinstance(seq, int) or isinstance(seq, bool):
             raise TypeError(
                 f"intervene.interrupt expects int on port 'spine_seq', got {type(seq).__name__}"
             )
-        kind = "approve" if decision.action_type == _HITL_ACTION_TYPE else "reject"
+        if decision.action_type == _HITL_ACTION_TYPE or requires_human_input(decision.tool_calls):
+            kind = "approve"
+        else:
+            kind = "reject"
         cmd = Command(
             kind=kind,  # type: ignore[arg-type]
             payload={"decision_id": decision.decision_id},

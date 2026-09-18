@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from lca.contracts.models.core.execution.result import Result
 
 __all__ = [
+    "HITL_TOOL_NAMES",
     "AgentCard",
     "Decision",
     "DelegationSpec",
@@ -22,6 +23,7 @@ __all__ = [
     "Reflection",
     "TaskProgress",
     "ToolCall",
+    "requires_human_input",
 ]
 
 
@@ -105,6 +107,26 @@ class Decision:
     # may dispatch directly; ``True`` means ``act.approve.gate`` routes
     # through the HITL interrupt seam (ADR-0228 §2.6).
     needs_approval: bool = False
+
+
+#: Tool names that pause the run for human input before execution. When a
+#: Decision carries one of these calls, ``act.approve.gate`` routes through
+#: ``intervene.interrupt`` (ADR-0228) instead of dispatching to the tool.
+HITL_TOOL_NAMES: frozenset[str] = frozenset({"askUserQuestion"})
+
+
+def requires_human_input(tool_calls: object) -> bool:
+    """True when any call names a HITL tool.
+
+    Single home for the ``Decision.needs_approval`` predicate so every
+    Decision producer (``think.decision.parse``,
+    ``decision.compose.action``, legacy classifier) classifies identically.
+    Takes ``object`` and coerces defensively: producers pass ``list``,
+    ``tuple`` or ``None``.
+    """
+    if not isinstance(tool_calls, (list, tuple)):
+        return False
+    return any(getattr(call, "tool_name", None) in HITL_TOOL_NAMES for call in tool_calls)
 
 
 @dataclass

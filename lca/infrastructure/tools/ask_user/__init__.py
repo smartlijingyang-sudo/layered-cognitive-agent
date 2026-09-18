@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.execution.decision import Observation
-from lca.contracts.models.core.execution.result import ApprovalPendingError
 from lca.contracts.models.core.execution.tool import ToolApi, ToolManifest, ToolMeta
 from lca.contracts.protocols import Tool
 from lca.infrastructure.tools.builder.builder import build_tools_from_manifest
@@ -81,8 +81,22 @@ class AskUserExecutor:
         error = _validate(params)
         if error:
             return Observation(observation_id="", success=False, payload=None, error=error)
-        raise ApprovalPendingError(
-            approval_request={"type": "ask_user_question", "questions": params["questions"]}
+        # HITL pause travels the graph path (Decision.needs_approval →
+        # act.approve.gate → intervene.interrupt), never through here. A
+        # direct invoke returns the request as data so Body keeps its
+        # Observation contract instead of escaping an exception that
+        # dispatch folds into FAILED.
+        return Observation(
+            observation_id=new_id("obs"),
+            success=False,
+            payload=None,
+            error="waiting for human approval",
+            extra={
+                "approval_request": {
+                    "type": "ask_user_question",
+                    "questions": params["questions"],
+                }
+            },
         )
 
 

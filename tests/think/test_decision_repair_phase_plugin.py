@@ -16,7 +16,7 @@ from typing import Any
 import pytest
 
 from lca.contracts.atoms.enums.enums import ActionType
-from lca.contracts.models.core.conversation.llm import LLMResponse
+from lca.contracts.models.core.conversation.llm import LLMResponse, NativeToolCall
 from lca.contracts.models.core.execution.decision import Decision, ToolCall
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
@@ -513,3 +513,56 @@ async def test_well_formed_markup_block_becomes_an_executable_call() -> None:
     assert isinstance(routing, RoutingDecision)
     assert routing.next_node == "think.gate"
     assert routing.next_hint == "decision_ok"
+
+
+def _ask_user_response() -> LLMResponse:
+    return LLMResponse(
+        text="",
+        tool_calls=(
+            NativeToolCall(
+                call_id="c1",
+                name="askUserQuestion",
+                arguments={
+                    "questions": [
+                        {
+                            "question": "Which color scheme?",
+                            "header": "Theme",
+                            "options": [
+                                {"label": "Dark", "description": "Dark mode"},
+                                {"label": "Light", "description": "Light mode"},
+                            ],
+                        }
+                    ]
+                },
+            ),
+        ),
+        model="qwen3.7-plus",
+        finish_reason="tool_calls",
+    )
+
+
+@pytest.mark.asyncio
+async def test_think_parse_sets_needs_approval_for_ask_user() -> None:
+    """``think.decision.parse`` must flag HITL like ``decision.compose.action``.
+
+    The live solo path parses through this node, not the concept graph; a
+    missing flag lets ``act.approve.gate`` skip and the tool executes,
+    folding to FAILED instead of pausing (run_7a88995dd563).
+    """
+    decision = await _parse(_ask_user_response())
+    assert decision.action_type == ActionType.USE_TOOL.value
+    assert decision.tool_calls[0].tool_name == "askUserQuestion"
+    assert decision.needs_approval is True
+
+
+@pytest.mark.asyncio
+async def test_think_parse_leaves_flag_clear_for_normal_tool() -> None:
+    decision = await _parse(
+        LLMResponse(
+            text="",
+            tool_calls=(NativeToolCall(call_id="c1", name="listFiles", arguments={}),),
+            model="qwen3.7-plus",
+            finish_reason="tool_calls",
+        )
+    )
+    assert decision.needs_approval is False

@@ -48,6 +48,7 @@ from lca.contracts.models.core.execution.decision import (
     Decision,
     DelegationSpec,
     ToolCall,
+    requires_human_input,
 )
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
@@ -97,6 +98,7 @@ class DecisionParseExecutor:
                     tool_calls=list(tool_calls),
                     delegations=list(delegations),
                     response_text=intent if action_type == "respond" else None,
+                    needs_approval=requires_human_input(tool_calls),
                 )
             }
         )

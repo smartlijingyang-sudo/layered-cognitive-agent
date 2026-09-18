@@ -19,7 +19,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.models.core.conversation.llm import LLMResponse
-from lca.contracts.models.core.execution.decision import Decision
+from lca.contracts.models.core.execution.decision import Decision, requires_human_input
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
@@ -58,6 +58,7 @@ class DefaultDecisionClassifier(DecisionClassifier):
                 rationale="",
                 confidence=1.0,
                 tool_calls=list(projected.tool_calls),
+                needs_approval=requires_human_input(projected.tool_calls),
             )
         if projected.intent:
             return Decision(

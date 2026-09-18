@@ -32,7 +32,12 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
-from lca.contracts.models.core.execution.decision import Decision, DelegationSpec, ToolCall
+from lca.contracts.models.core.execution.decision import (
+    Decision,
+    DelegationSpec,
+    ToolCall,
+    requires_human_input,
+)
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -112,7 +117,7 @@ def _compose(
             delegations=list(delegations),
         )
     if tool_calls:
-        needs_approval = _requires_human_input(tool_calls)
+        needs_approval = requires_human_input(tool_calls)
         return Decision(
             decision_id=new_id("dec"),
             action_type=ActionType.USE_TOOL.value,
@@ -137,16 +142,6 @@ def _compose(
         confidence=0.0,
         response_text=_PARSE_FAILURE_USER_MESSAGE,
     )
-
-
-def _requires_human_input(tool_calls: tuple[ToolCall, ...]) -> bool:
-    """True when any tool call requires human input before execution.
-
-    ``askUserQuestion`` is the sole HITL tool. When present, the graph
-    routes through ``act.approve.gate`` → ``intervene.interrupt`` to
-    pause and collect user input before the tool executes.
-    """
-    return any(call.tool_name == "askUserQuestion" for call in tool_calls)
 
 
 def _wire_extra(tool_calls: tuple[ToolCall, ...]) -> dict[str, object]:

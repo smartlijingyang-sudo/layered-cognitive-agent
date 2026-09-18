@@ -76,6 +76,11 @@ class SpineContext:
         return val
 
     @classmethod
+    def current_sequence(cls) -> int:
+        """Peek the live spine tail without allocating a sequence number."""
+        return cls._seq.get()
+
+    @classmethod
     def next_epoch(cls) -> int:
         val = cls._epoch.get() + 1
         cls._epoch.set(val)
