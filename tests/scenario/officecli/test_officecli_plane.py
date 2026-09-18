@@ -58,13 +58,13 @@ class TestBundledOfficecliSkill(unittest.TestCase):
         bundle.mkdir(parents=True)
         skill_md = bundle / "SKILL.md"
         skill_md.write_text(
-            "---\nname: demo\ndescription: v1\nversion: 1\n---\n# body1\n",
+            "---\nname: demo\ndescription: v1\nversion: 1\nreferences: []\n---\n# body1\n",
             encoding="utf-8",
         )
         root = bundle.parent
         self.assertEqual(ensure_bundled_skills(self.store, root=root), ("demo-skill",))
         skill_md.write_text(
-            "---\nname: demo\ndescription: v2\nversion: 2\n---\n# body2\n",
+            "---\nname: demo\ndescription: v2\nversion: 2\nreferences: []\n---\n# body2\n",
             encoding="utf-8",
         )
         refreshed = ensure_bundled_skills(self.store, root=root)

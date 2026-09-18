@@ -67,7 +67,9 @@ def test_assistant_scope_miss_falls_back_to_global(tmp_path: Path) -> None:
     merged = _merged(tmp_path)
     assert merged.get("global-skill").skill_id == "global-skill"
     assert merged.read_resource("global-skill", "REFERENCE.md") == "ref"
-    assert merged.resource_files("global-skill") == {"REFERENCE.md": b"ref"}
+    # references 用 ``resources/`` 前缀声明；resource_files 返回带前缀的挂载键。
+    assert merged.resource_files("global-skill") == {"resources/REFERENCE.md": b"ref"}
+    assert merged.read_resource("global-skill", "resources/REFERENCE.md") == "ref"
 
 
 def test_both_scopes_missing_raises_once(tmp_path: Path) -> None:

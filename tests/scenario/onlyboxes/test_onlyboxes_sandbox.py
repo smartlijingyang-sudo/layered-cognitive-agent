@@ -377,5 +377,27 @@ class ExecuteCodeArtifactTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("__LCA_ONLYBOXES_ARTIFACTS__", GUEST_ARTIFACT_SCANNER)
 
 
+class SafeRelNameTests(unittest.TestCase):
+    """safe_rel_name() must keep nested skill-resource paths (ADR-0242 D4)."""
+
+    def test_keeps_nested_relative_path(self) -> None:
+        from lca.infrastructure.sandbox.onlyboxes.bootstrap import safe_rel_name
+
+        self.assertEqual(
+            safe_rel_name("_skills/create-assistant/resources/list_roles.py"),
+            "_skills/create-assistant/resources/list_roles.py",
+        )
+
+    def test_flat_filename_unchanged(self) -> None:
+        from lca.infrastructure.sandbox.onlyboxes.bootstrap import safe_rel_name
+
+        self.assertEqual(safe_rel_name("sales.xlsx"), "sales.xlsx")
+
+    def test_strips_traversal_and_leading_slash(self) -> None:
+        from lca.infrastructure.sandbox.onlyboxes.bootstrap import safe_rel_name
+
+        self.assertEqual(safe_rel_name("/../../etc/passwd"), "etc/passwd")
+
+
 if __name__ == "__main__":
     unittest.main()

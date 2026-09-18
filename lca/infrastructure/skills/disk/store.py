@@ -108,7 +108,9 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
 
     def read_resource(self, skill_id: str, rel_path: str) -> str:
         package = self.get(skill_id)
-        normalized = safe_rel_path(rel_path)
+        # resource_paths 存 ``resources/`` 前缀的 skill 根相对路径；
+        # 调用方可能传扁平名或带前缀名，统一归一化后检查。
+        normalized = _to_resource_rel(safe_rel_path(rel_path))
         if normalized not in package.resource_paths:
             raise SkillNotFoundError(
                 f"技能 {skill_id!r} 中不存在资源路径 {rel_path!r}（不在白名单内）"
@@ -120,11 +122,15 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
         package = self.get(skill_id)
         out: dict[str, bytes] = {}
         for rel in package.resource_paths:
+            # 挂载键带 ``resources/`` 前缀，与 SKILL.md references 声明一致，
+            # 使 run_skill_script 在 skill 根目录执行 ``resources/<file>`` 可达。
             out[rel] = self._read_resource_bytes(skill_id, rel)
         return out
 
     def _read_resource_bytes(self, skill_id: str, rel_path: str) -> bytes:
-        path = self._root / sanitize_skill_id(skill_id) / _RESOURCES / rel_path
+        # 物理布局: resources/<flat>；resource_paths 的 ``resources/`` 前缀在此剥离。
+        storage_rel = _strip_resources_prefix(safe_rel_path(rel_path))
+        path = self._root / sanitize_skill_id(skill_id) / _RESOURCES / storage_rel
         if not path.is_file():
             raise SkillNotFoundError(f"资源文件不存在: {rel_path}")
         data = path.read_bytes()
@@ -175,10 +181,12 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
                 continue
             if len(data) > SKILL_MAX_RESOURCE_BYTES:
                 raise ValueError(f"资源 {clean} 超过单文件上限")
-            out_path = resources_dir / clean
+            # 落盘用扁平相对路径；manifest 记录 ``resources/`` 前缀的声明路径。
+            storage_rel = _strip_resources_prefix(clean)
+            out_path = resources_dir / storage_rel
             out_path.parent.mkdir(parents=True, exist_ok=True)
             out_path.write_bytes(data)
-            normalized_resources.append(clean)
+            normalized_resources.append(_to_resource_rel(clean))
 
         # ADR-0214 §7: 校验 references 列表里的所有路径必须落到 _root/<sid>/_RESOURCES
         # 或 _root/<sid>/(SKILL.md 同级) — 不存在就 fail-loud。
@@ -234,3 +242,15 @@ def safe_rel_path(name: str) -> str:
     cleaned = name.replace("\\", "/").strip().lstrip("/")
     parts = [p for p in cleaned.split("/") if p and p not in {".", ".."}]
     return "/".join(parts)
+
+
+def _strip_resources_prefix(path: str) -> str:
+    """Strip a leading ``resources/`` prefix from a declared reference path."""
+    prefix = f"{_RESOURCES}/"
+    return path[len(prefix):] if path.startswith(prefix) else path
+
+
+def _to_resource_rel(path: str) -> str:
+    """Normalize a path to the ``resources/``-prefixed skill-relative form."""
+    prefix = f"{_RESOURCES}/"
+    return path if path.startswith(prefix) else f"{prefix}{path}"

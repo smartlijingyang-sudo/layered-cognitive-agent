@@ -56,6 +56,8 @@ class BindingsViewBuilder:
     search: object | None = None
     bindings: object | None = None
     mode: str = "solo"
+    assistant_id: str = ""
+    home_path: str | None = None
 
     def build(self) -> BindingsView:
         """Project the builder onto the typed ``BindingsView`` boundary DTO.
@@ -72,6 +74,8 @@ class BindingsViewBuilder:
             search=self.search,
             bindings=self.bindings,
             mode=self.mode,
+            assistant_id=self.assistant_id,
+            home_path=self.home_path,
         )
 
 

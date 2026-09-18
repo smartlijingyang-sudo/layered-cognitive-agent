@@ -120,6 +120,10 @@ class BindingsView(BaseModel):
     search: object | None = None
     bindings: object | None = None
     mode: str = "solo"
+    assistant_id: str = ""
+    """ADR-0242 D4: non-empty ⇒ tool fork must narrow to Home policy."""
+    home_path: str | None = None
+    """Assistant Home 绝对路径；与 ``assistant_id`` 一起驱动工具过滤。"""
 
 
 class ForkedTools(BaseModel):

@@ -175,6 +175,16 @@ class ToolForkDispatchExecutor:
         # — sandbox plane = isolation, not creator/tool visibility policy.
         if getattr(bindings, "mode", "solo") == "solo":
             items = _filter_solo_creator_tools(items)
+        # ADR-0242 D4 / I-B3: assistant-bound runs see only the Home-filtered
+        # tool set, matching the permission manifest built from the same
+        # tools.yaml / grants.yaml policy (the assembler filters
+        # Agent.tools; this is the second gate and must stay in sync).
+        if bindings.assistant_id and bindings.home_path:
+            from lca.infrastructure.tools.assistant.filter import (
+                filter_tools_by_assistant,
+            )
+
+            items = filter_tools_by_assistant(items, bindings.home_path)
         _assert_sandbox_tools_visible(bindings, items)
         forked_tools = ForkedTools(
             items=items,

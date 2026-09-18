@@ -98,7 +98,7 @@ class TestExecute:
         # capabilities 是结构化清单（ADR-0242 D7）：含模板示例目标与工具名
         assert isinstance(payload["capabilities"], list)
         assert "深度研究" in payload["capabilities"]
-        assert "workspace.read" in payload["capabilities"]
+        assert "结构化报告" in payload["capabilities"]
         # personality / tone 从 SOUL 提取
         assert payload["personality"]
         assert payload["tone"]
@@ -193,12 +193,10 @@ class TestExecute:
         assert obs.success
         merged = bridge.calls[0]["description"]
         assert merged.startswith("深度研究 · 能力：")
-        # 默认模板 goals + tools allow 都进入能力清单。
+        # 默认模板 goals 进入能力清单（tools.yaml allow 为空 = 默认放行）。
         assert "日常协助" in merged
-        assert "workspace.read" in merged
         # Observation payload 的 capabilities 与并入描述的能力同源。
-        assert obs.payload["capabilities"] == ["日常协助", "信息整理", "问题解答",
-                                               "workspace.read", "workspace.write", "workspace.list"]
+        assert obs.payload["capabilities"] == ["日常协助", "信息整理", "问题解答"]
 
     @pytest.mark.asyncio
     async def test_bridge_success_sets_frontend_url(self, catalog: AssistantCatalogImpl) -> None:

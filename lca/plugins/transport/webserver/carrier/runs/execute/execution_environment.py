@@ -58,6 +58,9 @@ from lca.plugins.transport.webserver.carrier.runs.execute.loop_drivers import Ru
 from lca.plugins.transport.webserver.carrier.runs.lifecycle.run_context_factory import (
     run_context_for_session as _run_context_for_session,
 )
+from lca.plugins.transport.webserver.carrier.runs.lifecycle.runnable_assembly import (
+    _assistant_spec_for_run,
+)
 from lca.plugins.transport.webserver.handlers.runs.api.attachment_staging import (
     stage_machine_attachments as _stage_machine_attachments,
 )
@@ -191,6 +194,8 @@ class RunExecutionEnvironment:
                     profile=str(getattr(session, "profile", "") or ""),
                 )
             try:
+                spec = _assistant_spec_for_run(self._ctx, assistant_id)
+                home_path = spec.home_path if spec is not None else None
                 bindings_view = BindingsViewBuilder(
                     file_store=providers.file_store,
                     bindings=bindings,
@@ -201,6 +206,8 @@ class RunExecutionEnvironment:
                     skill_store=resolve_skill_store(self._ctx, assistant_id),
                     machine_resolver=self._machine_resolver,
                     mode=(getattr(session, "mode", "") or "solo").strip() or "solo",
+                    assistant_id=assistant_id,
+                    home_path=home_path,
                 )
                 tools_service = require_capability(self._ctx, "tools")
                 # Hot-resume cache (same class as session.ambit): the HIL

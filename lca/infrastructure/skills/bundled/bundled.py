@@ -32,8 +32,8 @@ _BUNDLED_SOURCE_PREFIX = "bundled:"
 
 def default_bundled_skills_root() -> Path:
     """Repo-root ``skills/`` directory (…/layered-cognitive-agent/skills)."""
-    # lca/infrastructure/skills/bundled.py → parents[3] = repo root
-    return Path(__file__).resolve().parents[3] / "skills"
+    # bundled/bundled.py 在 repo 根下 4 层(lca/infrastructure/skills/bundled)。
+    return Path(__file__).resolve().parents[4] / "skills"
 
 
 def ensure_bundled_skills(

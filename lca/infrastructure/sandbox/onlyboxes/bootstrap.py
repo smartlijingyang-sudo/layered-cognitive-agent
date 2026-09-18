@@ -39,10 +39,14 @@ def wait_ms(timeout_s: int) -> int:
 
 
 def safe_rel_name(name: str) -> str:
-    """Strip path traversal; keep basename for guest mount."""
+    """Strip path traversal; keep the cleaned relative path for guest mount.
+
+    Subdirectories are preserved so skill resources (``_skills/<id>/<rel>``)
+    land at their declared path instead of being flattened to the basename.
+    """
     cleaned = name.replace("\\", "/").strip().lstrip("/")
     parts = [p for p in cleaned.split("/") if p and p not in {".", ".."}]
-    return parts[-1] if parts else "file.bin"
+    return "/".join(parts) if parts else "file.bin"
 
 
 def auth_headers(access_token: str) -> dict[str, str]:

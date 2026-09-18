@@ -193,6 +193,8 @@ def tools_from_scope(
         search=require_capability(scope, "search"),
         skill_store=resolve_skill_store(scope, assistant_id),
         machine_resolver=machine_resolver,
+        assistant_id=assistant_id.strip(),
+        home_path=home_path,
     ).build()
     tools = tuple(require_capability(scope, "tools").materialize(view))
     assistant_id = assistant_id.strip()
@@ -201,7 +203,7 @@ def tools_from_scope(
     if home_path is None:
         spec = _assistant_spec_for_run(scope, assistant_id)
         home_path = spec.home_path if spec is not None else None
-    from lca.plugins.assistant.tools import filter_tools_by_assistant
+    from lca.infrastructure.tools.assistant.filter import filter_tools_by_assistant
 
     return filter_tools_by_assistant(tools, home_path)
 

@@ -300,3 +300,71 @@ async def test_team_mode_keeps_creator_host_tools() -> None:
     names = {t.name for t in forked}
     for host in _CREATOR_HOST_TOOL_NAMES:
         assert host in names, f"{host!r} must be present in team mode"
+
+
+# ──────────────────────────────────────────────────────────────────────
+# ADR-0242 D4 / I-B3: assistant-bound runs fork only the Home-filtered
+# tool set. The model must not see tools the permission manifest denies.
+# ──────────────────────────────────────────────────────────────────────
+
+
+def _write_home_policy(home: Path, *, allow: list[str], deny: list[str]) -> None:
+    home.mkdir(parents=True, exist_ok=True)
+    (home / "tools.yaml").write_text(
+        f"tools:\n  allow: [{', '.join(allow)}]\n  deny: [{', '.join(deny)}]\n",
+        encoding="utf-8",
+    )
+    (home / "grants.yaml").write_text("grants: []\n", encoding="utf-8")
+
+
+@pytest.mark.asyncio
+async def test_assistant_id_filters_forked_tools_by_home_policy(tmp_path) -> None:
+    """I-B3: assistant Home deny 列表中的工具不出现在 ForkedTools。"""
+    from pathlib import Path
+
+    from lca.contracts.models.cognition.boundary import BindingsView
+
+    home = tmp_path / "asst_home"
+    _write_home_policy(home, allow=[], deny=["search"])
+    tools = _ToolsServiceStub(
+        tools={
+            "search": _ToolStub(name="search"),
+            "runCommand": _ToolStub(name="runCommand"),
+            "create_assistant_skill": _ToolStub(name="create_assistant_skill"),
+        }
+    )
+    executor = ToolForkDispatchExecutor()
+    bindings = BindingsView(
+        sandbox=None,
+        mode="solo",
+        assistant_id="asst_test",
+        home_path=str(home),
+    )
+    result = await executor.node_execute(
+        _ctx(),
+        _input(bindings, tools=tools),
+    )
+    forked: _ToolsServiceStub = result.port_values["forked_tools"].items  # type: ignore[assignment]
+    names = {t.name for t in forked}
+    assert "search" not in names
+    assert "runCommand" in names
+    assert "create_assistant_skill" in names
+
+
+@pytest.mark.asyncio
+async def test_no_assistant_id_leaves_fork_untouched(tmp_path) -> None:
+    """I-B8:无 assistant_id 时工具 fork 不套用 Home 过滤。"""
+    from lca.contracts.models.cognition.boundary import BindingsView
+
+    tools = _ToolsServiceStub(
+        tools={"search": _ToolStub(name="search"), "runCommand": _ToolStub(name="runCommand")}
+    )
+    executor = ToolForkDispatchExecutor()
+    bindings = BindingsView(sandbox=None, mode="solo")
+    result = await executor.node_execute(
+        _ctx(),
+        _input(bindings, tools=tools),
+    )
+    forked: _ToolsServiceStub = result.port_values["forked_tools"].items  # type: ignore[assignment]
+    names = {t.name for t in forked}
+    assert names == {"search", "runCommand"}
