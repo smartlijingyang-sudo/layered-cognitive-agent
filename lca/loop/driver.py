@@ -15,6 +15,7 @@ from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.core.policy.stop import StopDecision
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.contracts.protocols.runtime.runtime.composition import ResultFinalizer
 from lca.framework.graph.adapter import PhaseRunCursor
 from lca.framework.graph.interpreter import InterpretationResult, PlanInterpreter
@@ -105,6 +106,89 @@ def _recover_final_output_text(payload: object, *, visits: tuple = ()) -> str | 
     return ref if isinstance(ref, str) and ref.strip() else None
 
 
+def _pause_from_interrupt(visits: tuple) -> dict | None:
+    """Newest-first scan for an ``intervene.resume`` pause signal.
+
+    Returns ``{"node_id", "occurrence", "decision"}`` for the pausing
+    visit, or ``None``. Only the documented pause protocol
+    (``next_hint == "intervene.resume"``) maps to a paused outcome;
+    other ``should_terminate`` terminals (e.g. control "stop"
+    verdicts) keep the existing stop-decision path.
+    """
+    for visit in reversed(tuple(visits) or ()):
+        outs = getattr(visit, "outputs", None) or {}
+        if not isinstance(outs, dict):
+            continue
+        for value in outs.values():
+            if (
+                isinstance(value, RoutingDecision)
+                and value.should_terminate
+                and value.next_hint == "intervene.resume"
+            ):
+                node_id = getattr(visit, "node_id", "") or ""
+                occurrence = sum(
+                    1 for v in (tuple(visits) or ()) if getattr(v, "node_id", None) == node_id
+                )
+                return {
+                    "node_id": node_id,
+                    "occurrence": max(occurrence, 1),
+                    "decision": outs.get("decision"),
+                }
+    return None
+
+
+def _paused_outcome_parts(pause: dict, *, plan_ref: str, visits: tuple) -> tuple:
+    """Build the paused ``(stop, cursor, approval_request)`` triple.
+
+    The run stopped at ``intervene.interrupt``; resume re-enters at
+    ``intervene.resume`` (outer yaml), so the durable cursor points
+    there. ``approval_id`` follows the ``<plan_ref>:<node>:<visit>``
+    shape the transport logs on resume.
+    """
+    from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
+        PhaseRunCursor,
+    )
+
+    node_id = pause["node_id"] or "intervene.interrupt"
+    occurrence = pause["occurrence"] or 1
+    approval_id = f"{plan_ref}:{node_id}:{occurrence}"
+    questions: list = []
+    decision = pause.get("decision")
+    tool_calls = getattr(decision, "tool_calls", None) or []
+    for call in tool_calls if isinstance(tool_calls, (list, tuple)) else []:
+        if getattr(call, "tool_name", None) != "askUserQuestion":
+            continue
+        arguments = getattr(call, "arguments", None)
+        if isinstance(arguments, dict) and isinstance(arguments.get("questions"), list):
+            questions = arguments["questions"]
+            break
+    approval_request: dict[str, object] = {
+        "approval_id": approval_id,
+        "type": "ask_user_question",
+        "questions": questions,
+    }
+    counts: dict[str, int] = {}
+    for visit in tuple(visits) or ():
+        name = getattr(visit, "node_id", None)
+        if isinstance(name, str) and name:
+            counts[name] = counts.get(name, 0) + 1
+    # Resume restarts the turn at perception with the human answer already
+    # in state (runtime_loop splices it before re-entry). Re-entering
+    # mid-graph (intervene.resume) would need the kernel to re-seed the
+    # persisted Command AND the original pending Decision — neither is
+    # seeded today, so point the durable cursor at the outer entry whose
+    # declared inputs are empty.
+    cursor = PhaseRunCursor(
+        plan_ref=plan_ref,
+        node_id="perceive.main",
+        visit_counts=tuple(counts.items()),
+        edge_counts=(),
+        artifacts={},
+        causation_refs=(),
+        budget_snapshot={},
+    )
+    return StopDecision(), cursor, approval_request
+
 
 class DeclarativeExecution:
     """V2 driver module: ``CompiledRunPlan`` → :class:`InterpretationResult`."""
@@ -185,21 +269,36 @@ class DeclarativeExecution:
         from lca.framework.graph.adapter import PhaseRunCursor as _PRC
 
         output_ports = dict(interpretation.output or {})
-        stop_decision = _stop_from_interpretation_output(
-            output_ports, visits=interpretation.visits
-        )
 
-        cursor_obj = interpretation.terminal_node
-        _cursor_value = (
-            _PRC(current_node_id=cursor_obj, visited_nodes=()) if cursor_obj else None
-        )
-
-        if stop_decision.failure is not None or stop_decision.reason is StopReason.ERROR:
-            _kind = ExecutionOutcome.FAILED
+        pause = _pause_from_interrupt(interpretation.visits)
+        if pause is not None:
+            stop_decision, pause_cursor, approval_request = _paused_outcome_parts(
+                pause,
+                plan_ref=self._bindings.plan_ref(),
+                visits=interpretation.visits,
+            )
         else:
-            _kind = ExecutionOutcome.COMPLETED
+            stop_decision = _stop_from_interpretation_output(
+                output_ports, visits=interpretation.visits
+            )
+            pause_cursor = None
+            approval_request = None
+
+        if pause is not None:
+            _kind = ExecutionOutcome.PAUSED
+            _cursor_value = pause_cursor
+        else:
+            cursor_obj = interpretation.terminal_node
+            _cursor_value = (
+                _PRC(current_node_id=cursor_obj, visited_nodes=()) if cursor_obj else None
+            )
+            if stop_decision.failure is not None or stop_decision.reason is StopReason.ERROR:
+                _kind = ExecutionOutcome.FAILED
+            else:
+                _kind = ExecutionOutcome.COMPLETED
 
         _stop_value = stop_decision
+        _approval_ref = approval_request
 
         @_dc(frozen=True, slots=True)
         class _OutcomeShim:
@@ -207,7 +306,7 @@ class DeclarativeExecution:
             cursor: object = _cursor_value
             stop: object = _stop_value
             error_fact: object | None = None
-            approval_request: dict | None = None
+            approval_request: dict | None = _field(default_factory=lambda: _approval_ref)
 
         _outcome = _OutcomeShim()
         _state_ref = state
@@ -230,7 +329,6 @@ class DeclarativeExecution:
             plan_ref=self._bindings.plan_ref(),
             journal_sequence=self._journal.sequence,
         )
-
 
     def _load_v2_graph_spec(self, plan) -> dict:
         """Walk the resolved bundles, find the first v2 graph spec.

@@ -65,6 +65,7 @@ from lca.contracts.protocols.graph.errors import (
 )
 from lca.contracts.protocols.graph.node_io import NodeOutput
 from lca.contracts.protocols.graph.plan import Plan, PlanEdge, PlanNode
+from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.contracts.protocols.graph.strategy import StrategyContext
 from lca.contracts.protocols.graph.visit import DispatchDecision, VisitRecord
 from lca.framework.graph.observation import (
@@ -279,6 +280,46 @@ class PlanInterpreter:
                 },
             )
 
+            # HITL pause / control stop: a RoutingDecision asking to
+            # terminate stops the whole traversal here — inner and outer
+            # runs share this loop, so the signal propagates across the
+            # subgraph seam via the merged ports (the outer delegate
+            # declares ``routing``). Checked before edge selection so a
+            # pause never falls through to the next edge.
+            paused = _terminate_routing(to_merge)
+            if paused is not None:
+                traversal.terminal = True
+                traversal.terminal_reason = ("should_terminate", node.id, 0, 0)
+                self.observer.observe(
+                    _visit_end_of(
+                        node,
+                        plan.id,
+                        traversal.visit_counts.get(node.id, 1),
+                        depth,
+                        outcome="success",
+                        error="",
+                        elapsed_ms=self.clock() - visit_started,
+                        inputs=inputs.port_values,
+                        outputs=output.port_values,
+                        dispatch="terminal",
+                        occurred_at_ms=self.clock(),
+                    )
+                )
+                visit = VisitRecord(
+                    plan_ref=plan.id,
+                    node_id=node.id,
+                    binding_kind=node.binding,
+                    inputs=dict(inputs.port_values),
+                    outputs=dict(output.port_values),
+                    dispatch=DispatchDecision(kind="terminal"),
+                    error=None,
+                )
+                self.recorder.record(visit)
+                visits.append(visit)
+                facts.extend(output.port_values.get("facts", ()) or ())
+                terminal_node = node.id
+                break
+
             # D4: terminal_predicate evaluation before edge selection.
             if schema.terminal_predicate is not None:
                 reader = _reader_factory(node.id)
@@ -413,6 +454,19 @@ class InterpretationResult:
     visits: tuple[VisitRecord, ...]
     facts: tuple[Any, ...]
     output: dict[str, Any] = field(default_factory=dict)
+
+
+def _terminate_routing(merged: dict[str, Any]) -> RoutingDecision | None:
+    """Return the first ``RoutingDecision`` asking to terminate, if any.
+
+    Scans this visit's merged ports (not the registry) so only the
+    current node's own signal stops traversal — a stale ``routing``
+    left by an earlier visit cannot pause a later one.
+    """
+    for value in merged.values():
+        if isinstance(value, RoutingDecision) and value.should_terminate:
+            return value
+    return None
 
 
 def _terminal_port_values(ports: PortRegistry, plan: Plan) -> dict[str, Any]:
