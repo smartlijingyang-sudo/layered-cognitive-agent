@@ -28,11 +28,13 @@ __all__ = [
     "DEFAULT_TEMPLATE_DIR_NAME",
     "DEFAULT_TEMPLATE_ID",
     "SCHEMA_VERSION",
+    "SOUL_CORE_SECTIONS",
     "TEMPLATE_REGISTRY",
     "AssistantAlreadyExists",
     "AssistantCatalogError",
     "AssistantDigestMismatch",
     "HomePaths",
+    "SoulValidationError",
     "build_manifest",
     "compute_digests",
     "known_template_ids",
@@ -92,6 +94,23 @@ class AssistantDigestMismatch(AssistantCatalogError):  # noqa: N818
 
 class AssistantAlreadyExists(AssistantCatalogError):  # noqa: N818
     """``create`` 时 ``assistant_id`` 已存在。"""
+
+
+# SOUL 完整度校验的四个核心语义段（ADR-0242 D1 / 附录 C）。
+# 安全边界 / 记忆规则 / 错误处理 / 红线四段由模板预置，向导只确认，不强制手写。
+SOUL_CORE_SECTIONS: tuple[str, ...] = (
+    "## 🧠 身份",
+    "## 🎭 性格",
+    "## 🛠 能力",
+    "## 🗣 语气",
+)
+
+
+class SoulValidationError(AssistantCatalogError):
+    """``catalog.create`` 的 SOUL 完整度校验失败（fail-closed，ADR-0242 I-B2）。
+
+    消息必须告诉调用方（LLM）具体缺哪一段 / 长度不足，便于继续对齐。
+    """
 
 
 # ── Home 路径集合 ────────────────────────────────────────────────────

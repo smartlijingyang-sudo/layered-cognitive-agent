@@ -12,7 +12,7 @@
 
 | 面 | 字段 | 进 manifest digest? |
 |---|---|---|
-| 配置(SSOT) | profile / SOUL / IDENTITY / USER / AGENTS / goals / grants / tools | 是 |
+| 配置(SSOT) | profile / SOUL / USER / AGENTS / goals / grants / tools | 是 |
 | 记忆 | MEMORY.md / memory/ | 否(I-A13) |
 | 工作区 | workspace/ | 否 |
 
@@ -23,6 +23,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import uuid
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
@@ -63,6 +64,7 @@ from lca.contracts.protocols.assistant.catalog import (
     PlanRevision,
     ProfilePatch,
 )
+from lca.contracts.protocols.assistant.role_resolver import RoleCard
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
@@ -74,6 +76,7 @@ from lca.plugins.assistant.events._events import (
 )
 from lca.plugins.assistant.home._home_layout import (
     DEFAULT_TEMPLATE_ID,
+    SOUL_CORE_SECTIONS,
     TEMPLATE_REGISTRY,
     HomePaths,
     build_manifest,
@@ -142,10 +145,14 @@ class _AssistantCatalogImpl(AssistantCatalog):
         （ADR-0187 §3 D11/D12 的角色模板面）;未知值抛
         ``_CatalogConfigError``（REST 层映射 400,不回落 default）。
 
-        ``seed_user_md`` 非空 = 引导式创建:覆盖 USER.md 后删除
-        BOOTSTRAP.md 并补发 ``assistant.bootstrap.completed`` EP
+        SOUL 取数顺序（ADR-0242 D1）:``soul`` > ``from_role`` backstory
+        > 模板默认。``soul`` 非空时必须通过完整度校验（I-B2 fail-closed）,
+        缺段 / 长度不足抛 ``SoulValidationError``,不降级用模板 SOUL 创建。
+
+        引导式创建（``seed_user_md`` 或 ``soul`` 非空）:写 USER.md、
+        删除 BOOTSTRAP.md 并补发 ``assistant.bootstrap.completed`` EP
         （ADR-0187 §3 D12 完成流;BOOTSTRAP 不在配置面 digest 内,
-        删除不影响 manifest）。
+        删除不影响 manifest）。裸创建（两者皆空）保留 BOOTSTRAP.md。
         """
         if req.template_id not in TEMPLATE_REGISTRY:
             raise _CatalogConfigError(
@@ -160,19 +167,27 @@ class _AssistantCatalogImpl(AssistantCatalog):
         # 1. 物化文件(失败 ⇒ 半成品 Home 清理)
         rendered = render_template(req.template_id, name=req.name, description=req.description)
 
-        # 1b. from_role: 用角色卡片覆盖 SOUL.md 和 profile.json emoji
+        # 1b. soul:向导对齐结果优先,且必须先通过完整度校验
+        if req.soul:
+            _validate_soul(req.soul)
+            rendered.files["SOUL.md"] = req.soul
+
+        # 1c. from_role:卡片填充 emoji / role_id / goals;SOUL 只在无 soul 时用 backstory
+        card: RoleCard | None = None
         if req.from_role:
             if self._role_resolver is None:
                 raise _CatalogConfigError(
                     "from_role 需要 RoleCardResolver；当前 profile 未配置 assistant.role_resolver"
                 )
             card = self._role_resolver.resolve(req.from_role)
-            rendered.files["SOUL.md"] = card.backstory
+            if not req.soul:
+                rendered.files["SOUL.md"] = card.backstory
             profile = json.loads(rendered.files["profile.json"])
             if card.emoji:
                 profile["emoji"] = card.emoji
             profile["role_id"] = req.from_role
             rendered.files["profile.json"] = json.dumps(profile, ensure_ascii=False, indent=2)
+            rendered.files["goals.yaml"] = _goals_yaml_from_role_card(card)
 
         try:
             write_home_files(home.root, rendered.files)
@@ -186,9 +201,17 @@ class _AssistantCatalogImpl(AssistantCatalog):
             if req.seed_user_md:
                 (home.root / "USER.md").write_text(req.seed_user_md, encoding="utf-8")
 
+            # 2b. inherit_from:把来源 Home 的 skills/ + tools/grants 策略复制为快照
+            if req.inherit_from:
+                self._copy_inherited_snapshot(req.inherit_from, home.root)
+
+            # 2c. Home 卫生:USER.md 不允许为空(ADR-0242 D2)
+            _ensure_non_empty_user_md(home.root)
+
             # 3. 引导式创建完成流:删除 BOOTSTRAP.md（EP 在 manifest 写盘后发,
             #    携带事件时刻的 manifest_digest）
-            if req.seed_user_md and home.bootstrap_md.is_file():
+            guided = bool(req.seed_user_md or req.soul)
+            if guided and home.bootstrap_md.is_file():
                 home.bootstrap_md.unlink()
 
             # 4. manifest.digests + revision_seq=0
@@ -217,7 +240,7 @@ class _AssistantCatalogImpl(AssistantCatalog):
                 template_id=req.template_id,
             )
         )
-        if req.seed_user_md:
+        if guided:
             self._emit_bootstrap_completed(
                 AssistantBootstrapCompletedEventPayload(
                     assistant_id=assistant_id,
@@ -278,6 +301,8 @@ class _AssistantCatalogImpl(AssistantCatalog):
             grant_digest=_sha256_digest(home.root / "grants.yaml"),
             tools_policy_digest=_sha256_digest(home.root / "tools.yaml"),
             role_id=str(manifest["role_id"]) if manifest.get("role_id") else None,
+            profile_opening_message=str(profile.get("opening_message") or ""),
+            profile_locale=str(profile.get("locale") or ""),
         )
 
     def list(self) -> tuple[AssistantSummary, ...]:
@@ -340,6 +365,30 @@ class _AssistantCatalogImpl(AssistantCatalog):
             return
         self._emit(ASSISTANT_BOOTSTRAP_COMPLETED, payload.to_dict())
 
+    def _copy_inherited_snapshot(self, source_id: str, dest_home: Path) -> None:
+        """把来源 Home 的 ``skills/`` + ``tools.yaml`` / ``grants.yaml`` 复制为快照。
+
+        - 先经 ``self.get`` 做 digest 校验:来源未知 / digest 不匹配 ⇒
+          ``AssistantCatalogError`` 子类(fail-closed,ADR-0242 D1);
+        - ``skills/`` 只复制含 ``SKILL.md`` 的已验证技能目录;
+        - ``tools.yaml`` / ``grants.yaml`` 整文件复制为新 Home 的策略;
+        - 复制是快照,新 Home 之后各自演化。
+        """
+        source_spec = self.get(source_id)
+        source_home = Path(source_spec.home_path)
+
+        source_skills = source_home / "skills"
+        dest_skills = dest_home / "skills"
+        if source_skills.is_dir():
+            for child in sorted(source_skills.iterdir()):
+                if child.is_dir() and (child / "SKILL.md").is_file():
+                    shutil.copytree(child, dest_skills / child.name, dirs_exist_ok=True)
+
+        for name in ("tools.yaml", "grants.yaml"):
+            src = source_home / name
+            if src.is_file():
+                (dest_home / name).write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+
 
 # ── AgentSpec 构造 ────────────────────────────────────────────────
 
@@ -381,6 +430,7 @@ from lca.plugins.assistant.home._home_layout import (  # noqa: E402
     AssistantAlreadyExists,
     AssistantCatalogError,
     AssistantDigestMismatch,
+    SoulValidationError,
 )
 
 
@@ -416,6 +466,93 @@ class _CatalogConfigError(AssistantCatalogError):
 def _new_assistant_id() -> str:
     """生成 ``asst_<12hex>`` 形式的助理 id(与仓内 ``new_id`` 命名一致)。"""
     return f"asst_{uuid.uuid4().hex[:12]}"
+
+
+_SOUL_MIN_CHARS = 200
+"""SOUL 完整度下限(去除全部空白后,中文按字符计;ADR-0242 D1)。"""
+
+
+def _validate_soul(soul: str) -> None:
+    """SOUL 完整度校验(fail-closed;ADR-0242 I-B2)。
+
+    校验项:
+    1. 去除空白后长度 >= ``_SOUL_MIN_CHARS``;
+    2. 必须包含四个核心语义段标记(身份/性格/能力/语气)。
+
+    失败抛 :class:`SoulValidationError`,消息明确指出缺哪一段 / 长度不足,
+    便于向导继续对齐。安全边界/记忆规则/错误处理/红线由模板预置,不要求。
+    """
+    compact = "".join(soul.split())
+    if len(compact) < _SOUL_MIN_CHARS:
+        raise SoulValidationError(
+            f"SOUL 完整度不足:去除空白后 {len(compact)} 字符,要求 >= {_SOUL_MIN_CHARS} 字符。"
+            "请补充身份/性格/能力/语气的具体内容后再创建,不要用模板默认 SOUL 降级。"
+        )
+    missing = [marker for marker in SOUL_CORE_SECTIONS if marker not in soul]
+    if missing:
+        raise SoulValidationError(
+            "SOUL 缺少语义段: "
+            + ", ".join(missing)
+            + "。请补全这四个核心段(身份/性格/能力/语气)后重试;"
+            "安全边界/记忆规则/错误处理/红线由模板预置,无需手写。"
+        )
+
+
+def _mission_goal_names(backstory: str, limit: int = 3) -> list[str]:
+    """从角色卡 backstory 的「核心使命」段提取 ``###`` 标题作为目标名(ADR-0242 D2)。"""
+    lines = backstory.splitlines()
+    in_mission = False
+    goals: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            in_mission = "核心使命" in stripped
+            continue
+        if in_mission and stripped.startswith("### "):
+            name = stripped[4:].strip()
+            if name and len(goals) < limit:
+                goals.append(name)
+    return goals
+
+
+def _goals_yaml_from_role_card(card: RoleCard) -> str:
+    """把角色卡核心使命的前三个目标写成非空 goals.yaml(ADR-0242 D2)。
+
+    角色卡没有「核心使命」段时,用角色标题兜底保证 goals.yaml 非空。
+    """
+    goal_names = _mission_goal_names(card.backstory)
+    if not goal_names:
+        goal_names = [f"{card.title}核心职责"]
+    lines = ["goals:"]
+    for name in goal_names:
+        lines.append(f"  - name: {name}")
+        lines.append(f"    description: 来自角色卡「核心使命」的目标,围绕「{name}」持续交付。")
+        lines.append("    success_criteria: 完成该目标下的关键交付物并得到用户认可。")
+    lines.append("notes: |")
+    lines.append("  目标提取自角色卡「核心使命」段;可经 revise_profile 调整。")
+    return "\n".join(lines) + "\n"
+
+
+_DEFAULT_USER_MD = """# USER
+
+助理服务的对象画像。请在向导中或首次对话中补充以下内容:
+
+- **称呼**:用户希望被怎么称呼?
+- **服务对象**:用户的主要身份(如:开发者、产品经理、学生)?
+- **偏好**:回复风格、常用工具、禁忌话题?
+- **上下文**:用户当前项目 / 场景的关键背景?
+"""
+
+
+def _ensure_non_empty_user_md(home: Path) -> None:
+    """Home 卫生:USER.md 不允许为空(ADR-0242 D2)。
+
+    模板已提供可填充骨架;本守卫只在文件缺失或空白时写入默认骨架,
+    保证向导创建 / 裸创建的 Home 都不含空 USER.md。
+    """
+    user_md = home / "USER.md"
+    if not user_md.is_file() or not user_md.read_text(encoding="utf-8").strip():
+        user_md.write_text(_DEFAULT_USER_MD, encoding="utf-8")
 
 
 def _sha256_digest(path: Path) -> str:
@@ -615,5 +752,6 @@ __all__ = [
     "AssistantCatalogImpl",
     "AssistantDigestMismatch",
     "Config",
+    "SoulValidationError",
     "setup",
 ]

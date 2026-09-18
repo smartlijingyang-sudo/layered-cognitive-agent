@@ -164,19 +164,24 @@ def project_home_to_context_manifest(
 
 
 def _memory_layer_excluded_from_items(items: tuple[ContextItem, ...]) -> bool:
-    """守护：投影出的 ContextManifest 不含 MEMORY 痕迹（I-A13 + PR-4 新不变量）。
+    """守护：投影出的 ContextManifest 不含记忆面文件（I-A13 + PR-4 新不变量）。
 
-    静态检查：所有 item 的 payload 不应引用 ``memory/`` / ``MEMORY.md`` 字面；
-    provenance 不含 ``memory`` 字段。允许 ``assistant.bootstrap.{id}`` 前缀。
+    静态检查：item 名 / provenance 不得指向 ``MEMORY.md`` 或 ``memory/`` 目录，
+    payload 文本不得包含 ``/memory/`` 路径引用。SOUL/USER 配置面正文引用
+    记忆规则（如附录 C 的「写入 memory/」「MEMORY.md」）是合法配置内容，
+    不视为记忆面泄漏。
     """
     for item in items:
         provenance = item.provenance
-        if "memory" in provenance.lower() or "MEMORY" in provenance:
+        if "memory" in provenance.lower():
             return False
         payload = item.payload
         if isinstance(payload, Mapping):
+            name = str(payload.get("name") or "")
+            if name in {"MEMORY.md", "memory"}:
+                return False
             text_repr = str(payload)
-            if "MEMORY.md" in text_repr or "/memory/" in text_repr:
+            if "/memory/" in text_repr:
                 return False
     return True
 

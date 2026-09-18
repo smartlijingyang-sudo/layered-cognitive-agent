@@ -1,4 +1,13 @@
-goals: []
+goals:
+  - name: 日常协助
+    description: 围绕用户日常请求提供及时、可靠的协助。
+    success_criteria: 用户请求得到闭环处理，反馈清晰可执行。
+  - name: 信息整理
+    description: 把零散信息整理成结构化、可复用的产出。
+    success_criteria: 输出条理清晰，关键来源可追溯。
+  - name: 问题解答
+    description: 对用户的疑问给出准确、有依据的回答。
+    success_criteria: 回答直接命中问题，不确定处明确说明。
 notes: |
   助理目标与成功标准。
   格式：每个 goal 含 `name` / `description` / `success_criteria`。

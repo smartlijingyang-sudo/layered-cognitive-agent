@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
@@ -25,7 +26,7 @@ from lca.plugins.domain.assistant.catalog.plugin import AssistantCatalogImpl
 class _StubRoleResolver:
     """Test double: resolves two role_ids."""
 
-    _CARDS = {
+    _CARDS: ClassVar[dict[str, RoleCard]] = {
         "engineering/architect": RoleCard(
             role_id="engineering/architect",
             title="软件架构师",
@@ -95,7 +96,9 @@ class TestCreateFromRole:
                 from_role="engineering/architect",
             )
         )
-        manifest = json.loads((Path(handle.home_path) / "manifest.json").read_text(encoding="utf-8"))
+        manifest = json.loads(
+            (Path(handle.home_path) / "manifest.json").read_text(encoding="utf-8")
+        )
         assert manifest["role_id"] == "engineering/architect"
 
     def test_spec_carries_role_id(self, catalog: AssistantCatalogImpl) -> None:
@@ -110,9 +113,7 @@ class TestCreateFromRole:
         assert spec.role_id == "engineering/architect"
 
     def test_without_from_role_has_no_role_id(self, catalog: AssistantCatalogImpl) -> None:
-        handle = catalog.create(
-            CreateAssistantRequest(name="通用", description="通用助理")
-        )
+        handle = catalog.create(CreateAssistantRequest(name="通用", description="通用助理"))
         spec = catalog.get(handle.assistant_id)
         assert spec.role_id is None
 
@@ -158,3 +159,67 @@ class TestCreateFromRole:
         assert "用户体验" in soul
         profile = json.loads((Path(handle.home_path) / "profile.json").read_text(encoding="utf-8"))
         assert profile["emoji"] == "🎨"
+
+    def test_soul_overrides_from_role_backstory(self, catalog: AssistantCatalogImpl) -> None:
+        """ADR-0242 D1：soul 非空时覆盖角色卡 backstory，但 role_id 仍进 manifest。"""
+        soul = (
+            "## 🧠 身份\n"
+            + "你是自定义架构助理。" * 20
+            + "\n## 🎭 性格\n"
+            + "结论先行。" * 20
+            + "\n## 🛠 能力\n"
+            + "擅长系统设计。" * 20
+            + "\n## 🗣 语气\n"
+            + "专业务实。" * 20
+        )
+        handle = catalog.create(
+            CreateAssistantRequest(
+                name="小架",
+                description="架构顾问",
+                from_role="engineering/architect",
+                soul=soul,
+            )
+        )
+        written = (Path(handle.home_path) / "SOUL.md").read_text(encoding="utf-8")
+        assert written == soul
+        manifest = json.loads(
+            (Path(handle.home_path) / "manifest.json").read_text(encoding="utf-8")
+        )
+        assert manifest["role_id"] == "engineering/architect"
+
+    def test_from_role_goals_from_mission_section(self, catalog: AssistantCatalogImpl) -> None:
+        """ADR-0242 D2：从角色卡「核心使命」段提取前 3 个目标写入 goals.yaml。"""
+        import yaml
+
+        class _MissionResolver(_StubRoleResolver):
+            _CARDS: ClassVar[dict[str, RoleCard]] = {
+                "engineering/architect": RoleCard(
+                    role_id="engineering/architect",
+                    title="软件架构师",
+                    department="engineering",
+                    summary="系统设计专家",
+                    backstory=(
+                        "# 软件架构师\n\n"
+                        "## 核心使命\n"
+                        "### 系统设计\n"
+                        "### 架构评审\n"
+                        "### 技术选型\n"
+                        "### 性能优化\n"
+                    ),
+                    emoji="🏛️",
+                ),
+            }
+
+        cat = AssistantCatalogImpl(
+            root=catalog._root,
+            role_resolver=_MissionResolver(),
+        )
+        handle = cat.create(
+            CreateAssistantRequest(
+                name="小架",
+                from_role="engineering/architect",
+            )
+        )
+        goals = yaml.safe_load((Path(handle.home_path) / "goals.yaml").read_text(encoding="utf-8"))
+        names = [g["name"] for g in goals["goals"]]
+        assert names == ["系统设计", "架构评审", "技术选型"]

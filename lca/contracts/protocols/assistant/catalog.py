@@ -45,6 +45,18 @@ class CreateAssistantRequest:
     from_role: str | None = None
     """角色档案 role_id（如 'engineering/engineering-software-architect'）。
     非空时 SOUL.md 内容来自 RoleCard.backstory，忽略模板中的 SOUL 文案。"""
+    soul: str | None = None
+    """向导对齐后的最终 SOUL 全文（ADR-0242 D1）。
+
+    非空时覆盖 ``from_role`` backstory 与模板默认，且必须在
+    ``catalog.create`` 边界通过完整度校验（四核心语义段 + 去除空白后
+    >= 200 字符）。"""
+    inherit_from: str | None = None
+    """继承快照来源 assistant_id（ADR-0242 D1/D2）。
+
+    非空时把来源 Home 的 ``skills/``（含 SKILL.md 的目录）与
+    ``tools.yaml`` / ``grants.yaml`` 策略复制为新 Home 快照；来源未知或
+    digest 不匹配则 fail-closed。"""
     initial_skills: tuple[str, ...] = ()
     """创建后立即安装的 skill_id 列表。空 = 不预装。"""
 
@@ -53,6 +65,11 @@ class CreateAssistantRequest:
             raise ValueError("name 必须为非空助理名")
         if self.from_role is not None and not self.from_role.strip():
             raise ValueError("from_role 必须为非空字符串或 None")
+        # 空字符串统一归一化为 None（向导可能传空值占位）
+        for field_name in ("soul", "inherit_from"):
+            value = getattr(self, field_name)
+            if value is not None and not value.strip():
+                object.__setattr__(self, field_name, None)
 
 
 @dataclass(frozen=True)
@@ -148,19 +165,23 @@ class AssistantCatalog(Protocol):
     def get(self, assistant_id: str) -> AssistantSpec:
         """按 assistant_id 取 resolve 视图；不存在抛 ValueError。"""
         ...
+
     def list(self) -> tuple[AssistantSummary, ...]: ...
 
     def revise_profile(self, assistant_id: str, patch: ProfilePatch) -> PlanRevision:
         """patch 模式：digest 重算 + ``revision_seq++`` + ``revisions/`` 快照 + EP。"""
         ...
+
     def reimport(self, assistant_id: str, reason: str) -> PlanRevision:
         """裸改恢复模式：以磁盘当前文件为输入重算全部配置面 digest。
 
         ``actor="reimport"``；``reason`` 写入 EP 元数据。"""
         ...
+
     def retire(self, assistant_id: str, reason: str) -> None:
         """转入 retired 状态，拒收新 run（EP assistant.retired）。"""
         ...
+
 
 __all__ = [
     "AssistantCatalog",

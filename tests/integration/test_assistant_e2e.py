@@ -82,10 +82,12 @@ class TestWebAssistantE2E:
             # 2. bootstrap.project → ContextManifest
             projection = bootstrap.project(handle.assistant_id)
             assert projection.assistant_id == handle.assistant_id
-            assert len(projection.manifest.items) == 5  # SOUL/IDENTITY/USER/AGENTS/goals
-            # 无 MEMORY 字面(I-A13 + PR-4 新不变量)
+            assert len(projection.manifest.items) == 4  # SOUL/USER/AGENTS/goals（IDENTITY 已删除）
+            # 无记忆面文件作为投影 item（I-A13 + PR-4 新不变量；配置面正文引用
+            # 记忆规则是合法内容，不在此列）
             for item in projection.manifest.items:
-                assert "MEMORY" not in str(item.payload)
+                assert item.payload.get("name") not in {"MEMORY.md", "memory"}
+                assert "/memory/" not in str(item.payload)
 
             # 3. workspace.materialize → ExecutionSpace
             mat = workspace.materialize(
