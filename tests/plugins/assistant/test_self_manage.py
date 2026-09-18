@@ -35,6 +35,7 @@ from lca.infrastructure.tools.assistant.self_manage_tools import (
     UpdateAssistantProfileTool,
     UpdateAssistantSoulTool,
 )
+from lca.plugins.assistant.home._home_layout import load_manifest
 from lca.plugins.assistant.skill.overlay import AssistantSkillOverlayImpl
 from lca.plugins.domain.assistant.catalog.plugin import (
     AssistantCatalogError,
@@ -209,6 +210,11 @@ class TestSkillOverlayRemove:
 
         ep_events = [e for e in emitted if e[0] == ASSISTANT_PROFILE_REVISED]
         assert any("skills/to-remove" in e[1].get("changes", ()) for e in ep_events)
+        # I-B6:删除技能是配置面变更，必须留 revisions/ 快照。
+        manifest = load_manifest(home, assistant_id)
+        revision_seq = int(manifest.get("revision_seq") or 0)
+        assert revision_seq >= 2  # install 一次 + remove 一次
+        assert (home / "revisions" / f"{revision_seq}.json").is_file()
 
     async def test_remove_unknown_skill_raises(self, catalog: AssistantCatalogImpl) -> None:
         overlay = AssistantSkillOverlayImpl(catalog=catalog)

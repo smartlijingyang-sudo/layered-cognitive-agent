@@ -18,6 +18,7 @@ from lca.contracts.models.observability.journal.journal import (
     CastingStarted,
     RunScope,
 )
+from lca.contracts.models.team.role.team import RoleProfile
 from lca.contracts.protocols import LLMAdapter
 from lca.contracts.protocols.collaboration.casting.casting import (
     CastingError,
@@ -73,8 +74,14 @@ async def build_runnable_team(
     bindings: PlaneBindings | None = None,
     scope: Context | None = None,
     tools: Sequence[Tool] = (),
+    role_profile: RoleProfile | None = None,
 ) -> Team:
-    """Build one Team from profile-selected role and casting capabilities."""
+    """Build one Team from profile-selected role and casting capabilities.
+
+    ``role_profile`` (ADR-0242 D3) carries an assistant's Home persona; when
+    present it overrides the lead member's role/goal/backstory so an
+    assistant-bound team run keeps the assistant's identity (I-B1).
+    """
     del bindings
     record_scope = RunScope(trace_id=cast("TraceId", trace_id), run_id=cast("RunId", run_id))
     with bind_backends(observability), run_scope(record_scope):
@@ -100,6 +107,7 @@ async def build_runnable_team(
         observability=observability,
         scope=scope,
         tools=tools,
+        role_profile=role_profile,
     )
 
 
@@ -133,6 +141,7 @@ class _TeamModeAdapter(ModeAdapter):
             bindings=build_request.assembly.bindings,
             scope=build_request.assembly.scope,
             tools=build_request.tools,
+            role_profile=build_request.role_profile,
         )
 
 

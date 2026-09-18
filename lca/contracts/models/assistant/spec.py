@@ -95,6 +95,12 @@ class AssistantSpec:
     job_ids: tuple[str, ...]
     grant_digest: str
     tools_policy_digest: str
+    grants: frozenset[str] = field(default_factory=frozenset)
+    """``grants.yaml`` 的 grant 集合（ADR-0242 D13）。
+
+    未来 ``assistant.invoke``（multi-agent 编排）直接用它校验目标 assistant
+    的授权，无需再解析 Home。与 ``grant_digest`` 同源：digest 是配置面校验锚，
+    本字段是运行期可直接使用的集合。"""
     role_id: str | None = None
     """创建时引用的角色档案 role_id（如 'engineering/engineering-software-architect'）。
     None 表示用模板默认 SOUL 创建。"""

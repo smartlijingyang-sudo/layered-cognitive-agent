@@ -18,6 +18,7 @@ from lca.application.authoring.casting import (
     parse_casting_output,
     repair_invalid_role_ids,
 )
+from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
 from lca.contracts.models.team.team.coordination import LeadMandate, Pipeline
 from lca.contracts.protocols.collaboration.casting.casting import (
     CastingError,
@@ -221,6 +222,38 @@ class TestBuildFromCastingPlan(unittest.TestCase):
         self.assertEqual(governance.mandate, LeadMandate.CONSULT)
         self.assertEqual(governance.agent.profile.role, "项目总监")
         self.assertIn("主持本次评估", governance.agent.profile.goal)
+        self.assertEqual([m.profile.role for m in team.spec.members], ["产品经理"])
+
+    def test_role_profile_overrides_lead_persona(self) -> None:
+        """ADR-0242 D3:assistant 绑定的 team run，lead 人设来自 Home。"""
+        plan = CastingPlan(
+            selected=(
+                SelectedRole(role_id="strategy/lead", task_hint="主持本次评估"),
+                SelectedRole(role_id="product/pm"),
+            ),
+            governance_kind="consult",
+            lead_role_id="strategy/lead",
+            rationale="x",
+        )
+        team = build_from_casting_plan(
+            plan,
+            _FixedLibrary(),
+            ScriptedLLMAdapter(),
+            observability=InMemoryObservability(),
+            tools=(),
+            role_profile=RoleProfile(
+                role="数据分析师",
+                goal="提供数据洞察",
+                backstory="你是数据分析师，擅长 SQL 与可视化。",
+                tool_permission_manifest=ToolPermissionManifest(allowed_tools=()),
+            ),
+        )
+        governance = team.spec.governance
+        assert isinstance(governance, LeadSpec)
+        self.assertEqual(governance.agent.profile.role, "数据分析师")
+        self.assertEqual(governance.agent.profile.goal, "提供数据洞察")
+        self.assertIn("数据分析师", governance.agent.profile.backstory)
+        # 非 lead 成员仍由角色卡决定。
         self.assertEqual([m.profile.role for m in team.spec.members], ["产品经理"])
 
     def test_coordination_path_builds_pipeline_in_selected_order(self) -> None:

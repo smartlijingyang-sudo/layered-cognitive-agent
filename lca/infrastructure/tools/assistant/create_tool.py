@@ -161,13 +161,19 @@ class AssistantCreateTool(Tool):
         emoji = str(profile.get("emoji") or "🤖")
         opening_message = str(profile.get("opening_message") or "")
         soul_summary = _read_text(handle.home_path, "SOUL.md")
+        capabilities = _capabilities_from_home(handle.home_path)
 
         frontend_agent_id: str | None = None
         if self._bridge is not None:
             frontend_agent_id = await self._bridge.register(
                 assistant_id=handle.assistant_id,
                 name=name,
-                description=description or str(profile.get("description", "")),
+                # ADR-0242 D7: 能力摘要并入 description，使前端 agent 行
+                # 在侧边栏 / 管理页直接可见。
+                description=_merge_description_with_capabilities(
+                    description or str(profile.get("description", "")),
+                    capabilities,
+                ),
                 emoji=emoji,
                 system_role=soul_summary,
                 opening_message=opening_message,
@@ -183,7 +189,7 @@ class AssistantCreateTool(Tool):
             "emoji": emoji,
             "personality": _personality_from_soul(soul_summary),
             "tone": _tone_from_soul(soul_summary),
-            "capabilities": _capabilities_from_home(handle.home_path),
+            "capabilities": capabilities,
             "bootstrap_completed": bool(seed or soul_text),
             "frontend_agent_id": frontend_agent_id,
             "frontend_url": f"/agent/{frontend_agent_id}" if frontend_agent_id else None,
@@ -241,6 +247,20 @@ def _soul_section(soul: str, marker: str) -> list[str]:
             if stripped:
                 items.append(stripped)
     return items
+
+
+def _merge_description_with_capabilities(description: str, capabilities: list[str]) -> str:
+    """把能力清单并入描述（ADR-0242 D7）：``<角色描述> · 能力：<列表>``。
+
+    能力为空时原样返回描述，避免 ``· 能力：`` 尾缀。
+    """
+    base = description.strip()
+    caps = "、".join(capabilities).strip()
+    if not caps:
+        return base
+    if not base:
+        return f"能力：{caps}"
+    return f"{base} · 能力：{caps}"
 
 
 def _personality_from_soul(soul: str) -> str:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 
 from pydantic import BaseModel
@@ -67,6 +67,7 @@ def build_solo_agent(
     scope: Context | None = None,
     tools: Sequence[Tool] | None = None,
     memory: MemorySystem | None = None,
+    runtime_overrides: Mapping[str, object] | None = None,
 ) -> Agent:
     """Build the single-Agent runnable selected by the Solo mode adapter.
 
@@ -74,6 +75,9 @@ def build_solo_agent(
     present it fills role/goal/backstory. ``memory`` (ADR-0242 D5) selects a
     persistent per-assistant MemorySystem; the no-assistant path keeps the
     historical empty goal/backstory and the default per-run memory.
+    ``runtime_overrides`` (ADR-0242 D9) carries ``profile.json.runtime``
+    values; supported keys are ``max_steps`` and ``max_wall_clock_seconds``,
+    applied only when present.
     """
     del bindings
     if role_profile is not None:
@@ -92,6 +96,13 @@ def build_solo_agent(
         "observability": observability,
         "scope": scope,
     }
+    runtime = dict(runtime_overrides or {})
+    max_steps = runtime.get("max_steps")
+    if isinstance(max_steps, int) and max_steps > 0:
+        kwargs["max_steps"] = max_steps
+    max_wall_clock = runtime.get("max_wall_clock_seconds")
+    if isinstance(max_wall_clock, int) and max_wall_clock > 0:
+        kwargs["max_wall_clock_seconds"] = max_wall_clock
     if memory is not None:
         kwargs["memory"] = memory
     return Agent(**kwargs)
@@ -129,6 +140,7 @@ class _SoloModeAdapter(ModeAdapter):
             scope=build_request.assembly.scope,
             tools=build_request.tools,
             memory=memory,
+            runtime_overrides=build_request.assistant_runtime,
         )
 
 

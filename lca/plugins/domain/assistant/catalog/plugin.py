@@ -4,9 +4,8 @@
 
 - ``provides=("assistant.catalog",)``;
 - ``create / get / list`` —— Home CRUD(PR-3 范围);
-- ``revise_profile / reimport / retire`` —— 仅签名存在;抛
-  ``NotImplementedError`` 加 ``COMPAT(delete-when: ...)`` 注释
-  (PR-5/7 补完)。
+- ``revise_profile / reimport`` —— 配置面唯一写入口(ADR-0242 D6);
+- ``retire`` —— COMPAT 占位(delete-when: 2026-12-31,待 retire 入口落地)。
 
 三层真值(ADR-0187 §3 D2):
 
@@ -94,6 +93,7 @@ from lca.plugins.assistant.home._home_layout import (
     render_template,
     write_home_files,
     write_manifest,
+    write_revision_snapshot,
 )
 
 log = structlog.get_logger(__name__)
@@ -122,8 +122,8 @@ class _AssistantCatalogImpl(AssistantCatalog):
     """Catalog 内部实现;通过 plugin ``setup`` 注入 ctx。
 
     单一职责:Home CRUD + manifest digest 守门。``revise_profile`` /
-    ``reimport`` / ``retire`` 在 PR-5/7 补完;PR-3 仅占位抛
-    ``NotImplementedError``。
+    ``reimport`` 是配置面唯一写入口(ADR-0242 D6);``retire`` 仍为
+    COMPAT 占位(delete-when 2026-12-31)。
     """
 
     def __init__(
@@ -303,6 +303,7 @@ class _AssistantCatalogImpl(AssistantCatalog):
             skill_ids=(),
             job_ids=(),
             grant_digest=_sha256_digest(home.root / "grants.yaml"),
+            grants=_load_grants(home.root),
             tools_policy_digest=_sha256_digest(home.root / "tools.yaml"),
             role_id=str(manifest["role_id"]) if manifest.get("role_id") else None,
             profile_opening_message=str(profile.get("opening_message") or ""),
@@ -419,7 +420,7 @@ class _AssistantCatalogImpl(AssistantCatalog):
             created_at=str(manifest.get("created_at") or ""),
         )
         _copy_manifest_extras(manifest, new_manifest)
-        _write_revision_snapshot(home.root, new_revision_seq, new_manifest)
+        write_revision_snapshot(home.root, new_revision_seq, new_manifest)
         write_manifest(home.root, new_manifest)
 
         self._emit_profile_revised(
@@ -458,7 +459,7 @@ class _AssistantCatalogImpl(AssistantCatalog):
             created_at=str(manifest.get("created_at") or ""),
         )
         _copy_manifest_extras(manifest, new_manifest)
-        _write_revision_snapshot(home.root, new_revision_seq, new_manifest)
+        write_revision_snapshot(home.root, new_revision_seq, new_manifest)
         write_manifest(home.root, new_manifest)
 
         self._emit_profile_revised(
@@ -784,16 +785,6 @@ def _write_json(path: Path, data: Mapping[str, object]) -> None:
     )
 
 
-def _write_revision_snapshot(home: Path, revision_seq: int, manifest: Mapping[str, object]) -> None:
-    """把修订后的 manifest 快照写入 ``revisions/{revision_seq}.json``（ADR-0242 D6）。"""
-    revisions_dir = home / "revisions"
-    revisions_dir.mkdir(parents=True, exist_ok=True)
-    (revisions_dir / f"{revision_seq}.json").write_text(
-        json.dumps(dict(manifest), ensure_ascii=False, indent=2, sort_keys=True),
-        encoding="utf-8",
-    )
-
-
 def _copy_manifest_extras(source: Mapping[str, object], target: dict[str, object]) -> None:
     """把 manifest 中非 digest 派生字段（role_id / skills 索引等）复制到修订版。"""
     for key in ("role_id", "skills"):
@@ -804,6 +795,28 @@ def _copy_manifest_extras(source: Mapping[str, object], target: dict[str, object
 def _iso_now(clock: Callable[[], datetime]) -> str:
     """ISO-8601 UTC 时间字符串（复用注入时钟）。"""
     return clock().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _load_grants(home: Path) -> frozenset[str]:
+    """读 ``grants.yaml`` 的 grant 集合（ADR-0242 D13）。
+
+    与 ``lca.plugins.assistant.tools`` 的过滤语义一致：缺失 / 损坏 / 非 list
+    视为空集合（fail-closed 最窄授权）。供 ``AssistantSpec.grants`` 直接携带，
+    未来 ``assistant.invoke`` 校验目标助理授权时无需再解析 Home。
+    """
+    path = home / "grants.yaml"
+    if not path.is_file():
+        return frozenset()
+    try:
+        parsed = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError:
+        return frozenset()
+    if not isinstance(parsed, dict):
+        return frozenset()
+    grants = parsed.get("grants")
+    if not isinstance(grants, list):
+        return frozenset()
+    return frozenset(str(item).strip() for item in grants if isinstance(item, str) and item.strip())
 
 
 def _summary_from_home(home_dir: Path) -> AssistantSummary | None:

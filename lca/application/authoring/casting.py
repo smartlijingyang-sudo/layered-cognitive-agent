@@ -16,6 +16,7 @@ import structlog
 
 from lca.application.api.api import Agent, Team, TeamLead
 from lca.application.authoring.role_suggest import suggest_for_auto_repair, suggest_from_paths
+from lca.contracts.models.team.role.team import RoleProfile
 from lca.contracts.models.team.team.coordination import (
     STRATEGY_KEY_DEBATE,
     STRATEGY_KEY_FAN_OUT,
@@ -283,12 +284,16 @@ def build_from_casting_plan(
     observability: str | ObservabilityBackend = OBSERVABILITY_CHOICE_CONSOLE,
     scope: Context | None = None,
     tools: Sequence[Tool],
+    role_profile: RoleProfile | None = None,
 ) -> Team:
     """Compile a validated casting plan using the caller-materialized tools.
 
     Tool materialization belongs to the profile's ``tools`` capability at the
     run-assembly boundary. This translator only projects the selected tool set
     onto each member, so it cannot recreate a concrete default tool provider.
+    ``role_profile`` (ADR-0242 D3) overrides the lead member's persona with an
+    assistant's Home role/goal/backstory when the run is bound to an
+    assistant; ``None`` keeps the historical card-derived lead.
     """
     cards: dict[str, tuple[RoleCard, str | None]] = {
         chosen.role_id: (library.get(chosen.role_id), chosen.task_hint) for chosen in plan.selected
@@ -308,10 +313,23 @@ def build_from_casting_plan(
             scope=scope,
         )
 
+    def _lead_member(role_id: str) -> Agent:
+        if role_profile is not None:
+            return Agent(
+                role=role_profile.role,
+                goal=role_profile.goal,
+                backstory=role_profile.backstory,
+                tools=member_tools,
+                llm=llm,
+                observability=observability,
+                scope=scope,
+            )
+        return _member(role_id)
+
     if plan.governance_kind in _LEAD_MANDATE_BY_KIND:
         if plan.lead_role_id is None:  # 白名单校验已保证，此处防御式兜底
             raise CastingError("lead 类治理缺少 lead_role_id")
-        lead_agent = _member(plan.lead_role_id)
+        lead_agent = _lead_member(plan.lead_role_id)
         members = [_member(role_id) for role_id in cards if role_id != plan.lead_role_id]
         return Team(
             members=members,

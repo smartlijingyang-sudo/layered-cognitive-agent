@@ -183,6 +183,24 @@ class TestExecute:
         assert bridge.calls[0]["opening_message"] == ""  # 默认模板 profile.json 为空
 
     @pytest.mark.asyncio
+    async def test_bridge_receives_description_with_capability_merge(
+        self, catalog: AssistantCatalogImpl
+    ) -> None:
+        """ADR-0242 D7:能力摘要并入 description，前端 agent 行直接可见。"""
+        bridge = _FakeBridge("agt_front")
+        tool = AssistantCreateTool(catalog=catalog, bridge=bridge)
+        obs = await tool.execute({"name": "小研", "description": "深度研究"})
+        assert obs.success
+        merged = bridge.calls[0]["description"]
+        assert merged.startswith("深度研究 · 能力：")
+        # 默认模板 goals + tools allow 都进入能力清单。
+        assert "日常协助" in merged
+        assert "workspace.read" in merged
+        # Observation payload 的 capabilities 与并入描述的能力同源。
+        assert obs.payload["capabilities"] == ["日常协助", "信息整理", "问题解答",
+                                               "workspace.read", "workspace.write", "workspace.list"]
+
+    @pytest.mark.asyncio
     async def test_bridge_success_sets_frontend_url(self, catalog: AssistantCatalogImpl) -> None:
         bridge = _FakeBridge("agt_front")
         tool = AssistantCreateTool(catalog=catalog, bridge=bridge)

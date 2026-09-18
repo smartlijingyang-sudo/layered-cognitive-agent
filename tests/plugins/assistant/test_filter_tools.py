@@ -79,6 +79,62 @@ class TestFilterToolsByAssistant:
         result = filter_tools_by_assistant([_tool("writer", "workspace.write")], home)
         assert result == ()
 
+
+# ── tools_from_scope → filter_tools_by_assistant 集成（I-B3 回归）─────
+
+
+class _FakeMaterializingTools:
+    def __init__(self, tools: list[object]) -> None:
+        self._tools = tuple(tools)
+
+    def materialize(self, view: object) -> tuple[object, ...]:
+        return self._tools
+
+
+class _FakeFilterScope:
+    """提供 tools_from_scope 所需的 capability seam。"""
+
+    def __init__(self, tools: list[object]) -> None:
+        self._tools = _FakeMaterializingTools(tools)
+
+    def require(self, key: str) -> object:
+        if key == "tools":
+            return self._tools
+        if key in {"file_store", "sandbox", "search", "skills"}:
+            return object()
+        raise KeyError(key)
+
+
+class TestToolsFromScopeFiltersByAssistant:
+    def test_assistant_id_applies_home_filter(self, tmp_path: Path) -> None:
+        """带 assistant_id 时，tools_from_scope 返回 Home 过滤后的工具集。"""
+        from lca.plugins.transport.webserver.carrier.runs.lifecycle.runnable_assembly import (
+            tools_from_scope,
+        )
+
+        home = tmp_path / "asst_home"
+        home.mkdir()
+        _write_tools(home, allow=["alpha"], deny=["beta"])
+        scope = _FakeFilterScope([_tool("alpha"), _tool("beta"), _tool("gamma")])
+
+        result = tools_from_scope(
+            scope,
+            None,
+            assistant_id="asst_x",
+            home_path=str(home),
+        )
+        assert [t.name for t in result] == ["alpha"]
+
+    def test_no_assistant_id_returns_full_set(self, tmp_path: Path) -> None:
+        """I-B8:无 assistant_id 路径返回原始工具集，不做过滤。"""
+        from lca.plugins.transport.webserver.carrier.runs.lifecycle.runnable_assembly import (
+            tools_from_scope,
+        )
+
+        scope = _FakeFilterScope([_tool("alpha"), _tool("beta")])
+        result = tools_from_scope(scope, None)
+        assert [t.name for t in result] == ["alpha", "beta"]
+
     def test_tool_without_grant_requires_allow_membership(self, home: Path) -> None:
         """A non-empty allow list narrows grant-agnostic tools to the listed
         names instead of widening the set."""

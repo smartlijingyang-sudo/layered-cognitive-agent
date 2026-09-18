@@ -98,3 +98,35 @@ class TestBuildSoloAgentRoleProfile:
         assert agent.role_profile.role == "自定义角色"
         assert agent.role_profile.goal == "目标"
         assert agent.role_profile.backstory == "背景"
+
+    def test_runtime_overrides_flow_into_agent_spec(self) -> None:
+        """ADR-0242 D9:profile.json.runtime 的 max_steps / max_wall_clock 生效。"""
+        llm = ScriptedLLMAdapter({}, default_respond=True)
+        agent = build_solo_agent(
+            llm,
+            observability=InMemoryObservability(),
+            runtime_overrides={"max_steps": 9, "max_wall_clock_seconds": 123},
+        )
+        assert agent.spec.max_steps == 9
+        assert agent.spec.max_wall_clock_seconds == 123
+
+    def test_runtime_overrides_ignored_when_absent(self) -> None:
+        """无 runtime 覆盖时保留默认值，不传 None 破坏 Agent 构造。"""
+        llm = ScriptedLLMAdapter({}, default_respond=True)
+        agent = build_solo_agent(
+            llm,
+            observability=InMemoryObservability(),
+            runtime_overrides={},
+        )
+        assert agent.spec.max_steps > 0
+        assert agent.spec.max_wall_clock_seconds is None or agent.spec.max_wall_clock_seconds > 0
+
+    def test_runtime_overrides_reject_non_positive(self) -> None:
+        """非正数 / 非 int 的 runtime 值被忽略（fail-soft，不覆盖默认）。"""
+        llm = ScriptedLLMAdapter({}, default_respond=True)
+        agent = build_solo_agent(
+            llm,
+            observability=InMemoryObservability(),
+            runtime_overrides={"max_steps": 0, "max_wall_clock_seconds": "abc"},
+        )
+        assert agent.spec.max_steps > 0

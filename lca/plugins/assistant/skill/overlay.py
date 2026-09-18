@@ -90,6 +90,7 @@ from lca.plugins.assistant.home._home_layout import (
     build_manifest,
     load_manifest,
     write_manifest,
+    write_revision_snapshot,
 )
 
 log = structlog.get_logger(__name__)
@@ -430,6 +431,8 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
         section.pop(skill_id, None)
         new_manifest["skills"] = section
         write_manifest(home, new_manifest)
+        # I-B6: 删除技能是配置面变更，必须留 revisions/ 快照供回滚/审计。
+        write_revision_snapshot(home, new_revision_seq, new_manifest)
 
         self._emit_profile_revised(
             AssistantProfileRevisedEventPayload(
@@ -494,6 +497,8 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
         }
         new_manifest["skills"] = section
         write_manifest(home, new_manifest)
+        # I-B6: 一切配置变更留 revisions/ 快照（install 也是配置面变更）。
+        write_revision_snapshot(home, _revision_of(new_manifest), new_manifest)
         return new_manifest
 
     def _emit_installed(self, payload: AssistantSkillInstalledEventPayload) -> None:

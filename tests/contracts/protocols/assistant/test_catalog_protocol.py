@@ -119,9 +119,6 @@ class _MissingMethods:
 
 
 class TestAssistantCatalogProtocol:
-    def test_protocol_is_runtime_checkable(self) -> None:
-        assert hasattr(AssistantCatalog, "__protocol_attrs__")
-
     def test_runtime_check_accepts_structural_match(self) -> None:
         assert isinstance(_FakeCatalog(), AssistantCatalog)
 
@@ -270,8 +267,6 @@ class TestProfilePatch:
         assert patch.goals_yaml is None
         assert patch.grants_yaml is None
         assert patch.tools_yaml is None
-        assert patch.skills is None
-        assert patch.routines is None
         assert patch.extra == {}
 
     def test_profile_runtime_accepts_dict(self) -> None:

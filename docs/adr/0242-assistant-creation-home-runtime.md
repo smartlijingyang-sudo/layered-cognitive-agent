@@ -660,33 +660,43 @@ flowchart TB
 1. SOUL 语义段标记是否与角色卡 backstory 现有结构兼容？角色卡已有 `## 🧠 身份与记忆` 等段落，需要把四段标记映射进卡片模板或向导转换。
 2. 技能继承快照的大小上限。建议单技能包 ≤ 8MB，总继承 ≤ 32MB（对齐 OpenClaw 的 bundle 上限）。
 3. `revisions/` 快照的读回 UI 是否本期实现。建议先写盘不读回，`revise_reimport` 是恢复路径。
+4. **D10 生产接线未完成**：`PlanResolutionService.assistant_spec_provider` 在 CLI facade 与 web run 路径都未注入。web 路径的 plan 在 profile boot 时编译（`compiled_plan_from_scope`），per-agent `plan.yaml` 覆盖与 `(assistant_id, manifest_digest)` 缓存只在 service 层测试生效。修复需要 per-run 重编译/scope rebind，触及核心 plan-binding 架构，单独 PR。
+5. **D5 工作区运行期绑定未完成**：`assistant.workspace` 只物化 ExecutionSpace dataclass，`execution_environment.py` 仍用 per-run `run_workspace_scope`。`{home}/workspace/` 作为沙箱挂载基目录需要改 run 清理与沙箱映射，ADR §6 已标注「涉及面较大，放后期」。
+6. **D11 装配管线插件化未实现**：`AssistantAssemblyStep` Protocol、`assistant.assembly_step` capability、默认步骤插件、L2 感知节点、`assistant.assembly.step` EP 均不存在。现有 `runnable_assembly.py` 是硬编码顺序（spec→persona→tools→skill_store→model），功能等价但不可替换。
+7. **I-B7 敏感确认依赖 LLM 自觉**：敏感工具只检查 `confirmed=true`，不程序化调用 `askUserQuestion`。LCA 工具模型下工具不能直接调用其他工具，前置确认由 LLM 经运行时 `askUserQuestion` 工具完成；如需硬保证需新的审批闸机制。
 
 ---
 
 ## 附录 A · 实现者检查单
 
-- [ ] `CreateAssistantRequest` 增加 `soul` / `inherit_from`，契约测试
-- [ ] `catalog.create` SOUL 完整度校验 + 失败语义（缺段拒收）
-- [ ] `RunnableBuildRequest.role_profile` + `build_solo_agent` 支持
-- [ ] `tools_from_scope` 调 `filter_tools_by_assistant`
-- [ ] `BindingsViewBuilder` 技能 store 走 `active_skill_store`
-- [ ] `revise_profile` 实现 + `revisions/` 快照 + EP
-- [ ] 自我管理工具族 + 敏感 / 非敏感审批语义
-- [ ] `AssistantMemory` + 工作区持久化
-- [ ] 模板清理（IDENTITY 引用、USER / goals 填充）
-- [ ] `assistant_default` 及变体模板的 SOUL.md 换成附录 C 结构化模板，核心段留空由向导填充
-- [ ] 前端 `lcaStartRun` 带 `assistant_id`
-- [ ] 创建后结构化汇报 + skill 强制复述
-- [ ] `profile.json` 支持 `model` / `opening_message` / `locale` / `runtime` 字段，契约测试
-- [ ] bridge 注册从 Home 读 `opening_message`，不再由 create 工具临时拼
+> **验证状态（2026-09-18）**：PR-0..PR-8 已合入。本清单经完整流程验证后更新：
+> 已勾选项有实现 + 回归测试；未勾选项为真实缺口（见各决策与开放问题）。
+> 验证发现并修复的问题：team 模式 persona 未注入、bridge 描述未并入能力、
+> `profile.runtime` 无运行时消费者、skill 删除缺 `revisions/` 快照、
+> `ProfilePatch.skills/routines` 死字段、`AssistantSpec` 缺 `grants`、文档过期。
+
+- [x] `CreateAssistantRequest` 增加 `soul` / `inherit_from`，契约测试
+- [x] `catalog.create` SOUL 完整度校验 + 失败语义（缺段拒收）
+- [x] `RunnableBuildRequest.role_profile` + `build_solo_agent` 支持
+- [x] `tools_from_scope` 调 `filter_tools_by_assistant`
+- [x] `BindingsViewBuilder` 技能 store 走 `active_skill_store`
+- [x] `revise_profile` 实现 + `revisions/` 快照 + EP
+- [x] 自我管理工具族 + 敏感 / 非敏感审批语义
+- [~] `AssistantMemory` + 工作区持久化（记忆已落地；`{home}/workspace/` 运行期绑定未接线，见 D5 缺口）
+- [x] 模板清理（IDENTITY 引用、USER / goals 填充）
+- [x] `assistant_default` 及变体模板的 SOUL.md 换成附录 C 结构化模板，核心段留空由向导填充
+- [x] 前端 `lcaStartRun` 带 `assistant_id`
+- [x] 创建后结构化汇报 + skill 强制复述
+- [x] `profile.json` 支持 `model` / `opening_message` / `locale` / `runtime` 字段，契约测试
+- [x] bridge 注册从 Home 读 `opening_message`，不再由 create 工具临时拼
 - [x] `plan.yaml` schema（frozen 模型，未知字段 fail-closed）+ 进 manifest digest
-- [x] `CompiledRunPlan` 缓存键升级为 `(assistant_id, manifest_digest)`，`plan.yaml` 变更触发重编译
-- [ ] `create_assistant_skill` / `skill_overlay.install` 只写 `{home}/skills/`，回归测试确认不写全局 store
-- [ ] 合并 `_home_layout.py` 唯一副本，删空壳包，清理 IDENTITY 残留（D12）
-- [ ] 删除 `evolve.py` COMPAT `SkillInstallReceipt`，复用 overlay 回执（D12）
-- [ ] `AssistantSpec` 携带 `assistant_id` / `home_path` / `grants`，供未来 `assistant.invoke` 解析（D13）
-- [ ] `plan.yaml` 支持 orchestrator 选择带 planner 节点的 think 子图 bundle（D13）
-- [ ] web-standard 回归绿
+- [~] `CompiledRunPlan` 缓存键升级为 `(assistant_id, manifest_digest)`，`plan.yaml` 变更触发重编译（service 层已实现并有测试；生产 run 路径未注入 `assistant_spec_provider`，见 D10 缺口）
+- [x] `create_assistant_skill` / `skill_overlay.install` 只写 `{home}/skills/`，回归测试确认不写全局 store
+- [x] 合并 `_home_layout.py` 唯一副本，删空壳包，清理 IDENTITY 残留（D12）
+- [x] 删除 `evolve.py` COMPAT `SkillInstallReceipt`，复用 overlay 回执（D12）
+- [x] `AssistantSpec` 携带 `assistant_id` / `home_path` / `grants`，供未来 `assistant.invoke` 解析（D13）
+- [~] `plan.yaml` 支持 orchestrator 选择带 planner 节点的 think 子图 bundle（结构支持；planner 节点属 D13 后续范围）
+- [x] web-standard 回归绿
 
 ---
 

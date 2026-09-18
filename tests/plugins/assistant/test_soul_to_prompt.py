@@ -188,6 +188,48 @@ class TestPersonaReachesSoloAgent:
         assert "系统架构专家" in agent.role_profile.backstory
 
 
+class TestIB1RoleGoalBackstoryNonEmpty:
+    """I-B1:带 assistant_id 的 run，ROLE/GOAL/BACKSTORY 三行来自 Home 且非空。
+
+    在 prompt section 层验证（run 的 ``llm.request.header`` 内容由这些
+    section 渲染而成）；完整 journal 级断言需要 full-run harness。
+    """
+
+    def _role_profile_from_home(self, catalog: AssistantCatalogImpl) -> RoleProfile:
+        handle = catalog.create(
+            CreateAssistantRequest(
+                name="小架",
+                description="架构顾问",
+                from_role="engineering/architect",
+            )
+        )
+        spec = catalog.get(handle.assistant_id)
+        persona = persona_from_home(spec.home_path)
+        return RoleProfile(
+            role=persona.role,
+            goal=persona.goal,
+            backstory=persona.backstory,
+            tool_permission_manifest=ToolPermissionManifest(allowed_tools=()),
+        )
+
+    def test_role_goal_backstory_lines_all_non_empty(self, catalog: AssistantCatalogImpl) -> None:
+        role_profile = self._role_profile_from_home(catalog)
+
+        role_out = RoleSection().render(role_profile=role_profile, tools=[])
+        goal_out = GoalSection().render(role_profile=role_profile, tools=[])
+        backstory_out = BackstorySection().render(role_profile=role_profile, tools=[])
+
+        assert role_out.text.startswith("ROLE:")
+        assert role_out.text.strip() != "ROLE:"
+        assert goal_out.text.startswith("GOAL:")
+        assert goal_out.text.strip() != "GOAL:"
+        assert backstory_out.text.startswith("BACKSTORY:")
+        assert backstory_out.text.strip() != "BACKSTORY:"
+        # 内容来自 Home（角色卡 backstory），不是模板占位。
+        assert "系统架构专家" in backstory_out.text
+        assert "小架" in role_out.text
+
+
 class TestCurrentDateSectionLocale:
     """ADR-0242 D9/PR-8：CurrentDateSection 按 manifest.extra['locale'] 渲染星期。"""
 

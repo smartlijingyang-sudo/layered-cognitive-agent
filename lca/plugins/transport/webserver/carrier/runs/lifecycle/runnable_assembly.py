@@ -8,7 +8,7 @@ knowledge.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol, cast
 
 from lca.application.api.api import Agent, Team
@@ -63,6 +63,8 @@ class RunnableBuildRequest:
     """Assistant Home persona (ADR-0242 D3); None when no assistant_id."""
     assistant_home_path: str | None = None
     """Assistant Home 绝对路径 (ADR-0242 D4/D5); None when no assistant_id."""
+    assistant_runtime: dict[str, object] = field(default_factory=dict)
+    """``profile.json.runtime`` 运行参数覆盖 (ADR-0242 D9); 空 dict = 默认值。"""
 
 
 class CognitiveRunnableAssembler:
@@ -104,6 +106,7 @@ class CognitiveRunnableAssembler:
                 request.scope, assistant_id, home_path=home_path
             ),
             assistant_home_path=home_path,
+            assistant_runtime=dict(spec.profile_runtime) if spec is not None else {},
         )
         adapter = self._mode_registry.resolve(request.mode)
         return cast("Agent | Team", await adapter.build(prepared))

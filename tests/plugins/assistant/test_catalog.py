@@ -220,6 +220,8 @@ class TestGet:
         spec = catalog.get(handle.assistant_id)
         assert spec.profile_model == ""  # 模板默认无 model
         assert spec.profile_runtime == {}
+        # ADR-0242 D13:AssistantSpec 携带 grants 集合供未来 assistant.invoke 校验。
+        assert spec.grants == frozenset({"workspace.write", "skill.import", "profile.revise"})
 
     def test_get_reads_profile_model_and_runtime_after_revise(
         self,

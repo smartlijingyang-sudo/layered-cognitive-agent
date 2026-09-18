@@ -44,6 +44,7 @@ __all__ = [
     "scaffold_subdirs",
     "sha256_digest",
     "write_manifest",
+    "write_revision_snapshot",
 ]
 
 
@@ -195,6 +196,25 @@ def write_manifest(home: Path, manifest: dict[str, object]) -> None:
     """manifest 写盘:UTF-8 + 缩进 + sort_keys(可读 + 稳定)。"""
     (home / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+
+
+def write_revision_snapshot(
+    home: Path,
+    revision_seq: int,
+    manifest: Mapping[str, object],
+) -> None:
+    """把修订后的 manifest 快照写入 ``revisions/{revision_seq}.json``（ADR-0242 D6）。
+
+    配置面每次变更（``revise_profile`` / ``reimport`` / skill 删除）都必须留下
+    快照，供回滚与审计。manifest 中的 ``digests`` 是配置面文件摘要，快照按
+    变更时刻的 manifest 原文保存。
+    """
+    revisions_dir = home / "revisions"
+    revisions_dir.mkdir(parents=True, exist_ok=True)
+    (revisions_dir / f"{revision_seq}.json").write_text(
+        json.dumps(dict(manifest), ensure_ascii=False, indent=2, sort_keys=True),
         encoding="utf-8",
     )
 
