@@ -16,7 +16,6 @@ import structlog
 
 from lca.contracts.atoms.ids.ids import RunId, TraceId
 from lca.contracts.mechanisms.capability.capability import (
-    provider_current,
     require_capability,
 )
 from lca.contracts.models.core.state.plane import PlaneBindings
@@ -39,6 +38,7 @@ from lca.infrastructure.runtime_plane.capability_bindings import (
 from lca.infrastructure.runtime_plane.scope.scope import plane_bindings_scope
 from lca.infrastructure.sandbox.runtime.scope import bind_sandbox_runtime
 from lca.infrastructure.search.scope.scope import search_run_scope
+from lca.infrastructure.skills.assistant.resolver import resolve_skill_store
 from lca.infrastructure.tools.run.attachment_scope import run_attachment_scope
 from lca.infrastructure.tools.run.finalizer import run_id_scope
 from lca.infrastructure.workspace import run_workspace_scope
@@ -196,7 +196,9 @@ class RunExecutionEnvironment:
                     bindings=bindings,
                     sandbox=providers.sandbox,
                     search=require_capability(self._ctx, "search"),
-                    skill_store=provider_current(require_capability(self._ctx, "skills")),
+                    # ADR-0242 D4: assistant runs read the merged store so
+                    # skill tools see the same view as prompt discovery.
+                    skill_store=resolve_skill_store(self._ctx, assistant_id),
                     machine_resolver=self._machine_resolver,
                     mode=(getattr(session, "mode", "") or "solo").strip() or "solo",
                 )

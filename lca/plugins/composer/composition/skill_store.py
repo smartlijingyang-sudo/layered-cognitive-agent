@@ -2,17 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any
 
-from lca.contracts.mechanisms.capability.capability import (
-    MissingCapabilityError,
-    provider_current,
-    require_capability,
-)
-from lca.contracts.protocols.assistant.skill_overlay import AssistantSkillOverlay
-from lca.contracts.protocols.memory.operational_skills import SkillPackageStore
 from lca.infrastructure.observability.facade.run.ambit import current_assistant_id
-from lca.infrastructure.skills.assistant.merged_store import AssistantMergedSkillStore
+from lca.infrastructure.skills.assistant.resolver import resolve_skill_store
 
 
 def active_skill_store(scope: object) -> Any:
@@ -22,24 +15,7 @@ def active_skill_store(scope: object) -> Any:
     is available, merge that Home's ``skills/`` tree with the global store so
     prompt discovery and ``activate_skill`` see assistant-owned skills first.
     """
-    store = provider_current(require_capability(scope, "skills"))
-    if store is None:
-        raise MissingCapabilityError("skills")
-    assistant_id = current_assistant_id().strip()
-    if not assistant_id:
-        return store
-    try:
-        overlay_svc = require_capability(scope, "assistant.skill_overlay")
-    except MissingCapabilityError:
-        return store
-    overlay = provider_current(overlay_svc)
-    if overlay is None:
-        return store
-    return AssistantMergedSkillStore(
-        global_store=cast("SkillPackageStore", store),
-        overlay=cast("AssistantSkillOverlay", overlay),
-        assistant_id=assistant_id,
-    )
+    return resolve_skill_store(scope, current_assistant_id())
 
 
 __all__ = ["active_skill_store"]

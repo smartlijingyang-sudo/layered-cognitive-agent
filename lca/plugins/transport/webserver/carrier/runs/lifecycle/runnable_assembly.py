@@ -76,6 +76,9 @@ class CognitiveRunnableAssembler:
     async def assemble(self, request: RunnableAssemblyRequest) -> Agent | Team:
         """Materialize common dependencies and delegate to the selected adapter."""
         assistant_id = str(getattr(request.session, "assistant_id", "") or "").strip()
+        # Resolve the Home path once; both the persona and the tool set read
+        # the same Home, so a single catalog lookup serves both (ADR-0242 D3/D4).
+        home_path = _home_path_for_assistant(request.scope, assistant_id) if assistant_id else None
 
         prepared = RunnableBuildRequest(
             assembly=request,
@@ -85,14 +88,39 @@ class CognitiveRunnableAssembler:
                 request.bindings,
                 machine_resolver=request.machine_resolver,
                 assistant_id=assistant_id,
+                home_path=home_path,
             ),
-            role_profile=_role_profile_for_assistant(request.scope, assistant_id),
+            role_profile=_role_profile_for_assistant(
+                request.scope, assistant_id, home_path=home_path
+            ),
         )
         adapter = self._mode_registry.resolve(request.mode)
         return cast("Agent | Team", await adapter.build(prepared))
 
 
-def _role_profile_for_assistant(scope: Context | None, assistant_id: str) -> RoleProfile | None:
+def _home_path_for_assistant(scope: Context | None, assistant_id: str) -> str:
+    """Resolve an assistant's Home path through the catalog (ADR-0242 D4).
+
+    A non-empty ``assistant_id`` must resolve through the assistant catalog;
+    a missing catalog is a run-assembly error rather than a silent policy
+    drop. ``POST /runs`` already validates the binding, so this is defensive.
+    """
+    try:
+        catalog = require_capability(scope, ASSISTANT_CATALOG.key)
+    except MissingCapabilityError as exc:
+        raise RuntimeError(
+            "assistant_id is set but the assistant.catalog capability is missing; "
+            "cannot resolve the assistant Home"
+        ) from exc
+    return catalog.get(assistant_id).home_path
+
+
+def _role_profile_for_assistant(
+    scope: Context | None,
+    assistant_id: str,
+    *,
+    home_path: str | None = None,
+) -> RoleProfile | None:
     """Resolve an assistant's Home persona into a ``RoleProfile`` (ADR-0242 D3).
 
     A non-empty ``assistant_id`` must resolve through the assistant catalog;
@@ -101,17 +129,11 @@ def _role_profile_for_assistant(scope: Context | None, assistant_id: str) -> Rol
     """
     if not assistant_id:
         return None
-    try:
-        catalog = require_capability(scope, ASSISTANT_CATALOG.key)
-    except MissingCapabilityError as exc:
-        raise RuntimeError(
-            "assistant_id is set but the assistant.catalog capability is missing; "
-            "cannot resolve the assistant Home persona"
-        ) from exc
-    spec = catalog.get(assistant_id)
+    if home_path is None:
+        home_path = _home_path_for_assistant(scope, assistant_id)
     from lca.plugins.assistant.persona.persona import persona_from_home
 
-    persona = persona_from_home(spec.home_path)
+    persona = persona_from_home(home_path)
     return RoleProfile(
         role=persona.role,
         goal=persona.goal,
@@ -126,14 +148,21 @@ def tools_from_scope(
     *,
     machine_resolver: MachineResolver | None = None,
     assistant_id: str = "",
+    home_path: str | None = None,
 ) -> tuple[Tool, ...]:
-    """Materialize tools from the booted tools seam; missing seams fail loudly."""
+    """Materialize tools from the booted tools seam; missing seams fail loudly.
+
+    With a non-empty ``assistant_id`` the materialized set is narrowed by the
+    assistant Home's ``tools.yaml`` / ``grants.yaml`` (ADR-0242 D4 / I-B3);
+    the legacy no-assistant path returns the full set unchanged (I-B8).
+    """
 
     if scope is None:
         return ()
     from lca.infrastructure.runtime_plane.capability_bindings import (
         BindingsViewBuilder,
     )
+    from lca.infrastructure.skills.assistant.resolver import resolve_skill_store
 
     # ``materialize`` consumes a typed ``BindingsView``; the dict form it
     # used to receive was silently downgraded to ``BindingsView()`` inside
@@ -144,10 +173,18 @@ def tools_from_scope(
         bindings=bindings,
         sandbox=provider_current(require_capability(scope, "sandbox")),
         search=require_capability(scope, "search"),
-        skill_store=provider_current(require_capability(scope, "skills")),
+        skill_store=resolve_skill_store(scope, assistant_id),
         machine_resolver=machine_resolver,
     ).build()
-    return tuple(require_capability(scope, "tools").materialize(view))
+    tools = tuple(require_capability(scope, "tools").materialize(view))
+    assistant_id = assistant_id.strip()
+    if not assistant_id:
+        return tools
+    if home_path is None:
+        home_path = _home_path_for_assistant(scope, assistant_id)
+    from lca.plugins.assistant.tools import filter_tools_by_assistant
+
+    return filter_tools_by_assistant(tools, home_path)
 
 
 __all__ = [
