@@ -227,6 +227,92 @@ def _patch_agent_dispatcher(ctx: PatchContext) -> bool:
     return True
 
 
+def _apply_ask_user_handler_upgrade(text: str) -> str | None:
+    """Upgrade an already-injected ``handleLcaAskUserSubmit`` to Option B.
+
+    The P1 handler POSTed the answer to ``/lca-api/runs/<id>/answer`` and
+    returned ``skipResume`` without reconnecting the WS, so the resumed run's
+    stream never reached the UI. Option B removes the POST (the resume now
+    lives in ``lcaResumeGatewayRun``) and carries ``lcaRunId`` +
+    ``toolResultContent`` so conversationControl can open the resume op.
+
+    Idempotent: returns None when ``lcaRunId`` is already present.
+    """
+    if "lcaRunId" in text:
+        return None
+
+    opts_anchor = (
+        "interface SubmitToolInteractionOptions {\n"
+        "  createUserMessage?: boolean;\n"
+        "  skipResume?: boolean;"
+    )
+    if opts_anchor not in text:
+        msg = "[lca_runtime_agent_gateway] customInteractionHandlers opts upgrade anchor not found"
+        raise SystemExit(msg)
+    text = text.replace(
+        opts_anchor,
+        "interface SubmitToolInteractionOptions {\n"
+        "  createUserMessage?: boolean;\n"
+        "  skipResume?: boolean;\n"
+        "  lcaRunId?: string;",
+        1,
+    )
+
+    old_return = (
+        "  try {\n"
+        "    await fetch(`/lca-api/runs/${runId}/answer`, {\n"
+        "      body: JSON.stringify({\n"
+        "        approval_id: 'askUserQuestion',\n"
+        "        idempotency_key: `${runId}:${messageId}`,\n"
+        "        payload: answerText,\n"
+        "      }),\n"
+        "      headers: {\n"
+        "        Authorization: `Bearer ${LCA_TOKEN}`,\n"
+        "        'Content-Type': 'application/json',\n"
+        "      },\n"
+        "      method: 'POST',\n"
+        "    });\n"
+        "  } catch (error) {\n"
+        "    console.error('[LCA] askUserQuestion answer failed', error);\n"
+        "  }\n"
+        "\n"
+        "  return {\n"
+        "    options: { createUserMessage: false, pluginState: { askUserAnswers: payload }, skipResume: true },\n"
+        "    payload,\n"
+        "  };"
+    )
+    new_return = (
+        "  return {\n"
+        "    options: {\n"
+        "      createUserMessage: false,\n"
+        "      pluginState: { askUserAnswers: payload },\n"
+        "      skipResume: true,\n"
+        "      lcaRunId: runId,\n"
+        "      toolResultContent: answerText,\n"
+        "    },\n"
+        "    payload,\n"
+        "  };"
+    )
+    if old_return not in text:
+        msg = "[lca_runtime_agent_gateway] customInteractionHandlers /answer block anchor not found"
+        raise SystemExit(msg)
+    text = text.replace(old_return, new_return, 1)
+
+    # The /answer POST was the only consumer of the injected token const, and
+    # the store imports only fed the retired broken_read path.
+    text = text.replace(
+        "\nconst LCA_TOKEN = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';",
+        "",
+        1,
+    )
+    text = text.replace(
+        "import { dataSelectors, useConversationStore } from '@/features/Conversation/store';\n",
+        "",
+        1,
+    )
+    return text
+
+
 def _patch_custom_interaction_handlers(ctx: PatchContext) -> bool:
     handlers_path = (
         "src/features/Conversation/Messages/AssistantGroup/Tool/Detail/Intervention/"
@@ -259,18 +345,11 @@ def _patch_custom_interaction_handlers(ctx: PatchContext) -> bool:
         handlers_text = ctx.read(handlers_path)
 
     if "handleLcaAskUserSubmit" in handlers_text:
+        upgraded = _apply_ask_user_handler_upgrade(handlers_text)
+        if upgraded is not None:
+            ctx.write(handlers_path, upgraded)
+            changed = True
         return changed
-
-    import_anchor = "import { topicService } from '@/services/topic';"
-    if import_anchor not in handlers_text:
-        raise SystemExit("[lca_runtime_agent_gateway] customInteractionHandlers import anchor not found")
-    handlers_text = handlers_text.replace(
-        import_anchor,
-        import_anchor
-        + "\nimport { dataSelectors, useConversationStore } from '@/features/Conversation/store';\n"
-        + "\nconst LCA_TOKEN = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';",
-        1,
-    )
 
     ctx_anchor = "interface CustomInteractionContext {\n  apiName?: string;"
     if ctx_anchor not in handlers_text:
@@ -286,7 +365,7 @@ def _patch_custom_interaction_handlers(ctx: PatchContext) -> bool:
         raise SystemExit("[lca_runtime_agent_gateway] SubmitToolInteractionOptions anchor not found")
     handlers_text = handlers_text.replace(
         opts_anchor,
-        "interface SubmitToolInteractionOptions {\n  createUserMessage?: boolean;\n  skipResume?: boolean;",
+        "interface SubmitToolInteractionOptions {\n  createUserMessage?: boolean;\n  skipResume?: boolean;\n  lcaRunId?: string;",
         1,
     )
 
@@ -306,8 +385,9 @@ def _patch_custom_interaction_handlers(ctx: PatchContext) -> bool:
 
     lca_handler_fn = """
 /**
- * LCA askUserQuestion resume: POST the answer to the LCA gateway and store
- * structured answers in pluginState. The LCA run resumes on the gateway WS.
+ * LCA askUserQuestion resume: hand the answer to conversationControl, which
+ * opens a NEW gateway op that reconnects to the SAME run's WS
+ * (resume_tool_result). The run_id comes from the intervention requestArgs.
  */
 const handleLcaAskUserSubmit: CustomInteractionSubmitHandler = async (payload, context) => {
   const messageId = context?.messageId;
@@ -340,25 +420,14 @@ const handleLcaAskUserSubmit: CustomInteractionSubmitHandler = async (payload, c
     answerText = lines.length > 0 ? lines.join('\\n') : JSON.stringify(payload);
   }
 
-  try {
-    await fetch(`/lca-api/runs/${runId}/answer`, {
-      body: JSON.stringify({
-        approval_id: 'askUserQuestion',
-        idempotency_key: `${runId}:${messageId}`,
-        payload: answerText,
-      }),
-      headers: {
-        Authorization: `Bearer ${LCA_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      method: 'POST',
-    });
-  } catch (error) {
-    console.error('[LCA] askUserQuestion answer failed', error);
-  }
-
   return {
-    options: { createUserMessage: false, pluginState: { askUserAnswers: payload }, skipResume: true },
+    options: {
+      createUserMessage: false,
+      pluginState: { askUserAnswers: payload },
+      skipResume: true,
+      lcaRunId: runId,
+      toolResultContent: answerText,
+    },
     payload,
   };
 };
@@ -409,7 +478,7 @@ def _patch_conversation_control(ctx: PatchContext) -> bool:
             raise SystemExit("[lca_runtime_agent_gateway] conversationControl type anchor not found")
         control_text = control_text.replace(
             type_anchor,
-            "      skipResume?: boolean;\n      toolResultContent?: string;\n    },\n  ): Promise<void> => {",
+            "      lcaRunId?: string;\n      skipResume?: boolean;\n      toolResultContent?: string;\n    },\n  ): Promise<void> => {",
             1,
         )
         resume_anchor = (
@@ -424,14 +493,93 @@ def _patch_conversation_control(ctx: PatchContext) -> bool:
         control_text = control_text.replace(
             resume_anchor,
             resume_anchor
-            + "\n\n    // LCA: the run is already resumed by POST /runs/<id>/answer; skip the\n"
-            + "    // client/gateway resume to avoid creating a duplicate run.\n"
+            + "\n\n    // LCA: the answer ships as a resume_tool_result run command; a new\n"
+            + "    // gateway op reconnects to the SAME run's WS from the last stream\n"
+            + "    // position. The native gateway resume would create a duplicate run,\n"
+            + "    // so skip it and open the LCA resume op instead.\n"
             + "    if (options?.skipResume) {\n"
+            + "      if (options.lcaRunId) {\n"
+            + "        const [{ lcaResumeGatewayRun }, { getLcaStreamPosition }] = await Promise.all([\n"
+            + "          import('@/store/chat/agents/transports/lcaGateway/executeGatewayRun'),\n"
+            + "          import('@/store/chat/agents/transports/lcaGateway/LcaAgentStreamClient'),\n"
+            + "        ]);\n"
+            + "        try {\n"
+            + "          await lcaResumeGatewayRun(this.#get, {\n"
+            + "            context: effectiveContext,\n"
+            + "            runId: options.lcaRunId,\n"
+            + "            lastEventId: getLcaStreamPosition(options.lcaRunId),\n"
+            + "            parentMessageId: toolMessageId,\n"
+            + "            topicId: effectiveContext.topicId ?? '',\n"
+            + "            toolCallId: toolMessage.tool_call_id ?? '',\n"
+            + "            content: options.toolResultContent ?? '',\n"
+            + "          });\n"
+            + "        } catch (error) {\n"
+            + "          console.error('[LCA] askUserQuestion resume op failed', error);\n"
+            + "        }\n"
+            + "      }\n"
             + "      completeOperation(operationId);\n"
             + "      return;\n"
             + "    }",
             1,
         )
+        ctx.write(control_path, control_text)
+        changed = True
+        control_text = ctx.read(control_path)
+
+    if "lcaRunId" not in control_text:
+        type_anchor = "      skipResume?: boolean;\n      toolResultContent?: string;\n    },\n  ): Promise<void> => {"
+        if type_anchor not in control_text:
+            raise SystemExit("[lca_runtime_agent_gateway] conversationControl type upgrade anchor not found")
+        control_text = control_text.replace(
+            type_anchor,
+            "      lcaRunId?: string;\n      skipResume?: boolean;\n      toolResultContent?: string;\n    },\n  ): Promise<void> => {",
+            1,
+        )
+        ctx.write(control_path, control_text)
+        changed = True
+        control_text = ctx.read(control_path)
+
+    if "LCA resume op instead" not in control_text:
+        old_skip_block = (
+            "    // LCA: the run is already resumed by POST /runs/<id>/answer; skip the\n"
+            "    // client/gateway resume to avoid creating a duplicate run.\n"
+            "    if (options?.skipResume) {\n"
+            "      completeOperation(operationId);\n"
+            "      return;\n"
+            "    }"
+        )
+        new_skip_block = (
+            "    // LCA: the answer ships as a resume_tool_result run command; a new\n"
+            "    // gateway op reconnects to the SAME run's WS from the last stream\n"
+            "    // position. The native gateway resume would create a duplicate run,\n"
+            "    // so skip it and open the LCA resume op instead.\n"
+            "    if (options?.skipResume) {\n"
+            "      if (options.lcaRunId) {\n"
+            "        const [{ lcaResumeGatewayRun }, { getLcaStreamPosition }] = await Promise.all([\n"
+            "          import('@/store/chat/agents/transports/lcaGateway/executeGatewayRun'),\n"
+            "          import('@/store/chat/agents/transports/lcaGateway/LcaAgentStreamClient'),\n"
+            "        ]);\n"
+            "        try {\n"
+            "          await lcaResumeGatewayRun(this.#get, {\n"
+            "            context: effectiveContext,\n"
+            "            runId: options.lcaRunId,\n"
+            "            lastEventId: getLcaStreamPosition(options.lcaRunId),\n"
+            "            parentMessageId: toolMessageId,\n"
+            "            topicId: effectiveContext.topicId ?? '',\n"
+            "            toolCallId: toolMessage.tool_call_id ?? '',\n"
+            "            content: options.toolResultContent ?? '',\n"
+            "          });\n"
+            "        } catch (error) {\n"
+            "          console.error('[LCA] askUserQuestion resume op failed', error);\n"
+            "        }\n"
+            "      }\n"
+            "      completeOperation(operationId);\n"
+            "      return;\n"
+            "    }"
+        )
+        if old_skip_block not in control_text:
+            raise SystemExit("[lca_runtime_agent_gateway] conversationControl skipResume block anchor not found")
+        control_text = control_text.replace(old_skip_block, new_skip_block, 1)
         ctx.write(control_path, control_text)
         changed = True
         control_text = ctx.read(control_path)
@@ -958,6 +1106,157 @@ def _apply_stream_start_clear_tool_streaming(text: str) -> str | None:
     return text.replace(_STREAM_START_RESET_ANCHOR, _STREAM_START_RESET_REPLACEMENT, 1)
 
 
+def _apply_gateway_last_event_id(text: str) -> str | None:
+    """Thread ``lastEventId`` through gateway.ts so LCA resume ops replay from
+    the last stream position instead of the run start.
+
+    Idempotent: returns None when the plumbing is already present.
+    """
+    if "lastEventId" in text:
+        return None
+
+    params_anchor = (
+        "  resumeOnConnect?: boolean;\n"
+        "  /**\n"
+        "   * Auth token for the Gateway\n"
+        "   */\n"
+        "  token: string;"
+    )
+    if params_anchor not in text:
+        msg = "[lca_runtime_agent_gateway] gateway ConnectGatewayParams anchor not found"
+        raise SystemExit(msg)
+    text = text.replace(
+        params_anchor,
+        "  resumeOnConnect?: boolean;\n"
+        "  /** Last stream event id seen for this run; LCA resume replays from it. */\n"
+        "  lastEventId?: string;\n"
+        "  /**\n"
+        "   * Auth token for the Gateway\n"
+        "   */\n"
+        "  token: string;",
+        1,
+    )
+
+    destructure_anchor = (
+        "    const { operationId, gatewayUrl, token, topicId, onEvent, onSessionComplete, resumeOnConnect } =\n"
+        "      params;"
+    )
+    if destructure_anchor not in text:
+        msg = "[lca_runtime_agent_gateway] gateway connectToGateway destructure anchor not found"
+        raise SystemExit(msg)
+    text = text.replace(
+        destructure_anchor,
+        "    const {\n"
+        "      operationId,\n"
+        "      gatewayUrl,\n"
+        "      token,\n"
+        "      topicId,\n"
+        "      onEvent,\n"
+        "      onSessionComplete,\n"
+        "      resumeOnConnect,\n"
+        "      lastEventId,\n"
+        "    } = params;",
+        1,
+    )
+
+    client_anchor = "    const client = this.createClient({ gatewayUrl, operationId, resumeOnConnect, token });"
+    if client_anchor not in text:
+        msg = "[lca_runtime_agent_gateway] gateway createClient call anchor not found"
+        raise SystemExit(msg)
+    text = text.replace(
+        client_anchor,
+        "    const client = this.createClient({ gatewayUrl, operationId, resumeOnConnect, token, lastEventId });",
+        1,
+    )
+
+    factory_anchor = (
+        "  createClient: (options: AgentStreamClientOptions) => GatewayConnection['client'] = (options) => {\n"
+        "    if (isLcaGatewayMode()) {\n"
+        "      return lcaConnectToGateway({\n"
+        "        operationId: options.operationId,\n"
+        "        resumeOnConnect: options.resumeOnConnect,\n"
+        "        token: options.token,\n"
+        "      });\n"
+        "    }"
+    )
+    if factory_anchor not in text:
+        msg = "[lca_runtime_agent_gateway] gateway createClient factory anchor not found"
+        raise SystemExit(msg)
+    text = text.replace(
+        factory_anchor,
+        "  createClient: (options: AgentStreamClientOptions & { lastEventId?: string }) => GatewayConnection['client'] = (options) => {\n"
+        "    if (isLcaGatewayMode()) {\n"
+        "      return lcaConnectToGateway({\n"
+        "        operationId: options.operationId,\n"
+        "        resumeOnConnect: options.resumeOnConnect,\n"
+        "        token: options.token,\n"
+        "        lastEventId: options.lastEventId,\n"
+        "      });\n"
+        "    }",
+        1,
+    )
+    return text
+
+
+def _apply_waiting_for_human_park(text: str) -> str | None:
+    """Treat ``waiting_for_human`` as a park, not a completion.
+
+    The LCA run pauses for human input at askUserQuestion; completing the run
+    would mark the topic unread and drain the input queue. Instead, complete
+    the current op via ``onRunParked`` and let a NEW op resume the same run.
+
+    Idempotent: returns None when the park block is already present.
+    """
+    if "LCA park: the run is paused waiting for human input" in text:
+        return None
+
+    reasons_old = (
+        "const NON_COMPLETION_RUNTIME_END_REASONS = "
+        "new Set(['interrupted', 'waiting_for_async_tool']);"
+    )
+    reasons_new = (
+        "const NON_COMPLETION_RUNTIME_END_REASONS = "
+        "new Set(['interrupted', 'waiting_for_async_tool', 'waiting_for_human']);"
+    )
+    if reasons_old not in text:
+        msg = "[lca_runtime_agent_gateway] gatewayEventHandler NON_COMPLETION_RUNTIME_END_REASONS anchor not found"
+        raise SystemExit(msg)
+    text = text.replace(reasons_old, reasons_new, 1)
+
+    park_anchor = "          // Terminal run lifecycle. `isCompletedRuntimeEnd` is the clean-vs-not"
+    if park_anchor not in text:
+        msg = "[lca_runtime_agent_gateway] gatewayEventHandler Terminal run lifecycle anchor not found"
+        raise SystemExit(msg)
+    park_block = (
+        "          if (data?.reason === 'waiting_for_human') {\n"
+        "            // LCA park: the run is paused waiting for human input. Complete the\n"
+        "            // operation so the loading spinner clears, but fire NO terminal\n"
+        "            // side effects (unread / queue drain / notification). A NEW\n"
+        "            // operation resumes the same run when the user answers.\n"
+        "            if (runLifecycle) {\n"
+        "              await runLifecycle.onRunParked({ ...lifecycleEventBase, reason: 'waiting_for_human' });\n"
+        "            } else {\n"
+        "              get().completeOperation(operationId);\n"
+        "            }\n"
+        "            return;\n"
+        "          }\n"
+        "\n"
+    )
+    text = text.replace(park_anchor, park_block + park_anchor, 1)
+    return text
+
+
+def _patch_gateway_last_event_id(ctx: PatchContext) -> bool:
+    """Route ``lastEventId`` through gateway.ts for LCA resume ops."""
+    rel = "src/store/chat/slices/agentRun/actions/transports/gateway/gateway.ts"
+    text = ctx.read(rel)
+    patched = _apply_gateway_last_event_id(text)
+    if patched is None:
+        return False
+    ctx.write(rel, patched)
+    return True
+
+
 def _patch_gateway_event_handler_lca(ctx: PatchContext) -> bool:
     """Emit the LCA-flavored gatewayEventHandler with the runtimeType
     enum, the messageService override, the merge-by-id
@@ -991,6 +1290,7 @@ def _patch_gateway_event_handler_lca(ctx: PatchContext) -> bool:
         _apply_tool_end_in_memory_result,
         _apply_tool_merge_first_seen_order,
         _apply_stream_start_clear_tool_streaming,
+        _apply_waiting_for_human_park,
     ):
         patched = apply_fn(text)
         if patched is not None:
@@ -1053,6 +1353,7 @@ def apply(ctx: PatchContext) -> bool:
     for patch_fn in (
         _patch_gateway_create_client,
         _patch_gateway_lca_routing,
+        _patch_gateway_last_event_id,
         _patch_streaming_executor,
         _patch_agent_dispatcher,
         _patch_custom_interaction_handlers,
