@@ -33,7 +33,8 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
-from typing import Any, Protocol, cast
+from dataclasses import dataclass
+from typing import Any, Literal, Protocol, cast
 
 from starlette.applications import Starlette
 from starlette.routing import WebSocketRoute
@@ -65,8 +66,65 @@ class RunPort(Protocol):
 
 
 _HEARTBEAT_INTERVAL_S = 30.0
-_RACE_TIMEOUT_S = 0.5
 _PUMP_QUEUE_MAX = 256
+
+
+@dataclass(frozen=True, slots=True)
+class _RecvMsg:
+    msg: dict[str, Any] | None
+
+
+@dataclass(frozen=True, slots=True)
+class _RecvDisconnected:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class _RecvFailed:
+    exc: Exception
+
+
+RecvOutcome = _RecvMsg | _RecvDisconnected | _RecvFailed
+
+
+@dataclass(frozen=True, slots=True)
+class _LoopContinue:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class _LoopStop:
+    reason: Literal["SilentDisconnect", "Terminal", "Interrupted"]
+
+
+LoopVerdict = _LoopContinue | _LoopStop
+
+
+def _classify_recv_task(task: asyncio.Task[dict[str, Any] | None]) -> RecvOutcome:
+    """Map a finished recv task to Msg, silent disconnect, or swallowed failure."""
+    try:
+        return _RecvMsg(msg=task.result())
+    except WebSocketDisconnect:
+        return _RecvDisconnected()
+    except asyncio.CancelledError:
+        # Recv cancellation means the socket is gone; the client resumes from last_id.
+        return _RecvDisconnected()
+    except Exception as exc:
+        return _RecvFailed(exc=exc)
+
+
+async def _join_wait_tasks(*tasks: asyncio.Task[Any] | None) -> None:
+    """Cancel pending wait tasks and retrieve finished ones."""
+    # Retrieving every wait task keeps "never retrieved" warnings from escaping the loop.
+    for task in tasks:
+        if task is None:
+            continue
+        if not task.done():
+            task.cancel()
+        try:
+            await task
+        except (asyncio.CancelledError, Exception):
+            pass
 
 
 def _dbg(msg: str, *args: Any) -> None:
@@ -116,7 +174,7 @@ async def _run_session(
     run_port: RunPort | None,
     public_pem: str | None = None,
 ) -> None:
-    _dbg("_run_session enter run_id=%s peer=%s", run_id, getattr(ws.client, 'host', '?'))
+    _dbg("_run_session enter run_id=%s peer=%s", run_id, getattr(ws.client, "host", "?"))
     # 1. auth handshake
     try:
         first = await _recv_json(ws)
@@ -126,7 +184,11 @@ async def _run_session(
     except Exception as exc:
         _dbg("_run_session recv auth EXC run_id=%s: %r", run_id, exc)
         return
-    _dbg("_run_session recv auth frame: type=%s token_len=%s", (first or {}).get('type'), len((first or {}).get('token') or ''))
+    _dbg(
+        "_run_session recv auth frame: type=%s token_len=%s",
+        (first or {}).get("type"),
+        len((first or {}).get("token") or ""),
+    )
     if not first or first.get("type") != "auth":
         await ws.send_json({"type": "auth_failed", "reason": "expected auth frame"})
         return
@@ -148,7 +210,12 @@ async def _run_session(
     except Exception as exc:
         _dbg("recv resume EXC run_id=%s: %r", run_id, exc)
         return
-    _dbg("recv resume frame: type=%s lastEventId=%s wantStatus=%s", (resume or {}).get('type'), (resume or {}).get('lastEventId'), (resume or {}).get('wantStatus'))
+    _dbg(
+        "recv resume frame: type=%s lastEventId=%s wantStatus=%s",
+        (resume or {}).get("type"),
+        (resume or {}).get("lastEventId"),
+        (resume or {}).get("wantStatus"),
+    )
     if not resume or resume.get("type") != "resume":
         last_id = "0"
         want_status = False
@@ -159,7 +226,9 @@ async def _run_session(
     replayed_upto = "" if last_id == "0" else str(last_id)
     if run_id is not None:
         history = await stream_manager.read_history(run_id, count=1000)
-        _dbg("read_history run_id=%s count=%s replayed_upto=%s", run_id, len(history), replayed_upto)
+        _dbg(
+            "read_history run_id=%s count=%s replayed_upto=%s", run_id, len(history), replayed_upto
+        )
         terminal_status = _terminal_status_from_history(history)
         history.reverse()
         sent = 0
@@ -202,12 +271,11 @@ async def _live_loop(
     run_port: RunPort | None,
     start_id: str = "",
 ) -> None:
-    """Race stream frames against client control frames until disconnect.
+    """Wait on {frame_ready, recv} with a heartbeat sweep until the run ends.
 
-    ``start_id`` is the highest stream id the resume replay already wrote to
-    this socket. The XREAD pump reads strictly-after that cursor; starting it
-    at ``"0"`` instead re-delivers the replayed prefix, and every
-    ``snapshotMode: "append"`` chunk in it would be applied twice by the UI.
+    Only a newly queued stream frame or an arrived client control frame wakes the loop; a heartbeat-interval timeout re-waits without cancelling either task, starting the pump strictly after start_id so the replayed prefix is never redelivered.
+
+    Drained stream frames forward before the control frame is handled, and every SilentDisconnect, Terminal, or Interrupted exit funnels through cancel-and-await of both wait tasks.
     """
     _dbg("_live_loop enter run_id=%s start_id=%s", run_id, start_id)
     frame_queue: asyncio.Queue[bytes] = asyncio.Queue(maxsize=_PUMP_QUEUE_MAX)
@@ -215,6 +283,8 @@ async def _live_loop(
     last_id = start_id or "0"
     pump_task: asyncio.Task[None] | None = None
     pump_started = False
+    recv_task: asyncio.Task[dict[str, Any] | None] | None = None
+    frame_task: asyncio.Task[bytes] | None = None
 
     async def _pump() -> None:
         try:
@@ -234,70 +304,97 @@ async def _live_loop(
                 break
         return frames
 
+    async def _funnel(
+        recv: asyncio.Task[dict[str, Any] | None] | None,
+        frame_ready: asyncio.Task[bytes] | None,
+    ) -> None:
+        # Single exit path keeps GC silent: a finished recv holding disconnect must be retrieved, not dropped.
+        await _join_wait_tasks(recv, frame_ready)
+
     try:
+        recv_task = asyncio.create_task(_recv_json(ws))
+        frame_task = asyncio.create_task(frame_queue.get())
         while True:
             if ws.client_state == WebSocketState.DISCONNECTED:
+                await _funnel(recv_task, frame_task)
                 return
 
             if not pump_started:
                 pump_task = asyncio.create_task(_pump())
                 pump_started = True
 
-            recv_task = asyncio.create_task(_recv_json(ws))
-            try:
-                done, _ = await asyncio.wait(
-                    {recv_task},
-                    timeout=_RACE_TIMEOUT_S,
-                    return_when=asyncio.FIRST_COMPLETED,
-                )
-            except Exception:
-                recv_task.cancel()
+            done, _pending = await asyncio.wait(
+                {recv_task, frame_task},
+                timeout=_HEARTBEAT_INTERVAL_S,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            if not done:
+                # Sweep timeout with both pending must not cancel: control frames on the boundary stay exactly-once.
                 continue
 
-            # 1. Forward any frames the pump queued during the wait window.
-            queued = await _drain_queue()
-            for frame in queued:
-                if ws.client_state == WebSocketState.DISCONNECTED:
-                    return
+            if frame_task in done:
                 try:
-                    ev = _parse_sse_agent_event_frame(frame)
-                    if ev is None:
-                        continue
-                    if await _forward_stream_event(ws, ev):
+                    first_frame = frame_task.result()
+                except asyncio.CancelledError:
+                    await _funnel(recv_task, frame_task)
+                    return
+                except Exception as exc:
+                    # queue.get has no fallible path; recreating keeps the two-task wait set whole.
+                    _dbg("frame_ready failed: %r", exc)
+                    frame_task = asyncio.create_task(frame_queue.get())
+                else:
+                    rest = await _drain_queue()
+                    frames = [first_frame, *rest]
+                    verdict: LoopVerdict = _LoopContinue()
+                    for frame in frames:
+                        if ws.client_state == WebSocketState.DISCONNECTED:
+                            verdict = _LoopStop(reason="SilentDisconnect")
+                            break
+                        try:
+                            ev = _parse_sse_agent_event_frame(frame)
+                            if ev is None:
+                                continue
+                            if await _forward_stream_event(ws, ev):
+                                verdict = _LoopStop(reason="Terminal")
+                                break
+                        except (WebSocketDisconnect, RuntimeError):
+                            # Send side is gone; the client resumes from last_id, so exit quietly.
+                            verdict = _LoopStop(reason="SilentDisconnect")
+                            break
+                        next_id = ev.get("id")
+                        if next_id:
+                            last_id = str(next_id)
+                    if isinstance(verdict, _LoopStop):
+                        await _funnel(recv_task, frame_task)
                         return
-                except (WebSocketDisconnect, RuntimeError):
-                    return
-                next_id = ev.get("id") if ev is not None else None
-                if next_id:
-                    last_id = str(next_id)
+                    # The consumed frame already sits in `frames`, so a fresh get() loses nothing.
+                    frame_task = asyncio.create_task(frame_queue.get())
 
-            # 2. If a control frame arrived, handle it.
             if recv_task in done:
-                # Attach a no-op done callback so a raised WebSocketDisconnect
-                # (e.g. after we returned for "interrupt") is not flagged as
-                # an unretrieved task exception in pytest logs.
-                recv_task.add_done_callback(lambda _t: None)
-                try:
-                    msg = recv_task.result()
-                except WebSocketDisconnect:
+                outcome: RecvOutcome = _classify_recv_task(recv_task)
+                if isinstance(outcome, _RecvDisconnected):
+                    await _funnel(recv_task, frame_task)
                     return
-                except Exception:
-                    msg = None
-                if msg is not None:
+                if isinstance(outcome, _RecvFailed):
+                    # Unknown recv failure carries no control intent; keep waiting with a fresh recv.
+                    _dbg("recv failed: %r", outcome.exc)
+                    recv_task = asyncio.create_task(_recv_json(ws))
+                    continue
+                msg = outcome.msg
+                if msg is None:
+                    recv_task = asyncio.create_task(_recv_json(ws))
+                    continue
+                try:
                     handled = await _handle_control_frame(
                         ws, msg=msg, run_id=run_id, run_port=run_port
                     )
-                    if handled == "interrupt":
-                        return
-                continue
-
-            # 3. Otherwise the wait timed out; loop to keep draining the queue.
-            recv_task.add_done_callback(lambda _t: None)
-            recv_task.cancel()
-            try:
-                await recv_task
-            except (asyncio.CancelledError, WebSocketDisconnect, Exception):
-                pass
+                except (WebSocketDisconnect, RuntimeError):
+                    await _funnel(recv_task, frame_task)
+                    return
+                if handled == "interrupt":
+                    await _funnel(recv_task, frame_task)
+                    return
+                recv_task = asyncio.create_task(_recv_json(ws))
     finally:
         pump_stop.set()
         if pump_task is not None and not pump_task.done():
@@ -306,6 +403,7 @@ async def _live_loop(
                 await pump_task
             except (asyncio.CancelledError, Exception):
                 pass
+        await _join_wait_tasks(recv_task, frame_task)
 
 
 async def _handle_control_frame(
@@ -374,7 +472,11 @@ async def _send_agent_event(ws: WebSocket, ev: dict) -> None:
             "timestamp": ev.get("timestamp", 0),
         },
     }
-    _dbg("_send_agent_event id=%s type=%s", ev.get("id"), (ev.get("data") or {}).get("type") if isinstance(ev.get("data"), dict) else ev.get("type"))
+    _dbg(
+        "_send_agent_event id=%s type=%s",
+        ev.get("id"),
+        (ev.get("data") or {}).get("type") if isinstance(ev.get("data"), dict) else ev.get("type"),
+    )
     await ws.send_json(envelope)
 
 
