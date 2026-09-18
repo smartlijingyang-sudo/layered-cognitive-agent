@@ -148,19 +148,15 @@ def _map_session_checkpoint(data: dict[str, Any], *, parent: str | None) -> dict
 
 
 def _map_approval_persisted(data: dict[str, Any], *, parent: str | None) -> dict[str, Any] | None:
-    """Checkpoint pause — ``approval.persisted.v1`` always pairs with waiting_input."""
-    del parent
-    stamped: dict[str, Any] = {
-        "event": {
-            "type": "SpineClose",
-            "reason": "waiting_for_human",
-            "final_state": {"status": "waiting_for_human"},
-        }
-    }
-    pending = data.get("pending_tools_calling")
-    if isinstance(pending, list) and pending:
-        stamped["event"]["pending_tools_calling"] = pending
-    return stamped
+    """``approval.persisted.v1`` stays journal-internal (recovery SSOT).
+
+    It always pairs with a ``waiting_input`` checkpoint, which already
+    yields the WS ``step_start → agent_runtime_end`` pause pair. Mapping
+    both would double-publish the pause (run_41571c76b953: four identical
+    pairs). Recovery reads the journal fact directly, unaffected.
+    """
+    del data, parent
+    return None
 
 
 _CATALOG_HANDLERS = {

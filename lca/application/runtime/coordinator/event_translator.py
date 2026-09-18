@@ -450,20 +450,6 @@ class EventTranslator:
             },
         }
 
-    @staticmethod
-    def _spine_kernel_run_stop(e: dict) -> dict:
-        payload = _inner_payload(e)
-        final_state = {"status": payload.get("status") or "completed"}
-        return {
-            "type": "agent_runtime_end",
-            "data": {
-                "finalState": final_state,
-                "reason": "completed",
-                "reasonDetail": str(payload.get("error") or ""),
-                "phase": "execution_complete",
-            },
-        }
-
 
 _HANDLERS = {
     "LlmCallStarted": EventTranslator._llm_call_started,
@@ -490,7 +476,6 @@ _SPINE_HANDLERS = {
     "step.tool_call.record": EventTranslator._spine_tool_call_record,
     "phase.tool.call.start": EventTranslator._spine_phase_tool_start,
     "body.tool.execute.end": EventTranslator._spine_body_tool_end,
-    "kernel.run.stop": EventTranslator._spine_kernel_run_stop,
 }
 
 

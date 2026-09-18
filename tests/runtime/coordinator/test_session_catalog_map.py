@@ -129,3 +129,18 @@ def test_catalog_tool_invoked_takes_precedence_over_spine_end() -> None:
     )
     assert catalog is not None
     assert catalog["event"]["type"] == "ToolInvoked"
+
+
+def test_approval_persisted_is_ws_silent() -> None:
+    """``approval.persisted.v1`` stays journal-internal (recovery SSOT).
+
+    It always pairs with a ``waiting_input`` checkpoint that already
+    yields the WS pause pair; mapping both double-publishes.
+    """
+    assert (
+        catalog_session_event_to_stamped(
+            "approval.persisted.v1",
+            {"approval_id": "a1", "resume_point": {}},
+        )
+        is None
+    )
