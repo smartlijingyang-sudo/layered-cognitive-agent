@@ -140,16 +140,16 @@ async def decode_create_run(
     mode = str(body.get("mode") or body.get("model") or "solo")
     resolved_mode = resolve_mode(ctx, mode)
 
-    run_input: LobeHubRunInput = await prepare_run_from_messages(messages, file_store)
-    if not run_input.user_text.strip():
-        return _err("messages must include a non-empty user message", status_code=400)
-
     resume_approval = _decode_resume_approval(body.get("resume_approval"))
     if isinstance(resume_approval, JSONResponse):
         return resume_approval
     resume_tool_result = _decode_resume_tool_result(body.get("resume_tool_result"))
     if isinstance(resume_tool_result, JSONResponse):
         return resume_tool_result
+
+    run_input: LobeHubRunInput = await prepare_run_from_messages(messages, file_store)
+    if resume_approval is None and resume_tool_result is None and not run_input.user_text.strip():
+        return _err("messages must include a non-empty user message", status_code=400)
 
     return CreateRunRequest(
         profile=str(body.get("profile") or "web-standard"),

@@ -166,6 +166,62 @@ async def test_post_runs_with_resume_tool_result_forwards_to_run_port(
 
 
 @pytest.mark.asyncio
+async def test_post_runs_with_resume_tool_result_accepts_empty_messages(
+    tmp_path: Path,
+    rsa_keys: dict[str, str],
+    mock_mode_resolver: None,
+) -> None:
+    """A resume body carries no user prompt: empty ``messages`` must not 400.
+
+    The LCA resume op (``lcaResumeGatewayRun``) POSTs ``/lca-api/runs`` with
+    ``messages: []`` plus ``resume_tool_result``. The non-empty user-message
+    validation applies to fresh runs only; a resume already has its run
+    context server-side and would otherwise be rejected before routing.
+    """
+    from lca.infrastructure.file.store import LocalFileStore
+
+    run_id = "run_existing_paused_empty"
+    topic_id = "topic_resume_empty"
+    store = SqliteRunningOperationStore(":memory:")
+    await store.insert(
+        run_id=run_id,
+        topic_id=topic_id,
+        agent_id="agent_a",
+        assistant_message_id="msg_parent",
+        scope="main",
+    )
+
+    port = _RecordingPort()
+    app = Starlette()
+    app.state.ctx = object()
+    app.state.file_store = LocalFileStore(tmp_path / "files")
+    app.state.run_port = port
+    app.state.running_operation_store = store
+
+    response = await create_run(
+        _request(
+            {
+                "messages": [],
+                "topic_id": topic_id,
+                "resume_tool_result": {
+                    "toolCallId": "tc_empty",
+                    "parentMessageId": "msg_parent",
+                    "content": "the user's answer",
+                },
+            },
+            app,
+        )
+    )
+    assert response.status_code == 200
+    assert port.create_calls == [], "resume_tool_result must skip create_and_dispatch"
+    assert len(port.resume_calls) == 1
+    call = port.resume_calls[0]
+    assert call["run_id"] == run_id
+    assert call["approval_id"] == "tc_empty"
+    assert call["payload"] == "the user's answer"
+
+
+@pytest.mark.asyncio
 async def test_post_runs_without_resume_field_still_creates_run(
     tmp_path: Path,
     rsa_keys: dict[str, str],
