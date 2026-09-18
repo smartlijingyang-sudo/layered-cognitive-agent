@@ -271,25 +271,18 @@ async def test_gate_rejects_non_command_port() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_gate_resume_path_is_outer_level_act_resume_delegate() -> None:
-    """m1 outer-edge-SSOT close-out: the resume path reaches
-    ``act.approve.gate`` via the outer ``act.resume`` subgraph delegate
-    (``entry_node=act.approve.gate`` in ``bundles/outer/phase_main.yaml``),
-    NOT via a subgraph-internal ``intervene.resume`` stub.
+def test_gate_resume_path_is_full_restart() -> None:
+    """Full-restart HITL resume: no surgical resume nodes in outer graph.
 
-    The previous PR-1b design relied on a kernel re-projection hook
-    (``ADR-0237 §6`` promised but never implemented) that would feed the
-    outer ``intervene.resume``'s ``command`` / ``decision`` into the
-    stub's port registry. Without that hook the stub was unreachable
-    from the subgraph entry — the lifter flagged it at boot. The new
-    design routes the resume cycle through outer edges that the kernel
-    actually drives, with the per-plan resume-edge validator satisfied
-    by the outer ``intervene.resume → act.resume`` edge.
+    The HITL resume design restarts the graph from ``perceive.main``
+    with the human answer folded into state (driver.py). The previous
+    surgical-resume nodes (``act.resume``, ``intervene.resume``) and
+    their edges were removed because they were dead code — the driver
+    always points the cursor at ``perceive.main``.
 
-    This guard pins the close-out: ``act_subgraph.yaml`` must NOT carry
-    the ``intervene.resume → act.approve.gate`` inner edge (the design
-    that never worked), and ``phase_main.yaml`` MUST carry the
-    ``act.resume`` subgraph delegate.
+    This guard pins the design: the outer YAML must NOT carry
+    ``act.resume`` or ``intervene.resume`` nodes, and must have
+    ``intervene.interrupt`` for the pause path.
     """
     from pathlib import Path
 
@@ -297,54 +290,36 @@ def test_gate_resume_path_is_outer_level_act_resume_delegate() -> None:
 
     repo_root = Path(__file__).resolve().parents[2]
 
-    act_bundle = yaml.safe_load(
-        (repo_root / "bundles" / "act" / "act_subgraph.yaml").read_text(encoding="utf-8")
-    )
-    act_edges = act_bundle.get("edges", ()) or ()
-    inner_resume_edges = [
-        e
-        for e in act_edges
-        if isinstance(e, dict)
-        and e.get("from") == "intervene.resume"
-        and e.get("to") == "act.approve.gate"
-    ]
-    assert not inner_resume_edges, (
-        "intervene.resume → act.approve.gate inner edge present in "
-        "bundles/act/act_subgraph.yaml; m1 close-out removed it because "
-        "the kernel re-projection hook ADR-0237 §6 promised was never "
-        "implemented. Resume reaches act.approve.gate via the outer "
-        "act.resume subgraph delegate (entry_node override)."
-    )
-
     outer_spec = yaml.safe_load(
         (repo_root / "bundles" / "outer" / "phase_main.yaml").read_text(encoding="utf-8")
     )
     outer_nodes = outer_spec.get("nodes", ()) or ()
-    act_resume_nodes = [
-        n for n in outer_nodes
-        if isinstance(n, dict) and n.get("id") == "act.resume"
-    ]
-    assert act_resume_nodes, (
-        "act.resume outer subgraph delegate missing from "
-        "bundles/outer/phase_main.yaml; resume path lost its outer entry."
+    node_ids = {n.get("id") for n in outer_nodes if isinstance(n, dict)}
+
+    assert "act.resume" not in node_ids, (
+        "act.resume node present in bundles/outer/phase_main.yaml; "
+        "full-restart resume design removed it (driver.py restarts "
+        "from perceive.main with the human answer folded into state)."
     )
-    resume_node = act_resume_nodes[0]
-    sub_spec_ref = resume_node.get("sub_spec_ref") or {}
-    assert sub_spec_ref.get("entry_node") == "act.approve.gate", (
-        f"act.resume entry_node must be 'act.approve.gate', "
-        f"got {sub_spec_ref.get('entry_node')!r}"
+    assert "intervene.resume" not in node_ids, (
+        "intervene.resume node present in bundles/outer/phase_main.yaml; "
+        "full-restart resume design removed it."
+    )
+    assert "intervene.interrupt" in node_ids, (
+        "intervene.interrupt node missing from outer plan; "
+        "the HITL pause path requires this node."
     )
 
     outer_edges = outer_spec.get("edges", ()) or ()
-    resume_cycle_edges = [
+    resume_edges = [
         e for e in outer_edges
         if isinstance(e, dict)
-        and e.get("from") == "intervene.resume"
-        and e.get("to") == "act.resume"
+        and (e.get("from") == "intervene.resume" or e.get("to") == "intervene.resume"
+             or e.get("from") == "act.resume" or e.get("to") == "act.resume")
     ]
-    assert resume_cycle_edges, (
-        "intervene.resume → act.resume outer edge missing; the resume "
-        "cycle is broken — a paused run cannot re-enter act.approve.gate."
+    assert not resume_edges, (
+        "Edges referencing intervene.resume or act.resume present in "
+        "outer plan; full-restart resume design removed them."
     )
 
 

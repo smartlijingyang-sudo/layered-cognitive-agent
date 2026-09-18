@@ -172,12 +172,12 @@ def _paused_outcome_parts(pause: dict, *, plan_ref: str, visits: tuple) -> tuple
         name = getattr(visit, "node_id", None)
         if isinstance(name, str) and name:
             counts[name] = counts.get(name, 0) + 1
-    # Resume restarts the turn at perception with the human answer already
-    # in state (runtime_loop splices it before re-entry). Re-entering
-    # mid-graph (intervene.resume) would need the kernel to re-seed the
-    # persisted Command AND the original pending Decision — neither is
-    # seeded today, so point the durable cursor at the outer entry whose
-    # declared inputs are empty.
+    # Full-restart resume design: the human answer is folded into state
+    # via HumanAnswerResumeInputAdapter, and the graph re-runs from
+    # perceive.main. The LLM sees the question-and-answer in full
+    # conversational context and reasons about next steps. This matches
+    # the industry pattern (LangGraph resume-and-think) and avoids the
+    # complexity of mid-graph re-entry with typed port seeding.
     cursor = PhaseRunCursor(
         plan_ref=plan_ref,
         node_id="perceive.main",

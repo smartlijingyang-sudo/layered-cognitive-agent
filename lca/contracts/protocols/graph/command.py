@@ -1,15 +1,14 @@
-"""Command — typed control-plane port for ``intervene`` subgraph.
+"""Command — typed control-plane port for HITL pause.
 
-Per ADR-0228 §Decision 4: kernel reads a persisted ``Command`` from the
-spine (observation) and re-projects it as a typed port via the
-``intervene.resume`` node. The ``Command`` becomes a typed input to the
-``think`` phase, replacing the implicit ``ask_user`` path through
-``Decision.action_type``.
+Per ADR-0228 §Decision 4: ``intervene.interrupt`` creates a ``Command``
+as a typed record of the pause. The driver (driver.py) detects the
+pause signal and restarts the graph from ``perceive.main`` with the
+human answer folded into state. ``Command`` is a Pydantic-frozen
+``extra="forbid"`` cross-graph DTO.
 
 ``Command`` is a control-plane artifact (it changes which node executes
 next), but every emission lands in the journal as a ``SessionEvent``
-first (observation), and the kernel reads from the journal projection —
-not from a parallel channel. AGENTS.md §3 C7.
+first (observation). AGENTS.md §3 C7.
 """
 
 from __future__ import annotations

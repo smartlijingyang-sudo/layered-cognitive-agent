@@ -114,7 +114,6 @@ from lca.nodes.effect.pre_dispatch_envelope_check import (
     EffectPreDispatchEnvelopeCheckExecutor,
 )
 from lca.nodes.intervene.approve_gate import ApproveGateExecutor
-from lca.nodes.intervene.resume import ResumeExecutor
 
 BUNDLE_PATH = (
     Path(__file__).resolve().parent.parent.parent / "bundles" / "act" / "act_subgraph.yaml"

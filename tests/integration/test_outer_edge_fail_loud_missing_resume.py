@@ -1,11 +1,10 @@
-"""PR-1 acceptance — boot fail-loud when act.approve.gate lacks resume edge.
+"""Validator acceptance — outer plan must consume approval_routing.
 
-HITL without a resume edge is unsafe: an interrupt can pause a run
-but never recover. PR-1 makes this fail-loud at boot: any plan that
-declares ``act.approve.gate`` must also declare a cross-subgraph
-``intervene.resume → act.approve.gate`` edge. The check is per-plan
-(both the outer plan and the inner act_subgraph plan that hosts the
-gate's executor must satisfy it).
+The full-restart HITL resume design (driver.py restarts from perceive.main)
+does not require an ``intervene.resume → act.approve.gate`` edge. The
+validator now checks that the outer plan consumes ``approval_routing.next_hint``
+via edge predicates so approve-interrupt and approve-rejected outcomes
+have somewhere to land.
 """
 
 from __future__ import annotations
@@ -19,11 +18,7 @@ from lca.framework.graph.lifter import lift_graph_spec
 
 
 def _apply_entry_fallback(mapping):
-    """Mirror ``_apply_entry_fallback`` from ``lca_kernel.boot.plan_validation``.
-
-    Mark the first node as :class:`Plan.entry` if no node carries
-    ``entry: True`` — same shape the production validator uses.
-    """
+    """Mirror ``_apply_entry_fallback`` from ``lca_kernel.boot.plan_validation``."""
     spec = dict(mapping)
     nodes = list(spec.get("nodes") or ())
     if nodes and not any(
@@ -34,36 +29,31 @@ def _apply_entry_fallback(mapping):
     return spec
 
 
-def test_missing_approval_resume_node_raises_planlifterror(tmp_path: Path) -> None:
-    """profile 含 act.approve.gate 但缺 intervene.resume → act.approve.gate 边 → PlanLiftError。"""
+def test_outer_plan_must_consume_approval_routing(tmp_path: Path) -> None:
+    """Outer plan with act.main but no approval_routing consumer → PlanLiftError."""
     bad_yaml = tmp_path / "bad.yaml"
     bad_yaml.write_text(
         dedent(
             """\
-            id: bad.subgraph
-            region: act
+            id: bad.outer
+            region: agent
             nodes:
-              - id: act.authorize
-                factory: act.authorize
-                inputs: [decision]
-                outputs: [decision, approval_required]
-              - id: act.envelope
-                factory: act.envelope
-                inputs: [decision]
-                outputs: [envelope]
-              - id: act.approve.gate
-                factory: act.approve.gate
-                inputs: [decision]
-                outputs: [decision, routing]
+              - id: act.main
+                region: phase:act
+                sub_spec_ref:
+                  plan_ref: bundles/act/act_subgraph.yaml
+                  entry_node: act.validate
+                  binding_edge: act.main
+                declared_inputs: [decision]
+                declared_outputs: [decision, should_terminate, approval_routing]
               - id: terminal.commit
+                region: phase:terminal
                 binding: terminate
                 terminal: true
-                inputs: [decision]
-                outputs: [terminal_outcome]
+                declared_inputs: [decision]
+                declared_outputs: [terminal_outcome]
             edges:
-              - {from: act.authorize, to: act.approve.gate, when: true}
-              - {from: act.approve.gate, to: act.envelope, when: true}
-              # 故意缺 intervene.resume → act.approve.gate 跨子图 resume 边
+              - {from: act.main, to: terminal.commit, when: true}
             """
         ),
         encoding="utf-8",
@@ -74,56 +64,42 @@ def test_missing_approval_resume_node_raises_planlifterror(tmp_path: Path) -> No
 
     with pytest.raises(Exception) as exc:
         lift_graph_spec(spec)
-    # We assert on a substring so the test is robust to the exact
-    # error message wording. The lifter uses PlanLiftError for typed
-    # plan failures; we accept any subclass that mentions the gate.
     message = str(exc.value)
-    assert "act.approve.gate" in message, (
-        "lifter must reference act.approve.gate in the failure message "
-        "(node_id=act.approve.gate is the SSOT for the fail-loud "
-        "diagnostic); got: " + message
-    )
-    assert "resume" in message.lower(), (
-        "lifter must explain why the resume edge is required; got: "
-        + message
+    assert "approval_routing" in message, (
+        "validator must reference approval_routing in the failure message; got: " + message
     )
 
 
-def test_approval_resume_node_edge_present_passes_lift(tmp_path: Path) -> None:
-    """Negative control: plan WITH the resume edge lifts cleanly."""
+def test_outer_plan_with_approval_routing_consumer_passes_lift(tmp_path: Path) -> None:
+    """Negative control: outer plan that consumes approval_routing lifts cleanly."""
     good_yaml = tmp_path / "good.yaml"
     good_yaml.write_text(
         dedent(
             """\
-            id: good.subgraph
-            region: act
-            approval_resume_node: act.approve.gate
+            id: good.outer
+            region: agent
             nodes:
-              - id: act.authorize
-                factory: act.authorize
-                inputs: [decision]
-                outputs: [decision, approval_required]
-              - id: act.envelope
-                factory: act.envelope
-                inputs: [decision]
-                outputs: [envelope]
-              - id: act.approve.gate
-                factory: act.approve.gate
-                inputs: [decision]
-                outputs: [decision, routing]
-              - id: intervene.resume
-                factory: intervene.resume
-                inputs: [command]
-                outputs: [decision]
+              - id: act.main
+                region: phase:act
+                sub_spec_ref:
+                  plan_ref: bundles/act/act_subgraph.yaml
+                  entry_node: act.validate
+                  binding_edge: act.main
+                declared_inputs: [decision]
+                declared_outputs: [decision, should_terminate, approval_routing]
               - id: terminal.commit
+                region: phase:terminal
                 binding: terminate
                 terminal: true
-                inputs: [decision]
-                outputs: [terminal_outcome]
+                declared_inputs: [decision]
+                declared_outputs: [terminal_outcome]
             edges:
-              - {from: act.authorize, to: act.approve.gate, when: true}
-              - {from: act.approve.gate, to: act.envelope, when: true}
-              - {from: intervene.resume, to: act.approve.gate, when: true}
+              - from: act.main
+                to: terminal.commit
+                when:
+                  kind: eq
+                  port: { name: approval_routing, field: next_hint }
+                  value: approve_rejected
             """
         ),
         encoding="utf-8",
@@ -132,19 +108,11 @@ def test_approval_resume_node_edge_present_passes_lift(tmp_path: Path) -> None:
     raw = __import__("yaml").safe_load(good_yaml.read_text(encoding="utf-8"))
     spec = _apply_entry_fallback(raw)
     plan = lift_graph_spec(spec)
-    assert any(n.id == "act.approve.gate" for n in plan.nodes)
-    assert any(
-        e.source == "intervene.resume" and e.target == "act.approve.gate"
-        for e in plan.edges
-    )
+    assert any(n.id == "act.main" for n in plan.nodes)
 
 
-def test_plan_without_approve_gate_does_not_require_resume_edge(tmp_path: Path) -> None:
-    """Negative control: a plan without act.approve.gate is not affected.
-
-    The fail-loud check is gated on ``act.approve.gate in node_ids``;
-    plans that don't carry the gate must lift without the resume edge.
-    """
+def test_plan_without_approve_gate_does_not_require_routing_consumer(tmp_path: Path) -> None:
+    """Negative control: a plan without act.main/approve.gate is not affected."""
     plain_yaml = tmp_path / "plain.yaml"
     plain_yaml.write_text(
         dedent(

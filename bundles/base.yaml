@@ -101,14 +101,6 @@ entries:
   name: phase_think_gate
   $module: lca.nodes.think.gate
   config: {}
-# ADR-0228 §Decision 4 + §Decision 6: intervene is a cross-phase
-# subgraph. ``intervene.resume`` is the typed-boundary node that
-# re-feeds the journal-persisted ``Command`` into think as a
-# typed ``Decision`` port.
-- id: lca.nodes.intervene.resume
-  name: lca_nodes_intervene_resume
-  $module: lca.nodes.intervene.resume
-  config: {}
 - id: phase.think.reason.plan
   name: phase_think_reason_plan
   $module: lca.nodes.think.reason.plan

@@ -72,8 +72,8 @@ nodes:
   # Routing semantics (typed ``RoutingDecision.next_hint``):
   #   approve_skipped   → act.envelope (decision.needs_approval=False)
   #   approve_interrupt → outer intervene.interrupt (no Command yet)
-  #   approve_approved  → act.envelope (Command.kind == "approve")
-  #   approve_rejected  → outer terminal.commit (reject/redirect/resume-timeout)
+  #   approve_approved  → act.envelope (reserved for future surgical resume)
+  #   approve_rejected  → outer terminal.commit (reject/redirect)
   #
   # Only the approve-skipped/approved branches have an inner edge to
   # act.envelope; approve_interrupt/approved-rejected don't fan out
@@ -84,10 +84,9 @@ nodes:
     factory: act.approve.gate
     # ``decision`` is the typed upstream Decision (carries
     # needs_approval); ``approval_required`` is the boolean computed by
-    # act.authorize. ``command`` is optional (consumed only on the
-    # resume path when the outer ``act.resume`` subgraph delegate
-    # re-enters this gate with the persisted Command forwarded via
-    # the kernel-wide port registry).
+    # act.authorize. ``command`` is optional and unused in the current
+    # full-restart resume path (driver.py restarts from perceive.main
+    # with the human answer folded into state).
     inputs:
       - decision
       - approval_required
@@ -196,21 +195,6 @@ nodes:
     config:
       emit_on_enter: []
       emit_on_exit: [phase.act.fold.end]
-
-  # ADR-0237 / PR-1b close-out: the original subgraph-internal
-  # ``intervene.resume`` stub node + ``intervene.resume → act.approve.gate``
-  # edge were a workaround that relied on an unrealised kernel
-  # re-projection hook (ADR-0237 §6 promised "kernel re-projects the
-  # persisted Command into the subgraph's port registry before
-  # entering this stub" — no such hook exists in
-  # SubgraphStrategy.run / PortRegistry). The resume path now goes
-  # through the outer-level ``act.resume`` subgraph delegate in
-  # bundles/outer/phase_main.yaml, which re-enters this same subgraph
-  # at ``entry_node=act.approve.gate`` with ``command`` forwarded
-  # through the outer ``declared_inputs``. The per-plan resume-edge
-  # validator (PR-1 lifter check) is satisfied because the outer
-  # ``intervene.resume → act.resume`` edge is the resume-edge target
-  # consumed at outer-plan lift time.
 
   # PR-3.8.5: 1:1 receipt join typed-boundary node. Consumes the
   # ``receipts`` list port (emitted by effect.execute after PR-3.8.5
