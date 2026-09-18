@@ -97,6 +97,61 @@ def test_record_step_tool_call_with_no_arguments_omits_field() -> None:
     assert "arguments_summary" not in captured[0]
 
 
+def test_record_step_tool_call_with_status_marks_pending_approval() -> None:
+    captured: list[dict[str, Any]] = []
+
+    def fake_publish_ep(
+        ep: str,
+        payload: dict[str, Any],
+        *,
+        state: Any = None,
+        session: Any = None,
+        actor: str = "body",
+    ) -> None:
+        captured.append(dict(payload))
+
+    with patch(
+        "lca.loop.commit.tool_journal.publish_ep_bound",
+        side_effect=fake_publish_ep,
+    ):
+        record_step_tool_call(
+            tool_name="askUserQuestion",
+            invocation_id="toolu_pending",
+            arguments={"questions": [{"question": "name"}]},
+            status="pending_approval",
+        )
+
+    assert captured[0]["tool_name"] == "askUserQuestion"
+    assert captured[0]["invocation_id"] == "toolu_pending"
+    assert captured[0]["status"] == "pending_approval"
+
+
+def test_record_step_tool_call_omits_status_when_not_supplied() -> None:
+    captured: list[dict[str, Any]] = []
+
+    def fake_publish_ep(
+        ep: str,
+        payload: dict[str, Any],
+        *,
+        state: Any = None,
+        session: Any = None,
+        actor: str = "body",
+    ) -> None:
+        captured.append(dict(payload))
+
+    with patch(
+        "lca.loop.commit.tool_journal.publish_ep_bound",
+        side_effect=fake_publish_ep,
+    ):
+        record_step_tool_call(
+            tool_name="runCommand",
+            invocation_id="toolu_ok",
+            arguments={"command": "echo hi"},
+        )
+
+    assert "status" not in captured[0]
+
+
 def test_record_step_tool_result_publishes_step_tool_result_record_ep() -> None:
     captured: list[tuple[str, dict[str, Any]]] = []
 

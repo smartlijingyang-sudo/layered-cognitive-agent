@@ -336,6 +336,7 @@ def record_step_tool_call(
     invocation_id: str,
     arguments: dict[str, Any] | None,
     arguments_summary: str = "",
+    status: str = "",
     state: AgentState | None = None,
     session: object | None = None,
     actor: str = "body",
@@ -347,7 +348,9 @@ def record_step_tool_call(
     tool_journal). Payload fields mirror what ``StdLoopCursor.record_tool_call``
     emits (excluding cursor-only fields ``incarnation`` / ``plan_ref`` /
     ``step_index`` / ``call_seq``, which are injected by the cursor itself
-    on its own path and never reach the business path).
+    on its own path and never reach the business path). ``status`` marks
+    observed-but-not-executed calls (``pending_approval``) so health derivers
+    can distinguish them from orphaned executions.
     """
     step, run_id = _phase_tool_context()
     payload: dict[str, Any] = {
@@ -359,6 +362,8 @@ def record_step_tool_call(
     }
     if arguments_summary:
         payload["arguments_summary"] = arguments_summary
+    if status:
+        payload["status"] = status
     return publish_ep_bound(
         "step.tool_call.record",
         payload,

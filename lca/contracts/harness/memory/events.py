@@ -308,6 +308,7 @@ class SessionCheckpoint:
     """
 
     status: str
+    pending_tools_calling: list[dict[str, Any]] | None = None
 
 
 @session_event("gate.decided.v1", visibility="model")

@@ -98,6 +98,50 @@ def test_session_checkpoint_forwards_pending_tools_calling_when_present() -> Non
     assert "pending_tools_calling" not in bare["event"]
 
 
+def test_session_checkpoint_dataclass_pending_tools_flows_to_step_start() -> None:
+    """The ``SessionCheckpoint`` field reaches the WS ``step_start`` pause pair."""
+    from dataclasses import asdict
+
+    from lca.application.runtime.coordinator.event_translator import EventTranslator
+    from lca.contracts.harness.memory.events import SessionCheckpoint
+
+    checkpoint = SessionCheckpoint(
+        status="waiting_input",
+        pending_tools_calling=[
+            {
+                "tool_name": "askUserQuestion",
+                "call_id": "toolu_1",
+                "arguments": {"questions": []},
+            }
+        ],
+    )
+    stamped = catalog_session_event_to_stamped(
+        "session.checkpoint.v1",
+        asdict(checkpoint),
+    )
+    assert stamped is not None
+    assert stamped["event"]["pending_tools_calling"] == [
+        {
+            "tool_name": "askUserQuestion",
+            "call_id": "toolu_1",
+            "arguments": {"questions": []},
+        }
+    ]
+    out = EventTranslator().translate(stamped)
+    assert isinstance(out, list)
+    step_start = out[0]
+    assert step_start["type"] == "step_start"
+    assert step_start["data"]["phase"] == "human_approval"
+    assert step_start["data"]["requiresApproval"] is True
+    assert step_start["data"]["pendingToolsCalling"] == [
+        {
+            "tool_name": "askUserQuestion",
+            "call_id": "toolu_1",
+            "arguments": {"questions": []},
+        }
+    ]
+
+
 def test_body_tool_execute_end_spine_is_suppressed() -> None:
     assert is_suppressed_spine_ep("body.tool.execute.end")
     assert (

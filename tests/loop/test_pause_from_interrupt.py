@@ -51,7 +51,11 @@ def _pause_visit(node_id: str = "intervene.interrupt", occurrence: int = 1):
         next_hint="intervene.resume",
     )
     visits = tuple(
-        SimpleNamespace(node_id=node_id, outputs={"decision": decision, "routing": routing})
+        SimpleNamespace(
+            node_id=node_id,
+            inputs={"decision": decision},
+            outputs={"routing": routing},
+        )
         for _ in range(occurrence)
     )
     return visits, decision
@@ -101,6 +105,24 @@ def test_paused_parts_shape() -> None:
     assert approval["approval_id"] == "plan-1:intervene.interrupt:1"
     assert approval["type"] == "ask_user_question"
     assert approval["questions"][0]["question"] == "Which color?"
+    assert approval["tool_calls"] == [
+        {
+            "call_id": "c1",
+            "tool_name": "askUserQuestion",
+            "arguments": {
+                "questions": [
+                    {
+                        "question": "Which color?",
+                        "header": "Color",
+                        "options": [
+                            {"label": "Red", "description": "red"},
+                            {"label": "Blue", "description": "blue"},
+                        ],
+                    }
+                ]
+            },
+        }
+    ]
 
 
 def test_paused_parts_tolerate_missing_questions() -> None:
@@ -115,20 +137,28 @@ def test_paused_parts_tolerate_missing_questions() -> None:
     visits = (
         SimpleNamespace(
             node_id="intervene.interrupt",
+            inputs={"decision": decision},
             outputs={
                 "routing": RoutingDecision(
                     action_type=ActionType.ASK_HUMAN,
                     should_terminate=True,
                     next_hint="intervene.resume",
-                ),
-                "decision": decision,
+                )
             },
         ),
     )
     pause = _pause_from_interrupt(visits)
     assert pause is not None
+    assert pause["decision"] is decision
     _, _, approval = _paused_outcome_parts(pause, plan_ref="p", visits=visits)
     assert approval["questions"] == []
+    assert approval["tool_calls"] == [
+        {
+            "call_id": "c9",
+            "tool_name": "askUserQuestion",
+            "arguments": {},
+        }
+    ]
 
 
 @pytest.mark.asyncio

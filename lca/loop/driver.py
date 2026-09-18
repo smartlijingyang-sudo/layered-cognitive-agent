@@ -113,10 +113,14 @@ def _pause_from_interrupt(visits: tuple) -> dict | None:
     visit, or ``None``. Only the documented pause protocol
     (``next_hint == "intervene.resume"``) maps to a paused outcome;
     other ``should_terminate`` terminals (e.g. control "stop"
-    verdicts) keep the existing stop-decision path.
+    verdicts) keep the existing stop-decision path. The paused
+    ``Decision`` is read from the visit's *inputs*: ``intervene.interrupt``
+    consumes ``decision`` and emits only ``command``/``routing``, so the
+    output port map never carries it.
     """
     for visit in reversed(tuple(visits) or ()):
         outs = getattr(visit, "outputs", None) or {}
+        ins = getattr(visit, "inputs", None) or {}
         if not isinstance(outs, dict):
             continue
         for value in outs.values():
@@ -132,7 +136,7 @@ def _pause_from_interrupt(visits: tuple) -> dict | None:
                 return {
                     "node_id": node_id,
                     "occurrence": max(occurrence, 1),
-                    "decision": outs.get("decision"),
+                    "decision": ins.get("decision") or outs.get("decision"),
                 }
     return None
 
@@ -166,6 +170,15 @@ def _paused_outcome_parts(pause: dict, *, plan_ref: str, visits: tuple) -> tuple
         "approval_id": approval_id,
         "type": "ask_user_question",
         "questions": questions,
+        "tool_calls": [
+            {
+                "call_id": getattr(call, "call_id", ""),
+                "tool_name": getattr(call, "tool_name", ""),
+                "arguments": getattr(call, "arguments", None),
+            }
+            for call in tool_calls
+            if isinstance(tool_calls, (list, tuple))
+        ],
     }
     counts: dict[str, int] = {}
     for visit in tuple(visits) or ():

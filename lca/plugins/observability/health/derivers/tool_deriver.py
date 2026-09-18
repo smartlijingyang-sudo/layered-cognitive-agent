@@ -124,12 +124,18 @@ def _check_tool_calls(
     calls: list[SpineEvent],
     results: list[SpineEvent],
 ) -> list[RunHealthCondition]:
-    """Emit failed conditions for tool_calls without a matching result."""
+    """Emit failed conditions for tool_calls without a matching result.
+
+    Calls marked ``status="pending_approval"`` are observed but not yet
+    authorized (HITL pause); they have no result by design and must not be
+    reported as orphaned executions.
+    """
     out: list[RunHealthCondition] = []
-    if not calls:
+    executed = [c for c in calls if c["payload"].get("status") != "pending_approval"]
+    if not executed:
         return out
     result_ids = {r["payload"].get("invocation_id") for r in results}
-    orphans = [c for c in calls if c["payload"].get("invocation_id") not in result_ids]
+    orphans = [c for c in executed if c["payload"].get("invocation_id") not in result_ids]
     if not orphans:
         return out
     evidence = tuple(make_evidence_ref(c) for c in orphans)

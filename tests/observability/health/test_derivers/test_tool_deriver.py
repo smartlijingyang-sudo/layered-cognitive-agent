@@ -121,6 +121,28 @@ def test_tool_returns_failed_when_tool_call_unmatched() -> None:
     assert any(c.status == "failed" and c.reason == "tool_orphan_dropped" for c in conditions)
 
 
+def test_tool_pending_approval_call_is_not_orphan() -> None:
+    """A ``step.tool_call.record`` marked ``status="pending_approval"`` has no result by
+    design (HITL pause) and must NOT be reported as an orphaned execution."""
+    from lca.plugins.observability.health.derivers.tool_deriver import ToolDeriver
+
+    deriver = ToolDeriver()
+    events = [
+        _tool_event(
+            event_id="run_x:1",
+            execution_point="step.tool_call.record",
+            payload={
+                "invocation_id": "toolu_pending",
+                "tool_name": "askUserQuestion",
+                "status": "pending_approval",
+            },
+        ),
+    ]
+    conditions = deriver.evaluate(events)
+    assert not any(c.reason == "tool_orphan_dropped" for c in conditions)
+    assert not any(c.status == "failed" for c in conditions)
+
+
 def test_tool_returns_failed_when_sandbox_enter_unmatched() -> None:
     """A ``body.sandbox.enter`` with no matching ``body.sandbox.exit`` is failed."""
     from lca.plugins.observability.health.derivers.tool_deriver import ToolDeriver
