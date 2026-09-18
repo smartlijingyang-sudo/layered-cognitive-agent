@@ -24,7 +24,7 @@ from lca.contracts.observability.closure.assistant_ep_closure import (
     ASSISTANT_CREATED,
 )
 from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
-from lca.plugins.assistant.home._home_layout import (
+from lca.plugins.domain.assistant._home_layout import (
     CONFIG_FACE_FILES,
     TEMPLATE_REGISTRY,
     AssistantCatalogError,
@@ -68,8 +68,7 @@ class TestTemplateRegistry:
         for entry in CONFIG_FACE_FILES:
             assert entry in rendered.files, f"{template_id} 缺 {entry}"
         assert rendered.files["BOOTSTRAP.md"].strip()
-        assert "小助" in rendered.files["IDENTITY.md"]
-        assert "{{ name }}" not in rendered.files["IDENTITY.md"]
+        assert "测试职责" in rendered.files["profile.json"]
 
     @pytest.mark.parametrize("template_id", ROLE_TEMPLATES)
     def test_role_template_profile_carries_emoji_and_soul(self, template_id: str) -> None:

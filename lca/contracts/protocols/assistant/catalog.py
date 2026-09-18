@@ -27,18 +27,32 @@ from lca.contracts.models.assistant.spec import AssistantSpec
 class CreateAssistantRequest:
     """``AssistantCatalog.create`` 入参。
 
-    模板 id 钉为 ``assistant.default``（ADR-0187 §3 D11）；初始 skill 由
-    Catalog 编排调用 overlay.install，Catalog 自身不实现安装逻辑。
+    两种创建路径：
+
+    1. **模板创建**（``from_role=None``）：用 ``template_id`` 对应的模板填充
+       SOUL.md 等配置面。向后兼容旧行为。
+    2. **角色档案创建**（``from_role=<role_id>``）：从 ``RoleCardResolver``
+       解析角色卡片，用卡片 backstory 填充 SOUL.md，emoji/title 从卡片
+       frontmatter 取。模板仍提供其他配置面的默认值（grants/tools/AGENTS）。
+
+    ``initial_skills`` 在 Home 物化后由 Catalog 编排 overlay.install 安装。
     """
 
     name: str
     description: str = ""
     template_id: str = "assistant.default"
     seed_user_md: str | None = None
+    from_role: str | None = None
+    """角色档案 role_id（如 'engineering/engineering-software-architect'）。
+    非空时 SOUL.md 内容来自 RoleCard.backstory，忽略模板中的 SOUL 文案。"""
+    initial_skills: tuple[str, ...] = ()
+    """创建后立即安装的 skill_id 列表。空 = 不预装。"""
 
     def __post_init__(self) -> None:
         if not self.name or not self.name.strip():
             raise ValueError("name 必须为非空助理名")
+        if self.from_role is not None and not self.from_role.strip():
+            raise ValueError("from_role 必须为非空字符串或 None")
 
 
 @dataclass(frozen=True)
@@ -75,7 +89,6 @@ class ProfilePatch:
     profile_name: str | None = None
     profile_description: str | None = None
     soul_md: str | None = None
-    identity_md: str | None = None
     user_md: str | None = None
     agents_md: str | None = None
     goals_yaml: str | None = None

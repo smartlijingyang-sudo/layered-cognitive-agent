@@ -46,19 +46,26 @@ class AssistantCreateTool(Tool):
         "创建一个新助理（个人助手）：在后端初始化其人设/目标/技能配置，"
         "并在前端助理列表注册入口。用户想「创建助理/新建助手」时使用。"
         "参数: name（助理名字，必填）、description（一句话职责）、"
-        "template_id（角色模板：assistant.default/assistant.research/"
-        "assistant.writing/assistant.coding/assistant.translation/"
-        "assistant.daily）、seed_user_md（可选：用户画像，提供则视为"
-        "引导式创建并完成 BOOTSTRAP）。"
+        "from_role（可选：角色档案 role_id，如 engineering/engineering-software-architect，"
+        "提供则 SOUL 从该角色卡片填充）、"
+        "template_id（角色模板：assistant.default 等，from_role 不填时使用）、"
+        "seed_user_md（可选：用户画像）。"
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
             "name": {"type": "string", "description": "助理名字（用户确认过的）"},
             "description": {"type": "string", "description": "一句话职责描述"},
+            "from_role": {
+                "type": "string",
+                "description": (
+                    "角色档案 role_id（如 engineering/engineering-software-architect）。"
+                    "提供时 SOUL.md 从该角色卡片 backstory 填充，assistant 自动获得该角色的人格。"
+                ),
+            },
             "template_id": {
                 "type": "string",
-                "description": "角色模板 id；默认 assistant.default",
+                "description": "角色模板 id；默认 assistant.default。from_role 提供时仍用模板填充其他配置面",
             },
             "seed_user_md": {
                 "type": "string",
@@ -100,7 +107,9 @@ class AssistantCreateTool(Tool):
         description = str(args.get("description") or "").strip()
         template_id = str(args.get("template_id") or "assistant.default")
         seed_user_md = args.get("seed_user_md")
+        from_role = args.get("from_role")
         seed = str(seed_user_md).strip() if isinstance(seed_user_md, str) else None
+        role = str(from_role).strip() if isinstance(from_role, str) and from_role.strip() else None
 
         try:
             handle = self._catalog.create(
@@ -109,6 +118,7 @@ class AssistantCreateTool(Tool):
                     description=description,
                     template_id=template_id,
                     seed_user_md=seed or None,
+                    from_role=role,
                 )
             )
         except Exception as exc:  # catalog raises typed AssistantCatalogError

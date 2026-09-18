@@ -51,7 +51,6 @@ def _agent_spec() -> AgentSpec:
 def _bootstrap() -> AssistantBootstrapRefs:
     return AssistantBootstrapRefs(
         soul_digest="soul-abc",
-        identity_digest="identity-abc",
         user_digest="user-abc",
         agents_digest="agents-abc",
     )
@@ -151,6 +150,28 @@ class TestCreateAssistantRequest:
             req = CreateAssistantRequest(name="Demo")
             req.name = "Other"  # type: ignore[misc]
 
+    def test_from_role_defaults_to_none(self) -> None:
+        req = CreateAssistantRequest(name="Demo")
+        assert req.from_role is None
+
+    def test_from_role_accepts_role_id(self) -> None:
+        req = CreateAssistantRequest(
+            name="Arch", from_role="engineering/engineering-software-architect"
+        )
+        assert req.from_role == "engineering/engineering-software-architect"
+
+    def test_from_role_empty_string_rejected(self) -> None:
+        with pytest.raises(ValueError, match="from_role"):
+            CreateAssistantRequest(name="Demo", from_role="")
+
+    def test_initial_skills_defaults_to_empty(self) -> None:
+        req = CreateAssistantRequest(name="Demo")
+        assert req.initial_skills == ()
+
+    def test_initial_skills_accepts_tuple(self) -> None:
+        req = CreateAssistantRequest(name="Demo", initial_skills=("pdf", "docx"))
+        assert req.initial_skills == ("pdf", "docx")
+
 
 # ── AssistantHandle / AssistantSummary ───────────────────────
 
@@ -191,7 +212,6 @@ class TestProfilePatch:
         assert patch.profile_name is None
         assert patch.profile_description is None
         assert patch.soul_md is None
-        assert patch.identity_md is None
         assert patch.user_md is None
         assert patch.agents_md is None
         assert patch.goals_yaml is None

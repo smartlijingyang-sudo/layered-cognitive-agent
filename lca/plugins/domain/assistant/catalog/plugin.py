@@ -125,11 +125,13 @@ class _AssistantCatalogImpl(AssistantCatalog):
         root: Path,
         event_emitter: Callable[[str, Mapping[str, Any]], Any] | None = None,
         clock: Callable[[], datetime] | None = None,
+        role_resolver: Any | None = None,
     ) -> None:
         self._root = root
         self._root.mkdir(parents=True, exist_ok=True)
         self._emit = event_emitter
         self._clock = clock or (lambda: datetime.now(UTC))
+        self._role_resolver = role_resolver
 
     # ── 公开面 ────────────────────────────────────────────────────────
 
@@ -157,6 +159,21 @@ class _AssistantCatalogImpl(AssistantCatalog):
 
         # 1. 物化文件(失败 ⇒ 半成品 Home 清理)
         rendered = render_template(req.template_id, name=req.name, description=req.description)
+
+        # 1b. from_role: 用角色卡片覆盖 SOUL.md 和 profile.json emoji
+        if req.from_role:
+            if self._role_resolver is None:
+                raise _CatalogConfigError(
+                    "from_role 需要 RoleCardResolver；当前 profile 未配置 assistant.role_resolver"
+                )
+            card = self._role_resolver.resolve(req.from_role)
+            rendered.files["SOUL.md"] = card.backstory
+            profile = json.loads(rendered.files["profile.json"])
+            if card.emoji:
+                profile["emoji"] = card.emoji
+            profile["role_id"] = req.from_role
+            rendered.files["profile.json"] = json.dumps(profile, ensure_ascii=False, indent=2)
+
         try:
             write_home_files(home.root, rendered.files)
         except Exception:
@@ -181,6 +198,8 @@ class _AssistantCatalogImpl(AssistantCatalog):
                 revision_seq=0,
                 home=home.root,
             )
+            if req.from_role:
+                manifest["role_id"] = req.from_role
             write_manifest(home.root, manifest)
         except Exception:
             cleanup_home(home.root)
@@ -236,7 +255,6 @@ class _AssistantCatalogImpl(AssistantCatalog):
 
         bootstrap = AssistantBootstrapRefs(
             soul_digest=declared_digests["SOUL.md"],
-            identity_digest=declared_digests["IDENTITY.md"],
             user_digest=declared_digests["USER.md"],
             agents_digest=declared_digests["AGENTS.md"],
         )
@@ -253,15 +271,13 @@ class _AssistantCatalogImpl(AssistantCatalog):
             template_id=template_id,
             profile_name=str(profile.get("name", "")),
             profile_description=str(profile.get("description", "")),
-            agent_spec=_placeholder_agent_spec(
-                name=str(profile.get("name", "")),
-                description=str(profile.get("description", "")),
-            ),
+            agent_spec=_build_agent_spec(str(home.root)),
             bootstrap=bootstrap,
             skill_ids=(),
             job_ids=(),
             grant_digest=_sha256_digest(home.root / "grants.yaml"),
             tools_policy_digest=_sha256_digest(home.root / "tools.yaml"),
+            role_id=str(manifest["role_id"]) if manifest.get("role_id") else None,
         )
 
     def list(self) -> tuple[AssistantSummary, ...]:
@@ -325,30 +341,33 @@ class _AssistantCatalogImpl(AssistantCatalog):
         self._emit(ASSISTANT_BOOTSTRAP_COMPLETED, payload.to_dict())
 
 
-# ── 占位 AgentSpec(PR-3 范围)────────────────────────────────────────
+# ── AgentSpec 构造 ────────────────────────────────────────────────
 
 
 class _PlaceholderLLM:
-    """PR-3 占位 LLM adapter;PR-4 RuntimeFactory 注入真 LLM resolver。"""
+    """占位 LLM adapter;运行时 RuntimeFactory 注入真 LLM resolver。"""
 
     async def complete(self, _prompt: str, **_kwargs: Any) -> Any:  # pragma: no cover
-        raise NotImplementedError("PR-3 占位 LLM;PR-4 RuntimeFactory 注入真 LLM")
+        raise NotImplementedError("占位 LLM;RuntimeFactory 注入真 LLM")
 
     async def stream(self, _prompt: str, **_kwargs: Any) -> Any:  # pragma: no cover
-        raise NotImplementedError("PR-3 占位 LLM;PR-4 RuntimeFactory 注入真 LLM")
+        raise NotImplementedError("占位 LLM;RuntimeFactory 注入真 LLM")
 
 
-def _placeholder_agent_spec(*, name: str, description: str) -> AgentSpec:
-    """构造最小可工作的占位 AgentSpec(PR-3 范围)。
+def _build_agent_spec(home_path: str) -> AgentSpec:
+    """从 AssistantHome 构造 AgentSpec：RoleProfile 来自 persona 解析。
 
-    PR-4 才把具体 llm/tools/budget 填实;本 PR 的 ``AssistantSpec.agent_spec``
-    仅承载 ``profile`` 字段以满足 dataclass 形状,不参与 resolve 期编译。
+    LLM adapter 仍为占位（运行时由 RuntimeFactory 注入）。
+    RoleProfile 使用真实数据：name → role, description → goal, SOUL → backstory。
     """
+    from lca.plugins.assistant.persona.persona import persona_from_home
+
+    persona = persona_from_home(home_path)
     return AgentSpec(
         profile=RoleProfile(
-            role="assistant.role",
-            goal=description or "be helpful",
-            backstory=f"PR-3 占位;assistant={name}",
+            role=persona.role or "assistant",
+            goal=persona.goal or "be helpful",
+            backstory=persona.backstory or "",
             tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
         ),
         llm=_PlaceholderLLM(),  # type: ignore[arg-type]
@@ -552,7 +571,11 @@ async def setup(ctx: PluginContext, config: Config) -> None:
             producer=type(None),
         )
 
-    catalog = _AssistantCatalogImpl(root=root, event_emitter=_emit)
+    catalog = _AssistantCatalogImpl(
+        root=root,
+        event_emitter=_emit,
+        role_resolver=_try_build_role_resolver(),
+    )
     ctx.provide(ASSISTANT_CATALOG.key, catalog)
 
     # 补登 assistant EP 描述符:PR-2 已落 contracts 层 _ASSISTANT_EVENT_DESCRIPTORS;
@@ -574,6 +597,17 @@ async def setup(ctx: PluginContext, config: Config) -> None:
 
 # 用于测试在不接 ctx 时直接构造
 AssistantCatalogImpl = _AssistantCatalogImpl
+
+
+def _try_build_role_resolver() -> Any | None:
+    """尝试构造 FileRoleCardResolver；roles/ 不可用则返回 None（不阻断 catalog boot）。"""
+    try:
+        from lca.infrastructure.tools.assistant.role_card_resolver import FileRoleCardResolver
+
+        return FileRoleCardResolver()
+    except Exception:
+        return None
+
 
 __all__ = [
     "AssistantAlreadyExists",

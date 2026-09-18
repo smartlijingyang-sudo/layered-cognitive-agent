@@ -240,6 +240,7 @@ async def create_assistant(request: Request) -> JSONResponse:
     description = body.get("description") or ""
     template_id = body.get("template_id") or "assistant.default"
     seed_user_md = body.get("seed_user_md") or None
+    from_role = body.get("from_role") or None
     if not isinstance(description, str):
         return _error_envelope(
             "invalid_request",
@@ -253,6 +254,13 @@ async def create_assistant(request: Request) -> JSONResponse:
             status_code=400,
             error_type="invalid_request",
             detail="template_id 必须为字符串",
+        )
+    if from_role is not None and not isinstance(from_role, str):
+        return _error_envelope(
+            "invalid_request",
+            status_code=400,
+            error_type="invalid_request",
+            detail="from_role 必须为字符串",
         )
     if seed_user_md is not None and not isinstance(seed_user_md, str):
         return _error_envelope(
@@ -269,6 +277,7 @@ async def create_assistant(request: Request) -> JSONResponse:
                 description=description.strip(),
                 template_id=template_id,
                 seed_user_md=seed_user_md,
+                from_role=from_role.strip() if isinstance(from_role, str) and from_role.strip() else None,
             )
         )
     except AssistantCatalogError as exc:
@@ -376,7 +385,6 @@ async def get_assistant(request: Request) -> JSONResponse:
             "profile_description": spec.profile_description,
             "bootstrap": {
                 "soul_digest": spec.bootstrap.soul_digest,
-                "identity_digest": spec.bootstrap.identity_digest,
                 "user_digest": spec.bootstrap.user_digest,
                 "agents_digest": spec.bootstrap.agents_digest,
             },
@@ -469,6 +477,132 @@ async def install_assistant_skill(request: Request) -> JSONResponse:
     return _json({"receipt": dataclasses.asdict(receipt)}, status_code=200)
 
 
+async def import_lobehub_agent(request: Request) -> JSONResponse:
+    """``POST /v1/assistants/import-lobehub`` — 从 LobeHub agent JSON 导入助理。
+
+    LobeHub agent JSON 形态：
+    ``{title, description, avatar, systemRole, plugins?, openingMessage?}``
+
+    映射规则：
+    - title → name
+    - description → description
+    - avatar → emoji（取第一个字符如果是 emoji，否则用默认 🤖）
+    - systemRole → SOUL.md 全文
+
+    201 + assistant handle on success。
+    """
+    catalog = _catalog_from_request(request)
+    if catalog is None:
+        return _not_implemented("catalog_unavailable", "import_lobehub")
+
+    try:
+        body = await request.json()
+    except (ValueError, OSError):
+        return _error_envelope("invalid_json", status_code=400, error_type="invalid_request")
+    if not isinstance(body, dict):
+        return _error_envelope(
+            "invalid_request",
+            status_code=400,
+            error_type="invalid_request",
+            detail="body 必须是 JSON object",
+        )
+
+    name = body.get("title") or body.get("name")
+    if not isinstance(name, str) or not name.strip():
+        return _error_envelope(
+            "invalid_request",
+            status_code=400,
+            error_type="invalid_request",
+            detail="title/name 必须为非空字符串",
+        )
+    description = str(body.get("description") or "").strip()
+    system_role = str(body.get("systemRole") or body.get("system_role") or "").strip()
+    avatar = str(body.get("avatar") or "").strip()
+
+    emoji = _extract_emoji(avatar)
+
+    from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
+
+    try:
+        handle = catalog.create(
+            CreateAssistantRequest(
+                name=name.strip(),
+                description=description,
+                template_id="assistant.default",
+                seed_user_md=None,
+            )
+        )
+    except AssistantCatalogError as exc:
+        return _error_envelope(
+            "invalid_request",
+            status_code=400,
+            error_type="invalid_request",
+            detail=str(exc),
+        )
+
+    from pathlib import Path
+
+    home = Path(handle.home_path)
+
+    if system_role:
+        (home / "SOUL.md").write_text(system_role, encoding="utf-8")
+
+    if emoji:
+        import json
+
+        profile_path = home / "profile.json"
+        profile = json.loads(profile_path.read_text(encoding="utf-8"))
+        profile["emoji"] = emoji
+        profile["source"] = "lobehub"
+        profile_path.write_text(
+            json.dumps(profile, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+    from lca.plugins.domain.assistant._home_layout import (
+        build_manifest,
+        load_manifest,
+        write_manifest,
+    )
+
+    manifest = load_manifest(home, handle.assistant_id)
+    new_manifest = build_manifest(
+        assistant_id=handle.assistant_id,
+        template_id="assistant.default",
+        revision_seq=int(manifest.get("revision_seq", 0)) + (1 if system_role or emoji else 0),
+        home=home,
+    )
+    if system_role or emoji:
+        new_manifest["source"] = "lobehub"
+        write_manifest(home, new_manifest)
+
+    return _json(
+        {
+            "assistant_id": handle.assistant_id,
+            "home_path": handle.home_path,
+            "revision_seq": handle.revision_seq,
+            "source": "lobehub",
+            "profile": _profile_view(handle.home_path),
+        },
+        status_code=201,
+    )
+
+
+def _extract_emoji(avatar: str) -> str:
+    """从 LobeHub avatar 字段提取 emoji。
+
+    LobeHub avatar 可以是 emoji 字符或 URL。如果是 emoji 则返回，
+    否则返回空字符串（让 catalog 用默认 emoji）。
+    """
+    if not avatar:
+        return ""
+    if avatar.startswith(("http://", "https://", "/")):
+        return ""
+    if len(avatar) <= 4:
+        return avatar
+    return ""
+
+
 async def retire_assistant(request: Request) -> JSONResponse:
     """``POST /v1/assistants/{assistant_id}/retire`` —— ``catalog.retire``."""
     if _catalog_from_request(request) is None:
@@ -519,6 +653,12 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
         "/v1/assistants",
         assistants_root,
         ("POST", "GET", "OPTIONS"),
+    ),
+    # import-lobehub must come before {assistant_id} to avoid path conflict
+    RouteSpec(
+        "/v1/assistants/import-lobehub",
+        import_lobehub_agent,
+        ("POST", "OPTIONS"),
     ),
     RouteSpec("/v1/assistants/{assistant_id}", get_assistant, ("GET", "OPTIONS")),
     RouteSpec(
@@ -613,6 +753,7 @@ __all__ = [
     "create_assistant_job",
     "fire_assistant_job",
     "get_assistant",
+    "import_lobehub_agent",
     "install_assistant_skill",
     "list_assistant_jobs",
     "list_assistants",

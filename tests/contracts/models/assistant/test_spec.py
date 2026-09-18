@@ -44,7 +44,6 @@ class _StubLLM:
 def _bootstrap() -> AssistantBootstrapRefs:
     return AssistantBootstrapRefs(
         soul_digest="soul-abc",
-        identity_digest="identity-abc",
         user_digest="user-abc",
         agents_digest="agents-abc",
     )
@@ -74,18 +73,16 @@ class TestAssistantBootstrapRefs:
     def test_construction_stores_digests(self) -> None:
         refs = _bootstrap()
         assert refs.soul_digest == "soul-abc"
-        assert refs.identity_digest == "identity-abc"
         assert refs.user_digest == "user-abc"
         assert refs.agents_digest == "agents-abc"
 
     @pytest.mark.parametrize(
         "field_name",
-        ["soul_digest", "identity_digest", "user_digest", "agents_digest"],
+        ["soul_digest", "user_digest", "agents_digest"],
     )
     def test_empty_digest_rejected(self, field_name: str) -> None:
         valid = {
             "soul_digest": "soul-abc",
-            "identity_digest": "identity-abc",
             "user_digest": "user-abc",
             "agents_digest": "agents-abc",
         }

@@ -5,12 +5,12 @@
 - plugin Manifest:provides=assistant.bootstrap / requires=assistant.catalog /
   layer=L4 / kind=SEAM / effects=NONE / test_suite 字符串对齐
 - BootstrapProjectionService.project(assistant_id):
-  * 返回 ContextManifest,5 个 item(SOUL/IDENTITY/USER/AGENTS/goals)
+  * 返回 ContextManifest,4 个 item(SOUL/USER/AGENTS/goals)
   * 不含 MEMORY 字面(I-A13 + PR-4 新不变量)
   * digest 不一致 ⇒ AssistantDigestMismatch 透传
   * 助理 home 缺失 ⇒ ValueError
 - project_home_to_context_manifest(纯函数):
-  * SOUL/IDENTITY/USER/AGENTS 内容 ⇒ ContextItem.payload.text
+  * SOUL/USER/AGENTS 内容 ⇒ ContextItem.payload.text
   * goals.yaml list/mapping 解析 ⇒ payload.goals
 - 跨助理隔离:助理 A 的 SOUL 不出现在助理 B 的 ContextManifest
 """
@@ -119,7 +119,7 @@ class TestPluginManifest:
 
 
 class TestProjectHomeToContextManifest:
-    def test_returns_context_manifest_with_five_items(
+    def test_returns_context_manifest_with_four_items(
         self,
         assistant_a: Any,
     ) -> None:
@@ -128,7 +128,7 @@ class TestProjectHomeToContextManifest:
             assistant_id=assistant_a.assistant_id,
         )
         assert isinstance(manifest, ContextManifest)
-        assert len(manifest.items) == 5  # SOUL/IDENTITY/USER/AGENTS/goals
+        assert len(manifest.items) == 4  # SOUL/USER/AGENTS/goals
 
     def test_items_have_assistant_provenance(
         self,
@@ -149,9 +149,9 @@ class TestProjectHomeToContextManifest:
             spec_home=Path(assistant_a.home_path),
             assistant_id=assistant_a.assistant_id,
         )
-        # AGENTS 文本 = tools.yaml / SOUL/IDENTITY/USER 各自文本
+        # AGENTS 文本 = tools.yaml / SOUL/USER 各自文本
         names = sorted(item.payload.get("name") for item in manifest.items)
-        assert names == ["AGENTS.md", "IDENTITY.md", "SOUL.md", "USER.md", "goals.yaml"]
+        assert names == ["AGENTS.md", "SOUL.md", "USER.md", "goals.yaml"]
 
     def test_goals_yaml_parsed(
         self,

@@ -39,12 +39,11 @@ def persona_from_home(home_path: str) -> AssistantPersona:
     description = str(profile.get("description") or "").strip()
 
     soul = _read_text(home / "SOUL.md")
-    identity = _read_text(home / "IDENTITY.md")
     user = _read_text(home / "USER.md")
     first_goal = _first_goal_name(home / "goals.yaml")
 
     goal = description or first_goal
-    parts = [text for text in (soul, identity, user) if text.strip()]
+    parts = [text for text in (soul, user) if text.strip()]
     backstory = "\n\n".join(parts)[:_BACKSTORY_MAX_CHARS]
     return AssistantPersona(
         role=name,

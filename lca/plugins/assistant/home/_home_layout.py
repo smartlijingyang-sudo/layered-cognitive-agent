@@ -55,7 +55,6 @@ SCHEMA_VERSION: int = 1
 CONFIG_FACE_FILES: tuple[str, ...] = (
     "profile.json",
     "SOUL.md",
-    "IDENTITY.md",
     "USER.md",
     "AGENTS.md",
     "goals.yaml",

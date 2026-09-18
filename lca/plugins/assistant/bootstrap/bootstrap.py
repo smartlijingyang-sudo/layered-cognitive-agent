@@ -1,12 +1,12 @@
 """assistant.bootstrap plugin —— ADR-0187 §7 PR-4。
 
-把 AssistantHome 的四个 bootstrap 配置面文件 + ``goals.yaml`` 投影进
+把 AssistantHome 的三个 bootstrap 配置面文件 + ``goals.yaml`` 投影进
 ``ContextManifest``；MEMORY.md / memory/ 不进（I-A13）。
 
 - 投影目标字段：
-  * ``workspace_instructions`` ← ``AGENTS.md``（SOUL/IDENTITY/USER/AGENTS 共占一组，
+  * ``workspace_instructions`` ← ``AGENTS.md``（SOUL/USER/AGENTS 共占一组，
     AGENTS 是工具用法约定）
-  * ``workspace_artifacts`` ← ``IDENTITY.md`` + ``goals.yaml`` 列表化
+  * ``workspace_artifacts`` ← ``goals.yaml`` 列表化
   * 另起两组 ``system`` ``ContextItem``：SOUL / USER
 - 投影只读 + 不写文件（``EffectClass.NONE``）。
 - ``provides=("assistant.bootstrap",)``；``requires=("assistant.catalog",)``。
@@ -49,11 +49,11 @@ from lca.plugins.assistant.home._home_layout import HomePaths, load_manifest
 
 _BOOTSTRAP_FACE_FILES: tuple[str, ...] = (
     "SOUL.md",
-    "IDENTITY.md",
     "USER.md",
     "AGENTS.md",
 )
-"""PR-4 投影目标文件：四个 bootstrap 配置面 + AGENTS 工具用法约定。"""
+"""PR-4 投影目标文件：三个 bootstrap 配置面 + AGENTS 工具用法约定。
+IDENTITY.md 已删除（身份信息由 profile.json SSOT 拥有）。"""
 
 # MEMORY.md / memory/ 必须在投影外（I-A13：记忆面不参与 digest 不进 manifest）；
 # 本插件代码不读取 / 不引用这两个字面路径；静态 grep 由 arch test 守住。
@@ -80,8 +80,8 @@ def project_home_to_context_manifest(
 ) -> ContextManifest:
     """从 AssistantHome 物化 ContextManifest（PR-4 投影函数）。
 
-    只读 ``SOUL.md`` / ``IDENTITY.md`` / ``USER.md`` / ``AGENTS.md`` + ``goals.yaml``
-    五个文件；MEMORY.md / memory/ 不读取。失败（文件缺失 / 读错误 / goals.yaml
+    只读 ``SOUL.md`` / ``USER.md`` / ``AGENTS.md`` + ``goals.yaml``
+    四个文件；MEMORY.md / memory/ 不读取。失败（文件缺失 / 读错误 / goals.yaml
     非 dict）⇒ ``ValueError``（fail-closed；不允许回落空 manifest）。
 
     Precondition：``spec_home`` 是 AssistantHome 根路径（assistant_id 子目录）；
@@ -103,9 +103,6 @@ def project_home_to_context_manifest(
         if face_name == "AGENTS.md":
             kind: ItemKind = "workspace_instructions"
             content_class = ContextClass.INSTRUCTION
-        elif face_name == "IDENTITY.md":
-            kind = "workspace_artifacts"
-            content_class = ContextClass.DATA
         else:
             # SOUL.md / USER.md → system prompt 一等公民（不进 prompt 时由
             # reasoner prompt assembler 决策；本 PR-4 只保证 ContextManifest

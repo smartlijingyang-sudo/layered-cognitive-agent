@@ -228,6 +228,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     app = getattr(handle, "app", None)
     if app is not None and hasattr(app, "state"):
         app.state.assistant_catalog = catalog
+        app.state.role_card_resolver = _try_build_role_card_resolver()
 
     if app is not None and hasattr(app, "router"):
         _mount_assistant_routes(ctx, app)
@@ -265,6 +266,18 @@ def _mount_assistant_routes(ctx: PluginContext, app: Any) -> None:
 
         inner: Any = ctx._runtime()  # type: ignore[attr-defined]
         inner.effect(_dispose, label=f"route:{spec.path}")
+
+
+def _try_build_role_card_resolver() -> Any | None:
+    """构造 FileRoleCardResolver；roles/ 不可用则返回 None。"""
+    try:
+        from lca.infrastructure.tools.assistant.role_card_resolver import (
+            FileRoleCardResolver,
+        )
+
+        return FileRoleCardResolver()
+    except Exception:
+        return None
 
 
 __all__ = ["AssistantFrontendBridge", "Config", "setup"]

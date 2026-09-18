@@ -28,22 +28,20 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class AssistantBootstrapRefs:
-    """bootstrap 配置面四个文件的 content digest。
+    """bootstrap 配置面三个文件的 content digest。
 
-    SOUL / IDENTITY / USER / AGENTS 是 resolve 期的 digest 校验锚点；
+    SOUL / USER / AGENTS 是 resolve 期的 digest 校验锚点；
     MEMORY.md 属追加真值，不参与 digest 与 ``revision_seq``（ADR-0187 §3 D2
-    真值分层 + I-A13）。
+    真值分层 + I-A13）。IDENTITY.md 已删除（身份信息由 profile.json SSOT 拥有）。
     """
 
     soul_digest: str
-    identity_digest: str
     user_digest: str
     agents_digest: str
 
     def __post_init__(self) -> None:
         for name, value in (
             ("soul_digest", self.soul_digest),
-            ("identity_digest", self.identity_digest),
             ("user_digest", self.user_digest),
             ("agents_digest", self.agents_digest),
         ):
@@ -89,6 +87,9 @@ class AssistantSpec:
     job_ids: tuple[str, ...]
     grant_digest: str
     tools_policy_digest: str
+    role_id: str | None = None
+    """创建时引用的角色档案 role_id（如 'engineering/engineering-software-architect'）。
+    None 表示用模板默认 SOUL 创建。"""
 
     def __post_init__(self) -> None:
         if not self.assistant_id or not self.assistant_id.strip():

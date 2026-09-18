@@ -201,7 +201,6 @@ class TestGet:
         assert spec.revision_seq == 0
         assert spec.template_id == "assistant.default"
         assert spec.bootstrap.soul_digest.startswith("sha256:")
-        assert spec.bootstrap.identity_digest.startswith("sha256:")
         assert spec.bootstrap.user_digest.startswith("sha256:")
         assert spec.bootstrap.agents_digest.startswith("sha256:")
         assert spec.grant_digest.startswith("sha256:")
@@ -319,7 +318,7 @@ class TestMemoryLayerDigestPolicy:
     ) -> None:
         """配置面写入必须触发 fail-closed(与上对照;双向 I-A13)。"""
         handle = catalog.create(request_default)
-        (Path(handle.home_path) / "IDENTITY.md").write_text("tampered", encoding="utf-8")
+        (Path(handle.home_path) / "USER.md").write_text("tampered", encoding="utf-8")
         with pytest.raises(AssistantDigestMismatch):
             catalog.get(handle.assistant_id)
 
