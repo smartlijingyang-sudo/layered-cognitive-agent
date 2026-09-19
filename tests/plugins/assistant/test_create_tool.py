@@ -256,6 +256,81 @@ class TestExecute:
         assert bridge.calls == []  # 创建失败不得触达前端注册
 
 
+class TestDefaultToolNames:
+    """默认工具名提供者经工具传入 Catalog（ADR-0243 D3 延伸）。"""
+
+    @pytest.mark.asyncio
+    async def test_default_tool_names_provider_passed_to_catalog(
+        self, catalog: AssistantCatalogImpl
+    ) -> None:
+        captured: list[CreateAssistantRequest] = []
+
+        class _RecordingCatalog:
+            def create(self, req: CreateAssistantRequest) -> AssistantHandle:
+                captured.append(req)
+                return AssistantHandle(
+                    assistant_id="asst_rec",
+                    home_path=str(catalog._root / "asst_rec"),
+                    revision_seq=0,
+                )
+
+        tool = AssistantCreateTool(
+            catalog=_RecordingCatalog(),  # type: ignore[arg-type]
+            default_tool_names=lambda: ("search", "readFile"),
+        )
+        obs = await tool.execute({"name": "小研"})
+        assert obs.success
+        assert len(captured) == 1
+        assert captured[0].default_tool_names == ("readFile", "search")
+
+    @pytest.mark.asyncio
+    async def test_default_tool_names_provider_failure_returns_empty(
+        self, catalog: AssistantCatalogImpl
+    ) -> None:
+        """提供者抛错 ⇒ fail-soft 返回空元组，保持模板 allow: []。"""
+        captured: list[CreateAssistantRequest] = []
+
+        class _RecordingCatalog:
+            def create(self, req: CreateAssistantRequest) -> AssistantHandle:
+                captured.append(req)
+                return AssistantHandle(
+                    assistant_id="asst_rec",
+                    home_path=str(catalog._root / "asst_rec"),
+                    revision_seq=0,
+                )
+
+        def _boom() -> tuple[str, ...]:
+            raise RuntimeError("materialize failed")
+
+        tool = AssistantCreateTool(
+            catalog=_RecordingCatalog(),  # type: ignore[arg-type]
+            default_tool_names=_boom,
+        )
+        obs = await tool.execute({"name": "小研"})
+        assert obs.success
+        assert len(captured) == 1
+        assert captured[0].default_tool_names == ()
+
+    @pytest.mark.asyncio
+    async def test_without_provider_returns_empty(self, catalog: AssistantCatalogImpl) -> None:
+        captured: list[CreateAssistantRequest] = []
+
+        class _RecordingCatalog:
+            def create(self, req: CreateAssistantRequest) -> AssistantHandle:
+                captured.append(req)
+                return AssistantHandle(
+                    assistant_id="asst_rec",
+                    home_path=str(catalog._root / "asst_rec"),
+                    revision_seq=0,
+                )
+
+        tool = AssistantCreateTool(catalog=_RecordingCatalog())  # type: ignore[arg-type]
+        obs = await tool.execute({"name": "小研"})
+        assert obs.success
+        assert len(captured) == 1
+        assert captured[0].default_tool_names == ()
+
+
 class TestToolContract:
     """Tool schema must enforce the wizard order (role before name)."""
 

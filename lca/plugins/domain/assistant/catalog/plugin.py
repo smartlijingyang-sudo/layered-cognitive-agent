@@ -190,6 +190,37 @@ def _list_materializable_global_skills(global_store: Any) -> tuple[str, ...]:
     )
 
 
+def _materialize_default_tools(home: Path, names: tuple[str, ...]) -> None:
+    """把平台默认工具名写入 ``{home}/tools.yaml`` 的 ``allow`` 列表。
+
+    保留模板 ``deny`` 与结构，仅把 ``allow`` 替换为去重排序后的工具名；
+    ``notes`` 改为创建时物化说明，使 Home 工具配置与 skills/ 对等显式可见
+    （ADR-0243 D3 延伸）。tools.yaml 在 ``CONFIG_FACE_FILES`` 内，
+    manifest digest 由 ``build_manifest`` / ``compute_digests`` 自动覆盖。
+    """
+    path = home / "tools.yaml"
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    tools = data.get("tools")
+    if not isinstance(tools, dict):
+        tools = {}
+        data["tools"] = tools
+    tools["allow"] = sorted(set(names))
+    tools.setdefault("deny", [])
+    data["notes"] = (
+        "创建时物化的平台默认工具集（与 skills/ 物化对等）；deny 逐个排除；"
+        "需授权工具由 grants.yaml 决定（C5 衰减）。收紧策略可经 revise_profile 修改。"
+    )
+    path.write_text(
+        yaml.safe_dump(data, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+
+
 class _AssistantCatalogImpl(AssistantCatalog):
     """Catalog 内部实现;通过 plugin ``setup`` 注入 ctx。
 
@@ -292,6 +323,11 @@ class _AssistantCatalogImpl(AssistantCatalog):
                     req.inherit_from, home.root
                 )
 
+            # 2b2. 默认工具物化：非继承创建且显式携带默认工具名时，写入 allow 列表，
+            #      使 Home 的工具配置与 skills/ 一样显式可见（ADR-0243 D3 延伸）。
+            if req.default_tool_names and not req.inherit_from:
+                _materialize_default_tools(home.root, req.default_tool_names)
+
             # 2c. Home 卫生:USER.md 不允许为空(ADR-0242 D2)
             _ensure_non_empty_user_md(home.root)
 
@@ -307,9 +343,7 @@ class _AssistantCatalogImpl(AssistantCatalog):
                 )
             if skills_to_materialize:
                 if self._global_skills_store is None:
-                    raise _CatalogConfigError(
-                        "initial_skills 需要全局技能库（skills 能力不可用）"
-                    )
+                    raise _CatalogConfigError("initial_skills 需要全局技能库（skills 能力不可用）")
                 materialized_index, materialized_digests = _materialize_global_skills(
                     self._global_skills_store,
                     home.root,

@@ -68,7 +68,7 @@ LCA 采用 **硬链接 + COW**：兼容现有 `DiskSkillPackageStore` 目录结�
 
 ### D3 · 工具双层模型
 
-- **内置工具**：平台代码定义。Home 只存策略（`tools.yaml` allow/deny + `grants.yaml`）；详情是平台工具注册表的只读投影，不复制。
+- **内置工具**：平台代码定义。Home 只存策略（`tools.yaml` allow/deny + `grants.yaml`）；创建时把平台默认工具集物化为 `tools.yaml` 的 `allow` 列表（`CreateAssistantRequest.default_tool_names` 落地），Home 显式记录该助理的默认工具集；工具详情仍是平台工具注册表的只读投影，不复制。
 - **自定义工具**：`{home}/tools/<tool_id>/tool.json` 定义，具体、可编辑、隔离，与 `skills/` 对等。
 
 `tool.json` schema（frozen Pydantic，未知字段 fail-closed）：
@@ -216,3 +216,4 @@ LCA 采用 **硬链接 + COW**：兼容现有 `DiskSkillPackageStore` 目录结�
 | 日期 | 变更 |
 |---|---|
 | 2026-09-19 | 初稿，编号 0243，登记 README 索引 |
+| 2026-09-19 | 补充 D3：创建时物化默认工具 allow 列表（与 skills 物化对等） |

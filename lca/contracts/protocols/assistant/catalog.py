@@ -63,6 +63,13 @@ class CreateAssistantRequest:
     空 = 默认把全局技能库全部可物化技能硬链接到 ``{home}/skills/``
     （全局库不可用时保持空技能集）;显式传列表 = 只装指定技能。
     """
+    default_tool_names: tuple[str, ...] = ()
+    """创建时写入 ``{home}/tools.yaml`` ``allow`` 列表的默认工具名（ADR-0243 D3 延伸）。
+
+    空 = 保持模板 ``allow: []``（平台默认全量可见，向后兼容）。非空且
+    ``inherit_from`` 为空时，Catalog 物化为显式 allow 列表，使 Home 的
+    工具配置与 skills/ 物化对等可见。
+    """
 
     def __post_init__(self) -> None:
         if not self.name or not self.name.strip():
@@ -74,6 +81,11 @@ class CreateAssistantRequest:
             value = getattr(self, field_name)
             if value is not None and not value.strip():
                 object.__setattr__(self, field_name, None)
+        object.__setattr__(
+            self,
+            "default_tool_names",
+            tuple(sorted({str(n).strip() for n in self.default_tool_names if str(n).strip()})),
+        )
 
 
 @dataclass(frozen=True)
