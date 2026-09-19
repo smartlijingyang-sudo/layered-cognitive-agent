@@ -34,6 +34,8 @@ from lca.infrastructure.tools.assistant.create_skill_tool import (
     assistant_create_skill_tool_from_run,
 )
 from lca.infrastructure.tools.assistant.create_tool import AssistantCreateTool
+from lca.infrastructure.tools.assistant.role_card_resolver import FileRoleCardResolver
+from lca.infrastructure.tools.assistant.role_card_tool import RoleCardListTool
 from lca.infrastructure.tools.assistant.self_manage_tools import (
     assistant_self_manage_tools_from_run,
 )
@@ -90,12 +92,17 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     overlay = ctx.require(ASSISTANT_SKILL_OVERLAY.key)
     tool_overlay = ctx.require(ASSISTANT_TOOL_OVERLAY.key)
     tools_service = ctx.require("tools")
+    try:
+        role_resolver: FileRoleCardResolver | None = FileRoleCardResolver()
+    except Exception:
+        role_resolver = None
 
     def _catalog_names() -> list[str]:
         return tools_service.names()
 
     def _assistant_tools_factory(bindings: object) -> list[Any] | None:
         tools: list[Any] = [AssistantCreateTool(catalog=catalog, bridge=bridge)]
+        tools.append(RoleCardListTool(resolver=role_resolver))
         # ``assistant_id`` comes from the run bindings when the caller has
         # them, else from the ambient ``current_assistant_id()``;
         # ``assistant_create_skill_tool_from_run`` owns that precedence, so the

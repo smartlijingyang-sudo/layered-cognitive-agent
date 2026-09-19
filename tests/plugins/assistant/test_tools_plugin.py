@@ -9,6 +9,7 @@ import pytest
 from lca.harness.plugin_api import definition_from_plugin
 from lca.infrastructure.tools.assistant.create_skill_tool import AssistantCreateSkillTool
 from lca.infrastructure.tools.assistant.create_tool import AssistantCreateTool
+from lca.infrastructure.tools.assistant.role_card_tool import RoleCardListTool
 from lca.plugins.domain.tools.assistant_tools import plugin as tools_plugin
 
 
@@ -72,11 +73,12 @@ async def test_factory_builds_create_tool_with_injected_deps() -> None:
     await tools_plugin.setup.setup(ctx, None)
 
     produced = tools_service.factories["assistant"](None)
-    assert isinstance(produced, list) and len(produced) == 1
+    assert isinstance(produced, list) and len(produced) == 2
     tool = produced[0]
     assert isinstance(tool, AssistantCreateTool)
     assert tool._catalog is catalog
     assert tool._bridge is bridge
+    assert isinstance(produced[1], RoleCardListTool)
 
 
 @pytest.mark.asyncio
@@ -87,12 +89,13 @@ async def test_factory_adds_create_skill_tool_when_assistant_id_bound() -> None:
     await tools_plugin.setup.setup(ctx, None)
 
     produced = tools_service.factories["assistant"]({"assistant_id": "asst_demo"})
-    # create_assistant + create_assistant_skill + 10 个自我管理工具（ADR-0242 D6 + ADR-0243 D6）
-    assert isinstance(produced, list) and len(produced) == 12
+    # create_assistant + list_role_cards + create_assistant_skill + 10 个自我管理工具（ADR-0242 D6 + ADR-0243 D6）
+    assert isinstance(produced, list) and len(produced) == 13
     assert isinstance(produced[0], AssistantCreateTool)
-    assert isinstance(produced[1], AssistantCreateSkillTool)
-    assert produced[1]._overlay is overlay
-    assert produced[1]._assistant_id == "asst_demo"
+    assert isinstance(produced[1], RoleCardListTool)
+    assert isinstance(produced[2], AssistantCreateSkillTool)
+    assert produced[2]._overlay is overlay
+    assert produced[2]._assistant_id == "asst_demo"
     from lca.infrastructure.tools.assistant.self_manage_tools import (
         UpdateAssistantSoulTool,
     )
