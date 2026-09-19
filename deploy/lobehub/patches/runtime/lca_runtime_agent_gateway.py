@@ -28,6 +28,7 @@ _NEW_FILES = (
     "connect.ts",
     "execute.ts",
     "executeGatewayRun.ts",
+    "executeGatewayRun.test.ts",
     "messageService.ts",
     "messageService.test.ts",
     "reconnect.ts",
