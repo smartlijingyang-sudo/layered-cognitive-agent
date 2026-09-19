@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 import tempfile
 import time
 from pathlib import Path
@@ -33,7 +34,8 @@ class AssistantCreateSkillTool(Tool):
         "后续对话会自动加载）。"
         "参数: skill_md（SKILL.md 全文，含 YAML frontmatter）、"
         "skill_id（可选，默认从 frontmatter name 推导）、"
-        "sandbox_path（可选，沙箱内已写好的 SKILL.md 相对路径，与 skill_md 二选一）。"
+        "sandbox_path（可选，沙箱/工作区内已写好的 SKILL.md 文件，或包含 SKILL.md "
+        "与 resources/ 的目录，与 skill_md 二选一；传目录时 resources/ 等附属文件会一并安装）。"
         "安装后请 activate_skill 加载操作指南。"
     )
     parameters: ClassVar[dict[str, Any]] = {
@@ -49,7 +51,7 @@ class AssistantCreateSkillTool(Tool):
             },
             "sandbox_path": {
                 "type": "string",
-                "description": "可选：沙箱内 SKILL.md 路径（与 skill_md 二选一）",
+                "description": "可选：沙箱内 SKILL.md 文件路径，或包含 SKILL.md + resources/ 的目录路径（与 skill_md 二选一）",
             },
         },
     }
@@ -77,33 +79,47 @@ class AssistantCreateSkillTool(Tool):
 
         skill_md = str(args.get("skill_md") or "").strip()
         sandbox_path = str(args.get("sandbox_path") or "").strip()
-        if sandbox_path and not skill_md:
-            skill_md = _read_sandbox_skill_md(sandbox_path)
-            if not skill_md:
-                return self._fail(start, f"无法读取沙箱路径: {sandbox_path}")
-
         explicit_id = str(args.get("skill_id") or "").strip()
-        try:
-            meta, _ = split_frontmatter(skill_md)
-            skill_id = sanitize_skill_id(explicit_id or skill_title(meta, "assistant-skill"))
-        except ValueError as exc:
-            return self._fail(start, str(exc))
-
-        if explicit_id:
-            # The installer names the package from SKILL.md frontmatter, so an
-            # `skill_id` argument that disagrees with it would be silently
-            # dropped; refuse instead of installing under a different id.
-            declared_id = sanitize_skill_id(skill_title(meta, "assistant-skill"))
-            if skill_id != declared_id:
-                return self._fail(
-                    start,
-                    f"skill_id {skill_id!r} 与 SKILL.md frontmatter 的 "
-                    f"name {declared_id!r} 不一致 — 二者必须相同",
-                )
 
         staging = Path(tempfile.mkdtemp(prefix="lca-create-skill-"))
         try:
-            (staging / "SKILL.md").write_text(skill_md, encoding="utf-8")
+            if skill_md:
+                (staging / "SKILL.md").write_text(skill_md, encoding="utf-8")
+            else:
+                resolved = _resolve_workspace_path(sandbox_path)
+                if resolved is None:
+                    return self._fail(start, f"无法解析沙箱路径: {sandbox_path}")
+                if resolved.is_dir():
+                    shutil.copytree(resolved, staging, dirs_exist_ok=True)
+                    if not (staging / "SKILL.md").is_file():
+                        return self._fail(start, f"沙箱目录缺少 SKILL.md: {sandbox_path}")
+                elif resolved.is_file():
+                    (staging / "SKILL.md").write_text(
+                        resolved.read_text(encoding="utf-8"),
+                        encoding="utf-8",
+                    )
+                else:
+                    return self._fail(start, f"沙箱路径不存在: {sandbox_path}")
+
+            skill_md = (staging / "SKILL.md").read_text(encoding="utf-8")
+            try:
+                meta, _ = split_frontmatter(skill_md)
+                skill_id = sanitize_skill_id(explicit_id or skill_title(meta, "assistant-skill"))
+            except ValueError as exc:
+                return self._fail(start, str(exc))
+
+            if explicit_id:
+                # The installer names the package from SKILL.md frontmatter, so an
+                # `skill_id` argument that disagrees with it would be silently
+                # dropped; refuse instead of installing under a different id.
+                declared_id = sanitize_skill_id(skill_title(meta, "assistant-skill"))
+                if skill_id != declared_id:
+                    return self._fail(
+                        start,
+                        f"skill_id {skill_id!r} 与 SKILL.md frontmatter 的 "
+                        f"name {declared_id!r} 不一致 — 二者必须相同",
+                    )
+
             receipt = await self._overlay.install(
                 self._assistant_id,
                 SkillSource(local_path=str(staging)),
@@ -112,8 +128,6 @@ class AssistantCreateSkillTool(Tool):
         except Exception as exc:
             return self._fail(start, f"安装失败: {exc}")
         finally:
-            import shutil
-
             shutil.rmtree(staging, ignore_errors=True)
 
         text = (
@@ -145,20 +159,17 @@ class AssistantCreateSkillTool(Tool):
         )
 
 
-def _read_sandbox_skill_md(sandbox_path: str) -> str:
-    """Best-effort read of a sandbox-relative SKILL.md via workspace seam."""
+def _resolve_workspace_path(sandbox_path: str) -> Path | None:
+    """Resolve a sandbox-relative path against the current run workspace root."""
     from lca.infrastructure.observability.facade.run.ambit import current_workspace
 
     workspace = current_workspace()
     if workspace is None:
-        return ""
+        return None
     root = Path(getattr(workspace, "root", "") or getattr(workspace, "path", "") or "")
     if not root:
-        return ""
-    candidate = root / sandbox_path.lstrip("/")
-    if candidate.is_file():
-        return candidate.read_text(encoding="utf-8")
-    return ""
+        return None
+    return root / sandbox_path.lstrip("/")
 
 
 def assistant_create_skill_tool_from_run(
