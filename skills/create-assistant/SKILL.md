@@ -65,7 +65,7 @@ DEPARTMENT → ROLE → SOUL_ALIGN → NAME → CREATE
 - 查看更多（列出该部门所有角色）
 - 自定义角色（不用角色卡，按用户描述生成专属 SOUL）
 
-**出口条件**：选中一个角色卡，或选择「自定义角色」。
+**出口条件**：选中一个角色卡，或选择「自定义角色」。STATE 5 时角色卡路径传 `from_role`，自定义角色路径传 `custom_role=true`，两者必须二选一。
 
 搜索模式：用户描述了需求但不知道选哪个角色（例：「我需要一个能帮我做数据分析的助理」），用 `run_skill_script` 执行 `list_roles.py --search 数据分析` 搜索匹配的角色，展示结果让用户选择。
 
@@ -107,7 +107,9 @@ DEPARTMENT → ROLE → SOUL_ALIGN → NAME → CREATE
 
 ### STATE 5 · CREATE（创建）
 
-调用 `create_assistant`：
+调用 `create_assistant`。**根据 STATE 2 的选择二选一传参**：
+
+角色卡路径（用户选了角色卡）：
 
 ```json
 {
@@ -120,7 +122,21 @@ DEPARTMENT → ROLE → SOUL_ALIGN → NAME → CREATE
 }
 ```
 
-- `soul` 传 STATE 3 对齐后的最终 SOUL。非空时它覆盖 `from_role` backstory。
+自定义角色路径（用户选了「自定义角色」）：
+
+```json
+{
+  "name": "<确认后的名字>",
+  "description": "<用户描述 + 补充的职责>",
+  "custom_role": true,
+  "soul": "<STATE 3 生成的完整 SOUL 全文>",
+  "inherit_from": "<当前 assistant_id（在本助理对话内创建时默认带上）>",
+  "seed_user_md": "<可选：用户画像（称呼/服务对象/偏好）>"
+}
+```
+
+- `soul` 传 STATE 3 对齐后的最终 SOUL。非空时它覆盖 `from_role` backstory；安全边界/记忆规则/错误处理/红线由模板自动补全。
+- `from_role` 与 `custom_role` 必须二选一：带 `soul` 创建时两者都缺会被工具拒绝，回到 STATE 2。
 - `inherit_from` 默认取当前对话所在 assistant 的 `assistant_id`（复制其技能与工具/授权策略为快照）。用户明确不要继承时省略。
 - `seed_user_md` 在 SOUL_ALIGN 顺带问到的用户画像（称呼 / 服务对象 / 偏好）非空时传入。
 

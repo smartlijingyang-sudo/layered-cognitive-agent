@@ -50,9 +50,12 @@ class AssistantCreateTool(Tool):
     description = (
         "创建一个新助理（个人助手）：在后端初始化其人设/目标/技能配置，"
         "并在前端助理列表注册入口。用户想「创建助理/新建助手」时使用。"
+        "向导创建必须先选择角色卡（from_role，从 268 个角色档案中按部门→角色选择）"
+        "或声明自定义角色（custom_role=true）。"
         "参数: name（助理名字，必填）、description（一句话职责）、"
-        "from_role（可选：角色档案 role_id，如 engineering/engineering-software-architect，"
+        "from_role（角色档案 role_id，如 engineering/engineering-software-architect，"
         "提供则 SOUL 从该角色卡片填充）、"
+        "custom_role（true 表示用户选择自定义角色，不依赖角色卡）、"
         "soul（可选：向导对齐后的最终 SOUL 全文，非空时覆盖 from_role 并必须通过完整度校验）、"
         "inherit_from（可选：继承快照来源 assistant_id，复制其技能与工具/授权策略）、"
         "template_id（角色模板：assistant.default 等，from_role 不填时使用）、"
@@ -71,12 +74,20 @@ class AssistantCreateTool(Tool):
                     "assistant 自动获得该角色的人格。"
                 ),
             },
+            "custom_role": {
+                "type": "boolean",
+                "description": (
+                    "true 表示用户选择自定义角色，不依赖角色卡；此时必须同时提供 soul。"
+                    "与 from_role 二选一（向导 STATE 2 的出口条件）。"
+                ),
+            },
             "soul": {
                 "type": "string",
                 "description": (
                     "向导对齐后的最终 SOUL 全文（Markdown，含 ## 🧠 身份 / ## 🎭 性格 / "
                     "## 🛠 能力 / ## 🗣 语气 四个核心段，去除空白后至少 200 字符）。"
-                    "非空时覆盖 from_role backstory 与模板默认。"
+                    "非空时覆盖 from_role backstory；安全边界/记忆规则/错误处理/红线"
+                    "由模板自动补全。"
                 ),
             },
             "inherit_from": {
@@ -116,6 +127,23 @@ class AssistantCreateTool(Tool):
         template_id = args.get("template_id") or "assistant.default"
         if template_id not in known_template_ids():
             return f"未知 template_id={template_id!r};可选: {', '.join(known_template_ids())}"
+        # ADR-0242 D1 STATE 2 出口条件：向导创建（带 soul）必须在角色卡和
+        # 自定义角色之间二选一，避免 LLM 跳过「先大类再小类」的角色选择。
+        soul = args.get("soul")
+        soul_text = str(soul).strip() if isinstance(soul, str) and soul.strip() else None
+        if soul_text:
+            from_role = args.get("from_role")
+            role = (
+                str(from_role).strip() if isinstance(from_role, str) and from_role.strip() else None
+            )
+            custom_role = bool(args.get("custom_role"))
+            if not role and not custom_role:
+                return (
+                    "向导创建需要选择角色卡（from_role=角色库 role_id，如 "
+                    "engineering/engineering-software-architect）或声明自定义角色"
+                    "（custom_role=true）。请回到向导 STATE 2：先用 list_roles.py "
+                    "让用户从 268 个角色档案中选择，或确认走自定义角色。"
+                )
         return None
 
     async def execute(self, args: dict[str, Any]) -> Observation:

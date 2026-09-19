@@ -78,6 +78,29 @@ class TestValidate:
         tool = AssistantCreateTool(catalog=catalog)
         assert tool.validate({"name": "研究", "template_id": "assistant.research"}) is None
 
+    def test_guided_creation_requires_role_or_custom(self) -> None:
+        """ADR-0242 D1 STATE 2：带 soul 的向导创建必须在 from_role 和
+        custom_role 之间二选一，防止 LLM 跳过「先大类再小类」。"""
+        tool = AssistantCreateTool(catalog=None)  # type: ignore[arg-type]
+        error = tool.validate({"name": "向导", "soul": _valid_soul()})
+        assert error is not None
+        assert "from_role" in error and "custom_role" in error
+
+    def test_guided_creation_with_role_or_custom_passes(self) -> None:
+        tool = AssistantCreateTool(catalog=None)  # type: ignore[arg-type]
+        assert (
+            tool.validate(
+                {"name": "向导", "soul": _valid_soul(), "from_role": "engineering/architect"}
+            )
+            is None
+        )
+        assert tool.validate({"name": "向导", "soul": _valid_soul(), "custom_role": True}) is None
+
+    def test_bare_creation_without_soul_still_allowed(self) -> None:
+        """裸创建（无 soul）不受向导二选一约束，BOOTSTRAP 路径保留。"""
+        tool = AssistantCreateTool(catalog=None)  # type: ignore[arg-type]
+        assert tool.validate({"name": "裸建"}) is None
+
 
 class TestExecute:
     @pytest.mark.asyncio
@@ -109,7 +132,7 @@ class TestExecute:
     ) -> None:
         tool = AssistantCreateTool(catalog=catalog, bridge=None)
         soul = _valid_soul()
-        obs = await tool.execute({"name": "向导", "soul": soul})
+        obs = await tool.execute({"name": "向导", "soul": soul, "custom_role": True})
         assert obs.success
         assert obs.payload["bootstrap_completed"] is True
 
@@ -127,7 +150,7 @@ class TestExecute:
             + "\n## 🛠 能力\n"
             + "擅长测试。" * 30
         )
-        obs = await tool.execute({"name": "向导", "soul": soul_missing_tone})
+        obs = await tool.execute({"name": "向导", "soul": soul_missing_tone, "custom_role": True})
         assert not obs.success
         assert obs.error is not None and "## 🗣 语气" in obs.error
         from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
@@ -154,6 +177,7 @@ class TestExecute:
             {
                 "name": "向导",
                 "soul": _valid_soul(),
+                "custom_role": True,
                 "inherit_from": "asst_source",
             }
         )
