@@ -181,6 +181,15 @@ def _create(
             "the facade mints a fresh ``sess_<16hex>`` id."
         ),
     ),
+    assistant_id: str | None = typer.Option(
+        None,
+        "--assistant-id",
+        help=(
+            "Optional assistant id (``asst_*``) to bind the run to (ADR-0187 D7). "
+            "When omitted and ``--agent`` names a LobeHub agent row that maps to an "
+            "assistant, the mapping is resolved best-effort; unmapped agents stay unbound."
+        ),
+    ),
 ) -> None:
     """Create one run via the carrier; print ``run_id`` + ``trace_id`` + ``ws_url``.
 
@@ -200,6 +209,7 @@ def _create(
     facade path is intended for tests, offline mode, and CLI↔HTTP parity
     verification; it does NOT start a real run.
     """
+    resolved_assistant_id = _resolve_assistant_id(agent, assistant_id)
     if facade:
         _create_via_facade(
             user_text=user_text,
@@ -207,7 +217,7 @@ def _create(
             agent=agent,
             profile=profile,
             session_id=session_id,
-            assistant_id=None,
+            assistant_id=resolved_assistant_id,
             attachment_ids=(),
             execution_target="",
             options={},
@@ -215,12 +225,13 @@ def _create(
         )
         return
 
-    body = {
-        "messages": [{"role": "user", "content": user_text}],
-        "mode": mode,
-        "agent": agent,
-        "profile": profile,
-    }
+    body = _build_create_body(
+        user_text=user_text,
+        mode=mode,
+        agent=agent,
+        profile=profile,
+        assistant_id=resolved_assistant_id,
+    )
     request = urllib.request.Request(  # noqa: S310 — CLI to local kernel; LCA_OPS_BASE_URL is operator-controlled.
         f"{base_url.rstrip('/')}/runs",
         method="POST",
@@ -291,6 +302,45 @@ def _create(
         # --wait 老路径:除 SOP 外,仍按旧 exit-code 语义退出(success=0,其他非零)。
         terminal = report.get("terminal_status") or "unknown"
         raise typer.Exit(code=0 if terminal == "success" else 1)
+
+
+def _build_create_body(
+    *,
+    user_text: str,
+    mode: str,
+    agent: str,
+    profile: str,
+    assistant_id: str | None,
+) -> dict[str, object]:
+    """Build the ``POST /runs`` JSON body.
+
+    ``assistant_id`` is included only when non-empty so the legacy
+    unbound path stays byte-identical (ADR-0187 I-A1).
+    """
+    body: dict[str, object] = {
+        "messages": [{"role": "user", "content": user_text}],
+        "mode": mode,
+        "agent": agent,
+        "profile": profile,
+    }
+    if assistant_id:
+        body["assistant_id"] = assistant_id
+    return body
+
+
+def _resolve_assistant_id(agent: str, assistant_id: str | None) -> str | None:
+    """Best-effort resolve a LobeHub ``agt_*`` agent row to its ``asst_*`` assistant id.
+
+    The ``agt_* ↔ asst_*`` mapping truth lives in the LobeHub ``agents``
+    row (``agencyConfig.lcaAssistantId``); the assistant catalog keeps no
+    local copy (assistant-create-flow note). An explicit ``--assistant-id``
+    always wins; otherwise the run stays unbound rather than failing on an
+    unavailable mapping.
+    """
+    if assistant_id:
+        return assistant_id
+    del agent  # no local reverse mapping to consult; agent-only runs stay unbound.
+    return None
 
 
 def _create_via_facade(
