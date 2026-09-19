@@ -9,7 +9,8 @@ or pipeline wiring.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Callable
+from typing import TYPE_CHECKING, cast
 
 from lca.contracts.capabilities import (
     BRAINS,
@@ -19,9 +20,11 @@ from lca.contracts.capabilities import (
     PROMPT_SECTION_REGISTRY,
     PROMPT_TEMPLATE_SELECTOR,
 )
-from lca.contracts.protocols import BrainFactory
+from lca.contracts.mechanisms.capability.capability import MissingCapabilityError
+from lca.contracts.protocols import BrainFactory, DecisionGate
 
 if TYPE_CHECKING:
+    from lca.cognition.brain.gate.service import GateService
     from lca.harness.plugin_api import PluginContext
 
 
@@ -40,6 +43,32 @@ STANDARD_COGNITIVE_BRAIN_FACTORY_REQUIREMENTS: tuple[str, ...] = (
 """The complete, profile-selected dependency closure of the standard Brain."""
 
 
+def _agent_gate_factory_from(
+    ctx: PluginContext,
+) -> Callable[[], DecisionGate | None] | None:
+    """Resolve the profile-selected Think guard chain, fail-soft.
+
+    The Brain aliases require the ``gates`` capability, but a profile may
+    legitimately omit the ``gates.chain.sequential`` assembler contribution.
+    Such profiles keep the pre-PR-5 behavior (``agent_gates=None``) instead
+    of failing Brain construction; only an actually assembled chain is
+    exposed to the ``concept.decision.enforce`` guard nodes.
+    """
+
+    try:
+        gates = cast("GateService", ctx.require("gates"))
+    except KeyError:
+        return None
+
+    def _build() -> DecisionGate | None:
+        try:
+            return gates.assemble()
+        except MissingCapabilityError:
+            return None
+
+    return _build
+
+
 def build_standard_cognitive_brain_factory(ctx: PluginContext) -> BrainFactory:
     """Close selected cognitive primitives into the shared standard Brain factory.
 
@@ -52,6 +81,7 @@ def build_standard_cognitive_brain_factory(ctx: PluginContext) -> BrainFactory:
     from lca.cognition.brain.pipeline.default_factory import SimpleBrainFactory
 
     return SimpleBrainFactory(
+        agent_gate_factory=_agent_gate_factory_from(ctx),
         classifier=ctx.require("decision_classifier"),
         critic_factory=ctx.require("critic.simple"),
         reasoner_cls=ctx.require("reasoner.prompt"),

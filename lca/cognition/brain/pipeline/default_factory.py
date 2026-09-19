@@ -50,7 +50,7 @@ class SimpleBrainFactory:
     def __init__(
         self,
         *,
-        agent_gate_factory: Callable[[], DecisionGate] | None = None,
+        agent_gate_factory: Callable[[], DecisionGate | None] | None = None,
         classifier: DecisionClassifier,
         critic_factory: Callable[[], Critic],
         reasoner_cls: type[PromptReasoner],
