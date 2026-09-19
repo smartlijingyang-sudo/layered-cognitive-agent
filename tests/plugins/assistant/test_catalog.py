@@ -220,6 +220,53 @@ class TestCreate:
         assert a.assistant_id != b.assistant_id
 
 
+# ── 默认工具物化（ADR-0243 D3 延伸）─────────────────────────────────
+
+
+class TestDefaultToolNames:
+    def test_create_with_default_tool_names_writes_allow_list(
+        self,
+        catalog: AssistantCatalogImpl,
+    ) -> None:
+        handle = catalog.create(
+            CreateAssistantRequest(name="X", default_tool_names=("search", "readFile"))
+        )
+        home = Path(handle.home_path)
+        data = yaml.safe_load((home / "tools.yaml").read_text(encoding="utf-8"))
+        assert data["tools"]["allow"] == ["readFile", "search"]  # 排序去重
+        assert data["tools"]["deny"] == []
+        # tools.yaml 是配置面：manifest digest 自动覆盖，get 不抛
+        assert catalog.get(handle.assistant_id).assistant_id == handle.assistant_id
+
+    def test_create_without_default_tool_names_keeps_empty_allow(
+        self,
+        catalog: AssistantCatalogImpl,
+        request_default: CreateAssistantRequest,
+    ) -> None:
+        handle = catalog.create(request_default)
+        data = yaml.safe_load((Path(handle.home_path) / "tools.yaml").read_text(encoding="utf-8"))
+        assert data["tools"]["allow"] == []
+
+    def test_create_with_inherit_from_keeps_source_tools_policy(
+        self,
+        catalog: AssistantCatalogImpl,
+    ) -> None:
+        """继承快照整文件复制优先于默认物化（inherit_from 胜出）。"""
+        source = catalog.create(CreateAssistantRequest(name="来源", default_tool_names=("search",)))
+        child = catalog.create(
+            CreateAssistantRequest(
+                name="继承",
+                inherit_from=source.assistant_id,
+                default_tool_names=("readFile",),
+            )
+        )
+        data = yaml.safe_load((Path(child.home_path) / "tools.yaml").read_text(encoding="utf-8"))
+        assert data["tools"]["allow"] == ["search"]
+        assert (Path(child.home_path) / "tools.yaml").read_text(encoding="utf-8") == (
+            Path(source.home_path) / "tools.yaml"
+        ).read_text(encoding="utf-8")
+
+
 # ── get ─────────────────────────────────────────────────────────────
 
 

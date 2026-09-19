@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -55,6 +56,7 @@ class AssistantCreateTool(Tool):
         "对话顺序（强制）：先让用户选择角色卡（from_role，从 268 个角色档案中按部门→角色选择；先用 list_role_cards 工具列出部门与角色供用户选择）"
         "或声明自定义角色（custom_role=true），再询问助理名字与职责；"
         "在角色确定之前不得询问助理名字。"
+        "角色选择时每次 askUserQuestion 只问一个问题（不要在一次调用里塞多组选项），避免用户被重复确认。"
         "参数: name（助理名字，必填，须在角色选择之后确认）、description（一句话职责）、"
         "from_role（角色档案 role_id，如 engineering/engineering-software-architect，"
         "提供则 SOUL 从该角色卡片填充）、"
@@ -122,9 +124,23 @@ class AssistantCreateTool(Tool):
         *,
         catalog: AssistantCatalog,
         bridge: AssistantFrontendBridge | None = None,
+        default_tool_names: Callable[[], tuple[str, ...]] | None = None,
     ) -> None:
         self._catalog = catalog
         self._bridge = bridge
+        self._default_tool_names = default_tool_names
+
+    def _resolve_default_tool_names(self) -> tuple[str, ...]:
+        """物化当前 run 的平台默认工具名；提供者缺失或抛错时返回空（fail-soft）。"""
+        if self._default_tool_names is None:
+            return ()
+        try:
+            names = self._default_tool_names()
+        except Exception:
+            return ()
+        if not isinstance(names, tuple):
+            names = tuple(names)
+        return tuple(sorted({str(n).strip() for n in names if str(n).strip()}))
 
     def validate(self, args: dict[str, Any]) -> str | None:
         name = args.get("name")
@@ -186,6 +202,7 @@ class AssistantCreateTool(Tool):
                     from_role=role,
                     soul=soul_text,
                     inherit_from=inherit,
+                    default_tool_names=self._resolve_default_tool_names(),
                 )
             )
         except Exception as exc:  # catalog raises typed AssistantCatalogError

@@ -7,6 +7,7 @@ fork_for_run 会把工厂 bind 进本 profile 的每个 run；web-standard 不�
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -39,6 +40,28 @@ from lca.infrastructure.tools.assistant.role_card_tool import RoleCardListTool
 from lca.infrastructure.tools.assistant.self_manage_tools import (
     assistant_self_manage_tools_from_run,
 )
+
+
+def _default_tool_names_provider(
+    tools_service: Any, bindings: object
+) -> Callable[[], tuple[str, ...]]:
+    """返回创建时写入新 Home tools.yaml 的默认工具名提供者。
+
+    用当前 run 的 BindingsView 物化平台默认工具集（与 tools_from_scope 同源），
+    使新助理的 tools.yaml 显式记录其默认工具。物化失败返回空元组，保持
+    模板 ``allow: []`` 行为（fail-soft）。
+    """
+
+    def _names() -> tuple[str, ...]:
+        try:
+            from lca.contracts.models.cognition.boundary import BindingsView
+
+            b = bindings if isinstance(bindings, BindingsView) else BindingsView()
+            return tuple(sorted({t.name for t in tools_service.materialize(b)}))
+        except Exception:
+            return ()
+
+    return _names
 
 
 @plugin(
@@ -101,7 +124,13 @@ async def setup(ctx: PluginContext, config: Any) -> None:
         return tools_service.names()
 
     def _assistant_tools_factory(bindings: object) -> list[Any] | None:
-        tools: list[Any] = [AssistantCreateTool(catalog=catalog, bridge=bridge)]
+        tools: list[Any] = [
+            AssistantCreateTool(
+                catalog=catalog,
+                bridge=bridge,
+                default_tool_names=_default_tool_names_provider(tools_service, bindings),
+            )
+        ]
         tools.append(RoleCardListTool(resolver=role_resolver))
         # ``assistant_id`` comes from the run bindings when the caller has
         # them, else from the ambient ``current_assistant_id()``;
