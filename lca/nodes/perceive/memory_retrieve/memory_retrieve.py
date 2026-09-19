@@ -8,7 +8,6 @@ emits the typed ``memories`` port.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.enums.enums import ActionType
@@ -22,6 +21,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
+from lca.contracts.models.core.conversation.memory import MemoryRecord
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -51,18 +51,26 @@ class PerceiveMemoryRetrieveExecutor:
     ) -> NodeOutput:
         runtime = context.runtime or {}
         manifest = input.port_values.get("manifest")
-        memory_provider = getattr(runtime, "memory_provider", None)
-        if memory_provider is None and hasattr(runtime, "get"):
-            memory_provider = runtime.get("memory_provider")
+        # Canonical capability is the composed MemorySystem under ``memory``
+        # (ADR-0244 D4). ``memory_provider`` remains a test-only fallback.
+        memory = getattr(runtime, "memory", None)
+        if memory is None and hasattr(runtime, "get"):
+            memory = runtime.get("memory")
+        if memory is None:
+            memory = getattr(runtime, "memory_provider", None)
+            if memory is None and hasattr(runtime, "get"):
+                memory = runtime.get("memory_provider")
 
-        memories: list[dict[str, Any]] = []
-        if memory_provider is not None and hasattr(memory_provider, "retrieve"):
+        memories: list[MemoryRecord] = []
+        if memory is not None and hasattr(memory, "retrieve"):
             try:
-                retrieved = await memory_provider.retrieve(manifest=manifest)
+                retrieved = await memory.retrieve(manifest=manifest)
                 if isinstance(retrieved, (list, tuple)):
                     memories.extend(retrieved)
-            except Exception as exc:
-                _ = exc
+            except Exception:
+                # Memory retrieval is best-effort: empty result must not
+                # block the cognitive main flow (ADR-0244).
+                memories = []
 
         routing = RoutingDecision(action_type=ActionType.RESPOND)
         return NodeOutput(

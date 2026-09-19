@@ -7,7 +7,7 @@ projects it onto the closed ``observation`` port that downstream
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.enums.enums import ActionType
@@ -20,6 +20,10 @@ from lca.contracts.harness.composition.plugin_contract import (
     LifecycleContract,
     PluginContract,
     PluginIdentity,
+)
+from lca.contracts.models.core.perceive.perception import (
+    ContextItem,
+    ContextManifest,
 )
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
@@ -36,11 +40,11 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 @dataclass(frozen=True, slots=True)
 class PerceiveFoldExecutor:
-    """Terminal-of-typing node: ``manifest`` → ``observation``."""
+    """Terminal-of-typing node: ``manifest`` + ``memories`` → ``observation``."""
 
     semantic_name: str = "phase.perceive.fold"
     region: str = "perceive"
-    declared_inputs: tuple[PortName, ...] = ("manifest",)
+    declared_inputs: tuple[PortName, ...] = ("manifest", "memories")
     declared_outputs: tuple[PortName, ...] = (
         "in_assembled_manifest",
         "observation",
@@ -52,11 +56,19 @@ class PerceiveFoldExecutor:
         input: NodeInput,
     ) -> NodeOutput:
         del context
-        observation = input.port_values.get("manifest")
+        manifest = input.port_values.get("manifest")
+        memories = input.port_values.get("memories") or ()
+        if memories and isinstance(manifest, ContextManifest):
+            item = ContextItem(
+                kind="memory",
+                payload=list(memories),
+                provenance="memory.retrieve",
+            )
+            manifest = replace(manifest, items=(*manifest.items, item))
         return NodeOutput(
             port_values={
-                "in_assembled_manifest": observation,
-                "observation": observation,
+                "in_assembled_manifest": manifest,
+                "observation": manifest,
                 "routing": RoutingDecision(action_type=ActionType.RESPOND),
             },
         )
