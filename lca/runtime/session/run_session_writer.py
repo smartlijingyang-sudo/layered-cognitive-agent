@@ -9,8 +9,10 @@ no ContextVar lookup.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any, Literal
 
+from lca.contracts.models.core.conversation.conversation import ConversationTurn
 from lca.contracts.models.session.call_id import CallId
 from lca.contracts.models.session.epoch_header import EpochHeader
 from lca.contracts.models.session.event_ref import EventRef
@@ -137,6 +139,7 @@ class RunSessionWriter(RunSessionWriterProtocol):
         # Post-PR-2 this stays 0 for any well-formed multi-call decision
         # (Body commits every declared call before any tool runs).
         self._orphan_dropped_count: int = 0
+        self._seeded_prior_turns: bool = False
 
     def _require_session(self) -> SessionProtocol:
         if self._session is None:
@@ -155,6 +158,46 @@ class RunSessionWriter(RunSessionWriterProtocol):
         shape. Preserves ``event.time`` fidelity.
         """
         return _event_ref_from_session(session, event)
+
+    def seed_prior_turns(
+        self,
+        turns: Sequence[ConversationTurn],
+    ) -> None:
+        """Inject multi-turn conversation history into Session before the current task.
+
+        Ensures C3 (facts traceable via Session single track) and ADR-0244.
+        Idempotent: only seeds once per RunSessionWriter.
+        """
+        session = self._require_session()
+        if self._seeded_prior_turns or not turns:
+            return
+        for idx, turn in enumerate(turns):
+            if turn.role in ("user", "human"):
+                session.append(
+                    "surface/user_message",
+                    {
+                        "message_id": f"history:turn_{idx}",
+                        "role": "user",
+                        "content": turn.content,
+                        "historical": True,
+                    },
+                    surface_op="user_message",
+                )
+            elif turn.role == "assistant":
+                session.append(
+                    "surface/assistant_message",
+                    {
+                        "turn": 0,
+                        "step": 0,
+                        "role": "assistant",
+                        "content": turn.content,
+                        "tool_calls": None,
+                        "usage": None,
+                        "historical": True,
+                    },
+                    surface_op="assistant_message",
+                )
+        self._seeded_prior_turns = True
 
     def append_user_message(
         self,

@@ -8,8 +8,10 @@ construction is at :func:`lca.session.lifecycle.bind.bind_run_event_session_from
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any, Literal, Protocol, runtime_checkable
 
+from lca.contracts.models.core.conversation.conversation import ConversationTurn
 from lca.contracts.models.session.call_id import CallId
 from lca.contracts.models.session.epoch_header import EpochHeader
 from lca.contracts.models.session.event_ref import EventRef
@@ -29,6 +31,11 @@ class RunSessionWriterProtocol(Protocol):
     Fail-loud on unbound Session — no silent ``None`` return, no ContextVar
     lookup.
     """
+
+    def seed_prior_turns(
+        self,
+        turns: Sequence[ConversationTurn],
+    ) -> None: ...
 
     def append_user_message(
         self,
