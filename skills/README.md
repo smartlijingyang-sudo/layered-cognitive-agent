@@ -16,5 +16,9 @@
 |----------|------|
 | `officecli` | Office 平面知识层（ADR-0054）；binary 在 terminal 镜像 |
 | `improve-codebase-architecture` | 扫描架构深化机会并直接呈现候选项；不直接修改代码 |
+| `create-assistant` | 从角色档案库创建新助理的五状态向导 |
+| `cordis-plugin-development` | Cordis 插件开发元字段参考 |
+| `editing-lca-compositions` | LCA 声明式组合编辑 |
+| `skill-creator` | 创建/改进当前助理自己的操作技能（改编自 Anthropic 官方 skill-creator） |
 
 **不要**把 Market 下载的 skill 提交到本目录；Market 仍走 `import_skill`。

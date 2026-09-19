@@ -70,6 +70,14 @@ class TestActivateSkillPromptInjection(unittest.TestCase):
         self.assertIn("不要", text)
         self.assertIn("重复", text)
 
+    def test_activate_skill_creator_injects_workflow(self) -> None:
+        """激活 skill-creator 后 prompt 必须包含创建流程与安装工具。"""
+        obs = asyncio.run(self._activate("skill-creator"))
+        self.assertTrue(obs.success, obs.error)
+        text = obs.payload["text"]
+        self.assertIn("skill-creator", text)
+        self.assertIn("create_assistant_skill", text)
+
     def test_activate_with_empty_references_declares_no_refs(self) -> None:
         """references: [] 的 skill 激活后必须显式说「无可用 references」。
 
