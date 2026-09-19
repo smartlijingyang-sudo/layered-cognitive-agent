@@ -116,6 +116,25 @@ class SkillExecTool(Tool):
                 extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
             )
 
+        package = self._store.get(activated.skill_id)
+        missing_resources = [
+            ref
+            for ref in package.references
+            if ref.startswith("resources/") and ref not in resources
+        ]
+        if missing_resources:
+            return Observation(
+                observation_id=new_id("obs"),
+                success=False,
+                payload=None,
+                error=(
+                    f"技能 {activated.skill_id} 的资源未安装到技能包："
+                    f"{', '.join(missing_resources)}。请重新安装该技能后再试。"
+                ),
+                latency_ms=int((time.monotonic() - start) * 1000),
+                extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
+            )
+
         code = build_skill_exec_code(
             skill_id=activated.skill_id,
             command=command,

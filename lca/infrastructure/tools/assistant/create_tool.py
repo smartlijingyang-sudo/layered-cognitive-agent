@@ -52,7 +52,7 @@ class AssistantCreateTool(Tool):
         "并在前端助理列表注册入口。创建时自动把全局技能库全部技能物化到该助理"
         "Home 的 skills/ 目录（ADR-0243），创建后即可激活使用。"
         "用户想「创建助理/新建助手」时使用。"
-        "对话顺序（强制）：先让用户选择角色卡（from_role，从 268 个角色档案中按部门→角色选择）"
+        "对话顺序（强制）：先让用户选择角色卡（from_role，从 268 个角色档案中按部门→角色选择；先用 list_role_cards 工具列出部门与角色供用户选择）"
         "或声明自定义角色（custom_role=true），再询问助理名字与职责；"
         "在角色确定之前不得询问助理名字。"
         "参数: name（助理名字，必填，须在角色选择之后确认）、description（一句话职责）、"
@@ -147,8 +147,8 @@ class AssistantCreateTool(Tool):
                 return (
                     "向导创建需要选择角色卡（from_role=角色库 role_id，如 "
                     "engineering/engineering-software-architect）或声明自定义角色"
-                    "（custom_role=true）。请回到向导 STATE 2：先用 list_roles.py "
-                    "让用户从 268 个角色档案中选择，或确认走自定义角色。"
+                    "（custom_role=true）。请回到向导 STATE 2：先用 list_role_cards "
+                    "工具让用户从 268 个角色档案中选择，或确认走自定义角色。"
                 )
         return None
 
