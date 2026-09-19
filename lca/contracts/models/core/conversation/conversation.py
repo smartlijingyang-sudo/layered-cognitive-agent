@@ -4,9 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# Working-memory key: prior turns seeded from gateway / RunContext.extra.
-PRIOR_CONVERSATION_WM_KEY = "prior_conversation"
-
 
 @dataclass(frozen=True)
 class ConversationTurn:

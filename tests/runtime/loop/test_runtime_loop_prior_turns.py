@@ -2,7 +2,7 @@
 
 Verifies that:
 1. prior_turns from RunContext are seeded via run_writer.seed_prior_turns;
-2. PRIOR_CONVERSATION_WM_KEY is retired and NOT written into state.extra;
+2. the retired `prior_conversation` working-memory channel is NOT written into state.extra;
 3. derive_messages() on writer includes both prior turns and the current task in chronological order.
 """
 
@@ -14,10 +14,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from lca.contracts.models.core.conversation.conversation import (
-    PRIOR_CONVERSATION_WM_KEY,
-    ConversationTurn,
-)
+from lca.contracts.models.core.conversation.conversation import ConversationTurn
 from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import AgentState, Budget
@@ -125,9 +122,9 @@ async def test_runtime_loop_seeds_prior_turns_and_avoids_state_extra_key() -> No
     assert len(captured_states) == 1
     state = captured_states[0]
 
-    # Invariant C4: state.extra must NOT contain PRIOR_CONVERSATION_WM_KEY
-    assert PRIOR_CONVERSATION_WM_KEY not in state.extra, (
-        f"PRIOR_CONVERSATION_WM_KEY should be retired, found in state.extra: {state.extra}"
+    # Invariant C4: state.extra must NOT contain the retired working-memory key
+    assert "prior_conversation" not in state.extra, (
+        f"prior_conversation should be retired, found in state.extra: {state.extra}"
     )
 
     # Invariant C3: Prior turns must be seeded into Session facts
@@ -140,7 +137,7 @@ async def test_runtime_loop_seeds_prior_turns_and_avoids_state_extra_key() -> No
 
 
 @pytest.mark.asyncio
-async def test_runtime_loop_seeds_prior_turns_from_legacy_ctx_extra() -> None:
+async def test_runtime_loop_ignores_legacy_ctx_extra_channel() -> None:
     session = Session("test-session-legacy")
     set_publish_session(cast("Any", session))
 
@@ -148,12 +145,12 @@ async def test_runtime_loop_seeds_prior_turns_from_legacy_ctx_extra() -> None:
     bindings = _Bindings(captured_states)
     runtime = CognitiveRuntime(cast("Any", bindings))
 
-    # Test legacy extra fallback
+    # The retired working-memory channel must be ignored: only ctx.prior_turns seeds.
     ctx = RunContext(
         trace_id="trace-legacy",
         session_id="s-legacy",
         extra={
-            PRIOR_CONVERSATION_WM_KEY: [
+            "prior_conversation": [
                 {"role": "user", "content": "历史问题"},
                 {"role": "assistant", "content": "历史答案"},
             ]
@@ -170,15 +167,13 @@ async def test_runtime_loop_seeds_prior_turns_from_legacy_ctx_extra() -> None:
     state = captured_states[0]
 
     # Invariant C4: retired from state.extra
-    assert PRIOR_CONVERSATION_WM_KEY not in state.extra
+    assert "prior_conversation" not in state.extra
 
-    # Invariant C3: single-track facts preserved
+    # The fallback channel must not seed any historical facts
     writer = RunSessionWriter(session=session)
     messages = writer.derive_messages()
-    assert len(messages) == 3
-    assert messages[0] == {"role": "user", "content": "历史问题"}
-    assert messages[1] == {"role": "assistant", "content": "历史答案"}
-    assert messages[2] == {"role": "user", "content": "新问题"}
+    assert len(messages) == 1
+    assert messages[0] == {"role": "user", "content": "新问题"}
 
 
 @pytest.mark.asyncio
@@ -200,10 +195,9 @@ async def test_runtime_loop_without_prior_turns() -> None:
     assert result.status == TaskStatus.COMPLETED
     assert len(captured_states) == 1
     state = captured_states[0]
-    assert PRIOR_CONVERSATION_WM_KEY not in state.extra
+    assert "prior_conversation" not in state.extra
 
     writer = RunSessionWriter(session=session)
     messages = writer.derive_messages()
     assert len(messages) == 1
     assert messages[0] == {"role": "user", "content": "单一请求"}
-
