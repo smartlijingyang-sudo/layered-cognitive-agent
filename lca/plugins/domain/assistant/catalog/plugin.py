@@ -836,8 +836,8 @@ def _write_json(path: Path, data: Mapping[str, object]) -> None:
 
 
 def _copy_manifest_extras(source: Mapping[str, object], target: dict[str, object]) -> None:
-    """把 manifest 中非 digest 派生字段（role_id / skills 索引等）复制到修订版。"""
-    for key in ("role_id", "skills"):
+    """把 manifest 中非 digest 派生字段（role_id / skills / tools 索引等）复制到修订版。"""
+    for key in ("role_id", "skills", "tools"):
         if key in source:
             target[key] = source[key]
 

@@ -24,6 +24,11 @@ entries:
     $module: lca.plugins.assistant.skill.overlay
     config: {}
 
+  - id: lca.plugins.assistant.tool.overlay
+    name: lca_plugins_assistant_tool_overlay
+    $module: lca.plugins.assistant.tool.overlay
+    config: {}
+
   - id: lca.plugins.assistant.webserver.bridge
     name: lca_plugins_assistant_webserver_bridge
     $module: lca.plugins.assistant.webserver.bridge

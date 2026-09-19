@@ -15,6 +15,7 @@ from lca.contracts.capabilities import (
     ASSISTANT_CATALOG,
     ASSISTANT_FRONTEND_BRIDGE,
     ASSISTANT_SKILL_OVERLAY,
+    ASSISTANT_TOOL_OVERLAY,
 )
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -44,6 +45,7 @@ from lca.infrastructure.tools.assistant.self_manage_tools import (
         ASSISTANT_CATALOG.key,
         ASSISTANT_FRONTEND_BRIDGE.key,
         ASSISTANT_SKILL_OVERLAY.key,
+        ASSISTANT_TOOL_OVERLAY.key,
         "tools",
     ),
     implements=[Tool],
@@ -51,8 +53,8 @@ from lca.infrastructure.tools.assistant.self_manage_tools import (
     kind=PluginKind.PROVIDER,
     effects=(EffectClass.TOOLS,),
     description=(
-        "注册 create_assistant / create_assistant_skill 工具工厂（ADR-0187 §3 D12）："
-        "对话创建助理及其 Home 内 skill；后者仅在 run 绑定 assistant_id 时出现。"
+        "注册 create_assistant / create_assistant_skill / 自定义工具管理工具（ADR-0187 §3 D12 + "
+        "ADR-0243 D6）：对话创建助理及其 Home 内 skill/tool；后者仅在 run 绑定 assistant_id 时出现。"
     ),
     test_suite="tests/plugins/assistant/test_tools_plugin.py",
     functional_group=FunctionalGroup.G10_COMPOSITION,
@@ -73,6 +75,7 @@ from lca.infrastructure.tools.assistant.self_manage_tools import (
             ASSISTANT_CATALOG.key,
             ASSISTANT_FRONTEND_BRIDGE.key,
             ASSISTANT_SKILL_OVERLAY.key,
+            ASSISTANT_TOOL_OVERLAY.key,
             "tools",
         ),
         emits=(),
@@ -85,6 +88,11 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     catalog = ctx.require(ASSISTANT_CATALOG.key)
     bridge = ctx.require(ASSISTANT_FRONTEND_BRIDGE.key)
     overlay = ctx.require(ASSISTANT_SKILL_OVERLAY.key)
+    tool_overlay = ctx.require(ASSISTANT_TOOL_OVERLAY.key)
+    tools_service = ctx.require("tools")
+
+    def _catalog_names() -> list[str]:
+        return tools_service.names()
 
     def _assistant_tools_factory(bindings: object) -> list[Any] | None:
         tools: list[Any] = [AssistantCreateTool(catalog=catalog, bridge=bridge)]
@@ -95,9 +103,15 @@ async def setup(ctx: PluginContext, config: Any) -> None:
         create_skill = assistant_create_skill_tool_from_run(bindings, overlay=overlay)
         if create_skill is not None:
             tools.append(create_skill)
-        # 自我管理工具族（ADR-0242 D6）：只在 run 绑定 assistant_id 时出现。
+        # 自我管理工具族（ADR-0242 D6 + ADR-0243 D6）：只在 run 绑定 assistant_id 时出现。
         tools.extend(
-            assistant_self_manage_tools_from_run(bindings, catalog=catalog, overlay=overlay)
+            assistant_self_manage_tools_from_run(
+                bindings,
+                catalog=catalog,
+                overlay=overlay,
+                tool_overlay=tool_overlay,
+                catalog_names=_catalog_names,
+            )
         )
         return tools
 

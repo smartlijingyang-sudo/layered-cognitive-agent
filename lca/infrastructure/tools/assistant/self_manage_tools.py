@@ -14,12 +14,14 @@ apply and return a payload the LLM relays to the user ("改完告知").
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from lca.contracts.atoms.enums.enums import ContentType
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
+from lca.contracts.models.assistant.tool_spec import ToolSpec
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.protocols import Tool
@@ -29,6 +31,7 @@ from lca.infrastructure.observability.facade.run.ambit import current_assistant_
 if TYPE_CHECKING:
     from lca.contracts.protocols.assistant.catalog import AssistantCatalog
     from lca.contracts.protocols.assistant.skill_overlay import AssistantSkillOverlay
+    from lca.contracts.protocols.assistant.tool_overlay import AssistantToolOverlay
 
 _LIST_ASSISTANT_SKILLS_TOOL = "list_assistant_skills"
 _DELETE_ASSISTANT_SKILL_TOOL = "delete_assistant_skill"
@@ -36,6 +39,9 @@ _UPDATE_ASSISTANT_SOUL_TOOL = "update_assistant_soul"
 _UPDATE_ASSISTANT_PROFILE_TOOL = "update_assistant_profile"
 _UPDATE_ASSISTANT_GRANTS_TOOL = "update_assistant_grants"
 _LIST_ASSISTANT_TOOLS_TOOL = "list_assistant_tools"
+_CREATE_ASSISTANT_TOOL_TOOL = "create_assistant_tool"
+_UPDATE_ASSISTANT_TOOL_TOOL = "update_assistant_tool"
+_DELETE_ASSISTANT_TOOL_TOOL = "delete_assistant_tool"
 
 _SENSITIVE_CONFIRMATION_HINT = (
     "这是敏感操作，必须先经用户确认：调用 askUserQuestion 询问用户是否确认，"
@@ -55,10 +61,14 @@ class _BaseAssistantTool(Tool):
         catalog: AssistantCatalog,
         assistant_id: str,
         overlay: AssistantSkillOverlay | None = None,
+        tool_overlay: AssistantToolOverlay | None = None,
+        catalog_names: Callable[[], list[str]] | None = None,
     ) -> None:
         self._catalog = catalog
         self._assistant_id = assistant_id
         self._overlay = overlay
+        self._tool_overlay = tool_overlay
+        self._catalog_names = catalog_names
 
     def _ok(self, start: float, payload: dict[str, Any] | None, text: str = "") -> Observation:
         return Observation(
@@ -295,10 +305,13 @@ class UpdateAssistantGrantsTool(_BaseAssistantTool):
 
 
 class ListAssistantToolsTool(_BaseAssistantTool):
-    """List the tools allowed by the assistant's tools.yaml (read-only)."""
+    """List the assistant's effective tool set: builtin policy + custom tools."""
 
     name = _LIST_ASSISTANT_TOOLS_TOOL
-    description = "列出当前助理 Home tools.yaml 允许/禁止的工具策略（allow/deny 列表）。只读。"
+    description = (
+        "列出当前助理的工具集：内置工具的 allow/deny 策略 + 自定义工具详情。"
+        "只读，不修改任何配置。"
+    )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {},
@@ -316,14 +329,189 @@ class ListAssistantToolsTool(_BaseAssistantTool):
             tools = data.get("tools") if isinstance(data, dict) else {}
             allow = tools.get("allow") if isinstance(tools, dict) else []
             deny = tools.get("deny") if isinstance(tools, dict) else []
+            grants = self._load_grants(Path(spec.home_path))
+
+            custom_tools: list[dict[str, object]] = []
+            if self._tool_overlay is not None:
+                for receipt in self._tool_overlay.list_installed(self._assistant_id):
+                    custom_tools.append(
+                        {
+                            "tool_id": receipt.tool_id,
+                            "path": receipt.install_path,
+                            "digest": receipt.digest,
+                        }
+                    )
+
+            catalog = sorted(self._catalog_names()) if self._catalog_names else []
+            allowed_builtins = [
+                name for name in catalog if name not in deny and (not allow or name in allow)
+            ]
         except Exception as exc:
-            return self._fail(start, f"读取工具策略失败: {exc}")
+            return self._fail(start, f"读取工具失败: {exc}")
         return self._ok(
             start,
             {
                 "assistant_id": self._assistant_id,
                 "allow": list(allow) if isinstance(allow, list) else [],
                 "deny": list(deny) if isinstance(deny, list) else [],
+                "grants": sorted(grants),
+                "builtin_catalog": catalog,
+                "allowed_builtins": allowed_builtins,
+                "custom_tools": custom_tools,
+                "hint": (
+                    "可用 create_assistant_tool（写 {home}/tools/<id>/tool.json）新增自定义工具，"
+                    "用 update_assistant_tool 修改，delete_assistant_tool 删除（敏感，需用户确认）。"
+                ),
+            },
+        )
+
+    def _load_grants(self, home: Path) -> frozenset[str]:
+        import yaml
+
+        path = home / "grants.yaml"
+        if not path.is_file():
+            return frozenset()
+        try:
+            parsed = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except yaml.YAMLError:
+            return frozenset()
+        if not isinstance(parsed, dict):
+            return frozenset()
+        grants = parsed.get("grants")
+        if not isinstance(grants, list):
+            return frozenset()
+        return frozenset(str(g).strip() for g in grants if isinstance(g, str) and g.strip())
+
+
+class CreateAssistantToolTool(_BaseAssistantTool):
+    """Create a custom tool in the assistant's Home (ADR-0243 D6)."""
+
+    name = _CREATE_ASSISTANT_TOOL_TOOL
+    description = (
+        "为当前助理新增一个自定义工具，写入 Home 的 tools/ 目录。"
+        "参数: tool_json（tool.json 全文，含 name/description/parameters/handler）。"
+        "非敏感操作，改完告知用户。"
+    )
+    parameters: ClassVar[dict[str, Any]] = {
+        "type": "object",
+        "properties": {
+            "tool_json": {
+                "type": "string",
+                "description": "tool.json 全文（JSON），schema 见 ToolSpec",
+            },
+        },
+        "required": ["tool_json"],
+    }
+
+    async def execute(self, args: dict[str, Any]) -> Observation:
+        start = time.monotonic()
+        raw = str(args.get("tool_json") or "").strip()
+        if not raw:
+            return self._fail(start, "tool_json 必须为非空字符串")
+        if self._tool_overlay is None:
+            return self._fail(start, "assistant.tool_overlay 能力不可用")
+        try:
+            spec = ToolSpec.model_validate_json(raw)
+            receipt = await self._tool_overlay.create(self._assistant_id, spec, actor="agent")
+        except Exception as exc:
+            return self._fail(start, f"新增工具失败: {exc}")
+        return self._ok(
+            start,
+            {
+                "assistant_id": self._assistant_id,
+                "tool_id": receipt.tool_id,
+                "path": receipt.install_path,
+                "message": f"已新增自定义工具「{receipt.tool_id}」。",
+            },
+        )
+
+
+class UpdateAssistantToolTool(_BaseAssistantTool):
+    """Update a custom tool in the assistant's Home (ADR-0243 D6)."""
+
+    name = _UPDATE_ASSISTANT_TOOL_TOOL
+    description = (
+        "修改当前助理的一个自定义工具。"
+        "参数: tool_id（要修改的工具 id，与 tool_json.name 一致）、tool_json（新的全文）。"
+        "非敏感操作，改完告知用户。"
+    )
+    parameters: ClassVar[dict[str, Any]] = {
+        "type": "object",
+        "properties": {
+            "tool_id": {"type": "string", "description": "要修改的工具 id"},
+            "tool_json": {"type": "string", "description": "新的 tool.json 全文"},
+        },
+        "required": ["tool_id", "tool_json"],
+    }
+
+    async def execute(self, args: dict[str, Any]) -> Observation:
+        start = time.monotonic()
+        tool_id = str(args.get("tool_id") or "").strip()
+        raw = str(args.get("tool_json") or "").strip()
+        if not tool_id:
+            return self._fail(start, "tool_id 必须为非空字符串")
+        if not raw:
+            return self._fail(start, "tool_json 必须为非空字符串")
+        if self._tool_overlay is None:
+            return self._fail(start, "assistant.tool_overlay 能力不可用")
+        try:
+            spec = ToolSpec.model_validate_json(raw)
+            receipt = await self._tool_overlay.update(
+                self._assistant_id, tool_id, spec, actor="agent"
+            )
+        except Exception as exc:
+            return self._fail(start, f"修改工具失败: {exc}")
+        return self._ok(
+            start,
+            {
+                "assistant_id": self._assistant_id,
+                "tool_id": receipt.tool_id,
+                "path": receipt.install_path,
+                "message": f"已修改自定义工具「{receipt.tool_id}」。",
+            },
+        )
+
+
+class DeleteAssistantToolTool(_BaseAssistantTool):
+    """Delete a custom tool from the assistant's Home (sensitive)."""
+
+    name = _DELETE_ASSISTANT_TOOL_TOOL
+    description = (
+        "删除当前助理的一个自定义工具（不可逆，敏感操作）。"
+        "必须先经用户确认：调用 askUserQuestion 询问，用户同意后才携带 confirmed=true 调用。"
+        "参数: tool_id（要删除的工具 id）、confirmed（用户是否已确认，必须为 true）。"
+    )
+    parameters: ClassVar[dict[str, Any]] = {
+        "type": "object",
+        "properties": {
+            "tool_id": {"type": "string", "description": "要删除的工具 id"},
+            "confirmed": {
+                "type": "boolean",
+                "description": "用户是否已明确确认删除（敏感操作必须为 true）",
+            },
+        },
+        "required": ["tool_id", "confirmed"],
+    }
+
+    async def execute(self, args: dict[str, Any]) -> Observation:
+        start = time.monotonic()
+        tool_id = str(args.get("tool_id") or "").strip()
+        if not tool_id:
+            return self._fail(start, "tool_id 必须为非空字符串")
+        if args.get("confirmed") is not True:
+            return self._fail(start, f"删除工具需要用户确认。{_SENSITIVE_CONFIRMATION_HINT}")
+        if self._tool_overlay is None:
+            return self._fail(start, "assistant.tool_overlay 能力不可用")
+        try:
+            await self._tool_overlay.remove(self._assistant_id, tool_id, actor="agent")
+        except Exception as exc:
+            return self._fail(start, f"删除工具失败: {exc}")
+        return self._ok(
+            start,
+            {
+                "assistant_id": self._assistant_id,
+                "deleted_tool_id": tool_id,
+                "message": f"已删除自定义工具「{tool_id}」。",
             },
         )
 
@@ -333,6 +521,8 @@ def assistant_self_manage_tools_from_run(
     *,
     catalog: AssistantCatalog,
     overlay: AssistantSkillOverlay | None = None,
+    tool_overlay: AssistantToolOverlay | None = None,
+    catalog_names: Callable[[], list[str]] | None = None,
 ) -> list[Tool]:
     """Materialize the self-management tools when the run binds an assistant_id."""
     bind = run if isinstance(run, dict) else {}
@@ -346,22 +536,42 @@ def assistant_self_manage_tools_from_run(
         UpdateAssistantSoulTool(catalog=catalog, assistant_id=assistant_id),
         UpdateAssistantProfileTool(catalog=catalog, assistant_id=assistant_id),
         UpdateAssistantGrantsTool(catalog=catalog, assistant_id=assistant_id),
-        ListAssistantToolsTool(catalog=catalog, assistant_id=assistant_id),
+        ListAssistantToolsTool(
+            catalog=catalog,
+            assistant_id=assistant_id,
+            tool_overlay=tool_overlay,
+            catalog_names=catalog_names,
+        ),
+        CreateAssistantToolTool(
+            catalog=catalog, assistant_id=assistant_id, tool_overlay=tool_overlay
+        ),
+        UpdateAssistantToolTool(
+            catalog=catalog, assistant_id=assistant_id, tool_overlay=tool_overlay
+        ),
+        DeleteAssistantToolTool(
+            catalog=catalog, assistant_id=assistant_id, tool_overlay=tool_overlay
+        ),
     ]
 
 
 __all__ = [
+    "_CREATE_ASSISTANT_TOOL_TOOL",
     "_DELETE_ASSISTANT_SKILL_TOOL",
+    "_DELETE_ASSISTANT_TOOL_TOOL",
     "_LIST_ASSISTANT_SKILLS_TOOL",
     "_LIST_ASSISTANT_TOOLS_TOOL",
     "_UPDATE_ASSISTANT_GRANTS_TOOL",
     "_UPDATE_ASSISTANT_PROFILE_TOOL",
     "_UPDATE_ASSISTANT_SOUL_TOOL",
+    "_UPDATE_ASSISTANT_TOOL_TOOL",
+    "CreateAssistantToolTool",
     "DeleteAssistantSkillTool",
+    "DeleteAssistantToolTool",
     "ListAssistantSkillsTool",
     "ListAssistantToolsTool",
     "UpdateAssistantGrantsTool",
     "UpdateAssistantProfileTool",
     "UpdateAssistantSoulTool",
+    "UpdateAssistantToolTool",
     "assistant_self_manage_tools_from_run",
 ]

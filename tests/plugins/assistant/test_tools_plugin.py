@@ -21,10 +21,18 @@ class _FakeToolsService:
 
 
 class _FakeCtx:
-    def __init__(self, catalog: Any, bridge: Any, overlay: Any, tools: _FakeToolsService) -> None:
+    def __init__(
+        self,
+        catalog: Any,
+        bridge: Any,
+        overlay: Any,
+        tools: _FakeToolsService,
+        tool_overlay: Any = None,
+    ) -> None:
         self._catalog = catalog
         self._bridge = bridge
         self._overlay = overlay
+        self._tool_overlay = tool_overlay if tool_overlay is not None else object()
         self._tools = tools
 
     def require(self, key: str) -> Any:
@@ -34,6 +42,8 @@ class _FakeCtx:
             return self._bridge
         if key == "assistant.skill_overlay":
             return self._overlay
+        if key == "assistant.tool_overlay":
+            return self._tool_overlay
         if key == "tools":
             return self._tools
         raise KeyError(key)
@@ -77,8 +87,8 @@ async def test_factory_adds_create_skill_tool_when_assistant_id_bound() -> None:
     await tools_plugin.setup.setup(ctx, None)
 
     produced = tools_service.factories["assistant"]({"assistant_id": "asst_demo"})
-    # create_assistant + create_assistant_skill + 6 个自我管理工具（ADR-0242 D6）
-    assert isinstance(produced, list) and len(produced) == 8
+    # create_assistant + create_assistant_skill + 9 个自我管理工具（ADR-0242 D6 + ADR-0243 D6）
+    assert isinstance(produced, list) and len(produced) == 11
     assert isinstance(produced[0], AssistantCreateTool)
     assert isinstance(produced[1], AssistantCreateSkillTool)
     assert produced[1]._overlay is overlay
@@ -95,4 +105,5 @@ def test_plugin_manifest_declares_no_provides() -> None:
     assert set(defn.provided_capability_keys) == set()
     assert "assistant.catalog" in set(defn.required_capability_keys)
     assert "assistant.skill_overlay" in set(defn.required_capability_keys)
+    assert "assistant.tool_overlay" in set(defn.required_capability_keys)
     assert "tools" in set(defn.required_capability_keys)

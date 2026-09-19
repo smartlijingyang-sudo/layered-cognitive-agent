@@ -181,6 +181,7 @@
 | [0240](0240-node-emit-dispatch-whitelist-additions.md) | Node-level emit dispatch whitelist additions — BundleGraphSpec v2 `emit_on_enter` / `emit_on_exit` 接通 driver:10 个 EP 名(`terminal.commit` / `phase.*.fold` / `think.gate.end` / `phase_graph.subgraph.{enter,exit}`) 落入 `_EP_DISPATCH` 表 + `emit_*_for_state` helpers;validator 路径偏移 bug 修复;`NodeEventEmissionCheck` 重启;C11 closed-set 落地(`SPINE_EXECUTION_POINTS` + `_SPINE_EP_TO_CATEGORY` + `spine.yaml` 均已预注册);同 PR 配套 Note [`2026-09-15-node-emit-dispatcher-wiring`](../../notes/implemented/seam/2026-09-15-node-emit-dispatcher-wiring.md) | Implemented |
 | [0241](0241-tool-fork-typed-port-projection.md) | `tool.fork.dispatch` typed-port 投影 — plan-side 闭集闭合与 framework 投影语义统一（`translate_inputs` 按名字投影 + ToolsService/BindingsView 作 outer-plan typed port） | Accepted |
 | [0242](0242-assistant-creation-home-runtime.md) | Assistant 创建向导、Home 驱动运行与自我管理 — 对话内向导（大类→小类→SOUL 对齐→取名）、run 期人设/工具/技能从 Home 装配、助理级记忆与工作区持久化、per-agent 图/流程/prompt 覆盖与实验隔离、自我管理工具族 | Proposed |
+| [0243](0243-assistant-skill-tool-isolation-config.md) | 助理技能/工具隔离与可配置化 — 技能硬链接 + 写时复制物化到 Home、`{home}/tools/` 自定义工具目录、运行时只从 Home 加载、自我管理工具族扩展（edit skill / create|update|delete tool） | Proposed |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
 

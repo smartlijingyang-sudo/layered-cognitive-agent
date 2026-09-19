@@ -271,3 +271,110 @@ class TestSelfManageTools:
         obs = asyncio.run(tool.execute({}))
         assert obs.success is True
         assert obs.payload is not None and obs.payload["skills"] == []
+
+
+# ──────────────────────────────────────────────────────────────────────
+# ADR-0243 D6: create/update/delete_assistant_tool + list_assistant_tools
+# 返回自定义工具详情。
+# ──────────────────────────────────────────────────────────────────────
+
+
+def _tool_spec(name: str = "my_tool"):
+    from lca.contracts.models.assistant.tool_spec import ToolHandlerSpec, ToolSpec
+
+    return ToolSpec(
+        name=name,
+        description="自定义工具",
+        parameters={"type": "object", "properties": {}},
+        handler=ToolHandlerSpec(kind="builtin_preset", builtin="runCommand"),
+    )
+
+
+class TestToolSelfManage:
+    def test_create_tool_writes_home(
+        self,
+        catalog: AssistantCatalogImpl,
+        emitted: list[tuple[str, dict[str, Any]]],
+    ) -> None:
+        from lca.infrastructure.tools.assistant.self_manage_tools import (
+            CreateAssistantToolTool,
+        )
+        from lca.plugins.assistant.tool.overlay import AssistantToolOverlayImpl
+
+        assistant_id = _create(catalog)
+        overlay = AssistantToolOverlayImpl(catalog=catalog)
+        tool = CreateAssistantToolTool(
+            catalog=catalog, assistant_id=assistant_id, tool_overlay=overlay
+        )
+        spec = _tool_spec()
+        obs = asyncio.run(tool.execute({"tool_json": spec.model_dump_json()}))
+        assert obs.success is True
+        home = Path(catalog.get(assistant_id).home_path)
+        assert (home / "tools" / "my_tool" / "tool.json").is_file()
+
+    def test_create_tool_bad_json_rejected(
+        self,
+        catalog: AssistantCatalogImpl,
+    ) -> None:
+        from lca.infrastructure.tools.assistant.self_manage_tools import (
+            CreateAssistantToolTool,
+        )
+        from lca.plugins.assistant.tool.overlay import AssistantToolOverlayImpl
+
+        assistant_id = _create(catalog)
+        overlay = AssistantToolOverlayImpl(catalog=catalog)
+        tool = CreateAssistantToolTool(
+            catalog=catalog, assistant_id=assistant_id, tool_overlay=overlay
+        )
+        obs = asyncio.run(tool.execute({"tool_json": "{not json"}))
+        assert obs.success is False
+        assert "失败" in (obs.error or "")
+
+    def test_delete_tool_requires_confirmation(
+        self,
+        catalog: AssistantCatalogImpl,
+    ) -> None:
+        from lca.infrastructure.tools.assistant.self_manage_tools import (
+            DeleteAssistantToolTool,
+        )
+        from lca.plugins.assistant.tool.overlay import AssistantToolOverlayImpl
+
+        assistant_id = _create(catalog)
+        overlay = AssistantToolOverlayImpl(catalog=catalog)
+        tool = DeleteAssistantToolTool(
+            catalog=catalog, assistant_id=assistant_id, tool_overlay=overlay
+        )
+        obs = asyncio.run(tool.execute({"tool_id": "x", "confirmed": False}))
+        assert obs.success is False
+        assert "确认" in (obs.error or "")
+
+    def test_list_tools_includes_custom_tools(
+        self,
+        catalog: AssistantCatalogImpl,
+    ) -> None:
+        from lca.infrastructure.tools.assistant.self_manage_tools import (
+            ListAssistantToolsTool,
+        )
+        from lca.plugins.assistant.tool.overlay import AssistantToolOverlayImpl
+
+        assistant_id = _create(catalog)
+        overlay = AssistantToolOverlayImpl(catalog=catalog)
+        asyncio.run(overlay.create(assistant_id, _tool_spec()))
+        tool = ListAssistantToolsTool(
+            catalog=catalog,
+            assistant_id=assistant_id,
+            tool_overlay=overlay,
+            catalog_names=lambda: ["runCommand", "search"],
+        )
+        obs = asyncio.run(tool.execute({}))
+        assert obs.success is True
+        assert obs.payload is not None
+        assert obs.payload["custom_tools"] == [
+            {
+                "tool_id": "my_tool",
+                "path": str(Path(catalog.get(assistant_id).home_path) / "tools" / "my_tool"),
+                "digest": obs.payload["custom_tools"][0]["digest"],
+            }
+        ]
+        assert obs.payload["builtin_catalog"] == ["runCommand", "search"]
+        assert obs.payload["allowed_builtins"] == ["runCommand", "search"]

@@ -21,6 +21,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import structlog
+
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
@@ -57,6 +59,8 @@ _FORKED_BINDING_KEYS: frozenset[str] = frozenset(
         "machine_resolver",
     }
 )
+
+_log = structlog.get_logger(__name__)
 
 
 def _bindings_from_runtime_plane() -> BindingsView | None:
@@ -127,6 +131,54 @@ def _assert_sandbox_tools_visible(bindings: BindingsView, items: tuple) -> None:
         )
 
 
+def _custom_tools_from_home(home_path: str, items: tuple) -> tuple:
+    """Load assistant custom tools from ``{home}/tools/`` (ADR-0243 D5).
+
+    Only ``builtin_preset`` tools whose backing builtin is present in the
+    filtered run tool set are materialized; a preset wrapping a denied or
+    unavailable builtin is skipped to avoid dead tools.
+    """
+    from pathlib import Path
+
+    from lca.contracts.models.assistant.tool_spec import ToolSpec
+    from lca.contracts.protocols import Tool
+    from lca.infrastructure.tools.assistant.custom_tool import AssistantCustomTool
+
+    tools_root = Path(home_path) / "tools"
+    if not tools_root.is_dir():
+        return ()
+    by_name = {str(getattr(tool, "name", "")): tool for tool in items}
+
+    def resolve_builtin(name: str) -> Tool | None:
+        return by_name.get(name)
+
+    out: list[AssistantCustomTool] = []
+    for child in sorted(tools_root.iterdir()):
+        if not child.is_dir() or child.name.startswith("."):
+            continue
+        spec_path = child / "tool.json"
+        if not spec_path.is_file():
+            continue
+        try:
+            spec = ToolSpec.model_validate_json(spec_path.read_text(encoding="utf-8"))
+        except Exception:
+            _log.warning(
+                "tool.fork.dispatch.skip_bad_custom_tool",
+                home=str(tools_root),
+                tool_id=child.name,
+            )
+            continue
+        if spec.handler.kind == "builtin_preset" and (spec.handler.builtin or "") not in by_name:
+            continue
+        out.append(
+            AssistantCustomTool(
+                spec,
+                builtin_resolver=resolve_builtin,
+            )
+        )
+    return tuple(out)
+
+
 @dataclass(frozen=True, slots=True)
 class ToolForkDispatchExecutor:
     """concept.tool.fork 节点:typed BindingsView → ForkedTools."""
@@ -185,6 +237,7 @@ class ToolForkDispatchExecutor:
             )
 
             items = filter_tools_by_assistant(items, bindings.home_path)
+            items = items + _custom_tools_from_home(bindings.home_path, items)
         _assert_sandbox_tools_visible(bindings, items)
         forked_tools = ForkedTools(
             items=items,

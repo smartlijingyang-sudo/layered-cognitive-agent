@@ -72,6 +72,7 @@ CONFIG_FACE_FILES: tuple[str, ...] = (
 # Home 占位子目录(空目录占位)
 _HOME_SUBDIRS: tuple[str, ...] = (
     "skills",
+    "tools",
     "workspace",
     "memory",
     "routines",

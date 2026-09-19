@@ -298,6 +298,9 @@ ASSISTANT_CATALOG = Capability[object]("assistant.catalog", cardinality="one")
 ASSISTANT_SKILL_OVERLAY = Capability[object]("assistant.skill_overlay", cardinality="one")
 """助理域 skill overlay（挂 0048 全局 store 之上的 per-assistant 索引）。"""
 
+ASSISTANT_TOOL_OVERLAY = Capability[object]("assistant.tool_overlay", cardinality="one")
+"""助理域 tool overlay（ADR-0243 D4）：写 ``{home}/tools/`` 的自定义工具定义。"""
+
 ASSISTANT_EVOLVE = Capability[object]("assistant.evolve", cardinality="one")
 """助理域 SkillAcquirer 实现（与 learning.skill_acquirer 平行但 capability 独立）。"""
 

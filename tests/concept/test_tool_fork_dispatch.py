@@ -17,6 +17,7 @@ Cases:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -184,15 +185,13 @@ async def test_tools_capability_missing_fails_loud() -> None:
         )
 
 
-@pytest.mark.asyncio
-async def test_module_does_not_import_emit() -> None:
+def test_module_does_not_import_emit() -> None:
     """P5 invariant: node plugin module is pure — no EP / journal import."""
     import lca.nodes.concept.tool_fork.dispatch as mod
 
     src = mod.__file__
     assert src is not None
-    with open(src, encoding="utf-8") as f:
-        text = f.read()
+    text = Path(src).read_text(encoding="utf-8")
     assert "from lca.infrastructure.session.emit" not in text
     assert "from lca.loop.emit" not in text
 
@@ -320,7 +319,6 @@ def _write_home_policy(home: Path, *, allow: list[str], deny: list[str]) -> None
 @pytest.mark.asyncio
 async def test_assistant_id_filters_forked_tools_by_home_policy(tmp_path) -> None:
     """I-B3: assistant Home deny 列表中的工具不出现在 ForkedTools。"""
-    from pathlib import Path
 
     from lca.contracts.models.cognition.boundary import BindingsView
 
@@ -368,3 +366,78 @@ async def test_no_assistant_id_leaves_fork_untouched(tmp_path) -> None:
     forked: _ToolsServiceStub = result.port_values["forked_tools"].items  # type: ignore[assignment]
     names = {t.name for t in forked}
     assert names == {"search", "runCommand"}
+
+
+# ──────────────────────────────────────────────────────────────────────
+# ADR-0243 D5 / I-B17: assistant-bound runs merge custom tools from
+# ``{home}/tools/``. A preset wrapping a denied/unavailable builtin is
+# skipped; a preset wrapping an allowed builtin appears in ForkedTools.
+# ──────────────────────────────────────────────────────────────────────
+
+
+def _write_custom_tool(home, tool_id: str, *, builtin: str, name: str | None = None) -> None:
+    import json
+
+    tool_dir = home / "tools" / tool_id
+    tool_dir.mkdir(parents=True, exist_ok=True)
+    spec = {
+        "name": name or tool_id,
+        "description": "自定义工具",
+        "parameters": {"type": "object", "properties": {}},
+        "required_grant": "",
+        "handler": {"kind": "builtin_preset", "builtin": builtin, "args": {}},
+    }
+    (tool_dir / "tool.json").write_text(json.dumps(spec), encoding="utf-8")
+
+
+@pytest.mark.asyncio
+async def test_assistant_id_merges_custom_tools(tmp_path) -> None:
+    """I-B17:自定义工具进入 ForkedTools；包装被 deny 内置工具的 preset 被跳过。"""
+    from lca.contracts.models.cognition.boundary import BindingsView
+
+    home = tmp_path / "asst_home"
+    _write_home_policy(home, allow=[], deny=["search"])
+    _write_custom_tool(home, "report_tool", builtin="runCommand")
+    _write_custom_tool(home, "search_wrapper", builtin="search")
+
+    tools = _ToolsServiceStub(
+        tools={
+            "search": _ToolStub(name="search"),
+            "runCommand": _ToolStub(name="runCommand"),
+        }
+    )
+    executor = ToolForkDispatchExecutor()
+    bindings = BindingsView(
+        sandbox=None,
+        mode="solo",
+        assistant_id="asst_test",
+        home_path=str(home),
+    )
+    result = await executor.node_execute(
+        _ctx(),
+        _input(bindings, tools=tools),
+    )
+    forked: _ToolsServiceStub = result.port_values["forked_tools"].items  # type: ignore[assignment]
+    names = {t.name for t in forked}
+    assert "report_tool" in names, "包装允许内置工具的自定义工具应出现"
+    assert "search_wrapper" not in names, "包装被 deny 内置工具的自定义工具应被跳过"
+    assert "search" not in names, "内置 search 被 Home 策略 deny"
+
+
+@pytest.mark.asyncio
+async def test_custom_tools_not_merged_without_assistant_id(tmp_path) -> None:
+    """I-B19:无 assistant_id 时不读 {home}/tools/。"""
+    from lca.contracts.models.cognition.boundary import BindingsView
+
+    home = tmp_path / "asst_home"
+    _write_custom_tool(home, "report_tool", builtin="runCommand")
+    tools = _ToolsServiceStub(tools={"runCommand": _ToolStub(name="runCommand")})
+    executor = ToolForkDispatchExecutor()
+    bindings = BindingsView(sandbox=None, mode="solo")
+    result = await executor.node_execute(
+        _ctx(),
+        _input(bindings, tools=tools),
+    )
+    forked: _ToolsServiceStub = result.port_values["forked_tools"].items  # type: ignore[assignment]
+    names = {t.name for t in forked}
+    assert names == {"runCommand"}
