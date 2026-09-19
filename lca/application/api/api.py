@@ -116,6 +116,7 @@ class Agent(AgentUnit):
         tools: Sequence[Tool],
         llm: LLMAdapter,
         *,
+        role_profile: RoleProfile | None = None,
         max_steps: int = DEFAULT_MAX_STEPS,
         max_wall_clock_seconds: int | None = DEFAULT_MAX_WALL_CLOCK_SECONDS,
         memory: str | MemorySystem = MEMORY_CHOICE_SIMPLE,
@@ -124,15 +125,17 @@ class Agent(AgentUnit):
         brain: str | Brain = BRAIN_CHOICE_DEFAULT,
         scope: Context | None = None,
     ) -> None:
-        self._spec = AgentSpec(
-            profile=RoleProfile(
+        if role_profile is None:
+            role_profile = RoleProfile(
                 role=role,
                 goal=goal,
                 backstory=backstory,
                 tool_permission_manifest=ToolPermissionManifest(
                     allowed_tools=[t.name for t in tools]
                 ),
-            ),
+            )
+        self._spec = AgentSpec(
+            profile=role_profile,
             llm=llm,
             tools=tuple(tools),
             max_steps=max_steps,

@@ -91,6 +91,7 @@ def build_solo_agent(
         "role": role,
         "goal": goal,
         "backstory": backstory,
+        "role_profile": role_profile,
         "tools": filter_solo_tools(tools if tools is not None else ()),
         "llm": llm,
         "observability": observability,
