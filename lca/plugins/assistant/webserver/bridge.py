@@ -52,6 +52,14 @@ _TRPC_CREATE_AGENT_PATH = "/trpc/lambda/agent.createAgent"
 _DEFAULT_TIMEOUT_S = 10.0
 _SOUL_SUMMARY_MAX_CHARS = 2000
 """systemRole 摘要长度上限（LobeHub agents.system_role 是 text 列；防人设全文膨胀）。"""
+_TITLE_MAX_CHARS = 200
+"""title 长度上限（LobeHub agents.title 是 varchar(255)）。"""
+_DESCRIPTION_MAX_CHARS = 900
+"""description 长度上限（LobeHub agents.description 是 varchar(1000)）。
+
+ADR-0242 D7 把能力清单并入描述后很容易超过 1000 字符，不截断会导致
+``agent.createAgent`` 的 Postgres insert 失败（500），前端 agent 行缺失。
+"""
 
 
 # ── Plugin 配置 ───────────────────────────────────────────────────────
@@ -112,8 +120,8 @@ class AssistantFrontendBridge:
             return None
 
         config: dict[str, Any] = {
-            "title": name,
-            "description": description,
+            "title": name[:_TITLE_MAX_CHARS],
+            "description": description[:_DESCRIPTION_MAX_CHARS],
             "avatar": emoji,
             "model": "solo",
             "systemRole": system_role[:_SOUL_SUMMARY_MAX_CHARS],
