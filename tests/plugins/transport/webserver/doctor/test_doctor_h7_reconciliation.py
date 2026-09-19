@@ -70,7 +70,9 @@ def test_h7_passes_with_text_step_and_plural_concurrent_tools(tmp_path: Path) ->
     H7 应精确对账并通过 (ok=True)。
     旧代码如果不读 step.tool_calls，只会读到 1 个工具，从而误报 mismatch。
     """
-    meta = JournalMetadata(agent_role="assistant", strategy_key="solo", plan_ref="p", objective="multi-tool test")
+    meta = JournalMetadata(
+        agent_role="assistant", strategy_key="solo", plan_ref="p", objective="multi-tool test"
+    )
     doc = empty_document(run_id="run_concurrent", trace_id="t1", metadata=meta, started_at=0.0)
 
     # Step 1: 纯文本回复
@@ -78,7 +80,9 @@ def test_h7_passes_with_text_step_and_plural_concurrent_tools(tmp_path: Path) ->
 
     # Step 2: 包含 2 个并发工具调用
     tc1 = ToolCallRecord(invocation_id="inv-cmd-1", name="runCommand", arguments={"command": "ls"})
-    tc2 = ToolCallRecord(invocation_id="inv-code-2", name="executeCode", arguments={"code": "print(1)"})
+    tc2 = ToolCallRecord(
+        invocation_id="inv-code-2", name="executeCode", arguments={"code": "print(1)"}
+    )
     tr1 = ToolResult(invocation_id="inv-cmd-1", ok=True, latency_ms=50)
     tr2 = ToolResult(invocation_id="inv-code-2", ok=True, latency_ms=80)
 
@@ -108,11 +112,21 @@ def test_h7_passes_with_text_step_and_plural_concurrent_tools(tmp_path: Path) ->
         [
             {
                 "execution_point": "phase.tool.call.end",
-                "payload": {"tool_name": "runCommand", "invocation_id": "inv-cmd-1", "ok": True, "step": 2},
+                "payload": {
+                    "tool_name": "runCommand",
+                    "invocation_id": "inv-cmd-1",
+                    "ok": True,
+                    "step": 2,
+                },
             },
             {
                 "execution_point": "phase.tool.call.end",
-                "payload": {"tool_name": "executeCode", "invocation_id": "inv-code-2", "ok": True, "step": 2},
+                "payload": {
+                    "tool_name": "executeCode",
+                    "invocation_id": "inv-code-2",
+                    "ok": True,
+                    "step": 2,
+                },
             },
         ],
     )
@@ -131,7 +145,9 @@ def test_h7_identifies_forked_tools_with_interleaved_text_steps_legacy(tmp_path:
     因为 2 != 1，旧代码误判 forked=False，报错 mismatch (ok=False)！
     新对账机制：通过 spine 中 step 2 包含多条 phase.tool.call.end 识别为并发工具，判定 ok=None (forked)。
     """
-    meta = JournalMetadata(agent_role="assistant", strategy_key="solo", plan_ref="p", objective="legacy fork test")
+    meta = JournalMetadata(
+        agent_role="assistant", strategy_key="solo", plan_ref="p", objective="legacy fork test"
+    )
     doc = empty_document(run_id="run_legacy_fork", trace_id="t2", metadata=meta, started_at=0.0)
 
     # Step 1: 纯文本回复
@@ -164,11 +180,21 @@ def test_h7_identifies_forked_tools_with_interleaved_text_steps_legacy(tmp_path:
         [
             {
                 "execution_point": "phase.tool.call.end",
-                "payload": {"tool_name": "runCommand", "invocation_id": "inv-cmd-1", "ok": True, "step": 2},
+                "payload": {
+                    "tool_name": "runCommand",
+                    "invocation_id": "inv-cmd-1",
+                    "ok": True,
+                    "step": 2,
+                },
             },
             {
                 "execution_point": "phase.tool.call.end",
-                "payload": {"tool_name": "executeCode", "invocation_id": "inv-code-2", "ok": True, "step": 2},
+                "payload": {
+                    "tool_name": "executeCode",
+                    "invocation_id": "inv-code-2",
+                    "ok": True,
+                    "step": 2,
+                },
             },
         ],
     )
@@ -187,11 +213,15 @@ def test_h7_detects_genuine_lost_tool_call_with_precise_difference(tmp_path: Pat
     Journal: 仅有 step 1 (inv-1), step 2 (inv-2)
     H7 判定 ok=False，并在 extra 和 detail 中准确指出 missing_in_journal 包含了 inv-3。
     """
-    meta = JournalMetadata(agent_role="assistant", strategy_key="solo", plan_ref="p", objective="lost tool test")
+    meta = JournalMetadata(
+        agent_role="assistant", strategy_key="solo", plan_ref="p", objective="lost tool test"
+    )
     doc = empty_document(run_id="run_lost", trace_id="t3", metadata=meta, started_at=0.0)
 
     for i in (1, 2):
-        tc = ToolCallRecord(invocation_id=f"inv-{i}", name="runCommand", arguments={"command": f"cmd {i}"})
+        tc = ToolCallRecord(
+            invocation_id=f"inv-{i}", name="runCommand", arguments={"command": f"cmd {i}"}
+        )
         tr = ToolResult(invocation_id=f"inv-{i}", ok=True, latency_ms=50)
         doc = append_step(
             doc,
@@ -217,7 +247,12 @@ def test_h7_detects_genuine_lost_tool_call_with_precise_difference(tmp_path: Pat
         [
             {
                 "execution_point": "phase.tool.call.end",
-                "payload": {"tool_name": "runCommand", "invocation_id": f"inv-{i}", "ok": True, "step": i},
+                "payload": {
+                    "tool_name": "runCommand",
+                    "invocation_id": f"inv-{i}",
+                    "ok": True,
+                    "step": i,
+                },
             }
             for i in (1, 2, 3)
         ],
@@ -229,3 +264,57 @@ def test_h7_detects_genuine_lost_tool_call_with_precise_difference(tmp_path: Pat
     assert (h7.extra or {}).get("forked_tool_calls") is False
     assert "missing_in_journal" in (h7.extra or {})
     assert "inv-3" in (h7.extra or {}).get("missing_in_journal", [])
+
+
+def test_h7_uses_set_reconciliation_when_step_info_missing(tmp_path: Path) -> None:
+    """Spine 事件缺少 step 字段时，启发式 (total_steps == tool_total < spine_total) 不再生效。
+
+    旧代码会因 total_steps == tool_total < spine_total 而把真实丢失误判为 forked
+    (ok=None)，掩盖数据丢失。新行为：直接按集合差报告 ok=False，并精确列出缺失 id。
+    """
+    meta = JournalMetadata(
+        agent_role="assistant", strategy_key="solo", plan_ref="p", objective="no step info test"
+    )
+    doc = empty_document(run_id="run_no_step_info", trace_id="t4", metadata=meta, started_at=0.0)
+
+    for i in (1, 2):
+        tc = ToolCallRecord(
+            invocation_id=f"inv-{i}", name="runCommand", arguments={"command": f"cmd {i}"}
+        )
+        tr = ToolResult(invocation_id=f"inv-{i}", ok=True, latency_ms=50)
+        doc = append_step(
+            doc,
+            JournalStep(
+                step_id=f"step-{i}",
+                step_index=i,
+                phase="act",
+                entered_at=float(i),
+                outcome="ok",
+                tool_call=tc,
+                tool_result=tr,
+                thinking=ThinkingTrace(model="test-model", latency_ms=10),
+                reflect=ReflectTrace(summary=f"step {i}"),
+            ),
+        )
+    doc = close_document(doc, outcome="completed", closed_at=5.0)
+    path = _write_doc(tmp_path, doc)
+
+    # Spine 有 3 个工具调用，但 payload 不带 step 字段
+    _write_spine(
+        tmp_path,
+        "run_no_step_info",
+        [
+            {
+                "execution_point": "phase.tool.call.end",
+                "payload": {"tool_name": "runCommand", "invocation_id": f"inv-{i}", "ok": True},
+            }
+            for i in (1, 2, 3)
+        ],
+    )
+
+    report = diagnose_step_tree(path)
+    h7 = report.hops["H7"]
+    assert h7.ok is False
+    # 启发式不再写入 forked_tool_calls
+    assert "forked_tool_calls" not in (h7.extra or {})
+    assert (h7.extra or {}).get("missing_in_journal") == ["inv-3"]
