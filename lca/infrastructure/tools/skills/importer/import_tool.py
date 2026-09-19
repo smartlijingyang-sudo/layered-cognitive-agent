@@ -41,7 +41,8 @@ class SkillImportTool(Tool):
         "从网络安装操作 skill 到本地技能库（与角色身份无关）。"
         "支持：market identifier、lobehub.com/skills/…/skill.md、"
         "GitHub 目录链接、ZIP URL、裸 SKILL.md URL。"
-        "若为当前助理创建专属 skill，请用 create_assistant_skill（写入助理 Home）。"
+        "为当前助理创建专属 skill 仅在助理绑定工具 create_assistant_skill 存在时可用"
+        "（写入助理 Home）；否则安装结果只进入全局技能库。"
         "参数: identifier（Market ID，与 url 二选一）或 url + kind（auto/url/zip）。"
     )
     parameters: ClassVar[dict[str, Any]] = {
