@@ -172,43 +172,68 @@ export async function lcaExecuteGatewayRun(
     params: Record<string, unknown>;
   },
 ): Promise<{ model: string; provider: string }> {
-  const lastUser = params.messages
-    .slice()
-    .reverse()
-    .find((m) => m.role === 'user');
-  const content =
-    typeof lastUser?.content === 'string'
-      ? lastUser.content
-      : JSON.stringify(lastUser?.content ?? '');
-
-  // Forward LobeHub-side attachment fields so LCA ingress can hydrate the
-  // FileStore before composing the run prompt. Empty arrays are dropped to
-  // keep the wire shape stable for text-only turns.
-  const attachmentExtras: {
+  // Forward multi-turn conversation messages with attachments attached to their originating turns.
+  const rawMessages = params.messages || [];
+  const wireMessages: Array<{
+    role: string;
+    content: string;
     imageList?: Array<{ id: string; url: string; alt?: string }>;
     fileList?: Array<{ id: string; name?: string; url?: string; fileType?: string }>;
     files?: string[];
-  } = {};
-  const imageList = (lastUser as { imageList?: unknown } | undefined)?.imageList;
-  if (Array.isArray(imageList) && imageList.length > 0) {
-    attachmentExtras.imageList = imageList as Array<{
-      id: string;
-      url: string;
-      alt?: string;
-    }>;
+  }> = [];
+
+  for (const m of rawMessages) {
+    if (!m || m.role === 'system') continue;
+    if (m.role !== 'user' && m.role !== 'assistant') continue;
+
+    const msgContent =
+      typeof m.content === 'string'
+        ? m.content
+        : m.content != null
+          ? JSON.stringify(m.content)
+          : '';
+
+    const attachmentExtras: {
+      imageList?: Array<{ id: string; url: string; alt?: string }>;
+      fileList?: Array<{ id: string; name?: string; url?: string; fileType?: string }>;
+      files?: string[];
+    } = {};
+
+    const imageList = (m as { imageList?: unknown }).imageList;
+    if (Array.isArray(imageList) && imageList.length > 0) {
+      attachmentExtras.imageList = imageList as Array<{
+        id: string;
+        url: string;
+        alt?: string;
+      }>;
+    }
+    const fileList = (m as { fileList?: unknown }).fileList;
+    if (Array.isArray(fileList) && fileList.length > 0) {
+      attachmentExtras.fileList = fileList as Array<{
+        id: string;
+        name?: string;
+        url?: string;
+        fileType?: string;
+      }>;
+    }
+    const files = (m as { files?: unknown }).files;
+    if (Array.isArray(files) && files.length > 0) {
+      attachmentExtras.files = files as string[];
+    }
+
+    if (!msgContent && Object.keys(attachmentExtras).length === 0) {
+      continue;
+    }
+
+    wireMessages.push({
+      role: m.role,
+      content: msgContent,
+      ...attachmentExtras,
+    });
   }
-  const fileList = (lastUser as { fileList?: unknown } | undefined)?.fileList;
-  if (Array.isArray(fileList) && fileList.length > 0) {
-    attachmentExtras.fileList = fileList as Array<{
-      id: string;
-      name?: string;
-      url?: string;
-      fileType?: string;
-    }>;
-  }
-  const files = (lastUser as { files?: unknown } | undefined)?.files;
-  if (Array.isArray(files) && files.length > 0) {
-    attachmentExtras.files = files as string[];
+
+  if (wireMessages.length === 0) {
+    wireMessages.push({ role: 'user', content: '' });
   }
 
   const state = get();
@@ -233,7 +258,7 @@ export async function lcaExecuteGatewayRun(
 
   const receipt = await lcaStartRun({
     agent: { id: params.model, name: params.model },
-    messages: [{ role: 'user', content, ...attachmentExtras }],
+    messages: wireMessages,
     parent_message_id: assistantMessageId || params.parentMessageId,
     topic_id: topicId || undefined,
     ...(assistantId ? { assistant_id: assistantId } : {}),
