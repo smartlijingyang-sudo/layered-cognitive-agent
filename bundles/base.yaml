@@ -150,6 +150,10 @@ entries:
   name: phase_perceive_observe
   $module: lca.nodes.perceive.observe.observe
   config: {}
+- id: phase.perceive.memory_retrieve
+  name: phase_perceive_memory_retrieve
+  $module: lca.nodes.perceive.memory_retrieve.memory_retrieve
+  config: {}
 - id: phase.perceive.fold
   name: phase_perceive_fold
   $module: lca.nodes.perceive.fold.fold
@@ -161,6 +165,10 @@ entries:
 - id: phase.reflect.admit_recovery
   name: phase_reflect_admit_recovery
   $module: lca.nodes.reflect.admit_recovery.admit_recovery
+  config: {}
+- id: phase.remember.admit
+  name: phase_remember_admit
+  $module: lca.nodes.remember.admit.admit
   config: {}
 - id: phase.remember.write
   name: phase_remember_write

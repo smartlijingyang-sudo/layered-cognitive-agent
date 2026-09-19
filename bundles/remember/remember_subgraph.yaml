@@ -7,12 +7,18 @@
 
 id: remember.subgraph
 region: remember
-purpose: remember 双步执行 — write (mint envelope + dispatch) → fold (memory_receipt)
+purpose: remember 三步执行 — admit (filter & authority gate) → write (mint envelope + dispatch) → fold (memory_receipt)
 
 nodes:
+  - id: phase.remember.admit
+    factory: phase.remember.admit
+    inputs: [decision, observation, reflection]
+    outputs: [decision, observation, reflection, admitted, candidate, routing]
+    config:
+
   - id: phase.remember.write
     factory: phase.remember.write
-    inputs: [decision, observation, reflection]
+    inputs: [decision, observation, reflection, admitted, candidate]
     outputs: [memory_receipt]
     config:
 
@@ -23,6 +29,10 @@ nodes:
     config:
 
 edges:
+  - from: phase.remember.admit
+    to: phase.remember.write
+    when: true
+
   - from: phase.remember.write
     to: phase.remember.fold
     when: true

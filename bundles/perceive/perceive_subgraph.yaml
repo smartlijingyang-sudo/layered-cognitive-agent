@@ -10,12 +10,18 @@
 
 id: perceive.subgraph
 region: perceive
-purpose: perceive 双步执行 — observe (PerceiveHub) → fold (manifest → observation)
+purpose: perceive 三步执行 — observe (PerceiveHub) → memory_retrieve (Context Memories) → fold (manifest → observation)
 
 nodes:
   - id: phase.perceive.observe
     factory: phase.perceive.observe
     outputs: [manifest, routing]
+    config:
+
+  - id: phase.perceive.memory_retrieve
+    factory: phase.perceive.memory_retrieve
+    inputs: [manifest]
+    outputs: [manifest, memories, routing]
     config:
 
   - id: phase.perceive.fold
@@ -32,4 +38,7 @@ nodes:
 
 edges:
   - from: phase.perceive.observe
+    to: phase.perceive.memory_retrieve
+
+  - from: phase.perceive.memory_retrieve
     to: phase.perceive.fold

@@ -24,6 +24,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
+from lca.contracts.models.cognition.boundary import ProceduralMemoryCandidate
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
@@ -61,6 +62,46 @@ def _normalize_observation(value: object) -> object:
             },
         )
     return value
+
+def _extract_procedural_candidate(state: object, observation: object) -> ProceduralMemoryCandidate | None:
+    """Universal cognitive meta-feature extraction for procedural memory candidates.
+
+    ADR-0244: Identifies candidates based PURELY on structural execution indicators:
+    - Multi-step tool execution sequence (>= 2 successful tool hops)
+    - Production of concrete deliverables (files/artifacts)
+    NEVER inspects specific skill names or regex patterns.
+    """
+    if observation is None or not getattr(observation, "success", False):
+        return None
+
+    # Meta-feature 1: Check for tool sequence or multi-step history in state
+    turns = getattr(state, "turns", ()) or ()
+    tool_sequence: list[str] = []
+    for t in turns:
+        dec = getattr(t, "decision", None)
+        for tc in getattr(dec, "tool_calls", ()) or ():
+            tname = getattr(tc, "tool_name", "")
+            if tname:
+                tool_sequence.append(str(tname))
+        action_name = getattr(dec, "action_name", "") or getattr(dec, "tool_name", "")
+        if action_name and action_name not in ("respond", "think", "wait"):
+            tool_sequence.append(str(action_name))
+
+    obs_extra = getattr(observation, "extra", {}) or {}
+    files = obs_extra.get("generated_files") or ()
+
+    # Trigger condition: multi-step tool sequence (>=2) or deliverable files produced
+    if len(tool_sequence) >= 2 or len(files) > 0:
+        candidate_id = new_id("cand_proc")
+        return ProceduralMemoryCandidate(
+            candidate_id=candidate_id,
+            workflow_summary=f"Automated workflow with {len(tool_sequence)} steps and {len(files)} outputs",
+            tool_sequence=tuple(tool_sequence),
+            evidence_count=len(tool_sequence) + len(files),
+            confidence=0.9,
+            suggested_title=f"Procedural SOP ({len(tool_sequence)} actions)",
+        )
+    return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,6 +152,21 @@ class ReflectScoreExecutor:
                 observation=observation,
                 critic=None,
             )
+
+        # ADR-0244: Universal procedural memory candidate extraction
+        candidate = _extract_procedural_candidate(state, observation)
+        if candidate is not None:
+            if payload is None:
+                from lca.contracts.atoms.enums.enums import ReflectionVerdict
+                from lca.contracts.models.core.execution.decision import Reflection
+                payload = Reflection(
+                    reflection_id=new_id("refl"),
+                    verdict=ReflectionVerdict.ON_TRACK,
+                    extra={"procedural_candidate": candidate},
+                )
+            elif hasattr(payload, "extra") and isinstance(payload.extra, dict):
+                payload.extra["procedural_candidate"] = candidate
+
         return NodeOutput(
             port_values={
                 "reflection": payload,

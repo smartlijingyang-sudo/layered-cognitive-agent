@@ -152,10 +152,27 @@ class ReasonerBundle(BaseModel):
     template: TemplateSelection
 
 
+class ProceduralMemoryCandidate(BaseModel):
+    """Candidate procedural memory (SOP / skill) identified during reflection.
+
+    ADR-0244: Emitted purely from universal cognitive meta-features (multi-step tool
+    success chain, artifact generation) without hardcoded skill names or intent regexes.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True, arbitrary_types_allowed=True)
+    candidate_id: str
+    workflow_summary: str
+    tool_sequence: tuple[str, ...] = ()
+    evidence_count: int = 1
+    confidence: float = 1.0
+    suggested_title: str = ""
+
+
 __all__ = [
     "BindingsView",
     "ForkedTools",
     "MemoryReceipt",
+    "ProceduralMemoryCandidate",
     "ReasonerBundle",
     "ReasonerContext",
     "RoleSnapshot",
@@ -174,3 +191,4 @@ BindingsView.model_rebuild()
 ForkedTools.model_rebuild()
 RoleSnapshot.model_rebuild()
 ReasonerBundle.model_rebuild()
+ProceduralMemoryCandidate.model_rebuild()

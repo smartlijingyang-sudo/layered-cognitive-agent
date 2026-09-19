@@ -51,6 +51,8 @@ class RememberWriteExecutor:
         "decision",
         "observation",
         "reflection",
+        "admitted",
+        "candidate",
         "effect_gateway",
     )
     declared_outputs: tuple[PortName, ...] = ("envelope",)
@@ -64,7 +66,11 @@ class RememberWriteExecutor:
         decision = input.port_values.get("decision")
         observation = input.port_values.get("observation")
         reflection = input.port_values.get("reflection")
-        if decision is None or observation is None or reflection is None:
+        admitted = input.port_values.get("admitted")
+        candidate = input.port_values.get("candidate")
+
+        # Fast-Path / Rejection: if admitted is explicitly False, skip minting envelope
+        if admitted is False or decision is None or observation is None or reflection is None:
             return NodeOutput(
                 port_values={
                     "envelope": None,
@@ -86,6 +92,7 @@ class RememberWriteExecutor:
                 "operation": "memory.update",
                 "observation": observation,
                 "reflection": reflection,
+                "candidate": candidate,
             },
         )
         gateway = input.port_values.get("effect_gateway")

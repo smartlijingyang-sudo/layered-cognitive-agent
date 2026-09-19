@@ -103,7 +103,7 @@ nodes:
     region: phase:remember
     sub_spec_ref:
       plan_ref: bundles/remember/remember_subgraph.yaml
-      entry_node: phase.remember.write
+      entry_node: phase.remember.admit
       binding_edge: remember.main
     # Inner ``phase.remember.write`` declared_inputs are
     # ``[decision, observation, reflection]`` per the executor's
