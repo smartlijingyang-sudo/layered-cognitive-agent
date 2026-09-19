@@ -18,6 +18,7 @@ from lca.contracts.atoms.enums.enums import MemoryLayer
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.conversation.memory import MemoryRecord
 from lca.contracts.models.core.execution.decision import Observation, Reflection
+from lca.contracts.models.core.perceive.perception import ContextManifest
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.memory.memory import MemorySystem
 
@@ -60,6 +61,11 @@ class AssistantMemory(MemorySystem):
     async def perceive(self, state: AgentState) -> AgentState:
         """返回原状态；检索注入由后续 memory.retrieve 节点负责（ADR-0242 D11）。"""
         return state
+
+    async def retrieve(self, manifest: ContextManifest) -> list[MemoryRecord]:
+        """返回持久化的事实记忆（semantic + episodic），供 ``memory_retrieve`` 注入。"""
+        del manifest
+        return self.query(MemoryLayer.SEMANTIC) + self.query(MemoryLayer.EPISODIC)
 
     async def update(
         self,

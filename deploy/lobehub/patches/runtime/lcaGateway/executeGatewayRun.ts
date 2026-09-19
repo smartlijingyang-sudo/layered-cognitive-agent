@@ -153,6 +153,26 @@ function createLcaRunOnSessionComplete(
   };
 }
 
+// ADR-0244 D1: assistant placeholder rows (optimistic '...', LOADING_FLAT,
+// or empty content with no tools/reasoning/attachments) must not reach the
+// backend as if they were real replies.
+export function isPlaceholderAssistantRow(m: unknown): boolean {
+  const row = m as {
+    role?: string;
+    content?: unknown;
+    tools?: unknown[];
+    reasoning?: { content?: unknown };
+    imageList?: unknown[];
+    fileList?: unknown[];
+  };
+  if (!row || row.role !== 'assistant') return false;
+  if (row.tools?.length || row.reasoning?.content || row.imageList?.length || row.fileList?.length) {
+    return false;
+  }
+  const content = typeof row.content === 'string' ? row.content : '';
+  return content === '' || content === '...' || content === 'LOADING_FLAT';
+}
+
 export async function lcaExecuteGatewayRun(
   get: () => ChatStore,
   params: {
@@ -185,6 +205,7 @@ export async function lcaExecuteGatewayRun(
   for (const m of rawMessages) {
     if (!m || m.role === 'system') continue;
     if (m.role !== 'user' && m.role !== 'assistant') continue;
+    if (isPlaceholderAssistantRow(m)) continue;
 
     const msgContent =
       typeof m.content === 'string'

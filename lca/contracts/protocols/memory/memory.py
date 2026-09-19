@@ -7,6 +7,7 @@ from typing import Protocol, runtime_checkable
 from lca.contracts.atoms.enums.enums import MemoryLayer
 from lca.contracts.models.core.conversation.memory import MemoryRecord, MemoryRelationKind
 from lca.contracts.models.core.execution.decision import Observation, Reflection
+from lca.contracts.models.core.perceive.perception import ContextManifest
 from lca.contracts.models.core.state.state import AgentState
 
 
@@ -27,6 +28,13 @@ class MemorySystem(Protocol):
     ) -> None: ...
 
     def query(self, layer: MemoryLayer) -> list[MemoryRecord]: ...
+
+    async def retrieve(self, manifest: ContextManifest) -> list[MemoryRecord]:
+        """Retrieve context-relevant memories for the current turn (ADR-0244 D4).
+
+        Called by ``phase.perceive.memory_retrieve``; must return typed
+        ``MemoryRecord`` values and never raise on empty memory.
+        """
 
 
 @runtime_checkable

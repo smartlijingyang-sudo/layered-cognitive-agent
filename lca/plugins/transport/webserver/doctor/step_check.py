@@ -252,7 +252,9 @@ def _scan_xref(run_dir: Path, run_id: str, scan: StepScan) -> StepScan:
                         spine_tool_inv_ids.add(inv_id)
                     step_val = payload.get("step")
                     if step_val is not None:
-                        spine_step_tool_counts[step_val] = spine_step_tool_counts.get(step_val, 0) + 1
+                        spine_step_tool_counts[step_val] = (
+                            spine_step_tool_counts.get(step_val, 0) + 1
+                        )
                 # SSOT watchdog: phase.*.fold payload schema drift
                 payload = rec.get("payload")
                 if (
@@ -742,29 +744,38 @@ def _hop_h7(scan: StepScan) -> HopVerdict:
         # PR-D: parity check — journal distinct invocation count must match
         # spine phase.tool.call.end total.
         if scan.tool_total != spine_total:
-            # StepRecord.tool_call is singular in legacy projections, so a Decision that forked N
-            # parallel tool calls projects to one step holding one of them.
-            # Spine recording multiple calls for the same step indicates forking.
+            # ADR-0244: the total_steps == tool_total < spine_total heuristic is
+            # retired. Forked detection is only valid when spine events carry step
+            # info; otherwise the set differences are the precise verdict.
             if scan.spine_tool_has_step_info:
                 forked = scan.spine_tool_forked
-            else:
-                forked = scan.total_steps == scan.tool_total < spine_total
-            extra["forked_tool_calls"] = forked
-            detail = (
-                f"H7 step-tree 每步只投影一个 tool_call,本 run 有并发工具调用 "
-                f"({scan.tool_total} steps 承载 {spine_total} 次调用);"
-                f"事实层 step.tool_call.record 完整"
-                if forked
-                else (
-                    f"H7 journal/spine tool_total mismatch ({scan.tool_total} vs {spine_total})"
-                    + (f": missing in journal {missing_in_journal}" if missing_in_journal else "")
+                extra["forked_tool_calls"] = forked
+                detail = (
+                    f"H7 step-tree 每步只投影一个 tool_call,本 run 有并发工具调用 "
+                    f"({scan.tool_total} steps 承载 {spine_total} 次调用);"
+                    f"事实层 step.tool_call.record 完整"
+                    if forked
+                    else (
+                        f"H7 journal/spine tool_total mismatch ({scan.tool_total} vs {spine_total})"
+                        + (
+                            f": missing in journal {missing_in_journal}"
+                            if missing_in_journal
+                            else ""
+                        )
+                        + (f": missing in spine {missing_in_spine}" if missing_in_spine else "")
+                    )
                 )
+                return HopVerdict(
+                    ok=None if forked else False,
+                    detail=detail,
+                    extra=extra,
+                )
+            detail = (
+                f"H7 journal/spine tool_total mismatch ({scan.tool_total} vs {spine_total})"
+                + (f": missing in journal {missing_in_journal}" if missing_in_journal else "")
+                + (f": missing in spine {missing_in_spine}" if missing_in_spine else "")
             )
-            return HopVerdict(
-                ok=None if forked else False,
-                detail=detail,
-                extra=extra,
-            )
+            return HopVerdict(ok=False, detail=detail, extra=extra)
         spine_fail = scan.spine_phase_tool_call_end_failure_count
         journal_fail = scan.tool_total - scan.tool_success
         if spine_fail > 0 and journal_fail == 0:

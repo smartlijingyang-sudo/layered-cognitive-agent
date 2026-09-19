@@ -51,3 +51,8 @@ entries:
     name: lca_plugins_assistant_tools
     $module: lca.plugins.domain.tools.assistant_tools.plugin
     config: {}
+
+  - id: lca.plugins.assistant.curator.curator
+    name: lca_plugins_assistant_curator
+    $module: lca.plugins.assistant.curator.curator
+    config: {}

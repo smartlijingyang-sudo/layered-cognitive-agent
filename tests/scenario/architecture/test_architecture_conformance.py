@@ -252,8 +252,8 @@ class TestRemovedLoopInterventionPaths:
 
 class TestWorkingMemoryKeys:
     """The 12+ working_memory keys documented in conversation.py / runtime_loop
-    must be the only keys written in the codebase.  ``PRIOR_CONVERSATION_WM_KEY``
-    is the only canonical key today; ``loop_warning`` and ``subtasks`` are
+    must be the only keys written in the codebase.  The retired
+    ``prior_conversation`` key is gone; ``loop_warning`` and ``subtasks`` are
     deprecated and must be removed.
     """
 
