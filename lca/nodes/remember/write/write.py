@@ -68,6 +68,7 @@ class RememberWriteExecutor:
             return NodeOutput(
                 port_values={
                     "envelope": None,
+                    "memory_receipt": None,
                     "routing": RoutingDecision(action_type=ActionType.RESPOND),
                 },
             )

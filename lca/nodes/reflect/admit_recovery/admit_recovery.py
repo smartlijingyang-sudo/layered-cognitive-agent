@@ -43,12 +43,11 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 def _is_failure(observation: object) -> bool:
     if observation is None:
-        return True
+        return False
     if isinstance(observation, EffectReceipt):
         return observation.outcome is not EffectOutcome.SUCCEEDED
     if isinstance(observation, Mapping):
-        success = observation.get("success")
-        return success is False or success is None
+        return observation.get("success") is False
     return bool(getattr(observation, "success", None) is False)
 
 

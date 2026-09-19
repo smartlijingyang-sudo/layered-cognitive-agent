@@ -157,10 +157,10 @@ edges:
       port: { name: decision, field: action_type }
       value: use_tool
 
-  # think → terminal.commit when decision.action_type == respond
-  # AND decision.response_text is non-empty.
+  # think → reflect.main when decision.action_type == respond
+  # AND decision.response_text is non-empty (ADR-0244 closed cognitive loop).
   - from: think.main
-    to: terminal.commit
+    to: reflect.main
     when:
       kind: and
       children:
@@ -191,14 +191,14 @@ edges:
   # requirement (no silent split between "进 interrupt" and "回 think").
   #
   # Edge-order invariant: ``should_terminate`` must precede the use_tool
-  # re-ask edge so budget exhaustion routes to ``terminal.commit``
+  # re-ask edge so budget exhaustion routes to ``reflect.main``
   # instead of re-entering ``think.main``. ``select_edge`` returns the
   # first matching edge; reversing the order lets the use_tool edge
   # win on every iteration and the run loops indefinitely without
   # producing ``manifest.json`` / ``kernel.log``.
-  # act → terminal.commit on should_terminate.
+  # act → reflect.main on should_terminate (ADR-0244 closed cognitive loop).
   - from: act.main
-    to: terminal.commit
+    to: reflect.main
     when:
       kind: eq
       port: { name: should_terminate }

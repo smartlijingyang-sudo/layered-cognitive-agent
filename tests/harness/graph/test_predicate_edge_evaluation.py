@@ -117,7 +117,8 @@ def test_act_main_routes_failed_tool_back_to_think(outer_plan) -> None:
         )
 
     assert _choose(should_terminate=False).target == "think.main"
-    assert _choose(should_terminate=True).target == "terminal.commit"
+    # ADR-0244: completion routes through reflect.main to close the cognitive loop
+    assert _choose(should_terminate=True).target == "reflect.main"
 
 
 def test_select_edge_no_match_when_port_unset() -> None:
