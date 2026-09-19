@@ -254,3 +254,17 @@ class TestExecute:
         assert not obs.success
         assert obs.error is not None and "disk full" in obs.error
         assert bridge.calls == []  # 创建失败不得触达前端注册
+
+
+class TestToolContract:
+    """Tool schema must enforce the wizard order (role before name)."""
+
+    def test_description_forces_role_selection_before_name(self) -> None:
+        description = AssistantCreateTool.description
+        assert "先让用户选择角色卡" in description
+        assert "再询问助理名字" in description
+        assert "在角色确定之前不得询问助理名字" in description
+
+    def test_name_parameter_confirmed_after_role_selection(self) -> None:
+        name_schema = AssistantCreateTool.parameters["properties"]["name"]
+        assert "角色选择之后" in name_schema["description"]
