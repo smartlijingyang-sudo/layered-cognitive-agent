@@ -37,11 +37,9 @@ from lca.infrastructure.runtime_plane.capability_bindings import (
 )
 from lca.infrastructure.runtime_plane.scope.scope import plane_bindings_scope
 from lca.infrastructure.sandbox.runtime.scope import bind_sandbox_runtime
-from lca.infrastructure.search.scope.scope import search_run_scope
 from lca.infrastructure.skills.assistant.resolver import resolve_skill_store
-from lca.infrastructure.tools.run.attachment_scope import run_attachment_scope
-from lca.infrastructure.tools.run.finalizer import run_id_scope
 from lca.infrastructure.workspace import run_workspace_scope
+from lca.plugins.transport.webserver.carrier.runs.run_scopes import run_identity_scopes
 from lca.plugins.transport.webserver.carrier.runs.execute.environment_bindings import (
     resolve_bindings as _resolve_bindings,
 )
@@ -167,9 +165,7 @@ class RunExecutionEnvironment:
         with (
             bind_facade_run(facade_ctx),
             bind_run_ambit(ambit),
-            run_id_scope(session.run_id),
-            run_attachment_scope(session.attachment_ids),
-            search_run_scope(),
+            run_identity_scopes(session.run_id, session.attachment_ids),
         ):
             log_context: dict[str, str] = {
                 "run_id": session.run_id,

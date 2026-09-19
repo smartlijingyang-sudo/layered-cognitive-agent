@@ -20,6 +20,7 @@ from lca.plugins.loop.driver.plugin import (
     _UnknownExecutionTargetError as _UnknownExecutionTargetError,
 )
 from lca.plugins.transport.webserver.carrier.runs.binding import ensure_session_hub
+from lca.plugins.transport.webserver.carrier.runs.run_scopes import run_identity_scopes
 from lca.plugins.transport.webserver.carrier.runs.execute.execution_environment import (
     RunExecutionEnvironment,
 )
@@ -241,6 +242,7 @@ class RunLifecycleCoordinator:
                 # P3-06: snapshot/runnable are hot-path cache; authority is Session facts.
                 with (
                     bind_run_ambit(ambit) if ambit is not None else nullcontext(),
+                    run_identity_scopes(session.run_id, session.attachment_ids or ()),
                     run_workspace_scope(session.run_id),
                     plane_bindings_scope(bindings) if bindings is not None else nullcontext(),
                 ):
