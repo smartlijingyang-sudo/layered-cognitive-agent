@@ -46,6 +46,14 @@ class GuestLayout:
     def onlyboxes(cls) -> GuestLayout:
         return cls.from_root(SANDBOX_MOUNT_ROOT)
 
+    @classmethod
+    def for_run(cls, run_id: str, base_root: str = SANDBOX_MOUNT_ROOT) -> GuestLayout:
+        """Create a guest layout scoped to a specific run for workspace isolation."""
+        cleaned = run_id.replace("\\", "/").strip().lstrip("/") if run_id else ""
+        bits = [part for part in cleaned.split("/") if part and part not in {".", ".."}]
+        clean_id = "/".join(bits) if bits else "default"
+        return cls.from_root(join_under(base_root, "runs", clean_id))
+
     def join(self, *parts: str) -> str:
         return join_under(self.root, *parts)
 

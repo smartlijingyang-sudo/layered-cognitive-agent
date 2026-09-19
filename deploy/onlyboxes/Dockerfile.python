@@ -36,6 +36,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         jq \
     && fc-cache -f
 
+COPY local.conf /etc/fonts/local.conf
 COPY requirements-python.txt /tmp/requirements-python.txt
 COPY matplotlibrc /etc/matplotlibrc
 

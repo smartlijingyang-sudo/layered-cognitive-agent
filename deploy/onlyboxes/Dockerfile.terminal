@@ -27,6 +27,7 @@ USER root
 
 # CJK fonts for reportlab / matplotlib Chinese PDF & plots.
 # Agent must NOT curl fonts at runtime — terminalExec image is the sole channel.
+COPY local.conf /etc/fonts/local.conf
 COPY requirements-python.txt /tmp/requirements-python.txt
 COPY matplotlibrc /etc/matplotlibrc
 COPY install-officecli.sh /tmp/install-officecli.sh
