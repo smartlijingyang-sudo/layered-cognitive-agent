@@ -26,9 +26,11 @@ class Config(BaseModel):
 
 
 class WorkspaceService:
-    """Minimal stub — full WorkspaceService deferred to follow-up.
+    """Registry of workspace providers.
 
-    Holds a registry of workspace providers (currently empty).
+    ``lca-workspace-provider`` registers the persistent assistant
+    ``WorkspaceService`` from ``lca/infrastructure/workspace/`` under the
+    ``local`` name (ADR-0244 D7.2).
     """
 
     def __init__(self) -> None:
@@ -51,7 +53,7 @@ class WorkspaceService:
     provides=["workspace"],
     layer="L0",
     effects="none",
-    description="Minimal WorkspaceService stub — full implementation deferred.",
+    description="WorkspaceService registry — providers register via lca-workspace-provider.",
     test_suite="tests/test_plugin_alignment.py::test_tier1_plugin_shape",
     kind=PluginKind.SEAM,
     contract=PluginContract(

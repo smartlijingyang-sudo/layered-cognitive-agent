@@ -1,7 +1,7 @@
-"""Workspace Provider plugin — Tier-2 (placeholder).
+"""Workspace Provider plugin — Tier-2.
 
-Full WorkspaceService does not yet exist in lca/infrastructure/workspace/.
-This Tier-2 stub is a safe default that registers a no-op workspace.
+Registers the persistent assistant workspace service (ADR-0244 D7.2) on the
+``workspace`` registry provided by ``lca-workspace-service``.
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.infrastructure.workspace import WorkspaceService
 
 
 class Config(BaseModel):
@@ -35,7 +36,7 @@ class Config(BaseModel):
     requires=["workspace"],
     layer="L0",
     effects="none",
-    description="Placeholder Workspace provider — real implementation deferred.",
+    description="Registers the persistent assistant WorkspaceService.",
     test_suite="tests/test_plugin_alignment.py",
     kind=PluginKind.PROVIDER,
     contract=PluginContract(
@@ -57,5 +58,6 @@ class Config(BaseModel):
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    """WorkspaceService does not exist yet; deferred to follow-up."""
-    pass
+    """Register the persistent workspace service under the ``local`` name."""
+    del config
+    ctx.require("workspace").register("local", WorkspaceService())
