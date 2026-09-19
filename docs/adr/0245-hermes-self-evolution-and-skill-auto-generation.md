@@ -4,7 +4,7 @@
 
 **Research — 2026-09-19**
 
-> **一句话**：对 `~/.hermes/` 生产系统的全面调研，揭示了两套并行的 Skill 生成机制（`self_evolution` 实验模块 + `curator//learn` 生产机制）以及基于基因匹配的进化引擎，为 LCA 程序性记忆沉淀（ADR-0244）提供完整的参考实现蓝图。
+> **一句话**：对 `~/.hermes/` 生产系统的全面调研，揭示了生产机制（`memory` + `skill_manage` 工具协议）与未接线的实验模块（`self_evolution`），以及基于基因匹配的进化引擎，为 LCA 程序性记忆沉淀（ADR-0244）提供完整的参考实现蓝图。
 
 **Informs**：
 - [ADR-0244](0244-cognitive-memory-closed-loop-and-sandbox-convergence.md)（认知记忆闭环与程序性记忆沉淀）
@@ -42,13 +42,18 @@
 
 ---
 
-## 二、两套并行 Skill 生成机制
+## 二、生产机制与未接线的实验模块
 
-### 2.1 机制 A：`self_evolution` 模块（实验性）
+> **更正**：生产 Hermes Agent 实际通过 `memory` / `skill_manage` 工具协议
+> 沉淀技能（见 §5 的 LobeHub Worker Agent 协议）；`self_evolution` 是
+> **未接线**的实验模块。本节保留两套机制的调研作为参考。
+
+### 2.1 机制 A：`self_evolution` 模块（未接线的实验）
 
 位置：`~/.hermes/hermes-agent/self_evolution/`
 
-通过**自动补丁**集成到 `run_agent.py`，每次对话结束后非阻塞触发：
+该模块**未接入**生产 Agent 的运行循环（`run_agent.py` 中不存在对应调用）；
+以下代码是其设计意图，仅作参考：
 
 ```python
 self._evolution_engine.process_task_result(
@@ -84,7 +89,7 @@ _extract_error_signals()
   → 存储失败模式到 L2
 ```
 
-> **已知问题**：当前实现将用户每条消息都当作任务结晶，`min_trace_length=2` 阈值过低，导致"看看启动了 ccs 了吗"等调试消息也被结晶为 Skill，产生大量低价值记录。**建议提高阈值（≥5）并增加语义过滤。**
+> **已知问题**：当前实现将用户每条消息都当作任务结晶，`min_trace_length=2` 阈值过低，导致"看看启动了 ccs 了吗"等调试消息也被结晶为 Skill，产生大量低价值记录。**建议提高阈值（≥5）并增加语义过滤。**（因模块未接线，该问题不影响生产路径。）
 
 ### 2.2 机制 B：`curator + /learn` 机制（生产级）
 
@@ -129,7 +134,7 @@ _extract_error_signals()
 | 存储位置 | `~/.hermes/self_evolution/skills/` | `~/.hermes/skills/<category>/` |
 | Skill 质量 | 低（无语义过滤） | 高（遵循 AUTHORING_STANDARDS） |
 | 失败学习 | ✅ 基因匹配进化建议 | ❌ 无 |
-| 生产成熟度 | 实验性 | 生产级核心功能 |
+| 生产成熟度 | 未接线实验 | 生产辅助（主机制见 §5 memory/skill_manage） |
 
 ---
 
@@ -182,6 +187,12 @@ L4  会话归档            L4_session_archives/ 目录
 ---
 
 ## 五、LCA/LobeHub 内置 Worker Agent 协议
+
+> **生产机制**：这是 Hermes 实际在用的技能生成与维护入口。`memory`
+> （`writeMemory` / 记忆沉淀）与 `skill_manage`
+> （`createSkillIfAbsent` / `replaceSkillContentCAS` / `listSkills` /
+> `getSkill` / `renameSkill`）是生产 Agent 的工具协议；§2.1 的
+> `self_evolution` 与其无关且未接线。
 
 这是本次调研的最重要发现，来自 `~/layered-cognitive-agent/` vendored 的 LobeHub 实现：
 

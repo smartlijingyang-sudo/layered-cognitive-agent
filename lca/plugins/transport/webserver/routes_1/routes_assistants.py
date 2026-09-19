@@ -38,10 +38,13 @@ to default agent".
 from __future__ import annotations
 
 import dataclasses
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse
+
+if TYPE_CHECKING:
+    from lca.contracts.protocols.assistant.catalog import ProfilePatch
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -399,11 +402,148 @@ async def get_assistant(request: Request) -> JSONResponse:
     )
 
 
+_PROFILE_PATCH_FIELDS = (
+    "profile_name",
+    "profile_description",
+    "profile_opening_message",
+    "profile_locale",
+    "profile_model",
+    "profile_runtime",
+    "soul_md",
+    "user_md",
+    "agents_md",
+    "goals_yaml",
+    "grants_yaml",
+    "tools_yaml",
+    "plan_yaml",
+)
+
+
+def _profile_patch_from_body(body: dict[str, Any]) -> ProfilePatch:
+    """把 PATCH body 映射为 ``ProfilePatch``（ADR-0242 D9/D10 字段）。
+
+    ``None`` 表示「不动」；空字符串表示「清空字段」（语义由 Catalog 决定）。
+    未知字段 / 类型错误抛 ``ValueError``（路由映射 400）。
+    """
+    from lca.contracts.protocols.assistant.catalog import ProfilePatch
+
+    unknown = set(body) - set(_PROFILE_PATCH_FIELDS) - {"actor"}
+    if unknown:
+        raise ValueError(f"未知字段: {', '.join(sorted(unknown))}")
+
+    def _opt_str(key: str) -> str | None:
+        value = body.get(key)
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError(f"{key} 必须为字符串或 null")
+        return value
+
+    runtime = body.get("profile_runtime")
+    if runtime is not None and not isinstance(runtime, dict):
+        raise ValueError("profile_runtime 必须为 object 或 null")
+
+    return ProfilePatch(
+        profile_name=_opt_str("profile_name"),
+        profile_description=_opt_str("profile_description"),
+        profile_opening_message=_opt_str("profile_opening_message"),
+        profile_locale=_opt_str("profile_locale"),
+        profile_model=_opt_str("profile_model"),
+        profile_runtime=dict(runtime) if isinstance(runtime, dict) else None,
+        soul_md=_opt_str("soul_md"),
+        user_md=_opt_str("user_md"),
+        agents_md=_opt_str("agents_md"),
+        goals_yaml=_opt_str("goals_yaml"),
+        grants_yaml=_opt_str("grants_yaml"),
+        tools_yaml=_opt_str("tools_yaml"),
+        plan_yaml=_opt_str("plan_yaml"),
+    )
+
+
 async def revise_assistant_profile(request: Request) -> JSONResponse:
-    """``PATCH /v1/assistants/{assistant_id}/profile`` —— ``catalog.revise_profile``."""
-    if _catalog_from_request(request) is None:
+    """``PATCH /v1/assistants/{assistant_id}/profile`` —— ``catalog.revise_profile``.
+
+    状态码契约（ADR-0187 §3 D7 fail-closed）：
+
+    - catalog capability 不在场 ⇒ 501 ``catalog_unavailable``；
+    - body 非法 / 未知字段 / patch 类型错误 ⇒ 400；
+    - 未知 assistant ⇒ 404；配置面 digest 不匹配 ⇒ 409；
+    - 成功 ⇒ 200 + ``PlanRevision`` 字段 + 更新后的 profile 视图。
+    """
+    catalog = _catalog_from_request(request)
+    if catalog is None:
         return _not_implemented("catalog_unavailable", "AssistantCatalog.revise_profile")
-    return _not_implemented("catalog_pending", "PR-3 catalog handler not wired")
+    assistant_id = str(request.path_params.get("assistant_id") or "")
+
+    try:
+        body = await request.json()
+    except (ValueError, OSError):
+        return _error_envelope("invalid_json", status_code=400, error_type="invalid_request")
+    if not isinstance(body, dict):
+        return _error_envelope(
+            "invalid_request",
+            status_code=400,
+            error_type="invalid_request",
+            detail="body 必须是 JSON object",
+        )
+
+    actor_raw = body.get("actor")
+    if actor_raw is not None and not isinstance(actor_raw, str):
+        return _error_envelope(
+            "invalid_request",
+            status_code=400,
+            error_type="invalid_request",
+            detail="actor 必须为字符串",
+        )
+    actor = actor_raw.strip() if actor_raw else "system"
+
+    try:
+        patch = _profile_patch_from_body(body)
+    except ValueError as exc:
+        return _error_envelope(
+            "invalid_request",
+            status_code=400,
+            error_type="invalid_request",
+            detail=str(exc),
+        )
+
+    try:
+        revision = catalog.revise_profile(assistant_id, patch, actor=actor)
+        home_path = catalog.get(assistant_id).home_path
+    except AssistantDigestMismatch as exc:
+        return _error_envelope(
+            "digest_mismatch",
+            status_code=409,
+            error_type="conflict",
+            detail=str(exc),
+        )
+    except AssistantCatalogError as exc:
+        return _error_envelope(
+            "assistant_not_found",
+            status_code=404,
+            error_type="not_found",
+            detail=str(exc),
+        )
+    except ValueError as exc:
+        return _error_envelope(
+            "invalid_request",
+            status_code=400,
+            error_type="invalid_request",
+            detail=str(exc),
+        )
+
+    return _json(
+        {
+            "assistant_id": revision.assistant_id,
+            "revision_seq": revision.revision_seq,
+            "manifest_digest": revision.manifest_digest,
+            "actor": revision.actor,
+            "snapshot_path": revision.snapshot_path,
+            "revised_at": revision.revised_at,
+            "profile": _profile_view(home_path),
+        },
+        status_code=200,
+    )
 
 
 async def install_assistant_skill(request: Request) -> JSONResponse:
