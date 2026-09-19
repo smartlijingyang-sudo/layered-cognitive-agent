@@ -270,3 +270,55 @@ async def test_complete_without_state_session_does_not_forward_them() -> None:
     assert starts[0][1]["state"] is None
     assert "session" in starts[0][1]
     assert starts[0][1]["session"] is None
+
+
+async def test_stream_idle_timeout_fires_despite_non_progress_events() -> None:
+    """Non-content events must not defeat the LLM stream idle timeout.
+
+    Regression: a provider that starts streaming a tool call and never
+    finishes it keeps the stream "alive" with ``FUNCTION_CALL_ARGUMENTS_DELTA``
+    events. Those events reset the per-event ``wait_for`` deadline, so the
+    stream hangs until a manual cancel. The idle guard must measure time
+    since the last *content* delta (text or non-empty tool arguments), not
+    since any event.
+    """
+    import asyncio
+
+    class _NonProgressInner(_FakeInner):
+        async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[LLMStreamEvent]:
+            del prompt, kwargs
+            yield LLMStreamEvent(type=LLMStreamEventType.OUTPUT_TEXT_DELTA, text="hi")
+            i = 0
+            while True:
+                yield LLMStreamEvent(
+                    type=LLMStreamEventType.FUNCTION_CALL_ARGUMENTS_DELTA,
+                    tool_call_id=f"toolu_{i}",
+                    tool_name=None,
+                    arguments_delta="",
+                )
+                i += 1
+                await asyncio.sleep(0.05)
+
+    spy = _SpySpine()
+    state = _state()
+    session = object()
+    adapter = TelemetryLLMAdapter(
+        _NonProgressInner(),
+        idle_timeout_s=0.5,
+        spine_emit=spy,
+    )
+
+    async def _consume() -> None:
+        async for _ in adapter.stream("prompt", state=state, session=session):
+            pass
+
+    # The stream must abort itself (TimeoutError) instead of hanging; the
+    # outer deadline only bounds a regression where the guard never fires.
+    with pytest.raises(TimeoutError):
+        await asyncio.wait_for(_consume(), timeout=10.0)
+
+    ends = [c for c in spy.calls if c[0] == "emit_llm_call_end"]
+    assert len(ends) == 1
+    assert ends[0][1]["outcome"] == "timeout"
+    assert ends[0][1]["state"] is state
+    assert ends[0][1]["session"] is session

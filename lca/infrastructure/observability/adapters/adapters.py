@@ -105,6 +105,28 @@ def _maybe_fail_model(*, turn: int, step: int, error: str) -> None:
     fail_model(turn=turn_no, step=step, error=error)
 
 
+def _is_content_progress(event: LLMStreamEvent) -> bool:
+    """True when the event carries actual LLM content progress.
+
+    Protocol-only events (block boundaries, empty tool-call chunks) must not
+    extend the idle deadline, or a provider that never finishes a tool call
+    keeps the stream alive indefinitely.
+    """
+    if event.type in (
+        LLMStreamEventType.COMPLETED,
+        LLMStreamEventType.FUNCTION_CALL_ARGUMENTS_DONE,
+    ):
+        return True
+    if event.type in (
+        LLMStreamEventType.OUTPUT_TEXT_DELTA,
+        LLMStreamEventType.REASONING_TEXT_DELTA,
+    ):
+        return bool(event.text)
+    if event.type == LLMStreamEventType.FUNCTION_CALL_ARGUMENTS_DELTA:
+        return bool(event.arguments_delta)
+    return False
+
+
 class TelemetryLLMAdapter(LLMAdapter):
     """Decorator: Session EP emit only — no legacy journal writes.
 
@@ -257,10 +279,14 @@ class TelemetryLLMAdapter(LLMAdapter):
         inner_stream = self._inner.stream(prompt, **inner_kwargs)
         try:
             while True:
+                # Only content deltas reset the idle deadline; protocol-only
+                # events (block boundaries, empty tool-call chunks) must not
+                # keep a never-finishing tool-call stream alive forever.
+                remaining = self._idle_timeout_s - activity.idle_s()
                 try:
                     event = await asyncio.wait_for(
                         inner_stream.__anext__(),
-                        timeout=self._idle_timeout_s,
+                        timeout=max(0.0, remaining),
                     )
                 except StopAsyncIteration:
                     break
@@ -277,7 +303,8 @@ class TelemetryLLMAdapter(LLMAdapter):
                         idle_timeout_s=self._idle_timeout_s,
                     )
                     raise
-                activity.touch()
+                if _is_content_progress(event):
+                    activity.touch()
                 if event.type == LLMStreamEventType.COMPLETED:
                     saw_completed = True
                     if reasoning_text or reasoning_started is not None:

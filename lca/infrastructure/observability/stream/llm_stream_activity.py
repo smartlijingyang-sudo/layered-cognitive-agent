@@ -13,10 +13,10 @@ import time
 from collections.abc import Callable
 
 LLM_ACTIVITY_HEARTBEAT_S: float = 5.0
-"""Emit llm.stream.stall when no LLM delta for this many seconds."""
+"""Emit llm.stream.stall when no content delta for this many seconds."""
 
 LLM_STREAM_IDLE_TIMEOUT_S: float = 60.0
-"""Abort an in-flight LLM stream after this many seconds without a delta.
+"""Abort an in-flight LLM stream after this many seconds without a content delta.
 
 Inter-token (and first-token) idle guard for provider stalls such as
 ``run_a3a442ff00aa`` — partial output then silence until manual cancel.
@@ -55,7 +55,12 @@ class LlmStreamActivityTracker:
         self._task = asyncio.create_task(self._heartbeat_loop())
 
     def touch(self) -> None:
+        """Mark content progress; resets the idle deadline."""
         self._last_delta_at = time.monotonic()
+
+    def idle_s(self) -> float:
+        """Seconds since the last content-progress delta."""
+        return time.monotonic() - self._last_delta_at
 
     async def close(self) -> None:
         self._closed = True
@@ -70,7 +75,7 @@ class LlmStreamActivityTracker:
         try:
             while not self._closed:
                 await asyncio.sleep(LLM_ACTIVITY_HEARTBEAT_S)
-                idle_s = time.monotonic() - self._last_delta_at
+                idle_s = self.idle_s()
                 if idle_s >= LLM_ACTIVITY_HEARTBEAT_S - 0.25:
                     if self._on_idle is not None:
                         self._on_idle(idle_s, self._seq)
