@@ -20,6 +20,7 @@ from lca.contracts.models.core.conversation.memory import (
     MemoryTrust,
 )
 from lca.contracts.models.core.execution.decision import Observation, Reflection
+from lca.contracts.models.core.perceive.perception import ContextManifest
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols import MemorySystem, TemporalMemoryStore
 from lca.infrastructure.state_store.sqlite_temporal_memory import SqliteTemporalMemoryStore
@@ -27,6 +28,23 @@ from lca.infrastructure.state_store.sqlite_temporal_memory import SqliteTemporal
 _DEFAULT_SCOPE = "local:default"
 _DEFAULT_RECALL_LIMIT = 8
 _ARCHIVE_CONFIDENCE = 0.75
+
+
+def _query_from_manifest(manifest: ContextManifest) -> str:
+    """从 manifest 条目提取纯文本检索词；无文本时返回空串。"""
+    if manifest is None:
+        return ""
+    parts: list[str] = []
+    for item in getattr(manifest, "items", ()) or ():
+        payload = item.payload
+        if isinstance(payload, str):
+            parts.append(payload)
+        elif isinstance(payload, (list, tuple)):
+            for p in payload:
+                if isinstance(p, str):
+                    parts.append(p)
+                    break
+    return " ".join(parts)[:500]
 
 
 class TemporalMemorySystem(MemorySystem):
@@ -83,6 +101,29 @@ class TemporalMemorySystem(MemorySystem):
             for record in scoped_records
         ]
         return replace(state, retrieved_context=evidence)
+
+    async def retrieve(self, manifest: ContextManifest) -> list[MemoryRecord]:
+        """按 manifest 文本召回当前有效事实，供 ``memory_retrieve`` 注入。
+
+        结果与 ``perceive`` 一样标记 ``UNTRUSTED_HISTORY``，绝不作为策略/权限来源。
+        """
+        query = _query_from_manifest(manifest)
+        if not query:
+            return []
+        scoped_records = self._store.recall(
+            scope_id=self._scope_id,
+            query=query,
+            as_of_ms=None,
+            limit=self._recall_limit,
+        )
+        return [
+            replace(
+                record,
+                trust=MemoryTrust.UNTRUSTED_HISTORY,
+                metadata={**record.metadata, "recall_query": query},
+            )
+            for record in scoped_records
+        ]
 
     async def update(
         self, state: AgentState, observation: Observation, reflection: Reflection

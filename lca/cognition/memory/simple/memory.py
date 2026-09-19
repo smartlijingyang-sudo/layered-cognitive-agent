@@ -28,6 +28,7 @@ from lca.contracts.atoms.semantic.keys import (
 )
 from lca.contracts.models.core.conversation.memory import MemoryRecord
 from lca.contracts.models.core.execution.decision import Observation, Reflection
+from lca.contracts.models.core.perceive.perception import ContextManifest
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.observability.memory.journal_receipt import (
     MemoryJournalReceipt,
@@ -171,6 +172,18 @@ class SimpleMemorySystem(MemorySystem):
             state=state,
         )
         return replace(state, retrieved_context=compacted)
+
+    async def retrieve(self, manifest: ContextManifest) -> list[MemoryRecord]:
+        """按 RetrievalPolicy 从四层选记录，供 ``memory_retrieve`` 注入（ADR-0244 D4）。
+
+        与 ``perceive`` 共用同一策略与预算，但不提交 journal/spine receipt，
+        避免在 perceive 阶段重复记账。
+        """
+        del manifest
+        layers_snapshot: dict[MemoryLayer, list[MemoryRecord]] = {
+            layer_name: self._get_layer_records(layer_name) for layer_name in self._private_layers
+        }
+        return list(self.retrieval.retrieve(layers_snapshot, budget=_DEFAULT_MAX_WORKING))
 
     def _shadow_compact(self, records: list[MemoryRecord]) -> list[MemoryRecord]:
         """保留作为 compact 路径的兼容 helper；ADR-0068 后实际由

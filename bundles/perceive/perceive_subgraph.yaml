@@ -26,7 +26,7 @@ nodes:
 
   - id: phase.perceive.fold
     factory: phase.perceive.fold
-    inputs: [manifest]
+    inputs: [manifest, memories]
     # ``in_assembled_manifest`` is the typed boundary that
     # ``think.shortcut`` consumes (per ThinkShortcutExecutor's
     # declared_inputs); naming it here keeps the inner-emit

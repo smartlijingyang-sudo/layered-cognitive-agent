@@ -9,8 +9,9 @@ from typing import Any
 
 import yaml
 
-from lca.contracts.atoms.enums.enums import ReflectionVerdict
+from lca.contracts.atoms.enums.enums import MemoryLayer, ReflectionVerdict
 from lca.contracts.models.cognition.boundary import ProceduralMemoryCandidate
+from lca.contracts.models.core.conversation.memory import MemoryRecord
 from lca.contracts.models.core.execution.decision import (
     Decision,
     Observation,
@@ -23,6 +24,7 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
 )
+from lca.nodes.perceive.fold.fold import PerceiveFoldExecutor
 from lca.nodes.perceive.memory_retrieve.memory_retrieve import PerceiveMemoryRetrieveExecutor
 from lca.nodes.reflect.score.score import ReflectScoreExecutor
 from lca.nodes.remember.admit.admit import RememberAdmitExecutor
@@ -45,8 +47,15 @@ class MockEffectGateway:
 
 
 class MockMemoryProvider:
-    async def retrieve(self, manifest: Any) -> list[dict[str, Any]]:
-        return [{"memory_id": "mem_001", "content": "Prior user preference: always use strict type hints"}]
+    async def retrieve(self, manifest: Any) -> list[MemoryRecord]:
+        return [
+            MemoryRecord(
+                record_id="mem_001",
+                content="Prior user preference: always use strict type hints",
+                memory_type=MemoryLayer.SEMANTIC,
+                importance=0.9,
+            )
+        ]
 
 
 async def test_perceive_memory_retrieve_with_provider() -> None:
@@ -62,8 +71,62 @@ async def test_perceive_memory_retrieve_with_provider() -> None:
     assert output.port_values["manifest"] is manifest
     memories = output.port_values["memories"]
     assert len(memories) == 1
-    assert memories[0]["memory_id"] == "mem_001"
-    assert "strict type hints" in memories[0]["content"]
+    assert isinstance(memories[0], MemoryRecord)
+    assert memories[0].record_id == "mem_001"
+    assert "strict type hints" in memories[0].content
+
+
+async def test_memory_retrieve_resolves_canonical_memory() -> None:
+    """The node resolves the composed MemorySystem under the canonical ``memory`` key."""
+    executor = PerceiveMemoryRetrieveExecutor()
+
+    class _CanonicalMemory:
+        async def retrieve(self, manifest: Any) -> list[MemoryRecord]:
+            assert manifest is not None
+            return [
+                MemoryRecord(
+                    record_id="mem_canonical",
+                    content="canonical memory fact",
+                    memory_type=MemoryLayer.SEMANTIC,
+                    importance=0.8,
+                )
+            ]
+
+    manifest = ContextManifest(items=())
+    context = NodeContext(runtime={"memory": _CanonicalMemory()}, metadata={}, budget=None)
+    node_input = NodeInput(port_values={"manifest": manifest})
+
+    output = await executor.node_execute(context, node_input)
+
+    memories = output.port_values["memories"]
+    assert len(memories) == 1
+    assert memories[0].record_id == "mem_canonical"
+
+
+async def test_fold_merges_retrieved_memories_into_manifest() -> None:
+    """PerceiveFoldExecutor merges retrieved memories into the manifest as kind=memory."""
+    executor = PerceiveFoldExecutor()
+    manifest = ContextManifest(items=())
+    memories = (
+        MemoryRecord(
+            record_id="mem_fold",
+            content="folded memory",
+            memory_type=MemoryLayer.SEMANTIC,
+            importance=0.7,
+        ),
+    )
+    context = NodeContext(runtime={}, metadata={}, budget=None)
+    node_input = NodeInput(port_values={"manifest": manifest, "memories": memories})
+
+    output = await executor.node_execute(context, node_input)
+
+    merged = output.port_values["in_assembled_manifest"]
+    assert isinstance(merged, ContextManifest)
+    assert merged.has_kind("memory")
+    memory_items = merged.by_kind("memory")
+    assert len(memory_items) == 1
+    assert memory_items[0].provenance == "memory.retrieve"
+    assert memory_items[0].payload[0].record_id == "mem_fold"
 
 
 async def test_perceive_memory_retrieve_without_provider() -> None:
@@ -127,7 +190,12 @@ async def test_reflect_score_universal_meta_feature_distillation() -> None:
 
 def test_no_hardcoded_skill_names_in_nodes() -> None:
     """Strict check: ensure no hardcoded skill names or intent regexes in cognitive nodes."""
-    for cls in (ReflectScoreExecutor, RememberAdmitExecutor, RememberWriteExecutor, PerceiveMemoryRetrieveExecutor):
+    for cls in (
+        ReflectScoreExecutor,
+        RememberAdmitExecutor,
+        RememberWriteExecutor,
+        PerceiveMemoryRetrieveExecutor,
+    ):
         source = inspect.getsource(cls)
         assert "skill-creator" not in source, f"Hardcoded 'skill-creator' found in {cls.__name__}"
         assert "做成一个skill" not in source, f"Hardcoded Chinese regex found in {cls.__name__}"
@@ -138,7 +206,9 @@ async def test_remember_admit_gate_verifies_authority_and_filters_noise() -> Non
     admit_executor = RememberAdmitExecutor()
     context = NodeContext(runtime={}, metadata={}, budget=None)
 
-    decision = Decision(decision_id="dec_1", action_type="respond", rationale="test", confidence=1.0)
+    decision = Decision(
+        decision_id="dec_1", action_type="respond", rationale="test", confidence=1.0
+    )
     candidate = ProceduralMemoryCandidate(
         candidate_id="cand_1",
         workflow_summary="Two-step pipeline",
@@ -152,14 +222,18 @@ async def test_remember_admit_gate_verifies_authority_and_filters_noise() -> Non
         verdict=ReflectionVerdict.ON_TRACK,
         extra={"procedural_candidate": candidate},
     )
-    input_succ = NodeInput(port_values={"decision": decision, "observation": succ_obs, "reflection": refl_with_cand})
+    input_succ = NodeInput(
+        port_values={"decision": decision, "observation": succ_obs, "reflection": refl_with_cand}
+    )
     out_succ = await admit_executor.node_execute(context, input_succ)
     assert out_succ.port_values["admitted"] is True
     assert out_succ.port_values["candidate"] == candidate
 
     # 2. Failed tool observation -> Rejected
     fail_obs = Observation(observation_id="obs_fail", success=False, payload=None)
-    input_fail = NodeInput(port_values={"decision": decision, "observation": fail_obs, "reflection": refl_with_cand})
+    input_fail = NodeInput(
+        port_values={"decision": decision, "observation": fail_obs, "reflection": refl_with_cand}
+    )
     out_fail = await admit_executor.node_execute(context, input_fail)
     assert out_fail.port_values["admitted"] is False
     assert out_fail.port_values["candidate"] is None
@@ -170,7 +244,9 @@ async def test_remember_admit_gate_verifies_authority_and_filters_noise() -> Non
         verdict=ReflectionVerdict.ON_TRACK,
         extra={"fast_path": True},
     )
-    input_noop = NodeInput(port_values={"decision": decision, "observation": None, "reflection": refl_noop})
+    input_noop = NodeInput(
+        port_values={"decision": decision, "observation": None, "reflection": refl_noop}
+    )
     out_noop = await admit_executor.node_execute(context, input_noop)
     assert out_noop.port_values["admitted"] is False
     assert out_noop.port_values["candidate"] is None
@@ -180,9 +256,15 @@ async def test_remember_write_c10_narrow_door() -> None:
     """RememberWriteExecutor obeys C10: only dispatches envelope when admitted."""
     write_executor = RememberWriteExecutor()
     gateway = MockEffectGateway()
-    context = NodeContext(runtime={"effect_gateway": gateway}, metadata={"plan_ref": "plan1", "node_id": "n1"}, budget=None)
+    context = NodeContext(
+        runtime={"effect_gateway": gateway},
+        metadata={"plan_ref": "plan1", "node_id": "n1"},
+        budget=None,
+    )
 
-    decision = Decision(decision_id="dec_1", action_type="respond", rationale="test", confidence=1.0)
+    decision = Decision(
+        decision_id="dec_1", action_type="respond", rationale="test", confidence=1.0
+    )
     obs = Observation(observation_id="obs_1", success=True, payload=None)
     refl = Reflection(reflection_id="refl_1", verdict=ReflectionVerdict.ON_TRACK)
 
@@ -243,6 +325,9 @@ def test_subgraphs_declarative_schema_and_node_wiring() -> None:
     edges = [(e["from"], e["to"]) for e in perceive_data["edges"]]
     assert ("phase.perceive.observe", "phase.perceive.memory_retrieve") in edges
     assert ("phase.perceive.memory_retrieve", "phase.perceive.fold") in edges
+
+    fold_node = next(n for n in perceive_data["nodes"] if n["id"] == "phase.perceive.fold")
+    assert fold_node.get("inputs") == ["manifest", "memories"]
 
     # Remember subgraph
     remember_path = repo_root / "bundles" / "remember" / "remember_subgraph.yaml"
