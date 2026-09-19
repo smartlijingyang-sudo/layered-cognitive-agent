@@ -182,6 +182,7 @@
 | [0241](0241-tool-fork-typed-port-projection.md) | `tool.fork.dispatch` typed-port 投影 — plan-side 闭集闭合与 framework 投影语义统一（`translate_inputs` 按名字投影 + ToolsService/BindingsView 作 outer-plan typed port） | Accepted |
 | [0242](0242-assistant-creation-home-runtime.md) | Assistant 创建向导、Home 驱动运行与自我管理 — 对话内向导（大类→小类→SOUL 对齐→取名）、run 期人设/工具/技能从 Home 装配、助理级记忆与工作区持久化、per-agent 图/流程/prompt 覆盖与实验隔离、自我管理工具族 | Proposed |
 | [0243](0243-assistant-skill-tool-isolation-config.md) | 助理技能/工具隔离与可配置化 — 技能硬链接 + 写时复制物化到 Home、`{home}/tools/` 自定义工具目录、运行时只从 Home 加载、自我管理工具族扩展（edit skill / create|update|delete tool） | Proposed |
+| [0244](0244-cognitive-memory-closed-loop-and-sandbox-convergence.md) | 认知记忆闭环、上下文会话流与执行沙箱根治 — Token 预算感知会话切片 + Session 单轨注入、主外层图打通 reflect/remember 及零成本准入门禁、通用技能自描述与程序性记忆自适应沉淀、沙箱系统级 CJK 字体基线与工作空间分层、JournalStep 复数化与精准集合对账 | Proposed |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
 
