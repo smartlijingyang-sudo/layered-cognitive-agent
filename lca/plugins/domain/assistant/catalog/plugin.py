@@ -177,6 +177,19 @@ def _materialize_global_skills(
     return index, digests
 
 
+def _list_materializable_global_skills(global_store: Any) -> tuple[str, ...]:
+    """返回全局库中可物化（含 SKILL.md + manifest.json）的 skill_id 列表。"""
+    store_root = getattr(global_store, "root", None)
+    if store_root is None:
+        return ()
+    return tuple(
+        entry.skill_id
+        for entry in global_store.list_installed()
+        if (Path(store_root) / entry.skill_id / "SKILL.md").is_file()
+        and (Path(store_root) / entry.skill_id / "manifest.json").is_file()
+    )
+
+
 class _AssistantCatalogImpl(AssistantCatalog):
     """Catalog 内部实现;通过 plugin ``setup`` 注入 ctx。
 
@@ -218,6 +231,10 @@ class _AssistantCatalogImpl(AssistantCatalog):
         删除 BOOTSTRAP.md 并补发 ``assistant.bootstrap.completed`` EP
         （ADR-0187 §3 D12 完成流;BOOTSTRAP 不在配置面 digest 内,
         删除不影响 manifest）。裸创建（两者皆空）保留 BOOTSTRAP.md。
+
+        技能物化（ADR-0243 D1 / I-B14）:``initial_skills`` 空 = 默认把
+        全局技能库全部可物化技能硬链接到 ``{home}/skills/``（全局库不可用时
+        保持空技能集）;显式传列表 = 只装指定技能。
         """
         if req.template_id not in TEMPLATE_REGISTRY:
             raise _CatalogConfigError(
@@ -278,10 +295,17 @@ class _AssistantCatalogImpl(AssistantCatalog):
             # 2c. Home 卫生:USER.md 不允许为空(ADR-0242 D2)
             _ensure_non_empty_user_md(home.root)
 
-            # 2d. initial_skills:把全局技能硬链接物化为 Home 有效技能集(ADR-0243 D1)
+            # 2d. initial_skills:默认把全局技能硬链接物化为 Home 有效技能集
+            #     (ADR-0243 D1 / I-B14)。空 initial_skills = 物化全部全局技能,
+            #     使创建后 {home}/skills/ 非空;显式传列表 = 只装指定技能。
             skills_index: dict[str, Any] = dict(inherited_index)
             skills_digests: dict[str, str] = dict(inherited_digests)
-            if req.initial_skills:
+            skills_to_materialize = req.initial_skills
+            if not skills_to_materialize and self._global_skills_store is not None:
+                skills_to_materialize = _list_materializable_global_skills(
+                    self._global_skills_store
+                )
+            if skills_to_materialize:
                 if self._global_skills_store is None:
                     raise _CatalogConfigError(
                         "initial_skills 需要全局技能库（skills 能力不可用）"
@@ -289,7 +313,7 @@ class _AssistantCatalogImpl(AssistantCatalog):
                 materialized_index, materialized_digests = _materialize_global_skills(
                     self._global_skills_store,
                     home.root,
-                    req.initial_skills,
+                    skills_to_materialize,
                     _iso_now(self._clock),
                 )
                 skills_index.update(materialized_index)

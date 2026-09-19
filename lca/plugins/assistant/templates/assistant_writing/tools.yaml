@@ -2,4 +2,4 @@ tools:
   allow: []
   deny: []
 notes: |
-  工具 allow / deny 策略引用；具体 tool 由 Profile grant 决定（C5 衰减）。
+  空 allow = 平台默认工具全量可见；deny 逐个排除；需授权工具由 grants.yaml 决定（C5 衰减）。收紧策略可经 revise_profile 修改。
