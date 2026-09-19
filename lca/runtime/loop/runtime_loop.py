@@ -16,7 +16,10 @@ if TYPE_CHECKING:
     from lca.infrastructure.observability.spine.event.record import Outcome
 
 from lca.contracts.atoms.ids.ids import new_id
-from lca.contracts.models.core.conversation.conversation import PRIOR_CONVERSATION_WM_KEY
+from lca.contracts.models.core.conversation.conversation import (
+    PRIOR_CONVERSATION_WM_KEY,
+    ConversationTurn,
+)
 from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.core.policy.budget import DEFAULT_MAX_STEPS, create_budget
 from lca.contracts.models.core.state.lifecycle import TaskStatus
@@ -162,8 +165,6 @@ class CognitiveRuntime(Runtime):
             from_role=(ctx.from_role if ctx else ""),
             team_awareness=(ctx.team_awareness if ctx else None),
         )
-        if ctx and ctx.extra.get(PRIOR_CONVERSATION_WM_KEY):
-            state.extra[PRIOR_CONVERSATION_WM_KEY] = ctx.extra[PRIOR_CONVERSATION_WM_KEY]
         self._bindings.require_executable_plan()
         from lca.infrastructure.session.bindings import (
             resolve_session_reader,
@@ -202,6 +203,18 @@ class CognitiveRuntime(Runtime):
                 # port-required TypeError before any reasoning fires.
                 if self._bindings.capabilities.get("writer") is None:
                     self._bindings = self._bindings.with_writer(run_writer)
+                # ADR-0244: Seed prior conversation turns via Session single track
+                prior_turns = ctx.prior_turns if ctx else ()
+                if not prior_turns and ctx and ctx.extra.get(PRIOR_CONVERSATION_WM_KEY):
+                    raw_turns = ctx.extra.get(PRIOR_CONVERSATION_WM_KEY) or []
+                    prior_turns = tuple(
+                        ConversationTurn(role=t.get("role", "user"), content=t.get("content", ""))
+                        if isinstance(t, dict)
+                        else t
+                        for t in raw_turns
+                    )
+                if prior_turns:
+                    run_writer.seed_prior_turns(prior_turns)
                 run_writer.append_user_message(
                     message_id=f"task:{trace_id}",
                     role="user",

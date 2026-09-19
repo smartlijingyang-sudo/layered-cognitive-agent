@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from lca.contracts.models.core.conversation.conversation import ConversationTurn
 from lca.contracts.models.team.team.awareness import TeamAwareness
 
 
@@ -28,4 +29,5 @@ class RunContext:
     context_refs: list[str] = field(default_factory=list)
     deadline: datetime | None = None
     team_awareness: TeamAwareness | None = None
+    prior_turns: tuple[ConversationTurn, ...] = ()
     extra: dict[str, Any] = field(default_factory=dict)

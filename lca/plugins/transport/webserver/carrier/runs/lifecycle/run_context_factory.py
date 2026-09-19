@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from lca.contracts.models.core.conversation.conversation import PRIOR_CONVERSATION_WM_KEY
 from lca.contracts.models.team.run.context import RunContext
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunSession
 
@@ -15,11 +14,11 @@ def run_context_for_session(session: RunSession) -> RunContext:
         "agent_id": session.agent.agent_id,
         "agent_name": session.agent.name,
     }
-    if session.prior_turns:
-        extra[PRIOR_CONVERSATION_WM_KEY] = [
-            {"role": turn.role, "content": turn.content} for turn in session.prior_turns
-        ]
-    return RunContext(session_id=session.agent.agent_id, extra=extra)
+    return RunContext(
+        session_id=session.agent.agent_id,
+        prior_turns=tuple(session.prior_turns) if session.prior_turns else (),
+        extra=extra,
+    )
 
 
 __all__ = ["run_context_for_session"]
