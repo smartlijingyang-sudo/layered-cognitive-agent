@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from lca.contracts.models.core.state.plane import PlaneBindings, PlaneKind, PlaneRef
 from lca.contracts.protocols import Tool
-from lca.contracts.protocols.memory.operational_skills import SkillPackageInstaller
+from lca.contracts.protocols.memory.operational_skills import SkillPackageStore
 from lca.contracts.protocols.runtime.infra.infra import MachineResolver, Sandbox
 from lca.infrastructure.capability.search.search import SearchService
 from lca.infrastructure.file.store import FileStore
@@ -33,7 +33,7 @@ def build_g2a_chat_tools(
     *,
     sandbox: Sandbox | None = None,
     search: SearchService | None = None,
-    skill_store: SkillPackageInstaller | None = None,
+    skill_store: SkillPackageStore | None = None,
     machine_resolver: MachineResolver | None = None,
     fallback: bool = True,
 ) -> list[Tool]:
@@ -59,7 +59,7 @@ def build_default_tools(
     *,
     sandbox: Sandbox | None = None,
     search: SearchService | None = None,
-    skill_store: SkillPackageInstaller | None = None,
+    skill_store: SkillPackageStore | None = None,
     machine_resolver: MachineResolver | None = None,
     fallback: bool = True,
 ) -> list[Tool]:

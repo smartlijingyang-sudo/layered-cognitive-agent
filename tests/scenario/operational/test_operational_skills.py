@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from lca.contracts.protocols.memory.operational_skills import (
@@ -23,6 +25,7 @@ from lca.infrastructure.skills.activation.scope import (
     register_activated,
     resolve_skill_for_exec,
 )
+from lca.infrastructure.skills.assistant.merged_store import AssistantMergedSkillStore
 from lca.infrastructure.skills.disk.store import DiskSkillPackageStore, sanitize_skill_id
 from lca.infrastructure.skills.http.importer import HttpSkillImporter
 from lca.infrastructure.skills.market.auth import (
@@ -32,6 +35,7 @@ from lca.infrastructure.skills.market.auth import (
     resolve_market_access_token,
     token_endpoint_for,
 )
+from lca.infrastructure.skills.marketplace.marketplace import LobeHubMarketClient
 from lca.infrastructure.skills.settings.settings import SkillSettings
 from lca.infrastructure.skills.zip.security import extract_zip_bytes, find_skill_markdown
 from lca.infrastructure.tools.contract.project.project import project_tool_state
@@ -40,6 +44,7 @@ from lca.infrastructure.tools.skills.activate.tool import SkillActivateTool
 from lca.infrastructure.tools.skills.importer.import_tool import SkillImportTool
 from lca.infrastructure.tools.skills.read.reference_tool import SkillReadReferenceOnceTool
 from lca.infrastructure.tools.skills.search.tool import SkillSearchTool
+from lca.infrastructure.tools.skills.tool.set import build_operational_skill_tools
 
 
 def _make_zip(files: dict[str, str]) -> bytes:
@@ -48,6 +53,23 @@ def _make_zip(files: dict[str, str]) -> bytes:
         for name, text in files.items():
             zf.writestr(name, text)
     return buf.getvalue()
+
+
+async def _slow_market_search(*args: object, **kwargs: object) -> SkillSearchResult:
+    """Simulate a market endpoint that never answers within the search budget."""
+    await asyncio.sleep(1.0)
+    return SkillSearchResult(items=(), total=0, page=1, page_size=20)
+
+
+class _OverlayReceiptStub:
+    """Minimal AssistantSkillOverlay stub exposing only ``list_installed``."""
+
+    def __init__(self, install_path: str) -> None:
+        self._receipts = (SimpleNamespace(install_path=install_path),)
+
+    def list_installed(self, assistant_id: str) -> tuple[object, ...]:
+        del assistant_id
+        return self._receipts
 
 
 class _StubSkillImporter:
@@ -234,6 +256,32 @@ class TestSkillTools(unittest.IsolatedAsyncioTestCase):
         self.assertGreater(len(projected["items"]), 0)
         self.assertEqual(projected["items"][0]["identifier"], "pdf-helper")
 
+    async def test_search_degrades_to_local_on_market_timeout(self) -> None:
+        self.store.install_package(
+            skill_id="local-helper",
+            skill_md_text="---\nname: local\ndescription: local\nreferences: []\n---\nbody",
+            resource_files={},
+            source_url="u",
+        )
+        settings = SkillSettings(cache_dir=Path(self._tmp.name), market_search_timeout_s=0.1)
+        importer = HttpSkillImporter(store=self.store, settings=settings)
+        tool = SkillSearchTool(importer, self.store)
+        with (
+            patch.object(
+                importer._market,
+                "_auth_headers",
+                AsyncMock(return_value={"Authorization": "Bearer x"}),
+            ),
+            patch.object(
+                importer._market,
+                "_search_list_api",
+                AsyncMock(side_effect=_slow_market_search),
+            ),
+        ):
+            obs = await tool.execute({"query": "pdf"})
+        self.assertTrue(obs.success)
+        self.assertIn("local-helper", obs.payload["content"])
+
     async def test_tools_consume_importer_protocol_without_http_store_attribute(self) -> None:
         package = self.store.install_package(
             skill_id="protocol-demo",
@@ -355,6 +403,45 @@ class TestDefaultTools(unittest.TestCase):
     def test_sanitize_skill_id(self) -> None:
         self.assertEqual(sanitize_skill_id("anthropics-skills-pdf"), "anthropics-skills-pdf")
         self.assertEqual(sanitize_skill_id("foo/bar"), "foo-bar")
+
+
+class TestOperationalSkillToolAssembly(unittest.TestCase):
+    """import_skill 必须走 installer 接缝，绝不写穿只读的 merged 视图。"""
+
+    def test_installer_stays_global_when_store_is_merged(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            global_store = DiskSkillPackageStore(SkillSettings(cache_dir=root / "global"))
+            merged = AssistantMergedSkillStore(
+                global_store=global_store,
+                overlay=_OverlayReceiptStub(str(root / "home" / "skills" / "demo")),  # type: ignore[arg-type]
+                assistant_id="asst",
+            )
+            tools = build_operational_skill_tools(store=merged, installer=global_store)
+        import_tool = next(t for t in tools if t.name == "import_skill")
+        search_tool = next(t for t in tools if t.name == "search_skill")
+        self.assertIs(import_tool._importer.store, global_store)
+        self.assertIs(search_tool._store, merged)
+
+
+class TestMarketSearchTimeout(unittest.IsolatedAsyncioTestCase):
+    async def test_search_raises_skill_import_error_on_timeout(self) -> None:
+        settings = SkillSettings(market_search_timeout_s=0.1)
+        client = LobeHubMarketClient(settings)
+        with (
+            patch.object(
+                client,
+                "_auth_headers",
+                AsyncMock(return_value={"Authorization": "Bearer x"}),
+            ),
+            patch.object(
+                client,
+                "_search_list_api",
+                AsyncMock(side_effect=_slow_market_search),
+            ),
+            self.assertRaises(SkillImportError),
+        ):
+            await client.search("pdf")
 
 
 if __name__ == "__main__":

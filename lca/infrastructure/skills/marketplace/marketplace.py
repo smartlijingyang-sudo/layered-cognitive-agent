@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from pathlib import Path
@@ -24,7 +25,6 @@ from lca.infrastructure.skills.settings.settings import SkillSettings, get_skill
 
 _IDENTIFIERS_CACHE_NAME = "market_identifiers.json"
 _IDENTIFIERS_TTL_S = 24 * 60 * 60
-_IDENTIFIERS_TIMEOUT_S = 180.0
 _MAX_IDENTIFIER_MATCHES = 500
 
 
@@ -44,7 +44,11 @@ class LobeHubMarketClient:
 
     async def _auth_headers(self, *, force_refresh: bool = False) -> dict[str, str]:
         headers = {"Accept": "application/json"}
-        token = await resolve_market_access_token(self._settings, force_refresh=force_refresh)
+        token = await resolve_market_access_token(
+            self._settings,
+            force_refresh=force_refresh,
+            timeout_s=self._settings.market_search_timeout_s,
+        )
         if token:
             headers["Authorization"] = f"Bearer {token}"
         return headers
@@ -89,6 +93,21 @@ class LobeHubMarketClient:
         *,
         page: int = 1,
         page_size: int = 20,
+    ) -> SkillSearchResult:
+        try:
+            return await asyncio.wait_for(
+                self._search_impl(query, page=page, page_size=page_size),
+                timeout=self._settings.market_search_timeout_s,
+            )
+        except TimeoutError as exc:
+            raise SkillImportError("Market 搜索超时") from exc
+
+    async def _search_impl(
+        self,
+        query: str,
+        *,
+        page: int,
+        page_size: int,
     ) -> SkillSearchResult:
         headers = await self._auth_headers()
         if "Authorization" not in headers:
@@ -227,7 +246,7 @@ class LobeHubMarketClient:
             return cached
         base = self._settings.market_base_url.rstrip("/")
         url = urljoin(f"{base}/", "api/v1/skills/identifiers")
-        timeout = httpx.Timeout(_IDENTIFIERS_TIMEOUT_S)
+        timeout = httpx.Timeout(self._settings.market_search_timeout_s)
         async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
             try:
                 response = await client.get(url, headers=headers)

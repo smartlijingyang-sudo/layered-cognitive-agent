@@ -115,14 +115,19 @@ class SkillSearchTool(Tool):
     async def _search_with_degradation(
         self, query: str, page: int, page_size: int
     ) -> SkillSearchResult:
-        """Three-level degradation: original → core terms → local installed."""
+        """Three-level degradation: original → core terms → local installed.
+
+        A market error (``None``) skips the core-terms retry: the market is
+        unreachable, so re-querying only burns the tool timeout. Core-term
+        retry is reserved for a reachable market that returns no hits.
+        """
         # Level 1: original query
         result = await self._safe_search(query, page, page_size)
         if result is not None and result.items:
             return result
 
         # Level 2: extract core terms (first 2 words) and retry
-        if query:
+        if result is not None and query:
             core_terms = " ".join(query.split()[:2])
             if core_terms != query:
                 degraded = await self._safe_search(core_terms, page, page_size)

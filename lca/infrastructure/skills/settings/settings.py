@@ -47,6 +47,12 @@ class SkillSettings(BaseSettings):
         description="Path to @lobehub/market-cli credentials.json",
     )
     market_timeout_s: float = Field(default=60.0, ge=1.0)
+    market_search_timeout_s: float = Field(
+        default=4.0,
+        ge=0.1,
+        description="Total budget for a market search; must fit inside the tool timeout "
+        "so search_skill can degrade to local skills when the market is slow.",
+    )
     allowed_hosts: tuple[str, ...] = Field(
         default=(
             "market.lobehub.com",

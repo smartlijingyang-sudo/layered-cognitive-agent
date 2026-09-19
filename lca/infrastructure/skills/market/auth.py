@@ -179,6 +179,7 @@ async def resolve_market_access_token(
     settings: SkillSettings | None = None,
     *,
     force_refresh: bool = False,
+    timeout_s: float | None = None,
 ) -> str | None:
     """Return a usable Bearer access token, or None if no auth configured."""
     global _cache
@@ -200,7 +201,7 @@ async def resolve_market_access_token(
             client_id=client_id,
             client_secret=client_secret,
             base_url=base_url,
-            timeout_s=cfg.market_timeout_s,
+            timeout_s=timeout_s if timeout_s is not None else cfg.market_timeout_s,
         )
     except (RuntimeError, httpx.HTTPError):
         return None
