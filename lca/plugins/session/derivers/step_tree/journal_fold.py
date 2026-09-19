@@ -256,6 +256,8 @@ class _Frame:
     thinking: ThinkingTrace | None = None
     tool_call: ToolCallRecord | None = None
     tool_result: ToolResult | None = None
+    tool_calls: list[ToolCallRecord] = field(default_factory=list)
+    tool_results: list[ToolResult] = field(default_factory=list)
     reflect: ReflectTrace | None = None
     segments: list[SegmentRecord] = field(default_factory=list)
     outcome: str | None = None
@@ -365,40 +367,67 @@ def _tool_result_ok(payload: Mapping[str, Any]) -> bool:
     return outcome in {"success", "completed", "ok", ""}
 
 
+def _add_or_update_tool_call(target: _Frame, record: ToolCallRecord) -> None:
+    for idx, existing in enumerate(target.tool_calls):
+        if existing.invocation_id and existing.invocation_id == record.invocation_id:
+            target.tool_calls[idx] = record
+            return
+    target.tool_calls.append(record)
+
+
+def _add_or_update_tool_result(target: _Frame, result: ToolResult) -> None:
+    for idx, existing in enumerate(target.tool_results):
+        if existing.invocation_id and existing.invocation_id == result.invocation_id:
+            target.tool_results[idx] = result
+            return
+    target.tool_results.append(result)
+
+
 def _assign_tool_call(target: _Frame, payload: Mapping[str, Any], ep: str) -> None:
-    # 不同 invocation_id = 不同 tool,新帧覆盖;同 invocation_id = 同一 tool
-    # 的镜像 record,走 binding merge 累积字段(避免 listFiles → readFile
-    # 互相覆盖的回归:run_3cf06424f0b7)。
     incoming_inv = str(payload.get("invocation_id") or "")
-    existing_inv = (
-        str(getattr(target.tool_call, "invocation_id", "") or "")
-        if target.tool_call is not None
-        else ""
-    )
-    if incoming_inv and existing_inv and incoming_inv != existing_inv:
-        target.tool_call = _binding_engine().apply_tool_call(None, payload, ep)
-    else:
-        target.tool_call = _binding_engine().apply_tool_call(target.tool_call, payload, ep)
+    existing_record: ToolCallRecord | None = None
+    for rec in target.tool_calls:
+        if rec.invocation_id and rec.invocation_id == incoming_inv:
+            existing_record = rec
+            break
+    if existing_record is None and target.tool_call is not None:
+        if str(getattr(target.tool_call, "invocation_id", "") or "") == incoming_inv:
+            existing_record = target.tool_call
+
+    updated = _binding_engine().apply_tool_call(existing_record, payload, ep)
+    if updated is not None:
+        _add_or_update_tool_call(target, updated)
+        if target.tool_call is None or target.tool_call.invocation_id == updated.invocation_id:
+            target.tool_call = updated
+        elif not target.tool_call.invocation_id and updated.invocation_id:
+            target.tool_call = updated
 
 
 def _assign_tool_result(target: _Frame, payload: Mapping[str, Any], ep: str) -> None:
     incoming_inv = str(payload.get("invocation_id") or "")
-    existing_inv = (
-        str(getattr(target.tool_result, "invocation_id", "") or "")
-        if target.tool_result is not None
-        else ""
+    existing_result: ToolResult | None = None
+    for res in target.tool_results:
+        if res.invocation_id and res.invocation_id == incoming_inv:
+            existing_result = res
+            break
+    if existing_result is None and target.tool_result is not None:
+        if str(getattr(target.tool_result, "invocation_id", "") or "") == incoming_inv:
+            existing_result = target.tool_result
+
+    updated = _binding_engine().apply_tool_result(
+        existing_result,
+        payload,
+        ep,
+        ok_default=_tool_result_ok(payload),
     )
-    if incoming_inv and existing_inv and incoming_inv != existing_inv:
-        target.tool_result = _binding_engine().apply_tool_result(
-            None, payload, ep, ok_default=_tool_result_ok(payload)
-        )
-    else:
-        target.tool_result = _binding_engine().apply_tool_result(
-            target.tool_result,
-            payload,
-            ep,
-            ok_default=_tool_result_ok(payload),
-        )
+    if updated is not None:
+        if incoming_inv and not getattr(updated, "invocation_id", ""):
+            updated = replace(updated, invocation_id=incoming_inv)
+        _add_or_update_tool_result(target, updated)
+        if target.tool_result is None or getattr(target.tool_result, "invocation_id", "") == updated.invocation_id:
+            target.tool_result = updated
+        elif not getattr(target.tool_result, "invocation_id", "") and updated.invocation_id:
+            target.tool_result = updated
 
 
 def _capture_exception(state: _StepTreeState, payload: Mapping[str, Any], ts: float) -> None:
@@ -590,10 +619,11 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
                     raw_response_preview=assistant_content[:600] if assistant_content else "",
                 )
             if isinstance(tool_calls, list) and tool_calls:
-                first_call = tool_calls[0]
-                if isinstance(first_call, Mapping):
-                    call_args = first_call.get("arguments") or first_call.get("args") or {}
-                    fn = first_call.get("function")
+                for call_item in tool_calls:
+                    if not isinstance(call_item, Mapping):
+                        continue
+                    call_args = call_item.get("arguments") or call_item.get("args") or {}
+                    fn = call_item.get("function")
                     if isinstance(fn, Mapping):
                         name = str(fn.get("name") or "")
                         if not call_args:
@@ -604,15 +634,18 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
                                 except (json.JSONDecodeError, ValueError):
                                     call_args = {}
                     else:
-                        name = str(first_call.get("name") or "")
-                    target.tool_call = ToolCallRecord(
+                        name = str(call_item.get("name") or "")
+                    tc_record = ToolCallRecord(
                         invocation_id=str(
-                            first_call.get("id") or first_call.get("invocation_id") or ""
+                            call_item.get("id") or call_item.get("invocation_id") or ""
                         ),
                         name=name,
                         arguments=dict(call_args) if isinstance(call_args, dict) else {},
                         arguments_summary="",
                     )
+                    _add_or_update_tool_call(target, tc_record)
+                    if target.tool_call is None:
+                        target.tool_call = tc_record
     elif ep == "phase.act.fold.start":
         _record_phase(state, "act", ts, event)
     elif ep in PHASE_FOLD_EPS:
@@ -710,6 +743,8 @@ def _materialize(
             thinking=f.thinking,
             tool_call=f.tool_call,
             tool_result=f.tool_result,
+            tool_calls=tuple(f.tool_calls) if f.tool_calls else (() if f.tool_call is None else (f.tool_call,)),
+            tool_results=tuple(f.tool_results) if f.tool_results else (() if f.tool_result is None else (f.tool_result,)),
             reflect=f.reflect,
             segments=tuple(f.segments),
             outcome=_journal_step_outcome(f.outcome),

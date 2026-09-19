@@ -117,11 +117,15 @@ class JournalDocument:
         """
         seen: list[str] = []
         for step in self.steps:
-            if step.tool_result is None:
-                continue
-            for f in step.tool_result.files_created:
-                if f not in seen:
-                    seen.append(f)
+            results = (
+                step.tool_results
+                if step.tool_results
+                else ((step.tool_result,) if step.tool_result is not None else ())
+            )
+            for res in results:
+                for f in res.files_created:
+                    if f not in seen:
+                        seen.append(f)
         return tuple(seen)
 
 
