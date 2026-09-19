@@ -137,6 +137,29 @@ class TestRegister:
         _, kwargs = fake_client.post.call_args
         assert len(kwargs["json"]["json"]["config"]["systemRole"]) <= 2000
 
+    @pytest.mark.asyncio
+    async def test_description_truncated_to_lobehub_column(
+        self, bridge: AssistantFrontendBridge
+    ) -> None:
+        ok = _FakeResponse(200, '{"result": {"data": {"json": {"agentId": "agt_ok"}}}}')
+        fake_client = AsyncMock()
+        fake_client.post = AsyncMock(return_value=ok)
+        fake_client.__aenter__ = AsyncMock(return_value=fake_client)
+        fake_client.__aexit__ = AsyncMock(return_value=None)
+        with patch("httpx.AsyncClient", return_value=fake_client):
+            await bridge.register(
+                assistant_id="asst_x",
+                name="名" * 500,
+                description="能" * 5000,
+                emoji="🤖",
+                system_role="s",
+            )
+        _, kwargs = fake_client.post.call_args
+        config = kwargs["json"]["json"]["config"]
+        # LobeHub agents.description is varchar(1000), title is varchar(255)
+        assert len(config["description"]) <= 900
+        assert len(config["title"]) <= 200
+
 
 class _FakeInner:
     def __init__(self) -> None:
