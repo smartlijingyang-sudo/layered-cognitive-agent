@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from lca.application.runtime.coordinator.event_translator import EventTranslator
@@ -16,11 +17,14 @@ from lca.infrastructure.observability.tool_message_plugin_state_store import (
     resolve_tool_message_plugin_state_store,
 )
 
+ArtifactClosureResolver = Callable[[str], Awaitable[dict | None]]
+
 
 def build_agent_runtime_coordinator(
     store: RunningOperationStore,
     *,
     plugin_state_store: ToolMessagePluginStateStore | None = None,
+    artifact_closure_resolver: ArtifactClosureResolver | None = None,
 ) -> LcaAgentRuntimeCoordinator:
     """Wire coordinator with running-op metadata + pluginState DB writer."""
 
@@ -52,7 +56,8 @@ def build_agent_runtime_coordinator(
         translator=EventTranslator(),
         metadata_writer=metadata_writer,
         tool_state_writer=tool_state_writer,
+        artifact_closure_resolver=artifact_closure_resolver,
     )
 
 
-__all__ = ("build_agent_runtime_coordinator",)
+__all__ = ("ArtifactClosureResolver", "build_agent_runtime_coordinator")

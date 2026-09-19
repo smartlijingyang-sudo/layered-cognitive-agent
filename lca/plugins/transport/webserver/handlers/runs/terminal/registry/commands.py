@@ -104,7 +104,11 @@ class RegistryRunCommands:
         if session is None:
             _log.warning("run_cancel_rejected", run_id=run_id, reason="run_not_found")
             return RunCommandReceipt(accepted=False, error="run not found")
-        if session.status in (RunLifecycleStatus.COMPLETED, RunLifecycleStatus.FAILED, RunLifecycleStatus.CANCELLED):
+        if session.status in (
+            RunLifecycleStatus.COMPLETED,
+            RunLifecycleStatus.FAILED,
+            RunLifecycleStatus.CANCELLED,
+        ):
             _log.info("run_cancel_noop", run_id=run_id, status=session.status.value)
             return RunCommandReceipt(accepted=True, status=session.status.value)
         prior_status = session.status
@@ -124,7 +128,6 @@ class RegistryRunCommands:
             # for a canceled run.
             await RunTerminalizer(self._registry).terminalize(
                 session,
-                workspace=None,
                 success=False,
             )
         _log.info(
@@ -153,7 +156,9 @@ class RegistryRunCommands:
                 idempotency_key=idempotency_key,
             )
             session = self._registry.get(run_id)
-            _emit_command_rejected(session, command_type="resume_approval", reason="payload_not_string")
+            _emit_command_rejected(
+                session, command_type="resume_approval", reason="payload_not_string"
+            )
             return RunCommandReceipt(
                 accepted=False,
                 error="approval payload must be a string",
@@ -193,7 +198,9 @@ class RegistryRunCommands:
                 status=session.status.value,
                 idempotency_key=idempotency_key,
             )
-            _emit_command_rejected(session, command_type="resume_approval", reason="not_waiting_input")
+            _emit_command_rejected(
+                session, command_type="resume_approval", reason="not_waiting_input"
+            )
             return RunCommandReceipt(
                 accepted=False,
                 error="run not waiting for input",
@@ -232,7 +239,9 @@ class RegistryRunCommands:
                 reason="no_resume_state",
                 idempotency_key=idempotency_key,
             )
-            _emit_command_rejected(session, command_type="resume_approval", reason="no_resume_state")
+            _emit_command_rejected(
+                session, command_type="resume_approval", reason="no_resume_state"
+            )
             return RunCommandReceipt(
                 accepted=False,
                 error="no resume state available",

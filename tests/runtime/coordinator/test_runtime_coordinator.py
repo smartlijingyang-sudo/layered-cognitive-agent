@@ -352,3 +352,87 @@ async def test_handle_stamped_hitl_pause_publishes_step_start_then_runtime_end(
     await coord.synthesize_terminal_if_pending(clean_run_id, session=session)
     after = await manager.read_history(clean_run_id, count=10)
     assert len([e for e in after if e["type"] == "agent_runtime_end"]) == 1
+
+
+async def test_handle_stamped_attaches_artifact_closure_to_agent_runtime_end(
+    manager: LcaStreamEventLog, clean_run_id: str
+) -> None:
+    """Regression: artifact closure rides the terminal event, not per-tool wire.
+
+    exportFile's projected state carries no ``files`` field, so a client that
+    folds per-tool ``tool_end`` results misses the deliverable. The closure
+    must be synthesized from the run workspace ledger and attached to
+    ``agent_runtime_end`` atomically.
+    """
+
+    async def resolver(run_id: str) -> dict | None:
+        assert run_id == clean_run_id
+        return {
+            "text": "已生成以下文件：\n- [📥 report.pdf](/files/file_abc)",
+            "files": [
+                {
+                    "name": "report.pdf",
+                    "url": "/files/file_abc",
+                    "mimeType": "application/pdf",
+                    "sizeBytes": 92160,
+                    "attachmentId": "file_abc",
+                    "previewable": True,
+                }
+            ],
+        }
+
+    coord = LcaAgentRuntimeCoordinator(
+        stream_manager=manager,
+        translator=EventTranslator(),
+        metadata_writer=AsyncMock(),
+        tool_state_writer=AsyncMock(),
+        artifact_closure_resolver=resolver,
+    )
+    await coord.start(clean_run_id, ctx={})
+    await coord.handle_stamped(
+        clean_run_id,
+        {
+            "event": {
+                "type": "SpineClose",
+                "reason": "completed",
+                "final_state": {"status": "done"},
+            }
+        },
+    )
+    history = await manager.read_history(clean_run_id, count=10)
+    end = next(e for e in history if e["type"] == "agent_runtime_end")
+    assert end["data"]["reason"] == "completed"
+    assert end["data"]["artifactClosure"]["text"].startswith("已生成以下文件")
+    assert end["data"]["artifactClosure"]["files"][0]["name"] == "report.pdf"
+
+
+async def test_handle_stamped_omits_artifact_closure_when_resolver_returns_none(
+    manager: LcaStreamEventLog, clean_run_id: str
+) -> None:
+    """No workspace deliverables -> terminal event carries no closure."""
+
+    async def resolver(run_id: str) -> dict | None:
+        assert run_id == clean_run_id
+        return None
+
+    coord = LcaAgentRuntimeCoordinator(
+        stream_manager=manager,
+        translator=EventTranslator(),
+        metadata_writer=AsyncMock(),
+        tool_state_writer=AsyncMock(),
+        artifact_closure_resolver=resolver,
+    )
+    await coord.start(clean_run_id, ctx={})
+    await coord.handle_stamped(
+        clean_run_id,
+        {
+            "event": {
+                "type": "SpineClose",
+                "reason": "completed",
+                "final_state": {"status": "done"},
+            }
+        },
+    )
+    history = await manager.read_history(clean_run_id, count=10)
+    end = next(e for e in history if e["type"] == "agent_runtime_end")
+    assert "artifactClosure" not in end["data"]

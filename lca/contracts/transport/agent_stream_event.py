@@ -29,7 +29,6 @@ class _WireBase(BaseModel):
         return super().model_dump_json(**kwargs)
 
 
-
 class AgentRuntimeInit(_WireBase):
     type: Literal["agent_runtime_init"] = "agent_runtime_init"
     data: dict
@@ -46,6 +45,9 @@ class AgentRuntimeEndData(_WireBase):
     phase: Literal["execution_complete"]
     operationId: str | None = None
     uiMessages: list | None = None
+    # Artifact closure (download list) computed from the run's workspace
+    # ledger at terminal time. Present when the run produced deliverables.
+    artifactClosure: dict | None = None
 
 
 class AgentRuntimeEnd(_WireBase):
@@ -72,8 +74,15 @@ class StreamStart(_WireBase):
 
 class StreamChunkData(_WireBase):
     chunkType: Literal[
-        "text", "reasoning", "tools_calling", "image", "grounding",
-        "base64_image", "content_part", "reasoning_part", "tool_state",
+        "text",
+        "reasoning",
+        "tools_calling",
+        "image",
+        "grounding",
+        "base64_image",
+        "content_part",
+        "reasoning_part",
+        "tool_state",
     ]
     content: str | None = None
     reasoning: str | None = None
@@ -327,7 +336,23 @@ class Heartbeat(_WireBase):
 
 # Full union for type checking
 AgentStreamEvent = Annotated[
-    AgentRuntimeInit | AgentRuntimeEnd | StreamStart | StreamChunk | StreamEnd | VisibleOutputEnd | StreamRetry | ToolStart | ToolEnd | ToolExecute | AgentInterventionRequest | AgentInterventionResponse | StepStart | StepComplete | NotifyUpdate | ErrorEvent | Heartbeat,
+    AgentRuntimeInit
+    | AgentRuntimeEnd
+    | StreamStart
+    | StreamChunk
+    | StreamEnd
+    | VisibleOutputEnd
+    | StreamRetry
+    | ToolStart
+    | ToolEnd
+    | ToolExecute
+    | AgentInterventionRequest
+    | AgentInterventionResponse
+    | StepStart
+    | StepComplete
+    | NotifyUpdate
+    | ErrorEvent
+    | Heartbeat,
     Field(discriminator="type"),
 ]
 

@@ -23,7 +23,7 @@ from lca.infrastructure.computer.guest import (
 from lca.infrastructure.computer.office.plane import normalize_officecli_command
 from lca.infrastructure.computer.op.result import ComputerOpResult, TerminalCapableSandbox
 from lca.infrastructure.computer.sandbox.computer import normalize_sandbox_path
-from lca.infrastructure.file.store import FileStore, persist_generated_files
+from lca.infrastructure.file.store import FileStore, file_part_from_stored, persist_generated_files
 from lca.infrastructure.sandbox.factory.factory import get_sandbox_policy
 from lca.infrastructure.sandbox.runtime.scope import ensure_sandbox_runtime
 from lca.infrastructure.workspace.deliverable import (
@@ -390,6 +390,10 @@ class ComputerRuntimeExecMixin:
             "mime_type": mime_type,
             "size": stored.size_bytes,
         }
+        # The file is already in FileStore. Expose it as a canonical file part
+        # so ``_reuse_or_persist_files`` reuses this record instead of writing
+        # a duplicate blob on the next observation build.
+        state["files"] = [file_part_from_stored(stored)]
         sandbox_file = SandboxFile(name=filename, mime_type=mime_type, data=data)
         return ComputerOpResult(
             success=True,

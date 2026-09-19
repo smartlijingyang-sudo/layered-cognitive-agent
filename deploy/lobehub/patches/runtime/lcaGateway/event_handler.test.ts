@@ -164,7 +164,7 @@ describe('createLcaGatewayEventHandler', () => {
     expect(store.internal_executeClientTool).not.toHaveBeenCalled();
   });
 
-  it('folds tool_end file parts into the deliverable sink', async () => {
+  it('folds agent_runtime_end artifactClosure into the deliverable sink', async () => {
     const store = createStore();
     const collected: unknown[] = [];
     const handler = createLcaGatewayEventHandler(
@@ -174,14 +174,22 @@ describe('createLcaGatewayEventHandler', () => {
         context,
         operationId: 'op-1',
       },
-      { collect: (result) => collected.push(result), lists: () => ({ fileList: [], imageList: [] }) },
+      {
+        collectClosure: (closure) => collected.push(closure),
+        lists: () => ({ fileList: [], imageList: [] }),
+      },
     );
 
-    const result = { content: 'ok', state: { files: [{ name: 'a.pdf', url: '/files/file_1' }] } };
-    handler(makeEvent('tool_end', { isSuccess: true, result } as never));
+    const closure = {
+      text: '已生成以下文件：',
+      files: [{ name: 'a.pdf', url: '/files/file_1' }],
+    };
+    handler(
+      makeEvent('agent_runtime_end', { reason: 'completed', artifactClosure: closure } as never),
+    );
     await flush();
 
-    expect(collected).toEqual([result]);
+    expect(collected).toEqual([closure]);
   });
 
   it('still forwards non-tool_execute events through the shared handler', async () => {

@@ -118,6 +118,10 @@ class RunSession:
     loop_cursor_token: object | None = (
         None  # ADR-0169 §D11 PR-1.5: deprecated;Task 5 删除 ContextVar 后已 no-op
     )
+    # Run-scoped workspace (ADR-0051) retained on the session so the gateway
+    # coordinator can synthesize the artifact closure at terminal time even
+    # after the run_workspace_scope context has exited.
+    workspace: Any | None = None
     event_session: BoundRunEventSession | None = None  # ADR-0186: per-run DSH Session 绑定
 
     _closed: bool = field(
