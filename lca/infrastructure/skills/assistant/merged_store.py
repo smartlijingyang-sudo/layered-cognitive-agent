@@ -22,10 +22,11 @@ _T = TypeVar("_T")
 
 
 class AssistantMergedSkillStore(SkillPackageStore):
-    """Read-through view: assistant Home skills + global ``~/.lca/skills/``.
+    """Assistant-scoped skill store: ``{home}/skills/`` 是完整有效技能集（ADR-0243 D1）。
 
-    Writes stay on ``AssistantSkillOverlay`` / global importer — this adapter
-    is for prompt discovery and ``activate_skill`` lookup only.
+    ADR-0243 起，assistant-bound run 的发现与激活只读 Home ``skills/``；
+    全局 ``~/.lca/skills/`` 只是创建时硬链接物化的内容源，不再是运行时
+    兜底层——删除 Home 条目后技能不会从全局重新出现（I-B16）。
     """
 
     def __init__(
@@ -53,37 +54,19 @@ class AssistantMergedSkillStore(SkillPackageStore):
         return self._assistant_store
 
     def list_installed(self) -> tuple[SkillIndexEntry, ...]:
-        seen: set[str] = set()
-        merged: list[SkillIndexEntry] = []
         assistant_store = self._assistant_disk_store()
-        if assistant_store is not None:
-            for entry in assistant_store.list_installed():
-                if entry.skill_id in seen:
-                    continue
-                seen.add(entry.skill_id)
-                merged.append(entry)
-        for entry in self._global.list_installed():
-            if entry.skill_id in seen:
-                continue
-            seen.add(entry.skill_id)
-            merged.append(entry)
-        return tuple(merged)
+        if assistant_store is None:
+            return ()
+        return assistant_store.list_installed()
 
     def _lookup(self, fetch: Callable[[SkillPackageStore], _T]) -> _T:
-        """Read the assistant scope first, then the global scope.
-
-        A miss in the assistant scope is not an error — the skill may simply be
-        a global one — so it falls through to the global store, whose own
-        ``SkillNotFoundError`` is the single authoritative failure the caller
-        sees.
-        """
+        """只查 Home 范围；未安装即抛 ``SkillNotFoundError``（无全局兜底）。"""
         assistant_store = self._assistant_disk_store()
-        if assistant_store is not None:
-            try:
-                return fetch(assistant_store)
-            except SkillNotFoundError:  # WHY: assistant scope is only one of two
-                pass  # lookup scopes; the global store below decides.
-        return fetch(self._global)
+        if assistant_store is None:
+            raise SkillNotFoundError(
+                f"assistant {self._assistant_id!r} 未安装任何技能"
+            )
+        return fetch(assistant_store)
 
     def get(self, skill_id: str) -> SkillPackage:
         return self._lookup(lambda store: store.get(skill_id))

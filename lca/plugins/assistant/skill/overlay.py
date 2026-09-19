@@ -226,6 +226,26 @@ def _package_digest(package: SkillPackage) -> str:
     return digest if digest.startswith("sha256:") else f"sha256:{digest}"
 
 
+def _mark_local(skill_dir: Path) -> None:
+    """把落盘包的 ``manifest.json`` 标记为 ``source: "local"``（ADR-0243 D2）。
+
+    ``global_link`` 包在编辑（COW）后变成独立副本，来源标记必须更新。
+    """
+    meta_path = skill_dir / "manifest.json"
+    if not meta_path.is_file():
+        return
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    if isinstance(meta, dict):
+        meta["source"] = "local"
+        meta_path.write_text(
+            json.dumps(meta, ensure_ascii=False, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+
+
 def _iso(moment: datetime) -> str:
     return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -443,6 +463,140 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
                 reason=f"remove_skill:{skill_id}",
                 changes=(f"skills/{skill_id}",),
             )
+        )
+
+    async def edit(
+        self,
+        assistant_id: str,
+        skill_id: str,
+        skill_md: str,
+        *,
+        actor: str = "system",
+    ) -> SkillInstallReceipt:
+        """编辑已安装 skill（ADR-0243 PR-3）：COW + 覆盖落盘 + manifest 修订 + EP。
+
+        ``global_link`` 包在此被断链复制为 ``local``（新文件新 inode），
+        全局库与其他 agent 零感知（I-B15）。新 SKILL.md 走 0048 结构校验
+        与 0067 三闸；失败不写盘、不发 EP。
+        """
+        spec = self._catalog.get(assistant_id)  # digest 校验 fail-closed
+        home = Path(spec.home_path)
+        skills_root = home / "skills"
+        skill_dir = skills_root / sanitize_skill_id(skill_id)
+        if not skill_dir.is_dir():
+            raise SkillNotInstalled(f"skill 未安装: assistant={assistant_id!r} skill={skill_id!r}")
+
+        staging_root = skills_root / _STAGING_DIR_NAME / uuid.uuid4().hex
+        try:
+            package = self._stage_edited_package(staging_root, skill_dir, skill_id, skill_md)
+            artifact = _gate_package(package)
+            dest = _place_package(staging_root, skills_root, skill_id)
+            _mark_local(dest)
+
+            manifest = load_manifest(home, assistant_id)
+            new_revision_seq = _revision_of(manifest) + 1
+            package_digest = _package_digest(package)
+            extra: dict[str, str] = {}
+            previous_digests = manifest.get("digests")
+            if isinstance(previous_digests, dict):
+                extra = {
+                    str(name): str(value)
+                    for name, value in previous_digests.items()
+                    if isinstance(value, str) and str(name).startswith(_SKILLS_DIGEST_PREFIX)
+                }
+            extra[f"{_SKILLS_DIGEST_PREFIX}{skill_id}"] = package_digest
+            new_manifest = build_manifest(
+                assistant_id=assistant_id,
+                template_id=str(manifest.get("template_id") or DEFAULT_TEMPLATE_ID),
+                revision_seq=new_revision_seq,
+                home=home,
+                created_at=str(manifest.get("created_at") or "") or None,
+                extra_digests=extra,
+            )
+            skills_section = manifest.get("skills")
+            section: dict[str, Any] = (
+                dict(skills_section) if isinstance(skills_section, dict) else {}
+            )
+            section[skill_id] = {
+                "digest": package_digest,
+                "artifact_state": artifact.state.value,
+                "version": package.version,
+                "source": "local",
+                "installed_at": _iso(self._clock()),
+                "actor": actor,
+            }
+            new_manifest["skills"] = section
+            write_manifest(home, new_manifest)
+            write_revision_snapshot(home, new_revision_seq, new_manifest)
+        finally:
+            shutil.rmtree(staging_root, ignore_errors=True)
+            staging_parent = skills_root / _STAGING_DIR_NAME
+            if staging_parent.is_dir():
+                with contextlib.suppress(OSError):
+                    staging_parent.rmdir()
+
+        self._emit_profile_revised(
+            AssistantProfileRevisedEventPayload(
+                assistant_id=assistant_id,
+                revision_seq=new_revision_seq,
+                manifest_digest=str(new_manifest["manifest_digest"]),
+                actor=actor,
+                reason=f"edit_skill:{skill_id}",
+                changes=(f"skills/{skill_id}",),
+            )
+        )
+        return SkillInstallReceipt(
+            assistant_id=assistant_id,
+            skill_id=skill_id,
+            version=package.version,
+            digest=package_digest,
+            artifact_state=artifact.state.value,
+            installed_at=_iso(self._clock()),
+            revision_seq=new_revision_seq,
+            manifest_digest=str(new_manifest["manifest_digest"]),
+            actor=actor,
+            source="local",
+            install_path=str(dest),
+        )
+
+    def _stage_edited_package(
+        self,
+        staging_root: Path,
+        skill_dir: Path,
+        skill_id: str,
+        skill_md: str,
+    ) -> SkillPackage:
+        """在 staging 里用新 SKILL.md + 既有 resources 重建包并经 0048 校验。"""
+        staging_dir = staging_root / skill_id
+        staging_dir.mkdir(parents=True, exist_ok=True)
+        src_resources = skill_dir / "resources"
+        if src_resources.is_dir():
+            shutil.copytree(src_resources, staging_dir / "resources", dirs_exist_ok=True)
+        (staging_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
+
+        resource_files: dict[str, bytes] = {}
+        res_dir = staging_dir / "resources"
+        if res_dir.is_dir():
+            for path in sorted(res_dir.rglob("*")):
+                if path.is_file():
+                    rel = safe_rel_path(str(path.relative_to(staging_dir)))
+                    if rel:
+                        resource_files[rel] = path.read_bytes()
+
+        meta: dict[str, Any] = {}
+        old_manifest = skill_dir / "manifest.json"
+        if old_manifest.is_file():
+            try:
+                meta = json.loads(old_manifest.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                meta = {}
+        store = DiskSkillPackageStore(SkillSettings(cache_dir=staging_root))
+        return store.install_package(
+            skill_id=skill_id,
+            skill_md_text=skill_md,
+            resource_files=resource_files,
+            source_url=str(meta.get("source_url") or "") or str(skill_dir),
+            version=str(meta.get("version") or ""),
         )
 
     # ── 内部 ──────────────────────────────────────────────────────────

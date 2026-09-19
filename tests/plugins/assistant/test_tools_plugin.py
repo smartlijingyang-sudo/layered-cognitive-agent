@@ -87,8 +87,8 @@ async def test_factory_adds_create_skill_tool_when_assistant_id_bound() -> None:
     await tools_plugin.setup.setup(ctx, None)
 
     produced = tools_service.factories["assistant"]({"assistant_id": "asst_demo"})
-    # create_assistant + create_assistant_skill + 9 个自我管理工具（ADR-0242 D6 + ADR-0243 D6）
-    assert isinstance(produced, list) and len(produced) == 11
+    # create_assistant + create_assistant_skill + 10 个自我管理工具（ADR-0242 D6 + ADR-0243 D6）
+    assert isinstance(produced, list) and len(produced) == 12
     assert isinstance(produced[0], AssistantCreateTool)
     assert isinstance(produced[1], AssistantCreateSkillTool)
     assert produced[1]._overlay is overlay

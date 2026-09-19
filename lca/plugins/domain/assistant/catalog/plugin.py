@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import uuid
 from collections.abc import Callable, Mapping
@@ -91,6 +92,7 @@ from lca.plugins.assistant.home._home_layout import (
     list_children_dirs,
     load_manifest,
     render_template,
+    sha256_digest,
     write_home_files,
     write_manifest,
     write_revision_snapshot,
@@ -118,6 +120,63 @@ class Config(BaseModel):
 # ── Catalog 实现 ──────────────────────────────────────────────────────
 
 
+def _link_tree(src: Path, dst: Path) -> None:
+    """把 ``src`` 目录树硬链接镜像到 ``dst``（文件硬链接，目录新建）。"""
+    dst.mkdir(parents=True, exist_ok=True)
+    for child in src.iterdir():
+        target = dst / child.name
+        if child.is_dir():
+            _link_tree(child, target)
+        elif child.is_file():
+            os.link(child, target)
+
+
+def _materialize_global_skills(
+    global_store: Any,
+    home: Path,
+    skill_ids: tuple[str, ...],
+    now: str,
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """把 ``initial_skills`` 里的全局技能硬链接物化到 ``{home}/skills/``。
+
+    返回 ``(skills 索引, skills digest 前缀)`` 供 Home manifest 写入。每个
+    落盘包的 ``manifest.json`` 标记 ``source: "global_link"``（ADR-0243 D2）。
+    """
+    store_root = getattr(global_store, "root", None)
+    if store_root is None:
+        raise _CatalogConfigError("全局技能库不支持硬链接物化（缺 root 属性）")
+    skills_root = home / "skills"
+    skills_root.mkdir(parents=True, exist_ok=True)
+    index: dict[str, Any] = {}
+    digests: dict[str, str] = {}
+    for skill_id in skill_ids:
+        src = Path(store_root) / skill_id
+        if not (src / "SKILL.md").is_file() or not (src / "manifest.json").is_file():
+            raise _CatalogConfigError(f"全局技能不存在: {skill_id}")
+        dest = skills_root / skill_id
+        if dest.exists():
+            shutil.rmtree(dest)
+        _link_tree(src, dest)
+        # 标记来源：global_link（本地 manifest 多一个 source 字段）
+        meta = json.loads((src / "manifest.json").read_text(encoding="utf-8"))
+        meta["source"] = "global_link"
+        (dest / "manifest.json").write_text(
+            json.dumps(meta, ensure_ascii=False, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        digest = sha256_digest(dest / "SKILL.md")
+        index[skill_id] = {
+            "digest": digest,
+            "artifact_state": "verified",
+            "version": str(meta.get("version") or ""),
+            "source": "global_link",
+            "installed_at": now,
+            "actor": "system",
+        }
+        digests[f"skills/{skill_id}"] = digest
+    return index, digests
+
+
 class _AssistantCatalogImpl(AssistantCatalog):
     """Catalog 内部实现;通过 plugin ``setup`` 注入 ctx。
 
@@ -133,12 +192,14 @@ class _AssistantCatalogImpl(AssistantCatalog):
         event_emitter: Callable[[str, Mapping[str, Any]], Any] | None = None,
         clock: Callable[[], datetime] | None = None,
         role_resolver: Any | None = None,
+        global_skills_store: Any | None = None,
     ) -> None:
         self._root = root
         self._root.mkdir(parents=True, exist_ok=True)
         self._emit = event_emitter
         self._clock = clock or (lambda: datetime.now(UTC))
         self._role_resolver = role_resolver
+        self._global_skills_store = global_skills_store
 
     # ── 公开面 ────────────────────────────────────────────────────────
 
@@ -207,11 +268,32 @@ class _AssistantCatalogImpl(AssistantCatalog):
                 (home.root / "USER.md").write_text(req.seed_user_md, encoding="utf-8")
 
             # 2b. inherit_from:把来源 Home 的 skills/ + tools/grants 策略复制为快照
+            inherited_index: dict[str, Any] = {}
+            inherited_digests: dict[str, str] = {}
             if req.inherit_from:
-                self._copy_inherited_snapshot(req.inherit_from, home.root)
+                inherited_index, inherited_digests = self._copy_inherited_snapshot(
+                    req.inherit_from, home.root
+                )
 
             # 2c. Home 卫生:USER.md 不允许为空(ADR-0242 D2)
             _ensure_non_empty_user_md(home.root)
+
+            # 2d. initial_skills:把全局技能硬链接物化为 Home 有效技能集(ADR-0243 D1)
+            skills_index: dict[str, Any] = dict(inherited_index)
+            skills_digests: dict[str, str] = dict(inherited_digests)
+            if req.initial_skills:
+                if self._global_skills_store is None:
+                    raise _CatalogConfigError(
+                        "initial_skills 需要全局技能库（skills 能力不可用）"
+                    )
+                materialized_index, materialized_digests = _materialize_global_skills(
+                    self._global_skills_store,
+                    home.root,
+                    req.initial_skills,
+                    _iso_now(self._clock),
+                )
+                skills_index.update(materialized_index)
+                skills_digests.update(materialized_digests)
 
             # 3. 引导式创建完成流:删除 BOOTSTRAP.md（EP 在 manifest 写盘后发,
             #    携带事件时刻的 manifest_digest）
@@ -225,9 +307,12 @@ class _AssistantCatalogImpl(AssistantCatalog):
                 template_id=req.template_id,
                 revision_seq=0,
                 home=home.root,
+                extra_digests=skills_digests,
             )
             if req.from_role:
                 manifest["role_id"] = req.from_role
+            if skills_index:
+                manifest["skills"] = skills_index
             write_manifest(home.root, manifest)
         except Exception:
             cleanup_home(home.root)
@@ -528,12 +613,19 @@ class _AssistantCatalogImpl(AssistantCatalog):
         if mismatches:
             raise _DigestMismatch(home, assistant_id, mismatches)
 
-    def _copy_inherited_snapshot(self, source_id: str, dest_home: Path) -> None:
+    def _copy_inherited_snapshot(
+        self, source_id: str, dest_home: Path
+    ) -> tuple[dict[str, Any], dict[str, str]]:
         """把来源 Home 的 ``skills/`` + ``tools.yaml`` / ``grants.yaml`` 复制为快照。
+
+        返回 ``(skills 索引, skills digest 前缀)``，供 create 写入新 Home
+        manifest（否则继承技能在发现层会变成未索引的 draft）。
 
         - 先经 ``self.get`` 做 digest 校验:来源未知 / digest 不匹配 ⇒
           ``AssistantCatalogError`` 子类(fail-closed,ADR-0242 D1);
         - ``skills/`` 只复制含 ``SKILL.md`` 的已验证技能目录;
+        - ``global_link`` 技能用硬链接复制（保持空间效率与来源标记），
+          ``local`` 技能用快照复制（ADR-0243 PR-2）;
         - ``tools.yaml`` / ``grants.yaml`` 整文件复制为新 Home 的策略;
         - 复制是快照,新 Home 之后各自演化。
         """
@@ -542,10 +634,45 @@ class _AssistantCatalogImpl(AssistantCatalog):
 
         source_skills = source_home / "skills"
         dest_skills = dest_home / "skills"
+        index: dict[str, Any] = {}
+        digests: dict[str, str] = {}
         if source_skills.is_dir():
             for child in sorted(source_skills.iterdir()):
                 if child.is_dir() and (child / "SKILL.md").is_file():
-                    shutil.copytree(child, dest_skills / child.name, dirs_exist_ok=True)
+                    is_global_link = False
+                    meta_path = child / "manifest.json"
+                    if meta_path.is_file():
+                        try:
+                            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                            is_global_link = meta.get("source") == "global_link"
+                        except (OSError, ValueError):
+                            is_global_link = False
+                    dest = dest_skills / child.name
+                    if is_global_link:
+                        shutil.copytree(
+                            child,
+                            dest,
+                            dirs_exist_ok=True,
+                            copy_function=os.link,
+                        )
+                    else:
+                        shutil.copytree(child, dest, dirs_exist_ok=True)
+                    digest = sha256_digest(dest / "SKILL.md")
+                    index[child.name] = {
+                        "digest": digest,
+                        "artifact_state": "verified",
+                        "version": str(meta.get("version") or "") if is_global_link else "",
+                        "source": "global_link" if is_global_link else "local",
+                        "installed_at": _iso_now(self._clock),
+                        "actor": "system",
+                    }
+                    digests[f"skills/{child.name}"] = digest
+
+        for name in ("tools.yaml", "grants.yaml"):
+            src = source_home / name
+            if src.is_file():
+                (dest_home / name).write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        return index, digests
 
         for name in ("tools.yaml", "grants.yaml"):
             src = source_home / name
@@ -1006,10 +1133,13 @@ async def setup(ctx: PluginContext, config: Config) -> None:
             producer=type(None),
         )
 
+    from lca.infrastructure.skills.disk.store import DiskSkillPackageStore
+
     catalog = _AssistantCatalogImpl(
         root=root,
         event_emitter=_emit,
         role_resolver=_try_build_role_resolver(),
+        global_skills_store=DiskSkillPackageStore(),
     )
     ctx.provide(ASSISTANT_CATALOG.key, catalog)
 

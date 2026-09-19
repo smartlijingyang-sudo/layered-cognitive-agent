@@ -249,6 +249,56 @@ class TestSelfManageTools:
         assert obs.success is False
         assert "确认" in (obs.error or "")
 
+    def test_edit_skill_requires_both_args(self, catalog: AssistantCatalogImpl) -> None:
+        from lca.infrastructure.tools.assistant.self_manage_tools import (
+            EditAssistantSkillTool,
+        )
+        from lca.plugins.assistant.skill.overlay import AssistantSkillOverlayImpl
+
+        assistant_id = _create(catalog)
+        overlay = AssistantSkillOverlayImpl(catalog=catalog)
+        tool = EditAssistantSkillTool(
+            catalog=catalog, assistant_id=assistant_id, overlay=overlay
+        )
+        obs = asyncio.run(tool.execute({"skill_id": "x", "skill_md": ""}))
+        assert obs.success is False
+        assert "skill_md" in (obs.error or "")
+
+    def test_edit_skill_applies_cow(
+        self, catalog: AssistantCatalogImpl, tmp_path: Path
+    ) -> None:
+        import json as _json
+
+        from lca.contracts.protocols.assistant.skill_overlay import SkillSource
+        from lca.infrastructure.tools.assistant.self_manage_tools import (
+            EditAssistantSkillTool,
+        )
+        from lca.plugins.assistant.skill.overlay import AssistantSkillOverlayImpl
+
+        assistant_id = _create(catalog)
+        overlay = AssistantSkillOverlayImpl(catalog=catalog)
+        staging = tmp_path / "skill-src"
+        staging.mkdir()
+        (staging / "SKILL.md").write_text(
+            "---\nname: demo-skill\ndescription: d\nreferences: []\n---\nbody",
+            encoding="utf-8",
+        )
+        asyncio.run(
+            overlay.install(assistant_id, SkillSource(local_path=str(staging)), actor="test")
+        )
+        tool = EditAssistantSkillTool(
+            catalog=catalog, assistant_id=assistant_id, overlay=overlay
+        )
+        new_md = "---\nname: demo-skill\ndescription: edited\nreferences: []\n---\nnew body"
+        obs = asyncio.run(tool.execute({"skill_id": "demo-skill", "skill_md": new_md}))
+        assert obs.success is True
+        home = Path(catalog.get(assistant_id).home_path)
+        assert (home / "skills" / "demo-skill" / "SKILL.md").read_text(
+            encoding="utf-8"
+        ).endswith("new body")
+        manifest = _json.loads((home / "manifest.json").read_text(encoding="utf-8"))
+        assert manifest["skills"]["demo-skill"]["source"] == "local"
+
     def test_update_grants_requires_confirmation(self, catalog: AssistantCatalogImpl) -> None:
         assistant_id = _create(catalog)
         tool = UpdateAssistantGrantsTool(catalog=catalog, assistant_id=assistant_id)

@@ -264,3 +264,29 @@ class AssistantSkillOverlay(Protocol):
         一条 ``assistant.profile.revised`` Spine 事件。
         """
         ...
+
+    async def edit(
+        self,
+        assistant_id: str,
+        skill_id: str,
+        skill_md: str,
+        *,
+        actor: str = "system",
+    ) -> SkillInstallReceipt:
+        """编辑本助理已安装的 skill（ADR-0243 PR-3，COW）。
+
+        时序：``catalog.get`` digest 校验（fail-closed）⇒ 若包来源为
+        ``global_link`` 先断链复制为 ``local`` ⇒ staging 内校验新
+        SKILL.md（0048 结构上限 + 0067 三闸）⇒ 覆盖落盘
+        ``{home}/skills/<skill_id>/`` ⇒ manifest 重算 + ``revision_seq++``
+        ⇒ 发 ``assistant.profile.revised`` EP。
+
+        失败语义：
+        - ``assistant_id`` 不存在 / digest 不匹配 ⇒ Catalog 异常透传；
+        - 包未落盘 ⇒ ``SkillNotInstalled``（不写盘、不发 EP）；
+        - 新 SKILL.md 校验失败 ⇒ ``SkillImportError``（不写盘、不发 EP）。
+
+        外部后果：``{home}/skills/<skill_id>/`` 内容更新 + manifest 修订 +
+        一条 ``assistant.profile.revised`` Spine 事件。
+        """
+        ...

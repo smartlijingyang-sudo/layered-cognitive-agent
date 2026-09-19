@@ -35,6 +35,7 @@ if TYPE_CHECKING:
 
 _LIST_ASSISTANT_SKILLS_TOOL = "list_assistant_skills"
 _DELETE_ASSISTANT_SKILL_TOOL = "delete_assistant_skill"
+_EDIT_ASSISTANT_SKILL_TOOL = "edit_assistant_skill"
 _UPDATE_ASSISTANT_SOUL_TOOL = "update_assistant_soul"
 _UPDATE_ASSISTANT_PROFILE_TOOL = "update_assistant_profile"
 _UPDATE_ASSISTANT_GRANTS_TOOL = "update_assistant_grants"
@@ -171,6 +172,55 @@ class DeleteAssistantSkillTool(_BaseAssistantTool):
                 "assistant_id": self._assistant_id,
                 "deleted_skill_id": skill_id,
                 "message": f"已删除技能「{skill_id}」。",
+            },
+        )
+
+
+class EditAssistantSkillTool(_BaseAssistantTool):
+    """Edit a skill in the assistant's Home (COW, non-sensitive)."""
+
+    name = _EDIT_ASSISTANT_SKILL_TOOL
+    description = (
+        "编辑当前助理 Home 的一个已安装技能（写时复制：若该技能链接自全局库，"
+        "会先复制为助理私有副本再修改，不影响其他 agent）。非敏感操作，改完告知用户。"
+        "参数: skill_id（要编辑的技能 id）、skill_md（新的 SKILL.md 全文，含 YAML frontmatter）。"
+    )
+    parameters: ClassVar[dict[str, Any]] = {
+        "type": "object",
+        "properties": {
+            "skill_id": {"type": "string", "description": "要编辑的技能 id"},
+            "skill_md": {
+                "type": "string",
+                "description": "新的 SKILL.md 全文（含 YAML frontmatter）",
+            },
+        },
+        "required": ["skill_id", "skill_md"],
+    }
+
+    async def execute(self, args: dict[str, Any]) -> Observation:
+        start = time.monotonic()
+        skill_id = str(args.get("skill_id") or "").strip()
+        skill_md = str(args.get("skill_md") or "").strip()
+        if not skill_id:
+            return self._fail(start, "skill_id 必须为非空字符串")
+        if not skill_md:
+            return self._fail(start, "skill_md 必须为非空字符串")
+        if self._overlay is None:
+            return self._fail(start, "assistant.skill_overlay 能力不可用")
+        try:
+            receipt = await self._overlay.edit(
+                self._assistant_id, skill_id, skill_md, actor="agent"
+            )
+        except Exception as exc:
+            return self._fail(start, f"编辑技能失败: {exc}")
+        return self._ok(
+            start,
+            {
+                "assistant_id": self._assistant_id,
+                "skill_id": receipt.skill_id,
+                "source": receipt.source,
+                "path": receipt.install_path,
+                "message": f"已编辑技能「{receipt.skill_id}」。",
             },
         )
 
@@ -533,6 +583,7 @@ def assistant_self_manage_tools_from_run(
     return [
         ListAssistantSkillsTool(catalog=catalog, assistant_id=assistant_id, overlay=overlay),
         DeleteAssistantSkillTool(catalog=catalog, assistant_id=assistant_id, overlay=overlay),
+        EditAssistantSkillTool(catalog=catalog, assistant_id=assistant_id, overlay=overlay),
         UpdateAssistantSoulTool(catalog=catalog, assistant_id=assistant_id),
         UpdateAssistantProfileTool(catalog=catalog, assistant_id=assistant_id),
         UpdateAssistantGrantsTool(catalog=catalog, assistant_id=assistant_id),
@@ -558,6 +609,7 @@ __all__ = [
     "_CREATE_ASSISTANT_TOOL_TOOL",
     "_DELETE_ASSISTANT_SKILL_TOOL",
     "_DELETE_ASSISTANT_TOOL_TOOL",
+    "_EDIT_ASSISTANT_SKILL_TOOL",
     "_LIST_ASSISTANT_SKILLS_TOOL",
     "_LIST_ASSISTANT_TOOLS_TOOL",
     "_UPDATE_ASSISTANT_GRANTS_TOOL",
@@ -567,6 +619,7 @@ __all__ = [
     "CreateAssistantToolTool",
     "DeleteAssistantSkillTool",
     "DeleteAssistantToolTool",
+    "EditAssistantSkillTool",
     "ListAssistantSkillsTool",
     "ListAssistantToolsTool",
     "UpdateAssistantGrantsTool",
