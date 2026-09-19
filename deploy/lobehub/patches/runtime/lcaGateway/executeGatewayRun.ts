@@ -5,10 +5,7 @@
 // then opens the LCA agent-gateway WebSocket and wires native gateway events.
 
 import type { ConversationContext } from '@lobechat/types';
-import { countContextTokens, getSlicedMessages } from '@lobechat/context-engine';
 
-import { getAiInfraStoreState } from '@/store/aiInfra';
-import { modelContextWindowTokens } from '@/store/aiInfra/slices/aiModel/selectors';
 import { useAgentStore } from '@/store/agent';
 import { buildRunLifecycle } from '@/store/chat/slices/agentRun/actions/lifecycle/buildRunLifecycle';
 import type { RunScope } from '@/store/chat/slices/agentRun/actions/lifecycle/types';
@@ -156,19 +153,10 @@ function createLcaRunOnSessionComplete(
   };
 }
 
-// ADR-0244 D1: placeholder-free, token-budget-aware wire messages.
-const ASSISTANT_PLACEHOLDER = '...';
-const LOADING_FLAT = 'LOADING_FLAT';
-
-type AttachmentExtras = {
-  imageList?: Array<{ id: string; url: string; alt?: string }>;
-  fileList?: Array<{ id: string; name?: string; url?: string; fileType?: string }>;
-  files?: string[];
-};
-
-type WireMessage = { role: string; content: string } & AttachmentExtras;
-
-function isPlaceholderAssistantRow(m: unknown): boolean {
+// ADR-0244 D1: assistant placeholder rows (optimistic '...', LOADING_FLAT,
+// or empty content with no tools/reasoning/attachments) must not reach the
+// backend as if they were real replies.
+export function isPlaceholderAssistantRow(m: unknown): boolean {
   const row = m as {
     role?: string;
     content?: unknown;
@@ -182,91 +170,7 @@ function isPlaceholderAssistantRow(m: unknown): boolean {
     return false;
   }
   const content = typeof row.content === 'string' ? row.content : '';
-  return content === '' || content === ASSISTANT_PLACEHOLDER || content === LOADING_FLAT;
-}
-
-function toWireMessage(m: unknown): WireMessage | null {
-  const row = m as {
-    role?: string;
-    content?: unknown;
-    imageList?: unknown[];
-    fileList?: unknown[];
-    files?: string[];
-  };
-  if (!row || row.role === 'system') return null;
-  if (row.role !== 'user' && row.role !== 'assistant') return null;
-
-  const content =
-    typeof row.content === 'string'
-      ? row.content
-      : row.content != null
-        ? JSON.stringify(row.content)
-        : '';
-
-  const attachmentExtras: AttachmentExtras = {};
-  if (Array.isArray(row.imageList) && row.imageList.length > 0) {
-    attachmentExtras.imageList = row.imageList as AttachmentExtras['imageList'];
-  }
-  if (Array.isArray(row.fileList) && row.fileList.length > 0) {
-    attachmentExtras.fileList = row.fileList as AttachmentExtras['fileList'];
-  }
-  if (Array.isArray(row.files) && row.files.length > 0) {
-    attachmentExtras.files = row.files as string[];
-  }
-
-  if (!content && Object.keys(attachmentExtras).length === 0) return null;
-  return { role: row.role, content, ...attachmentExtras };
-}
-
-/**
- * Build the ``messages`` payload for POST /lca-api/runs.
- *
- * Drops assistant placeholder rows, keeps attachments on their originating
- * turn, and truncates history to the model context window when one is known.
- * The current turn is always preserved. Falls back to an empty user message
- * when nothing remains.
- */
-export function sliceWireMessages(rawMessages: unknown[], ctxWindow?: number): WireMessage[] {
-  const filtered = rawMessages.filter((m) => !isPlaceholderAssistantRow(m));
-  const toWire = (messages: unknown[]) =>
-    messages.map(toWireMessage).filter((m): m is WireMessage => m !== null);
-
-  if (filtered.length === 0 || toWire(filtered).length === 0) {
-    return [{ role: 'user', content: '' }];
-  }
-  if (!ctxWindow || ctxWindow <= 0) return toWire(filtered);
-
-  const reserved = Math.floor(ctxWindow * 0.4);
-  const budget = ctxWindow - reserved;
-  // Count tokens on the original UI messages so the context engine sees the
-  // real content structure, not the flattened wire projection.
-  const count = (messages: unknown[]) =>
-    countContextTokens({ messages: messages as never, tools: [] }).adjustedTotal;
-
-  if (count(filtered) <= budget) return toWire(filtered);
-
-  // Group-aware truncation: keep the largest suffix that fits the budget.
-  let lo = 1;
-  let hi = filtered.length;
-  let best = 1;
-  while (lo <= hi) {
-    const mid = Math.floor((lo + hi) / 2);
-    const sliced = getSlicedMessages(filtered as never, {
-      enableHistoryCount: true,
-      historyCount: mid,
-    }) as unknown[];
-    if (sliced.length > 0 && count(sliced) <= budget) {
-      best = mid;
-      lo = mid + 1;
-    } else {
-      hi = mid - 1;
-    }
-  }
-  const finalSliced = getSlicedMessages(filtered as never, {
-    enableHistoryCount: true,
-    historyCount: best,
-  }) as unknown[];
-  return toWire(finalSliced);
+  return content === '' || content === '...' || content === 'LOADING_FLAT';
 }
 
 export async function lcaExecuteGatewayRun(
@@ -288,21 +192,75 @@ export async function lcaExecuteGatewayRun(
     params: Record<string, unknown>;
   },
 ): Promise<{ model: string; provider: string }> {
-  // ADR-0244 D1: budget-aware, placeholder-free wire messages.
+  // Forward multi-turn conversation messages with attachments attached to their originating turns.
+  const rawMessages = params.messages || [];
+  const wireMessages: Array<{
+    role: string;
+    content: string;
+    imageList?: Array<{ id: string; url: string; alt?: string }>;
+    fileList?: Array<{ id: string; name?: string; url?: string; fileType?: string }>;
+    files?: string[];
+  }> = [];
+
+  for (const m of rawMessages) {
+    if (!m || m.role === 'system') continue;
+    if (m.role !== 'user' && m.role !== 'assistant') continue;
+    if (isPlaceholderAssistantRow(m)) continue;
+
+    const msgContent =
+      typeof m.content === 'string'
+        ? m.content
+        : m.content != null
+          ? JSON.stringify(m.content)
+          : '';
+
+    const attachmentExtras: {
+      imageList?: Array<{ id: string; url: string; alt?: string }>;
+      fileList?: Array<{ id: string; name?: string; url?: string; fileType?: string }>;
+      files?: string[];
+    } = {};
+
+    const imageList = (m as { imageList?: unknown }).imageList;
+    if (Array.isArray(imageList) && imageList.length > 0) {
+      attachmentExtras.imageList = imageList as Array<{
+        id: string;
+        url: string;
+        alt?: string;
+      }>;
+    }
+    const fileList = (m as { fileList?: unknown }).fileList;
+    if (Array.isArray(fileList) && fileList.length > 0) {
+      attachmentExtras.fileList = fileList as Array<{
+        id: string;
+        name?: string;
+        url?: string;
+        fileType?: string;
+      }>;
+    }
+    const files = (m as { files?: unknown }).files;
+    if (Array.isArray(files) && files.length > 0) {
+      attachmentExtras.files = files as string[];
+    }
+
+    if (!msgContent && Object.keys(attachmentExtras).length === 0) {
+      continue;
+    }
+
+    wireMessages.push({
+      role: m.role,
+      content: msgContent,
+      ...attachmentExtras,
+    });
+  }
+
+  if (wireMessages.length === 0) {
+    wireMessages.push({ role: 'user', content: '' });
+  }
+
   const state = get();
   const context = params.context as ConversationContext;
   const topicId = context.topicId ?? state.activeTopicId ?? '';
   const nested = params.params;
-
-  const agentRow = useAgentStore.getState().agentMap[context.agentId] as
-    | { model?: string | null; provider?: string | null }
-    | undefined;
-  const ctxWindow =
-    agentRow?.model && agentRow?.provider
-      ? modelContextWindowTokens(agentRow.model, agentRow.provider)(getAiInfraStoreState())
-      : undefined;
-  const wireMessages = sliceWireMessages(params.messages || [], ctxWindow ?? undefined);
-
   const assistantMessageId = resolveAssistantMessageId(
     params.parentMessageId,
     params.parentMessageType,
@@ -314,6 +272,7 @@ export async function lcaExecuteGatewayRun(
   // `agencyConfig.lcaAssistantId`; forward it so the run assembles the
   // agent persona from its Home (ADR-0242 D3). `params.model` is the run
   // mode ('solo'/'team'), so the agent row lookup uses `context.agentId`.
+  const agentRow: unknown = useAgentStore.getState().agentMap[context.agentId];
   const assistantId = (
     agentRow as { agencyConfig?: { lcaAssistantId?: string } | null } | undefined
   )?.agencyConfig?.lcaAssistantId;
