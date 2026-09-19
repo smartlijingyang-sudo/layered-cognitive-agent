@@ -33,6 +33,7 @@ import time
 import traceback
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import structlog
 
@@ -46,6 +47,7 @@ from lca.infrastructure.observability.journal.engine.journal_io import (
     load_journal_records,
     record_normalize,
 )
+from lca.infrastructure.workspace.artifact_ledger import artifact_closure_text
 from lca.plugins.observability.health.run_health_fold import fold_run_health
 from lca.plugins.transport.webserver.doctor import diagnose
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import (
@@ -183,17 +185,14 @@ def record_terminal_materialization(session: RunSession) -> None:
             payload_for_hash = health_report.model_dump(mode="json")
             payload_for_hash.pop("generated_at", None)
             health_hash = hashlib.sha256(
-                json.dumps(payload_for_hash, sort_keys=True,
-                           ensure_ascii=False).encode("utf-8")
+                json.dumps(payload_for_hash, sort_keys=True, ensure_ascii=False).encode("utf-8")
             ).hexdigest()
 
         # G-12: under the per-run-id flock, check for early-return.
         with _materialization_lock(manifest_path):
             if manifest_path.exists():
                 try:
-                    existing = json.loads(
-                        manifest_path.read_text(encoding="utf-8")
-                    )
+                    existing = json.loads(manifest_path.read_text(encoding="utf-8"))
                 except (OSError, json.JSONDecodeError):
                     existing = None
                 if (
@@ -221,14 +220,11 @@ def record_terminal_materialization(session: RunSession) -> None:
                 ledger_high_watermark=ledger_high_watermark_for(session),
                 ledger_summary=ledger_summary_for(session),
                 started_at=session.started_at,
-                closed_at=(
-                    session.closed_at
-                    if session.closed_at is not None
-                    else time.time()
-                ),
+                closed_at=(session.closed_at if session.closed_at is not None else time.time()),
                 extra={
                     "doctor_report": report.as_dict(),
                     "flush_errors": tuple(flush_errors),
+                    "artifact_closure": _artifact_closure_manifest(session),
                 },
             )
             atomic_write_text(
@@ -275,12 +271,14 @@ def flush_step_artifacts_with_log(session: RunSession) -> list[dict[str, str]]:
             error_message=str(exc)[:500],
             exc_info=True,
         )
-        return [{
-            "operation": "flush_step_tree_artifacts",
-            "error_type": type(exc).__name__,
-            "error_message": str(exc)[:500],
-            "traceback": traceback.format_exc(limit=4),
-        }]
+        return [
+            {
+                "operation": "flush_step_tree_artifacts",
+                "error_type": type(exc).__name__,
+                "error_message": str(exc)[:500],
+                "traceback": traceback.format_exc(limit=4),
+            }
+        ]
 
 
 def _doctor_journal_path(session: RunSession, locator: RunLocator) -> Path:
@@ -378,6 +376,25 @@ def ledger_summary_for(session: RunSession) -> str:
         return digest.hexdigest()
     except OSError:
         return ""
+
+
+def _artifact_closure_manifest(session: RunSession) -> dict[str, Any] | None:
+    """Durable artifact-closure metric for the terminal manifest.
+
+    Mirrors what the gateway coordinator attaches to ``agent_runtime_end``.
+    ``debug-run`` / manifest readers can check whether a run that produced
+    files actually carried a deliverable closure.
+    """
+    workspace = getattr(session, "workspace", None)
+    if workspace is None:
+        return None
+    snapshot = workspace.artifacts.snapshot()
+    if not snapshot.artifacts:
+        return None
+    return {
+        "artifact_count": len(snapshot.artifacts),
+        "text": artifact_closure_text(snapshot),
+    }
 
 
 __all__ = [

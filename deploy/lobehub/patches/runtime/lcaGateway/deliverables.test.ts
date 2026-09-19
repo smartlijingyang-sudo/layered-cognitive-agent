@@ -20,10 +20,10 @@ const pdfPart = {
 };
 
 describe('createLcaDeliverables', () => {
-  it('projects harvested sandbox files onto the answer row file list', () => {
+  it('projects the terminal artifact closure onto the answer row file list', () => {
     const deliverables = createLcaDeliverables();
 
-    deliverables.collect({ content: 'PDF generated', state: { files: [pdfPart] } });
+    deliverables.collectClosure({ text: '已生成以下文件：', files: [pdfPart] });
 
     expect(deliverables.lists()).toEqual({
       fileList: [
@@ -42,13 +42,11 @@ describe('createLcaDeliverables', () => {
   it('routes images to imageList and keeps them out of fileList', () => {
     const deliverables = createLcaDeliverables();
 
-    deliverables.collect({
-      state: {
-        files: [
-          { mimeType: 'image/png', name: 'chart.png', sizeBytes: 10, url: '/files/file_2' },
-          pdfPart,
-        ],
-      },
+    deliverables.collectClosure({
+      files: [
+        { mimeType: 'image/png', name: 'chart.png', sizeBytes: 10, url: '/files/file_2' },
+        pdfPart,
+      ],
     });
 
     const { fileList, imageList } = deliverables.lists();
@@ -59,9 +57,9 @@ describe('createLcaDeliverables', () => {
   it('keeps the latest harvest for one basename', () => {
     const deliverables = createLcaDeliverables();
 
-    deliverables.collect({ state: { files: [pdfPart] } });
-    deliverables.collect({
-      state: { files: [{ ...pdfPart, attachmentId: 'file_9', url: '/files/file_9' }] },
+    deliverables.collectClosure({ files: [pdfPart] });
+    deliverables.collectClosure({
+      files: [{ ...pdfPart, attachmentId: 'file_9', url: '/files/file_9' }],
     });
 
     expect(deliverables.lists().fileList).toEqual([
@@ -75,29 +73,32 @@ describe('createLcaDeliverables', () => {
     ]);
   });
 
-  it('ignores results that carry no file parts', () => {
+  it('ignores closures that carry no file parts', () => {
     const deliverables = createLcaDeliverables();
 
-    deliverables.collect(undefined);
-    deliverables.collect({ content: 'no files here' });
-    deliverables.collect({ state: { files: [] } });
-    deliverables.collect({ state: { files: [{ name: '', url: '' }] } });
+    deliverables.collectClosure(undefined);
+    deliverables.collectClosure({ text: 'no files here' });
+    deliverables.collectClosure({ files: [] });
+    deliverables.collectClosure({ files: [{ name: '', url: '' }] });
 
     expect(deliverables.lists()).toEqual({ fileList: [], imageList: [] });
   });
 
-  it('reads top-level files as well as state.files', () => {
+  it('does not depend on per-tool state.files', () => {
+    // exportFile's projected state historically carries no ``files`` field.
+    // The closure comes from the backend ledger instead, so a tool_end result
+    // with no file parts must not feed the answer row.
     const deliverables = createLcaDeliverables();
 
-    deliverables.collect({ files: [pdfPart] });
-
+    deliverables.collectClosure({ files: [pdfPart] });
+    // A tool_end-shaped object with empty state.files is NOT a closure source.
     expect(deliverables.lists().fileList.map((file) => file.url)).toEqual(['/files/file_1']);
   });
 
   it('exposes the harvested deliverables for the answer text', () => {
     const deliverables = createLcaDeliverables();
 
-    deliverables.collect({ state: { files: [pdfPart] } });
+    deliverables.collectClosure({ files: [pdfPart] });
 
     expect(deliverables.files().map((file) => file.name)).toEqual(['report.pdf']);
   });

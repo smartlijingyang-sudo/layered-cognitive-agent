@@ -25,8 +25,8 @@ const asRecord = (value: unknown): Record<string, unknown> | undefined =>
 export type LcaDeliverableLists = { fileList: FileRow[]; imageList: ImageRow[] };
 
 export type LcaDeliverables = {
-  /** Record the file parts of one `tool_end` result. Later harvests win. */
-  collect: (result: unknown) => void;
+  /** Record the artifact closure carried by ``agent_runtime_end``. */
+  collectClosure: (closure: unknown) => void;
   /** Harvested deliverables, one per basename. */
   files: () => ArtifactFile[];
   /** Native message lists for the answer row; empty when nothing was produced. */
@@ -37,11 +37,10 @@ export function createLcaDeliverables(): LcaDeliverables {
   let files: ArtifactFile[] = [];
 
   return {
-    collect(result: unknown) {
-      const record = asRecord(result);
+    collectClosure(closure: unknown) {
+      const record = asRecord(closure);
       if (!record) return;
-      const state = asRecord(record.state);
-      const harvested = collectArtifactFiles(record.files, state?.files);
+      const harvested = collectArtifactFiles(record.files);
       if (harvested.length === 0) return;
       files = latestDeliverables([...files, ...harvested]);
     },

@@ -20,10 +20,10 @@ from lca.plugins.loop.driver.plugin import (
     _UnknownExecutionTargetError as _UnknownExecutionTargetError,
 )
 from lca.plugins.transport.webserver.carrier.runs.binding import ensure_session_hub
-from lca.plugins.transport.webserver.carrier.runs.run_scopes import run_identity_scopes
 from lca.plugins.transport.webserver.carrier.runs.execute.execution_environment import (
     RunExecutionEnvironment,
 )
+from lca.plugins.transport.webserver.carrier.runs.run_scopes import run_identity_scopes
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import (
     RunRegistry,
     RunSession,
@@ -107,6 +107,7 @@ class RunLifecycleCoordinator:
             )
             async with environment.prepare() as prepared:
                 workspace = prepared.workspace
+                session.workspace = workspace
                 outcome = await prepared.driver.execute(
                     session,
                     question=question,
@@ -346,7 +347,6 @@ class RunLifecycleCoordinator:
             return
         await RunTerminalizer(self._registry).terminalize(
             session,
-            workspace=workspace,
             success=success,
         )
 

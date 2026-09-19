@@ -12,11 +12,15 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from typing import Any, Protocol
 
+import structlog
+
 from lca.application.runtime.coordinator.event_translator import EventTranslator
 from lca.application.runtime.coordinator.terminal_hints import (
     resolve_live_terminal_hint,
 )
 from lca.infrastructure.observability.stream import LcaStreamEventLog
+
+_log = structlog.get_logger(__name__)
 
 MetadataWriter = Callable[[str, dict], Awaitable[None]]
 
@@ -39,11 +43,13 @@ class LcaAgentRuntimeCoordinator:
         translator: EventTranslator,
         metadata_writer: MetadataWriter,
         tool_state_writer: ToolStateWriter,
+        artifact_closure_resolver: Callable[[str], Awaitable[dict | None]] | None = None,
     ) -> None:
         self._mgr = stream_manager
         self._translator = translator
         self._metadata_writer = metadata_writer
         self._tool_state_writer = tool_state_writer
+        self._artifact_closure_resolver = artifact_closure_resolver
         # Track which runs have already had their natural agent_runtime_end
         # published, so the watchdog does not double-publish.
         self._natural_terminal_published: set[str] = set()
@@ -88,6 +94,15 @@ class LcaAgentRuntimeCoordinator:
             return
         envelopes = envelope if isinstance(envelope, list) else [envelope]
         for one in envelopes:
+            if one["type"] == "agent_runtime_end" and self._artifact_closure_resolver is not None:
+                closure = await self._artifact_closure_resolver(run_id)
+                if closure:
+                    one["data"]["artifactClosure"] = closure
+                    _log.info(
+                        "artifact_closure_emitted",
+                        run_id=run_id,
+                        artifact_count=len(closure.get("files") or []),
+                    )
             await self._mgr.publish(run_id, one["type"], one["data"], step_index=step_index)
 
         if any(one["type"] == "agent_runtime_end" for one in envelopes):
@@ -152,15 +167,25 @@ class LcaAgentRuntimeCoordinator:
         calls for the same run_id publish duplicates (the watchdog's
         job is to skip if `_natural_terminal_published` is set).
         """
+        data: dict[str, Any] = {
+            "finalState": final_state,
+            "reason": status,
+            "reasonDetail": "",
+            "phase": "execution_complete",
+        }
+        if self._artifact_closure_resolver is not None:
+            closure = await self._artifact_closure_resolver(run_id)
+            if closure:
+                data["artifactClosure"] = closure
+                _log.info(
+                    "artifact_closure_emitted",
+                    run_id=run_id,
+                    artifact_count=len(closure.get("files") or []),
+                )
         await self._mgr.publish(
             run_id,
             "agent_runtime_end",
-            {
-                "finalState": final_state,
-                "reason": status,
-                "reasonDetail": "",
-                "phase": "execution_complete",
-            },
+            data,
             step_index=0,
         )
         self._natural_terminal_published.add(run_id)

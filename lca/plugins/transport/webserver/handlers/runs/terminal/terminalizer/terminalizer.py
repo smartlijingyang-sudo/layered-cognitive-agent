@@ -8,7 +8,6 @@ public sequencing point shared by initial execution and resume paths.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from typing import Any
 
 import structlog
 
@@ -22,9 +21,6 @@ from lca.plugins.transport.webserver.handlers.runs.session.session.session impor
 )
 from lca.plugins.transport.webserver.handlers.runs.terminal.status.status import (
     derive_terminal_status as _derive_terminal_status,
-)
-from lca.plugins.transport.webserver.read.runs.artifact.closure import (
-    emit_artifact_closure_if_needed as _emit_artifact_closure_if_needed,
 )
 from lca.plugins.transport.webserver.read.runs.terminal.materialization import (
     record_terminal_materialization as _record_terminal_materialization,
@@ -47,7 +43,7 @@ class RunTerminalizer:
         self._finalizer = finalizer
         self._materializer = materializer or _record_terminal_materialization
 
-    async def terminalize(self, session: RunSession, *, workspace: Any, success: bool) -> None:
+    async def terminalize(self, session: RunSession, *, success: bool) -> None:
         """Close a run exactly once while preserving Journal ownership of terminal facts."""
         # ADR-0169 PR-12.7:close reason 由 terminal outcome 派生 — 'completed' 为
         # 成功,'error' 为异常失败,与 cursor.close / LoopCursor 契约语义对齐。
@@ -61,8 +57,6 @@ class RunTerminalizer:
 
             _derive_terminal_status(session, success)
             ensure_carrier_terminal_observation(session)
-            if session.hub is not None:
-                _emit_artifact_closure_if_needed(workspace, session, session.hub)
             await self._finalizer(session.run_id)
         except Exception:
             _log.exception("finalize_run_pre_close_failed", hop="H2", run_id=session.run_id)

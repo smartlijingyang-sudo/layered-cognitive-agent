@@ -1,4 +1,4 @@
-/** Journal file parts → markdown href rewrite + final-answer native lists. */
+/** Journal file parts → final-answer native lists. */
 
 export type ArtifactFile = {
   attachmentId?: string;
@@ -67,81 +67,12 @@ export function collectArtifactFiles(...sources: unknown[]): ArtifactFile[] {
   return out;
 }
 
-/** User-facing cards: one slot per basename, last harvest wins. */
-const FILE_MD_RE = /\[(?:📥\s*)?([^\]]+)\]\((\/files\/file_[a-f0-9]+)\)/gi;
-
-export function mimeFromName(name: string): string {
-  const lower = name.toLowerCase();
-  if (lower.endsWith('.png')) return 'image/png';
-  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
-  if (lower.endsWith('.gif')) return 'image/gif';
-  if (lower.endsWith('.webp')) return 'image/webp';
-  if (lower.endsWith('.svg')) return 'image/svg+xml';
-  if (lower.endsWith('.pdf')) return 'application/pdf';
-  if (lower.endsWith('.html') || lower.endsWith('.htm')) return 'text/html';
-  if (lower.endsWith('.pptx')) {
-    return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
-  }
-  if (lower.endsWith('.docx')) {
-    return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-  }
-  if (lower.endsWith('.xlsx')) {
-    return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-  }
-  return 'application/octet-stream';
-}
-
-/** Ledger closure markdown is the user-facing Work list (one card per basename). */
-export function collectMarkdownDeliverables(text: string): ArtifactFile[] {
-  if (!text) return [];
-  const out: ArtifactFile[] = [];
-  const seen = new Set<string>();
-  for (const match of text.matchAll(FILE_MD_RE)) {
-    const name = match[1]?.trim();
-    const url = match[2]?.trim();
-    if (!name || !url || seen.has(url)) continue;
-    seen.add(url);
-    const mimeType = mimeFromName(name);
-    out.push({
-      mimeType,
-      name,
-      previewable: mimeType.startsWith('image/') || mimeType === 'application/pdf' || mimeType === 'text/html',
-      url,
-    });
-  }
-  return out;
-}
-
 export function latestDeliverables(files: ArtifactFile[]): ArtifactFile[] {
   const byName = new Map<string, ArtifactFile>();
   for (const file of files) {
     byName.set(basename(file.name), file);
   }
   return [...byName.values()];
-}
-
-export function rewriteArtifactMarkdown(text: string, files: ArtifactFile[]): string {
-  if (!text || !files.length) return text;
-  const byName = new Map<string, string>();
-  for (const file of latestDeliverables(files)) {
-    byName.set(file.name, file.url);
-    byName.set(basename(file.name), file.url);
-  }
-  const names = [...byName.keys()].sort((a, b) => b.length - a.length);
-  let next = text;
-  for (const name of names) {
-    const url = byName.get(name);
-    if (!url) continue;
-    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    next = next.replace(
-      new RegExp(
-        `]\\((?:(?:\\./)|(?:sandbox://[^\\s)]*?)|(?:computer://[^\\s)]*?))?${escaped}\\)`,
-        'g',
-      ),
-      `](${url})`,
-    );
-  }
-  return next;
 }
 
 /** Answer-bubble download list — same shape as the backend ledger closure. */
@@ -153,10 +84,8 @@ const CLOSURE_HEADING = '已生成以下文件：';
  * `fileList` lives only in the store (LobeHub derives it from the
  * `messages_files` relation, which LCA's `/files` artifacts are not part of),
  * so the persisted answer text is what still carries the download after a
- * reload. Mirrors `artifact_closure_text` in
- * `lca/infrastructure/workspace/artifact_ledger.py`; delete this when that
- * closure reaches the gateway wire (today the runtime appends it after the
- * terminal fact, so the WS is already closed).
+ * reload. The file list arrives on ``agent_runtime_end.data.artifactClosure``
+ * (see ``deliverables.collectClosure``).
  */
 export function appendDeliverableClosure(text: string, files: ArtifactFile[]): string {
   const missing = latestDeliverables(files).filter((file) => !text.includes(file.url));

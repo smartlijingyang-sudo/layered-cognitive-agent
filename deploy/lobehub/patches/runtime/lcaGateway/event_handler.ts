@@ -46,7 +46,7 @@ import { createLcaInMemoryMessagesReader } from './messageService';
 const log = debug('lobe-client:lca-gateway');
 
 const noopDeliverables: LcaDeliverables = {
-  collect: () => undefined,
+  collectClosure: () => undefined,
   files: () => [],
   lists: () => ({ fileList: [], imageList: [] }),
 };
@@ -62,8 +62,10 @@ const noopDeliverables: LcaDeliverables = {
  * (the LCA runtime never emits them — see file header). The shared case
  * remains intact for the native hetero path.
  *
- * `deliverables` optionally folds each `tool_end` result's harvested file
- * parts so the caller can attach them to the answer row when the run ends.
+ * `deliverables` optionally folds the artifact closure carried by
+ * ``agent_runtime_end`` so the caller can attach them to the answer row when
+ * the run ends. The closure is synthesized from the backend workspace ledger
+ * and is tool-agnostic (executeCode / runCommand / exportFile all land here).
  */
 export const createLcaGatewayEventHandler = (
   get: Parameters<typeof createGatewayEventHandler>[0],
@@ -156,7 +158,6 @@ export const createLcaGatewayEventHandler = (
         toolCallId?: string;
       };
       const toolCallId = data.payload?.toolCalling?.id || data.toolCallId;
-      deliverables.collect(data.result);
       if (toolCallId) {
         persistLcaToolResult(store, {
           context: params.context,
@@ -164,6 +165,16 @@ export const createLcaGatewayEventHandler = (
           result: data.result,
           toolCallId,
         });
+      }
+    }
+
+    if (event.type === 'agent_runtime_end') {
+      const data = event.data as {
+        artifactClosure?: unknown;
+        reason?: string;
+      };
+      if (data.artifactClosure !== undefined) {
+        deliverables.collectClosure(data.artifactClosure);
       }
     }
 

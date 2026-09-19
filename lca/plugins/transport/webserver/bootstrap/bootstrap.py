@@ -143,16 +143,44 @@ def install_bootstrap_state(
     app.state.file_store = file_store
     app.state.device_hub = boot.device_hub
 
+    from lca.infrastructure.file.store import _is_previewable
     from lca.infrastructure.observability.running_operation_store import (
         resolve_running_operation_store,
     )
+    from lca.infrastructure.workspace.artifact_ledger import artifact_closure_text
     from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.coordinator_factory import (
         build_agent_runtime_coordinator,
     )
 
+    async def resolve_artifact_closure(run_id: str) -> dict | None:
+        session = run_registry.get(run_id)
+        workspace = getattr(session, "workspace", None) if session is not None else None
+        if workspace is None:
+            return None
+        snapshot = workspace.artifacts.snapshot()
+        if not snapshot.artifacts:
+            return None
+        files = [
+            {
+                "name": art.name,
+                "url": art.url,
+                "mimeType": art.mime_type,
+                "sizeBytes": art.size_bytes,
+                "attachmentId": art.url.rsplit("/", 1)[-1],
+                "previewable": _is_previewable(art.mime_type, art.name),
+            }
+            for art in snapshot.artifacts
+            if art.url
+        ]
+        text = artifact_closure_text(snapshot)
+        return {"text": text, "files": files}
+
     running_operation_store = resolve_running_operation_store()
     app.state.running_operation_store = running_operation_store
-    app.state.agent_runtime_coordinator = build_agent_runtime_coordinator(running_operation_store)
+    app.state.agent_runtime_coordinator = build_agent_runtime_coordinator(
+        running_operation_store,
+        artifact_closure_resolver=resolve_artifact_closure,
+    )
 
     if carrier_ctx is not None:
         with contextlib.suppress(Exception):
