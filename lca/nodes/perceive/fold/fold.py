@@ -10,8 +10,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from lca.contracts.atoms.control.slot import ControlSlot
-from lca.contracts.atoms.enums.enums import ActionType
+from lca.contracts.atoms.enums.enums import ActionType, ContentType
 from lca.contracts.atoms.functional.group import FunctionalGroup
+from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -21,6 +22,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
+from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -52,10 +54,19 @@ class PerceiveFoldExecutor:
         input: NodeInput,
     ) -> NodeOutput:
         del context
-        observation = input.port_values.get("manifest")
+        manifest = input.port_values.get("manifest")
+        # The ``observation`` port feeds phase.reflect.score, whose critic
+        # reads ``Observation.success``. Project the manifest into a typed
+        # Observation instead of leaking the raw manifest across the boundary.
+        observation = Observation(
+            observation_id=new_id("obs"),
+            success=True,
+            payload=manifest,
+            content_type=ContentType.TEXT,
+        )
         return NodeOutput(
             port_values={
-                "in_assembled_manifest": observation,
+                "in_assembled_manifest": manifest,
                 "observation": observation,
                 "routing": RoutingDecision(action_type=ActionType.RESPOND),
             },
