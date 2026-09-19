@@ -35,7 +35,7 @@ class CreateAssistantRequest:
        解析角色卡片，用卡片 backstory 填充 SOUL.md，emoji/title 从卡片
        frontmatter 取。模板仍提供其他配置面的默认值（grants/tools/AGENTS）。
 
-    ``initial_skills`` 在 Home 物化后由 Catalog 编排 overlay.install 安装。
+    ``initial_skills`` 在 Home 物化时由 Catalog 硬链接物化到 ``{home}/skills/``。
     """
 
     name: str
@@ -58,7 +58,11 @@ class CreateAssistantRequest:
     ``tools.yaml`` / ``grants.yaml`` 策略复制为新 Home 快照；来源未知或
     digest 不匹配则 fail-closed。"""
     initial_skills: tuple[str, ...] = ()
-    """创建后立即安装的 skill_id 列表。空 = 不预装。"""
+    """创建后立即安装的 skill_id 列表（ADR-0243 D1）。
+
+    空 = 默认把全局技能库全部可物化技能硬链接到 ``{home}/skills/``
+    （全局库不可用时保持空技能集）;显式传列表 = 只装指定技能。
+    """
 
     def __post_init__(self) -> None:
         if not self.name or not self.name.strip():
