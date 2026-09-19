@@ -85,6 +85,7 @@ class ToolResult:
     files_created: tuple[str, ...] = ()
     error: str | None = None
     delta_summary: str = ""
+    invocation_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -183,6 +184,8 @@ class JournalStep:
     thinking: ThinkingTrace | None = None
     tool_call: ToolCallRecord | None = None
     tool_result: ToolResult | None = None
+    tool_calls: tuple[ToolCallRecord, ...] = ()
+    tool_results: tuple[ToolResult, ...] = ()
     reflect: ReflectTrace | None = None
 
     spans: tuple[SpanRecord, ...] = ()
@@ -190,6 +193,17 @@ class JournalStep:
     error: str | None = None
     segments: tuple[SegmentRecord, ...] = ()  # 3.1; ADR-0166 D2
     extra: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.tool_call is not None and not self.tool_calls:
+            object.__setattr__(self, "tool_calls", (self.tool_call,))
+        elif self.tool_call is None and self.tool_calls:
+            object.__setattr__(self, "tool_call", self.tool_calls[0])
+
+        if self.tool_result is not None and not self.tool_results:
+            object.__setattr__(self, "tool_results", (self.tool_result,))
+        elif self.tool_result is None and self.tool_results:
+            object.__setattr__(self, "tool_result", self.tool_results[0])
 
 
 # ── helpers ──────────────────────────────────────────────
