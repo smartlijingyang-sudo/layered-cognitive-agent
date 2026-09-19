@@ -139,6 +139,37 @@ class TestCreate:
         text = (Path(handle.home_path) / "USER.md").read_text(encoding="utf-8")
         assert text == "custom user context"
 
+    def test_create_with_soul_merges_template_default_sections(
+        self,
+        catalog: AssistantCatalogImpl,
+    ) -> None:
+        """ADR-0242 附录 C:用户 soul 只含四核心段时,模板默认段必须补上。
+
+        回归:上次真实创建 run 产出的 SOUL 只有四个核心段,缺少
+        安全边界/记忆规则/错误处理/红线(向导按 skill 不手写默认段,
+        后端必须从模板合并)。
+        """
+        soul = (
+            "## 🧠 身份\n你是一位测试助理。" * 1
+            + "你擅长测试。" * 30
+            + "\n## 🎭 性格\n"
+            + "结论先行。" * 30
+            + "\n## 🛠 能力\n"
+            + "擅长编写测试。" * 30
+            + "\n## 🗣 语气\n"
+            + "专业务实。" * 30
+        )
+        req = CreateAssistantRequest(name="测试", description="d", soul=soul)
+        handle = catalog.create(req)
+        created = (Path(handle.home_path) / "SOUL.md").read_text(encoding="utf-8")
+        for marker in (
+            "## 🔒 安全边界",
+            "## 💾 记忆规则",
+            "## ⚠️ 错误处理",
+            "## 🚫 红线",
+        ):
+            assert marker in created, f"模板默认段缺失: {marker}"
+
     def test_create_manifest_schema(
         self,
         catalog: AssistantCatalogImpl,
@@ -662,7 +693,10 @@ class TestSoulValidation:
         soul = _valid_soul()
         handle = catalog.create(CreateAssistantRequest(name="向导创建", soul=soul))
         written = (Path(handle.home_path) / "SOUL.md").read_text(encoding="utf-8")
-        assert written == soul
+        # 用户核心段保留;模板默认段合并进 Home(ADR-0242 附录 C)
+        assert written.startswith(soul)
+        for marker in ("## 🔒 安全边界", "## 💾 记忆规则", "## ⚠️ 错误处理", "## 🚫 红线"):
+            assert marker in written
 
     def test_soul_overrides_from_role_backstory(
         self,
@@ -692,7 +726,10 @@ class TestSoulValidation:
             )
         )
         home = Path(handle.home_path)
-        assert (home / "SOUL.md").read_text(encoding="utf-8") == soul
+        written = (home / "SOUL.md").read_text(encoding="utf-8")
+        assert written.startswith(soul)
+        for marker in ("## 🔒 安全边界", "## 💾 记忆规则", "## ⚠️ 错误处理", "## 🚫 红线"):
+            assert marker in written
         profile = json.loads((home / "profile.json").read_text(encoding="utf-8"))
         assert profile["role_id"] == "engineering/architect"
         assert profile["emoji"] == "🏛️"

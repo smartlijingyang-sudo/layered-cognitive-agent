@@ -174,7 +174,8 @@ class _AssistantCatalogImpl(AssistantCatalog):
         # 1b. soul:向导对齐结果优先,且必须先通过完整度校验
         if req.soul:
             _validate_soul(req.soul)
-            rendered.files["SOUL.md"] = req.soul
+            # 用户 soul 只含四个核心段;模板预置的默认段在此补上(ADR-0242 附录 C)
+            rendered.files["SOUL.md"] = _merge_soul_defaults(req.soul, rendered.files["SOUL.md"])
 
         # 1c. from_role:卡片填充 emoji / role_id / goals;SOUL 只在无 soul 时用 backstory
         card: RoleCard | None = None
@@ -666,6 +667,55 @@ def _validate_soul(soul: str) -> None:
             + "。请补全这四个核心段(身份/性格/能力/语气)后重试;"
             "安全边界/记忆规则/错误处理/红线由模板预置,无需手写。"
         )
+
+
+# ADR-0242 附录 C:模板预置的四个默认段,向导不要求用户手写。
+_SOUL_DEFAULT_MARKERS: tuple[str, ...] = (
+    "## 🔒 安全边界",
+    "## 💾 记忆规则",
+    "## ⚠️ 错误处理",
+    "## 🚫 红线",
+)
+
+
+def _merge_soul_defaults(soul: str, template_soul: str) -> str:
+    """把模板预置的默认段合并进用户 SOUL。
+
+    用户向导只产出四个核心段;缺失的默认段按模板顺序从 ``template_soul``
+    提取并追加,保证最终 Home 的 SOUL 是完整的八段结构。
+    """
+    if all(marker in soul for marker in _SOUL_DEFAULT_MARKERS):
+        return soul
+    sections = _split_soul_sections(template_soul)
+    defaults: list[str] = []
+    for marker in _SOUL_DEFAULT_MARKERS:
+        if marker in soul:
+            continue
+        # 模板标题可能是 ``## 🚫 红线（凌驾一切）`` 这类扩展形式,按前缀匹配。
+        section = next((v for k, v in sections.items() if k.startswith(marker)), None)
+        if section is not None:
+            defaults.append(section)
+    if not defaults:
+        return soul
+    return soul.rstrip() + "\n\n" + "\n\n".join(defaults) + "\n"
+
+
+def _split_soul_sections(soul: str) -> dict[str, str]:
+    """按 ``## `` 标题把 SOUL 文本切成 ``{标题: 完整节块}``。"""
+    sections: dict[str, str] = {}
+    current_marker: str | None = None
+    current: list[str] = []
+    for line in soul.splitlines():
+        if line.startswith("## "):
+            if current_marker is not None:
+                sections[current_marker] = "\n".join(current).strip()
+            current_marker = line.strip()
+            current = [line]
+        elif current_marker is not None:
+            current.append(line)
+    if current_marker is not None:
+        sections[current_marker] = "\n".join(current).strip()
+    return sections
 
 
 def _mission_goal_names(backstory: str, limit: int = 3) -> list[str]:

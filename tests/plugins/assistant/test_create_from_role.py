@@ -181,7 +181,9 @@ class TestCreateFromRole:
             )
         )
         written = (Path(handle.home_path) / "SOUL.md").read_text(encoding="utf-8")
-        assert written == soul
+        assert written.startswith(soul)
+        for marker in ("## 🔒 安全边界", "## 💾 记忆规则", "## ⚠️ 错误处理", "## 🚫 红线"):
+            assert marker in written
         manifest = json.loads(
             (Path(handle.home_path) / "manifest.json").read_text(encoding="utf-8")
         )
