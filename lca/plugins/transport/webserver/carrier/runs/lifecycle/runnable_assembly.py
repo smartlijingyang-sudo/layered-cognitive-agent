@@ -157,6 +157,10 @@ def _role_profile_for_assistant(
         goal=persona.goal,
         backstory=persona.backstory,
         tool_permission_manifest=ToolPermissionManifest(allowed_tools=()),
+        extra={
+            "assistant_id": assistant_id,
+            "assistant_home_path": home_path or "",
+        },
     )
 
 

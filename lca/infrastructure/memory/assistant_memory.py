@@ -73,21 +73,73 @@ class AssistantMemory(MemorySystem):
         observation: Observation,
         reflection: Reflection,
     ) -> None:
-        """把本条观察追加进 working 层并持久化。"""
-        records = self._load(MemoryLayer.WORKING)
+        """Persist admitted memory candidates into the right layer.
+
+        User-confirmed semantic directives go to ``semantic.json``;
+        procedural SOP candidates go to ``procedural.json``. The generic
+        step record stays in ``working.json`` for observability.
+        """
+        extra = getattr(reflection, "extra", {}) or {}
+        semantic = extra.get("memory_candidate")
+        if isinstance(semantic, dict):
+            content = str(semantic.get("content") or "").strip()
+            if content:
+                self._append(
+                    MemoryLayer.SEMANTIC,
+                    content=content,
+                    state=state,
+                    observation=observation,
+                    reflection=reflection,
+                    metadata={"source": str(semantic.get("source") or "user")},
+                )
+                return
+        procedural = extra.get("procedural_candidate")
+        if procedural is not None:
+            content = str(getattr(procedural, "workflow_summary", "") or "").strip()
+            if content:
+                self._append(
+                    MemoryLayer.PROCEDURAL,
+                    content=content,
+                    state=state,
+                    observation=observation,
+                    reflection=reflection,
+                    metadata={"candidate_id": str(getattr(procedural, "candidate_id", "") or "")},
+                )
+                return
+        self._append(
+            MemoryLayer.WORKING,
+            content=(
+                f"step={state.step} success={observation.success} verdict={reflection.verdict}"
+            ),
+            state=state,
+            observation=observation,
+            reflection=reflection,
+        )
+
+    def _append(
+        self,
+        layer: MemoryLayer,
+        *,
+        content: str,
+        state: AgentState,
+        observation: Observation,
+        reflection: Reflection,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Append one record to ``<layer>.json`` and persist the layer."""
+        records = self._load(layer)
         records.append(
             {
                 "record_id": new_id("mem"),
-                "layer": MemoryLayer.WORKING.value,
-                "content": (
-                    f"step={state.step} success={observation.success} verdict={reflection.verdict}"
-                ),
+                "layer": layer.value,
+                "content": content,
                 "importance": 0.5,
                 "source_trace_id": str(getattr(state, "trace_id", "") or ""),
                 "created_at": _utc_now_iso(),
+                "metadata": metadata or {},
             }
         )
-        self._save(MemoryLayer.WORKING, records)
+        self._save(layer, records)
 
     def query(self, layer: MemoryLayer) -> list[MemoryRecord]:
         """返回指定层的持久化记录（按写入顺序）。"""

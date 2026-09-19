@@ -100,7 +100,16 @@ class RememberWriteExecutor:
             gateway = runtime.get("effect_gateway")
         receipt: object | None = None
         if gateway is not None:
-            receipt = await gateway.dispatch(envelope)
+            from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
+                EffectPolicyPlan,
+            )
+
+            policy = EffectPolicyPlan(
+                allowed_effects=(envelope.grant.effect_class,),
+                approval_required=(),
+                idempotency_required=(),
+            )
+            receipt = await gateway.execute(envelope, policy)
         # Forward both the envelope (typed side-effect wire) and the receipt
         # to the fold node so downstream can render a typed ``memory_receipt``.
         return NodeOutput(

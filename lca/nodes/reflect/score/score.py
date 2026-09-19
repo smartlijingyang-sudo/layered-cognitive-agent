@@ -63,7 +63,10 @@ def _normalize_observation(value: object) -> object:
         )
     return value
 
-def _extract_procedural_candidate(state: object, observation: object) -> ProceduralMemoryCandidate | None:
+
+def _extract_procedural_candidate(
+    state: object, observation: object
+) -> ProceduralMemoryCandidate | None:
     """Universal cognitive meta-feature extraction for procedural memory candidates.
 
     ADR-0244: Identifies candidates based PURELY on structural execution indicators:
@@ -101,6 +104,54 @@ def _extract_procedural_candidate(state: object, observation: object) -> Procedu
             confidence=0.9,
             suggested_title=f"Procedural SOP ({len(tool_sequence)} actions)",
         )
+    return None
+
+
+_SEMANTIC_DIRECTIVE_MARKERS: tuple[str, ...] = (
+    # Chinese: explicit user preference / persona directives.
+    "记住",
+    "记一下",
+    "以后",
+    "叫我",
+    "称呼我",
+    "请叫我",
+    "我的昵称",
+    "我的名字",
+    "我喜欢",
+    "我偏好",
+    "我偏爱",
+    "记得",
+    # English: same class of directive.
+    "remember",
+    "from now on",
+    "call me",
+    "please call me",
+    "my name is",
+    "i like",
+    "i prefer",
+    "always",
+)
+
+
+def _extract_semantic_candidate(state: object) -> dict[str, object] | None:
+    """Extract an explicit user preference or persona directive as semantic memory.
+
+    ADR-0244: user-confirmed facts outrank tool observations and model
+    inference. When the current task is a direct instruction about how the
+    assistant should address or behave toward the user, the instruction
+    itself is the memory record. This is a generic directive detector, not a
+    business-keyword or skill-name matcher, so it stays domain-neutral.
+    """
+    task = str(getattr(state, "task", "") or "").strip()
+    if not task:
+        return None
+    lowered = task.lower()
+    if any(marker in task or marker in lowered for marker in _SEMANTIC_DIRECTIVE_MARKERS):
+        return {
+            "content": task,
+            "source": "user",
+            "confidence": 1.0,
+        }
     return None
 
 
@@ -159,6 +210,7 @@ class ReflectScoreExecutor:
             if payload is None:
                 from lca.contracts.atoms.enums.enums import ReflectionVerdict
                 from lca.contracts.models.core.execution.decision import Reflection
+
                 payload = Reflection(
                     reflection_id=new_id("refl"),
                     verdict=ReflectionVerdict.ON_TRACK,
@@ -166,6 +218,22 @@ class ReflectScoreExecutor:
                 )
             elif hasattr(payload, "extra") and isinstance(payload.extra, dict):
                 payload.extra["procedural_candidate"] = candidate
+
+        # ADR-0244: user-confirmed semantic memory candidate. Explicit
+        # preference / persona directives persist as semantic memory.
+        semantic = _extract_semantic_candidate(state)
+        if semantic is not None:
+            if payload is None:
+                from lca.contracts.atoms.enums.enums import ReflectionVerdict
+                from lca.contracts.models.core.execution.decision import Reflection
+
+                payload = Reflection(
+                    reflection_id=new_id("refl"),
+                    verdict=ReflectionVerdict.ON_TRACK,
+                    extra={"memory_candidate": semantic},
+                )
+            elif hasattr(payload, "extra") and isinstance(payload.extra, dict):
+                payload.extra["memory_candidate"] = semantic
 
         return NodeOutput(
             port_values={

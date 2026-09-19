@@ -315,6 +315,43 @@ class ContextSection:
         return SectionOutput(text=label_line("CONTEXT", body))
 
 
+class HomeSection:
+    """Render the assistant Home paths for a bound run (ADR-0242 D3/D5).
+
+    The model needs to know where its persistent memory, skills, and
+    workspace live so it stops searching the sandbox root. Renders nothing
+    for unbound runs.
+    """
+
+    name: ClassVar[str] = "home"
+
+    def render(
+        self,
+        *,
+        role_profile: RoleProfile,
+        task: str,
+        awareness: TeamAwareness | None,
+        manifest: ContextManifest | None,
+        tools: Sequence[Tool],
+        activated_skills: tuple[ActivatedSkill, ...],
+    ) -> SectionOutput:
+        del task, awareness, manifest, tools, activated_skills
+        extra = getattr(role_profile, "extra", {}) or {}
+        home = str(extra.get("assistant_home_path") or "").strip()
+        assistant_id = str(extra.get("assistant_id") or "").strip()
+        if not home and not assistant_id:
+            return SectionOutput(text="")
+        lines = []
+        if assistant_id:
+            lines.append(f"assistant_id: {assistant_id}")
+        if home:
+            lines.append(f"home_dir: {home}")
+            lines.append(f"memory_dir: {home}/memory/  (持久化记忆；用户偏好写这里)")
+            lines.append(f"skills_dir: {home}/skills/")
+            lines.append(f"workspace_dir: {home}/workspace/  (沙箱 /mnt/data 映射到此)")
+        return SectionOutput(text=block("HOME", "\n".join(lines)))
+
+
 class TeammatesSection:
     name: ClassVar[str] = "teammates"
 
@@ -568,6 +605,11 @@ def build_context(config: BaseModel) -> ContextSection:
     return ContextSection()
 
 
+def build_home(config: BaseModel) -> HomeSection:
+    del config
+    return HomeSection()
+
+
 def build_teammates(config: BaseModel) -> TeammatesSection:
     del config
     return TeammatesSection()
@@ -743,6 +785,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         ("task", build_task(Config())),
         ("activated_skills", build_activated_skills(Config())),
         ("context", build_context(Config())),
+        ("home", build_home(Config())),
         ("teammates", build_teammates(Config())),
         ("assigned_roles_text", build_assigned_roles(Config())),
         ("member_reports_text", build_member_reports(Config())),
@@ -765,6 +808,7 @@ __all__ = [
     "EvidencePackSection",
     "GoalSection",
     "HierarchicalInstructionsSection",
+    "HomeSection",
     "MemberReportsSection",
     "MemberStatusSection",
     "ReactToolUsageSection",
