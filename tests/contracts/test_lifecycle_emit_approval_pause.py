@@ -114,6 +114,58 @@ def test_approval_pause_records_pending_tool_call_before_checkpoint() -> None:
     assert len(persist_calls) == 1  # persist_approval ran after the record
 
 
+def test_approval_pause_uses_session_run_id_over_minted_resume_scope() -> None:
+    """HIL resume mints a fresh observability RunScope; the frontend card must
+    carry the session run id, not the minted child id, so the UI reattaches
+    to the live stream."""
+    calls: list[dict] = []
+
+    class _MintedScope:
+        run_id = "run_minted_child"
+
+    def fake_record(**kw: object) -> None:
+        calls.append(kw)
+
+    with (
+        patch(
+            "lca.infrastructure.observability.facade.run.context.get_current_run_scope",
+            return_value=_MintedScope(),
+        ),
+        patch(
+            "lca.infrastructure.tools.run.finalizer.get_current_run_id",
+            return_value="run_session",
+        ),
+        patch(
+            "lca.loop.commit.tool_journal.record_step_tool_call",
+            side_effect=fake_record,
+        ),
+        patch(
+            "lca.infrastructure.session.emit.lifecycle_emit.checkpoint",
+            side_effect=lambda status, **kw: None,
+        ),
+        patch(
+            "lca.infrastructure.session.emit.lifecycle_emit.persist_approval",
+            side_effect=lambda *args, **kw: None,
+        ),
+        patch(
+            "lca.plugins.session.runtime.resume.point.serialize_resume_point",
+            return_value={},
+        ),
+        patch(
+            "lca.plugins.session.runtime.resume.point.resume_point_from_state_snapshot",
+            return_value=object(),
+        ),
+    ):
+        from lca.infrastructure.session.emit.lifecycle_emit import (
+            emit_approval_pause_from_result,
+        )
+
+        emit_approval_pause_from_result(_paused_result())
+
+    assert len(calls) == 1
+    assert calls[0]["arguments"]["lca_run_id"] == "run_session"
+
+
 def test_approval_pause_skips_tools_without_identity() -> None:
     calls: list[dict] = []
     checkpoint_kwargs: list[dict] = []

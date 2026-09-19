@@ -171,6 +171,7 @@ def emit_approval_pause_from_result(result: Result) -> None:
     from lca.infrastructure.observability.facade.run.context import (
         get_current_run_scope,
     )
+    from lca.infrastructure.tools.run.finalizer import get_current_run_id
     from lca.loop.commit.tool_journal import record_step_tool_call
     from lca.plugins.session.runtime.resume.point import (
         resume_point_from_state_snapshot,
@@ -178,7 +179,12 @@ def emit_approval_pause_from_result(result: Result) -> None:
     )
 
     scope = get_current_run_scope()
-    run_id = str(scope.run_id) if scope is not None and scope.run_id else ""
+    # HIL resume mints a fresh observability RunScope (adopt_run_scope), so the
+    # frontend-facing run id must come from the carrier/session scope; the
+    # minted child id would point the UI at a nonexistent stream.
+    run_id = get_current_run_id() or (
+        str(scope.run_id) if scope is not None and scope.run_id else ""
+    )
     pending: list[dict[str, Any]] = []
     tool_calls = approval_request.get("tool_calls")
     if isinstance(tool_calls, list):
