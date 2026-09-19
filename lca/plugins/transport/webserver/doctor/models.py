@@ -138,6 +138,11 @@ class StepScan:
     # H3 step-tree integrity: step_id / step_index 序列(供 _hop_h3 判定重复与跳号)。
     step_ids: tuple[str, ...] = ()
     step_indexes: tuple[int, ...] = ()
+    # H7 精准集合对账 (ADR-0244 PR-1 Task 3)
+    tool_invocation_ids: tuple[str, ...] = ()
+    spine_tool_invocation_ids: tuple[str, ...] = ()
+    spine_tool_forked: bool = False
+    spine_tool_has_step_info: bool = False
 
 
 __all__ = [

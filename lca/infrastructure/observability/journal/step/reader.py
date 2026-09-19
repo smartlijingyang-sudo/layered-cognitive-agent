@@ -121,6 +121,10 @@ def _from_jsonable(obj: Any, cls: Any) -> Any:
         tool_result = (
             _from_jsonable(obj.get("tool_result"), ToolResult) if obj.get("tool_result") else None
         )
+        raw_calls = obj.get("tool_calls") or ()
+        tool_calls = tuple(_from_jsonable(tc, ToolCallRecord) for tc in raw_calls)
+        raw_results = obj.get("tool_results") or ()
+        tool_results = tuple(_from_jsonable(tr, ToolResult) for tr in raw_results)
         reflect = _from_jsonable(obj.get("reflect"), ReflectTrace) if obj.get("reflect") else None
         spans = tuple(_from_jsonable(s, SpanRecord) for s in obj.get("spans", ()))
         return cls(
@@ -136,6 +140,8 @@ def _from_jsonable(obj: Any, cls: Any) -> Any:
             thinking=thinking,
             tool_call=tool_call,
             tool_result=tool_result,
+            tool_calls=tool_calls,
+            tool_results=tool_results,
             reflect=reflect,
             spans=spans,
             outcome=obj.get("outcome"),

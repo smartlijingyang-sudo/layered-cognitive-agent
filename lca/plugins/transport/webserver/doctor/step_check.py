@@ -217,6 +217,8 @@ def _scan_xref(run_dir: Path, run_id: str, scan: StepScan) -> StepScan:
     spine_phase_tool_call_end_total = 0
     spine_phase_tool_call_end_ok_count = 0
     spine_phase_tool_call_end_failure_count = 0
+    spine_tool_inv_ids: set[str] = set()
+    spine_step_tool_counts: dict[Any, int] = {}
     if spine_path is not None:
         try:
             for ln in spine_path.read_text(encoding="utf-8").splitlines():
@@ -232,7 +234,7 @@ def _scan_xref(run_dir: Path, run_id: str, scan: StepScan) -> StepScan:
                 ep = rec.get("execution_point")
                 if isinstance(ep, str):
                     spine_counts[ep] = spine_counts.get(ep, 0) + 1
-                # H7 多源对账:统计 phase.tool.call.end.ok
+                # H7 多源对账:统计 phase.tool.call.end.ok 与 invocation_ids
                 if (
                     isinstance(ep, str)
                     and ep == "phase.tool.call.end"
@@ -245,6 +247,12 @@ def _scan_xref(run_dir: Path, run_id: str, scan: StepScan) -> StepScan:
                             spine_phase_tool_call_end_ok_count += 1
                         elif payload["ok"] is False:
                             spine_phase_tool_call_end_failure_count += 1
+                    inv_id = payload.get("invocation_id")
+                    if isinstance(inv_id, str) and inv_id:
+                        spine_tool_inv_ids.add(inv_id)
+                    step_val = payload.get("step")
+                    if step_val is not None:
+                        spine_step_tool_counts[step_val] = spine_step_tool_counts.get(step_val, 0) + 1
                 # SSOT watchdog: phase.*.fold payload schema drift
                 payload = rec.get("payload")
                 if (
@@ -313,6 +321,9 @@ def _scan_xref(run_dir: Path, run_id: str, scan: StepScan) -> StepScan:
         spine_phase_tool_call_end_total=spine_phase_tool_call_end_total,
         spine_phase_tool_call_end_ok_count=spine_phase_tool_call_end_ok_count,
         spine_phase_tool_call_end_failure_count=spine_phase_tool_call_end_failure_count,
+        spine_tool_invocation_ids=tuple(sorted(spine_tool_inv_ids)),
+        spine_tool_forked=any(count > 1 for count in spine_step_tool_counts.values()),
+        spine_tool_has_step_info=bool(spine_step_tool_counts),
     )
 
 
@@ -462,20 +473,42 @@ def _scan_step_doc(path: Path) -> StepScan:
     for step in doc.steps:
         step_ids.append(step.step_id)
         step_indexes.append(step.step_index)
-        if step.tool_call is not None:
-            inv_id = getattr(step.tool_call, "invocation_id", "") or ""
+
+        # Collect tool calls (support both plural tool_calls and singular tool_call)
+        calls: list[Any] = list(step.tool_calls) if step.tool_calls else []
+        if not calls and step.tool_call is not None:
+            calls = [step.tool_call]
+        for tc in calls:
+            inv_id = getattr(tc, "invocation_id", "") or ""
             if inv_id:
                 _tool_invocation_ids.add(inv_id)
-            if step.tool_result is not None and step.tool_result.ok:
+
+        # Collect tool results (support both plural tool_results and singular tool_result)
+        results: list[Any] = list(step.tool_results) if step.tool_results else []
+        if not results and step.tool_result is not None:
+            results = [step.tool_result]
+
+        step_has_success = False
+        step_has_failure = False
+        for tr in results:
+            inv_id = getattr(tr, "invocation_id", "") or ""
+            if inv_id:
+                _tool_invocation_ids.add(inv_id)
+            if tr.ok:
                 tool_success += 1
-                consecutive = 0
+                step_has_success = True
                 # ok=True 与 error 非空矛盾(fold invariant 该拒绝的样本)
-                if step.tool_result.error and str(step.tool_result.error).strip():
+                if tr.error and str(tr.error).strip():
                     tool_ok_error_conflicts.append(step.step_index)
-            elif step.outcome == "fail":
-                failure_steps.append(step.step_index)
-                consecutive += 1
-                max_consec = max(max_consec, consecutive)
+            else:
+                step_has_failure = True
+
+        if step_has_success:
+            consecutive = 0
+        elif step.outcome == "fail" or (results and step_has_failure):
+            failure_steps.append(step.step_index)
+            consecutive += 1
+            max_consec = max(max_consec, consecutive)
     tool_total = len(_tool_invocation_ids)
     duration_ms: int | None = None
     if doc.closed_at is not None and doc.started_at is not None:
@@ -512,6 +545,7 @@ def _scan_step_doc(path: Path) -> StepScan:
         tool_ok_error_conflicts=tuple(tool_ok_error_conflicts),
         step_ids=tuple(step_ids),
         step_indexes=tuple(step_indexes),
+        tool_invocation_ids=tuple(sorted(_tool_invocation_ids)),
     )
 
 
@@ -692,31 +726,44 @@ def _hop_h7(scan: StepScan) -> HopVerdict:
     # 互相对账。不一致即 H7.ok=False。
     if scan.spine_phase_tool_call_end_total > 0:
         spine_total = scan.spine_phase_tool_call_end_total
+        extra["spine_phase_tool_call_end_total"] = spine_total
+        extra["journal_tool_total"] = scan.tool_total
+
+        # ADR-0244 PR-1 Task 3: 精准集合对账
+        journal_invs = set(scan.tool_invocation_ids)
+        spine_invs = set(scan.spine_tool_invocation_ids)
+        missing_in_journal = sorted(spine_invs - journal_invs) if spine_invs else []
+        missing_in_spine = sorted(journal_invs - spine_invs) if spine_invs else []
+        if missing_in_journal:
+            extra["missing_in_journal"] = missing_in_journal
+        if missing_in_spine:
+            extra["missing_in_spine"] = missing_in_spine
+
         # PR-D: parity check — journal distinct invocation count must match
         # spine phase.tool.call.end total.
         if scan.tool_total != spine_total:
-            # StepRecord.tool_call is singular, so a Decision that forked N
+            # StepRecord.tool_call is singular in legacy projections, so a Decision that forked N
             # parallel tool calls projects to one step holding one of them.
-            # Every step carrying exactly one invocation_id means none lost
-            # its record, so a spine surplus can only be forked calls — a
-            # projection limit, not a fact-level inconsistency.
-            forked = scan.total_steps == scan.tool_total < spine_total
+            # Spine recording multiple calls for the same step indicates forking.
+            if scan.spine_tool_has_step_info:
+                forked = scan.spine_tool_forked
+            else:
+                forked = scan.total_steps == scan.tool_total < spine_total
+            extra["forked_tool_calls"] = forked
+            detail = (
+                f"H7 step-tree 每步只投影一个 tool_call,本 run 有并发工具调用 "
+                f"({scan.tool_total} steps 承载 {spine_total} 次调用);"
+                f"事实层 step.tool_call.record 完整"
+                if forked
+                else (
+                    f"H7 journal/spine tool_total mismatch ({scan.tool_total} vs {spine_total})"
+                    + (f": missing in journal {missing_in_journal}" if missing_in_journal else "")
+                )
+            )
             return HopVerdict(
                 ok=None if forked else False,
-                detail=(
-                    f"H7 step-tree 每步只投影一个 tool_call,本 run 有并发工具调用 "
-                    f"({scan.tool_total} steps 承载 {spine_total} 次调用);"
-                    f"事实层 step.tool_call.record 完整"
-                    if forked
-                    else f"H7 journal/spine tool_total mismatch "
-                    f"({scan.tool_total} vs {spine_total})"
-                ),
-                extra={
-                    **extra,
-                    "spine_phase_tool_call_end_total": spine_total,
-                    "journal_tool_total": scan.tool_total,
-                    "forked_tool_calls": forked,
-                },
+                detail=detail,
+                extra=extra,
             )
         spine_fail = scan.spine_phase_tool_call_end_failure_count
         journal_fail = scan.tool_total - scan.tool_success
