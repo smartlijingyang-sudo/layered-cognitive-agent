@@ -132,6 +132,33 @@ class TestCreateMaterializesGlobalSkills:
                 )
             )
 
+    def test_create_defaults_to_all_global_skills(
+        self,
+        catalog: AssistantCatalogImpl,
+        global_store: DiskSkillPackageStore,
+    ) -> None:
+        """空 initial_skills = 默认物化全部全局技能（ADR-0243 I-B14）。"""
+        handle = catalog.create(CreateAssistantRequest(name="Demo", description="d"))
+        home = Path(handle.home_path)
+        skill_dir = home / "skills" / "global-skill"
+        assert (skill_dir / "SKILL.md").is_file()
+        assert (skill_dir / "manifest.json").is_file()
+        meta = json.loads((skill_dir / "manifest.json").read_text(encoding="utf-8"))
+        assert meta["source"] == "global_link"
+        manifest = _read_manifest(home)
+        entry = manifest["skills"]["global-skill"]
+        assert entry["source"] == "global_link"
+        assert manifest["digests"]["skills/global-skill"] == entry["digest"]
+
+    def test_create_without_global_store_keeps_empty_skills(self, root: Path) -> None:
+        """全局库不可用时，空 initial_skills 不失败，skills/ 保持为空。"""
+        catalog = AssistantCatalogImpl(root=root, event_emitter=None)
+        handle = catalog.create(CreateAssistantRequest(name="Demo", description="d"))
+        home = Path(handle.home_path)
+        skills_dir = home / "skills"
+        assert skills_dir.is_dir()
+        assert list(skills_dir.glob("*/SKILL.md")) == []
+
 
 class TestEditCow:
     async def test_edit_breaks_hardlink_and_keeps_global(
