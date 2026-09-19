@@ -346,9 +346,13 @@ class HomeSection:
             lines.append(f"assistant_id: {assistant_id}")
         if home:
             lines.append(f"home_dir: {home}")
-            lines.append(f"memory_dir: {home}/memory/  (持久化记忆；用户偏好写这里)")
+            lines.append(f"memory_dir: {home}/memory/  (持久化记忆；系统自动写入，勿用沙箱命令访问)")
             lines.append(f"skills_dir: {home}/skills/")
             lines.append(f"workspace_dir: {home}/workspace/  (沙箱 /mnt/data 映射到此)")
+            lines.append(
+                "记忆说明: 用户让你记住的偏好/事实由系统自动写入 memory_dir，"
+                "你无需手动创建文件；下次会话会自动带到你的上下文。"
+            )
         return SectionOutput(text=block("HOME", "\n".join(lines)))
 
 
