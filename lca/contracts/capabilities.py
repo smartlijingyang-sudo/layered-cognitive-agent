@@ -302,6 +302,8 @@ ASSISTANT_TOOL_OVERLAY = Capability[object]("assistant.tool_overlay", cardinalit
 """助理域 tool overlay（ADR-0243 D4）：写 ``{home}/tools/`` 的自定义工具定义。"""
 
 ASSISTANT_EVOLVE = Capability[object]("assistant.evolve", cardinality="one")
+ASSISTANT_CURATOR = Capability[object]("assistant.curator", cardinality="one")
+"""Procedural-memory curator service (ADR-0244 D6.2)."""
 """助理域 SkillAcquirer 实现（与 learning.skill_acquirer 平行但 capability 独立）。"""
 
 ASSISTANT_JOBS = Capability[object]("assistant.jobs", cardinality="one")
