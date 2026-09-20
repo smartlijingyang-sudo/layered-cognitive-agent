@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-import os
+import posixpath
 import time
 from typing import Any
 
@@ -36,11 +36,11 @@ class FakeSandboxProvider:
         args: dict[str, Any],
         grant: CapabilityGrant,
     ) -> EffectReceipt:
-        base: dict[str, Any] = dict(
-            job_id=grant.job_id,
-            idempotency_key=grant.idempotency_key,
-            stderr_digest=None,
-        )
+        base: dict[str, Any] = {
+            "job_id": grant.job_id,
+            "idempotency_key": grant.idempotency_key,
+            "stderr_digest": None,
+        }
         if grant.expires_at < int(time.time()):
             return EffectReceipt(
                 **base,
@@ -51,10 +51,8 @@ class FakeSandboxProvider:
             )
         path = str(args.get("path", args.get("directory", "")))
         if path and grant.path_prefixes:
-            norm = os.path.normpath(path)
-            if not any(
-                norm.startswith(os.path.normpath(p)) for p in grant.path_prefixes
-            ):
+            norm = posixpath.normpath(path)
+            if not any(norm.startswith(posixpath.normpath(p)) for p in grant.path_prefixes):
                 return EffectReceipt(
                     **base,
                     success=False,

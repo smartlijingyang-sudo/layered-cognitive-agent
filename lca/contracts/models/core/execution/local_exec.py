@@ -9,13 +9,13 @@ rules: frozen=True, extra="forbid" (C13)
 
 from __future__ import annotations
 
-from enum import Enum
-from typing import Sequence
+from collections.abc import Sequence
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict
 
 
-class TargetKind(str, Enum):
+class TargetKind(StrEnum):
     """执行目标分类——工具 schema 和 UI 必须据此区分（I-UMS-5）。"""
 
     SANDBOX = "sandbox"

@@ -16,8 +16,8 @@ def test_plane_ref_backward_compatible() -> None:
         id="s-1",
         label="sandbox",
         kind=PlaneKind.SANDBOX,
-        root="/tmp",
-        outputs_dir="/tmp/out",
+        root="/repo",
+        outputs_dir="/repo/out",
     )
     assert ref.kind == PlaneKind.SANDBOX
     assert ref.capability_summary == ()

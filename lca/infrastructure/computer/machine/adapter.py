@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import hashlib
-import os
+import posixpath
 import time
 from typing import Any
 
@@ -20,9 +20,7 @@ from lca.infrastructure.computer.machine.machine import MachineComputer
 
 
 class MachineLocalExecAdapter:
-    def __init__(
-        self, computer: MachineComputer, *, machine_id: str, label: str
-    ) -> None:
+    def __init__(self, computer: MachineComputer, *, machine_id: str, label: str) -> None:
         self._computer = computer
         self._machine_id = machine_id
         self._label = label
@@ -39,11 +37,11 @@ class MachineLocalExecAdapter:
     async def execute(
         self, operation: str, args: dict[str, Any], grant: CapabilityGrant
     ) -> EffectReceipt:
-        base = dict(
-            job_id=grant.job_id,
-            idempotency_key=grant.idempotency_key,
-            stderr_digest=None,
-        )
+        base = {
+            "job_id": grant.job_id,
+            "idempotency_key": grant.idempotency_key,
+            "stderr_digest": None,
+        }
         if grant.expires_at < int(time.time()):
             return EffectReceipt(
                 **base,
@@ -54,10 +52,8 @@ class MachineLocalExecAdapter:
             )
         path = str(args.get("path", args.get("directory", "")))
         if path and grant.path_prefixes:
-            norm = os.path.normpath(path)
-            if not any(
-                norm.startswith(os.path.normpath(p)) for p in grant.path_prefixes
-            ):
+            norm = posixpath.normpath(path)
+            if not any(norm.startswith(posixpath.normpath(p)) for p in grant.path_prefixes):
                 return EffectReceipt(
                     **base,
                     success=False,

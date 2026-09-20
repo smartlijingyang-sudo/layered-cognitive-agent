@@ -68,11 +68,11 @@ class FakeCompanionProvider:
         args: dict[str, Any],
         grant: CapabilityGrant,
     ) -> EffectReceipt:
-        base: dict[str, Any] = dict(
-            job_id=grant.job_id,
-            idempotency_key=grant.idempotency_key,
-            stderr_digest=None,
-        )
+        base: dict[str, Any] = {
+            "job_id": grant.job_id,
+            "idempotency_key": grant.idempotency_key,
+            "stderr_digest": None,
+        }
         if self._mode == "offline":
             return EffectReceipt(
                 **base,
@@ -92,9 +92,7 @@ class FakeCompanionProvider:
         path = str(args.get("path", args.get("directory", "")))
         if path and grant.path_prefixes:
             norm = os.path.normpath(path)
-            if not any(
-                norm.startswith(os.path.normpath(p)) for p in grant.path_prefixes
-            ):
+            if not any(norm.startswith(os.path.normpath(p)) for p in grant.path_prefixes):
                 return EffectReceipt(
                     **base,
                     success=False,
