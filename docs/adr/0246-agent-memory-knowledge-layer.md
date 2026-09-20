@@ -2,7 +2,7 @@
 
 ## 状态
 
-**Proposed — 2026-09-20**
+**Accepted — 2026-09-20**
 
 > **一句话**：把 LCA 的 agent 记忆从"关键词触发的原文存档"升级为结构化知识层——LLM 蒸馏提取、typed `MemoryRecord`、受治理记忆工具、用户画像回填、预算内相关性检索、supersede/遗忘生命周期；同时清理 `workspace_instructions` 污染与硬编码关键词机制，修通 `assistant.bootstrap` 正确通道。
 
