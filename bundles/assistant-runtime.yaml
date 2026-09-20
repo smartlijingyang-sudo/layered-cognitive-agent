@@ -14,6 +14,11 @@ entries:
     $module: lca.plugins.assistant.bootstrap.bootstrap
     config: {}
 
+  - id: lca.plugins.assistant.profile.profile
+    name: lca_plugins_assistant_profile
+    $module: lca.plugins.assistant.profile.profile
+    config: {}
+
   - id: lca.plugins.assistant.workspace.workspace
     name: lca_plugins_assistant_workspace
     $module: lca.plugins.assistant.workspace.workspace

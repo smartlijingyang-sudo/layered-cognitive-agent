@@ -20,7 +20,11 @@ class NullRetrievalPolicy(RetrievalPolicy):
         self,
         layers: dict[MemoryLayer, list[MemoryRecord]],
         budget: int,
+        *,
+        query: str = "",
+        token_budget: int | None = None,
     ) -> list[MemoryRecord]:
+        del layers, budget, query, token_budget
         return []
 
 

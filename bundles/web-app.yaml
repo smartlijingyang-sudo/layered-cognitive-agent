@@ -23,10 +23,6 @@ entries:
   name: sensor_team_inbox
   $module: lca.plugins.sensors.team.inbox
   config: {}
-- id: sensor.workspace-instructions
-  name: sensor_workspace_instructions
-  $module: lca.plugins.sensors.workspace.instructions
-  config: {}
 - id: sensor.skill-catalog
   name: sensor_skill_catalog
   $module: lca.plugins.sensors.skill.catalog

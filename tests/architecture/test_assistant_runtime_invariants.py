@@ -362,6 +362,7 @@ class TestPromptSectionRegistryUnchanged:
                     "task",
                     "activated_skills",
                     "context",
+                    "user_profile",
                     "teammates",
                     "assigned_roles_text",
                     "member_reports_text",

@@ -27,6 +27,7 @@ from lca.cognition.brain.sections.types import (
     context_exclusions_for,
     join_lines,
     label_line,
+    memory_records_from_manifest,
     render_activated_skills,
     render_artifacts_block,
     render_assigned_roles,
@@ -36,6 +37,7 @@ from lca.cognition.brain.sections.types import (
     render_teammates,
 )
 from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.enums.enums import MemoryCategory
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import PROMPT_SECTION_REGISTRY
@@ -315,6 +317,40 @@ class ContextSection:
         return SectionOutput(text=label_line("CONTEXT", body))
 
 
+class UserProfileSection:
+    """Render the structured user profile from identity/preference memories.
+
+    ADR-0246 PR-5: the model sees a distilled USER_PROFILE block (称呼/身份/
+    偏好) independent of raw memory lines. Empty profile renders nothing so
+    the section disappears until the first identity/preference fact lands.
+    """
+
+    name: ClassVar[str] = "user_profile"
+
+    def render(
+        self,
+        *,
+        role_profile: RoleProfile,
+        task: str,
+        awareness: TeamAwareness | None,
+        manifest: ContextManifest | None,
+        tools: Sequence[Tool],
+        activated_skills: tuple[ActivatedSkill, ...],
+    ) -> SectionOutput:
+        del role_profile, task, awareness, tools, activated_skills
+        records = memory_records_from_manifest(manifest)
+        identity = [r.content for r in records if r.category is MemoryCategory.IDENTITY]
+        preference = [r.content for r in records if r.category is MemoryCategory.PREFERENCE]
+        lines: list[str] = []
+        if identity:
+            lines.append("身份：" + "；".join(identity))
+        if preference:
+            lines.append("偏好：" + "；".join(preference))
+        if not lines:
+            return SectionOutput(text="")
+        return SectionOutput(text=label_line("USER_PROFILE", "\n".join(lines)))
+
+
 class HomeSection:
     """Render the assistant Home paths for a bound run (ADR-0242 D3/D5).
 
@@ -346,12 +382,15 @@ class HomeSection:
             lines.append(f"assistant_id: {assistant_id}")
         if home:
             lines.append(f"home_dir: {home}")
-            lines.append(f"memory_dir: {home}/memory/  (持久化记忆；系统自动写入，勿用沙箱命令访问)")
+            lines.append(
+                f"memory_dir: {home}/memory/  (持久化记忆；系统自动写入，勿用沙箱命令访问)"
+            )
             lines.append(f"skills_dir: {home}/skills/")
             lines.append(f"workspace_dir: {home}/workspace/  (沙箱 /mnt/data 映射到此)")
             lines.append(
                 "记忆说明: 用户让你记住的偏好/事实由系统自动写入 memory_dir，"
-                "你无需手动创建文件；下次会话会自动带到你的上下文。"
+                "也可用 memory_search / memory_add / memory_update / memory_remove 读写；"
+                "下次会话会自动带到你的上下文。"
             )
         return SectionOutput(text=block("HOME", "\n".join(lines)))
 
@@ -609,6 +648,11 @@ def build_context(config: BaseModel) -> ContextSection:
     return ContextSection()
 
 
+def build_user_profile(config: BaseModel) -> UserProfileSection:
+    del config
+    return UserProfileSection()
+
+
 def build_home(config: BaseModel) -> HomeSection:
     del config
     return HomeSection()
@@ -789,6 +833,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         ("task", build_task(Config())),
         ("activated_skills", build_activated_skills(Config())),
         ("context", build_context(Config())),
+        ("user_profile", build_user_profile(Config())),
         ("home", build_home(Config())),
         ("teammates", build_teammates(Config())),
         ("assigned_roles_text", build_assigned_roles(Config())),
@@ -823,5 +868,6 @@ __all__ = [
     "TaskSection",
     "TeammatesSection",
     "ToolsSection",
+    "UserProfileSection",
     "setup",
 ]

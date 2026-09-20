@@ -3,11 +3,16 @@
 ADR-0244: Retrieves semantic, episodic, and procedural memory context for the
 current turn without hardcoded heuristics. Enriches the perceived manifest and
 emits the typed ``memories`` port.
+ADR-0246 PR-4: passes a textual ``query`` and a ``token_budget`` to the memory
+system's ``retrieve`` so injection is budgeted and relevance-ranked, never a
+full dump.
 """
 
 from __future__ import annotations
 
+import inspect
 from dataclasses import dataclass
+from typing import Any
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.enums.enums import ActionType
@@ -33,6 +38,37 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+
+# ADR-0246 PR-4: 默认记忆注入 token 预算（约 2000 token，字符级近似）。
+_DEFAULT_MEMORY_TOKEN_BUDGET = 2000
+
+
+def _query_from_manifest(manifest: object) -> str:
+    """从 manifest 条目提取纯文本检索词；无文本时返回空串。"""
+    if manifest is None:
+        return ""
+    parts: list[str] = []
+    for item in getattr(manifest, "items", ()) or ():
+        payload = getattr(item, "payload", None)
+        if isinstance(payload, str):
+            parts.append(payload)
+        elif isinstance(payload, (list, tuple)):
+            for p in payload:
+                if isinstance(p, str):
+                    parts.append(p)
+                    break
+    return " ".join(parts)[:500]
+
+
+def _accepts_kwarg(func: object, name: str) -> bool:
+    """判断 ``retrieve`` 是否接受可选关键字参数（兼容旧实现与测试 fake）。"""
+    try:
+        sig = inspect.signature(func)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return False
+    return name in sig.parameters or any(
+        p.kind is inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,7 +100,14 @@ class PerceiveMemoryRetrieveExecutor:
         memories: list[MemoryRecord] = []
         if memory is not None and hasattr(memory, "retrieve"):
             try:
-                retrieved = await memory.retrieve(manifest=manifest)
+                retrieve = memory.retrieve
+                kwargs: dict[str, Any] = {}
+                query = _query_from_manifest(manifest)
+                if _accepts_kwarg(retrieve, "query"):
+                    kwargs["query"] = query
+                if _accepts_kwarg(retrieve, "token_budget"):
+                    kwargs["token_budget"] = _DEFAULT_MEMORY_TOKEN_BUDGET
+                retrieved = await retrieve(manifest=manifest, **kwargs)
                 if isinstance(retrieved, (list, tuple)):
                     memories.extend(retrieved)
             except Exception:

@@ -4,11 +4,17 @@ ADR-0221: this is the lowest-level node in the perceive subgraph. It
 calls the profile-selected ``perceive_hub`` capability and emits a
 typed ``manifest`` port. The next node (``phase.perceive.fold``)
 collapses the manifest into the closed ``observation`` shape.
+
+ADR-0246 PR-7: when the runtime carries ``assistant_bootstrap`` +
+``assistant_id``, the node merges the per-assistant Home projection
+(SOUL/USER/AGENTS + goals.yaml) into the manifest, replacing any global
+``workspace_instructions`` items so the assistant Home is the only
+producer of that kind.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.enums.enums import ActionType
@@ -22,6 +28,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
+from lca.contracts.models.core.perceive.perception import ContextManifest
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -52,6 +59,8 @@ class PerceiveObserveExecutor:
     ) -> NodeOutput:
         runtime = context.runtime or {}
         hub = getattr(runtime, "perceive_hub", None)
+        if hub is None and hasattr(runtime, "get"):
+            hub = runtime.get("perceive_hub")
         routing = RoutingDecision(action_type=ActionType.RESPOND)
         if not isinstance(hub, PerceiveHub):
             return NodeOutput(port_values={"manifest": None, "routing": routing})
@@ -59,7 +68,37 @@ class PerceiveObserveExecutor:
         if agent_state is None and hasattr(runtime, "get"):
             agent_state = runtime.get("agent_state")
         manifest = await hub.perceive(agent_state)  # type: ignore[arg-type]
-        return NodeOutput(port_values={"manifest": manifest, "routing": routing})
+        merged = await self._merge_assistant_bootstrap(runtime, manifest)
+        return NodeOutput(port_values={"manifest": merged, "routing": routing})
+
+    @staticmethod
+    async def _merge_assistant_bootstrap(runtime: object, manifest: object) -> object:
+        """合并 per-assistant bootstrap 投影；任何失败保持原 manifest。"""
+        if not isinstance(manifest, ContextManifest):
+            return manifest
+        bootstrap = getattr(runtime, "assistant_bootstrap", None)
+        if bootstrap is None and hasattr(runtime, "get"):
+            bootstrap = runtime.get("assistant_bootstrap")
+        assistant_id = getattr(runtime, "assistant_id", None)
+        if assistant_id is None and hasattr(runtime, "get"):
+            assistant_id = runtime.get("assistant_id")
+        if bootstrap is None or not str(assistant_id or "").strip():
+            return manifest
+        try:
+            projection = bootstrap.project(str(assistant_id))
+            bootstrap_manifest = getattr(projection, "manifest", None)
+            if isinstance(bootstrap_manifest, ContextManifest):
+                items: tuple[object, ...] = bootstrap_manifest.items
+            elif callable(getattr(projection, "items", None)):
+                items = tuple(projection.items())
+            else:
+                items = ()
+        except Exception:
+            # 投影失败不阻塞感知主流程（fail-soft）。
+            return manifest
+        # 助理 Home 是 workspace_instructions 唯一生产者：移除全局 sensor 条目。
+        hub_items = tuple(item for item in manifest.items if item.kind != "workspace_instructions")
+        return replace(manifest, items=hub_items + tuple(items))
 
 
 @plugin(

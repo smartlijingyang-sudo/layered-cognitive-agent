@@ -235,6 +235,9 @@ class CognitiveRuntime(Runtime):
             resume_input.input_value,
             resume_input.turn,
         )
+        # ADR-0246 PR-8: 恢复路径补跑记忆捕获——人工回答也是用户陈述，
+        # 先提炼身份/偏好再进入下一轮，避免「说了但没记」。
+        await self._capture_resume_memory(state, resume_input)
         from lca.infrastructure.session.bindings import resolve_session_reader
         from lca.runtime.session.run_session_writer import RunSessionWriter
 
@@ -306,6 +309,14 @@ class CognitiveRuntime(Runtime):
             phase_cursor=phase_cursor.node_id,
             resume_envelope=True,
         )
+
+    async def _capture_resume_memory(self, state: object, resume_input: object) -> None:
+        """补跑记忆捕获：人工回答 → LLM 蒸馏 → memory.update（ADR-0246 PR-8）。"""
+        from lca.runtime.support.resume_memory import capture_resume_memory
+
+        memory = self._bindings.memory
+        adapter = self._bindings.capabilities.get("adapter")
+        await capture_resume_memory(memory, adapter, resume_input, state)
 
     async def _run_driver(
         self,

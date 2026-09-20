@@ -35,6 +35,7 @@ from lca.infrastructure.tools.assistant.create_skill_tool import (
     assistant_create_skill_tool_from_run,
 )
 from lca.infrastructure.tools.assistant.create_tool import AssistantCreateTool
+from lca.infrastructure.tools.assistant.memory_tools import assistant_memory_tools_from_run
 from lca.infrastructure.tools.assistant.role_card_resolver import FileRoleCardResolver
 from lca.infrastructure.tools.assistant.role_card_tool import RoleCardListTool
 from lca.infrastructure.tools.assistant.self_manage_tools import (
@@ -149,6 +150,8 @@ async def setup(ctx: PluginContext, config: Any) -> None:
                 catalog_names=_catalog_names,
             )
         )
+        # 受治理记忆工具族（ADR-0246 PR-6）：search/add/update/remove 结构化记忆。
+        tools.extend(assistant_memory_tools_from_run(bindings, catalog=catalog))
         return tools
 
     ctx.require("tools").register_factory("assistant", _assistant_tools_factory)

@@ -173,17 +173,30 @@ class SimpleMemorySystem(MemorySystem):
         )
         return replace(state, retrieved_context=compacted)
 
-    async def retrieve(self, manifest: ContextManifest) -> list[MemoryRecord]:
+    async def retrieve(
+        self,
+        manifest: ContextManifest,
+        *,
+        query: str = "",
+        token_budget: int | None = None,
+    ) -> list[MemoryRecord]:
         """按 RetrievalPolicy 从四层选记录，供 ``memory_retrieve`` 注入（ADR-0244 D4）。
 
-        与 ``perceive`` 共用同一策略与预算，但不提交 journal/spine receipt，
-        避免在 perceive 阶段重复记账。
+        与 ``perceive`` 共用同一策略，但可传入 ``query`` / ``token_budget``
+        （ADR-0246 PR-4），不提交 journal/spine receipt，避免在 perceive
+        阶段重复记账。
         """
-        del manifest
         layers_snapshot: dict[MemoryLayer, list[MemoryRecord]] = {
             layer_name: self._get_layer_records(layer_name) for layer_name in self._private_layers
         }
-        return list(self.retrieval.retrieve(layers_snapshot, budget=_DEFAULT_MAX_WORKING))
+        return list(
+            self.retrieval.retrieve(
+                layers_snapshot,
+                budget=_DEFAULT_MAX_WORKING,
+                query=query,
+                token_budget=token_budget,
+            )
+        )
 
     def _shadow_compact(self, records: list[MemoryRecord]) -> list[MemoryRecord]:
         """保留作为 compact 路径的兼容 helper；ADR-0068 后实际由

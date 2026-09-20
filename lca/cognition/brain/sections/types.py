@@ -7,7 +7,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from lca.contracts.atoms.enums.enums import MemoryLayer, MemoryRecordKind
+from lca.contracts.atoms.enums.enums import MemoryCategory, MemoryLayer, MemoryRecordKind
 from lca.contracts.models.core.conversation.memory import MemoryRecord, MemoryTrust
 from lca.contracts.models.core.perceive.perception import (
     ContextItem,
@@ -144,6 +144,10 @@ def format_record_line(record: MemoryRecord) -> str:
     if record.kind == MemoryRecordKind.RESPONSE:
         step = record.metadata.get("step", "?")
         return f"- [{layer}] 我此前的回复(step={step}): {record.content}"
+    # ADR-0246 PR-5: semantic 层结构化事实行用 ``category`` 标签，不再是原文层名。
+    category = getattr(record, "category", None)
+    if category in {MemoryCategory.IDENTITY, MemoryCategory.PREFERENCE, MemoryCategory.FACT}:
+        return f"- [{category.value}] {record.content}"
     return f"- [{layer}] {record.content}"
 
 

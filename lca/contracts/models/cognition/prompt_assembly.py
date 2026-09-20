@@ -55,6 +55,7 @@ REGISTERED_PROMPT_SECTION_NAMES: frozenset[str] = frozenset(
         "task",
         "activated_skills",
         "context",
+        "user_profile",
         "teammates",
         "assigned_roles_text",
         "member_reports_text",

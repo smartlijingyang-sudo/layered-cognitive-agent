@@ -26,6 +26,8 @@ def project_runtime_phase_capabilities(
     perceive_hub: PerceiveHub,
     llm: LLMAdapter,
     permission_manifest: ToolPermissionManifest | None = None,
+    assistant_bootstrap: object | None = None,
+    assistant_id: str = "",
 ) -> RuntimePhaseCapabilities:
     """Project graph facts into one frozen phase capability view.
 
@@ -52,6 +54,10 @@ def project_runtime_phase_capabilities(
         "perceive_hub": perceive_hub,
         "adapter": llm,
         "permission_manifest": permission_manifest,
+        # ADR-0246 PR-7: assistant 域可选注入，供 phase.perceive.observe 合并
+        # per-assistant Home 投影（bootstrap 服务 + assistant_id）。
+        "assistant_bootstrap": assistant_bootstrap,
+        "assistant_id": assistant_id,
     }
     conflicting = sorted(
         name
