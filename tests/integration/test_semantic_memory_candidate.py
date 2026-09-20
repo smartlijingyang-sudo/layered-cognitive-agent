@@ -8,12 +8,14 @@ import pytest
 
 from lca.contracts.atoms.enums.enums import MemoryLayer, ReflectionVerdict
 from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection
+from lca.contracts.models.core.perceive.perception import ContextManifest
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
 )
 from lca.infrastructure.memory.assistant_memory import AssistantMemory
+from lca.nodes.perceive.fold.fold import PerceiveFoldExecutor
 from lca.nodes.reflect.score.score import _extract_semantic_candidate
 from lca.nodes.remember.write.write import RememberWriteExecutor
 
@@ -121,3 +123,41 @@ async def test_remember_write_dispatches_via_execute() -> None:
     assert envelope.metadata["state"] is not None
     assert envelope.metadata["decision"].decision_id == "decision_1"
     assert output.port_values.get("memory_receipt") == {"admitted": True}
+
+
+class _RecordingReducer:
+    def __init__(self) -> None:
+        self.applied: list[object] = []
+
+    def apply_perception(self, state: AgentState, manifest: ContextManifest) -> AgentState:
+        state.perceive = manifest  # type: ignore[attr-defined]
+        self.applied.append(manifest)
+        return state
+
+
+@pytest.mark.asyncio
+async def test_perceive_fold_applies_merged_manifest_to_state() -> None:
+    reducer = _RecordingReducer()
+    state = _state("记住：以后叫我老板")
+    manifest = ContextManifest(items=())
+    executor = PerceiveFoldExecutor()
+    context = NodeContext(
+        runtime={"state": state, "reducer": reducer},
+        budget={},
+        metadata={},
+    )
+    memories = [
+        {
+            "record_id": "mem_1",
+            "content": "以后叫我老板",
+            "memory_type": "semantic",
+            "importance": 1.0,
+        }
+    ]
+    output = await executor.node_execute(
+        context,
+        NodeInput(port_values={"manifest": manifest, "memories": memories}),
+    )
+    merged = output.port_values["in_assembled_manifest"]
+    assert any(item.kind == "memory" for item in merged.items)
+    assert reducer.applied == [merged]

@@ -41,7 +41,15 @@ class MockEffectGateway:
     def __init__(self) -> None:
         self.dispatched_envelopes: list[Any] = []
 
-    async def dispatch(self, envelope: Any) -> dict[str, Any]:
+    async def execute(
+        self,
+        envelope: Any,
+        policy: Any,
+        *,
+        state: Any = None,
+        decision: Any = None,
+    ) -> dict[str, Any]:
+        del policy, state, decision
         self.dispatched_envelopes.append(envelope)
         return {"status": "persisted", "idempotency_key": envelope.idempotency_key}
 

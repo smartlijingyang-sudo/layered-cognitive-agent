@@ -58,7 +58,7 @@ class PerceiveFoldExecutor:
         context: NodeContext,
         input: NodeInput,
     ) -> NodeOutput:
-        del context
+        runtime = context.runtime or {}
         manifest = input.port_values.get("manifest")
         memories = input.port_values.get("memories") or ()
         if memories and isinstance(manifest, ContextManifest):
@@ -68,6 +68,20 @@ class PerceiveFoldExecutor:
                 provenance="memory.retrieve",
             )
             manifest = replace(manifest, items=(*manifest.items, item))
+        # Fold the merged manifest onto the reducer-owned state projection
+        # (C4), mirroring think.route's ``apply_skill_route`` pattern. Without
+        # this, ``state.perceive.manifest`` stays ``None`` and the prompt's
+        # CONTEXT section never sees retrieved memory items (ADR-0242 D5).
+        if manifest is not None:
+            state = getattr(runtime, "state", None)
+            if state is None and hasattr(runtime, "get"):
+                state = runtime.get("state") or runtime.get("agent_state")
+            reducer = getattr(runtime, "reducer", None)
+            if reducer is None and hasattr(runtime, "get"):
+                reducer = runtime.get("reducer")
+            apply_perception = getattr(reducer, "apply_perception", None)
+            if state is not None and callable(apply_perception):
+                apply_perception(state, manifest)
         # The ``observation`` port feeds phase.reflect.score, whose critic
         # reads ``Observation.success``. Project the manifest into a typed
         # Observation instead of leaking the raw manifest across the boundary.
