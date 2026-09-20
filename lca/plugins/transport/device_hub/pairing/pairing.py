@@ -30,6 +30,7 @@ class PairingRequest:
     user_id: str | None = None
     workspace_id: str | None = None
     machine_token: str | None = None
+    pre_authorized: bool = False
 
     @property
     def expires_in(self) -> int:
@@ -65,12 +66,86 @@ class DevicePairingService:
     def _normalize_user_code(self, code: str) -> str:
         return code.replace("-", "").strip().upper()
 
+    def preauth_code(
+        self,
+        user_id: str,
+        workspace_id: str,
+        expires_in: int = 600,
+    ) -> PairingRequest:
+        now = time.time()
+        device_code = secrets.token_urlsafe(32)
+
+        chars = string.ascii_uppercase + string.digits
+        chars = chars.replace("0", "").replace("O", "").replace("1", "").replace("I", "")
+        raw_code = "".join(secrets.choice(chars) for _ in range(8))
+        user_code = f"{raw_code[:4]}-{raw_code[4:]}"
+        norm_code = self._normalize_user_code(user_code)
+
+        req = PairingRequest(
+            device_code=device_code,
+            user_code=user_code,
+            device_id="",
+            label="",
+            platform="",
+            created_at=now,
+            expires_at=now + expires_in,
+            status=PairingStatus.AUTHORIZED,
+            user_id=user_id,
+            workspace_id=workspace_id,
+            pre_authorized=True,
+        )
+
+        self._by_device_code[device_code] = req
+        self._by_user_code[norm_code] = req
+        return req
+
+    def claim_preauth(
+        self,
+        user_code: str,
+        device_id: str,
+        label: str,
+        platform: str = "",
+    ) -> PairingRequest | None:
+        norm = self._normalize_user_code(user_code)
+        req = self._by_user_code.get(norm)
+        if not req:
+            return None
+
+        now = time.time()
+        if now > req.expires_at or req.status == PairingStatus.EXPIRED:
+            req.status = PairingStatus.EXPIRED
+            return None
+
+        if not req.pre_authorized or req.status != PairingStatus.AUTHORIZED:
+            return None
+
+        token = f"mtk-{secrets.token_hex(24)}"
+        req.device_id = device_id
+        req.label = label
+        req.platform = platform
+        req.machine_token = token
+        req.status = PairingStatus.COMPLETED
+        req.pre_authorized = False
+        self._by_machine_token[token] = req
+        return req
+
     def request_code(
         self,
         device_id: str,
         label: str,
         platform: str = "",
+        user_code: str | None = None,
     ) -> PairingRequest:
+        if user_code:
+            claimed = self.claim_preauth(
+                user_code=user_code,
+                device_id=device_id,
+                label=label,
+                platform=platform,
+            )
+            if claimed is not None:
+                return claimed
+
         now = time.time()
         device_code = secrets.token_urlsafe(32)
 
