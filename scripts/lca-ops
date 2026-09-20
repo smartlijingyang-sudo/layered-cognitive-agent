@@ -11,6 +11,16 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT}"
 
+# Antigravity/多账号沙箱 HOME 防护：若当前 HOME 命中沙箱目录（如 .agy-accounts），
+# 纠正为真实宿主用户家目录，并默认锚定 LCA_HOME 为 ~/.lca，确保数据权威固化在真实家目录。
+if [[ "${HOME:-}" == *".agy-accounts"* ]]; then
+  _REAL_PW_DIR="$(getent passwd "${UID:-$(id -u)}" 2>/dev/null | cut -d: -f6 || true)"
+  if [[ -n "${_REAL_PW_DIR}" && -d "${_REAL_PW_DIR}" ]]; then
+    export HOME="${_REAL_PW_DIR}"
+  fi
+fi
+export LCA_HOME="${LCA_HOME:-${HOME}/.lca}"
+
 # 默认走 venv python3(共享 lca_kernel serve 子进程解释器);详见
 # docs/specs/python-environment.md 与 KernelServeService._spawn docstring。
 # LCA_USE_UV=1 时显式回退到 uv run(创独立 .venv, vendored 包不同步,慎用)。

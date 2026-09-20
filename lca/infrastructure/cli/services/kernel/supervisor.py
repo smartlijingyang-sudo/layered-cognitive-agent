@@ -778,6 +778,18 @@ class KernelSupervisor:
     def state(self) -> ProgramState:
         return self._state
 
+    def _build_subprocess_env(self) -> dict[str, str]:
+        env = dict(os.environ)
+        if self._config.environment:
+            env.update(self._config.environment)
+        from lca.infrastructure.path import get_lca_home, get_real_user_home
+
+        real_home = str(get_real_user_home())
+        if ".agy-accounts" in env.get("HOME", ""):
+            env["HOME"] = real_home
+        env.setdefault("LCA_HOME", str(get_lca_home()))
+        return env
+
     def start(self) -> ProgramStatus:
         """Spawn the subprocess; returns immediately. Three threads
         run until :meth:`stop` or FATAL.
@@ -787,11 +799,7 @@ class KernelSupervisor:
         self._open_log_files()
         argv = self._config.argv()
         cwd = self._config.directory or None
-        env = (
-            {**os.environ, **self._config.environment}
-            if self._config.environment
-            else None
-        )
+        env = self._build_subprocess_env()
         try:
             proc = subprocess.Popen(  # noqa: S603 — argv list, no shell
                 argv,
@@ -1040,11 +1048,7 @@ class KernelSupervisor:
         self._open_log_files()
         argv = self._config.argv()
         cwd = self._config.directory or None
-        env = (
-            {**os.environ, **self._config.environment}
-            if self._config.environment
-            else None
-        )
+        env = self._build_subprocess_env()
         try:
             proc = subprocess.Popen(  # noqa: S603 — argv list, no shell
                 argv, cwd=cwd, env=env,

@@ -1177,7 +1177,9 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     失败语义:``assistants_root`` 不可写 → 立即抛 ProfileResolveError 衍生错误
     由 plugin manager 接住(不静默降级到默认路径)。
     """
-    root = Path(config.assistants_root).expanduser()  # noqa: ASYNC240 - setup path resolution, not async file IO
+    from lca.infrastructure.path import expand_user_path
+
+    root = expand_user_path(config.assistants_root)
 
     def _emit(event: str, payload: Mapping[str, Any]) -> Any:
         from lca.infrastructure.observability.domain_event_publish import (

@@ -8,8 +8,13 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from lca.infrastructure.path import get_lca_home, get_real_user_home
+
 _DEFAULT_MARKET_BASE = "https://market.lobehub.com"
-_DEFAULT_MARKET_CREDENTIALS = Path.home() / ".lobehub-market" / "credentials.json"
+
+
+def _default_market_credentials() -> Path:
+    return get_real_user_home() / ".lobehub-market" / "credentials.json"
 
 
 class SkillSettings(BaseSettings):
@@ -23,7 +28,7 @@ class SkillSettings(BaseSettings):
     )
 
     cache_dir: Path = Field(
-        default_factory=lambda: Path.home() / ".lca" / "skills",
+        default_factory=lambda: get_lca_home() / "skills",
         description="Installed skill packages root",
     )
     market_base_url: str = Field(
@@ -43,7 +48,7 @@ class SkillSettings(BaseSettings):
         description="M2M client secret (or MARKET_CLIENT_SECRET / credentials file)",
     )
     market_credentials_path: Path = Field(
-        default=_DEFAULT_MARKET_CREDENTIALS,
+        default_factory=_default_market_credentials,
         description="Path to @lobehub/market-cli credentials.json",
     )
     market_timeout_s: float = Field(default=60.0, ge=1.0)

@@ -18,6 +18,7 @@ from lca.contracts.protocols.memory.operational_skills import (
     SkillPackageInstaller,
     SkillPackageStore,
 )
+from lca.infrastructure.path import expand_user_path
 from lca.infrastructure.skills.frontmatter.frontmatter import (
     parse_references_field,
     skill_title,
@@ -47,7 +48,7 @@ class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):
 
     def __init__(self, settings: SkillSettings | None = None) -> None:
         self._settings = settings if settings is not None else get_skill_settings()
-        self._root: Path = self._settings.cache_dir.expanduser()
+        self._root: Path = expand_user_path(self._settings.cache_dir)
         self._root.mkdir(parents=True, exist_ok=True)
 
     @property

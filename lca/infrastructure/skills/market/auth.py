@@ -27,9 +27,10 @@ from urllib.parse import urljoin
 
 import httpx
 
+from lca.infrastructure.path import get_real_user_home
 from lca.infrastructure.skills.settings.settings import SkillSettings, get_skill_settings
 
-_DEFAULT_CREDENTIALS_PATH = Path.home() / ".lobehub-market" / "credentials.json"
+_DEFAULT_CREDENTIALS_PATH = get_real_user_home() / ".lobehub-market" / "credentials.json"
 _TOKEN_SKEW_S = 60
 _ASSERTION_TTL_S = 300
 

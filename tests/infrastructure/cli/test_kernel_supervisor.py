@@ -394,3 +394,20 @@ class TestActionResultBuilders:
         assert result["verdict"] == "failed"
         assert "unknown action 'foobar'" in result["reason"]
         assert "--help" in result["next_command"]
+
+
+class TestSupervisorSubprocessEnv:
+    def test_build_subprocess_env_sanitizes_agy_home(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from lca.infrastructure.cli.services.kernel.supervisor import KernelSupervisor
+
+        monkeypatch.setenv("HOME", "/home/lichao/.agy-accounts/b")
+        monkeypatch.delenv("LCA_HOME", raising=False)
+        monkeypatch.delenv("LCA_USER_HOME", raising=False)
+
+        cfg = ProgramConfig(name="test_app", command="/bin/echo")
+        sup = KernelSupervisor(cfg)
+        env = sup._build_subprocess_env()
+
+        assert ".agy-accounts" not in env["HOME"]
+        assert "LCA_HOME" in env
+        assert env["LCA_HOME"].endswith(".lca")
