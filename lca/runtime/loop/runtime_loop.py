@@ -9,6 +9,7 @@ per-Turn drivers.
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
 
@@ -52,6 +53,8 @@ if TYPE_CHECKING:
     from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
     from lca.contracts.protocols.state.plan import CompiledRunPlan
     from lca.harness.declarative.lifecycle.phase_observation import PhaseObserver
+
+logger = logging.getLogger(__name__)
 
 
 class CognitiveRuntime(Runtime):
@@ -311,12 +314,20 @@ class CognitiveRuntime(Runtime):
         )
 
     async def _capture_resume_memory(self, state: object, resume_input: object) -> None:
-        """补跑记忆捕获：人工回答 → LLM 蒸馏 → memory.update（ADR-0246 PR-8）。"""
+        """补跑记忆捕获：人工回答 → LLM 蒸馏 → memory.update（ADR-0246 PR-8）。
+
+        必须严格满足 fail-soft 原则：记忆提炼属于旁路增强，任何异常（如
+        能力缺失、LLM 蒸馏异常、存储异常）均不得阻断恢复主流程。
+        """
         from lca.runtime.support.resume_memory import capture_resume_memory
 
-        memory = self._bindings.memory
-        adapter = self._bindings.capabilities.get("adapter")
-        await capture_resume_memory(memory, adapter, resume_input, state)
+        try:
+            memory = self._bindings.capabilities.get("memory")
+            adapter = self._bindings.capabilities.get("adapter")
+            await capture_resume_memory(memory, adapter, resume_input, state)
+        except Exception:
+            # 记忆捕获失败绝对不阻断恢复主流程（fail-soft）
+            logger.debug("Failed to capture resume memory (fail-soft)", exc_info=True)
 
     async def _run_driver(
         self,

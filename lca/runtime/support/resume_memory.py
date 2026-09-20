@@ -59,9 +59,13 @@ async def capture_resume_memory(
         verdict=ReflectionVerdict.ON_TRACK,
         extra={"memory_candidates": candidates},
     )
-    await memory.update(
-        state,
-        observation,
-        reflection,
-    )
-    return True
+    try:
+        await memory.update(
+            state,
+            observation,
+            reflection,
+        )
+        return True
+    except Exception:
+        # 写入失败不阻塞恢复（fail-soft）。
+        return False

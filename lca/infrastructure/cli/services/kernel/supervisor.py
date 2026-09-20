@@ -809,6 +809,7 @@ class KernelSupervisor:
                 ),
                 stdin=subprocess.DEVNULL,
                 close_fds=True,
+                start_new_session=True,
             )
         except OSError as exc:
             self._close_log_files()

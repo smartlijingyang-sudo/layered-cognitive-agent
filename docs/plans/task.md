@@ -10,3 +10,4 @@
 | PR3-T8 | 门禁快速路径防护（Fast-Path Zero-Cost Gate, 保证常态无异常回复零额外开销） | Completed | tests/nodes/test_zero_cost_fast_path.py 4 passed (<2ms fast-path, _is_failure(None)=False) |
 | PR4-T9 | 沙箱系统级 Fontconfig CJK 字体别名映射与事务工作区隔离 | Completed | tests/infrastructure/sandbox/test_cjk_font_and_isolation.py 4 passed, local.conf CJK fallback & Dockerfiles updated |
 | PR5-T10 | 声明式记忆图节点化与自适应程序性经验（SOP）沉淀机制 | Completed | tests/integration/test_memory_and_procedural_distillation.py 7 passed (perceive.memory_retrieve, remember.admit/write, universal procedural distillation, no hardcoding) |
+| FIX-RESUME-MEMORY | 优雅修复 CognitiveRuntime.resume 记忆捕获对象边界与 fail-soft 异常隔离 | Completed | tests/runtime/loop/test_runtime_loop_resume_memory.py 3 passed (capabilities.get("memory") + fail-soft isolation) |
