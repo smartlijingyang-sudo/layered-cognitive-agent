@@ -15,7 +15,7 @@ LCA 的"高级工程师自助定位"基础设施入口。所有 debug / observab
 
 | 症状 | 第一步 | 第二步 | 第三步 |
 |---|---|---|---|
-| **浏览器抓包:5xx 但 status 健康** | `curl -i -X POST -d '{...}' http://127.0.0.1:8765/<path>` 复现 | `lca-ops logs \| tail -120` 看 `/tmp/lca-kernel.log` | 在该日志里 grep `Traceback` / `Exception` / `<ExceptionName>` |
+| **浏览器抓包:5xx 但 status 健康** | `curl -i -X POST -d '{...}' http://10.36.6.252:8765/<path>` 复现 | `lca-ops logs \| tail -120` 看 `/tmp/lca-kernel.log` | 在该日志里 grep `Traceback` / `Exception` / `<ExceptionName>` |
 | **lobehub 网关层就 5xx(看不到 kernel log)** | `lca-ops journal logs lobehub \| tail -80` | 在 `.lca-ops/lobehub.log` 里 grep `<path>` | 多数情况是 lobehub → kernel 路由问题(`LCA_GATEWAY_PUBLIC_URL` 错) |
 | **拿到 run_id,要看 run 内部失败** | `LATEST=$(ls -1t traces/runs \| head -1)` | `lca-ops debug-run "$LATEST"` | 走 [run-debug-guide.md](./run-debug-guide.md) Step 1–7 |
 | **kernel 进程在但日志路径变了** | `pid=$(pgrep -f 'lca_kernel serve' \| head -1); ls -l /proc/$pid/fd/1` | 读 symlink 指向的实际 log(可能是手动启动留下的) | 若空 → 进程 stdout 被 redirect 到 nohup/launcher,加 `-vv` 重启 |
@@ -45,7 +45,7 @@ LCA 的"高级工程师自助定位"基础设施入口。所有 debug / observab
 # 直接打 kernel(不走 lobehub)
 curl -sS -X POST -H 'Content-Type: application/json' \
      -d '{"messages":[{"role":"user","content":"hello"}]}' \
-     -i http://127.0.0.1:8765/runs
+     -i http://10.36.6.252:8765/runs
 # 期望修复后:HTTP/1.1 202 Accepted
 # 修复前:HTTP/1.1 500 Internal Server Error + body "Internal Server Error"
 ```
@@ -76,7 +76,7 @@ curl -sS -X POST -H 'Content-Type: application/json' \
 |---|---|
 | **Vite 默认只 expose `VITE_*` env**;`process.env.NEXT_PUBLIC_*` 在浏览器 bundle 是 `undefined` —— `isLcaGatewayMode()` 永远返回 `false`。 | Vite dev server logs, `getLcaGatewayUrl()` throws "lcaGatewayUrl not configured" |
 | **`lca-ops lobehub restart` 跑完 SPA bundle 没被重新 inject 真 URL**(lobehub-spa Vite 仍加载旧的占位符字符串 `ws://lca-gateway-unset:0000`) | `grep 'LCA_GATEWAY_WS_URL' lobehub-ui/src/store/chat/agents/transports/lcaGateway/client.ts` 看到占位符 |
-| lobehub-spa 进程**根本没在跑** —— Vite dev server (:9876) listener 没了,前端 SPA bundle 取不到 | `ss -ltn \| grep 9876` 没输出;`curl http://127.0.0.1:9876/` 返回 `connection refused` |
+| lobehub-spa 进程**根本没在跑** —— Vite dev server (:9876) listener 没了,前端 SPA bundle 取不到 | `ss -ltn \| grep 9876` 没输出;`curl http://10.36.6.252:9876/` 返回 `connection refused` |
 
 ### 复现 / 验证命令
 
@@ -87,7 +87,7 @@ grep -E "lca-api|runs|ws-token" .lca-ops/lobehub.log | tail -20
 # rewrite 后的路径 (/runs),而不是原始 /lca-api/runs —— 这是正常的。
 
 # 2. Vite 服务端有没有把 NEXT_PUBLIC_LCA_GATEWAY_URL 注入 SPA bundle?
-curl -sS "http://127.0.0.1:9876/src/store/chat/agents/transports/lcaGateway/client.ts" | grep LCA_GATEWAY_WS_URL
+curl -sS "http://10.36.6.252:9876/src/store/chat/agents/transports/lcaGateway/client.ts" | grep LCA_GATEWAY_WS_URL
 # 期望: const LCA_GATEWAY_WS_URL = "ws://<host>:<port>";
 # 如果看到 "ws://lca-gateway-unset:0000" → patch engine 没 inject 真值,跑
 # ./scripts/lca-ops lobehub restart,会看到 "[lca] patch applied: lca_runtime_agent_gateway"
@@ -96,7 +96,7 @@ curl -sS "http://127.0.0.1:9876/src/store/chat/agents/transports/lcaGateway/clie
 # 在浏览器 DevTools Console 跑:
 #   __BUILD_TIME_LCA_GATEWAY_URL  (console 里 __vite_something 或 grep 上面 url)
 # 或 grep agentDispatcher.ts bundle:
-curl -sS "http://127.0.0.1:9876/src/store/chat/slices/agentRun/actions/dispatch/agentDispatcher.ts" \
+curl -sS "http://10.36.6.252:9876/src/store/chat/slices/agentRun/actions/dispatch/agentDispatcher.ts" \
     | grep -A2 isLcaGatewayMode
 ```
 
@@ -235,7 +235,7 @@ fail-loud 是 `lca_kernel` lifecycle 的 K6 内置钩子(`lca_kernel/lifecycle.p
 
 ```sh
 # 1. 看 vite 实际 serve 的内容
-curl -sS http://127.0.0.1:9876/src/path/to/file.ts | grep 你刚改的字符串
+curl -sS http://10.36.6.252:9876/src/path/to/file.ts | grep 你刚改的字符串
 
 # 2. 看 kernel 端 access log 是否有新 run 创建 + WS handshake
 grep "POST /v1/runs.*ws-token" /tmp/lca-kernel.log | tail -5

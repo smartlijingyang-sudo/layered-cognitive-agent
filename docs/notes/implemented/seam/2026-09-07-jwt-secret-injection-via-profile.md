@@ -136,7 +136,7 @@ env, fail at spawn, not at first request.
   `render_create_run_receipt(..., jwt_keys=<real>)` returns 202 with a
   three-part JWT in `ws_token`; the same call with `jwt_keys=None`
   returns 503 with `code="jwt_secret_unconfigured"`.
-- Manual: `curl -X POST -d '{...}' http://127.0.0.1:8765/runs` returns
+- Manual: `curl -X POST -d '{...}' http://10.36.6.252:8765/runs` returns
   202 when the web-app bundle's `dev_mode: true` is active.
 
 ## Risks

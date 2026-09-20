@@ -145,7 +145,7 @@ Run 触发  创建新 run（carrier-aligned，唯一入口）
   ./scripts/lca-ops observation plan-show <ref>           # 显示 plan blueprint(预期图)
 
   HTTP 等价（外部脚本用）：
-  curl -X POST http://127.0.0.1:8765/runs -H 'Content-Type: application/json' \
+  curl -X POST http://10.36.6.252:8765/runs -H 'Content-Type: application/json' \
     -d '{"messages":[{"role":"user","content":"..."}],"mode":"solo","agent":"agt_aVxY6ag9MbMc"}'
 
   ❌ /v1/chat/completions 不是 run 创建入口——它是 LobeHub webui 的 OpenAI 兼容
@@ -244,7 +244,7 @@ Composio（LCA-native OAuth，读 .env COMPOSIO_API_KEY）
   ./scripts/lca-ops composio migrate --database-url $DATABASE_URL
 
   OAuth callback（自动 refresh，无需手动 composioRefresh）:
-  http://127.0.0.1:8765/composio/oauth/callback
+  http://10.36.6.252:8765/composio/oauth/callback
 
 ────────────────────────────────
 通用参数

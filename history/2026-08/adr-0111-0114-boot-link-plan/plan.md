@@ -179,8 +179,8 @@ uv run pytest tests/plugins/gateway/ -v
 uv run pytest tests/test_architecture_gateway.py -v
 uv run pytest tests/gateway/ -v
 uv run lca-ops serve &   # 启动后 curl 验证
-curl -s http://127.0.0.1:3080/health | jq .
-curl -s http://127.0.0.1:3080/runs -X POST -H "Content-Type: application/json" -d '{}' | jq .
+curl -s http://10.36.6.252:3080/health | jq .
+curl -s http://10.36.6.252:3080/runs -X POST -H "Content-Type: application/json" -d '{}' | jq .
 ```
 
 ### PR-6 (W1.5-g, ADR-0111 + 0112):gateway/app.py 瘦身

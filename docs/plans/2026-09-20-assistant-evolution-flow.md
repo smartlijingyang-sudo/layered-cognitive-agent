@@ -4,7 +4,7 @@
 
 **Goal:** 为助理演化闭环（创建助理 → 自我感知 → 对话修改 USER 画像并自动回填 → 自主创建并安装 Skill → 激活并使用该 Skill 解决问题）构建确定性集成回归测试与真实模型端到端测试套件。
 
-**Architecture:** 采用分层联动双模套件：`tests/integration/test_assistant_evolution_flow.py` 基于真实 `AssistantCatalog`、`PerceiveObserveExecutor`、`AssistantMemory`、`ProfileBackfillService` 及 `AssistantSkillOverlay`，在零外部依赖与零网络开销下验证全流程契约；`tests/e2e/test_assistant_evolution_flow_live.py` 连接本地运行的 `http://127.0.0.1:8765` 内核，驱动真实模型多轮会话并断言文件系统变化与工具执行闭环。
+**Architecture:** 采用分层联动双模套件：`tests/integration/test_assistant_evolution_flow.py` 基于真实 `AssistantCatalog`、`PerceiveObserveExecutor`、`AssistantMemory`、`ProfileBackfillService` 及 `AssistantSkillOverlay`，在零外部依赖与零网络开销下验证全流程契约；`tests/e2e/test_assistant_evolution_flow_live.py` 连接本地运行的 `http://10.36.6.252:8765` 内核，驱动真实模型多轮会话并断言文件系统变化与工具执行闭环。
 
 **Tech Stack:** Python 3.11+, pytest, pytest-asyncio, LCA Assistant Catalog & Overlay (ADR-0187/ADR-0242), Memory Knowledge Layer & Backfill (ADR-0246/ADR-0247), urllib.request.
 
@@ -38,7 +38,7 @@
 - Create: `tests/e2e/test_assistant_evolution_flow_live.py`
 
 **Step 1: 编写带有 `@pytest.mark.real_llm` 的 5 轮 Live 测试**
-- 接入点与跳过保护：`_has_llm_key()` 和 `_kernel_ready()`（`http://127.0.0.1:8765/health`）；
+- 接入点与跳过保护：`_has_llm_key()` 和 `_kernel_ready()`（`http://10.36.6.252:8765/health`）；
 - Turn 0: `POST /v1/assistants` 创建新助理；
 - Turn 1: 发起 run 询问“请介绍你自己与可用工具/技能”，断言 run 成功且助理准确自我感知；
 - Turn 2: 发起 run 说明“我是系统架构师李超，技术栈 Python/Rust，偏好简洁代码优先”，等待 run 完成后断言磁盘 `{home}/USER.md` 物理出现用户画像；

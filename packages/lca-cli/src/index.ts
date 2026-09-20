@@ -9,7 +9,7 @@ program.name('lca').description('LCA device CLI');
 program
   .command('connect')
   .description('Connect this machine to an LCA gateway')
-  .option('--gateway <url>', 'Gateway HTTP/WS base URL', 'http://127.0.0.1:8765')
+  .option('--gateway <url>', 'Gateway HTTP/WS base URL', 'http://10.36.6.252:8765')
   .option('--token <token>', 'serviceToken / JWT')
   .option('--token-type <type>', 'serviceToken | jwt | apiKey', 'serviceToken')
   .option('--workspace <path>', 'Workspace root', process.env['HOME'] || '/home/sandbox-user')

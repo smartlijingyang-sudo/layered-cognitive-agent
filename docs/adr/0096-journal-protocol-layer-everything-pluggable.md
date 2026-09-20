@@ -35,8 +35,8 @@
 | 流式显示模型回答"你好！我是你的 AI 助手…" | **完全看不到** |
 | 实时显示 reasoning | **完全看不到** |
 | 后端 log 看到 207 个事件流过 | ✅ 看到 |
-| `curl http://127.0.0.1:8765/runs/<id>/live` 看到 207 帧 SSE | ✅ 看到 |
-| `curl http://127.0.0.1:3010/lca-api/runs/<id>/live` 看到 207 帧 SSE | ✅ 看到 |
+| `curl http://10.36.6.252:8765/runs/<id>/live` 看到 207 帧 SSE | ✅ 看到 |
+| `curl http://10.36.6.252:3010/lca-api/runs/<id>/live` 看到 207 帧 SSE | ✅ 看到 |
 | 前端 fetch `/lca-api/runs/<id>/live` 收到 207 帧并渲染 | ❌ **静默渲染为空文本** |
 
 **问题在跨仓协议漂移：journal envelope 已经从 v1（`{event: {typed payload}}`）迁移到 v2（`{data: {typed payload}, descriptor, event_id, scope}`），后端完全切到 v2，前端 `parseSseBlock` 仍假设 v1。**所有 StepTextDelta 帧的 `text_delta` 被解析为 `undefined`，所有 ReasoningDelta 帧的 `text_delta` 同样为 `undefined`。

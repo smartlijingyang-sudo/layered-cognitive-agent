@@ -98,7 +98,7 @@ log "  → run_id=$RUN_ID"
 log "Step 3.5: poll for terminal outcome (max 5 min)"
 for i in $(seq 1 30); do
     sleep 10
-    STATUS=$(curl -s "http://127.0.0.1:8765/runs/${RUN_ID}/doctor" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('status','unknown'))" 2>/dev/null || echo "unknown")
+    STATUS=$(curl -s "http://10.36.6.252:8765/runs/${RUN_ID}/doctor" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('status','unknown'))" 2>/dev/null || echo "unknown")
     if [ "$STATUS" = "completed" ] || [ "$STATUS" = "failed" ] || [ "$STATUS" = "canceled" ]; then
         log "  → run reached terminal: $STATUS (after $((i*10))s)"
         break
@@ -143,7 +143,7 @@ print(f"PG-007 hit: {pg007} (PR-F 闭环目标,本次不强约束)")
 # 6. terminal outcome
 import urllib.request
 doctor = json.loads(urllib.request.urlopen(
-    f"http://127.0.0.1:8765/runs/${RUN_ID}/doctor"
+    f"http://10.36.6.252:8765/runs/${RUN_ID}/doctor"
 ).read())
 print(f"doctor status: {doctor.get('status')}, outcome: {doctor.get('outcome')}")
 

@@ -372,7 +372,7 @@ class TestHttpPathRegression:
                     "--profile",
                     "web-standard",
                     "--base-url",
-                    "http://127.0.0.1:8765",
+                    "http://10.36.6.252:8765",
                 ],
             )
         assert result.exit_code == 0, result.stdout

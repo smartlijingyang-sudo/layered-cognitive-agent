@@ -67,7 +67,7 @@ def test_probe_returns_false_when_lan_unreachable(svc: KernelServeSpawner) -> No
 
 def test_probe_skipped_when_url_parses_to_loopback(svc: KernelServeSpawner) -> None:
     """If LCA_GATEWAY_PUBLIC_URL == loopback health URL, no extra probe needed."""
-    loopback_url = svc.health_url  # http://127.0.0.1:8765/health
+    loopback_url = svc.health_url  # http://10.36.6.252:8765/health
     with (
         patch.dict(os.environ, {"LCA_GATEWAY_PUBLIC_URL": loopback_url}, clear=False),
         patch("lca.infrastructure.cli.services.kernel.spawner._http_get") as mocked,

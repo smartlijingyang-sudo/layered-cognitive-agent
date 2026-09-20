@@ -19,7 +19,7 @@ import pytest
 
 pytestmark = pytest.mark.real_llm
 
-_BASE = os.environ.get("LCA_OPS_BASE_URL", "http://127.0.0.1:8765")
+_BASE = os.environ.get("LCA_OPS_BASE_URL", "http://10.36.6.252:8765")
 _SKILL_URL = os.environ.get(
     "LCA_TEST_SKILL_URL",
     "https://raw.githubusercontent.com/anthropics/skills/main/skills/docx/SKILL.md",

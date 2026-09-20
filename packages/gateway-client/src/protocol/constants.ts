@@ -1,5 +1,5 @@
 /** Default gateway URL for local dev. */
-export const DEFAULT_GATEWAY_URL = 'http://127.0.0.1:8765';
+export const DEFAULT_GATEWAY_URL = 'http://10.36.6.252:8765';
 
 /** Heartbeat interval in ms. */
 export const HEARTBEAT_INTERVAL_MS = 30_000;

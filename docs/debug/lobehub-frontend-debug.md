@@ -10,8 +10,8 @@ LobeHub dev 是**双进程**：Next.js `:3010`（HTML/API 壳）+ Vite SPA `:987
 
 ```bash
 ./scripts/lca-ops status --json | jq '.[] | select(.service=="lobehub")'
-curl -sI http://127.0.0.1:3010/ | head -3
-curl -sI http://127.0.0.1:9876/ | head -3
+curl -sI http://10.36.6.252:3010/ | head -3
+curl -sI http://10.36.6.252:9876/ | head -3
 # 与 VITE_DEV_HOST 对齐（默认 deploy/lobehub/.env.lca 里的 LAN IP）
 curl -sI "http://${VITE_DEV_HOST:-10.36.6.252}:9876/" | head -3
 ls lobehub-ui/src/store/chat/agents/transports/lcaRunCommand.ts \

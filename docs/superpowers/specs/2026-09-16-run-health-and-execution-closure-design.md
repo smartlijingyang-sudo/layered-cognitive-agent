@@ -286,7 +286,7 @@ After all 3 PRs merge and `lca-ops kernel-restart` runs, the system MUST satisfy
 |---|---|---|
 | R-1 | `lca-ops kernel-restart` exit code 0 | `./scripts/lca-ops kernel-restart` |
 | R-2 | Profile resolve returns 15 plans validated (same as pre-change) | post-restart report shows `profile=profiles/web-standard.yaml 15 plans validated` |
-| R-3 | Health probe 200 with `4/4 plugin, fiber_count` non-zero | `curl http://127.0.0.1:8765/health` |
+| R-3 | Health probe 200 with `4/4 plugin, fiber_count` non-zero | `curl http://10.36.6.252:8765/health` |
 | R-4 | No new lint-imports / check_package_contracts / ruff / mypy failures introduced by any PR | compare pre-merge gate output to post-merge gate output; only "introduced by this PR" lines count |
 | R-5 | New `lca.health_derivers` entry-point group is registered before any fold function call | bootstrap-time test: `import lca.plugins.observability.health.fold_provider` and assert `_DERIVERS` length == 7 |
 

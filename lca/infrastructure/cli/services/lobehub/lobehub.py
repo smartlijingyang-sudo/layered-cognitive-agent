@@ -638,9 +638,7 @@ class LobeHubService:
         # at vite DefinePlugin time. Writing to .env is a fallback for manual
         # `bun run dev:*` (where process env may be empty); the primary path
         # is _child_env() which carries the same value into subprocess env.
-        gateway_ws = gateway_base.replace("http://", "ws://", 1).replace(
-            "https://", "wss://", 1
-        )
+        gateway_ws = gateway_base.replace("http://", "ws://", 1).replace("https://", "wss://", 1)
 
         for line in lines:
             if line.startswith("OPENAI_PROXY_URL="):
@@ -693,7 +691,7 @@ class LobeHubService:
                 return f"http://{vite_host}:{self._kernel_serve.port}"
         bind = self._kernel_serve.host
         if bind in {"0.0.0.0", "::"}:  # noqa: S104 — checking bind, not binding
-            return f"http://127.0.0.1:{self._kernel_serve.port}"
+            return f"http://10.36.6.252:{self._kernel_serve.port}"
         return self._kernel_serve.base_url.rstrip("/")
 
     def _ensure_deps(self) -> bool:
@@ -728,7 +726,7 @@ class LobeHubService:
         return False
 
     def _spa_ready(self) -> bool:
-        spa_url = f"http://127.0.0.1:{self._config.spa_port}/"
+        spa_url = f"http://10.36.6.252:{self._config.spa_port}/"
         needed = 2
         consec = 0
         for _ in range(120):
@@ -780,9 +778,7 @@ class LobeHubService:
         # console gate, which must default off in any production-shaped
         # deployment.
         gateway_http = self._client_gateway_base()
-        gateway_ws = gateway_http.replace("http://", "ws://", 1).replace(
-            "https://", "wss://", 1
-        )
+        gateway_ws = gateway_http.replace("http://", "ws://", 1).replace("https://", "wss://", 1)
         return {
             **os.environ,
             "PORT": str(self._config.dev_port),
@@ -792,9 +788,7 @@ class LobeHubService:
             "OPENAI_API_KEY": "lca-local",
             "ENABLED_OPENAI": "1",
             "NEXT_PUBLIC_LCA_GATEWAY_URL": gateway_ws,
-            "NEXT_PUBLIC_LCA_HOST_CONSOLE": os.environ.get(
-                "NEXT_PUBLIC_LCA_HOST_CONSOLE", "0"
-            ),
+            "NEXT_PUBLIC_LCA_HOST_CONSOLE": os.environ.get("NEXT_PUBLIC_LCA_HOST_CONSOLE", "0"),
         }
 
     def _spawn_script(self, script: str, log_name: str) -> int | None:

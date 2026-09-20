@@ -58,7 +58,7 @@ Each live lane runs on its own local worktree at the PR head. Drive through `con
 
 - [ ] `git fetch origin <head-branch> && git checkout <head SHA>`.
 - [ ] Start the backend with `./scripts/lca-ops kernel-restart`. Wait until `./scripts/lca-ops status --json` reports the kernel healthy.
-- [ ] Create a fresh test assistant once per lane VM with `curl -X POST http://127.0.0.1:8765/v1/assistants -H 'Content-Type: application/json' -d '{"name":"验证助理","from_role":"marketing/marketing-kuaishou-strategist"}'` and record the returned `assistant_id`.
+- [ ] Create a fresh test assistant once per lane VM with `curl -X POST http://10.36.6.252:8765/v1/assistants -H 'Content-Type: application/json' -d '{"name":"验证助理","from_role":"marketing/marketing-kuaishou-strategist"}'` and record the returned `assistant_id`.
 - [ ] Deliver input through `./scripts/lca-ops runs create --user-text "<input>" --assistant-id <assistant_id>` (PR-1 and later) or through the LobeHub UI at `http://localhost:3010` for browser lanes. Name the read-only diagnostics. They are `lca-ops journal replay`, `lca-ops debug-run`, `lca-ops timeline`, `cat ~/.lca/assistants/<id>/memory/*.json`, `cat ~/.lca/assistants/<id>/SOUL.md`, `cat ~/.lca/assistants/<id>/USER.md`, `ls ~/.lca/assistants/<id>/skills/`.
 - [ ] Save every screenshot to `/tmp/swarm-<pr-id>/worker-<n>/<slug>.png` with `import -window root` and return the paths with the report.
 

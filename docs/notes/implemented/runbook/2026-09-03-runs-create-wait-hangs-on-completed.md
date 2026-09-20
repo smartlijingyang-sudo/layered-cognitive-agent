@@ -11,7 +11,7 @@ Status: implemented
 证据:
 
 - `traces/runs/run_365ad8d3c2c0/manifest.json`:`status="completed"`、`outcome="completed"`、`closed_at=1788409105.787`(12:18:25 创建后 7 秒关闭)。
-- `curl http://127.0.0.1:8765/runs/run_365ad8d3c2c0/doctor` 返回 `{"status":"unknown","outcome":"completed",...}`。
+- `curl http://10.36.6.252:8765/runs/run_365ad8d3c2c0/doctor` 返回 `{"status":"unknown","outcome":"completed",...}`。
 - `lca/infrastructure/cli/commands/runs.py:152` 把 terminal 集硬编码为 `{"success", "failed", "cancelled", "paused"}`,**不包含 `"completed"` / `"unknown"`**。
 - 同 run 的 `run_<id>.spine.jsonl` 371 行,其中 `transport.route.exit` × 114 是 CLI polling 反复触发的副作用,会污染后续 `journal trace --human` 的可读性。
 

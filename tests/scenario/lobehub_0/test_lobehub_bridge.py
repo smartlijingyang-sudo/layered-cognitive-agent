@@ -232,11 +232,11 @@ class TestLobeHubFileIngest(unittest.IsolatedAsyncioTestCase):
             cache = IngestCache(Path(tmp) / "cache.json", max_entries=10, store=store)
             ref = FileRef(
                 name="data.csv",
-                url="http://127.0.0.1/data.csv",
+                url="http://10.36.6.252/data.csv",
                 mime_type="text/csv",
                 lobehub_id="file-abc",
             )
-            fetcher = _StubFetcher({"http://127.0.0.1/data.csv": (b"1,2", "text/csv")})
+            fetcher = _StubFetcher({"http://10.36.6.252/data.csv": (b"1,2", "text/csv")})
             settings = LobeHubBridgeSettings(ingest_allow_private_ip=True)
             first = await ingest_file_refs(
                 (ref,), store, fetcher=fetcher, cache=cache, settings=settings

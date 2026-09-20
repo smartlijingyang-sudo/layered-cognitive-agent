@@ -29,7 +29,7 @@ Agent 需要执行模型生成的代码（数据分析、图表、文件变换�
 
 | 变量 | 含义 |
 |---|---|
-| `ONLYBOXES_BASE_URL` | console HTTP 根，如 `http://127.0.0.1:8089` |
+| `ONLYBOXES_BASE_URL` | console HTTP 根，如 `http://10.36.6.252:8089` |
 | `ONLYBOXES_ACCESS_TOKEN` | 控制台签发的 access token（`obx_…`） |
 | `LCA_SANDBOX_BACKEND` | 可选；仅 `onlyboxes` 受支持 |
 

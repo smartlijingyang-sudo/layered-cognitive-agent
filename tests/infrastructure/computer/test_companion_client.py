@@ -123,7 +123,7 @@ async def test_companion_auto_pair_with_preauth_code(tmp_path: Path) -> None:
     token_file = tmp_path / "companion_token.json"
     client = CompanionClient(
         CompanionConfig(
-            server_url="http://127.0.0.1:8765",
+            server_url="http://10.36.6.252:8765",
             device_id="dev-auto",
             label="Auto Laptop",
             token_file=token_file,

@@ -19,7 +19,7 @@ def main() -> None:
 
     # Subcommand: pair
     p_pair = subparsers.add_parser("pair", help="Pair this machine with LCA Gateway")
-    p_pair.add_argument("--server", default="http://127.0.0.1:8765", help="Gateway URL")
+    p_pair.add_argument("--server", default="http://10.36.6.252:8765", help="Gateway URL")
     p_pair.add_argument("--device-id", default=None, help="Explicit device ID")
     p_pair.add_argument("--label", default=None, help="Device label")
     p_pair.add_argument("--token-file", default=None, help="Custom token file path")
@@ -28,7 +28,7 @@ def main() -> None:
     # Subcommand: start / run
     for cmd_name in ("start", "run"):
         p_start = subparsers.add_parser(cmd_name, help="Start the companion daemon")
-        p_start.add_argument("--server", default="http://127.0.0.1:8765", help="Gateway URL")
+        p_start.add_argument("--server", default="http://10.36.6.252:8765", help="Gateway URL")
         p_start.add_argument("--token", default=None, help="Machine token override")
         p_start.add_argument("--device-id", default=None, help="Explicit device ID")
         p_start.add_argument("--label", default=None, help="Device label")

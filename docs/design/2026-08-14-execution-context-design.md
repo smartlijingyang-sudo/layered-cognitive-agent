@@ -1465,7 +1465,7 @@ LCA_SSH_ALIAS=smartljy
 LCA_WINDOWS_WORKSPACE=C:\Users\lichao\workspace
 
 # Onlyboxes (保持现有变量名兼容)
-ONLYBOXES_BASE_URL=http://127.0.0.1:8089
+ONLYBOXES_BASE_URL=http://10.36.6.252:8089
 ONLYBOXES_ACCESS_TOKEN=obx_...
 ```
 

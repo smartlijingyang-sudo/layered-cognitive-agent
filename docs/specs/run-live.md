@@ -115,10 +115,10 @@ curl 路径走前端 wire(经 Next rewrite `/lca-api/runs` → gateway `/runs`),
 RUN=$(curl -s -H "Authorization: Bearer ${LCA_TOKEN:-lca-local}" \
   -H "Content-Type: application/json" \
   -d '{"mode":"solo","messages":[{"role":"user","content":"hello"}]}' \
-  "${LCA_FRONTEND_URL:-http://127.0.0.1:3010}/lca-api/runs" | jq -r .run_id)
+  "${LCA_FRONTEND_URL:-http://10.36.6.252:3010}/lca-api/runs" | jq -r .run_id)
 
 curl -N -H "Authorization: Bearer ${LCA_TOKEN:-lca-local}" \
-  "${LCA_FRONTEND_URL:-http://127.0.0.1:3010}/lca-api/runs/$RUN/live"
+  "${LCA_FRONTEND_URL:-http://10.36.6.252:3010}/lca-api/runs/$RUN/live"
 ```
 
 | 现象 | 先查 |

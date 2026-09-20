@@ -82,7 +82,7 @@ class FactoryTests(unittest.TestCase):
             self.assertIsNone(resolve_sandbox())
 
     def test_credentials_return_onlyboxes_adapter(self) -> None:
-        os.environ["ONLYBOXES_BASE_URL"] = "http://127.0.0.1:8089"
+        os.environ["ONLYBOXES_BASE_URL"] = "http://10.36.6.252:8089"
         os.environ["ONLYBOXES_ACCESS_TOKEN"] = "obx_test"  # noqa: S105
         os.environ["LCA_SANDBOX_BACKEND"] = "onlyboxes"
         with patch(

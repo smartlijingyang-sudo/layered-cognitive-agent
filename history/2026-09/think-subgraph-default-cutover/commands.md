@@ -150,7 +150,7 @@ think.main -> phase.think.subgraph_host
 **期望输出(健康)**:
 
 ```text
-● kernel_serve — running, healthy at http://127.0.0.1:8765/health
+● kernel_serve — running, healthy at http://10.36.6.252:8765/health
 ● infra — all services reachable
 ● lobehub — pid <pid>, :3010, healthy
 ● daemon — pid <pid>, connected
@@ -169,8 +169,8 @@ think.main -> phase.think.subgraph_host
 [{"level":"info","message":"Pipeline: status"},
  {"step":"stack.status"},
  {"service":"kernel_serve","status":"running","pid":..., "port":8765,
-  "detail":"healthy at http://127.0.0.1:8765/health",
-  "checks":[{"name":"health","ok":true,"detail":"http://127.0.0.1:8765/health"}]}]
+  "detail":"healthy at http://10.36.6.252:8765/health",
+  "checks":[{"name":"health","ok":true,"detail":"http://10.36.6.252:8765/health"}]}]
 ```
 
 `status` **不直接报告 profile 路径**(避免 health 端点泄漏 boot 信息);profile 由
@@ -201,7 +201,7 @@ phase 在跑(实际上 subgraph host 是 5 个 step,顶层 trace 看到的仍是
 ### 5.2 `/health` endpoint
 
 ```bash
-curl -sS http://127.0.0.1:8765/health
+curl -sS http://10.36.6.252:8765/health
 ```
 
 **期望**:

@@ -14,7 +14,7 @@ import urllib.request
 
 import typer
 
-_BASE_URL_DEFAULT = "http://127.0.0.1:8765"
+_BASE_URL_DEFAULT = "http://10.36.6.252:8765"
 
 
 def register(app: typer.Typer) -> None:

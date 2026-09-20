@@ -46,7 +46,7 @@ class _FakeResponse:
 
 @pytest.fixture
 def bridge() -> AssistantFrontendBridge:
-    return AssistantFrontendBridge(lobehub_url="http://127.0.0.1:3010")
+    return AssistantFrontendBridge(lobehub_url="http://10.36.6.252:3010")
 
 
 class TestRegister:

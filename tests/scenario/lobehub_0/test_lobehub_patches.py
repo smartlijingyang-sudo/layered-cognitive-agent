@@ -317,15 +317,11 @@ def _seed_ui(tmp_path: Path) -> Path:
     tool_surfaces.parent.mkdir(parents=True, exist_ok=True)
     tool_surfaces.write_text(_STUB_TOOL_SURFACES, encoding="utf-8")
 
-    dispatcher = (
-        tmp_path / "src/store/chat/slices/agentRun/actions/dispatch/agentDispatcher.ts"
-    )
+    dispatcher = tmp_path / "src/store/chat/slices/agentRun/actions/dispatch/agentDispatcher.ts"
     dispatcher.parent.mkdir(parents=True, exist_ok=True)
     dispatcher.write_text("export const dispatchAgent = () => {};\n", encoding="utf-8")
 
-    gateway = (
-        tmp_path / "src/store/chat/slices/agentRun/actions/transports/gateway/gateway.ts"
-    )
+    gateway = tmp_path / "src/store/chat/slices/agentRun/actions/transports/gateway/gateway.ts"
     gateway.parent.mkdir(parents=True, exist_ok=True)
     gateway.write_text(_STUB_GATEWAY, encoding="utf-8")
 
@@ -341,7 +337,7 @@ def _seed_ui(tmp_path: Path) -> Path:
     # patch engine. Tests exercising the "no URL" path overwrite or
     # delete this file explicitly.
     (tmp_path / ".env").write_text(
-        "LCA_GATEWAY_PUBLIC_URL=http://127.0.0.1:8765\n",
+        "LCA_GATEWAY_PUBLIC_URL=http://10.36.6.252:8765\n",
         encoding="utf-8",
     )
 
@@ -444,9 +440,7 @@ def test_resolve_gateway_http_ignores_os_environ_only(tmp_path: Path, monkeypatc
     assert _resolve_gateway_http(ctx) == ""
 
 
-def test_resolve_gateway_http_returns_empty_when_key_missing(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_resolve_gateway_http_returns_empty_when_key_missing(tmp_path: Path, monkeypatch) -> None:
     # ``.env`` exists but lacks the key → ``""``.
     from deploy.lobehub.patches.runtime.lca_runtime_agent_gateway import (
         _resolve_gateway_http,
@@ -464,9 +458,7 @@ def test_resolve_gateway_http_returns_empty_when_key_missing(
 
 
 _EXECUTE_PATCH_PATH = Path("deploy/lobehub/patches/runtime/lcaGateway/execute.ts")
-_DRIVER_PATCH_PATH = Path(
-    "deploy/lobehub/patches/runtime/lcaGateway/executeGatewayRun.ts"
-)
+_DRIVER_PATCH_PATH = Path("deploy/lobehub/patches/runtime/lcaGateway/executeGatewayRun.ts")
 
 
 def test_patch_source_declares_attachment_extras_in_execute_ts() -> None:

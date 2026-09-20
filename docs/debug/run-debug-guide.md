@@ -138,7 +138,7 @@ Each step has five labels you should expect to find in your own output:
 # 1. Sanity: where is the error?
 curl -sS -i -X POST -H 'Content-Type: application/json' \
      -d '{"messages":[{"role":"user","content":"hello"}]}' \
-     http://127.0.0.1:8765/runs | head -20
+     http://10.36.6.252:8765/runs | head -20
 
 # 2. Read the kernel process log (NOT traces/runs/<id>/kernel.log — that one
 #    is only for the post-run tail). The actual kernel stdout/stderr is at
@@ -228,13 +228,13 @@ the fix is in, jump to Step 7 (verify on the live system).
 
 ```sh
 # 1. Confirm the LCA gateway URL is baked into the SPA bundle (Vite serves it on the fly):
-curl -sS "http://127.0.0.1:9876/src/store/chat/agents/transports/lcaGateway/client.ts" \
+curl -sS "http://10.36.6.252:9876/src/store/chat/agents/transports/lcaGateway/client.ts" \
     | grep -E 'LCA_GATEWAY_WS_URL\s*='
 # Expect: const LCA_GATEWAY_WS_URL = "ws://<host>:<port>";
 # If you see "ws://lca-gateway-unset:0000", the patch apply did not inject the URL.
 
 # 2. Confirm isLcaGatewayMode() in agentDispatcher has the same URL:
-curl -sS "http://127.0.0.1:9876/src/store/chat/slices/agentRun/actions/dispatch/agentDispatcher.ts" \
+curl -sS "http://10.36.6.252:9876/src/store/chat/slices/agentRun/actions/dispatch/agentDispatcher.ts" \
     | grep -A2 isLcaGatewayMode
 
 # 3. Re-run the patch engine with the env, then restart lobehub:
@@ -248,7 +248,7 @@ LCA_GATEWAY_PUBLIC_URL=http://<host>:<port> python3 deploy/lobehub/patch_lobehub
 
 **NEXT.** If the bundle is correct but the chat still goes to `/webapi/chat/openai`, the agent configuration on the lobehub side is overriding the gateway dispatch — check `lobehub-ui/.env` for `OPENAI_PROXY_URL` and `NEXT_PUBLIC_LCA_GATEWAY_URL`, and confirm the active agent config (`.lca-ops/runtime/state.db`) sets the agent to `solo`/`team`/`auto`, not `general`. Otherwise this is the JWT-key bug above; jump to Step 0b.
 
-**FAIL.** `curl http://127.0.0.1:9876/` returns connection refused → the Vite dev server is not running. `ss -ltn | grep 9876` confirms. `./scripts/lca-ops lobehub restart` brings it back. **Do not** `pkill -f vite` from inside an interactive bash that has `vite` in its argv; that self-kills the shell before it reaches the inner command. Use `kill $(ss -ltnp | grep 9876 | grep -oP 'pid=\\K[0-9]+')` or open a fresh shell.
+**FAIL.** `curl http://10.36.6.252:9876/` returns connection refused → the Vite dev server is not running. `ss -ltn | grep 9876` confirms. `./scripts/lca-ops lobehub restart` brings it back. **Do not** `pkill -f vite` from inside an interactive bash that has `vite` in its argv; that self-kills the shell before it reaches the inner command. Use `kill $(ss -ltnp | grep 9876 | grep -oP 'pid=\\K[0-9]+')` or open a fresh shell.
 
 ---
 
@@ -275,7 +275,7 @@ rm -rf lobehub-ui/node_modules/.vite lobehub-ui/.next && \
 # (DevTools → Network → Disable cache 是同等手段)
 
 # 确认 vite serve 的 bundle 已经是新版本(不是缓存里的旧 module)
-curl -sS http://127.0.0.1:9876/src/path/to/just/changed.ts | grep "你刚加的字符串"
+curl -sS http://10.36.6.252:9876/src/path/to/just/changed.ts | grep "你刚加的字符串"
 ```
 
 **OUTPUT.** 如果 curl 看到新字符串但浏览器还显示旧行为,问题在浏览器;否则清缓存 + 重启。
@@ -685,7 +685,7 @@ lca-ops runs create --user-text "请把昨日的 csv 按 region 汇总"
 
 # HTTP (for shell scripts / external integrations):
 # 等价于浏览器 LobeHub 会发的请求 —— 走 Next rewrite `/lca-api/runs` → gateway `/runs`。
-curl -X POST "${LCA_FRONTEND_URL:-http://127.0.0.1:3010}/lca-api/runs" \
+curl -X POST "${LCA_FRONTEND_URL:-http://10.36.6.252:3010}/lca-api/runs" \
   -H "Authorization: Bearer ${LCA_TOKEN:-lca-local}" \
   -H 'Content-Type: application/json' \
   -d '{

@@ -43,7 +43,7 @@ def _patch_next(ctx: PatchContext) -> bool:
 const nextConfig = {
   ..._baseConfig,
   async rewrites() {
-    const base = process.env.LCA_GATEWAY_PUBLIC_URL || 'http://127.0.0.1:8765';
+    const base = process.env.LCA_GATEWAY_PUBLIC_URL || 'http://10.36.6.252:8765';
     const baseRewrites = typeof _baseConfig.rewrites === 'function'
       ? await _baseConfig.rewrites()
       : [];
@@ -89,11 +89,11 @@ def _patch_vite(ctx: PatchContext) -> bool:
     needle = "      '/webapi': `http://localhost:${process.env.PORT || 3010}`,\n    },"
     insert = """      '/webapi': `http://localhost:${process.env.PORT || 3010}`,
       // LCA: file proxy
-      '/files': process.env.LCA_GATEWAY_PUBLIC_URL || 'http://127.0.0.1:8765',
+      '/files': process.env.LCA_GATEWAY_PUBLIC_URL || 'http://10.36.6.252:8765',
       '/lca-api': {
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\\/lca-api/, ''),
-        target: process.env.LCA_GATEWAY_PUBLIC_URL || 'http://127.0.0.1:8765',
+        target: process.env.LCA_GATEWAY_PUBLIC_URL || 'http://10.36.6.252:8765',
         ws: true,
       },
     },"""
@@ -111,12 +111,12 @@ def _ensure_vite_ws(ctx: PatchContext) -> bool:
     applied = """      '/lca-api': {
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\\/lca-api/, ''),
-        target: process.env.LCA_GATEWAY_PUBLIC_URL || 'http://127.0.0.1:8765',
+        target: process.env.LCA_GATEWAY_PUBLIC_URL || 'http://10.36.6.252:8765',
       },"""
     new = """      '/lca-api': {
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\\/lca-api/, ''),
-        target: process.env.LCA_GATEWAY_PUBLIC_URL || 'http://127.0.0.1:8765',
+        target: process.env.LCA_GATEWAY_PUBLIC_URL || 'http://10.36.6.252:8765',
         ws: true,
       },"""
     if applied not in text:

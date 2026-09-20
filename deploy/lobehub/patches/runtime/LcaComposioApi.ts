@@ -64,7 +64,7 @@ const gatewayBase = (): string => {
   }
   const proxy = process.env.NEXT_PUBLIC_OPENAI_PROXY_URL || process.env.OPENAI_PROXY_URL || '';
   if (proxy) return proxy.replace(/\/v1\/?$/, '').replace(/\/$/, '');
-  return 'http://127.0.0.1:8765';
+  return 'http://10.36.6.252:8765';
 };
 
 async function lcaComposioFetch<T>(path: string, init?: RequestInit): Promise<T> {

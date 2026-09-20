@@ -4997,11 +4997,11 @@ def kernel_process():
         stderr=subprocess.DEVNULL,
     )
     try:
-        _wait_for_health(f"http://127.0.0.1:{port}/health", timeout=30.0)
+        _wait_for_health(f"http://10.36.6.252:{port}/health", timeout=30.0)
     except Exception:
         proc.terminate()
         raise
-    yield {"base_url": f"http://127.0.0.1:{port}", "port": port}
+    yield {"base_url": f"http://10.36.6.252:{port}", "port": port}
     proc.terminate()
     try:
         proc.wait(timeout=5)

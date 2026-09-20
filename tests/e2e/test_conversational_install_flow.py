@@ -96,7 +96,7 @@ def test_conversational_auto_install_and_pairing_flow(tmp_path: Path) -> None:
     time.sleep(0.5)
 
     try:
-        base_url = f"http://127.0.0.1:{port}"
+        base_url = f"http://10.36.6.252:{port}"
 
         # 1. Frontend requests preauth pairing code
         preauth_resp = httpx.post(

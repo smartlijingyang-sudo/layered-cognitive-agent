@@ -85,7 +85,7 @@ def test_user_machine_full_pairing_and_execution_flow(tmp_path: Path) -> None:
     while not getattr(server, "started", False):
         time.sleep(0.01)
 
-    base_url = f"http://127.0.0.1:{port}"
+    base_url = f"http://10.36.6.252:{port}"
     device_id = "m-alice-mbp"
     label = "Alice MacBook Pro"
 

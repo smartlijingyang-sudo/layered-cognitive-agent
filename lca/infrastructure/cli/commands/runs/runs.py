@@ -140,7 +140,7 @@ def _create(
         help="Profile name passed to ``POST /runs`` (default: web-standard).",
     ),
     base_url: str = typer.Option(
-        "http://127.0.0.1:8765",
+        "http://10.36.6.252:8765",
         "--base-url",
         envvar="LCA_OPS_BASE_URL",
         help="Kernel base URL (override via env LCA_OPS_BASE_URL when shelling out from another host).",

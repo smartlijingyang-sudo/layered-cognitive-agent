@@ -29,9 +29,18 @@ def test_solo_run_does_not_fail_with_no_filestore_in_ambient_scope(
     log_fh = log_path.open("w")
     proc = subprocess.Popen(
         [  # noqa: S607 — controlled dev-only invocation
-            "uv", "run", "python", "-m", "lca_kernel", "serve",
-            "--profile", "profiles/web-standard.yaml",
-            "--host", "127.0.0.1", "--port", "18766",
+            "uv",
+            "run",
+            "python",
+            "-m",
+            "lca_kernel",
+            "serve",
+            "--profile",
+            "profiles/web-standard.yaml",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "18766",
             "--allow-unknown-env",
         ],
         cwd="/home/lichao/layered-cognitive-agent",
@@ -45,7 +54,7 @@ def test_solo_run_does_not_fail_with_no_filestore_in_ambient_scope(
         for _ in range(90):
             time.sleep(1)
             with contextlib.suppress(Exception):
-                r = httpx.get("http://127.0.0.1:18766/health", timeout=2.0)
+                r = httpx.get("http://10.36.6.252:18766/health", timeout=2.0)
                 if r.status_code == 200:
                     ready = True
                     break
@@ -53,7 +62,7 @@ def test_solo_run_does_not_fail_with_no_filestore_in_ambient_scope(
 
         # Dispatch a solo run.
         resp = httpx.post(
-            "http://127.0.0.1:18766/runs",
+            "http://10.36.6.252:18766/runs",
             json={
                 "messages": [{"role": "user", "content": "ping"}],
                 "model": "solo",
@@ -68,7 +77,7 @@ def test_solo_run_does_not_fail_with_no_filestore_in_ambient_scope(
         status = "working"
         for _ in range(120):
             time.sleep(1)
-            g = httpx.get(f"http://127.0.0.1:18766/runs/{run_id}", timeout=2.0)
+            g = httpx.get(f"http://10.36.6.252:18766/runs/{run_id}", timeout=2.0)
             d = g.json()
             status = d.get("status")
             if status != "working":

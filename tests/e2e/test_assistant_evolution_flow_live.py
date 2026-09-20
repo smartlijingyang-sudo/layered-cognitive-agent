@@ -25,7 +25,7 @@ import pytest
 
 pytestmark = pytest.mark.real_llm
 
-_BASE = os.environ.get("LCA_OPS_BASE_URL", "http://127.0.0.1:8765")
+_BASE = os.environ.get("LCA_OPS_BASE_URL", "http://10.36.6.252:8765")
 
 
 def _kernel_ready() -> bool:

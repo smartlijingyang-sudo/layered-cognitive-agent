@@ -9,7 +9,7 @@ from pathlib import Path
 from lca.infrastructure.path import expand_user_path, get_lca_home
 
 _DEFAULT_BASE_URL = "https://backend.composio.dev/api/v3"
-_DEFAULT_CALLBACK_URL = "http://127.0.0.1:8765/composio/oauth/callback"
+_DEFAULT_CALLBACK_URL = "http://10.36.6.252:8765/composio/oauth/callback"
 _DEFAULT_USER_ID = "lca-local-user"
 
 
@@ -43,7 +43,9 @@ class ComposioSettings:
         elif isinstance(auth_config_ids, str) and auth_config_ids.strip():
             parsed_auth = _parse_auth_config_ids(auth_config_ids)
 
-        path = expand_user_path(connections_path) if connections_path else _default_connections_path()
+        path = (
+            expand_user_path(connections_path) if connections_path else _default_connections_path()
+        )
         return cls(
             api_key=api_key.strip(),
             base_url=(base_url or _DEFAULT_BASE_URL).rstrip("/"),

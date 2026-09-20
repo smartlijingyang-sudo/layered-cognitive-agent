@@ -43,7 +43,7 @@ class KernelServeConfig(BaseModel):
     """
 
     url: str = "ws://127.0.0.1:8765"
-    health_url: str = "http://127.0.0.1:8765/health"
+    health_url: str = "http://10.36.6.252:8765/health"
     token: str = Field(default="lca-local-host")
 
 

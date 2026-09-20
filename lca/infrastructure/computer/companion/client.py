@@ -26,7 +26,7 @@ _log = structlog.get_logger(__name__)
 
 @dataclass
 class CompanionConfig:
-    server_url: str = "http://127.0.0.1:8765"
+    server_url: str = "http://10.36.6.252:8765"
     device_id: str = field(default_factory=lambda: f"m-{socket.gethostname().lower()}")
     label: str = field(default_factory=socket.gethostname)
     platform: str = field(default_factory=sys_platform.system)

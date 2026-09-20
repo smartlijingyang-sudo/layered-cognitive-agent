@@ -4,7 +4,7 @@ Host sidecar is a machine transport, not a Sandbox. Tests may still inject a
 real Sandbox via ``set_sandbox_resolver``. Gateway must not inject Host here.
 
 Required env for Onlyboxes (after ``load_dotenv_if_present``):
-- ``ONLYBOXES_BASE_URL`` — console HTTP base, e.g. ``http://127.0.0.1:8089``
+- ``ONLYBOXES_BASE_URL`` — console HTTP base, e.g. ``http://10.36.6.252:8089``
 - ``ONLYBOXES_ACCESS_TOKEN`` — dashboard access token (``obx_...``)
 
 Optional:
