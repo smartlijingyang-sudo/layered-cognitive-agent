@@ -1,0 +1,117 @@
+"""MachineLocalExecAdapter — 将 MachineComputer 适配为 LocalExecPort (ADR-0246 M1)。
+
+职责：Grant 校验（过期、路径越界）→ 调用 MachineComputer → 包装为 EffectReceipt。
+"""
+
+from __future__ import annotations
+
+import hashlib
+import os
+import time
+from typing import Any
+
+from lca.contracts.models.core.execution.local_exec import (
+    CapabilityGrant,
+    EffectReceipt,
+    LocalExecTarget,
+    TargetKind,
+)
+from lca.infrastructure.computer.machine.machine import MachineComputer
+
+
+class MachineLocalExecAdapter:
+    def __init__(
+        self, computer: MachineComputer, *, machine_id: str, label: str
+    ) -> None:
+        self._computer = computer
+        self._machine_id = machine_id
+        self._label = label
+
+    @property
+    def target(self) -> LocalExecTarget:
+        return LocalExecTarget(
+            kind=TargetKind.USER_MACHINE,
+            id=self._machine_id,
+            label=self._label,
+            capability_summary=["read_file", "write_file", "run_command", "git"],
+        )
+
+    async def execute(
+        self, operation: str, args: dict[str, Any], grant: CapabilityGrant
+    ) -> EffectReceipt:
+        base = dict(
+            job_id=grant.job_id,
+            idempotency_key=grant.idempotency_key,
+            stderr_digest=None,
+        )
+        if grant.expires_at < int(time.time()):
+            return EffectReceipt(
+                **base,
+                success=False,
+                exit_code=None,
+                error_kind="grant_expired",
+                stdout_digest=None,
+            )
+        path = str(args.get("path", args.get("directory", "")))
+        if path and grant.path_prefixes:
+            norm = os.path.normpath(path)
+            if not any(
+                norm.startswith(os.path.normpath(p)) for p in grant.path_prefixes
+            ):
+                return EffectReceipt(
+                    **base,
+                    success=False,
+                    exit_code=None,
+                    error_kind="scope_violation",
+                    stdout_digest=None,
+                )
+        try:
+            result = await self._dispatch(operation, args)
+        except ConnectionError:
+            return EffectReceipt(
+                **base,
+                success=False,
+                exit_code=None,
+                error_kind="device_offline",
+                stdout_digest=None,
+            )
+        digest = (
+            "sha256-" + hashlib.sha256(result.content.encode()).hexdigest()[:16]
+            if result.content
+            else None
+        )
+        return EffectReceipt(
+            **base,
+            success=result.success,
+            exit_code=0 if result.success else 1,
+            error_kind=None if result.success else "execution_error",
+            stdout_digest=digest,
+        )
+
+    async def _dispatch(self, operation: str, args: dict[str, Any]):
+        _map = {
+            "read_file": lambda: self._computer.read_file(path=args.get("path", "")),
+            "write_file": lambda: self._computer.write_file(
+                path=args.get("path", ""), content=args.get("content", "")
+            ),
+            "run_command": lambda: self._computer.run_command(
+                command=args.get("command", ""), timeout_s=args.get("timeout_s", 60)
+            ),
+            "list_files": lambda: self._computer.list_files(
+                directory_path=args.get("directory", "")
+            ),
+        }
+        fn = _map.get(operation)
+        if fn is None:
+            from lca.infrastructure.computer.op.result import ComputerOpResult
+
+            return ComputerOpResult(
+                success=False,
+                content=f"unknown: {operation}",
+                state={},
+                error="unknown",
+            )
+        return await fn()
+
+
+__all__ = ["MachineLocalExecAdapter"]
