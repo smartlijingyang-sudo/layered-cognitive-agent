@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from lca.contracts.atoms.enums.enums import MemoryLayer, MemoryRecordKind
+from lca.contracts.atoms.enums.enums import MemoryCategory, MemoryLayer, MemoryRecordKind
 
 
 class MemoryTrust(str, Enum):
@@ -37,6 +37,8 @@ class MemoryRecord:
     content: str
     memory_type: MemoryLayer
     importance: float
+    category: MemoryCategory = MemoryCategory.FACT
+    dedupe_key: str | None = None
     recency_score: float | None = None
     embedding: list[float] | None = None
     source_trace_id: str | None = None
@@ -56,6 +58,10 @@ class MemoryRecord:
     trust: MemoryTrust = MemoryTrust.TRUSTED
 
     def __post_init__(self) -> None:
+        if not isinstance(self.category, MemoryCategory):
+            raise ValueError(f"memory category must be a MemoryCategory, got {self.category!r}")
+        if self.dedupe_key is not None and not isinstance(self.dedupe_key, str):
+            raise ValueError("memory dedupe_key must be a string or None")
         if not 0.0 <= self.importance <= 1.0:
             raise ValueError("memory importance must be between 0 and 1")
         if self.confidence is not None and not 0.0 <= self.confidence <= 1.0:
@@ -78,4 +84,4 @@ class MemoryRecord:
             raise ValueError("valid_until_ms must not precede valid_from_ms")
 
 
-__all__ = ["MemoryRecord", "MemoryRelationKind", "MemoryTrust"]
+__all__ = ["MemoryCategory", "MemoryRecord", "MemoryRelationKind", "MemoryTrust"]

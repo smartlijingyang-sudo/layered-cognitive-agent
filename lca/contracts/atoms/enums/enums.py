@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import Enum, StrEnum
 
 
 class ActionType(str, Enum):
@@ -160,6 +160,25 @@ class MemoryRecordKind(str, Enum):
     TOOL_RESULT = "tool_result"
     DELEGATION_RESULT = "delegation_result"
     RESPONSE = "response"
+
+
+class MemoryCategory(StrEnum):
+    """结构化记忆类别（ADR-0246）——在 ``MemoryLayer`` 之上细化记忆语义。
+
+    - ``IDENTITY``:用户身份/角色陈述（如「我是架构师」）
+    - ``PREFERENCE``:用户偏好/语气指令（如「我不喜欢啰嗦」）
+    - ``FACT``:一般事实（工具观察、模型推断的确定性事实）
+    - ``EPISODIC``:情景记录（与 ``MemoryLayer.EPISODIC`` 对应）
+    - ``PROCEDURAL``:程序性知识（与 ``MemoryLayer.PROCEDURAL`` 对应）
+
+    该枚举是记忆知识层的闭集分类；新增类别必须同步 whitelist/文档。
+    """
+
+    IDENTITY = "identity"
+    PREFERENCE = "preference"
+    FACT = "fact"
+    EPISODIC = "episodic"
+    PROCEDURAL = "procedural"
 
 
 class LLMStreamEventType(str, Enum):
