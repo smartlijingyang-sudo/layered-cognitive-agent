@@ -134,6 +134,19 @@ class Agent(AgentUnit):
                     allowed_tools=[t.name for t in tools]
                 ),
             )
+        else:
+            # The Home role_profile carries identity extras (assistant_id,
+            # home path) but its manifest is empty because persona resolution
+            # happens before tool filtering. Authorize the actual materialized
+            # tools so the SafeExecutor permission gate allows them (C5).
+            from dataclasses import replace
+
+            role_profile = replace(
+                role_profile,
+                tool_permission_manifest=ToolPermissionManifest(
+                    allowed_tools=[t.name for t in tools]
+                ),
+            )
         self._spec = AgentSpec(
             profile=role_profile,
             llm=llm,
