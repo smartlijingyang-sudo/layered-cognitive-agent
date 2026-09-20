@@ -184,7 +184,7 @@
 | [0243](0243-assistant-skill-tool-isolation-config.md) | 助理技能/工具隔离与可配置化 — 技能硬链接 + 写时复制物化到 Home、`{home}/tools/` 自定义工具目录、运行时只从 Home 加载、自我管理工具族扩展（edit skill / create|update|delete tool） | Proposed |
 | [0244](0244-cognitive-memory-closed-loop-and-sandbox-convergence.md) | 认知记忆闭环、上下文会话流与执行沙箱根治 — Token 预算感知会话切片 + Session 单轨注入、主外层图打通 reflect/remember 及零成本准入门禁、通用技能自描述与程序性记忆自适应沉淀、沙箱系统级 CJK 字体基线与工作空间分层、JournalStep 复数化与精准集合对账 | Accepted |
 | [0245](0245-hermes-self-evolution-and-skill-auto-generation.md) | Hermes 自我进化机制与 Skill 自动生成调研 — `memory` + `skill_manage` 工具协议、self_evolution 实验模块、基因匹配进化引擎，为程序性记忆沉淀提供参考实现蓝图 | Research |
-| [0246](0246-agent-memory-knowledge-layer.md) | Agent 记忆知识层 — 从关键词原文存档升级为结构化知识：LLM 蒸馏提取、typed MemoryRecord、受治理记忆工具、用户画像回填、预算内相关性检索、supersede/遗忘生命周期，修通 assistant.bootstrap 死代码并清理 workspace_instructions 污染与硬编码关键词机制 | Accepted |
+| [0247](0247-agent-memory-knowledge-layer.md) | Agent 记忆知识层 — 从关键词原文存档升级为结构化知识：LLM 蒸馏提取、typed MemoryRecord、受治理记忆工具、用户画像回填、预算内相关性检索、supersede/遗忘生命周期，修通 assistant.bootstrap 死代码并清理 workspace_instructions 污染与硬编码关键词机制 | Accepted |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
 

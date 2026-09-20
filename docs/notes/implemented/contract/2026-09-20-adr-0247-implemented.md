@@ -1,4 +1,4 @@
-# Agent Note: ADR-0246 Agent 记忆知识层落地
+# Agent Note: ADR-0247 Agent 记忆知识层落地
 
 Status: implemented
 
@@ -8,7 +8,7 @@ Status: implemented
 
 ## Decision
 
-按 ADR-0246 十个 PR 落地：
+按 ADR-0247 十个 PR 落地：
 
 1. **契约升级**：新增 `MemoryCategory` 闭集（identity/preference/fact/episodic/procedural）；`MemoryRecord` 增加 `category` / `dedupe_key`，supersede/过期复用既有 `revision_of` / `valid_until_ms` / `retired_at_ms`；新增 `MemoryStore`（upsert/supersede/query）与 `MemoryTool` 协议。
 2. **测试基建**：`tests/support/memory_harness.py` 提供内存 store、固定检索策略、fake extractor 与 4 轮对话夹具。

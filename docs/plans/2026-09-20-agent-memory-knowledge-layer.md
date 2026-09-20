@@ -1,6 +1,6 @@
 # Agent 记忆知识层实施计划
 
-把 LCA 的 agent 记忆从"关键词触发的原文存档"升级为结构化知识层：LLM 蒸馏提取、typed `MemoryRecord`、受治理记忆工具、用户画像回填、预算内相关性检索、supersede/遗忘生命周期；修通 `assistant.bootstrap` 死代码，清理 `workspace_instructions` 污染与硬编码关键词机制。决策依据见 [ADR-0246](../adr/0246-agent-memory-knowledge-layer.md)。
+把 LCA 的 agent 记忆从"关键词触发的原文存档"升级为结构化知识层：LLM 蒸馏提取、typed `MemoryRecord`、受治理记忆工具、用户画像回填、预算内相关性检索、supersede/遗忘生命周期；修通 `assistant.bootstrap` 死代码，清理 `workspace_instructions` 污染与硬编码关键词机制。决策依据见 [ADR-0247](../adr/0247-agent-memory-knowledge-layer.md)。
 
 PR 顺序：PR-1 → PR-2 → PR-3 → PR-4 → PR-5 → PR-6 → PR-7 → PR-8 → PR-9 → PR-10。PR-1/PR-2 是契约与测试基建，PR-3~PR-8 是图节点与工具接入，PR-9 清理垃圾逻辑，PR-10 端到端回归。
 
@@ -139,7 +139,7 @@ PR 顺序：PR-1 → PR-2 → PR-3 → PR-4 → PR-5 → PR-6 → PR-7 → PR-8 
 
 **Review gate.** None。行为变化由集成测试覆盖。
 
-**Merge.** 单 PR squash merge。删除关键词表必须在本 PR 内完成（ADR-0246 §7 迁移语义）。
+**Merge.** 单 PR squash merge。删除关键词表必须在本 PR 内完成（ADR-0247 §7 迁移语义）。
 
 ---
 
@@ -387,7 +387,7 @@ PR 顺序：PR-1 → PR-2 → PR-3 → PR-4 → PR-5 → PR-6 → PR-7 → PR-8 
 
 **Build.**
 
-- 一个变更：把 ADR-0246 的验收谓词固化为可重复的端到端测试。
+- 一个变更：把 ADR-0247 的验收谓词固化为可重复的端到端测试。
 
 **You see.**
 
@@ -417,7 +417,7 @@ PR 顺序：PR-1 → PR-2 → PR-3 → PR-4 → PR-5 → PR-6 → PR-7 → PR-8 
 
 ## 收尾
 
-- [ ] 全部 PR 合并后，更新 ADR-0246 状态为 Accepted，并按 implemented 惯例补 Agent Note（`docs/notes/implemented/contract/2026-09-20-adr-0246-implemented.md`）。
+- [ ] 全部 PR 合并后，更新 ADR-0247 状态为 Accepted，并按 implemented 惯例补 Agent Note（`docs/notes/implemented/contract/2026-09-20-adr-0247-implemented.md`）。
 - [ ] 跑 `uv run python scripts/verify_md_links.py` + `uv run python scripts/verify_doc_budgets.py` + `uv run python scripts/check_doc_layering.py --strict`。
 - [ ] 把本次调研证据（run 时间线、现象、业界对照）归档到 `history/2026-09/memory-knowledge-layer/`。
 
@@ -430,7 +430,7 @@ PR 顺序：PR-1 → PR-2 → PR-3 → PR-4 → PR-5 → PR-6 → PR-7 → PR-8 
 
 ## 附录 B 备选方案
 
-见 ADR-0246 §6。
+见 ADR-0247 §6。
 
 ## 附录 C 风险
 
