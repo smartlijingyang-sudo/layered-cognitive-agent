@@ -105,3 +105,40 @@ async def test_preference_phrasing_variants_converge(tmp_path) -> None:
     active = memory.query(MemoryLayer.SEMANTIC)
     assert len(active) == 1
     assert active[0].category is MemoryCategory.PREFERENCE
+
+
+@pytest.mark.asyncio
+async def test_address_preference_variants_converge(tmp_path) -> None:
+    """「叫他X」与「希望被称呼为X」是同一偏好，应跨写入路径收敛。"""
+    memory = AssistantMemory(tmp_path / "asst")
+
+    memory.upsert(
+        MemoryRecord(
+            record_id="mem_add_3",
+            content="用户称呼偏好：叫他「老板」",
+            memory_type=MemoryLayer.SEMANTIC,
+            importance=0.9,
+            category=MemoryCategory.PREFERENCE,
+            dedupe_key="user_address_preference",
+            confidence=1.0,
+            metadata={"source": "user"},
+        )
+    )
+    await memory.update(
+        _state(),
+        Observation(observation_id="obs_1", success=True, payload=None),
+        _reflection(
+            [
+                {
+                    "category": MemoryCategory.PREFERENCE.value,
+                    "content": "用户偏好：希望被称呼为老板",
+                    "confidence": 1.0,
+                    "source": "model",
+                    "dedupe_key": "preference:call_boss",
+                }
+            ]
+        ),
+    )
+
+    active = memory.query(MemoryLayer.SEMANTIC)
+    assert len(active) == 1
