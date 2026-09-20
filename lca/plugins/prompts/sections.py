@@ -389,7 +389,8 @@ class HomeSection:
             lines.append(f"workspace_dir: {home}/workspace/  (沙箱 /mnt/data 映射到此)")
             lines.append(
                 "记忆说明: 用户让你记住的偏好/事实由系统自动写入 memory_dir，"
-                "你无需手动创建文件；下次会话会自动带到你的上下文。"
+                "也可用 memory_search / memory_add / memory_update / memory_remove 读写；"
+                "下次会话会自动带到你的上下文。"
             )
         return SectionOutput(text=block("HOME", "\n".join(lines)))
 

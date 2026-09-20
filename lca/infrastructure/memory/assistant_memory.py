@@ -134,9 +134,7 @@ class AssistantMemory(MemorySystem):
                         confidence=cand.get("confidence"),
                         source=str(cand.get("source") or "user"),
                         dedupe_key=cand.get("dedupe_key"),
-                        state=state,
-                        observation=observation,
-                        reflection=reflection,
+                        source_trace_id=str(getattr(state, "trace_id", "") or ""),
                     )
             if self._profile_backfill is not None:
                 # ADR-0246 PR-5：身份/偏好事实落盘后触发 USER.md 系统回填。
@@ -191,9 +189,8 @@ class AssistantMemory(MemorySystem):
         confidence: object,
         source: str,
         dedupe_key: object,
-        state: AgentState,
-        observation: Observation,
-        reflection: Reflection,
+        source_trace_id: str,
+        record_id: str | None = None,
     ) -> None:
         """追加一条 typed semantic 记录；同 ``dedupe_key`` 旧记录被 supersede。"""
         layer = MemoryLayer.SEMANTIC
@@ -211,7 +208,7 @@ class AssistantMemory(MemorySystem):
             confidence_value = None
         dedupe_key_value = str(dedupe_key).strip() if dedupe_key else None
 
-        new_id_value = new_id("mem")
+        new_id_value = record_id or new_id("mem")
         superseded_id: str | None = None
         if dedupe_key_value:
             for entry in records:
@@ -236,12 +233,63 @@ class AssistantMemory(MemorySystem):
                 "revision_of": superseded_id,
                 "deleted": False,
                 "retired_at_ms": None,
-                "source_trace_id": str(getattr(state, "trace_id", "") or ""),
+                "source_trace_id": source_trace_id,
                 "created_at_ms": now_ms,
                 "created_at": _utc_now_iso(),
                 "metadata": {"source": source},
             }
         )
+        self._save(layer, records)
+
+    def upsert(self, record: MemoryRecord) -> MemoryRecord:
+        """按 ``dedupe_key`` 幂等写入 typed 记录（ADR-0246 ``MemoryStore`` 语义）。
+
+        同 ``dedupe_key`` 的旧活跃记录被标记 superseded；返回的 ``record``
+        与落盘条目共享 ``record_id``。
+        """
+        self._append_semantic(
+            record_id=record.record_id,
+            content=record.content,
+            category=record.category.value,
+            confidence=record.confidence,
+            source=(
+                str(record.metadata.get("source") or "user")
+                if isinstance(record.metadata, dict)
+                else "user"
+            ),
+            dedupe_key=record.dedupe_key,
+            source_trace_id=record.source_trace_id or "",
+        )
+        return record
+
+    def supersede(
+        self,
+        record_id: str,
+        replacement: MemoryRecord,
+        *,
+        reason: str = "superseded",
+    ) -> MemoryRecord:
+        """退役旧记录并写入替代记录，建立 ``revision_of`` 血缘。"""
+        layer = MemoryLayer.SEMANTIC
+        records = self._load(layer)
+        now_ms = _utc_now_ms()
+        for entry in records:
+            if entry.get("record_id") == record_id and not entry.get("deleted", False):
+                entry["deleted"] = True
+                entry["retired_at_ms"] = now_ms
+                entry.setdefault("metadata", {})["superseded_reason"] = reason
+        self._save(layer, records)
+        return self.upsert(replacement)
+
+    def remove(self, record_id: str) -> None:
+        """把指定记录标记为已删除（保留审计，不再参与检索）。"""
+        layer = MemoryLayer.SEMANTIC
+        records = self._load(layer)
+        now_ms = _utc_now_ms()
+        for entry in records:
+            if entry.get("record_id") == record_id and not entry.get("deleted", False):
+                entry["deleted"] = True
+                entry["retired_at_ms"] = now_ms
         self._save(layer, records)
 
     def _append(
