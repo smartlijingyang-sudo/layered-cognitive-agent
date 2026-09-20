@@ -79,6 +79,10 @@ class ProductionRuntimeDeps:
     phase_observer: PhaseObserver
     lifecycle_publisher: RuntimeLifecyclePublisher | None = None
     permission_manifest: ToolPermissionManifest | None = None
+    # ADR-0246 PR-7: assistant 域可选注入（bootstrap 投影服务 + 当前 run 的
+    # assistant_id），供 perceive.observe 合并 Home 配置面。
+    assistant_bootstrap: object | None = None
+    assistant_id: str = ""
 
     def runtime_phase_capabilities(self) -> RuntimePhaseCapabilities:
         """Project one frozen phase view from the canonical graph facts."""
@@ -90,6 +94,8 @@ class ProductionRuntimeDeps:
             perceive_hub=self.perceive_hub,
             llm=self.llm,
             permission_manifest=self.permission_manifest,
+            assistant_bootstrap=self.assistant_bootstrap,
+            assistant_id=self.assistant_id,
         )
 
 
