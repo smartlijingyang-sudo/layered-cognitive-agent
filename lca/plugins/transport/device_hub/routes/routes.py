@@ -8,7 +8,7 @@ from typing import Any, cast
 
 import structlog
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from lca.infrastructure.tools.lca_computer.manifest import LOCAL_SYSTEM_ID as _COMPUTER_IDENTIFIER
@@ -301,6 +301,186 @@ async def pair_poll(request: Request) -> JSONResponse:
             "workspaceId": result.workspace_id,
             "error": result.error,
         },
+        headers=cors_headers(),
+    )
+
+
+async def pair_preauth(request: Request) -> JSONResponse:
+    if request.method == "OPTIONS":
+        return JSONResponse({}, headers=cors_headers())
+    body = await _read_json(request)
+    user_id = str(body.get("userId") or body.get("user_id") or "")
+    workspace_id = str(body.get("workspaceId") or body.get("workspace_id") or "")
+    if not user_id:
+        try:
+            user = _auth_from_body(request, body)
+            user_id = user.user_id
+            workspace_id = user.workspace_id or workspace_id
+        except AuthError:
+            user_id = "default-user"
+            workspace_id = workspace_id or "default-workspace"
+
+    pairing = _pairing(request)
+    req = pairing.preauth_code(user_id=user_id, workspace_id=workspace_id or "default-workspace")
+
+    host = request.headers.get("host") or "127.0.0.1:8765"
+    scheme = request.url.scheme or "http"
+    base_url = f"{scheme}://{host}"
+
+    ps_cmd = f"irm {base_url}/api/device/install.ps1?code={req.user_code} | iex"
+    sh_cmd = f"curl -fsSL {base_url}/api/device/install.sh?code={req.user_code} | bash"
+
+    return JSONResponse(
+        {
+            "success": True,
+            "userCode": req.user_code,
+            "deviceCode": req.device_code,
+            "expiresIn": req.expires_in,
+            "installCommands": {
+                "windows": ps_cmd,
+                "bash": sh_cmd,
+            },
+        },
+        headers=cors_headers(),
+    )
+
+
+async def install_ps1(request: Request) -> Response:
+    if request.method == "OPTIONS":
+        return Response("", headers=cors_headers())
+    code = str(request.query_params.get("code") or "").strip()
+    host = request.headers.get("host") or "127.0.0.1:8765"
+    scheme = request.url.scheme or "http"
+    server_url = f"{scheme}://{host}"
+
+    script = f'''# LCA Companion Installer for Windows (PowerShell)
+$ErrorActionPreference = "Stop"
+$Server = "{server_url}"
+$PreauthCode = "{code}"
+
+Write-Host "==========================================" -ForegroundColor Cyan
+Write-Host " LCA Local Companion Installer (PowerShell) " -ForegroundColor Cyan
+Write-Host " Server: $Server" -ForegroundColor Gray
+Write-Host "==========================================" -ForegroundColor Cyan
+
+# 1. Check Python
+$pythonCmd = (Get-Command python, py, python3 -ErrorAction SilentlyContinue | Select-Object -First 1).Source
+if (-not $pythonCmd) {{
+    Write-Host "[!] Python 3 not found in PATH." -ForegroundColor Red
+    Write-Host "Please install Python 3 (e.g. winget install Python.Python.3.11) and rerun." -ForegroundColor Yellow
+    exit 1
+}}
+Write-Host "[✓] Found Python: $pythonCmd" -ForegroundColor Green
+
+# 2. Setup directory
+$lcaDir = Join-Path $HOME ".lca"
+$binDir = Join-Path $lcaDir "bin"
+if (-not (Test-Path $binDir)) {{
+    New-Item -ItemType Directory -Path $binDir -Force | Out-Null
+}}
+
+# 3. Download Companion
+$companionScript = Join-Path $binDir "lca-companion.py"
+Write-Host "[*] Downloading companion client..." -ForegroundColor Gray
+Invoke-RestMethod -Uri "$Server/api/device/download/companion.py" -OutFile $companionScript -ErrorAction SilentlyContinue
+if (-not (Test-Path $companionScript)) {{
+    $repoUrl = "$Server/scripts/lca-companion"
+    Invoke-RestMethod -Uri $repoUrl -OutFile $companionScript -ErrorAction SilentlyContinue
+}}
+
+# 4. Connect & Run
+Write-Host "[*] Connecting and pairing with gateway..." -ForegroundColor Gray
+$runArgs = @("$companionScript", "run", "--server", "$Server")
+if ($PreauthCode) {{
+    $runArgs += @("--preauth-code", "$PreauthCode")
+}}
+
+Write-Host "[✓] Starting LCA Companion in background..." -ForegroundColor Green
+Start-Process -FilePath $pythonCmd -ArgumentList ($runArgs -join " ") -WindowStyle Hidden
+Write-Host "[✓] Local Companion is now running and connected to $Server!" -ForegroundColor Green
+'''
+    return Response(
+        content=script,
+        media_type="text/plain; charset=utf-8",
+        headers={
+            **cors_headers(),
+            "Content-Disposition": 'inline; filename="install.ps1"',
+        },
+    )
+
+
+async def install_sh(request: Request) -> Response:
+    if request.method == "OPTIONS":
+        return Response("", headers=cors_headers())
+    code = str(request.query_params.get("code") or "").strip()
+    host = request.headers.get("host") or "127.0.0.1:8765"
+    scheme = request.url.scheme or "http"
+    server_url = f"{scheme}://{host}"
+
+    script = f'''#!/usr/bin/env bash
+set -e
+
+SERVER="{server_url}"
+PREAUTH_CODE="{code}"
+
+echo "=========================================="
+echo " LCA Local Companion Installer (Bash)"
+echo " Server: $SERVER"
+echo "=========================================="
+
+# 1. Find python3
+if command -v python3 >/dev/null 2>&1; then
+    PYTHON="python3"
+elif command -v python >/dev/null 2>&1; then
+    PYTHON="python"
+else
+    echo "[!] Python 3 not found. Please install python3 and try again." >&2
+    exit 1
+fi
+
+# 2. Setup directory
+LCA_DIR="$HOME/.lca"
+BIN_DIR="$LCA_DIR/bin"
+mkdir -p "$BIN_DIR"
+
+COMPANION_BIN="$BIN_DIR/lca-companion.py"
+echo "[*] Downloading companion client..."
+curl -fsSL "$SERVER/api/device/download/companion.py" -o "$COMPANION_BIN" 2>/dev/null || \\
+curl -fsSL "$SERVER/scripts/lca-companion" -o "$COMPANION_BIN" 2>/dev/null || true
+
+# 3. Launch
+CMD=("$PYTHON" "$COMPANION_BIN" "run" "--server" "$SERVER")
+if [ -n "$PREAUTH_CODE" ]; then
+    CMD+=("--preauth-code" "$PREAUTH_CODE")
+fi
+
+echo "[*] Launching Companion in background..."
+nohup "${{CMD[@]}}" > "$LCA_DIR/companion.log" 2>&1 &
+echo "[✓] Local Companion is running (PID: $!) and connected to $SERVER!"
+'''
+    return Response(
+        content=script,
+        media_type="text/x-shellscript; charset=utf-8",
+        headers={
+            **cors_headers(),
+            "Content-Disposition": 'inline; filename="install.sh"',
+        },
+    )
+
+
+async def download_companion(request: Request) -> Response:
+    if request.method == "OPTIONS":
+        return Response("", headers=cors_headers())
+    from pathlib import Path
+
+    candidate = Path(__file__).resolve().parents[5] / "scripts" / "lca-companion"  # noqa: ASYNC240
+    if candidate.exists():
+        content = candidate.read_text(encoding="utf-8")
+    else:
+        content = "#!/usr/bin/env python3\nimport sys\nprint('Companion runner')\n"
+    return Response(
+        content=content,
+        media_type="text/x-python; charset=utf-8",
         headers=cors_headers(),
     )
 
