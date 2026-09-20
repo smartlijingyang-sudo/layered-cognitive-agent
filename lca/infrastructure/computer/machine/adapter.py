@@ -76,11 +76,20 @@ class MachineLocalExecAdapter:
             if result.content
             else None
         )
+        if not result.success:
+            is_offline = "offline" in (result.error or "").lower()
+            return EffectReceipt(
+                **base,
+                success=False,
+                exit_code=1,
+                error_kind="device_offline" if is_offline else "execution_error",
+                stdout_digest=digest,
+            )
         return EffectReceipt(
             **base,
-            success=result.success,
-            exit_code=0 if result.success else 1,
-            error_kind=None if result.success else "execution_error",
+            success=True,
+            exit_code=0,
+            error_kind=None,
             stdout_digest=digest,
         )
 

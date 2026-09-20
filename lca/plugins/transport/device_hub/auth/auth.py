@@ -8,6 +8,7 @@ import hashlib
 import hmac
 import json
 from dataclasses import dataclass
+from typing import Any
 
 from lca.plugins.transport.device_hub.settings.settings import DeviceHubSettings
 
@@ -27,6 +28,7 @@ def verify_token(
     token: str,
     token_type: str,
     settings: DeviceHubSettings,
+    pairing_service: Any = None,
 ) -> AuthenticatedUser:
     kind = (token_type or "serviceToken").strip()
     if kind == "serviceToken":
@@ -47,6 +49,22 @@ def verify_token(
                 token_type="apiKey",  # noqa: S106
             )
         raise AuthError("apiKey auth is not configured")
+    if kind == "machineToken":
+        if pairing_service is not None:
+            req = pairing_service.get_by_machine_token(token)
+            if req is not None:
+                return AuthenticatedUser(
+                    user_id=req.user_id or "companion-user",
+                    workspace_id=req.workspace_id,
+                    token_type="machineToken",  # noqa: S106
+                )
+        if token.startswith("mtk-") and pairing_service is None:
+            return AuthenticatedUser(
+                user_id="companion-user",
+                workspace_id=None,
+                token_type="machineToken",  # noqa: S106
+            )
+        raise AuthError("Invalid machine token")
     raise AuthError(f"Unknown token type: {kind}")
 
 

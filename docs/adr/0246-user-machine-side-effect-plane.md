@@ -2,7 +2,7 @@
 
 ## 状态
 
-**M1 Implemented — 2026-09-20**
+**Implemented (M1–M4) — 2026-09-20**
 
 Refines: [ADR-0044](0044-code-sandbox-adapters.md)、[ADR-0050](0050-run-bound-sandbox-runtime.md)、[ADR-0051](0051-run-workspace-plane.md)、[ADR-0076](0076-six-plane-capability-layout-and-substitution-test.md)、[ADR-0078](0078-hil-approval-state-machine.md)、[ADR-0186](0186-session-as-event-ssot.md)、[ADR-0200](0200-p1-agent-gateway-bridge.md)、[ADR-0206](0206-information-graph-kernel.md)。
 

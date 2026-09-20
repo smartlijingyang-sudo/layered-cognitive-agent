@@ -63,6 +63,12 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 UI = ROOT / "lobehub-ui"
+if not UI.is_dir():
+    for parent in ROOT.parents:
+        candidate = parent / "lobehub-ui"
+        if candidate.is_dir():
+            UI = candidate
+            break
 MANIFEST_FILE = UI / ".lca-manifest.json"
 LEGACY_STAMP = UI / ".lca-patched"
 LEGACY_HASHES = UI / ".lca-patch-hashes"

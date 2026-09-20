@@ -31,6 +31,9 @@ from lca.plugins.transport.device_hub.routes.routes import (
     connect_device,
     device_status,
     list_devices,
+    pair_code,
+    pair_poll,
+    pair_verify,
     rpc,
     system_info,
     tool_call,
@@ -46,6 +49,9 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
     RouteSpec("/api/device/rpc", rpc, ("POST", "OPTIONS")),
     RouteSpec("/api/device/agent/run", agent_run, ("POST", "OPTIONS")),
     RouteSpec("/api/device/files/upload", upload_files, ("POST", "OPTIONS")),
+    RouteSpec("/api/device/pair/code", pair_code, ("POST", "OPTIONS")),
+    RouteSpec("/api/device/pair/verify", pair_verify, ("POST", "OPTIONS")),
+    RouteSpec("/api/device/pair/poll", pair_poll, ("POST", "OPTIONS")),
 )
 
 # WebSocket path stays literal:RouteSpec is HTTP-only.
@@ -59,7 +65,7 @@ _WS_PATH = "/api/device/ws"
     layer="L1",
     kind=PluginKind.PROVIDER,
     effects="none",
-    description="Register /api/device/* (7 HTTP + 1 WebSocket) routes.",
+    description="Register /api/device/* (10 HTTP + 1 WebSocket) routes.",
     test_suite="tests.lca_plugins.transport.webserver.test_device",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

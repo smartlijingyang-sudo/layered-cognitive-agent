@@ -209,6 +209,115 @@ def _patch_switcher(text: str) -> str:
         end = text.find("\n", end) + 1
         text = text[:start] + text[end:]
 
+    text = _patch_pairing_ui(text)
+
+    return text
+
+
+def _patch_pairing_ui(text: str) -> str:
+    if "/* LCA: ADR-0246 M4 Device Code Pairing */" in text:
+        return text
+
+    # 1. mutate hook
+    text = text.replace(
+        "  const { data: devices, isLoading } = useDeviceList();\n",
+        "  const { data: devices, isLoading, mutate: refreshDevices } = useDeviceList();\n",
+        1,
+    )
+
+    # 2. state & callback
+    state_anchor = "  const selectExecutionTarget = useSelectExecutionTarget(agentId);\n"
+    state_code = (
+        "  /* LCA: ADR-0246 M4 Device Code Pairing */\n"
+        "  const [pairCode, setPairCode] = useState('');\n"
+        "  const [pairingStatus, setPairStatus] = useState<{ ok?: boolean; msg?: string } | null>(null);\n"
+        "  const [isPairing, setIsPairing] = useState(false);\n"
+        "\n"
+        "  const handlePairSubmit = useCallback(async () => {\n"
+        "    const code = pairCode.trim();\n"
+        "    if (!code) return;\n"
+        "    setIsPairing(true);\n"
+        "    setPairStatus(null);\n"
+        "    try {\n"
+        "      const resp = await fetch('/lca-api/api/device/pair/verify', {\n"
+        "        method: 'POST',\n"
+        "        headers: { 'Content-Type': 'application/json' },\n"
+        "        body: JSON.stringify({ userCode: code }),\n"
+        "      });\n"
+        "      const data = await resp.json();\n"
+        "      if (resp.ok && data.success) {\n"
+        "        setPairStatus({ ok: true, msg: `设备已配对: ${data.label || data.deviceId}` });\n"
+        "        setPairCode('');\n"
+        "        if (refreshDevices) void refreshDevices();\n"
+        "      } else {\n"
+        "        setPairStatus({ ok: false, msg: `配对失败: ${data.error || '无效配对码'}` });\n"
+        "      }\n"
+        "    } catch (e: any) {\n"
+        "      setPairStatus({ ok: false, msg: `网络错误: ${e.message}` });\n"
+        "    } finally {\n"
+        "      setIsPairing(false);\n"
+        "    }\n"
+        "  }, [pairCode, refreshDevices]);\n"
+    )
+    if state_anchor in text:
+        text = text.replace(state_anchor, state_anchor + state_code, 1)
+
+    # 3. JSX card
+    jsx_anchor = "    </Flexbox>\n  );\n\n  const chip = ("
+    jsx_code = (
+        "      {/* LCA: Device Code Pairing card (ADR-0246 M4) */}\n"
+        "      <div style={{ padding: '8px 12px', borderTop: '1px solid rgba(128,128,128,0.2)', marginTop: 6 }}>\n"
+        "        <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 4 }}>\n"
+        "          配对本机 / 新设备 (CLI)\n"
+        "        </div>\n"
+        "        <div style={{ display: 'flex', gap: 6 }}>\n"
+        "          <input\n"
+        '            placeholder="配对码 (如 ABCD-1234)"\n'
+        "            value={pairCode}\n"
+        "            onChange={(e) => setPairCode(e.target.value)}\n"
+        "            onKeyDown={(e) => {\n"
+        "              if (e.key === 'Enter') void handlePairSubmit();\n"
+        "            }}\n"
+        "            style={{\n"
+        "              flex: 1,\n"
+        "              height: 26,\n"
+        "              padding: '0 8px',\n"
+        "              fontSize: 12,\n"
+        "              borderRadius: 4,\n"
+        "              border: '1px solid rgba(128,128,128,0.2)',\n"
+        "              background: 'transparent',\n"
+        "              color: 'inherit',\n"
+        "            }}\n"
+        "          />\n"
+        "          <button\n"
+        '            type="button"\n'
+        "            onClick={() => void handlePairSubmit()}\n"
+        "            disabled={isPairing || !pairCode.trim()}\n"
+        "            style={{\n"
+        "              height: 26,\n"
+        "              padding: '0 8px',\n"
+        "              fontSize: 12,\n"
+        "              borderRadius: 4,\n"
+        "              cursor: isPairing || !pairCode.trim() ? 'not-allowed' : 'pointer',\n"
+        "              background: 'var(--color-primary, #1677ff)',\n"
+        "              color: '#fff',\n"
+        "              border: 'none',\n"
+        "            }}\n"
+        "          >\n"
+        "            {isPairing ? '验证中' : '配对'}\n"
+        "          </button>\n"
+        "        </div>\n"
+        "        {pairingStatus ? (\n"
+        "          <div style={{ fontSize: 11, marginTop: 4, color: pairingStatus.ok ? '#52c41a' : '#ff4d4f' }}>\n"
+        "            {pairingStatus.msg}\n"
+        "          </div>\n"
+        "        ) : null}\n"
+        "      </div>\n"
+        "    </Flexbox>\n  );\n\n  const chip = ("
+    )
+    if jsx_anchor in text:
+        text = text.replace(jsx_anchor, jsx_code, 1)
+
     return text
 
 

@@ -15,6 +15,7 @@ from lca.infrastructure.tools.lca_computer.manifest import LOCAL_SYSTEM_ID as _C
 from lca.plugins.transport.device_hub.auth.auth import AuthenticatedUser, AuthError, verify_token
 from lca.plugins.transport.device_hub.hub.hub import DeviceHub, encode_arguments
 from lca.plugins.transport.device_hub.models.models import DeviceConnection
+from lca.plugins.transport.device_hub.pairing.pairing import DevicePairingService
 from lca.plugins.transport.device_hub.registry.registry import DeviceRegistry
 from lca.plugins.transport.device_hub.settings.settings import DeviceHubSettings
 from lca.plugins.transport.webserver.handlers.cors.cors import cors_headers
@@ -34,6 +35,14 @@ def _settings(request: Request) -> DeviceHubSettings:
     return cast("DeviceHubSettings", request.app.state.device_settings)
 
 
+def _pairing(request: Request) -> DevicePairingService:
+    service = getattr(request.app.state, "device_pairing", None)
+    if service is None:
+        service = DevicePairingService()
+        request.app.state.device_pairing = service
+    return cast("DevicePairingService", service)
+
+
 def _auth_from_body(request: Request, body: dict[str, Any]) -> AuthenticatedUser:
     token = str(body.get("token") or request.headers.get("authorization") or "")
     if token.lower().startswith("bearer "):
@@ -42,7 +51,8 @@ def _auth_from_body(request: Request, body: dict[str, Any]) -> AuthenticatedUser
     if not token:
         token = _settings(request).service_token
         token_type = "serviceToken"  # noqa: S105
-    return verify_token(token, token_type, _settings(request))
+    pairing_service = getattr(request.app.state, "device_pairing", None)
+    return verify_token(token, token_type, _settings(request), pairing_service=pairing_service)
 
 
 async def _read_json(request: Request) -> dict[str, Any]:
@@ -202,6 +212,99 @@ async def upload_files(request: Request) -> JSONResponse:
     return JSONResponse(result, headers=cors_headers())
 
 
+async def pair_code(request: Request) -> JSONResponse:
+    if request.method == "OPTIONS":
+        return JSONResponse({}, headers=cors_headers())
+    body = await _read_json(request)
+    device_id = str(body.get("deviceId") or body.get("device_id") or "")
+    label = str(body.get("label") or "Companion")
+    platform = str(body.get("platform") or "")
+    if not device_id:
+        return JSONResponse(
+            {"error": "deviceId is required"}, status_code=400, headers=cors_headers()
+        )
+
+    pairing = _pairing(request)
+    req = pairing.request_code(device_id=device_id, label=label, platform=platform)
+    return JSONResponse(
+        {
+            "deviceCode": req.device_code,
+            "userCode": req.user_code,
+            "verificationUri": "/pair",
+            "expiresIn": req.expires_in,
+            "interval": 2,
+        },
+        headers=cors_headers(),
+    )
+
+
+async def pair_verify(request: Request) -> JSONResponse:
+    if request.method == "OPTIONS":
+        return JSONResponse({}, headers=cors_headers())
+    body = await _read_json(request)
+    user_code = str(body.get("userCode") or body.get("user_code") or "").strip()
+    if not user_code:
+        return JSONResponse(
+            {"error": "userCode is required"}, status_code=400, headers=cors_headers()
+        )
+
+    user_id = str(body.get("userId") or body.get("user_id") or "")
+    workspace_id = str(body.get("workspaceId") or body.get("workspace_id") or "")
+    if not user_id:
+        try:
+            user = _auth_from_body(request, body)
+            user_id = user.user_id
+            workspace_id = user.workspace_id or workspace_id
+        except AuthError:
+            user_id = "default-user"
+
+    pairing = _pairing(request)
+    result = pairing.verify_code(
+        user_code=user_code,
+        user_id=user_id,
+        workspace_id=workspace_id or "default-workspace",
+    )
+    if not result.success:
+        return JSONResponse(
+            {"success": False, "error": result.error},
+            status_code=400,
+            headers=cors_headers(),
+        )
+    return JSONResponse(
+        {
+            "success": True,
+            "deviceId": result.device_id,
+            "label": result.label,
+        },
+        headers=cors_headers(),
+    )
+
+
+async def pair_poll(request: Request) -> JSONResponse:
+    if request.method == "OPTIONS":
+        return JSONResponse({}, headers=cors_headers())
+    body = await _read_json(request)
+    device_code = str(body.get("deviceCode") or body.get("device_code") or "").strip()
+    if not device_code:
+        return JSONResponse(
+            {"error": "deviceCode is required"}, status_code=400, headers=cors_headers()
+        )
+
+    pairing = _pairing(request)
+    result = pairing.poll_token(device_code=device_code)
+    return JSONResponse(
+        {
+            "status": result.status,
+            "machineToken": result.machine_token,
+            "tokenType": "machineToken" if result.machine_token else None,
+            "userId": result.user_id,
+            "workspaceId": result.workspace_id,
+            "error": result.error,
+        },
+        headers=cors_headers(),
+    )
+
+
 async def connect_device(websocket: WebSocket) -> None:
     await websocket.accept()
     registry: DeviceRegistry = websocket.app.state.devices
@@ -228,10 +331,12 @@ async def connect_device(websocket: WebSocket) -> None:
         await websocket.close(code=4400)
         return
     try:
+        pairing_service = getattr(websocket.app.state, "device_pairing", None)
         user = verify_token(
             str(hello.get("token") or ""),
             str(hello.get("tokenType") or "serviceToken"),
             settings,
+            pairing_service=pairing_service,
         )
     except AuthError as exc:
         await websocket.send_json({"type": "auth_failed", "reason": str(exc)})

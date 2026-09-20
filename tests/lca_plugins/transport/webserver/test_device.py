@@ -31,14 +31,14 @@ class _FakeCtx:
 
 
 @pytest.mark.asyncio
-async def test_routes_device_register_seven_http_routes() -> None:
+async def test_routes_device_register_ten_http_routes() -> None:
     from lca.plugins.transport.webserver.routes_1.routes_device import setup as plugin
 
     router = RouteRegistry()
     ctx = _FakeCtx(router)
     await plugin.setup(ctx, None)
 
-    assert len(router._exact) == 7
+    assert len(router._exact) == 10
 
 
 @pytest.mark.asyncio
@@ -69,19 +69,22 @@ async def test_routes_device_paths_match_baseline() -> None:
         "/api/device/rpc",
         "/api/device/agent/run",
         "/api/device/files/upload",
+        "/api/device/pair/code",
+        "/api/device/pair/verify",
+        "/api/device/pair/poll",
     }
     assert expected.issubset(router._exact.keys())
 
 
 @pytest.mark.asyncio
 async def test_routes_device_effects_tracked() -> None:
-    """8 routes × 1 effect each = 8 effects(7 HTTP + 1 WS)。"""
+    """11 routes × 1 effect each = 11 effects(10 HTTP + 1 WS)。"""
     from lca.plugins.transport.webserver.routes_1.routes_device import setup as plugin
 
     router = RouteRegistry()
     ctx = _FakeCtx(router)
     await plugin.setup(ctx, None)
 
-    assert len(ctx._fake_runtime.effects) == 8
+    assert len(ctx._fake_runtime.effects) == 11
     labels = {label for _dispose, label in ctx._fake_runtime.effects}
     assert "ws:/api/device/ws" in labels
