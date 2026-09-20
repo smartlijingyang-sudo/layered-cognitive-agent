@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 
 class PlaneKind(str, Enum):
     MACHINE = "machine"
     SANDBOX = "sandbox"
+    POOL_WORKER = "pool_worker"  # ADR-0246 M1
 
 
 @dataclass(frozen=True)
@@ -20,6 +21,7 @@ class PlaneRef:
     outputs_dir: str
     platform: str = ""
     home: str = ""
+    capability_summary: tuple[str, ...] = field(default_factory=tuple)  # ADR-0246 M1
 
 
 @dataclass(frozen=True)
