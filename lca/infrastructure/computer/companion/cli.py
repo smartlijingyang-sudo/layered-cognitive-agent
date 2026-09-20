@@ -23,27 +23,32 @@ def main() -> None:
     p_pair.add_argument("--device-id", default=None, help="Explicit device ID")
     p_pair.add_argument("--label", default=None, help="Device label")
     p_pair.add_argument("--token-file", default=None, help="Custom token file path")
+    p_pair.add_argument("--preauth-code", default=None, help="Pre-authorized code for auto-pairing")
 
-    # Subcommand: start
-    p_start = subparsers.add_parser("start", help="Start the companion daemon")
-    p_start.add_argument("--server", default="http://127.0.0.1:8765", help="Gateway URL")
-    p_start.add_argument("--token", default=None, help="Machine token override")
-    p_start.add_argument("--device-id", default=None, help="Explicit device ID")
-    p_start.add_argument("--label", default=None, help="Device label")
-    p_start.add_argument("--token-file", default=None, help="Custom token file path")
-    p_start.add_argument(
-        "--allow-path",
-        action="append",
-        dest="allowed_paths",
-        default=[],
-        help="Permitted directory path",
-    )
-    p_start.add_argument(
-        "--no-commands",
-        action="store_false",
-        dest="allow_commands",
-        help="Disable command execution",
-    )
+    # Subcommand: start / run
+    for cmd_name in ("start", "run"):
+        p_start = subparsers.add_parser(cmd_name, help="Start the companion daemon")
+        p_start.add_argument("--server", default="http://127.0.0.1:8765", help="Gateway URL")
+        p_start.add_argument("--token", default=None, help="Machine token override")
+        p_start.add_argument("--device-id", default=None, help="Explicit device ID")
+        p_start.add_argument("--label", default=None, help="Device label")
+        p_start.add_argument("--token-file", default=None, help="Custom token file path")
+        p_start.add_argument(
+            "--preauth-code", default=None, help="Pre-authorized code for auto-pairing"
+        )
+        p_start.add_argument(
+            "--allow-path",
+            action="append",
+            dest="allowed_paths",
+            default=[],
+            help="Permitted directory path",
+        )
+        p_start.add_argument(
+            "--no-commands",
+            action="store_false",
+            dest="allow_commands",
+            help="Disable command execution",
+        )
 
     # Subcommand: status
     p_status = subparsers.add_parser("status", help="Show companion pairing status")
@@ -64,7 +69,10 @@ def main() -> None:
             cfg.label = args.label
         client = CompanionClient(cfg)
         try:
-            asyncio.run(client.pair())
+            if args.preauth_code:
+                asyncio.run(client.auto_pair(args.preauth_code))
+            else:
+                asyncio.run(client.pair())
         except KeyboardInterrupt:
             print("\nPairing aborted by user.")
             sys.exit(130)
@@ -72,7 +80,7 @@ def main() -> None:
             print(f"\n[!] Pairing failed: {exc}", file=sys.stderr)
             sys.exit(1)
 
-    elif args.subcommand == "start":
+    elif args.subcommand in ("start", "run"):
         cfg = CompanionConfig(
             server_url=args.server,
             token_file=token_file or Path.home() / ".lca" / "companion_token.json",
@@ -86,6 +94,15 @@ def main() -> None:
         if args.label:
             cfg.label = args.label
         client = CompanionClient(cfg)
+
+        if not client.config.machine_token and getattr(args, "preauth_code", None):
+            try:
+                print(f"[*] Auto-pairing with pre-authorized code: {args.preauth_code}...")
+                token = asyncio.run(client.auto_pair(args.preauth_code))
+                client.config.machine_token = token
+            except Exception as exc:
+                print(f"\n[!] Auto-pairing failed: {exc}", file=sys.stderr)
+                sys.exit(1)
 
         if not client.config.machine_token:
             print(

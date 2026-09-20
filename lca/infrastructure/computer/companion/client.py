@@ -92,17 +92,44 @@ class CompanionClient:
                 raise PermissionError(f"Access denied: path '{path}' is outside permitted scopes")
         return norm
 
-    async def request_pairing(self) -> dict[str, Any]:
+    async def request_pairing(self, user_code: str | None = None) -> dict[str, Any]:
         url = f"{self.config.server_url.rstrip('/')}/api/device/pair/code"
         payload = {
             "deviceId": self.config.device_id,
             "label": self.config.label,
             "platform": self.config.platform,
         }
+        if user_code:
+            payload["userCode"] = user_code
         async with httpx.AsyncClient() as client:
             resp = await client.post(url, json=payload, timeout=10.0)
             resp.raise_for_status()
             return resp.json()
+
+    async def auto_pair(self, preauth_code: str) -> str:
+        req = await self.request_pairing(user_code=preauth_code)
+        token = req.get("machineToken")
+        if token:
+            user_id = req.get("userId")
+            workspace_id = req.get("workspaceId")
+            self.config.save_token(token, user_id=user_id, workspace_id=workspace_id)
+            print(f"[✓] Auto-pairing successful! Token saved to {self.config.token_file}")
+            return token
+
+        device_code = req.get("deviceCode")
+        if not device_code:
+            raise RuntimeError(f"Unexpected response from pairing endpoint: {req}")
+
+        res = await self.poll_pairing(device_code)
+        if res.get("status") == "success" and res.get("machineToken"):
+            token = res["machineToken"]
+            user_id = res.get("userId")
+            workspace_id = res.get("workspaceId")
+            self.config.save_token(token, user_id=user_id, workspace_id=workspace_id)
+            print(f"[✓] Auto-pairing successful! Token saved to {self.config.token_file}")
+            return token
+
+        raise RuntimeError(f"Auto-pairing failed with response: {req}")
 
     async def poll_pairing(self, device_code: str) -> dict[str, Any]:
         url = f"{self.config.server_url.rstrip('/')}/api/device/pair/poll"

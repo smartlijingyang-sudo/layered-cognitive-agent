@@ -116,3 +116,34 @@ def test_companion_rpc_system_info() -> None:
     assert info["label"] == "RPC Test"
     assert "platform" in info
     assert "hostname" in info
+
+
+@pytest.mark.asyncio
+async def test_companion_auto_pair_with_preauth_code(tmp_path: Path) -> None:
+    token_file = tmp_path / "companion_token.json"
+    client = CompanionClient(
+        CompanionConfig(
+            server_url="http://127.0.0.1:8765",
+            device_id="dev-auto",
+            label="Auto Laptop",
+            token_file=token_file,
+        )
+    )
+
+    # Mock request_pairing returning immediate machineToken
+    async def fake_request_pairing(user_code: str | None = None) -> dict[str, object]:
+        assert user_code == "PRE-1234"
+        return {
+            "deviceCode": "d-123",
+            "userCode": "PRE-1234",
+            "machineToken": "mtk-auto-999",
+            "userId": "alice",
+            "workspaceId": "ws-auto",
+            "status": "completed",
+        }
+
+    client.request_pairing = fake_request_pairing  # type: ignore[method-assign]
+    token = await client.auto_pair("PRE-1234")
+    assert token == "mtk-auto-999"  # noqa: S105
+    assert client.config.machine_token == "mtk-auto-999"  # noqa: S105
+    assert token_file.exists()
