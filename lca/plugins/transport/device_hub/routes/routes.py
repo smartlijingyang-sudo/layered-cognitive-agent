@@ -378,6 +378,10 @@ if (-not $pythonCmd) {{
 }}
 Write-Host "[✓] Found Python: $pythonCmd" -ForegroundColor Green
 
+# Ensure dependencies
+Write-Host "[*] Checking dependencies (httpx, websockets)..." -ForegroundColor Gray
+& $pythonCmd -m pip install -q httpx websockets
+
 # 2. Setup directory
 $lcaDir = Join-Path $HOME ".lca"
 $binDir = Join-Path $lcaDir "bin"
@@ -444,6 +448,9 @@ else
     exit 1
 fi
 
+echo "[*] Checking dependencies (httpx, websockets)..."
+$PYTHON -m pip install -q httpx websockets 2>/dev/null || true
+
 # 2. Setup directory
 LCA_DIR="$HOME/.lca"
 BIN_DIR="$LCA_DIR/bin"
@@ -479,15 +486,28 @@ async def download_companion(request: Request) -> Response:
         return Response("", headers=cors_headers())
     from pathlib import Path
 
-    candidate = Path(__file__).resolve().parents[5] / "scripts" / "lca-companion"  # noqa: ASYNC240
-    if candidate.exists():
-        content = candidate.read_text(encoding="utf-8")
+    standalone = (
+        Path(__file__).resolve().parents[4]  # noqa: ASYNC240
+        / "infrastructure"
+        / "computer"
+        / "companion"
+        / "standalone.py"
+    )
+    if standalone.exists():
+        content = standalone.read_text(encoding="utf-8")
     else:
-        content = "#!/usr/bin/env python3\nimport sys\nprint('Companion runner')\n"
+        candidate = Path(__file__).resolve().parents[5] / "scripts" / "lca-companion"  # noqa: ASYNC240
+        if candidate.exists():
+            content = candidate.read_text(encoding="utf-8")
+        else:
+            content = "#!/usr/bin/env python3\nimport sys\nprint('Companion runner')\n"
     return Response(
         content=content,
         media_type="text/x-python; charset=utf-8",
-        headers=cors_headers(),
+        headers={
+            **cors_headers(),
+            "Content-Disposition": 'attachment; filename="lca-companion.py"',
+        },
     )
 
 
