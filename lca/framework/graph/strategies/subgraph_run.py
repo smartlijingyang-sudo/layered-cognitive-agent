@@ -171,6 +171,21 @@ def translate_inputs(context: StrategyContext, input: NodeInput) -> dict[str, An
 def translate_outputs(context: StrategyContext, merged_output: Mapping[str, Any]) -> dict[str, Any]:
     outer_output: dict[str, Any] = dict(merged_output)
     outer_declared_outputs = outer_declared_outputs_of(context)
+    if outer_declared_outputs:
+        # Prefer name-based mapping. ``merged_output`` is the inner
+        # terminal node's port snapshot, so its keys are the actual
+        # inner output port names. When they coincide with the outer
+        # declared outputs (the common six-phase case), map by name so
+        # positional drift between the inner entry and terminal schemas
+        # cannot swap ports (e.g. reflect.main emitting the Reflection
+        # on ``routing`` because the entry schema lists observation first).
+        by_name = {
+            name: merged_output[name] for name in outer_declared_outputs if name in merged_output
+        }
+        if len(by_name) == len(outer_declared_outputs):
+            return by_name
+        if by_name:
+            outer_output = by_name
     inner_schema = context.inner_io_schema
     if inner_schema is not None and inner_schema.outputs and outer_declared_outputs:
         inner_output_names = tuple(p.name for p in inner_schema.outputs)
