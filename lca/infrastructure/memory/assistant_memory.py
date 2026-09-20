@@ -17,6 +17,7 @@ from retrieval.
 from __future__ import annotations
 
 import json
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -31,6 +32,8 @@ from lca.contracts.protocols.memory.memory import MemorySystem
 
 _MEMORY_DIR = "memory"
 
+_ProfileBackfillCallback = Callable[[str, list[MemoryRecord]], Awaitable[None]]
+
 __all__ = ["AssistantMemory"]
 
 
@@ -40,11 +43,20 @@ class AssistantMemory(MemorySystem):
     记录以 JSON 数组持久化在 ``{home}/memory/<layer>.json``；读取时惰性
     加载，写入时整层覆写（记录量级小，简单可审计）。不参与 manifest
     digest（I-A13），不触碰 ``MEMORY.md`` / 配置面文件。
+
+    ``profile_backfill`` 是 ADR-0246 PR-5 的可选回调：写入 identity/preference
+    事实后以 ``(assistant_id, records)`` 触发 USER.md 回填（系统行为）。
     """
 
-    def __init__(self, home_path: str | Path) -> None:
+    def __init__(
+        self,
+        home_path: str | Path,
+        *,
+        profile_backfill: _ProfileBackfillCallback | None = None,
+    ) -> None:
         self._root = Path(home_path) / _MEMORY_DIR
         self._root.mkdir(parents=True, exist_ok=True)
+        self._profile_backfill = profile_backfill
 
     def _layer_path(self, layer: MemoryLayer) -> Path:
         return self._root / f"{layer.value}.json"
@@ -126,6 +138,16 @@ class AssistantMemory(MemorySystem):
                         observation=observation,
                         reflection=reflection,
                     )
+            if self._profile_backfill is not None:
+                # ADR-0246 PR-5：身份/偏好事实落盘后触发 USER.md 系统回填。
+                assistant_id = self._root.parent.name
+                identity_pref = [
+                    r
+                    for r in self.query(MemoryLayer.SEMANTIC)
+                    if r.category in {MemoryCategory.IDENTITY, MemoryCategory.PREFERENCE}
+                ]
+                if identity_pref:
+                    await self._profile_backfill(assistant_id, identity_pref)
             return
         procedural = extra.get("procedural_candidate")
         if procedural is not None:

@@ -315,6 +315,13 @@ ASSISTANT_BOOTSTRAP = Capability[object]("assistant.bootstrap", cardinality="one
 MEMORY.md / memory/ 不参与投影（I-A13）；只读 + 投影，不写文件。
 """
 
+ASSISTANT_PROFILE_BACKFILL = Capability[object]("assistant.profile.backfill", cardinality="one")
+"""从 identity/preference 记忆回填 ``{home}/USER.md``（ADR-0246 PR-5）。
+
+系统行为：把结构化用户画像写入 USER.md 并经 ``revise_profile`` 产生 revision
+快照；模型不直接写该文件。
+"""
+
 ASSISTANT_WORKSPACE = Capability[object]("assistant.workspace", cardinality="one")
 """绑定 cwd = home/workspace/ 到 ExecutionSpace 事实（ADR-0187 §3 D5 + PR-4）。
 
