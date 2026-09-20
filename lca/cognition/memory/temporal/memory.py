@@ -102,28 +102,48 @@ class TemporalMemorySystem(MemorySystem):
         ]
         return replace(state, retrieved_context=evidence)
 
-    async def retrieve(self, manifest: ContextManifest) -> list[MemoryRecord]:
+    async def retrieve(
+        self,
+        manifest: ContextManifest,
+        *,
+        query: str = "",
+        token_budget: int | None = None,
+    ) -> list[MemoryRecord]:
         """按 manifest 文本召回当前有效事实，供 ``memory_retrieve`` 注入。
 
         结果与 ``perceive`` 一样标记 ``UNTRUSTED_HISTORY``，绝不作为策略/权限来源。
+        ``query`` 覆盖 manifest 派生的检索词；``token_budget`` 做字符级截断。
         """
-        query = _query_from_manifest(manifest)
-        if not query:
+        retrieve_query = query.strip() or _query_from_manifest(manifest)
+        if not retrieve_query:
             return []
         scoped_records = self._store.recall(
             scope_id=self._scope_id,
-            query=query,
+            query=retrieve_query,
             as_of_ms=None,
             limit=self._recall_limit,
         )
-        return [
+        records = [
             replace(
                 record,
                 trust=MemoryTrust.UNTRUSTED_HISTORY,
-                metadata={**record.metadata, "recall_query": query},
+                metadata={**record.metadata, "recall_query": retrieve_query},
             )
             for record in scoped_records
         ]
+        if token_budget is None or token_budget <= 0:
+            return records
+        from lca.cognition.memory.layered.retrieval_policy import estimate_tokens
+
+        kept: list[MemoryRecord] = []
+        used = 0
+        for record in records:
+            estimated = estimate_tokens(record.content)
+            if used + estimated > token_budget:
+                break
+            kept.append(record)
+            used += estimated
+        return kept
 
     async def update(
         self, state: AgentState, observation: Observation, reflection: Reflection

@@ -69,10 +69,32 @@ class AssistantMemory(MemorySystem):
         """返回原状态；检索注入由后续 memory.retrieve 节点负责（ADR-0242 D11）。"""
         return state
 
-    async def retrieve(self, manifest: ContextManifest) -> list[MemoryRecord]:
-        """返回持久化的事实记忆（semantic + episodic），供 ``memory_retrieve`` 注入。"""
-        del manifest
-        return self.query(MemoryLayer.SEMANTIC) + self.query(MemoryLayer.EPISODIC)
+    async def retrieve(
+        self,
+        manifest: ContextManifest,
+        *,
+        query: str = "",
+        token_budget: int | None = None,
+    ) -> list[MemoryRecord]:
+        """返回持久化的事实记忆（semantic + episodic），供 ``memory_retrieve`` 注入。
+
+        ADR-0246 PR-4：按 ``token_budget`` 做字符级截断，默认不截断。
+        """
+        del manifest, query
+        records = self.query(MemoryLayer.SEMANTIC) + self.query(MemoryLayer.EPISODIC)
+        if token_budget is None or token_budget <= 0:
+            return records
+        from lca.cognition.memory.layered.retrieval_policy import estimate_tokens
+
+        kept: list[MemoryRecord] = []
+        used = 0
+        for record in records:
+            estimated = estimate_tokens(record.content)
+            if used + estimated > token_budget:
+                break
+            kept.append(record)
+            used += estimated
+        return kept
 
     async def update(
         self,

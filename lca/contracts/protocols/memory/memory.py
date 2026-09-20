@@ -29,11 +29,19 @@ class MemorySystem(Protocol):
 
     def query(self, layer: MemoryLayer) -> list[MemoryRecord]: ...
 
-    async def retrieve(self, manifest: ContextManifest) -> list[MemoryRecord]:
+    async def retrieve(
+        self,
+        manifest: ContextManifest,
+        *,
+        query: str = "",
+        token_budget: int | None = None,
+    ) -> list[MemoryRecord]:
         """Retrieve context-relevant memories for the current turn (ADR-0244 D4).
 
         Called by ``phase.perceive.memory_retrieve``; must return typed
-        ``MemoryRecord`` values and never raise on empty memory.
+        ``MemoryRecord`` values and never raise on empty memory. ``query``
+        is the textual relevance signal and ``token_budget`` caps the
+        estimated token volume of the returned records (ADR-0246 PR-4).
         """
 
 
@@ -142,14 +150,18 @@ class RetrievalPolicy(Protocol):
     """按 4 层语义从记忆存储挑选记录到 ``retrieved_context``（ADR-0068）。
 
     默认实现 ``NullRetrievalPolicy`` 不选任何 record；标准 bundle 装
-    ``LayeredRetrievalPolicy``：working 永保留，semantic/procedural 按 recency
-    共享 70% budget，episodic 仅余量填充 30%。
+    ``LayeredRetrievalPolicy``：working 永保留，semantic/procedural 按
+    ``relevance × recency × importance`` 共享 70% budget，episodic 仅余量
+    填充 30%（ADR-0246 PR-4 增加 ``query`` 与 ``token_budget`` 参数）。
     """
 
     def retrieve(
         self,
         layers: dict[MemoryLayer, list[MemoryRecord]],
         budget: int,
+        *,
+        query: str = "",
+        token_budget: int | None = None,
     ) -> list[MemoryRecord]: ...
 
 
