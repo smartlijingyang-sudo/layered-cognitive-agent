@@ -215,23 +215,74 @@ def _patch_switcher(text: str) -> str:
 
 
 def _patch_pairing_ui(text: str) -> str:
-    if "/* LCA: ADR-0246 M4 Device Code Pairing */" in text:
+    if "/* LCA: CONV-INSTALL-4 One-Liner Auto-Install */" in text:
         return text
 
+    # If old M4 state code exists, strip it
+    old_state = "  /* LCA: ADR-0246 M4 Device Code Pairing */\n"
+    if old_state in text:
+        start = text.index(old_state)
+        end = text.find("  }, [pairCode, refreshDevices]);\n", start)
+        if end > 0:
+            text = text[:start] + text[end + len("  }, [pairCode, refreshDevices]);\n") :]
+
+    # If old M4 JSX exists, strip it
+    old_jsx = "      {/* LCA: Device Code Pairing card (ADR-0246 M4) */}\n"
+    if old_jsx in text:
+        start = text.index(old_jsx)
+        end = text.find("    </Flexbox>\n  );\n\n  const chip = (", start)
+        if end > 0:
+            text = text[:start] + text[end:]
+
     # 1. mutate hook
-    text = text.replace(
-        "  const { data: devices, isLoading } = useDeviceList();\n",
-        "  const { data: devices, isLoading, mutate: refreshDevices } = useDeviceList();\n",
-        1,
-    )
+    if "mutate: refreshDevices" not in text:
+        text = text.replace(
+            "  const { data: devices, isLoading } = useDeviceList();\n",
+            "  const { data: devices, isLoading, mutate: refreshDevices } = useDeviceList();\n",
+            1,
+        )
 
     # 2. state & callback
     state_anchor = "  const selectExecutionTarget = useSelectExecutionTarget(agentId);\n"
     state_code = (
-        "  /* LCA: ADR-0246 M4 Device Code Pairing */\n"
+        "  /* LCA: CONV-INSTALL-4 One-Liner Auto-Install */\n"
         "  const [pairCode, setPairCode] = useState('');\n"
         "  const [pairingStatus, setPairStatus] = useState<{ ok?: boolean; msg?: string } | null>(null);\n"
         "  const [isPairing, setIsPairing] = useState(false);\n"
+        "  const [installCmd, setInstallCmd] = useState<string>('');\n"
+        "  const [cmdOs, setCmdOs] = useState<'windows' | 'bash'>('windows');\n"
+        "  const [copied, setCopied] = useState(false);\n"
+        "  const [knownDevIds, setKnownDevIds] = useState<Set<string>>(new Set());\n"
+        "\n"
+        "  const fetchInstallCmd = useCallback(async (os: 'windows' | 'bash') => {\n"
+        "    setCmdOs(os);\n"
+        "    try {\n"
+        "      const resp = await fetch('/lca-api/api/device/pair/preauth', {\n"
+        "        method: 'POST',\n"
+        "        headers: { 'Content-Type': 'application/json' },\n"
+        "        body: JSON.stringify({}),\n"
+        "      });\n"
+        "      const data = await resp.json();\n"
+        "      if (data.success && data.installCommands) {\n"
+        "        setInstallCmd(data.installCommands[os] || '');\n"
+        "      }\n"
+        "    } catch (e: any) {\n"
+        "      console.error('Failed to get install command', e);\n"
+        "    }\n"
+        "  }, []);\n"
+        "\n"
+        "  useEffect(() => {\n"
+        "    if (!devices) return;\n"
+        "    const currentOnline = devices.filter((d: any) => d.online);\n"
+        "    if (knownDevIds.size > 0) {\n"
+        "      const newlyJoined = currentOnline.find((d: any) => !knownDevIds.has(d.deviceId));\n"
+        "      if (newlyJoined && selectExecutionTarget) {\n"
+        "        selectExecutionTarget('device', newlyJoined.deviceId);\n"
+        "        setPairStatus({ ok: true, msg: `已自动绑定本机: ${newlyJoined.label || newlyJoined.deviceId}` });\n"
+        "      }\n"
+        "    }\n"
+        "    setKnownDevIds(new Set(currentOnline.map((d: any) => d.deviceId)));\n"
+        "  }, [devices, knownDevIds, selectExecutionTarget]);\n"
         "\n"
         "  const handlePairSubmit = useCallback(async () => {\n"
         "    const code = pairCode.trim();\n"
@@ -248,6 +299,7 @@ def _patch_pairing_ui(text: str) -> str:
         "      if (resp.ok && data.success) {\n"
         "        setPairStatus({ ok: true, msg: `设备已配对: ${data.label || data.deviceId}` });\n"
         "        setPairCode('');\n"
+        "        if (selectExecutionTarget) selectExecutionTarget('device', data.deviceId);\n"
         "        if (refreshDevices) void refreshDevices();\n"
         "      } else {\n"
         "        setPairStatus({ ok: false, msg: `配对失败: ${data.error || '无效配对码'}` });\n"
@@ -257,7 +309,7 @@ def _patch_pairing_ui(text: str) -> str:
         "    } finally {\n"
         "      setIsPairing(false);\n"
         "    }\n"
-        "  }, [pairCode, refreshDevices]);\n"
+        "  }, [pairCode, refreshDevices, selectExecutionTarget]);\n"
     )
     if state_anchor in text:
         text = text.replace(state_anchor, state_anchor + state_code, 1)
@@ -267,8 +319,56 @@ def _patch_pairing_ui(text: str) -> str:
     jsx_code = (
         "      {/* LCA: Device Code Pairing card (ADR-0246 M4) */}\n"
         "      <div style={{ padding: '8px 12px', borderTop: '1px solid rgba(128,128,128,0.2)', marginTop: 6 }}>\n"
+        "        <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>\n"
+        "          <span style={{ fontWeight: 500 }}>一键接入本机 (免输码)</span>\n"
+        "          <div style={{ display: 'flex', gap: 4 }}>\n"
+        "            <button\n"
+        '              type="button"\n'
+        "              onClick={() => void fetchInstallCmd('windows')}\n"
+        "              style={{ fontSize: 10, padding: '1px 5px', border: '1px solid rgba(128,128,128,0.3)', borderRadius: 3, background: cmdOs === 'windows' ? 'var(--color-primary, #1677ff)' : 'transparent', color: cmdOs === 'windows' ? '#fff' : 'inherit', cursor: 'pointer' }}\n"
+        "            >\n"
+        "              PowerShell\n"
+        "            </button>\n"
+        "            <button\n"
+        '              type="button"\n'
+        "              onClick={() => void fetchInstallCmd('bash')}\n"
+        "              style={{ fontSize: 10, padding: '1px 5px', border: '1px solid rgba(128,128,128,0.3)', borderRadius: 3, background: cmdOs === 'bash' ? 'var(--color-primary, #1677ff)' : 'transparent', color: cmdOs === 'bash' ? '#fff' : 'inherit', cursor: 'pointer' }}\n"
+        "            >\n"
+        "              Bash\n"
+        "            </button>\n"
+        "          </div>\n"
+        "        </div>\n"
+        "        {installCmd ? (\n"
+        "          <div style={{ marginBottom: 8 }}>\n"
+        "            <div style={{ fontSize: 10, background: 'rgba(128,128,128,0.08)', padding: '6px 8px', borderRadius: 4, fontFamily: 'monospace', wordBreak: 'break-all', display: 'flex', alignItems: 'center', gap: 6 }}>\n"
+        "              <span style={{ flex: 1, userSelect: 'all' }}>{installCmd}</span>\n"
+        "              <button\n"
+        '                type="button"\n'
+        "                onClick={() => {\n"
+        "                  navigator.clipboard.writeText(installCmd);\n"
+        "                  setCopied(true);\n"
+        "                  setTimeout(() => setCopied(false), 2000);\n"
+        "                }}\n"
+        "                style={{ fontSize: 10, padding: '2px 8px', background: 'var(--color-primary, #1677ff)', color: '#fff', border: 'none', borderRadius: 3, cursor: 'pointer' }}\n"
+        "              >\n"
+        "                {copied ? '已复制' : '复制'}\n"
+        "              </button>\n"
+        "            </div>\n"
+        "            <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginTop: 3 }}>\n"
+        "              在本地终端粘贴回车，将自动完成安装建联并切换\n"
+        "            </div>\n"
+        "          </div>\n"
+        "        ) : (\n"
+        "          <button\n"
+        '            type="button"\n'
+        "            onClick={() => void fetchInstallCmd(cmdOs)}\n"
+        "            style={{ width: '100%', fontSize: 11, padding: '5px 8px', marginBottom: 8, borderRadius: 4, border: '1px dashed rgba(128,128,128,0.3)', background: 'transparent', color: 'inherit', cursor: 'pointer' }}\n"
+        "          >\n"
+        "            + 获取本地一键安装启动命令\n"
+        "          </button>\n"
+        "        )}\n"
         "        <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 4 }}>\n"
-        "          配对本机 / 新设备 (CLI)\n"
+        "          或输入已有配对码\n"
         "        </div>\n"
         "        <div style={{ display: 'flex', gap: 6 }}>\n"
         "          <input\n"
