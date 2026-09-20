@@ -271,11 +271,13 @@ def assistant_memory_tools_from_run(
     run: object | None,
     *,
     catalog: object,
+    profile_backfill: object | None = None,
 ) -> list[Tool]:
     """物化受治理记忆工具；run 绑定 assistant_id 时出现。
 
     ``catalog`` 只用于解析 assistant Home 路径；记忆读写全部走
-    ``AssistantMemory`` typed 存储。
+    ``AssistantMemory`` typed 存储。``profile_backfill`` 是 ADR-0246 PR-5
+    的可选异步回调，经工具写入身份/偏好事实后同样触发 USER.md 回填。
     """
     from lca.contracts.protocols.assistant.catalog import AssistantCatalog
     from lca.infrastructure.observability.facade.run.ambit import current_assistant_id
@@ -289,7 +291,7 @@ def assistant_memory_tools_from_run(
         return []
     try:
         spec = catalog.get(assistant_id)
-        memory = AssistantMemory(spec.home_path)
+        memory = AssistantMemory(spec.home_path, profile_backfill=profile_backfill)
     except Exception:
         return []
     return [

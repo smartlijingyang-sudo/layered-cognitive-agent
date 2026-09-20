@@ -29,11 +29,13 @@ class _FakeCtx:
         overlay: Any,
         tools: _FakeToolsService,
         tool_overlay: Any = None,
+        profile_backfill: Any = None,
     ) -> None:
         self._catalog = catalog
         self._bridge = bridge
         self._overlay = overlay
         self._tool_overlay = tool_overlay if tool_overlay is not None else object()
+        self._profile_backfill = profile_backfill if profile_backfill is not None else object()
         self._tools = tools
 
     def require(self, key: str) -> Any:
@@ -45,6 +47,8 @@ class _FakeCtx:
             return self._overlay
         if key == "assistant.tool_overlay":
             return self._tool_overlay
+        if key == "assistant.profile.backfill":
+            return self._profile_backfill
         if key == "tools":
             return self._tools
         raise KeyError(key)

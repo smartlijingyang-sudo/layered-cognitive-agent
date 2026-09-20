@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol, cast
 
 from lca.application.api.api import Agent, Team
-from lca.contracts.capabilities import ASSISTANT_CATALOG
+from lca.contracts.capabilities import ASSISTANT_CATALOG, ASSISTANT_PROFILE_BACKFILL
 from lca.contracts.mechanisms.capability.capability import (
     MissingCapabilityError,
     provider_current,
@@ -65,6 +65,9 @@ class RunnableBuildRequest:
     """Assistant Home 绝对路径 (ADR-0242 D4/D5); None when no assistant_id."""
     assistant_runtime: dict[str, object] = field(default_factory=dict)
     """``profile.json.runtime`` 运行参数覆盖 (ADR-0242 D9); 空 dict = 默认值。"""
+    profile_backfill: object | None = None
+    """ADR-0246 PR-5: ``(assistant_id, records) -> None`` 异步回调，身份/偏好
+    落盘后触发 USER.md 回填；None = 未装配（fail-soft，USER.md 保持模板）。"""
 
 
 class CognitiveRunnableAssembler:
@@ -107,6 +110,7 @@ class CognitiveRunnableAssembler:
             ),
             assistant_home_path=home_path,
             assistant_runtime=dict(spec.profile_runtime) if spec is not None else {},
+            profile_backfill=_profile_backfill_for_run(request.scope),
         )
         adapter = self._mode_registry.resolve(request.mode)
         return cast("Agent | Team", await adapter.build(prepared))
@@ -162,6 +166,30 @@ def _role_profile_for_assistant(
             "assistant_home_path": home_path or "",
         },
     )
+
+
+def _profile_backfill_for_run(scope: Context | None) -> object | None:
+    """Resolve the USER.md backfill callback from the booted scope.
+
+    Returns an async ``(assistant_id, records) -> None`` callback backed by
+    the ``assistant.profile.backfill`` capability. Returns ``None`` when the
+    scope is absent or the capability is missing, so non-assistant profiles
+    keep the historical no-backfill behavior (fail-soft).
+    """
+    if scope is None:
+        return None
+    try:
+        service = require_capability(scope, ASSISTANT_PROFILE_BACKFILL.key)
+    except (MissingCapabilityError, TypeError, ValueError):
+        return None
+    backfill = getattr(service, "backfill_from_records", None)
+    if not callable(backfill):
+        return None
+
+    async def _backfill(assistant_id: str, records: object) -> None:
+        backfill(assistant_id, records)
+
+    return _backfill
 
 
 def tools_from_scope(

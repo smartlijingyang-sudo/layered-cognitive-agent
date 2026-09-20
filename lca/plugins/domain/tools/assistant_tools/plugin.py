@@ -15,6 +15,7 @@ from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import (
     ASSISTANT_CATALOG,
     ASSISTANT_FRONTEND_BRIDGE,
+    ASSISTANT_PROFILE_BACKFILL,
     ASSISTANT_SKILL_OVERLAY,
     ASSISTANT_TOOL_OVERLAY,
 )
@@ -70,6 +71,7 @@ def _default_tool_names_provider(
     requires=(
         ASSISTANT_CATALOG.key,
         ASSISTANT_FRONTEND_BRIDGE.key,
+        ASSISTANT_PROFILE_BACKFILL.key,
         ASSISTANT_SKILL_OVERLAY.key,
         ASSISTANT_TOOL_OVERLAY.key,
         "tools",
@@ -100,6 +102,7 @@ def _default_tool_names_provider(
         reads=(
             ASSISTANT_CATALOG.key,
             ASSISTANT_FRONTEND_BRIDGE.key,
+            ASSISTANT_PROFILE_BACKFILL.key,
             ASSISTANT_SKILL_OVERLAY.key,
             ASSISTANT_TOOL_OVERLAY.key,
             "tools",
@@ -115,7 +118,14 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     bridge = ctx.require(ASSISTANT_FRONTEND_BRIDGE.key)
     overlay = ctx.require(ASSISTANT_SKILL_OVERLAY.key)
     tool_overlay = ctx.require(ASSISTANT_TOOL_OVERLAY.key)
+    profile_backfill_svc = ctx.require(ASSISTANT_PROFILE_BACKFILL.key)
     tools_service = ctx.require("tools")
+
+    async def _profile_backfill(assistant_id: str, records: object) -> None:
+        backfill = getattr(profile_backfill_svc, "backfill_from_records", None)
+        if callable(backfill):
+            backfill(assistant_id, records)
+
     try:
         role_resolver: FileRoleCardResolver | None = FileRoleCardResolver()
     except Exception:
@@ -151,7 +161,13 @@ async def setup(ctx: PluginContext, config: Any) -> None:
             )
         )
         # 受治理记忆工具族（ADR-0246 PR-6）：search/add/update/remove 结构化记忆。
-        tools.extend(assistant_memory_tools_from_run(bindings, catalog=catalog))
+        tools.extend(
+            assistant_memory_tools_from_run(
+                bindings,
+                catalog=catalog,
+                profile_backfill=_profile_backfill,
+            )
+        )
         return tools
 
     ctx.require("tools").register_factory("assistant", _assistant_tools_factory)

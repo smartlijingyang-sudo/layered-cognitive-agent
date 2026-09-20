@@ -132,7 +132,10 @@ class _SoloModeAdapter(ModeAdapter):
         if build_request.role_profile is not None and build_request.assistant_home_path:
             from lca.infrastructure.memory.assistant_memory import AssistantMemory
 
-            memory = AssistantMemory(build_request.assistant_home_path)
+            memory = AssistantMemory(
+                build_request.assistant_home_path,
+                profile_backfill=build_request.profile_backfill,
+            )
         return build_solo_agent(
             build_request.llm,
             observability=build_request.assembly.observability,

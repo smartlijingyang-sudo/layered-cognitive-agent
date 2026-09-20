@@ -192,7 +192,12 @@ class AssistantMemory(MemorySystem):
         source_trace_id: str,
         record_id: str | None = None,
     ) -> None:
-        """追加一条 typed semantic 记录；同 ``dedupe_key`` 旧记录被 supersede。"""
+        """追加一条 typed semantic 记录；同 ``dedupe_key`` 旧记录被 supersede。
+
+        ADR-0247 回归：除 ``dedupe_key`` 幂等外，再按 ``category + 内容指纹``
+        做内容级去重。模型经 ``memory_add`` 写入的 dedupe_key 可能与自动提取
+        的 canonical key 不同，但同一事实必须收敛为一条活跃记录。
+        """
         layer = MemoryLayer.SEMANTIC
         records = self._load(layer)
         now_ms = _utc_now_ms()
@@ -210,13 +215,29 @@ class AssistantMemory(MemorySystem):
 
         new_id_value = record_id or new_id("mem")
         superseded_id: str | None = None
+
+        def _retire(entry: dict[str, Any]) -> None:
+            nonlocal superseded_id
+            entry["deleted"] = True
+            entry["retired_at_ms"] = now_ms
+            entry.setdefault("metadata", {})["superseded_by"] = new_id_value
+            superseded_id = str(entry.get("record_id") or "")
+
+        # 1) 同 dedupe_key：canonical 幂等键（ADR-0246 语义）。
         if dedupe_key_value:
             for entry in records:
                 if entry.get("dedupe_key") == dedupe_key_value and not entry.get("deleted", False):
-                    entry["deleted"] = True
-                    entry["retired_at_ms"] = now_ms
-                    entry.setdefault("metadata", {})["superseded_by"] = new_id_value
-                    superseded_id = str(entry.get("record_id") or "")
+                    _retire(entry)
+
+        # 2) 同 category + 内容指纹：跨写入路径（memory_add vs 自动提取）去重。
+        if superseded_id is None:
+            fingerprint = _content_fingerprint(content)
+            if fingerprint:
+                for entry in records:
+                    if entry.get("category") != category_value or entry.get("deleted", False):
+                        continue
+                    if _content_fingerprint(str(entry.get("content") or "")) == fingerprint:
+                        _retire(entry)
 
         records.append(
             {
@@ -356,6 +377,29 @@ def _as_category(value: object) -> MemoryCategory:
         return MemoryCategory(str(value)) if value else MemoryCategory.FACT
     except ValueError:
         return MemoryCategory.FACT
+
+
+# 内容指纹前缀标签：这些标签后的剩余部分是事实核心，跨路径去重时忽略。
+_FINGERPRINT_LABELS: frozenset[str] = frozenset(
+    {"用户身份", "用户偏好", "称呼偏好", "称呼", "身份", "偏好", "事实"}
+)
+
+
+def _content_fingerprint(content: str) -> str:
+    """结构化事实的内容指纹：去引号、去常见标签前缀、去空白。
+
+    用于 store 边界的内容级幂等（ADR-0247 回归）。例如
+    ``称呼偏好：称呼用户为"老板"`` 与 ``用户偏好：称呼用户为老板``
+    都收敛为 ``称呼用户为老板``。
+    """
+    normalized = content
+    for ch in "\"'「」『』“”‘’":
+        normalized = normalized.replace(ch, "")
+    if "：" in normalized:
+        label, _, rest = normalized.partition("：")
+        if label.strip() in _FINGERPRINT_LABELS:
+            normalized = rest
+    return "".join(normalized.split())
 
 
 def _utc_now_ms() -> int:
