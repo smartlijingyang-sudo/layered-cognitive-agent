@@ -76,9 +76,9 @@ class RememberAdmitExecutor:
 
         # Extract candidates
         procedural_candidate = extra.get("procedural_candidate")
-        semantic_candidate = extra.get("memory_candidate")
+        semantic_candidates = self._semantic_candidates(extra)
 
-        if procedural_candidate is None and semantic_candidate is None:
+        if procedural_candidate is None and not semantic_candidates:
             return self._emit_rejection(decision, observation, reflection)
 
         # Authority Check (ADR-0244 §3.3: User > Tool > Model)
@@ -88,17 +88,36 @@ class RememberAdmitExecutor:
             if not obs_success:
                 # Failed execution must not be admitted as a viable SOP
                 return self._emit_rejection(decision, observation, reflection)
-            return self._emit_admission(decision, observation, reflection, candidate=procedural_candidate)
+            return self._emit_admission(
+                decision, observation, reflection, candidate=procedural_candidate
+            )
 
-        if semantic_candidate is not None:
-            source = semantic_candidate.get("source", "model") if isinstance(semantic_candidate, dict) else "model"
-            confidence = float(semantic_candidate.get("confidence", 0.0)) if isinstance(semantic_candidate, dict) else 0.0
-            # Reject ungrounded model conjectures
-            if source == "model" and confidence < 0.8:
-                return self._emit_rejection(decision, observation, reflection)
-            return self._emit_admission(decision, observation, reflection, candidate=semantic_candidate)
+        # Semantic candidates: reject ungrounded model conjectures, keep the rest.
+        admitted = [cand for cand in semantic_candidates if self._is_admissible(cand)]
+        if not admitted:
+            return self._emit_rejection(decision, observation, reflection)
+        return self._emit_admission(decision, observation, reflection, candidate=admitted)
 
-        return self._emit_rejection(decision, observation, reflection)
+    @staticmethod
+    def _semantic_candidates(extra: dict[str, Any]) -> list[dict[str, Any]]:
+        """读取 ADR-0246 结构化候选列表；兼容旧的单候选 ``memory_candidate``。"""
+        candidates = extra.get("memory_candidates")
+        if isinstance(candidates, list):
+            return [c for c in candidates if isinstance(c, dict)]
+        single = extra.get("memory_candidate")
+        if isinstance(single, dict):
+            return [single]
+        return []
+
+    @staticmethod
+    def _is_admissible(candidate: dict[str, Any]) -> bool:
+        """权威度过滤：低置信度的模型推断不落盘（User > Tool > Model）。"""
+        source = str(candidate.get("source") or "model")
+        try:
+            confidence = float(candidate.get("confidence", 0.0))
+        except (TypeError, ValueError):
+            confidence = 0.0
+        return not (source == "model" and confidence < 0.8)
 
     def _emit_admission(
         self,

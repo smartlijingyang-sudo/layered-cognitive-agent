@@ -5,6 +5,13 @@ A minimal ``MemorySystem`` implementation that persists memory records under
 is the isolation boundary: two assistants never share records.  Memory is
 NOT part of the manifest digest (I-A13), so this module never touches
 ``MEMORY.md`` or any config-face file.
+
+ADR-0246: records are typed knowledge entries. Semantic records carry
+``category`` / ``dedupe_key`` / ``confidence`` / ``source``; a new record
+with the same ``dedupe_key`` supersedes the previous active one
+(``deleted=True`` + ``retired_at_ms`` on the old record, ``revision_of``
+on the new). Superseded records stay on disk for audit and are excluded
+from retrieval.
 """
 
 from __future__ import annotations
@@ -14,7 +21,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from lca.contracts.atoms.enums.enums import MemoryLayer
+from lca.contracts.atoms.enums.enums import MemoryCategory, MemoryLayer
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.conversation.memory import MemoryRecord
 from lca.contracts.models.core.execution.decision import Observation, Reflection
@@ -75,24 +82,29 @@ class AssistantMemory(MemorySystem):
     ) -> None:
         """Persist admitted memory candidates into the right layer.
 
-        User-confirmed semantic directives go to ``semantic.json``;
-        procedural SOP candidates go to ``procedural.json``. The generic
-        step record stays in ``working.json`` for observability.
+        ADR-0246 semantic candidates (``memory_candidates`` list) persist as
+        typed semantic records with ``category`` / ``dedupe_key`` and
+        supersede previous records with the same dedupe_key. Procedural SOP
+        candidates go to ``procedural.json``. The generic step record stays
+        in ``working.json`` for observability.
         """
         extra = getattr(reflection, "extra", {}) or {}
-        semantic = extra.get("memory_candidate")
-        if isinstance(semantic, dict):
-            content = str(semantic.get("content") or "").strip()
-            if content:
-                self._append(
-                    MemoryLayer.SEMANTIC,
-                    content=content,
-                    state=state,
-                    observation=observation,
-                    reflection=reflection,
-                    metadata={"source": str(semantic.get("source") or "user")},
-                )
-                return
+        candidates = self._semantic_candidates(extra)
+        if candidates:
+            for cand in candidates:
+                content = str(cand.get("content") or "").strip()
+                if content:
+                    self._append_semantic(
+                        content=content,
+                        category=cand.get("category", MemoryCategory.FACT.value),
+                        confidence=cand.get("confidence"),
+                        source=str(cand.get("source") or "user"),
+                        dedupe_key=cand.get("dedupe_key"),
+                        state=state,
+                        observation=observation,
+                        reflection=reflection,
+                    )
+            return
         procedural = extra.get("procedural_candidate")
         if procedural is not None:
             content = str(getattr(procedural, "workflow_summary", "") or "").strip()
@@ -116,6 +128,78 @@ class AssistantMemory(MemorySystem):
             reflection=reflection,
         )
 
+    @staticmethod
+    def _semantic_candidates(extra: dict[str, Any]) -> list[dict[str, Any]]:
+        """读取 ADR-0246 结构化候选列表；兼容旧的单候选 ``memory_candidate``。"""
+        candidates = extra.get("memory_candidates")
+        if isinstance(candidates, list):
+            return [c for c in candidates if isinstance(c, dict)]
+        single = extra.get("memory_candidate")
+        if isinstance(single, dict):
+            return [single]
+        return []
+
+    def _append_semantic(
+        self,
+        *,
+        content: str,
+        category: object,
+        confidence: object,
+        source: str,
+        dedupe_key: object,
+        state: AgentState,
+        observation: Observation,
+        reflection: Reflection,
+    ) -> None:
+        """追加一条 typed semantic 记录；同 ``dedupe_key`` 旧记录被 supersede。"""
+        layer = MemoryLayer.SEMANTIC
+        records = self._load(layer)
+        now_ms = _utc_now_ms()
+        try:
+            category_value = (
+                MemoryCategory(str(category)).value if category else MemoryCategory.FACT.value
+            )
+        except ValueError:
+            category_value = MemoryCategory.FACT.value
+        try:
+            confidence_value = float(confidence) if confidence is not None else None
+        except (TypeError, ValueError):
+            confidence_value = None
+        dedupe_key_value = str(dedupe_key).strip() if dedupe_key else None
+
+        new_id_value = new_id("mem")
+        superseded_id: str | None = None
+        if dedupe_key_value:
+            for entry in records:
+                if entry.get("dedupe_key") == dedupe_key_value and not entry.get("deleted", False):
+                    entry["deleted"] = True
+                    entry["retired_at_ms"] = now_ms
+                    entry.setdefault("metadata", {})["superseded_by"] = new_id_value
+                    superseded_id = str(entry.get("record_id") or "")
+
+        records.append(
+            {
+                "record_id": new_id_value,
+                "layer": layer.value,
+                "category": category_value,
+                "content": content,
+                "importance": 0.9
+                if confidence_value is not None and confidence_value >= 0.8
+                else 0.5,
+                "confidence": confidence_value,
+                "source": source,
+                "dedupe_key": dedupe_key_value,
+                "revision_of": superseded_id,
+                "deleted": False,
+                "retired_at_ms": None,
+                "source_trace_id": str(getattr(state, "trace_id", "") or ""),
+                "created_at_ms": now_ms,
+                "created_at": _utc_now_iso(),
+                "metadata": {"source": source},
+            }
+        )
+        self._save(layer, records)
+
     def _append(
         self,
         layer: MemoryLayer,
@@ -136,25 +220,54 @@ class AssistantMemory(MemorySystem):
                 "importance": 0.5,
                 "source_trace_id": str(getattr(state, "trace_id", "") or ""),
                 "created_at": _utc_now_iso(),
+                "created_at_ms": _utc_now_ms(),
                 "metadata": metadata or {},
             }
         )
         self._save(layer, records)
 
     def query(self, layer: MemoryLayer) -> list[MemoryRecord]:
-        """返回指定层的持久化记录（按写入顺序）。"""
+        """返回指定层的活跃记录（默认排除被 supersede 的旧记录）。"""
         return [
             MemoryRecord(
                 record_id=str(entry.get("record_id") or ""),
                 content=str(entry.get("content") or ""),
                 memory_type=MemoryLayer(str(entry.get("layer") or layer.value)),
                 importance=float(entry.get("importance") or 0.5),
+                category=_as_category(entry.get("category")),
+                dedupe_key=entry.get("dedupe_key")
+                if isinstance(entry.get("dedupe_key"), str)
+                else None,
+                confidence=entry.get("confidence")
+                if isinstance(entry.get("confidence"), (int, float))
+                else None,
                 source_trace_id=str(entry.get("source_trace_id") or ""),
-                created_at_ms=entry.get("created_at_ms"),
+                created_at_ms=entry.get("created_at_ms")
+                if isinstance(entry.get("created_at_ms"), int)
+                else None,
+                revision_of=entry.get("revision_of")
+                if isinstance(entry.get("revision_of"), str)
+                else None,
+                deleted=bool(entry.get("deleted", False)),
+                retired_at_ms=entry.get("retired_at_ms")
+                if isinstance(entry.get("retired_at_ms"), int)
+                else None,
                 metadata=entry.get("metadata") if isinstance(entry.get("metadata"), dict) else {},
             )
             for entry in self._load(layer)
+            if not entry.get("deleted", False)
         ]
+
+
+def _as_category(value: object) -> MemoryCategory:
+    try:
+        return MemoryCategory(str(value)) if value else MemoryCategory.FACT
+    except ValueError:
+        return MemoryCategory.FACT
+
+
+def _utc_now_ms() -> int:
+    return int(datetime.now(UTC).timestamp() * 1000)
 
 
 def _utc_now_iso() -> str:

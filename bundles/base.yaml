@@ -162,6 +162,10 @@ entries:
   name: phase_reflect_score
   $module: lca.nodes.reflect.score.score
   config: {}
+- id: phase.reflect.memory.extract
+  name: phase_reflect_memory_extract
+  $module: lca.nodes.reflect.memory_extract.memory_extract
+  config: {}
 - id: phase.reflect.admit_recovery
   name: phase_reflect_admit_recovery
   $module: lca.nodes.reflect.admit_recovery.admit_recovery

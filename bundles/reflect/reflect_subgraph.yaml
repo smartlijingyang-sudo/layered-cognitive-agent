@@ -1,10 +1,11 @@
 # bundles/reflect_subgraph.yaml — reflect 多节点子图
 # ADR-0217 Bundle Graph Schema v2 + ADR-0221 six-phase subgraph cutover.
 #
-# 拓扑:score → admit_recovery(双节点 typed port pipeline)。
-# score 调 reflection pipeline / brain 产 typed reflection;admit_recovery
-# 根据 observation.success 决定 routing.next_hint + 决定 outer loop
-# 是否走 recovery 边(replaces 旧 RecoveryReflectExecutor)。
+# 拓扑:score → memory.extract → admit_recovery(三节点 typed port pipeline)。
+# score 调 reflection pipeline / brain 产 typed reflection;memory.extract
+# 做 ADR-0246 LLM 蒸馏提取结构化记忆候选（快速路径零 LLM 调用）;
+# admit_recovery 根据 observation.success 决定 routing.next_hint + 决定 outer
+# loop 是否走 recovery 边(replaces 旧 RecoveryReflectExecutor)。
 #
 # D4 typed-port cutover: the recovery routing hint flows via the typed
 # ``routing`` port (``RoutingDecision.next_hint``). The edge predicate
@@ -12,7 +13,7 @@
 
 id: reflect.subgraph
 region: reflect
-purpose: reflect 双步执行 — score (reflection pipeline) → admit_recovery (recovery hint)
+purpose: reflect 三步执行 — score (reflection pipeline) → memory.extract (LLM 蒸馏记忆) → admit_recovery (recovery hint)
 
 nodes:
   - id: phase.reflect.score
@@ -26,6 +27,14 @@ nodes:
     outputs: [observation, reflection]
     config:
 
+  - id: phase.reflect.memory.extract
+    factory: phase.reflect.memory.extract
+    # ADR-0246: LLM 蒸馏节点读取 score 产出的 reflection，把结构化
+    # memory_candidates 合并进 reflection.extra 后继续下传。
+    inputs: [reflection]
+    outputs: [reflection]
+    config:
+
   - id: phase.reflect.admit_recovery
     factory: phase.reflect.admit_recovery
     inputs: [observation, reflection]
@@ -34,4 +43,7 @@ nodes:
 
 edges:
   - from: phase.reflect.score
+    to: phase.reflect.memory.extract
+
+  - from: phase.reflect.memory.extract
     to: phase.reflect.admit_recovery

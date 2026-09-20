@@ -1,4 +1,4 @@
-"""Semantic memory candidate extraction, persistence, and dispatch tests (PR-4)."""
+"""Semantic memory candidate extraction, persistence, and dispatch tests (ADR-0246 PR-3)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from lca.contracts.atoms.enums.enums import MemoryLayer, ReflectionVerdict
+from lca.contracts.atoms.enums.enums import MemoryCategory, MemoryLayer, ReflectionVerdict
 from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.perceive.perception import ContextManifest
 from lca.contracts.models.core.state.state import AgentState, Budget
@@ -16,7 +16,6 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
 )
 from lca.infrastructure.memory.assistant_memory import AssistantMemory
 from lca.nodes.perceive.fold.fold import PerceiveFoldExecutor
-from lca.nodes.reflect.score.score import _extract_semantic_candidate
 from lca.nodes.remember.write.write import RememberWriteExecutor
 
 
@@ -46,35 +45,75 @@ def _decision() -> Decision:
     )
 
 
-def test_extract_semantic_candidate_user_directive() -> None:
-    cand = _extract_semantic_candidate(_state("记住：我的昵称是老板，我的名字叫李超。"))
-    assert cand is not None
-    assert cand["source"] == "user"
-    assert cand["confidence"] == 1.0
-    assert "老板" in str(cand["content"])
-
-
-def test_extract_semantic_candidate_non_directive_none() -> None:
-    assert _extract_semantic_candidate(_state("什么是快手电商？")) is None
+def _identity_candidates() -> list[dict[str, object]]:
+    return [
+        {
+            "category": MemoryCategory.IDENTITY.value,
+            "content": "用户身份：架构师",
+            "confidence": 1.0,
+            "source": "user",
+            "dedupe_key": "identity:architect",
+        }
+    ]
 
 
 @pytest.mark.asyncio
-async def test_assistant_memory_persists_semantic_content(tmp_path) -> None:
+async def test_assistant_memory_persists_typed_semantic_content(tmp_path) -> None:
     mem = AssistantMemory(tmp_path / "asst")
     await mem.update(
-        _state("记住：以后叫我老板"),
+        _state("我是架构师"),
+        _observation(),
+        _reflection(memory_candidates=_identity_candidates()),
+    )
+    semantic = mem.query(MemoryLayer.SEMANTIC)
+    assert len(semantic) == 1
+    assert semantic[0].content == "用户身份：架构师"
+    assert semantic[0].category is MemoryCategory.IDENTITY
+    assert semantic[0].dedupe_key == "identity:architect"
+    assert semantic[0].confidence == 1.0
+
+    records = json.loads(
+        (tmp_path / "asst" / "memory" / "semantic.json").read_text(encoding="utf-8")
+    )
+    assert records[0]["category"] == "identity"
+    assert records[0]["dedupe_key"] == "identity:architect"
+    assert records[0]["metadata"]["source"] == "user"
+
+
+@pytest.mark.asyncio
+async def test_assistant_memory_supersedes_same_dedupe_key(tmp_path) -> None:
+    mem = AssistantMemory(tmp_path / "asst")
+    await mem.update(
+        _state("我是架构师"),
+        _observation(),
+        _reflection(memory_candidates=_identity_candidates()),
+    )
+    await mem.update(
+        _state("我是高级架构师"),
         _observation(),
         _reflection(
-            memory_candidate={"content": "以后叫我老板", "source": "user", "confidence": 1.0}
+            memory_candidates=[
+                {
+                    "category": MemoryCategory.IDENTITY.value,
+                    "content": "用户身份：高级架构师",
+                    "confidence": 1.0,
+                    "source": "user",
+                    "dedupe_key": "identity:architect",
+                }
+            ]
         ),
     )
     semantic = mem.query(MemoryLayer.SEMANTIC)
     assert len(semantic) == 1
-    assert semantic[0].content == "以后叫我老板"
-    records = json.loads(
+    assert semantic[0].content == "用户身份：高级架构师"
+    assert semantic[0].revision_of is not None
+
+    all_entries = json.loads(
         (tmp_path / "asst" / "memory" / "semantic.json").read_text(encoding="utf-8")
     )
-    assert records[0]["metadata"]["source"] == "user"
+    old = next(e for e in all_entries if e["content"] == "用户身份：架构师")
+    assert old["deleted"] is True
+    assert old["retired_at_ms"] is not None
 
 
 class _RecordingGateway:
@@ -101,7 +140,7 @@ async def test_remember_write_dispatches_via_execute() -> None:
     gateway = _RecordingGateway()
     executor = RememberWriteExecutor()
     context = NodeContext(
-        runtime={"effect_gateway": gateway, "agent_state": _state("记住：以后叫我老板")},
+        runtime={"effect_gateway": gateway, "agent_state": _state("我是架构师")},
         budget={},
         metadata={"plan_ref": "plan:1", "node_id": "remember.write"},
     )
@@ -109,11 +148,9 @@ async def test_remember_write_dispatches_via_execute() -> None:
         port_values={
             "decision": _decision(),
             "observation": _observation(),
-            "reflection": _reflection(
-                memory_candidate={"content": "以后叫我老板", "source": "user", "confidence": 1.0}
-            ),
+            "reflection": _reflection(memory_candidates=_identity_candidates()),
             "admitted": True,
-            "candidate": {"content": "以后叫我老板", "source": "user", "confidence": 1.0},
+            "candidate": _identity_candidates(),
             "effect_gateway": gateway,
         }
     )
@@ -138,7 +175,7 @@ class _RecordingReducer:
 @pytest.mark.asyncio
 async def test_perceive_fold_applies_merged_manifest_to_state() -> None:
     reducer = _RecordingReducer()
-    state = _state("记住：以后叫我老板")
+    state = _state("我是架构师")
     manifest = ContextManifest(items=())
     executor = PerceiveFoldExecutor()
     context = NodeContext(
@@ -149,7 +186,7 @@ async def test_perceive_fold_applies_merged_manifest_to_state() -> None:
     memories = [
         {
             "record_id": "mem_1",
-            "content": "以后叫我老板",
+            "content": "用户身份：架构师",
             "memory_type": "semantic",
             "importance": 1.0,
         }
