@@ -32,6 +32,23 @@ from lca.infrastructure.skills.zip.security import (
 )
 
 
+def _ensure_references_field(skill_md_text: str) -> str:
+    """在 YAML frontmatter 中补 ``references: []``（ADR-0214 §7 可空声明）。
+
+    仅当文本以 ``---`` 开头时在 opening delimiter 后插入；非标准 frontmatter
+    原样返回，让 install_package 的既有校验正常 fail-loud。
+    """
+    if not skill_md_text.startswith("---"):
+        return skill_md_text
+    lines = skill_md_text.split("\n", 2)
+    if len(lines) < 2:
+        return skill_md_text
+    head = lines[0]
+    rest = lines[1]
+    tail = lines[2] if len(lines) > 2 else ""
+    return f"{head}\nreferences: []\n{rest}\n{tail}"
+
+
 class HttpSkillImporter(SkillImporter):
     """Fetch skill packages from network and persist through the installer seam."""
 
@@ -163,6 +180,11 @@ class HttpSkillImporter(SkillImporter):
         meta, _ = split_frontmatter(text)
         fallback = PurePosixPath(url).stem or "skill"
         skill_id = sanitize_skill_id(skill_title(meta, fallback))
+        # ADR-0214 §7 要求 frontmatter 声明 references（可空）。裸 SKILL.md 来源
+        # 常缺省该字段，这里补 ``references: []`` 再进 install_package，避免
+        # URL 安装被合约拒收（ADR-0247 流程测试补强）。
+        if "references" not in meta:
+            text = _ensure_references_field(text)
         return self._store.install_package(
             skill_id=skill_id,
             skill_md_text=text,

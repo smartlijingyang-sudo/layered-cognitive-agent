@@ -30,17 +30,22 @@ class AssistantCreateSkillTool(Tool):
 
     name = CREATE_ASSISTANT_SKILL_TOOL
     description = (
-        "为当前绑定的助理创建并安装一个操作 skill（写入助理 Home 的 skills/ 目录，"
-        "后续对话会自动加载）。"
-        "参数: skill_md（SKILL.md 全文，含 YAML frontmatter）、"
-        "skill_id（可选，默认从 frontmatter name 推导）、"
-        "sandbox_path（可选，沙箱/工作区内已写好的 SKILL.md 文件，或包含 SKILL.md "
-        "与 resources/ 的目录，与 skill_md 二选一；传目录时 resources/ 等附属文件会一并安装）。"
+        "为当前绑定的助理安装一个操作 skill（写入助理 Home 的 skills/ 目录，"
+        "后续对话会自动加载）。支持三种来源，任选其一："
+        "source_url（网络地址，如 GitHub 目录 / ZIP / 裸 SKILL.md URL，经 0067 "
+        "三闸校验后安装）；skill_md（SKILL.md 全文）；sandbox_path（沙箱内已写好"
+        "的 SKILL.md 文件或目录）。"
+        "参数: source_url / skill_md / sandbox_path 三选一，"
+        "skill_id（可选，默认从 frontmatter name 推导）。"
         "安装后请 activate_skill 加载操作指南。"
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
+            "source_url": {
+                "type": "string",
+                "description": "可选：要安装的 skill 网络地址（GitHub 目录 / ZIP / 裸 SKILL.md URL）",
+            },
             "skill_md": {
                 "type": "string",
                 "description": "SKILL.md 完整内容（含 frontmatter）",
@@ -65,10 +70,12 @@ class AssistantCreateSkillTool(Tool):
     def validate(self, args: dict[str, Any]) -> str | None:
         skill_md = str(args.get("skill_md") or "").strip()
         sandbox_path = str(args.get("sandbox_path") or "").strip()
-        if not skill_md and not sandbox_path:
-            return "skill_md 与 sandbox_path 至少提供一个"
-        if skill_md and sandbox_path:
-            return "skill_md 与 sandbox_path 只能提供一个"
+        source_url = str(args.get("source_url") or "").strip()
+        provided = [v for v in (skill_md, sandbox_path, source_url) if v]
+        if not provided:
+            return "skill_md / sandbox_path / source_url 至少提供一个"
+        if len(provided) > 1:
+            return "skill_md / sandbox_path / source_url 只能提供一个"
         return None
 
     async def execute(self, args: dict[str, Any]) -> Observation:
@@ -79,52 +86,63 @@ class AssistantCreateSkillTool(Tool):
 
         skill_md = str(args.get("skill_md") or "").strip()
         sandbox_path = str(args.get("sandbox_path") or "").strip()
+        source_url = str(args.get("source_url") or "").strip()
         explicit_id = str(args.get("skill_id") or "").strip()
 
         staging = Path(tempfile.mkdtemp(prefix="lca-create-skill-"))
         try:
-            if skill_md:
-                (staging / "SKILL.md").write_text(skill_md, encoding="utf-8")
+            if source_url:
+                # 网络源：直接走 overlay 的 0048 拉取 + 0067 三闸（URL 路径）。
+                receipt = await self._overlay.install(
+                    self._assistant_id,
+                    SkillSource(url=source_url),
+                    actor="agent",
+                )
             else:
-                resolved = _resolve_workspace_path(sandbox_path)
-                if resolved is None:
-                    return self._fail(start, f"无法解析沙箱路径: {sandbox_path}")
-                if resolved.is_dir():
-                    shutil.copytree(resolved, staging, dirs_exist_ok=True)
-                    if not (staging / "SKILL.md").is_file():
-                        return self._fail(start, f"沙箱目录缺少 SKILL.md: {sandbox_path}")
-                elif resolved.is_file():
-                    (staging / "SKILL.md").write_text(
-                        resolved.read_text(encoding="utf-8"),
-                        encoding="utf-8",
-                    )
+                if skill_md:
+                    (staging / "SKILL.md").write_text(skill_md, encoding="utf-8")
                 else:
-                    return self._fail(start, f"沙箱路径不存在: {sandbox_path}")
+                    resolved = _resolve_workspace_path(sandbox_path)
+                    if resolved is None:
+                        return self._fail(start, f"无法解析沙箱路径: {sandbox_path}")
+                    if resolved.is_dir():
+                        shutil.copytree(resolved, staging, dirs_exist_ok=True)
+                        if not (staging / "SKILL.md").is_file():
+                            return self._fail(start, f"沙箱目录缺少 SKILL.md: {sandbox_path}")
+                    elif resolved.is_file():
+                        (staging / "SKILL.md").write_text(
+                            resolved.read_text(encoding="utf-8"),
+                            encoding="utf-8",
+                        )
+                    else:
+                        return self._fail(start, f"沙箱路径不存在: {sandbox_path}")
 
-            skill_md = (staging / "SKILL.md").read_text(encoding="utf-8")
-            try:
-                meta, _ = split_frontmatter(skill_md)
-                skill_id = sanitize_skill_id(explicit_id or skill_title(meta, "assistant-skill"))
-            except ValueError as exc:
-                return self._fail(start, str(exc))
-
-            if explicit_id:
-                # The installer names the package from SKILL.md frontmatter, so an
-                # `skill_id` argument that disagrees with it would be silently
-                # dropped; refuse instead of installing under a different id.
-                declared_id = sanitize_skill_id(skill_title(meta, "assistant-skill"))
-                if skill_id != declared_id:
-                    return self._fail(
-                        start,
-                        f"skill_id {skill_id!r} 与 SKILL.md frontmatter 的 "
-                        f"name {declared_id!r} 不一致 — 二者必须相同",
+                skill_md = (staging / "SKILL.md").read_text(encoding="utf-8")
+                try:
+                    meta, _ = split_frontmatter(skill_md)
+                    skill_id = sanitize_skill_id(
+                        explicit_id or skill_title(meta, "assistant-skill")
                     )
+                except ValueError as exc:
+                    return self._fail(start, str(exc))
 
-            receipt = await self._overlay.install(
-                self._assistant_id,
-                SkillSource(local_path=str(staging)),
-                actor="agent",
-            )
+                if explicit_id:
+                    # The installer names the package from SKILL.md frontmatter, so an
+                    # `skill_id` argument that disagrees with it would be silently
+                    # dropped; refuse instead of installing under a different id.
+                    declared_id = sanitize_skill_id(skill_title(meta, "assistant-skill"))
+                    if skill_id != declared_id:
+                        return self._fail(
+                            start,
+                            f"skill_id {skill_id!r} 与 SKILL.md frontmatter 的 "
+                            f"name {declared_id!r} 不一致 — 二者必须相同",
+                        )
+
+                receipt = await self._overlay.install(
+                    self._assistant_id,
+                    SkillSource(local_path=str(staging)),
+                    actor="agent",
+                )
         except Exception as exc:
             return self._fail(start, f"安装失败: {exc}")
         finally:
