@@ -79,6 +79,21 @@ class TestFilterToolsByAssistant:
         result = filter_tools_by_assistant([_tool("writer", "workspace.write")], home)
         assert result == ()
 
+    def test_filter_tools_keeps_assistant_tools_via_grants(self, home: Path) -> None:
+        from lca.infrastructure.tools.assistant.create_skill_tool import (
+            AssistantCreateSkillTool,
+        )
+        from lca.infrastructure.tools.assistant.self_manage_tools import (
+            UpdateAssistantSoulTool,
+        )
+
+        _write_tools(home, allow=["alpha"], deny=[])
+        _write_grants(home, ["skill.import", "profile.revise"])
+        skill_tool = AssistantCreateSkillTool(overlay=object(), assistant_id="asst_demo")
+        soul_tool = UpdateAssistantSoulTool(catalog=object(), assistant_id="asst_demo")
+        result = filter_tools_by_assistant([skill_tool, soul_tool, _tool("beta")], home)
+        assert {t.name for t in result} == {"create_assistant_skill", "update_assistant_soul"}
+
 
 # ── tools_from_scope → filter_tools_by_assistant 集成（I-B3 回归）─────
 

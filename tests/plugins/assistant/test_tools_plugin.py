@@ -107,6 +107,23 @@ async def test_factory_adds_create_skill_tool_when_assistant_id_bound() -> None:
     assert any(isinstance(t, UpdateAssistantSoulTool) for t in produced)
 
 
+@pytest.mark.asyncio
+async def test_factory_adds_tools_when_bindings_view_carries_assistant_id() -> None:
+    from lca.contracts.models.cognition.boundary import BindingsView
+
+    overlay = object()
+    tools_service = _FakeToolsService()
+    ctx = _FakeCtx(catalog=object(), bridge=object(), overlay=overlay, tools=tools_service)
+    await tools_plugin.setup.setup(ctx, None)
+
+    view = BindingsView(assistant_id="asst_demo")
+    produced = tools_service.factories["assistant"](view)
+    assert isinstance(produced, list) and len(produced) == 13
+    assert isinstance(produced[2], AssistantCreateSkillTool)
+    assert produced[2]._assistant_id == "asst_demo"
+    assert produced[2].required_grant == "skill.import"
+
+
 def test_plugin_manifest_declares_no_provides() -> None:
     defn = definition_from_plugin(tools_plugin.setup)
     assert set(defn.provided_capability_keys) == set()

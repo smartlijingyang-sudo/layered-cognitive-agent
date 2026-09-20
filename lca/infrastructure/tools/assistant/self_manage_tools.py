@@ -95,6 +95,7 @@ class ListAssistantSkillsTool(_BaseAssistantTool):
     """List the skills installed in the bound assistant's Home (read-only)."""
 
     name = _LIST_ASSISTANT_SKILLS_TOOL
+    required_grant: ClassVar[str] = "skill.import"
     description = "列出当前助理 Home 已安装的技能（skill_id 列表）。只读，不修改任何配置。"
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
@@ -135,6 +136,7 @@ class DeleteAssistantSkillTool(_BaseAssistantTool):
     """Delete a skill from the assistant's Home (sensitive, requires confirmation)."""
 
     name = _DELETE_ASSISTANT_SKILL_TOOL
+    required_grant: ClassVar[str] = "skill.import"
     description = (
         "删除当前助理 Home 的一个已安装技能（不可逆，敏感操作）。"
         "必须先经用户确认：调用 askUserQuestion 询问，用户同意后才携带 confirmed=true 调用。"
@@ -180,6 +182,7 @@ class EditAssistantSkillTool(_BaseAssistantTool):
     """Edit a skill in the assistant's Home (COW, non-sensitive)."""
 
     name = _EDIT_ASSISTANT_SKILL_TOOL
+    required_grant: ClassVar[str] = "skill.import"
     description = (
         "编辑当前助理 Home 的一个已安装技能（写时复制：若该技能链接自全局库，"
         "会先复制为助理私有副本再修改，不影响其他 agent）。非敏感操作，改完告知用户。"
@@ -229,6 +232,7 @@ class UpdateAssistantSoulTool(_BaseAssistantTool):
     """Update the assistant's SOUL.md (non-sensitive, notify after applying)."""
 
     name = _UPDATE_ASSISTANT_SOUL_TOOL
+    required_grant: ClassVar[str] = "profile.revise"
     description = (
         "修改当前助理的 SOUL.md（人格/语气/边界）。非敏感操作，改完告知用户。"
         "SOUL 必须包含四个核心语义段（## 🧠 身份 / ## 🎭 性格 / ## 🛠 能力 / ## 🗣 语气），"
@@ -269,6 +273,7 @@ class UpdateAssistantProfileTool(_BaseAssistantTool):
     """Update the assistant's profile.json name/description (non-sensitive)."""
 
     name = _UPDATE_ASSISTANT_PROFILE_TOOL
+    required_grant: ClassVar[str] = "profile.revise"
     description = (
         "修改当前助理的 profile（名字 / 描述 / emoji 通过描述体现）。非敏感操作，改完告知用户。"
         "参数: name（可选，新名字）、description（可选，新职责描述）。至少提供一个。"
@@ -312,6 +317,7 @@ class UpdateAssistantGrantsTool(_BaseAssistantTool):
     """Update the assistant's grants.yaml (sensitive, requires confirmation)."""
 
     name = _UPDATE_ASSISTANT_GRANTS_TOOL
+    required_grant: ClassVar[str] = "profile.revise"
     description = (
         "修改当前助理的 grants.yaml（能力授权，扩权敏感）。"
         "必须先经用户确认：调用 askUserQuestion 询问，用户同意后才携带 confirmed=true 调用。"
@@ -358,6 +364,7 @@ class ListAssistantToolsTool(_BaseAssistantTool):
     """List the assistant's effective tool set: builtin policy + custom tools."""
 
     name = _LIST_ASSISTANT_TOOLS_TOOL
+    required_grant: ClassVar[str] = "profile.revise"
     description = (
         "列出当前助理的工具集：内置工具的 allow/deny 策略 + 自定义工具详情。"
         "只读，不修改任何配置。"
@@ -437,6 +444,7 @@ class CreateAssistantToolTool(_BaseAssistantTool):
     """Create a custom tool in the assistant's Home (ADR-0243 D6)."""
 
     name = _CREATE_ASSISTANT_TOOL_TOOL
+    required_grant: ClassVar[str] = "profile.revise"
     description = (
         "为当前助理新增一个自定义工具，写入 Home 的 tools/ 目录。"
         "参数: tool_json（tool.json 全文，含 name/description/parameters/handler）。"
@@ -480,6 +488,7 @@ class UpdateAssistantToolTool(_BaseAssistantTool):
     """Update a custom tool in the assistant's Home (ADR-0243 D6)."""
 
     name = _UPDATE_ASSISTANT_TOOL_TOOL
+    required_grant: ClassVar[str] = "profile.revise"
     description = (
         "修改当前助理的一个自定义工具。"
         "参数: tool_id（要修改的工具 id，与 tool_json.name 一致）、tool_json（新的全文）。"
@@ -526,6 +535,7 @@ class DeleteAssistantToolTool(_BaseAssistantTool):
     """Delete a custom tool from the assistant's Home (sensitive)."""
 
     name = _DELETE_ASSISTANT_TOOL_TOOL
+    required_grant: ClassVar[str] = "profile.revise"
     description = (
         "删除当前助理的一个自定义工具（不可逆，敏感操作）。"
         "必须先经用户确认：调用 askUserQuestion 询问，用户同意后才携带 confirmed=true 调用。"
@@ -575,8 +585,12 @@ def assistant_self_manage_tools_from_run(
     catalog_names: Callable[[], list[str]] | None = None,
 ) -> list[Tool]:
     """Materialize the self-management tools when the run binds an assistant_id."""
-    bind = run if isinstance(run, dict) else {}
-    explicit = str(bind.get("assistant_id") or "").strip()
+    if run is None:
+        explicit = ""
+    elif isinstance(run, dict):
+        explicit = str(run.get("assistant_id") or "").strip()
+    else:
+        explicit = str(getattr(run, "assistant_id", "") or "").strip()
     assistant_id = explicit or current_assistant_id().strip()
     if not assistant_id:
         return []

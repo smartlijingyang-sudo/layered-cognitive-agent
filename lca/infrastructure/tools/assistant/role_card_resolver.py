@@ -15,7 +15,6 @@ from lca.contracts.protocols.assistant.role_resolver import (
     RoleCard,
     RoleCardResolver,
     RoleIndexEntry,
-    RoleNotFoundError,
 )
 
 __all__ = ["FileRoleCardResolver"]

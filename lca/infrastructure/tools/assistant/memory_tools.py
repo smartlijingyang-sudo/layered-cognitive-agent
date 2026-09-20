@@ -66,6 +66,7 @@ class MemorySearchTool(_BaseMemoryTool):
     """Search the assistant's structured memory (read-only)."""
 
     name = _MEMORY_SEARCH_TOOL
+    required_grant: ClassVar[str] = "profile.revise"
     description = (
         "搜索当前助理的结构化记忆（身份/偏好/事实）。只读，不修改任何数据。"
         "参数: query（关键词）、limit（可选，最多返回条数，默认 5）。"
@@ -116,6 +117,7 @@ class MemoryAddTool(_BaseMemoryTool):
     """Add a structured memory record (governed write)."""
 
     name = _MEMORY_ADD_TOOL
+    required_grant: ClassVar[str] = "profile.revise"
     description = (
         "把用户明确陈述的身份/偏好/事实写入结构化记忆。"
         "参数: content（结构化事实，如「用户身份：架构师」）、category（identity/"
@@ -175,6 +177,7 @@ class MemoryUpdateTool(_BaseMemoryTool):
     """Supersede an existing memory record with a corrected fact."""
 
     name = _MEMORY_UPDATE_TOOL
+    required_grant: ClassVar[str] = "profile.revise"
     description = (
         "用新事实替换一条已有记忆记录（旧记录标记 superseded，保留审计）。"
         "参数: record_id（要替换的记录 id）、content（新事实）、category（可选）、"
@@ -234,6 +237,7 @@ class MemoryRemoveTool(_BaseMemoryTool):
     """Remove a memory record (sensitive, requires confirmation)."""
 
     name = _MEMORY_REMOVE_TOOL
+    required_grant: ClassVar[str] = "profile.revise"
     description = (
         "删除一条记忆记录（不可逆，敏感操作）。必须先经用户确认。"
         "参数: record_id（要删除的记录 id）、confirmed（用户是否已确认，必须为 true）。"
@@ -284,8 +288,12 @@ def assistant_memory_tools_from_run(
 
     if not isinstance(catalog, AssistantCatalog):
         return []
-    bind = run if isinstance(run, dict) else {}
-    explicit = str(bind.get("assistant_id") or "").strip()
+    if run is None:
+        explicit = ""
+    elif isinstance(run, dict):
+        explicit = str(run.get("assistant_id") or "").strip()
+    else:
+        explicit = str(getattr(run, "assistant_id", "") or "").strip()
     assistant_id = explicit or current_assistant_id().strip()
     if not assistant_id:
         return []

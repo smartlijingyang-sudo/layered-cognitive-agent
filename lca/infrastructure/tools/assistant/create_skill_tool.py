@@ -29,6 +29,7 @@ class AssistantCreateSkillTool(Tool):
     """Create/install a skill under ``{assistant_home}/skills/<skill_id>/``."""
 
     name = CREATE_ASSISTANT_SKILL_TOOL
+    required_grant: ClassVar[str] = "skill.import"
     description = (
         "为当前绑定的助理安装一个操作 skill（写入助理 Home 的 skills/ 目录，"
         "后续对话会自动加载）。支持三种来源，任选其一："
@@ -195,9 +196,13 @@ def assistant_create_skill_tool_from_run(
     *,
     overlay: AssistantSkillOverlay,
 ) -> AssistantCreateSkillTool | None:
-    """Materialize the tool when the run bind dict carries ``assistant_id``."""
-    bind = run if isinstance(run, dict) else {}
-    explicit = str(bind.get("assistant_id") or "").strip()
+    """Materialize the tool when the run bindings carry ``assistant_id``."""
+    if run is None:
+        explicit = ""
+    elif isinstance(run, dict):
+        explicit = str(run.get("assistant_id") or "").strip()
+    else:
+        explicit = str(getattr(run, "assistant_id", "") or "").strip()
     assistant_id = explicit or current_assistant_id().strip()
     if not assistant_id:
         return None

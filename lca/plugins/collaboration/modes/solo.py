@@ -81,9 +81,13 @@ def build_solo_agent(
     """
     del bindings
     if role_profile is not None:
+        import dataclasses
+
         role = role_profile.role or role
         goal = role_profile.goal
         backstory = role_profile.backstory
+        if not role_profile.role and role:
+            role_profile = dataclasses.replace(role_profile, role=role)
     else:
         goal = ""
         backstory = ""
