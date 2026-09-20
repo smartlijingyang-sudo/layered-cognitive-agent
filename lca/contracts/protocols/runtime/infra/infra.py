@@ -258,3 +258,43 @@ class TransportRegistryProtocol(Protocol):
     def resolve(self, protocol_name: str) -> AgentTransport: ...
 
     def list_protocols(self) -> list[str]: ...
+
+
+# ---------- ADR-0246 M1: LocalExecPort ----------
+
+from lca.contracts.models.core.execution.local_exec import (  # noqa: E402
+    CapabilityGrant,
+    EffectReceipt,
+    LocalExecTarget,
+)
+
+
+@runtime_checkable
+class LocalExecPort(Protocol):
+    """副作用执行 Seam（ADR-0246 §3.1）。
+
+    替换测试要求：同一 operation 换 Provider 后，审批状态、Journal 事件
+    形状、幂等重放和错误分类保持一致。
+    Provider 不得把失败静默转换成另一个目标的成功（I-UMS-1）。
+    """
+
+    @property
+    def target(self) -> LocalExecTarget:
+        """当前执行目标描述（I-UMS-5：工具 schema 和 UI 渲染依赖此字段）。"""
+        ...
+
+    async def execute(
+        self,
+        operation: str,
+        args: dict[str, Any],
+        grant: CapabilityGrant,
+    ) -> EffectReceipt:
+        """执行一次副作用，返回不可变回执。
+
+        实现契约：
+        - 幂等键命中历史 → 直接返回原 receipt，不重复执行（I-UMS-6）
+        - grant.expires_at < now → error_kind="grant_expired"，fail-loud（I-UMS-3）
+        - 路径越界 → error_kind="scope_violation"，fail-loud（I-UMS-3）
+        - 目标 offline → error_kind="device_offline"，fail-loud（I-UMS-1）
+        """
+        ...
