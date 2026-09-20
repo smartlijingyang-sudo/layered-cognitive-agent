@@ -99,7 +99,7 @@ async def test_remember_write_dispatches_via_execute() -> None:
     gateway = _RecordingGateway()
     executor = RememberWriteExecutor()
     context = NodeContext(
-        runtime={"effect_gateway": gateway},
+        runtime={"effect_gateway": gateway, "agent_state": _state("记住：以后叫我老板")},
         budget={},
         metadata={"plan_ref": "plan:1", "node_id": "remember.write"},
     )
@@ -117,4 +117,7 @@ async def test_remember_write_dispatches_via_execute() -> None:
     )
     output = await executor.node_execute(context, input_)
     assert len(gateway.executed) == 1
+    envelope = gateway.executed[0][0]
+    assert envelope.metadata["state"] is not None
+    assert envelope.metadata["decision"].decision_id == "decision_1"
     assert output.port_values.get("memory_receipt") == {"admitted": True}

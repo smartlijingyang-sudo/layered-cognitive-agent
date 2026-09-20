@@ -80,6 +80,7 @@ class RememberWriteExecutor:
             )
         plan_ref = str(context.metadata.get("plan_ref", ""))
         node_id = str(context.metadata.get("node_id", "remember.write"))
+        state = runtime.get("agent_state")
         envelope = mint_envelope(
             plan_ref=plan_ref,
             scope_ref=node_id,
@@ -90,6 +91,8 @@ class RememberWriteExecutor:
             metadata={
                 "effect_class": "memory",
                 "operation": "memory.update",
+                "state": state,
+                "decision": decision,
                 "observation": observation,
                 "reflection": reflection,
                 "candidate": candidate,
