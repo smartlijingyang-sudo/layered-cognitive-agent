@@ -92,9 +92,7 @@ class FakeCompanionProvider:
         path = str(args.get("path", args.get("directory", "")))
         if path and grant.path_prefixes:
             norm = posixpath.normpath(path)
-            if not any(
-                norm.startswith(posixpath.normpath(p)) for p in grant.path_prefixes
-            ):
+            if not any(norm.startswith(posixpath.normpath(p)) for p in grant.path_prefixes):
                 return EffectReceipt(
                     **base,
                     success=False,

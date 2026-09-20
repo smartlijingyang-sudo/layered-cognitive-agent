@@ -78,9 +78,7 @@ async def test_deny_fail_loud() -> None:
 async def test_grant_expired_fail_loud() -> None:
     """I-UMS-3: Grant 过期必须 fail-loud。"""
     provider = FakeCompanionProvider()
-    receipt = await provider.execute(
-        "read_file", {"path": "/repo/a.py"}, _grant(expires_delta=-1)
-    )
+    receipt = await provider.execute("read_file", {"path": "/repo/a.py"}, _grant(expires_delta=-1))
     assert receipt.success is False
     assert receipt.error_kind == "grant_expired"
 

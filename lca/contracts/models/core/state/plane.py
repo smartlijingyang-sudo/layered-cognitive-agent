@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 
-class PlaneKind(str, Enum):
+class PlaneKind(StrEnum):
     MACHINE = "machine"
     SANDBOX = "sandbox"
     POOL_WORKER = "pool_worker"  # ADR-0246 M1

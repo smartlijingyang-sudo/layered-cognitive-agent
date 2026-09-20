@@ -1,6 +1,6 @@
 """Auto-created by split_oversized_directories."""
 
-from lca.contracts.models.core.execution.local_exec import (  # noqa: F401
+from lca.contracts.models.core.execution.local_exec import (
     CapabilityGrant,
     EffectReceipt,
     LocalExecTarget,
@@ -10,9 +10,9 @@ from lca.contracts.models.core.execution.verdict import VERDICT_SCHEMA_VERSION, 
 
 __all__ = [
     "VERDICT_SCHEMA_VERSION",
-    "Verdict",
     "CapabilityGrant",
     "EffectReceipt",
     "LocalExecTarget",
     "TargetKind",
+    "Verdict",
 ]
