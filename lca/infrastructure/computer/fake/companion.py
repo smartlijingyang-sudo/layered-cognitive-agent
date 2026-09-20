@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 
-import os
+import posixpath
 import time
 from typing import Any, Literal
 
@@ -23,12 +23,12 @@ from lca.contracts.models.core.execution.local_exec import (
 
 
 class FakeCompanionProvider:
-    """mode: normal | offline | deny"""
+    """mode: normal | offline | deny | timeout | cancel"""
 
     def __init__(
         self,
         *,
-        mode: Literal["normal", "offline", "deny"] = "normal",
+        mode: Literal["normal", "offline", "deny", "timeout", "cancel"] = "normal",
         machine_id: str = "m-fake-01",
         label: str = "FakeWindows-PC",
     ) -> None:
@@ -91,8 +91,10 @@ class FakeCompanionProvider:
             )
         path = str(args.get("path", args.get("directory", "")))
         if path and grant.path_prefixes:
-            norm = os.path.normpath(path)
-            if not any(norm.startswith(os.path.normpath(p)) for p in grant.path_prefixes):
+            norm = posixpath.normpath(path)
+            if not any(
+                norm.startswith(posixpath.normpath(p)) for p in grant.path_prefixes
+            ):
                 return EffectReceipt(
                     **base,
                     success=False,
@@ -106,6 +108,22 @@ class FakeCompanionProvider:
                 success=False,
                 exit_code=None,
                 error_kind="local_policy_denied",
+                stdout_digest=None,
+            )
+        if self._mode == "timeout":
+            return EffectReceipt(
+                **base,
+                success=False,
+                exit_code=None,
+                error_kind="timeout",
+                stdout_digest=None,
+            )
+        if self._mode == "cancel":
+            return EffectReceipt(
+                **base,
+                success=False,
+                exit_code=None,
+                error_kind="cancelled",
                 stdout_digest=None,
             )
         self.execution_count += 1
