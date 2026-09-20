@@ -219,23 +219,29 @@ async def pair_code(request: Request) -> JSONResponse:
     device_id = str(body.get("deviceId") or body.get("device_id") or "")
     label = str(body.get("label") or "Companion")
     platform = str(body.get("platform") or "")
+    user_code = str(body.get("userCode") or body.get("user_code") or "").strip() or None
     if not device_id:
         return JSONResponse(
             {"error": "deviceId is required"}, status_code=400, headers=cors_headers()
         )
 
     pairing = _pairing(request)
-    req = pairing.request_code(device_id=device_id, label=label, platform=platform)
-    return JSONResponse(
-        {
-            "deviceCode": req.device_code,
-            "userCode": req.user_code,
-            "verificationUri": "/pair",
-            "expiresIn": req.expires_in,
-            "interval": 2,
-        },
-        headers=cors_headers(),
+    req = pairing.request_code(
+        device_id=device_id, label=label, platform=platform, user_code=user_code
     )
+    resp_data: dict[str, Any] = {
+        "deviceCode": req.device_code,
+        "userCode": req.user_code,
+        "verificationUri": "/pair",
+        "expiresIn": req.expires_in,
+        "interval": 2,
+    }
+    if req.machine_token:
+        resp_data["machineToken"] = req.machine_token
+        resp_data["status"] = req.status
+        resp_data["userId"] = req.user_id
+        resp_data["workspaceId"] = req.workspace_id
+    return JSONResponse(resp_data, headers=cors_headers())
 
 
 async def pair_verify(request: Request) -> JSONResponse:

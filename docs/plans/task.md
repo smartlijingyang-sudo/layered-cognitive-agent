@@ -12,9 +12,9 @@
 | ADR-0246-M3 | Local Companion Client（CompanionClient / scripts/lca-companion CLI） | Completed | CompanionClient/CLI 落地，支持配对、重连、本地能力白名单拦截，6/6 单测通过 |
 | ADR-0246-M4 | 前端 UI 异构切换器配对卡片（HeteroDeviceSwitcher 补丁与数据刷新） | Completed | execution_target 补丁升级，支持输入配对码调用 verify 并 mutate 刷新设备列表，patch 校验 23/23 ok |
 | ADR-0246-E2E | 全链路真实端到端集成验证（Live Gateway + Companion Client + LocalExecPort + 安全边界） | Completed | test_user_machine_full_flow 全链路通过（WS配对连接、指令执行、文件读写、超期 Grant 拒绝、越权拒绝、离线兜底），ADR-0246 43/43 测试全数通过 |
-| CONV-INSTALL-1 | 预授权配对状态机增强（DevicePairingService / preauth_code 一次性免输码） | Planned | 计划文件：docs/plans/2026-09-20-conversational-local-machine-connection-plan.md Task 1 |
-| CONV-INSTALL-2 | 服务端动态脚本下发端点（install.ps1 / install.sh / pair/preauth 路由） | Planned | 计划文件：docs/plans/2026-09-20-conversational-local-machine-connection-plan.md Task 2 |
-| CONV-INSTALL-3 | 本机 Companion CLI 预授权直连模式（--preauth-code 自动建联常驻） | Planned | 计划文件：docs/plans/2026-09-20-conversational-local-machine-connection-plan.md Task 3 |
-| CONV-INSTALL-4 | 前端 LobeHub UI 异构切换器一键安装卡片与自动绑定执行目标 | Planned | 计划文件：docs/plans/2026-09-20-conversational-local-machine-connection-plan.md Task 4 |
-| CONV-INSTALL-5 | 端到端全链路对话式安装与自动配对集成测试 | Planned | 计划文件：docs/plans/2026-09-20-conversational-local-machine-connection-plan.md Task 5 |
+| CONV-INSTALL-1 | 预授权配对状态机增强（DevicePairingService / preauth_code 一次性免输码） | Completed | preauth_code 与 claim_preauth 落地，单测 4/4 通过，覆盖生成、免输码自动验证、单次消费与过期失效 |
+| CONV-INSTALL-2 | 服务端动态脚本下发端点（install.ps1 / install.sh / pair/preauth 路由） | Completed | install.ps1、install.sh、pair/preauth、download/companion.py 路由落地，7/7 单测全通 |
+| CONV-INSTALL-3 | 本机 Companion CLI 预授权直连模式（--preauth-code 自动建联常驻） | Completed | auto_pair 与 --preauth-code CLI 支持落地，支持免交互自动配对并启动常驻，单测通过 |
+| CONV-INSTALL-4 | 前端 LobeHub UI 异构切换器一键安装卡片与自动绑定执行目标 | Completed | HeteroDeviceSwitcher 补丁升级落地，支持免输码一键命令（PowerShell/Bash）与上线自动绑定执行目标，23/23 补丁验证全通 |
+| CONV-INSTALL-5 | 端到端全链路对话式安装与自动配对集成测试 | Completed | test_conversational_auto_install_and_pairing_flow 全链路端到端测试 100% 通过（POST /api/device/pair/preauth 生成一键脚本，动态获取 install.ps1/install.sh，Companion 零输入自动配对获取 machineToken，WS 握手在线，LocalExecPort 执行命令与文件写入全链路打通），ADR-0246 & CONV-INSTALL 52/52 测试全数通过 |
 
