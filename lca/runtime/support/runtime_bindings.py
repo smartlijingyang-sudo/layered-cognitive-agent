@@ -24,6 +24,7 @@ from lca.contracts.protocols.declarative.declarative_1.declarative_execution imp
 from lca.contracts.protocols.declarative.declarative_1.node_executor import NodeExecutor
 from lca.contracts.protocols.journal.artifact.closure import ArtifactClosure
 from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyStore
+from lca.contracts.protocols.journal.phase.observation import PhaseObserver
 from lca.contracts.protocols.memory.memory import MemorySystem
 from lca.contracts.protocols.runtime.infra.infra import StateStore
 from lca.contracts.protocols.runtime.runtime.composition import (
@@ -44,7 +45,6 @@ from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
 from lca.contracts.protocols.state.plan import CompiledRunPlan
 from lca.contracts.protocols.state.reducer import Reducer
 from lca.contracts.protocols.think.cognition import Brain, PerceiveHub
-from lca.contracts.protocols.journal.phase.observation import PhaseObserver
 from lca.harness.plan import compiled_run_plan_ref
 from lca.runtime.loop.runtime_event_publisher import NullRuntimeLifecyclePublisher
 
@@ -259,7 +259,12 @@ class DeclarativeRuntimeBindings:
             phase_observer=self.phase_observer,
             lifecycle_publisher=self.lifecycle_publisher,
             node_executors=dict(self.node_executors),
-            node_executor_runtime_scope=self.capabilities,
+            node_executor_runtime_scope=self.capabilities.with_extra(
+                {
+                    "reducer": self.reducer,
+                    "state_store": self.state_store,
+                }
+            ),
             graph_observer=graph_observer,
         )
         # ADR-0221 P3: the v2 interpreter is the kernel-native
