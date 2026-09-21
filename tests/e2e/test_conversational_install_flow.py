@@ -88,7 +88,7 @@ def test_conversational_auto_install_and_pairing_flow(tmp_path: Path) -> None:
     app.state.device_pairing = pairing
     app.state.device_settings = settings
 
-    config = uvicorn.Config(app=app, host="127.0.0.1", port=port, log_level="warning")
+    config = uvicorn.Config(app=app, host="0.0.0.0", port=port, log_level="warning")
     server = uvicorn.Server(config)
     server_thread = threading.Thread(target=server.run, daemon=True)
     server_thread.start()

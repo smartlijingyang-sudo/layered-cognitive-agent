@@ -369,27 +369,197 @@ Write-Host " LCA Local Companion Installer (PowerShell) " -ForegroundColor Cyan
 Write-Host " Server: $Server" -ForegroundColor Gray
 Write-Host "==========================================" -ForegroundColor Cyan
 
-# 1. Check Python
-$pythonCmd = (Get-Command python, py, python3 -ErrorAction SilentlyContinue | Select-Object -First 1).Source
-if (-not $pythonCmd) {{
-    Write-Host "[!] Python 3 not found in PATH." -ForegroundColor Red
-    Write-Host "Please install Python 3 (e.g. winget install Python.Python.3.11) and rerun." -ForegroundColor Yellow
-    exit 1
+# 0. UTF-8 so logs do not crash under gbk consoles
+$env:PYTHONIOENCODING = "utf-8"
+$env:PYTHONUTF8 = "1"
+try {{ [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new() }} catch {{}}
+
+# Function to test whether a candidate python executable actually works and is >= 3.10
+function Test-PythonCandidate($exePath) {{
+    if (-not $exePath) {{ return $false }}
+    if (-not (Test-Path $exePath -PathType Leaf)) {{ return $false }}
+    if ($exePath -match "[.]cmd$") {{ return $false }}
+    try {{
+        $testCode = "import sys; v=sys.version_info; sys.exit(0 if (v.major==3 and v.minor>=10) else 1)"
+        $proc = Start-Process -FilePath $exePath -ArgumentList @("-c", $testCode) -NoNewWindow -Wait -PassThru -RedirectStandardError ([System.IO.Path]::GetTempFileName()) -RedirectStandardOutput ([System.IO.Path]::GetTempFileName())
+        if ($proc.ExitCode -eq 0) {{
+            return $true
+        }}
+    }} catch {{}}
+    return $false
 }}
-Write-Host "[✓] Found Python: $pythonCmd" -ForegroundColor Green
 
-# Ensure dependencies
+# Function to refresh PATH from Windows Registry (Machine + User)
+function Update-SessionPath {{
+    try {{
+        $machinePath = [System.Environment]::GetEnvironmentVariable("Path", [System.EnvironmentVariableTarget]::Machine)
+        $userPath = [System.Environment]::GetEnvironmentVariable("Path", [System.EnvironmentVariableTarget]::User)
+        $combined = @($userPath, $machinePath, $env:Path) -join ";"
+        $unique = ($combined -split ";" | Where-Object {{ $_ -and (Test-Path $_) }} | Select-Object -Unique) -join ";"
+        $env:Path = $unique
+    }} catch {{}}
+}}
+
+# 1. Discover existing Python on system
+function Find-Python {{
+    Update-SessionPath
+
+    # 1.1 Check PATH commands
+    foreach ($name in @("python.exe", "py.exe", "python3.exe", "python", "py", "python3")) {{
+        $cmd = Get-Command $name -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($cmd -and $cmd.Source) {{
+            if (Test-PythonCandidate $cmd.Source) {{
+                return $cmd.Source
+            }}
+        }}
+    }}
+
+    # 1.2 Check Windows Registry (Current User & Local Machine)
+    $regRoots = @("HKCU:\\Software\\Python\\PythonCore", "HKLM:\\Software\\Python\\PythonCore")
+    foreach ($root in $regRoots) {{
+        if (Test-Path $root) {{
+            $subkeys = Get-ChildItem $root -ErrorAction SilentlyContinue | Sort-Object Name -Descending
+            foreach ($key in $subkeys) {{
+                $regKey = Join-Path $key.PSPath "InstallPath"
+                $installPath = (Get-ItemProperty $regKey -ErrorAction SilentlyContinue)."(default)"
+                if ($installPath) {{
+                    $candidate = Join-Path $installPath "python.exe"
+                    if (Test-PythonCandidate $candidate) {{
+                        return $candidate
+                    }}
+                }}
+            }}
+        }}
+    }}
+
+    # 1.3 Check common Windows installation directories
+    $commonDirs = @(
+        "$env:LOCALAPPDATA/Programs/Python",
+        "$env:ProgramFiles/Python",
+        "${{env:ProgramFiles(x86)}}/Python",
+        "$env:SystemDrive/Python",
+        "$env:USERPROFILE/scoop/apps/python",
+        "$env:USERPROFILE/.pyenv/pyenv-win/versions"
+    )
+    foreach ($dir in $commonDirs) {{
+        if (Test-Path $dir) {{
+            $pyExes = Get-ChildItem -Path $dir -Filter "python.exe" -Recurse -Depth 3 -ErrorAction SilentlyContinue
+            foreach ($item in $pyExes) {{
+                if (Test-PythonCandidate $item.FullName) {{
+                    return $item.FullName
+                }}
+            }}
+        }}
+    }}
+
+    # 1.4 Check specific shims & distributions (Conda, Scoop, UV)
+    $specificPaths = @(
+        "$env:USERPROFILE/miniconda3/python.exe",
+        "$env:USERPROFILE/anaconda3/python.exe",
+        "$env:ProgramData/miniconda3/python.exe",
+        "$env:ProgramData/anaconda3/python.exe",
+        "$env:USERPROFILE/scoop/shims/python.exe",
+        "$env:LOCALAPPDATA/uv/python/cpython-3.11*/python.exe",
+        "$env:LOCALAPPDATA/uv/python/cpython-3.12*/python.exe",
+        "$env:LOCALAPPDATA/uv/python/cpython-3.13*/python.exe"
+    )
+    foreach ($pattern in $specificPaths) {{
+        $resolved = Resolve-Path $pattern -ErrorAction SilentlyContinue
+        if ($resolved) {{
+            foreach ($r in $resolved) {{
+                if (Test-PythonCandidate $r.Path) {{
+                    return $r.Path
+                }}
+            }}
+        }}
+    }}
+
+    return $null
+}}
+
+$pythonCmd = Find-Python
+
+# 2. If Python not found, attempt automated installation
+if (-not $pythonCmd) {{
+    Write-Host "[!] Python 3.10+ not found in PATH or standard directories." -ForegroundColor Yellow
+    Write-Host "[*] Attempting automated Python 3 installation..." -ForegroundColor Cyan
+
+    $installed = $false
+
+    # Option A: Windows Package Manager (winget)
+    $hasWinget = Get-Command winget -ErrorAction SilentlyContinue
+    if ($hasWinget) {{
+        Write-Host "[*] Installing Python 3.11 via winget..." -ForegroundColor Gray
+        try {{
+            & winget install --id Python.Python.3.11 -e --silent --accept-package-agreements --accept-source-agreements
+            Update-SessionPath
+            $pythonCmd = Find-Python
+            if ($pythonCmd) {{
+                $installed = $true
+            }}
+        }} catch {{
+            Write-Host "[!] Winget install error: $_" -ForegroundColor DarkGray
+        }}
+    }}
+
+    # Option B: Direct download of official python.org installer
+    if (-not $installed) {{
+        Write-Host "[*] Downloading official Python 3.11 installer from python.org..." -ForegroundColor Gray
+        try {{
+            $arch = if ([System.Environment]::Is64BitOperatingSystem) {{ "amd64" }} else {{ "win32" }}
+            $installerUrl = "https://www.python.org/ftp/python/3.11.9/python-3.11.9-$arch.exe"
+            $tempInstaller = Join-Path ([System.IO.Path]::GetTempPath()) "python-3.11.9-installer.exe"
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
+            Invoke-WebRequest -Uri $installerUrl -OutFile $tempInstaller -UseBasicParsing
+            if (Test-Path $tempInstaller) {{
+                Write-Host "[*] Running silent Python installer (per-user)..." -ForegroundColor Gray
+                $installProc = Start-Process -FilePath $tempInstaller -ArgumentList "/quiet InstallAllUsers=0 PrependPath=1 Include_pip=1 Include_test=0" -Wait -PassThru
+                Remove-Item $tempInstaller -Force -ErrorAction SilentlyContinue
+                Update-SessionPath
+                $pythonCmd = Find-Python
+                if ($pythonCmd) {{
+                    $installed = $true
+                }}
+            }}
+        }} catch {{
+            Write-Host "[!] Direct installer error: $_" -ForegroundColor DarkGray
+        }}
+    }}
+
+    if (-not $pythonCmd) {{
+        Write-Host "[!] Python 3.10+ installation could not be completed automatically." -ForegroundColor Red
+        Write-Host "Please install Python 3 manually using one of the following methods:" -ForegroundColor Yellow
+        Write-Host "  1. Run: winget install Python.Python.3.11" -ForegroundColor Gray
+        Write-Host "  2. Download from: https://www.python.org/downloads/" -ForegroundColor Gray
+        Write-Host "     (Make sure to check 'Add python.exe to PATH' during installation)" -ForegroundColor Gray
+        exit 1
+    }}
+}}
+
+Write-Host "[OK] Found Python: $pythonCmd" -ForegroundColor Green
+
+# 3. Ensure pip & dependencies
 Write-Host "[*] Checking dependencies (httpx, websockets)..." -ForegroundColor Gray
-& $pythonCmd -m pip install -q httpx websockets
+try {{
+    & $pythonCmd -m pip --version 2>$null | Out-Null
+    if ($LASTEXITCODE -ne 0) {{
+        & $pythonCmd -m ensurepip --default-pip 2>$null | Out-Null
+    }}
+}} catch {{}}
 
-# 2. Setup directory
+$pipRes = & $pythonCmd -m pip install -q --no-warn-script-location httpx websockets 2>&1
+if ($LASTEXITCODE -ne 0) {{
+    & $pythonCmd -m pip install -q --user --no-warn-script-location httpx websockets
+}}
+
+# 4. Setup directory
 $lcaDir = Join-Path $HOME ".lca"
 $binDir = Join-Path $lcaDir "bin"
 if (-not (Test-Path $binDir)) {{
     New-Item -ItemType Directory -Path $binDir -Force | Out-Null
 }}
 
-# 3. Download Companion
+# 5. Download Companion
 $companionScript = Join-Path $binDir "lca-companion.py"
 Write-Host "[*] Downloading companion client..." -ForegroundColor Gray
 Invoke-RestMethod -Uri "$Server/api/device/download/companion.py" -OutFile $companionScript -ErrorAction SilentlyContinue
@@ -398,16 +568,16 @@ if (-not (Test-Path $companionScript)) {{
     Invoke-RestMethod -Uri $repoUrl -OutFile $companionScript -ErrorAction SilentlyContinue
 }}
 
-# 4. Connect & Run
+# 6. Connect & Run
 Write-Host "[*] Connecting and pairing with gateway..." -ForegroundColor Gray
 $runArgs = @("$companionScript", "run", "--server", "$Server")
 if ($PreauthCode) {{
     $runArgs += @("--preauth-code", "$PreauthCode")
 }}
 
-Write-Host "[✓] Starting LCA Companion in background..." -ForegroundColor Green
+Write-Host "[OK] Starting LCA Companion in background..." -ForegroundColor Green
 Start-Process -FilePath $pythonCmd -ArgumentList ($runArgs -join " ") -WindowStyle Hidden
-Write-Host "[✓] Local Companion is now running and connected to $Server!" -ForegroundColor Green
+Write-Host "[OK] Local Companion is now running and connected to $Server!" -ForegroundColor Green
 '''
     return Response(
         content=script,
@@ -438,18 +608,43 @@ echo " LCA Local Companion Installer (Bash)"
 echo " Server: $SERVER"
 echo "=========================================="
 
-# 1. Find python3
-if command -v python3 >/dev/null 2>&1; then
-    PYTHON="python3"
-elif command -v python >/dev/null 2>&1; then
-    PYTHON="python"
-else
-    echo "[!] Python 3 not found. Please install python3 and try again." >&2
-    exit 1
+# 1. Find python3 (>= 3.10)
+find_python() {{
+    for cmd in python3 python python3.12 python3.11 python3.10; do
+        if command -v "$cmd" >/dev/null 2>&1; then
+            if "$cmd" -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" 2>/dev/null; then
+                echo "$cmd"
+                return 0
+            fi
+        fi
+    done
+    return 1
+}}
+
+PYTHON=$(find_python || true)
+
+if [ -z "$PYTHON" ]; then
+    echo "[!] Python 3.10+ not found in PATH. Attempting automated installation..."
+    if command -v apt-get >/dev/null 2>&1; then
+        sudo apt-get update -y && sudo apt-get install -y python3 python3-pip python3-venv || true
+    elif command -v brew >/dev/null 2>&1; then
+        brew install python3 || true
+    elif command -v dnf >/dev/null 2>&1; then
+        sudo dnf install -y python3 python3-pip || true
+    elif command -v apk >/dev/null 2>&1; then
+        apk add --no-cache python3 py3-pip || true
+    fi
+    PYTHON=$(find_python || true)
 fi
 
+if [ -z "$PYTHON" ]; then
+    echo "[!] Python 3.10+ not found. Please install Python 3.10 or higher and try again." >&2
+    exit 1
+fi
+echo "[OK] Found Python: $($PYTHON --version 2>&1)"
+
 echo "[*] Checking dependencies (httpx, websockets)..."
-$PYTHON -m pip install -q httpx websockets 2>/dev/null || true
+$PYTHON -m pip install -q httpx websockets 2>/dev/null || $PYTHON -m pip install -q --user httpx websockets 2>/dev/null || true
 
 # 2. Setup directory
 LCA_DIR="$HOME/.lca"
@@ -469,7 +664,7 @@ fi
 
 echo "[*] Launching Companion in background..."
 nohup "${{CMD[@]}}" > "$LCA_DIR/companion.log" 2>&1 &
-echo "[✓] Local Companion is running (PID: $!) and connected to $SERVER!"
+echo "[OK] Local Companion is running (PID: $!) and connected to $SERVER!"
 '''
     return Response(
         content=script,

@@ -55,5 +55,4 @@
 | REFACTOR-EE0B-TASK-4 | 动态化时效性年份检测与 Prompt 魔法值清理 | Completed | TEMPORAL_YEAR_REGEX 升级为通用年份匹配，is_search_intent 结合当前 UTC 年份动态核验区间 [2024, current_year + 5] 与 freshness verbs；search_routing_hint 动态插值当前年份并剔除特定环境变量硬编码；15/15 场景测试全通 |
 | REFACTOR-EE0B-TASK-5 | 规范 MCP Manager / Stdio 子进程生命周期与资源释放 | Completed | StdioMCPTransport/Client/Manager 实现 close_sync 与强化 async close，主动关闭 stdin/管道并在 GC 前置 transport._closed=True；build_ambient_mcp_tools 临时循环初始化后即刻安全释放 transport；8/8 MCP 测试全绿且 0 unraisable exception 警告 |
 | REFACTOR-EE0B-TASK-6 | 全量回归测试与架构门禁验证 | Completed | 43/43 单元与场景测试全通（Search / MCP / Scenario / Web / Tool Fork）；ruff check/format 全部通过；git diff --check 退出码 0；负向边界（Does NOT own）与架构不变量 100% 达标 |
-
-
+| COMPANION-AUTO-PYTHON | Companion 安装脚本增强：自动跨目录/注册表检测本地 Python 3.10+ 并支持缺省自动静默安装 | Completed | 1. 探测增强：实现 Test-PythonCandidate（>=3.10真机执行探测避开空桩）、Update-SessionPath（注册表动态刷新PATH）、多源探测（PATH命令/注册表HKCU+HKLM/AppData与ProgramFiles标准路径/Scoop/Pyenv-win/Conda/UV）；2. 自动安装降级链：探测不到时优先尝试 winget install Python.Python.3.11，失败则自动下载 python.org 官方安装包静默免特权安装（/quiet InstallAllUsers=0 PrependPath=1）；3. 依赖自愈：自动 ensurepip 并带 --user 降级安装 httpx 与 websockets；4. install.sh 补全 find_python 与包管理器兜底；5. 单测与端到端 35/35 全绿 |

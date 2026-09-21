@@ -94,6 +94,17 @@ async def test_install_ps1_renders_template() -> None:
     assert '$PreauthCode = "TEST-1234"' in text
     assert "Start-Process" in text
 
+    # Behavioral invariants: Python auto-detection & auto-install
+    assert "function Test-PythonCandidate" in text
+    assert "function Update-SessionPath" in text
+    assert "function Find-Python" in text
+    assert "HKCU:\\Software\\Python\\PythonCore" in text
+    assert "Programs/Python" in text
+    assert "winget install --id Python.Python.3.11" in text
+    assert "python-3.11.9" in text
+    assert "InstallAllUsers=0 PrependPath=1" in text
+    assert "--user" in text
+
 
 @pytest.mark.asyncio
 async def test_install_sh_renders_template() -> None:
@@ -110,3 +121,10 @@ async def test_install_sh_renders_template() -> None:
     assert 'SERVER="http://10.36.6.252:8765"' in text
     assert 'PREAUTH_CODE="TEST-1234"' in text
     assert "nohup" in text
+
+    # Behavioral invariants: Linux/macOS Python detection & auto-install
+    assert "find_python()" in text
+    assert "sys.version_info >= (3, 10)" in text
+    assert "apt-get" in text
+    assert "brew" in text
+    assert "--user" in text
