@@ -1,5 +1,6 @@
 | Task ID | Description | Status | Evidence |
 |---|---|---|---|
+| UPDATE-ASSISTANT-USER-TOOL | 新增 UpdateAssistantUserTool 封闭 USER.md digest 安全写入缺口 | Completed | 新增 UpdateAssistantUserTool（self_manage_tools.py），调用 catalog.revise_profile(ProfilePatch(user_md=...))；添加 _UPDATE_ASSISTANT_USER_TOOL 常量并加入 __all__ 与工厂；更新 test_self_manage.py（2 新测试：happy path + 空值拒绝）与 test_self_manage_exposure.py（_FULL_FAMILY 集合+1）；28/28 全通，ruff clean；commit bf9eaeb1a 已推送 |
 | FE-FLOW-1 | 环境与前置服务健康检查与 agent-browser 会话初始化 | Completed | kernel:8765/health 正常，lobehub:3010 正常，daemon:2958997 正常，agent-browser open 成功进入首页 |
 | FE-FLOW-2 | 前端助理创建测试（创建新助理、配置元数据、检查列表） | Completed | 对话创建架构演化助手成功（asst_a4deb4835fe3），自动物化 Home（SOUL/USER/AGENTS/skills），成功在前端与 Postgres 投影 agt_LORSp1CoEFBL |
 | FE-FLOW-3 | 多轮问答与自我感知测试（首轮问答、自感知身份/能力/SOUL/USER） | Completed | 架构演化助手准确自我感知（SOUL.md 六大职责、DDD思维、权衡原则、20项技能与工具链全景） |
