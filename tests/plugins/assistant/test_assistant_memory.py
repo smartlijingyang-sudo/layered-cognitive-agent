@@ -11,7 +11,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lca.contracts.atoms.enums.enums import MemoryLayer, ReflectionVerdict
+from lca.contracts.atoms.enums.enums import MemoryCategory, MemoryLayer, ReflectionVerdict
+from lca.contracts.models.core.conversation.memory import MemoryRecord
 from lca.contracts.models.core.execution.decision import Observation, Reflection
 from lca.infrastructure.memory.assistant_memory import AssistantMemory
 from lca.plugins.collaboration.modes.solo import build_solo_agent
@@ -102,3 +103,128 @@ class TestSoloAgentMemoryWiring:
         from lca.contracts.protocols.journal.spec.spec import MEMORY_CHOICE_SIMPLE
 
         assert agent._spec.memory == MEMORY_CHOICE_SIMPLE
+
+
+class TestMemoryDedupeAndBackfill:
+    """ADR-0247 回归：canonical dedupe_key、内容指纹去重、写路径回填。"""
+
+    @staticmethod
+    def _pref(
+        record_id: str,
+        content: str,
+        dedupe_key: str | None = None,
+    ) -> MemoryRecord:
+        return MemoryRecord(
+            record_id=record_id,
+            content=content,
+            memory_type=MemoryLayer.SEMANTIC,
+            importance=0.9,
+            category=MemoryCategory.PREFERENCE,
+            dedupe_key=dedupe_key,
+            confidence=1.0,
+        )
+
+    def test_canonical_dedupe_key_collapses_aliases(self, tmp_path: Path) -> None:
+        """同语义事实的不同 dedupe_key 别名收敛为一条活跃记录。"""
+        home = tmp_path / "asst_home"
+        home.mkdir()
+        mem = AssistantMemory(home)
+        mem.upsert(self._pref("mem_a", "技术栈偏好：Python", dedupe_key="tech_stack"))
+        mem.upsert(
+            self._pref(
+                "mem_b",
+                "技术栈偏好：Python",
+                dedupe_key="preference:tech_stack_rust_go",
+            )
+        )
+        records = mem.query(MemoryLayer.SEMANTIC)
+        assert len(records) == 1
+        assert records[0].dedupe_key == "preference:tech_stack"
+
+    def test_tech_stack_fingerprint_collapses_phrasing(self, tmp_path: Path) -> None:
+        """不同措辞表达同一技术栈偏好时，内容指纹收敛为一条活跃记录。"""
+        home = tmp_path / "asst_home"
+        home.mkdir()
+        mem = AssistantMemory(home)
+        mem.upsert(self._pref("mem_a", "用户偏好：只用 Python"))
+        mem.upsert(self._pref("mem_b", "用户技术栈偏好：Python（弃用 Rust 和 Go）"))
+        mem.upsert(self._pref("mem_c", "技术栈偏好：Python，不再使用 Rust 与 Go"))
+        records = mem.query(MemoryLayer.SEMANTIC)
+        assert len(records) == 1
+        # 写路径内容级去重保留最新写入的一条。
+        assert records[0].content == "技术栈偏好：Python，不再使用 Rust 与 Go"
+
+    def test_upsert_triggers_profile_backfill(self, tmp_path: Path) -> None:
+        """memory_add 路径（upsert）写入身份/偏好后触发 USER.md 回填。"""
+        from lca.infrastructure.tools.assistant.memory_tools import MemoryAddTool
+
+        home = tmp_path / "asst_home"
+        home.mkdir()
+        calls: list[tuple[str, list[str]]] = []
+
+        async def backfill(assistant_id: str, records: list[MemoryRecord]) -> None:
+            calls.append((assistant_id, [r.content for r in records]))
+
+        mem = AssistantMemory(home, profile_backfill=backfill)
+        import asyncio
+
+        asyncio.run(
+            MemoryAddTool(memory=mem).execute(
+                {"content": "用户身份：架构师", "category": "identity"}
+            )
+        )
+        assert len(calls) == 1
+        assert calls[0][0] == "asst_home"
+        assert "用户身份：架构师" in calls[0][1]
+
+    def test_supersede_triggers_profile_backfill(self, tmp_path: Path) -> None:
+        """memory_update 路径（supersede）替换身份/偏好后触发 USER.md 回填。"""
+        from lca.infrastructure.tools.assistant.memory_tools import MemoryUpdateTool
+
+        home = tmp_path / "asst_home"
+        home.mkdir()
+        calls: list[tuple[str, list[str]]] = []
+
+        async def backfill(assistant_id: str, records: list[MemoryRecord]) -> None:
+            calls.append((assistant_id, [r.content for r in records]))
+
+        mem = AssistantMemory(home, profile_backfill=backfill)
+        mem.upsert(self._pref("mem_old", "用户偏好：Rust", dedupe_key="preference:tech_stack"))
+        calls.clear()
+        import asyncio
+
+        asyncio.run(
+            MemoryUpdateTool(memory=mem).execute(
+                {
+                    "record_id": "mem_old",
+                    "content": "用户偏好：Python",
+                    "category": "preference",
+                    "dedupe_key": "preference:tech_stack",
+                }
+            )
+        )
+        assert len(calls) == 1
+        assert calls[0][0] == "asst_home"
+        assert "用户偏好：Python" in calls[0][1]
+        assert "用户偏好：Rust" not in calls[0][1]
+
+    def test_remove_triggers_profile_backfill(self, tmp_path: Path) -> None:
+        """memory_remove 路径（remove）删除身份/偏好后触发 USER.md 回填。"""
+        from lca.infrastructure.tools.assistant.memory_tools import MemoryRemoveTool
+
+        home = tmp_path / "asst_home"
+        home.mkdir()
+        calls: list[tuple[str, list[str]]] = []
+
+        async def backfill(assistant_id: str, records: list[MemoryRecord]) -> None:
+            calls.append((assistant_id, [r.content for r in records]))
+
+        mem = AssistantMemory(home, profile_backfill=backfill)
+        mem.upsert(self._pref("mem_a", "用户偏好：Python", dedupe_key="preference:tech_stack"))
+        calls.clear()
+        import asyncio
+
+        asyncio.run(MemoryRemoveTool(memory=mem).execute({"record_id": "mem_a", "confirmed": True}))
+        assert len(calls) == 1
+        assert calls[0][0] == "asst_home"
+        assert calls[0][1] == []

@@ -62,7 +62,8 @@ def test_backfill_from_records_writes_user_md_patch() -> None:
     assert "用户偏好：不喜欢啰嗦" in user_md
 
 
-def test_backfill_noop_without_identity_or_preference() -> None:
+def test_backfill_writes_empty_user_md_without_identity_or_preference() -> None:
+    """无身份/偏好事实时回填空 USER.md，清掉已删除事实的残留条目。"""
     catalog = _RecordingCatalog()
     service = ProfileBackfillService(catalog)  # type: ignore[arg-type]
     fact = MemoryRecord(
@@ -73,8 +74,12 @@ def test_backfill_noop_without_identity_or_preference() -> None:
         category=MemoryCategory.FACT,
     )
     result = service.backfill_from_records("asst_1", [fact])
-    assert result is None
-    assert catalog.revisions == []
+    assert result == {"revision_seq": 1}
+    assert len(catalog.revisions) == 1
+    _, patch = catalog.revisions[0]
+    user_md = getattr(patch, "user_md", "")
+    assert "## 身份" not in user_md
+    assert "## 偏好" not in user_md
 
 
 def _state() -> AgentState:

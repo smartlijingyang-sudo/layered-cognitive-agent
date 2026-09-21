@@ -37,6 +37,30 @@ _ProfileBackfillCallback = Callable[[str, list[MemoryRecord]], Awaitable[None]]
 
 __all__ = ["AssistantMemory"]
 
+# 常见事实的 canonical dedupe_key 别名。模型/提取器可能用不同措辞表达同一事实
+# （如 ``tech_stack`` / ``preference:tech_stack_rust_go``），写入时统一收敛到
+# canonical key，保证同语义事实只有一条活跃记录（ADR-0247 §3.3）。
+_CANONICAL_DEDUPE_KEY_ALIASES: dict[str, str] = {
+    "tech_stack": "preference:tech_stack",
+    "preference:tech_stack": "preference:tech_stack",
+    "preference:tech_stack_rust_go": "preference:tech_stack",
+    "preference:tech_stack_python_only": "preference:tech_stack",
+    "preference:tech_stack_python": "preference:tech_stack",
+    "user_identity": "identity:user",
+    "identity:name": "identity:name",
+    "identity:chief_architect": "identity:chief_architect",
+    "preference:design_principles": "preference:design_principles",
+    "preference:dependency_control": "preference:dependency_control",
+    "preference:dependency-control": "preference:dependency_control",
+}
+
+
+def _canonical_dedupe_key(dedupe_key: str | None) -> str | None:
+    """把已知别名收敛到 canonical key；未知 key 原样返回。"""
+    if not dedupe_key:
+        return None
+    return _CANONICAL_DEDUPE_KEY_ALIASES.get(dedupe_key, dedupe_key)
+
 
 class AssistantMemory(MemorySystem):
     """``MemorySystem`` 实现：读写 ``{home}/memory/``，键按助理隔离。
@@ -137,16 +161,8 @@ class AssistantMemory(MemorySystem):
                         dedupe_key=cand.get("dedupe_key"),
                         source_trace_id=str(getattr(state, "trace_id", "") or ""),
                     )
-            if self._profile_backfill is not None:
-                # ADR-0246 PR-5：身份/偏好事实落盘后触发 USER.md 系统回填。
-                assistant_id = self._root.parent.name
-                identity_pref = [
-                    r
-                    for r in self.query(MemoryLayer.SEMANTIC)
-                    if r.category in {MemoryCategory.IDENTITY, MemoryCategory.PREFERENCE}
-                ]
-                if identity_pref:
-                    await self._profile_backfill(assistant_id, identity_pref)
+            # ADR-0246 PR-5：身份/偏好事实落盘后触发 USER.md 系统回填。
+            await self.refresh_user_profile()
             return
         procedural = extra.get("procedural_candidate")
         if procedural is not None:
@@ -212,7 +228,7 @@ class AssistantMemory(MemorySystem):
             confidence_value = float(confidence) if confidence is not None else None
         except (TypeError, ValueError):
             confidence_value = None
-        dedupe_key_value = str(dedupe_key).strip() if dedupe_key else None
+        dedupe_key_value = _canonical_dedupe_key(str(dedupe_key).strip() if dedupe_key else None)
 
         new_id_value = record_id or new_id("mem")
         superseded_id: str | None = None
@@ -262,6 +278,24 @@ class AssistantMemory(MemorySystem):
             }
         )
         self._save(layer, records)
+
+    async def refresh_user_profile(self) -> None:
+        """身份/偏好事实变化后，从活跃记录全量重建 USER.md（系统回填）。
+
+        任何写路径（图节点 ``update`` 与受治理工具 ``memory_add`` /
+        ``memory_update`` / ``memory_remove``）写入后都必须调用，保证 USER.md
+        始终是活跃 identity/preference 记录的投影，不残留 superseded 旧事实。
+        """
+        if self._profile_backfill is None:
+            return
+        assistant_id = self._root.parent.name
+        identity_pref = [
+            r
+            for r in self.query(MemoryLayer.SEMANTIC)
+            if r.category in {MemoryCategory.IDENTITY, MemoryCategory.PREFERENCE}
+        ]
+        # 即使身份/偏好为空也回填，清掉 USER.md 中已删除事实的残留条目。
+        await self._profile_backfill(assistant_id, identity_pref)
 
     def upsert(self, record: MemoryRecord) -> MemoryRecord:
         """按 ``dedupe_key`` 幂等写入 typed 记录（ADR-0246 ``MemoryStore`` 语义）。
@@ -391,12 +425,57 @@ _FINGERPRINT_LABELS: frozenset[str] = frozenset(
         "身份",
         "偏好",
         "事实",
+        "技术栈偏好",
+        "用户技术栈偏好",
+        "技术栈",
     }
 )
 
 # 称呼类变体：不同措辞表达同一语义（叫他X / 叫我X / 称呼用户为X / 希望被称呼为X），
 # 归一到 ``称呼X``，让跨写入路径（memory_add vs 自动提取）能收敛。
 _ADDRESS_VARIANTS_RE = re.compile(r"^(?:叫他|叫我|称呼用户为|希望被称呼为|称呼我为|称呼为)")
+
+# 技术栈偏好指纹用「活跃语言集合」。排序集合可跨措辞收敛：
+#   ``只用 Python``、``使用 Python，不再使用 Rust 与 Go``、``Python（弃用 Rust 和 Go）``
+# 都收敛为 ``技术栈:active:Python``；``Python + Go`` 则不同。
+_TECH_STACK_LANGS = (
+    "Python",
+    "Rust",
+    "Go",
+    "TypeScript",
+    "JavaScript",
+    "Java",
+    "C++",
+    "C#",
+    "Ruby",
+    "PHP",
+    "Kotlin",
+    "Swift",
+    "Scala",
+    "Zig",
+    "Elixir",
+    "Erlang",
+    "Haskell",
+)
+_TECH_STACK_LANG_RE = re.compile("|".join(re.escape(lang) for lang in _TECH_STACK_LANGS))
+_TECH_STACK_DEPRECATE_WORDS = ("弃用", "不再使用", "不用", "放弃", "停用")
+_DATE_QUALIFIER_RE = re.compile(r"[（(]\d{4}-\d{2}-\d{2}[^）)]*[）)]")
+
+
+def _tech_stack_fingerprint(text: str) -> str | None:
+    """技术栈偏好的语义指纹：提取活跃语言集合，跨措辞收敛。"""
+    matches = list(_TECH_STACK_LANG_RE.finditer(text))
+    if not matches:
+        return None
+    active: list[str] = []
+    for m in matches:
+        before = text[max(0, m.start() - 12) : m.start()]
+        if not any(word in before for word in _TECH_STACK_DEPRECATE_WORDS):
+            active.append(m.group())
+    active.sort()
+    if not active:
+        return None
+    return f"技术栈:active:{','.join(active)}"
 
 
 def _content_fingerprint(content: str) -> str:
@@ -407,15 +486,21 @@ def _content_fingerprint(content: str) -> str:
       都收敛为 ``称呼老板``。
     - ``用户称呼偏好：叫他「老板」`` 与 ``用户偏好：希望被称呼为老板``
       都收敛为 ``称呼老板``。
+    - ``技术栈偏好：Python（弃用 Rust 和 Go）`` 与 ``用户偏好：只用 Python``
+      收敛为同一 ``技术栈:active:Python`` 指纹。
     """
     normalized = content
     for ch in "\"'「」『』“”‘’":
         normalized = normalized.replace(ch, "")
+    normalized = _DATE_QUALIFIER_RE.sub("", normalized)
     if "：" in normalized:
         label, _, rest = normalized.partition("：")
         if label.strip() in _FINGERPRINT_LABELS:
             normalized = rest
     normalized = _ADDRESS_VARIANTS_RE.sub("称呼", normalized)
+    tech = _tech_stack_fingerprint(normalized)
+    if tech is not None:
+        return tech
     return "".join(normalized.split())
 
 

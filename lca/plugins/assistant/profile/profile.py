@@ -41,7 +41,7 @@ __all__ = [
 _ProfileBackfillCallback = Callable[[str, list[MemoryRecord]], Awaitable[None]]
 
 
-def _render_user_profile(records: Sequence[MemoryRecord]) -> str:
+def render_user_profile(records: Sequence[MemoryRecord]) -> str:
     """把 identity/preference 记录渲染成 USER.md 画像。"""
     identity = [r.content for r in records if r.category is MemoryCategory.IDENTITY]
     preference = [r.content for r in records if r.category is MemoryCategory.PREFERENCE]
@@ -68,19 +68,17 @@ class ProfileBackfillService:
         assistant_id: str,
         records: Sequence[MemoryRecord],
     ) -> object | None:
-        """回填 USER.md 并返回 ``PlanRevision``；无身份/偏好事实时返回 None。
+        """回填 USER.md 并返回 ``PlanRevision``。
 
-        只读记忆记录，写 USER.md 走 ``revise_profile``（revision 快照由
-        Catalog 负责）。同一次回填覆盖整个 USER.md 为用户画像。
+        身份/偏好事实全量重渲染为 USER.md（无事实时写空画像，清掉已删除的
+        残留条目），经 ``revise_profile`` 覆盖写并产生 revision 快照。
         """
         identity_pref = [
             r for r in records if r.category in {MemoryCategory.IDENTITY, MemoryCategory.PREFERENCE}
         ]
-        if not identity_pref:
-            return None
         return self._catalog.revise_profile(
             assistant_id,
-            ProfilePatch(user_md=_render_user_profile(identity_pref)),
+            ProfilePatch(user_md=render_user_profile(identity_pref)),
         )
 
 

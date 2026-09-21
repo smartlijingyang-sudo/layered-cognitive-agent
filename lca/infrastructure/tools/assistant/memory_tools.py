@@ -178,6 +178,7 @@ class MemoryAddTool(_BaseMemoryTool):
             metadata={"source": "user"},
         )
         persisted = self._memory.upsert(record)
+        await self._memory.refresh_user_profile()
         return self._ok(
             start,
             {
@@ -239,6 +240,7 @@ class MemoryUpdateTool(_BaseMemoryTool):
             metadata={"source": "user"},
         )
         persisted = self._memory.supersede(record_id, replacement)
+        await self._memory.refresh_user_profile()
         return self._ok(
             start,
             {
@@ -278,6 +280,7 @@ class MemoryRemoveTool(_BaseMemoryTool):
         if args.get("confirmed") is not True:
             return self._fail(start, f"删除记忆需要用户确认。{_SENSITIVE_CONFIRMATION_HINT}")
         self._memory.remove(record_id)
+        await self._memory.refresh_user_profile()
         return self._ok(
             start,
             {
