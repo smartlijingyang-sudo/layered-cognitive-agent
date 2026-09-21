@@ -553,6 +553,8 @@ def reconcile(
         else:
             results.append(PatchResult(name, "orphan_restored", "no recorded writes (legacy)"))
 
+    manifest_dirty = bool(results)
+
     # ── 2. Stale source + cold-start declared divergence ───────────
     cold_start = not manifest.patches
     for pm in modules:
@@ -561,6 +563,20 @@ def reconcile(
         sha_changed = (
             existing is not None and existing.source_sha != "" and existing.source_sha != sha
         )
+        marker_broken = False
+        if existing is not None and pm.meta.verify_marker:
+            check_file = pm.meta.verify_file or (pm.meta.files[0] if pm.meta.files else "")
+            if check_file:
+                target_path = UI / check_file
+                if not target_path.is_file():
+                    marker_broken = True
+                else:
+                    try:
+                        if pm.meta.verify_marker not in target_path.read_text():
+                            marker_broken = True
+                    except OSError:
+                        marker_broken = True
+
         declared_diverges: list[str] = []
         if cold_start and existing is None:
             for rel in pm.meta.files:
@@ -573,10 +589,12 @@ def reconcile(
                     except OSError:
                         pass
 
-        if sha_changed or declared_diverges:
+        if sha_changed or declared_diverges or marker_broken:
             to_restore: set[str] = set()
             if existing is not None:
                 to_restore.update(existing.written)
+                if marker_broken:
+                    to_restore.update(pm.meta.files)
             to_restore.update(declared_diverges)
             if to_restore:
                 _restore_from_upstream(sorted(to_restore))
@@ -588,13 +606,15 @@ def reconcile(
                 existing.written = []
                 existing.source_sha = sha
                 existing.status = "pending"
+            manifest_dirty = True
         elif existing is None:
             manifest.patches[pm.meta.name] = PatchEntry(
                 name=pm.meta.name, source_sha=sha, status="pending"
             )
+            manifest_dirty = True
 
     # Persist reconcile changes (orphan removals, sha updates).
-    if results:
+    if results or manifest_dirty:
         _write_manifest(manifest)
 
     return results
@@ -632,6 +652,28 @@ def apply_patches(names: tuple[str, ...] = ()) -> list[PatchResult]:
             ctx._current_patch = ""
             continue
         ctx._current_patch = ""
+
+        is_broken = False
+        check_file = pm.meta.verify_file or (pm.meta.files[0] if pm.meta.files else "")
+        if not was_applied and pm.meta.verify_marker:
+            target_path = ctx.path(check_file) if check_file else None
+            if not target_path or not target_path.is_file():
+                is_broken = True
+            else:
+                try:
+                    if pm.meta.verify_marker not in target_path.read_text():
+                        is_broken = True
+                except OSError:
+                    is_broken = True
+
+        if is_broken:
+            results.append(PatchResult(pm.meta.name, "broken", f"marker absent in {check_file}"))
+            _log("BROKEN", pm.meta.name, f"marker absent in {check_file}")
+            entry = manifest.patches.get(pm.meta.name) or PatchEntry(name=pm.meta.name)
+            entry.status = "broken"
+            entry.source_sha = _compute_patch_hash(pm)
+            manifest.patches[pm.meta.name] = entry
+            continue
 
         status = "applied" if was_applied else "skipped"
         if was_applied:

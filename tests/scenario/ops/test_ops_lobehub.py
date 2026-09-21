@@ -52,10 +52,10 @@ def test_status_running_when_dev_up_but_stored_pid_stale(lobehub_svc: LobeHubSer
     lobehub_svc._state.write_pid("lobehub", 999_999)
 
     with (
-        patch("lca.infrastructure.cli.services.lobehub.http_ready", return_value=True),
-        patch("lca.infrastructure.cli.services.lobehub.pid_on_port", return_value=42_001),
+        patch("lca.infrastructure.cli.services.lobehub.lobehub.http_ready", return_value=True),
+        patch("lca.infrastructure.cli.services.lobehub.lobehub.pid_on_port", return_value=42_001),
         patch(
-            "lca.infrastructure.cli.services.lobehub.pid_alive",
+            "lca.infrastructure.cli.services.lobehub.lobehub.pid_alive",
             side_effect=lambda pid: pid in {42_001, 42_002},
         ),
     ):
@@ -71,9 +71,9 @@ def test_status_stopped_when_dev_down_and_pid_stale(lobehub_svc: LobeHubService)
     lobehub_svc._state.write_pid("lobehub", 999_999)
 
     with (
-        patch("lca.infrastructure.cli.services.lobehub.http_ready", return_value=False),
-        patch("lca.infrastructure.cli.services.lobehub.pid_on_port", return_value=None),
-        patch("lca.infrastructure.cli.services.lobehub.pid_alive", return_value=False),
+        patch("lca.infrastructure.cli.services.lobehub.lobehub.http_ready", return_value=False),
+        patch("lca.infrastructure.cli.services.lobehub.lobehub.pid_on_port", return_value=None),
+        patch("lca.infrastructure.cli.services.lobehub.lobehub.pid_alive", return_value=False),
     ):
         state = lobehub_svc.state()
 
@@ -110,17 +110,20 @@ def test_start_spawns_next_and_spa_not_coupled_dev(lobehub_svc: LobeHubService) 
         return hits["n"] > 1
 
     with (
-        patch.object(lobehub_svc, "ensure_ready", return_value=False),
-        patch("lca.infrastructure.cli.services.lobehub.subprocess.Popen", side_effect=_popen),
+        patch.object(lobehub_svc, "ensure_ready", return_value=True),
+        patch(
+            "lca.infrastructure.cli.services.lobehub.lobehub.subprocess.Popen", side_effect=_popen
+        ),
         # state() now calls patch verify; suppress it for this SPA-spawn path.
         patch(
-            "lca.infrastructure.cli.services.lobehub.subprocess.run",
+            "lca.infrastructure.cli.services.lobehub.lobehub.subprocess.run",
             return_value=type("_R", (), {"stdout": "", "stderr": "", "returncode": 0})(),
         ),
-        patch("lca.infrastructure.cli.services.lobehub.http_ready", side_effect=_ready),
-        patch("lca.infrastructure.cli.services.lobehub.time.sleep"),
+        patch("lca.infrastructure.cli.services.lobehub.lobehub.http_ready", side_effect=_ready),
+        patch("lca.infrastructure.cli.services.lobehub.lobehub.time.sleep"),
         patch(
-            "lca.infrastructure.cli.services.lobehub.pid_on_port", side_effect=_port_pid(None, None)
+            "lca.infrastructure.cli.services.lobehub.lobehub.pid_on_port",
+            side_effect=_port_pid(None, None),
         ),
     ):
         state = lobehub_svc.start()
@@ -130,21 +133,31 @@ def test_start_spawns_next_and_spa_not_coupled_dev(lobehub_svc: LobeHubService) 
     assert ["bun", "run", "dev"] not in scripts
     assert ["bun", "run", "dev:next"] in scripts
     assert ["bun", "run", "dev:spa"] in scripts
-    assert lobehub_svc._state.read_pid("lobehub") == 101
-    assert lobehub_svc._state.read_pid("lobehub-spa") == 102
+    assert lobehub_svc._state.read_pid("lobehub") == 102
+    assert lobehub_svc._state.read_pid("lobehub-spa") == 101
+
+
+def test_start_refuses_when_ensure_ready_fails(lobehub_svc: LobeHubService) -> None:
+    """start() must fail-loud and return STOPPED if ensure_ready fails."""
+    with patch.object(lobehub_svc, "ensure_ready", return_value=False):
+        state = lobehub_svc.start()
+
+    assert state.status == ServiceStatus.STOPPED
+    assert "ensure_ready failed" in state.detail
+    assert "prerequisites failed" in state.why
 
 
 def test_next_up_spa_down_is_degraded_not_stopped(lobehub_svc: LobeHubService) -> None:
     lobehub_svc._state.write_pid("lobehub", 42_001)
 
     with (
-        patch("lca.infrastructure.cli.services.lobehub.http_ready", return_value=True),
+        patch("lca.infrastructure.cli.services.lobehub.lobehub.http_ready", return_value=True),
         patch(
-            "lca.infrastructure.cli.services.lobehub.pid_on_port",
+            "lca.infrastructure.cli.services.lobehub.lobehub.pid_on_port",
             side_effect=_port_pid(42_001, None),
         ),
         patch(
-            "lca.infrastructure.cli.services.lobehub.pid_alive",
+            "lca.infrastructure.cli.services.lobehub.lobehub.pid_alive",
             side_effect=lambda pid: pid in {42_001, 42_002},
         ),
     ):
@@ -171,19 +184,21 @@ def test_heal_spa_only_does_not_respawn_next(lobehub_svc: LobeHubService) -> Non
     with (
         patch.object(lobehub_svc, "ensure_ready", return_value=False),
         patch.object(lobehub_svc, "stop") as stop,
-        patch("lca.infrastructure.cli.services.lobehub.subprocess.Popen", side_effect=_popen),
+        patch(
+            "lca.infrastructure.cli.services.lobehub.lobehub.subprocess.Popen", side_effect=_popen
+        ),
         # state() now calls patch verify; suppress it for this SPA-spawn path.
         patch(
-            "lca.infrastructure.cli.services.lobehub.subprocess.run",
+            "lca.infrastructure.cli.services.lobehub.lobehub.subprocess.run",
             return_value=type("_R", (), {"stdout": "", "stderr": "", "returncode": 0})(),
         ),
-        patch("lca.infrastructure.cli.services.lobehub.http_ready", return_value=True),
+        patch("lca.infrastructure.cli.services.lobehub.lobehub.http_ready", return_value=True),
         patch(
-            "lca.infrastructure.cli.services.lobehub.pid_on_port",
+            "lca.infrastructure.cli.services.lobehub.lobehub.pid_on_port",
             side_effect=_port_pid(42_001, None),
         ),
         patch(
-            "lca.infrastructure.cli.services.lobehub.pid_alive",
+            "lca.infrastructure.cli.services.lobehub.lobehub.pid_alive",
             side_effect=lambda pid: pid in {42_001, 77},
         ),
     ):
@@ -256,7 +271,7 @@ def test_run_patch_verify_uses_subprocess_and_caches(tmp_path: Path) -> None:
             calls["n"] += 1
 
     with patch(
-        "lca.infrastructure.cli.services.lobehub.subprocess.run",
+        "lca.infrastructure.cli.services.lobehub.lobehub.subprocess.run",
         return_value=_FakeProc(),
     ):
         first = svc._run_patch_verify()
@@ -278,13 +293,13 @@ def test_status_patches_field_reports_verify_count_not_file_count(
     )
 
     with (
-        patch("lca.infrastructure.cli.services.lobehub.http_ready", return_value=True),
+        patch("lca.infrastructure.cli.services.lobehub.lobehub.http_ready", return_value=True),
         patch(
-            "lca.infrastructure.cli.services.lobehub.pid_on_port",
+            "lca.infrastructure.cli.services.lobehub.lobehub.pid_on_port",
             side_effect=_port_pid(42_001, 42_002),
         ),
         patch(
-            "lca.infrastructure.cli.services.lobehub.pid_alive",
+            "lca.infrastructure.cli.services.lobehub.lobehub.pid_alive",
             side_effect=lambda pid: pid in {42_001, 42_002},
         ),
     ):
@@ -306,13 +321,13 @@ def test_status_patches_broken_suggests_patch_engine_directly(
     )
 
     with (
-        patch("lca.infrastructure.cli.services.lobehub.http_ready", return_value=True),
+        patch("lca.infrastructure.cli.services.lobehub.lobehub.http_ready", return_value=True),
         patch(
-            "lca.infrastructure.cli.services.lobehub.pid_on_port",
+            "lca.infrastructure.cli.services.lobehub.lobehub.pid_on_port",
             side_effect=_port_pid(42_001, 42_002),
         ),
         patch(
-            "lca.infrastructure.cli.services.lobehub.pid_alive",
+            "lca.infrastructure.cli.services.lobehub.lobehub.pid_alive",
             side_effect=lambda pid: pid in {42_001, 42_002},
         ),
     ):
@@ -323,7 +338,8 @@ def test_status_patches_broken_suggests_patch_engine_directly(
     assert "15/18 verified" in patches_check.detail
     assert "file_proxy_rewrite" in patches_check.detail
     assert state.next_action == "python3 deploy/lobehub/patch_lobehub.py"
-    assert state.status == ServiceStatus.RUNNING
+    assert state.status == ServiceStatus.DEGRADED
+    assert "degraded" in state.detail
 
 
 def test_heal_runs_patch_engine_in_place_when_markers_broken(tmp_path: Path) -> None:
@@ -349,15 +365,20 @@ def test_heal_runs_patch_engine_in_place_when_markers_broken(tmp_path: Path) -> 
         tmp_path / "state_heal",
         root,
     )
-    svc._state.write_pid("lobehub", 42_001)
-    svc._run_patch_verify = lambda: _VerifySummaryStub(  # type: ignore[attr-defined]
-        ok=15, broken=3, names=("file_proxy_rewrite",)
-    )
+    broken_count = [3]
+
+    def _stub_verify() -> _VerifySummaryStub:
+        if broken_count[0] == 0:
+            return _VerifySummaryStub(ok=18, broken=0, names=())
+        return _VerifySummaryStub(ok=15, broken=broken_count[0], names=("file_proxy_rewrite",))
+
+    svc._run_patch_verify = _stub_verify  # type: ignore[attr-defined]
 
     invoked: list[list[str]] = []
 
     def _fake_run(cmd: object, **_kwargs: object) -> object:
         invoked.append(list(cmd))  # type: ignore[arg-type]
+        broken_count[0] = 0
 
         class _R:
             returncode = 0
@@ -369,14 +390,16 @@ def test_heal_runs_patch_engine_in_place_when_markers_broken(tmp_path: Path) -> 
     with (
         patch.object(svc, "stop") as stop,
         patch.object(svc, "start") as start,
-        patch("lca.infrastructure.cli.services.lobehub.subprocess.run", side_effect=_fake_run),
-        patch("lca.infrastructure.cli.services.lobehub.http_ready", return_value=True),
         patch(
-            "lca.infrastructure.cli.services.lobehub.pid_on_port",
+            "lca.infrastructure.cli.services.lobehub.lobehub.subprocess.run", side_effect=_fake_run
+        ),
+        patch("lca.infrastructure.cli.services.lobehub.lobehub.http_ready", return_value=True),
+        patch(
+            "lca.infrastructure.cli.services.lobehub.lobehub.pid_on_port",
             side_effect=_port_pid(42_001, 42_002),
         ),
         patch(
-            "lca.infrastructure.cli.services.lobehub.pid_alive",
+            "lca.infrastructure.cli.services.lobehub.lobehub.pid_alive",
             side_effect=lambda pid: pid in {42_001, 42_002},
         ),
     ):

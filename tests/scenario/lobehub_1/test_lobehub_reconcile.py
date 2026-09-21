@@ -295,3 +295,57 @@ def test_failed_import_is_not_treated_as_orphan(sandbox: dict[str, Path]) -> Non
 
     assert not any(r.name == "broken_import" for r in results)
     assert (sandbox["ui"] / "src/q.ts").read_text() == "patched-q\n"
+
+
+def test_reconcile_detects_marker_broken_and_restores_from_upstream(
+    sandbox: dict[str, Path],
+) -> None:
+    """When a patch has matching SHA in manifest but its verify_marker is absent
+    on disk (e.g. file was overwritten or reset), reconcile must detect the break,
+    restore declared files from upstream, and mark the patch as pending so it
+    can be reapplied cleanly.
+    """
+    _seed_upstream(sandbox["upstream"], {"src/target.ts": "original upstream content\n"})
+    # Disk currently has corrupted/reverted content missing the marker
+    _seed_ui(sandbox["ui"], {"src/target.ts": "corrupted content\n"})
+
+    meta = PatchMeta(
+        name="healing_patch",
+        description="test healing patch",
+        files=("src/target.ts",),
+        risk="low",
+        category="test",
+        verify_file="src/target.ts",
+        verify_marker="LCA_HEAL_MARKER",
+    )
+
+    def apply(ctx: PatchContext) -> bool:
+        return ctx.write_if_changed("src/target.ts", "healed with LCA_HEAL_MARKER\n")
+
+    pm = PatchModule(meta=meta, apply=apply)
+    sha = _compute_patch_hash(pm)
+
+    # Manifest claims it was already applied with this exact sha
+    manifest = Manifest()
+    manifest.patches["healing_patch"] = PatchEntry(
+        name="healing_patch",
+        status="applied",
+        source_sha=sha,
+        written=["src/target.ts"],
+    )
+    _write_manifest(manifest)
+
+    reconcile(modules=[pm])
+
+    # File on disk was restored to upstream baseline
+    assert (sandbox["ui"] / "src/target.ts").read_text() == "original upstream content\n"
+
+    # Manifest was marked pending
+    updated_manifest = _read_manifest()
+    assert updated_manifest.patches["healing_patch"].status == "pending"
+
+    # Subsequent apply writes the healed content containing the marker
+    ctx = PatchContext(ui_dir=sandbox["ui"], manifest=updated_manifest)
+    ctx._current_patch = "healing_patch"
+    assert pm.apply(ctx)
+    assert (sandbox["ui"] / "src/target.ts").read_text() == "healed with LCA_HEAL_MARKER\n"

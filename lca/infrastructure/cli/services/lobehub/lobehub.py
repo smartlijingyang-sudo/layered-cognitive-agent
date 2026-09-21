@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 import time
 from contextlib import suppress
 from dataclasses import dataclass
@@ -140,7 +141,19 @@ class LobeHubService:
         """
         self._state.remove_pid(self.name)
         self._state.remove_pid(self._SPA_NAME)
-        self.ensure_ready()
+        if not self.ensure_ready():
+            verify = self._run_patch_verify()
+            broken_desc = (
+                f"broken patches: {', '.join(verify.names)}"
+                if verify.broken
+                else "prerequisites failed"
+            )
+            return ServiceState(
+                status=ServiceStatus.STOPPED,
+                detail=f"ensure_ready failed ({broken_desc})",
+                why=f"Frontend prerequisites failed: {broken_desc}",
+                next_action="python3 deploy/lobehub/patch_lobehub.py",
+            )
         spa_pid = self._ensure_spa()
         if spa_pid is None:
             return ServiceState(status=ServiceStatus.STOPPED, detail="vite spawn failed")
@@ -190,16 +203,16 @@ class LobeHubService:
     def ensure_ready(self) -> bool:
         """Ensure all prerequisites: source, patches, env, deps.
 
-        Each step checks if it needs to run, so this is safe to call
-        repeatedly.
+        Returns True when prerequisites are satisfied and patches verified.
+        Returns False if source cannot be ensured or patches are broken.
         """
-        worked = False
-        worked |= self._ensure_source()
-        worked |= self._ensure_patches()
-        worked |= self._ensure_pnpm_patches()
-        worked |= self._ensure_env()
-        worked |= self._ensure_deps()
-        return worked
+        self._ensure_source()
+        if not self._ensure_patches():
+            return False
+        self._ensure_pnpm_patches()
+        self._ensure_env()
+        self._ensure_deps()
+        return True
 
     # ── Health ────────────────────────────────────────────────────────
 
@@ -313,19 +326,21 @@ class LobeHubService:
             )
             next_action = "./scripts/lca-ops lobehub heal"
         elif dev_ok:
-            status = ServiceStatus.RUNNING
-            detail = "healthy"
             if patches_broken:
-                detail = f"healthy ({patch_detail})"
+                status = ServiceStatus.DEGRADED
+                detail = f"degraded ({patch_detail})"
                 why = (
-                    "patch markers missing in target files — "
-                    "run `python3 deploy/lobehub/patch_lobehub.py`"
+                    f"patch markers missing in target files ({', '.join(verify.names)}) — "
+                    "frontend routes will fail; run `python3 deploy/lobehub/patch_lobehub.py`"
                 )
                 next_action = "python3 deploy/lobehub/patch_lobehub.py"
-            elif patches_drift:
-                detail = f"healthy (patch source drifted — {patch_drift.summary})"
-                why = "patch source changed since last apply"
-                next_action = "./scripts/lca-ops lobehub ensure"
+            else:
+                status = ServiceStatus.RUNNING
+                detail = "healthy"
+                if patches_drift:
+                    detail = f"healthy (patch source drifted — {patch_drift.summary})"
+                    why = "patch source changed since last apply"
+                    next_action = "./scripts/lca-ops lobehub ensure"
         elif process_ok:
             status = ServiceStatus.DEGRADED
             detail = "process alive but dev server not responding"
@@ -360,7 +375,9 @@ class LobeHubService:
 
         # Patch drift/broken → run the patch engine in place; do NOT stop Next.
         # The dev server will HMR the patched files.
-        if current.is_running and current.next_action.startswith("python3 "):
+        if (current.is_running or current.status == ServiceStatus.DEGRADED) and (
+            current.next_action.startswith("python3 ") or "broken" in current.detail
+        ):
             patch_script = self._root / "deploy" / "lobehub" / "patch_lobehub.py"
             if patch_script.exists():
                 with suppress(subprocess.SubprocessError, OSError):
@@ -509,7 +526,16 @@ class LobeHubService:
                 print(f"[lca] patch {tag}: {r.name}", flush=True)
             self._state.save_snapshot("patches", [deploy_dir], "*")
             self._verify_cache = None
-            return any(r.status == "applied" for r in results)
+
+            verify = self._run_patch_verify()
+            if verify.broken > 0:
+                print(
+                    f"[lca] patch verify FAILED after apply: {verify.broken} broken ({', '.join(verify.names)})",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                return False
+            return True
         except Exception as exc:  # health check best-effort
             print(f"[lca] patch ensure failed: {type(exc).__name__}: {exc}", flush=True)
             return False
