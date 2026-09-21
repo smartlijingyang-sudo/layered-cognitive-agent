@@ -50,8 +50,7 @@ def apply(ctx: PatchContext) -> bool:
             1,
         )
 
-    # intercept — rewrite if broken double-escape exists, or insert fresh
-    broken = "connect\\\\s*"
+    # intercept — rewrite if marker exists, or insert fresh
     good_block = (
         "        const message = getMarkdownContent();\n"
         "        /* LCA: connect-local intent */\n"
@@ -81,7 +80,7 @@ def apply(ctx: PatchContext) -> bool:
             r"          window\.dispatchEvent\([\s\S]*?\);\n"
             r"          return;\n"
             r"        }\n",
-            good_block,
+            lambda _: good_block,
             text,
             count=1,
         )

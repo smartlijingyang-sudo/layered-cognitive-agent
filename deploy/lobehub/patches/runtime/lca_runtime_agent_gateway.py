@@ -103,20 +103,6 @@ _MARKER_INSERTIONS: tuple[dict[str, str], ...] = (
             "// point and lcaGateway/connect.ts for the WS factory.\n"
         ),
     },
-    {
-        "rel": (
-            f"{_UI_TRANSPORTS}/lcaToolRender/renderers/"
-            "lobe-user-interaction/askUserQuestion.tsx"
-        ),
-        "marker": "/* LCA-P1: native askUserQuestion render */",
-        "insert": (
-            "/* LCA-P1: native askUserQuestion render */\n"
-            "// Render using pluginState.lca.run_id, written at HIL\n"
-            "// setup (see lcaChatRow.ts). The render itself is\n"
-            "// LCA-native; the patch only annotates the file for\n"
-            "// idempotency.\n"
-        ),
-    },
 )
 
 
@@ -129,10 +115,7 @@ def _modified_files() -> tuple[str, ...]:
             "src/features/Conversation/Messages/AssistantGroup/Tool/Detail/"
             "Intervention/customInteractionHandlers.ts"
         ),
-        (
-            "src/features/Conversation/Messages/AssistantGroup/Tool/Detail/"
-            "Intervention/index.tsx"
-        ),
+        ("src/features/Conversation/Messages/AssistantGroup/Tool/Detail/Intervention/index.tsx"),
         "src/store/chat/slices/agentRun/actions/entries/conversationControl.ts",
         "src/store/chat/slices/agentRun/actions/__tests__/conversationControl.lcaResume.test.ts",
         "src/spa/initialize/toolSurfaces.ts",
@@ -212,7 +195,11 @@ def _patch_agent_dispatcher(ctx: PatchContext) -> bool:
         "}"
     )
     if old_gated in text:
-        text = text.replace(old_gated, "export function isLcaGatewayMode(_agentId?: string): boolean {\n  return true;\n}", 1)
+        text = text.replace(
+            old_gated,
+            "export function isLcaGatewayMode(_agentId?: string): boolean {\n  return true;\n}",
+            1,
+        )
         # Drop the URL import; mode no longer reads it.
         text = text.replace(
             "import { LCA_GATEWAY_WS_URL as LCA_GATEWAY_URL } from "
@@ -222,9 +209,10 @@ def _patch_agent_dispatcher(ctx: PatchContext) -> bool:
         )
         ctx.write(rel, text)
         return True
-    if "export function isLcaGatewayMode" in text and "return true;" in text.split(
-        "export function isLcaGatewayMode", 1
-    )[1][:200]:
+    if (
+        "export function isLcaGatewayMode" in text
+        and "return true;" in text.split("export function isLcaGatewayMode", 1)[1][:200]
+    ):
         return False
     ctx.write(rel, text + "\n" + _IS_LCA_GATEWAY_MODE)
     return True
@@ -365,7 +353,9 @@ def _patch_custom_interaction_handlers(ctx: PatchContext) -> bool:
 
     opts_anchor = "interface SubmitToolInteractionOptions {\n  createUserMessage?: boolean;"
     if opts_anchor not in handlers_text:
-        raise SystemExit("[lca_runtime_agent_gateway] SubmitToolInteractionOptions anchor not found")
+        raise SystemExit(
+            "[lca_runtime_agent_gateway] SubmitToolInteractionOptions anchor not found"
+        )
     handlers_text = handlers_text.replace(
         opts_anchor,
         "interface SubmitToolInteractionOptions {\n  createUserMessage?: boolean;\n  skipResume?: boolean;\n  lcaRunId?: string;",
@@ -381,7 +371,9 @@ def _patch_custom_interaction_handlers(ctx: PatchContext) -> bool:
         "    match: isAskUserQuestionCall,\n"
         "  },"
     )
-    new_handler = "  {\n    handler: handleLcaAskUserSubmit,\n    match: isAskUserQuestionCall,\n  },"
+    new_handler = (
+        "  {\n    handler: handleLcaAskUserSubmit,\n    match: isAskUserQuestionCall,\n  },"
+    )
     if old_handler not in handlers_text:
         raise SystemExit("[lca_runtime_agent_gateway] askUserQuestion handler anchor not found")
     handlers_text = handlers_text.replace(old_handler, new_handler, 1)
@@ -438,7 +430,9 @@ const handleLcaAskUserSubmit: CustomInteractionSubmitHandler = async (payload, c
 """
     handlers_anchor = "const customInteractionSubmitHandlers: Array<{"
     if handlers_anchor not in handlers_text:
-        raise SystemExit("[lca_runtime_agent_gateway] customInteractionSubmitHandlers anchor not found")
+        raise SystemExit(
+            "[lca_runtime_agent_gateway] customInteractionSubmitHandlers anchor not found"
+        )
     handlers_text = handlers_text.replace(handlers_anchor, lca_handler_fn + handlers_anchor, 1)
     ctx.write(handlers_path, handlers_text)
     return True
@@ -478,7 +472,9 @@ def _patch_conversation_control(ctx: PatchContext) -> bool:
     if "skipResume" not in control_text:
         type_anchor = "      toolResultContent?: string;\n    },\n  ): Promise<void> => {"
         if type_anchor not in control_text:
-            raise SystemExit("[lca_runtime_agent_gateway] conversationControl type anchor not found")
+            raise SystemExit(
+                "[lca_runtime_agent_gateway] conversationControl type anchor not found"
+            )
         control_text = control_text.replace(
             type_anchor,
             "      lcaRunId?: string;\n      skipResume?: boolean;\n      toolResultContent?: string;\n    },\n  ): Promise<void> => {",
@@ -492,7 +488,9 @@ def _patch_conversation_control(ctx: PatchContext) -> bool:
             "    // honor the next Stop normally."
         )
         if resume_anchor not in control_text:
-            raise SystemExit("[lca_runtime_agent_gateway] conversationControl resume anchor not found")
+            raise SystemExit(
+                "[lca_runtime_agent_gateway] conversationControl resume anchor not found"
+            )
         control_text = control_text.replace(
             resume_anchor,
             resume_anchor
@@ -536,7 +534,9 @@ def _patch_conversation_control(ctx: PatchContext) -> bool:
     if "lcaRunId" not in control_text:
         type_anchor = "      skipResume?: boolean;\n      toolResultContent?: string;\n    },\n  ): Promise<void> => {"
         if type_anchor not in control_text:
-            raise SystemExit("[lca_runtime_agent_gateway] conversationControl type upgrade anchor not found")
+            raise SystemExit(
+                "[lca_runtime_agent_gateway] conversationControl type upgrade anchor not found"
+            )
         control_text = control_text.replace(
             type_anchor,
             "      lcaRunId?: string;\n      skipResume?: boolean;\n      toolResultContent?: string;\n    },\n  ): Promise<void> => {",
@@ -589,7 +589,9 @@ def _patch_conversation_control(ctx: PatchContext) -> bool:
             "    }"
         )
         if old_skip_block not in control_text:
-            raise SystemExit("[lca_runtime_agent_gateway] conversationControl skipResume block anchor not found")
+            raise SystemExit(
+                "[lca_runtime_agent_gateway] conversationControl skipResume block anchor not found"
+            )
         control_text = control_text.replace(old_skip_block, new_skip_block, 1)
         ctx.write(control_path, control_text)
         changed = True
@@ -737,7 +739,9 @@ def _patch_conversation_control(ctx: PatchContext) -> bool:
                 "import { buildRunLifecycle } from '../lifecycle/buildRunLifecycle';"
             )
             if lifecycle_import_anchor not in control_text:
-                raise SystemExit("[lca_runtime_agent_gateway] conversationControl token anchor not found")
+                raise SystemExit(
+                    "[lca_runtime_agent_gateway] conversationControl token anchor not found"
+                )
             control_text = control_text.replace(
                 lifecycle_import_anchor,
                 lifecycle_import_anchor
@@ -751,7 +755,9 @@ def _patch_conversation_control(ctx: PatchContext) -> bool:
             "    // 2. Create a user message indicating the skip"
         )
         if skip_anchor not in control_text:
-            raise SystemExit("[lca_runtime_agent_gateway] conversationControl skip anchor not found")
+            raise SystemExit(
+                "[lca_runtime_agent_gateway] conversationControl skip anchor not found"
+            )
         skip_block = (
             "    if (this.#wasInterimOpStopped(operationId)) return;\n"
             "\n"
@@ -796,7 +802,9 @@ def _patch_conversation_control(ctx: PatchContext) -> bool:
                 "import { buildRunLifecycle } from '../lifecycle/buildRunLifecycle';"
             )
             if lifecycle_import_anchor not in control_text:
-                raise SystemExit("[lca_runtime_agent_gateway] conversationControl token anchor not found")
+                raise SystemExit(
+                    "[lca_runtime_agent_gateway] conversationControl token anchor not found"
+                )
             control_text = control_text.replace(
                 lifecycle_import_anchor,
                 lifecycle_import_anchor
@@ -806,7 +814,9 @@ def _patch_conversation_control(ctx: PatchContext) -> bool:
 
         cancel_anchor = "    const toolContent = 'User cancelled this interaction.';\n"
         if cancel_anchor not in control_text:
-            raise SystemExit("[lca_runtime_agent_gateway] conversationControl cancel anchor not found")
+            raise SystemExit(
+                "[lca_runtime_agent_gateway] conversationControl cancel anchor not found"
+            )
         cancel_block = (
             "    const toolContent = 'User cancelled this interaction.';\n"
             "\n"
@@ -974,10 +984,12 @@ def _patch_gateway_lca_routing(ctx: PatchContext) -> bool:
         "    if (!agentGatewayUrl) return;"
     )
     if old_reconnect_sig not in text:
-        raise SystemExit("[lca_runtime_agent_gateway] reconnectToGatewayOperation sig anchor not found")
+        raise SystemExit(
+            "[lca_runtime_agent_gateway] reconnectToGatewayOperation sig anchor not found"
+        )
     text = text.replace(old_reconnect_sig, new_reconnect_sig, 1)
 
-    old_token = (
+    old_jwt_anchor = (
         "    // Get a fresh JWT token (original expired after 5 min). The server throws\n"
         "    // TRPCError NOT_FOUND when it has no running operation on this topic — our\n"
         "    // local marker is stale (e.g. an error run cleared the server marker but not\n"
@@ -994,7 +1006,7 @@ def _patch_gateway_lca_routing(ctx: PatchContext) -> bool:
         "      throw error;\n"
         "    }"
     )
-    new_token = (
+    new_jwt_code = (
         "    // Mint or reuse JWT for WS auth (LCA: run_* + ws_token; native: tRPC).\n"
         "    let token: string;\n"
         "    if (isLcaGatewayMode()) {\n"
@@ -1023,9 +1035,9 @@ def _patch_gateway_lca_routing(ctx: PatchContext) -> bool:
         "      }\n"
         "    }"
     )
-    if old_token not in text:
+    if old_jwt_anchor not in text:
         raise SystemExit("[lca_runtime_agent_gateway] reconnect token anchor not found")
-    text = text.replace(old_token, new_token, 1)
+    text = text.replace(old_jwt_anchor, new_jwt_code, 1)
 
     old_cancel = (
         "    this.#get().onOperationCancel(gatewayOpId, async () => {\n"
@@ -1306,7 +1318,9 @@ def _apply_gateway_last_event_id(text: str) -> str | None:
         1,
     )
 
-    client_anchor = "    const client = this.createClient({ gatewayUrl, operationId, resumeOnConnect, token });"
+    client_anchor = (
+        "    const client = this.createClient({ gatewayUrl, operationId, resumeOnConnect, token });"
+    )
     if client_anchor not in text:
         msg = "[lca_runtime_agent_gateway] gateway createClient call anchor not found"
         raise SystemExit(msg)
@@ -1520,11 +1534,7 @@ def _apply_gateway_reconnect_lca(text: str) -> str | None:
     text = text.replace(connect_head_anchor, connect_head_replacement, 1)
 
     connect_tail_anchor = (
-        "      operationId,\n"
-        "      resumeOnConnect: true,\n"
-        "      token,\n"
-        "      topicId,\n"
-        "    });\n"
+        "      operationId,\n      resumeOnConnect: true,\n      token,\n      topicId,\n    });\n"
     )
     if connect_tail_anchor not in text:
         msg = "[lca_runtime_agent_gateway] reconnect connectToGateway tail anchor not found"
@@ -1571,10 +1581,7 @@ def _patch_gateway_event_handler_lca(ctx: PatchContext) -> bool:
     Idempotent: re-running this on an already-patched file is a
     no-op (skip). The marker is the MessageReader type alias.
     """
-    rel = (
-        "src/store/chat/slices/agentRun/actions/transports/"
-        "gateway/gatewayEventHandler.ts"
-    )
+    rel = "src/store/chat/slices/agentRun/actions/transports/gateway/gatewayEventHandler.ts"
     text = ctx.read(rel)
     changed = False
     marker = "type MessageReader = " + chr(123)
@@ -1628,9 +1635,7 @@ def apply(ctx: PatchContext) -> bool:
             "from lobehub-ui/.env — run `lca-ops lobehub restart` to "
             "regenerate it, or set the key manually."
         )
-    gateway_ws = gateway_http.replace("http://", "ws://", 1).replace(
-        "https://", "wss://", 1
-    )
+    gateway_ws = gateway_http.replace("http://", "ws://", 1).replace("https://", "wss://", 1)
 
     for fname in _NEW_FILES:
         rel = f"{_LCA_GATEWAY_DIR}/{fname}"

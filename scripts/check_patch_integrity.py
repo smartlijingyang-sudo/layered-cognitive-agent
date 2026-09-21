@@ -48,6 +48,7 @@ class _CaptureCtx:
 
     def __init__(self) -> None:
         self.written: dict[str, str] = {}
+        self._ui = _UI_DIR
 
     def path(self, rel: str) -> Path:
         return _UI_DIR / rel
