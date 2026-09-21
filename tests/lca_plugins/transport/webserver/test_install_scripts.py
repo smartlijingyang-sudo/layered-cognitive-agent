@@ -99,10 +99,10 @@ async def test_install_ps1_renders_template() -> None:
     assert "function Update-SessionPath" in text
     assert "function Find-Python" in text
     assert "HKCU:\\Software\\Python\\PythonCore" in text
-    assert "Programs/Python" in text
-    assert "winget install --id Python.Python.3.11" in text
+    assert "Programs\\Python" in text
+    assert "winget install --id Python.Python.3.11 --source winget" in text
     assert "python-3.11.9" in text
-    assert "InstallAllUsers=0 PrependPath=1" in text
+    assert "InstallAllUsers=0" in text
     assert "--user" in text
 
 

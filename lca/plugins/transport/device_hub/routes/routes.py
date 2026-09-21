@@ -380,10 +380,13 @@ function Test-PythonCandidate($exePath) {{
     if (-not (Test-Path $exePath -PathType Leaf)) {{ return $false }}
     if ($exePath -match "[.]cmd$") {{ return $false }}
     try {{
-        $testCode = "import sys; v=sys.version_info; sys.exit(0 if (v.major==3 and v.minor>=10) else 1)"
-        $proc = Start-Process -FilePath $exePath -ArgumentList @("-c", $testCode) -NoNewWindow -Wait -PassThru -RedirectStandardError ([System.IO.Path]::GetTempFileName()) -RedirectStandardOutput ([System.IO.Path]::GetTempFileName())
-        if ($proc.ExitCode -eq 0) {{
-            return $true
+        $out = & $exePath -c "import sys; print('LCA_PY_' + str(sys.version_info[0]) + '_' + str(sys.version_info[1]))" 2>$null
+        if ($LASTEXITCODE -eq 0 -and $out -match "LCA_PY_(\\d+)_(\\d+)") {{
+            $major = [int]$matches[1]
+            $minor = [int]$matches[2]
+            if ($major -eq 3 -and $minor -ge 10) {{
+                return $true
+            }}
         }}
     }} catch {{}}
     return $false
@@ -404,13 +407,13 @@ function Update-SessionPath {{
 function Find-Python {{
     Update-SessionPath
 
+    $candidates = [System.Collections.Generic.List[string]]::new()
+
     # 1.1 Check PATH commands
     foreach ($name in @("python.exe", "py.exe", "python3.exe", "python", "py", "python3")) {{
         $cmd = Get-Command $name -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($cmd -and $cmd.Source) {{
-            if (Test-PythonCandidate $cmd.Source) {{
-                return $cmd.Source
-            }}
+        if ($cmd -and $cmd.Source -and ($cmd.Source -notmatch "[.]cmd$")) {{
+            $candidates.Add($cmd.Source)
         }}
     }}
 
@@ -423,54 +426,59 @@ function Find-Python {{
                 $regKey = Join-Path $key.PSPath "InstallPath"
                 $installPath = (Get-ItemProperty $regKey -ErrorAction SilentlyContinue)."(default)"
                 if ($installPath) {{
-                    $candidate = Join-Path $installPath "python.exe"
-                    if (Test-PythonCandidate $candidate) {{
-                        return $candidate
-                    }}
+                    $candidates.Add((Join-Path $installPath "python.exe"))
                 }}
             }}
         }}
     }}
 
-    # 1.3 Check common Windows installation directories
-    $commonDirs = @(
-        "$env:LOCALAPPDATA/Programs/Python",
-        "$env:ProgramFiles/Python",
-        "${{env:ProgramFiles(x86)}}/Python",
-        "$env:SystemDrive/Python",
-        "$env:USERPROFILE/scoop/apps/python",
-        "$env:USERPROFILE/.pyenv/pyenv-win/versions"
+    # 1.3 Check standard Windows directory locations
+    $stdPaths = @(
+        (Join-Path $env:LOCALAPPDATA "Programs\\Python\\Python313\\python.exe"),
+        (Join-Path $env:LOCALAPPDATA "Programs\\Python\\Python312\\python.exe"),
+        (Join-Path $env:LOCALAPPDATA "Programs\\Python\\Python311\\python.exe"),
+        (Join-Path $env:LOCALAPPDATA "Programs\\Python\\Python310\\python.exe"),
+        (Join-Path $env:ProgramFiles "Python313\\python.exe"),
+        (Join-Path $env:ProgramFiles "Python312\\python.exe"),
+        (Join-Path $env:ProgramFiles "Python311\\python.exe"),
+        (Join-Path $env:ProgramFiles "Python310\\python.exe"),
+        (Join-Path ${{env:ProgramFiles(x86)}} "Python313\\python.exe"),
+        (Join-Path ${{env:ProgramFiles(x86)}} "Python312\\python.exe"),
+        (Join-Path ${{env:ProgramFiles(x86)}} "Python311\\python.exe"),
+        (Join-Path ${{env:ProgramFiles(x86)}} "Python310\\python.exe"),
+        "C:\\Python313\\python.exe",
+        "C:\\Python312\\python.exe",
+        "C:\\Python311\\python.exe",
+        "C:\\Python310\\python.exe",
+        (Join-Path $env:USERPROFILE "scoop\apps\\python\\current\\python.exe"),
+        (Join-Path $env:USERPROFILE "scoop\\shims\\python.exe"),
+        (Join-Path $env:USERPROFILE ".pyenv\\pyenv-win\\shims\\python.exe"),
+        (Join-Path $env:USERPROFILE "miniconda3\\python.exe"),
+        (Join-Path $env:USERPROFILE "anaconda3\\python.exe"),
+        (Join-Path $env:ProgramData "miniconda3\\python.exe"),
+        (Join-Path $env:ProgramData "anaconda3\\python.exe")
     )
-    foreach ($dir in $commonDirs) {{
-        if (Test-Path $dir) {{
-            $pyExes = Get-ChildItem -Path $dir -Filter "python.exe" -Recurse -Depth 3 -ErrorAction SilentlyContinue
-            foreach ($item in $pyExes) {{
-                if (Test-PythonCandidate $item.FullName) {{
-                    return $item.FullName
-                }}
+    foreach ($p in $stdPaths) {{
+        if ($p) {{ $candidates.Add($p) }}
+    }}
+
+    # 1.4 Scan UV and Programs directories recursively if present
+    $scanDirs = @(
+        (Join-Path $env:LOCALAPPDATA "Programs\\Python"),
+        (Join-Path $env:LOCALAPPDATA "uv\\python")
+    )
+    foreach ($sdir in $scanDirs) {{
+        if (Test-Path $sdir) {{
+            Get-ChildItem -Path $sdir -Filter "python.exe" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {{
+                $candidates.Add($_.FullName)
             }}
         }}
     }}
 
-    # 1.4 Check specific shims & distributions (Conda, Scoop, UV)
-    $specificPaths = @(
-        "$env:USERPROFILE/miniconda3/python.exe",
-        "$env:USERPROFILE/anaconda3/python.exe",
-        "$env:ProgramData/miniconda3/python.exe",
-        "$env:ProgramData/anaconda3/python.exe",
-        "$env:USERPROFILE/scoop/shims/python.exe",
-        "$env:LOCALAPPDATA/uv/python/cpython-3.11*/python.exe",
-        "$env:LOCALAPPDATA/uv/python/cpython-3.12*/python.exe",
-        "$env:LOCALAPPDATA/uv/python/cpython-3.13*/python.exe"
-    )
-    foreach ($pattern in $specificPaths) {{
-        $resolved = Resolve-Path $pattern -ErrorAction SilentlyContinue
-        if ($resolved) {{
-            foreach ($r in $resolved) {{
-                if (Test-PythonCandidate $r.Path) {{
-                    return $r.Path
-                }}
-            }}
+    # Test each candidate
+    foreach ($cand in ($candidates | Select-Object -Unique)) {{
+        if ($cand -and (Test-PythonCandidate $cand)) {{
+            return $cand
         }}
     }}
 
@@ -486,12 +494,15 @@ if (-not $pythonCmd) {{
 
     $installed = $false
 
-    # Option A: Windows Package Manager (winget)
+    # Option A: Windows Package Manager (winget) specifying --source winget
     $hasWinget = Get-Command winget -ErrorAction SilentlyContinue
     if ($hasWinget) {{
-        Write-Host "[*] Installing Python 3.11 via winget..." -ForegroundColor Gray
+        Write-Host "[*] Installing Python 3.11 via winget (source: winget)..." -ForegroundColor Gray
         try {{
-            & winget install --id Python.Python.3.11 -e --silent --accept-package-agreements --accept-source-agreements
+            & winget install --id Python.Python.3.11 --source winget --exact --silent --accept-package-agreements --accept-source-agreements
+            if ($LASTEXITCODE -ne 0) {{
+                & winget install Python.Python.3.11 --source winget --silent --accept-package-agreements --accept-source-agreements
+            }}
             Update-SessionPath
             $pythonCmd = Find-Python
             if ($pythonCmd) {{
@@ -512,11 +523,20 @@ if (-not $pythonCmd) {{
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
             Invoke-WebRequest -Uri $installerUrl -OutFile $tempInstaller -UseBasicParsing
             if (Test-Path $tempInstaller) {{
-                Write-Host "[*] Running silent Python installer (per-user)..." -ForegroundColor Gray
-                $installProc = Start-Process -FilePath $tempInstaller -ArgumentList "/quiet InstallAllUsers=0 PrependPath=1 Include_pip=1 Include_test=0" -Wait -PassThru
+                $targetDir = Join-Path $env:LOCALAPPDATA "Programs\\Python\\Python311"
+                $logPath = Join-Path ([System.IO.Path]::GetTempPath()) "python-installer.log"
+                Write-Host "[*] Running silent Python installer to $targetDir..." -ForegroundColor Gray
+                $argStr = "/quiet InstallAllUsers=0 TargetDir=`"$targetDir`" PrependPath=1 Include_pip=1 Shortcuts=0 /log `"$logPath`""
+                $installProc = Start-Process -FilePath $tempInstaller -ArgumentList $argStr -Wait -PassThru
                 Remove-Item $tempInstaller -Force -ErrorAction SilentlyContinue
                 Update-SessionPath
                 $pythonCmd = Find-Python
+                if (-not $pythonCmd) {{
+                    $directExe = Join-Path $targetDir "python.exe"
+                    if (Test-PythonCandidate $directExe) {{
+                        $pythonCmd = $directExe
+                    }}
+                }}
                 if ($pythonCmd) {{
                     $installed = $true
                 }}
@@ -529,7 +549,7 @@ if (-not $pythonCmd) {{
     if (-not $pythonCmd) {{
         Write-Host "[!] Python 3.10+ installation could not be completed automatically." -ForegroundColor Red
         Write-Host "Please install Python 3 manually using one of the following methods:" -ForegroundColor Yellow
-        Write-Host "  1. Run: winget install Python.Python.3.11" -ForegroundColor Gray
+        Write-Host "  1. Run: winget install Python.Python.3.11 --source winget" -ForegroundColor Gray
         Write-Host "  2. Download from: https://www.python.org/downloads/" -ForegroundColor Gray
         Write-Host "     (Make sure to check 'Add python.exe to PATH' during installation)" -ForegroundColor Gray
         exit 1
