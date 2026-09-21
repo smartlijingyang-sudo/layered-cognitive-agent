@@ -84,7 +84,7 @@ patch:
     config:
       api_key:
         from_env: COMPOSIO_API_KEY
-        required: true
+        required: false
       callback_url:
         from_env: LCA_COMPOSIO_CALLBACK_URL
         required: false

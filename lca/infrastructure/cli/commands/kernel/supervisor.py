@@ -230,7 +230,7 @@ def register(app: typer.Typer) -> None:
             help="For `logs`: keep tailing (Ctrl+C to exit)",
         ),
         profile: str = typer.Option(
-            "profiles/web-standard.yaml", "--profile", "-p",
+            "profiles/web-assistant.yaml", "--profile", "-p",
             help="For dev-default config: profile path",
         ),
         port: int = typer.Option(

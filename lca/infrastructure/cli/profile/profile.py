@@ -11,7 +11,7 @@ import os
 from collections.abc import Mapping
 from pathlib import Path
 
-DEFAULT_PROFILE = "profiles/web-standard.yaml"
+DEFAULT_PROFILE = "profiles/web-assistant.yaml"
 
 
 def resolve_profile_path(

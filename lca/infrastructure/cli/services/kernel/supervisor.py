@@ -703,7 +703,7 @@ def parse_program_config(path: str | Path) -> list[ProgramConfig]:
 
 def default_program_config(
     *,
-    profile: str = "profiles/web-standard.yaml",
+    profile: str = "profiles/web-assistant.yaml",
     host: str = "0.0.0.0",  # noqa: S104 — bind-all default
     port: int = 8765,
 ) -> ProgramConfig:
