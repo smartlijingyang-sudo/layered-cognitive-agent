@@ -157,5 +157,15 @@ describe('submitToolInteraction LCA resume', () => {
       expect.any(Function),
       expect.objectContaining({ runId: 'run-lca-1' }),
     );
+
+    // The LCA skipResume branch mirrors the native gateway resume: after the
+    // resume op succeeds, the topic returns to 'active' so the intervention
+    // card disappears instead of staying parked at waitingForHuman.
+    const updateTopicStatus = useChatStore.getState().updateTopicStatus as ReturnType<
+      typeof vi.fn
+    >;
+    expect(updateTopicStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'active', topicId }),
+    );
   });
 });

@@ -23,6 +23,9 @@
 
 import type { AgentStreamEvent } from '@lobechat/agent-gateway-client';
 import type { ConversationContext, UIChatMessage } from '@lobechat/types';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { messageService } from '@/services/message';
@@ -522,5 +525,50 @@ describe('createLcaGatewayEventHandler (multi-run / multi-LLM)', () => {
     );
     expect(runLifecycle.completeRun).not.toHaveBeenCalled();
     expect(store.completeOperation).not.toHaveBeenCalled();
+  });
+});
+
+// Patch-level lock for the LCA HITL state-convergence PR. These tests read the
+// APPLIED lobehub-ui sources (this file is copied into
+// `src/store/chat/agents/transports/lcaGateway/` by the patch engine) and pin
+// the two fixes:
+//   1. conversationControl's LCA skipResume branch writes topic status
+//      'active' (native gateway resume parity) so the intervention card
+//      disappears after the user answers.
+//   2. gateway.ts's reconnectToGatewayOperation uses createLcaGatewayEventHandler
+//      and resumes from getLcaStreamPosition(operationId) instead of replaying
+//      the run from the start with the shared DB-backed handler.
+describe('patched gateway reconnect surface (LCA HITL convergence)', () => {
+  const uiRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../../..');
+  const gatewaySource = readFileSync(
+    resolve(uiRoot, 'src/store/chat/slices/agentRun/actions/transports/gateway/gateway.ts'),
+    'utf-8',
+  );
+  const controlSource = readFileSync(
+    resolve(uiRoot, 'src/store/chat/slices/agentRun/actions/entries/conversationControl.ts'),
+    'utf-8',
+  );
+
+  it('routes reconnectToGatewayOperation through createLcaGatewayEventHandler', () => {
+    expect(gatewaySource).toContain('createLcaGatewayEventHandler(this.#get, {');
+    expect(gatewaySource).toContain(
+      '@/store/chat/agents/transports/lcaGateway/event_handler',
+    );
+    expect(gatewaySource).toContain('resuming: true');
+  });
+
+  it('passes lastEventId from getLcaStreamPosition into connectToGateway on reconnect', () => {
+    expect(gatewaySource).toContain('getLcaStreamPosition(operationId)');
+    expect(gatewaySource).toContain(
+      '@/store/chat/agents/transports/lcaGateway/LcaAgentStreamClient',
+    );
+    expect(gatewaySource).toContain('      lastEventId,');
+  });
+
+  it('writes topic status active in the LCA skipResume branch of conversationControl', () => {
+    expect(controlSource).toContain(
+      "this.#writeTopicStatus(effectiveContext, 'active');\n      completeOperation(operationId);",
+    );
+    expect(controlSource).toContain('LCA: mirror the native gateway resume');
   });
 });

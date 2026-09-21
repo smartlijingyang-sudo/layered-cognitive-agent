@@ -520,6 +520,10 @@ def _patch_conversation_control(ctx: PatchContext) -> bool:
             + "          console.error('[LCA] askUserQuestion resume op failed', error);\n"
             + "        }\n"
             + "      }\n"
+            + "      // LCA: mirror the native gateway resume — return the topic to\n"
+            + "      // 'active' so the intervention card disappears (see\n"
+            + "      // conversationControl.ts:716).\n"
+            + "      this.#writeTopicStatus(effectiveContext, 'active');\n"
             + "      completeOperation(operationId);\n"
             + "      return;\n"
             + "    }",
@@ -576,6 +580,10 @@ def _patch_conversation_control(ctx: PatchContext) -> bool:
             "          console.error('[LCA] askUserQuestion resume op failed', error);\n"
             "        }\n"
             "      }\n"
+            "      // LCA: mirror the native gateway resume — return the topic to\n"
+            "      // 'active' so the intervention card disappears (see\n"
+            "      // conversationControl.ts:716).\n"
+            "      this.#writeTopicStatus(effectiveContext, 'active');\n"
             "      completeOperation(operationId);\n"
             "      return;\n"
             "    }"
@@ -583,6 +591,43 @@ def _patch_conversation_control(ctx: PatchContext) -> bool:
         if old_skip_block not in control_text:
             raise SystemExit("[lca_runtime_agent_gateway] conversationControl skipResume block anchor not found")
         control_text = control_text.replace(old_skip_block, new_skip_block, 1)
+        ctx.write(control_path, control_text)
+        changed = True
+        control_text = ctx.read(control_path)
+
+    if "LCA: mirror the native gateway resume" not in control_text:
+        # Already-patched checkouts carry the skipResume block without the topic
+        # status write. Anchor on the resume-failure catch and insert the 'active'
+        # write between the resume op and completeOperation, matching the native
+        # gateway resume (conversationControl.ts:716).
+        resume_status_anchor = (
+            "        } catch (error) {\n"
+            "          console.error('[LCA] askUserQuestion resume op failed', error);\n"
+            "        }\n"
+            "      }\n"
+            "      completeOperation(operationId);\n"
+            "      return;\n"
+            "    }"
+        )
+        if resume_status_anchor not in control_text:
+            raise SystemExit(
+                "[lca_runtime_agent_gateway] conversationControl skipResume status anchor not found"
+            )
+        control_text = control_text.replace(
+            resume_status_anchor,
+            "        } catch (error) {\n"
+            "          console.error('[LCA] askUserQuestion resume op failed', error);\n"
+            "        }\n"
+            "      }\n"
+            "      // LCA: mirror the native gateway resume — return the topic to\n"
+            "      // 'active' so the intervention card disappears (see\n"
+            "      // conversationControl.ts:716).\n"
+            "      this.#writeTopicStatus(effectiveContext, 'active');\n"
+            "      completeOperation(operationId);\n"
+            "      return;\n"
+            "    }",
+            1,
+        )
         ctx.write(control_path, control_text)
         changed = True
         control_text = ctx.read(control_path)
@@ -1359,6 +1404,156 @@ def _patch_gateway_last_event_id(ctx: PatchContext) -> bool:
     return True
 
 
+def _apply_gateway_reconnect_lca(text: str) -> str | None:
+    """Route ``reconnectToGatewayOperation`` through the LCA event handler and
+    resume from the last stream position.
+
+    Page-refresh reconnects (``useGatewayReconnect``) previously reused the
+    shared ``createGatewayEventHandler`` (DB reader) and called
+    ``connectToGateway`` without ``lastEventId``, so a parked run's events were
+    replayed from the start — re-parking ``waitingForHuman`` and letting the DB
+    pending row clobber the in-memory approved intervention state. In LCA mode,
+    build the LCA event handler (in-memory reader + ``resuming`` semantics) and
+    pass the run's last stream position so the reconnect is a passive
+    re-subscribe.
+
+    Idempotent: returns None when the reconnect already routes through
+    ``createLcaGatewayEventHandler``.
+    """
+    if "createLcaGatewayEventHandler(this.#get, {" in text:
+        return None
+
+    handler_anchor = (
+        "    const eventHandler = createGatewayEventHandler(this.#get, {\n"
+        "      assistantMessageId,\n"
+        "      context,\n"
+        "      // Server-side operation id — needed for tool_result dispatch back over\n"
+        "      // the same WS that gatewayConnections is keyed on.\n"
+        "      gatewayOperationId: operationId,\n"
+        "      operationId: gatewayOpId,\n"
+        "      runLifecycle: buildRunLifecycle(this.#get, {\n"
+        "        context,\n"
+        "        parentMessageId: assistantMessageId,\n"
+        "        parentMessageType: 'assistant',\n"
+        "        runId: gatewayOpId,\n"
+        "        runScope: (context.scope === 'sub_agent' ? 'sub_agent' : 'top_level') as RunScope,\n"
+        "        runtimeType: 'gateway',\n"
+        "      }),\n"
+        "    });\n"
+    )
+    if handler_anchor not in text:
+        msg = "[lca_runtime_agent_gateway] reconnect eventHandler anchor not found"
+        raise SystemExit(msg)
+    handler_replacement = (
+        "    // LCA reconnect: page refresh re-subscribes to the SAME run. Use the\n"
+        "    // LCA event handler (in-memory reader + resuming step semantics) so the\n"
+        "    // replayed stream does not re-park waitingForHuman or clobber approved\n"
+        "    // intervention state with hollow DB rows.\n"
+        "    let eventHandler: ReturnType<typeof createGatewayEventHandler>;\n"
+        "    if (isLcaGatewayMode()) {\n"
+        "      const { createLcaGatewayEventHandler } = await import(\n"
+        "        '@/store/chat/agents/transports/lcaGateway/event_handler'\n"
+        "      );\n"
+        "      eventHandler = createLcaGatewayEventHandler(this.#get, {\n"
+        "        assistantMessageId,\n"
+        "        context,\n"
+        "        // Server-side operation id — needed for tool_result dispatch back over\n"
+        "        // the same WS that gatewayConnections is keyed on.\n"
+        "        gatewayOperationId: operationId,\n"
+        "        operationId: gatewayOpId,\n"
+        "        resuming: true,\n"
+        "        runLifecycle: buildRunLifecycle(this.#get, {\n"
+        "          context,\n"
+        "          parentMessageId: assistantMessageId,\n"
+        "          parentMessageType: 'assistant',\n"
+        "          runId: gatewayOpId,\n"
+        "          runScope: (context.scope === 'sub_agent' ? 'sub_agent' : 'top_level') as RunScope,\n"
+        "          runtimeType: 'gateway',\n"
+        "        }),\n"
+        "      });\n"
+        "    } else {\n"
+        "      eventHandler = createGatewayEventHandler(this.#get, {\n"
+        "        assistantMessageId,\n"
+        "        context,\n"
+        "        // Server-side operation id — needed for tool_result dispatch back over\n"
+        "        // the same WS that gatewayConnections is keyed on.\n"
+        "        gatewayOperationId: operationId,\n"
+        "        operationId: gatewayOpId,\n"
+        "        runLifecycle: buildRunLifecycle(this.#get, {\n"
+        "          context,\n"
+        "          parentMessageId: assistantMessageId,\n"
+        "          parentMessageType: 'assistant',\n"
+        "          runId: gatewayOpId,\n"
+        "          runScope: (context.scope === 'sub_agent' ? 'sub_agent' : 'top_level') as RunScope,\n"
+        "          runtimeType: 'gateway',\n"
+        "        }),\n"
+        "      });\n"
+        "    }\n"
+    )
+    text = text.replace(handler_anchor, handler_replacement, 1)
+
+    connect_head_anchor = (
+        "    this.#get().connectToGateway({\n"
+        "      gatewayUrl: agentGatewayUrl,\n"
+        "      onEvent: eventRouter,\n"
+        "      onSessionComplete: ({ succeeded, terminalReceived, authFailed }) => {\n"
+    )
+    if connect_head_anchor not in text:
+        msg = "[lca_runtime_agent_gateway] reconnect connectToGateway head anchor not found"
+        raise SystemExit(msg)
+    connect_head_replacement = (
+        "    let lastEventId: string | undefined;\n"
+        "    if (isLcaGatewayMode()) {\n"
+        "      const { getLcaStreamPosition } = await import(\n"
+        "        '@/store/chat/agents/transports/lcaGateway/LcaAgentStreamClient'\n"
+        "      );\n"
+        "      // Resume from the last stream position, not the run start, so a\n"
+        "      // parked run's replay does not re-park waitingForHuman.\n"
+        "      lastEventId = getLcaStreamPosition(operationId);\n"
+        "    }\n"
+        "\n"
+        "    this.#get().connectToGateway({\n"
+        "      gatewayUrl: agentGatewayUrl,\n"
+        "      onEvent: eventRouter,\n"
+        "      onSessionComplete: ({ succeeded, terminalReceived, authFailed }) => {\n"
+    )
+    text = text.replace(connect_head_anchor, connect_head_replacement, 1)
+
+    connect_tail_anchor = (
+        "      operationId,\n"
+        "      resumeOnConnect: true,\n"
+        "      token,\n"
+        "      topicId,\n"
+        "    });\n"
+    )
+    if connect_tail_anchor not in text:
+        msg = "[lca_runtime_agent_gateway] reconnect connectToGateway tail anchor not found"
+        raise SystemExit(msg)
+    text = text.replace(
+        connect_tail_anchor,
+        "      operationId,\n"
+        "      resumeOnConnect: true,\n"
+        "      token,\n"
+        "      topicId,\n"
+        "      lastEventId,\n"
+        "    });\n",
+        1,
+    )
+    return text
+
+
+def _patch_gateway_reconnect_lca(ctx: PatchContext) -> bool:
+    """Route ``reconnectToGatewayOperation`` through the LCA event handler and
+    resume from the last stream position."""
+    rel = "src/store/chat/slices/agentRun/actions/transports/gateway/gateway.ts"
+    text = ctx.read(rel)
+    patched = _apply_gateway_reconnect_lca(text)
+    if patched is None:
+        return False
+    ctx.write(rel, patched)
+    return True
+
+
 def _patch_gateway_event_handler_lca(ctx: PatchContext) -> bool:
     """Emit the LCA-flavored gatewayEventHandler with the runtimeType
     enum, the messageService override, the merge-by-id
@@ -1468,6 +1663,7 @@ def apply(ctx: PatchContext) -> bool:
         _patch_gateway_create_client,
         _patch_gateway_lca_routing,
         _patch_gateway_last_event_id,
+        _patch_gateway_reconnect_lca,
         _patch_streaming_executor,
         _patch_agent_dispatcher,
         _patch_custom_interaction_handlers,
