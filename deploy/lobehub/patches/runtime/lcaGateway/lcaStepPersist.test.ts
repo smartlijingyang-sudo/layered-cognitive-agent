@@ -154,6 +154,52 @@ describe('lcaStepPersist', () => {
     );
   });
 
+  it('stamps pending intervention onto an already-created tool row when the real record follows the placeholder', () => {
+    const store = createStore();
+    // 占位 tools_calling（无 intervention）先建行
+    ensureLcaToolMessages(store, {
+      assistantId: 'asst-1',
+      context,
+      operationId: 'op-1',
+      toolsCalling: [
+        {
+          apiName: 'askUserQuestion',
+          arguments: '{"questions":[]}',
+          id: 'tc-ask2',
+          identifier: 'lobe-user-interaction',
+          type: 'builtin',
+        },
+      ],
+    });
+
+    const rowBefore = store.dbMessagesMap[topicKey].find(
+      (m) => m.role === 'tool' && m.tool_call_id === 'tc-ask2',
+    );
+    expect(rowBefore?.pluginIntervention).toBeUndefined();
+
+    // 正式 tools_calling（带 intervention）应补 stamp 到已存在的行
+    ensureLcaToolMessages(store, {
+      assistantId: 'asst-1',
+      context,
+      operationId: 'op-1',
+      toolsCalling: [
+        {
+          apiName: 'askUserQuestion',
+          arguments: '{"lca_run_id":"run-1","questions":[]}',
+          id: 'tc-ask2',
+          identifier: 'lobe-user-interaction',
+          intervention: { status: 'pending' },
+          type: 'builtin',
+        },
+      ],
+    });
+
+    const rowAfter = store.dbMessagesMap[topicKey].find(
+      (m) => m.role === 'tool' && m.tool_call_id === 'tc-ask2',
+    );
+    expect(rowAfter?.pluginIntervention).toEqual({ status: 'pending' });
+  });
+
   it('writes tool_end content and pluginState onto the tool message, not only assistant.tools', async () => {
     const store = createStore();
     const tools = ensureLcaToolMessages(store, {

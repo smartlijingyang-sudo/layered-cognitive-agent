@@ -103,7 +103,21 @@ export const ensureLcaToolMessages = (
     const callId = tool.id;
     if (!callId) return tool;
     const already = byCallId.get(callId);
-    if (already?.id) return { ...tool, result_msg_id: already.id };
+    if (already?.id) {
+      // The gateway emits a placeholder `tools_calling` (no intervention)
+      // first, then the real tool-call record with
+      // `intervention: {status:'pending'}`. The early return above would
+      // drop the marker, leaving the askUserQuestion card without its
+      // option buttons. Stamp the pending marker onto the existing row.
+      if (tool.intervention && already.pluginIntervention?.status !== 'pending') {
+        store.internal_dispatchMessage({
+          id: already.id,
+          type: 'updateMessage',
+          value: { pluginIntervention: tool.intervention },
+        });
+      }
+      return { ...tool, result_msg_id: already.id };
+    }
 
     const toolMessageId = nanoid();
     const toolMessage = {
