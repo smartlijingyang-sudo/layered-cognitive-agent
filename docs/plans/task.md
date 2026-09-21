@@ -32,10 +32,10 @@
 | PUSH-TASK-3 | 【自我修正】长期记忆反思回填 USER.md 与自主演化 SOUL.md 核心使命 | Pending | 待测试画像回填与 update_assistant_soul 契约更新落盘 |
 | PUSH-TASK-4 | 【跨机协作】结合本地 Companion 执行机器探查（LocalExecPort 边界实测） | Pending | 待测试通过本地 companion 读取 git log 与系统状态回执闭环 |
 | BRAINSTORM-JEV-CONTEXT | 探索项目上下文与 TypeSafe/Jev 能力契合点 | Completed | 已梳理 LCA 认知五相（Think/Gate/Reflect/Route）痛点与 Jev 原语（Noul/Choice/Score）对应切入点 |
-| BRAINSTORM-JEV-QUESTIONS | 澄清业务偏好与核心痛点约束（单步提问） | In Progress | 正在与用户沟通首要痛点与接入目标场景 |
-| BRAINSTORM-JEV-APPROACHES | 提出 2-3 种具体整合架构方案与权衡 | Pending | 待用户回答澄清问题后输出方案对比与推荐 |
-| BRAINSTORM-JEV-DESIGN-SECTIONS | 逐步呈现设计细节并获取用户审批 | Pending | 待方案选型确认后推进 |
-| BRAINSTORM-JEV-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Pending | 待设计审批通过后落地 |
-| BRAINSTORM-JEV-TRANSITION | 转换至实施计划制定（writing-plans） | Pending | 终态推进 |
+| BRAINSTORM-JEV-QUESTIONS | 澄清业务偏好与核心痛点约束（单步提问） | Completed | 用户选定方案 1（记忆反思与沉淀增强），强调 API 额度控制、优雅设计模式、开关与降级兜底 |
+| BRAINSTORM-JEV-APPROACHES | 提出 2-3 种具体整合架构方案与权衡 | Completed | 提出方案 A（策略模式+降级链+熔断）、方案 B（图节点解耦）、方案 C（双阶段评分），用户选定方案 A |
+| BRAINSTORM-JEV-DESIGN-SECTIONS | 逐步呈现设计细节并获取用户审批 | Completed | 4 节设计细节（分层契约、策略与熔断器、节点集成、异常矩阵与测试）全部获用户审核批准 |
+| BRAINSTORM-JEV-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Completed | 落盘 docs/plans/2026-09-21-typesafe-memory-prefilter-design.md 并已提交 git |
+| BRAINSTORM-JEV-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 落盘 docs/plans/2026-09-21-typesafe-memory-prefilter-plan.md 并已提交 git，准备按单流执行 |
 
 
