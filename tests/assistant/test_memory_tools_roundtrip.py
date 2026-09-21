@@ -75,3 +75,38 @@ async def test_add_same_dedupe_key_supersedes(tmp_path) -> None:
     # 同 dedupe_key 只保留最新一条
     assert len(results) == 1
     assert results[0]["record_id"] == obs2.payload["record_id"]
+
+
+@pytest.mark.asyncio
+async def test_multi_term_search(tmp_path) -> None:
+    memory = AssistantMemory(tmp_path / "asst")
+    add = MemoryAddTool(memory=memory)
+    search = MemorySearchTool(memory=memory)
+
+    await add.execute(
+        {"content": "用户姓名：李超", "category": "identity", "dedupe_key": "identity:name"}
+    )
+    await add.execute(
+        {
+            "content": "技术栈偏好：Rust 与 Python",
+            "category": "preference",
+            "dedupe_key": "preference:stack",
+        }
+    )
+    await add.execute(
+        {
+            "content": "架构原则：简单可依赖",
+            "category": "preference",
+            "dedupe_key": "preference:arch",
+        }
+    )
+
+    # 空格切分的多关键词复合搜索
+    res = await search.execute({"query": "姓名 技术栈 架构", "limit": 10})
+    assert res.success is True
+    records = res.payload["records"]
+    assert len(records) == 3
+    contents = [r["content"] for r in records]
+    assert "用户姓名：李超" in contents
+    assert "技术栈偏好：Rust 与 Python" in contents
+    assert "架构原则：简单可依赖" in contents

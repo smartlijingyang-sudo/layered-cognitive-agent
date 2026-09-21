@@ -94,6 +94,22 @@ class TestFilterToolsByAssistant:
         result = filter_tools_by_assistant([skill_tool, soul_tool, _tool("beta")], home)
         assert {t.name for t in result} == {"create_assistant_skill", "update_assistant_soul"}
 
+    def test_local_prefix_matches_unprefixed_allow(self, home: Path) -> None:
+        _write_tools(home, allow=["runCommand", "readFile"], deny=[])
+        tools = [_tool("local_runCommand"), _tool("local_readFile"), _tool("local_writeFile")]
+        result = filter_tools_by_assistant(tools, home)
+        assert [t.name for t in result] == ["local_runCommand", "local_readFile"]
+
+    def test_local_prefix_denied_by_base_name(self, home: Path) -> None:
+        _write_tools(home, allow=["runCommand"], deny=["runCommand"])
+        result = filter_tools_by_assistant([_tool("local_runCommand"), _tool("runCommand")], home)
+        assert result == ()
+
+    def test_local_prefix_denied_by_explicit_local_name(self, home: Path) -> None:
+        _write_tools(home, allow=["runCommand"], deny=["local_runCommand"])
+        result = filter_tools_by_assistant([_tool("local_runCommand"), _tool("runCommand")], home)
+        assert [t.name for t in result] == ["runCommand"]
+
 
 # ── tools_from_scope → filter_tools_by_assistant 集成（I-B3 回归）─────
 

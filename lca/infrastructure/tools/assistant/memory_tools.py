@@ -93,7 +93,23 @@ class MemorySearchTool(_BaseMemoryTool):
             MemoryLayer.EPISODIC
         )
         lowered = query.lower()
-        matched = [r for r in records if query in r.content or lowered in r.content.lower()][:limit]
+        terms = [t for t in lowered.split() if t]
+
+        def _score(r: MemoryRecord) -> int:
+            content_lower = r.content.lower()
+            key_lower = (r.dedupe_key or "").lower()
+            cat_lower = r.category.value.lower()
+            target = f"{content_lower} {key_lower} {cat_lower}"
+            score = 10 if (query in r.content or lowered in content_lower) else 0
+            for t in terms:
+                if t in target:
+                    score += 2
+            return score
+
+        scored = [(r, _score(r)) for r in records]
+        scored_matched = [item for item in scored if item[1] > 0]
+        scored_matched.sort(key=lambda item: item[1], reverse=True)
+        matched = [item[0] for item in scored_matched][:limit]
         return self._ok(
             start,
             {

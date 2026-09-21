@@ -57,14 +57,15 @@ def filter_tools_by_assistant(
     kept: list[Tool] = []
     for tool in tools:
         name = tool.name
-        if name in deny:
+        base_name = name[6:] if name.startswith("local_") else name
+        if name in deny or base_name in deny:
             continue
         required_grant = _required_grant(tool)
         if required_grant:
             if required_grant in grants:
                 kept.append(tool)
             continue
-        if not allow or name in allow:
+        if not allow or name in allow or base_name in allow:
             kept.append(tool)
     return tuple(kept)
 
