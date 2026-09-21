@@ -16,6 +16,10 @@ from pathlib import Path
 
 import typer
 
+from lca.infrastructure.cli.commands.journal import (
+    spine_event_seq,
+    spine_event_when,
+)
 from lca.infrastructure.cli.commands.kernel._shared import find_latest_run_id
 from lca.infrastructure.cli.config.config import OpsConfig
 
@@ -157,8 +161,8 @@ def _iter_jsonl(path: Path) -> Iterator[dict[str, object]]:
 
 def _render_event(event: dict[str, object], *, verbose: bool, run_dir: Path | None = None) -> str:
     """One-line human rendering of a spine event."""
-    when = str(event.get("when") or event.get("when_corrected") or "")
-    seq = event.get("sequence", 0)
+    when = spine_event_when(event)
+    seq = spine_event_seq(event)
     ep = str(event.get("execution_point", "?"))
     channel = str(event.get("channel", "?"))
     outcome = event.get("outcome")

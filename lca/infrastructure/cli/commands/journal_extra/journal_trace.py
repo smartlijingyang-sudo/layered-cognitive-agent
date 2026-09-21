@@ -46,6 +46,10 @@ from typing import Any
 
 import typer
 
+from lca.infrastructure.cli.commands.journal import (
+    spine_event_seq,
+    spine_event_when,
+)
 from lca.infrastructure.cli.commands.kernel._shared import find_latest_run_id
 from lca.infrastructure.observability.backends.run_locator_fs import (
     FilesystemRunLocator,
@@ -209,7 +213,7 @@ def _event_to_row(seq: int, event: dict[str, Any]) -> TraceRow:
         execution_point=str(event.get("execution_point", "?")),
         channel=str(event.get("channel", "?")),
         outcome=str(event.get("outcome") or ""),
-        when=str(event.get("when", "")),
+        when=spine_event_when(event),
         source_file=file_value,
         source_line=line_value,
         source_function=function_value,
@@ -681,7 +685,7 @@ def _parent_is_lca_span(parent: str | None) -> bool:
 
 
 def _parse_when(event: dict[str, Any]) -> datetime | None:
-    raw = event.get("when")
+    raw = spine_event_when(event)
     if not raw:
         return None
     try:
@@ -1135,7 +1139,7 @@ def register(app: typer.Typer) -> None:
             if not isinstance(payload, dict):
                 skipped += 1
                 continue
-            seq = int(event.get("sequence", 0) or 0)
+            seq = spine_event_seq(event)
             rows.append(_event_to_row(seq, event))
 
         if json_output:
