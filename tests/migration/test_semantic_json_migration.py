@@ -103,7 +103,7 @@ def test_dedupe_semantic_memory_keeps_highest_authority(tmp_path) -> None:
                     "importance": 0.9,
                     "confidence": 0.9,
                     "source": "model",
-                    "dedupe_key": "preference:tech_stack_rust_go",
+                    "dedupe_key": "preference:tech_stack",
                     "deleted": False,
                     "created_at_ms": 200,
                     "metadata": {"source": "model"},

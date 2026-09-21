@@ -124,35 +124,35 @@ class TestMemoryDedupeAndBackfill:
             confidence=1.0,
         )
 
-    def test_canonical_dedupe_key_collapses_aliases(self, tmp_path: Path) -> None:
-        """同语义事实的不同 dedupe_key 别名收敛为一条活跃记录。"""
+    def test_canonical_dedupe_key_normalization(self, tmp_path: Path) -> None:
+        """同 category 下不带前缀与带前缀/连字符的 dedupe_key 规范化为统一键并收敛。"""
         home = tmp_path / "asst_home"
         home.mkdir()
         mem = AssistantMemory(home)
-        mem.upsert(self._pref("mem_a", "技术栈偏好：Python", dedupe_key="tech_stack"))
+        mem.upsert(self._pref("mem_a", "用户偏好：风格简洁", dedupe_key="style"))
         mem.upsert(
             self._pref(
                 "mem_b",
-                "技术栈偏好：Python",
-                dedupe_key="preference:tech_stack_rust_go",
+                "用户偏好：风格简洁",
+                dedupe_key="preference:style",
             )
         )
         records = mem.query(MemoryLayer.SEMANTIC)
         assert len(records) == 1
-        assert records[0].dedupe_key == "preference:tech_stack"
+        assert records[0].dedupe_key == "preference:style"
 
-    def test_tech_stack_fingerprint_collapses_phrasing(self, tmp_path: Path) -> None:
-        """不同措辞表达同一技术栈偏好时，内容指纹收敛为一条活跃记录。"""
+    def test_content_fingerprint_collapses_phrasing(self, tmp_path: Path) -> None:
+        """不同标签前缀与引号变体表达同一偏好时，内容指纹收敛为一条活跃记录。"""
         home = tmp_path / "asst_home"
         home.mkdir()
         mem = AssistantMemory(home)
-        mem.upsert(self._pref("mem_a", "用户偏好：只用 Python"))
-        mem.upsert(self._pref("mem_b", "用户技术栈偏好：Python（弃用 Rust 和 Go）"))
-        mem.upsert(self._pref("mem_c", "技术栈偏好：Python，不再使用 Rust 与 Go"))
+        mem.upsert(self._pref("mem_a", "用户偏好：不喜欢啰嗦"))
+        mem.upsert(self._pref("mem_b", "偏好：不喜欢啰嗦"))
+        mem.upsert(self._pref("mem_c", '用户偏好：不喜欢"啰嗦"'))
         records = mem.query(MemoryLayer.SEMANTIC)
         assert len(records) == 1
         # 写路径内容级去重保留最新写入的一条。
-        assert records[0].content == "技术栈偏好：Python，不再使用 Rust 与 Go"
+        assert records[0].content == '用户偏好：不喜欢"啰嗦"'
 
     def test_upsert_triggers_profile_backfill(self, tmp_path: Path) -> None:
         """memory_add 路径（upsert）写入身份/偏好后触发 USER.md 回填。"""

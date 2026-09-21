@@ -99,13 +99,19 @@ def dedupe_semantic_memory(home_path: str | Path) -> int:
     # 先把所有活跃记录的 dedupe_key 重写为 canonical key，防止未来写入复发。
     key_rewritten = False
     for entry in active:
-        canonical = _canonical_dedupe_key(str(entry.get("dedupe_key") or "").strip() or None)
+        canonical = _canonical_dedupe_key(
+            str(entry.get("dedupe_key") or "").strip() or None,
+            category=str(entry.get("category") or ""),
+        )
         if canonical and entry.get("dedupe_key") != canonical:
             entry["dedupe_key"] = canonical
             key_rewritten = True
 
     def _group_key(entry: dict[str, object]) -> tuple[object, ...]:
-        canonical = str(entry.get("dedupe_key") or "").strip() or None
+        canonical = _canonical_dedupe_key(
+            str(entry.get("dedupe_key") or "").strip() or None,
+            category=str(entry.get("category") or ""),
+        )
         if canonical:
             return (entry.get("category"), canonical)
         return (entry.get("category"), _content_fingerprint(str(entry.get("content") or "")))
@@ -128,7 +134,10 @@ def dedupe_semantic_memory(home_path: str | Path) -> int:
             continue
         group.sort(key=_authority, reverse=True)
         keeper = group[0]
-        canonical = _canonical_dedupe_key(str(keeper.get("dedupe_key") or "").strip() or None)
+        canonical = _canonical_dedupe_key(
+            str(keeper.get("dedupe_key") or "").strip() or None,
+            category=str(keeper.get("category") or ""),
+        )
         if canonical:
             keeper["dedupe_key"] = canonical
         for entry in group[1:]:
