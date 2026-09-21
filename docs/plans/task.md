@@ -27,15 +27,20 @@
 | ASST-CAPABILITY-VERIFY | 架构小助专属自治域能力实测：自我感知、创建Skill、记忆持久化与跨轮召回 | Completed | 1. 自我感知与MD/技能感知（run_f69b7e39c90d）：准确自述身份职责、SOUL.md六大职责与三原则、识破USER.md空白、准确枚举20项已挂载技能与工具链；2. 创建Skill（run_835bc0e18f63）：成功调用专属工具create_assistant_skill，物化落盘arch-doc-standards（manifest.json content_hash=78fc2f...，SKILL.md 146行高质量ADR规范）；3. 记忆持久化与召回（run_8742e94dd32b & run_570f261afec4）：主动调memory_add及reflect.memory.extract自动沉淀7条事实至semantic.json，优化MemorySearchTool多词分词评分（3/3单测全通），次轮对话零幻觉100%精确召回李超/系统总架构师/Rust+Python/架构三原则全景信息 |
 | INSTALL-TYPESAFE-SKILL | 安装并验证 TypeSafe Skill 与 Python SDK 环境 | Completed | 通过 `npx -y skills add typesafe-ai/skills --skill typesafe-ai` 成功安装到 `.agents/skills/typesafe-ai` 并同步至 `.agent/skills/typesafe-ai`；生成 `skills-lock.json`；安全写入 `TYPESAFE_API_KEY` 至 `.env`；安装 `typesafe-sdk`；通过 live System One Noul 测试调用（返回 0.95），验证通过 |
 | PUSH-TASK-1 | 【技能闭环】激活新创建的 arch-doc-standards 技能并实际编写落盘 ADR | Completed | 成功调用 activate_skill 激活 arch-doc-standards，严格遵循 SKILL.md 中的 ADR 规范与模板，在私有自治域 workspace/docs/adr/ 成功落盘《ADR-0301: 架构小助专属记忆与技能自演化机制》（142行/9.5KB，含双层架构图、四方案权衡表、已知风险缓解与三原则对齐） |
-| PUSH-TASK-2 | 【记忆演化】记忆冲突更新（Rust+Go废除Python）与敏感删除风控（删除三原则） | In Progress | 待发起偏好变更、敏感删除确认与次轮零污染召回测试 |
-
-| PUSH-TASK-3 | 【自我修正】长期记忆反思回填 USER.md 与自主演化 SOUL.md 核心使命 | Pending | 待测试画像回填与 update_assistant_soul 契约更新落盘 |
-| PUSH-TASK-4 | 【跨机协作】结合本地 Companion 执行机器探查（LocalExecPort 边界实测） | Pending | 待测试通过本地 companion 读取 git log 与系统状态回执闭环 |
+| PUSH-TASK-2 | 【记忆演化】记忆冲突更新（Rust+Go废除Python）与敏感删除风控（删除三原则） | Completed | 1. 偏好变更（run_00ec7ac9247d）：成功调用 memory_update 触发 supersede 机制，将旧 Python 记录标记 retired，最新记录生效为 Rust+Go；2. 敏感风控（run_ec51f48b27ac）：要求删除三原则时严格按契约拦截，拒绝擅自删除并调用 askUserQuestion 发起确认审批；3. 人类审批恢复执行：经 POST /runs/run_ec51f48b27ac/answer 确认删除后成功标记 deleted: True；4. 次轮零污染召回（run_0058acd971e7）：零幽灵记忆，精准回答“Rust+Go（已弃用Python）”且明确回答“三原则记录已为空” |
+| PUSH-TASK-3 | 【自我修正】长期记忆反思回填 USER.md 与自主演化 SOUL.md 核心使命 | Completed | 1. USER.md回填：小助自主将用户画像（李超/系统总架构师/Rust+Go/废除Python）完整落盘USER.md；2. Digest治理：暴露缺乏专用工具裸写导致_DigestMismatch，经reimport修复并明晰改进点；3. SOUL.md演化（run_626edd55c390）：小助面对4核心段约束自愈重试，成功调用update_assistant_soul向SOUL.md追加第6条“依赖管控——严禁未经性能基准评估擅自引入重量级第三方依赖”，文件已权威落盘且版本一致 |
+| PUSH-TASK-4 | 【跨机协作】结合本地 Companion 执行机器探查（LocalExecPort 边界实测） | In Progress | 正在验证本地 Companion / LocalExecPort 跨机执行闭环与能力隔离 |
 | BRAINSTORM-JEV-CONTEXT | 探索项目上下文与 TypeSafe/Jev 能力契合点 | Completed | 已梳理 LCA 认知五相（Think/Gate/Reflect/Route）痛点与 Jev 原语（Noul/Choice/Score）对应切入点 |
 | BRAINSTORM-JEV-QUESTIONS | 澄清业务偏好与核心痛点约束（单步提问） | Completed | 用户选定方案 1（记忆反思与沉淀增强），强调 API 额度控制、优雅设计模式、开关与降级兜底 |
 | BRAINSTORM-JEV-APPROACHES | 提出 2-3 种具体整合架构方案与权衡 | Completed | 提出方案 A（策略模式+降级链+熔断）、方案 B（图节点解耦）、方案 C（双阶段评分），用户选定方案 A |
 | BRAINSTORM-JEV-DESIGN-SECTIONS | 逐步呈现设计细节并获取用户审批 | Completed | 4 节设计细节（分层契约、策略与熔断器、节点集成、异常矩阵与测试）全部获用户审核批准 |
 | BRAINSTORM-JEV-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Completed | 落盘 docs/plans/2026-09-21-typesafe-memory-prefilter-design.md 并已提交 git |
 | BRAINSTORM-JEV-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 落盘 docs/plans/2026-09-21-typesafe-memory-prefilter-plan.md 并已提交 git，准备按单流执行 |
+| TYPESAFE-TASK-1 | 契约层与判定结果 DTO (FilterDecision, MemoryPreFilter) | Completed | 创建 lca/contracts/protocols/memory/filter.py，通过 tests/reflect/test_memory_pre_filter_contract.py 2/2 passed |
+| TYPESAFE-TASK-2 | 本地规则策略 (RegexMemoryFilter) | Completed | 创建 lca/infrastructure/memory/pre_filter/ (tokens.py, regex_filter.py)，通过 tests/reflect/test_regex_memory_filter.py 2/2 passed |
+| TYPESAFE-TASK-3 | TypeSafe Jev 语义策略 (TypeSafeMemoryFilter) | Completed | 创建 lca/infrastructure/memory/pre_filter/typesafe_filter.py，通过 tests/reflect/test_typesafe_memory_filter.py 3/3 passed |
+| TYPESAFE-TASK-4 | 熔断降级链与开关 (FallbackMemoryFilter) | Completed | 创建 lca/infrastructure/memory/pre_filter/fallback_filter.py，覆盖 429 熔断、开关、缺 Key 与自愈，tests/reflect/test_fallback_memory_filter.py 4/4 passed |
+| TYPESAFE-TASK-5 | 节点集成与运行时装配 (ReflectMemoryExtractExecutor) | Completed | ReflectMemoryExtractExecutor 成功集成 MemoryPreFilter 与 FallbackMemoryFilter，7/7 单测通过（含原有回归测试） |
+| TYPESAFE-TASK-6 | 全链路回归验证与活体验证 | Completed | 25/25 reflect 单测全通，ruff/git-diff 门禁通过，实测隐式偏好判定（noul=0.83）、普通指令过滤（noul=0.03），优雅降级全链路验证通过 |
 
 
