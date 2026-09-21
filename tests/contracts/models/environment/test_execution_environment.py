@@ -71,6 +71,31 @@ def test_environment_from_plane_projects_sandbox() -> None:
     assert env.is_current is False
 
 
+def test_to_dict_does_not_let_metadata_shadow_core_fields() -> None:
+    plane = _machine_plane()
+    env = ExecutionEnvironment(
+        kind=EnvironmentKind.MACHINE,
+        id=plane.id,
+        label=plane.label,
+        platform="Windows",
+        online=True,
+        is_current=True,
+        root=plane.root,
+        outputs_dir=plane.outputs_dir,
+        home=plane.home,
+        workspace="F:\\下载",
+        metadata={"platform": "Windows", "online": True, "extra": "kept"},
+    )
+    data = env.to_dict()
+    assert data["id"] == "m-lipcmain"
+    assert data["platform"] == "Windows"
+    assert data["online"] is True
+    assert data["is_current"] is True
+    assert data["home"] == "C:\\Users\\li"
+    assert data["workspace"] == "F:\\下载"
+    assert data["extra"] == "kept"
+
+
 def test_to_dict_is_stable_wire_shape() -> None:
     env = environment_from_plane(_machine_plane(), is_current=True)
     data = env.to_dict()

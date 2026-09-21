@@ -44,20 +44,23 @@ class ExecutionEnvironment:
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "kind": self.kind.value,
-            "id": self.id,
-            "label": self.label,
-            "platform": self.platform,
-            "online": self.online,
-            "is_current": self.is_current,
-            "root": self.root,
-            "outputs_dir": self.outputs_dir,
-            "home": self.home,
-            "workspace": self.workspace,
-            "capabilities": list(self.capabilities),
-            **self.metadata,
-        }
+        result = dict(self.metadata)
+        result.update(
+            {
+                "kind": self.kind.value,
+                "id": self.id,
+                "label": self.label,
+                "platform": self.platform,
+                "online": self.online,
+                "is_current": self.is_current,
+                "root": self.root,
+                "outputs_dir": self.outputs_dir,
+                "home": self.home,
+                "workspace": self.workspace,
+                "capabilities": list(self.capabilities),
+            }
+        )
+        return result
 
 
 def environment_from_plane(

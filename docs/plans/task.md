@@ -56,9 +56,9 @@
 | REFACTOR-EE0B-TASK-5 | 规范 MCP Manager / Stdio 子进程生命周期与资源释放 | Completed | StdioMCPTransport/Client/Manager 实现 close_sync 与强化 async close，主动关闭 stdin/管道并在 GC 前置 transport._closed=True；build_ambient_mcp_tools 临时循环初始化后即刻安全释放 transport；8/8 MCP 测试全绿且 0 unraisable exception 警告 |
 | REFACTOR-EE0B-TASK-6 | 全量回归测试与架构门禁验证 | Completed | 43/43 单元与场景测试全通（Search / MCP / Scenario / Web / Tool Fork）；ruff check/format 全部通过；git diff --check 退出码 0；负向边界（Does NOT own）与架构不变量 100% 达标 |
 | COMPANION-AUTO-PYTHON | Companion 安装脚本增强：自动跨目录/注册表检测本地 Python 3.10+ 并支持缺省自动静默安装 | Completed | 1. 探测增强：实现 Test-PythonCandidate（>=3.10真机执行探测避开空桩）、Update-SessionPath（注册表动态刷新PATH）、多源探测（PATH命令/注册表HKCU+HKLM/AppData与ProgramFiles标准路径/Scoop/Pyenv-win/Conda/UV）；2. 自动安装降级链：探测不到时优先尝试 winget install Python.Python.3.11，失败则自动下载 python.org 官方安装包静默免特权安装（/quiet InstallAllUsers=0 PrependPath=1）；3. 依赖自愈：自动 ensurepip 并带 --user 降级安装 httpx 与 websockets；4. install.sh 补全 find_python 与包管理器兜底；5. 单测与端到端 35/35 全绿 |
-| REMOVE-CLIENT-INTERCEPT | 移除前端 ChatInput 劫持与 confirmModal 弹窗，恢复“连接本机”正常消息发送与前端消息渲染 | Paused | 待后续恢复 |
+| REMOVE-CLIENT-INTERCEPT | 移除前端 ChatInput 劫持与 confirmModal 弹窗，恢复“连接本机”正常消息发送与前端消息渲染 | Completed | 删除 ConnectLocalIntent 补丁，配对 UI 并入 execution-target picker；补丁完整性 23/23 通过 |
 | TOOL-CONNECT-LOCAL-MACHINE | 实现并注册 connect_local_machine 工具（接入 DevicePairingService preauth 一次性免密命令生成） | Pending | 待实现 |
 | SKILL-CONNECT-LOCAL | 创建 connect-local 技能，定义自然语言触发与强制经 askUserQuestion 确认引导 SOP | Pending | 待实现 |
 | VERIFY-CONNECT-LOCAL-E2E | 全链路单测、Patch 完整性检验与端到端回归验证 | Pending | 待执行 |
-| BRAINSTORM-PROMPT-CLEANUP | 第一性原理与 DDD 设计模式重构：执行平面 Prompt/Fallback 垃圾逻辑清理与配置化统一管理 | In Progress | 正在进行上下文探索与首个澄清设计沟通 |
+| BRAINSTORM-PROMPT-CLEANUP | 第一性原理与 DDD 设计模式重构：执行平面 Prompt/Fallback 垃圾逻辑清理与配置化统一管理 | Completed | 落地 ExecutionEnvironment 领域模型 + EnvironmentCatalog 端口适配器 + PlanePromptStrategy 策略模式 + listEnvironments 工具；53 测试通过 |
 | AWS-AGENT-TOOLKIT-SETUP | 接入 Agent Toolkit for AWS 使得 LCA Agent 支持 AWS 资源探查 | In Progress | 探测到环境 Linux x86_64、curl 与 uv 就绪，向用户收集 profile_name/AWS experience/Region |

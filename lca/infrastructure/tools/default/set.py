@@ -11,6 +11,7 @@ from lca.contracts.protocols import Tool
 from lca.contracts.protocols.memory.operational_skills import SkillPackageStore
 from lca.contracts.protocols.runtime.infra.infra import MachineResolver, Sandbox
 from lca.infrastructure.capability.search.search import SearchService
+from lca.infrastructure.environment.factory import build_environment_catalog
 from lca.infrastructure.file.store import FileStore
 from lca.infrastructure.runtime_plane.resolve.resolve import (
     ref_of,
@@ -85,8 +86,6 @@ def build_default_tools(
 
     # Environment awareness is plane-independent: it lists the current plane
     # plus every paired device, so a sandbox run can still perceive lipcmain.
-    from lca.infrastructure.environment.factory import build_environment_catalog
-
     awareness_tools: list[Tool] = environment_awareness.build_tools(
         catalog=build_environment_catalog(bound, sandbox=sandbox, machine_resolver=machine_resolver)
     )

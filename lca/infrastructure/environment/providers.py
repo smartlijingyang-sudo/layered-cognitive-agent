@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from lca.contracts.models.core.environment.model import (
     EnvironmentKind,
     ExecutionEnvironment,
     environment_from_plane,
 )
 from lca.contracts.models.core.state.plane import PlaneRef
+from lca.contracts.protocols.runtime.environment import DeviceProvider
 
 
 class SandboxEnvironmentProvider:
@@ -29,36 +28,31 @@ class SandboxEnvironmentProvider:
 class DeviceEnvironmentProvider:
     """Map every paired device in the registry to a machine environment."""
 
-    def __init__(self, devices: Any | None = None) -> None:
-        # Accepts a DeviceProvider (runtime-checkable Protocol) or None.
+    def __init__(self, devices: DeviceProvider | None = None) -> None:
         self._devices = devices
 
     def list_environments(self) -> list[ExecutionEnvironment]:
         if self._devices is None:
             return []
-        list_fn = getattr(self._devices, "list_devices", None)
-        if list_fn is None:
-            return []
-        envs: list[ExecutionEnvironment] = []
-        for device in list_fn():
-            if not isinstance(device, dict):
-                continue
-            device_id = device.get("deviceId") or ""
-            if not device_id:
-                continue
-            envs.append(
-                ExecutionEnvironment(
-                    kind=EnvironmentKind.MACHINE,
-                    id=device_id,
-                    label=device.get("hostname") or device_id,
-                    platform=device.get("platform", ""),
-                    online=bool(device.get("online")),
-                    home=device.get("home", ""),
-                    workspace=device.get("workspace", ""),
-                    metadata=device,
-                )
-            )
-        return envs
+        return [
+            self._from_device(device)
+            for device in self._devices.list_devices()
+            if isinstance(device, dict) and device.get("deviceId")
+        ]
+
+    @staticmethod
+    def _from_device(device: dict) -> ExecutionEnvironment:
+        device_id = device["deviceId"]
+        return ExecutionEnvironment(
+            kind=EnvironmentKind.MACHINE,
+            id=device_id,
+            label=device.get("hostname") or device_id,
+            platform=device.get("platform", ""),
+            online=bool(device.get("online")),
+            home=device.get("home", ""),
+            workspace=device.get("workspace", ""),
+            metadata=device,
+        )
 
 
 __all__ = ["DeviceEnvironmentProvider", "SandboxEnvironmentProvider"]

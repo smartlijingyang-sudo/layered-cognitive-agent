@@ -5,7 +5,11 @@ from __future__ import annotations
 from lca.contracts.models.core.environment.model import environment_from_plane
 from lca.contracts.models.core.state.plane import PlaneBindings, PlaneKind
 from lca.contracts.protocols import Sandbox
-from lca.contracts.protocols.runtime.environment import EnvironmentCatalog
+from lca.contracts.protocols.runtime.environment import (
+    DeviceProvider,
+    EnvironmentCatalog,
+    EnvironmentProvider,
+)
 from lca.contracts.protocols.runtime.infra.infra import MachineResolver
 from lca.infrastructure.environment.catalog import CompositeEnvironmentCatalog
 from lca.infrastructure.environment.providers import (
@@ -27,13 +31,13 @@ def build_environment_catalog(
     """
     bound = bindings if bindings is not None else PlaneBindings(primary=None)
 
-    providers: list[object] = []
+    providers: list[EnvironmentProvider] = []
     sandbox_ref = ref_of(bound, PlaneKind.SANDBOX)
     if sandbox_ref is None and sandbox is not None:
         sandbox_ref = sandbox_ref_from(sandbox)
     if sandbox_ref is not None:
         providers.append(SandboxEnvironmentProvider(sandbox_ref))
-    if getattr(machine_resolver, "list_devices", None) is not None:
+    if isinstance(machine_resolver, DeviceProvider):
         providers.append(DeviceEnvironmentProvider(machine_resolver))
 
     current = None

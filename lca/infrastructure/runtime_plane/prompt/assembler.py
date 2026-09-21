@@ -26,9 +26,6 @@ from lca.infrastructure.runtime_plane.resolve.resolve import (
 from lca.infrastructure.runtime_plane.scope.scope import current_bindings, current_primary
 from lca.infrastructure.tools.lca_computer.types import CLOUD_SANDBOX_APIS, MACHINE_APIS
 
-_CLOUD_TOOL_NAME = "lobe-cloud-sandbox"
-_LOCAL_TOOL_NAME = "lobe-local-system"
-
 _STRATEGIES: dict[PlaneKind, PlanePromptStrategy] = {
     PlaneKind.SANDBOX: SandboxPlaneStrategy(),
     PlaneKind.MACHINE: MachinePlaneStrategy(),
@@ -108,14 +105,16 @@ def render_plane_prompt(
     blocks: list[str] = []
     if want_cloud:
         plane = _sandbox_plane()
-        rendered = _strategy(PlaneKind.SANDBOX).render(plane, store=store)
+        strategy = _strategy(PlaneKind.SANDBOX)
+        rendered = strategy.render(plane, store=store)
         if rendered:
-            blocks.append(_tool_block(_CLOUD_TOOL_NAME, rendered))
+            blocks.append(_tool_block(strategy.tool_name, rendered))
     if want_machine:
         plane = _machine_plane()
-        rendered = _strategy(PlaneKind.MACHINE).render(plane, store=store)
+        strategy = _strategy(PlaneKind.MACHINE)
+        rendered = strategy.render(plane, store=store)
         if rendered:
-            blocks.append(_tool_block(_LOCAL_TOOL_NAME, rendered))
+            blocks.append(_tool_block(strategy.tool_name, rendered))
     return "\n".join(blocks)
 
 

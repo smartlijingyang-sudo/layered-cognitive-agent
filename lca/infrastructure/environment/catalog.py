@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import replace
-from typing import Any
 
-from lca.contracts.models.core.environment.model import ExecutionEnvironment
+from lca.contracts.models.core.environment.model import (
+    EnvironmentKind,
+    ExecutionEnvironment,
+)
 from lca.contracts.protocols.runtime.environment import (
     EnvironmentProvider,
 )
@@ -30,7 +32,7 @@ class CompositeEnvironmentCatalog:
         self._current = current
 
     def list_all(self) -> list[ExecutionEnvironment]:
-        seen: set[tuple[Any, Any]] = set()
+        seen: set[tuple[EnvironmentKind, str]] = set()
         merged: list[ExecutionEnvironment] = []
         for provider in self._providers:
             for env in provider.list_environments():
