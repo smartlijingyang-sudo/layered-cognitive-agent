@@ -35,7 +35,11 @@ class FallbackMemoryFilter(MemoryPreFilter):
         if enabled is not None:
             self._enabled = enabled
         else:
-            self._enabled = os.getenv("LCA_TYPESAFE_ENABLED", "true").strip().lower() in ("true", "1", "yes")
+            self._enabled = os.getenv("LCA_TYPESAFE_ENABLED", "true").strip().lower() in (
+                "true",
+                "1",
+                "yes",
+            )
 
         if circuit_breaker_seconds is not None:
             self._circuit_breaker_seconds = circuit_breaker_seconds

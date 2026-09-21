@@ -153,12 +153,6 @@ class ReflectMemoryExtractExecutor:
         if not decision.should_extract:
             return self._passthrough(reflection)
 
-        extra["pre_filter"] = {
-            "source": decision.source,
-            "reason": decision.reason,
-            "confidence": decision.confidence,
-        }
-
         adapter = getattr(runtime, "adapter", None)
         if adapter is None and hasattr(runtime, "get"):
             adapter = runtime.get("adapter")
@@ -174,6 +168,11 @@ class ReflectMemoryExtractExecutor:
 
         if candidates:
             extra["memory_candidates"] = candidates
+            extra["pre_filter"] = {
+                "source": decision.source,
+                "reason": decision.reason,
+                "confidence": decision.confidence,
+            }
         return self._passthrough(reflection)
 
     @staticmethod

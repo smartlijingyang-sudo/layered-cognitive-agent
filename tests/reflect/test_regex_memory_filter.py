@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import pytest
+
 from lca.infrastructure.memory.pre_filter.regex_filter import RegexMemoryFilter
 
 

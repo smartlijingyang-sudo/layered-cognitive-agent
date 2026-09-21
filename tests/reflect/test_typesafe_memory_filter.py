@@ -18,7 +18,10 @@ async def test_typesafe_filter_high_prob():
     mock_client.__aenter__.return_value = mock_client
     mock_client.__aexit__.return_value = None
 
-    with patch("lca.infrastructure.memory.pre_filter.typesafe_filter.AsyncTypeSafeClient", return_value=mock_client):
+    with patch(
+        "lca.infrastructure.memory.pre_filter.typesafe_filter.AsyncTypeSafeClient",
+        return_value=mock_client,
+    ):
         filter_ = TypeSafeMemoryFilter(api_key="test_key", threshold=0.65)
         decision = await filter_.evaluate("以后关于架构的讨论都使用精简风格")
         assert decision.should_extract is True
@@ -37,7 +40,10 @@ async def test_typesafe_filter_low_prob():
     mock_client.__aenter__.return_value = mock_client
     mock_client.__aexit__.return_value = None
 
-    with patch("lca.infrastructure.memory.pre_filter.typesafe_filter.AsyncTypeSafeClient", return_value=mock_client):
+    with patch(
+        "lca.infrastructure.memory.pre_filter.typesafe_filter.AsyncTypeSafeClient",
+        return_value=mock_client,
+    ):
         filter_ = TypeSafeMemoryFilter(api_key="test_key", threshold=0.65)
         decision = await filter_.evaluate("今天上海天气怎么样")
         assert decision.should_extract is False
