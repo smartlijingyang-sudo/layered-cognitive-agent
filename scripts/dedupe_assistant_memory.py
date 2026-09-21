@@ -41,6 +41,21 @@ def main(argv: list[str] | None = None) -> int:
     if identity_pref:
         user_md = render_user_profile(identity_pref)
         (home / "USER.md").write_text(user_md, encoding="utf-8")
+        # USER.md 是配置面文件，改写后必须同步 manifest digests，
+        # 否则 assistant catalog 的 digest 校验会 fail-closed（409 digest_mismatch）。
+        from lca.contracts.observability.canonical_digest import canonical_digest
+        from lca.plugins.assistant.home._home_layout import (
+            compute_digests,
+            load_manifest,
+            write_manifest,
+        )
+
+        manifest = load_manifest(home, assistant_id=home.name)
+        manifest["digests"] = compute_digests(home)
+        manifest["manifest_digest"] = canonical_digest(
+            manifest["digests"], length=64, prefix="sha256:"
+        )
+        write_manifest(home, manifest)
     print(
         f"semantic.json: {changed} 条重复记录标记为 superseded;"
         f" USER.md 已重建（{len(identity_pref)} 条活跃身份/偏好事实）"
