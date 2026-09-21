@@ -467,9 +467,13 @@ def _scan_step_doc(path: Path) -> StepScan:
     # FoldConsistencyError,但残留 journal 文件可能含历史矛盾样本。
     # doctor 仍要识别它们并报 H7.ok=False。
     tool_ok_error_conflicts: list[int] = []
-    # PR-D: tool_total = distinct non-empty invocation_id count,
-    # excluding phantom steps with empty invocation_id.
+    # PR-D: tool_total = distinct non-empty tool-call invocation_id count,
+    # excluding phantom steps with empty invocation_id. tool_success counts
+    # the subset of those call ids with at least one ok result, so the
+    # success rate stays within [0, 1] even when tool_results carries extra
+    # non-tool rows (e.g. decision.parse records).
     _tool_invocation_ids: set[str] = set()
+    _tool_success_ids: set[str] = set()
     step_ids: list[str] = []
     step_indexes: list[int] = []
     for step in doc.steps:
@@ -480,10 +484,9 @@ def _scan_step_doc(path: Path) -> StepScan:
         calls: list[Any] = list(step.tool_calls) if step.tool_calls else []
         if not calls and step.tool_call is not None:
             calls = [step.tool_call]
-        for tc in calls:
-            inv_id = getattr(tc, "invocation_id", "") or ""
-            if inv_id:
-                _tool_invocation_ids.add(inv_id)
+        step_call_ids = {getattr(tc, "invocation_id", "") or "" for tc in calls}
+        step_call_ids.discard("")
+        _tool_invocation_ids.update(step_call_ids)
 
         # Collect tool results (support both plural tool_results and singular tool_result)
         results: list[Any] = list(step.tool_results) if step.tool_results else []
@@ -492,18 +495,29 @@ def _scan_step_doc(path: Path) -> StepScan:
 
         step_has_success = False
         step_has_failure = False
+        results_carry_invocation_id = False
         for tr in results:
             inv_id = getattr(tr, "invocation_id", "") or ""
             if inv_id:
-                _tool_invocation_ids.add(inv_id)
+                results_carry_invocation_id = True
             if tr.ok:
-                tool_success += 1
+                if inv_id in step_call_ids:
+                    _tool_success_ids.add(inv_id)
                 step_has_success = True
                 # ok=True 与 error 非空矛盾(fold invariant 该拒绝的样本)
                 if tr.error and str(tr.error).strip():
                     tool_ok_error_conflicts.append(step.step_index)
             else:
                 step_has_failure = True
+
+        # Legacy journals (and fixtures) write tool_result without an
+        # invocation_id; attribute a single-call step's success by its rows.
+        if (
+            not results_carry_invocation_id
+            and len(step_call_ids) == 1
+            and any(getattr(tr, "ok", False) for tr in results)
+        ):
+            _tool_success_ids.add(next(iter(step_call_ids)))
 
         if step_has_success:
             consecutive = 0
@@ -512,6 +526,7 @@ def _scan_step_doc(path: Path) -> StepScan:
             consecutive += 1
             max_consec = max(max_consec, consecutive)
     tool_total = len(_tool_invocation_ids)
+    tool_success = len(_tool_success_ids)
     duration_ms: int | None = None
     if doc.closed_at is not None and doc.started_at is not None:
         duration_ms = int((doc.closed_at - doc.started_at) * 1000)

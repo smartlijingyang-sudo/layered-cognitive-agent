@@ -318,3 +318,66 @@ def test_h7_uses_set_reconciliation_when_step_info_missing(tmp_path: Path) -> No
     # 启发式不再写入 forked_tool_calls
     assert "forked_tool_calls" not in (h7.extra or {})
     assert (h7.extra or {}).get("missing_in_journal") == ["inv-3"]
+
+
+def test_h7_success_rate_capped_at_distinct_calls_with_pseudo_results(tmp_path: Path) -> None:
+    """tool_results 里的非工具行(decision.parse / 空 invocation_id)不得把
+    success_rate 推到 1.0 以上;tool_success 按 distinct tool-call id 计。
+
+    回归场景 run_41fbd76ce118:journal 每步 tool_results 混入 decision 与
+    空 invocation_id 行,旧代码 tool_success 逐行累加得 20/10 = 200%。
+    """
+    meta = JournalMetadata(
+        agent_role="assistant", strategy_key="solo", plan_ref="p", objective="pseudo result test"
+    )
+    doc = empty_document(run_id="run_pseudo", trace_id="t5", metadata=meta, started_at=0.0)
+
+    tc1 = ToolCallRecord(invocation_id="inv-1", name="search", arguments={"query": "a"})
+    tc2 = ToolCallRecord(invocation_id="inv-2", name="search", arguments={"query": "b"})
+    tr1 = ToolResult(invocation_id="inv-1", ok=True, latency_ms=10)
+    tr2 = ToolResult(invocation_id="inv-2", ok=True, latency_ms=10)
+    pseudo = ToolResult(invocation_id="decision_abc", ok=True, latency_ms=0)
+    empty = ToolResult(invocation_id="", ok=True, latency_ms=0)
+
+    doc = append_step(
+        doc,
+        JournalStep(
+            step_id="step-1",
+            step_index=1,
+            phase="act",
+            entered_at=1.0,
+            outcome="ok",
+            tool_call=tc1,
+            tool_result=tr1,
+            tool_calls=(tc1, tc2),
+            tool_results=(tr1, tr2, pseudo, empty),
+            thinking=ThinkingTrace(model="test-model", latency_ms=5),
+            reflect=ReflectTrace(summary="two tools, two pseudo rows"),
+        ),
+    )
+    doc = close_document(doc, outcome="completed", closed_at=5.0)
+    path = _write_doc(tmp_path, doc)
+
+    _write_spine(
+        tmp_path,
+        "run_pseudo",
+        [
+            {
+                "execution_point": "phase.tool.call.end",
+                "payload": {"tool_name": "search", "invocation_id": "inv-1", "ok": True, "step": 1},
+            },
+            {
+                "execution_point": "phase.tool.call.end",
+                "payload": {"tool_name": "search", "invocation_id": "inv-2", "ok": True, "step": 1},
+            },
+        ],
+    )
+
+    report = diagnose_step_tree(path)
+    h7 = report.hops["H7"]
+    assert h7.ok is True, f"Expected H7.ok=True, got {h7.ok}, detail={h7.detail}"
+    extra = h7.extra or {}
+    assert extra.get("tool_total") == 2
+    assert extra.get("tool_success") == 2
+    assert extra.get("success_rate") == 1.0
+    assert "100%" in h7.detail

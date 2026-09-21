@@ -199,6 +199,7 @@ def _from_jsonable(obj: Any, cls: Any) -> Any:
             files_created=tuple(obj.get("files_created", ())),
             error=obj.get("error"),
             delta_summary=obj.get("delta_summary", ""),
+            invocation_id=obj.get("invocation_id", ""),
         )
     if cls is ReflectTrace:
         return cls(
