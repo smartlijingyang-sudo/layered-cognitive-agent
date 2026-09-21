@@ -70,7 +70,53 @@ class EffectReceipt(BaseModel):
     stderr_digest: str | None
 
 
+class AccessVerdict(StrEnum):
+    """授权判定的三态结果（ADR-0246 §1.1 授权边界）。
+
+    同意边界是另一层：``NEEDS_APPROVAL`` 表示本次请求需要交给
+    ADR-0078 的 HIL 状态机,不表示已被拒绝。
+    """
+
+    ALLOW = "allow"
+    NEEDS_APPROVAL = "needs_approval"
+    DENY = "deny"
+
+
+class AccessReason(StrEnum):
+    """判定依据,机器可读,进 receipt 与审批请求。"""
+
+    IN_GRANT = "in_grant"
+    OUTSIDE_GRANT = "outside_grant"
+    OUTSIDE_WORKING_ROOT = "outside_working_root"
+    OPERATION_NOT_GRANTED = "operation_not_granted"
+    CREDENTIAL_PATH = "credential_path"
+    TEMP_PATH = "temp_path"
+    COMMAND_CLASS = "command_class"
+    COMMAND_NOT_ALLOWED = "command_not_allowed"
+    NOT_A_MACHINE = "not_a_machine"
+    JOB_CONTINUATION = "job_continuation"
+
+
+class AccessDecision(BaseModel):
+    """一次授权判定的结果（许可类,非事实;ADR-0246 §1.1）。
+
+    纯值对象。判定方不抛异常、不做 I/O;消费方按 ``verdict`` 分派到
+    执行、审批或 ``EffectReceipt(error_kind="scope_violation")``。
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    operation: str
+    verdict: AccessVerdict
+    reason: AccessReason
+    path: str = ""
+    detail: str = ""
+
+
 __all__ = [
+    "AccessDecision",
+    "AccessReason",
+    "AccessVerdict",
     "CapabilityGrant",
     "EffectReceipt",
     "LocalExecTarget",
