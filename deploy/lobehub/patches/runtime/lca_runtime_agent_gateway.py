@@ -134,6 +134,7 @@ def _modified_files() -> tuple[str, ...]:
             "Intervention/index.tsx"
         ),
         "src/store/chat/slices/agentRun/actions/entries/conversationControl.ts",
+        "src/store/chat/slices/agentRun/actions/__tests__/conversationControl.lcaResume.test.ts",
         "src/spa/initialize/toolSurfaces.ts",
         "src/store/chat/slices/agentRun/actions/dispatch/agentDispatcher.ts",
     ]
@@ -1351,6 +1352,18 @@ def apply(ctx: PatchContext) -> bool:
             )
         if ctx.write_if_changed(rel, text):
             changed = True
+
+    lca_resume_test_rel = (
+        "src/store/chat/slices/agentRun/actions/__tests__/conversationControl.lcaResume.test.ts"
+    )
+    lca_resume_test_src = _HERE / "lcaGateway" / "conversationControl.lcaResume.test.ts"
+    if not lca_resume_test_src.is_file():
+        raise SystemExit(f"missing patch source: {lca_resume_test_src}")
+    if ctx.write_if_changed(
+        lca_resume_test_rel,
+        lca_resume_test_src.read_text(encoding="utf-8"),
+    ):
+        changed = True
 
     for patch_fn in (
         _patch_gateway_create_client,

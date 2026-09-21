@@ -40,50 +40,16 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.contracts.protocols.graph.routing import RoutingDecision
+from lca.contracts.protocols.memory.filter import MemoryPreFilter
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.infrastructure.memory.pre_filter import DEFAULT_MEMORY_TOKENS, FallbackMemoryFilter
 
 # 快速路径成本门：仅当用户陈述可能包含自我身份/偏好信号时才值得调 LLM 蒸馏。
 # 这是成本门（避免普通回复产生 LLM 调用），不是提取启发式；提取本身由 LLM
 # 完成（ADR-0246 §3.3 / §7）。ADR-0247 回归：无第一人称代词的偏好句
 # （如「还是简洁一点好」）也必须触发，否则偏好纠正永不落盘。误报只多一次
 # LLM 小调用，可接受；漏报会丢记忆，不可接受。
-_SELF_REFERENCE_TOKENS: tuple[str, ...] = (
-    # 第一人称代词
-    "我",
-    "我的",
-    "咱",
-    "本人",
-    "i ",
-    "i'm",
-    "i am",
-    "my ",
-    "me ",
-    "myself",
-    # 偏好/身份表达动词
-    "喜欢",
-    "不喜欢",
-    "希望",
-    "想要",
-    "偏好",
-    "讨厌",
-    "习惯",
-    # 身份/称呼/记忆指令
-    "叫我",
-    "我是",
-    "记住我",
-    "记得我",
-    "以后",
-    # 风格偏好形容词（常以无主语句出现）
-    "简洁",
-    "简短",
-    "详细",
-    "直接",
-    "啰嗦",
-    "废话",
-    "一点",
-    "比较好",
-    "更好",
-)
+_SELF_REFERENCE_TOKENS: tuple[str, ...] = DEFAULT_MEMORY_TOKENS
 
 _EXTRACT_PROMPT = """ROLE: memory_extract
 你是记忆提取器。从用户陈述中提取结构化记忆候选。
@@ -158,6 +124,7 @@ class ReflectMemoryExtractExecutor:
     region: str = "reflect"
     declared_inputs: tuple[PortName, ...] = ("reflection",)
     declared_outputs: tuple[PortName, ...] = ("reflection", "routing")
+    pre_filter: MemoryPreFilter | None = None
 
     async def node_execute(
         self,
@@ -178,8 +145,19 @@ class ReflectMemoryExtractExecutor:
         if state is None and hasattr(runtime, "get"):
             state = runtime.get("agent_state")
         task = str(getattr(state, "task", "") or "").strip()
-        if not task or not _may_contain_self_reference(task):
+        if not task:
             return self._passthrough(reflection)
+
+        filter_ = self.pre_filter if self.pre_filter is not None else FallbackMemoryFilter()
+        decision = await filter_.evaluate(task)
+        if not decision.should_extract:
+            return self._passthrough(reflection)
+
+        extra["pre_filter"] = {
+            "source": decision.source,
+            "reason": decision.reason,
+            "confidence": decision.confidence,
+        }
 
         adapter = getattr(runtime, "adapter", None)
         if adapter is None and hasattr(runtime, "get"):
