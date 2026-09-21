@@ -289,6 +289,17 @@ events:
     publishers:
       - lca.loop.fact_gateway.DefaultFactGateway
 
+  - category: spine.llm.tool_call.streaming
+    plane: lca.contracts.event.Plane.OBSERVABILITY
+    payload_class: lca_kernel.events.payloads.spine.SpineEventPayload
+    fields:
+      model: str
+      tool_name: str
+      invocation_id: str
+      activation_ref: str
+    publishers:
+      - lca.loop.fact_gateway.DefaultFactGateway
+
   - category: spine.llm.request.header
     plane: lca.contracts.event.Plane.OBSERVABILITY
     payload_class: lca_kernel.events.payloads.model_visible.SpineLlmRequestHeaderPayload

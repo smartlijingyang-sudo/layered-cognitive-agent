@@ -67,6 +67,7 @@ LLM_SPINE_EPS: Final[tuple[str, ...]] = (
     "llm.call.end",
     "llm.stream.token",
     "llm.stream.stall",
+    "llm.tool_call.streaming",
     "llm.request.header",
     "llm.request.header.assistant",
     "brain.perceive.start",

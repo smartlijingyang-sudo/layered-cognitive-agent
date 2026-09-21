@@ -53,5 +53,15 @@ class LlmSpineEmitter(Protocol):
         session: object | None = None,
     ) -> Any: ...
 
+    def emit_llm_tool_call_streaming(
+        self,
+        *,
+        model: str,
+        tool_name: str,
+        invocation_id: str,
+        state: AgentState | None = None,
+        session: object | None = None,
+    ) -> Any: ...
+
 
 __all__ = ["LlmSpineEmitter"]

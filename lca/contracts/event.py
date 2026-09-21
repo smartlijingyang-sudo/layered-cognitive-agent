@@ -66,6 +66,7 @@ class Category(str, Enum):
     SPINE_LLM_CALL_END = "spine.llm.call.end"
     SPINE_LLM_STREAM_TOKEN = "spine.llm.stream.token"  # noqa: S105  # enum 名,非密码
     SPINE_LLM_STREAM_STALL = "spine.llm.stream.stall"
+    SPINE_LLM_TOOL_CALL_STREAMING = "spine.llm.tool_call.streaming"
     SPINE_LLM_REQUEST_HEADER = "spine.llm.request.header"
     SPINE_LLM_REQUEST_HEADER_ASSISTANT = "spine.llm.request.header.assistant"
     SPINE_EXCEPTION_CAUGHT = "spine.exception.caught"

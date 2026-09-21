@@ -353,6 +353,28 @@ class EventTranslator:
         }
 
     @staticmethod
+    def _spine_llm_tool_call_streaming(e: dict) -> dict | None:
+        """``llm.tool_call.streaming`` → 提前的 ``tools_calling`` 占位。
+
+        在 LLM 生成工具参数期间触发一次，复用 LobeHub 原生 ``stream_chunk``
+        ``tools_calling`` 契约渲染工具卡片；参数留空（仍在生成），完整参数由
+        随后的 ``step.tool_call.record`` 覆盖（前端 ``preserveToolResultMessageIds``
+        按工具 id 合并）。
+        """
+        payload = _inner_payload(e)
+        tool_name = str(payload.get("tool_name") or "")
+        invocation_id = str(payload.get("invocation_id") or "")
+        if not tool_name or not invocation_id:
+            return None
+        return {
+            "type": "stream_chunk",
+            "data": {
+                "chunkType": "tools_calling",
+                "toolsCalling": [wire_tool_call(tool_name, invocation_id, {})],
+            },
+        }
+
+    @staticmethod
     def _spine_llm_header_assistant(e: dict) -> dict | None:
         payload = _inner_payload(e)
         content = str(payload.get("assistant_content") or "")
@@ -478,6 +500,7 @@ _SPINE_HANDLERS = {
     "llm.call.start": EventTranslator._spine_llm_call_start,
     "llm.call.end": EventTranslator._spine_llm_call_end,
     "llm.stream.token": EventTranslator._spine_llm_stream_token,
+    "llm.tool_call.streaming": EventTranslator._spine_llm_tool_call_streaming,
     "llm.request.header.assistant": EventTranslator._spine_llm_header_assistant,
     "step.tool_call.record": EventTranslator._spine_tool_call_record,
     "phase.tool.call.start": EventTranslator._spine_phase_tool_start,

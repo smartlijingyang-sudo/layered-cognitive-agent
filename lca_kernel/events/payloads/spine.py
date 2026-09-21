@@ -89,6 +89,7 @@ SPINE_EXECUTION_POINTS: tuple[str, ...] = (
     "llm.call.end",
     "llm.stream.token",
     "llm.stream.stall",
+    "llm.tool_call.streaming",
     "llm.request.header",
     # Model-visible assistant decision (ADR-0185 §3.3 + ADR-0208)
     "llm.request.header.assistant",
@@ -217,6 +218,7 @@ _SPINE_EP_TO_CATEGORY: dict[str, str] = {
     "llm.call.end": "spine.llm.call.end",
     "llm.stream.token": "spine.llm.stream.token",
     "llm.stream.stall": "spine.llm.stream.stall",
+    "llm.tool_call.streaming": "spine.llm.tool_call.streaming",
     "llm.request.header": "spine.llm.request.header",
     # Model-visible assistant decision (ADR-0185 §3.3 + ADR-0208)
     "llm.request.header.assistant": "spine.llm.request.header.assistant",

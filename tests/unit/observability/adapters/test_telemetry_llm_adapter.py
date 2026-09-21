@@ -59,6 +59,9 @@ class _SpySpine:
     def emit_llm_stream_stall(self, **kwargs: Any) -> None:
         self.calls.append(("emit_llm_stream_stall", kwargs))
 
+    def emit_llm_tool_call_streaming(self, **kwargs: Any) -> None:
+        self.calls.append(("emit_llm_tool_call_streaming", kwargs))
+
 
 @dataclass
 class _FakeInner(LLMAdapter):
@@ -322,3 +325,55 @@ async def test_stream_idle_timeout_fires_despite_non_progress_events() -> None:
     assert ends[0][1]["outcome"] == "timeout"
     assert ends[0][1]["state"] is state
     assert ends[0][1]["session"] is session
+
+
+async def test_stream_emits_tool_call_streaming_once_per_call() -> None:
+    """首个工具调用参数增量触发一次 ``llm.tool_call.streaming`` 占位。
+
+    同一调用 id 的后续 delta 不再重复发布（ADR-0162 进度事件不膨胀事实账本）。
+    """
+    events = [
+        LLMStreamEvent(
+            type=LLMStreamEventType.FUNCTION_CALL_ARGUMENTS_DELTA,
+            tool_call_id="toolu_abc",
+            tool_name="executeCode",
+            arguments_delta='{"code":',
+        ),
+        LLMStreamEvent(
+            type=LLMStreamEventType.FUNCTION_CALL_ARGUMENTS_DELTA,
+            tool_call_id="toolu_abc",
+            tool_name="executeCode",
+            arguments_delta="\"x\":1}",
+        ),
+        LLMStreamEvent(
+            type=LLMStreamEventType.FUNCTION_CALL_ARGUMENTS_DELTA,
+            tool_call_id="toolu_def",
+            tool_name="search",
+            arguments_delta="{\"q\":",
+        ),
+        LLMStreamEvent(type=LLMStreamEventType.COMPLETED, response=LLMResponse(text="")),
+    ]
+
+    class _ToolInner(LLMAdapter):
+        name = "tool-inner"
+
+        async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:
+            return LLMResponse(text="", model="m", usage=TokenUsage())
+
+        async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[LLMStreamEvent]:
+            del prompt, kwargs
+            for ev in events:
+                yield ev
+
+    spy = _SpySpine()
+    state = _state()
+    session = object()
+    adapter = TelemetryLLMAdapter(_ToolInner(), spine_emit=spy)
+
+    _ = [e async for e in adapter.stream("prompt", state=state, session=session)]
+
+    streaming = [c for c in spy.calls if c[0] == "emit_llm_tool_call_streaming"]
+    assert len(streaming) == 2
+    by_call = {c[1]["invocation_id"]: c[1] for c in streaming}
+    assert by_call["toolu_abc"]["tool_name"] == "executeCode"
+    assert by_call["toolu_def"]["tool_name"] == "search"

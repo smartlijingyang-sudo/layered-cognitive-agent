@@ -276,6 +276,9 @@ class TelemetryLLMAdapter(LLMAdapter):
         activity = LlmStreamActivityTracker(step=step, model=model, on_idle=_on_idle)
         activity.start()
 
+        # 已发布 ``llm.tool_call.streaming`` 占位的调用 id；同一工具调用只发一次。
+        tool_call_streamed: set[str] = set()
+
         inner_stream = self._inner.stream(prompt, **inner_kwargs)
         try:
             while True:
@@ -377,6 +380,26 @@ class TelemetryLLMAdapter(LLMAdapter):
                             session=session,
                         )
                         output_seq += 1
+                elif event.type == LLMStreamEventType.FUNCTION_CALL_ARGUMENTS_DELTA:
+                    # 工具调用参数生成中的轻量占位（ADR-0194 P2-13 扩展）。
+                    # 只在首个带工具名的 delta 触发一次，让网关提前渲染原生
+                    # ``tools_calling`` 卡片；参数增量不进事实账本（ADR-0162），
+                    # 完整参数仍由 ``step.tool_call.record`` 在 LLM 结束后落库。
+                    tool_name = event.tool_name or ""
+                    invocation_id = event.tool_call_id or ""
+                    if (
+                        tool_name
+                        and invocation_id
+                        and invocation_id not in tool_call_streamed
+                    ):
+                        tool_call_streamed.add(invocation_id)
+                        self._spine().emit_llm_tool_call_streaming(
+                            model=model,
+                            tool_name=tool_name,
+                            invocation_id=invocation_id,
+                            state=state,
+                            session=session,
+                        )
                 yield event
         except asyncio.CancelledError:
             end_outcome = "cancelled"

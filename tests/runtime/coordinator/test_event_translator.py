@@ -117,6 +117,39 @@ def test_spine_llm_header_assistant_becomes_stream_chunk_text() -> None:
     assert out["data"]["content"] == "你好呀！"
 
 
+def test_spine_llm_tool_call_streaming_becomes_tools_calling() -> None:
+    """``llm.tool_call.streaming`` 提前渲染原生 ``tools_calling`` 卡片占位。"""
+    t = EventTranslator()
+    stamped = {
+        "event": {
+            "execution_point": "llm.tool_call.streaming",
+            "payload": {
+                "model": "solo",
+                "tool_name": "executeCode",
+                "invocation_id": "toolu_x",
+            },
+        }
+    }
+    out = t.translate(stamped)
+    assert out is not None
+    assert out["type"] == "stream_chunk"
+    assert out["data"]["chunkType"] == "tools_calling"
+    tool = out["data"]["toolsCalling"][0]
+    assert tool["id"] == "toolu_x"
+    assert tool["apiName"] == "executeCode"
+
+
+def test_spine_llm_tool_call_streaming_missing_identity_is_ignored() -> None:
+    t = EventTranslator()
+    stamped = {
+        "event": {
+            "execution_point": "llm.tool_call.streaming",
+            "payload": {"model": "solo"},
+        }
+    }
+    assert t.translate(stamped) is None
+
+
 def test_spine_tool_call_record_becomes_tools_calling() -> None:
     t = EventTranslator()
     stamped = {
