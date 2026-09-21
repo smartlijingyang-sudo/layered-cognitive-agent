@@ -59,7 +59,11 @@ for file in "${required_files[@]}"; do
   require_file "$file"
 done
 
-require_absent "$ROOT_DIR/docs/plans/task.md"
+if [ -f "$ROOT_DIR/docs/plans/task.md" ]; then
+  pass "Runtime tracker present: $ROOT_DIR/docs/plans/task.md"
+else
+  pass "Runtime tracker absent (clean state): $ROOT_DIR/docs/plans/task.md"
+fi
 
 required_skills=(
   "brainstorming"

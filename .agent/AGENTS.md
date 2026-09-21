@@ -11,6 +11,8 @@ This profile adapts Superpowers workflows for Antigravity with strict single-flo
 3. Use `browser_subagent` only for browser automation tasks.
 4. Track checklist progress in `<project-root>/docs/plans/task.md` (table-only live tracker).
 5. Keep changes scoped to the requested task and verify before completion claims.
+6. Negative Boundary (Does Not Own): Every plan task MUST declare and honor what it does NOT own. Sprawling refactors or touching out-of-scope files is strictly prohibited (AP-01).
+7. Invariants in Tests: Any architectural or behavioral invariants MUST be backed by deterministic automated tests (pytest/assert), never merely stated in prompts or comments (AP-02).
 
 ## Tool Translation Contract
 
@@ -52,5 +54,6 @@ Before saying a task is done:
 
 1. Run the relevant verification command(s).
 2. Confirm exit status and key output.
-3. Update `<project-root>/docs/plans/task.md`.
-4. Report evidence, then claim completion.
+3. Verify negative scope: confirm git status/diff contains no changes to files in Does NOT own.
+4. Update `<project-root>/docs/plans/task.md`.
+5. Report evidence, then claim completion.
