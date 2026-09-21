@@ -113,9 +113,10 @@ class Agent(AgentUnit):
         role: str,
         goal: str,
         backstory: str,
-        tools: Sequence[Tool],
-        llm: LLMAdapter,
+        tools: Sequence[Tool] = (),
+        llm: LLMAdapter | None = None,
         *,
+        auto_mcp: bool = False,
         role_profile: RoleProfile | None = None,
         max_steps: int = DEFAULT_MAX_STEPS,
         max_wall_clock_seconds: int | None = DEFAULT_MAX_WALL_CLOCK_SECONDS,
@@ -125,13 +126,24 @@ class Agent(AgentUnit):
         brain: str | Brain = BRAIN_CHOICE_DEFAULT,
         scope: Context | None = None,
     ) -> None:
+        actual_tools = list(tools)
+        if auto_mcp:
+            from lca.infrastructure.mcp.tool_set import build_ambient_mcp_tools
+
+            mcp_tools = build_ambient_mcp_tools()
+            existing_names = {t.name for t in actual_tools}
+            for mt in mcp_tools:
+                if mt.name not in existing_names:
+                    actual_tools.append(mt)
+                    existing_names.add(mt.name)
+
         if role_profile is None:
             role_profile = RoleProfile(
                 role=role,
                 goal=goal,
                 backstory=backstory,
                 tool_permission_manifest=ToolPermissionManifest(
-                    allowed_tools=[t.name for t in tools]
+                    allowed_tools=[t.name for t in actual_tools]
                 ),
             )
         else:
@@ -144,13 +156,13 @@ class Agent(AgentUnit):
             role_profile = replace(
                 role_profile,
                 tool_permission_manifest=ToolPermissionManifest(
-                    allowed_tools=[t.name for t in tools]
+                    allowed_tools=[t.name for t in actual_tools]
                 ),
             )
         self._spec = AgentSpec(
             profile=role_profile,
             llm=llm,
-            tools=tuple(tools),
+            tools=tuple(actual_tools),
             max_steps=max_steps,
             max_wall_clock_seconds=max_wall_clock_seconds,
             memory=memory,
@@ -171,7 +183,21 @@ class Agent(AgentUnit):
         return self._spec
 
     async def run(self, task: str | AgentMessage, ctx: RunContext | None = None) -> Result:
-        return await self._agent.run(task, ctx)
+        from lca.infrastructure.runtime_plane.capability_bindings import (
+            BindingsViewBuilder,
+            current_bindings,
+            reset_capability_bindings,
+            set_capability_bindings,
+        )
+
+        token = None
+        if current_bindings() is None:
+            token = set_capability_bindings(BindingsViewBuilder())
+        try:
+            return await self._agent.run(task, ctx)
+        finally:
+            if token is not None:
+                reset_capability_bindings(token)
 
     async def resume(
         self, snapshot: StateSnapshot, input: str | AgentMessage | None = None

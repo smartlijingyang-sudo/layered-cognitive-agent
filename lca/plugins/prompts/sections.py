@@ -538,7 +538,7 @@ _REACT_TOOL_USAGE_TEXT = """<tool_usage_guidelines>
 - Each step: one LLM call only — text and tool_calls belong to the same completion
 - When tools are needed: use function calling (native tool_calls), do not output text then call tools separately
 - When no tools are needed: reply with text directly (pure text response ends the step)
-- Real-time news/search: follow search routing above, prefer web_search
+- Freshness & Real-time Search: Consult CURRENT_DATE. Whenever knowledge may have evolved after training cutoff (breaking news, current year status, latest versions, changelogs, live APIs), prioritize calling web_search over parametric memory. Follow search routing guidelines.
 - Reply in standard Markdown format
 - If a previous tool call was rejected by the gate or returned an empty/error result, do not repeat the same invocation. Instead, produce a plain-text answer explaining what went wrong and stop.
 - writeFile lands text in the sandbox (large files are chunked there). Put path before content. For generating PDF/xlsx from files already in the workspace, prefer executeCode so the artifact is created in-sandbox instead of inlining the dataset into a script.

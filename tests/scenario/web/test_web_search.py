@@ -19,6 +19,20 @@ class TestSearchIntent(unittest.TestCase):
     def test_non_search_query(self) -> None:
         self.assertFalse(is_search_intent("写一个 Python 排序函数"))
 
+    def test_freshness_and_version_queries_detected(self) -> None:
+        self.assertTrue(is_search_intent("2026年最新进展"))
+        self.assertTrue(is_search_intent("Python 3.13 changelog"))
+        self.assertTrue(is_search_intent("Exa API latest release"))
+        self.assertTrue(is_search_intent("查看这个库的更新说明"))
+        self.assertFalse(is_search_intent("实现一个二叉树前序遍历算法"))
+
+    def test_search_routing_hint_freshness(self) -> None:
+        from lca.infrastructure.search.router.router import search_routing_hint
+
+        hint = search_routing_hint(tavily_available=True)
+        self.assertIn("Freshness-First", hint)
+        self.assertIn("CURRENT_DATE", hint)
+
 
 class TestSearchFormatting(unittest.TestCase):
     def test_format_hits(self) -> None:
@@ -62,7 +76,7 @@ class TestLlmFallbackRouting(unittest.TestCase):
         with search_run_scope() as state:
             state.web_search_failed = True
             state.prefer_llm_search = True
-            with patch("lca.infrastructure.search.router.get_llm_settings") as mock_llm:
+            with patch("lca.infrastructure.search.router.router.get_llm_settings") as mock_llm:
                 mock_llm.return_value.enable_search = True
                 mock_llm.return_value.forced_search = False
                 kwargs = resolve_llm_search_kwargs(task="今天有什么新闻")

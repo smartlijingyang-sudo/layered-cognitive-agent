@@ -39,6 +39,21 @@ class SearchSettings(BaseSettings):
     )
     tavily_max_results: int = Field(default=5, ge=1, le=20)
     tavily_search_depth: str = Field(default="basic")
+
+    exa_api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("EXA_API_KEY", "LCA_SEARCH_EXA_API_KEY"),
+        description="Exa AI REST API key for neural search.",
+    )
+    exa_max_results: int = Field(default=8, ge=1, le=25)
+
+    searxng_url: str = Field(
+        default="http://localhost:8888",
+        validation_alias=AliasChoices("SEARXNG_URL", "LCA_SEARCH_SEARXNG_URL"),
+        description="Local or remote SearXNG endpoint.",
+    )
+    searxng_max_results: int = Field(default=10, ge=1, le=50)
+
     llm_fallback: bool = Field(
         default=True,
         description="When tool providers fail, enable Qwen enable_search on next LLM call.",

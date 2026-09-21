@@ -111,13 +111,13 @@ class TestSearchSkillToolFiltering(unittest.IsolatedAsyncioTestCase):
                 AsyncMock(return_value=market_result),
             ),
             patch(
-                "lca.infrastructure.tools.skills.search_tool.any_search_provider_available",
+                "lca.infrastructure.tools.skills.search.tool.any_search_provider_available",
                 return_value=True,
             ),
         ):
             obs = await tool.execute({"query": "news search"})
         self.assertTrue(obs.success)
-        text = obs.payload["text"]
+        text = obs.payload.get("content") or obs.payload.get("text") or ""
         self.assertIn("anthropics-skills-pdf", text)
         self.assertNotIn("tavily-ai-skills-tavily-search", text)
 
@@ -134,13 +134,13 @@ class TestActivateSkillBlocksTavilyCli(unittest.IsolatedAsyncioTestCase):
     async def test_activate_tavily_skill_rejected_when_web_search_ready(self) -> None:
         self.store.install_package(
             skill_id="tavily-ai-skills-tavily-search",
-            skill_md_text="---\nname: tavily-search\n---\nUse tvly CLI",
+            skill_md_text="---\nname: tavily-search\nreferences: []\n---\nUse tvly CLI",
             resource_files={},
             source_url="u",
         )
         tool = SkillActivateTool(self.store)
         with patch(
-            "lca.infrastructure.tools.skills.activate_tool.any_search_provider_available",
+            "lca.infrastructure.tools.skills.activate.tool.any_search_provider_available",
             return_value=True,
         ):
             obs = await tool.execute({"skill_id": "tavily-ai-skills-tavily-search"})
