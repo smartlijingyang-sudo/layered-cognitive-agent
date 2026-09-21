@@ -53,6 +53,8 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 - Create: `exact/path/to/file.py`
 - Modify: `exact/path/to/existing.py:123-145`
 - Test: `tests/exact/path/to/test.py`
+- Does NOT own: [Files/directories/layers strictly forbidden to touch in this task, AP-01]
+- Invariants to test: [Specific invariants that MUST have assertions in the test, AP-02]
 
 **Step 1: Write the failing test**
 
@@ -91,6 +93,7 @@ git commit -m "feat: add specific feature"
 - Exact file paths always
 - Complete code in plan (not "add validation")
 - Exact commands with expected output
+- Every task MUST state `Does NOT own` (AP-01) and testable invariants (AP-02)
 - Reference relevant skills with @ syntax
 - DRY, YAGNI, TDD, frequent commits
 
