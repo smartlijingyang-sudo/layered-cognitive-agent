@@ -45,6 +45,12 @@ def _g2a_factory(bindings: object) -> list:
     )
 
 
+def _mcp_factory(bindings: object) -> list:
+    from lca.infrastructure.mcp.tool_set import build_ambient_mcp_tools
+
+    return build_ambient_mcp_tools()
+
+
 @plugin(
     id="lca-tools-provider",
     requires=["tools"],
@@ -75,3 +81,6 @@ def _g2a_factory(bindings: object) -> list:
 async def setup(ctx: PluginContext, config: Config) -> None:
     if "g2a" in config.factories:
         ctx.require("tools").register_factory("g2a", _g2a_factory)
+        ctx.require("tools").register_factory("mcp", _mcp_factory)
+    elif "mcp" in config.factories:
+        ctx.require("tools").register_factory("mcp", _mcp_factory)

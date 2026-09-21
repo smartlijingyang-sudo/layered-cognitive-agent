@@ -61,4 +61,4 @@
 | SKILL-CONNECT-LOCAL | 创建 connect-local 技能，定义自然语言触发与强制经 askUserQuestion 确认引导 SOP | Pending | 待实现 |
 | VERIFY-CONNECT-LOCAL-E2E | 全链路单测、Patch 完整性检验与端到端回归验证 | Pending | 待执行 |
 | BRAINSTORM-PROMPT-CLEANUP | 第一性原理与 DDD 设计模式重构：执行平面 Prompt/Fallback 垃圾逻辑清理与配置化统一管理 | Completed | 落地 ExecutionEnvironment 领域模型 + EnvironmentCatalog 端口适配器 + PlanePromptStrategy 策略模式 + listEnvironments 工具；53 测试通过 |
-| AWS-AGENT-TOOLKIT-SETUP | 接入 Agent Toolkit for AWS 使得 LCA Agent 支持 AWS 资源探查 | In Progress | 探测到环境 Linux x86_64、curl 与 uv 就绪，向用户收集 profile_name/AWS experience/Region |
+| AWS-AGENT-TOOLKIT-SETUP | 接入 Agent Toolkit for AWS 使得 LCA Agent 支持 AWS 资源探查 | Completed | 1. AWS CLI v2与aws-lca profile（ap-northeast-1 / 账号272973566293）鉴权配置完成；2. 安装23项AWS Agent Skills与配置~/.gemini/settings.json及~/.codex/config.toml；3. AGENTS.md规范追加；4. .lca/mcp.yaml接入aws-mcp服务；5. lca-tools-provider动态挂载_mcp_factory，filter_tools_by_assistant支持mcp/aws-mcp前缀与过滤规则（单测22/22通过）；6. 架构小助（asst_44dd568b3bf9）物化过滤放行8项AWS工具；7. 编写test_aws_mcp_dialogue.py验证Agent对话循环中实时调用mcp__aws-mcp__aws___list_regions获取真实AWS区域（ap-northeast-1）100%全链路测试通过；8. 内核重启就绪 |

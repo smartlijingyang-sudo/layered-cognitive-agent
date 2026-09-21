@@ -60,6 +60,25 @@ def filter_tools_by_assistant(
         base_name = name[6:] if name.startswith("local_") else name
         if name in deny or base_name in deny:
             continue
+        if name.startswith("mcp__"):
+            parts = name.split("__", 2)
+            server_name = parts[1] if len(parts) > 1 else ""
+            raw_tool_name = parts[2] if len(parts) > 2 else ""
+            if (
+                "mcp" in deny
+                or (server_name and server_name in deny)
+                or (raw_tool_name and raw_tool_name in deny)
+            ):
+                continue
+            if (
+                not allow
+                or "mcp" in allow
+                or name in allow
+                or (server_name and server_name in allow)
+                or (raw_tool_name and raw_tool_name in allow)
+            ):
+                kept.append(tool)
+            continue
         required_grant = _required_grant(tool)
         if required_grant:
             if required_grant in grants:

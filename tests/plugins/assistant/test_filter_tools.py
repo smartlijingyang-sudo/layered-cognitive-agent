@@ -211,3 +211,21 @@ class TestToolsFromScopeFiltersByAssistant:
     def test_returns_empty_tuple_for_empty_tools(self, home: Path) -> None:
         _write_tools(home, allow=["alpha"], deny=[])
         assert filter_tools_by_assistant([], home) == ()
+
+    def test_mcp_tool_allowed_by_server_name(self, home: Path) -> None:
+        _write_tools(home, allow=["aws-mcp"], deny=[])
+        mcp_tool = _tool("mcp__aws-mcp__aws___list_regions")
+        other_mcp = _tool("mcp__other-mcp__other_tool")
+        result = filter_tools_by_assistant([mcp_tool, other_mcp], home)
+        assert [t.name for t in result] == ["mcp__aws-mcp__aws___list_regions"]
+
+    def test_mcp_tool_allowed_by_generic_mcp_keyword(self, home: Path) -> None:
+        _write_tools(home, allow=["mcp"], deny=[])
+        mcp_tool = _tool("mcp__aws-mcp__aws___list_regions")
+        result = filter_tools_by_assistant([mcp_tool], home)
+        assert [t.name for t in result] == ["mcp__aws-mcp__aws___list_regions"]
+
+    def test_mcp_tool_denied_by_server_name(self, home: Path) -> None:
+        _write_tools(home, allow=[], deny=["aws-mcp"])
+        mcp_tool = _tool("mcp__aws-mcp__aws___list_regions")
+        assert filter_tools_by_assistant([mcp_tool], home) == ()

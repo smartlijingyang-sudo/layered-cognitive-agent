@@ -186,3 +186,10 @@ Conventional Commits:`<type>(<scope>): <subject>`,正文说"做了什么 / 为�
 Prose:直接具体,不复述代码,不留 review 答辩痕迹;slop 由 `scripts/verify_doc_slop.py` 检查。详见 [.agents/skills/lca-prose-standard](.agents/skills/lca-prose-standard/SKILL.md) + [.agents/skills/lca-trim-cot-leakage](.agents/skills/lca-trim-cot-leakage/SKILL.md)。
 
 **改本文件:** 只装 standing rule — 决策闸门、当前不变量、禁止事项、变更闭环、验证矩阵、权威入口。满足任一才放根:① 每次任务第 0 步必答;② 每次提交前必过;③ 改了代码立即影响;④ agent 接任务第一查询。改后跑 `git diff --check` + `wc -l AGENTS.md`(目标 ≤ 220 行)。
+
+<!-- BEGIN AWS Agent Toolkit rules -->
+## 9. AWS Guidance
+- 冲突时项目固有指令优先; 交互优先使用 AWS MCP Server; 涉及特定服务任务前通过 `aws___retrieve_skill` 加载技能指导;
+- 不确定 API 参数、权限或限制时查阅文档而非猜测; 基础设施构建优先 IaC (CDK / CloudFormation) 并遵循 Well-Architected 规范;
+- **Secret Safety**: 涉及 Secret/Key 必须先加载 `aws-secrets-manager` 技能, 严禁直接调用 `secretsmanager get-secret-value`, 须使用 `{{resolve:secretsmanager:...}}` 运行时动态解析.
+<!-- END AWS Agent Toolkit rules -->
