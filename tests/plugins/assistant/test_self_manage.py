@@ -34,6 +34,7 @@ from lca.infrastructure.tools.assistant.self_manage_tools import (
     UpdateAssistantGrantsTool,
     UpdateAssistantProfileTool,
     UpdateAssistantSoulTool,
+    UpdateAssistantUserTool,
 )
 from lca.plugins.assistant.home._home_layout import load_manifest
 from lca.plugins.assistant.skill.overlay import AssistantSkillOverlayImpl
@@ -428,3 +429,34 @@ class TestToolSelfManage:
         ]
         assert obs.payload["builtin_catalog"] == ["runCommand", "search"]
         assert obs.payload["allowed_builtins"] == ["runCommand", "search"]
+
+
+# ──────────────────────────────────────────────────────────────────────
+# UpdateAssistantUserTool — USER.md 写入路径（digest 一致性保证）
+# ──────────────────────────────────────────────────────────────────────
+
+
+class TestUpdateAssistantUserTool:
+    def test_writes_user_md_via_catalog(self, catalog: AssistantCatalogImpl) -> None:
+        """Happy path: user_md goes through catalog.revise_profile → digest OK."""
+        assistant_id = _create(catalog)
+        tool = UpdateAssistantUserTool(catalog=catalog, assistant_id=assistant_id)
+        user_md = "# 用户\n姓名：李超\n角色：系统总架构师\n技术偏好：Rust + Go\n"
+        obs = asyncio.run(tool.execute({"user_md": user_md}))
+
+        assert obs.success is True
+        assert obs.payload is not None
+        assert obs.payload["assistant_id"] == assistant_id
+        assert "revision_seq" in obs.payload
+
+        home = Path(catalog.get(assistant_id).home_path)
+        assert (home / "USER.md").read_text(encoding="utf-8").strip() == user_md.strip()
+
+    def test_empty_user_md_rejected(self, catalog: AssistantCatalogImpl) -> None:
+        """Empty user_md must fail-closed — not silently wipe USER.md."""
+        assistant_id = _create(catalog)
+        tool = UpdateAssistantUserTool(catalog=catalog, assistant_id=assistant_id)
+        obs = asyncio.run(tool.execute({"user_md": ""}))
+
+        assert obs.success is False
+        assert obs.error is not None

@@ -39,6 +39,7 @@ _EDIT_ASSISTANT_SKILL_TOOL = "edit_assistant_skill"
 _UPDATE_ASSISTANT_SOUL_TOOL = "update_assistant_soul"
 _UPDATE_ASSISTANT_PROFILE_TOOL = "update_assistant_profile"
 _UPDATE_ASSISTANT_GRANTS_TOOL = "update_assistant_grants"
+_UPDATE_ASSISTANT_USER_TOOL = "update_assistant_user"
 _LIST_ASSISTANT_TOOLS_TOOL = "list_assistant_tools"
 _CREATE_ASSISTANT_TOOL_TOOL = "create_assistant_tool"
 _UPDATE_ASSISTANT_TOOL_TOOL = "update_assistant_tool"
@@ -360,6 +361,55 @@ class UpdateAssistantGrantsTool(_BaseAssistantTool):
         )
 
 
+class UpdateAssistantUserTool(_BaseAssistantTool):
+    """Update the assistant's USER.md (non-sensitive, notify after applying).
+
+    USER.md stores the long-term user profile (name, role, preferences).
+    Writing through this tool ensures the catalog digest stays consistent —
+    prevents the _DigestMismatch that occurs when files are written directly.
+    """
+
+    name = _UPDATE_ASSISTANT_USER_TOOL
+    required_grant: ClassVar[str] = "profile.revise"
+    description = (
+        "修改当前助理的 USER.md（用户画像：姓名、角色、技术偏好、工作习惯等）。"
+        "非敏感操作，改完告知用户。必须通过此工具写入——裸写文件会导致 Digest 不一致。"
+        "参数: user_md（新的 USER.md 全文，Markdown 格式）。"
+    )
+    parameters: ClassVar[dict[str, Any]] = {
+        "type": "object",
+        "properties": {
+            "user_md": {
+                "type": "string",
+                "description": "新的 USER.md 全文（Markdown）",
+            },
+        },
+        "required": ["user_md"],
+    }
+
+    async def execute(self, args: dict[str, Any]) -> Observation:
+        start = time.monotonic()
+        user_md = str(args.get("user_md") or "").strip()
+        if not user_md:
+            return self._fail(start, "user_md 必须为非空字符串")
+        try:
+            revision = self._catalog.revise_profile(
+                self._assistant_id,
+                ProfilePatch(user_md=user_md),
+                actor="agent",
+            )
+        except Exception as exc:
+            return self._fail(start, f"更新 USER.md 失败: {exc}")
+        return self._ok(
+            start,
+            {
+                "assistant_id": self._assistant_id,
+                "revision_seq": revision.revision_seq,
+                "message": "已更新 USER.md（用户画像）。",
+            },
+        )
+
+
 class ListAssistantToolsTool(_BaseAssistantTool):
     """List the assistant's effective tool set: builtin policy + custom tools."""
 
@@ -601,6 +651,7 @@ def assistant_self_manage_tools_from_run(
         UpdateAssistantSoulTool(catalog=catalog, assistant_id=assistant_id),
         UpdateAssistantProfileTool(catalog=catalog, assistant_id=assistant_id),
         UpdateAssistantGrantsTool(catalog=catalog, assistant_id=assistant_id),
+        UpdateAssistantUserTool(catalog=catalog, assistant_id=assistant_id),
         ListAssistantToolsTool(
             catalog=catalog,
             assistant_id=assistant_id,
@@ -630,6 +681,7 @@ __all__ = [
     "_UPDATE_ASSISTANT_PROFILE_TOOL",
     "_UPDATE_ASSISTANT_SOUL_TOOL",
     "_UPDATE_ASSISTANT_TOOL_TOOL",
+    "_UPDATE_ASSISTANT_USER_TOOL",
     "CreateAssistantToolTool",
     "DeleteAssistantSkillTool",
     "DeleteAssistantToolTool",
@@ -640,5 +692,6 @@ __all__ = [
     "UpdateAssistantProfileTool",
     "UpdateAssistantSoulTool",
     "UpdateAssistantToolTool",
+    "UpdateAssistantUserTool",
     "assistant_self_manage_tools_from_run",
 ]
