@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ntpath
 import os
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -71,8 +72,12 @@ def raise_if_out_of_scope(path: str, plane: PlaneRef) -> str:
 
 
 def _normalize(path: str, platform: str) -> str:
+    # ``PureWindowsPath`` keeps ``..`` segments because pathlib refuses to
+    # resolve them without a filesystem, so containment checks would treat
+    # ``root\..\secret`` as inside ``root``. ``ntpath.normpath`` collapses
+    # them, matching what ``os.path.normpath`` does on the POSIX side.
     if _windows(platform):
-        return str(PureWindowsPath(path))
+        return ntpath.normpath(path)
     return os.path.normpath(path)
 
 
