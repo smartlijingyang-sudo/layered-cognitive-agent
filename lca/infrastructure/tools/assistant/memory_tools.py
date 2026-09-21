@@ -136,8 +136,9 @@ class MemoryAddTool(_BaseMemoryTool):
     required_grant: ClassVar[str] = "profile.revise"
     description = (
         "把用户明确陈述的身份/偏好/事实写入结构化记忆。"
-        "参数: content（结构化事实，如「用户身份：架构师」）、category（identity/"
-        "preference/fact）、dedupe_key（可选，幂等键，同键新事实会替换旧事实）。"
+        "参数: content（结构化事实，如「用户身份：系统架构师」）、category（identity/"
+        "preference/fact）、dedupe_key（可选，属性维度键，如 preference:tech_stack、identity:role，"
+        "同维度新事实会自动覆盖旧事实，严禁包含具体取值）。"
         "非敏感操作，改完告知用户。"
     )
     parameters: ClassVar[dict[str, Any]] = {
@@ -149,7 +150,10 @@ class MemoryAddTool(_BaseMemoryTool):
                 "enum": ["identity", "preference", "fact"],
                 "description": "记忆类别",
             },
-            "dedupe_key": {"type": "string", "description": "可选幂等键"},
+            "dedupe_key": {
+                "type": "string",
+                "description": "可选属性维度键（如 preference:tech_stack、identity:role，严禁包含具体取值）",
+            },
         },
         "required": ["content", "category"],
     }
@@ -198,7 +202,7 @@ class MemoryUpdateTool(_BaseMemoryTool):
     description = (
         "用新事实替换一条已有记忆记录（旧记录标记 superseded，保留审计）。"
         "参数: record_id（要替换的记录 id）、content（新事实）、category（可选）、"
-        "dedupe_key（可选）。非敏感操作，改完告知用户。"
+        "dedupe_key（可选，默认自动继承旧记录维度键）。非敏感操作，改完告知用户。"
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
@@ -210,7 +214,10 @@ class MemoryUpdateTool(_BaseMemoryTool):
                 "enum": ["identity", "preference", "fact"],
                 "description": "记忆类别（可选，默认 fact）",
             },
-            "dedupe_key": {"type": "string", "description": "可选幂等键"},
+            "dedupe_key": {
+                "type": "string",
+                "description": "可选属性维度键（默认继承旧记录键，同维度替换）",
+            },
         },
         "required": ["record_id", "content"],
     }

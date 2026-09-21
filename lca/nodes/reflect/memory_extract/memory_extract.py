@@ -56,15 +56,19 @@ _EXTRACT_PROMPT = """ROLE: memory_extract
 
 规则：
 - 只提取用户明确陈述的自我身份、偏好或显式要求记住的事实。
-- content 必须是第三人称结构化事实（如「用户身份：架构师」「用户偏好：不喜欢啰嗦」），
-  禁止输出用户原文整句。
+- content 必须是第三人称结构化事实（如「用户身份：系统架构师」「用户偏好：不喜欢啰嗦」），禁止输出用户原文整句。
 - category 只能是 identity / preference / fact。
 - confidence 0.0-1.0：用户明确陈述 = 1.0，模型推断 = 0.6 以下。
-- dedupe_key 用于幂等与 supersede，如 identity:architect、preference:concise。
+- dedupe_key 用于同维度幂等与覆盖更新（supersede），必须是稳定的抽象属性维度（格式为 category:topic，如 identity:role、identity:name、preference:tech_stack、preference:code_style、preference:database、preference:verbosity）。
+  【铁律】dedupe_key 代表稳定的主题维度，严禁把具体的偏好值拼入 key（例如偏好 Python 必须是 preference:tech_stack，严禁 preference:tech_stack_python；身份是架构师必须是 identity:role，严禁 identity:architect）。
+- 如果用户陈述是在变更、替换或废弃某项已有偏好/身份，必须直接复用对应已有记忆的 dedupe_key 进行覆盖替换。
 - 没有候选时输出空数组 []。
 
+当前已有活跃记忆（供参考，如修改/替换下列某项请复用对应 dedupe_key）：
+{existing_memories}
+
 输出 JSON 数组（不要 markdown 代码块），每项格式：
-{"category": "identity", "content": "用户身份：架构师", "confidence": 1.0, "dedupe_key": "identity:architect"}
+[{"category": "identity", "content": "用户身份：系统架构师", "confidence": 1.0, "dedupe_key": "identity:role"}]
 
 用户陈述：
 {task}
@@ -116,6 +120,33 @@ def _parse_candidates(text: str) -> list[dict[str, Any]]:
     return candidates
 
 
+def _format_existing_memories(runtime: Any) -> str:
+    """提取当前活跃的身份与偏好记忆，供提取器做上下文感知的覆盖与演化。"""
+    memory = getattr(runtime, "memory", None)
+    if memory is None and hasattr(runtime, "get"):
+        memory = runtime.get("memory")
+    if memory is None or not hasattr(memory, "query"):
+        return "（无）"
+    try:
+        from lca.contracts.atoms.enums.enums import MemoryCategory, MemoryLayer
+
+        records = [
+            r
+            for r in memory.query(MemoryLayer.SEMANTIC)
+            if getattr(r, "category", None) in {MemoryCategory.IDENTITY, MemoryCategory.PREFERENCE}
+            and not getattr(r, "deleted", False)
+        ]
+        if not records:
+            return "（无）"
+        lines = []
+        for r in records:
+            key_str = f" [dedupe_key: {r.dedupe_key}]" if getattr(r, "dedupe_key", None) else ""
+            lines.append(f"-{key_str} {r.content}")
+        return "\n".join(lines)
+    except Exception:
+        return "（无）"
+
+
 @dataclass(frozen=True, slots=True)
 class ReflectMemoryExtractExecutor:
     """Primitive: distill the current user statement into memory candidates."""
@@ -159,8 +190,12 @@ class ReflectMemoryExtractExecutor:
         if adapter is None or not hasattr(adapter, "complete"):
             return self._passthrough(reflection)
 
+        existing_memories = _format_existing_memories(runtime)
+        prompt = _EXTRACT_PROMPT.replace("{existing_memories}", existing_memories).replace(
+            "{task}", task
+        )
         try:
-            response = await adapter.complete(_EXTRACT_PROMPT.replace("{task}", task))
+            response = await adapter.complete(prompt)
             candidates = _parse_candidates(getattr(response, "text", "") or "")
         except Exception:
             # 提取失败不阻塞主流程（ADR-0246 §0.6 fail-soft）。

@@ -114,3 +114,60 @@ async def test_extract_does_not_call_llm_on_ordinary_reply() -> None:
     assert output.port_values["reflection"] is reflection
     assert "memory_candidates" not in reflection.extra
     assert adapter.calls == 0
+
+
+class _CapturingAdapter:
+    def __init__(self) -> None:
+        self.last_prompt = ""
+        self.calls = 0
+
+    async def complete(self, prompt: str, **kwargs: object) -> LLMResponse:
+        self.calls += 1
+        self.last_prompt = prompt
+        return LLMResponse(text="[]", model="stub")
+
+
+class _FakeMemory:
+    def __init__(self, records: list[object]) -> None:
+        self._records = records
+
+    def query(self, layer: object) -> list[object]:
+        del layer
+        return self._records
+
+
+@pytest.mark.asyncio
+async def test_extract_injects_existing_memories_into_prompt() -> None:
+    """验证提取器从 runtime.memory 读取活跃记忆并注入 Prompt，实现上下文感知的记忆演化。"""
+    from lca.contracts.atoms.enums.enums import MemoryCategory, MemoryLayer
+    from lca.contracts.models.core.conversation.memory import MemoryRecord
+
+    fake_memory = _FakeMemory(
+        [
+            MemoryRecord(
+                record_id="mem_1",
+                content="用户技术栈偏好：Python",
+                memory_type=MemoryLayer.SEMANTIC,
+                importance=0.9,
+                category=MemoryCategory.PREFERENCE,
+                dedupe_key="preference:tech_stack",
+            )
+        ]
+    )
+    from lca.infrastructure.memory.pre_filter.regex_filter import RegexMemoryFilter
+
+    adapter = _CapturingAdapter()
+    executor = ReflectMemoryExtractExecutor(pre_filter=RegexMemoryFilter())
+    context = NodeContext(
+        runtime={
+            "adapter": adapter,
+            "agent_state": _state("我不用Python了，改用Rust和Go"),
+            "memory": fake_memory,
+        },
+        metadata={},
+        budget=None,
+    )
+    await executor.node_execute(context, NodeInput(port_values={"reflection": _reflection()}))
+    assert adapter.calls == 1
+    assert "preference:tech_stack" in adapter.last_prompt
+    assert "用户技术栈偏好：Python" in adapter.last_prompt

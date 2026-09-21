@@ -228,3 +228,20 @@ class TestMemoryDedupeAndBackfill:
         assert len(calls) == 1
         assert calls[0][0] == "asst_home"
         assert calls[0][1] == []
+
+    def test_supersede_inherits_old_dedupe_key_when_omitted(self, tmp_path: Path) -> None:
+        """supersede 时若替代记录未显式传 dedupe_key，应自动继承旧记录的属性维度键。"""
+        home = tmp_path / "asst_home"
+        home.mkdir()
+        mem = AssistantMemory(home)
+        mem.upsert(self._pref("mem_old", "用户偏好：MySQL", dedupe_key="preference:database"))
+        mem.supersede(
+            "mem_old",
+            self._pref("mem_new", "用户偏好：PostgreSQL", dedupe_key=None),
+        )
+        records = mem.query(MemoryLayer.SEMANTIC)
+        assert len(records) == 1
+        assert records[0].record_id == "mem_new"
+        assert records[0].content == "用户偏好：PostgreSQL"
+        assert records[0].dedupe_key == "preference:database"
+        assert records[0].revision_of == "mem_old"

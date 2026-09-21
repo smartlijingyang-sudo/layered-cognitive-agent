@@ -199,6 +199,7 @@ class AssistantMemory(MemorySystem):
         dedupe_key: object,
         source_trace_id: str,
         record_id: str | None = None,
+        revision_of: str | None = None,
     ) -> None:
         """追加一条 typed semantic 记录；同 ``dedupe_key`` 旧记录被 supersede。
 
@@ -224,7 +225,7 @@ class AssistantMemory(MemorySystem):
         )
 
         new_id_value = record_id or new_id("mem")
-        superseded_id: str | None = None
+        superseded_id: str | None = revision_of
 
         def _retire(entry: dict[str, Any]) -> None:
             nonlocal superseded_id
@@ -308,6 +309,7 @@ class AssistantMemory(MemorySystem):
             ),
             dedupe_key=record.dedupe_key,
             source_trace_id=record.source_trace_id or "",
+            revision_of=record.revision_of,
         )
         return record
 
@@ -322,12 +324,27 @@ class AssistantMemory(MemorySystem):
         layer = MemoryLayer.SEMANTIC
         records = self._load(layer)
         now_ms = _utc_now_ms()
+        old_dedupe_key: str | None = None
         for entry in records:
             if entry.get("record_id") == record_id and not entry.get("deleted", False):
                 entry["deleted"] = True
                 entry["retired_at_ms"] = now_ms
                 entry.setdefault("metadata", {})["superseded_reason"] = reason
+                old_dedupe_key = str(entry.get("dedupe_key") or "").strip() or None
         self._save(layer, records)
+        # 继承被替换记录的维度键与血缘，保持事实维度稳定延续
+        replacement = MemoryRecord(
+            record_id=replacement.record_id,
+            content=replacement.content,
+            memory_type=replacement.memory_type,
+            importance=replacement.importance,
+            category=replacement.category,
+            dedupe_key=replacement.dedupe_key or old_dedupe_key,
+            confidence=replacement.confidence,
+            source_trace_id=replacement.source_trace_id,
+            metadata=replacement.metadata,
+            revision_of=record_id,
+        )
         return self.upsert(replacement)
 
     def remove(self, record_id: str) -> None:
