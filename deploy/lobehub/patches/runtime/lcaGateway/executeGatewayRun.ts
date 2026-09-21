@@ -272,10 +272,21 @@ export async function lcaExecuteGatewayRun(
   // `agencyConfig.lcaAssistantId`; forward it so the run assembles the
   // agent persona from its Home (ADR-0242 D3). `params.model` is the run
   // mode ('solo'/'team'), so the agent row lookup uses `context.agentId`.
+  // LCA: also forward the stored execution target + bound device so the run
+  // executes on the paired machine (e.g. lipcmain) instead of the sandbox.
   const agentRow: unknown = useAgentStore.getState().agentMap[context.agentId];
-  const assistantId = (
-    agentRow as { agencyConfig?: { lcaAssistantId?: string } | null } | undefined
-  )?.agencyConfig?.lcaAssistantId;
+  const agencyConfig = (
+    agentRow as
+      | {
+          agencyConfig?: {
+            lcaAssistantId?: string;
+            executionTarget?: string;
+            boundDeviceId?: string;
+          } | null;
+        }
+      | undefined
+  )?.agencyConfig;
+  const assistantId = agencyConfig?.lcaAssistantId;
 
   const receipt = await lcaStartRun({
     agent: { id: params.model, name: params.model },
@@ -283,6 +294,10 @@ export async function lcaExecuteGatewayRun(
     parent_message_id: assistantMessageId || params.parentMessageId,
     topic_id: topicId || undefined,
     ...(assistantId ? { assistant_id: assistantId } : {}),
+    ...(agencyConfig?.executionTarget
+      ? { execution_target: agencyConfig.executionTarget }
+      : {}),
+    ...(agencyConfig?.boundDeviceId ? { device_id: agencyConfig.boundDeviceId } : {}),
   });
 
   const { operationId: gatewayOpId } = state.startOperation({

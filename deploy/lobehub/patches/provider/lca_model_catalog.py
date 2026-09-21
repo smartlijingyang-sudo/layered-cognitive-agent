@@ -8,19 +8,26 @@ _HOOK = "src/hooks/useEnabledChatModels.ts"
 _SELECTION = "src/features/ChatInput/hooks/useAgentModelSelection.ts"
 _MODEL = "src/features/ChatInput/ActionBar/Model/index.tsx"
 _LABEL = "src/features/ChatInput/ActionBar/ModelLabel/index.tsx"
+_TOOL_USE = "src/hooks/useModelSupportToolUse.ts"
+_EFFECTIVE_MODE = "src/features/ChatInput/hooks/useEffectiveAgentMode.ts"
 _MARKER = "LCA: picker only solo/team/auto"
 
 meta = PatchMeta(
     name="lca_model_catalog",
     description="Chat model picker shows only solo / team / auto",
-    files=(_HOOK, _SELECTION, _MODEL, _LABEL),
+    files=(_HOOK, _SELECTION, _MODEL, _LABEL, _TOOL_USE, _EFFECTIVE_MODE),
     risk="medium",
     category="provider",
     depends_on=(),
     why="Users must pick an LCA mode, not a vendor model; vendor ids leak into /webapi/chat",
     technical_detail=(
         "useEnabledChatModels returns a fixed LCA catalog. "
-        "useAgentModelSelection remaps any other stored model to solo."
+        "useAgentModelSelection remaps any other stored model to solo. "
+        "useModelSupportToolUse returns true for LCA catalog models because the "
+        "gateway run carrier always provides tools, even when the aiInfra "
+        "enabled-model list (server runtime state) has no solo/team/auto row. "
+        "useEffectiveAgentMode remaps the stored model before the capability "
+        "check so Agent mode (and the device selector) is available."
     ),
     verify_file=_HOOK,
     verify_marker=_MARKER,
@@ -104,8 +111,54 @@ _SELECTION_REPLACEMENT = """  /* LCA: picker only solo/team/auto */
 """
 
 
+_TOOL_USE_TS = """import { aiModelSelectors, useAiInfraStore } from '@/store/aiInfra';
+
+/* LCA: catalog models always support tool calling (gateway run carrier). */
+import { LCA_CHAT_MODELS } from '@/hooks/useEnabledChatModels';
+
+export const useModelSupportToolUse = (model: string, provider: string) => {
+  if ((LCA_CHAT_MODELS as readonly string[]).includes(model)) return true;
+  return useAiInfraStore(aiModelSelectors.isModelSupportToolUse(model, provider));
+};
+"""
+
+_EFFECTIVE_MODE_IMPORT = (
+    "import { useModelSupportToolUse } from '@/hooks/useModelSupportToolUse';\n"
+)
+_EFFECTIVE_MODE_NEEDLE = "const supportToolUse = useModelSupportToolUse(model, provider);"
+_EFFECTIVE_MODE_REPLACEMENT = (
+    "/* LCA: remap stored vendor model to the LCA catalog before the tool-use "
+    "check so Agent mode / device selector is available. */\n"
+    "  const supportToolUse = useModelSupportToolUse(resolveLcaChatModel(model), 'openai');"
+)
+
+
+def _patch_effective_mode(ctx: PatchContext) -> bool:
+    rel = _EFFECTIVE_MODE
+    body = ctx.read(rel)
+    original = body
+    if "resolveLcaChatModel" not in body:
+        if _EFFECTIVE_MODE_IMPORT not in body:
+            raise SystemExit("[lca_model_catalog] effective-mode import anchor missing")
+        body = body.replace(
+            _EFFECTIVE_MODE_IMPORT,
+            _EFFECTIVE_MODE_IMPORT + "import { resolveLcaChatModel } from '@/hooks/useEnabledChatModels';\n",
+            1,
+        )
+    if _EFFECTIVE_MODE_NEEDLE in body:
+        body = body.replace(_EFFECTIVE_MODE_NEEDLE, _EFFECTIVE_MODE_REPLACEMENT, 1)
+    elif _EFFECTIVE_MODE_REPLACEMENT not in body:
+        raise SystemExit("[lca_model_catalog] effective-mode supportToolUse anchor missing")
+    if body != original:
+        ctx.write(rel, body)
+        return True
+    return False
+
+
 def apply(ctx: PatchContext) -> bool:
     changed = ctx.write_if_changed(_HOOK, _HOOK_TS)
+    changed = ctx.write_if_changed(_TOOL_USE, _TOOL_USE_TS) or changed
+    changed = _patch_effective_mode(ctx) or changed
     text = ctx.read(_SELECTION)
     if not ("provider: 'openai'" in text and "lcaModel" in text):
         if _SELECTION_NEEDLE not in text:

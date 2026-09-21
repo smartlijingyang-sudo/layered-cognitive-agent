@@ -322,6 +322,20 @@ def _patch_switcher(text: str) -> str:
         1,
     )
 
+    # LCA devices live in the LCA registry, not the native `device.listDevices`
+    # table, so `boundDevice` may be undefined. Show the bound id instead of
+    # "Unknown device".
+    text = text.replace(
+        "      ? (boundDevice?.friendlyName ??\n"
+        "        boundDevice?.hostname ??\n"
+        "        t('heteroAgent.executionTarget.unknownDevice'))\n",
+        "      ? (boundDevice?.friendlyName ??\n"
+        "        boundDevice?.hostname ??\n"
+        "        boundDeviceId ??\n"
+        "        t('heteroAgent.executionTarget.unknownDevice'))\n",
+        1,
+    )
+
     text = text.replace(
         "  const isActive = (target: DeviceExecutionTarget, deviceId?: string) => {\n"
         "    if (target === 'device') return executionTarget === 'device' && boundDeviceId === deviceId;\n"
@@ -473,7 +487,15 @@ def _patch_pairing_state(text: str) -> str:
         "        setPairStatus({ ok: true, msg: `已自动绑定: ${newlyJoined.friendlyName || newlyJoined.deviceId}` });\n"
         "      }\n"
         "    }\n"
-        "    setKnownDevIds(new Set(currentOnline.map((d: any) => d.deviceId)));\n"
+        "    // Only update when the id set actually changed: re-setting a new\n"
+        "    // Set on every render (e.g. empty native device list) loops forever.\n"
+        "    const nextIds = new Set(currentOnline.map((d: any) => d.deviceId));\n"
+        "    if (\n"
+        "      nextIds.size !== knownDevIds.size ||\n"
+        "      !Array.from(nextIds).every((id) => knownDevIds.has(id))\n"
+        "    ) {\n"
+        "      setKnownDevIds(nextIds);\n"
+        "    }\n"
         "  }, [devices, knownDevIds, selectExecutionTarget]);\n"
         "\n"
         "  const handlePairSubmit = useCallback(async () => {\n"

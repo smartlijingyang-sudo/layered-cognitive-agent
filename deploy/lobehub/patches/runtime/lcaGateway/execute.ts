@@ -14,6 +14,11 @@ export interface LcaStartRunBody {
   // When present the backend assembles the run's persona from the
   // assistant Home (ADR-0242 D3) instead of the default empty profile.
   assistant_id?: string;
+  // LCA: forward the agent's stored execution target so the run executes on
+  // the bound device (e.g. lipcmain) instead of the cloud sandbox. The
+  // backend maps execution_target=device + device_id to the machine plane.
+  execution_target?: string;
+  device_id?: string;
   run_id?: string;
   // ``imageList`` / ``fileList`` / ``files`` mirror the LobeHub
   // ``UIChatMessage`` shape so the LCA ingress can hydrate attachments
@@ -80,6 +85,8 @@ export async function lcaStartRun(
       ...(body.topic_id ? { topic_id: body.topic_id } : {}),
       ...(body.resume_approval ? { resume_approval: body.resume_approval } : {}),
       ...(body.resume_tool_result ? { resume_tool_result: body.resume_tool_result } : {}),
+      ...(body.execution_target ? { execution_target: body.execution_target } : {}),
+      ...(body.device_id ? { device_id: body.device_id } : {}),
     }),
   });
   if (!resp.ok) {
