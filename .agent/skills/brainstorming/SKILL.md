@@ -73,6 +73,9 @@ digraph brainstorming {
 - Scale each section to its complexity: a few sentences if straightforward, up to 200-300 words if nuanced
 - Ask after each section whether it looks right so far
 - Cover: architecture, components, data flow, error handling, testing
+- **Mandatory boundaries:** Must explicitly state `Owns` (what will be built) and `Does NOT own` (what is strictly out-of-scope / forbidden to modify, AP-01)
+- **Autopilot Level:** Must classify the blast radius into the Autopilot Ladder (`INVESTIGATE` / `DRAFT` / `AUTOPILOT`, AP-05)
+- **Invariants in tests:** Explicitly specify what invariants will be verified in automated tests (AP-02)
 - Be ready to go back and clarify if something doesn't make sense
 
 ## After the Design

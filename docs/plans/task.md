@@ -45,7 +45,7 @@
 | TYPESAFE-TASK-6 | 全链路回归验证与活体验证 | Completed | 25/25 reflect 单测全通，ruff/git-diff 门禁通过，实测隐式偏好判定（noul=0.83）、普通指令过滤（noul=0.03），优雅降级全链路验证通过 |
 | GROKBOT-TASK-1 | 沉淀反模式知识库 docs/antipatterns/lca-antipatterns.md | Completed | 成功创建 docs/antipatterns/lca-antipatterns.md，首批收录 6 大核心反模式（AP-01至AP-06），严格遵循[现场-根因-铁律]格式与[写原则删故事]准则 |
 | GROKBOT-TASK-2 | .agent/AGENTS.md 增加负向边界(Does Not Own)与不变量入测铁律 | Completed | Core Rules 补充规则 6（负向边界Does Not Own）与规则 7（测试不变量断言）；Verification Discipline 增加负边界与无越权变更检验；bash .agent/tests/check-antigravity-profile.sh 82/82 全通 |
-| GROKBOT-TASK-3 | .agent/skills/brainstorming 增加负向清单与爆炸半径自治阶梯 | Pending | 待修改 |
+| GROKBOT-TASK-3 | .agent/skills/brainstorming 增加负向清单与爆炸半径自治阶梯 | Completed | 在 Presenting the design 环节强制要求声明 Owns、Does NOT own（AP-01）、Autopilot Ladder 爆炸半径等级（AP-05）与测试不变量（AP-02）；run-tests.sh 82/82 passed |
 | GROKBOT-TASK-4 | .agent/skills/writing-plans 任务模板嵌入负边界与断言测试声明 | Pending | 待修改 |
 | GROKBOT-TASK-5 | code-reviewer 与 single-flow-task-execution 审查清单增加边界与反模式守卫 | Pending | 待修改 |
 | GROKBOT-TASK-6 | Antigravity profile 自动化测试与全链路闭环验证 | Pending | 待执行 |
