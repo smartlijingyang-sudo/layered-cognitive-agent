@@ -567,9 +567,13 @@ try {{
     }}
 }} catch {{}}
 
+$prevEAP = $ErrorActionPreference; $ErrorActionPreference = "SilentlyContinue"
 $pipRes = & $pythonCmd -m pip install -q --no-warn-script-location httpx websockets 2>&1
+$ErrorActionPreference = $prevEAP
 if ($LASTEXITCODE -ne 0) {{
-    & $pythonCmd -m pip install -q --user --no-warn-script-location httpx websockets
+    $prevEAP = $ErrorActionPreference; $ErrorActionPreference = "SilentlyContinue"
+    & $pythonCmd -m pip install -q --user --no-warn-script-location httpx websockets 2>&1
+    $ErrorActionPreference = $prevEAP
 }}
 
 # 4. Setup directory
