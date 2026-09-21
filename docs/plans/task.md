@@ -22,5 +22,5 @@
 | REFACTOR-CLEANUP-BRAINSTORM | 第一性原理架构重构头脑风暴：明确范围、提炼方案、消除垃圾逻辑与建立业界范式 | Completed | 架构设计文档与落地实施计划均已就绪并获得用户确认 |
 | REFACTOR-TASK-1-PROFILE | 软化 Composio 阻断依赖 & 平台默认 Profile 合流为 web-assistant | Completed | Composio required:false，supervisor/cli/config/profile 默认 profile 收敛至 profiles/web-assistant.yaml，13 plans validated ok，单测 test_supervisor_profile_default.py 3/3 passed |
 | REFACTOR-TASK-2-RESUME-BINDING | 网关 _dispatch_resume 支持精准 run_id 寻址与前端补丁对齐 | Completed | CreateRunRequest 增加 run_id 字段，decode_create_run 解析 run_id，_dispatch_resume 优先使用显式 run_id 寻址消除 409 竞态，execute.ts 与 executeGatewayRun.ts 携带 run_id，patch_lobehub.py 23/23 生效，test_resume_run_id_binding.py 3/3 passed |
-| REFACTOR-TASK-3-SKILL-HYGIENE | 彻底重构 create-assistant/SKILL.md 提示词与消除内部架构泄露 | In Progress | 正在清理 create-assistant 提示词中内部架构与状态机泄露内容，规范五步向导 SOP |
-| REFACTOR-TASK-4-INTEGRATION-VERIFY | 端到端服务重启与全链路集成验证 | Not Started | 待执行：kernel-restart、health 检查、回归测试全集 |
+| REFACTOR-TASK-3-SKILL-HYGIENE | 彻底重构 create-assistant/SKILL.md 提示词与消除内部架构泄露 | Completed | create-assistant/SKILL.md 提示词重构，删除 web-assistant/profile/系统管理员等泄露词汇，建立无工具自然友好提示防线与五步向导 SOP；search_skill 描述剔除诱导短语；单测 test_create_assistant_skill_hygiene.py 2/2 passed |
+| REFACTOR-TASK-4-INTEGRATION-VERIFY | 端到端服务重启与全链路集成验证 | In Progress | 正在重启内核服务，执行全链路健康检查与回归测试 |

@@ -54,7 +54,7 @@ _SANDBOX_FALLBACK = "无匹配 skill。建议用 execute_code 直接编码实现
 class SkillSearchTool(Tool):
     name = SEARCH_SKILL_TOOL
     description = (
-        "检索操作技能库（不会做的任务先搜这里）。"
+        "按关键词检索操作技能库（Skill）。"
         "优先查 LobeHub Market（需 market 鉴权：market-cli 凭证或 "
         "LCA_SKILL_MARKET_TOKEN / M2M client），否则搜本机已安装 skill。"
         "找到后用 import_skill 安装，再 activate_skill 加载指南。"
