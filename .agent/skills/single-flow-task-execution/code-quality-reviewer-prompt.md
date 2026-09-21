@@ -18,3 +18,4 @@ task_boundary:
 ```
 
 **Code reviewer returns:** Strengths, Issues (Critical/Important/Minor), Assessment
+**Mandatory Guard:** Any modification to files declared in `Does NOT own` must be flagged as Critical (AP-01).

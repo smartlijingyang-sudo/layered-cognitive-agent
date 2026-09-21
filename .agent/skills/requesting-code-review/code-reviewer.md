@@ -54,6 +54,12 @@ git diff {BASE_SHA}..{HEAD_SHA}
 - No scope creep?
 - Breaking changes documented?
 
+**Boundary & Anti-pattern Guard (Grokbot Field Notes):**
+- Negative Boundary: Did git diff touch ANY file or layer in the task's `Does NOT own`? (If yes, mark as Critical - Must Fix, AP-01)
+- Single Source of Truth: Did code compute any derived values that should belong to an existing SSOT? (AP-03)
+- Invariants Tested: Are all business/architectural invariants verified by concrete test assertions rather than prompt promises? (AP-02)
+- Anti-pattern Check: Does the implementation violate any patterns in `docs/antipatterns/lca-antipatterns.md`?
+
 **Production Readiness:**
 - Migration strategy (if schema changes)?
 - Backward compatibility considered?
