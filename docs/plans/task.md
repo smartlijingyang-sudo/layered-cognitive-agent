@@ -24,3 +24,18 @@
 | REFACTOR-TASK-2-RESUME-BINDING | 网关 _dispatch_resume 支持精准 run_id 寻址与前端补丁对齐 | Completed | CreateRunRequest 增加 run_id 字段，decode_create_run 解析 run_id，_dispatch_resume 优先使用显式 run_id 寻址消除 409 竞态，execute.ts 与 executeGatewayRun.ts 携带 run_id，patch_lobehub.py 23/23 生效，test_resume_run_id_binding.py 3/3 passed |
 | REFACTOR-TASK-3-SKILL-HYGIENE | 彻底重构 create-assistant/SKILL.md 提示词与消除内部架构泄露 | Completed | create-assistant/SKILL.md 提示词重构，删除 web-assistant/profile/系统管理员等泄露词汇，建立无工具自然友好提示防线与五步向导 SOP；search_skill 描述剔除诱导短语；单测 test_create_assistant_skill_hygiene.py 2/2 passed |
 | REFACTOR-TASK-4-INTEGRATION-VERIFY | 端到端服务重启与全链路集成验证 | Completed | 1. 服务重启：kernel-restart 重启至 web-assistant profile（pid=1805823，13 plans ok，2736 fibers ok，health 探针 ok，加载 310 个助理）；2. 单测回归：13/13 全数通过；3. 真实多轮活体验证（run_3e591218c03f）：0 次误调 search_skill，0 处架构/状态机泄露，4 轮问答（部门→角色→名字→职责）经精准 run_id 寻址顺畅恢复（0 次 409 冲突），成功调用 create_assistant 物化落盘 asst_44dd568b3bf9（架构小助，22 项技能，SOUL 8KB），Postgres 权威投影 agt_erElPnOEkHdF 闭环 |
+| ASST-CAPABILITY-VERIFY | 架构小助专属自治域能力实测：自我感知、创建Skill、记忆持久化与跨轮召回 | Completed | 1. 自我感知与MD/技能感知（run_f69b7e39c90d）：准确自述身份职责、SOUL.md六大职责与三原则、识破USER.md空白、准确枚举20项已挂载技能与工具链；2. 创建Skill（run_835bc0e18f63）：成功调用专属工具create_assistant_skill，物化落盘arch-doc-standards（manifest.json content_hash=78fc2f...，SKILL.md 146行高质量ADR规范）；3. 记忆持久化与召回（run_8742e94dd32b & run_570f261afec4）：主动调memory_add及reflect.memory.extract自动沉淀7条事实至semantic.json，优化MemorySearchTool多词分词评分（3/3单测全通），次轮对话零幻觉100%精确召回李超/系统总架构师/Rust+Python/架构三原则全景信息 |
+| INSTALL-TYPESAFE-SKILL | 安装并验证 TypeSafe Skill 与 Python SDK 环境 | Completed | 通过 `npx -y skills add typesafe-ai/skills --skill typesafe-ai` 成功安装到 `.agents/skills/typesafe-ai` 并同步至 `.agent/skills/typesafe-ai`；生成 `skills-lock.json`；安全写入 `TYPESAFE_API_KEY` 至 `.env`；安装 `typesafe-sdk`；通过 live System One Noul 测试调用（返回 0.95），验证通过 |
+| PUSH-TASK-1 | 【技能闭环】激活新创建的 arch-doc-standards 技能并实际编写落盘 ADR | Completed | 成功调用 activate_skill 激活 arch-doc-standards，严格遵循 SKILL.md 中的 ADR 规范与模板，在私有自治域 workspace/docs/adr/ 成功落盘《ADR-0301: 架构小助专属记忆与技能自演化机制》（142行/9.5KB，含双层架构图、四方案权衡表、已知风险缓解与三原则对齐） |
+| PUSH-TASK-2 | 【记忆演化】记忆冲突更新（Rust+Go废除Python）与敏感删除风控（删除三原则） | In Progress | 待发起偏好变更、敏感删除确认与次轮零污染召回测试 |
+
+| PUSH-TASK-3 | 【自我修正】长期记忆反思回填 USER.md 与自主演化 SOUL.md 核心使命 | Pending | 待测试画像回填与 update_assistant_soul 契约更新落盘 |
+| PUSH-TASK-4 | 【跨机协作】结合本地 Companion 执行机器探查（LocalExecPort 边界实测） | Pending | 待测试通过本地 companion 读取 git log 与系统状态回执闭环 |
+| BRAINSTORM-JEV-CONTEXT | 探索项目上下文与 TypeSafe/Jev 能力契合点 | Completed | 已梳理 LCA 认知五相（Think/Gate/Reflect/Route）痛点与 Jev 原语（Noul/Choice/Score）对应切入点 |
+| BRAINSTORM-JEV-QUESTIONS | 澄清业务偏好与核心痛点约束（单步提问） | In Progress | 正在与用户沟通首要痛点与接入目标场景 |
+| BRAINSTORM-JEV-APPROACHES | 提出 2-3 种具体整合架构方案与权衡 | Pending | 待用户回答澄清问题后输出方案对比与推荐 |
+| BRAINSTORM-JEV-DESIGN-SECTIONS | 逐步呈现设计细节并获取用户审批 | Pending | 待方案选型确认后推进 |
+| BRAINSTORM-JEV-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Pending | 待设计审批通过后落地 |
+| BRAINSTORM-JEV-TRANSITION | 转换至实施计划制定（writing-plans） | Pending | 终态推进 |
+
+
