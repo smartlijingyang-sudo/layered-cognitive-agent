@@ -14,6 +14,7 @@ export interface LcaStartRunBody {
   // When present the backend assembles the run's persona from the
   // assistant Home (ADR-0242 D3) instead of the default empty profile.
   assistant_id?: string;
+  run_id?: string;
   // ``imageList`` / ``fileList`` / ``files`` mirror the LobeHub
   // ``UIChatMessage`` shape so the LCA ingress can hydrate attachments
   // before they reach the prompt assembler (ADR-0099-compatible schema).
@@ -31,11 +32,13 @@ export interface LcaStartRunBody {
     parentMessageId: string;
     rejectionReason?: string;
     toolCallId: string;
+    run_id?: string;
   };
   resume_tool_result?: {
     content: string;
     parentMessageId: string;
     toolCallId: string;
+    run_id?: string;
     pluginState?: Record<string, unknown>;
   };
 }
@@ -71,6 +74,7 @@ export async function lcaStartRun(
     body: JSON.stringify({
       agent: body.agent,
       messages: body.messages,
+      ...(body.run_id ? { run_id: body.run_id } : {}),
       ...(body.assistant_id ? { assistant_id: body.assistant_id } : {}),
       ...(body.parent_message_id ? { parent_message_id: body.parent_message_id } : {}),
       ...(body.topic_id ? { topic_id: body.topic_id } : {}),

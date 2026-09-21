@@ -385,11 +385,12 @@ export async function lcaResumeGatewayRun(
   // Resume through the native-aligned path: POST /lca-api/runs with
   // resume_tool_result returns the SAME run_id (backend _dispatch_resume).
   await lcaStartRun({
+    run_id: runId,
     agent: { id: 'solo', name: 'solo' },
     messages: [],
     parent_message_id: parentMessageId,
     topic_id: topicId || undefined,
-    resume_tool_result: { content, parentMessageId, toolCallId },
+    resume_tool_result: { content, parentMessageId, toolCallId, run_id: runId },
   });
 
   // The resume receipt does not carry a fresh ws_token; mint one for this run.

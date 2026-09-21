@@ -21,6 +21,6 @@
 | DEBUG-RUN-ANALYSIS | 深入调试最后一次 run：分析 search_skill 触发根因、五状态向导泄露给用户原因及终止未继续的原因 | Completed | 根因追溯闭环：1. search_skill 出现根因：内核运行于 web-standard profile，缺 assistant-runtime bundle 导致无 create_assistant 内置工具，prompt 注入 20 项通用工具与 available_skills，诱导模型退化调用 search_skill/activate_skill；2. 向导泄露原因：activate_skill 注入 create-assistant/SKILL.md，模型执行前置检查发现缺失 create_assistant，按指南“告知用户”时将内部五状态 SOP 当解释性文本全盘输出；3. 终止未继续根因：纯文本回复触发 LCA 认知循环 terminal.commit 正常收敛，且前期 askUserQuestion 答案因前端触发新 Run 覆盖 topic 最新指针，导致 resume 请求命中运行中新 Run 引发 409 Conflict 答案丢弃 |
 | REFACTOR-CLEANUP-BRAINSTORM | 第一性原理架构重构头脑风暴：明确范围、提炼方案、消除垃圾逻辑与建立业界范式 | Completed | 架构设计文档与落地实施计划均已就绪并获得用户确认 |
 | REFACTOR-TASK-1-PROFILE | 软化 Composio 阻断依赖 & 平台默认 Profile 合流为 web-assistant | Completed | Composio required:false，supervisor/cli/config/profile 默认 profile 收敛至 profiles/web-assistant.yaml，13 plans validated ok，单测 test_supervisor_profile_default.py 3/3 passed |
-| REFACTOR-TASK-2-RESUME-BINDING | 网关 _dispatch_resume 支持精准 run_id 寻址与前端补丁对齐 | In Progress | 正在编写 run_id 绑定单测并改造 command_endpoints 与前端补丁 |
-| REFACTOR-TASK-3-SKILL-HYGIENE | 彻底重构 create-assistant/SKILL.md 提示词与消除内部架构泄露 | Not Started | 待执行：删除运维引导垃圾提示、规范五步向导 SOP、调优 search_skill 工具描述 |
+| REFACTOR-TASK-2-RESUME-BINDING | 网关 _dispatch_resume 支持精准 run_id 寻址与前端补丁对齐 | Completed | CreateRunRequest 增加 run_id 字段，decode_create_run 解析 run_id，_dispatch_resume 优先使用显式 run_id 寻址消除 409 竞态，execute.ts 与 executeGatewayRun.ts 携带 run_id，patch_lobehub.py 23/23 生效，test_resume_run_id_binding.py 3/3 passed |
+| REFACTOR-TASK-3-SKILL-HYGIENE | 彻底重构 create-assistant/SKILL.md 提示词与消除内部架构泄露 | In Progress | 正在清理 create-assistant 提示词中内部架构与状态机泄露内容，规范五步向导 SOP |
 | REFACTOR-TASK-4-INTEGRATION-VERIFY | 端到端服务重启与全链路集成验证 | Not Started | 待执行：kernel-restart、health 检查、回归测试全集 |

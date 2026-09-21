@@ -96,6 +96,8 @@ class CreateRunRequest:
     ctx: object
     assistant_id: str = ""
     """ADR-0187 §3 D7 一次性 run 绑定（``asst_*``）；空 = 遗留默认 agent。"""
+    run_id: str = ""
+    """精准指定要恢复的 run_id，避免并发/多轮时 topic 最新指针漂移导致的 409 Conflict。"""
     resume_approval: dict[str, Any] | None = None
     """Gap C: front-end ``LcaStartRunBody.resume_approval`` (deploy patch).
     Non-``None`` ⇒ POST is an approval-resume of a paused run; ``create_run``
@@ -151,8 +153,11 @@ async def decode_create_run(
     if resume_approval is None and resume_tool_result is None and not run_input.user_text.strip():
         return _err("messages must include a non-empty user message", status_code=400)
 
+    run_id_raw = body.get("run_id")
+    run_id = str(run_id_raw).strip() if run_id_raw is not None else ""
+
     return CreateRunRequest(
-        profile=str(body.get("profile") or "web-standard"),
+        profile=str(body.get("profile") or "web-assistant"),
         question=run_input.question,
         user_text=run_input.user_text,
         mode=resolved_mode,
@@ -166,6 +171,7 @@ async def decode_create_run(
         options=dict(body.get("options") or {}),
         ctx=ctx,
         assistant_id=assistant_id,
+        run_id=run_id,
         resume_approval=resume_approval,
         resume_tool_result=resume_tool_result,
     )
@@ -425,32 +431,38 @@ async def _dispatch_resume(
 ) -> JSONResponse:
     """Route a resume body to :meth:`RunPort.resume_approval`.
 
-    Looks up the existing run via ``running_operation_store`` keyed by
-    ``topic_id``; the front-end LCA flow publishes the running operation
-    row on ``POST /runs`` create and reuses it on resume.
+    Prefers explicit ``run_id`` from the request / payload; falls back to
+    looking up the existing run via ``running_operation_store`` keyed by
+    ``topic_id`` when ``run_id`` is not supplied.
     """
-    topic_id = topic_id_from_body(body)
-    if not topic_id:
-        return _err(
-            "resume requires topic_id to locate the existing run",
-            status_code=400,
-            code="missing_topic_id",
-        )
-    store = getattr(request.app.state, "running_operation_store", None)
-    if store is None:
-        return _err("running operation store not available", status_code=503)
-    row = await store.get_latest_for_topic(topic_id)
-    if row is None:
-        return _err(
-            f"no running operation for topic {topic_id!r}",
-            status_code=404,
-            code="run_not_found",
-        )
-    run_id = str(row.get("run_id") or "")
-    if not run_id:
-        return _err("running operation row missing run_id", status_code=500)
-
     payload_dict = decoded.resume_tool_result or decoded.resume_approval or {}
+    run_id = (
+        decoded.run_id or str(payload_dict.get("run_id") or "") or str(body.get("run_id") or "")
+    ).strip()
+
+    store = getattr(request.app.state, "running_operation_store", None)
+
+    if not run_id:
+        topic_id = topic_id_from_body(body)
+        if not topic_id:
+            return _err(
+                "resume requires run_id or topic_id to locate the existing run",
+                status_code=400,
+                code="missing_topic_id",
+            )
+        if store is None:
+            return _err("running operation store not available", status_code=503)
+        row = await store.get_latest_for_topic(topic_id)
+        if row is None:
+            return _err(
+                f"no running operation for topic {topic_id!r}",
+                status_code=404,
+                code="run_not_found",
+            )
+        run_id = str(row.get("run_id") or "").strip()
+        if not run_id:
+            return _err("running operation row missing run_id", status_code=500)
+
     approval_id = str(payload_dict.get("tool_call_id") or payload_dict.get("approval_id") or "")
     if not approval_id:
         return _err(
@@ -476,7 +488,7 @@ async def _dispatch_resume(
             receipt.error or "approval resume rejected",
             status_code=receipt.error_status,
         )
-    if idempotency_key and hasattr(store, "record_answer_key"):
+    if idempotency_key and store is not None and hasattr(store, "record_answer_key"):
         await store.record_answer_key(run_id, idempotency_key)
     return JSONResponse(
         {"run_id": run_id, "status": receipt.status or "resumed"},
