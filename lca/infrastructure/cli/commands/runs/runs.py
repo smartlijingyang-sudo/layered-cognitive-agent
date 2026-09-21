@@ -135,9 +135,9 @@ def _create(
         help="Agent id (default: LobeHub's default solo 助手).",
     ),
     profile: str = typer.Option(
-        "web-standard",
+        "web-assistant",
         "--profile",
-        help="Profile name passed to ``POST /runs`` (default: web-standard).",
+        help="Profile name passed to ``POST /runs`` (default: web-assistant).",
     ),
     base_url: str = typer.Option(
         "http://10.36.6.252:8765",
