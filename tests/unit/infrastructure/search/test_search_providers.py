@@ -1,15 +1,15 @@
 """Unit tests for refactored multi-provider Search Service."""
 
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from lca.infrastructure.search.constants.constants import (
     PROVIDER_EXA,
     PROVIDER_SEARXNG,
-    PROVIDER_TAVILY,
 )
 from lca.infrastructure.search.models.models import SearchHit, SearchResponse
-from lca.infrastructure.search.service.service import web_search, any_search_provider_available
+from lca.infrastructure.search.service.service import any_search_provider_available, web_search
 
 
 @pytest.mark.asyncio
@@ -18,11 +18,11 @@ async def test_search_service_fallback_chain():
     # 1. Exa fails -> fallback to SearXNG
     with (
         patch(
-            "lca.infrastructure.search.service.service.search_exa",
+            "lca.infrastructure.search.providers.exa.search_exa",
             new_callable=AsyncMock,
         ) as mock_exa,
         patch(
-            "lca.infrastructure.search.service.service.search_searxng",
+            "lca.infrastructure.search.providers.searxng.search_searxng",
             new_callable=AsyncMock,
         ) as mock_searx,
         patch(
@@ -30,11 +30,11 @@ async def test_search_service_fallback_chain():
             return_value=(PROVIDER_EXA, PROVIDER_SEARXNG),
         ),
         patch(
-            "lca.infrastructure.search.service.service.exa_api_key_configured",
+            "lca.infrastructure.search.providers.exa.exa_api_key_configured",
             return_value=True,
         ),
         patch(
-            "lca.infrastructure.search.service.service.searxng_available",
+            "lca.infrastructure.search.providers.searxng.searxng_available",
             return_value=True,
         ),
     ):
@@ -58,15 +58,19 @@ async def test_search_service_fallback_chain():
 
 
 def test_any_search_provider_available():
-    with patch(
-        "lca.infrastructure.search.service.service.configured_provider_ids",
-        return_value=(PROVIDER_EXA, PROVIDER_SEARXNG),
-    ), patch(
-        "lca.infrastructure.search.service.service.exa_api_key_configured",
-        return_value=False,
-    ), patch(
-        "lca.infrastructure.search.service.service.searxng_available",
-        return_value=True,
+    with (
+        patch(
+            "lca.infrastructure.search.service.service.configured_provider_ids",
+            return_value=(PROVIDER_EXA, PROVIDER_SEARXNG),
+        ),
+        patch(
+            "lca.infrastructure.search.providers.exa.exa_api_key_configured",
+            return_value=False,
+        ),
+        patch(
+            "lca.infrastructure.search.providers.searxng.searxng_available",
+            return_value=True,
+        ),
     ):
         assert any_search_provider_available() is True
 
@@ -74,6 +78,7 @@ def test_any_search_provider_available():
 @pytest.mark.asyncio
 async def test_search_exa_time_range_filter():
     from unittest.mock import MagicMock
+
     from lca.infrastructure.search.providers.exa import search_exa
 
     mock_resp = MagicMock()
@@ -100,3 +105,36 @@ async def test_search_exa_time_range_filter():
         assert "startPublishedDate" in captured_payload
         assert len(res.results) == 1
         assert res.results[0].title == "Fresh Post"
+
+
+def test_search_provider_protocol_and_registry():
+    """Verify built-in providers implement SearchProvider and register properly."""
+    from lca.infrastructure.search.providers.exa import ExaSearchProvider
+    from lca.infrastructure.search.providers.protocol import SearchProvider
+    from lca.infrastructure.search.providers.registry import (
+        SearchProviderRegistry,
+        get_search_provider,
+    )
+    from lca.infrastructure.search.providers.searxng import SearXNGSearchProvider
+    from lca.infrastructure.search.providers.tavily import TavilySearchProvider
+
+    exa = ExaSearchProvider()
+    searx = SearXNGSearchProvider()
+    tavily = TavilySearchProvider()
+
+    assert isinstance(exa, SearchProvider)
+    assert isinstance(searx, SearchProvider)
+    assert isinstance(tavily, SearchProvider)
+
+    # Test default registry lookup
+    assert get_search_provider("exa") is not None
+    assert get_search_provider("searxng") is not None
+    assert get_search_provider("tavily") is not None
+    assert get_search_provider("non_existent") is None
+
+    # Custom registry isolated test
+    custom_reg = SearchProviderRegistry()
+    assert custom_reg.all_providers() == ()
+    custom_reg.register(exa)
+    assert custom_reg.get("exa") is exa
+    assert len(custom_reg.all_providers()) == 1

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from datetime import UTC, datetime
 from typing import Any
 
 from lca.infrastructure.llm_adapter.settings.settings import get_llm_settings
@@ -25,8 +26,15 @@ def is_search_intent(text: str) -> bool:
         return False
     if any(pattern in lowered for pattern in SEARCH_INTENT_PATTERNS):
         return True
-    if _YEAR_RE.search(lowered) and any(verb in lowered for verb in FRESHNESS_VERBS):
-        return True
+    if any(verb in lowered for verb in FRESHNESS_VERBS):
+        current_year = datetime.now(UTC).year
+        for match in _YEAR_RE.finditer(lowered):
+            try:
+                year = int(match.group(1))
+                if 2024 <= year <= current_year + 5:
+                    return True
+            except (ValueError, IndexError):
+                continue
     return False
 
 
@@ -75,6 +83,7 @@ def search_routing_hint(
         if search_available is not None
         else (tavily_available if tavily_available is not None else any_search_provider_available())
     )
+    current_year = datetime.now(UTC).year
     if ready:
         return (
             "- **时效性与检索第一原则 (Freshness-First)**:\n"
@@ -82,7 +91,7 @@ def search_routing_hint(
             "  - 当任务涉及实时事件、最新动态、近期数据，或信息可能在模型知识截止期后发生演变时"
             "（如开源类库版本更新、API 变更、Changelog、CVE 漏洞、官方文档更新），"
             "**必须优先调用 search (web_search)**，严禁依赖参数化记忆猜测或生成未经检索核实的内容。\n"
-            "  - **高质量检索构造**: 结合 CURRENT_DATE 主动添加时间限定（如年份 2026、月份），"
+            f"  - **高质量检索构造**: 结合 CURRENT_DATE 主动添加时间限定（如年份 {current_year}、月份），"
             "若搜索强时效/今日新闻，建议传递可选参数 time_range='day' 或 'week'。\n"
             "  - 勿对实时搜索使用 search_skill / import_skill（尤其 Tavily CLI skill）；勿沙箱 curl 安装脚本。\n"
             "  - web_search 失败或无返回时 **respond** 纯文本说明情况，系统将自动启用 LLM 联网搜索兜底。"
@@ -91,5 +100,5 @@ def search_routing_hint(
         "- **时效性与检索提示 (Freshness Hint)**:\n"
         "  - 当前外部搜索 Provider 未配置，涉及实时/最新信息时请直接 **respond**（系统将启用 LLM 联网搜索兜底）。\n"
         "  - 勿 search_skill 安装 Tavily CLI；勿沙箱 curl tvly。\n"
-        "  - 配置 EXA_API_KEY / SEARXNG_URL / TAVILY_API_KEY 后将自动启用原生 **web_search** 高速检索。"
+        "  - 配置外部搜索环境（如 Exa / SearXNG / Tavily）后将自动启用原生 **web_search** 高速检索。"
     )

@@ -5,26 +5,19 @@ from __future__ import annotations
 import html
 from typing import Any
 
-from lca.infrastructure.search.constants.constants import (
-    PROVIDER_EXA,
-    PROVIDER_SEARXNG,
-    PROVIDER_TAVILY,
-)
 from lca.infrastructure.search.models.models import SearchHit, SearchResponse
-from lca.infrastructure.search.providers.exa import exa_api_key_configured, search_exa
-from lca.infrastructure.search.providers.searxng import search_searxng, searxng_available
-from lca.infrastructure.search.providers.tavily import search_tavily, tavily_api_key_configured
+from lca.infrastructure.search.providers import (
+    get_search_provider,
+)
 from lca.infrastructure.search.scope.scope import mark_web_search_attempt
 from lca.infrastructure.search.settings.settings import configured_provider_ids
 
 
 def any_search_provider_available() -> bool:
-    for provider in configured_provider_ids():
-        if provider == PROVIDER_EXA and exa_api_key_configured():
-            return True
-        if provider == PROVIDER_SEARXNG and searxng_available():
-            return True
-        if provider == PROVIDER_TAVILY and tavily_api_key_configured():
+    """Check whether at least one configured search provider is available."""
+    for provider_id in configured_provider_ids():
+        provider = get_search_provider(provider_id)
+        if provider is not None and provider.is_available():
             return True
     return False
 
@@ -41,41 +34,21 @@ async def web_search(
         return SearchResponse(query="", provider="", error="empty query")
 
     last_error = "no search providers configured"
-    for provider in configured_provider_ids():
-        if provider == PROVIDER_EXA:
-            if not exa_api_key_configured():
-                last_error = "EXA_API_KEY not configured"
-                continue
-            result = await search_exa(text, topic=topic, time_range=time_range)
-            mark_web_search_attempt(provider=provider, ok=result.ok, error=result.error)
-            if result.ok:
-                return result
-            last_error = result.error or "exa search failed"
+    for provider_id in configured_provider_ids():
+        provider = get_search_provider(provider_id)
+        if provider is None:
+            last_error = f"unknown search provider: {provider_id}"
             continue
 
-        if provider == PROVIDER_SEARXNG:
-            if not searxng_available():
-                last_error = "SEARXNG_URL not configured"
-                continue
-            result = await search_searxng(text, topic=topic, time_range=time_range)
-            mark_web_search_attempt(provider=provider, ok=result.ok, error=result.error)
-            if result.ok:
-                return result
-            last_error = result.error or "searxng search failed"
+        if not provider.is_available():
+            last_error = f"{provider_id} not configured or unavailable"
             continue
 
-        if provider == PROVIDER_TAVILY:
-            if not tavily_api_key_configured():
-                last_error = "TAVILY_API_KEY not configured"
-                continue
-            result = await search_tavily(text, topic=topic, time_range=time_range)
-            mark_web_search_attempt(provider=provider, ok=result.ok, error=result.error)
-            if result.ok:
-                return result
-            last_error = result.error or "tavily search failed"
-            continue
-
-        last_error = f"unknown search provider: {provider}"
+        result = await provider.search(text, topic=topic, time_range=time_range)
+        mark_web_search_attempt(provider=provider_id, ok=result.ok, error=result.error)
+        if result.ok:
+            return result
+        last_error = result.error or f"{provider_id} search failed"
 
     mark_web_search_attempt(provider="none", ok=False, error=last_error)
     return SearchResponse(query=text, provider="", error=last_error)

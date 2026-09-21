@@ -2,14 +2,14 @@
 and can successfully invoke them.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from lca.application.api.api import Agent
 from lca.application.api.spawn import _format_tools_xml
 from lca.infrastructure.mcp.tool_set import (
     build_ambient_mcp_tools,
-    build_ambient_mcp_tools_async,
     reset_ambient_mcp_manager,
 )
 
@@ -119,7 +119,7 @@ async def test_agent_run_loop_invokes_mcp_tool():
         reset_capability_bindings,
         set_capability_bindings,
     )
-    from tests.harness.scripted_llm import ScriptedLLMAdapter, use_tool, respond
+    from tests.harness.scripted_llm import ScriptedLLMAdapter, respond, use_tool
 
     token = set_capability_bindings(BindingsViewBuilder())
     try:
@@ -133,6 +133,9 @@ async def test_agent_run_loop_invokes_mcp_tool():
             default_respond=True,
         )
 
+        from lca.application.api.api import ensure_default_ctx
+
+        scope = await ensure_default_ctx()
         agent = Agent(
             role="SearchResearcher",
             goal="Find info on python async using SearXNG",
@@ -140,6 +143,7 @@ async def test_agent_run_loop_invokes_mcp_tool():
             auto_mcp=True,
             llm=llm,
             max_steps=5,
+            scope=scope,
         )
 
         result = await agent.run("Please search for python async")

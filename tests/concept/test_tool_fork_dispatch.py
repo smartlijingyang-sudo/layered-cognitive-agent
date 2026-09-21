@@ -441,3 +441,15 @@ async def test_custom_tools_not_merged_without_assistant_id(tmp_path) -> None:
     forked: _ToolsServiceStub = result.port_values["forked_tools"].items  # type: ignore[assignment]
     names = {t.name for t in forked}
     assert names == {"runCommand"}
+
+
+def test_tool_fork_dispatch_no_application_layer_imports() -> None:
+    """Invariant (C13, Layering): cognition/runtime nodes must not import application layer."""
+    import inspect
+
+    from lca.nodes.concept.tool_fork import dispatch
+
+    src = inspect.getsource(dispatch)
+    assert "lca.application" not in src, (
+        "tool_fork.dispatch must not import from lca.application (reverse dependency)"
+    )

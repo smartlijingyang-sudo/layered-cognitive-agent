@@ -65,8 +65,8 @@ SEARCH_INTENT_PATTERNS: tuple[str, ...] = (
     "current status",
 )
 
-# Regex for matching post-cutoff / current / near-future years (e.g. 2024..2039)
-TEMPORAL_YEAR_REGEX = r"\b(202[4-9]|203[0-9])\b"
+# Regex for matching 4-digit years (e.g. 2024, 2026, 2030)
+TEMPORAL_YEAR_REGEX = r"\b(20\d{2})\b"
 FRESHNESS_VERBS: tuple[str, ...] = (
     "version",
     "release",

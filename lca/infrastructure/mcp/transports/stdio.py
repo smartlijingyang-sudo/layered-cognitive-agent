@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import re
+import time
 from typing import Any
 
 import structlog
@@ -66,12 +68,7 @@ class StdioMCPTransport(MCPTransportPort):
             curr_loop = None
 
         if self._proc is not None and curr_loop is not None and self._loop is not curr_loop:
-            try:
-                if self._proc.returncode is None:
-                    self._proc.terminate()
-            except Exception:
-                pass
-            self._proc = None
+            self.close_sync()
 
         if self.is_connected:
             return
@@ -108,7 +105,8 @@ class StdioMCPTransport(MCPTransportPort):
     async def send_message(self, message: dict[str, Any]) -> None:
         if not self.is_connected or self._proc is None or self._proc.stdin is None:
             await self.connect()
-        assert self._proc is not None and self._proc.stdin is not None
+        if self._proc is None or self._proc.stdin is None:
+            raise RuntimeError(f"MCP server '{self._config.name}' stdin is not available")
 
         if self._lock is None:
             self._lock = asyncio.Lock()
@@ -123,7 +121,8 @@ class StdioMCPTransport(MCPTransportPort):
             raise RuntimeError(f"MCP server '{self._config.name}' stdio is not connected")
 
         async def _read_line() -> str:
-            assert self._proc is not None and self._proc.stdout is not None
+            if self._proc is None or self._proc.stdout is None:
+                raise RuntimeError(f"MCP server '{self._config.name}' stdout is not available")
             while True:
                 line_bytes = await self._proc.stdout.readline()
                 if not line_bytes:
@@ -144,24 +143,74 @@ class StdioMCPTransport(MCPTransportPort):
             else:
                 line = await _read_line()
             return json.loads(line)  # type: ignore[no-any-return]
-        except asyncio.TimeoutError as exc:
+        except TimeoutError as exc:
             raise TimeoutError(f"MCP server '{self._config.name}' timed out waiting for response") from exc
         except json.JSONDecodeError as exc:
             raise ValueError(f"Invalid JSON from MCP server '{self._config.name}': {exc}") from exc
 
     async def close(self) -> None:
         if self._proc is not None:
-            try:
-                if self._proc.returncode is None:
-                    self._proc.terminate()
+            proc = self._proc
+            self._proc = None
+            self._lock = None
+            self._loop = None
+            with contextlib.suppress(Exception):
+                if proc.stdin is not None:
+                    with contextlib.suppress(Exception):
+                        proc.stdin.close()
+
+                if proc.returncode is None:
+                    with contextlib.suppress(ProcessLookupError):
+                        proc.terminate()
                     try:
-                        await asyncio.wait_for(self._proc.wait(), timeout=3.0)
-                    except asyncio.TimeoutError:
-                        self._proc.kill()
-                        await self._proc.wait()
-            except ProcessLookupError:
-                pass
-            finally:
-                self._proc = None
-                self._lock = None
-                self._loop = None
+                        await asyncio.wait_for(proc.wait(), timeout=1.5)
+                    except (TimeoutError, Exception):
+                        with contextlib.suppress(ProcessLookupError):
+                            proc.kill()
+                        with contextlib.suppress(Exception):
+                            await asyncio.wait_for(proc.wait(), timeout=1.5)
+
+                transport = getattr(proc, "_transport", None)
+                if transport is not None:
+                    transport._closed = True
+                    for pipe_name in ("_stdin", "_stdout", "_stderr"):
+                        pipe_proto = getattr(transport, pipe_name, None)
+                        if pipe_proto is not None and hasattr(pipe_proto, "pipe") and pipe_proto.pipe is not None:
+                            with contextlib.suppress(Exception):
+                                pipe_proto.pipe.close()
+                    with contextlib.suppress(Exception):
+                        transport.close()
+            with contextlib.suppress(Exception):
+                await asyncio.sleep(0)
+
+    def close_sync(self) -> None:
+        """Synchronously terminate child process and release pipes without active loop."""
+        if self._proc is not None:
+            proc = self._proc
+            self._proc = None
+            self._lock = None
+            self._loop = None
+            with contextlib.suppress(Exception):
+                if proc.stdin is not None:
+                    with contextlib.suppress(Exception):
+                        proc.stdin.close()
+                if proc.returncode is None:
+                    with contextlib.suppress(ProcessLookupError):
+                        proc.terminate()
+                    with contextlib.suppress(Exception):
+                        proc.kill()
+                with contextlib.suppress(Exception):
+                    if proc.pid is not None:
+                        for _ in range(10):
+                            pid_res, _ = os.waitpid(proc.pid, os.WNOHANG)
+                            if pid_res != 0:
+                                break
+                            time.sleep(0.01)
+                transport = getattr(proc, "_transport", None)
+                if transport is not None:
+                    transport._closed = True
+                    for pipe_name in ("_stdin", "_stdout", "_stderr"):
+                        pipe_proto = getattr(transport, pipe_name, None)
+                        if pipe_proto is not None and hasattr(pipe_proto, "pipe") and pipe_proto.pipe is not None:
+                            with contextlib.suppress(Exception):
+                                pipe_proto.pipe.close()

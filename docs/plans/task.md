@@ -49,6 +49,11 @@
 | GROKBOT-TASK-4 | .agent/skills/writing-plans 任务模板嵌入负边界与断言测试声明 | Completed | Task Structure 模板增加 Does NOT own 负向保护声明（AP-01）与 Invariants to test 测试断言声明（AP-02）；Remember 章节嵌入对应铁律；run-tests.sh 82/82 passed |
 | GROKBOT-TASK-5 | code-reviewer 与 single-flow-task-execution 审查清单增加边界与反模式守卫 | Completed | 在 requesting-code-review/code-reviewer.md 注入 Boundary & Anti-pattern Guard 四项审查（Does NOT own 违例即 Critical、SSOT 派生单写、测试断言闭环、反模式库核验）；在 code-quality-reviewer-prompt.md 声明强制守卫；run-tests.sh 82/82 passed |
 | GROKBOT-TASK-6 | Antigravity profile 自动化测试与全链路闭环验证 | Completed | check-antigravity-profile.sh 与 run-tests.sh 82/82 检查全数通过，git diff --check 干净，Superpower 各阶段自动守卫闭环 |
-
+| REFACTOR-EE0B-TASK-1 | 切除 tool_fork/dispatch.py 反向依赖与异常吞没 | Completed | 移除 holder.ctx 反向 import 与 try-except 吞异常，恢复 fail-loud 契约；BodyComposer 正式注入 phase_capabilities={"tools": tools} 走标准 typed port 投影通道；test_tool_fork_dispatch_no_application_layer_imports 断言通过，16/16 dispatch 测试 + 4/4 agent mcp 测试全绿 |
+| REFACTOR-EE0B-TASK-2 | 实现 SearchProvider Protocol 与 Registry | Completed | 新增 SearchProvider 协议（protocol.py）与 SearchProviderRegistry（registry.py）；Exa/SearXNG/Tavily 分别封装实现该契约并自动注入默认注册表；4/4 单测全部通过 |
+| REFACTOR-EE0B-TASK-3 | 重构 service.py 移除 Provider 硬编码 if 梯子 | Completed | any_search_provider_available 与 web_search 彻底剥离 if-elif 链，改为遍历 configured_provider_ids 经 Registry 动态路由与可用性校验；14/14 scenario 搜索测试与 fallback 验证全绿 |
+| REFACTOR-EE0B-TASK-4 | 动态化时效性年份检测与 Prompt 魔法值清理 | Completed | TEMPORAL_YEAR_REGEX 升级为通用年份匹配，is_search_intent 结合当前 UTC 年份动态核验区间 [2024, current_year + 5] 与 freshness verbs；search_routing_hint 动态插值当前年份并剔除特定环境变量硬编码；15/15 场景测试全通 |
+| REFACTOR-EE0B-TASK-5 | 规范 MCP Manager / Stdio 子进程生命周期与资源释放 | Completed | StdioMCPTransport/Client/Manager 实现 close_sync 与强化 async close，主动关闭 stdin/管道并在 GC 前置 transport._closed=True；build_ambient_mcp_tools 临时循环初始化后即刻安全释放 transport；8/8 MCP 测试全绿且 0 unraisable exception 警告 |
+| REFACTOR-EE0B-TASK-6 | 全量回归测试与架构门禁验证 | Completed | 43/43 单元与场景测试全通（Search / MCP / Scenario / Web / Tool Fork）；ruff check/format 全部通过；git diff --check 退出码 0；负向边界（Does NOT own）与架构不变量 100% 达标 |
 
 

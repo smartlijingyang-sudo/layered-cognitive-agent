@@ -207,9 +207,7 @@ class ToolForkDispatchExecutor:
         bindings = input.port_values.get("bindings")
         if bindings is None:
             bindings = _bindings_from_runtime_plane()
-        if bindings is None:
-            bindings = BindingsView()
-        elif not isinstance(bindings, BindingsView):
+        if not isinstance(bindings, BindingsView):
             raise TypeError(
                 "tool.fork.dispatch: 'bindings' port must be a BindingsView "
                 f"instance, got {type(bindings).__name__}"
@@ -217,17 +215,7 @@ class ToolForkDispatchExecutor:
 
         tools_service = input.port_values.get("tools")
         if tools_service is None:
-            try:
-                from lca.application.api.default_context import holder
-
-                if holder.ctx is not None:
-                    tools_service = holder.ctx.require("tools")
-            except Exception:
-                pass
-        if tools_service is None:
-            from lca.infrastructure.capability.tools.tools import ToolsService
-
-            tools_service = ToolsService()
+            raise RuntimeError("tool.fork.dispatch: 'tools' typed port missing from input ports")
 
         forked = tools_service.fork_for_run(bindings)
         items = tuple(forked.list_tools())

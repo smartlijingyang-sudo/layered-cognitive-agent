@@ -83,3 +83,32 @@ async def search_searxng(
         results=tuple(hits),
         latency_ms=latency_ms,
     )
+
+
+class SearXNGSearchProvider:
+    """SearXNG Local/Self-Hosted Search Provider Adapter."""
+
+    @property
+    def id(self) -> str:
+        return PROVIDER_SEARXNG
+
+    def is_available(self, settings: SearchSettings | None = None) -> bool:
+        import sys
+
+        svc = sys.modules.get("lca.infrastructure.search.service.service")
+        fn = getattr(svc, "searxng_available", searxng_available) if svc else searxng_available
+        return fn(settings=settings)
+
+    async def search(
+        self,
+        query: str,
+        *,
+        topic: str | None = None,
+        time_range: str | None = None,
+        settings: SearchSettings | None = None,
+    ) -> SearchResponse:
+        import sys
+
+        svc = sys.modules.get("lca.infrastructure.search.service.service")
+        fn = getattr(svc, "search_searxng", search_searxng) if svc else search_searxng
+        return await fn(query, topic=topic, time_range=time_range, settings=settings)

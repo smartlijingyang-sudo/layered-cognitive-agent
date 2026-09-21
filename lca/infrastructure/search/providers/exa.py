@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -53,7 +53,7 @@ async def search_exa(
         "contents": {"highlights": True},
     }
     if time_range:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         delta_map = {
             "day": timedelta(days=1),
             "week": timedelta(days=7),
@@ -86,7 +86,11 @@ async def search_exa(
         if not isinstance(item, dict):
             continue
         highlights = item.get("highlights") or []
-        content = "\n".join(str(h) for h in highlights) if isinstance(highlights, list) else str(highlights)
+        content = (
+            "\n".join(str(h) for h in highlights)
+            if isinstance(highlights, list)
+            else str(highlights)
+        )
         hits.append(
             SearchHit(
                 title=str(item.get("title") or ""),
@@ -104,3 +108,36 @@ async def search_exa(
         results=tuple(hits),
         latency_ms=latency_ms,
     )
+
+
+class ExaSearchProvider:
+    """Exa Neural Search Provider Adapter."""
+
+    @property
+    def id(self) -> str:
+        return PROVIDER_EXA
+
+    def is_available(self, settings: SearchSettings | None = None) -> bool:
+        import sys
+
+        svc = sys.modules.get("lca.infrastructure.search.service.service")
+        fn = (
+            getattr(svc, "exa_api_key_configured", exa_api_key_configured)
+            if svc
+            else exa_api_key_configured
+        )
+        return fn(settings=settings)
+
+    async def search(
+        self,
+        query: str,
+        *,
+        topic: str | None = None,
+        time_range: str | None = None,
+        settings: SearchSettings | None = None,
+    ) -> SearchResponse:
+        import sys
+
+        svc = sys.modules.get("lca.infrastructure.search.service.service")
+        fn = getattr(svc, "search_exa", search_exa) if svc else search_exa
+        return await fn(query, topic=topic, time_range=time_range, settings=settings)

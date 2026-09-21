@@ -92,7 +92,7 @@ class BodyComposer:
             hooks=hooks,
             observability=None,
             llm=None,
-            phase_capabilities={},
+            phase_capabilities={"tools": tools},
             metadata={"composer": self.key},
         )
 

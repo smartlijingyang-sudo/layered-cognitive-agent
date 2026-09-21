@@ -97,3 +97,36 @@ async def search_tavily(
         answer=answer,
         latency_ms=latency_ms,
     )
+
+
+class TavilySearchProvider:
+    """Tavily Search Provider Adapter."""
+
+    @property
+    def id(self) -> str:
+        return PROVIDER_TAVILY
+
+    def is_available(self, settings: SearchSettings | None = None) -> bool:
+        import sys
+
+        svc = sys.modules.get("lca.infrastructure.search.service.service")
+        fn = (
+            getattr(svc, "tavily_api_key_configured", tavily_api_key_configured)
+            if svc
+            else tavily_api_key_configured
+        )
+        return fn(settings=settings)
+
+    async def search(
+        self,
+        query: str,
+        *,
+        topic: str | None = None,
+        time_range: str | None = None,
+        settings: SearchSettings | None = None,
+    ) -> SearchResponse:
+        import sys
+
+        svc = sys.modules.get("lca.infrastructure.search.service.service")
+        fn = getattr(svc, "search_tavily", search_tavily) if svc else search_tavily
+        return await fn(query, topic=topic, time_range=time_range, settings=settings)

@@ -208,7 +208,7 @@ class MCPClient(MCPClientPort):
             _log.error("mcp_call_tool_failed", server=self.server_name, tool=tool_name, error=str(e))
             return MCPToolResult(
                 is_error=True,
-                content=[MCPToolContentChunk(type="text", text=f"Call failed: {str(e)}")],
+                content=[MCPToolContentChunk(type="text", text=f"Call failed: {e!s}")],
                 latency_ms=latency_ms,
             )
 
@@ -217,3 +217,10 @@ class MCPClient(MCPClientPort):
             await self._transport.close()
             self._status = MCPServerStatus.DISCONNECTED
             self._tools.clear()
+
+    def close_sync(self) -> None:
+        """Synchronously disconnect transport without active loop."""
+        if hasattr(self._transport, "close_sync"):
+            self._transport.close_sync()
+        self._status = MCPServerStatus.DISCONNECTED
+        self._tools.clear()

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 
 from lca.infrastructure.mcp.config import find_mcp_config_path, load_mcp_servers
 from lca.infrastructure.mcp.manager import MCPManager

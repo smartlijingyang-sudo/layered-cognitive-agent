@@ -6,4 +6,4 @@ from lca.infrastructure.search.settings.settings import (
     get_search_settings,
 )
 
-__all__ = ['SearchSettings', 'get_search_settings', 'configured_provider_ids']
+__all__ = ['SearchSettings', 'configured_provider_ids', 'get_search_settings']

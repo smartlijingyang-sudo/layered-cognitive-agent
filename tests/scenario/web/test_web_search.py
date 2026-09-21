@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import unittest
+from datetime import UTC
 from unittest.mock import AsyncMock, patch
 
 from lca.infrastructure.search.models.models import SearchHit, SearchResponse
@@ -27,11 +28,27 @@ class TestSearchIntent(unittest.TestCase):
         self.assertFalse(is_search_intent("实现一个二叉树前序遍历算法"))
 
     def test_search_routing_hint_freshness(self) -> None:
+        from datetime import datetime
+
         from lca.infrastructure.search.router.router import search_routing_hint
 
         hint = search_routing_hint(tavily_available=True)
         self.assertIn("Freshness-First", hint)
         self.assertIn("CURRENT_DATE", hint)
+        current_year = str(datetime.now(UTC).year)
+        self.assertIn(current_year, hint)
+
+    def test_dynamic_temporal_year_boundary(self) -> None:
+        from datetime import datetime
+
+        curr = datetime.now(UTC).year
+        # Current and near future years with freshness verbs match
+        self.assertTrue(is_search_intent(f"{curr}年最新进展"))
+        self.assertTrue(is_search_intent(f"{curr + 1} release status"))
+        # Distant past years (before 2024) do not trigger freshness intent
+        self.assertFalse(is_search_intent("2015年历史进展"))
+        # Distant future years (> curr + 5) do not trigger freshness intent
+        self.assertFalse(is_search_intent(f"{curr + 10}年进展"))
 
 
 class TestSearchFormatting(unittest.TestCase):

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+import concurrent.futures
 
 import structlog
 
@@ -38,26 +38,29 @@ def get_ambient_mcp_manager() -> MCPManager | None:
         return None
 
 
+async def reset_ambient_mcp_manager_async() -> None:
+    """Asynchronously reset and close the cached ambient MCP manager."""
+    global _AMBIENT_MCP_MANAGER
+    if _AMBIENT_MCP_MANAGER is not None:
+        mgr = _AMBIENT_MCP_MANAGER
+        _AMBIENT_MCP_MANAGER = None
+        await mgr.close()
+
+
 def reset_ambient_mcp_manager() -> None:
     """Reset the cached ambient MCP manager (useful for tests and loop changes)."""
     global _AMBIENT_MCP_MANAGER
     if _AMBIENT_MCP_MANAGER is not None:
         mgr = _AMBIENT_MCP_MANAGER
         _AMBIENT_MCP_MANAGER = None
-        try:
-            loop = asyncio.get_running_loop()
-            if loop.is_running():
-                asyncio.create_task(mgr.close())
-        except RuntimeError:
-            try:
-                asyncio.run(mgr.close())
-            except Exception:
-                pass
-    else:
-        _AMBIENT_MCP_MANAGER = None
+        mgr.close_sync()
 
 
-import concurrent.futures
+async def _init_transient_and_disconnect(mgr: MCPManager) -> None:
+    """Initialize manager on transient loop then disconnect transports to prevent leaks."""
+    await mgr.initialize()
+    for client in mgr._clients.values():
+        await client._transport.close()
 
 
 async def build_ambient_mcp_tools_async() -> list[Tool]:
@@ -92,10 +95,10 @@ def build_ambient_mcp_tools() -> list[Tool]:
             if loop is not None and loop.is_running():
                 # Running inside an event loop on current thread: run init in worker thread
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                    future = pool.submit(asyncio.run, manager.initialize())
+                    future = pool.submit(asyncio.run, _init_transient_and_disconnect(manager))
                     future.result(timeout=30)
             else:
-                asyncio.run(manager.initialize())
+                asyncio.run(_init_transient_and_disconnect(manager))
 
         return build_tools_from_mcp_manager(manager)
     except Exception as exc:

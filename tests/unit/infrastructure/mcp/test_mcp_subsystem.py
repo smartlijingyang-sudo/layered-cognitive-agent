@@ -1,14 +1,13 @@
 """Tests for LCA MCP Infrastructure."""
 
 import pytest
+
 from lca.contracts.models.mcp.types import (
-    MCPServerConfig,
     MCPTransportType,
-    MCPTool,
 )
+from lca.infrastructure.mcp.bridge import build_tools_from_mcp_manager
 from lca.infrastructure.mcp.config import load_mcp_servers
 from lca.infrastructure.mcp.manager import MCPManager
-from lca.infrastructure.mcp.bridge import adapt_mcp_tool_to_lca, build_tools_from_mcp_manager
 
 
 def test_mcp_config_loading():
@@ -74,9 +73,32 @@ async def test_searxng_mcp_live_discovery():
         qnames = [t.name for t in lca_tools]
         assert "mcp__searxng__searxng_search" in qnames
 
-        # Test live search execution via manager
         res = await manager.execute_tool("searxng_search", {"query": "python"})
         assert not res.is_error
         assert len(res.text_content) > 0
     finally:
         await manager.close()
+
+
+@pytest.mark.asyncio
+async def test_stdio_transport_close_sync_marks_transport_closed():
+    """Verify that close_sync properly terminates process and sets transport._closed."""
+    from lca.infrastructure.mcp.transports.stdio import StdioMCPTransport
+
+    servers = load_mcp_servers()
+    searx_cfg = servers.get("searxng")
+    if not searx_cfg:
+        pytest.skip("SearXNG MCP not configured")
+
+    transport = StdioMCPTransport(searx_cfg)
+    await transport.connect()
+    assert transport.is_connected
+    assert transport._proc is not None
+    internal_transport = getattr(transport._proc, "_transport", None)
+    assert internal_transport is not None
+
+    transport.close_sync()
+    assert not transport.is_connected
+    assert transport._proc is None
+    # Underlying asyncio transport must be explicitly marked closed to prevent unraisable __del__ warning
+    assert internal_transport._closed is True

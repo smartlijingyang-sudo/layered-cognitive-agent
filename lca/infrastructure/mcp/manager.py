@@ -121,6 +121,13 @@ class MCPManager(MCPManagerPort):
             await asyncio.gather(*tasks, return_exceptions=True)
         self._tool_cache.clear()
 
+    def close_sync(self) -> None:
+        """Synchronously disconnect all active MCP servers without event loop."""
+        for client in self._clients.values():
+            if hasattr(client, "close_sync"):
+                client.close_sync()
+        self._tool_cache.clear()
+
     def doctor(self) -> dict[str, Any]:
         """Health diagnostics status report."""
         report: dict[str, Any] = {
