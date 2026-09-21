@@ -43,5 +43,12 @@
 | TYPESAFE-TASK-4 | 熔断降级链与开关 (FallbackMemoryFilter) | Completed | 创建 lca/infrastructure/memory/pre_filter/fallback_filter.py，覆盖 429 熔断、开关、缺 Key 与自愈，tests/reflect/test_fallback_memory_filter.py 4/4 passed |
 | TYPESAFE-TASK-5 | 节点集成与运行时装配 (ReflectMemoryExtractExecutor) | Completed | ReflectMemoryExtractExecutor 成功集成 MemoryPreFilter 与 FallbackMemoryFilter，7/7 单测通过（含原有回归测试） |
 | TYPESAFE-TASK-6 | 全链路回归验证与活体验证 | Completed | 25/25 reflect 单测全通，ruff/git-diff 门禁通过，实测隐式偏好判定（noul=0.83）、普通指令过滤（noul=0.03），优雅降级全链路验证通过 |
+| GROKBOT-TASK-1 | 沉淀反模式知识库 docs/antipatterns/lca-antipatterns.md | Pending | 待创建 |
+| GROKBOT-TASK-2 | .agent/AGENTS.md 增加负向边界(Does Not Own)与不变量入测铁律 | Pending | 待修改 |
+| GROKBOT-TASK-3 | .agent/skills/brainstorming 增加负向清单与爆炸半径自治阶梯 | Pending | 待修改 |
+| GROKBOT-TASK-4 | .agent/skills/writing-plans 任务模板嵌入负边界与断言测试声明 | Pending | 待修改 |
+| GROKBOT-TASK-5 | code-reviewer 与 single-flow-task-execution 审查清单增加边界与反模式守卫 | Pending | 待修改 |
+| GROKBOT-TASK-6 | Antigravity profile 自动化测试与全链路闭环验证 | Pending | 待执行 |
+
 
 
