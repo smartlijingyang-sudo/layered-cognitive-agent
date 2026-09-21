@@ -111,6 +111,7 @@ ADR-0246 M2 的控制面签发仍未接通。`subject_user_id` 在工具构造�
 - [ADR-0246](../../../adr/0246-user-machine-side-effect-plane.md) §1.1 四边界、§3.2 Grant、§4.3 HIL 降级、§9 删除条件
 - [ADR-0078](../../../adr/0078-hil-approval-state-machine.md) 同意边界与 HIL 状态机
 - [ADR-0228](../../../adr/0228-plan-intervene-delegate-subgraphs.md) 图级 HITL 中断路径
+- [工具失败与恢复](../../../specs/tool-failure-recovery.md) 错误分类表与 §8 暂停语义,已按本决策对齐
 - [执行平面设计](../../../design/2026-08-14-execution-planes-design.md) §5.5 本机可写根、§14 开放问题 1
 - [graph HITL 暂停未被执行](../../implemented/seam/2026-09-18-graph-hitl-pause-not-honored.md) 暂停消费者,本方案前置条件
 - [HIL resume 必须重绑 RunAmbit](../../implemented/seam/2026-09-05-hil-resume-rebinds-ambit.md) 恢复侧 ambient 真值

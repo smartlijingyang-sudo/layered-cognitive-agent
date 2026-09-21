@@ -39,7 +39,8 @@ think
 | 参数校验失败 | `validation` | 返回 `Observation(success=False)`，不重试 | 可以修改参数后重试 |
 | 确定性执行错误 | `execution` | 返回失败 Observation，不重复相同参数 | 可以更换方案或工具 |
 | 网络超时、资源暂不可用 | `transient` | 按退避策略在同一动作内重试 | 若最终失败，再由 Agent 决定 |
-| 人工审批等待 | 不转换为 Observation | 抛出 `ApprovalPendingError`，进入暂停流程 | 等待输入后 resume |
+| 人工审批等待 | 无 Observation；`Decision.needs_approval` 为真 | `act.approve.gate` 路由到 `intervene.interrupt`，写 `approval.persisted.v1` 与 `waiting_input` checkpoint | 等待输入后 resume |
+| 机器平面授权拒绝 | `error_kind` 为 `scope_violation` 或 `approval_required` | 返回 `Observation(success=False)`，`state` 平铺 `verdict` 与 `reason` 并携带 `approval_request`，不抛异常 | `scope_violation` 不重试；`approval_required` 应转成一次向用户的询问 |
 
 相同参数的确定性错误不应被重复提交。例如，空表达式、非法路径或不符合工具 schema 的参数，重试不会改变结果。瞬时错误的重试仍属于同一个 `Decision`，不会制造新的认知步骤。
 
@@ -154,7 +155,11 @@ USE_TOOL + failed Observation → 继续（act.main → think.main）
 
 ## 8. 暂停、恢复和幂等
 
-人工审批不是工具失败。`ApprovalPendingError` 会被解释器捕获为 `paused` outcome，同时保存 `PhaseRunCursor`。Cursor 包含 `plan_ref`、当前 node、访问次数、边访问次数、artifacts、因果引用和预算快照，恢复时必须验证 `plan_ref` 一致。
+人工审批不是工具失败。同意走图上通道：`Decision.needs_approval` 为真时 `act.approve.gate` 路由到 `intervene.interrupt`，写 `approval.persisted.v1` 与 `waiting_input` checkpoint，见 [HIL 审批状态机](../adr/0078-hil-approval-state-machine.md) 与 [graph HITL 暂停未被执行](../notes/implemented/seam/2026-09-18-graph-hitl-pause-not-honored.md)。[`ResultFinalizer`](../../lca/runtime/projection/result_finalizer.py) 对 paused 的 declarative run 强制要求 approval request 与非空 `approval_id`。
+
+`ApprovalPendingError` 仍是 contracts 导出的暂停信号，两个 SafeExecutor 都原样向上传播它，`lca/` 下已无生产抛出点。机器平面的授权判定返回带类型的 Observation，见 [机器平面路径授权归 CapabilityGrant](../notes/implemented/seam/2026-09-21-machine-path-authorization-belongs-to-capability-grant.md)。
+
+暂停保存 `PhaseRunCursor`。Cursor 包含 `plan_ref`、当前 node、访问次数、边访问次数、artifacts、因果引用和预算快照，恢复时必须验证 `plan_ref` 一致。
 
 effectful 操作使用幂等键：
 
