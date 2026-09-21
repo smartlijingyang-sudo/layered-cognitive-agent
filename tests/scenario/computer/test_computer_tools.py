@@ -112,6 +112,14 @@ class TestDefaultToolsComputer(unittest.TestCase):
         self.assertIn("writeFile", names)
         self.assertNotIn("sandbox_inspect", names)
 
+    def test_default_set_includes_environment_awareness(self) -> None:
+        from unittest.mock import patch
+
+        with patch("lca.infrastructure.tools.default.set.resolve_sandbox") as mock:
+            mock.return_value = InlineSandbox()
+            names = {t.name for t in build_default_tools(self.store)}
+        self.assertIn("listEnvironments", names)
+
     def test_both_available_without_extra_has_no_local_face(self) -> None:
         from unittest.mock import patch
 

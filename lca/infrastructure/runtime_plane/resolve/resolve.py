@@ -53,6 +53,23 @@ def sandbox_ref_from(sandbox: Sandbox) -> PlaneRef:
     return make_sandbox_ref(name=str(getattr(sandbox, "name", "") or "onlyboxes"))
 
 
+def default_machine_ref() -> PlaneRef:
+    """Fallback machine ``PlaneRef`` for unified prompt rendering.
+
+    Used when a machine block is requested but no device is currently bound,
+    so the strategy pipeline never falls back to Python string literals.
+    """
+    return PlaneRef(
+        id="machine-default",
+        label="Local Machine",
+        kind=PlaneKind.MACHINE,
+        root="",
+        outputs_dir="outputs",
+        platform="",
+        home="",
+    )
+
+
 def resolve_plane_bindings(
     machine: PlaneRef | None,
     sandbox: PlaneRef | None,

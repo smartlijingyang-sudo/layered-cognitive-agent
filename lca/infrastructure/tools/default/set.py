@@ -19,7 +19,7 @@ from lca.infrastructure.runtime_plane.resolve.resolve import (
 )
 from lca.infrastructure.sandbox.factory.factory import resolve_sandbox
 from lca.infrastructure.tools import ask_user as ask_user_module
-from lca.infrastructure.tools import lca_computer
+from lca.infrastructure.tools import environment_awareness, lca_computer
 from lca.infrastructure.tools import web_search as web_search_module
 from lca.infrastructure.tools import write_file as write_file_module
 from lca.infrastructure.tools.skills.tool.set import build_operational_skill_tools
@@ -83,6 +83,14 @@ def build_default_tools(
     if sandbox is None and fallback:
         sandbox = resolve_sandbox() if ref_of(bound, PlaneKind.SANDBOX) is not None else None
 
+    # Environment awareness is plane-independent: it lists the current plane
+    # plus every paired device, so a sandbox run can still perceive lipcmain.
+    from lca.infrastructure.environment.factory import build_environment_catalog
+
+    awareness_tools: list[Tool] = environment_awareness.build_tools(
+        catalog=build_environment_catalog(bound, sandbox=sandbox, machine_resolver=machine_resolver)
+    )
+
     if file_store is not None:
         if bound.primary is not None:
             computer.extend(_tools_for_ref(bound.primary, file_store, sandbox, machine_resolver))
@@ -99,6 +107,7 @@ def build_default_tools(
             *search_tools,
             *hil_tools,
             *computer,
+            *awareness_tools,
             *build_operational_skill_tools(
                 sandbox=skill_sandbox, file_store=file_store, store=skill_store
             ),
@@ -111,6 +120,7 @@ def build_default_tools(
         *search_tools,
         *hil_tools,
         *write_tools,
+        *awareness_tools,
         *build_operational_skill_tools(sandbox=None, file_store=file_store, store=skill_store),
     ]
 

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from lca.cognition.brain.prompt.sandbox_prompt import build_cloud_sandbox_prompt
+from lca.infrastructure.runtime_plane.prompt.assembler import render_plane_prompt
 from lca.infrastructure.tools.lca_computer.apis.execute.code import DESCRIPTION
 
 
 def test_sandbox_role_does_not_advertise_missing_matplotlib_families() -> None:
-    text = build_cloud_sandbox_prompt(())
+    text = render_plane_prompt(())
     assert "font.sans-serif" in text
     assert "WenQuanYi Zen Hei" not in text
     assert "Noto Sans CJK" not in text

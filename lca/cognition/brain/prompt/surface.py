@@ -5,9 +5,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from lca.cognition.brain.prompt.sandbox_prompt import build_cloud_sandbox_prompt
 from lca.contracts.observability.canonical_digest import canonical_digest
 from lca.contracts.protocols.runtime.infra.infra import Tool
+from lca.infrastructure.runtime_plane.prompt.assembler import render_plane_prompt
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,7 +54,7 @@ class PromptSurface:
         Native ``tool_calls`` leave ``tools`` empty here. That catalog is
         not the environment: an empty sequence still renders addressing.
         """
-        return build_cloud_sandbox_prompt(list(tools))
+        return render_plane_prompt(list(tools))
 
     def render_tools_block(self, tools: Sequence[Tool]) -> PromptSurfaceRender:
         tools_xml = self.render_tools_xml(tools)

@@ -111,13 +111,13 @@ def test_tmp_no_approval() -> None:
 def test_machine_tools_inject_local_system_role() -> None:
     from types import SimpleNamespace
 
-    from lca.cognition.brain.prompt.sandbox_prompt import build_cloud_sandbox_prompt
+    from lca.infrastructure.runtime_plane.prompt.assembler import render_plane_prompt
     from lca.infrastructure.runtime_plane.resolve.resolve import PlaneBindings
     from lca.infrastructure.runtime_plane.scope.scope import plane_bindings_scope
 
     plane = _machine()
     with plane_bindings_scope(PlaneBindings(primary=plane)):
-        text = build_cloud_sandbox_prompt([SimpleNamespace(name="local_listFiles")])
+        text = render_plane_prompt([SimpleNamespace(name="local_listFiles")])
     assert "lobe-local-system" in text
     assert "/home/lca-sandbox" in text
     assert "reportlab" in text
@@ -125,13 +125,13 @@ def test_machine_tools_inject_local_system_role() -> None:
 
 
 def test_empty_catalog_follows_bound_machine_plane() -> None:
-    from lca.cognition.brain.prompt.sandbox_prompt import build_cloud_sandbox_prompt
+    from lca.infrastructure.runtime_plane.prompt.assembler import render_plane_prompt
     from lca.infrastructure.runtime_plane.resolve.resolve import PlaneBindings
     from lca.infrastructure.runtime_plane.scope.scope import plane_bindings_scope
 
     plane = _machine()
     with plane_bindings_scope(PlaneBindings(primary=plane)):
-        text = build_cloud_sandbox_prompt(())
+        text = render_plane_prompt(())
     assert "lobe-local-system" in text
     assert "CLOUD SANDBOX" not in text
 

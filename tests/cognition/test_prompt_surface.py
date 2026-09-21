@@ -24,7 +24,7 @@ def test_render_tools_xml_uses_fc_tools_not_empty_catalog() -> None:
 def test_render_tools_block_emits_full_sandbox_when_tools_present() -> None:
     surface = PromptSurface.default()
     with patch(
-        "lca.cognition.brain.prompt.surface.build_cloud_sandbox_prompt",
+        "lca.cognition.brain.prompt.surface.render_plane_prompt",
         return_value="X" * 300,
     ):
         rendered = surface.render_tools_block(
@@ -40,7 +40,7 @@ def test_render_tools_block_keeps_sandbox_when_catalog_empty() -> None:
 
     surface = PromptSurface.default()
     with patch(
-        "lca.cognition.brain.prompt.surface.build_cloud_sandbox_prompt",
+        "lca.cognition.brain.prompt.surface.render_plane_prompt",
         return_value="X" * 300,
     ) as builder:
         rendered = surface.render_tools_block(())

@@ -71,8 +71,8 @@ def test_empty_tool_catalog_still_lists_uploaded_guest_path(tmp_path: Path) -> N
     ``/mnt/data`` in the system prompt, so the model ``find /`` for the xlsx.
     """
 
-    from lca.cognition.brain.prompt.sandbox_prompt import build_cloud_sandbox_prompt
     from lca.cognition.brain.prompt.surface import PromptSurface
+    from lca.infrastructure.runtime_plane.prompt.assembler import render_plane_prompt
 
     store = LocalFileStore(root=tmp_path)
     store.put(
@@ -82,7 +82,7 @@ def test_empty_tool_catalog_still_lists_uploaded_guest_path(tmp_path: Path) -> N
     )
     aid = _first_id(store)
     with bind_run_ambit(RunAmbit(file_store=store)), run_attachment_scope([aid]):
-        built = build_cloud_sandbox_prompt(())
+        built = render_plane_prompt(())
         rendered = PromptSurface.default().render_sandbox_block(())
     guest = "/mnt/data/可以合为一个表格吗 能兼容这些所有内容.xlsx"
     assert guest in built

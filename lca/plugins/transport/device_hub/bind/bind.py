@@ -44,6 +44,10 @@ class DeviceMachineResolver(MachineResolver):
     def resolve_transport(self, device_id: str) -> MachineTransport | None:
         return DeviceTransport.for_device(self._registry, self._hub, device_id)
 
+    def list_devices(self) -> list[dict]:
+        """All paired devices with identity + online state (DeviceProvider)."""
+        return [device.as_dict() for device in self._registry.list_all()]
+
 
 _hub: DeviceHub | None = None
 

@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
+from lca.contracts.models.core.state.plane import PlaneRef
 from lca.infrastructure.file.store import FileStore
 from lca.infrastructure.runtime_plane.resolve.resolve import (
-    make_sandbox_ref,
     resolve_plane_bindings,
     sandbox_ref_from,
 )
@@ -23,10 +22,14 @@ def current_primary_ref() -> PlaneRef | None:
 
 
 def environment_note() -> str:
-    primary = current_primary_ref()
-    if primary is not None:
-        return plane_system_role(primary)
-    return plane_system_role(make_sandbox_ref())
+    """Render the current plane's system-role text.
+
+    Delegates to the execution-plane prompt assembler so there is a single
+    rendering pipeline for sandbox and machine planes.
+    """
+    from lca.infrastructure.runtime_plane.prompt.assembler import render_plane_role
+
+    return render_plane_role()
 
 
 def skill_preamble(store: FileStore | None = None) -> str:
@@ -40,38 +43,4 @@ def skill_preamble(store: FileStore | None = None) -> str:
     return "\n".join(lines) + "\n"
 
 
-def plane_system_role(plane: PlaneRef) -> str:
-    if plane.kind is PlaneKind.MACHINE:
-        from lca.infrastructure.attachment.system.role_renderer import render_system_role
-        from lca.infrastructure.observability import (
-            current_file_store as get_current_run_file_store,
-        )
-        from lca.infrastructure.runtime_plane.preinstall.prompt import (
-            render_preinstalled_block,
-        )
-
-        result = render_system_role(
-            plane,
-            template_name="machine_system_role",
-            store=get_current_run_file_store(),
-            extra_placeholders={
-                "{{preinstalled}}": render_preinstalled_block(plane=PlaneKind.MACHINE),
-            },
-        )
-        rendered = result.text
-        if plane.home:
-            rendered += f"\n- User home (for spoken locations like Desktop only): `{plane.home}`"
-        return rendered
-    return _sandbox_note(plane.root, plane.outputs_dir)
-
-
-def _sandbox_note(root: str, outputs: str) -> str:
-    return (
-        "**Important:** This is a CLOUD SANDBOX environment, NOT the user's local file system.\n"
-        "- Files created here are temporary and session-specific\n"
-        "- Each run has its own isolated workspace\n"
-        '- Default shell is /bin/sh (not bash). For bash-specific features use: bash -c "your_command"\n'
-        "- Commands time out after 120 seconds unless a longer timeout is set\n"
-        f"- Workspace root: {root}\n"
-        f"- **Output directory (required for generated files): {outputs}**"
-    )
+__all__ = ["current_primary_ref", "environment_note", "skill_preamble"]
