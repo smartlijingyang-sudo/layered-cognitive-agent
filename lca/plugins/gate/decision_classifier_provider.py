@@ -25,6 +25,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.gate.decision_classifier import DecisionClassifier
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.infrastructure.runtime_plane.access.classify import machine_calls_need_approval
 
 _PARSE_FAILURE_USER_MESSAGE = "抱歉，模型未返回有效决策，请重试。"
 
@@ -58,7 +59,8 @@ class DefaultDecisionClassifier(DecisionClassifier):
                 rationale="",
                 confidence=1.0,
                 tool_calls=list(projected.tool_calls),
-                needs_approval=requires_human_input(projected.tool_calls),
+                needs_approval=requires_human_input(projected.tool_calls)
+                or machine_calls_need_approval(projected.tool_calls),
             )
         if projected.intent:
             return Decision(

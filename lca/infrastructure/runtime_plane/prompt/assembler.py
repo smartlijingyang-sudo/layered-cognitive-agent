@@ -13,6 +13,7 @@ from collections.abc import Sequence
 from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
 from lca.contracts.protocols import Tool
 from lca.infrastructure.file.store import FileStore
+from lca.infrastructure.runtime_plane.bindings.bindings import current_bindings, current_primary
 from lca.infrastructure.runtime_plane.prompt.strategy import (
     MachinePlaneStrategy,
     PlanePromptStrategy,
@@ -23,7 +24,6 @@ from lca.infrastructure.runtime_plane.resolve.resolve import (
     make_sandbox_ref,
     ref_of,
 )
-from lca.infrastructure.runtime_plane.scope.scope import current_bindings, current_primary
 from lca.infrastructure.tools.lca_computer.types import CLOUD_SANDBOX_APIS, MACHINE_APIS
 
 _STRATEGIES: dict[PlaneKind, PlanePromptStrategy] = {

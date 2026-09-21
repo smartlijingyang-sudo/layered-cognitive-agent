@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import pytest
 
+from lca.contracts.models.core.execution.local_exec import AccessVerdict
 from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
-from lca.infrastructure.runtime_plane.paths.paths import outputs_under
+from lca.infrastructure.runtime_plane.access.grant import default_access_scope
+from lca.infrastructure.runtime_plane.access.policy import decide_access
+from lca.infrastructure.runtime_plane.paths.paths import outputs_under, resolve_plane_path
 from lca.infrastructure.runtime_plane.resolve.resolve import (
     PlaneBindingError,
     PlaneRequest,
@@ -13,7 +16,18 @@ from lca.infrastructure.runtime_plane.resolve.resolve import (
     ref_of,
     resolve_plane_bindings,
 )
-from lca.infrastructure.runtime_plane.scope.scope import path_needs_approval, resolve_plane_path
+
+
+def _needs_approval(plane: object, path: str) -> bool:
+    return (
+        decide_access(
+            "read_file",
+            scope=default_access_scope(plane, "read_file"),  # type: ignore[arg-type]
+            plane=plane,  # type: ignore[arg-type]
+            paths=[path],
+        ).verdict
+        is AccessVerdict.NEEDS_APPROVAL
+    )
 
 
 def _machine(**kwargs: str) -> PlaneRef:
@@ -95,25 +109,25 @@ def test_relative_path_joins_root() -> None:
 def test_absolute_path_not_remapped() -> None:
     plane = _machine()
     assert resolve_plane_path("/mnt/data/x", plane) == "/mnt/data/x"
-    assert path_needs_approval("/mnt/data/x", plane)
+    assert _needs_approval(plane, "/mnt/data/x")
 
 
 def test_inside_root_no_approval() -> None:
     plane = _machine()
-    assert not path_needs_approval("/home/lca-sandbox/out/a.txt", plane)
+    assert not _needs_approval(plane, "/home/lca-sandbox/out/a.txt")
 
 
 def test_tmp_no_approval() -> None:
     plane = _machine()
-    assert not path_needs_approval("/tmp/scratch", plane)  # noqa: S108
+    assert not _needs_approval(plane, "/tmp/scratch")  # noqa: S108
 
 
 def test_machine_tools_inject_local_system_role() -> None:
     from types import SimpleNamespace
 
+    from lca.infrastructure.runtime_plane.bindings.bindings import plane_bindings_scope
     from lca.infrastructure.runtime_plane.prompt.assembler import render_plane_prompt
     from lca.infrastructure.runtime_plane.resolve.resolve import PlaneBindings
-    from lca.infrastructure.runtime_plane.scope.scope import plane_bindings_scope
 
     plane = _machine()
     with plane_bindings_scope(PlaneBindings(primary=plane)):
@@ -125,9 +139,9 @@ def test_machine_tools_inject_local_system_role() -> None:
 
 
 def test_empty_catalog_follows_bound_machine_plane() -> None:
+    from lca.infrastructure.runtime_plane.bindings.bindings import plane_bindings_scope
     from lca.infrastructure.runtime_plane.prompt.assembler import render_plane_prompt
     from lca.infrastructure.runtime_plane.resolve.resolve import PlaneBindings
-    from lca.infrastructure.runtime_plane.scope.scope import plane_bindings_scope
 
     plane = _machine()
     with plane_bindings_scope(PlaneBindings(primary=plane)):
@@ -138,5 +152,5 @@ def test_empty_catalog_follows_bound_machine_plane() -> None:
 
 def test_dotdot_escape_needs_approval() -> None:
     plane = _machine()
-    assert path_needs_approval("/home/lca-sandbox/../.ssh/id_rsa", plane)
-    assert path_needs_approval("/tmp/../etc/passwd", plane)  # noqa: S108
+    assert _needs_approval(plane, "/home/lca-sandbox/../.ssh/id_rsa")
+    assert _needs_approval(plane, "/tmp/../etc/passwd")  # noqa: S108

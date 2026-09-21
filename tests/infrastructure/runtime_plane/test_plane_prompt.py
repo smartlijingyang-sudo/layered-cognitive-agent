@@ -5,8 +5,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from lca.contracts.models.core.state.plane import PlaneBindings, PlaneKind, PlaneRef
+from lca.infrastructure.runtime_plane.bindings.bindings import plane_bindings_scope
 from lca.infrastructure.runtime_plane.prompt.assembler import render_plane_prompt
-from lca.infrastructure.runtime_plane.scope.scope import plane_bindings_scope
 
 
 def _machine() -> PlaneRef:

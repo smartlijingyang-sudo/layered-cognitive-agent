@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
+from lca.infrastructure.runtime_plane.bindings.bindings import plane_bindings_scope
 from lca.infrastructure.runtime_plane.resolve.resolve import PlaneBindings
-from lca.infrastructure.runtime_plane.scope.scope import plane_bindings_scope
 from lca.infrastructure.sandbox.factory.factory import set_sandbox_resolver
 from lca.infrastructure.sandbox.surface.surface import environment_note, skill_preamble
 

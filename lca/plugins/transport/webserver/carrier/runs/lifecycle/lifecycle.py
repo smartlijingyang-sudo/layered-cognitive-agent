@@ -13,8 +13,8 @@ from lca.contracts.observability import exc_to_record
 from lca.contracts.observability.registry.status import RunLifecycleStatus
 from lca.contracts.protocols.runtime.infra.infra import MachineResolver
 from lca.infrastructure.observability.facade.run.ambit import bind_run_ambit
+from lca.infrastructure.runtime_plane.bindings.bindings import plane_bindings_scope
 from lca.infrastructure.runtime_plane.resolve.resolve import PlaneBindingError
-from lca.infrastructure.runtime_plane.scope.scope import plane_bindings_scope
 from lca.infrastructure.workspace import run_workspace_scope
 from lca.plugins.loop.driver.plugin import (
     _UnknownExecutionTargetError as _UnknownExecutionTargetError,

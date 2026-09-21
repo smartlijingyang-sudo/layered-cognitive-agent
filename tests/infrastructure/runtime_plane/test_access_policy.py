@@ -8,10 +8,17 @@ from __future__ import annotations
 
 import time
 
-from lca.contracts.models.core.execution.local_exec import AccessReason, AccessVerdict
+from lca.contracts.models.core.execution.local_exec import (
+    AccessReason,
+    AccessScope,
+    AccessVerdict,
+    access_scope_of,
+)
 from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
 from lca.infrastructure.runtime_plane.access import (
+    DEFAULT_READ_ONLY_COMMANDS,
     decide_access,
+    default_access_scope,
     default_machine_grant,
     is_credential_path,
     readable_prefixes,
@@ -52,25 +59,42 @@ def _posix_plane() -> PlaneRef:
     )
 
 
-def _grant(plane: PlaneRef, operation: str, **overrides: object):
-    kwargs: dict[str, object] = {
-        "operation": operation,
-        "job_id": "job-1",
-        "idempotency_key": "idem-1",
-        "subject_user_id": "u-1",
-        "expires_at": _EXPIRES,
-    }
-    kwargs.update(overrides)
-    return default_machine_grant(plane, **kwargs)  # type: ignore[arg-type]
+def _scope(plane: PlaneRef, operation: str, **overrides: object) -> AccessScope:
+    scope = default_access_scope(plane, operation)
+    return scope.model_copy(update=overrides) if overrides else scope
 
 
 def _verdict(operation: str, plane: PlaneRef, **kwargs: object) -> AccessVerdict:
-    grant = kwargs.pop("grant", None) or _grant(plane, operation)
-    return decide_access(operation, grant=grant, plane=plane, **kwargs).verdict  # type: ignore[arg-type]
+    scope = kwargs.pop("scope", None) or _scope(plane, operation)
+    return decide_access(operation, scope=scope, plane=plane, **kwargs).verdict  # type: ignore[arg-type]
 
 
 def test_default_read_scope_is_working_root_plus_home() -> None:
     assert readable_prefixes(_windows_plane()) == (_WINDOWS_ROOT, _WINDOWS_HOME)
+
+
+def test_access_scope_of_projects_only_the_authorization_fields() -> None:
+    grant = default_machine_grant(
+        _windows_plane(),
+        operation="read_file",
+        job_id="job-1",
+        idempotency_key="idem-1",
+        subject_user_id="u-1",
+        expires_at=_EXPIRES,
+        approval_id="ap-1",
+        request_digest="d-1",
+    )
+    scope = access_scope_of(grant)
+    assert scope.operation == "read_file"
+    assert scope.path_prefixes == (_WINDOWS_ROOT, _WINDOWS_HOME)
+    assert scope.command_allowlist == DEFAULT_READ_ONLY_COMMANDS
+    assert scope.command_class is None
+    assert set(AccessScope.model_fields) == {
+        "operation",
+        "path_prefixes",
+        "command_allowlist",
+        "command_class",
+    }
 
 
 def test_read_of_home_config_is_allowed() -> None:
@@ -88,7 +112,7 @@ def test_read_outside_grant_needs_approval() -> None:
 def test_read_of_secret_inside_home_needs_approval() -> None:
     decision = decide_access(
         "read_file",
-        grant=_grant(_windows_plane(), "read_file"),
+        scope=_scope(_windows_plane(), "read_file"),
         plane=_windows_plane(),
         paths=["C:\\Users\\li\\.ssh\\id_rsa"],
     )
@@ -127,7 +151,7 @@ def test_write_inside_home_but_outside_working_root_needs_approval() -> None:
 def test_write_to_credential_path_is_denied() -> None:
     decision = decide_access(
         "edit_file",
-        grant=_grant(_windows_plane(), "edit_file"),
+        scope=_scope(_windows_plane(), "edit_file"),
         plane=_windows_plane(),
         paths=["C:\\Users\\li\\.aws\\credentials"],
     )
@@ -180,9 +204,9 @@ def test_command_outside_allowlist_needs_approval() -> None:
 
 
 def test_empty_allowlist_needs_approval() -> None:
-    grant = _grant(_windows_plane(), "run_command", command_allowlist=())
+    scope = _scope(_windows_plane(), "run_command", command_allowlist=())
     assert (
-        _verdict("run_command", _windows_plane(), command="tasklist", grant=grant)
+        _verdict("run_command", _windows_plane(), command="tasklist", scope=scope)
         is AccessVerdict.NEEDS_APPROVAL
     )
 
@@ -202,7 +226,7 @@ def test_sandbox_plane_is_not_gated_twice() -> None:
     )
     decision = decide_access(
         "write_file",
-        grant=_grant(sandbox, "write_file"),
+        scope=_scope(sandbox, "write_file"),
         plane=sandbox,
         paths=["/etc/passwd"],
     )
@@ -210,10 +234,10 @@ def test_sandbox_plane_is_not_gated_twice() -> None:
     assert decision.reason is AccessReason.NOT_A_MACHINE
 
 
-def test_grant_for_another_operation_is_denied() -> None:
-    grant = _grant(_windows_plane(), "read_file")
+def test_scope_for_another_operation_is_denied() -> None:
+    scope = _scope(_windows_plane(), "read_file")
     decision = decide_access(
-        "write_file", grant=grant, plane=_windows_plane(), paths=["F:\\下载\\a.txt"]
+        "write_file", scope=scope, plane=_windows_plane(), paths=["F:\\下载\\a.txt"]
     )
     assert decision.verdict is AccessVerdict.DENY
     assert decision.reason is AccessReason.OPERATION_NOT_GRANTED

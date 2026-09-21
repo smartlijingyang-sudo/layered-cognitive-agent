@@ -1,7 +1,7 @@
 """Machine-plane access policy — the authorization boundary (ADR-0246 §1.1).
 
-One concept: given an operation, the paths it touches, and a
-:class:`CapabilityGrant`, decide ``allow`` / ``needs_approval`` / ``deny``.
+One concept: given an operation, the paths it touches, and an
+:class:`AccessScope`, decide ``allow`` / ``needs_approval`` / ``deny``.
 
 Pure and total. No I/O, no exceptions, no runtime state. The caller turns the
 verdict into an execution, an ADR-0078 HIL pause, or an
@@ -26,8 +26,8 @@ from collections.abc import Sequence
 from lca.contracts.models.core.execution.local_exec import (
     AccessDecision,
     AccessReason,
+    AccessScope,
     AccessVerdict,
-    CapabilityGrant,
 )
 from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
 from lca.infrastructure.runtime_plane.paths.paths import (
@@ -118,7 +118,7 @@ def is_credential_path(path: str) -> bool:
     return any(segment.lower() in CREDENTIAL_DIR_SEGMENTS for segment in segments[:-1])
 
 
-def classify_path(path: str, *, grant: CapabilityGrant, plane: PlaneRef) -> str:
+def classify_path(path: str, *, scope: AccessScope, plane: PlaneRef) -> str:
     """Order matters: secret first, so a credential inside the grant still gates."""
     if is_credential_path(path):
         return _PathClass.CREDENTIAL
@@ -126,7 +126,7 @@ def classify_path(path: str, *, grant: CapabilityGrant, plane: PlaneRef) -> str:
         return _PathClass.TEMP
     if is_within(path, plane.root, plane.platform):
         return _PathClass.WORKING_ROOT
-    if within_any(path, tuple(grant.path_prefixes), plane.platform):
+    if within_any(path, tuple(scope.path_prefixes), plane.platform):
         return _PathClass.IN_GRANT
     return _PathClass.OUTSIDE
 
@@ -150,11 +150,11 @@ def _first_token(subcommand: str) -> str:
     return subcommand.split(None, 1)[0].lower() if subcommand else ""
 
 
-def _decide_command(command: str, grant: CapabilityGrant) -> AccessDecision:
+def _decide_command(command: str, scope: AccessScope) -> AccessDecision:
     operation = "run_command"
     parts = subcommands(command)
-    if grant.command_allowlist and parts:
-        allowed = {entry.strip().lower() for entry in grant.command_allowlist if entry.strip()}
+    if scope.command_allowlist and parts:
+        allowed = {entry.strip().lower() for entry in scope.command_allowlist if entry.strip()}
         if all(_first_token(part) in allowed for part in parts):
             return AccessDecision(
                 operation=operation,
@@ -162,7 +162,7 @@ def _decide_command(command: str, grant: CapabilityGrant) -> AccessDecision:
                 reason=AccessReason.COMMAND_CLASS,
                 detail="every subcommand is in the grant allowlist",
             )
-    if grant.command_class == READ_ONLY_COMMAND_CLASS:
+    if scope.command_class == READ_ONLY_COMMAND_CLASS:
         return AccessDecision(
             operation=operation,
             verdict=AccessVerdict.ALLOW,
@@ -178,7 +178,7 @@ def _decide_command(command: str, grant: CapabilityGrant) -> AccessDecision:
 
 
 def _decide_paths(
-    operation: str, paths: Sequence[str], *, grant: CapabilityGrant, plane: PlaneRef
+    operation: str, paths: Sequence[str], *, scope: AccessScope, plane: PlaneRef
 ) -> AccessDecision:
     table = _WRITE_VERDICT if operation in WRITE_OPERATIONS else _READ_VERDICT
     strictest = AccessDecision(
@@ -188,7 +188,7 @@ def _decide_paths(
     )
     for raw in paths:
         resolved = resolve_plane_path(raw, plane)
-        verdict, reason = table[classify_path(resolved, grant=grant, plane=plane)]
+        verdict, reason = table[classify_path(resolved, scope=scope, plane=plane)]
         if _SEVERITY[verdict] > _SEVERITY[strictest.verdict]:
             strictest = AccessDecision(
                 operation=operation,
@@ -203,7 +203,7 @@ def _decide_paths(
 def decide_access(
     operation: str,
     *,
-    grant: CapabilityGrant,
+    scope: AccessScope,
     plane: PlaneRef,
     paths: Sequence[str] = (),
     command: str = "",
@@ -223,15 +223,15 @@ def decide_access(
             reason=AccessReason.JOB_CONTINUATION,
             detail="acts on a command_id from an already-decided run_command",
         )
-    if grant.operation and grant.operation != operation:
+    if scope.operation and scope.operation != operation:
         return AccessDecision(
             operation=operation,
             verdict=AccessVerdict.DENY,
             reason=AccessReason.OPERATION_NOT_GRANTED,
-            detail=f"grant was issued for {grant.operation!r}",
+            detail=f"scope was issued for {scope.operation!r}",
         )
     if operation in EXEC_OPERATIONS:
-        return _decide_command(command, grant)
+        return _decide_command(command, scope)
     if operation not in READ_OPERATIONS and operation not in WRITE_OPERATIONS:
         return AccessDecision(
             operation=operation,
@@ -239,7 +239,7 @@ def decide_access(
             reason=AccessReason.OUTSIDE_GRANT,
             detail="unclassified operation; default to consent",
         )
-    return _decide_paths(operation, paths, grant=grant, plane=plane)
+    return _decide_paths(operation, paths, scope=scope, plane=plane)
 
 
 __all__ = [

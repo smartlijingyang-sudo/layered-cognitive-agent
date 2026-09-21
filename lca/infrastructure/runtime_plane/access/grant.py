@@ -1,4 +1,4 @@
-"""Default CapabilityGrant construction for a paired user machine.
+"""Default AccessScope / CapabilityGrant construction for a paired user machine.
 
 ADR-0246 §3.2 puts grant issuance in the control plane. Until a signing
 control plane exists, this module is the single construction point, and the
@@ -15,7 +15,10 @@ one.
 
 from __future__ import annotations
 
-from lca.contracts.models.core.execution.local_exec import CapabilityGrant
+from lca.contracts.models.core.execution.local_exec import (
+    AccessScope,
+    CapabilityGrant,
+)
 from lca.contracts.models.core.state.plane import PlaneRef
 
 #: Commands that only observe. Matched on the first token of every subcommand.
@@ -64,6 +67,21 @@ def readable_prefixes(plane: PlaneRef) -> tuple[str, ...]:
     return tuple(seen)
 
 
+def default_access_scope(plane: PlaneRef, operation: str) -> AccessScope:
+    """The authorization input derivable from a plane alone.
+
+    Tool construction has a ``PlaneRef`` and no run in flight, so the scope
+    cannot carry per-job credentials. This is the single definition of the
+    default shape; ``default_machine_grant`` projects it onto a job.
+    """
+    return AccessScope(
+        operation=operation,
+        path_prefixes=readable_prefixes(plane),
+        command_allowlist=DEFAULT_READ_ONLY_COMMANDS,
+        command_class=None,
+    )
+
+
 def default_machine_grant(
     plane: PlaneRef,
     *,
@@ -77,14 +95,15 @@ def default_machine_grant(
     command_allowlist: tuple[str, ...] = DEFAULT_READ_ONLY_COMMANDS,
 ) -> CapabilityGrant:
     """Build the per-job grant for one operation on a paired machine."""
+    scope = default_access_scope(plane, operation)
     return CapabilityGrant(
         job_id=job_id,
         idempotency_key=idempotency_key,
         subject_user_id=subject_user_id,
         subject_machine_id=plane.id,
-        operation=operation,
-        path_prefixes=readable_prefixes(plane),
-        command_class=None,
+        operation=scope.operation,
+        path_prefixes=scope.path_prefixes,
+        command_class=scope.command_class,
         command_allowlist=command_allowlist,
         expires_at=expires_at,
         approval_id=approval_id,
@@ -92,4 +111,9 @@ def default_machine_grant(
     )
 
 
-__all__ = ["DEFAULT_READ_ONLY_COMMANDS", "default_machine_grant", "readable_prefixes"]
+__all__ = [
+    "DEFAULT_READ_ONLY_COMMANDS",
+    "default_access_scope",
+    "default_machine_grant",
+    "readable_prefixes",
+]

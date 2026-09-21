@@ -1,16 +1,12 @@
-"""Machine path scope audit — pathScopeAudit parity."""
+"""Machine path scope — path resolution and access policy verdicts."""
 
 from __future__ import annotations
 
-import pytest
-
-from lca.contracts.models.core.execution.result import ApprovalPendingError
+from lca.contracts.models.core.execution.local_exec import AccessScope, AccessVerdict
 from lca.contracts.models.core.state.plane import PlaneKind, PlaneRef
-from lca.infrastructure.runtime_plane.scope.scope import (
-    path_needs_approval,
-    raise_if_out_of_scope,
-    resolve_plane_path,
-)
+from lca.infrastructure.runtime_plane.access.grant import default_access_scope
+from lca.infrastructure.runtime_plane.access.policy import decide_access
+from lca.infrastructure.runtime_plane.paths.paths import resolve_plane_path
 
 
 def _machine(root: str = "/home/lca-sandbox") -> PlaneRef:
@@ -22,6 +18,15 @@ def _machine(root: str = "/home/lca-sandbox") -> PlaneRef:
         outputs_dir=f"{root}/outputs",
         platform="linux",
     )
+
+
+def _verdict(operation: str, plane: PlaneRef, paths: list[str]) -> AccessVerdict:
+    return decide_access(
+        operation,
+        scope=default_access_scope(plane, operation),
+        plane=plane,
+        paths=paths,
+    ).verdict
 
 
 def test_relative_resolves_against_root() -> None:
@@ -39,18 +44,12 @@ def test_absolute_kept_as_is() -> None:
 def test_temp_does_not_need_approval() -> None:
     plane = _machine()
     scratch = "/tmp/scratch.txt"  # noqa: S108
-    assert not path_needs_approval(scratch, plane)
+    assert _verdict("read_file", plane, [scratch]) is AccessVerdict.ALLOW
 
 
 def test_outside_root_needs_approval() -> None:
     plane = _machine()
-    assert path_needs_approval("/etc/passwd", plane)
-
-
-def test_raise_if_out_of_scope_blocks_escape() -> None:
-    plane = _machine()
-    with pytest.raises(ApprovalPendingError):
-        raise_if_out_of_scope("/etc/passwd", plane)
+    assert _verdict("read_file", plane, ["/etc/passwd"]) is AccessVerdict.NEEDS_APPROVAL
 
 
 def test_sandbox_skips_approval() -> None:
@@ -61,7 +60,14 @@ def test_sandbox_skips_approval() -> None:
         root="/mnt/data",
         outputs_dir="/mnt/data/outputs",
     )
-    assert not path_needs_approval("/anywhere/outside", sandbox)
+    scope = AccessScope()
+    decision = decide_access(
+        "read_file",
+        scope=scope,
+        plane=sandbox,
+        paths=["/anywhere/outside"],
+    )
+    assert decision.verdict is AccessVerdict.ALLOW
 
 
 def _windows_machine(root: str = "F:\\work") -> PlaneRef:
@@ -84,19 +90,25 @@ def test_windows_resolve_collapses_parent_segments() -> None:
 
 def test_windows_parent_escape_needs_approval() -> None:
     plane = _windows_machine()
-    assert path_needs_approval("F:\\work\\..\\secret.txt", plane)
-    assert path_needs_approval("F:\\work\\a\\..\\..\\secret.txt", plane)
-    assert not path_needs_approval("F:\\work\\notes.md", plane)
+    assert (
+        _verdict("read_file", plane, ["F:\\work\\..\\secret.txt"]) is AccessVerdict.NEEDS_APPROVAL
+    )
+    assert (
+        _verdict("read_file", plane, ["F:\\work\\a\\..\\..\\secret.txt"])
+        is AccessVerdict.NEEDS_APPROVAL
+    )
+    assert _verdict("read_file", plane, ["F:\\work\\notes.md"]) is AccessVerdict.ALLOW
 
 
 def test_windows_outside_root_needs_approval() -> None:
     plane = _windows_machine()
     target = "C:\\Users\\li\\AppData\\Roaming\\clash-verge\\verge.yaml"
-    assert path_needs_approval(target, plane)
-    with pytest.raises(ApprovalPendingError):
-        raise_if_out_of_scope(target, plane)
+    assert _verdict("read_file", plane, [target]) is AccessVerdict.ALLOW
+    outside = "D:\\other\\secret.txt"
+    assert _verdict("read_file", plane, [outside]) is AccessVerdict.NEEDS_APPROVAL
 
 
 def test_windows_temp_does_not_need_approval() -> None:
     plane = _windows_machine()
-    assert not path_needs_approval("C:\\Users\\li\\AppData\\Local\\Temp\\x.txt", plane)
+    temp = "C:\\Users\\li\\AppData\\Local\\Temp\\x.txt"
+    assert _verdict("read_file", plane, [temp]) is AccessVerdict.ALLOW

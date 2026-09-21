@@ -56,6 +56,37 @@ class CapabilityGrant(BaseModel):
     request_digest: str  # 规范化请求摘要（防 Confused Deputy）
 
 
+class AccessScope(BaseModel):
+    """授权判定输入：本机平面在本次 run 的授权事实（ADR-0246 §3.2）。
+
+    ``CapabilityGrant`` 是控制面签发的可审计许可，随 Job 携带；在控制面
+    签发路径（M2）接通前，决策生产者从 ``PlaneRef`` 投影出本对象交给
+    ``decide_access``。二者携带同一组事实，字段语义一致。
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    #: ``""`` 表示不绑定具体操作;非空时必须与请求的 operation 一致。
+    operation: str = ""
+    path_prefixes: Sequence[str] = ()
+    command_allowlist: Sequence[str] = ()
+    command_class: str | None = None
+
+
+def access_scope_of(grant: CapabilityGrant) -> AccessScope:
+    """把 per-job 的可审计 grant 投影成授权判定读取的字段集。
+
+    ``CapabilityGrant`` 保留控制面签发所需的凭证与 TTL 字段;授权判定只读
+    ``AccessScope``,二者字段语义一致(C13 单向投影)。
+    """
+    return AccessScope(
+        operation=grant.operation,
+        path_prefixes=grant.path_prefixes,
+        command_allowlist=grant.command_allowlist,
+        command_class=grant.command_class,
+    )
+
+
 class EffectReceipt(BaseModel):
     """执行回执（不可变，追加进 Session.append，ADR-0246 §3.3）。"""
 
@@ -116,9 +147,11 @@ class AccessDecision(BaseModel):
 __all__ = [
     "AccessDecision",
     "AccessReason",
+    "AccessScope",
     "AccessVerdict",
     "CapabilityGrant",
     "EffectReceipt",
     "LocalExecTarget",
     "TargetKind",
+    "access_scope_of",
 ]

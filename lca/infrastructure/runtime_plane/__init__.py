@@ -1,7 +1,16 @@
-"""Product-environment binding — resolve, scope, path audit."""
+"""Execution-plane domain: resolve, bind, project paths."""
 
 from lca.contracts.models.core.state.plane import PlaneBindings, PlaneKind, PlaneRef
-from lca.infrastructure.runtime_plane.paths.paths import join_under, outputs_under
+from lca.infrastructure.runtime_plane.bindings.bindings import (
+    current_bindings,
+    current_primary,
+    plane_bindings_scope,
+)
+from lca.infrastructure.runtime_plane.paths.paths import (
+    join_under,
+    outputs_under,
+    resolve_plane_path,
+)
 from lca.infrastructure.runtime_plane.resolve.resolve import (
     PlaneBindingError,
     PlaneRequest,
@@ -9,14 +18,6 @@ from lca.infrastructure.runtime_plane.resolve.resolve import (
     ref_of,
     resolve_plane_bindings,
     sandbox_ref_from,
-)
-from lca.infrastructure.runtime_plane.scope.scope import (
-    current_bindings,
-    current_primary,
-    path_needs_approval,
-    plane_bindings_scope,
-    raise_if_out_of_scope,
-    resolve_plane_path,
 )
 
 __all__ = [
@@ -30,9 +31,7 @@ __all__ = [
     "join_under",
     "make_sandbox_ref",
     "outputs_under",
-    "path_needs_approval",
     "plane_bindings_scope",
-    "raise_if_out_of_scope",
     "ref_of",
     "resolve_plane_bindings",
     "resolve_plane_path",
