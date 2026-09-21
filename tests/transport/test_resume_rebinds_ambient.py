@@ -86,3 +86,58 @@ def test_resume_rebinds_ambient_file_store(monkeypatch) -> None:
     asyncio.run(_scenario())
 
     assert seen.get("file_store") is store
+
+
+def test_resume_binds_spine_hook_in_task_context(monkeypatch) -> None:
+    """Regression: resume 的任务上下文必须重新绑定 spine→Session hook。
+
+    ``_session_append_hook`` 是 task-local ContextVar；fresh run 在其执行任务里
+    绑定，resume 跑在 HTTP handler 的 ``create_task`` 新上下文里，若不重新绑定，
+    resume 图的 spine 事件会以 ``spine_port_append: no Session hook bound``
+    全部丢弃（ADR-0186 Session SSOT 失效）。
+    """
+    import lca.plugins.session.runtime.spine.hook as spine_hook_module
+    from lca.plugins.transport.webserver.carrier.runs.lifecycle.lifecycle import (
+        RunLifecycleCoordinator,
+    )
+
+    bridge = MagicMock(name="bridge")
+    bound = MagicMock(name="bound")
+    bound.bridge = bridge
+
+    session = _waiting_session()
+    session.event_session = bound
+
+    calls: list[str] = []
+
+    class _Result:
+        status = "completed"
+
+    class _Runnable:
+        async def resume(self, snapshot, *, input):
+            return _Result()
+
+    session.runnable = _Runnable()
+
+    async def _noop_finish(*args, **kwargs) -> None:
+        return None
+
+    def _fake_bind(hook_bridge):
+        calls.append("bind")
+        return "token"
+
+    def _fake_reset(token) -> None:
+        calls.append("reset")
+
+    monkeypatch.setattr(spine_hook_module, "bind_bridge_spine_hook", _fake_bind)
+    monkeypatch.setattr(spine_hook_module, "reset_bridge_spine_hook", _fake_reset)
+    monkeypatch.setattr(RunLifecycleCoordinator, "_finish_or_pause", staticmethod(_noop_finish))
+
+    coordinator = RunLifecycleCoordinator(_RegistryStub(session))  # type: ignore[arg-type]
+
+    async def _scenario() -> None:
+        await coordinator.resume(session, answer="answer")
+
+    asyncio.run(_scenario())
+
+    assert calls == ["bind", "reset"]

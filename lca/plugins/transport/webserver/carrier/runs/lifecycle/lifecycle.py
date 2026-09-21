@@ -218,6 +218,20 @@ class RunLifecycleCoordinator:
 
         success = False
         session.status = RunLifecycleStatus.RUNNING
+        # 会话 spine→Session hook 是 task-local ContextVar：fresh run 在其执行
+        # 任务里绑定，resume 跑在新任务（HTTP handler create_task），上下文里
+        # 没有该 hook，导致 resume 图的 spine 事件与事实全部丢弃
+        # （``spine_port_append: no Session hook bound``）。这里在 resume 任务
+        # 的上下文里重新绑定，resume 结束后 reset。
+        from lca.plugins.session.runtime.spine.hook import (
+            bind_bridge_spine_hook,
+            reset_bridge_spine_hook,
+        )
+
+        spine_hook_token = None
+        bound = session.event_session
+        if bound is not None and getattr(bound, "bridge", None) is not None:
+            spine_hook_token = bind_bridge_spine_hook(bound.bridge)
         try:
             bindings = session.bindings
             ambit = session.ambit
@@ -288,6 +302,8 @@ class RunLifecycleCoordinator:
                 exception_class=type(exc).__name__,
             )
         finally:
+            if spine_hook_token is not None:
+                reset_bridge_spine_hook(spine_hook_token)
             await self._finish_or_pause(session, workspace=None, success=success)
 
     @staticmethod
