@@ -19,11 +19,16 @@ from lca.contracts.models.core.state.plane import PlaneRef
 
 
 class EnvironmentKind(StrEnum):
-    """Closed set of environment kinds. Extend with a new member per plane."""
+    """Closed set of environment kinds. Extend with a new member per plane.
+
+    Keeps every member of ``PlaneKind`` plus forward-only kinds (``SSH``)
+    that device catalogs may report before a plane exists for them.
+    """
 
     SANDBOX = "sandbox"
     MACHINE = "machine"
     SSH = "ssh"
+    POOL_WORKER = "pool_worker"  # ADR-0246 M1
 
 
 @dataclass(frozen=True)
@@ -85,6 +90,7 @@ def environment_from_plane(
         root=plane.root,
         outputs_dir=plane.outputs_dir,
         home=plane.home,
+        capabilities=tuple(plane.capability_summary),
         metadata=dict(extra or {}),
     )
 

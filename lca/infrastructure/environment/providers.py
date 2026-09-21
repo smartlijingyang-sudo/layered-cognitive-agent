@@ -42,15 +42,21 @@ class DeviceEnvironmentProvider:
 
     @staticmethod
     def _from_device(device: dict) -> ExecutionEnvironment:
+        from lca.infrastructure.runtime_plane.paths.paths import outputs_under
+
         device_id = device["deviceId"]
+        workspace = device.get("workspace", "").strip()
         return ExecutionEnvironment(
             kind=EnvironmentKind.MACHINE,
             id=device_id,
             label=device.get("hostname") or device_id,
             platform=device.get("platform", ""),
             online=bool(device.get("online")),
+            root=workspace,
+            outputs_dir=outputs_under(workspace) if workspace else "",
             home=device.get("home", ""),
-            workspace=device.get("workspace", ""),
+            workspace=workspace,
+            capabilities=tuple(device.get("capabilities", ()) or ()),
             metadata=device,
         )
 

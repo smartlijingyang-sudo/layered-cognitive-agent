@@ -71,6 +71,42 @@ def test_environment_from_plane_projects_sandbox() -> None:
     assert env.is_current is False
 
 
+def test_environment_from_plane_projects_pool_worker() -> None:
+    plane = PlaneRef(
+        id="w1",
+        label="worker",
+        kind=PlaneKind.POOL_WORKER,
+        root="/w",
+        outputs_dir="/w/outputs",
+        platform="linux",
+    )
+    env = environment_from_plane(plane)
+    assert env.kind is EnvironmentKind.POOL_WORKER
+    assert env.id == "w1"
+    assert env.root == "/w"
+
+
+def test_environment_from_plane_projects_capabilities() -> None:
+    plane = PlaneRef(
+        id="m-lipcmain",
+        label="lipcmain",
+        kind=PlaneKind.MACHINE,
+        root="F:\\下载",
+        outputs_dir="F:\\下载\\outputs",
+        platform="Windows",
+        home="C:\\Users\\li",
+        capability_summary=("read_file", "write_file", "run_command", "git"),
+    )
+    env = environment_from_plane(plane, is_current=True)
+    assert env.capabilities == ("read_file", "write_file", "run_command", "git")
+    assert env.to_dict()["capabilities"] == [
+        "read_file",
+        "write_file",
+        "run_command",
+        "git",
+    ]
+
+
 def test_to_dict_does_not_let_metadata_shadow_core_fields() -> None:
     plane = _machine_plane()
     env = ExecutionEnvironment(

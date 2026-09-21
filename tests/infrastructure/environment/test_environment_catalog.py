@@ -56,6 +56,7 @@ def test_device_provider_maps_registry_rows() -> None:
                 "home": "C:\\Users\\li",
                 "workspace": "F:\\下载",
                 "online": True,
+                "capabilities": ["read_file", "write_file", "run_command"],
             },
             {
                 "deviceId": "m-desktop",
@@ -73,6 +74,9 @@ def test_device_provider_maps_registry_rows() -> None:
     assert envs[0].label == "lipcmain"
     assert envs[0].online is True
     assert envs[0].workspace == "F:\\下载"
+    assert envs[0].root == "F:\\下载"
+    assert envs[0].outputs_dir == "F:\\下载/outputs"
+    assert envs[0].capabilities == ("read_file", "write_file", "run_command")
     assert envs[1].online is False
 
 
