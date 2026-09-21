@@ -361,6 +361,38 @@ class HomeSection:
 
     name: ClassVar[str] = "home"
 
+    # 声明式行模板：每条 ``(key, template)`` 一行，渲染时用动态值 format。
+    # 改文案/加行只动这张表，不碰控制流（数据驱动，对齐 prompt 模板范式）。
+    _LINE_TEMPLATES: tuple[tuple[str, str], ...] = (
+        ("assistant_id", "assistant_id: {assistant_id}"),
+        ("home_dir", "home_dir: {home}"),
+        (
+            "memory_dir",
+            "memory_dir: {home}/memory/  (持久化记忆；系统自动写入，勿用沙箱命令访问)",
+        ),
+        ("skills_dir", "skills_dir: {home}/skills/"),
+        (
+            "workspace_dir",
+            "workspace_dir: {home}/workspace/  (沙箱 /mnt/data 映射到此)",
+        ),
+        (
+            "routing",
+            "目录路由: 用户问「你的目录/配置/记忆/你自己」时，默认用 home_dir；"
+            "只有文件操作/代码执行/生成产物时才用 workspace_dir（沙箱 /mnt/data）。",
+        ),
+        (
+            "memory_note",
+            "记忆说明: 用户让你记住的偏好/事实由系统自动写入 memory_dir，"
+            "也可用 memory_search / memory_add / memory_update / memory_remove 读写；"
+            "下次会话会自动带到你的上下文。",
+        ),
+    )
+
+    # 依赖 ``home`` 才渲染的 key；``assistant_id`` 单独判断。
+    _HOME_ONLY_KEYS: frozenset[str] = frozenset(
+        {"home_dir", "memory_dir", "skills_dir", "workspace_dir", "routing", "memory_note"}
+    )
+
     def render(
         self,
         *,
@@ -377,21 +409,12 @@ class HomeSection:
         assistant_id = str(extra.get("assistant_id") or "").strip()
         if not home and not assistant_id:
             return SectionOutput(text="")
-        lines = []
-        if assistant_id:
-            lines.append(f"assistant_id: {assistant_id}")
-        if home:
-            lines.append(f"home_dir: {home}")
-            lines.append(
-                f"memory_dir: {home}/memory/  (持久化记忆；系统自动写入，勿用沙箱命令访问)"
-            )
-            lines.append(f"skills_dir: {home}/skills/")
-            lines.append(f"workspace_dir: {home}/workspace/  (沙箱 /mnt/data 映射到此)")
-            lines.append(
-                "记忆说明: 用户让你记住的偏好/事实由系统自动写入 memory_dir，"
-                "也可用 memory_search / memory_add / memory_update / memory_remove 读写；"
-                "下次会话会自动带到你的上下文。"
-            )
+        lines = [
+            template.format(home=home, assistant_id=assistant_id)
+            for key, template in self._LINE_TEMPLATES
+            if (key == "assistant_id" and assistant_id)
+            or (key in self._HOME_ONLY_KEYS and home)
+        ]
         return SectionOutput(text=block("HOME", "\n".join(lines)))
 
 

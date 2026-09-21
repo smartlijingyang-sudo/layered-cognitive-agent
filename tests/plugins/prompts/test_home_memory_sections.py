@@ -47,6 +47,10 @@ def test_home_section_renders_paths() -> None:
     assert "memory_dir" in text
     assert "skills_dir" in text
     assert "workspace_dir" in text
+    # 目录路由规则：用户问「你的目录/配置/记忆」默认 home，文件操作才用沙箱。
+    assert "目录路由" in text
+    assert "默认用 home_dir" in text
+    assert "workspace_dir（沙箱 /mnt/data）" in text
 
 
 def test_home_section_unbound_empty() -> None:
