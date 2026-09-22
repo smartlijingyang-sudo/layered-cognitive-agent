@@ -21,18 +21,32 @@ from types import SimpleNamespace
 import pytest
 
 from lca.contracts.atoms.enums.enums import ActionType
+from lca.contracts.models.core.conversation.llm import LLMResponse, NativeToolCall
 from lca.contracts.models.core.execution.decision import (
     Decision,
     ToolCall,
     requires_human_input,
 )
+from lca.contracts.models.core.state.plane import PlaneBindings, PlaneKind, PlaneRef
 from lca.contracts.protocols.graph.command import Command
 from lca.contracts.protocols.graph.routing import RoutingDecision
+from lca.infrastructure.runtime_plane.access.classify import machine_calls_need_approval
+from lca.infrastructure.runtime_plane.bindings.bindings import plane_bindings_scope
+from lca.loop.driver import _pause_from_interrupt, _paused_outcome_parts
 from lca.nodes.concept.decision_classify.compose_action import _compose
 from lca.nodes.intervene.approve_gate import ApproveGateExecutor
 from lca.nodes.intervene.interrupt import InterruptExecutor
-from lca.loop.driver import _pause_from_interrupt, _paused_outcome_parts
+from lca.plugins.gate.decision_classifier_provider import DefaultDecisionClassifier
 from lca.runtime.support.resume_input import HumanAnswerResumeInputAdapter
+
+
+def _tool_call_response(name: str, arguments: dict[str, object]) -> LLMResponse:
+    """A native function-calling response carrying one tool call."""
+    return LLMResponse(
+        text="",
+        finish_reason="tool_calls",
+        tool_calls=[NativeToolCall(call_id="c-native", name=name, arguments=arguments)],
+    )
 
 
 _QUESTIONS = [
@@ -103,9 +117,7 @@ class TestStep2ApproveGateRoutesToInterrupt:
         gate = ApproveGateExecutor()
         decision = _ask_decision()
         ctx = SimpleNamespace()
-        node_input = SimpleNamespace(
-            port_values={"decision": decision, "command": None}
-        )
+        node_input = SimpleNamespace(port_values={"decision": decision, "command": None})
         output = await gate.node_execute(ctx, node_input)
         routing = output.port_values["approval_routing"]
         assert routing.next_hint == "approve_interrupt"
@@ -115,16 +127,12 @@ class TestStep2ApproveGateRoutesToInterrupt:
     async def test_skipped_for_regular_tool(self) -> None:
         gate = ApproveGateExecutor()
         decision = _compose(
-            tool_calls=(
-                ToolCall(call_id="tc", tool_name="bash", arguments={}),
-            ),
+            tool_calls=(ToolCall(call_id="tc", tool_name="bash", arguments={}),),
             delegations=(),
             intent="",
         )
         ctx = SimpleNamespace()
-        node_input = SimpleNamespace(
-            port_values={"decision": decision, "command": None}
-        )
+        node_input = SimpleNamespace(port_values={"decision": decision, "command": None})
         output = await gate.node_execute(ctx, node_input)
         routing = output.port_values["approval_routing"]
         assert routing.next_hint == "approve_skipped"
@@ -139,9 +147,7 @@ class TestStep3InterruptEmitsTerminate:
         interrupt = InterruptExecutor()
         decision = _ask_decision()
         ctx = SimpleNamespace()
-        node_input = SimpleNamespace(
-            port_values={"decision": decision, "spine_seq": 42}
-        )
+        node_input = SimpleNamespace(port_values={"decision": decision, "spine_seq": 42})
         output = await interrupt.node_execute(ctx, node_input)
         cmd = output.port_values["command"]
         routing = output.port_values["routing"]
@@ -193,9 +199,7 @@ class TestStep5ApprovalRequestShape:
         )
         pause = _pause_from_interrupt(visits)
         assert pause is not None
-        stop, cursor, approval = _paused_outcome_parts(
-            pause, plan_ref="plan-1", visits=visits
-        )
+        _stop, cursor, approval = _paused_outcome_parts(pause, plan_ref="plan-1", visits=visits)
         assert approval["type"] == "ask_user_question"
         assert approval["questions"] == _QUESTIONS
         assert approval["approval_id"] == "plan-1:intervene.interrupt:1"
@@ -305,9 +309,7 @@ class TestFullLoopIntegration:
         assert pause is not None
 
         # Step 5: approval_request carries questions
-        _, cursor, approval = _paused_outcome_parts(
-            pause, plan_ref="plan-x", visits=(visit,)
-        )
+        _, cursor, approval = _paused_outcome_parts(pause, plan_ref="plan-x", visits=(visit,))
         assert approval["questions"] == _QUESTIONS
         assert cursor.node_id == "perceive.main"
 
@@ -320,11 +322,127 @@ class TestFullLoopIntegration:
         # Step 7: WS events carry the pause to frontend
         from lca.application.runtime.coordinator.event_translator import EventTranslator
 
-        events = EventTranslator._spine_close({
-            "final_state": {"status": "waiting_input"},
-            "reason": "waiting_input",
-            "pending_tools_calling": [],
-        })
+        events = EventTranslator._spine_close(
+            {
+                "final_state": {"status": "waiting_input"},
+                "reason": "waiting_input",
+                "pending_tools_calling": [],
+            }
+        )
         assert isinstance(events, list)
         assert events[0]["data"]["phase"] == "human_approval"
         assert events[1]["data"]["reason"] == "waiting_input"
+
+
+_MACHINE_ROOT = "F:\\下载"
+_MACHINE_HOME = "C:\\Users\\li"
+_SSH_KEY = "C:\\Users\\li\\.ssh\\id_rsa"
+_HOME_CONFIG = (
+    "C:\\Users\\li\\AppData\\Roaming\\io.github.clash-verge-rev.clash-verge-rev\\verge.yaml"
+)
+
+
+def _machine_bindings() -> PlaneBindings:
+    return PlaneBindings(
+        primary=PlaneRef(
+            id="m-lipcmain",
+            label="lipcmain",
+            kind=PlaneKind.MACHINE,
+            root=_MACHINE_ROOT,
+            outputs_dir=f"{_MACHINE_ROOT}\\outputs",
+            platform="Windows",
+            home=_MACHINE_HOME,
+        )
+    )
+
+
+def _machine_decision(path: str) -> Decision:
+    return _compose(
+        tool_calls=(
+            ToolCall(call_id="tc-m", tool_name="local_readFile", arguments={"path": path}),
+        ),
+        delegations=(),
+        intent="",
+    )
+
+
+class TestMachineAccessConsentChain:
+    """A machine call the access policy gates reaches intervene.interrupt.
+
+    This is the consent half of ADR-0246 §1.1. Authorization decides the
+    verdict; the graph pause carries it. The run must not fail silently the way
+    run_5fd426ea0367 did.
+    """
+
+    def test_credential_read_sets_needs_approval(self) -> None:
+        with plane_bindings_scope(_machine_bindings()):
+            assert _machine_decision(_SSH_KEY).needs_approval is True
+
+    def test_read_inside_grant_does_not_pause(self) -> None:
+        with plane_bindings_scope(_machine_bindings()):
+            assert _machine_decision(_HOME_CONFIG).needs_approval is False
+
+    def test_no_bound_plane_means_no_machine_opinion(self) -> None:
+        assert _machine_decision(_SSH_KEY).needs_approval is False
+
+    def test_sandbox_plane_does_not_gate_twice(self) -> None:
+        sandbox = PlaneBindings(
+            primary=PlaneRef(
+                id="sb-1",
+                label="Onlyboxes",
+                kind=PlaneKind.SANDBOX,
+                root="/mnt/data",
+                outputs_dir="/mnt/data/outputs",
+            )
+        )
+        with plane_bindings_scope(sandbox):
+            decision = _compose(
+                tool_calls=(
+                    ToolCall(
+                        call_id="tc-s",
+                        tool_name="readFile",
+                        arguments={"path": "/etc/passwd"},
+                    ),
+                ),
+                delegations=(),
+                intent="",
+            )
+        assert decision.needs_approval is False
+
+    @pytest.mark.asyncio
+    async def test_gated_machine_call_routes_to_interrupt(self) -> None:
+        with plane_bindings_scope(_machine_bindings()):
+            decision = _machine_decision(_SSH_KEY)
+        output = await ApproveGateExecutor().node_execute(
+            SimpleNamespace(),
+            SimpleNamespace(port_values={"decision": decision, "command": None}),
+        )
+        routing = output.port_values["approval_routing"]
+        assert routing.next_hint == "approve_interrupt"
+        assert routing.next_node == "intervene.interrupt"
+
+    @pytest.mark.asyncio
+    async def test_allowed_machine_call_routes_to_envelope(self) -> None:
+        with plane_bindings_scope(_machine_bindings()):
+            decision = _machine_decision(_HOME_CONFIG)
+        output = await ApproveGateExecutor().node_execute(
+            SimpleNamespace(),
+            SimpleNamespace(port_values={"decision": decision, "command": None}),
+        )
+        routing = output.port_values["approval_routing"]
+        assert routing.next_hint == "approve_skipped"
+        assert routing.next_node == "act.envelope"
+
+    def test_all_three_producers_classify_identically(self) -> None:
+        calls = (
+            ToolCall(call_id="tc-m", tool_name="local_readFile", arguments={"path": _SSH_KEY}),
+        )
+        with plane_bindings_scope(_machine_bindings()):
+            assert requires_human_input(calls) is False
+            assert machine_calls_need_approval(calls) is True
+            assert (
+                DefaultDecisionClassifier()
+                .classify(_tool_call_response("local_readFile", {"path": _SSH_KEY}))
+                .needs_approval
+                is True
+            )
