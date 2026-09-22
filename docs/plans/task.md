@@ -198,7 +198,15 @@
 | BRAINSTORM-ADR248-COMPLETION-CONTEXT | 深度梳理 ADR-0248 剩余切片缺口（Box Accessor、Auto-Review 三态、Initiative Hooks、运行时主循环总装） | Completed | 已摸清四大核心缺口与已有模块映射，明确补齐目标与架构分层 |
 | BRAINSTORM-ADR248-COMPLETION-QUESTIONS | 澄清补齐范围、优先级与总装策略（单步提问） | Completed | 用户选定推荐方案：全量推进两阶段落地（阶段一补齐切片 3/4/8 领域能力，阶段二完成运行时主循环总装） |
 | BRAINSTORM-ADR248-COMPLETION-APPROACHES | 提炼 2-3 种补齐与演进方案及权衡对比 | Completed | 提出方案 A（统一领域下沉与声明式注入）、方案 B（外挂中间件）、方案 C（主循环硬编码），用户确认采纳方案 A |
-| BRAINSTORM-ADR248-COMPLETION-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量测试）并获取用户审批 | In Progress | 正在逐步呈现 4 大设计细节并征询用户审批确认 |
-| BRAINSTORM-ADR248-COMPLETION-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Pending | 待设计获批后落盘并提交 git |
-| BRAINSTORM-ADR248-COMPLETION-TRANSITION | 转换至实施计划制定（writing-plans） | Pending | 待设计完工后启动单流执行计划编制 |
+| BRAINSTORM-ADR248-COMPLETION-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量测试）并获取用户审批 | Completed | 全部 4 节设计细节（边界与Autopilot、三大领域模型、主循环总装机制、不变量断言矩阵）均获用户审批通过 |
+| BRAINSTORM-ADR248-COMPLETION-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Completed | 落盘 docs/plans/2026-09-23-adr-0248-completion-and-runtime-wiring-design.md 并提交 git (commit 68cb379b6) |
+| BRAINSTORM-ADR248-COMPLETION-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 落盘实施计划 docs/plans/2026-09-23-adr-0248-completion-and-runtime-wiring-plan.md 并提交 git |
+| ADR248-TASK-1-BOX-ACCESSOR | 切片 3：员工电脑平面与 BoxAccessor（ComputerPlane, BoxAccessor 沙箱隔离与读写） | Pending | 待执行 |
+| ADR248-TASK-2-AUTO-REVIEW-CONTRACTS | 切片 4：Auto-Review 契约与动作指纹（AutoReviewMode, AutoReviewVerdict, action_fingerprint） | Pending | 待执行 |
+| ADR248-TASK-3-AUTO-REVIEW-GATE | 切片 4：Auto-Review 硬闸与重放人审核验（AutoReviewGate 三态拦截与 Escalate 指纹核验） | Pending | 待执行 |
+| ADR248-TASK-4-INITIATIVE-HOOKS | 切片 8：Initiative Hooks 纯函数主动提议器（InitiativeOffer, evaluate_initiative 单轮收敛） | Pending | 待执行 |
+| ADR248-TASK-5-RUNTIME-WIRING | 阶段二：运行时主循环总装适配器（RuntimeVocalContext, CognitiveRuntime Seam 挂接与 Settle 校验） | Pending | 待执行 |
+| ADR248-TASK-6-E2E-SCENARIO | 阶段二：ADR-0248 全链路闭环端到端集成场景测试（test_runtime_loop_gated_e2e.py） | Pending | 待执行 |
+| ADR248-TASK-7-REGRESSION | 全链路全量单测回归、代码风格检查与架构守卫验证（Pytest, Ruff, Diff Clean） | Pending | 待执行 |
+
 
