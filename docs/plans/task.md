@@ -82,4 +82,10 @@
 | APPROVAL-TASK-4-THINK-PURITY | 认知层纯净化：think.decision.parse 剔除跨层 runtime_plane 依赖 | Completed | 切除 think.decision.parse 对 runtime_plane 的跨层依赖，恢复纯净认知映射；AST 纯净化测试与 91+ think 测试全通；compose_action 统一接入 ApprovalPolicyEngine 保障 ADR-0246 consent 链 |
 | APPROVAL-TASK-5-ACT-GATE | 控制面图节点化：act.authorize 与 act.approve.gate 接入结构化审批契约 | Completed | act.authorize 接入 ApprovalPolicyEngine 输出结构化 approval_requirement；act.approve.gate 消费 rich requirement 且兼顾向后兼容；27/27 intervene 单测全绿 |
 | APPROVAL-TASK-6-REGRESSION | 全链路回归验证：全量测试套件、代码门禁与架构守卫验证 | Completed | 全量回归测试套件 171/171 全绿（contracts/engine/think/intervene/plane_bindings/hitl_e2e）；ruff check 0 报错；git diff --check clean；AGENTS.md 188 行符合规范；负边界 Does NOT own 100% 遵守 |
+| BRAINSTORM-LOCAL-ENV-CONTEXT | 深度剖析前端执行环境“本机”状态、配对码本质与安装全链路 | Completed | 已梳理 HeteroDeviceSwitcher、execution_target patch、DevicePairingService、preauth 机制与 install.ps1/sh 脚本链路 |
+| BRAINSTORM-LOCAL-ENV-QUESTIONS | 澄清配对码本质与确认“本机”交互与状态机改造方案 | Completed | 回答配对码意义与免输入机制，确认多台主机命名、双启动模式与后端持久化免交互需求 |
+| BRAINSTORM-LOCAL-ENV-APPROACHES | 提出 2-3 种具体交互与技术架构方案及权衡 | Completed | 提炼方案 A（原生状态卡片+动态免密脚本下载+一键命令复制）、方案 B（URI Protocol 协议唤起）、方案 C（Inline 展开），用户选定方案 A |
+| BRAINSTORM-LOCAL-ENV-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量）并获取用户审批 | In Progress | 细化生命周期、重连秒启机制、分层契约与前端组件架构，逐步呈批 |
+| BRAINSTORM-LOCAL-ENV-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Pending | 待沉淀 |
+| BRAINSTORM-LOCAL-ENV-TRANSITION | 转换至实施计划制定（writing-plans） | Pending | 待转换 |
 
