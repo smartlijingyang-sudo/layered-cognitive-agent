@@ -105,3 +105,17 @@ def test_folded_delegation_result_contract():
             consensus_status="unanimous",
             illegal="value",
         )
+
+
+def test_peer_folded_result_supports_member_metadata():
+    result = PeerFoldedResult(
+        task_id="task_meta_1",
+        member_findings={"custom/analyst": "分析完成"},
+        synthesized_verdict="【协同汇报】全员共识已形成",
+        consensus_status="unanimous",
+        member_metadata={
+            "custom/analyst": {"name": "李四", "role": "数据分析师", "emoji": "📊"}
+        },
+    )
+    assert result.member_metadata["custom/analyst"]["name"] == "李四"
+    assert result.member_metadata["custom/analyst"]["emoji"] == "📊"

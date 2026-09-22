@@ -58,6 +58,7 @@ class PeerFoldedResult(BaseModel):
     member_findings: dict[str, str]
     synthesized_verdict: str
     consensus_status: Literal["unanimous", "concerns_noted", "split"]
+    member_metadata: dict[str, dict[str, str]] = {}
 
 
 # Backward-compatible alias to avoid breaking existing references
