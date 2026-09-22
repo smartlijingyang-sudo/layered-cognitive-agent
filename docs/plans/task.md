@@ -137,9 +137,9 @@
 | BRAINSTORM-CREATOR-CONTEXT | 深度调研 deepseek-harness 创造模式与 LCA Creator 对齐现状与差距 | Completed | 摸清 DSH（cordis preset/runtimes/discovery/skills）与 LCA（四面协议/PresetAuthoring/单向层）全景差异，定位 4 大核心断裂与缺口 |
 | BRAINSTORM-CREATOR-QUESTIONS | 澄清 Agent 专属目录组织、自感知感知链与运行时动态注入诉求 | Completed | 用户选定双层同构自治方案（{assistant_home}/presets/ 与 plugins/），并强调支持 preset 跨 Agent 共享、提升导出为项目内置预置等灵活演进场景 |
 | BRAINSTORM-CREATOR-APPROACHES | 提炼 2-3 种端到端能力闭环与自感知架构方案与权衡对比 | Completed | 用户选定方案 A（三层阶梯式自治与感知架构），要求采用 DDD、设计模式、第一性原理、模块化与高可扩展性 |
-| BRAINSTORM-CREATOR-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量测试）并获取用户审批 | In Progress | 正在呈现第一节：DDD 领域模型、存储分层拓扑与边界管控 |
-| BRAINSTORM-CREATOR-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Pending | 待执行 |
-| BRAINSTORM-CREATOR-TRANSITION | 转换至实施计划制定（writing-plans） | Pending | 待执行 |
+| BRAINSTORM-CREATOR-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量测试）并获取用户审批 | Completed | 3 大小节（DDD 模型边界、组件与执行链路、5 大端到端场景与可观测事件）均获用户审批通过 |
+| BRAINSTORM-CREATOR-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Completed | 落盘 docs/plans/2026-09-22-creator-mode-assistant-home-alignment-design.md 并完成 git 提交（commit fedf426fc） |
+| BRAINSTORM-CREATOR-TRANSITION | 转换至实施计划制定（writing-plans） | In Progress | 正在使用 writing-plans 技能编写细粒度实施计划 |
 | E2E-BROWSER-SCENARIO-1 | 场景1：agent-browser 导航进入架构小助会话并验证会话视图与执行环境 | Completed | agent-browser 成功导航至 http://127.0.0.1:3010/agent/agt_erElPnOEkHdF/，验证会话视图加载、标题（Inquiry About Assistant Capabilities · 架构小助 · LobeHub）、多轮历史记录与执行环境按钮（Auto/Manual/solo/Agent），零控制台报错，截屏留存 docs/plans/scenario1_arch_assistant_session.png (67KB) |
 | E2E-BROWSER-SCENARIO-2 | 场景2：agent-browser 验证架构协同成员条（MemberChipsBar）与折叠面板挂载 | Completed | 架构小助消息气泡顶部成功激活并挂载 CollaborationTeamBar，呈现「👥 架构协同三角已组队:」标题、三大专家芯片（📐 观澜 · 边界与契约[blue] / ⚖️ 衡岳 · 状态机与不变量[gold] / 🔍 镜川 · 对抗审计[purple]）及「已收敛汇总[green]」标签，AntD Collapse 成功挂载，截屏留存 docs/plans/scenario2_collaboration_team_bar.png (78KB) |
 | E2E-BROWSER-SCENARIO-3 | 场景3：agent-browser 点击展开专家折叠面板（Collapse）并截屏留存证据 | Completed | agent-browser 真实触发点击 @e73 (观澜)、@e74 (衡岳)、@e75 (镜川)，3 个折叠项全数切换为 expanded=true，DOM .ant-collapse-body 完整渲染各专家独立隔离审查报告详情，截屏留存 docs/plans/scenario3_collaboration_collapse_expanded.png (98KB)，33/33 自动化协同单测全绿，补丁 byte-identical 100% 一致 |
