@@ -61,6 +61,7 @@ class ActAuthorizeExecutor:
         "decision",
         "state",
         "approval_required",
+        "approval_requirement",
     )
 
     async def node_execute(
@@ -125,19 +126,25 @@ class ActAuthorizeExecutor:
                         f"act.authorize: unsafe tool name rejected: {call.tool_name!r}"
                     )
 
-        # ADR-0237 / PR-1b: typed ``approval_required`` — Decision carries
-        # ``needs_approval`` (typed field, PR-5); we project it onto a
-        # subgraph-local boolean so the inner edge predicate
-        # ``act.authorize → act.approve.gate`` can read it without crossing
-        # into Decision's payload_type. Computed once at the seam, not
-        # re-read on every dispatch.
-        approval_required = bool(decision.needs_approval)
+        # ADR-0237 / PR-1b: typed ``approval_required`` and structured
+        # ``approval_requirement``. We evaluate policies via ApprovalPolicyEngine
+        # and project onto the subgraph ports.
+        from lca.infrastructure.runtime_plane.access.approval_engine import (
+            build_default_approval_engine,
+        )
+        from lca.infrastructure.runtime_plane.bindings.bindings import current_primary
+
+        plane = getattr(state, "primary_plane", None) or current_primary()
+        req = build_default_approval_engine().evaluate(decision.tool_calls, plane=plane)
+
+        approval_required = bool(decision.needs_approval) or bool(req.required)
 
         return NodeOutput(
             port_values={
                 "decision": decision,
                 "state": state,
                 "approval_required": approval_required,
+                "approval_requirement": req,
             }
         )
 

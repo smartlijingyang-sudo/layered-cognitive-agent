@@ -115,7 +115,11 @@ class ApproveGateExecutor:
                 f"got {type(command).__name__}"
             )
 
-        needs_approval = bool(decision.needs_approval)
+        req = input.port_values.get("approval_requirement")
+        if req is not None and hasattr(req, "required"):
+            needs_approval = bool(req.required)
+        else:
+            needs_approval = bool(decision.needs_approval)
 
         if not needs_approval:
             next_hint = _NEXT_HINT_APPROVE_SKIPPED
@@ -141,9 +145,10 @@ class ApproveGateExecutor:
             next_node=next_node,
             next_hint=next_hint,
         )
-        return NodeOutput(
-            port_values={"decision": decision, "approval_routing": routing}
-        )
+        port_values = {"decision": decision, "approval_routing": routing}
+        if req is not None:
+            port_values["approval_requirement"] = req
+        return NodeOutput(port_values=port_values)
 
 
 @plugin(
