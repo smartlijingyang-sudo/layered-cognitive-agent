@@ -30,6 +30,9 @@ class FallbackMemoryFilter(MemoryPreFilter):
         enabled: bool | None = None,
         circuit_breaker_seconds: float | None = None,
     ) -> None:
+        from lca.infrastructure.llm_adapter.factory.factory import load_dotenv_if_present
+
+        load_dotenv_if_present()
         self._primary = primary
         self._fallback = fallback if fallback is not None else RegexMemoryFilter()
         if enabled is not None:
@@ -76,7 +79,20 @@ class FallbackMemoryFilter(MemoryPreFilter):
             self._primary = TypeSafeMemoryFilter(api_key=api_key)
 
         try:
-            return await self._primary.evaluate(text)
+            res = await self._primary.evaluate(text)
+            if res.should_extract:
+                return res
+            # ADR-0247 准则：漏报丢记忆不可接受，误报仅多一次 LLM 抽取。
+            # 若语义评分略低于阈值，但本地规则命中显式关键词，由本地规则放行。
+            fallback_res = await self._fallback.evaluate(text)
+            if fallback_res.should_extract:
+                return FilterDecision(
+                    should_extract=True,
+                    reason=f"fallback_cooperative_match:{fallback_res.reason}",
+                    source=f"{res.source}+regex",
+                    confidence=max(res.confidence, fallback_res.confidence),
+                )
+            return res
         except Exception as exc:
             logger.warning("TypeSafeMemoryFilter 调用失败或额度耗尽，触发断路器熔断降级: %s", exc)
             self._circuit_open_until = time.time() + self._circuit_breaker_seconds

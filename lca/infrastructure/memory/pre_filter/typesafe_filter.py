@@ -16,10 +16,16 @@ class TypeSafeMemoryFilter(MemoryPreFilter):
     def __init__(
         self,
         api_key: str | None = None,
-        threshold: float = 0.65,
+        threshold: float = 0.50,
         timeout_seconds: float = 1.5,
     ) -> None:
-        self._api_key = api_key if api_key is not None else os.getenv("TYPESAFE_API_KEY", "")
+        if api_key is None:
+            from lca.infrastructure.llm_adapter.factory.factory import load_dotenv_if_present
+
+            load_dotenv_if_present()
+            self._api_key = os.getenv("TYPESAFE_API_KEY", "")
+        else:
+            self._api_key = api_key
         self._threshold = threshold
         self._timeout_seconds = timeout_seconds
 
@@ -33,7 +39,10 @@ class TypeSafeMemoryFilter(MemoryPreFilter):
                     state={"statement": text},
                     questions={
                         "should_memorize": Noul(
-                            instructions="该用户陈述是否表达了应当被长期记住的个人身份、角色、习惯偏好或项目指导方针？"
+                            instructions=(
+                                "该用户陈述是否表达了应当被长期记住的个人身份角色、"
+                                "习惯偏好、项目指导方针、系统约束或环境配置？"
+                            )
                         )
                     },
                 )
