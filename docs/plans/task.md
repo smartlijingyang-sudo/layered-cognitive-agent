@@ -173,5 +173,5 @@
 | MEM-TASK-2-EPISODIC | 情景记忆生成与自我感知闭环（AssistantMemory.update 写入 episodic.json / 50条滚动缓冲区） | Completed | 实现工具执行自省侦测，沉淀 MemoryLayer.EPISODIC 情景记录，50 条容量 FIFO 滚动限制，保持 working 观察面；25/25 assistant memory 测试全通 |
 | MEM-TASK-3-RELEVANCE | 接入多维相关性检索（AssistantMemory.retrieve 接入 LayeredRetrievalPolicy relevance*recency*importance） | Completed | 移除 del manifest, query，接入加权检索打分与时间衰减因子，按 relevance*recency*importance 降序排序并做 Token 预算剪裁；27/27 测试全通 |
 | MEM-TASK-4-PROMPT-DEDUP | Prompt 呈现去重与纯净化（ContextSection 与 UserProfileSection 互斥 / 修复旧测试） | Completed | render_context_lines 增加 exclude_categories 过滤；ContextSection 显式排除 IDENTITY 与 PREFERENCE 分类，交由 UserProfileSection 专职结构化呈现；修复 test_home_section_in_builtin_react_template；12/12 prompt 测试全通，ruff clean |
-| MEM-TASK-5-SCENARIOS | 5 大多场景端到端闭环验证（用户画像演化 / 环境规则感知 / 自我情景记忆 / 意图检索剪裁 / 受治理工具） | In Progress | 正在构建 5 大场景端到端闭环测试套件 |
-| MEM-TASK-6-REGRESSION | 全链路回归、代码门禁与架构守卫验证（Pytest / Ruff / Diff Clean） | Pending | 待执行 |
+| MEM-TASK-5-SCENARIOS | 5 大多场景端到端闭环验证（用户画像演化 / 环境规则感知 / 自我情景记忆 / 意图检索剪裁 / 受治理工具） | Completed | 编写 tests/scenario/memory/test_memory_closed_loop_scenarios.py，全覆盖 5 大端到端业务场景与 INV-01~06 6大不变量断言（画像演化supersede、环境客观事实、情景自我感知50条FIFO、相关度降序与预算剪裁、受治理工具与风控确认），5/5场景全绿，ruff clean |
+| MEM-TASK-6-REGRESSION | 全链路回归、代码门禁与架构守卫验证（Pytest / Ruff / Diff Clean） | In Progress | 正在运行全量记忆回归测试套件与代码门禁 |
