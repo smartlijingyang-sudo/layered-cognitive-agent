@@ -138,7 +138,7 @@ async def test_full_collaboration_system_lifecycle_flow(tmp_path: Path):
     assert obs.success is True
     payload = obs.payload
     assert payload["consensus_status"] == "unanimous"
-    assert "架构三角已形成完全共识" in payload["synthesized_verdict"]
+    assert "全员共识已形成" in payload["synthesized_verdict"]
     assert len(payload["member_findings"]) == 3
 
     # =========================================================================
@@ -170,7 +170,7 @@ async def test_full_collaboration_system_lifecycle_flow(tmp_path: Path):
     # Step 7: 前端数据映射与折叠卡片契约核验 (Frontend Data Contract)
     # =========================================================================
     # 验证最终报告文本包含触发前端 CollaborationTeamBar 的关键字
-    assert "【架构协同汇报】" in payload["synthesized_verdict"]
+    assert "【协同汇报】" in payload["synthesized_verdict"]
     # 验证 payload 能被前端 extra / metadata 直接消费并构造 3 个展开详情
     findings = payload["member_findings"]
     assert any("观澜" in k or "guanlan" in k for k in findings)

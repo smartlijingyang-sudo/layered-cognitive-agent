@@ -61,7 +61,7 @@ def test_full_flow_peer_collaboration_e2e():
 
     # 5. 断言汇总结论
     assert folded.consensus_status == "unanimous"
-    assert "架构三角已形成完全共识" in folded.synthesized_verdict
+    assert "全员共识已形成" in folded.synthesized_verdict
     assert len(folded.member_findings) == 3
 
     # 断言 Hermes 隔离原则：中间工具噪音绝未穿透到最终结果
@@ -72,7 +72,7 @@ def test_full_flow_peer_collaboration_e2e():
         assert "$" not in finding
 
     # 6. 前端标记判定：最终汇报包含触发前端 CollaborationTeamBar 的标志
-    assert "【架构协同汇报】" in folded.synthesized_verdict
+    assert "【协同汇报】" in folded.synthesized_verdict
 
 
 def test_full_flow_timeout_degradation_e2e():
