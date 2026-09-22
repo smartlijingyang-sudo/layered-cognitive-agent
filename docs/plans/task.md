@@ -109,4 +109,7 @@
 | REVIEW-FIX-2-GRANT-SCOPE-PROJECTION | 修复 MachineLocalExecAdapter 投影 access_scope_of(grant) 与补全单测断言（闭环 AP-02/AP-03） | Completed | MachineLocalExecAdapter.execute 执行时动态投影 access_scope_of(grant) 至底层 computer._scope，修复 tests/infrastructure/computer/ 41/41 全绿 |
 | REVIEW-FIX-3-CODE-HYGIENE | 伴侣客户端代码整洁度与健壮性提升（PEP 8 顶层 import、跨平台 is_process_alive 精准判定） | Completed | 提升 client.py 顶层规范化 import，修复 is_process_alive 对系统 errno.EPERM 的存活性识别，单测 11/11 全通 |
 | REVIEW-COMPREHENSIVE-TESTS | 全量关联单测、场景测试、架构门禁与补丁一致性验证 | Completed | 关联单测与场景测试 55/55 全绿；patch_lobehub.py 23/23 ok；check_patch_integrity 81 文件 byte-identical；ruff check 0 报错；git diff --check clean；AP-01 负边界 100% 达标 |
-
+| WECHAT-REVIEW-UNDERSTAND | 梳理微信频道原生接管设计、提交差异与核心契约 | Completed | 梳理完成 6 大提交、17 个变更文件与全链路数据流架构设计 |
+| WECHAT-REVIEW-FLOW-TEST | 执行微信频道全套流程测试（端到端E2E/Worker/Client/Formatter/Route/Patch） | Completed | 23/23 测试 100% 全绿（含扫码绑定、轮询、消息上行、打字态、进度下行、最终回复、解绑及异常测试） |
+| WECHAT-REVIEW-CODE-AUDIT | 深度 Review 代码规范性、坏味道、可维护性、并发安全与架构不变量 | Completed | 对照 AP-01 至 AP-06、SSOT 单写、C1-C14 不变量与 ruff 严格核验通过 |
+| WECHAT-REVIEW-REPORT | 输出结构化审查报告与整改/演进建议 | Completed | 输出合并与清理报告，代码已安全推送至 origin/main |
