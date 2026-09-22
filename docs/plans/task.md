@@ -164,8 +164,14 @@
 | DYN-ROLE-TASK-7-UI-PATCH | 前端协同 UI 数据驱动化：基于 findings 动态渲染 Tag 与 Collapse 面板 | Completed | 彻底移除人名与写死 3 项卡片；重构为遍历 findings 与 member_metadata 动态渲染调色板 Tag 与 Collapse 审查面板；patch verify 25 ok，check_patch_integrity 84 文件 byte-identical 全过 |
 | DYN-ROLE-TASK-8-REGRESSION | 全链路回归验证：全量单测、补丁一致性与代码门禁验证 | Completed | 1. 关联单测与场景测试 35/35 全数通过（耗时 6.80s，涵盖协同全链路：contracts/triage/fold/peer_provider/room/delegate_tools/group_chat_e2e/lifecycle）；2. 变更代码 ruff check 0 报错通过；3. 补丁一致性 check_patch_integrity 84 文件 100% byte-identical；4. git diff --check 退出码 0；5. AP-01 负向清单（未触碰核心循环）与 AP-02 测试不变量 100% 达标 |
 | BRAINSTORM-MEMORY-CONTEXT | 深度审计 ADR-0244/0247 与记忆链路全景（提取/门禁/存储/检索/呈现/自感知） | Completed | 已完成代码与 ADR 深度排查，定位 8 大断裂缺口（预过滤偏词、情景记忆真空、检索相关性丢弃、双重呈现、bootstrap 截断等） |
-| BRAINSTORM-MEMORY-QUESTIONS | 澄清记忆测试维度与评测场景期望（单步提问） | In Progress | 正在向用户发起场景与目标澄清提问 |
+| BRAINSTORM-MEMORY-QUESTIONS | 澄清记忆测试维度与评测场景期望（单步提问） | Completed | 用户选定方案 1（诊断性多场景真实验证 + 直击根因彻底闭环），指出 TYPESAFE_API_KEY 已配置在 .env |
 | BRAINSTORM-MEMORY-APPROACHES | 提炼 2-3 种测试与多场景验证方案及系统演进权衡 | Completed | 提出方案 A（分层闭环+自环人感知）、方案 B（轻量补丁）、方案 C（图重构），用户明确批准方案 A |
-| BRAINSTORM-MEMORY-DESIGN-SECTIONS | 逐步呈现多场景测试套件与记忆闭环设计细节（Owns/Does NOT own/不变量） | In Progress | 正在逐步呈批设计方案细节（Section 1: 边界、级别与预过滤） |
-| BRAINSTORM-MEMORY-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Pending | 待落盘 |
-| BRAINSTORM-MEMORY-TRANSITION | 转换至实施计划制定（writing-plans） | Pending | 待转化 |
+| BRAINSTORM-MEMORY-DESIGN-SECTIONS | 逐步呈现多场景测试套件与记忆闭环设计细节（Owns/Does NOT own/不变量） | Completed | 全部 3 节设计细节（边界/门禁、情景写入/相关性检索/Prompt去重、5大场景与不变量）获用户审批 |
+| BRAINSTORM-MEMORY-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Completed | 落盘 docs/plans/2026-09-22-memory-closed-loop-and-scenario-validation-design.md 并已提交 git |
+| BRAINSTORM-MEMORY-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 落盘 docs/plans/2026-09-22-memory-closed-loop-and-scenario-validation-plan.md 并已提交 git |
+| MEM-TASK-1-PREFILTER | 预过滤门禁韧性与环境加载（.env 加载 / Jev 提问指南与阈值调优 / 词表拓展） | Pending | 待执行 |
+| MEM-TASK-2-EPISODIC | 情景记忆生成与自我感知闭环（AssistantMemory.update 写入 episodic.json / 50条滚动缓冲区） | Pending | 待执行 |
+| MEM-TASK-3-RELEVANCE | 接入多维相关性检索（AssistantMemory.retrieve 接入 LayeredRetrievalPolicy relevance*recency*importance） | Pending | 待执行 |
+| MEM-TASK-4-PROMPT-DEDUP | Prompt 呈现去重与纯净化（ContextSection 与 UserProfileSection 互斥 / 修复旧测试） | Pending | 待执行 |
+| MEM-TASK-5-SCENARIOS | 5 大多场景端到端闭环验证（用户画像演化 / 环境规则感知 / 自我情景记忆 / 意图检索剪裁 / 受治理工具） | Pending | 待执行 |
+| MEM-TASK-6-REGRESSION | 全链路回归、代码门禁与架构守卫验证（Pytest / Ruff / Diff Clean） | Pending | 待执行 |
