@@ -68,7 +68,7 @@
 | BRAINSTORM-APPROVAL-GATE-APPROACHES | 提出 2-3 种架构演进方案与权衡对比 | Completed | 提出方案 A（声明式两阶段图算子+策略责任链）、方案 B（中心化 PolicyService 插件）、方案 C（渐进式封装），用户审核确认选择方案 A |
 | BRAINSTORM-APPROVAL-GATE-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量测试）并获取用户审批 | Completed | 3 大小节（契约模型与拓扑、策略责任链与设计模式、边界清单与不变量测试）均获用户审批通过 |
 | BRAINSTORM-APPROVAL-GATE-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Completed | 已落地 docs/plans/2026-09-22-approval-policy-engine-design.md |
-| BRAINSTORM-APPROVAL-GATE-TRANSITION | 转换至实施计划制定（writing-plans） | In Progress | 准备调用 writing-plans 编制执行计划 |
+| BRAINSTORM-APPROVAL-GATE-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 已沉淀详细实施计划 docs/plans/2026-09-22-approval-policy-engine-plan.md 并提交 git |
 | BRAINSTORM-7DED-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量测试）与获取用户审批 | Completed | 3 大小节（边界与自治等级、核心组件数据流与设计模式、测试架构与不变量断言矩阵）均获用户审批通过 |
 | BRAINSTORM-7DED-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Completed | 已沉淀 docs/plans/2026-09-22-mcp-integration-refactor-design.md |
 | BRAINSTORM-7DED-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 已沉淀详细实施计划 docs/plans/2026-09-22-mcp-integration-refactor.md 并提交 git |
