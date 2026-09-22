@@ -99,7 +99,7 @@
 | BRAINSTORM-WECHAT-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Pending | 待执行 |
 | REVIEW-ANTIPATTERN-AUDIT | 代码质量审查与反模式深度审计（对照 AP-01 至 AP-06、SSOT、C1-C14 及代码异味） | Completed | 深度审计全部 12 个变更文件，完成 Checklist 逐项核验；定位 4 处关键优化点（下载端点缺码兜底、Adapter Grant 投影、PEP 8 import、进程存活判空与权限），已输出结构化审查报告 |
 | REVIEW-FIX-1-PREAUTH-FALLBACK | 服务端动态脚本下载端点缺码自愈（routes.py 动态生成 preauth_code 规避空参交互） | Completed | download_runner_bat/command 在未传 code 时自愈调用 pairing.preauth_code() 生成临时凭据，test_install_scripts.py 7/7 passed |
-| REVIEW-FIX-2-GRANT-SCOPE-PROJECTION | 修复 MachineLocalExecAdapter 投影 access_scope_of(grant) 与补全单测断言（闭环 AP-02/AP-03） | In Progress | 正在接入 access_scope_of(grant) 投影并修复 test_local_exec_port_e2e.py |
-| REVIEW-FIX-3-CODE-HYGIENE | 伴侣客户端代码整洁度与健壮性提升（PEP 8 顶层 import、跨平台 is_process_alive 精准判定） | Pending | 待执行 |
+| REVIEW-FIX-2-GRANT-SCOPE-PROJECTION | 修复 MachineLocalExecAdapter 投影 access_scope_of(grant) 与补全单测断言（闭环 AP-02/AP-03） | Completed | MachineLocalExecAdapter.execute 执行时动态投影 access_scope_of(grant) 至底层 computer._scope，修复 tests/infrastructure/computer/ 41/41 全绿 |
+| REVIEW-FIX-3-CODE-HYGIENE | 伴侣客户端代码整洁度与健壮性提升（PEP 8 顶层 import、跨平台 is_process_alive 精准判定） | In Progress | 优化 client.py 顶层 import 与 is_process_alive 对 EPERM 的正确识别 |
 | REVIEW-COMPREHENSIVE-TESTS | 全量关联单测、场景测试、架构门禁与补丁一致性验证 | Pending | 待执行 |
 

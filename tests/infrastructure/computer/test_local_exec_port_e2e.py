@@ -85,6 +85,7 @@ def _grant(
     idem: str = "idem-e2e-01",
     operation: str = "read_file",
     path_prefixes: list[str] | None = None,
+    command_allowlist: list[str] | None = None,
     expires_delta: int = 3600,
 ) -> CapabilityGrant:
     return CapabilityGrant(
@@ -95,7 +96,7 @@ def _grant(
         operation=operation,
         path_prefixes=path_prefixes or ["/repo"],
         command_class=None,
-        command_allowlist=[],
+        command_allowlist=command_allowlist or [],
         expires_at=int(time.time()) + expires_delta,
         approval_id="appr-01",
         request_digest="sha256-req-digest",
@@ -145,7 +146,12 @@ async def test_e2e_run_command_flow() -> None:
     """端到端命令执行全流程：检查退出状态与输出摘要。"""
     transport = _MockTransport()
     adapter = _build_machine_adapter(transport)
-    grant = _grant(job_id="job-cmd-1", idem="idem-cmd-1", operation="run_command")
+    grant = _grant(
+        job_id="job-cmd-1",
+        idem="idem-cmd-1",
+        operation="run_command",
+        command_allowlist=["pytest"],
+    )
 
     receipt = await adapter.execute(
         "run_command",

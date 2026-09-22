@@ -15,6 +15,7 @@ from lca.contracts.models.core.execution.local_exec import (
     EffectReceipt,
     LocalExecTarget,
     TargetKind,
+    access_scope_of,
 )
 from lca.infrastructure.computer.machine.machine import MachineComputer
 
@@ -61,7 +62,10 @@ class MachineLocalExecAdapter:
                     error_kind="scope_violation",
                     stdout_digest=None,
                 )
+        orig_scope = getattr(self._computer, "_scope", None)
         try:
+            if hasattr(self._computer, "_scope") and grant:
+                self._computer._scope = access_scope_of(grant)
             result = await self._dispatch(operation, args)
         except ConnectionError:
             return EffectReceipt(
@@ -71,6 +75,9 @@ class MachineLocalExecAdapter:
                 error_kind="device_offline",
                 stdout_digest=None,
             )
+        finally:
+            if hasattr(self._computer, "_scope") and orig_scope is not None:
+                self._computer._scope = orig_scope
         digest = (
             "sha256-" + hashlib.sha256(result.content.encode()).hexdigest()[:16]
             if result.content
