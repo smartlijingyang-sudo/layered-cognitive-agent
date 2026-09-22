@@ -5,12 +5,14 @@ from lca.infrastructure.vocal.exceptions import (
 )
 from lca.infrastructure.vocal.gate import DirectVocalGate, GatedVocalGate
 from lca.infrastructure.vocal.strategy import DirectVoiceStrategy, GatedVoiceStrategy
+from lca.infrastructure.vocal.tool import SendMessageTool
 
 __all__ = (
     "DirectVocalGate",
     "DirectVoiceStrategy",
     "GatedVocalGate",
     "GatedVoiceStrategy",
+    "SendMessageTool",
     "UndeliveredTurnError",
     "VocalGateAlreadyBlockedError",
     "VocalGateError",
