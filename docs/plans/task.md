@@ -136,8 +136,8 @@
 | PEER-ROOM-FLOW-E2E-LIFECYCLE | 串联测试：物化Home+房间持久化+消息路由+协调者工具+Hermes防污染+容错降级+前端渲染全链路闭环 | Completed | 落地 tests/collaboration/test_full_lifecycle_flow.py，全链路串联工作区物化、房间持久化、确定性消息分流、协调者工具发起、Hermes防污染Fold、异常超时降级与前端Collapse数据契约，33/33 协同测试全绿，byte-identical 一致通过 |
 | BRAINSTORM-CREATOR-CONTEXT | 深度调研 deepseek-harness 创造模式与 LCA Creator 对齐现状与差距 | Completed | 摸清 DSH（cordis preset/runtimes/discovery/skills）与 LCA（四面协议/PresetAuthoring/单向层）全景差异，定位 4 大核心断裂与缺口 |
 | BRAINSTORM-CREATOR-QUESTIONS | 澄清 Agent 专属目录组织、自感知感知链与运行时动态注入诉求 | Completed | 用户选定双层同构自治方案（{assistant_home}/presets/ 与 plugins/），并强调支持 preset 跨 Agent 共享、提升导出为项目内置预置等灵活演进场景 |
-| BRAINSTORM-CREATOR-APPROACHES | 提炼 2-3 种端到端能力闭环与自感知架构方案与权衡对比 | In Progress | 正在提炼具备跨 Agent 共享与平台提升能力的三套落地架构方案 |
-| BRAINSTORM-CREATOR-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量测试）并获取用户审批 | Pending | 待执行 |
+| BRAINSTORM-CREATOR-APPROACHES | 提炼 2-3 种端到端能力闭环与自感知架构方案与权衡对比 | Completed | 用户选定方案 A（三层阶梯式自治与感知架构），要求采用 DDD、设计模式、第一性原理、模块化与高可扩展性 |
+| BRAINSTORM-CREATOR-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量测试）并获取用户审批 | In Progress | 正在呈现第一节：DDD 领域模型、存储分层拓扑与边界管控 |
 | BRAINSTORM-CREATOR-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Pending | 待执行 |
 | BRAINSTORM-CREATOR-TRANSITION | 转换至实施计划制定（writing-plans） | Pending | 待执行 |
 | E2E-BROWSER-SCENARIO-1 | 场景1：agent-browser 导航进入架构小助会话并验证会话视图与执行环境 | Completed | agent-browser 成功导航至 http://127.0.0.1:3010/agent/agt_erElPnOEkHdF/，验证会话视图加载、标题（Inquiry About Assistant Capabilities · 架构小助 · LobeHub）、多轮历史记录与执行环境按钮（Auto/Manual/solo/Agent），零控制台报错，截屏留存 docs/plans/scenario1_arch_assistant_session.png (67KB) |
