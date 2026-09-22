@@ -63,3 +63,9 @@
 | BRAINSTORM-PROMPT-CLEANUP | 第一性原理与 DDD 设计模式重构：执行平面 Prompt/Fallback 垃圾逻辑清理与配置化统一管理 | Completed | 落地 ExecutionEnvironment 领域模型 + EnvironmentCatalog 端口适配器 + PlanePromptStrategy 策略模式 + listEnvironments 工具；53 测试通过 |
 | AWS-AGENT-TOOLKIT-SETUP | 接入 Agent Toolkit for AWS 使得 LCA Agent 支持 AWS 资源探查 | Completed | 1. AWS CLI v2与aws-lca profile（ap-northeast-1 / 账号272973566293）鉴权配置完成；2. 安装23项AWS Agent Skills与配置~/.gemini/settings.json及~/.codex/config.toml；3. AGENTS.md规范追加；4. .lca/mcp.yaml接入aws-mcp服务；5. lca-tools-provider动态挂载_mcp_factory，filter_tools_by_assistant支持mcp/aws-mcp前缀与过滤规则（单测22/22通过）；6. 架构小助（asst_44dd568b3bf9）物化过滤放行8项AWS工具；7. 编写test_aws_mcp_dialogue.py验证Agent对话循环中实时调用mcp__aws-mcp__aws___list_regions获取真实AWS区域（ap-northeast-1）100%全链路测试通过；8. 内核重启就绪 |
 | CLEANUP-AGENTS-MD | 清理 AGENTS.md 中误注入的 AWS Guidance 具体规则，恢复纯粹的 LCA Coding Agent Contract | Completed | 移除 ## 9. AWS Guidance（-7行），wc -l 188（<=220），git diff --check clean |
+| BRAINSTORM-APPROVAL-GATE-CONTEXT | 深度梳理 decision_needs_approval 上下游链路与六大架构不变量根因 | Completed | 梳理出职责倒挂（认知层import基础设施层全局状态）、双平面穿透（C2/C8）、布尔盲区（Boolean Blindness）、缺乏策略扩展性与图节点职责割裂等核心问题 |
+| BRAINSTORM-APPROVAL-GATE-QUESTIONS | 澄清重构目标与演进倾向（单步提问） | Completed | 用户明确选择彻底按第一性原理重构：解耦认知与许可、图节点化、策略模式与富上下文审批契约 |
+| BRAINSTORM-APPROVAL-GATE-APPROACHES | 提出 2-3 种架构演进方案与权衡对比 | Completed | 提出方案 A（声明式两阶段图算子+策略责任链）、方案 B（中心化 PolicyService 插件）、方案 C（渐进式封装），用户审核确认选择方案 A |
+| BRAINSTORM-7DED-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量测试）与获取用户审批 | Completed | 3 大小节（边界与自治等级、核心组件数据流与设计模式、测试架构与不变量断言矩阵）均获用户审批通过 |
+| BRAINSTORM-7DED-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Completed | 已沉淀 docs/plans/2026-09-22-mcp-integration-refactor-design.md |
+| BRAINSTORM-7DED-TRANSITION | 转换至实施计划制定（writing-plans） | In Progress | 正在加载 writing-plans 技能并编制实施计划 |
