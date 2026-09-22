@@ -163,4 +163,9 @@
 | DYN-ROLE-TASK-6-DELEGATE-TOOL | 协同委派工具通用化：泛化工具描述与回退模拟数据，支持动态团队 | Completed | TeamCastTool 与 HandoffToPeerTool 描述泛化；execute 根据 decision.selected_peers 动态派发与生成回执并注入 member_metadata；tests/tools/test_collaboration_delegate_tools.py 4/4 全通，ruff clean |
 | DYN-ROLE-TASK-7-UI-PATCH | 前端协同 UI 数据驱动化：基于 findings 动态渲染 Tag 与 Collapse 面板 | Completed | 彻底移除人名与写死 3 项卡片；重构为遍历 findings 与 member_metadata 动态渲染调色板 Tag 与 Collapse 审查面板；patch verify 25 ok，check_patch_integrity 84 文件 byte-identical 全过 |
 | DYN-ROLE-TASK-8-REGRESSION | 全链路回归验证：全量单测、补丁一致性与代码门禁验证 | Completed | 1. 关联单测与场景测试 35/35 全数通过（耗时 6.80s，涵盖协同全链路：contracts/triage/fold/peer_provider/room/delegate_tools/group_chat_e2e/lifecycle）；2. 变更代码 ruff check 0 报错通过；3. 补丁一致性 check_patch_integrity 84 文件 100% byte-identical；4. git diff --check 退出码 0；5. AP-01 负向清单（未触碰核心循环）与 AP-02 测试不变量 100% 达标 |
-| CREATOR-REVIEW-FIXES | 修复审查发现的问题（调试日志增强、原子化写入全覆盖、孤立插件自愈清理、动态工具回滚撤权闭环） | Completed | 1. fs_repository 引入 structlog 结构化日志，_load_from_dir 记录元数据解析异常；2. fs_repository 与 creator_promotion 全面采用 _atomic_write_text 防范并发半写入；3. FileSystemPresetRepository.delete 增设独立插件防孤立自愈清理（test_delete_preset_preserves_shared_plugin_copies 通过）；4. ToolsService 增设 unregister()，DynamicToolBridge 增设 unregister_tool()并在 _retire 时同步撤销 SafeExecutor 权限与卸载工具（闭环 C5 撤权）；68/68 全量测试全绿，ruff clean |
+| BRAINSTORM-MEMORY-CONTEXT | 深度审计 ADR-0244/0247 与记忆链路全景（提取/门禁/存储/检索/呈现/自感知） | Completed | 已完成代码与 ADR 深度排查，定位 8 大断裂缺口（预过滤偏词、情景记忆真空、检索相关性丢弃、双重呈现、bootstrap 截断等） |
+| BRAINSTORM-MEMORY-QUESTIONS | 澄清记忆测试维度与评测场景期望（单步提问） | In Progress | 正在向用户发起场景与目标澄清提问 |
+| BRAINSTORM-MEMORY-APPROACHES | 提炼 2-3 种测试与多场景验证方案及系统演进权衡 | Completed | 提出方案 A（分层闭环+自环人感知）、方案 B（轻量补丁）、方案 C（图重构），用户明确批准方案 A |
+| BRAINSTORM-MEMORY-DESIGN-SECTIONS | 逐步呈现多场景测试套件与记忆闭环设计细节（Owns/Does NOT own/不变量） | In Progress | 正在逐步呈批设计方案细节（Section 1: 边界、级别与预过滤） |
+| BRAINSTORM-MEMORY-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Pending | 待落盘 |
+| BRAINSTORM-MEMORY-TRANSITION | 转换至实施计划制定（writing-plans） | Pending | 待转化 |
