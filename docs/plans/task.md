@@ -122,7 +122,7 @@
 | BRAINSTORM-GROUP-CHAT-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 落盘实施计划 docs/plans/2026-09-22-peer-assistants-and-group-chat-plan.md 并提交 git，准备单流执行 |
 | PEER-ROOM-TASK-1-CONTRACTS | 契约层模型（PeerProfile, HandoffEnvelope, RoomSpec, FoldedDelegationResult） | Completed | 落地 lca/contracts/models/collaboration/peer.py，模型不可变（frozen=True）且严禁额外字段（extra="forbid"），4/4 测试 100% 通过（0.27s），ruff 0 报错 |
 | PEER-ROOM-TASK-2-ROLES | 架构三角标准角色卡（roles/architecture/{guanlan,hengyue,jingchuan}.md） | Completed | 落地 roles/architecture/ 下观澜、衡岳、镜川三张标准角色卡，frontmatter与职责符合ADR-0042，FileRoleLibrary 成功索引加载，2/2 单测 100% 通过，ruff clean |
-| PEER-ROOM-TASK-3-TRIAGE | 协调者收敛分流与组队路由器（CoordinatorTriageRouter） | Pending | 待执行 |
+| PEER-ROOM-TASK-3-TRIAGE | 协调者收敛分流与组队路由器（CoordinatorTriageRouter） | Completed | 落地 lca/application/collaboration/triage.py，实现默认 SOLO 收敛、点名转交与架构三角自动组队判定，生成无冗余 HandoffEnvelope，3/3 测试 100% 通过（0.68s），ruff clean |
 | PEER-ROOM-TASK-4-FOLD | 上下文防污染与 Fold 聚合器（DelegationFoldAggregator） | Pending | 待执行 |
 | PEER-ROOM-TASK-5-UI-PATCH | LobeHub 前端协同 UI 补丁（MemberChipsBar & FoldedSection） | Pending | 待执行 |
 | PEER-ROOM-TASK-6-E2E-REGRESSION | 全链路端到端回归与架构门禁核验（单测/Patch一致性/Ruff/Diff） | Pending | 待执行 |
