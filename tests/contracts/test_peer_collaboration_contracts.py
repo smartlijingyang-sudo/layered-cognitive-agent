@@ -4,6 +4,7 @@ from pydantic import ValidationError
 from lca.contracts.models.collaboration.peer import (
     FoldedDelegationResult,
     HandoffEnvelope,
+    PeerFoldedResult,
     PeerProfile,
     RoomSpec,
 )
@@ -86,10 +87,21 @@ def test_folded_delegation_result_contract():
         synthesized_verdict="架构审查全数通过",
         consensus_status="unanimous",
     )
+    assert PeerFoldedResult is FoldedDelegationResult
     assert result.consensus_status == "unanimous"
     assert len(result.member_findings) == 2
 
     # 序列化/反序列化一致性 (C8/C13)
     dumped = result.model_dump_json()
-    restored = FoldedDelegationResult.model_validate_json(dumped)
+    restored = PeerFoldedResult.model_validate_json(dumped)
     assert restored == result
+
+    # 额外字段必须拒绝 (extra="forbid")
+    with pytest.raises(ValidationError):
+        PeerFoldedResult(
+            task_id="task_12345",
+            member_findings={},
+            synthesized_verdict="ok",
+            consensus_status="unanimous",
+            illegal="value",
+        )

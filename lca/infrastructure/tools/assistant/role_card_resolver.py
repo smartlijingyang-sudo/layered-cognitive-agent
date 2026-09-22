@@ -21,6 +21,7 @@ __all__ = ["FileRoleCardResolver"]
 
 DEPARTMENT_LABELS: dict[str, str] = {
     "academic": "学术研究",
+    "architecture": "系统架构",
     "design": "设计",
     "engineering": "工程技术",
     "finance": "金融财务",

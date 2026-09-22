@@ -48,3 +48,14 @@ def test_file_role_library_indexes_triad():
     assert jingchuan.title == "镜川"
     assert jingchuan.department == "architecture"
     assert "审计" in jingchuan.summary or "反模式" in jingchuan.summary
+
+
+def test_file_role_card_resolver_architecture_department():
+    from lca.infrastructure.tools.assistant.role_card_resolver import (
+        FileRoleCardResolver,
+    )
+
+    resolver = FileRoleCardResolver()
+    depts = {d.department_id: d.label for d in resolver.list_departments()}
+    assert "architecture" in depts
+    assert depts["architecture"] == "系统架构"

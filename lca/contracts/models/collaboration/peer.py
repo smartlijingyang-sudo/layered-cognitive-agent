@@ -49,8 +49,8 @@ class RoomSpec(BaseModel):
     routing_policy: Literal["coordinator_first", "mention_only"] = "coordinator_first"
 
 
-class FoldedDelegationResult(BaseModel):
-    """Structured result synthesized by the delegate.fold node."""
+class PeerFoldedResult(BaseModel):
+    """Structured result synthesized by the delegate.fold node (ADR-0250)."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -58,3 +58,15 @@ class FoldedDelegationResult(BaseModel):
     member_findings: dict[str, str]
     synthesized_verdict: str
     consensus_status: Literal["unanimous", "concerns_noted", "split"]
+
+
+# Backward-compatible alias to avoid breaking existing references
+FoldedDelegationResult = PeerFoldedResult
+
+__all__ = [
+    "FoldedDelegationResult",
+    "HandoffEnvelope",
+    "PeerFoldedResult",
+    "PeerProfile",
+    "RoomSpec",
+]

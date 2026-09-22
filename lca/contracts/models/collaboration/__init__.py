@@ -3,6 +3,7 @@
 from lca.contracts.models.collaboration.peer import (
     FoldedDelegationResult,
     HandoffEnvelope,
+    PeerFoldedResult,
     PeerProfile,
     RoomSpec,
 )
@@ -10,6 +11,7 @@ from lca.contracts.models.collaboration.peer import (
 __all__ = [
     "FoldedDelegationResult",
     "HandoffEnvelope",
+    "PeerFoldedResult",
     "PeerProfile",
     "RoomSpec",
 ]
