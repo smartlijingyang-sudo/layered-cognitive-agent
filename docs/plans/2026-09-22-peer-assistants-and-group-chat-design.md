@@ -1,8 +1,8 @@
 # 架构设计文档：持久队友、Handoff 委派总线与群聊房间（Peer Assistants & Rooms）
 
-**文档标识**：`docs/plans/2026-09-22-peer-assistants-and-group-chat-design.md`  
-**对齐契约**：`ADR-0250`（草案同步）  
-**关联 ADR**：ADR-0042（角色库与自动组队）、ADR-0228（委派子图与类型化端口）、ADR-0232（并发扇出）、ADR-0242（AssistantHome 运行时）  
+**文档标识**：`docs/plans/2026-09-22-peer-assistants-and-group-chat-design.md`
+**对齐契约**：[`ADR-0250`](../adr/0250-peer-assistants-handoff-bus-and-rooms.md)（已落地）
+**关联 ADR**：ADR-0042（角色库与自动组队）、ADR-0228（委派子图与类型化端口）、ADR-0232（并发扇出）、ADR-0242（AssistantHome 运行时）
 **状态**：Approved by User  
 **日期**：2026-09-22  
 
@@ -100,14 +100,17 @@ class RoomSpec(BaseModel):
     shared_topic_id: str              # 共享 Topic
     routing_policy: Literal["coordinator_first", "mention_only"] = "coordinator_first"
 
-class FoldedDelegationResult(BaseModel):
-    """结构化委派汇总结果（由 delegate.fold 节点生成）"""
+class PeerFoldedResult(BaseModel):
+    """结构化委派汇总结果（由 delegate.fold 节点生成，ADR-0250）"""
     model_config = ConfigDict(frozen=True, extra="forbid")
     
     task_id: str
     member_findings: dict[str, str]   # 各专家回传的精简结论
     synthesized_verdict: str          # 协调者提炼的终审权威结论
     consensus_status: Literal["unanimous", "concerns_noted", "split"]
+
+# 兼容别名（避免与 ADR-0228 既有 FoldedDelegationResult 平行冲突）
+FoldedDelegationResult = PeerFoldedResult
 ```
 
 ---
@@ -162,6 +165,23 @@ class FoldedDelegationResult(BaseModel):
 - **沙箱隔离**：各专家的中间检索与思考日志留存私有日志，不污染主通道；
 - **收口输出**：专家回传精炼后的结论 Markdown，由 Fold 聚合为统一结构。
 
+### 6.4 协调者工具面（Coordinator Tool Interface）
+- **架构组队工具（`cast_architecture_team`）**：`TeamCastTool` 允许协调者在 Think 阶段以结构化参数发起架构三角并发协同，产出 Folded 聚合结果；
+- **单点转交工具（`handoff_to_peer`）**：`HandoffToPeerTool` 允许协调者向指定专家（如 `arch_guanlan`）定向投递 `HandoffEnvelope` 任务信封；
+- 模块落盘于 `lca/infrastructure/tools/collaboration/`。
+
+### 6.5 持久化队友工作区物化（Peer Assistant Materializer）
+- **模型解析与物化**：`PeerProfileResolver` 从 `roles/architecture/` 解析强类型 `PeerProfile`；
+- **真实工作区固化**：`materialize_peer_assistant` 将观澜、衡岳、镜川物化至 `~/.lca/assistants/arch_*`，生成 `SOUL.md`、`USER.md`、`AGENTS.md` 及 `meta.json`；
+- 模块落盘于 `lca/application/collaboration/peer_provider.py`。
+
+### 6.6 群聊房间仓储与路由策略（RoomRepository & Router）
+- **文件仓储**：`JsonRoomRepository` 支持将 `RoomSpec` 持久化至 `~/.lca/rooms/*.json`，具备完整的 CRUD 与幂等性；
+- **路由策略引擎**：`RoomMessageRouter` 实现确定性路由判定：
+  - `coordinator_first`：默认由协调者单入口收敛，仅当出现 `@专家` 时路由至对应专家；
+  - `mention_only`：严格按点名白名单转发；
+- 模块落盘于 `lca/domain/collaboration/room.py`。
+
 ---
 
 ## 7. 前端 LobeHub Patch 交互设计
@@ -169,11 +189,12 @@ class FoldedDelegationResult(BaseModel):
 采用声明式补丁挂载于 `deploy/lobehub/patches/ui/`：
 
 1. **协同成员条（`MemberChipsBar`）**：
-   - 位于消息气泡顶部，展示当前参与该任务的专家芯片：`[观澜 · 契约] [衡岳 · 不变量] [镜川 · 审计]`；
-   - 具备运行状态标识（`分析中...` ➔ `已完成` ➔ `告警`）。
+   - 位于消息气泡顶部，展示当前参与该任务的专家芯片：`[观澜 · 边界与契约] [衡岳 · 状态机与不变量] [镜川 · 对抗审计]`；
+   - 具备运行状态标识（`已收敛汇总`）。
 2. **专家产出折叠区（`FoldedAgentSection`）**：
-   - 紧随成员条下方，提供各专家的独立分析折叠卡片，可按需展开查看原始审计论据；
-   - 折叠卡片底部为协调者提炼的终审权威结论，兼顾整洁体验与审计追溯。
+   - 紧随成员条下方，采用 Ant Design `<Collapse>` 组件提供观澜、衡岳、镜川各专家的独立分析折叠卡片；
+   - 支持用户按需展开查看原始沙箱审计论据，兼顾极简体验与审计追溯；
+   - 保持补丁与 LobeHub 上游代码隔离，严禁直接篡改 `lobehub-ui/` 源码（AP-01）。
 
 ---
 

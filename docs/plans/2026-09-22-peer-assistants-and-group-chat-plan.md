@@ -385,3 +385,62 @@ Expected: 0 errors, 0 warnings
 git add tests/collaboration/test_group_chat_e2e.py
 git commit -m "test(collaboration): add end-to-end integration test for peer assistants and rooms"
 ```
+
+---
+
+### Task 7: ADR-0250 架构立约、模型消歧与部门映射
+
+**Files:**
+- Create: `docs/adr/0250-peer-assistants-handoff-bus-and-rooms.md`
+- Modify: `lca/contracts/models/collaboration/peer.py`
+- Modify: `lca/contracts/models/collaboration/__init__.py`
+- Modify: `lca/infrastructure/tools/assistant/role_card_resolver.py`
+- Test: `tests/contracts/test_peer_collaboration_contracts.py`
+- Test: `tests/roles/test_architecture_triad_roles.py`
+- Invariants to test: 避免与 ADR-0228 同名模型冲突（引入 `PeerFoldedResult` 并保留兼容别名）；角色库部门映射包含 `architecture: 系统架构`（AP-02）
+
+---
+
+### Task 8: 持久队友工作区物化与 PeerProfile 解析（PeerProfileResolver）
+
+**Files:**
+- Create: `lca/application/collaboration/peer_provider.py`
+- Test: `tests/collaboration/test_peer_provider.py`
+- Invariants to test: 从 Markdown 角色卡解析强类型 `PeerProfile`；物化持久化 AssistantHome 工作区（`SOUL.md`、`USER.md`、`AGENTS.md`、`meta.json`）；物化具备幂等性（C8/C9）
+
+---
+
+### Task 9: 群聊房间仓储与确定性路由（JsonRoomRepository & Router）
+
+**Files:**
+- Create: `lca/domain/collaboration/room.py`
+- Test: `tests/collaboration/test_room_repository_and_routing.py`
+- Invariants to test: `RoomSpec` 文件持久化与 CRUD；确定性路由策略（`coordinator_first` 首收敛与 `mention_only` 白名单）
+
+---
+
+### Task 10: 协调者委派工具面（TeamCastTool & HandoffToPeerTool）
+
+**Files:**
+- Create: `lca/infrastructure/tools/collaboration/delegate_tool.py`
+- Create: `lca/infrastructure/tools/collaboration/__init__.py`
+- Test: `tests/tools/test_collaboration_delegate_tools.py`
+- Invariants to test: 允许模型在 Think 阶段自主发起架构组队（`cast_architecture_team`）或单点转交（`handoff_to_peer`）；Hermes 隔离长日志；结构化 Observation 输出
+
+---
+
+### Task 11: 前端 UI 补丁增强（Collapse 专家分析卡片）
+
+**Files:**
+- Modify: `deploy/lobehub/patches/ui/CollaborationTeamBar.tsx`
+- Invariants to test: 真实渲染 Ant Design `<Collapse>` 折叠面板，支持展开观澜/衡岳/镜川各专家的独立审查报告；`patch_lobehub.py verify` 25 ok；`check_patch_integrity.py` 84 文件 byte-identical
+
+---
+
+### Task 12: 全链路回归、设计文档同步与架构门禁核验
+
+**Files:**
+- Modify: `docs/plans/2026-09-22-peer-assistants-and-group-chat-design.md`
+- Modify: `docs/plans/2026-09-22-peer-assistants-and-group-chat-plan.md`
+- Modify: `docs/plans/task.md`
+- Invariants to test: 全链路多 Agent 协同与各单测 100% 全绿；ruff 0 报错；git diff --check clean；AP-01 负边界 100% 达标

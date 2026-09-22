@@ -131,5 +131,5 @@
 | PEER-ROOM-PR2-PEER-PROVIDER | 落地 PeerProfileResolver 与持久化 AssistantHome 物化工具 | Completed | 落地 lca/application/collaboration/peer_provider.py，支持从角色卡解析强类型 PeerProfile 并物化持久化 AssistantHome（SOUL/USER/AGENTS/meta.json），4/4 测试全绿 |
 | PEER-ROOM-PR3-ROOM-REPO-ROUTER | 落地 RoomSpec 仓储（JsonRoomRepository）与群聊路由策略（RoomMessageRouter） | Completed | 落地 lca/domain/collaboration/room.py，实现 JsonRoomRepository 文件仓储（CRUD）与 RoomMessageRouter（coordinator_first / mention_only 确定性路由），单测 3/3 全绿 |
 | PEER-ROOM-PR4-COORDINATOR-TOOL | 落地协调者委派工具 TeamCastTool 与 HandoffToPeerTool 并接入工具体系 | Completed | 落地 lca/infrastructure/tools/collaboration/（TeamCastTool & HandoffToPeerTool），让 Agent 在 Think 阶段具备自主并发选角与点名转交能力，单测 4/4 全绿 |
-| PEER-ROOM-PR5-UI-FOLD-EXPAND | 升级 LobeHub 前端补丁 CollaborationTeamBar.tsx，落地 AntD Collapse 专家分析折叠卡片 | In Progress | 正在升级 deploy/lobehub/patches/ui/CollaborationTeamBar.tsx 并重新验证前端补丁与一致性 |
-| PEER-ROOM-PR6-REGRESSION-AND-DOCS | 全链路端到端回归验证、更新设计与计划文档、执行代码门禁与补丁一致性核验 | Pending | 待执行 |
+| PEER-ROOM-PR5-UI-FOLD-EXPAND | 升级 LobeHub 前端补丁 CollaborationTeamBar.tsx，落地 AntD Collapse 专家分析折叠卡片 | Completed | 升级 CollaborationTeamBar.tsx 渲染 AntD Collapse 折叠面板，呈现观澜/衡岳/镜川各专家的独立审查报告，patch verify 25 ok，check_patch_integrity 84 文件 byte-identical 全过 |
+| PEER-ROOM-PR6-REGRESSION-AND-DOCS | 全链路端到端回归验证、更新设计与计划文档、执行代码门禁与补丁一致性核验 | Completed | 更新 design.md（对齐 ADR-0250、补全 6.4 工具面、6.5 物化面与 6.6 房间仓储）与 plan.md（追加 Task 7-12）；30/30 协同单测全绿；ruff 0 报错；check_patch_integrity 84 文件 byte-identical；git diff --check clean |
