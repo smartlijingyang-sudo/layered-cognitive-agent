@@ -101,5 +101,5 @@
 | REVIEW-FIX-1-PREAUTH-FALLBACK | 服务端动态脚本下载端点缺码自愈（routes.py 动态生成 preauth_code 规避空参交互） | Completed | download_runner_bat/command 在未传 code 时自愈调用 pairing.preauth_code() 生成临时凭据，test_install_scripts.py 7/7 passed |
 | REVIEW-FIX-2-GRANT-SCOPE-PROJECTION | 修复 MachineLocalExecAdapter 投影 access_scope_of(grant) 与补全单测断言（闭环 AP-02/AP-03） | Completed | MachineLocalExecAdapter.execute 执行时动态投影 access_scope_of(grant) 至底层 computer._scope，修复 tests/infrastructure/computer/ 41/41 全绿 |
 | REVIEW-FIX-3-CODE-HYGIENE | 伴侣客户端代码整洁度与健壮性提升（PEP 8 顶层 import、跨平台 is_process_alive 精准判定） | Completed | 提升 client.py 顶层规范化 import，修复 is_process_alive 对系统 errno.EPERM 的存活性识别，单测 11/11 全通 |
-| REVIEW-COMPREHENSIVE-TESTS | 全量关联单测、场景测试、架构门禁与补丁一致性验证 | In Progress | 正在执行全量回归套件、静态分析与补丁一致性校验 |
+| REVIEW-COMPREHENSIVE-TESTS | 全量关联单测、场景测试、架构门禁与补丁一致性验证 | Completed | 关联单测与场景测试 55/55 全绿；patch_lobehub.py 23/23 ok；check_patch_integrity 81 文件 byte-identical；ruff check 0 报错；git diff --check clean；AP-01 负边界 100% 达标 |
 
