@@ -6,6 +6,7 @@
 - :mod:`.routes_runs_sessions` —— ``lca-gateway-routes-runs-sessions`` plugin(/runs + /v1/sessions)。
 - :mod:`.routes_openai_compat_files` —— ``lca-gateway-routes-openai-compat-files`` plugin(/v1/* + /files/*)。
 - :mod:`.routes_device` —— ``lca-gateway-routes-device`` plugin(/api/device/*)。
+- :mod:`.routes_channels_wechat` —— ``lca-gateway-routes-channels-wechat`` plugin(/lca-api/channels/wechat/*)。
 
 webserver transport 的 factory 在 :mod:`gateway.app` —— 它直接驱动
 :func:`lca_kernel.run_kernel_lifespan`,不在 transport 命名空间里保留独立
