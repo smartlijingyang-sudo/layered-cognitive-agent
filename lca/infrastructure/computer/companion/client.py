@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import errno
 import json
 import os
 import platform as sys_platform
 import socket
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -30,7 +32,9 @@ def is_process_alive(pid: int) -> bool:
     try:
         os.kill(pid, 0)
         return True
-    except OSError:
+    except OSError as exc:
+        return getattr(exc, "errno", None) == errno.EPERM
+    except Exception:
         return False
 
 
@@ -102,8 +106,6 @@ class CompanionClient:
         if not target:
             return
         target.parent.mkdir(parents=True, exist_ok=True)
-        from datetime import UTC, datetime
-
         data = {
             "pid": pid if pid is not None else os.getpid(),
             "device_id": self.config.device_id,
