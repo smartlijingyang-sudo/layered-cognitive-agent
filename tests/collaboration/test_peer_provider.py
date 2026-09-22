@@ -60,3 +60,21 @@ def test_materialize_peer_assistant_creates_files(tmp_path: Path):
     # 幂等性测试 (C9)
     home_dir2 = materialize_peer_assistant(profile)
     assert home_dir2 == home_dir
+
+
+def test_peer_profile_resolver_resolves_generic_role(tmp_path: Path):
+    resolver = PeerProfileResolver(base_home=tmp_path)
+    profile = resolver.resolve("engineering/engineering-senior-developer")
+    assert profile.peer_id == "engineering_engineering-senior-developer"
+    assert not profile.peer_id.startswith("arch_")
+    assert profile.home_namespace == str(
+        tmp_path / "assistants" / "engineering_engineering-senior-developer"
+    )
+
+    # 验证 resolve_team
+    team = resolver.resolve_team(
+        ("engineering/engineering-senior-developer", "architecture/guanlan")
+    )
+    assert len(team) == 2
+    assert team[0].peer_id == "engineering_engineering-senior-developer"
+    assert team[1].peer_id == "arch_guanlan"

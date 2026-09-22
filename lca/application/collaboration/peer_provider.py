@@ -7,6 +7,8 @@ and materializes persistent AssistantHome workspaces under ~/.lca/assistants/.
 from __future__ import annotations
 
 import json
+import logging
+from collections.abc import Sequence
 from pathlib import Path
 
 from lca.agent.role_library import FileRoleLibrary
@@ -17,17 +19,13 @@ from lca.contracts.protocols.collaboration.casting.casting import (
 )
 from lca.infrastructure.path.locator import get_lca_home
 
-_ARCH_TRIAD_ROLES: tuple[str, ...] = (
+_logger = logging.getLogger(__name__)
+
+_DEFAULT_ARCHITECTURE_TRIAD = (
     "architecture/guanlan",
     "architecture/hengyue",
     "architecture/jingchuan",
 )
-
-_DEFAULT_ROLE_CAPABILITIES: dict[str, tuple[str, ...]] = {
-    "architecture/guanlan": ("contracts", "adr_guard", "domain_boundary"),
-    "architecture/hengyue": ("state_machine", "invariants", "reducer_guard"),
-    "architecture/jingchuan": ("antipattern_audit", "adversarial_review", "code_hygiene"),
-}
 
 
 class PeerProfileResolver:
@@ -48,15 +46,22 @@ class PeerProfileResolver:
         except RoleNotFoundError as exc:
             raise KeyError(f"Role not found: {role_id}") from exc
 
-        peer_name_slug = role_id.split("/")[-1]
-        peer_id = (
-            f"arch_{peer_name_slug}" if not peer_name_slug.startswith("arch_") else peer_name_slug
-        )
+        # 保持 architecture 命名空间与 arch_ 规范兼容，其他部门使用标准命名
+        if card.department == "architecture":
+            peer_name_slug = role_id.split("/")[-1]
+            peer_id = (
+                f"arch_{peer_name_slug}"
+                if not peer_name_slug.startswith("arch_")
+                else peer_name_slug
+            )
+        else:
+            peer_id = role_id.replace("/", "_")
+
         home_path = self._base_home / "assistants" / peer_id
-        capabilities = _DEFAULT_ROLE_CAPABILITIES.get(role_id, ("general_architecture",))
+        capabilities = self._resolve_capabilities(card)
 
         # 职责简述从 summary 或 backstory 第一句提炼
-        role_desc = card.summary or f"{card.title} · 系统架构专家"
+        role_desc = card.summary or f"{card.title} · {card.department.title()}专家"
 
         return PeerProfile(
             peer_id=peer_id,
@@ -67,9 +72,28 @@ class PeerProfileResolver:
             capabilities=capabilities,
         )
 
+    def resolve_team(self, role_ids: Sequence[str]) -> tuple[PeerProfile, ...]:
+        """Resolve a team of roles by their role_ids."""
+        return tuple(self.resolve(r_id) for r_id in role_ids)
+
     def resolve_triad(self) -> tuple[PeerProfile, ...]:
-        """Resolve the Architecture Triad (Guanlan, Hengyue, Jingchuan)."""
-        return tuple(self.resolve(r_id) for r_id in _ARCH_TRIAD_ROLES)
+        """Resolve the Architecture Triad (backward compatible helper)."""
+        return self.resolve_team(_DEFAULT_ARCHITECTURE_TRIAD)
+
+    def _resolve_capabilities(self, card: RoleCard) -> tuple[str, ...]:
+        # 从角色卡部门与概要自适应提取能力
+        caps: list[str] = []
+        if card.department:
+            caps.append(f"{card.department}_domain")
+        if "契约" in card.summary or "边界" in card.summary:
+            caps.extend(["contracts", "adr_guard", "domain_boundary"])
+        elif "状态机" in card.summary or "不变量" in card.summary:
+            caps.extend(["state_machine", "invariants", "reducer_guard"])
+        elif "审计" in card.summary or "反模式" in card.summary:
+            caps.extend(["antipattern_audit", "adversarial_review", "code_hygiene"])
+        else:
+            caps.append("general_analysis")
+        return tuple(dict.fromkeys(caps))
 
 
 def materialize_peer_assistant(
@@ -92,14 +116,26 @@ def materialize_peer_assistant(
             backstory = role_card.backstory
         else:
             lib = library or FileRoleLibrary()
-            # 尝试通过 peer_id 逆向查找或默认
-            slug = profile.peer_id.removeprefix("arch_")
-            try:
-                card = lib.get(f"architecture/{slug}")
-                backstory = card.backstory
-            except Exception:
+            found_card = None
+            candidate_keys = [
+                profile.peer_id,
+                profile.peer_id.replace("_", "/"),
+            ]
+            if profile.peer_id.startswith("arch_"):
+                candidate_keys.append(f"architecture/{profile.peer_id.removeprefix('arch_')}")
+            for cand in candidate_keys:
+                try:
+                    found_card = lib.get(cand)
+                    break
+                except Exception as exc:
+                    _logger.debug("Candidate key %s not found in library: %s", cand, exc)
+                    continue
+
+            if found_card is not None:
+                backstory = found_card.backstory
+            else:
                 backstory = (
-                    f"# {profile.name} · {profile.role}\n\n第一性原理驱动的高级系统架构专家。"
+                    f"# {profile.name} · {profile.role}\n\n第一性原理驱动的高级领域专家。"
                 )
         soul_file.write_text(f"# SOUL of {profile.name}\n\n{backstory}\n", encoding="utf-8")
 
