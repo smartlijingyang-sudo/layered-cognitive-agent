@@ -33,8 +33,7 @@ def estimate_tokens(text: str) -> int:
 def _relevance(query: str, content: str) -> float:
     """查询词项与记忆内容的重叠度；无查询时返回中性值 1.0。
 
-    中文按字符集合重叠，英文按词集合重叠。重叠度是简单的词项召回率，
-    不是语义相似度——排序的语义部分由 recency×importance 承载。
+    中文按字符集合重叠，英文按词集合重叠。重叠度结合词项召回率与确切词项命中加成。
     """
     if not query:
         return _DEFAULT_RELEVANCE
@@ -42,13 +41,17 @@ def _relevance(query: str, content: str) -> float:
     c = content.lower()
     if not q:
         return 0.0
+    terms = [t for t in q.split() if len(t) >= 2]
+    substring_bonus = 0.5 if (q in c or any(term in c for term in terms)) else 0.0
     if any("\u4e00" <= ch <= "\u9fff" for ch in q):
         q_set = set(q)
         c_set = set(c)
-        return len(q_set & c_set) / len(q_set) if q_set else 0.0
+        overlap = len(q_set & c_set) / len(q_set) if q_set else 0.0
+        return min(2.0, overlap + substring_bonus)
     q_words = set(q.split())
     c_words = set(c.split())
-    return len(q_words & c_words) / len(q_words) if q_words else 0.0
+    overlap = len(q_words & c_words) / len(q_words) if q_words else 0.0
+    return min(2.0, overlap + substring_bonus)
 
 
 def _is_expired(record: MemoryRecord) -> bool:

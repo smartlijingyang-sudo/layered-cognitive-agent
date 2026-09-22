@@ -101,24 +101,50 @@ class AssistantMemory(MemorySystem):
 
     async def retrieve(
         self,
-        manifest: ContextManifest,
+        manifest: ContextManifest | None = None,
         *,
         query: str = "",
         token_budget: int | None = None,
     ) -> list[MemoryRecord]:
         """返回持久化的事实记忆（semantic + episodic），供 ``memory_retrieve`` 注入。
 
-        ADR-0246 PR-4：按 ``token_budget`` 做字符级截断，默认不截断。
+        ADR-0246 PR-4 / ADR-0247：按 query 相关性、时效 recency 与重要性排序，
+        受 ``token_budget`` 约束截断。最相关的记录排在最前，淘汰不相关的历史事实。
         """
-        del manifest, query
-        records = self.query(MemoryLayer.SEMANTIC) + self.query(MemoryLayer.EPISODIC)
+        del manifest
+        from lca.cognition.memory.layered.retrieval_policy import (
+            _is_expired,
+            _relevance,
+            estimate_tokens,
+        )
+
+        all_records = self.query(MemoryLayer.SEMANTIC) + self.query(MemoryLayer.EPISODIC)
+        active = [r for r in all_records if not r.deleted and not _is_expired(r)]
+        if not active:
+            return []
+
+        now_ms = _utc_now_ms()
+
+        def _score(r: MemoryRecord) -> float:
+            rel = _relevance(query, r.content)
+            if r.recency_score is not None:
+                rec = r.recency_score
+            elif r.created_at_ms is not None and r.created_at_ms > 0:
+                age_hours = max(0.0, (now_ms - r.created_at_ms) / (1000.0 * 3600.0))
+                rec = max(0.2, 1.0 / (1.0 + age_hours * 0.05))
+            else:
+                rec = 0.5
+            imp = r.importance if r.importance is not None else 0.5
+            return rel * rec * imp
+
+        scored = sorted(active, key=_score, reverse=True)
+
         if token_budget is None or token_budget <= 0:
-            return records
-        from lca.cognition.memory.layered.retrieval_policy import estimate_tokens
+            return scored
 
         kept: list[MemoryRecord] = []
         used = 0
-        for record in records:
+        for record in scored:
             estimated = estimate_tokens(record.content)
             if used + estimated > token_budget:
                 break
