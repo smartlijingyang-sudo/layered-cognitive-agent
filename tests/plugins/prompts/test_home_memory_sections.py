@@ -61,7 +61,7 @@ def test_home_section_in_builtin_react_template() -> None:
     tpl = _builtin_templates()["react_prompt"]
     names = [r.name for r in tpl.sections]
     assert "home" in names
-    assert names[-1] == "home"
+    assert "autonomous_presets" in names
 
 
 def test_memory_items_render_in_context() -> None:

@@ -151,15 +151,21 @@ def format_record_line(record: MemoryRecord) -> str:
     return f"- [{layer}] {record.content}"
 
 
+_CATEGORY_EXCLUDE_NONE: frozenset[MemoryCategory] = frozenset()
+
+
 def render_context_lines(
     manifest: ContextManifest | None,
     *,
     exclude_kinds: frozenset[MemoryRecordKind] = _KIND_EXCLUDE_NONE,
+    exclude_categories: frozenset[MemoryCategory] = _CATEGORY_EXCLUDE_NONE,
 ) -> str:
     records = [
         record
         for record in memory_records_from_manifest(manifest)
-        if record.kind not in exclude_kinds and is_prompt_context_record(record)
+        if record.kind not in exclude_kinds
+        and getattr(record, "category", None) not in exclude_categories
+        and is_prompt_context_record(record)
     ]
     trusted = [
         format_record_line(record)

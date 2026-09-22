@@ -309,7 +309,13 @@ class ContextSection:
         exclude = context_exclusions_for(awareness)
         body = join_lines(
             [
-                render_context_lines(manifest, exclude_kinds=exclude),
+                render_context_lines(
+                    manifest,
+                    exclude_kinds=exclude,
+                    exclude_categories=frozenset(
+                        {MemoryCategory.IDENTITY, MemoryCategory.PREFERENCE}
+                    ),
+                ),
                 render_subtasks_block(manifest),
                 render_artifacts_block(manifest),
             ]
