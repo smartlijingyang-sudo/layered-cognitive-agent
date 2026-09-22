@@ -1,25 +1,21 @@
 """Collaboration Room specification repository and message routing (ADR-0250).
 
-Provides RoomSpec persistence (JsonRoomRepository) and room-level message routing policies
-(coordinator_first vs mention_only).
+Provides RoomSpec persistence (JsonRoomRepository) and dynamic room-level message routing policies
+(coordinator_first vs mention_only) without hardcoded role dictionaries.
 """
 
 from __future__ import annotations
 
+import json
 import logging
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from lca.contracts.models.collaboration.peer import RoomSpec
 from lca.infrastructure.path.locator import get_lca_home
 
 _logger = logging.getLogger(__name__)
-
-_PEER_NICKNAME_MAP: dict[str, str] = {
-    "观澜": "arch_guanlan",
-    "衡岳": "arch_hengyue",
-    "镜川": "arch_jingchuan",
-}
 
 
 class RoomRepository(Protocol):
@@ -76,26 +72,39 @@ class JsonRoomRepository(RoomRepository):
 
 
 class RoomMessageRouter:
-    """Evaluates incoming room messages against the RoomSpec's routing policy."""
+    """Evaluates incoming room messages against the RoomSpec's routing policy using dynamic discovery."""
 
-    def __init__(self, room: RoomSpec) -> None:
+    def __init__(
+        self,
+        room: RoomSpec,
+        member_names: Mapping[str, str] | None = None,
+        role_library: Any | None = None,
+    ) -> None:
         self._room = room
+        self._member_names = dict(member_names) if member_names else {}
+        self._role_library = role_library
 
     def route_message(self, message: str) -> tuple[str, ...]:
         """Determine recipient agent/peer IDs based on message content and routing policy."""
         mentioned: list[str] = []
 
-        # 检查显式 @ 标识与别名
-        for name, peer_id in _PEER_NICKNAME_MAP.items():
-            if (f"@{name}" in message or f"@{peer_id}" in message) and (
-                peer_id not in mentioned and peer_id in self._room.member_peer_ids
-            ):
+        # 检查各成员的显式 @ 标识与别名
+        for peer_id in self._room.member_peer_ids:
+            if f"@{peer_id}" in message:
+                if peer_id not in mentioned:
+                    mentioned.append(peer_id)
+                continue
+
+            name = self._resolve_name(peer_id)
+            if name and f"@{name}" in message and peer_id not in mentioned:
                 mentioned.append(peer_id)
 
-        if (f"@{self._room.coordinator_agent_id}" in message or "@协调者" in message) and (
-            self._room.coordinator_agent_id not in mentioned
+        # 检查协调者 @ 标识
+        coord_id = self._room.coordinator_agent_id
+        if (f"@{coord_id}" in message or "@协调者" in message) and (
+            coord_id not in mentioned
         ):
-            mentioned.append(self._room.coordinator_agent_id)
+            mentioned.append(coord_id)
 
         # 策略 1: coordinator_first（默认协调者收敛）
         if self._room.routing_policy == "coordinator_first":
@@ -108,3 +117,52 @@ class RoomMessageRouter:
             return tuple(mentioned)
 
         return (self._room.coordinator_agent_id,)
+
+    def _resolve_name(self, peer_id: str) -> str:
+        """Dynamically resolve display name for peer_id."""
+        if peer_id in self._member_names:
+            return self._member_names[peer_id]
+
+        # 1. 尝试从 AssistantHome/meta.json 动态读取
+        try:
+            home_dir = get_lca_home() / "assistants" / peer_id
+            meta_file = home_dir / "meta.json"
+            if meta_file.is_file():
+                meta_json = json.loads(meta_file.read_text(encoding="utf-8"))
+                name = meta_json.get("name")
+                if name:
+                    self._member_names[peer_id] = str(name)
+                    return str(name)
+        except Exception as exc:
+            _logger.debug("Error reading assistant meta for %s: %s", peer_id, exc)
+
+        # 2. 尝试从 RoleLibrary 动态反解
+        lib = self._get_role_library()
+        if lib is not None:
+            candidate_keys = [
+                peer_id,
+                peer_id.replace("_", "/"),
+            ]
+            if peer_id.startswith("arch_"):
+                candidate_keys.append(f"architecture/{peer_id.removeprefix('arch_')}")
+            for cand in candidate_keys:
+                try:
+                    card = lib.get(cand)
+                    self._member_names[peer_id] = card.title
+                    return card.title
+                except Exception as exc:
+                    _logger.debug("Candidate %s not in role library: %s", cand, exc)
+                    continue
+
+        return ""
+
+    def _get_role_library(self) -> Any | None:
+        if self._role_library is not None:
+            return self._role_library
+        try:
+            from lca.agent.role_library import FileRoleLibrary
+
+            self._role_library = FileRoleLibrary()
+            return self._role_library
+        except Exception:
+            return None

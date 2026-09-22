@@ -75,3 +75,20 @@ def test_room_message_router_mention_only():
     # 显式 @ 衡岳 -> 唤醒衡岳
     recipients_mention = router.route_message("@衡岳 请核查状态机迁移")
     assert recipients_mention == ("arch_hengyue",)
+
+
+def test_room_message_router_dynamic_members():
+    room = RoomSpec(
+        room_id="room_dyn_01",
+        display_name="动态评审组",
+        coordinator_agent_id="coordinator_lead",
+        member_peer_ids=("sec_guard", "perf_tuner"),
+        shared_topic_id="topic_01",
+        routing_policy="coordinator_first",
+    )
+    router = RoomMessageRouter(
+        room, member_names={"sec_guard": "安防管家", "perf_tuner": "调优专家"}
+    )
+    assert router.route_message("@安防管家 请核实接口鉴权") == ("sec_guard",)
+    assert router.route_message("@sec_guard 请核实") == ("sec_guard",)
+    assert router.route_message("常规讨论，无点名") == ("coordinator_lead",)

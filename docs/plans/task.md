@@ -159,7 +159,7 @@
 | DYN-ROLE-TASK-2-FOLD | 聚合器纯净化：移除 _NAME_MAP，实现自适应元数据感知与通用共识收敛 | Completed | 彻底移除 _NAME_MAP 静态字典；实现基于 peer_metadata/RoleLibrary/AssistantHome/文本自省的四级动态名称感知；收敛通用【协同汇报】文本；tests/collaboration/test_delegation_fold.py 4/4 全通，ruff clean |
 | DYN-ROLE-TASK-3-TRIAGE | 协调者分流解耦：移除 _ARCH_TRIAD 与硬编码 if，实现候选角色动态点名与组队 | Completed | 彻底移除 _ARCH_TRIAD 与硬编码 if 分支；支持基于 candidates 注入与 FileRoleLibrary 动态点名及组队选拔；tests/collaboration/test_coordinator_triage.py 4/4 全通，ruff clean |
 | DYN-ROLE-TASK-4-PEER-PROVIDER | 角色卡装配器通用化：移除架构绑定与 arch_ 前缀，通用解析与物化任意角色 | Completed | 移除 _ARCH_TRIAD_ROLES 与静态能力映射；支持泛化解析任意 role_id（非架构部门使用 role_id.replace('/', '_') 避免强绑 arch_ 前缀）；新增 resolve_team 通用组队；tests/collaboration/test_peer_provider.py 5/5 全通，ruff clean |
-| DYN-ROLE-TASK-5-ROOM-ROUTER | 房间路由策略泛化：移除 _PEER_NICKNAME_MAP，基于房间成员名单动态 @ 唤醒 | Pending | 待执行 |
+| DYN-ROLE-TASK-5-ROOM-ROUTER | 房间路由策略泛化：移除 _PEER_NICKNAME_MAP，基于房间成员名单动态 @ 唤醒 | Completed | 彻底移除 _PEER_NICKNAME_MAP 静态字典；支持注入 member_names 与自动经 AssistantHome/RoleLibrary 动态解析成员昵称；tests/collaboration/test_room_repository_and_routing.py 4/4 全通，ruff clean |
 | DYN-ROLE-TASK-6-DELEGATE-TOOL | 协同委派工具通用化：泛化工具描述与回退模拟数据，支持动态团队 | Pending | 待执行 |
 | DYN-ROLE-TASK-7-UI-PATCH | 前端协同 UI 数据驱动化：基于 findings 动态渲染 Tag 与 Collapse 面板 | Pending | 待执行 |
 | DYN-ROLE-TASK-8-REGRESSION | 全链路回归验证：全量单测、补丁一致性与代码门禁验证 | Pending | 待执行 |
