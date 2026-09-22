@@ -33,7 +33,7 @@ def _build_headers(bot_token: str) -> dict[str, str]:
 
 
 def chunk_text(text: str, limit: int = MAX_TEXT_CHUNK_LENGTH) -> list[str]:
-    """Split text into chunks up to limit characters."""
+    """Split text into chunks up to limit characters, preserving paragraph and sentence boundaries where possible."""
     if not text:
         return []
     if len(text) <= limit:
@@ -41,8 +41,27 @@ def chunk_text(text: str, limit: int = MAX_TEXT_CHUNK_LENGTH) -> list[str]:
     chunks: list[str] = []
     rem = text
     while rem:
-        chunks.append(rem[:limit])
-        rem = rem[limit:]
+        if len(rem) <= limit:
+            chunks.append(rem)
+            break
+        # 1. Prefer splitting at paragraph boundary (\n\n)
+        idx = rem.rfind("\n\n", 0, limit)
+        if idx == -1 or idx < limit // 3:
+            # 2. Prefer splitting at newline (\n)
+            idx = rem.rfind("\n", 0, limit)
+        if idx == -1 or idx < limit // 3:
+            # 3. Prefer splitting at space
+            idx = rem.rfind(" ", 0, limit)
+        if idx == -1 or idx < limit // 3:
+            # 4. Fallback to hard limit slice
+            idx = limit
+        else:
+            # Include newline in chunk
+            idx += 1
+        chunk = rem[:idx].strip()
+        if chunk:
+            chunks.append(chunk)
+        rem = rem[idx:].lstrip("\r\n")
     return chunks
 
 

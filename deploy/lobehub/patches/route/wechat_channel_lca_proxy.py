@@ -99,6 +99,25 @@ def apply(ctx: PatchContext) -> bool:
     if old_create in text:
         text = text.replace(old_create, new_create, 1)
 
+    # 3b. Patch delete to hook LCA WeChat unbind
+    old_delete = """  delete = async (id: string) => {
+    return lambdaClient.agentBotProvider.delete.mutate({ id });
+  };"""
+    new_delete = """  delete = async (id: string) => {
+    try {
+      await fetch('/lca-api/channels/wechat/unbind', {
+        body: JSON.stringify({ assistant_id: id }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+      });
+    } catch (err) {
+      console.warn('[WeChat LCA] unbind error:', err);
+    }
+    return lambdaClient.agentBotProvider.delete.mutate({ id });
+  };"""
+    if old_delete in text:
+        text = text.replace(old_delete, new_delete, 1)
+
     # 4. Patch getRuntimeStatus for wechat
     old_runtime_status = """  getRuntimeStatus = async (params: {
     applicationId: string;

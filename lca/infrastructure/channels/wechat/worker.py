@@ -39,15 +39,17 @@ class WechatChannelWorker:
         config: WechatChannelConfig,
         client: WechatIlinkClient,
         dispatch_fn: DispatchFunction,
+        owns_client: bool = True,
     ) -> None:
         self.assistant_id = assistant_id
         self.config = config
         self.client = client
         self.dispatch_fn = dispatch_fn
+        self._owns_client = owns_client
 
         self.cursor: str = ""
         self._context_tokens: dict[str, str] = {}
-        self._typing_tickets: dict[str, str] = {}
+        self._active_tasks: set[asyncio.Task[None]] = set()
         self._stopped = False
         self._task: asyncio.Task[None] | None = None
         self.status: str = "running"
@@ -63,7 +65,9 @@ class WechatChannelWorker:
         msgs = updates.get("msgs", [])
 
         for msg in msgs:
-            await self._handle_inbound_message(msg)
+            task = asyncio.create_task(self._handle_inbound_message(msg))
+            self._active_tasks.add(task)
+            task.add_done_callback(self._active_tasks.discard)
 
     async def _handle_inbound_message(self, msg: dict[str, Any]) -> None:
         from_user = msg.get("from_user_id")
@@ -86,7 +90,7 @@ class WechatChannelWorker:
             return
 
         session_id = derive_wechat_session_id(self.assistant_id, from_user)
-        typing_ticket = self._typing_tickets.get(from_user, "")
+        typing_ticket = str(msg.get("typing_ticket") or "")
 
         # 1. Trigger typing indicator on WeChat client
         await self.client.send_typing(
@@ -150,7 +154,11 @@ class WechatChannelWorker:
             self._task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-        await self.client.close()
+        for t in list(self._active_tasks):
+            if not t.done():
+                t.cancel()
+        if self._owns_client:
+            await self.client.close()
 
     async def _run_loop(self) -> None:
         backoff = 1.0

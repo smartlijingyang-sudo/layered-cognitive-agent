@@ -277,6 +277,10 @@ entries:
   name: lca_webserver_routes_openai_compat_files
   $module: lca.plugins.transport.webserver.routes_1.routes_openai_compat_files
   config: {}
+- id: lca-gateway-routes-channels-wechat
+  name: lca_gateway_routes_channels_wechat
+  $module: lca.plugins.transport.webserver.routes_channels_wechat
+  config: {}
 - id: lca-webserver-bootstrap
   name: lca_webserver_bootstrap
   $module: lca.plugins.transport.webserver.bootstrap.bootstrap

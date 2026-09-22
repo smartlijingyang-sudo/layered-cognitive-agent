@@ -130,6 +130,7 @@ def test_wechat_patch_apply_and_idempotence() -> None:
     assert "/lca-api/channels/wechat/qrcode" in content
     assert "/lca-api/channels/wechat/status" in content
     assert "/lca-api/channels/wechat/bind" in content
+    assert "/lca-api/channels/wechat/unbind" in content
     assert "params.platform === 'wechat'" in content
 
     # Second apply: idempotent, returns False

@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import AsyncMock, call
 
 import pytest
@@ -63,6 +64,8 @@ async def test_worker_processes_inbound_message():
 
     # Run single polling iteration
     await worker.poll_step()
+    if worker._active_tasks:
+        await asyncio.gather(*list(worker._active_tasks))
 
     # Verify dispatch occurred with mapped session
     assert len(dispatched_runs) == 1

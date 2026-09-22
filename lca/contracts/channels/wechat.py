@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -39,4 +40,4 @@ class WechatChannelConfig(BaseModel):
     base_url: str = "https://ilinkai.weixin.qq.com"
     enabled: bool = True
     display_tool_calls: bool = False
-    updated_at: str = Field(default_factory=str)
+    updated_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
