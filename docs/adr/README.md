@@ -196,3 +196,6 @@
 ## 维护规则
 - 不改旧文件；新决策用 `Supersedes: ADR-XXXX` 标记
 - CI `tests/test_refactor_guards.py::test_adr_index_matches_filesystem` 守护本表与 `docs/adr/*.md` 编号一致
+
+- [ADR-0248 Grok Bot coordinator runtime (evidence)](./0248-grok-bot-coordinator-runtime-evidence.md) — 证据级五对象/投递契约/唤醒/人闸/连续性与主动；对照 learn-grok-bot + 重建树 + LocalExec
+
