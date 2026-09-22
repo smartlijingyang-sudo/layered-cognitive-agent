@@ -6,6 +6,7 @@ specialist teams (TeamCastTool) or specific peer specialists (HandoffToPeerTool)
 
 from __future__ import annotations
 
+import logging
 import time
 from typing import Any, ClassVar, Literal
 
@@ -18,6 +19,8 @@ from lca.contracts.models.collaboration.peer import HandoffEnvelope
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.protocols import Tool
+
+_logger = logging.getLogger(__name__)
 
 TEAM_CAST_TOOL = "cast_architecture_team"
 PEER_HANDOFF_TOOL = "handoff_to_peer"
@@ -83,25 +86,26 @@ class TeamCastTool(Tool):
         # 2. 模拟/调度专家沙箱执行（隔离工具长日志，Hermes 隔离）
         simulated_receipts: dict[str, str] = {}
         for peer_id in decision.selected_peers:
-            if "guanlan" in peer_id:
-                simulated_receipts[peer_id] = (
-                    "观澜（契约与边界）：第一性原理重述完毕，领域模型配置 extra='forbid'，"
-                    "Seam 接口单向依赖严格成立，Does NOT own 负向清单无越界。"
-                )
-            elif "hengyue" in peer_id:
-                simulated_receipts[peer_id] = (
-                    "衡岳（状态机与不变量）：事实/状态/决策/许可/回执/投影六分类已严密对齐，"
-                    "Reducer 单写原则通过，C1~C14 架构不变量已具备确定性测试矩阵。"
-                )
-            elif "jingchuan" in peer_id:
-                simulated_receipts[peer_id] = (
-                    "镜川（对抗审查与审计）：完成 AP-01~AP-06 反模式逐项核验，"
-                    "未发现并发竞争与死锁风险，代码工程卫生全面达标。"
-                )
-            else:
-                simulated_receipts[peer_id] = (
-                    f"专家 [{peer_id}] 分析结论：领域规则核验通过，方案具备确定性与工程规范。"
-                )
+            role_slug = peer_id.split("/")[-1]
+            display_name = role_slug
+            duty_info = ""
+            try:
+                from lca.infrastructure.roles.file_library import FileRoleLibrary
+
+                library = FileRoleLibrary()
+                card = library.get_role(role_slug)
+                if card:
+                    display_name = card.name or role_slug
+                    tagline = card.tagline or card.description
+                    if tagline:
+                        duty_info = f"（{tagline}）"
+            except Exception as exc:
+                _logger.debug("Failed to resolve dynamic role card for %s: %s", role_slug, exc)
+
+            simulated_receipts[peer_id] = (
+                f"{display_name}{duty_info}：领域规则与不变量核验通过，"
+                f"方案符合工程规范与质量标准。"
+            )
 
         # 3. 终态强制 Fold 聚合
         folded = self._aggregator.fold(task_id=task_id, receipts=simulated_receipts)
