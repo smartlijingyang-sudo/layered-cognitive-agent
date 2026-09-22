@@ -7,6 +7,7 @@ from lca.infrastructure.vocal.gate import DirectVocalGate, GatedVocalGate
 from lca.infrastructure.vocal.settle_guard import VocalSettleGuard
 from lca.infrastructure.vocal.strategy import DirectVoiceStrategy, GatedVoiceStrategy
 from lca.infrastructure.vocal.tool import SendMessageTool
+from lca.infrastructure.vocal.wake import WakeClassifier
 
 __all__ = (
     "DirectVocalGate",
@@ -18,4 +19,5 @@ __all__ = (
     "VocalGateAlreadyBlockedError",
     "VocalGateError",
     "VocalSettleGuard",
+    "WakeClassifier",
 )
