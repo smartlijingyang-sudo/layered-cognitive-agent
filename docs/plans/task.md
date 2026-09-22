@@ -188,10 +188,10 @@
 | VOCAL-TASK-5-SETTLE | Settle 交付核验硬闸与例程沉默门禁（VocalSettleGuard, Ack≠Delivery, RoutineSilence） | Completed | 落地 VocalSettleGuard，严格断言用户轮次交付闭环（INV-VOCAL-04）并放行例程沉默（INV-VOCAL-06），tests/infrastructure/vocal/test_vocal_settle_guard.py 3/3 通过 |
 | VOCAL-TASK-6-FACTORY-E2E | 策略工厂与全链路场景集成验证（VocalStrategyFactory, 端到端模拟与经典模式回归） | Completed | 落地 VocalStrategyFactory，完整验证用户发起轮次（Reply-First Ack -> 工具执行 -> Delivery 交付 -> Settle 收敛）、经典模式默认直通零回归及 Widget 选项卡停等，tests/scenario/vocal/test_gated_conversation_e2e.py 3/3 通过 |
 | VOCAL-TASK-7-REGRESSION | 全量单测回归、代码风格检查与架构守卫核验（Pytest, Ruff, Diff Clean） | Completed | 1. 门控声带全链路测试套件 17/17 全数通过（contracts 7, infrastructure 7, scenario 3）；2. ruff check 0 报错通过；3. ruff format 风格格式化 100% 达标；4. git diff --check 退出码 0；5. 严格遵守 AP-01 负向清单（零改动已有核心 transport/DB/UI）与 AP-02 六大测试不变量守卫闭环 |
-| WAKE-TASK-1-CLASSIFIER | Wake 契约模型与分类器（WakeSource, WakeContext, WakeClassifier） | Pending | 待执行 |
-| WAKE-TASK-2-GATE-INTEGRATION | 声带硬闸与结算门禁接入 WakeContext（GatedVocalGate, VocalSettleGuard） | Pending | 待执行 |
-| WAKE-TASK-3-REPLY-FIRST | Reply-First 提示词与门禁中间件（ReplyFirstMiddleware） | Pending | 待执行 |
-| WAKE-TASK-4-SUBAGENT-MUTE | Subagent 物理禁声过滤器（VocalToolFilter, tools_deny） | Pending | 待执行 |
-| WAKE-TASK-5-REVIVAL | 后台复苏（Revival）与父进程统一交付协调器（RevivalCoordinator） | Pending | 待执行 |
-| WAKE-TASK-6-E2E-SCENARIOS | 全链路多门控集成场景测试（Routine 沉默 / Inbound 渠道 / Subagent 交付） | Pending | 待执行 |
-| WAKE-TASK-7-REGRESSION | 全量单测回归、代码风格检查与架构守卫核验（Pytest, Ruff, Diff Clean） | Pending | 待执行 |
+| WAKE-TASK-1-CLASSIFIER | Wake 契约模型与分类器（WakeSource, WakeContext, WakeClassifier） | Completed | 落地 WakeSource 六大闭集、WakeContext 不可变载荷与 WakeClassifier，覆盖 Routine 沉默/Inbound 渠道等全规则，tests/contracts/vocal/test_wake_models.py 及 tests/infrastructure/vocal/test_wake_classifier.py 6/6 全通 |
+| WAKE-TASK-2-GATE-INTEGRATION | 声带硬闸与结算门禁接入 WakeContext（GatedVocalGate, VocalSettleGuard） | Completed | GatedVocalGate 接入 WakeContext，VocalSettleGuard 依据 is_silence_allowed 严格管控收敛，tests/infrastructure/vocal/test_vocal_wake_integration.py 3/3 通过 |
+| WAKE-TASK-3-REPLY-FIRST | Reply-First 提示词与门禁中间件（ReplyFirstMiddleware） | Completed | 落地 ReplyFirstMiddleware，在未 Ack 前精准注入承接提示并在 Ack 后即刻停止，tests/infrastructure/vocal/test_reply_first_middleware.py 3/3 全通 |
+| WAKE-TASK-4-SUBAGENT-MUTE | Subagent 物理禁声过滤器（VocalToolFilter, tools_deny） | Completed | 落地 VocalToolFilter，物理切断子代理 send_message 声带，实现子代理重活无杂音且只向父进程汇报，tests/infrastructure/vocal/test_subagent_vocal_mute.py 2/2 全通 |
+| WAKE-TASK-5-REVIVAL | 后台复苏（Revival）与父进程统一交付协调器（RevivalCoordinator） | Completed | 落地 RevivalCoordinator，子代理完工触发 WakeSource.REVIVAL 唤醒父协调者并由父进程统一发声交付，tests/application/vocal/test_revival_coordinator.py 1/1 全通 |
+| WAKE-TASK-6-E2E-SCENARIOS | 全链路多门控集成场景测试（Routine 沉默 / Inbound 渠道 / Subagent 交付） | Completed | 落地全链路综合场景测试（Routine 合规沉默 / Inbound 渠道定向绑定 / 子代理物理禁声与父进程 Revival 唤醒统一交付），tests/scenario/vocal/test_wake_matrix_and_revival_e2e.py 3/3 通过 |
+| WAKE-TASK-7-REGRESSION | 全量单测回归、代码风格检查与架构守卫核验（Pytest, Ruff, Diff Clean） | Completed | 1. 唤醒与复苏全链路测试套件 35/35 全数通过（contracts 9, infrastructure 19, application 1, scenario 6）；2. ruff check 0 报错通过；3. ruff format 风格格式化 100% 达标；4. git diff --check 退出码 0；5. 严格遵守 AP-01 负向清单（零改动已有核心 transport/DB/UI）与 AP-02 全测试不变量守卫闭环 |

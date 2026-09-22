@@ -33,6 +33,4 @@ class GatedVoiceStrategy(VocalStrategy):
         wake_source: str | WakeSource = "user_input",
         wake_context: WakeContext | None = None,
     ) -> VocalGateProtocol:
-        return GatedVocalGate(
-            operation_id, wake_source=wake_source, wake_context=wake_context
-        )
+        return GatedVocalGate(operation_id, wake_source=wake_source, wake_context=wake_context)

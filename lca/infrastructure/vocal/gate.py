@@ -88,9 +88,7 @@ class GatedVocalGate(VocalGateProtocol):
                     "type": "widget",
                     "message_id": msg_id,
                     "content": payload.content,
-                    "options": [
-                        opt.model_dump() for opt in (payload.options or [])
-                    ],
+                    "options": [opt.model_dump() for opt in (payload.options or [])],
                 }
             )
         else:
@@ -100,9 +98,7 @@ class GatedVocalGate(VocalGateProtocol):
                 "content": payload.content,
             }
             if self.wake_context.channel_target:
-                visible_record["channel_target"] = (
-                    self.wake_context.channel_target
-                )
+                visible_record["channel_target"] = self.wake_context.channel_target
             self._visible.append(visible_record)
 
         self.delivered_count += 1

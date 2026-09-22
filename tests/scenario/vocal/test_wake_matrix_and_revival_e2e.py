@@ -16,9 +16,7 @@ def test_e2e_routine_silent_execution_flow():
     gate = strategy.create_gate("run_routine_1", wake_source=wake.source, wake_context=wake)
     guard = VocalSettleGuard(gate)
 
-    gate.handle_text_chunk(
-        "Routine health-check: all systems normal, no action required."
-    )
+    gate.handle_text_chunk("Routine health-check: all systems normal, no action required.")
     assert len(gate.get_visible_outputs()) == 0
     assert guard.validate_turn_settle() is True
 
@@ -54,9 +52,7 @@ def test_e2e_subagent_mute_and_revival_flow():
     assert "send_message" in coord_tools
 
     # 2. 子代理被物理禁声（剥离 send_message）
-    sub_tools = tool_filter.filter_tools_for_runtime(
-        coord_tools, origin="subagent"
-    )
+    sub_tools = tool_filter.filter_tools_for_runtime(coord_tools, origin="subagent")
     assert "send_message" not in sub_tools
 
     # 3. 父进程建立门控
@@ -74,8 +70,6 @@ def test_e2e_subagent_mute_and_revival_flow():
     revival_coord = RevivalCoordinator(parent_gate)
     wake, receipt = revival_coord.handle_subagent_completion(subagent_outcome)
     assert wake.source == WakeSource.REVIVAL
+    assert receipt.vocal_type == "text"
     assert len(parent_gate.get_visible_outputs()) == 1
-    assert (
-        "发现并修复 3 处配置漂移"
-        in parent_gate.get_visible_outputs()[0]["content"]
-    )
+    assert "发现并修复 3 处配置漂移" in parent_gate.get_visible_outputs()[0]["content"]

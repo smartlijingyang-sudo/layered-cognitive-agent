@@ -19,11 +19,7 @@ def test_middleware_stops_injecting_after_ack():
     gate = GatedVocalGate("op_2", wake_context=wake)
     middleware = ReplyFirstMiddleware()
 
-    gate.deliver(
-        SendMessagePayload(
-            type=VocalMessageType.TEXT, content="正在为你排查..."
-        )
-    )
+    gate.deliver(SendMessagePayload(type=VocalMessageType.TEXT, content="正在为你排查..."))
     assert gate.has_acked is True
 
     prompt = middleware.augment_prompt("Original Prompt", gate)

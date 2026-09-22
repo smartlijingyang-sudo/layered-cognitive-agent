@@ -16,9 +16,7 @@ def test_revival_coordinator_handles_subagent_completion():
         "summary": "已成功分析 100 个文件，发现 2 处潜在内存泄漏。",
     }
 
-    wake_ctx, delivery_receipt = revival_coord.handle_subagent_completion(
-        subagent_result
-    )
+    wake_ctx, delivery_receipt = revival_coord.handle_subagent_completion(subagent_result)
 
     # 3. 验证唤醒源为 REVIVAL
     assert wake_ctx.source == WakeSource.REVIVAL

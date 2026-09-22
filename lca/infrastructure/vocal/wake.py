@@ -20,14 +20,7 @@ class WakeClassifier:
                 requires_reply_first=False,
                 priority=priority,
             )
-        elif src == WakeSource.USER_INPUT:
-            return WakeContext(
-                source=src,
-                is_silence_allowed=False,
-                requires_reply_first=True,
-                priority=priority,
-            )
-        elif src == WakeSource.FIRST_RUN:
+        elif src in (WakeSource.USER_INPUT, WakeSource.FIRST_RUN):
             return WakeContext(
                 source=src,
                 is_silence_allowed=False,

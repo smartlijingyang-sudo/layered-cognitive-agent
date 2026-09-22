@@ -20,14 +20,8 @@ class WakeContext(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     source: WakeSource = Field(..., description="唤醒源")
-    is_silence_allowed: bool = Field(
-        default=False, description="是否允许无变化时完全沉默收敛"
-    )
-    requires_reply_first: bool = Field(
-        default=False, description="是否要求首个动作为承接回复"
-    )
+    is_silence_allowed: bool = Field(default=False, description="是否允许无变化时完全沉默收敛")
+    requires_reply_first: bool = Field(default=False, description="是否要求首个动作为承接回复")
     channel_target: str | None = Field(default=None, description="入站渠道标识")
-    subagent_id: str | None = Field(
-        default=None, description="复苏事件关联的子代理ID"
-    )
+    subagent_id: str | None = Field(default=None, description="复苏事件关联的子代理ID")
     priority: bool = Field(default=False, description="是否为高优先级打断唤醒")
