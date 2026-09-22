@@ -152,6 +152,6 @@
 | BRAINSTORM-ROLE-DECOUPLE-CONTEXT | 全面排查代码与 61fc9bab 提交中的角色硬编码并完成全景梳理 | Completed | 已深度排查 fold.py、triage.py、peer_provider.py、room.py、delegate_tool.py、CollaborationTeamBar.tsx 等全链路 6 大硬编码重灾区 |
 | BRAINSTORM-ROLE-DECOUPLE-QUESTIONS | 澄清动态角色来源、运行时装配与团队解耦架构方案（单步提问） | Completed | 用户明确选定推荐方案（仓储与目录动态发现，消除所有写死字典，由各模块动态感知与自适应渲染） |
 | BRAINSTORM-ROLE-DECOUPLE-APPROACHES | 提炼 2-3 种彻底消除硬编码的动态角色与团队装配架构方案与权衡 | Completed | 提出方案 A（领域驱动依赖反转与数据驱动UI）、方案 B、方案 C，用户明确确认采用推荐方案 A |
-| BRAINSTORM-ROLE-DECOUPLE-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量测试）并获取用户审批 | In Progress | 正在呈现第一小节：边界划分、自治等级与契约模型设计 |
-| BRAINSTORM-ROLE-DECOUPLE-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Pending | 待执行 |
+| BRAINSTORM-ROLE-DECOUPLE-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量测试）并获取用户审批 | Completed | 3 大小节（边界与契约、后端动态数据流、前端UI补丁与测试矩阵）全部获用户审核批准 |
+| BRAINSTORM-ROLE-DECOUPLE-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | In Progress | 正在落地 docs/plans/2026-09-22-dynamic-role-and-team-decoupling-design.md |
 | BRAINSTORM-ROLE-DECOUPLE-TRANSITION | 转换至实施计划制定（writing-plans） | Pending | 待执行 |
