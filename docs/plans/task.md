@@ -115,8 +115,9 @@
 | WECHAT-REVIEW-REPORT | 输出结构化审查报告与整改/演进建议 | Completed | 输出合并与清理报告，代码已安全推送至 origin/main |
 | WECHAT-FIX-P0-DISPATCH-COGNITION | 微信频道生产化全面整改与全链路闭环验证（调度接通、孤儿治理、长轮询并发、解绑补丁、智能分片、内核真实重启） | Completed | 1. 真实认知调度打通：routes_channels_wechat.py 实现 wechat_gateway_dispatch，经 RunPort 启动认知任务、消费 spine 进度并返回 final output；2. 孤儿插件治理：web-app.yaml 注册 lca-gateway-routes-channels-wechat 并更新 README.md，audit-plugin-shape 0 违例；3. 并发长轮询与生命周期：worker.py 采用 asyncio.create_task 并发分发入站消息，支持 owns_client 避免错杀单例；4. 前端解绑代理：wechat_channel_lca_proxy.py 支持 delete 方法代理 unbind，check_patch_integrity 82/82 文件 100% byte-identical；5. 智能分片：client.py 语义换行智能分片；6. 密钥脱敏：routes config 返回脱敏 bot_token；7. 单测全通：23/23 关联单测 100% 通过（耗时 13.8s）；8. 内核真实重启实测：kernel-restart 成功重启至 web-assistant profile（pid=2829634, 6862 fibers 0 fail），实测 live /lca-api/channels/wechat/qrcode 成功获取实时微信 iLink 二维码 |
 | BRAINSTORM-GROUP-CHAT-CONTEXT | 探索项目上下文（ADR-0042、ADR-0228、roles/、LobeHub Tab与助理注册表） | Completed | 已梳理 ADR-0042 自动组队、ADR-0228 委派子图、ADR-0242 助理 Home/注册表及 LobeHub 补丁体系 |
-| BRAINSTORM-GROUP-CHAT-QUESTIONS | 澄清群聊产品壳与多 Agent 协同核心意图与边界（单步提问） | In Progress | 正在单步澄清需求与落地优先级 |
-| BRAINSTORM-GROUP-CHAT-APPROACHES | 提出 2-3 种分层演进与落地架构方案及权衡 | Pending | 待提炼 |
-| BRAINSTORM-GROUP-CHAT-DESIGN-SECTIONS | 逐步呈现设计细节（Owns / Does NOT own / 不变量 / ADR 契约）并获取审批 | Pending | 待呈批 |
-| BRAINSTORM-GROUP-CHAT-DESIGN-DOC | 沉淀设计文档 docs/plans/2026-09-22-peer-assistants-and-group-chat-design.md 并提交 | Pending | 待落盘 |
+| BRAINSTORM-GROUP-CHAT-QUESTIONS | 澄清群聊产品壳与多 Agent 协同核心意图与边界（单步提问） | Completed | 用户选定推荐路径：ADR-0250 契约先行立规，随后推进架构三角角色卡与协调者一句话组队/成员条 UI 垂直切片 |
+| BRAINSTORM-GROUP-CHAT-APPROACHES | 提出 2-3 种分层演进与落地架构方案及权衡 | Completed | 结合 6 大业界范式（Grok/Swarm/AutoGen/CrewAI/LobeHub/Hermes）提炼方案 A（声明式三层同构+M1垂直切片）获用户确认 |
+| BRAINSTORM-GROUP-CHAT-DESIGN-SECTIONS | 逐步呈现设计细节（Owns / Does NOT own / 不变量 / ADR 契约）并获取审批 | Completed | 全部 3 节设计细节（契约模型、状态机与Fold机制、前端Patch与测试矩阵）均获用户审核批准 |
+| BRAINSTORM-GROUP-CHAT-DESIGN-DOC | 沉淀设计文档 docs/plans/2026-09-22-peer-assistants-and-group-chat-design.md 并提交 | In Progress | 正在落盘完整设计文档并提交 git |
+
 | BRAINSTORM-GROUP-CHAT-TRANSITION | 转换至实施计划制定（writing-plans） | Pending | 待转换 |
