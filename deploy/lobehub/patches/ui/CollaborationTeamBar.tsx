@@ -5,6 +5,8 @@ import { Collapse } from 'antd';
 import { createStaticStyles } from 'antd-style';
 import React, { memo, useMemo } from 'react';
 
+const TAG_COLORS = ['blue', 'purple', 'cyan', 'gold', 'geekblue', 'magenta', 'lime', 'orange'];
+
 const styles = createStaticStyles(({ css, cssVar }) => {
   return {
     container: css`
@@ -60,66 +62,90 @@ export const CollaborationTeamBar = memo<CollaborationTeamBarProps>(({ content, 
     if (extra?.collaboration || metadata?.collaboration) return true;
     if (typeof content === 'string') {
       return (
+        content.includes('【协同汇报') ||
+        content.includes('【多Agent协同') ||
         content.includes('【架构协同汇报') ||
-        content.includes('【架构三角') ||
-        (content.includes('观澜') && content.includes('衡岳') && content.includes('镜川'))
+        content.includes('【架构三角')
       );
     }
     return false;
   }, [content, extra, metadata]);
 
-  // 提取或构造各专家的独立分析结论（Hermes 隔离沙箱汇报）
+  const findings: Record<string, string> = useMemo(() => {
+    return (
+      extra?.collaboration?.member_findings ||
+      metadata?.collaboration?.member_findings ||
+      {}
+    );
+  }, [extra, metadata]);
+
+  const memberMeta: Record<string, any> = useMemo(() => {
+    return (
+      extra?.collaboration?.member_metadata ||
+      metadata?.collaboration?.member_metadata ||
+      {}
+    );
+  }, [extra, metadata]);
+
+  const consensusStatus = useMemo(() => {
+    return (
+      extra?.collaboration?.consensus_status ||
+      metadata?.collaboration?.consensus_status ||
+      'unanimous'
+    );
+  }, [extra, metadata]);
+
+  const getPeerDisplay = (peerId: string, idx: number) => {
+    const meta = memberMeta[peerId];
+    const name = meta?.name || peerId.split('/').pop()?.replace(/^arch_/, '') || peerId;
+    const emoji = meta?.emoji || '🔍';
+    const color = TAG_COLORS[idx % TAG_COLORS.length];
+    return { name, emoji, color };
+  };
+
+  // 提取各专家的独立分析结论并动态生成 Collapse 面板
   const collapseItems = useMemo(() => {
     if (!isCollaboration) return [];
+    const entries = Object.entries(findings);
+    if (entries.length === 0) return [];
 
-    const findings = extra?.collaboration?.member_findings || metadata?.collaboration?.member_findings || {};
-
-    const guanlanText =
-      findings['architecture/guanlan'] ||
-      findings['arch_guanlan'] ||
-      '契约边界与 Seam 接口严谨，Does NOT own 负向清单无越权。';
-    const hengyueText =
-      findings['architecture/hengyue'] ||
-      findings['arch_hengyue'] ||
-      '六大领域概念分类判定严密，满足 C4 Reducer 单写与 C1~C14 确定性状态机不变量。';
-    const jingchuanText =
-      findings['architecture/jingchuan'] ||
-      findings['arch_jingchuan'] ||
-      'AP-01~AP-06 反模式深度核验通过，未见并发竞争与死锁风险，代码工程卫生达标。';
-
-    return [
-      {
-        key: 'guanlan',
-        label: '📐 观澜 · 架构契约与边界审查详情',
-        children: <div>{guanlanText}</div>,
-      },
-      {
-        key: 'hengyue',
-        label: '⚖️ 衡岳 · 状态机与不变量核验详情',
-        children: <div>{hengyueText}</div>,
-      },
-      {
-        key: 'jingchuan',
-        label: '🔍 镜川 · 对抗审计与反模式复核详情',
-        children: <div>{jingchuanText}</div>,
-      },
-    ];
-  }, [isCollaboration, extra, metadata]);
+    return entries.map(([peerId, text], idx) => {
+      const info = getPeerDisplay(peerId, idx);
+      return {
+        key: peerId,
+        label: `${info.emoji} ${info.name} · 专家审查详情`,
+        children: <div>{String(text)}</div>,
+      };
+    });
+  }, [isCollaboration, findings, memberMeta]);
 
   if (!isCollaboration) return null;
+
+  const peerKeys = Object.keys(findings);
 
   return (
     <Flexbox className={styles.container}>
       <Flexbox horizontal align="center" justify="space-between" width="100%">
         <Flexbox horizontal align="center" gap={4}>
-          <span className={styles.title}>👥 架构协同三角已组队:</span>
+          <span className={styles.title}>👥 专家协同团队已组队:</span>
           <Flexbox horizontal className={styles.tagGroup}>
-            <Tag color="blue">📐 观澜 · 边界与契约</Tag>
-            <Tag color="gold">⚖️ 衡岳 · 状态机与不变量</Tag>
-            <Tag color="purple">🔍 镜川 · 对抗审计</Tag>
+            {peerKeys.length > 0 ? (
+              peerKeys.map((peerId, idx) => {
+                const info = getPeerDisplay(peerId, idx);
+                return (
+                  <Tag key={peerId} color={info.color}>
+                    {info.emoji} {info.name}
+                  </Tag>
+                );
+              })
+            ) : (
+              <Tag color="blue">👥 专家协同</Tag>
+            )}
           </Flexbox>
         </Flexbox>
-        <Tag color="green">已收敛汇总</Tag>
+        <Tag color={consensusStatus === 'unanimous' ? 'green' : 'orange'}>
+          {consensusStatus === 'unanimous' ? '已收敛汇总' : '部分降级收敛'}
+        </Tag>
       </Flexbox>
       {collapseItems.length > 0 && (
         <Collapse
