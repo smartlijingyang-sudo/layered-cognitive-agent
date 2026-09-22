@@ -7,8 +7,10 @@ from lca.contracts.models.vocal.models import (
     SendMessagePayload,
     VocalMessageType,
 )
+from lca.contracts.models.vocal.wake import WakeContext, WakeSource
 from lca.contracts.protocols.vocal.protocol import VocalGateProtocol
 from lca.infrastructure.vocal.exceptions import VocalGateAlreadyBlockedError
+from lca.infrastructure.vocal.wake import WakeClassifier
 
 
 class DirectVocalGate(VocalGateProtocol):
@@ -43,9 +45,20 @@ class DirectVocalGate(VocalGateProtocol):
 class GatedVocalGate(VocalGateProtocol):
     """门控声带硬闸：大模型普通文本内省截流，仅允许经由 SendMessage 工具对外发声。"""
 
-    def __init__(self, operation_id: str, wake_source: str = "user_input") -> None:
+    def __init__(
+        self,
+        operation_id: str,
+        wake_source: str | WakeSource = "user_input",
+        wake_context: WakeContext | None = None,
+    ) -> None:
         self.operation_id = operation_id
-        self.wake_source = wake_source
+        if wake_context is not None:
+            self.wake_context = wake_context
+            self.wake_source = wake_context.source.value
+        else:
+            self.wake_context = WakeClassifier().classify(wake_source)
+            self.wake_source = self.wake_context.source.value
+
         self._scratchpad: list[str] = []
         self._visible: list[dict[str, Any]] = []
         self._awaiting_widget: bool = False
@@ -75,17 +88,22 @@ class GatedVocalGate(VocalGateProtocol):
                     "type": "widget",
                     "message_id": msg_id,
                     "content": payload.content,
-                    "options": [opt.model_dump() for opt in (payload.options or [])],
+                    "options": [
+                        opt.model_dump() for opt in (payload.options or [])
+                    ],
                 }
             )
         else:
-            self._visible.append(
-                {
-                    "type": payload.type.value,
-                    "message_id": msg_id,
-                    "content": payload.content,
-                }
-            )
+            visible_record: dict[str, Any] = {
+                "type": payload.type.value,
+                "message_id": msg_id,
+                "content": payload.content,
+            }
+            if self.wake_context.channel_target:
+                visible_record["channel_target"] = (
+                    self.wake_context.channel_target
+                )
+            self._visible.append(visible_record)
 
         self.delivered_count += 1
         self.has_acked = True
