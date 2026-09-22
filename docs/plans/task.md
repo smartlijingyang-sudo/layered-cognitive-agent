@@ -124,6 +124,6 @@
 | PEER-ROOM-TASK-2-ROLES | 架构三角标准角色卡（roles/architecture/{guanlan,hengyue,jingchuan}.md） | Completed | 落地 roles/architecture/ 下观澜、衡岳、镜川三张标准角色卡，frontmatter与职责符合ADR-0042，FileRoleLibrary 成功索引加载，2/2 单测 100% 通过，ruff clean |
 | PEER-ROOM-TASK-3-TRIAGE | 协调者收敛分流与组队路由器（CoordinatorTriageRouter） | Completed | 落地 lca/application/collaboration/triage.py，实现默认 SOLO 收敛、点名转交与架构三角自动组队判定，生成无冗余 HandoffEnvelope，3/3 测试 100% 通过（0.68s），ruff clean |
 | PEER-ROOM-TASK-4-FOLD | 上下文防污染与 Fold 聚合器（DelegationFoldAggregator） | Completed | 落地 lca/application/collaboration/fold.py，实现 Hermes 隔离清洗、超时降级容错及共识状态判定，3/3 测试 100% 通过（0.67s），ruff clean |
-| PEER-ROOM-TASK-5-UI-PATCH | LobeHub 前端协同 UI 补丁（MemberChipsBar & FoldedSection） | Pending | 待执行 |
+| PEER-ROOM-TASK-5-UI-PATCH | LobeHub 前端协同 UI 补丁（MemberChipsBar & FoldedSection） | Completed | 落地 deploy/lobehub/patches/ui/collaboration_team_bar.py 与 CollaborationTeamBar.tsx，成功注入并挂载到 Assistant/index.tsx，patch verify 与 check_patch_integrity 84/84 文件 byte-identical 通过，单测 3/3 全通，ruff clean |
 | PEER-ROOM-TASK-6-E2E-REGRESSION | 全链路端到端回归与架构门禁核验（单测/Patch一致性/Ruff/Diff） | Pending | 待执行 |
 
