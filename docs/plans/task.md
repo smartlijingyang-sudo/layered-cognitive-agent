@@ -120,7 +120,7 @@
 | BRAINSTORM-GROUP-CHAT-DESIGN-SECTIONS | 逐步呈现设计细节（Owns / Does NOT own / 不变量 / ADR 契约）并获取审批 | Completed | 全部 3 节设计细节（契约模型、状态机与Fold机制、前端Patch与测试矩阵）均获用户审核批准 |
 | BRAINSTORM-GROUP-CHAT-DESIGN-DOC | 沉淀设计文档 docs/plans/2026-09-22-peer-assistants-and-group-chat-design.md 并提交 | Completed | 落盘 docs/plans/2026-09-22-peer-assistants-and-group-chat-design.md 并完成 git 提交（commit 7fe4c8dc9） |
 | BRAINSTORM-GROUP-CHAT-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 落盘实施计划 docs/plans/2026-09-22-peer-assistants-and-group-chat-plan.md 并提交 git，准备单流执行 |
-| PEER-ROOM-TASK-1-CONTRACTS | 契约层模型（PeerProfile, HandoffEnvelope, RoomSpec, FoldedDelegationResult） | Pending | 待执行 |
+| PEER-ROOM-TASK-1-CONTRACTS | 契约层模型（PeerProfile, HandoffEnvelope, RoomSpec, FoldedDelegationResult） | Completed | 落地 lca/contracts/models/collaboration/peer.py，模型不可变（frozen=True）且严禁额外字段（extra="forbid"），4/4 测试 100% 通过（0.27s），ruff 0 报错 |
 | PEER-ROOM-TASK-2-ROLES | 架构三角标准角色卡（roles/architecture/{guanlan,hengyue,jingchuan}.md） | Pending | 待执行 |
 | PEER-ROOM-TASK-3-TRIAGE | 协调者收敛分流与组队路由器（CoordinatorTriageRouter） | Pending | 待执行 |
 | PEER-ROOM-TASK-4-FOLD | 上下文防污染与 Fold 聚合器（DelegationFoldAggregator） | Pending | 待执行 |
