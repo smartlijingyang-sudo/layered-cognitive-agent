@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import time
 from typing import TYPE_CHECKING, Any, cast
 
 from lca.application.authoring.preset_authoring import PresetAuthoring
@@ -144,15 +146,16 @@ def _publish_release(
     target_scope: str | None,
     preset_id: str | None,
 ) -> Any | None:
-    if target_scope != Scope.RELEASE.value:
+    if target_scope not in (Scope.RELEASE.value, Scope.AGENT.value):
         return None
     root = tool._preset_root
     asst_home = getattr(tool, "_assistant_home", None)
     if root is None and asst_home is not None:
         root = asst_home / "presets"
 
+    effective_preset_id = preset_id or item.artifact.logical_id
     layout = PresetAuthoring.publish(
-        preset_id=preset_id or item.artifact.logical_id,
+        preset_id=effective_preset_id,
         plugin_name=item.artifact.logical_id,
         plugin_id=plugin_id,
         plugin_source=item.source,
@@ -161,6 +164,26 @@ def _publish_release(
         root=root,
     )
     if asst_home is not None:
+        preset_dir = (root or (asst_home / "presets")) / effective_preset_id
+        meta_file = preset_dir / "preset.json"
+        metadata = {
+            "preset_id": effective_preset_id,
+            "scope": target_scope or "agent",
+            "assistant_id": getattr(asst_home, "name", "") or "",
+            "description": item.metadata.get("description", ""),
+            "created_at": time.time(),
+            "plugins": [
+                {
+                    "name": item.artifact.logical_id,
+                    "capabilities": list(item.metadata.get("capabilities", ())),
+                    "side_effects": item.metadata.get("side_effects", "none"),
+                    "policy_class": item.metadata.get("policy_class", "execute"),
+                    "implements": list(item.metadata.get("implements", ())),
+                }
+            ],
+        }
+        meta_file.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+
         direct_plugins = asst_home / "plugins"
         direct_plugins.mkdir(parents=True, exist_ok=True)
         (direct_plugins / f"{item.artifact.logical_id}.py").write_text(
