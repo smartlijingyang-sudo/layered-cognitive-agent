@@ -210,4 +210,3 @@ async def test_download_runner_auto_generates_code_when_omitted() -> None:
     text_cmd = resp_cmd.body.decode("utf-8")
     assert "?code=" in text_cmd
     assert '?code="' not in text_cmd  # not empty!
-

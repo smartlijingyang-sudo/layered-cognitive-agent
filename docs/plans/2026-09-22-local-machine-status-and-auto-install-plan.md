@@ -21,7 +21,7 @@
 - Modify: `lca/infrastructure/computer/companion/cli.py`
 - Create: `tests/infrastructure/computer/test_companion_state.py`
 - Does NOT own: `deploy/lobehub/`, `lca/core/`, `lca/cognition/`, `contracts/` (AP-01)
-- Invariants to test: 
+- Invariants to test:
   - 启动时在 `~/.lca/companion_state.json` 准确写入 PID、started_at 与 server_url；
   - 重复启动时检测到已有进程存活，安全提示并直接返回，避免多个实例抢占长连接 (AP-02)。
 
@@ -45,7 +45,7 @@ def test_companion_state_written_on_startup(tmp_path: Path) -> None:
     cfg = CompanionConfig(server_url="http://127.0.0.1:8765", token_file=tmp_path / "token.json")
     client = CompanionClient(cfg)
     client.write_state(state_file=state_file, pid=12345)
-    
+
     assert state_file.is_file()
     data = json.loads(state_file.read_text(encoding="utf-8"))
     assert data["pid"] == 12345
