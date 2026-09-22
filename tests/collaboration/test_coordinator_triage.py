@@ -46,3 +46,21 @@ def test_coordinator_triage_cast_for_architecture_tasks():
             == "请帮我深度重构审批流系统，涉及状态机迁移、Reducer单写不变量、分层契约和对抗审计"
         )
         assert "topic" in env.context_slice
+
+
+def test_triage_router_dynamic_candidates_mention():
+    from lca.contracts.models.collaboration.peer import PeerProfile
+
+    custom_peer = PeerProfile(
+        peer_id="custom_auditor",
+        name="安全守卫",
+        role="网络安全审计师",
+        description="系统漏洞审查",
+        home_namespace="/home/user/.lca/assistants/custom_auditor",
+    )
+    router = CoordinatorTriageRouter(candidates=(custom_peer,))
+    decision = router.triage("请 @安全守卫 审查下当前的防火墙规则")
+    assert decision.kind == TriageDecisionKind.PEER_HANDOFF
+    assert decision.selected_peers == ("custom_auditor",)
+    assert "安全守卫" in decision.reasoning
+    assert decision.envelopes[0].receiver_id == "custom_auditor"

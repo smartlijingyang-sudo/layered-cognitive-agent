@@ -193,6 +193,46 @@ class DynamicToolBridge:
         except Exception:
             _log.debug("dynamic_tool.record_audit_skipped", tool_name=tool.name)
 
+    @classmethod
+    def unregister_tool(
+        cls,
+        tool_name: str,
+        *,
+        tools_service: Any | None = None,
+        safe_executor: Any | None = None,
+    ) -> None:
+        """Unregister tool from active ToolsService and revoke SafeExecutor C5 permission."""
+        if tools_service is not None and hasattr(tools_service, "unregister"):
+            tools_service.unregister(tool_name)
+            _log.info("dynamic_tool.unregistered_service", tool_name=tool_name)
+        elif tools_service is not None and hasattr(tools_service, "_tools"):
+            if isinstance(tools_service._tools, dict):
+                tools_service._tools.pop(tool_name, None)
+                _log.info("dynamic_tool.unregistered_service", tool_name=tool_name)
+
+        if safe_executor is not None and hasattr(safe_executor, "permission_manifest"):
+            manifest = safe_executor.permission_manifest
+            if hasattr(manifest, "allowed_tools"):
+                if isinstance(manifest.allowed_tools, list):
+                    manifest.allowed_tools = [t for t in manifest.allowed_tools if t != tool_name]
+                elif isinstance(manifest.allowed_tools, tuple):
+                    manifest.allowed_tools = tuple(t for t in manifest.allowed_tools if t != tool_name)
+                _log.info("dynamic_tool.revoked_safe_executor", tool_name=tool_name)
+
+        # Emit audit fact
+        try:
+            record(
+                RuntimeObserved(
+                    kind=RuntimeKind.PLUGIN,
+                    operation="tool.unbridged",
+                    source=tool_name,
+                    outcome=OperationOutcome.SUCCESS,
+                    input={"tool_name": tool_name},
+                )
+            )
+        except Exception:
+            _log.debug("dynamic_tool.record_audit_skipped", tool_name=tool_name)
+
 
 __all__ = [
     "DynamicPluginToolAdapter",

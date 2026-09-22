@@ -148,9 +148,45 @@ def test_delete_preset(tmp_path: Path) -> None:
     )
     repo.save(pkg, assistant_home=assistant_home)
     assert repo.find_by_id("to_delete", assistant_home=assistant_home) is not None
+    assert (assistant_home / "plugins" / "temp_tool.py").is_file()
 
     deleted = repo.delete("to_delete", assistant_home=assistant_home)
     assert deleted is True
     assert repo.find_by_id("to_delete", assistant_home=assistant_home) is None
+    # Autonomous standalone copy is cleaned up to prevent ghost plugins
+    assert not (assistant_home / "plugins" / "temp_tool.py").is_file()
+
     # Deleting non-existent returns False
     assert repo.delete("to_delete", assistant_home=assistant_home) is False
+
+
+def test_delete_preset_preserves_shared_plugin_copies(tmp_path: Path) -> None:
+    assistant_home = tmp_path / "assistants" / "asst_arch_01"
+    assistant_home.mkdir(parents=True)
+    repo = FileSystemPresetRepository()
+
+    # Preset 1 and Preset 2 both have shared_tool
+    pkg1 = PresetPackage(
+        preset_id="preset_1",
+        scope=PresetScope.PRIVATE,
+        assistant_id="asst_arch_01",
+        plugins=(_sample_plugin("shared_tool"),),
+    )
+    pkg2 = PresetPackage(
+        preset_id="preset_2",
+        scope=PresetScope.PRIVATE,
+        assistant_id="asst_arch_01",
+        plugins=(_sample_plugin("shared_tool"),),
+    )
+    repo.save(pkg1, assistant_home=assistant_home)
+    repo.save(pkg2, assistant_home=assistant_home)
+
+    assert (assistant_home / "plugins" / "shared_tool.py").is_file()
+
+    # Delete preset_1: shared_tool must still exist because preset_2 still references it
+    repo.delete("preset_1", assistant_home=assistant_home)
+    assert (assistant_home / "plugins" / "shared_tool.py").is_file()
+
+    # Delete preset_2: now shared_tool is truly orphan and gets cleaned up
+    repo.delete("preset_2", assistant_home=assistant_home)
+    assert not (assistant_home / "plugins" / "shared_tool.py").is_file()

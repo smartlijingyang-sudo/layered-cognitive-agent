@@ -401,6 +401,9 @@ async def test_scenario_5_hot_upgrade_and_safe_rollback(tmp_path: Path) -> None:
     obs_b = BoundObservability(journal=journal)
 
     with bind_backends(obs_b):
+        tools_service = ToolsService()
+        safe_executor = DummySafeExecutor(allowed_tools=["builtin_bash"])
+
         ctx = Context()
         composer = CordisComposer(ctx, invariant_checker=build_default_invariant_checker())
         control_tool = build_cordis_control_tool(
@@ -413,6 +416,8 @@ async def test_scenario_5_hot_upgrade_and_safe_rollback(tmp_path: Path) -> None:
             ),
             actor_role="arch-creator",
             assistant_home=assistant_home,
+            tools_service=tools_service,
+            safe_executor=safe_executor,
         )
 
         # 1. Mount v1
@@ -481,6 +486,12 @@ async def test_scenario_5_hot_upgrade_and_safe_rollback(tmp_path: Path) -> None:
         })
         assert res_rollback.success is True
         assert res_rollback.payload["artifact"]["state"] == "retired"
+
+        # SafeExecutor & ToolsService synchronization check on retirement (C5 capability revocation)
+        assert tools_service.get("funnel_analytics") is None
+        assert "funnel_analytics" not in safe_executor.permission_manifest.allowed_tools
+        with pytest.raises(ToolExecutionError, match=r"未在 ToolPermissionManifest.allowed_tools 中授权"):
+            await safe_executor.execute(tool_v2, {"counts": [100, 50, 10]})
 
         # Journal contains PluginUnmounted fact
         events = [s.event for s in journal.store.events]

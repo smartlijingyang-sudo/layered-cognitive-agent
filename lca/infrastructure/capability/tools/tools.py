@@ -68,6 +68,10 @@ class ToolsService(ToolRegistry):
         """Legacy path: register a pre-built tool instance directly."""
         self._tools[tool.name] = tool
 
+    def unregister(self, name: str) -> Tool | None:
+        """Unregister a pre-built tool instance directly."""
+        return self._tools.pop(name, None)
+
     def get(self, name: str) -> Tool | None:
         return self._tools.get(name)
 

@@ -164,6 +164,8 @@ def _publish_release(
         root=root,
     )
     if asst_home is not None:
+        from lca.infrastructure.preset.fs_repository import _atomic_write_text
+
         preset_dir = (root or (asst_home / "presets")) / effective_preset_id
         meta_file = preset_dir / "preset.json"
         metadata = {
@@ -182,13 +184,11 @@ def _publish_release(
                 }
             ],
         }
-        meta_file.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+        _atomic_write_text(meta_file, json.dumps(metadata, ensure_ascii=False, indent=2))
 
         direct_plugins = asst_home / "plugins"
         direct_plugins.mkdir(parents=True, exist_ok=True)
-        (direct_plugins / f"{item.artifact.logical_id}.py").write_text(
-            item.source, encoding="utf-8"
-        )
+        _atomic_write_text(direct_plugins / f"{item.artifact.logical_id}.py", item.source)
     return layout
 
 
@@ -201,6 +201,19 @@ def _retire(
     )
     artifact = migrate_to_retired(item.artifact)
     authored[artifact.logical_id] = with_artifact(item, artifact)
+
+    # DynamicToolBridge unregister
+    tools_svc = getattr(tool, "_tools_service", None)
+    safe_exec = getattr(tool, "_safe_executor", None)
+    if tools_svc is not None or safe_exec is not None:
+        from lca.infrastructure.tools.dynamic.bridge import DynamicToolBridge
+
+        DynamicToolBridge.unregister_tool(
+            item.artifact.logical_id,
+            tools_service=tools_svc,
+            safe_executor=safe_exec,
+        )
+
     stamped = record(
         PluginUnmounted(
             plugin_name=unmounted.plugin_name,

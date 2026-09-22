@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from lca.contracts.models.core.execution.decision import Observation
+from lca.contracts.models.core.execution.result import ToolExecutionError
 from lca.contracts.models.team.role.team import ToolPermissionManifest
 from lca.infrastructure.capability.tools.tools import ToolsService
 from lca.infrastructure.tools.dynamic.bridge import (
@@ -182,3 +183,32 @@ def factory():
         res_exec = await safe_executor.execute(bridged_tool, {"items": [1, 2, 3, 4, 5]})
         assert res_exec.success is True
         assert res_exec.payload == 15
+
+        # 6. Rollback / retire: DynamicToolBridge unregisters tool and revokes SafeExecutor permission
+        res_rollback = await tool.execute(
+            {"action": "promote", "name": "dynamic_sum", "rollback": True}
+        )
+        assert res_rollback.success is True
+        assert tools_service.get("dynamic_sum") is None
+        assert "dynamic_sum" not in safe_executor.permission_manifest.allowed_tools
+
+        with pytest.raises(ToolExecutionError, match=r"未在 ToolPermissionManifest.allowed_tools 中授权"):
+            await safe_executor.execute(bridged_tool, {"items": [1, 2]})
+
+
+@pytest.mark.asyncio
+async def test_bridge_unregister_tool_direct() -> None:
+    tools_service = ToolsService()
+    safe_executor = DummySafeExecutor(allowed_tools=["existing_tool"])
+
+    tool = DynamicToolBridge.bridge_callable("test_fn", lambda: 42)
+    DynamicToolBridge.register_tool(tool, tools_service=tools_service, safe_executor=safe_executor)
+
+    assert tools_service.get("test_fn") is not None
+    assert "test_fn" in safe_executor.permission_manifest.allowed_tools
+
+    # Unregister
+    DynamicToolBridge.unregister_tool("test_fn", tools_service=tools_service, safe_executor=safe_executor)
+
+    assert tools_service.get("test_fn") is None
+    assert "test_fn" not in safe_executor.permission_manifest.allowed_tools

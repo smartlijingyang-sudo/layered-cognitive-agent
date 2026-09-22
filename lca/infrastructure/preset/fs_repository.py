@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import json
 import re
 import shutil
@@ -10,12 +9,14 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+import structlog
 import yaml
 
 from lca.contracts.models.preset.package import AuthoredPlugin, PresetPackage, PresetScope
 from lca.contracts.protocols.preset.repository import PresetRepositoryProtocol
 from lca.infrastructure.path.locator import get_lca_home
 
+_log = structlog.get_logger(__name__)
 _PRESET_ID_REGEX = re.compile(r"^[a-zA-Z0-9_-]+$")
 
 
@@ -76,15 +77,13 @@ class FileSystemPresetRepository(PresetRepositoryProtocol):
         # 1. Write plugin files
         for plugin in package.plugins:
             plugin_file = plugins_dir / f"{plugin.name}.py"
-            plugin_file.write_text(plugin.code, encoding="utf-8")
+            _atomic_write_text(plugin_file, plugin.code)
 
             # Autonomous agent standalone access copy
             if package.scope == PresetScope.PRIVATE and assistant_home is not None:
                 standalone_plugins_dir = assistant_home / "plugins"
                 standalone_plugins_dir.mkdir(parents=True, exist_ok=True)
-                (standalone_plugins_dir / f"{plugin.name}.py").write_text(
-                    plugin.code, encoding="utf-8"
-                )
+                _atomic_write_text(standalone_plugins_dir / f"{plugin.name}.py", plugin.code)
 
         # 2. Write bundle.yaml
         bundle_manifest = (
@@ -199,6 +198,24 @@ class FileSystemPresetRepository(PresetRepositoryProtocol):
         validate_preset_id(preset_id)
         target_dir = self._resolve_dir(preset_id, scope, assistant_home)
         if target_dir.is_dir():
+            # If private scope, clean up standalone plugin copies if not referenced by other presets
+            if scope == PresetScope.PRIVATE and assistant_home is not None:
+                pkg = self.find_by_id(preset_id, assistant_home=assistant_home, scope=scope)
+                if pkg is not None:
+                    all_presets = self.list_presets(
+                        assistant_home=assistant_home, scope=PresetScope.PRIVATE
+                    )
+                    other_plugin_names = {
+                        p.name
+                        for other in all_presets
+                        if other.preset_id != preset_id
+                        for p in other.plugins
+                    }
+                    standalone_dir = assistant_home / "plugins"
+                    for plugin in pkg.plugins:
+                        if plugin.name not in other_plugin_names:
+                            standalone_file = standalone_dir / f"{plugin.name}.py"
+                            standalone_file.unlink(missing_ok=True)
             shutil.rmtree(target_dir)
             return True
         return False
@@ -219,13 +236,27 @@ class FileSystemPresetRepository(PresetRepositoryProtocol):
         # Load metadata if exists
         meta: dict[str, Any] = {}
         if preset_json_file.is_file():
-            with contextlib.suppress(Exception):
+            try:
                 meta = json.loads(preset_json_file.read_text(encoding="utf-8"))
+            except Exception as exc:
+                _log.debug(
+                    "preset.metadata_parse_failed",
+                    preset_id=preset_id,
+                    path=str(preset_json_file),
+                    error=str(exc),
+                )
 
         bundle_manifest: dict[str, Any] = {}
         if bundle_file.is_file():
-            with contextlib.suppress(Exception):
+            try:
                 bundle_manifest = yaml.safe_load(bundle_file.read_text(encoding="utf-8")) or {}
+            except Exception as exc:
+                _log.debug(
+                    "preset.bundle_manifest_parse_failed",
+                    preset_id=preset_id,
+                    path=str(bundle_file),
+                    error=str(exc),
+                )
 
         assistant_id = meta.get("assistant_id")
         description = meta.get("description", "")

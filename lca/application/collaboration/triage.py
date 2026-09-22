@@ -2,20 +2,26 @@
 
 Implements the single-entrypoint convergence principle:
 - Default to SOLO (never spam peers unnecessarily)
-- Explicit specialist mentions route to PEER_HANDOFF
-- Complex architectural and system-level objectives route to TEAM_CAST (Architecture Triad)
+- Explicit specialist mentions route to PEER_HANDOFF (dynamically matched from candidates/library)
+- Complex architectural and system-level objectives route to TEAM_CAST
 - Generates typed HandoffEnvelopes with clean context slices (anti-pollution)
 """
 
+from __future__ import annotations
+
+import logging
 import uuid
+from collections.abc import Sequence
 from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from lca.contracts.models.collaboration.peer import HandoffEnvelope
+from lca.contracts.models.collaboration.peer import HandoffEnvelope, PeerProfile
 
-_ARCH_TRIAD = (
+_logger = logging.getLogger(__name__)
+
+_DEFAULT_FALLBACK_TEAM = (
     "architecture/guanlan",
     "architecture/hengyue",
     "architecture/jingchuan",
@@ -59,71 +65,118 @@ class TriageDecision(BaseModel):
 
 
 class CoordinatorTriageRouter:
-    """Evaluates user objectives to determine collaboration topology."""
+    """Evaluates user objectives to determine collaboration topology without hardcoded roles."""
 
-    def __init__(self, triad: tuple[str, ...] = _ARCH_TRIAD) -> None:
-        self._triad = triad
+    def __init__(
+        self,
+        candidates: Sequence[PeerProfile] | None = None,
+        default_team: Sequence[str] | None = None,
+        role_library: Any | None = None,
+    ) -> None:
+        self._candidates = tuple(candidates) if candidates else ()
+        self._default_team = tuple(default_team) if default_team else None
+        self._role_library = role_library
 
     def triage(
         self,
         objective: str,
         correlation_id: str | None = None,
-        sender_id: str = "coordinator_sam",
+        sender_id: str = "coordinator_agent",
         context_extra: dict[str, Any] | None = None,
     ) -> TriageDecision:
         cid = correlation_id or f"run_{uuid.uuid4().hex[:12]}"
         lowered = objective.lower()
 
-        # 1. 单点专家明确点名 / 显式 Hand-off
-        if "观澜" in objective:
-            target = "architecture/guanlan"
-            envelope = self._build_envelope(cid, sender_id, target, objective, context_extra)
+        # 1. 单点专家明确点名 / 显式 Hand-off (优先遍历传入的 candidates)
+        if self._candidates:
+            for peer in self._candidates:
+                if (
+                    peer.name in objective
+                    or f"@{peer.name}" in objective
+                    or f"@{peer.peer_id}" in objective
+                    or peer.peer_id in objective
+                ):
+                    envelope = self._build_envelope(
+                        cid, sender_id, peer.peer_id, objective, context_extra
+                    )
+                    return TriageDecision(
+                        kind=TriageDecisionKind.PEER_HANDOFF,
+                        selected_peers=(peer.peer_id,),
+                        reasoning=f"显式指定专家队友：{peer.name} ({peer.role})",
+                        envelopes=(envelope,),
+                    )
+
+        # 2. 未指定 candidates 时，动态查询角色库进行名称匹配
+        matched_role = self._match_from_library(objective)
+        if matched_role is not None:
+            role_id, role_title = matched_role
+            envelope = self._build_envelope(cid, sender_id, role_id, objective, context_extra)
             return TriageDecision(
                 kind=TriageDecisionKind.PEER_HANDOFF,
-                selected_peers=(target,),
-                reasoning="显式指定架构边界与契约总监：观澜",
-                envelopes=(envelope,),
-            )
-        if "衡岳" in objective:
-            target = "architecture/hengyue"
-            envelope = self._build_envelope(cid, sender_id, target, objective, context_extra)
-            return TriageDecision(
-                kind=TriageDecisionKind.PEER_HANDOFF,
-                selected_peers=(target,),
-                reasoning="显式指定状态机与不变量总监：衡岳",
-                envelopes=(envelope,),
-            )
-        if "镜川" in objective:
-            target = "architecture/jingchuan"
-            envelope = self._build_envelope(cid, sender_id, target, objective, context_extra)
-            return TriageDecision(
-                kind=TriageDecisionKind.PEER_HANDOFF,
-                selected_peers=(target,),
-                reasoning="显式指定对抗审查与反模式审计师：镜川",
+                selected_peers=(role_id,),
+                reasoning=f"显式指定专家队友：{role_title}",
                 envelopes=(envelope,),
             )
 
-        # 2. 复合架构与系统演化任务 -> 架构三角自动组队 (TEAM_CAST)
+        # 3. 复合架构与系统演化任务 -> 自动组队 (TEAM_CAST)
         hit_keywords = [kw for kw in _ARCH_KEYWORDS if kw in lowered]
         if len(hit_keywords) >= 2 or any(kw in lowered for kw in ("重构", "架构", "不变量")):
+            team = self._resolve_team_peers()
             envelopes = tuple(
                 self._build_envelope(cid, sender_id, peer_id, objective, context_extra)
-                for peer_id in self._triad
+                for peer_id in team
             )
             return TriageDecision(
                 kind=TriageDecisionKind.TEAM_CAST,
-                selected_peers=self._triad,
-                reasoning=f"识别为复合系统架构议题（命中: {', '.join(hit_keywords)}），激活架构三角协同",
+                selected_peers=team,
+                reasoning=f"识别为复合系统架构议题（命中: {', '.join(hit_keywords)}），激活团队协同",
                 envelopes=envelopes,
             )
 
-        # 3. 默认单人收敛 (SOLO)
+        # 4. 默认单人收敛 (SOLO)
         return TriageDecision(
             kind=TriageDecisionKind.SOLO,
             selected_peers=(),
             reasoning="常规单步任务，协调者自行处理闭环",
             envelopes=(),
         )
+
+    def _resolve_team_peers(self) -> tuple[str, ...]:
+        if self._default_team:
+            return self._default_team
+        if self._candidates:
+            return tuple(c.peer_id for c in self._candidates)
+        return _DEFAULT_FALLBACK_TEAM
+
+    def _match_from_library(self, objective: str) -> tuple[str, str] | None:
+        lib = self._get_role_library()
+        if lib is None:
+            return None
+        try:
+            for entry in lib.index():
+                title = entry.title
+                if not title or len(title) < 2:
+                    continue
+                # 精确匹配全中文名称或 @ 标识
+                if (
+                    all("\u4e00" <= ch <= "\u9fff" for ch in title)
+                    and title in objective
+                ) or f"@{entry.role_id}" in objective:
+                    return entry.role_id, title
+        except Exception as exc:
+            _logger.debug("Error during library role matching: %s", exc)
+        return None
+
+    def _get_role_library(self) -> Any | None:
+        if self._role_library is not None:
+            return self._role_library
+        try:
+            from lca.agent.role_library import FileRoleLibrary
+
+            self._role_library = FileRoleLibrary()
+            return self._role_library
+        except Exception:
+            return None
 
     def _build_envelope(
         self,
