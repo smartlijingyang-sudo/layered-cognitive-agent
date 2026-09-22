@@ -76,4 +76,10 @@
 | REFACTOR-7DED-TASK-2-FILTER | 策略过滤器管道重构与 C5 Grant 鉴权修复（filter.py + test_filter_tools.py） | Completed | 抽取 _tool_matching_names 构建统一漏斗管道，彻底封堵 MCP 工具绕过 required_grant 漏洞，24/24 passed |
 | REFACTOR-7DED-TASK-3-TEST-MOCK | 消除假单测外部网络与环境依赖，实现确定性离线单测（test_aws_mcp_dialogue.py） | Completed | 消除外部网络与真实 AWS 凭证依赖，使用 Stub 工具模拟测试，2/2 passed，符合 C8 确定性 |
 | REFACTOR-7DED-TASK-4-REGRESSION | 全链路单测回归、代码门禁与架构守卫验证 | Completed | 29/29 测试全绿（耗时 26s），ruff check/format 0 报错，git diff --check 0 告警，严格遵守 Does NOT own 负边界 |
+| APPROVAL-TASK-1-CONTRACTS | 契约层重构：ApprovalRequirement 领域模型与 ApprovalStrategy 协议 | Completed | 落地 ApprovalRequirement 不可变模型、ApprovalReasonKind/RiskLevel 枚举与 ApprovalStrategy 协议；单测 4/4 通过，ruff clean |
+| APPROVAL-TASK-2-ENGINE | 基础设施层：ApprovalPolicyEngine 责任链引擎与内置三大策略 | In Progress | 正在实现责任链引擎与三大内置策略（HITL、Machine、DefaultAllow） |
+| APPROVAL-TASK-3-COMPAT | 基础设施兼容垫片：decision_needs_approval 委托至 ApprovalPolicyEngine | Pending | 待执行 |
+| APPROVAL-TASK-4-THINK-PURITY | 认知层纯净化：think.decision.parse 剔除跨层 runtime_plane 依赖 | Pending | 待执行 |
+| APPROVAL-TASK-5-ACT-GATE | 控制面图节点化：act.authorize 与 act.approve.gate 接入结构化审批契约 | Pending | 待执行 |
+| APPROVAL-TASK-6-REGRESSION | 全链路回归验证：全量测试套件、代码门禁与架构守卫验证 | Pending | 待执行 |
 
