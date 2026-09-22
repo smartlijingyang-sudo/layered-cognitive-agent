@@ -92,4 +92,14 @@
 | LOCAL-ENV-TASK-2-FAST-PATH | 服务端动态直下脚本与 Fast-Path 秒启增强 (routes.py, routes_device.py) | Completed | install.ps1/sh 落地 Fast-Path 检测与自启动；新增 runner.bat 与 runner.command 动态端点；10/10 测试通过 |
 | LOCAL-ENV-TASK-3-UI-PATCH | 前端 UI 补丁升级（解禁离线行、双模弹窗与配对码剥离） (execution_target.py) | Completed | 编写 test_lobehub_execution_target.py 断言（3/3 passed），升级 execution_target.py 补丁解禁离线行并实现双模唤醒（一键下载启动脚本 + 一键终端运行），主视图彻底剥离手动输入框；patch_lobehub.py 23/23 ok，check_patch_integrity.py 81文件一致 |
 | LOCAL-ENV-TASK-4-REGRESSION | 全链路回归、代码门禁与架构守卫验证 | Completed | 关联单测与场景套件全数通过（24/24 passed: companion_state 4/4, install_scripts 6/6, execution_target 3/3, companion_client 7/7, routes_device 4/4）；ruff check 0 报错；git diff --check clean；check_patch_integrity 81 文件一致；严格遵守 AP-01 负向边界（Does NOT own） |
+| BRAINSTORM-WECHAT-CONTEXT | 探索微信 iLink 协议、LobeHub 现状与 LCA Python 架构结合点 | Completed | 已摸清 iLink Bot 协议、Node 端实现(@lobechat/chat-adapter-wechat)、LobeHub 双入口(Channel/Messenger)及 LCA 传输层插件体系 |
+| BRAINSTORM-WECHAT-QUESTIONS | 澄清微信频道在 LCA 的业务归属与接入方式（单步提问） | Completed | 用户明确选定方案 A（Agent 级专属消息频道）+ 方案 1（按 openid 映射独立持久化 LCA Session 并支持认知/工具全闭环） |
+| BRAINSTORM-WECHAT-APPROACHES | 提出 2-3 种 Python 端接管与前后端桥接方案及权衡 | Completed | 提出方案 A、B、C，用户选定方案 A（LCA 原生 Transport 插件 + LobeHub 前端轻量 Patch 代理） |
+| BRAINSTORM-WECHAT-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量）并获取用户审批 | In Progress | 细化 Section 1（范围、边界、Autopilot 等级与分层架构），准备呈批 |
+| BRAINSTORM-WECHAT-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Pending | 待执行 |
+| REVIEW-ANTIPATTERN-AUDIT | 代码质量审查与反模式深度审计（对照 AP-01 至 AP-06、SSOT、C1-C14 及代码异味） | Completed | 深度审计全部 12 个变更文件，完成 Checklist 逐项核验；定位 4 处关键优化点（下载端点缺码兜底、Adapter Grant 投影、PEP 8 import、进程存活判空与权限），已输出结构化审查报告 |
+| REVIEW-FIX-1-PREAUTH-FALLBACK | 服务端动态脚本下载端点缺码自愈（routes.py 动态生成 preauth_code 规避空参交互） | Completed | download_runner_bat/command 在未传 code 时自愈调用 pairing.preauth_code() 生成临时凭据，test_install_scripts.py 7/7 passed |
+| REVIEW-FIX-2-GRANT-SCOPE-PROJECTION | 修复 MachineLocalExecAdapter 投影 access_scope_of(grant) 与补全单测断言（闭环 AP-02/AP-03） | In Progress | 正在接入 access_scope_of(grant) 投影并修复 test_local_exec_port_e2e.py |
+| REVIEW-FIX-3-CODE-HYGIENE | 伴侣客户端代码整洁度与健壮性提升（PEP 8 顶层 import、跨平台 is_process_alive 精准判定） | Pending | 待执行 |
+| REVIEW-COMPREHENSIVE-TESTS | 全量关联单测、场景测试、架构门禁与补丁一致性验证 | Pending | 待执行 |
 

@@ -180,3 +180,34 @@ async def test_download_runner_command_endpoint() -> None:
     text = resp.body.decode("utf-8")
     assert "CMD-TEST" in text
     assert "/bin/bash" in text
+
+
+@pytest.mark.asyncio
+async def test_download_runner_auto_generates_code_when_omitted() -> None:
+    from lca.plugins.transport.device_hub.routes.routes import (
+        download_runner_bat,
+        download_runner_command,
+    )
+
+    req_bat = _make_request(
+        "/api/device/download/runner.bat",
+        method="GET",
+        headers={"host": "10.36.6.252:8765"},
+    )
+    resp_bat = await download_runner_bat(req_bat)
+    assert resp_bat.status_code == 200
+    text_bat = resp_bat.body.decode("utf-8")
+    assert "?code=" in text_bat
+    assert "?code='" not in text_bat  # not empty!
+
+    req_cmd = _make_request(
+        "/api/device/download/runner.command",
+        method="GET",
+        headers={"host": "10.36.6.252:8765"},
+    )
+    resp_cmd = await download_runner_command(req_cmd)
+    assert resp_cmd.status_code == 200
+    text_cmd = resp_cmd.body.decode("utf-8")
+    assert "?code=" in text_cmd
+    assert '?code="' not in text_cmd  # not empty!
+

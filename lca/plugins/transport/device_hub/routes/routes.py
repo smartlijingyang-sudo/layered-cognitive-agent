@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 from datetime import UTC, datetime
 from typing import Any, cast
@@ -767,6 +768,12 @@ async def download_runner_bat(request: Request) -> Response:
     if request.method == "OPTIONS":
         return Response("", headers=cors_headers())
     code = str(request.query_params.get("code") or "").strip()
+    if not code:
+        with contextlib.suppress(Exception):
+            pairing = _pairing(request)
+            req = pairing.preauth_code(user_id="default-user", workspace_id="default-workspace")
+            code = req.user_code
+
     host = request.headers.get("host") or "127.0.0.1:8765"
     scheme = request.url.scheme or "http"
     server_url = f"{scheme}://{host}"
@@ -790,6 +797,12 @@ async def download_runner_command(request: Request) -> Response:
     if request.method == "OPTIONS":
         return Response("", headers=cors_headers())
     code = str(request.query_params.get("code") or "").strip()
+    if not code:
+        with contextlib.suppress(Exception):
+            pairing = _pairing(request)
+            req = pairing.preauth_code(user_id="default-user", workspace_id="default-workspace")
+            code = req.user_code
+
     host = request.headers.get("host") or "127.0.0.1:8765"
     scheme = request.url.scheme or "http"
     server_url = f"{scheme}://{host}"
