@@ -142,7 +142,7 @@
 | BRAINSTORM-CREATOR-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 落地实施计划 docs/plans/2026-09-22-creator-mode-assistant-home-alignment-plan.md 并完成 git 提交（commit 545b7ed2f） |
 | CREATOR-TASK-1-FIX-TESTS | 修复既有历史测试 Import 路径断裂（P0 基线恢复） | Completed | 修复 tests/scenario/cordis/ 下 4 个测试模块中废弃的 composer_provider import 路径；修复 facade.py record() 与 fact_gateway.py append_catalog() 镜像支持 BoundObservability 内存日志；修复 test_cordis_creator_skills.py 废弃私有函数依赖；tests/scenario/cordis/ 45/45 全通，tests/artifact/test_composer_artifact_lifecycle.py 1/1 通过，ruff clean |
 | CREATOR-TASK-2-DOMAIN-REPO | DDD 领域契约与文件仓储适配器（PresetPackage & FileSystemPresetRepository） | Completed | 落地 PresetScope (StrEnum: private/shared/platform)、AuthoredPlugin 与 PresetPackage 领域模型；定义 PresetRepositoryProtocol 仓储契约；实现 FileSystemPresetRepository 支持双层同构存储拓扑与路径防穿越校验（INV-AP01）；tests/domain/preset/test_preset_repository.py 4/4 全绿，ruff clean |
-| CREATOR-TASK-3-DYNAMIC-BRIDGE | 动态工具桥接器与执行面 Seam（DynamicToolBridge & cordis_control 穿透） | Pending | 待执行 |
+| CREATOR-TASK-3-DYNAMIC-BRIDGE | 动态工具桥接器与执行面 Seam（DynamicToolBridge & cordis_control 穿透） | Completed | 落地 DynamicPluginToolAdapter 与 DynamicToolBridge；打通 promote 后的动态工具自动包装、ToolsService 即刻注册与 SafeExecutor.permission_manifest.allowed_tools C5 权限同步通道；支持 assistant_home 隔离落盘；tests/infrastructure/tools/dynamic/ 4/4 全绿，cordis scenario 45/45 全绿，ruff clean |
 | CREATOR-TASK-4-PRESET-DISCOVERY | Assistant 自治预置发现装载与感知注入（AssistantPresetDiscovery） | Pending | 待执行 |
 | CREATOR-TASK-5-PROMOTION-SERVICE | 跨 Agent 共享与平台提升服务（PresetPromotionService） | Pending | 待执行 |
 | CREATOR-TASK-6-E2E-CLOSED-LOOP | 五大端到端闭环场景测试与回归门禁（Comprehensive E2E Closed-Loop Suite） | Pending | 待执行 |

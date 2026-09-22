@@ -87,6 +87,24 @@ def promote(
     if tool._on_mounted is not None:
         instance = tool._composer._ctx.own_bindings.get(mounted.context_key)
         tool._on_mounted(mounted.plugin_name, instance, item.metadata)
+
+    # DynamicToolBridge integration: auto-bridge active tools into runtime ToolsService & SafeExecutor
+    tools_svc = getattr(tool, "_tools_service", None)
+    safe_exec = getattr(tool, "_safe_executor", None)
+    if tools_svc is not None or safe_exec is not None:
+        from lca.infrastructure.tools.dynamic.bridge import DynamicToolBridge
+
+        instance = tool._composer._ctx.own_bindings.get(mounted.context_key)
+        if instance is not None:
+            bridged = DynamicToolBridge.bridge_instance(
+                mounted.plugin_name, instance, item.metadata
+            )
+            DynamicToolBridge.register_tool(
+                bridged,
+                tools_service=tools_svc,
+                safe_executor=safe_exec,
+            )
+
     stamped = record(
         PluginMounted(
             plugin_name=mounted.plugin_name,
@@ -128,15 +146,27 @@ def _publish_release(
 ) -> Any | None:
     if target_scope != Scope.RELEASE.value:
         return None
-    return PresetAuthoring.publish(
+    root = tool._preset_root
+    asst_home = getattr(tool, "_assistant_home", None)
+    if root is None and asst_home is not None:
+        root = asst_home / "presets"
+
+    layout = PresetAuthoring.publish(
         preset_id=preset_id or item.artifact.logical_id,
         plugin_name=item.artifact.logical_id,
         plugin_id=plugin_id,
         plugin_source=item.source,
         plugin_meta=item.metadata,
         actor_role=tool._actor_role,
-        root=tool._preset_root,
+        root=root,
     )
+    if asst_home is not None:
+        direct_plugins = asst_home / "plugins"
+        direct_plugins.mkdir(parents=True, exist_ok=True)
+        (direct_plugins / f"{item.artifact.logical_id}.py").write_text(
+            item.source, encoding="utf-8"
+        )
+    return layout
 
 
 def _retire(

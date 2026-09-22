@@ -117,12 +117,18 @@ class CordisControlTool(Tool):
         actor_role: str = "",
         preset_root: Path | None = None,
         on_mounted: Any | None = None,
+        assistant_home: Path | None = None,
+        tools_service: Any | None = None,
+        safe_executor: Any | None = None,
     ) -> None:
         self._composer = composer
         self._caller_grant = tuple(caller_grant)
         self._actor_role = actor_role
         self._preset_root = preset_root
         self._on_mounted = on_mounted
+        self._assistant_home = assistant_home
+        self._tools_service = tools_service
+        self._safe_executor = safe_executor
         self._creator = CreatorRuntime(self)
 
     def validate(self, args: dict[str, Any]) -> str | None:
@@ -191,6 +197,9 @@ def build_cordis_control_tool(
     actor_role: str = "",
     preset_root: Path | None = None,
     on_mounted: Any | None = None,
+    assistant_home: Path | None = None,
+    tools_service: Any | None = None,
+    safe_executor: Any | None = None,
 ) -> Tool:
     """Build the protocol Tool bound to one governed Creator runtime."""
 
@@ -200,6 +209,9 @@ def build_cordis_control_tool(
         actor_role=actor_role,
         preset_root=preset_root,
         on_mounted=on_mounted,
+        assistant_home=assistant_home,
+        tools_service=tools_service,
+        safe_executor=safe_executor,
     )
     tool_type = type(
         "Tool_cordis_control",
@@ -212,6 +224,16 @@ def build_cordis_control_tool(
             "default_timeout_s": implementation.default_timeout_s,
             "execute": implementation.execute,
             "validate": implementation.validate,
+            "_composer": implementation._composer,
+            "_creator": implementation._creator,
+            "_caller_grant": implementation._caller_grant,
+            "_actor_role": implementation._actor_role,
+            "_preset_root": implementation._preset_root,
+            "_on_mounted": implementation._on_mounted,
+            "_assistant_home": implementation._assistant_home,
+            "_tools_service": implementation._tools_service,
+            "_safe_executor": implementation._safe_executor,
+            "_impl": implementation,
         },
     )
     return tool_type()  # type: ignore[no-any-return]
