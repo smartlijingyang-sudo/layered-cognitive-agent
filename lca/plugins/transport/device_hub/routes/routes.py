@@ -487,6 +487,18 @@ function Find-Python {{
 
 $pythonCmd = Find-Python
 
+# Fast-Path: If already installed and paired, launch immediately
+$lcaDir = Join-Path $HOME ".lca"
+$tokenFile = Join-Path $lcaDir "companion_token.json"
+$companionScript = Join-Path $lcaDir "bin\\lca-companion.py"
+if ((Test-Path $tokenFile) -and (Test-Path $companionScript) -and $pythonCmd) {{
+    Write-Host "[*] Fast-Path: Existing pairing detected, launching companion directly..." -ForegroundColor Green
+    $fastArgs = @("$companionScript", "run", "--server", "$Server")
+    Start-Process -FilePath $pythonCmd -ArgumentList ($fastArgs -join " ") -WindowStyle Hidden
+    Write-Host "[OK] LCA Companion fast-launched in background!" -ForegroundColor Green
+    exit 0
+}}
+
 # 2. If Python not found, attempt automated installation
 if (-not $pythonCmd) {{
     Write-Host "[!] Python 3.10+ not found in PATH or standard directories." -ForegroundColor Yellow
@@ -599,6 +611,16 @@ if ($PreauthCode) {{
     $runArgs += @("--preauth-code", "$PreauthCode")
 }}
 
+# 7. Setup Auto-start on Windows login (Startup folder)
+try {{
+    $startupDir = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Startup)
+    if ($startupDir -and (Test-Path $startupDir)) {{
+        $vbsPath = Join-Path $startupDir "lca-companion.vbs"
+        $vbsContent = "Set WshShell = CreateObject(`"WScript.Shell`")`r`nWshShell.Run `"`"$pythonCmd`" `"$companionScript`" run --server `"$Server`"`", 0, False"
+        [System.IO.File]::WriteAllText($vbsPath, $vbsContent, [System.Text.Encoding]::ASCII)
+    }}
+}} catch {{}}
+
 Write-Host "[OK] Starting LCA Companion in background..." -ForegroundColor Green
 Start-Process -FilePath $pythonCmd -ArgumentList ($runArgs -join " ") -WindowStyle Hidden
 Write-Host "[OK] Local Companion is now running and connected to $Server!" -ForegroundColor Green
@@ -667,6 +689,17 @@ if [ -z "$PYTHON" ]; then
 fi
 echo "[OK] Found Python: $($PYTHON --version 2>&1)"
 
+# Fast-Path: If already installed and paired, launch immediately
+LCA_DIR="$HOME/.lca"
+TOKEN_FILE="$LCA_DIR/companion_token.json"
+COMPANION_BIN="$LCA_DIR/bin/lca-companion.py"
+if [ -f "$TOKEN_FILE" ] && [ -f "$COMPANION_BIN" ]; then
+    echo "[*] Fast-Path: Existing pairing detected, launching companion directly..."
+    nohup "$PYTHON" "$COMPANION_BIN" run --server "$SERVER" >/dev/null 2>&1 &
+    echo "[OK] LCA Companion fast-launched in background!"
+    exit 0
+fi
+
 echo "[*] Checking dependencies (httpx, websockets)..."
 $PYTHON -m pip install -q httpx websockets 2>/dev/null || $PYTHON -m pip install -q --user httpx websockets 2>/dev/null || true
 
@@ -726,6 +759,49 @@ async def download_companion(request: Request) -> Response:
         headers={
             **cors_headers(),
             "Content-Disposition": 'attachment; filename="lca-companion.py"',
+        },
+    )
+
+
+async def download_runner_bat(request: Request) -> Response:
+    if request.method == "OPTIONS":
+        return Response("", headers=cors_headers())
+    code = str(request.query_params.get("code") or "").strip()
+    host = request.headers.get("host") or "127.0.0.1:8765"
+    scheme = request.url.scheme or "http"
+    server_url = f"{scheme}://{host}"
+    ps1_url = f"{server_url}/api/device/install.ps1?code={code}"
+
+    script = (
+        "@echo off\r\n"
+        f'powershell -ExecutionPolicy Bypass -NoProfile -c "irm \'{ps1_url}\' | iex"\r\n'
+    )
+    return Response(
+        content=script,
+        media_type="application/x-bat",
+        headers={
+            **cors_headers(),
+            "Content-Disposition": 'attachment; filename="lca-runner.bat"',
+        },
+    )
+
+
+async def download_runner_command(request: Request) -> Response:
+    if request.method == "OPTIONS":
+        return Response("", headers=cors_headers())
+    code = str(request.query_params.get("code") or "").strip()
+    host = request.headers.get("host") or "127.0.0.1:8765"
+    scheme = request.url.scheme or "http"
+    server_url = f"{scheme}://{host}"
+    sh_url = f"{server_url}/api/device/install.sh?code={code}"
+
+    script = f'#!/bin/bash\ncurl -fsSL "{sh_url}" | bash\n'
+    return Response(
+        content=script,
+        media_type="application/x-sh",
+        headers={
+            **cors_headers(),
+            "Content-Disposition": 'attachment; filename="lca-runner.command"',
         },
     )
 

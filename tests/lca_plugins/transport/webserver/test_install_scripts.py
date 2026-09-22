@@ -128,3 +128,55 @@ async def test_install_sh_renders_template() -> None:
     assert "apt-get" in text
     assert "brew" in text
     assert "--user" in text
+
+
+@pytest.mark.asyncio
+async def test_install_ps1_contains_fast_path_and_autostart() -> None:
+    req = _make_request(
+        "/api/device/install.ps1",
+        method="GET",
+        headers={"host": "10.36.6.252:8765"},
+        query_params={"code": "FAST-TEST"},
+    )
+    resp = await install_ps1(req)
+    assert resp.status_code == 200
+    text = resp.body.decode("utf-8")
+    assert "Fast-Path" in text
+    assert "companion_token.json" in text
+    assert "Startup" in text
+
+
+@pytest.mark.asyncio
+async def test_download_runner_bat_endpoint() -> None:
+    from lca.plugins.transport.device_hub.routes.routes import download_runner_bat
+
+    req = _make_request(
+        "/api/device/download/runner.bat",
+        method="GET",
+        headers={"host": "10.36.6.252:8765"},
+        query_params={"code": "BAT-TEST"},
+    )
+    resp = await download_runner_bat(req)
+    assert resp.status_code == 200
+    assert 'attachment; filename="lca-runner.bat"' in resp.headers.get("content-disposition", "")
+    text = resp.body.decode("utf-8")
+    assert "BAT-TEST" in text
+    assert "powershell" in text.lower()
+
+
+@pytest.mark.asyncio
+async def test_download_runner_command_endpoint() -> None:
+    from lca.plugins.transport.device_hub.routes.routes import download_runner_command
+
+    req = _make_request(
+        "/api/device/download/runner.command",
+        method="GET",
+        headers={"host": "10.36.6.252:8765"},
+        query_params={"code": "CMD-TEST"},
+    )
+    resp = await download_runner_command(req)
+    assert resp.status_code == 200
+    assert 'attachment; filename="lca-runner.command"' in resp.headers.get("content-disposition", "")
+    text = resp.body.decode("utf-8")
+    assert "CMD-TEST" in text
+    assert "/bin/bash" in text

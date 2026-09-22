@@ -31,6 +31,8 @@ from lca.plugins.transport.device_hub.routes.routes import (
     connect_device,
     device_status,
     download_companion,
+    download_runner_bat,
+    download_runner_command,
     install_ps1,
     install_sh,
     list_devices,
@@ -60,6 +62,8 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
     RouteSpec("/api/device/install.ps1", install_ps1, ("GET", "OPTIONS")),
     RouteSpec("/api/device/install.sh", install_sh, ("GET", "OPTIONS")),
     RouteSpec("/api/device/download/companion.py", download_companion, ("GET", "OPTIONS")),
+    RouteSpec("/api/device/download/runner.bat", download_runner_bat, ("GET", "OPTIONS")),
+    RouteSpec("/api/device/download/runner.command", download_runner_command, ("GET", "OPTIONS")),
 )
 
 # WebSocket path stays literal:RouteSpec is HTTP-only.
@@ -73,7 +77,7 @@ _WS_PATH = "/api/device/ws"
     layer="L1",
     kind=PluginKind.PROVIDER,
     effects="none",
-    description="Register /api/device/* (14 HTTP + 1 WebSocket) routes.",
+    description="Register /api/device/* (16 HTTP + 1 WebSocket) routes.",
     test_suite="tests.lca_plugins.transport.webserver.test_device",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
