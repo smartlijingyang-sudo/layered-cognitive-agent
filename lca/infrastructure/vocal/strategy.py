@@ -10,9 +10,7 @@ class DirectVoiceStrategy(VocalStrategy):
     def mode(self) -> VocalMode:
         return VocalMode.DIRECT
 
-    def create_gate(
-        self, operation_id: str, wake_source: str = "user_input"
-    ) -> VocalGateProtocol:
+    def create_gate(self, operation_id: str, wake_source: str = "user_input") -> VocalGateProtocol:
         return DirectVocalGate(operation_id)
 
 
@@ -23,7 +21,5 @@ class GatedVoiceStrategy(VocalStrategy):
     def mode(self) -> VocalMode:
         return VocalMode.GATED
 
-    def create_gate(
-        self, operation_id: str, wake_source: str = "user_input"
-    ) -> VocalGateProtocol:
+    def create_gate(self, operation_id: str, wake_source: str = "user_input") -> VocalGateProtocol:
         return GatedVocalGate(operation_id, wake_source=wake_source)

@@ -181,10 +181,10 @@
 | BRAINSTORM-VOCAL-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量测试）并获取用户审批 | Completed | 全部 4 节设计细节（边界隔离与Autopilot、领域契约与状态机、执行流与三大硬闸、测试拓扑与断言矩阵）均获用户审批 |
 | BRAINSTORM-VOCAL-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Completed | 落盘 docs/plans/2026-09-22-gated-vocal-runtime-and-delivery-contract-design.md 并已提交 git (commit c6bd337d1) |
 | BRAINSTORM-VOCAL-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 落盘实施计划 docs/plans/2026-09-22-gated-vocal-runtime-and-delivery-contract-plan.md 并已提交 git (commit 5a8bf10ed) |
-| VOCAL-TASK-1-CONTRACTS | 契约模型与不可变载荷（VocalMode, VocalMessageType, WidgetOption, SendMessagePayload, DeliveryReceipt） | Pending | 待执行 |
-| VOCAL-TASK-2-PROTOCOLS | 端口契约与策略接口（VocalGateProtocol, VocalStrategy） | Pending | 待执行 |
-| VOCAL-TASK-3-GATES | 经典直通策略与门控声带拦截器（DirectVoiceStrategy, GatedVocalGate, 内省截流） | Pending | 待执行 |
-| VOCAL-TASK-4-TOOL | SendMessage 原语工具与 Widget 停等状态机（SendMessageTool, TurnVocalState, AwaitingBlock） | Pending | 待执行 |
-| VOCAL-TASK-5-SETTLE | Settle 交付核验硬闸与例程沉默门禁（VocalSettleGuard, Ack≠Delivery, RoutineSilence） | Pending | 待执行 |
-| VOCAL-TASK-6-FACTORY-E2E | 策略工厂与全链路场景集成验证（VocalStrategyFactory, 端到端模拟与经典模式回归） | Pending | 待执行 |
-| VOCAL-TASK-7-REGRESSION | 全量单测回归、代码风格检查与架构守卫核验（Pytest, Ruff, Diff Clean） | Pending | 待执行 |
+| VOCAL-TASK-1-CONTRACTS | 契约模型与不可变载荷（VocalMode, VocalMessageType, WidgetOption, SendMessagePayload, DeliveryReceipt） | Completed | 落地 VocalMode/VocalMessageType 枚举与不可变强类型载荷模型（frozen=True, extra="forbid"），字段语义校验完整，tests/contracts/vocal/test_vocal_models.py 6/6 全通 |
+| VOCAL-TASK-2-PROTOCOLS | 端口契约与策略接口（VocalGateProtocol, VocalStrategy） | Completed | 落地 VocalGateProtocol 与 VocalStrategy 强类型运行时可检查协议，tests/contracts/vocal/test_vocal_protocol.py 1/1 通过 |
+| VOCAL-TASK-3-GATES | 经典直通策略与门控声带拦截器（DirectVoiceStrategy, GatedVocalGate, 内省截流） | Completed | 落地 DirectVocalGate 与 GatedVocalGate，实现内省文本 100% 截流至 scratchpad 且直出模式零退化，tests/infrastructure/vocal/test_vocal_gate_isolation.py 2/2 通过 |
+| VOCAL-TASK-4-TOOL | SendMessage 原语工具与 Widget 停等状态机（SendMessageTool, TurnVocalState, AwaitingBlock） | Completed | 落地 SendMessageTool 工具与 Widget 单轮停等状态机，彻底封堵二次发声漏洞（INV-VOCAL-03），tests/infrastructure/vocal/test_send_message_tool.py 2/2 通过 |
+| VOCAL-TASK-5-SETTLE | Settle 交付核验硬闸与例程沉默门禁（VocalSettleGuard, Ack≠Delivery, RoutineSilence） | Completed | 落地 VocalSettleGuard，严格断言用户轮次交付闭环（INV-VOCAL-04）并放行例程沉默（INV-VOCAL-06），tests/infrastructure/vocal/test_vocal_settle_guard.py 3/3 通过 |
+| VOCAL-TASK-6-FACTORY-E2E | 策略工厂与全链路场景集成验证（VocalStrategyFactory, 端到端模拟与经典模式回归） | Completed | 落地 VocalStrategyFactory，完整验证用户发起轮次（Reply-First Ack -> 工具执行 -> Delivery 交付 -> Settle 收敛）、经典模式默认直通零回归及 Widget 选项卡停等，tests/scenario/vocal/test_gated_conversation_e2e.py 3/3 通过 |
+| VOCAL-TASK-7-REGRESSION | 全量单测回归、代码风格检查与架构守卫核验（Pytest, Ruff, Diff Clean） | Completed | 1. 门控声带全链路测试套件 17/17 全数通过（contracts 7, infrastructure 7, scenario 3）；2. ruff check 0 报错通过；3. ruff format 风格格式化 100% 达标；4. git diff --check 退出码 0；5. 严格遵守 AP-01 负向清单（零改动已有核心 transport/DB/UI）与 AP-02 六大测试不变量守卫闭环 |

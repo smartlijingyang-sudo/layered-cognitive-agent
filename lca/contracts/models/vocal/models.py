@@ -1,5 +1,6 @@
 from enum import StrEnum
 from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
@@ -16,7 +17,7 @@ class VocalMessageType(StrEnum):
     TEXT = "text"
     ATTACHMENT = "attachment"
     WIDGET = "widget"
-    SECRET_REQUEST = "secret_request"
+    SECRET_REQUEST = "secret_request"  # noqa: S105  # enum 名,非密码
 
 
 class WidgetOption(BaseModel):
@@ -42,18 +43,17 @@ class SendMessagePayload(BaseModel):
     options: list[WidgetOption] | None = Field(
         default=None, description="交互选项列表（1-6项，widget必填）"
     )
-    secret_key: str | None = Field(
-        default=None, description="凭证标识键名（secret_request必填）"
-    )
+    secret_key: str | None = Field(default=None, description="凭证标识键名（secret_request必填）")
     reply_to_id: str | None = Field(default=None, description="关联的上下文消息ID")
 
     @model_validator(mode="after")
     def validate_payload_semantics(self) -> "SendMessagePayload":
         if self.type == VocalMessageType.TEXT and not self.content:
             raise ValueError("type='text' 时 content 字段不能为空")
-        if self.type == VocalMessageType.WIDGET:
-            if not self.options or len(self.options) < 1 or len(self.options) > 6:
-                raise ValueError("type='widget' 时 options 必须包含 1 到 6 个选项")
+        if self.type == VocalMessageType.WIDGET and (
+            not self.options or len(self.options) < 1 or len(self.options) > 6
+        ):
+            raise ValueError("type='widget' 时 options 必须包含 1 到 6 个选项")
         if self.type == VocalMessageType.SECRET_REQUEST and not self.secret_key:
             raise ValueError("type='secret_request' 时 secret_key 字段不能为空")
         return self

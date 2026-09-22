@@ -1,5 +1,10 @@
 from typing import Protocol, runtime_checkable
-from lca.contracts.models.vocal.models import DeliveryReceipt, SendMessagePayload, VocalMode
+
+from lca.contracts.models.vocal.models import (
+    DeliveryReceipt,
+    SendMessagePayload,
+    VocalMode,
+)
 
 
 @runtime_checkable
@@ -28,8 +33,6 @@ class VocalStrategy(Protocol):
         """策略对应模式。"""
         ...
 
-    def create_gate(
-        self, operation_id: str, wake_source: str = "user_input"
-    ) -> VocalGateProtocol:
+    def create_gate(self, operation_id: str, wake_source: str = "user_input") -> VocalGateProtocol:
         """为特定 Run 创建专用声带门控实例。"""
         ...

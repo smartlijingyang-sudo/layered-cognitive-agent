@@ -10,9 +10,7 @@ class VocalStrategyFactory:
         self._direct = DirectVoiceStrategy()
         self._gated = GatedVoiceStrategy()
 
-    def resolve_strategy(
-        self, vocal_mode: str | VocalMode | None = None
-    ) -> VocalStrategy:
+    def resolve_strategy(self, vocal_mode: str | VocalMode | None = None) -> VocalStrategy:
         if vocal_mode is None:
             return self._direct
 

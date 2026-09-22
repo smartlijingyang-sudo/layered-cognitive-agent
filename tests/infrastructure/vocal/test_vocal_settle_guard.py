@@ -21,11 +21,7 @@ def test_settle_guard_passes_when_message_delivered():
     gate = GatedVocalGate("op_2", wake_source="user_input")
     guard = VocalSettleGuard(gate)
 
-    gate.deliver(
-        SendMessagePayload(
-            type=VocalMessageType.TEXT, content="Final answer delivered"
-        )
-    )
+    gate.deliver(SendMessagePayload(type=VocalMessageType.TEXT, content="Final answer delivered"))
     assert guard.validate_turn_settle() is True
 
 

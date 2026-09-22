@@ -75,9 +75,7 @@ class GatedVocalGate(VocalGateProtocol):
                     "type": "widget",
                     "message_id": msg_id,
                     "content": payload.content,
-                    "options": [
-                        opt.model_dump() for opt in (payload.options or [])
-                    ],
+                    "options": [opt.model_dump() for opt in (payload.options or [])],
                 }
             )
         else:

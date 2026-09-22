@@ -25,12 +25,8 @@ def test_full_gated_conversation_flow_ack_then_deliver():
     assert gate.has_acked is True
 
     # 3. 模拟耗时工具排查完毕后的正式交付
-    gate.handle_text_chunk(
-        "Log analysis finished, found root cause in connection pool."
-    )
-    tool.execute(
-        type="text", content="排查完成，根因为连接池耗尽，已自动扩容。"
-    )
+    gate.handle_text_chunk("Log analysis finished, found root cause in connection pool.")
+    tool.execute(type="text", content="排查完成，根因为连接池耗尽，已自动扩容。")
     assert len(gate.get_visible_outputs()) == 2
 
     # 4. Settle 结算收敛成功

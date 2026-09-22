@@ -16,7 +16,7 @@ def test_vocal_mode_and_message_type_enums():
     assert VocalMessageType.TEXT == "text"
     assert VocalMessageType.WIDGET == "widget"
     assert VocalMessageType.ATTACHMENT == "attachment"
-    assert VocalMessageType.SECRET_REQUEST == "secret_request"
+    assert VocalMessageType.SECRET_REQUEST == "secret_request"  # noqa: S105
 
 
 def test_send_message_payload_text_validation():
@@ -44,8 +44,11 @@ def test_send_message_payload_widget_validation():
 
 
 def test_send_message_payload_secret_request_validation():
-    payload = SendMessagePayload(type=VocalMessageType.SECRET_REQUEST, secret_key="GITHUB_TOKEN")
-    assert payload.secret_key == "GITHUB_TOKEN"
+    payload = SendMessagePayload(
+        type=VocalMessageType.SECRET_REQUEST,
+        secret_key="GITHUB_TOKEN",  # noqa: S106
+    )
+    assert payload.secret_key == "GITHUB_TOKEN"  # noqa: S105
 
     with pytest.raises(ValueError, match="secret_key 字段不能为空"):
         SendMessagePayload(type=VocalMessageType.SECRET_REQUEST, secret_key=None)
