@@ -117,9 +117,7 @@ ADR-0246 M2 的控制面签发仍未接通。`subject_user_id` 在工具构造�
 - [HIL resume 必须重绑 RunAmbit](../../implemented/seam/2026-09-05-hil-resume-rebinds-ambit.md) 恢复侧 ambient 真值
 - [执行环境目录与平面提示词策略](../../implemented/seam/2026-09-21-execution-environment-catalog-and-plane-prompt-strategy.md) `ExecutionEnvironment` 与 `MachinePlaneStrategy`
 
-邻接缺陷,不在本 Note 范围:`EnvironmentKind(plane.kind.value)` 对 `PlaneKind.POOL_WORKER` 抛
-`ValueError`,两个闭集对同一概念给出不重合的成员;`ExecutionEnvironment.capabilities` 在两条构造
-路径上都未填充。二者各自成一条 Note。
+邻接不变量,归 [执行环境目录与平面提示词策略](../../implemented/seam/2026-09-21-execution-environment-catalog-and-plane-prompt-strategy.md) 而非本 Note:`EnvironmentKind` 覆盖 `PlaneKind` 的每个成员,外加尚无平面的前向种类 `SSH`,因此 `environment_from_plane` 对任意平面都是全函数;`ExecutionEnvironment.capabilities` 由 `plane.capability_summary` 投影。
 
 ## References
 
