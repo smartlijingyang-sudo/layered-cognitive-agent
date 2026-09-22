@@ -72,8 +72,8 @@
 | BRAINSTORM-7DED-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量测试）与获取用户审批 | Completed | 3 大小节（边界与自治等级、核心组件数据流与设计模式、测试架构与不变量断言矩阵）均获用户审批通过 |
 | BRAINSTORM-7DED-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Completed | 已沉淀 docs/plans/2026-09-22-mcp-integration-refactor-design.md |
 | BRAINSTORM-7DED-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 已沉淀详细实施计划 docs/plans/2026-09-22-mcp-integration-refactor.md 并提交 git |
-| REFACTOR-7DED-TASK-1-PROVIDER | 配置 SSOT 与表驱动工厂注册解耦（base.yaml + provider.py） | In Progress | 正在编写 TDD 失败用例与解耦实现 |
-| REFACTOR-7DED-TASK-2-FILTER | 策略过滤器管道重构与 C5 Grant 鉴权修复（filter.py + test_filter_tools.py） | Pending | 待执行 |
-| REFACTOR-7DED-TASK-3-TEST-MOCK | 消除假单测外部网络与环境依赖，实现确定性离线单测（test_aws_mcp_dialogue.py） | Pending | 待执行 |
-| REFACTOR-7DED-TASK-4-REGRESSION | 全链路单测回归、代码门禁与架构守卫验证 | Pending | 待执行 |
+| REFACTOR-7DED-TASK-1-PROVIDER | 配置 SSOT 与表驱动工厂注册解耦（base.yaml + provider.py） | Completed | 消除 if 分支耦合，base.yaml 显式声明 mcp 工厂，provider.py 采用 _TOOL_FACTORIES 表驱动分发，单测 3/3 passed |
+| REFACTOR-7DED-TASK-2-FILTER | 策略过滤器管道重构与 C5 Grant 鉴权修复（filter.py + test_filter_tools.py） | Completed | 抽取 _tool_matching_names 构建统一漏斗管道，彻底封堵 MCP 工具绕过 required_grant 漏洞，24/24 passed |
+| REFACTOR-7DED-TASK-3-TEST-MOCK | 消除假单测外部网络与环境依赖，实现确定性离线单测（test_aws_mcp_dialogue.py） | Completed | 消除外部网络与真实 AWS 凭证依赖，使用 Stub 工具模拟测试，2/2 passed，符合 C8 确定性 |
+| REFACTOR-7DED-TASK-4-REGRESSION | 全链路单测回归、代码门禁与架构守卫验证 | Completed | 29/29 测试全绿（耗时 26s），ruff check/format 0 报错，git diff --check 0 告警，严格遵守 Does NOT own 负边界 |
 
