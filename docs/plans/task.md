@@ -175,3 +175,16 @@
 | MEM-TASK-4-PROMPT-DEDUP | Prompt 呈现去重与纯净化（ContextSection 与 UserProfileSection 互斥 / 修复旧测试） | Completed | render_context_lines 增加 exclude_categories 过滤；ContextSection 显式排除 IDENTITY 与 PREFERENCE 分类，交由 UserProfileSection 专职结构化呈现；修复 test_home_section_in_builtin_react_template；12/12 prompt 测试全通，ruff clean |
 | MEM-TASK-5-SCENARIOS | 5 大多场景端到端闭环验证（用户画像演化 / 环境规则感知 / 自我情景记忆 / 意图检索剪裁 / 受治理工具） | Completed | 编写 tests/scenario/memory/test_memory_closed_loop_scenarios.py，全覆盖 5 大端到端业务场景与 INV-01~06 6大不变量断言（画像演化supersede、环境客观事实、情景自我感知50条FIFO、相关度降序与预算剪裁、受治理工具与风控确认），5/5场景全绿，ruff clean |
 | MEM-TASK-6-REGRESSION | 全链路回归、代码门禁与架构守卫验证（Pytest / Ruff / Diff Clean） | Completed | 1. 记忆全链路测试 75/75 全数通过（assistant 12、reflect 19、plugins/assistant 27、prompts 12、scenario/memory 5）；2. ruff check 0 报错；3. git diff --check 干净退出码 0；4. 严格遵守 AP-01 负边界（未侵入认知图拓扑/前端UI/外部DB）与 AP-02 测试不变量全断言守卫 |
+| BRAINSTORM-VOCAL-CONTEXT | 深度剖析 ADR-0248、learn-grok-bot 16 机制与桌面员工唯一声道第一性原理 | Completed | 成功同步并 rebase ADR-0248，完成公开课与重建树证据级解剖，梳理出五大产品对象与进程硬闸本质 |
+| BRAINSTORM-VOCAL-QUESTIONS | 澄清声带模式与优先级，严格确立“双模零侵入”与“第一方领域命名”原则 | Completed | 用户批准方案 A，强调零破坏现有直出流程，严格禁止使用外部商业命名，收敛至 gated / VocalGate |
+| BRAINSTORM-VOCAL-APPROACHES | 提炼 2-3 种声带隔离架构方案与权衡对比 | Completed | 提炼方案 A（策略模式+硬闸窄门）、方案 B（软引导透传）、方案 C（流式标签解析），用户选定方案 A |
+| BRAINSTORM-VOCAL-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量测试）并获取用户审批 | Completed | 全部 4 节设计细节（边界隔离与Autopilot、领域契约与状态机、执行流与三大硬闸、测试拓扑与断言矩阵）均获用户审批 |
+| BRAINSTORM-VOCAL-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Completed | 落盘 docs/plans/2026-09-22-gated-vocal-runtime-and-delivery-contract-design.md 并已提交 git (commit c6bd337d1) |
+| BRAINSTORM-VOCAL-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 落盘实施计划 docs/plans/2026-09-22-gated-vocal-runtime-and-delivery-contract-plan.md 并已提交 git (commit 5a8bf10ed) |
+| VOCAL-TASK-1-CONTRACTS | 契约模型与不可变载荷（VocalMode, VocalMessageType, WidgetOption, SendMessagePayload, DeliveryReceipt） | Pending | 待执行 |
+| VOCAL-TASK-2-PROTOCOLS | 端口契约与策略接口（VocalGateProtocol, VocalStrategy） | Pending | 待执行 |
+| VOCAL-TASK-3-GATES | 经典直通策略与门控声带拦截器（DirectVoiceStrategy, GatedVocalGate, 内省截流） | Pending | 待执行 |
+| VOCAL-TASK-4-TOOL | SendMessage 原语工具与 Widget 停等状态机（SendMessageTool, TurnVocalState, AwaitingBlock） | Pending | 待执行 |
+| VOCAL-TASK-5-SETTLE | Settle 交付核验硬闸与例程沉默门禁（VocalSettleGuard, Ack≠Delivery, RoutineSilence） | Pending | 待执行 |
+| VOCAL-TASK-6-FACTORY-E2E | 策略工厂与全链路场景集成验证（VocalStrategyFactory, 端到端模拟与经典模式回归） | Pending | 待执行 |
+| VOCAL-TASK-7-REGRESSION | 全量单测回归、代码风格检查与架构守卫核验（Pytest, Ruff, Diff Clean） | Pending | 待执行 |
