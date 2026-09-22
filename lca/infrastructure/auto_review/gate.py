@@ -49,18 +49,12 @@ class AutoReviewGate:
             return AutoReviewVerdict(action=AutoReviewAction.ALLOW, reason="AutoReview 关闭")
 
         if self.mode == AutoReviewMode.SHADOW:
-            self._audit_records.append(
-                {"tool": tool_name, "args": arguments, "flagged": is_risky}
-            )
-            return AutoReviewVerdict(
-                action=AutoReviewAction.ALLOW, reason="Shadow 模式放行并审计"
-            )
+            self._audit_records.append({"tool": tool_name, "args": arguments, "flagged": is_risky})
+            return AutoReviewVerdict(action=AutoReviewAction.ALLOW, reason="Shadow 模式放行并审计")
 
         # ENFORCE 模式
         if not is_risky:
-            return AutoReviewVerdict(
-                action=AutoReviewAction.ALLOW, reason="操作低风险自动放行"
-            )
+            return AutoReviewVerdict(action=AutoReviewAction.ALLOW, reason="操作低风险自动放行")
 
         if "cat /etc/shadow" in cmd:
             return AutoReviewVerdict(

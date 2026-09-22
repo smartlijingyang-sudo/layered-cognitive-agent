@@ -201,12 +201,12 @@
 | BRAINSTORM-ADR248-COMPLETION-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量测试）并获取用户审批 | Completed | 全部 4 节设计细节（边界与Autopilot、三大领域模型、主循环总装机制、不变量断言矩阵）均获用户审批通过 |
 | BRAINSTORM-ADR248-COMPLETION-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Completed | 落盘 docs/plans/2026-09-23-adr-0248-completion-and-runtime-wiring-design.md 并提交 git (commit 68cb379b6) |
 | BRAINSTORM-ADR248-COMPLETION-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 落盘实施计划 docs/plans/2026-09-23-adr-0248-completion-and-runtime-wiring-plan.md 并提交 git |
-| ADR248-TASK-1-BOX-ACCESSOR | 切片 3：员工电脑平面与 BoxAccessor（ComputerPlane, BoxAccessor 沙箱隔离与读写） | Pending | 待执行 |
-| ADR248-TASK-2-AUTO-REVIEW-CONTRACTS | 切片 4：Auto-Review 契约与动作指纹（AutoReviewMode, AutoReviewVerdict, action_fingerprint） | Pending | 待执行 |
-| ADR248-TASK-3-AUTO-REVIEW-GATE | 切片 4：Auto-Review 硬闸与重放人审核验（AutoReviewGate 三态拦截与 Escalate 指纹核验） | Pending | 待执行 |
-| ADR248-TASK-4-INITIATIVE-HOOKS | 切片 8：Initiative Hooks 纯函数主动提议器（InitiativeOffer, evaluate_initiative 单轮收敛） | Pending | 待执行 |
-| ADR248-TASK-5-RUNTIME-WIRING | 阶段二：运行时主循环总装适配器（RuntimeVocalContext, CognitiveRuntime Seam 挂接与 Settle 校验） | Pending | 待执行 |
-| ADR248-TASK-6-E2E-SCENARIO | 阶段二：ADR-0248 全链路闭环端到端集成场景测试（test_runtime_loop_gated_e2e.py） | Pending | 待执行 |
-| ADR248-TASK-7-REGRESSION | 全链路全量单测回归、代码风格检查与架构守卫验证（Pytest, Ruff, Diff Clean） | Pending | 待执行 |
+| ADR248-TASK-1-BOX-ACCESSOR | 切片 3：员工电脑平面与 BoxAccessor（ComputerPlane, BoxAccessor 沙箱隔离与读写） | Completed | 落地 ComputerPlane 枚举与 BoxAccessor 抽象，确保 /home/box 沙箱安全隔离与越权阻断，3/3 单测全绿 |
+| ADR248-TASK-2-AUTO-REVIEW-CONTRACTS | 切片 4：Auto-Review 契约与动作指纹（AutoReviewMode, AutoReviewVerdict, action_fingerprint） | Completed | 落地 AutoReviewMode 三态枚举、AutoReviewVerdict 不可变模型与确定性 SHA-256 指纹算法，3/3 单测全绿 |
+| ADR248-TASK-3-AUTO-REVIEW-GATE | 切片 4：Auto-Review 硬闸与重放人审核验（AutoReviewGate 三态拦截与 Escalate 指纹核验） | Completed | 落地 AutoReviewGate 三态硬闸（off/shadow/enforce）与动作指纹放行防绕过机制，4/4 单测全绿 |
+| ADR248-TASK-4-INITIATIVE-HOOKS | 切片 8：Initiative Hooks 纯函数主动提议器（InitiativeOffer, evaluate_initiative 单轮收敛） | Completed | 落地 InitiativeSignal、InitiativeOffer 与 evaluate_initiative 纯函数提议器，覆盖重复3次例程与连接器提示，3/3 单测全绿 |
+| ADR248-TASK-5-RUNTIME-WIRING | 阶段二：运行时主循环总装适配器（RuntimeVocalContext, CognitiveRuntime Seam 挂接与 Settle 校验） | Completed | 落地 resolve_runtime_vocal 运行时适配器，在 CognitiveRuntime.run / _run_driver 声明式注入门控与结算守卫，2/2 单测全绿 |
+| ADR248-TASK-6-E2E-SCENARIO | 阶段二：ADR-0248 全链路闭环端到端集成场景测试（test_runtime_loop_gated_e2e.py） | Completed | 落地 test_adr0248_full_runtime_closed_loop_e2e 端到端场景测试，走通内省截流 -> Reply-First -> 员工机 -> AutoReview -> 交付 -> Settle -> 主动提议全闭环，1/1 通过 |
+| ADR248-TASK-7-REGRESSION | 全链路全量单测回归、代码风格检查与架构守卫验证（Pytest, Ruff, Diff Clean） | Completed | 1. ADR-0248 全链路关联测试 51/51 全数通过；2. ruff check 0 报错；3. ruff format 35 文件格式化 100% 达标；4. git diff --check 退出码 0；5. 严格遵守 AP-01 负边界与 AP-02 核心不变量全断言闭环 |
 
 

@@ -20,9 +20,7 @@ def test_adr0248_full_runtime_closed_loop_e2e(tmp_path: Path):
     7. 纯函数主动提议钩子（生成 Routine 提议）
     """
     # 1. 运行态总装门控
-    vocal_ctx = resolve_runtime_vocal(
-        vocal_mode="gated", operation_id="run_adr248_e2e"
-    )
+    vocal_ctx = resolve_runtime_vocal(vocal_mode="gated", operation_id="run_adr248_e2e")
     gate = vocal_ctx.gate
     guard = vocal_ctx.settle_guard
     assert guard is not None
@@ -43,9 +41,7 @@ def test_adr0248_full_runtime_closed_loop_e2e(tmp_path: Path):
     assert gate.has_acked is True
 
     # 5. 员工机操作与 Auto-Review 审查
-    verdict = auto_review.evaluate(
-        "write_file", {"command": "write config", "path": "config.yaml"}
-    )
+    verdict = auto_review.evaluate("write_file", {"command": "write config", "path": "config.yaml"})
     assert verdict.action == "allow"
     box.write_text("config.yaml", "env: production")
     assert box.read_text("config.yaml") == "env: production"
