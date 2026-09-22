@@ -195,3 +195,10 @@
 | WAKE-TASK-5-REVIVAL | 后台复苏（Revival）与父进程统一交付协调器（RevivalCoordinator） | Completed | 落地 RevivalCoordinator，子代理完工触发 WakeSource.REVIVAL 唤醒父协调者并由父进程统一发声交付，tests/application/vocal/test_revival_coordinator.py 1/1 全通 |
 | WAKE-TASK-6-E2E-SCENARIOS | 全链路多门控集成场景测试（Routine 沉默 / Inbound 渠道 / Subagent 交付） | Completed | 落地全链路综合场景测试（Routine 合规沉默 / Inbound 渠道定向绑定 / 子代理物理禁声与父进程 Revival 唤醒统一交付），tests/scenario/vocal/test_wake_matrix_and_revival_e2e.py 3/3 通过 |
 | WAKE-TASK-7-REGRESSION | 全量单测回归、代码风格检查与架构守卫核验（Pytest, Ruff, Diff Clean） | Completed | 1. 唤醒与复苏全链路测试套件 35/35 全数通过（contracts 9, infrastructure 19, application 1, scenario 6）；2. ruff check 0 报错通过；3. ruff format 风格格式化 100% 达标；4. git diff --check 退出码 0；5. 严格遵守 AP-01 负向清单（零改动已有核心 transport/DB/UI）与 AP-02 全测试不变量守卫闭环 |
+| BRAINSTORM-ADR248-COMPLETION-CONTEXT | 深度梳理 ADR-0248 剩余切片缺口（Box Accessor、Auto-Review 三态、Initiative Hooks、运行时主循环总装） | Completed | 已摸清四大核心缺口与已有模块映射，明确补齐目标与架构分层 |
+| BRAINSTORM-ADR248-COMPLETION-QUESTIONS | 澄清补齐范围、优先级与总装策略（单步提问） | Completed | 用户选定推荐方案：全量推进两阶段落地（阶段一补齐切片 3/4/8 领域能力，阶段二完成运行时主循环总装） |
+| BRAINSTORM-ADR248-COMPLETION-APPROACHES | 提炼 2-3 种补齐与演进方案及权衡对比 | Completed | 提出方案 A（统一领域下沉与声明式注入）、方案 B（外挂中间件）、方案 C（主循环硬编码），用户确认采纳方案 A |
+| BRAINSTORM-ADR248-COMPLETION-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量测试）并获取用户审批 | In Progress | 正在逐步呈现 4 大设计细节并征询用户审批确认 |
+| BRAINSTORM-ADR248-COMPLETION-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Pending | 待设计获批后落盘并提交 git |
+| BRAINSTORM-ADR248-COMPLETION-TRANSITION | 转换至实施计划制定（writing-plans） | Pending | 待设计完工后启动单流执行计划编制 |
+
