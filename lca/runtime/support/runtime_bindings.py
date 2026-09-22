@@ -228,6 +228,10 @@ class DeclarativeRuntimeBindings:
         """
         return replace(self, capabilities=self.capabilities.with_extra({"writer": writer}))
 
+    def with_vocal_gate(self, vocal_gate: object) -> DeclarativeRuntimeBindings:
+        """Return a copy with ``vocal_gate`` injected into the phase capabilities (ADR-0248)."""
+        return replace(self, capabilities=self.capabilities.with_extra({"vocal_gate": vocal_gate}))
+
     def require_executable_plan(self) -> CompiledRunPlan:
         """Return the selected plan once the bindings carry its node executors."""
         if self.plan is None or not self.node_executors:

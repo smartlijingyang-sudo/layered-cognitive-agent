@@ -37,6 +37,7 @@ from lca.runtime.support.checkpoint_resolution import DeclarativeCheckpoint
 from lca.runtime.support.runtime_bindings import DeclarativeRuntimeBindings
 
 if TYPE_CHECKING:
+    from lca.application.vocal.runtime_wiring import RuntimeVocalContext
     from lca.contracts.mechanisms import HookRegistry
     from lca.contracts.protocols import (
         ArtifactClosure,
@@ -211,9 +212,33 @@ class CognitiveRuntime(Runtime):
                     role="user",
                     content=task,
                 )
+            # ADR-0248: 运行态声带与硬闸解析
+            vocal_mode = None
+            wake_source = "user_input"
+            wake_context = None
+            if ctx:
+                vocal_mode = getattr(ctx, "vocal_mode", None) or (ctx.extra or {}).get("vocal_mode")
+                wake_source = (ctx.extra or {}).get("wake_source", "user_input")
+                wake_context = (ctx.extra or {}).get("wake_context")
+
+            from lca.application.vocal.runtime_wiring import resolve_runtime_vocal
+            from lca.contracts.models.vocal.models import VocalMode
+
+            vocal_ctx = resolve_runtime_vocal(
+                vocal_mode=vocal_mode,
+                operation_id=trace_id,
+                wake_source=wake_source,
+                wake_context=wake_context,
+            )
+            if vocal_ctx.mode == VocalMode.GATED:
+                self._bindings = self._bindings.with_vocal_gate(vocal_ctx.gate)
+
             await self._lifecycle.publish(RuntimeLifecycleEventType.STARTED, state)
             return await self._run_driver(
-                state, runner=lambda: self._bindings.new_driver().run(state)
+                state,
+                runner=lambda: self._bindings.new_driver().run(state),
+                vocal_ctx=vocal_ctx,
+                ctx=ctx,
             )
         finally:
             global_bridge.dispose()
@@ -336,6 +361,8 @@ class CognitiveRuntime(Runtime):
         runner: Callable[[], Awaitable[Result]],
         phase_cursor: str | None = None,
         resume_envelope: bool = False,
+        vocal_ctx: RuntimeVocalContext | None = None,
+        ctx: RunContext | None = None,
     ) -> Result:
         """Own driver lifecycle projection for both fresh and resumed turns."""
         # PR-3.4: capture the resume envelope metadata so we can emit
@@ -379,6 +406,9 @@ class CognitiveRuntime(Runtime):
         await await_step_boundary_checkpoint()
         try:
             result = await runner()
+            # ADR-0248: 门控声带轮次结算核验硬闸
+            if vocal_ctx is not None and vocal_ctx.settle_guard is not None:
+                vocal_ctx.settle_guard.validate_turn_settle()
         except asyncio.CancelledError as exc:
             await self._lifecycle.publish(
                 RuntimeLifecycleEventType.CANCELED,
@@ -407,6 +437,14 @@ class CognitiveRuntime(Runtime):
                     node_id=resume_envelope_meta["node_id"],
                     outcome=outcome_holder["value"],
                 )
+            if outcome_holder["value"] == "success" and ctx is not None:
+                features = (ctx.extra or {}).get("transcript_features")
+                if features:
+                    from lca.application.initiative.hooks import evaluate_initiative
+
+                    offer = evaluate_initiative(features)
+                    if offer is not None:
+                        ctx.extra["initiative_offer"] = offer.model_dump()
             # ADR-0166 S5: 异常路径走 exception.finally；正常路径走
             # lifecycle.finally —— reader 不再被「成功也发 exception.*」混淆。
             if outcome_holder["value"] == "success":
