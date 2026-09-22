@@ -24,6 +24,16 @@ import websockets
 _log = structlog.get_logger(__name__)
 
 
+def is_process_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
 @dataclass
 class CompanionConfig:
     server_url: str = "http://10.36.6.252:8765"
@@ -35,6 +45,9 @@ class CompanionConfig:
     allow_commands: bool = True
     token_file: Path | None = field(
         default_factory=lambda: Path.home() / ".lca" / "companion_token.json"
+    )
+    state_file: Path | None = field(
+        default_factory=lambda: Path.home() / ".lca" / "companion_state.json"
     )
 
     def save_token(
@@ -78,6 +91,51 @@ class CompanionClient:
         self.config = config or CompanionConfig()
         if not self.config.machine_token:
             self.config.load_token()
+
+    def write_state(
+        self,
+        state_file: Path | None = None,
+        pid: int | None = None,
+        status: str = "running",
+    ) -> None:
+        target = state_file or self.config.state_file
+        if not target:
+            return
+        target.parent.mkdir(parents=True, exist_ok=True)
+        from datetime import UTC, datetime
+
+        data = {
+            "pid": pid if pid is not None else os.getpid(),
+            "device_id": self.config.device_id,
+            "label": self.config.label,
+            "server_url": self.config.server_url,
+            "status": status,
+            "started_at": datetime.now(UTC).isoformat(),
+        }
+        target.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+    def clear_state(self, state_file: Path | None = None) -> None:
+        target = state_file or self.config.state_file
+        if target and target.exists():
+            try:
+                target.unlink()
+            except OSError:
+                pass
+
+    def is_another_instance_running(self, state_file: Path | None = None) -> bool:
+        target = state_file or self.config.state_file
+        if not target or not target.exists():
+            return False
+        try:
+            data = json.loads(target.read_text(encoding="utf-8"))
+            pid = data.get("pid")
+            if pid and isinstance(pid, int):
+                if pid == os.getpid():
+                    return False
+                return is_process_alive(pid)
+        except Exception:
+            return False
+        return False
 
     def _check_path(self, path: str) -> str:
         norm = os.path.abspath(os.path.expanduser(path))
