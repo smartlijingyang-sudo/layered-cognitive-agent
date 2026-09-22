@@ -105,8 +105,10 @@ def apply(ctx: PatchContext) -> bool:
   };"""
     new_delete = """  delete = async (id: string) => {
     try {
+      const match = typeof window !== 'undefined' ? window.location.pathname.match(/\\/agent\\/([^/]+)/) : null;
+      const targetAssistantId = match ? match[1] : id;
       await fetch('/lca-api/channels/wechat/unbind', {
-        body: JSON.stringify({ assistant_id: id }),
+        body: JSON.stringify({ assistant_id: targetAssistantId }),
         headers: { 'Content-Type': 'application/json' },
         method: 'POST',
       });

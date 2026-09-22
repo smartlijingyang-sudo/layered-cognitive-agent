@@ -10,6 +10,7 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
+import httpx
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
@@ -47,6 +48,31 @@ def _mask_secret(val: str | None) -> str:
     if len(val) <= 8:
         return "******"
     return f"{val[:3]}****{val[-4:]}"
+
+
+async def _resolve_assistant_id(assistant_id: str) -> str:
+    """Resolve LobeHub agt_* agent id to LCA asst_* assistant id via TRPC if needed."""
+    if not assistant_id or not assistant_id.startswith("agt_"):
+        return assistant_id
+    try:
+        url = "http://127.0.0.1:3010/trpc/lambda/agent.getAgentConfigById"
+        params = {"input": json.dumps({"json": {"agentId": assistant_id}})}
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            resp = await client.get(url, params=params)
+            if resp.status_code == 200:
+                data = resp.json()
+                lca_id = (
+                    data.get("result", {})
+                    .get("data", {})
+                    .get("json", {})
+                    .get("agencyConfig", {})
+                    .get("lcaAssistantId")
+                )
+                if lca_id:
+                    return str(lca_id)
+    except Exception as exc:
+        logger.debug("Failed to resolve agt_ id via TRPC: %s", exc)
+    return assistant_id
 
 
 def _extract_latest_progress(spine_path: Path) -> tuple[str | None, dict[str, Any] | None]:
@@ -91,7 +117,8 @@ async def wechat_gateway_dispatch(
         logger.warning("WeChat dispatch fallback: run_port or registry not available on app.state")
         return f"[{assistant_id}] 收到微信消息: {user_text}"
 
-    agent_ref = AgentRef(agent_id=assistant_id)
+    resolved_id = await _resolve_assistant_id(assistant_id)
+    agent_ref = AgentRef(agent_id=resolved_id)
     run_request = RunRequest(
         profile="web-assistant",
         question=user_text,
@@ -106,7 +133,7 @@ async def wechat_gateway_dispatch(
         execution_target="",
         options={},
         ctx=ctx,
-        assistant_id=assistant_id,
+        assistant_id=resolved_id,
     )
 
     receipt = await run_port.create_and_dispatch(run_request)
@@ -263,6 +290,7 @@ async def wechat_bind(request: Request) -> Response:
             status_code=400,
             headers=cors_headers(),
         )
+    assistant_id = await _resolve_assistant_id(assistant_id)
 
     bot_id = body.get("bot_id") or body.get("ilink_bot_id")
     bot_token = body.get("bot_token")
@@ -310,6 +338,7 @@ async def wechat_unbind(request: Request) -> Response:
             status_code=400,
             headers=cors_headers(),
         )
+    assistant_id = await _resolve_assistant_id(assistant_id)
 
     manager = _get_manager(request)
     await manager.unbind_channel(assistant_id)
@@ -332,6 +361,7 @@ async def wechat_config(request: Request) -> Response:
             status_code=400,
             headers=cors_headers(),
         )
+    assistant_id = await _resolve_assistant_id(assistant_id)
 
     manager = _get_manager(request)
     config = manager.get_channel_config(assistant_id)
