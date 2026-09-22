@@ -229,3 +229,16 @@ class TestToolsFromScopeFiltersByAssistant:
         _write_tools(home, allow=[], deny=["aws-mcp"])
         mcp_tool = _tool("mcp__aws-mcp__aws___list_regions")
         assert filter_tools_by_assistant([mcp_tool], home) == ()
+
+    def test_mcp_tool_with_required_grant_denied_without_grant(self, home: Path) -> None:
+        _write_tools(home, allow=["mcp"], deny=[])
+        mcp_tool = _tool("mcp__aws-mcp__aws_privileged", required_grant="aws.admin")
+        result = filter_tools_by_assistant([mcp_tool], home)
+        assert result == ()
+
+    def test_mcp_tool_with_required_grant_allowed_with_grant(self, home: Path) -> None:
+        _write_tools(home, allow=["mcp"], deny=[])
+        _write_grants(home, ["aws.admin"])
+        mcp_tool = _tool("mcp__aws-mcp__aws_privileged", required_grant="aws.admin")
+        result = filter_tools_by_assistant([mcp_tool], home)
+        assert [t.name for t in result] == ["mcp__aws-mcp__aws_privileged"]

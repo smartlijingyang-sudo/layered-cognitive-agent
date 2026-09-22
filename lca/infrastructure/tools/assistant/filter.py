@@ -36,6 +36,22 @@ __all__ = ["filter_tools_by_assistant"]
 _ToolSet: TypeAlias = tuple[Tool, ...]
 
 
+def _tool_matching_names(tool: Tool) -> frozenset[str]:
+    """Extract all valid matching identifier keys for a tool."""
+    name = tool.name
+    keys: set[str] = {name}
+    if name.startswith("local_"):
+        keys.add(name[6:])
+    elif name.startswith("mcp__"):
+        parts = name.split("__", 2)
+        keys.add("mcp")
+        if len(parts) > 1 and parts[1]:
+            keys.add(parts[1])
+        if len(parts) > 2 and parts[2]:
+            keys.add(parts[2])
+    return frozenset(keys)
+
+
 def filter_tools_by_assistant(
     tools: Iterable[Tool],
     home_path: str | Path,
@@ -56,35 +72,15 @@ def filter_tools_by_assistant(
 
     kept: list[Tool] = []
     for tool in tools:
-        name = tool.name
-        base_name = name[6:] if name.startswith("local_") else name
-        if name in deny or base_name in deny:
-            continue
-        if name.startswith("mcp__"):
-            parts = name.split("__", 2)
-            server_name = parts[1] if len(parts) > 1 else ""
-            raw_tool_name = parts[2] if len(parts) > 2 else ""
-            if (
-                "mcp" in deny
-                or (server_name and server_name in deny)
-                or (raw_tool_name and raw_tool_name in deny)
-            ):
-                continue
-            if (
-                not allow
-                or "mcp" in allow
-                or name in allow
-                or (server_name and server_name in allow)
-                or (raw_tool_name and raw_tool_name in allow)
-            ):
-                kept.append(tool)
+        keys = _tool_matching_names(tool)
+        if bool(keys & deny):
             continue
         required_grant = _required_grant(tool)
         if required_grant:
             if required_grant in grants:
                 kept.append(tool)
             continue
-        if not allow or name in allow or base_name in allow:
+        if not allow or bool(keys & allow):
             kept.append(tool)
     return tuple(kept)
 
