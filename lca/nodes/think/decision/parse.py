@@ -48,7 +48,6 @@ from lca.contracts.models.core.execution.decision import (
     Decision,
     DelegationSpec,
     ToolCall,
-    requires_human_input,
 )
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
@@ -60,7 +59,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.infrastructure.runtime_plane.access.classify import machine_calls_need_approval
+from lca.infrastructure.runtime_plane.access.classify import decision_needs_approval
 
 if TYPE_CHECKING:
     from lca.contracts.models.core.conversation.llm import LLMResponse
@@ -99,8 +98,7 @@ class DecisionParseExecutor:
                     tool_calls=list(tool_calls),
                     delegations=list(delegations),
                     response_text=intent if action_type == "respond" else None,
-                    needs_approval=requires_human_input(tool_calls)
-                    or machine_calls_need_approval(tool_calls),
+                    needs_approval=decision_needs_approval(tool_calls),
                 )
             }
         )

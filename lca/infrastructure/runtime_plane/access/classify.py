@@ -16,6 +16,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from lca.contracts.models.core.execution.decision import requires_human_input
 from lca.contracts.models.core.execution.local_exec import (
     AccessDecision,
     AccessVerdict,
@@ -143,10 +144,23 @@ def machine_calls_need_approval(tool_calls: object) -> bool:
     return tool_calls_need_approval(tool_calls, current_primary())
 
 
+def decision_needs_approval(tool_calls: object) -> bool:
+    """The whole ``Decision.needs_approval`` predicate, in one place.
+
+    Every Decision producer calls this instead of composing the two halves
+    itself, so the three producers cannot drift. ``requires_human_input`` owns
+    the HITL tool names; ``machine_calls_need_approval`` owns machine-plane
+    access. ADR-0246 §1.1 keeps authorization and consent separate, and neither
+    half replaces the other.
+    """
+    return requires_human_input(tool_calls) or machine_calls_need_approval(tool_calls)
+
+
 __all__ = [
     "MACHINE_TOOL_PREFIX",
     "call_paths",
     "decide_tool_call",
+    "decision_needs_approval",
     "machine_calls_need_approval",
     "machine_operation",
     "tool_calls_need_approval",
