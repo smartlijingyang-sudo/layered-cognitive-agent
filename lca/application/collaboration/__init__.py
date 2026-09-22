@@ -1,5 +1,6 @@
 """Collaboration application services."""
 
+from lca.application.collaboration.fold import DelegationFoldAggregator
 from lca.application.collaboration.triage import (
     CoordinatorTriageRouter,
     TriageDecision,
@@ -8,6 +9,7 @@ from lca.application.collaboration.triage import (
 
 __all__ = [
     "CoordinatorTriageRouter",
+    "DelegationFoldAggregator",
     "TriageDecision",
     "TriageDecisionKind",
 ]
