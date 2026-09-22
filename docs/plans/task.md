@@ -128,8 +128,8 @@
 | PEER-ROOM-TASK-6-E2E-REGRESSION | 全链路端到端回归与架构门禁核验（单测/Patch一致性/Ruff/Diff） | Completed | 编写并通过 tests/collaboration/test_group_chat_e2e.py，18/18 协同测试全绿，patch verify 与 check_patch_integrity 84/84 通过，ruff 0 报错，git diff --check clean，AP-01 负边界 100% 达标 |
 | CHECK-PEER-ROOM-AUDIT | 对比审计设计文档与现状，明确 6 大未涵盖/未完善 PR 清单与工程落地路径 | Completed | 审计完成，定位：1.缺失ADR-0250；2.同名模型冲突；3.角色未物化Home；4.RoomSpec无仓储与路由；5.缺Agent委派Tool；6.UI缺折叠卡片渲染 |
 | PEER-ROOM-PR1-ADR0250-CONTRACT | 落地 ADR-0250 权威架构决策记录，消解模型命名冲突，健全架构角色库部门映射 | Completed | 落地 docs/adr/0250-peer-assistants-handoff-bus-and-rooms.md；命名空间消除歧义（PeerFoldedResult）；role_card_resolver 补充 architecture: 系统架构；测试 7/7 全绿 |
-| PEER-ROOM-PR2-PEER-PROVIDER | 落地 PeerProfileResolver 与持久化 AssistantHome 物化工具 | In Progress | 正在实现 lca/application/collaboration/peer_provider.py 并补充单元测试 |
-| PEER-ROOM-PR3-ROOM-REPO-ROUTER | 落地 RoomSpec 仓储（JsonRoomRepository）与群聊路由策略（RoomMessageRouter） | Pending | 待执行 |
+| PEER-ROOM-PR2-PEER-PROVIDER | 落地 PeerProfileResolver 与持久化 AssistantHome 物化工具 | Completed | 落地 lca/application/collaboration/peer_provider.py，支持从角色卡解析强类型 PeerProfile 并物化持久化 AssistantHome（SOUL/USER/AGENTS/meta.json），4/4 测试全绿 |
+| PEER-ROOM-PR3-ROOM-REPO-ROUTER | 落地 RoomSpec 仓储（JsonRoomRepository）与群聊路由策略（RoomMessageRouter） | In Progress | 正在实现 lca/domain/collaboration/room.py 与 tests/collaboration/test_room_repository_and_routing.py |
 | PEER-ROOM-PR4-COORDINATOR-TOOL | 落地协调者委派工具 TeamCastTool 与 HandoffToPeerTool 并接入工具体系 | Pending | 待执行 |
 | PEER-ROOM-PR5-UI-FOLD-EXPAND | 升级 LobeHub 前端补丁 CollaborationTeamBar.tsx，落地 AntD Collapse 专家分析折叠卡片 | Pending | 待执行 |
 | PEER-ROOM-PR6-REGRESSION-AND-DOCS | 全链路端到端回归验证、更新设计与计划文档、执行代码门禁与补丁一致性核验 | Pending | 待执行 |
