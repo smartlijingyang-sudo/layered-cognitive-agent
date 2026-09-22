@@ -25,7 +25,7 @@ async def test_team_cast_tool_execution():
     assert obs.success is True
     payload = obs.payload
     assert payload["consensus_status"] == "unanimous"
-    assert "架构三角已形成完全共识" in payload["synthesized_verdict"]
+    assert "全员共识已形成" in payload["synthesized_verdict"]
     assert len(payload["member_findings"]) == 3
     assert (
         "arch_guanlan" in payload["member_findings"]
