@@ -117,10 +117,8 @@ class CompanionClient:
     def clear_state(self, state_file: Path | None = None) -> None:
         target = state_file or self.config.state_file
         if target and target.exists():
-            try:
+            with contextlib.suppress(OSError):
                 target.unlink()
-            except OSError:
-                pass
 
     def is_another_instance_running(self, state_file: Path | None = None) -> bool:
         target = state_file or self.config.state_file

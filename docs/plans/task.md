@@ -91,5 +91,5 @@
 | LOCAL-ENV-TASK-1-PID-LOCK | 伴侣客户端 PID 锁、状态记录与防重复启动 (client.py, cli.py) | Completed | 落地 write_state、clear_state、is_another_instance_running 与 PID 互斥守护；tests/infrastructure/computer/test_companion_state.py 4/4 通过，test_companion_client.py 7/7 全绿 |
 | LOCAL-ENV-TASK-2-FAST-PATH | 服务端动态直下脚本与 Fast-Path 秒启增强 (routes.py, routes_device.py) | Completed | install.ps1/sh 落地 Fast-Path 检测与自启动；新增 runner.bat 与 runner.command 动态端点；10/10 测试通过 |
 | LOCAL-ENV-TASK-3-UI-PATCH | 前端 UI 补丁升级（解禁离线行、双模弹窗与配对码剥离） (execution_target.py) | Completed | 编写 test_lobehub_execution_target.py 断言（3/3 passed），升级 execution_target.py 补丁解禁离线行并实现双模唤醒（一键下载启动脚本 + 一键终端运行），主视图彻底剥离手动输入框；patch_lobehub.py 23/23 ok，check_patch_integrity.py 81文件一致 |
-| LOCAL-ENV-TASK-4-REGRESSION | 全链路回归、代码门禁与架构守卫验证 | In Progress | 执行中：关联测试套件回归、ruff、git diff --check、负向边界守护 |
+| LOCAL-ENV-TASK-4-REGRESSION | 全链路回归、代码门禁与架构守卫验证 | Completed | 关联单测与场景套件全数通过（24/24 passed: companion_state 4/4, install_scripts 6/6, execution_target 3/3, companion_client 7/7, routes_device 4/4）；ruff check 0 报错；git diff --check clean；check_patch_integrity 81 文件一致；严格遵守 AP-01 负向边界（Does NOT own） |
 
