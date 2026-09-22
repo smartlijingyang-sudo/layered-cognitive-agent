@@ -118,6 +118,12 @@
 | BRAINSTORM-GROUP-CHAT-QUESTIONS | 澄清群聊产品壳与多 Agent 协同核心意图与边界（单步提问） | Completed | 用户选定推荐路径：ADR-0250 契约先行立规，随后推进架构三角角色卡与协调者一句话组队/成员条 UI 垂直切片 |
 | BRAINSTORM-GROUP-CHAT-APPROACHES | 提出 2-3 种分层演进与落地架构方案及权衡 | Completed | 结合 6 大业界范式（Grok/Swarm/AutoGen/CrewAI/LobeHub/Hermes）提炼方案 A（声明式三层同构+M1垂直切片）获用户确认 |
 | BRAINSTORM-GROUP-CHAT-DESIGN-SECTIONS | 逐步呈现设计细节（Owns / Does NOT own / 不变量 / ADR 契约）并获取审批 | Completed | 全部 3 节设计细节（契约模型、状态机与Fold机制、前端Patch与测试矩阵）均获用户审核批准 |
-| BRAINSTORM-GROUP-CHAT-DESIGN-DOC | 沉淀设计文档 docs/plans/2026-09-22-peer-assistants-and-group-chat-design.md 并提交 | In Progress | 正在落盘完整设计文档并提交 git |
+| BRAINSTORM-GROUP-CHAT-DESIGN-DOC | 沉淀设计文档 docs/plans/2026-09-22-peer-assistants-and-group-chat-design.md 并提交 | Completed | 落盘 docs/plans/2026-09-22-peer-assistants-and-group-chat-design.md 并完成 git 提交（commit 7fe4c8dc9） |
+| BRAINSTORM-GROUP-CHAT-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 落盘实施计划 docs/plans/2026-09-22-peer-assistants-and-group-chat-plan.md 并提交 git，准备单流执行 |
+| PEER-ROOM-TASK-1-CONTRACTS | 契约层模型（PeerProfile, HandoffEnvelope, RoomSpec, FoldedDelegationResult） | Pending | 待执行 |
+| PEER-ROOM-TASK-2-ROLES | 架构三角标准角色卡（roles/architecture/{guanlan,hengyue,jingchuan}.md） | Pending | 待执行 |
+| PEER-ROOM-TASK-3-TRIAGE | 协调者收敛分流与组队路由器（CoordinatorTriageRouter） | Pending | 待执行 |
+| PEER-ROOM-TASK-4-FOLD | 上下文防污染与 Fold 聚合器（DelegationFoldAggregator） | Pending | 待执行 |
+| PEER-ROOM-TASK-5-UI-PATCH | LobeHub 前端协同 UI 补丁（MemberChipsBar & FoldedSection） | Pending | 待执行 |
+| PEER-ROOM-TASK-6-E2E-REGRESSION | 全链路端到端回归与架构门禁核验（单测/Patch一致性/Ruff/Diff） | Pending | 待执行 |
 
-| BRAINSTORM-GROUP-CHAT-TRANSITION | 转换至实施计划制定（writing-plans） | Pending | 待转换 |
