@@ -36,6 +36,7 @@ from lca.contracts.models.core.execution.decision import (
     Decision,
     DelegationSpec,
     ToolCall,
+    requires_human_input,
 )
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
@@ -47,7 +48,6 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.infrastructure.runtime_plane.access.classify import decision_needs_approval
 
 _PARSE_FAILURE_USER_MESSAGE = "抱歉，模型未返回有效决策，请重试。"
 
@@ -117,7 +117,7 @@ def _compose(
             delegations=list(delegations),
         )
     if tool_calls:
-        needs_approval = decision_needs_approval(tool_calls)
+        needs_approval = requires_human_input(tool_calls)
         return Decision(
             decision_id=new_id("dec"),
             action_type=ActionType.USE_TOOL.value,

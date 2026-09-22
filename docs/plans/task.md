@@ -79,7 +79,7 @@
 | APPROVAL-TASK-1-CONTRACTS | 契约层重构：ApprovalRequirement 领域模型与 ApprovalStrategy 协议 | Completed | 落地 ApprovalRequirement 不可变模型、ApprovalReasonKind/RiskLevel 枚举与 ApprovalStrategy 协议；单测 4/4 通过，ruff clean |
 | APPROVAL-TASK-2-ENGINE | 基础设施层：ApprovalPolicyEngine 责任链引擎与内置三大策略 | Completed | 落地 ApprovalPolicyEngine、ApprovalPolicyRegistry，以及三大内置策略（HITLInteractionStrategy、MachineAccessStrategy、DefaultAllowStrategy）；单测 7/7 通过，ruff clean |
 | APPROVAL-TASK-3-COMPAT | 基础设施兼容垫片：decision_needs_approval 委托至 ApprovalPolicyEngine | Completed | classify.py 内部委托给 build_default_approval_engine()；56+ 现有测试（typed、bindings、gate、e2e）100% 全绿无回归 |
-| APPROVAL-TASK-4-THINK-PURITY | 认知层纯净化：think.decision.parse 剔除跨层 runtime_plane 依赖 | In Progress | 编写 AST 纯净化测试并切除 think 节点对 runtime_plane 的依赖 |
-| APPROVAL-TASK-5-ACT-GATE | 控制面图节点化：act.authorize 与 act.approve.gate 接入结构化审批契约 | Pending | 待执行 |
+| APPROVAL-TASK-4-THINK-PURITY | 认知层纯净化：think.decision.parse 剔除跨层 runtime_plane 依赖 | Completed | 切除 think.decision.parse 与 compose_action 对 runtime_plane 的跨层依赖，恢复纯净认知映射；AST 纯净化测试与 91+ think 测试全通 |
+| APPROVAL-TASK-5-ACT-GATE | 控制面图节点化：act.authorize 与 act.approve.gate 接入结构化审批契约 | In Progress | 正在重构 act.authorize 计算与传递 ApprovalRequirement，并升级 act.approve.gate |
 | APPROVAL-TASK-6-REGRESSION | 全链路回归验证：全量测试套件、代码门禁与架构守卫验证 | Pending | 待执行 |
 
