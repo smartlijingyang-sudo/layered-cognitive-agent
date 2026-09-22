@@ -85,7 +85,11 @@
 | BRAINSTORM-LOCAL-ENV-CONTEXT | 深度剖析前端执行环境“本机”状态、配对码本质与安装全链路 | Completed | 已梳理 HeteroDeviceSwitcher、execution_target patch、DevicePairingService、preauth 机制与 install.ps1/sh 脚本链路 |
 | BRAINSTORM-LOCAL-ENV-QUESTIONS | 澄清配对码本质与确认“本机”交互与状态机改造方案 | Completed | 回答配对码意义与免输入机制，确认多台主机命名、双启动模式与后端持久化免交互需求 |
 | BRAINSTORM-LOCAL-ENV-APPROACHES | 提出 2-3 种具体交互与技术架构方案及权衡 | Completed | 提炼方案 A（原生状态卡片+动态免密脚本下载+一键命令复制）、方案 B（URI Protocol 协议唤起）、方案 C（Inline 展开），用户选定方案 A |
-| BRAINSTORM-LOCAL-ENV-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量）并获取用户审批 | In Progress | 细化生命周期、重连秒启机制、分层契约与前端组件架构，逐步呈批 |
-| BRAINSTORM-LOCAL-ENV-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Pending | 待沉淀 |
-| BRAINSTORM-LOCAL-ENV-TRANSITION | 转换至实施计划制定（writing-plans） | Pending | 待转换 |
+| BRAINSTORM-LOCAL-ENV-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量）并获取用户审批 | Completed | 细化生命周期、重连秒启机制、分层契约与前端组件架构，逐步呈批并获用户确认 |
+| BRAINSTORM-LOCAL-ENV-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Completed | 已落盘 docs/plans/2026-09-22-local-machine-status-and-auto-install-design.md 并提交 git |
+| BRAINSTORM-LOCAL-ENV-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 已落盘 docs/plans/2026-09-22-local-machine-status-and-auto-install-plan.md 并提交 git |
+| LOCAL-ENV-TASK-1-PID-LOCK | 伴侣客户端 PID 锁、状态记录与防重复启动 (client.py, cli.py) | Pending | 待执行 |
+| LOCAL-ENV-TASK-2-FAST-PATH | 服务端动态直下脚本与 Fast-Path 秒启增强 (routes.py, routes_device.py) | Pending | 待执行 |
+| LOCAL-ENV-TASK-3-UI-PATCH | 前端 UI 补丁升级（解禁离线行、双模弹窗与配对码剥离） (execution_target.py) | Pending | 待执行 |
+| LOCAL-ENV-TASK-4-REGRESSION | 全链路回归、代码门禁与架构守卫验证 | Pending | 待执行 |
 
