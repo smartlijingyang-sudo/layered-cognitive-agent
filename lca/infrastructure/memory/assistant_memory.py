@@ -12,6 +12,7 @@ with the same ``dedupe_key`` supersedes the previous active one
 (``deleted=True`` + ``retired_at_ms`` on the old record, ``revision_of``
 on the new). Superseded records stay on disk for audit and are excluded
 from retrieval.
+ADR-0247: 情景记忆（episodic.json 沉淀工具链自省记录，滚动容量 50）。
 """
 
 from __future__ import annotations
@@ -32,6 +33,7 @@ from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.memory.memory import MemorySystem
 
 _MEMORY_DIR = "memory"
+_MAX_EPISODIC_RECORDS = 50
 
 _ProfileBackfillCallback = Callable[[str, list[MemoryRecord]], Awaitable[None]]
 
@@ -154,7 +156,8 @@ class AssistantMemory(MemorySystem):
                     )
             # ADR-0246 PR-5：身份/偏好事实落盘后触发 USER.md 系统回填。
             await self.refresh_user_profile()
-            return
+            if not self._is_tool_execution_observation(observation, state):
+                return
         procedural = extra.get("procedural_candidate")
         if procedural is not None:
             content = str(getattr(procedural, "workflow_summary", "") or "").strip()
@@ -168,6 +171,21 @@ class AssistantMemory(MemorySystem):
                     metadata={"candidate_id": str(getattr(procedural, "candidate_id", "") or "")},
                 )
                 return
+        # ADR-0247: 情景自知记忆 —— 当发生具体工具调用或步骤交付时沉淀为情景记录
+        if self._is_tool_execution_observation(observation, state):
+            task_str = str(getattr(state, "task", "") or "").strip()[:60]
+            tool_desc = self._summarize_tool_execution(observation)
+            content = f"在任务「{task_str}」中执行了 {tool_desc}"
+            self._append(
+                MemoryLayer.EPISODIC,
+                content=content,
+                state=state,
+                observation=observation,
+                reflection=reflection,
+                importance=0.7,
+                metadata={"step": getattr(state, "step", 0)},
+            )
+
         self._append(
             MemoryLayer.WORKING,
             content=(
@@ -177,6 +195,46 @@ class AssistantMemory(MemorySystem):
             observation=observation,
             reflection=reflection,
         )
+
+    @staticmethod
+    def _is_tool_execution_observation(
+        observation: Observation | None, state: AgentState | None
+    ) -> bool:
+        if observation is None:
+            return False
+        payload = getattr(observation, "payload", None)
+        if isinstance(payload, dict):
+            if any(
+                k in payload
+                for k in (
+                    "tool",
+                    "tool_name",
+                    "tool_calls",
+                    "tool_results",
+                    "command",
+                    "invocation_id",
+                )
+            ):
+                return True
+        elif isinstance(payload, list) and payload:
+            first = payload[0]
+            if isinstance(first, dict) and any(
+                k in first for k in ("tool", "tool_name", "output", "invocation_id")
+            ):
+                return True
+        return False
+
+    @staticmethod
+    def _summarize_tool_execution(observation: Observation) -> str:
+        payload = getattr(observation, "payload", None)
+        if isinstance(payload, dict):
+            tool = payload.get("tool") or payload.get("tool_name") or "tool"
+            output = str(payload.get("output") or payload.get("result") or "").strip()
+            if output:
+                out_snippet = output[:80] + ("..." if len(output) > 80 else "")
+                return f"{tool} 工具，产出: {out_snippet}"
+            return f"{tool} 工具"
+        return "工具交互"
 
     @staticmethod
     def _semantic_candidates(extra: dict[str, Any]) -> list[dict[str, Any]]:
@@ -366,6 +424,7 @@ class AssistantMemory(MemorySystem):
         state: AgentState,
         observation: Observation,
         reflection: Reflection,
+        importance: float = 0.5,
         metadata: dict[str, Any] | None = None,
     ) -> None:
         """Append one record to ``<layer>.json`` and persist the layer."""
@@ -375,13 +434,15 @@ class AssistantMemory(MemorySystem):
                 "record_id": new_id("mem"),
                 "layer": layer.value,
                 "content": content,
-                "importance": 0.5,
+                "importance": importance,
                 "source_trace_id": str(getattr(state, "trace_id", "") or ""),
                 "created_at": _utc_now_iso(),
                 "created_at_ms": _utc_now_ms(),
                 "metadata": metadata or {},
             }
         )
+        if layer == MemoryLayer.EPISODIC and len(records) > _MAX_EPISODIC_RECORDS:
+            records = records[-_MAX_EPISODIC_RECORDS:]
         self._save(layer, records)
 
     def query(self, layer: MemoryLayer) -> list[MemoryRecord]:
