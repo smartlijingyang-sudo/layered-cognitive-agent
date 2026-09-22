@@ -371,6 +371,8 @@ class HomeSection:
             "memory_dir: {home}/memory/  (持久化记忆；系统自动写入，勿用沙箱命令访问)",
         ),
         ("skills_dir", "skills_dir: {home}/skills/"),
+        ("presets_dir", "presets_dir: {home}/presets/  (自主创造的预置包目录)"),
+        ("plugins_dir", "plugins_dir: {home}/plugins/  (自主创造的插件独立执行目录)"),
         (
             "workspace_dir",
             "workspace_dir: {home}/workspace/  (沙箱 /mnt/data 映射到此)",
@@ -390,7 +392,16 @@ class HomeSection:
 
     # 依赖 ``home`` 才渲染的 key；``assistant_id`` 单独判断。
     _HOME_ONLY_KEYS: frozenset[str] = frozenset(
-        {"home_dir", "memory_dir", "skills_dir", "workspace_dir", "routing", "memory_note"}
+        {
+            "home_dir",
+            "memory_dir",
+            "skills_dir",
+            "presets_dir",
+            "plugins_dir",
+            "workspace_dir",
+            "routing",
+            "memory_note",
+        }
     )
 
     def render(
@@ -416,6 +427,35 @@ class HomeSection:
             or (key in self._HOME_ONLY_KEYS and home)
         ]
         return SectionOutput(text=block("HOME", "\n".join(lines)))
+
+
+class AutonomousPresetsSection:
+    """Renders the autonomous custom presets and tools discovered in the assistant's Home."""
+
+    name: ClassVar[str] = "autonomous_presets"
+
+    def render(
+        self,
+        *,
+        role_profile: RoleProfile,
+        task: str,
+        awareness: TeamAwareness | None,
+        manifest: ContextManifest | None,
+        tools: Sequence[Tool],
+        activated_skills: tuple[ActivatedSkill, ...],
+    ) -> SectionOutput:
+        del task, awareness, manifest, tools, activated_skills
+        extra = getattr(role_profile, "extra", {}) or {}
+        home = str(extra.get("assistant_home_path") or "").strip()
+        if not home:
+            return SectionOutput(text="")
+
+        from lca.infrastructure.preset.discovery import AssistantPresetDiscovery
+
+        overview = AssistantPresetDiscovery(home).render_prompt_overview()
+        if not overview:
+            return SectionOutput(text="")
+        return SectionOutput(text=block("autonomous_presets", overview))
 
 
 class TeammatesSection:
@@ -681,6 +721,11 @@ def build_home(config: BaseModel) -> HomeSection:
     return HomeSection()
 
 
+def build_autonomous_presets(config: BaseModel) -> AutonomousPresetsSection:
+    del config
+    return AutonomousPresetsSection()
+
+
 def build_teammates(config: BaseModel) -> TeammatesSection:
     del config
     return TeammatesSection()
@@ -858,6 +903,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         ("context", build_context(Config())),
         ("user_profile", build_user_profile(Config())),
         ("home", build_home(Config())),
+        ("autonomous_presets", build_autonomous_presets(Config())),
         ("teammates", build_teammates(Config())),
         ("assigned_roles_text", build_assigned_roles(Config())),
         ("member_reports_text", build_member_reports(Config())),
@@ -871,6 +917,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
 __all__ = [
     "ActivatedSkillsSection",
     "AssignedRolesSection",
+    "AutonomousPresetsSection",
     "AvailableSkillsSection",
     "BackstorySection",
     "CloudSandboxSection",

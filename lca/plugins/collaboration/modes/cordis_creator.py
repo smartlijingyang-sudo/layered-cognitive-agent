@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Collection, Sequence
+from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from pydantic import BaseModel
@@ -67,6 +68,7 @@ def build_cordis_creator_agent(
     observability: BoundObservability,
     scope: Context | None,
     tools: Sequence[Tool] | None = None,
+    assistant_home: str | Path | None = None,
 ) -> Agent:
     """Build the Creator Agent from role and control-tool capabilities."""
     creator_profile = cast("RoleProfile", require_capability(scope, CORDIS_CREATOR_ROLE.key))
@@ -80,6 +82,7 @@ def build_cordis_creator_agent(
         creator_tools[_CREATOR_CONTROL_TOOL] = control_tool_factory.create(
             scope=scope,
             actor_role=creator_profile.role,
+            assistant_home=Path(assistant_home) if assistant_home else None,
         )
     return Agent(
         role=creator_profile.role,
@@ -114,6 +117,7 @@ class _CordisCreatorModeAdapter(ModeAdapter):
             observability=build_request.assembly.observability,
             scope=build_request.assembly.scope,
             tools=build_request.tools,
+            assistant_home=build_request.assistant_home_path,
         )
 
 

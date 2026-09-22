@@ -100,12 +100,18 @@ def _builtin_templates() -> Mapping[str, _PromptTemplate]:
     routing_extra = 4  # teammates, assigned_roles, member_reports, routing_instructions
     hierarchical_extra = 4  # member_status, evidence_pack, hierarchical_instructions (+ extra)
     home_ref = (("home", "stateful", True, ""),)
+    autonomous_presets_ref = (("autonomous_presets", "stateful", True, ""),)
     user_profile_ref = (("user_profile", "stateful", True, ""),)
     return {
         "react_prompt": _PromptTemplate(
             id="react_prompt",
             variant=_variant_for("react_prompt"),
-            sections=refs(base[:react_section_count] + user_profile_ref + home_ref),
+            sections=refs(
+                base[:react_section_count]
+                + user_profile_ref
+                + home_ref
+                + autonomous_presets_ref
+            ),
         ),
         "routing_prompt": _PromptTemplate(
             id="routing_prompt",
@@ -115,6 +121,7 @@ def _builtin_templates() -> Mapping[str, _PromptTemplate]:
                 + base[react_section_count : react_section_count + routing_extra]
                 + user_profile_ref
                 + home_ref
+                + autonomous_presets_ref
             ),
         ),
         "hierarchical_prompt": _PromptTemplate(
@@ -129,6 +136,7 @@ def _builtin_templates() -> Mapping[str, _PromptTemplate]:
                 ]
                 + user_profile_ref
                 + home_ref
+                + autonomous_presets_ref
             ),
         ),
     }

@@ -10,7 +10,8 @@ profile's generic tool set.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -36,7 +37,15 @@ if TYPE_CHECKING:
 class CordisControlToolFactoryProtocol(Protocol):
     """Build one Creator control Tool with profile-owned authorization."""
 
-    def create(self, *, scope: Context | None, actor_role: str) -> Tool: ...
+    def create(
+        self,
+        *,
+        scope: Context | None,
+        actor_role: str,
+        assistant_home: Path | None = None,
+        tools_service: Any | None = None,
+        safe_executor: Any | None = None,
+    ) -> Tool: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,7 +60,15 @@ class CordisControlToolFactory:
 
     caller_grant: tuple[str, ...]
 
-    def create(self, *, scope: Context | None, actor_role: str) -> Tool:
+    def create(
+        self,
+        *,
+        scope: Context | None,
+        actor_role: str,
+        assistant_home: Path | None = None,
+        tools_service: Any | None = None,
+        safe_executor: Any | None = None,
+    ) -> Tool:
         """Build the tool with a ``CordisComposer`` constructed inline.
 
         PR-C: the Composer factory is no longer a runtime-bound capability;
@@ -66,6 +83,9 @@ class CordisControlToolFactory:
             composer=composer,
             caller_grant=self.caller_grant,
             actor_role=actor_role,
+            assistant_home=assistant_home,
+            tools_service=tools_service,
+            safe_executor=safe_executor,
         )
 
 

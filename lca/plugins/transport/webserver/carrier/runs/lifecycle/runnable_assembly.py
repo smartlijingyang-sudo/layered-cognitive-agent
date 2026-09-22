@@ -237,7 +237,31 @@ def tools_from_scope(
         home_path = spec.home_path if spec is not None else None
     from lca.infrastructure.tools.assistant.filter import filter_tools_by_assistant
 
-    return filter_tools_by_assistant(tools, home_path)
+    filtered = filter_tools_by_assistant(tools, home_path)
+    if home_path:
+        from pathlib import Path
+
+        from lca.infrastructure.preset.discovery import AssistantPresetDiscovery
+        from lca.infrastructure.tools.assistant.filter import (
+            _load_tools_policy,
+            _tool_matching_names,
+        )
+
+        policy = _load_tools_policy(Path(home_path))
+        deny = policy[1] if policy is not None else frozenset()
+
+        discovery = AssistantPresetDiscovery(home_path)
+        discovered_tools = discovery.discover_tools()
+        if discovered_tools:
+            existing_names = {t.name for t in filtered}
+            kept_discovered = [
+                t
+                for t in discovered_tools
+                if t.name not in existing_names and not bool(_tool_matching_names(t) & deny)
+            ]
+            filtered = (*filtered, *kept_discovered)
+
+    return filtered
 
 
 __all__ = [
