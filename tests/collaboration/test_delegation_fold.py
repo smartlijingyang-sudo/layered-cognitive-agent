@@ -10,8 +10,10 @@ def test_fold_aggregator_unanimous():
     }
     result = aggregator.fold(task_id="task_001", receipts=receipts)
     assert result.task_id == "task_001"
-    assert result.consensus_status == "unanimous"
-    assert "架构三角已形成完全共识" in result.synthesized_verdict
+    assert "全员共识已形成" in result.synthesized_verdict
+    assert "观澜" in result.synthesized_verdict
+    assert "衡岳" in result.synthesized_verdict
+    assert "镜川" in result.synthesized_verdict
     assert len(result.member_findings) == 3
     assert result.member_findings["architecture/guanlan"] == receipts["architecture/guanlan"]
 
@@ -49,3 +51,26 @@ def test_fold_aggregator_anti_context_pollution():
     assert "DEBUG:" not in cleaned
     assert "TRACE:" not in cleaned
     assert "结论：经代码检索，所有分层契约均无反向依赖，符合规范。" in cleaned
+
+
+def test_fold_aggregator_dynamic_peers_without_hardcoding():
+    aggregator = DelegationFoldAggregator()
+    receipts = {
+        "security/auditor": "未发现漏洞，认证鉴权符合标准。",
+        "performance/optimizer": "QPS 达标，P99 延迟低于 50ms。",
+    }
+    peer_metadata = {
+        "security/auditor": {"name": "安全审计员"},
+        "performance/optimizer": {"name": "性能调优师"},
+    }
+    result = aggregator.fold(
+        task_id="task_dyn_01",
+        receipts=receipts,
+        peer_metadata=peer_metadata,
+    )
+    assert result.consensus_status == "unanimous"
+    assert "观澜" not in result.synthesized_verdict
+    assert "安全审计员" in result.synthesized_verdict
+    assert "性能调优师" in result.synthesized_verdict
+    assert "全员共识已形成" in result.synthesized_verdict
+    assert result.member_metadata["security/auditor"]["name"] == "安全审计员"
