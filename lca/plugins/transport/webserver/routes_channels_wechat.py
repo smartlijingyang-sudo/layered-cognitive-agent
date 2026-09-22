@@ -41,7 +41,9 @@ def _get_client(request: Request) -> WechatIlinkClient:
 def _get_manager(request: Request) -> WechatChannelManager:
     manager = getattr(request.app.state, "wechat_manager", None)
     if manager is None:
-        manager = WechatChannelManager()
+        manager = WechatChannelManager(
+            client_factory=lambda _base_url: _get_client(request)
+        )
         request.app.state.wechat_manager = manager
     return manager
 
@@ -106,10 +108,9 @@ async def wechat_bind(request: Request) -> Response:
             headers=cors_headers(),
         )
 
-    bot_id = body.get("bot_id")
+    bot_id = body.get("bot_id") or body.get("ilink_bot_id")
     bot_token = body.get("bot_token")
-    user_id = body.get("user_id")
-
+    user_id = body.get("user_id") or body.get("ilink_user_id")
     if not bot_id or not bot_token or not user_id:
         return JSONResponse(
             {"error": "Missing required credentials (bot_id, bot_token, user_id)"},

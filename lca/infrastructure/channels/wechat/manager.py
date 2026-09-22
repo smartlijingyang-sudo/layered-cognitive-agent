@@ -23,6 +23,7 @@ class WechatChannelManager:
         self,
         base_dir: Path | str | None = None,
         dispatch_fn: DispatchFunction | None = None,
+        client_factory: Callable[[str], WechatIlinkClient] | None = None,
     ) -> None:
         if base_dir is None:
             self.base_dir = get_lca_home()
@@ -30,6 +31,7 @@ class WechatChannelManager:
             self.base_dir = Path(base_dir).resolve()
 
         self.dispatch_fn = dispatch_fn or self._default_dispatch
+        self._client_factory = client_factory or (lambda base_url: WechatIlinkClient(base_url=base_url))
         self._workers: dict[str, WechatChannelWorker] = {}
 
     async def _default_dispatch(
@@ -73,7 +75,7 @@ class WechatChannelManager:
         await self.stop_worker(assistant_id)
 
         if config.enabled:
-            client = WechatIlinkClient(base_url=config.base_url)
+            client = self._client_factory(config.base_url)
             worker = WechatChannelWorker(
                 assistant_id=assistant_id,
                 config=config,
@@ -105,7 +107,7 @@ class WechatChannelManager:
             assistant_id = channel_file.parent.parent.name
             config = self.get_channel_config(assistant_id)
             if config and config.enabled:
-                client = WechatIlinkClient(base_url=config.base_url)
+                client = self._client_factory(config.base_url)
                 worker = WechatChannelWorker(
                     assistant_id=assistant_id,
                     config=config,
