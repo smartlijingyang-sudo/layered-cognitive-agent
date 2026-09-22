@@ -190,6 +190,11 @@ async def wechat_config(request: Request) -> Response:
 
 
 ROUTE_SPECS: tuple[RouteSpec, ...] = (
+    RouteSpec("/channels/wechat/qrcode", wechat_qrcode, ("GET", "OPTIONS")),
+    RouteSpec("/channels/wechat/status", wechat_status, ("GET", "OPTIONS")),
+    RouteSpec("/channels/wechat/bind", wechat_bind, ("POST", "OPTIONS")),
+    RouteSpec("/channels/wechat/unbind", wechat_unbind, ("POST", "OPTIONS")),
+    RouteSpec("/channels/wechat/config", wechat_config, ("GET", "OPTIONS")),
     RouteSpec("/lca-api/channels/wechat/qrcode", wechat_qrcode, ("GET", "OPTIONS")),
     RouteSpec("/lca-api/channels/wechat/status", wechat_status, ("GET", "OPTIONS")),
     RouteSpec("/lca-api/channels/wechat/bind", wechat_bind, ("POST", "OPTIONS")),
