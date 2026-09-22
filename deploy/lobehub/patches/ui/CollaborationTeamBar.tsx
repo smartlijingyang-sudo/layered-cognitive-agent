@@ -5,12 +5,12 @@ import { Collapse } from 'antd';
 import { createStaticStyles } from 'antd-style';
 import React, { memo, useMemo } from 'react';
 
-const styles = createStaticStyles(({ css, token }) => {
+const styles = createStaticStyles(({ css, cssVar }) => {
   return {
     container: css`
-      border: 1px solid ${token.colorBorderSecondary};
-      background: ${token.colorFillQuaternary};
-      border-radius: ${token.borderRadius}px;
+      border: 1px solid ${cssVar.colorBorderSecondary};
+      background: ${cssVar.colorFillQuaternary};
+      border-radius: ${cssVar.borderRadius};
       padding: 8px 12px;
       margin-bottom: 8px;
       width: 100%;
@@ -18,7 +18,7 @@ const styles = createStaticStyles(({ css, token }) => {
     `,
     title: css`
       font-weight: 600;
-      color: ${token.colorTextSecondary};
+      color: ${cssVar.colorTextSecondary};
       margin-right: 8px;
     `,
     tagGroup: css`
@@ -31,18 +31,18 @@ const styles = createStaticStyles(({ css, token }) => {
       border: none !important;
 
       .ant-collapse-item {
-        border-bottom: 1px solid ${token.colorBorderSecondary} !important;
+        border-bottom: 1px solid ${cssVar.colorBorderSecondary} !important;
       }
       .ant-collapse-header {
         padding: 4px 8px !important;
         font-size: 12px !important;
-        color: ${token.colorTextSecondary} !important;
+        color: ${cssVar.colorTextSecondary} !important;
       }
       .ant-collapse-content-box {
         padding: 6px 12px !important;
         font-size: 12px !important;
-        background: ${token.colorBgContainer};
-        border-radius: ${token.borderRadiusSM}px;
+        background: ${cssVar.colorBgContainer};
+        border-radius: ${cssVar.borderRadiusSM};
         white-space: pre-wrap;
       }
     `,
