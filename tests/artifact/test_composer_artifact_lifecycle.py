@@ -6,7 +6,7 @@ from cordis import Context
 
 from lca.contracts.atoms.artifact.state import ArtifactState
 from lca.contracts.mechanisms.composition.composition import PluginFactory
-from lca.plugins.think.composition.composer_provider import (
+from lca.plugins.composer.composition.cordis_composer import (
     CordisComposer,
     build_default_invariant_checker,
 )

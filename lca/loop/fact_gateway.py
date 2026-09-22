@@ -185,6 +185,35 @@ class DefaultFactGateway(FactGateway):
     def append_catalog(self, event: Any, *, actor: str) -> AppendReceipt:
         """提交 typed catalog 事件(镜像 ``harness.session.emit``)。"""
         record = emit(self._catalog_session, event, actor=actor)
+        from lca.contracts.models.observability.journal.catalog import JOURNAL_EVENT_CLASSES
+        from lca.infrastructure.observability.facade.facade.facade import current_bound
+
+        bound = current_bound()
+        if bound is not None and bound.journal is not None:
+            journal_event = event
+            if type(event).__name__ == "ToolInvokedCommitted":
+                from lca.contracts.models.observability.journal.journal import ToolInvoked
+
+                journal_event = ToolInvoked(
+                    tool_name=getattr(event, "tool_name", ""),
+                    invocation_id=getattr(event, "invocation_id", ""),
+                    ok=getattr(event, "ok", True),
+                    latency_ms=getattr(event, "latency_ms", 0),
+                    attempt=getattr(event, "attempt", 1),
+                    error=getattr(event, "error", ""),
+                    files=getattr(event, "files", ()),
+                    arguments=getattr(event, "arguments", {}),
+                    arguments_ref=getattr(event, "arguments_ref", None),
+                    output_ref=getattr(event, "output_ref", None),
+                    output_text=getattr(event, "output_text", None),
+                    output_truncated=getattr(event, "output_truncated", False),
+                    projected_state=getattr(event, "projected_state", {}),
+                )
+            elif type(event).__name__ not in JOURNAL_EVENT_CLASSES:
+                journal_event = None
+
+            if journal_event is not None:
+                bound.journal.write(journal_event)
         return _record_to_receipt(record)
 
     def publish_ep(self, ep: str, payload: Mapping[str, Any], *, actor: str) -> AppendReceipt:

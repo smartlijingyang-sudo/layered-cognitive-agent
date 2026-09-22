@@ -35,7 +35,7 @@ from typing import Any
 
 from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
 from lca.infrastructure.observability.facade import BoundObservability, bind_backends
-from lca.plugins.think.composition.composer_provider import (
+from lca.plugins.composer.composition.cordis_composer import (
     CordisComposer,
     build_default_invariant_checker,
 )

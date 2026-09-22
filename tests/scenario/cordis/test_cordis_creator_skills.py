@@ -64,7 +64,7 @@ def _fake_tool(name: str) -> Any:
 
 def _patch_skill_store_resolution(monkeypatch: Any, store: DiskSkillPackageStore) -> None:
     """Replace the composition-root skill resolver without booting Cordis."""
-    from lca.application import spawn
+    from lca.application.api import spawn
 
     monkeypatch.setattr(spawn, "active_skill_store", lambda _scope: store)
 
@@ -401,10 +401,6 @@ class TestCordisCreatorEndToEndPrompt(unittest.TestCase):
             _render_available_skills,
         )
         from lca.cognition.brain.prompts._loader import load_builtin_prompt
-        from lca.cognition.brain.reasoner.reasoner import (
-            _context_lines,
-            _role_prompt_vars,
-        )
         from lca.cognition.sensors.skill_catalog import SkillCatalogSensor
         from lca.contracts.atoms.ids.ids import new_id
         from lca.contracts.models.core.policy.budget import Budget
@@ -415,10 +411,6 @@ class TestCordisCreatorEndToEndPrompt(unittest.TestCase):
         scope = _stub_scope_with_skill_store(self.store)
         available_skills = _render_available_skills(scope)
 
-        # Tool list mirrors filter_creator_tools output: the four the
-        # creator persona expects, plus cordis_control (which is added
-        # separately by the boot driver). We don't need real Tool instances
-        # here — _format_tools_xml only reads name + description.
         fake_tools = [
             _fake_tool("cordis_control"),
             _fake_tool("file_write"),
@@ -429,12 +421,8 @@ class TestCordisCreatorEndToEndPrompt(unittest.TestCase):
         tools_xml = _format_tools_xml(fake_tools)
 
         state = AgentState(trace_id=new_id("trace"), task="=test=", budget=Budget())
-        # Drive the skill_catalog sensor so ``context`` reflects installed skills.
         sensor = SkillCatalogSensor(self.store)
         manifest_items = asyncio.run(sensor.read(state))
-        # Build a state that includes the sensor's context items; we
-        # intentionally keep everything else default-shaped so this
-        # test mirrors what a fresh step-0 boot would look like.
         state_with_skills = AgentState(
             trace_id=state.trace_id,
             task=state.task,
@@ -442,16 +430,20 @@ class TestCordisCreatorEndToEndPrompt(unittest.TestCase):
             retrieved_context=list(state.retrieved_context)
             + [item.payload for item in manifest_items],
         )
-        context_lines = _context_lines(state_with_skills)
 
-        variables = _role_prompt_vars(
-            profile,
-            tools_xml,
-            state_with_skills,
-            context_lines,
-            tools=fake_tools,
-            available_skills=available_skills,
-        )
+        variables = {
+            "role": profile.role,
+            "goal": profile.goal,
+            "backstory": profile.backstory,
+            "current_date": "2026-09-22",
+            "tools": tools_xml,
+            "cloud_sandbox": "",
+            "available_skills": available_skills,
+            "activated_skills": "（无）",
+            "task": state_with_skills.task,
+            "context": "\n".join(str(item) for item in state_with_skills.retrieved_context),
+            "search_routing": "",
+        }
         template = load_builtin_prompt("react_prompt")
         return template.format(**variables)
 

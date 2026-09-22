@@ -53,11 +53,11 @@ from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEve
 from lca.contracts.protocols import LLMAdapter
 from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
 from lca.infrastructure.observability.facade import BoundObservability, bind_backends
-from lca.plugins.roles.cordis_creator import build_cordis_creator_role_profile
-from lca.plugins.think.composition.composer_provider import (
+from lca.plugins.composer.composition.cordis_composer import (
     CordisComposer,
     build_default_invariant_checker,
 )
+from lca.plugins.roles.cordis_creator import build_cordis_creator_role_profile
 from lca.plugins.tools.bash import build_bash_tool
 from lca.plugins.tools.cordis_control import build_cordis_control_tool
 from lca.plugins.tools.file_write import build_file_write_tool
@@ -94,13 +94,14 @@ class SequenceScriptedLLM(LLMAdapter):
     async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:
         role = self._extract_role(prompt) or "*"
         self.calls.append((role, prompt[:200]))
-        seq = self._scripts.get(role) or self._scripts.get("*") or []
-        idx = self._cursors.get(role, 0)
+        seq_key = role if role in self._scripts else ("*" if "*" in self._scripts else (next(iter(self._scripts)) if self._scripts else "*"))
+        seq = self._scripts.get(seq_key, [])
+        idx = self._cursors.get(seq_key, 0)
         if idx >= len(seq):
             if self._default_respond and seq:
                 return seq[-1]
-            raise LookupError(f"SequenceScriptedLLM exhausted for role={role!r}")
-        self._cursors[role] = idx + 1
+            raise LookupError(f"SequenceScriptedLLM exhausted for role={role!r} (using key {seq_key!r})")
+        self._cursors[seq_key] = idx + 1
         return seq[idx]
 
     async def stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[LLMStreamEvent]:
@@ -291,6 +292,7 @@ def _build_creator_toolkit(preset_root: Path):
     这样 agent 的下一次 ``use_tool("csv_stats", ...)`` 能命中。
     """
     from cordis import Context
+
     from lca.infrastructure.capability.tools.tools import ToolsService
 
     ctx = Context()
@@ -348,6 +350,7 @@ def _build_creator_toolkit_with_preset(preset_id: str, preset_root: Path):
     的工具集直接含 csv_stats（无需 cordis_control）。
     """
     from cordis import Context
+
     from lca.contracts.mechanisms.composition.composition import PluginFactory
     from lca.infrastructure.capability.tools.tools import ToolsService
 
@@ -655,19 +658,20 @@ class TestCreatorRealScenario:
         plugin_path = bootstrap_preset_dir / "csv_stats.py"
         plugin_path.write_text(_CSV_STATS_PLUGIN_SOURCE, encoding="utf-8")
         # 把 PresetAuthoring 的 bundle.yaml 也写好
-        PresetAuthoring.publish(
-            preset_id="csv_stats",
-            plugin_name="csv_stats",
-            plugin_id="csv_stats",
-            plugin_source=_CSV_STATS_PLUGIN_SOURCE,
-            plugin_meta={
-                "name": "csv_stats",
-                "capabilities": ["tool_fs.read"],
-                "policy_class": "execute",
-            },
-            actor_role="preset-bootstrap",
-            root=preset_root,
-        )
+        with bind_journal():
+            PresetAuthoring.publish(
+                preset_id="csv_stats",
+                plugin_name="csv_stats",
+                plugin_id="csv_stats",
+                plugin_source=_CSV_STATS_PLUGIN_SOURCE,
+                plugin_meta={
+                    "name": "csv_stats",
+                    "capabilities": ["tool_fs.read"],
+                    "policy_class": "execute",
+                },
+                actor_role="preset-bootstrap",
+                root=preset_root,
+            )
 
         # ── 阶段 1：第二 session —— agent 用 csv_stats 不需要 cordis_control ──
         # 关键差异：脚本里只有 use_tool("csv_stats", ...) + respond；没有 Creator control 步骤

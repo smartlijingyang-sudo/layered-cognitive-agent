@@ -13,7 +13,7 @@ from lca.contracts.mechanisms.composition.composition import ComposerErrorCode
 from lca.contracts.models.observability.journal.journal import PluginMounted, PluginMountRejected
 from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
 from lca.infrastructure.observability.facade import BoundObservability, bind_backends
-from lca.plugins.think.composition.composer_provider import (
+from lca.plugins.composer.composition.cordis_composer import (
     CordisComposer,
     build_default_invariant_checker,
 )

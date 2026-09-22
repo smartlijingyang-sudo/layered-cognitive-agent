@@ -186,7 +186,10 @@ def record(event: JournalEvent) -> StampedEvent | None:
     )
 
     session = resolve_session_reader()
+    bound = _bound.get()
     if session is None:
+        if bound is not None and bound.journal is not None:
+            return bound.journal.write(event)
         raise RuntimeError(
             f"record({type(event).__name__}) requires a bound Session "
             "(SSOT only; bind via bind_run_event_session or set_publish_session)"
@@ -194,7 +197,10 @@ def record(event: JournalEvent) -> StampedEvent | None:
     event_type = type(event).__name__
     payload = asdict(event)
     record_event = session.append(event_type, payload)
-    return StampedEvent(
+    stamped_from_journal = None
+    if bound is not None and bound.journal is not None:
+        stamped_from_journal = bound.journal.write(event)
+    return stamped_from_journal or StampedEvent(
         event=event,
         seq=record_event.seq,
         ts=record_event.time / 1000.0,
