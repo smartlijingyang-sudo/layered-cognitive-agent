@@ -95,7 +95,7 @@
 | BRAINSTORM-WECHAT-CONTEXT | 探索微信 iLink 协议、LobeHub 现状与 LCA Python 架构结合点 | Completed | 已摸清 iLink Bot 协议、Node 端实现(@lobechat/chat-adapter-wechat)、LobeHub 双入口(Channel/Messenger)及 LCA 传输层插件体系 |
 | BRAINSTORM-WECHAT-QUESTIONS | 澄清微信频道在 LCA 的业务归属与接入方式（单步提问） | Completed | 用户明确选定方案 A（Agent 级专属消息频道）+ 方案 1（按 openid 映射独立持久化 LCA Session 并支持认知/工具全闭环） |
 | BRAINSTORM-WECHAT-APPROACHES | 提出 2-3 种 Python 端接管与前后端桥接方案及权衡 | Completed | 提出方案 A、B、C，用户选定方案 A（LCA 原生 Transport 插件 + LobeHub 前端轻量 Patch 代理） |
-| BRAINSTORM-WECHAT-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量）并获取用户审批 | In Progress | 细化 Section 3 增强版（双端协同：前端实时思考/工具流 + 微信端 typing 及中间进度透传），准备呈批 |
+| BRAINSTORM-WECHAT-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量）并获取用户审批 | In Progress | Section 1, 2, 3 全数获批；现细化 Section 4（前端 Patch 代理机制与不变量自动化测试矩阵），准备呈批 |
 | BRAINSTORM-WECHAT-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Pending | 待执行 |
 | REVIEW-ANTIPATTERN-AUDIT | 代码质量审查与反模式深度审计（对照 AP-01 至 AP-06、SSOT、C1-C14 及代码异味） | Completed | 深度审计全部 12 个变更文件，完成 Checklist 逐项核验；定位 4 处关键优化点（下载端点缺码兜底、Adapter Grant 投影、PEP 8 import、进程存活判空与权限），已输出结构化审查报告 |
 | REVIEW-FIX-1-PREAUTH-FALLBACK | 服务端动态脚本下载端点缺码自愈（routes.py 动态生成 preauth_code 规避空参交互） | Completed | download_runner_bat/command 在未传 code 时自愈调用 pairing.preauth_code() 生成临时凭据，test_install_scripts.py 7/7 passed |
