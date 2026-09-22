@@ -153,5 +153,13 @@
 | BRAINSTORM-ROLE-DECOUPLE-QUESTIONS | 澄清动态角色来源、运行时装配与团队解耦架构方案（单步提问） | Completed | 用户明确选定推荐方案（仓储与目录动态发现，消除所有写死字典，由各模块动态感知与自适应渲染） |
 | BRAINSTORM-ROLE-DECOUPLE-APPROACHES | 提炼 2-3 种彻底消除硬编码的动态角色与团队装配架构方案与权衡 | Completed | 提出方案 A（领域驱动依赖反转与数据驱动UI）、方案 B、方案 C，用户明确确认采用推荐方案 A |
 | BRAINSTORM-ROLE-DECOUPLE-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量测试）并获取用户审批 | Completed | 3 大小节（边界与契约、后端动态数据流、前端UI补丁与测试矩阵）全部获用户审核批准 |
-| BRAINSTORM-ROLE-DECOUPLE-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | In Progress | 正在落地 docs/plans/2026-09-22-dynamic-role-and-team-decoupling-design.md |
-| BRAINSTORM-ROLE-DECOUPLE-TRANSITION | 转换至实施计划制定（writing-plans） | Pending | 待执行 |
+| BRAINSTORM-ROLE-DECOUPLE-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 | Completed | 已沉淀 docs/plans/2026-09-22-dynamic-role-and-team-decoupling-design.md 并完成 git 提交（commit f5cb3db81） |
+| BRAINSTORM-ROLE-DECOUPLE-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 已沉淀 docs/plans/2026-09-22-dynamic-role-and-team-decoupling-plan.md 并完成 git 提交（commit 0fb0d4824） |
+| DYN-ROLE-TASK-1-CONTRACTS | 契约模型增强：PeerFoldedResult 增加 member_metadata 自描述字段 | Pending | 待执行 |
+| DYN-ROLE-TASK-2-FOLD | 聚合器纯净化：移除 _NAME_MAP，实现自适应元数据感知与通用共识收敛 | Pending | 待执行 |
+| DYN-ROLE-TASK-3-TRIAGE | 协调者分流解耦：移除 _ARCH_TRIAD 与硬编码 if，实现候选角色动态点名与组队 | Pending | 待执行 |
+| DYN-ROLE-TASK-4-PEER-PROVIDER | 角色卡装配器通用化：移除架构绑定与 arch_ 前缀，通用解析与物化任意角色 | Pending | 待执行 |
+| DYN-ROLE-TASK-5-ROOM-ROUTER | 房间路由策略泛化：移除 _PEER_NICKNAME_MAP，基于房间成员名单动态 @ 唤醒 | Pending | 待执行 |
+| DYN-ROLE-TASK-6-DELEGATE-TOOL | 协同委派工具通用化：泛化工具描述与回退模拟数据，支持动态团队 | Pending | 待执行 |
+| DYN-ROLE-TASK-7-UI-PATCH | 前端协同 UI 数据驱动化：基于 findings 动态渲染 Tag 与 Collapse 面板 | Pending | 待执行 |
+| DYN-ROLE-TASK-8-REGRESSION | 全链路回归验证：全量单测、补丁一致性与代码门禁验证 | Pending | 待执行 |
