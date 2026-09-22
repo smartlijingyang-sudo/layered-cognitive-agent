@@ -368,6 +368,7 @@ entries:
   config:
     factories:
     - g2a
+    - mcp
 - id: lca-transport-provider
   name: lca_providers_transport
   $module: lca.plugins.act.transport.provider

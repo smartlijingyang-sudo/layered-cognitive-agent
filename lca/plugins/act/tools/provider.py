@@ -24,7 +24,7 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 class Config(BaseModel):
     model_config = {"extra": "forbid"}
-    factories: list[str] = Field(default_factory=lambda: ["g2a"])
+    factories: list[str] = Field(default_factory=lambda: ["g2a", "mcp"])
 
 
 def _g2a_factory(bindings: object) -> list:
@@ -49,6 +49,12 @@ def _mcp_factory(bindings: object) -> list:
     from lca.infrastructure.mcp.tool_set import build_ambient_mcp_tools
 
     return build_ambient_mcp_tools()
+
+
+_TOOL_FACTORIES = {
+    "g2a": _g2a_factory,
+    "mcp": _mcp_factory,
+}
 
 
 @plugin(
@@ -79,8 +85,8 @@ def _mcp_factory(bindings: object) -> list:
     ),
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
-    if "g2a" in config.factories:
-        ctx.require("tools").register_factory("g2a", _g2a_factory)
-        ctx.require("tools").register_factory("mcp", _mcp_factory)
-    elif "mcp" in config.factories:
-        ctx.require("tools").register_factory("mcp", _mcp_factory)
+    tools_seam = ctx.require("tools")
+    for name in config.factories:
+        factory = _TOOL_FACTORIES.get(name)
+        if factory is not None:
+            tools_seam.register_factory(name, factory)
