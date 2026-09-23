@@ -216,10 +216,14 @@ class CognitiveRuntime(Runtime):
             vocal_mode = None
             wake_source = "user_input"
             wake_context = None
+            origin = "user"
+            auto_review_mode = "off"
             if ctx:
                 vocal_mode = getattr(ctx, "vocal_mode", None) or (ctx.extra or {}).get("vocal_mode")
                 wake_source = (ctx.extra or {}).get("wake_source", "user_input")
                 wake_context = (ctx.extra or {}).get("wake_context")
+                origin = (ctx.extra or {}).get("origin", "user")
+                auto_review_mode = (ctx.extra or {}).get("auto_review_mode", "off")
 
             from lca.application.vocal.runtime_wiring import resolve_runtime_vocal
             from lca.contracts.models.vocal.models import VocalMode
@@ -233,13 +237,45 @@ class CognitiveRuntime(Runtime):
             if vocal_ctx.mode == VocalMode.GATED:
                 self._bindings = self._bindings.with_vocal_gate(vocal_ctx.gate)
 
-            await self._lifecycle.publish(RuntimeLifecycleEventType.STARTED, state)
-            return await self._run_driver(
-                state,
-                runner=lambda: self._bindings.new_driver().run(state),
-                vocal_ctx=vocal_ctx,
-                ctx=ctx,
+            # ADR-0248 阶段二：把声带/审查/执行者身份回填到每 Run BindingsView，
+            # 使图层 concept.tool.fork 读取到同一份运行时绑定（声带工具追加、
+            # 子代理禁声、AutoReview 包装均在该 seam 消费）。
+            from lca.contracts.models.auto_review.models import (
+                AutoReviewMode as AutoReviewModeEnum,
             )
+            from lca.infrastructure.auto_review.gate import AutoReviewGate
+            from lca.infrastructure.computer.box_accessor import BoxAccessor
+            from lca.infrastructure.runtime_plane.capability_bindings import (
+                reset_capability_bindings,
+                with_runtime_bindings,
+            )
+
+            auto_review_gate = None
+            if auto_review_mode != "off":
+                try:
+                    auto_review_gate = AutoReviewGate(mode=AutoReviewModeEnum(auto_review_mode))
+                except ValueError:
+                    auto_review_mode = "off"
+                    auto_review_gate = None
+
+            runtime_bindings_token = with_runtime_bindings(
+                vocal_mode=vocal_ctx.mode.value,
+                vocal_gate=vocal_ctx.gate,
+                auto_review_mode=auto_review_mode,
+                auto_review_gate=auto_review_gate,
+                origin=origin,
+                box_accessor=BoxAccessor(),
+            )
+            try:
+                await self._lifecycle.publish(RuntimeLifecycleEventType.STARTED, state)
+                return await self._run_driver(
+                    state,
+                    runner=lambda: self._bindings.new_driver().run(state),
+                    vocal_ctx=vocal_ctx,
+                    ctx=ctx,
+                )
+            finally:
+                reset_capability_bindings(runtime_bindings_token)
         finally:
             global_bridge.dispose()
 
@@ -438,7 +474,22 @@ class CognitiveRuntime(Runtime):
                     outcome=outcome_holder["value"],
                 )
             if outcome_holder["value"] == "success" and ctx is not None:
+                # ADR-0248 切片 8：InitiativeHook 需要 transcript_features。
+                # 若调用方未提供，运行时从可用输入（prior_turns）派生基线特征，
+                # 保证钩子在真实 Run 成功路径上被调用。调用方可在
+                # RunContext.extra["transcript_features"] 注入更丰富的特征。
                 features = (ctx.extra or {}).get("transcript_features")
+                if not features:
+                    prior_turns = getattr(ctx, "prior_turns", ()) or ()
+                    features = {
+                        "user_turn_count": sum(
+                            1 for t in prior_turns if getattr(t, "role", "") == "user"
+                        ),
+                        "assistant_turn_count": sum(
+                            1 for t in prior_turns if getattr(t, "role", "") == "assistant"
+                        ),
+                        "manual_action_counts": {},
+                    }
                 if features:
                     from lca.application.initiative.hooks import evaluate_initiative
 

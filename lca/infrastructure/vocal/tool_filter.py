@@ -1,5 +1,7 @@
 from collections.abc import Sequence
 
+from lca.contracts.protocols import Tool
+
 
 class VocalToolFilter:
     """声带工具过滤器：依据执行者身份（协调者 vs 子代理）实施声带物理隔离。
@@ -16,4 +18,10 @@ class VocalToolFilter:
     ) -> list[str]:
         if origin == "subagent":
             return [t for t in tools if t != self.VOCAL_TOOL_NAME]
+        return list(tools)
+
+    def filter_tool_objects(self, tools: Sequence[Tool], origin: str | None = None) -> list[Tool]:
+        """按 Tool 对象过滤（供 tool.fork 使用）：子代理剔除 send_message。"""
+        if origin == "subagent":
+            return [t for t in tools if t.name != self.VOCAL_TOOL_NAME]
         return list(tools)

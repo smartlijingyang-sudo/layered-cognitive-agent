@@ -124,6 +124,21 @@ class BindingsView(BaseModel):
     """ADR-0242 D4: non-empty ⇒ tool fork must narrow to Home policy."""
     home_path: str | None = None
     """Assistant Home 绝对路径；与 ``assistant_id`` 一起驱动工具过滤。"""
+    vocal_mode: str = "direct"
+    """ADR-0248: 声带分发模式（``direct`` / ``gated``）。tool.fork 据此追加
+    ``send_message`` 声带工具；仅 ``gated`` 生效。"""
+    vocal_gate: object | None = None
+    """ADR-0248: 门控声带实例（``vocal_mode=="gated"`` 时由 runtime loop 注入）。"""
+    auto_review_mode: str = "off"
+    """ADR-0248: 工具副作用自动审查模式（``off`` / ``shadow`` / ``enforce``）。"""
+    auto_review_gate: object | None = None
+    """ADR-0248: ``AutoReviewGate`` 实例（``auto_review_mode != "off"`` 时由 runtime
+    loop 注入），tool.fork 用它包装副作用工具。"""
+    origin: str = "user"
+    """ADR-0248: 执行者身份（``user`` / ``subagent`` / ``workflow``）。子代理经
+    ``VocalToolFilter`` 物理禁声，绝不对用户发声。"""
+    box_accessor: object | None = None
+    """ADR-0248: 员工电脑（``/home/box``）访问器实例，供员工机工具消费。"""
 
 
 class ForkedTools(BaseModel):

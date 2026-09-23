@@ -20,6 +20,7 @@ ADR-0220 P7: ``bindings`` 端口缺省时,从
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
 import structlog
 
@@ -238,6 +239,34 @@ class ToolForkDispatchExecutor:
 
             items = filter_tools_by_assistant(items, bindings.home_path)
             items = items + _custom_tools_from_home(bindings.home_path, items)
+        # ── ADR-0248 运行时总装：声带追加 / 子代理禁声 / AutoReview 包装 ──
+        from lca.infrastructure.auto_review.wrapped_tool import (
+            AutoReviewWrappedTool,
+        )
+        from lca.infrastructure.vocal.tool_filter import VocalToolFilter
+
+        origin = getattr(bindings, "origin", "user")
+        vocal_mode = getattr(bindings, "vocal_mode", "direct")
+        vocal_gate = getattr(bindings, "vocal_gate", None)
+        auto_review_mode = getattr(bindings, "auto_review_mode", "off")
+        auto_review_gate = getattr(bindings, "auto_review_gate", None)
+
+        # 子代理物理禁声：send_message 绝不进入子代理工具集（ADR-0248 §5.3）。
+        if origin == "subagent":
+            items = tuple(VocalToolFilter().filter_tool_objects(items, origin="subagent"))
+        # gated 模式主协调者自动追加 send_message 唯一声带工具。
+        elif vocal_mode == "gated" and vocal_gate is not None:
+            from lca.contracts.protocols.vocal.protocol import VocalGateProtocol
+            from lca.infrastructure.vocal.tool_adapter import SendMessageVocalTool
+
+            items = (*items, SendMessageVocalTool(cast("VocalGateProtocol", vocal_gate)))
+
+        # AutoReview 三态硬闸：非 off 时所有工具包一层 AutoReviewWrappedTool。
+        if auto_review_mode != "off" and auto_review_gate is not None:
+            from lca.infrastructure.auto_review.gate import AutoReviewGate
+
+            gate = cast("AutoReviewGate", auto_review_gate)
+            items = tuple(AutoReviewWrappedTool(tool, gate) for tool in items)
         _assert_sandbox_tools_visible(bindings, items)
         forked_tools = ForkedTools(
             items=items,

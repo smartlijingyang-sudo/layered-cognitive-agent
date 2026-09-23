@@ -72,9 +72,7 @@ def _build_reasoner_context() -> ReasonerContext:
 
 
 def _build_template_selection() -> TemplateSelection:
-    return TemplateSelection(
-        template_id="react", variant="react", decision_path="profile_default"
-    )
+    return TemplateSelection(template_id="react", variant="react", decision_path="profile_default")
 
 
 class TestBindingsView:
@@ -93,6 +91,31 @@ class TestBindingsView:
         view = BindingsView()
         with pytest.raises(ValidationError):
             view.file_store = object()
+
+    def test_adr0248_runtime_wiring_fields_defaults(self) -> None:
+        view = BindingsView()
+        assert view.vocal_mode == "direct"
+        assert view.vocal_gate is None
+        assert view.auto_review_mode == "off"
+        assert view.auto_review_gate is None
+        assert view.origin == "user"
+        assert view.box_accessor is None
+
+    def test_adr0248_runtime_wiring_fields_explicit(self) -> None:
+        view = BindingsView(
+            vocal_mode="gated",
+            vocal_gate=object(),
+            auto_review_mode="enforce",
+            auto_review_gate=object(),
+            origin="subagent",
+            box_accessor=object(),
+        )
+        assert view.vocal_mode == "gated"
+        assert view.vocal_gate is not None
+        assert view.auto_review_mode == "enforce"
+        assert view.auto_review_gate is not None
+        assert view.origin == "subagent"
+        assert view.box_accessor is not None
 
 
 class TestForkedTools:
