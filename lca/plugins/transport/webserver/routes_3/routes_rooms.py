@@ -30,6 +30,7 @@ from lca.application.collaboration.room_dispatch import (
     RoomDispatcher,
     RoomNotFoundError,
     RunDispatchResult,
+    RunOutcome,
 )
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -118,6 +119,36 @@ async def _start_run(
     )
 
 
+async def _read_run_status(request: Request, run_id: str) -> RunOutcome:
+    """Read a room-dispatched run's terminal outcome via ``RunPort.summary``."""
+    run_port = getattr(request.app.state, "run_port", None)
+    if run_port is None:
+        return RunOutcome(status="unknown", error="run_port unavailable")
+    summary = await run_port.summary(run_id)
+    if summary is None:
+        return RunOutcome(status="unknown", error="run not found")
+    return RunOutcome(
+        status=str(summary.get("status") or summary.get("session_status") or "unknown"),
+        error=str(summary.get("error") or ""),
+    )
+
+
+def _dispatcher_for(request: Request, room_id: str) -> RoomDispatcher:
+    """Build a RoomDispatcher wired to the live RunPort for this request."""
+    return RoomDispatcher(
+        room_repository=JsonRoomRepository(),
+        message_store=JsonRoomMessageStore(),
+        run_starter=lambda *, objective, mode, correlation_id: _start_run(
+            request,
+            room_id=room_id,
+            objective=objective,
+            mode=mode,
+            correlation_id=correlation_id,
+        ),
+        run_status_reader=lambda run_id: _read_run_status(request, run_id),
+    )
+
+
 async def create_room(request: Request) -> JSONResponse:
     """``POST /v1/rooms`` —— 创建房间。"""
     try:
@@ -170,17 +201,7 @@ async def post_room_message(request: Request) -> JSONResponse:
     if run_port is None:
         return _error("run_port not available", status_code=503, code="run_port_unavailable")
 
-    dispatcher = RoomDispatcher(
-        room_repository=JsonRoomRepository(),
-        message_store=JsonRoomMessageStore(),
-        run_starter=lambda *, objective, mode, correlation_id: _start_run(
-            request,
-            room_id=room_id,
-            objective=objective,
-            mode=mode,
-            correlation_id=correlation_id,
-        ),
-    )
+    dispatcher = _dispatcher_for(request, room_id)
     try:
         started = await dispatcher.dispatch(room_id, content, sender_id=sender_id)
     except RoomNotFoundError:
@@ -191,6 +212,13 @@ async def post_room_message(request: Request) -> JSONResponse:
 async def list_room_messages(request: Request) -> JSONResponse:
     """``GET /v1/rooms/{room_id}/messages`` —— 列出房间转录。"""
     room_id = str(request.path_params.get("room_id") or "")
+    dispatcher = _dispatcher_for(request, room_id)
+    try:
+        # Phase 2: lazy revival — append FOLDED facts for completed runs so the
+        # transcript is consistent whenever it is read.
+        await dispatcher.sync_completed(room_id)
+    except RoomNotFoundError:
+        return _error(f"room not found: {room_id}", status_code=404, code="room_not_found")
     messages = JsonRoomMessageStore().list_messages(room_id)
     return _json({"messages": [msg.model_dump() for msg in messages]})
 
