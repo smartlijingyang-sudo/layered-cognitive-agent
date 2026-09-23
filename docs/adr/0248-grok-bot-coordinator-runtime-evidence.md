@@ -1,6 +1,6 @@
 # ADR-0248: 协调型桌面 Agent 运行时 — 证据级解剖（可模范实现）
 
-- Status: Proposed → 待架构室 Keep
+- Status: Implemented（切片 1–9 落地 + 运行时主循环总装）— 2026-09-23
 - Date: 2026-09-22
 - Deciders: 李超 / 山姆汇总；观澜·衡岳·镜川会审中
 - Relates: ADR-0246（用户机副作用平面 / Companion·LocalExec）

@@ -226,5 +226,9 @@
 | ADR248-EXEC-FACTORY | 根因修复：send_message 变成工具工厂，在组合期进入 body 可执行注册表 | Completed | 在 execution_environment 提前创建共享 GatedVocalGate/AutoReviewGate，注册 send_message 工厂；tools_from_scope/materialize 阶段物化进 spec.tools（body 注册表），runtime loop 复用同一 gate；修复「模型看得到但执行时未注册工具」 |
 | ADR248-EXEC-FILTER | 声带系统工具豁免 assistant 工具策略过滤 | Completed | filter_tools_by_assistant 对 send_message 始终保留（tools.yaml allow 未列出也不过滤），否则组合期被工具策略剔除导致批次执行失败 |
 | ADR248-EXEC-VERIFY | 真实 run 验证：模型调用 send_message 且批次执行成功 | Completed | 真实 gated run（产品大脑）中模型正确调用 send_message（content/type=text），body.tool.execute.end outcome=success，run 成功完成；ADR-0248 全链路相关 235/236 通过（唯一失败为既有环境相关 test_companion_rpc_system_info） |
+| GROK-BOT-GAP-1-BOX-TOOLS | 修复缺口 1：BoxAccessor 消费工具（box_read_file / box_write_file / box_list_files / box_run_command）并在 gated 模式注册，员工机 Shell 仅在 Auto-Review 开启时暴露 | Completed | 落地 lca/infrastructure/tools/box/，tool.fork.dispatch 在 gated 模式追加员工机工具与人闸；tests/infrastructure/tools/box/ 8/8 通过 |
+| GROK-BOT-GAP-2-HUMAN-GATES | 修复缺口 2：人闸补齐（request_box_help 工具 + HITL_TOOL_NAMES 扩展 + AutoReviewGate 连接器/插件鉴权 escalate） | Completed | 新增 request_box_help（走 HITL 暂停）；HITL_TOOL_NAMES 增补；AutoReviewGate 新增 HUMAN_GATE_TOOL_SUBSTRINGS 分类；tests/infrastructure/tools/box/test_box_help_tool.py + test_auto_review_gate.py 全绿 |
+| GROK-BOT-GAP-3-LADDER | 修复缺口 3：工作面梯子（ADR-0248 §6）纯函数策略 + gated 模式工具排序接线 | Completed | 落地 lca/infrastructure/work_surface/ladder.py（memory→box→connectors→web→browser→gui→user），tool.fork gated 模式稳定排序；tests/infrastructure/work_surface/ 7/7 通过 |
+| GROK-BOT-ADR-STATUS | 修复 ADR 状态登记：README 索引 0246/0248/0250 更新为 Implemented，ADR-0248 头部更新为 Implemented | Completed | docs/adr/README.md 三行状态 + docs/adr/0248 头部状态；test_adr_index_matches_filesystem 通过 |
 
 
