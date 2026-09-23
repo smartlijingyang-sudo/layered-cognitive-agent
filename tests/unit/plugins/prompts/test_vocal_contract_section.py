@@ -84,6 +84,8 @@ def test_contract_text_comes_from_prompt_resource_files() -> None:
     contract = load_builtin_prompt("vocal_contract")
     reminder = load_builtin_prompt("reply_first_reminder")
     assert "send_message" in contract
+    # Reply-First 契约必须是强制 ack-first，而非「可以先发」
+    assert "必须首先通过 send_message" in contract
     assert "Reply-First" in reminder
 
 
@@ -138,4 +140,5 @@ def test_react_tool_usage_gated_variant_comes_from_resource_file() -> None:
 
     text = load_builtin_prompt("react_tool_usage_guidelines_gated")
     assert "MUST call send_message" in text
+    assert "MUST first call send_message" in text
     assert "reply with text directly" not in text
