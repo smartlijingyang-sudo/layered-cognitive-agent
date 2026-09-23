@@ -186,6 +186,9 @@
 | [0245](0245-hermes-self-evolution-and-skill-auto-generation.md) | Hermes 自我进化机制与 Skill 自动生成调研 — `memory` + `skill_manage` 工具协议、self_evolution 实验模块、基因匹配进化引擎，为程序性记忆沉淀提供参考实现蓝图 | Research |
 | [0246](0246-user-machine-side-effect-plane.md) | 用户机器副作用平面 — 业界范式多方案（Companion/浏览器受限/隧道/托管执行机/MDM）+ LCA Computer/HIL/Gateway 挂缝；不定死网页弹 PowerShell | Proposed |
 | [0247](0247-agent-memory-knowledge-layer.md) | Agent 记忆知识层 — 从关键词原文存档升级为结构化知识：LLM 蒸馏提取、typed MemoryRecord、受治理记忆工具、用户画像回填、预算内相关性检索、supersede/遗忘生命周期，修通 assistant.bootstrap 死代码并清理 workspace_instructions 污染与硬编码关键词机制 | Accepted |
+| [0248](0248-grok-bot-coordinator-runtime-evidence.md) | 协调型桌面 Agent 运行时 — 证据级解剖（可模范实现） | Proposed |
+| [0250](0250-peer-assistants-handoff-bus-and-rooms.md) | Peer Assistants Handoff Bus and Rooms | Proposed |
+| [0251](0251-openmuse-runtime-sandbox-durable-task-evidence.md) | OpenMuse 架构解剖与借鉴 — 长程租约任务、防漂移双门禁与可接管沙箱证据 | Proposed |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
 
