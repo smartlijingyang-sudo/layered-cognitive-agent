@@ -58,6 +58,7 @@ _FORKED_BINDING_KEYS: frozenset[str] = frozenset(
         "search",
         "skill_store",
         "machine_resolver",
+        "box_accessor",
     }
 )
 
@@ -266,12 +267,38 @@ class ToolForkDispatchExecutor:
 
             items = (*items, SendMessageVocalTool(cast("VocalGateProtocol", vocal_gate)))
 
+        # ADR-0248 §3.2 / §3.5：gated 模式挂载员工机工具与人闸，让
+        # BoxAccessor 被真实消费。子代理只拿员工机文件工具，不拿
+        # request_box_help（子代理无声道，交还桌面由父进程负责）。
+        if vocal_mode == "gated":
+            from lca.infrastructure.computer.box_accessor import BoxAccessor
+            from lca.infrastructure.tools.box import build_box_help_tools, build_box_tools
+
+            if bindings.box_accessor is not None:
+                # 员工机 Shell 只在 Auto-Review 开启时暴露（ADR-0248 切片 4）。
+                include_shell = auto_review_mode != "off"
+                items = (
+                    *items,
+                    *build_box_tools(
+                        cast("BoxAccessor", bindings.box_accessor),
+                        include_shell=include_shell,
+                    ),
+                )
+            if origin != "subagent":
+                items = (*items, *build_box_help_tools())
+
         # AutoReview 三态硬闸：非 off 时所有工具包一层 AutoReviewWrappedTool。
         if auto_review_mode != "off" and auto_review_gate is not None:
             from lca.infrastructure.auto_review.gate import AutoReviewGate
 
             gate = cast("AutoReviewGate", auto_review_gate)
             items = tuple(AutoReviewWrappedTool(tool, gate) for tool in items)
+
+        # ADR-0248 §6 工作面梯子：gated 模式按梯子稳定排序（低阶在前）。
+        if vocal_mode == "gated":
+            from lca.infrastructure.work_surface.ladder import order_tools_by_ladder
+
+            items = tuple(order_tools_by_ladder(items))
         _assert_sandbox_tools_visible(bindings, items)
         forked_tools = ForkedTools(
             items=items,

@@ -140,3 +140,94 @@ async def test_auto_review_off_leaves_tools_unwrapped() -> None:
     result = await ToolForkDispatchExecutor().node_execute(_ctx(), _input(bindings, _base_tools()))
     items = result.port_values["forked_tools"].items
     assert not any(isinstance(t, AutoReviewWrappedTool) for t in items)
+
+
+@pytest.mark.asyncio
+async def test_gated_mode_appends_box_tools_consuming_box_accessor(tmp_path) -> None:
+    from lca.infrastructure.computer.box_accessor import BoxAccessor
+
+    box = BoxAccessor(root_dir=tmp_path / "box")
+    gate = GatedVocalGate("op_box")
+    bindings = _bindings(vocal_mode="gated", vocal_gate=gate, box_accessor=box)
+    result = await ToolForkDispatchExecutor().node_execute(_ctx(), _input(bindings, _base_tools()))
+    names = [getattr(t, "name", "") for t in result.port_values["forked_tools"].items]
+    assert "box_read_file" in names
+    assert "box_write_file" in names
+    assert "box_list_files" in names
+    # 默认 auto_review=off：员工机 Shell 不暴露
+    assert "box_run_command" not in names
+    # 人闸挂载
+    assert "request_box_help" in names
+
+    # BoxAccessor 被真实消费：写读闭环
+    box_tool = next(
+        t for t in result.port_values["forked_tools"].items if t.name == "box_write_file"
+    )
+    obs = await box_tool.execute({"path": "hello.txt", "content": "hi"})
+    assert obs.success is True
+    read_tool = next(
+        t for t in result.port_values["forked_tools"].items if t.name == "box_read_file"
+    )
+    read_obs = await read_tool.execute({"path": "hello.txt"})
+    assert read_obs.payload["content"] == "hi"
+
+
+@pytest.mark.asyncio
+async def test_gated_mode_exposes_box_shell_only_under_auto_review(tmp_path) -> None:
+    from lca.infrastructure.auto_review.gate import AutoReviewGate
+    from lca.infrastructure.computer.box_accessor import BoxAccessor
+
+    box = BoxAccessor(root_dir=tmp_path / "box")
+    gate = GatedVocalGate("op_box_shell")
+    bindings = _bindings(
+        vocal_mode="gated",
+        vocal_gate=gate,
+        box_accessor=box,
+        auto_review_mode="enforce",
+        auto_review_gate=AutoReviewGate(mode=AutoReviewMode.ENFORCE),
+    )
+    result = await ToolForkDispatchExecutor().node_execute(_ctx(), _input(bindings, _base_tools()))
+    names = [getattr(t, "name", "") for t in result.port_values["forked_tools"].items]
+    assert "box_run_command" in names
+    # 工具被 AutoReview 包装，危险命令在 execute 前被拦截
+    shell = next(t for t in result.port_values["forked_tools"].items if t.name == "box_run_command")
+    assert isinstance(shell, AutoReviewWrappedTool)
+    obs = await shell.execute({"command": "cat /etc/shadow"})
+    assert obs.success is False
+
+
+@pytest.mark.asyncio
+async def test_gated_subagent_gets_box_files_but_no_help_tool(tmp_path) -> None:
+    from lca.infrastructure.computer.box_accessor import BoxAccessor
+
+    box = BoxAccessor(root_dir=tmp_path / "box")
+    gate = GatedVocalGate("op_sub_box")
+    bindings = _bindings(vocal_mode="gated", vocal_gate=gate, box_accessor=box, origin="subagent")
+    result = await ToolForkDispatchExecutor().node_execute(_ctx(), _input(bindings, _base_tools()))
+    names = [getattr(t, "name", "") for t in result.port_values["forked_tools"].items]
+    assert "box_read_file" in names
+    assert "request_box_help" not in names
+    assert "send_message" not in names
+
+
+@pytest.mark.asyncio
+async def test_gated_mode_orders_tools_by_work_surface_ladder(tmp_path) -> None:
+    from lca.infrastructure.computer.box_accessor import BoxAccessor
+
+    tools = _ToolsServiceStub(
+        tools={
+            "askUserQuestion": _ToolStub(name="askUserQuestion"),
+            "web_search": _ToolStub(name="web_search"),
+            "run_shell": _ToolStub(name="run_shell"),
+            "memory_add": _ToolStub(name="memory_add"),
+        }
+    )
+    box = BoxAccessor(root_dir=tmp_path / "box")
+    gate = GatedVocalGate("op_ladder")
+    bindings = _bindings(vocal_mode="gated", vocal_gate=gate, box_accessor=box)
+    result = await ToolForkDispatchExecutor().node_execute(_ctx(), _input(bindings, tools))
+    names = [getattr(t, "name", "") for t in result.port_values["forked_tools"].items]
+    assert names.index("memory_add") < names.index("run_shell")
+    assert names.index("run_shell") < names.index("web_search")
+    assert names.index("web_search") < names.index("askUserQuestion")
+    assert names.index("askUserQuestion") < names.index("send_message")

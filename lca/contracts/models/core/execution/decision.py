@@ -112,7 +112,7 @@ class Decision:
 #: Tool names that pause the run for human input before execution. When a
 #: Decision carries one of these calls, ``act.approve.gate`` routes through
 #: ``intervene.interrupt`` (ADR-0228) instead of dispatching to the tool.
-HITL_TOOL_NAMES: frozenset[str] = frozenset({"askUserQuestion"})
+HITL_TOOL_NAMES: frozenset[str] = frozenset({"askUserQuestion", "request_box_help"})
 
 
 def requires_human_input(tool_calls: object) -> bool:

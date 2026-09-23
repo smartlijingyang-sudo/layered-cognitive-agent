@@ -40,3 +40,28 @@ def test_gate_enforce_escalate_and_verify_fingerprint():
     # 2. 换命令试图偷渡：拒绝
     tampered_verdict = gate.evaluate("run_shell", {"command": "rm -rf /home/box/other"})
     assert tampered_verdict.action == AutoReviewAction.ESCALATE
+
+
+def test_gate_enforce_escalates_connector_auth_tools():
+    gate = AutoReviewGate(mode=AutoReviewMode.ENFORCE)
+    verdict = gate.evaluate("mcp__github__install", {})
+    assert verdict.action == AutoReviewAction.ESCALATE
+    assert "连接器/插件鉴权需要用户确认" in verdict.reason
+
+    # 同动作经人工授权后可重放放行
+    gate.grant_approval(verdict.action_fingerprint)
+    replayed = gate.evaluate("mcp__github__install", {})
+    assert replayed.action == AutoReviewAction.ALLOW
+
+
+def test_gate_enforce_escalates_connector_management_tools():
+    gate = AutoReviewGate(mode=AutoReviewMode.ENFORCE)
+    verdict = gate.evaluate("enable_connector", {"connector": "github"})
+    assert verdict.action == AutoReviewAction.ESCALATE
+    assert "连接器/插件鉴权需要用户确认" in verdict.reason
+
+
+def test_gate_enforce_does_not_escalate_regular_box_tools():
+    gate = AutoReviewGate(mode=AutoReviewMode.ENFORCE)
+    verdict = gate.evaluate("box_read_file", {"path": "notes.md"})
+    assert verdict.action == AutoReviewAction.ALLOW
