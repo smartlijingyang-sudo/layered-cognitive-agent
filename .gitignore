@@ -52,3 +52,6 @@ tests/scenario/cordis/.scratch_cordis_creator_real/
 
 # Per-run spine JSONL artifacts (<run_id>.spine.jsonl) written relative to process cwd
 *.spine.jsonl
+
+# External tool artifact (CopilotKit) - not part of LCA
+.copilotkit/
