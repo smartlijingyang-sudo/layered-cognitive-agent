@@ -21,12 +21,6 @@ from lca.contracts.models.collaboration.peer import HandoffEnvelope, PeerProfile
 
 _logger = logging.getLogger(__name__)
 
-_DEFAULT_FALLBACK_TEAM = (
-    "architecture/guanlan",
-    "architecture/hengyue",
-    "architecture/jingchuan",
-)
-
 _ARCH_KEYWORDS = frozenset(
     {
         "架构",
@@ -146,7 +140,20 @@ class CoordinatorTriageRouter:
             return self._default_team
         if self._candidates:
             return tuple(c.peer_id for c in self._candidates)
-        return _DEFAULT_FALLBACK_TEAM
+        # 无注入 candidates/default_team 时动态查询角色库，取所有已注册角色 ID
+        lib = self._get_role_library()
+        if lib is not None:
+            try:
+                team = tuple(entry.role_id for entry in lib.index() if entry.role_id)
+                if team:
+                    return team
+            except Exception as exc:
+                _logger.debug("Error enumerating role library for team fallback: %s", exc)
+        _logger.warning(
+            "CoordinatorTriageRouter: no candidates, default_team, or role library available; "
+            "TEAM_CAST will produce empty peer set."
+        )
+        return ()
 
     def _match_from_library(self, objective: str) -> tuple[str, str] | None:
         lib = self._get_role_library()

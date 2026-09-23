@@ -12,7 +12,35 @@ from lca.infrastructure.tools.collaboration.delegate_tool import (
 
 @pytest.mark.asyncio
 async def test_team_cast_tool_execution():
-    tool = TeamCastTool()
+    from lca.application.collaboration.triage import CoordinatorTriageRouter
+    from lca.contracts.models.collaboration.peer import PeerProfile
+
+    # 显式注入三个候选专家，与全局角色库解耦（C8 确定性）
+    candidates = [
+        PeerProfile(
+            peer_id="arch_guanlan",
+            name="观澜",
+            role="架构评审",
+            description="契约与分层边界守护",
+            home_namespace="roles/architecture/guanlan",
+        ),
+        PeerProfile(
+            peer_id="arch_hengyue",
+            name="衡岳",
+            role="状态机核查",
+            description="不变量与状态机专家",
+            home_namespace="roles/architecture/hengyue",
+        ),
+        PeerProfile(
+            peer_id="arch_jingchuan",
+            name="镜川",
+            role="反模式审计",
+            description="代码质量与架构合规",
+            home_namespace="roles/architecture/jingchuan",
+        ),
+    ]
+    router = CoordinatorTriageRouter(candidates=candidates)
+    tool = TeamCastTool(router=router)
     assert tool.name == TEAM_CAST_TOOL
 
     obs = await tool.execute(

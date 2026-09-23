@@ -5,4 +5,4 @@ from lca.infrastructure.computer.sandbox.computer import (
     normalize_sandbox_path,
 )
 
-__all__ = ['normalize_sandbox_path', 'SandboxComputer']
+__all__ = ['SandboxComputer', 'normalize_sandbox_path']

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import logging
 import secrets
 import uuid
 from typing import Any
@@ -10,6 +11,9 @@ from typing import Any
 import httpx
 
 from lca.contracts.channels.wechat import WechatQrResult, WechatStatusResult
+
+logger = logging.getLogger(__name__)
+
 
 DEFAULT_BASE_URL = "https://ilinkai.weixin.qq.com"
 CHANNEL_VERSION = "1.0.0"
@@ -175,7 +179,11 @@ class WechatIlinkClient:
         typing_ticket: str,
         start: bool = True,
     ) -> bool:
-        """Send typing indicator (status: 1=start, 2=stop)."""
+        """Send typing indicator (status: 1=start, 2=stop).
+
+        Typing is best-effort: transient HTTP errors are logged and suppressed;
+        asyncio.CancelledError is intentionally allowed to propagate.
+        """
         url = f"{self.base_url}/ilink/bot/sendtyping"
         body = {
             "base_info": {"channel_version": CHANNEL_VERSION},
@@ -190,5 +198,11 @@ class WechatIlinkClient:
                 headers=_build_headers(bot_token),
             )
             return resp.is_success
-        except Exception:
+        except httpx.HTTPError as exc:
+            # 瞬时网络错误：typing 是尽力而为，不应影响主消息流
+            logger.warning("WeChat send_typing transient HTTP error: %s", exc)
+            return False
+        except Exception as exc:
+            # 防御兜底：记录意外错误类型，便于诊断
+            logger.error("WeChat send_typing unexpected error: %s", type(exc).__name__, exc_info=True)
             return False

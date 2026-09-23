@@ -172,12 +172,15 @@ class DynamicToolBridge:
 
         if safe_executor is not None and hasattr(safe_executor, "permission_manifest"):
             manifest = safe_executor.permission_manifest
-            if hasattr(manifest, "allowed_tools") and tool.name not in manifest.allowed_tools:
+            if hasattr(manifest, "add_permitted"):
+                # 优先使用受管公共接口（C4 guardrail）
+                manifest.add_permitted(tool.name)
+                _log.info("dynamic_tool.authorized_safe_executor", tool_name=tool.name)
+            elif hasattr(manifest, "allowed_tools") and tool.name not in manifest.allowed_tools:
+                # COMPAT: 旧 ToolPermissionManifest 实例尚未迁移；只读 tuple 不可变故跳过
                 if isinstance(manifest.allowed_tools, list):
                     manifest.allowed_tools.append(tool.name)
-                elif isinstance(manifest.allowed_tools, tuple):
-                    manifest.allowed_tools = (*manifest.allowed_tools, tool.name)
-                _log.info("dynamic_tool.authorized_safe_executor", tool_name=tool.name)
+                _log.info("dynamic_tool.authorized_safe_executor_compat", tool_name=tool.name)
 
         # Emit audit fact
         try:
@@ -212,12 +215,15 @@ class DynamicToolBridge:
 
         if safe_executor is not None and hasattr(safe_executor, "permission_manifest"):
             manifest = safe_executor.permission_manifest
-            if hasattr(manifest, "allowed_tools"):
+            if hasattr(manifest, "revoke_permitted"):
+                # 优先使用受管公共接口（C4 guardrail）
+                manifest.revoke_permitted(tool_name)
+                _log.info("dynamic_tool.revoked_safe_executor", tool_name=tool_name)
+            elif hasattr(manifest, "allowed_tools"):
+                # COMPAT: 旧实例；仅处理 list 类型
                 if isinstance(manifest.allowed_tools, list):
                     manifest.allowed_tools = [t for t in manifest.allowed_tools if t != tool_name]
-                elif isinstance(manifest.allowed_tools, tuple):
-                    manifest.allowed_tools = tuple(t for t in manifest.allowed_tools if t != tool_name)
-                _log.info("dynamic_tool.revoked_safe_executor", tool_name=tool_name)
+                _log.info("dynamic_tool.revoked_safe_executor_compat", tool_name=tool_name)
 
         # Emit audit fact
         try:

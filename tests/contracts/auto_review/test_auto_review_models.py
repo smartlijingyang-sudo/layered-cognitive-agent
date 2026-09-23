@@ -26,7 +26,7 @@ def test_auto_review_verdict_frozen():
         reason="Safe operation",
     )
     with pytest.raises(ValidationError):
-        verdict.action = AutoReviewAction.BLOCK  # type: ignore
+        verdict.action = AutoReviewAction.BLOCK  # type: ignore[misc]  # intentional frozen violation test
 
 
 def test_action_fingerprint_deterministic():

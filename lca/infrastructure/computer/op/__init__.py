@@ -5,4 +5,4 @@ from lca.infrastructure.computer.op.result import (
     TerminalCapableSandbox,
 )
 
-__all__ = ['TerminalCapableSandbox', 'ComputerOpResult']
+__all__ = ['ComputerOpResult', 'TerminalCapableSandbox']

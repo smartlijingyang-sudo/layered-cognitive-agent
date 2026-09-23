@@ -61,6 +61,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.runtime.infra.infra import Tool
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.infrastructure.preset.discovery import AssistantPresetDiscovery
 
 # ── Per-section Pydantic Config ────────────────────────────────────
 
@@ -455,8 +456,6 @@ class AutonomousPresetsSection:
         home = str(extra.get("assistant_home_path") or "").strip()
         if not home:
             return SectionOutput(text="")
-
-        from lca.infrastructure.preset.discovery import AssistantPresetDiscovery
 
         overview = AssistantPresetDiscovery(home).render_prompt_overview()
         if not overview:

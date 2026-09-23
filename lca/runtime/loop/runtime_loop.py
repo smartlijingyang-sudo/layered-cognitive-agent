@@ -444,7 +444,9 @@ class CognitiveRuntime(Runtime):
 
                     offer = evaluate_initiative(features)
                     if offer is not None:
-                        ctx.extra["initiative_offer"] = offer.model_dump()
+                        # initiative_offer 是运行时派生投影，写入 Result.extra 而非回写
+                        # 输入契约 RunContext.extra（RunContext 是只读输入，不是输出总线）。
+                        result.extra["initiative_offer"] = offer.model_dump()
             # ADR-0166 S5: 异常路径走 exception.finally；正常路径走
             # lifecycle.finally —— reader 不再被「成功也发 exception.*」混淆。
             if outcome_holder["value"] == "success":

@@ -33,6 +33,18 @@ class ToolPermissionManifest:
     max_calls_per_task: dict[str, int] = field(default_factory=dict)
     requires_approval: list[str] = field(default_factory=list)
 
+    def add_permitted(self, tool_name: str) -> None:
+        """将工具名加入允许列表（幂等）。
+
+        这是 allowed_tools 变更的唯一公共入口；调用方不得直接操作列表。
+        """
+        if tool_name not in self.allowed_tools:
+            self.allowed_tools.append(tool_name)
+
+    def revoke_permitted(self, tool_name: str) -> None:
+        """从允许列表移除工具名（幂等）。"""
+        self.allowed_tools = [t for t in self.allowed_tools if t != tool_name]
+
 
 @dataclass
 class RoleProfile:
