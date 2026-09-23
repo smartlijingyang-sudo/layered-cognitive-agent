@@ -8,7 +8,7 @@ enter carrier-side scopes before a loop driver executes.
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager, nullcontext
+from contextlib import asynccontextmanager, nullcontext, suppress
 from dataclasses import dataclass
 from typing import Any, cast
 
@@ -210,19 +210,61 @@ class RunExecutionEnvironment:
                 auto_review_mode = str(profile_runtime.get("auto_review_mode", "off"))
                 vocal_gate = None
                 auto_review_gate = None
-                send_message_factory_disposer = None
+                factory_disposers: list[Any] = []
+                from lca.infrastructure.computer.box_accessor import BoxAccessor
+
+                box_accessor = BoxAccessor()
                 if vocal_mode == VocalMode.GATED.value:
+                    from lca.infrastructure.tools.box import (
+                        BoxListFilesTool,
+                        BoxReadFileTool,
+                        BoxRunCommandTool,
+                        BoxWriteFileTool,
+                        RequestBoxHelpTool,
+                    )
+
                     vocal_gate = GatedVocalGate(operation_id=str(session.run_id))
                     if auto_review_mode != "off":
                         auto_review_gate = AutoReviewGate(mode=AutoReviewModeEnum(auto_review_mode))
 
-                    def _send_message_factory(bindings: object) -> object | None:
-                        if getattr(bindings, "vocal_mode", "direct") != VocalMode.GATED.value:
+                    def _send_message_factory(b: object) -> object | None:
+                        if getattr(b, "vocal_mode", "direct") != VocalMode.GATED.value:
                             return None
                         return SendMessageVocalTool(vocal_gate)  # type: ignore[arg-type]
 
-                    send_message_factory_disposer = tools_service.register_factory(
-                        "send_message", _send_message_factory
+                    factory_disposers.append(
+                        tools_service.register_factory("send_message", _send_message_factory)
+                    )
+                    factory_disposers.append(
+                        tools_service.register_factory(
+                            "box_read_file",
+                            lambda b, box=box_accessor: BoxReadFileTool(box),
+                        )
+                    )
+                    factory_disposers.append(
+                        tools_service.register_factory(
+                            "box_write_file",
+                            lambda b, box=box_accessor: BoxWriteFileTool(box),
+                        )
+                    )
+                    factory_disposers.append(
+                        tools_service.register_factory(
+                            "box_list_files",
+                            lambda b, box=box_accessor: BoxListFilesTool(box),
+                        )
+                    )
+                    if auto_review_mode != "off":
+                        factory_disposers.append(
+                            tools_service.register_factory(
+                                "box_run_command",
+                                lambda b, box=box_accessor: BoxRunCommandTool(box),
+                            )
+                        )
+                    factory_disposers.append(
+                        tools_service.register_factory(
+                            "request_box_help",
+                            lambda b: RequestBoxHelpTool(),
+                        )
                     )
                 # 共享给 runnable_assembly（组合 body 工具注册表）与 runtime loop。
                 session.vocal_mode = vocal_mode  # type: ignore[attr-defined]
@@ -246,10 +288,7 @@ class RunExecutionEnvironment:
                     auto_review_mode=auto_review_mode,
                     auto_review_gate=auto_review_gate,
                     origin="user",
-                    box_accessor=__import__(
-                        "lca.infrastructure.computer.box_accessor",
-                        fromlist=["BoxAccessor"],
-                    ).BoxAccessor(),
+                    box_accessor=box_accessor,
                 )
                 # Hot-resume cache (same class as session.ambit): the HIL
                 # resume task has no execution environment, so it
@@ -290,8 +329,9 @@ class RunExecutionEnvironment:
                             workspace=workspace,
                         )
             finally:
-                if send_message_factory_disposer is not None:
-                    send_message_factory_disposer()
+                for disposer in factory_disposers:
+                    with suppress(Exception):
+                        disposer()
                 if capability_token is not None:
                     reset_capability_bindings(capability_token)
                 if tools_token is not None:

@@ -1,3 +1,5 @@
+import os
+import uuid
 from pathlib import Path
 
 from lca.contracts.models.computer.box import ComputerPlane
@@ -26,7 +28,18 @@ class BoxAccessor:
     def write_text(self, subpath: str, content: str) -> Path:
         target = self.resolve_path(subpath)
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(content, encoding="utf-8")
+        # ADR-0251 决策一：原子刷盘（临时文件落地 + fsync + 原子 os.replace）
+        tmp_target = target.parent / f".tmp_{target.name}_{uuid.uuid4().hex[:8]}"
+        try:
+            with tmp_target.open("w", encoding="utf-8") as fh:
+                fh.write(content)
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(tmp_target, target)
+        except BaseException:
+            if tmp_target.exists():
+                tmp_target.unlink()
+            raise
         return target
 
     def read_text(self, subpath: str) -> str:

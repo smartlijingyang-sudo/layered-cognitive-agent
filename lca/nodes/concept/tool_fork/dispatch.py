@@ -274,18 +274,26 @@ class ToolForkDispatchExecutor:
             from lca.infrastructure.computer.box_accessor import BoxAccessor
             from lca.infrastructure.tools.box import build_box_help_tools, build_box_tools
 
+            existing_names = {getattr(tool, "name", "") for tool in items}
             if bindings.box_accessor is not None:
                 # 员工机 Shell 只在 Auto-Review 开启时暴露（ADR-0248 切片 4）。
                 include_shell = auto_review_mode != "off"
-                items = (
-                    *items,
-                    *build_box_tools(
+                box_tools = [
+                    t
+                    for t in build_box_tools(
                         cast("BoxAccessor", bindings.box_accessor),
                         include_shell=include_shell,
-                    ),
-                )
+                    )
+                    if getattr(t, "name", "") not in existing_names
+                ]
+                items = (*items, *box_tools)
             if origin != "subagent":
-                items = (*items, *build_box_help_tools())
+                help_tools = [
+                    t
+                    for t in build_box_help_tools()
+                    if getattr(t, "name", "") not in existing_names
+                ]
+                items = (*items, *help_tools)
 
         # AutoReview 三态硬闸：非 off 时所有工具包一层 AutoReviewWrappedTool。
         if auto_review_mode != "off" and auto_review_gate is not None:

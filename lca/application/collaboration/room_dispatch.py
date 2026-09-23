@@ -69,6 +69,9 @@ class RunStarter(Protocol):
         objective: str,
         mode: str,
         correlation_id: str,
+        coordinator_agent_id: str | None = None,
+        selected_peers: tuple[str, ...] | None = None,
+        room_id: str | None = None,
     ) -> RunDispatchResult: ...
 
 
@@ -127,11 +130,21 @@ class RoomDispatcher:
         selected = RoomMessageRouter(room).route_message(user_text)
         mode = "team" if room.member_peer_ids else "solo"
         correlation_id = new_id("room")
-        result = await self._run_starter(
-            objective=user_text,
-            mode=mode,
-            correlation_id=correlation_id,
-        )
+        try:
+            result = await self._run_starter(
+                objective=user_text,
+                mode=mode,
+                correlation_id=correlation_id,
+                coordinator_agent_id=room.coordinator_agent_id,
+                selected_peers=selected,
+                room_id=room_id,
+            )
+        except TypeError:
+            result = await self._run_starter(
+                objective=user_text,
+                mode=mode,
+                correlation_id=correlation_id,
+            )
 
         started_msg = RoomMessage(
             message_id=new_id("room_msg"),

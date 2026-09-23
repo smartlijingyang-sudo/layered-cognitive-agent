@@ -73,6 +73,8 @@ async def _start_run(
     objective: str,
     mode: str,
     correlation_id: str,
+    coordinator_agent_id: str | None = None,
+    selected_peers: tuple[str, ...] | None = None,
 ) -> RunDispatchResult:
     """Wire ``RoomDispatcher`` to the real ``RunPort`` (aligns with create_run).
 
@@ -87,6 +89,12 @@ async def _start_run(
         file_store,
     )
     run_port = getattr(request.app.state, "run_port", None)
+    agent_raw = (
+        {"id": coordinator_agent_id, "name": coordinator_agent_id}
+        if coordinator_agent_id
+        else None
+    )
+    agent = command_endpoints.parse_agent_ref(agent_raw)
     run_request = command_endpoints.RunRequest(
         profile="web-assistant",
         question=run_input.question,
@@ -94,12 +102,16 @@ async def _start_run(
         mode=command_endpoints.resolve_profile_mode(ctx, mode),
         attachment_ids=run_input.attachment_ids,
         prior_turns=run_input.prior_turns,
-        agent=command_endpoints.parse_agent_ref(None),
+        agent=agent,
         device_id="",
         plane="",
         extra_plane="",
         execution_target="",
-        options={},
+        options={
+            "room_id": room_id,
+            "correlation_id": correlation_id,
+            "selected_peers": list(selected_peers or ()),
+        },
         ctx=ctx,
     )
     receipt = await run_port.create_and_dispatch(run_request)
@@ -108,7 +120,7 @@ async def _start_run(
             request,
             run_id=receipt.run_id,
             topic_id=room_id,
-            agent_id=str(command_endpoints.parse_agent_ref(None).agent_id),
+            agent_id=str(agent.agent_id),
             body={"messages": [{"role": "user", "content": objective}], "scope": "main"},
         )
     return RunDispatchResult(
@@ -139,12 +151,14 @@ def _dispatcher_for(request: Request, room_id: str) -> RoomDispatcher:
     return RoomDispatcher(
         room_repository=JsonRoomRepository(),
         message_store=JsonRoomMessageStore(),
-        run_starter=lambda *, objective, mode, correlation_id: _start_run(
+        run_starter=lambda *, objective, mode, correlation_id, coordinator_agent_id=None, selected_peers=None, room_id=room_id: _start_run(
             request,
             room_id=room_id,
             objective=objective,
             mode=mode,
             correlation_id=correlation_id,
+            coordinator_agent_id=coordinator_agent_id,
+            selected_peers=selected_peers,
         ),
         run_status_reader=lambda run_id: _read_run_status(request, run_id),
     )

@@ -33,9 +33,19 @@ from lca.contracts.protocols.runtime.infra.infra import Tool
 
 __all__ = ["filter_tools_by_assistant"]
 
-# ADR-0248 平台声带系统工具：gated 模式下唯一对外发声通道，不受 assistant
-# tools.yaml/grants.yaml 策略过滤（否则「模型看得到但 body 未注册」）。
-_VOCAL_SYSTEM_TOOLS: frozenset[str] = frozenset({"send_message"})
+# ADR-0248 平台系统工具：gated 模式下声带与员工电脑沙箱核心工具，不受 assistant
+# tools.yaml/grants.yaml 策略过滤（否则「模型看得到但 body 未注册或被策略误杀」）。
+_VOCAL_SYSTEM_TOOLS: frozenset[str] = frozenset(
+    {
+        "send_message",
+        "box_read_file",
+        "box_write_file",
+        "box_list_files",
+        "box_run_command",
+        "request_box_help",
+    }
+)
+
 
 _ToolSet: TypeAlias = tuple[Tool, ...]
 
