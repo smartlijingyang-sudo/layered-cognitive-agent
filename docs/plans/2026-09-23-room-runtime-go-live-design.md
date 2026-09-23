@@ -141,10 +141,13 @@ class RoomMessage(BaseModel):
 - `/v1/rooms` REST 路由
 - 单元测试与集成测试
 
-### 阶段 2：异步 Mailbox + Revival
+### 阶段 2：惰性 Revival（已落地）
 
-- `MailboxStore`：协调者发出 `HandoffEnvelope` 后立即返回，peer 后台执行，幂等领取。
-- run 完成事件订阅：`RuntimeLifecycleEvent` 触发 `RevivalCoordinator`，调用 `finalize` 把折叠结果回写房间。
+- `RoomDispatcher.sync_completed`：读取房间转录时，对已到达终态的 run 自动追加 `FOLDED` 消息。
+- 幂等：同一 `correlation_id` 已有 FOLDED 则不重复追加；进行中的 run 跳过。
+- 终态来源：`RunPort.summary` 返回的 status（completed / failed / canceled 等）。
+- 说明：run 的完整输出文本不持久化在后端可读位置，FOLDED 消息携带终态摘要；完整结论仍在 run 自己的会话里由 gateway 投递。
+- `MailboxStore` 与 push 式 `RuntimeLifecycleEvent` 订阅留作后续增强。
 
 ### 阶段 3：前端群聊视图
 
