@@ -235,7 +235,13 @@ class RunExecutionEnvironment:
                         yield PreparedRun(
                             driver=driver,
                             bindings=bindings,
-                            run_context=_run_context_for_session(session),
+                            # ADR-0248: profile.json.runtime 的 vocal_mode /
+                            # auto_review_mode / wake_source 经 RunContext.extra
+                            # 透传，runtime loop 据此启用 gated 模式与 AutoReview。
+                            run_context=_run_context_for_session(
+                                session,
+                                profile_runtime=spec.profile_runtime if spec is not None else None,
+                            ),
                             workspace=workspace,
                         )
             finally:

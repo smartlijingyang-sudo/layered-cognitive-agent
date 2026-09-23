@@ -180,3 +180,52 @@ async def test_direct_mode_flow_keeps_classic_passthrough() -> None:
     assert result.status == TaskStatus.COMPLETED
     assert "vocal_gate" not in bindings.capabilities
     assert "initiative_offer" not in result.extra
+
+
+@pytest.mark.asyncio
+async def test_profile_runtime_to_gated_run_full_chain() -> None:
+    """profile.json.runtime → RunContext.extra → gated run 全链路。
+
+    用 ``run_context_for_session`` 模拟 web carrier 读取 assistant
+    ``profile_runtime={"vocal_mode": "gated"}``，再驱动真实 runtime loop，
+    验证配置通道到门控行为整条链路生效。
+    """
+    from dataclasses import dataclass as _dataclass
+    from dataclasses import field as _field
+
+    from lca.plugins.transport.webserver.carrier.runs.lifecycle.run_context_factory import (
+        run_context_for_session,
+    )
+
+    @_dataclass
+    class _AgentStub:
+        agent_id: str = "agt_gated_profile"
+        name: str = "Gated Assistant"
+
+    @_dataclass
+    class _SessionStub:
+        agent: _AgentStub = _field(default_factory=_AgentStub)
+        prior_turns: tuple[Any, ...] = ()
+
+    session = Session("test-profile-gated-chain")
+    set_publish_session(cast("Any", session))
+
+    captured_states: list[AgentState] = []
+    bindings = _Bindings(captured_states)
+    runtime = CognitiveRuntime(cast("Any", bindings))
+
+    ctx = run_context_for_session(
+        _SessionStub(),  # type: ignore[arg-type]
+        profile_runtime={"vocal_mode": "gated"},
+    )
+
+    try:
+        result = await runtime.run(task="按配置走 Grok 模式", ctx=ctx)
+    finally:
+        reset_publish_session(None)
+
+    assert result.status == TaskStatus.COMPLETED
+    assert ctx.extra["vocal_mode"] == "gated"
+    gate = bindings.capabilities["vocal_gate"]
+    assert isinstance(gate, GatedVocalGate)
+    assert [v["content"] for v in gate.get_visible_outputs()] == ["已完成配置排查。"]

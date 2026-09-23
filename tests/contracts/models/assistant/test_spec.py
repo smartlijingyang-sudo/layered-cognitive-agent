@@ -224,3 +224,28 @@ class TestAssistantSpec:
                 grant_digest="g",
                 tools_policy_digest="",
             )
+
+
+# ── ADR-0248 profile.json.runtime 声带/审查键校验 ────────────────
+
+
+class TestProfileRuntimeAdr0248:
+    def test_accepts_valid_vocal_mode(self) -> None:
+        spec = replace(_spec(), profile_runtime={"vocal_mode": "gated"})
+        assert spec.profile_runtime["vocal_mode"] == "gated"
+
+    def test_accepts_valid_auto_review_mode(self) -> None:
+        spec = replace(_spec(), profile_runtime={"auto_review_mode": "enforce"})
+        assert spec.profile_runtime["auto_review_mode"] == "enforce"
+
+    def test_rejects_invalid_vocal_mode(self) -> None:
+        with pytest.raises(ValueError, match="vocal_mode"):
+            replace(_spec(), profile_runtime={"vocal_mode": "bogus"})
+
+    def test_rejects_invalid_auto_review_mode(self) -> None:
+        with pytest.raises(ValueError, match="auto_review_mode"):
+            replace(_spec(), profile_runtime={"auto_review_mode": "bogus"})
+
+    def test_empty_profile_runtime_still_valid(self) -> None:
+        spec = replace(_spec(), profile_runtime={})
+        assert spec.profile_runtime == {}

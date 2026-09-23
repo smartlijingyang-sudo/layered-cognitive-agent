@@ -27,6 +27,17 @@ from lca.contracts.models.assistant.plan_overlay import PlanOverlay
 if TYPE_CHECKING:
     from lca.contracts.protocols.journal.spec.spec import AgentSpec
 
+# ── ADR-0248 profile.json.runtime 键（Home 数据，进 manifest digest）─────
+PROFILE_RUNTIME_VOCAL_MODE = "vocal_mode"
+"""声带分发模式：``direct``（默认直通）或 ``gated``（Grok 模式唯一声带）。"""
+PROFILE_RUNTIME_AUTO_REVIEW_MODE = "auto_review_mode"
+"""工具副作用自动审查：``off`` / ``shadow`` / ``enforce``。"""
+PROFILE_RUNTIME_WAKE_SOURCE = "wake_source"
+"""唤醒源（可选）：``user_input`` / ``routine`` / ``inbound`` / ``revival`` 等。"""
+
+_VOCAL_MODES: frozenset[str] = frozenset({"direct", "gated"})
+_AUTO_REVIEW_MODES: frozenset[str] = frozenset({"off", "shadow", "enforce"})
+
 
 @dataclass(frozen=True)
 class AssistantBootstrapRefs:
@@ -134,6 +145,20 @@ class AssistantSpec:
             raise ValueError("grant_digest 必须为非空 content digest")
         if not self.tools_policy_digest or not self.tools_policy_digest.strip():
             raise ValueError("tools_policy_digest 必须为非空 content digest")
+        # ADR-0248: profile.json.runtime 中的声带/审查键必须取闭集值，非法配置
+        # fail-closed（防止运行时静默回退到 direct 掩盖配置错误）。
+        vocal_mode = self.profile_runtime.get(PROFILE_RUNTIME_VOCAL_MODE)
+        if vocal_mode is not None and vocal_mode not in _VOCAL_MODES:
+            raise ValueError(
+                f"profile_runtime['{PROFILE_RUNTIME_VOCAL_MODE}'] 必须是 "
+                f"{sorted(_VOCAL_MODES)} 之一，得到 {vocal_mode!r}"
+            )
+        auto_review_mode = self.profile_runtime.get(PROFILE_RUNTIME_AUTO_REVIEW_MODE)
+        if auto_review_mode is not None and auto_review_mode not in _AUTO_REVIEW_MODES:
+            raise ValueError(
+                f"profile_runtime['{PROFILE_RUNTIME_AUTO_REVIEW_MODE}'] 必须是 "
+                f"{sorted(_AUTO_REVIEW_MODES)} 之一，得到 {auto_review_mode!r}"
+            )
 
 
 __all__ = ["AssistantBootstrapRefs", "AssistantSpec"]

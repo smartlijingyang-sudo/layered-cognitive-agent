@@ -216,5 +216,8 @@
 | ADR248-WIRE-INITIATIVE | 运行时总装：transcript_features 派生，InitiativeHook 在真实 Run 成功路径生效 | Completed | runtime_loop 在成功收敛时从 prior_turns 派生基线特征并调用 evaluate_initiative，钩子不再是死代码 |
 | ADR248-WIRE-REGRESSION | 运行时总装全量回归与门禁（Pytest, Ruff, Format, Diff） | Completed | 1. ADR-0248 全链路相关测试 136/137 通过（唯一失败为既有环境相关 tests/infrastructure/computer/test_companion_client.py::test_companion_rpc_system_info）；2. ruff check 0 报错；3. ruff format 11/11 达标；4. git diff --check 退出码 0 |
 | ADR248-WIRE-FLOW-TEST | 流程测试：真实 runtime loop 驱动 gated 模式全流程（截流 -> send_message -> Settle -> Initiative） | Completed | 新增 tests/scenario/adr0248/test_runtime_loop_gated_flow.py，通过 CognitiveRuntime.run 以 vocal_mode=gated 跑完整 Run，验证内省文本不进气泡、唯一声道交付、Settle 收敛、InitiativeHook 触发；direct 模式零退化对照，2/2 通过 |
+| ADR248-PROFILE-CONFIG | 产品配置通道：assistant profile.json.runtime 声明 vocal_mode / auto_review_mode / wake_source（ADR-0242 D9 Home 数据） | Completed | 定义 PROFILE_RUNTIME_VOCAL_MODE / PROFILE_RUNTIME_AUTO_REVIEW_MODE / PROFILE_RUNTIME_WAKE_SOURCE 常量，AssistantSpec 对闭集取值校验（非法值 fail-closed），tests/contracts/models/assistant/test_spec.py 5/5 通过 |
+| ADR248-PROFILE-INJECTION | carrier 读取 profile_runtime 写入 RunContext.extra，web 路径按 assistant 配置启用 gated | Completed | 扩展 run_context_for_session(session, profile_runtime) 并接入 execution_environment，tests/plugins/transport/webserver/carrier/runs/test_run_context_adr0248.py 4/4 通过 |
+| ADR248-PROFILE-FLOW | 全链路：profile.json.runtime -> RunContext.extra -> gated run 行为 | Completed | test_runtime_loop_gated_flow 新增全链路用例，验证 assistant 配置驱动真实 runtime loop 进入 Grok 模式；ADR-0248 全链路相关 162/163 通过（唯一失败为既有环境相关 test_companion_rpc_system_info） |
 
 
