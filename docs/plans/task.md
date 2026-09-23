@@ -215,5 +215,6 @@
 | ADR248-WIRE-AUTOREVIEW | 运行时总装：AutoReviewWrappedTool —— 工具执行 seam 三态审查（allow/block/escalate/adapt） | Completed | 落地 Tool 装饰器，execute 前调用 AutoReviewGate.evaluate，危险 Shell 被硬闸拦截并携带指纹，off 模式零侵入透传，tests/infrastructure/auto_review/test_wrapped_tool.py 5/5 通过 |
 | ADR248-WIRE-INITIATIVE | 运行时总装：transcript_features 派生，InitiativeHook 在真实 Run 成功路径生效 | Completed | runtime_loop 在成功收敛时从 prior_turns 派生基线特征并调用 evaluate_initiative，钩子不再是死代码 |
 | ADR248-WIRE-REGRESSION | 运行时总装全量回归与门禁（Pytest, Ruff, Format, Diff） | Completed | 1. ADR-0248 全链路相关测试 136/137 通过（唯一失败为既有环境相关 tests/infrastructure/computer/test_companion_client.py::test_companion_rpc_system_info）；2. ruff check 0 报错；3. ruff format 11/11 达标；4. git diff --check 退出码 0 |
+| ADR248-WIRE-FLOW-TEST | 流程测试：真实 runtime loop 驱动 gated 模式全流程（截流 -> send_message -> Settle -> Initiative） | Completed | 新增 tests/scenario/adr0248/test_runtime_loop_gated_flow.py，通过 CognitiveRuntime.run 以 vocal_mode=gated 跑完整 Run，验证内省文本不进气泡、唯一声道交付、Settle 收敛、InitiativeHook 触发；direct 模式零退化对照，2/2 通过 |
 
 
