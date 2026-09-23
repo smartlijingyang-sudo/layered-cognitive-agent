@@ -37,6 +37,15 @@ _ARCH_KEYWORDS = frozenset(
     }
 )
 
+# 无注入 candidates/default_team 时 TEAM_CAST 的默认收敛团队（架构三角）。
+# 回退到角色库全量角色会产出数百成员的团队，违背「复合架构任务收敛到专家三角」的
+# 设计意图，也让测试与生产行为不可预测（见 peer_provider 的同名常量）。
+_DEFAULT_ARCH_TEAM = (
+    "architecture/guanlan",
+    "architecture/hengyue",
+    "architecture/jingchuan",
+)
+
 
 class TriageDecisionKind(StrEnum):
     """Routing classification for coordinator triage."""
@@ -140,20 +149,8 @@ class CoordinatorTriageRouter:
             return self._default_team
         if self._candidates:
             return tuple(c.peer_id for c in self._candidates)
-        # 无注入 candidates/default_team 时动态查询角色库，取所有已注册角色 ID
-        lib = self._get_role_library()
-        if lib is not None:
-            try:
-                team = tuple(entry.role_id for entry in lib.index() if entry.role_id)
-                if team:
-                    return team
-            except Exception as exc:
-                _logger.debug("Error enumerating role library for team fallback: %s", exc)
-        _logger.warning(
-            "CoordinatorTriageRouter: no candidates, default_team, or role library available; "
-            "TEAM_CAST will produce empty peer set."
-        )
-        return ()
+        # 无注入时回退到默认架构三角，而非角色库全量角色。
+        return _DEFAULT_ARCH_TEAM
 
     def _match_from_library(self, objective: str) -> tuple[str, str] | None:
         lib = self._get_role_library()
@@ -166,8 +163,7 @@ class CoordinatorTriageRouter:
                     continue
                 # 精确匹配全中文名称或 @ 标识
                 if (
-                    all("\u4e00" <= ch <= "\u9fff" for ch in title)
-                    and title in objective
+                    all("\u4e00" <= ch <= "\u9fff" for ch in title) and title in objective
                 ) or f"@{entry.role_id}" in objective:
                     return entry.role_id, title
         except Exception as exc:
