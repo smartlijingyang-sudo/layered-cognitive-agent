@@ -269,6 +269,10 @@ entries:
   name: lca_webserver_routes_runs_sessions
   $module: lca.plugins.transport.webserver.routes_2.routes_runs_sessions
   config: {}
+- id: lca-gateway-routes-rooms
+  name: lca_webserver_routes_rooms
+  $module: lca.plugins.transport.webserver.routes_3.routes_rooms
+  config: {}
 - id: lca-gateway-routes-device
   name: lca_webserver_routes_device
   $module: lca.plugins.transport.webserver.routes_1.routes_device
