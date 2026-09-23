@@ -368,6 +368,7 @@ class TestPromptSectionRegistryUnchanged:
                     "member_reports_text",
                     "member_status_text",
                     "evidence_pack_text",
+                    "vocal_contract",
                 }
             )
             == REGISTERED_PROMPT_SECTION_NAMES

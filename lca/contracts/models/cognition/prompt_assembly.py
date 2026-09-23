@@ -61,6 +61,7 @@ REGISTERED_PROMPT_SECTION_NAMES: frozenset[str] = frozenset(
         "member_reports_text",
         "member_status_text",
         "evidence_pack_text",
+        "vocal_contract",
     }
 )
 

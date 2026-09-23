@@ -219,5 +219,8 @@
 | ADR248-PROFILE-CONFIG | 产品配置通道：assistant profile.json.runtime 声明 vocal_mode / auto_review_mode / wake_source（ADR-0242 D9 Home 数据） | Completed | 定义 PROFILE_RUNTIME_VOCAL_MODE / PROFILE_RUNTIME_AUTO_REVIEW_MODE / PROFILE_RUNTIME_WAKE_SOURCE 常量，AssistantSpec 对闭集取值校验（非法值 fail-closed），tests/contracts/models/assistant/test_spec.py 5/5 通过 |
 | ADR248-PROFILE-INJECTION | carrier 读取 profile_runtime 写入 RunContext.extra，web 路径按 assistant 配置启用 gated | Completed | 扩展 run_context_for_session(session, profile_runtime) 并接入 execution_environment，tests/plugins/transport/webserver/carrier/runs/test_run_context_adr0248.py 4/4 通过 |
 | ADR248-PROFILE-FLOW | 全链路：profile.json.runtime -> RunContext.extra -> gated run 行为 | Completed | test_runtime_loop_gated_flow 新增全链路用例，验证 assistant 配置驱动真实 runtime loop 进入 Grok 模式；ADR-0248 全链路相关 162/163 通过（唯一失败为既有环境相关 test_companion_rpc_system_info） |
+| ADR248-SECTION-VOCAL-CONTRACT | 正规机制：新增 vocal_contract prompt section（Config 驱动、模板注册），替代硬编码注入 | Completed | 按 LCA prompt section 架构实现：REGISTERED_PROMPT_SECTION_NAMES 闭集扩展、sections.py 注册 stateful section、template_provider 内建模板引用；gated 渲染契约+Reply-First 提醒、direct 零侵入 |
+| ADR248-SECTION-RESOURCE | 提示词正文放入 .md 资源文件（非 Python 硬编码） | Completed | 新增 lca/cognition/brain/prompts/vocal_contract.md 与 reply_first_reminder.md，section 经 load_builtin_prompt 加载；profile 仍可用 instruction_overrides 覆盖 |
+| ADR248-SECTION-REGRESSION | 声带契约 section 全量回归与门禁 | Completed | 新增 tests/unit/plugins/prompts/test_vocal_contract_section.py（gated/acked/direct/资源文件/模板引用 6 项）；ADR-0248 全链路相关 190/191 通过（唯一失败为既有环境相关 test_companion_rpc_system_info）；ruff/format/diff 门禁全绿 |
 
 

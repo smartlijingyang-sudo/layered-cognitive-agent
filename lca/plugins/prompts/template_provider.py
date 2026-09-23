@@ -51,6 +51,8 @@ def _builtin_section_refs() -> tuple[tuple[str, str, bool, str | None], ...]:
         ("role", "pure", False, None),
         ("goal", "pure", False, None),
         ("backstory", "pure", False, None),
+        # ADR-0248：gated 模式声带契约（非 gated 渲染为空，零侵入）
+        ("vocal_contract", "stateful", True, ""),
         ("current_date", "stateful", False, None),
         ("tools", "stateful", False, None),
         ("cloud_sandbox", "stateful", False, None),

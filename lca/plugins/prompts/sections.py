@@ -257,6 +257,74 @@ class CurrentDateSection:
         return SectionOutput(text=label_line("CURRENT_DATE", text))
 
 
+# ── ADR-0248 声带契约 section（gated 模式教模型用 send_message 发声）──
+#
+# 提示词正文放在 lca/cognition/brain/prompts/*.md 资源文件（与 react_prompt.md
+# 同目录），代码只保留条件渲染逻辑；profile 可用 instruction_overrides
+# 覆盖默认文本。
+
+
+def _load_prompt_resource(name: str) -> str:
+    """读取内置提示词资源文件；缺失时返回空串（可由配置覆盖）。"""
+    from lca.cognition.brain.prompts._loader import load_builtin_prompt
+
+    try:
+        return load_builtin_prompt(name)
+    except (FileNotFoundError, TypeError):
+        return ""
+
+
+# 默认文本来自资源文件；setup 时可按 instruction_overrides 覆盖。
+_VOCAL_CONTRACT_TEXT = _load_prompt_resource("vocal_contract")
+_REPLY_FIRST_TEXT = _load_prompt_resource("reply_first_reminder")
+
+
+class VocalContractSection:
+    """ADR-0248 声带契约段落：仅 gated 模式渲染（direct 返回空）。
+
+    渲染规则：
+    - ``vocal_mode != "gated"`` → 空输出（零侵入）；
+    - gated：始终渲染声带契约（教模型唯一发声通道）；
+    - 未 Ack 且 ``requires_reply_first`` → 追加 Reply-First 提醒。
+    运行时状态经 ``current_bindings_view()`` 读取，不注入额外依赖。
+    """
+
+    name: ClassVar[str] = "vocal_contract"
+
+    def __init__(self, contract_text: str, reminder_text: str) -> None:
+        self._contract_text = contract_text
+        self._reminder_text = reminder_text
+
+    def render(
+        self,
+        *,
+        role_profile: RoleProfile,
+        task: str,
+        awareness: TeamAwareness | None,
+        manifest: ContextManifest | None,
+        tools: Sequence[Tool],
+        activated_skills: tuple[ActivatedSkill, ...],
+    ) -> SectionOutput:
+        del role_profile, task, awareness, manifest, tools, activated_skills
+        from lca.infrastructure.runtime_plane.capability_bindings import (
+            current_bindings_view,
+        )
+
+        view = current_bindings_view()
+        if view is None or getattr(view, "vocal_mode", "direct") != "gated":
+            return SectionOutput(text="")
+
+        parts = [self._contract_text]
+        gate = getattr(view, "vocal_gate", None)
+        if gate is not None:
+            wake = getattr(gate, "wake_context", None)
+            requires_reply_first = bool(getattr(wake, "requires_reply_first", False))
+            has_acked = bool(getattr(gate, "has_acked", False))
+            if requires_reply_first and not has_acked:
+                parts.append(self._reminder_text)
+        return SectionOutput(text=block("vocal_contract", "\n\n".join(parts)))
+
+
 class TaskSection:
     name: ClassVar[str] = "task"
 
@@ -701,6 +769,12 @@ def build_current_date(config: BaseModel) -> CurrentDateSection:
     return CurrentDateSection()
 
 
+def build_vocal_contract(config: BaseModel) -> VocalContractSection:
+    """ADR-0248 声带契约段落构造器（文本经 instruction_overrides 覆盖）。"""
+    del config
+    return VocalContractSection(_VOCAL_CONTRACT_TEXT, _REPLY_FIRST_TEXT)
+
+
 def build_task(config: BaseModel) -> TaskSection:
     del config
     return TaskSection()
@@ -827,6 +901,11 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     ):
         if name in overrides:
             globals()[f"_INSTRUCTION_OVERRIDE_{name.upper()}"] = overrides[name]
+    # ADR-0248 声带契约文本覆盖（profile YAML 可定制）。
+    if "vocal_contract" in overrides:
+        globals()["_VOCAL_CONTRACT_TEXT"] = overrides["vocal_contract"]
+    if "reply_first_reminder" in overrides:
+        globals()["_REPLY_FIRST_TEXT"] = overrides["reply_first_reminder"]
 
     # Pull catalog providers lazily so the section plugin does not
     # require the catalog at setup time — composition root order is
@@ -914,6 +993,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         ("member_reports_text", build_member_reports(Config())),
         ("member_status_text", build_member_status(Config())),
         ("evidence_pack_text", build_evidence_pack(Config())),
+        ("vocal_contract", build_vocal_contract(Config())),
     ]
     for name, section in stateful_sections:
         registry.register(section, kind="stateful", name=name)
@@ -944,5 +1024,7 @@ __all__ = [
     "TeammatesSection",
     "ToolsSection",
     "UserProfileSection",
+    "VocalContractSection",
+    "build_vocal_contract",
     "setup",
 ]

@@ -105,6 +105,10 @@ class HistoryDeriveExecutor:
     (folded header → live render from ``turn_render.trace``). The fallback
     exists because the folded header publishes during the LLM call
     itself (too late for this node); see module docstring for details.
+
+    ADR-0248: gated 模式的声带契约与 Reply-First 提醒由注册的
+    ``vocal_contract`` prompt section 在 ``think.reason.render`` 渲染时注入，
+    本节点不自行拼接提示词内容。
     """
 
     semantic_name: str = "history.derive"
