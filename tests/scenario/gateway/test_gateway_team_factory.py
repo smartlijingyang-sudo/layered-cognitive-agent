@@ -6,7 +6,7 @@ import json
 import unittest
 
 from lca.agent.role_library import FileRoleLibrary
-from lca.application.api.api import Agent, Team
+from lca.application.api.api import Agent, Team, ensure_default_ctx
 from lca.application.authoring.casting import LLMTeamCaster
 from lca.cognition.team.modes.default_modes import (
     build_runnable_team,
@@ -152,6 +152,46 @@ class TestGatewayTeamCastingFactory(unittest.IsolatedAsyncioTestCase):
         # 产品路径不允许出现测试探针人设（Alice/Bob 只存在于 tests/harness）
         self.assertNotIn("Alice", roles)
         self.assertNotIn("Bob", roles)
+
+    async def test_lead_team_preserves_lead_role_profile(self) -> None:
+        """Lead-governed teams must keep ``role_profile`` on the lead brain.
+
+        Regression: ``ModularBrain.with_gate`` used to drop ``role_profile``,
+        so ``assemble_lead`` produced a lead runtime whose ``think.reason.render``
+        failed with "missing brain.role_profile" (run_2387de46f5aa).
+        """
+        plan = json.dumps(
+            {
+                "selected": [
+                    {"role_id": "product/product-manager", "task_hint": "输出需求要点"},
+                    {"role_id": "marketing/marketing-content-creator"},
+                ],
+                "governance": {"kind": "board", "lead_role_id": "product/product-manager"},
+                "rationale": "产品经理主导并收口",
+            },
+            ensure_ascii=False,
+        )
+        llm = ScriptedLLMAdapter(
+            {"caster": [LLMResponse(text=plan, model="scripted-llm")]}, default_respond=True
+        )
+        collector = InMemoryObservability()
+        scope = await ensure_default_ctx()
+        runnable = await build_runnable_team(
+            "写一份发布方案",
+            llm,
+            observability=collector,
+            trace_id="trace-team",
+            run_id="run-team",
+            library=FileRoleLibrary(),
+            caster=LLMTeamCaster(BuiltinCastingPromptRenderer()),
+            tools=(),
+            scope=scope,
+        )
+        lead = runnable._handle.lead
+        self.assertIsNotNone(lead)
+        brain = getattr(lead.runtime, "brain", None)
+        self.assertIsNotNone(brain)
+        self.assertIsNotNone(getattr(brain, "role_profile", None))
 
 
 if __name__ == "__main__":
