@@ -76,6 +76,18 @@ class _FakeRunPort:
             rejection_reason=None,
         )
 
+    async def summary(self, run_id: str) -> dict[str, Any] | None:
+        return {
+            "run_id": run_id,
+            "trace_id": "trace_e2e_1",
+            "status": "completed",
+            "session_status": "completed",
+            "mode": "team",
+            "agent": {"id": "solo", "name": "助手"},
+            "question": "",
+            "error": "",
+        }
+
 
 def _build_app(tmp_path: Path) -> tuple[Starlette, _FakeRunPort]:
     router = RouteRegistry()
@@ -139,9 +151,10 @@ def test_room_api_closed_loop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     assert gateway_calls[0]["run_id"] == "run_e2e_1"
     assert gateway_calls[0]["topic_id"] == "room_e2e"
 
-    # 5. transcript persisted both facts
+    # 5. transcript persisted both facts; lazy revival appends FOLDED
     transcript = client.get("/v1/rooms/room_e2e/messages").json()["messages"]
-    assert [m["kind"] for m in transcript] == ["user", "run_started"]
+    assert [m["kind"] for m in transcript] == ["user", "run_started", "folded"]
     assert transcript[0]["sender_id"] == "user"
     assert transcript[1]["sender_id"] == "coordinator_sam"
     assert transcript[1]["payload"]["selected_peers"] == ["coordinator_sam"]
+    assert transcript[2]["payload"]["consensus_status"] == "unanimous"

@@ -182,3 +182,134 @@ async def test_dispatch_preserves_user_message_when_run_rejected():
     assert started.payload["accepted"] is False
     assert started.payload["rejection_reason"] == "no llm key"
     assert store.messages[0].kind == RoomMessageKind.USER
+
+
+class _FakeRunStatusReader:
+    def __init__(self, outcome) -> None:
+        self.outcome = outcome
+
+    async def __call__(self, run_id: str):
+        del run_id
+        return self.outcome
+
+
+def _dispatcher_with_status(repo, store, starter, status_reader) -> RoomDispatcher:
+    return RoomDispatcher(
+        repo,
+        store,
+        starter,
+        clock=lambda: 1000.0,
+        run_status_reader=status_reader,
+    )
+
+
+async def _dispatch_and_start(repo, store, starter, dispatcher) -> RoomMessage:
+    return await dispatcher.dispatch("room_1", "hello")
+
+
+@pytest.mark.asyncio
+async def test_sync_completed_appends_folded_for_completed_run():
+    from lca.application.collaboration.room_dispatch import RunOutcome
+
+    repo = _FakeRoomRepository({_room().room_id: _room()})
+    store = _FakeMessageStore()
+    starter = _RecordingRunStarter()
+    dispatcher = _dispatcher_with_status(
+        repo, store, starter, _FakeRunStatusReader(RunOutcome(status="completed"))
+    )
+    started = await dispatcher.dispatch("room_1", "hello")
+
+    appended = await dispatcher.sync_completed("room_1")
+
+    assert len(appended) == 1
+    folded = appended[0]
+    assert folded.kind == RoomMessageKind.FOLDED
+    assert folded.correlation_id == started.correlation_id
+    assert folded.run_id == started.run_id
+    assert folded.payload["consensus_status"] == "unanimous"
+    assert "已完成" in folded.content
+
+
+@pytest.mark.asyncio
+async def test_sync_completed_is_idempotent():
+    from lca.application.collaboration.room_dispatch import RunOutcome
+
+    repo = _FakeRoomRepository({_room().room_id: _room()})
+    store = _FakeMessageStore()
+    starter = _RecordingRunStarter()
+    dispatcher = _dispatcher_with_status(
+        repo, store, starter, _FakeRunStatusReader(RunOutcome(status="completed"))
+    )
+    await dispatcher.dispatch("room_1", "hello")
+
+    first = await dispatcher.sync_completed("room_1")
+    second = await dispatcher.sync_completed("room_1")
+
+    assert len(first) == 1
+    assert len(second) == 0
+    assert sum(1 for m in store.messages if m.kind == RoomMessageKind.FOLDED) == 1
+
+
+@pytest.mark.asyncio
+async def test_sync_completed_skips_inflight_run():
+    from lca.application.collaboration.room_dispatch import RunOutcome
+
+    repo = _FakeRoomRepository({_room().room_id: _room()})
+    store = _FakeMessageStore()
+    starter = _RecordingRunStarter()
+    dispatcher = _dispatcher_with_status(
+        repo, store, starter, _FakeRunStatusReader(RunOutcome(status="running"))
+    )
+    await dispatcher.dispatch("room_1", "hello")
+
+    appended = await dispatcher.sync_completed("room_1")
+
+    assert appended == ()
+    assert all(m.kind != RoomMessageKind.FOLDED for m in store.messages)
+
+
+@pytest.mark.asyncio
+async def test_sync_completed_failed_run_uses_concerns_noted():
+    from lca.application.collaboration.room_dispatch import RunOutcome
+
+    repo = _FakeRoomRepository({_room().room_id: _room()})
+    store = _FakeMessageStore()
+    starter = _RecordingRunStarter()
+    dispatcher = _dispatcher_with_status(
+        repo,
+        store,
+        starter,
+        _FakeRunStatusReader(RunOutcome(status="failed", error="boom")),
+    )
+    started = await dispatcher.dispatch("room_1", "hello")
+
+    appended = await dispatcher.sync_completed("room_1")
+
+    assert len(appended) == 1
+    folded = appended[0]
+    assert folded.payload["consensus_status"] == "concerns_noted"
+    assert "boom" in folded.content
+    assert folded.correlation_id == started.correlation_id
+
+
+@pytest.mark.asyncio
+async def test_finalize_sets_correlation_id_from_run_started():
+    from lca.contracts.models.collaboration.peer import PeerFoldedResult
+
+    repo = _FakeRoomRepository({_room().room_id: _room()})
+    store = _FakeMessageStore()
+    starter = _RecordingRunStarter()
+    dispatcher = _dispatcher(repo, store, starter)
+    started = await dispatcher.dispatch("room_1", "hello")
+
+    folded = PeerFoldedResult(
+        task_id=started.correlation_id,
+        synthesized_verdict="结论",
+        member_findings={},
+        consensus_status="unanimous",
+        member_metadata={},
+    )
+    msg = await dispatcher.finalize("room_1", started.run_id, folded)
+
+    assert msg.kind == RoomMessageKind.FOLDED
+    assert msg.correlation_id == started.correlation_id

@@ -55,6 +55,18 @@ class _FakeRunPort:
             rejection_reason=None,
         )
 
+    async def summary(self, run_id: str) -> dict[str, Any] | None:
+        return {
+            "run_id": run_id,
+            "trace_id": f"trace_{run_id}",
+            "status": "completed",
+            "session_status": "completed",
+            "mode": "team",
+            "agent": {"id": "solo", "name": "助手"},
+            "question": "",
+            "error": "",
+        }
+
 
 def _build_app(tmp_path: Path, run_port: _FakeRunPort) -> Starlette:
     router = RouteRegistry()
@@ -159,9 +171,10 @@ def test_post_message_dispatches_run(client: TestClient):
     assert body["payload"]["trace_id"] == "trace_1"
     assert body["payload"]["accepted"] is True
 
-    # USER + RUN_STARTED are both recorded
+    # USER + RUN_STARTED recorded; Phase 2 lazy revival appends FOLDED
     messages = client.get("/v1/rooms/room_1/messages").json()["messages"]
-    assert [m["kind"] for m in messages] == ["user", "run_started"]
+    assert [m["kind"] for m in messages] == ["user", "run_started", "folded"]
+    assert messages[2]["payload"]["consensus_status"] == "unanimous"
 
 
 def test_post_message_unknown_room_returns_404(client: TestClient):
