@@ -187,8 +187,22 @@ class ReactWorkflowSection(StaticTextSection):
     name = "react_workflow"
 
 
+@dataclass
 class ReactToolUsageSection(StaticTextSection):
-    name = "react_tool_usage_guidelines"
+    """工具使用指南。gated 模式返回去掉「文本直出」冲突指令的变体。"""
+
+    name: ClassVar[str] = "react_tool_usage_guidelines"
+    gated_text: str = ""
+
+    def render(self, *, role_profile: RoleProfile, tools: Sequence[Tool]) -> SectionOutput:
+        from lca.infrastructure.runtime_plane.capability_bindings import (
+            current_bindings_view,
+        )
+
+        view = current_bindings_view()
+        if view is not None and getattr(view, "vocal_mode", "direct") == "gated":
+            return SectionOutput(text=self.gated_text)
+        return SectionOutput(text=self.text)
 
 
 class RoutingInstructionsSection(StaticTextSection):
@@ -498,8 +512,7 @@ class HomeSection:
         lines = [
             template.format(home=home, assistant_id=assistant_id)
             for key, template in self._LINE_TEMPLATES
-            if (key == "assistant_id" and assistant_id)
-            or (key in self._HOME_ONLY_KEYS and home)
+            if (key == "assistant_id" and assistant_id) or (key in self._HOME_ONLY_KEYS and home)
         ]
         return SectionOutput(text=block("HOME", "\n".join(lines)))
 
@@ -645,6 +658,9 @@ _REACT_WORKFLOW_TEXT = """<workflow>
 5. Export files by default when the user asks to create/generate/save something.
 </workflow>"""
 
+# ADR-0248 gated 变体：移除「文本直出」冲突指令，正文来自资源文件。
+_REACT_TOOL_USAGE_TEXT_GATED = _load_prompt_resource("react_tool_usage_guidelines_gated")
+
 _REACT_TOOL_USAGE_TEXT = """<tool_usage_guidelines>
 - Tools in <tools> are called via function calling (native tool_calls)
 - Skills in <available_skills> require activate_skill first; <activated_skills> are already active
@@ -748,8 +764,10 @@ def build_react_workflow(config: BaseModel) -> StaticTextSection:
     return build_static_text(config, "react_workflow", _REACT_WORKFLOW_TEXT)
 
 
-def build_react_tool_usage(config: BaseModel) -> StaticTextSection:
-    return build_static_text(config, "react_tool_usage_guidelines", _REACT_TOOL_USAGE_TEXT)
+def build_react_tool_usage(config: BaseModel) -> ReactToolUsageSection:
+    text = getattr(config, "text", None) or _REACT_TOOL_USAGE_TEXT
+    gated_text = getattr(config, "gated_text", None) or _REACT_TOOL_USAGE_TEXT_GATED
+    return ReactToolUsageSection(text=text, gated_text=gated_text)
 
 
 def build_routing_instructions(config: BaseModel) -> StaticTextSection:
@@ -906,6 +924,8 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         globals()["_VOCAL_CONTRACT_TEXT"] = overrides["vocal_contract"]
     if "reply_first_reminder" in overrides:
         globals()["_REPLY_FIRST_TEXT"] = overrides["reply_first_reminder"]
+    if "react_tool_usage_guidelines_gated" in overrides:
+        globals()["_REACT_TOOL_USAGE_TEXT_GATED"] = overrides["react_tool_usage_guidelines_gated"]
 
     # Pull catalog providers lazily so the section plugin does not
     # require the catalog at setup time — composition root order is

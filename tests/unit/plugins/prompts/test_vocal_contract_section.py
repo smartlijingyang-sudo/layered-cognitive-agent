@@ -102,3 +102,40 @@ def test_builtin_templates_include_vocal_contract_ref() -> None:
     for tpl in _builtin_templates().values():
         names = {ref.name for ref in tpl.sections}
         assert "vocal_contract" in names
+
+
+# ── ADR-0248 gated 变体：工具使用指南消除「文本直出」冲突 ────────────
+
+
+def test_react_tool_usage_direct_keeps_base_guidelines() -> None:
+    """direct 模式：基础指南原样（含 reply with text directly）。"""
+    from lca.plugins.prompts.sections import build_react_tool_usage
+
+    section = build_react_tool_usage(type("_Cfg", (), {})())
+    out = section.render(role_profile=None, tools=())  # type: ignore[arg-type]
+    assert "reply with text directly" in out.text
+    assert "MUST call send_message" not in out.text
+
+
+def test_react_tool_usage_gated_switches_to_gated_variant() -> None:
+    """gated 模式：返回去冲突变体（强制 send_message，无文本直出）。"""
+    from lca.plugins.prompts.sections import build_react_tool_usage
+
+    section = build_react_tool_usage(type("_Cfg", (), {})())
+    token = set_capability_bindings(BindingsViewBuilder(vocal_mode="gated"))
+    try:
+        out = section.render(role_profile=None, tools=())  # type: ignore[arg-type]
+    finally:
+        reset_capability_bindings(token)
+
+    assert "reply with text directly" not in out.text
+    assert "MUST call send_message" in out.text
+
+
+def test_react_tool_usage_gated_variant_comes_from_resource_file() -> None:
+    """gated 变体正文来自 .md 资源文件。"""
+    from lca.cognition.brain.prompts._loader import load_builtin_prompt
+
+    text = load_builtin_prompt("react_tool_usage_guidelines_gated")
+    assert "MUST call send_message" in text
+    assert "reply with text directly" not in text

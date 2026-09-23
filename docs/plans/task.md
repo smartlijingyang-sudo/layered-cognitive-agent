@@ -222,5 +222,6 @@
 | ADR248-SECTION-VOCAL-CONTRACT | 正规机制：新增 vocal_contract prompt section（Config 驱动、模板注册），替代硬编码注入 | Completed | 按 LCA prompt section 架构实现：REGISTERED_PROMPT_SECTION_NAMES 闭集扩展、sections.py 注册 stateful section、template_provider 内建模板引用；gated 渲染契约+Reply-First 提醒、direct 零侵入 |
 | ADR248-SECTION-RESOURCE | 提示词正文放入 .md 资源文件（非 Python 硬编码） | Completed | 新增 lca/cognition/brain/prompts/vocal_contract.md 与 reply_first_reminder.md，section 经 load_builtin_prompt 加载；profile 仍可用 instruction_overrides 覆盖 |
 | ADR248-SECTION-REGRESSION | 声带契约 section 全量回归与门禁 | Completed | 新增 tests/unit/plugins/prompts/test_vocal_contract_section.py（gated/acked/direct/资源文件/模板引用 6 项）；ADR-0248 全链路相关 190/191 通过（唯一失败为既有环境相关 test_companion_rpc_system_info）；ruff/format/diff 门禁全绿 |
+| ADR248-GUIDELINES-GATED | 消除基础指南与声带契约的指令冲突（reply with text directly） | Completed | 新增 react_tool_usage_guidelines_gated.md 资源变体，ReactToolUsageSection 在 gated 模式返回强制 send_message 的指南（移除「文本直出」），direct 模式保持原样；新增 3 项测试 |
 
 
