@@ -44,6 +44,7 @@ def summary_for_session(session: RunSession) -> dict[str, Any]:
         "agent": {"id": session.agent.agent_id, "name": session.agent.name},
         "question": session.question,
         "error": session.error,
+        "output": session.output,
     }
     if session.approval_request is not None:
         payload["approval_request"] = session.approval_request

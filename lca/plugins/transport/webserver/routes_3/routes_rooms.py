@@ -130,6 +130,7 @@ async def _read_run_status(request: Request, run_id: str) -> RunOutcome:
     return RunOutcome(
         status=str(summary.get("status") or summary.get("session_status") or "unknown"),
         error=str(summary.get("error") or ""),
+        output=str(summary.get("output") or ""),
     )
 
 

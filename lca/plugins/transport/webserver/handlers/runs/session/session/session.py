@@ -83,6 +83,7 @@ class RunSession:
     agent: AgentRef = field(default_factory=default_agent_ref)
     status: RunLifecycleStatus = RunLifecycleStatus.PENDING
     error: str = ""
+    output: str = ""  # terminal conclusion text (Result.output), persisted at run end
     task: asyncio.Task[Any] | None = None
     cancel_requested: bool = False
     # P3-06: snapshot/runnable are process-local resume cache, not SSOT.

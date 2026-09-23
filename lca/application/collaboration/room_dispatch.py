@@ -57,6 +57,7 @@ class RunOutcome:
 
     status: str
     error: str = ""
+    output: str = ""
 
 
 class RunStarter(Protocol):
@@ -214,11 +215,12 @@ class RoomDispatcher:
     ) -> RoomMessage:
         """Build and append a FOLDED fact from a run's terminal outcome."""
         completed = outcome.status == "completed"
-        verdict = (
-            f"run {started.run_id} 已完成"
-            if completed
-            else f"run {started.run_id} 结束: {outcome.error or outcome.status}"
-        )
+        if completed and outcome.output:
+            verdict = outcome.output
+        elif completed:
+            verdict = f"run {started.run_id} 已完成"
+        else:
+            verdict = f"run {started.run_id} 结束: {outcome.error or outcome.status}"
         folded = PeerFoldedResult(
             task_id=started.correlation_id,
             synthesized_verdict=verdict,

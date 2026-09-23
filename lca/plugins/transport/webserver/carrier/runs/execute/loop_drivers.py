@@ -117,6 +117,10 @@ class CognitiveRunDriver:
             if isinstance(runnable, Agent)
             else await runnable.run(question)
         )
+        # Persist the full conclusion text on the session so the room fold and
+        # other after-the-fact readers can reproduce the run's verdict without
+        # re-running the agent. ``Result.output`` is the final answer.
+        session.output = result.output or ""
         if result.status == TaskStatus.INPUT_REQUIRED:
             return DriverOutcome(
                 success=False,
