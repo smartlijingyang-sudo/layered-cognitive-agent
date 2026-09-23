@@ -131,6 +131,7 @@ class ModularBrain(Brain):
             reducer=self.reducer,
             think_pipeline=self._think_pipeline,
             reflection_pipeline=self._reflection_pipeline,
+            role_profile=self.role_profile,
         )
 
 
