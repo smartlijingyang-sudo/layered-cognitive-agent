@@ -33,6 +33,10 @@ from lca.contracts.protocols.runtime.infra.infra import Tool
 
 __all__ = ["filter_tools_by_assistant"]
 
+# ADR-0248 平台声带系统工具：gated 模式下唯一对外发声通道，不受 assistant
+# tools.yaml/grants.yaml 策略过滤（否则「模型看得到但 body 未注册」）。
+_VOCAL_SYSTEM_TOOLS: frozenset[str] = frozenset({"send_message"})
+
 _ToolSet: TypeAlias = tuple[Tool, ...]
 
 
@@ -81,6 +85,9 @@ def filter_tools_by_assistant(
                 kept.append(tool)
             continue
         if not allow or bool(keys & allow):
+            kept.append(tool)
+        elif bool(keys & _VOCAL_SYSTEM_TOOLS):
+            # 声带系统工具始终保留（gated 唯一发声通道，见模块 docstring）。
             kept.append(tool)
     return tuple(kept)
 

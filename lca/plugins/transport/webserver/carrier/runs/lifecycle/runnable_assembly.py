@@ -104,6 +104,12 @@ class CognitiveRunnableAssembler:
                 machine_resolver=request.machine_resolver,
                 assistant_id=assistant_id,
                 home_path=home_path,
+                # ADR-0248：共享 execution_environment 创建的 gate/审查配置，
+                # 让 send_message 在组合期进入 body 可执行注册表。
+                vocal_mode=str(getattr(request.session, "vocal_mode", "direct") or "direct"),
+                vocal_gate=getattr(request.session, "vocal_gate", None),
+                auto_review_mode=str(getattr(request.session, "auto_review_mode", "off") or "off"),
+                auto_review_gate=getattr(request.session, "auto_review_gate", None),
             ),
             role_profile=_role_profile_for_assistant(
                 request.scope, assistant_id, home_path=home_path
@@ -199,12 +205,19 @@ def tools_from_scope(
     machine_resolver: MachineResolver | None = None,
     assistant_id: str = "",
     home_path: str | None = None,
+    vocal_mode: str = "direct",
+    vocal_gate: object | None = None,
+    auto_review_mode: str = "off",
+    auto_review_gate: object | None = None,
 ) -> tuple[Tool, ...]:
     """Materialize tools from the booted tools seam; missing seams fail loudly.
 
     With a non-empty ``assistant_id`` the materialized set is narrowed by the
     assistant Home's ``tools.yaml`` / ``grants.yaml`` (ADR-0242 D4 / I-B3);
     the legacy no-assistant path returns the full set unchanged (I-B8).
+
+    ADR-0248: gated 模式经 ``send_message`` 工具工厂物化出声带工具（进入 body
+    可执行注册表）；``auto_review_mode != "off"`` 时所有工具包 AutoReview 硬闸。
     """
 
     if scope is None:
@@ -227,8 +240,22 @@ def tools_from_scope(
         machine_resolver=machine_resolver,
         assistant_id=assistant_id.strip(),
         home_path=home_path,
+        vocal_mode=vocal_mode,
+        vocal_gate=vocal_gate,
+        auto_review_mode=auto_review_mode,
+        auto_review_gate=auto_review_gate,
     ).build()
     tools = tuple(require_capability(scope, "tools").materialize(view))
+    # ADR-0248：AutoReview 硬闸在组合期包装，确保 body 执行时真的过闸。
+    if auto_review_mode != "off" and auto_review_gate is not None:
+        from typing import cast
+
+        from lca.infrastructure.auto_review.gate import AutoReviewGate
+        from lca.infrastructure.auto_review.wrapped_tool import AutoReviewWrappedTool
+
+        tools = tuple(
+            AutoReviewWrappedTool(tool, cast("AutoReviewGate", auto_review_gate)) for tool in tools
+        )
     assistant_id = assistant_id.strip()
     if not assistant_id:
         return tools

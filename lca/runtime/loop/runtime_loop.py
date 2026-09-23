@@ -225,15 +225,38 @@ class CognitiveRuntime(Runtime):
                 origin = (ctx.extra or {}).get("origin", "user")
                 auto_review_mode = (ctx.extra or {}).get("auto_review_mode", "off")
 
-            from lca.application.vocal.runtime_wiring import resolve_runtime_vocal
-            from lca.contracts.models.vocal.models import VocalMode
-
-            vocal_ctx = resolve_runtime_vocal(
-                vocal_mode=vocal_mode,
-                operation_id=trace_id,
-                wake_source=wake_source,
-                wake_context=wake_context,
+            from lca.application.vocal.runtime_wiring import (
+                RuntimeVocalContext,
+                resolve_runtime_vocal,
             )
+            from lca.contracts.models.vocal.models import VocalMode
+            from lca.infrastructure.runtime_plane.capability_bindings import (
+                current_bindings_view,
+            )
+            from lca.infrastructure.vocal.settle_guard import VocalSettleGuard
+
+            # 复用 carrier 在组合期创建的共享 gate（同一实例负责投递与结算）。
+            # 若存在，不新建 gate，保证 body 的 send_message 工具投递到同一个门控。
+            existing_view = current_bindings_view()
+            existing_gate = (
+                getattr(existing_view, "vocal_gate", None) if existing_view is not None else None
+            )
+            if (
+                existing_gate is not None
+                and getattr(existing_view, "vocal_mode", "direct") == VocalMode.GATED.value
+            ):
+                vocal_ctx = RuntimeVocalContext(
+                    mode=VocalMode.GATED,
+                    gate=existing_gate,  # type: ignore[arg-type]
+                    settle_guard=VocalSettleGuard(existing_gate),  # type: ignore[arg-type]
+                )
+            else:
+                vocal_ctx = resolve_runtime_vocal(
+                    vocal_mode=vocal_mode,
+                    operation_id=trace_id,
+                    wake_source=wake_source,
+                    wake_context=wake_context,
+                )
             if vocal_ctx.mode == VocalMode.GATED:
                 self._bindings = self._bindings.with_vocal_gate(vocal_ctx.gate)
 

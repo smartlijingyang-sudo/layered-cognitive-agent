@@ -229,3 +229,39 @@ async def test_profile_runtime_to_gated_run_full_chain() -> None:
     gate = bindings.capabilities["vocal_gate"]
     assert isinstance(gate, GatedVocalGate)
     assert [v["content"] for v in gate.get_visible_outputs()] == ["已完成配置排查。"]
+
+
+@pytest.mark.asyncio
+async def test_runtime_loop_reuses_carrier_gate_instance() -> None:
+    """runtime loop 复用 carrier 在 bindings 中发布的 gate，不新建实例。
+
+    确保 body 的 send_message 投递与 settle 结算使用同一门控对象。
+    """
+    from lca.infrastructure.runtime_plane.capability_bindings import (
+        BindingsViewBuilder,
+        reset_capability_bindings,
+        set_capability_bindings,
+    )
+    from lca.infrastructure.vocal.gate import GatedVocalGate
+
+    session = Session("test-gate-reuse")
+    set_publish_session(cast("Any", session))
+
+    captured_states: list[AgentState] = []
+    bindings = _Bindings(captured_states)
+    runtime = CognitiveRuntime(cast("Any", bindings))
+
+    shared_gate = GatedVocalGate("op_shared")
+    token = set_capability_bindings(BindingsViewBuilder(vocal_mode="gated", vocal_gate=shared_gate))
+    ctx = RunContext(trace_id="trace-gate-reuse", session_id="s3")
+
+    try:
+        result = await runtime.run(task="共享 gate 测试", ctx=ctx)
+    finally:
+        reset_capability_bindings(token)
+        reset_publish_session(None)
+
+    assert result.status == TaskStatus.COMPLETED
+    used_gate = bindings.capabilities.get("vocal_gate")
+    assert used_gate is shared_gate
+    assert [v["content"] for v in shared_gate.get_visible_outputs()] == ["已完成配置排查。"]

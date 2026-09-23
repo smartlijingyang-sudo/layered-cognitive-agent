@@ -52,3 +52,26 @@ def test_plain_text_never_visible_without_send_message() -> None:
     gate = GatedVocalGate("op_4")
     gate.handle_text_chunk("Internal scratchpad introspection")
     assert len(gate.get_visible_outputs()) == 0
+
+
+def test_send_message_factory_materializes_only_when_gated() -> None:
+    """ADR-0248：send_message 工具工厂仅在 gated bindings 下物化。"""
+    from lca.contracts.models.cognition.boundary import BindingsView
+    from lca.infrastructure.capability.tools.tools import ToolsService
+
+    service = ToolsService()
+    gate = GatedVocalGate("op_factory")
+    service.register_factory(
+        "send_message",
+        lambda b: (
+            SendMessageVocalTool(gate) if getattr(b, "vocal_mode", "direct") == "gated" else None
+        ),
+    )
+
+    # direct 模式不物化
+    direct_tools = service.materialize(BindingsView())
+    assert [t.name for t in direct_tools if t.name == "send_message"] == []
+
+    # gated 模式物化 send_message
+    gated_tools = service.materialize(BindingsView(vocal_mode="gated", vocal_gate=gate))
+    assert any(t.name == "send_message" for t in gated_tools)

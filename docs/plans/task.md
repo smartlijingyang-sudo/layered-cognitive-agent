@@ -223,5 +223,8 @@
 | ADR248-SECTION-RESOURCE | 提示词正文放入 .md 资源文件（非 Python 硬编码） | Completed | 新增 lca/cognition/brain/prompts/vocal_contract.md 与 reply_first_reminder.md，section 经 load_builtin_prompt 加载；profile 仍可用 instruction_overrides 覆盖 |
 | ADR248-SECTION-REGRESSION | 声带契约 section 全量回归与门禁 | Completed | 新增 tests/unit/plugins/prompts/test_vocal_contract_section.py（gated/acked/direct/资源文件/模板引用 6 项）；ADR-0248 全链路相关 190/191 通过（唯一失败为既有环境相关 test_companion_rpc_system_info）；ruff/format/diff 门禁全绿 |
 | ADR248-GUIDELINES-GATED | 消除基础指南与声带契约的指令冲突（reply with text directly） | Completed | 新增 react_tool_usage_guidelines_gated.md 资源变体，ReactToolUsageSection 在 gated 模式返回强制 send_message 的指南（移除「文本直出」），direct 模式保持原样；新增 3 项测试 |
+| ADR248-EXEC-FACTORY | 根因修复：send_message 变成工具工厂，在组合期进入 body 可执行注册表 | Completed | 在 execution_environment 提前创建共享 GatedVocalGate/AutoReviewGate，注册 send_message 工厂；tools_from_scope/materialize 阶段物化进 spec.tools（body 注册表），runtime loop 复用同一 gate；修复「模型看得到但执行时未注册工具」 |
+| ADR248-EXEC-FILTER | 声带系统工具豁免 assistant 工具策略过滤 | Completed | filter_tools_by_assistant 对 send_message 始终保留（tools.yaml allow 未列出也不过滤），否则组合期被工具策略剔除导致批次执行失败 |
+| ADR248-EXEC-VERIFY | 真实 run 验证：模型调用 send_message 且批次执行成功 | Completed | 真实 gated run（产品大脑）中模型正确调用 send_message（content/type=text），body.tool.execute.end outcome=success，run 成功完成；ADR-0248 全链路相关 235/236 通过（唯一失败为既有环境相关 test_companion_rpc_system_info） |
 
 

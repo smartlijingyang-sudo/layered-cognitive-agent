@@ -254,8 +254,13 @@ class ToolForkDispatchExecutor:
         # 子代理物理禁声：send_message 绝不进入子代理工具集（ADR-0248 §5.3）。
         if origin == "subagent":
             items = tuple(VocalToolFilter().filter_tool_objects(items, origin="subagent"))
-        # gated 模式主协调者自动追加 send_message 唯一声带工具。
-        elif vocal_mode == "gated" and vocal_gate is not None:
+        # gated 模式主协调者追加 send_message 唯一声带工具。若组合期工厂已
+        # 物化（assistant profile 路径），跳过，避免重复 schema。
+        elif (
+            vocal_mode == "gated"
+            and vocal_gate is not None
+            and not any(getattr(tool, "name", "") == "send_message" for tool in items)
+        ):
             from lca.contracts.protocols.vocal.protocol import VocalGateProtocol
             from lca.infrastructure.vocal.tool_adapter import SendMessageVocalTool
 

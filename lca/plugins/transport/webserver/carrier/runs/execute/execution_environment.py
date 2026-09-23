@@ -192,6 +192,43 @@ class RunExecutionEnvironment:
             try:
                 spec = _assistant_spec_for_run(self._ctx, assistant_id)
                 home_path = spec.home_path if spec is not None else None
+                tools_service = require_capability(self._ctx, "tools")
+                # ADR-0248: 在组合前解析 assistant 声带/审查配置并创建共享 gate，
+                # 注册 send_message 工具工厂，使该工具在 materialize 阶段就进入
+                # body 的可执行工具注册表（此前只在 fork 节点追加到模型可见列表，
+                # 导致「模型看得到但执行时未注册工具」）。
+                from lca.contracts.models.auto_review.models import (
+                    AutoReviewMode as AutoReviewModeEnum,
+                )
+                from lca.contracts.models.vocal.models import VocalMode
+                from lca.infrastructure.auto_review.gate import AutoReviewGate
+                from lca.infrastructure.vocal.gate import GatedVocalGate
+                from lca.infrastructure.vocal.tool_adapter import SendMessageVocalTool
+
+                profile_runtime = spec.profile_runtime if spec is not None else {}
+                vocal_mode = str(profile_runtime.get("vocal_mode", "direct"))
+                auto_review_mode = str(profile_runtime.get("auto_review_mode", "off"))
+                vocal_gate = None
+                auto_review_gate = None
+                send_message_factory_disposer = None
+                if vocal_mode == VocalMode.GATED.value:
+                    vocal_gate = GatedVocalGate(operation_id=str(session.run_id))
+                    if auto_review_mode != "off":
+                        auto_review_gate = AutoReviewGate(mode=AutoReviewModeEnum(auto_review_mode))
+
+                    def _send_message_factory(bindings: object) -> object | None:
+                        if getattr(bindings, "vocal_mode", "direct") != VocalMode.GATED.value:
+                            return None
+                        return SendMessageVocalTool(vocal_gate)  # type: ignore[arg-type]
+
+                    send_message_factory_disposer = tools_service.register_factory(
+                        "send_message", _send_message_factory
+                    )
+                # 共享给 runnable_assembly（组合 body 工具注册表）与 runtime loop。
+                session.vocal_mode = vocal_mode  # type: ignore[attr-defined]
+                session.vocal_gate = vocal_gate  # type: ignore[attr-defined]
+                session.auto_review_mode = auto_review_mode  # type: ignore[attr-defined]
+                session.auto_review_gate = auto_review_gate  # type: ignore[attr-defined]
                 bindings_view = BindingsViewBuilder(
                     file_store=providers.file_store,
                     bindings=bindings,
@@ -204,8 +241,16 @@ class RunExecutionEnvironment:
                     mode=(getattr(session, "mode", "") or "solo").strip() or "solo",
                     assistant_id=assistant_id,
                     home_path=home_path,
+                    vocal_mode=vocal_mode,
+                    vocal_gate=vocal_gate,
+                    auto_review_mode=auto_review_mode,
+                    auto_review_gate=auto_review_gate,
+                    origin="user",
+                    box_accessor=__import__(
+                        "lca.infrastructure.computer.box_accessor",
+                        fromlist=["BoxAccessor"],
+                    ).BoxAccessor(),
                 )
-                tools_service = require_capability(self._ctx, "tools")
                 # Hot-resume cache (same class as session.ambit): the HIL
                 # resume task has no execution environment, so it
                 # re-publishes these handles instead of re-resolving.
@@ -245,6 +290,8 @@ class RunExecutionEnvironment:
                             workspace=workspace,
                         )
             finally:
+                if send_message_factory_disposer is not None:
+                    send_message_factory_disposer()
                 if capability_token is not None:
                     reset_capability_bindings(capability_token)
                 if tools_token is not None:

@@ -242,3 +242,21 @@ class TestToolsFromScopeFiltersByAssistant:
         mcp_tool = _tool("mcp__aws-mcp__aws_privileged", required_grant="aws.admin")
         result = filter_tools_by_assistant([mcp_tool], home)
         assert [t.name for t in result] == ["mcp__aws-mcp__aws_privileged"]
+
+
+class TestVocalSystemToolExempt:
+    def test_send_message_kept_even_when_not_in_allow(self, home: Path) -> None:
+        """ADR-0248：send_message 是平台声带系统工具，不在 tools.yaml allow
+        中也必须保留（否则 gated 模式模型看得到但 body 未注册）。"""
+        _write_tools(home, allow=["readFile"], deny=[])
+        tools = [_tool("readFile"), _tool("send_message")]
+        result = filter_tools_by_assistant(tools, home)
+        names = [t.name for t in result]
+        assert "send_message" in names
+        assert "readFile" in names
+
+    def test_send_message_still_denied_when_explicitly_denied(self, home: Path) -> None:
+        """deny 仍然优先：显式 deny send_message 则移除。"""
+        _write_tools(home, allow=[], deny=["send_message"])
+        result = filter_tools_by_assistant([_tool("send_message")], home)
+        assert result == ()
