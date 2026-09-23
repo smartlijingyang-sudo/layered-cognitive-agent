@@ -65,6 +65,7 @@ class _FakeRunPort:
             "agent": {"id": "solo", "name": "助手"},
             "question": "",
             "error": "",
+            "output": "完整结论文本",
         }
 
 
@@ -175,6 +176,7 @@ def test_post_message_dispatches_run(client: TestClient):
     messages = client.get("/v1/rooms/room_1/messages").json()["messages"]
     assert [m["kind"] for m in messages] == ["user", "run_started", "folded"]
     assert messages[2]["payload"]["consensus_status"] == "unanimous"
+    assert messages[2]["content"] == "完整结论文本"
 
 
 def test_post_message_unknown_room_returns_404(client: TestClient):

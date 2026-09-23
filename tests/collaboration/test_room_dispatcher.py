@@ -231,6 +231,30 @@ async def test_sync_completed_appends_folded_for_completed_run():
 
 
 @pytest.mark.asyncio
+async def test_sync_completed_uses_full_output_as_verdict():
+    from lca.application.collaboration.room_dispatch import RunOutcome
+
+    repo = _FakeRoomRepository({_room().room_id: _room()})
+    store = _FakeMessageStore()
+    starter = _RecordingRunStarter()
+    dispatcher = _dispatcher_with_status(
+        repo,
+        store,
+        starter,
+        _FakeRunStatusReader(RunOutcome(status="completed", output="完整结论文本")),
+    )
+    await dispatcher.dispatch("room_1", "hello")
+
+    appended = await dispatcher.sync_completed("room_1")
+
+    assert len(appended) == 1
+    folded = appended[0]
+    assert folded.kind == RoomMessageKind.FOLDED
+    assert folded.content == "完整结论文本"
+    assert folded.payload["consensus_status"] == "unanimous"
+
+
+@pytest.mark.asyncio
 async def test_sync_completed_is_idempotent():
     from lca.application.collaboration.room_dispatch import RunOutcome
 

@@ -86,6 +86,7 @@ class _FakeRunPort:
             "agent": {"id": "solo", "name": "助手"},
             "question": "",
             "error": "",
+            "output": "完整结论文本",
         }
 
 
@@ -158,3 +159,4 @@ def test_room_api_closed_loop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     assert transcript[1]["sender_id"] == "coordinator_sam"
     assert transcript[1]["payload"]["selected_peers"] == ["coordinator_sam"]
     assert transcript[2]["payload"]["consensus_status"] == "unanimous"
+    assert transcript[2]["content"] == "完整结论文本"
