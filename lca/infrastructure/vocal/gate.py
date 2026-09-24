@@ -35,6 +35,9 @@ class DirectVocalGate(VocalGateProtocol):
     def is_awaiting_widget(self) -> bool:
         return False
 
+    def reset_awaiting_widget(self) -> None:
+        pass
+
     def get_visible_outputs(self) -> list[dict[str, Any]]:
         return list(self._visible)
 
@@ -114,6 +117,10 @@ class GatedVocalGate(VocalGateProtocol):
 
     def is_awaiting_widget(self) -> bool:
         return self._awaiting_widget
+
+    def reset_awaiting_widget(self) -> None:
+        """重置 widget 停等标记（在用户回复 resume 后调用）。"""
+        self._awaiting_widget = False
 
     def get_visible_outputs(self) -> list[dict[str, Any]]:
         return list(self._visible)

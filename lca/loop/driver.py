@@ -160,11 +160,35 @@ def _paused_outcome_parts(pause: dict, *, plan_ref: str, visits: tuple) -> tuple
     decision = pause.get("decision")
     tool_calls = getattr(decision, "tool_calls", None) or []
     for call in tool_calls if isinstance(tool_calls, (list, tuple)) else []:
-        if getattr(call, "tool_name", None) != "askUserQuestion":
-            continue
+        tname = getattr(call, "tool_name", None)
         arguments = getattr(call, "arguments", None)
-        if isinstance(arguments, dict) and isinstance(arguments.get("questions"), list):
+        if (
+            tname == "askUserQuestion"
+            and isinstance(arguments, dict)
+            and isinstance(arguments.get("questions"), list)
+        ):
             questions = arguments["questions"]
+            break
+        if (
+            tname == "send_message"
+            and isinstance(arguments, dict)
+            and arguments.get("type") in ("widget", "secret_request")
+        ):
+            content = arguments.get("content") or "请选择："
+            opts = arguments.get("options") or []
+            formatted_opts = []
+            for opt in opts:
+                if isinstance(opt, dict):
+                    formatted_opts.append(opt.get("label") or opt.get("id") or str(opt))
+                else:
+                    formatted_opts.append(str(opt))
+            questions = [
+                {
+                    "question": content,
+                    "options": formatted_opts,
+                    "is_multi_select": False,
+                }
+            ]
             break
     approval_request: dict[str, object] = {
         "approval_id": approval_id,
@@ -279,7 +303,7 @@ class DeclarativeExecution:
         from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
             ExecutionOutcome,
         )
-        from lca.framework.graph.adapter import PhaseRunCursor as _PRC
+        from lca.framework.graph.adapter import PhaseRunCursor
 
         output_ports = dict(interpretation.output or {})
 
@@ -303,7 +327,7 @@ class DeclarativeExecution:
         else:
             cursor_obj = interpretation.terminal_node
             _cursor_value = (
-                _PRC(current_node_id=cursor_obj, visited_nodes=()) if cursor_obj else None
+                PhaseRunCursor(current_node_id=cursor_obj, visited_nodes=()) if cursor_obj else None
             )
             if stop_decision.failure is not None or stop_decision.reason is StopReason.ERROR:
                 _kind = ExecutionOutcome.FAILED

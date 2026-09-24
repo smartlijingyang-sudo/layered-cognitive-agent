@@ -126,7 +126,15 @@ def requires_human_input(tool_calls: object) -> bool:
     """
     if not isinstance(tool_calls, (list, tuple)):
         return False
-    return any(getattr(call, "tool_name", None) in HITL_TOOL_NAMES for call in tool_calls)
+    for call in tool_calls:
+        name = getattr(call, "tool_name", None)
+        if name in HITL_TOOL_NAMES:
+            return True
+        if name == "send_message":
+            args = getattr(call, "arguments", None)
+            if isinstance(args, dict) and args.get("type") in ("widget", "secret_request"):
+                return True
+    return False
 
 
 @dataclass

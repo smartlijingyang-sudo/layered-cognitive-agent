@@ -23,6 +23,10 @@ class VocalGateProtocol(Protocol):
         """当前轮次是否正等待 Widget 用户选择。"""
         ...
 
+    def reset_awaiting_widget(self) -> None:
+        """重置 Widget 停等标记（在用户回复 resume 后调用）。"""
+        ...
+
 
 @runtime_checkable
 class VocalStrategy(Protocol):
