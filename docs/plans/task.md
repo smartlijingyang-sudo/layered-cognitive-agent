@@ -254,5 +254,13 @@
 | DASHBOARD-OPT-TASK-2 | 前端集群聚合配额池与 Uptime 心跳健康微条组件 (static/index.html) | Completed | 顶部装配全集群算力总览 (ClusterAggregateBar)，账号卡片与迷你矩阵卡片装配 Uptime 心跳微条 (HeartbeatBar) 带延迟 Tooltip 与状态自适应着色 |
 | DASHBOARD-OPT-TASK-3 | 原生 SVG 双环形微仪表、全局快捷键系统与一键复制动效 (static/index.html) | Completed | 落地纯 SVG 双环形微仪表 (Gemini/Claude 5h)，实现全局快捷键 (1-4切Tab、R立即刷新、输入框智能保护)，卡片命令与tmux会话增加一键复制与Toast |
 | DASHBOARD-OPT-TASK-4 | 服务平滑重启与端到端回归验证 (端口 1888) | Completed | ./start.sh 平滑重启成功，E2E 验证 HTML 结构、Auth 登录、/api/quota 实时聚合与心跳探测全链路 8/8 账号 100% 通过 (4/4 自动化单测通过) |
+| EVERYTHING-TASK-1-SKELETON | 初始化 ~/everything-library Git 仓库与标准目录骨架 | Pending | 待执行 |
+| EVERYTHING-TASK-2-MODELS-STORE | 数据契约与 MarkdownFrontmatter 读写引擎 [INV-01] | Pending | 待执行 |
+| EVERYTHING-TASK-3-INDEX-FTS | SQLite FTS5 全文检索投影引擎 [INV-02] | Pending | 待执行 |
+| EVERYTHING-TASK-4-AUTH-SECURITY | 认证模块与安全门禁（密码 lichao12） [INV-03] | Pending | 待执行 |
+| EVERYTHING-TASK-5-API-EXPORT | RESTful API 与 Awesome 格式导出端点 [INV-04] | Pending | 待执行 |
+| EVERYTHING-TASK-6-WEB-UI | 现代响应式 Web UI、深浅色模式与分类/状态交互 | Pending | 待执行 |
+| EVERYTHING-TASK-7-SEED-RUNSH | 种子数据注入与一键管理脚本 run.sh（端口 1889） | Pending | 待执行 |
+| EVERYTHING-TASK-8-E2E-DELIVERY | 全链路端到端集成验证与服务交付 | Pending | 待执行 |
 
 
