@@ -241,9 +241,10 @@
 | GROKBOT-PROD-BRAINSTORM-DESIGN-SECTIONS | 步骤 4：逐步呈现分节设计规范（Owns/Does NOT own/不变量断言）并呈批 | Completed | 全部 4 节设计规范（拓扑与边界、声带与沙箱、浏览器与例程、状态机与不变量）全部获用户审核批准 |
 | GROKBOT-PROD-BRAINSTORM-DESIGN-DOC | 步骤 5：沉淀正式设计文档至 docs/plans/ 并提交 git | Completed | 已沉淀 docs/plans/2026-09-24-grok-bot-production-alignment-design.md 并完成 git 提交 (commit 8b4405e91) |
 | GROKBOT-PROD-BRAINSTORM-TRANSITION | 步骤 6：转换至实施计划制定（writing-plans） | Completed | 已沉淀详细实施计划 docs/plans/2026-09-24-grok-bot-production-alignment-plan.md 并提交 git |
-| GROK-ALIGN-TASK-1-CONTRACTS | Task 1：契约模型层健全（Routine, Browser, Widget & Secret Models） | Pending | 待执行 |
-| GROK-ALIGN-TASK-2-STREAM-DELIVERY | Task 2：P0 认知流截流与声带气泡真实交付（Streaming Interception & Bubble Delivery） | Pending | 待执行 |
-| GROK-ALIGN-TASK-3-WIDGET-RESUME | Task 3：P0 Widget 停等状态机与前端选项卡闭环（Widget Stop-and-Wait） | Pending | 待执行 |
+| GROK-ALIGN-TASK-1-CONTRACTS | Task 1：契约模型层健全（Routine, Browser, Widget & Secret Models） | Completed | 落地 RoutineSpec, SpendBudget, BrowserAction, DesktopLock 不可变契约，tests/contracts/ 7/7 passed (commit d26b26f45) |
+| GROK-ALIGN-TASK-2-STREAM-DELIVERY | Task 2：P0 认知流截流与声带气泡真实交付（Streaming Interception & Bubble Delivery） | Completed | 落地 llm_turn/executor.py 流式 chunk 截流至 GatedVocalGate scratchpad，send_message 向 Session 权威追加 vocal.message.delivered 事实事件（visibility=user），TerminalResultProjection 支持从 gate 提取交付气泡文本；tests/infrastructure/vocal/ 27/27 测试全数通过，ruff clean |
+
+| GROK-ALIGN-TASK-3-WIDGET-RESUME | Task 3：P0 Widget 停等状态机与前端选项卡闭环（Widget Stop-and-Wait） | In Progress | 正在落地 runtime_loop is_awaiting_widget 挂起与交互选项卡组件恢复闭环 |
 | GROK-ALIGN-TASK-4-CONTAINER-BOX | Task 4：P1 员工机安全容器沙箱化（BoxExecutionPort & Sandbox Adapter） | Pending | 待执行 |
 | GROK-ALIGN-TASK-5-BROWSER-SUBAGENT | Task 5：P2 浏览器控制与单屏互斥锁（Browser Subagent & Desktop Lock） | Pending | 待执行 |
 | GROK-ALIGN-TASK-6-ROUTINE-ENGINE | Task 6：P3 声明式例程引擎与消费护栏（Routine Repository, Scheduler & Spend Guard） | Pending | 待执行 |

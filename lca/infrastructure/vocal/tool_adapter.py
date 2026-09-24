@@ -78,13 +78,32 @@ class SendMessageVocalTool(Tool):
                 payload=None,
                 error=err,
             )
+        content_val = args.get("content")
         receipt = self._inner.execute(
             type=str(args.get("type") or "text"),
-            content=args.get("content"),
+            content=content_val,
             options=args.get("options"),
             secret_key=args.get("secret_key"),
             reply_to_id=args.get("reply_to_id"),
         )
+        # 向 Session 追加不可变事实事件 (ADR-0248 §3.3 / ADR-0186 单轨)
+        from lca.infrastructure.session.bindings import resolve_session_reader
+
+        session = resolve_session_reader()
+        if session is not None and hasattr(session, "append"):
+            session.append(
+                "vocal.message.delivered",
+                {
+                    "message_id": receipt["message_id"],
+                    "vocal_type": receipt["vocal_type"],
+                    "content": content_val,
+                    "options": args.get("options"),
+                    "secret_key": args.get("secret_key"),
+                    "reply_to_id": args.get("reply_to_id"),
+                },
+                visibility="user",
+            )
+
         return Observation(
             observation_id=new_id("obs"),
             success=True,
@@ -92,6 +111,7 @@ class SendMessageVocalTool(Tool):
                 "status": "delivered",
                 "message_id": receipt["message_id"],
                 "vocal_type": receipt["vocal_type"],
+                "content": content_val,
                 "is_terminal_for_turn": receipt["is_terminal_for_turn"],
                 "requires_user_action": receipt["requires_user_action"],
             },

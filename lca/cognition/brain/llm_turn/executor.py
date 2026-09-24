@@ -74,6 +74,19 @@ async def execute_llm_turn(
     return await _stream_turn(llm, tools, prompt, step=step, llm_kwargs=llm_kwargs, state=state)
 
 
+def _handle_output_text_chunk(chunk: str) -> None:
+    """ADR-0248 唯一声道：gated 模式下文本散文截流进 scratchpad，抑制向前端直出。"""
+    from lca.infrastructure.runtime_plane.capability_bindings import current_bindings_view
+
+    view = current_bindings_view()
+    if view is not None and getattr(view, "vocal_mode", "direct") == "gated":
+        gate = getattr(view, "vocal_gate", None)
+        if gate is not None and hasattr(gate, "handle_text_chunk"):
+            gate.handle_text_chunk(chunk)
+            return
+    append_run_partial(chunk)
+
+
 async def _summarize_after_search(
     llm: LLMAdapter,
     tools: list[Tool],
@@ -90,7 +103,7 @@ async def _summarize_after_search(
             if event.type == LLMStreamEventType.OUTPUT_TEXT_DELTA:
                 chunk = event.text or ""
                 accumulated += chunk
-                append_run_partial(chunk)
+                _handle_output_text_chunk(chunk)
             elif event.type == LLMStreamEventType.COMPLETED and event.response is not None:
                 stream_response = event.response
                 break
@@ -125,7 +138,8 @@ async def _stream_turn(
         if event.type == LLMStreamEventType.OUTPUT_TEXT_DELTA:
             chunk = event.text or ""
             accumulated += chunk
-            append_run_partial(chunk)
+            _handle_output_text_chunk(chunk)
+
         elif event.type == LLMStreamEventType.FUNCTION_CALL_ARGUMENTS_DELTA:
             push_tool_call_stream(
                 tool_slots,

@@ -175,8 +175,28 @@ def _status_for_terminal_kind(kind: TerminalOutcomeKind) -> TaskStatus:
 def _terminal_output(terminal_outcome: TerminalOutcome) -> str | None:
     reference = terminal_outcome.final_output_ref
     if isinstance(reference, TextRef):
-        return str(reference.text)
-    return str(reference) if reference else None
+        text = str(reference.text)
+        if text.strip():
+            return text
+    elif reference:
+        text = str(reference)
+        if text.strip():
+            return text
+
+    # ADR-0248: 门控声带模式下，模型通过 send_message 发声，final_output_ref 可能为空。
+    # 此时从当前绑定的 vocal_gate 提取正式投递的可见气泡文本。
+    from lca.infrastructure.runtime_plane.capability_bindings import current_bindings_view
+
+    view = current_bindings_view()
+    if view is not None and getattr(view, "vocal_mode", "direct") == "gated":
+        gate = getattr(view, "vocal_gate", None)
+        if gate is not None and hasattr(gate, "get_visible_outputs"):
+            delivered_texts = [
+                str(v["content"]) for v in gate.get_visible_outputs() if v.get("content")
+            ]
+            if delivered_texts:
+                return "\n\n".join(delivered_texts)
+    return None
 
 
 __all__ = ["TerminalResultProjection"]
