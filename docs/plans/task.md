@@ -235,5 +235,9 @@
 | ADR-REMEDIATION-3-BOX-ATOMIC-FSYNC | 补齐 ADR-0251 Decision 1：BoxAccessor.write_text 采用临时文件写入、os.fsync 刷盘与 os.replace 原子替换，确保员工机持久化强一致 | Completed | BoxAccessor.write_text 实现 .tmp_uuid 临时文件、os.fsync(fh.fileno()) 强刷盘及 os.replace 原子提交；test_tool_batch_executor_runs_box_write_and_read 验证落盘数据与原子性 |
 | ADR-REMEDIATION-4-HYGIENE-LINT | 代码工程规范修复：消除 room_chat_panel.py 缺失文件尾换行 (W292) 与 execution_environment/tests 中无用 import/变量 | Completed | deploy/lobehub/patches/ui/room_chat_panel.py 补全换行，patch_lobehub.py 26/26 ok；execution_environment contextlib.suppress 规范化；ruff check 0 报错 |
 | ADR-REMEDIATION-5-FLOW-VERIFY | 全流程多层级测试闭环与关联套件回归（ADR-0246/0248/0250/0251 116/116 全通） | Completed | 新增 test_box_tools_assembly_flow.py 与 test_room_coordinator_wiring.py；116/116 关联单测与场景测试通过；git diff --check clean；严格遵守负边界（Does NOT own） |
-
-
+| GROKBOT-PROD-BRAINSTORM-CONTEXT | 步骤 1：深度排查项目上下文与 Grok Bot 生产级就绪全链路断点 | Completed | 已摸清流式截流悬空、消息未送达前端、Widget未中断、Box沙箱裸跑与例程调度缺失等核心断点 |
+| GROKBOT-PROD-BRAINSTORM-QUESTIONS | 步骤 2：针对生产化范围、技术路径与系统边界提出澄清问题（单步提问） | In Progress | 正在向用户发起技术演进与架构权衡决策澄清 |
+| GROKBOT-PROD-BRAINSTORM-APPROACHES | 步骤 3：提炼 2-3 种正规落地与系统架构方案并给出推荐 | Pending | 待执行 |
+| GROKBOT-PROD-BRAINSTORM-DESIGN-SECTIONS | 步骤 4：逐步呈现分节设计规范（Owns/Does NOT own/不变量断言）并呈批 | Pending | 待执行 |
+| GROKBOT-PROD-BRAINSTORM-DESIGN-DOC | 步骤 5：沉淀正式设计文档至 docs/plans/ 并提交 git | Pending | 待执行 |
+| GROKBOT-PROD-BRAINSTORM-TRANSITION | 步骤 6：转换至实施计划制定（writing-plans） | Pending | 待执行 |
