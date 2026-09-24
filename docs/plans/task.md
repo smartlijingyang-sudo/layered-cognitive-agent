@@ -245,8 +245,8 @@
 | GROK-ALIGN-TASK-2-STREAM-DELIVERY | Task 2：P0 认知流截流与声带气泡真实交付（Streaming Interception & Bubble Delivery） | Completed | 落地 llm_turn/executor.py 流式 chunk 截流至 GatedVocalGate scratchpad，send_message 向 Session 权威追加 vocal.message.delivered 事实事件（visibility=user），TerminalResultProjection 支持从 gate 提取交付气泡文本；tests/infrastructure/vocal/ 27/27 测试全数通过，ruff clean |
 
 | GROK-ALIGN-TASK-3-WIDGET-RESUME | Task 3：P0 Widget 停等状态机与前端选项卡闭环（Widget Stop-and-Wait） | Completed | 落地 runtime_loop.py is_awaiting_widget() 停等至 INPUT_REQUIRED 并挂载 approval_request，requires_human_input 支持 send_message widget/secret_request，GatedVocalGate 提供 reset_awaiting_widget() 恢复机制，落地 LobeHub 前端 WidgetCard.tsx 与 widget_card.py 补丁（25 ok）；tests/runtime/test_widget_stop_and_wait.py 3/3 passed，ruff clean |
-| GROK-ALIGN-TASK-4-CONTAINER-BOX | Task 4：P1 员工机安全容器沙箱化（BoxExecutionPort & Sandbox Adapter） | In Progress | 正在落地 BoxExecutionPort、Onlyboxes 容器沙箱适配器与安全越界阻断 |
-| GROK-ALIGN-TASK-5-BROWSER-SUBAGENT | Task 5：P2 浏览器控制与单屏互斥锁（Browser Subagent & Desktop Lock） | Pending | 待执行 |
+| GROK-ALIGN-TASK-4-CONTAINER-BOX | Task 4：P1 员工机安全容器沙箱化（BoxExecutionPort & Sandbox Adapter） | Completed | 落地 BoxExecutionPort 契约协议、LocalBoxAdapter（严格沙箱与提权阻断）与 OnlyboxesBoxAdapter（容器隔离沙箱），重构 BoxAccessor 与 BoxRunCommandTool 对接沙箱适配器消除宿主机裸跑；tests/infrastructure/ 18/18 测试全通，ruff clean |
+| GROK-ALIGN-TASK-5-BROWSER-SUBAGENT | Task 5：P2 浏览器控制与单屏互斥锁（Browser Subagent & Desktop Lock） | In Progress | 正在落地 DesktopLockManager 单屏互斥、BrowserSubagent 与浏览器操作工具集 |
 | GROK-ALIGN-TASK-6-ROUTINE-ENGINE | Task 6：P3 声明式例程引擎与消费护栏（Routine Repository, Scheduler & Spend Guard） | Pending | 待执行 |
 | GROK-ALIGN-TASK-7-E2E-REGRESSION | Task 7：全链路集成场景与架构门禁回归（Closed-Loop E2E & Pre-push Guards） | Pending | 待执行 |
 

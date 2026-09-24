@@ -212,6 +212,28 @@ class BoxRunCommandTool(Tool):
             return _failure(err, kind=FAILURE_KIND_VALIDATION)
         command = str(args["command"])
         timeout_s = int(args.get("timeout_s") or 30)
+
+        adapter = getattr(self._box, "adapter", None)
+        if adapter is not None and hasattr(adapter, "run_command"):
+            try:
+                res = await adapter.run_command(command, timeout_s=timeout_s)
+            except TimeoutError as exc:
+                return _failure(str(exc))
+            except PermissionError as exc:
+                return _failure(f"安全硬闸拦截：{exc}")
+            except Exception as exc:
+                return _failure(f"员工机命令执行失败：{exc}")
+            return Observation(
+                observation_id=new_id("obs"),
+                success=res.returncode == 0,
+                payload={
+                    "stdout": res.stdout,
+                    "stderr": res.stderr,
+                    "returncode": res.returncode,
+                },
+                error="" if res.returncode == 0 else f"exit code {res.returncode}",
+            )
+
         cwd = self._box.root_dir
 
         def _run() -> subprocess.CompletedProcess[str]:

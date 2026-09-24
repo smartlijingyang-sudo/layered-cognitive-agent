@@ -1,6 +1,7 @@
 import os
 import uuid
 from pathlib import Path
+from typing import Any
 
 from lca.contracts.models.computer.box import ComputerPlane
 
@@ -13,10 +14,20 @@ class BoxAccessor:
     严禁越出沙箱访问宿主机其它目录。
     """
 
-    def __init__(self, root_dir: str | Path = "/home/box") -> None:
+    def __init__(
+        self,
+        root_dir: str | Path = "/home/box",
+        adapter: Any | None = None,
+    ) -> None:
         self.root_dir = Path(root_dir).resolve()
         self.display_name = "我的电脑"
         self.plane = ComputerPlane.BOX
+        if adapter is not None:
+            self.adapter = adapter
+        else:
+            from lca.infrastructure.computer.box_sandbox_adapter import LocalBoxAdapter
+
+            self.adapter = LocalBoxAdapter(root_dir=self.root_dir)
 
     def resolve_path(self, subpath: str) -> Path:
         """解析并确保路径绝对不越出 /home/box 沙箱根目录。"""
