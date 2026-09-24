@@ -254,13 +254,13 @@
 | DASHBOARD-OPT-TASK-2 | 前端集群聚合配额池与 Uptime 心跳健康微条组件 (static/index.html) | Completed | 顶部装配全集群算力总览 (ClusterAggregateBar)，账号卡片与迷你矩阵卡片装配 Uptime 心跳微条 (HeartbeatBar) 带延迟 Tooltip 与状态自适应着色 |
 | DASHBOARD-OPT-TASK-3 | 原生 SVG 双环形微仪表、全局快捷键系统与一键复制动效 (static/index.html) | Completed | 落地纯 SVG 双环形微仪表 (Gemini/Claude 5h)，实现全局快捷键 (1-4切Tab、R立即刷新、输入框智能保护)，卡片命令与tmux会话增加一键复制与Toast |
 | DASHBOARD-OPT-TASK-4 | 服务平滑重启与端到端回归验证 (端口 1888) | Completed | ./start.sh 平滑重启成功，E2E 验证 HTML 结构、Auth 登录、/api/quota 实时聚合与心跳探测全链路 8/8 账号 100% 通过 (4/4 自动化单测通过) |
-| EVERYTHING-TASK-1-SKELETON | 初始化 ~/everything-library Git 仓库与标准目录骨架 | Pending | 待执行 |
-| EVERYTHING-TASK-2-MODELS-STORE | 数据契约与 MarkdownFrontmatter 读写引擎 [INV-01] | Pending | 待执行 |
-| EVERYTHING-TASK-3-INDEX-FTS | SQLite FTS5 全文检索投影引擎 [INV-02] | Pending | 待执行 |
-| EVERYTHING-TASK-4-AUTH-SECURITY | 认证模块与安全门禁（密码 lichao12） [INV-03] | Pending | 待执行 |
-| EVERYTHING-TASK-5-API-EXPORT | RESTful API 与 Awesome 格式导出端点 [INV-04] | Pending | 待执行 |
-| EVERYTHING-TASK-6-WEB-UI | 现代响应式 Web UI、深浅色模式与分类/状态交互 | Pending | 待执行 |
-| EVERYTHING-TASK-7-SEED-RUNSH | 种子数据注入与一键管理脚本 run.sh（端口 1889） | Pending | 待执行 |
-| EVERYTHING-TASK-8-E2E-DELIVERY | 全链路端到端集成验证与服务交付 | Pending | 待执行 |
+| EVERYTHING-TASK-1-SKELETON | 初始化 ~/everything-library Git 仓库与标准目录骨架 | Completed | 创建 ~/everything-library，初始化 main 分支，落盘 categories.yaml、.gitignore、README.md、requirements.txt 并完成初始提交（commit 7e399ac） |
+| EVERYTHING-TASK-2-MODELS-STORE | 数据契约与 MarkdownFrontmatter 读写引擎 [INV-01] | Completed | 实现 ItemSchema/CategorySchema 与 MarkdownStore，编写 test_models.py 与 test_markdown_store.py，5/5 单测 100% 通过，INV-01 往返保真度验证通过（commit c7c6ec7） |
+| EVERYTHING-TASK-3-INDEX-FTS | SQLite FTS5 全文检索投影引擎 [INV-02] | Completed | 实现 IndexStore（SQLite FTS5 + 主投影表），编写 test_index_store.py 覆盖查询、状态/分类/标签过滤、FTS5 全文检索与聚合统计，INV-02 投影一致性测试 100% 通过（commit 8985a0a） |
+| EVERYTHING-TASK-4-AUTH-SECURITY | 认证模块与安全门禁（密码 lichao12） [INV-03] | Completed | 实现 Settings 与 session 签名/验签/门禁依赖（require_auth_api / require_auth_web），编写 test_auth.py 验证未鉴权拦截、密码验证、Cookie防伪造与时效，INV-03 鉴权门禁单测 100% 通过（commit ec9191f） |
+| EVERYTHING-TASK-5-API-EXPORT | RESTful API 与 Awesome 格式导出端点 [INV-04] | Completed | 实现 /api/items CRUD、/api/categories、/api/stats 与 /api/export/awesome 端点，编写 test_api.py，INV-04 Awesome 格式导出与 RESTful API 测试 100% 通过（commit 5afdeac） |
+| EVERYTHING-TASK-6-WEB-UI | 现代响应式 Web UI、深浅色模式与分类/状态交互 | Completed | 实现 base.html、login.html、index.html（Tailwind+Lucide+深浅色+卡片/列表双视图+状态即时流转+录入编辑抽屉+FTS5即时搜索），编写 test_web.py 验证路由与模板渲染 100% 通过（commit 06d9cec） |
+| EVERYTHING-TASK-7-SEED-RUNSH | 种子数据注入与一键管理脚本 run.sh（端口 1889） | Completed | 注入 sindresorhus/awesome、LCA、Todo 种子数据，编写 run.sh 控制脚本支持 start/stop/status/logs，指定 0.0.0.0:1889（commit 29a71f0） |
+| EVERYTHING-TASK-8-E2E-DELIVERY | 全链路端到端集成验证与服务交付 | Completed | 9/9 自动化单元与集成测试全部通过；服务成功常驻监听 0.0.0.0:1889（PID 2131359）；端到端实测验证未认证 303 重定向拦截、密码 lichao12 登录鉴权、会话保持、/api/items 与 /api/export/awesome 导出、局域网 http://10.36.6.252:1889 HTTP 200 畅通（commit 23cc84f） |
 
 
