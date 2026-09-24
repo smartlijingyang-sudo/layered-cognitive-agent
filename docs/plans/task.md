@@ -250,5 +250,9 @@
 | GROK-ALIGN-TASK-6-ROUTINE-ENGINE | Task 6：P3 声明式例程引擎与消费护栏（Routine Repository, Scheduler & Spend Guard） | Completed | 落地 JsonRoutineRepository（声明式例程存储）、SpendGuard（Token 日预算与超限硬熔断，INV-08 闭环）与 RoutineSchedulerService（合法沉默特权，INV-07 闭环）；tests/application/routine/ 3/3 测试全通，ruff clean |
 | GROK-ALIGN-TASK-7-E2E-REGRESSION | Task 7：全链路集成场景与架构门禁回归（Closed-Loop E2E & Pre-push Guards） | Completed | 落地 test_grok_bot_production_closed_loop.py，INV-01 ~ INV-09 全 9 项不变量 100% 串联验证通过（7/7 passed in 18s），全套 Grok Bot 生产级架构门禁与单测闭环 |
 | FLOW-TEST-AND-PRODUCTION-FIXES | 全链路流程性测试与多场景缺陷定位治理（员工机沙箱/Session错误事实/CLI与Doctor状态机/局域网IP与Profile合流） | Completed | 全链路排查修复 10 处核心阻断与缺陷：1. BoxAdapter /home/box 无权限降级至 ~/.lca/box；2. lifecycle.py 补全 session.error 赋值；3. terminalizer 剔除废弃 workspace 参数；4. test_run_solo_smoke 统一回环 127.0.0.1 消除局域网超时；5. cancel_observability mock 路径迁移；6. gateway_composition 默认 profile 断言合流至 web-assistant；7. Composio 无 key 软化不阻断；8. PlanResolutionService 支持 bare profile 名称自愈映射；9. registry_queries.doctor 优先使用 step-tree journal.json 修复 status=unknown；10. runs.py 扩展 _TERMINAL_DOCTOR_STATUSES 补全 completed 并接通 wait 轮询状态机；79/79 测试全绿，live runs create --wait 成功返回 0，timeline 68 节点/18 子图认知闭环 0 报错 |
+| DASHBOARD-OPT-TASK-1 | 后端轻量心跳历史收集与集群聚合指标 (app.py) | Completed | 落地 HEARTBEAT_HISTORY (maxlen=20)、calculate_cluster_aggregate 与 fetch_single_account_quota 延时采集，/api/quota 扩充 aggregate 返回体，test_dashboard_enhancements.py 2/2 passed |
+| DASHBOARD-OPT-TASK-2 | 前端集群聚合配额池与 Uptime 心跳健康微条组件 (static/index.html) | Completed | 顶部装配全集群算力总览 (ClusterAggregateBar)，账号卡片与迷你矩阵卡片装配 Uptime 心跳微条 (HeartbeatBar) 带延迟 Tooltip 与状态自适应着色 |
+| DASHBOARD-OPT-TASK-3 | 原生 SVG 双环形微仪表、全局快捷键系统与一键复制动效 (static/index.html) | Completed | 落地纯 SVG 双环形微仪表 (Gemini/Claude 5h)，实现全局快捷键 (1-4切Tab、R立即刷新、输入框智能保护)，卡片命令与tmux会话增加一键复制与Toast |
+| DASHBOARD-OPT-TASK-4 | 服务平滑重启与端到端回归验证 (端口 1888) | Completed | ./start.sh 平滑重启成功，E2E 验证 HTML 结构、Auth 登录、/api/quota 实时聚合与心跳探测全链路 8/8 账号 100% 通过 (4/4 自动化单测通过) |
 
 
