@@ -236,8 +236,16 @@
 | ADR-REMEDIATION-4-HYGIENE-LINT | 代码工程规范修复：消除 room_chat_panel.py 缺失文件尾换行 (W292) 与 execution_environment/tests 中无用 import/变量 | Completed | deploy/lobehub/patches/ui/room_chat_panel.py 补全换行，patch_lobehub.py 26/26 ok；execution_environment contextlib.suppress 规范化；ruff check 0 报错 |
 | ADR-REMEDIATION-5-FLOW-VERIFY | 全流程多层级测试闭环与关联套件回归（ADR-0246/0248/0250/0251 116/116 全通） | Completed | 新增 test_box_tools_assembly_flow.py 与 test_room_coordinator_wiring.py；116/116 关联单测与场景测试通过；git diff --check clean；严格遵守负边界（Does NOT own） |
 | GROKBOT-PROD-BRAINSTORM-CONTEXT | 步骤 1：深度排查项目上下文与 Grok Bot 生产级就绪全链路断点 | Completed | 已摸清流式截流悬空、消息未送达前端、Widget未中断、Box沙箱裸跑与例程调度缺失等核心断点 |
-| GROKBOT-PROD-BRAINSTORM-QUESTIONS | 步骤 2：针对生产化范围、技术路径与系统边界提出澄清问题（单步提问） | In Progress | 正在向用户发起技术演进与架构权衡决策澄清 |
-| GROKBOT-PROD-BRAINSTORM-APPROACHES | 步骤 3：提炼 2-3 种正规落地与系统架构方案并给出推荐 | Pending | 待执行 |
-| GROKBOT-PROD-BRAINSTORM-DESIGN-SECTIONS | 步骤 4：逐步呈现分节设计规范（Owns/Does NOT own/不变量断言）并呈批 | Pending | 待执行 |
-| GROKBOT-PROD-BRAINSTORM-DESIGN-DOC | 步骤 5：沉淀正式设计文档至 docs/plans/ 并提交 git | Pending | 待执行 |
-| GROKBOT-PROD-BRAINSTORM-TRANSITION | 步骤 6：转换至实施计划制定（writing-plans） | Pending | 待执行 |
+| GROKBOT-PROD-BRAINSTORM-QUESTIONS | 步骤 2：针对生产化范围、技术路径与系统边界提出澄清问题（单步提问） | Completed | 用户选定大闭环全量推进、渐进完整态 Playwright+屏幕锁、声明式 YAML+Asyncio 调度引擎 |
+| GROKBOT-PROD-BRAINSTORM-APPROACHES | 步骤 3：提炼 2-3 种正规落地与系统架构方案并给出推荐 | Completed | 提炼方案 A（领域分层声明式驱动）、方案 B、方案 C，用户明确确认采用推荐方案 A |
+| GROKBOT-PROD-BRAINSTORM-DESIGN-SECTIONS | 步骤 4：逐步呈现分节设计规范（Owns/Does NOT own/不变量断言）并呈批 | Completed | 全部 4 节设计规范（拓扑与边界、声带与沙箱、浏览器与例程、状态机与不变量）全部获用户审核批准 |
+| GROKBOT-PROD-BRAINSTORM-DESIGN-DOC | 步骤 5：沉淀正式设计文档至 docs/plans/ 并提交 git | Completed | 已沉淀 docs/plans/2026-09-24-grok-bot-production-alignment-design.md 并完成 git 提交 (commit 8b4405e91) |
+| GROKBOT-PROD-BRAINSTORM-TRANSITION | 步骤 6：转换至实施计划制定（writing-plans） | Completed | 已沉淀详细实施计划 docs/plans/2026-09-24-grok-bot-production-alignment-plan.md 并提交 git |
+| GROK-ALIGN-TASK-1-CONTRACTS | Task 1：契约模型层健全（Routine, Browser, Widget & Secret Models） | Pending | 待执行 |
+| GROK-ALIGN-TASK-2-STREAM-DELIVERY | Task 2：P0 认知流截流与声带气泡真实交付（Streaming Interception & Bubble Delivery） | Pending | 待执行 |
+| GROK-ALIGN-TASK-3-WIDGET-RESUME | Task 3：P0 Widget 停等状态机与前端选项卡闭环（Widget Stop-and-Wait） | Pending | 待执行 |
+| GROK-ALIGN-TASK-4-CONTAINER-BOX | Task 4：P1 员工机安全容器沙箱化（BoxExecutionPort & Sandbox Adapter） | Pending | 待执行 |
+| GROK-ALIGN-TASK-5-BROWSER-SUBAGENT | Task 5：P2 浏览器控制与单屏互斥锁（Browser Subagent & Desktop Lock） | Pending | 待执行 |
+| GROK-ALIGN-TASK-6-ROUTINE-ENGINE | Task 6：P3 声明式例程引擎与消费护栏（Routine Repository, Scheduler & Spend Guard） | Pending | 待执行 |
+| GROK-ALIGN-TASK-7-E2E-REGRESSION | Task 7：全链路集成场景与架构门禁回归（Closed-Loop E2E & Pre-push Guards） | Pending | 待执行 |
+
