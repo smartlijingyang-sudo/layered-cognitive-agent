@@ -266,5 +266,6 @@
 | COCKPIT-PACING-TASK-2 | 首页一体化驾驶舱重构 (合并任务与矩阵，消灭重复卡片) (static/index.html) | Completed | 整合并删除近1000行冗余代码，收敛为3大Tab（驾驶舱、数据分析、运维SOP）；顶部算力池展示Gemini/Claude周步调偏差；8账号一体化综合卡片实现SSOT（聚合配额、周度步调差、状态、心跳、当前业务、最近问答与快捷操作） |
 | COCKPIT-PACING-TASK-3 | 运维中心 (Tab 3) 长篇 SOP 渐进式折叠手风琴重构 (static/index.html) | Completed | 将血泪教训、环境分组、风控穿透直达和CLI命令速查收拢为4大语义化 details 手风琴折叠块，支持一键展开/收起全部指南，消除首屏长篇文字堆叠 |
 | COCKPIT-PACING-TASK-4 | 服务平滑重启与端到端回归验证 (端口 1888) | Completed | ./start.sh 平滑重启成功，10/10 自动化测试全绿（test_assets + test_dashboard_enhancements）；端到端实测验证账号A Gemini +6.6%（结余稳健）、Claude -11.5%（偏快预警），全集群宏观步调与LAN http://10.36.6.252:1888 100% 畅通 |
+| FIX-DASHBOARD-BUSY-DETECTION | 修复正在执行任务数误判为0（切除脆弱tmux提示匹配，引入进程HOME与DB实时状态判断） | Completed | 定位三大根因：1. check_tmux_is_waiting 强绑后台tmux空闲屏；2. and not is_waiting_in_tmux 误杀真执行状态；3. 缺乏直接SSH进程识别。重构后支持多源进程探测与transcript/DB毫秒级新鲜度校验，单测增补至 11/11 全通，live 实测实时精准呈现 2 忙碌（账号 A 与账号 I） |
 
 
