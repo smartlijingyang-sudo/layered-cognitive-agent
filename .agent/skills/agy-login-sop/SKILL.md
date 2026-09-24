@@ -86,7 +86,7 @@ grep -iE "authenticated successfully|token acquired" $(ls -t ~/.gemini/antigravi
 
 agy 数据目录跟随 `$HOME`,因此**每个账户一个隔离 HOME** 即可并存,token 互不覆盖,可同时运行。
 
-### 已配置的账户(本机现状与台账)
+### 已配置的在用账户 (Active Accounts)
 
 数据源 SSOT 为 `~/.agy-accounts/accounts.json`，可通过 `agy-switch` 实时查看看板。
 
@@ -95,20 +95,32 @@ agy 数据目录跟随 `$HOME`,因此**每个账户一个隔离 HOME** 即可并
 | **A** | `kuaikuaibaby@gmail.com` | `agy-a` | `agylogin` | 2026-09-20 | 任意环境 / 通用设备 | 稳定老号，无异地风控，兼兼容默认 `~/.gemini/` |
 | **B** | `smartlijingyangbrother@gmail.com` | `agy-b` | `agylogin-b` | 2026-09-20 | 任意环境 / 通用设备 | 主力核心账号，作为新账号克隆基准模板 |
 | **C** | `noqadanum01@gmail.com` | `agy-c` | `agylogin-c` | 2026-09-20 | 任意环境 / 通用设备 | 稳定老号，日常无限制使用 |
-| **D** | `huersebuied@gmail.com` | `agy-d` | `agylogin-d` | 2026-09-22 | **公司 Opera 浏览器** | 公司机 Opera 保持登录态，用于日常授权与维护 |
 | **E** | `boistromspritio@gmail.com` | `agy-e` | `agylogin-e` | 2026-09-23 | **家里 Opera 浏览器** | 家里 Opera 登录管理，已激活 Google Cloud Shell 建立开发者信任 |
 | **F** | `kolpasfasnuio@gmail.com` | `agy-f` | `agylogin-f` | 2026-09-23 | **家里 Opera 浏览器** | 家里 Opera 登录管理，首次授权已就绪 Starter Quota |
+| **I** | `moretunrewial@gmail.com` | `agy-i` | `agylogin-i` | 2026-09-24 | 通用/扩展浏览器 | 第九账号，已完成初始化与 Superpowers 接入 |
+| **J** | `berrishecameilla@gmail.com` | `agy-j` | `agylogin-j` | 2026-09-24 | 通用/扩展浏览器 | 第十账号，已完成初始化与 Superpowers 接入 |
+| **K** | `jimiyangbro@gmail.com` | `agy-k` | `agylogin-k` | 2026-09-24 | 通用/扩展浏览器 | 第十一账号，已完成初始化与 Superpowers 接入，Starter 缓冲额度 |
 
-- 账户 A / B / C / D / E / F 的隔离 HOME: `~/.agy-accounts/{a,b,c,d,e,f}/`, 其中 `.cache/ms-playwright-go` 符号链接到 `~/.cache/ms-playwright-go`, 复用浏览器驱动
+### 废弃池子 (Deprecated Pool)
+
+以下账号均因需要手机验证/扫码但当初手机无法使用导致 OAuth Token 失效，已归档并在看板与命令中停用：
+- **原 G**: `zandermarhanse@gmail.com` (浏览器会话过期触发扫码/手机验证，无法验证导致吊销)
+- **D**: `huersebuied@gmail.com` (需手机二次验证，原手机无法接码，`invalid_grant`)
+- **现 G**: `janniferarjune@gmail.com` (需手机二次验证，原手机无法接码，`invalid_grant`)
+- **H**: `copelandmanuley@gmail.com` (需手机二次验证，原手机无法接码，`invalid_grant`)
+
+- 在用账户 A / B / C / E / F / I / J / K 的隔离 HOME: `~/.agy-accounts/{a,b,c,e,f,i,j,k}/`
 - 切换工具(已安装到 `~/.local/bin/`):
   - `agy-a` → 用 `HOME=/home/lichao/.agy-accounts/a` 启动 agy (账户 A)
   - `agy-b` → 用 `HOME=/home/lichao/.agy-accounts/b` 启动 agy (账户 B)
   - `agy-c` → 用 `HOME=/home/lichao/.agy-accounts/c` 启动 agy (账户 C)
-  - `agy-d` → 用 `HOME=/home/lichao/.agy-accounts/d` 启动 agy (账户 D)
   - `agy-e` → 用 `HOME=/home/lichao/.agy-accounts/e` 启动 agy (账户 E)
   - `agy-f` → 用 `HOME=/home/lichao/.agy-accounts/f` 启动 agy (账户 F)
-  - `agy-switch [a|b|c|d|e|f]` → 查看/切换不同账户会话; 多会话并存时直接 `tmux attach -t agylogin[-b|-c|-d|-e|-f]` 即可
-  - Web 可视化管理平台: 局域网访问 `http://10.36.6.252:1888` (密码: `lichao12`)，提供实时额度雷达、数据分析与 Web 终端控制台
+  - `agy-i` → 用 `HOME=/home/lichao/.agy-accounts/i` 启动 agy (账户 I)
+  - `agy-j` → 用 `HOME=/home/lichao/.agy-accounts/j` 启动 agy (账户 J)
+  - `agy-k` → 用 `HOME=/home/lichao/.agy-accounts/k` 启动 agy (账户 K)
+  - `agy-switch [a|b|c|e|f|i|j|k]` → 查看/切换不同账户会话; 多会话并存时直接 `tmux attach -t agylogin[-b|-c|-e|-f|-i|-j|-k]` 即可
+  - Web 可视化管理平台: 局域网访问 `http://10.36.6.252:1888` (密码: `lichao12`)，提供实时额度雷达、全景任务看板、数据分析与 Web 终端控制台
 
 ### 新增账号的流程 (以账号 D 为例)
 
@@ -163,7 +175,24 @@ tmux capture-pane -t agylogin-d -p | sed 's/\x1b\[[0-9;]*m//g' > /tmp/agy-pane-d
 
 - 不要对两个账户共用同一个 HOME,否则 token 文件互相覆盖,后登录的会踢掉先登录的
 - 若某个账户的 token 过期/被撤销,只需重新走 Step 2–4(针对该账户的隔离 HOME),不影响另一个账户
-- 旧的默认 HOME 里若残留不合格账户(如 `noqadanum01@gmail.com`)的 token,直接删除 `~/.gemini/antigravity-cli/antigravity-oauth-token` 即可,或先备份到 `/tmp/`
+## ⚠️ 账号维护血泪经验与避坑铁律 (Session Expired 防废号法则)
+
+### 事故复盘：原 G 账号废号根因
+原 G 账号（`zandermarhanse@gmail.com`）在完成授权后，因管理环境中的**浏览器关闭退出 / 浏览器会话过期（Session Expired）**，导致触发了 Google 账号的安全重新登录与扫码验证。在境外代理/无固定设备指纹的开发环境下，突发 Session 失效引发的重新登录与重新扫描会直接联动 Google 身份安全中心将先前的 OAuth Refresh Token 撤销，本地 agy 报出：
+`UNAUTHENTICATED (code 401): Request had invalid authentication credentials. Expected OAuth 2 access token...`（底层返回 `invalid_grant`），致使本地绑定的 CLI 凭证彻底报废，只能换号！
+
+### 核心规程与铁律：
+1. **【铁律一】绝对不要主动退出浏览器或清理浏览器会话 (Session)**：
+   - 凡是登录并管理过 agy 账号的浏览器（如公司电脑 Opera、家里电脑 Opera、专用 Profile 等），**严禁主动退出浏览器程序、清理 Cookie / 浏览历史，严禁点击 Google 账号“退出登录”**！
+   - 浏览器窗口与后台 Session 必须**长期常驻保持在线态**。
+2. **【铁律二】防止 Session Expired 连锁反应**：
+   - Google 会定期对长时间无活动或网络 IP 突变的会话进行 Session 失效处理。若出现 Session Expired 提示重新登录/扫码，**千万不要在多变 IP 或随意的新设备上盲目重新扫码**。
+   - 盲目操作极易被判定为异地盗号风控，导致 OAuth Refresh Token 被吊销。
+3. **【铁律三】遇重登或风控提示，第一步先开 Cloud Shell 刷信任**：
+   - 若浏览器出现重新登录或验证提示，**不要立即去扫 CLI 授权码**。
+   - 优先在当前常驻浏览器内直接打开 👉 **`https://shell.cloud.google.com/`**，借助 Google 官方云端开发者环境刷新会话可信度，等 Cloud Shell 终端加载正常后再继续操作。
+4. **【铁律四】固定设备、固定 Profile，坚决不交叉混用**：
+   - D 组锁定公司 Opera，E/F 组锁定家里 Opera，G 组锁定专用浏览器环境，严格执行物理/环境隔离，避免多账号在同一未隔离的普通浏览器环境中来回切换。
 
 ## 账号资格与风控拦截排查 (Eligibility & Security SOP)
 
