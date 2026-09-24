@@ -279,3 +279,5 @@
 | LIVE-MONITOR-TASK-2 | 自动化测试与契约验证 (test_dashboard_enhancements.py) | Completed | 编写 test_extract_latest_exchange_rich_dict 与 test_live_tasks_active_tasks_and_prompts，覆盖四元组解包、字典键值校验与 API 实时任务输出格式；单测全部通过 |
 | LIVE-MONITOR-TASK-3 | 前端驾驶舱实时执行雷达与全景 Prompt/回复卡片组件 (static/index.html) | Completed | 1. 驾驶舱首屏 Tab 1 顶部装配高优先级「集群实时执行监视器 (Live Execution Radar)」：双栏分屏独立呈现执行中任务、用户输入指令(Prompt)与 AI 实时回复/当前动作，附带一键复制与全屏弹窗；2. 账号卡片 Row 5 在 BUSY 状态下自动显式呈现执行动作、Prompt与回复；3. 增设「任务交互全景透视」全局大屏模态弹窗；单测 17/17 自动化门禁全部通过 |
 | LIVE-MONITOR-TASK-4 | 服务平滑重启与端到端全链路验证 (端口 1888) | Completed | bash start.sh 平滑重启成功；测试集（test_assets + test_dashboard_enhancements）17/17 全绿；实测 live API 验证秒级捕获账号 A 正在执行任务（Prompt: "执行中的 应该看到在执行什么任务啊 什么prompt 什么回复啊" | 当前动作: Probing live API cluster/live_tasks | 回复内容实时可查），集群待命时优雅展示最近任务（账号 I），局域网 http://10.36.6.252:1888 100% 畅通 |
+| FIX-MULTI-TASK-FLAPPING | 修复多账号执行中状态抖动与漏判（切除硬编码单一CASCADE_RUNNING依赖，加入5分钟会话交互活跃窗口） | Completed | 根因：Antigravity在分段输出完毕等待用户输入或转折时，SQLite会暂时置status为CASCADE_RUN_STATUS_IDLE，导致原本活跃的账号I被强行剔除出忙碌态；重构判定模型为“DB显式RUNNING 或 5分钟内有交互更新”，彻底消除抖动；热重启验证Busy Count精准锁定为 2（账号 A 与账号 I 并发执行），Prompt/回复与动作毫秒级双路同屏展示 |
+
