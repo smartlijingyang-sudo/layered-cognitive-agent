@@ -100,6 +100,7 @@ agy 数据目录跟随 `$HOME`,因此**每个账户一个隔离 HOME** 即可并
 | **I** | `moretunrewial@gmail.com` | `agy-i` | `agylogin-i` | 2026-09-24 | 通用/扩展浏览器 | 第九账号，已完成初始化与 Superpowers 接入 |
 | **J** | `berrishecameilla@gmail.com` | `agy-j` | `agylogin-j` | 2026-09-24 | 通用/扩展浏览器 | 第十账号，已完成初始化与 Superpowers 接入 |
 | **K** | `jimiyangbro@gmail.com` | `agy-k` | `agylogin-k` | 2026-09-24 | 通用/扩展浏览器 | 第十一账号，已完成初始化与 Superpowers 接入，Starter 缓冲额度 |
+| **L** | `annayangirl@gmail.com` | `agy-l` | `agylogin-l` | 2026-09-25 | 通用/扩展浏览器 | 第十二账号，已完成初始化与 Superpowers 接入，Starter 缓冲额度 |
 
 ### 废弃池子 (Deprecated Pool)
 
@@ -109,7 +110,7 @@ agy 数据目录跟随 `$HOME`,因此**每个账户一个隔离 HOME** 即可并
 - **现 G**: `janniferarjune@gmail.com` (需手机二次验证，原手机无法接码，`invalid_grant`)
 - **H**: `copelandmanuley@gmail.com` (需手机二次验证，原手机无法接码，`invalid_grant`)
 
-- 在用账户 A / B / C / E / F / I / J / K 的隔离 HOME: `~/.agy-accounts/{a,b,c,e,f,i,j,k}/`
+- 在用账户 A / B / C / E / F / I / J / K / L 的隔离 HOME: `~/.agy-accounts/{a,b,c,e,f,i,j,k,l}/`
 - 切换工具(已安装到 `~/.local/bin/`):
   - `agy-a` → 用 `HOME=/home/lichao/.agy-accounts/a` 启动 agy (账户 A)
   - `agy-b` → 用 `HOME=/home/lichao/.agy-accounts/b` 启动 agy (账户 B)
@@ -119,7 +120,8 @@ agy 数据目录跟随 `$HOME`,因此**每个账户一个隔离 HOME** 即可并
   - `agy-i` → 用 `HOME=/home/lichao/.agy-accounts/i` 启动 agy (账户 I)
   - `agy-j` → 用 `HOME=/home/lichao/.agy-accounts/j` 启动 agy (账户 J)
   - `agy-k` → 用 `HOME=/home/lichao/.agy-accounts/k` 启动 agy (账户 K)
-  - `agy-switch [a|b|c|e|f|i|j|k]` → 查看/切换不同账户会话; 多会话并存时直接 `tmux attach -t agylogin[-b|-c|-e|-f|-i|-j|-k]` 即可
+  - `agy-l` → 用 `HOME=/home/lichao/.agy-accounts/l` 启动 agy (账户 L)
+  - `agy-switch [a|b|c|e|f|i|j|k|l]` → 查看/切换不同账户会话; 多会话并存时直接 `tmux attach -t agylogin[-b|-c|-e|-f|-i|-j|-k|-l]` 即可
   - Web 可视化管理平台: 局域网访问 `http://10.36.6.252:1888` (密码: `lichao12`)，提供实时额度雷达、全景任务看板、数据分析与 Web 终端控制台
 
 ### 新增账号的流程 (以账号 D 为例)

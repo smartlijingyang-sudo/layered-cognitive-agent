@@ -271,6 +271,10 @@
 | DIFF-CONTRIB-TASK-2 | 后端账号贡献模型与任务数据注入 (app.py) | Completed | 在 get_cluster_live_tasks 中按 capacity_weight 与配额消耗量计算各账号加权吞吐消耗占比（burn_contrib_pct），按历史交互计算 Prompt 贡献占比（prompt_contrib_pct），并注入 pipeline_stage 与 capacity_badge，单测 test_account_contributions_and_pipeline_stages 通过 |
 | DIFF-CONTRIB-TASK-3 | 前端错峰接力流水线与差异化卡片重构 (static/index.html) | Completed | 顶部资源池升级呈现“Gemini 加权算力池 (66.6%) · 20.0 算力权”及加权步调；装配 8 节点“7天错峰接力流水线”微时间轴（按回血倒计时严格升序分三阶段呈现）；8 账号卡片装配 PRO 3×权/FREE 1×权徽章、接力回血倒计时与算力消耗/交互工作量贡献条 |
 | DIFF-CONTRIB-TASK-4 | 服务平滑重启与全链路端到端回归验证 (端口 1888) | Completed | ./start.sh 平滑重启成功，13/13 自动化测试全绿（test_assets + test_dashboard_enhancements）；端到端实测验证流水线排序准确（B 41h周六回血 -> A 61h周日回血 -> C 82h周一回血 -> F/E/I/K/J 错峰储备），账号B吞吐贡献43.6%/A贡献26.8%，各端点与局域网 http://10.36.6.252:1888 100% 畅通 |
+| FORECAST-TASK-1 | 后端未来 7 天回血预报算法 (app.py) | Completed | 实现 calculate_7day_forecast 算法：推演今天/明天/后天/+3至+6天共7个自然日窗口，基于 resetTime 智能归组9个账号，按 Google AI Pro(3.0权)/Starter(1.0权) 精确计算恢复算力权(U)与全集群池跳增百分比(pool_lift_pct)，并生成动态轮换策略建议；自动化测试 test_7day_forecast_calculation 验证通过 |
+| FORECAST-TASK-2 | API 响应体集成与数据注入 (app.py) | Completed | 将 forecast_7days 顺利装配进 /api/quota 的 calculate_cluster_aggregate 聚合体及 /api/cluster/live_tasks；集成测试 test_quota_and_live_tasks_include_7day_forecast 验证通过 |
+| FORECAST-TASK-3 | 前端 7 天回血预报日程卡片流组件 (static/index.html) | Completed | 在首页驾驶舱 7 天接力时间轴下方装配横向 7 列「未来 7 天回血预报日程表」卡片流，明天琥珀金高亮脉动，今天靛蓝微光，回血日翡翠绿呼吸，直观呈现各日期重置账号胶囊、恢复算力权、集群提振与轮换建议；端到端测试 test_index_html_enhancements_present 验证通过 |
+| FORECAST-TASK-4 | 服务平滑重启与全链路端到端回归验证 (端口 1888) | Completed | bash start.sh 平滑重启成功；15/15 项单元与集成测试全部通过；实测 live API 验证明天周六账号B(16:52 +3U/+13.9%)、后天周日账号A(12:52 +3U/+8.7%)、大后天周一账号C(09:38 +3U/+3.9%)、周三账号F&E(+6U/+4.4%)、周四账号I&K&J&L(+6U/+2.5%) 错峰接力数据毫秒级无缓存实时计算正确，局域网 http://10.36.6.252:1888 100% 畅通 |
 
 
 
