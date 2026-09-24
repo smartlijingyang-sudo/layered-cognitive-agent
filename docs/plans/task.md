@@ -262,5 +262,9 @@
 | EVERYTHING-TASK-6-WEB-UI | 现代响应式 Web UI、深浅色模式与分类/状态交互 | Completed | 实现 base.html、login.html、index.html（Tailwind+Lucide+深浅色+卡片/列表双视图+状态即时流转+录入编辑抽屉+FTS5即时搜索），编写 test_web.py 验证路由与模板渲染 100% 通过（commit 06d9cec） |
 | EVERYTHING-TASK-7-SEED-RUNSH | 种子数据注入与一键管理脚本 run.sh（端口 1889） | Completed | 注入 sindresorhus/awesome、LCA、Todo 种子数据，编写 run.sh 控制脚本支持 start/stop/status/logs，指定 0.0.0.0:1889（commit 29a71f0） |
 | EVERYTHING-TASK-8-E2E-DELIVERY | 全链路端到端集成验证与服务交付 | Completed | 9/9 自动化单元与集成测试全部通过；服务成功常驻监听 0.0.0.0:1889（PID 2131359）；端到端实测验证未认证 303 重定向拦截、密码 lichao12 登录鉴权、会话保持、/api/items 与 /api/export/awesome 导出、局域网 http://10.36.6.252:1889 HTTP 200 畅通（commit 23cc84f） |
+| COCKPIT-PACING-TASK-1 | 后端周配额时间步调算法与集群宏观步调指标 (app.py) | Completed | 实现 calculate_weekly_pacing 算法，168h滚动窗口与理论应存水位对比，calculate_cluster_aggregate 扩充全集群 pacing 偏差，单测 5/5 全通 |
+| COCKPIT-PACING-TASK-2 | 首页一体化驾驶舱重构 (合并任务与矩阵，消灭重复卡片) (static/index.html) | Completed | 整合并删除近1000行冗余代码，收敛为3大Tab（驾驶舱、数据分析、运维SOP）；顶部算力池展示Gemini/Claude周步调偏差；8账号一体化综合卡片实现SSOT（聚合配额、周度步调差、状态、心跳、当前业务、最近问答与快捷操作） |
+| COCKPIT-PACING-TASK-3 | 运维中心 (Tab 3) 长篇 SOP 渐进式折叠手风琴重构 (static/index.html) | Completed | 将血泪教训、环境分组、风控穿透直达和CLI命令速查收拢为4大语义化 details 手风琴折叠块，支持一键展开/收起全部指南，消除首屏长篇文字堆叠 |
+| COCKPIT-PACING-TASK-4 | 服务平滑重启与端到端回归验证 (端口 1888) | Completed | ./start.sh 平滑重启成功，10/10 自动化测试全绿（test_assets + test_dashboard_enhancements）；端到端实测验证账号A Gemini +6.6%（结余稳健）、Claude -11.5%（偏快预警），全集群宏观步调与LAN http://10.36.6.252:1888 100% 畅通 |
 
 
