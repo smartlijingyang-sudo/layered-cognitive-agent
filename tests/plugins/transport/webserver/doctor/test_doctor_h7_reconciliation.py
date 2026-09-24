@@ -381,3 +381,47 @@ def test_h7_success_rate_capped_at_distinct_calls_with_pseudo_results(tmp_path: 
     assert extra.get("tool_success") == 2
     assert extra.get("success_rate") == 1.0
     assert "100%" in h7.detail
+
+
+def test_h7_recognizes_hil_interaction_tool_as_success(tmp_path: Path) -> None:
+    """HIL 交互工具（如 askUserQuestion）在 step outcome 为 ok 且无 error 时应计入成功。
+
+    这类工具通过暂停等待外部回复完成交互，不产生常规的 in-step EffectReceipt。
+    避免将其误判为工具调用失败导致 H7 报 0% 成功率。
+    """
+    meta = JournalMetadata(
+        agent_role="assistant", strategy_key="solo", plan_ref="p", objective="hil test"
+    )
+    doc = empty_document(run_id="run_hil", trace_id="t_hil", metadata=meta, started_at=0.0)
+
+    tc = ToolCallRecord(
+        invocation_id="inv-ask-1",
+        name="askUserQuestion",
+        arguments={"question": "确认删除？"},
+    )
+    doc = append_step(
+        doc,
+        JournalStep(
+            step_id="step-1",
+            step_index=1,
+            phase="act",
+            entered_at=1.0,
+            outcome="ok",
+            tool_call=tc,
+            tool_calls=(tc,),
+            tool_result=None,
+            tool_results=(),
+            thinking=ThinkingTrace(model="test-model", latency_ms=5),
+            reflect=ReflectTrace(summary="asked user question"),
+        ),
+    )
+    doc = close_document(doc, outcome="completed", closed_at=2.0)
+    path = _write_doc(tmp_path, doc)
+
+    report = diagnose_step_tree(path)
+    h7 = report.hops["H7"]
+    assert h7.ok is True, f"Expected H7.ok=True for HIL interaction tool, got {h7.ok}, detail={h7.detail}"
+    assert (h7.extra or {}).get("tool_total") == 1
+    assert (h7.extra or {}).get("tool_success") == 1
+    assert (h7.extra or {}).get("success_rate") == 1.0
+    assert "100%" in h7.detail

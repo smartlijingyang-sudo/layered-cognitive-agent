@@ -519,6 +519,22 @@ def _scan_step_doc(path: Path) -> StepScan:
         ):
             _tool_success_ids.add(next(iter(step_call_ids)))
 
+        # Human-in-the-loop (HIL) interaction tools (e.g. askUserQuestion):
+        # These tools pause the run to elicit human input rather than returning
+        # an in-step EffectReceipt. When the step completed with ok and no error,
+        # the interaction question was successfully dispatched and yielded to human.
+        for tc in calls:
+            inv_id = getattr(tc, "invocation_id", "") or ""
+            name = getattr(tc, "name", "") or ""
+            if (
+                name in ("askUserQuestion", "confirmAction")
+                and inv_id
+                and step.outcome == "ok"
+                and not step.error
+            ):
+                _tool_success_ids.add(inv_id)
+                step_has_success = True
+
         if step_has_success:
             consecutive = 0
         elif step.outcome == "fail" or (results and step_has_failure):

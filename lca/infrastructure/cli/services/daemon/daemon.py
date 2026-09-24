@@ -248,9 +248,11 @@ class DaemonService:
             return False
 
         for src in (gw_src, cli_src):
+            tsc_bin = src / "node_modules" / ".bin" / "tsc"
+            cmd = [str(tsc_bin)] if tsc_bin.exists() else ["npx", "--yes", "tsc"]
             try:
-                subprocess.run(
-                    ["npx", "tsc"],  # noqa: S607
+                subprocess.run(  # noqa: S603
+                    cmd,
                     cwd=src,
                     capture_output=True,
                     timeout=60,

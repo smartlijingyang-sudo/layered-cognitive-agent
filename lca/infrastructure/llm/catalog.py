@@ -111,7 +111,12 @@ class ModelRegistry:
         normalized = requested.strip().lower()
         if normalized in _LCA_MODE_NAMES:
             return self.configured_chat_model
-        return _OPENAI_CHAT_ALIASES.get(normalized, requested.strip() or self.configured_chat_model)
+        if normalized in _OPENAI_CHAT_ALIASES:
+            configured = self.configured_chat_model
+            if configured:
+                return configured
+            return _OPENAI_CHAT_ALIASES[normalized]
+        return requested.strip() or self.configured_chat_model
 
     def resolve_embedding_model(self, requested: str) -> str:
         normalized = requested.strip().lower()

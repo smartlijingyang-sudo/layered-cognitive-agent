@@ -159,3 +159,21 @@ def test_debug_run_no_kernel_log_does_not_crash(tmp_path: Path) -> None:
     adapter = DebugRunToolAdapter.from_locator_root(str(tmp_path))
     report = adapter.debug_run(run_id)
     assert report.kernel_log_tail == ""
+
+
+def test_debug_run_paused_run_without_manifest(tmp_path: Path) -> None:
+    """Paused runs have no manifest.json yet; debug_run should inspect journal.json."""
+    run_id = "run_paused_001"
+    run_dir = tmp_path / "runs" / run_id
+    run_dir.mkdir(parents=True)
+    with open(run_dir / "journal.json", "w") as f:
+        json.dump({"metadata": {"outcome": "paused"}}, f)
+    with open(run_dir / f"{run_id}.spine.jsonl", "w") as f:
+        f.write("")
+
+    adapter = DebugRunToolAdapter.from_locator_root(str(tmp_path))
+    report = adapter.debug_run(run_id)
+    rendered = report.render_text()
+    assert "status=paused" in rendered
+    assert "status: paused" in rendered
+    assert "Resume via POST /runs" in rendered

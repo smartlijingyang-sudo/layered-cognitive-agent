@@ -222,6 +222,24 @@ class DebugRunToolAdapter:
         kernel_log_path = run_dir / "kernel.log"
 
         manifest_summary = _safe_json(manifest_path)
+        if not manifest_summary:
+            journal_summary = _safe_json(run_dir / "journal.json")
+            journal_outcome = str(journal_summary.get("metadata", {}).get("outcome") or "").strip()
+            if not journal_outcome:
+                steps = journal_summary.get("steps") or []
+                if steps and isinstance(steps, list):
+                    journal_outcome = str(steps[-1].get("outcome") or "").strip()
+            if journal_outcome == "paused":
+                manifest_summary = {
+                    "extra": {
+                        "doctor_report": {
+                            "status": "paused",
+                            "outcome": "paused",
+                            "summary": "run paused (waiting for human input/approval)",
+                        }
+                    }
+                }
+
         spine_events = _safe_lines(spine_events_path)
         seqs: list[int] = sorted(
             run_seq for e in spine_events if isinstance((run_seq := e.get("run_seq")), int)
@@ -241,8 +259,15 @@ class DebugRunToolAdapter:
         phase_cursor = _extract_phase_cursor(spine_events)
         attempts = _extract_attempts(manifest_summary)
         stack_frames, suggested = _extract_diagnostic(manifest_summary)
-        if suggested is None and _run_failed(manifest_summary, spine_events):
-            suggested = _suggest_action_from_failure_kind(error_type, error_message)
+        if suggested is None:
+            doctor_st = manifest_summary.get("extra", {}).get("doctor_report", {}).get("status")
+            if doctor_st == "paused":
+                suggested = (
+                    "Run is paused awaiting user input/approval. "
+                    "Resume via POST /runs with resume_tool_result or approve via client UI."
+                )
+            elif _run_failed(manifest_summary, spine_events):
+                suggested = _suggest_action_from_failure_kind(error_type, error_message)
 
         tail = _tail_lines(kernel_log_path)
 
