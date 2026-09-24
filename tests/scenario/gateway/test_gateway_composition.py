@@ -10,7 +10,7 @@ from lca_kernel.cli.cli import create_app
 
 @pytest.mark.asyncio
 async def test_profile_resolution_has_explicit_precedence(tmp_path: Path) -> None:
-    default = tmp_path / "profiles" / "web-standard.yaml"
+    default = tmp_path / "profiles" / "web-assistant.yaml"
     default.parent.mkdir()
     default.write_text("profile: test\n")
 
@@ -30,7 +30,7 @@ async def test_profile_resolution_has_explicit_precedence(tmp_path: Path) -> Non
         == "profiles/environment.yaml"
     )
     assert resolve_profile_path(environ={}, working_directory=tmp_path) == (
-        "profiles/web-standard.yaml"
+        "profiles/web-assistant.yaml"
     )
 
 

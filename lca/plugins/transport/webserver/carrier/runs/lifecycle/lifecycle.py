@@ -314,8 +314,8 @@ class RunLifecycleCoordinator:
         *,
         error: str | None = None,
     ) -> None:
-        """Project mutable lifecycle state into the observation seam."""
-
+        err_msg = error or f"{type(exc).__name__}: {exc}"
+        session.error = err_msg
         record_run_failure(
             RunFailureFacts(
                 trace_id=session.trace_id,
@@ -323,7 +323,7 @@ class RunLifecycleCoordinator:
                 agent_role=session.agent.name if session.agent else "",
                 strategy_key=session.mode,
                 objective=session.user_text,
-                error=error or f"{type(exc).__name__}: {exc}",
+                error=err_msg,
             )
         )
 

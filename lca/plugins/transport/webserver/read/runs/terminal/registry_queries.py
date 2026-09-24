@@ -52,7 +52,16 @@ class RegistryRunQueries:
         )
         if session is None and not spine_path.is_file():
             return None
-        return diagnose(session, spine_path)
+        target_path = spine_path
+        if session is not None and getattr(session, "locator", None) is not None:
+            step_path = session.locator.journal_step_path(run_id)
+            if step_path.exists():
+                target_path = step_path
+        else:
+            step_path = spine_path.parent / "journal.json"
+            if step_path.exists():
+                target_path = step_path
+        return diagnose(session, target_path)
 
     def journal_path(self, run_id: str) -> Path | None:
         """Return only the current run's spine path; never fall back across sessions."""

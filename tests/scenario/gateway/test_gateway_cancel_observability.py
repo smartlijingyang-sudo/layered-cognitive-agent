@@ -67,7 +67,9 @@ class _LazyHubAgent:
     async def run(self, objective: str) -> Any:
         hub = self._session.hub
         self._inner = CognitiveAgent(
-            _HangRuntime(), _role(), hub,  # type: ignore[arg-type]
+            _HangRuntime(),
+            _role(),
+            hub,  # type: ignore[arg-type]
             event_session_binder=EventSessionBinder(SessionStore()),
         )
         return await self._inner.run(objective)
@@ -85,7 +87,7 @@ async def test_execute_run_cancel_no_otel_detach_noise(caplog: pytest.LogCapture
             registry, question="hang", user_text="hang", mode="solo", ctx=ctx
         )
         with patch(
-            "gateway.plugins.default_modes.build_solo_agent",
+            "lca.plugins.collaboration.modes.solo.build_solo_agent",
             return_value=_LazyHubAgent(session),
         ):
             task = schedule_run(registry, session, ctx=ctx)

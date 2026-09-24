@@ -43,7 +43,7 @@ async def test_terminalize_closes_then_materializes_and_cleans_registry() -> Non
         registry,
         finalizer=close_run,
         materializer=materialize,
-    ).terminalize(session, workspace=None, success=True)
+    ).terminalize(session, success=True)
 
     assert session.status == RunStatus.COMPLETED
     assert events == ["close", "clear", "prune", "materialize"]
@@ -66,7 +66,7 @@ async def test_missing_journal_finish_uses_failure_fallback() -> None:
         registry,
         finalizer=close_run,
         materializer=lambda _session: None,
-    ).terminalize(session, workspace=None, success=False)
+    ).terminalize(session, success=False)
 
     assert session.status == RunStatus.FAILED
 
@@ -83,6 +83,6 @@ async def test_terminalize_preserves_cancel_signal_over_success() -> None:
         registry,
         finalizer=close_run,
         materializer=lambda _session: None,
-    ).terminalize(session, workspace=None, success=True)
+    ).terminalize(session, success=True)
 
     assert session.status == RunStatus.CANCELLED

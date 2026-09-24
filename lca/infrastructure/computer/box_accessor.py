@@ -24,10 +24,12 @@ class BoxAccessor:
         self.plane = ComputerPlane.BOX
         if adapter is not None:
             self.adapter = adapter
+            self.root_dir = getattr(adapter, "root_dir", self.root_dir)
         else:
             from lca.infrastructure.computer.box_sandbox_adapter import LocalBoxAdapter
 
             self.adapter = LocalBoxAdapter(root_dir=self.root_dir)
+            self.root_dir = getattr(self.adapter, "root_dir", self.root_dir)
 
     def resolve_path(self, subpath: str) -> Path:
         """解析并确保路径绝对不越出 /home/box 沙箱根目录。"""

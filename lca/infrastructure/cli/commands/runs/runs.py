@@ -72,9 +72,13 @@ _POST_CREATE_POLL_INTERVAL_S = 2
 _TERMINAL_DOCTOR_STATUSES = frozenset(
     {
         "success",
+        "completed",
+        RunLifecycleStatus.COMPLETED.value,
         RunLifecycleStatus.FAILED.value,
+        RunLifecycleStatus.CANCELLED.value,
         "cancelled",
         RunLifecycleStatus.PAUSED.value,
+        RunLifecycleStatus.TIMEOUT.value,
     }
 )
 
@@ -264,11 +268,16 @@ def _create(
 
     if json_mode:
         # JSON 模式也要走 SOP,否则 agent 用 --json 时仍会漏掉 sidecar 异常。
-        report = _build_post_create_report(run_id, base_url) if not no_sop else None
+        if wait:
+            _poll_terminal_status(run_id, base_url)
+        report = _build_post_create_report(run_id, base_url) if not no_sop or wait else None
         payload = {"status": status_code, **receipt}
         if report is not None:
             payload["post_create_report"] = report
         typer.echo(json.dumps(payload, indent=2, ensure_ascii=False))
+        if wait:
+            terminal = (report or {}).get("terminal_status") or "unknown"
+            raise typer.Exit(code=0 if terminal in {"success", "completed"} else 1)
         return
 
     # P1: live streaming is via WebSocket at /v1/runs/{run_id}/ws.
@@ -295,13 +304,15 @@ def _create(
         return
 
     # Post-create SOP (default; SKILL lca-debug-run step 4).
+    if wait:
+        _poll_terminal_status(run_id, base_url)
     report = _build_post_create_report(run_id, base_url)
     _render_post_create_report(run_id, report)
 
     if wait:
         # --wait 老路径:除 SOP 外,仍按旧 exit-code 语义退出(success=0,其他非零)。
         terminal = report.get("terminal_status") or "unknown"
-        raise typer.Exit(code=0 if terminal == "success" else 1)
+        raise typer.Exit(code=0 if terminal in {"success", "completed"} else 1)
 
 
 def _build_create_body(

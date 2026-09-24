@@ -20,7 +20,7 @@ from lca.session.lifecycle.recovery import assert_resume_allowed
 
 def validate_durable_resume(session: RunSession) -> None:
     """Fail-closed when Session facts disagree with a resume attempt."""
-    bound = session.event_session
+    bound = getattr(session, "event_session", None)
     if bound is None:
         return
     inner = getattr(bound, "inner", None) or getattr(bound, "session", None)

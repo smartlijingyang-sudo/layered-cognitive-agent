@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, SecretStr
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -23,7 +23,7 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 class Config(BaseModel):
     model_config = {"extra": "forbid"}
-    api_key: SecretStr | str = Field(min_length=1)
+    api_key: SecretStr | str | None = None
     base_url: str | None = None
     callback_url: str | None = None
     default_user_id: str | None = None
@@ -67,9 +67,11 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.infrastructure.integrations.composio.service.service import ComposioIntegration
     from lca.infrastructure.integrations.composio.settings.settings import ComposioSettings
 
+    if not config.api_key:
+        return
     api_key = _secret_value(config.api_key).strip()
     if not api_key:
-        raise RuntimeError("lca-composio-provider: api_key is required")
+        return
 
     settings = ComposioSettings.from_plugin_config(
         api_key=api_key,

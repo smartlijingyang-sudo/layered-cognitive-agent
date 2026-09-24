@@ -131,6 +131,14 @@ class PlanResolutionService:
                 return replace(cached, cached=True)
 
         path = Path(profile_path)
+        if not path.is_file():
+            candidate = Path("profiles") / f"{profile_path}.yaml"
+            if candidate.is_file():
+                path = candidate
+            elif not str(profile_path).endswith((".yaml", ".yml")):
+                candidate2 = Path(f"{profile_path}.yaml")
+                if candidate2.is_file():
+                    path = candidate2
         try:
             resolved: ResolvedProfile = resolve_profile(path)
             plan: CompiledRunPlan = compile_plan(

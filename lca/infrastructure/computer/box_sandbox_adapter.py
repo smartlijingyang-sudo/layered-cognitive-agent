@@ -27,7 +27,14 @@ class LocalBoxAdapter(BoxExecutionPort):
 
     def __init__(self, root_dir: str | Path = "/home/box") -> None:
         self.root_dir = Path(root_dir).resolve()
-        self.root_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self.root_dir.mkdir(parents=True, exist_ok=True)
+        except (PermissionError, OSError):
+            from lca.infrastructure.path.locator import get_lca_home
+
+            fallback = Path(os.environ.get("LCA_BOX_ROOT", get_lca_home() / "box"))
+            fallback.mkdir(parents=True, exist_ok=True)
+            self.root_dir = fallback.resolve()
 
     def _resolve_safe_path(self, path: str) -> Path:
         clean_sub = path.lstrip("/")
@@ -154,6 +161,10 @@ class OnlyboxesBoxAdapter(BoxExecutionPort):
         if self._docker_available is None:
             self._docker_available = bool(shutil.which("docker"))
         return self._docker_available
+
+    @property
+    def root_dir(self) -> Path:
+        return self._fallback.root_dir
 
     async def read_file(
         self,
