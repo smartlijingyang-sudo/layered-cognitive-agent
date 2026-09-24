@@ -275,6 +275,7 @@
 | FORECAST-TASK-2 | API 响应体集成与数据注入 (app.py) | Completed | 将 forecast_7days 顺利装配进 /api/quota 的 calculate_cluster_aggregate 聚合体及 /api/cluster/live_tasks；集成测试 test_quota_and_live_tasks_include_7day_forecast 验证通过 |
 | FORECAST-TASK-3 | 前端 7 天回血预报日程卡片流组件 (static/index.html) | Completed | 在首页驾驶舱 7 天接力时间轴下方装配横向 7 列「未来 7 天回血预报日程表」卡片流，明天琥珀金高亮脉动，今天靛蓝微光，回血日翡翠绿呼吸，直观呈现各日期重置账号胶囊、恢复算力权、集群提振与轮换建议；端到端测试 test_index_html_enhancements_present 验证通过 |
 | FORECAST-TASK-4 | 服务平滑重启与全链路端到端回归验证 (端口 1888) | Completed | bash start.sh 平滑重启成功；15/15 项单元与集成测试全部通过；实测 live API 验证明天周六账号B(16:52 +3U/+13.9%)、后天周日账号A(12:52 +3U/+8.7%)、大后天周一账号C(09:38 +3U/+3.9%)、周三账号F&E(+6U/+4.4%)、周四账号I&K&J&L(+6U/+2.5%) 错峰接力数据毫秒级无缓存实时计算正确，局域网 http://10.36.6.252:1888 100% 畅通 |
-
-
-
+| LIVE-MONITOR-TASK-1 | 后端实时交互与动作提取算法升级 (app.py) | Completed | 实现 LatestExchangeDict（支持四元组解包兼字典访问）、to_cst_time_str 与 extract_latest_exchange：精准抓取活跃动作 active_action（底层工具名+toolSummary/toolAction）、step_index、thinking_preview，剥离 XML 标签还原真实 Prompt 与 Response；在 get_cluster_live_tasks 中构造 active_tasks 集合与 most_recent_task 备用项 |
+| LIVE-MONITOR-TASK-2 | 自动化测试与契约验证 (test_dashboard_enhancements.py) | Completed | 编写 test_extract_latest_exchange_rich_dict 与 test_live_tasks_active_tasks_and_prompts，覆盖四元组解包、字典键值校验与 API 实时任务输出格式；单测全部通过 |
+| LIVE-MONITOR-TASK-3 | 前端驾驶舱实时执行雷达与全景 Prompt/回复卡片组件 (static/index.html) | Completed | 1. 驾驶舱首屏 Tab 1 顶部装配高优先级「集群实时执行监视器 (Live Execution Radar)」：双栏分屏独立呈现执行中任务、用户输入指令(Prompt)与 AI 实时回复/当前动作，附带一键复制与全屏弹窗；2. 账号卡片 Row 5 在 BUSY 状态下自动显式呈现执行动作、Prompt与回复；3. 增设「任务交互全景透视」全局大屏模态弹窗；单测 17/17 自动化门禁全部通过 |
+| LIVE-MONITOR-TASK-4 | 服务平滑重启与端到端全链路验证 (端口 1888) | Completed | bash start.sh 平滑重启成功；测试集（test_assets + test_dashboard_enhancements）17/17 全绿；实测 live API 验证秒级捕获账号 A 正在执行任务（Prompt: "执行中的 应该看到在执行什么任务啊 什么prompt 什么回复啊" | 当前动作: Probing live API cluster/live_tasks | 回复内容实时可查），集群待命时优雅展示最近任务（账号 I），局域网 http://10.36.6.252:1888 100% 畅通 |
