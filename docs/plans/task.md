@@ -246,6 +246,7 @@
 
 | GROK-ALIGN-TASK-3-WIDGET-RESUME | Task 3：P0 Widget 停等状态机与前端选项卡闭环（Widget Stop-and-Wait） | Completed | 落地 runtime_loop.py is_awaiting_widget() 停等至 INPUT_REQUIRED 并挂载 approval_request，requires_human_input 支持 send_message widget/secret_request，GatedVocalGate 提供 reset_awaiting_widget() 恢复机制，落地 LobeHub 前端 WidgetCard.tsx 与 widget_card.py 补丁（25 ok）；tests/runtime/test_widget_stop_and_wait.py 3/3 passed，ruff clean |
 | GROK-ALIGN-TASK-4-CONTAINER-BOX | Task 4：P1 员工机安全容器沙箱化（BoxExecutionPort & Sandbox Adapter） | Completed | 落地 BoxExecutionPort 契约协议、LocalBoxAdapter（严格沙箱与提权阻断）与 OnlyboxesBoxAdapter（容器隔离沙箱），重构 BoxAccessor 与 BoxRunCommandTool 对接沙箱适配器消除宿主机裸跑；tests/infrastructure/ 18/18 测试全通，ruff clean |
+| GROK-ALIGN-TASK-5-BROWSER-SUBAGENT | Task 5：P2 浏览器控制与单屏互斥锁（Browser Subagent & Desktop Lock） | Completed | 落地 DesktopLockManager（单屏独占与 120s TTL 防死锁）、BrowserSubagent（物理禁声剔除 send_message，INV-05 闭环）与 BrowserNavigateTool/BrowserClickTool/BrowserScreenshotTool 等原语工具；tests/infrastructure/ 4/4 测试全通，ruff clean |
 | GROK-ALIGN-TASK-6-ROUTINE-ENGINE | Task 6：P3 声明式例程引擎与消费护栏（Routine Repository, Scheduler & Spend Guard） | Completed | 落地 JsonRoutineRepository（声明式例程存储）、SpendGuard（Token 日预算与超限硬熔断，INV-08 闭环）与 RoutineSchedulerService（合法沉默特权，INV-07 闭环）；tests/application/routine/ 3/3 测试全通，ruff clean |
-| GROK-ALIGN-TASK-7-E2E-REGRESSION | Task 7：全链路集成场景与架构门禁回归（Closed-Loop E2E & Pre-push Guards） | In Progress | 正在编写全链路闭环集成场景与执行代码门禁自检 |
+| GROK-ALIGN-TASK-7-E2E-REGRESSION | Task 7：全链路集成场景与架构门禁回归（Closed-Loop E2E & Pre-push Guards） | Completed | 落地 test_grok_bot_production_closed_loop.py，INV-01 ~ INV-09 全 9 项不变量 100% 串联验证通过（7/7 passed in 18s），全套 Grok Bot 生产级架构门禁与单测闭环 |
 
