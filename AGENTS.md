@@ -16,6 +16,7 @@ LCA 是基于 vendored Cordis 的 Python 插件化认知 Agent 框架。
 | SSOT 矩阵 | [ADR-0195 §4](docs/adr/0195-platform-architecture-convergence.md) · [platform-directory-architecture.md](docs/specs/platform-directory-architecture.md) |
 | 调试 runbook | [docs/debug/README.md](docs/debug/README.md) |
 | 代码工程守则 | [docs/agent-contract/coding-guardrails.md](docs/agent-contract/coding-guardrails.md) |
+| 个人智库与参考库 | [~/everything-library](file:///home/lichao/everything-library) (内网: 10.36.6.252:1889; 选型/设计/找API/模板前必查) |
 
 **迁移态 disclaimer:** Durable 事实经 `FactGateway` → `Session.append` 单轨(ADR-0186/0191/0194 P1–P5 已落地);`spine_reflector_*` 已从 bundle 退役。插件 legacy 顶层目录与 reflector COMPAT shim 仍保留 import 回退;delete-when 见 [0194-0195-implementation-plan.md](docs/specs/0194-0195-implementation-plan.md) §P5 与 ADR-0195 §2.5。
 
@@ -177,7 +178,7 @@ contracts → infrastructure → cognition → runtime → agent
 | 审计 Reducer 单写 / 能力归属 | `audit-state-writers` / `why <capability>` |
 | 声明图编译/逐层 inflate | `plan compile <p>` / `plan validate <json>` / `plan tree <p>` |
 
-**Before X,读 Y:** 调试 → [docs/debug/README.md](docs/debug/README.md);Journal/Trace → [docs/specs/harness-spine-spec.md](docs/specs/harness-spine-spec.md);散文 → [.agents/skills/lca-prose-standard](.agents/skills/lca-prose-standard/SKILL.md);新 Note → [.agents/skills/lca-write-note](.agents/skills/lca-write-note/SKILL.md);CI 测试可靠性 → [.agents/skills/lca-ci-test-reliability](.agents/skills/lca-ci-test-reliability/SKILL.md)。
+**Before X,读 Y:** 调试 → [docs/debug/README.md](docs/debug/README.md);选型/找API/模板/云服务 → [~/everything-library/data/items](file:///home/lichao/everything-library/data/items);Journal/Trace → [docs/specs/harness-spine-spec.md](docs/specs/harness-spine-spec.md);散文 → [.agents/skills/lca-prose-standard](.agents/skills/lca-prose-standard/SKILL.md);新 Note → [.agents/skills/lca-write-note](.agents/skills/lca-write-note/SKILL.md);CI 测试可靠性 → [.agents/skills/lca-ci-test-reliability](.agents/skills/lca-ci-test-reliability/SKILL.md)。
 
 ## 8. Git 与文档卫生
 
