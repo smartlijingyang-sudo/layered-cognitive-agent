@@ -187,6 +187,7 @@
 | [0246](0246-user-machine-side-effect-plane.md) | 用户机器副作用平面 — 业界范式多方案（Companion/浏览器受限/隧道/托管执行机/MDM）+ LCA Computer/HIL/Gateway 挂缝；不定死网页弹 PowerShell | Implemented |
 | [0247](0247-agent-memory-knowledge-layer.md) | Agent 记忆知识层 — 从关键词原文存档升级为结构化知识：LLM 蒸馏提取、typed MemoryRecord、受治理记忆工具、用户画像回填、预算内相关性检索、supersede/遗忘生命周期，修通 assistant.bootstrap 死代码并清理 workspace_instructions 污染与硬编码关键词机制 | Accepted |
 | [0248](0248-grok-bot-coordinator-runtime-evidence.md) | 协调型桌面 Agent 运行时 — 证据级解剖（可模范实现） | Implemented |
+| [0249](0249-cadence-inspired-dual-track-memory-consolidation.md) | 基于 Cadence 生物范式的昼夜双轨记忆固化架构 — 毫秒级残差门控快记（Fast Path）+ 离线做梦固化慢变（Night Consolidation）+ 有界切片（Patch）+ DDD 聚合根与受治理 C10 窄门回填 | Accepted |
 | [0250](0250-peer-assistants-handoff-bus-and-rooms.md) | Peer Assistants Handoff Bus and Rooms | Implemented |
 | [0251](0251-openmuse-runtime-sandbox-durable-task-evidence.md) | OpenMuse 架构解剖与借鉴 — 长程租约任务、防漂移双门禁与可接管沙箱证据 | Proposed |
 | [0252](0252-multi-user-onboarding-and-identity.md) | 多用户登录与 Onboarding 隔离 — LCA 自有数据库 + LobeHub 原生前端（归属关系 LCA 全权控制，身份 SSOT = Better Auth users） | Implemented |

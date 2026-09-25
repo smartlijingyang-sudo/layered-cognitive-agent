@@ -297,6 +297,12 @@
 | AWS-TRAFFIC-COST-MONITOR | AWS 实时流量与费用监视器集成进 Dashboard（100GB免费额度/日均消耗/EBS存储/Credit全额抵扣/预警卡片） | Completed | 1. 后端落地 calculate_aws_metrics 与 get_aws_metrics（5分钟TTL防抖缓存，CloudWatch NetworkOut 本月/今日/预测算法与 EBS 卷探测），提供 /api/aws/metrics；2. 前端一体化驾驶舱 Tab 1 首屏装配「AWS 东京出口节点 · 成本与 100GB 免费流量监视器」玻璃拟态卡片（100GB进度条、日均0.83GB/天、月末预测24.9GB、EBS 8GB/30GB、Credit抵扣）；3. 23/23 自动化测试全绿（增补3项单测覆盖算法逻辑、API鉴权缓存与HTML渲染）；4. 服务平滑重启，live curl 与浏览器端验证 100% 畅通 |
 | AWS-INDEPENDENT-TAB | 顶部导航栏开辟独立「AWS 流量与成本」Tab（快捷键 1-3，全景展现节点拓扑、100GB水位、EBS与Credit费率大盘） | Completed | 1. 桌面/移动端顶部导航栏新增「AWS 流量与成本」独立 Tab 项，带动态流量水位徽章；2. 全局快捷键升级为 1-3 切 Tab（按 3 瞬间进入 AWS 大盘并触发 Toast 提示）；3. 在 <main> 区域装配专属 Tab 3 全景控制中心（拓扑、4大状态立柱、免费配额与Credit抵扣机制、自动化防风险清单与双向跳转）；4. 23/23 自动化测试全绿，服务平滑重启，live 页面 100% 畅通 |
 | AWS-COST-EXPLORER-DISPLAY | 接入 AWS Cost Explorer 真实账单费用明细并在大盘中精准展示（目前原始使用费用 $3.55、Credit抵扣 -$3.55、实付 $0.00） | Completed | 1. 后端落地 Cost Explorer 真实账单抓取（按 RECORD_TYPE 分组精准提取 Usage、Credit 与 NetCost），格式化 -$3.55 财务标准；2. 顶部导航徽章展示 20.1G · $3.55，驾驶舱 Col 4 与 Tab 3 专属大盘立柱 4 显式呈现「目前原始消耗 $3.55、Credit 抵充 -$3.55、信用卡实付 $0.00」；3. 23/23 自动化测试全绿，服务平滑重启验证 |
+| BRAINSTORM-CADENCE-MEM-CONTEXT | 探索项目现有记忆架构（ADR-0244/0247、reflect/remember节点）与Cadence生物范式契合点 | Completed | 已梳理现有 ADR-0244/0247 记忆链路、Reflect/Remember 节点现状，结合 Cadence 快慢双轨、昼夜固化、局部有界修复与元认知门控提炼出落地演进基石 |
+| BRAINSTORM-CADENCE-MEM-QUESTIONS | 澄清机制核心边界、触发时机与演进诉求（单步提问） | Completed | 用户明确选择全生命周期闭环架构：涵盖“快慢双轨 + 离线做梦固化 + 局部有界切片(Patch) + 残差门控”一体化机制 |
+| BRAINSTORM-CADENCE-MEM-APPROACHES | 提出 2-3 种具体架构整合方案与权衡分析 | Completed | 详细权衡方案 A（昼夜解耦双轨）、方案 B（图节点扩展）、方案 C（Sidecar 守护），用户确认采纳推荐的方案 A |
+| BRAINSTORM-CADENCE-MEM-DESIGN-SECTIONS | 逐步呈现设计细节（DDD领域模型、分层契约、快慢双轨、做梦固化、不变量测试）并获取用户审批 | Completed | 3 大小节（边界自治与DDD实体、双轨数据流与状态机设计模式、不变量断言矩阵与场景测试）全部获用户审核批准 |
+| BRAINSTORM-CADENCE-MEM-DESIGN-DOC | 沉淀正式 ADR 与设计文档至 docs/adr/ 及 docs/plans/ | Completed | 已落盘 docs/adr/0249-cadence-inspired-dual-track-memory-consolidation.md 与 docs/plans/2026-09-26-cadence-memory-consolidation-design.md，并通过 test_adr_index_matches_filesystem 门禁 |
+| BRAINSTORM-CADENCE-MEM-TRANSITION | 转换至实施计划制定（writing-plans） | Pending | 待执行 |
 
 
 
