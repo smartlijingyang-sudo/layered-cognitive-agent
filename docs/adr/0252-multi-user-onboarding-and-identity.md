@@ -219,3 +219,5 @@ CREATE UNIQUE INDEX IF NOT EXISTS lca_user_assistants_agent_idx
 | 日期 | 变更 |
 |---|---|
 | 2026-09-25 | 初稿；基于三路并行设计探索（LCA 自建身份 / LobeHub 原生 + JWT / 最小混合），采用最小混合为基底，归属数据落 LCA 自有数据库；吸收 JWT 硬化路径与 dev_mode fail-closed 语义 |
+| 2026-09-25 | PR-5：`register-lobehub` 重试端点 + bridge `clientId` 幂等透传 |
+| 2026-09-25 | PR-6：中间件 matcher 覆盖 `/lca-api`，`x-lca-user-id` 注入经 `NextResponse.next({ request: { headers } })` 正确转发；浏览器 E2E 实测 manifest.user_id = 真实 userId |
