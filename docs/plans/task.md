@@ -295,6 +295,9 @@
 | DYN-SEARCH-TASK-4 | Agent-Friendly CLI 客户端 (search-agent) | Completed | search-agent CLI 落地并软链至 ~/bin/search-agent，支持 --json、--fast、--deep 及无损 stdout/stderr 分流，自动化测试 2/2 100% 通过（commit 57d9aa2） |
 | DYN-SEARCH-TASK-5 | 全链路端到端实测与验收验证 | Completed | 25/25 单元与集成测试全部通过；实测 live search-agent 验证单点事实秒级直出（Python 3.12 release date 2.77s 返回标准 JSON）与电影查询多源聚合（自动激活 searxng_web/jina_reader/grok_x_search，严格裁剪无关 github_cli），终端 Markdown 与 JSON 双轨无损运转 |
 | AWS-TRAFFIC-COST-MONITOR | AWS 实时流量与费用监视器集成进 Dashboard（100GB免费额度/日均消耗/EBS存储/Credit全额抵扣/预警卡片） | Completed | 1. 后端落地 calculate_aws_metrics 与 get_aws_metrics（5分钟TTL防抖缓存，CloudWatch NetworkOut 本月/今日/预测算法与 EBS 卷探测），提供 /api/aws/metrics；2. 前端一体化驾驶舱 Tab 1 首屏装配「AWS 东京出口节点 · 成本与 100GB 免费流量监视器」玻璃拟态卡片（100GB进度条、日均0.83GB/天、月末预测24.9GB、EBS 8GB/30GB、Credit抵扣）；3. 23/23 自动化测试全绿（增补3项单测覆盖算法逻辑、API鉴权缓存与HTML渲染）；4. 服务平滑重启，live curl 与浏览器端验证 100% 畅通 |
+| AWS-INDEPENDENT-TAB | 顶部导航栏开辟独立「AWS 流量与成本」Tab（快捷键 1-3，全景展现节点拓扑、100GB水位、EBS与Credit费率大盘） | Completed | 1. 桌面/移动端顶部导航栏新增「AWS 流量与成本」独立 Tab 项，带动态流量水位徽章；2. 全局快捷键升级为 1-3 切 Tab（按 3 瞬间进入 AWS 大盘并触发 Toast 提示）；3. 在 <main> 区域装配专属 Tab 3 全景控制中心（拓扑、4大状态立柱、免费配额与Credit抵扣机制、自动化防风险清单与双向跳转）；4. 23/23 自动化测试全绿，服务平滑重启，live 页面 100% 畅通 |
+
+
 
 
 
