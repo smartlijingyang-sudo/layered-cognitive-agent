@@ -90,6 +90,8 @@ def build_cordis_creator_role_profile() -> RoleProfile:
                 "bash",
                 "activate_skill",
                 "read_skill_reference_once",
+                "runCommand",
+                "executeCode",
             ],
             max_calls_per_task={
                 "cordis_control": 32,
@@ -97,6 +99,8 @@ def build_cordis_creator_role_profile() -> RoleProfile:
                 "bash": 16,
                 "activate_skill": 8,
                 "read_skill_reference_once": 8,
+                "runCommand": 16,
+                "executeCode": 16,
             },
             requires_approval=[],
         ),

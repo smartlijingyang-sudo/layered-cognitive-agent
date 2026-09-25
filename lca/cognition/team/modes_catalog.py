@@ -69,7 +69,8 @@ LCA_UI_MODELS: Final[tuple[str, ...]] = ("solo", "team", "auto", "cordis-creator
 - ``auto``    —— 同 team（显式别名）
 - ``cordis-creator`` —— Creator §13.3 自 plugin 创作 persona；同一 web-standard
   profile 上下文，工具集由 cordis-creator role 的 manifest 限定为
-  ``cordis_control / file_write / bash`` 三件。
+  ``cordis_control / file_write / bash`` 加上沙箱执行工具
+  ``runCommand / executeCode``。
 """
 
 SOLO_MODE_KEY: Final[str] = "solo"

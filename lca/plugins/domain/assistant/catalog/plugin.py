@@ -67,7 +67,7 @@ from lca.contracts.protocols.assistant.catalog import (
     PlanRevision,
     ProfilePatch,
 )
-from lca.contracts.protocols.assistant.role_resolver import RoleCard
+from lca.contracts.protocols.assistant.role_resolver import RoleCard, RoleNotFoundError
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
@@ -293,7 +293,10 @@ class _AssistantCatalogImpl(AssistantCatalog):
                 raise _CatalogConfigError(
                     "from_role 需要 RoleCardResolver；当前 profile 未配置 assistant.role_resolver"
                 )
-            card = self._role_resolver.resolve(req.from_role)
+            try:
+                card = self._role_resolver.resolve(req.from_role)
+            except RoleNotFoundError as exc:
+                raise AssistantCatalogError(str(exc)) from exc
             if not req.soul:
                 rendered.files["SOUL.md"] = card.backstory
             profile = json.loads(rendered.files["profile.json"])

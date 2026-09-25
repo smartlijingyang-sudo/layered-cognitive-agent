@@ -171,6 +171,14 @@ class SqliteUserAssistantStore(AssistantOwnership):
             ).fetchone()
         return str(row["user_id"]) if row is not None else None
 
+    def assistant_id_for_client(self, user_id: str, client_id: str) -> str | None:
+        with self._use_connection() as connection:
+            row = connection.execute(
+                "SELECT assistant_id FROM lca_user_assistants WHERE user_id = ? AND client_id = ?",
+                (user_id, client_id),
+            ).fetchone()
+        return str(row["assistant_id"]) if row is not None else None
+
     def assistant_ids_for(self, user_id: str) -> tuple[str, ...]:
         with self._use_connection() as connection:
             rows = connection.execute(
@@ -295,6 +303,17 @@ class PostgresUserAssistantStore(AssistantOwnership):
             cur.execute(
                 "SELECT user_id FROM lca_user_assistants WHERE assistant_id = %s",
                 (assistant_id,),
+            )
+            row = cur.fetchone()
+            return str(row[0]) if row is not None else None
+
+        return self._use_cursor(_run)
+
+    def assistant_id_for_client(self, user_id: str, client_id: str) -> str | None:
+        def _run(cur: Any) -> str | None:
+            cur.execute(
+                "SELECT assistant_id FROM lca_user_assistants WHERE user_id = %s AND client_id = %s",
+                (user_id, client_id),
             )
             row = cur.fetchone()
             return str(row[0]) if row is not None else None

@@ -81,6 +81,9 @@ class AssistantOwnership(Protocol):
     def owner_of(self, assistant_id: str) -> str | None:
         """返回 ``assistant_id`` 的 owner；未知返回 ``None``。"""
 
+    def assistant_id_for_client(self, user_id: str, client_id: str) -> str | None:
+        """返回该用户在该 ``client_id`` 下已绑定的 ``asst_*``；无则 ``None``。"""
+
     def assistant_ids_for(self, user_id: str) -> tuple[str, ...]:
         """返回用户拥有的全部 ``asst_*`` id（已排序）。"""
 

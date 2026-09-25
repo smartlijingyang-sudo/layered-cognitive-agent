@@ -427,6 +427,33 @@ async def create_assistant(request: Request) -> JSONResponse:
         )
     initial_skills = tuple(dict.fromkeys(initial_skills_raw))
 
+    # ADR-0252 D3/D8 幂等：同 (user_id, client_id) 已绑定 → 返回既有助理，
+    # 不重复创建 Home（修复重复 client_id 产生孤儿助理）。
+    ownership = _ownership_from_request(request)
+    if client_id and ownership is not None:
+        existing_id = ownership.assistant_id_for_client(user_id, client_id)
+        if existing_id:
+            try:
+                existing_spec = catalog.get(existing_id)
+            except AssistantCatalogError as exc:
+                return _error_envelope(
+                    "invalid_request",
+                    status_code=400,
+                    error_type="invalid_request",
+                    detail=str(exc),
+                )
+            return _json(
+                {
+                    "assistant_id": existing_spec.assistant_id,
+                    "home_path": existing_spec.home_path,
+                    "revision_seq": existing_spec.revision_seq,
+                    "template_id": existing_spec.template_id,
+                    "agent_id": ownership.agent_id_of(existing_spec.assistant_id),
+                    "profile": _profile_view(existing_spec.home_path),
+                },
+                status_code=200,
+            )
+
     try:
         handle = catalog.create(
             CreateAssistantRequest(
