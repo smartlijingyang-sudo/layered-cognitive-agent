@@ -19,7 +19,7 @@ import { persistAssistantRow } from '../lcaPersist';
 import { getLcaGatewayUrl } from './client';
 import { createLcaDeliverables, type LcaDeliverables } from './deliverables';
 import { createLcaGatewayEventHandler } from './event_handler';
-import { lcaStartRun } from './execute';
+import { lcaStartRun, type LcaStartRunResult } from './execute';
 import { lcaRefreshWsToken } from './reconnect';
 
 type MessageLike = { id?: string; parentId?: string; role?: string };
@@ -288,17 +288,45 @@ export async function lcaExecuteGatewayRun(
   )?.agencyConfig;
   const assistantId = agencyConfig?.lcaAssistantId;
 
-  const receipt = await lcaStartRun({
-    agent: { id: params.model, name: params.model },
-    messages: wireMessages,
-    parent_message_id: assistantMessageId || params.parentMessageId,
-    topic_id: topicId || undefined,
-    ...(assistantId ? { assistant_id: assistantId } : {}),
-    ...(agencyConfig?.executionTarget
-      ? { execution_target: agencyConfig.executionTarget }
-      : {}),
-    ...(agencyConfig?.boundDeviceId ? { device_id: agencyConfig.boundDeviceId } : {}),
-  });
+  let receipt: LcaStartRunResult;
+  try {
+    receipt = await lcaStartRun({
+      agent: { id: params.model, name: params.model },
+      messages: wireMessages,
+      parent_message_id: assistantMessageId || params.parentMessageId,
+      topic_id: topicId || undefined,
+      ...(assistantId ? { assistant_id: assistantId } : {}),
+      ...(agencyConfig?.executionTarget
+        ? { execution_target: agencyConfig.executionTarget }
+        : {}),
+      ...(agencyConfig?.boundDeviceId ? { device_id: agencyConfig.boundDeviceId } : {}),
+    });
+  } catch (error) {
+    const err = error as Error;
+    console.error('[LCA] run start failed:', err);
+    // Backfill the assistant placeholder so a failed run start does not
+    // leave the conversation with a dangling "..." row and a stuck
+    // "Preparing response" state (ISSUE-010).
+    if (assistantMessageId) {
+      await persistAssistantRow(get, assistantMessageId, {
+        content: `⚠️ 本次回复未能启动（${err.message || '服务暂不可用'}）。请稍后重试。`,
+        model: params.model,
+        operationId: params.operationId || '',
+      }).catch((e) => console.error('[LCA] backfill placeholder failed', e));
+    }
+    if (params.operationId) {
+      state.completeOperation(params.operationId);
+    }
+    if (topicId && context.agentId) {
+      void state.updateTopicStatus?.({
+        agentId: context.agentId,
+        groupId: context.groupId,
+        status: 'active',
+        topicId,
+      });
+    }
+    throw err;
+  }
 
   const { operationId: gatewayOpId } = state.startOperation({
     context,

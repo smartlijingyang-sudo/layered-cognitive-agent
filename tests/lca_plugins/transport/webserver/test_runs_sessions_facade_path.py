@@ -126,3 +126,36 @@ class TestCreateRunViaRunPort:
         response = await create_run(request)
         assert response.status_code == 400
         assert port.calls == []
+
+    @pytest.mark.asyncio
+    async def test_create_run_returns_503_when_gateway_registration_redis_down(
+        self,
+        file_store: LocalFileStore,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Redis 不可达时，run 已创建但流注册失败 ⇒ 503 可恢复，而非 500。"""
+        import redis.exceptions
+
+        from lca.plugins.transport.webserver.handlers.runs.terminal.streaming import (
+            gateway_lifecycle,
+        )
+
+        port = _StubRunPort(run_id="run_redis_down")
+
+        async def _boom(*_args: Any, **_kwargs: Any) -> None:
+            raise redis.exceptions.TimeoutError("connect timeout")
+
+        monkeypatch.setattr(gateway_lifecycle, "register_gateway_run", _boom)
+
+        state = type("State", (), {})()
+        state.file_store = file_store
+        state.run_port = port
+        request = _request(
+            body={"messages": [{"role": "user", "content": "hi"}]},
+            app_state=state,
+        )
+        response = await create_run(request)
+        assert response.status_code == 503
+        body = json.loads(response.body)
+        assert body["error"]["code"] == "gateway_stream_unavailable"
+        assert len(port.calls) == 1

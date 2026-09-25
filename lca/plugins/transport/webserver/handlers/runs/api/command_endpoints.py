@@ -21,6 +21,9 @@ import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
+import redis.exceptions
+import structlog
+
 if TYPE_CHECKING:
     from starlette.applications import Starlette
 
@@ -47,6 +50,8 @@ from lca.plugins.transport.webserver.read.runs.identity.identity import (
     AgentRef,
     parse_agent_ref,
 )
+
+log = structlog.get_logger(__name__)
 
 
 def _file_store_of(request: Request) -> LocalFileStore:
@@ -447,13 +452,34 @@ async def create_run(request: Request) -> JSONResponse:
         register_gateway_run,
     )
 
-    await register_gateway_run(
-        request,
-        run_id=receipt.run_id,
-        topic_id=topic_id_from_body(body),
-        agent_id=str(decoded.agent.agent_id or "solo"),
-        body=body,
-    )
+    try:
+        await register_gateway_run(
+            request,
+            run_id=receipt.run_id,
+            topic_id=topic_id_from_body(body),
+            agent_id=str(decoded.agent.agent_id or "solo"),
+            body=body,
+        )
+    except (
+        redis.exceptions.TimeoutError,
+        redis.exceptions.ConnectionError,
+        redis.exceptions.RedisError,
+        OSError,
+    ) as exc:
+        # Gateway stream publication is a post-dispatch side effect. If Redis
+        # is momentarily unreachable the run itself is already created and
+        # executing; surface a recoverable 503 instead of a 500 so the client
+        # can retry later without leaving the UI in an unknown state.
+        log.warning(
+            "gateway.register.redis_unavailable",
+            run_id=receipt.run_id,
+            error=str(exc),
+        )
+        return _err(
+            "agent runtime stream unavailable, retry later",
+            status_code=503,
+            code="gateway_stream_unavailable",
+        )
     jwt_keys = getattr(request.app.state, "jwt_keys", None)
     return render_create_run_receipt(receipt, decoded.agent, jwt_keys=jwt_keys)
 

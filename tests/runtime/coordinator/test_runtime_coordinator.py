@@ -436,3 +436,43 @@ async def test_handle_stamped_omits_artifact_closure_when_resolver_returns_none(
     history = await manager.read_history(clean_run_id, count=10)
     end = next(e for e in history if e["type"] == "agent_runtime_end")
     assert "artifactClosure" not in end["data"]
+
+
+class TestPublishRetry:
+    """Redis 容错：publish 对瞬态错误重试，耗尽后抛原始错误。"""
+
+    @pytest.mark.asyncio
+    async def test_publish_retries_transient_redis_error(self) -> None:
+        import redis.exceptions
+
+        from lca.infrastructure.observability.stream import LcaStreamEventLog
+
+        client = AsyncMock()
+        client.xadd = AsyncMock(
+            side_effect=[
+                redis.exceptions.TimeoutError("boom"),
+                redis.exceptions.TimeoutError("boom"),
+                "1-0",
+            ]
+        )
+        client.expire = AsyncMock(return_value=True)
+        mgr = LcaStreamEventLog(client)
+        event_id = await mgr.publish("run_retry", "agent_runtime_init", {"x": 1}, step_index=0)
+        assert event_id == "1-0"
+        assert client.xadd.await_count == 3
+        # expire 只在 xadd 成功的那次尝试中被调用
+        assert client.expire.await_count == 1
+
+    @pytest.mark.asyncio
+    async def test_publish_raises_after_exhausting_retries(self) -> None:
+        import redis.exceptions
+
+        from lca.infrastructure.observability.stream import LcaStreamEventLog
+
+        client = AsyncMock()
+        client.xadd = AsyncMock(side_effect=redis.exceptions.TimeoutError("boom"))
+        client.expire = AsyncMock(return_value=True)
+        mgr = LcaStreamEventLog(client)
+        with pytest.raises(redis.exceptions.TimeoutError):
+            await mgr.publish("run_retry_fail", "agent_runtime_init", {}, step_index=0)
+        assert client.xadd.await_count == 3

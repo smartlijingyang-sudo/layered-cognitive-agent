@@ -20,6 +20,8 @@ import time
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, cast
 
+import redis.exceptions
+
 from lca.contracts.transport.stream_keys import (
     STREAM_MAXLEN,
     STREAM_RETENTION_SECONDS,
@@ -28,6 +30,12 @@ from lca.contracts.transport.stream_keys import (
 
 if TYPE_CHECKING:
     from redis.asyncio import Redis
+
+#: Transient Redis failures worth retrying before surfacing a 5xx to the
+#: gateway client. Redis sits on the run's publish path, so a momentary
+#: connect timeout must not abort an otherwise-created run.
+_PUBLISH_ATTEMPTS = 3
+_PUBLISH_BACKOFF_S = 0.25
 
 
 class LcaStreamEventLog:
@@ -49,6 +57,9 @@ class LcaStreamEventLog:
         """XADD an event to the run's stream; refresh TTL.
 
         Returns the Redis-generated event id (`<ms>-<seq>`).
+        Transient Redis errors (timeout / connection) are retried with a
+        short backoff before propagating, so a single connectivity blip does
+        not surface as HTTP 500 on the run-creation path.
         """
         # Parse STREAM_MAXLEN: native uses `"~1000"` (approximate trim).
         # redis-py expects maxlen as int + approximate=True.
@@ -56,23 +67,44 @@ class LcaStreamEventLog:
         maxlen_int = int(maxlen_str)
         approximate = STREAM_MAXLEN.startswith("~")
 
-        event_id = await self._redis.xadd(
-            stream_key(run_id),
-            {
-                "type": type,
-                "stepIndex": str(step_index),
-                "operationId": run_id,
-                "data": json.dumps(data),
-                "timestamp": str(_now_ms()),
-            },
-            id="*",
-            maxlen=maxlen_int,
-            approximate=approximate,
+        key = stream_key(run_id)
+        event = {
+            "type": type,
+            "stepIndex": str(step_index),
+            "operationId": run_id,
+            "data": json.dumps(data),
+            "timestamp": str(_now_ms()),
+        }
+        last_exc: Exception | None = None
+        for attempt in range(_PUBLISH_ATTEMPTS):
+            try:
+                event_id = await self._redis.xadd(
+                    key,
+                    event,
+                    id="*",
+                    maxlen=maxlen_int,
+                    approximate=approximate,
+                )
+                await self._redis.expire(key, STREAM_RETENTION_SECONDS)
+                # Redis-py returns bytes when decode_responses=False, str when True.
+                # Normalise to str for the caller.
+                return str(event_id)
+            except (
+                redis.exceptions.TimeoutError,
+                redis.exceptions.ConnectionError,
+                redis.exceptions.RedisError,
+                OSError,
+            ) as exc:
+                last_exc = exc
+                if attempt < _PUBLISH_ATTEMPTS - 1:
+                    await asyncio.sleep(_PUBLISH_BACKOFF_S * (attempt + 1))
+        # All retries exhausted — surface the last transient error. The
+        # caller (`create_run`) converts this into a recoverable 503.
+        if last_exc is not None:
+            raise last_exc
+        raise redis.exceptions.ConnectionError(
+            f"publish failed for run {run_id} without a retryable exception"
         )
-        await self._redis.expire(stream_key(run_id), STREAM_RETENTION_SECONDS)
-        # Redis-py returns bytes when decode_responses=False, str when True.
-        # Normalise to str for the caller.
-        return str(event_id)
 
     async def cleanup(self, run_id: str) -> None:
         """Delete the run's stream key. Called on `agent_runtime_end`."""
@@ -181,9 +213,7 @@ def _encode_sse_agent_event(event: dict) -> bytes:
     }
     body = json.dumps(envelope, ensure_ascii=False)
     event_id = event.get("id") or ""
-    return (
-        f"id: {event_id}\nevent: agent_event\ndata: {body}\n\n"
-    ).encode()
+    return (f"id: {event_id}\nevent: agent_event\ndata: {body}\n\n").encode()
 
 
 __all__ = ("LcaStreamEventLog",)
