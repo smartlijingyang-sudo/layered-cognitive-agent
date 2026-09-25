@@ -80,6 +80,15 @@ patch:
   - id: lca.plugins.assistant.webserver.bridge
     config:
       lobehub_url: "http://10.36.6.252:3010"
+  # ADR-0252：用户↔助理归属关系（LCA 自有数据库）。dev_mode=true 保持
+  # 存量单用户行为（local-dev-user，不校验 token）；false 时 fail-closed。
+  - id: lca.plugins.assistant.ownership
+    config:
+      database_url:
+        from_env: LCA_DATABASE_URL
+        required: false
+      dev_mode: true
+      expected_token: "lca-local"
   - id: lca-composio-provider
     config:
       api_key:

@@ -947,3 +947,53 @@ def _valid_soul() -> str:
         + "\n## 🗣 语气\n"
         + "专业务实，简洁量化。" * 20
     )
+
+
+# ── ADR-0252 D5：owner_user_id + list(user_id) 过滤 ──────────────────
+
+
+class TestOwnershipScoping:
+    def test_create_writes_user_id_to_manifest(
+        self,
+        catalog: AssistantCatalogImpl,
+        request_default: CreateAssistantRequest,
+    ) -> None:
+        handle = catalog.create(
+            CreateAssistantRequest(name="Demo", owner_user_id="alice")
+        )
+        manifest = json.loads(
+            (Path(handle.home_path) / "manifest.json").read_text(encoding="utf-8")
+        )
+        assert manifest["user_id"] == "alice"
+
+    def test_create_without_owner_omits_user_id(
+        self,
+        catalog: AssistantCatalogImpl,
+        request_default: CreateAssistantRequest,
+    ) -> None:
+        handle = catalog.create(request_default)
+        manifest = json.loads(
+            (Path(handle.home_path) / "manifest.json").read_text(encoding="utf-8")
+        )
+        assert "user_id" not in manifest
+
+    def test_list_filters_by_user_id(
+        self,
+        catalog: AssistantCatalogImpl,
+    ) -> None:
+        catalog.create(CreateAssistantRequest(name="Alice's", owner_user_id="alice"))
+        catalog.create(CreateAssistantRequest(name="Bob's", owner_user_id="bob"))
+
+        alice_ids = {s.assistant_id for s in catalog.list(user_id="alice")}
+        bob_ids = {s.assistant_id for s in catalog.list(user_id="bob")}
+        assert alice_ids.isdisjoint(bob_ids)
+        assert len(alice_ids) == 1
+        assert len(bob_ids) == 1
+
+    def test_list_without_user_id_returns_all(
+        self,
+        catalog: AssistantCatalogImpl,
+    ) -> None:
+        catalog.create(CreateAssistantRequest(name="Alice's", owner_user_id="alice"))
+        catalog.create(CreateAssistantRequest(name="Bob's", owner_user_id="bob"))
+        assert len(catalog.list()) == 2

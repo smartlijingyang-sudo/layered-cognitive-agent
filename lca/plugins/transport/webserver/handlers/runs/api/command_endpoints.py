@@ -369,6 +369,36 @@ def _validate_assistant_binding(request: Request, assistant_id: str) -> JSONResp
     return None
 
 
+def _validate_assistant_ownership(request: Request, assistant_id: str) -> JSONResponse | None:
+    """ADR-0252 I-4：带 ``assistant_id`` 的 run 归属检查。
+
+    - 无绑定 / 无用户头 / ``dev_mode`` ⇒ ``None``（遗留路径与 CLI/host
+      sidecar 路径不变，I-A1）；
+    - 归属已知且非请求者 ⇒ 403（fail-closed，不静默回落默认助理）。
+    """
+    if not assistant_id:
+        return None
+    from lca.plugins.transport.webserver.handlers.auth.user import auth_config_of
+
+    _, dev_mode = auth_config_of(request)
+    if dev_mode:
+        return None
+    user_id = request.headers.get("x-lca-user-id", "").strip()
+    if not user_id:
+        return None
+    ownership = getattr(request.app.state, "assistant_ownership", None)
+    if ownership is None:
+        return None
+    owner = ownership.owner_of(assistant_id)
+    if owner is not None and owner != user_id:
+        return _err(
+            "assistant not owned by caller",
+            status_code=403,
+            code="assistant_not_owned",
+        )
+    return None
+
+
 async def create_run(request: Request) -> JSONResponse:
     """``POST /runs`` — dispatch a run command and return its async receipt.
 
@@ -401,6 +431,10 @@ async def create_run(request: Request) -> JSONResponse:
     binding_error = _validate_assistant_binding(request, decoded.assistant_id)
     if binding_error is not None:
         return binding_error
+
+    ownership_error = _validate_assistant_ownership(request, decoded.assistant_id)
+    if ownership_error is not None:
+        return ownership_error
 
     if decoded.resume_approval is not None or decoded.resume_tool_result is not None:
         return await _dispatch_resume(request, body, decoded)

@@ -56,14 +56,14 @@ def _setup_plugin() -> tuple[Any, RouteRegistry]:
 
 
 @pytest.mark.asyncio
-async def test_routes_assistants_register_seven_routes() -> None:
-    """Seven :class:`RouteSpec` entries; ``/v1/assistants`` carries
+async def test_routes_assistants_register_nine_routes() -> None:
+    """Nine :class:`RouteSpec` entries; ``/v1/assistants`` carries
     both POST (create) and GET (list) via the dispatcher, and
     ``/v1/assistants/{assistant_id}/jobs`` carries POST (register) and
     GET (list) via the jobs dispatcher (PR-8)."""
     plugin, router, ctx = _setup_plugin()
     await plugin.setup(ctx, None)
-    assert len(router._exact) == 7
+    assert len(router._exact) == 9
 
 
 @pytest.mark.asyncio
@@ -72,9 +72,11 @@ async def test_routes_assistants_paths_match_advertised_surface() -> None:
     await plugin.setup(ctx, None)
     expected = {
         "/v1/assistants",
+        "/v1/assistants/import-lobehub",
         "/v1/assistants/{assistant_id}",
         "/v1/assistants/{assistant_id}/profile",
         "/v1/assistants/{assistant_id}/skills:install",
+        "/v1/assistants/{assistant_id}/bind-agent",
         "/v1/assistants/{assistant_id}/retire",
         "/v1/assistants/{assistant_id}/jobs",
         "/v1/assistants/{assistant_id}/jobs/{job_id}:fire",
@@ -86,13 +88,15 @@ async def test_routes_assistants_paths_match_advertised_surface() -> None:
 async def test_routes_assistants_effects_tracked() -> None:
     plugin, _router, ctx = _setup_plugin()
     await plugin.setup(ctx, None)
-    assert len(ctx._fake_runtime.effects) == 7
+    assert len(ctx._fake_runtime.effects) == 9
     labels = {label for _dispose, label in ctx._fake_runtime.effects}
     for path in (
         "/v1/assistants",
+        "/v1/assistants/import-lobehub",
         "/v1/assistants/{assistant_id}",
         "/v1/assistants/{assistant_id}/profile",
         "/v1/assistants/{assistant_id}/skills:install",
+        "/v1/assistants/{assistant_id}/bind-agent",
         "/v1/assistants/{assistant_id}/retire",
         "/v1/assistants/{assistant_id}/jobs",
         "/v1/assistants/{assistant_id}/jobs/{job_id}:fire",
@@ -107,9 +111,11 @@ def test_routes_assistants_exposes_public_routes_constant() -> None:
     paths = {spec.path for spec in ROUTE_SPECS}
     assert paths == {
         "/v1/assistants",
+        "/v1/assistants/import-lobehub",
         "/v1/assistants/{assistant_id}",
         "/v1/assistants/{assistant_id}/profile",
         "/v1/assistants/{assistant_id}/skills:install",
+        "/v1/assistants/{assistant_id}/bind-agent",
         "/v1/assistants/{assistant_id}/retire",
         "/v1/assistants/{assistant_id}/jobs",
         "/v1/assistants/{assistant_id}/jobs/{job_id}:fire",

@@ -63,6 +63,13 @@ class CreateAssistantRequest:
     空 = 默认把全局技能库全部可物化技能硬链接到 ``{home}/skills/``
     （全局库不可用时保持空技能集）;显式传列表 = 只装指定技能。
     """
+    owner_user_id: str | None = None
+    """Home 归属用户（ADR-0252 D5）。
+
+    由调用方（REST 层）从可信头/请求身份推导，**禁止从 body 直接透传**。
+    非空时 ``manifest.json`` 记录顶层 ``user_id``（归属元数据，不进配置面
+    digest、不触发 ``revision_seq``）。
+    """
     default_tool_names: tuple[str, ...] = ()
     """创建时写入 ``{home}/tools.yaml`` ``allow`` 列表的默认工具名（ADR-0243 D3 延伸）。
 
@@ -196,7 +203,9 @@ class AssistantCatalog(Protocol):
         """按 assistant_id 取 resolve 视图；不存在抛 ValueError。"""
         ...
 
-    def list(self) -> tuple[AssistantSummary, ...]: ...
+    def list(self, user_id: str | None = None) -> tuple[AssistantSummary, ...]:
+        """列出 Home；``user_id`` 非空时按 manifest 归属过滤（ADR-0252 D5）。"""
+        ...
 
     def revise_profile(self, assistant_id: str, patch: ProfilePatch) -> PlanRevision:
         """patch 模式：digest 重算 + ``revision_seq++`` + ``revisions/`` 快照 + EP。"""

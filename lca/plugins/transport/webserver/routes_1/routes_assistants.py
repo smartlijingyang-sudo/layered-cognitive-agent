@@ -62,6 +62,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
+from lca.contracts.protocols.assistant.ownership import UserAssistantBinding
 from lca.contracts.protocols.assistant.skill_overlay import SkillSource
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
@@ -72,6 +73,10 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.domain.assistant.catalog.plugin import (
     AssistantCatalogError,
     AssistantDigestMismatch,
+)
+from lca.plugins.transport.webserver.handlers.auth.user import (
+    auth_config_of,
+    user_id_from_request,
 )
 from lca.plugins.transport.webserver.handlers.cors.cors import CORS_HEADERS
 from lca.plugins.transport.webserver.route.register import register_routes
@@ -180,6 +185,74 @@ def _error_envelope(
     return _json(payload, status_code=status_code)
 
 
+def _user_from_request(request: Request) -> tuple[str, JSONResponse | None]:
+    """解析请求身份（ADR-0252 D4）；返回 ``(user_id, error_response)``。"""
+    expected_token, dev_mode = auth_config_of(request)
+    return user_id_from_request(request, expected_token=expected_token, dev_mode=dev_mode)
+
+
+def _ownership_from_request(request: Request) -> Any | None:
+    """读 ``app.state.assistant_ownership``；未装配返回 ``None``。"""
+    state = getattr(request, "app", None)
+    if state is None:
+        return None
+    state_obj = getattr(state, "state", None)
+    if state_obj is None:
+        return None
+    return getattr(state_obj, "assistant_ownership", None)
+
+
+def _is_dev_mode(request: Request) -> bool:
+    _, dev_mode = auth_config_of(request)
+    return dev_mode
+
+
+def _ownership_error(request: Request, user_id: str, assistant_id: str) -> JSONResponse | None:
+    """归属校验（ADR-0252 D6）：非 owner 一律 404（不泄露存在性）。
+
+    ``dev_mode`` 或 ownership 未装配时放行（存量单用户行为不变）。
+    """
+    if _is_dev_mode(request):
+        return None
+    ownership = _ownership_from_request(request)
+    if ownership is None:
+        return None
+    owner = ownership.owner_of(assistant_id)
+    if owner is None or owner != user_id:
+        return _error_envelope(
+            "assistant_not_found",
+            status_code=404,
+            error_type="not_found",
+            detail="assistant 不存在",
+        )
+    return None
+
+
+def _bind_ownership(
+    request: Request,
+    *,
+    user_id: str,
+    assistant_id: str,
+    client_id: str,
+    role_id: str | None,
+    initial_skills: tuple[str, ...],
+) -> None:
+    """创建后写入归属关系（ADR-0252 D3）；ownership 未装配时静默跳过。"""
+    ownership = _ownership_from_request(request)
+    if ownership is None:
+        return
+    ownership.ensure_user(user_id)
+    ownership.bind(
+        UserAssistantBinding(
+            user_id=user_id,
+            assistant_id=assistant_id,
+            client_id=client_id or assistant_id,
+            role_id=role_id,
+            initial_skills=initial_skills,
+        )
+    )
+
+
 def _parse_skill_source(raw: Any) -> SkillSource | None:
     """body ``source`` → :class:`SkillSource`;不支持的形状返回 ``None``。
 
@@ -206,14 +279,19 @@ def _parse_skill_source(raw: Any) -> SkillSource | None:
 
 
 async def create_assistant(request: Request) -> JSONResponse:
-    """``POST /v1/assistants`` —— ``AssistantCatalog.create`` entry.
+    """``POST /v1/assistants`` —— ``AssistantCatalog.create`` entry。
 
-    状态码契约（ADR-0187 §3 D7 fail-closed）：
+    状态码契约（ADR-0187 §3 D7 fail-closed + ADR-0252 D4/D6）：
 
     - catalog capability 不在场 ⇒ 501 ``catalog_unavailable``；
+    - 身份不可解析 ⇒ 401（``dev_mode`` 外）；
     - body 非法 / name 缺失 / 未知 template ⇒ 400；
-    - 成功 ⇒ 201 + handle + profile 视图。
+    - 成功 ⇒ 201 + handle + profile 视图，并写入归属关系。
     """
+    user_id, auth_error = _user_from_request(request)
+    if auth_error is not None:
+        return auth_error
+
     catalog = _catalog_from_request(request)
     if catalog is None:
         return _not_implemented("catalog_unavailable", "AssistantCatalog.create")
@@ -244,6 +322,8 @@ async def create_assistant(request: Request) -> JSONResponse:
     template_id = body.get("template_id") or "assistant.default"
     seed_user_md = body.get("seed_user_md") or None
     from_role = body.get("from_role") or None
+    client_id = body.get("client_id") or ""
+    initial_skills_raw = body.get("initial_skills") or []
     if not isinstance(description, str):
         return _error_envelope(
             "invalid_request",
@@ -272,6 +352,23 @@ async def create_assistant(request: Request) -> JSONResponse:
             error_type="invalid_request",
             detail="seed_user_md 必须为字符串",
         )
+    if not isinstance(client_id, str):
+        return _error_envelope(
+            "invalid_request",
+            status_code=400,
+            error_type="invalid_request",
+            detail="client_id 必须为字符串",
+        )
+    if not isinstance(initial_skills_raw, list) or not all(
+        isinstance(skill, str) for skill in initial_skills_raw
+    ):
+        return _error_envelope(
+            "invalid_request",
+            status_code=400,
+            error_type="invalid_request",
+            detail="initial_skills 必须为字符串数组",
+        )
+    initial_skills = tuple(dict.fromkeys(initial_skills_raw))
 
     try:
         handle = catalog.create(
@@ -283,6 +380,8 @@ async def create_assistant(request: Request) -> JSONResponse:
                 from_role=from_role.strip()
                 if isinstance(from_role, str) and from_role.strip()
                 else None,
+                initial_skills=initial_skills,
+                owner_user_id=user_id,
             )
         )
     except AssistantCatalogError as exc:
@@ -292,6 +391,15 @@ async def create_assistant(request: Request) -> JSONResponse:
             error_type="invalid_request",
             detail=str(exc),
         )
+
+    _bind_ownership(
+        request,
+        user_id=user_id,
+        assistant_id=handle.assistant_id,
+        client_id=client_id,
+        role_id=from_role.strip() if isinstance(from_role, str) and from_role.strip() else None,
+        initial_skills=initial_skills,
+    )
 
     return _json(
         {
@@ -322,10 +430,18 @@ def _profile_view(home_path: str) -> dict[str, Any]:
 
 
 async def list_assistants(request: Request) -> JSONResponse:
-    """``GET /v1/assistants`` —— ``AssistantCatalog.list``."""
+    """``GET /v1/assistants`` —— ``AssistantCatalog.list``（ADR-0252 D6 归属隔离）。
+
+    ``dev_mode`` 保持存量行为（列出全部）；非 dev 模式只返回调用者拥有的
+    Home（``manifest.user_id`` 过滤）。
+    """
+    user_id, auth_error = _user_from_request(request)
+    if auth_error is not None:
+        return auth_error
     catalog = _catalog_from_request(request)
     if catalog is None:
         return _not_implemented("catalog_unavailable", "AssistantCatalog.list")
+    items = catalog.list() if _is_dev_mode(request) else catalog.list(user_id=user_id)
     summaries = [
         {
             "assistant_id": item.assistant_id,
@@ -338,7 +454,7 @@ async def list_assistants(request: Request) -> JSONResponse:
             "job_count": item.job_count,
             "updated_at": item.updated_at,
         }
-        for item in catalog.list()
+        for item in items
     ]
     return _json({"assistants": summaries}, status_code=200)
 
@@ -361,9 +477,13 @@ async def get_assistant(request: Request) -> JSONResponse:
     Response projects the serializable ``AssistantSpec`` fields only;
     ``agent_spec`` carries a live LLM adapter and never leaves the process.
 
-    状态码契约：未知 id ⇒ 404；digest 不匹配 ⇒ 409（fail-closed，
-    唯一恢复路径 = reimport）。
+    状态码契约（ADR-0252 D6）：身份不可解析 ⇒ 401；未知 id ⇒ 404；
+    digest 不匹配 ⇒ 409（fail-closed，唯一恢复路径 = reimport）；
+    非 owner ⇒ 404（不泄露存在性）。
     """
+    user_id, auth_error = _user_from_request(request)
+    if auth_error is not None:
+        return auth_error
     catalog = _catalog_from_request(request)
     if catalog is None:
         return _not_implemented("catalog_unavailable", "AssistantCatalog.get")
@@ -379,6 +499,10 @@ async def get_assistant(request: Request) -> JSONResponse:
         return _error_envelope(
             "assistant_not_found", status_code=404, error_type="not_found", detail=str(exc)
         )
+
+    ownership_error = _ownership_error(request, user_id, assistant_id)
+    if ownership_error is not None:
+        return ownership_error
 
     return _json(
         {
@@ -463,17 +587,25 @@ def _profile_patch_from_body(body: dict[str, Any]) -> ProfilePatch:
 async def revise_assistant_profile(request: Request) -> JSONResponse:
     """``PATCH /v1/assistants/{assistant_id}/profile`` —— ``catalog.revise_profile``.
 
-    状态码契约（ADR-0187 §3 D7 fail-closed）：
+    状态码契约（ADR-0187 §3 D7 fail-closed + ADR-0252 D6）：
 
+    - 身份不可解析 ⇒ 401；
     - catalog capability 不在场 ⇒ 501 ``catalog_unavailable``；
     - body 非法 / 未知字段 / patch 类型错误 ⇒ 400；
-    - 未知 assistant ⇒ 404；配置面 digest 不匹配 ⇒ 409；
+    - 未知 assistant ⇒ 404；配置面 digest 不匹配 ⇒ 409；非 owner ⇒ 404；
     - 成功 ⇒ 200 + ``PlanRevision`` 字段 + 更新后的 profile 视图。
     """
+    user_id, auth_error = _user_from_request(request)
+    if auth_error is not None:
+        return auth_error
     catalog = _catalog_from_request(request)
     if catalog is None:
         return _not_implemented("catalog_unavailable", "AssistantCatalog.revise_profile")
     assistant_id = str(request.path_params.get("assistant_id") or "")
+
+    ownership_error = _ownership_error(request, user_id, assistant_id)
+    if ownership_error is not None:
+        return ownership_error
 
     try:
         body = await request.json()
@@ -549,14 +681,18 @@ async def revise_assistant_profile(request: Request) -> JSONResponse:
 async def install_assistant_skill(request: Request) -> JSONResponse:
     """``POST /v1/assistants/{assistant_id}/skills:install`` —— ``overlay.install`` (PR-6).
 
-    状态码契约(ADR-0187 §3 D7 fail-closed):
+    状态码契约(ADR-0187 §3 D7 fail-closed + ADR-0252 D6):
 
+    - 身份不可解析 ⇒ 401；
     - overlay capability 不在场 ⇒ 503 ``skill_overlay_unavailable``;
     - body 非法 / source 形状不支持 ⇒ 400;
-    - 助理不存在 ⇒ 404;配置面 digest 不匹配 ⇒ 409;
+    - 助理不存在 ⇒ 404;配置面 digest 不匹配 ⇒ 409;非 owner ⇒ 404;
     - 拉取 / 格式 / 0067 三闸拒收 ⇒ 422 ``install_rejected``;
     - 成功 ⇒ 200 + ``SkillInstallReceipt``(含四件套字段)。
     """
+    user_id, auth_error = _user_from_request(request)
+    if auth_error is not None:
+        return auth_error
     overlay = _skill_overlay_from_request(request)
     if overlay is None:
         return _error_envelope(
@@ -566,6 +702,11 @@ async def install_assistant_skill(request: Request) -> JSONResponse:
             detail="assistant.skill_overlay capability 不在已解析 profile 中",
         )
     assistant_id = str(request.path_params.get("assistant_id") or "")
+
+    ownership_error = _ownership_error(request, user_id, assistant_id)
+    if ownership_error is not None:
+        return ownership_error
+
     try:
         body = await request.json()
     except (ValueError, OSError):
@@ -745,6 +886,59 @@ def _extract_emoji(avatar: str) -> str:
     return ""
 
 
+async def bind_agent(request: Request) -> JSONResponse:
+    """``POST /v1/assistants/{assistant_id}/bind-agent`` —— owner 回填 LobeHub agent 行。
+
+    ADR-0252 D8：浏览器 onboarding 路径在 LCA 创建 Home 后调原生
+    ``agent.createAgent`` 生成 ``agt_*``，再把 ``agent_id`` 回填到归属记录。
+    幂等：已绑定同一 ``agent_id`` 返回 200；未知/非 owner ⇒ 404。
+    """
+    user_id, auth_error = _user_from_request(request)
+    if auth_error is not None:
+        return auth_error
+    assistant_id = str(request.path_params.get("assistant_id") or "")
+
+    ownership = _ownership_from_request(request)
+    if ownership is None:
+        return _error_envelope(
+            "ownership_unavailable",
+            status_code=503,
+            error_type="service_unavailable",
+            detail="assistant.ownership capability 不在已解析 profile 中",
+        )
+    owner = ownership.owner_of(assistant_id)
+    if owner is None or owner != user_id:
+        return _error_envelope(
+            "assistant_not_found",
+            status_code=404,
+            error_type="not_found",
+            detail="assistant 不存在",
+        )
+
+    try:
+        body = await request.json()
+    except (ValueError, OSError):
+        return _error_envelope("invalid_json", status_code=400, error_type="invalid_request")
+    if not isinstance(body, dict):
+        return _error_envelope(
+            "invalid_request",
+            status_code=400,
+            error_type="invalid_request",
+            detail="body 必须是 JSON object",
+        )
+    agent_id = str(body.get("agent_id") or "").strip()
+    if not agent_id:
+        return _error_envelope(
+            "invalid_request",
+            status_code=400,
+            error_type="invalid_request",
+            detail="agent_id 必须为非空字符串",
+        )
+
+    ownership.set_agent_id(assistant_id, agent_id)
+    return _json({"assistant_id": assistant_id, "agent_id": agent_id}, status_code=200)
+
+
 async def retire_assistant(request: Request) -> JSONResponse:
     """``POST /v1/assistants/{assistant_id}/retire`` —— ``catalog.retire``."""
     if _catalog_from_request(request) is None:
@@ -811,6 +1005,11 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
     RouteSpec(
         "/v1/assistants/{assistant_id}/skills:install",
         install_assistant_skill,
+        ("POST", "OPTIONS"),
+    ),
+    RouteSpec(
+        "/v1/assistants/{assistant_id}/bind-agent",
+        bind_agent,
         ("POST", "OPTIONS"),
     ),
     RouteSpec(

@@ -44,11 +44,14 @@ class Config(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    database_url: str = ""
-    """``{from_env: LCA_DATABASE_URL}`` 展开值；空 = SQLite。"""
+    database_url: str | None = None
+    """``{from_env: LCA_DATABASE_URL}`` 展开值；``None``/空 = SQLite。"""
 
     dev_mode: bool = True
     """True = 归属检查放行（存量单用户行为）；False = fail-closed。"""
+
+    expected_token: str = "lca-local"  # noqa: S105  dev 共享 token，非凭据
+    """``Authorization: Bearer`` / ``X-LCA-Token`` 期望值（dev_mode=False 时校验）。"""
 
 
 @plugin(
@@ -80,13 +83,15 @@ class Config(BaseModel):
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """构造 store，提供 capability，并安装到 ``app.state.assistant_ownership``。"""
-    store = build_user_assistant_store(database_url=config.database_url)
+    store = build_user_assistant_store(database_url=config.database_url or "")
     ctx.provide(ASSISTANT_OWNERSHIP.key, store)
 
     handle = ctx.require("web_server")
     app = getattr(handle, "app", None)
     if app is not None and hasattr(app, "state"):
         app.state.assistant_ownership = store
+        app.state.lca_auth_expected_token = config.expected_token
+        app.state.lca_auth_dev_mode = config.dev_mode
     log.info("assistant.ownership.installed", dev_mode=config.dev_mode)
 
 

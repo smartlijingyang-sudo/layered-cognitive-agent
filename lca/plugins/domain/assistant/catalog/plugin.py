@@ -369,6 +369,8 @@ class _AssistantCatalogImpl(AssistantCatalog):
             )
             if req.from_role:
                 manifest["role_id"] = req.from_role
+            if req.owner_user_id:
+                manifest["user_id"] = req.owner_user_id
             if skills_index:
                 manifest["skills"] = skills_index
             write_manifest(home.root, manifest)
@@ -461,16 +463,30 @@ class _AssistantCatalogImpl(AssistantCatalog):
             plan_overlay=_load_plan_overlay(home.root),
         )
 
-    def list(self) -> tuple[AssistantSummary, ...]:
+    def list(self, user_id: str | None = None) -> tuple[AssistantSummary, ...]:
         """扫 ``{assistants_root}/*/manifest.json``;digest 不一致的不列。
 
         失败语义(PR-3 范围):manifest 缺失 / JSON 损坏 / 必填字段缺失
         等结构性错误 → log warning + 跳过(fail-closed 列表不列坏项);
         digest 不匹配 → log warning + 跳过;**不发 EP**(工程 EP 不在 12 EP
         闭集内,需先 ADR 才加)。
+
+        ``user_id`` 非空时只返回 ``manifest.user_id == user_id`` 的 Home
+        （ADR-0252 D5 磁盘侧归属过滤）。存量无 ``user_id`` 字段的 Home
+        不匹配任何用户（归属迁移见 ADR-0252 §7 开放问题 1）。
         """
         summaries: list[AssistantSummary] = []
         for child in list_children_dirs(self._root):
+            if user_id is not None:
+                manifest_path = child / "manifest.json"
+                if not manifest_path.is_file():
+                    continue
+                try:
+                    manifest = _read_json(manifest_path)
+                except (OSError, ValueError):
+                    continue
+                if str(manifest.get("user_id") or "") != user_id:
+                    continue
             summary = _summary_from_home(child)
             if summary is not None:
                 summaries.append(summary)
