@@ -106,12 +106,15 @@ class AssistantFrontendBridge:
         emoji: str,
         system_role: str,
         opening_message: str = "",
+        client_id: str = "",
     ) -> str | None:
         """投影一个助理到前端；成功返回 ``agt_*`` agent id，失败返回 ``None``。
 
         Precondition：``assistant_id`` / ``name`` 非空（catalog.create 已保证）。
         ``opening_message`` 由调用方从 Home 的 ``profile.json`` 读取（ADR-0242 D9），
         本桥不再拼装开场白。
+        ``client_id`` 透传给 LobeHub ``agent.createAgent`` 做幂等
+        （``agents.client_id_user_id_unique``，ADR-0252 D8）。
         Failure：未启用 / 网络错误 / 非 200 / 响应缺 ``agentId`` ⇒ ``None``
         + warning log（fail-soft；创建真值不受影响）。
         """
@@ -131,7 +134,9 @@ class AssistantFrontendBridge:
         }
         if opening_message:
             config["openingMessage"] = opening_message
-        body = {"json": {"config": config}}
+        body: dict[str, Any] = {"json": {"config": config}}
+        if client_id:
+            body["json"]["clientId"] = client_id
 
         try:
             import httpx
@@ -248,6 +253,8 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         timeout_s=config.timeout_s,
     )
     ctx.provide(ASSISTANT_FRONTEND_BRIDGE.key, bridge)
+    if app is not None and hasattr(app, "state"):
+        app.state.assistant_frontend_bridge = bridge
 
 
 def _mount_assistant_routes(ctx: PluginContext, app: Any) -> None:

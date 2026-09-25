@@ -74,8 +74,9 @@ def test_bind_same_assistant_different_client_no_duplicate(
 def test_set_agent_id(store: SqliteUserAssistantStore) -> None:
     store.ensure_user("user_1")
     store.bind(_binding())
+    assert store.agent_id_of("asst_1") is None
     store.set_agent_id("asst_1", "agt_1")
-    assert store.owner_of("asst_1") == "user_1"
+    assert store.agent_id_of("asst_1") == "agt_1"
 
 
 def test_agent_id_unique_index(store: SqliteUserAssistantStore) -> None:

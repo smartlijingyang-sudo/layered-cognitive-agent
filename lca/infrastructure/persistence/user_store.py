@@ -190,6 +190,16 @@ class SqliteUserAssistantStore(AssistantOwnership):
                 (agent_id, assistant_id),
             )
 
+    def agent_id_of(self, assistant_id: str) -> str | None:
+        with self._use_connection() as connection:
+            row = connection.execute(
+                "SELECT agent_id FROM lca_user_assistants WHERE assistant_id = ?",
+                (assistant_id,),
+            ).fetchone()
+        if row is None or row["agent_id"] is None:
+            return None
+        return str(row["agent_id"])
+
     def set_onboarding_state(self, user_id: str, state: str) -> None:
         with self._use_connection() as connection:
             connection.execute(
@@ -313,6 +323,19 @@ class PostgresUserAssistantStore(AssistantOwnership):
             )
 
         self._use_cursor(_run)
+
+    def agent_id_of(self, assistant_id: str) -> str | None:
+        def _run(cur: Any) -> str | None:
+            cur.execute(
+                "SELECT agent_id FROM lca_user_assistants WHERE assistant_id = %s",
+                (assistant_id,),
+            )
+            row = cur.fetchone()
+            if row is None or row[0] is None:
+                return None
+            return str(row[0])
+
+        return self._use_cursor(_run)
 
     def set_onboarding_state(self, user_id: str, state: str) -> None:
         def _run(cur: Any) -> None:

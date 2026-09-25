@@ -87,6 +87,9 @@ class AssistantOwnership(Protocol):
     def set_agent_id(self, assistant_id: str, agent_id: str) -> None:
         """bridge 注册成功后回填 LobeHub agent id。"""
 
+    def agent_id_of(self, assistant_id: str) -> str | None:
+        """返回已绑定的 LobeHub ``agt_*``；未绑定返回 ``None``。"""
+
     def set_onboarding_state(self, user_id: str, state: str) -> None:
         """更新用户 onboarding 状态（pending|agent_created|completed）。"""
 

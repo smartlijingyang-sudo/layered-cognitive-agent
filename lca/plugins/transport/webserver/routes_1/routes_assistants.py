@@ -939,6 +939,98 @@ async def bind_agent(request: Request) -> JSONResponse:
     return _json({"assistant_id": assistant_id, "agent_id": agent_id}, status_code=200)
 
 
+async def register_lobehub(request: Request) -> JSONResponse:
+    """``POST /v1/assistants/{assistant_id}/register-lobehub`` —— bridge 注册重试。
+
+    ADR-0252 D8：浏览器路径用原生 ``agent.createAgent`` + ``bind-agent``；
+    本端点是 LCA bridge 路径（dev/CLI/skill 创建）的失败重试。owner-only，
+    已绑定 ``agent_id`` 时 no-op 返回现有值；bridge 未装配/注册失败 502。
+    """
+    user_id, auth_error = _user_from_request(request)
+    if auth_error is not None:
+        return auth_error
+    assistant_id = str(request.path_params.get("assistant_id") or "")
+
+    ownership = _ownership_from_request(request)
+    if ownership is None:
+        return _error_envelope(
+            "ownership_unavailable",
+            status_code=503,
+            error_type="service_unavailable",
+            detail="assistant.ownership capability 不在已解析 profile 中",
+        )
+    owner = ownership.owner_of(assistant_id)
+    if owner is None or owner != user_id:
+        return _error_envelope(
+            "assistant_not_found",
+            status_code=404,
+            error_type="not_found",
+            detail="assistant 不存在",
+        )
+
+    existing = ownership.agent_id_of(assistant_id)
+    if existing:
+        return _json({"assistant_id": assistant_id, "agent_id": existing}, status_code=200)
+
+    bridge = getattr(request.app.state, "assistant_frontend_bridge", None)
+    if bridge is None or not getattr(bridge, "enabled", False):
+        return _error_envelope(
+            "bridge_unavailable",
+            status_code=503,
+            error_type="service_unavailable",
+            detail="assistant.frontend_bridge 未装配或未启用",
+        )
+
+    catalog = _catalog_from_request(request)
+    if catalog is None:
+        return _not_implemented("catalog_unavailable", "AssistantCatalog.get")
+    try:
+        spec = catalog.get(assistant_id)
+    except AssistantCatalogError as exc:
+        return _error_envelope(
+            "assistant_not_found",
+            status_code=404,
+            error_type="not_found",
+            detail=str(exc),
+        )
+
+    import json
+    from pathlib import Path
+
+    home = Path(spec.home_path)
+    profile: dict[str, object] = {}
+    try:
+        profile = json.loads((home / "profile.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        profile = {}
+    emoji = str(profile.get("emoji") or "🤖")
+    opening_message = str(profile.get("opening_message") or "")
+    soul = ""
+    try:
+        soul = (home / "SOUL.md").read_text(encoding="utf-8")
+    except OSError:
+        soul = ""
+
+    agent_id = await bridge.register(
+        assistant_id=assistant_id,
+        name=spec.profile_name,
+        description=spec.profile_description,
+        emoji=emoji,
+        system_role=soul,
+        opening_message=opening_message,
+        client_id=f"lca-{assistant_id}",
+    )
+    if agent_id is None:
+        return _error_envelope(
+            "bridge_registration_failed",
+            status_code=502,
+            error_type="bad_gateway",
+            detail="LobeHub agent 行注册失败，可稍后重试",
+        )
+    ownership.set_agent_id(assistant_id, agent_id)
+    return _json({"assistant_id": assistant_id, "agent_id": agent_id}, status_code=200)
+
+
 async def retire_assistant(request: Request) -> JSONResponse:
     """``POST /v1/assistants/{assistant_id}/retire`` —— ``catalog.retire``."""
     if _catalog_from_request(request) is None:
@@ -1010,6 +1102,11 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
     RouteSpec(
         "/v1/assistants/{assistant_id}/bind-agent",
         bind_agent,
+        ("POST", "OPTIONS"),
+    ),
+    RouteSpec(
+        "/v1/assistants/{assistant_id}/register-lobehub",
+        register_lobehub,
         ("POST", "OPTIONS"),
     ),
     RouteSpec(

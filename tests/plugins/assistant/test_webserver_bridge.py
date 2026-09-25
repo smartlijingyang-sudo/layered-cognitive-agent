@@ -206,3 +206,31 @@ class TestMountAssistantRoutes:
         first_count = len(app.router.routes)
         _mount_assistant_routes(ctx, app)  # type: ignore[arg-type]
         assert len(app.router.routes) == first_count
+
+
+class TestRegisterClientId:
+    """ADR-0252 D8：bridge.register 透传 clientId 做幂等。"""
+
+    @pytest.mark.asyncio
+    async def test_client_id_forwarded_in_body(self) -> None:
+        from unittest.mock import AsyncMock, patch
+
+        from lca.plugins.assistant.webserver.bridge import AssistantFrontendBridge
+
+        bridge = AssistantFrontendBridge(lobehub_url="http://lobehub:3010")
+        ok = _FakeResponse(200, '{"result": {"data": {"json": {"agentId": "agt_ok"}}}}')
+        fake_client = AsyncMock()
+        fake_client.post = AsyncMock(return_value=ok)
+        fake_client.__aenter__ = AsyncMock(return_value=fake_client)
+        fake_client.__aexit__ = AsyncMock(return_value=None)
+        with patch("httpx.AsyncClient", return_value=fake_client):
+            await bridge.register(
+                assistant_id="asst_map",
+                name="研究",
+                description="研究职责",
+                emoji="🔍",
+                system_role="SOUL 内容",
+                client_id="lca-asst_map",
+            )
+        _, kwargs = fake_client.post.call_args
+        assert kwargs["json"]["json"]["clientId"] == "lca-asst_map"
