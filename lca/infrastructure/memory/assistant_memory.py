@@ -30,6 +30,7 @@ from lca.contracts.models.core.conversation.memory import MemoryRecord
 from lca.contracts.models.core.execution.decision import Observation, Reflection
 from lca.contracts.models.core.perceive.perception import ContextManifest
 from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.models.memory.episode import canonical_dedupe_key
 from lca.contracts.protocols.memory.memory import MemorySystem
 
 _MEMORY_DIR = "memory"
@@ -45,14 +46,7 @@ def _canonical_dedupe_key(dedupe_key: str | None, category: str | None = None) -
 
     保证同语义事实的幂等键格式一致（ADR-0247 §3.3），保持领域无关，不硬编码具体业务实体。
     """
-    if not dedupe_key:
-        return None
-    key = str(dedupe_key).strip().lower().replace("-", "_")
-    if ":" not in key and category:
-        cat = str(category).strip().lower()
-        if cat:
-            key = f"{cat}:{key}"
-    return key
+    return canonical_dedupe_key(dedupe_key, category)
 
 
 class AssistantMemory(MemorySystem):
@@ -75,6 +69,11 @@ class AssistantMemory(MemorySystem):
         self._root = Path(home_path) / _MEMORY_DIR
         self._root.mkdir(parents=True, exist_ok=True)
         self._profile_backfill = profile_backfill
+
+    @property
+    def home_path(self) -> Path:
+        """Reflect resolves the episode directory from the bound memory without reading ``_root``."""
+        return self._root.parent
 
     def _layer_path(self, layer: MemoryLayer) -> Path:
         return self._root / f"{layer.value}.json"
@@ -284,6 +283,7 @@ class AssistantMemory(MemorySystem):
         source_trace_id: str,
         record_id: str | None = None,
         revision_of: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """追加一条 typed semantic 记录；同 ``dedupe_key`` 旧记录被 supersede。
 
@@ -352,7 +352,7 @@ class AssistantMemory(MemorySystem):
                 "source_trace_id": source_trace_id,
                 "created_at_ms": now_ms,
                 "created_at": _utc_now_iso(),
-                "metadata": {"source": source},
+                "metadata": _stored_metadata(source, metadata),
             }
         )
         self._save(layer, records)
@@ -394,6 +394,7 @@ class AssistantMemory(MemorySystem):
             dedupe_key=record.dedupe_key,
             source_trace_id=record.source_trace_id or "",
             revision_of=record.revision_of,
+            metadata=record.metadata if isinstance(record.metadata, dict) else None,
         )
         return record
 
@@ -502,6 +503,16 @@ class AssistantMemory(MemorySystem):
             for entry in self._load(layer)
             if not entry.get("deleted", False)
         ]
+
+
+def _stored_metadata(source: str, metadata: dict[str, Any] | None) -> dict[str, Any]:
+    stored = {"source": source}
+    if not metadata:
+        return stored
+    for key, value in metadata.items():
+        if key != "source":
+            stored[key] = value
+    return stored
 
 
 def _as_category(value: object) -> MemoryCategory:

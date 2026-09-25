@@ -15,9 +15,15 @@ from __future__ import annotations
 
 import json
 import re
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
+from pydantic import BaseModel, ConfigDict
+
+from lca.cognition.memory.govern import govern
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.enums.enums import ActionType, MemoryCategory
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -42,6 +48,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.contracts.protocols.memory.filter import MemoryPreFilter
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.infrastructure.memory.episode_buffer import EpisodeBuffer
 from lca.infrastructure.memory.pre_filter import DEFAULT_MEMORY_TOKENS, FallbackMemoryFilter
 
 # 快速路径成本门：仅当用户陈述可能包含自我身份/偏好信号时才值得调 LLM 蒸馏。
@@ -156,6 +163,8 @@ class ReflectMemoryExtractExecutor:
     declared_inputs: tuple[PortName, ...] = ("reflection",)
     declared_outputs: tuple[PortName, ...] = ("reflection", "routing")
     pre_filter: MemoryPreFilter | None = None
+    governor_enabled: bool = False
+    now_ms: Callable[[], int] | None = None
 
     async def node_execute(
         self,
@@ -170,6 +179,15 @@ class ReflectMemoryExtractExecutor:
             extra = {}
         if extra.get("fast_path") is True or extra.get("memory_candidates"):
             return self._passthrough(reflection)
+
+        if self.governor_enabled:
+            try:
+                governed = self._apply_governor(context, reflection)
+            except Exception:
+                # Buffer or template failure must not fail the turn.
+                governed = None
+            if governed is not None:
+                return governed
 
         runtime = context.runtime or {}
         state = getattr(runtime, "agent_state", None)
@@ -210,6 +228,46 @@ class ReflectMemoryExtractExecutor:
             }
         return self._passthrough(reflection)
 
+    def _apply_governor(self, context: NodeContext, reflection: object) -> NodeOutput | None:
+        runtime = context.runtime or {}
+        home = _episode_home(runtime)
+        state = getattr(runtime, "agent_state", None)
+        if state is None and hasattr(runtime, "get"):
+            state = runtime.get("agent_state")
+        turns = getattr(state, "control_turns", None) if state is not None else None
+        observation = None
+        if isinstance(turns, list) and turns:
+            observation = getattr(turns[-1], "observation", None)
+        observation_success = (
+            getattr(observation, "success", None) if observation is not None else None
+        )
+        if observation_success is not None and not isinstance(observation_success, bool):
+            observation_success = None
+        observation_error = getattr(observation, "error", None) if observation is not None else None
+        if observation_error is not None and not isinstance(observation_error, str):
+            observation_error = str(observation_error)
+        last_error = getattr(state, "last_error", None) if state is not None else None
+        if last_error is not None and not isinstance(last_error, str):
+            last_error = str(last_error)
+        lesson = getattr(reflection, "lesson", None)
+        if lesson is not None and not isinstance(lesson, str):
+            lesson = str(lesson)
+        fact = govern(
+            task=str(getattr(state, "task", "") or ""),
+            trace_id=str(getattr(state, "trace_id", "") or ""),
+            lesson=lesson,
+            observation_success=observation_success,
+            observation_error=observation_error,
+            last_error=last_error,
+            now_ms=self.now_ms() if self.now_ms is not None else int(time.time() * 1000),
+        )
+        if fact is None:
+            return self._passthrough(reflection)
+        if home is None:
+            return None
+        EpisodeBuffer(home).append(fact)
+        return self._passthrough(reflection)
+
     @staticmethod
     def _passthrough(reflection: object) -> NodeOutput:
         return NodeOutput(
@@ -220,8 +278,47 @@ class ReflectMemoryExtractExecutor:
         )
 
 
+def _runtime_get(runtime: object, key: str) -> object:
+    getter = getattr(runtime, "get", None)
+    if callable(getter):
+        return getter(key)
+    return None
+
+
+def _episode_home(runtime: object) -> Path | None:
+    raw_home = _runtime_get(runtime, "assistant_home_path")
+    if isinstance(raw_home, Path):
+        return raw_home if str(raw_home).strip() else None
+    if isinstance(raw_home, str) and raw_home.strip():
+        return Path(raw_home)
+    memory = _runtime_get(runtime, "memory")
+    bound = getattr(memory, "home_path", None)
+    if isinstance(bound, Path):
+        return bound
+    if isinstance(bound, str) and bound.strip():
+        return Path(bound)
+    return None
+
+
+class Config(BaseModel):
+    """Optional daytime episode governor. Default off leaves today's extractor."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    governor_enabled: bool = False
+
+
+def _config_from(config: object) -> Config:
+    if isinstance(config, Config):
+        return config
+    if isinstance(config, dict):
+        return Config.model_validate(config)
+    return Config()
+
+
 @plugin(
     id="phase.reflect.memory.extract",
+    Config=Config,
     provides=("reflect::phase.reflect.memory.extract",),
     layer="L2",
     kind=PluginKind.PRIMITIVE,
@@ -250,8 +347,11 @@ class ReflectMemoryExtractExecutor:
     ),
 )
 async def setup(ctx: PluginContext, config: object) -> None:
-    del config
-    ctx.provide("reflect::phase.reflect.memory.extract", ReflectMemoryExtractExecutor())
+    parsed = _config_from(config)
+    ctx.provide(
+        "reflect::phase.reflect.memory.extract",
+        ReflectMemoryExtractExecutor(governor_enabled=parsed.governor_enabled),
+    )
 
 
-__all__ = ["ReflectMemoryExtractExecutor", "setup"]
+__all__ = ["Config", "ReflectMemoryExtractExecutor", "setup"]

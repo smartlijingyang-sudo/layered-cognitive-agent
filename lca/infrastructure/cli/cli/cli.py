@@ -44,6 +44,7 @@ from lca.infrastructure.cli.commands import (
     journal_steps,
     journal_trace,
     kernel,
+    memory,
     notes,
     observation,
     package_organization,
@@ -98,6 +99,7 @@ kernel.register(app)
 from lca.infrastructure.cli.commands.kernel import supervisor as kernel_supervisor_mod
 kernel_supervisor_mod.register(app)
 notes.register(app)
+memory.register(app)
 typecheck.register(app)
 observation.register(app)
 

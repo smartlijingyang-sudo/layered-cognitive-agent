@@ -11,6 +11,7 @@ from lca.infrastructure.cli.commands.ops import (
     audit,
     composio,
     events_delivery,
+    memory,
     notes,
     typecheck,
 )
@@ -64,6 +65,7 @@ __all__ = [
     "journal_steps",
     "journal_trace",
     "kernel",
+    "memory",
     "notes",
     "package_organization",
     "profile_inspect",
