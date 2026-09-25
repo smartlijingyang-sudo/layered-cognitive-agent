@@ -105,7 +105,9 @@ def test_creator_adapter_fails_closed_without_a_role_capability() -> None:
 def test_creator_adapter_has_no_local_persona_tools_or_grant_literals() -> None:
     """Static gate against reintroducing Creator policy into the Gateway adapter."""
 
-    source = (REPO / "lca" / "plugins" / "collaboration" / "modes" / "cordis_creator.py").read_text(encoding="utf-8")
+    source = (REPO / "lca" / "plugins" / "collaboration" / "modes" / "cordis_creator.py").read_text(
+        encoding="utf-8"
+    )
     assert "build_cordis_creator_role_profile" not in source
     assert "creator_names =" not in source
     assert "caller_grant=(" not in source
@@ -121,3 +123,17 @@ def test_casting_translation_requires_caller_materialized_tools() -> None:
 
     assert "build_default_tools" not in source
     assert tools_parameter.default is inspect.Parameter.empty
+
+
+def test_creator_role_manifest_surfaces_sandbox_tools() -> None:
+    """D3 regression: creator role must expose runCommand/executeCode.
+
+    The cordis-creator run binds a sandbox; tool.fork.dispatch fails loud
+    unless the role manifest surfaces the sandbox execution APIs.
+    """
+    from lca.plugins.roles.cordis_creator import build_cordis_creator_role_profile
+
+    role = build_cordis_creator_role_profile()
+    allowed = set(role.tool_permission_manifest.allowed_tools)
+    assert "runCommand" in allowed
+    assert "executeCode" in allowed

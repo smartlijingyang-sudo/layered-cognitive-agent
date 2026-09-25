@@ -14,7 +14,19 @@ import pytest
 from starlette.applications import Starlette
 from starlette.testclient import TestClient
 
+from lca.contracts.protocols.assistant.role_resolver import RoleNotFoundError
 from lca.plugins.transport.webserver.router.router import RouteRegistry
+
+_STUB_ROLE_CARDS: dict[str, object] = {
+    "engineering/architect": {
+        "role_id": "engineering/architect",
+        "title": "软件架构师",
+        "department": "engineering",
+        "summary": "系统设计专家",
+        "backstory": "# 软件架构师",
+        "emoji": "🏛️",
+    }
+}
 
 
 class _FakeRuntime:
@@ -584,6 +596,49 @@ def test_post_assistants_rejects_unknown_template(tmp_path: Any) -> None:
     assert response.status_code == 400
 
 
+class _StubRoleResolverForRoutes:
+    """Role resolver that only knows one role id (D1 regression)."""
+
+    def resolve(self, role_id: str) -> object:
+        if role_id not in _STUB_ROLE_CARDS:
+            raise RoleNotFoundError(f"unknown: {role_id}")
+        card = _STUB_ROLE_CARDS[role_id]
+        return type("RoleCard", (), card)()
+
+    def list_available(self) -> tuple[str, ...]:
+        return tuple(sorted(_STUB_ROLE_CARDS))
+
+
+def _app_with_catalog_and_role_resolver(tmp_path: Any) -> Starlette:
+    """Catalog backed by a role resolver for from_role integration tests."""
+    from pathlib import Path
+
+    from lca.plugins.domain.assistant.catalog.plugin import AssistantCatalogImpl
+
+    plugin, router, ctx = _setup_plugin()
+    _run_plugin_setup(plugin, ctx)
+    app = Starlette()
+    router.install(app)
+    catalog = AssistantCatalogImpl(
+        root=Path(tmp_path) / "assistants",
+        role_resolver=_StubRoleResolverForRoutes(),
+    )
+    app.state.assistant_catalog = catalog
+    return app
+
+
+def test_post_assistants_unknown_from_role_returns_400(tmp_path: Any) -> None:
+    """D1 regression: unknown ``from_role`` must be 400, not 500."""
+    app = _app_with_catalog_and_role_resolver(tmp_path)
+    client = TestClient(app)
+    response = client.post(
+        "/v1/assistants",
+        json={"name": "x", "from_role": "no/such-role"},
+    )
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "invalid_request"
+
+
 def test_get_assistants_lists_created(tmp_path: Any) -> None:
     app, catalog = _app_with_catalog(tmp_path)
     from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
@@ -660,6 +715,12 @@ class _FakeOwnership:
         row = self.bindings.get(assistant_id)
         return row["user_id"] if row else None
 
+    def assistant_id_for_client(self, user_id: str, client_id: str) -> str | None:
+        for asst_id, row in self.bindings.items():
+            if row["user_id"] == user_id and row["client_id"] == client_id:
+                return asst_id
+        return None
+
     def set_agent_id(self, assistant_id: str, agent_id: str) -> None:
         if assistant_id in self.bindings:
             self.bindings[assistant_id]["agent_id"] = agent_id
@@ -715,6 +776,43 @@ def test_post_assistants_registers_bridge_when_present(tmp_path: Any) -> None:
     binding = ownership.bindings[body["assistant_id"]]
     assert binding["agent_id"] == "agt_abc123"
     assert binding["status"] == "active"
+
+
+def test_post_assistants_duplicate_client_id_is_idempotent(tmp_path: Any) -> None:
+    """D2 regression: same ``(user_id, client_id)`` maps to the same assistant."""
+    from lca.infrastructure.persistence.user_store import SqliteUserAssistantStore
+
+    app = _app_with_catalog_and_role_resolver(tmp_path)
+    store = SqliteUserAssistantStore(path=tmp_path / "lca.sqlite3")
+    app.state.assistant_ownership = store
+    client = TestClient(app)
+    headers = {"x-lca-user-id": "user-dup"}
+    first = client.post(
+        "/v1/assistants",
+        json={
+            "name": "幂等助理",
+            "client_id": "dup-client-1",
+            "from_role": "engineering/architect",
+        },
+        headers=headers,
+    )
+    assert first.status_code == 201
+    first_id = first.json()["assistant_id"]
+
+    second = client.post(
+        "/v1/assistants",
+        json={
+            "name": "幂等助理-重试",
+            "client_id": "dup-client-1",
+            "from_role": "engineering/architect",
+        },
+        headers=headers,
+    )
+    assert second.status_code == 200
+    assert second.json()["assistant_id"] == first_id
+    # 磁盘上只有一个 Home
+    homes = list((tmp_path / "assistants").glob("asst_*"))
+    assert len(homes) == 1
 
 
 def test_post_assistants_bridge_failure_keeps_pending(tmp_path: Any) -> None:
