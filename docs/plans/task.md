@@ -288,3 +288,5 @@
 | EMAIL-LINK-TASK-3 | 驾驶舱全组件无死角邮箱展示与悬浮联动改造 (static/index.html) | Completed | 落地方案 A（分层渐进披露）：微时间轴/预报卡片等紧凑区域展示 agy 胶囊+信封图标与丰富 Tooltip/一键复制；执行雷达、审计矩阵、智能选号卡、账号主卡片与任务弹窗直接渲染邮箱+复制按钮；全组件挂载 @mouseenter / @mouseleave 触发全站同账号毫秒级联动高亮 |
 | EMAIL-LINK-TASK-4 | 自动化测试、平滑重启与全链路端到端回归验证 (端口 1888) | Completed | 19/19 项自动化测试 100% 通过；bash start.sh 平滑重启成功；实测 9 个账号邮箱映射准确，鼠标悬浮任一组件中账号（如 agy-b）全站对应时间轴、预报卡、执行雷达、审计行及主卡片同步亮起光环，局域网 http://10.36.6.252:1888 100% 畅通 |
 | MODAL-ESC-EXIT | 全局弹窗与抽屉 ESC 退出与终端桥接健壮性加固 (static/index.html) | Completed | 1. 任务交互全景透视模态窗挂载 @keydown.esc 与 handleGlobalKeydown 拦截，补齐 ESC 退出与关闭按键提示；2. 修复 openTerminal 跨类型寻址适配器；3. 交互式终端控制台与快速派发输入框全部打通 ESC 退出；4. 19/19 单测全通，服务平滑重启验证 |
+| AWS-COST-OPTIMIZATION-CLEANUP | AWS 实时费用穿透审计、80GB 裸盘安全卸载删除与 RDS 残留快照彻底清理 | Completed | 1. 依托 Agent Toolkit 与 aws-billing-and-cost-management 技能穿透 Cost Explorer 账单（Usage $3.55 vs Credit -$3.55）；2. 探查并删除 20GB 残留 RDS 快照 database-1-snapshot；3. 经 EC2 Instance Connect 探测锁定未分区裸盘 vol-0a25dd72d2c48df48（80GB）；4. 成功执行卸载并彻底删除该卷，EBS 容量从 88GB 降回 8GB，完全回归 Free Tier 免费覆盖，年化预计省 ~$80+ |
+
