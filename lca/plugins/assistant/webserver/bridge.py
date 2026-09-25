@@ -107,6 +107,7 @@ class AssistantFrontendBridge:
         system_role: str,
         opening_message: str = "",
         client_id: str = "",
+        cookie: str | None = None,
     ) -> str | None:
         """投影一个助理到前端；成功返回 ``agt_*`` agent id，失败返回 ``None``。
 
@@ -115,6 +116,9 @@ class AssistantFrontendBridge:
         本桥不再拼装开场白。
         ``client_id`` 透传给 LobeHub ``agent.createAgent`` 做幂等
         （``agents.client_id_user_id_unique``，ADR-0252 D8）。
+        ``cookie`` 转发浏览器会话（ADR-0252 D8「bridge 转发 Cookie /
+        Authorization」）：LobeHub ``agent.createAgent`` 是受 Better Auth
+        保护的 lambda 过程，缺会话会 302 到登录页。
         Failure：未启用 / 网络错误 / 非 200 / 响应缺 ``agentId`` ⇒ ``None``
         + warning log（fail-soft；创建真值不受影响）。
         """
@@ -137,6 +141,9 @@ class AssistantFrontendBridge:
         body: dict[str, Any] = {"json": {"config": config}}
         if client_id:
             body["json"]["clientId"] = client_id
+        headers: dict[str, str] = {"content-type": "application/json"}
+        if cookie:
+            headers["cookie"] = cookie
 
         try:
             import httpx
@@ -145,7 +152,7 @@ class AssistantFrontendBridge:
                 response = await client.post(
                     f"{self._base}{_TRPC_CREATE_AGENT_PATH}",
                     json=body,
-                    headers={"content-type": "application/json"},
+                    headers=headers,
                 )
         except Exception as exc:  # httpx 网络/超时/连接错误统一降级
             log.warning(

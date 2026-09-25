@@ -565,6 +565,8 @@ def test_post_assistants_creates_with_catalog(tmp_path: Any) -> None:
     assert body["profile"]["name"] == "小研"
     assert body["profile"]["emoji"] == "🔍"
     assert body["template_id"] == "assistant.research"
+    # bridge 未装配时 fail-soft：agent_id 为 null，归属保持 pending
+    assert body["agent_id"] is None
 
 
 def test_post_assistants_rejects_missing_name(tmp_path: Any) -> None:
@@ -630,3 +632,112 @@ def test_get_assistant_digest_mismatch_returns_409(tmp_path: Any) -> None:
     response = client.get(f"/v1/assistants/{handle.assistant_id}")
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "digest_mismatch"
+
+
+# ── ADR-0252 bridge 注册：create_assistant 立即投影 LobeHub agent 行 ──
+
+
+class _FakeOwnership:
+    """In-memory AssistantOwnership stand-in for bridge tests."""
+
+    def __init__(self) -> None:
+        self.bindings: dict[str, dict[str, str]] = {}
+
+    def ensure_user(
+        self, user_id: str, *, username: str | None = None, email: str | None = None
+    ) -> None:
+        return None
+
+    def bind(self, binding: Any) -> None:
+        self.bindings[binding.assistant_id] = {
+            "user_id": binding.user_id,
+            "client_id": binding.client_id,
+            "agent_id": binding.agent_id or "",
+            "status": binding.status,
+        }
+
+    def owner_of(self, assistant_id: str) -> str | None:
+        row = self.bindings.get(assistant_id)
+        return row["user_id"] if row else None
+
+    def set_agent_id(self, assistant_id: str, agent_id: str) -> None:
+        if assistant_id in self.bindings:
+            self.bindings[assistant_id]["agent_id"] = agent_id
+            self.bindings[assistant_id]["status"] = "active"
+
+    def agent_id_of(self, assistant_id: str) -> str | None:
+        row = self.bindings.get(assistant_id)
+        return row["agent_id"] or None if row else None
+
+
+class _FakeBridge:
+    """Record calls and return a canned agent id."""
+
+    def __init__(self, *, agent_id: str | None, enabled: bool = True) -> None:
+        self.agent_id = agent_id
+        self.enabled = enabled
+        self.calls: list[dict[str, Any]] = []
+
+    async def register(self, **kwargs: Any) -> str | None:
+        self.calls.append(kwargs)
+        return self.agent_id
+
+
+def _app_with_catalog_and_bridge(
+    tmp_path: Any, bridge: _FakeBridge, ownership: _FakeOwnership | None = None
+) -> tuple[Starlette, _FakeOwnership, _FakeBridge]:
+    app, _catalog = _app_with_catalog(tmp_path)
+    app.state.assistant_frontend_bridge = bridge
+    store = ownership or _FakeOwnership()
+    app.state.assistant_ownership = store
+    return app, store, bridge
+
+
+def test_post_assistants_registers_bridge_when_present(tmp_path: Any) -> None:
+    bridge = _FakeBridge(agent_id="agt_abc123")
+    app, ownership, bridge = _app_with_catalog_and_bridge(tmp_path, bridge)
+    client = TestClient(app)
+    response = client.post(
+        "/v1/assistants",
+        json={"name": "桥接助理", "client_id": "onboarding-1"},
+        headers={"cookie": "session=abc"},
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["agent_id"] == "agt_abc123"
+    # bridge 收到浏览器会话 Cookie 与幂等 client_id（ADR-0252 D8）
+    assert bridge.calls, "bridge.register 未被调用"
+    call = bridge.calls[0]
+    assert call["cookie"] == "session=abc"
+    assert call["client_id"] == "onboarding-1"
+    assert call["system_role"], "SOUL.md 应作为 systemRole 传入"
+    # 归属回填为 active
+    binding = ownership.bindings[body["assistant_id"]]
+    assert binding["agent_id"] == "agt_abc123"
+    assert binding["status"] == "active"
+
+
+def test_post_assistants_bridge_failure_keeps_pending(tmp_path: Any) -> None:
+    bridge = _FakeBridge(agent_id=None)
+    app, ownership, _bridge = _app_with_catalog_and_bridge(tmp_path, bridge)
+    client = TestClient(app)
+    response = client.post(
+        "/v1/assistants",
+        json={"name": "桥接失败助理", "client_id": "onboarding-2"},
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["agent_id"] is None
+    binding = ownership.bindings[body["assistant_id"]]
+    assert binding["agent_id"] == ""
+    assert binding["status"] == "pending"
+
+
+def test_post_assistants_bridge_disabled_fail_soft(tmp_path: Any) -> None:
+    bridge = _FakeBridge(agent_id=None, enabled=False)
+    app, ownership, _bridge = _app_with_catalog_and_bridge(tmp_path, bridge)
+    client = TestClient(app)
+    response = client.post("/v1/assistants", json={"name": "桥禁用助理"})
+    assert response.status_code == 201
+    assert response.json()["agent_id"] is None
+    assert next(iter(ownership.bindings.values()))["status"] == "pending"

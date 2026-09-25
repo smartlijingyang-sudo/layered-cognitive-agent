@@ -253,6 +253,63 @@ def _bind_ownership(
     )
 
 
+async def _register_bridge(request: Request, assistant_id: str, client_id: str) -> str | None:
+    """把新建 Home 投影成 LobeHub agents 行并回填归属（ADR-0252 D7/D8）。
+
+    读取 ``app.state.assistant_frontend_bridge``，用浏览器会话 Cookie 调
+    LobeHub ``agent.createAgent``；成功回填 ``agent_id`` 并把绑定状态置为
+    ``active``。bridge 未装配 / 注册失败 ⇒ ``None``（fail-soft，保持
+    ``pending``，前端可经 ``register-lobehub`` 重试）。
+    """
+    ownership = _ownership_from_request(request)
+    app = getattr(request, "app", None)
+    bridge = getattr(getattr(app, "state", None), "assistant_frontend_bridge", None)
+    if ownership is None or bridge is None or not getattr(bridge, "enabled", False):
+        return None
+    catalog = _catalog_from_request(request)
+    if catalog is None:
+        return None
+    try:
+        spec = catalog.get(assistant_id)
+    except AssistantCatalogError:
+        return None
+
+    import json
+    from pathlib import Path
+
+    home = Path(spec.home_path)
+    profile: dict[str, object] = {}
+    try:
+        profile = json.loads((home / "profile.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        profile = {}
+    emoji = str(profile.get("emoji") or "🤖")
+    opening_message = str(profile.get("opening_message") or "")
+    soul = ""
+    try:
+        soul = (home / "SOUL.md").read_text(encoding="utf-8")
+    except OSError:
+        soul = ""
+
+    agent_id = None
+    try:
+        agent_id = await bridge.register(
+            assistant_id=assistant_id,
+            name=spec.profile_name,
+            description=spec.profile_description,
+            emoji=emoji,
+            system_role=soul,
+            opening_message=opening_message,
+            client_id=client_id,
+            cookie=request.headers.get("cookie"),
+        )
+    except Exception:  # bridge 自身异常统一 fail-soft
+        agent_id = None
+    if agent_id:
+        ownership.set_agent_id(assistant_id, agent_id)
+    return agent_id
+
+
 def _parse_skill_source(raw: Any) -> SkillSource | None:
     """body ``source`` → :class:`SkillSource`;不支持的形状返回 ``None``。
 
@@ -401,12 +458,17 @@ async def create_assistant(request: Request) -> JSONResponse:
         initial_skills=initial_skills,
     )
 
+    agent_id = await _register_bridge(
+        request, handle.assistant_id, client_id or f"lca-{handle.assistant_id}"
+    )
+
     return _json(
         {
             "assistant_id": handle.assistant_id,
             "home_path": handle.home_path,
             "revision_seq": handle.revision_seq,
             "template_id": template_id,
+            "agent_id": agent_id,
             "profile": _profile_view(handle.home_path),
         },
         status_code=201,
@@ -972,54 +1034,7 @@ async def register_lobehub(request: Request) -> JSONResponse:
     if existing:
         return _json({"assistant_id": assistant_id, "agent_id": existing}, status_code=200)
 
-    bridge = getattr(request.app.state, "assistant_frontend_bridge", None)
-    if bridge is None or not getattr(bridge, "enabled", False):
-        return _error_envelope(
-            "bridge_unavailable",
-            status_code=503,
-            error_type="service_unavailable",
-            detail="assistant.frontend_bridge 未装配或未启用",
-        )
-
-    catalog = _catalog_from_request(request)
-    if catalog is None:
-        return _not_implemented("catalog_unavailable", "AssistantCatalog.get")
-    try:
-        spec = catalog.get(assistant_id)
-    except AssistantCatalogError as exc:
-        return _error_envelope(
-            "assistant_not_found",
-            status_code=404,
-            error_type="not_found",
-            detail=str(exc),
-        )
-
-    import json
-    from pathlib import Path
-
-    home = Path(spec.home_path)
-    profile: dict[str, object] = {}
-    try:
-        profile = json.loads((home / "profile.json").read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        profile = {}
-    emoji = str(profile.get("emoji") or "🤖")
-    opening_message = str(profile.get("opening_message") or "")
-    soul = ""
-    try:
-        soul = (home / "SOUL.md").read_text(encoding="utf-8")
-    except OSError:
-        soul = ""
-
-    agent_id = await bridge.register(
-        assistant_id=assistant_id,
-        name=spec.profile_name,
-        description=spec.profile_description,
-        emoji=emoji,
-        system_role=soul,
-        opening_message=opening_message,
-        client_id=f"lca-{assistant_id}",
-    )
+    agent_id = await _register_bridge(request, assistant_id, f"lca-{assistant_id}")
     if agent_id is None:
         return _error_envelope(
             "bridge_registration_failed",
@@ -1027,7 +1042,6 @@ async def register_lobehub(request: Request) -> JSONResponse:
             error_type="bad_gateway",
             detail="LobeHub agent 行注册失败，可稍后重试",
         )
-    ownership.set_agent_id(assistant_id, agent_id)
     return _json({"assistant_id": assistant_id, "agent_id": agent_id}, status_code=200)
 
 
