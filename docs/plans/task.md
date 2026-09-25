@@ -294,6 +294,9 @@
 | DYN-SEARCH-TASK-3 | 引擎自适应执行与阻塞式 API 端点扩展 | Completed | FederatedSearchEngine 装配 IntentRouter，实现自适应三轨（秒级快答/多源聚合/深度研报）与结果结构化生成，扩展 POST /api/search/query 阻塞端点，测试 3/3 100% 通过（commit 6b37511） |
 | DYN-SEARCH-TASK-4 | Agent-Friendly CLI 客户端 (search-agent) | Completed | search-agent CLI 落地并软链至 ~/bin/search-agent，支持 --json、--fast、--deep 及无损 stdout/stderr 分流，自动化测试 2/2 100% 通过（commit 57d9aa2） |
 | DYN-SEARCH-TASK-5 | 全链路端到端实测与验收验证 | Completed | 25/25 单元与集成测试全部通过；实测 live search-agent 验证单点事实秒级直出（Python 3.12 release date 2.77s 返回标准 JSON）与电影查询多源聚合（自动激活 searxng_web/jina_reader/grok_x_search，严格裁剪无关 github_cli），终端 Markdown 与 JSON 双轨无损运转 |
+| AWS-TRAFFIC-COST-MONITOR | AWS 实时流量与费用监视器集成进 Dashboard（100GB免费额度/日均消耗/EBS存储/Credit全额抵扣/预警卡片） | Completed | 1. 后端落地 calculate_aws_metrics 与 get_aws_metrics（5分钟TTL防抖缓存，CloudWatch NetworkOut 本月/今日/预测算法与 EBS 卷探测），提供 /api/aws/metrics；2. 前端一体化驾驶舱 Tab 1 首屏装配「AWS 东京出口节点 · 成本与 100GB 免费流量监视器」玻璃拟态卡片（100GB进度条、日均0.83GB/天、月末预测24.9GB、EBS 8GB/30GB、Credit抵扣）；3. 23/23 自动化测试全绿（增补3项单测覆盖算法逻辑、API鉴权缓存与HTML渲染）；4. 服务平滑重启，live curl 与浏览器端验证 100% 畅通 |
+
+
 
 
 
