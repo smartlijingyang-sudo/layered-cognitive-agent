@@ -289,4 +289,11 @@
 | EMAIL-LINK-TASK-4 | 自动化测试、平滑重启与全链路端到端回归验证 (端口 1888) | Completed | 19/19 项自动化测试 100% 通过；bash start.sh 平滑重启成功；实测 9 个账号邮箱映射准确，鼠标悬浮任一组件中账号（如 agy-b）全站对应时间轴、预报卡、执行雷达、审计行及主卡片同步亮起光环，局域网 http://10.36.6.252:1888 100% 畅通 |
 | MODAL-ESC-EXIT | 全局弹窗与抽屉 ESC 退出与终端桥接健壮性加固 (static/index.html) | Completed | 1. 任务交互全景透视模态窗挂载 @keydown.esc 与 handleGlobalKeydown 拦截，补齐 ESC 退出与关闭按键提示；2. 修复 openTerminal 跨类型寻址适配器；3. 交互式终端控制台与快速派发输入框全部打通 ESC 退出；4. 19/19 单测全通，服务平滑重启验证 |
 | AWS-COST-OPTIMIZATION-CLEANUP | AWS 实时费用穿透审计、80GB 裸盘安全卸载删除与 RDS 残留快照彻底清理 | Completed | 1. 依托 Agent Toolkit 与 aws-billing-and-cost-management 技能穿透 Cost Explorer 账单（Usage $3.55 vs Credit -$3.55）；2. 探查并删除 20GB 残留 RDS 快照 database-1-snapshot；3. 经 EC2 Instance Connect 探测锁定未分区裸盘 vol-0a25dd72d2c48df48（80GB）；4. 成功执行卸载并彻底删除该卷，EBS 容量从 88GB 降回 8GB，完全回归 Free Tier 免费覆盖，年化预计省 ~$80+ |
+| DYN-SEARCH-TASK-1 | 动态能力注册中心 (Capability Registry) | Completed | SearchCapability 数据类与 CapabilityRegistry 动态单例容器实现完毕，预置 7 大全域自描述能力（SearXNG/Jina/Grok X/Grok Web/GitHub/Linux.do+Reddit/本地FTS5），自动化测试 3/3 100% 通过（commit 047fa0e） |
+| DYN-SEARCH-TASK-2 | Jev/Laya 意图分析与动态路由器 (IntentRouter) | Completed | IntentRouter 实现完毕，集成 TypeSafe System One (Score/Choice/Noul) 概率评估与优雅降级机制，支持动态能力池上下文注入与非代码领域智能裁剪，自动化测试 5/5 100% 通过（commit e3bd0f8） |
+| DYN-SEARCH-TASK-3 | 引擎自适应执行与阻塞式 API 端点扩展 | Completed | FederatedSearchEngine 装配 IntentRouter，实现自适应三轨（秒级快答/多源聚合/深度研报）与结果结构化生成，扩展 POST /api/search/query 阻塞端点，测试 3/3 100% 通过（commit 6b37511） |
+| DYN-SEARCH-TASK-4 | Agent-Friendly CLI 客户端 (search-agent) | Completed | search-agent CLI 落地并软链至 ~/bin/search-agent，支持 --json、--fast、--deep 及无损 stdout/stderr 分流，自动化测试 2/2 100% 通过（commit 57d9aa2） |
+| DYN-SEARCH-TASK-5 | 全链路端到端实测与验收验证 | Completed | 25/25 单元与集成测试全部通过；实测 live search-agent 验证单点事实秒级直出（Python 3.12 release date 2.77s 返回标准 JSON）与电影查询多源聚合（自动激活 searxng_web/jina_reader/grok_x_search，严格裁剪无关 github_cli），终端 Markdown 与 JSON 双轨无损运转 |
+
+
 
