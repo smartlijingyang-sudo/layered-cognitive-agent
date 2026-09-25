@@ -189,6 +189,7 @@
 | [0248](0248-grok-bot-coordinator-runtime-evidence.md) | 协调型桌面 Agent 运行时 — 证据级解剖（可模范实现） | Implemented |
 | [0250](0250-peer-assistants-handoff-bus-and-rooms.md) | Peer Assistants Handoff Bus and Rooms | Implemented |
 | [0251](0251-openmuse-runtime-sandbox-durable-task-evidence.md) | OpenMuse 架构解剖与借鉴 — 长程租约任务、防漂移双门禁与可接管沙箱证据 | Proposed |
+| [0252](0252-multi-user-onboarding-and-identity.md) | 多用户登录与 Onboarding 隔离 — LCA 自有数据库 + LobeHub 原生前端（归属关系 LCA 全权控制，身份 SSOT = Better Auth users） | Proposed |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
 
