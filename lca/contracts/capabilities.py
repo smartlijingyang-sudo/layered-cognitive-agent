@@ -309,6 +309,9 @@ ASSISTANT_CURATOR = Capability[object]("assistant.curator", cardinality="one")
 ASSISTANT_JOBS = Capability[object]("assistant.jobs", cardinality="one")
 """JobSpec 收集器，向 continuous_control_plane_factory 注册 WorkItem；ADR-0093 复用。"""
 
+ASSISTANT_OWNERSHIP = Capability[object]("assistant.ownership", cardinality="one")
+"""用户↔助理归属关系（ADR-0252 D2/D3）：LCA 自有数据库控制，LobeHub 后端不读不写。"""
+
 ASSISTANT_BOOTSTRAP = Capability[object]("assistant.bootstrap", cardinality="one")
 """将配置面 SOUL/IDENTITY/USER/AGENTS 投影进 ContextManifest（ADR-0187 §3 D5 + PR-4）。
 

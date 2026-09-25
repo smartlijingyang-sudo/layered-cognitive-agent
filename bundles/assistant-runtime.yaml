@@ -9,6 +9,15 @@ entries:
         from_env: LCA_ASSISTANTS_ROOT
         required: false
 
+  - id: lca.plugins.assistant.ownership
+    name: lca_plugins_assistant_ownership
+    $module: lca.plugins.assistant.ownership.plugin
+    config:
+      database_url:
+        from_env: LCA_DATABASE_URL
+        required: false
+      dev_mode: true
+
   - id: lca.plugins.assistant.bootstrap.bootstrap
     name: lca_plugins_assistant_bootstrap
     $module: lca.plugins.assistant.bootstrap.bootstrap
