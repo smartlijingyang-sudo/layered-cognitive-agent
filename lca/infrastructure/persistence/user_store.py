@@ -14,11 +14,11 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import closing, contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar, cast
 
 from lca.contracts.protocols.assistant.ownership import (
     AssistantOwnership,
@@ -27,6 +27,8 @@ from lca.contracts.protocols.assistant.ownership import (
 from lca.infrastructure.persistence.postgres import postgres_connection
 
 _DEFAULT_PATH: Path = Path("~/.lca/lca.sqlite3").expanduser()
+
+_T = TypeVar("_T")
 
 _SQLITE_DDL = """
 CREATE TABLE IF NOT EXISTS lca_users (
@@ -240,7 +242,7 @@ class PostgresUserAssistantStore(AssistantOwnership):
             cur.execute(_POSTGRES_DDL)
             conn.commit()
 
-    def _use_cursor(self, fn: Any) -> Any:
+    def _use_cursor(self, fn: Callable[[Any], _T]) -> _T:
         with postgres_connection(self._database_url) as conn, conn.cursor() as cur:
             result = fn(cur)
             conn.commit()
@@ -316,7 +318,9 @@ class PostgresUserAssistantStore(AssistantOwnership):
                 (user_id, client_id),
             )
             row = cur.fetchone()
-            return str(row[0]) if row is not None else None
+            if row is None:
+                return None
+            return cast("str", row[0])
 
         return self._use_cursor(_run)
 
