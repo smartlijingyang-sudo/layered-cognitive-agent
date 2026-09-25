@@ -1,6 +1,6 @@
 # ADR-0252: 多用户登录与 Onboarding 隔离 — LCA 自有数据库 + LobeHub 原生前端
 
-- Status: Proposed — 2026-09-25
+- Status: Implemented — 2026-09-25（PR-1..PR-4 已落地）
 - Date: 2026-09-25
 - Deciders: 李超 / 山姆汇总
 - Relates:
