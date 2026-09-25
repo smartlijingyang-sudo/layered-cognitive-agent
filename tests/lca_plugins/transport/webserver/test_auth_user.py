@@ -91,3 +91,51 @@ def test_x_lca_token_header_accepted() -> None:
     )
     assert error is None
     assert user_id == "alice"
+
+
+# ── 归属隔离（ADR-0252 D6）────────────────────────────────────────────
+
+
+class _FakeOwnership:
+    def __init__(self, owner: str | None) -> None:
+        self._owner = owner
+
+    def owner_of(self, assistant_id: str) -> str | None:
+        return self._owner
+
+
+def _make_request_with_state(
+    *,
+    dev_mode: bool,
+    owner: str | None,
+    user_id: str = "bob",
+) -> Request:
+    request = _make_request({"x-lca-user-id": user_id, "Authorization": "Bearer lca-local"})
+    state = request.app.state
+    state.lca_auth_dev_mode = dev_mode
+    state.lca_auth_expected_token = DEFAULT_EXPECTED_TOKEN
+    state.assistant_ownership = _FakeOwnership(owner)
+    return request
+
+
+def test_ownership_error_returns_404_for_non_owner() -> None:
+    from lca.plugins.transport.webserver.routes_1.routes_assistants import _ownership_error
+
+    request = _make_request_with_state(dev_mode=False, owner="alice", user_id="bob")
+    error = _ownership_error(request, "bob", "asst_alice")
+    assert isinstance(error, JSONResponse)
+    assert error.status_code == 404
+
+
+def test_ownership_error_allows_owner() -> None:
+    from lca.plugins.transport.webserver.routes_1.routes_assistants import _ownership_error
+
+    request = _make_request_with_state(dev_mode=False, owner="bob", user_id="bob")
+    assert _ownership_error(request, "bob", "asst_bob") is None
+
+
+def test_ownership_error_skipped_in_dev_mode() -> None:
+    from lca.plugins.transport.webserver.routes_1.routes_assistants import _ownership_error
+
+    request = _make_request_with_state(dev_mode=True, owner="alice", user_id="bob")
+    assert _ownership_error(request, "bob", "asst_alice") is None

@@ -61,6 +61,11 @@ entries:
     $module: lca.plugins.transport.webserver.routes_1.routes_role_cards
     config: {}
 
+  - id: lca.plugins.transport.webserver.routes_1.routes_onboarding
+    name: lca_webserver_routes_onboarding
+    $module: lca.plugins.transport.webserver.routes_1.routes_onboarding
+    config: {}
+
   - id: lca.plugins.assistant.tools.tools
     name: lca_plugins_assistant_tools
     $module: lca.plugins.domain.tools.assistant_tools.plugin

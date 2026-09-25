@@ -91,7 +91,7 @@ async def onboarding_presets(request: Request) -> JSONResponse:
     skills: list[dict[str, str]] = []
     try:
         store = DiskSkillPackageStore()
-        root = store.root()
+        root = store.root
         for entry in store.list_installed():
             package_root = root / entry.skill_id
             if (package_root / "SKILL.md").is_file() and (
