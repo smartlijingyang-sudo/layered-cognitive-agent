@@ -332,6 +332,7 @@ class CognitiveAgent(AgentUnit):
             session_id=ctx.session_id,
             from_role=ctx.from_role,
             context_refs=list(ctx.context_refs),
+            prior_turns=tuple(ctx.prior_turns),
             deadline=workspace.deadline,
             team_awareness=ctx.team_awareness,
             extra=dict(ctx.extra),
