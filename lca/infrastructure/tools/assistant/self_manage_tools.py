@@ -6,16 +6,17 @@ Home.  All writes go through the single configuration write-entry
 tool writes Home files directly (I-B6).
 
 Approval semantics (I-B7): sensitive operations (delete skill, expand
-grants, edit SOUL safety sections) require an explicit ``confirmed: true``
-argument, which the LLM only
-sets after the user confirms via ``askUserQuestion``.  Non-sensitive changes
+grants) require an explicit ``confirmed: true`` argument, which the LLM only
+sets after the user confirms via ``askUserQuestion``. SOUL safety sections
+are platform-protected: the catalog rejects any agent edit that changes
+them (红线只读化), so they need no confirmation path. Non-sensitive changes
 apply and return a payload the LLM relays to the user ("改完告知").
 """
 
 from __future__ import annotations
 
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -28,7 +29,6 @@ from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.protocols import Tool
 from lca.contracts.protocols.assistant.catalog import ProfilePatch
 from lca.infrastructure.observability.facade.run.ambit import current_assistant_id
-from lca.plugins.assistant.home._home_layout import SOUL_SAFETY_SECTIONS
 
 if TYPE_CHECKING:
     from lca.contracts.protocols.assistant.catalog import AssistantCatalog
@@ -51,29 +51,6 @@ _SENSITIVE_CONFIRMATION_HINT = (
     "这是敏感操作，必须先经用户确认：调用 askUserQuestion 询问用户是否确认，"
     "用户明确同意后才可携带 confirmed=true 再次调用。"
 )
-
-
-def _soul_sections(text: str) -> dict[str, str]:
-    """按 ``## `` 标题把 SOUL 文本切成 ``{标题: 完整节块}``（strip 后）。"""
-    sections: dict[str, str] = {}
-    current_marker: str | None = None
-    current: list[str] = []
-    for line in text.splitlines():
-        if line.startswith("## "):
-            if current_marker is not None:
-                sections[current_marker] = "\n".join(current).strip()
-            current_marker = line.strip()
-            current = [line]
-        elif current_marker is not None:
-            current.append(line)
-    if current_marker is not None:
-        sections[current_marker] = "\n".join(current).strip()
-    return sections
-
-
-def _safety_section(sections: Mapping[str, str], marker: str) -> str | None:
-    """取安全段内容；标题可能是 ``## 🚫 红线（凌驾一切）`` 扩展形式，按前缀匹配。"""
-    return next((v for k, v in sections.items() if k.startswith(marker)), None)
 
 
 class _BaseAssistantTool(Tool):
@@ -255,29 +232,22 @@ class EditAssistantSkillTool(_BaseAssistantTool):
 
 
 class UpdateAssistantSoulTool(_BaseAssistantTool):
-    """Update the assistant's SOUL.md (safety-section edits need confirmation)."""
+    """Update the assistant's SOUL.md (safety sections are platform-protected)."""
 
     name = _UPDATE_ASSISTANT_SOUL_TOOL
     required_grant: ClassVar[str] = "profile.revise"
     description = (
-        "修改当前助理的 SOUL.md（人格/语气/边界）。"
+        "修改当前助理的 SOUL.md 的四核心段（身份/性格/能力/语气）。"
         "SOUL 必须包含四个核心语义段（## 🧠 身份 / ## 🎭 性格 / ## 🛠 能力 / ## 🗣 语气），"
-        "去除空白后至少 200 字符。安全边界/记忆规则/错误处理/红线四个安全段是平台保底："
-        "提交里缺失会被系统自动补回，无法整体删除；修改安全段内容属敏感操作，"
-        "必须先经用户确认（askUserQuestion）后携带 confirmed=true 调用。"
-        "参数: soul（新的 SOUL 全文）、confirmed（修改安全段内容时必须为 true）。"
+        "去除空白后至少 200 字符。安全边界/记忆规则/错误处理/红线四个安全段由平台保护："
+        "提交里缺失会被系统自动补回，无法整体删除；agent 不可修改安全段内容，"
+        "如需调整请让用户直接编辑 Home 文件。"
+        "参数: soul（新的 SOUL 全文）。"
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
             "soul": {"type": "string", "description": "新的 SOUL.md 全文（Markdown）"},
-            "confirmed": {
-                "type": "boolean",
-                "description": (
-                    "修改安全边界/记忆规则/错误处理/红线四段内容时必须为 true，"
-                    "需先经 askUserQuestion 得到用户确认"
-                ),
-            },
         },
         "required": ["soul"],
     }
@@ -287,11 +257,6 @@ class UpdateAssistantSoulTool(_BaseAssistantTool):
         soul = str(args.get("soul") or "").strip()
         if not soul:
             return self._fail(start, "soul 必须为非空字符串")
-        if self._modifies_safety_section(soul) and args.get("confirmed") is not True:
-            return self._fail(
-                start,
-                f"修改安全边界/记忆规则/错误处理/红线属敏感操作。{_SENSITIVE_CONFIRMATION_HINT}",
-            )
         try:
             revision = self._catalog.revise_profile(
                 self._assistant_id,
@@ -307,28 +272,6 @@ class UpdateAssistantSoulTool(_BaseAssistantTool):
                 "revision_seq": revision.revision_seq,
                 "message": "已更新 SOUL.md（人格/语气/边界）。",
             },
-        )
-
-    def _modifies_safety_section(self, submitted_soul: str) -> bool:
-        """判定提交是否修改了安全段内容（敏感操作确认门，ADR-0242 I-B7 延伸）。
-
-        仅当「当前文件有该安全段 且 提交也有 且 strip 后文本不同」才算敏感：
-        提交缺段会被 Catalog 合并还原、当前缺段属于补回，都不改变保底内容。
-        读不到当前文件按不敏感处理——revise_profile 内部的 digest 校验仍
-        fail-closed，篡改文件不可能经本工具静默落盘。
-        """
-        try:
-            spec = self._catalog.get(self._assistant_id)
-            current_soul = (Path(spec.home_path) / "SOUL.md").read_text(encoding="utf-8")
-        except Exception:
-            return False
-        current_sections = _soul_sections(current_soul)
-        submitted_sections = _soul_sections(submitted_soul)
-        return any(
-            (current := _safety_section(current_sections, marker)) is not None
-            and (submitted := _safety_section(submitted_sections, marker)) is not None
-            and current.strip() != submitted.strip()
-            for marker in SOUL_SAFETY_SECTIONS
         )
 
 

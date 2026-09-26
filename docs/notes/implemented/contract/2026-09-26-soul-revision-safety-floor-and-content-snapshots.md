@@ -20,18 +20,23 @@ Status: implemented
 - `_validate_soul` 缺段报错附可照抄的四核心段骨架（`_SOUL_CORE_SKELETON`），模型重试少走一轮。
 - `write_revision_snapshot` 在快照 JSON 追加 `files` 键（CONFIG_FACE_FILES 中存在文件的全文）；`create()` 写 `revisions/0.json` 出生基线，使回滚可以恢复内容而不只是校验 digest。读回 UI 仍按 ADR-0242 开放问题暂缓。
 - 安全段标记词表提升为 `_home_layout.SOUL_SAFETY_SECTIONS` 公开常量，catalog 与 self_manage_tools 共用，消灭双份词表。
-- `UpdateAssistantSoulTool` 增加可选 `confirmed` 参数：提交的安全段文案与当前文件不同时必须为 true，模型须先经 `askUserQuestion` 获得用户同意。对齐 ADR-0242 D6 敏感修改审批语义。读不到当前文件按不敏感处理，revise 内部的 digest 校验仍 fail-closed。
+- **红线只读化**：`revise_profile` 在 `actor="agent"`（工具路径）时校验安全段内容逐字节不可变（`_validate_safety_sections_unchanged`），`update_assistant_soul` 无法修改安全段；用户经 REST（actor=system）修改不受限。比确认门更严格，对齐业界「不可变核心层」结论。
+- `_validate_soul` 增加注入载荷检测：零宽/方向控制字符、指令覆盖/自我复制式短语（中英）直接 fail-closed。
+- 模型每轮可见的 `BackstorySection` 尾部追加常驻反注入警告，位于助理可写文件之外，SOUL 重写不会丢失。
+- `_AssistantCatalogImpl.restore_revision(assistant_id, revision_seq)`：读历史快照 `files` 全文写回 Home 再经 `reimport` 生成新 revision + EP（reason=rollback-to-N）。`lca-ops assistants soul-history/diff/rollback` 提供诊断与恢复消费端。
 
 ## Alternatives considered
 
 - **校验要求全八段（strict validation）**：强迫模型每次复读安全段文本，复读引入漂移风险，且与 ADR-0242 附录 C「安全段模板预置、无需手写」的既定契约冲突。
 - **内容快照走独立 digest 寻址存储（CAS）**：快照无读方，属过度设计；`files` 键增量进入现有快照即可，无迁移负担。
-- **确认门放在 `catalog.revise_profile`**：REST PATCH 路径是用户亲自发起，无需二次确认；门放 agent 工具边界符合信任分级（agent 低信任、用户高信任）。
+- **确认门放在 `catalog.revise_profile`（agent 可经用户确认后改安全段）**：REST PATCH 路径是用户亲自发起，无需二次确认；对 agent 工具路径，确认门仍把安全段暴露在模型可写面，不如直接拒绝严格。最终采用 actor 区分：agent 完全不可改，用户可改。
+- **安全段上限（M5，文件大小上限）**：存量助理 SOUL 最大约 23KB（角色卡长背景），硬上限会破坏存量；backstory 注入已截断 3000 字符，文件膨胀不直接放大 prompt，故本轮不做上限，留给后续。
 - **do nothing**：安全段已在真实运行中丢失，红线可被静默删除，不可接受。
 
 ## Consequences
 
 - 已丢安全段的存量助理在下一次 revise 时自动补回（自愈），补回来源优先当前文件、其次模板默认文案。实测的 asst_5166b058964f 属于此类。
 - 快照体积从 ~1KB（digest）增至配置面全文（几十 KB 级），随 revision 数线性增长；个人助理量级可接受。
+- `restore_revision` 对历史 digest-only 快照（无 `files`）fail-closed，无法回滚到修复前生成的修订；新快照均含内容。
 - `dream.py` 直写 USER.md 的 `user-md-preimage-*.md` 前置镜像与 `files` 快照并存，存在统一到单一快照入口的机会，留给后续决策。
-- 验证：`tests/plugins/assistant/test_self_manage.py` 新增 `TestSoulRevisionSafety` 六组用例，覆盖合并保留定制文案、坏档自愈、错误消息骨架、创建基线快照、篡改检测+reimport 恢复链；`TestSelfManageTools` 新增安全段修改确认门三态。实时 run 复测改语气后安全段完整保留。
+- 验证：`tests/plugins/assistant/test_self_manage.py` 覆盖合并保留定制文案、坏档自愈、错误消息骨架、创建基线快照、注入载荷拒绝、agent 改安全段拒绝/用户允许、回滚（含 digest-only 失败路径）、篡改检测+reimport 恢复链；`test_soul_to_prompt.py` 覆盖警告常驻。实时 run 复测改语气后安全段完整保留；`lca-ops assistants soul-rollback` 实测回滚成功。

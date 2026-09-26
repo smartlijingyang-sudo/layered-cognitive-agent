@@ -552,8 +552,11 @@ class _AssistantCatalogImpl(AssistantCatalog):
             _validate_soul(patch.soul_md)
             # 安全段是平台保底,revise 不允许整体删除:提交里显式给出的以提交为准,
             # 缺失的先从当前文件回填(保留用户已定制文案),仍缺再用模板兜底。
+            # agent 路径（工具）额外受限：安全段内容逐字节不可变，红线只读化。
             soul_path = home.root / "SOUL.md"
             current_soul = soul_path.read_text(encoding="utf-8") if soul_path.is_file() else ""
+            if actor == "agent":
+                _validate_safety_sections_unchanged(current_soul, patch.soul_md)
             merged_soul = _merge_soul_defaults(patch.soul_md, current_soul)
             if any(marker not in merged_soul for marker in SOUL_SAFETY_SECTIONS):
                 template_id = str(manifest.get("template_id") or "") or DEFAULT_TEMPLATE_ID
@@ -667,6 +670,40 @@ class _AssistantCatalogImpl(AssistantCatalog):
             snapshot_path=str(home.root / "revisions" / f"{new_revision_seq}.json"),
             revised_at=_iso_now(self._clock),
         )
+
+    def restore_revision(self, assistant_id: str, revision_seq: int) -> PlanRevision:
+        """内容级回滚：把配置面恢复为历史修订快照（ADR-0242 D6 延伸）。
+
+        读 ``revisions/{seq}.json`` 的 ``files`` 全文写回 Home，再经 ``reimport``
+        重算 digest、``revision_seq++``、写新快照并发 EP（actor=reimport，
+        reason=rollback-to-{seq}）。恢复路径与 ``reimport`` 同构，不校验现有
+        digest（正是恢复路径的用途）。
+
+        失败语义：快照缺失 / 不含 ``files``（历史 digest-only 快照）⇒
+        ``AssistantCatalogError``，不写盘。
+        """
+        home = HomePaths(root=self._root / assistant_id)
+        snapshot_path = home.root / "revisions" / f"{revision_seq}.json"
+        if not snapshot_path.is_file():
+            raise AssistantCatalogError(f"revision {revision_seq} 快照不存在: {assistant_id}")
+        try:
+            snapshot = _read_json(snapshot_path)
+        except (OSError, ValueError) as exc:
+            raise AssistantCatalogError(
+                f"revision {revision_seq} 快照不可读: {snapshot_path}"
+            ) from exc
+        files = snapshot.get("files")
+        if not isinstance(files, dict):
+            raise AssistantCatalogError(
+                f"revision {revision_seq} 快照不含文件内容（历史 digest-only 快照），无法回滚。"
+            )
+        for name, content in files.items():
+            if not isinstance(name, str) or not isinstance(content, str):
+                raise AssistantCatalogError(
+                    f"revision {revision_seq} 快照 files 内容异常: {name!r}"
+                )
+            (home.root / name).write_text(content, encoding="utf-8")
+        return self.reimport(assistant_id, reason=f"rollback-to-{revision_seq}")
 
     # ── 内部 ──────────────────────────────────────────────────────────
 
@@ -879,16 +916,93 @@ _SOUL_CORE_SKELETON = (
     "## 🗣 语气\n<说话方式>"
 )
 
+# 零宽 / 方向控制字符：注入载荷常用载体（ClawHavoc、Zenity 实战记录）。
+_ZERO_WIDTH_CHARS: tuple[str, ...] = (
+    "\u200b",
+    "\u200c",
+    "\u200d",
+    "\u200e",
+    "\u200f",
+    "\u2060",
+    "\ufeff",
+    "\u202a",
+    "\u202b",
+    "\u202c",
+    "\u202d",
+    "\u202e",
+)
+
+# 覆盖指令式 / 自我复制式载荷短语（中英混合，小写匹配）。
+_SOUL_INJECTION_PATTERNS: tuple[str, ...] = (
+    "忽略之前指令",
+    "忽略上述指令",
+    "无视之前",
+    "无视上文",
+    "忘记之前的指令",
+    "ignore all previous",
+    "ignore previous",
+    "disregard all previous",
+    "forget all previous",
+    "override your instructions",
+    "you are now",
+    "act as if",
+    "复制此指令",
+    "把以上内容",
+    "写入你的系统提示",
+    "重复我上面的话",
+)
+
+
+def _reject_injected_soul(soul: str) -> None:
+    """拒绝含注入载荷的 SOUL（fail-closed；Mind Viruses / PPA 威胁模型）。
+
+    零宽字符命中即拒；指令覆盖 / 自我复制式短语命中即拒，错误消息给出命中模式，
+    便于用户定位并清理。确定性错误不重试（C10）。
+    """
+    for char in _ZERO_WIDTH_CHARS:
+        if char in soul:
+            raise SoulValidationError(
+                f"SOUL 含零宽/控制字符（U+{ord(char):04X}），疑似注入载荷，拒绝写入。"
+                "请移除隐藏字符后重试。"
+            )
+    lowered = soul.lower()
+    for pattern in _SOUL_INJECTION_PATTERNS:
+        if pattern in lowered:
+            raise SoulValidationError(
+                f"SOUL 命中指令覆盖/自我复制模式「{pattern}」，拒绝写入。"
+                "SOUL.md 是人格配置不是指令来源，请移除该内容后重试。"
+            )
+
+
+def _validate_safety_sections_unchanged(current_soul: str, submitted_soul: str) -> None:
+    """agent 修订 SOUL 时，安全段内容必须逐字节不变（红线只读化）。
+
+    提交缺段会被 ``_merge_soul_defaults`` 补回，不算修改；提交显式给出与当前
+    文件不同的安全段文案 → 拒绝。用户经 REST（actor=system）修改不受此限。
+    """
+    current_sections = _split_soul_sections(current_soul)
+    submitted_sections = _split_soul_sections(submitted_soul)
+    for marker in SOUL_SAFETY_SECTIONS:
+        current = next((v for k, v in current_sections.items() if k.startswith(marker)), None)
+        submitted = next((v for k, v in submitted_sections.items() if k.startswith(marker)), None)
+        if current is not None and submitted is not None and current.strip() != submitted.strip():
+            raise SoulValidationError(
+                f"SOUL 安全段 {marker} 由平台保护，agent 不可修改。"
+                "如需调整安全边界/记忆规则/错误处理/红线，请用户直接编辑 Home 文件。"
+            )
+
 
 def _validate_soul(soul: str) -> None:
     """SOUL 完整度校验(fail-closed;ADR-0242 I-B2)。
 
     校验项:
     1. 去除空白后长度 >= ``_SOUL_MIN_CHARS``;
-    2. 必须包含四个核心语义段标记(身份/性格/能力/语气)。
+    2. 必须包含四个核心语义段标记(身份/性格/能力/语气);
+    3. 无注入载荷:零宽字符 / 覆盖指令式短语直接拒绝(I-B2 延伸,Mind Viruses 防护)。
 
-    失败抛 :class:`SoulValidationError`,消息明确指出缺哪一段 / 长度不足,
-    便于向导继续对齐。安全边界/记忆规则/错误处理/红线由模板预置,不要求。
+    失败抛 :class:`SoulValidationError`,消息明确指出缺哪一段 / 长度不足 /
+    命中的注入模式,便于向导继续对齐。安全边界/记忆规则/错误处理/红线由模板预置,
+    不要求。
     """
     compact = "".join(soul.split())
     if len(compact) < _SOUL_MIN_CHARS:
@@ -896,6 +1010,7 @@ def _validate_soul(soul: str) -> None:
             f"SOUL 完整度不足:去除空白后 {len(compact)} 字符,要求 >= {_SOUL_MIN_CHARS} 字符。"
             "请补充身份/性格/能力/语气的具体内容后再创建,不要用模板默认 SOUL 降级。"
         )
+    _reject_injected_soul(soul)
     missing = [marker for marker in SOUL_CORE_SECTIONS if marker not in soul]
     if missing:
         raise SoulValidationError(

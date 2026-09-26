@@ -1,16 +1,19 @@
-"""``lca-ops assistants`` — CLI wrapper for ``/v1/assistants`` (ADR-0187 §3 D7).
+"""``lca-ops assistants`` — Assistant lifecycle CLI（ADR-0187 §3 D7）。
 
-Thin wrapper：创建/查看助理的真值在 ``AssistantCatalog``（经
-``routes_assistants`` REST），本模块只构造/转发 HTTP，不复制业务。
-内核未启用 ``assistant-runtime`` bundle（web-standard）时端点返回
-501 ``catalog_unavailable``，命令原样呈现错误。
+创建/查看助理走 REST 薄封装（真值在 ``AssistantCatalog``，经
+``routes_assistants``）；``soul-history/diff/rollback`` 是内容级回滚的
+诊断/恢复命令，直接进程内读 ``revisions/`` 快照并调用 catalog（与
+``memory`` 命令同构），因为快照读回尚无 REST 端点。
 """
 
 from __future__ import annotations
 
+import difflib
 import json
+import os
 import urllib.error
 import urllib.request
+from pathlib import Path
 
 import typer
 
@@ -26,7 +29,95 @@ def register(app: typer.Typer) -> None:
     assistants_app.command(name="list", help=_list.__doc__ or "")(_list)
     assistants_app.command(name="show", help=_show.__doc__ or "")(_show)
     assistants_app.command(name="create", help=_create.__doc__ or "")(_create)
+    assistants_app.command(name="soul-history", help=_soul_history.__doc__ or "")(_soul_history)
+    assistants_app.command(name="soul-diff", help=_soul_diff.__doc__ or "")(_soul_diff)
+    assistants_app.command(name="soul-rollback", help=_soul_rollback.__doc__ or "")(_soul_rollback)
     app.add_typer(assistants_app, name="assistants")
+
+
+def _assistants_root() -> Path:
+    """CLI 进程内使用的 catalog 根目录（与内核 LCA_ASSISTANTS_ROOT 同源）。"""
+    return Path(os.environ.get("LCA_ASSISTANTS_ROOT", str(Path.home() / ".lca" / "assistants")))
+
+
+def _catalog() -> object:
+    """进程内实例化配置面 catalog（同 ``ops.memory`` 的用法）。"""
+    from lca.plugins.domain.assistant.catalog.plugin import _AssistantCatalogImpl
+
+    return _AssistantCatalogImpl(root=_assistants_root())
+
+
+def _load_snapshot(assistant_id: str, revision_seq: int) -> dict[str, object]:
+    root = _assistants_root()
+    path = root / assistant_id / "revisions" / f"{revision_seq}.json"
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        typer.echo(f"读取快照失败 {path}: {exc}")
+        raise typer.Exit(code=1) from exc
+
+
+def _soul_history(
+    assistant_id: str = typer.Argument(..., help="asst_* id"),
+) -> None:
+    """列出助理的修订历史（revisions/N.json 摘要）。"""
+    revisions_dir = _assistants_root() / assistant_id / "revisions"
+    if not revisions_dir.is_dir():
+        typer.echo(f"assistant {assistant_id} 无 revisions/ 目录（可能未创建或已删除）")
+        raise typer.Exit(code=1)
+    seqs = sorted(int(p.stem) for p in revisions_dir.glob("*.json"))
+    if not seqs:
+        typer.echo("（无修订快照）")
+        return
+    for seq in seqs:
+        snapshot = _load_snapshot(assistant_id, seq)
+        created = str(snapshot.get("created_at") or "?")
+        has_files = "files" in snapshot
+        typer.echo(f"{seq:>4}  {created}  files={has_files}")
+
+
+def _soul_diff(
+    assistant_id: str = typer.Argument(..., help="asst_* id"),
+    from_seq: int = typer.Argument(..., help="起始修订序号"),
+    to_seq: int = typer.Argument(..., help="目标修订序号"),
+) -> None:
+    """对比两个修订快照的配置面文件差异（unified diff）。"""
+    snap_from = _load_snapshot(assistant_id, from_seq)
+    snap_to = _load_snapshot(assistant_id, to_seq)
+    files_from = snap_from.get("files") if isinstance(snap_from.get("files"), dict) else {}
+    files_to = snap_to.get("files") if isinstance(snap_to.get("files"), dict) else {}
+    if not files_from and not files_to:
+        typer.echo(f"revision {from_seq} / {to_seq} 均不含文件内容（digest-only 快照）")
+        return
+    names = sorted(set(files_from) | set(files_to))
+    changed = [name for name in names if files_from.get(name) != files_to.get(name)]
+    if not changed:
+        typer.echo(f"revision {from_seq} → {to_seq}：无文件差异")
+        return
+    for name in changed:
+        typer.echo(f"── {name} ──")
+        old = (files_from.get(name) or "").splitlines()
+        new = (files_to.get(name) or "").splitlines()
+        for line in difflib.unified_diff(
+            old,
+            new,
+            fromfile=f"rev{from_seq}/{name}",
+            tofile=f"rev{to_seq}/{name}",
+            lineterm="",
+        ):
+            typer.echo(line)
+
+
+def _soul_rollback(
+    assistant_id: str = typer.Argument(..., help="asst_* id"),
+    to: int = typer.Option(..., "--to", help="要回滚到的修订序号"),
+) -> None:
+    """把配置面恢复为历史修订快照（写回全文 → reimport → 新 revision）。"""
+    revision = _catalog().restore_revision(assistant_id, to)  # type: ignore[attr-defined]
+    typer.echo(
+        f"rolled back {assistant_id} → rev{to}，新 revision_seq={revision.revision_seq} "
+        f"snapshot={revision.snapshot_path}"
+    )
 
 
 def _request(
