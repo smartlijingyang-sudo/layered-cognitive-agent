@@ -89,6 +89,11 @@ patch:
         required: false
       dev_mode: true
       expected_token: "lca-local"
+  # 日间 episode 只属于助理主目录，只有本 profile 装配这块家目录。
+  # 插件默认保持关闭，其它部署没有这块家目录，应继续走今天的提取器。
+  - id: phase.reflect.memory.extract
+    config:
+      governor_enabled: true
   - id: lca-composio-provider
     config:
       api_key:
