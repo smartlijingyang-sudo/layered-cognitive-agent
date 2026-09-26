@@ -18,11 +18,11 @@ import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from lca.cognition.memory.daytime import episode_home
 from lca.cognition.memory.govern import govern
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.enums.enums import ActionType, MemoryCategory
@@ -230,7 +230,7 @@ class ReflectMemoryExtractExecutor:
 
     def _apply_governor(self, context: NodeContext, reflection: object) -> NodeOutput | None:
         runtime = context.runtime or {}
-        home = _episode_home(runtime)
+        home = episode_home(runtime)
         state = getattr(runtime, "agent_state", None)
         if state is None and hasattr(runtime, "get"):
             state = runtime.get("agent_state")
@@ -276,28 +276,6 @@ class ReflectMemoryExtractExecutor:
                 "routing": RoutingDecision(action_type=ActionType.RESPOND),
             }
         )
-
-
-def _runtime_get(runtime: object, key: str) -> object:
-    getter = getattr(runtime, "get", None)
-    if callable(getter):
-        return getter(key)
-    return None
-
-
-def _episode_home(runtime: object) -> Path | None:
-    raw_home = _runtime_get(runtime, "assistant_home_path")
-    if isinstance(raw_home, Path):
-        return raw_home if str(raw_home).strip() else None
-    if isinstance(raw_home, str) and raw_home.strip():
-        return Path(raw_home)
-    memory = _runtime_get(runtime, "memory")
-    bound = getattr(memory, "home_path", None)
-    if isinstance(bound, Path):
-        return bound
-    if isinstance(bound, str) and bound.strip():
-        return Path(bound)
-    return None
 
 
 class Config(BaseModel):

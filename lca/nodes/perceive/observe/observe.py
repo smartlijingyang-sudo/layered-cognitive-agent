@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
+from lca.cognition.memory.daytime import record_task_episode
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -58,16 +59,18 @@ class PerceiveObserveExecutor:
         input: NodeInput,
     ) -> NodeOutput:
         runtime = context.runtime or {}
+        # Tool turns often stop before reflect. The utterance is already here.
+        state = input.port_values.get("state")
+        if state is None and hasattr(runtime, "get"):
+            state = runtime.get("agent_state")
+        record_task_episode(runtime, state)
         hub = getattr(runtime, "perceive_hub", None)
         if hub is None and hasattr(runtime, "get"):
             hub = runtime.get("perceive_hub")
         routing = RoutingDecision(action_type=ActionType.RESPOND)
         if not isinstance(hub, PerceiveHub):
             return NodeOutput(port_values={"manifest": None, "routing": routing})
-        agent_state = input.port_values.get("state")
-        if agent_state is None and hasattr(runtime, "get"):
-            agent_state = runtime.get("agent_state")
-        manifest = await hub.perceive(agent_state)  # type: ignore[arg-type]
+        manifest = await hub.perceive(state)  # type: ignore[arg-type]
         merged = await self._merge_assistant_bootstrap(runtime, manifest)
         return NodeOutput(port_values={"manifest": merged, "routing": routing})
 
