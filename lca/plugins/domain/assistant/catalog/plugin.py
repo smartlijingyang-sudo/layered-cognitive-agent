@@ -256,8 +256,8 @@ class _AssistantCatalogImpl(AssistantCatalog):
         （ADR-0187 §3 D11/D12 的角色模板面）;未知值抛
         ``_CatalogConfigError``（REST 层映射 400,不回落 default）。
 
-        SOUL 取数顺序（ADR-0242 D1）:``soul`` > ``from_role`` backstory
-        > 模板默认。``soul`` 非空时必须通过完整度校验（I-B2 fail-closed）,
+        SOUL 取数顺序（ADR-0242 D1）:``soul`` > ``use_template_soul`` 时的模板
+        SOUL > ``from_role`` backstory > 模板默认。``soul`` 非空时必须通过完整度校验（I-B2 fail-closed）,
         缺段 / 长度不足抛 ``SoulValidationError``,不降级用模板 SOUL 创建。
 
         引导式创建（``seed_user_md`` 或 ``soul`` 非空）:写 USER.md、
@@ -288,7 +288,8 @@ class _AssistantCatalogImpl(AssistantCatalog):
             # 用户 soul 只含四个核心段;模板预置的默认段在此补上(ADR-0242 附录 C)
             rendered.files["SOUL.md"] = _merge_soul_defaults(req.soul, rendered.files["SOUL.md"])
 
-        # 1c. from_role:卡片填充 emoji / role_id / goals;SOUL 只在无 soul 时用 backstory
+        # 1c. from_role:卡片填充 emoji / role_id / goals。
+        # SOUL 只用 backstory：没有对齐结果，且调用方没有要求留下模板人格。
         card: RoleCard | None = None
         if req.from_role:
             if self._role_resolver is None:
@@ -299,7 +300,7 @@ class _AssistantCatalogImpl(AssistantCatalog):
                 card = self._role_resolver.resolve(req.from_role)
             except RoleNotFoundError as exc:
                 raise AssistantCatalogError(str(exc)) from exc
-            if not req.soul:
+            if not req.soul and not req.use_template_soul:
                 rendered.files["SOUL.md"] = card.backstory
             profile = json.loads(rendered.files["profile.json"])
             if card.emoji:

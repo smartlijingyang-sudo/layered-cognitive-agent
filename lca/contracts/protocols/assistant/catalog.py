@@ -44,7 +44,9 @@ class CreateAssistantRequest:
     seed_user_md: str | None = None
     from_role: str | None = None
     """角色档案 role_id（如 'engineering/engineering-software-architect'）。
-    非空时 SOUL.md 内容来自 RoleCard.backstory，忽略模板中的 SOUL 文案。"""
+
+    非空时 emoji、role_id、goals 来自角色卡。SOUL.md 默认用
+    RoleCard.backstory。``use_template_soul`` 为真时改留模板 SOUL。"""
     soul: str | None = None
     """向导对齐后的最终 SOUL 全文（ADR-0242 D1）。
 
@@ -69,6 +71,12 @@ class CreateAssistantRequest:
     由调用方（REST 层）从可信头/请求身份推导，**禁止从 body 直接透传**。
     非空时 ``manifest.json`` 记录顶层 ``user_id``（归属元数据，不进配置面
     digest、不触发 ``revision_seq``）。
+    """
+    use_template_soul: bool = False
+    """为真时，即使有 ``from_role`` 也保留模板 SOUL.md。
+
+    登录向导用这个开关。角色卡仍提供 emoji、role_id 和 goals。
+    ``soul`` 非空时仍以对齐结果为准。
     """
     default_tool_names: tuple[str, ...] = ()
     """创建时写入 ``{home}/tools.yaml`` ``allow`` 列表的默认工具名（ADR-0243 D3 延伸）。

@@ -160,6 +160,25 @@ class TestCreateFromRole:
         profile = json.loads((Path(handle.home_path) / "profile.json").read_text(encoding="utf-8"))
         assert profile["emoji"] == "🎨"
 
+    def test_use_template_soul_keeps_default_persona(self, catalog: AssistantCatalogImpl) -> None:
+        """登录向导：角色卡仍记 role_id / emoji，SOUL 留默认模板。"""
+        handle = catalog.create(
+            CreateAssistantRequest(
+                name="小架",
+                description="架构顾问",
+                from_role="engineering/architect",
+                use_template_soul=True,
+            )
+        )
+        soul = (Path(handle.home_path) / "SOUL.md").read_text(encoding="utf-8")
+        assert "你不是聊天机器人" in soul
+        assert "你是 小架" in soul
+        assert "主要语言：zh-CN" in soul
+        assert "系统架构专家" not in soul
+        profile = json.loads((Path(handle.home_path) / "profile.json").read_text(encoding="utf-8"))
+        assert profile["emoji"] == "🏛️"
+        assert profile["role_id"] == "engineering/architect"
+
     def test_soul_overrides_from_role_backstory(self, catalog: AssistantCatalogImpl) -> None:
         """ADR-0242 D1：soul 非空时覆盖角色卡 backstory，但 role_id 仍进 manifest。"""
         soul = (

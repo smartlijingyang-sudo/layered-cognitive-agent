@@ -2,7 +2,8 @@
 
 ADR-0252 D7：``AgentPickerStep`` 从 LCA presets 选角色 + 勾选技能（默认全选），
 Continue 调 LCA ``POST /v1/assistants``（``client_id``/``name``/``from_role``/
-``initial_skills``）再 ``finishOnboarding()``。
+``initial_skills``/``use_template_soul``）再 ``finishOnboarding()``。
+``use_template_soul`` 让 SOUL.md 用默认模板人格。
 """
 
 from __future__ import annotations
@@ -38,12 +39,12 @@ def apply(ctx: PatchContext) -> bool:
     service_rel = "src/services/installOnboardingAgent.ts"
     step_rel = "src/routes/onboarding/features/AgentPickerStep/index.tsx"
 
-    if ctx.has_marker(step_rel, "LCA skill_picker"):
-        return False
-
-    # 1) New service file.
+    # 1) Service file. Fragment is the source, including on re-apply.
     service_source = (_FRAGMENT_DIR / "installOnboardingAgent.ts").read_text(encoding="utf-8")
-    ctx.write(service_rel, service_source)
+    wrote_service = ctx.write_if_changed(service_rel, service_source)
+
+    if ctx.has_marker(step_rel, "LCA skill_picker"):
+        return wrote_service
 
     # 2) Patch AgentPickerStep.
     text = ctx.read(step_rel)

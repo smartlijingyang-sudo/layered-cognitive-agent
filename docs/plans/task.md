@@ -303,6 +303,10 @@
 | BRAINSTORM-CADENCE-MEM-DESIGN-SECTIONS | 逐步呈现设计细节（DDD领域模型、分层契约、快慢双轨、做梦固化、不变量测试）并获取用户审批 | Completed | 3 大小节（边界自治与DDD实体、双轨数据流与状态机设计模式、不变量断言矩阵与场景测试）全部获用户审核批准 |
 | BRAINSTORM-CADENCE-MEM-DESIGN-DOC | 沉淀正式 ADR 与设计文档至 docs/adr/ 及 docs/plans/ | Completed | 已落盘 docs/adr/0249-cadence-inspired-dual-track-memory-consolidation.md 与 docs/plans/2026-09-26-cadence-memory-consolidation-design.md，并通过 test_adr_index_matches_filesystem 门禁 |
 | BRAINSTORM-CADENCE-MEM-TRANSITION | 转换至实施计划制定（writing-plans） | Pending | 待执行 |
+| ELIGIBILITY-PROBE-CORE | 后端核心探活逻辑（check_account_eligibility直调loadCodeAssist与simulate_agy_cli_probe，整合入fetch_single_account_quota与/api/quota） | Completed | 实现 check_account_eligibility 直调 loadCodeAssist(FULL_ELIGIBILITY_CHECK) 识别 ineligibleTiers/VALIDATION_REQUIRED/SUBSCRIPTION_REQUIRED，实现 simulate_agy_cli_probe，整合入 fetch_single_account_quota 与 calculate_cluster_aggregate 及 calculate_daily_burn_table |
+| ELIGIBILITY-PROBE-API-TESTS | 扩展探活 API 端点（/api/accounts/{id}/eligibility、/api/accounts/{id}/probe、/api/cluster/probe_all）与自动化测试用例 | Completed | 增加 /api/accounts/{id}/eligibility、/api/accounts/{id}/probe 与 /api/cluster/probe_all 端点，增加 4 组 100% 覆盖单测（27/27 全绿） |
+| ELIGIBILITY-PROBE-FRONTEND | 前端 Cockpit 账号卡片探活徽章、Google 解锁验证直通链接与一键探活交互组件（static/index.html） | Completed | 1. 大盘总览条：新增【X 账号探活阻断】红色胶囊与 tooltip；2. 账号卡片：Row 1 增加【探活正常/验证阻断】状态徽章；被阻断账号高亮展示 Google 风控二验警示框，提供【直通 Google 验证页面】一键跳转与【重新探活】按钮；底部工具条增加单卡片即时【⚡ 深度探活】按键；3. Daily Burn Table：增加【去验证】直达链接；4. Vue setup 增加 probingAccount、probingAll、getAccountEligibility、probeSingleAccount、probeAllAccounts 等状态与方法，测试用例 test_html_frontend_eligibility_probe_contracts 100% 通过 |
+| ELIGIBILITY-PROBE-VERIFY-RESTART | 服务平滑重启与实测端到端探活验证（实测精准识别出 C/E/F/I/O 风控阻断与 A/B/M/N/P 正常） | Completed | 1. 执行 bash start.sh 平滑重启 tmux 会话 agy-dashboard 服务（0.0.0.0:1888）；2. 全量 pytest 自动化测试 28/28 全绿（耗时 15.7s）；3. 实测调用 POST /api/cluster/probe_all 与 GET /api/quota?force=true，精准探测识别出 E/F/I/O 4个账号处于 VALIDATION_REQUIRED 风控阻断并提取出 Google 解锁直通链接，A/B/M/N/P 5个账号探活正常；彻底消灭单纯看配额接口导致的健康假阳性 |
 
 
 

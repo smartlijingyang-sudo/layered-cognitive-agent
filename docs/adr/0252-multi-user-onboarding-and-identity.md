@@ -117,14 +117,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS lca_user_assistants_agent_idx
 1. 原生 onboarding 前缀照旧（Telemetry → ResponseLanguage → FullName → Interests → ProSettings）。
 2. `AgentPickerStep` 组件复用，数据源换成 LCA 角色预设。补丁 `deploy/lobehub/patches/onboarding/lca_presets.py` 改 `src/services/agentMarketplace.ts`，把 `lambdaClient.market.agent.getOnboardingFull` 换成 `GET /lca-api/v1/onboarding/presets`。`roles/` 角色卡按 department 映射到原生 `MarketplaceCategory`（未知部门落默认桶），`AgentCard` / `CategoryFilter` 原样渲染。
 3. 新增 `SkillCapabilityStep`（插入 Classic 流，`deploy/lobehub/patches/onboarding/skill_picker.py`），从同一 presets 端点的 `skills` 段列出全局技能（`~/.lca/skills` 中含 `SKILL.md` + `manifest.json` 的包），`@lobehub/ui` `Checkbox` 渲染，**默认全选**。
-4. Continue 调 `POST /lca-api/v1/assistants`，body 带 `{client_id, name, from_role, initial_skills: [...selected]}`。
+4. Continue 调 `POST /lca-api/v1/assistants`，body 带 `{client_id, name, from_role, initial_skills: [...selected], use_template_soul: true}`。`use_template_soul` 让 `SOUL.md` 使用 `assistant.default` 的默认人格。角色卡仍写入 emoji、`role_id` 和 goals。
 5. LCA 后端 `catalog.create` 物化新 Home，只硬链接勾选技能到 `{home}/skills/`；写 `manifest.user_id`；插入 `lca_user_assistants`（status=pending）；bridge 注册 LobeHub agent 行；最后 `status=active`。
 6. 前端刷新 agent 列表，调原生 `finishOnboarding()`，跳转 `/chat/<agt_id>`。
 
 新增端点：
 
 - `GET /v1/onboarding/presets` — 角色预设 + 技能目录（经 `role_card_resolver` + 全局技能库）
-- `POST /v1/assistants` 扩展 body：`client_id`、`from_role`、`initial_skills`
+- `POST /v1/assistants` 扩展 body：`client_id`、`from_role`、`initial_skills`、`use_template_soul`
 - `POST /v1/assistants/{id}/register-lobehub` — bridge 注册失败后的重试端点
 
 ### D8 · Bridge 投影与幂等

@@ -8,6 +8,7 @@ while the owning capability is absent. The handler bodies must remain
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -625,6 +626,127 @@ def _app_with_catalog_and_role_resolver(tmp_path: Any) -> Starlette:
     )
     app.state.assistant_catalog = catalog
     return app
+
+
+def test_onboarding_flow_default_soul_reaches_prompt(tmp_path: Any) -> None:
+    """登录向导的请求体走到人设提示。
+
+    同一条真实角色卡走两遍。不带开关时 backstory 进 SOUL。
+    带上向导的 use_template_soul 后，磁盘、persona 和 BACKSTORY 行都是默认人格。
+    角色的 emoji、role_id、goals 仍留下。
+    """
+    from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
+    from lca.infrastructure.tools.assistant.role_card_resolver import FileRoleCardResolver
+    from lca.plugins.assistant.persona.persona import persona_from_home
+    from lca.plugins.domain.assistant.catalog.plugin import AssistantCatalogImpl
+    from lca.plugins.prompts.sections import BackstorySection
+
+    role_id = "engineering/engineering-software-architect"
+    roles = Path(__file__).resolve().parents[4] / "roles"
+    plugin, router, ctx = _setup_plugin()
+    _run_plugin_setup(plugin, ctx)
+    app = Starlette()
+    router.install(app)
+    resolver = FileRoleCardResolver(root=roles)
+    catalog = AssistantCatalogImpl(
+        root=Path(tmp_path) / "assistants",
+        role_resolver=resolver,
+    )
+    app.state.assistant_catalog = catalog
+    client = TestClient(app)
+    card = resolver.resolve(role_id)
+    marker = "限界上下文"
+    assert marker in card.backstory
+
+    leaked = client.post(
+        "/v1/assistants",
+        json={
+            "client_id": "flow-backstory",
+            "name": "旧路径",
+            "description": "对照",
+            "from_role": role_id,
+            "initial_skills": [],
+        },
+    )
+    assert leaked.status_code == 201
+    leaked_soul = (Path(leaked.json()["home_path"]) / "SOUL.md").read_text(encoding="utf-8")
+    assert marker in leaked_soul
+
+    created = client.post(
+        "/v1/assistants",
+        json={
+            "client_id": "flow-default-soul",
+            "name": "小架",
+            "description": "架构顾问",
+            "from_role": role_id,
+            "initial_skills": [],
+            "use_template_soul": True,
+        },
+    )
+    assert created.status_code == 201
+    body = created.json()
+    home = Path(body["home_path"])
+    soul = (home / "SOUL.md").read_text(encoding="utf-8")
+    assert "你不是聊天机器人" in soul
+    assert "你是 小架" in soul
+    assert "架构顾问" in soul
+    assert "主要语言：zh-CN" in soul
+    assert marker not in soul
+    assert "{{ name }}" not in soul
+    assert body["profile"]["role_id"] == role_id
+    assert body["profile"]["emoji"] == "🏛️"
+
+    goals = (home / "goals.yaml").read_text(encoding="utf-8")
+    assert "软件架构师核心职责" in goals
+
+    persona = persona_from_home(str(home))
+    assert persona.role == "小架"
+    assert persona.goal == "架构顾问"
+    assert "你不是聊天机器人" in persona.backstory
+    assert marker not in persona.backstory
+    profile = RoleProfile(
+        role=persona.role,
+        goal=persona.goal,
+        backstory=persona.backstory,
+        tool_permission_manifest=ToolPermissionManifest(allowed_tools=()),
+    )
+    rendered = BackstorySection().render(role_profile=profile, tools=[])
+    assert rendered.text.startswith("BACKSTORY:")
+    assert "你不是聊天机器人" in rendered.text
+    assert marker not in rendered.text
+
+
+def test_post_assistants_use_template_soul_keeps_default_persona(tmp_path: Any) -> None:
+    """登录向导带 use_template_soul 时，SOUL 是默认模板，角色卡不覆盖。"""
+    app = _app_with_catalog_and_role_resolver(tmp_path)
+    client = TestClient(app)
+    response = client.post(
+        "/v1/assistants",
+        json={
+            "name": "小架",
+            "description": "架构顾问",
+            "from_role": "engineering/architect",
+            "use_template_soul": True,
+        },
+    )
+    assert response.status_code == 201
+    home = response.json()["home_path"]
+    soul = (Path(home) / "SOUL.md").read_text(encoding="utf-8")
+    assert "你不是聊天机器人" in soul
+    assert "# 软件架构师" not in soul
+    assert response.json()["profile"]["role_id"] == "engineering/architect"
+    assert response.json()["profile"]["emoji"] == "🏛️"
+
+
+def test_post_assistants_rejects_non_bool_use_template_soul(tmp_path: Any) -> None:
+    app, _ = _app_with_catalog(tmp_path)
+    client = TestClient(app)
+    response = client.post(
+        "/v1/assistants",
+        json={"name": "小架", "use_template_soul": "yes"},
+    )
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "invalid_request"
 
 
 def test_post_assistants_unknown_from_role_returns_400(tmp_path: Any) -> None:

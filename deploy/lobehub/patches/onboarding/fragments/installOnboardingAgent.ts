@@ -1,5 +1,7 @@
 // LCA onboarding agent creation (ADR-0252 D7).
 // POST /lca-api/v1/assistants with client_id/name/from_role/initial_skills.
+// use_template_soul keeps assistant_default/SOUL.md. The role card still
+// supplies emoji, role_id, and goals.
 
 export interface InstallOnboardingAgentArgs {
   clientId: string;
@@ -26,6 +28,7 @@ export const installOnboardingAgent = async (
       name: args.name,
       from_role: args.fromRole,
       initial_skills: args.initialSkills,
+      use_template_soul: true,
     }),
   });
   if (!response.ok) {

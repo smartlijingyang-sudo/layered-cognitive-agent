@@ -379,6 +379,7 @@ async def create_assistant(request: Request) -> JSONResponse:
     template_id = body.get("template_id") or "assistant.default"
     seed_user_md = body.get("seed_user_md") or None
     from_role = body.get("from_role") or None
+    use_template_soul = body.get("use_template_soul", False)
     client_id = body.get("client_id") or ""
     initial_skills_raw = body.get("initial_skills") or []
     if not isinstance(description, str):
@@ -401,6 +402,13 @@ async def create_assistant(request: Request) -> JSONResponse:
             status_code=400,
             error_type="invalid_request",
             detail="from_role 必须为字符串",
+        )
+    if not isinstance(use_template_soul, bool):
+        return _error_envelope(
+            "invalid_request",
+            status_code=400,
+            error_type="invalid_request",
+            detail="use_template_soul 必须为布尔值",
         )
     if seed_user_md is not None and not isinstance(seed_user_md, str):
         return _error_envelope(
@@ -464,6 +472,7 @@ async def create_assistant(request: Request) -> JSONResponse:
                 from_role=from_role.strip()
                 if isinstance(from_role, str) and from_role.strip()
                 else None,
+                use_template_soul=use_template_soul,
                 initial_skills=initial_skills,
                 owner_user_id=user_id,
             )

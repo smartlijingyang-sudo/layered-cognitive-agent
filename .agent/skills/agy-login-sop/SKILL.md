@@ -98,19 +98,24 @@ agy 数据目录跟随 `$HOME`,因此**每个账户一个隔离 HOME** 即可并
 | **E** | `boistromspritio@gmail.com` | `agy-e` | `agylogin-e` | 2026-09-23 | **家里 Opera 浏览器** | 家里 Opera 登录管理，已激活 Google Cloud Shell 建立开发者信任 |
 | **F** | `kolpasfasnuio@gmail.com` | `agy-f` | `agylogin-f` | 2026-09-23 | **家里 Opera 浏览器** | 家里 Opera 登录管理，首次授权已就绪 Starter Quota |
 | **I** | `moretunrewial@gmail.com` | `agy-i` | `agylogin-i` | 2026-09-24 | 通用/扩展浏览器 | 第九账号，已完成初始化与 Superpowers 接入 |
-| **J** | `berrishecameilla@gmail.com` | `agy-j` | `agylogin-j` | 2026-09-24 | 通用/扩展浏览器 | 第十账号，已完成初始化与 Superpowers 接入 |
-| **K** | `jimiyangbro@gmail.com` | `agy-k` | `agylogin-k` | 2026-09-24 | 通用/扩展浏览器 | 第十一账号，已完成初始化与 Superpowers 接入，Starter 缓冲额度 |
-| **L** | `annayangirl@gmail.com` | `agy-l` | `agylogin-l` | 2026-09-25 | 通用/扩展浏览器 | 第十二账号，已完成初始化与 Superpowers 接入，Starter 缓冲额度 |
+| **M** | `crystalloverchen@gmail.com` | `agy-m` | `agylogin-m` | 2026-09-25 | 通用/扩展浏览器 | 第十三账号，Starter 缓冲额度，待升级 Google AI Pro |
+| **N** | `peterpetrelee@gmail.com` | `agy-n` | `agylogin-n` | 2026-09-25 | 通用/扩展浏览器 | 第十四账号，Starter 缓冲额度，已就绪 |
+| **O** | `jingjingthequee@gmail.com` | `agy-o` | `agylogin-o` | 2026-09-25 | 通用/扩展浏览器 | 第十五账号，Starter 缓冲额度，已就绪 |
+| **P** | `johnyangbro@gmail.com` | `agy-p` | `agylogin-p` | 2026-09-25 | 通用/扩展浏览器 | 第十六账号，Starter 缓冲额度，满血就绪 |
 
 ### 废弃池子 (Deprecated Pool)
 
-以下账号均因需要手机验证/扫码但当初手机无法使用导致 OAuth Token 失效，已归档并在看板与命令中停用：
+以下账号均因需要手机验证/扫码但当初手机无法使用导致 OAuth Token 失效，或 Starter 体验额度到期转入 SUBSCRIPTION_REQUIRED 无法恢复使用，已归档并在看板与命令中停用：
 - **原 G**: `zandermarhanse@gmail.com` (浏览器会话过期触发扫码/手机验证，无法验证导致吊销)
 - **D**: `huersebuied@gmail.com` (需手机二次验证，原手机无法接码，`invalid_grant`)
 - **现 G**: `janniferarjune@gmail.com` (需手机二次验证，原手机无法接码，`invalid_grant`)
 - **H**: `copelandmanuley@gmail.com` (需手机二次验证，原手机无法接码，`invalid_grant`)
+- **Q**: `sarayangirl@gmail.com` (授权后触发 Google 风控拦截，OAuth 端点返回 `invalid_grant`，已清理废弃)
+- **L**: `annayangirl@gmail.com` (并发刷新导致 OAuth Refresh Token 被 Google 吊销 `invalid_grant` 401，已清理废弃)
+- **J**: `berrishecameilla@gmail.com` (Starter 体验配额到期且触发异地扫码风控，转入 SUBSCRIPTION_REQUIRED #3501 废弃)
+- **K**: `jimiyangbro@gmail.com` (高强度消耗完 Starter 配额后触发设备二验扫码阻断，转入 SUBSCRIPTION_REQUIRED #3501 废弃)
 
-- 在用账户 A / B / C / E / F / I / J / K / L 的隔离 HOME: `~/.agy-accounts/{a,b,c,e,f,i,j,k,l}/`
+- 在用账户 A / B / C / E / F / I / M / N / O / P 的隔离 HOME: `~/.agy-accounts/{a,b,c,e,f,i,m,n,o,p}/`
 - 切换工具(已安装到 `~/.local/bin/`):
   - `agy-a` → 用 `HOME=/home/lichao/.agy-accounts/a` 启动 agy (账户 A)
   - `agy-b` → 用 `HOME=/home/lichao/.agy-accounts/b` 启动 agy (账户 B)
@@ -118,10 +123,11 @@ agy 数据目录跟随 `$HOME`,因此**每个账户一个隔离 HOME** 即可并
   - `agy-e` → 用 `HOME=/home/lichao/.agy-accounts/e` 启动 agy (账户 E)
   - `agy-f` → 用 `HOME=/home/lichao/.agy-accounts/f` 启动 agy (账户 F)
   - `agy-i` → 用 `HOME=/home/lichao/.agy-accounts/i` 启动 agy (账户 I)
-  - `agy-j` → 用 `HOME=/home/lichao/.agy-accounts/j` 启动 agy (账户 J)
-  - `agy-k` → 用 `HOME=/home/lichao/.agy-accounts/k` 启动 agy (账户 K)
-  - `agy-l` → 用 `HOME=/home/lichao/.agy-accounts/l` 启动 agy (账户 L)
-  - `agy-switch [a|b|c|e|f|i|j|k|l]` → 查看/切换不同账户会话; 多会话并存时直接 `tmux attach -t agylogin[-b|-c|-e|-f|-i|-j|-k|-l]` 即可
+  - `agy-m` → 用 `HOME=/home/lichao/.agy-accounts/m` 启动 agy (账户 M)
+  - `agy-n` → 用 `HOME=/home/lichao/.agy-accounts/n` 启动 agy (账户 N)
+  - `agy-o` → 用 `HOME=/home/lichao/.agy-accounts/o` 启动 agy (账户 O)
+  - `agy-p` → 用 `HOME=/home/lichao/.agy-accounts/p` 启动 agy (账户 P)
+  - `agy-switch [a|b|c|e|f|i|m|n|o|p]` → 查看/切换不同账户会话; 多会话并存时直接 `tmux attach -t agylogin[-b|-c|-e|-f|-i|-m|-n|-o|-p]` 即可
   - Web 可视化管理平台: 局域网访问 `http://10.36.6.252:1888` (密码: `lichao12`)，提供实时额度雷达、全景任务看板、数据分析与 Web 终端控制台
 
 ### 新增账号的流程 (以账号 D 为例)
@@ -179,22 +185,51 @@ tmux capture-pane -t agylogin-d -p | sed 's/\x1b\[[0-9;]*m//g' > /tmp/agy-pane-d
 - 若某个账户的 token 过期/被撤销,只需重新走 Step 2–4(针对该账户的隔离 HOME),不影响另一个账户
 ## ⚠️ 账号维护血泪经验与避坑铁律 (Session Expired 防废号法则)
 
-### 事故复盘：原 G 账号废号根因
+### 事故复盘（一）：原 G 账号废号根因
 原 G 账号（`zandermarhanse@gmail.com`）在完成授权后，因管理环境中的**浏览器关闭退出 / 浏览器会话过期（Session Expired）**，导致触发了 Google 账号的安全重新登录与扫码验证。在境外代理/无固定设备指纹的开发环境下，突发 Session 失效引发的重新登录与重新扫描会直接联动 Google 身份安全中心将先前的 OAuth Refresh Token 撤销，本地 agy 报出：
 `UNAUTHENTICATED (code 401): Request had invalid authentication credentials. Expected OAuth 2 access token...`（底层返回 `invalid_grant`），致使本地绑定的 CLI 凭证彻底报废，只能换号！
 
+### 事故复盘（二）：2026-09-25 anna 暴雷与多账号雪崩连坐根因
+2026-09-25 晚间，集群多账号突然接连报出 `403 PERMISSION_DENIED: Verify your account to continue`（典型 Trace 如 `Error ID: 226cf856-f53a-4f6e-8935-44df3a2afd7a-1`），彻底排查后确认了三重叠加根因链：
+1. **新号纯闲置触发 24h 首检失效**：L 账号（`annayangirl@gmail.com`）在注册接入后的 24 小时内**完全零实际开发对话交互（调用量纯 0）**。在 Google 视角里，该新号仅有 AWS 机房 IP 在定时发机器心跳，而在原登录设备上却无任何生理活跃轨迹，在到达 24 小时审查关卡时被判定为弃用僵尸会话，下发 `Session Expired` 并联动吊销 Refresh Token（`invalid_grant` 401）。
+2. **自动换号脚本（agy-auto）的雪崩放大效应**：L 账号失效后，调度器以 3 秒为间隔狂暴执行自动故障转移，在同一 AWS 机房 IP（`18.181.236.82`）上密集轮流切换 J ➔ E ➔ C ➔ F 发起 API 请求。这直接命中了 Google API 网关的反女巫防刷算法（Anti-Sybil），Google 对该出网 IP 实施了**短时全员连坐阻断**，导致老号和 Pro 号被误伤挂起。
+3. **同账号双实例并发与系统资源击穿**：调度器在 tmux 已有常驻会话的情况下再次启动同账号子进程，双进程并发读写同一个 Keyring 与 Token，并击穿了 Linux 内核默认 `fs.inotify.max_user_instances=128`，导致文件监听和凭证读写彻底紊乱。
+
 ### 核心规程与铁律：
-1. **【铁律一】绝对不要主动退出浏览器或清理浏览器会话 (Session)**：
+1. **【绝对红线一·整机并发限制】绝对不可多开超过 2 或 3 个 agy 会话或进程**：
+   - 全机并发上限硬指标：任何时刻整台机器上运行的 `agy` 进程数**严禁超过 2~3 个**（日常仅保留 **1 个主力 B 账号**，极端交接/排错最多启动 1 个 A 账号）。
+   - 严禁在多个 tmux、后台子 shell 或并发 agent 中随意拉起新 agy 实例，防止出网 IP 并发连接瞬间暴增触发 Google 防火墙并发拦截。
+2. **【绝对红线二·调用频率限制】一定不能高频调用 Google API / Antigravity 端点**：
+   - 保持真实人类开发节奏：阅读、思考、排查、调试与验证之间需有自然间隙。**严禁编写脚本对 agy 接口自动化轰炸、无限循环压力测试或秒级高频触发**。
+   - 严禁自动化高频配额探测：已彻底停用任何在后台定时高频轮询 Google 配额/Token 的监控程序。
+   - 单会话适度重构：单个会话步骤过长（> 40 步）或上下文过大时，主动 `/exit` 重启新会话，避免每次生成向 Google 发送超大 payload 触发深度审计。
+3. **【铁律三】绝对不要主动退出浏览器或清理浏览器会话 (Session)**：
    - 凡是登录并管理过 agy 账号的浏览器（如公司电脑 Opera、家里电脑 Opera、专用 Profile 等），**严禁主动退出浏览器程序、清理 Cookie / 浏览历史，严禁点击 Google 账号“退出登录”**！
    - 浏览器窗口与后台 Session 必须**长期常驻保持在线态**。
-2. **【铁律二】防止 Session Expired 连锁反应**：
+4. **【铁律四】防止 Session Expired 连锁反应**：
    - Google 会定期对长时间无活动或网络 IP 突变的会话进行 Session 失效处理。若出现 Session Expired 提示重新登录/扫码，**千万不要在多变 IP 或随意的新设备上盲目重新扫码**。
    - 盲目操作极易被判定为异地盗号风控，导致 OAuth Refresh Token 被吊销。
-3. **【铁律三】遇重登或风控提示，第一步先开 Cloud Shell 刷信任**：
+5. **【铁律五】遇重登或风控提示，第一步先开 Cloud Shell 刷信任**：
    - 若浏览器出现重新登录或验证提示，**不要立即去扫 CLI 授权码**。
    - 优先在当前常驻浏览器内直接打开 👉 **`https://shell.cloud.google.com/`**，借助 Google 官方云端开发者环境刷新会话可信度，等 Cloud Shell 终端加载正常后再继续操作。
-4. **【铁律四】固定设备、固定 Profile，坚决不交叉混用**：
-   - D 组锁定公司 Opera，E/F 组锁定家里 Opera，G 组锁定专用浏览器环境，严格执行物理/环境隔离，避免多账号在同一未隔离的普通浏览器环境中来回切换。
+6. **【铁律六】固定设备、固定 Profile，坚决不交叉混用**：
+   - 各组账号严格绑定独立浏览器环境，严格执行物理/环境隔离，避免多账号在同一未隔离的普通浏览器环境中来回切换。
+7. **【铁律七】严禁编写与运行多账号秒级自动切号脚本（防连坐铁律）**：
+   - 严禁任何在遇到 429/401 后自动秒级轮换唤醒下一账号的程序（如已被物理删除的 `agy-auto`）。
+   - 单账号遇到限额或异常时必须立即停止，切忌向整个账号池顺序传导压力，避免因单点故障引爆整机房 IP 连坐风控。
+8. **【铁律八】新账号接入必执行“破冰会话”（破冰法则）**：
+   - 新号（特别是 Starter 冷号）接入后，**严禁 24 小时纯闲置挂机**！
+   - 必须在接入后的首个 24 小时内，主动在终端发起 1~2 轮真实代码问答或任务交互，在 Google 后台打上真实开发者活跃标记（Token 消费记录），安全度过 24h 审查点。
+9. **【铁律九】单账号严格单一实例，严禁并发双开（单实例法则）**：
+   - 每个账号在系统内有且仅有一个专属的 tmux 常驻会话（`agylogin-<id>`）；
+   - 日常交互统一使用 `tmux attach -t <会话名>` 或 `agy-switch` 接入，启动脚本内置 `EXISTING_PID` 进程级守护，严禁通过外部命令再次并发启动相同 HOME 目录的新 `agy` 进程，防止文件锁与 Token 竞态冲突。
+10. **【铁律十】数据独立与物理隔离，严禁再次创建跨账号共享软链接**：
+    - 2026-09-26 已全面拆除共享大脑 (`shared_memory`)。各账号必须保持独立的 `brain`、`conversations`、`history.jsonl` 与 `conversation_summaries.db`，杜绝任何会话指纹跨账号交叉暴露。
+11. **【铁律十一】Per-Account 代理网络分流**：
+    - 主力 B 账号走 `:7891` (`aws-ljy-reality`, `18.181.236.82`)；
+    - 备用 A 账号走 `:7892` (`smartljy-reality`, `45.76.169.192`)；
+    - 冷备 E 账号走 `:7893` (`smartljy-hy2`, `45.76.169.192`)；
+    - 绝不同时使用相同出口 IP 刷新多账号凭证，避免 Anti-Sybil 连坐。
 
 ## 账号资格与风控拦截排查 (Eligibility & Security SOP)
 
@@ -227,21 +262,33 @@ tmux capture-pane -t agylogin-d -p | sed 's/\x1b\[[0-9;]*m//g' > /tmp/agy-pane-d
 网页端完成验证或开通 AI Pro 后，旧的 `access_token` 不会自动更新 claims。可使用下面的 Python 命令快速刷新并持久化：
 
 ```bash
+# 注意代理端口与账号对应关系：B 账号用 7891，A 账号用 7892，E 账号用 7893
 python3 -c "
 import json, urllib.request, urllib.parse
 data = json.load(open('/home/lichao/.agy-accounts/<account-letter>/.gemini/antigravity-cli/antigravity-oauth-token'))
 body = urllib.parse.urlencode({
-    'client_id': '<AGY_GOOGLE_CLIENT_ID>',
-    'client_secret': '<AGY_GOOGLE_CLIENT_SECRET>',
+    'client_id': data.get('clientID', ''),
+    'client_secret': data.get('clientSecret', ''),
     'grant_type': 'refresh_token',
     'refresh_token': data['token']['refresh_token'],
 }).encode()
-opener = urllib.request.build_opener(urllib.request.ProxyHandler({'http': 'http://127.0.0.1:7890', 'https': 'http://127.0.0.1:7890'}))
+# 根据账号选择端口: B -> 7891, A -> 7892, E -> 7893
+port = 7891 if '<account-letter>' == 'b' else (7892 if '<account-letter>' == 'a' else 7893)
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({'http': f'http://127.0.0.1:{port}', 'https': f'http://127.0.0.1:{port}'}))
 resp = opener.open(urllib.request.Request('https://oauth2.googleapis.com/token', data=body))
 data['token']['access_token'] = json.load(resp)['access_token']
 json.dump(data, open('/home/lichao/.agy-accounts/<account-letter>/.gemini/antigravity-cli/antigravity-oauth-token', 'w'))
-print('Token refreshed successfully!')
+print(f'Token refreshed successfully via port {port}!')
 "
+```
+
+## 巡检与健康诊断
+
+随时运行 `agy-health-check` 巡检当前活跃账号状态与日志报警（429、403、`invalid_grant`、未登录风暴）：
+
+```bash
+agy-health-check       # 查看最近 500 行日志统计
+agy-health-check 2000  # 查看最近 2000 行深入统计
 ```
 
 ## 注意事项
