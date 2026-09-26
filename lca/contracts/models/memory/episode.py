@@ -21,11 +21,8 @@ class ResidualClass(StrEnum):
 
 
 class LifecycleState(StrEnum):
-    # Not emitted: superseded is loser_fact_ids; candidate would need a second non-idempotent dream.
     ephemeral_fast = "ephemeral_fast"
-    candidate = "candidate"
     consolidated_slow = "consolidated_slow"
-    superseded = "superseded"
 
 
 class EpisodeFact(BaseModel):

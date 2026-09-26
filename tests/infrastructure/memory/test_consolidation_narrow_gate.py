@@ -39,7 +39,12 @@ def test_dream_writes_preimage_once_and_does_not_duplicate_rows(tmp_path: Path) 
     def _render(_records: object) -> str:
         return _RENDER
 
-    run_dream(home, now_ms=_NOW, backfill=None, render=_render)
+    def _backfill(assistant_id: str, records: list[object]) -> None:
+        assert assistant_id == home.name
+        assert any(getattr(record, "content", None) == "用户偏好：详细" for record in records)
+        (home / "USER.md").write_text(_RENDER, encoding="utf-8")
+
+    run_dream(home, now_ms=_NOW, backfill=_backfill, render=_render)
 
     preimage = home / "revisions" / f"user-md-preimage-{_NOW}.md"
     assert preimage.read_text(encoding="utf-8") == "old\n"
@@ -50,7 +55,7 @@ def test_dream_writes_preimage_once_and_does_not_duplicate_rows(tmp_path: Path) 
     assert active[0]["content"] == "用户偏好：详细"
     assert len(AssistantMemory(home).query(MemoryLayer.SEMANTIC)) == 1
 
-    run_dream(home, now_ms=_NOW, backfill=None, render=_render)
+    run_dream(home, now_ms=_NOW, backfill=_backfill, render=_render)
 
     semantic_again = json.loads((home / "memory" / "semantic.json").read_text(encoding="utf-8"))
     active_again = [row for row in semantic_again if not row.get("deleted")]

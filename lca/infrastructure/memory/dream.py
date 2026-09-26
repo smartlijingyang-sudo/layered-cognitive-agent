@@ -66,18 +66,13 @@ def _sync_user_md(
     desired = render(records).encode()
     user_md = home / "USER.md"
     current = user_md.read_bytes() if user_md.is_file() else b""
-    if desired == current:
-        return None, False
-    if backfill is None and (home / "manifest.json").is_file():
+    if desired == current or backfill is None:
         return None, False
     revisions = home / "revisions"
     revisions.mkdir(parents=True, exist_ok=True)
     preimage = revisions / f"user-md-preimage-{now_ms}.md"
     preimage.write_bytes(current)
-    if backfill is not None:
-        backfill(home.name, records)
-        return str(preimage), True
-    user_md.write_bytes(desired)
+    backfill(home.name, records)
     return str(preimage), True
 
 

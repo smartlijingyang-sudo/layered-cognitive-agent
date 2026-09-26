@@ -25,14 +25,19 @@ def register(app: typer.Typer) -> None:
     app.add_typer(memory_app, name="memory")
 
 
-def _dream_callbacks(home: Path) -> tuple[_Render, _Backfill | None]:
+def _dream_callbacks(home: Path) -> tuple[_Render, _Backfill]:
     from lca.plugins.assistant.profile.profile import (
         ProfileBackfillService,
         render_user_profile,
     )
 
     if not (home / "manifest.json").is_file():
-        return render_user_profile, None
+
+        def _write_user_md(assistant_id: str, records: list[MemoryRecord]) -> None:
+            del assistant_id
+            (home / "USER.md").write_text(render_user_profile(records), encoding="utf-8")
+
+        return render_user_profile, _write_user_md
     from lca.plugins.domain.assistant.catalog.plugin import _AssistantCatalogImpl
 
     catalog = _AssistantCatalogImpl(root=home.parent)
