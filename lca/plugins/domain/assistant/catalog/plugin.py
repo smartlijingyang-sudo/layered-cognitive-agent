@@ -81,6 +81,7 @@ from lca.plugins.assistant.events._events import (
 from lca.plugins.assistant.home._home_layout import (
     DEFAULT_TEMPLATE_ID,
     SOUL_CORE_SECTIONS,
+    SOUL_SAFETY_SECTIONS,
     TEMPLATE_REGISTRY,
     HomePaths,
     build_manifest,
@@ -91,6 +92,7 @@ from lca.plugins.assistant.home._home_layout import (
     known_template_ids,
     list_children_dirs,
     load_manifest,
+    render_default_template,
     render_template,
     sha256_digest,
     write_home_files,
@@ -377,6 +379,8 @@ class _AssistantCatalogImpl(AssistantCatalog):
             if skills_index:
                 manifest["skills"] = skills_index
             write_manifest(home.root, manifest)
+            # revision 0 = 出生状态基线:让 revisions/ 从创建起就有内容级回滚锚点。
+            write_revision_snapshot(home.root, 0, manifest)
         except Exception:
             cleanup_home(home.root)
             raise
@@ -546,7 +550,27 @@ class _AssistantCatalogImpl(AssistantCatalog):
 
         if patch.soul_md is not None:
             _validate_soul(patch.soul_md)
-            (home.root / "SOUL.md").write_text(patch.soul_md, encoding="utf-8")
+            # 安全段是平台保底,revise 不允许整体删除:提交里显式给出的以提交为准,
+            # 缺失的先从当前文件回填(保留用户已定制文案),仍缺再用模板兜底。
+            soul_path = home.root / "SOUL.md"
+            current_soul = soul_path.read_text(encoding="utf-8") if soul_path.is_file() else ""
+            merged_soul = _merge_soul_defaults(patch.soul_md, current_soul)
+            if any(marker not in merged_soul for marker in SOUL_SAFETY_SECTIONS):
+                template_id = str(manifest.get("template_id") or "") or DEFAULT_TEMPLATE_ID
+                try:
+                    template_soul = render_template(
+                        template_id,
+                        name=str(profile.get("name") or ""),
+                        description=str(profile.get("description") or ""),
+                    ).files["SOUL.md"]
+                except AssistantCatalogError:
+                    # 未登记模板（如 LobeHub 导入遗留）降级到内置默认模板，保底不丢安全段。
+                    template_soul = render_default_template(
+                        name=str(profile.get("name") or ""),
+                        description=str(profile.get("description") or ""),
+                    ).files["SOUL.md"]
+                merged_soul = _merge_soul_defaults(merged_soul, template_soul)
+            soul_path.write_text(merged_soul, encoding="utf-8")
             changes.append("SOUL.md")
         if patch.user_md is not None:
             (home.root / "USER.md").write_text(patch.user_md, encoding="utf-8")
@@ -846,6 +870,15 @@ def _new_assistant_id() -> str:
 _SOUL_MIN_CHARS = 200
 """SOUL 完整度下限(去除全部空白后,中文按字符计;ADR-0242 D1)。"""
 
+# 缺段错误附带的可照抄骨架:模型第一次重写常丢段,给模板可省一轮重试。
+_SOUL_CORE_SKELETON = (
+    "可直接照此骨架补全：\n"
+    "## 🧠 身份\n<你是谁>\n"
+    "## 🎭 性格\n<行事风格>\n"
+    "## 🛠 能力\n<擅长与边界>\n"
+    "## 🗣 语气\n<说话方式>"
+)
+
 
 def _validate_soul(soul: str) -> None:
     """SOUL 完整度校验(fail-closed;ADR-0242 I-B2)。
@@ -869,30 +902,22 @@ def _validate_soul(soul: str) -> None:
             "SOUL 缺少语义段: "
             + ", ".join(missing)
             + "。请补全这四个核心段(身份/性格/能力/语气)后重试;"
-            "安全边界/记忆规则/错误处理/红线由模板预置,无需手写。"
+            "安全边界/记忆规则/错误处理/红线由模板预置,无需手写。\n" + _SOUL_CORE_SKELETON
         )
 
 
-# ADR-0242 附录 C:模板预置的四个默认段,向导不要求用户手写。
-_SOUL_DEFAULT_MARKERS: tuple[str, ...] = (
-    "## 🔒 安全边界",
-    "## 💾 记忆规则",
-    "## ⚠️ 错误处理",
-    "## 🚫 红线",
-)
-
-
 def _merge_soul_defaults(soul: str, template_soul: str) -> str:
-    """把模板预置的默认段合并进用户 SOUL。
+    """把预置的安全段合并进用户 SOUL。
 
-    用户向导只产出四个核心段;缺失的默认段按模板顺序从 ``template_soul``
-    提取并追加,保证最终 Home 的 SOUL 是完整的八段结构。
+    用户向导只产出四个核心段;缺失的安全段按顺序从 ``template_soul``
+    （创建路径 = 模板,revise 路径 = 当前文件或模板）提取并追加,
+    保证最终 Home 的 SOUL 是完整的八段结构。
     """
-    if all(marker in soul for marker in _SOUL_DEFAULT_MARKERS):
+    if all(marker in soul for marker in SOUL_SAFETY_SECTIONS):
         return soul
     sections = _split_soul_sections(template_soul)
     defaults: list[str] = []
-    for marker in _SOUL_DEFAULT_MARKERS:
+    for marker in SOUL_SAFETY_SECTIONS:
         if marker in soul:
             continue
         # 模板标题可能是 ``## 🚫 红线（凌驾一切）`` 这类扩展形式,按前缀匹配。

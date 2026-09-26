@@ -29,6 +29,7 @@ __all__ = [
     "DEFAULT_TEMPLATE_ID",
     "SCHEMA_VERSION",
     "SOUL_CORE_SECTIONS",
+    "SOUL_SAFETY_SECTIONS",
     "TEMPLATE_REGISTRY",
     "AssistantAlreadyExists",
     "AssistantCatalogError",
@@ -109,6 +110,16 @@ SOUL_CORE_SECTIONS: tuple[str, ...] = (
     "## 🎭 性格",
     "## 🛠 能力",
     "## 🗣 语气",
+)
+
+# 模板预置的四个平台保底安全段（ADR-0242 附录 C）。revise 提交缺失时由
+# Catalog 从当前文件 / 模板合并补回；修改其内容是敏感操作，需用户确认。
+# 唯一词表：catalog revise 合并与 self-manage 工具确认门都从这里 import。
+SOUL_SAFETY_SECTIONS: tuple[str, ...] = (
+    "## 🔒 安全边界",
+    "## 💾 记忆规则",
+    "## ⚠️ 错误处理",
+    "## 🚫 红线",
 )
 
 
@@ -210,12 +221,21 @@ def write_revision_snapshot(
 
     配置面每次变更（``revise_profile`` / ``reimport`` / skill 删除）都必须留下
     快照，供回滚与审计。manifest 中的 ``digests`` 是配置面文件摘要，快照按
-    变更时刻的 manifest 原文保存。
+    变更时刻的 manifest 原文保存；``files`` 键额外保存变更时刻配置面文件的
+    全文（磁盘上存在的 ``CONFIG_FACE_FILES``），使回滚可以恢复内容而不仅是
+    校验 digest。revision 0 是 create 写入的出生状态基线。
     """
+    files: dict[str, str] = {}
+    for name in CONFIG_FACE_FILES:
+        path = home / name
+        if path.is_file():
+            files[name] = path.read_text(encoding="utf-8")
+    snapshot: dict[str, object] = dict(manifest)
+    snapshot["files"] = files
     revisions_dir = home / "revisions"
     revisions_dir.mkdir(parents=True, exist_ok=True)
     (revisions_dir / f"{revision_seq}.json").write_text(
-        json.dumps(dict(manifest), ensure_ascii=False, indent=2, sort_keys=True),
+        json.dumps(snapshot, ensure_ascii=False, indent=2, sort_keys=True),
         encoding="utf-8",
     )
 

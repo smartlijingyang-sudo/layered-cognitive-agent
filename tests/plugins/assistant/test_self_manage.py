@@ -13,6 +13,7 @@ Covers:
 from __future__ import annotations
 
 import asyncio
+import json as _json
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -36,11 +37,15 @@ from lca.infrastructure.tools.assistant.self_manage_tools import (
     UpdateAssistantSoulTool,
     UpdateAssistantUserTool,
 )
-from lca.plugins.assistant.home._home_layout import load_manifest
+from lca.plugins.assistant.home._home_layout import (
+    SOUL_SAFETY_SECTIONS,
+    load_manifest,
+)
 from lca.plugins.assistant.skill.overlay import AssistantSkillOverlayImpl
 from lca.plugins.domain.assistant.catalog.plugin import (
     AssistantCatalogError,
     AssistantCatalogImpl,
+    AssistantDigestMismatch,
 )
 
 
@@ -94,9 +99,15 @@ class TestReviseProfile:
         assert new_spec.revision_seq == old_seq + 1
 
         home = Path(new_spec.home_path)
-        assert (home / "SOUL.md").read_text(encoding="utf-8") == new_soul
+        soul_on_disk = (home / "SOUL.md").read_text(encoding="utf-8")
+        # D1：修订会合并回安全段——提交的核心段原样保留，缺失的安全段被补回。
+        assert soul_on_disk.startswith(new_soul.rstrip() + "\n\n")
+        assert all(marker in soul_on_disk for marker in SOUL_SAFETY_SECTIONS)
         snapshot = home / "revisions" / f"{revision.revision_seq}.json"
         assert snapshot.is_file()
+        # D3：快照携带配置面文件全文，支持内容级回滚。
+        snapshot_json = _json.loads(snapshot.read_text(encoding="utf-8"))
+        assert snapshot_json["files"]["SOUL.md"] == soul_on_disk
 
         ep_events = [e for e in emitted if e[0] == ASSISTANT_PROFILE_REVISED]
         assert len(ep_events) == 1
@@ -167,6 +178,96 @@ class TestReviseProfile:
             catalog.revise_profile(assistant_id, ProfilePatch(plan_yaml="prompt:\n  bogus: x\n"))
 
 
+def _core_soul(identity: str = "新身份", reps: int = 6) -> str:
+    """仅含四核心段的 SOUL 文本（缺安全段；去空白后 >= 200 字符）。"""
+    return (
+        f"## 🧠 身份\n{identity}。\n" * reps
+        + "## 🎭 性格\n新性格。\n" * reps
+        + "## 🛠 能力\n新能力。\n" * reps
+        + "## 🗣 语气\n新语气。\n" * reps
+    )
+
+
+class TestSoulRevisionSafety:
+    """SOUL 修订安全底线（D1/D2/D3 回归）。
+
+    - 缺失安全段自动合并：当前文件定制文案优先，模板默认兜底，坏档自愈；
+    - 校验报错附可照抄骨架，模型重试少走一轮；
+    - create 写 ``revisions/0.json`` 出生基线，快照带配置面文件全文；
+    - 篡改检测 fail-closed，``reimport`` 是唯一恢复路径。
+    """
+
+    def test_revise_preserves_customized_safety_section(
+        self, catalog: AssistantCatalogImpl
+    ) -> None:
+        """提交只含四核心段时，当前文件里已定制的安全段文案被保留。"""
+        assistant_id = _create(catalog)
+        home = Path(catalog.get(assistant_id).home_path)
+        soul_path = home / "SOUL.md"
+        custom_red_line = "## 🚫 红线\n1. 绝不输出任何 token。\n2. 本地优先。\n"
+        catalog.revise_profile(
+            assistant_id,
+            ProfilePatch(soul_md=_valid_soul() + "\n\n" + custom_red_line),
+        )
+        assert "绝不输出任何 token" in soul_path.read_text(encoding="utf-8")
+
+        # 再提交纯四核心段：定制红线从当前文件保留，而不是被模板默认覆盖。
+        catalog.revise_profile(assistant_id, ProfilePatch(soul_md=_valid_soul()))
+        after = soul_path.read_text(encoding="utf-8")
+        assert "绝不输出任何 token" in after
+        assert all(marker in after for marker in SOUL_SAFETY_SECTIONS)
+
+    def test_revise_self_heals_missing_safety_sections(self, catalog: AssistantCatalogImpl) -> None:
+        """存量坏档（安全段已丢）：revise 时从模板默认补回。"""
+        assistant_id = _create(catalog)
+        home = Path(catalog.get(assistant_id).home_path)
+        soul_path = home / "SOUL.md"
+        broken = _core_soul(identity="坏档")
+        soul_path.write_text(broken, encoding="utf-8")
+        catalog.reimport(assistant_id, reason="test-broken-soul")
+
+        catalog.revise_profile(assistant_id, ProfilePatch(soul_md=_core_soul()))
+        after = soul_path.read_text(encoding="utf-8")
+        assert all(marker in after for marker in SOUL_SAFETY_SECTIONS)
+        assert "坏档" not in after
+
+    def test_validation_error_includes_skeleton(self, catalog: AssistantCatalogImpl) -> None:
+        """缺段错误消息附骨架，模型可直接照抄补全。"""
+        assistant_id = _create(catalog)
+        soul_missing_tone = (
+            "## 🧠 身份\n身份。\n" * 20
+            + "## 🎭 性格\n性格。\n" * 20
+            + "## 🛠 能力\n能力。\n" * 20
+        )
+        with pytest.raises(AssistantCatalogError) as excinfo:
+            catalog.revise_profile(assistant_id, ProfilePatch(soul_md=soul_missing_tone))
+        message = str(excinfo.value)
+        assert "🗣 语气" in message
+        assert "可直接照此骨架补全" in message
+        assert "## 🧠 身份" in message
+
+    def test_create_writes_baseline_revision(self, catalog: AssistantCatalogImpl) -> None:
+        """创建即写 ``revisions/0.json`` 出生基线，快照含配置面全文。"""
+        assistant_id = _create(catalog)
+        home = Path(catalog.get(assistant_id).home_path)
+        baseline = home / "revisions" / "0.json"
+        assert baseline.is_file()
+        snapshot = _json.loads(baseline.read_text(encoding="utf-8"))
+        assert snapshot["files"]["SOUL.md"] == (home / "SOUL.md").read_text(encoding="utf-8")
+
+    def test_tamper_detection_then_reimport_recovers(self, catalog: AssistantCatalogImpl) -> None:
+        """裸写 SOUL.md → revise fail-closed → reimport 合法化后可再 revise。"""
+        assistant_id = _create(catalog)
+        home = Path(catalog.get(assistant_id).home_path)
+        (home / "SOUL.md").write_text("被篡改", encoding="utf-8")
+        with pytest.raises(AssistantDigestMismatch):
+            catalog.revise_profile(assistant_id, ProfilePatch(soul_md=_valid_soul()))
+
+        catalog.reimport(assistant_id, reason="test-tamper")
+        revision = catalog.revise_profile(assistant_id, ProfilePatch(soul_md=_valid_soul()))
+        assert revision.revision_seq >= 2
+
+
 class TestReimport:
     def test_reimport_recomputes_digests(self, catalog: AssistantCatalogImpl) -> None:
         assistant_id = _create(catalog)
@@ -235,6 +336,32 @@ class TestSelfManageTools:
         soul_on_disk = (home / "SOUL.md").read_text(encoding="utf-8")
         assert "数据分析师" in soul_on_disk
 
+    def test_update_soul_tool_safety_change_requires_confirmation(
+        self, catalog: AssistantCatalogImpl
+    ) -> None:
+        """修改安全段内容必须 confirmed=true；缺安全段（系统合并）无需确认。"""
+        assistant_id = _create(catalog)
+        tool = UpdateAssistantSoulTool(catalog=catalog, assistant_id=assistant_id)
+        home = Path(catalog.get(assistant_id).home_path)
+        soul_path = home / "SOUL.md"
+        assert "绝不暴露凭证" in soul_path.read_text(encoding="utf-8")
+
+        # 提交修改红线文案且不带 confirmed → 拒绝且不落盘。
+        modified = _valid_soul() + "\n\n## 🚫 红线\n1. 可直接删除文件。\n"
+        obs = asyncio.run(tool.execute({"soul": modified}))
+        assert obs.success is False
+        assert "敏感" in (obs.error or "")
+        assert "可直接删除文件" not in soul_path.read_text(encoding="utf-8")
+
+        # 带 confirmed=true → 应用。
+        obs = asyncio.run(tool.execute({"soul": modified, "confirmed": True}))
+        assert obs.success is True
+        assert "可直接删除文件" in soul_path.read_text(encoding="utf-8")
+
+        # 纯四核心段（安全段缺失由系统合并补回）→ 无需确认。
+        obs = asyncio.run(tool.execute({"soul": _valid_soul()}))
+        assert obs.success is True
+
     def test_update_profile_tool_requires_at_least_one_field(
         self, catalog: AssistantCatalogImpl
     ) -> None:
@@ -258,16 +385,12 @@ class TestSelfManageTools:
 
         assistant_id = _create(catalog)
         overlay = AssistantSkillOverlayImpl(catalog=catalog)
-        tool = EditAssistantSkillTool(
-            catalog=catalog, assistant_id=assistant_id, overlay=overlay
-        )
+        tool = EditAssistantSkillTool(catalog=catalog, assistant_id=assistant_id, overlay=overlay)
         obs = asyncio.run(tool.execute({"skill_id": "x", "skill_md": ""}))
         assert obs.success is False
         assert "skill_md" in (obs.error or "")
 
-    def test_edit_skill_applies_cow(
-        self, catalog: AssistantCatalogImpl, tmp_path: Path
-    ) -> None:
+    def test_edit_skill_applies_cow(self, catalog: AssistantCatalogImpl, tmp_path: Path) -> None:
         import json as _json
 
         from lca.contracts.protocols.assistant.skill_overlay import SkillSource
@@ -287,16 +410,16 @@ class TestSelfManageTools:
         asyncio.run(
             overlay.install(assistant_id, SkillSource(local_path=str(staging)), actor="test")
         )
-        tool = EditAssistantSkillTool(
-            catalog=catalog, assistant_id=assistant_id, overlay=overlay
-        )
+        tool = EditAssistantSkillTool(catalog=catalog, assistant_id=assistant_id, overlay=overlay)
         new_md = "---\nname: demo-skill\ndescription: edited\nreferences: []\n---\nnew body"
         obs = asyncio.run(tool.execute({"skill_id": "demo-skill", "skill_md": new_md}))
         assert obs.success is True
         home = Path(catalog.get(assistant_id).home_path)
-        assert (home / "skills" / "demo-skill" / "SKILL.md").read_text(
-            encoding="utf-8"
-        ).endswith("new body")
+        assert (
+            (home / "skills" / "demo-skill" / "SKILL.md")
+            .read_text(encoding="utf-8")
+            .endswith("new body")
+        )
         manifest = _json.loads((home / "manifest.json").read_text(encoding="utf-8"))
         assert manifest["skills"]["demo-skill"]["source"] == "local"
 
