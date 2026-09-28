@@ -306,13 +306,25 @@
 | ELIGIBILITY-PROBE-CORE | 后端核心探活逻辑（check_account_eligibility直调loadCodeAssist与simulate_agy_cli_probe，整合入fetch_single_account_quota与/api/quota） | Completed | 实现 check_account_eligibility 直调 loadCodeAssist(FULL_ELIGIBILITY_CHECK) 识别 ineligibleTiers/VALIDATION_REQUIRED/SUBSCRIPTION_REQUIRED，实现 simulate_agy_cli_probe，整合入 fetch_single_account_quota 与 calculate_cluster_aggregate 及 calculate_daily_burn_table |
 | ELIGIBILITY-PROBE-API-TESTS | 扩展探活 API 端点（/api/accounts/{id}/eligibility、/api/accounts/{id}/probe、/api/cluster/probe_all）与自动化测试用例 | Completed | 增加 /api/accounts/{id}/eligibility、/api/accounts/{id}/probe 与 /api/cluster/probe_all 端点，增加 4 组 100% 覆盖单测（27/27 全绿） |
 | ELIGIBILITY-PROBE-FRONTEND | 前端 Cockpit 账号卡片探活徽章、Google 解锁验证直通链接与一键探活交互组件（static/index.html） | Completed | 1. 大盘总览条：新增【X 账号探活阻断】红色胶囊与 tooltip；2. 账号卡片：Row 1 增加【探活正常/验证阻断】状态徽章；被阻断账号高亮展示 Google 风控二验警示框，提供【直通 Google 验证页面】一键跳转与【重新探活】按钮；底部工具条增加单卡片即时【⚡ 深度探活】按键；3. Daily Burn Table：增加【去验证】直达链接；4. Vue setup 增加 probingAccount、probingAll、getAccountEligibility、probeSingleAccount、probeAllAccounts 等状态与方法，测试用例 test_html_frontend_eligibility_probe_contracts 100% 通过 |
-| ELIGIBILITY-PROBE-VERIFY-RESTART | 服务平滑重启与实测端到端探活验证（实测精准识别出 C/E/F/I/O 风控阻断与 A/B/M/N/P 正常） | Completed | 1. 执行 bash start.sh 平滑重启 tmux 会话 agy-dashboard 服务（0.0.0.0:1888）；2. 全量 pytest 自动化测试 28/28 全绿（耗时 15.7s）；3. 实测调用 POST /api/cluster/probe_all 与 GET /api/quota?force=true，精准探测识别出 E/F/I/O 4个账号处于 VALIDATION_REQUIRED 风控阻断并提取出 Google 解锁直通链接，A/B/M/N/P 5个账号探活正常；彻底消灭单纯看配额接口导致的健康假阳性 |
-
-
-
-
-
-
+| MUSE-MCP-TASK-1 | 初始化工程结构与配置管理（pyproject.toml, Config, test_config） | Completed | 建立 /home/lichao/tools/muse-mcp-hub 工程脚手架，实现基础环境声明与鉴权配置解析，3/3 测试全绿（commit 41f9d34） |
+| MUSE-MCP-TASK-2 | 实现三大核心资产的数据适配器（Library, Weekly, Wiki） | Completed | 对接 everything-library, weekly-report, wiki，落地路径防穿越沙箱与单元测试，4/4 测试全绿（commit 6084154） |
+| MUSE-MCP-TASK-3 | 注册官方 MCP Tools 并生成符合规范的 Schema | Completed | FastMCP/MCPServer 注册 9 个核心 tools，严格检验 inputSchema 与错误信封包装，10/10 测试全绿（commit cc30007） |
+| MUSE-MCP-TASK-4 | 构建 SSE 网络传输层、鉴权中间件与 ASGI 应用 | Completed | 实现标准 SSE transport，纯 ASGI Bearer Token 鉴权中间件与 CORS 过滤，13/13 测试全绿（commit 829f7d5） |
+| MUSE-MCP-TASK-5 | 部署管理脚本、端到端验证与接入文档 | Completed | 产出 ~/bin/muse-mcp-hub 快捷命令、run.sh、README 规范文档与 live E2E 测试，14/14 测试全绿（commit a61caf6），服务在线于 0.0.0.0:18999 |
+| AGY-DASHBOARD-DEDUP-LJYANGBOY-KUAIKUAIBABY | agy dashboard 去重：kuaikuaibaby 与 ljyangboy 归集至账号 A，消除 root 冗余与重复计算 | Completed | 1. accounts.json 剔除重复的 root 账号条目，总数从 20 收敛为 19，存活数从 8 修正为 7；账号 A 明确主邮箱 ljyangboy@gmail.com 与别名 kuaikuaibaby@gmail.com；2. quota_snapshot.json 将 root 真实配额平滑合流至 A 号并剔除 root，算力池与消耗审计准确去重；3. app.py 在 live_tasks、aggregate、pipeline、forecast、burn_table、probe 等全链路剥离 root 节点并支持 root/agy 路径与进程对 A 的透明映射；4. 前端 index.html 默认数量降级由 8 调整为 7；5. 新增单测 test_kuaikuaibaby_and_ljyangboy_unified_no_duplicates，37/37 测试全通；6. 重启 1888 端口仪表盘，live API 确认存活账号为 ['B', 'A', 'C', 'I', 'P', 'N', 'J'] 且 0 处 root 冗余 |
+| SMARTLJY-AUDIT-DELTA | 深度比对 smartljy VPS 远端实际资产与本地 ~/smartljy 历史快照的增量差异，摸排所有新增/修改配置与数据库 | Completed | 完成全盘深探，定位 8 大关键增量差异（Hy2 Salamander obfs+200M/BBR、sub-server.py 动态标题与规则路由、clash.yaml 端口跳跃与分组降级、xui-restart 定时重启、fail2ban 3x-ipl、sysctl 网络调优、xray 独立配置、LE cert3 新证书） |
+| SMARTLJY-UPGRADE-SYNC-SCRIPT | 升级 deploy/sync-192-vps.sh 备份同步脚本，闭环覆盖所有遗漏资产并支持完整性校验 | Completed | 升级 deploy/sync-192-vps.sh 覆盖 sysctl、fail2ban、ufw、xray standalone、xui-restart timer、vnstat、sub rules 及 LE cert3，升级 deploy/02-restore-on-server.sh 还原脚本，单源收敛 sync-from-live.sh |
+| SMARTLJY-EXECUTE-BACKUP | 执行全量增量备份拉取，生成 snapshot-20260928.tgz 并同步刷新 smartljy-192-vps 与 server 目录 | Completed | 成功拉取生成 snapshot-20260928.tgz（3.2MB）与 SHA256SUMS，同步刷新 smartljy-192-vps、server、local/secrets 及 local/logs，全量资产零遗漏落盘 |
+| SMARTLJY-VERIFY-AND-MIGRATION-DOCS | 本地完整性校验（校验和、解压、权限）与更新换机迁移指南 MIGRATION.md | Completed | 编写并通过 11 项自动化单元测试 tests/test_backup_integrity.py（11/11 passed in 0.16s）；更新 MIGRATION.md 与 README.md，实测 live 03-verify.sh 100% 畅通（HTTP 200） |
+| EVERYTHING-LIB-OPTIMIZE | 修复 Everything Library 复制 Markdown 失败、放通 127.0.0.1 读请求免鉴权、更换 Brand 为 Everything Library 并注入专属 Favicon | Completed | 修复 base.html 中的 copyReaderMarkdown / copySearchResultMarkdown（双轨 fallback、去除冗余头），auth.py 允许 127.0.0.1/::1 读请求免鉴权并通过 3 组自动化单测；挂载 static 静态目录与 favicon.svg/ico，重命名 Title 为 Everything Library |
+| MACHINE-SEARCH-CLI-TOOLS | 构建本机双轨检索 CLI 工具（el-find 与 fast-find）实现毫秒级快速寻址 | Completed | 在 /home/lichao/bin/ 交付 el-find（HTTP API + SQLite FTS5 双轨知识库毫秒级检索，30ms 返回）与 fast-find（支持 -p 端口拓扑寻址、-d 项目寻址、-f 文件名过滤寻址及预剪枝关键字全文检索），两工具已赋予 +x 并实测验证 |
+| MACHINE-SEARCH-ATLAS-AND-SYMLINKS | 更新系统全景拓扑图 SYSTEM_ATLAS.md，建立 agent-mail-hub 与 SYSTEM_ATLAS 快捷软链 | Completed | 补充 8095（Agent Mail Hub）、18999（Muse MCP Hub）、2097（smartljy sub）等端口拓扑；建立 ~/tools/agent-mail-hub 与 ~/SYSTEM_ATLAS.md 符号链接并提交 git |
+| MACHINE-SEARCH-AGENT-SKILL | 创建 machine-search Skill 固化三级检索 SOP，并在项目与全局多层目录同步 | Completed | 创建 .agent/skills/machine-search/SKILL.md 规范 Tier 1 (el-find) -> Tier 2 (fast-find -p/ATLAS) -> Tier 3 (fast-find) 三级协议；同步至 ~/.agy-accounts/c/.gemini/skills/ 与 /home/lichao/.gemini/skills/ 供 Antigravity 全局生效 |
+| CQRS-TASK-1 | 事件模型与持久化追加器 (events.py + tests) | Completed | 编写不可变事件定义与 append-only 追加器，3/3 单测覆盖校验、追加与加载通过 |
+| CQRS-TASK-2 | 台账投影器与消抖原子落盘 (projector.py + tests) | Completed | 实现确定性模板渲染与 .tmp -> os.replace 原子替换，消抖与幂等性测试 3/3 通过 |
+| CQRS-TASK-3 | 异步 Git 自动提交模块与消抖控制 | Completed | 独立后台队列消抖提交 Everything Library Git 仓库，弹性容错单测 1/1 通过 |
+| CQRS-TASK-4 | API 服务集成与生命周期挂载 (server.py) | Completed | FastAPI lifespan 挂载投影器，/acquire 与 /code 非阻塞投递事件，端到端测试 8/8 通过 |
+| CQRS-TASK-5 | 回填今日实战历史数据、平滑重启与实测闭环 | Completed | 补全今日 20 条实战数据与 10 个已分配邮箱台账，平滑重启 :8095（PID: 3853961），live 探针 200 OK，Everything Library 毫秒级自动投影并完成 Git 提交（ba10004），8/8 单测与集成测试全绿 |
 
 
 
