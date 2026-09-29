@@ -155,10 +155,43 @@ def _patch_effective_mode(ctx: PatchContext) -> bool:
     return False
 
 
+_LOCALES = (
+    (
+        "locales/zh-CN/components.json",
+        '"ModelSwitchPanel.searchPlaceholder": "搜索模型..."',
+        '"ModelSwitchPanel.searchPlaceholder": "搜索模式..."',
+    ),
+    (
+        "locales/en-US/components.json",
+        '"ModelSwitchPanel.searchPlaceholder": "Search models..."',
+        '"ModelSwitchPanel.searchPlaceholder": "Search modes..."',
+    ),
+    (
+        "packages/locales/src/default/components.ts",
+        "'ModelSwitchPanel.searchPlaceholder': 'Search models...'",
+        "'ModelSwitchPanel.searchPlaceholder': 'Search modes...'",
+    ),
+)
+
+
+def _patch_locales(ctx: PatchContext) -> bool:
+    changed = False
+    for rel, old, new in _LOCALES:
+        t = ctx.read(rel)
+        if new in t:
+            continue
+        if old not in t:
+            raise SystemExit(f"[lca_model_catalog] locale needle missing in {rel}")
+        ctx.write(rel, t.replace(old, new, 1))
+        changed = True
+    return changed
+
+
 def apply(ctx: PatchContext) -> bool:
     changed = ctx.write_if_changed(_HOOK, _HOOK_TS)
     changed = ctx.write_if_changed(_TOOL_USE, _TOOL_USE_TS) or changed
     changed = _patch_effective_mode(ctx) or changed
+    changed = _patch_locales(ctx) or changed
     text = ctx.read(_SELECTION)
     if not ("provider: 'openai'" in text and "lcaModel" in text):
         if _SELECTION_NEEDLE not in text:
