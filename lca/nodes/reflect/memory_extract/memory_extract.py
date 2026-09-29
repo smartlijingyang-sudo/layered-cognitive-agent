@@ -182,12 +182,12 @@ class ReflectMemoryExtractExecutor:
 
         if self.governor_enabled:
             try:
-                governed = self._apply_governor(context, reflection)
+                self._apply_governor(context, reflection)
             except Exception:
                 # Buffer or template failure must not fail the turn.
-                governed = None
-            if governed is not None:
-                return governed
+                pass
+            # Governor 是白天 episode 快记旁路（副作用），不替代语义蒸馏；
+            # 下面的 pre-filter 已做成本门控，继续走主流程。
 
         runtime = context.runtime or {}
         state = getattr(runtime, "agent_state", None)
@@ -228,7 +228,13 @@ class ReflectMemoryExtractExecutor:
             }
         return self._passthrough(reflection)
 
-    def _apply_governor(self, context: NodeContext, reflection: object) -> NodeOutput | None:
+    def _apply_governor(self, context: NodeContext, reflection: object) -> None:
+        """白天残差门控：模板匹配命中时向 EpisodeBuffer 追加一条 episode fact。
+
+        纯副作用，不返回 NodeOutput —— 调用方继续走语义蒸馏主流程。
+        Episode 事实是快变缓冲，语义候选仍由下面的 LLM 蒸馏产生，
+        两者正交（ADR-0249 双轨：白天快记 + 语义蒸馏并行，不互斥）。
+        """
         runtime = context.runtime or {}
         home = episode_home(runtime)
         state = getattr(runtime, "agent_state", None)
@@ -262,11 +268,11 @@ class ReflectMemoryExtractExecutor:
             now_ms=self.now_ms() if self.now_ms is not None else int(time.time() * 1000),
         )
         if fact is None:
-            return self._passthrough(reflection)
+            return None
         if home is None:
             return None
         EpisodeBuffer(home).append(fact)
-        return self._passthrough(reflection)
+        return None
 
     @staticmethod
     def _passthrough(reflection: object) -> NodeOutput:
