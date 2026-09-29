@@ -1,6 +1,6 @@
 # LCA Coding Agent Contract
 
-LCA 是基于 vendored Cordis 的 Python 插件化认知 Agent 框架。**本仓库专属于 LCA 认知智能体系统本身，严禁提交宿主机运维、机器目录重构或外部系统资产（此类资产归属于 `~/everything-library`）。**
+LCA 是基于 vendored Cordis 的 Python 插件化认知 Agent 框架。**本仓库专属于 LCA 认知智能体系统本身。哪怕当前工作目录在 LCA 下修改了外部资产，也严禁提交到本 Git；只有与 LCA 项目本身直接相关的变更才允许提交（宿主机运维与外部资产归属于 `~/everything-library`）。**
 
 ## 0. 权威入口
 
@@ -183,6 +183,7 @@ contracts → infrastructure → cognition → runtime → agent
 
 ## 8. Git 与文档卫生
 
+**范围铁律:** 哪怕当前工作目录在 LCA，顺带修改了外部资产，也严禁提交到本仓库！只有与本 Agent 框架直接相关的代码/测试/文档才允许提交。外部资产必须切换至对应仓（如 `~/everything-library`）提交。
 Conventional Commits:`<type>(<scope>): <subject>`,正文说"做了什么 / 为什么"。一个提交一个主题;不用 `--no-verify`;不提交密钥或运行产物;远程 `git pull --rebase`。
 
 Prose:直接具体,不复述代码,不留 review 答辩痕迹;slop 由 `scripts/verify_doc_slop.py` 检查。详见 [.agents/skills/lca-prose-standard](.agents/skills/lca-prose-standard/SKILL.md) + [.agents/skills/lca-trim-cot-leakage](.agents/skills/lca-trim-cot-leakage/SKILL.md)。
