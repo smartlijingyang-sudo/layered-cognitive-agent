@@ -80,12 +80,70 @@ def test_spine_llm_call_end_becomes_stream_end() -> None:
     stamped = {
         "event": {
             "execution_point": "llm.call.end",
-            "payload": {"model": "solo", "outcome": "success"},
+            "stream": True,
+            "payload": {"model": "solo", "outcome": "success", "stream": True},
         }
     }
     out = t.translate(stamped)
     assert out is not None
     assert out["type"] == "stream_end"
+
+
+def test_spine_llm_call_start_non_streaming_is_dropped() -> None:
+    """Internal non-streaming calls (memory_extract) must not open a UI step.
+
+    ``adapters.complete()`` emits ``llm.call.start`` with ``stream=False``.
+    Translating this as ``stream_start`` would insert an empty assistant row
+    after the user's real reply.
+    """
+    t = EventTranslator()
+    stamped = {
+        "event": {
+            "execution_point": "llm.call.start",
+            "parentMessageId": "msg_assistant",
+            "stream": False,
+            "payload": {"model": "solo", "stream": False, "prompt_preview": "ROLE: memory_extract"},
+        }
+    }
+    assert t.translate(stamped) is None
+
+
+def test_spine_llm_call_end_non_streaming_is_dropped() -> None:
+    """Non-streaming ``llm.call.end`` must not close a step that never opened."""
+    t = EventTranslator()
+    stamped = {
+        "event": {
+            "execution_point": "llm.call.end",
+            "stream": False,
+            "payload": {"model": "solo", "stream": False, "outcome": "success"},
+        }
+    }
+    assert t.translate(stamped) is None
+
+
+def test_spine_llm_call_end_stream_failure_becomes_error() -> None:
+    """A failed user-turn streaming LLM call surfaces as gateway ``error``.
+
+    Without this, the placeholder stays on ``...`` forever because
+    ``stream_end`` alone does not replace the bubble content.
+    """
+    t = EventTranslator()
+    stamped = {
+        "event": {
+            "execution_point": "llm.call.end",
+            "stream": True,
+            "payload": {
+                "model": "qwen3.7-plus",
+                "stream": True,
+                "outcome": "failure",
+                "latency_ms": 20065,
+            },
+        }
+    }
+    out = t.translate(stamped)
+    assert out is not None
+    assert out["type"] == "error"
+    assert "qwen3.7-plus" in out["data"]["message"]
 
 
 def test_spine_llm_stream_token_reasoning() -> None:

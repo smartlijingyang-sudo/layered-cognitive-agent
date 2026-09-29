@@ -29,6 +29,27 @@ def _inner_payload(e: dict[str, Any]) -> dict[str, Any]:
     return e
 
 
+_FAILURE_OUTCOMES: frozenset[str] = frozenset({"failure", "failed", "error"})
+
+
+def _user_visible_llm_failure_message(e: dict[str, Any]) -> str:
+    """Build a short, human-readable failure message from ``llm.call.end``.
+
+    The user turn failed before any assistant text was produced. The message
+    must be actionable in Chinese without leaking internals.
+    """
+    payload = _inner_payload(e)
+    model = str(payload.get("model") or "")
+    latency_ms = payload.get("latency_ms")
+    parts: list[str] = ["本次回复失败"]
+    if model:
+        parts.append(f"(模型 {model})")
+    if isinstance(latency_ms, (int, float)) and latency_ms > 0:
+        parts.append(f"，等待约 {int(latency_ms) // 1000}s 后失败")
+    parts.append("，请稍后重试。")
+    return "".join(parts)
+
+
 def wire_tool_call(
     tool_name: str,
     invocation_id: str,
@@ -312,7 +333,16 @@ class EventTranslator:
     # ── Session spine EP → gateway (ADR-0194 SSOT) ─────────────────
 
     @staticmethod
-    def _spine_llm_call_start(e: dict) -> dict:
+    def _spine_llm_call_start(e: dict) -> dict | None:
+        # Internal non-streaming calls (memory_extract, summarisation) are
+        # not user-visible LLM steps. Translating them as ``stream_start``
+        # would open an empty assistant row in the chat UI and confuse
+        # the multi-step layout. Only user-turn streaming calls open a row.
+        stream = e.get("stream")
+        if stream is None:
+            stream = _inner_payload(e).get("stream")
+        if stream is False:
+            return None
         parent = e.get("parentMessageId")
         assistant: dict[str, Any] = {}
         if isinstance(parent, str) and parent:
@@ -323,8 +353,31 @@ class EventTranslator:
         }
 
     @staticmethod
-    def _spine_llm_call_end(e: dict) -> dict:
-        del e
+    def _spine_llm_call_end(e: dict) -> dict | None:
+        # Match the start filter: non-streaming calls never opened a UI
+        # step, so they must not close one either.
+        stream = e.get("stream")
+        if stream is None:
+            stream = _inner_payload(e).get("stream")
+        if stream is False:
+            return None
+
+        # A failed user-turn streaming LLM call leaves the placeholder
+        # stuck on ``...`` because ``stream_end`` alone does not replace
+        # it. Translate the failure into a gateway ``error`` event so the
+        # ChatItem error badge renders the errno instead.
+        outcome = e.get("outcome")
+        if outcome is None:
+            outcome = _inner_payload(e).get("outcome")
+        if stream is True and isinstance(outcome, str) and outcome in _FAILURE_OUTCOMES:
+            return {
+                "type": "error",
+                "data": {
+                    "type": "AgentRuntimeError",
+                    "message": _user_visible_llm_failure_message(e),
+                },
+            }
+
         return {"type": "stream_end", "data": {}}
 
     @staticmethod

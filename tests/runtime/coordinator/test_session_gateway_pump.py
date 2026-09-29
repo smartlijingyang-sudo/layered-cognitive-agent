@@ -15,6 +15,7 @@ def test_spine_llm_call_start_maps_execution_point() -> None:
     assert stamped is not None
     assert stamped["event"]["execution_point"] == "llm.call.start"
     assert stamped["event"]["parentMessageId"] == "msg_assistant"
+    assert stamped["event"]["stream"] is True
 
 
 def test_spine_llm_stream_token_maps_execution_point() -> None:
