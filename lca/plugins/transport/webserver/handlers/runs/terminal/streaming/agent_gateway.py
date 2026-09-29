@@ -194,10 +194,20 @@ async def _run_session(
         return
     token = first.get("token", "")
     try:
-        verify_user_jwt(token, expected_operation_id=run_id, public_key_pem=public_pem)
+        decoded_payload = verify_user_jwt(token, expected_operation_id=run_id, public_key_pem=public_pem)
     except InvalidTokenError as exc:
         await ws.send_json({"type": "auth_failed", "reason": str(exc)})
         return
+
+    token_user_id = decoded_payload.get("sub")
+    if token_user_id and run_id:
+        init_event = await stream_manager.get_init_event(run_id)
+        if init_event:
+            run_user_id = (init_event.get("data") or {}).get("userId")
+            if run_user_id and run_user_id != token_user_id:
+                await ws.send_json({"type": "auth_failed", "reason": "user_id mismatch for run"})
+                return
+
     await ws.send_json({"type": "auth_success"})
     _dbg("sent auth_success run_id=%s", run_id)
 

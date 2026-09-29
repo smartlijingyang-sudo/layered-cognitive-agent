@@ -68,6 +68,7 @@ def create_run_session(
     extra_plane: str = "",
     execution_target: str = "",
     assistant_id: str = "",
+    user_id: str = "",
     ctx: Any | None = None,
 ) -> RunSession:
     """Build a RunSession through the unified factory.
@@ -101,6 +102,7 @@ def create_run_session(
             extra_plane=extra_plane.strip(),
             execution_target=execution_target.strip(),
             assistant_id=assistant_id.strip(),
+            user_id=user_id.strip(),
         )
     )
 

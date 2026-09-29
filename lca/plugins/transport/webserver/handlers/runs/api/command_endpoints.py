@@ -101,6 +101,8 @@ class CreateRunRequest:
     ctx: object
     assistant_id: str = ""
     """ADR-0187 §3 D7 一次性 run 绑定（``asst_*``）；空 = 遗留默认 agent。"""
+    user_id: str = ""
+    """ADR-0252: 调用者用户身份（来自 x-lca-user-id 头）。"""
     run_id: str = ""
     """精准指定要恢复的 run_id，避免并发/多轮时 topic 最新指针漂移导致的 409 Conflict。"""
     resume_approval: dict[str, Any] | None = None
@@ -120,6 +122,7 @@ async def decode_create_run(
     ctx: object,
     file_store: LocalFileStore,
     resolve_mode: Any,
+    user_id: str = "",
 ) -> CreateRunRequest | JSONResponse:
     """Decode + validate ``POST /runs`` body to a typed carrier request.
 
@@ -176,6 +179,7 @@ async def decode_create_run(
         options=dict(body.get("options") or {}),
         ctx=ctx,
         assistant_id=assistant_id,
+        user_id=user_id,
         run_id=run_id,
         resume_approval=resume_approval,
         resume_tool_result=resume_tool_result,
@@ -274,6 +278,7 @@ def render_create_run_receipt(
     agent: AgentRef,
     *,
     jwt_keys: Any | None = None,
+    user_id: str | None = None,
 ) -> JSONResponse:
     """Format a :class:`RunReceipt` to the 202 compatibility envelope.
 
@@ -298,7 +303,7 @@ def render_create_run_receipt(
     private_pem = getattr(jwt_keys, "private_pem", None) if jwt_keys is not None else None
     try:
         ws_token = mint_user_jwt(
-            user_id=str(agent.agent_id or "lca-local"),
+            user_id=user_id or str(agent.agent_id or "lca-local"),
             operation_id=receipt.run_id,
             private_key_pem=private_pem,
             ttl_seconds=DEFAULT_TTL_SECONDS,
@@ -335,6 +340,7 @@ def _to_run_request(carrier: CreateRunRequest) -> RunRequest:
         options=carrier.options,
         ctx=carrier.ctx,
         assistant_id=carrier.assistant_id,
+        user_id=carrier.user_id,
     )
 
 
@@ -377,9 +383,10 @@ def _validate_assistant_binding(request: Request, assistant_id: str) -> JSONResp
 def _validate_assistant_ownership(request: Request, assistant_id: str) -> JSONResponse | None:
     """ADR-0252 I-4：带 ``assistant_id`` 的 run 归属检查。
 
-    - 无绑定 / 无用户头 / ``dev_mode`` ⇒ ``None``（遗留路径与 CLI/host
-      sidecar 路径不变，I-A1）；
-    - 归属已知且非请求者 ⇒ 403（fail-closed，不静默回落默认助理）。
+    - 无绑定 / ``dev_mode`` ⇒ ``None``（遗留路径与 CLI/host sidecar 路径不变，I-A1）；
+    - 非 dev 模式下带 ``assistant_id``：
+      * 缺少用户头 ⇒ 401（fail-closed，无静默兜底，ADR-0252 D6）；
+      * 归属已知且非请求者 ⇒ 403（fail-closed，不静默回落默认助理）。
     """
     if not assistant_id:
         return None
@@ -390,7 +397,11 @@ def _validate_assistant_ownership(request: Request, assistant_id: str) -> JSONRe
         return None
     user_id = request.headers.get("x-lca-user-id", "").strip()
     if not user_id:
-        return None
+        return _err(
+            "missing x-lca-user-id header",
+            status_code=401,
+            code="missing_user",
+        )
     ownership = getattr(request.app.state, "assistant_ownership", None)
     if ownership is None:
         return None
@@ -402,6 +413,55 @@ def _validate_assistant_ownership(request: Request, assistant_id: str) -> JSONRe
             code="assistant_not_owned",
         )
     return None
+
+
+async def _validate_run_ownership(request: Request, run_id: str) -> tuple[JSONResponse | None, Any]:
+    """Validate run exists and caller owns it in non-dev mode.
+
+    Returns (None, session) if authorized, or (JSONResponse, None) if rejected.
+    """
+    registry = getattr(request.app.state, "registry", None)
+    get_run = getattr(registry, "get", None) if registry is not None else None
+    session = get_run(run_id) if callable(get_run) else None
+
+    from lca.plugins.transport.webserver.handlers.auth.user import auth_config_of
+
+    _, dev_mode = auth_config_of(request)
+    if dev_mode:
+        if session is None:
+            return JSONResponse({"error": "run not found"}, status_code=404, headers=cors_headers()), None
+        return None, session
+
+    caller_user_id = request.headers.get("x-lca-user-id", "").strip()
+    if not caller_user_id:
+        return JSONResponse(
+            {"error": "missing x-lca-user-id header", "code": "missing_user"},
+            status_code=401,
+            headers=cors_headers(),
+        ), None
+
+    owner_user_id = getattr(session, "user_id", "") or ""
+    if not owner_user_id:
+        from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.wire.http import (
+            _stream_manager,
+        )
+
+        mgr = _stream_manager()
+        init_event = await mgr.get_init_event(run_id)
+        if init_event:
+            owner_user_id = (init_event.get("data") or {}).get("userId") or ""
+
+    if session is None and not owner_user_id:
+        return JSONResponse({"error": "run not found"}, status_code=404, headers=cors_headers()), None
+
+    if owner_user_id and owner_user_id != caller_user_id:
+        return JSONResponse(
+            {"error": "run not owned by caller", "code": "run_not_owned"},
+            status_code=403,
+            headers=cors_headers(),
+        ), None
+
+    return None, session
 
 
 async def create_run(request: Request) -> JSONResponse:
@@ -423,12 +483,14 @@ async def create_run(request: Request) -> JSONResponse:
     if isinstance(body, JSONResponse):
         return body
 
+    user_id = request.headers.get("x-lca-user-id", "").strip()
     ctx = getattr(request.app.state, "ctx", None)
     decoded = await decode_create_run(
         body,
         ctx=ctx,
         file_store=_file_store_of(request),
         resolve_mode=resolve_profile_mode,
+        user_id=user_id,
     )
     if isinstance(decoded, JSONResponse):
         return decoded
@@ -459,6 +521,8 @@ async def create_run(request: Request) -> JSONResponse:
             topic_id=topic_id_from_body(body),
             agent_id=str(decoded.agent.agent_id or "solo"),
             body=body,
+            user_id=decoded.user_id,
+            assistant_id=decoded.assistant_id,
         )
     except (
         redis.exceptions.TimeoutError,
@@ -481,7 +545,12 @@ async def create_run(request: Request) -> JSONResponse:
             code="gateway_stream_unavailable",
         )
     jwt_keys = getattr(request.app.state, "jwt_keys", None)
-    return render_create_run_receipt(receipt, decoded.agent, jwt_keys=jwt_keys)
+    return render_create_run_receipt(
+        receipt,
+        decoded.agent,
+        jwt_keys=jwt_keys,
+        user_id=decoded.user_id or None,
+    )
 
 
 async def _dispatch_resume(
@@ -523,6 +592,10 @@ async def _dispatch_resume(
         if not run_id:
             return _err("running operation row missing run_id", status_code=500)
 
+    err, _ = await _validate_run_ownership(request, run_id)
+    if err is not None:
+        return err
+
     approval_id = str(payload_dict.get("tool_call_id") or payload_dict.get("approval_id") or "")
     if not approval_id:
         return _err(
@@ -559,6 +632,9 @@ async def _dispatch_resume(
 async def cancel_run(request: Request) -> JSONResponse:
     """``POST /runs/{run_id}/cancel`` — forward cancellation through the run owner."""
     run_id = request.path_params["run_id"]
+    err, _ = await _validate_run_ownership(request, run_id)
+    if err is not None:
+        return err
     receipt = await _run_port_of(request).cancel(run_id)
     if not receipt.accepted:
         return JSONResponse(
@@ -572,11 +648,9 @@ async def cancel_run(request: Request) -> JSONResponse:
 async def record_run_feedback(request: Request) -> JSONResponse:
     """``POST /runs/{run_id}/feedback`` — append ``feedback.record.v1`` (ADR-0189)."""
     run_id = request.path_params["run_id"]
-    registry = getattr(request.app.state, "registry", None)
-    get_run = getattr(registry, "get", None)
-    session = get_run(run_id) if callable(get_run) else None
-    if session is None:
-        return JSONResponse({"error": "run not found"}, status_code=404, headers=cors_headers())
+    err, session = await _validate_run_ownership(request, run_id)
+    if err is not None:
+        return err
     try:
         body = await request.json()
     except json.JSONDecodeError:
@@ -608,6 +682,9 @@ async def record_run_feedback(request: Request) -> JSONResponse:
 async def answer_run(request: Request) -> JSONResponse:
     """``POST /runs/{run_id}/answer`` — adapt one durable approval resume command."""
     run_id = request.path_params["run_id"]
+    err, _ = await _validate_run_ownership(request, run_id)
+    if err is not None:
+        return err
     try:
         body = await request.json()
     except json.JSONDecodeError:

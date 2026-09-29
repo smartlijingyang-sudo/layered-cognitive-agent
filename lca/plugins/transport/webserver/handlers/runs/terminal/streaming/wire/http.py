@@ -72,6 +72,27 @@ async def get_running_operation(request: Request) -> JSONResponse:
         return JSONResponse({"running_operation": None})
     topic_id = request.path_params.get("topic_id", "")
     row = await store.get_latest_for_topic(topic_id)
+    if row is None:
+        return JSONResponse({"running_operation": None})
+
+    from lca.plugins.transport.webserver.handlers.auth.user import auth_config_of
+
+    _, dev_mode = auth_config_of(request)
+    if not dev_mode:
+        caller_user_id = request.headers.get("x-lca-user-id", "").strip()
+        run_id = row.get("run_id") if isinstance(row, dict) else None
+        if run_id:
+            registry = getattr(request.app.state, "registry", None)
+            session = registry.get(run_id) if (registry and hasattr(registry, "get")) else None
+            owner_user_id = getattr(session, "user_id", "") if session is not None else ""
+            if not owner_user_id:
+                mgr = _stream_manager()
+                init_event = await mgr.get_init_event(run_id)
+                if init_event:
+                    owner_user_id = (init_event.get("data") or {}).get("userId") or ""
+            if owner_user_id and owner_user_id != caller_user_id:
+                return JSONResponse({"running_operation": None})
+
     return JSONResponse({"running_operation": row})
 
 
@@ -88,15 +109,40 @@ async def refresh_ws_token(request: Request) -> JSONResponse:
     run_id = request.path_params.get("run_id", "")
     if not run_id:
         return JSONResponse({"error": "missing run_id"}, status_code=400)
-    if not await _stream_manager().exists(run_id):
+    mgr = _stream_manager()
+    if not await mgr.exists(run_id):
         return JSONResponse(
             {"error": "running_operation_not_found", "run_id": run_id},
             status_code=404,
         )
-    # user_id is supplied by the auth layer in production; for this
-    # wire endpoint we accept a header but default to a stable id
-    # so the test pattern (no auth wiring) still works.
-    user_id = request.headers.get("x-lca-user-id") or f"ws-token-{uuid.uuid4().hex[:8]}"
+
+    from lca.plugins.transport.webserver.handlers.auth.user import auth_config_of
+
+    _, dev_mode = auth_config_of(request)
+    caller_user_id = request.headers.get("x-lca-user-id", "").strip()
+
+    if not dev_mode:
+        if not caller_user_id:
+            return JSONResponse(
+                {"error": "missing x-lca-user-id header", "code": "missing_user"},
+                status_code=401,
+            )
+        registry = getattr(request.app.state, "registry", None)
+        session = registry.get(run_id) if (registry and hasattr(registry, "get")) else None
+        owner_user_id = getattr(session, "user_id", "") if session is not None else ""
+        if not owner_user_id:
+            init_event = await mgr.get_init_event(run_id)
+            if init_event:
+                owner_user_id = (init_event.get("data") or {}).get("userId") or ""
+        if owner_user_id and owner_user_id != caller_user_id:
+            return JSONResponse(
+                {"error": "run not owned by caller", "code": "run_not_owned"},
+                status_code=403,
+            )
+        user_id = caller_user_id
+    else:
+        user_id = caller_user_id or f"ws-token-{uuid.uuid4().hex[:8]}"
+
     jwt_keys = getattr(request.app.state, "jwt_keys", None)
     private_pem = getattr(jwt_keys, "private_pem", None) if jwt_keys is not None else None
     try:

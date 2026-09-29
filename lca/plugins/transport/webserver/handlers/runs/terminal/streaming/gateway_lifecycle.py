@@ -45,6 +45,8 @@ async def register_gateway_run(
     topic_id: str,
     agent_id: str,
     body: dict[str, Any],
+    user_id: str = "",
+    assistant_id: str = "",
 ) -> None:
     """Start gateway metadata + broadcast for one newly-created run."""
     coordinator = getattr(request.app.state, "agent_runtime_coordinator", None)
@@ -66,6 +68,9 @@ async def register_gateway_run(
     parent_raw = body.get("parent_message_id") or body.get("parentMessageId")
     assistant_message_id = parent_raw if isinstance(parent_raw, str) and parent_raw else None
 
+    resolved_user_id = user_id or getattr(session, "user_id", "") or None
+    resolved_assistant_id = assistant_id or getattr(session, "assistant_id", "") or None
+
     await coordinator.start(
         run_id,
         ctx={
@@ -73,6 +78,8 @@ async def register_gateway_run(
             "topic_id": topic_id,
             "scope": scope,
             "assistant_message_id": assistant_message_id,
+            "user_id": resolved_user_id,
+            "assistant_id": resolved_assistant_id,
         },
     )
     schedule_gateway_session_pump(

@@ -38,6 +38,8 @@ class RunRequest:
     """Optional ADR-0187 §3 D7 one-shot binding for this run (no session
     binding). Non-empty ⇒ run binds to that assistant; ``None`` ⇒ inherit
     legacy default agent (forward-compatible, I-A1)."""
+    user_id: str = ""
+    """Caller user identity (from x-lca-user-id header) for multi-tenant isolation."""
 
 
 @dataclass(frozen=True, slots=True)

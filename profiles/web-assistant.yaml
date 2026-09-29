@@ -82,12 +82,15 @@ patch:
       lobehub_url: "http://10.36.6.252:3010"
   # ADR-0252：用户↔助理归属关系（LCA 自有数据库）。dev_mode=true 保持
   # 存量单用户行为（local-dev-user，不校验 token）；false 时 fail-closed。
+  # 默认由 LCA_DEV_MODE 环境变量控制（缺省为 false，fail-closed 安全隔离）。
   - id: lca.plugins.assistant.ownership
     config:
       database_url:
         from_env: LCA_DATABASE_URL
         required: false
-      dev_mode: true
+      dev_mode:
+        from_env: LCA_DEV_MODE
+        required: false
       expected_token: "lca-local"
   # 日间 episode 只属于助理主目录，只有本 profile 装配这块家目录。
   # 插件默认保持关闭，其它部署没有这块家目录，应继续走今天的提取器。

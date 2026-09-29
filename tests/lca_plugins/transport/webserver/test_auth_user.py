@@ -139,3 +139,74 @@ def test_ownership_error_skipped_in_dev_mode() -> None:
 
     request = _make_request_with_state(dev_mode=True, owner="alice", user_id="bob")
     assert _ownership_error(request, "bob", "asst_alice") is None
+
+
+def test_ownership_config_defaults_to_false() -> None:
+    from lca.plugins.assistant.ownership.plugin import Config
+
+    cfg = Config()
+    assert cfg.dev_mode is False
+
+
+def test_ownership_config_dev_mode_coercion() -> None:
+    from lca.plugins.assistant.ownership.plugin import Config
+
+    assert Config(dev_mode="1").dev_mode is True  # type: ignore[arg-type]
+    assert Config(dev_mode="true").dev_mode is True  # type: ignore[arg-type]
+    assert Config(dev_mode=True).dev_mode is True
+    assert Config(dev_mode="0").dev_mode is False  # type: ignore[arg-type]
+    assert Config(dev_mode="false").dev_mode is False  # type: ignore[arg-type]
+    assert Config(dev_mode=None).dev_mode is False  # type: ignore[arg-type]
+    assert Config(dev_mode=False).dev_mode is False
+
+
+def test_validate_assistant_ownership_requires_user_id_in_non_dev_mode() -> None:
+    from lca.plugins.transport.webserver.handlers.runs.api.command_endpoints import (
+        _validate_assistant_ownership,
+    )
+
+    request = _make_request({"Authorization": "Bearer lca-local"})
+    request.app.state.lca_auth_dev_mode = False
+    request.app.state.assistant_ownership = _FakeOwnership("alice")
+
+    error = _validate_assistant_ownership(request, "asst_alice")
+    assert isinstance(error, JSONResponse)
+    assert error.status_code == 401
+
+
+def test_validate_assistant_ownership_rejects_non_owner() -> None:
+    from lca.plugins.transport.webserver.handlers.runs.api.command_endpoints import (
+        _validate_assistant_ownership,
+    )
+
+    request = _make_request({"Authorization": "Bearer lca-local", "x-lca-user-id": "bob"})
+    request.app.state.lca_auth_dev_mode = False
+    request.app.state.assistant_ownership = _FakeOwnership("alice")
+
+    error = _validate_assistant_ownership(request, "asst_alice")
+    assert isinstance(error, JSONResponse)
+    assert error.status_code == 403
+
+
+def test_validate_assistant_ownership_allows_owner() -> None:
+    from lca.plugins.transport.webserver.handlers.runs.api.command_endpoints import (
+        _validate_assistant_ownership,
+    )
+
+    request = _make_request({"Authorization": "Bearer lca-local", "x-lca-user-id": "alice"})
+    request.app.state.lca_auth_dev_mode = False
+    request.app.state.assistant_ownership = _FakeOwnership("alice")
+
+    assert _validate_assistant_ownership(request, "asst_alice") is None
+
+
+def test_validate_assistant_ownership_allows_in_dev_mode() -> None:
+    from lca.plugins.transport.webserver.handlers.runs.api.command_endpoints import (
+        _validate_assistant_ownership,
+    )
+
+    request = _make_request({"Authorization": "Bearer lca-local"})
+    request.app.state.lca_auth_dev_mode = True
+    request.app.state.assistant_ownership = _FakeOwnership("alice")
+
+    assert _validate_assistant_ownership(request, "asst_alice") is None

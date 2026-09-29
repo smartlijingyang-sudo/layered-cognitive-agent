@@ -18,7 +18,7 @@ import asyncio
 import json
 import time
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import redis.exceptions
 
@@ -127,6 +127,13 @@ class LcaStreamEventLog:
         """Return up to `count` most recent events, newest first."""
         result = await self._redis.xrevrange(stream_key(run_id), "+", "-", count=count)
         return [_parse_redis_stream_row(row) for row in (result or [])]  # type: ignore[arg-type]
+
+    async def get_init_event(self, run_id: str) -> dict[str, Any] | None:
+        """Fetch the first event in the run's stream (typically agent_runtime_init)."""
+        result = await self._redis.xrange(stream_key(run_id), "-", "+", count=1)
+        if not result:
+            return None
+        return _parse_redis_stream_row(result[0])
 
     async def subscribe(
         self,

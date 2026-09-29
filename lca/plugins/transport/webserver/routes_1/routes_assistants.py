@@ -852,6 +852,12 @@ async def install_assistant_skill(request: Request) -> JSONResponse:
     user_id, auth_error = _user_from_request(request)
     if auth_error is not None:
         return auth_error
+    assistant_id = str(request.path_params.get("assistant_id") or "")
+
+    ownership_error = _ownership_error(request, user_id, assistant_id)
+    if ownership_error is not None:
+        return ownership_error
+
     overlay = _skill_overlay_from_request(request)
     if overlay is None:
         return _error_envelope(
@@ -860,11 +866,6 @@ async def install_assistant_skill(request: Request) -> JSONResponse:
             error_type="service_unavailable",
             detail="assistant.skill_overlay capability 不在已解析 profile 中",
         )
-    assistant_id = str(request.path_params.get("assistant_id") or "")
-
-    ownership_error = _ownership_error(request, user_id, assistant_id)
-    if ownership_error is not None:
-        return ownership_error
 
     try:
         body = await request.json()
@@ -1144,6 +1145,13 @@ async def register_lobehub(request: Request) -> JSONResponse:
 
 async def retire_assistant(request: Request) -> JSONResponse:
     """``POST /v1/assistants/{assistant_id}/retire`` —— ``catalog.retire``."""
+    user_id, auth_error = _user_from_request(request)
+    if auth_error is not None:
+        return auth_error
+    assistant_id = str(request.path_params.get("assistant_id") or "")
+    ownership_error = _ownership_error(request, user_id, assistant_id)
+    if ownership_error is not None:
+        return ownership_error
     if _catalog_from_request(request) is None:
         return _not_implemented("catalog_unavailable", "AssistantCatalog.retire")
     return _not_implemented("catalog_pending", "PR-3 catalog handler not wired")

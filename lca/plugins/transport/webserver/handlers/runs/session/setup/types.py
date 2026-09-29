@@ -26,6 +26,8 @@ class RunSessionRequest:
     execution_target: str = ""
     assistant_id: str = ""
     """ADR-0187 §3 D7 一次性 run 绑定（``asst_*``）；空 = 遗留默认 agent。"""
+    user_id: str = ""
+    """ADR-0252: 调用者用户身份（来自 x-lca-user-id 头）。"""
 
 
 __all__ = ["RunSessionRequest"]

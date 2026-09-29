@@ -24,9 +24,10 @@ from lca.contracts.protocols.assistant.ownership import (
     AssistantOwnership,
     UserAssistantBinding,
 )
+from lca.infrastructure.path.locator import get_lca_home
 from lca.infrastructure.persistence.postgres import postgres_connection
 
-_DEFAULT_PATH: Path = Path("~/.lca/lca.sqlite3").expanduser()
+_DEFAULT_PATH: Path = get_lca_home() / "lca.sqlite3"
 
 _T = TypeVar("_T")
 

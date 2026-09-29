@@ -16,8 +16,10 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import structlog
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
@@ -47,11 +49,20 @@ class Config(BaseModel):
     database_url: str | None = None
     """``{from_env: LCA_DATABASE_URL}`` 展开值；``None``/空 = SQLite。"""
 
-    dev_mode: bool = True
+    dev_mode: bool = False
     """True = 归属检查放行（存量单用户行为）；False = fail-closed。"""
 
     expected_token: str = "lca-local"  # noqa: S105  dev 共享 token，非凭据
     """``Authorization: Bearer`` / ``X-LCA-Token`` 期望值（dev_mode=False 时校验）。"""
+
+    @field_validator("dev_mode", mode="before")
+    @classmethod
+    def _coerce_dev_mode(cls, v: Any) -> bool:
+        if v is None:
+            return False
+        if isinstance(v, str):
+            return v.strip().lower() in ("1", "true", "yes", "on")
+        return bool(v)
 
 
 @plugin(

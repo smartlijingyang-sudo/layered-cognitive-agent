@@ -274,6 +274,7 @@ class RunSessionBuilder:
                 extra_plane=request.extra_plane.strip(),
                 execution_target=request.execution_target.strip(),
                 assistant_id=(getattr(request, "assistant_id", "") or "").strip(),
+                user_id=(getattr(request, "user_id", "") or "").strip(),
                 started_at=started_at,
                 locator=locator,
                 event_session=event_session,

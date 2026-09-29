@@ -26,17 +26,9 @@ from lca.contracts.observability.journal.run_journal import (
 )
 from lca.contracts.observability.registry.run_locator import RunLocator
 from lca.contracts.observability.registry.status import RunLifecycleStatus
-
-# COMPAT(delete-when: rg 'RunStatus' tests/ lca/plugins/transport/ = 0 except alias,
-#         tracking: ADR-0183 PR-11 RunLifecycleStatus rename)
-RunStatus = RunLifecycleStatus
 from lca.contracts.protocols import JournalProjector
 from lca.infrastructure.observability import BoundObservability
 from lca.infrastructure.observability.facade.run.ambit import RunAmbit
-
-# spec section H ContextVar deletion: ``reset_run_cursor`` (ContextVar
-# reset) is gone;cursor lifetime is per-run via ``RunSession.loop_cursor``
-# held explicitly.
 from lca.plugins.transport.webserver.handlers.runs.session.event.session import (
     BoundRunEventSession,
     unbind_run_event_session,
@@ -58,6 +50,10 @@ from lca.plugins.transport.webserver.read.runs.identity.identity import (
 from lca.plugins.transport.webserver.read.runs.journal.projection_binding import (
     ProcessJournalBinding,
 )
+
+# COMPAT(delete-when: rg 'RunStatus' tests/ lca/plugins/transport/ = 0 except alias,
+#         tracking: ADR-0183 PR-11 RunLifecycleStatus rename)
+RunStatus = RunLifecycleStatus
 
 _RUNS_ROOT = Path("traces")  # ADR-0065 §七: locator root, runs/ 是其子目录
 
@@ -111,6 +107,7 @@ class RunSession:
     extra_plane: str = ""
     execution_target: str = ""
     assistant_id: str = ""  # ADR-0187 §3 D7：本 run 绑定的助理 id（空 = 遗留路径）
+    user_id: str = ""  # ADR-0252：发起本 run 的租户 user_id（空 = 遗留/dev 路径）
     started_at: float = 0.0
     locator: RunLocator | None = None  # ADR-0065 PR-11: run 级 locator 引用
     thread_tree_writer: object | None = None  # ADR-0186 PR-3g: per-run StepTreeFoldDeriver
