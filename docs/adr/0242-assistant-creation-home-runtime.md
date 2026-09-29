@@ -106,7 +106,7 @@ class CreateAssistantRequest:
     inherit_from: str | None = None  # 新增：继承快照来源
 ```
 
-`catalog.create` 的 SOUL 取数顺序：`soul`（向导对齐结果）> `use_template_soul` 时保留的模板 SOUL > `from_role` 角色卡 backstory > 模板默认。`soul` 非空时必须通过完整度校验。登录向导传 `use_template_soul=true`，角色卡仍提供 emoji、role_id 和 goals。
+`catalog.create` 的 SOUL 取数顺序：`soul`（向导对齐结果）> `use_template_soul` 时保留的模板 SOUL > `from_role` 角色卡 backstory > 模板默认。`soul` 非空时必须通过完整度校验。登录向导不传 `use_template_soul`（默认 False），每个选中角色卡 backstory 写入各自 `SOUL.md`，角色卡同时提供 emoji、role_id 和 goals。
 
 ### D2 · Home 目录卫生与继承
 

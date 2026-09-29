@@ -1,9 +1,10 @@
 """Patch: skill_picker — LCA onboarding agent creation with skill checkboxes.
 
 ADR-0252 D7：``AgentPickerStep`` 从 LCA presets 选角色 + 勾选技能（默认全选），
-Continue 调 LCA ``POST /v1/assistants``（``client_id``/``name``/``from_role``/
-``initial_skills``/``use_template_soul``）再 ``finishOnboarding()``。
-``use_template_soul`` 让 SOUL.md 用默认模板人格。
+Continue 对**每个选中角色**调 LCA ``POST /v1/assistants``（``client_id``/``name``/
+``from_role``/``initial_skills``）再 ``finishOnboarding()``。每个角色生成独立
+助理 Home 与归属记录，SOUL.md 使用角色卡 backstory（``use_template_soul``
+不发送，默认 False）。
 """
 
 from __future__ import annotations
@@ -24,11 +25,11 @@ meta = PatchMeta(
     risk="high",
     category="onboarding",
     depends_on=("lca_presets",),
-    why="ADR-0252 D7: onboarding creates an isolated LCA assistant with selected skills",
+    why="ADR-0252 D7: onboarding creates an isolated LCA assistant per selected role with selected skills",
     technical_detail=(
         "Adds installOnboardingAgent service; patches AgentPickerStep to load "
-        "skill capabilities, default all checked, and create the assistant via "
-        "POST /lca-api/v1/assistants."
+        "skill capabilities, default all checked, and create one assistant per "
+        "selected role via POST /lca-api/v1/assistants (distinct client_id each)."
     ),
     verify_file="src/routes/onboarding/features/AgentPickerStep/index.tsx",
     verify_marker="LCA skill_picker",
@@ -57,7 +58,9 @@ def apply(ctx: PatchContext) -> bool:
     text = text.replace(anchor_import, repl_import, 1)
 
     # 2b. Service imports.
-    anchor_services = "import { installMarketplaceAgents } from '@/services/installMarketplaceAgents';"
+    anchor_services = (
+        "import { installMarketplaceAgents } from '@/services/installMarketplaceAgents';"
+    )
     repl_services = (
         "import { fetchOnboardingSkillCapabilities } from '@/services/agentMarketplace';\n"
         "import { installOnboardingAgent } from '@/services/installOnboardingAgent';"
@@ -68,11 +71,14 @@ def apply(ctx: PatchContext) -> bool:
 
     # 2c. Skill state.
     anchor_state = "  const [selected, setSelected] = useState<Set<string>>(() => new Set());"
-    repl_state = anchor_state + """
+    repl_state = (
+        anchor_state
+        + """
   const [skills, setSkills] = useState<
     Array<{ id: string; name: string; description: string }>
   >([]);
   const [checkedSkills, setCheckedSkills] = useState<Set<string>>(() => new Set());"""
+    )
     if anchor_state not in text:
         raise AssertionError("skill_picker: state anchor not found")
     text = text.replace(anchor_state, repl_state, 1)
@@ -86,7 +92,9 @@ def apply(ctx: PatchContext) -> bool:
         : orderedTemplates.filter((tpl) => tpl.category === active),
     [active, orderedTemplates],
   );"""
-    repl_memo = anchor_memo + """
+    repl_memo = (
+        anchor_memo
+        + """
 
   // LCA skill_picker: load skill capabilities, default all checked (ADR-0252 D7).
   useEffect(() => {
@@ -97,6 +105,7 @@ def apply(ctx: PatchContext) -> bool:
       })
       .catch((error) => console.error('[AgentPickerStep] skills load failed', error));
   }, []);"""
+    )
     if anchor_memo not in text:
         raise AssertionError("skill_picker: visibleTemplates memo anchor not found")
     text = text.replace(anchor_memo, repl_memo, 1)
@@ -113,16 +122,19 @@ def apply(ctx: PatchContext) -> bool:
   }, [categoryHints, finish, requestId, selected]);"""
     repl_continue = """    const selectedTemplateIds = [...selected];
     trackOnboardingMarketplacePicked({ categoryHints, requestId, selectedTemplateIds });
-    const firstRole = allTemplates.find((tpl) => tpl.id === selectedTemplateIds[0]);
-    try {
-      await installOnboardingAgent({
-        clientId: requestId,
-        name: firstRole?.title || 'My Agent',
-        fromRole: firstRole?.id || '',
-        initialSkills: [...checkedSkills],
-      });
-    } catch (installError) {
-      console.error('[AgentPickerStep] LCA install failed', installError);
+    for (const [index, templateId] of selectedTemplateIds.entries()) {
+      const role = allTemplates.find((tpl) => tpl.id === templateId);
+      if (!role) continue;
+      try {
+        await installOnboardingAgent({
+          clientId: `${requestId}-${index + 1}`,
+          name: role.title || 'My Agent',
+          fromRole: role.id,
+          initialSkills: [...checkedSkills],
+        });
+      } catch (installError) {
+        console.error('[AgentPickerStep] LCA install failed', installError);
+      }
     }
     await finish('continue', selectedTemplateIds.length);
   }, [allTemplates, categoryHints, checkedSkills, finish, requestId, selected]);"""

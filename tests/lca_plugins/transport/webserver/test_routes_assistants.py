@@ -26,7 +26,15 @@ _STUB_ROLE_CARDS: dict[str, object] = {
         "summary": "系统设计专家",
         "backstory": "# 软件架构师",
         "emoji": "🏛️",
-    }
+    },
+    "engineering/engineering-data-engineer": {
+        "role_id": "engineering/engineering-data-engineer",
+        "title": "数据工程师",
+        "department": "engineering",
+        "summary": "数据管线专家",
+        "backstory": "# 数据工程师",
+        "emoji": "📊",
+    },
 }
 
 
@@ -935,6 +943,59 @@ def test_post_assistants_duplicate_client_id_is_idempotent(tmp_path: Any) -> Non
     # 磁盘上只有一个 Home
     homes = list((tmp_path / "assistants").glob("asst_*"))
     assert len(homes) == 1
+
+
+def test_post_assistants_multiple_client_ids_create_distinct_homes(tmp_path: Any) -> None:
+    """Onboarding 多选：每个 ``(client_id, from_role)`` 生成独立 Home + 归属行。
+
+    前端现在对每个选中角色用独立 client_id 调 ``POST /v1/assistants``
+    （ADR-0252 D7 多选修复）。每个助理必须落独立目录、SOUL 用角色卡
+    backstory，并且每条 client_id 都有归属记录。
+    """
+    from lca.infrastructure.persistence.user_store import SqliteUserAssistantStore
+
+    app = _app_with_catalog_and_role_resolver(tmp_path)
+    store = SqliteUserAssistantStore(path=tmp_path / "lca.sqlite3")
+    app.state.assistant_ownership = store
+    client = TestClient(app)
+    headers = {"x-lca-user-id": "user-multi"}
+
+    payloads = [
+        ("onboard-1", "架构师", "engineering/architect", "# 软件架构师"),
+        ("onboard-2", "数据工程师", "engineering/engineering-data-engineer", "# 数据工程师"),
+    ]
+    created = []
+    for client_id, name, role_id, backstory_marker in payloads:
+        resp = client.post(
+            "/v1/assistants",
+            json={
+                "name": name,
+                "client_id": client_id,
+                "from_role": role_id,
+                "initial_skills": [],
+            },
+            headers=headers,
+        )
+        assert resp.status_code == 201, resp.text
+        body = resp.json()
+        created.append(body)
+        soul = (Path(body["home_path"]) / "SOUL.md").read_text(encoding="utf-8")
+        assert backstory_marker in soul  # 角色卡 backstory 进入 SOUL（非默认模板）
+        assert body["profile"]["role_id"] == role_id
+        assert body["profile"]["emoji"] == ("🏛️" if role_id == "engineering/architect" else "📊")
+
+    # 两个助理是不同 Home，不互相覆盖
+    assert created[0]["assistant_id"] != created[1]["assistant_id"]
+    assert created[0]["home_path"] != created[1]["home_path"]
+
+    # 归属表有两条独立记录，client_id 与 role_id 正确
+    for client_id, _name, _role_id, _marker in payloads:
+        asst_id = store.assistant_id_for_client("user-multi", client_id)
+        assert asst_id is not None
+        assert store.owner_of(asst_id) == "user-multi"
+
+    # 该用户的归属列表包含两个助理，互不覆盖
+    assert set(store.assistant_ids_for("user-multi")) == {c["assistant_id"] for c in created}
 
 
 def test_post_assistants_bridge_failure_keeps_pending(tmp_path: Any) -> None:
