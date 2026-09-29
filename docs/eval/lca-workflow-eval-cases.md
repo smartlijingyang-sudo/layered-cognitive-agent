@@ -41,7 +41,15 @@ Anthropic《Automating eval design and hillclimbing with Claude》的核心是�
 cd ~/layered-cognitive-agent
 # 确认 LLM_API_KEY（项目根 .env 或 export）
 uv run python scripts/run_scenario_file.py tests/fixtures/team_scenarios/lca_workflow_eval.yaml --list
+
+# 跑单个 case
 uv run python scripts/run_scenario_file.py tests/fixtures/team_scenarios/lca_workflow_eval.yaml --case 01_baseline_synthesis
+
+# 一键全量跑分并打印汇总表格（真实 LLM）
+uv run python scripts/run_scenario_file.py tests/fixtures/team_scenarios/lca_workflow_eval.yaml --all
+
+# 离线确定性冒烟跑分（不耗 token，验证全流程装配与断言逻辑）
+uv run python scripts/run_scenario_file.py tests/fixtures/team_scenarios/lca_workflow_eval.yaml --all --mock
 ```
 
 ## 4. 怎么判定
@@ -49,6 +57,7 @@ uv run python scripts/run_scenario_file.py tests/fixtures/team_scenarios/lca_wor
 **程序化（优先）：**
 
 - runner 自带断言：`assertions` 里的 `status` / `min_steps`，跑完直接给 pass/fail。
+  - **认知 Step 语义（第一性原理）**：在 LCA 架构中，单个认知 Agent 的一次闭环迭代（perceive → think → act → reflect → remember → terminal.commit）即为一个完整认知 Step（`total_steps = 1`）。在无工具调用或单轮收敛任务中，步数真值即为 1；涉及工具多轮调用或 Pipeline 接力编排时步数才会递增。断言 `min_steps: 1` + `status: completed` 能够严格保障链路完整闭环且未被异常中断。
 - journal 回放：`./scripts/lca-ops journal logs -r <run_id>` 看 spine ledger，
   检查 `decision / step / tool / gate` 事件序列是否符合预期
   （例如 04 应出现治理拒绝决策事件，01 应出现完整 perceive→…→stop 链）。
@@ -78,7 +87,3 @@ uv run python scripts/run_scenario_file.py tests/fixtures/team_scenarios/lca_wor
    （程序化判定：退出码非零 + stderr 含 bundle 名）。
 3. 新文件放 `tests/fixtures/team_scenarios/`，命名 `lca_eval_<主题>.yaml`，
    格式与本文件一致；每新增一批，在此文档 §2 续表。
-
----
-*文件状态：`tests/fixtures/team_scenarios/lca_workflow_eval.yaml` 与本文档均为 untracked，
-review 通过后按仓库规范 `git add` + commit（本集属于 LCA 相关变更，符合 AGENTS.md 提交范围）。*

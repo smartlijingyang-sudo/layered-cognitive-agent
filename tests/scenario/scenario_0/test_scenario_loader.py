@@ -8,7 +8,7 @@ from pathlib import Path
 
 from tests.support.scenario_loader import ScenarioSpec, build_team, load_scenario
 
-_FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures" / "team_scenarios"
+_FIXTURES_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "team_scenarios"
 
 
 class TestLoadScenario(unittest.TestCase):
