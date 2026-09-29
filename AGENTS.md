@@ -1,6 +1,6 @@
 # LCA Coding Agent Contract
 
-LCA 是基于 vendored Cordis 的 Python 插件化认知 Agent 框架。
+LCA 是基于 vendored Cordis 的 Python 插件化认知 Agent 框架。**本仓库专属于 LCA 认知智能体系统本身，严禁提交宿主机运维、机器目录重构或外部系统资产（此类资产归属于 `~/everything-library`）。**
 
 ## 0. 权威入口
 
@@ -113,6 +113,7 @@ contracts → infrastructure → cognition → runtime → agent
 ## 4. 禁止事项与迁移态
 
 **禁止:**
+- 提交宿主机/非 LCA 资产 — 本工程专属于 Agent 系统本身，严禁提交宿主机级运维脚本、目录结构调整、非 LCA 业务计划或测试；整台机器的运维、全局拓扑、SOP 与全局测试一律归属于 `~/everything-library`
 - 反向依赖 `application`;绕过 Reducer 改 State;绕过 Body 执行副作用
 - 业务路径直接写 Journal/Spine/Session 后端;只能调唯一公共生产入口
 - 把 projection/trace/metrics/view 当事实源

@@ -14,6 +14,7 @@ This profile adapts Superpowers workflows for Antigravity with strict single-flo
 6. Negative Boundary (Does Not Own): Every plan task MUST declare and honor what it does NOT own. Sprawling refactors or touching out-of-scope files is strictly prohibited (AP-01).
 7. Invariants in Tests: Any architectural or behavioral invariants MUST be backed by deterministic automated tests (pytest/assert), never merely stated in prompts or comments (AP-02).
 8. Active Knowledge Base Retrieval: For any technical selection, UI cloning/prototyping, free-tier cloud service choice, or third-party API integration, proactively check the user's Everything Library at `/home/lichao/everything-library/data/items/` (or via `http://10.36.6.252:1889/api/items?search=...`) before designing or implementing from scratch. Do not wait for the user to remind.
+9. Project Scope Boundary: `layered-cognitive-agent` (LCA) is strictly the user's cognitive AI agent framework repository. NEVER commit host machine ops, directory restructuring, external tools, or non-LCA assets to this repository. All host-level ops, atlas, SOPs, and machine tests strictly belong to `~/everything-library`.
 
 ## Tool Translation Contract
 
