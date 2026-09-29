@@ -776,6 +776,67 @@ async def revise_assistant_profile(request: Request) -> JSONResponse:
     )
 
 
+async def reimport_assistant(request: Request) -> JSONResponse:
+    """``POST /v1/assistants/{assistant_id}:reimport`` —— ``catalog.reimport``.
+
+    ADR-0187 §3 D2 定义的裸改恢复路径：以磁盘当前配置面文件为输入重算
+    全部 digest ⇒ ``revision_seq++`` ⇒ 写 ``revisions/`` 快照 ⇒ 发 EP
+    （``actor="reimport"``）。不校验现有 digest（正是恢复路径的用途）。
+
+    状态码契约：
+
+    - 身份不可解析 ⇒ 401；
+    - catalog capability 不在场 ⇒ 501 ``catalog_unavailable``；
+    - 未知 assistant ⇒ 404；非 owner ⇒ 404；
+    - 成功 ⇒ 200 + ``PlanRevision`` 字段。
+    """
+    user_id, auth_error = _user_from_request(request)
+    if auth_error is not None:
+        return auth_error
+    catalog = _catalog_from_request(request)
+    if catalog is None:
+        return _not_implemented("catalog_unavailable", "AssistantCatalog.reimport")
+    assistant_id = str(request.path_params.get("assistant_id") or "")
+
+    ownership_error = _ownership_error(request, user_id, assistant_id)
+    if ownership_error is not None:
+        return ownership_error
+
+    try:
+        body = await request.json()
+    except (ValueError, OSError):
+        body = {}
+    reason = "manual_reimport"
+    if isinstance(body, dict):
+        reason_raw = body.get("reason")
+        if isinstance(reason_raw, str) and reason_raw.strip():
+            reason = reason_raw.strip()[:120]
+
+    try:
+        revision = catalog.reimport(assistant_id, reason=f"api:{reason}")
+        home_path = catalog.get(assistant_id).home_path
+    except AssistantCatalogError as exc:
+        return _error_envelope(
+            "assistant_not_found",
+            status_code=404,
+            error_type="not_found",
+            detail=str(exc),
+        )
+
+    return _json(
+        {
+            "assistant_id": revision.assistant_id,
+            "revision_seq": revision.revision_seq,
+            "manifest_digest": revision.manifest_digest,
+            "actor": revision.actor,
+            "snapshot_path": revision.snapshot_path,
+            "revised_at": revision.revised_at,
+            "profile": _profile_view(home_path),
+        },
+        status_code=200,
+    )
+
+
 async def install_assistant_skill(request: Request) -> JSONResponse:
     """``POST /v1/assistants/{assistant_id}/skills:install`` —— ``overlay.install`` (PR-6).
 
@@ -1143,6 +1204,11 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
         "/v1/assistants/{assistant_id}/profile",
         revise_assistant_profile,
         ("PATCH", "OPTIONS"),
+    ),
+    RouteSpec(
+        "/v1/assistants/{assistant_id}:reimport",
+        reimport_assistant,
+        ("POST", "OPTIONS"),
     ),
     RouteSpec(
         "/v1/assistants/{assistant_id}/skills:install",

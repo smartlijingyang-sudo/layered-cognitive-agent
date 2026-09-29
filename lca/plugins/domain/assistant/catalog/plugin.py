@@ -82,6 +82,7 @@ from lca.plugins.assistant.home._home_layout import (
     DEFAULT_TEMPLATE_ID,
     SOUL_CORE_SECTIONS,
     SOUL_SAFETY_SECTIONS,
+    find_missing_soul_sections,
     TEMPLATE_REGISTRY,
     HomePaths,
     build_manifest,
@@ -416,15 +417,23 @@ class _AssistantCatalogImpl(AssistantCatalog):
         )
 
     def get(self, assistant_id: str) -> AssistantSpec:
-        """digest 校验 + 读 Home + 构 AssistantSpec;失败抛 AssistantDigestMismatch。"""
+        """digest 校验 + 读 Home + 构 AssistantSpec。
+
+        digest 不一致时不再抛 AssistantDigestMismatch 锁死助理，而是按
+        ADR-0187 §3 D2 的 revise_reimport 语义自愈：以磁盘现状重算 digest、
+        revision_seq++、记 revision 快照（actor="filesystem"），然后继续。
+        这是 Terraform refresh 模型——采纳现实为新基线，读路径永不阻断；
+        篡改证据保留在 revision 快照链里。写路径（revise_profile）仍保留
+        409 乐观并发校验（K8s resourceVersion 模型）。
+        """
         home = HomePaths(root=self._root / assistant_id)
         manifest = load_manifest(home.root, assistant_id)
 
-        # digest 校验(I-A3 fail-closed):重算配置面文件 digest
+        # digest 校验:重算配置面文件 digest
         actual_digests = compute_digests(home.root)
         declared_digests_raw = manifest.get("digests") or {}
         if not isinstance(declared_digests_raw, dict):
-            raise _DigestMismatch(home.root, assistant_id, [])
+            declared_digests_raw = {}
         declared_digests: dict[str, str] = {
             str(name): str(value)
             for name, value in declared_digests_raw.items()
@@ -432,7 +441,22 @@ class _AssistantCatalogImpl(AssistantCatalog):
         }
         mismatches = diff_digests(declared_digests, actual_digests)
         if mismatches:
-            raise _DigestMismatch(home.root, assistant_id, mismatches)
+            # 自愈：用户手改 Home 文件是最自然的操作，不应锁死助理。
+            # reimport 以磁盘现状为输入重算 digest 并记快照，之后继续。
+            import logging as _logging
+
+            _logging.getLogger(__name__).warning(
+                "assistant %s 配置面 digest 不一致(%s)，自动 reimport 自愈",
+                assistant_id,
+                ",".join(mismatches),
+            )
+            self.reimport(assistant_id, reason="auto_heal_on_get")
+            manifest = load_manifest(home.root, assistant_id)
+            declared_digests = {
+                str(name): str(value)
+                for name, value in (manifest.get("digests") or {}).items()
+                if isinstance(value, str)
+            }
 
         bootstrap = AssistantBootstrapRefs(
             soul_digest=declared_digests["SOUL.md"],
@@ -1012,12 +1036,15 @@ def _validate_soul(soul: str) -> None:
             "请补充身份/性格/能力/语气的具体内容后再创建,不要用模板默认 SOUL 降级。"
         )
     _reject_injected_soul(soul)
-    missing = [marker for marker in SOUL_CORE_SECTIONS if marker not in soul]
+    # 语义匹配（业界规范：normalize 后验语义）：接受 "## 身份"、"### 🧠身份"、
+    # "## 🛠️ 能力"（emoji 变体选择符）等写法，不再要求字节级精确匹配。
+    missing = find_missing_soul_sections(soul)
     if missing:
         raise SoulValidationError(
             "SOUL 缺少语义段: "
-            + ", ".join(missing)
+            + "、".join(f"「{name}」" for name in missing)
             + "。请补全这四个核心段(身份/性格/能力/语气)后重试;"
+            "标题写法不限（含/不含 emoji、##/### 均可）;"
             "安全边界/记忆规则/错误处理/红线由模板预置,无需手写。\n" + _SOUL_CORE_SKELETON
         )
 

@@ -112,6 +112,46 @@ SOUL_CORE_SECTIONS: tuple[str, ...] = (
     "## 🗣 语气",
 )
 
+# 四核心段的语义名（去 emoji 后的规范名）。校验时按语义匹配而非字节精确匹配：
+# 接受 "## 身份"、"### 🧠身份"、"## 🛠️ 能力"（变体选择符）等写法。业界规范
+# （OpenAI GPTs / Claude Projects 均为 freeform）：normalize 后验语义，不卡格式。
+SOUL_CORE_SECTION_NAMES: tuple[str, ...] = ("身份", "性格", "能力", "语气")
+
+
+def normalize_soul_section_header(line: str) -> str:
+    """归一化 SOUL 语义段标题行，便于语义匹配。
+
+    去掉：markdown 标题符号（#）、emoji（含变体选择符 U+FE0F、ZWJ U+200D、
+    肤色修饰符）、首尾空白。返回纯语义文本，如 "## 🧠 身份" -> "身份"。
+    """
+    text = line.strip()
+    # 去掉行首的 # 号（支持 ## / ### 等）
+    text = text.lstrip("#").strip()
+    # 去掉 emoji 及相关不可见修饰符
+    kept: list[str] = []
+    for ch in text:
+        cp = ord(ch)
+        if (
+            0x1F000 <= cp <= 0x1FAFF  # emoji 主区
+            or 0x2600 <= cp <= 0x27BF  # 杂项符号/装饰
+            or cp in (0xFE0F, 0x200D)  # 变体选择符 / 零宽连接符
+            or 0x1F3FB <= cp <= 0x1F3FF  # 肤色修饰符
+        ):
+            continue
+        kept.append(ch)
+    return "".join(kept).strip()
+
+
+def find_missing_soul_sections(soul: str) -> tuple[str, ...]:
+    """按语义名检查 SOUL 缺失的核心段，返回缺失的语义名。"""
+    present: set[str] = set()
+    for line in soul.splitlines():
+        norm = normalize_soul_section_header(line)
+        if norm in SOUL_CORE_SECTION_NAMES:
+            present.add(norm)
+    return tuple(n for n in SOUL_CORE_SECTION_NAMES if n not in present)
+
+
 # 模板预置的四个平台保底安全段（ADR-0242 附录 C）。revise 提交缺失时由
 # Catalog 从当前文件 / 模板合并补回；修改其内容是敏感操作，需用户确认。
 # 唯一词表：catalog revise 合并与 self-manage 工具确认门都从这里 import。
