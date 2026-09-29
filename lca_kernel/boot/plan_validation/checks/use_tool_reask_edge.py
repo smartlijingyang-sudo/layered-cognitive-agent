@@ -22,7 +22,7 @@ _ACTION = "use_tool"
 
 
 def _predicate_is_use_tool(pred: Predicate | None) -> bool:
-    """True when *pred* (or a child) equals ``decision.action_type == use_tool``."""
+    """True when *pred* (or a child) tests for ``decision.action_type == use_tool``."""
     if pred is None:
         return False
     if (
@@ -31,6 +31,15 @@ def _predicate_is_use_tool(pred: Predicate | None) -> bool:
         and pred.port.name == "decision"
         and pred.port.field == "action_type"
         and pred.value == _ACTION
+    ):
+        return True
+    if (
+        pred.kind == "in"
+        and pred.port is not None
+        and pred.port.name == "decision"
+        and pred.port.field == "action_type"
+        and isinstance(pred.value, (list, tuple, set))
+        and _ACTION in pred.value
     ):
         return True
     return any(_predicate_is_use_tool(child) for child in pred.children)

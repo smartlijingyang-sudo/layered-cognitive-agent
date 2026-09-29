@@ -36,7 +36,6 @@ from lca.contracts.harness.composition.plugin_contract import (
 from lca.contracts.models.core.execution.decision import Decision
 from lca.contracts.protocols.act.command.envelope import (
     CapabilityGrant,
-    CommandEnvelope,
     mint_envelope,
 )
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
@@ -99,38 +98,62 @@ class ActEnvelopeExecutor:
         plan_ref = context.metadata["plan_ref"]
         node_ref = context.metadata["node_id"]
 
-        envelopes: tuple[CommandEnvelope, ...] = tuple(
-            mint_envelope(
-                plan_ref=plan_ref,
-                scope_ref=node_ref,
-                decision=decision,
-                provider="effect.body",
-                grant=CapabilityGrant(
-                    capability="body.act",
-                    scope="run",
-                    effect_class="tools",
-                ),
-                # Idempotency key includes the call index so a multi-call
-                # decision does not collapse N envelopes into one cached
-                # entry (PR-2 already separated BodySurfaceEventContract;
-                # this is the matching envelope-side guard).
-                idempotency_key=(f"{plan_ref}:{node_ref}:{decision.decision_id}:{call_index}"),
-                metadata={
-                    "effect_class": "tools",
-                    "operation": "body.act",
-                    "state": context.runtime.get("state"),
-                    "decision": decision,
-                    "tool_call_index": call_index,
-                    # The dispatch site is the only place that knows which
-                    # declared call this envelope carries. ``effect.execute``
-                    # reads this id to attribute the model-visible
-                    # ``surface/tool_result`` row; reconstructing it downstream
-                    # from ``decision`` only works for a single-call turn.
-                    "tool_call_id": decision.tool_calls[call_index].call_id,
-                },
+        if decision.delegations and not decision.tool_calls:
+            envelopes = tuple(
+                mint_envelope(
+                    plan_ref=plan_ref,
+                    scope_ref=node_ref,
+                    decision=decision,
+                    provider="effect.body",
+                    grant=CapabilityGrant(
+                        capability="body.act",
+                        scope="run",
+                        effect_class="delegations",
+                    ),
+                    idempotency_key=f"{plan_ref}:{node_ref}:{decision.decision_id}:{del_index}",
+                    metadata={
+                        "effect_class": "delegations",
+                        "operation": "body.act",
+                        "state": context.runtime.get("state"),
+                        "decision": decision,
+                        "delegation_index": del_index,
+                    },
+                )
+                for del_index in range(len(decision.delegations))
             )
-            for call_index in range(len(decision.tool_calls))
-        )
+        else:
+            envelopes = tuple(
+                mint_envelope(
+                    plan_ref=plan_ref,
+                    scope_ref=node_ref,
+                    decision=decision,
+                    provider="effect.body",
+                    grant=CapabilityGrant(
+                        capability="body.act",
+                        scope="run",
+                        effect_class="tools",
+                    ),
+                    # Idempotency key includes the call index so a multi-call
+                    # decision does not collapse N envelopes into one cached
+                    # entry (PR-2 already separated BodySurfaceEventContract;
+                    # this is the matching envelope-side guard).
+                    idempotency_key=(f"{plan_ref}:{node_ref}:{decision.decision_id}:{call_index}"),
+                    metadata={
+                        "effect_class": "tools",
+                        "operation": "body.act",
+                        "state": context.runtime.get("state"),
+                        "decision": decision,
+                        "tool_call_index": call_index,
+                        # The dispatch site is the only place that knows which
+                        # declared call this envelope carries. ``effect.execute``
+                        # reads this id to attribute the model-visible
+                        # ``surface/tool_result`` row; reconstructing it downstream
+                        # from ``decision`` only works for a single-call turn.
+                        "tool_call_id": decision.tool_calls[call_index].call_id,
+                    },
+                )
+                for call_index in range(len(decision.tool_calls))
+            )
 
         return NodeOutput(
             port_values={

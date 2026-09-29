@@ -199,6 +199,8 @@ def _owed_rows(
     rows = _batch_rows(observation)
     if rows:
         return rows
+    if envelope.metadata.get("effect_class") != "tools":
+        return ()
     call_id = envelope.metadata.get("tool_call_id") or getattr(observation, "tool_call_id", None)
     if call_id:
         return (_ToolResultRow(str(call_id), observation, dispatch_error),)

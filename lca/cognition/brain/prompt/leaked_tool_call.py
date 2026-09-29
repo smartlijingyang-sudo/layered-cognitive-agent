@@ -33,8 +33,20 @@ _TOOL_NAME = re.compile(r"^[A-Za-z_][\w]{0,63}$")
 _BRACKET_CALL = re.compile(r"\[Tool call:\s*([A-Za-z_][\w]*)\]\s*(\{.*\})\s*\Z", re.DOTALL)
 _FUNCTION_CALL = re.compile(r"<function=\s*([A-Za-z_][\w]*)\s*>(.*?)</function\s*>", re.DOTALL)
 _INVOKE_CALL = re.compile(r"<invoke\s+name=\"([^\"]+)\"\s*>(.*?)</invoke\s*>", re.DOTALL)
+_TOOL_TAG_CALL = re.compile(r"<tool\s+name=\"([^\"]+)\"\s*>(.*?)</tool\s*>", re.DOTALL)
+_TOOL_CALL_JSON = re.compile(r"<tool_call\s*>(.*?)</tool_call\s*>", re.DOTALL)
+_DELEGATE_CALL = re.compile(r"<delegate_to(?:_role)?\s*>(.*?)</delegate_to(?:_role)?\s*>", re.DOTALL)
+_QWEN_SPECIAL_CALL = re.compile(
+    r"<\|tool_call_begin\|>(?:function\s*)?(?:<\|tool_call_name\|>)?([A-Za-z_][\w]*)"
+    r"(?:<\|tool_call_argument\|>)?(?:<\|tool_call_begin\|>)?(.*?)"
+    r"(?:<\|tool_call_end\|>|<\|tool_call_begin\|>|\Z)",
+    re.DOTALL,
+)
+
 _PARAMETER = re.compile(r"<parameter\s+name=\"([^\"]+)\"\s*>(.*?)</parameter\s*>", re.DOTALL)
-_CALLS_WRAPPER = re.compile(r"</?tool_calls\s*>")
+_PARAM_OR_PARAMETER = re.compile(r"<param(?:eter)?\s+name=\"([^\"]+)\"\s*>(.*?)</param(?:eter)?\s*>", re.DOTALL)
+_CHILD_XML_TAG = re.compile(r"<([A-Za-z_][\w]*)\s*>(.*?)</\1\s*>", re.DOTALL)
+_CALLS_WRAPPER = re.compile(r"</?tool_calls\s*>|<\|/?tool_calls\|>|<\|tool_call_end\|>")
 
 # Every delimiter of the grammars above, opening and closing. A fragment that
 # contains one of these is a tool call we could not read, never prose. The
@@ -44,12 +56,22 @@ _MARKERS = (
     "[Tool call:",
     "<tool_calls",
     "</tool_calls>",
+    "<tool_call",
+    "</tool_call>",
     "<invoke",
     "</invoke>",
     "<parameter",
     "</parameter>",
     "<function=",
     "</function>",
+    "<tool name=",
+    "</tool>",
+    "<delegate_to",
+    "</delegate_to>",
+    "</delegate_to_role>",
+    "<|tool_calls|>",
+    "<|tool_call_begin|>",
+    "<|tool_call_end|>",
 )
 
 
@@ -114,12 +136,83 @@ def _from_invoke(match: re.Match[str]) -> NativeToolCall | None:
     return _call(match.group(1), arguments)
 
 
+def _from_tool_tag(match: re.Match[str]) -> NativeToolCall | None:
+    name = match.group(1).strip()
+    body = _unfence(match.group(2).strip())
+    # 1. Try JSON body
+    json_args = _json_object(body)
+    if json_args is not None:
+        return _call(name, json_args)
+    # 2. Try <param name="..."> or <parameter name="...">
+    params = _PARAM_OR_PARAMETER.findall(body)
+    if params:
+        return _call(name, {k: _scalar(v) for k, v in params})
+    # 3. Try child XML tags <tag>value</tag>
+    tags = _CHILD_XML_TAG.findall(body)
+    if tags:
+        return _call(name, {k: _scalar(v) for k, v in tags})
+    return None
+
+
+def _from_tool_call_json(match: re.Match[str]) -> NativeToolCall | None:
+    body = _unfence(match.group(1).strip())
+    parsed = _json_object(body)
+    if parsed is None:
+        return None
+    if "function" in parsed and isinstance(parsed["function"], dict):
+        parsed = parsed["function"]
+    name = str(parsed.get("name") or "").strip()
+    raw_args = parsed.get("arguments")
+    args: dict[str, Any] = {}
+    if isinstance(raw_args, dict):
+        args = raw_args
+    elif isinstance(raw_args, str) and raw_args.strip():
+        parsed_args = _json_object(raw_args)
+        args = parsed_args if parsed_args is not None else {"value": raw_args}
+    return _call(name, args)
+
+
+def _from_delegate(match: re.Match[str]) -> NativeToolCall | None:
+    body = _unfence(match.group(1).strip())
+    parsed_json = _json_object(body)
+    tags = dict(_CHILD_XML_TAG.findall(body)) if not parsed_json else {}
+    target_role = (
+        tags.get("role")
+        or tags.get("target_role")
+        or (parsed_json.get("target_role") if parsed_json else "")
+        or (parsed_json.get("role") if parsed_json else "")
+    )
+    subtask = (
+        tags.get("subtask")
+        or tags.get("objective")
+        or (parsed_json.get("subtask") if parsed_json else "")
+        or (parsed_json.get("objective") if parsed_json else "")
+    )
+    args: dict[str, Any] = {}
+    if target_role:
+        args["target_role"] = str(target_role).strip()
+    if subtask:
+        args["subtask"] = str(subtask).strip()
+    return _call("delegate", args)
+
+
+def _from_qwen(match: re.Match[str]) -> NativeToolCall | None:
+    name = match.group(1).strip()
+    raw_args = match.group(2).strip()
+    args = _json_object(raw_args) if raw_args else {}
+    return _call(name, args if args is not None else {})
+
+
 # Grammar to decoder, in the order they are tried. Sits next to the decoders so
 # a new encoding is one entry here and one function below.
 _ENCODINGS = (
     (_BRACKET_CALL, _from_bracket),
     (_FUNCTION_CALL, _from_function),
     (_INVOKE_CALL, _from_invoke),
+    (_TOOL_TAG_CALL, _from_tool_tag),
+    (_TOOL_CALL_JSON, _from_tool_call_json),
+    (_DELEGATE_CALL, _from_delegate),
+    (_QWEN_SPECIAL_CALL, _from_qwen),
 )
 
 

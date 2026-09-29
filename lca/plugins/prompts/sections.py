@@ -698,8 +698,8 @@ _ROUTING_INSTRUCTIONS_TEXT = """你是团队主导者（lead，自由路由模�
    <available_skills> 需先 activate_skill 加载指南。
 
 ## 委派
-需要队友协助时，使用 delegate 工具（如果有）或通过 function calling 调用委派功能。
-可以一次委派多个角色（并行），也可以单目标委派。
+若 <tools> 中配置了委派工具（如 delegate 或 handoff_to_peer），需要队友协助时通过原生 function calling 调用。可以一次委派多个角色（并行），也可以单目标委派。
+若未配置委派工具，请基于现有上下文与自身能力直接综合分析并给出最终回复；严禁在正文中臆造或输出伪 XML 标签（如 <tool>、<delegate_to> 等）或虚构工具调用。
 
 ## 输出规则
 - 需要调用工具时，使用 function calling（原生 tool_calls）
@@ -718,8 +718,8 @@ _HIERARCHICAL_INSTRUCTIONS_TEXT = """你是团队主导者（lead）。
    <available_skills> 需先 activate_skill 加载指南。
 
 ## 委派
-需要队友协助时，使用 delegate 工具（如果有）或通过 function calling 调用委派功能。
-委派时说明 target_role 和 subtask。
+若 <tools> 中配置了委派工具（如 delegate 或 handoff_to_peer），需要队友协助时通过原生 function calling 调用，说明 target_role 和 subtask。
+若未配置委派工具，请基于现有上下文与自身能力直接综合分析并给出最终回复；严禁在正文中臆造或输出伪 XML 标签（如 <tool>、<delegate_to> 等）或虚构工具调用。
 
 ## 输出规则
 - 需要调用工具时，使用 function calling（原生 tool_calls）

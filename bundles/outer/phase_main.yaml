@@ -149,13 +149,13 @@ edges:
   - from: perceive.main
     to: think.main
 
-  # think → act when decision.action_type == use_tool.
+  # think → act when decision.action_type in [use_tool, delegate].
   - from: think.main
     to: act.main
     when:
-      kind: eq
+      kind: in
       port: { name: decision, field: action_type }
-      value: use_tool
+      value: [use_tool, delegate]
 
   # think → reflect.main when decision.action_type == respond
   # AND decision.response_text is non-empty (ADR-0244 closed cognitive loop).
@@ -209,7 +209,7 @@ edges:
     when:
       kind: and
       children:
-        - { kind: eq, port: { name: decision, field: action_type }, value: use_tool }
+        - { kind: in, port: { name: decision, field: action_type }, value: [use_tool, delegate] }
         - { kind: in, port: { name: approval_routing, field: next_hint }, value: [approve_skipped, approve_approved] }
     loop:
       # Hard cap on the tool re-ask (LangGraph recursion_limit /

@@ -99,6 +99,83 @@ class TestParseTextChannel(unittest.TestCase):
         self.assertIsNone(decision.response_text)
         self.assertEqual(decision.tool_calls[0].wire_status, "incomplete")
 
+    def test_tool_tag_with_param_becomes_a_call(self) -> None:
+        text = (
+            "现在开始协助您。\n"
+            '<tool name="delegate_to_role">\n'
+            '<param name="target_role">sales</param>\n'
+            '<param name="subtask">分析折扣限制</param>\n'
+            "</tool>"
+        )
+        channel = parse_text_channel(text)
+        self.assertEqual(channel.prose, "现在开始协助您。")
+        self.assertEqual(channel.undecodable, "")
+        self.assertEqual([c.name for c in channel.calls], ["delegate_to_role"])
+        self.assertEqual(
+            channel.calls[0].arguments,
+            {"target_role": "sales", "subtask": "分析折扣限制"},
+        )
+
+    def test_tool_tag_with_json_body_becomes_a_call(self) -> None:
+        text = (
+            "我来计算一下总额：\n"
+            '<tool name="calculator">{"expression": "400 + 15"}</tool>'
+        )
+        channel = parse_text_channel(text)
+        self.assertEqual(channel.prose, "我来计算一下总额：")
+        self.assertEqual(channel.undecodable, "")
+        self.assertEqual([c.name for c in channel.calls], ["calculator"])
+        self.assertEqual(channel.calls[0].arguments, {"expression": "400 + 15"})
+
+    def test_tool_call_json_block_becomes_a_call(self) -> None:
+        text = (
+            "查询中：\n"
+            "<tool_call>\n"
+            '{"name": "fetch_user", "arguments": {"user_id": 123}}\n'
+            "</tool_call>"
+        )
+        channel = parse_text_channel(text)
+        self.assertEqual(channel.prose, "查询中：")
+        self.assertEqual(channel.undecodable, "")
+        self.assertEqual([c.name for c in channel.calls], ["fetch_user"])
+        self.assertEqual(channel.calls[0].arguments, {"user_id": 123})
+
+    def test_delegate_to_xml_block_becomes_a_call(self) -> None:
+        text = (
+            "我需要法务专家介入：\n"
+            "<delegate_to>\n"
+            "<role>legal</role>\n"
+            "<subtask>审核合同条款</subtask>\n"
+            "</delegate_to>"
+        )
+        channel = parse_text_channel(text)
+        self.assertEqual(channel.prose, "我需要法务专家介入：")
+        self.assertEqual(channel.undecodable, "")
+        self.assertEqual([c.name for c in channel.calls], ["delegate"])
+        self.assertEqual(
+            channel.calls[0].arguments,
+            {"target_role": "legal", "subtask": "审核合同条款"},
+        )
+
+    def test_qwen_special_token_tool_call_becomes_a_call(self) -> None:
+        text = (
+            "运行命令：\n"
+            "<|tool_calls|><|tool_call_begin|>run_cmd<|tool_call_begin|>"
+            '{"cmd": "pytest"}<|tool_call_end|>'
+        )
+        channel = parse_text_channel(text)
+        self.assertEqual(channel.prose, "运行命令：")
+        self.assertEqual(channel.undecodable, "")
+        self.assertEqual([c.name for c in channel.calls], ["run_cmd"])
+        self.assertEqual(channel.calls[0].arguments, {"cmd": "pytest"})
+
+    def test_modern_dangling_tags_become_undecodable(self) -> None:
+        channel = parse_text_channel("完成分析。\n</tool>\n</delegate_to>")
+        self.assertEqual(channel.calls, ())
+        self.assertEqual(channel.prose, "完成分析。")
+        self.assertIn("</tool>", channel.undecodable)
+        self.assertIn("</delegate_to>", channel.undecodable)
+
 
 if __name__ == "__main__":
     unittest.main()

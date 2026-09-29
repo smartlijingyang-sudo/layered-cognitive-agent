@@ -130,3 +130,36 @@ def test_non_outer_plan_is_skipped() -> None:
         edges=(),
     )
     assert UseToolReaskEdgeCheck().run(plan, plan_id="inner.think") is None
+
+
+def test_bounded_reask_with_in_predicate_passes() -> None:
+    reask = PlanEdge(
+        source="act.main",
+        target="think.main",
+        when=Predicate(
+            kind="and",
+            children=(
+                Predicate(
+                    kind="in",
+                    port=PortRef(name="decision", field="action_type"),
+                    value=["use_tool", "delegate"],
+                ),
+                Predicate(
+                    kind="in",
+                    port=PortRef(name="approval_routing", field="next_hint"),
+                    value=["approve_skipped"],
+                ),
+            ),
+        ),
+        loop=EdgeLoopObligation(max_iterations=8, budget="run.steps"),
+    )
+    plan = Plan(
+        id="phase.main.outer",
+        nodes=(
+            PlanNode(id="act.main", binding=BindingKind.NODE_EXECUTOR, entry=True),
+            PlanNode(id="think.main", binding=BindingKind.NODE_EXECUTOR),
+        ),
+        edges=(reask,),
+    )
+    err = UseToolReaskEdgeCheck().run(plan, plan_id="phase.main.outer")
+    assert err is None

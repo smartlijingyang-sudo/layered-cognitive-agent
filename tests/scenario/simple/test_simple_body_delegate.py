@@ -19,6 +19,7 @@ from lca.infrastructure.transport.registry import (
     TransportRegistry,
 )
 from tests.support.action_authority import build_test_body
+from tests.support.session_gate_helpers import bound_session
 from tests.support.unimplemented_transport import UnimplementedTransport
 
 
@@ -36,6 +37,7 @@ def _make_decision(
     action_type: str = "delegate",
     delegations: list[DelegationSpec] | None = None,
     tool_calls: list[ToolCall] | None = None,
+    response_text: str | None = None,
 ) -> Decision:
     return Decision(
         decision_id="dec-1",
@@ -44,6 +46,7 @@ def _make_decision(
         confidence=1.0,
         tool_calls=tool_calls or [],
         delegations=list(delegations or []),
+        response_text=response_text,
     )
 
 
@@ -60,7 +63,16 @@ async def _failing_handler(subtask: str) -> Observation:
     raise RuntimeError("agent exploded")
 
 
-class TestDelegateHappyPath(unittest.IsolatedAsyncioTestCase):
+class _BaseDelegateTest(unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        self._session_ctx = bound_session()
+        self._session_ctx.__enter__()
+
+    def tearDown(self) -> None:
+        self._session_ctx.__exit__(None, None, None)
+
+
+class TestDelegateHappyPath(_BaseDelegateTest):
     async def test_delegate_by_agent_id(self) -> None:
         transport = InternalTransport()
         transport.register_agent("researcher", _echo_handler)
@@ -131,7 +143,7 @@ class TestDelegateHappyPath(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(obs.success)
 
 
-class TestDelegatePolling(unittest.IsolatedAsyncioTestCase):
+class TestDelegatePolling(_BaseDelegateTest):
     """验证轮询语义：handler 异步执行期间 poll 返回 working，完成后拿到结果。"""
 
     async def test_delegate_waits_for_slow_handler(self) -> None:
@@ -151,7 +163,7 @@ class TestDelegatePolling(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(obs.payload, "slow done")
 
 
-class TestDelegateErrors(unittest.IsolatedAsyncioTestCase):
+class TestDelegateErrors(_BaseDelegateTest):
     """delegate 分支的错误路径。"""
 
     async def test_no_transport_raises_clear_error(self) -> None:
@@ -210,13 +222,12 @@ class TestDelegateErrors(unittest.IsolatedAsyncioTestCase):
         self.assertIn("exploded", obs.error or "")
 
 
-class TestDelegateDoesNotAffectOtherBranches(unittest.IsolatedAsyncioTestCase):
+class TestDelegateDoesNotAffectOtherBranches(_BaseDelegateTest):
     """确保新增 delegate 分支不影响 respond / use_tool 原有行为。"""
 
     async def test_respond_still_works(self) -> None:
         body = build_test_body(SimpleToolRegistry(), _noop_executor())
-        decision = _make_decision(action_type="respond")
-        decision.response_text = "hello"
+        decision = _make_decision(action_type="respond", response_text="hello")
 
         obs = await body.act(decision, _make_state())
         self.assertTrue(obs.success)
@@ -230,7 +241,7 @@ class TestDelegateDoesNotAffectOtherBranches(unittest.IsolatedAsyncioTestCase):
             await body.act(decision, _make_state())
 
 
-class TestProtocolRouting(unittest.IsolatedAsyncioTestCase):
+class TestProtocolRouting(_BaseDelegateTest):
     """验证 _handle_delegate 按 spec.protocol 路由到不同 transport。"""
 
     async def test_unimplemented_protocol_raises_not_implemented(self) -> None:
@@ -283,7 +294,7 @@ class TestProtocolRouting(unittest.IsolatedAsyncioTestCase):
             await body.act(decision, _make_state())
 
 
-class TestBackwardCompatTransport(unittest.IsolatedAsyncioTestCase):
+class TestBackwardCompatTransport(_BaseDelegateTest):
     """验证旧的 transport= 参数仍然可用。"""
 
     async def test_transport_kwarg_still_works(self) -> None:

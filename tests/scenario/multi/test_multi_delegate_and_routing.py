@@ -22,6 +22,7 @@ from lca.infrastructure.transport.registry import TransportRegistry
 from lca.plugins.strategies.lead.lead import LeadStrategy
 from lca.plugins.strategies.peer.swarm import SwarmStrategy
 from tests.support.action_authority import build_test_body
+from tests.support.session_gate_helpers import bound_session
 from tests.support.team_stage import stage_with_invoker
 
 
@@ -35,7 +36,16 @@ def _make_registry(transport: InternalTransport) -> TransportRegistry:
     return reg
 
 
-class TestMultiDelegateBody(unittest.IsolatedAsyncioTestCase):
+class _BaseSessionTest(unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        self._session_ctx = bound_session()
+        self._session_ctx.__enter__()
+
+    def tearDown(self) -> None:
+        self._session_ctx.__exit__(None, None, None)
+
+
+class TestMultiDelegateBody(_BaseSessionTest):
     async def test_parallel_delegate(self) -> None:
         transport = InternalTransport()
         seen: list[str] = []
@@ -160,7 +170,7 @@ class TestRoutingPlane(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([p.role for p in awareness.teammates], ["m"])
 
 
-class TestPeerSwarm(unittest.IsolatedAsyncioTestCase):
+class TestPeerSwarm(_BaseSessionTest):
     async def test_swarm_stops_on_first_success_with_output(self) -> None:
         a = MagicMock()
         a.role_profile = MagicMock()
