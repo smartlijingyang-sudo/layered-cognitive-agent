@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from typing import cast
 
+from lca.contracts.exceptions.registry import RegistryKeyError
 from lca.contracts.models.core.execution.decision import Decision
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.act.command.envelope import CommandEnvelope, RunDelta
@@ -32,7 +33,6 @@ from lca.contracts.protocols.declarative.declarative_1.declarative_graph import 
 from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyStore
 from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
 from lca.contracts.protocols.state.reducer import Reducer
-from lca.infrastructure.component.registry import RegistryKeyError
 
 
 class RegistryEffectDispatcher(EffectDispatcher):

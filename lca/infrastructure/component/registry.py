@@ -17,23 +17,11 @@ from __future__ import annotations
 
 from typing import Any, Generic, TypeVar
 
+from lca.contracts.exceptions.registry import RegistryKeyError
 from lca.contracts.mechanisms import NamedRegistryProtocol
 
 _T = TypeVar("_T")
 _StrList = list[str]  # 避免类内方法名 list 遮蔽内置 list 类型
-
-
-class RegistryKeyError(ValueError):
-    """按名称查找注册表条目失败。
-
-    继承 ValueError 以保持向后兼容（已有测试 assertRaises(ValueError)）。
-    """
-
-    def __init__(self, key: str, registry_kind: str, available: list[str]) -> None:
-        self.key = key
-        self.registry_kind = registry_kind
-        self.available = available
-        super().__init__(f"未注册{registry_kind} {key!r}，可用: {available}")
 
 
 class NamedRegistry(NamedRegistryProtocol, Generic[_T]):

@@ -30,9 +30,7 @@ class SubgraphDepthExceededError(RuntimeError):
     """PG-007-depth: nesting depth > ``max_subgraph_depth`` (default 8)."""
 
     def __init__(self, depth: int, max_depth: int) -> None:
-        super().__init__(
-            f"subgraph depth {depth} exceeds max {max_depth}"
-        )
+        super().__init__(f"subgraph depth {depth} exceeds max {max_depth}")
         self.depth = depth
         self.max_depth = max_depth
 
