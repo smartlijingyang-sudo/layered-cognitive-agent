@@ -183,3 +183,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat fce60fc18` → 5 files changed, 138 insertions(+), 5 deletions(-); gross diff = 143 > 100.
 - **Tests:** `uv run pytest -q tests/harness/declarative/lifecycle/test_tracing_phase_observer.py tests/architecture/test_phase_observation_seam.py -m "not real_llm" --no-cov` → **5 passed**; `test_phase_transaction_depends_on_observation_seam_not_tracing_backend` is the pre-existing stale `lca/loop/transaction.py` test.
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 18 — 2026-09-30
+
+- **Commit:** `f473a3aec` (cherry-picked from subagent branch `round-i` commit `8fb3f7435`)
+- **Architectural concern:** module depth / oversized module. `lca/infrastructure/cli/services/kernel/supervisor.py` (1237 lines) mixed config parsing, state I/O, result builders, process helpers, restart decisions, and the supervisor class.
+- **Change:** split into a `supervisor/` package (`types`, `config`, `state`, `results`, `process`, `decisions`, `supervisor` submodules) with an explicit re-export barrel; updated tests to patch submodule globals; added `test_supervisor_barrel.py` pinning the public surface.
+- **Files:** 11 files (7 new submodules + barrel + test + test updates).
+- **Shortstat:** `git show --shortstat f473a3aec` → 11 files changed, 1544 insertions(+), 1289 deletions(-); gross diff = 2833 > 100.
+- **Tests:** `uv run pytest -q tests/infrastructure/cli/test_supervisor_barrel.py tests/infrastructure/cli/test_kernel_supervisor.py tests/infrastructure/cli/test_kernel_restart_report.py -m "not real_llm" --no-cov` → **46 passed**.
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
