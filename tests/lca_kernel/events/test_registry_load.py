@@ -120,3 +120,45 @@ events:
 def test_empty_config_dir_raises(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError, match="事件配置 SSOT 目录为空"):
         EventRegistry.load(tmp_path)
+
+
+def test_load_populates_descriptor_fields_and_consumer_rules(tmp_path: Path) -> None:
+    """catalog 装载产出完整 EventSpec 描述 + 顶层 consumer_rules。
+
+    走公开路径 :meth:`EventRegistry.load`：yaml 原文 ``publishers_tokens`` /
+    ``subscribers_tokens`` / ``fields`` 保留，consumer_rules 前缀规则装载为
+    typed :class:`SubscriberRule` 并物化进 ``subscribers`` 映射。
+    """
+    from lca.plugins.events.sinks.spine_file_sink.sink import SpineFileSink
+
+    (tmp_path / "catalog.yaml").write_text(
+        """
+consumer_rules:
+  - prefix: "team."
+    subscribers:
+      - lca.plugins.events.sinks.spine_file_sink.sink.SpineFileSink
+events:
+  - category: team.delegation.cache_hit
+    plane: lca.contracts.event.Plane.STRUCTURAL
+    payload_class: lca_kernel.events.payloads.TeamDelegationCacheHit
+    publishers:
+      - lca.loop.fact_gateway.DefaultFactGateway
+    subscribers:
+      - lca.plugins.events.sinks.spine_file_sink.sink.SpineFileSink
+    fields:
+      trace: "true"
+"""
+    )
+    registry = EventRegistry.load(tmp_path)
+    spec = registry.specs[0]
+    assert spec.category == Category.TEAM_DELEGATION_CACHE_HIT
+    assert spec.plane is Plane.STRUCTURAL
+    assert issubclass(spec.payload_class, EventPayload)
+    assert spec.fields == {"trace": "true"}
+    assert spec.publishers_tokens == ("lca.loop.fact_gateway.DefaultFactGateway",)
+    assert spec.subscribers_tokens == (
+        "lca.plugins.events.sinks.spine_file_sink.sink.SpineFileSink",
+    )
+    # consumer_rules 前缀规则 → typed SubscriberRule，订阅授权已物化。
+    assert {r.prefix for r in registry.consumer_rules} == {"team."}
+    assert SpineFileSink in registry.subscribers[Category.TEAM_DELEGATION_CACHE_HIT]
