@@ -163,3 +163,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat fea78f49f` → 2 files changed, 108 insertions(+), 2 deletions(-); gross diff = 110 > 100.
 - **Tests:** `uv run pytest -q tests/architecture/test_plugin_api_explicit_exports.py -m "not real_llm" --no-cov` → **6 passed**.
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 16 — 2026-09-30
+
+- **Commit:** `9a9debcdf` (cherry-picked from subagent branch `round-d` commit `20b80c902`)
+- **Architectural concern:** module depth / oversized `__init__`. `lca_kernel/boot/plan_validation/__init__.py` (~880 lines) held all plan-validation logic.
+- **Change:** split into `core.py`, `bundle_mapping.py`, `predicates.py`, `typed_ports.py`, `reachability.py`; `__init__.py` is now an explicit re-export barrel (public surface unchanged); fixed a pre-existing RUF005 in `_check_plan_spec`; added 24 reachability/typed-port/terminal/predicate tests through the barrel.
+- **Files:** `lca_kernel/boot/plan_validation/{core,bundle_mapping,predicates,typed_ports,reachability}.py` (new), `lca_kernel/boot/plan_validation/__init__.py`, `tests/lca_kernel/boot/test_plan_validation_reachability.py`.
+- **Shortstat:** `git show --shortstat 9a9debcdf` → 7 files changed, 1419 insertions(+), 841 deletions(-); gross diff = 2260 > 100.
+- **Tests:** `uv run pytest -q tests/lca_kernel/boot/test_plan_validation_reachability.py tests/lca_kernel/boot/test_plan_validation.py -m "not real_llm" --no-cov` → **33 passed**; `test_aggregates_errors_across_plans` fails on a stale `lifter_mod._bundle_yaml_path` monkeypatch (pre-existing at base).
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
