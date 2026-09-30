@@ -283,3 +283,43 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat 575bc70f8` → 9 files changed, 170 insertions(+), 224 deletions(-); gross diff = 394 > 100.
 - **Tests:** `uv run pytest -q tests/architecture/test_harness_observability_moved_to_kernel.py tests/lca_kernel/test_boot_events_emitted.py -m "not real_llm" --no-cov` → **7 passed** (2 boot-event failures pre-existing at HEAD `d645b6ea7`).
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 28 — 2026-09-30
+
+- **Commit:** `158200073` (cherry-picked from subagent branch `round-l` commit `9d567b314`)
+- **Architectural concern:** module depth / oversized module. `lca/plugins/prompts/sections.py` (1060 lines, ~30 section classes) mixed all prompt sections in one file.
+- **Change:** split into a `sections/` package (`base`, `role`, `time`, `tools`, `skills`, `task`, `text`, `context`, `teammates`, `member_status`, `evidence`, `vocal`, `plugin` + barrel); bundle `$module` updated; added a barrel-coverage test.
+- **Files:** 18 files (13 new submodules + barrel + plugin + test updates), 1 deleted module.
+- **Shortstat:** `git show --shortstat 158200073` → 18 files changed, 1546 insertions(+), 1063 deletions(-); gross diff = 2609 > 100.
+- **Tests:** `uv run pytest -q tests/plugins/prompts/test_sections_package_barrel.py -m "not real_llm" --no-cov` → **3 passed** (subagent ran 69 passed across the affected set; remaining failures pre-existing).
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 29 — 2026-09-30
+
+- **Commit:** `bc0e80704` (cherry-picked from subagent branch `round-k` commit `65094483a`)
+- **Architectural concern:** module depth / oversized module. `routes_assistants.py` (1323 lines) held nine `/v1/assistants` endpoints with inline JSON shaping.
+- **Change:** split into a `routes_assistants/` package (`codecs`, `profile`, `skills`, `jobs`, `lobehub`, `router` + barrel); added `test_assistants_codecs.py` (16 codec tests).
+- **Files:** 9 files (6 new submodules + barrel + test), 1 deleted module.
+- **Shortstat:** `git show --shortstat bc0e80704` → 9 files changed, 1585 insertions(+), 1323 deletions(-); gross diff = 2908 > 100.
+- **Tests:** `uv run pytest -q tests/plugins/transport/webserver/routes_1/test_assistants_codecs.py -m "not real_llm" --no-cov` → **16 passed** (subagent ran 96 passed / 8 pre-existing failures).
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 30 — 2026-09-30
+
+- **Commit:** `2b36fc885` (cherry-picked from subagent branch `round-o` commit `0a85d5492`)
+- **Architectural concern:** module depth / oversized module. `safe_executor.py` (609 lines) mixed retry classification, evidence staging, and the executor pipeline.
+- **Change:** split into a `safe_executor/` package (`retry.py`, `evidence.py`, `executor.py` + barrel); added `test_safe_executor_retry_policy.py`.
+- **Files:** 5 files (2 new submodules + barrel + test), 1 renamed module.
+- **Shortstat:** `git show --shortstat 2b36fc885` → 5 files changed, 335 insertions(+), 130 deletions(-); gross diff = 465 > 100.
+- **Tests:** `uv run pytest -q tests/cognition/body/test_safe_executor_retry_policy.py -m "not real_llm" --no-cov` → **7 passed** (subagent ran 106 passed / 0 new failures).
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 31 — 2026-09-30
+
+- **Commit:** `b821e6bec` (cherry-picked from subagent branch `round-q` commit `455576263`)
+- **Architectural concern:** retired deprecated module / layering. `lca/harness/profile/boot/boot.py` was a deprecated COMPAT shim importing infrastructure (harness→infrastructure violation).
+- **Change:** moved its two surviving helpers into `lca_kernel.boot.boot`; migrated all callers onto `lca_kernel.run_kernel` / `run_resolved_kernel` / `boot_entries`; dropped `boot_*` re-exports from harness/profile; deleted the module; added a structural regression test.
+- **Files:** 24 files (25 Python files migrated, 1 deleted module, 1 new structural test).
+- **Shortstat:** `git show --shortstat b821e6bec` → 24 files changed, 204 insertions(+), 260 deletions(-); gross diff = 464 > 100.
+- **Tests:** `uv run pytest -q tests/architecture/test_profile_boot_module_retired.py -m "not real_llm" --no-cov` → **2 passed** (subagent verified the affected-set failures are pre-existing `typesafe_sdk` ModuleNotFoundError).
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
