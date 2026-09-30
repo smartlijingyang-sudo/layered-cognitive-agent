@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+from collections.abc import Callable
 from typing import Any
 
 from lca.application.runtime.coordinator.session_catalog_map import (
@@ -40,33 +41,20 @@ def _stamped_payload(stamped: StampedEvent) -> dict[str, Any]:
     return {"event": event_body}
 
 
-def session_event_to_stamped(
+def _suppress_duplicate_event(
+    _event_type: str,
+    _data: dict[str, Any],
+    _parent: str | None,
+) -> dict[str, Any] | None:
+    return None
+
+
+def _convert_execution_point_event(
     event_type: str,
     data: dict[str, Any],
-    *,
-    assistant_message_id: str | None = None,
+    parent: str | None,
 ) -> dict[str, Any] | None:
-    """Map one committed Session event to an EventTranslator input envelope."""
-    catalog = catalog_session_event_to_stamped(
-        event_type,
-        data,
-        assistant_message_id=assistant_message_id,
-    )
-    if catalog is not None:
-        return catalog
-
-    parent = assistant_message_id or None
-
-    if event_type == "thinking.delta.v1":
-        # Session SSOT already publishes ``llm.stream.token`` for the same
-        # delta via LlmSpineEmitter; translating both doubles every chunk.
-        return None
-
-    if event_type == "assistant.responded.v1":
-        # ModelVisibleHook already commits ``spine.llm.request.header.assistant``
-        # with the same assistant body; translating both duplicates reply text.
-        return None
-
+    """Convert a spine/execution-point event into a stamped envelope."""
     execution_point = data.get("execution_point")
     if not execution_point and event_type.startswith("spine."):
         from lca_kernel.events.payloads.spine import category_to_spine_ep
@@ -95,6 +83,38 @@ def session_event_to_stamped(
         return {"event": body}
 
     return None
+
+
+#: Event types Session SSOT already republishes under another spine EP, so
+#: translating them again would duplicate the payload on the gateway stream.
+_EVENT_CONVERTERS: dict[str, Callable[[str, dict[str, Any], str | None], dict[str, Any] | None]] = {
+    # Session SSOT already publishes ``llm.stream.token`` for the same
+    # delta via LlmSpineEmitter; translating both doubles every chunk.
+    "thinking.delta.v1": _suppress_duplicate_event,
+    # ModelVisibleHook already commits ``spine.llm.request.header.assistant``
+    # with the same assistant body; translating both duplicates reply text.
+    "assistant.responded.v1": _suppress_duplicate_event,
+}
+
+
+def session_event_to_stamped(
+    event_type: str,
+    data: dict[str, Any],
+    *,
+    assistant_message_id: str | None = None,
+) -> dict[str, Any] | None:
+    """Map one committed Session event to an EventTranslator input envelope."""
+    catalog = catalog_session_event_to_stamped(
+        event_type,
+        data,
+        assistant_message_id=assistant_message_id,
+    )
+    if catalog is not None:
+        return catalog
+
+    parent = assistant_message_id or None
+    converter = _EVENT_CONVERTERS.get(event_type, _convert_execution_point_event)
+    return converter(event_type, data, parent)
 
 
 async def _publish_session_event(
