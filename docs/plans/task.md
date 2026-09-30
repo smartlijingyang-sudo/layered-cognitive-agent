@@ -348,5 +348,11 @@
 | CONTEXT-MUSE-BRAINSTORM-QUESTIONS | 澄清 ADR 演进形式（新增 ADR-0254 vs 扩展已有 ADR-0249）与商用级架构范围（单步提问） | Completed | 用户明确选定方案 1：新建顶层 ADR-0254《顶级商用级 Assistant 全景上下文文件与持续记忆体系架构》，作为顶层集大成者（Extends & Unifies ADR-0242/0247/0249/0253） |
 | CONTEXT-MUSE-BRAINSTORM-APPROACHES | 提炼 2-3 种端到端商用级架构方案并给出权衡与推荐 | Completed | 提炼方案 A/B/C 并给出详尽权衡，用户选定方案 A（三层分级 Markdown-as-DB + 持续反应式控制面 + 昼夜做梦闭环） |
 | CONTEXT-MUSE-BRAINSTORM-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量测试）并获取用户审批 | Completed | 全部 5 节设计细节（边界/存储/控制面/认知/测试矩阵）已获用户逐节逐一确认批准 |
-| CONTEXT-MUSE-BRAINSTORM-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并落盘 ADR 草案 | Completed | 成功落盘 docs/adr/0254-commercial-context-files-and-continuous-memory-runtime.md 并完成 v2 深度修订（确立方案 A Markdown 为唯一 SSOT 并 Supersedes ADR-0247 存储部分、收敛为 5 大 Standing 文件对齐 0242、放宽 Provenance 正则、补全 Side Chat 隔离与滞后纪律等 10 项意见），更新 docs/adr/README.md 且通过 test_refactor_guards 门禁 |
-| CONTEXT-MUSE-BRAINSTORM-TRANSITION | 转换至实施计划制定（writing-plans） | In Progress | 准备进入实施计划制定阶段 |
+| CORP-MCP-1-SCAFFOLD | 创建 /home/lichao/tools/corp-mcp 基础结构与模块加载器（pyproject.toml, config.py, base.py, registry） | Completed | 成功初始化 /home/lichao/tools/corp-mcp，建立 ModuleRegistry 动态模块加载体系，安全权限配置就绪 |
+| CORP-MCP-2-CLIENT | 实现 Fintech OA 异步客户端（生产接口 fintech.kltb.com.cn，自动登录与本地票据安全缓存续期） | Completed | 实现 OAApiClient，支持 production 接口直连、多优先级 Ticket 解析、自动登录与本地 0600 安全会话缓存自愈 |
+| CORP-MCP-3-TOOLS | 实现 5 大只读查询工具（oa_whoami, oa_my_tickets, oa_ticket_timeline, oa_ticket_detail, oa_template_list） | Completed | 落地 5 大只读工具并集成 sanitize_dict 敏感字段递归脱敏保护，杜绝任何数据越权与凭证泄露 |
+| CORP-MCP-4-TESTS | 编写 pytest 自动化测试套件（100% 只读断言，无写接口，Schema 验证与 Mock 测试） | Completed | 编写 test_invariants.py, test_sanitization.py, test_client_and_tools_mock.py，5/5 测试全部通过（退出码 0） |
+| CORP-MCP-5-MUSE-BRIDGE | 在 muse-mcp-hub 中平滑接入 corp-mcp 只读工具，重启服务并健康探针验证 | Completed | muse-mcp-hub 成功动态挂载 5 项 OA 工具（共 22 项工具），服务重启成功（PID: 3874505），公网 HTTPS 健康探针与 SSE 端点验证通过 |
+| CORP-MCP-6-DOCS | 在 ~/everything-library 中沉淀 corp-mcp 架构与安全规范 | Completed | 在 everything-library/data/items/tools/corp-mcp-hub.md 权威归档资产与设计规范 |
+| CORP-MCP-7-LCA-INTEGRATION | 接入 LCA 项目 (.lca/mcp.yaml) 并完成工具注入/执行/认知闭环测试与在线实测 | Completed | .lca/mcp.yaml 配置 stdio 直连 corp-mcp，7 项 oa_* 工具自动发现与权限注册通过；tests/unit/infrastructure/mcp/test_agent_mcp_injection.py 7/7 全通；真实内核实测 run_d04f94f2134a（身份查询）与 run_03b74bfe2b0c（待办工单）100% 成功 |
+
