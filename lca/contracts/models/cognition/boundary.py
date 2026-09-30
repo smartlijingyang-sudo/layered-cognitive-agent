@@ -71,6 +71,8 @@ class MemoryReceipt(BaseModel):
     Reports whether the upstream ``Reflection`` was admitted into durable
     memory and the resulting reference (or rejection reason). Admit
     policy lives in the producer; this DTO is the read-only contract.
+    ``projection_bytes`` and ``may_acknowledge`` record the curated
+    markdown rewrite that followed a semantic commit.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -78,6 +80,8 @@ class MemoryReceipt(BaseModel):
     memory_ref: str | None = None
     reflection_id: str = ""
     rejection_reason: str | None = None
+    projection_bytes: int = 0
+    may_acknowledge: bool = False
 
 
 class StopPayload(BaseModel):

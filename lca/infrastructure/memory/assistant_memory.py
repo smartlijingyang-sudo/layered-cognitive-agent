@@ -3,8 +3,9 @@
 A minimal ``MemorySystem`` implementation that persists memory records under
 ``{home}/memory/`` (one JSON file per ``MemoryLayer``).  The Home directory
 is the isolation boundary: two assistants never share records.  Memory is
-NOT part of the manifest digest (I-A13), so this module never touches
-``MEMORY.md`` or any config-face file.
+NOT part of the manifest digest (I-A13). After a semantic write this
+module rewrites ``MEMORY.md`` as a projection of the active rows. The
+JSON file remains the record store.
 
 ADR-0246: records are typed knowledge entries. Semantic records carry
 ``category`` / ``dedupe_key`` / ``confidence`` / ``source``; a new record
@@ -18,6 +19,8 @@ ADR-0247: 情景记忆（episodic.json 沉淀工具链自省记录，滚动容�
 from __future__ import annotations
 
 import json
+import logging
+import os
 import re
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
@@ -32,6 +35,13 @@ from lca.contracts.models.core.perceive.perception import ContextManifest
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.memory.episode import canonical_dedupe_key
 from lca.contracts.protocols.memory.memory import MemorySystem
+from lca.infrastructure.memory.curated_projection import (
+    CuratedProjectionReceipt,
+    contains_secret,
+    render_curated_markdown,
+)
+
+logger = logging.getLogger(__name__)
 
 _MEMORY_DIR = "memory"
 _MAX_EPISODIC_RECORDS = 50
@@ -54,7 +64,7 @@ class AssistantMemory(MemorySystem):
 
     记录以 JSON 数组持久化在 ``{home}/memory/<layer>.json``；读取时惰性
     加载，写入时整层覆写（记录量级小，简单可审计）。不参与 manifest
-    digest（I-A13），不触碰 ``MEMORY.md`` / 配置面文件。
+    digest（I-A13）。语义层写入后，把活跃记录投影到 ``MEMORY.md``。
 
     ``profile_backfill`` 是 ADR-0246 PR-5 的可选回调：写入 identity/preference
     事实后以 ``(assistant_id, records)`` 触发 USER.md 回填（系统行为）。
@@ -69,6 +79,7 @@ class AssistantMemory(MemorySystem):
         self._root = Path(home_path) / _MEMORY_DIR
         self._root.mkdir(parents=True, exist_ok=True)
         self._profile_backfill = profile_backfill
+        self.last_curated_receipt: CuratedProjectionReceipt | None = None
 
     @property
     def home_path(self) -> Path:
@@ -88,10 +99,50 @@ class AssistantMemory(MemorySystem):
             return []
         return data if isinstance(data, list) else []
 
-    def _save(self, layer: MemoryLayer, records: list[dict[str, Any]]) -> None:
+    def _save(
+        self,
+        layer: MemoryLayer,
+        records: list[dict[str, Any]],
+        *,
+        committed_ids: tuple[str, ...] = (),
+    ) -> None:
         self._layer_path(layer).write_text(
             json.dumps(records, ensure_ascii=False, indent=2, sort_keys=True),
             encoding="utf-8",
+        )
+        if layer is MemoryLayer.SEMANTIC:
+            self._project_curated(committed_ids)
+
+    def _project_curated(self, committed_ids: tuple[str, ...]) -> None:
+        """Rewrite ``MEMORY.md`` from the active semantic rows."""
+
+        path = self.home_path / "MEMORY.md"
+        try:
+            text = render_curated_markdown(self.query(MemoryLayer.SEMANTIC))
+            temporary = path.with_suffix(".md.tmp")
+            temporary.write_text(text, encoding="utf-8")
+            os.replace(temporary, path)
+        except OSError as exc:
+            logger.warning("memory projection write failed: %s", exc)
+            self.last_curated_receipt = CuratedProjectionReceipt(
+                ok=False,
+                path=str(path),
+                byte_count=0,
+                record_ids=committed_ids,
+                error=str(exc),
+            )
+            return
+        self.last_curated_receipt = CuratedProjectionReceipt(
+            ok=True,
+            path=str(path),
+            byte_count=len(text.encode("utf-8")),
+            record_ids=committed_ids,
+        )
+        logger.info(
+            "memory projection wrote path=%s bytes=%s committed=%s",
+            path,
+            self.last_curated_receipt.byte_count,
+            len(committed_ids),
         )
 
     async def perceive(self, state: AgentState) -> AgentState:
@@ -171,6 +222,7 @@ class AssistantMemory(MemorySystem):
             for cand in candidates:
                 content = str(cand.get("content") or "").strip()
                 if content:
+                    trigger = cand.get("trigger")
                     self._append_semantic(
                         content=content,
                         category=cand.get("category", MemoryCategory.FACT.value),
@@ -178,6 +230,7 @@ class AssistantMemory(MemorySystem):
                         source=str(cand.get("source") or "user"),
                         dedupe_key=cand.get("dedupe_key"),
                         source_trace_id=str(getattr(state, "trace_id", "") or ""),
+                        metadata={"trigger": str(trigger)} if trigger else None,
                     )
             # ADR-0246 PR-5：身份/偏好事实落盘后触发 USER.md 系统回填。
             await self.refresh_user_profile()
@@ -291,6 +344,15 @@ class AssistantMemory(MemorySystem):
         做内容级去重。模型经 ``memory_add`` 写入的 dedupe_key 可能与自动提取
         的 canonical key 不同，但同一事实必须收敛为一条活跃记录。
         """
+        if contains_secret(content):
+            logger.warning("memory projection rejected credential-shaped content")
+            self.last_curated_receipt = CuratedProjectionReceipt(
+                ok=False,
+                path=str(self.home_path / "MEMORY.md"),
+                byte_count=0,
+                error="credential_rejected",
+            )
+            return
         layer = MemoryLayer.SEMANTIC
         records = self._load(layer)
         now_ms = _utc_now_ms()
@@ -355,7 +417,7 @@ class AssistantMemory(MemorySystem):
                 "metadata": _stored_metadata(source, metadata),
             }
         )
-        self._save(layer, records)
+        self._save(layer, records, committed_ids=(new_id_value,))
 
     async def refresh_user_profile(self) -> None:
         """身份/偏好事实变化后，从活跃记录全量重建 USER.md（系统回填）。

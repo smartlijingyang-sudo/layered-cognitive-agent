@@ -11,8 +11,6 @@ reflection)``,填充 ``memory_ref = new_id("mem")``;admit=False →
 
 from __future__ import annotations
 
-from dataclasses import replace
-
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.ids.ids import new_id
@@ -38,6 +36,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.memory.memory import MemorySystem
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.infrastructure.memory.curated_projection import may_acknowledge_projection
 
 
 class MemoryWriteDispatchExecutor:
@@ -97,7 +96,14 @@ class MemoryWriteDispatchExecutor:
                 "runs (the default MemoryService is published under 'memory')."
             )
         await memory.update(state, observation, reflection)
-        stamped = replace(receipt, memory_ref=new_id("mem"))
+        projection = getattr(memory, "last_curated_receipt", None)
+        stamped = receipt.model_copy(
+            update={
+                "memory_ref": new_id("mem"),
+                "projection_bytes": int(getattr(projection, "byte_count", 0) or 0),
+                "may_acknowledge": may_acknowledge_projection(projection),
+            }
+        )
         return NodeOutput(port_values={"memory_receipt": stamped})
 
 
@@ -126,7 +132,7 @@ class MemoryWriteDispatchExecutor:
     ),
     ownership=OwnershipDeclaration(
         reads=("plugin.serve",),
-        emits=("plugin.served"),
+        emits=("plugin.served",),
         state_mutation="forbidden",
     ),
 )

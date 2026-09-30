@@ -18,6 +18,8 @@ from pathlib import Path
 
 import yaml
 
+from lca.cognition.memory.standing import STANDING_ORDER, assemble_standing
+
 _BACKSTORY_MAX_CHARS = 3000
 _GOAL_MAX_CHARS = 300
 
@@ -38,19 +40,17 @@ def persona_from_home(home_path: str) -> AssistantPersona:
     name = str(profile.get("name") or "").strip()
     description = str(profile.get("description") or "").strip()
 
-    soul = _read_text(home / "SOUL.md")
-    user = _read_text(home / "USER.md")
-    agents = _read_text(home / "AGENTS.md")
     first_goal = _first_goal_name(home / "goals.yaml")
 
     goal = description or first_goal
-    parts = [text for text in (soul, user) if text.strip()]
-    # AGENTS.md 是助理的工作约定（工具用法、协作纪律），此前有写无读、
-    # 从未进入 prompt。此处并入 backstory 拼装，顺序 SOUL > USER > AGENTS：
-    # 截断从末尾切，身份信息优先保留。
-    if agents.strip():
-        parts.append("## 工作约定（AGENTS.md）\n" + agents.strip())
-    backstory = "\n\n".join(parts)[:_BACKSTORY_MAX_CHARS]
+    documents: list[tuple[str, str]] = []
+    for file_name in STANDING_ORDER:
+        text = _read_text(home / file_name)
+        if file_name == "AGENTS.md" and text.strip():
+            text = "## 工作约定（AGENTS.md）\n" + text.strip()
+        documents.append((file_name, text))
+    # 每次装配都重读磁盘。预算先留给 SOUL / USER / MEMORY，再留给工作手册。
+    backstory = assemble_standing(documents, budget_chars=_BACKSTORY_MAX_CHARS)
     return AssistantPersona(
         role=name,
         goal=goal[:_GOAL_MAX_CHARS],

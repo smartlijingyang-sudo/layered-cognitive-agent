@@ -32,6 +32,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from lca.cognition.brain.llm_turn.response_projection import project_llm_response
+from lca.cognition.memory.acknowledgement import guard_memory_claim
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.ids.ids import new_id
@@ -88,6 +89,8 @@ class DecisionParseExecutor:
         tool_calls, delegations, intent = _project_response(llm_response)
         action_type = _infer_action_type(tool_calls=tool_calls, delegations=delegations)
         decision_id = new_id("decision")
+        response_text = intent if action_type == "respond" else None
+        response_text = _guard_acknowledgement(context=context, text=response_text)
         return NodeOutput(
             port_values={
                 "decision": Decision(
@@ -97,11 +100,30 @@ class DecisionParseExecutor:
                     confidence=1.0,
                     tool_calls=list(tool_calls),
                     delegations=list(delegations),
-                    response_text=intent if action_type == "respond" else None,
+                    response_text=response_text,
                     needs_approval=requires_human_input(tool_calls),
                 )
             }
         )
+
+
+def _guard_acknowledgement(*, context: NodeContext, text: str | None) -> str | None:
+    """Drop a user-visible "remembered" claim unless the write receipt allows it.
+
+    ``memory_receipt`` travels on the runtime carrier when a memory write
+    finished before this turn's reply. When it is absent the original text
+    passes through unchanged so unrelated calls keep working. When it is
+    present but the projection did not commit, the claim is replaced.
+    """
+    if text is None or text == "":
+        return text
+    runtime = getattr(context, "runtime", None)
+    receipt = getattr(runtime, "memory_receipt", None)
+    if receipt is None and runtime is not None and hasattr(runtime, "get"):
+        receipt = runtime.get("memory_receipt")
+    if receipt is None:
+        return text
+    return guard_memory_claim(text, allowed=bool(getattr(receipt, "may_acknowledge", False)))
 
 
 def _resolve_port(name: str, *, input: NodeInput, context: NodeContext) -> Any:
