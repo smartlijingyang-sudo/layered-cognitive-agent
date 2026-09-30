@@ -45,6 +45,7 @@ from lca.infrastructure.memory.contextfiles.domain.explain import (
     ExplainableRecord,
     explain_record,
 )
+from lca.infrastructure.memory.contextfiles.domain.layout import layout_for_home
 from lca.infrastructure.memory.contextfiles.events.publisher import (
     ProjectionFailed,
     ProjectionWritten,
@@ -123,16 +124,22 @@ class AssistantMemory(MemorySystem):
         if layer is MemoryLayer.SEMANTIC:
             self._project_curated(committed_ids)
 
-    def _project_curated(self, committed_ids: tuple[str, ...]) -> None:
-        """Rewrite ``MEMORY.md`` from the active semantic rows."""
+    def _projection_relative(self) -> str:
+        """Relative path of the curated projection. The layout file names it."""
 
-        path = self.home_path / "MEMORY.md"
+        return layout_for_home(self.home_path).projection_file
+
+    def _project_curated(self, committed_ids: tuple[str, ...]) -> None:
+        """Rewrite the curated projection from the active semantic rows."""
+
+        relative = self._projection_relative()
+        path = self.home_path / relative
         try:
             text = render_curated_markdown(
                 _claims_from_records(self.query(MemoryLayer.SEMANTIC)),
                 source_note="记录在 `memory/semantic.json`。",
             )
-            DiskFileStore(self.home_path).atomic_replace("MEMORY.md", text)
+            DiskFileStore(self.home_path).atomic_replace(relative, text)
         except OSError as exc:
             logger.warning("memory projection write failed: %s", exc)
             self.last_curated_receipt = CuratedProjectionReceipt(
@@ -350,7 +357,7 @@ class AssistantMemory(MemorySystem):
             logger.warning("memory projection rejected credential-shaped content")
             self.last_curated_receipt = CuratedProjectionReceipt(
                 ok=False,
-                path=str(self.home_path / "MEMORY.md"),
+                path=str(self.home_path / self._projection_relative()),
                 byte_count=0,
                 error="credential_rejected",
             )

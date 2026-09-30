@@ -2,23 +2,16 @@
 
 The bytes come from a fresh disk read supplied by the caller. This module
 only decides which of those bytes survive a character budget. History is
-what gets cut. Standing files are packed in a fixed order, and a single
-long file cannot spend the whole budget while a later file is still waiting.
+what gets cut. File order and the live-copy note come from the layout.
+A single long file cannot spend the whole budget while a later file is
+still waiting.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 
-STANDING_ORDER: tuple[str, ...] = (
-    "SOUL.md",
-    "USER.md",
-    "MEMORY.md",
-    "AGENTS.md",
-    "TOOLS.md",
-)
-
-STANDING_LIVE_NOTE = "常驻文件是磁盘上的实时副本，分歧以最新文件为准。"
+from lca.infrastructure.memory.contextfiles.domain.layout import packaged_layout
 
 
 def render_injected(name: str, body: str) -> str:
@@ -31,13 +24,19 @@ def assemble_standing(
     files: Sequence[tuple[str, str]],
     *,
     budget_chars: int,
+    order: Sequence[str] | None = None,
 ) -> str:
-    """Pack standing documents in ``STANDING_ORDER`` within ``budget_chars``."""
+    """Pack standing documents in ``order`` within ``budget_chars``.
+
+    ``order`` defaults to the packaged layout. A home passes its own list
+    after merging ``memory/contextfiles.toml``.
+    """
 
     if budget_chars <= 0:
         return ""
+    names = _order(order)
     by_name = dict(files)
-    pending = [(name, by_name.get(name, "")) for name in STANDING_ORDER]
+    pending = [(name, by_name.get(name, "")) for name in names]
     pending = [(name, body) for name, body in pending if body.strip()]
     remaining = budget_chars
     blocks: list[str] = []
@@ -59,6 +58,7 @@ def rehydrate_after_compaction(
     files: Sequence[tuple[str, str]],
     *,
     budget_chars: int,
+    order: Sequence[str] | None = None,
 ) -> str:
     """Drop old history first, then append a fresh standing snapshot.
 
@@ -67,7 +67,7 @@ def rehydrate_after_compaction(
     """
 
     standing_budget = max(budget_chars // 2, 0)
-    standing = assemble_standing(files, budget_chars=standing_budget)
+    standing = assemble_standing(files, budget_chars=standing_budget, order=order)
     if not standing:
         return history[-budget_chars:] if budget_chars > 0 else ""
     gap = "\n\n" if history.strip() else ""
@@ -97,17 +97,25 @@ def _fit(name: str, body: str, cap: int) -> str | None:
     return render_injected(name, body.strip()[:room])
 
 
-def refresh_injected(text: str, files: Sequence[tuple[str, str]]) -> str:
+def refresh_injected(
+    text: str,
+    files: Sequence[tuple[str, str]],
+    *,
+    order: Sequence[str] | None = None,
+    live_note: str | None = None,
+) -> str:
     """Replace injected standing blocks with the supplied file bodies.
 
     Text that never used the injection markers is returned unchanged, so a
     historical system prompt without standing blocks stays intact. Bodies are
     not summarized. A file that is missing or blank drops its old block.
-    A standing file that was not in the text is appended, in order.
+    A standing file that was not in the text is appended, in layout order.
     """
 
     if "<!-- INJECTED FILE:" not in text:
         return text
+    names = _order(order)
+    note = packaged_layout().live_note if live_note is None else live_note
     by_name = {name: body.strip() for name, body in files}
     lines = text.splitlines()
     output: list[str] = []
@@ -128,13 +136,13 @@ def refresh_injected(text: str, files: Sequence[tuple[str, str]]) -> str:
         body = by_name.get(name, "")
         if body:
             _append_block(output, name, body)
-    for name in STANDING_ORDER:
+    for name in names:
         if name in seen:
             continue
         body = by_name.get(name, "")
         if body:
             _append_block(output, name, body)
-    _ensure_live_note(output)
+    _ensure_live_note(output, note)
     return "\n".join(output).strip()
 
 
@@ -144,12 +152,18 @@ def _append_block(output: list[str], name: str, body: str) -> None:
     output.extend(render_injected(name, body).splitlines())
 
 
-def _ensure_live_note(output: list[str]) -> None:
-    if STANDING_LIVE_NOTE in output:
+def _order(order: Sequence[str] | None) -> tuple[str, ...]:
+    if order is None:
+        return packaged_layout().standing_files
+    return tuple(order)
+
+
+def _ensure_live_note(output: list[str], live_note: str) -> None:
+    if not live_note or live_note in output:
         return
     for index, line in enumerate(output):
         if line.startswith("<!-- INJECTED FILE:"):
-            output.insert(index, STANDING_LIVE_NOTE)
+            output.insert(index, live_note)
             output.insert(index + 1, "")
             return
 
@@ -177,8 +191,6 @@ def _strip_injected(history: str) -> str:
 
 
 __all__ = [
-    "STANDING_LIVE_NOTE",
-    "STANDING_ORDER",
     "assemble_standing",
     "refresh_injected",
     "rehydrate_after_compaction",

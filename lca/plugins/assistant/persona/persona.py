@@ -7,7 +7,7 @@ run 期人设注入的唯一入口：``persona_from_home`` 把 Home 的配置面
 不改闭集）。
 
 失败语义：文件缺失/损坏 → 对应字段空串（不抛错；人设降级不阻断 run）。
-长度截断：backstory 上限 ``_BACKSTORY_MAX_CHARS``，防 prompt 膨胀。
+backstory 预算、常驻文件名单和工作手册标题来自上下文布局文件。
 """
 
 from __future__ import annotations
@@ -18,12 +18,9 @@ from pathlib import Path
 import yaml
 
 from lca.infrastructure.assistant.io import read_json_soft
-from lca.infrastructure.memory.contextfiles.domain.standing import (
-    STANDING_ORDER,
-    assemble_standing,
-)
+from lca.infrastructure.memory.contextfiles.domain.layout import layout_for_home
+from lca.infrastructure.memory.contextfiles.domain.standing import assemble_standing
 
-_BACKSTORY_MAX_CHARS = 3000
 _GOAL_MAX_CHARS = 300
 
 
@@ -46,14 +43,18 @@ def persona_from_home(home_path: str) -> AssistantPersona:
     first_goal = _first_goal_name(home / "goals.yaml")
 
     goal = description or first_goal
+    layout = layout_for_home(home_path)
     documents: list[tuple[str, str]] = []
-    for file_name in STANDING_ORDER:
+    for file_name in layout.standing_files:
         text = _read_text(home / file_name)
-        if file_name == "AGENTS.md" and text.strip():
-            text = "## 工作约定（AGENTS.md）\n" + text.strip()
+        if file_name == layout.agents_file and text.strip():
+            text = f"{layout.agents_heading}\n{text.strip()}"
         documents.append((file_name, text))
-    # 每次装配都重读磁盘。预算先留给 SOUL / USER / MEMORY，再留给工作手册。
-    backstory = assemble_standing(documents, budget_chars=_BACKSTORY_MAX_CHARS)
+    backstory = assemble_standing(
+        documents,
+        budget_chars=layout.backstory_budget_chars,
+        order=layout.standing_files,
+    )
     return AssistantPersona(
         role=name,
         goal=goal[:_GOAL_MAX_CHARS],

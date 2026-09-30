@@ -21,12 +21,16 @@ from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.protocols import Tool
 from lca.infrastructure.memory.assistant_memory import AssistantMemory
+from lca.infrastructure.memory.contextfiles.adapters.disk import DiskFileStore
+from lca.infrastructure.memory.contextfiles.domain.layout import layout_for_home
+from lca.infrastructure.memory.contextfiles.service.people import PeopleDirectory
 
 _MEMORY_SEARCH_TOOL = "memory_search"
 _MEMORY_ADD_TOOL = "memory_add"
 _MEMORY_UPDATE_TOOL = "memory_update"
 _MEMORY_REMOVE_TOOL = "memory_remove"
 _MEMORY_EXPLAIN_TOOL = "memory_explain"
+_PERSON_NOTE_TOOL = "person_note"
 
 _SENSITIVE_CONFIRMATION_HINT = (
     "这是敏感操作，必须先经用户确认：调用 askUserQuestion 询问用户是否确认，"
@@ -302,6 +306,46 @@ class MemoryExplainTool(_BaseMemoryTool):
         )
 
 
+class PersonNoteTool(_BaseMemoryTool):
+    """Write one person page under the assistant home and refresh the index."""
+
+    name = _PERSON_NOTE_TOOL
+    required_grant: ClassVar[str] = "profile.revise"
+    description = (
+        "记下一个人。按当前主目录的上下文布局写入人物页，并重写人物索引。"
+        "参数: name（显示名）、note（关于这个人的话）。同名会覆盖。"
+    )
+    parameters: ClassVar[dict[str, Any]] = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "人物显示名"},
+            "note": {"type": "string", "description": "关于这个人的话"},
+        },
+        "required": ["name", "note"],
+    }
+
+    async def execute(self, args: dict[str, Any]) -> Observation:
+        start = time.monotonic()
+        name = str(args.get("name") or "").strip()
+        note = str(args.get("note") or "").strip()
+        if not name or not note:
+            return self._fail(start, "name 和 note 都必须为非空字符串")
+        layout = layout_for_home(self._memory.home_path)
+        try:
+            page = PeopleDirectory(
+                DiskFileStore(self._memory.home_path),
+                layout=layout,
+            ).upsert(name, note)
+        except ValueError as exc:
+            return self._fail(start, str(exc))
+        except OSError as exc:
+            return self._fail(start, f"人物页没有写入: {exc}")
+        return self._ok(
+            start,
+            {"slug": page.slug, "name": page.name, "path": layout.person_page_path(page.slug)},
+        )
+
+
 class MemoryRemoveTool(_BaseMemoryTool):
     """Remove a memory record (sensitive, requires confirmation)."""
 
@@ -378,6 +422,7 @@ def assistant_memory_tools_from_run(
         MemoryUpdateTool(memory=memory),
         MemoryRemoveTool(memory=memory),
         MemoryExplainTool(memory=memory),
+        PersonNoteTool(memory=memory),
     ]
 
 
@@ -391,5 +436,6 @@ __all__ = [
     "MemoryRemoveTool",
     "MemorySearchTool",
     "MemoryUpdateTool",
+    "PersonNoteTool",
     "assistant_memory_tools_from_run",
 ]

@@ -56,6 +56,9 @@ build-backend = "setuptools.build_meta"
 include = ["lca*", "gateway*", "lca_kernel"]
 exclude = ["tests*", "skills*", "roles*", "profiles*", "bundles*", "history*", "packages*", "deploy*", "vendor*"]
 
+[tool.setuptools.package-data]
+"lca.infrastructure.memory.contextfiles" = ["layout.toml"]
+
 [tool.importlinter]
 root_package = "lca"
 include_external_packages = true

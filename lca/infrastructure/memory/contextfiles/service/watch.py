@@ -8,12 +8,13 @@ a missing file is not reported as a deletion.
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 
 from lca.infrastructure.memory.contextfiles.domain.diff import (
     render_standing_diff,
     unified_diff,
 )
-from lca.infrastructure.memory.contextfiles.domain.standing import STANDING_ORDER
+from lca.infrastructure.memory.contextfiles.domain.layout import packaged_layout
 from lca.infrastructure.memory.contextfiles.events.publisher import StandingChanged
 from lca.infrastructure.memory.contextfiles.ports.events import DomainEventPublisher
 from lca.infrastructure.memory.contextfiles.ports.file_store import FileStore
@@ -28,16 +29,19 @@ class StandingCursor:
         self._files: dict[str, str] | None = None
         self._publisher = publisher
 
-    def poll(self, store: FileStore) -> str:
+    def poll(self, store: FileStore, *, standing_files: Sequence[str] | None = None) -> str:
         """Return the diff since the previous poll, or an empty string."""
 
-        current = {name: _read(store, name, self._files) for name in STANDING_ORDER}
+        names = (
+            packaged_layout().standing_files if standing_files is None else tuple(standing_files)
+        )
+        current = {name: _read(store, name, self._files) for name in names}
         previous = self._files
         self._files = current
         if previous is None:
             return ""
         changes: list[tuple[str, str]] = []
-        for name in STANDING_ORDER:
+        for name in names:
             diff = unified_diff(name, previous.get(name, ""), current.get(name, ""))
             if not diff:
                 continue

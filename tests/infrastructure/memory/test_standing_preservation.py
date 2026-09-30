@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from lca.infrastructure.memory.contextfiles.adapters.disk import DiskFileStore
+from lca.infrastructure.memory.contextfiles.domain.layout import packaged_layout
 from lca.infrastructure.memory.contextfiles.domain.standing import (
-    STANDING_LIVE_NOTE,
     refresh_injected,
     render_injected,
 )
@@ -32,7 +32,7 @@ def test_refresh_injected_replaces_body_and_keeps_surrounding_text() -> None:
     assert "后面的工具说明" in out
     assert "用户住在杭州" in out
     assert "用户住在上海" not in out
-    assert STANDING_LIVE_NOTE in out
+    assert packaged_layout().live_note in out
 
 
 def test_refresh_injected_does_not_truncate_a_long_file() -> None:
@@ -49,7 +49,7 @@ def test_refresh_injected_is_idempotent() -> None:
     once = refresh_injected(render_injected("SOUL.md", "人设"), [("SOUL.md", "人设")])
     twice = refresh_injected(once, [("SOUL.md", "人设")])
     assert once == twice
-    assert once.count(STANDING_LIVE_NOTE) == 1
+    assert once.count(packaged_layout().live_note) == 1
 
 
 def test_refresh_injected_drops_a_blank_file() -> None:

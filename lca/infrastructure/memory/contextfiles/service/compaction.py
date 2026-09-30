@@ -9,10 +9,8 @@ from __future__ import annotations
 
 import logging
 
-from lca.infrastructure.memory.contextfiles.domain.standing import (
-    STANDING_ORDER,
-    refresh_injected,
-)
+from lca.infrastructure.memory.contextfiles.domain.layout import ContextLayout, packaged_layout
+from lca.infrastructure.memory.contextfiles.domain.standing import refresh_injected
 from lca.infrastructure.memory.contextfiles.events.publisher import StandingPreserved
 from lca.infrastructure.memory.contextfiles.ports.events import DomainEventPublisher
 from lca.infrastructure.memory.contextfiles.ports.file_store import FileStore
@@ -24,11 +22,19 @@ def preserve_standing_sections(
     text: str,
     store: FileStore,
     publisher: DomainEventPublisher | None = None,
+    *,
+    layout: ContextLayout | None = None,
 ) -> str:
     """Return ``text`` with injected standing blocks replaced from ``store``."""
 
-    files = tuple((name, _read(store, name)) for name in STANDING_ORDER)
-    refreshed = refresh_injected(text, files)
+    chosen = packaged_layout() if layout is None else layout
+    files = tuple((name, _read(store, name)) for name in chosen.standing_files)
+    refreshed = refresh_injected(
+        text,
+        files,
+        order=chosen.standing_files,
+        live_note=chosen.live_note,
+    )
     changed = refreshed != text
     if changed:
         logger.info(

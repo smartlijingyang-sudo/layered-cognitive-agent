@@ -28,6 +28,14 @@ class ProjectionWritten(MemoryDomainEvent):
 
 
 @dataclass(frozen=True, slots=True)
+class PersonRecorded(MemoryDomainEvent):
+    """A person page was written and the index was refreshed."""
+
+    slug: str
+    name: str
+
+
+@dataclass(frozen=True, slots=True)
 class StandingChanged(MemoryDomainEvent):
     """One standing file differs from the cursor's previous copy."""
 
@@ -72,6 +80,7 @@ class InProcessEventPublisher(DomainEventPublisher):
 __all__ = [
     "InProcessEventPublisher",
     "MemoryDomainEvent",
+    "PersonRecorded",
     "ProjectionFailed",
     "ProjectionWritten",
     "StandingChanged",

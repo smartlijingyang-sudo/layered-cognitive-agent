@@ -1,7 +1,7 @@
 """Tests for the standing-file assembly module.
 
 Covers ``assemble_standing``, ``render_injected``, ``rehydrate_after_compaction``
-and the fixed ``STANDING_ORDER``. The module lives in infrastructure so both
+and the packaged layout order. The module lives in infrastructure so both
 the memory refresh loader and the persona plugin depend on it without an upward
 ``infrastructure -> cognition`` import.
 """
@@ -10,16 +10,22 @@ from __future__ import annotations
 
 import importlib
 
+from lca.infrastructure.memory.contextfiles.domain.layout import packaged_layout
 from lca.infrastructure.memory.contextfiles.domain.standing import (
-    STANDING_ORDER,
     assemble_standing,
     rehydrate_after_compaction,
     render_injected,
 )
 
 
-def test_standing_order_has_five_fixed_files() -> None:
-    assert STANDING_ORDER == ("SOUL.md", "USER.md", "MEMORY.md", "AGENTS.md", "TOOLS.md")
+def test_standing_order_comes_from_the_layout_file() -> None:
+    assert packaged_layout().standing_files == (
+        "SOUL.md",
+        "USER.md",
+        "MEMORY.md",
+        "AGENTS.md",
+        "TOOLS.md",
+    )
 
 
 def test_assemble_standing_respects_budget() -> None:

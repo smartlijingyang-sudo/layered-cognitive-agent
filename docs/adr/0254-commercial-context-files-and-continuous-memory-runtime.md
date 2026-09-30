@@ -15,7 +15,7 @@
 
 **不替代已接受的 ADR。** [ADR-0247](0247-agent-memory-knowledge-layer.md) 的 `MemoryRecord` 与 `{home}/memory/` 仍是记录真值。[ADR-0249](0249-cadence-inspired-dual-track-memory-consolidation.md) 的昼夜写入与 `CommandEnvelope` 窄门仍是写入路径。[ADR-0242](0242-assistant-creation-home-runtime.md) 的 Home 仍是目录主人，身份仍在 `profile.json`。
 
-已落地的切片见 [Agent Note: 结构化记忆的人可读投影](../notes/implemented/seam/2026-09-30-curated-memory-projection.md) 与 [Agent Note: 折叠系统提示里的常驻文件跟磁盘](../notes/implemented/seam/2026-09-30-standing-files-survive-folded-header.md)。`MEMORY.md` 是活跃语义记录的投影。折叠后的系统提示保留规则，其中的常驻文件块按磁盘重写。对用户说已经记下，要先有写盘回执。`memory_explain` 展开一条记录的八个审计字段。常驻文件在下一次历史装配时与进程内的上一份副本比较，差异附在系统提示后。Inotify、人物图谱、side chat、对齐综述仍留在本 Proposed ADR 的后续。
+已落地的切片见 [Agent Note: 结构化记忆的人可读投影](../notes/implemented/seam/2026-09-30-curated-memory-projection.md) 与 [Agent Note: 折叠系统提示里的常驻文件跟磁盘](../notes/implemented/seam/2026-09-30-standing-files-survive-folded-header.md)。`MEMORY.md` 是活跃语义记录的投影。折叠后的系统提示保留规则，其中的常驻文件块按磁盘重写。对用户说已经记下，要先有写盘回执。`memory_explain` 展开一条记录的八个审计字段。常驻文件在下一次历史装配时与进程内的上一份副本比较，差异附在系统提示后。一个人一份人物页。目录、索引名、常驻文件名单和预算来自包内 `layout.toml`，助理主目录的 `memory/contextfiles.toml` 可以覆盖。索引由这些页面重写。Inotify、群体页、side chat、对齐综述仍留在本 Proposed ADR 的后续。
 
 ---
 

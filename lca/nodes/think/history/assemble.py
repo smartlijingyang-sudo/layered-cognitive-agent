@@ -62,6 +62,7 @@ from lca.contracts.protocols.session.model.context import ModelVisibleRequest
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.memory.contextfiles.adapters.disk import DiskFileStore
 from lca.infrastructure.memory.contextfiles.adapters.polling import poll_standing_home
+from lca.infrastructure.memory.contextfiles.domain.layout import layout_for_home
 from lca.infrastructure.memory.contextfiles.service.compaction import (
     preserve_standing_sections,
 )
@@ -200,7 +201,11 @@ def _refresh_standing(system: str, *, runtime: object) -> str:
     home_path = _home_path(runtime)
     if not home_path:
         return system
-    return preserve_standing_sections(system, DiskFileStore(home_path))
+    return preserve_standing_sections(
+        system,
+        DiskFileStore(home_path),
+        layout=layout_for_home(home_path),
+    )
 
 
 def _home_path(runtime: object) -> str | None:

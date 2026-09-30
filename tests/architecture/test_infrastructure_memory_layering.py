@@ -78,6 +78,8 @@ def test_cognition_memory_imports_down_for_standing() -> None:
     import lca.cognition.memory  # noqa: F401
 
     # The persona plugin and the refresh loader both resolve from infrastructure.
-    from lca.infrastructure.memory.contextfiles.domain.standing import STANDING_ORDER
+    from lca.infrastructure.memory.contextfiles.domain.layout import packaged_layout
+    from lca.infrastructure.memory.contextfiles.domain.standing import assemble_standing
 
-    assert "SOUL.md" in STANDING_ORDER
+    assert "SOUL.md" in packaged_layout().standing_files
+    assert callable(assemble_standing)

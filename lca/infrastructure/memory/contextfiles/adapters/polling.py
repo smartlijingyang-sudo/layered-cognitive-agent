@@ -10,6 +10,7 @@ from __future__ import annotations
 import threading
 
 from lca.infrastructure.memory.contextfiles.adapters.disk import DiskFileStore
+from lca.infrastructure.memory.contextfiles.domain.layout import layout_for_home
 from lca.infrastructure.memory.contextfiles.service.watch import StandingCursor
 
 _cursors: dict[str, StandingCursor] = {}
@@ -19,9 +20,10 @@ _lock = threading.Lock()
 def poll_standing_home(home_path: str) -> str:
     """Diff the standing files in ``home_path`` against this process's last copy."""
 
+    layout = layout_for_home(home_path)
     with _lock:
         cursor = _cursors.setdefault(home_path, StandingCursor())
-        return cursor.poll(DiskFileStore(home_path))
+        return cursor.poll(DiskFileStore(home_path), standing_files=layout.standing_files)
 
 
 def reset_standing_cursors() -> None:
