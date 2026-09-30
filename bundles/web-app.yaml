@@ -135,7 +135,7 @@ entries:
   config: {}
 - id: lca-brain-prompt-sections
   name: lca_brain_prompt_sections
-  $module: lca.plugins.prompts.sections
+  $module: lca.plugins.prompts.sections.plugin
   config: {}
 - id: lca-prompt-assembler-section-manifest
   name: lca_prompt_assembler_section_manifest

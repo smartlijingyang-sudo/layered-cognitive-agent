@@ -4,7 +4,7 @@ DSH-style Service Definition / Service Provider / Primitive grouping:
 
 - :mod:`lca.plugins.prompts.registry` — closed PromptSectionRegistry (Tier-1 SEAM)
 - :mod:`lca.plugins.prompts.template_provider` — PromptTemplateProvider (Tier-1 PROVIDER)
-- :mod:`lca.plugins.prompts.sections` — all 17 section plugins in one Cordis module (Tier-1 PRIMITIVE)
+- :mod:`lca.plugins.prompts.sections` — typed section classes + one Cordis plugin (Tier-1 PRIMITIVE)
 - :mod:`lca.plugins.prompts.assembler` — Profile-selected PromptAssembler (Tier-1 PRIMITIVE)
 - :mod:`lca.plugins.prompts.selector` — Profile-selected PromptTemplateSelector (Tier-1 PRIMITIVE)
 """
