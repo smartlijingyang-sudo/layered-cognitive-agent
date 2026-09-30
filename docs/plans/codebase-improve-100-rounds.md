@@ -403,3 +403,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat 725d90e2b` → 7 files changed, 91 insertions(+), 29 deletions(-); gross diff = 120 > 100.
 - **Tests:** `uv run pytest -q tests/channels/test_wechat_service.py tests/channels/test_wechat_channel_worker.py tests/channels/test_wechat_channel_e2e.py -m "not real_llm" --no-cov` → **10 passed**.
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 40 — 2026-09-30
+
+- **Commit:** `7e25bf3bc` (cherry-picked from subagent branch `round-v` commit `5c2f5faa9`)
+- **Architectural concern:** module depth / oversized module. `cognitive_emit.py` (796 lines) was a single production seam for several event families.
+- **Change:** split into a `cognitive_emit/` package (`envelope`, `gate_events`, `reflection_events`, `tool_events`, `step_events` + barrel); added `test_cognitive_emit_barrel.py`.
+- **Files:** 7 files (5 new submodules + barrel + test), 1 module renamed.
+- **Shortstat:** `git show --shortstat 7e25bf3bc` → 7 files changed, 656 insertions(+), 411 deletions(-); gross diff = 1067 > 100.
+- **Tests:** `uv run pytest -q tests/infrastructure/test_cognitive_emit_barrel.py -m "not real_llm" --no-cov` → **3 passed** (subagent ran 43 passed / 2 pre-existing failures).
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
