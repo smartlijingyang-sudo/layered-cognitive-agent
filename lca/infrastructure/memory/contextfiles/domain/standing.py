@@ -18,6 +18,8 @@ STANDING_ORDER: tuple[str, ...] = (
     "TOOLS.md",
 )
 
+STANDING_LIVE_NOTE = "常驻文件是磁盘上的实时副本，分歧以最新文件为准。"
+
 
 def render_injected(name: str, body: str) -> str:
     """Wrap one standing file so a later reload can find its bounds."""
@@ -95,6 +97,70 @@ def _fit(name: str, body: str, cap: int) -> str | None:
     return render_injected(name, body.strip()[:room])
 
 
+def refresh_injected(text: str, files: Sequence[tuple[str, str]]) -> str:
+    """Replace injected standing blocks with the supplied file bodies.
+
+    Text that never used the injection markers is returned unchanged, so a
+    historical system prompt without standing blocks stays intact. Bodies are
+    not summarized. A file that is missing or blank drops its old block.
+    A standing file that was not in the text is appended, in order.
+    """
+
+    if "<!-- INJECTED FILE:" not in text:
+        return text
+    by_name = {name: body.strip() for name, body in files}
+    lines = text.splitlines()
+    output: list[str] = []
+    seen: set[str] = set()
+    index = 0
+    while index < len(lines):
+        name = _injected_name(lines[index])
+        if name is None:
+            output.append(lines[index])
+            index += 1
+            continue
+        index += 1
+        while index < len(lines) and _injected_name(lines[index], end=True) is None:
+            index += 1
+        if index < len(lines):
+            index += 1
+        seen.add(name)
+        body = by_name.get(name, "")
+        if body:
+            _append_block(output, name, body)
+    for name in STANDING_ORDER:
+        if name in seen:
+            continue
+        body = by_name.get(name, "")
+        if body:
+            _append_block(output, name, body)
+    _ensure_live_note(output)
+    return "\n".join(output).strip()
+
+
+def _append_block(output: list[str], name: str, body: str) -> None:
+    if output and output[-1] != "":
+        output.append("")
+    output.extend(render_injected(name, body).splitlines())
+
+
+def _ensure_live_note(output: list[str]) -> None:
+    if STANDING_LIVE_NOTE in output:
+        return
+    for index, line in enumerate(output):
+        if line.startswith("<!-- INJECTED FILE:"):
+            output.insert(index, STANDING_LIVE_NOTE)
+            output.insert(index + 1, "")
+            return
+
+
+def _injected_name(line: str, *, end: bool = False) -> str | None:
+    prefix = "<!-- END INJECTED FILE:" if end else "<!-- INJECTED FILE:"
+    if not line.startswith(prefix) or not line.endswith("-->"):
+        return None
+    return line[len(prefix) : -len("-->")].strip() or None
+
+
 def _strip_injected(history: str) -> str:
     lines: list[str] = []
     skipping = False
@@ -111,8 +177,10 @@ def _strip_injected(history: str) -> str:
 
 
 __all__ = [
+    "STANDING_LIVE_NOTE",
     "STANDING_ORDER",
     "assemble_standing",
+    "refresh_injected",
     "rehydrate_after_compaction",
     "render_injected",
 ]

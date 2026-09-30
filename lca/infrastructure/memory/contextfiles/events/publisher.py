@@ -28,6 +28,14 @@ class ProjectionWritten(MemoryDomainEvent):
 
 
 @dataclass(frozen=True, slots=True)
+class StandingPreserved(MemoryDomainEvent):
+    """Injected standing blocks were rewritten from the current files."""
+
+    names: tuple[str, ...]
+    changed: bool
+
+
+@dataclass(frozen=True, slots=True)
 class ProjectionFailed(MemoryDomainEvent):
     """A curated projection could not be written; records stay in the JSON store."""
 
@@ -58,4 +66,5 @@ __all__ = [
     "MemoryDomainEvent",
     "ProjectionFailed",
     "ProjectionWritten",
+    "StandingPreserved",
 ]

@@ -60,6 +60,10 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.session.model.context import ModelVisibleRequest
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.infrastructure.memory.contextfiles.adapters.disk import DiskFileStore
+from lca.infrastructure.memory.contextfiles.service.compaction import (
+    preserve_standing_sections,
+)
 
 
 def _tool_to_spec(tool: Tool) -> dict[str, Any]:
@@ -136,6 +140,7 @@ class HistoryDeriveExecutor:
             header=header,
             render=input.port_values.get("turn_render"),
         )
+        system = _refresh_standing(system, runtime=context.runtime)
         tools = _forked_to_tools(input.port_values.get("forked_tools"))
         return NodeOutput(
             port_values={
@@ -160,6 +165,40 @@ def _resolve_port(name: str, *, input: NodeInput, context: NodeContext) -> Any:
             f"history.derive: '{name}' port must be supplied via input.port_values or context.runtime"
         )
     return value
+
+
+def _refresh_standing(system: str, *, runtime: object) -> str:
+    """Replace injected standing blocks from disk when a home is bound.
+
+    The folded header stays the source for the rest of the system prompt.
+    Without a home, the prompt is unchanged so replay of a marker-less
+    header keeps its historical text.
+    """
+
+    if "<!-- INJECTED FILE:" not in system:
+        return system
+    home_path = _home_path(runtime)
+    if not home_path:
+        return system
+    return preserve_standing_sections(system, DiskFileStore(home_path))
+
+
+def _home_path(runtime: object) -> str | None:
+    home = getattr(runtime, "home_path", None)
+    if not home and hasattr(runtime, "get"):
+        home = runtime.get("home_path")
+    if home:
+        return str(home)
+    try:
+        from lca.infrastructure.runtime_plane.capability_bindings import (
+            current_bindings_view,
+        )
+
+        bindings = current_bindings_view()
+    except Exception:
+        return None
+    bound = getattr(bindings, "home_path", None) if bindings is not None else None
+    return str(bound) if bound else None
 
 
 def _system_from_header(header: Any) -> str:

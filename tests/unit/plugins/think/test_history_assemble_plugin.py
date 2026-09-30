@@ -329,6 +329,36 @@ async def test_system_falls_back_to_turn_render_trace_when_header_missing() -> N
     assert request.system == "You are LobeHub 助手."
 
 
+async def test_folded_header_keeps_history_and_refreshes_standing_blocks(tmp_path) -> None:
+    """A reused system prompt keeps its rules and replaces standing files from disk."""
+    (tmp_path / "MEMORY.md").write_text("用户住在杭州\n", encoding="utf-8")
+    header = "\n".join(
+        [
+            "历史系统规则",
+            "<!-- INJECTED FILE: MEMORY.md -->",
+            "用户住在上海",
+            "<!-- END INJECTED FILE: MEMORY.md -->",
+        ]
+    )
+    executor = HistoryDeriveExecutor()
+    writer = _FakeWriter(messages=[{"role": "user", "content": "hi"}], system=header)
+    out = await executor.node_execute(
+        context=_node_context(runtime={"home_path": str(tmp_path)}),
+        input=NodeInput(
+            port_values={
+                "state": _make_state(),
+                "writer": writer,
+                "turn_render": _render("from-render"),
+            }
+        ),
+    )
+    system = out.port_values["model_visible_request"].system
+    assert "历史系统规则" in system
+    assert "用户住在杭州" in system
+    assert "用户住在上海" not in system
+    assert "from-render" not in system
+
+
 async def test_system_prefers_header_when_folded() -> None:
     """``header.system`` wins over ``turn_render.trace`` (replay-safe fold path).
 
