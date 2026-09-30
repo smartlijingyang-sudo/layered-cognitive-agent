@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, call
 import pytest
 
 from lca.contracts.channels.wechat import WechatChannelConfig
-from lca.infrastructure.channels.wechat.manager import WechatChannelManager
+from lca.infrastructure.channels.wechat.service import WechatChannelService
 from lca.infrastructure.channels.wechat.worker import (
     WechatChannelWorker,
     derive_wechat_session_id,
@@ -75,10 +75,12 @@ async def test_worker_processes_inbound_message():
     assert text == "你好，能帮我查下磁盘吗？"
 
     # Verify typing was sent (start=True, then start=False)
-    client.send_typing.assert_has_calls([
-        call("token_abc", "user_wechat_1@im.wechat", "", start=True),
-        call("token_abc", "user_wechat_1@im.wechat", "", start=False),
-    ])
+    client.send_typing.assert_has_calls(
+        [
+            call("token_abc", "user_wechat_1@im.wechat", "", start=True),
+            call("token_abc", "user_wechat_1@im.wechat", "", start=False),
+        ]
+    )
 
     # Verify progress was sent (because display_tool_calls=True)
     assert any("正在分析磁盘" in str(call) for call in client.send_message.call_args_list)
@@ -90,7 +92,7 @@ async def test_worker_processes_inbound_message():
 
 @pytest.mark.asyncio
 async def test_manager_bind_and_unbind(tmp_path):
-    manager = WechatChannelManager(base_dir=tmp_path)
+    manager = WechatChannelService(base_dir=tmp_path)
     config = WechatChannelConfig(
         bot_id="bot_test@im.bot",
         bot_token="token_123",  # noqa: S106

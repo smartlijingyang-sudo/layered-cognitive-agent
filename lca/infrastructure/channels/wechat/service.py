@@ -1,4 +1,4 @@
-"""Manager for Assistant WeChat channels and worker lifecycle."""
+"""Service for Assistant WeChat channels and worker lifecycle."""
 
 from __future__ import annotations
 
@@ -16,8 +16,13 @@ from lca.infrastructure.path.locator import get_lca_home
 logger = logging.getLogger(__name__)
 
 
-class WechatChannelManager:
-    """Manages channel worker processes and persistence per Assistant."""
+def channel_config_path(base_dir: Path, assistant_id: str) -> Path:
+    """Return the persisted WeChat channel config path for an assistant."""
+    return base_dir / "assistants" / assistant_id / "channels" / "wechat.json"
+
+
+class WechatChannelService:
+    """Manage channel worker processes and persistence per Assistant."""
 
     def __init__(
         self,
@@ -31,7 +36,9 @@ class WechatChannelManager:
             self.base_dir = Path(base_dir).resolve()
 
         self.dispatch_fn = dispatch_fn or self._default_dispatch
-        self._client_factory = client_factory or (lambda base_url: WechatIlinkClient(base_url=base_url))
+        self._client_factory = client_factory or (
+            lambda base_url: WechatIlinkClient(base_url=base_url)
+        )
         self._workers: dict[str, WechatChannelWorker] = {}
 
     async def _default_dispatch(
@@ -45,7 +52,7 @@ class WechatChannelManager:
         return f"[{assistant_id}] 收到微信消息: {text}"
 
     def _get_config_path(self, assistant_id: str) -> Path:
-        return self.base_dir / "assistants" / assistant_id / "channels" / "wechat.json"
+        return channel_config_path(self.base_dir, assistant_id)
 
     def is_running(self, assistant_id: str) -> bool:
         worker = self._workers.get(assistant_id)

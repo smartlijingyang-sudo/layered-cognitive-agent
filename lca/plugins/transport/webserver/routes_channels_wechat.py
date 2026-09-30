@@ -33,7 +33,7 @@ from lca.contracts.routing import RouteSpec
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.channels.wechat.client import WechatIlinkClient
 from lca.infrastructure.channels.wechat.formatter import WechatMessageFormatter
-from lca.infrastructure.channels.wechat.manager import WechatChannelManager
+from lca.infrastructure.channels.wechat.service import WechatChannelService
 from lca.plugins.transport.webserver.handlers.cors.cors import cors_headers
 from lca.plugins.transport.webserver.handlers.runs.terminal.port.port import RunRequest
 from lca.plugins.transport.webserver.read.runs.identity.identity import AgentRef
@@ -215,10 +215,10 @@ def _get_client(request: Request) -> WechatIlinkClient:
     return client
 
 
-def _get_manager(request: Request) -> WechatChannelManager:
+def _get_manager(request: Request) -> WechatChannelService:
     manager = getattr(request.app.state, "wechat_manager", None)
     if manager is None:
-        manager = WechatChannelManager(
+        manager = WechatChannelService(
             client_factory=lambda base_url: WechatIlinkClient(base_url=base_url),
             dispatch_fn=lambda asst_id, sess_id, text, cb=None: wechat_gateway_dispatch(
                 request.app, asst_id, sess_id, text, cb

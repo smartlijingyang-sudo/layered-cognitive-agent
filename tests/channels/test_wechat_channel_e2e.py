@@ -12,7 +12,7 @@ from starlette.testclient import TestClient
 
 from lca.contracts.channels.wechat import WechatQrResult, WechatStatusResult
 from lca.infrastructure.channels.wechat.formatter import WechatMessageFormatter
-from lca.infrastructure.channels.wechat.manager import WechatChannelManager
+from lca.infrastructure.channels.wechat.service import WechatChannelService
 from lca.infrastructure.channels.wechat.worker import derive_wechat_session_id
 from lca.plugins.transport.webserver.routes_channels_wechat import (
     wechat_bind,
@@ -23,7 +23,7 @@ from lca.plugins.transport.webserver.routes_channels_wechat import (
 )
 
 
-def _create_gateway_app(client_mock: AsyncMock, manager: WechatChannelManager) -> Starlette:
+def _create_gateway_app(client_mock: AsyncMock, manager: WechatChannelService) -> Starlette:
     routes = [
         Route("/lca-api/channels/wechat/qrcode", wechat_qrcode, methods=["GET", "OPTIONS"]),
         Route("/lca-api/channels/wechat/status", wechat_status, methods=["GET", "OPTIONS"]),
@@ -66,14 +66,18 @@ async def test_full_wechat_channel_lifecycle_and_messaging_flow(tmp_path):
             # 2) Send tool calling progress
             tool_call_text = WechatMessageFormatter.format_step_progress(
                 step_type="tools_calling",
-                tools_calling=[{"identifier": "system", "api_name": "get_system_metrics", "summary_arg": "cpu"}],
+                tools_calling=[
+                    {"identifier": "system", "api_name": "get_system_metrics", "summary_arg": "cpu"}
+                ],
                 total_tool_calls=1,
             )
             await progress_callback(tool_call_text)
             # 3) Send tool result progress
             tool_done_text = WechatMessageFormatter.format_step_progress(
                 step_type="tools_result",
-                tools_calling=[{"identifier": "system", "api_name": "get_system_metrics", "summary_arg": "cpu"}],
+                tools_calling=[
+                    {"identifier": "system", "api_name": "get_system_metrics", "summary_arg": "cpu"}
+                ],
                 tools_result=[{"is_success": True, "output": "CPU load: 15.2%"}],
                 total_tool_calls=1,
                 elapsed_seconds=0.25,
@@ -85,7 +89,7 @@ async def test_full_wechat_channel_lifecycle_and_messaging_flow(tmp_path):
             "当前系统运行正常，CPU 负载为 15.2%，处于健康区间。"
         )
 
-    manager = WechatChannelManager(
+    manager = WechatChannelService(
         base_dir=tmp_path,
         dispatch_fn=simulated_cognitive_dispatch,
         client_factory=lambda _: client_mock,
@@ -187,10 +191,12 @@ async def test_full_wechat_channel_lifecycle_and_messaging_flow(tmp_path):
     assert d_prompt == "请分析当前系统负载并报告。"
 
     # Verify typing lifecycle
-    client_mock.send_typing.assert_has_calls([
-        call(status_data["bot_token"], user_wechat_id, "", start=True),
-        call(status_data["bot_token"], user_wechat_id, "", start=False),
-    ])
+    client_mock.send_typing.assert_has_calls(
+        [
+            call(status_data["bot_token"], user_wechat_id, "", start=True),
+            call(status_data["bot_token"], user_wechat_id, "", start=False),
+        ]
+    )
 
     # Verify progress notifications sent to user
     sent_calls = client_mock.send_message.call_args_list
@@ -224,7 +230,7 @@ async def test_full_wechat_channel_lifecycle_and_messaging_flow(tmp_path):
 async def test_wechat_channel_edge_cases_and_error_handling(tmp_path):
     """Verify error responses: missing parameters, expired QR code, and unbinding non-existent channels."""
     client_mock = AsyncMock()
-    manager = WechatChannelManager(base_dir=tmp_path, client_factory=lambda _: client_mock)
+    manager = WechatChannelService(base_dir=tmp_path, client_factory=lambda _: client_mock)
     app = _create_gateway_app(client_mock, manager)
     http_client = TestClient(app)
 
@@ -248,7 +254,9 @@ async def test_wechat_channel_edge_cases_and_error_handling(tmp_path):
     assert resp.status_code == 400
 
     # 5. Unbind non-existent assistant -> 200 (idempotent)
-    resp = http_client.post("/lca-api/channels/wechat/unbind", json={"assistant_id": "non_existent"})
+    resp = http_client.post(
+        "/lca-api/channels/wechat/unbind", json={"assistant_id": "non_existent"}
+    )
     assert resp.status_code == 200
     assert resp.json()["ok"] is True
 
@@ -259,4 +267,3 @@ async def test_wechat_channel_edge_cases_and_error_handling(tmp_path):
     assert resp.json()["status"] == "expired"
 
     await manager.shutdown()
-

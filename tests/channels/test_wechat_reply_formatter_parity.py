@@ -40,7 +40,10 @@ def test_render_completed_tools_calling_with_summary_and_header():
         {"identifier": "local", "api_name": "runCommand", "summary_arg": 'cmd: "df -h"'},
     ]
     tools_result = [
-        {"output": "Filesystem Size Used Avail Use% Mounted on\n/dev/sda1 50G 20G 30G 40% /", "is_success": True},
+        {
+            "output": "Filesystem Size Used Avail Use% Mounted on\n/dev/sda1 50G 20G 30G 40% /",
+            "is_success": True,
+        },
     ]
     formatted = WechatMessageFormatter.format_step_progress(
         step_type="act",
