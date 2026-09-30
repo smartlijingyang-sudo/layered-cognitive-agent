@@ -63,3 +63,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat b34bfa989` → 7 files changed, 158 insertions(+), 4 deletions(-); gross diff = 162 > 100.
 - **Tests:** `uv run pytest -q tests/infrastructure/memory/test_standing_assembly.py tests/cognition/memory/test_curated_memory_scenarios.py tests/plugins/assistant/test_persona.py tests/infrastructure/memory/retrieval/test_scoring.py tests/infrastructure/memory/retrieval/test_layered_retrieval.py tests/plugins/assistant/test_assistant_memory.py tests/migration/test_semantic_json_migration.py tests/architecture/test_infrastructure_memory_layering.py -m "not real_llm" --no-cov` → **82 passed**.
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 6 — 2026-09-30
+
+- **Commit:** `e14d73c43`
+- **Architectural concern:** layering violation / dependency direction. `lca.cognition.brain.llm_turn.executor` imported the concrete `RunSessionWriter` from `lca.runtime` (upward cognition→runtime edge).
+- **Change:** added `lca/infrastructure/session/history.py::derive_turn_history` (the `SessionReader` protocol already exposes `derive_messages`); repointed `executor.py`; added history seam tests and a TYPE_CHECKING-aware structural test scanning `lca/cognition/` for runtime imports.
+- **Files:** `lca/infrastructure/session/history.py` (new), `lca/cognition/brain/llm_turn/executor.py`, `tests/infrastructure/session/test_history.py`, `tests/architecture/test_cognition_no_runtime_import.py`.
+- **Shortstat:** `git show --shortstat e14d73c43` → 4 files changed, 138 insertions(+), 4 deletions(-); gross diff = 142 > 100.
+- **Tests:** `uv run pytest -q tests/infrastructure/session/test_history.py tests/architecture/test_cognition_no_runtime_import.py tests/scenario/llm_1/test_llm_turn.py -m "not real_llm" --no-cov` → **11 passed**. The `test_tool_using_run_evidence.py::test_tool_using_path_fork_reasoner_sandbox_journal_broken_hop_none` failure is pre-existing (reproduced at base commit `d16a4d0d6`).
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
