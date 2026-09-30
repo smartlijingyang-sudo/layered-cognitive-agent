@@ -31,7 +31,7 @@ from lca.infrastructure.session.bindings import (
     await_model_request_checkpoint,
     resolve_session_reader,
 )
-from lca.runtime.session.run_session_writer import RunSessionWriter
+from lca.infrastructure.session.history import derive_turn_history
 
 _log = structlog.get_logger(__name__)
 
@@ -65,9 +65,7 @@ async def execute_llm_turn(
     if reasoner_prompt is not None:
         llm_kwargs["reasoner_prompt"] = reasoner_prompt
     session = resolve_session_reader()
-    llm_kwargs["history"] = (
-        RunSessionWriter(session=session).derive_messages() if session is not None else []
-    )
+    llm_kwargs["history"] = derive_turn_history(session)
     await await_model_request_checkpoint()
     if mode == LlmTurnMode.SUMMARIZE:
         return await _summarize_after_search(llm, tools, prompt, step=step, llm_kwargs=llm_kwargs)
