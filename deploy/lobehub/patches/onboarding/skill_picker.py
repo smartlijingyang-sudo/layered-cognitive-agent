@@ -149,7 +149,7 @@ def apply(ctx: PatchContext) -> bool:
           <Text fontSize={14} type={'secondary'}>
             Agent Skills
           </Text>
-          <Flexbox gap={8} horizontal wrap>
+          <Flexbox gap={8} horizontal wrap="wrap">
             {skills.map((skill) => (
               <Checkbox
                 key={skill.id}
