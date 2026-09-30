@@ -5,11 +5,11 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from lca.harness.profile.boot.boot import boot_profile
 from lca.plugins.composer.act.body_composer import BodyComposer
 from lca.plugins.composer.collaboration.team_composer import TeamComposer
 from lca.plugins.composer.perceive.composer import PerceiveComposer
 from lca.plugins.composer.think.brain_composer import BrainComposer
+from lca_kernel import run_kernel
 
 REPO = Path(__file__).resolve().parents[2]
 WEB_APP_BUNDLE_PATH = REPO / "bundles" / "web-app.yaml"
@@ -34,7 +34,7 @@ def test_web_bundle_registers_one_entry_per_plan_composer() -> None:
 def test_booted_web_profile_exposes_all_plane_composers() -> None:
     """The default profile closes each graph contribution through its own provider."""
 
-    context = asyncio.run(boot_profile("profiles/web-standard.yaml"))
+    context = asyncio.run(run_kernel("profiles/web-standard.yaml"))
 
     assert isinstance(context.inject("composer.brain"), BrainComposer)
     assert isinstance(context.inject("composer.body"), BodyComposer)

@@ -10,16 +10,17 @@ import pytest
 
 from lca.contracts.mechanisms.capability.capability import MissingCapabilityError
 from lca.harness.diagnostics.inspect.inspect import format_capability_graph, format_plugin_tree
-from lca.harness.profile.boot.boot import boot_entries, boot_profile, load_profile_entries
 from lca.harness.profile.boot.products import (
     compiled_plan_from_scope,
     profile_boot_products_from_scope,
     resolved_profile_from_scope,
 )
+from lca.harness.profile.resolve.source import load_profile_entries
 from lca.plugins.observability.profile.snapshot_run_boot_provider import PluginSnapshotEntry
 from lca.plugins.transport.webserver.handlers.runs.session.diagnostics.diagnostics import (
     plugin_inventory_from_boot_products,
 )
+from lca_kernel import boot_entries, run_kernel
 
 REPO = Path(__file__).resolve().parents[2]
 SCAN_ROOTS = (REPO / "lca", REPO / "gateway")
@@ -84,7 +85,7 @@ def test_programmatic_boot_attaches_resolved_profile_without_context_entries() -
 def test_run_plugin_inventory_reads_boot_products_not_context_entries() -> None:
     """Run diagnostics must ignore a stale dynamic entries attribute."""
 
-    ctx = asyncio.run(boot_profile(FIXTURE_PROFILE))
+    ctx = asyncio.run(run_kernel(FIXTURE_PROFILE))
     resolved = resolved_profile_from_scope(ctx)
     assert resolved is not None
     ctx.__dict__["entries"] = (
@@ -110,7 +111,7 @@ def test_run_plugin_inventory_reads_boot_products_not_context_entries() -> None:
 def test_production_boot_inspection_reads_the_attached_resolved_profile() -> None:
     """A file Profile boot must expose inspection through the same fact pair."""
 
-    ctx = asyncio.run(boot_profile(FIXTURE_PROFILE))
+    ctx = asyncio.run(run_kernel(FIXTURE_PROFILE))
 
     assert "entries" not in ctx.__dict__
     resolved = resolved_profile_from_scope(ctx)

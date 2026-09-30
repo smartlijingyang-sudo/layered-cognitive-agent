@@ -85,7 +85,7 @@ class TestDefaultCtxAcrossEventLoops(unittest.TestCase):
             except BaseException as exc:  # pragma: no cover - asserted below
                 failures.append(exc)
 
-        with patch("lca.harness.profile.boot.boot_profile", new=fake_boot_profile):
+        with patch("lca_kernel.run_kernel", new=fake_boot_profile):
             threads = [threading.Thread(target=worker, args=(index,)) for index in range(2)]
             for thread in threads:
                 thread.start()

@@ -13,9 +13,9 @@ from lca.contracts.capabilities import (
     MEMORY_RETRIEVAL_POLICY,
     MEMORY_WRITE_POLICY,
 )
-from lca.harness.profile.boot.boot import boot_profile
 from lca.harness.profile.resolve.resolve import resolve_profile
 from lca.infrastructure.memory.retrieval.layered import LayeredRetrievalPolicy
+from lca_kernel import run_kernel
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -43,7 +43,7 @@ def test_memory_provider_declares_both_policy_dependencies() -> None:
 def test_booted_memory_service_uses_profile_selected_policy_instances() -> None:
     """The memory factory binds resolved policies once and disallows call-time overrides."""
 
-    ctx = asyncio.run(boot_profile("profiles/web-standard.yaml"))
+    ctx = asyncio.run(run_kernel("profiles/web-standard.yaml"))
     memory_service = ctx.inject("memory")
     memory = memory_service.create()
 

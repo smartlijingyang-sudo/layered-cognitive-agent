@@ -284,7 +284,6 @@ def test_run_with_tool_use_succeeds_on_web_standard() -> None:
         )
         from lca.contracts.protocols import LLMAdapter
         from lca.contracts.protocols.journal.spec.spec import AgentSpec
-        from lca.harness.profile.boot.boot import boot_profile
         from lca.plugins.composer.composition.agent_assembly import (
             PlanBoundAgentAssembler,
         )
@@ -294,6 +293,7 @@ def test_run_with_tool_use_succeeds_on_web_standard() -> None:
             bind_run_event_session_from_store,
             unbind_run_event_session,
         )
+        from lca_kernel import run_kernel
     except Exception as exc:  # pragma: no cover - import errors are not the test target
         pytest.skip(f"required modules unavailable: {type(exc).__name__}: {exc}")
 
@@ -332,7 +332,7 @@ def test_run_with_tool_use_succeeds_on_web_standard() -> None:
             )
 
     async def _drive() -> tuple[TaskStatus, list[dict[str, Any]]]:
-        ctx = await boot_profile("profiles/web-standard.yaml")
+        ctx = await run_kernel("profiles/web-standard.yaml")
         try:
             store = ctx.inject("session.store")
             if not isinstance(store, SessionStore):

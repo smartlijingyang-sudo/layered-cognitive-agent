@@ -38,15 +38,14 @@ log:emit
 
 - `ProfileResolveError`
 - `ResolvedProfile`
-- `boot_entries`
-- `boot_profile`
-- `boot_resolved_profile`
 - `dump_resolved`
 - `load_profile_entries`
 - `resolve_profile`
 
+> Boot 入口属于 kernel 公共面（ADR-0115 K3 + ADR-0195 P4-K02）：单一入口是 lca_kernel 的
+> run_kernel / run_resolved_kernel / boot_entries。本模块只导出上面列出的 5 个符号，不提供 boot 相关的名字。
 > Lifespan 属 kernel 公共面（ADR-0115 K6 + ADR-0117 K6）：单一入口是 lca_kernel 的
-> run_kernel_lifespan。本模块只导出上面列出的 8 个符号，不提供 lifespan 相关的名字。
+> run_kernel_lifespan。本模块不提供 lifespan 相关的名字。
 
 **模块清单**:
 

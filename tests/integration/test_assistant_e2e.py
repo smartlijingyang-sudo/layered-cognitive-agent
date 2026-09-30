@@ -54,9 +54,9 @@ def assistants_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
 async def _boot_and_get_services(
     profile: Path,
 ) -> tuple[Any, AssistantCatalog, BootstrapProjectionService, WorkspaceMaterializationService]:
-    from lca.harness.profile.boot.boot import boot_profile
+    from lca_kernel import run_kernel
 
-    ctx = await boot_profile(profile)
+    ctx = await run_kernel(profile)
     catalog = ctx.inject(ASSISTANT_CATALOG.key)
     bootstrap = ctx.inject(ASSISTANT_BOOTSTRAP.key)
     workspace = ctx.inject(ASSISTANT_WORKSPACE.key)
@@ -155,9 +155,9 @@ class TestWebAssistantE2E:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """web-standard profile boot 后 ctx 不暴露 assistant.* capability。"""
-        from lca.harness.profile.boot.boot import boot_profile
+        from lca_kernel import run_kernel
 
-        ctx = await boot_profile(WEB_STANDARD)
+        ctx = await run_kernel(WEB_STANDARD)
         try:
             for key in (
                 ASSISTANT_CATALOG.key,

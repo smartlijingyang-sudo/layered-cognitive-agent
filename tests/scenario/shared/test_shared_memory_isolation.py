@@ -237,12 +237,12 @@ class TestTeamSharedMemoryInjection(unittest.IsolatedAsyncioTestCase):
         from lca.contracts.models.team.team.coordination import (
             Pipeline,
         )
-        from lca.harness.profile.boot.boot import boot_profile
         from lca.infrastructure.llm_adapter.mock.llm import MockLLMAdapter
+        from lca_kernel import run_kernel
         from tests.support.agent_specs import make_spec
 
         llm = MockLLMAdapter()
-        scope = await boot_profile("profiles/web-standard.yaml")
+        scope = await run_kernel("profiles/web-standard.yaml")
         team = spawn_team(
             members=[make_spec("agent_a", llm), make_spec("agent_b", llm)],
             coordination=Pipeline(),
@@ -266,12 +266,12 @@ class TestTeamSharedMemoryInjection(unittest.IsolatedAsyncioTestCase):
         from lca.contracts.models.team.team.coordination import (
             Pipeline,
         )
-        from lca.harness.profile.boot.boot import boot_profile
         from lca.infrastructure.llm_adapter.mock.llm import MockLLMAdapter
+        from lca_kernel import run_kernel
         from tests.support.agent_specs import make_spec
 
         llm = MockLLMAdapter()
-        scope = await boot_profile("profiles/web-standard.yaml")
+        scope = await run_kernel("profiles/web-standard.yaml")
         team = spawn_team(
             members=[make_spec("agent_a", llm), make_spec("agent_b", llm)],
             coordination=Pipeline(),

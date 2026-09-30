@@ -10,9 +10,9 @@ from lca.application.api.api import Agent
 from lca.application.api.spawn import spawn_agent
 from lca.contracts.atoms.enums.enums import ActionScope
 from lca.contracts.mechanisms.capability.capability import MissingCapabilityError
-from lca.harness.profile.boot.boot import boot_entries, boot_profile, load_profile_entries
 from lca.harness.profile.boot.products import resolved_profile_from_scope
 from lca.harness.profile.resolve.resolve import ProfileResolveError
+from lca.harness.profile.resolve.source import load_profile_entries
 from lca.infrastructure.llm.resolver import live_credential
 from lca.infrastructure.llm_adapter.mock.llm import MockLLMAdapter
 from lca.plugins.composer.perceive.perceive import build_perceive_hub
@@ -21,6 +21,7 @@ from lca.plugins.transport.webserver.handlers.runs.session.session.session impor
     RunRegistry,
     RunStatus,
 )
+from lca_kernel import boot_entries, run_kernel
 
 DEFAULT_PROFILE = "profiles/web-standard.yaml"
 
@@ -104,7 +105,7 @@ def no_llm_key(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.asyncio
 async def test_dead_ids_absent_from_default_boot(no_llm_key: None) -> None:
-    ctx = await boot_profile(DEFAULT_PROFILE)
+    ctx = await run_kernel(DEFAULT_PROFILE)
     ids = _entry_ids(ctx)
     assert DEAD_DEFAULT_IDS.isdisjoint(ids)
     for dead in DEAD_DEFAULT_IDS:
@@ -113,7 +114,7 @@ async def test_dead_ids_absent_from_default_boot(no_llm_key: None) -> None:
 
 @pytest.mark.asyncio
 async def test_every_default_entry_is_consumed(no_llm_key: None) -> None:
-    ctx = await boot_profile(DEFAULT_PROFILE)
+    ctx = await run_kernel(DEFAULT_PROFILE)
     injected: set[str] = set()
     orig = ctx.inject
 
@@ -269,7 +270,7 @@ async def test_omitting_skills_provider_does_not_call_resolve_skill_store(
 
 @pytest.mark.asyncio
 async def test_llm_single_owner_without_key(no_llm_key: None) -> None:
-    ctx = await boot_profile(DEFAULT_PROFILE)
+    ctx = await run_kernel(DEFAULT_PROFILE)
     resolver = ctx.inject("llm_resolver")
     assert resolver.is_available() is False
     with pytest.raises(Exception, match="LLM_API_KEY"):
@@ -284,7 +285,7 @@ async def test_llm_single_owner_without_key(no_llm_key: None) -> None:
 
 @pytest.mark.asyncio
 async def test_empty_execution_target_uses_profile_default(no_llm_key: None) -> None:
-    ctx = await boot_profile(DEFAULT_PROFILE)
+    ctx = await run_kernel(DEFAULT_PROFILE)
     registry = ctx.inject("run_loop_driver_registry")
     empty = registry.resolve("")
     named = registry.resolve("cognitive")
@@ -295,7 +296,7 @@ async def test_empty_execution_target_uses_profile_default(no_llm_key: None) -> 
 
 @pytest.mark.asyncio
 async def test_overlapping_compose_keeps_distinct_adapters(no_llm_key: None) -> None:
-    ctx = await boot_profile(DEFAULT_PROFILE)
+    ctx = await run_kernel(DEFAULT_PROFILE)
     one = MockLLMAdapter()
     two = MockLLMAdapter()
     a1 = Agent(role="a", goal="", backstory="", tools=(), llm=one, scope=ctx)
@@ -310,7 +311,7 @@ async def test_cognitive_driver_composes_once(
 ) -> None:
     from tests.support.gateway_scripted import ScriptedLLMResolver
 
-    ctx = await boot_profile(DEFAULT_PROFILE)
+    ctx = await run_kernel(DEFAULT_PROFILE)
     ctx.provide("llm_resolver", ScriptedLLMResolver())
     calls = {"n": 0}
     original = spawn_agent
@@ -334,7 +335,7 @@ async def test_cognitive_driver_composes_once(
 async def test_two_execute_runs_complete_with_scripted_text(no_llm_key: None) -> None:
     from tests.support.gateway_scripted import ScriptedLLMResolver
 
-    ctx = await boot_profile(DEFAULT_PROFILE)
+    ctx = await run_kernel(DEFAULT_PROFILE)
     ctx.provide("llm_resolver", ScriptedLLMResolver())
     outputs: list[str] = []
     for question in ("say hello in one word", "say goodbye in one word"):
@@ -353,9 +354,7 @@ async def test_two_execute_runs_complete_with_scripted_text(no_llm_key: None) ->
 
 @pytest.mark.asyncio
 async def test_dump_profile_matches_boot_ids() -> None:
-    from lca.harness.profile.boot.boot import load_profile_entries
-
-    ctx = await boot_profile(DEFAULT_PROFILE)
+    ctx = await run_kernel(DEFAULT_PROFILE)
     dumped = {
         e["id"]
         for e in load_profile_entries(DEFAULT_PROFILE)
@@ -375,7 +374,7 @@ async def test_unknown_execution_target_writes_journal_and_session_error(
     """
     from tests.support.gateway_scripted import ScriptedLLMResolver
 
-    ctx = await boot_profile(DEFAULT_PROFILE)
+    ctx = await run_kernel(DEFAULT_PROFILE)
     ctx.provide("llm_resolver", ScriptedLLMResolver())
     registry = RunRegistry()
     session = create_run_session(

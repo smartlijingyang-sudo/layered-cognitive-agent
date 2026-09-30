@@ -8,15 +8,15 @@ from __future__ import annotations
 
 import asyncio
 
-from lca.harness.profile.boot.boot import boot_profile
 from lca.infrastructure.observability.writable_matrix import NullStorage
 from lca.infrastructure.observability.writable_matrix.registry import (
     WritableFaceRegistry,
 )
+from lca_kernel import run_kernel
 
 
 def test_boot_web_standard_exposes_event_spine_and_writable_registry() -> None:
-    ctx = asyncio.run(boot_profile("profiles/web-standard.yaml"))
+    ctx = asyncio.run(run_kernel("profiles/web-standard.yaml"))
 
     event_spine = ctx.inject("event_spine")
     writable_face_registry = ctx.inject("writable_face_registry")
@@ -41,7 +41,7 @@ def test_event_spine_subscribe_accepts_deriver_callbacks() -> None:
     本测试断言 EventSpine.subscribe 接受任意 callable subscriber 形态,
     不绑定具体 deriver 实现。
     """
-    ctx = asyncio.run(boot_profile("profiles/web-standard.yaml"))
+    ctx = asyncio.run(run_kernel("profiles/web-standard.yaml"))
     spine_core = ctx.inject("event_spine")
     assert spine_core is not None
 

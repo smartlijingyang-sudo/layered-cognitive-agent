@@ -26,6 +26,7 @@ from lca.contracts.capabilities import (
     RESUME_INPUT_ADAPTERS,
     RUNTIME_JOURNAL_FACTORY,
 )
+from lca.contracts.models.team.role.team import ToolPermissionManifest
 from lca.contracts.protocols.journal.spec.spec import AgentSpec
 from lca.contracts.protocols.runtime.runtime.composition import (
     CheckpointStateResolverFactory,
@@ -36,12 +37,12 @@ from lca.contracts.protocols.runtime.runtime.composition import (
     RuntimeJournalFactory,
 )
 from lca.contracts.protocols.state.plan import CompiledRunPlan
-from lca.harness.profile.boot.boot import boot_profile
 from lca.plugins.composer.runtime.runtime.binding import (
     ProductionRuntimeDeps,
     bind_runtime_graph,
 )
 from lca.plugins.composer.runtime.runtime.capabilities import RuntimeCapabilityClosure
+from lca_kernel import run_kernel
 
 REPO = Path(__file__).resolve().parents[2]
 AGENT_ASSEMBLY_PATH = REPO / "lca" / "plugins" / "composer" / "composition" / "agent_assembly.py"
@@ -236,7 +237,7 @@ def test_web_profile_registers_default_resume_input_adapter() -> None:
 def test_booted_web_profile_resolves_human_answer_adapter() -> None:
     """The default profile exposes a working adapter through its registry seam."""
 
-    ctx = asyncio.run(boot_profile("profiles/web-standard.yaml"))
+    ctx = asyncio.run(run_kernel("profiles/web-standard.yaml"))
     factory = ctx.inject(RESUME_INPUT_ADAPTERS.key)
 
     normalized = factory.create("human_answer").normalize("继续")
@@ -249,7 +250,7 @@ def test_booted_web_profile_resolves_human_answer_adapter() -> None:
 def test_booted_web_profile_resolves_declarative_runtime_factories() -> None:
     """The default bundle exposes all profile-selectable runtime factory seams."""
 
-    ctx = asyncio.run(boot_profile("profiles/web-standard.yaml"))
+    ctx = asyncio.run(run_kernel("profiles/web-standard.yaml"))
 
     assert isinstance(
         ctx.inject(CHECKPOINT_STATE_RESOLVER_FACTORY.key), CheckpointStateResolverFactory

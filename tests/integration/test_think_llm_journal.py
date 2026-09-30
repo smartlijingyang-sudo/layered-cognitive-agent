@@ -111,6 +111,7 @@ def _bind_run_cursor(ctx: Any, run_id: str, bridge: Any) -> Any:
     from types import SimpleNamespace
 
     from lca.cognition.body.executor.cursor_record import CursorRecord
+
     from lca.infrastructure.observability.loop_cursor.persistence.coordinator import (
         NullPersistenceCoordinator,
     )
@@ -170,7 +171,6 @@ def test_think_llm_journal_populates_journal_json() -> None:
     ``LLM_API_KEY`` present in the environment must not switch this gate off.
     """
     try:
-        from lca.harness.profile.boot.boot import boot_profile
         from lca.plugins.composer.composition.agent_assembly import (
             PlanBoundAgentAssembler,
         )
@@ -186,13 +186,14 @@ def test_think_llm_journal_populates_journal_json() -> None:
             bind_run_event_session_from_store,
             unbind_run_event_session,
         )
+        from lca_kernel import run_kernel
     except Exception as exc:  # pragma: no cover - import errors are not the test target
         pytest.skip(f"required modules unavailable: {type(exc).__name__}: {exc}")
 
     run_id = f"run_test_think_llm_journal_{uuid.uuid4().hex[:12]}"
 
     async def _drive() -> tuple[TaskStatus, Path]:
-        ctx = await boot_profile("profiles/web-standard.yaml")
+        ctx = await run_kernel("profiles/web-standard.yaml")
         try:
             store = ctx.inject("session.store")
             if not isinstance(store, SessionStore):

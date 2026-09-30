@@ -16,7 +16,6 @@ from lca.contracts.observability.journal.run_journal import (
     RunJournalComponents,
     RunJournalFactory,
 )
-from lca.harness.profile.boot.boot import boot_profile
 from lca.infrastructure.observability.backends.journal_backend import MemoryJournal
 from lca.infrastructure.observability.backends.run_locator_fs import (
     FilesystemRunLocator,
@@ -31,6 +30,7 @@ from lca.plugins.transport.webserver.carrier.runs.execute import (
     create_run_session,
 )
 from lca.plugins.transport.webserver.handlers.runs.session.session.session import RunRegistry
+from lca_kernel import run_kernel
 
 
 def _install_observability_seams(services: dict[str, object]) -> None:
@@ -69,7 +69,7 @@ def _install_observability_seams(services: dict[str, object]) -> None:
 
 
 def test_default_profile_exposes_ledger_factory() -> None:
-    ctx = asyncio.run(boot_profile("profiles/web-standard.yaml"))
+    ctx = asyncio.run(run_kernel("profiles/web-standard.yaml"))
 
     factory = ctx.inject("run_ledger_factory")
 

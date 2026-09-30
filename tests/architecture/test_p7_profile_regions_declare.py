@@ -15,7 +15,6 @@ import pathlib
 
 import yaml
 
-
 REGIONS_DECLARED = ("phase:plan", "phase:replan", "control:safety")
 
 PROFILES = pathlib.Path("profiles")
@@ -80,20 +79,20 @@ class TestParseRegionsDeclareIsolated:
         We use AST extraction + exec to avoid the cordis import chain
         triggered by ``from lca.harness.profile.resolve.source import ...``
         (the source module imports cordis at module top via
-        lca.harness.profile.boot).
+        lca.harness.profile.boot.runtime_closure).
         """
         import ast
         import typing
-        from pathlib import Path as _P
+        from pathlib import Path
 
-        text = _P("lca/harness/profile/resolve/source.py").read_text(encoding="utf-8")
+        text = Path("lca/harness/profile/resolve/source.py").read_text(encoding="utf-8")
         tree = ast.parse(text)
         # Find the function definition
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef) and node.name == "_parse_regions_declare":
                 module = ast.Module(body=[node], type_ignores=[])
                 ns: dict = {"Any": typing.Any, "Mapping": typing.Mapping}
-                exec(compile(module, "<ast>", "exec"), ns)
+                exec(compile(module, "<ast>", "exec"), ns)  # noqa: S102
                 return ns["_parse_regions_declare"](raw)
         raise RuntimeError("_parse_regions_declare not found in source.py")
 

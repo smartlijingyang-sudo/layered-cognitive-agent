@@ -19,12 +19,12 @@ from lca.contracts.protocols.journal.spec.spec import (
     MEMORY_CHOICE_TEMPORAL,
     STATE_STORE_CHOICE_MEMORY,
 )
-from lca.harness.profile.boot.boot import boot_profile
 from lca.infrastructure.component.registry import ComponentRegistry, RegistryKeyError
 from lca.infrastructure.state_store.in_memory_store import InMemoryStateStore
 from lca.plugins.state.component.budget_policy_provider import (
     ComponentRegistryLeadBudgetPolicyResolver,
 )
+from lca_kernel import run_kernel
 
 
 def test_component_registry_rejects_duplicate_owner_without_replacing_first() -> None:
@@ -128,7 +128,7 @@ def test_lead_decision_gate_selection_consumes_only_gate_service() -> None:
 def test_default_profile_closes_retained_component_contributors_through_one_seam() -> None:
     """Default implementations are independently contributed, then discovered centrally."""
 
-    context = asyncio.run(boot_profile("profiles/web-standard.yaml"))
+    context = asyncio.run(run_kernel("profiles/web-standard.yaml"))
     registry = context.inject(COMPONENT_REGISTRY.key)
 
     assert isinstance(registry, ComponentRegistry)

@@ -125,9 +125,9 @@ async def run_mode(
     col = collector or InMemoryObservability()
     # Boot the cordis context once (per run_mode invocation) so Agent constructors
     # have a populated cordis.Context to resolve services from.
-    from lca.harness.profile.boot.boot import boot_profile
+    from lca_kernel import run_kernel
 
-    cordis_ctx = await boot_profile("profiles/web-standard.yaml")
+    cordis_ctx = await run_kernel("profiles/web-standard.yaml")
 
     def _agent(role: str, steps: int = 5) -> Agent:
         goal, backstory = _probe_profile(role)

@@ -79,8 +79,8 @@ def test_plan_binding_rejects_v1_fallback_candidates():
 
 async def test_incomplete_runnable_profile_is_rejected_during_boot_before_binding():
     """Plan validation belongs to boot, before a composer can consume a scope."""
-    from lca.harness.profile.boot.boot import boot_resolved_profile
     from lca.harness.profile.resolve.resolve import resolve_profile
+    from lca_kernel import run_resolved_kernel
 
     resolved = resolve_profile("profiles/web-standard.yaml")
     missing_stop = tuple(
@@ -92,7 +92,7 @@ async def test_incomplete_runnable_profile_is_rejected_during_boot_before_bindin
         ValueError,
         match=r"PG-001: declared phase node .*phase\.stop\.standard.*active 'stop' phase executor",
     ):
-        await boot_resolved_profile(incomplete)
+        await run_resolved_kernel(incomplete)
 
 
 def test_plan_binding_rejects_a_scope_without_the_boot_frozen_plan():

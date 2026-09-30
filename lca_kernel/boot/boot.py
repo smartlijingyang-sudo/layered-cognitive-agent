@@ -64,7 +64,7 @@ from cordis import Context
 from lca.contracts.models.observability.journal.journal import (
     BootPluginFiberSpawned,
 )
-from lca.harness.plugin_api import PluginDefinition
+from lca.harness.plugin_api import AuditedPluginContext, PluginDefinition
 from lca.harness.profile.boot.products import (
     ProfileBootProducts,
     attach_profile_boot_products,
@@ -74,6 +74,7 @@ from lca.harness.profile.boot.products import (
 )
 from lca.harness.profile.boot.projection import BootEntry
 from lca.harness.profile.resolve.resolve import ResolvedProfile, resolve_entries
+from lca.harness.profile.validate.errors import ProfileResolveError
 from lca.infrastructure.file.store import FileStore
 
 # boot_products is the seam's source-of-truth (compat-only in PR-2 sense);
@@ -121,6 +122,71 @@ def spawn_fiber(ctx: Context, definition: PluginDefinition, config: Any) -> Any:
         fiber.dispose, label=f"plugin:{definition.spec.id}"
     )  # ↓ K6:把 fiber.dispose 登记成 effect,K6 退出时 LIFO 调
     return fiber  # ↑ K3:返回 fiber 句柄(主循环 await 它)
+
+
+async def boot_plugin(ctx: Context, definition: PluginDefinition, config: Any) -> None:
+    """Run one manifest plugin once through its Cordis Fiber (test helper).
+
+    Retired ``lca.harness.profile.boot.boot._boot_plugin`` moves here so the
+    plugin lifecycle and the declaration-to-interaction audit stay on the K3
+    seam. It boots a single plugin through the same audited Fiber path as
+    :func:`run_kernel`, then validates its runtime interactions.
+    """
+    audits: list[AuditedPluginContext] = []
+
+    async def setup(_fiber_ctx: Context, fiber_config: Any) -> Any:
+        audited = AuditedPluginContext(ctx, definition)
+        audits.append(audited)
+        return await _run_setup(definition.setup, audited, fiber_config)
+
+    fiber = ctx.registry.plugin(
+        {
+            "name": definition.spec.id,
+            "apply": setup,
+            "inject": [],
+            "Config": definition.Config,
+        },
+        config=config,
+    )
+    ctx.effect(fiber.dispose, label=f"plugin:{definition.spec.id}")
+    await fiber.await_()
+
+    if len(audits) != 1:
+        raise RuntimeError(f"plugin {definition.spec.id}: expected exactly one audited setup")
+    validate_audited_interactions(definition, audits[0])
+
+
+def validate_audited_interactions(
+    definition: PluginDefinition, audited: AuditedPluginContext
+) -> None:
+    """Defend the declaration-to-interaction subset invariant after Fiber boot."""
+    from lca.harness.plugin.context import requirement_covers_key
+
+    declared_provide = set(definition.provided_capability_keys)
+    declared_require = set(definition.required_capability_keys)
+    undeclared_provide = audited.provided - declared_provide
+    registered_seams = {seam for seam, _ in audited.registered}
+    missing_provide = {
+        key
+        for key in (declared_provide - audited.provided)
+        if "[" not in key
+        and key not in registered_seams
+        and not any(key.startswith(seam + ".") for seam in registered_seams)
+        and not any(key.startswith(req + ".") for req in audited.required)
+    }
+    undeclared_require = {
+        key
+        for key in audited.required
+        if key not in declared_require
+        and not any(requirement_covers_key(pattern, key) for pattern in declared_require)
+    }
+    if undeclared_provide or undeclared_require or missing_provide:
+        raise ProfileResolveError(
+            f"plugin {definition.spec.id}: undeclared interaction "
+            f"provide={sorted(undeclared_provide)} "
+            f"require={sorted(undeclared_require)} "
+            f"missing_provide={sorted(missing_provide)}"
+        )
 
 
 async def run_kernel(
@@ -454,7 +520,7 @@ __all__ = [
     "ProfileBootProducts",
     "attach_profile_boot_products",
     "boot_entries",
-    "compile_profile_boot_products",
+    "boot_plugin",
     "compiled_plan_from_scope",
     "install_compile_result",
     "profile_boot_products_from_scope",
@@ -463,4 +529,5 @@ __all__ = [
     "run_resolved_kernel",
     "spawn_fiber",
     "stop_kernel",
+    "validate_audited_interactions",
 ]

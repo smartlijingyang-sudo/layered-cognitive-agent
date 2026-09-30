@@ -9,8 +9,8 @@ from dataclasses import dataclass
 
 import pytest
 
-from lca.harness.profile.boot.boot import _validate_audited_interactions
 from lca.harness.profile.validate.errors import ProfileResolveError
+from lca_kernel.boot.boot import validate_audited_interactions
 
 
 @dataclass
@@ -45,7 +45,7 @@ def test_missing_provide_detected() -> None:
     )
     audited = _FakeAudited(provided=set(), required=set(), registered=set())
     with pytest.raises(ProfileResolveError, match="missing_provide"):
-        _validate_audited_interactions(defn, audited)  # type: ignore[arg-type]
+        validate_audited_interactions(defn, audited)  # type: ignore[arg-type]
 
 
 def test_register_through_seam_counts_as_provided() -> None:
@@ -61,7 +61,7 @@ def test_register_through_seam_counts_as_provided() -> None:
         registered=set(),
     )
     # tools.bash 以 required seam "tools" 前缀兑现 — 不应触发 missing_provide
-    _validate_audited_interactions(defn, audited)  # type: ignore[arg-type]
+    validate_audited_interactions(defn, audited)  # type: ignore[arg-type]
 
 
 def test_explicit_provide_satisfies_declaration() -> None:
@@ -71,7 +71,7 @@ def test_explicit_provide_satisfies_declaration() -> None:
         required_capability_keys=(),
     )
     audited = _FakeAudited(provided={"session.store"}, required=set(), registered=set())
-    _validate_audited_interactions(defn, audited)  # type: ignore[arg-type]
+    validate_audited_interactions(defn, audited)  # type: ignore[arg-type]
 
 
 def test_register_via_ctx_register_counts() -> None:
@@ -86,4 +86,4 @@ def test_register_via_ctx_register_counts() -> None:
         required=set(),
         registered={("mode.loop", "cognitive")},
     )
-    _validate_audited_interactions(defn, audited)  # type: ignore[arg-type]
+    validate_audited_interactions(defn, audited)  # type: ignore[arg-type]

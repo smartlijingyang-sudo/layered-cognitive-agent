@@ -1,4 +1,4 @@
-"""ADR-0061 — resolve_profile / boot_resolved_profile contracts."""
+"""ADR-0061 — resolve_profile / run_resolved_kernel contracts."""
 
 from __future__ import annotations
 
@@ -18,13 +18,6 @@ from lca.harness.plugin_api import (
     PluginKind,
     UndeclaredInteractionError,
 )
-from lca.harness.profile.boot.boot import (
-    _boot_plugin,
-    boot_entries,
-    boot_profile,
-    boot_resolved_profile,
-    load_profile_entries,
-)
 from lca.harness.profile.boot.products import (
     compiled_plan_from_scope,
     profile_boot_products_from_scope,
@@ -36,6 +29,9 @@ from lca.harness.profile.resolve.resolve import (
     resolve_entries,
     resolve_profile,
 )
+from lca.harness.profile.resolve.source import load_profile_entries
+from lca_kernel import boot_entries, run_kernel, run_resolved_kernel
+from lca_kernel.boot.boot import boot_plugin
 
 DEFAULT = Path("profiles/web-standard.yaml")
 
@@ -256,7 +252,7 @@ def test_audited_context_uses_manifest_declarations_as_one_authorization_seam() 
 
 
 def test_boot_default_profile() -> None:
-    ctx = asyncio.run(boot_profile(DEFAULT))
+    ctx = asyncio.run(run_kernel(DEFAULT))
     perceive = ctx.inject("perceive")
     assert [e.id for e in perceive.members()][:2] == ["clock", "workspace-artifacts"]
     gates = ctx.inject("gates")
@@ -267,7 +263,7 @@ def test_boot_default_profile() -> None:
 
 def test_boot_resolved_matches_facade() -> None:
     resolved = resolve_profile(DEFAULT)
-    ctx = asyncio.run(boot_resolved_profile(resolved))
+    ctx = asyncio.run(run_resolved_kernel(resolved))
     assert resolved_profile_from_scope(ctx) is resolved
 
 
@@ -293,19 +289,20 @@ def test_boot_resolved_preflights_products_before_plugin_lifecycle(
     monkeypatch.setattr("lca_kernel.boot.boot._boot_context", unexpected_boot)
 
     with pytest.raises(ProfileResolveError, match="preflight rejected"):
-        asyncio.run(boot_resolved_profile(resolve_profile(DEFAULT)))
+        asyncio.run(run_resolved_kernel(resolve_profile(DEFAULT)))
 
     assert events == ["compile"]
 
 
-def test_boot_entrances_converge_on_one_audited_sequence() -> None:
-    """Resolved and programmatic input adapters delegate to kernel boot."""
-    source = Path("lca/harness/profile/boot/boot.py").read_text(encoding="utf-8")
-    assert "run_resolved_kernel" in source
-    assert "kernel_boot_entries" in source
-    assert "run_kernel" in source
-    assert "_boot_context" not in source
-    assert "async def _boot_context" not in source
+def test_boot_entrances_converge_on_kernel_seam() -> None:
+    """Resolved and programmatic input adapters delegate to kernel boot only."""
+    source = Path("lca_kernel/boot/boot.py").read_text(encoding="utf-8")
+    assert "async def run_kernel" in source
+    assert "async def run_resolved_kernel" in source
+    assert "async def boot_entries" in source
+    assert "async def boot_plugin" in source
+    assert "def validate_audited_interactions" in source
+    assert not Path("lca/harness/profile/boot/boot.py").exists()
 
 
 def test_fiber_boot_executes_audited_setup_once_and_owns_its_disposer() -> None:
@@ -340,7 +337,7 @@ def test_fiber_boot_executes_audited_setup_once_and_owns_its_disposer() -> None:
         from cordis import Context
 
         ctx = Context()
-        await _boot_plugin(ctx, definition, {})
+        await boot_plugin(ctx, definition, {})
         assert events == ["setup"]
         await ctx.dispose()
 
@@ -351,7 +348,7 @@ def test_fiber_boot_executes_audited_setup_once_and_owns_its_disposer() -> None:
 def test_boot_caches_the_single_validated_runnable_plan() -> None:
     """Every Agent from a production scope must bind the one boot-time plan."""
 
-    ctx = asyncio.run(boot_profile(DEFAULT))
+    ctx = asyncio.run(run_kernel(DEFAULT))
 
     products = profile_boot_products_from_scope(ctx)
     assert products is not None
@@ -377,7 +374,7 @@ def test_programmatic_boot_attaches_resolved_profile_without_a_compiled_plan() -
 def test_boot_test_default_profile_allows_an_inspectable_non_runnable_plan() -> None:
     """Explicit test defaults may boot a partial plugin fixture without production phases."""
 
-    ctx = asyncio.run(boot_profile("profiles/test-minimal.yaml"))
+    ctx = asyncio.run(run_kernel("profiles/test-minimal.yaml"))
 
     products = profile_boot_products_from_scope(ctx)
     assert products is not None

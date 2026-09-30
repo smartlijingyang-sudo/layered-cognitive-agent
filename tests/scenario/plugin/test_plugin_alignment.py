@@ -31,7 +31,8 @@ from pathlib import Path
 
 import pytest
 
-from lca.harness.profile.boot.boot import boot_entries, boot_profile, load_profile_entries
+from lca.harness.profile.resolve.source import load_profile_entries
+from lca_kernel import boot_entries, run_kernel
 
 _ROOT = Path(__file__).resolve().parent.parent
 _PLUGINS_DIR = _ROOT / "lca" / "plugins"
@@ -195,7 +196,7 @@ def test_factory_registry_seams() -> None:
 
     from lca.contracts.mechanisms.factory.registry import FactoryRegistry
 
-    ctx = asyncio.run(boot_profile(DEFAULT_PROFILE))
+    ctx = asyncio.run(run_kernel(DEFAULT_PROFILE))
     for key in _REGISTRY_SEAMS:
         registry = ctx.inject(key)
         assert isinstance(registry, FactoryRegistry), (
@@ -227,7 +228,7 @@ def test_require_capability_has_no_seam_path() -> None:
         require_capability,
     )
 
-    ctx = asyncio.run(boot_profile(DEFAULT_PROFILE))
+    ctx = asyncio.run(run_kernel(DEFAULT_PROFILE))
     with pytest.raises(MissingCapabilityError, match="no_such_capability"):
         require_capability(ctx, "no_such_capability")
     with pytest.raises((KeyError, MissingCapabilityError)):
@@ -335,7 +336,7 @@ def test_run_loop_driver_registry_resolves_cognitive() -> None:
     """The /runs HTTP path can resolve ``cognitive`` after a default boot."""
     import asyncio
 
-    ctx = asyncio.run(boot_profile(DEFAULT_PROFILE))
+    ctx = asyncio.run(run_kernel(DEFAULT_PROFILE))
     registry = ctx.inject("run_loop_driver_registry")
     driver = registry.resolve("cognitive")
     assert driver is not None
