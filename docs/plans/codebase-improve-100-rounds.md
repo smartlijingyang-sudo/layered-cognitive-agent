@@ -93,3 +93,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat 6aca6bc71` → 2 files changed, 118 insertions(+), 9 deletions(-); gross diff = 127 > 100.
 - **Tests:** `uv run pytest -q tests/infrastructure/sandbox/test_adapter_seam.py tests/infrastructure/test_local_sandbox_output_mime.py tests/infrastructure/test_local_sandbox_attachment_path.py tests/infrastructure/computer/test_box_sandbox_adapter.py -m "not real_llm" --no-cov` → **17 passed**.
 - **Gates:** ruff check / format --check on touched files: pass (pre-existing ASYNC240/S108 fixed in this round); `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 9 — 2026-09-30
+
+- **Commit:** `1c02da325` (cherry-picked from subagent branch `round-a` commit `0a9e6c07b`)
+- **Architectural concern:** duplicated pure logic / locality. Remaining local time formatters and a third clock (local-timezone `_timestamp`, `SpineClock`, `_iso`/`_iso_now` copies in evolve/overlay/catalog) drifted from the contracts `utc_now*` seam.
+- **Change:** `idempotency/store.py` now writes `utc_now_iso()` (fixing a local-timezone drift); `SpineClock` delegates to the contracts seam while keeping `freeze()`; `evolve.py` / `overlay.py` / `catalog/plugin.py` dropped their private ISO formatters.
+- **Files:** `lca/infrastructure/idempotency/store.py`, `lca_kernel/events/spine/runtime.py`, `lca/plugins/assistant/evolve/evolve.py`, `lca/plugins/assistant/skill/overlay.py`, `lca/plugins/domain/assistant/catalog/plugin.py`, 5 test files.
+- **Shortstat:** `git show --shortstat 1c02da325` → 10 files changed, 191 insertions(+), 50 deletions(-); gross diff = 241 > 100.
+- **Tests:** `uv run pytest -q tests/lca_kernel/events/test_spine_clock_utc.py tests/lca_kernel/events/test_spine_runtime.py tests/infrastructure/idempotency/test_utc_timestamp.py tests/runtime/test_idempotency_store.py tests/plugins/assistant/test_evolve.py tests/plugins/assistant/test_skill_overlay.py tests/contracts/atoms/test_ids_time.py -m "not real_llm" --no-cov` → **94 passed**; `test_gateway_reuses_receipt_after_runtime_reconstruction` fails on a stale `lca.loop.driver.RuntimePhaseCapabilities` import (pre-existing at HEAD).
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
