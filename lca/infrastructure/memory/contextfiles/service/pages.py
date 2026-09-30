@@ -44,9 +44,19 @@ class PageDirectory:
         self._event_for = event_for
 
     def upsert(self, name: str, body: str, *, slug: str | None = None) -> NamedPage:
-        """Create or replace one page, then rewrite the index."""
+        """Create or replace one page, then rewrite the index.
 
-        page = NamedPage(slug=slug_for(slug or name), name=name.strip(), body=body.strip())
+        A replaced page keeps its intimacy score so the dream pipeline's
+        relationship ordering survives later ``person_note`` edits.
+        """
+
+        page_slug = slug_for(slug or name)
+        page = NamedPage(
+            slug=page_slug,
+            name=name.strip(),
+            body=body.strip(),
+            intimacy=self._intimacy_of(page_slug),
+        )
         if not page.name or not page.body:
             raise ValueError("name and body are required")
         self._store.atomic_replace(self._page_path(page.slug), render_person_page(page))
@@ -56,6 +66,15 @@ class PageDirectory:
         if self._publisher is not None and self._event_for is not None:
             self._publisher.publish(self._event_for(slug=page.slug, name=page.name))
         return page
+
+    def _intimacy_of(self, slug: str) -> float:
+        """Return the intimacy stored on an existing page, or 0.0."""
+
+        try:
+            text = self._store.read_text(self._page_path(slug))
+        except OSError:
+            return 0.0
+        return parse_person_page(slug, text).intimacy
 
     def list(self) -> tuple[NamedPage, ...]:
         """Return pages in this directory. The index file is not a page."""
@@ -71,6 +90,27 @@ class PageDirectory:
                 continue
             pages.append(parse_person_page(slug, text))
         return tuple(sorted(pages, key=lambda page: (page.name, page.slug)))
+
+    def set_intimacy(self, slug: str, score: float) -> NamedPage | None:
+        """Update one page's intimacy score and always refresh the index.
+
+        Returns the updated page, or ``None`` when no such page exists. The
+        index is rewritten even when the score is unchanged so a page that
+        was created directly on disk still gets its index.
+        """
+
+        try:
+            text = self._store.read_text(self._page_path(slug))
+        except OSError:
+            return None
+        page = parse_person_page(slug, text)
+        from dataclasses import replace
+
+        updated = replace(page, intimacy=max(0.0, float(score)))
+        self._store.atomic_replace(self._page_path(slug), render_person_page(updated))
+        pages = self.list()
+        self._store.atomic_replace(self._index_path(), render_index(pages, heading=self._heading))
+        return updated
 
     def _page_path(self, slug: str) -> str:
         return f"{self._directory}/{slug}.md"

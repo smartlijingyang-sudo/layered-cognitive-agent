@@ -22,9 +22,13 @@ from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.protocols import Tool
 from lca.infrastructure.memory.assistant_memory import AssistantMemory
 from lca.infrastructure.memory.contextfiles.adapters.disk import DiskFileStore
+from lca.infrastructure.memory.contextfiles.domain.edit import StaleSnapshotOperationError
 from lca.infrastructure.memory.contextfiles.domain.layout import layout_for_home
+from lca.infrastructure.memory.contextfiles.domain.privacy import is_private_personal
 from lca.infrastructure.memory.contextfiles.service.groups import GroupsDirectory
+from lca.infrastructure.memory.contextfiles.service.indexing import search_memory_index
 from lca.infrastructure.memory.contextfiles.service.people import PeopleDirectory
+from lca.infrastructure.memory.contextfiles.service.sidechat import SideChatDirectory
 
 _MEMORY_SEARCH_TOOL = "memory_search"
 _MEMORY_ADD_TOOL = "memory_add"
@@ -58,6 +62,15 @@ class _BaseMemoryTool(Tool):
             latency_ms=int((time.monotonic() - start) * 1000),
         )
 
+    def _uncommitted(self, start: float) -> Observation | None:
+        """Fail when the curated projection did not commit the write."""
+
+        receipt = self._memory.last_curated_receipt
+        if receipt is not None and receipt.ok:
+            return None
+        detail = receipt.error if receipt is not None and receipt.error else "记忆没有写入"
+        return self._fail(start, detail)
+
     def _fail(self, start: float, message: str) -> Observation:
         return Observation(
             observation_id=new_id("obs"),
@@ -70,19 +83,21 @@ class _BaseMemoryTool(Tool):
 
 
 class MemorySearchTool(_BaseMemoryTool):
-    """Search the assistant's structured memory (read-only)."""
+    """Search the assistant's structured memory and branch memory (read-only)."""
 
     name = _MEMORY_SEARCH_TOOL
     required_grant: ClassVar[str] = "profile.revise"
     description = (
-        "搜索当前助理的结构化记忆（身份/偏好/事实）。只读，不修改任何数据。"
-        "参数: query（关键词）、limit（可选，最多返回条数，默认 5）。"
+        "搜索当前助理的结构化记忆（身份/偏好/事实）与每日流水全文索引。只读，不修改任何数据。"
+        "参数: query（关键词）、limit（可选，最多返回条数，默认 5）、"
+        "branch（可选，side chat id；提供时同时检索主记忆与该分支的 MEMORY.md）。"
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
             "query": {"type": "string", "description": "搜索关键词"},
             "limit": {"type": "integer", "description": "最多返回条数（默认 5）"},
+            "branch": {"type": "string", "description": "side chat id（可选）"},
         },
         "required": ["query"],
     }
@@ -96,6 +111,50 @@ class MemorySearchTool(_BaseMemoryTool):
             limit = max(1, min(50, int(args.get("limit") or 5)))
         except (TypeError, ValueError):
             limit = 5
+        branch = str(args.get("branch") or "").strip() or None
+        if branch is not None:
+            records = [
+                row
+                for row in self._search_main(query, limit=limit)
+                if not is_private_personal(str(row.get("content") or ""))
+            ] + self._search_branch(query, branch, limit=limit)
+        else:
+            indexed = self._search_indexed(query, limit=limit)
+            records = indexed if indexed is not None else self._search_main(query, limit=limit)
+        return self._ok(
+            start,
+            {
+                "query": query,
+                "count": len(records),
+                "records": records,
+            },
+        )
+
+    def _search_indexed(self, query: str, *, limit: int) -> list[dict[str, Any]] | None:
+        """Query the built FTS index. Returns None when no index exists."""
+
+        layout = layout_for_home(self._memory.home_path)
+        hits = search_memory_index(
+            self._memory.home_path,
+            query,
+            limit=limit,
+            layout=layout,
+        )
+        if hits is None:
+            return None
+        return [
+            {
+                "record_id": hit.doc_id,
+                "category": hit.kind,
+                "content": hit.content,
+                "dedupe_key": None,
+                "created_at_ms": None,
+                "path": hit.path,
+            }
+            for hit in hits
+        ]
+
+    def _search_main(self, query: str, *, limit: int) -> list[dict[str, Any]]:
         records = self._memory.query(MemoryLayer.SEMANTIC) + self._memory.query(
             MemoryLayer.EPISODIC
         )
@@ -117,27 +176,44 @@ class MemorySearchTool(_BaseMemoryTool):
         scored_matched = [item for item in scored if item[1] > 0]
         scored_matched.sort(key=lambda item: item[1], reverse=True)
         matched = [item[0] for item in scored_matched][:limit]
-        return self._ok(
-            start,
+        return [
             {
-                "query": query,
-                "count": len(matched),
-                "records": [
-                    {
-                        "record_id": r.record_id,
-                        "category": r.category.value,
-                        "content": r.content,
-                        "dedupe_key": r.dedupe_key,
-                        "created_at_ms": r.created_at_ms,
-                    }
-                    for r in matched
-                ],
-            },
-        )
+                "record_id": r.record_id,
+                "category": r.category.value,
+                "content": r.content,
+                "dedupe_key": r.dedupe_key,
+                "created_at_ms": r.created_at_ms,
+            }
+            for r in matched
+        ]
+
+    def _search_branch(self, query: str, branch: str, *, limit: int) -> list[dict[str, Any]]:
+        layout = layout_for_home(self._memory.home_path)
+        directory = SideChatDirectory(DiskFileStore(self._memory.home_path), layout=layout)
+        try:
+            hits = directory.search(query, branch, limit=limit)
+        except ValueError:
+            return []
+        return [
+            {
+                "record_id": hit.record_id,
+                "category": "fact",
+                "content": hit.content,
+                "dedupe_key": None,
+                "created_at_ms": None,
+                "branch": branch,
+            }
+            for hit in hits
+        ]
 
 
 class MemoryAddTool(_BaseMemoryTool):
-    """Add a structured memory record (governed write)."""
+    """Add a structured memory record (governed write).
+
+    With ``branch`` the fact is written to that side chat's ``MEMORY.md``
+    and the main curated memory stays untouched. Without ``branch`` the
+    record lands in the structured semantic store as before.
+    """
 
     name = _MEMORY_ADD_TOOL
     required_grant: ClassVar[str] = "profile.revise"
@@ -146,6 +222,7 @@ class MemoryAddTool(_BaseMemoryTool):
         "参数: content（结构化事实，如「用户身份：系统架构师」）、category（identity/"
         "preference/fact）、dedupe_key（可选，属性维度键，如 preference:tech_stack、identity:role，"
         "同维度新事实会自动覆盖旧事实，严禁包含具体取值）。"
+        "branch（可选，side chat id）: 提供时写入该分支会话的 MEMORY.md，不进入主记忆。"
         "非敏感操作，改完告知用户。"
     )
     parameters: ClassVar[dict[str, Any]] = {
@@ -161,6 +238,7 @@ class MemoryAddTool(_BaseMemoryTool):
                 "type": "string",
                 "description": "可选属性维度键（如 preference:tech_stack、identity:role，严禁包含具体取值）",
             },
+            "branch": {"type": "string", "description": "可选 side chat id，写入分支记忆"},
         },
         "required": ["content", "category"],
     }
@@ -171,6 +249,9 @@ class MemoryAddTool(_BaseMemoryTool):
         category_raw = str(args.get("category") or "").strip()
         if not content:
             return self._fail(start, "content 必须为非空字符串")
+        branch = str(args.get("branch") or "").strip() or None
+        if branch is not None:
+            return self._write_branch(start, content, branch)
         try:
             category = MemoryCategory(category_raw)
         except ValueError:
@@ -188,7 +269,13 @@ class MemoryAddTool(_BaseMemoryTool):
             confidence=1.0,
             metadata={"source": "user"},
         )
-        persisted = self._memory.upsert(record)
+        try:
+            persisted = self._memory.upsert(record)
+        except (OSError, StaleSnapshotOperationError) as exc:
+            return self._fail(start, f"记忆没有写入: {exc}")
+        rejected = self._uncommitted(start)
+        if rejected is not None:
+            return rejected
         await self._memory.refresh_user_profile()
         return self._ok(
             start,
@@ -197,6 +284,29 @@ class MemoryAddTool(_BaseMemoryTool):
                 "category": persisted.category.value,
                 "content": persisted.content,
                 "message": f"已记录 {category.value} 记忆。",
+            },
+        )
+
+    def _write_branch(self, start: float, content: str, branch: str) -> Observation:
+        """Write a branch-specific fact to the side chat's MEMORY.md."""
+
+        layout = layout_for_home(self._memory.home_path)
+        directory = SideChatDirectory(DiskFileStore(self._memory.home_path), layout=layout)
+        try:
+            record = directory.write(branch, content, source="user", trigger="side chat")
+        except ValueError as exc:
+            return self._fail(start, str(exc))
+        except OSError as exc:
+            return self._fail(start, f"分支记忆没有写入: {exc}")
+        return self._ok(
+            start,
+            {
+                "record_id": record.record_id,
+                "category": "fact",
+                "content": record.content,
+                "branch": branch,
+                "path": layout.side_chat_memory_path(branch),
+                "message": "已记入该分支会话的记忆，未改动主记忆。",
             },
         )
 
@@ -253,7 +363,13 @@ class MemoryUpdateTool(_BaseMemoryTool):
             confidence=1.0,
             metadata={"source": "user"},
         )
-        persisted = self._memory.supersede(record_id, replacement)
+        try:
+            persisted = self._memory.supersede(record_id, replacement)
+        except (OSError, StaleSnapshotOperationError) as exc:
+            return self._fail(start, f"记忆没有写入: {exc}")
+        rejected = self._uncommitted(start)
+        if rejected is not None:
+            return rejected
         await self._memory.refresh_user_profile()
         return self._ok(
             start,

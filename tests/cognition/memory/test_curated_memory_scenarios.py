@@ -146,7 +146,7 @@ def test_credential_shaped_content_is_not_stored(tmp_path: Path) -> None:
     assert may_acknowledge_projection(memory.last_curated_receipt) is False
 
 
-def test_projection_write_failure_keeps_the_record_and_blocks_acknowledgement(
+def test_projection_write_failure_rolls_back_the_record_and_blocks_acknowledgement(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     memory = AssistantMemory(tmp_path / "asst")
@@ -159,7 +159,8 @@ def test_projection_write_failure_keeps_the_record_and_blocks_acknowledgement(
     assert memory.last_curated_receipt is not None
     assert memory.last_curated_receipt.ok is False
     assert "disk full" in memory.last_curated_receipt.error
-    assert (memory.home_path / "memory" / "semantic.json").is_file()
+    assert not (memory.home_path / "memory" / "semantic.json").is_file()
+    assert memory.query(MemoryLayer.SEMANTIC) == []
     assert may_acknowledge_projection(memory.last_curated_receipt) is False
 
 

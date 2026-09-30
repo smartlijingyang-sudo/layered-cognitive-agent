@@ -41,6 +41,11 @@ class GroupsDirectory:
 
         return self._pages.upsert(name, body, slug=slug)
 
+    def set_intimacy(self, slug: str, score: float) -> NamedPage | None:
+        """Update one group's intimacy score and rewrite the index."""
+
+        return self._pages.set_intimacy(slug, score)
+
     def list(self) -> tuple[NamedPage, ...]:
         """Return group pages. The index file is not a group."""
 

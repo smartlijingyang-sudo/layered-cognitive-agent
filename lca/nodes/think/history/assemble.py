@@ -61,8 +61,15 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 from lca.contracts.protocols.session.model.context import ModelVisibleRequest
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.memory.contextfiles.adapters.disk import DiskFileStore
-from lca.infrastructure.memory.contextfiles.adapters.polling import poll_standing_home
+from lca.infrastructure.memory.contextfiles.adapters.polling import (
+    ensure_standing_watcher,
+    poll_standing_home,
+)
 from lca.infrastructure.memory.contextfiles.domain.layout import layout_for_home
+from lca.infrastructure.memory.contextfiles.service.alignment import load_alignment_synthesis
+from lca.infrastructure.memory.contextfiles.service.assembly import (
+    refresh_standing_backstory,
+)
 from lca.infrastructure.memory.contextfiles.service.compaction import (
     preserve_standing_sections,
 )
@@ -144,6 +151,7 @@ class HistoryDeriveExecutor:
         )
         system = _refresh_standing(system, runtime=context.runtime)
         system = _append_standing_diff(system, runtime=context.runtime)
+        system = _append_alignment_synthesis(system, runtime=context.runtime)
         tools = _forked_to_tools(input.port_values.get("forked_tools"))
         return NodeOutput(
             port_values={
@@ -174,12 +182,16 @@ def _append_standing_diff(system: str, *, runtime: object) -> str:
     """Append a unified diff when standing files changed since the last poll.
 
     The first poll for a home only records the baseline. The cursor lives in
-    the process, so this node does not write agent state or the home.
+    the process, so this node does not write agent state or the home. A live
+    run (one with per-turn capability bindings) starts the real-time watcher
+    so diffs are captured at detection time, not lazily at assembly.
     """
 
     home_path = _home_path(runtime)
     if not home_path:
         return system
+    if _live_bindings_home() == home_path:
+        ensure_standing_watcher(home_path)
     note = poll_standing_home(home_path)
     if not note:
         return system
@@ -188,19 +200,65 @@ def _append_standing_diff(system: str, *, runtime: object) -> str:
     return f"{system}\n\n{note}"
 
 
-def _refresh_standing(system: str, *, runtime: object) -> str:
-    """Replace injected standing blocks from disk when a home is bound.
+def _append_alignment_synthesis(system: str, *, runtime: object) -> str:
+    """Append the nightly alignment synthesis when the home has one.
 
-    The folded header stays the source for the rest of the system prompt.
-    Without a home, the prompt is unchanged so replay of a marker-less
-    header keeps its historical text.
+    The synthesis is a soft alignment signal. It is read from disk on every
+    assembly so a fresh dream pass reaches the model without a restart.
     """
 
-    if "<!-- INJECTED FILE:" not in system:
-        return system
     home_path = _home_path(runtime)
     if not home_path:
         return system
+    try:
+        synthesis = load_alignment_synthesis(
+            DiskFileStore(home_path),
+            layout=layout_for_home(home_path),
+        )
+    except OSError:
+        return system
+    if not synthesis.strip():
+        return system
+    if not system:
+        return synthesis
+    return f"{system}\n\n{synthesis}"
+
+
+def _live_bindings_home() -> str | None:
+    """Return the home path from the per-turn capability bindings, if any."""
+
+    try:
+        from lca.infrastructure.runtime_plane.capability_bindings import (
+            current_bindings_view,
+        )
+
+        bindings = current_bindings_view()
+    except Exception:
+        return None
+    bound = getattr(bindings, "home_path", None) if bindings is not None else None
+    return str(bound) if bound else None
+
+
+def _refresh_standing(system: str, *, runtime: object) -> str:
+    """Replace injected standing blocks from disk when a home is bound.
+
+    A home-bound run, including a derived subagent, always receives the
+    standing snapshot. When the upstream prompt already has injection
+    markers, those blocks are rewritten from disk. When it has none, the
+    snapshot is appended so a child that lost the parent's markers still
+    sees the five files.
+    """
+
+    home_path = _home_path(runtime)
+    if not home_path:
+        return system
+    if "<!-- INJECTED FILE:" not in system:
+        snapshot = refresh_standing_backstory(home_path, "")
+        if not snapshot:
+            return system
+        if not system:
+            return snapshot
+        return f"{system}\n\n{snapshot}"
     return preserve_standing_sections(
         system,
         DiskFileStore(home_path),

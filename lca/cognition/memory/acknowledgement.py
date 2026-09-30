@@ -11,7 +11,11 @@ import re
 
 from lca.infrastructure.memory.contextfiles.domain.curated import may_acknowledge_projection
 
-_CLAIM = re.compile(r"已记下|已记住|我记住了|I(?:'ve| have) (?:noted|remembered)", re.IGNORECASE)
+_CLAIM = re.compile(
+    r"已记下|已记住|我记住了|我记下了|已经记录|记下来了|记下了|帮你记下|"
+    r"I(?:'ve| have) (?:noted|remembered)",
+    re.IGNORECASE,
+)
 _REFUSAL = "这条还没有写入记忆文件。我不能说已经记下。"
 
 

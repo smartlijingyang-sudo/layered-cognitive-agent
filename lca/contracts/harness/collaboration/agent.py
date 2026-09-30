@@ -26,6 +26,7 @@ class AgentOptions:
     max_tokens: int | None = None
     tools_allow: tuple[str, ...] | None = None
     tools_deny: tuple[str, ...] | None = None
+    standing_snapshot: str = ""
 
 
 @dataclass(frozen=True)

@@ -36,6 +36,12 @@ from lca.plugins.prompts.sections.member_status import (
     MemberStatusSection,
     build_member_status,
 )
+from lca.plugins.prompts.sections.memory import (
+    MemoryRetrievalSection,
+    PrivacyFirewallSection,
+    build_memory_retrieval,
+    build_privacy_firewall,
+)
 from lca.plugins.prompts.sections.plugin import Config, setup
 from lca.plugins.prompts.sections.role import (
     BackstorySection,
@@ -104,6 +110,8 @@ __all__ = [
     "HomeSection",
     "MemberReportsSection",
     "MemberStatusSection",
+    "MemoryRetrievalSection",
+    "PrivacyFirewallSection",
     "ReactToolUsageSection",
     "ReactWorkflowSection",
     "RoleSection",
@@ -128,6 +136,8 @@ __all__ = [
     "build_home",
     "build_member_reports",
     "build_member_status",
+    "build_memory_retrieval",
+    "build_privacy_firewall",
     "build_react_tool_usage",
     "build_react_workflow",
     "build_role_section",

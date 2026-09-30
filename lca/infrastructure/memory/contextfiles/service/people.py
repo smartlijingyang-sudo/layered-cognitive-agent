@@ -41,6 +41,11 @@ class PeopleDirectory:
 
         return self._pages.upsert(name, body, slug=slug)
 
+    def set_intimacy(self, slug: str, score: float) -> NamedPage | None:
+        """Update one person's intimacy score and rewrite the index."""
+
+        return self._pages.set_intimacy(slug, score)
+
     def list(self) -> tuple[NamedPage, ...]:
         """Return person pages. The index file is not a person."""
 

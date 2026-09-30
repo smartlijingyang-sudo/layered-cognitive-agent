@@ -72,3 +72,19 @@ def test_explicit_identity_promotes_at_recurrence_one() -> None:
     assert cluster.content == "用户身份：架构师"
     assert cluster.recurrence == 1
     assert cluster.lifecycle is LifecycleState.consolidated_slow
+
+
+def test_explicit_preference_promotes_at_recurrence_one() -> None:
+    episodes = (
+        _fact(
+            "ep_pref",
+            "t1",
+            "用户偏好短回复",
+            _NOW,
+            category=MemoryCategory.PREFERENCE,
+            dedupe_key="preference:verbosity",
+            explicit=True,
+        ),
+    )
+    plan = consolidate(episodes, now_ms=_NOW)
+    assert plan.clusters[0].lifecycle is LifecycleState.consolidated_slow

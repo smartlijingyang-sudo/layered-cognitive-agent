@@ -39,8 +39,9 @@ from lca.infrastructure.memory.contextfiles.domain.curated import (
     CuratedProjectionReceipt,
     contains_secret,
     may_acknowledge_projection,
-    render_curated_markdown,
+    plan_curated_projection,
 )
+from lca.infrastructure.memory.contextfiles.domain.edit import StaleSnapshotOperationError
 from lca.infrastructure.memory.contextfiles.domain.explain import (
     ClaimExplanation,
     ExplainableRecord,
@@ -63,6 +64,7 @@ logger = logging.getLogger(__name__)
 
 _MEMORY_DIR = "memory"
 _MAX_EPISODIC_RECORDS = 50
+_LATCH_FILE = "claim-latch.json"
 
 _ProfileBackfillCallback = Callable[[str, list[MemoryRecord]], Awaitable[None]]
 
@@ -92,7 +94,7 @@ class AssistantMemory(MemorySystem):
         self._profile_backfill = profile_backfill
         self._event_publisher = event_publisher
         self._last_curated_receipt: CuratedProjectionReceipt | None = None
-        self._open_claim: CuratedProjectionReceipt | None = None
+        self._open_claim: CuratedProjectionReceipt | None = self._load_latch()
 
     @property
     def last_curated_receipt(self) -> CuratedProjectionReceipt | None:
@@ -103,11 +105,55 @@ class AssistantMemory(MemorySystem):
         # Receipt is write evidence; _open_claim is the one unused acknowledgement.
         self._last_curated_receipt = receipt
         self._open_claim = receipt if may_acknowledge_projection(receipt) else None
+        self._persist_latch(self._open_claim)
 
     def take_claim_right(self) -> CuratedProjectionReceipt | None:
         receipt = self._open_claim
         self._open_claim = None
+        self._persist_latch(None)
         return receipt
+
+    def _latch_path(self) -> Path:
+        return self._root / _LATCH_FILE
+
+    def _load_latch(self) -> CuratedProjectionReceipt | None:
+        path = self._latch_path()
+        if not path.is_file():
+            return None
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        if not isinstance(data, dict):
+            return None
+        ids = data.get("record_ids") or ()
+        receipt = CuratedProjectionReceipt(
+            ok=bool(data.get("ok")),
+            path=str(data.get("path") or ""),
+            byte_count=int(data.get("byte_count") or 0),
+            record_ids=tuple(str(item) for item in ids),
+            error=str(data.get("error") or ""),
+        )
+        return receipt if may_acknowledge_projection(receipt) else None
+
+    def _persist_latch(self, receipt: CuratedProjectionReceipt | None) -> None:
+        path = self._latch_path()
+        if receipt is None:
+            path.unlink(missing_ok=True)
+            return
+        path.write_text(
+            json.dumps(
+                {
+                    "ok": receipt.ok,
+                    "path": receipt.path,
+                    "byte_count": receipt.byte_count,
+                    "record_ids": list(receipt.record_ids),
+                    "error": receipt.error,
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
 
     @property
     def home_path(self) -> Path:
@@ -118,14 +164,27 @@ class AssistantMemory(MemorySystem):
         return self._root / f"{layer.value}.json"
 
     def _load(self, layer: MemoryLayer) -> list[dict[str, Any]]:
+        _text, records = self._load_with_text(layer)
+        return records
+
+    def _read_layer_text(self, layer: MemoryLayer) -> str:
         path = self._layer_path(layer)
         if not path.is_file():
-            return []
+            return ""
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return []
-        return data if isinstance(data, list) else []
+            return path.read_text(encoding="utf-8")
+        except OSError:
+            return ""
+
+    def _load_with_text(self, layer: MemoryLayer) -> tuple[str, list[dict[str, Any]]]:
+        text = self._read_layer_text(layer)
+        if not text:
+            return "", []
+        try:
+            data = json.loads(text)
+        except ValueError:
+            return text, []
+        return text, data if isinstance(data, list) else []
 
     def _save(
         self,
@@ -133,13 +192,26 @@ class AssistantMemory(MemorySystem):
         records: list[dict[str, Any]],
         *,
         committed_ids: tuple[str, ...] = (),
+        base_text: str | None = None,
     ) -> None:
-        self._layer_path(layer).write_text(
+        path = self._layer_path(layer)
+        if layer is MemoryLayer.SEMANTIC and base_text is not None:
+            current = path.read_text(encoding="utf-8") if path.is_file() else ""
+            if current != base_text:
+                raise StaleSnapshotOperationError(f"{path.name} changed during edit")
+        previous = path.read_text(encoding="utf-8") if path.is_file() else ""
+        path.write_text(
             json.dumps(records, ensure_ascii=False, indent=2, sort_keys=True),
             encoding="utf-8",
         )
         if layer is MemoryLayer.SEMANTIC:
             self._project_curated(committed_ids)
+            receipt = self.last_curated_receipt
+            if receipt is not None and not receipt.ok:
+                if previous:
+                    path.write_text(previous, encoding="utf-8")
+                elif path.is_file():
+                    path.unlink()
 
     def _projection_relative(self) -> str:
         """Relative path of the curated projection. The layout file names it."""
@@ -151,8 +223,9 @@ class AssistantMemory(MemorySystem):
 
         relative = self._projection_relative()
         path = self.home_path / relative
+        omitted: tuple[CuratedClaim, ...] = ()
         try:
-            text = render_curated_markdown(
+            text, omitted = plan_curated_projection(
                 _claims_from_records(self.query(MemoryLayer.SEMANTIC)),
                 source_note="记录在 `memory/semantic.json`。",
             )
@@ -195,6 +268,33 @@ class AssistantMemory(MemorySystem):
                     record_ids=committed_ids,
                 )
             )
+        try:
+            self._archive_omitted(omitted)
+        except OSError as exc:
+            logger.warning("memory projection archive failed: %s", exc)
+
+    def _archive_omitted(self, omitted: tuple[CuratedClaim, ...]) -> None:
+        """Append claims dropped from the projection for budget into revisions/."""
+
+        if not omitted:
+            return
+        date = datetime.now(UTC).strftime("%Y%m%d")
+        relative = f"revisions/archive_{date}.md"
+        store = DiskFileStore(self.home_path)
+        try:
+            existing = store.read_text(relative)
+        except OSError:
+            existing = ""
+        lines = []
+        for claim in omitted:
+            marker = f"{claim.claim_id}:"
+            if marker in existing:
+                continue
+            lines.append(f"- {claim.claim_id}: {claim.body}")
+        if not lines:
+            return
+        body = existing if existing.endswith("\n") or not existing else f"{existing}\n"
+        store.atomic_replace(relative, body + "\n".join(lines) + "\n")
 
     async def perceive(self, state: AgentState) -> AgentState:
         """返回原状态；检索注入由后续 memory.retrieve 节点负责（ADR-0242 D11）。"""
@@ -380,7 +480,7 @@ class AssistantMemory(MemorySystem):
             )
             return
         layer = MemoryLayer.SEMANTIC
-        records = self._load(layer)
+        base_text, records = self._load_with_text(layer)
         now_ms = utc_now_ms()
         try:
             category_value = (
@@ -443,7 +543,7 @@ class AssistantMemory(MemorySystem):
                 "metadata": _stored_metadata(source, metadata),
             }
         )
-        self._save(layer, records, committed_ids=(new_id_value,))
+        self._save(layer, records, committed_ids=(new_id_value,), base_text=base_text)
 
     async def refresh_user_profile(self) -> None:
         """身份/偏好事实变化后，从活跃记录全量重建 USER.md（系统回填）。
@@ -494,8 +594,16 @@ class AssistantMemory(MemorySystem):
         reason: str = "superseded",
     ) -> MemoryRecord:
         """退役旧记录并写入替代记录，建立 ``revision_of`` 血缘。"""
+        if contains_secret(replacement.content):
+            self.last_curated_receipt = CuratedProjectionReceipt(
+                ok=False,
+                path=str(self.home_path / self._projection_relative()),
+                byte_count=0,
+                error="credential_rejected",
+            )
+            return replacement
         layer = MemoryLayer.SEMANTIC
-        records = self._load(layer)
+        base_text, records = self._load_with_text(layer)
         now_ms = utc_now_ms()
         old_dedupe_key: str | None = None
         for entry in records:
@@ -504,7 +612,7 @@ class AssistantMemory(MemorySystem):
                 entry["retired_at_ms"] = now_ms
                 entry.setdefault("metadata", {})["superseded_reason"] = reason
                 old_dedupe_key = str(entry.get("dedupe_key") or "").strip() or None
-        self._save(layer, records)
+        self._save(layer, records, base_text=base_text)
         # 继承被替换记录的维度键与血缘，保持事实维度稳定延续
         replacement = MemoryRecord(
             record_id=replacement.record_id,
@@ -523,13 +631,13 @@ class AssistantMemory(MemorySystem):
     def remove(self, record_id: str) -> None:
         """把指定记录标记为已删除（保留审计，不再参与检索）。"""
         layer = MemoryLayer.SEMANTIC
-        records = self._load(layer)
+        base_text, records = self._load_with_text(layer)
         now_ms = utc_now_ms()
         for entry in records:
             if entry.get("record_id") == record_id and not entry.get("deleted", False):
                 entry["deleted"] = True
                 entry["retired_at_ms"] = now_ms
-        self._save(layer, records)
+        self._save(layer, records, base_text=base_text)
 
     def _append(
         self,
@@ -543,7 +651,7 @@ class AssistantMemory(MemorySystem):
         metadata: dict[str, Any] | None = None,
     ) -> None:
         """Append one record to ``<layer>.json`` and persist the layer."""
-        records = self._load(layer)
+        base_text, records = self._load_with_text(layer)
         records.append(
             {
                 "record_id": new_id("mem"),
@@ -558,7 +666,11 @@ class AssistantMemory(MemorySystem):
         )
         if layer == MemoryLayer.EPISODIC and len(records) > _MAX_EPISODIC_RECORDS:
             records = records[-_MAX_EPISODIC_RECORDS:]
-        self._save(layer, records)
+        self._save(
+            layer,
+            records,
+            base_text=base_text if layer is MemoryLayer.SEMANTIC else None,
+        )
 
     def explain(self, record_id: str) -> ClaimExplanation | None:
         """Return the eight audit fields for one semantic record, including retired rows."""

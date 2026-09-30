@@ -72,7 +72,10 @@ def canonical_dedupe_key(dedupe_key: str | None, category: str | None = None) ->
 
 
 def _lifecycle(winner: EpisodeFact, recurrence: int) -> LifecycleState:
-    if winner.category == MemoryCategory.IDENTITY and winner.explicit_user_authority:
+    if winner.explicit_user_authority and winner.category in {
+        MemoryCategory.IDENTITY,
+        MemoryCategory.PREFERENCE,
+    }:
         return LifecycleState.consolidated_slow
     if recurrence >= 2:
         return LifecycleState.consolidated_slow

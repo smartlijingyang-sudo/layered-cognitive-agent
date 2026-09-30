@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import tomllib
+from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path, PurePosixPath
@@ -31,6 +32,11 @@ _FIELDS = (
     "agents_file",
     "agents_heading",
     "projection_file",
+    "side_chats_dir",
+    "side_chat_memory_file",
+    "trail_dir",
+    "alignment_synthesis_file",
+    "index_db_file",
 )
 
 
@@ -49,6 +55,11 @@ class ContextLayout:
     agents_file: str
     agents_heading: str
     projection_file: str
+    side_chats_dir: str
+    side_chat_memory_file: str
+    trail_dir: str
+    alignment_synthesis_file: str
+    index_db_file: str
 
     def person_page_path(self, slug: str) -> str:
         """Relative path of one person page."""
@@ -71,6 +82,23 @@ class ContextLayout:
         """Relative path of the groups index."""
 
         return f"{self.groups_dir}/{self.groups_index}"
+
+    def side_chat_memory_path(self, chat_id: str) -> str:
+        """Relative path of one side chat's branch memory file."""
+
+        return f"{self.side_chats_dir}/{chat_id}/{self.side_chat_memory_file}"
+
+    @property
+    def alignment_synthesis_path(self) -> str:
+        """Relative path of the alignment synthesis document."""
+
+        return self.alignment_synthesis_file
+
+    @property
+    def index_db_path(self) -> str:
+        """Relative path of the full-text index database."""
+
+        return self.index_db_file
 
 
 def read_layout(text: str) -> ContextLayout:
@@ -149,6 +177,18 @@ def _from_mapping(data: dict[str, object]) -> ContextLayout:
         agents_file=_relative(data["agents_file"], key="agents_file"),
         agents_heading=_line(data["agents_heading"], key="agents_heading"),
         projection_file=_relative(data["projection_file"], key="projection_file"),
+        side_chats_dir=_relative(data["side_chats_dir"], key="side_chats_dir"),
+        side_chat_memory_file=_relative(
+            data["side_chat_memory_file"],
+            key="side_chat_memory_file",
+            single_segment=True,
+        ),
+        trail_dir=_relative(data["trail_dir"], key="trail_dir"),
+        alignment_synthesis_file=_relative(
+            data["alignment_synthesis_file"],
+            key="alignment_synthesis_file",
+        ),
+        index_db_file=_relative(data["index_db_file"], key="index_db_file"),
     )
 
 
@@ -178,10 +218,57 @@ def _positive_int(value: object, *, key: str) -> int:
     return value
 
 
+def allowed_root_entries(layout: ContextLayout | None = None) -> frozenset[str]:
+    """Return the root-level entries an assistant home may contain.
+
+    ADR-0254 §3.1 defines the five standing files plus the memory, side-chat,
+    dreams, revisions and skill/workspace directories. The host's own
+    manifest, profile and override files are allowed too.
+    """
+
+    chosen = packaged_layout() if layout is None else layout
+    roots = set(chosen.standing_files)
+    for relative in (
+        chosen.people_dir,
+        chosen.groups_dir,
+        chosen.side_chats_dir,
+        chosen.trail_dir,
+        chosen.home_override,
+    ):
+        roots.add(relative.split("/", 1)[0])
+    roots.update(
+        {
+            "dreams",
+            "revisions",
+            "skills",
+            "presets",
+            "plugins",
+            "workspace",
+            "manifest.json",
+            "profile.json",
+            "tools.yaml",
+            "grants.yaml",
+        }
+    )
+    return frozenset(roots)
+
+
+def validate_root_entries(
+    entries: Sequence[str],
+    layout: ContextLayout | None = None,
+) -> tuple[str, ...]:
+    """Return the root entries that are not allowed, in sorted order."""
+
+    allowed = allowed_root_entries(layout)
+    return tuple(sorted(entry for entry in entries if entry not in allowed))
+
+
 __all__ = [
     "ContextLayout",
+    "allowed_root_entries",
     "layout_for_home",
     "merge_layout",
     "packaged_layout",
     "read_layout",
+    "validate_root_entries",
 ]

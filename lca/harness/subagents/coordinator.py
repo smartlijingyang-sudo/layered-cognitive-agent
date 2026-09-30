@@ -119,4 +119,5 @@ class SubagentActivationCoordinator:
             max_tokens=options.max_tokens,
             tools_allow=tools_allow,
             tools_deny=tools_deny,
+            standing_snapshot=options.standing_snapshot,
         )

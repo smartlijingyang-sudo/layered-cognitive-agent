@@ -10,6 +10,10 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from lca.infrastructure.memory.contextfiles.domain.trail import (
+    NarrowGateViolationError,
+    is_trail_relative,
+)
 from lca.infrastructure.memory.contextfiles.ports.file_store import FileSnapshot
 
 
@@ -33,16 +37,34 @@ class DiskFileStore:
         return self._resolve(relative_path).read_text(encoding="utf-8")
 
     def write_text(self, relative_path: str, text: str) -> None:
+        self._refuse_trail_overwrite(relative_path, text)
         target = self._resolve(relative_path)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(text, encoding="utf-8")
 
     def atomic_replace(self, relative_path: str, text: str) -> None:
+        self._refuse_trail_overwrite(relative_path, text)
         target = self._resolve(relative_path)
         target.parent.mkdir(parents=True, exist_ok=True)
         temporary = target.with_name(target.name + ".tmp")
         temporary.write_text(text, encoding="utf-8")
         os.replace(temporary, target)
+
+    def _refuse_trail_overwrite(self, relative_path: str, text: str) -> None:
+        """Refuse a trail write that is not a strict append of the current file."""
+
+        if not is_trail_relative(relative_path):
+            return
+        target = self._resolve(relative_path)
+        if not target.is_file():
+            return
+        existing = target.read_text(encoding="utf-8")
+        if not existing:
+            return
+        prefix = existing if text.startswith(existing) else existing.rstrip("\n")
+        if text.startswith(prefix) and len(text) >= len(prefix):
+            return
+        raise NarrowGateViolationError(f"trail files are append-only evidence: {relative_path}")
 
     def exists(self, relative_path: str) -> bool:
         return self._resolve(relative_path).is_file()

@@ -44,6 +44,40 @@ class GroupRecorded(MemoryDomainEvent):
 
 
 @dataclass(frozen=True, slots=True)
+class SideChatRecorded(MemoryDomainEvent):
+    """A branch fact was written to a side chat's MEMORY.md."""
+
+    chat_id: str
+    record_id: str
+    path: str
+
+
+@dataclass(frozen=True, slots=True)
+class IndexRebuilt(MemoryDomainEvent):
+    """The full-text memory index was rebuilt from curated and trail files."""
+
+    path: str
+    document_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class SynthesisWritten(MemoryDomainEvent):
+    """The nightly alignment synthesis was written to the assistant home."""
+
+    path: str
+    assertion_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class DreamCompleted(MemoryDomainEvent):
+    """The offline dream pass finished for one assistant home."""
+
+    home: str
+    promoted: int
+    upserted: int
+
+
+@dataclass(frozen=True, slots=True)
 class StandingChanged(MemoryDomainEvent):
     """One standing file differs from the cursor's previous copy."""
 
@@ -68,6 +102,14 @@ class ProjectionFailed(MemoryDomainEvent):
     record_ids: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True, slots=True)
+class WatcherFault(MemoryDomainEvent):
+    """A standing-file watcher poll failed; the session keeps assembling."""
+
+    home: str
+    error: str
+
+
 class InProcessEventPublisher(DomainEventPublisher):
     """Publish ``MemoryDomainEvent`` instances to in-process subscribers."""
 
@@ -86,12 +128,17 @@ class InProcessEventPublisher(DomainEventPublisher):
 
 
 __all__ = [
+    "DreamCompleted",
     "GroupRecorded",
     "InProcessEventPublisher",
+    "IndexRebuilt",
     "MemoryDomainEvent",
     "PersonRecorded",
     "ProjectionFailed",
     "ProjectionWritten",
+    "SideChatRecorded",
     "StandingChanged",
     "StandingPreserved",
+    "SynthesisWritten",
+    "WatcherFault",
 ]

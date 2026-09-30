@@ -2,7 +2,7 @@
 
 ## 状态
 
-**Proposed — 2026-09-30**
+**Accepted — 2026-09-30**
 
 > **一句话**：借鉴生产环境实测的 Context Muse 体系与业界顶尖商用范式，将 LCA Assistant 的上下文与记忆体系统一收敛为“纯 Markdown-as-DB 三层分级底座（5 大核心 Standing 文件）”、“运行时连续控制面（FS Watcher 实时 Diff 注入 + 物理隔离 Compaction 防失忆）”与“昼夜双轨闭环（在线强制检索写盘 + 离线做梦对齐综述）”，彻底打破长程对话性能衰减、失忆与认知阻塞，实现工业级高可信自演化。
 
@@ -15,7 +15,7 @@
 
 **不替代已接受的 ADR。** [ADR-0247](0247-agent-memory-knowledge-layer.md) 的 `MemoryRecord` 与 `{home}/memory/` 仍是记录真值。[ADR-0249](0249-cadence-inspired-dual-track-memory-consolidation.md) 的昼夜写入与 `CommandEnvelope` 窄门仍是写入路径。[ADR-0242](0242-assistant-creation-home-runtime.md) 的 Home 仍是目录主人，身份仍在 `profile.json`。
 
-已落地的切片见 [Agent Note: 结构化记忆的人可读投影](../notes/implemented/seam/2026-09-30-curated-memory-projection.md) 与 [Agent Note: 折叠系统提示里的常驻文件跟磁盘](../notes/implemented/seam/2026-09-30-standing-files-survive-folded-header.md)。`MEMORY.md` 是活跃语义记录的投影。折叠后的系统提示保留规则，其中的常驻文件块按磁盘重写。对用户说已经记下，要先有写盘回执。`memory_explain` 展开一条记录的八个审计字段。常驻文件在下一次历史装配时与进程内的上一份副本比较，差异附在系统提示后。一个人一份人物页。一个群体一份群体页。目录、索引名、常驻文件名单和预算来自包内 `layout.toml`，助理主目录的 `memory/contextfiles.toml` 可以覆盖。索引由这些页面重写。新建助理时写入 `TOOLS.md`，这份备忘不进配置面摘要。`MEMORY.md` 仍由投影在第一次写入时创建。Inotify、side chat、对齐综述仍留在本 Proposed ADR 的后续。
+已落地的切片见 [Agent Note: 结构化记忆的人可读投影](../notes/implemented/seam/2026-09-30-curated-memory-projection.md)、[Agent Note: 折叠系统提示里的常驻文件跟磁盘](../notes/implemented/seam/2026-09-30-standing-files-survive-folded-header.md)、[Agent Note: 实时常驻文件监听](../notes/implemented/seam/2026-09-30-real-time-standing-watcher.md)、[Agent Note: Side Chat 分支记忆隔离](../notes/implemented/seam/2026-09-30-side-chat-isolation.md)、[Agent Note: FTS 记忆索引与检索决策树](../notes/implemented/seam/2026-09-30-fts-memory-index.md) 与 [Agent Note: 做梦慢路径与对齐综述](../notes/implemented/seam/2026-09-30-dream-slow-path.md)。`MEMORY.md` 是活跃语义记录的投影。折叠后的系统提示保留规则，其中的常驻文件块按磁盘重写。对用户说已经记下，要先有写盘回执。`memory_explain` 展开一条记录的八个审计字段。常驻文件变更由进程内实时监听器捕获，在下一次历史装配时以统一 diff 附在系统提示后，监听故障不阻断会话。一个人一份人物页。一个群体一份群体页。目录、索引名、常驻文件名单和预算来自包内 `layout.toml`，助理主目录的 `memory/contextfiles.toml` 可以覆盖。索引由这些页面重写。新建助理时写入 `TOOLS.md`，这份备忘不进配置面摘要。`MEMORY.md` 仍由投影在第一次写入时创建。`memory/index` 持有由语义记录与每日流水构建的全文索引，`memory_search` 查询它；系统提示注入强制检索决策树与防幻觉终端闸门。分支会话的事实写入 `side-chats/<id>/MEMORY.md`。带 `branch` 的检索不返回主会话里的私人内容（作息、病史、住址、凭证）；其余主记忆仍可检索。提示同时注入「检索到不等于可透露」。`lca-ops memory dream` 把流水里的显式偏好写入 `MEMORY.md`；一次性事件留在流水里供检索，不写进对齐综述。综述只收偏好与身份，并带 `message:xxx` 引用。监听故障记 `WATCHER_FAULT` 且不阻断会话。Inotify 秒级监听以轮询线程等效实现，SLA 记为目标而非门禁。
 
 ---
 

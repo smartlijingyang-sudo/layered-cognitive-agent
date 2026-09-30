@@ -45,6 +45,10 @@ from lca.plugins.prompts.sections.context import (
 )
 from lca.plugins.prompts.sections.evidence import build_evidence_pack
 from lca.plugins.prompts.sections.member_status import build_member_status
+from lca.plugins.prompts.sections.memory import (
+    build_memory_retrieval,
+    build_privacy_firewall,
+)
 from lca.plugins.prompts.sections.role import (
     build_backstory_section,
     build_goal_section,
@@ -218,6 +222,8 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         ("user_profile", build_user_profile(Config())),
         ("home", build_home(Config())),
         ("autonomous_presets", build_autonomous_presets(Config())),
+        ("memory_retrieval", build_memory_retrieval(Config())),
+        ("privacy_firewall", build_privacy_firewall(Config())),
         ("teammates", build_teammates(Config())),
         ("assigned_roles_text", build_assigned_roles(Config())),
         ("member_reports_text", build_member_reports(Config())),
