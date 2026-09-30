@@ -30,6 +30,7 @@ from lca.contracts.models.core.execution.sandbox import (
     SessionInfo,
 )
 from lca.contracts.models.core.state.guest_layout import GuestLayout
+from lca.contracts.protocols import Sandbox
 from lca.infrastructure.sandbox.onlyboxes.bootstrap import safe_rel_name
 from lca.infrastructure.sandbox.output.collect import try_append_generated_file
 from lca.infrastructure.sandbox.streaming.streaming import SandboxStreamEmitter
@@ -70,7 +71,23 @@ def default_local_root() -> str:
         return str(cache)
 
 
-class LocalSandboxAdapter:
+def _ensure_dir(path: Path) -> None:
+    """阻塞式建目录；沙箱文件 I/O 本就是阻塞子进程路径，同步执行。"""
+    path.mkdir(parents=True, exist_ok=True)
+
+
+def _write_text_blocking(path: Path, text: str) -> None:
+    """阻塞式写文本；配合子进程执行，避免 async pathlib 依赖。"""
+    path.write_text(text, encoding="utf-8")
+
+
+def _unlink_blocking(path: Path) -> None:
+    """幂等删除临时文件（阻塞式）。"""
+    with contextlib.suppress(OSError):
+        path.unlink(missing_ok=True)
+
+
+class LocalSandboxAdapter(Sandbox):
     """Host-backed Sandbox: real filesystem + subprocess shell/code exec."""
 
     name = "local-sandbox"
@@ -105,7 +122,7 @@ class LocalSandboxAdapter:
         if guest == mount or guest.startswith(mount + "/"):
             rel = guest[len(mount) :].lstrip("/")
             return str(root / rel) if rel else str(root)
-        if guest.startswith("/tmp/"):
+        if guest.startswith(f"{os.sep}tmp{os.sep}"):
             return guest
         return str(root / guest.lstrip("/"))
 
@@ -136,7 +153,7 @@ class LocalSandboxAdapter:
     ) -> SandboxResult:
         emitter = SandboxStreamEmitter(invocation_id)
         work = cwd or str(self._session_root(session_id))
-        Path(work).mkdir(parents=True, exist_ok=True)
+        _ensure_dir(Path(work))
         rewritten = self._rewrite_command(command)
         wrapped = f"cd {shlex.quote(work)} && {rewritten}"
         try:
@@ -206,11 +223,11 @@ class LocalSandboxAdapter:
         del timeout_s
         root_guest = base_dir or self._layout.root
         host_base = Path(self._guest_to_host(root_guest, session_id=session_id))
-        host_base.mkdir(parents=True, exist_ok=True)
-        (host_base / SANDBOX_OUTPUT_SUBDIR).mkdir(parents=True, exist_ok=True)
+        _ensure_dir(host_base)
+        _ensure_dir(host_base / SANDBOX_OUTPUT_SUBDIR)
         for name, source in files.items():
             target = host_base / safe_rel_name(name)
-            target.parent.mkdir(parents=True, exist_ok=True)
+            _ensure_dir(target.parent)
             if isinstance(source, str) and source.startswith(("http://", "https://")):
                 # Download via curl in the sandbox shell for parity with Onlyboxes.
                 result = await self._exec_shell(
@@ -297,7 +314,7 @@ class LocalSandboxAdapter:
         fd, code_path = tempfile.mkstemp(prefix="lca-code-", suffix=f".{ext}", dir="/tmp")
         os.close(fd)
         try:
-            Path(code_path).write_text(code, encoding="utf-8")
+            _write_text_blocking(Path(code_path), code)
             return await self._exec_shell(
                 f"{runner} {shlex.quote(code_path)}",
                 session_id=session_id,
@@ -306,8 +323,7 @@ class LocalSandboxAdapter:
                 cwd=str(work),
             )
         finally:
-            with contextlib.suppress(OSError):
-                Path(code_path).unlink(missing_ok=True)
+            _unlink_blocking(Path(code_path))
 
 
 __all__ = ["LocalSandboxAdapter", "default_local_root"]
