@@ -42,10 +42,9 @@ def test_production_runtime_and_composer_contain_no_legacy_execution_fallbacks()
 def test_production_assembly_requires_profile_selected_phase_observer() -> None:
     """Phase observation must be an explicit production capability binding."""
 
-    runtime_assembly = Path("lca/plugins/composer/runtime/runtime_assembly.py").read_text()
-    runtime_capabilities = Path("lca/plugins/composer/runtime/runtime_capabilities.py").read_text()
-    runtime_binding = Path("lca/plugins/composer/runtime/runtime_binding.py").read_text()
-    transaction = Path("lca/loop/transaction.py").read_text()
+    runtime_assembly = Path("lca/plugins/composer/runtime/runtime/assembly.py").read_text()
+    runtime_capabilities = Path("lca/plugins/composer/runtime/runtime/capabilities.py").read_text()
+    runtime_binding = Path("lca/plugins/composer/runtime/runtime/binding.py").read_text()
 
     assert "resolve_runtime_capabilities" in runtime_assembly
     assert "bind_runtime_graph(" in runtime_assembly
@@ -53,8 +52,9 @@ def test_production_assembly_requires_profile_selected_phase_observer() -> None:
     assert "PHASE_OBSERVER" in runtime_capabilities
     assert "require_declared_capabilities(" in runtime_capabilities
     assert "phase_observer=capabilities.phase_observer" in runtime_binding
-    assert "TracingPhaseObserver" not in transaction
-    assert "phase_observer or" not in transaction
+    # The legacy lca/loop/transaction.py (PhaseExecutionTransaction) is fully
+    # retired; phase observation lives only in the capability binding above.
+    assert not Path("lca/loop/transaction.py").exists()
 
 
 def test_plan_binding_rejects_v1_fallback_candidates():

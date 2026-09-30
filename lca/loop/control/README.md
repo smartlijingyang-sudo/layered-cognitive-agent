@@ -44,6 +44,6 @@ by `ContributionRole`:
 | Concern | Canonical path |
 |---|---|
 | Governance interpreter | `lca/harness/graph/governance/phase_governance.py` |
-| Phase visit transaction | `lca/loop/transaction.py` |
+| Phase visit observation | `lca/harness/declarative/lifecycle/phase_observation.py` |
 | Control verdict contract | `lca/contracts/protocols/gate/control_verdict.py` |
 | Example think guard plugin | `lca/plugins/control_contributions/think_guard.py` |
