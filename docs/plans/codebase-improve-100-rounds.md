@@ -413,3 +413,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat 7e25bf3bc` → 7 files changed, 656 insertions(+), 411 deletions(-); gross diff = 1067 > 100.
 - **Tests:** `uv run pytest -q tests/infrastructure/test_cognitive_emit_barrel.py -m "not real_llm" --no-cov` → **3 passed** (subagent ran 43 passed / 2 pre-existing failures).
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 41 — 2026-09-30
+
+- **Commit:** `cd966421d` (cherry-picked from subagent branch `round-u` commit `80afcd945`)
+- **Architectural concern:** module depth / oversized module. `skill/overlay.py` (827 lines) mixed import, gating, placement, digest, and receipt logic.
+- **Change:** split into an `overlay/` package (`importing.py`, `gating.py`, `receipts.py`, `overlay.py`, `plugin.py` + barrel); updated architecture invariants; added `test_skill_overlay_gating_receipts.py` (11 tests).
+- **Files:** 9 files (5 new submodules + barrel + 2 test updates).
+- **Shortstat:** `git show --shortstat cd966421d` → 9 files changed, 639 insertions(+), 353 deletions(-); gross diff = 992 > 100.
+- **Tests:** `uv run pytest -q tests/plugins/assistant/test_skill_overlay_gating_receipts.py -m "not real_llm" --no-cov` → **11 passed**.
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
