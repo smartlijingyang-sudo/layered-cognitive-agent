@@ -606,3 +606,51 @@ def test_explicit_run_id_still_works(traces_root: Path) -> None:
     )
     assert result.exit_code == 0, result.stderr
     assert "brain/perceive.py" in result.stdout
+
+
+# ── pure parse/render helpers via the package barrel ──────────────────
+
+
+def test_pure_parse_render_via_barrel(tmp_path: Path) -> None:
+    """Pure parse/render helpers stay reachable through the package barrel.
+
+    The refactor split ``journal_trace.py`` into ``parse`` / ``render`` /
+    ``command`` submodules; the barrel re-exports ``register`` and the
+    submodules stay importable through the package. This test pins the
+    pure functions (JSONL decoding, I17 projection, table + human
+    rendering) without booting the CLI.
+    """
+    from lca.infrastructure.cli.commands.journal_extra import journal_trace
+
+    ledger = tmp_path / "events.jsonl"
+    ledger.write_text(
+        '{"event_id": "run_x:1", "ts": "2026-09-01T00:00:00+00:00", '
+        '"execution_point": "brain.perceive.start", "channel": "fact", '
+        '"outcome": "success", "payload": {"source_location": '
+        '{"file": "a.py", "line": 1, "function": "f"}, "call_frames": [], '
+        '"locals_snapshot": {"pre_call": {}}}}\n'
+        "\n"
+        "not-json\n",
+        encoding="utf-8",
+    )
+
+    # parse: JSONL decoding skips blank lines and marks malformed lines.
+    decoded = list(journal_trace.parse._iter_events(ledger))
+    assert len(decoded) == 2
+    assert decoded[1].get("__decode_error__") is True
+
+    # parse: I17 source columns project into TraceRow.
+    row = journal_trace.parse._event_to_row(1, decoded[0])
+    assert row.source_file == "a.py"
+    assert row.source_line == 1
+    assert row.source_function == "f"
+
+    # render: the machine table surfaces the source column.
+    table = journal_trace.render._row_iter_to_table([row], with_locals=False)
+    assert "execution_point" in table
+    assert "a.py:1 (f)" in table
+
+    # render: the human view renders the EP headline + payload detail.
+    human = journal_trace.render._render_human([decoded[0]])
+    assert "brain.perceive.start" in human
+    assert "source_location" in human
