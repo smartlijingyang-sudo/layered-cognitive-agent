@@ -5,19 +5,13 @@ module M4: lca/contracts/observability/observation/m4_lifecycle/
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import Any
 
 from lca.contracts.observability.observation import BundleLoad
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.loop.fact_gateway import publish_ep_bound
+from lca.loop.observation import now_iso, publish_ep_observation
 
 _EV_BUNDLE_LOAD = "observation.bundle.load"
-_OBSERVER_ACTOR = "observation"
-
-
-def _now_iso() -> str:
-    return datetime.now(UTC).isoformat()
 
 
 def observe_bundle_load(
@@ -36,12 +30,11 @@ def observe_bundle_load(
         status=status,
         version=version,
         failure_reason=failure_reason,
-        loaded_at=_now_iso(),
+        loaded_at=now_iso(),
     )
-    publish_ep_bound(
+    publish_ep_observation(
         _EV_BUNDLE_LOAD,
         fact.model_dump(mode="json"),
-        actor=_OBSERVER_ACTOR,
     )
 
 

@@ -10,7 +10,6 @@ Emit 走 :func:`append_catalog_bound` —— Session 单轨（ADR-0186）。
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import Any
 
 from lca.contracts.observability.observation import (
@@ -19,14 +18,8 @@ from lca.contracts.observability.observation import (
     NodeExit,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.loop.fact_gateway import append_catalog_bound
+from lca.loop.observation import now_iso, publish_session_observation
 from lca.plugins.events._session_observe import current_session
-
-_OBSERVER_ACTOR = "observation"
-
-
-def _now_iso() -> str:
-    return datetime.now(UTC).isoformat()
 
 
 def observe_node_enter(
@@ -50,10 +43,10 @@ def observe_node_enter(
         sub_graph_id=sub_graph_id,
         depth=depth,
         visit_count=visit_count,
-        entered_at=_now_iso(),
+        entered_at=now_iso(),
         inputs=inputs or {},
     )
-    append_catalog_bound(fact, session=current_session(), actor=_OBSERVER_ACTOR)
+    publish_session_observation(fact, session=current_session())
 
 
 def observe_node_exit(
@@ -80,9 +73,9 @@ def observe_node_exit(
         elapsed_ms=elapsed_ms,
         outputs=outputs or {},
         exception=exception,
-        exited_at=_now_iso(),
+        exited_at=now_iso(),
     )
-    append_catalog_bound(fact, session=current_session(), actor=_OBSERVER_ACTOR)
+    publish_session_observation(fact, session=current_session())
 
 
 @plugin(

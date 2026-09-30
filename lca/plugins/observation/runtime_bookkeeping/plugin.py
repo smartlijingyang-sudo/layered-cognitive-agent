@@ -8,19 +8,12 @@ Emit 走 :func:`append_catalog_bound` —— Session 单轨（ADR-0186）。
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import Any
 
 from lca.contracts.observability.observation import ReducerApply
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.loop.fact_gateway import append_catalog_bound
+from lca.loop.observation import now_iso, publish_session_observation
 from lca.plugins.events._session_observe import current_session
-
-_OBSERVER_ACTOR = "observation"
-
-
-def _now_iso() -> str:
-    return datetime.now(UTC).isoformat()
 
 
 def observe_reducer_apply(
@@ -43,9 +36,9 @@ def observe_reducer_apply(
         exception_class=exception_class,
         phase_boundary=phase_boundary,
         elapsed_ms=elapsed_ms,
-        occurred_at=_now_iso(),
+        occurred_at=now_iso(),
     )
-    append_catalog_bound(fact, session=current_session(), actor=_OBSERVER_ACTOR)
+    publish_session_observation(fact, session=current_session())
 
 
 @plugin(

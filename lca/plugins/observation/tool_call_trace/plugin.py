@@ -5,19 +5,13 @@ module M5: lca/contracts/observability/observation/m5_event_traces/
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import Any
 
 from lca.contracts.observability.observation import ToolCallTrace
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.loop.fact_gateway import publish_ep_bound
+from lca.loop.observation import now_iso, publish_ep_observation
 
 _EV_TOOL_CALL = "observation.tool_call"
-_OBSERVER_ACTOR = "observation"
-
-
-def _now_iso() -> str:
-    return datetime.now(UTC).isoformat()
 
 
 def observe_tool_call(
@@ -40,12 +34,11 @@ def observe_tool_call(
         success=success,
         elapsed_ms=elapsed_ms,
         retry_count=retry_count,
-        occurred_at=_now_iso(),
+        occurred_at=now_iso(),
     )
-    publish_ep_bound(
+    publish_ep_observation(
         _EV_TOOL_CALL,
         fact.model_dump(mode="json"),
-        actor=_OBSERVER_ACTOR,
     )
 
 

@@ -11,7 +11,6 @@ module M7: lca/contracts/observability/observation/m7_diff/
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import UTC, datetime
 from typing import Any
 
 from lca.contracts.observability.observation import (
@@ -23,14 +22,9 @@ from lca.contracts.observability.observation import (
     UnexpectedNode,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.loop.fact_gateway import publish_ep_bound
+from lca.loop.observation import now_iso, publish_ep_observation
 
 _EV_DIFF = "diagnosis.diff_report"
-_OBSERVER_ACTOR = "diagnosis"
-
-
-def _now_iso() -> str:
-    return datetime.now(UTC).isoformat()
 
 
 def diff_blueprint_trajectory(
@@ -98,7 +92,7 @@ def diff_blueprint_trajectory(
         unexpected_nodes=unexpected,
         contract_violations=tuple(violations),
         edge_deviations=(),
-        diffed_at=_now_iso(),
+        diffed_at=now_iso(),
     )
 
 
@@ -110,10 +104,10 @@ def observe_diff(
 ) -> DiffReport:
     """Caller-facing wrapper:计算 + emit。"""
     report = diff_blueprint_trajectory(run_id=run_id, blueprint=blueprint, node_exits=node_exits)
-    publish_ep_bound(
+    publish_ep_observation(
         _EV_DIFF,
         report.model_dump(mode="json"),
-        actor=_OBSERVER_ACTOR,
+        actor="diagnosis",
     )
     return report
 

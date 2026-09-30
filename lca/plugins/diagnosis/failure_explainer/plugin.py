@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from typing import Any
 
 from lca.contracts.observability.observation import (
@@ -24,10 +23,9 @@ from lca.contracts.observability.observation import (
     RootCauseStep,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.loop.fact_gateway import publish_ep_bound
+from lca.loop.observation import now_iso, publish_ep_observation
 
 _EV_EXPLANATION = "diagnosis.failure_explanation"
-_OBSERVER_ACTOR = "diagnosis"
 
 
 @dataclass(frozen=True)
@@ -77,10 +75,6 @@ ROOT_CAUSE_TEMPLATES: tuple[_Template, ...] = (
         contract_clause="ctl.authorize",
     ),
 )
-
-
-def _now_iso() -> str:
-    return datetime.now(UTC).isoformat()
 
 
 def explain_failure(
@@ -164,7 +158,7 @@ def explain_failure(
         summary=summary,
         root_cause_chain=tuple(chain),
         remediation_hints=tuple(hints),
-        explained_at=_now_iso(),
+        explained_at=now_iso(),
     )
 
 
@@ -176,10 +170,10 @@ def observe_explanation(
 ) -> FailureExplanation:
     """Caller-facing wrapper:计算 + emit。"""
     explanation = explain_failure(run_id=run_id, diff=diff, control_traces=control_traces)
-    publish_ep_bound(
+    publish_ep_observation(
         _EV_EXPLANATION,
         explanation.model_dump(mode="json"),
-        actor=_OBSERVER_ACTOR,
+        actor="diagnosis",
     )
     return explanation
 

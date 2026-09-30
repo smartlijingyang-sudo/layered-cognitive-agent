@@ -9,19 +9,13 @@ commit 的 fact 拼出来),observer 走 Session.append emit。
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import Any
 
 from lca.contracts.observability.observation import ArtifactSnapshot
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.loop.fact_gateway import publish_ep_bound
+from lca.loop.observation import now_iso, publish_ep_observation
 
 _EV_ARTIFACT = "observation.artifact_snapshot"
-_OBSERVER_ACTOR = "observation"
-
-
-def _now_iso() -> str:
-    return datetime.now(UTC).isoformat()
 
 
 def observe_artifact_snapshot(
@@ -38,12 +32,11 @@ def observe_artifact_snapshot(
         phase=phase,
         artifacts=artifacts,
         context_digest=context_digest,
-        snapshotted_at=_now_iso(),
+        snapshotted_at=now_iso(),
     )
-    publish_ep_bound(
+    publish_ep_observation(
         _EV_ARTIFACT,
         fact.model_dump(mode="json"),
-        actor=_OBSERVER_ACTOR,
     )
 
 
