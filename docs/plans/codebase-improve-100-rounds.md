@@ -143,3 +143,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat f3a266bab` → 2 files changed, 119 insertions(+), 24 deletions(-); gross diff = 143 > 100.
 - **Tests:** `uv run pytest -q tests/runtime/coordinator -m "not real_llm" --no-cov` → **91 passed** (13 in the pump test file).
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 14 — 2026-09-30
+
+- **Commit:** `495a7c66d`
+- **Architectural concern:** layering violation / dependency direction. `lca.harness.declarative.execute.dispatch` imported `RegistryKeyError` from `lca.infrastructure.component.registry`, but harness must depend only on contracts.
+- **Change:** created `lca/contracts/exceptions/registry.py` with `RegistryKeyError`; re-exported it from `lca/contracts/exceptions/__init__.py`; infrastructure registry now re-exports from contracts (existing consumers unaffected); harness imports from contracts; added tests + structural guard.
+- **Files:** `lca/contracts/exceptions/registry.py` + `__init__.py`, `lca/infrastructure/component/registry.py`, `lca/harness/declarative/execute/dispatch.py`, `tests/contracts/exceptions/test_registry_error.py`.
+- **Shortstat:** `git show --shortstat 495a7c66d` → 6 files changed, 89 insertions(+), 23 deletions(-); gross diff = 112 > 100.
+- **Tests:** `uv run pytest -q tests/contracts/exceptions/test_registry_error.py tests/contracts/test_canonical_digest.py -m "not real_llm" --no-cov` → **23 passed** (6 new); `tests/harness/test_pipeline_loader.py` failures pre-existing at base `b42b40e5d`.
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
