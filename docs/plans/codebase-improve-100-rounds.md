@@ -383,3 +383,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat 11b1710f1` → 5 files changed, 949 insertions(+), 800 deletions(-); gross diff = 1749 > 100.
 - **Tests:** `uv run pytest -q tests/lca_kernel/events/test_fold.py -m "not real_llm" --no-cov` → **61 passed** (including 2 new).
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 38 — 2026-09-30
+
+- **Commit:** `3c203e505` (cherry-picked from subagent branch `round-t` commit `e487f672e`)
+- **Architectural concern:** module depth / oversized module. `device_hub/routes/routes.py` (906 lines) mixed HTTP handlers, the WebSocket loop, and argument encoding.
+- **Change:** split into a `routes/` package (`context.py`, `routes_http.py`, `routes_ws.py`, re-export `routes.py` + barrel `__init__.py`); added `test_routes_barrel.py`.
+- **Files:** 6 files (3 new submodules + 2 barrels + test).
+- **Shortstat:** `git show --shortstat 3c203e505` → 6 files changed, 1107 insertions(+), 904 deletions(-); gross diff = 2011 > 100.
+- **Tests:** `uv run pytest -q tests/lca_plugins/transport/device_hub/test_routes_barrel.py -m "not real_llm" --no-cov` → **3 passed** (subagent ran 30 passed / 2 skipped across the affected set).
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
