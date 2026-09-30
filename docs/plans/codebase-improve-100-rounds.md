@@ -203,3 +203,23 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat 0f31ac638` → 6 files changed, 620 insertions(+), 600 deletions(-); gross diff = 1220 > 100.
 - **Tests:** `uv run pytest -q tests/think/test_decision_repair_phase_plugin.py tests/observability/health/test_run_health_fold.py tests/observability/health/test_derivers/test_think_deriver.py -m "not real_llm" --no-cov` → **56 passed**.
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 20 — 2026-09-30
+
+- **Commit:** `573352239` (cherry-picked from subagent branch `round-e` commit `1461ab71b`)
+- **Architectural concern:** layering violation / dependency direction. `lca.infrastructure.session.context.turn_control_reader` imported `observation_files_created` and `view_tool_fingerprint` upward from cognition.
+- **Change:** moved `ControlTurnView` and the fingerprint projection into contracts (`lca/contracts/models/core/execution/{control_turn,fingerprint}.py`); `view_tool_fingerprint` now imports from contracts; `observation_files_created` is injected as a callback at the composition boundary; added `tests/architecture/test_infrastructure_session_no_cognition.py`.
+- **Files:** 14 files (2 new contracts modules, 1 new structural test, reader + cognition + composition callers).
+- **Shortstat:** `git show --shortstat 573352239` → 14 files changed, 343 insertions(+), 174 deletions(-); gross diff = 517 > 100.
+- **Tests:** `uv run pytest -q tests/architecture/test_infrastructure_session_no_cognition.py tests/infrastructure/test_turn_control_reader.py tests/infrastructure/test_turn_control_files_created.py -m "not real_llm" --no-cov` → **13 passed** (subagent ran 54 across the full affected set).
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 21 — 2026-09-30
+
+- **Commit:** `446c3200d` (cherry-picked from subagent branch `round-f` commit `cb73130db`)
+- **Architectural concern:** design pattern / duplicated logic. Three nearly identical `InMemory*HandlerRegistry` classes each re-declared `register`/`resolve` over `UniqueOperationRegistry`.
+- **Change:** added `GenericInMemoryRegistry[T, TProtocol]` + `make_inmemory_registry(kind, protocol)` in `lca/infrastructure/handler/registry.py`; the three act providers now declare their registries as factory calls; public names preserved; added `tests/infrastructure/handler/test_generic_registry.py`.
+- **Files:** `lca/infrastructure/handler/registry.py` + `__init__.py`, 3 act provider files, `tests/infrastructure/handler/test_generic_registry.py`.
+- **Shortstat:** `git show --shortstat 446c3200d` → 6 files changed, 205 insertions(+), 69 deletions(-); gross diff = 274 > 100.
+- **Tests:** `uv run pytest -q tests/infrastructure/handler/test_generic_registry.py -m "not real_llm" --no-cov` → **6 passed** (subagent ran 74 across the affected set; 3 failures pre-existing).
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
