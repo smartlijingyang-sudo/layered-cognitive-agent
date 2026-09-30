@@ -22,3 +22,11 @@ The candidate backlog is populated by a repo-wide `lca-find-simplifications` swe
 | 8 | `lca/plugins/transport/webserver/doctor/steps/hops.py` stub-ok-True fallback | COMPAT shim | COMPAT(delete-when: scan.step_ids/indexes no empty-tuple fallback) — verify | ~30 | planned |
 | 9 | `lca/plugins/domain/assistant/catalog/handlers.py` `retire` placeholder | COMPAT placeholder | COMPAT(delete-when: 2026-12-31, retire 入口落地后删除); method raises NotImplementedError — verify | ~15 | planned |
 | 10 | `lca/infrastructure/observability/spine/sinks/naming.py` SPINE_FILE_SUFFIX | COMPAT constant | COMPAT(delete-when: spine_filename 默认稳定 ≥14 天) — verify | ~15 | planned |
+
+## Iteration log
+
+Each row: iteration → commit SHA → module/files → `.py` numstat (add+del) → benefit → checks run.
+
+| # | SHA | Module/File | .py lines (A+D) | Benefit | Checks |
+|---|---|---|---|---|---|
+| 1 | 6f44ab70e | `lca/plugins/observability/spine/reflectors/` + `spine/core.py` | 619 (6+613) | Delete retired 582-line reflector package (zero consumers) + dead soft-import loop over 4 non-existent modules in core.py | ruff core.py OK; pytest spine subset 85 passed / 27 failed = baseline (5 pre-existing reproduced on clean stash); lint-imports unchanged |
