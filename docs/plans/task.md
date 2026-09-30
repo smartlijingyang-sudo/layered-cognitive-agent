@@ -359,3 +359,9 @@
 | ADR-0254-TEST-BRAINSTORM-APPROACHES | 提出 2-3 种场景测试与验收流程架构方案及权衡对比 | Completed | 用户选定推荐方案：双轨立体分级验收体系（48h 主线演进 + 8大边界攻防 + 认知量化量规） |
 | ADR-0254-TEST-BRAINSTORM-DESIGN-SECTIONS | 逐步呈现场景测试流程、用例矩阵与验收标准设计并获取审批 | Completed | 全部 7 大阶段 48h 跨 Topic 演进流、11 项功能倒推场景与 5 大极端刁难场景均获用户确认 |
 | ADR-0254-TEST-BRAINSTORM-DOC | 沉淀商用级全景场景测试规范至 docs/specs/ 并提交 git | Completed | 成功落盘 docs/specs/adr-0254-scenario-testing-specification.md（660+ 行，覆盖 48h 跨 Topic 演进、底层后台读写 IO、记忆整理与做梦管线、11 大功能倒推与 5 大极端刁难场景） |
+| BRAINSTORM-COMMERCIAL-EVAL-CONTEXT | 深度剖析项目 ADR、业界顶级 Agent (Muse/Grok/Hermes) 能力与现有评测运行器 | Completed | 已摸透 ADR-0254/0250/0248/0245/0253 契约、Muse五大上下文文件/昼夜做梦、Grok主动嗅觉/机智协调/伴侣执行、Hermes工具精准/专家组队Fold及现存 YAML/Runner 评测基座 |
+| BRAINSTORM-COMMERCIAL-EVAL-QUESTIONS | 澄清对话式场景设计维度、测试驱动(TDD)执行模式与核心商用验收边界（单步提问） | Completed | 用户选定：1. 集大成商用旗舰 Assistant（融汇 Muse 记忆/Grok 机智敏锐/Hermes 精准工具与自演化）；2. 双模执行体系（结构化 YAML 剧本 + 独立 runner 跑分 + pytest TDD 自动化红绿门禁闭环） |
+| BRAINSTORM-COMMERCIAL-EVAL-APPROACHES | 提出 2-3 种对话场景评测与 TDD 缺陷闭环架构方案及权衡 | Completed | 用户选定方案 A，并明确要求融入业界主流对 Agent 进行测试的标准问题类型、测试流程与多轮评测规范 |
+| BRAINSTORM-COMMERCIAL-EVAL-DESIGN-SECTIONS | 逐步呈现全景对话用例体系（多轮问题/期望/能力点/短板暴露）并获取用户审批 | Completed | 全部 3 节（主流标准流程/8大象限16套多轮对话剧本/双模执行与TDD缺陷闭环）均获用户审核批准 |
+| BRAINSTORM-COMMERCIAL-EVAL-DESIGN-DOC | 沉淀商用级全景对话评测与 TDD 驱动设计文档至 docs/plans/ 并提交 | Completed | 成功落盘 docs/plans/2026-09-30-commercial-dialogue-scenario-eval-design.md 并已提交 git |
+| BRAINSTORM-COMMERCIAL-EVAL-TRANSITION | 转换至实施计划制定（writing-plans） | In Progress | 准备调用 writing-plans 技能编写落地实施计划 |
