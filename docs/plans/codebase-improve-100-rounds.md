@@ -233,3 +233,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat ba00c5a45` → 3 files changed, 111 insertions(+), 2 deletions(-); gross diff = 113 > 100.
 - **Tests:** `uv run pytest -q tests/infrastructure/tools/assistant/test_filter_tools.py tests/architecture/test_no_assistant_tools_alias.py -m "not real_llm" --no-cov` → **33 passed**.
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 23 — 2026-09-30
+
+- **Commit:** `7d60cc10a`
+- **Architectural concern:** shallow retired stub / dead compatibility shell. The ADR-0163 sibling re-export `routes.py` existed only for legacy `mock.patch` strings; no live code referenced them.
+- **Change:** deleted the stub; simplified the api `__init__.py` (removed `routes` from exports); repointed docstring/comment references in `command_endpoints.py`, `diagnostics.py`, and a scenario test; added a structural guard.
+- **Files:** `lca/plugins/transport/webserver/handlers/runs/api/routes.py` (deleted), `lca/plugins/transport/webserver/handlers/runs/api/__init__.py`, `command_endpoints.py`, `diagnostics.py`, 2 test files.
+- **Shortstat:** `git show --shortstat 7d60cc10a` → 7 files changed, 74 insertions(+), 77 deletions(-); gross diff = 151 > 100.
+- **Tests:** `uv run pytest -q tests/architecture/test_runs_api_routes_stub_retired.py -m "not real_llm" --no-cov` → **4 passed**. `test_catalog_registers_profile_route` fails on a stale `ROUTES` import (pre-existing at HEAD).
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
