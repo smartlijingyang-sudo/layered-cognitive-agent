@@ -46,6 +46,7 @@ def test_agent_boot_auto_mcp_injection(mock_llm):
     assert len(tool_names) >= 2, f"Expected at least 2 MCP tools, got {tool_names}"
     assert any("searxng" in name for name in tool_names), f"searxng not in {tool_names}"
     assert any("exa" in name for name in tool_names), f"exa not in {tool_names}"
+    assert any("corp" in name for name in tool_names), f"corp not in {tool_names}"
 
     # 2. Verify tool permission manifest authorizes all injected tools
     allowed_tools = set(agent.role_profile.tool_permission_manifest.allowed_tools)
@@ -57,6 +58,36 @@ def test_agent_boot_auto_mcp_injection(mock_llm):
     assert "<tool" in tools_xml
     assert "searxng" in tools_xml
     assert "exa" in tools_xml
+    assert "corp" in tools_xml
+
+
+def test_agent_boot_corp_mcp_tools(mock_llm):
+    """Verify that Agent(auto_mcp=True) discovers and authorizes corp MCP tools."""
+    agent = Agent(
+        role="CorporateAssistant",
+        goal="Assist with company OA tickets and workflow queries",
+        backstory="Corporate OA assistant with access to internal corp-mcp",
+        auto_mcp=True,
+        llm=mock_llm,
+    )
+
+    corp_tool_names = [t.name for t in agent.spec.tools if "corp" in t.name]
+    expected_corp_tools = {
+        "mcp__corp__oa_whoami",
+        "mcp__corp__oa_my_tickets",
+        "mcp__corp__oa_ticket_timeline",
+        "mcp__corp__oa_ticket_detail",
+        "mcp__corp__oa_template_list",
+        "mcp__corp__oa_ticket_controls",
+        "mcp__corp__oa_approve_ticket",
+    }
+    assert expected_corp_tools.issubset(set(corp_tool_names)), (
+        f"Missing corp tools: {expected_corp_tools - set(corp_tool_names)}"
+    )
+
+    allowed_tools = set(agent.role_profile.tool_permission_manifest.allowed_tools)
+    for name in expected_corp_tools:
+        assert name in allowed_tools, f"Corp tool '{name}' not in allowed_tools manifest"
 
 
 def test_agent_boot_explicit_mcp_injection(mock_llm):
