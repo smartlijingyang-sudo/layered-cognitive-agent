@@ -11,12 +11,12 @@ from datetime import datetime
 from typing import Any, Literal
 
 from lca.contracts.observability.evidence.outcome import Outcome
+from lca.contracts.observability.spine.records import Channel
 from lca.infrastructure.observability.spine.manifest.manifest import EXECUTION_POINTS
 
-__all__ = ["Channel", "EventRecord", "Outcome", "Phase"]
-
-Channel = Literal["fact", "control", "error", "diagnostic"]
 Phase = Literal["live", "orphan"]
+
+__all__ = ["Channel", "EventRecord", "Outcome", "Phase"]
 
 
 @dataclass(frozen=True, slots=True)

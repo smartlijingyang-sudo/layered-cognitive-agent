@@ -37,6 +37,6 @@ log:emit
 模块导入失败 → ImportError；类实例化失败 → TypeError / ValueError；运行时错误以 L1 protocol 中定义的异常类型抛出。
 
 ## 9. 公共入口
-包门面导出的名字与模块 __all__ 一一对应（共 17 项）：
+包门面导出的名字与模块 __all__ 一一对应（共 21 项）：
 
-`Classification`, `DIGEST_PREFIX`, `ErrKind`, `EvidenceIntegrityError`, `EvidencePolicy`, `EvidenceReceipt`, `EvidenceRef`, `EvidenceStore`, `ExceptionRecord`, `Outcome`, `RetentionClass`, `RunLedgerFactory`, `RunLifecycleStatus`, `SourceLocation`, `classify_exception`, `exc_to_record`, `sha256_payload_digest`
+`Channel`, `Classification`, `DIGEST_PREFIX`, `ErrKind`, `EventSpine`, `EvidenceIntegrityError`, `EvidencePolicy`, `EvidenceReceipt`, `EvidenceRef`, `EvidenceStore`, `ExceptionRecord`, `Outcome`, `RetentionClass`, `RunLedgerFactory`, `RunLifecycleStatus`, `SourceLocation`, `SpanContext`, `SpineContext`, `classify_exception`, `exc_to_record`, `sha256_payload_digest`

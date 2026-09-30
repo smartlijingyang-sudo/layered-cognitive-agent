@@ -12,12 +12,11 @@ The Protocol mirrors the convention used by
 structural typing via ``@runtime_checkable`` so test doubles and
 lightweight classes can opt in without inheriting from a base class.
 
-The ``span`` argument is intentionally typed as ``Any`` because the
-concrete ``SpineContext.SpanContext`` lives in the ``infrastructure``
-layer and this module sits in ``contracts`` (import-linter forbids
-``contracts -> infrastructure``). At runtime any object exposing the
-attributes a producer cares about (e.g. ``span_id``,
-``execution_point``) is acceptable.
+The ``span`` argument is intentionally typed as ``Any`` because
+plugins may receive richer spine-internal shapes beyond the contract
+:class:`~lca.contracts.observability.spine.context.SpanContext`. At
+runtime any object exposing the attributes a producer cares about
+(e.g. ``span_id``, ``execution_point``) is acceptable.
 """
 
 from __future__ import annotations

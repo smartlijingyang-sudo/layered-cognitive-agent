@@ -341,21 +341,25 @@ def test_anomaly_runs_via_session_observer_not_emit_pipeline_when_hooked() -> No
     emit_text = emit_path.read_text(encoding="utf-8")
     assert "is_session_ssot_hook_active()" in emit_text
     assert "self._anomaly.on_event" in emit_text
-    anomaly_plugin = _REPO_ROOT / "lca" / "plugins" / "session" / "spine_anomaly" / "spine_anomaly.py"
+    anomaly_plugin = (
+        _REPO_ROOT / "lca" / "plugins" / "session" / "spine_anomaly" / "spine_anomaly.py"
+    )
     assert anomaly_plugin.exists()
     assert "session_event_to_event_record" in anomaly_plugin.read_text(encoding="utf-8")
 
 
 def test_wrap_bypasses_emit_pipeline_when_session_ssot_hook() -> None:
     """ADR-0186 wave-4 / ADR-0194 P2-07: SSOT hook 活跃时 wrap 不得经 EmitPipeline。"""
-    wrap_path = _REPO_ROOT / "lca" / "harness" / "declarative" / "compile" / "instrument_wrap.py"
+    events_path = (
+        _REPO_ROOT / "lca" / "harness" / "declarative" / "compile" / "instrument" / "events.py"
+    )
     hooks_path = _REPO_ROOT / "lca" / "plugins" / "observability" / "spine" / "runtime_hooks.py"
-    wrap_text = wrap_path.read_text(encoding="utf-8")
+    events_text = events_path.read_text(encoding="utf-8")
     hooks_text = hooks_path.read_text(encoding="utf-8")
-    assert "is_session_ssot_hook_active()" in wrap_text
+    assert "is_session_ssot_hook_active()" in events_text
     assert "_emit_via_pipeline" not in hooks_text
     assert "resolve_active_pipeline" not in hooks_text
-    safe_body = wrap_text[wrap_text.index("def _safe_append(") :]
+    safe_body = events_text[events_text.index("def _safe_append(") :]
     ssot_idx = safe_body.index("is_session_ssot_hook_active()")
     pipeline_idx = safe_body.index("_resolve_pipeline()")
     assert ssot_idx < pipeline_idx

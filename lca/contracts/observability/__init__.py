@@ -32,6 +32,10 @@ from lca.contracts.observability.journal.ledger import RunLedgerFactory as RunLe
 from lca.contracts.observability.registry.status import (
     RunLifecycleStatus as RunLifecycleStatus,
 )
+from lca.contracts.observability.spine import Channel as Channel
+from lca.contracts.observability.spine import EventSpine as EventSpine
+from lca.contracts.observability.spine import SpanContext as SpanContext
+from lca.contracts.observability.spine import SpineContext as SpineContext
 from lca.contracts.observability.trace.exception_capture import (
     ErrKind as ErrKind,
 )
@@ -50,8 +54,10 @@ from lca.contracts.observability.trace.exception_capture import (
 
 __all__ = [
     "DIGEST_PREFIX",
+    "Channel",
     "Classification",
     "ErrKind",
+    "EventSpine",
     "EvidenceIntegrityError",
     "EvidencePolicy",
     "EvidenceReceipt",
@@ -63,6 +69,8 @@ __all__ = [
     "RunLedgerFactory",
     "RunLifecycleStatus",
     "SourceLocation",
+    "SpanContext",
+    "SpineContext",
     "classify_exception",
     "exc_to_record",
     "sha256_payload_digest",

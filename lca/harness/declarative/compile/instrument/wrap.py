@@ -29,17 +29,19 @@ The wrapper is **safe to compose**:
 
 Emission routing (PR-7.1)
 -------------------------
-When an ``emit_pipeline`` is installed via
+The actual spine emission lives in :mod:`...instrument.events`; when
+an ``emit_pipeline`` is installed via
 :func:`set_active_pipeline_accessor`, every event goes through
 ``EmitPipeline.emit(...)`` so all enabled ``FieldProducer`` plugins
-(signature / source / spantree / context / runtime) contribute their
-keys to ``EventRecord.payload``. With no pipeline installed the wrapper
-falls back to a direct ``EventSpine.append(...)``, keeping the PR-4
-assembler contract intact for pre-boot and unit-test paths.
+contribute their keys to ``EventRecord.payload``. With no pipeline
+installed the wrapper falls back to a direct ``EventSpine.append(...)``,
+keeping the PR-4 assembler contract intact for pre-boot and unit-test
+paths.
 
-``lca.harness`` must not statically import ``lca.plugins``, so the
-pipeline is reached duck-typed via the accessor rather than by
-importing ``EmitPipeline``.
+``lca.harness`` must not statically import ``lca.plugins`` or
+``lca.infrastructure``, so the pipeline is reached duck-typed via the
+accessor seam in :mod:`...instrument.accessors` and all spine types
+come from :mod:`lca.contracts.observability`.
 """
 
 from __future__ import annotations
@@ -47,23 +49,23 @@ from __future__ import annotations
 import asyncio
 import functools
 import inspect
-import logging
 from collections.abc import Awaitable, Callable
 from typing import Any, TypeVar, overload
 
+from lca.contracts.observability import SpineContext
 from lca.contracts.observability.canonical_digest import canonical_digest
-from lca.infrastructure.observability.loop_cursor.spine._spine_port import (
-    is_session_ssot_hook_active,
+from lca.harness.declarative.compile.instrument.accessors import (
+    _resolve_spine,
+    resolve_active_pipeline,
+    resolve_active_spine,
+    set_active_pipeline_accessor,
+    set_active_spine_accessor,
 )
-from lca.infrastructure.observability.spine.context.context import (
-    SpanContext,
-    SpineContext,
+from lca.harness.declarative.compile.instrument.events import (
+    _emit_spine_direct,
+    _exception_payload,
+    _safe_append,
 )
-from lca.infrastructure.observability.spine.event.record import Channel
-from lca.infrastructure.observability.spine.event.record import Outcome as OutcomeT
-from lca.infrastructure.observability.spine.event.spine import EventSpine
-
-log = logging.getLogger(__name__)
 
 WRAP_INSTRUMENTED_ATTR = "__lca_instrumented__"
 ASSEMBLER_PROVENANCE = "assembler"
@@ -71,120 +73,7 @@ DEFAULT_START_EXECUTION_POINT = "phase_graph.node.start"
 DEFAULT_END_EXECUTION_POINT = "phase_graph.node.end"
 
 
-def _is_i17_violation(exc: BaseException) -> bool:
-    """Duck-typed check for ``I17Violation`` without a static import.
-
-    ``lca.harness`` must not statically import ``lca.plugins``. The
-    I17 class lives in :mod:`lca.plugins.observability.spine.emit_pipeline`
-    and is identifiable by its fully-qualified name. This lets the
-    wrapper route I17 failures to a dedicated traceback-emitting path
-    (the silent-swallow bug from ADR-2026-09-02-i17-traceback §A) while
-    keeping the assembler import graph unchanged.
-    """
-    cls = type(exc)
-    return (
-        cls.__name__ == "I17Violation"
-        and cls.__module__
-        in (
-            "lca.infrastructure.observability.spine.spine.enrich",
-            "lca.plugins.observability.spine.emit_pipeline",
-        )
-    )
-
-
 _F = TypeVar("_F", bound=Callable[..., Any])
-
-# Process-local active spine accessors live alongside the spine reflector
-# plugins. Importing them directly would create a cross-layer cycle
-# (assembler → observability plugin → assembler). Instead we expose a
-# pluggable accessor that the spine plugins can register against and
-# fall back to ``None`` in unit tests.
-
-_active_spine_getter: Callable[[], EventSpine | None] | None = None
-_active_pipeline_getter: Callable[[], Any] | None = None
-
-
-def set_active_spine_accessor(
-    getter: Callable[[], EventSpine | None] | None,
-) -> Callable[[], EventSpine | None] | None:
-    """Install a process-local spine accessor used by :func:`wrap_instrument`.
-
-    Returns the previous accessor so callers can restore it (typically
-    tests using a ``monkeypatch`` style scope).
-    """
-    global _active_spine_getter
-    previous = _active_spine_getter
-    _active_spine_getter = getter
-    return previous
-
-
-def set_active_pipeline_accessor(
-    getter: Callable[[], Any] | None,
-) -> Callable[[], Any] | None:
-    """Install a process-local EmitPipeline accessor for :func:`wrap_instrument`.
-
-    When a pipeline is installed, ``wrap_instrument`` routes every
-    emission through ``EmitPipeline.emit(...)`` so enabled
-    ``FieldProducer`` plugins contribute their keys to
-    ``EventRecord.payload``. With no pipeline installed, the wrapper
-    falls back to the direct ``EventSpine.append`` path so PR-4
-    assembler contracts still hold under unit tests.
-
-    Returns the previous accessor so callers can restore it.
-    """
-    global _active_pipeline_getter
-    previous = _active_pipeline_getter
-    _active_pipeline_getter = getter
-    return previous
-
-
-def _resolve_spine() -> EventSpine | None:
-    if _active_spine_getter is None:
-        return None
-    try:
-        return _active_spine_getter()
-    except Exception as exc:  # pragma: no cover — defensive only
-        log.warning("wrap_instrument: spine accessor raised %r", exc)
-        return None
-
-
-def _resolve_pipeline() -> Any:
-    """Return the active ``EmitPipeline`` (structural Protocol), or ``None``.
-
-    The protocol is structural: we never import :class:`EmitPipeline`
-    here because ``lca.harness`` must not statically import
-    ``lca.plugins`` (plugin tree is an optional boot-time layer). The
-    pipeline accessor is registered by the boot path via
-    :func:`set_active_pipeline_accessor` and the wrapper calls the
-    duck-typed ``emit(...)`` method.
-    """
-    if _active_pipeline_getter is None:
-        return None
-    try:
-        return _active_pipeline_getter()
-    except Exception as exc:  # pragma: no cover — defensive only
-        log.warning("wrap_instrument: pipeline accessor raised %r", exc)
-        return None
-
-
-def resolve_active_pipeline() -> Any:
-    """Return the installed ``emit_pipeline`` or ``None`` when unwired.
-
-    Public counterpart of :func:`_resolve_pipeline` for the
-    ``ctx_effect`` / ``ctx_intercept`` wrap plugins, which must resolve
-    the same pipeline through the same seam rather than reach into this
-    module's private helpers or install a second accessor.
-    """
-    return _resolve_pipeline()
-
-
-def resolve_active_spine() -> EventSpine | None:
-    """Return the installed ``EventSpine`` or ``None`` when unwired.
-
-    Public counterpart of :func:`_resolve_spine`; see
-    :func:`resolve_active_pipeline` for why the wrap plugins need it.
-    """
-    return _resolve_spine()
 
 
 def _fingerprint_value(value: Any) -> str:
@@ -194,236 +83,6 @@ def _fingerprint_value(value: Any) -> str:
     except Exception as exc:
         rendered = f"<unreprable: {exc!r}>"
     return canonical_digest(rendered, length=16)
-
-
-# ``_TRACEBACK_CAPPED_BYTES`` mirrors ``_publish_i17_rejection`` (ADR-0165.1 §96).
-# 4 KiB is enough to keep the most recent frames of a typical agent call while
-# keeping the per-event jsonl cost bounded.
-_TRACEBACK_CAPPED_BYTES = 4096
-
-
-def _exception_payload(exc: BaseException, *, boundary: str = "instrument_wrap") -> dict[str, Any]:
-    """Structured failure fields —— 走 :func:`exc_to_record` SSOT。
-
-    ADR-2026-09-02-i17-stream-align §B + ADR-0169: wrap 层的异常归一化
-    必须与 transport 路径一致,都经过 :class:`ExceptionRecord`。
-    历史 ``exc_type`` / ``reason`` legacy alias 由 :meth:`ExceptionRecord.asdict`
-    提供,这里不再手搓。
-    """
-    from lca.contracts.observability import exc_to_record
-
-    return exc_to_record(exc, boundary=boundary).asdict()
-
-
-def _emit_spine_direct(
-    *,
-    spine: EventSpine,
-    execution_point: str,
-    channel: Channel,
-    payload: dict[str, Any],
-    outcome: OutcomeT | None,
-    span: SpanContext | None,
-) -> None:
-    """Direct ``EventSpine.append`` with contained failure handling."""
-    try:
-        spine.append(
-            execution_point=execution_point,
-            channel=channel,
-            caller_payload=payload,
-            outcome=outcome,
-            span_ctx=span,
-        )
-    except ValueError as exc:
-        log.warning(
-            "wrap_instrument: drop invalid event ep=%s err=%s",
-            execution_point,
-            exc,
-            exc_info=True,
-        )
-    except Exception as exc:
-        if _is_i17_violation(exc):
-            _publish_i17_rejection(
-                spine=spine,
-                span=span,
-                attempted_ep=execution_point,
-                exc=exc,
-                channel=channel,
-            )
-            log.error(
-                "wrap_instrument: I17 rejected ep=%s reason=%s",
-                execution_point,
-                exc,
-                exc_info=True,
-            )
-        else:
-            log.warning(
-                "wrap_instrument: spine emit failed ep=%s err=%s",
-                execution_point,
-                exc,
-                exc_info=True,
-            )
-
-
-def _emit_via_pipeline(
-    *,
-    pipeline: Any,
-    spine: EventSpine,
-    execution_point: str,
-    channel: Channel,
-    payload: dict[str, Any],
-    outcome: OutcomeT | None,
-    span: SpanContext | None,
-) -> None:
-    """Route through ``EmitPipeline.emit`` with contained failure handling."""
-    try:
-        pipeline.emit(
-            execution_point=execution_point,
-            channel=channel,
-            span_ctx=span,
-            caller_payload=payload,
-            spine=spine,
-            outcome=outcome,
-        )
-    except ValueError as exc:
-        log.warning(
-            "wrap_instrument: drop invalid event ep=%s err=%s",
-            execution_point,
-            exc,
-            exc_info=True,
-        )
-    except Exception as exc:
-        if _is_i17_violation(exc):
-            _publish_i17_rejection(
-                spine=spine,
-                span=span,
-                attempted_ep=execution_point,
-                exc=exc,
-                channel=channel,
-            )
-            log.error(
-                "wrap_instrument: I17 rejected ep=%s reason=%s",
-                execution_point,
-                exc,
-                exc_info=True,
-            )
-        else:
-            log.warning(
-                "wrap_instrument: pipeline emit failed ep=%s err=%s",
-                execution_point,
-                exc,
-                exc_info=True,
-            )
-
-
-def _safe_append(
-    *,
-    spine: EventSpine | None,
-    execution_point: str,
-    channel: Channel,
-    payload: dict[str, Any],
-    outcome: OutcomeT | None,
-    span: SpanContext | None,
-    exc: BaseException | None = None,
-) -> None:
-    """Emit a spine event without letting a broken helper block the caller.
-
-    When a process-local EmitPipeline accessor is installed (PR-7.1),
-    the emission is routed through it so enabled ``FieldProducer``
-    plugins may merge their keys into the payload before the
-    ``EventRecord`` is sealed — unless a production Session SSOT hook
-    is active, in which case enrich/commit/anomaly already run at the
-    Session boundary and the wrapper calls ``EventSpine.append`` directly.
-    When no pipeline is installed this function falls back to the direct
-    ``EventSpine.append`` path so PR-4 assembler contracts still hold
-    under unit tests.
-
-    ``exc`` carries a ``BaseException`` captured by the wrap layer at
-    the call site. When provided it is merged into the payload as the
-    structured failure fields documented in :func:`_exception_payload`,
-    so a channel="error" event always carries enough information to
-    render the traceback without re-raising.
-    """
-    if exc is not None:
-        # Caller payload wins on conflict (the caller may override
-        # ``exception_message`` with a domain-specific phrasing), so we
-        # merge exc first and then apply caller payload on top.
-        payload = {**_exception_payload(exc), **payload}
-    if spine is None:
-        return
-    if is_session_ssot_hook_active():
-        _emit_spine_direct(
-            spine=spine,
-            execution_point=execution_point,
-            channel=channel,
-            payload=payload,
-            outcome=outcome,
-            span=span,
-        )
-        return
-    pipeline = _resolve_pipeline()
-    if pipeline is not None:
-        _emit_via_pipeline(
-            pipeline=pipeline,
-            spine=spine,
-            execution_point=execution_point,
-            channel=channel,
-            payload=payload,
-            outcome=outcome,
-            span=span,
-        )
-        return
-    _emit_spine_direct(
-        spine=spine,
-        execution_point=execution_point,
-        channel=channel,
-        payload=payload,
-        outcome=outcome,
-        span=span,
-    )
-
-
-def _publish_i17_rejection(
-    *,
-    spine: EventSpine,
-    span: SpanContext | None,
-    attempted_ep: str,
-    exc: BaseException,
-    channel: Channel,
-) -> None:
-    """Emit one ``spine.i17.rejected`` journal event with the original traceback.
-
-    Mirrors ``EmitPipeline``'s sidecar style so the rejection is
-    recoverable from the run directory (rather than only from
-    stderr). Falls back to a ``log.warning`` when the spine itself
-    rejects the publication — we never want reject-noticing to
-    mask the original I17.
-    """
-    from lca.contracts.observability import exc_to_record
-
-    rec = exc_to_record(exc, boundary="spine.i17.rejection")
-    try:
-        spine.append(
-            execution_point="spine.i17.rejected",
-            channel="error",
-            caller_payload={
-                "attempted_execution_point": attempted_ep,
-                "exception_class": rec.exception_class,
-                "reason": rec.exception_message,
-                "err_kind": rec.err_kind.value,
-                "traceback_text": rec.traceback_text,
-                "span_id": getattr(span, "span_id", None),
-                "outer_channel": str(channel),
-            },
-            outcome="failure",
-            span_ctx=span,
-        )
-    except Exception as publish_exc:
-        log.warning(
-            "wrap_instrument: spine.i17.rejected publication failed "
-            "err=%s; I17 traceback still on stderr",
-            publish_exc,
-            exc_info=True,
-        )
 
 
 def _sync_wrapper(
@@ -654,12 +313,17 @@ def wrap_executor(executor: Any) -> Any:
     return InstrumentedPhaseExecutor(executor, wrapped_execute)
 
 
+# Split-module back-compat re-exports: consumers predate the split and
+# import these helpers from ``wrap`` directly.
 __all__ = [
     "ASSEMBLER_PROVENANCE",
     "DEFAULT_END_EXECUTION_POINT",
     "DEFAULT_START_EXECUTION_POINT",
     "WRAP_INSTRUMENTED_ATTR",
     "InstrumentedPhaseExecutor",
+    "_emit_spine_direct",
+    "_exception_payload",
+    "_safe_append",
     "resolve_active_pipeline",
     "resolve_active_spine",
     "set_active_pipeline_accessor",
