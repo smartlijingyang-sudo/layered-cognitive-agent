@@ -344,3 +344,9 @@
 | MAILBOX-DASHBOARD-TASK-2 | 全屏独立看板模板与 Web 路由 (/ledger/mailbox) | Completed | 新增独立全屏模板 ledger_mailbox.html，集成 KPI 卡片、时序趋势图、分页搜索表格、资产池总览，单测 1/1 通过 |
 | MAILBOX-DASHBOARD-TASK-3 | 知识库主页卡片交互联动 (index.html) | Completed | 在 index.html 中将 smartlijingyang-mail-registry-record 拦截并直达独立全屏专页，卡片标注看板徽标 |
 | MAILBOX-DASHBOARD-TASK-4 | 服务热重载、端到端探针验证与验收 | Completed | everything-library (:1889) 平滑重启成功（PID: 2758505）；实测 /api/ledger/mailbox/data 聚合 API 正确返回 242 个资产、325 条审计流水、时序趋势与 Agent 排名；实测 /ledger/mailbox 页面 HTTP 200 正常渲染；外部代码与测试严格隔离并在 ~/everything-library 提交闭环（326db79, 45b7a35, 02cca6a） |
+| CONTEXT-MUSE-BRAINSTORM-CONTEXT | 深度剖析 LCA 现有记忆与上下文体系、Context Muse 生产实测与业界范式 | Completed | 已摸清 LCA 现状（ADR-0242/0247/0249）、Context Muse 5 大支柱与业界 6 大范式（Claude Code / OpenClaw / Letta / Hermes / AutoGen / Cadence） |
+| CONTEXT-MUSE-BRAINSTORM-QUESTIONS | 澄清 ADR 演进形式（新增 ADR-0254 vs 扩展已有 ADR-0249）与商用级架构范围（单步提问） | Completed | 用户明确选定方案 1：新建顶层 ADR-0254《顶级商用级 Assistant 全景上下文文件与持续记忆体系架构》，作为顶层集大成者（Extends & Unifies ADR-0242/0247/0249/0253） |
+| CONTEXT-MUSE-BRAINSTORM-APPROACHES | 提炼 2-3 种端到端商用级架构方案并给出权衡与推荐 | Completed | 提炼方案 A/B/C 并给出详尽权衡，用户选定方案 A（三层分级 Markdown-as-DB + 持续反应式控制面 + 昼夜做梦闭环） |
+| CONTEXT-MUSE-BRAINSTORM-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量测试）并获取用户审批 | Completed | 全部 5 节设计细节（边界/存储/控制面/认知/测试矩阵）已获用户逐节逐一确认批准 |
+| CONTEXT-MUSE-BRAINSTORM-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并落盘 ADR 草案 | Completed | 成功落盘 docs/adr/0254-commercial-context-files-and-continuous-memory-runtime.md、更新 docs/adr/README.md 且通过 test_refactor_guards 门禁，并落盘 docs/plans/2026-09-30-commercial-context-files-and-continuous-memory-design.md |
+| CONTEXT-MUSE-BRAINSTORM-TRANSITION | 转换至实施计划制定（writing-plans） | In Progress | 准备进入实施计划制定阶段 |
