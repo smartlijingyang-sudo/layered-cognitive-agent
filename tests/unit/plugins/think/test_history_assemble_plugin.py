@@ -329,6 +329,50 @@ async def test_system_falls_back_to_turn_render_trace_when_header_missing() -> N
     assert request.system == "You are LobeHub 助手."
 
 
+async def test_second_turn_appends_a_standing_diff(tmp_path) -> None:
+    """The first assembly records the files. The next one shows the edit."""
+    from lca.infrastructure.memory.contextfiles.adapters.polling import (
+        reset_standing_cursors,
+    )
+
+    reset_standing_cursors()
+    memory = tmp_path / "MEMORY.md"
+    memory.write_text("用户住在杭州\n", encoding="utf-8")
+    header = "\n".join(
+        [
+            "历史系统规则",
+            "<!-- INJECTED FILE: MEMORY.md -->",
+            "用户住在杭州",
+            "<!-- END INJECTED FILE: MEMORY.md -->",
+        ]
+    )
+    executor = HistoryDeriveExecutor()
+    writer = _FakeWriter(messages=[{"role": "user", "content": "hi"}], system=header)
+    runtime = {"home_path": str(tmp_path)}
+
+    async def _run() -> str:
+        out = await executor.node_execute(
+            context=_node_context(runtime=runtime),
+            input=NodeInput(
+                port_values={
+                    "state": _make_state(),
+                    "writer": writer,
+                    "turn_render": _render("from-render"),
+                }
+            ),
+        )
+        return out.port_values["model_visible_request"].system
+
+    first = await _run()
+    assert "常驻文件有更新" not in first
+    memory.write_text("用户住在北京\n", encoding="utf-8")
+    second = await _run()
+    assert "历史系统规则" in second
+    assert "用户住在北京" in second
+    assert "常驻文件有更新" in second
+    reset_standing_cursors()
+
+
 async def test_folded_header_keeps_history_and_refreshes_standing_blocks(tmp_path) -> None:
     """A reused system prompt keeps its rules and replaces standing files from disk."""
     (tmp_path / "MEMORY.md").write_text("用户住在杭州\n", encoding="utf-8")

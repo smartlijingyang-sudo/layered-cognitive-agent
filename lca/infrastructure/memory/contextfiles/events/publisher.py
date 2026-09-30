@@ -28,6 +28,14 @@ class ProjectionWritten(MemoryDomainEvent):
 
 
 @dataclass(frozen=True, slots=True)
+class StandingChanged(MemoryDomainEvent):
+    """One standing file differs from the cursor's previous copy."""
+
+    path: str
+    diff: str
+
+
+@dataclass(frozen=True, slots=True)
 class StandingPreserved(MemoryDomainEvent):
     """Injected standing blocks were rewritten from the current files."""
 
@@ -66,5 +74,6 @@ __all__ = [
     "MemoryDomainEvent",
     "ProjectionFailed",
     "ProjectionWritten",
+    "StandingChanged",
     "StandingPreserved",
 ]

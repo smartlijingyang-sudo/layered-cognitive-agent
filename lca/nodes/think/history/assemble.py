@@ -61,6 +61,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 from lca.contracts.protocols.session.model.context import ModelVisibleRequest
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.memory.contextfiles.adapters.disk import DiskFileStore
+from lca.infrastructure.memory.contextfiles.adapters.polling import poll_standing_home
 from lca.infrastructure.memory.contextfiles.service.compaction import (
     preserve_standing_sections,
 )
@@ -141,6 +142,7 @@ class HistoryDeriveExecutor:
             render=input.port_values.get("turn_render"),
         )
         system = _refresh_standing(system, runtime=context.runtime)
+        system = _append_standing_diff(system, runtime=context.runtime)
         tools = _forked_to_tools(input.port_values.get("forked_tools"))
         return NodeOutput(
             port_values={
@@ -165,6 +167,24 @@ def _resolve_port(name: str, *, input: NodeInput, context: NodeContext) -> Any:
             f"history.derive: '{name}' port must be supplied via input.port_values or context.runtime"
         )
     return value
+
+
+def _append_standing_diff(system: str, *, runtime: object) -> str:
+    """Append a unified diff when standing files changed since the last poll.
+
+    The first poll for a home only records the baseline. The cursor lives in
+    the process, so this node does not write agent state or the home.
+    """
+
+    home_path = _home_path(runtime)
+    if not home_path:
+        return system
+    note = poll_standing_home(home_path)
+    if not note:
+        return system
+    if not system:
+        return note
+    return f"{system}\n\n{note}"
 
 
 def _refresh_standing(system: str, *, runtime: object) -> str:
