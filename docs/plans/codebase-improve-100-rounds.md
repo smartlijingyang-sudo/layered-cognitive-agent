@@ -43,3 +43,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat 64f5d60fb` → 7 files changed, 229 insertions(+), 106 deletions(-); gross diff = 335 > 100.
 - **Tests:** `uv run pytest -q tests/infrastructure/assistant/test_io.py tests/plugins/assistant/test_persona.py tests/plugins/assistant/test_self_manage.py tests/plugins/assistant/test_create_tool.py tests/plugins/assistant/test_tool_overlay.py tests/plugins/domain/tools/assistant_tools/test_self_manage_exposure.py tests/architecture/test_assistant_catalog_invariants.py -m "not real_llm" --no-cov` → **116 passed**. Two unrelated pre-existing failures recorded (not introduced by this round): `test_workspace.py::test_materialize_propagates_digest_mismatch` (catalog auto-heals digest mismatch at HEAD) and `test_assistant_d12_cleanup_invariants.py::test_no_identity_md_reference_in_assistant_domain` (`profile.py:46` at HEAD).
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 4 — 2026-09-30
+
+- **Commit:** `7165fb2a4`
+- **Architectural concern:** duplicated pure logic / locality. Thirteen observation and diagnosis plugins each redefined `_now_iso()` and `_OBSERVER_ACTOR` and repeated the `publish_ep_bound` / `append_catalog_bound` fact envelope.
+- **Change:** created `lca/loop/observation.py` with `now_iso()`, `OBSERVER_ACTOR`, `publish_ep_observation`, `publish_session_observation`; migrated all 13 plugins; preserved the `"diagnosis"` actor in the three diagnosis plugins.
+- **Files:** `lca/loop/observation.py` (new), 13 plugin files under `lca/plugins/observation/` and `lca/plugins/diagnosis/`.
+- **Shortstat:** `git show --shortstat 7165fb2a4` → 14 files changed, 99 insertions(+), 134 deletions(-); gross diff = 233 > 100.
+- **Tests:** `uv run pytest -q tests/observation/ tests/architecture/test_phase_observation_seam.py -m "not real_llm" --no-cov` → **84 passed**; `test_phase_observation_seam.py::test_phase_transaction_depends_on_observation_seam_not_tracing_backend` is a pre-existing stale test referencing non-existent `lca/loop/transaction.py`.
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
