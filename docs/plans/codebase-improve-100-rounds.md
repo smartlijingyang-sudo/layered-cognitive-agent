@@ -353,3 +353,33 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat b02d2fe9a` → 13 files changed, 129 insertions(+), 34 deletions(-); gross diff = 163 > 100.
 - **Tests:** `uv run pytest -q tests/architecture/test_spine_sinks_migrated.py tests/plugins/events/sinks/test_console_sink_migrated.py -m "not real_llm" --no-cov` → **8 passed**; `brain.think.start` sink tests are pre-existing whitelist mismatches.
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 35 — 2026-09-30
+
+- **Commit:** `25c996caa` (subagent `round-s` work, committed by orchestrator)
+- **Architectural concern:** module depth / oversized module. `doctor/step_check.py` (1199 lines) held 20+ `_hop_*` functions and a monolithic `StepScan` context.
+- **Change:** split into a `steps/` package (`scan.py`, `hops.py`, `diagnose.py` + barrel); historical import path preserved; added `test_step_check_barrel.py`.
+- **Files:** 6 files (3 new submodules + barrel + test), 1 module reduced to barrel.
+- **Shortstat:** `git show --shortstat 25c996caa` → 6 files changed, 1350 insertions(+), 1169 deletions(-); gross diff = 2519 > 100.
+- **Tests:** `uv run pytest -q tests/plugins/transport/webserver/doctor/test_step_check_barrel.py tests/plugins/transport/webserver/doctor/ -m "not real_llm" --no-cov` → **9 passed**.
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 36 — 2026-09-30
+
+- **Commit:** `5496bb67e` (cherry-picked from subagent branch `round-r` commit `b87d0bb4c`)
+- **Architectural concern:** module depth / oversized module. `journal_trace.py` (1191 lines) mixed JSONL parsing, I17 column extraction, terminal rendering, and CLI args.
+- **Change:** split into a `journal_trace/` package (`parse.py`, `render.py`, `command.py` + barrel); all 51 public names preserved; added a pure parse/render barrel test.
+- **Files:** 5 files (3 new submodules + barrel + test), 1 module renamed to `render.py`.
+- **Shortstat:** `git show --shortstat 5496bb67e` → 5 files changed, 464 insertions(+), 366 deletions(-); gross diff = 830 > 100.
+- **Tests:** `uv run pytest -q tests/journal/test_trace_human.py tests/journal/test_trace_locals.py -m "not real_llm" --no-cov` → **14 passed** (2 failures + 11 errors pre-existing whitelist mismatches).
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 37 — 2026-09-30
+
+- **Commit:** `11b1710f1` (cherry-picked from subagent branch `round-w` commit `f32c5b8fd`)
+- **Architectural concern:** module depth / oversized module. `lca_kernel/events/fold/fold.py` (866 lines) mixed event decoding, fold algorithms, and canonical result types.
+- **Change:** split into `inputs.py` (envelope decoding/morphism), `core.py` (fold algorithms), `projection.py` (canonical result types); `fold.py` is now a re-export barrel; added 2 input-morphism tests.
+- **Files:** 5 files (3 new submodules + barrel + test).
+- **Shortstat:** `git show --shortstat 11b1710f1` → 5 files changed, 949 insertions(+), 800 deletions(-); gross diff = 1749 > 100.
+- **Tests:** `uv run pytest -q tests/lca_kernel/events/test_fold.py -m "not real_llm" --no-cov` → **61 passed** (including 2 new).
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
