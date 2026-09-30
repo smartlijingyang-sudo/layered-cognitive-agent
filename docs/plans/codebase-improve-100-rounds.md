@@ -153,3 +153,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat 495a7c66d` → 6 files changed, 89 insertions(+), 23 deletions(-); gross diff = 112 > 100.
 - **Tests:** `uv run pytest -q tests/contracts/exceptions/test_registry_error.py tests/contracts/test_canonical_digest.py -m "not real_llm" --no-cov` → **23 passed** (6 new); `tests/harness/test_pipeline_loader.py` failures pre-existing at base `b42b40e5d`.
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 15 — 2026-09-30
+
+- **Commit:** `fea78f49f` (subagent `round-h` commit, amended to exceed the 100-line bar)
+- **Architectural concern:** shallow facade / explicit interface. `lca/harness/plugin_api.py` was a 4-line star re-export (`from lca.harness.plugin import *`), hiding its public surface.
+- **Change:** replaced the star import with an explicit 13-name re-export block + `__all__`; added regression tests (surface equality with `lca.harness.plugin.__all__`, object identity, no-star-import guard, sorted explicit `__all__`, all consumers import cleanly, thin-facade guard).
+- **Files:** `lca/harness/plugin_api.py`, `tests/architecture/test_plugin_api_explicit_exports.py`.
+- **Shortstat:** `git show --shortstat fea78f49f` → 2 files changed, 108 insertions(+), 2 deletions(-); gross diff = 110 > 100.
+- **Tests:** `uv run pytest -q tests/architecture/test_plugin_api_explicit_exports.py -m "not real_llm" --no-cov` → **6 passed**.
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
