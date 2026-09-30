@@ -20,8 +20,8 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -33,11 +33,18 @@ from lca.contracts.models.core.perceive.perception import ContextManifest
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.memory.episode import canonical_dedupe_key
 from lca.contracts.protocols.memory.memory import MemorySystem
-from lca.infrastructure.memory.curated_projection import (
+from lca.infrastructure.memory.contextfiles.adapters.disk import DiskFileStore
+from lca.infrastructure.memory.contextfiles.domain.curated import (
+    CuratedClaim,
     CuratedProjectionReceipt,
     contains_secret,
     render_curated_markdown,
 )
+from lca.infrastructure.memory.contextfiles.events.publisher import (
+    ProjectionFailed,
+    ProjectionWritten,
+)
+from lca.infrastructure.memory.contextfiles.ports.events import DomainEventPublisher
 from lca.infrastructure.memory.fingerprint import content_fingerprint
 from lca.infrastructure.memory.retrieval.scoring import (
     apply_token_budget,
@@ -71,10 +78,12 @@ class AssistantMemory(MemorySystem):
         home_path: str | Path,
         *,
         profile_backfill: _ProfileBackfillCallback | None = None,
+        event_publisher: DomainEventPublisher | None = None,
     ) -> None:
         self._root = Path(home_path) / _MEMORY_DIR
         self._root.mkdir(parents=True, exist_ok=True)
         self._profile_backfill = profile_backfill
+        self._event_publisher = event_publisher
         self.last_curated_receipt: CuratedProjectionReceipt | None = None
 
     @property
@@ -114,10 +123,11 @@ class AssistantMemory(MemorySystem):
 
         path = self.home_path / "MEMORY.md"
         try:
-            text = render_curated_markdown(self.query(MemoryLayer.SEMANTIC))
-            temporary = path.with_suffix(".md.tmp")
-            temporary.write_text(text, encoding="utf-8")
-            os.replace(temporary, path)
+            text = render_curated_markdown(
+                _claims_from_records(self.query(MemoryLayer.SEMANTIC)),
+                source_note="记录在 `memory/semantic.json`。",
+            )
+            DiskFileStore(self.home_path).atomic_replace("MEMORY.md", text)
         except OSError as exc:
             logger.warning("memory projection write failed: %s", exc)
             self.last_curated_receipt = CuratedProjectionReceipt(
@@ -127,6 +137,14 @@ class AssistantMemory(MemorySystem):
                 record_ids=committed_ids,
                 error=str(exc),
             )
+            if self._event_publisher is not None:
+                self._event_publisher.publish(
+                    ProjectionFailed(
+                        path=str(path),
+                        error=str(exc),
+                        record_ids=committed_ids,
+                    )
+                )
             return
         self.last_curated_receipt = CuratedProjectionReceipt(
             ok=True,
@@ -140,6 +158,14 @@ class AssistantMemory(MemorySystem):
             self.last_curated_receipt.byte_count,
             len(committed_ids),
         )
+        if self._event_publisher is not None:
+            self._event_publisher.publish(
+                ProjectionWritten(
+                    path=str(path),
+                    byte_count=self.last_curated_receipt.byte_count,
+                    record_ids=committed_ids,
+                )
+            )
 
     async def perceive(self, state: AgentState) -> AgentState:
         """返回原状态；检索注入由后续 memory.retrieve 节点负责（ADR-0242 D11）。"""
@@ -536,6 +562,36 @@ class AssistantMemory(MemorySystem):
             for entry in self._load(layer)
             if not entry.get("deleted", False)
         ]
+
+
+def _claims_from_records(records: list[MemoryRecord]) -> list[CuratedClaim]:
+    """Map host records into the portable projection input."""
+
+    claims: list[CuratedClaim] = []
+    for record in records:
+        if record.deleted:
+            continue
+        metadata = record.metadata if isinstance(record.metadata, dict) else {}
+        source = str(metadata.get("source") or "").strip()
+        trigger = str(metadata.get("trigger") or "").strip() or str(record.source_trace_id or "")
+        claims.append(
+            CuratedClaim(
+                claim_id=record.record_id,
+                kind=record.category.value,
+                body=record.content,
+                importance=record.importance,
+                source=source,
+                trigger=trigger.strip(),
+                recorded_on=_recorded_on(record.created_at_ms),
+            )
+        )
+    return claims
+
+
+def _recorded_on(created_at_ms: int | None) -> str:
+    if created_at_ms is None:
+        return ""
+    return datetime.fromtimestamp(created_at_ms / 1000, tz=UTC).strftime("%Y-%m-%d")
 
 
 def _stored_metadata(source: str, metadata: dict[str, Any] | None) -> dict[str, Any]:

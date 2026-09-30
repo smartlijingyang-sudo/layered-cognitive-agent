@@ -187,7 +187,7 @@ async def test_reason_render_refreshes_backstory_from_disk(
     """绑定 Home 时,每轮渲染从磁盘重读常驻文件并刷新 backstory。"""
     from types import SimpleNamespace
 
-    from lca.infrastructure.memory.standing_refresh import refresh_standing_backstory
+    from lca.infrastructure.memory.contextfiles.service.assembly import refresh_standing_backstory
 
     home = tmp_path / "asst"
     home.mkdir()

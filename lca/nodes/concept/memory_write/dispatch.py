@@ -36,7 +36,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.memory.memory import MemorySystem
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.infrastructure.memory.curated_projection import may_acknowledge_projection
+from lca.infrastructure.memory.contextfiles.domain.curated import may_acknowledge_projection
 
 
 class MemoryWriteDispatchExecutor:

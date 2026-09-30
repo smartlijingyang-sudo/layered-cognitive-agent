@@ -8,7 +8,7 @@ Status: implemented
 
 ## Decision
 
-`AssistantMemory` 在语义层写入成功后，用活跃的 fact 与 preference 记录重写 `{home}/MEMORY.md`。身份记录仍只回填 `USER.md`。`memory/semantic.json` 继续是记录真值。`MEMORY.md` 页首写明它是投影，下次写入会整文件替换。
+`AssistantMemory` 在语义层写入成功后，把活跃的 fact 与 preference 记录译成 `CuratedClaim`，再重写 `{home}/MEMORY.md`。投影规则不认识 `MemoryRecord`。身份记录仍只回填 `USER.md`。`memory/semantic.json` 继续是记录真值。`MEMORY.md` 页首写明它是投影，下次写入会整文件替换。写盘走 `FileStore`，成功或失败都发布领域事件。
 
 凭证形态的正文不落记录，也不改投影。写盘用同目录临时文件替换。失败时 `last_curated_receipt.ok` 为 false，已写入的 JSON 记录保留。
 
@@ -16,7 +16,7 @@ Status: implemented
 
 `persona_from_home` 每次从磁盘读取 `SOUL.md`、`USER.md`、`MEMORY.md`、`AGENTS.md`、`TOOLS.md`，按这个顺序装进有界的 backstory。后面还有文件时，当前文件最多使用剩余预算的一半。`rehydrate_after_compaction` 先丢掉历史里的旧注入块，再接上刚读到的常驻文件。历史在预算不够时从前面被切掉。
 
-`think.reason.render` 每轮渲染前通过注入的 `standing_refresher` 重读磁盘上的常驻文件，刷新 `role_profile.backstory`。`refresh_standing_backstory` 位于 `lca/infrastructure/memory/standing_refresh.py`，由 `DeclarativeRuntimeBindings` 注入节点运行时。没有 home 绑定、没有 refresher、或读取失败时，原 profile 保持不变。这样压缩或外部编辑后的最新常驻文件在下一轮渲染进入 prompt。
+`think.reason.render` 每轮渲染前通过注入的 `standing_refresher` 重读磁盘上的常驻文件，刷新 `role_profile.backstory`。`refresh_standing_backstory` 位于 `lca/infrastructure/memory/contextfiles/service/assembly.py`，由 `DeclarativeRuntimeBindings` 注入节点运行时。没有 home 绑定、没有 refresher、或读取失败时，原 profile 保持不变。这样压缩或外部编辑后的最新常驻文件在下一轮渲染进入 prompt。
 
 ## Alternatives considered
 

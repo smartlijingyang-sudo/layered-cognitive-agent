@@ -57,11 +57,27 @@ def test_no_local_standing_module_remains_in_cognition() -> None:
     assert not old_path.exists(), "standing module must live in infrastructure now"
 
 
+def test_contextfiles_package_does_not_import_the_host() -> None:
+    """The package must stay movable. It may import only itself."""
+
+    root = REPO / "lca" / "infrastructure" / "memory" / "contextfiles"
+    allowed = "lca.infrastructure.memory.contextfiles"
+    violations: list[str] = []
+    for path in _py_files(root):
+        text = path.read_text(encoding="utf-8")
+        for target in _import_statements(text):
+            if target.startswith("lca.") and not (
+                target == allowed or target.startswith(allowed + ".")
+            ):
+                violations.append(f"{path}: {target}")
+    assert violations == [], f"host imports inside contextfiles: {violations}"
+
+
 def test_cognition_memory_imports_down_for_standing() -> None:
     """Cognition may import the standing helpers from infrastructure (downward)."""
     import lca.cognition.memory  # noqa: F401
 
     # The persona plugin and the refresh loader both resolve from infrastructure.
-    from lca.infrastructure.memory.standing import STANDING_ORDER
+    from lca.infrastructure.memory.contextfiles.domain.standing import STANDING_ORDER
 
     assert "SOUL.md" in STANDING_ORDER

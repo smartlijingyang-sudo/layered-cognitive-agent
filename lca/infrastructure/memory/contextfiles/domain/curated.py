@@ -1,19 +1,15 @@
-"""Human-readable projection of active semantic ``MemoryRecord`` rows.
+"""Human-readable projection of curated memory claims.
 
-``memory/semantic.json`` stays the record store. ``MEMORY.md`` is rewritten
-from the active rows so a person can open one file and see the same facts.
-The projection is not a second source of truth. The next semantic write
-replaces it.
+The record store stays outside this module. Callers map their own records
+into ``CuratedClaim`` and this module renders ``MEMORY.md``. The projection
+is not a second source of truth. The next render replaces the file.
 """
 
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
-
-from lca.contracts.atoms.enums.enums import MemoryCategory
-from lca.contracts.models.core.conversation.memory import MemoryRecord
 
 _SECRET = re.compile(
     r"(?i)(\bsk-[A-Za-z0-9]{8,}\b|\bapi[_-]?key\s*[:=]\s*\S+|\bpassword\s*[:=]\s*\S+)"
@@ -21,9 +17,27 @@ _SECRET = re.compile(
 _CHAR_BUDGET = 12_000
 
 _SECTION_FOR = {
-    MemoryCategory.FACT: "Facts",
-    MemoryCategory.PREFERENCE: "Preferences",
+    "fact": "Facts",
+    "preference": "Preferences",
 }
+
+
+@dataclass(frozen=True, slots=True)
+class CuratedClaim:
+    """One active memory sentence, already translated out of the host store.
+
+    ``kind`` is ``fact`` or ``preference`` for rows that appear in the
+    projection. Other kinds are ignored. ``recorded_on`` is ``YYYY-MM-DD``
+    or empty. The host decides how its clock becomes that date.
+    """
+
+    claim_id: str
+    kind: str
+    body: str
+    importance: float = 0.5
+    source: str = ""
+    trigger: str = ""
+    recorded_on: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,26 +71,34 @@ def may_acknowledge_projection(receipt: CuratedProjectionReceipt | None) -> bool
     )
 
 
-def render_curated_markdown(records: list[MemoryRecord], *, char_budget: int = _CHAR_BUDGET) -> str:
-    """Render active fact and preference rows. Identity stays in ``USER.md``."""
+def render_curated_markdown(
+    claims: Sequence[CuratedClaim],
+    *,
+    char_budget: int = _CHAR_BUDGET,
+    source_note: str = "",
+) -> str:
+    """Render fact and preference claims. Identity stays with the caller.
 
-    chosen = [
-        record
-        for record in records
-        if not record.deleted and record.category in _SECTION_FOR and record.content.strip()
-    ]
-    chosen.sort(key=lambda record: (-record.importance, record.record_id))
+    ``source_note`` is the host's name for its record store. The domain does
+    not know that name.
+    """
+
+    chosen = [claim for claim in claims if claim.kind in _SECTION_FOR and claim.body.strip()]
+    chosen.sort(key=lambda claim: (-claim.importance, claim.claim_id))
+    lead = "这份文件由活跃的结构化记忆记录投影而成。"
+    if source_note.strip():
+        lead = f"{lead}{source_note.strip()}"
     lines = [
         "# 长期记忆",
         "",
-        "这份文件由活跃的结构化记忆记录投影而成。记录在 `memory/semantic.json`。",
+        lead,
         "下次写入会重写本文件。直接改这里不会改记录。",
         "",
     ]
     grouped: dict[str, list[str]] = {"Facts": [], "Preferences": []}
-    for record in chosen:
-        section = _SECTION_FOR[record.category]
-        bullet = _bullet(record)
+    for claim in chosen:
+        section = _SECTION_FOR[claim.kind]
+        bullet = _bullet(claim)
         projected = "\n".join(lines + _sections(grouped) + [bullet])
         if len(projected) > char_budget:
             break
@@ -99,32 +121,18 @@ def _sections(grouped: dict[str, list[str]]) -> list[str]:
     return lines
 
 
-def _bullet(record: MemoryRecord) -> str:
-    source = _meta(record, "source") or "unspecified"
-    trigger = _meta(record, "trigger") or record.source_trace_id or "unspecified"
-    body = record.content.strip()
+def _bullet(claim: CuratedClaim) -> str:
+    source = claim.source.strip() or "unspecified"
+    trigger = claim.trigger.strip() or "unspecified"
+    body = claim.body.strip()
     suffix = f" This came from {source} when {trigger}"
-    recorded = _recorded_date(record)
-    if recorded:
-        suffix += f", recorded {recorded}"
+    if claim.recorded_on:
+        suffix += f", recorded {claim.recorded_on}"
     return f"- {body}.{suffix}." if not body.endswith((".", "。")) else f"- {body}{suffix}."
 
 
-def _meta(record: MemoryRecord, key: str) -> str:
-    if not isinstance(record.metadata, dict):
-        return ""
-    value = record.metadata.get(key)
-    return str(value).strip() if value else ""
-
-
-def _recorded_date(record: MemoryRecord) -> str:
-    if record.created_at_ms is None:
-        return ""
-    moment = datetime.fromtimestamp(record.created_at_ms / 1000, tz=UTC)
-    return moment.strftime("%Y-%m-%d")
-
-
 __all__ = [
+    "CuratedClaim",
     "CuratedProjectionReceipt",
     "contains_secret",
     "may_acknowledge_projection",

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lca.infrastructure.memory.standing_refresh import refresh_standing_backstory
+from lca.infrastructure.memory.contextfiles.service.assembly import refresh_standing_backstory
 
 
 def test_refresh_reads_standing_files_in_budget_order(tmp_path: Path) -> None:

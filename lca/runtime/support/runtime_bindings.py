@@ -46,7 +46,7 @@ from lca.contracts.protocols.state.plan import CompiledRunPlan
 from lca.contracts.protocols.state.reducer import Reducer
 from lca.contracts.protocols.think.cognition import Brain, PerceiveHub
 from lca.harness.plan import compiled_run_plan_ref
-from lca.infrastructure.memory.standing_refresh import refresh_standing_backstory
+from lca.infrastructure.memory.contextfiles.service.assembly import refresh_standing_backstory
 from lca.runtime.loop.runtime_event_publisher import NullRuntimeLifecyclePublisher
 
 if TYPE_CHECKING:

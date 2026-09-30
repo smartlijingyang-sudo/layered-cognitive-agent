@@ -30,11 +30,12 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
 )
 from lca.framework.graph.host_wiring import make_node_runtime_view_factory
 from lca.infrastructure.memory.assistant_memory import AssistantMemory
-from lca.infrastructure.memory.curated_projection import (
+from lca.infrastructure.memory.contextfiles.domain.curated import (
+    CuratedClaim,
     may_acknowledge_projection,
     render_curated_markdown,
 )
-from lca.infrastructure.memory.standing import rehydrate_after_compaction
+from lca.infrastructure.memory.contextfiles.domain.standing import rehydrate_after_compaction
 from lca.nodes.concept.memory_write.dispatch import MemoryWriteDispatchExecutor
 from lca.nodes.think.decision.parse import DecisionParseExecutor
 from lca.plugins.assistant.persona.persona import persona_from_home
@@ -63,20 +64,33 @@ def _record(
     )
 
 
+def _claim(
+    *,
+    claim_id: str,
+    body: str,
+    kind: str = "fact",
+    importance: float = 0.5,
+    source: str = "user",
+    trigger: str = "用户要求记下",
+    recorded_on: str = "2025-06-15",
+) -> CuratedClaim:
+    return CuratedClaim(
+        claim_id=claim_id,
+        kind=kind,
+        body=body,
+        importance=importance,
+        source=source,
+        trigger=trigger,
+        recorded_on=recorded_on,
+    )
+
+
 def test_projection_renders_fact_provenance_and_skips_identity() -> None:
     text = render_curated_markdown(
         [
-            _record(record_id="fact-1", content="用户住在上海"),
-            _record(
-                record_id="id-1",
-                content="用户是架构师",
-                category=MemoryCategory.IDENTITY,
-            ),
-            _record(
-                record_id="pref-1",
-                content="回答要短",
-                category=MemoryCategory.PREFERENCE,
-            ),
+            _claim(claim_id="fact-1", body="用户住在上海"),
+            _claim(claim_id="id-1", body="用户是架构师", kind="identity"),
+            _claim(claim_id="pref-1", body="回答要短", kind="preference"),
         ]
     )
     assert "## Facts" in text
@@ -89,11 +103,11 @@ def test_projection_renders_fact_provenance_and_skips_identity() -> None:
 
 
 def test_projection_drops_lower_importance_when_budget_is_tight() -> None:
-    records = [
-        _record(record_id="a", content="甲" * 80, importance=0.9),
-        _record(record_id="b", content="乙" * 80, importance=0.1),
+    claims = [
+        _claim(claim_id="a", body="甲" * 80, importance=0.9),
+        _claim(claim_id="b", body="乙" * 80, importance=0.1),
     ]
-    text = render_curated_markdown(records, char_budget=280)
+    text = render_curated_markdown(claims, char_budget=280)
     assert "甲" in text
     assert "乙" not in text
 
@@ -103,6 +117,7 @@ def test_commit_rewrites_projection_and_supersede_keeps_one_active_fact(tmp_path
     memory.upsert(_record(record_id="city-1", content="用户住在上海"))
     first = (memory.home_path / "MEMORY.md").read_text(encoding="utf-8")
     assert "用户住在上海" in first
+    assert "记录在 `memory/semantic.json`。" in first
     assert memory.last_curated_receipt is not None
     assert memory.last_curated_receipt.ok is True
     assert memory.last_curated_receipt.record_ids == ("city-1",)
@@ -116,7 +131,7 @@ def test_commit_rewrites_projection_and_supersede_keeps_one_active_fact(tmp_path
 
 
 def test_same_active_rows_render_the_same_markdown() -> None:
-    rows = [_record(record_id="fact-1", content="用户住在上海")]
+    rows = [_claim(claim_id="fact-1", body="用户住在上海")]
     assert render_curated_markdown(rows) == render_curated_markdown(list(rows))
 
 
@@ -139,7 +154,7 @@ def test_projection_write_failure_keeps_the_record_and_blocks_acknowledgement(
     def _boom(*_args: object, **_kwargs: object) -> None:
         raise OSError("disk full")
 
-    monkeypatch.setattr("lca.infrastructure.memory.assistant_memory.os.replace", _boom)
+    monkeypatch.setattr("lca.infrastructure.memory.contextfiles.adapters.disk.os.replace", _boom)
     memory.upsert(_record(record_id="city-1", content="用户住在上海"))
     assert memory.last_curated_receipt is not None
     assert memory.last_curated_receipt.ok is False

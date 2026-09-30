@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import importlib
 
-from lca.infrastructure.memory.standing import (
+from lca.infrastructure.memory.contextfiles.domain.standing import (
     STANDING_ORDER,
     assemble_standing,
     rehydrate_after_compaction,
@@ -81,8 +81,10 @@ def test_rehydrate_after_compaction_drops_injected_blocks() -> None:
 
 def test_refresh_standing_backstory_uses_infrastructure_standing() -> None:
     """The loader must not reach upward into cognition for standing assembly."""
-    loader = importlib.import_module("lca.infrastructure.memory.standing_refresh")
-    source = importlib.util.find_spec("lca.infrastructure.memory.standing_refresh").origin
+    loader = importlib.import_module("lca.infrastructure.memory.contextfiles.service.assembly")
+    source = importlib.util.find_spec(
+        "lca.infrastructure.memory.contextfiles.service.assembly"
+    ).origin
     text = __import__("pathlib").Path(source).read_text(encoding="utf-8")
     assert "lca.cognition" not in text
     assert callable(loader.refresh_standing_backstory)
