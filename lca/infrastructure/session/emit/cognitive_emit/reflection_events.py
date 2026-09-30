@@ -1,8 +1,9 @@
-"""Gate / perceive / think Session fact production (ADR-0191 R2, ADR-0194 P1-06/14/15).
+"""Brain-internal spine EP emitters (ADR-0194 P1-15, ADR-0220 §6.2).
 
-Single production seam for ``gate.decided.v1``, ``context.manifested.v1``, and
-reasoner spine EPs (via ``publish_ep_bound``). All helpers no-op when no Session
-is bound (tests / offline).
+Single production seam for ``critic.*``, ``synthesizer.*``,
+``skill_router.*``, ``prompt_assembler.*`` and ``reasoner.*`` spine facts
+(via ``publish_ep_bound``), plus the reasoner spine envelope. All helpers
+no-op when no Session is bound (tests / offline).
 """
 
 from __future__ import annotations
@@ -10,10 +11,6 @@ from __future__ import annotations
 import contextlib
 from typing import Any, cast
 
-from lca.contracts.harness.memory.events import (
-    ContextManifestCommitted,
-    GateDecidedCommitted,
-)
 from lca.contracts.models.cognition.boundary import (
     ReasonerContext,
     RoleSnapshot,
@@ -21,102 +18,12 @@ from lca.contracts.models.cognition.boundary import (
 )
 from lca.contracts.models.cognition.reasoner_turn import ReasonerTurnPlan, ReasonerTurnRender
 from lca.contracts.models.core.conversation.llm import LLMResponse
-from lca.contracts.models.core.perceive.perception import ContextItem, ContextManifest
-from lca.contracts.models.core.policy.gate_policy import GateDecided
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols import Reasoner
-from lca.contracts.protocols.loop.fact_gateway import AppendReceipt
-from lca.loop.fact_gateway import append_catalog_bound, publish_ep_bound
-
-
-def _gate_decided_committed(event: GateDecided, *, step: int) -> GateDecidedCommitted:
-    fact = event.policy_fact
-    return GateDecidedCommitted(
-        event_id=event.event_id,
-        gate=event.gate,
-        verdict=event.verdict,
-        is_rewritten=event.is_rewritten,
-        step=step,
-        policy_fact_kind=fact.kind if fact is not None else "",
-        policy_fact_message=fact.message if fact is not None else "",
-        policy_fact_source=fact.source if fact is not None else "",
-        tool_name=event.tool_name,
-        rationale=event.rationale,
-    )
-
-
-def _context_item_wire(item: ContextItem) -> dict[str, Any]:
-    return {
-        "kind": item.kind,
-        "payload_repr": repr(item.payload),
-        "provenance": item.provenance,
-        "extra": dict(item.extra),
-    }
-
-
-def emit_gate_decided(
-    session: object,
-    event: GateDecidedCommitted,
-    *,
-    actor: str = "gate",
-) -> AppendReceipt | None:
-    """Append one ``gate.decided.v1`` fact."""
-    return append_catalog_bound(event, session=session, actor=actor)
-
-
-def emit_gate_decided_from_policy(
-    state: AgentState,
-    event: GateDecided,
-    *,
-    session: object | None = None,
-    actor: str = "gate",
-) -> AppendReceipt | None:
-    """Map contracts ``GateDecided`` → session fact; no-op if unbound."""
-    return append_catalog_bound(
-        _gate_decided_committed(event, step=state.step),
-        state=state,
-        session=session,
-        actor=actor,
-    )
-
-
-def emit_context_manifested(
-    session: object,
-    manifest: ContextManifest,
-    *,
-    step: int,
-    actor: str = "perceive",
-) -> AppendReceipt | None:
-    """Append one ``context.manifested.v1`` fact."""
-    return append_catalog_bound(
-        ContextManifestCommitted(
-            step=step,
-            digest=manifest.digest,
-            items=tuple(_context_item_wire(item) for item in manifest.items),
-        ),
-        session=session,
-        actor=actor,
-    )
-
-
-def emit_context_manifested_for_state(
-    state: AgentState,
-    manifest: ContextManifest,
-    *,
-    session: object | None = None,
-    actor: str = "perceive",
-) -> AppendReceipt | None:
-    """Resolve session from run context, then emit manifest fact."""
-    return append_catalog_bound(
-        ContextManifestCommitted(
-            step=state.step,
-            digest=manifest.digest,
-            items=tuple(_context_item_wire(item) for item in manifest.items),
-        ),
-        state=state,
-        session=session,
-        actor=actor,
-    )
+from lca.infrastructure.session.emit.cognitive_emit.envelope import (
+    AppendReceipt,
+    publish_ep_bound,
+)
 
 
 def emit_critic_eval_start_for_state(
@@ -351,297 +258,6 @@ def _emit_reasoner_meta_from_render(plan: ReasonerTurnPlan, render: ReasonerTurn
         )
 
 
-# ---------------------------------------------------------------------------
-# Act-subgraph spine EPs (ADR-0220 §3.3 observation surface).
-#
-# The act subgraph emits these EPs through NodeGraphDriver's
-# ``emit_on_enter`` / ``emit_on_exit`` config. Each helper below
-# publishes one SPINE_EXECUTION_POINTS entry via FactGateway so the
-# observation plane captures the act-phase lifecycle. ``state`` is
-# the only required arg because the driver dispatches with the
-# outer-state handle; richer payload (decision_id, tool_name, etc.)
-# is intentionally left to dedicated control-plane plugins that wire
-# the typed Decision / EffectReceipt boundary, not this helper.
-# ---------------------------------------------------------------------------
-
-
-def emit_phase_tool_call_start_for_state(
-    state: AgentState,
-    *,
-    session: object | None = None,
-    actor: str = "act",
-) -> AppendReceipt | None:
-    """Append one ``phase.tool.call.start`` spine fact."""
-    return publish_ep_bound(
-        "phase.tool.call.start",
-        {"state_id": state.trace_id},
-        state=state,
-        session=session,
-        actor=actor,
-    )
-
-
-def emit_phase_tool_call_end_for_state(
-    state: AgentState,
-    *,
-    outcome: str = "success",
-    session: object | None = None,
-    actor: str = "act",
-) -> AppendReceipt | None:
-    """Append one ``phase.tool.call.end`` spine fact."""
-    return publish_ep_bound(
-        "phase.tool.call.end",
-        {"state_id": state.trace_id, "outcome": outcome},
-        state=state,
-        session=session,
-        actor=actor,
-    )
-
-
-# ---------------------------------------------------------------------------
-# Node-level emit dispatch (ADR-0240).
-#
-# These helpers back the ``_EP_DISPATCH`` entries that the graph driver
-# (:class:`lca.framework.graph.interpreter.PlanInterpreter`) fires from
-# ``emit_on_enter`` / ``emit_on_exit`` declarations on BundleGraphSpec
-# v2 nodes. Payload is intentionally minimal (``state_id``); richer
-# fields (decision_id, tool_name, error class) stay with the imperative
-# ``publish_ep_bound`` call sites in tool_journal / safe_executor /
-# action_handlers — see Note `2026-09-15-node-emit-dispatcher-wiring` §Out
-# of scope.
-# ---------------------------------------------------------------------------
-
-
-def emit_terminal_commit_for_state(
-    state: AgentState,
-    *,
-    session: object | None = None,
-    actor: str = "kernel",
-) -> AppendReceipt | None:
-    """Append one ``terminal.commit`` spine fact."""
-    return publish_ep_bound(
-        "terminal.commit",
-        {"state_id": state.trace_id},
-        state=state,
-        session=session,
-        actor=actor,
-    )
-
-
-def emit_phase_perceive_fold_for_state(
-    state: AgentState,
-    *,
-    session: object | None = None,
-    actor: str = "perceive",
-) -> AppendReceipt | None:
-    """Append one ``phase.perceive.fold`` spine fact."""
-    return publish_ep_bound(
-        "phase.perceive.fold",
-        {"state_id": state.trace_id},
-        state=state,
-        session=session,
-        actor=actor,
-    )
-
-
-def emit_phase_think_fold_for_state(
-    state: AgentState,
-    *,
-    session: object | None = None,
-    actor: str = "think",
-) -> AppendReceipt | None:
-    """Append one ``phase.think.fold`` spine fact."""
-    return publish_ep_bound(
-        "phase.think.fold",
-        {"state_id": state.trace_id},
-        state=state,
-        session=session,
-        actor=actor,
-    )
-
-
-def emit_phase_reflect_fold_for_state(
-    state: AgentState,
-    *,
-    session: object | None = None,
-    actor: str = "reflect",
-) -> AppendReceipt | None:
-    """Append one ``phase.reflect.fold`` spine fact."""
-    return publish_ep_bound(
-        "phase.reflect.fold",
-        {"state_id": state.trace_id},
-        state=state,
-        session=session,
-        actor=actor,
-    )
-
-
-def emit_phase_remember_fold_for_state(
-    state: AgentState,
-    *,
-    session: object | None = None,
-    actor: str = "remember",
-) -> AppendReceipt | None:
-    """Append one ``phase.remember.fold`` spine fact."""
-    return publish_ep_bound(
-        "phase.remember.fold",
-        {"state_id": state.trace_id},
-        state=state,
-        session=session,
-        actor=actor,
-    )
-
-
-def emit_phase_stop_fold_for_state(
-    state: AgentState,
-    *,
-    session: object | None = None,
-    actor: str = "stop",
-) -> AppendReceipt | None:
-    """Append one ``phase.stop.fold`` spine fact."""
-    return publish_ep_bound(
-        "phase.stop.fold",
-        {"state_id": state.trace_id},
-        state=state,
-        session=session,
-        actor=actor,
-    )
-
-
-def emit_phase_act_fold_start_for_state(
-    state: AgentState,
-    *,
-    session: object | None = None,
-    actor: str = "act",
-) -> AppendReceipt | None:
-    """Append one ``phase.act.fold.start`` spine fact."""
-    return publish_ep_bound(
-        "phase.act.fold.start",
-        {"state_id": state.trace_id},
-        state=state,
-        session=session,
-        actor=actor,
-    )
-
-
-def emit_think_gate_end_for_state(
-    state: AgentState,
-    *,
-    session: object | None = None,
-    actor: str = "think",
-) -> AppendReceipt | None:
-    """Append one ``think.gate.end`` spine fact."""
-    return publish_ep_bound(
-        "think.gate.end",
-        {"state_id": state.trace_id},
-        state=state,
-        session=session,
-        actor=actor,
-    )
-
-
-def emit_phase_graph_subgraph_enter_for_state(
-    state: AgentState,
-    *,
-    session: object | None = None,
-    actor: str = "graph",
-) -> AppendReceipt | None:
-    """Append one ``phase_graph.subgraph.enter`` spine fact."""
-    return publish_ep_bound(
-        "phase_graph.subgraph.enter",
-        {"state_id": state.trace_id},
-        state=state,
-        session=session,
-        actor=actor,
-    )
-
-
-def emit_phase_graph_subgraph_exit_for_state(
-    state: AgentState,
-    *,
-    session: object | None = None,
-    actor: str = "graph",
-) -> AppendReceipt | None:
-    """Append one ``phase_graph.subgraph.exit`` spine fact."""
-    return publish_ep_bound(
-        "phase_graph.subgraph.exit",
-        {"state_id": state.trace_id},
-        state=state,
-        session=session,
-        actor=actor,
-    )
-
-
-def emit_think_gate_start_for_state(
-    state: AgentState,
-    *,
-    session: object | None = None,
-    actor: str = "act",
-) -> AppendReceipt | None:
-    """Append one ``think.gate.start`` spine fact.
-
-    The act-subgraph ``act.authorize`` node reuses the gate EP as its
-    observation surface — it is the policy gate for tool dispatch.
-    """
-    return publish_ep_bound(
-        "think.gate.start",
-        {"state_id": state.trace_id},
-        state=state,
-        session=session,
-        actor=actor,
-    )
-
-
-def emit_body_tool_execute_start_for_state(
-    state: AgentState,
-    *,
-    session: object | None = None,
-    actor: str = "act",
-) -> AppendReceipt | None:
-    """Append one ``body.tool.execute.start`` spine fact."""
-    return publish_ep_bound(
-        "body.tool.execute.start",
-        {"state_id": state.trace_id},
-        state=state,
-        session=session,
-        actor=actor,
-    )
-
-
-def emit_body_tool_execute_end_for_state(
-    state: AgentState,
-    *,
-    outcome: str = "success",
-    session: object | None = None,
-    actor: str = "act",
-) -> AppendReceipt | None:
-    """Append one ``body.tool.execute.end`` spine fact."""
-    return publish_ep_bound(
-        "body.tool.execute.end",
-        {"state_id": state.trace_id, "outcome": outcome},
-        state=state,
-        session=session,
-        actor=actor,
-    )
-
-
-def emit_phase_act_fold_end_for_state(
-    state: AgentState,
-    *,
-    outcome: str = "success",
-    session: object | None = None,
-    actor: str = "act",
-) -> AppendReceipt | None:
-    """Append one ``phase.act.fold.end`` spine fact."""
-    return publish_ep_bound(
-        "phase.act.fold.end",
-        {"state_id": state.trace_id, "outcome": outcome},
-        state=state,
-        session=session,
-        actor=actor,
-    )
-
-
 async def run_reasoner_generate_thoughts_with_spine_facts(
     reasoner: Reasoner,
     state: AgentState,
@@ -766,31 +382,13 @@ async def run_reasoner_generate_thoughts_with_spine_facts(
 
 
 __all__ = [
-    "emit_context_manifested",
-    "emit_context_manifested_for_state",
     "emit_critic_eval_end_for_state",
     "emit_critic_eval_start_for_state",
-    "emit_gate_decided",
-    "emit_gate_decided_from_policy",
-    "emit_phase_act_fold_end_for_state",
-    "emit_phase_act_fold_start_for_state",
-    "emit_phase_graph_subgraph_enter_for_state",
-    "emit_phase_graph_subgraph_exit_for_state",
-    "emit_phase_perceive_fold_for_state",
-    "emit_phase_reflect_fold_for_state",
-    "emit_phase_remember_fold_for_state",
-    "emit_phase_stop_fold_for_state",
-    "emit_phase_think_fold_for_state",
-    "emit_phase_tool_call_end_for_state",
-    "emit_phase_tool_call_start_for_state",
     "emit_prompt_assembler_end_for_state",
     "emit_prompt_assembler_start_for_state",
     "emit_reasoner_reason_end_for_state",
     "emit_reasoner_reason_start_for_state",
     "emit_skill_router_route_for_state",
     "emit_synthesizer_merge_for_state",
-    "emit_terminal_commit_for_state",
-    "emit_think_gate_end_for_state",
-    "emit_think_gate_start_for_state",
     "run_reasoner_generate_thoughts_with_spine_facts",
 ]
