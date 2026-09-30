@@ -343,3 +343,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat 1b1f8f3da` → 8 files changed, 122 insertions(+), 41 deletions(-); gross diff = 163 > 100.
 - **Tests:** `uv run pytest -q tests/unit/infrastructure/mcp/test_routing.py tests/unit/infrastructure/mcp/test_mcp_subsystem.py -m "not real_llm" --no-cov` → **8 passed**.
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 34 — 2026-09-30
+
+- **Commit:** `b02d2fe9a`
+- **Architectural concern:** COMPAT package cleanup / locality. The still-live file/console sink plugins lived in the ADR-0181 COMPAT package `lca.plugins.observability.spine.sinks`.
+- **Change:** moved them into `lca.plugins.events.sinks.{file_sink,console_sink}`; repointed bundles (`loop_cursor.spine_*`) and tests; removed the COMPAT headers (delete condition landed); updated `scripts/check_writable_matrix_boundaries.py`; added structural + behavioral tests for `ConsoleSink`.
+- **Files:** 13 files (2 plugin moves, 2 bundle updates, 2 test updates, 3 COMPAT headers, 1 script, 2 new tests).
+- **Shortstat:** `git show --shortstat b02d2fe9a` → 13 files changed, 129 insertions(+), 34 deletions(-); gross diff = 163 > 100.
+- **Tests:** `uv run pytest -q tests/architecture/test_spine_sinks_migrated.py tests/plugins/events/sinks/test_console_sink_migrated.py -m "not real_llm" --no-cov` → **8 passed**; `brain.think.start` sink tests are pre-existing whitelist mismatches.
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
