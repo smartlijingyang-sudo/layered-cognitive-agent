@@ -13,6 +13,7 @@ Case 矩阵(spec §3.1):
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -80,6 +81,7 @@ class _StubBrain:
 class _StubRuntime:
     state: AgentState | None
     brain: _StubBrain | None
+    standing_refresher: Any = None
 
 
 def _ctx(caps: dict[str, Any]) -> NodeContext:
@@ -176,6 +178,61 @@ def test_reason_render_module_does_not_import_emit() -> None:
         text = f.read()
     assert "from lca.infrastructure.session.emit" not in text
     assert "from lca.loop.emit" not in text
+
+
+@pytest.mark.asyncio
+async def test_reason_render_refreshes_backstory_from_disk(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """绑定 Home 时,每轮渲染从磁盘重读常驻文件并刷新 backstory。"""
+    from types import SimpleNamespace
+
+    from lca.infrastructure.memory.standing_refresh import refresh_standing_backstory
+
+    home = tmp_path / "asst"
+    home.mkdir()
+    (home / "SOUL.md").write_text("人设正文", encoding="utf-8")
+    (home / "USER.md").write_text("称呼小超", encoding="utf-8")
+    (home / "MEMORY.md").write_text("用户住在杭州", encoding="utf-8")
+    (home / "AGENTS.md").write_text("手册内容", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "lca.infrastructure.runtime_plane.capability_bindings.current_bindings_view",
+        lambda: SimpleNamespace(home_path=str(home)),
+    )
+    executor = ThinkReasonRenderExecutor()
+    reasoner = _Reasoner(render=_render())
+    brain = _StubBrain(reasoner=reasoner, role_profile=reasoner.role_profile_field)
+    runtime = _StubRuntime(
+        state=AgentState(trace_id="t", task="x", budget=Budget()),
+        brain=brain,
+        standing_refresher=refresh_standing_backstory,
+    )
+    result = await executor.node_execute(
+        NodeContext(runtime=runtime, budget={}, metadata={}),
+        NodeInput(port_values={"turn_plan": _plan()}),
+    )
+    assert result.port_values.get("turn_render") is reasoner.render
+    assert reasoner.received_role is not None
+    refreshed = reasoner.received_role.profile.backstory
+    assert "用户住在杭州" in refreshed
+    assert "人设正文" in refreshed
+    assert "手册内容" in refreshed
+
+
+@pytest.mark.asyncio
+async def test_reason_render_without_refresher_keeps_original_profile() -> None:
+    """无 refresher / 无 home 绑定时,原 role_profile 原样传给 render_turn。"""
+    executor = ThinkReasonRenderExecutor()
+    reasoner = _Reasoner(render=_render())
+    plan = _plan()
+    result = await executor.node_execute(
+        _ctx({"phase.think.reason.render": reasoner}),
+        NodeInput(port_values={"turn_plan": plan}),
+    )
+    assert result.port_values.get("turn_render") is reasoner.render
+    assert reasoner.received_role is not None
+    assert reasoner.received_role.profile is reasoner.role_profile_field
 
 
 @pytest.mark.asyncio

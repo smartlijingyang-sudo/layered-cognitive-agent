@@ -16,6 +16,8 @@ Status: implemented
 
 `persona_from_home` 每次从磁盘读取 `SOUL.md`、`USER.md`、`MEMORY.md`、`AGENTS.md`、`TOOLS.md`，按这个顺序装进有界的 backstory。后面还有文件时，当前文件最多使用剩余预算的一半。`rehydrate_after_compaction` 先丢掉历史里的旧注入块，再接上刚读到的常驻文件。历史在预算不够时从前面被切掉。
 
+`think.reason.render` 每轮渲染前通过注入的 `standing_refresher` 重读磁盘上的常驻文件，刷新 `role_profile.backstory`。`refresh_standing_backstory` 位于 `lca/infrastructure/memory/standing_refresh.py`，由 `DeclarativeRuntimeBindings` 注入节点运行时。没有 home 绑定、没有 refresher、或读取失败时，原 profile 保持不变。这样压缩或外部编辑后的最新常驻文件在下一轮渲染进入 prompt。
+
 ## Alternatives considered
 
 ### 为什么不把 MEMORY.md 改成唯一真值？

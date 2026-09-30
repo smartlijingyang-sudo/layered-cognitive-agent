@@ -15,7 +15,8 @@ think.reason inner_graph 第 2 节点 plugin:把 compat-era ``(state, plan)``
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from typing import Any
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -46,6 +47,46 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 _log = logging.getLogger(__name__)
+
+
+def _refresh_role_profile(
+    runtime: object,
+    role_profile: object,
+) -> object:
+    """Re-read the standing files when the run is bound to an assistant home.
+
+    The injected ``standing_refresher`` returns the freshly assembled
+    backstory from disk. Without a refresher, without ``bindings.home_path``,
+    or when the refresh fails, the original profile is kept unchanged.
+    """
+    refresher = _resolve_refresher(runtime)
+    if not callable(refresher):
+        return role_profile
+    try:
+        from lca.infrastructure.runtime_plane.capability_bindings import (
+            current_bindings_view,
+        )
+
+        bindings = current_bindings_view()
+    except Exception:
+        return role_profile
+    home_path = getattr(bindings, "home_path", None) if bindings is not None else None
+    if not home_path:
+        return role_profile
+    fallback = str(getattr(role_profile, "backstory", "") or "")
+    refreshed = refresher(home_path, fallback=fallback)
+    if not refreshed or refreshed == fallback:
+        return role_profile
+    return replace(role_profile, backstory=refreshed)
+
+
+def _resolve_refresher(runtime: object) -> Any:
+    """Read the ``standing_refresher`` capability off the runtime view."""
+
+    refresher = getattr(runtime, "standing_refresher", None)
+    if refresher is None and hasattr(runtime, "get"):
+        refresher = runtime.get("standing_refresher")
+    return refresher
 
 
 def _state_to_boundary(
@@ -136,6 +177,7 @@ class ThinkReasonRenderExecutor:
         plan = input.port_values.get("turn_plan")
         render_turn = getattr(reasoner, "render_turn", None) if reasoner is not None else None
         role_profile = _resolve_role_profile(runtime)
+        role_profile = _refresh_role_profile(runtime, role_profile)
         missing = [
             name
             for name, value in (
