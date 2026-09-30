@@ -24,7 +24,6 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Callable, Mapping
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +33,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from lca.contracts.atoms.artifact.state import ArtifactState, is_legal_transition
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
+from lca.contracts.atoms.ids.ids import utc_now_iso
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import ASSISTANT_CATALOG, ASSISTANT_EVOLVE
 from lca.contracts.harness.composition.plugin_contract import (
@@ -142,14 +142,12 @@ class _AssistantEvolveImpl(AssistantEvolve, SkillAcquirer):
         *,
         catalog: AssistantCatalog,
         event_emitter: Callable[[str, Mapping[str, Any]], Any] | None = None,
-        clock: Callable[[], datetime] | None = None,
         min_confidence: float = 0.7,
         min_evidence: int = 1,
         draft_confidence: float = 0.8,
     ) -> None:
         self._catalog = catalog
         self._emit_fn = event_emitter
-        self._clock = clock or (lambda: datetime.now(UTC))
         self._min_confidence = min_confidence
         self._min_evidence = min_evidence
         self._draft_confidence = draft_confidence
@@ -200,7 +198,7 @@ class _AssistantEvolveImpl(AssistantEvolve, SkillAcquirer):
             assistant_id=assistant_id,
             run_ids=tuple(run_ids),
             evidence_refs=evidence,
-            observed_at=_iso(self._clock()),
+            observed_at=utc_now_iso(),
         )
 
     def distill(self, assistant_id: str, digest: ObservationDigest) -> SkillAcquisitionCandidate:
@@ -314,7 +312,7 @@ class _AssistantEvolveImpl(AssistantEvolve, SkillAcquirer):
                 "approved_by": approval.approved_by,
                 "approved_at": approval.approved_at,
                 "reason": approval.reason,
-                "promoted_at": _iso(self._clock()),
+                "promoted_at": utc_now_iso(),
             }
         )
         (skill_dir / "install.json").write_text(
@@ -338,7 +336,7 @@ class _AssistantEvolveImpl(AssistantEvolve, SkillAcquirer):
         if draft_path.is_file():
             draft_path.unlink()
 
-        promoted_at = _iso(self._clock())
+        promoted_at = utc_now_iso()
         self._emit(
             ASSISTANT_SKILL_EVOLVED_PROMOTED,
             AssistantSkillEvolvedPromotedEventPayload(
@@ -425,7 +423,7 @@ class _AssistantEvolveImpl(AssistantEvolve, SkillAcquirer):
             "evidence_refs": list(candidate.evidence_refs),
             "status": candidate.status,
             "scope": _EXPERIMENT_SCOPE,
-            "created_at": _iso(self._clock()),
+            "created_at": utc_now_iso(),
             "revision_seq": revision_seq,
             "manifest_digest": manifest_digest,
             "draft_digest": draft_digest,
@@ -450,10 +448,6 @@ class _AssistantEvolveImpl(AssistantEvolve, SkillAcquirer):
 def _content_digest(text: str) -> str:
     """``sha256:<hex>`` 内容 digest（与 _home_layout.sha256_digest 同形态）。"""
     return f"sha256:{hashlib.sha256(text.encode('utf-8')).hexdigest()}"
-
-
-def _iso(now: datetime) -> str:
-    return now.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _skill_name(candidate_id: str) -> str:

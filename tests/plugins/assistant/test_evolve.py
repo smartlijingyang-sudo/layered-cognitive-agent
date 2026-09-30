@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -45,9 +45,6 @@ from lca.plugins.assistant.evolve.evolve import (
 )
 from lca.plugins.domain.assistant.catalog.plugin import AssistantCatalogImpl
 
-_FIXED_NOW = datetime(2026, 9, 4, 12, 0, 0, tzinfo=UTC)
-
-
 # ── fixtures ─────────────────────────────────────────────────────────
 
 
@@ -74,7 +71,6 @@ def evolve(
     return AssistantEvolveImpl(
         catalog=catalog,
         event_emitter=_record,
-        clock=lambda: _FIXED_NOW,
     )
 
 
@@ -113,7 +109,13 @@ class TestObserve:
         assert digest.assistant_id == assistant_id
         assert digest.run_ids == ("run-a", "run-b")
         assert digest.evidence_refs == ("spine:run-a", "spine:run-b")
-        assert digest.observed_at == "2026-09-04T12:00:00Z"
+        # 共享 seam utc_now_iso() 输出：%Y-%m-%dT%H:%M:%SZ（UTC，无本地时区漂移）
+        observed = digest.observed_at
+        assert len(observed) == 20
+        assert observed.endswith("Z")
+        parsed = datetime.fromisoformat(observed.replace("Z", "+00:00"))
+        assert parsed.utcoffset() is not None
+        assert parsed.utcoffset().total_seconds() == 0
 
     def test_observe_empty_run_ids_rejected(
         self, evolve: AssistantEvolveImpl, assistant_id: str

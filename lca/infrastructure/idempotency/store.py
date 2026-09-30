@@ -18,6 +18,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Final
 
+from lca.contracts.atoms.ids.ids import utc_now_iso
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.protocols.journal.idempotency.idempotency import (
     IdempotencyClaim,
@@ -90,7 +91,7 @@ class SqliteIdempotencyStore(IdempotencyStore):
                         (plan_ref, idempotency_key, status, receipt_json, updated_at)
                     VALUES (?, ?, 'in_progress', NULL, ?)
                     """,
-                    (plan_ref, idempotency_key, _timestamp()),
+                    (plan_ref, idempotency_key, utc_now_iso()),
                 )
                 return IdempotencyClaim(status="new")
             if row["status"] == "in_progress":
@@ -135,12 +136,8 @@ class SqliteIdempotencyStore(IdempotencyStore):
                 SET status = 'completed', receipt_json = ?, updated_at = ?
                 WHERE plan_ref = ? AND idempotency_key = ?
                 """,
-                (receipt_json, _timestamp(), plan_ref, idempotency_key),
+                (receipt_json, utc_now_iso(), plan_ref, idempotency_key),
             )
-
-
-def _timestamp() -> str:
-    return datetime.now().astimezone().isoformat(timespec="microseconds")
 
 
 def _encode_receipt(value: object) -> object:

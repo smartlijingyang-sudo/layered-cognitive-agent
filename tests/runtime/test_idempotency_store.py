@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import sqlite3
 
 import pytest
 
@@ -111,3 +112,24 @@ async def test_gateway_reuses_receipt_after_runtime_reconstruction(tmp_path) -> 
 
     assert first_result == second_result
     assert body.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_claim_persists_utc_iso_updated_at(tmp_path) -> None:
+    """``updated_at`` 必须走共享 seam ``utc_now_iso()``（UTC，非本地时区）。"""
+    path = tmp_path / "idempotency.sqlite3"
+    store = SqliteIdempotencyStore(path)
+    await store.claim("plan-utc", "effect-utc")
+
+    connection = sqlite3.connect(path)
+    try:
+        row = connection.execute(
+            "SELECT updated_at FROM effect_idempotency"
+            " WHERE plan_ref='plan-utc' AND idempotency_key='effect-utc'"
+        ).fetchone()
+    finally:
+        connection.close()
+    assert row is not None
+    updated_at = str(row[0])
+    assert len(updated_at) == 20
+    assert updated_at.endswith("Z")

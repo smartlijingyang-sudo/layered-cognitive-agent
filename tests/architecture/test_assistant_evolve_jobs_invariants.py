@@ -83,7 +83,7 @@ def _make_env(tmp_path: Path) -> tuple[Any, Any, list[tuple[str, dict[str, Any]]
         emitted.append((event, dict(payload)))
 
     catalog = AssistantCatalogImpl(root=tmp_path, event_emitter=_record)
-    evolve = AssistantEvolveImpl(catalog=catalog, event_emitter=_record, clock=lambda: _FIXED_NOW)
+    evolve = AssistantEvolveImpl(catalog=catalog, event_emitter=_record)
     return catalog, evolve, emitted
 
 

@@ -23,7 +23,6 @@ import json
 import shutil
 import uuid
 from collections.abc import Callable, Mapping
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +31,7 @@ from pydantic import BaseModel, ConfigDict
 
 from lca.contracts.atoms.artifact.state import ArtifactState
 from lca.contracts.atoms.functional.group import FunctionalGroup
+from lca.contracts.atoms.ids.ids import utc_now_iso
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import ASSISTANT_CATALOG, ASSISTANT_SKILL_OVERLAY
 from lca.contracts.harness.composition.plugin_contract import (
@@ -246,10 +246,6 @@ def _mark_local(skill_dir: Path) -> None:
         )
 
 
-def _iso(moment: datetime) -> str:
-    return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
 def _revision_of(manifest: Mapping[str, Any]) -> int:
     raw = manifest.get("revision_seq", 0)
     if isinstance(raw, bool):
@@ -278,12 +274,10 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
         catalog: AssistantCatalog,
         event_emitter: Callable[[str, Mapping[str, Any]], Any] | None = None,
         url_importer_factory: Callable[[Path], SkillImporter] | None = None,
-        clock: Callable[[], datetime] | None = None,
     ) -> None:
         self._catalog = catalog
         self._emit = event_emitter
         self._url_importer_factory = url_importer_factory or _default_url_importer
-        self._clock = clock or (lambda: datetime.now(UTC))
 
     # ── 公开面 ────────────────────────────────────────────────────────
 
@@ -317,7 +311,7 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
                 with contextlib.suppress(OSError):
                     staging_parent.rmdir()  # 仅当空目录时收掉,不留空壳
 
-        installed_at = _iso(self._clock())
+        installed_at = utc_now_iso()
         payload = AssistantSkillInstalledEventPayload(
             assistant_id=assistant_id,
             revision_seq=_revision_of(manifest),
@@ -396,7 +390,7 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
             assistant_id=assistant_id,
             skill_id=skill_id,
             activation_id=f"act_{uuid.uuid4().hex[:12]}",
-            activated_at=_iso(self._clock()),
+            activated_at=utc_now_iso(),
             revision_seq=_revision_of(manifest),
             manifest_digest=str(manifest.get("manifest_digest") or ""),
             actor=actor,
@@ -522,7 +516,7 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
                 "artifact_state": artifact.state.value,
                 "version": package.version,
                 "source": "local",
-                "installed_at": _iso(self._clock()),
+                "installed_at": utc_now_iso(),
                 "actor": actor,
             }
             new_manifest["skills"] = section
@@ -551,7 +545,7 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
             version=package.version,
             digest=package_digest,
             artifact_state=artifact.state.value,
-            installed_at=_iso(self._clock()),
+            installed_at=utc_now_iso(),
             revision_seq=new_revision_seq,
             manifest_digest=str(new_manifest["manifest_digest"]),
             actor=actor,
@@ -646,7 +640,7 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
             "artifact_state": artifact.state.value,
             "version": package.version,
             "source": source.reference,
-            "installed_at": _iso(self._clock()),
+            "installed_at": utc_now_iso(),
             "actor": actor,
         }
         new_manifest["skills"] = section

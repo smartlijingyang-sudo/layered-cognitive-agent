@@ -26,7 +26,7 @@ import os
 import shutil
 import uuid
 from collections.abc import Callable, Mapping
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +35,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
 from lca.contracts.atoms.functional.group import FunctionalGroup
+from lca.contracts.atoms.ids.ids import utc_now_iso
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.capabilities import ASSISTANT_CATALOG
 from lca.contracts.harness.composition.plugin_contract import (
@@ -241,14 +242,12 @@ class _AssistantCatalogImpl(AssistantCatalog):
         *,
         root: Path,
         event_emitter: Callable[[str, Mapping[str, Any]], Any] | None = None,
-        clock: Callable[[], datetime] | None = None,
         role_resolver: Any | None = None,
         global_skills_store: Any | None = None,
     ) -> None:
         self._root = root
         self._root.mkdir(parents=True, exist_ok=True)
         self._emit = event_emitter
-        self._clock = clock or (lambda: datetime.now(UTC))
         self._role_resolver = role_resolver
         self._global_skills_store = global_skills_store
 
@@ -359,7 +358,7 @@ class _AssistantCatalogImpl(AssistantCatalog):
                     self._global_skills_store,
                     home.root,
                     skills_to_materialize,
-                    _iso_now(self._clock),
+                    _iso_now(),
                 )
                 skills_index.update(materialized_index)
                 skills_digests.update(materialized_digests)
@@ -658,7 +657,7 @@ class _AssistantCatalogImpl(AssistantCatalog):
             manifest_digest=str(new_manifest["manifest_digest"]),
             actor=actor,
             snapshot_path=str(home.root / "revisions" / f"{new_revision_seq}.json"),
-            revised_at=_iso_now(self._clock),
+            revised_at=_iso_now(),
         )
 
     def reimport(self, assistant_id: str, reason: str) -> PlanRevision:
@@ -697,7 +696,7 @@ class _AssistantCatalogImpl(AssistantCatalog):
             manifest_digest=str(new_manifest["manifest_digest"]),
             actor="reimport",
             snapshot_path=str(home.root / "revisions" / f"{new_revision_seq}.json"),
-            revised_at=_iso_now(self._clock),
+            revised_at=_iso_now(),
         )
 
     def restore_revision(self, assistant_id: str, revision_seq: int) -> PlanRevision:
@@ -830,7 +829,7 @@ class _AssistantCatalogImpl(AssistantCatalog):
                         "artifact_state": "verified",
                         "version": str(meta.get("version") or "") if is_global_link else "",
                         "source": "global_link" if is_global_link else "local",
-                        "installed_at": _iso_now(self._clock),
+                        "installed_at": _iso_now(),
                         "actor": "system",
                     }
                     digests[f"skills/{child.name}"] = digest
@@ -1195,8 +1194,14 @@ def _copy_manifest_extras(source: Mapping[str, object], target: dict[str, object
             target[key] = source[key]
 
 
-def _iso_now(clock: Callable[[], datetime]) -> str:
-    """ISO-8601 UTC 时间字符串（复用注入时钟）。"""
+def _iso_now(clock: Callable[[], datetime] | None = None) -> str:
+    """ISO-8601 UTC 时间字符串。
+
+    生产路径直接返回共享 seam ``utc_now_iso()``（``%Y-%m-%dT%H:%M:%SZ``）；
+    ``clock`` 仅为测试注入固定时钟保留的可调用缝（None = 走 seam）。
+    """
+    if clock is None:
+        return utc_now_iso()
     return clock().strftime("%Y-%m-%dT%H:%M:%SZ")
 
 

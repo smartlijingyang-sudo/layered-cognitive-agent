@@ -34,10 +34,11 @@ import os
 import sys
 import tempfile
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TextIO, TypeGuard, cast
 
+from lca.contracts.atoms.ids.ids import utc_now, utc_now_iso, utc_now_ms
 from lca.contracts.event import EventPayload
 from lca_kernel.events.bus.bus import EnvelopeRef
 
@@ -83,8 +84,9 @@ def is_spine_event(payload: Any) -> TypeGuard[EventPayload]:
 class SpineClock:
     """统一时钟 helper。
 
-    替代散落的 ``datetime.now(timezone.utc).isoformat()`` 模式。
-    全局可注入（测试可换 FrozenClock）；生产用 wall-clock UTC。
+    生产路径委托共享 seam ``lca.contracts.atoms.ids.ids``（``utc_now`` /
+    ``utc_now_iso`` / ``utc_now_ms``），不再散落 ``datetime.now(timezone.utc)
+    .isoformat()``。全局可注入（测试可换 FrozenClock）；``freeze()`` 固定时钟。
     """
 
     _override: datetime | None = None
@@ -93,11 +95,19 @@ class SpineClock:
     def now(cls) -> datetime:
         if cls._override is not None:
             return cls._override
-        return datetime.now(UTC)
+        return utc_now()
 
     @classmethod
     def now_iso(cls) -> str:
-        return cls.now().isoformat()
+        if cls._override is not None:
+            return cls._override.isoformat()
+        return utc_now_iso()
+
+    @classmethod
+    def now_ms(cls) -> int:
+        if cls._override is not None:
+            return int(cls._override.timestamp() * 1000)
+        return utc_now_ms()
 
     @classmethod
     def freeze(cls, at: datetime | None) -> None:
