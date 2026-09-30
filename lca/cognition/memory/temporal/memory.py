@@ -133,7 +133,7 @@ class TemporalMemorySystem(MemorySystem):
         ]
         if token_budget is None or token_budget <= 0:
             return records
-        from lca.cognition.memory.layered.retrieval_policy import estimate_tokens
+        from lca.infrastructure.memory.retrieval.scoring import estimate_tokens
 
         kept: list[MemoryRecord] = []
         used = 0

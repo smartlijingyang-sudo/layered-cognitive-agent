@@ -43,10 +43,13 @@ log:emit
 
 **模块清单**:
 
-- `lca/cognition/memory/layered_retrieval_policy.py`
-- `lca/cognition/memory/null_retrieval_policy.py`
-- `lca/cognition/memory/policy.py`
-- `lca/cognition/memory/semantic_compaction.py`
-- `lca/cognition/memory/simple_memory.py`
-- `lca/cognition/memory/team_shared_memory.py`
-- `lca/cognition/memory/temporal_memory.py`
+- `lca/cognition/memory/acknowledgement.py`
+- `lca/cognition/memory/daytime.py`
+- `lca/cognition/memory/govern.py`
+- `lca/cognition/memory/standing.py`
+- `lca/cognition/memory/null/retrieval_policy.py`
+- `lca/cognition/memory/policy/policy.py`
+- `lca/cognition/memory/semantic/compaction.py`
+- `lca/cognition/memory/simple/memory.py`
+- `lca/cognition/memory/team/shared_memory.py`
+- `lca/cognition/memory/temporal/memory.py`

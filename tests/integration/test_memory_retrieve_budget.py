@@ -4,14 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from lca.cognition.memory.layered.retrieval_policy import (
-    LayeredRetrievalPolicy,
-    estimate_tokens,
-)
 from lca.cognition.memory.policy.policy import MemoryAuthority, MemoryWrite
 from lca.cognition.memory.simple.memory import SimpleMemorySystem
 from lca.contracts.atoms.enums.enums import MemoryLayer, MemoryRecordKind
 from lca.contracts.models.core.perceive.perception import ContextManifest
+from lca.infrastructure.memory.retrieval.layered import LayeredRetrievalPolicy
+from lca.infrastructure.memory.retrieval.scoring import estimate_tokens
 
 
 def _write(record_id: str, content: str) -> MemoryWrite:

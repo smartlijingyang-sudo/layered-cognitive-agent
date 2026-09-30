@@ -59,9 +59,7 @@ class Config(BaseModel):
 )
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Provide LayeredRetrievalPolicy as ``retrieval.layered``."""
-    from lca.cognition.memory.layered.retrieval_policy import (
-        LayeredRetrievalPolicy,
-    )
+    from lca.infrastructure.memory.retrieval.layered import LayeredRetrievalPolicy
 
     ctx.provide("retrieval.layered", LayeredRetrievalPolicy)
     ctx.provide(MEMORY_RETRIEVAL_POLICY.key, LayeredRetrievalPolicy)

@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pytest
 
-from lca.cognition.memory.layered.retrieval_policy import LayeredRetrievalPolicy
 from lca.cognition.memory.simple.memory import SimpleMemorySystem
 from lca.contracts.capabilities import (
     MEMORY_COMPACTION_POLICY,
@@ -16,6 +15,7 @@ from lca.contracts.capabilities import (
 )
 from lca.harness.profile.boot.boot import boot_profile
 from lca.harness.profile.resolve.resolve import resolve_profile
+from lca.infrastructure.memory.retrieval.layered import LayeredRetrievalPolicy
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -61,6 +61,6 @@ def test_booted_memory_service_uses_profile_selected_policy_instances() -> None:
 def test_memory_provider_does_not_register_the_concrete_class_directly() -> None:
     """Factory closure, rather than constructor defaults, owns production policy injection."""
 
-    source = (REPO / "lca/plugins/memory/memory_provider.py").read_text(encoding="utf-8")
+    source = (REPO / "lca/plugins/memory/providers/memory_provider.py").read_text(encoding="utf-8")
     assert 'register("simple", SimpleMemorySystem)' not in source
     assert "build_simple_memory" in source

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from lca.cognition.memory.layered.retrieval_policy import LayeredRetrievalPolicy
 from lca.contracts.atoms.enums.enums import MemoryLayer
 from lca.contracts.models.core.conversation.memory import MemoryRecord
+from lca.infrastructure.memory.retrieval.layered import LayeredRetrievalPolicy
 
 
 def _rec(
