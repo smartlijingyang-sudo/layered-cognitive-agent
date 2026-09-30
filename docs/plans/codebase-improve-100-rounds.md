@@ -323,3 +323,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat b821e6bec` → 24 files changed, 204 insertions(+), 260 deletions(-); gross diff = 464 > 100.
 - **Tests:** `uv run pytest -q tests/architecture/test_profile_boot_module_retired.py -m "not real_llm" --no-cov` → **2 passed** (subagent verified the affected-set failures are pre-existing `typesafe_sdk` ModuleNotFoundError).
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 32 — 2026-09-30
+
+- **Commit:** `147331659`
+- **Architectural concern:** stale references / dead code. The retired `lca/loop/transaction.py` (pre-kernel `PhaseExecutionTransaction`) was still referenced by two architecture tests and two READMEs; `scripts/lca-inspect-plan.py` imported two nonexistent modules.
+- **Change:** rewrote the phase-observation seam test against the current lifecycle module; repointed the production-closure test at the composer runtime package; updated the loop READMEs; fixed `lca-inspect-plan.py` to use `lca_kernel.plan.plan_compile`; added a structural guard scanning production+scripts for retired module paths.
+- **Files:** `tests/architecture/test_phase_observation_seam.py`, `tests/architecture/test_declarative_production_closure.py`, `tests/architecture/test_no_stale_module_references.py` (new), `scripts/lca-inspect-plan.py`, `lca/loop/README.md`, `lca/loop/control/README.md`.
+- **Shortstat:** `git show --shortstat 147331659` → 6 files changed, 94 insertions(+), 19 deletions(-); gross diff = 113 > 100.
+- **Tests:** `uv run pytest -q tests/architecture/test_phase_observation_seam.py tests/architecture/test_no_stale_module_references.py -m "not real_llm" --no-cov` → **5 passed** (the profile-boot rejection test in `test_declarative_production_closure.py` is pre-existing).
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
