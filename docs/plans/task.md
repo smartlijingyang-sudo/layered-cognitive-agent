@@ -369,5 +369,5 @@
 | COMMERCIAL-EVAL-TASK-2-LOADER | 评测模型 DTO 与 YAML 剧本解析加载器 (dialogue_scenario_loader.py) | Completed | 成功落地 lca/application/eval/ 下强类型不可变 Pydantic 模型（DialogueTurn, DialogueScenario, CommercialEvalSuite）与解析器（load_commercial_scenarios, parse_dialogue_scenarios_from_yaml），tests/eval/test_dialogue_scenario_loader.py 5/5 测试全部通过，ruff/diff 门禁干净 |
 | COMMERCIAL-EVAL-TASK-3-INVARIANTS | 确定性中间态断言与规则清单裁判引擎 (invariants_checker.py) | Completed | 成功落地 lca/application/eval/invariants_checker.py（包含零工具泄漏、出生证明合规、凭证防外泄、C10 安全窄门、写盘优先回复断言及聚合校验器），tests/eval/test_invariants_checker.py 8/8 全通，全量 eval 15/15 全绿，ruff/diff 门禁干净 |
 | COMMERCIAL-EVAL-TASK-4-CLI | 双模 CLI 评测运行器 (scripts/run_commercial_eval.py) | Completed | 成功落地 scripts/run_commercial_eval.py（支持 --list, --all, --case, --mock, --report），输出格式化终端战力卡片与 Markdown 战力看板，tests/eval/test_commercial_eval_runner_cli.py 5/5 全通，ruff/diff 门禁干净 |
-| COMMERCIAL-EVAL-TASK-5-TDD-SUITE | 自动化 pytest TDD 门禁测试套件 (test_commercial_dialogue_tdd.py) | Pending | 待实现 |
+| COMMERCIAL-EVAL-TASK-5-TDD-SUITE | 自动化 pytest TDD 门禁测试套件 (test_commercial_dialogue_tdd.py) | Completed | 成功落地 tests/eval/test_commercial_dialogue_tdd.py（35 个参数化测试全部 100% 通过，覆盖 16 套多轮场景离线断言、轮次完整性与 3 大攻防对抗缺陷拦截用例），ruff/diff 门禁干净 |
 | COMMERCIAL-EVAL-TASK-6-SCORECARD | 全链路基线执行、短板缺陷定位与商用就绪报告 (commercial_eval_scorecard.md) | Pending | 待执行 |
