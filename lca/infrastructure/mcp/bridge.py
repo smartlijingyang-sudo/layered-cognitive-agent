@@ -10,13 +10,15 @@ from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.mcp.types import MCPTool
 from lca.contracts.protocols import Tool
 from lca.contracts.protocols.act.tool.pipeline import ToolDefinition
-from lca.infrastructure.mcp.manager import MCPManager
+from lca.infrastructure.mcp.hub import MCPHub
 
 
-def adapt_mcp_tool_to_lca(manager: MCPManager, mcp_tool: MCPTool) -> Tool:
+def adapt_mcp_tool_to_lca(manager: MCPHub, mcp_tool: MCPTool) -> Tool:
     """Build a first-class LCA Tool from an MCPTool declaration."""
     tool_name = mcp_tool.qualified_name
-    description = mcp_tool.description or f"MCP tool '{mcp_tool.name}' on server '{mcp_tool.server_name}'"
+    description = (
+        mcp_tool.description or f"MCP tool '{mcp_tool.name}' on server '{mcp_tool.server_name}'"
+    )
     parameters = mcp_tool.input_schema or {"type": "object", "properties": {}}
 
     async def execute(_self: Tool, args: dict[str, Any]) -> Observation:
@@ -67,6 +69,6 @@ def adapt_mcp_tool_to_definition(mcp_tool: MCPTool) -> ToolDefinition:
     )
 
 
-def build_tools_from_mcp_manager(manager: MCPManager) -> list[Tool]:
+def build_tools_from_mcp_manager(manager: MCPHub) -> list[Tool]:
     """Export all healthy MCP tools as LCA Tool instances."""
     return [adapt_mcp_tool_to_lca(manager, t) for t in manager.get_all_tools()]

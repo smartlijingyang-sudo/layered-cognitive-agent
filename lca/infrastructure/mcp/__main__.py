@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 
 from lca.infrastructure.mcp.config import find_mcp_config_path, load_mcp_servers
-from lca.infrastructure.mcp.manager import MCPManager
+from lca.infrastructure.mcp.hub import MCPHub
 
 
 async def _run_doctor() -> None:
@@ -23,7 +23,7 @@ async def _run_doctor() -> None:
     servers = load_mcp_servers(config_path)
     print(f"✓ Configured servers: {list(servers.keys())}\n")
 
-    manager = MCPManager(servers)
+    manager = MCPHub(servers)
     print("Connecting and discovering tools from MCP servers...")
     await manager.initialize()
 

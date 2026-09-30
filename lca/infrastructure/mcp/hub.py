@@ -1,4 +1,4 @@
-"""MCPManager — Aggregate Root for managing multiple MCP servers and tool namespace routing."""
+"""MCPHub — Aggregate Root for managing multiple MCP servers and tool namespace routing."""
 
 from __future__ import annotations
 
@@ -16,11 +16,12 @@ from lca.contracts.models.mcp.types import (
 from lca.contracts.protocols.mcp.ports import MCPManagerPort
 from lca.infrastructure.mcp.client import MCPClient
 from lca.infrastructure.mcp.config import load_mcp_servers
+from lca.infrastructure.mcp.routing import build_tool_routing_table
 
 _log = structlog.get_logger(__name__)
 
 
-class MCPManager(MCPManagerPort):
+class MCPHub(MCPManagerPort):
     """Orchestrates multiple MCP server connections and tools discovery."""
 
     def __init__(self, configs: dict[str, MCPServerConfig] | None = None) -> None:
@@ -54,29 +55,15 @@ class MCPManager(MCPManagerPort):
         self._rebuild_tool_index()
 
     def _rebuild_tool_index(self) -> None:
-        self._tool_cache.clear()
-        name_collisions: set[str] = set()
-        raw_map: dict[str, list[tuple[str, MCPTool]]] = {}
-
-        for server_name, client in self._clients.items():
-            if client.status != MCPServerStatus.HEALTHY:
-                continue
-            for tool in client._tools:
-                # 1. Qualified name: mcp__{server}__{tool}
-                qname = tool.qualified_name
-                self._tool_cache[qname] = (server_name, tool)
-
-                # Track raw names for collision detection
-                raw_map.setdefault(tool.name, []).append((server_name, tool))
-
-        # 2. Allow unambiguous raw tool name invocation
-        for raw_name, matches in raw_map.items():
-            if len(matches) == 1:
-                server_name, tool = matches[0]
-                self._tool_cache[raw_name] = (server_name, tool)
-            else:
-                name_collisions.add(raw_name)
-                _log.debug("mcp_tool_name_collision", tool=raw_name, servers=[s for s, _ in matches])
+        healthy_tools = [
+            (server_name, tool)
+            for server_name, client in self._clients.items()
+            if client.status == MCPServerStatus.HEALTHY
+            for tool in client._tools
+        ]
+        self._tool_cache, collisions = build_tool_routing_table(healthy_tools)
+        for raw_name, servers in collisions.items():
+            _log.debug("mcp_tool_name_collision", tool=raw_name, servers=servers)
 
     def get_all_tools(self) -> list[MCPTool]:
         """Return list of all discovered tools across healthy servers."""

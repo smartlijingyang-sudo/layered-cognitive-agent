@@ -7,11 +7,11 @@ from lca.infrastructure.mcp.bridge import (
 )
 from lca.infrastructure.mcp.client import MCPClient
 from lca.infrastructure.mcp.config import find_mcp_config_path, load_mcp_servers
-from lca.infrastructure.mcp.manager import MCPManager
+from lca.infrastructure.mcp.hub import MCPHub
 
 __all__ = [
     "MCPClient",
-    "MCPManager",
+    "MCPHub",
     "adapt_mcp_tool_to_definition",
     "adapt_mcp_tool_to_lca",
     "build_tools_from_mcp_manager",

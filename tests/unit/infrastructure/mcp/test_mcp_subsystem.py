@@ -7,7 +7,7 @@ from lca.contracts.models.mcp.types import (
 )
 from lca.infrastructure.mcp.bridge import build_tools_from_mcp_manager
 from lca.infrastructure.mcp.config import load_mcp_servers
-from lca.infrastructure.mcp.manager import MCPManager
+from lca.infrastructure.mcp.hub import MCPHub
 
 
 def test_mcp_config_loading():
@@ -58,7 +58,7 @@ async def test_searxng_mcp_live_discovery():
     if not searx_cfg:
         pytest.skip("SearXNG MCP not configured")
 
-    manager = MCPManager({"searxng": searx_cfg})
+    manager = MCPHub({"searxng": searx_cfg})
     try:
         await manager.initialize()
         tools = manager.get_all_tools()

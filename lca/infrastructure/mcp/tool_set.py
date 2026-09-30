@@ -10,15 +10,15 @@ import structlog
 from lca.contracts.protocols import Tool
 from lca.infrastructure.mcp.bridge import build_tools_from_mcp_manager
 from lca.infrastructure.mcp.config import find_mcp_config_path, load_mcp_servers
-from lca.infrastructure.mcp.manager import MCPManager
+from lca.infrastructure.mcp.hub import MCPHub
 
 _log = structlog.get_logger(__name__)
 
-_AMBIENT_MCP_MANAGER: MCPManager | None = None
+_AMBIENT_MCP_MANAGER: MCPHub | None = None
 
 
-def get_ambient_mcp_manager() -> MCPManager | None:
-    """Return shared ambient MCPManager instance if mcp.yaml exists."""
+def get_ambient_mcp_manager() -> MCPHub | None:
+    """Return shared ambient MCPHub instance if mcp.yaml exists."""
     global _AMBIENT_MCP_MANAGER
     if _AMBIENT_MCP_MANAGER is not None:
         return _AMBIENT_MCP_MANAGER
@@ -31,7 +31,7 @@ def get_ambient_mcp_manager() -> MCPManager | None:
         servers = load_mcp_servers(config_path)
         if not servers:
             return None
-        _AMBIENT_MCP_MANAGER = MCPManager(servers)
+        _AMBIENT_MCP_MANAGER = MCPHub(servers)
         return _AMBIENT_MCP_MANAGER
     except Exception as exc:
         _log.warning("ambient_mcp_manager_init_failed", error=str(exc))
@@ -56,7 +56,7 @@ def reset_ambient_mcp_manager() -> None:
         mgr.close_sync()
 
 
-async def _init_transient_and_disconnect(mgr: MCPManager) -> None:
+async def _init_transient_and_disconnect(mgr: MCPHub) -> None:
     """Initialize manager on transient loop then disconnect transports to prevent leaks."""
     await mgr.initialize()
     for client in mgr._clients.values():
