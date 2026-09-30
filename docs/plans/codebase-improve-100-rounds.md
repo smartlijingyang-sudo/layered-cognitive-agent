@@ -173,3 +173,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat 9a9debcdf` → 7 files changed, 1419 insertions(+), 841 deletions(-); gross diff = 2260 > 100.
 - **Tests:** `uv run pytest -q tests/lca_kernel/boot/test_plan_validation_reachability.py tests/lca_kernel/boot/test_plan_validation.py -m "not real_llm" --no-cov` → **33 passed**; `test_aggregates_errors_across_plans` fails on a stale `lifter_mod._bundle_yaml_path` monkeypatch (pre-existing at base).
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 17 — 2026-09-30
+
+- **Commit:** `fce60fc18`
+- **Architectural concern:** layering violation / dependency direction. `lca.harness.declarative.lifecycle.phase_observation` imported the infrastructure `span` function, violating harness-depends-only-on-contracts.
+- **Change:** added the `SpanOpener` port in `lca/contracts/protocols/telemetry/span_opener.py`; `TracingPhaseObserver` now takes an injected opener (default no-op); both plugin composition points (`observer_tracing_provider`, `runtime_input` fixture) pass the infrastructure `span`; added tests + structural guard.
+- **Files:** `lca/contracts/protocols/telemetry/span_opener.py` (new), `lca/harness/declarative/lifecycle/phase_observation.py`, 2 plugin files, `tests/harness/declarative/lifecycle/test_tracing_phase_observer.py`.
+- **Shortstat:** `git show --shortstat fce60fc18` → 5 files changed, 138 insertions(+), 5 deletions(-); gross diff = 143 > 100.
+- **Tests:** `uv run pytest -q tests/harness/declarative/lifecycle/test_tracing_phase_observer.py tests/architecture/test_phase_observation_seam.py -m "not real_llm" --no-cov` → **5 passed**; `test_phase_transaction_depends_on_observation_seam_not_tracing_backend` is the pre-existing stale `lca/loop/transaction.py` test.
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
