@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from contextlib import AbstractContextManager, ExitStack, contextmanager, nullcontext
 from enum import StrEnum
+from typing import Any
 
 import structlog
 
@@ -21,8 +22,8 @@ from lca.contracts.protocols.journal.phase.observation import (
     PhaseObserverRegistry,
     PhaseStateSnapshot,
 )
+from lca.contracts.protocols.telemetry.span_opener import SpanOpener
 from lca.harness.declarative.lifecycle.phase_observation_snapshot import phase_state_snapshot
-from lca.infrastructure.observability import span
 
 _log = structlog.get_logger("lca.runtime.phase_observer")
 
@@ -146,8 +147,21 @@ _PHASE_TO_LOOP_SPAN: dict[SemanticPhase, SpanName] = {
 }
 
 
+def _null_span_opener(_name: object, **_attributes: Any) -> AbstractContextManager[object]:
+    """Default no-op span opener when no telemetry seam is injected."""
+    return nullcontext()
+
+
 class TracingPhaseObserver(PhaseObserver):
-    """Map standard semantic phases to existing loop spans."""
+    """Map standard semantic phases to existing loop spans.
+
+    The concrete ``span`` implementation lives in infrastructure; it is injected
+    via the :class:`SpanOpener` port at the composition boundary so harness keeps
+    depending only on contracts. Without injection, tracing degrades to a no-op.
+    """
+
+    def __init__(self, span_opener: SpanOpener | None = None) -> None:
+        self._span_opener = span_opener if span_opener is not None else _null_span_opener
 
     def observe(
         self,
@@ -158,7 +172,7 @@ class TracingPhaseObserver(PhaseObserver):
         span_name = _PHASE_TO_LOOP_SPAN.get(semantic_phase)
         if span_name is None:
             return nullcontext()
-        return span(
+        return self._span_opener(
             span_name,
             **{
                 ATTR_AGENT_ROLE: state.agent_role,

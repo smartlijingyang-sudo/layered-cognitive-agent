@@ -26,6 +26,7 @@ from lca.contracts.protocols.journal.phase.observation import (
 )
 from lca.harness.declarative.lifecycle.phase_observation import TracingPhaseObserver
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.infrastructure.observability import span
 
 
 class Config(BaseModel):
@@ -78,7 +79,7 @@ async def setup(ctx: PluginContext, config: BaseModel) -> None:
     registry.register(
         PhaseObserverContribution(
             id="tracing",
-            observer=TracingPhaseObserver(),
+            observer=TracingPhaseObserver(span_opener=span),
             priority=config.priority,
         )
     )

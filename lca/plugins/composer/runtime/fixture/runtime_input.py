@@ -37,6 +37,7 @@ from lca.contracts.protocols.session.resume.input import ResumeInputAdapter
 from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
 from lca.contracts.protocols.state.plan import CompiledRunPlan
 from lca.harness.declarative.lifecycle.phase_observation import PhaseObserver, TracingPhaseObserver
+from lca.infrastructure.observability import span
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,7 +67,9 @@ class RuntimeDeps:
     interpreter_factory: DeclarativeInterpreterFactory | None = None
     checkpoint_state_resolver_factory: CheckpointStateResolverFactory | None = None
     result_finalizer_factory: ResultFinalizerFactory | None = None
-    phase_observer: PhaseObserver = field(default_factory=TracingPhaseObserver)
+    phase_observer: PhaseObserver = field(
+        default_factory=lambda: TracingPhaseObserver(span_opener=span)
+    )
 
 
 __all__ = ["RuntimeDeps"]
