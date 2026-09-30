@@ -273,3 +273,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat 0c3e4a630` → 4 files changed, 395 insertions(+), 193 deletions(-); gross diff = 588 > 100.
 - **Tests:** `uv run pytest -q tests/lca_kernel/events/test_catalog_loader.py tests/lca_kernel/events/test_registry_load.py -m "not real_llm" --no-cov` → **13 passed**.
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 27 — 2026-09-30
+
+- **Commit:** `575bc70f8`
+- **Architectural concern:** layering violation / dependency direction. `lca.harness.observability.assemble` imported infrastructure concrete types, violating harness-depends-only-on-contracts.
+- **Change:** relocated `assemble_observability`, `make_minimal_bound`, `default_policy` into `lca_kernel.runtime.observability` (the kernel composition boundary); repointed the plugin `binding.py` and three test consumers; deleted `lca/harness/observability/`; added a structural test.
+- **Files:** `lca_kernel/runtime/observability.py`, `lca/plugins/transport/webserver/carrier/runs/binding.py`, `lca/harness/observability/*` (deleted), 4 test files.
+- **Shortstat:** `git show --shortstat 575bc70f8` → 9 files changed, 170 insertions(+), 224 deletions(-); gross diff = 394 > 100.
+- **Tests:** `uv run pytest -q tests/architecture/test_harness_observability_moved_to_kernel.py tests/lca_kernel/test_boot_events_emitted.py -m "not real_llm" --no-cov` → **7 passed** (2 boot-event failures pre-existing at HEAD `d645b6ea7`).
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
