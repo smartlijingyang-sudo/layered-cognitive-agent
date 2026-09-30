@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lca.cognition.memory.standing import STANDING_ORDER, assemble_standing
+from lca.infrastructure.memory.standing import STANDING_ORDER, assemble_standing
 
 _BACKSTORY_BUDGET = 3000
 

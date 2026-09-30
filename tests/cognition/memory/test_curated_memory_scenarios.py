@@ -13,7 +13,6 @@ from pathlib import Path
 import pytest
 
 from lca.cognition.memory.acknowledgement import guard_memory_claim
-from lca.cognition.memory.standing import rehydrate_after_compaction
 from lca.contracts.atoms.enums.enums import (
     ContentType,
     MemoryCategory,
@@ -35,6 +34,7 @@ from lca.infrastructure.memory.curated_projection import (
     may_acknowledge_projection,
     render_curated_markdown,
 )
+from lca.infrastructure.memory.standing import rehydrate_after_compaction
 from lca.nodes.concept.memory_write.dispatch import MemoryWriteDispatchExecutor
 from lca.nodes.think.decision.parse import DecisionParseExecutor
 from lca.plugins.assistant.persona.persona import persona_from_home

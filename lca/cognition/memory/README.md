@@ -46,7 +46,6 @@ log:emit
 - `lca/cognition/memory/acknowledgement.py`
 - `lca/cognition/memory/daytime.py`
 - `lca/cognition/memory/govern.py`
-- `lca/cognition/memory/standing.py`
 - `lca/cognition/memory/null/retrieval_policy.py`
 - `lca/cognition/memory/policy/policy.py`
 - `lca/cognition/memory/semantic/compaction.py`

@@ -17,8 +17,8 @@ from pathlib import Path
 
 import yaml
 
-from lca.cognition.memory.standing import STANDING_ORDER, assemble_standing
 from lca.infrastructure.assistant.io import read_json_soft
+from lca.infrastructure.memory.standing import STANDING_ORDER, assemble_standing
 
 _BACKSTORY_MAX_CHARS = 3000
 _GOAL_MAX_CHARS = 300
