@@ -36,7 +36,7 @@ from lca.plugins.transport.webserver.handlers.runs.session.session.session impor
 
 _log = structlog.get_logger(__name__)
 
-# Duplicated with lca.plugins.transport.webserver.handlers.runs.api.routes.query_endpoints; keep both in lockstep (MVA-3).
+# Duplicated with lca.plugins.transport.webserver.handlers.runs.api.query_endpoints; keep both in lockstep (MVA-3).
 _PROFILE_SNAPSHOT_NAME = "profile_snapshot.json"
 _DEFAULT_PROFILE_SNAPSHOT_ROOT = Path("traces") / "runs"
 

@@ -361,9 +361,7 @@ def _read_plugin_health(ctx: Any) -> dict[str, Any] | None:
 
         registry_populated = registered > 0 or expected == 0
 
-        fiber_count = sum(
-            1 for plugin in getattr(resolved, "plugins", ()) if not plugin.disabled
-        )
+        fiber_count = sum(1 for plugin in getattr(resolved, "plugins", ()) if not plugin.disabled)
 
         # pipeline_registered: read the module-level _REGISTERED set used
         # by ``register_pipeline_once`` to deduplicate pipeline loads.

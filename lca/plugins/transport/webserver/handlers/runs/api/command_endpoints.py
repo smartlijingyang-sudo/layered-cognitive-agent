@@ -429,7 +429,9 @@ async def _validate_run_ownership(request: Request, run_id: str) -> tuple[JSONRe
     _, dev_mode = auth_config_of(request)
     if dev_mode:
         if session is None:
-            return JSONResponse({"error": "run not found"}, status_code=404, headers=cors_headers()), None
+            return JSONResponse(
+                {"error": "run not found"}, status_code=404, headers=cors_headers()
+            ), None
         return None, session
 
     caller_user_id = request.headers.get("x-lca-user-id", "").strip()
@@ -452,7 +454,9 @@ async def _validate_run_ownership(request: Request, run_id: str) -> tuple[JSONRe
             owner_user_id = (init_event.get("data") or {}).get("userId") or ""
 
     if session is None and not owner_user_id:
-        return JSONResponse({"error": "run not found"}, status_code=404, headers=cors_headers()), None
+        return JSONResponse(
+            {"error": "run not found"}, status_code=404, headers=cors_headers()
+        ), None
 
     if owner_user_id and owner_user_id != caller_user_id:
         return JSONResponse(
@@ -735,7 +739,7 @@ __all__ = [
 def build_create_run_app() -> Starlette:
     """Test factory mirroring the production /runs route mounting.
 
-    The production router in :mod:`lca.plugins.transport.webserver.handlers.runs.api.routes`
+    The production router in :mod:`lca.plugins.transport.webserver.handlers.runs.api.command_endpoints`
     mounts ``create_run`` under ``POST /lca-api/runs``; this factory
     exposes the same handler at the bare ``/runs`` path so integration
     tests can hit it directly without standing up the whole

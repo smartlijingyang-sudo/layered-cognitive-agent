@@ -2,7 +2,7 @@
 
 The tracker named ``gateway/runs/api.py``; that facade was removed
 (``tests/test_run_import_boundaries.py::test_run_handler_facade_is_absent``).
-The handler lives in ``lca.plugins.transport.webserver.handlers.runs.api.routes.query_endpoints`` and is registered
+The handler lives in ``lca.plugins.transport.webserver.handlers.runs.api.query_endpoints`` and is registered
 on ``/runs/{run_id}/profile`` (LobeHub prefixes ``/lca-api`` at the proxy).
 """
 
