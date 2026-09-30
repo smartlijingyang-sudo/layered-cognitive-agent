@@ -139,7 +139,7 @@ entries:
   # ── L0 sinks (2) ────────────────────────────────────────────────
   - id: spine.sink.file
     name: spine_sink_file
-    $module: lca.plugins.observability.spine.sinks.file
+    $module: lca.plugins.events.sinks.file_sink
     config:
       # ADR-0165.1 / PR-27 L10 / PR-4: boot → .lca/spine/boot-spine.jsonl;
       # real runs → traces/runs/<run_id>/<run_id>.spine.jsonl
@@ -155,7 +155,7 @@ entries:
 
   - id: spine.sink.console
     name: spine_sink_console
-    $module: lca.plugins.observability.spine.sinks.console
+    $module: lca.plugins.events.sinks.console_sink
     config: {}
 
   # ── L0 wraps (1) ────────────────────────────────────────────────

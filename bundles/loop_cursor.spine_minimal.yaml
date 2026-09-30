@@ -58,6 +58,6 @@ entries:
 
   - id: spine.sink.file
     name: spine_sink_file
-    $module: lca.plugins.observability.spine.sinks.file
+    $module: lca.plugins.events.sinks.file_sink
     config:
       path: .lca/spine/benchmark-spine.jsonl

@@ -51,7 +51,7 @@ L10_FILENAME_SCAN_FILES = (
     "lca/infrastructure/observability/spine/sinks/routing_file_sink.py",
     "lca/infrastructure/observability/writable_matrix/defaults.py",
     "lca/infrastructure/observability/journal/backends/filesystem.py",
-    "lca/plugins/observability/spine/sinks/file.py",
+    "lca/plugins/events/sinks/file_sink/__init__.py",
 )
 
 # ADR-0176 D8:deriver 写盘护栏。
@@ -60,12 +60,8 @@ L10_FILENAME_SCAN_FILES = (
 # 单一职责:deriver 是「订阅 + 物化」,副作用(写盘)归 model_visible_recorder
 # 与 spine emitter / storage。本脚本扫描业务 cognition / deriver / spine
 # 路径,确保新增的"由 deriver 写盘"通道被 fail-fast 拦下。
-DERIVER_WRITE_PATH_PATTERN = re.compile(
-    r"""\.(write_text|write_bytes)\s*\("""
-)
-DERIVER_DIRECTORIES = (
-    ROOT / "lca/infrastructure/observability/spine/derivers",
-)
+DERIVER_WRITE_PATH_PATTERN = re.compile(r"""\.(write_text|write_bytes)\s*\(""")
+DERIVER_DIRECTORIES = (ROOT / "lca/infrastructure/observability/spine/derivers",)
 # 例外:deriver 的合法"物化"产出 —— 每个文件都对应一个 deriver 的 view 视图。
 # - step_tree_accumulator.py → journal.json (StepTreeAccumulator 落 JournalDocument)
 # - waterfall.py → waterfall.md (人读 timeline 视图)

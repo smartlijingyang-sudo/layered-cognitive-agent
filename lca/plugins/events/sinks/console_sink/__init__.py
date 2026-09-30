@@ -127,9 +127,7 @@ class ConsoleSink:
             self._stream.write(line + "\n")
             self._stream.flush()
         except Exception:
-            log.exception(
-                "spine.console.write_event failed event_id=%s", event_id
-            )
+            log.exception("spine.console.write_event failed event_id=%s", event_id)
 
     def close(self) -> None:
         return

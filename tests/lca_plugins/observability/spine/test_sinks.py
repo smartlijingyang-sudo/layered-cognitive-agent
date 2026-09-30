@@ -13,9 +13,9 @@ from lca.infrastructure.observability.spine.event.record import EventRecord
 from lca.infrastructure.observability.spine.sinks.routing_file_sink import (
     RunRoutingFileSink,
 )
-from lca.plugins.observability.spine.sinks.console import ConsoleSink
-from lca.plugins.observability.spine.sinks.console import setup as console_setup
-from lca.plugins.observability.spine.sinks.file import setup as file_setup
+from lca.plugins.events.sinks.console_sink import ConsoleSink
+from lca.plugins.events.sinks.console_sink import setup as console_setup
+from lca.plugins.events.sinks.file_sink import setup as file_setup
 
 
 class _StubPluginContext:
@@ -298,8 +298,6 @@ def test_console_setup_registers_session_observer() -> None:
             )(),
             type("R", (), {"event_id": "run_e2e:1"})(),
         )
-        assert stream.getvalue().startswith(
-            "run=run_e2e  seq=1  phase_graph.node.start"
-        )
+        assert stream.getvalue().startswith("run=run_e2e  seq=1  phase_graph.node.start")
     finally:
         clear_observer_catalog()

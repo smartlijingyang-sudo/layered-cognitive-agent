@@ -24,8 +24,8 @@ from typing import Any
 import yaml
 
 from lca.harness.profile.resolve.resolve import ResolvedProfile, resolve_profile
-from lca.plugins.observability.spine.sinks.console import ConsoleSink
-from lca.plugins.observability.spine.sinks.console import setup as console_setup
+from lca.plugins.events.sinks.console_sink import ConsoleSink
+from lca.plugins.events.sinks.console_sink import setup as console_setup
 
 # Reuse the existing sink-test fixtures; they already pin the payload shape
 # that ``graph_timeline.render_line`` is verified against.
