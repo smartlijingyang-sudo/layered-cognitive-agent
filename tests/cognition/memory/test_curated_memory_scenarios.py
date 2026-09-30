@@ -29,6 +29,7 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
 )
+from lca.framework.graph.host_wiring import make_node_runtime_view_factory
 from lca.infrastructure.memory.assistant_memory import AssistantMemory
 from lca.infrastructure.memory.curated_projection import (
     may_acknowledge_projection,
@@ -241,16 +242,27 @@ async def test_dispatch_stamps_acknowledgement_only_after_projection(tmp_path: P
     assert guard_memory_claim("已记下。", allowed=stamped.may_acknowledge) == "已记下。"
 
 
-async def _parse_decision(text: str, *, may_acknowledge: bool | None) -> Decision:
-    if may_acknowledge is None:
-        runtime: dict[str, object] = {}
+async def _parse_decision(
+    text: str,
+    *,
+    may_acknowledge: bool | None,
+    memory: AssistantMemory | None = None,
+) -> Decision:
+    if memory is None:
+        if may_acknowledge is None:
+            runtime: dict[str, object] = {}
+        else:
+            runtime = {
+                "memory_receipt": MemoryReceipt(
+                    admitted=True,
+                    may_acknowledge=may_acknowledge,
+                )
+            }
     else:
-        runtime = {
-            "memory_receipt": MemoryReceipt(
-                admitted=True,
-                may_acknowledge=may_acknowledge,
-            )
-        }
+        runtime = make_node_runtime_view_factory(
+            base_scope={"memory": memory},
+            effect_gateway=None,
+        )(None)
     response = LLMResponse(text=text, tool_calls=(), model="test-model", finish_reason="stop")
     output = await DecisionParseExecutor().node_execute(
         NodeContext(runtime=runtime, budget={}, metadata={}),
@@ -277,3 +289,32 @@ async def test_decision_parse_keeps_remembered_claim_with_receipt() -> None:
 async def test_decision_parse_without_memory_receipt_keeps_original_text() -> None:
     decision = await _parse_decision("好的，已记下。", may_acknowledge=None)
     assert decision.response_text == "好的，已记下。"
+
+
+def test_runtime_view_exposes_memory_receipt_from_memory_seam(tmp_path: Path) -> None:
+    memory = AssistantMemory(tmp_path / "asst")
+    view = make_node_runtime_view_factory(
+        base_scope={"memory": memory},
+        effect_gateway=None,
+    )(None)
+    assert view.get("memory_receipt") is None
+    memory.upsert(_record(record_id="city-1", content="用户住在上海"))
+    receipt = view.get("memory_receipt")
+    assert receipt is not None
+    assert receipt.ok is True
+    assert receipt.record_ids == ("city-1",)
+
+
+@pytest.mark.asyncio
+async def test_decision_parse_uses_live_memory_receipt(tmp_path: Path) -> None:
+    memory = AssistantMemory(tmp_path / "asst")
+    decision = await _parse_decision("好的，已记下。", may_acknowledge=None, memory=memory)
+    assert decision.response_text == "好的，已记下。"
+
+    memory.upsert(_record(record_id="city-1", content="用户住在上海"))
+    decision = await _parse_decision("好的，已记下。", may_acknowledge=None, memory=memory)
+    assert decision.response_text == "好的，已记下。"
+
+    memory.upsert(_record(record_id="secret", content="password: hunter2"))
+    decision = await _parse_decision("好的，已记下。", may_acknowledge=None, memory=memory)
+    assert decision.response_text == "这条还没有写入记忆文件。我不能说已经记下。"

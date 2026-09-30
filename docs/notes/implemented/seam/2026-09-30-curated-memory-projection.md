@@ -12,7 +12,7 @@ Status: implemented
 
 凭证形态的正文不落记录，也不改投影。写盘用同目录临时文件替换。失败时 `last_curated_receipt.ok` 为 false，已写入的 JSON 记录保留。
 
-`memory.write.dispatch` 把这次提交的字节数和 `may_acknowledge` 打进 `MemoryReceipt`。`may_acknowledge` 仅在回执成功、字节数大于 0、且这次提交有记录编号时为 true。`guard_memory_claim` 在该标志为 false 时，把「已记下」一类句子换成明确的未写入说明。
+`memory.write.dispatch` 把这次提交的字节数和 `may_acknowledge` 打进 `MemoryReceipt`。`may_acknowledge` 仅在回执成功、字节数大于 0、且这次提交有记录编号时为 true。`guard_memory_claim` 在该标志为 false 时，把「已记下」一类句子换成明确的未写入说明。`think.decision.parse` 是认领守卫的消费点：节点运行时视图从 memory 能力动态读取 `last_curated_receipt`，`may_acknowledge` 为 false 时替换最终回复。守卫同时接受 `MemoryReceipt` 与 `CuratedProjectionReceipt` 两种回执形状；运行时没有回执时保持原文。
 
 `persona_from_home` 每次从磁盘读取 `SOUL.md`、`USER.md`、`MEMORY.md`、`AGENTS.md`、`TOOLS.md`，按这个顺序装进有界的 backstory。后面还有文件时，当前文件最多使用剩余预算的一半。`rehydrate_after_compaction` 先丢掉历史里的旧注入块，再接上刚读到的常驻文件。历史在预算不够时从前面被切掉。
 

@@ -5,6 +5,7 @@ recursive runner, node runtime view, subgraph depth ContextVar) lives
 here — outside the thin adapter seam and outside the visit loop in
 :class:`PlanInterpreter`.
 """
+
 from __future__ import annotations
 
 import time
@@ -102,9 +103,7 @@ def make_recursive_runner(adapter: Any) -> RecursiveRunner:
             clock=adapter.graph_clock,
             results_by_phase=outer_mirror if outer_mirror is not None else {},
         )
-        result = await interp.run(
-            sub_plan, outer_state=seeded_state, port_registry=port_registry
-        )
+        result = await interp.run(sub_plan, outer_state=seeded_state, port_registry=port_registry)
         return dict(result.output)
 
     return recursive_runner
@@ -145,6 +144,8 @@ def make_node_runtime_view_factory(
         def get(self, name: str) -> Any:
             if name == "effect_gateway":
                 return self._effect_gateway
+            if name == "memory_receipt":
+                return self._memory_receipt()
             base = self._base
             if base is None:
                 return None
@@ -155,6 +156,26 @@ def make_node_runtime_view_factory(
                 return getter(name)
             except (KeyError, AttributeError, TypeError):
                 return None
+
+        def _memory_receipt(self) -> Any:
+            """Project the latest curated write receipt from the memory seam.
+
+            The memory capability is already part of the runtime scope. Its
+            concrete store may expose ``last_curated_receipt`` (AssistantMemory
+            does); non-assistant stores return ``None`` and the acknowledgement
+            guard falls back to its pass-through behaviour.
+            """
+            base = self._base
+            if base is None:
+                return None
+            getter = getattr(base, "get", None) or getattr(base, "resolve", None)
+            if getter is None:
+                return None
+            try:
+                memory = getter("memory")
+            except (KeyError, AttributeError, TypeError):
+                return None
+            return getattr(memory, "last_curated_receipt", None)
 
         def __getattr__(self, name: str) -> Any:
             return getattr(self._base, name)
@@ -279,6 +300,12 @@ __all__ = [
     "LegacyResultShim",
     "NodeRuntimeView",
     "NodeRuntimeViewFactory",
+    "_LegacyResultShim",
+    "_NodeRuntimeView",
+    "_build_registry",
+    "_default_graph_clock",
+    "_enter_subgraph",
+    "_exit_subgraph",
     "build_registry",
     "current_graph_depth",
     "default_graph_clock",
@@ -290,10 +317,4 @@ __all__ = [
     "make_recursive_runner",
     "plan_entry_id",
     "seed_traversal",
-    "_LegacyResultShim",
-    "_NodeRuntimeView",
-    "_build_registry",
-    "_default_graph_clock",
-    "_enter_subgraph",
-    "_exit_subgraph",
 ]

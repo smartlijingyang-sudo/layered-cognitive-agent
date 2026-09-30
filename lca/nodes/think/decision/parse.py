@@ -61,6 +61,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.infrastructure.memory.curated_projection import may_acknowledge_projection
 
 if TYPE_CHECKING:
     from lca.contracts.models.core.conversation.llm import LLMResponse
@@ -123,7 +124,10 @@ def _guard_acknowledgement(*, context: NodeContext, text: str | None) -> str | N
         receipt = runtime.get("memory_receipt")
     if receipt is None:
         return text
-    return guard_memory_claim(text, allowed=bool(getattr(receipt, "may_acknowledge", False)))
+    allowed = getattr(receipt, "may_acknowledge", None)
+    if allowed is None:
+        allowed = may_acknowledge_projection(receipt)
+    return guard_memory_claim(text, allowed=bool(allowed))
 
 
 def _resolve_port(name: str, *, input: NodeInput, context: NodeContext) -> Any:
