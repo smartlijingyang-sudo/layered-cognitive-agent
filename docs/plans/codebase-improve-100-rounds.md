@@ -223,3 +223,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat 446c3200d` → 6 files changed, 205 insertions(+), 69 deletions(-); gross diff = 274 > 100.
 - **Tests:** `uv run pytest -q tests/infrastructure/handler/test_generic_registry.py -m "not real_llm" --no-cov` → **6 passed** (subagent ran 74 across the affected set; 3 failures pre-existing).
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 22 — 2026-09-30
+
+- **Commit:** `ba00c5a45`
+- **Architectural concern:** shallow re-export shell / dead indirection. `lca/plugins/assistant/tools.py` re-exported `filter_tools_by_assistant` but had zero production consumers (only one test imported it).
+- **Change:** deleted the alias; repointed the test at `lca.infrastructure.tools.assistant.filter` and moved it next to the implementation; fixed the stale docstring reference in `io.py`; added a structural guard + behavioral edge-case tests (box tools, string home path, grant interactions).
+- **Files:** `lca/plugins/assistant/tools.py` (deleted), `lca/infrastructure/assistant/io.py`, `tests/infrastructure/tools/assistant/test_filter_tools.py` (moved + extended), `tests/architecture/test_no_assistant_tools_alias.py`.
+- **Shortstat:** `git show --shortstat ba00c5a45` → 3 files changed, 111 insertions(+), 2 deletions(-); gross diff = 113 > 100.
+- **Tests:** `uv run pytest -q tests/infrastructure/tools/assistant/test_filter_tools.py tests/architecture/test_no_assistant_tools_alias.py -m "not real_llm" --no-cov` → **33 passed**.
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
