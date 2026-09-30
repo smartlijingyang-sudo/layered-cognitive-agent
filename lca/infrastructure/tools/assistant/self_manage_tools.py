@@ -28,6 +28,7 @@ from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.protocols import Tool
 from lca.contracts.protocols.assistant.catalog import ProfilePatch
+from lca.infrastructure.assistant.io import load_grants
 from lca.infrastructure.observability.facade.run.ambit import current_assistant_id
 
 if TYPE_CHECKING:
@@ -440,7 +441,7 @@ class ListAssistantToolsTool(_BaseAssistantTool):
             tools = data.get("tools") if isinstance(data, dict) else {}
             allow = tools.get("allow") if isinstance(tools, dict) else []
             deny = tools.get("deny") if isinstance(tools, dict) else []
-            grants = self._load_grants(Path(spec.home_path))
+            grants = load_grants(Path(spec.home_path))
 
             custom_tools: list[dict[str, object]] = []
             if self._tool_overlay is not None:
@@ -475,23 +476,6 @@ class ListAssistantToolsTool(_BaseAssistantTool):
                 ),
             },
         )
-
-    def _load_grants(self, home: Path) -> frozenset[str]:
-        import yaml
-
-        path = home / "grants.yaml"
-        if not path.is_file():
-            return frozenset()
-        try:
-            parsed = yaml.safe_load(path.read_text(encoding="utf-8"))
-        except yaml.YAMLError:
-            return frozenset()
-        if not isinstance(parsed, dict):
-            return frozenset()
-        grants = parsed.get("grants")
-        if not isinstance(grants, list):
-            return frozenset()
-        return frozenset(str(g).strip() for g in grants if isinstance(g, str) and g.strip())
 
 
 class CreateAssistantToolTool(_BaseAssistantTool):

@@ -73,6 +73,12 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.journal.spec.spec import AgentSpec
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.infrastructure.assistant.io import (
+    load_grants,
+    read_json,
+    sha256_digest,
+    write_json,
+)
 from lca.plugins.assistant.events._events import (
     AssistantBootstrapCompletedEventPayload,
     AssistantCreatedEventPayload,
@@ -80,9 +86,7 @@ from lca.plugins.assistant.events._events import (
 )
 from lca.plugins.assistant.home._home_layout import (
     DEFAULT_TEMPLATE_ID,
-    SOUL_CORE_SECTIONS,
     SOUL_SAFETY_SECTIONS,
-    find_missing_soul_sections,
     TEMPLATE_REGISTRY,
     HomePaths,
     build_manifest,
@@ -90,12 +94,12 @@ from lca.plugins.assistant.home._home_layout import (
     compute_digests,
     count_yaml_in,
     diff_digests,
+    find_missing_soul_sections,
     known_template_ids,
     list_children_dirs,
     load_manifest,
     render_default_template,
     render_template,
-    sha256_digest,
     write_home_files,
     write_manifest,
     write_revision_snapshot,
@@ -464,7 +468,7 @@ class _AssistantCatalogImpl(AssistantCatalog):
             agents_digest=declared_digests["AGENTS.md"],
         )
 
-        profile = _read_json(home.root / "profile.json")
+        profile = read_json(home.root / "profile.json")
         revision_seq_raw = manifest.get("revision_seq", 0)
         revision_seq = int(revision_seq_raw) if isinstance(revision_seq_raw, (int, str)) else 0
         template_id_raw = manifest.get("template_id", "")
@@ -480,9 +484,9 @@ class _AssistantCatalogImpl(AssistantCatalog):
             bootstrap=bootstrap,
             skill_ids=(),
             job_ids=(),
-            grant_digest=_sha256_digest(home.root / "grants.yaml"),
-            grants=_load_grants(home.root),
-            tools_policy_digest=_sha256_digest(home.root / "tools.yaml"),
+            grant_digest=sha256_digest(home.root / "grants.yaml"),
+            grants=load_grants(home.root),
+            tools_policy_digest=sha256_digest(home.root / "tools.yaml"),
             role_id=str(manifest["role_id"]) if manifest.get("role_id") else None,
             profile_opening_message=str(profile.get("opening_message") or ""),
             profile_locale=str(profile.get("locale") or ""),
@@ -514,7 +518,7 @@ class _AssistantCatalogImpl(AssistantCatalog):
                 if not manifest_path.is_file():
                     continue
                 try:
-                    manifest = _read_json(manifest_path)
+                    manifest = read_json(manifest_path)
                 except (OSError, ValueError):
                     continue
                 if str(manifest.get("user_id") or "") != user_id:
@@ -549,7 +553,7 @@ class _AssistantCatalogImpl(AssistantCatalog):
         self._check_digests(home.root, assistant_id, manifest)
 
         changes: list[str] = []
-        profile = _read_json(home.root / "profile.json")
+        profile = read_json(home.root / "profile.json")
         profile_patched = False
         if patch.profile_name is not None:
             profile["name"] = patch.profile_name
@@ -570,7 +574,7 @@ class _AssistantCatalogImpl(AssistantCatalog):
             profile["runtime"] = patch.profile_runtime
             profile_patched = True
         if profile_patched:
-            _write_json(home.root / "profile.json", profile)
+            write_json(home.root / "profile.json", profile)
             changes.append("profile.json")
 
         if patch.soul_md is not None:
@@ -712,7 +716,7 @@ class _AssistantCatalogImpl(AssistantCatalog):
         if not snapshot_path.is_file():
             raise AssistantCatalogError(f"revision {revision_seq} 快照不存在: {assistant_id}")
         try:
-            snapshot = _read_json(snapshot_path)
+            snapshot = read_json(snapshot_path)
         except (OSError, ValueError) as exc:
             raise AssistantCatalogError(
                 f"revision {revision_seq} 快照不可读: {snapshot_path}"
@@ -1147,22 +1151,6 @@ def _ensure_non_empty_user_md(home: Path) -> None:
         user_md.write_text(_DEFAULT_USER_MD, encoding="utf-8")
 
 
-def _sha256_digest(path: Path) -> str:
-    """manifest 外部字段 digest(grants / tools policy);复用 _home_layout 的实现。"""
-    from lca.plugins.assistant.home._home_layout import sha256_digest
-
-    return sha256_digest(path)
-
-
-def _read_json(path: Path) -> dict[str, object]:
-    """读 JSON 文件;非 dict 抛 ValueError。"""
-    text = path.read_text(encoding="utf-8")
-    data = json.loads(text)
-    if not isinstance(data, dict):
-        raise ValueError(f"{path}: 顶层不是 JSON object")
-    return data
-
-
 def _load_plan_overlay(home: Path) -> PlanOverlay | None:
     """读 ``{home}/plan.yaml`` 并校验为 ``PlanOverlay``；文件缺失返回 None。
 
@@ -1200,13 +1188,6 @@ def _parse_plan_overlay(text: str, *, source: str) -> PlanOverlay:
         raise PlanOverlayValidationError(f"{source}: plan.yaml 校验失败: {exc}") from exc
 
 
-def _write_json(path: Path, data: Mapping[str, object]) -> None:
-    """写 JSON 文件（UTF-8 + 缩进 + sort_keys）。"""
-    path.write_text(
-        json.dumps(dict(data), ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8"
-    )
-
-
 def _copy_manifest_extras(source: Mapping[str, object], target: dict[str, object]) -> None:
     """把 manifest 中非 digest 派生字段（role_id / skills / tools 索引等）复制到修订版。"""
     for key in ("role_id", "skills", "tools"):
@@ -1219,28 +1200,6 @@ def _iso_now(clock: Callable[[], datetime]) -> str:
     return clock().strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _load_grants(home: Path) -> frozenset[str]:
-    """读 ``grants.yaml`` 的 grant 集合（ADR-0242 D13）。
-
-    与 ``lca.plugins.assistant.tools`` 的过滤语义一致：缺失 / 损坏 / 非 list
-    视为空集合（fail-closed 最窄授权）。供 ``AssistantSpec.grants`` 直接携带，
-    未来 ``assistant.invoke`` 校验目标助理授权时无需再解析 Home。
-    """
-    path = home / "grants.yaml"
-    if not path.is_file():
-        return frozenset()
-    try:
-        parsed = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except yaml.YAMLError:
-        return frozenset()
-    if not isinstance(parsed, dict):
-        return frozenset()
-    grants = parsed.get("grants")
-    if not isinstance(grants, list):
-        return frozenset()
-    return frozenset(str(item).strip() for item in grants if isinstance(item, str) and item.strip())
-
-
 def _summary_from_home(home_dir: Path) -> AssistantSummary | None:
     """从一个 candidate home dir 构造 AssistantSummary;失败返回 None。"""
     manifest_path = home_dir / "manifest.json"
@@ -1248,7 +1207,7 @@ def _summary_from_home(home_dir: Path) -> AssistantSummary | None:
         log.warning("assistant.catalog.list.skip_no_manifest", home=str(home_dir))
         return None
     try:
-        manifest = _read_json(manifest_path)
+        manifest = read_json(manifest_path)
     except (OSError, ValueError) as exc:
         log.warning(
             "assistant.catalog.list.skip_bad_manifest",
@@ -1280,7 +1239,7 @@ def _summary_from_home(home_dir: Path) -> AssistantSummary | None:
         return None
 
     profile_path = home_dir / "profile.json"
-    profile = _read_json(profile_path) if profile_path.is_file() else {}
+    profile = read_json(profile_path) if profile_path.is_file() else {}
     skills_dir = home_dir / "skills"
     return AssistantSummary(
         assistant_id=assistant_id,

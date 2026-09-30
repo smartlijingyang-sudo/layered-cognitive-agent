@@ -14,7 +14,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
@@ -22,6 +21,7 @@ from pathlib import Path
 
 from lca.contracts.atoms.ids.ids import utc_now_iso
 from lca.contracts.observability.canonical_digest import canonical_digest
+from lca.infrastructure.assistant.io import read_json, sha256_digest
 
 __all__ = [
     "CONFIG_FACE_FILES",
@@ -196,15 +196,6 @@ class HomePaths:
 # ── digest 与 manifest ───────────────────────────────────────────────
 
 
-def sha256_digest(path: Path) -> str:
-    """计算文件的 ``sha256:<hex>`` 内容 digest。"""
-    h = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(65536), b""):
-            h.update(chunk)
-    return f"sha256:{h.hexdigest()}"
-
-
 def compute_digests(home: Path) -> dict[str, str]:
     """重算配置面文件 digest;文件缺失返回空字典(让校验步骤自然 fail)。"""
     digests: dict[str, str] = {}
@@ -288,7 +279,7 @@ def load_manifest(home: Path, assistant_id: str) -> dict[str, object]:
     if not manifest_path.is_file():
         raise AssistantCatalogError(f"assistant home 缺 manifest.json: {home}")
     try:
-        manifest = _read_json(manifest_path)
+        manifest = read_json(manifest_path)
     except (OSError, ValueError) as exc:
         raise AssistantCatalogError(f"manifest.json 不可读: {home} ({exc})") from exc
     declared_id = manifest.get("assistant_id")
@@ -444,15 +435,6 @@ def cleanup_home(home: Path) -> None:
 
 
 # ── helpers ──────────────────────────────────────────────────────────
-
-
-def _read_json(path: Path) -> dict[str, object]:
-    """读取 JSON 文件;非 dict 抛 ValueError。"""
-    text = path.read_text(encoding="utf-8")
-    data = json.loads(text)
-    if not isinstance(data, dict):
-        raise ValueError(f"{path}: 顶层不是 JSON object")
-    return data
 
 
 def count_yaml_in(directory: Path) -> int:

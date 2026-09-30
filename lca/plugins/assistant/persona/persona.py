@@ -12,13 +12,13 @@ run 期人设注入的唯一入口：``persona_from_home`` 把 Home 的配置面
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
 
 from lca.cognition.memory.standing import STANDING_ORDER, assemble_standing
+from lca.infrastructure.assistant.io import read_json_soft
 
 _BACKSTORY_MAX_CHARS = 3000
 _GOAL_MAX_CHARS = 300
@@ -36,7 +36,7 @@ class AssistantPersona:
 def persona_from_home(home_path: str) -> AssistantPersona:
     """从 AssistantHome 解析人设；任何文件缺失都降级为空字段。"""
     home = Path(home_path)
-    profile = _read_json(home / "profile.json")
+    profile = read_json_soft(home / "profile.json")
     name = str(profile.get("name") or "").strip()
     description = str(profile.get("description") or "").strip()
 
@@ -56,14 +56,6 @@ def persona_from_home(home_path: str) -> AssistantPersona:
         goal=goal[:_GOAL_MAX_CHARS],
         backstory=backstory,
     )
-
-
-def _read_json(path: Path) -> dict[str, object]:
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-    return raw if isinstance(raw, dict) else {}
 
 
 def _read_text(path: Path) -> str:
