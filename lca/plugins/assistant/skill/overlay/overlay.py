@@ -1,19 +1,7 @@
-"""assistant.skill_overlay plugin —— ADR-0187 §7 PR-6。
+"""assistant.skill_overlay —— Overlay 实现类。
 
-助理域 skill overlay 唯一实现:
-
-- ``provides=("assistant.skill_overlay",)``;
-- ``install`` —— 经 ADR-0048 ``SkillImporter`` 拉取/校验 ⇒ ADR-0067 三闸
-  (identity / invariant / experiment) ⇒ ``DRAFT → VERIFIED`` ⇒ 落盘
-  ``{home}/skills/<skill_id>/`` ⇒ manifest skills 索引 + ``revision_seq++``
-  ⇒ 发 ``assistant.skill.installed`` EP;
-- ``list_installed`` —— 扫 ``{home}/skills/``;
-- ``activate`` —— 仅接受 VERIFIED/ACTIVE 包;未验证拒收(发
-  ``assistant.skill.activated`` EP,不写 Home)。
-
-写路径 ⊆ ``{home}/skills/``;``~/.lca/skills/`` 全局 store 只读不写。
-拉取绑定到 Home 内 staging 的 ``DiskSkillPackageStore``,网络行为仍由
-0048 机制(host allowlist / 大小上限 / ZIP 安全解压)治理。
+``_AssistantSkillOverlayImpl`` 承载 install / list_installed / activate /
+remove / edit;manifest skills 索引修订与 EP 发射仍在此实现。
 """
 
 from __future__ import annotations
@@ -27,26 +15,9 @@ from pathlib import Path
 from typing import Any
 
 import structlog
-from pydantic import BaseModel, ConfigDict
 
-from lca.contracts.atoms.artifact.state import ArtifactState
-from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.ids.ids import utc_now_iso
-from lca.contracts.atoms.scope.scope import Scope
-from lca.contracts.capabilities import ASSISTANT_CATALOG, ASSISTANT_SKILL_OVERLAY
-from lca.contracts.harness.composition.plugin_contract import (
-    ArchitectureContract,
-    AuthorityContract,
-    EvidenceContract,
-    LifecycleContract,
-    PluginContract,
-    PluginIdentity,
-)
-from lca.contracts.harness.journal.artifact import (
-    CapabilityArtifact,
-    make_capability_artifact,
-    migrate_to_verified,
-)
+from lca.contracts.harness.journal.artifact import CapabilityArtifact
 from lca.contracts.observability.closure.assistant_ep_closure import (
     ASSISTANT_PROFILE_REVISED,
     ASSISTANT_SKILL_ACTIVATED,
@@ -61,24 +32,12 @@ from lca.contracts.protocols.assistant.skill_overlay import (
     SkillNotVerified,
     SkillSource,
 )
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
-    OwnershipDeclaration,
-)
-from lca.contracts.protocols.memory.operational_skills import (
-    SKILL_MAX_CONTENT_CHARS,
-    SKILL_MAX_RESOURCES,
-    SkillImporter,
-    SkillImportError,
-    SkillPackage,
-)
-from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.contracts.protocols.memory.operational_skills import SkillImporter, SkillPackage
 from lca.infrastructure.skills.disk.store import (
     DiskSkillPackageStore,
     safe_rel_path,
     sanitize_skill_id,
 )
-from lca.infrastructure.skills.frontmatter.frontmatter import skill_title, split_frontmatter
-from lca.infrastructure.skills.http.importer import HttpSkillImporter
 from lca.infrastructure.skills.settings.settings import SkillSettings
 from lca.plugins.assistant.events._events import (
     AssistantProfileRevisedEventPayload,
@@ -92,172 +51,23 @@ from lca.plugins.assistant.home._home_layout import (
     write_manifest,
     write_revision_snapshot,
 )
+from lca.plugins.assistant.skill.overlay.gating import (
+    _ACTIVATABLE_STATES,
+    _SKILLS_DIGEST_PREFIX,
+    _STAGING_DIR_NAME,
+    _gate_package,
+    _mark_local,
+    _package_digest,
+    _place_package,
+    _revision_of,
+)
+from lca.plugins.assistant.skill.overlay.importing import (
+    _default_url_importer,
+    _import_local_path,
+)
+from lca.plugins.assistant.skill.overlay.receipts import _receipt_from_disk
 
-log = structlog.get_logger(__name__)
-
-
-# ── 常量 ─────────────────────────────────────────────────────────────
-
-_STAGING_DIR_NAME = ".staging"
-"""Home 内 staging 子目录名(隐藏目录;``list_installed`` 跳过)。"""
-
-_SKILLS_DIGEST_PREFIX = "skills/"
-"""manifest ``digests`` 中 skills 索引条目的 key 前缀。"""
-
-_ACTIVATABLE_STATES = frozenset({ArtifactState.VERIFIED.value, ArtifactState.ACTIVE.value})
-"""``activate`` 接受的状态闭集(ADR-0187 §3 D6)。"""
-
-
-# ── Plugin 配置 ───────────────────────────────────────────────────────
-
-
-class Config(BaseModel):
-    """无配置字段:home 路径经 ``assistant.catalog`` 解析,根路径由
-    Catalog 的 Profile 注入拥有;本插件不读 ``os.environ``。"""
-
-    model_config = ConfigDict(extra="forbid")
-
-
-# ── 0048 拉取 seam ───────────────────────────────────────────────────
-
-
-def _default_url_importer(staging_root: Path) -> SkillImporter:
-    """默认 URL 拉取器:0048 ``HttpSkillImporter`` 绑定 Home 内 staging store。
-
-    ``cache_dir`` 显式注入 = 拉取产物只落 staging,不触达全局
-    skills store(pydantic-settings 中 init 值优先于环境变量)。
-    """
-    return HttpSkillImporter(
-        store=DiskSkillPackageStore(SkillSettings(cache_dir=staging_root)),
-        settings=SkillSettings(cache_dir=staging_root),
-    )
-
-
-def _import_local_path(staging_root: Path, local_path: str) -> SkillPackage:
-    """本地目录源:读 ``SKILL.md`` + 资源,经 0048 ``install_package`` 校验落 staging。
-
-    校验(大小上限 / 资源路径安全 / skill_id 合法性)全部由
-    ``DiskSkillPackageStore.install_package`` 执行,与 URL 路径同一入口。
-    """
-    src = Path(local_path)
-    if not src.is_dir():
-        raise SkillImportError(f"local_path 不是已存在目录: {local_path}")
-    skill_md = next((p for p in (src / "SKILL.md", src / "skill.md") if p.is_file()), None)
-    if skill_md is None:
-        raise SkillImportError(f"local_path 缺 SKILL.md: {local_path}")
-    text = skill_md.read_text(encoding="utf-8")
-    resources: dict[str, bytes] = {}
-    for path in sorted(src.rglob("*")):
-        if not path.is_file() or path == skill_md:
-            continue
-        rel = safe_rel_path(str(path.relative_to(src)))
-        if rel:
-            resources[rel] = path.read_bytes()
-    meta, _ = split_frontmatter(text)
-    skill_id = sanitize_skill_id(skill_title(meta, src.name))
-    store = DiskSkillPackageStore(SkillSettings(cache_dir=staging_root))
-    return store.install_package(
-        skill_id=skill_id,
-        skill_md_text=text,
-        resource_files=resources,
-        source_url=str(src),
-    )
-
-
-# ── 0067 三闸 ────────────────────────────────────────────────────────
-
-
-def _gate_package(package: SkillPackage) -> CapabilityArtifact:
-    """ADR-0067 三闸 + ``DRAFT → VERIFIED`` 迁移;任一失败抛 ``SkillImportError``。
-
-    - identity —— skill_id 合法、内容 digest 固定、来源 provenance 非空;
-    - invariant —— 0048 结构上限(内容长度 / 资源数 / 路径白名单)不破坏;
-    - experiment —— 落点限助理域 scope,安装不携带任何 grant 扩张。
-
-    状态机迁移经 ``migrate_to_verified``(0067 唯一提升入口);非法迁移
-    抛 ``InvalidStateTransitionError``。
-    """
-    if not package.skill_id or sanitize_skill_id(package.skill_id) != package.skill_id:
-        raise SkillImportError(f"identity 闸失败: skill_id 非法 {package.skill_id!r}")
-    if not package.content_hash:
-        raise SkillImportError("identity 闸失败: 包缺内容 digest")
-    if not package.source_url:
-        raise SkillImportError("identity 闸失败: 缺安装来源")
-    if len(package.content) > SKILL_MAX_CONTENT_CHARS:
-        raise SkillImportError("invariant 闸失败: SKILL.md 超过上限")
-    if len(package.resource_paths) > SKILL_MAX_RESOURCES:
-        raise SkillImportError("invariant 闸失败: 资源数超过上限")
-    for rel in package.resource_paths:
-        if not rel or safe_rel_path(rel) != rel:
-            raise SkillImportError(f"invariant 闸失败: 资源路径非法 {rel!r}")
-
-    artifact = make_capability_artifact(
-        logical_id=f"assistant.skill:{package.skill_id}",
-        content=package.content_hash,
-        scope=Scope.AGENT,
-        state=ArtifactState.DRAFT,
-        grants=(),
-        metadata={"source_url": package.source_url, "version": package.version},
-    )
-    if artifact.grants:
-        # 安装永不扩权:外部包脚本执行仍受沙箱与既有 grant 约束(ADR-0187 §3 D6)
-        raise SkillImportError("experiment 闸失败: 安装不得携带 grant")
-    if artifact.scope is not Scope.AGENT:
-        raise SkillImportError("experiment 闸失败: 落点 scope 限助理域")
-    return migrate_to_verified(artifact)
-
-
-def _place_package(staging_root: Path, skills_root: Path, skill_id: str) -> Path:
-    """把 staging 中的完整包移入 ``{home}/skills/<skill_id>/``(覆盖式重装)。"""
-    src = staging_root / skill_id
-    if not (src / "manifest.json").is_file() or not (src / "SKILL.md").is_file():
-        raise SkillImportError(f"staging 包不完整: {src}")
-    skills_root.mkdir(parents=True, exist_ok=True)
-    dest = skills_root / skill_id
-    if dest.exists():
-        shutil.rmtree(dest)
-    shutil.move(str(src), str(dest))
-    return dest
-
-
-def _package_digest(package: SkillPackage) -> str:
-    """``sha256:<hex>`` 形式的包内容摘要(manifest digests 条目同形)。"""
-    digest = package.content_hash
-    return digest if digest.startswith("sha256:") else f"sha256:{digest}"
-
-
-def _mark_local(skill_dir: Path) -> None:
-    """把落盘包的 ``manifest.json`` 标记为 ``source: "local"``（ADR-0243 D2）。
-
-    ``global_link`` 包在编辑（COW）后变成独立副本，来源标记必须更新。
-    """
-    meta_path = skill_dir / "manifest.json"
-    if not meta_path.is_file():
-        return
-    try:
-        meta = json.loads(meta_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return
-    if isinstance(meta, dict):
-        meta["source"] = "local"
-        meta_path.write_text(
-            json.dumps(meta, ensure_ascii=False, indent=2, sort_keys=True),
-            encoding="utf-8",
-        )
-
-
-def _revision_of(manifest: Mapping[str, Any]) -> int:
-    raw = manifest.get("revision_seq", 0)
-    if isinstance(raw, bool):
-        return 0
-    if isinstance(raw, int):
-        return raw
-    if isinstance(raw, str) and raw.isdigit():
-        return int(raw)
-    return 0
-
-
-# ── Overlay 实现 ─────────────────────────────────────────────────────
+log = structlog.get_logger(__package__)
 
 
 class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
@@ -683,139 +493,5 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
         self._emit(ASSISTANT_SKILL_ACTIVATED, payload.to_dict())
 
 
-def _receipt_from_disk(
-    skill_dir: Path,
-    entry: Mapping[str, Any] | None,
-    *,
-    assistant_id: str,
-    revision_seq: int,
-    manifest_digest: str,
-) -> SkillInstallReceipt:
-    """从 ``{home}/skills/<skill_id>/`` 重建回执。
-
-    ``entry`` = Home manifest skills 索引记录;缺失(手动落盘)⇒
-    ``artifact_state="draft"`` —— 可见但不可 activate(fail-closed)。
-    """
-    store_manifest: dict[str, Any] = {}
-    store_manifest_path = skill_dir / "manifest.json"
-    if store_manifest_path.is_file():
-        try:
-            loaded = json.loads(store_manifest_path.read_text(encoding="utf-8"))
-            if isinstance(loaded, dict):
-                store_manifest = loaded
-        except (OSError, ValueError):
-            store_manifest = {}
-
-    if entry is not None:
-        state = str(entry.get("artifact_state") or "draft")
-        digest = str(entry.get("digest") or "")
-        installed_at = str(entry.get("installed_at") or "")
-        actor = str(entry.get("actor") or "system")
-        source = str(entry.get("source") or "")
-        version = str(entry.get("version") or "")
-    else:
-        state = ArtifactState.DRAFT.value
-        digest = ""
-        installed_at = str(store_manifest.get("imported_at") or "")
-        actor = "system"
-        source = str(store_manifest.get("source_url") or "")
-        version = str(store_manifest.get("version") or "")
-    if not digest:
-        content_hash = str(store_manifest.get("content_hash") or "")
-        digest = f"sha256:{content_hash}" if content_hash else "sha256:unknown"
-    return SkillInstallReceipt(
-        assistant_id=assistant_id,
-        skill_id=skill_dir.name,
-        version=version,
-        digest=digest,
-        artifact_state=state,
-        installed_at=installed_at,
-        revision_seq=revision_seq,
-        manifest_digest=manifest_digest,
-        actor=actor,
-        source=source,
-        install_path=str(skill_dir),
-    )
-
-
-# ── Plugin manifest ───────────────────────────────────────────────────
-
-
-@plugin(
-    id="lca.plugins.assistant.skill.overlay",
-    provides=(ASSISTANT_SKILL_OVERLAY.key,),
-    requires=(ASSISTANT_CATALOG.key, "event.bus"),
-    layer="L4",
-    kind=PluginKind.PROVIDER,
-    # capability_plan_resolver 禁止多 effect class;网络拉取是 0048
-    # SkillImporter 的 effect 面,本插件自身的持久副作用 = Home skills 写。
-    effects=(EffectClass.FILESYSTEM,),
-    description=(
-        "助理域 skill 安装/激活(ADR-0187 §7 PR-6):0048 拉取 + 0067 三闸,"
-        "只写本助理 Home 的 skills 子树,禁写全局 skills store;"
-        "未验证包不可 activate。"
-    ),
-    test_suite="tests/plugins/assistant/test_skill_overlay.py",
-    functional_group=FunctionalGroup.G10_COMPOSITION,
-    contract=PluginContract(
-        identity=PluginIdentity(version="v1"),
-        architecture=ArchitectureContract(group=FunctionalGroup.G10_COMPOSITION),
-        lifecycle=LifecycleContract(allowed_scopes=(Scope.PROFILE,)),
-        authority=AuthorityContract(grants=("plugin.serve",)),
-        observability=EvidenceContract(
-            descriptors=(
-                "lca.plugins.assistant.skill_overlay.checked",
-                "lca.plugins.assistant.skill_overlay.served",
-            )
-        ),
-    ),
-    ownership=OwnershipDeclaration(
-        reads=(ASSISTANT_CATALOG.key, "event.bus"),
-        emits=(ASSISTANT_SKILL_INSTALLED, ASSISTANT_SKILL_ACTIVATED),
-        state_mutation="scoped",
-    ),
-)
-async def setup(ctx: PluginContext, config: Config) -> None:
-    """assistant.skill_overlay plugin boot。
-
-    行为契约:
-
-    1. ``ctx.require(assistant.catalog)`` 取 Catalog(先决依赖;DAG 保证
-       catalog 先 boot);isinstance 校验 fail-loud。
-    2. EP 发射走 audited ``ctx.emit``;``assistant.*`` EP 描述符由
-       catalog plugin boot 期统一补登(12 个),本插件不重复注册。
-    3. 拉取器默认 ``_default_url_importer``(0048 HttpSkillImporter 绑定
-       Home 内 staging store);测试可经实现类构造参数替换。
-    """
-    del config
-    catalog = ctx.require(ASSISTANT_CATALOG.key)
-    if not isinstance(catalog, AssistantCatalog):
-        raise TypeError(
-            f"assistant.skill_overlay requires {ASSISTANT_CATALOG.key} 为 AssistantCatalog, "
-            f"得到 {type(catalog).__name__}"
-        )
-
-    def _emit(event: str, payload: Mapping[str, Any]) -> Any:
-        from lca.infrastructure.observability.domain_event_publish import (
-            publish_structural_event,
-        )
-
-        return publish_structural_event(
-            execution_point=event,
-            channel="fact",
-            payload=dict(payload),
-            producer=type(None),
-        )
-
-    overlay = _AssistantSkillOverlayImpl(catalog=catalog, event_emitter=_emit)
-    ctx.provide(ASSISTANT_SKILL_OVERLAY.key, overlay)
-
-
 # 用于测试在不接 ctx 时直接构造
 AssistantSkillOverlayImpl = _AssistantSkillOverlayImpl
-
-__all__ = [
-    "AssistantSkillOverlayImpl",
-    "Config",
-    "setup",
-]

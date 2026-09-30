@@ -205,7 +205,11 @@ class TestAssistantPluginOneDirOnePy:
     """
 
     def test_no_subdir_manifest_under_assistant(self) -> None:
-        """禁止 ``lca/plugins/assistant/<sub>/manifest.py + plugin.py`` 双文件形态。"""
+        """禁止 ``lca/plugins/assistant/<sub>/manifest.py + plugin.py`` 双文件形态。
+
+        允许两种形态:kind 目录内单个 ``<kind>.py`` plugin 文件,或单个
+        子包(如 ``skill/overlay/``)承载 plugin manifest。
+        """
         for sub in (LCA / "plugins" / "assistant").iterdir():
             if sub.name in {
                 "__init__.py",
@@ -220,7 +224,14 @@ class TestAssistantPluginOneDirOnePy:
             if not sub.is_dir():
                 continue
             py_files = [p for p in sub.glob("*.py") if p.name != "__init__.py"]
-            assert len(py_files) == 1, f"目录 {sub} 应只有一个 plugin 文件,实际 {py_files}"
+            if len(py_files) == 1:
+                continue
+            child_packages = [
+                c for c in sub.iterdir() if c.is_dir() and (c / "__init__.py").exists()
+            ]
+            assert len(child_packages) == 1, (
+                f"目录 {sub} 应只有一个 plugin 文件或一个子包,实际 {py_files}"
+            )
 
 
 # ── 静态:web-standard profile resolve 不含 assistant plugin id ──────

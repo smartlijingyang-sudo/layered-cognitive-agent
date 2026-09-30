@@ -25,7 +25,7 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[2]
 LCA = REPO / "lca"
-OVERLAY_MODULE = LCA / "plugins" / "assistant" / "skill" / "overlay.py"
+OVERLAY_PACKAGE = LCA / "plugins" / "assistant" / "skill" / "overlay"
 
 _BANNED_TOKENS: tuple[str, ...] = (
     "AssistantRuntime",
@@ -38,6 +38,16 @@ def _read_lca_source() -> str:
     """把 lca/ 下所有 ``.py`` 文件拼成一个字符串(忽略 __pycache__)。"""
     chunks: list[str] = []
     for path in sorted(LCA.rglob("*.py")):
+        if "__pycache__" in path.parts:
+            continue
+        chunks.append(path.read_text(encoding="utf-8", errors="replace"))
+    return "\n".join(chunks)
+
+
+def _read_overlay_code() -> str:
+    """把 overlay 包下所有 ``.py`` 文件拼成一个字符串(忽略 __pycache__)。"""
+    chunks: list[str] = []
+    for path in sorted(OVERLAY_PACKAGE.rglob("*.py")):
         if "__pycache__" in path.parts:
             continue
         chunks.append(path.read_text(encoding="utf-8", errors="replace"))
@@ -58,7 +68,7 @@ def _code_only(text: str) -> str:
 class TestWritePathConstrainedToHomeSkills:
     def test_module_does_not_reference_global_skill_store(self) -> None:
         """静态:不引用全局 store 默认路径,不调 ``get_skill_settings``。"""
-        code = _code_only(OVERLAY_MODULE.read_text(encoding="utf-8"))
+        code = _code_only(_read_overlay_code())
         assert ".lca/skills" not in code, "overlay 代码引用全局 skills store 路径"
         assert "Path.home()" not in code, "overlay 代码不得用 Path.home() 定落点"
         assert "get_skill_settings" not in code, (
@@ -67,7 +77,7 @@ class TestWritePathConstrainedToHomeSkills:
 
     def test_module_constructs_store_with_explicit_cache_dir(self) -> None:
         """每个 ``DiskSkillPackageStore(`` 调用点必须带显式 settings。"""
-        code = _code_only(OVERLAY_MODULE.read_text(encoding="utf-8"))
+        code = _code_only(_read_overlay_code())
         for match in re.finditer(r"DiskSkillPackageStore\(([^)]*)\)", code):
             arg = match.group(1)
             assert "SkillSettings(cache_dir=" in arg, (
@@ -218,11 +228,11 @@ class TestNoParallelAssistantLoopOrCompiler:
 
 class TestNoDirectNetworkImports:
     def test_overlay_module_has_no_http_client_imports(self) -> None:
-        code = _code_only(OVERLAY_MODULE.read_text(encoding="utf-8"))
+        code = _code_only(_read_overlay_code())
         for banned in ("import httpx", "import requests", "import urllib", "from urllib"):
             assert banned not in code, f"overlay 直连网络库: {banned!r}(应经 0048)"
 
     def test_overlay_uses_0048_importer_seam(self) -> None:
-        code = _code_only(OVERLAY_MODULE.read_text(encoding="utf-8"))
+        code = _code_only(_read_overlay_code())
         assert "import_from_url" in code, "overlay 应经 SkillImporter.import_from_url 拉取"
         assert "install_package" in code, "overlay 应经 SkillPackageInstaller.install_package 校验"
