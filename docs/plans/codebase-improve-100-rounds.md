@@ -333,3 +333,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat 147331659` → 6 files changed, 94 insertions(+), 19 deletions(-); gross diff = 113 > 100.
 - **Tests:** `uv run pytest -q tests/architecture/test_phase_observation_seam.py tests/architecture/test_no_stale_module_references.py -m "not real_llm" --no-cov` → **5 passed** (the profile-boot rejection test in `test_declarative_production_closure.py` is pre-existing).
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 33 — 2026-09-30
+
+- **Commit:** `1b1f8f3da` (cherry-picked from subagent branch `round-x` commit `566c56ae6`)
+- **Architectural concern:** naming discipline / design pattern. `lca/infrastructure/mcp/manager.py` used the forbidden `Manager` shape and mixed connection lifecycle with namespace routing.
+- **Change:** renamed `MCPManager` → `MCPHub` (module `hub.py`), extracted pure `build_tool_routing_table` into `lca/infrastructure/mcp/routing.py`, updated importers, added `tests/unit/infrastructure/mcp/test_routing.py`.
+- **Files:** 8 files (1 rename, 1 new routing module, 1 new test, importer updates).
+- **Shortstat:** `git show --shortstat 1b1f8f3da` → 8 files changed, 122 insertions(+), 41 deletions(-); gross diff = 163 > 100.
+- **Tests:** `uv run pytest -q tests/unit/infrastructure/mcp/test_routing.py tests/unit/infrastructure/mcp/test_mcp_subsystem.py -m "not real_llm" --no-cov` → **8 passed**.
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
