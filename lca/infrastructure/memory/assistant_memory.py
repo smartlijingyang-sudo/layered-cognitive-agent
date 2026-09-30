@@ -23,12 +23,11 @@ import logging
 import os
 import re
 from collections.abc import Awaitable, Callable
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from lca.contracts.atoms.enums.enums import MemoryCategory, MemoryLayer
-from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.atoms.ids.ids import new_id, utc_now_iso, utc_now_ms
 from lca.contracts.models.core.conversation.memory import MemoryRecord
 from lca.contracts.models.core.execution.decision import Observation, Reflection
 from lca.contracts.models.core.perceive.perception import ContextManifest
@@ -174,7 +173,7 @@ class AssistantMemory(MemorySystem):
         if not active:
             return []
 
-        now_ms = _utc_now_ms()
+        now_ms = utc_now_ms()
         scored = sorted(
             active,
             key=lambda r: score_record(r, query, now_ms=now_ms),
@@ -335,7 +334,7 @@ class AssistantMemory(MemorySystem):
             return
         layer = MemoryLayer.SEMANTIC
         records = self._load(layer)
-        now_ms = _utc_now_ms()
+        now_ms = utc_now_ms()
         try:
             category_value = (
                 MemoryCategory(str(category)).value if category else MemoryCategory.FACT.value
@@ -393,7 +392,7 @@ class AssistantMemory(MemorySystem):
                 "retired_at_ms": None,
                 "source_trace_id": source_trace_id,
                 "created_at_ms": now_ms,
-                "created_at": _utc_now_iso(),
+                "created_at": utc_now_iso(),
                 "metadata": _stored_metadata(source, metadata),
             }
         )
@@ -450,7 +449,7 @@ class AssistantMemory(MemorySystem):
         """退役旧记录并写入替代记录，建立 ``revision_of`` 血缘。"""
         layer = MemoryLayer.SEMANTIC
         records = self._load(layer)
-        now_ms = _utc_now_ms()
+        now_ms = utc_now_ms()
         old_dedupe_key: str | None = None
         for entry in records:
             if entry.get("record_id") == record_id and not entry.get("deleted", False):
@@ -478,7 +477,7 @@ class AssistantMemory(MemorySystem):
         """把指定记录标记为已删除（保留审计，不再参与检索）。"""
         layer = MemoryLayer.SEMANTIC
         records = self._load(layer)
-        now_ms = _utc_now_ms()
+        now_ms = utc_now_ms()
         for entry in records:
             if entry.get("record_id") == record_id and not entry.get("deleted", False):
                 entry["deleted"] = True
@@ -505,8 +504,8 @@ class AssistantMemory(MemorySystem):
                 "content": content,
                 "importance": importance,
                 "source_trace_id": str(getattr(state, "trace_id", "") or ""),
-                "created_at": _utc_now_iso(),
-                "created_at_ms": _utc_now_ms(),
+                "created_at": utc_now_iso(),
+                "created_at_ms": utc_now_ms(),
                 "metadata": metadata or {},
             }
         )
@@ -601,11 +600,3 @@ def _content_fingerprint(content: str) -> str:
             normalized = rest
     normalized = _ADDRESS_VARIANTS_RE.sub("称呼", normalized)
     return "".join(normalized.split())
-
-
-def _utc_now_ms() -> int:
-    return int(datetime.now(UTC).timestamp() * 1000)
-
-
-def _utc_now_iso() -> str:
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")

@@ -9,14 +9,11 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
 from pathlib import Path
 
+from lca.contracts.atoms.ids.ids import utc_now_ms
+
 __all__ = ["clean_lowercase_user_md", "migrate_semantic_memory"]
-
-
-def _utc_now_ms() -> int:
-    return int(datetime.now(UTC).timestamp() * 1000)
 
 
 def migrate_semantic_memory(home_path: str | Path) -> int:
@@ -36,7 +33,7 @@ def migrate_semantic_memory(home_path: str | Path) -> int:
         return 0
     if not isinstance(records, list):
         return 0
-    now_ms = _utc_now_ms()
+    now_ms = utc_now_ms()
     changed = 0
     for entry in records:
         if not isinstance(entry, dict):
@@ -93,7 +90,7 @@ def dedupe_semantic_memory(home_path: str | Path) -> int:
     if not isinstance(records, list):
         return 0
 
-    now_ms = _utc_now_ms()
+    now_ms = utc_now_ms()
     active = [r for r in records if isinstance(r, dict) and not r.get("deleted", False)]
 
     # 先把所有活跃记录的 dedupe_key 重写为 canonical key，防止未来写入复发。

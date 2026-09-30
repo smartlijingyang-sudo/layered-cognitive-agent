@@ -18,9 +18,9 @@ import hashlib
 import json
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from pathlib import Path
 
+from lca.contracts.atoms.ids.ids import utc_now_iso
 from lca.contracts.observability.canonical_digest import canonical_digest
 
 __all__ = [
@@ -240,7 +240,7 @@ def build_manifest(
         "revision_seq": revision_seq,
         "digests": digests,
         "manifest_digest": manifest_digest,
-        "created_at": created_at or _utc_now_iso(),
+        "created_at": created_at or utc_now_iso(),
     }
 
 
@@ -453,10 +453,6 @@ def _read_json(path: Path) -> dict[str, object]:
     if not isinstance(data, dict):
         raise ValueError(f"{path}: 顶层不是 JSON object")
     return data
-
-
-def _utc_now_iso() -> str:
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def count_yaml_in(directory: Path) -> int:

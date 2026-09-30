@@ -13,8 +13,7 @@ down, infrastructure imports its sibling, and ``contracts`` keeps only the
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
+from lca.contracts.atoms.ids.ids import utc_now_ms
 from lca.contracts.models.core.conversation.memory import MemoryRecord
 
 _DEFAULT_RECENCY = 0.5
@@ -54,7 +53,7 @@ def is_expired(record: MemoryRecord, *, now_ms: int | None = None) -> bool:
     """``valid_until_ms`` 已过则视为过期；无有效期则永不过期。"""
     if record.valid_until_ms is None:
         return False
-    now = now_ms if now_ms is not None else _utc_now_ms()
+    now = now_ms if now_ms is not None else utc_now_ms()
     return record.valid_until_ms < now
 
 
@@ -122,10 +121,6 @@ def apply_token_budget(
         kept.append(record)
         used += estimated
     return kept
-
-
-def _utc_now_ms() -> int:
-    return int(datetime.now(UTC).timestamp() * 1000)
 
 
 __all__ = [

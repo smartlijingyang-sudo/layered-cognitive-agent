@@ -40,6 +40,16 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+def utc_now_ms() -> int:
+    """当前 UTC 时间的 Unix 毫秒时间戳（记忆记录、迁移、检索统一使用）。"""
+    return int(datetime.now(UTC).timestamp() * 1000)
+
+
+def utc_now_iso() -> str:
+    """当前 UTC 时间的 ``%Y-%m-%dT%H:%M:%SZ`` 表示（持久化投影统一使用）。"""
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def new_id(prefix: str) -> str:
     """生成 ``{prefix}_{hex12}`` 格式的唯一 id。"""
     return f"{prefix}_{uuid.uuid4().hex[:_ID_SUFFIX_LEN]}"

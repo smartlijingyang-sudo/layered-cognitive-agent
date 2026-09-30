@@ -16,7 +16,6 @@ import json
 import sqlite3
 from collections.abc import Callable, Iterator
 from contextlib import closing, contextmanager
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, TypeVar, cast
 
@@ -82,10 +81,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS lca_user_assistants_agent_idx
 CREATE INDEX IF NOT EXISTS lca_user_assistants_user_id_idx
     ON lca_user_assistants (user_id);
 """
-
-
-def _utc_now_iso() -> str:
-    return datetime.now(UTC).isoformat()
 
 
 class SqliteUserAssistantStore(AssistantOwnership):
