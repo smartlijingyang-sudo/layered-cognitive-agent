@@ -51,7 +51,7 @@ from lca.infrastructure.attachment.settings.settings import (
     get_attachment_policy,
 )
 from lca.infrastructure.file.store import FileStore
-from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
+from lca.infrastructure.sandbox.factory.factory import ONLYBOXES
 
 if TYPE_CHECKING:
     from lca.infrastructure.file.store import StoredFile

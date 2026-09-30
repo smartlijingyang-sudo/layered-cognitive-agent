@@ -5,7 +5,7 @@ No user values are interpolated here. Constants are host-side only.
 
 from __future__ import annotations
 
-from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
+from lca.infrastructure.sandbox.factory.factory import ONLYBOXES
 
 SCRIPT_PRELUDE = f"""
 import base64

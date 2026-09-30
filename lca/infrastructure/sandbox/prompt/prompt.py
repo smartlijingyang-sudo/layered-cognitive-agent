@@ -35,7 +35,7 @@ def render_cloud_sandbox_system_role(
     if store is not None and ids:
         uploaded = format_sandbox_uploaded_files_prompt(store, ids)
 
-    from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
+    from lca.infrastructure.sandbox.factory.factory import ONLYBOXES
     from lca.infrastructure.sandbox.surface.surface import environment_note
 
     outputs_dir = ONLYBOXES.outputs_dir

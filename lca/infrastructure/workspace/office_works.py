@@ -14,7 +14,7 @@ from typing import Any
 import structlog
 
 from lca.infrastructure.file.store import FileStore, persist_generated_files
-from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
+from lca.infrastructure.sandbox.factory.factory import ONLYBOXES
 from lca.infrastructure.sandbox.runtime.scope import get_sandbox_runtime
 from lca.infrastructure.workspace.deliverable import is_office_name
 from lca.infrastructure.workspace.scope import get_run_workspace

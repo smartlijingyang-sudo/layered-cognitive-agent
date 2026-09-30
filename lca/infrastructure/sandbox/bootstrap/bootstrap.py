@@ -7,7 +7,7 @@ directory init and the shared init marker constant.
 
 from __future__ import annotations
 
-from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
+from lca.infrastructure.sandbox.factory.factory import ONLYBOXES
 
 # LobeHub marker name — single source of truth for idempotent file sync (``bootstrap.ts``).
 SANDBOX_FILES_INIT_MARKER = ONLYBOXES.init_marker

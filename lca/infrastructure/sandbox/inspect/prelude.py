@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from lca.contracts.models.core.execution.sandbox import SANDBOX_OUTPUT_SUBDIR
-from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
+from lca.infrastructure.sandbox.factory.factory import ONLYBOXES
 
 # Inlined into the guest inspect script. Datetime / pandas Timestamp / numpy
 # scalars in Excel samples must not fail json.dumps (run_8e2a1e79c0a4).

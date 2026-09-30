@@ -13,10 +13,6 @@ from __future__ import annotations
 import asyncio
 from typing import cast
 
-from lca.cognition.body.delegation.cache import (
-    cached_delegation_observation,
-    tag_delegation_extra,
-)
 from lca.cognition.body.delegation.target import resolve_delegation_target
 from lca.cognition.body.tools.tool_batch_executor import ToolBatchExecutor
 from lca.cognition.body.tools.tool_wire_gate import (
@@ -67,6 +63,10 @@ from lca.contracts.protocols import (
 from lca.contracts.protocols.act.action.action import Action
 from lca.contracts.protocols.act.command.envelope import command_envelope_to_dict
 from lca.contracts.protocols.act.tool.batch_execution import ToolBatchExecutionPolicy
+from lca.infrastructure.delegation.cache import (
+    cached_delegation_observation,
+    tag_delegation_extra,
+)
 
 _ERR_DEADLINE_EXPIRED = "delegate 超时(deadline 已过期)"
 _ERR_TIMEOUT = "delegate 超时"

@@ -34,7 +34,7 @@ from lca.infrastructure.attachment.settings.settings import (
 )
 from lca.infrastructure.file.store import FileStore
 from lca.infrastructure.observability import current_file_store as get_current_run_file_store
-from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
+from lca.infrastructure.sandbox.factory.factory import ONLYBOXES
 
 
 class _PlaneAccess(Protocol):

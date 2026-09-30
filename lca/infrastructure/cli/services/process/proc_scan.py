@@ -41,7 +41,12 @@ def find_pid_by_argv(*needles: str) -> ProcessHandle | None:
             if not pid_dir.name.isdigit():
                 continue
             try:
-                cmdline = (pid_dir / "cmdline").read_bytes().replace(b"\x00", b" ").decode("utf-8", errors="ignore")
+                cmdline = (
+                    (pid_dir / "cmdline")
+                    .read_bytes()
+                    .replace(b"\x00", b" ")
+                    .decode("utf-8", errors="ignore")
+                )
             except (FileNotFoundError, PermissionError):
                 continue
             if all(needle in cmdline for needle in needles):
@@ -67,6 +72,7 @@ class _ProcfsProxy:
     def send_signal(self, sig: int) -> None:
         import contextlib
         import os
+
         with contextlib.suppress(ProcessLookupError):
             os.kill(self.pid, sig)
 

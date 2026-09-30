@@ -15,7 +15,6 @@ appropriate interpreter, avoiding ``ARG_MAX`` crashes from inline base64.
 from __future__ import annotations
 
 import base64
-import json
 from dataclasses import replace
 from typing import Any
 
@@ -33,13 +32,13 @@ from lca.contracts.models.core.execution.sandbox import (
 from lca.contracts.models.core.state.guest_layout import GuestLayout
 from lca.contracts.protocols import Sandbox
 from lca.infrastructure.sandbox.bootstrap.bootstrap import SANDBOX_FILES_INIT_MARKER
+from lca.infrastructure.sandbox.factory.factory import ONLYBOXES
 from lca.infrastructure.sandbox.onlyboxes.bootstrap import (
     auth_headers,
     parse_terminal_response,
     safe_rel_name,
     timeout_ms,
 )
-from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
 from lca.infrastructure.sandbox.streaming.streaming import SandboxStreamEmitter
 
 _log = structlog.get_logger(__name__)
@@ -50,6 +49,7 @@ def _guess_mime(name: str) -> str:
 
     mime, _ = mimetypes.guess_type(name)
     return mime or "application/octet-stream"
+
 
 # ── constants ───────────────────────────────────────────────────────
 

@@ -1,4 +1,4 @@
-﻿"""Sandbox resolver — Onlyboxes preferred, local host-backed fallback.
+"""Sandbox resolver — Onlyboxes preferred, local host-backed fallback.
 
 Host sidecar is a machine transport, not a Sandbox. Tests may still inject a
 real Sandbox via ``set_sandbox_resolver``. Gateway must not inject Host here.
@@ -22,10 +22,16 @@ import os
 from collections.abc import Callable
 
 from lca.contracts.models.core.policy.sandbox_policy import DEFAULT_POLICY, SandboxPolicy
+from lca.contracts.models.core.state.guest_layout import GuestLayout
 from lca.contracts.protocols import Sandbox
 from lca.infrastructure.llm_adapter.factory.factory import load_dotenv_if_present
 
 _log = logging.getLogger(__name__)
+
+# Fixed guest disk layout for Onlyboxes images. Callers read ``ONLYBOXES``
+# (or a ``GuestLayout`` they were given); the layout model in contracts owns
+# the ``join_under`` / ``outputs_under`` path helpers.
+ONLYBOXES: GuestLayout = GuestLayout.onlyboxes()
 
 _override: Callable[[], Sandbox | None] | None = None
 _policy: SandboxPolicy = DEFAULT_POLICY

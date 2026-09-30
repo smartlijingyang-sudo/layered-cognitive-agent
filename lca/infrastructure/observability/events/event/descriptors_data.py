@@ -273,7 +273,7 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         _descriptor(
             DelegationCacheHit,
             domain=VocabDomain.TEAM,
-            emitter="lca.cognition.body.delegation.cache",
+            emitter="lca.infrastructure.delegation.cache",
             required=("callee_role",),
             description="委派幂等短路",
             durability="best_effort",

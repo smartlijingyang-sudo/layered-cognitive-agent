@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import UTC
 
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.execution.decision import DelegationSpec, Observation
@@ -13,13 +14,12 @@ from lca.plugins.events.publishers.delegation_cache.plugin import (
 )
 from lca_kernel.events import TeamDelegationCacheHit
 from lca_kernel.events.bus.bus import EventBus, EventRef
-from datetime import UTC
 
 
 def _state_with_hit_result(
     state: AgentState, role: str = "analyst", subtask: str = "汇总"
 ) -> AgentState:
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from lca.contracts.models.team.delegation.delegation import DelegationResult
     from lca.contracts.models.team.team.awareness import TeamAwareness
@@ -108,12 +108,12 @@ def test_cached_observation_no_hit_returns_none() -> None:
     assert DelegationCachePlugin().cached_observation(spec, state) is None
 
 
-def test_compatibility_shell_delegates_to_plugin() -> None:
-    """cognition 兼容壳 → DelegationCachePlugin → Session.append。"""
+def test_cache_module_delegates_to_plugin() -> None:
+    """infrastructure 缓存模块 → DelegationCachePlugin → Session.append。"""
     from typing import Any
     from unittest.mock import MagicMock
 
-    from lca.cognition.body.delegation.cache import cached_delegation_observation
+    from lca.infrastructure.delegation.cache import cached_delegation_observation
     from lca.plugins.events.publishers._session_publish import (
         reset_publish_session,
         set_publish_session,

@@ -9,14 +9,13 @@ import unittest
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from lca.infrastructure.sandbox.factory.factory import resolve_sandbox, sandbox_backend
+from lca.infrastructure.sandbox.factory.factory import ONLYBOXES, resolve_sandbox, sandbox_backend
 from lca.infrastructure.sandbox.onlyboxes.adapter import OnlyboxesSandboxAdapter
 from lca.infrastructure.sandbox.onlyboxes.artifacts import (
     ARTIFACT_BEGIN,
     ARTIFACT_END,
     strip_artifacts,
 )
-from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
 
 
 def _artifact_block(files: list[tuple[str, bytes]]) -> str:

@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from lca.contracts.models.core.execution.sandbox import SANDBOX_MOUNT_ROOT, SANDBOX_OUTPUT_SUBDIR
-from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
+from lca.infrastructure.sandbox.factory.factory import ONLYBOXES
 
 _REPO = Path(__file__).resolve().parents[1]
 _ONLYBOXES = _REPO / "deploy" / "onlyboxes"

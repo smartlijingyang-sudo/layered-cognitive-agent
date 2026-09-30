@@ -7,8 +7,8 @@ Re-exports ``ARTIFACT_BEGIN`` / ``ARTIFACT_END`` markers used by
 from __future__ import annotations
 
 from lca.contracts.models.core.execution.sandbox import SANDBOX_MAX_GENERATED_FILE_BYTES
+from lca.infrastructure.sandbox.factory.factory import ONLYBOXES
 from lca.infrastructure.sandbox.onlyboxes.artifacts import ARTIFACT_BEGIN, ARTIFACT_END
-from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
 
 # Guest Python executed after user code to scan the outputs directory and
 # print an artifact marker block that the host parses via ``strip_artifacts``.

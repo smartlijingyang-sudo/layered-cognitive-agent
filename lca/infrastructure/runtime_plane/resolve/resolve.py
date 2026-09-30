@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from lca.contracts.models.core.state.plane import PlaneBindings, PlaneKind, PlaneRef
 from lca.contracts.protocols import Sandbox
-from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
+from lca.infrastructure.sandbox.factory.factory import ONLYBOXES
 
 
 class PlaneBindingError(ValueError):

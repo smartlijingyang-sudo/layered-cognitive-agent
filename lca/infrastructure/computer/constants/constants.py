@@ -1,6 +1,6 @@
 """Computer use constants — guest markers and result caps.
 
-Sandbox disk roots live in ``lca.infrastructure.sandbox.paths``.
+Sandbox disk roots live in ``lca.infrastructure.sandbox.factory``.
 """
 
 from __future__ import annotations

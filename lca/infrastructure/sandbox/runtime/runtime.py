@@ -31,8 +31,8 @@ from lca.infrastructure.sandbox.bootstrap.bootstrap import SANDBOX_INIT_TIMEOUT_
 from lca.infrastructure.sandbox.cjk.matplotlib_guest import guest_bootstrap_source
 from lca.infrastructure.sandbox.error.parse import classify_execution_error
 from lca.infrastructure.sandbox.exec.result import sandbox_exec_result_from
+from lca.infrastructure.sandbox.factory.factory import ONLYBOXES
 from lca.infrastructure.sandbox.inspect.prelude import INSPECT_SCRIPT, parse_inspect_stdout
-from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
 from lca.infrastructure.sandbox.runtime.mount import (
     build_mount_manifest,
     load_mount_files,

@@ -15,11 +15,9 @@ from lca.infrastructure.host_runtime.providers.shared import (
     ToolsProvider,
     VenvProvider,
 )
-from lca.infrastructure.host_runtime.providers.user import (
-    CLIProvider,
-    UserProvider,
-    WorkspaceProvider,
-)
+from lca.infrastructure.host_runtime.providers.user_account import UserProvider
+from lca.infrastructure.host_runtime.providers.user_cli import CLIProvider
+from lca.infrastructure.host_runtime.providers.user_workspace import WorkspaceProvider
 
 
 class HostEnvironment:

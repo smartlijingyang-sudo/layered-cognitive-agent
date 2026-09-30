@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 from lca.contracts.models.core.execution.sandbox import SandboxErrorKind, SandboxResult
-from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
+from lca.infrastructure.sandbox.factory.factory import ONLYBOXES
 
 _USER_LINE_RE = re.compile(
     r'File "<lca-user>", line (\d+)',

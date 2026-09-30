@@ -9,7 +9,7 @@ from lca.infrastructure.computer.constants.constants import (
 )
 from lca.infrastructure.computer.guest.json_script import compose_json_script
 from lca.infrastructure.computer.guest.preamble import SCRIPT_PRELUDE
-from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
+from lca.infrastructure.sandbox.factory.factory import ONLYBOXES
 
 SEARCH_FILES_SCRIPT = (
     SCRIPT_PRELUDE

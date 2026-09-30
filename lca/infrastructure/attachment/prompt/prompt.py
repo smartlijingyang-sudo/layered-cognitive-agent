@@ -16,7 +16,7 @@ from lca.contracts.models.core.state.plane import PlaneKind
 from lca.infrastructure.attachment.layout.layout import AttachmentLayout, sanitize_attachment_name
 from lca.infrastructure.attachment.settings.settings import get_attachment_policy
 from lca.infrastructure.file.store import FileStore, LocalFileStore
-from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
+from lca.infrastructure.sandbox.factory.factory import ONLYBOXES
 from lca.infrastructure.tools.run.attachment_scope import get_current_run_attachment_ids
 from lca.infrastructure.tools.run.finalizer import get_current_run_id
 

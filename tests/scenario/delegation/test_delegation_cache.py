@@ -5,10 +5,6 @@ from __future__ import annotations
 import unittest
 from datetime import UTC, datetime
 
-from lca.cognition.body.delegation.cache import (
-    cached_delegation_observation,
-    tag_delegation_extra,
-)
 from lca.contracts.atoms.enums.enums import MemoryRecordKind
 from lca.contracts.atoms.semantic.keys import (
     OBS_CACHE_HIT,
@@ -20,6 +16,10 @@ from lca.contracts.models.core.execution.decision import DelegationSpec, Observa
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.models.team.delegation.delegation import DelegationResult
 from lca.contracts.models.team.team.awareness import TeamAwareness
+from lca.infrastructure.delegation.cache import (
+    cached_delegation_observation,
+    tag_delegation_extra,
+)
 
 
 def _delegation_result(role: str = "Alice", subtask: str = "analyze") -> DelegationResult:

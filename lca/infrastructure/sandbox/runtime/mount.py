@@ -16,7 +16,7 @@ from lca.contracts.models.core.execution.sandbox import (
 )
 from lca.infrastructure.file.store import FileStore
 from lca.infrastructure.sandbox.exec.result import sandbox_exec_result_from
-from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
+from lca.infrastructure.sandbox.factory.factory import ONLYBOXES
 
 # ADR-0101 PR-3 carry-over:tools 包的 __init__.py 会拉起 computer.sandbox_computer
 # 链,提前导入 ``tools.run_attachment_scope`` 会触发 ``runtime_scope`` ↔

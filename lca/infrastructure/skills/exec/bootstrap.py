@@ -6,7 +6,7 @@ import json
 
 from lca.contracts.protocols.memory.operational_skills import SANDBOX_SKILL_MOUNT_PREFIX
 from lca.infrastructure.credentials.sandbox_env import build_sandbox_env_preamble
-from lca.infrastructure.sandbox.paths.paths import ONLYBOXES
+from lca.infrastructure.sandbox.factory.factory import ONLYBOXES
 
 
 def skill_mount_dir(skill_id: str) -> str:
