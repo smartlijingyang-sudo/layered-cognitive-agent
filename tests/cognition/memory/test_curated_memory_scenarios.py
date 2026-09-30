@@ -242,6 +242,68 @@ async def test_dispatch_stamps_acknowledgement_only_after_projection(tmp_path: P
     assert guard_memory_claim("已记下。", allowed=stamped.may_acknowledge) == "已记下。"
 
 
+@pytest.mark.asyncio
+async def test_memory_claim_flow_write_receipt_reaches_decision(tmp_path: Path) -> None:
+    """一条完整流程：写盘结果经运行时视图决定最终回复。"""
+    memory = AssistantMemory(tmp_path / "asst")
+    view = make_node_runtime_view_factory(
+        base_scope={"memory": memory},
+        effect_gateway=None,
+    )(None)
+    state = AgentState(trace_id="trace-flow", task="记住城市", budget=Budget())
+    observation = Observation(
+        observation_id="obs-1", success=True, payload={}, content_type=ContentType.TEXT
+    )
+
+    def _candidate(content: str, key: str) -> Reflection:
+        return Reflection(
+            reflection_id=f"ref-{key}",
+            verdict=ReflectionVerdict.ON_TRACK,
+            extra={
+                "memory_candidates": [
+                    {
+                        "content": content,
+                        "category": "fact",
+                        "confidence": 0.95,
+                        "source": "user",
+                        "dedupe_key": key,
+                        "trigger": "用户说以后按这个来",
+                    }
+                ]
+            },
+        )
+
+    async def _dispatch(reflection: Reflection) -> MemoryReceipt:
+        output = await MemoryWriteDispatchExecutor().node_execute(
+            NodeContext(runtime=view, budget={}, metadata={}),
+            NodeInput(
+                {
+                    "memory_receipt": MemoryReceipt(
+                        admitted=True,
+                        reflection_id=reflection.reflection_id,
+                    ),
+                    "observation": observation,
+                    "reflection": reflection,
+                    "state": state,
+                    "memory": memory,
+                }
+            ),
+        )
+        return output.port_values["memory_receipt"]
+
+    # 场景 A：合法写盘成功，回执允许认领，最终回复保留「已记下」。
+    ok_receipt = await _dispatch(_candidate("用户住在杭州", "home.city"))
+    assert ok_receipt.may_acknowledge is True
+    decision_ok = await _parse_decision("好的，已记下。", may_acknowledge=None, memory=memory)
+    assert decision_ok.response_text == "好的，已记下。"
+
+    # 场景 B：凭证被拒，回执不允许认领，最终回复被替换为未写入说明。
+    bad_receipt = await _dispatch(_candidate("password: hunter2", "secret"))
+    assert bad_receipt.may_acknowledge is False
+    decision_bad = await _parse_decision("好的，已记下。", may_acknowledge=None, memory=memory)
+    assert decision_bad.response_text == "这条还没有写入记忆文件。我不能说已经记下。"
+
+
 async def _parse_decision(
     text: str,
     *,

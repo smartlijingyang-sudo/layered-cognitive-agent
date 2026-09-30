@@ -34,4 +34,4 @@ ADR-0242 把身份放在 `profile.json`，人设放在 `SOUL.md`，并删除了 
 
 ## Verification
 
-`tests/cognition/memory/test_curated_memory_scenarios.py` 覆盖投影、取代、凭证拒绝、写盘失败、回执门闩、压缩后重读，以及 `memory.write.dispatch` 打上 `may_acknowledge`。`tests/plugins/assistant/test_persona.py` 覆盖常驻文件预算。
+`tests/cognition/memory/test_curated_memory_scenarios.py` 覆盖投影、取代、凭证拒绝、写盘失败、回执门闩、压缩后重读，以及 `memory.write.dispatch` 打上 `may_acknowledge`。流程级场景测试把「写盘 → 运行时视图回执 → 决策守卫 → 最终回复」串成一条链路：合法写盘保留「已记下」，凭证被拒替换为未写入说明。`tests/plugins/assistant/test_persona.py` 覆盖常驻文件预算。
