@@ -243,3 +243,33 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat 7d60cc10a` → 7 files changed, 74 insertions(+), 77 deletions(-); gross diff = 151 > 100.
 - **Tests:** `uv run pytest -q tests/architecture/test_runs_api_routes_stub_retired.py -m "not real_llm" --no-cov` → **4 passed**. `test_catalog_registers_profile_route` fails on a stale `ROUTES` import (pre-existing at HEAD).
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 24 — 2026-09-30
+
+- **Commit:** `3f28556a4` (cherry-picked from subagent branch `round-j` commit `4ff8eee8f`)
+- **Architectural concern:** module depth / oversized plugin. `lca/plugins/domain/assistant/catalog/plugin.py` (1397 lines) mixed Home CRUD, SOUL validation, plan-overlay parsing, manifest digest, and event emission.
+- **Change:** split into a `catalog/` package (`handlers.py`, `soul.py`, `manifest.py`, `events.py`, `plan_overlay.py`, `plugin.py`, barrel `__init__.py`); public surface preserved; added a barrel-path regression test.
+- **Files:** 8 files (6 new submodules + barrel + test updates).
+- **Shortstat:** `git show --shortstat 3f28556a4` → 8 files changed, 1397 insertions(+), 1219 deletions(-); gross diff = 2616 > 100.
+- **Tests:** `uv run pytest -q tests/plugins/assistant/test_catalog.py -m "not real_llm" --no-cov` → **87 passed** (5 digest-mismatch failures pre-existing at HEAD).
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 25 — 2026-09-30
+
+- **Commit:** `190ea3994` (cherry-picked from subagent branch `round-n` commit `2d61b5214`)
+- **Architectural concern:** module depth / oversized module. `narrative_writer.py` (670 lines) mixed per-primitive section renderers, fold-chapter renderers, and the writer.
+- **Change:** split into a `narrative_writer/` package (`sections.py`, `fold.py`, `writer.py`, barrel `__init__.py`); tightened 3 bare `Any` annotations to `object`; added `tests/scenario/step/test_narrative_writer_sections.py`.
+- **Files:** 6 files (3 new submodules + barrel + test), 1 deleted module.
+- **Shortstat:** `git show --shortstat 190ea3994` → 6 files changed, 761 insertions(+), 670 deletions(-); gross diff = 1431 > 100.
+- **Tests:** `uv run pytest -q tests/scenario/step/test_narrative_writer_sections.py -m "not real_llm" --no-cov` → **3 passed** (subagent ran 61 passed / 7 pre-existing failures across the affected set).
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 26 — 2026-09-30
+
+- **Commit:** `0c3e4a630` (cherry-picked from subagent branch `round-p` commit `7ef705f78`)
+- **Architectural concern:** module depth. `lca_kernel/events/registry/registry.py` (620 lines) mixed the yaml-driven catalog loading with the registry class.
+- **Change:** extracted `lca_kernel/events/registry/catalog.py` (229 lines) with `EventSpec` + yaml loading; `registry.py` delegates `load` to `catalog.load_catalog`; added `tests/lca_kernel/events/test_catalog_loader.py` and `test_registry_load.py`.
+- **Files:** 4 files (1 new module + 2 test files + registry updates).
+- **Shortstat:** `git show --shortstat 0c3e4a630` → 4 files changed, 395 insertions(+), 193 deletions(-); gross diff = 588 > 100.
+- **Tests:** `uv run pytest -q tests/lca_kernel/events/test_catalog_loader.py tests/lca_kernel/events/test_registry_load.py -m "not real_llm" --no-cov` → **13 passed**.
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
