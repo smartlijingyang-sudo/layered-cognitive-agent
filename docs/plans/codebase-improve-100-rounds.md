@@ -83,3 +83,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat 762ab2f68` → 10 files changed, 137 insertions(+), 21 deletions(-); gross diff = 158 > 100.
 - **Tests:** `uv run pytest -q tests/architecture/test_infrastructure_no_agent_import.py tests/scenario/role/test_role_library.py tests/scenario/team_0/test_team_casting.py tests/infrastructure/roles/test_role_card_resolver.py -m "not real_llm" --no-cov` → **29 passed**.
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 8 — 2026-09-30
+
+- **Commit:** `6aca6bc71`
+- **Architectural concern:** seam consistency / adapter pattern. `LocalSandboxAdapter` implemented every `Sandbox` protocol method but omitted the base class, while `OnlyboxesSandboxAdapter(Sandbox)` declared it — the factory's `resolve_sandbox() -> Sandbox | None` seam was statically uncheckable for the local adapter.
+- **Change:** declared `class LocalSandboxAdapter(Sandbox)`, fixed pre-existing ASYNC240/S108 ruff violations in the file by extracting blocking sync I/O helpers (`_ensure_dir`, `_write_text_blocking`, `_unlink_blocking`), and added a shared contract test both adapters must satisfy (subclass + method signatures + factory return type).
+- **Files:** `lca/infrastructure/sandbox/local/adapter.py`, `tests/infrastructure/sandbox/test_adapter_seam.py`.
+- **Shortstat:** `git show --shortstat 6aca6bc71` → 2 files changed, 118 insertions(+), 9 deletions(-); gross diff = 127 > 100.
+- **Tests:** `uv run pytest -q tests/infrastructure/sandbox/test_adapter_seam.py tests/infrastructure/test_local_sandbox_output_mime.py tests/infrastructure/test_local_sandbox_attachment_path.py tests/infrastructure/computer/test_box_sandbox_adapter.py -m "not real_llm" --no-cov` → **17 passed**.
+- **Gates:** ruff check / format --check on touched files: pass (pre-existing ASYNC240/S108 fixed in this round); `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
