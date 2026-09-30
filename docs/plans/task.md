@@ -355,4 +355,7 @@
 | CORP-MCP-5-MUSE-BRIDGE | 在 muse-mcp-hub 中平滑接入 corp-mcp 只读工具，重启服务并健康探针验证 | Completed | muse-mcp-hub 成功动态挂载 5 项 OA 工具（共 22 项工具），服务重启成功（PID: 3874505），公网 HTTPS 健康探针与 SSE 端点验证通过 |
 | CORP-MCP-6-DOCS | 在 ~/everything-library 中沉淀 corp-mcp 架构与安全规范 | Completed | 在 everything-library/data/items/tools/corp-mcp-hub.md 权威归档资产与设计规范 |
 | CORP-MCP-7-LCA-INTEGRATION | 接入 LCA 项目 (.lca/mcp.yaml) 并完成工具注入/执行/认知闭环测试与在线实测 | Completed | .lca/mcp.yaml 配置 stdio 直连 corp-mcp，7 项 oa_* 工具自动发现与权限注册通过；tests/unit/infrastructure/mcp/test_agent_mcp_injection.py 7/7 全通；真实内核实测 run_d04f94f2134a（身份查询）与 run_03b74bfe2b0c（待办工单）100% 成功 |
-
+| ADR-0254-TEST-BRAINSTORM-CONTEXT | 深度剖析 ADR-0254 认知架构目标与场景验收覆盖需求 | Completed | 梳理完成 ADR-0254 五层映射、Context Muse 8 大场景与工业级验收目标 |
+| ADR-0254-TEST-BRAINSTORM-APPROACHES | 提出 2-3 种场景测试与验收流程架构方案及权衡对比 | Completed | 用户选定推荐方案：双轨立体分级验收体系（48h 主线演进 + 8大边界攻防 + 认知量化量规） |
+| ADR-0254-TEST-BRAINSTORM-DESIGN-SECTIONS | 逐步呈现场景测试流程、用例矩阵与验收标准设计并获取审批 | Completed | 全部 7 大阶段 48h 跨 Topic 演进流、11 项功能倒推场景与 5 大极端刁难场景均获用户确认 |
+| ADR-0254-TEST-BRAINSTORM-DOC | 沉淀商用级全景场景测试规范至 docs/specs/ 并提交 git | Completed | 成功落盘 docs/specs/adr-0254-scenario-testing-specification.md（660+ 行，覆盖 48h 跨 Topic 演进、底层后台读写 IO、记忆整理与做梦管线、11 大功能倒推与 5 大极端刁难场景） |
