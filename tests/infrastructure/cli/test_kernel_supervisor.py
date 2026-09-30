@@ -43,7 +43,10 @@ class TestDecideRestart:
 
     def test_user_stopped_returns_stopped_no_matter_what(self) -> None:
         d = decide_restart(
-            0, autorestart=True, restart_count=0, startretries=3,
+            0,
+            autorestart=True,
+            restart_count=0,
+            startretries=3,
             user_stopped=True,
         )
         assert d.next_state == ProgramState.STOPPED
@@ -52,14 +55,20 @@ class TestDecideRestart:
 
     def test_clean_exit_with_autorestart_false_returns_stopped(self) -> None:
         d = decide_restart(
-            0, autorestart=False, restart_count=0, startretries=3,
+            0,
+            autorestart=False,
+            restart_count=0,
+            startretries=3,
             user_stopped=False,
         )
         assert d.next_state == ProgramState.STOPPED
 
     def test_clean_exit_with_autorestart_true_backs_off(self) -> None:
         d = decide_restart(
-            0, autorestart=True, restart_count=0, startretries=3,
+            0,
+            autorestart=True,
+            restart_count=0,
+            startretries=3,
             user_stopped=False,
         )
         assert d.next_state == ProgramState.BACKOFF
@@ -68,7 +77,10 @@ class TestDecideRestart:
 
     def test_exhausted_startretries_returns_fatal(self) -> None:
         d = decide_restart(
-            1, autorestart=True, restart_count=3, startretries=3,
+            1,
+            autorestart=True,
+            restart_count=3,
+            startretries=3,
             user_stopped=False,
         )
         assert d.next_state == ProgramState.FATAL
@@ -77,7 +89,10 @@ class TestDecideRestart:
     def test_backoff_capped_at_30(self) -> None:
         # 2^5 = 32, capped to 30
         d = decide_restart(
-            1, autorestart=True, restart_count=5, startretries=10,
+            1,
+            autorestart=True,
+            restart_count=5,
+            startretries=10,
             user_stopped=False,
         )
         assert d.backoff_s == 30.0
@@ -86,7 +101,10 @@ class TestDecideRestart:
         # Even with autorestart=False and clean exit, user_stopped
         # takes precedence (the supervisor was asked to stop).
         d = decide_restart(
-            0, autorestart=False, restart_count=0, startretries=3,
+            0,
+            autorestart=False,
+            restart_count=0,
+            startretries=3,
             user_stopped=True,
         )
         assert d.next_state == ProgramState.STOPPED
@@ -119,8 +137,7 @@ class TestParseProgramConfig:
     def test_args_are_split_shell_style(self, tmp_path: Path) -> None:
         path = _write(
             tmp_path,
-            "[program:app]\ncommand=/bin/echo\n"
-            "args=--foo \"hello world\" --bar=42\n",
+            '[program:app]\ncommand=/bin/echo\nargs=--foo "hello world" --bar=42\n',
         )
         progs = parse_program_config(path)
         assert progs[0].args == ("--foo", "hello world", "--bar=42")
@@ -128,8 +145,7 @@ class TestParseProgramConfig:
     def test_unknown_keys_raise_loud(self, tmp_path: Path) -> None:
         path = _write(
             tmp_path,
-            "[program:app]\ncommand=/bin/echo\n"
-            "user=root\n",  # supervisord doesn't have this
+            "[program:app]\ncommand=/bin/echo\nuser=root\n",  # supervisord doesn't have this
         )
         with pytest.raises(ValueError, match="unknown keys"):
             parse_program_config(path)
@@ -137,8 +153,7 @@ class TestParseProgramConfig:
     def test_invalid_bool_raises_loud(self, tmp_path: Path) -> None:
         path = _write(
             tmp_path,
-            "[program:app]\ncommand=/bin/echo\n"
-            "autorestart=maybe\n",
+            "[program:app]\ncommand=/bin/echo\nautorestart=maybe\n",
         )
         with pytest.raises(ValueError, match="autorestart"):
             parse_program_config(path)
@@ -146,8 +161,7 @@ class TestParseProgramConfig:
     def test_invalid_int_raises_loud(self, tmp_path: Path) -> None:
         path = _write(
             tmp_path,
-            "[program:app]\ncommand=/bin/echo\n"
-            "startretries=many\n",
+            "[program:app]\ncommand=/bin/echo\nstartretries=many\n",
         )
         with pytest.raises(ValueError, match="startretries"):
             parse_program_config(path)
@@ -171,8 +185,7 @@ class TestParseProgramConfig:
     def test_env_parsing(self, tmp_path: Path) -> None:
         path = _write(
             tmp_path,
-            "[program:app]\ncommand=/bin/echo\n"
-            "environment=KEY1=val1,KEY2=val2\n",
+            "[program:app]\ncommand=/bin/echo\nenvironment=KEY1=val1,KEY2=val2\n",
         )
         progs = parse_program_config(path)
         assert progs[0].environment == {"KEY1": "val1", "KEY2": "val2"}
@@ -195,31 +208,41 @@ class TestParseProgramConfig:
 
 class TestStateFile:
     def test_clear_removes_file(self, tmp_path: Path, monkeypatch) -> None:
-        # Override LCA_SUPERVISOR_STATE for the test.
-        import lca.infrastructure.cli.services.kernel.supervisor as mod
+        # Override LCA_SUPERVISOR_STATE for the test. The state-file
+        # globals live in the ``state`` submodule after the package
+        # split, so patch there — the barrel re-exports the functions.
+        import importlib
+
+        state_mod = importlib.import_module(
+            "lca.infrastructure.cli.services.kernel.supervisor.state"
+        )
         state = tmp_path / "state.json"
         state.write_text('{"program":"x","pid":1}')
-        monkeypatch.setattr(mod, "_STATE_PATH", state)
-        assert mod._read_state_file() == {"program": "x", "pid": 1}
+        monkeypatch.setattr(state_mod, "_STATE_PATH", state)
+        assert state_mod._read_state_file() == {"program": "x", "pid": 1}
         clear_state()
         assert not state.exists()
         assert read_state_file() is None
 
-    def test_read_missing_returns_none(
-        self, tmp_path: Path, monkeypatch
-    ) -> None:
-        import lca.infrastructure.cli.services.kernel.supervisor as mod
+    def test_read_missing_returns_none(self, tmp_path: Path, monkeypatch) -> None:
+        import importlib
+
+        state_mod = importlib.import_module(
+            "lca.infrastructure.cli.services.kernel.supervisor.state"
+        )
         state = tmp_path / "nonexistent.json"
-        monkeypatch.setattr(mod, "_STATE_PATH", state)
+        monkeypatch.setattr(state_mod, "_STATE_PATH", state)
         assert read_state_file() is None
 
-    def test_read_malformed_returns_none(
-        self, tmp_path: Path, monkeypatch
-    ) -> None:
-        import lca.infrastructure.cli.services.kernel.supervisor as mod
+    def test_read_malformed_returns_none(self, tmp_path: Path, monkeypatch) -> None:
+        import importlib
+
+        state_mod = importlib.import_module(
+            "lca.infrastructure.cli.services.kernel.supervisor.state"
+        )
         state = tmp_path / "state.json"
         state.write_text("not json")
-        monkeypatch.setattr(mod, "_STATE_PATH", state)
+        monkeypatch.setattr(state_mod, "_STATE_PATH", state)
         assert read_state_file() is None
 
 
@@ -228,31 +251,40 @@ class TestStateFile:
 
 class TestGetSupervisor:
     def test_returns_same_instance_for_same_config(
-        self, monkeypatch: pytest.MonkeyPatch,
+        self,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        # Reset module-level cache so the test is hermetic.
-        import lca.infrastructure.cli.services.kernel.supervisor as mod
-        monkeypatch.setattr(mod, "_SUPERVISOR_CACHE", {})
+        # Reset module-level cache so the test is hermetic. The cache
+        # lives in the ``supervisor`` submodule after the package split.
+        import importlib
+
+        sup_mod = importlib.import_module(
+            "lca.infrastructure.cli.services.kernel.supervisor.supervisor"
+        )
+        monkeypatch.setattr(sup_mod, "_SUPERVISOR_CACHE", {})
 
         cfg = ProgramConfig(
-            name="test_app", command="/bin/echo", args=("hi",),
+            name="test_app",
+            command="/bin/echo",
+            args=("hi",),
         )
         a = get_supervisor(cfg)
         b = get_supervisor(cfg)
         assert a is b
 
     def test_returns_different_instance_for_different_config(
-        self, monkeypatch: pytest.MonkeyPatch,
+        self,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        import lca.infrastructure.cli.services.kernel.supervisor as mod
-        monkeypatch.setattr(mod, "_SUPERVISOR_CACHE", {})
+        import importlib
 
-        a = get_supervisor(
-            ProgramConfig(name="x", command="/bin/echo", args=())
+        sup_mod = importlib.import_module(
+            "lca.infrastructure.cli.services.kernel.supervisor.supervisor"
         )
-        b = get_supervisor(
-            ProgramConfig(name="y", command="/bin/echo", args=())
-        )
+        monkeypatch.setattr(sup_mod, "_SUPERVISOR_CACHE", {})
+
+        a = get_supervisor(ProgramConfig(name="x", command="/bin/echo", args=()))
+        b = get_supervisor(ProgramConfig(name="y", command="/bin/echo", args=()))
         assert a is not b
 
 
@@ -291,7 +323,8 @@ class TestActionResultBuilders:
 
     def test_build_start_failed(self) -> None:
         cfg = ProgramConfig(
-            name="lca_kernel_dev", command="/bin/echo",
+            name="lca_kernel_dev",
+            command="/bin/echo",
             readiness_timeout=30.0,
         )
         status = _status_fixture(state=ProgramState.STARTING)
@@ -317,7 +350,8 @@ class TestActionResultBuilders:
 
     def test_build_restart_failed(self) -> None:
         cfg = ProgramConfig(
-            name="lca_kernel_dev", command="/bin/echo",
+            name="lca_kernel_dev",
+            command="/bin/echo",
             readiness_timeout=15.0,
         )
         status = _status_fixture(state=ProgramState.STARTING)
@@ -331,7 +365,9 @@ class TestActionResultBuilders:
             ProgramEvent(ts=1.0, kind="spawned", pid=12345, message="hi"),
         ]
         result = build_status_result(
-            cfg, _status_fixture(), events=events,
+            cfg,
+            _status_fixture(),
+            events=events,
         )
         assert result["verdict"] == "ready"
         assert "next_command" not in result
@@ -342,7 +378,10 @@ class TestActionResultBuilders:
         cfg = ProgramConfig(name="lca_kernel_dev", command="/bin/echo")
         status = _status_fixture(state=ProgramState.FATAL)
         result = build_status_result(
-            cfg, status, events=[], is_fatal=True,
+            cfg,
+            status,
+            events=[],
+            is_fatal=True,
         )
         assert result["verdict"] == "failed"
         assert "kernel-supervisor logs" in result["next_command"]
@@ -362,18 +401,20 @@ class TestActionResultBuilders:
         progs = [
             ProgramConfig(name="app_a", command="/bin/echo"),
             ProgramConfig(
-                name="app_b", command="/bin/echo",
+                name="app_b",
+                command="/bin/echo",
                 args=("--port", "8080"),
             ),
         ]
-        result = build_check_config_result("/tmp/sup.conf", progs)
+        result = build_check_config_result("/tmp/sup.conf", progs)  # noqa: S108
         assert result["verdict"] == "ready"
-        assert result["config_path"] == "/tmp/sup.conf"
+        assert result["config_path"] == "/tmp/sup.conf"  # noqa: S108
         assert len(result["programs"]) == 2
 
     def test_build_config_error(self) -> None:
         result = build_config_error_result(
-            "/tmp/bad.conf", ValueError("missing command"),
+            "/tmp/bad.conf",  # noqa: S108
+            ValueError("missing command"),
         )
         assert result["verdict"] == "failed"
         assert "missing command" in result["reason"]
@@ -382,7 +423,9 @@ class TestActionResultBuilders:
     def test_build_command_error_with_orphans(self) -> None:
         cfg = ProgramConfig(name="app", command="/bin/echo")
         result = build_command_error_result(
-            "start", cfg, orphan_pids=[123, 456],
+            "start",
+            cfg,
+            orphan_pids=[123, 456],
             status=_status_fixture(),
         )
         assert result["verdict"] == "failed"
