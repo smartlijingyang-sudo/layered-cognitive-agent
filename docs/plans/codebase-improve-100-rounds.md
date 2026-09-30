@@ -193,3 +193,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat f473a3aec` → 11 files changed, 1544 insertions(+), 1289 deletions(-); gross diff = 2833 > 100.
 - **Tests:** `uv run pytest -q tests/infrastructure/cli/test_supervisor_barrel.py tests/infrastructure/cli/test_kernel_supervisor.py tests/infrastructure/cli/test_kernel_restart_report.py -m "not real_llm" --no-cov` → **46 passed**.
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 19 — 2026-09-30
+
+- **Commit:** `0f31ac638`
+- **Architectural concern:** module depth / oversized module. `lca/nodes/think/decision_repair.py` (600 lines) mixed the plugin carrier, executor, pure schema validation, deterministic argument repair, and routing sentinels.
+- **Change:** split into a `decision_repair/` package: `constants.py` (outcome sentinels), `schema.py` (tool-call JSON-schema matching), `repair.py` (deterministic repair mechanics), `executor.py` (plugin carrier + executor + routing), and an explicit re-export barrel.
+- **Files:** `lca/nodes/think/decision_repair/{__init__,constants,schema,repair,executor}.py` (new), `lca/nodes/think/decision_repair.py` (deleted).
+- **Shortstat:** `git show --shortstat 0f31ac638` → 6 files changed, 620 insertions(+), 600 deletions(-); gross diff = 1220 > 100.
+- **Tests:** `uv run pytest -q tests/think/test_decision_repair_phase_plugin.py tests/observability/health/test_run_health_fold.py tests/observability/health/test_derivers/test_think_deriver.py -m "not real_llm" --no-cov` → **56 passed**.
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
