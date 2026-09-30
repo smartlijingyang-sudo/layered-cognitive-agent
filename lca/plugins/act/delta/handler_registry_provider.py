@@ -7,27 +7,11 @@ state-folding behavior stays local and independently navigable.
 
 from __future__ import annotations
 
-from lca.contracts.protocols.state.delta_handler import DeltaHandler, DeltaHandlerRegistry
-from lca.infrastructure.handler.registry import UniqueOperationRegistry
+from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
+from lca.infrastructure.handler.registry import make_inmemory_registry
 
-
-class InMemoryDeltaHandlerRegistry(UniqueOperationRegistry[DeltaHandler], DeltaHandlerRegistry):
-    """Neutral registry keyed by the Reducer operation name."""
-
-    def __init__(self) -> None:
-        super().__init__("delta handler")
-
-    def register(self, operation: str, handler: DeltaHandler) -> None:
-        """Register the unique owner of a Reducer operation."""
-        self._register(operation, handler)
-
-    def resolve(self, operation: str) -> DeltaHandler | None:
-        """Resolve the handler for a Reducer operation."""
-        return self._resolve(operation)
-
-    def registered_delta_operations(self) -> tuple[str, ...]:
-        """Return a stable snapshot of registered Reducer operations."""
-        return self._registered_operations()
+# Neutral registry keyed by the Reducer operation name; provider installs defaults.
+InMemoryDeltaHandlerRegistry = make_inmemory_registry("delta handler", DeltaHandlerRegistry)
 
 
 def register_default_delta_handlers(registry: DeltaHandlerRegistry) -> None:
@@ -57,7 +41,7 @@ def register_default_delta_handlers(registry: DeltaHandlerRegistry) -> None:
     registry.register("paused", PausedDeltaHandler())
 
 
-class DefaultDeltaHandlerRegistry(InMemoryDeltaHandlerRegistry):
+class DefaultDeltaHandlerRegistry(InMemoryDeltaHandlerRegistry):  # type: ignore[valid-type, misc]
     """Compatibility factory with the provider's default handler set."""
 
     def __init__(self) -> None:

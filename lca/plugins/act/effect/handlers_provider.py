@@ -38,7 +38,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.infrastructure.handler.registry import UniqueOperationRegistry
+from lca.infrastructure.handler.registry import make_inmemory_registry
 
 
 class Config(BaseModel):
@@ -92,27 +92,9 @@ class MemoryUpdateEffectHandler(EffectHandler):
         return {"admitted": True}
 
 
-class InMemoryEffectHandlerRegistry(UniqueOperationRegistry[EffectHandler], EffectHandlerRegistry):
-    """效果处理器接缝的空容器。
-
-    接缝定义只提供容器，明确启用的 Provider 才能注册 handler。同一 operation
-    的第二个所有者会在此失败，避免装配顺序重新定义运行时行为。
-    """
-
-    def __init__(self) -> None:
-        super().__init__("effect handler")
-
-    def register(self, operation: str, handler: EffectHandler) -> None:
-        """注册一个 effect operation 的唯一 handler 所有者。"""
-        self._register(operation, handler)
-
-    def resolve(self, operation: str) -> EffectHandler | None:
-        """解析 effect operation 对应的 handler。"""
-        return self._resolve(operation)
-
-    def registered_effect_operations(self) -> tuple[str, ...]:
-        """返回稳定的已注册 effect operation 快照。"""
-        return self._registered_operations()
+# 效果处理器接缝的空容器：接缝定义只提供容器，明确启用的 Provider 才能注册
+# handler。同一 operation 的第二个所有者会在此失败，避免装配顺序重新定义运行时行为。
+InMemoryEffectHandlerRegistry = make_inmemory_registry("effect handler", EffectHandlerRegistry)
 
 
 def register_default_effect_handlers(registry: EffectHandlerRegistry) -> None:

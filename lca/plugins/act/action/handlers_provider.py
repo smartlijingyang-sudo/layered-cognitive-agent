@@ -31,7 +31,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.infrastructure.handler.registry import UniqueOperationRegistry
+from lca.infrastructure.handler.registry import make_inmemory_registry
 
 
 class Config(BaseModel):
@@ -194,27 +194,9 @@ class HandoffActionHandler(ActionHandler):
         return HandoffOperation(transport_registry)
 
 
-class InMemoryActionHandlerRegistry(UniqueOperationRegistry[ActionHandler], ActionHandlerRegistry):
-    """动作处理器接缝的中性容器。
-
-    默认行为仍由 :func:`register_default_action_handlers` 在 Provider 中安装；
-    共享注册表确保同一个 ActionType 不会被后启动的 Provider 静默覆盖。
-    """
-
-    def __init__(self) -> None:
-        super().__init__("action handler")
-
-    def register(self, action_type: str, handler: ActionHandler) -> None:
-        """注册一个 ActionType 的唯一 handler 所有者。"""
-        self._register(action_type, handler)
-
-    def resolve(self, action_type: str) -> ActionHandler | None:
-        """解析 ActionType 对应的 handler。"""
-        return self._resolve(action_type)
-
-    def registered(self) -> tuple[str, ...]:
-        """返回稳定的已注册 ActionType 快照。"""
-        return self._registered_operations()
+# 动作处理器接缝的中性容器：默认行为仍由 register_default_action_handlers 安装，
+# 共享注册表确保同一个 ActionType 不会被后启动的 Provider 静默覆盖。
+InMemoryActionHandlerRegistry = make_inmemory_registry("action handler", ActionHandlerRegistry)
 
 
 def register_default_action_handlers(
@@ -240,7 +222,7 @@ def register_default_action_handlers(
         registry.register(action_type, handler)
 
 
-class DefaultActionHandlerRegistry(InMemoryActionHandlerRegistry):
+class DefaultActionHandlerRegistry(InMemoryActionHandlerRegistry):  # type: ignore[valid-type, misc]
     """Compatibility factory for a registry populated with built-in handlers.
 
     Production profiles must use ``lca-action-handler-provider`` and inject a
