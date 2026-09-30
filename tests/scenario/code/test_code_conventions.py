@@ -178,9 +178,7 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     "lca/harness/graph/execute/interpreter.py": (
         "ADR-0194 解释边界 shim,延迟导入 PlanInterpreterAdapter"
     ),
-    "lca/loop/driver.py": (
-        "ADR-0075 DeclarativeRuntimeDriver 统一 pause/resume/result 出口"
-    ),
+    "lca/loop/driver.py": ("ADR-0075 DeclarativeRuntimeDriver 统一 pause/resume/result 出口"),
     "lca/infrastructure/observability/journal/engine.py": (
         "RunStore 单模块承载事件索引 + get/get_event/get_blob/find_terminal"
         "（PR2 / PR6 / PR10 集中落地）"
@@ -191,13 +189,9 @@ _LINE_COUNT_EXEMPT: dict[str, str] = {
     "lca/infrastructure/observability/journal/console_projector.py": (
         "ConsoleProjector 单模块承载 console 输出（ADR-0037）"
     ),
-    "lca/infrastructure/observability/diagnostics.py": (
-        "DiagnosePattern 单模块承载 4 个 v3 §24.5 诊断模式"
-        "（model_not_seen / loop_stuck / memory_poisoned / approval_rejected）"
-    ),
     "lca.infrastructure.cli/cli.py": (
         "lca-ops CLI 单模块承载 dev/restart/stop/status/heal/provision"
-        "/diagnose/dump-profile/inspect-tree 全子命令"
+        "/dump-profile/inspect-tree 全子命令"
     ),
     "lca.infrastructure.cli/commands/tools.py": (
         "coding-agent tools CLI 封装（ADR-0065 §六 / PR-9）：9 个只读子命令从旧 cli.py 拆出"

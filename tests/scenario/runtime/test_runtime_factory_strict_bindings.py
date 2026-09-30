@@ -6,10 +6,12 @@ from unittest.mock import MagicMock
 import pytest
 
 from lca.contracts.mechanisms import HookRegistry
+from lca.contracts.models.team.role.team import ToolPermissionManifest
 from lca.contracts.protocols import (
     ArtifactClosure,
     Body,
     Brain,
+    LLMAdapter,
     MemorySystem,
     PerceiveHub,
     StateStore,
@@ -67,6 +69,7 @@ def _production_deps() -> ProductionRuntimeDeps:
         permission_manifest=cast("ToolPermissionManifest", object()),
         reducer=cast("Reducer", DefaultReducer()),
         compiled_plan=cast("CompiledRunPlan", object()),
+        node_executors={},
         phase_capabilities={},
         effect_handler_registry=cast("EffectHandlerRegistry", object()),
         delta_handler_registry=cast("DeltaHandlerRegistry", object()),
@@ -103,7 +106,7 @@ def test_production_factory_closes_runtime_from_explicit_dependencies() -> None:
     assert runtime.bindings.result_finalizer_factory is deps.result_finalizer_factory
     assert runtime.phase_observer is deps.phase_observer
     assert runtime.bindings.plan is deps.compiled_plan
-    assert dict(runtime.node_executors) == {}
+    assert dict(runtime.bindings.node_executors) == {}
 
 
 def test_production_binding_uses_selected_runtime_mechanism_factories() -> None:
@@ -253,7 +256,7 @@ def test_fixture_adapter_preserves_explicit_values_when_completing_defaults() ->
 
     assert completed.reducer is sentinel_reducer
     assert completed.brain is deps.brain
-    assert completed.phase_capabilities["stop_policy"] is completed.stop_policy
+    assert completed.phase_capabilities == deps.phase_capabilities
 
 
 def test_binding_freezes_node_executor_mapping_after_composition() -> None:
@@ -263,3 +266,20 @@ def test_binding_freezes_node_executor_mapping_after_composition() -> None:
     executors["late"] = cast("NodeExecutor", object())
 
     assert "late" not in runtime.bindings.node_executors
+
+
+def test_fixture_adapter_imports_without_stale_loop_guard_seam() -> None:
+    """Fixture adapter must load without the retired declarative loop-guard seam.
+
+    ADR-0221 P3 retired the ``loop_guard_evaluator`` constructor arg from
+    ``DefaultDeclarativeInterpreterFactory``; the fixture must not reference
+    the deleted ``lca.harness.declarative.execute.loop_guard`` module.
+    """
+    import importlib
+    import inspect
+
+    adapter = importlib.import_module("lca.plugins.composer.runtime.fixture.runtime_adapter")
+    assert hasattr(adapter, "FixtureRuntimeAdapter")
+    source = inspect.getsource(adapter)
+    assert "DeclarativeLoopGuardEvaluator" not in source
+    assert "harness.declarative.execute.loop_guard" not in source

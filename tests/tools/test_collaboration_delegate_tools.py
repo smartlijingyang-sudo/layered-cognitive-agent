@@ -94,3 +94,14 @@ async def test_handoff_to_peer_tool_validation():
     err = tool.validate({"objective": "test"})
     assert err is not None
     assert "peer_id" in err
+
+
+def test_delegate_tool_imports_without_stale_roles_fallback() -> None:
+    """delegate_tool 必须直接使用 RoleCardResolver seam，不再引用已删除的 lca.infrastructure.roles。"""
+    import importlib
+    import inspect
+
+    mod = importlib.import_module("lca.infrastructure.tools.collaboration.delegate_tool")
+    source = inspect.getsource(mod)
+    assert "lca.infrastructure.roles" not in source
+    assert "RoleCardResolver" in source

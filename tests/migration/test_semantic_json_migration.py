@@ -159,3 +159,15 @@ def test_dedupe_canonicalizes_singleton_keys(tmp_path) -> None:
 
     records = json.loads((memory_dir / "semantic.json").read_text(encoding="utf-8"))
     assert records[0]["dedupe_key"] == "preference:dependency_control"
+
+
+def test_migration_does_not_import_from_assistant_memory() -> None:
+    """迁移去重必须直接使用 contracts 的 canonical_dedupe_key，不再依赖 assistant_memory 内部实现。"""
+    import inspect
+
+    import lca.infrastructure.memory.migration as migration
+
+    source = inspect.getsource(migration)
+    assert "assistant_memory" not in source
+    assert "_canonical_dedupe_key" not in source
+    assert "_content_fingerprint" not in source

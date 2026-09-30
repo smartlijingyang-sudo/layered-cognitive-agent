@@ -50,8 +50,8 @@ class RuntimeDeps:
     state_store: StateStore
     perceive_hub: PerceiveHub
     llm: LLMAdapter
-    permission_manifest: ToolPermissionManifest | None = None
     phase_capabilities: Mapping[str, object]
+    permission_manifest: ToolPermissionManifest | None = None
     reducer: Reducer | None = None
     compiled_plan: CompiledRunPlan | None = None
     node_executors: Mapping[str, NodeExecutor] = field(default_factory=dict)

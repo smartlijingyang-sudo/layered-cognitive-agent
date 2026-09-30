@@ -19,6 +19,8 @@ from lca.contracts.models.collaboration.peer import HandoffEnvelope
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.protocols import Tool
+from lca.contracts.protocols.assistant.role_resolver import RoleCardResolver
+from lca.infrastructure.tools.assistant.role_card_resolver import FileRoleCardResolver
 
 _logger = logging.getLogger(__name__)
 
@@ -56,9 +58,11 @@ class TeamCastTool(Tool):
         self,
         router: CoordinatorTriageRouter | None = None,
         aggregator: DelegationFoldAggregator | None = None,
+        role_cards: RoleCardResolver | None = None,
     ) -> None:
         self._router = router or CoordinatorTriageRouter()
         self._aggregator = aggregator or DelegationFoldAggregator()
+        self._role_cards = role_cards or FileRoleCardResolver()
 
     def validate(self, args: dict[str, Any]) -> str | None:
         objective = args.get("objective")
@@ -85,26 +89,19 @@ class TeamCastTool(Tool):
 
         # 2. 模拟/调度专家沙箱执行（隔离工具长日志，Hermes 隔离）
         simulated_receipts: dict[str, str] = {}
+        available_roles = set(self._role_cards.list_available())
         for peer_id in decision.selected_peers:
             role_slug = peer_id.split("/")[-1]
             display_name = role_slug
             duty_info = ""
-            try:
-                from lca.infrastructure.roles.file_library import FileRoleLibrary
-
-                library = FileRoleLibrary()
-                card = library.get_role(role_slug)
-                if card:
-                    display_name = card.name or role_slug
-                    tagline = card.tagline or card.description
-                    if tagline:
-                        duty_info = f"（{tagline}）"
-            except Exception as exc:
-                _logger.debug("Failed to resolve dynamic role card for %s: %s", role_slug, exc)
+            if peer_id in available_roles:
+                card = self._role_cards.resolve(peer_id)
+                display_name = card.title or role_slug
+                if card.summary:
+                    duty_info = f"（{card.summary}）"
 
             simulated_receipts[peer_id] = (
-                f"{display_name}{duty_info}：领域规则与不变量核验通过，"
-                f"方案符合工程规范与质量标准。"
+                f"{display_name}{duty_info}：领域规则与不变量核验通过，方案符合工程规范与质量标准。"
             )
 
         # 3. 终态强制 Fold 聚合

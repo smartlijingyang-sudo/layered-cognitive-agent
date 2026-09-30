@@ -21,7 +21,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
@@ -39,6 +38,7 @@ from lca.infrastructure.memory.curated_projection import (
     contains_secret,
     render_curated_markdown,
 )
+from lca.infrastructure.memory.fingerprint import content_fingerprint
 from lca.infrastructure.memory.retrieval.scoring import (
     apply_token_budget,
     is_expired,
@@ -53,14 +53,6 @@ _MAX_EPISODIC_RECORDS = 50
 _ProfileBackfillCallback = Callable[[str, list[MemoryRecord]], Awaitable[None]]
 
 __all__ = ["AssistantMemory"]
-
-
-def _canonical_dedupe_key(dedupe_key: str | None, category: str | None = None) -> str | None:
-    """通用规范化 dedupe_key（去除空白、转小写、连字符转下划线、补全 category 命名空间）。
-
-    保证同语义事实的幂等键格式一致（ADR-0247 §3.3），保持领域无关，不硬编码具体业务实体。
-    """
-    return canonical_dedupe_key(dedupe_key, category)
 
 
 class AssistantMemory(MemorySystem):
@@ -345,7 +337,7 @@ class AssistantMemory(MemorySystem):
             confidence_value = float(confidence) if confidence is not None else None
         except (TypeError, ValueError):
             confidence_value = None
-        dedupe_key_value = _canonical_dedupe_key(
+        dedupe_key_value = canonical_dedupe_key(
             str(dedupe_key).strip() if dedupe_key else None, category=category_value
         )
 
@@ -367,12 +359,12 @@ class AssistantMemory(MemorySystem):
 
         # 2) 同 category + 内容指纹：跨写入路径（memory_add vs 自动提取）去重。
         if superseded_id is None:
-            fingerprint = _content_fingerprint(content)
+            fingerprint = content_fingerprint(content)
             if fingerprint:
                 for entry in records:
                     if entry.get("category") != category_value or entry.get("deleted", False):
                         continue
-                    if _content_fingerprint(str(entry.get("content") or "")) == fingerprint:
+                    if content_fingerprint(str(entry.get("content") or "")) == fingerprint:
                         _retire(entry)
 
         records.append(
@@ -561,42 +553,3 @@ def _as_category(value: object) -> MemoryCategory:
         return MemoryCategory(str(value)) if value else MemoryCategory.FACT
     except ValueError:
         return MemoryCategory.FACT
-
-
-# 内容指纹前缀标签：这些标签后的剩余部分是事实核心，跨路径去重时忽略。
-_FINGERPRINT_LABELS: frozenset[str] = frozenset(
-    {
-        "用户身份",
-        "用户偏好",
-        "用户称呼偏好",
-        "称呼偏好",
-        "称呼",
-        "身份",
-        "偏好",
-        "事实",
-    }
-)
-
-# 称呼类变体：不同措辞表达同一语义（叫他X / 叫我X / 称呼用户为X / 希望被称呼为X），
-# 归一到 ``称呼X``，让跨写入路径（memory_add vs 自动提取）能收敛。
-_ADDRESS_VARIANTS_RE = re.compile(r"^(?:叫他|叫我|称呼用户为|希望被称呼为|称呼我为|称呼为)")
-
-
-def _content_fingerprint(content: str) -> str:
-    """结构化事实的内容指纹：去引号、去常见标签前缀、称呼变体归一、去空白。
-
-    用于 store 边界的内容级幂等（ADR-0247 回归）。例如：
-    - ``称呼偏好：称呼用户为"老板"`` 与 ``用户偏好：称呼用户为老板``
-      都收敛为 ``称呼老板``。
-    - ``用户称呼偏好：叫他「老板」`` 与 ``用户偏好：希望被称呼为老板``
-      都收敛为 ``称呼老板``。
-    """
-    normalized = content
-    for ch in "\"'「」『』“”‘’":
-        normalized = normalized.replace(ch, "")
-    if "：" in normalized:
-        label, _, rest = normalized.partition("：")
-        if label.strip() in _FINGERPRINT_LABELS:
-            normalized = rest
-    normalized = _ADDRESS_VARIANTS_RE.sub("称呼", normalized)
-    return "".join(normalized.split())

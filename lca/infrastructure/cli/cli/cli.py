@@ -32,7 +32,6 @@ from lca.infrastructure.cli.commands import (
     composio,
     creator_plan,
     declarative,
-    diagnostics,
     driver_debug,
     e2e,
     events_delivery,
@@ -55,6 +54,7 @@ from lca.infrastructure.cli.commands import (
     typecheck,
     workflow,
 )
+from lca.infrastructure.cli.commands.kernel import supervisor as kernel_supervisor_mod
 from lca.infrastructure.cli.guide.guide import GUIDE
 
 app = typer.Typer(
@@ -77,10 +77,21 @@ def _root(ctx: typer.Context) -> None:
 # Register all command groups (skip retired composition/declarative-graph
 # modules that fail to import under ADR-0221 P3).
 for _cmd in (
-    workflow, services, journal, runs, assistants, e2e,
-    tools, driver_debug, profile_inspect, diagnostics,
-    events_delivery, package_organization, audit,
-    creator_plan, composio, declarative,
+    workflow,
+    services,
+    journal,
+    runs,
+    assistants,
+    e2e,
+    tools,
+    driver_debug,
+    profile_inspect,
+    events_delivery,
+    package_organization,
+    audit,
+    creator_plan,
+    composio,
+    declarative,
 ):
     if _cmd is not None:
         _cmd.register(app)
@@ -96,7 +107,7 @@ journal_exceptions.register(_journal_group)
 journal_step.register(_journal_group)
 journal_session.register(_journal_group)
 kernel.register(app)
-from lca.infrastructure.cli.commands.kernel import supervisor as kernel_supervisor_mod
+
 kernel_supervisor_mod.register(app)
 notes.register(app)
 memory.register(app)

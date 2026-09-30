@@ -28,7 +28,6 @@ from lca.contracts.protocols.runtime.runtime.composition import (
 from lca.contracts.protocols.session.resume.input import ResumeInputAdapter
 from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
 from lca.contracts.protocols.state.plan import CompiledRunPlan
-from lca.harness.declarative.execute.loop_guard import DeclarativeLoopGuardEvaluator
 from lca.plugins.composer.runtime.fixture import runtime_defaults as fixture_runtime_defaults
 from lca.plugins.composer.runtime.fixture.runtime_input import RuntimeDeps
 from lca.plugins.composer.runtime.runtime.deps import ProductionRuntimeDeps
@@ -74,7 +73,7 @@ class FixtureRuntimeAdapter:
             delta_reducer_factory=self._deps.delta_reducer_factory or RegistryDeltaReducerFactory(),
             journal_factory=self._deps.journal_factory or ObservabilityRuntimeJournalFactory(),
             interpreter_factory=self._deps.interpreter_factory
-            or DefaultDeclarativeInterpreterFactory(DeclarativeLoopGuardEvaluator()),
+            or DefaultDeclarativeInterpreterFactory(),
             checkpoint_state_resolver_factory=self._deps.checkpoint_state_resolver_factory
             or DefaultCheckpointStateResolverFactory(),
             result_finalizer_factory=self._deps.result_finalizer_factory

@@ -74,10 +74,8 @@ def dedupe_semantic_memory(home_path: str | Path) -> int:
     再次最新 created_at_ms），其余标记 ``deleted=True`` + ``superseded_reason="deduped"``。
     同时把保留记录的 ``dedupe_key`` 重写为 canonical key，防止复发。
     """
-    from lca.infrastructure.memory.assistant_memory import (
-        _canonical_dedupe_key,
-        _content_fingerprint,
-    )
+    from lca.contracts.models.memory.episode import canonical_dedupe_key
+    from lca.infrastructure.memory.fingerprint import content_fingerprint
 
     home = Path(home_path)
     path = home / "memory" / "semantic.json"
@@ -96,7 +94,7 @@ def dedupe_semantic_memory(home_path: str | Path) -> int:
     # 先把所有活跃记录的 dedupe_key 重写为 canonical key，防止未来写入复发。
     key_rewritten = False
     for entry in active:
-        canonical = _canonical_dedupe_key(
+        canonical = canonical_dedupe_key(
             str(entry.get("dedupe_key") or "").strip() or None,
             category=str(entry.get("category") or ""),
         )
@@ -105,13 +103,13 @@ def dedupe_semantic_memory(home_path: str | Path) -> int:
             key_rewritten = True
 
     def _group_key(entry: dict[str, object]) -> tuple[object, ...]:
-        canonical = _canonical_dedupe_key(
+        canonical = canonical_dedupe_key(
             str(entry.get("dedupe_key") or "").strip() or None,
             category=str(entry.get("category") or ""),
         )
         if canonical:
             return (entry.get("category"), canonical)
-        return (entry.get("category"), _content_fingerprint(str(entry.get("content") or "")))
+        return (entry.get("category"), content_fingerprint(str(entry.get("content") or "")))
 
     def _authority(entry: dict[str, object]) -> tuple[int, float, int]:
         source = str(entry.get("source") or "model")
@@ -131,7 +129,7 @@ def dedupe_semantic_memory(home_path: str | Path) -> int:
             continue
         group.sort(key=_authority, reverse=True)
         keeper = group[0]
-        canonical = _canonical_dedupe_key(
+        canonical = canonical_dedupe_key(
             str(keeper.get("dedupe_key") or "").strip() or None,
             category=str(keeper.get("category") or ""),
         )
