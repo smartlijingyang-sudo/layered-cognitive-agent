@@ -113,3 +113,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat 43f76e975` → 36 files changed, 166 insertions(+), 103 deletions(-); gross diff = 269 > 100.
 - **Tests:** `uv run pytest -q tests/architecture/test_no_shallow_reexport_shells.py tests/scenario/delegation/test_delegation_cache.py tests/scenario/sandbox_1/test_sandbox_paths.py tests/scenario/sandbox_1/test_sandbox_resolver.py -m "not real_llm" --no-cov` → **20 passed**; the two `tests/plugins/events/publishers/test_delegation_cache.py` failures are pre-existing at base `9bc0ce68b`.
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 11 — 2026-09-30
+
+- **Commit:** `d5c0a9a63` (cherry-picked from subagent branch `round-b` commit `9bd7173a1`)
+- **Architectural concern:** stale indirection / dead references / module depth. The empty `_canonical_dedupe_key` wrapper and migration's private-import kept a stale indirection alive; three modules referenced deleted code (`loop_guard`, `lca.infrastructure.roles`, `observability.diagnostics`).
+- **Change:** deleted the wrapper; extracted `lca/infrastructure/memory/fingerprint.py` (`content_fingerprint`) shared by assistant_memory and migration; fixed `runtime_adapter.py` (retired loop-guard arg + field ordering), `delegate_tool.py` (inject `FileRoleCardResolver` via the `RoleCardResolver` contract), removed the dead `lca-ops diagnose` CLI command and its tests.
+- **Files:** 17 files (2 new, 3 deleted modules, 3 deleted test files, importer/test updates).
+- **Shortstat:** `git show --shortstat d5c0a9a63` → 17 files changed, 178 insertions(+), 592 deletions(-); gross diff = 770 > 100.
+- **Tests:** `uv run pytest -q tests/infrastructure/cli/test_cli_imports_clean.py tests/scenario/runtime/test_runtime_factory_strict_bindings.py tests/tools/test_collaboration_delegate_tools.py tests/migration/test_semantic_json_migration.py tests/plugins/assistant/test_assistant_memory.py tests/plugins/assistant/test_assistant_memory_relevance.py tests/plugins/assistant/test_profile_backfill.py tests/infrastructure/memory/retrieval/test_scoring.py -m "not real_llm" --no-cov` → **63 passed**.
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
