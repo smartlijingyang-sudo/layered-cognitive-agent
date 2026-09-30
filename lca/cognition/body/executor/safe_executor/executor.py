@@ -1,8 +1,10 @@
-"""SafeExecutor — permission → validate → ToolStarted → cache → retry → execute → ToolInvoked.
+"""Executor pipeline — permission → validate → ToolStarted → cache → retry → execute → ToolInvoked.
 
-ADR-0101 PR-2:tool 事件回归事实账本。``arguments`` / ``output`` 经
-``EvidenceStore.prepare()`` 落到 evidence/<sha256>.json;``files`` 仍
-作为 typed 字段(metadata-only,不截断)。
+``SimpleSafeExecutor`` is the L1 safe boundary for tool calls: permission
+checks, argument validation, journal commitment (ToolStarted / ToolInvoked /
+ToolDenied / step.tool_call / step.tool_result), sandbox boundary
+instrumentation, and the retry/cache loop. Evidence staging helpers live in
+``evidence``; the retry policy lives in ``retry``.
 """
 
 from __future__ import annotations
@@ -15,14 +17,29 @@ from typing import Any, Literal
 import structlog
 
 from lca.cognition.body.emit._args_summary import summarize_args
-from lca.cognition.body.internal._retry_classification import (
-    _DETERMINISTIC_EXCEPTIONS,
+from lca.cognition.body.emit.tool_journal import (
+    prepare_tool_invoked,
+    prepare_tool_started,
+    record_tool_invoked_diagnostic,
+    record_tool_started_diagnostic,
+)
+from lca.cognition.body.executor.safe_executor.evidence import (
+    _delta_summary_from_obs,
+    _elapsed_ms,
+    _extract_files_created,
+    _extract_stderr,
+    _extract_stdout_chars_total,
+    _extract_stdout_head,
+)
+from lca.cognition.body.executor.safe_executor.retry import (
+    classify_failure_kind,
+    is_retryable_failure,
+    next_backoff_delay,
 )
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.atoms.semantic.keys import (
     FAILURE_KIND,
     FAILURE_KIND_EXECUTION,
-    FAILURE_KIND_TRANSIENT,
     FAILURE_KIND_VALIDATION,
 )
 from lca.contracts.models.core.execution.decision import Observation
@@ -34,122 +51,6 @@ from lca.infrastructure.session.bindings import await_tool_side_effect_checkpoin
 from lca.infrastructure.tools.tool.invocation_scope import tool_invocation_scope
 
 _log = structlog.get_logger("lca.safe_executor")
-
-_PERF_COUNTER_SCALE = 1000
-
-
-def _elapsed_ms(started: float) -> int:
-    return int((time.perf_counter() - started) * _PERF_COUNTER_SCALE)
-
-
-# Single SSOT for body-layer stdout-shaped keys. Kept in sync with the
-# convergence layer's ``_STDOUT_KEYS`` in
-# ``lca/cognition/convergence/payload.py``. Any new stdout-shaped payload
-# key must be added to both lists. delete-when: pipeline_safe_executor is
-# folded into safe_executor (single owner of the contract).
-_STDOUT_KEYS = ("output", "stdout", "content", "text")
-
-# Body-layer SSOT for harvested-file keys and entry shape, kept in sync with
-# the convergence layer's ``_FILE_KEYS`` / ``_file_names`` for the same reason
-# and under the same delete-when as ``_STDOUT_KEYS`` above.
-_FILE_KEYS = ("files_created", "files")
-
-
-def _file_names(value: Any) -> tuple[str, ...]:
-    """Normalize harvested file entries to names.
-
-    The sandbox harvest carries A2A file metadata dicts (``name`` / ``url`` /
-    ``mimeType``; see ``infrastructure/tools/sandbox/observation.py``), while
-    writeFile-shaped producers carry plain name strings. Stringifying a dict
-    entry would surface its repr as a filename.
-    """
-    if not isinstance(value, (list, tuple)):
-        return ()
-    names: list[str] = []
-    for item in value:
-        name = str(item.get("name") or "") if isinstance(item, dict) else str(item or "")
-        if name:
-            names.append(name)
-    return tuple(names)
-
-
-def _extract_stdout_head(observation: Any, *, limit: int = 2000) -> str:
-    """从 Observation.payload 抽 stdout-like 文本;空 observation 返回空串。"""
-    payload = getattr(observation, "payload", None)
-    if not isinstance(payload, dict):
-        return ""
-    for key in _STDOUT_KEYS:
-        value = payload.get(key)
-        if isinstance(value, str):
-            return value[:limit]
-    return ""
-
-
-def _extract_stdout_chars_total(observation: Any) -> int:
-    """真实 stdout 字符数,优先取 ``output`` / ``stdout`` / ``content`` / ``text`` 第一个非空 str。
-
-    Returns 0 when observation 无 stdout-like 文本;用于填入
-    ``step.tool_result.record.stdout_chars_total``,让 critic / LLM context
-    看到真实产出长度(避免被 ``stdout_head`` 摘要误判为空)。
-    """
-    payload = getattr(observation, "payload", None)
-    if not isinstance(payload, dict):
-        return 0
-    for key in _STDOUT_KEYS:
-        value = payload.get(key)
-        if isinstance(value, str):
-            return len(value)
-    return 0
-
-
-def _extract_stderr(observation: Any, *, limit: int = 2000) -> str:
-    """从 Observation.payload 抽 stderr;空 observation 返回空串。"""
-    payload = getattr(observation, "payload", None)
-    if not isinstance(payload, dict):
-        return ""
-    value = payload.get("stderr")
-    if isinstance(value, str):
-        return value[:limit]
-    return ""
-
-
-def _extract_files_created(observation: Any) -> tuple[str, ...]:
-    """从 Observation 抽产出文件名;失败兜底空 tuple。
-
-    ``extra`` 先于 ``payload``:sandbox harvest 两处写同一份 file_parts
-    (``infrastructure/tools/sandbox/exec_observation.py``)。
-    """
-    for container in (getattr(observation, "extra", None), getattr(observation, "payload", None)):
-        if not isinstance(container, dict):
-            continue
-        for key in _FILE_KEYS:
-            names = _file_names(container.get(key))
-            if names:
-                return names
-    return ()
-
-
-def _delta_summary_from_obs(observation: Any, *, limit: int = 200) -> str:
-    """从 Observation 生成 step.tool_result.delta_summary(< 200 字符人话)。"""
-    if not getattr(observation, "success", True):
-        err = getattr(observation, "error", None) or "unknown"
-        return f"❌ {type(err).__name__}: {err}"[:limit]
-    files = _extract_files_created(observation)
-    if files:
-        names = ", ".join(files[:3])
-        return f"✅ 写出 {len(files)} 个文件: {names}"[:limit]
-    stdout = _extract_stdout_head(observation, limit=80)
-    if stdout:
-        return f"✅ stdout[:80] = {stdout.replace(chr(10), '⏎')}"[:limit]
-    return "✅ ok"
-
-
-from lca.cognition.body.emit.tool_journal import (  # noqa: E402
-    prepare_tool_invoked,
-    prepare_tool_started,
-    record_tool_invoked_diagnostic,
-    record_tool_started_diagnostic,
-)
 
 
 def _commit_tool_denied(tool: Tool, reason: str) -> None:
@@ -462,7 +363,7 @@ class SimpleSafeExecutor(SafeExecutor):
             # retried at the infrastructure level.  Execution errors (code bugs, bad
             # input) are deterministic — retrying with the same args is pointless.
             # The agent's ReAct loop handles correction via critic feedback.
-            if failure_kind != FAILURE_KIND_TRANSIENT:
+            if not is_retryable_failure(obs):
                 self._record_invoked(
                     tool,
                     args,
@@ -488,7 +389,7 @@ class SimpleSafeExecutor(SafeExecutor):
                     reason=last_error or str(failure_kind or "transient"),
                 )
                 await asyncio.sleep(delay)
-                delay *= retry_policy.backoff_multiplier
+                delay = next_backoff_delay(delay, retry_policy)
 
         if last_obs is not None:
             self._record_invoked(
@@ -576,11 +477,7 @@ class SimpleSafeExecutor(SafeExecutor):
             )
             # Deterministic errors (code bugs, bad input) will never succeed
             # on retry — fail fast so the agent's ReAct loop can correct.
-            failure_kind = (
-                FAILURE_KIND_EXECUTION
-                if isinstance(err, _DETERMINISTIC_EXCEPTIONS)
-                else FAILURE_KIND_TRANSIENT
-            )
+            failure_kind = classify_failure_kind(err)
             observation = Observation(
                 observation_id=new_id("obs"),
                 success=False,
