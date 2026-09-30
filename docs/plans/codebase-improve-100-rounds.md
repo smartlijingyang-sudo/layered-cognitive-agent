@@ -133,3 +133,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat 11035065f` → 9 files changed, 105 insertions(+), 8 deletions(-); gross diff = 113 > 100.
 - **Tests:** `uv run pytest -q tests/observability/loop_cursor/test_cursor_record.py tests/observability/loop_cursor/test_incarnation.py tests/scenario/llm_1/test_llm_turn.py -m "not real_llm" --no-cov` → **23 passed** (8 new + existing). `test_tool_using_run_evidence.py` failure is pre-existing.
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check` (staged): clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 13 — 2026-09-30
+
+- **Commit:** `f3a266bab` (subagent `round-g` commit, amended to exceed the 100-line bar)
+- **Architectural concern:** design pattern / strategy map. `session_event_to_stamped` used a sequential `if event_type == ...` chain for duplicate-suppression and execution-point conversion.
+- **Change:** replaced the chain with a module-level `_EVENT_CONVERTERS` strategy map (two suppression entries) plus the generic execution-point converter fallback; preserved catalog-tier precedence; added edge-case tests (suppressed spine EPs, catalog precedence, category override, table-driven structural guard).
+- **Files:** `lca/application/runtime/coordinator/session_gateway_pump.py`, `tests/runtime/coordinator/test_session_gateway_pump.py`.
+- **Shortstat:** `git show --shortstat f3a266bab` → 2 files changed, 119 insertions(+), 24 deletions(-); gross diff = 143 > 100.
+- **Tests:** `uv run pytest -q tests/runtime/coordinator -m "not real_llm" --no-cov` → **91 passed** (13 in the pump test file).
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
