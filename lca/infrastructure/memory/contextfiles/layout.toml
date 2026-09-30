@@ -3,6 +3,8 @@
 standing_files = ["SOUL.md", "USER.md", "MEMORY.md", "AGENTS.md", "TOOLS.md"]
 people_dir = "memory/people"
 people_index = "INDEX.md"
+groups_dir = "memory/groups"
+groups_index = "INDEX.md"
 live_note = "常驻文件是磁盘上的实时副本，分歧以最新文件为准。"
 home_override = "memory/contextfiles.toml"
 backstory_budget_chars = 3000

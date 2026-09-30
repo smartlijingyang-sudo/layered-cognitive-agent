@@ -36,6 +36,14 @@ class PersonRecorded(MemoryDomainEvent):
 
 
 @dataclass(frozen=True, slots=True)
+class GroupRecorded(MemoryDomainEvent):
+    """A group page was written and the index was refreshed."""
+
+    slug: str
+    name: str
+
+
+@dataclass(frozen=True, slots=True)
 class StandingChanged(MemoryDomainEvent):
     """One standing file differs from the cursor's previous copy."""
 
@@ -78,6 +86,7 @@ class InProcessEventPublisher(DomainEventPublisher):
 
 
 __all__ = [
+    "GroupRecorded",
     "InProcessEventPublisher",
     "MemoryDomainEvent",
     "PersonRecorded",

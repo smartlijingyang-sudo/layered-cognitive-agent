@@ -20,8 +20,9 @@ from lca.infrastructure.memory.contextfiles.domain.layout import (
 from lca.infrastructure.memory.contextfiles.domain.standing import render_injected
 from lca.infrastructure.memory.contextfiles.service.assembly import refresh_standing_backstory
 from lca.infrastructure.memory.contextfiles.service.compaction import preserve_standing_sections
+from lca.infrastructure.memory.contextfiles.service.groups import GroupsDirectory
 from lca.infrastructure.memory.contextfiles.service.people import PeopleDirectory
-from lca.infrastructure.tools.assistant.memory_tools import PersonNoteTool
+from lca.infrastructure.tools.assistant.memory_tools import GroupNoteTool, PersonNoteTool
 from lca.plugins.assistant.persona.persona import persona_from_home
 
 _REPO = Path(__file__).resolve().parents[3]
@@ -42,6 +43,7 @@ def test_python_sources_do_not_own_the_layout_names() -> None:
     root = _REPO / "lca" / "infrastructure" / "memory" / "contextfiles"
     standing = (root / "domain" / "standing.py").read_text(encoding="utf-8")
     people = (root / "service" / "people.py").read_text(encoding="utf-8")
+    groups = (root / "service" / "groups.py").read_text(encoding="utf-8")
     assembly = (root / "service" / "assembly.py").read_text(encoding="utf-8")
     persona = (_REPO / "lca" / "plugins" / "assistant" / "persona" / "persona.py").read_text(
         encoding="utf-8"
@@ -52,11 +54,14 @@ def test_python_sources_do_not_own_the_layout_names() -> None:
     assert "SOUL.md" not in standing
     assert "memory/people" not in people
     assert "INDEX.md" not in people
+    assert "memory/groups" not in groups
+    assert "INDEX.md" not in groups
     assert "AGENTS.md" not in assembly
     assert "3000" not in assembly
     assert "SOUL.md" not in persona
     assert "3000" not in persona
     assert "memory/people" not in tools
+    assert "memory/groups" not in tools
 
 
 def test_read_layout_rejects_a_parent_segment() -> None:
@@ -66,6 +71,9 @@ def test_read_layout_rejects_a_parent_segment() -> None:
     broken = text.replace('people_dir = "memory/people"', 'people_dir = "../outside"')
     with pytest.raises(ValueError):
         read_layout(broken)
+    broken_groups = text.replace('groups_dir = "memory/groups"', 'groups_dir = "../outside"')
+    with pytest.raises(ValueError):
+        read_layout(broken_groups)
 
 
 def test_merge_rejects_unknown_keys() -> None:
@@ -83,6 +91,36 @@ def test_home_overlay_moves_people_and_the_tool_follows(tmp_path: Path) -> None:
     assert "住在杭州" in page.read_text(encoding="utf-8")
     assert "李雷" in index.read_text(encoding="utf-8")
     assert not (home / "memory" / "people").exists()
+    assert layout_for_home(home).groups_dir == "memory/groups"
+
+
+def test_home_overlay_moves_groups(tmp_path: Path) -> None:
+    home = tmp_path / "asst"
+    _overlay(home, 'groups_dir = "notes/groups"\ngroups_index = "CATALOG.md"\n')
+    directory = GroupsDirectory(DiskFileStore(home), layout=layout_for_home(home))
+    directory.upsert("设计组", "每周三同步")
+    page = home / "notes" / "groups" / "设计组.md"
+    index = home / "notes" / "groups" / "CATALOG.md"
+    assert "每周三同步" in page.read_text(encoding="utf-8")
+    assert "设计组" in index.read_text(encoding="utf-8")
+    assert not (home / "memory" / "groups").exists()
+    assert layout_for_home(home).people_dir == "memory/people"
+
+
+@pytest.mark.asyncio
+async def test_group_note_tool_uses_the_home_overlay(tmp_path: Path) -> None:
+    home = tmp_path / "asst"
+    _overlay(home, 'groups_dir = "notes/groups"\n')
+    observation = await GroupNoteTool(memory=AssistantMemory(home)).execute(
+        {"name": "设计组", "note": "每周三同步"}
+    )
+    assert observation.success is True
+    assert observation.payload == {
+        "slug": "设计组",
+        "name": "设计组",
+        "path": "notes/groups/设计组.md",
+    }
+    assert (home / "notes" / "groups" / "设计组.md").is_file()
 
 
 @pytest.mark.asyncio

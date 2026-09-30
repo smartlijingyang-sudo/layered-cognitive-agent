@@ -23,6 +23,8 @@ _FIELDS = (
     "standing_files",
     "people_dir",
     "people_index",
+    "groups_dir",
+    "groups_index",
     "live_note",
     "home_override",
     "backstory_budget_chars",
@@ -39,6 +41,8 @@ class ContextLayout:
     standing_files: tuple[str, ...]
     people_dir: str
     people_index: str
+    groups_dir: str
+    groups_index: str
     live_note: str
     home_override: str
     backstory_budget_chars: int
@@ -56,6 +60,17 @@ class ContextLayout:
         """Relative path of the people index."""
 
         return f"{self.people_dir}/{self.people_index}"
+
+    def group_page_path(self, slug: str) -> str:
+        """Relative path of one group page."""
+
+        return f"{self.groups_dir}/{slug}.md"
+
+    @property
+    def groups_index_path(self) -> str:
+        """Relative path of the groups index."""
+
+        return f"{self.groups_dir}/{self.groups_index}"
 
 
 def read_layout(text: str) -> ContextLayout:
@@ -123,6 +138,8 @@ def _from_mapping(data: dict[str, object]) -> ContextLayout:
         standing_files=names,
         people_dir=_relative(data["people_dir"], key="people_dir"),
         people_index=_relative(data["people_index"], key="people_index", single_segment=True),
+        groups_dir=_relative(data["groups_dir"], key="groups_dir"),
+        groups_index=_relative(data["groups_index"], key="groups_index", single_segment=True),
         live_note=_line(data["live_note"], key="live_note"),
         home_override=_relative(data["home_override"], key="home_override"),
         backstory_budget_chars=_positive_int(

@@ -32,7 +32,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from lca.cognition.brain.llm_turn.response_projection import project_llm_response
-from lca.cognition.memory.acknowledgement import guard_memory_claim
+from lca.cognition.memory.acknowledgement import guard_reply
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.ids.ids import new_id
@@ -61,7 +61,6 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.infrastructure.memory.contextfiles.domain.curated import may_acknowledge_projection
 
 if TYPE_CHECKING:
     from lca.contracts.models.core.conversation.llm import LLMResponse
@@ -109,25 +108,14 @@ class DecisionParseExecutor:
 
 
 def _guard_acknowledgement(*, context: NodeContext, text: str | None) -> str | None:
-    """Drop a user-visible "remembered" claim unless the write receipt allows it.
+    """Allow a user-visible "remembered" claim only from an unspent successful write.
 
-    ``memory_receipt`` travels on the runtime carrier when a memory write
-    finished before this turn's reply. When it is absent the original text
-    passes through unchanged so unrelated calls keep working. When it is
-    present but the projection did not commit, the claim is replaced.
+    Assistant memory holds one unspent successful projection at a time. A
+    claiming reply spends it; a non-claiming reply does not. With no assistant
+    memory and no injected receipt the original text is unchanged. An injected
+    receipt still follows ``may_acknowledge`` and is not spent.
     """
-    if text is None or text == "":
-        return text
-    runtime = getattr(context, "runtime", None)
-    receipt = getattr(runtime, "memory_receipt", None)
-    if receipt is None and runtime is not None and hasattr(runtime, "get"):
-        receipt = runtime.get("memory_receipt")
-    if receipt is None:
-        return text
-    allowed = getattr(receipt, "may_acknowledge", None)
-    if allowed is None:
-        allowed = may_acknowledge_projection(receipt)
-    return guard_memory_claim(text, allowed=bool(allowed))
+    return guard_reply(text, getattr(context, "runtime", None))
 
 
 def _resolve_port(name: str, *, input: NodeInput, context: NodeContext) -> Any:

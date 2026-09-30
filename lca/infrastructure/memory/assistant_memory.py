@@ -38,6 +38,7 @@ from lca.infrastructure.memory.contextfiles.domain.curated import (
     CuratedClaim,
     CuratedProjectionReceipt,
     contains_secret,
+    may_acknowledge_projection,
     render_curated_markdown,
 )
 from lca.infrastructure.memory.contextfiles.domain.explain import (
@@ -90,7 +91,23 @@ class AssistantMemory(MemorySystem):
         self._root.mkdir(parents=True, exist_ok=True)
         self._profile_backfill = profile_backfill
         self._event_publisher = event_publisher
-        self.last_curated_receipt: CuratedProjectionReceipt | None = None
+        self._last_curated_receipt: CuratedProjectionReceipt | None = None
+        self._open_claim: CuratedProjectionReceipt | None = None
+
+    @property
+    def last_curated_receipt(self) -> CuratedProjectionReceipt | None:
+        return self._last_curated_receipt
+
+    @last_curated_receipt.setter
+    def last_curated_receipt(self, receipt: CuratedProjectionReceipt | None) -> None:
+        # Receipt is write evidence; _open_claim is the one unused acknowledgement.
+        self._last_curated_receipt = receipt
+        self._open_claim = receipt if may_acknowledge_projection(receipt) else None
+
+    def take_claim_right(self) -> CuratedProjectionReceipt | None:
+        receipt = self._open_claim
+        self._open_claim = None
+        return receipt
 
     @property
     def home_path(self) -> Path:

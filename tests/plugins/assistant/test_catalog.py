@@ -7,6 +7,7 @@
 - list:扫 ``{assistants_root}/*/manifest.json``;digest 不一致的不列
 - manifest schema_version=1 + 8 个配置面 digest 字段
 - 记忆面(MEMORY.md / memory/)不在 digest 列(I-A13)
+- 工具备忘 TOOLS.md 创建时写入，不进 digest
 - assistant.created EP payload 必含 4 件套
 - plugin Manifest:provides=assistant.catalog / requires=event.bus / layer=L4 /
   effects=FILESYSTEM / test_suite 字符串对齐
@@ -39,6 +40,7 @@ from lca.harness.plugin.manifest import EffectClass
 from lca.harness.plugin_api import definition_from_plugin
 from lca.plugins.assistant.events._events import AssistantCreatedEventPayload
 from lca.plugins.assistant.home._home_layout import CONFIG_FACE_FILES, SCHEMA_VERSION
+from lca.plugins.assistant.persona.persona import persona_from_home
 from lca.plugins.domain.assistant.catalog.plugin import (
     AssistantCatalogError,
     AssistantCatalogImpl,
@@ -124,6 +126,23 @@ class TestCreate:
         """PR-3 不创建 MEMORY.md(记忆面是 PR-4 memory seam 工作);I-A13。"""
         handle = catalog.create(request_default)
         assert not (Path(handle.home_path) / "MEMORY.md").exists()
+
+    def test_create_writes_tools_md_outside_the_digest(
+        self,
+        catalog: AssistantCatalogImpl,
+        request_default: CreateAssistantRequest,
+    ) -> None:
+        handle = catalog.create(request_default)
+        home = Path(handle.home_path)
+        text = (home / "TOOLS.md").read_text(encoding="utf-8")
+        assert "主机映射" in text
+        assert "主机映射" in persona_from_home(str(home)).backstory
+        manifest = json.loads((home / "manifest.json").read_text(encoding="utf-8"))
+        assert "TOOLS.md" not in manifest["digests"]
+        assert "MEMORY.md" not in manifest["digests"]
+        (home / "TOOLS.md").write_text("主机别名：dev\n", encoding="utf-8")
+        spec = catalog.get(handle.assistant_id)
+        assert spec.assistant_id == handle.assistant_id
 
     def test_create_seed_user_md_overrides_default(
         self,

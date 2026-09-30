@@ -386,11 +386,18 @@ def test_runtime_view_exposes_memory_receipt_from_memory_seam(tmp_path: Path) ->
 async def test_decision_parse_uses_live_memory_receipt(tmp_path: Path) -> None:
     memory = AssistantMemory(tmp_path / "asst")
     decision = await _parse_decision("好的，已记下。", may_acknowledge=None, memory=memory)
-    assert decision.response_text == "好的，已记下。"
+    assert decision.response_text == "这条还没有写入记忆文件。我不能说已经记下。"
 
     memory.upsert(_record(record_id="city-1", content="用户住在上海"))
+    decision = await _parse_decision("今天先说到这里。", may_acknowledge=None, memory=memory)
+    assert decision.response_text == "今天先说到这里。"
     decision = await _parse_decision("好的，已记下。", may_acknowledge=None, memory=memory)
     assert decision.response_text == "好的，已记下。"
+    assert memory.last_curated_receipt is not None
+    assert memory.last_curated_receipt.ok is True
+    decision = await _parse_decision("好的，已记下。", may_acknowledge=None, memory=memory)
+    assert decision.response_text == "这条还没有写入记忆文件。我不能说已经记下。"
+    assert memory.last_curated_receipt.ok is True
 
     memory.upsert(_record(record_id="secret", content="password: hunter2"))
     decision = await _parse_decision("好的，已记下。", may_acknowledge=None, memory=memory)

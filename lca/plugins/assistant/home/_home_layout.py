@@ -22,6 +22,7 @@ from pathlib import Path
 from lca.contracts.atoms.ids.ids import utc_now_iso
 from lca.contracts.observability.canonical_digest import canonical_digest
 from lca.infrastructure.assistant.io import read_json, sha256_digest
+from lca.infrastructure.memory.contextfiles.domain.layout import packaged_layout
 
 __all__ = [
     "CONFIG_FACE_FILES",
@@ -407,7 +408,31 @@ def render_template(template_id: str, *, name: str, description: str) -> Templat
     if bootstrap_src.is_file():
         files[_BOOTSTRAP_FILE] = bootstrap_src.read_text(encoding="utf-8")
 
+    # 其余常驻文件是活备忘，不进配置面摘要。投影文件等第一次写入再出现。
+    files.update(_scaffold_standing_notes())
+
     return TemplateRender(files=files)
+
+
+def _scaffold_standing_notes() -> dict[str, str]:
+    """Load standing files that are neither config face nor the projection.
+
+    A quirk edit must not change ``manifest_digest``. ``MEMORY.md`` stays out
+    because the projection replaces that file, and an empty copy would look
+    like a record store.
+    """
+
+    layout = packaged_layout()
+    skip = set(CONFIG_FACE_FILES) | {layout.projection_file}
+    notes: dict[str, str] = {}
+    for name in layout.standing_files:
+        if name in skip:
+            continue
+        src = _templates_root() / name
+        if not src.is_file():
+            raise AssistantCatalogError(f"常驻文件模板缺失: {name}")
+        notes[name] = src.read_text(encoding="utf-8")
+    return notes
 
 
 def render_default_template(*, name: str, description: str) -> TemplateRender:

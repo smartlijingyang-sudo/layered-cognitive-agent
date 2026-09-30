@@ -70,6 +70,8 @@ class TestTemplateRegistry:
         for entry in CONFIG_FACE_FILES:
             assert entry in rendered.files, f"{template_id} 缺 {entry}"
         assert rendered.files["BOOTSTRAP.md"].strip()
+        assert "主机映射" in rendered.files["TOOLS.md"]
+        assert "MEMORY.md" not in rendered.files
         assert "测试职责" in rendered.files["profile.json"]
 
     @pytest.mark.parametrize("template_id", ROLE_TEMPLATES)

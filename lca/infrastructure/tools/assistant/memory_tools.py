@@ -1,10 +1,10 @@
 """Assistant governed memory tools (ADR-0246 PR-6).
 
-Model-facing tools for reading and writing the assistant's structured
-memory (``{home}/memory/``). All writes go through ``AssistantMemory``
-typed-store methods (``upsert`` / ``supersede`` / ``remove``) which enforce
-dedupe_key idempotency and supersede lifecycle; the tools themselves run
-through the C10 Body → SafeExecutor narrow door like every other tool.
+Model-facing tools for the assistant's memory. Record writes go through
+``AssistantMemory`` (``upsert`` / ``supersede`` / ``remove``), which enforces
+dedupe_key idempotency and supersede lifecycle. Person and group pages are
+Markdown under the context-file layout, not rows in that store. The tools
+run through the C10 Body → SafeExecutor narrow door like every other tool.
 No tool writes Home config files or USER.md directly.
 """
 
@@ -23,6 +23,7 @@ from lca.contracts.protocols import Tool
 from lca.infrastructure.memory.assistant_memory import AssistantMemory
 from lca.infrastructure.memory.contextfiles.adapters.disk import DiskFileStore
 from lca.infrastructure.memory.contextfiles.domain.layout import layout_for_home
+from lca.infrastructure.memory.contextfiles.service.groups import GroupsDirectory
 from lca.infrastructure.memory.contextfiles.service.people import PeopleDirectory
 
 _MEMORY_SEARCH_TOOL = "memory_search"
@@ -31,6 +32,7 @@ _MEMORY_UPDATE_TOOL = "memory_update"
 _MEMORY_REMOVE_TOOL = "memory_remove"
 _MEMORY_EXPLAIN_TOOL = "memory_explain"
 _PERSON_NOTE_TOOL = "person_note"
+_GROUP_NOTE_TOOL = "group_note"
 
 _SENSITIVE_CONFIRMATION_HINT = (
     "这是敏感操作，必须先经用户确认：调用 askUserQuestion 询问用户是否确认，"
@@ -346,6 +348,46 @@ class PersonNoteTool(_BaseMemoryTool):
         )
 
 
+class GroupNoteTool(_BaseMemoryTool):
+    """Write one group page under the assistant home and refresh the index."""
+
+    name = _GROUP_NOTE_TOOL
+    required_grant: ClassVar[str] = "profile.revise"
+    description = (
+        "记下一个群体。按当前主目录的上下文布局写入群体页，并重写群体索引。"
+        "参数: name（显示名）、note（关于这个群体的话）。同名会覆盖。"
+    )
+    parameters: ClassVar[dict[str, Any]] = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "群体显示名"},
+            "note": {"type": "string", "description": "关于这个群体的话"},
+        },
+        "required": ["name", "note"],
+    }
+
+    async def execute(self, args: dict[str, Any]) -> Observation:
+        start = time.monotonic()
+        name = str(args.get("name") or "").strip()
+        note = str(args.get("note") or "").strip()
+        if not name or not note:
+            return self._fail(start, "name 和 note 都必须为非空字符串")
+        layout = layout_for_home(self._memory.home_path)
+        try:
+            page = GroupsDirectory(
+                DiskFileStore(self._memory.home_path),
+                layout=layout,
+            ).upsert(name, note)
+        except ValueError as exc:
+            return self._fail(start, str(exc))
+        except OSError as exc:
+            return self._fail(start, f"群体页没有写入: {exc}")
+        return self._ok(
+            start,
+            {"slug": page.slug, "name": page.name, "path": layout.group_page_path(page.slug)},
+        )
+
+
 class MemoryRemoveTool(_BaseMemoryTool):
     """Remove a memory record (sensitive, requires confirmation)."""
 
@@ -423,6 +465,7 @@ def assistant_memory_tools_from_run(
         MemoryRemoveTool(memory=memory),
         MemoryExplainTool(memory=memory),
         PersonNoteTool(memory=memory),
+        GroupNoteTool(memory=memory),
     ]
 
 
@@ -431,6 +474,7 @@ __all__ = [
     "_MEMORY_REMOVE_TOOL",
     "_MEMORY_SEARCH_TOOL",
     "_MEMORY_UPDATE_TOOL",
+    "GroupNoteTool",
     "MemoryAddTool",
     "MemoryExplainTool",
     "MemoryRemoveTool",
