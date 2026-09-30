@@ -423,3 +423,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat cd966421d` → 9 files changed, 639 insertions(+), 353 deletions(-); gross diff = 992 > 100.
 - **Tests:** `uv run pytest -q tests/plugins/assistant/test_skill_overlay_gating_receipts.py -m "not real_llm" --no-cov` → **11 passed**.
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 42 — 2026-09-30
+
+- **Commit:** `ed793e676` (cherry-picked from subagent branch `round-y` commit `2dd0c39ba`)
+- **Architectural concern:** layering violation + module depth. `lca.harness.declarative.compile.instrument.wrap` imported spine ports/records from infrastructure; the 669-line module mixed accessors, events, and wrappers.
+- **Change:** moved spine ports/records into `lca.contracts.observability.spine.{context,records,ports}`; infrastructure re-exports from contracts; split `wrap.py` into `instrument/{accessors,events,wrap}.py`; added `test_harness_instrument_no_infrastructure.py`.
+- **Files:** 14 files (3 new contracts modules, 2 new instrument submodules, 1 new test, importer/doc updates).
+- **Shortstat:** `git show --shortstat ed793e676` → 14 files changed, 762 insertions(+), 509 deletions(-); gross diff = 1271 > 100.
+- **Tests:** `uv run pytest -q tests/architecture/test_harness_instrument_no_infrastructure.py tests/observability/spine/test_wrap_uses_emit_pipeline.py tests/harness/declarative/compile/test_assembler_wraps_instrument.py tests/architecture/test_harness_observability_moved_to_kernel.py -m "not real_llm" --no-cov` → **14 passed**.
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
