@@ -183,3 +183,78 @@ async def test_agent_run_loop_invokes_mcp_tool():
         assert len(result.output) > 0
     finally:
         reset_capability_bindings(token)
+
+
+@pytest.mark.asyncio
+async def test_agent_injected_corp_tool_execution(mock_llm):
+    """Verify that corp MCP tool oa_whoami can be executed via LCA's Tool execution contract."""
+    agent = Agent(
+        role="CorporateTester",
+        goal="Test corp MCP tool execution",
+        backstory="Corporate tester",
+        auto_mcp=True,
+        llm=mock_llm,
+    )
+
+    corp_tool = None
+    for t in agent.spec.tools:
+        if t.name == "mcp__corp__oa_whoami":
+            corp_tool = t
+            break
+
+    assert corp_tool is not None, "mcp__corp__oa_whoami was not injected into Agent"
+
+    obs = await corp_tool.execute({})
+
+    assert obs is not None
+    assert obs.success is True
+    assert obs.payload is not None
+    assert isinstance(obs.payload, str)
+    assert "李超" in obs.payload
+    assert "200129" in obs.payload
+    assert obs.latency_ms is not None
+    assert obs.latency_ms >= 0
+
+
+@pytest.mark.asyncio
+async def test_agent_run_loop_invokes_corp_mcp_tool():
+    """Verify that an Agent with auto_mcp=True runs an end-to-end cognitive loop calling oa_whoami."""
+    from lca.infrastructure.runtime_plane.capability_bindings import (
+        BindingsViewBuilder,
+        reset_capability_bindings,
+        set_capability_bindings,
+    )
+    from tests.harness.scripted_llm import ScriptedLLMAdapter, respond, use_tool
+
+    token = set_capability_bindings(BindingsViewBuilder())
+    try:
+        llm = ScriptedLLMAdapter(
+            {
+                "*": [
+                    use_tool("mcp__corp__oa_whoami", {}),
+                    respond("用户李超的OA工号是200129，账号状态正常。"),
+                ]
+            },
+            default_respond=True,
+        )
+
+        from lca.application.api.api import ensure_default_ctx
+
+        scope = await ensure_default_ctx()
+        agent = Agent(
+            role="CorporateAssistant",
+            goal="Query OA details using corp MCP",
+            backstory="Corporate OA assistant",
+            auto_mcp=True,
+            llm=llm,
+            max_steps=5,
+            scope=scope,
+        )
+
+        result = await agent.run("请查询我的OA账号信息")
+        assert result.status == "completed"
+        assert result.output is not None
+        assert "200129" in result.output
+    finally:
+        reset_capability_bindings(token)
+
