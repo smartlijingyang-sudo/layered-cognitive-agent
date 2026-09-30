@@ -123,3 +123,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat d5c0a9a63` → 17 files changed, 178 insertions(+), 592 deletions(-); gross diff = 770 > 100.
 - **Tests:** `uv run pytest -q tests/infrastructure/cli/test_cli_imports_clean.py tests/scenario/runtime/test_runtime_factory_strict_bindings.py tests/tools/test_collaboration_delegate_tools.py tests/migration/test_semantic_json_migration.py tests/plugins/assistant/test_assistant_memory.py tests/plugins/assistant/test_assistant_memory_relevance.py tests/plugins/assistant/test_profile_backfill.py tests/infrastructure/memory/retrieval/test_scoring.py -m "not real_llm" --no-cov` → **63 passed**.
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 12 — 2026-09-30
+
+- **Commit:** `11035065f`
+- **Architectural concern:** layering violation / dependency direction. `lca.infrastructure.observability.adapters` lazily imported `CursorRecord` upward from `lca.cognition.body.executor`.
+- **Change:** moved `CursorRecord` into `lca/infrastructure/observability/loop_cursor/cursor_record.py`; repointed all 7 consumers (adapters, session handlers, llm_call, think llm, reasoner, simple_body); added behavioral tests (bind/get/try_advance) and structural tests asserting the old path is gone and adapters no longer import cognition.
+- **Files:** `lca/infrastructure/observability/loop_cursor/cursor_record.py` (renamed), 7 consumer files, `tests/observability/loop_cursor/test_cursor_record.py`.
+- **Shortstat:** `git show --shortstat 11035065f` → 9 files changed, 105 insertions(+), 8 deletions(-); gross diff = 113 > 100.
+- **Tests:** `uv run pytest -q tests/observability/loop_cursor/test_cursor_record.py tests/observability/loop_cursor/test_incarnation.py tests/scenario/llm_1/test_llm_turn.py -m "not real_llm" --no-cov` → **23 passed** (8 new + existing). `test_tool_using_run_evidence.py` failure is pre-existing.
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check` (staged): clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
