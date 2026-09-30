@@ -103,3 +103,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat 1c02da325` → 10 files changed, 191 insertions(+), 50 deletions(-); gross diff = 241 > 100.
 - **Tests:** `uv run pytest -q tests/lca_kernel/events/test_spine_clock_utc.py tests/lca_kernel/events/test_spine_runtime.py tests/infrastructure/idempotency/test_utc_timestamp.py tests/runtime/test_idempotency_store.py tests/plugins/assistant/test_evolve.py tests/plugins/assistant/test_skill_overlay.py tests/contracts/atoms/test_ids_time.py -m "not real_llm" --no-cov` → **94 passed**; `test_gateway_reuses_receipt_after_runtime_reconstruction` fails on a stale `lca.loop.driver.RuntimePhaseCapabilities` import (pre-existing at HEAD).
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 10 — 2026-09-30
+
+- **Commit:** `43f76e975` (cherry-picked from subagent branch `round-c` commit `8fff3da3c`)
+- **Architectural concern:** module depth / naming discipline. Two `utils`-named modules hid their responsibility; four shallow re-export/compat shells (`composio.py`, `sandbox/paths/paths.py`, `host_runtime/providers/user.py`, `cognition/body/delegation/cache.py`) added indirection.
+- **Change:** renamed `narrative/utils.py` → `formatting.py` and `process/utils.py` → `proc_scan.py`; deleted the four re-export shells and repointed all importers to concrete modules; merged `ONLYBOXES`/`GuestLayout` into the sandbox factory seam; added `tests/architecture/test_no_shallow_reexport_shells.py`.
+- **Files:** 36 files (2 renames, 4 deletions, importer updates, 1 new test).
+- **Shortstat:** `git show --shortstat 43f76e975` → 36 files changed, 166 insertions(+), 103 deletions(-); gross diff = 269 > 100.
+- **Tests:** `uv run pytest -q tests/architecture/test_no_shallow_reexport_shells.py tests/scenario/delegation/test_delegation_cache.py tests/scenario/sandbox_1/test_sandbox_paths.py tests/scenario/sandbox_1/test_sandbox_resolver.py -m "not real_llm" --no-cov` → **20 passed**; the two `tests/plugins/events/publishers/test_delegation_cache.py` failures are pre-existing at base `9bc0ce68b`.
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
