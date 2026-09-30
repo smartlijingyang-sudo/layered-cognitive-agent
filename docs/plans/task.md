@@ -372,4 +372,10 @@
 | COMMERCIAL-EVAL-TASK-5-TDD-SUITE | 自动化 pytest TDD 门禁测试套件 (test_commercial_dialogue_tdd.py) | Completed | 成功落地 tests/eval/test_commercial_dialogue_tdd.py（35 个参数化测试全部 100% 通过，覆盖 16 套多轮场景离线断言、轮次完整性与 3 大攻防对抗缺陷拦截用例），ruff/diff 门禁干净 |
 | COMMERCIAL-EVAL-TASK-6-SCORECARD | 全链路基线执行、短板缺陷定位与商用就绪报告 (commercial_eval_scorecard.md) | Completed | 成功生成 docs/eval/commercial_eval_scorecard.md，全量 16/16 套多轮场景断言达成 100% 通过率，全链路 55/55 测试通过（耗时 20s），ruff 0 报错，获得 COMMERCIAL READY 准入评级 |
 | COMMERCIAL-EVAL-TASK-7-DEFECT-FIX | 修复 SimpleMemorySystem 测试中 Session 未绑定导致的 FactGateway 事实丢弃缺陷 | Completed | 1. 根因：test_memory_policy.py 缺失 Session 绑定致 FactGateway 抛 unbound_drop，且 DefaultFactGateway.append_catalog 缺 MemoryCommittedCommitted/ContextCompactedCommitted 到 JournalEvent 的向后投影桥接；2. 修复：在 DefaultFactGateway 补全两类 Committed 事实向后映射，并在 test_memory_policy.py 3 处用例接入 bound_session()；3. 验证：tests/scenario/memory/test_memory_policy.py 21/21 全绿，tests/eval/ 55/55 全绿，ruff 0 违规，git diff --check 干净 |
+| BRAINSTORM-LCA-TESTS-CONTEXT | 深度剖析 53 套通用能力用例与 LCA 真实运行环境（工具/伴侣/多Agent/记忆/审批）对齐点 | Completed | 摸透 LCA 真实底座：asst 自治域、local_* 伴侣、TeamCast 架构三角、ApprovalPolicyEngine 窄门、continuous-memory 及现存 eval runner |
+| BRAINSTORM-LCA-TESTS-QUESTIONS | 澄清用例改写执行形态（纯对话执行手册 vs 自动化 YAML+Runner 集成）及优先级范围 | Completed | 用户明确选定：输出完整 53 套（A-1 至 K-2）全量真实 LCA 运行时对话执行手册，直测真实架构能力并便于复制执行 |
+| BRAINSTORM-LCA-TESTS-APPROACHES | 提出 2-3 种 LCA 真实落地映射方案与权衡（直接替换/分层递进/红队攻防增强） | Completed | 提出 3 大方案：真实系统深度同构（推荐）、泛化假工具微调、纯红队压力测试；推荐真实系统深度同构并获用户批准 |
+| BRAINSTORM-LCA-TESTS-DESIGN-SECTIONS | 逐步呈现改写后的 11 大类 LCA 真实可跑对话剧本设计并获取审批 | Completed | 架构边界、真实映射矩阵与代表性样活全盘获批 |
+| BRAINSTORM-LCA-TESTS-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-01-lca-runnable-capability-test-suite-design.md（392行，commit b2321cb59）与 docs/eval/lca-runnable-capability-test-suite.md（456行，commit e35994f8c） |
+| BRAINSTORM-LCA-TESTS-TRANSITION | 转换至实施计划制定（writing-plans）与交付完成 | Completed | 全量 53 套真实 LCA 对话执行手册设计与落盘闭环，可直接复制于 LobeHub 前端或 lca-ops runs 中实跑发现问题 |
 
