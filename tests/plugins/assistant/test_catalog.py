@@ -691,11 +691,11 @@ def test_create_cleans_up_on_failure(
 
     # 在 manifest 写入之前抛错 ⇒ write_home_files 之前 home 已 mkdir ⇒ 触发 cleanup
     monkeypatch.setattr(
-        "lca.plugins.domain.assistant.catalog.plugin._new_assistant_id",
+        "lca.plugins.domain.assistant.catalog.handlers._new_assistant_id",
         lambda: "asst_failtest",
     )
     monkeypatch.setattr(
-        "lca.plugins.domain.assistant.catalog.plugin.build_manifest",
+        "lca.plugins.domain.assistant.catalog.handlers.build_manifest",
         _raise,
     )
     with pytest.raises(RuntimeError):
@@ -958,9 +958,7 @@ class TestOwnershipScoping:
         catalog: AssistantCatalogImpl,
         request_default: CreateAssistantRequest,
     ) -> None:
-        handle = catalog.create(
-            CreateAssistantRequest(name="Demo", owner_user_id="alice")
-        )
+        handle = catalog.create(CreateAssistantRequest(name="Demo", owner_user_id="alice"))
         manifest = json.loads(
             (Path(handle.home_path) / "manifest.json").read_text(encoding="utf-8")
         )
@@ -997,3 +995,43 @@ class TestOwnershipScoping:
         catalog.create(CreateAssistantRequest(name="Alice's", owner_user_id="alice"))
         catalog.create(CreateAssistantRequest(name="Bob's", owner_user_id="bob"))
         assert len(catalog.list()) == 2
+
+
+# ── 拆包后公共路径回归（catalog 包聚焦子模块）───────────────────────
+
+
+class TestSplitPublicPath:
+    """拆包后 barrel 仍 re-export 异常；SOUL / plan-overlay 校验走公共路径。"""
+
+    def test_barrel_reexports_extracted_exceptions(self) -> None:
+        from lca.plugins.domain.assistant.catalog.plugin import (
+            AssistantAlreadyExists,
+            SoulValidationError,
+        )
+
+        assert issubclass(SoulValidationError, AssistantCatalogError)
+        assert issubclass(PlanOverlayValidationError, AssistantCatalogError)
+        assert issubclass(AssistantAlreadyExists, AssistantCatalogError)
+
+    def test_soul_validation_raises_specific_exception(
+        self,
+        catalog: AssistantCatalogImpl,
+    ) -> None:
+        """SOUL 完整度校验失败必须冒 ``SoulValidationError`` 子类（非笼统错误）。"""
+        from lca.plugins.domain.assistant.catalog.plugin import SoulValidationError
+
+        soul = "## 🧠 身份\n你是测试助理。\n## 🎭 性格\n直接坦诚。\n## 🛠 能力\n擅长测试。\n## 🗣 语气\n专业。"
+        with pytest.raises(SoulValidationError, match="200 字符"):
+            catalog.create(CreateAssistantRequest(name="x", soul=soul))
+
+    def test_plan_overlay_revise_raises_specific_exception(
+        self,
+        catalog: AssistantCatalogImpl,
+    ) -> None:
+        """``revise_profile`` 写入非法 plan.yaml 必须冒 ``PlanOverlayValidationError``。"""
+        handle = catalog.create(CreateAssistantRequest(name="Plan实验"))
+        with pytest.raises(PlanOverlayValidationError, match=r"plan\.yaml"):
+            catalog.revise_profile(
+                handle.assistant_id,
+                ProfilePatch(plan_yaml="prompt:\n  bogus_field: x\n"),
+            )
