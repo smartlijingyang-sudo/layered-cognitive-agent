@@ -53,3 +53,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat 7165fb2a4` → 14 files changed, 99 insertions(+), 134 deletions(-); gross diff = 233 > 100.
 - **Tests:** `uv run pytest -q tests/observation/ tests/architecture/test_phase_observation_seam.py -m "not real_llm" --no-cov` → **84 passed**; `test_phase_observation_seam.py::test_phase_transaction_depends_on_observation_seam_not_tracing_backend` is a pre-existing stale test referencing non-existent `lca/loop/transaction.py`.
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 5 — 2026-09-30
+
+- **Commit:** `b34bfa989`
+- **Architectural concern:** layering violation / dependency direction. `lca.infrastructure.memory.standing_refresh` imported `STANDING_ORDER` / `assemble_standing` upward from `lca.cognition.memory`.
+- **Change:** moved the pure standing-file assembly module into `lca/infrastructure/memory/standing.py`; repointed `standing_refresh`, `persona`, and the scenario test; updated the cognition memory README; added assembly/budget tests and a structural architecture test scanning infrastructure/memory for upward imports.
+- **Files:** `lca/infrastructure/memory/standing.py` (renamed from `lca/cognition/memory/standing.py`), `lca/infrastructure/memory/standing_refresh.py`, `lca/plugins/assistant/persona/persona.py`, `lca/cognition/memory/README.md`, `tests/infrastructure/memory/test_standing_assembly.py`, `tests/architecture/test_infrastructure_memory_layering.py`, `tests/cognition/memory/test_curated_memory_scenarios.py`.
+- **Shortstat:** `git show --shortstat b34bfa989` → 7 files changed, 158 insertions(+), 4 deletions(-); gross diff = 162 > 100.
+- **Tests:** `uv run pytest -q tests/infrastructure/memory/test_standing_assembly.py tests/cognition/memory/test_curated_memory_scenarios.py tests/plugins/assistant/test_persona.py tests/infrastructure/memory/retrieval/test_scoring.py tests/infrastructure/memory/retrieval/test_layered_retrieval.py tests/plugins/assistant/test_assistant_memory.py tests/migration/test_semantic_json_migration.py tests/architecture/test_infrastructure_memory_layering.py -m "not real_llm" --no-cov` → **82 passed**.
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
