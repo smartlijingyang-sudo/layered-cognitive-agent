@@ -209,6 +209,31 @@ class DefaultFactGateway(FactGateway):
                     output_truncated=getattr(event, "output_truncated", False),
                     projected_state=getattr(event, "projected_state", {}),
                 )
+            elif type(event).__name__ == "MemoryCommittedCommitted":
+                from lca.contracts.models.observability.journal.journal import MemoryCommitted
+
+                journal_event = MemoryCommitted(
+                    layer=getattr(event, "layer", ""),
+                    record_kind=getattr(event, "record_kind", ""),
+                    record_id=getattr(event, "record_id", ""),
+                )
+            elif type(event).__name__ == "ContextCompactedCommitted":
+                from lca.contracts.models.observability.journal.journal import ContextCompacted
+
+                journal_event = ContextCompacted(
+                    step=getattr(event, "step", 0),
+                    original_kinds=getattr(event, "original_kinds", ()),
+                    kept_kinds=getattr(event, "kept_kinds", ()),
+                    mode=getattr(event, "mode", "selection"),
+                    applied=getattr(event, "applied", False),
+                    reason=getattr(event, "reason", ""),
+                    source_record_count=getattr(event, "source_record_count", 0),
+                    summary_record_id=getattr(event, "summary_record_id", ""),
+                    original_characters=getattr(event, "original_characters", 0),
+                    result_characters=getattr(event, "result_characters", 0),
+                    compression_ratio=getattr(event, "compression_ratio", 0.0),
+                    coverage_ratio=getattr(event, "coverage_ratio", 0.0),
+                )
             elif type(event).__name__ not in JOURNAL_EVENT_CLASSES:
                 journal_event = None
 

@@ -365,10 +365,11 @@ class TestSimpleMemorySystemCommit:
         from lca.contracts.models.observability.journal.journal import RunScope
         from lca.infrastructure.observability import bind_backends, run_scope
         from tests.support.observability_helpers import make_test_bound
+        from tests.support.session_gate_helpers import bound_session
 
         hub = make_test_bound()
         system = SimpleMemorySystem()
-        with bind_backends(hub), run_scope(RunScope(trace_id="t1", run_id="r1")):
+        with bound_session(), bind_backends(hub), run_scope(RunScope(trace_id="t1", run_id="r1")):
             result = system.commit((_write(),))
         # ``commit`` records MemoryCommitted events onto the ambient RunStore.
         committed_events = [
@@ -386,6 +387,7 @@ class TestSimpleMemorySystemCommit:
         from lca.contracts.models.observability.journal.journal import RunScope
         from lca.infrastructure.observability import bind_backends, run_scope
         from tests.support.observability_helpers import make_test_bound
+        from tests.support.session_gate_helpers import bound_session
 
         class _AllWorkingRetrieval:
             def retrieve(self, layers, budget):
@@ -409,7 +411,7 @@ class TestSimpleMemorySystemCommit:
                 ),
             )
 
-        with bind_backends(hub), run_scope(RunScope(trace_id="t1", run_id="r1")):
+        with bound_session(), bind_backends(hub), run_scope(RunScope(trace_id="t1", run_id="r1")):
             await system.perceive(_agent_state())
 
         event = next(
@@ -430,6 +432,7 @@ class TestSimpleMemorySystemCommit:
         from lca.contracts.models.observability.journal.journal import RunScope
         from lca.infrastructure.observability import bind_backends, run_scope
         from tests.support.observability_helpers import make_test_bound
+        from tests.support.session_gate_helpers import bound_session
 
         hub = make_test_bound()
         system = SimpleMemorySystem()
@@ -444,7 +447,7 @@ class TestSimpleMemorySystemCommit:
                     recency_score=float(i),
                 ),
             )
-        with bind_backends(hub), run_scope(RunScope(trace_id="t1", run_id="r1")):
+        with bound_session(), bind_backends(hub), run_scope(RunScope(trace_id="t1", run_id="r1")):
             state = _agent_state()
             await system.perceive(state)
         compacted = [
