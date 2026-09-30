@@ -26,6 +26,7 @@ _MEMORY_SEARCH_TOOL = "memory_search"
 _MEMORY_ADD_TOOL = "memory_add"
 _MEMORY_UPDATE_TOOL = "memory_update"
 _MEMORY_REMOVE_TOOL = "memory_remove"
+_MEMORY_EXPLAIN_TOOL = "memory_explain"
 
 _SENSITIVE_CONFIRMATION_HINT = (
     "这是敏感操作，必须先经用户确认：调用 askUserQuestion 询问用户是否确认，"
@@ -258,6 +259,49 @@ class MemoryUpdateTool(_BaseMemoryTool):
         )
 
 
+class MemoryExplainTool(_BaseMemoryTool):
+    """Expand one memory record into its eight audit fields."""
+
+    name = _MEMORY_EXPLAIN_TOOL
+    is_idempotent = True
+    required_grant: ClassVar[str] = "profile.revise"
+    description = (
+        "展开一条记忆的出处。只读。"
+        "返回 claim、kind、salience、attribution、quote、timeline、confidence、supersession_chain。"
+        "参数: record_id（memory_search 返回的记录 id）。"
+    )
+    parameters: ClassVar[dict[str, Any]] = {
+        "type": "object",
+        "properties": {
+            "record_id": {"type": "string", "description": "要展开的记录 id"},
+        },
+        "required": ["record_id"],
+    }
+
+    async def execute(self, args: dict[str, Any]) -> Observation:
+        start = time.monotonic()
+        record_id = str(args.get("record_id") or "").strip()
+        if not record_id:
+            return self._fail(start, "record_id 必须为非空字符串")
+        explained = self._memory.explain(record_id)
+        if explained is None:
+            return self._fail(start, f"没有记录 {record_id}")
+        return self._ok(
+            start,
+            {
+                "record_id": record_id,
+                "claim": explained.claim,
+                "kind": explained.kind,
+                "salience": explained.salience,
+                "attribution": explained.attribution,
+                "quote": explained.quote,
+                "timeline": explained.timeline,
+                "confidence": explained.confidence,
+                "supersession_chain": list(explained.supersession_chain),
+            },
+        )
+
+
 class MemoryRemoveTool(_BaseMemoryTool):
     """Remove a memory record (sensitive, requires confirmation)."""
 
@@ -333,6 +377,7 @@ def assistant_memory_tools_from_run(
         MemoryAddTool(memory=memory),
         MemoryUpdateTool(memory=memory),
         MemoryRemoveTool(memory=memory),
+        MemoryExplainTool(memory=memory),
     ]
 
 
@@ -342,6 +387,7 @@ __all__ = [
     "_MEMORY_SEARCH_TOOL",
     "_MEMORY_UPDATE_TOOL",
     "MemoryAddTool",
+    "MemoryExplainTool",
     "MemoryRemoveTool",
     "MemorySearchTool",
     "MemoryUpdateTool",

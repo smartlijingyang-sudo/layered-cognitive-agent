@@ -484,7 +484,8 @@ class HomeSection:
         (
             "memory_note",
             "记忆说明: 用户让你记住的偏好/事实由系统自动写入 memory_dir，"
-            "也可用 memory_search / memory_add / memory_update / memory_remove 读写；"
+            "也可用 memory_search / memory_add / memory_update / memory_remove 读写，"
+            "用 memory_explain 查看一条记忆的出处；"
             "下次会话会自动带到你的上下文。",
         ),
     )

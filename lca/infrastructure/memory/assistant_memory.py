@@ -40,6 +40,11 @@ from lca.infrastructure.memory.contextfiles.domain.curated import (
     contains_secret,
     render_curated_markdown,
 )
+from lca.infrastructure.memory.contextfiles.domain.explain import (
+    ClaimExplanation,
+    ExplainableRecord,
+    explain_record,
+)
 from lca.infrastructure.memory.contextfiles.events.publisher import (
     ProjectionFailed,
     ProjectionWritten,
@@ -531,6 +536,19 @@ class AssistantMemory(MemorySystem):
             records = records[-_MAX_EPISODIC_RECORDS:]
         self._save(layer, records)
 
+    def explain(self, record_id: str) -> ClaimExplanation | None:
+        """Return the eight audit fields for one semantic record, including retired rows."""
+
+        records = [
+            _explainable(entry)
+            for entry in self._load(MemoryLayer.SEMANTIC)
+            if str(entry.get("record_id") or "")
+        ]
+        target = next((record for record in records if record.record_id == record_id), None)
+        if target is None:
+            return None
+        return explain_record(target, records)
+
     def query(self, layer: MemoryLayer) -> list[MemoryRecord]:
         """返回指定层的活跃记录（默认排除被 supersede 的旧记录）。"""
         return [
@@ -562,6 +580,25 @@ class AssistantMemory(MemorySystem):
             for entry in self._load(layer)
             if not entry.get("deleted", False)
         ]
+
+
+def _explainable(entry: dict[str, Any]) -> ExplainableRecord:
+    metadata = entry.get("metadata") if isinstance(entry.get("metadata"), dict) else {}
+    confidence = entry.get("confidence")
+    created = entry.get("created_at_ms")
+    revision = entry.get("revision_of")
+    return ExplainableRecord(
+        record_id=str(entry.get("record_id") or ""),
+        body=str(entry.get("content") or ""),
+        kind=str(entry.get("category") or "fact"),
+        importance=float(entry.get("importance") or 0.5),
+        confidence=float(confidence) if isinstance(confidence, (int, float)) else None,
+        source=str(metadata.get("source") or "").strip(),
+        trigger=str(metadata.get("trigger") or "").strip(),
+        recorded_on=_recorded_on(created if isinstance(created, int) else None),
+        quote=str(metadata.get("quote") or "").strip(),
+        revision_of=str(revision) if isinstance(revision, str) and revision else None,
+    )
 
 
 def _claims_from_records(records: list[MemoryRecord]) -> list[CuratedClaim]:
