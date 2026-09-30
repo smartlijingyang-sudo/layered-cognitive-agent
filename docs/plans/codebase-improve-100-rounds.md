@@ -393,3 +393,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat 3c203e505` → 6 files changed, 1107 insertions(+), 904 deletions(-); gross diff = 2011 > 100.
 - **Tests:** `uv run pytest -q tests/lca_plugins/transport/device_hub/test_routes_barrel.py -m "not real_llm" --no-cov` → **3 passed** (subagent ran 30 passed / 2 skipped across the affected set).
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 39 — 2026-09-30
+
+- **Commit:** `725d90e2b`
+- **Architectural concern:** naming discipline. `lca/infrastructure/channels/wechat/manager.py` used the forbidden `Manager` shape.
+- **Change:** renamed `WechatChannelManager` → `WechatChannelService` (module `service.py`); extracted the pure `channel_config_path` helper; repointed the webserver route and tests; added structural + helper tests.
+- **Files:** `lca/infrastructure/channels/wechat/{manager→service}.py`, `__init__.py`, `lca/plugins/transport/webserver/routes_channels_wechat.py`, 3 test files.
+- **Shortstat:** `git show --shortstat 725d90e2b` → 7 files changed, 91 insertions(+), 29 deletions(-); gross diff = 120 > 100.
+- **Tests:** `uv run pytest -q tests/channels/test_wechat_service.py tests/channels/test_wechat_channel_worker.py tests/channels/test_wechat_channel_e2e.py -m "not real_llm" --no-cov` → **10 passed**.
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
