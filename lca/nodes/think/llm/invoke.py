@@ -174,7 +174,7 @@ def _model_visible_identity(state: Any, request: Any) -> tuple[Any, Any]:
     cursor there is no step identity, so the hook stays transparent (same
     degradation as ``primitive.llm.call``).
     """
-    from lca.cognition.body.executor.cursor_record import CursorRecord
+    from lca.infrastructure.observability.loop_cursor.cursor_record import CursorRecord
     from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
         CurrentReasonerPrompt,
     )

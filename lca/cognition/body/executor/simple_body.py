@@ -11,7 +11,6 @@ from lca.cognition.body.emit.observation_surface import (
     observation_content,
     observation_error,
 )
-from lca.cognition.body.executor.cursor_record import CursorRecord
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.semantic.keys import OBS_DEGRADED_FROM
 from lca.contracts.harness.act.effect_receipt import EffectOutcome, EffectReceipt
@@ -26,6 +25,7 @@ from lca.contracts.observability.cursor.loop_cursor import PhaseName
 from lca.contracts.protocols import Body, SafeExecutor, ToolRegistry, TransportRegistryProtocol
 from lca.contracts.protocols.act.action.action import ActionRegistryProtocol
 from lca.infrastructure.component.registry import RegistryKeyError
+from lca.infrastructure.observability.loop_cursor.cursor_record import CursorRecord
 
 if TYPE_CHECKING:
     from lca.runtime.session.run_session_writer import RunSessionWriter

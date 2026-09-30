@@ -213,7 +213,7 @@ class PromptReasoner:
         cursor: Any = None
         reasoner_prompt: Any = None
         if render.trace is not None:
-            from lca.cognition.body.executor.cursor_record import CursorRecord
+            from lca.infrastructure.observability.loop_cursor.cursor_record import CursorRecord
             from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
                 CurrentReasonerPrompt,
             )

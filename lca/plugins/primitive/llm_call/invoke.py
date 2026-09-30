@@ -95,8 +95,8 @@ class LlmInvokeExecutor:
                 "wire phase.think.reasoner.credentials before primitive.llm.call."
             )
 
-        from lca.cognition.body.executor.cursor_record import CursorRecord
         from lca.cognition.brain.llm_turn import execute_llm_turn
+        from lca.infrastructure.observability.loop_cursor.cursor_record import CursorRecord
         from lca.plugins.events.hooks.model_visible.reasoner_prompt import (
             CurrentReasonerPrompt,
         )

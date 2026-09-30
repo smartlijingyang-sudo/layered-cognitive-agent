@@ -448,7 +448,7 @@ def _advance_think_fold(*, model: str, ok: bool) -> None:
     :class:`CursorRecord` (explicit DI) instead of the deleted
     ``get_current_cursor()`` ContextVar.
     """
-    from lca.cognition.body.executor.cursor_record import CursorRecord
+    from lca.infrastructure.observability.loop_cursor.cursor_record import CursorRecord
 
     cursor = CursorRecord.get()
     if cursor is None:
@@ -472,7 +472,7 @@ def _open_think_step(prompt: str) -> None:
     :class:`CursorRecord` (explicit DI) instead of the deleted
     ``get_current_cursor()`` ContextVar.
     """
-    from lca.cognition.body.executor.cursor_record import CursorRecord
+    from lca.infrastructure.observability.loop_cursor.cursor_record import CursorRecord
 
     cursor = CursorRecord.get()
     if cursor is None:

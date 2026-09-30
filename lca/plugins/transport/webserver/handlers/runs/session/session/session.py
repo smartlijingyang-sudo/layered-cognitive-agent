@@ -15,7 +15,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
 
-from lca.cognition.body.executor.cursor_record import CursorRecord
 from lca.contracts.models.core.conversation.conversation import ConversationTurn
 from lca.contracts.models.core.state.plane import PlaneBindings
 from lca.contracts.observability.infra.close_barrier import CloseReason
@@ -29,6 +28,7 @@ from lca.contracts.observability.registry.status import RunLifecycleStatus
 from lca.contracts.protocols import JournalProjector
 from lca.infrastructure.observability import BoundObservability
 from lca.infrastructure.observability.facade.run.ambit import RunAmbit
+from lca.infrastructure.observability.loop_cursor.cursor_record import CursorRecord
 from lca.plugins.transport.webserver.handlers.runs.session.event.session import (
     BoundRunEventSession,
     unbind_run_event_session,

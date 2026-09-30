@@ -22,7 +22,6 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, cast
 
-from lca.cognition.body.executor.cursor_record import CursorRecord
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.mechanisms.capability.capability import (
     MissingCapabilityError,
@@ -32,6 +31,7 @@ from lca.contracts.observability.canonical_digest import canonical_digest
 from lca.contracts.observability.journal.run_journal import RunJournalFactory
 from lca.harness.plan import compiled_run_plan_ref
 from lca.harness.profile.boot.products import compiled_plan_from_scope
+from lca.infrastructure.observability.loop_cursor.cursor_record import CursorRecord
 from lca.infrastructure.observability.loop_cursor.persistence.coordinator import (
     NullPersistenceCoordinator,
 )
