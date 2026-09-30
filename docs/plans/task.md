@@ -364,4 +364,10 @@
 | BRAINSTORM-COMMERCIAL-EVAL-APPROACHES | 提出 2-3 种对话场景评测与 TDD 缺陷闭环架构方案及权衡 | Completed | 用户选定方案 A，并明确要求融入业界主流对 Agent 进行测试的标准问题类型、测试流程与多轮评测规范 |
 | BRAINSTORM-COMMERCIAL-EVAL-DESIGN-SECTIONS | 逐步呈现全景对话用例体系（多轮问题/期望/能力点/短板暴露）并获取用户审批 | Completed | 全部 3 节（主流标准流程/8大象限16套多轮对话剧本/双模执行与TDD缺陷闭环）均获用户审核批准 |
 | BRAINSTORM-COMMERCIAL-EVAL-DESIGN-DOC | 沉淀商用级全景对话评测与 TDD 驱动设计文档至 docs/plans/ 并提交 | Completed | 成功落盘 docs/plans/2026-09-30-commercial-dialogue-scenario-eval-design.md 并已提交 git |
-| BRAINSTORM-COMMERCIAL-EVAL-TRANSITION | 转换至实施计划制定（writing-plans） | In Progress | 准备调用 writing-plans 技能编写落地实施计划 |
+| BRAINSTORM-COMMERCIAL-EVAL-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 成功落盘 docs/plans/2026-09-30-commercial-dialogue-scenario-eval-plan.md 并已提交 git |
+| COMMERCIAL-EVAL-TASK-1-YAML | 评测数据契约与 16 套多轮对话场景 YAML 剧本库 (commercial_flagship_eval.yaml) | Pending | 待编写 |
+| COMMERCIAL-EVAL-TASK-2-LOADER | 评测模型 DTO 与 YAML 剧本解析加载器 (dialogue_scenario_loader.py) | Pending | 待实现 |
+| COMMERCIAL-EVAL-TASK-3-INVARIANTS | 确定性中间态断言与规则清单裁判引擎 (invariants_checker.py) | Pending | 待实现 |
+| COMMERCIAL-EVAL-TASK-4-CLI | 双模 CLI 评测运行器 (scripts/run_commercial_eval.py) | Pending | 待实现 |
+| COMMERCIAL-EVAL-TASK-5-TDD-SUITE | 自动化 pytest TDD 门禁测试套件 (test_commercial_dialogue_tdd.py) | Pending | 待实现 |
+| COMMERCIAL-EVAL-TASK-6-SCORECARD | 全链路基线执行、短板缺陷定位与商用就绪报告 (commercial_eval_scorecard.md) | Pending | 待执行 |
