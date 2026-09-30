@@ -35,7 +35,7 @@ def assemble_run_hub(
 ) -> BoundObservability:
     """Extend boot observability with immutable projections for one run."""
     del settings
-    from lca.harness.observability import make_minimal_bound
+    from lca_kernel.runtime.observability import make_minimal_bound
 
     try:
         base: BoundObservability = require_capability(ctx, "observability")
@@ -58,9 +58,7 @@ def assemble_run_hub(
     return run_bound
 
 
-def ensure_session_hub(
-    session: RunSession, *, ctx: Any
-) -> BoundObservability:
+def ensure_session_hub(session: RunSession, *, ctx: Any) -> BoundObservability:
     """Return the already-bound hub on the session.
 
     ADR-0167 D11: RunSessionBuilder 在 ``build`` 阶段已经把 hub 装上, 任何

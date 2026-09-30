@@ -62,11 +62,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from lca.contracts.observability.core.ports import (
+    AttributePolicyBackend,
+    JournalBackend,
+    ScorerFn,
+    TracerBackend,
+)
 from lca.contracts.observability.infra.close_barrier import CloseBarrier, CloseReason, CloseReport
-from lca.harness.observability import assemble_observability
+from lca.contracts.observability.registry.named_registry import NamedRegistry
 from lca.infrastructure.observability import (
+    AttributePolicy,
     BoundObservability,
-    NamedRegistry,
     ObservabilitySettings,
 )
 
@@ -424,7 +430,120 @@ class _NullCloseEmitter:
         return None
 
 
+def assemble_observability(
+    ctx: Any,
+    settings: ObservabilitySettings | None = None,
+) -> BoundObservability:
+    """从注册表 + settings 装配 BoundObservability 并挂到 ctx。
+
+    装配顺序：policy → readers → journal → tracer → scorers。任何 seam 缺失则
+    跳过对应组件；运行时由 facade 安全 no-op。原位于
+    ``lca.harness.observability``，迁到 kernel 后 harness 不再依赖 infrastructure。
+    """
+    cfg = settings or ObservabilitySettings()
+
+    def _maybe(key: str) -> Any:
+        inject = getattr(ctx, "inject", None)
+        if not callable(inject):
+            return None
+        try:
+            return ctx.inject(key, default=None)
+        except (KeyError, TypeError):
+            return None
+
+    # 1. policy
+    policy: AttributePolicyBackend | None = None
+    policy_registry = _maybe("attribute_policy_backends")
+    if isinstance(policy_registry, NamedRegistry) and "default" in policy_registry:
+        policy_factory = policy_registry.get("default")
+        if policy_factory is not None:
+            policy = policy_factory(cfg)
+
+    # 2. readers
+    readers: list[Any] = []
+    reader_registry = _maybe("fact_readers")
+    if isinstance(reader_registry, NamedRegistry):
+        for name in cfg.reader_backend_names():
+            factory = reader_registry.get(name)
+            if factory is None:
+                continue
+            readers.append(factory(cfg))
+
+    # 3. journal
+    journal: JournalBackend | None = None
+    journal_registry = _maybe("journal_backends")
+    descriptor_registry = _maybe("event_descriptor_registry")
+    if isinstance(journal_registry, NamedRegistry):
+        backend_name = cfg.journal_backend
+        if backend_name:
+            factory = journal_registry.get(backend_name)
+            if factory is not None:
+                journal = factory(
+                    cfg,
+                    projections=tuple(readers),
+                    policy=policy,
+                    descriptor_registry=descriptor_registry,
+                )
+
+    # 4. tracer
+    tracer: TracerBackend | None = None
+    tracer_registry = _maybe("tracer_backends")
+    if isinstance(tracer_registry, NamedRegistry):
+        backend_name = cfg.tracer_backend
+        if backend_name:
+            factory = tracer_registry.get(backend_name)
+            if factory is not None:
+                tracer = factory(cfg, policy=policy)
+
+    # 5. scorers
+    scorers: list[ScorerFn] = []
+    scorer_registry = _maybe("fact_scorers")
+    if isinstance(scorer_registry, NamedRegistry):
+        for name in cfg.scorer_backend_names():
+            factory = scorer_registry.get(name)
+            if factory is None:
+                continue
+            scorers.append(factory(cfg))
+
+    bound = BoundObservability(
+        journal=journal,
+        tracer=tracer,
+        policy=policy,
+        scorers=tuple(scorers),
+        evidence_store=_maybe("evidence_store"),
+        evidence_policy=_maybe("evidence_policy"),
+    )
+    provide = getattr(ctx, "provide", None)
+    if callable(provide):
+        provide("observability", bound)
+    return bound
+
+
+def make_minimal_bound(
+    *,
+    journal: JournalBackend | None = None,
+    tracer: TracerBackend | None = None,
+    policy: AttributePolicyBackend | None = None,
+    scorers: tuple[ScorerFn, ...] = (),
+) -> BoundObservability:
+    """测试/CLI 直接构造 BoundObservability（不走 boot 路径）。"""
+    return BoundObservability(
+        journal=journal,
+        tracer=tracer,
+        policy=policy,
+        scorers=scorers,
+    )
+
+
+def default_policy() -> AttributePolicyBackend:
+    """框架默认 attribute policy（标准 verbosity + 脱敏）。"""
+    return AttributePolicy()
+
+
 __all__ = [
     "ObservabilityRuntime",
+    "assemble_observability",
+    "default_policy",
     "install_observability",
+    "make_minimal_bound",
 ]

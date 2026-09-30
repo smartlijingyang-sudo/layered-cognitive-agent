@@ -41,12 +41,12 @@ from lca.contracts.models.observability.journal.journal import (
     BootProfileResolved,
 )
 from lca.contracts.observability.journal.store import JournalStoreBackend
-from lca.harness.observability.assemble import make_minimal_bound
 from lca.infrastructure.observability import AttributePolicy
 from lca.infrastructure.observability.journal.backends.memory import InMemoryJournalStore
 from lca.infrastructure.observability.journal.engine.engine import RunStore
 from lca_kernel.boot.boot import _emit_boot_events  # pyright: ignore[reportPrivateUsage]
 from lca_kernel.boot.stages import Stage
+from lca_kernel.runtime.observability import make_minimal_bound
 
 
 class _CaptureStore(JournalStoreBackend):
@@ -265,9 +265,7 @@ def test_emit_boot_events_structlog_records_plugin_id() -> None:
             boot_started=time.monotonic(),
         )
 
-    boot_pending = [
-        entry for entry in logs if entry.get("event") == "boot.pending_event"
-    ]
+    boot_pending = [entry for entry in logs if entry.get("event") == "boot.pending_event"]
     assert len(boot_pending) == 1, f"expected one boot.pending_event, got {logs!r}"
     entry = boot_pending[0]
     assert entry["plugin_id"] == "p-alpha", entry

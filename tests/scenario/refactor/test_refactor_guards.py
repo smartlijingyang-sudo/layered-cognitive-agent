@@ -101,7 +101,7 @@ class TestLeadWallClockPropagation(unittest.TestCase):
         from lca.agent.cognitive_agent import CognitiveAgent
         from lca.application.api.spawn import promote_lead
         from lca.application.authoring.policies import LeadBudgetPolicy
-        from lca.harness.observability.assemble import make_minimal_bound
+        from lca_kernel.runtime.observability import make_minimal_bound
 
         runtime = MagicMock()
         role_profile = MagicMock()
@@ -134,9 +134,7 @@ class TestAdrIndexMatchesFilesystem(unittest.TestCase):
             slug = match.group(3) or path.stem
             file_ids.append(f"{match.group(1)}{match.group(2) or ''}:{slug}")
 
-        duplicates = {n for n in file_numbers if file_numbers.count(n) > 1}
         # ADR 同号允许多个文件（follow-up / 双 0165），用 file_ids 查重
-        id_duplicates = {i for i in file_ids if file_ids.count(i) > 1}
         # 允许 `ADR-NNNN Followup-N` 共享主 slug（历史），但文件实体不能同名重复
         filename_ids = [p.name for p in adr_files if p.name != "README.md"]
         filename_dupes = {n for n in filename_ids if filename_ids.count(n) > 1}
