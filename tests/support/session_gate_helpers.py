@@ -32,10 +32,16 @@ def bound_session(session_id: str = "test_session") -> Iterator[Session]:
 
 def append_control_turn(state: AgentState, turn: Turn) -> None:
     """Append one turn to ``state.history`` and Session ``turn.control.v1`` when bound."""
+    from lca.cognition.convergence.payload import observation_files_created
+
     state.history.append(turn)
     session = resolve_session_reader()
     if session is not None:
-        append_turn_control_fact(session, turn)
+        append_turn_control_fact(
+            session,
+            turn,
+            files_created_fn=observation_files_created,
+        )
 
 
 def extend_control_turns(state: AgentState, turns: Iterable[Turn]) -> None:

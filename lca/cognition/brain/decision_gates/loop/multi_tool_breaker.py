@@ -40,6 +40,7 @@ from lca.cognition.brain.decision_gates.loop.fingerprint import (
 )
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.models.core.execution.control_turn import ControlTurnView
 from lca.contracts.models.core.execution.decision import Decision, ToolCall
 from lca.contracts.models.core.policy.gate_policy import GateDecided, PolicyFact
 from lca.contracts.models.core.policy.loop_policy import (
@@ -49,7 +50,6 @@ from lca.contracts.models.core.policy.loop_policy import (
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols import DecisionGate
 from lca.infrastructure.session.context.turn_control_reader import (
-    ControlTurnView,
     iter_control_turns_reversed,
 )
 from lca.plugins.session.task_progress.projection import TaskProgressProjection

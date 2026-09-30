@@ -205,12 +205,17 @@ class DefaultReducer(Reducer):
 
             writer = resolve_flushable_session()
         if writer is not None:
+            from lca.cognition.convergence.payload import observation_files_created
             from lca.infrastructure.session.context.turn_control_reader import (
                 append_turn_control_fact,
             )
             from lca_kernel.events.session.session import SessionProtocol
 
-            append_turn_control_fact(cast("SessionProtocol", writer), turn)
+            append_turn_control_fact(
+                cast("SessionProtocol", writer),
+                turn,
+                files_created_fn=observation_files_created,
+            )
         return result
 
     @_instrument_apply

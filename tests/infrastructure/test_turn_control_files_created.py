@@ -51,6 +51,8 @@ def test_turn_control_folds_files_created() -> None:
 
 
 def test_append_turn_control_fact_extracts_files_from_observation_extra() -> None:
+    from lca.cognition.convergence.payload import observation_files_created
+
     session = Session("fc_1")
     append_turn_control_fact(
         session,
@@ -69,6 +71,7 @@ def test_append_turn_control_fact_extracts_files_from_observation_extra() -> Non
                 extra={"files_created": ["out.py"]},
             ),
         ),
+        files_created_fn=observation_files_created,
     )
     agent_state = AgentState(trace_id="t", task="t", budget=Budget())
     token = set_publish_session(session)

@@ -23,6 +23,7 @@ from lca.contracts.models.core.conversation.memory import (
     MemoryRelationKind,
     MemoryTrust,
 )
+from lca.contracts.models.core.execution.control_turn import ControlTurnView
 from lca.contracts.models.core.execution.decision import (
     Decision,
     DelegationSpec,
@@ -30,6 +31,12 @@ from lca.contracts.models.core.execution.decision import (
     Reflection,
     ToolCall,
     Turn,
+)
+from lca.contracts.models.core.execution.fingerprint import (
+    fingerprint_payload,
+    normalize_for_fingerprint,
+    tool_call_fingerprint,
+    view_tool_fingerprint,
 )
 from lca.contracts.models.core.execution.result import (
     ApprovalPendingError,

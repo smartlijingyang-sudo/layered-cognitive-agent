@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from lca.cognition.convergence.payload import (
     merge_files_created,
+    observation_files_created,
     payload_stdout,
     turn_has_delivery_signal,
 )
@@ -61,7 +62,7 @@ def _is_use_tool(action_type: object) -> bool:
 def collect_delivery_material(state: AgentState) -> DeliveryMaterial:
     best_stdout = ""
     best_files: tuple[str, ...] = ()
-    for turn in reversed(control_turns(state)):
+    for turn in reversed(control_turns(state, files_created_fn=observation_files_created)):
         if not _is_use_tool(turn.action_type):
             continue
         if not turn.observation_success:

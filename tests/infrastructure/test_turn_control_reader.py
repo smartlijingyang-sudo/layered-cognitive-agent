@@ -69,6 +69,8 @@ def test_control_turns_falls_back_to_in_process_mirror_without_session() -> None
 
 
 def test_gates_prefer_session_projection_over_history() -> None:
+    from lca.cognition.convergence.payload import observation_files_created
+
     session = Session("tc_gate")
     append_turn_control_fact(
         session,
@@ -82,6 +84,7 @@ def test_gates_prefer_session_projection_over_history() -> None:
             ),
             observation=Observation(observation_id="o1", success=True, payload={"ok": True}),
         ),
+        files_created_fn=observation_files_created,
     )
     token = set_publish_session(session)
     try:

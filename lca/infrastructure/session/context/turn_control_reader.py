@@ -7,13 +7,14 @@ is the in-process mirror with the same ``ControlTurnView`` shape (ADR-0191).
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Iterator, Sequence
 from typing import Any, cast
 
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.harness.memory.events import TurnControlCommitted
-from lca.contracts.models.core.execution.decision import Turn
+from lca.contracts.models.core.execution.control_turn import ControlTurnView
+from lca.contracts.models.core.execution.decision import Observation, Turn
+from lca.contracts.models.core.execution.fingerprint import view_tool_fingerprint
 from lca.contracts.models.core.state.state import AgentState
 from lca.harness.session.emit import emit
 from lca.infrastructure.session.bindings import resolve_session_reader
@@ -21,6 +22,11 @@ from lca.plugins.session.session_turn_control.session_turn_control import TurnCo
 from lca_kernel.events.session.session import SessionEvent, SessionProtocol
 
 _TURN_CONTROL = "turn.control.v1"
+
+#: Callback that extracts harvested file names from an Observation. Injected
+#: by the composition boundary (plugins/cognition) so infrastructure stays
+#: below the cognition layer (AGENTS.md §2.1).
+FilesCreatedExtractor = Callable[[Observation | None], tuple[str, ...]]
 
 
 def _action_type_text(value: object) -> str:
@@ -40,23 +46,12 @@ def _files_created_tuple(value: object) -> tuple[str, ...]:
     return ()
 
 
-@dataclass(frozen=True, slots=True)
-class ControlTurnView:
-    """Gate-facing turn summary folded from durable Session facts."""
-
-    action_type: str
-    tool_name: str | None = None
-    observation_success: bool | None = None
-    tool_arguments: dict[str, object] | None = None
-    observation_payload: object | None = None
-    observation_error: str | None = None
-    files_created: tuple[str, ...] = ()
-
-
-def turn_to_control_view(turn: Turn) -> ControlTurnView:
+def turn_to_control_view(
+    turn: Turn,
+    *,
+    files_created_fn: FilesCreatedExtractor | None = None,
+) -> ControlTurnView:
     """Project one in-process Turn into the gate-facing control summary."""
-    from lca.cognition.convergence.payload import observation_files_created
-
     decision = turn.decision
     observation = turn.observation
     tool_name = decision.tool_calls[0].tool_name if decision.tool_calls else None
@@ -68,17 +63,26 @@ def turn_to_control_view(turn: Turn) -> ControlTurnView:
         tool_arguments=tool_arguments,
         observation_payload=observation.payload if observation is not None else None,
         observation_error=observation.error if observation is not None else None,
-        files_created=observation_files_created(observation),
+        files_created=files_created_fn(observation) if files_created_fn is not None else (),
     )
 
 
-def turns_to_control_views(turns: Sequence[Turn]) -> tuple[ControlTurnView, ...]:
-    return tuple(turn_to_control_view(turn) for turn in turns)
+def turns_to_control_views(
+    turns: Sequence[Turn],
+    *,
+    files_created_fn: FilesCreatedExtractor | None = None,
+) -> tuple[ControlTurnView, ...]:
+    return tuple(turn_to_control_view(turn, files_created_fn=files_created_fn) for turn in turns)
 
 
-def append_turn_control_fact(session: SessionProtocol, turn: Turn) -> None:
+def append_turn_control_fact(
+    session: SessionProtocol,
+    turn: Turn,
+    *,
+    files_created_fn: FilesCreatedExtractor | None = None,
+) -> None:
     """Append one ``turn.control.v1`` fact for TurnControlUnit fold."""
-    view = turn_to_control_view(turn)
+    view = turn_to_control_view(turn, files_created_fn=files_created_fn)
     emit(
         session,
         TurnControlCommitted(
@@ -138,7 +142,11 @@ def projected_control_turns(state: AgentState) -> tuple[ControlTurnView, ...] | 
     return folded
 
 
-def control_turns(state: AgentState) -> tuple[ControlTurnView, ...]:
+def control_turns(
+    state: AgentState,
+    *,
+    files_created_fn: FilesCreatedExtractor | None = None,
+) -> tuple[ControlTurnView, ...]:
     """Gate-facing turn summaries: Session fold first, then in-process mirror.
 
     Durable ``turn.control.v1`` facts are SSOT when a Session is bound.
@@ -149,13 +157,17 @@ def control_turns(state: AgentState) -> tuple[ControlTurnView, ...]:
     if projected:
         return projected
     if state.control_turns:
-        return turns_to_control_views(state.control_turns)
+        return turns_to_control_views(state.control_turns, files_created_fn=files_created_fn)
     return ()
 
 
-def iter_control_turns_reversed(state: AgentState) -> Iterator[ControlTurnView]:
+def iter_control_turns_reversed(
+    state: AgentState,
+    *,
+    files_created_fn: FilesCreatedExtractor | None = None,
+) -> Iterator[ControlTurnView]:
     """Newest-first control turns for gate loop detectors."""
-    yield from reversed(control_turns(state))
+    yield from reversed(control_turns(state, files_created_fn=files_created_fn))
 
 
 def last_observation_success(state: AgentState) -> bool | None:
@@ -185,8 +197,6 @@ def consecutive_identical_tool_calls(state: AgentState, fingerprint: str | None)
     """Count consecutive USE_TOOL turns with the same tool+args fingerprint."""
     if not fingerprint:
         return 0
-    from lca.cognition.brain.decision_gates.loop.fingerprint import view_tool_fingerprint
-
     count = 0
     for turn in iter_control_turns_reversed(state):
         if (

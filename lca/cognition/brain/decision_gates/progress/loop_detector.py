@@ -29,9 +29,13 @@ from __future__ import annotations
 
 from lca.cognition.brain.decision_gates.chained.chained import record_gate_decided
 from lca.cognition.convergence.evidence import build_delivery_evidence
-from lca.cognition.convergence.payload import turn_has_delivery_signal
+from lca.cognition.convergence.payload import (
+    observation_files_created,
+    turn_has_delivery_signal,
+)
 from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.models.core.execution.control_turn import ControlTurnView
 from lca.contracts.models.core.execution.decision import Decision
 from lca.contracts.models.core.policy.gate_policy import GateDecided, PolicyFact
 from lca.contracts.models.core.policy.loop_policy import (
@@ -41,7 +45,6 @@ from lca.contracts.models.core.policy.loop_policy import (
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols import DecisionGate
 from lca.infrastructure.session.context.turn_control_reader import (
-    ControlTurnView,
     control_turns,
     iter_control_turns_reversed,
 )
@@ -136,7 +139,7 @@ class ProgressLoopDetector(DecisionGate):
         if not build_delivery_evidence(state).satisfied:
             return 0
         count = 0
-        for turn in iter_control_turns_reversed(state):
+        for turn in iter_control_turns_reversed(state, files_created_fn=observation_files_created):
             if turn.action_type != ActionType.USE_TOOL:
                 break
             if not turn.observation_success:
@@ -155,7 +158,7 @@ class ProgressLoopDetector(DecisionGate):
     def _count_consecutive_no_progress(state: AgentState) -> int:
         """Count consecutive recent turns that produced no progress."""
         count = 0
-        for turn in iter_control_turns_reversed(state):
+        for turn in iter_control_turns_reversed(state, files_created_fn=observation_files_created):
             if turn.action_type != ActionType.USE_TOOL:
                 break
             if ProgressLoopDetector._turn_has_meaningful_progress(turn):
@@ -167,7 +170,7 @@ class ProgressLoopDetector(DecisionGate):
     def _recent_tool_history(state: AgentState, *, n: int) -> list[str]:
         """Return the last n tool names from control turns (oldest-first)."""
         tools: list[str] = []
-        for turn in control_turns(state):
+        for turn in control_turns(state, files_created_fn=observation_files_created):
             if turn.action_type != ActionType.USE_TOOL:
                 continue
             if not turn.tool_name:
