@@ -134,47 +134,21 @@ class SpineCore:
 #   3. narrative / graph / waterfall / otel_trace — capability provide only
 #   4. anomaly — EmitPipeline direct on_event; capability / test surface
 
-# Reflector modules that keep a process-local ``_active_spine`` for emit_*.
-# Soft-import so a partial profile without those plugins still boots.
-_REFLECTOR_SET_ACTIVE_MODULES: tuple[str, ...] = (
-    "lca.plugins.observability.spine.reflectors.runtime",
-    "lca.plugins.observability.spine.reflectors.cognition",
-    "lca.plugins.observability.spine.reflectors.body_llm",
-    "lca.plugins.observability.spine.reflectors.agent_spawn",
-)
-
 
 def _activate_process_local_spine(ctx: PluginContext, event_spine: EventSpine) -> None:
-    """Wire wrap_instrument + known reflectors to the composed EventSpine.
+    """Wire wrap_instrument to the composed EventSpine.
 
     Registers a disposer via ``ctx.effect`` when available so profile
-    unload clears the process-local accessors (mirrors file_sink close).
+    unload clears the process-local accessor (mirrors file_sink close).
     """
     from lca.harness.declarative.compile.instrument.wrap import (
         set_active_spine_accessor,
     )
 
     previous = set_active_spine_accessor(lambda: event_spine)
-    previous_reflectors: list[tuple[Any, Any]] = []
-    import importlib
-
-    for module_path in _REFLECTOR_SET_ACTIVE_MODULES:
-        try:
-            module = importlib.import_module(module_path)
-        except ImportError:
-            continue
-        setter = getattr(module, "set_active_spine", None)
-        getter = getattr(module, "get_active_spine", None)
-        if not callable(setter):
-            continue
-        prior = getter() if callable(getter) else None
-        setter(event_spine)
-        previous_reflectors.append((setter, prior))
 
     def _restore() -> None:
         set_active_spine_accessor(previous)
-        for setter, prior in previous_reflectors:
-            setter(prior)
 
     effect = getattr(ctx, "effect", None)
     if callable(effect):
@@ -262,6 +236,7 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     # EventSpine requires at least one sink; use a no-op sink when no
     # real sinks are configured (all disk writes go through System B).
     if not sinks:
+
         class _NoOpSink:
             def write(self, record: Any) -> None:
                 pass
@@ -282,9 +257,9 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     ctx.provide("event_spine", spine_core)
     ctx.provide("spine_context", SpineContext)
 
-    # ADR-0165.1: publish is not enough — wrap_instrument and reflectors
-    # resolve the process-local accessor. Without this, every emit is a
-    # silent no-op even though FileSink is mounted.
+    # ADR-0165.1: publish is not enough — wrap_instrument resolves the
+    # process-local accessor. Without this, every emit is a silent no-op
+    # even though FileSink is mounted.
     _activate_process_local_spine(ctx, event_spine)
 
     log.debug(
