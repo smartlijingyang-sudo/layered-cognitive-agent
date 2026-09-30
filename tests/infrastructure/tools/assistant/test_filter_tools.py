@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from lca.plugins.assistant.tools import filter_tools_by_assistant
+from lca.infrastructure.tools.assistant.filter import filter_tools_by_assistant
 
 
 class _StubTool:
@@ -260,3 +260,67 @@ class TestVocalSystemToolExempt:
         _write_tools(home, allow=[], deny=["send_message"])
         result = filter_tools_by_assistant([_tool("send_message")], home)
         assert result == ()
+
+    def test_box_tools_kept_even_when_not_in_allow(self, home: Path) -> None:
+        """ADR-0248 平台声带/员工电脑系统工具默认豁免策略过滤。"""
+        _write_tools(home, allow=["readFile"], deny=[])
+        tools = [
+            _tool("readFile"),
+            _tool("box_run_command"),
+            _tool("box_read_file"),
+            _tool("request_box_help"),
+        ]
+        result = filter_tools_by_assistant(tools, home)
+        names = [t.name for t in result]
+        assert "readFile" in names
+        assert "box_run_command" in names
+        assert "box_read_file" in names
+        assert "request_box_help" in names
+
+    def test_box_tools_still_denied_when_explicitly_denied(self, home: Path) -> None:
+        _write_tools(home, allow=[], deny=["box_run_command"])
+        result = filter_tools_by_assistant([_tool("box_run_command")], home)
+        assert result == ()
+
+    def test_allow_narrowing_with_grant_tool_and_plain_tool(self, home: Path) -> None:
+        """A grant-requiring tool needs grant coverage even when allow-listed."""
+        _write_tools(home, allow=["alpha", "writer"], deny=[])
+        _write_grants(home, ["workspace.write"])
+        tools = [
+            _tool("alpha"),
+            _tool("writer", required_grant="workspace.write"),
+        ]
+        result = filter_tools_by_assistant(tools, home)
+        assert [t.name for t in result] == ["alpha", "writer"]
+
+    def test_mcp_tool_grant_denied_when_explicitly_denied(self, home: Path) -> None:
+        """Explicit deny wins over grant coverage for mcp tools too."""
+        _write_tools(home, allow=["mcp"], deny=["aws-mcp"])
+        _write_grants(home, ["aws.admin"])
+        mcp_tool = _tool("mcp__aws-mcp__aws_privileged", required_grant="aws.admin")
+        result = filter_tools_by_assistant([mcp_tool], home)
+        assert result == ()
+
+    def test_local_prefix_matching_with_grant(self, home: Path) -> None:
+        """local_ prefix matches base name for grant-requiring tools."""
+        _write_tools(home, allow=["runCommand"], deny=[])
+        _write_grants(home, ["machine.exec"])
+        tool = _tool("local_runCommand", required_grant="machine.exec")
+        result = filter_tools_by_assistant([tool], home)
+        assert [t.name for t in result] == ["local_runCommand"]
+
+    def test_accepts_string_home_path(self, tmp_path: Path) -> None:
+        """``home_path`` may be a str; the function must not require Path."""
+        home = tmp_path / "str_home"
+        home.mkdir()
+        _write_tools(home, allow=["alpha"], deny=[])
+        result = filter_tools_by_assistant([_tool("alpha")], str(home))
+        assert [t.name for t in result] == ["alpha"]
+
+    def test_empty_allow_with_grant_tool_requires_grant(self, home: Path) -> None:
+        """``allow: []`` keeps grant-agnostic tools but grant tools need grants."""
+        _write_tools(home, allow=[], deny=[])
+        result = filter_tools_by_assistant(
+            [_tool("plain"), _tool("gated", required_grant="missing.grant")], home
+        )
+        assert [t.name for t in result] == ["plain"]

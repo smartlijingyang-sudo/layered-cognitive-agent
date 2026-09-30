@@ -58,7 +58,7 @@ def load_grants(home: Path) -> frozenset[str]:
     """读 ``grants.yaml`` 的 grant 集合（ADR-0242 D13）。
 
     缺失 / 损坏 / 非 list 视为空集合（fail-closed 最窄授权）。过滤语义与
-    ``lca.plugins.assistant.tools`` 一致。
+    ``lca.infrastructure.tools.assistant.filter`` 一致。
     """
     path = home / "grants.yaml"
     if not path.is_file():
