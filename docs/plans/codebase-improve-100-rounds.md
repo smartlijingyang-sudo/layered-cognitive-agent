@@ -73,3 +73,13 @@ Methodology: `skills/improve-codebase-architecture/SKILL.md` vocabulary (module 
 - **Shortstat:** `git show --shortstat e14d73c43` → 4 files changed, 138 insertions(+), 4 deletions(-); gross diff = 142 > 100.
 - **Tests:** `uv run pytest -q tests/infrastructure/session/test_history.py tests/architecture/test_cognition_no_runtime_import.py tests/scenario/llm_1/test_llm_turn.py -m "not real_llm" --no-cov` → **11 passed**. The `test_tool_using_run_evidence.py::test_tool_using_path_fork_reasoner_sandbox_journal_broken_hop_none` failure is pre-existing (reproduced at base commit `d16a4d0d6`).
 - **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
+
+### Round 7 — 2026-09-30
+
+- **Commit:** `762ab2f68`
+- **Architectural concern:** layering violation / dependency direction. `role_card_resolver` (infrastructure) and `collaboration/room.py` (domain) imported `FileRoleLibrary` upward from `lca.agent`.
+- **Change:** moved `FileRoleLibrary` into `lca/infrastructure/roles/role_library.py` (new package), repointed all importers (resolver, room, team seam, tests), fixed the `_DEFAULT_ROLES_DIR` repo-root path, aligned the stale `lca/agent/README.md` module list, and added structural + resolver behavioral tests.
+- **Files:** `lca/infrastructure/roles/role_library.py` (renamed), `lca/infrastructure/roles/__init__.py` (new), `lca/infrastructure/tools/assistant/role_card_resolver.py`, `lca/domain/collaboration/room.py`, `lca/plugins/collaboration/team_1/team_role_library_seam.py`, `lca/agent/README.md`, 3 test files.
+- **Shortstat:** `git show --shortstat 762ab2f68` → 10 files changed, 137 insertions(+), 21 deletions(-); gross diff = 158 > 100.
+- **Tests:** `uv run pytest -q tests/architecture/test_infrastructure_no_agent_import.py tests/scenario/role/test_role_library.py tests/scenario/team_0/test_team_casting.py tests/infrastructure/roles/test_role_card_resolver.py -m "not real_llm" --no-cov` → **29 passed**.
+- **Gates:** ruff check / format --check on touched files: pass; `git diff --check`: clean; `lint-imports` and `check_package_contracts.py`: same pre-existing failures as baseline, no new ones.
