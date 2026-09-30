@@ -8,8 +8,12 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from lca.agent.role_library import AGENCY_ROLES_DIR_ENV, FileRoleLibrary, resolve_roles_dir
 from lca.contracts.protocols.collaboration.casting.casting import CastingError, RoleNotFoundError
+from lca.infrastructure.roles.role_library import (
+    AGENCY_ROLES_DIR_ENV,
+    FileRoleLibrary,
+    resolve_roles_dir,
+)
 
 _CARD_TEMPLATE = """---
 name: {name}

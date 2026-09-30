@@ -42,17 +42,7 @@ log:emit
 
 **模块清单**:
 
-- `lca/agent/_finalize.py`
 - `lca/agent/cognitive_agent.py`
-- `lca/agent/debate.py`
-- `lca/agent/handoff.py`
-- `lca/agent/lead.py`
 - `lca/agent/member_invoke.py`
 - `lca/agent/orchestration_registry.py`
-- `lca/agent/parallel.py`
-- `lca/agent/role_library.py`
-- `lca/agent/sequential.py`
-- `lca/agent/strategy.py`
-- `lca/agent/swarm.py`
 - `lca/agent/team_handle.py`
-- `lca/agent/topology.py`

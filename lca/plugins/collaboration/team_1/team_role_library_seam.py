@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from lca.agent.role_library import FileRoleLibrary
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
@@ -27,6 +26,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.infrastructure.roles.role_library import FileRoleLibrary
 
 
 class Config(BaseModel):

@@ -10,7 +10,6 @@ import json
 import unittest
 from typing import Any
 
-from lca.agent.role_library import FileRoleLibrary
 from lca.application.api.api import Team
 from lca.application.authoring.casting import (
     LLMTeamCaster,
@@ -29,6 +28,7 @@ from lca.contracts.protocols.collaboration.casting.casting import (
     SelectedRole,
 )
 from lca.contracts.protocols.journal.spec.spec import LeadSpec
+from lca.infrastructure.roles.role_library import FileRoleLibrary
 from lca.plugins.collaboration.team_1.team_casting_prompt_renderer_seam import (
     BuiltinCastingPromptRenderer,
 )

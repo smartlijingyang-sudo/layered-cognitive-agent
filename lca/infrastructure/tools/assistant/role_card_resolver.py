@@ -9,13 +9,13 @@ from __future__ import annotations
 from collections import defaultdict
 from pathlib import Path
 
-from lca.agent.role_library import FileRoleLibrary
 from lca.contracts.protocols.assistant.role_resolver import (
     DepartmentSummary,
     RoleCard,
     RoleCardResolver,
     RoleIndexEntry,
 )
+from lca.infrastructure.roles.role_library import FileRoleLibrary
 
 __all__ = ["FileRoleCardResolver"]
 
@@ -73,11 +73,7 @@ class FileRoleCardResolver(RoleCardResolver):
         )
 
     def list_by_department(self, department_id: str) -> tuple[RoleIndexEntry, ...]:
-        return tuple(
-            entry
-            for entry in self._library.index()
-            if entry.department == department_id
-        )
+        return tuple(entry for entry in self._library.index() if entry.department == department_id)
 
     def search(self, keyword: str) -> tuple[RoleIndexEntry, ...]:
         kw = keyword.lower()
