@@ -18,6 +18,7 @@ PR-0 只验证 fold 模块语义(reason / series 由 PR-2 publisher 状态决定
 from __future__ import annotations
 
 from collections.abc import Mapping
+from types import SimpleNamespace
 from typing import Any
 
 from lca_kernel.events.fold.fold import (
@@ -356,3 +357,31 @@ def test_fold_step_tree_multiple_turns() -> None:
     assert tree.turns[1].ended is False
     assert tree.active_turn == 1
     assert tree.active_step == (1, 0)
+
+
+# ── 输入 morphism:对象信封 / 缺省 category(经 barrel 回归)──────────────
+
+
+def test_fold_request_header_accepts_object_envelope_and_missing_category() -> None:
+    """``foldRequestHeader`` 经 barrel 接受对象信封与缺省 category 的 raw dict。
+
+    输入 morphism(:func:`_coerce_event`)支持 :class:`SpineEventRecord` 形态
+    (``category`` / ``payload`` 属性)与缺省 ``category`` 的 Mapping
+    (视为 ``spine.llm.request.header``);拆分后 barrel 路径必须保持这两条
+    入口可用。
+    """
+    object_event = SimpleNamespace(
+        category="spine.llm.request.header",
+        payload={"config": CONFIG_BASE, "system": "object"},
+    )
+    raw_dict_event = {"payload": {"config": CONFIG_BASE, "system": "raw"}}
+
+    assert foldRequestHeader([object_event]) == EpochHeader(config=CONFIG_BASE, system="object")
+    assert foldRequestHeader([raw_dict_event]) == EpochHeader(config=CONFIG_BASE, system="raw")
+
+
+def test_fold_request_header_skips_unrecognized_envelopes() -> None:
+    """``foldRequestHeader`` 对不可识别信封跳过,不抛(返回 ``from_``)。"""
+    baseline = EpochHeader(config=CONFIG_BASE, system="base")
+    assert foldRequestHeader(["not-an-event"], from_=baseline) is baseline
+    assert foldRequestHeader([42], from_=baseline) is baseline
