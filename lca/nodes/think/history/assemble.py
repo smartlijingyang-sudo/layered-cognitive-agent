@@ -146,12 +146,12 @@ class HistoryDeriveExecutor:
     semantic_name: str = "history.derive"
     region: str = "think"
     declared_inputs: tuple[PortName, ...] = (
-        "state",
-        "writer",
-        "forked_tools",
-        "turn_render",
+        PortName("state"),
+        PortName("writer"),
+        PortName("forked_tools"),
+        PortName("turn_render"),
     )
-    declared_outputs: tuple[PortName, ...] = ("model_visible_request",)
+    declared_outputs: tuple[PortName, ...] = (PortName("model_visible_request"),)
 
     async def node_execute(
         self,
@@ -159,19 +159,19 @@ class HistoryDeriveExecutor:
         input: NodeInput,
     ) -> NodeOutput:
         """Resolve declared ports, build the request, return typed output."""
-        state = _resolve_port("state", input=input, context=context)
-        writer = _resolve_port("writer", input=input, context=context)
+        state = _resolve_port(PortName("state"), input=input, context=context)
+        writer = _resolve_port(PortName("writer"), input=input, context=context)
         del state
         messages = writer.derive_messages()
         header = writer.request_header()
         system = _resolve_system(
             header=header,
-            render=input.port_values.get("turn_render"),
+            render=input.port_values.get(PortName("turn_render")),
         )
         system = _refresh_standing(system, runtime=context.runtime)
         system = _append_standing_diff(system, runtime=context.runtime)
         system = _append_alignment_synthesis(system, runtime=context.runtime)
-        tools, defer_catalog = _forked_to_tools_deferred(input.port_values.get("forked_tools"))
+        tools, defer_catalog = _forked_to_tools_deferred(input.port_values.get(PortName("forked_tools")))
         # The folded header is last turn's request, catalog included.
         # Appending again stacks a second copy of the same directory.
         system = _strip_defer_catalog(system)
@@ -179,7 +179,7 @@ class HistoryDeriveExecutor:
             system = f"{system}\n\n{defer_catalog}" if system else defer_catalog
         return NodeOutput(
             port_values={
-                "model_visible_request": ModelVisibleRequest(
+                PortName("model_visible_request"): ModelVisibleRequest(
                     messages=messages, system=system, tools=tools
                 )
             }
@@ -212,7 +212,7 @@ def _strip_defer_catalog(system: str) -> str:
     return system.strip()
 
 
-def _resolve_port(name: str, *, input: NodeInput, context: NodeContext) -> Any:
+def _resolve_port(name: PortName, *, input: NodeInput, context: NodeContext) -> Any:
     """Read a declared port from ``input.port_values`` or ``context.runtime``."""
     value = input.port_values.get(name)
     if value is None and hasattr(context, "runtime") and context.runtime is not None:
@@ -322,8 +322,10 @@ def _refresh_standing(system: str, *, runtime: object) -> str:
 
 def _home_path(runtime: object) -> str | None:
     home = getattr(runtime, "home_path", None)
-    if not home and hasattr(runtime, "get"):
-        home = runtime.get("home_path")
+    if not home:
+        get = getattr(runtime, "get", None)
+        if callable(get):
+            home = get("home_path")
     if home:
         return str(home)
     return _live_bindings_home()
