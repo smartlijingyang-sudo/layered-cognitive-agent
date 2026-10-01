@@ -70,12 +70,6 @@ class JournalDocument:
             return self.totals.steps
         return len(self.steps)
 
-    def total_segments(self) -> int:
-        """返回 segment 总数（3.1 totals.segments，3.0 返回 -1）。"""
-        if self.totals is None:
-            return -1
-        return self.totals.segments
-
     def total_phases(self) -> int:
         """返回 phase 总数（3.1 totals.phases，3.0 返回 -1）。"""
         if self.totals is None:
@@ -89,13 +83,6 @@ class JournalDocument:
         """
         for step in self.steps:
             if step.step_index == step_index:
-                return step
-        return None
-
-    def step_by_id(self, step_id: str) -> JournalStep | None:
-        """按 step_id 查找(O(n), 但 reader 调用不频繁)。"""
-        for step in self.steps:
-            if step.step_id == step_id:
                 return step
         return None
 
