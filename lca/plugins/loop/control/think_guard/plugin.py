@@ -22,6 +22,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.models.core.execution.decision import Decision
+from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -64,8 +65,8 @@ class ThinkGuardEnforceExecutor:
 
     semantic_name: str = "control.think.guard.enforce"
     region: str = "phase:think"
-    declared_inputs: tuple[PortName, ...] = ("decision",)
-    declared_outputs: tuple[PortName, ...] = ("decision",)
+    declared_inputs: tuple[PortName, ...] = (PortName("decision"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("decision"),)
 
     async def node_execute(
         self,
@@ -73,13 +74,13 @@ class ThinkGuardEnforceExecutor:
         input: NodeInput,
     ) -> NodeOutput:
         runtime = context.runtime or {}
-        decision = input.port_values.get("decision")
+        decision = input.port_values.get(PortName("decision"))
         routing = RoutingDecision(action_type=ActionType.RESPOND)
         if not isinstance(decision, Decision):
-            return NodeOutput(port_values={"decision": None, "routing": routing})
+            return NodeOutput(port_values={PortName("decision"): None, PortName("routing"): routing})
         gate_service = runtime.get("gates")
         if gate_service is None:
-            return NodeOutput(port_values={"decision": decision, "routing": routing})
+            return NodeOutput(port_values={PortName("decision"): decision, PortName("routing"): routing})
         from lca.cognition.brain.gate.service import GateService
 
         if not isinstance(gate_service, GateService):
@@ -87,8 +88,14 @@ class ThinkGuardEnforceExecutor:
                 "phase capability 'gates' must be GateService, "
                 f"got {type(gate_service).__name__}"
             )
-        enforced = await gate_service.assemble().enforce(runtime.get("agent_state"), decision)
-        return NodeOutput(port_values={"decision": enforced, "routing": routing})
+        agent_state = runtime.get("agent_state")
+        if not isinstance(agent_state, AgentState):
+            raise TypeError(
+                "phase capability 'agent_state' must be AgentState, "
+                f"got {type(agent_state).__name__}"
+            )
+        enforced = await gate_service.assemble().enforce(agent_state, decision)
+        return NodeOutput(port_values={PortName("decision"): enforced, PortName("routing"): routing})
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,8 +104,8 @@ class ThinkGuardExecutor:
 
     semantic_name: str = "control.think.guard"
     region: str = "phase:think"
-    declared_inputs: tuple[PortName, ...] = ("decision",)
-    declared_outputs: tuple[PortName, ...] = ("verdict",)
+    declared_inputs: tuple[PortName, ...] = (PortName("decision"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("verdict"),)
 
     async def node_execute(
         self,
@@ -106,7 +113,7 @@ class ThinkGuardExecutor:
         input: NodeInput,
     ) -> NodeOutput:
         del context
-        decision = input.port_values.get("decision")
+        decision = input.port_values.get(PortName("decision"))
         if not isinstance(decision, Decision):
             verdict = ControlVerdict(
                 kind=ControlVerdictKind.ALLOW,
@@ -115,8 +122,8 @@ class ThinkGuardExecutor:
             )
             return NodeOutput(
                 port_values={
-                    "verdict": verdict,
-                    "routing": RoutingDecision(action_type=ActionType.RESPOND),
+                    PortName("verdict"): verdict,
+                    PortName("routing"): RoutingDecision(action_type=ActionType.RESPOND),
                 },
             )
         if not _is_known_action(decision):
@@ -127,8 +134,8 @@ class ThinkGuardExecutor:
             )
             return NodeOutput(
                 port_values={
-                    "verdict": verdict,
-                    "routing": RoutingDecision(
+                    PortName("verdict"): verdict,
+                    PortName("routing"): RoutingDecision(
                         action_type=ActionType.RESPOND,
                         should_terminate=True,
                         next_hint="stop",
@@ -144,8 +151,8 @@ class ThinkGuardExecutor:
         should_terminate = kind == ControlVerdictKind.STOP
         return NodeOutput(
             port_values={
-                "verdict": verdict,
-                "routing": RoutingDecision(
+                PortName("verdict"): verdict,
+                PortName("routing"): RoutingDecision(
                     action_type=ActionType.RESPOND,
                     should_terminate=should_terminate,
                     next_hint="stop" if should_terminate else None,
