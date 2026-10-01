@@ -115,8 +115,10 @@ def dedupe_semantic_memory(home_path: str | Path) -> int:
         source = str(entry.get("source") or "model")
         # user 陈述 > tool 观察 > model 推断；权威度越高越靠前。
         source_rank = {"user": 3, "tool": 2, "model": 1}.get(source, 0)
-        confidence = float(entry.get("confidence") or 0.0)
-        created = int(entry.get("created_at_ms") or 0)
+        confidence_raw = entry.get("confidence") or 0.0
+        confidence = float(confidence_raw) if isinstance(confidence_raw, (int, float, str)) else 0.0
+        created_raw = entry.get("created_at_ms") or 0
+        created = int(created_raw) if isinstance(created_raw, (int, float, str)) else 0
         return (source_rank, confidence, created)
 
     groups: dict[tuple[object, ...], list[dict[str, object]]] = {}
@@ -138,7 +140,11 @@ def dedupe_semantic_memory(home_path: str | Path) -> int:
         for entry in group[1:]:
             entry["deleted"] = True
             entry["retired_at_ms"] = entry.get("retired_at_ms") or now_ms
-            entry.setdefault("metadata", {})["superseded_reason"] = "deduped"
+            metadata = entry.get("metadata")
+            if not isinstance(metadata, dict):
+                metadata = {}
+                entry["metadata"] = metadata
+            metadata["superseded_reason"] = "deduped"
             changed += 1
 
     if changed or key_rewritten:
