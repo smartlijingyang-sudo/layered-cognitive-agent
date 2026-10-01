@@ -96,8 +96,8 @@ class DelegationEnvelope:
 4. **不可逆失败三步断言**：mock 一个"上报失败但实际已发生"的成员调用，父走完查效果→记完成→不重试三步，journal 可查。
 5. **真实 run 断言**：一次多成员 pipeline 委派 run，journal 里 `DelegationIssued → (成员 steps) → DelegationCompleted → 复核事件` 链条完整。
 
-## 7. 待用户拍板（只提案，不决定）
+## 7. 决策记录（2026-10-01，李超授权 Athena 决定）
 
-1. **信封走 transport 的序列化上限**：peer 可能是另一个用户的助理，standing 全量是否脱敏/裁剪——默认给全量，peer 场景可能需要 `standing_redacted` 变体；
-2. **父 turn 摘要的生成器**：用模型即时摘要（准、贵）还是 journal step-tree 派生（便宜、事实级）——本 ADR 倾向后者（ADR-0164 step-tree 已有），但实现成本需评估；
-3. **是否把 `invoke(member, task)` 签名直接升级为信封**：破坏性小的是新增 `invoke_with_envelope`，干净的是直接升级——倾向直接升级（COMPAT 原则允许同 PR 删 shim），但这是 API 变更，需用户点头。
+1. **peer 场景信封脱敏——采用 `standing_redacted` 变体**：跨信任边界（peer、走 transport）默认发脱敏信封，剥离 PII（姓名、住址、联系方式、账号标识等），保留任务相关上下文；同机 subagent 本来就继承 transcript，继续用全量。理由：最小权限 / need-to-know，与生产 agent 的 discretion 原则一致（knowing much, showing little）。
+2. **父 turn 摘要生成器——journal step-tree 派生**：journal 是事实源，摘要从结构化记录派生，确定性、可审计、可复现、零额外模型成本；模型即时摘要有幻觉风险且不可复现，仅作 journal 缺失时的 fallback。
+3. **`invoke(member, task)` 签名——直接升级为信封**：不新增 `invoke_with_envelope`（避免 API 双轨）；保留 `task: str` 作为便捷参数，内部统一构造最小信封，向后兼容。
