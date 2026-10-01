@@ -111,6 +111,7 @@ class FileWriteTool(Tool):
     """file_write Tool 实现。"""
 
     name = "file_write"
+    namespace = "file"  # ADR-0256: 与 MANIFEST.api[0].namespace 一致
     description = MANIFEST.api[0].description
     parameters: ClassVar[dict[str, Any]] = MANIFEST.api[0].parameters
     is_idempotent = True
@@ -190,6 +191,7 @@ def build_file_write_tool() -> Tool:
         (Tool,),
         {
             "name": impl.name,
+            "namespace": impl.namespace,
             "description": impl.description,
             "parameters": impl.parameters,
             "is_idempotent": impl.is_idempotent,
