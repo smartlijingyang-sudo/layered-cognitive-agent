@@ -3,7 +3,7 @@
 C1-C4 可直接运行:未加载域调用被拒(错误抛回模型重试,不杀 run);
 已加载/eager 域放行.
 F2 可直接运行:截断参数值被拒(关联在研 _TRUNCATED_VALUE 改动).
-F3 以 skip 锁定待实现的重复发射去重.
+F3 已是真用例:同 turn 重复发射去重（test_f3_duplicate_emissions_in_one_turn_deduplicated）。
 """
 
 from __future__ import annotations
