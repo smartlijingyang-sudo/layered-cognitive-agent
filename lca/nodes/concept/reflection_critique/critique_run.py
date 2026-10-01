@@ -12,7 +12,7 @@ capability → RuntimeError(fail-loud),不允许静默回退到 NullCritic
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -46,8 +46,8 @@ class ReflectCritiqueRunExecutor:
 
     semantic_name: str = "reflect.critique.run"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("observation", "state")
-    declared_outputs: tuple[PortName, ...] = ("reflection",)
+    declared_inputs: tuple[PortName, ...] = (PortName("observation"), PortName("state"))
+    declared_outputs: tuple[PortName, ...] = (PortName("reflection"),)
 
     async def node_execute(
         self,
@@ -60,8 +60,8 @@ class ReflectCritiqueRunExecutor:
         outputs 端口(yaml):reflection (Reflection)
         """
         runtime = context.runtime
-        observation = input.port_values.get("observation")
-        state = input.port_values.get("state") or runtime.state
+        observation = input.port_values.get(PortName("observation"))
+        state = input.port_values.get(PortName("state")) or getattr(runtime, "state", None)
 
         if not isinstance(observation, Observation):
             raise TypeError(
@@ -75,13 +75,13 @@ class ReflectCritiqueRunExecutor:
             )
 
         critic = _resolve_critic(runtime)
-        reflection = await critic.critique(state, observation)
+        reflection = await critic.critique(cast("AgentState", state), observation)
         if not isinstance(reflection, Reflection):
             raise TypeError(
                 "reflect.critique.run: Critic.critique must return a "
                 f"Reflection instance, got {type(reflection).__name__}"
             )
-        return NodeOutput(port_values={"reflection": reflection})
+        return NodeOutput(port_values={PortName("reflection"): reflection})
 
 
 def _resolve_critic(runtime: Any) -> Critic:
