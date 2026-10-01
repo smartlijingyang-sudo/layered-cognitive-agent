@@ -94,9 +94,7 @@ async def onboarding_presets(request: Request) -> JSONResponse:
         root = store.root
         for entry in store.list_installed():
             package_root = root / entry.skill_id
-            if (package_root / "SKILL.md").is_file() and (
-                package_root / "manifest.json"
-            ).is_file():
+            if (package_root / "SKILL.md").is_file() and (package_root / "manifest.json").is_file():
                 skills.append(
                     {
                         "id": entry.skill_id,
@@ -110,8 +108,61 @@ async def onboarding_presets(request: Request) -> JSONResponse:
     return _json({"roles": roles, "skills": skills}, status_code=200)
 
 
+def _ownership_from_request(request: Request) -> Any | None:
+    state = getattr(request, "app", None)
+    if state is None:
+        return None
+    state_obj = getattr(state, "state", None)
+    if state_obj is None:
+        return None
+    return getattr(state_obj, "assistant_ownership", None)
+
+
+async def onboarding_welcome(request: Request) -> JSONResponse:
+    """``GET /v1/onboarding/welcome`` —— 首次迎新 / 打招呼话术（两阶段同构）。"""
+    expected_token, dev_mode = auth_config_of(request)
+    user_id, auth_error = user_id_from_request(
+        request, expected_token=expected_token, dev_mode=dev_mode
+    )
+    if auth_error is not None:
+        return auth_error
+
+    user_store = _ownership_from_request(request)
+    state = user_store.get_onboarding_state(user_id) if user_store else "pending"
+
+    user_name = ""
+    if user_store and state == "completed":
+        from lca.application.onboarding.script import extract_user_name_from_user_md
+
+        user_name = extract_user_name_from_user_md(user_store.get_user_md(user_id) or "")
+
+    assistant_name = str(request.query_params.get("assistant_name") or "小助")
+    role_title = str(request.query_params.get("role_title") or "专属")
+
+    from lca.application.onboarding.script import get_onboarding_opening_messages
+
+    msgs = get_onboarding_opening_messages(
+        user_state=state,
+        user_name=user_name,
+        assistant_name=assistant_name,
+        role_title=role_title,
+    )
+
+    return _json(
+        {
+            "user_id": user_id,
+            "onboarding_state": state,
+            "messages": list(msgs),
+            "step": "ask_user_name" if state == "pending" else "assistant_ready",
+            "user_name": user_name,
+        },
+        status_code=200,
+    )
+
+
 ROUTE_SPECS: tuple[RouteSpec, ...] = (
     RouteSpec("/v1/onboarding/presets", onboarding_presets, ("GET", "OPTIONS")),
+    RouteSpec("/v1/onboarding/welcome", onboarding_welcome, ("GET", "OPTIONS")),
 )
 
 

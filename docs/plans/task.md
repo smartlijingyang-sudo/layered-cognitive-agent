@@ -417,6 +417,6 @@
 | ONBOARDING-TASK-1 | 契约与数据库持久化增强 (`NamingCandidate`, `NamingWidgetPayload`, `user_store.py`) | Completed | 成功落地 NamingCandidate/NamingWidgetPayload 契约，扩展 SQLite 与 Postgres user_store 的 user_md 持久化与 CRUD 接口，单测 4/4 passed，commit 7824145df |
 | ONBOARDING-TASK-2 | 自管理工具链落地 (`CreateNameWidgetTool` & `UpdateIdentityTool`) | Completed | 成功落地 CreateNameWidgetTool 与 UpdateIdentityTool，支持 USER.md/IDENTITY.md 写入、Widget Token 生成与 🎉 庆祝回执，单测 2/2 passed，commit 2a5b3f576 |
 | ONBOARDING-TASK-3 | 助理创建自动继承老用户画像 (`AssistantCatalog.create`) | Completed | 成功在 AssistantCatalog.create 接入 user_store.get_user_md 自动继承机制，显式传入优先，单测 2/2 passed，commit 95b5e84ae |
-| ONBOARDING-TASK-4 | 开场白脚本化编排与网关 Reaction 桥接 | Pending | 待执行 |
-| ONBOARDING-TASK-5 | 前端 LobeHub UI 起名 Widget 补丁与交互组件 | Pending | 待执行 |
+| ONBOARDING-TASK-4 | 开场白脚本化编排与网关 Reaction 桥接 | Completed | 成功落地 lca/application/onboarding/script.py 编排逻辑与 /v1/onboarding/welcome 端点，支持新老用户两阶段同构开场白，7/7 测试通过，ruff 门禁 clean |
+| ONBOARDING-TASK-5 | 前端 LobeHub UI 起名 Widget 补丁与交互组件 | In Progress | 编写起名卡片组件补丁与测试 |
 | ONBOARDING-TASK-6 | 全链路不变量集成测试与门禁核验 (INV-01 ~ INV-08) | Pending | 待执行 |

@@ -39,14 +39,18 @@ async def test_onboarding_route_registers() -> None:
     ctx = _FakeCtx(router)
     await plugin.setup(ctx, None)
     assert "/v1/onboarding/presets" in router._exact
-    assert len(ctx._fake_runtime.effects) == 1
+    assert "/v1/onboarding/welcome" in router._exact
+    assert len(ctx._fake_runtime.effects) == 2
 
 
 def test_onboarding_route_exposes_public_constant() -> None:
     from lca.plugins.transport.webserver.routes_1.routes_onboarding import ROUTE_SPECS
 
     assert isinstance(ROUTE_SPECS, tuple)
-    assert {spec.path for spec in ROUTE_SPECS} == {"/v1/onboarding/presets"}
+    assert {spec.path for spec in ROUTE_SPECS} == {
+        "/v1/onboarding/presets",
+        "/v1/onboarding/welcome",
+    }
 
 
 # ── handler 行为（ADR-0252 D7）────────────────────────────────────────
@@ -132,3 +136,65 @@ async def test_onboarding_presets_returns_roles_and_skills(
         {"id": "r1", "title": "Arch", "description": "s", "avatar": "🏛️", "category": "engineering"}
     ]
     assert payload["skills"] == [{"id": "sk1", "name": "Skill One", "description": "does x"}]
+
+
+class _FakeOwnership:
+    def __init__(self) -> None:
+        self.states: dict[str, str] = {}
+        self.user_mds: dict[str, str] = {}
+
+    def get_onboarding_state(self, user_id: str) -> str:
+        return self.states.get(user_id, "pending")
+
+    def get_user_md(self, user_id: str) -> str | None:
+        return self.user_mds.get(user_id)
+
+
+def test_onboarding_welcome_handler_pending_and_completed() -> None:
+    from starlette.applications import Starlette
+    from starlette.routing import Route
+    from starlette.testclient import TestClient
+
+    from lca.plugins.transport.webserver.router.router import RouteRegistry
+    from lca.plugins.transport.webserver.routes_1.routes_onboarding import (
+        onboarding_welcome,
+    )
+
+    app = Starlette()
+    router = RouteRegistry()
+    router.register_http(
+        Route("/v1/onboarding/welcome", onboarding_welcome, methods=["GET", "OPTIONS"])
+    )
+    router.install(app)
+
+    fake_store = _FakeOwnership()
+    app.state.assistant_ownership = fake_store
+
+    client = TestClient(app)
+
+    # 1. Pending user -> 2 opening bubbles
+    resp_pending = client.get(
+        "/v1/onboarding/welcome",
+        headers={"x-lca-user-id": "new_user", "Authorization": "Bearer lca-local"},
+    )
+    assert resp_pending.status_code == 200
+    data_pending = resp_pending.json()
+    assert data_pending["onboarding_state"] == "pending"
+    assert data_pending["step"] == "ask_user_name"
+    assert len(data_pending["messages"]) == 2
+
+    # 2. Completed user -> 1 personalized greeting
+    fake_store.states["existing_user"] = "completed"
+    fake_store.user_mds["existing_user"] = "# USER.md\n- **Name:** 李超\n"
+
+    resp_completed = client.get(
+        "/v1/onboarding/welcome?assistant_name=星澜&role_title=架构师",
+        headers={"x-lca-user-id": "existing_user", "Authorization": "Bearer lca-local"},
+    )
+    assert resp_completed.status_code == 200
+    data_completed = resp_completed.json()
+    assert data_completed["onboarding_state"] == "completed"
+    assert data_completed["step"] == "assistant_ready"
+    assert len(data_completed["messages"]) == 1
+    assert "李超" in data_completed["messages"][0]
+    assert "星澜" in data_completed["messages"][0]
