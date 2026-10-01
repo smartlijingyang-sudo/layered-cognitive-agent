@@ -304,7 +304,7 @@ async def update_standing_file(request: Request) -> JSONResponse:
                 # 同步更新 user_store
                 user_store = getattr(request.app.state, "user_store", None)
                 if user_store is None:
-                    user_store = getattr(catalog, "_user_store", None)
+                    user_store = getattr(catalog, "user_store", None)
                 if user_store is not None and user_id:
                     with contextlib.suppress(Exception):
                         user_store.update_user_md(user_id, new_content)

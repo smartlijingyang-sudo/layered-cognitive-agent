@@ -56,7 +56,7 @@ class _BaseOnboardingTool(Tool):
         self._catalog = catalog
         self._assistant_id = assistant_id
         if user_store is None:
-            user_store = getattr(catalog, "_user_store", None)
+            user_store = getattr(catalog, "user_store", None)
         if user_id is None:
             import contextlib
             import json

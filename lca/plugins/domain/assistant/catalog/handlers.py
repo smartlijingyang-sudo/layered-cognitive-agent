@@ -299,6 +299,14 @@ class _AssistantCatalogImpl(_AssistantCatalogEventsMixin, AssistantCatalog):
 
     # ── 公开面 ────────────────────────────────────────────────────────
 
+    @property
+    def user_store(self) -> Any | None:
+        """只读 accessor：onboarding 工具 / standing_files 路由回退取 user_store 的公开入口。
+
+        替代直接 getattr(catalog, "_user_store") 的分层越界。
+        """
+        return self._user_store
+
     def create(self, req: CreateAssistantRequest) -> AssistantHandle:
         """物化 Home + manifest;发 ``assistant.created`` EP。
 
