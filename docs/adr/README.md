@@ -1,3 +1,17 @@
+On branch main
+Your branch is ahead of 'origin/main' by 45 commits.
+  (use "git push" to publish your local commits)
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   lca/infrastructure/observability/events/event/doc/doc.py
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	docs/adr/0261-self-introspection-projection.md
+
+no changes added to commit (use "git add" and/or "git commit -a")
 # ADR
 
 本目录只收录架构决策；过程文档不在此。
@@ -198,6 +212,7 @@
 | [0258](0258-compaction-exemption-and-reinjection.md) | 压缩豁免与重注契约：standing 永不进压缩流、摘要带  血统、刷新读失败保留旧块 fail-closed；ADR-0255 §4.5 的 LCA 落地提案 | Proposed |
 | [0259](0259-timestamp-trust-and-date-derivation.md) | 时间戳信任与日期推导契约：now 唯一来源升不变量、日期推导必须经可信工具验证、事件/记录/检索三时间分离；ADR-0255 §4.7 的 LCA 落地提案 | Proposed |
 | [0260](0260-forced-retrieval-and-write-before-claim.md) | 强制检索与写盘铁律契约：写盘确认门（acknowledgement.py）升不变量、检索义务决策树升契约+补 home-bound 渲染盲区、当场写/先读后写/冲突原地修正/凭证红线四纪律；ADR-0255 §4.2/§4.3 的 LCA 落地提案 | Proposed |
+| [0261](0261-self-introspection-projection.md) | 自省投影契约：自省答案只许来自本 turn 注入块（禁用工作区文件搜寻）、点名配置文件必须真实注入（BackstorySection 守卫升不变量并推广）、新增只读自省工具与写工具配对；ADR-0255 §4.8 的 LCA 落地提案 | Proposed |
 | [0255](0255-muse-production-runtime-full-reference.md) | Muse 生产运行时全量参考：每 turn 上下文装配顺序、9 个 standing 文件全文与权限矩阵、36 工具命名空间函数清单与关键参数、9 大机制（记忆三层/强制检索/落笔写盘/provenance/压缩豁免/子 agent 继承/自省投影）与 12 条验收用例；ADR-0254 的实证 companion | Proposed |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
