@@ -11,7 +11,8 @@ No tool writes Home config files or USER.md directly.
 from __future__ import annotations
 
 import time
-from typing import Any, ClassVar
+from collections.abc import Awaitable, Callable
+from typing import Any, ClassVar, Literal
 
 from lca.contracts.atoms.enums.enums import ContentType, MemoryCategory, MemoryLayer
 from lca.contracts.atoms.ids.ids import new_id
@@ -87,6 +88,7 @@ class MemorySearchTool(_BaseMemoryTool):
     """Search the assistant's structured memory and branch memory (read-only)."""
 
     name = _MEMORY_SEARCH_TOOL
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
     required_grant: ClassVar[str] = "profile.revise"
     description = (
         "搜索当前助理的结构化记忆（身份/偏好/事实）与每日流水全文索引。只读，不修改任何数据。"
@@ -217,6 +219,7 @@ class MemoryAddTool(_BaseMemoryTool):
     """
 
     name = _MEMORY_ADD_TOOL
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     required_grant: ClassVar[str] = "profile.revise"
     description = (
         "把用户明确陈述的身份/偏好/事实写入结构化记忆。"
@@ -316,6 +319,7 @@ class MemoryUpdateTool(_BaseMemoryTool):
     """Supersede an existing memory record with a corrected fact."""
 
     name = _MEMORY_UPDATE_TOOL
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     required_grant: ClassVar[str] = "profile.revise"
     description = (
         "用新事实替换一条已有记忆记录（旧记录标记 superseded，保留审计）。"
@@ -386,6 +390,7 @@ class MemoryExplainTool(_BaseMemoryTool):
     """Expand one memory record into its eight audit fields."""
 
     name = _MEMORY_EXPLAIN_TOOL
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
     is_idempotent = True
     required_grant: ClassVar[str] = "profile.revise"
     description = (
@@ -429,6 +434,7 @@ class PersonNoteTool(_BaseMemoryTool):
     """Write one person page under the assistant home and refresh the index."""
 
     name = _PERSON_NOTE_TOOL
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     required_grant: ClassVar[str] = "profile.revise"
     description = (
         "记下一个人。按当前主目录的上下文布局写入人物页，并重写人物索引。"
@@ -469,6 +475,7 @@ class GroupNoteTool(_BaseMemoryTool):
     """Write one group page under the assistant home and refresh the index."""
 
     name = _GROUP_NOTE_TOOL
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     required_grant: ClassVar[str] = "profile.revise"
     description = (
         "记下一个群体。按当前主目录的上下文布局写入群体页，并重写群体索引。"
@@ -509,6 +516,7 @@ class MemoryRemoveTool(_BaseMemoryTool):
     """Remove a memory record (sensitive, requires confirmation)."""
 
     name = _MEMORY_REMOVE_TOOL
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     required_grant: ClassVar[str] = "profile.revise"
     description = (
         "删除一条记忆记录（不可逆，敏感操作）。必须先经用户确认。"
@@ -548,7 +556,7 @@ def assistant_memory_tools_from_run(
     run: object | None,
     *,
     catalog: object,
-    profile_backfill: object | None = None,
+    profile_backfill: Callable[[str, list[MemoryRecord]], Awaitable[None]] | None = None,
 ) -> list[Tool]:
     """物化受治理记忆工具；run 绑定 assistant_id 时出现。
 
