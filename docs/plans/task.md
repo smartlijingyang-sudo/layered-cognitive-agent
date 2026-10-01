@@ -421,8 +421,8 @@
 | ONBOARDING-TASK-5 | 前端 LobeHub UI 起名 Widget 补丁与交互组件 | Completed | 成功落地 AssistantNamingWidget.tsx 与 assistant_naming_widget.py 声明式补丁，支持候选点选、自定义输入、实时预览与庆祝 Reaction，通过 byte-identical 完整性验证 |
 | ONBOARDING-TASK-6 | 全链路不变量集成测试与门禁核验 (INV-01 ~ INV-08) | Completed | 成功落地 tests/scenario/test_conversational_onboarding_e2e.py，覆盖 INV-01~08 全量不变量（终身单次幂等、DB SSOT、单写Digest、新助理画像自动继承、开场白定速、严格冻结契约、🎉庆祝Reaction、多租户强隔离），20/20 测试全绿，ruff 0 违规，byte-identical clean |
 | BRAINSTORM-FILE-SSOT-CONTEXT | 深度剖析文件即 SSOT、Standing 文件与前端编辑弹窗架构 | Completed | 已摸透 LCA 现有 layout.toml 9 大 Standing 文件、refresh_injected 实时注入、Catalog revise_profile 及双写机制 |
-| BRAINSTORM-FILE-SSOT-QUESTIONS | 澄清文件编辑器弹窗定位、与 Onboarding 关系及落地节奏（单步提问） | In Progress | 提炼关键设计共鸣并向用户发起单步澄清提问 |
-| BRAINSTORM-FILE-SSOT-APPROACHES | 提出 2-3 种前后端传输与交互落地架构方案及权衡 | Pending | 待提炼 |
-| BRAINSTORM-FILE-SSOT-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/双写并发/测试不变量）并获取审批 | Pending | 待呈现 |
-| BRAINSTORM-FILE-SSOT-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Pending | 待落盘 |
-| BRAINSTORM-FILE-SSOT-TRANSITION | 转换至实施计划制定（writing-plans） | Pending | 待转换 |
+| BRAINSTORM-FILE-SSOT-QUESTIONS | 澄清文件编辑器弹窗定位、与 Onboarding 关系及落地节奏（单步提问） | Completed | 用户明确排期独立于 Onboarding，重点打造 Muse 风格高质感前端编辑体验 |
+| BRAINSTORM-FILE-SSOT-APPROACHES | 提出 2-3 种前后端传输与交互落地架构方案及权衡 | Completed | 提出 4 级渐进体验与模块化 Patch 方案，用户已明确确认 (ok) |
+| BRAINSTORM-FILE-SSOT-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/双写并发/测试不变量）并获取审批 | Completed | 全部 4 节（系统边界/交互拓扑/REST契约与并发锁/测试矩阵）已获用户确认 |
+| BRAINSTORM-FILE-SSOT-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-01-assistant-avatar-drawer-and-file-ssot-editor-design.md 并提交 git |
+| BRAINSTORM-FILE-SSOT-TRANSITION | 转换至实施计划制定（writing-plans） | In Progress | 转换至 writing-plans 制定实施计划 |
