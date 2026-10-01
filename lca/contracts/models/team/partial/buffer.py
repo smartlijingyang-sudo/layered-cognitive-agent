@@ -31,14 +31,6 @@ def append_run_partial(text: str) -> None:
     buf.append(text)
 
 
-def peek_run_partial() -> str:
-    """查看当前缓冲（不清空）。"""
-    buf = _partial_chunks.get()
-    if not buf:
-        return ""
-    return "".join(buf)
-
-
 def drain_run_partial() -> str:
     """取出并清空当前缓冲。"""
     buf = _partial_chunks.get()
