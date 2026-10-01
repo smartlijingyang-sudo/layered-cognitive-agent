@@ -10,14 +10,8 @@ from __future__ import annotations
 
 from lca.contracts.observability.spine.context import (
     PhaseMachineViolation as PhaseMachineViolation,
-)
-from lca.contracts.observability.spine.context import (
     PhaseMachineViolationError as PhaseMachineViolationError,
-)
-from lca.contracts.observability.spine.context import (
     SpanContext as SpanContext,
-)
-from lca.contracts.observability.spine.context import (
     SpineContext as SpineContext,
 )
 
