@@ -241,12 +241,12 @@ class SqliteUserAssistantStore(AssistantOwnership):
         display_name: str | None = None,
     ) -> None:
         with self._use_connection() as connection:
-            # display_name=None 时 COALESCE(NULL, username)=username（无操作），
+            # display_name 为 None/空串时 NULLIF 转 NULL 后 COALESCE 回退到 username（无操作），
             # 单条语句等价覆盖原 if/else 两分支。
             connection.execute(
                 """
                 UPDATE lca_users
-                SET user_md = ?, username = COALESCE(?, username), updated_at = datetime('now')
+                SET user_md = ?, username = COALESCE(NULLIF(?, ''), username), updated_at = datetime('now')
                 WHERE user_id = ?
                 """,
                 (user_md, display_name, user_id),
@@ -425,12 +425,12 @@ class PostgresUserAssistantStore(AssistantOwnership):
         display_name: str | None = None,
     ) -> None:
         def _run(cur: Any) -> None:
-            # display_name=None 时 COALESCE(NULL, username)=username（无操作），
+            # display_name 为 None/空串时 NULLIF 转 NULL 后 COALESCE 回退到 username（无操作），
             # 单条语句等价覆盖原 if/else 两分支。
             cur.execute(
                 """
                 UPDATE lca_users
-                SET user_md = %s, username = COALESCE(%s, username), updated_at = now()
+                SET user_md = %s, username = COALESCE(NULLIF(%s, ''), username), updated_at = now()
                 WHERE user_id = %s
                 """,
                 (user_md, display_name, user_id),

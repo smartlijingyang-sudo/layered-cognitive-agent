@@ -425,4 +425,10 @@
 | BRAINSTORM-FILE-SSOT-APPROACHES | 提出 2-3 种前后端传输与交互落地架构方案及权衡 | Completed | 提出 4 级渐进体验与模块化 Patch 方案，用户已明确确认 (ok) |
 | BRAINSTORM-FILE-SSOT-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/双写并发/测试不变量）并获取审批 | Completed | 全部 4 节（系统边界/交互拓扑/REST契约与并发锁/测试矩阵）已获用户确认 |
 | BRAINSTORM-FILE-SSOT-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-01-assistant-avatar-drawer-and-file-ssot-editor-design.md 并提交 git |
-| BRAINSTORM-FILE-SSOT-TRANSITION | 转换至实施计划制定（writing-plans） | In Progress | 转换至 writing-plans 制定实施计划 |
+| BRAINSTORM-FILE-SSOT-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 成功落盘实施计划 docs/plans/2026-10-01-assistant-avatar-drawer-and-file-ssot-editor-plan.md 并完成任务分解 |
+| FILE-SSOT-TASK-1 | 后端 REST 契约：查询与单文件读取端点 (`standing_files.py`) | Pending | 待执行 |
+| FILE-SSOT-TASK-2 | 乐观锁并发写入与 Catalog / user_store 同步端点 | Pending | 待执行 |
+| FILE-SSOT-TASK-3 | 前端组件：居中动态呼吸 Mascot (`AssistantTopMascot.tsx`) | Pending | 待执行 |
+| FILE-SSOT-TASK-4 | 前端组件：右侧多 Section 滑出抽屉 (`AssistantStatusDrawer.tsx`) | Pending | 待执行 |
+| FILE-SSOT-TASK-5 | 前端组件：全屏沉浸式 Markdown 编辑器模态窗 (`StandingFileFullscreenEditor.tsx`) | Pending | 待执行 |
+| FILE-SSOT-TASK-6 | 前端补丁挂载与全链路不变量集成测试 (INV-01 ~ INV-06) | Pending | 待执行 |
