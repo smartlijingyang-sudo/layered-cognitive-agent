@@ -290,12 +290,13 @@ class Session(SessionProtocol):
         ``flush`` 方法。单个 listener 抛错被 contained（记 ``FlushResult.ok=False`` +
         结构化日志），不打断其余 listener。返回结果按调用顺序排列。
         """
-        results: list[FlushResult] = []
         event_count = len(self._log)
 
         # 快照后遍历：flush 期间新注册的 listener 不收本次调用。
-        for listener in tuple(self._flush_listeners):
-            results.append(await self._invoke_flush_listener(listener, event_count))
+        results: list[FlushResult] = [
+            await self._invoke_flush_listener(listener, event_count)
+            for listener in tuple(self._flush_listeners)
+        ]
 
         for observer in tuple(self._observers):
             flush_fn = getattr(observer, "flush", None)
