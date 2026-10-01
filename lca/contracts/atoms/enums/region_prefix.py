@@ -16,9 +16,8 @@ without code changes; the snapshot test in
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import Enum, StrEnum
 from pathlib import Path
-
 
 _NODES_DIR = Path(__file__).resolve().parents[3] / "nodes"
 
@@ -65,11 +64,11 @@ def _build_region_prefix_enum() -> type[RegionPrefix]:
 
 # Re-declare RegionPrefix as a str Enum so ``RegionPrefix.THINK == "think"``.
 # The enum class is rebuilt at import time from the file system.
-class _RegionPrefix(str, Enum):
+class _RegionPrefix(StrEnum):
     """str Enum over ``lca/nodes/`` top-level directories (ADR-0231 D1)."""
 
     @classmethod
-    def parse(cls, raw: object) -> "_RegionPrefix":
+    def parse(cls, raw: object) -> _RegionPrefix:
         """Strict parse — raises :exc:`UnknownRegionPrefixError` on miss."""
         if not isinstance(raw, str) or not raw.strip():
             raise UnknownRegionPrefixError(raw)
