@@ -57,17 +57,19 @@ grouped.setdefault(namespaces.get(tool.name, tool.name), []).append(tool.name)
 
 | namespace | mode | 目录一句话（给模型看） | 工具 |
 |---|---|---|---|
-| `core` | EAGER | 推理原语：按需加载工具目录 | `tool_search` |
-| `file` | DEFERRED | 文件系统：列出、读取、写入、编辑、移动、搜索文件内容 | `listFiles` `readFile` `writeFile` `editFile` `moveFiles` `globFiles` `searchFiles` `grepContent` `exportFile` |
-| `shell` | DEFERRED | 执行 shell 命令与脚本；危险操作会先请示你 | `runCommand` `execScript` `executeCode` `getCommandOutput` `killCommand` |
+| `core` | EAGER | 推理原语：按需加载工具目录 | `tool_search` `listEnvironments` `cordisControl` `profile_apply` `profile_diff` |
+| `file` | DEFERRED | 文件系统：列出、读取、写入、编辑、移动、搜索文件内容 | `listFiles` `readFile` `writeFile` `editFile` `moveFiles` `globFiles` `searchFiles` `grepContent` `exportFile` `fileWrite` |
+| `shell` | DEFERRED | 执行 shell 命令与脚本；危险操作会先请示你 | `runCommand` `execScript` `executeCode` `getCommandOutput` `killCommand` `bashRun` |
 | `memory` | DEFERRED | 搜索与写入长期记忆 | `memory_search` `memory_add` `memory_get` |
 | `skill` | DEFERRED | 技能的发现、安装与调用 | `search_skill` `activate_skill` `import_skill` `read_skill_reference_once` `run_skill_script` `readReference` |
 | `web` | DEFERRED | 联网搜索与网页抓取 | `search` |
-| `agent` | DEFERRED | 派发子任务、向用户提问 | `delegate_tool` `askUserQuestion` |
-| `ext` | DEFERRED | 第三方集成：连接与刷新外部服务 | `composioConnect` `composioRefresh` |
+| `agent` | DEFERRED | 助理管理、派发子任务、向用户提问 | `delegate_tool` `askUserQuestion` `send_message` `request_box_help` `create_assistant` `list_role_cards` `create_assistant_skill` `list_assistant_skills` `delete_assistant_skill` `edit_assistant_skill` `update_assistant_soul` `update_assistant_profile` `update_assistant_grants` `update_assistant_user` `list_assistant_tools` `create_assistant_tool` `update_assistant_tool` `delete_assistant_tool` |
+| `ext` | DEFERRED | 第三方集成：连接与刷新外部服务 | `composioConnect` `composioRefresh` 各 `mcp__<server>__<tool>` |
 
 取舍说明：
-- `core` 只放 `tool_search`。EAGER 的标准是"几乎每 turn 都用且 schema 极小"；且 defer 协议要求 loader 必须在 wire 上（session.py 已有注释：目录指向不存在的 loader 是死锁）。
+- `core` 放 loader 与平面无关的 LCA 内置原语：`tool_search`（loader 必须在 wire 上，session.py 已有注释：目录指向不存在的 loader 是死锁）、`listEnvironments`（默认工具集无条件注入、schema 极小，保持 eager 不改变既有可见性）、`cordisControl` / `profile_apply` / `profile_diff`（Creator 控制面与 profile 管理，仅 creator 模式出现）。其余工具按域 defer。
+- `agent` 域在 ADR-0255 清单基础上补入 assistant 自管理工具族（ADR-0242 D6）：`create_assistant` / `list_role_cards` / `create_assistant_skill` / `list_assistant_skills` 等。它们不是每 turn 都用，归入 DEFERRED，模型经 `tool_search(namespace='agent')` 按需加载。
+- `ext` 域除 `composioConnect` / `composioRefresh` 外，所有 MCP 工具（`mcp__<server>__<tool>`）归入 `ext`：它们是第三方服务适配，与 `composio` 同语义。
 - `memory` 保持 DEFERRED：2026-10-01 run 实证模型已学会 `tool_search(namespace='memory')`，协议可 cover，不必破例。
 - `shell` 独立成域且目录行自带"危险"字样——描述即行为约束。
 - `skill` 域的 snake/camel "双拼"（`activate_skill`/`activateSkill` 等）是**故意设计的双层命名**，不是 slop，不做 canonicalize：内部名（模型可见）用 snake_case，`api_name`/`ToolApi(name=...)`（前端契约：LobeHub/computer companion/wechat 展示）用 camelCase，两者在 `RenderContract` 里显式配对声明。wire gate 的 `_name_forms` 容错保留（前端 camelCase 名字在 wire 上还活着）。【2026-10-01 修正：此前版本误判为 slop 并要求收敛，已纠正；验收用例 A4 同步修正为只扫描内部注册名】另注：`runCommand`/`listFiles` 等工具内部名本身就是 camelCase（computer companion 的 dispatch 依赖），说明内部命名约定 snake+camel 并存——这是值得未来统一的一致性问题，但超出本 ADR 范围。

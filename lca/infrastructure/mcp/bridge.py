@@ -51,6 +51,7 @@ def adapt_mcp_tool_to_lca(manager: MCPHub, mcp_tool: MCPTool) -> Tool:
             "parameters": parameters,
             "is_idempotent": False,
             "default_timeout_s": 60,
+            "namespace": "ext",
             "execute": execute,
         },
     )

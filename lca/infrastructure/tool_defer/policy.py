@@ -23,7 +23,7 @@ DEFAULT_NAMESPACE_DESCRIPTIONS: dict[str, str] = {
     "memory": "搜索与写入长期记忆",
     "skill": "技能的发现、安装与调用",
     "web": "联网搜索与网页抓取",
-    "agent": "派发子任务、向用户提问",
+    "agent": "助理管理、派发子任务、向用户提问",
     "ext": "第三方集成：连接与刷新外部服务",
 }
 

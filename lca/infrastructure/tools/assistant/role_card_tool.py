@@ -26,6 +26,7 @@ class RoleCardListTool(Tool):
     """列出角色卡目录：部门列表 / 部门角色 / 关键词搜索。"""
 
     name = ROLE_CARD_LIST_TOOL
+    namespace: ClassVar[str] = "agent"
     description = (
         "列出角色卡目录（268 个专家角色，按部门→角色两级浏览，支持关键词搜索）。"
         "创建助理向导中：无参数返回部门列表；department 参数返回该部门下角色列表；"

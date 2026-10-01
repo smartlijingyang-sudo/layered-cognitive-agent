@@ -38,9 +38,7 @@ class ProfileApplyTool(Tool):
     """
 
     name = "profile_apply"
-    description = (
-        "Preview an approved profile candidate; production application is disabled."
-    )
+    description = "Preview an approved profile candidate; production application is disabled."
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
@@ -124,6 +122,7 @@ MANIFEST = ToolManifest(
             # PR-3 G-21 (ADR-0232): dry-run-only preview; declare ``read``
             # so a batch of profile_apply calls parallelises.
             effects="read",
+            namespace="core",
         ),
     ),
     meta=ToolMeta(

@@ -29,6 +29,7 @@ class AssistantCreateSkillTool(Tool):
     """Create/install a skill under ``{assistant_home}/skills/<skill_id>/``."""
 
     name = CREATE_ASSISTANT_SKILL_TOOL
+    namespace: ClassVar[str] = "agent"
     required_grant: ClassVar[str] = "skill.import"
     description = (
         "为当前绑定的助理安装一个操作 skill（写入助理 Home 的 skills/ 目录，"

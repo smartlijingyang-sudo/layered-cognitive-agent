@@ -35,12 +35,14 @@ _SANDBOX_APIS: tuple[ToolApi, ...] = (
         description=_execute_code.DESCRIPTION,
         parameters=_execute_code.parameters(),
         is_idempotent=_execute_code.IS_IDEMPOTENT,
+        namespace="shell",
     ),
     ToolApi(
         name=ApiName.EXPORT_FILE,
         description=_export_file.DESCRIPTION,
         parameters=_export_file.parameters(),
         is_idempotent=_export_file.IS_IDEMPOTENT,
+        namespace="file",
     ),
 )
 

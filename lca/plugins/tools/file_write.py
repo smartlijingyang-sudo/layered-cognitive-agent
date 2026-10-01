@@ -75,6 +75,7 @@ MANIFEST = ToolManifest(
             # PR-3 G-21 (ADR-0232): file_write mutates host fs; declare
             # ``write`` so ParallelReadOnly batch policy keeps it serial.
             effects="write",
+            namespace="file",
         ),
     ),
     meta=ToolMeta(
@@ -206,12 +207,14 @@ __all__ = ["IDENTIFIER", "MANIFEST", "FileWriteTool", "build_file_write_tool"]
 # ── Plugin manifest setup ─────────────────────────────────────
 
 
-from pydantic import BaseModel, ConfigDict  # noqa: E402,I001
+from pydantic import BaseModel, ConfigDict  # noqa: E402
 
 from lca.contracts.atoms.control.slot import ControlSlot  # noqa: E402
 from lca.contracts.atoms.functional.group import FunctionalGroup  # noqa: E402
 from lca.contracts.atoms.scope.scope import Scope  # noqa: E402
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration  # noqa: E402
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (  # noqa: E402
+    OwnershipDeclaration,
+)
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin  # noqa: E402
 
 

@@ -40,6 +40,7 @@ MANIFEST = ToolManifest(
                 },
                 "required": ["name", "content"],
             },
+            namespace="file",
         ),
     ),
     meta=ToolMeta(

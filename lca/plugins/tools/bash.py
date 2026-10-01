@@ -72,6 +72,7 @@ MANIFEST = ToolManifest(
             # the command; declare ``external`` so ParallelReadOnly batch
             # policy keeps bash serial.
             effects="external",
+            namespace="shell",
         ),
     ),
     meta=ToolMeta(
@@ -227,12 +228,14 @@ __all__ = ["IDENTIFIER", "MANIFEST", "BashTool", "build_bash_tool"]
 # plugin graph well-formed.
 
 
-from pydantic import BaseModel, ConfigDict  # noqa: E402,I001
+from pydantic import BaseModel, ConfigDict  # noqa: E402
 
 from lca.contracts.atoms.control.slot import ControlSlot  # noqa: E402
 from lca.contracts.atoms.functional.group import FunctionalGroup  # noqa: E402
 from lca.contracts.atoms.scope.scope import Scope  # noqa: E402
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import OwnershipDeclaration  # noqa: E402
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (  # noqa: E402
+    OwnershipDeclaration,
+)
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin  # noqa: E402
 
 

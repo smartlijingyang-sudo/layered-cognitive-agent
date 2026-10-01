@@ -37,6 +37,7 @@ MANAGEMENT_MANIFEST = ToolManifest(
                 "required": ["service"],
             },
             is_idempotent=False,
+            namespace="ext",
         ),
         ToolApi(
             name="composioRefresh",
@@ -55,6 +56,7 @@ MANAGEMENT_MANIFEST = ToolManifest(
                 "required": ["service"],
             },
             is_idempotent=True,
+            namespace="ext",
         ),
     ),
     meta=ToolMeta(
@@ -125,7 +127,12 @@ class ComposioManagementExecutor:
             return Observation(
                 observation_id=new_id("obs"),
                 success=True,
-                payload={"text": text, "identifier": service, "connected": True, "tool_count": len(conn.tools)},
+                payload={
+                    "text": text,
+                    "identifier": service,
+                    "connected": True,
+                    "tool_count": len(conn.tools),
+                },
             )
         return Observation(
             observation_id=new_id("obs"),
@@ -205,6 +212,7 @@ def build_tools(integration: ComposioIntegration | None) -> list[Tool]:
                 description=tool.description or f"Composio action {tool.name}",
                 parameters=tool.input_schema or {"type": "object", "properties": {}},
                 is_idempotent=False,
+                namespace="ext",
             )
             for tool in conn.tools
         )
@@ -213,7 +221,9 @@ def build_tools(integration: ComposioIntegration | None) -> list[Tool]:
         manifest = _action_manifest(conn.identifier, conn.label, apis)
         executor = ComposioActionExecutor(integration, conn.identifier)
 
-        async def _invoke(_executor: ComposioActionExecutor, api_name: str, args: dict[str, Any]) -> Observation:
+        async def _invoke(
+            _executor: ComposioActionExecutor, api_name: str, args: dict[str, Any]
+        ) -> Observation:
             return await _executor.invoke(api_name, args)
 
         tools.extend(

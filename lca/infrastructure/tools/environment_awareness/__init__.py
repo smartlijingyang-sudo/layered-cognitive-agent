@@ -40,6 +40,7 @@ MANIFEST = ToolManifest(
             },
             is_idempotent=True,
             effects="read",
+            namespace="core",
         ),
     ),
     meta=ToolMeta(

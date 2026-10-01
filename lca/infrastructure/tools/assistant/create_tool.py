@@ -48,6 +48,7 @@ class AssistantCreateTool(Tool):
     """创建一个新助理：物化 AssistantHome 并（尽力）注册前端入口。"""
 
     name = CREATE_ASSISTANT_TOOL
+    namespace: ClassVar[str] = "agent"
     description = (
         "创建一个新助理（个人助手）：在后端初始化其人设/目标/技能配置，"
         "并在前端助理列表注册入口。创建时自动把全局技能库全部技能物化到该助理"

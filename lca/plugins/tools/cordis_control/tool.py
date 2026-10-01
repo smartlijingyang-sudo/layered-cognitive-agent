@@ -51,6 +51,7 @@ MANIFEST = ToolManifest(
             # behaviour for any composite Creator action that has not
             # been individually audited as ``read``.
             effects="external",
+            namespace="core",
         ),
     ),
     meta=ToolMeta(

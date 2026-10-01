@@ -57,6 +57,7 @@ _SENSITIVE_CONFIRMATION_HINT = (
 class _BaseAssistantTool(Tool):
     """Shared scaffolding for the assistant self-management tools."""
 
+    namespace: ClassVar[str] = "agent"
     is_idempotent = False
     default_timeout_s = DEFAULT_TOOL_TIMEOUT_S
 
