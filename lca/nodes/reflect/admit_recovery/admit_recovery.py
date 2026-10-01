@@ -57,8 +57,8 @@ class ReflectAdmitRecoveryExecutor:
 
     semantic_name: str = "phase.reflect.admit_recovery"
     region: str = "reflect"
-    declared_inputs: tuple[PortName, ...] = ("observation", "reflection")
-    declared_outputs: tuple[PortName, ...] = ("reflection", "routing")
+    declared_inputs: tuple[PortName, ...] = (PortName("observation"), PortName("reflection"))
+    declared_outputs: tuple[PortName, ...] = (PortName("reflection"), PortName("routing"))
 
     async def node_execute(
         self,
@@ -66,12 +66,12 @@ class ReflectAdmitRecoveryExecutor:
         input: NodeInput,
     ) -> NodeOutput:
         del context
-        observation = input.port_values.get("observation")
+        observation = input.port_values.get(PortName("observation"))
         admit = _is_failure(observation)
         return NodeOutput(
             port_values={
-                "reflection": input.port_values.get("reflection"),
-                "routing": RoutingDecision(
+                PortName("reflection"): input.port_values.get(PortName("reflection")),
+                PortName("routing"): RoutingDecision(
                     action_type=ActionType.RESPOND,
                     next_hint="admit_recovery" if admit else None,
                 ),
