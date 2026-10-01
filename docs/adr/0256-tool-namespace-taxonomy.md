@@ -2,7 +2,7 @@
 
 ## 状态
 
-**Proposed — 2026-10-01**
+**Accepted — 2026-10-02**
 
 > **一句话**：终结"单工具 namespace"的退化现状——namespace 归属改为工具 factory 的声明式元数据，按 8 域划分（core/file/shell/memory/skill/web/agent/ext），让模型决策粒度、defer 加载粒度、审批边界三者同粒度，并给出可直接落地的 6 处代码改动 + 验收标准。
 
@@ -188,3 +188,11 @@ if tool.namespace not in session.loaded_namespaces and tool.namespace not in eag
 8问#6 的"注册期 fail-fast"措辞仍然成立（即 wiring time），保留。
 测试侧已跟随：`tests/infrastructure/tool_defer/test_update_turn_failsoft.py`（4 用例）、
 `tests/infrastructure/capability/tools/test_register_namespace_failfast.py`（2 用例）。
+
+---
+
+## 12. 修订记录（2026-10-02）：Proposed → Accepted
+
+- **状态升级**：Task 1–6 全绿上 main；A1/A2/B1/B2 验收用例全转真用例；fail-soft 修订（§11，李超本人 ea8b9f7ae）已在生产验证；8 域 conformance 套件绿。Proposed 使命完成，升级为 Accepted。
+- **裁决**：李超 2026-10-02 授权 Athena 按 muse 思想裁决 backlog todo-1 的状态迁移建议 → 升级。
+- **升级理由（muse 思想）**：契约的 Proposed 期是用来“验证机制”的；当验收矩阵全绿 + 生产实证（6 个 run 的 fail-soft 行为符合预期）+ 修订记录闭环时，继续挂 Proposed 是不诚实的状态——状态必须反映现实。

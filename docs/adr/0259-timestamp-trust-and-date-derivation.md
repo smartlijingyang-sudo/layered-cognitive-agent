@@ -96,3 +96,11 @@
 | "now" = 本 turn developer 时间戳，唯一可信来源 | `render_developer_timestamp` 已实现 | C1 升不变量 |
 | 凡需星期/日期推导一律 date -d 验证，不许用模型时间感 | 空白（无规则、无免审批工具通道） | C2 新增 |
 | 事件时间 vs 检索时间 vs 消息时间三者区分，X 必须来自事件字段 | 空白 | C3 新增 |
+
+---
+
+## 7. 决策记录（2026-10-02，李超授权 Athena 按 muse 思想裁决）
+
+1. **验证工具形态：core 域只读工具（`clock_now`/`date_offset`），免审批**。理由：机制 > 自觉（纯提示词是自觉，否决）；shell 白名单是给审批策略开口子（fail-open 方向）；core 只读工具无副作用，符合 0256“读不审”哲学。
+2. **C2 硬块落点：独立 `time_discipline` section**（不并入 CurrentDateSection）。理由：“now 锚定”与“推导纪律”是两种职责，混排违反关注点分离；独立 section 可单独开关。
+3. **CURRENT_DATE 锚定 turn 版本：暂不**，YAGNI（与 ADR 倾向一致）。

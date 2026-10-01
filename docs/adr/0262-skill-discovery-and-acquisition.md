@@ -83,3 +83,12 @@
 ② 检索语义：BM25/regex 的优先级与实现位置（tool 内 vs 独立 search 服务）；
 ③ promotion 批准主体：用户本人（默认 fail-closed）vs 可配置评估策略；
 ④ 无命中自建边界：execute_code 自建 vs 走浏览器/外部获取后沉淀——沉淀的证据门槛（对标 auto_acquire 的 min_confidence/min_evidence）。
+
+---
+
+## 4. 决策记录（2026-10-02，李超授权 Athena 按 muse 思想裁决）
+
+1. **C1 落点：独立 skill 义务提示块**（对标 0260 `_RETRIEVAL_DUTY`，不并入 tools 段）。理由：skill 检索是 run 级义务（C5 已定性为与记忆检索并列的义务实例），义务块显式化是生产 Muse 的实证模式；并入 tools 段会被能力描述稀释。
+2. **检索语义：tool 内渐进增强（关键词 → BM25 → regex 降级链），不建独立 search 服务**。理由：现有 `_search_with_degradation` 已是降级链雏形，就地增强改动最小；独立服务是 YAGNI——今天连 BM25 都没有。
+3. **promotion 批准主体：默认用户本人；评估策略接口预留但不实现**。理由：安装 skill 改变 agent 能力 ≈ 不可逆操作 → fail-closed 默认用户批；可配置策略是未来的扩展点，不是今天的决策。
+4. **无命中自建边界：先自建解决当下任务（C1），可复用流程产出 candidate 走 C3 三段门；证据门槛复用 auto_acquire 的 min_confidence/min_evidence**。理由：不发明第二套门槛（DRY）；自建是手段、沉淀是目的（C1 已定）。

@@ -193,7 +193,7 @@
 | [0252](0252-multi-user-onboarding-and-identity.md) | 多用户登录与 Onboarding 隔离 — LCA 自有数据库 + LobeHub 原生前端（归属关系 LCA 全权控制，身份 SSOT = Better Auth users） | Implemented |
 | [0253](0253-muse-sentinel-egress-and-credential-boundary.md) | Meta Muse 出站控制面、凭证边界与污点审批 — 沙箱无默认路由、独立进程按 request_digest 兑付密钥、私有数据取消自动放行、审批事件与对话正文隔离 | Proposed |
 | [0254](0254-commercial-context-files-and-continuous-memory-runtime.md) | 上下文文件与持续记忆。不替代 ADR-0247。已落地：MEMORY.md 投影、常驻文件按磁盘重读、写盘回执先于「已记下」、人物/群体页、TOOLS.md、实时监听与 WATCHER_FAULT、Side Chat 隔离与私人内容过滤、FTS 检索、做梦慢路径（显式偏好固化、亲近度、偏好综述） | Accepted |
-| [0256](0256-tool-namespace-taxonomy.md) | 工具命名空间划分规范：8 域划分、namespace 声明式元数据下沉 factory、defer 加载/审批/wire gate 三者同粒度，附 6 处代码改动与 8 条验收标准；ADR-0255 L1 defer 的划分规范。2026-10-02 修订：fail-fast→fail-soft（硬 fail-fast 收敛到 wiring time，见 §11） | Proposed |
+| [0256](0256-tool-namespace-taxonomy.md) | 工具命名空间划分规范：8 域划分、namespace 声明式元数据下沉 factory、defer 加载/审批/wire gate 三者同粒度，附 6 处代码改动与 8 条验收标准；ADR-0255 L1 defer 的划分规范。2026-10-02 修订：fail-fast→fail-soft（硬 fail-fast 收敛到 wiring time，见 §11）；2026-10-02 状态升级 Accepted | Accepted |
 | [0257](0257-delegation-context-inheritance-and-verification.md) | 委派上下文继承与复核协议：委派信封（standing 全量+父 turn 摘要+记忆投影）、回灌只收 evidence 指针、不可逆失败先验效果；ADR-0255 §4.6 的 LCA 落地提案 | Proposed |
 | [0258](0258-compaction-exemption-and-reinjection.md) | 压缩豁免与重注契约：standing 永不进压缩流、摘要带  血统、刷新读失败保留旧块 fail-closed；ADR-0255 §4.5 的 LCA 落地提案 | Proposed |
 | [0259](0259-timestamp-trust-and-date-derivation.md) | 时间戳信任与日期推导契约：now 唯一来源升不变量、日期推导必须经可信工具验证、事件/记录/检索三时间分离；ADR-0255 §4.7 的 LCA 落地提案 | Proposed |

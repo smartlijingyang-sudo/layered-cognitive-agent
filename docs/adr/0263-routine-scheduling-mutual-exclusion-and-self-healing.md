@@ -91,3 +91,12 @@
 - `SpendGuard`（INV-08）是**预算闸**，互斥锁是**并发闸**——两者正交，可叠加判定，顺序固定：enabled → 互斥锁 → SpendGuard → 时间窗口；
 - `WakeSource.ROUTINE`（INV-07）合法沉默特权不变——C1–C5 只管"能不能跑"，不管"跑起来吵不吵"；
 - `RoutineTrigger` 加 lifecycle 状态是 C3/C5 的前置——状态机设计（排队中/运行中/完成/失败/跳过）待实现 ADR 细化；`extra="forbid"` 的 frozen 模型需版本化演进。
+
+---
+
+## 9. 决策记录（2026-10-02，李超授权 Athena 按 muse 思想裁决）
+
+1. **锁介质：文件锁**（锁目录 + owner 标识 + mtime 心跳）。理由：单机 carrier 是当前部署形态；生产 Muse 三路 cron 的开工锁就是这套模式——被验证过的机制优先于新造的机制；repository 行锁引入 DB 竞争，分布式锁 YAGNI。
+2. **stale 阈值：默认 2×routine interval，可配；绝对上限 90 分钟**。理由：interval 倍数自适应不同频率的 routine；绝对上限防 interval 超长时的锁饿死（对齐三路 cron 5400s stale 收割实践）。
+3. **失败重试/死信：重试 3 次（退避 1min/5min/15min），3 次后进死信保留 7 天可查**。理由：数字需要有人定——取业界常见值，可配；死信保留是 fail-closed（失败可审计，不静默丢弃）。
+4. **tick 驱动落点：carrier 内**。理由：缺口四承认生产无 tick 驱动——先让调度器在现有 carrier 生命周期内跑起来（最小可用）；独立 daemon 是部署形态升级，YAGNI now。

@@ -2,7 +2,7 @@
 
 ## 状态
 
-**Accepted — 2026-09-30**
+**Accepted — 2026-09-30（2026-10-02 修订 v2：记忆 SSOT 二选一选 A）**
 
 > **一句话**：借鉴生产环境实测的 Context Muse 体系与业界顶尖商用范式，将 LCA Assistant 的上下文与记忆体系统一收敛为“纯 Markdown-as-DB 三层分级底座（5 大核心 Standing 文件）”、“运行时连续控制面（FS Watcher 实时 Diff 注入 + 物理隔离 Compaction 防失忆）”与“昼夜双轨闭环（在线强制检索写盘 + 离线做梦对齐综述）”，彻底打破长程对话性能衰减、失忆与认知阻塞，实现工业级高可信自演化。
 
@@ -13,7 +13,7 @@
 - [ADR-0253](0253-muse-sentinel-egress-and-credential-boundary.md)（出站控制面与凭证边界）：继承敏感凭证绝不入记忆的 C5/C10 红线治理；
 - [ADR-0195](0195-platform-architecture-convergence.md)（平台架构收敛与信息血统闭合）。
 
-**不替代已接受的 ADR。** [ADR-0247](0247-agent-memory-knowledge-layer.md) 的 `MemoryRecord` 与 `{home}/memory/` 仍是记录真值。[ADR-0249](0249-cadence-inspired-dual-track-memory-consolidation.md) 的昼夜写入与 `CommandEnvelope` 窄门仍是写入路径。[ADR-0242](0242-assistant-creation-home-runtime.md) 的 Home 仍是目录主人，身份仍在 `profile.json`。
+**不替代已接受的 ADR（2026-10-02 v2 修订：存储真值收敛为 Markdown，见文末修订记录）。** [ADR-0247](0247-agent-memory-knowledge-layer.md) 的 `MemoryRecord` **领域语义**（dedupe 去重特征键、supersede 取代链、provenance 血统模型、lifecycle 状态机）继续继承；但**记录的存储真值**收敛为本 ADR 的 Markdown 三层拓扑——`{home}/memory/` 下的 JSON（`semantic.json` 等）降为 Runtime 私有派生索引（只读、可重建），不再是“记录真值”。[ADR-0249](0249-cadence-inspired-dual-track-memory-consolidation.md) 的昼夜写入与 `CommandEnvelope` 窄门仍是写入路径。[ADR-0242](0242-assistant-creation-home-runtime.md) 的 Home 仍是目录主人，身份仍在 `profile.json`。
 
 已落地的切片见 [Agent Note: 结构化记忆的人可读投影](../notes/implemented/seam/2026-09-30-curated-memory-projection.md)、[Agent Note: 折叠系统提示里的常驻文件跟磁盘](../notes/implemented/seam/2026-09-30-standing-files-survive-folded-header.md)、[Agent Note: 实时常驻文件监听](../notes/implemented/seam/2026-09-30-real-time-standing-watcher.md)、[Agent Note: Side Chat 分支记忆隔离](../notes/implemented/seam/2026-09-30-side-chat-isolation.md)、[Agent Note: FTS 记忆索引与检索决策树](../notes/implemented/seam/2026-09-30-fts-memory-index.md) 与 [Agent Note: 做梦慢路径与对齐综述](../notes/implemented/seam/2026-09-30-dream-slow-path.md)。`MEMORY.md` 是活跃语义记录的投影。折叠后的系统提示保留规则，其中的常驻文件块按磁盘重写。对用户说已经记下，要先有写盘回执。`memory_explain` 展开一条记录的八个审计字段。常驻文件变更由进程内实时监听器捕获，在下一次历史装配时以统一 diff 附在系统提示后，监听故障不阻断会话。一个人一份人物页。一个群体一份群体页。目录、索引名、常驻文件名单和预算来自包内 `layout.toml`，助理主目录的 `memory/contextfiles.toml` 可以覆盖。索引由这些页面重写。新建助理时写入 `TOOLS.md`，这份备忘不进配置面摘要。`MEMORY.md` 仍由投影在第一次写入时创建。`memory/index` 持有由语义记录与每日流水构建的全文索引，`memory_search` 查询它；系统提示注入强制检索决策树与防幻觉终端闸门。分支会话的事实写入 `side-chats/<id>/MEMORY.md`。带 `branch` 的检索不返回主会话里的私人内容（作息、病史、住址、凭证）；其余主记忆仍可检索。提示同时注入「检索到不等于可透露」。`lca-ops memory dream` 把流水里的显式偏好写入 `MEMORY.md`；一次性事件留在流水里供检索，不写进对齐综述。综述只收偏好与身份，并带 `message:xxx` 引用。监听故障记 `WATCHER_FAULT` 且不阻断会话。Inotify 秒级监听以轮询线程等效实现，SLA 记为目标而非门禁。
 
@@ -28,7 +28,7 @@
 3. **唯一真值在哪里？**
    - Assistant 长期规则与事实 SSOT：`{home}/AGENTS.md`、`{home}/SOUL.md`、`{home}/USER.md`、`{home}/MEMORY.md`、`{home}/TOOLS.md` 与 `{home}/dreams/alignment/derived/ALIGNMENT_SYNTHESIS.md`；
    - 交互流水因果流 SSOT：`Session.append` 与 `{home}/memory/YYYY-MM-DD.md`；
-   - 检索引擎与缓存 SSOT：`{home}/memory/bank/` 与 `{home}/memory/index/`（含降级的 `semantic.json`，Runtime 私有维护，Agent 只读）。
+   - 检索引擎与缓存（派生索引，非 SSOT）：`{home}/memory/bank/` 与 `{home}/memory/index/`（含降级的 `semantic.json`，Runtime 私有维护，Agent 只读；索引由 Markdown 真值派生、可重建，索引损坏不丢真值）。
 4. **改变哪个边界？**
    - 契约层：标准化 5 大 Standing Markdown 规范与 Provenance 标注格式；
    - 运行时层：增强连续控制面，引入 FS Watcher Diff 注入与 Compaction 隔离装配器；
@@ -296,3 +296,15 @@ Runtime 启动 Inotify 监听器。当任一 Standing 文件在磁盘发生变�
 - **M1 阶段 (P0 - 存储底座与装配闭环)**：标准化 5 大 Markdown 模板、组装器 `<!-- INJECTED FILE: ... -->` 锚点、放宽的 Provenance 正则校验、根目录白名单测试与 Tier 1 结构不变量；
 - **M2 阶段 (P1 - 运行时动态感知与防护)**：Compaction 隔离协议、FS Watcher Diff 推送与故障隔离、Subagent 继承、System Prompt 检索决策树注入与写盘守卫测试；
 - **M3 阶段 (P2 - 昼夜做梦与对齐自演化)**：对接 ADR-0249 做梦引擎、Hourly Upkeep 与 Relationships 图谱、Nightly 对齐综述生成、Side Chat 隔离与 Tier 2 行为一致性场景回放。
+
+---
+
+## 8. 修订记录
+
+### v2 — 2026-10-02：记忆 SSOT 二选一裁决（选 A：Markdown 为准）
+
+- **裁决**：李超 2026-10-02 授权 Athena 按 muse 思想裁决 backlog todo-9 的 A/B 二选一 → **选 A**。
+- **A 的内容**：`MEMORY.md`（精选长期记忆）+ `{home}/memory/YYYY-MM-DD.md`（交互流水 Trail）是记录的唯一存储真值；`{home}/memory/bank/`、`{home}/memory/index/`（含 `semantic.json`）是 Runtime 私有维护的**派生索引**（只读、可重建），索引损坏不丢真值。
+- **与 ADR-0247 的关系**：0247 的 `MemoryRecord` **领域语义**（dedupe/supersede/provenance/lifecycle）继续继承；**存储真值**不再是 JSON——正文“不替代”段落与 §0 Q3 已同步修订。
+- **裁决理由（muse 思想）**：① SSOT 字面即“单一”——B 方案的“双层并存+同步裁决”引入了一个没有裁决机制的同步问题，是复杂度而非机制；② 生产 Muse 的实测形态就是 Markdown 为底座、索引为派生（ADR-0255 §4.2/§4.3）；③ ADR-0258 C2 已确立“journal 是压缩摘要细节恢复的唯一合法路径”——与 A 一致、与 B 冲突。
+- **联动**：ADR-0258 §5③ 的修订引用要求由本条覆盖。

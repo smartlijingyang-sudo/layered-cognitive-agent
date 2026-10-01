@@ -121,3 +121,11 @@ def _read(store: FileStore, name: str) -> str:
 | 新窗口重注 standing | `preserve_standing_sections` + 磁盘现读 | C1 升不变量 |
 | 摘要丢细节→走检索链找回，不许当原文引用 | journal 真值（ADR-0037），缺规则 | C2 新增 |
 | （Muse 隐含）刷新失败不丢配置 | 今天 fail-open，实锤 | C3 修复 |
+
+---
+
+## 7. 决策记录（2026-10-02，李超授权 Athena 按 muse 思想裁决）
+
+1. **C2 血统落点：事件 descriptor**（不选投影字段）。理由：轻量、随流转、不改 schema；投影字段要改 schema 是重型变更，YAGNI。
+2. **C3 `_read` 改法：三态返回**（读失败 / 空文件 / 已删除，不选上抛）。理由：三者是三种不同的事实——上抛把“空文件”这种合法状态也变成异常；fail-closed 体现在“读失败 → 保留旧块 + warning 事件”，而不是“读失败 → 炸掉调用链”。
+3. **0254 修订引用：由 ADR-0254 v2 修订记录覆盖**（本 ADR 落地后 0254 的“物理隔离 Compaction”段落引用已在 0254 修订记录中登记）。
