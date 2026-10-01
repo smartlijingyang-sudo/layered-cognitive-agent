@@ -172,6 +172,8 @@ class SessionProtocol(Protocol):
         *,
         actor: str | None = None,
         visibility: str = "model",
+        surface_op: Any | None = None,
+        source_event_seqs: tuple[int, ...] | None = None,
     ) -> SessionEvent:
         """校验 → 入日志 → fire observers（contained）→ 返回落日志的事件。
 
@@ -180,6 +182,8 @@ class SessionProtocol(Protocol):
         observer 抛错被 contained，不影响返回值。重入抛
         :class:`SessionReentryError`，同样不改日志。
         ``actor`` / ``visibility`` 写入事件信封元数据（审计/可见性投影）。
+        ``surface_op`` 标记调用方的表面操作名（投影/审计用，可选）；
+        ``source_event_seqs`` 声明本事件所派生的源事件序号（可选）。
         """
         ...
 
