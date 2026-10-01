@@ -61,8 +61,8 @@ class PromptTraceCompileExecutor:
 
     semantic_name: str = "prompt.trace.compile"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("prompt_text", "prompt_trace")
-    declared_outputs: tuple[PortName, ...] = ("render",)
+    declared_inputs: tuple[PortName, ...] = (PortName("prompt_text"), PortName("prompt_trace"))
+    declared_outputs: tuple[PortName, ...] = (PortName("render"),)
 
     async def node_execute(
         self,
@@ -75,8 +75,8 @@ class PromptTraceCompileExecutor:
         outputs 端口(yaml):render (ReasonerTurnRender)
         """
         del context
-        prompt = input.port_values.get("prompt_text")
-        trace = input.port_values.get("prompt_trace")
+        prompt = input.port_values.get(PortName("prompt_text"))
+        trace = input.port_values.get(PortName("prompt_trace"))
         if not isinstance(prompt, str):
             raise TypeError(
                 f"prompt.trace.compile: 'prompt_text' port must be str, got {type(prompt).__name__}"
@@ -97,7 +97,7 @@ class PromptTraceCompileExecutor:
                 total_chars=None,
                 variant=None,
             )
-            return NodeOutput(port_values={"render": render})
+            return NodeOutput(port_values={PortName("render"): render})
 
         render = ReasonerTurnRender(
             prompt=prompt,
@@ -109,7 +109,7 @@ class PromptTraceCompileExecutor:
             total_chars=trace.total_chars,
             variant=trace.variant,
         )
-        return NodeOutput(port_values={"render": render})
+        return NodeOutput(port_values={PortName("render"): render})
 
 
 @plugin(
