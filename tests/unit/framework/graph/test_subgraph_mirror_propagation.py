@@ -1,7 +1,7 @@
 """Regression test for ADR-0219 §4 cross-subgraph results_by_phase propagation.
 
 The outer :class:`PlanInterpreter` accumulates ``results_by_phase`` as each
-phase_executor visit writes its :class:`PhaseResult` into
+phase_executor visit writes its phase result into
 ``node_config["results_by_phase"]`` (which is the same dict object as
 ``PlanInterpreter.results_by_phase``). When a subgraph node runs, the
 recursive runner in :mod:`lca.framework.graph.adapter` creates a fresh
@@ -29,6 +29,7 @@ These tests pin the contract at the strategy boundary:
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -36,9 +37,6 @@ if TYPE_CHECKING:
 
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
     SemanticPhase,
-)
-from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
-    PhaseResult,
 )
 from lca.contracts.protocols.graph.binding import BindingKind
 from lca.contracts.protocols.graph.node_io import NodeInput
@@ -50,8 +48,12 @@ from lca.contracts.protocols.graph.strategy import StrategyContext
 from lca.framework.graph.strategies import SubgraphStrategy
 
 
-def _phase_result(result_kind: str) -> PhaseResult:
-    return PhaseResult(result_kind=result_kind, payload=None)
+def _phase_result(result_kind: str) -> SimpleNamespace:
+    # The v1 PhaseResult DTO was deleted in the ADR-0221 cutover; the
+    # production mirror (PlanInterpreter.results_by_phase) is an untyped
+    # dict and the strategy only forwards it, so an opaque stand-in pins
+    # the same contract.
+    return SimpleNamespace(result_kind=result_kind, payload=None)
 
 
 class TestSubgraphStrategyForwardsOuterMirror:
@@ -64,15 +66,15 @@ class TestSubgraphStrategyForwardsOuterMirror:
             captured["outer_mirror"] = outer_mirror
             return {}
 
-        from lca.framework.graph.strategies import subgraph_strategy as sg_mod
+        from lca.framework.graph.strategies import subgraph_run as sg_mod
 
         monkeypatch.setattr(
             sg_mod,
-            "_load_subgraph_plan",
+            "load_subgraph_plan",
             lambda plan_ref, entry_node: Plan(id="inner", nodes=(), edges=(), declared_inputs=()),
         )
         strategy = SubgraphStrategy(recursive_runner=_runner, max_depth=4)
-        outer_mirror: dict[SemanticPhase, PhaseResult] = {
+        outer_mirror: dict[SemanticPhase, object] = {
             SemanticPhase.THINK: _phase_result("decision")
         }
         ctx = StrategyContext(
@@ -94,11 +96,11 @@ class TestSubgraphStrategyForwardsOuterMirror:
             captured["outer_mirror"] = outer_mirror
             return {}
 
-        from lca.framework.graph.strategies import subgraph_strategy as sg_mod
+        from lca.framework.graph.strategies import subgraph_run as sg_mod
 
         monkeypatch.setattr(
             sg_mod,
-            "_load_subgraph_plan",
+            "load_subgraph_plan",
             lambda plan_ref, entry_node: Plan(id="inner", nodes=(), edges=(), declared_inputs=()),
         )
         strategy = SubgraphStrategy(recursive_runner=_runner, max_depth=4)
