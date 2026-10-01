@@ -6,7 +6,7 @@ typed boundary (ADR-0220 §3.3 + §4.2)。
 节点职责:决定一个 ``Reflection`` 是否值得记入长期记忆。``reflection_id``
 + ``admitted`` + ``rejection_reason`` 三元组是 typed boundary output。
 准入策略: Reflection 的 ``lesson`` 非空 → admitted; verdict ==
-ReflectionVerdict.APPROVED → admitted; 其余 → rejected。
+ReflectionVerdict.ON_TRACK → admitted; 其余 → rejected。
 """
 
 from __future__ import annotations
@@ -45,8 +45,8 @@ class MemoryAdmitPolicyExecutor:
 
     semantic_name: str = "memory.admit.policy"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("reflection",)
-    declared_outputs: tuple[PortName, ...] = ("memory_receipt",)
+    declared_inputs: tuple[PortName, ...] = (PortName("reflection"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("memory_receipt"),)
 
     async def node_execute(
         self,
@@ -59,7 +59,7 @@ class MemoryAdmitPolicyExecutor:
         outputs 端口(yaml):memory_receipt (MemoryReceipt)
         """
         del context
-        reflection = input.port_values.get("reflection")
+        reflection = input.port_values.get(PortName("reflection"))
         if not isinstance(reflection, Reflection):
             raise TypeError(
                 "memory.admit.policy: 'reflection' port must be a Reflection "
@@ -67,7 +67,7 @@ class MemoryAdmitPolicyExecutor:
             )
 
         receipt = _admit(reflection)
-        return NodeOutput(port_values={"memory_receipt": receipt})
+        return NodeOutput(port_values={PortName("memory_receipt"): receipt})
 
 
 def _admit(reflection: Reflection) -> MemoryReceipt:
@@ -79,7 +79,7 @@ def _admit(reflection: Reflection) -> MemoryReceipt:
     ``MemorySystem.update``.
     """
     has_lesson = bool(reflection.lesson and reflection.lesson.strip())
-    approved = reflection.verdict is ReflectionVerdict.APPROVED
+    approved = reflection.verdict is ReflectionVerdict.ON_TRACK
     if has_lesson or approved:
         return MemoryReceipt(
             admitted=True,
@@ -91,7 +91,7 @@ def _admit(reflection: Reflection) -> MemoryReceipt:
         admitted=False,
         memory_ref=None,
         reflection_id=reflection.reflection_id,
-        rejection_reason="reflection without lesson and not APPROVED verdict",
+        rejection_reason="reflection without lesson and not ON_TRACK verdict",
     )
 
 
