@@ -1,7 +1,10 @@
 """ADR-0256 §4/§5: namespace 是工具的声明式元数据,不是中央映射表.
 
-A2/A3 已随 Task 3（update_turn fail-fast）/ Task 2（删中央映射表）落地，
-skip 已解除，转为真用例。
+A2/A3 已随 Task 3 / Task 2 落地，skip 已解除，转为真用例。
+A2 契约语义已随 6d190d51b 修订：漏声明 namespace 的工具在 update_turn 不再
+硬崩（fail-soft：归入 "unknown" 伪 namespace、只露目录、warning 留痕，发现层面
+fail-closed），fail-fast 收敛到 wiring time（ToolsService.register 抛 ValueError）
+与 B2（policy 无描述的已声明 namespace 在 update_turn 仍抛错）。
 A1 已解除 skip：默认工具集全部声明 namespace，含 listEnvironments
 （environment_awareness 的 MANIFEST/ToolApi 已补 namespace="core"）。
 A4 可直接运行:源码级双拼工具名扫描.
@@ -31,8 +34,12 @@ def test_a1_all_tools_declare_namespace_in_whitelist():
         )
 
 
-def test_a2_update_turn_rejects_tool_without_namespace():
-    """漏写 namespace 的工具在 update_turn 直接抛错,不许静默上线."""
+def test_a2_missing_namespace_is_failsoft_not_silent(caplog):
+    """漏写 namespace 的工具在 update_turn 走 fail-soft（6d190d51b 修订语义），
+    而不是静默上线：归入 "unknown" 伪 namespace、只露目录、warning 留痕。
+    硬 fail-fast 契约由 tests/infrastructure/tool_defer/test_update_turn_failsoft.py
+    与 tests/infrastructure/capability/tools/test_register_namespace_failfast.py 承载。
+    """
     from lca.infrastructure.tool_defer.policy import DeferPolicy
     from lca.infrastructure.tool_defer.session import ToolDeferSession
 
@@ -42,8 +49,12 @@ def test_a2_update_turn_rejects_tool_without_namespace():
         parameters: ClassVar[dict[str, Any]] = {"type": "object", "properties": {}}
 
     session = ToolDeferSession(DeferPolicy())
-    with pytest.raises(ValueError, match="namespace"):
-        session.update_turn([_GhostTool()])  # 意向 API:不再传中央映射表
+    with caplog.at_level("WARNING"):
+        session.update_turn([_GhostTool()])  # 意向 API:不再传中央映射表，不再抛错
+    assert any(
+        "ghost_tool" in rec.getMessage() and "no namespace" in rec.getMessage()
+        for rec in caplog.records
+    ), "缺失 namespace 的工具应留 warning 痕迹"
 
 
 def test_a3_central_namespace_map_removed():
