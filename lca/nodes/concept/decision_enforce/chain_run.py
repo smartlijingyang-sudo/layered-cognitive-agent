@@ -11,6 +11,7 @@ typed ``Decision``。gate 列表从 ``context.runtime.brain.agent_gates``
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from lca.contracts.atoms.control.slot import ControlSlot
@@ -45,8 +46,8 @@ class GateChainRunExecutor:
 
     semantic_name: str = "gate.chain.run"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("decision", "state")
-    declared_outputs: tuple[PortName, ...] = ("enforced_decision", "decision")
+    declared_inputs: tuple[PortName, ...] = (PortName("decision"), PortName("state"))
+    declared_outputs: tuple[PortName, ...] = (PortName("enforced_decision"), PortName("decision"))
 
     async def node_execute(
         self,
@@ -58,8 +59,8 @@ class GateChainRunExecutor:
         inputs 端口(yaml):decision (Decision), state (AgentState)
         outputs 端口(yaml):enforced_decision (Decision)
         """
-        decision = input.port_values.get("decision")
-        state = input.port_values.get("state")
+        decision = input.port_values.get(PortName("decision"))
+        state = input.port_values.get(PortName("state"))
         if not isinstance(decision, Decision):
             raise TypeError(
                 f"gate.chain.run: 'decision' port must be a Decision, got {type(decision).__name__}"
@@ -76,7 +77,7 @@ class GateChainRunExecutor:
         # can read it (D4 typed-port contract: every edge target's
         # required input must be produced by a reachable predecessor
         # — reject's inputs are ``[decision, enforced_decision]``).
-        return NodeOutput(port_values={"enforced_decision": enforced, "decision": decision})
+        return NodeOutput(port_values={PortName("enforced_decision"): enforced, PortName("decision"): decision})
 
 
 def _resolve_gates(context: NodeContext) -> tuple[DecisionGate, ...]:
@@ -101,6 +102,8 @@ def _resolve_gates(context: NodeContext) -> tuple[DecisionGate, ...]:
         return ()
     if isinstance(raw, DecisionGate):
         return (raw,)
+    if not isinstance(raw, Iterable):
+        return ()
     try:
         items = tuple(raw)
     except TypeError:
