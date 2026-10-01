@@ -6,7 +6,6 @@ from pathlib import Path
 
 from lca.contracts.models.core.state.plane import PlaneKind
 from lca.infrastructure.runtime_plane.preinstall.prompt import render_preinstalled_block
-from lca.infrastructure.sandbox.surface.surface import plane_system_role
 
 
 def test_yaml_is_the_note_ssot() -> None:
@@ -38,8 +37,9 @@ def test_sandbox_block_shares_font_note() -> None:
 
 def test_machine_system_role_embeds_yaml_notes() -> None:
     from lca.contracts.models.core.state.plane import PlaneRef
+    from lca.infrastructure.runtime_plane.prompt.strategy import MachinePlaneStrategy
 
-    role = plane_system_role(
+    role = MachinePlaneStrategy().render(
         PlaneRef(
             id="dev-1",
             label="box",
