@@ -3,7 +3,9 @@
 LobeHub only executes ``assistant.tool_calls``, so a tool call the model writes
 as visible text has to be read back off the text channel. Qwen-family providers
 serialize one three ways: a bracketed ``[Tool call: name]`` header with a JSON
-body, a function tag with a JSON body, and an invoke/parameter tag pair. They
+body, a function tag with a JSON body, and an invoke/parameter tag pair; models
+with native agent encodings also emit a bare ``call`` line followed by a JSON
+body, or an ``<fsWrite>`` pseudo-XML block. They
 also sometimes emit only a *fragment* of one — a trailing closing tag with no
 opening tag, after the provider already stopped.
 
@@ -54,6 +56,8 @@ _PARAM_OR_PARAMETER = re.compile(
 )
 _CHILD_XML_TAG = re.compile(r"<([A-Za-z_][\w]*)\s*>(.*?)</\1\s*>", re.DOTALL)
 _CALLS_WRAPPER = re.compile(r"</?tool_calls\s*>|<\|/?tool_calls\|>|<\|tool_call_end\|>")
+_TEXT_WIRE_CALL = re.compile(r"^call[ \t]*\r?\n[ \t]*(\{.*\})[ \t]*\r?$", re.DOTALL | re.MULTILINE)
+_FS_WRITE_CALL = re.compile(r"<fsWrite\s*>(.*?)</fsWrite\s*>", re.DOTALL)
 
 # Every delimiter of the grammars above, opening and closing. A fragment that
 # contains one of these is a tool call we could not read, never prose. The
@@ -79,6 +83,9 @@ _MARKERS = (
     "<|tool_calls|>",
     "<|tool_call_begin|>",
     "<|tool_call_end|>",
+    "<fsWrite",
+    "</fsWrite>",
+    "call\n{",
 )
 
 
@@ -210,6 +217,26 @@ def _from_qwen(match: re.Match[str]) -> NativeToolCall | None:
     return _call(name, args if args is not None else {})
 
 
+def _from_text_wire(match: re.Match[str]) -> NativeToolCall | None:
+    """Bare ``call`` line followed by a JSON ``{"name": ..., "arguments": {...}}`` body."""
+    parsed = _json_object(_unfence(match.group(1).strip()))
+    if not parsed:
+        return None
+    args = parsed.get("arguments", {})
+    if not isinstance(args, dict):
+        args = {"value": args}
+    return _call(str(parsed.get("name", "")), args)
+
+
+def _from_fs_write(match: re.Match[str]) -> NativeToolCall | None:
+    """``<fsWrite><path>..</path><content>..</content></fsWrite>`` pseudo-XML."""
+    tags = dict(_CHILD_XML_TAG.findall(_unfence(match.group(1).strip())))
+    path = (tags.get("path") or "").strip()
+    if not path:
+        return None
+    return _call("write_file", {"path": path, "content": tags.get("content", "")})
+
+
 # Grammar to decoder, in the order they are tried. Sits next to the decoders so
 # a new encoding is one entry here and one function below.
 _ENCODINGS = (
@@ -220,6 +247,8 @@ _ENCODINGS = (
     (_TOOL_CALL_JSON, _from_tool_call_json),
     (_DELEGATE_CALL, _from_delegate),
     (_QWEN_SPECIAL_CALL, _from_qwen),
+    (_TEXT_WIRE_CALL, _from_text_wire),
+    (_FS_WRITE_CALL, _from_fs_write),
 )
 
 

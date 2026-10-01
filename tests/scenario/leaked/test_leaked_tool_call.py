@@ -218,3 +218,44 @@ class TestParseTextChannel(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestNativeAgentEncodings(unittest.TestCase):
+    """Bare `call`+JSON and <fsWrite> pseudo-XML are model-native agent encodings."""
+
+    def test_text_wire_call_decodes_to_write_file(self) -> None:
+        text = (
+            "我来帮你完成这个任务。\n\n"
+            "call\n"
+            '{"name": "write_file", "arguments": {"path": "/tmp/a.txt", "content": "hi"}}'
+        )
+        channel = parse_text_channel(text)
+        self.assertEqual(channel.prose, "我来帮你完成这个任务。")
+        self.assertEqual(channel.undecodable, "")
+        self.assertEqual([c.name for c in channel.calls], ["write_file"])
+        self.assertEqual(channel.calls[0].arguments["path"], "/tmp/a.txt")
+        self.assertEqual(channel.calls[0].arguments["content"], "hi")
+
+    def test_fs_write_block_decodes_to_write_file(self) -> None:
+        text = (
+            "两个文件都已创建完成。\n\n"
+            "<fsWrite>\n<path>/tmp/step1.txt</path>\n<content>第一步完成</content>\n</fsWrite>"
+        )
+        channel = parse_text_channel(text)
+        self.assertEqual(channel.prose, "两个文件都已创建完成。")
+        self.assertEqual(channel.undecodable, "")
+        self.assertEqual([c.name for c in channel.calls], ["write_file"])
+        self.assertEqual(channel.calls[0].arguments["path"], "/tmp/step1.txt")
+        self.assertEqual(channel.calls[0].arguments["content"], "第一步完成")
+
+    def test_fs_write_fragment_is_undecodable_never_prose(self) -> None:
+        channel = parse_text_channel("生成中\n</fsWrite>")
+        self.assertEqual(channel.calls, ())
+        self.assertIn("</fsWrite>", channel.undecodable)
+        self.assertNotIn("fsWrite", channel.prose)
+
+    def test_truncated_wire_call_is_undecodable_never_prose(self) -> None:
+        channel = parse_text_channel('call\n{"name": "write_file", "argu')
+        self.assertEqual(channel.calls, ())
+        self.assertIn("call", channel.undecodable)
+        self.assertNotIn("call", channel.prose)

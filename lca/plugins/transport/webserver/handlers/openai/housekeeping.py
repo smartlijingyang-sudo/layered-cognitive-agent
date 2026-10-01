@@ -8,6 +8,7 @@ from typing import Any
 
 from starlette.responses import JSONResponse, StreamingResponse
 
+from lca.cognition.brain.prompt.leaked_tool_call import parse_text_channel
 from lca.cognition.team.modes_catalog import DEFAULT_MODE
 from lca.infrastructure.openai.compat import (
     StructuredLLMError,
@@ -44,6 +45,29 @@ async def chat_completions_from_body(body: dict[str, Any]) -> JSONResponse | Str
     )
 
 
+_PASSTHROUGH_NO_TOOL_NOTE = (
+    "（注：本接口为透传代理，不执行工具调用；"
+"检测到的工具调用标记已移除，未被执行。）"
+)
+
+
+def sanitize_passthrough_text(text: str) -> str:
+    """Strip leaked tool-call markup from a passthrough completion.
+
+    The housekeeping path never runs an agent loop, so a model-written
+    ``call``/``<fsWrite>`` block is unexecuted by construction. Render prose
+    only and say so, instead of leaking the markup or letting a hallucinated
+    "done" stand.
+    """
+    channel = parse_text_channel(text or "")
+    if not channel.calls and not channel.undecodable:
+        return text
+    prose = channel.prose.strip()
+    if prose:
+        return f"{prose}\n\n{_PASSTHROUGH_NO_TOOL_NOTE}"
+    return _PASSTHROUGH_NO_TOOL_NOTE
+
+
 async def passthrough_chat_completion(
     *,
     messages: list[Any],
@@ -56,6 +80,7 @@ async def passthrough_chat_completion(
         text, usage = await create_simple_completion(messages=messages, model=model)
     except (StructuredLLMError, APIError) as exc:
         return error_response(str(exc), status_code=502, error_type="server_error")
+    text = sanitize_passthrough_text(text)
     if stream:
         return streaming_chat_response(chat_id, text)
     return JSONResponse(chat_response(chat_id, text, usage), headers=_cors_headers())
