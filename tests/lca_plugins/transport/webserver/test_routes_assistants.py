@@ -908,6 +908,31 @@ def test_post_assistants_registers_bridge_when_present(tmp_path: Any) -> None:
     assert binding["status"] == "active"
 
 
+def test_post_assistants_skip_frontend_bridge_keeps_the_existing_agent(tmp_path: Any) -> None:
+    """Binding an existing Lobe row must not register a second agent."""
+    bridge = _FakeBridge(agent_id="agt_should_not_appear")
+    app, ownership, bridge = _app_with_catalog_and_bridge(tmp_path, bridge)
+    client = TestClient(app)
+    response = client.post(
+        "/v1/assistants",
+        json={
+            "name": "默认助理",
+            "description": "收件箱默认助理",
+            "client_id": "lobe-agent:agt_inbox",
+            "use_template_soul": True,
+            "skip_frontend_bridge": True,
+        },
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["assistant_id"].startswith("asst_")
+    assert body["agent_id"] is None
+    assert bridge.calls == []
+    binding = ownership.bindings[body["assistant_id"]]
+    assert binding["client_id"] == "lobe-agent:agt_inbox"
+    assert binding["agent_id"] == ""
+
+
 def test_post_assistants_duplicate_client_id_is_idempotent(tmp_path: Any) -> None:
     """D2 regression: same ``(user_id, client_id)`` maps to the same assistant."""
     from lca.infrastructure.persistence.user_store import SqliteUserAssistantStore

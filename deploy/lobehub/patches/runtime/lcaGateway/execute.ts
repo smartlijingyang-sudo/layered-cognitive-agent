@@ -65,6 +65,33 @@ function bearer(): string {
   return envToken && envToken.length > 0 ? envToken : 'lca-local';
 }
 
+export async function ensureLcaAssistantId(
+  agentId: string,
+  existing: string | undefined,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string | undefined> {
+  if (existing) return existing;
+  if (!agentId) return undefined;
+  const resp = await fetchImpl('/lca-api/v1/assistants', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${bearer()}`,
+      [TOKEN_HEADER_NAME]: bearer(),
+    },
+    body: JSON.stringify({
+      name: '默认助理',
+      description: '收件箱默认助理',
+      client_id: `lobe-agent:${agentId}`,
+      use_template_soul: true,
+      skip_frontend_bridge: true,
+    }),
+  });
+  if (!resp.ok) return undefined;
+  const data = (await resp.json()) as { assistant_id?: string };
+  return data.assistant_id || undefined;
+}
+
 export async function lcaStartRun(
   body: LcaStartRunBody,
   fetchImpl: typeof fetch = fetch,

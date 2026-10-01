@@ -19,7 +19,7 @@ import { persistAssistantRow } from '../lcaPersist';
 import { getLcaGatewayUrl } from './client';
 import { createLcaDeliverables, type LcaDeliverables } from './deliverables';
 import { createLcaGatewayEventHandler } from './event_handler';
-import { lcaStartRun, type LcaStartRunResult } from './execute';
+import { ensureLcaAssistantId, lcaStartRun, type LcaStartRunResult } from './execute';
 import { lcaRefreshWsToken } from './reconnect';
 
 type MessageLike = { id?: string; parentId?: string; role?: string };
@@ -286,7 +286,25 @@ export async function lcaExecuteGatewayRun(
         }
       | undefined
   )?.agencyConfig;
-  const assistantId = agencyConfig?.lcaAssistantId;
+  const assistantId = await ensureLcaAssistantId(
+    context.agentId,
+    agencyConfig?.lcaAssistantId,
+  );
+  if (assistantId && assistantId !== agencyConfig?.lcaAssistantId) {
+    const update = (
+      useAgentStore.getState() as {
+        updateAgentConfigById?: (
+          id: string,
+          patch: { agencyConfig: { lcaAssistantId: string } },
+        ) => Promise<void>;
+      }
+    ).updateAgentConfigById;
+    if (update) {
+      await update(context.agentId, { agencyConfig: { lcaAssistantId: assistantId } }).catch(
+        () => undefined,
+      );
+    }
+  }
 
   let receipt: LcaStartRunResult;
   try {

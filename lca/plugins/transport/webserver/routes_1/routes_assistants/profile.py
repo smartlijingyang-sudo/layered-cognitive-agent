@@ -104,6 +104,14 @@ async def create_assistant(request: Request) -> JSONResponse:
             error_type="invalid_request",
             detail="use_template_soul 必须为布尔值",
         )
+    skip_frontend_bridge = body.get("skip_frontend_bridge", False)
+    if not isinstance(skip_frontend_bridge, bool):
+        return _error_envelope(
+            "invalid_request",
+            status_code=400,
+            error_type="invalid_request",
+            detail="skip_frontend_bridge 必须为布尔值",
+        )
     if seed_user_md is not None and not isinstance(seed_user_md, str):
         return _error_envelope(
             "invalid_request",
@@ -188,9 +196,11 @@ async def create_assistant(request: Request) -> JSONResponse:
         initial_skills=initial_skills,
     )
 
-    agent_id = await _register_bridge(
-        request, handle.assistant_id, client_id or f"lca-{handle.assistant_id}"
-    )
+    agent_id = None
+    if not skip_frontend_bridge:
+        agent_id = await _register_bridge(
+            request, handle.assistant_id, client_id or f"lca-{handle.assistant_id}"
+        )
 
     return _json(
         {

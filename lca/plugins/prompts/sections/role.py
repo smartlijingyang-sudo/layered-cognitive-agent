@@ -33,8 +33,15 @@ class BackstorySection:
     name: ClassVar[str] = "backstory"
 
     def render(self, *, role_profile: RoleProfile, tools: Sequence[Tool]) -> SectionOutput:
-        text = label_line("BACKSTORY", role_profile.backstory)
-        return SectionOutput(text=text + "\n\n" + _PERSONA_INJECTION_WARNING)
+        # The warning names SOUL.md. Emit it only after a real standing
+        # backstory, so an unbound session cannot go looking for a file
+        # that was never loaded.
+        text = (role_profile.backstory or "").strip()
+        if not text:
+            return SectionOutput(text="")
+        return SectionOutput(
+            text=label_line("BACKSTORY", text) + "\n\n" + _PERSONA_INJECTION_WARNING
+        )
 
 
 def build_role_section(config: BaseModel) -> RoleSection:
