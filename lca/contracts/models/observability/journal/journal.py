@@ -28,8 +28,6 @@ from lca.contracts.atoms.ids.ids import RunId, TraceId
 from lca.contracts.models.observability.event.event import OperationOutcome, RuntimeKind
 from lca.contracts.observability.evidence.evidence import (
     EvidenceRef,
-)
-from lca.contracts.observability.evidence.evidence import (
     EvidenceRef as _EvidenceRef,  # alias for JournalRecord.evidence compat
 )
 

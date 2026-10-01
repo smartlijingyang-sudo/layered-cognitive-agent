@@ -66,8 +66,6 @@ from lca.infrastructure.cli.services.kernel.supervisor.results import (
     build_restart_result,
     build_start_result,
     build_status_result,
-)
-from lca.infrastructure.cli.services.kernel.supervisor.results import (
     build_stop_result as build_stop_result,
 )
 from lca.infrastructure.cli.services.kernel.supervisor.state import (

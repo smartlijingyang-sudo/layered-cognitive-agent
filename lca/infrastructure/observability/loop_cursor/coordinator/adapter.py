@@ -35,11 +35,7 @@ from typing import Any, get_args
 
 from lca.contracts.models.observability.journal.step import (
     ThinkingTrace,
-)
-from lca.contracts.models.observability.journal.step import (
     ToolCallRecord as LegacyToolCallRecord,
-)
-from lca.contracts.models.observability.journal.step import (
     ToolResult as LegacyToolResult,
 )
 from lca.contracts.observability.cursor.loop_cursor import (

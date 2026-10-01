@@ -20,8 +20,6 @@ from datetime import UTC
 from lca.contracts.atoms.ids.ids import RunId, TraceId
 from lca.contracts.models.observability.journal.journal import (
     RunScope as _RunScope,
-)
-from lca.contracts.models.observability.journal.journal import (
     StampedEvent,
 )
 from lca.infrastructure.observability.journal.stream.live_tail import LiveGap, LiveTail
