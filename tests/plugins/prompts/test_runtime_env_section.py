@@ -14,10 +14,12 @@ from lca.plugins.prompts.sections.runtime_env import (
 
 
 def test_render_runtime_row_default():
+    import platform
+
     row = render_runtime_row()
-    assert row.startswith("Runtime: session=main chat | os=linux")
+    assert row.startswith(f"Runtime: session=main chat | os={platform.system().lower()}")
     assert "model=" in row
-    assert "shell=bash" in row
+    assert "shell=" in row
     assert "depth=0" in row
     assert "max_depth=2" in row
     assert "can_spawn=yes" in row
@@ -72,3 +74,33 @@ def test_developer_timestamp_section_render():
     out = sec.render(role_profile=profile, tools=())
     assert "[client_timezone=" in out.text
     assert "Sent from: " in out.text
+
+
+def test_runtime_env_does_not_emit_fake_muse_spark() -> None:
+    """INV-02: 状态行绝不输出假象 model=Muse Spark，必须反映系统实际 OS。"""
+    import platform
+
+    sec = RuntimeEnvSection()
+    profile = RoleProfile(
+        role="assistant",
+        goal="help user",
+        backstory="test",
+        tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
+    )
+    out = sec.render(role_profile=profile, tools=())
+    assert "model=Muse Spark" not in out.text
+    assert f"os={platform.system().lower()}" in out.text
+
+
+def test_developer_timestamp_reflects_local_timezone() -> None:
+    """INV-03: 时间戳必须动态反映本地实际时区，不硬编码固定东八区假象。"""
+    sec = DeveloperTimestampSection()
+    profile = RoleProfile(
+        role="assistant",
+        goal="help user",
+        backstory="test",
+        tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
+    )
+    out = sec.render(role_profile=profile, tools=())
+    local_tz = datetime.now().astimezone().tzname()
+    assert local_tz in out.text

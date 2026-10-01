@@ -7,8 +7,8 @@
 | BRAINSTORM-HARDCODING-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-01-hardcoding-remediation-design.md |
 | BRAINSTORM-HARDCODING-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 成功落盘 docs/plans/2026-10-01-hardcoding-remediation-plan.md 并完成实施分解 |
 | HARDCODING-TASK-1 | 模板与预设清洗 (TOOLS.md, AGENTS.md, USER.md) | Completed | 清除 TOOLS.md 私网 IP(10.36.6.252) 与代理(7890)，清除 6 个 AGENTS.md 智库路径与 6 个 USER.md 固定时区，新增 test_templates_have_no_host_private_hardcodings 断言全绿 (60/60 passed) |
-| HARDCODING-TASK-2 | Prompt 真实感知注入与消除假象 (runtime_env.py) | In_Progress | 执行中：准备重构 runtime_env.py 消除 Muse Spark 与固定东八区假象 |
-| HARDCODING-TASK-3 | 路径安全拦截收敛至权威 Locator (standing_path.py) | Ready | 待执行 |
+| HARDCODING-TASK-2 | Prompt 真实感知注入与消除假象 (runtime_env.py) | Completed | 消除 Muse Spark 与写死东八区假象，实现动态 OS、shell、model(qwen) 与本地时区感知，单测 18/18 全绿 |
+| HARDCODING-TASK-3 | 路径安全拦截收敛至权威 Locator (standing_path.py) | In_Progress | 执行中：准备重构 standing_path.py 接入 get_lca_home 权威前缀 |
 | HARDCODING-TASK-4 | 参数截断检测精细化与防误杀 (leaked_tool_call.py) | Ready | 待执行 |
 | HARDCODING-TASK-5 | 历史组装 Defer Catalog 标记解耦 (assemble.py) | Ready | 待执行 |
 | HARDCODING-TASK-6 | 全链路不变量回归验证与门禁体检 (INV-01 ~ INV-06) | Ready | 待执行 |
