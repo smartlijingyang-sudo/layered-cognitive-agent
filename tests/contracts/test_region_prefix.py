@@ -16,8 +16,7 @@ from lca.contracts.atoms.enums.region_prefix import (
     collect_region_prefixes,
 )
 
-
-# Region set observed at 2026-09-16 — the canonical value set is whatever
+# Region set observed at 2026-09-16, synced 2026-10-02 (effect region added) — the canonical value set is whatever
 # directories exist under ``lca/nodes/``. If you add a new region directory,
 # this test auto-picks it up because collect_region_prefixes walks the FS.
 _EXPECTED_REGIONS = frozenset(
@@ -25,6 +24,7 @@ _EXPECTED_REGIONS = frozenset(
         "act",
         "concept",
         "delegate",
+        "effect",
         "intervene",
         "loop",
         "perceive",
@@ -50,7 +50,7 @@ class TestRegionPrefixValues:
             )
 
     def test_current_snapshot_matches_expected_regions(self):
-        """Frozen snapshot of the 2026-09-16 region set.
+        """Frozen snapshot of the region set (2026-09-16, effect added later).
 
         If you intentionally add / remove a region directory under
         ``lca/nodes/``, update this expected set and document the change
