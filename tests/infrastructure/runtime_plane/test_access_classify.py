@@ -164,3 +164,53 @@ def test_malformed_input_is_not_an_error() -> None:
 
 def test_no_plane_means_no_opinion() -> None:
     assert tool_calls_need_approval([_call("local_readFile", path=_SSH_KEY)], None) is False
+
+
+def test_bare_run_command_with_rm_needs_approval_on_machine_plane() -> None:
+    """Regression: S6 scenario — bare ``runCommand`` emitting ``rm`` on the
+    MACHINE plane must pause for approval, exactly like ``local_runCommand``.
+
+    The model emits bare wire names in production runs and they execute on the
+    local machine; leaving them unclassified silently bypassed the gate.
+    """
+    bare = decide_tool_call(
+        "runCommand",
+        {"command": "rm /tmp/lca-mt-test/shopping.txt"},
+        plane=_machine(),
+    )
+    assert bare is not None
+    assert bare.verdict is AccessVerdict.NEEDS_APPROVAL
+    assert tool_calls_need_approval(
+        [_call("runCommand", command="rm /tmp/lca-mt-test/shopping.txt")],
+        _machine(),
+    ) is True
+
+
+def test_bare_read_file_on_credential_path_needs_approval() -> None:
+    decision = decide_tool_call("readFile", {"path": _SSH_KEY}, plane=_machine())
+    assert decision is not None
+    assert decision.verdict is AccessVerdict.NEEDS_APPROVAL
+    assert decision.reason is AccessReason.CREDENTIAL_PATH
+
+
+def test_bare_names_stay_ungated_on_sandbox_plane() -> None:
+    # This layer has no opinion off the machine plane: the sandbox container
+    # is the boundary (decide_access returns ALLOW there), and the approval
+    # predicate never pauses for it.
+    assert (
+        tool_calls_need_approval(
+            [_call("runCommand", command="rm /tmp/x")], _sandbox()
+        )
+        is False
+    )
+    assert (
+        decide_tool_call("runCommand", {"command": "rm /tmp/x"}, plane=_sandbox())
+        is None
+    )
+
+
+def test_bare_read_only_command_stays_allowed_on_machine_plane() -> None:
+    assert (
+        tool_calls_need_approval([_call("runCommand", command="tasklist")], _machine())
+        is False
+    )

@@ -47,17 +47,24 @@ _OPERATION_ARGS: dict[str, tuple[str, tuple[str, ...]]] = {
 _PATH_KEYS_BY_OPERATION: dict[str, tuple[str, ...]] = dict(_OPERATION_ARGS.values())
 
 
+def _bare_operation(tool_name: str) -> str | None:
+    """Policy operation for a bare wire apiName (no ``local_`` prefix)."""
+    entry = _OPERATION_ARGS.get(tool_name)
+    return entry[0] if entry is not None else None
+
+
 def machine_operation(tool_name: str) -> str | None:
     """The policy operation a wire tool name maps to, or None if it is not one.
 
     The prefix is required, not merely stripped. The sandbox face uses bare
     apiNames (``readFile``) and the machine face uses ``local_``-prefixed ones,
-    so an unprefixed name must not resolve to a machine operation.
+    so an unprefixed name must not resolve to a machine operation here.
+    (Bare names that execute on the machine plane are resolved by
+    :func:`decide_tool_call`, which owns the plane discriminator.)
     """
     if not tool_name.startswith(MACHINE_TOOL_PREFIX):
         return None
-    entry = _OPERATION_ARGS.get(tool_name.removeprefix(MACHINE_TOOL_PREFIX))
-    return entry[0] if entry is not None else None
+    return _bare_operation(tool_name.removeprefix(MACHINE_TOOL_PREFIX))
 
 
 def _first_str(arguments: Mapping[str, Any], keys: Sequence[str]) -> str:
@@ -98,8 +105,22 @@ def decide_tool_call(
 
     ``None`` means the call is not a machine computer tool, so this layer has
     no opinion and the caller falls back to its own classification.
+
+    Bare wire names (``runCommand``) that arrive while the MACHINE plane is
+    bound resolve to the same policy operation as their ``local_``-prefixed
+    twins: production traces show the model emits bare names and they execute
+    on the local machine, so leaving them unclassified silently bypasses the
+    approval gate. The plane -- not the name prefix -- is the discriminator; a
+    non-machine plane still yields no opinion from this layer.
     """
     operation = machine_operation(tool_name)
+    if (
+        operation is None
+        and plane is not None
+        and plane.kind is PlaneKind.MACHINE
+        and not tool_name.startswith(MACHINE_TOOL_PREFIX)
+    ):
+        operation = _bare_operation(tool_name)
     if operation is None or plane is None:
         return None
     return decide_access(
