@@ -18,9 +18,6 @@ from lca.contracts.models.observability.journal.journal import StampedEvent
 from lca.infrastructure.observability.events.event.catalog import descriptor_for
 from lca.infrastructure.observability.journal.engine.journal_io import stamped_to_record
 
-SSE_SENTINEL: None = None
-"""队列/订阅关闭哨兵（与 ``LiveTail.close`` 对齐）。"""
-
 
 def is_sse_visible(event_type: str) -> bool:
     """audience=restricted 的事件不进 SSE live 帧。"""
@@ -50,24 +47,3 @@ def parse_last_event_id(header_value: str | None) -> int:
     except ValueError:
         return 0
 
-
-def frames_after_seq(frames: list[str], after_seq: int) -> list[str]:
-    """从已缓冲 SSE 帧列表中筛出 seq > after_seq 的帧。"""
-    if after_seq <= 0:
-        return list(frames)
-    out: list[str] = []
-    for frame in frames:
-        seq = _seq_from_frame(frame)
-        if seq is not None and seq > after_seq:
-            out.append(frame)
-    return out
-
-
-def _seq_from_frame(frame: str) -> int | None:
-    for line in frame.splitlines():
-        if line.startswith("id: "):
-            try:
-                return int(line[4:].strip())
-            except ValueError:
-                return None
-    return None

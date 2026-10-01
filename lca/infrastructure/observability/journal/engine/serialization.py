@@ -159,53 +159,6 @@ def scope_from_dict(payload: Mapping[str, object]) -> RunScope:
         agent_role=_string_field(payload, "agent_role"),
         step=_int_field(payload, "step"),
     )
-
-
-def journal_record_to_dict(record: JournalRecord) -> dict[str, object]:
-    """Serialize JournalRecord to a plain dict."""
-    return {
-        "schema": record.schema,
-        "event_id": record.event_id,
-        "run_id": record.run_id,
-        "run_seq": record.run_seq,
-        "occurred_at": record.occurred_at,
-        "committed_at": record.committed_at,
-        "scope": scope_to_dict(record.scope),
-        "causation": causation_to_dict(record.causation),
-        "descriptor": descriptor_ref_to_dict(record.descriptor),
-        "data": dict(record.data),
-        "evidence": [ref.to_dict() for ref in record.evidence],
-        "plan_ref": record.plan_ref,
-    }
-
-
-def journal_record_from_dict(payload: Mapping[str, object]) -> JournalRecord:
-    """Deserialize JournalRecord from a plain dict."""
-    from lca.contracts.observability.evidence.evidence import EvidenceRef
-
-    scope = scope_from_dict(_mapping_field(payload, "scope"))
-    causation = causation_from_dict(_mapping_field(payload, "causation"))
-    descriptor = descriptor_ref_from_dict(_mapping_field(payload, "descriptor"))
-    evidence = tuple(
-        EvidenceRef.from_dict(_mapping_value(item, field_name="evidence[]"))
-        for item in _sequence_field(payload, "evidence")
-    )
-    return JournalRecord(
-        schema="lca.journal/2",
-        event_id=_string_field(payload, "event_id"),
-        run_id=_string_field(payload, "run_id"),
-        run_seq=_int_field(payload, "run_seq"),
-        occurred_at=_float_field(payload, "occurred_at"),
-        committed_at=_float_field(payload, "committed_at"),
-        scope=scope,
-        causation=causation,
-        descriptor=descriptor,
-        data=dict(_mapping_field(payload, "data")),
-        evidence=evidence,
-        plan_ref=_string_field(payload, "plan_ref"),
-    )
-
-
 def stamped_to_journal_record(
     stamped: StampedEvent,
     *,
