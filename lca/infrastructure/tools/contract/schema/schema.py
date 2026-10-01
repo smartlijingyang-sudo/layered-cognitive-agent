@@ -47,7 +47,6 @@ COMMON: dict[str, FieldSpec] = {
     "kind": FieldSpec("kind", "kind", "string", "observation"),
     "version": FieldSpec("version", "version", "string", "argument"),
     "page": FieldSpec("page", "page", "int", "argument"),
-    "page_size": FieldSpec("page_size", "pageSize", "int", "argument"),
     # Script execution
     "script": FieldSpec("script", "script", "string", "argument"),
     "skill_name": FieldSpec("skill_name", "skillName", "string", "argument"),
