@@ -7,12 +7,14 @@ import pytest
 from lca.contracts.models.core.policy.stop import StopDecision, StopReason
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
+    ExecutionOutcome,
+)
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     DeclarativeRunOutcome,
-    ExecutionOutcome,
     PhaseRunCursor,
 )
-from lca.harness.declarative.execute.outcome_projection import InterpretationResult
+from lca.framework.graph.host_wiring import LegacyResultShim
 from lca.plugins.loop.reducer.plugin import DefaultReducer
 from lca.runtime.projection.result_finalizer import RuntimeResultFinalizer
 
@@ -49,17 +51,14 @@ async def test_finalizer_projects_pause_from_one_terminal_fact() -> None:
     """A pause must not fall back to a separately derived carrier result."""
 
     cursor = _cursor()
-    interpretation = InterpretationResult(
+    interpretation = LegacyResultShim(
         state=AgentState(trace_id="trace-1", task="await approval", budget=Budget()),
-        artifact=None,
-        visits=(),
-        facts=(),
         terminal_node="think.standard",
         cursor=cursor,
         outcome=DeclarativeRunOutcome(
             kind=ExecutionOutcome.PAUSED,
             cursor=cursor,
-            stop=StopDecision(should_stop=False, reason=StopReason.CONTINUE),
+            stop=StopDecision(reason=StopReason.CONTINUE),
             approval_request={"approval_id": "approval-1", "type": "tool_approval"},
         ),
     )
