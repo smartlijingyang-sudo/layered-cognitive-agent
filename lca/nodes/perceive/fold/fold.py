@@ -47,10 +47,10 @@ class PerceiveFoldExecutor:
 
     semantic_name: str = "phase.perceive.fold"
     region: str = "perceive"
-    declared_inputs: tuple[PortName, ...] = ("manifest", "memories")
+    declared_inputs: tuple[PortName, ...] = (PortName("manifest"), PortName("memories"))
     declared_outputs: tuple[PortName, ...] = (
-        "in_assembled_manifest",
-        "observation",
+        PortName("in_assembled_manifest"),
+        PortName("observation"),
     )
 
     async def node_execute(
@@ -59,8 +59,8 @@ class PerceiveFoldExecutor:
         input: NodeInput,
     ) -> NodeOutput:
         runtime = context.runtime or {}
-        manifest = input.port_values.get("manifest")
-        memories = input.port_values.get("memories") or ()
+        manifest = input.port_values.get(PortName("manifest"))
+        memories = input.port_values.get(PortName("memories")) or ()
         if memories and isinstance(manifest, ContextManifest):
             item = ContextItem(
                 kind="memory",
@@ -93,9 +93,9 @@ class PerceiveFoldExecutor:
         )
         return NodeOutput(
             port_values={
-                "in_assembled_manifest": manifest,
-                "observation": observation,
-                "routing": RoutingDecision(action_type=ActionType.RESPOND),
+                PortName("in_assembled_manifest"): manifest,
+                PortName("observation"): observation,
+                PortName("routing"): RoutingDecision(action_type=ActionType.RESPOND),
             },
         )
 
