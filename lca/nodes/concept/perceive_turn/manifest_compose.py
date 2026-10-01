@@ -43,8 +43,8 @@ class PerceiveManifestComposeExecutor:
 
     semantic_name: str = "perceive.manifest.compose"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("context_items", "state")
-    declared_outputs: tuple[PortName, ...] = ("manifest",)
+    declared_inputs: tuple[PortName, ...] = (PortName("context_items"), PortName("state"))
+    declared_outputs: tuple[PortName, ...] = (PortName("manifest"),)
 
     async def node_execute(
         self,
@@ -57,8 +57,8 @@ class PerceiveManifestComposeExecutor:
         outputs 端口(yaml):manifest (ContextManifest)
         """
         del context
-        items = input.port_values.get("context_items") or ()
-        state = input.port_values.get("state")
+        items = input.port_values.get(PortName("context_items")) or ()
+        state = input.port_values.get(PortName("state"))
         if not isinstance(items, tuple):
             raise TypeError(
                 "perceive.manifest.compose: 'context_items' port must be a "
@@ -81,7 +81,7 @@ class PerceiveManifestComposeExecutor:
             digest=f"manifest:{new_id('manifest')}",
             schema_version="1.0",
         )
-        return NodeOutput(port_values={"manifest": manifest})
+        return NodeOutput(port_values={PortName("manifest"): manifest})
 
 
 @plugin(
