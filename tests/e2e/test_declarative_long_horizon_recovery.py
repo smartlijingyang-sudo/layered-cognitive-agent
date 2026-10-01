@@ -13,16 +13,17 @@ from typing import Any
 import pytest
 
 from lca.contracts.protocols.act.command.envelope import CommandEnvelope
+from lca.contracts.protocols.act.effect.handler import EffectHandlerRegistry
 from lca.harness.declarative.execute.dispatch import RegistryEffectDispatcher
-from lca.runtime.support.runtime_bindings import RuntimePhaseCapabilities
 from lca.plugins.act.effect.handlers_provider import (
     InMemoryEffectHandlerRegistry,
     register_default_effect_handlers,
 )
 from lca.runtime._overflow_0.idempotency_fixtures import InMemoryFixtureIdempotencyStore
+from lca.runtime.support.runtime_bindings import RuntimePhaseCapabilities
 
 
-def _default_effect_handlers() -> InMemoryEffectHandlerRegistry:
+def _default_effect_handlers() -> EffectHandlerRegistry:
     """Create an explicit test registry with the standard provider installed."""
     registry = InMemoryEffectHandlerRegistry()
     register_default_effect_handlers(registry)
