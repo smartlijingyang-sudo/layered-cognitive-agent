@@ -1,7 +1,10 @@
 """ADR-0256 §4/§5: namespace 是工具的声明式元数据,不是中央映射表.
 
-A1/A2/A3 断言 ADR-0256 落地后的目标行为,当前实现尚未迁移,
-以 skip 锁定意图;实现落地后去掉 skip 即验收.
+A2/A3 已随 Task 3（update_turn fail-fast）/ Task 2（删中央映射表）落地，
+skip 已解除，转为真用例。
+A1 仍 skip：默认工具集 6/7 已声明，仅 listEnvironments
+（lca/infrastructure/tools/environment_awareness 的 MANIFEST/ToolApi 未传
+namespace）漏声明，根子在源码，已立案 backlog，补上后解除。
 A4 可直接运行:源码级双拼工具名扫描.
 """
 
@@ -15,7 +18,10 @@ import pytest
 NAMESPACE_WHITELIST = {"core", "file", "shell", "memory", "skill", "web", "agent", "ext"}
 
 
-@pytest.mark.skip(reason="ADR-0256 §4 未落地:Tool 尚无 namespace 声明字段")
+@pytest.mark.skip(
+    reason="源码缺口（已立案 backlog）：默认工具集仅 listEnvironments 未声明 namespace "
+    "（environment_awareness 的 MANIFEST/ToolApi 未传 namespace），补上后解除 skip。"
+)
 def test_a1_all_tools_declare_namespace_in_whitelist():
     """注册表里每个工具都声明 namespace,且值在 8 域白名单内."""
     from lca.infrastructure.tools.default.set import build_default_tools
@@ -29,7 +35,6 @@ def test_a1_all_tools_declare_namespace_in_whitelist():
         )
 
 
-@pytest.mark.skip(reason="ADR-0256 §6 未落地:update_turn 尚未对漏声明 fail-fast")
 def test_a2_update_turn_rejects_tool_without_namespace():
     """漏写 namespace 的工具在 update_turn 直接抛错,不许静默上线."""
     from lca.infrastructure.tool_defer.policy import DeferPolicy
@@ -45,7 +50,6 @@ def test_a2_update_turn_rejects_tool_without_namespace():
         session.update_turn([_GhostTool()])  # 意向 API:不再传中央映射表
 
 
-@pytest.mark.skip(reason="ADR-0256 §5 未落地:ToolsService.tool_namespaces 中央映射表尚未删除")
 def test_a3_central_namespace_map_removed():
     """SSOT 下移到 factory 后,中央映射表必须消失."""
     import lca.infrastructure.capability.tools.tools as tools_mod
