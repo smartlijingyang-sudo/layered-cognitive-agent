@@ -66,17 +66,17 @@ class EffectExecuteExecutor:
     # decision=..., state=...)`` instead of being smuggled via
     # ``envelope.metadata``.
     declared_inputs: tuple[PortName, ...] = (
-        "envelope",
-        "verdict_refs",
-        "decision",
-        "state",
+        PortName("envelope"),
+        PortName("verdict_refs"),
+        PortName("decision"),
+        PortName("state"),
     )
     # PR-3.8.5 fix1: emit ``receipts`` (list-of-one) so the act subgraph's
     # ``act.join`` typed-boundary node (declared_inputs=("receipts",)) sees
     # the receipt via the kernel port registry. Previously emitted the
     # singular ``receipt`` which left ``receipts=None`` at join and every
     # act subgraph run terminated silently at join.
-    declared_outputs: tuple[PortName, ...] = ("receipts",)
+    declared_outputs: tuple[PortName, ...] = (PortName("receipts"),)
 
     async def node_execute(
         self,
@@ -95,7 +95,7 @@ class EffectExecuteExecutor:
         ``derive_messages`` 就还原不出 ``role=tool`` 行,模型会以为自己的
         工具调用没有得到回应而反复重发同一个调用。
         """
-        envelope = input.port_values.get("envelope")
+        envelope = input.port_values.get(PortName("envelope"))
         if not isinstance(envelope, CommandEnvelope):
             raise TypeError(
                 "effect.execute: 'envelope' port must be a CommandEnvelope "
@@ -105,12 +105,12 @@ class EffectExecuteExecutor:
         # ADR-0235 / PR-5: decision / state are typed-port inputs; they
         # flow into ``gateway.execute(envelope, policy, *, decision=...,
         # state=...)`` instead of being smuggled via ``envelope.metadata``.
-        decision = input.port_values.get("decision")
-        state = input.port_values.get("state")
+        decision = input.port_values.get(PortName("decision"))
+        state = input.port_values.get(PortName("state"))
 
         receipt, observation, dispatch_error = await _dispatch(envelope, context, decision, state)
         _append_tool_result_surface(context, envelope, receipt, observation, dispatch_error)
-        return NodeOutput(port_values={"receipts": [receipt]})
+        return NodeOutput(port_values={PortName("receipts"): [receipt]})
 
 
 def _resolve_writer(context: NodeContext) -> Any:
