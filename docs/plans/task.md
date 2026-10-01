@@ -414,9 +414,9 @@
 | BRAINSTORM-ONBOARDING-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量/契约模型）并获取用户审批 | Completed | 全部 4 节（系统边界与两阶段状态机/核心契约与工具链/前端LobeHub交互增强/测试架构与不变量矩阵）全盘获批 |
 | BRAINSTORM-ONBOARDING-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-01-conversational-onboarding-and-assistant-naming-design.md 并提交 git |
 | BRAINSTORM-ONBOARDING-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 成功落盘 docs/plans/2026-10-01-conversational-onboarding-and-assistant-naming-plan.md 并完成实施分解 |
-| ONBOARDING-TASK-1 | 契约与数据库持久化增强 (`NamingCandidate`, `NamingWidgetPayload`, `user_store.py`) | Pending | 待执行 |
-| ONBOARDING-TASK-2 | 自管理工具链落地 (`CreateNameWidgetTool` & `UpdateIdentityTool`) | Pending | 待执行 |
-| ONBOARDING-TASK-3 | 助理创建自动继承老用户画像 (`AssistantCatalog.create`) | Pending | 待执行 |
+| ONBOARDING-TASK-1 | 契约与数据库持久化增强 (`NamingCandidate`, `NamingWidgetPayload`, `user_store.py`) | Completed | 成功落地 NamingCandidate/NamingWidgetPayload 契约，扩展 SQLite 与 Postgres user_store 的 user_md 持久化与 CRUD 接口，单测 4/4 passed，commit 7824145df |
+| ONBOARDING-TASK-2 | 自管理工具链落地 (`CreateNameWidgetTool` & `UpdateIdentityTool`) | Completed | 成功落地 CreateNameWidgetTool 与 UpdateIdentityTool，支持 USER.md/IDENTITY.md 写入、Widget Token 生成与 🎉 庆祝回执，单测 2/2 passed，commit 2a5b3f576 |
+| ONBOARDING-TASK-3 | 助理创建自动继承老用户画像 (`AssistantCatalog.create`) | Completed | 成功在 AssistantCatalog.create 接入 user_store.get_user_md 自动继承机制，显式传入优先，单测 2/2 passed，commit 95b5e84ae |
 | ONBOARDING-TASK-4 | 开场白脚本化编排与网关 Reaction 桥接 | Pending | 待执行 |
 | ONBOARDING-TASK-5 | 前端 LobeHub UI 起名 Widget 补丁与交互组件 | Pending | 待执行 |
 | ONBOARDING-TASK-6 | 全链路不变量集成测试与门禁核验 (INV-01 ~ INV-08) | Pending | 待执行 |
