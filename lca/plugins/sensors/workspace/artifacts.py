@@ -33,7 +33,7 @@ class Config(BaseModel):
     layer="L1",
     effects="none",
     description="Perceive workspace artifact file pointers for the AgentState snapshot.",
-    test_suite="tests/test_sensors_v3.py",
+    test_suite="tests/scenario/sensors/test_sensors_v3.py",
     kind=PluginKind.PRIMITIVE,
     functional_group=FunctionalGroup.G4_PERCEPTION,
     contract=PluginContract(

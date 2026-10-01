@@ -51,7 +51,7 @@ class Config(BaseModel):
         "MCTS tree evaluation cache for LATS Brain. "
         "STUB ONLY — see ADR-0107; setup() raises NotImplementedError."
     ),
-    test_suite="tests/test_memory_policy.py",
+    test_suite="tests/scenario/memory/test_memory_policy.py",
     kind=PluginKind.PRIMITIVE,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

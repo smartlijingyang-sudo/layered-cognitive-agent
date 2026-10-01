@@ -40,7 +40,7 @@ class Config(BaseModel):
     layer="L0",
     effects="filesystem",
     description="Provide evidence_store + evidence_policy capability seams (ADR-0065 L5 / L8).",
-    test_suite="tests/test_seam_evidence_store.py::test_seam_provides_both",
+    test_suite="tests/scenario/seam/test_seam_evidence_store.py::test_seam_setup_provides_both_capabilities",
     kind=PluginKind.SEAM,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

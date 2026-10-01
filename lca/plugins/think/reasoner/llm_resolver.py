@@ -67,7 +67,7 @@ class _BoundAdapterResolver:
         "Expose the LlmResolver view of the boot-bound LLMAdapter; "
         "consumers are the runnable-assembly seam."
     ),
-    test_suite="tests/test_plugin_alignment.py::test_tier1_plugin_shape",
+    test_suite="tests/scenario/plugin/test_plugin_alignment.py::test_tier1_plugin_shape",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(

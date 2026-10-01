@@ -48,7 +48,7 @@ class Config(BaseModel):
         "Resolve boot-time LLM adapter from LLM_* env via "
         "ProductionLLMResolver and publish as llm_adapter capability."
     ),
-    test_suite="tests/test_plugin_alignment.py::test_tier1_plugin_shape",
+    test_suite="tests/scenario/plugin/test_plugin_alignment.py::test_tier1_plugin_shape",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(

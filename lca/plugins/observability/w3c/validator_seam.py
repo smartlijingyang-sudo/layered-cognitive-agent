@@ -37,7 +37,7 @@ class Config(BaseModel):
     layer="L0",
     effects="none",
     description="Provide W3C trace context validator (ADR-0065 §八 / PR-7).",
-    test_suite="tests/test_seam_w3c_validator.py::test_seam_provides_default_validator",
+    test_suite="tests/scenario/seam/test_seam_w3c_validator.py::test_seam_provides_default_validator",
     kind=PluginKind.SEAM,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

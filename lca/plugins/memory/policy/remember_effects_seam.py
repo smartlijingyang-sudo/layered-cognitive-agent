@@ -33,7 +33,7 @@ class Config(BaseModel):
     layer="L1",
     effects="none",
     description="Effect seam for the 'remember' cognitive step.",
-    test_suite="tests/test_plugin_alignment.py::test_seam_shape",
+    test_suite="tests/scenario/plugin/test_plugin_alignment.py",
     kind=PluginKind.SEAM,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

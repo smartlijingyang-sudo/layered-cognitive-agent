@@ -395,7 +395,7 @@ class Config(BaseModel):
     kind=PluginKind.PRIMITIVE,
     effects="none",
     description="Register graph TeamStrategy factory.",
-    test_suite="tests/test_graph_strategy.py",
+    test_suite="tests/scenario/graph/test_graph_strategy.py",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(

@@ -62,7 +62,7 @@ def _cognitive_driver_factory(ctx: object) -> CognitiveRunDriver:
     layer="L4",
     effects="none",
     description="Register the Gateway-owned cognitive RunLoopDriver adapter.",
-    test_suite="tests/test_plugin_tree_single_owner.py",
+    test_suite="tests/scenario/plugin/test_plugin_tree_single_owner.py",
     kind=PluginKind.PRIMITIVE,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:

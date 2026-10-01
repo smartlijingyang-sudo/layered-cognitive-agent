@@ -42,7 +42,7 @@ class Config(BaseModel):
         "Provide the standard Reflect primitive pipeline; profiles may replace its "
         "critic/fallback semantics without replacing the Brain or Agent Loop."
     ),
-    test_suite="tests/test_cognitive_pipeline_plugins.py",
+    test_suite="tests/scenario/cognitive/test_cognitive_pipeline_plugins.py",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(

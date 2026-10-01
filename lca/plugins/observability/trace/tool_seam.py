@@ -38,7 +38,7 @@ class Config(BaseModel):
     layer="L3",
     effects="none",
     description="Provide the TraceInspector tools seam (PR-9).",
-    test_suite="tests/test_trace_tool.py::test_seam_provides_tools",
+    test_suite="tests/scenario/trace/test_trace_tool.py::test_seam_provides_tools",
     kind=PluginKind.SEAM,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

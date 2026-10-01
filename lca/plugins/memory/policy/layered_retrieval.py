@@ -37,7 +37,7 @@ class Config(BaseModel):
         "Provide LayeredRetrievalPolicy as ``retrieval.layered``. "
         "Standard bundle upgrades default null retrieval to per-layer weighted."
     ),
-    test_suite="tests/test_plugin_alignment.py",
+    test_suite="tests/scenario/plugin/test_plugin_alignment.py",
     kind=PluginKind.PRIMITIVE,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

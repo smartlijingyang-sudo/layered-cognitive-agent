@@ -33,7 +33,7 @@ class Config(BaseModel):
     layer="L1",
     effects="none",
     description="Perceive the wall clock for the AgentState snapshot.",
-    test_suite="tests/test_sensors_v3.py",
+    test_suite="tests/scenario/sensors/test_sensors_v3.py",
     kind=PluginKind.PRIMITIVE,
     functional_group=FunctionalGroup.G2_SPACETIME,
     contract=PluginContract(

@@ -59,7 +59,7 @@ class JournalSchemaRegistry:
     layer="L0",
     effects="none",
     description="Provide the journal_schemas registry (ADR-0096 MVA-1).",
-    test_suite="tests/test_journal_schema_seam.py::test_journal_schema_seam_provides_registry",
+    test_suite="tests/scenario/journal_2/test_journal_schema_seam.py::test_journal_schema_seam_provides_registry",
     kind=PluginKind.SEAM,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

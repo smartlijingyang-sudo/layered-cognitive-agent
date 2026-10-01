@@ -34,7 +34,7 @@ class Config(BaseModel):
     layer="L0",
     effects="world",
     description="Register Sandbox providers on the SandboxService Definition.",
-    test_suite="tests/test_plugin_tree_single_owner.py",
+    test_suite="tests/scenario/plugin/test_plugin_tree_single_owner.py",
     kind=PluginKind.PROVIDER,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

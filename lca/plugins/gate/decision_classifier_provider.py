@@ -85,7 +85,7 @@ class DefaultDecisionClassifier(DecisionClassifier):
     layer="L1",
     effects="none",
     description="Provide the default DecisionClassifier implementation.",
-    test_suite="tests/test_plugin_alignment.py::test_tier2_plugin_shape",
+    test_suite="tests/scenario/plugin/test_plugin_alignment.py",
     kind=PluginKind.PROVIDER,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

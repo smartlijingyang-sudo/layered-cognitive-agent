@@ -33,7 +33,7 @@ class Config(BaseModel):
     layer="L1",
     effects="none",
     description="Provide NullCritic as ``critic.null`` (ADR-0068 default).",
-    test_suite="tests/test_plugin_alignment.py",
+    test_suite="tests/scenario/plugin/test_plugin_alignment.py",
     kind=PluginKind.PRIMITIVE,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

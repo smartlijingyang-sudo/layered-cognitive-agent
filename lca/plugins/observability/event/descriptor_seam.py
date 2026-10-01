@@ -38,7 +38,7 @@ class Config(BaseModel):
     layer="L0",
     effects="none",
     description="Provide the EventDescriptorRegistry service (PR-7 source inversion).",
-    test_suite="tests/test_event_descriptor_registry.py::test_seam_provides_registry",
+    test_suite="tests/scenario/event/test_event_descriptor_registry.py::test_seam_provides_registry",
     kind=PluginKind.SEAM,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

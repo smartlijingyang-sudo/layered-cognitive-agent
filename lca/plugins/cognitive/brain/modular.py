@@ -41,7 +41,7 @@ class Config(BaseModel):
     effects="none",
     functional_group=FunctionalGroup.G5_COGNITION,
     description="Register the standard cognitive Brain factory as brains['modular'].",
-    test_suite="tests/test_plugin_alignment.py",
+    test_suite="tests/scenario/plugin/test_plugin_alignment.py",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(

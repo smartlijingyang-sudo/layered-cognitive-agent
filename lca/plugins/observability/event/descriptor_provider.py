@@ -37,7 +37,7 @@ class Config(BaseModel):
     layer="L0",
     effects="none",
     description="Bootstrap 49 builtin EventDescriptor into the registry.",
-    test_suite="tests/test_event_descriptor_registry.py::test_bootstrap_registers_builtin_descriptors",
+    test_suite="tests/scenario/event/test_event_descriptor_registry.py::test_bootstrap_registers_builtin_descriptors",
     kind=PluginKind.PROVIDER,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

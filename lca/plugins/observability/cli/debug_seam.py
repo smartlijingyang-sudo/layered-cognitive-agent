@@ -37,7 +37,7 @@ class Config(BaseModel):
     layer="L0",
     effects="none",
     description="Provide the cli_debug_command seam (PR-9).",
-    test_suite="tests/test_cli_debug_trace.py::test_seam_provides_debug_registry",
+    test_suite="tests/scenario/cli/test_cli_debug_trace.py::test_seam_provides_debug_registry",
     kind=PluginKind.SEAM,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

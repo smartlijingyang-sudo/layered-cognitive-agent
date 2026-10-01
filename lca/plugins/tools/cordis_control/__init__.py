@@ -104,7 +104,7 @@ class Config(BaseModel):
     layer="L1",
     effects="world",
     description="Profile-selected factory for the Composer-bound cordis_control Tool.",
-    test_suite="tests/test_cordis_creator_e2e.py",
+    test_suite="tests/scenario/cordis/test_cordis_creator_e2e.py",
     kind=PluginKind.PRIMITIVE,
 )
 async def setup(ctx: PluginContext, config: Config) -> None:

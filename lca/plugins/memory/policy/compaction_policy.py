@@ -50,7 +50,7 @@ class Config(BaseModel):
     layer="L0",
     effects="none",
     description="Provide an auditable semantic compaction policy for memory context views.",
-    test_suite="tests/test_memory_policy.py",
+    test_suite="tests/scenario/memory/test_memory_policy.py",
     kind=PluginKind.PRIMITIVE,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

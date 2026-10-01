@@ -33,7 +33,7 @@ class Config(BaseModel):
     kind=PluginKind.SEAM,
     effects="none",
     description="Gate group registry; gate plugins add() onto it.",
-    test_suite="tests/test_plugin_alignment.py",
+    test_suite="tests/scenario/plugin/test_plugin_alignment.py",
     functional_group=FunctionalGroup.G6_DECISION,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

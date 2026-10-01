@@ -111,7 +111,7 @@ class Config(BaseModel):
     layer="L1",
     effects="none",
     description="Empty run-loop driver registry; loop plugins fill it in.",
-    test_suite="tests/test_plugin_tree_single_owner.py::test_empty_execution_target_uses_profile_default",
+    test_suite="tests/scenario/plugin/test_plugin_tree_single_owner.py::test_empty_execution_target_uses_profile_default",
     kind=PluginKind.PRIMITIVE,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

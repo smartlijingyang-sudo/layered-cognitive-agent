@@ -39,7 +39,7 @@ class Config(BaseModel):
     layer="L0",
     effects="memory",
     description="Register InMemoryJournalStore factory as journal_store_factories['memory'].",
-    test_suite="tests/test_journal_store_backend.py::test_provider_registers_memory_factory",
+    test_suite="tests/scenario/journal_2/test_journal_store_backend.py::test_provider_registers_memory_factory",
     kind=PluginKind.PROVIDER,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

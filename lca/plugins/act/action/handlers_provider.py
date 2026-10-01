@@ -255,7 +255,7 @@ def _compatibility_safe_batch_policy() -> ToolBatchExecutionPolicy:
     effects="none",
     description="Provide the default ActionHandler implementations (4 handlers for RESPOND/USE_TOOL/DELEGATE/HANDOFF).",
     kind=PluginKind.PROVIDER,
-    test_suite="tests/test_plugin_alignment.py::test_tier2_plugin_shape",
+    test_suite="tests/scenario/plugin/test_plugin_alignment.py",
     functional_group=FunctionalGroup.G7_EXECUTION,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

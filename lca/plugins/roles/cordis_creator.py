@@ -127,7 +127,7 @@ def build_cordis_creator_role_profile() -> RoleProfile:
     layer="L3",
     effects="none",
     description="Creator §13.3 cordis-creator role persona + tool permission manifest",
-    test_suite="tests/test_cordis_creator_e2e.py",
+    test_suite="tests/scenario/cordis/test_cordis_creator_e2e.py",
     kind=PluginKind.PRIMITIVE,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

@@ -33,7 +33,7 @@ class Config(BaseModel):
     kind=PluginKind.SEAM,
     effects="none",
     description="Perceive group registry; sensor plugins add() onto it.",
-    test_suite="tests/test_composer_sensor_wiring.py",
+    test_suite="tests/scenario/composer/test_composer_sensor_wiring.py",
     functional_group=FunctionalGroup.G4_PERCEPTION,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

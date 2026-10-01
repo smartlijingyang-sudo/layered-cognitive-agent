@@ -36,7 +36,7 @@ class Config(BaseModel):
     layer="L0",
     effects="world",
     description="Register FileStore providers on the FileStoreService Definition.",
-    test_suite="tests/test_plugin_alignment.py",
+    test_suite="tests/scenario/plugin/test_plugin_alignment.py",
     kind=PluginKind.PROVIDER,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

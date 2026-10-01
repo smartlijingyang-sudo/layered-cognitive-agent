@@ -113,7 +113,7 @@ def _render_event(stamped: Any) -> dict[str, Any]:
     layer="L0",
     effects="none",
     description="lca-ops debug trace handler via TraceInspector (PR-9).",
-    test_suite="tests/test_cli_debug_trace.py::test_trace_command_registered",
+    test_suite="tests/scenario/cli/test_cli_debug_trace.py::test_trace_command_registered",
     kind=PluginKind.PROVIDER,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

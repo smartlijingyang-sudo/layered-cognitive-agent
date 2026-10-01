@@ -37,7 +37,7 @@ class Config(BaseModel):
     layer="L0",
     effects="none",
     description="Provide the profile_snapshots registry (ADR-0096 MVA-3).",
-    test_suite="tests/test_profile_snapshot_seam.py::test_profile_snapshot_seam_provides_registry",
+    test_suite="tests/scenario/profile/test_profile_snapshot_seam.py::test_profile_snapshot_seam_provides_registry",
     kind=PluginKind.SEAM,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

@@ -58,7 +58,7 @@ class DefaultArtifactClosure(ArtifactClosure):
     effects="none",
     kind=PluginKind.PROVIDER,
     description="Provide the default ArtifactClosure implementation.",
-    test_suite="tests/test_plugin_alignment.py::test_tier2_plugin_shape",
+    test_suite="tests/scenario/plugin/test_plugin_alignment.py",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(

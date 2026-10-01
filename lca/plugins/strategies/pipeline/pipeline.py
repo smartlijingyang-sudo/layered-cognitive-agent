@@ -59,7 +59,7 @@ class Config(BaseModel):
     kind=PluginKind.PRIMITIVE,
     effects="none",
     description="Register pipeline TeamStrategy factory.",
-    test_suite="tests/test_orchestration_coverage.py",
+    test_suite="tests/scenario/orchestration/test_orchestration_coverage.py",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(

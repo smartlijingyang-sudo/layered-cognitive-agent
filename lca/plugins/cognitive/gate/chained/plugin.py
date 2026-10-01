@@ -42,7 +42,7 @@ class ChainedDecisionGateAssembler(DecisionGateAssembler):
     layer="L1",
     effects="none",
     description="Select the standard sequential DecisionGate chain strategy.",
-    test_suite="tests/test_cognitive_group_assembly.py",
+    test_suite="tests/scenario/cognitive/test_cognitive_group_assembly.py",
     kind=PluginKind.PRIMITIVE,
     functional_group=FunctionalGroup.G6_DECISION,
     contract=PluginContract(

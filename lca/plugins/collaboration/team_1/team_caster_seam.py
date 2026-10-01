@@ -44,7 +44,7 @@ class Config(BaseModel):
     effects="none",
     description="Provide the default LLM-backed Team casting policy.",
     Config=Config,
-    test_suite="tests/test_gateway_team_factory.py",
+    test_suite="tests/scenario/gateway/test_gateway_team_factory.py",
     kind=PluginKind.PRIMITIVE,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

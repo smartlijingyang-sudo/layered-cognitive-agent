@@ -44,7 +44,7 @@ class Config(BaseModel):
     layer="L3",
     effects="none",
     description="Register 5 TraceInspector tools (PR-9).",
-    test_suite="tests/test_trace_tool.py::test_provider_registers_all_tools",
+    test_suite="tests/scenario/trace/test_trace_tool.py::test_provider_registers_all_tools",
     kind=PluginKind.PROVIDER,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

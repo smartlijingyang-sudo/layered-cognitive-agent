@@ -39,7 +39,7 @@ class Config(BaseModel):
     layer="L0",
     effects="none",
     description="Provide the JournalStoreBackend factory registry (PR-8).",
-    test_suite="tests/test_journal_store_backend.py::test_factory_registry_provided",
+    test_suite="tests/scenario/journal_2/test_journal_store_backend.py",
     kind=PluginKind.SEAM,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

@@ -32,7 +32,7 @@ class Config(BaseModel):
     layer="L0",
     effects="tools",
     description="Register Search provider functions on the SearchService Definition.",
-    test_suite="tests/test_plugin_alignment.py",
+    test_suite="tests/scenario/plugin/test_plugin_alignment.py",
     kind=PluginKind.PROVIDER,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

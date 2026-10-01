@@ -107,7 +107,7 @@ class Config(BaseModel):
     effects="none",
     functional_group=FunctionalGroup.G8_COLLAB,
     description="Register lead TeamStrategy factory.",
-    test_suite="tests/test_orchestration_coverage.py",
+    test_suite="tests/scenario/orchestration/test_orchestration_coverage.py",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(

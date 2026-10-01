@@ -117,7 +117,7 @@ class Config(BaseModel):
     kind=PluginKind.PRIMITIVE,
     effects="none",
     description="Register fan_out TeamStrategy factory.",
-    test_suite="tests/test_parallel_strategy.py",
+    test_suite="tests/scenario/parallel/test_parallel_strategy.py",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(

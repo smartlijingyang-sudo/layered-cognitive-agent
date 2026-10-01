@@ -232,7 +232,7 @@ class Config(BaseModel):
     layer="L1",
     effects="tools",
     description="file_write Tool — Creator §13.3 file/shell primitive",
-    test_suite="tests/test_cordis_creator_real_scenario.py",
+    test_suite="tests/scenario/cordis/test_cordis_creator_real_scenario.py",
     kind=PluginKind.PRIMITIVE,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

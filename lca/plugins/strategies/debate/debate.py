@@ -133,7 +133,7 @@ class Config(BaseModel):
     kind=PluginKind.PRIMITIVE,
     effects="none",
     description="Register debate TeamStrategy factory.",
-    test_suite="tests/test_debate_strategy.py",
+    test_suite="tests/scenario/debate/test_debate_strategy.py",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(

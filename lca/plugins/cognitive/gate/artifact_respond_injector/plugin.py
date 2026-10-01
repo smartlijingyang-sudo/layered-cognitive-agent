@@ -33,7 +33,7 @@ class Config(BaseModel):
     layer="L1",
     effects="none",
     description="Inject artifact references into terminal respond actions.",
-    test_suite="tests/test_plugin_alignment.py",
+    test_suite="tests/scenario/plugin/test_plugin_alignment.py",
     kind=PluginKind.PRIMITIVE,
     functional_group=FunctionalGroup.G6_DECISION,
     contract=PluginContract(

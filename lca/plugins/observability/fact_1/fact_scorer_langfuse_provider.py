@@ -39,7 +39,7 @@ class Config(BaseModel):
     layer="L0",
     effects="network",
     description="Register Langfuse scorer factory as fact_scorers['langfuse'].",
-    test_suite="tests/test_observability_scorer.py::test_langfuse_scorer_registered",
+    test_suite="tests/scenario/observability/test_observability_scorer.py::test_langfuse_scorer_registered",
     kind=PluginKind.PROVIDER,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

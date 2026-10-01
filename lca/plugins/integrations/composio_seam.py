@@ -31,7 +31,7 @@ class Config(BaseModel):
     layer="L0",
     effects="tools",
     description="Provide the Composio integration Definition (connection + execute).",
-    test_suite="tests/test_composio_integration.py",
+    test_suite="tests/scenario/composio/test_composio_integration.py",
     kind=PluginKind.SEAM,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

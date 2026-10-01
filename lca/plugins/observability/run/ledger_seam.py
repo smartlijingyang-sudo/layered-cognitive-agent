@@ -155,7 +155,7 @@ class _StepTreeBundle:
         "Provide durable run ledgers and profile-selected run journal projections "
         "(writer, live tail, process projection; ADR-0065 L9)."
     ),
-    test_suite="tests/test_run_ledger_factory.py",
+    test_suite="tests/scenario/run_2/test_run_ledger_factory.py",
     kind=PluginKind.SEAM,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

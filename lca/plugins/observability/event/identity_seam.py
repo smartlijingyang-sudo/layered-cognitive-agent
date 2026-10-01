@@ -36,7 +36,7 @@ class Config(BaseModel):
     layer="L0",
     effects="none",
     description="Provide the event_identities registry (ADR-0096 MVA-2 + ADR-0097).",
-    test_suite="tests/test_event_identity_seam.py::test_event_identity_seam_provides_registry",
+    test_suite="tests/scenario/event/test_event_identity_seam.py::test_event_identity_seam_provides_registry",
     kind=PluginKind.SEAM,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

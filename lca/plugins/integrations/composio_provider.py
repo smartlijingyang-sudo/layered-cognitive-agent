@@ -43,7 +43,7 @@ def _secret_value(value: SecretStr | str) -> str:
     layer="L0",
     effects="tools",
     description="Configure ComposioIntegration from Profile-injected credentials.",
-    test_suite="tests/test_composio_integration.py",
+    test_suite="tests/scenario/composio/test_composio_integration.py",
     kind=PluginKind.PROVIDER,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

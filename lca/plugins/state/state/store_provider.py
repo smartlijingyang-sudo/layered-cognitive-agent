@@ -40,7 +40,7 @@ class Config(BaseModel):
     layer="L0",
     effects="none",
     description="Register memory or durable SQLite StateStore providers selected by Profile.",
-    test_suite="tests/test_plugin_tree_single_owner.py",
+    test_suite="tests/scenario/plugin/test_plugin_tree_single_owner.py",
     kind=PluginKind.PROVIDER,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

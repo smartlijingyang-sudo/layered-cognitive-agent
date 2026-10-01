@@ -49,7 +49,7 @@ def build_simple_hook_registry(ctx: PluginContext) -> HookRegistry:
     layer="L1",
     effects="none",
     description="Register CordisHookRegistry factory as hooks['simple'].",
-    test_suite="tests/test_plugin_alignment.py",
+    test_suite="tests/scenario/plugin/test_plugin_alignment.py",
     kind=PluginKind.PRIMITIVE,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

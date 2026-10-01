@@ -38,7 +38,7 @@ class Config(BaseModel):
     layer="L0",
     effects="filesystem",
     description="Provide run_locator capability seam (ADR-0065 §七 / PR-5).",
-    test_suite="tests/test_seam_run_locator.py::test_seam_provides_filesystem_locator",
+    test_suite="tests/scenario/seam/test_seam_run_locator.py::test_seam_provides_filesystem_locator",
     kind=PluginKind.SEAM,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

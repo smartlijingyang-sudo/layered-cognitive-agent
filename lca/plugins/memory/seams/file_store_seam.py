@@ -32,7 +32,7 @@ class Config(BaseModel):
     layer="L0",
     effects="world",
     description="Provide the FileStore Definition service (ProviderDispatch + file-store table).",
-    test_suite="tests/test_plugin_alignment.py::test_tier1_plugin_shape",
+    test_suite="tests/scenario/plugin/test_plugin_alignment.py::test_tier1_plugin_shape",
     kind=PluginKind.SEAM,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

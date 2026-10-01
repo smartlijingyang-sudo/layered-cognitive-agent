@@ -34,7 +34,7 @@ class Config(BaseModel):
     layer="L1",
     effects="tools",
     description="Register SimpleBody as bodies['simple'].",
-    test_suite="tests/test_plugin_alignment.py",
+    test_suite="tests/scenario/plugin/test_plugin_alignment.py",
     kind=PluginKind.PRIMITIVE,
     functional_group=FunctionalGroup.G7_EXECUTION,
     contract=PluginContract(

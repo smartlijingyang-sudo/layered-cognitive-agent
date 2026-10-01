@@ -49,7 +49,7 @@ class Config(BaseModel):
     kind=PluginKind.PRIMITIVE,
     effects="none",
     description=("Empty BODIES/BRAINS/HOOKS/RESUME_INPUT_ADAPTERS/STRATEGIES registry seams."),
-    test_suite="tests/test_plugin_alignment.py::test_factory_registry_seams",
+    test_suite="tests/scenario/plugin/test_plugin_alignment.py::test_factory_registry_seams",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(

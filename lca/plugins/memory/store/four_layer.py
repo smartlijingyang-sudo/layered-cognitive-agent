@@ -53,7 +53,7 @@ class Config(BaseModel):
         "Four-layer memory backend (working/episodic/semantic/procedural). "
         "STUB ONLY — see ADR-0107; setup() raises NotImplementedError."
     ),
-    test_suite="tests/test_memory_policy.py",
+    test_suite="tests/scenario/memory/test_memory_policy.py",
     kind=PluginKind.PRIMITIVE,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

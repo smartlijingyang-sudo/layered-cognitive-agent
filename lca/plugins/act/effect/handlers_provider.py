@@ -117,7 +117,7 @@ def register_default_effect_handlers(registry: EffectHandlerRegistry) -> None:
     effects="none",
     kind=PluginKind.PROVIDER,
     description="Register the standard body and memory EffectHandler implementations.",
-    test_suite="tests/test_plugin_alignment.py::test_tier2_plugin_shape",
+    test_suite="tests/scenario/plugin/test_plugin_alignment.py",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(

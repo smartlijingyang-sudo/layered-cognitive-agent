@@ -35,7 +35,7 @@ class Config(BaseModel):
     kind=PluginKind.PRIMITIVE,
     effects="none",
     description="DecisionGate that forces lead to consult every team member before responding.",
-    test_suite="tests/test_refactor_guards.py::TestProgressiveDisclosureVocabulary::test_must_consult_all_rewrites_early_respond",
+    test_suite="tests/scenario/refactor/test_refactor_guards.py::TestProgressiveDisclosureVocabulary::test_must_consult_all_rewrites_early_respond",
     functional_group=FunctionalGroup.G6_DECISION,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

@@ -31,7 +31,7 @@ class Config(BaseModel):
     layer="L1",
     effects="none",
     description="Provide RunStore class as ``journal_store``; Composer instantiates per-run.",
-    test_suite="tests/test_plugin_alignment.py::test_compose_root_no_inline_instantiation",
+    test_suite="tests/scenario/plugin/test_plugin_alignment.py::test_compose_root_no_inline_instantiation",
     kind=PluginKind.PRIMITIVE,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),

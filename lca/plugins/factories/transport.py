@@ -45,7 +45,7 @@ def build_transport_service_compose() -> TransportRegistryProtocol:
     layer="L1",
     effects="none",
     description="Compose-time TransportService factory (one fresh instance per compose).",
-    test_suite="tests/test_plugin_alignment.py::test_compose_root_no_inline_instantiation",
+    test_suite="tests/scenario/plugin/test_plugin_alignment.py::test_compose_root_no_inline_instantiation",
     kind=PluginKind.PRIMITIVE,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
