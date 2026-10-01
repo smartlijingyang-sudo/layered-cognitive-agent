@@ -228,11 +228,6 @@ class TestLifter:
         assert lifted.nodes[0].binding is BindingKind.NODE_EXECUTOR
         assert lifted.nodes[1].binding is BindingKind.SUBGRAPH
 
-    @pytest.mark.xfail(
-        reason="D5 validation catches real bug: terminal.commit edge references 'routing' port not in outputs. "
-        "D4 bundle rewrite will fix this.",
-        strict=True,
-    )
     def test_lift_graph_spec_subgraph_ref_inherits_inner_entry_schema(self) -> None:
         """An outer node carrying ``sub_spec_ref`` must declare its
         io_schema from the inner entry node's ports so the kernel
