@@ -43,8 +43,8 @@ class PromptCandidatePickExecutor:
 
     semantic_name: str = "prompt.candidate.pick"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("scored", "state")
-    declared_outputs: tuple[PortName, ...] = ("template_selection",)
+    declared_inputs: tuple[PortName, ...] = (PortName("scored"), PortName("state"))
+    declared_outputs: tuple[PortName, ...] = (PortName("template_selection"),)
 
     async def node_execute(
         self,
@@ -57,14 +57,14 @@ class PromptCandidatePickExecutor:
         outputs 端口(yaml):template_selection (TemplateSelection)
         """
         del context
-        scored = input.port_values.get("scored")
+        scored = input.port_values.get(PortName("scored"))
         if scored is None:
             scored = ()
         if not isinstance(scored, tuple):
             raise TypeError(
                 f"prompt.candidate.pick: 'scored' port must be a tuple, got {type(scored).__name__}"
             )
-        state = input.port_values.get("state")
+        state = input.port_values.get(PortName("state"))
         if state is not None and not isinstance(state, AgentState):
             raise TypeError(
                 "prompt.candidate.pick: 'state' port must be an AgentState "
@@ -87,7 +87,7 @@ class PromptCandidatePickExecutor:
                 variant="react",
                 decision_path="profile_default",
             )
-        return NodeOutput(port_values={"template_selection": selection})
+        return NodeOutput(port_values={PortName("template_selection"): selection})
 
 
 @plugin(
