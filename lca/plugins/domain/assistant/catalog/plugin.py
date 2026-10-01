@@ -151,6 +151,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         event_emitter=_emit,
         role_resolver=_try_build_role_resolver(),
         global_skills_store=DiskSkillPackageStore(),
+        user_store=ctx.soft_get("assistant.ownership"),
     )
     ctx.provide(ASSISTANT_CATALOG.key, catalog)
 

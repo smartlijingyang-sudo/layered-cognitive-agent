@@ -288,12 +288,14 @@ class _AssistantCatalogImpl(_AssistantCatalogEventsMixin, AssistantCatalog):
         event_emitter: Callable[[str, Mapping[str, Any]], Any] | None = None,
         role_resolver: Any | None = None,
         global_skills_store: Any | None = None,
+        user_store: Any | None = None,
     ) -> None:
         self._root = root
         self._root.mkdir(parents=True, exist_ok=True)
         self._emit = event_emitter
         self._role_resolver = role_resolver
         self._global_skills_store = global_skills_store
+        self._user_store = user_store
 
     # ── 公开面 ────────────────────────────────────────────────────────
 
@@ -365,9 +367,12 @@ class _AssistantCatalogImpl(_AssistantCatalogEventsMixin, AssistantCatalog):
 
         # 2..N:后续步骤任一失败 ⇒ 半成品 Home 清理
         try:
-            # 2. seed_user_md 覆盖默认 USER.md
-            if req.seed_user_md:
-                (home.root / "USER.md").write_text(req.seed_user_md, encoding="utf-8")
+            # 2. seed_user_md 覆盖默认 USER.md；未提供时自动从 user_store 继承全局画像 (INV-04)
+            effective_user_md = req.seed_user_md
+            if not effective_user_md and req.owner_user_id and self._user_store is not None:
+                effective_user_md = self._user_store.get_user_md(req.owner_user_id)
+            if effective_user_md:
+                (home.root / "USER.md").write_text(effective_user_md, encoding="utf-8")
 
             # 2b. inherit_from:把来源 Home 的 skills/ + tools/grants 策略复制为快照
             inherited_index: dict[str, Any] = {}
@@ -409,7 +414,7 @@ class _AssistantCatalogImpl(_AssistantCatalogEventsMixin, AssistantCatalog):
 
             # 3. 引导式创建完成流:删除 BOOTSTRAP.md（EP 在 manifest 写盘后发,
             #    携带事件时刻的 manifest_digest）
-            guided = bool(req.seed_user_md or req.soul)
+            guided = bool(effective_user_md or req.soul)
             if guided and home.bootstrap_md.is_file():
                 home.bootstrap_md.unlink()
 
