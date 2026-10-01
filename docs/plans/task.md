@@ -9,8 +9,8 @@
 | HARDCODING-TASK-1 | 模板与预设清洗 (TOOLS.md, AGENTS.md, USER.md) | Completed | 清除 TOOLS.md 私网 IP(10.36.6.252) 与代理(7890)，清除 6 个 AGENTS.md 智库路径与 6 个 USER.md 固定时区，新增 test_templates_have_no_host_private_hardcodings 断言全绿 (60/60 passed) |
 | HARDCODING-TASK-2 | Prompt 真实感知注入与消除假象 (runtime_env.py) | Completed | 消除 Muse Spark 与写死东八区假象，实现动态 OS、shell、model(qwen) 与本地时区感知，单测 18/18 全绿 |
 | HARDCODING-TASK-3 | 路径安全拦截收敛至权威 Locator (standing_path.py) | Completed | 废除 .lca 模糊段匹配，接入 expand_user_path 与 get_lca_home 权威前缀，工作区文件放行，自定义 LCA_HOME 防御生效，单测 11/11 全绿 |
-| HARDCODING-TASK-4 | 参数截断检测精细化与防误杀 (leaked_tool_call.py) | In_Progress | 执行中：准备优化参数截断正则，消除对合法包含点号命令的误杀 |
-| HARDCODING-TASK-5 | 历史组装 Defer Catalog 标记解耦 (assemble.py) | Ready | 待执行 |
+| HARDCODING-TASK-4 | 参数截断检测精细化与防误杀 (leaked_tool_call.py) | Completed | 将 _TRUNCATED_VALUE 收紧为尾部点号截断 (re.compile(r"…|\.{4,}\s*(\Z|\"|\')"))，消解合法参数（如正则 grep "a....b"）误杀；新增 test_regex_with_dots_is_not_rejected_as_truncated 断言；28/28 测试通过 |
+| HARDCODING-TASK-5 | 历史组装 Defer Catalog 标记解耦 (assemble.py) | In_Progress | 执行中：重构 _strip_defer_catalog，消除循环正则全量字符串替换 |
 | HARDCODING-TASK-6 | 全链路不变量回归验证与门禁体检 (INV-01 ~ INV-06) | Ready | 待执行 |
 | ADR-0256-TASK-1 | Contracts 层强化与 DeferPolicy 8 域闭环 (`Tool.namespace` & `DeferPolicy`) | Completed | Tool.namespace 与 ToolApi.namespace 契约增加，DeferPolicy 固化 8 域描述与 shell 审批，单测 3/3 passed，commit 9c8a6b566 |
 | ADR-0256-TASK-2 | 工具 Factory 与 Manifest 显式声明 Namespace 并下沉 SSOT | Completed | 23项工具显式声明 8 大 namespace，彻底切除 ToolsService._tool_namespaces，20/20 单测全通，commit bbb74b882 |

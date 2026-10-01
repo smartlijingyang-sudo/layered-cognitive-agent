@@ -208,6 +208,21 @@ class TestParseTextChannel(unittest.TestCase):
             'find /tmp -name "*.md"',
         )
 
+    def test_regex_with_dots_is_not_rejected_as_truncated(self) -> None:
+        """INV-05: 包含多点正则或占位符的合法参数不得被误杀为截断。"""
+        text = (
+            "分析日志：\n"
+            "<tool_calls>\n"
+            '<tool name="run_command">\n'
+            '<parameter name="command">grep -E "a....b" /tmp/test.log</parameter>\n'
+            "</tool>\n"
+            "</tool_calls>"
+        )
+        channel = parse_text_channel(text)
+        self.assertEqual(len(channel.calls), 1)
+        self.assertEqual(channel.calls[0].name, "run_command")
+        self.assertEqual(channel.calls[0].arguments["command"], 'grep -E "a....b" /tmp/test.log')
+
     def test_modern_dangling_tags_become_undecodable(self) -> None:
         channel = parse_text_channel("完成分析。\n</tool>\n</delegate_to>")
         self.assertEqual(channel.calls, ())

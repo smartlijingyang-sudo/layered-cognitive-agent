@@ -31,9 +31,10 @@ from lca.contracts.models.core.conversation.llm import NativeToolCall
 
 _FENCE = re.compile(r"```.*?(?:```|\Z)", re.DOTALL)
 _TOOL_NAME = re.compile(r"^[A-Za-z_][\w]{0,63}$")
-# Four-or-more dots, or a unicode ellipsis, is a model cutting a value off.
+# Four-or-more dots at the trailing end, or unicode ellipsis anywhere, indicates a truncated value.
 # Three dots stay legal so a Python ``...`` in a real argument still parses.
-_TRUNCATED_VALUE = re.compile(r"\.{4,}|…")
+# Embedded dots (e.g. in regexes or log extracts) are not truncation.
+_TRUNCATED_VALUE = re.compile(r"…|\.{4,}\s*(\Z|\"|\')")
 
 _BRACKET_CALL = re.compile(r"\[Tool call:\s*([A-Za-z_][\w]*)\]\s*(\{.*\})\s*\Z", re.DOTALL)
 _FUNCTION_CALL = re.compile(r"<function=\s*([A-Za-z_][\w]*)\s*>(.*?)</function\s*>", re.DOTALL)

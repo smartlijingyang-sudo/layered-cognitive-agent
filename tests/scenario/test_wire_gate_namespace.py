@@ -27,6 +27,7 @@ from lca.infrastructure.tool_defer.session import (
 @dataclass
 class FakeTool:
     name: str
+    namespace: str = ""
     description: str = ""
     parameters: dict[str, Any] | None = None
 
@@ -42,7 +43,7 @@ class FakeTool:
 
 
 DESCRIPTIONS = {
-    "tool_search": "推理原语:按需加载工具目录",
+    "core": "推理原语:按需加载工具目录",
     "file": "文件系统:列出、读取、写入、编辑、移动、搜索文件内容",
     "memory": "搜索与写入长期记忆",
 }
@@ -51,9 +52,12 @@ DESCRIPTIONS = {
 @pytest.fixture
 def defer_session() -> Any:
     session = ToolDeferSession(DeferPolicy(namespace_descriptions=DESCRIPTIONS))
-    tools = (FakeTool("tool_search"), FakeTool("readFile"), FakeTool("memory_search"))
-    mapping = {"tool_search": "tool_search", "readFile": "file", "memory_search": "memory"}
-    session.update_turn(tools, mapping)
+    tools = (
+        FakeTool("tool_search", namespace="core"),
+        FakeTool("readFile", namespace="file"),
+        FakeTool("memory_search", namespace="memory"),
+    )
+    session.update_turn(tools)
     token = set_current_defer_session(session)
     yield session
     reset_current_defer_session(token)
@@ -136,7 +140,7 @@ def test_f3_duplicate_emissions_in_one_turn_deduplicated():
         for i in range(21)
     ]
     other = NativeToolCall(call_id="call-x", name="listFiles",
-                           arguments={"path": "/tmp"})
-    projection = project_llm_response(LLMResponse(text="", tool_calls=dupes + [other]))
+                           arguments={"path": "/var/data"})
+    projection = project_llm_response(LLMResponse(text="", tool_calls=[*dupes, other]))
     names = [(c.tool_name, c.arguments.get("path")) for c in projection.tool_calls]
-    assert names == [("listFiles", "/home/lichao"), ("listFiles", "/tmp")]
+    assert names == [("listFiles", "/home/lichao"), ("listFiles", "/var/data")]
