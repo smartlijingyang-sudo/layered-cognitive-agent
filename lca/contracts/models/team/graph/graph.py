@@ -10,13 +10,13 @@ from __future__ import annotations
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from lca.contracts.models.core.state.state import AgentState
 
 
-class NodeType(str, Enum):
+class NodeType(StrEnum):
     """DAG 节点类型。"""
 
     ENTRY = "entry"
@@ -26,7 +26,7 @@ class NodeType(str, Enum):
     ROUTER = "router"
 
 
-class EdgeType(str, Enum):
+class EdgeType(StrEnum):
     """DAG 边类型。"""
 
     FIXED = "fixed"

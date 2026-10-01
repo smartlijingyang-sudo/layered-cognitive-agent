@@ -17,11 +17,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Protocol, runtime_checkable
 
 
-class Classification(str, Enum):
+class Classification(StrEnum):
     """载荷分类 —— 决定谁能读取与能否外送(ADR-0065 L8 + §四)。
 
     PUBLIC: 默认外送;SSE / OTel / Langfuse 均可发。
@@ -36,7 +36,7 @@ class Classification(str, Enum):
     CONFIDENTIAL = "confidential"
 
 
-class RetentionClass(str, Enum):
+class RetentionClass(StrEnum):
     """保留期限类 —— 决定 sweep 何时清零(ADR-0065 §四)。"""
 
     RUN_DEFAULT = "run-default"

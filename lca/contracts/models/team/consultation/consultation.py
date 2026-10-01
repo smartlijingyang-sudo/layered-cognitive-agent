@@ -10,10 +10,10 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 
-class ConsultationDisposition(str, Enum):
+class ConsultationDisposition(StrEnum):
     """一次咨询尝试的结局类别。"""
 
     COMPLETED = "completed"
@@ -23,7 +23,7 @@ class ConsultationDisposition(str, Enum):
     ERROR = "error"
 
 
-class SynthesisMethod(str, Enum):
+class SynthesisMethod(StrEnum):
     """board 收口方法——按证据完备度命名（非门闩开合）。"""
 
     FULL = "full"
