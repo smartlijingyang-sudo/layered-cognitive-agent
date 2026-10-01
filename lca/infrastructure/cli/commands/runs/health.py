@@ -10,16 +10,11 @@ conditions (priority: failed > degraded > unknown > ok).
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 from typing import Optional
 
 import typer
 
-from lca.contracts.observability.health.report import (
-    RunHealthReport,
-    RunHealthSummary,
-)
 from lca.plugins.observability.health.run_health_fold import fold_run_health
 
 _DEFAULT_TRACES_ROOT = Path("traces")
