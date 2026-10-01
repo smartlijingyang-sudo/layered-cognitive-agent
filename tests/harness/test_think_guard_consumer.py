@@ -6,18 +6,25 @@ This test verifies the L2 acceptance §2.4 + §3.3:
   按 ControlEntry.order 排序（升序）执行
 - ModularBrain.think() 不直接 mutate state（CV4 通过 reducer.apply_skill_route）
 - Stop PhaseExecutor 通过局部 ``stop_policy.decide(...)`` 走 stop.decide 控制面
+
+v2（ADR-0221 P3）：``CompiledRunPlan.control_entries`` 与
+``PluginSpec.contributes`` 均已退役。控制面绑定 = resolved profile 中启用插件
+的 ``provided_capability_keys``（``phase:<phase>::control.*``）。本文件在
+round-0151 按 v2 事实重写，断言意图（控制绑定到阶段）保持不变。
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pytest
 
 from lca.cognition.brain.pipeline.modular_brain import ModularBrain
+from lca.contracts.models.core.conversation.llm import LLMResponse
 from lca.contracts.models.core.execution.decision import Decision
 from lca.contracts.models.core.policy.budget import create_budget
 from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
 from lca.contracts.protocols import (
     DecisionGate,
     Reasoner,
@@ -32,13 +39,41 @@ from lca.plugins.loop.reducer.plugin import DefaultReducer
 
 @dataclass
 class _FakeReasoner(Reasoner):
-    """Returns a fixed LLMResponse (no decision-action field)."""
+    """Returns a fixed LLMResponse.
+
+    ADR-0220 §6：``generate_thoughts`` 已删除，Reasoner 只剩
+    ``render_turn``/``complete_turn`` + ``role_profile`` boot-time seam。
+    """
 
     response_text: str = "ok"
+    role_profile: RoleProfile = field(
+        default_factory=lambda: RoleProfile(
+            role="test-reasoner",
+            goal="test",
+            backstory="test",
+            tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
+        )
+    )
 
-    async def generate_thoughts(self, state: AgentState) -> object:
-        from lca.contracts.models.core.conversation.llm import LLMResponse
+    def render_turn(
+        self, context: object, template: object, role: object, **kwargs: object
+    ) -> object:
+        from lca.contracts.models.cognition.reasoner_turn import ReasonerTurnRender
 
+        return ReasonerTurnRender(
+            prompt=self.response_text,
+            trace=None,
+            section_count=0,
+            manifest=None,
+            activated_skill_ids=(),
+            section_outputs=None,
+            total_chars=None,
+            variant=None,
+        )
+
+    async def complete_turn(
+        self, state: AgentState, render: object, **kwargs: object
+    ) -> LLMResponse:
         return LLMResponse(
             text=self.response_text,
             tool_calls=[],
@@ -138,43 +173,42 @@ class TestModularBrainReducerPath:
         assert gate.calls == ["enforce:think.guard.test"]
 
 
+def _web_standard_phase_bindings() -> dict[str, str]:
+    """web-standard 下启用插件提供的 ``phase:<phase>::`` 能力键 → 插件 id。
+
+    v2（ADR-0221 P3）：``CompiledRunPlan.control_entries`` 恒为空 tuple，
+    控制面绑定只能从 resolved profile 的 ``provided_capability_keys`` 读。
+    """
+    from lca.harness.profile.resolve.resolve import resolve_profile
+
+    resolved = resolve_profile("profiles/web-standard.yaml")
+    bindings: dict[str, str] = {}
+    for plugin in resolved.plugins:
+        if plugin.disabled:
+            continue
+        for key in plugin.definition.provided_capability_keys:
+            if isinstance(key, str) and key.startswith("phase:"):
+                bindings[key] = plugin.definition.id
+    return bindings
+
+
 class TestDeclarativeControlProjection:
-    """生产控制只从原生 PluginSpec 贡献编译为计划绑定。"""
+    """生产控制只从原生 PluginSpec 贡献编译为计划绑定（v2 见上）。"""
 
     def test_think_guard_projection_is_bound_to_the_think_phase(self) -> None:
-        from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
-            SemanticPhase,
+        bindings = _web_standard_phase_bindings()
+        assert bindings.get("phase:think::control.think.guard") == "control.think.guard", (
+            "think.guard 控制必须由原生插件绑定到 think 阶段"
         )
-        from lca_kernel.plan.plan_compile import compile_plan
-        from lca.harness.profile.resolve.resolve import resolve_profile
-
-        plan = compile_plan(resolve_profile("profiles/web-standard.yaml"))
-        think_entries = tuple(
-            entry for entry in plan.control_entries if entry.phase is SemanticPhase.THINK
-        )
-
-        assert len(think_entries) == 1
-        assert think_entries[0].executor_capability == "control.think.guard"
-        assert think_entries[0].aggregation == "deny-on-any-deny"
-        assert think_entries[0].evidence_required
 
     def test_stop_control_projection_is_bound_to_the_stop_phase(self) -> None:
-        from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
-            SemanticPhase,
-        )
-        from lca_kernel.plan.plan_compile import compile_plan
-        from lca.harness.profile.resolve.resolve import resolve_profile
-
-        plan = compile_plan(resolve_profile("profiles/web-standard.yaml"))
-        stop_entries = tuple(
-            entry for entry in plan.control_entries if entry.phase is SemanticPhase.STOP
-        )
-
-        assert {entry.executor_capability for entry in stop_entries} == {
-            "control.stop.decide",
-            "control.stop.focus",
-            "control.observe.checkpoint",
-            "control.observe.wildcard",
+        bindings = _web_standard_phase_bindings()
+        stop_controls = {key for key in bindings if key.startswith("phase:stop::control.")}
+        # v1 的 control.stop.decide / control.stop.focus 在 ADR-0221 后已无提供方；
+        # stop 控制面 = observe checkpoint/wildcard 两个原生插件绑定。
+        assert stop_controls == {
+            "phase:stop::control.observe.checkpoint",
+            "phase:stop::control.observe.wildcard",
         }
 
 
@@ -202,20 +236,38 @@ class TestReducerProtocolNewMethod:
 
 
 class TestStopPolicyControlSurface:
-    """stop.decide 由 Stop 阶段的局部 StopPolicy 产生并归约为 RunDelta。"""
+    """v2（ADR-0221）：stop.decide 控制面不再是独立的 Stop PhaseExecutor
+    （``lca/plugins/loop/phase/stop/standard/plugin.py`` 已随 v1 退役）；
+    stop 控制由 ``phase:stop::`` 插件绑定 + convergence policy 的
+    ``STOP_DECIDE`` 槽位声明承担。
+    """
 
-    def test_stop_phase_executor_routes_stop_through_stop_policy(self) -> None:
+    def test_stop_control_surface_is_bound_in_v2(self) -> None:
         from pathlib import Path
 
-        stop_executor = Path("lca/plugins/loop/phase/stop/standard/plugin.py").read_text(
-            encoding="utf-8"
+        assert not Path("lca/plugins/loop/phase/stop/standard/plugin.py").exists(), (
+            "v1 Stop PhaseExecutor 已退役，不应复活"
         )
-        assert "stop_policy.decide(" in stop_executor, (
-            "stop PhaseExecutor must invoke its local StopPolicy.decide(...) with the "
-            "think/act/reflect artifacts (stop.decide control surface)."
-        )
-        assert "stop_rule" not in stop_executor
-        assert '"stop"' in stop_executor or "'stop'" in stop_executor, (
-            "stop PhaseExecutor must publish a RunDelta with operation='stop' "
-            "so reducer can fold the decision into AgentState."
+        bindings = _web_standard_phase_bindings()
+        assert {key for key in bindings if key.startswith("phase:stop::control.")} == {
+            "phase:stop::control.observe.checkpoint",
+            "phase:stop::control.observe.wildcard",
+        }
+
+    def test_stop_decide_slot_is_declared_by_convergence_policy(self) -> None:
+        from lca.contracts.atoms.control.slot import ControlSlot
+        from lca.harness.profile.resolve.resolve import resolve_profile
+
+        resolved = resolve_profile("profiles/web-standard.yaml")
+        declarants = set()
+        for plugin in resolved.plugins:
+            if plugin.disabled:
+                continue
+            contract = getattr(plugin.definition, "contract", None)
+            arch = getattr(contract, "architecture", None)
+            slots = tuple(getattr(arch, "control_slots", None) or ())
+            if ControlSlot.STOP_DECIDE in slots:
+                declarants.add(plugin.definition.id)
+        assert "convergence.policy.default" in declarants, (
+            "stop.decide 槽位应由 convergence policy 插件声明"
         )
