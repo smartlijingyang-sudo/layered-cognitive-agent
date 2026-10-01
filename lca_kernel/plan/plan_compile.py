@@ -202,7 +202,7 @@ class CompileOptions:
             ("env_fingerprint", self.env_fingerprint),
         ):
             if value is not None and not isinstance(value, str):
-                raise TypeError(f"{field} must be a string or None")
+                raise TypeError(f"{_field} must be a string or None")
         if not isinstance(self.include_disabled, bool):
             raise TypeError("include_disabled must be a boolean")
         if not isinstance(self.require_executable_phase_graph, bool):
