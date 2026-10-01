@@ -41,8 +41,8 @@ class PromptCandidateScoreExecutor:
 
     semantic_name: str = "prompt.candidate.score"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("candidates", "state")
-    declared_outputs: tuple[PortName, ...] = ("scored",)
+    declared_inputs: tuple[PortName, ...] = (PortName("candidates"), PortName("state"))
+    declared_outputs: tuple[PortName, ...] = (PortName("scored"),)
 
     async def node_execute(
         self,
@@ -57,7 +57,7 @@ class PromptCandidateScoreExecutor:
         P3 placeholder:所有 candidate score = 1.0。
         """
         del context
-        candidates = input.port_values.get("candidates")
+        candidates = input.port_values.get(PortName("candidates"))
         if candidates is None:
             candidates = ()
         if not isinstance(candidates, tuple):
@@ -71,14 +71,14 @@ class PromptCandidateScoreExecutor:
                     "prompt.candidate.score: 'candidates' entries must be str, "
                     f"got {type(candidate).__name__}"
                 )
-        state = input.port_values.get("state")
+        state = input.port_values.get(PortName("state"))
         if state is not None and not isinstance(state, AgentState):
             raise TypeError(
                 "prompt.candidate.score: 'state' port must be an AgentState "
                 f"instance or None, got {type(state).__name__}"
             )
         scored: tuple[tuple[str, float], ...] = tuple((candidate, 1.0) for candidate in candidates)
-        return NodeOutput(port_values={"scored": scored})
+        return NodeOutput(port_values={PortName("scored"): scored})
 
 
 @plugin(
