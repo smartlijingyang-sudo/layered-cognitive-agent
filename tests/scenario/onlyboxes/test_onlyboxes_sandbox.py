@@ -71,11 +71,13 @@ class FactoryTests(unittest.TestCase):
                 os.environ[key] = value
 
     def test_missing_credentials_returns_none(self) -> None:
+        # backend=onlyboxes 时无凭证返回 None；空缺省 backend 会走 local host-backed 兜底
+        #（factory docstring："Empty / local: Onlyboxes when credentials exist, else local"）。
         os.environ.pop("ONLYBOXES_BASE_URL", None)
         os.environ.pop("ONLYBOXES_ACCESS_TOKEN", None)
-        os.environ.pop("LCA_SANDBOX_BACKEND", None)
+        os.environ["LCA_SANDBOX_BACKEND"] = "onlyboxes"
         with patch(
-            "lca.infrastructure.sandbox.factory.load_dotenv_if_present",
+            "lca.infrastructure.sandbox.factory.factory.load_dotenv_if_present",
             lambda: None,
         ):
             self.assertIsNone(resolve_sandbox())
@@ -85,7 +87,7 @@ class FactoryTests(unittest.TestCase):
         os.environ["ONLYBOXES_ACCESS_TOKEN"] = "obx_test"  # noqa: S105
         os.environ["LCA_SANDBOX_BACKEND"] = "onlyboxes"
         with patch(
-            "lca.infrastructure.sandbox.factory.load_dotenv_if_present",
+            "lca.infrastructure.sandbox.factory.factory.load_dotenv_if_present",
             lambda: None,
         ):
             sandbox = resolve_sandbox()
