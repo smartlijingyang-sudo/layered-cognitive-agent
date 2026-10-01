@@ -65,8 +65,8 @@ class ActJoinExecutor:
 
     semantic_name: str = "act.join"
     region: str = "act"
-    declared_inputs: tuple[PortName, ...] = ("receipts",)
-    declared_outputs: tuple[PortName, ...] = ("receipt", "routing")
+    declared_inputs: tuple[PortName, ...] = (PortName("receipts"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("receipt"), PortName("routing"))
 
     async def node_execute(
         self,
@@ -79,7 +79,7 @@ class ActJoinExecutor:
         outputs 端口(yaml): receipt (EffectReceipt), routing (RoutingDecision)
         """
         del context  # unused: pure function of input port value
-        receipts_value = input.port_values.get("receipts")
+        receipts_value = input.port_values.get(PortName("receipts"))
         if receipts_value is None:
             receipts: list[EffectReceipt] = []
         elif isinstance(receipts_value, list):
@@ -102,8 +102,8 @@ class ActJoinExecutor:
         if len(receipts) == 1:
             return NodeOutput(
                 port_values={
-                    "receipt": receipts[0],
-                    "routing": RoutingDecision(
+                    PortName("receipt"): receipts[0],
+                    PortName("routing"): RoutingDecision(
                         action_type=ActionType.USE_TOOL,
                         next_node="act.observe",
                         next_hint="join_1to1",
@@ -113,7 +113,7 @@ class ActJoinExecutor:
 
         return NodeOutput(
             port_values={
-                "routing": RoutingDecision(
+                PortName("routing"): RoutingDecision(
                     action_type=ActionType.USE_TOOL,
                     next_node="terminal.commit",
                     next_hint="join_rejects_parallel_in_v1",
