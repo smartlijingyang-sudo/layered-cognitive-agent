@@ -68,7 +68,8 @@ class StreamableHttpMCPTransport(MCPTransportPort):
     async def send_message(self, message: dict[str, Any]) -> None:
         if not self.is_connected or self._client is None:
             await self.connect()
-        assert self._client is not None
+        if self._client is None:
+            raise RuntimeError(f"MCP server {self._config.name} HTTP client is not available")
 
         url = self._config.url
         if not url:
