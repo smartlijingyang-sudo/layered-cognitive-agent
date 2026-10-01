@@ -48,14 +48,14 @@ class RememberWriteExecutor:
     semantic_name: str = "phase.remember.write"
     region: str = "remember"
     declared_inputs: tuple[PortName, ...] = (
-        "decision",
-        "observation",
-        "reflection",
-        "admitted",
-        "candidate",
-        "effect_gateway",
+        PortName("decision"),
+        PortName("observation"),
+        PortName("reflection"),
+        PortName("admitted"),
+        PortName("candidate"),
+        PortName("effect_gateway"),
     )
-    declared_outputs: tuple[PortName, ...] = ("envelope",)
+    declared_outputs: tuple[PortName, ...] = (PortName("envelope"),)
 
     async def node_execute(
         self,
@@ -63,19 +63,19 @@ class RememberWriteExecutor:
         input: NodeInput,
     ) -> NodeOutput:
         runtime = context.runtime or {}
-        decision = input.port_values.get("decision")
-        observation = input.port_values.get("observation")
-        reflection = input.port_values.get("reflection")
-        admitted = input.port_values.get("admitted")
-        candidate = input.port_values.get("candidate")
+        decision = input.port_values.get(PortName("decision"))
+        observation = input.port_values.get(PortName("observation"))
+        reflection = input.port_values.get(PortName("reflection"))
+        admitted = input.port_values.get(PortName("admitted"))
+        candidate = input.port_values.get(PortName("candidate"))
 
         # Fast-Path / Rejection: if admitted is explicitly False, skip minting envelope
         if admitted is False or decision is None or observation is None or reflection is None:
             return NodeOutput(
                 port_values={
-                    "envelope": None,
-                    "memory_receipt": None,
-                    "routing": RoutingDecision(action_type=ActionType.RESPOND),
+                    PortName("envelope"): None,
+                    PortName("memory_receipt"): None,
+                    PortName("routing"): RoutingDecision(action_type=ActionType.RESPOND),
                 },
             )
         plan_ref = str(context.metadata.get("plan_ref", ""))
@@ -98,7 +98,7 @@ class RememberWriteExecutor:
                 "candidate": candidate,
             },
         )
-        gateway = input.port_values.get("effect_gateway")
+        gateway = input.port_values.get(PortName("effect_gateway"))
         if gateway is None:
             gateway = runtime.get("effect_gateway")
         receipt: object | None = None
@@ -117,9 +117,9 @@ class RememberWriteExecutor:
         # to the fold node so downstream can render a typed ``memory_receipt``.
         return NodeOutput(
             port_values={
-                "envelope": envelope,
-                "memory_receipt": receipt,
-                "routing": RoutingDecision(action_type=ActionType.RESPOND),
+                PortName("envelope"): envelope,
+                PortName("memory_receipt"): receipt,
+                PortName("routing"): RoutingDecision(action_type=ActionType.RESPOND),
             },
         )
 
