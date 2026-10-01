@@ -58,7 +58,9 @@ class _FakeUserStore:
         self.records[user_id] = content
 
 
-def _create_app_with_user_store(tmp_path: Path) -> tuple[Starlette, AssistantCatalogImpl, _FakeUserStore, str]:
+def _create_app_with_user_store(
+    tmp_path: Path,
+) -> tuple[Starlette, AssistantCatalogImpl, _FakeUserStore, str]:
     router = RouteRegistry()
     ctx = _FakeCtx(router)
     asyncio.run(setup.setup(ctx, None))
@@ -96,7 +98,9 @@ def test_inv01_whitelist_disallows_illegal_files_and_traversal(tmp_path: Path) -
     assert resp.json()["error"]["code"] in {"disallowed_file", "invalid_request", "not_found"}
 
     # 2. 尝试读取路径穿越
-    resp_traversal = client.get(f"/v1/assistants/{assistant_id}/standing-files/..%2F..%2Fetc%2Fpasswd")
+    resp_traversal = client.get(
+        f"/v1/assistants/{assistant_id}/standing-files/..%2F..%2Fetc%2Fpasswd"
+    )
     assert resp_traversal.status_code in {400, 404}
 
     # 3. 尝试更新非白名单文件
@@ -142,8 +146,8 @@ def test_inv03_optimistic_concurrency_conflict_defense(tmp_path: Path) -> None:
     conflict_resp = client.put(
         f"/v1/assistants/{assistant_id}/standing-files/IDENTITY.md",
         json={
-          "content": "# 篡改内容",
-          "expected_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+            "content": "# 篡改内容",
+            "expected_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
         },
     )
     assert conflict_resp.status_code == 409

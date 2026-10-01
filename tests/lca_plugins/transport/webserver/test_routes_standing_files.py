@@ -115,7 +115,9 @@ def test_standing_file_detail_disallows_illegal_file(tmp_path: Any) -> None:
     assert response.json()["error"]["code"] in {"disallowed_file", "invalid_request", "not_found"}
 
     # 尝试路径穿越
-    response_traversal = client.get(f"/v1/assistants/{assistant_id}/standing-files/..%2F..%2Fetc%2Fpasswd")
+    response_traversal = client.get(
+        f"/v1/assistants/{assistant_id}/standing-files/..%2F..%2Fetc%2Fpasswd"
+    )
     assert response_traversal.status_code in {400, 404}
 
 
@@ -138,7 +140,9 @@ def test_standing_file_update_success(tmp_path: Any) -> None:
     original_soul = read_resp.json()["content"]
 
     # 2. 追加新准则保持 SOUL 完整度要求
-    new_content = original_soul + "\n\n- 演化增量：用户是至高第一真理，坚决遵循三原则并持续沉淀知识。"
+    new_content = (
+        original_soul + "\n\n- 演化增量：用户是至高第一真理，坚决遵循三原则并持续沉淀知识。"
+    )
     put_resp = client.put(
         f"/v1/assistants/{assistant_id}/standing-files/SOUL.md",
         json={"content": new_content, "expected_hash": current_hash, "actor": "user_ui"},
@@ -163,7 +167,11 @@ def test_standing_file_update_optimistic_lock_conflict(tmp_path: Any) -> None:
 
     put_resp = client.put(
         f"/v1/assistants/{assistant_id}/standing-files/SOUL.md",
-        json={"content": "# 冲突内容", "expected_hash": "sha256:wrong_stale_hash", "actor": "user_ui"},
+        json={
+            "content": "# 冲突内容",
+            "expected_hash": "sha256:wrong_stale_hash",
+            "actor": "user_ui",
+        },
     )
     assert put_resp.status_code == 409
     err = put_resp.json()["error"]

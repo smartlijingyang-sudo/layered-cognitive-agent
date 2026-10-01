@@ -70,7 +70,9 @@ def apply(ctx: PatchContext) -> bool:
         )
 
     # 注入状态机与组件
-    target_needle = "const effectiveWorkingDirectory = topicWorkingDirectory || agentWorkingDirectory || '';"
+    target_needle = (
+        "const effectiveWorkingDirectory = topicWorkingDirectory || agentWorkingDirectory || '';"
+    )
     if target_needle in header_text and "drawerOpen" not in header_text:
         replacement = (
             f"{target_needle}\n\n"
