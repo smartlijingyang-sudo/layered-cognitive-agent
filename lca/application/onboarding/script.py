@@ -22,10 +22,6 @@ _NEW_USER_BUBBLE_1_ZH = (
 )
 _NEW_USER_BUBBLE_2_ZH = "在正式开始之前，我该怎么称呼你呢？"
 
-# Backwards compatibility aliases
-_NEW_USER_BUBBLE_1 = _NEW_USER_BUBBLE_1_EN
-_NEW_USER_BUBBLE_2 = _NEW_USER_BUBBLE_2_EN
-
 
 def extract_user_name_from_user_md(user_md: str) -> str:
     """从 USER.md 提取用户的显示称呼。"""
