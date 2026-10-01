@@ -58,8 +58,8 @@ class DecisionComposeActionExecutor:
 
     semantic_name: str = "decision.compose.action"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("tool_calls", "delegations", "intent")
-    declared_outputs: tuple[PortName, ...] = ("decision",)
+    declared_inputs: tuple[PortName, ...] = (PortName("tool_calls"), PortName("delegations"), PortName("intent"))
+    declared_outputs: tuple[PortName, ...] = (PortName("decision"),)
 
     async def node_execute(
         self,
@@ -73,9 +73,9 @@ class DecisionComposeActionExecutor:
         outputs 端口(yaml):decision (Decision)
         """
         del context
-        tool_calls = input.port_values.get("tool_calls") or ()
-        delegations = input.port_values.get("delegations") or ()
-        intent = input.port_values.get("intent") or ""
+        tool_calls = input.port_values.get(PortName("tool_calls")) or ()
+        delegations = input.port_values.get(PortName("delegations")) or ()
+        intent = input.port_values.get(PortName("intent")) or ""
 
         if not isinstance(tool_calls, tuple):
             raise TypeError(
@@ -93,7 +93,7 @@ class DecisionComposeActionExecutor:
             )
 
         decision = _compose(tool_calls=tool_calls, delegations=delegations, intent=intent)
-        return NodeOutput(port_values={"decision": decision})
+        return NodeOutput(port_values={PortName("decision"): decision})
 
 
 def _compose(
