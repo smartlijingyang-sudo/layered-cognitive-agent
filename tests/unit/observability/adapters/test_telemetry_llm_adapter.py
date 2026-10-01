@@ -69,6 +69,7 @@ class _FakeInner(LLMAdapter):
 
     name: str = "fake-inner"
     fail: bool = False
+    last_kwargs: dict[str, Any] | None = None
 
     async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:
         if self.fail:
@@ -159,7 +160,7 @@ async def test_complete_strips_state_and_session_from_inner_kwargs() -> None:
     consumed by the spine seam, not the inner adapter's contract).
     """
     inner = _FakeInner()
-    inner.last_kwargs: dict[str, Any] | None = None
+    inner.last_kwargs = None
 
     async def _record_complete(prompt: str, **kwargs: Any) -> LLMResponse:
         inner.last_kwargs = dict(kwargs)
