@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Mapping
 
 STANDARD_NAMESPACES: tuple[str, ...] = (
     "core",
@@ -75,6 +75,6 @@ class DeferPolicy:
 __all__ = [
     "DEFAULT_NAMESPACE_APPROVAL",
     "DEFAULT_NAMESPACE_DESCRIPTIONS",
-    "DeferPolicy",
     "STANDARD_NAMESPACES",
+    "DeferPolicy",
 ]

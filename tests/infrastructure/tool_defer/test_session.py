@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from lca.infrastructure.tool_defer.policy import DeferPolicy
+from lca.infrastructure.tool_defer.policy import DEFAULT_NAMESPACE_DESCRIPTIONS, DeferPolicy
 from lca.infrastructure.tool_defer.session import (
     ToolDeferSession,
     current_defer_session,
@@ -34,8 +34,8 @@ def _tools() -> tuple[FakeTool, ...]:
     return (
         FakeTool("tool_search", namespace="core"),
         FakeTool("core_a", namespace="core"),
-        FakeTool("b_one", namespace="browser"),
-        FakeTool("b_two", namespace="browser"),
+        FakeTool("b_one", namespace="web"),
+        FakeTool("b_two", namespace="web"),
     )
 
 
@@ -43,8 +43,8 @@ def _namespaces() -> dict[str, str]:
     return {
         "tool_search": "core",
         "core_a": "core",
-        "b_one": "browser",
-        "b_two": "browser",
+        "b_one": "web",
+        "b_two": "web",
     }
 
 
@@ -62,7 +62,7 @@ def _wire_names(wire: tuple[dict[str, Any], ...]) -> list[str]:
 def test_missing_loader_does_not_hide_every_tool() -> None:
     """Defer without tool_search is a deadlock. Render the full list instead."""
     session = _session()
-    tools = (FakeTool("runCommand"), FakeTool("readFile"))
+    tools = (FakeTool("runCommand", namespace="shell"), FakeTool("readFile", namespace="file"))
     session.update_turn(tools)
     wire, catalog = session.render_turn()
     assert _wire_names(wire) == ["runCommand", "readFile"]
@@ -75,7 +75,7 @@ def test_first_turn_injects_only_eager_schemas() -> None:
     wire, catalog = session.render_turn()
     # core is the eager namespace; tool_search and core_a are both in it.
     assert _wire_names(wire) == ["tool_search", "core_a"]
-    assert "browser" in catalog
+    assert "web" in catalog
     assert "core" not in catalog
 
 
@@ -105,7 +105,7 @@ def test_catalog_hint_appears_only_once_at_the_end() -> None:
     # discovery_rule 里只有一次 loading hint；每行目录不再重复它
     assert catalog.count("via tool_search") == 1
     assert catalog.count("[deferred —") == 0
-    assert catalog.count("- browser: 2 tools: b_one, b_two") == 1
+    assert catalog.count("- web: 联网搜索与网页抓取") == 1
     # core is the eager namespace; tool_search and core_a both there, so no catalog line for core
     assert "core" not in catalog
 
@@ -136,30 +136,30 @@ def _tool_wire_spec(tool: FakeTool) -> dict[str, Any]:
 def test_load_namespace_marks_loaded_and_returns_specs() -> None:
     session = _session()
     session.update_turn(_tools())
-    payload = session.load_namespace("browser")
-    assert payload["namespace"] == "browser"
+    payload = session.load_namespace("web")
+    assert payload["namespace"] == "web"
     assert [t["function"]["name"] for t in payload["tools"]] == ["b_one", "b_two"]
-    assert session.loaded_namespaces == frozenset({"browser"})
+    assert session.loaded_namespaces == frozenset({"web"})
 
 
 def test_loaded_namespace_injects_from_next_render() -> None:
     session = _session()
     session.update_turn(_tools())
-    session.load_namespace("browser")
+    session.load_namespace("web")
     wire, catalog = session.render_turn()
     assert _wire_names(wire) == ["tool_search", "core_a", "b_one", "b_two"]
-    # browser no longer needs a catalog line; core is eager so not in catalog either.
-    assert "browser" not in catalog
+    # web no longer needs a catalog line; core is eager so not in catalog either.
+    assert "web" not in catalog
     assert "core" not in catalog
 
 
 def test_load_namespace_is_idempotent() -> None:
     session = _session()
     session.update_turn(_tools())
-    first = session.load_namespace("browser")
-    second = session.load_namespace("browser")
+    first = session.load_namespace("web")
+    second = session.load_namespace("web")
     assert first == second
-    assert session.loaded_namespaces == frozenset({"browser"})
+    assert session.loaded_namespaces == frozenset({"web"})
 
 
 def test_load_unknown_namespace_raises_with_known_list() -> None:
@@ -170,7 +170,7 @@ def test_load_unknown_namespace_raises_with_known_list() -> None:
     except KeyError as exc:
         message = str(exc)
         assert "nope" in message
-        assert "browser" in message
+        assert "web" in message
         assert "core" in message
     else:
         raise AssertionError("expected KeyError")
@@ -180,10 +180,10 @@ def test_loaded_set_survives_turn_updates() -> None:
     """Dispatch runs every turn — the loaded set must not be rebuilt."""
     session = _session()
     session.update_turn(_tools())
-    session.load_namespace("browser")
+    session.load_namespace("web")
     # Next turn: same tools, fresh update.
     session.update_turn(_tools())
-    assert session.loaded_namespaces == frozenset({"browser"})
+    assert session.loaded_namespaces == frozenset({"web"})
     wire, _ = session.render_turn()
     assert "b_one" in _wire_names(wire)
 
@@ -201,17 +201,18 @@ def test_disabled_policy_renders_full_legacy_projection() -> None:
 
 
 def test_custom_eager_namespace() -> None:
-    # Add "browser" as an additional eager namespace on top of the default "core".
-    session = _session(eager_namespaces=frozenset({"core", "browser"}))
+    # Add "web" as an additional eager namespace on top of the default "core".
+    session = _session(eager_namespaces=frozenset({"core", "web"}))
     session.update_turn(_tools())
     wire, catalog = session.render_turn()
     assert _wire_names(wire) == ["tool_search", "core_a", "b_one", "b_two"]
-    assert "browser" not in catalog
+    assert "web" not in catalog
     assert "core" not in catalog
 
 
 def test_namespace_description_override_used_in_catalog() -> None:
-    session = _session(namespace_descriptions={"browser": "Web browsing."})
+    descriptions = {**DEFAULT_NAMESPACE_DESCRIPTIONS, "web": "Web browsing."}
+    session = _session(namespace_descriptions=descriptions)
     session.update_turn(_tools())
     _, catalog = session.render_turn()
     assert "Web browsing." in catalog
@@ -227,7 +228,7 @@ def test_render_without_turn_view_returns_empty() -> None:
 def test_turn_without_the_loader_renders_every_schema() -> None:
     """No tool_search on the turn. Hiding mystery and pointing at a missing loader deadlocks."""
     session = _session()
-    session.update_turn((FakeTool("mystery"),))
+    session.update_turn((FakeTool("mystery", namespace="file"),))
     wire, catalog = session.render_turn()
     assert _wire_names(wire) == ["mystery"]
     assert catalog == ""
@@ -236,11 +237,11 @@ def test_turn_without_the_loader_renders_every_schema() -> None:
 def test_unknown_tool_stays_deferred_when_the_loader_is_present() -> None:
     session = _session()
     session.update_turn(
-        (FakeTool("tool_search", namespace="core"), FakeTool("mystery")),
+        (FakeTool("tool_search", namespace="core"), FakeTool("mystery", namespace="file")),
     )
     wire, catalog = session.render_turn()
     assert _wire_names(wire) == ["tool_search"]
-    assert "mystery" in catalog
+    assert "file" in catalog
 
 
 # --- ContextVar seam --------------------------------------------------------

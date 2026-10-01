@@ -65,14 +65,17 @@ class ToolDeferSession:
         """Refresh the per-turn view after fork filtering/wrapping.
 
         Each tool must carry a non-empty ``namespace`` that belongs to the
-        policy's known namespaces.  Tools with an unknown namespace are placed
-        in a synthetic namespace under their own name (legacy path — emit a
-        warning rather than crashing, so incomplete tool migrations don't
-        deadlock the agent).  The loaded set is *not* reset.
+        policy's known namespaces.  Tools with a missing or unknown namespace
+        fail fast with ValueError.  The loaded set is *not* reset.
         """
         grouped: dict[str, list[str]] = {}
         for tool in tools:
-            ns = getattr(tool, "namespace", "") or tool.name
+            ns = getattr(tool, "namespace", "")
+            if not ns or ns not in self._policy.namespace_descriptions:
+                raise ValueError(
+                    f"tool {tool.name!r} declares invalid namespace {ns!r}; "
+                    f"known: {sorted(self._policy.namespace_descriptions.keys())}"
+                )
             grouped.setdefault(ns, []).append(tool.name)
         self._namespaces = tuple(
             ToolNamespace(
@@ -93,9 +96,10 @@ class ToolDeferSession:
         override = self._policy.namespace_descriptions.get(namespace)
         if override:
             return override
-        shown = ", ".join(tool_names[:8])
-        suffix = f" (+{len(tool_names) - 8} more)" if len(tool_names) > 8 else ""
-        return f"{len(tool_names)} tools: {shown}{suffix}"
+        raise ValueError(
+            f"namespace {namespace!r} has no description in policy; "
+            f"known: {sorted(self._policy.namespace_descriptions.keys())}"
+        )
 
     def load_namespace(self, namespace: str) -> dict[str, Any]:
         """Mark *namespace* loaded and return its full wire specs.
@@ -114,7 +118,7 @@ class ToolDeferSession:
             "tools": [self._specs[name] for name in target.tool_names],
         }
 
-    def load_namespaces(self, namespaces: list[str]) -> dict[str, Any]:
+    def load_namespaces(self, namespaces: Sequence[str]) -> dict[str, Any]:
         """Load several namespaces at once; return the merged payload.
 
         Semantics = one :meth:`load_namespace` call per name (already
@@ -124,11 +128,16 @@ class ToolDeferSession:
         """
         loaded: list[str] = []
         tools: list[dict[str, Any]] = []
+        seen_names: set[str] = set()
         for namespace in namespaces:
             payload = self.load_namespace(namespace)
             if namespace not in loaded:
                 loaded.append(namespace)
-                tools.extend(payload["tools"])
+            for tool_spec in payload["tools"]:
+                tname = tool_spec["function"]["name"]
+                if tname not in seen_names:
+                    seen_names.add(tname)
+                    tools.append(tool_spec)
         return {"namespaces": loaded, "tools": tools}
 
     def render_turn(self) -> tuple[tuple[dict[str, Any], ...], str]:

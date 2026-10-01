@@ -48,11 +48,18 @@ class ToolSearchTool(Tool):
                 "type": "string",
                 "description": (
                     "Namespace key from the deferred catalog, "
-                    'e.g. "browser".'
+                    'e.g. "file".'
                 ),
-            }
+            },
+            "namespaces": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "List of namespace keys to load in batch, "
+                    'e.g. ["file", "memory"].'
+                ),
+            },
         },
-        "required": ["namespace"],
         "additionalProperties": False,
     }
     is_idempotent: ClassVar[bool] = True
@@ -66,6 +73,16 @@ class ToolSearchTool(Tool):
         session = current_defer_session()
         if session is None:
             return _error("tool_search: no defer session bound to this run")
+        if "namespaces" in args and isinstance(args["namespaces"], list):
+            try:
+                payload = session.load_namespaces(args["namespaces"])
+            except KeyError as exc:
+                return _error(f"tool_search: {exc}")
+            return Observation(
+                observation_id=f"tool_search:{','.join(payload['namespaces'])}",
+                success=True,
+                payload=payload,
+            )
         namespace = args["namespace"]
         try:
             payload = session.load_namespace(namespace)
@@ -78,9 +95,14 @@ class ToolSearchTool(Tool):
         )
 
     def validate(self, args: dict[str, Any]) -> str | None:
-        namespace = args.get("namespace")
-        if not isinstance(namespace, str) or not namespace:
+        has_ns = "namespace" in args and isinstance(args["namespace"], str) and bool(args["namespace"])
+        has_nss = "namespaces" in args and isinstance(args["namespaces"], list) and bool(args["namespaces"])
+        if not has_ns and not has_nss:
+            return "Either 'namespace' (str) or 'namespaces' (list[str]) must be provided"
+        if has_ns and not isinstance(args["namespace"], str):
             return "'namespace' must be a non-empty string"
+        if has_nss and not all(isinstance(x, str) and bool(x) for x in args["namespaces"]):
+            return "'namespaces' must be a list of non-empty strings"
         return None
 
 

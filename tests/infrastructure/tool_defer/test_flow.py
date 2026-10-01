@@ -30,8 +30,14 @@ from lca.infrastructure.tool_defer.tool_search import ToolSearchTool
 class FakeTool:
     """Structural Tool: name / description / parameters."""
 
-    def __init__(self, name: str, params: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self,
+        name: str,
+        params: dict[str, Any] | None = None,
+        namespace: str = "",
+    ) -> None:
         self.name = name
+        self.namespace = namespace
         self.description = f"fake tool {name}"
         self.parameters = params or {"type": "object", "properties": {}}
 
@@ -51,33 +57,26 @@ async def test_full_defer_flow_run_to_render_to_load() -> None:
         search = ToolSearchTool()
         items = [
             search,
-            FakeTool("mcp_fs_read"),
-            FakeTool("mcp_fs_write"),
-            FakeTool("g2a_search"),
+            FakeTool("mcp_fs_read", namespace="file"),
+            FakeTool("mcp_fs_write", namespace="file"),
+            FakeTool("g2a_search", namespace="web"),
         ]
-        # what ToolsService.tool_namespaces() records at fork_for_run
-        namespaces = {
-            "tool_search": "tool_search",
-            "mcp_fs_read": "mcp",
-            "mcp_fs_write": "mcp",
-            "g2a_search": "g2a",
-        }
         session = current_defer_session()
         assert session is not None
 
         # --- turn 1: dispatch refreshes the view, assemble renders ---
-        session.update_turn(items, namespaces)
+        session.update_turn(items)
         wire, catalog = session.render_turn()
 
         # only the eager loader reaches the model; the rest are catalog lines
         assert _wire_names(wire) == ["tool_search"]
-        assert "mcp" in catalog
-        assert "g2a" in catalog
+        assert "file" in catalog
+        assert "web" in catalog
         # 目录只有一句话描述, 完整参数 schema 不能泄漏进来
         assert "parameters" not in catalog
 
-        # --- agent reads the catalog and loads the mcp namespace ---
-        obs = await search.execute({"namespace": "mcp"})
+        # --- agent reads the catalog and loads the file namespace ---
+        obs = await search.execute({"namespace": "file"})
         assert obs.success is True
         assert [t["function"]["name"] for t in obs.payload["tools"]] == [
             "mcp_fs_read",
@@ -85,7 +84,7 @@ async def test_full_defer_flow_run_to_render_to_load() -> None:
         ]
 
         # --- turn 2: dispatch refreshes (loaded set survives), assemble renders ---
-        session.update_turn(items, namespaces)
+        session.update_turn(items)
         wire2, catalog2 = session.render_turn()
         names2 = _wire_names(wire2)
 
@@ -93,8 +92,8 @@ async def test_full_defer_flow_run_to_render_to_load() -> None:
         assert "mcp_fs_read" in names2
         assert "mcp_fs_write" in names2
         assert "g2a_search" not in names2  # still deferred
-        assert "g2a" in catalog2
-        assert "mcp" not in catalog2  # loaded namespaces leave the catalog
+        assert "web" in catalog2
+        assert "file" not in catalog2  # loaded namespaces leave the catalog
 
         # the full schema really arrived on the wire
         spec = next(s for s in wire2 if s["function"]["name"] == "mcp_fs_read")
