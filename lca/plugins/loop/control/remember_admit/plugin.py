@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
@@ -28,7 +29,6 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.gate.control_verdict import ControlVerdict, ControlVerdictKind
 from lca.contracts.protocols.graph.routing import RoutingDecision
-from lca.contracts.atoms.enums.enums import ActionType
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
@@ -38,19 +38,23 @@ class RememberAdmitExecutor:
 
     semantic_name: str = "control.remember.admit"
     region: str = "phase:remember"
-    declared_inputs: tuple[PortName, ...] = ("observation", "reflection")
-    declared_outputs: tuple[PortName, ...] = ("verdict",)
+    declared_inputs: tuple[PortName, ...] = (PortName("observation"), PortName("reflection"))
+    declared_outputs: tuple[PortName, ...] = (PortName("verdict"),)
 
     async def node_execute(
         self,
         context: NodeContext,
         input: NodeInput,
     ) -> NodeOutput:
-        observation = input.port_values.get("observation")
-        reflection = input.port_values.get("reflection")
+        observation = input.port_values.get(PortName("observation"))
+        reflection = input.port_values.get(PortName("reflection"))
         runtime = context.runtime or {}
         state = runtime.get("agent_state")
-        status = getattr(state, "status", TaskStatus.WORKING) if state is not None else TaskStatus.WORKING
+        status = (
+            getattr(state, "status", TaskStatus.WORKING)
+            if state is not None
+            else TaskStatus.WORKING
+        )
         if not isinstance(observation, Observation) or not isinstance(reflection, Reflection):
             verdict = ControlVerdict(
                 kind=ControlVerdictKind.DENY,
@@ -71,8 +75,8 @@ class RememberAdmitExecutor:
             )
         return NodeOutput(
             port_values={
-                "verdict": verdict,
-                "routing": RoutingDecision(action_type=ActionType.RESPOND),
+                PortName("verdict"): verdict,
+                PortName("routing"): RoutingDecision(action_type=ActionType.RESPOND),
             },
         )
 
