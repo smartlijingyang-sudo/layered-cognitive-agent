@@ -16,7 +16,7 @@ without code changes; the snapshot test in
 
 from __future__ import annotations
 
-from enum import Enum, StrEnum
+from enum import StrEnum
 from pathlib import Path
 
 _NODES_DIR = Path(__file__).resolve().parents[3] / "nodes"
@@ -52,14 +52,6 @@ def collect_region_prefixes() -> frozenset[str]:
             continue
         out.add(entry.name)
     return frozenset(out)
-
-
-def _build_region_prefix_enum() -> type[RegionPrefix]:
-    """Materialize the :class:`RegionPrefix` enum from the live SSOT."""
-    members: dict[str, str] = {}
-    for name in sorted(collect_region_prefixes()):
-        members[name.upper()] = name
-    return Enum("RegionPrefix", members, type=str)  # type: ignore[misc]
 
 
 # Re-declare RegionPrefix as a str Enum so ``RegionPrefix.THINK == "think"``.
