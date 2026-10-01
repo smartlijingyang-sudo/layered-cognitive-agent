@@ -55,7 +55,7 @@ _EP_GLYPH: dict[str, str] = {
 }
 
 
-class _Row(TypedDict, total=False):
+class _Row(TypedDict):
     execution_point: str
     ts: str
     outcome: str
