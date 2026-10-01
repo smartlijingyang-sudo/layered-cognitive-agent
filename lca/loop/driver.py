@@ -11,6 +11,8 @@ directly through ``PlanInterpreter``.
 
 from __future__ import annotations
 
+from typing import Any, Protocol, runtime_checkable
+
 from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.core.policy.stop import StopDecision
 from lca.contracts.models.core.state.lifecycle import TaskStatus
@@ -22,6 +24,22 @@ from lca.framework.graph.interpreter import InterpretationResult, PlanInterprete
 from lca.runtime.loop.runtime_journal import RuntimeJournal
 from lca.runtime.support.checkpoint_resolution import DeclarativeCheckpoint
 from lca.runtime.support.runtime_bindings import DeclarativeRuntimeBindings
+
+
+@runtime_checkable
+class _InterpretationLike(Protocol):
+    """Structural shape DeclarativeExecution.execute reads off the run result.
+
+    The composition boundary (DeclarativeInterpreter.run -> object) stays
+    deliberately opaque; production returns LegacyResultShim and tests use
+    duck-typed fakes. This protocol documents the attributes the driver
+    actually consumes so the checker can see them.
+    """
+
+    output: dict[str, Any]
+    visits: tuple[Any, ...]
+    facts: tuple[Any, ...]
+    terminal_node: str
 
 
 def _stop_from_interpretation_output(
@@ -289,6 +307,14 @@ class DeclarativeExecution:
                 plan_obj,
                 outer_state=state,
                 traversal=traversal,
+            )
+        # The interpreter seam is opaque by contract; the driver only
+        # supports the legacy result shape (production LegacyResultShim,
+        # duck-typed fakes in tests). Fail loud instead of AttributeError.
+        if not isinstance(interpretation, _InterpretationLike):
+            raise TypeError(
+                "DeclarativeExecution.execute requires a result with "
+                f"output/visits/facts/terminal_node, got {type(interpretation).__name__}"
             )
         # ADR-0221 P3: ``InterpretationResult`` does not carry the
         # legacy v1 ``state``/``outcome``/``cursor`` shape that the
