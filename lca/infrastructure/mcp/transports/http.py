@@ -31,9 +31,7 @@ class StreamableHttpMCPTransport(MCPTransportPort):
     def is_connected(self) -> bool:
         if not self._is_connected or self._client is None or self._client.is_closed:
             return False
-        if loop_mismatch(self._loop):
-            return False
-        return True
+        return not loop_mismatch(self._loop)
 
     async def connect(self) -> None:
         try:

@@ -54,9 +54,7 @@ class StdioMCPTransport(MCPTransportPort):
     def is_connected(self) -> bool:
         if self._proc is None or self._proc.returncode is not None:
             return False
-        if loop_mismatch(self._loop):
-            return False
-        return True
+        return not loop_mismatch(self._loop)
 
     async def connect(self) -> None:
         try:
