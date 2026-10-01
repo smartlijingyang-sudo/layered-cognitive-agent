@@ -15,18 +15,15 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from types import SimpleNamespace
 
-import pytest
-
+from lca.cognition.memory.acknowledgement import guard_reply
 from lca.contracts.atoms.enums.enums import MemoryCategory, MemoryLayer
 from lca.contracts.models.core.conversation.memory import MemoryRecord
 from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
 from lca.infrastructure.memory.assistant_memory import AssistantMemory
 from lca.infrastructure.memory.contextfiles.domain.layout import (
-    allowed_root_entries,
     packaged_layout,
 )
 from lca.infrastructure.memory.contextfiles.domain.standing import (
@@ -45,10 +42,9 @@ from lca.plugins.prompts.sections.runtime_env import (
     render_developer_timestamp,
     render_runtime_row,
 )
-from lca.cognition.memory.acknowledgement import guard_reply
 
 
-def _home_bound_role(home_path: str = "/tmp/asst_test") -> RoleProfile:
+def _home_bound_role(home_path: str = "home/asst_test") -> RoleProfile:
     return RoleProfile(
         role="Athena",
         goal="Assist user",

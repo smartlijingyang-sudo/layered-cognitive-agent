@@ -7,7 +7,7 @@ timestamp message anchoring the agent's perception of "now".
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
@@ -16,7 +16,6 @@ if TYPE_CHECKING:
 from lca.contracts.models.cognition.prompt_assembly import SectionOutput
 from lca.contracts.models.team.role.team import RoleProfile
 from lca.contracts.protocols.runtime.infra.infra import Tool
-
 
 _WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 

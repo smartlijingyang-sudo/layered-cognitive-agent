@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+
+from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
 from lca.plugins.prompts.sections.runtime_env import (
+    DeveloperTimestampSection,
+    RuntimeEnvSection,
     render_developer_timestamp,
     render_runtime_row,
-    RuntimeEnvSection,
-    DeveloperTimestampSection,
 )
-from lca.contracts.models.team.role.team import RoleProfile
 
 
 def test_render_runtime_row_default():
@@ -23,7 +24,7 @@ def test_render_runtime_row_default():
 
 
 def test_render_runtime_row_custom():
-    row = render_runtime_row(
+    row = render_runtime_row(  # noqa: S604
         session="side chat",
         os_name="linux",
         model="qwen3.7-plus",
@@ -33,7 +34,10 @@ def test_render_runtime_row_custom():
         max_depth=2,
         can_spawn=False,
     )
-    assert row == "Runtime: session=side chat | os=linux | model=qwen3.7-plus | shell=zsh | chat=side | depth=1 | max_depth=2 | can_spawn=no"
+    assert (
+        row
+        == "Runtime: session=side chat | os=linux | model=qwen3.7-plus | shell=zsh | chat=side | depth=1 | max_depth=2 | can_spawn=no"
+    )
 
 
 def test_render_developer_timestamp_explicit():
@@ -43,9 +47,6 @@ def test_render_developer_timestamp_explicit():
     ts = render_developer_timestamp(dt=dt, tz_name="Asia/Shanghai", sent_from="web")
     assert "[Thu 2026-10-01 11:34:53 CST] [client_timezone=Asia/Shanghai]" in ts
     assert "Sent from: web" in ts
-
-
-from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManifest
 
 
 def test_runtime_env_section_render():

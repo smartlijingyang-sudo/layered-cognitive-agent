@@ -1,5 +1,11 @@
 | Task ID | Description | Status | Evidence |
 |---|---|---|---|
+| ADR-0255-TASK-1 | 9 大 Standing 文件布局与根拓扑白名单扩展 (`layout.toml` & `layout.py`) | Completed | layout.toml 扩展为 9 个 standing files，domain/layout.py 支持嵌套路径并加入 IDENTITY.md 白名单，15/15 单测全通，commit 925a2e97f |
+| ADR-0255-TASK-2 | 助理 Home 初始化默认骨架物化 (`IDENTITY.md` 与目录索引) | Completed | 补齐 IDENTITY.md/people/groups/alignment_synthesis 模板，更新 _scaffold_standing_notes 与 write_home_files，13/13 模板单测全通，commit 9a1bd1ab1 |
+| ADR-0255-TASK-3 | 上下文装配时间与 Runtime 元数据渲染 (Developer Timestamp & Runtime Row) | Completed | runtime_env.py 落地，注册 RuntimeEnvSection 与 DeveloperTimestampSection，8/8 单测全通，commit fa4af3182 |
+| ADR-0255-TASK-4 | 认知层强制检索与写盘硬闸门提示词策略 | Completed | 强化 _RETRIEVAL_DUTY，注入强制检索决策树、易变事实复验、自省投影防幻觉与落笔前写盘铁律，13/13 认知测试全通，commit bf561ea17 |
+| ADR-0255-TASK-5 | ADR-0255 T1–T12 自动化符合性测试套件 | Completed | test_adr0255_muse_runtime_conformance.py 落地，覆盖 T1 自省真实文件、T2 跨 run provenance、T3 写盘回执、T4 冲突原地 supersede、T5 强制检索决策树、T6 易变事实、T8 子 agent 继承、T9 防注入、T10 凭证红线、T12 压缩不失忆与时间真值，11/11 全通，commit e060b5d89 |
+| ADR-0255-TASK-6 | 全链路回归验证与 Pre-push 门禁体检 | Completed | 全量关联单测回归通过 (216/216 passed)，ADR-0255 专属测试套件全绿 (91/91 passed)，ruff check 0 报错，ruff format 校验通过，git diff --check 退出码 0，严格遵守 Does NOT own 负向边界 |
 | UPDATE-ASSISTANT-USER-TOOL | 新增 UpdateAssistantUserTool 封闭 USER.md digest 安全写入缺口 | Completed | 新增 UpdateAssistantUserTool（self_manage_tools.py），调用 catalog.revise_profile(ProfilePatch(user_md=...))；添加 _UPDATE_ASSISTANT_USER_TOOL 常量并加入 __all__ 与工厂；更新 test_self_manage.py（2 新测试：happy path + 空值拒绝）与 test_self_manage_exposure.py（_FULL_FAMILY 集合+1）；28/28 全通，ruff clean；commit bf9eaeb1a 已推送 |
 | FE-FLOW-1 | 环境与前置服务健康检查与 agent-browser 会话初始化 | Completed | kernel:8765/health 正常，lobehub:3010 正常，daemon:2958997 正常，agent-browser open 成功进入首页 |
 | FE-FLOW-2 | 前端助理创建测试（创建新助理、配置元数据、检查列表） | Completed | 对话创建架构演化助手成功（asst_a4deb4835fe3），自动物化 Home（SOUL/USER/AGENTS/skills），成功在前端与 Postgres 投影 agt_LORSp1CoEFBL |

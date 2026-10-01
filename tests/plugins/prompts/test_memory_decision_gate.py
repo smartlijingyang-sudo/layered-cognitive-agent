@@ -13,7 +13,7 @@ def test_memory_retrieval_section_contains_adr0255_decision_tree_and_write_rules
         goal="g",
         backstory="b",
         tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
-        extra={"assistant_home_path": "/tmp/test_home"},
+        extra={"assistant_home_path": "home/test_asst"},
     )
     out = sec.render(
         role_profile=profile,
