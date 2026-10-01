@@ -54,6 +54,10 @@ from lca.plugins.prompts.sections.role import (
     build_goal_section,
     build_role_section,
 )
+from lca.plugins.prompts.sections.runtime_env import (
+    build_developer_timestamp,
+    build_runtime_env,
+)
 from lca.plugins.prompts.sections.skills import build_activated_skills
 from lca.plugins.prompts.sections.task import build_task
 from lca.plugins.prompts.sections.teammates import (
@@ -206,6 +210,8 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         ("react_tool_usage_guidelines", build_react_tool_usage(Config()), "static"),
         ("routing_instructions", build_routing_instructions(Config()), "static"),
         ("hierarchical_instructions", build_hierarchical_instructions(Config()), "static"),
+        ("runtime_env", build_runtime_env(Config()), "static"),
+        ("developer_timestamp", build_developer_timestamp(Config()), "static"),
     ]
     for name, section, _kind in pure_sections:
         registry.register(section, kind="pure", name=name)

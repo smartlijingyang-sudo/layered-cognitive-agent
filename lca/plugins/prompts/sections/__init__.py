@@ -51,6 +51,14 @@ from lca.plugins.prompts.sections.role import (
     build_goal_section,
     build_role_section,
 )
+from lca.plugins.prompts.sections.runtime_env import (
+    DeveloperTimestampSection,
+    RuntimeEnvSection,
+    build_developer_timestamp,
+    build_runtime_env,
+    render_developer_timestamp,
+    render_runtime_row,
+)
 from lca.plugins.prompts.sections.skills import (
     ActivatedSkillsSection,
     build_activated_skills,
@@ -104,6 +112,7 @@ __all__ = [
     "Config",
     "ContextSection",
     "CurrentDateSection",
+    "DeveloperTimestampSection",
     "EvidencePackSection",
     "GoalSection",
     "HierarchicalInstructionsSection",
@@ -116,6 +125,7 @@ __all__ = [
     "ReactWorkflowSection",
     "RoleSection",
     "RoutingInstructionsSection",
+    "RuntimeEnvSection",
     "StaticTextSection",
     "TaskSection",
     "TeammatesSection",
@@ -130,6 +140,7 @@ __all__ = [
     "build_cloud_sandbox_section",
     "build_context",
     "build_current_date",
+    "build_developer_timestamp",
     "build_evidence_pack",
     "build_goal_section",
     "build_hierarchical_instructions",
@@ -142,11 +153,14 @@ __all__ = [
     "build_react_workflow",
     "build_role_section",
     "build_routing_instructions",
+    "build_runtime_env",
     "build_static_text",
     "build_task",
     "build_teammates",
     "build_tools_section",
     "build_user_profile",
     "build_vocal_contract",
+    "render_developer_timestamp",
+    "render_runtime_row",
     "setup",
 ]
