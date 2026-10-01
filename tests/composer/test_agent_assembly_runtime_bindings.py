@@ -46,11 +46,11 @@ from lca_kernel import run_kernel
 
 REPO = Path(__file__).resolve().parents[2]
 AGENT_ASSEMBLY_PATH = REPO / "lca" / "plugins" / "composer" / "composition" / "agent_assembly.py"
-RUNTIME_ASSEMBLY_PATH = REPO / "lca" / "plugins" / "composer" / "runtime" / "runtime_assembly.py"
+RUNTIME_ASSEMBLY_PATH = REPO / "lca" / "plugins" / "composer" / "runtime" / "runtime" / "assembly.py"
 RUNTIME_CAPABILITIES_PATH = (
-    REPO / "lca" / "plugins" / "composer" / "runtime" / "runtime_capabilities.py"
+    REPO / "lca" / "plugins" / "composer" / "runtime" / "runtime" / "capabilities.py"
 )
-RUNTIME_BINDING_PATH = REPO / "lca" / "plugins" / "composer" / "runtime" / "runtime_binding.py"
+RUNTIME_BINDING_PATH = REPO / "lca" / "plugins" / "composer" / "runtime" / "runtime" / "binding.py"
 WEB_APP_BUNDLE_PATH = REPO / "bundles" / "web-app.yaml"
 
 
@@ -140,16 +140,17 @@ def test_runtime_binding_adapter_maps_one_complete_graph_to_bindings() -> None:
         hooks=object(),
         state_store=object(),
         perceive_hub=object(),
+        llm=object(),
         observability=object(),
         phase_capabilities={"custom": object(), "stop_policy": object()},
     )
     plan = object()
-    scope = object()
+    scope = SimpleNamespace(own_bindings={})
     spec = cast("AgentSpec", SimpleNamespace())
     resume_input_adapter = object()
 
     with patch(
-        "lca.plugins.composer.runtime.runtime_capabilities.resolve_resume_input_adapter",
+        "lca.plugins.composer.runtime.runtime.capabilities.resolve_resume_input_adapter",
         return_value=resume_input_adapter,
     ) as resolve_resume_adapter:
         bindings = bind_runtime_graph(
@@ -172,6 +173,10 @@ def test_runtime_binding_adapter_maps_one_complete_graph_to_bindings() -> None:
         "body": graph.body,
         "memory": graph.memory,
         "perceive_hub": graph.perceive_hub,
+        "adapter": graph.llm,
+        "permission_manifest": None,
+        "assistant_bootstrap": None,
+        "assistant_id": "",
         "stop_policy": graph.phase_capabilities["stop_policy"],
         "custom": graph.phase_capabilities["custom"],
     }
@@ -192,6 +197,7 @@ def test_production_runtime_deps_rejects_conflicting_phase_capabilities() -> Non
         permission_manifest=cast("ToolPermissionManifest", object()),
         reducer=object(),
         compiled_plan=object(),
+        node_executors={},
         phase_capabilities={"brain": object()},
         effect_handler_registry=object(),
         delta_handler_registry=object(),
@@ -269,13 +275,14 @@ def test_runtime_phase_capability_projection_is_owned_by_runtime_bindings() -> N
 
     from lca.runtime.projection.phase_capabilities import project_runtime_phase_capabilities
 
-    brain, body, memory, perceive_hub = object(), object(), object(), object()
+    brain, body, memory, perceive_hub, llm = object(), object(), object(), object(), object()
     projected = project_runtime_phase_capabilities(
         phase_capabilities={"custom": "declared"},
         brain=brain,
         body=body,
         memory=memory,
         perceive_hub=perceive_hub,
+        llm=llm,
     )
 
     assert projected.values == {
@@ -284,6 +291,10 @@ def test_runtime_phase_capability_projection_is_owned_by_runtime_bindings() -> N
         "body": body,
         "memory": memory,
         "perceive_hub": perceive_hub,
+        "adapter": llm,
+        "permission_manifest": None,
+        "assistant_bootstrap": None,
+        "assistant_id": "",
     }
 
     with pytest.raises(ValueError, match="phase capability conflicts"):
@@ -293,4 +304,5 @@ def test_runtime_phase_capability_projection_is_owned_by_runtime_bindings() -> N
             body=body,
             memory=memory,
             perceive_hub=perceive_hub,
+            llm=llm,
         )
