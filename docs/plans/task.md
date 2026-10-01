@@ -14,10 +14,10 @@
 | HARDCODING-TASK-6 | 全链路不变量回归验证与门禁体检 (INV-01 ~ INV-06) | Completed | 关联不变量测试套件 122/122 100% 全绿（templates 60/60, runtime_env 7/7, standing_path 8/8, leaked 22/22, assemble 19/19, namespace 6/6）；ruff check 0 报错；ruff format 格式校验通过；git diff --check clean；负向边界 100% 遵守 |
 | ADR-0256-TASK-1 | Contracts 层强化与 DeferPolicy 8 域闭环 (`Tool.namespace` & `DeferPolicy`) | Completed | Tool.namespace 与 ToolApi.namespace 契约增加，DeferPolicy 固化 8 域描述与 shell 审批，单测 3/3 passed，commit 9c8a6b566 |
 | ADR-0256-TASK-2 | 工具 Factory 与 Manifest 显式声明 Namespace 并下沉 SSOT | Completed | 23项工具显式声明 8 大 namespace，彻底切除 ToolsService._tool_namespaces，20/20 单测全通，commit bbb74b882 |
-| ADR-0256-TASK-3 | ToolDeferSession 协议升级与 ToolSearch 批量加载 | Ready | 待执行 |
-| ADR-0256-TASK-4 | Cognition Wire Gate 升级为 Namespace 可见性判定与驼峰双拼清理 | Ready | 待执行 |
-| ADR-0256-TASK-5 | 接入安全控制面：Shell 域审批策略挂载 | Ready | 待执行 |
-| ADR-0256-TASK-6 | ADR-0256 全量符合性集成验收与 Pre-push 门禁体检 | Ready | 待执行 |
+| ADR-0256-TASK-3 | ToolDeferSession 协议升级与 ToolSearch 批量加载 | Completed | ToolDeferSession 升级为严格校验 tool.namespace 缺失/非法必 fail-fast，删除 'N tools:' 降级文本，tool_search 支持 namespaces: list[str] 批量加载并合并去重，42/42 单测全绿，commit b9993ba90 |
+| ADR-0256-TASK-4 | Cognition Wire Gate 升级为 Namespace 可见性判定与驼峰双拼清理 | Completed | Wire Gate 升级按 namespace 判定可见性并给出精准 guidance，彻底清理 _name_forms 驼峰双拼别名兼容，13/13 单测全绿，commit 0222130f7 |
+| ADR-0256-TASK-5 | 接入安全控制面：Shell 域审批策略挂载 | Completed | 实现 NamespaceApprovalStrategy 挂载至 ApprovalPolicyEngine，shell 域调用必触发 REQUIRE_APPROVAL (ELEVATED_COMMAND)，64/64 运行时测试全绿，commit a9afa17f2 |
+| ADR-0256-TASK-6 | ADR-0256 全量符合性集成验收与 Pre-push 门禁体检 | Completed | 落地 tests/scenario/test_tool_namespace_adr0256_conformance.py，覆盖 INV-01~INV-07 全部不变量，全链路 70/70 关联测试 100% 通过，ruff check 0 报错，git diff --check 干净 |
 | ADR-0255-TASK-1 | 9 大 Standing 文件布局与根拓扑白名单扩展 (`layout.toml` & `layout.py`) | Completed | layout.toml 扩展为 9 个 standing files，domain/layout.py 支持嵌套路径并加入 IDENTITY.md 白名单，15/15 单测全通，commit 925a2e97f |
 | ADR-0255-TASK-2 | 助理 Home 初始化默认骨架物化 (`IDENTITY.md` 与目录索引) | Completed | 补齐 IDENTITY.md/people/groups/alignment_synthesis 模板，更新 _scaffold_standing_notes 与 write_home_files，13/13 模板单测全通，commit 9a1bd1ab1 |
 | ADR-0255-TASK-3 | 上下文装配时间与 Runtime 元数据渲染 (Developer Timestamp & Runtime Row) | Completed | runtime_env.py 落地，注册 RuntimeEnvSection 与 DeveloperTimestampSection，8/8 单测全通，commit fa4af3182 |

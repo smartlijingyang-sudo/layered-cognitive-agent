@@ -314,7 +314,7 @@ async def test_defer_catalog_with_custom_discovery_rule_is_stripped() -> None:
     search = _make_stub_tool("tool_search", namespace="core")()
     run = _make_stub_tool("runCommand", namespace="shell")()
     custom_policy = DeferPolicy(
-        namespace_descriptions={"shell": "执行命令"},
+        namespace_descriptions={"core": "核心工具", "shell": "执行命令"},
         discovery_rule="Custom discovery rule: invoke tool_search before running commands.",
     )
     session = ToolDeferSession(custom_policy)
