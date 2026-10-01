@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 from typing import Any
 
@@ -44,10 +45,8 @@ class StreamableHttpMCPTransport(MCPTransportPort):
             curr_loop = None
 
         if self._client is not None and curr_loop is not None and self._loop is not curr_loop:
-            try:
+            with contextlib.suppress(Exception):
                 await self._client.aclose()
-            except Exception:
-                pass
             self._client = None
             self._is_connected = False
 
