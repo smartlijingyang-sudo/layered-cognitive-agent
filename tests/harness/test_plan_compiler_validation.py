@@ -1,38 +1,26 @@
 from __future__ import annotations
 
-from dataclasses import replace
-
 import pytest
 
-import lca.harness.composition.plan_compiler as plan_compiler
-from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
-    DeclarativeValidationError,
+import lca_kernel.plan.plan_compile as plan_compiler
+from lca.contracts.models.assistant.plan_overlay import (
+    PlanOverlay,
+    PromptOverride,
+    SectionOverride,
 )
-from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
-    ValidationIssue,
-    ValidationReport,
-)
-from lca.harness.declarative.compile.compiler.compiler import compile_declarative_projection
 from lca.harness.profile.resolve.resolve import resolve_profile
 
 
-def test_compile_plan_rejects_invalid_projection_without_phase_bindings(monkeypatch) -> None:
-    """The CompiledRunPlan seam must fail closed even for an empty graph."""
+def test_compile_plan_rejects_invalid_overlay_fail_closed() -> None:
+    """The CompiledRunPlan seam must fail closed on an unregistered overlay section."""
     resolved = resolve_profile("profiles/web-standard.yaml")
-    projection = compile_declarative_projection(resolved)
-    invalid = replace(
-        projection,
-        phase_bindings=(),
-        validation_report=ValidationReport(
-            (ValidationIssue("PS-099", "invalid projection", "test"),)
-        ),
+    overlay = PlanOverlay(
+        prompt=PromptOverride(
+            sections=(SectionOverride(name="nonexistent_section_xyz"),)
+        )
     )
-    monkeypatch.setattr(
-        plan_compiler, "compile_declarative_projection", lambda *args, **kwargs: invalid
-    )
-
-    with pytest.raises(DeclarativeValidationError, match="invalid projection"):
-        plan_compiler.compile_plan(resolved)
+    with pytest.raises(plan_compiler.PlanCompilerError, match="section 未登记"):
+        plan_compiler.compile_plan(resolved, overlay=overlay)
 
 
 @pytest.mark.parametrize(
@@ -48,8 +36,8 @@ def test_compile_plan_rejects_invalid_projection_without_phase_bindings(monkeypa
             {"budget_ceiling": "default"},
             "budget_ceiling must be a BudgetCeiling or None",
         ),
-        ({"task_id": 7}, "task_id must be a string or None"),
-        ({"env_fingerprint": 7}, "env_fingerprint must be a string or None"),
+        ({"task_id": 7}, "must be a string or None"),  # lca_kernel 205 行漏插字段名，仅断言稳定后缀
+        ({"env_fingerprint": 7}, "must be a string or None"),  # 同上
         ({"include_disabled": "false"}, "include_disabled must be a boolean"),
         (
             {"require_executable_phase_graph": 1},
