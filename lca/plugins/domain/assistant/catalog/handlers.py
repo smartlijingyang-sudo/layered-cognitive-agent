@@ -350,6 +350,10 @@ class _AssistantCatalogImpl(_AssistantCatalogEventsMixin, AssistantCatalog):
                 card = self._role_resolver.resolve(req.from_role)
             except RoleNotFoundError as exc:
                 raise AssistantCatalogError(str(exc)) from exc
+            if card is None:
+                raise AssistantCatalogError(
+                    f"role resolver returned no card for {req.from_role!r}"
+                )
             if not req.soul and not req.use_template_soul:
                 rendered.files["SOUL.md"] = card.backstory
             profile = json.loads(rendered.files["profile.json"])
@@ -504,9 +508,12 @@ class _AssistantCatalogImpl(_AssistantCatalogEventsMixin, AssistantCatalog):
             )
             self.reimport(assistant_id, reason="auto_heal_on_get")
             manifest = load_manifest(home.root, assistant_id)
+            declared_digests_raw = manifest.get("digests") or {}
+            if not isinstance(declared_digests_raw, dict):
+                declared_digests_raw = {}
             declared_digests = {
                 str(name): str(value)
-                for name, value in (manifest.get("digests") or {}).items()
+                for name, value in declared_digests_raw.items()
                 if isinstance(value, str)
             }
 
@@ -517,6 +524,7 @@ class _AssistantCatalogImpl(_AssistantCatalogEventsMixin, AssistantCatalog):
         )
 
         profile = read_json(home.root / "profile.json")
+        runtime_raw = profile.get("runtime")
         revision_seq_raw = manifest.get("revision_seq", 0)
         revision_seq = int(revision_seq_raw) if isinstance(revision_seq_raw, (int, str)) else 0
         template_id_raw = manifest.get("template_id", "")
@@ -540,9 +548,7 @@ class _AssistantCatalogImpl(_AssistantCatalogEventsMixin, AssistantCatalog):
             profile_locale=str(profile.get("locale") or ""),
             profile_model=str(profile.get("model") or ""),
             # runtime 是 JSON object;非 dict 视作未配置,不阻断 resolve。
-            profile_runtime=(
-                dict(profile["runtime"]) if isinstance(profile.get("runtime"), dict) else {}
-            ),
+            profile_runtime=dict(runtime_raw) if isinstance(runtime_raw, dict) else {},
             manifest_digest=str(manifest.get("manifest_digest") or ""),
             plan_overlay=_load_plan_overlay(home.root),
         )
@@ -681,7 +687,10 @@ class _AssistantCatalogImpl(_AssistantCatalogEventsMixin, AssistantCatalog):
         if not changes:
             raise _CatalogConfigError("ProfilePatch 未指定任何变更")
 
-        new_revision_seq = int(manifest.get("revision_seq") or 0) + 1
+        revision_seq_raw = manifest.get("revision_seq") or 0
+        new_revision_seq = (
+            int(revision_seq_raw) if isinstance(revision_seq_raw, (int, str)) else 0
+        ) + 1
         new_manifest = build_manifest(
             assistant_id=assistant_id,
             template_id=str(manifest.get("template_id", "")),
@@ -720,7 +729,10 @@ class _AssistantCatalogImpl(_AssistantCatalogEventsMixin, AssistantCatalog):
         """
         home = HomePaths(root=self._root / assistant_id)
         manifest = load_manifest(home.root, assistant_id)
-        new_revision_seq = int(manifest.get("revision_seq") or 0) + 1
+        revision_seq_raw = manifest.get("revision_seq") or 0
+        new_revision_seq = (
+            int(revision_seq_raw) if isinstance(revision_seq_raw, (int, str)) else 0
+        ) + 1
         new_manifest = build_manifest(
             assistant_id=assistant_id,
             template_id=str(manifest.get("template_id", "")),
