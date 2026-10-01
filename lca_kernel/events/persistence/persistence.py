@@ -174,7 +174,7 @@ def _spine_record_from_mapped(
     )
 
 
-class PersistenceFlushTimeout(TimeoutError):
+class PersistenceFlushTimeoutError(TimeoutError):
     """``flush_for`` 在指定超时内未等到 envelope 落盘。"""
 
     def __init__(self, event_id: str, timeout_s: float) -> None:
@@ -390,7 +390,7 @@ class PersistenceObserver:
             try:
                 await asyncio.wait_for(event.wait(), timeout=timeout)
             except TimeoutError as exc:
-                raise PersistenceFlushTimeout(event_id, timeout) from exc
+                raise PersistenceFlushTimeoutError(event_id, timeout) from exc
             return
 
         registry = self._ensure_registry()
@@ -409,7 +409,7 @@ class PersistenceObserver:
         try:
             await asyncio.wait_for(event.wait(), timeout=timeout)
         except TimeoutError as exc:
-            raise PersistenceFlushTimeout(event_id, timeout) from exc
+            raise PersistenceFlushTimeoutError(event_id, timeout) from exc
 
     def enqueue_spine_record(self, record: SpineEventRecord) -> None:
         """Public enqueue entry for shim callers (SpineFileSink.append)."""
@@ -490,7 +490,7 @@ class PersistenceObserver:
 
 __all__ = [
     "EnvelopeDeliveryObserver",
-    "PersistenceFlushTimeout",
+    "PersistenceFlushTimeoutError",
     "PersistenceHealthSnapshot",
     "PersistenceObserver",
 ]

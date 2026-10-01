@@ -46,7 +46,7 @@ from lca_kernel.events.fold.fold import (
 )
 from lca_kernel.events.persistence.persistence import (
     EnvelopeDeliveryObserver,
-    PersistenceFlushTimeout,
+    PersistenceFlushTimeoutError,
     PersistenceHealthSnapshot,
     PersistenceObserver,
 )
@@ -77,7 +77,7 @@ __all__ = [
     "EventPayload",
     "EventRef",
     "FsyncProtocol",
-    "PersistenceFlushTimeout",
+    "PersistenceFlushTimeoutError",
     "PersistenceHealthSnapshot",
     "PersistenceObserver",
     "Plane",

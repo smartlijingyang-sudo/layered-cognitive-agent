@@ -42,7 +42,7 @@ class SpineRegistryError(Exception):
     """Base class for SpineRegistry build-time errors."""
 
 
-class IncompleteRegistry(SpineRegistryError):
+class IncompleteRegistryError(SpineRegistryError):
     """Layer-1 violation: registry keys are missing from EXECUTION_POINTS.
 
     Raised by :meth:`SpineRegistry.validate` when one or more execution
@@ -53,12 +53,12 @@ class IncompleteRegistry(SpineRegistryError):
         self.missing = missing
         joined = ", ".join(sorted(missing))
         super().__init__(
-            f"IncompleteRegistry: {len(missing)} execution point(s) "
+            f"IncompleteRegistryError: {len(missing)} execution point(s) "
             f"have no registered handler: {joined}"
         )
 
 
-class MissingWrapFn(SpineRegistryError):
+class MissingWrapFnError(SpineRegistryError):
     """Layer-2 violation: a registration is missing wrap_fn or target_module.
 
     Raised by :meth:`SpineRegistry.register` immediately so a profile
@@ -70,7 +70,7 @@ class MissingWrapFn(SpineRegistryError):
         self.execution_point = execution_point
         self.missing_field = missing_field
         super().__init__(
-            f"MissingWrapFn: handler for {execution_point!r} is missing {missing_field!r}"
+            f"MissingWrapFnError: handler for {execution_point!r} is missing {missing_field!r}"
         )
 
 
@@ -127,15 +127,15 @@ class SpineRegistry:
 
         Raises
         ------
-        MissingWrapFn
+        MissingWrapFnError
             If ``wrap_fn`` is ``None`` (Layer-2 wrap-fn unbound).
-        MissingWrapFn
+        MissingWrapFnError
             If ``target_module`` is empty (Layer-2 target unbound).
         """
         if wrap_fn is None:
-            raise MissingWrapFn(execution_point, "wrap_fn")
+            raise MissingWrapFnError(execution_point, "wrap_fn")
         if not target_module:
-            raise MissingWrapFn(execution_point, "target_module")
+            raise MissingWrapFnError(execution_point, "target_module")
         handler = SpineHandler(
             execution_point=execution_point,
             wrap_fn=wrap_fn,
@@ -168,19 +168,19 @@ class SpineRegistry:
 
         Raises
         ------
-        IncompleteRegistry
+        IncompleteRegistryError
             If one or more ``execution_points`` are missing from
             :meth:`keys`.
         """
         registered = set(self._handlers)
         missing = tuple(point for point in execution_points if point not in registered)
         if missing:
-            raise IncompleteRegistry(missing)
+            raise IncompleteRegistryError(missing)
 
 
 __all__ = [
-    "IncompleteRegistry",
-    "MissingWrapFn",
+    "IncompleteRegistryError",
+    "MissingWrapFnError",
     "SpineHandler",
     "SpineRegistry",
     "SpineRegistryError",
