@@ -15,6 +15,37 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 
 _IMPLICIT_APPROVAL_EFFECTS: frozenset[str] = frozenset({"network", "filesystem", "world"})
 
+# Policy vocabulary (compiler-owned, ADR-0221 migration-era).
+#
+# ``EffectGovernanceDeclaration.policy`` is free text at the contract level;
+# the compiler interprets it with this vocabulary to project the plan-level
+# approval / idempotency tuples:
+#   "approval"            — the effect requires human approval
+#   "idempotent"          — the effect requires idempotency
+#   "approval+idempotent" — both
+#   "none"                — neither
+# Unrecognized tokens are ignored: the declaration author owns the
+# semantics; the compiler only projects what it recognizes.
+_POLICY_APPROVAL = "approval"
+_POLICY_IDEMPOTENT = "idempotent"
+_POLICY_NONE = "none"
+
+
+def _policy_flags(policy: str) -> tuple[bool, bool]:
+    """Project a policy string onto (requires_approval, requires_idempotency)."""
+    tokens = {token.strip() for token in policy.split("+")}
+    return (_POLICY_APPROVAL in tokens, _POLICY_IDEMPOTENT in tokens)
+
+
+def _migration_policy(effect: str) -> str:
+    """Encode the pre-ADR-0221 boolean semantics as a policy string."""
+    tokens = []
+    if effect in _IMPLICIT_APPROVAL_EFFECTS:
+        tokens.append(_POLICY_APPROVAL)
+    if effect != "none":
+        tokens.append(_POLICY_IDEMPOTENT)
+    return "+".join(tokens) if tokens else _POLICY_NONE
+
 
 def compile_effect_policy(specs: tuple[PluginSpec, ...]) -> EffectPolicyPlan:
     """Compile a plan-owned effect policy from active PluginSpec declarations.
@@ -26,10 +57,10 @@ def compile_effect_policy(specs: tuple[PluginSpec, ...]) -> EffectPolicyPlan:
     effects = tuple(sorted({effect for spec in specs for effect in spec.effects})) or ("none",)
     declared = _declared_governance(specs)
     approval_required = tuple(
-        effect for effect in effects if _governance_for(effect, declared).requires_approval
+        effect for effect in effects if _policy_flags(_governance_for(effect, declared).policy)[0]
     )
     idempotency_required = tuple(
-        effect for effect in effects if _governance_for(effect, declared).requires_idempotency
+        effect for effect in effects if _policy_flags(_governance_for(effect, declared).policy)[1]
     )
     return EffectPolicyPlan(
         gateway_capability="effect.gateway",
@@ -67,8 +98,7 @@ def _governance_for(
         return declared[effect]
     return EffectGovernanceDeclaration(
         effect_class=effect,
-        requires_approval=effect in _IMPLICIT_APPROVAL_EFFECTS,
-        requires_idempotency=effect != "none",
+        policy=_migration_policy(effect),
     )
 
 
