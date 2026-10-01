@@ -41,8 +41,8 @@ class PerceiveInputCollectExecutor:
 
     semantic_name: str = "perceive.input.collect"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("run_input",)
-    declared_outputs: tuple[PortName, ...] = ("raw_inputs",)
+    declared_inputs: tuple[PortName, ...] = (PortName("run_input"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("raw_inputs"),)
 
     async def node_execute(
         self,
@@ -55,12 +55,12 @@ class PerceiveInputCollectExecutor:
         outputs 端口(yaml):raw_inputs (tuple[Any, ...])
         """
         del context
-        run_input = input.port_values.get("run_input")
+        run_input = input.port_values.get(PortName("run_input"))
         if run_input is None:
-            return NodeOutput(port_values={"raw_inputs": ()})
+            return NodeOutput(port_values={PortName("raw_inputs"): ()})
         if isinstance(run_input, tuple):
-            return NodeOutput(port_values={"raw_inputs": run_input})
-        return NodeOutput(port_values={"raw_inputs": (run_input,)})
+            return NodeOutput(port_values={PortName("raw_inputs"): run_input})
+        return NodeOutput(port_values={PortName("raw_inputs"): (run_input,)})
 
 
 @plugin(
