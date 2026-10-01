@@ -18,11 +18,9 @@ from typing import Any
 from lca.contracts.observability import (
     Channel,
     EventSpine,
+    Outcome as OutcomeT,
     SpanContext,
     exc_to_record,
-)
-from lca.contracts.observability import (
-    Outcome as OutcomeT,
 )
 from lca.contracts.protocols.loop.spine_publish import is_session_ssot_hook_active
 from lca.harness.declarative.compile.instrument.accessors import _resolve_pipeline

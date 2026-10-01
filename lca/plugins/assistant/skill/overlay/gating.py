@@ -74,11 +74,6 @@ def _gate_package(package: SkillPackage) -> CapabilityArtifact:
         grants=(),
         metadata={"source_url": package.source_url, "version": package.version},
     )
-    if artifact.grants:
-        # 安装永不扩权:外部包脚本执行仍受沙箱与既有 grant 约束(ADR-0187 §3 D6)
-        raise SkillImportError("experiment 闸失败: 安装不得携带 grant")
-    if artifact.scope is not Scope.AGENT:
-        raise SkillImportError("experiment 闸失败: 落点 scope 限助理域")
     return migrate_to_verified(artifact)
 
 
