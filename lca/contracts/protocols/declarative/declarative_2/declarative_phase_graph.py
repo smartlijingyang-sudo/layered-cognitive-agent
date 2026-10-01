@@ -17,6 +17,10 @@ from lca.contracts.protocols.declarative.declarative_1.declarative_common import
     RelationType,
     SemanticPhase,
 )
+from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
+    DeclarativeRunOutcome,
+    PhaseRunCursor,
+)
 from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
     ActionAuthorityPlan,
     ActionScopeAuthority,
@@ -58,6 +62,7 @@ __all__ = [
     "CapabilityDeclaration",
     "CognitivePhaseGraphPlan",
     "CommandEnvelope",
+    "DeclarativeRunOutcome",
     "DeclarativeValidationError",
     "EffectGovernanceDeclaration",
     "EffectPolicyPlan",
@@ -68,6 +73,7 @@ __all__ = [
     "PhaseEdge",
     "PhaseExecutionPolicy",
     "PhaseNode",
+    "PhaseRunCursor",
     "PlanProvenance",
     "PluginConfiguration",
     "PluginImplementation",
