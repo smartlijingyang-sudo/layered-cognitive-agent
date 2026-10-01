@@ -190,7 +190,6 @@ def resolve_resume_input_adapter(
 def resolve_node_executor_bindings(
     scope: Context,
     *,
-    composite_separator: str = "::",
     registry_separator: str = "::",
 ) -> dict[str, NodeExecutor]:
     """Collect every node executor the booted scope already published.
@@ -209,9 +208,7 @@ def resolve_node_executor_bindings(
     name under different regions) resolve last-writer-wins, which
     matches how Cordis's own resolution order works.
 
-    For a stricter "only top-level subgraph regions" walk, callers can
-    pass a custom ``composite_separator`` and pre-filter — but the
-    default is deliberately permissive because the framework has no
+    The walk is deliberately permissive because the framework has no
     business-layer concept of "subgraph region".
     """
     from lca.harness.plugin.context import collect_context_bindings
