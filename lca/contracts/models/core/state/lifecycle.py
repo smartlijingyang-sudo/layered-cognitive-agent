@@ -24,29 +24,6 @@ class TaskStatus(str, Enum):
     CANCELED = "canceled"
 
 
-_STATUS_MAP: dict[str, TaskStatus] = {
-    TaskStatus.COMPLETED.value: TaskStatus.COMPLETED,
-    TaskStatus.PARTIAL.value: TaskStatus.PARTIAL,
-    TaskStatus.FAILED.value: TaskStatus.FAILED,
-    TaskStatus.WORKING.value: TaskStatus.WORKING,
-    "running": TaskStatus.WORKING,
-    "waiting_human": TaskStatus.INPUT_REQUIRED,
-    "input_required": TaskStatus.INPUT_REQUIRED,
-    TaskStatus.INPUT_REQUIRED.value: TaskStatus.INPUT_REQUIRED,
-    TaskStatus.CANCELED.value: TaskStatus.CANCELED,
-    "cancelled": TaskStatus.CANCELED,
-}
-
-
-def coerce_status(value: str | TaskStatus | None) -> TaskStatus | None:
-    """Normalise a string or TaskStatus into a TaskStatus, or None."""
-    if value is None:
-        return None
-    if isinstance(value, TaskStatus):
-        return value
-    return _STATUS_MAP.get(str(value), TaskStatus.COMPLETED)
-
-
 @dataclass
 class AgentCard:
     """Agent 能力名片：声明角色、工具、协议，供委派路由使用。"""
