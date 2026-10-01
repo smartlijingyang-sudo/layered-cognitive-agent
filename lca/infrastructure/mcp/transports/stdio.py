@@ -14,6 +14,7 @@ import structlog
 
 from lca.contracts.models.mcp.types import MCPServerConfig
 from lca.contracts.protocols.mcp.ports import MCPTransportPort
+from lca.infrastructure.mcp.transports._loop_guard import loop_mismatch
 
 _log = structlog.get_logger(__name__)
 
@@ -53,12 +54,8 @@ class StdioMCPTransport(MCPTransportPort):
     def is_connected(self) -> bool:
         if self._proc is None or self._proc.returncode is not None:
             return False
-        try:
-            curr_loop = asyncio.get_running_loop()
-            if self._loop is not None and self._loop is not curr_loop:
-                return False
-        except RuntimeError:
-            pass
+        if loop_mismatch(self._loop):
+            return False
         return True
 
     async def connect(self) -> None:
