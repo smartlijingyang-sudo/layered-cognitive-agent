@@ -78,6 +78,12 @@ class TestTemplateRegistry:
         assert "memory/people/INDEX.md" in rendered.files
         assert "memory/groups/INDEX.md" in rendered.files
         assert "dreams/alignment/derived/ALIGNMENT_SYNTHESIS.md" in rendered.files
+        assert "约定" in rendered.files["AGENTS.md"] and "教训" in rendered.files["AGENTS.md"]
+        assert (
+            "Who this user is and how to act for them"
+            in rendered.files["dreams/alignment/derived/ALIGNMENT_SYNTHESIS.md"]
+        )
+        assert "Notes" in rendered.files["USER.md"]
 
     @pytest.mark.parametrize("template_id", ROLE_TEMPLATES)
     def test_role_template_profile_carries_emoji_and_soul(self, template_id: str) -> None:
