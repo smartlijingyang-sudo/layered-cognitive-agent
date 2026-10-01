@@ -72,23 +72,12 @@ def tool_wire_block_observation(decision: Decision) -> Observation | None:
     )
 
 
-def _name_forms(name: str) -> set[str]:
-    """Snake and camel spellings of one tool name."""
-
-    forms = {name}
-    if "_" in name:
-        parts = [part for part in name.split("_") if part]
-        if parts:
-            forms.add(parts[0] + "".join(part.capitalize() for part in parts[1:]))
-    return forms
-
-
 def unexposed_tool_block_observation(decision: Decision) -> Observation | None:
     """Refuse a call whose schema was not on this turn's tool list.
 
     Defer hides a namespace until ``tool_search`` loads it. The registry
     still holds the tool. Executing a name the model was not given is the
-    fail-open side of that hide. No defer session means the legacy full list.
+    fail-closed side of that hide. No defer session means the legacy full list.
     """
 
     from lca.infrastructure.tool_defer.session import current_defer_session
@@ -102,16 +91,24 @@ def unexposed_tool_block_observation(decision: Decision) -> Observation | None:
         function = spec.get("function") if isinstance(spec, dict) else None
         name = function.get("name") if isinstance(function, dict) else ""
         if isinstance(name, str) and name:
-            visible |= _name_forms(name)
+            visible.add(name)
+
+    tool_to_ns: dict[str, str] = {}
+    for ns_obj in session.namespaces:
+        for tname in ns_obj.tool_names:
+            tool_to_ns[tname] = ns_obj.name
+
     for tc in decision.tool_calls:
-        if _name_forms(tc.tool_name) & visible:
+        if tc.tool_name in visible:
             continue
+        ns_name = tool_to_ns.get(tc.tool_name, "deferred")
         return Observation(
             observation_id=new_id("obs"),
             success=False,
             payload=None,
             error=(
-                f"tool {tc.tool_name} is not loaded this turn. "
+                f"tool {tc.tool_name} belongs to deferred namespace '{ns_name}' "
+                "which is not loaded this turn. "
                 "Call tool_search for its namespace before using it."
             ),
             tool_call_id=tc.call_id,

@@ -200,15 +200,15 @@ def test_unloaded_namespace_is_not_executable() -> None:
     )
 
     class _Tool:
-        def __init__(self, name: str) -> None:
+        def __init__(self, name: str, namespace: str) -> None:
             self.name = name
+            self.namespace = namespace
             self.description = name
             self.parameters = {"type": "object", "properties": {}}
 
     session = ToolDeferSession(DeferPolicy.default())
     session.update_turn(
-        (_Tool("tool_search"), _Tool("runCommand")),
-        {"tool_search": "tool_search", "runCommand": "runCommand"},
+        (_Tool("tool_search", namespace="core"), _Tool("run_command", namespace="shell")),
     )
     token = set_current_defer_session(session)
     try:
@@ -219,17 +219,25 @@ def test_unloaded_namespace_is_not_executable() -> None:
         )
         assert hidden is not None
         assert hidden.success is False
+        assert "shell" in (hidden.error or "")
         assert "tool_search" in (hidden.error or "")
         visible = unexposed_tool_block_observation(
             _decision(
                 ToolCall(
-                    call_id="c2", tool_name="tool_search", arguments={"namespace": "runCommand"}
+                    call_id="c2", tool_name="tool_search", arguments={"namespace": "shell"}
                 )
             )
         )
         assert visible is None
     finally:
         reset_current_defer_session(token)
+
+
+def test_name_forms_removed_and_camel_case_blocked() -> None:
+    """_name_forms is completely removed; calling unexposed tool by camelCase does not bypass wire gate."""
+    import lca.cognition.body.tools.tool_wire_gate as wire_gate
+
+    assert not hasattr(wire_gate, "_name_forms")
 
 
 def test_gate_blocks_tool_call_wire_status_even_without_decision_extra() -> None:
