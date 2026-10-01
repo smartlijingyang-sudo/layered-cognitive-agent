@@ -10,7 +10,7 @@ plugin-manifest declarations.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 PLUGIN_SPEC_VERSION = "lca/plugin-spec/v1"
 DECLARATIVE_PLAN_VERSION = "v2"
@@ -24,7 +24,7 @@ class DeclarativeValidationError(ValueError):
         super().__init__(f"{code}: {message}")
 
 
-class SemanticPhase(str, Enum):
+class SemanticPhase(StrEnum):
     """ADR-0075 允许的封闭语义阶段集合。"""
 
     PERCEIVE = "perceive"
@@ -35,7 +35,7 @@ class SemanticPhase(str, Enum):
     STOP = "stop"
 
 
-class PluginSpecKind(str, Enum):
+class PluginSpecKind(StrEnum):
     SEAM = "seam"
     PROVIDER = "provider"
     EFFECT_HANDLER = "effect-handler"
@@ -44,7 +44,7 @@ class PluginSpecKind(str, Enum):
     DRIVER = "driver"
 
 
-class RelationType(str, Enum):
+class RelationType(StrEnum):
     BEFORE = "before"
     AFTER = "after"
     CONTAINS = "contains"
