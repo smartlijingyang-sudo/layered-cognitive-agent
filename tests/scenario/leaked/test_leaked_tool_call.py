@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import unittest
 
+from lca.cognition.brain.llm_turn.response_projection import project_llm_response
 from lca.cognition.brain.prompt.leaked_tool_call import parse_text_channel
 from lca.contracts.models.core.conversation.llm import LLMResponse
 from lca.plugins.gate.decision_classifier_provider import DefaultDecisionClassifier
@@ -117,10 +118,7 @@ class TestParseTextChannel(unittest.TestCase):
         )
 
     def test_tool_tag_with_json_body_becomes_a_call(self) -> None:
-        text = (
-            "我来计算一下总额：\n"
-            '<tool name="calculator">{"expression": "400 + 15"}</tool>'
-        )
+        text = '我来计算一下总额：\n<tool name="calculator">{"expression": "400 + 15"}</tool>'
         channel = parse_text_channel(text)
         self.assertEqual(channel.prose, "我来计算一下总额：")
         self.assertEqual(channel.undecodable, "")
@@ -168,6 +166,47 @@ class TestParseTextChannel(unittest.TestCase):
         self.assertEqual(channel.undecodable, "")
         self.assertEqual([c.name for c in channel.calls], ["run_cmd"])
         self.assertEqual(channel.calls[0].arguments, {"cmd": "pytest"})
+
+    def test_truncated_command_value_is_not_a_call(self) -> None:
+        text = (
+            "让我看看。\n"
+            "<tool_calls>\n"
+            '<tool name="run_command">\n'
+            '<parameter name="command">find /home......</parameter>\n'
+            "</tool>\n"
+            "</tool_calls>"
+        )
+        channel = parse_text_channel(text)
+        self.assertEqual(channel.calls, ())
+        self.assertNotIn("find /home", channel.prose)
+        self.assertIn("find /home", channel.undecodable)
+
+    def test_unclosed_parameter_tag_is_not_a_call(self) -> None:
+        text = (
+            '<tool name="run_command">\n'
+            '<parameter name="command>\n'
+            'find /tmp -name "*.md"\n'
+            "</parameter >\n"
+            "</tool>"
+        )
+        channel = parse_text_channel(text)
+        self.assertEqual(channel.calls, ())
+        self.assertIn("<tool", channel.undecodable)
+
+    def test_duplicate_well_formed_calls_collapse_to_the_first(self) -> None:
+        block = (
+            '<tool name="run_command">\n'
+            '<parameter name="command">find /tmp -name "*.md"</parameter>\n'
+            "</tool>\n"
+        )
+        text = "让我看看。\n" + block + block
+        projection = project_llm_response(LLMResponse(text=text))
+        self.assertEqual(len(projection.tool_calls), 1)
+        self.assertEqual(projection.tool_calls[0].tool_name, "run_command")
+        self.assertEqual(
+            projection.tool_calls[0].arguments["command"],
+            'find /tmp -name "*.md"',
+        )
 
     def test_modern_dangling_tags_become_undecodable(self) -> None:
         channel = parse_text_channel("完成分析。\n</tool>\n</delegate_to>")

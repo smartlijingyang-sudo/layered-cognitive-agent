@@ -121,9 +121,22 @@ def test_f2_truncated_argument_value_is_rejected():
     assert _call("runCommand", {"command": "find /home/lichao"}) is not None
 
 
-@pytest.mark.skip(reason="待实现:同 turn 重复发射去重(2026-10-01 待办第 2 项)")
-def test_f3_duplicate_emissions_in_one_turn_deduplicated(defer_session: Any):
-    """同一 turn 发射 21 次相同调用,实际只执行 1 次.
+def test_f3_duplicate_emissions_in_one_turn_deduplicated():
+    """同一 turn 发射 21 次相同调用,只保留第 1 个良构的.
 
     回归 run_56ee6564e3ea:同一 find 发射 21 次/turn.
+    去重发生在 project_llm_response(_first_of_each_call).
     """
+    from lca.cognition.brain.llm_turn.response_projection import project_llm_response
+    from lca.contracts.models.core.conversation.llm import LLMResponse, NativeToolCall
+
+    dupes = [
+        NativeToolCall(call_id=f"call-{i}", name="listFiles",
+                       arguments={"path": "/home/lichao"})
+        for i in range(21)
+    ]
+    other = NativeToolCall(call_id="call-x", name="listFiles",
+                           arguments={"path": "/tmp"})
+    projection = project_llm_response(LLMResponse(text="", tool_calls=dupes + [other]))
+    names = [(c.tool_name, c.arguments.get("path")) for c in projection.tool_calls]
+    assert names == [("listFiles", "/home/lichao"), ("listFiles", "/tmp")]

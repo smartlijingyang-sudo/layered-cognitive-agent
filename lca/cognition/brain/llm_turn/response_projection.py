@@ -26,6 +26,7 @@ what lets a wire failure reach the user as a final answer and stop the loop on
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -65,6 +66,24 @@ def _undecodable_wire_call(markup: str) -> ToolCall:
     )
 
 
+def _first_of_each_call(calls: list[ToolCall]) -> list[ToolCall]:
+    """One completion's identical calls are one operation.
+
+    The first well-formed copy wins. Later copies with the same name and
+    arguments are the model repeating a block, not a second action.
+    """
+
+    seen: set[str] = set()
+    kept: list[ToolCall] = []
+    for call in calls:
+        key = call.tool_name + "\0" + json.dumps(call.arguments, sort_keys=True, default=str)
+        if key in seen:
+            continue
+        seen.add(key)
+        kept.append(call)
+    return kept
+
+
 def project_llm_response(response: LLMResponse) -> ResponseProjection:
     """Map ``response.tool_calls`` + ``response.text`` onto Decision parts."""
     intent = (response.text or "").strip()
@@ -98,6 +117,7 @@ def project_llm_response(response: LLMResponse) -> ResponseProjection:
                 wire_raw_preview=str(getattr(call, "wire_raw_preview", None) or ""),
             )
         )
+    tool_calls = _first_of_each_call(tool_calls)
     if undecodable and not tool_calls and not delegations:
         return ResponseProjection(
             tool_calls=(_undecodable_wire_call(undecodable),),

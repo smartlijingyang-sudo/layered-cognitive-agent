@@ -153,13 +153,6 @@ def recover_partial_tool_arguments(raw: str) -> dict[str, Any]:
     return out
 
 
-def _usable_recovered_arguments(arguments: dict[str, Any]) -> bool:
-    return any(
-        isinstance(arguments.get(key), str) and str(arguments[key]).strip()
-        for key in _PARTIAL_STRING_KEYS
-    )
-
-
 def _decode_json_string_prefix(source: str, start: int) -> str:
     parts: list[str] = []
     escaped = False
@@ -197,8 +190,7 @@ def resolve_tool_arguments(
         2. 空 arguments（其它结束原因）   → Ok({})
         3. json.loads 成功且 dict         → Ok（含 finish_reason=length）
         4. json.loads 成功非 dict         → Ok({"_value": ...})
-        5. JSONDecodeError 且能抽出 path/content/code 等 → Ok(recovered)
-        6. 其余 JSONDecodeError / length 且无法抽出     → Incomplete
+        5. JSONDecodeError                            → Incomplete
     """
     fr = normalize_finish_reason(finish_reason)
     raw = arguments_json if arguments_json is not None else ""
@@ -223,14 +215,7 @@ def resolve_tool_arguments(
             return ToolArgumentsOk(arguments=dict(parsed))
         return ToolArgumentsOk(arguments={"_value": parsed})
 
-    # Strict parse failed: ``raw`` is a truncated stream. Recovery is keyed on
-    # opaque text bodies because those are the arguments a coding agent cannot
-    # afford to lose; a payload that parses never reaches this branch, so its
-    # key names are not gated by ``_PARTIAL_STRING_KEYS``.
-    recovered = recover_partial_tool_arguments(raw)
-    if _usable_recovered_arguments(recovered):
-        return ToolArgumentsOk(arguments=recovered)
-
+    # Unterminated JSON is not a call. ADR-0047: do not salvage a prefix and run it.
     if fr is FinishReason.LENGTH:
         return ToolArgumentsIncomplete(
             raw=raw,

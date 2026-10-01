@@ -55,12 +55,12 @@ def test_non_dict_json_is_wrapped() -> None:
     assert outcome.arguments == {"_value": [1, 2]}
 
 
-def test_truncated_payload_with_recoverable_text_body_is_ok() -> None:
+def test_truncated_payload_with_recoverable_text_body_is_incomplete() -> None:
+    """A salvaged prefix is not a call. ADR-0047 forbids executing it."""
     raw = '{"path": "/mnt/data/report.pdf", "content": "第一行\n第二行'
     outcome = resolve_tool_arguments(raw, finish_reason="tool_calls")
-    assert isinstance(outcome, ToolArgumentsOk)
-    assert outcome.arguments["path"] == "/mnt/data/report.pdf"
-    assert outcome.arguments["content"].startswith("第一行")
+    assert isinstance(outcome, ToolArgumentsIncomplete)
+    assert outcome.reason == "unterminated_or_truncated_json"
 
 
 def test_truncated_payload_without_recoverable_field_is_incomplete() -> None:

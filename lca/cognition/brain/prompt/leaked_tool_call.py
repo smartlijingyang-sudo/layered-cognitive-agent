@@ -29,13 +29,18 @@ from lca.contracts.models.core.conversation.llm import NativeToolCall
 
 _FENCE = re.compile(r"```.*?(?:```|\Z)", re.DOTALL)
 _TOOL_NAME = re.compile(r"^[A-Za-z_][\w]{0,63}$")
+# Four-or-more dots, or a unicode ellipsis, is a model cutting a value off.
+# Three dots stay legal so a Python ``...`` in a real argument still parses.
+_TRUNCATED_VALUE = re.compile(r"\.{4,}|…")
 
 _BRACKET_CALL = re.compile(r"\[Tool call:\s*([A-Za-z_][\w]*)\]\s*(\{.*\})\s*\Z", re.DOTALL)
 _FUNCTION_CALL = re.compile(r"<function=\s*([A-Za-z_][\w]*)\s*>(.*?)</function\s*>", re.DOTALL)
 _INVOKE_CALL = re.compile(r"<invoke\s+name=\"([^\"]+)\"\s*>(.*?)</invoke\s*>", re.DOTALL)
 _TOOL_TAG_CALL = re.compile(r"<tool\s+name=\"([^\"]+)\"\s*>(.*?)</tool\s*>", re.DOTALL)
 _TOOL_CALL_JSON = re.compile(r"<tool_call\s*>(.*?)</tool_call\s*>", re.DOTALL)
-_DELEGATE_CALL = re.compile(r"<delegate_to(?:_role)?\s*>(.*?)</delegate_to(?:_role)?\s*>", re.DOTALL)
+_DELEGATE_CALL = re.compile(
+    r"<delegate_to(?:_role)?\s*>(.*?)</delegate_to(?:_role)?\s*>", re.DOTALL
+)
 _QWEN_SPECIAL_CALL = re.compile(
     r"<\|tool_call_begin\|>(?:function\s*)?(?:<\|tool_call_name\|>)?([A-Za-z_][\w]*)"
     r"(?:<\|tool_call_argument\|>)?(?:<\|tool_call_begin\|>)?(.*?)"
@@ -44,7 +49,9 @@ _QWEN_SPECIAL_CALL = re.compile(
 )
 
 _PARAMETER = re.compile(r"<parameter\s+name=\"([^\"]+)\"\s*>(.*?)</parameter\s*>", re.DOTALL)
-_PARAM_OR_PARAMETER = re.compile(r"<param(?:eter)?\s+name=\"([^\"]+)\"\s*>(.*?)</param(?:eter)?\s*>", re.DOTALL)
+_PARAM_OR_PARAMETER = re.compile(
+    r"<param(?:eter)?\s+name=\"([^\"]+)\"\s*>(.*?)</param(?:eter)?\s*>", re.DOTALL
+)
 _CHILD_XML_TAG = re.compile(r"<([A-Za-z_][\w]*)\s*>(.*?)</\1\s*>", re.DOTALL)
 _CALLS_WRAPPER = re.compile(r"</?tool_calls\s*>|<\|/?tool_calls\|>|<\|tool_call_end\|>")
 
@@ -219,6 +226,10 @@ _ENCODINGS = (
 def _call(name: str, arguments: dict[str, Any] | None) -> NativeToolCall | None:
     name = (name or "").strip()
     if arguments is None or not _TOOL_NAME.match(name):
+        return None
+    if any(
+        isinstance(value, str) and _TRUNCATED_VALUE.search(value) for value in arguments.values()
+    ):
         return None
     return NativeToolCall(
         call_id=new_id("call"),

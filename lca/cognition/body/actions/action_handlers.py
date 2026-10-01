@@ -18,6 +18,7 @@ from lca.cognition.body.tools.tool_batch_executor import ToolBatchExecutor
 from lca.cognition.body.tools.tool_wire_gate import (
     missing_arguments_block_observation,
     tool_wire_block_observation,
+    unexposed_tool_block_observation,
 )
 from lca.cognition.member_status.consult_policy import (
     classify_synthesis,
@@ -194,6 +195,9 @@ class UseToolOperation(Action):
         wire_block = tool_wire_block_observation(decision)
         if wire_block is not None:
             return wire_block
+        hidden = unexposed_tool_block_observation(decision)
+        if hidden is not None:
+            return hidden
         # ADR-0047: a call whose required arguments never arrived must not
         # execute with an empty payload; the model gets the retry instruction
         # instead of the tool's downstream error.

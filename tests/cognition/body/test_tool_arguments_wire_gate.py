@@ -55,8 +55,8 @@ def _decision(*calls: ToolCall) -> Decision:
     )
 
 
-def test_truncated_writefile_json_recovers_path_and_content() -> None:
-    """Sandbox Write lands recovered path+content; it does not execute ``{}``."""
+def test_truncated_writefile_json_is_incomplete() -> None:
+    """A cut-off writeFile body is not a call. The gate refuses it."""
     truncated = '{"path": "outputs/report.py", "content": "from reportlab.platypus import'
     response: LLMResponse = build_llm_response(
         text="",
@@ -67,9 +67,8 @@ def test_truncated_writefile_json_recovers_path_and_content() -> None:
     )
 
     call = response.tool_calls[0]
-    assert call.wire_status == "ok"
-    assert call.arguments["path"] == "outputs/report.py"
-    assert call.arguments["content"].startswith("from reportlab.platypus import")
+    assert call.wire_status == "incomplete"
+    assert call.arguments == {}
 
 
 def test_length_finish_reason_with_valid_json_still_executes() -> None:
@@ -163,7 +162,7 @@ def test_native_tool_call_defaults_to_ok() -> None:
     assert (call.wire_status, call.wire_reason, call.wire_raw_preview) == ("ok", "", "")
 
 
-def test_large_truncated_writefile_json_still_lands_in_sandbox_args() -> None:
+def test_large_truncated_writefile_json_does_not_execute() -> None:
     huge = '{"path": "outputs/a.py", "content": "' + ("x" * 20_000)
     response = build_llm_response(
         text="",
@@ -173,9 +172,8 @@ def test_large_truncated_writefile_json_still_lands_in_sandbox_args() -> None:
         finish_reason="tool_calls",
     )
     call = response.tool_calls[0]
-    assert call.wire_status == "ok"
-    assert call.arguments["path"] == "outputs/a.py"
-    assert len(call.arguments["content"]) == 20_000
+    assert call.wire_status == "incomplete"
+    assert call.arguments == {}
 
 
 def test_empty_arguments_with_tool_calls_finish_are_incomplete() -> None:
@@ -190,6 +188,48 @@ def test_empty_arguments_with_tool_calls_finish_are_incomplete() -> None:
     assert call.arguments == {}
     assert call.wire_status == "incomplete"
     assert call.wire_reason == "empty_arguments"
+
+
+def test_unloaded_namespace_is_not_executable() -> None:
+    from lca.cognition.body.tools.tool_wire_gate import unexposed_tool_block_observation
+    from lca.infrastructure.tool_defer.policy import DeferPolicy
+    from lca.infrastructure.tool_defer.session import (
+        ToolDeferSession,
+        reset_current_defer_session,
+        set_current_defer_session,
+    )
+
+    class _Tool:
+        def __init__(self, name: str) -> None:
+            self.name = name
+            self.description = name
+            self.parameters = {"type": "object", "properties": {}}
+
+    session = ToolDeferSession(DeferPolicy.default())
+    session.update_turn(
+        (_Tool("tool_search"), _Tool("runCommand")),
+        {"tool_search": "tool_search", "runCommand": "runCommand"},
+    )
+    token = set_current_defer_session(session)
+    try:
+        hidden = unexposed_tool_block_observation(
+            _decision(
+                ToolCall(call_id="c1", tool_name="run_command", arguments={"command": "find /tmp"})
+            )
+        )
+        assert hidden is not None
+        assert hidden.success is False
+        assert "tool_search" in (hidden.error or "")
+        visible = unexposed_tool_block_observation(
+            _decision(
+                ToolCall(
+                    call_id="c2", tool_name="tool_search", arguments={"namespace": "runCommand"}
+                )
+            )
+        )
+        assert visible is None
+    finally:
+        reset_current_defer_session(token)
 
 
 def test_gate_blocks_tool_call_wire_status_even_without_decision_extra() -> None:
