@@ -97,6 +97,18 @@ class RunLifecycleCoordinator:
         )
 
         SpineContext.set_run(session.run_id)
+        publish_token: Any = None
+        bound_event_session = getattr(session, "event_session", None)
+        if (
+            bound_event_session is not None
+            and getattr(bound_event_session, "bridge", None) is not None
+        ):
+            from lca.plugins.events._session_observe import set_session
+            from lca.plugins.events.publishers._session_publish import set_publish_session
+
+            publish_token = set_publish_session(bound_event_session.bridge)
+            set_session(bound_event_session.bridge)
+
         emit_kernel_run_start(run_id=session.run_id, trace_id=session.trace_id)
         try:
             environment = RunExecutionEnvironment(
@@ -197,6 +209,12 @@ class RunLifecycleCoordinator:
                 trace_id=session.trace_id,
             )
         finally:
+            if publish_token is not None:
+                from lca.plugins.events._session_observe import set_session
+                from lca.plugins.events.publishers._session_publish import reset_publish_session
+
+                reset_publish_session(publish_token)
+                set_session(None)
             emit_kernel_run_stop(
                 run_id=session.run_id,
                 outcome=run_outcome,
@@ -229,9 +247,15 @@ class RunLifecycleCoordinator:
         )
 
         spine_hook_token = None
+        publish_token = None
         bound = session.event_session
         if bound is not None and getattr(bound, "bridge", None) is not None:
+            from lca.plugins.events._session_observe import set_session
+            from lca.plugins.events.publishers._session_publish import set_publish_session
+
             spine_hook_token = bind_bridge_spine_hook(bound.bridge)
+            publish_token = set_publish_session(bound.bridge)
+            set_session(bound.bridge)
         try:
             bindings = session.bindings
             ambit = session.ambit
@@ -304,6 +328,12 @@ class RunLifecycleCoordinator:
         finally:
             if spine_hook_token is not None:
                 reset_bridge_spine_hook(spine_hook_token)
+            if publish_token is not None:
+                from lca.plugins.events._session_observe import set_session
+                from lca.plugins.events.publishers._session_publish import reset_publish_session
+
+                reset_publish_session(publish_token)
+                set_session(None)
             await self._finish_or_pause(session, workspace=None, success=success)
 
     @staticmethod

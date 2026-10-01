@@ -15,11 +15,15 @@ boot **不再** 因 Session 缺席而 ``mount_sink`` / ``bus.subscribe``。
 
 from __future__ import annotations
 
+import contextvars
 from collections.abc import Callable
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from lca.contracts.event import EventPayload
 from lca_kernel.events import EventRef
+
+if TYPE_CHECKING:
+    _current_session: SessionObserverTarget | None
 
 __all__ = [
     "EventObserverCallback",
@@ -46,13 +50,16 @@ class SessionObserverTarget(Protocol):
     def observe(self, plugin: type, callback: EventObserverCallback) -> object: ...
 
 
-_current_session: SessionObserverTarget | None = None
+# Context-local state backed by ContextVar for true multi-run / asyncio task isolation.
+_CURRENT_SESSION_VAR: contextvars.ContextVar[SessionObserverTarget | None] = contextvars.ContextVar(
+    "lca_current_observe_session", default=None
+)
 # plugin marker → callback；boot 写入，set_session 整表挂到当前 Session。
 _observer_catalog: dict[type, EventObserverCallback] = {}
 
 
 def set_session(session: object | None) -> None:
-    """装载 / 清空进程级 Session 观察目标，并挂上目录中的全部观察者。
+    """装载 / 清空当前上下文 Session 观察目标，并挂上目录中的全部观察者。
 
     所有权：机制方（per-run Session owner）是唯一调用方 —— Session 构造
     时装载，teardown 时传 ``None`` 清空。传入不带 ``observe`` 的对象抛
@@ -67,9 +74,8 @@ def set_session(session: object | None) -> None:
     幂等：同一 session 对象重复调用不重复注册 observer（防止 resume
     路径与 create 路径各调一次导致事件双写）。
     """
-    global _current_session
     if session is None:
-        _current_session = None
+        _CURRENT_SESSION_VAR.set(None)
         return
     from lca.plugins.session.runtime.bus.facade import as_bus_facade
 
@@ -77,16 +83,23 @@ def set_session(session: object | None) -> None:
     if not isinstance(bound, SessionObserverTarget):
         msg = f"Session 观察目标必须提供 observe()；got {type(session).__name__}"
         raise TypeError(msg)
-    if bound is _current_session:
+    if bound is _CURRENT_SESSION_VAR.get():
         return
-    _current_session = bound
+    _CURRENT_SESSION_VAR.set(bound)
     for plugin, callback in tuple(_observer_catalog.items()):
         bound.observe(plugin, callback)
 
 
 def current_session() -> SessionObserverTarget | None:
-    """读进程级 Session 观察目标；未装载返回 ``None``。"""
-    return _current_session
+    """读当前上下文 Session 观察目标；未装载返回 ``None``。"""
+    return _CURRENT_SESSION_VAR.get()
+
+
+def __getattr__(name: str) -> Any:
+    """兼容旧代码/单测通过 module._current_session 读取当前 observe session。"""
+    if name == "_current_session":
+        return current_session()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def observer_catalog() -> dict[type, EventObserverCallback]:
@@ -115,7 +128,7 @@ def register_as_session_observer(plugin: type, callback: EventObserverCallback) 
     if not callable(callback):
         raise TypeError(f"observe callback 必须可调用；got {type(callback).__name__}")
     _observer_catalog[plugin] = callback
-    session = _current_session
+    session = current_session()
     if session is None:
         return False
     session.observe(plugin, callback)

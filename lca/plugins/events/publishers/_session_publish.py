@@ -19,10 +19,16 @@ publisher 单点入口走 ``Session.append``;调用方必须先经
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Protocol
+import contextlib
+import contextvars
+from collections.abc import Iterator
+from contextlib import contextmanager
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 if TYPE_CHECKING:
     from lca_kernel.events.bus.bus import EventRef
+
+    _ACTIVE_SESSION: _PublishSession | None
 
 
 def _authorize_producer(payload: Any, producer: Any) -> None:
@@ -66,35 +72,53 @@ class _PublishSession(Protocol):
     ) -> EventRef: ...
 
 
-# Module-level state (SPEC section H: replaced ContextVar ``_current_session``).
-# 在 Task 7 Body 注入完成后,本 binding 转为 deprecated;目前保留以让现有测试
-# fixture (``set_publish_session(session)``) 仍可调,不留空白失败。
-_ACTIVE_SESSION: _PublishSession | None = None
+# Context-local state backed by ContextVar for true multi-run / asyncio task isolation.
+_ACTIVE_SESSION_VAR: contextvars.ContextVar[_PublishSession | None] = contextvars.ContextVar(
+    "lca_active_publish_session", default=None
+)
+
+
+def get_active_session() -> _PublishSession | None:
+    """获取当前上下文 (asyncio.Task / 线程) 绑定的 active Session。"""
+    return _ACTIVE_SESSION_VAR.get()
 
 
 def set_publish_session(
     session: object | None,
-) -> Any:
+) -> contextvars.Token[_PublishSession | None]:
     """设置当前上下文的 active Session。
 
-    SPEC section H:_current_session ContextVar 已删除;本函数保留 module-level
-    binding 以兼容现有 ``tests/transport/`` 等 fixture;调用方需自行保证
-    单 run 单上下文语义。返回 ``None``(不再返回 reset token,因无 ContextVar)。
+    采用 contextvars.ContextVar 保证多协程/并发任务间 Session 隔离。
+    返回 ContextVar token，可传给 :func:`reset_publish_session` 恢复上下文。
     """
     from lca.plugins.session.runtime.bus.facade import as_bus_facade
 
-    global _ACTIVE_SESSION
-    _ACTIVE_SESSION = as_bus_facade(session)
-    return None
+    bound = cast("_PublishSession | None", as_bus_facade(session))
+    return _ACTIVE_SESSION_VAR.set(bound)
 
 
 def reset_publish_session(
-    token: Any,
+    token: Any = None,
 ) -> None:
-    """释放 ``set_publish_session`` 绑定的 Session(token 参数 deprecated)。"""
-    del token
-    global _ACTIVE_SESSION
-    _ACTIVE_SESSION = None
+    """释放 ``set_publish_session`` 绑定的 Session。
+
+    若传入 token 则尝试 reset；否则将当前上下文重置为 None。
+    """
+    if isinstance(token, contextvars.Token):
+        with contextlib.suppress(ValueError):
+            _ACTIVE_SESSION_VAR.reset(token)
+            return
+    _ACTIVE_SESSION_VAR.set(None)
+
+
+@contextmanager
+def bound_session(session: object | None) -> Iterator[Any]:
+    """上下文管理器：为代码块绑定 active publish session 并确保退出后安全重置。"""
+    token = set_publish_session(session)
+    try:
+        yield session
+    finally:
+        reset_publish_session(token)
 
 
 def publish_via_session(
@@ -121,14 +145,23 @@ def publish_via_session(
     """
     from lca_kernel.events.errors.errors import MissingPublishSessionError
 
-    session = _ACTIVE_SESSION
+    session = get_active_session()
     if session is None:
         raise MissingPublishSessionError()
     _authorize_producer(payload, producer)
     return session.append(payload, producer=producer)
 
 
+def __getattr__(name: str) -> Any:
+    """兼容旧代码/单测通过 module._ACTIVE_SESSION 读取当前 active session。"""
+    if name == "_ACTIVE_SESSION":
+        return get_active_session()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 __all__ = [
+    "bound_session",
+    "get_active_session",
     "publish_via_session",
     "reset_publish_session",
     "set_publish_session",

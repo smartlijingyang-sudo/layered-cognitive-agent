@@ -128,11 +128,19 @@ def _request(
 ) -> tuple[int, dict | str]:
     url = f"{base_url.rstrip('/')}{path}"
     data = json.dumps(body).encode("utf-8") if body is not None else None
+    user_id = os.environ.get("LCA_USER_ID", "local-dev-user").strip() or "local-dev-user"
+    auth_token = os.environ.get("LCA_AUTH_TOKEN", "lca-local").strip() or "lca-local"
+    headers: dict[str, str] = {
+        "x-lca-user-id": user_id,
+        "Authorization": f"Bearer {auth_token}",
+    }
+    if data:
+        headers["content-type"] = "application/json"
     req = urllib.request.Request(  # noqa: S310 — CLI to local kernel; LCA_OPS_BASE_URL is operator-controlled.
         url,
         data=data,
         method=method,
-        headers={"content-type": "application/json"} if data else {},
+        headers=headers,
     )
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:  # noqa: S310 — same justification as Request above.

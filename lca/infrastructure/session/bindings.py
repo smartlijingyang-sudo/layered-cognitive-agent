@@ -33,15 +33,13 @@ _default_checkpoint_policy: SessionCheckpointPolicyProtocol | None = None
 def active_publish_session() -> object | None:
     """Read the live publish Session, or ``None`` when unbound.
 
-    ``_session_publish._ACTIVE_SESSION`` is reassigned by
-    :func:`set_publish_session`; consumers that bind it via
-    ``from X import Y`` capture the import-time ``None`` and never observe the
-    run binding made later. This function is the single live read — every
-    consumer resolves the writer through it.
+    ``_session_publish.get_active_session()`` resolves the ContextVar-backed
+    Session for the current context (asyncio.Task / thread), ensuring zero
+    cross-run concurrency event pollution.
     """
     from lca.plugins.events.publishers import _session_publish
 
-    return _session_publish._ACTIVE_SESSION
+    return _session_publish.get_active_session()
 
 
 def resolve_raw_session(target: object | None) -> Session | None:
@@ -117,7 +115,7 @@ def _resolve_checkpoint_policy() -> SessionCheckpointPolicyProtocol:
             SessionCheckpointPolicy(enabled=True),
         )
     policy = _default_checkpoint_policy
-    assert policy is not None
+    assert policy is not None  # noqa: S101
     return policy
 
 

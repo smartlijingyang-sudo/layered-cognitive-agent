@@ -51,6 +51,7 @@ The in-process contract lives in
 from __future__ import annotations
 
 import json
+import os
 import time
 import urllib.error
 import urllib.request
@@ -236,10 +237,16 @@ def _create(
         profile=profile,
         assistant_id=resolved_assistant_id,
     )
+    user_id = os.environ.get("LCA_USER_ID", "local-dev-user").strip() or "local-dev-user"
+    auth_token = os.environ.get("LCA_AUTH_TOKEN", "lca-local").strip() or "lca-local"
     request = urllib.request.Request(  # noqa: S310 — CLI to local kernel; LCA_OPS_BASE_URL is operator-controlled.
         f"{base_url.rstrip('/')}/runs",
         method="POST",
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            "x-lca-user-id": user_id,
+            "Authorization": f"Bearer {auth_token}",
+        },
         data=json.dumps(body).encode("utf-8"),
     )
     try:
@@ -433,9 +440,18 @@ def _poll_terminal_status(run_id: str, base_url: str) -> tuple[str | None, float
     last_status: str | None = None
     started = time.monotonic()
     url = f"{base_url.rstrip('/')}/runs/{run_id}/doctor"
+    user_id = os.environ.get("LCA_USER_ID", "local-dev-user").strip() or "local-dev-user"
+    auth_token = os.environ.get("LCA_AUTH_TOKEN", "lca-local").strip() or "lca-local"
+    poll_req = urllib.request.Request(  # noqa: S310 — CLI to local kernel; LCA_OPS_BASE_URL is operator-controlled.
+        url,
+        headers={
+            "x-lca-user-id": user_id,
+            "Authorization": f"Bearer {auth_token}",
+        },
+    )
     while time.monotonic() < deadline:
         try:
-            with urllib.request.urlopen(url, timeout=10) as resp:  # noqa: S310
+            with urllib.request.urlopen(poll_req, timeout=10) as resp:  # noqa: S310
                 doctor = json.loads(resp.read().decode("utf-8"))
         except (urllib.error.URLError, urllib.error.HTTPError):
             time.sleep(_POST_CREATE_POLL_INTERVAL_S)
