@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS lca_users (
     username         TEXT,
     email            TEXT,
     onboarding_state TEXT NOT NULL DEFAULT 'pending',
+    user_md          TEXT,
     created_at       TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -62,9 +63,11 @@ CREATE TABLE IF NOT EXISTS lca_users (
     username         text,
     email            text,
     onboarding_state text NOT NULL DEFAULT 'pending',
+    user_md          text,
     created_at       timestamptz NOT NULL DEFAULT now(),
     updated_at       timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE lca_users ADD COLUMN IF NOT EXISTS user_md text;
 CREATE TABLE IF NOT EXISTS lca_user_assistants (
     user_id        text NOT NULL REFERENCES lca_users(user_id) ON DELETE CASCADE,
     assistant_id   text PRIMARY KEY,
@@ -112,6 +115,11 @@ class SqliteUserAssistantStore(AssistantOwnership):
     def _initialize(self) -> None:
         with self._use_connection() as connection:
             connection.executescript(_SQLITE_DDL)
+            cols = {
+                row["name"] for row in connection.execute("PRAGMA table_info(lca_users)").fetchall()
+            }
+            if "user_md" not in cols:
+                connection.execute("ALTER TABLE lca_users ADD COLUMN user_md TEXT")
 
     # ── AssistantOwnership ──────────────────────────────────────────
 
@@ -224,6 +232,43 @@ class SqliteUserAssistantStore(AssistantOwnership):
                 (user_id,),
             ).fetchone()
         return str(row["onboarding_state"]) if row is not None else "pending"
+
+    def update_user_md(
+        self,
+        user_id: str,
+        user_md: str,
+        *,
+        display_name: str | None = None,
+    ) -> None:
+        with self._use_connection() as connection:
+            if display_name:
+                connection.execute(
+                    """
+                    UPDATE lca_users
+                    SET user_md = ?, username = COALESCE(?, username), updated_at = datetime('now')
+                    WHERE user_id = ?
+                    """,
+                    (user_md, display_name, user_id),
+                )
+            else:
+                connection.execute(
+                    """
+                    UPDATE lca_users
+                    SET user_md = ?, updated_at = datetime('now')
+                    WHERE user_id = ?
+                    """,
+                    (user_md, user_id),
+                )
+
+    def get_user_md(self, user_id: str) -> str | None:
+        with self._use_connection() as connection:
+            row = connection.execute(
+                "SELECT user_md FROM lca_users WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        if row is None or row["user_md"] is None:
+            return None
+        return str(row["user_md"])
 
 
 class PostgresUserAssistantStore(AssistantOwnership):
@@ -377,6 +422,48 @@ class PostgresUserAssistantStore(AssistantOwnership):
             )
             row = cur.fetchone()
             return str(row[0]) if row is not None else "pending"
+
+        return self._use_cursor(_run)
+
+    def update_user_md(
+        self,
+        user_id: str,
+        user_md: str,
+        *,
+        display_name: str | None = None,
+    ) -> None:
+        def _run(cur: Any) -> None:
+            if display_name:
+                cur.execute(
+                    """
+                    UPDATE lca_users
+                    SET user_md = %s, username = COALESCE(%s, username), updated_at = now()
+                    WHERE user_id = %s
+                    """,
+                    (user_md, display_name, user_id),
+                )
+            else:
+                cur.execute(
+                    """
+                    UPDATE lca_users
+                    SET user_md = %s, updated_at = now()
+                    WHERE user_id = %s
+                    """,
+                    (user_md, user_id),
+                )
+
+        self._use_cursor(_run)
+
+    def get_user_md(self, user_id: str) -> str | None:
+        def _run(cur: Any) -> str | None:
+            cur.execute(
+                "SELECT user_md FROM lca_users WHERE user_id = %s",
+                (user_id,),
+            )
+            row = cur.fetchone()
+            if row is None or row[0] is None:
+                return None
+            return str(row[0])
 
         return self._use_cursor(_run)
 

@@ -99,6 +99,18 @@ class AssistantOwnership(Protocol):
     def get_onboarding_state(self, user_id: str) -> str:
         """读取用户 onboarding 状态；未知用户返回 ``pending``。"""
 
+    def update_user_md(
+        self,
+        user_id: str,
+        user_md: str,
+        *,
+        display_name: str | None = None,
+    ) -> None:
+        """更新用户的全局画像 USER.md（与可选显示名）。"""
+
+    def get_user_md(self, user_id: str) -> str | None:
+        """读取用户的全局画像 USER.md；未知或未设置返回 None。"""
+
 
 __all__ = [
     "ONBOARDING_STATES",
