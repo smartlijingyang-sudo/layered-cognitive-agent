@@ -45,7 +45,7 @@ class Config(BaseModel):
     layer="L2",
     effects="none",
     description="Contribute standard tracing as a read-only declarative phase observer.",
-    test_suite="tests/declarative/test_phase_observer_plugins.py",
+    test_suite="tests/harness/declarative/lifecycle/test_tracing_phase_observer.py",
     kind=PluginKind.PROVIDER,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
