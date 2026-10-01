@@ -83,6 +83,34 @@ def test_main_ledger_written(tmp_path: Path) -> None:
     assert "brain.think.start" in content
 
 
+def test_request_header_writes_system_prompt_file(tmp_path: Path) -> None:
+    sink = TracingFileSink(tmp_path, run_id="run_test")
+    sink.write(_make_record(execution_point="kernel.run.start", seq=1))
+    sink.write(
+        _make_record(
+            execution_point="llm.request.header",
+            seq=4,
+            payload={"step_id": "step-001", "reason": "initial", "system": "ROLE: 默认助理\n正文"},
+        )
+    )
+    sink.write(
+        _make_record(
+            execution_point="llm.request.header",
+            seq=9,
+            payload={"step_id": "step-002", "reason": "change", "system": "ROLE: 第二轮"},
+        )
+    )
+    sink.close()
+    text = (tmp_path / "run_test.system-prompt.txt").read_text(encoding="utf-8")
+    assert text == (
+        "===== step_id=step-001 seq=4 reason=initial =====\n"
+        "ROLE: 默认助理\n"
+        "正文\n"
+        "===== step_id=step-002 seq=9 reason=change =====\n"
+        "ROLE: 第二轮\n"
+    )
+
+
 def test_exception_writes_to_exceptions_jsonl(tmp_path: Path) -> None:
     sink = TracingFileSink(tmp_path, run_id="run_test")
     sink.write(_make_exception_record(exc_class="AttributeError"))

@@ -252,9 +252,35 @@ class FileSink:
         else:
             os.write(self._fd, encoded)
         self._maybe_fsync(self._fd, self._fsync_protocol)
-        if force_offload:
-            return self._append_exception_index(record)
-        return None
+        index_reason = self._append_exception_index(record) if force_offload else None
+        self._append_system_prompt(record)
+        return index_reason
+
+    def _append_system_prompt(self, record: EventRecord) -> None:
+        """Write the model system prompt to a stable, readable file.
+
+        The same text also rides inside ``llm.request.header``. That row is
+        usually larger than the ledger atomic limit, so the spine keeps a
+        hashed sidecar. This file is the copy a person opens by name.
+        """
+        if record.execution_point != "llm.request.header":
+            return
+        payload = record.payload if isinstance(record.payload, dict) else {}
+        system = payload.get("system")
+        text = system if isinstance(system, str) else ""
+        step_id = str(payload.get("step_id") or record.step_id or "")
+        reason = str(payload.get("reason") or "")
+        block = f"===== step_id={step_id} seq={record.sequence} reason={reason} =====\n{text}\n"
+        path = self._run_dir / f"{self._run_id}.system-prompt.txt"
+        try:
+            with path.open("a", encoding="utf-8") as handle:
+                handle.write(block)
+        except OSError as exc:
+            log.error(
+                "file_sink: system prompt write failed run_id=%s err=%s",
+                self._run_id,
+                exc,
+            )
 
     def _render_encoded(self, record: EventRecord) -> bytes:
         line = json.dumps(serializable_event(record), default=str, sort_keys=False)

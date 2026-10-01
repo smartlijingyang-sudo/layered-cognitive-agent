@@ -722,6 +722,7 @@ After dispatch, immediately query the terminal state with
 | `journal.json` | step-tree (`lca.journal/3.1`) | only if run reached step tree (early-fail runs lack it) |
 | `journal.narrative.md` | `StepNarrativeWriter` | same as `journal.json` |
 | `<sha256>.json` | I10 size-offload sidecar (≥ 4 KB event) | only if any event exceeded `_ATOMIC_THRESHOLD` (typical for exception-bearing events) |
+| `<run_id>.system-prompt.txt` | `FileSink` copy of each `llm.request.header` `system` field | when the run published at least one request header |
 | `kernel.log` | `record_run_failure` (terminal failure fallback) | **mostly absent** — written only when the run's finishing path itself failed; a single best-effort line, not an internals log |
 
 > **Two "kernel logs" — do not confuse them.**
