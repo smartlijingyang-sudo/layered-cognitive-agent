@@ -15,7 +15,8 @@ from lca.infrastructure.capability.state.store import StateStoreService
 from lca.infrastructure.state_store.in_memory_store import InMemoryStateStore
 from lca.infrastructure.state_store.sqlite_store import SqliteStateStore
 from lca.plugins.composer.perceive.perceive import resolve_state_store
-from lca.plugins.state import state_store_provider
+from lca.plugins.state.state.store_provider import Config
+from lca.plugins.state.state.store_provider import setup as state_store_plugin
 
 
 @pytest.mark.asyncio
@@ -71,9 +72,9 @@ async def test_profile_default_state_store_uses_active_sqlite_provider(tmp_path:
     service = StateStoreService()
     context = _PluginContext({"state_store": service})
 
-    await state_store_provider.setup.setup(
+    await state_store_plugin.setup(
         context,
-        state_store_provider.Config(
+        Config(
             providers=["memory", "sqlite"],
             active_provider="sqlite",
             sqlite_database_path=str(tmp_path / "profile-state.db"),
@@ -89,7 +90,7 @@ async def test_profile_default_state_store_uses_active_sqlite_provider(tmp_path:
 
 
 def test_continuous_profile_enables_sqlite_state_and_control_plane() -> None:
-    repository_root = Path(__file__).resolve().parents[1]
+    repository_root = Path(__file__).resolve().parents[3]
     profile = load_profile_source(repository_root / "profiles" / "web-standard-continuous.yaml")
     entries = {str(entry["id"]): entry for entry in profile.entries}
 
