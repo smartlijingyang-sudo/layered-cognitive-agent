@@ -104,6 +104,10 @@ def _builtin_templates() -> Mapping[str, _PromptTemplate]:
     home_ref = (("home", "stateful", True, ""),)
     autonomous_presets_ref = (("autonomous_presets", "stateful", True, ""),)
     user_profile_ref = (("user_profile", "stateful", True, ""),)
+    runtime_env_ref = (("runtime_env", "pure", True, ""),)
+    developer_timestamp_ref = (("developer_timestamp", "pure", True, ""),)
+    memory_retrieval_ref = (("memory_retrieval", "stateful", True, ""),)
+    adr0255_tail = memory_retrieval_ref + developer_timestamp_ref + runtime_env_ref
     return {
         "react_prompt": _PromptTemplate(
             id="react_prompt",
@@ -113,6 +117,7 @@ def _builtin_templates() -> Mapping[str, _PromptTemplate]:
                 + user_profile_ref
                 + home_ref
                 + autonomous_presets_ref
+                + adr0255_tail
             ),
         ),
         "routing_prompt": _PromptTemplate(
@@ -124,6 +129,7 @@ def _builtin_templates() -> Mapping[str, _PromptTemplate]:
                 + user_profile_ref
                 + home_ref
                 + autonomous_presets_ref
+                + adr0255_tail
             ),
         ),
         "hierarchical_prompt": _PromptTemplate(
@@ -139,6 +145,7 @@ def _builtin_templates() -> Mapping[str, _PromptTemplate]:
                 + user_profile_ref
                 + home_ref
                 + autonomous_presets_ref
+                + adr0255_tail
             ),
         ),
     }
