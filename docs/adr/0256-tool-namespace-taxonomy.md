@@ -22,7 +22,7 @@
 4. **改变哪个边界？**
    - 契约层：`Tool` 新增 `namespace: str` 声明字段；`DeferPolicy` 新增 `namespace_approval`；
    - 注册层：删除 `ToolsService.tool_namespaces` 中央映射表，SSOT 下移到各 factory；
-   - 运行时层：`update_turn` 分组键改为 `tool.namespace`，漏声明直接抛错（fail-fast）。
+   - 运行时层：`update_turn` 分组键改为 `tool.namespace`；缺 namespace 的工具归入 `"unknown"` 伪 namespace、只露目录、warning 留痕（发现层 fail-closed，run 不死——见 §11 修订记录）。
 5. **现有 Protocol / ADR 能否表达？** 不能。ADR-0255 只记录了 defer 机制本身，未规定 namespace 的划分标准；`DeferMode` 只有 EAGER/DEFERRED 两档，没有"按什么切"的规范。
 6. **失败、重试、恢复和幂等语义是什么？**
    - 注册期：`tool.namespace` 为空 → 启动即抛错，不许静默上线（fail-fast）；
@@ -50,7 +50,7 @@ grouped.setdefault(namespaces.get(tool.name, tool.name), []).append(tool.name)
 
 1. **namespace 是工具的声明式元数据**，写在 factory 注册处，与工具同生死。中央映射表删除。
 2. **一个 namespace = 一次模型决策 = 一次 defer 加载 = 一个审批边界**，三者同粒度。凡是"按域挂审批""按域做可见性判定"的需求，都自然落到 namespace 上。
-3. **漏声明的工具不许悄悄上线**——注册期 fail-fast，不做运行期 fallback。
+3. **漏声明的工具不许悄悄上线**——wiring time（注册期）fail-fast，不做运行期 fallback；运行期发现层（`update_turn`）走 fail-soft：缺 namespace 归入 `"unknown"` 伪 namespace、只露目录、warning 留痕（见 §11 修订记录）。
 4. **写不出一句话目录描述的 namespace 不配存在**——`namespace_descriptions` 必填化是天然的粒度校验器。
 
 ## 3. Namespace 划分总表（2026-10-01 工具快照）
@@ -94,12 +94,13 @@ ToolFactory(name="writeFile", namespace="file", ...)
 ## 6. Defer 协议改动（`session.py`）
 
 ```python
-# update_turn 改后：分组键用声明，空值直接抛错
+# update_turn 改后：分组键用声明；缺 namespace 走 fail-soft（§11 修订）
 for tool in tools:
-    if not tool.namespace:
-        raise ValueError(f"tool {tool.name} declares no namespace")
-    grouped.setdefault(tool.namespace, []).append(tool.name)
+    ns = tool.namespace or "unknown"  # 缺声明 → "unknown" 伪 namespace（DEFERRED），warning 留痕
+    grouped.setdefault(ns, []).append(tool.name)
 ```
+
+> **2026-10-02 修订**：原设计"空值直接抛错"已改为 fail-soft——`update_turn` 抛错会在生产运行时炸 run（2026-10-01 实测 6 个 run 0 步死亡）；硬 fail-fast 收敛到 wiring time（`ToolsService.register()` 抛 `ValueError`）与 B2（policy 无描述的已声明 ns 在 `update_turn` 仍抛）。详见 §11。
 
 - `tool_search` 支持批量加载：`namespaces: list[str]`（`load_namespace` 已幂等，批量即循环调用；模型"查文件顺便搜记忆"时省一次往返）。
 - 目录渲染格式（跟 prompt 语言走，中文版）：
@@ -141,7 +142,7 @@ if tool.namespace not in session.loaded_namespaces and tool.namespace not in eag
 
 1. contracts：`Tool.namespace`、`DeferPolicy.namespace_descriptions` 必填化 + `namespace_approval`；
 2. 全部 factory 声明 namespace；删 `ToolsService.tool_namespaces`；
-3. `update_turn` 改分组键 + fail-fast；`_describe` 删默认实现；
+3. `update_turn` 改分组键 + 缺 namespace fail-soft（`"unknown"` 伪域 + warning 留痕，见 §11）；`_describe` 删默认实现；
 4. 写入 §3 的 8 句目录描述；
 5. `tool_search` 加批量参数；
 6. wire gate 改按 namespace 判可见性（与在研的 `_TRUNCATED_VALUE` / `arguments.py` fail-closed 改动合批提交）；
@@ -152,7 +153,7 @@ if tool.namespace not in session.loaded_namespaces and tool.namespace not in eag
 
 1. 目录行恰好 8 行，每行一句话可读，无 `"N tools:"`  fallback 文本；
 2. `tool_search(namespace='file')` 一次返回 9 个工具的完整 schema；
-3. 注册期漏写 namespace 的工具启动即抛错；
+3. wiring time（`ToolsService.register()`）漏写 namespace 的工具启动即抛错；`update_turn` 发现层缺 namespace 只露目录 + warning 留痕、不抛错（fail-soft，见 §11）；
 4. 模型调用未加载域的工具被 wire gate 拒掉，错误信息含正确的 `tool_search` 指引，且 run 不死（错误抛回模型重试）；
 5. `shell` 域的 `runCommand` 触发用户审批；
 6. 批量 `tool_search(namespaces=['file','memory'])` 一次往返返回两域 schema；
@@ -162,3 +163,28 @@ if tool.namespace not in session.loaded_namespaces and tool.namespace not in eag
 ---
 
 *实证附录：`traces/runs/run_56ee6564e3ea`（退化现状）、`traces/runs/run_28aa7eb3261b` / `run_ab78aeb6eabf`（defer 协议跑通）。凡与 §3 表格冲突的工具归属，以 factory 声明为准。*
+
+---
+
+## 11. 修订记录（post-landing）
+
+### 2026-10-02：fail-fast → fail-soft（李超 6d190d51b 缺陷2 机制级修复）
+
+**背景**：本 ADR 原设计要求 `update_turn` 对缺 namespace 的工具直接抛错（fail-fast）。
+2026-10-01 实测发现：一个 wrapper 吞掉了 `namespace` 字段，导致 **6 个生产 run 以 0 步死亡**——
+发现层 fail-fast 炸的是整个 run，不是漏声明的工具。
+
+**修订后的语义**（以 `lca/infrastructure/tool_defer/session.py::update_turn` docstring 为准）：
+- `update_turn`（发现层）**fail-soft**：缺 namespace 的工具归入 `"unknown"` 伪 namespace、
+  `DeferMode.DEFERRED`、目录描述固定为"未声明命名空间的工具（运行时兜底，deferred）"、
+  `log.warning` 留痕。发现层对模型 fail-closed（必须显式 `tool_search` 加载），对 run 本身永不炸 run。
+- 硬 **fail-fast 收敛到 wiring time**：`ToolsService.register()` 对空 namespace 抛 `ValueError`
+  （factory 由 contract 测试覆盖）；B2（policy 已声明 ns 但缺目录描述）在 `update_turn` 仍抛错——
+  这是 policy 配置错误，不是工具声明缺失。
+- **语义理由**：wiring time fail-fast 已足以保证"漏声明不许悄悄上线"（测试/启动期暴露）；
+  发现层 fail-fast 的边际收益为零、生产风险为正。fail-soft + warning 留痕保留了可观测性。
+
+**本文档同步修订处**：8问#4、§2 设计总则3、§6 代码示例、§9 checklist#3、§10 验收标准#3。
+8问#6 的"注册期 fail-fast"措辞仍然成立（即 wiring time），保留。
+测试侧已跟随：`tests/infrastructure/tool_defer/test_update_turn_failsoft.py`（4 用例）、
+`tests/infrastructure/capability/tools/test_register_namespace_failfast.py`（2 用例）。
