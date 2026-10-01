@@ -136,13 +136,6 @@ class EffectPreDispatchEnvelopeCheckExecutor(NodeExecutor):
                 f"effect.pre_dispatch.envelope_check: budget reservation negative ({res!r})"
             )
 
-        # safe-boundary (re-check; envelope-shape already covers but explicit per ADR-0234)
-        if not envelope.plan_ref or not envelope.scope_ref:
-            raise ValueError(
-                "effect.pre_dispatch.envelope_check: safe-boundary incomplete "
-                f"(plan_ref={envelope.plan_ref!r}, scope_ref={envelope.scope_ref!r})"
-            )
-
         return NodeOutput(
             port_values={
                 "envelope": envelope,

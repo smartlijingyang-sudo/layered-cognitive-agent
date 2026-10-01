@@ -294,16 +294,7 @@ def _home_path(runtime: object) -> str | None:
         home = runtime.get("home_path")
     if home:
         return str(home)
-    try:
-        from lca.infrastructure.runtime_plane.capability_bindings import (
-            current_bindings_view,
-        )
-
-        bindings = current_bindings_view()
-    except Exception:
-        return None
-    bound = getattr(bindings, "home_path", None) if bindings is not None else None
-    return str(bound) if bound else None
+    return _live_bindings_home()
 
 
 def _system_from_header(header: Any) -> str:

@@ -94,10 +94,6 @@ class ReadSkillReferenceThrottle:
 _default_throttle: ReadSkillReferenceThrottle = ReadSkillReferenceThrottle()
 
 
-def get_default_throttle() -> ReadSkillReferenceThrottle:
-    return _default_throttle
-
-
 @contract(
     RenderContract(
         tool_name="read_skill_reference_once",

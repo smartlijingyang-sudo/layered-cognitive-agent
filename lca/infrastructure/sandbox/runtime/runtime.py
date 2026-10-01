@@ -402,23 +402,6 @@ class RunBoundSandboxRuntime(SandboxRuntime):
             return
         self._remember_generated(existing)
 
-    async def _harvest_execute_delta(
-        self, invocation_id: str, budget: int
-    ) -> tuple[SandboxFile, ...]:
-        try:
-            return await self.harvest_output_delta(
-                invocation_id=invocation_id or "execute_harvest",
-                timeout_s=min(60, budget, self._default_timeout_s),
-            )
-        except Exception:
-            _log.warning(
-                "execute_harvest_failed",
-                run_id=self._run_id,
-                inv=invocation_id,
-                exc_info=True,
-            )
-            return ()
-
     def _exec_result(
         self, raw: SandboxResult, generated: tuple[SandboxFile, ...]
     ) -> SandboxExecResult:

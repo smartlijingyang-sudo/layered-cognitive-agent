@@ -36,9 +36,6 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.delegation.cache import (
     cached_delegation_observation as _cached_delegation_observation,
 )
-from lca.infrastructure.delegation.cache import (
-    tag_delegation_extra as _tag_delegation_extra,
-)
 
 # 业务方 plugin id（与 yaml publishers 白名单一致）。
 PUBLISHER_PLUGIN_ID = "delegation_cache"
@@ -53,11 +50,6 @@ class DelegationCachePlugin:
     def cached_observation(self, spec: DelegationSpec, state: AgentState) -> Observation | None:
         """幂等短路：回报记录中已有成功返回的 ``(target_role, subtask)`` 直接复用。"""
         return _cached_delegation_observation(spec, state)
-
-    @staticmethod
-    def _tag_extra(observation: Observation, spec: DelegationSpec) -> Observation:
-        """兼容壳：附委派归属（kind + role→result/subtask 映射）。"""
-        return _tag_delegation_extra(observation, spec)
 
 
 class _Config(BaseModel):

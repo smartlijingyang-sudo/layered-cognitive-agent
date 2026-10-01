@@ -67,11 +67,6 @@ class GraphNodeExecutorRegistry(GraphNodeExecutorRegistryProtocol):
                 f"{normalized.value!r}; available: {available or '<none>'}"
             ) from exc
 
-    def node_types(self) -> tuple[NodeType, ...]:
-        """Expose registered node types for boot-time and substitution tests."""
-
-        return tuple(self._executors)
-
 
 @plugin(
     id="lca.graph-node-executor-registry",

@@ -47,7 +47,6 @@ from lca.framework.graph.interpreter import PlanInterpreter
 from lca.framework.graph.lifter import lift_executable_plan
 from lca.framework.graph.observation import GraphObserver, NullGraphObserver
 from lca.framework.graph.port_registry import PortRegistry
-from lca.framework.graph.strategies.subgraph_strategy import RecursiveRunner
 from lca.framework.graph.strategy_registry import (
     NodeExecutorLookup,
     StrategyRegistry,
@@ -162,20 +161,8 @@ class PlanInterpreterAdapter:
                 default_strategy_registry(),
             )
 
-    def _build_recursive_runner(self) -> RecursiveRunner:
-        return make_recursive_runner(self)
-
     def _depth(self) -> int:
         return current_graph_depth()
-
-    def _build_node_executor_lookup(self) -> NodeExecutorLookup:
-        return make_node_executor_lookup(self.node_executors)
-
-    def _build_node_runtime_view_factory(self) -> NodeRuntimeViewFactory:
-        return make_node_runtime_view_factory(
-            base_scope=self.node_executor_runtime_scope,
-            effect_gateway=self.effect_gateway,
-        )
 
     async def run(
         self,

@@ -22,7 +22,6 @@ PYTHON_LANGUAGES: frozenset[str] = frozenset({"python", "py"})
 CAPABILITY_PYTHON = "pythonExec"
 CAPABILITY_TERMINAL = "terminalExec"
 TASK_MODE_SYNC = "sync"
-MAX_WAIT_MS = 120_000
 MAX_TIMEOUT_MS = 600_000
 STATUS_SUCCEEDED = "succeeded"
 
@@ -32,10 +31,6 @@ STATUS_SUCCEEDED = "succeeded"
 def timeout_ms(timeout_s: int) -> int:
     ms = max(1, int(timeout_s) * 1000)
     return min(ms, MAX_TIMEOUT_MS)
-
-
-def wait_ms(timeout_s: int) -> int:
-    return min(timeout_ms(timeout_s), MAX_WAIT_MS)
 
 
 def safe_rel_name(name: str) -> str:

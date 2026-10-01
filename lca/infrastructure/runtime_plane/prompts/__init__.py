@@ -5,10 +5,6 @@ from __future__ import annotations
 import importlib.resources
 
 
-def load_plane_prompt(name: str) -> str:
-    return load_plane_data(f"{name}.md")
-
-
 def load_plane_data(filename: str) -> str:
     try:
         return (

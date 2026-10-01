@@ -157,9 +157,4 @@ __all__ = [
 ]
 
 
-def _ensure_mapping_imported() -> None:  # pragma: no cover
-    """Touch Mapping import so the type checker treats it as part of the API."""
-    return None
-
-
 _ = (Mapping,)

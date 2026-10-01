@@ -38,10 +38,6 @@ from lca.plugins.transport.webserver.handlers.runs.api.query_endpoints import (
 from lca.plugins.transport.webserver.route.register import register_routes
 
 
-async def _options(_request: Request) -> JSONResponse:
-    return JSONResponse({}, headers=CORS_HEADERS)
-
-
 async def health(request: Request) -> JSONResponse:
     payload = health_payload(
         request.app.state.run_port,

@@ -430,22 +430,6 @@ class LobeHubService:
         except Exception:
             return False
 
-    @staticmethod
-    def _count_patches(deploy_dir: Path) -> int:
-        """Count patch module files (excluding __init__ and __pycache__).
-
-        Kept for legacy callers; the authoritative count comes from
-        ``patch_lobehub.py verify`` (``_run_patch_verify``).
-        """
-        patches_dir = deploy_dir / "patches"
-        if not patches_dir.is_dir():
-            return 0
-        return sum(
-            1
-            for f in patches_dir.rglob("*.py")
-            if f.name != "__init__.py" and "__pycache__" not in f.parts
-        )
-
     def _run_patch_verify(self) -> _VerifySummary:
         """Run ``patch_lobehub.py verify`` and return a structured summary.
 

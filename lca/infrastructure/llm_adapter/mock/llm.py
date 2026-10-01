@@ -11,14 +11,6 @@ from lca.contracts.atoms.enums.enums import LLMStreamEventType
 from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.protocols import LLMAdapter
 
-_REASONING_CHUNK_SIZE = 12
-
-
-def _chunk_text(text: str, *, size: int = _REASONING_CHUNK_SIZE) -> list[str]:
-    if size <= 0 or not text:
-        return [text] if text else []
-    return [text[i : i + size] for i in range(0, len(text), size)]
-
 
 def _last_tool_content(history: Any) -> str:
     if not isinstance(history, list):

@@ -21,15 +21,8 @@ from __future__ import annotations
 
 from contextvars import ContextVar
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from typing import Any, cast
 
-from lca.infrastructure.observability.spine.event.record import (
-    Channel,
-    EventRecord,
-    Outcome,
-    Phase,
-)
 from lca.infrastructure.observability.writable_matrix.registry import (
     MissingWritableFaceError,
     WritableFaceRegistry,
@@ -72,7 +65,6 @@ class StepCoordinator:
     started_at: float | None = None
     _current_step: str | None = None
     _current_segment: str | None = None
-    _seq: int = 0
 
     def bind_run(
         self,
@@ -87,49 +79,6 @@ class StepCoordinator:
         self.trace_id = trace_id
         self.metadata = metadata
         self.started_at = started_at
-
-    def _mint_record(
-        self,
-        *,
-        execution_point: str,
-        channel: Channel = "fact",
-        payload: dict[str, Any] | None = None,
-        outcome: Outcome | None = None,
-        phase: Phase = "live",
-        reason: str | None = None,
-    ) -> EventRecord:
-        self._seq += 1
-        now = datetime.now(UTC)
-        return EventRecord(
-            execution_point=execution_point,
-            channel=channel,
-            span_id=f"coord-{self._seq:06x}",
-            parent_span_id=None,
-            sequence=self._seq,
-            epoch=1,
-            causality_id=f"caus-{self._seq:06x}",
-            outcome=outcome,
-            when=now,
-            when_corrected=now,
-            prev_event_hash=None,
-            run_id=self.run_id,
-            step_id=self._current_step,
-            payload=payload or {},
-            phase=phase,
-            reason=reason,
-        )
-
-    def _write(self, record: EventRecord) -> None:
-        # SSOT 收口:StepCoordinator 不再是 spine writer。cursor 是唯一写入者
-        # (ADR-0169 P2 / D1);此方法保留仅供内部 state 派生(driver.begin_step
-        # 仍要走 StepDriver registry 派生 step_id,见 begin_step 注释)。
-        emitter = self.registry.require("emitter")
-        coalescer = self.registry.require("coalescer")
-        serializer = self.registry.require("serializer")
-        storage = self.registry.require("storage")
-        emitter.emit(record)
-        coalescer.feed(record.execution_point, record.payload)
-        storage.write(serializer.serialize(record))
 
     # ── 切步 / 切段 ────────────────────────────────────────────────
 

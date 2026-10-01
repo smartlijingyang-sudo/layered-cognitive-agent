@@ -547,18 +547,6 @@ def _parse_sse_agent_event_frame(frame: bytes) -> dict | None:
     return None
 
 
-def _extract_id_from_sse_frame(frame: bytes) -> str | None:
-    """Parse an SSE-shaped frame for the `id:` line, return its value or None."""
-    try:
-        text = frame.decode("utf-8")
-    except UnicodeDecodeError:
-        return None
-    for line in text.split("\n"):
-        if line.startswith("id:"):
-            return line[len("id:") :].strip() or None
-    return None
-
-
 def make_production_ws_handler() -> Any:
     """Return a WebSocket handler that resolves ``run_port`` from ``app.state``."""
 
