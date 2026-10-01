@@ -11,8 +11,9 @@ concept.prompt.render 图节点 2:typed ``PromptTemplate`` +
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from lca.cognition.brain.sections.assembler import render_template
 from lca.contracts.atoms.control.slot import ControlSlot
@@ -53,13 +54,13 @@ class PromptSectionsFillExecutor:
     semantic_name: str = "prompt.sections.fill"
     region: str = "concept"
     declared_inputs: tuple[PortName, ...] = (
-        "prompt_template",
-        "context",
-        "role",
-        "tools_provider",
-        "prompt_section_registry",
+        PortName("prompt_template"),
+        PortName("context"),
+        PortName("role"),
+        PortName("tools_provider"),
+        PortName("prompt_section_registry"),
     )
-    declared_outputs: tuple[PortName, ...] = ("prompt_text", "prompt_trace")
+    declared_outputs: tuple[PortName, ...] = (PortName("prompt_text"), PortName("prompt_trace"))
 
     async def node_execute(
         self,
@@ -72,9 +73,9 @@ class PromptSectionsFillExecutor:
         role (RoleSnapshot), tools_provider, prompt_section_registry
         outputs 端口(yaml):prompt_text (str), prompt_trace (PromptTrace)
         """
-        template = input.port_values.get("prompt_template")
-        ctx_dto = input.port_values.get("context")
-        role = input.port_values.get("role")
+        template = input.port_values.get(PortName("prompt_template"))
+        ctx_dto = input.port_values.get(PortName("context"))
+        role = input.port_values.get(PortName("role"))
         if not isinstance(template, PromptTemplate):
             raise TypeError(
                 "prompt.sections.fill: 'prompt_template' port must be a "
@@ -91,14 +92,14 @@ class PromptSectionsFillExecutor:
                 f"instance, got {type(role).__name__}"
             )
 
-        tools_provider = input.port_values.get("tools_provider")
+        tools_provider = input.port_values.get(PortName("tools_provider"))
         tools_seq: tuple[Any, ...] = ()
         if tools_provider is not None:
             listed = getattr(tools_provider, "list_tools", None)
             if callable(listed):
-                tools_seq = tuple(listed())
+                tools_seq = tuple(cast("Iterable[Any]", listed()))
 
-        registry = input.port_values.get("prompt_section_registry")
+        registry = input.port_values.get(PortName("prompt_section_registry"))
         if not isinstance(registry, PromptSectionRegistry):
             raise TypeError(
                 "prompt.sections.fill: 'prompt_section_registry' port must be a "
@@ -115,7 +116,7 @@ class PromptSectionsFillExecutor:
             tools=tools_seq,
             activated_skills=ctx_dto.activated_skills,
         )
-        return NodeOutput(port_values={"prompt_text": prompt, "prompt_trace": trace})
+        return NodeOutput(port_values={PortName("prompt_text"): prompt, PortName("prompt_trace"): trace})
 
 
 @plugin(
