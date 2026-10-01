@@ -63,6 +63,7 @@ async def test_gateway_reuses_receipt_after_runtime_reconstruction(tmp_path) -> 
     from types import SimpleNamespace
 
     from lca.contracts.protocols.act.command.envelope import CapabilityGrant, CommandEnvelope
+    from lca.contracts.protocols.act.effect.handler import EffectHandlerRegistry
     from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
         EffectPolicyPlan,
     )
@@ -93,7 +94,7 @@ async def test_gateway_reuses_receipt_after_runtime_reconstruction(tmp_path) -> 
     policy = EffectPolicyPlan(allowed_effects=("body.act",), idempotency_required=("body.act",))
     path = tmp_path / "idempotency.sqlite3"
 
-    def default_effect_handlers() -> InMemoryEffectHandlerRegistry:
+    def default_effect_handlers() -> EffectHandlerRegistry:
         registry = InMemoryEffectHandlerRegistry()
         register_default_effect_handlers(registry)
         return registry
