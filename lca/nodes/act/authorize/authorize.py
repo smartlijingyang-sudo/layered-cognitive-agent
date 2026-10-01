@@ -51,17 +51,17 @@ class ActAuthorizeExecutor:
     # typed ports (``act.envelope``, ``act.dispatch``, ``effect.execute``)
     # so the kernel does not need to reach into ``context.runtime``
     # again. The metadata-based smuggle path is closed.
-    declared_inputs: tuple[PortName, ...] = ("decision", "state")
+    declared_inputs: tuple[PortName, ...] = (PortName("decision"), PortName("state"))
     # ADR-0237 / PR-1b: typed ``approval_required: bool`` port replaces
     # the previous ``decision.extra["needs_approval"]`` metadata grep.
     # Decision itself is a typed DTO; ``approval_required`` is computed
     # here so we don't widen Decision's contract for one consumer. The
     # only reader is ``act.approve.gate`` in the same subgraph.
     declared_outputs: tuple[PortName, ...] = (
-        "decision",
-        "state",
-        "approval_required",
-        "approval_requirement",
+        PortName("decision"),
+        PortName("state"),
+        PortName("approval_required"),
+        PortName("approval_requirement"),
     )
 
     async def node_execute(
@@ -76,8 +76,8 @@ class ActAuthorizeExecutor:
                             approval_required (bool)
         """
         del context
-        decision = input.port_values.get("decision")
-        state = input.port_values.get("state")
+        decision = input.port_values.get(PortName("decision"))
+        state = input.port_values.get(PortName("state"))
         if not isinstance(decision, Decision):
             raise TypeError(
                 "act.authorize: 'decision' port must be a Decision "
@@ -141,10 +141,10 @@ class ActAuthorizeExecutor:
 
         return NodeOutput(
             port_values={
-                "decision": decision,
-                "state": state,
-                "approval_required": approval_required,
-                "approval_requirement": req,
+                PortName("decision"): decision,
+                PortName("state"): state,
+                PortName("approval_required"): approval_required,
+                PortName("approval_requirement"): req,
             }
         )
 
