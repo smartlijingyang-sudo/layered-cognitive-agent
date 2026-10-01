@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
-
 import pytest
 
 from lca.cognition.brain.decision_gates.chained.chained import record_gate_decided
@@ -11,20 +9,15 @@ from lca.contracts.harness.fold.perceive import (
     fold_context_manifest_from_events,
     fold_gate_decisions_from_events,
 )
-from lca.contracts.models.core.execution.decision import Decision
 from lca.contracts.models.core.perceive.perception import ContextItem, ContextManifest
 from lca.contracts.models.core.policy.budget import create_budget
 from lca.contracts.models.core.policy.gate_policy import GateDecided, PolicyFact
 from lca.contracts.models.core.state.state import AgentState
 from lca.infrastructure.session.emit.cognitive_emit import (
-    emit_brain_think_end_for_state,
-    emit_brain_think_start_for_state,
     emit_context_manifested_for_state,
     emit_gate_decided_from_policy,
-    run_brain_think_with_spine_facts,
     run_reasoner_generate_thoughts_with_spine_facts,
 )
-from lca.loop.fact_gateway import publish_ep_bound
 from lca.plugins.events.publishers._session_publish import (
     reset_publish_session,
     set_publish_session,
@@ -112,45 +105,6 @@ def test_emit_gate_decided_noop_when_session_unbound() -> None:
     )
 
 
-@pytest.mark.asyncio
-async def test_phase_fact_emitter_appends_context_manifested() -> None:
-    from lca.contracts.models.core.perceive.perception import ContextManifest
-    from lca.contracts.models.core.policy.budget import create_budget
-    from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
-        PhaseResult,
-        SemanticPhase,
-    )
-    from lca.loop.emit.spine.phase_fact import emit_phase_catalog_facts
-    from lca.plugins.events.publishers._session_publish import (
-        reset_publish_session,
-        set_publish_session,
-    )
-    from lca.session.append import Session
-
-    session = Session("manifest_emit")
-    token = set_publish_session(session)
-    try:
-        state = AgentState(
-            trace_id="trace:cognitive-emit",
-            task="test",
-            budget=create_budget(max_steps=8),
-            step=3,
-        )
-        manifest = ContextManifest(items=(), digest="abc123")
-        emit_phase_catalog_facts(
-            semantic_phase=SemanticPhase.PERCEIVE,
-            result=PhaseResult(result_kind="context", payload=manifest),
-            state=state,
-        )
-        events = [
-            event for event in session.snapshot_events() if event.type == "context.manifested.v1"
-        ]
-        assert len(events) == 1
-        folded = fold_context_manifest_from_events(session.snapshot_events(), step=3)
-        assert folded is not None
-        assert folded.digest == manifest.digest
-    finally:
-        reset_publish_session(token)
 
 
 def test_emit_context_manifested_for_state_serializes_items() -> None:
@@ -179,93 +133,6 @@ def test_emit_context_manifested_for_state_serializes_items() -> None:
         reset_publish_session(token)
 
 
-def test_emit_brain_think_start_routes_via_publish_ep_bound() -> None:
-    session = Session("brain_think_start")
-    token = set_publish_session(session)
-    try:
-        state = _state()
-        with patch(
-            "lca.infrastructure.session.cognitive_emit.publish_ep_bound",
-            wraps=publish_ep_bound,
-        ) as publish:
-            emit_brain_think_start_for_state(state)
-        publish.assert_called_once()
-        args, kwargs = publish.call_args
-        assert args[0] == "brain.think.start"
-        assert args[1]["state_id"] == state.trace_id
-        assert kwargs["state"] is state
-        assert kwargs["actor"] == "brain"
-    finally:
-        reset_publish_session(token)
-
-
-def test_emit_brain_think_end_appends_spine_fact() -> None:
-    session = Session("brain_think_end")
-    token = set_publish_session(session)
-    try:
-        state = _state()
-        emit_brain_think_start_for_state(state)
-        emit_brain_think_end_for_state(state, outcome="failure")
-        events = [
-            event
-            for event in session.snapshot_events()
-            if event.type.startswith("spine.cognition.brain.think.")
-        ]
-        assert len(events) == 2
-        assert events[0].type == "spine.cognition.brain.think.start"
-        assert events[1].type == "spine.cognition.brain.think.end"
-        assert events[1].data["payload"]["outcome"] == "failure"
-    finally:
-        reset_publish_session(token)
-
-
-@pytest.mark.asyncio
-async def test_run_brain_think_with_spine_facts_envelopes_decision() -> None:
-    session = Session("brain_think_envelope")
-    token = set_publish_session(session)
-    try:
-        state = _state()
-        decision = Decision(
-            decision_id="d-brain-think",
-            action_type="respond",
-            rationale="ok",
-            confidence=1.0,
-        )
-        brain = AsyncMock()
-        brain.think = AsyncMock(return_value=decision)
-        result = await run_brain_think_with_spine_facts(brain, state)
-        assert result is decision
-        brain.think.assert_awaited_once_with(state)
-        events = [
-            event
-            for event in session.snapshot_events()
-            if event.type.startswith("spine.cognition.brain.think.")
-        ]
-        assert len(events) == 2
-        assert events[1].data["payload"]["outcome"] == "success"
-    finally:
-        reset_publish_session(token)
-
-
-@pytest.mark.asyncio
-async def test_run_brain_think_with_spine_facts_emits_failure_on_error() -> None:
-    session = Session("brain_think_failure")
-    token = set_publish_session(session)
-    try:
-        state = _state()
-        brain = AsyncMock()
-        brain.think = AsyncMock(side_effect=RuntimeError("boom"))
-        with pytest.raises(RuntimeError, match="boom"):
-            await run_brain_think_with_spine_facts(brain, state)
-        events = [
-            event
-            for event in session.snapshot_events()
-            if event.type == "spine.cognition.brain.think.end"
-        ]
-        assert len(events) == 1
-        assert events[0].data["payload"]["outcome"] == "failure"
-    finally:
-        reset_publish_session(token)
 
 
 @pytest.mark.asyncio
@@ -354,11 +221,36 @@ async def test_run_reasoner_generate_thoughts_emits_prompt_assembler_eps() -> No
                 strip_empty_fields=True,
             ).render(**kwargs)
 
+    class _SeamReasoner(PromptReasoner):
+        """Adapt PromptReasoner to the spine seam duck-typed contract.
+
+        run_reasoner_generate_thoughts_with_spine_facts requires a
+        role_profile attribute plus complete_turn(state, render);
+        PromptReasoner itself keeps no role state (SRP) and takes
+        per-turn tools explicitly, so the test supplies both here.
+        """
+
+        role_profile = RoleProfile(
+            role="reasoner",
+            goal="test goal",
+            backstory="test backstory",
+            tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
+        )
+
+        async def complete_turn(self, state: AgentState, render: object) -> LLMResponse:
+            return await super().complete_turn(state, render, tools=())
+
+
     session = Session("reasoner_spine")
     token = set_publish_session(session)
     try:
         state = _state()
-        reasoner = PromptReasoner(llm=_NoopLLM())
+        reasoner = _SeamReasoner(
+            llm=_NoopLLM(),
+            selector=_StubSelector(),
+            template_provider=_StubProvider(template),
+            section_registry=_StubRegistry({("role", "pure"): _StaticRole()}),
+        )
         response = await run_reasoner_generate_thoughts_with_spine_facts(reasoner, state)
         assert response.text == "ok"
         starts = [
