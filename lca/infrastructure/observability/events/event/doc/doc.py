@@ -87,8 +87,8 @@ def _doc_casting_started() -> EventDoc:
     return EventDoc(
         summary="自动组队选角开始 —— Team 编译前的一次 LLM 调用",
         why="把用户 objective 映射到角色库,产出 CastingPlan 快照",
-        arch="L1 default_modes 选角插件入口;ADR-0042/0052 动态选角(emitter 在 lca.cognition.* 故 layer=L1)",
-        layer="L1",
+        arch="L4 plugins/collaboration team 模式选角入口;ADR-0042/0052 动态选角(emitter 在 lca.plugins.collaboration.modes.team 故 layer=L4)",
+        layer="L4",
     )
 
 
@@ -97,8 +97,8 @@ def _doc_casting_completed() -> EventDoc:
     return EventDoc(
         summary="选角完成,记录 governance_kind + lead_role + selected_roles + rationale",
         why="驱动后续 TeamRunStarted.members;白名单校验后的可回放快照",
-        arch="L1 default_modes;rationale 用于事后审计选角理由",
-        layer="L1",
+        arch="L4 plugins/collaboration team 模式;rationale 用于事后审计选角理由",
+        layer="L4",
     )
 
 
@@ -107,8 +107,8 @@ def _doc_casting_failed() -> EventDoc:
     return EventDoc(
         summary="选角失败 —— 解析 / 白名单 / 重试耗尽任一原因",
         why="run 无法展开,run_doctor 标记 H1 断裂(0065 §六)",
-        arch="L1 default_modes 降级路径",
-        layer="L1",
+        arch="L4 plugins/collaboration team 模式降级路径",
+        layer="L4",
     )
 
 
@@ -187,8 +187,8 @@ def _doc_delegation_cache() -> EventDoc:
     return EventDoc(
         summary="委派命中幂等缓存 —— 同一 mandate 之前跑过,直接复用结果",
         why="省钱省时;审计 '这是复用,不是真跑' 的标记",
-        arch="L1 body.delegation_cache;ADR-0049 咨询资源",
-        layer="L1",
+        arch="L0 infrastructure.delegation.cache;ADR-0049 咨询资源",
+        layer="L0",
     )
 
 
@@ -217,8 +217,8 @@ def _doc_step_completed() -> EventDoc:
     return EventDoc(
         summary="一个 perceive→think→act→reflect step 收口",
         why="actor_step 计数 + reflect 产物持久化",
-        arch="L2 event_emission;ADR-0002 闭环相位收口",
-        layer="L2",
+        arch="L1 cognition body executor(simple_body);ADR-0002 闭环相位收口",
+        layer="L1",
     )
 
 
@@ -227,8 +227,8 @@ def _doc_action_degraded() -> EventDoc:
     return EventDoc(
         summary="原决策动作被降级(权限 / 资源 / 审批拦截),实际执行了别的动作",
         why="保留 '为什么没按原本意图跑' 的审计痕迹",
-        arch="L2 event_emission;ADR-0078 审批状态机 + DecisionGate",
-        layer="L2",
+        arch="L1 cognition body executor(simple_body)派生;ADR-0078 审批状态机 + DecisionGate",
+        layer="L1",
     )
 
 
