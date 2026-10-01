@@ -139,3 +139,27 @@ class ComponentRegistryProtocol(Protocol):
     def get(self, category: str, name: str) -> Any | None: ...
     def require(self, category: str, name: str) -> Any: ...
     def list(self, category: str) -> list[str]: ...
+
+__all__ = [
+    "CapabilityContext",
+    "CapabilityGrantExceeded",
+    "CapabilityKey",
+    "Composer",
+    "ComposerError",
+    "ComposerErrorCode",
+    "InspectEntry",
+    "InspectResult",
+    "InvariantChecker",
+    "InvariantViolation",
+    "MissingCapabilityError",
+    "MountResult",
+    "NameConflict",
+    "NotMounted",
+    "PluginFactory",
+    "PluginMetaMissing",
+    "REQUIRED_CAPABILITY_KEYS",
+    "UnmountResult",
+    "consume",
+    "provider_current",
+    "require_capability",
+]
