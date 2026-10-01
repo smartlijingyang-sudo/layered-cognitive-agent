@@ -17,7 +17,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from pathlib import Path
 
 from lca.contracts.observability.registry.run_locator import RunLocator
@@ -69,19 +68,5 @@ class FilesystemRunLocator(RunLocator):
 
     def manifest_path(self, run_id: str) -> Path:
         return self.run_dir(run_id) / "manifest.json"
-
-    # ── 辅助(非 Protocol 契约)─────────────────────────────
-
-    def iter_run_dirs(self) -> Iterator[Path]:
-        """按 mtime 倒序遍历所有 run 目录(诊断 / 清理用)。"""
-        runs_root = self._root / "runs"
-        if not runs_root.exists():
-            return
-        yield from sorted(
-            (p for p in runs_root.iterdir() if p.is_dir()),
-            key=lambda p: p.stat().st_mtime,
-            reverse=True,
-        )
-
 
 __all__ = ["FilesystemRunLocator"]
