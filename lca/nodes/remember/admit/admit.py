@@ -43,17 +43,17 @@ class RememberAdmitExecutor:
     semantic_name: str = "phase.remember.admit"
     region: str = "remember"
     declared_inputs: tuple[PortName, ...] = (
-        "decision",
-        "observation",
-        "reflection",
+        PortName("decision"),
+        PortName("observation"),
+        PortName("reflection"),
     )
     declared_outputs: tuple[PortName, ...] = (
-        "decision",
-        "observation",
-        "reflection",
-        "admitted",
-        "candidate",
-        "routing",
+        PortName("decision"),
+        PortName("observation"),
+        PortName("reflection"),
+        PortName("admitted"),
+        PortName("candidate"),
+        PortName("routing"),
     )
 
     async def node_execute(
@@ -62,9 +62,9 @@ class RememberAdmitExecutor:
         input: NodeInput,
     ) -> NodeOutput:
         del context
-        decision = input.port_values.get("decision")
-        observation = input.port_values.get("observation")
-        reflection = input.port_values.get("reflection")
+        decision = input.port_values.get(PortName("decision"))
+        observation = input.port_values.get(PortName("observation"))
+        reflection = input.port_values.get(PortName("reflection"))
 
         # Fast-Path: missing reflection or explicit fast_path flag
         if reflection is None:
@@ -128,12 +128,12 @@ class RememberAdmitExecutor:
     ) -> NodeOutput:
         return NodeOutput(
             port_values={
-                "decision": decision,
-                "observation": observation,
-                "reflection": reflection,
-                "admitted": True,
-                "candidate": candidate,
-                "routing": RoutingDecision(action_type=ActionType.RESPOND),
+                PortName("decision"): decision,
+                PortName("observation"): observation,
+                PortName("reflection"): reflection,
+                PortName("admitted"): True,
+                PortName("candidate"): candidate,
+                PortName("routing"): RoutingDecision(action_type=ActionType.RESPOND),
             }
         )
 
@@ -145,12 +145,12 @@ class RememberAdmitExecutor:
     ) -> NodeOutput:
         return NodeOutput(
             port_values={
-                "decision": decision,
-                "observation": observation,
-                "reflection": reflection,
-                "admitted": False,
-                "candidate": None,
-                "routing": RoutingDecision(action_type=ActionType.RESPOND),
+                PortName("decision"): decision,
+                PortName("observation"): observation,
+                PortName("reflection"): reflection,
+                PortName("admitted"): False,
+                PortName("candidate"): None,
+                PortName("routing"): RoutingDecision(action_type=ActionType.RESPOND),
             }
         )
 
