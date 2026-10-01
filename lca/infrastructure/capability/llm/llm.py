@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Any
 
-from lca.contracts.atoms.enums.enums import LLMStreamEventType
 from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.protocols import LLMAdapter
 from lca.infrastructure.capability.dispatch.dispatch import ProviderDispatch
@@ -28,5 +27,3 @@ class LlmService(LLMAdapter):
         stream = adapter.stream
         async for event in stream(prompt, **kwargs):
             yield event
-        if False:  # pragma: no cover — keeps Protocol generator shape
-            yield LLMStreamEvent(type=LLMStreamEventType.COMPLETED)
