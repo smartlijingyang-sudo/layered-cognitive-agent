@@ -114,6 +114,7 @@ _default_throttle: ReadSkillReferenceThrottle = ReadSkillReferenceThrottle()
 )
 class SkillReadReferenceOnceTool(Tool):
     name = READ_SKILL_REFERENCE_ONCE_TOOL
+    namespace: ClassVar[str] = "skill"
     description = (
         "读取已安装 skill 的附属资源文件(模板/参考文档/脚本说明等)。"
         "需先 activate_skill,SKILL.md 正文已注入上下文;"

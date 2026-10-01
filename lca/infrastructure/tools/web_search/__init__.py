@@ -49,6 +49,7 @@ MANIFEST = ToolManifest(
                 "required": ["query"],
             },
             is_idempotent=True,
+            namespace="web",
         ),
     ),
     meta=ToolMeta(

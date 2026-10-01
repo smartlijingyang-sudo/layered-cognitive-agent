@@ -119,6 +119,7 @@ def build_skill_references_section(package: SkillPackage) -> str:
 )
 class SkillActivateTool(Tool):
     name = ACTIVATE_SKILL_TOOL
+    namespace: ClassVar[str] = "skill"
     description = (
         "激活已安装的操作 skill，将其 SKILL.md 操作指南注入当前上下文。"
         "包内 scripts/ 用 run_skill_script 在 skill 工作目录执行，不要把脚本抄进 executeCode。"

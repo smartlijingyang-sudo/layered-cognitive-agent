@@ -97,6 +97,7 @@ def _build_single_tool(
         (Tool,),
         {
             "name": tool_name,
+            "namespace": api.namespace,
             "description": api.description,
             "parameters": api.parameters,
             "is_idempotent": api.is_idempotent,

@@ -64,6 +64,7 @@ MANIFEST = ToolManifest(
             },
             is_idempotent=True,
             default_timeout_ms=3_600_000,
+            namespace="agent",
         ),
     ),
     meta=ToolMeta(

@@ -37,6 +37,7 @@ IMPORT_SKILL_TOOL = "import_skill"
 )
 class SkillImportTool(Tool):
     name = IMPORT_SKILL_TOOL
+    namespace: ClassVar[str] = "skill"
     description = (
         "从网络安装操作 skill 到本地技能库（与角色身份无关）。"
         "支持：market identifier、lobehub.com/skills/…/skill.md、"

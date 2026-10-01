@@ -46,7 +46,6 @@ class ToolsService(ToolRegistry):
     def __init__(self) -> None:
         self._factories: dict[str, _Factory] = {}
         self._tools: dict[str, Tool] = {}
-        self._tool_namespaces: dict[str, str] = {}
 
     def register_factory(self, name: str, factory: _Factory) -> Callable[[], None]:
         """Register a tool factory. Returns its disposer."""
@@ -92,27 +91,13 @@ class ToolsService(ToolRegistry):
             if isinstance(bound, list):
                 for tool in bound:
                     forked._tools[f"{name}:{tool.name}"] = tool
-                    forked._tool_namespaces[tool.name] = name
             else:
                 forked._tools[name] = bound
-                forked._tool_namespaces[bound.name] = name
-        for tool in self._tools.values():
-            forked._tool_namespaces[tool.name] = tool.name
         forked._tools.update(self._tools)
         return forked
 
     def names(self) -> list[str]:
         return sorted(set(self._factories) | set(self._tools))
-
-    def tool_namespaces(self) -> dict[str, str]:
-        """Map ``tool.name`` → factory namespace for this (forked) registry.
-
-        Populated by :meth:`fork_for_run`; empty on the Definition-level
-        service.  The defer-tool seam joins per-turn tools to namespaces on
-        ``tool.name`` — already the flat LLM function namespace, so the
-        join key is stable across filter/wrap stages.
-        """
-        return dict(self._tool_namespaces)
 
     def list_tools(self) -> list[Tool]:
         return list(self._tools.values())

@@ -47,6 +47,7 @@ _SENSITIVE_CONFIRMATION_HINT = (
 class _BaseMemoryTool(Tool):
     """Shared scaffolding for the memory tools."""
 
+    namespace: ClassVar[str] = "memory"
     is_idempotent = False
     default_timeout_s = DEFAULT_TOOL_TIMEOUT_S
 

@@ -81,16 +81,28 @@ _PARAM_BUILDERS = {
 }
 
 
+_SHELL_API_NAMES = frozenset(
+    {
+        ApiName.RUN_COMMAND,
+        ApiName.GET_COMMAND_OUTPUT,
+        ApiName.KILL_COMMAND,
+        ApiName.EXECUTE_CODE,
+    }
+)
+
+
 def _apis_for(names: Iterable[ApiName]) -> tuple[ToolApi, ...]:
     out: list[ToolApi] = []
     for name in names:
         desc, idempotent = _ALL_API_SPECS[name]
+        namespace = "shell" if name in _SHELL_API_NAMES else "file"
         out.append(
             ToolApi(
                 name=name,
                 description=desc,
                 parameters=_PARAM_BUILDERS[name](),
                 is_idempotent=idempotent,
+                namespace=namespace,
             )
         )
     return tuple(out)

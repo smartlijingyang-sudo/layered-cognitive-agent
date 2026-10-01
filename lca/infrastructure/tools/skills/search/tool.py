@@ -53,6 +53,7 @@ _SANDBOX_FALLBACK = "无匹配 skill。建议用 execute_code 直接编码实现
 )
 class SkillSearchTool(Tool):
     name = SEARCH_SKILL_TOOL
+    namespace: ClassVar[str] = "skill"
     description = (
         "按关键词检索操作技能库（Skill）。"
         "优先查 LobeHub Market（需 market 鉴权：market-cli 凭证或 "

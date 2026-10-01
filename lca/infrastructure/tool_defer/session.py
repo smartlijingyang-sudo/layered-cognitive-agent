@@ -12,7 +12,7 @@ never rebuilt inside dispatch (dispatch runs every turn, see
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from contextvars import ContextVar, Token
 from typing import TYPE_CHECKING, Any
 
@@ -61,16 +61,19 @@ class ToolDeferSession:
         """This turn's namespace view (turn order)."""
         return self._namespaces
 
-    def update_turn(self, tools: Sequence[Tool], namespaces: Mapping[str, str]) -> None:
+    def update_turn(self, tools: Sequence[Tool]) -> None:
         """Refresh the per-turn view after fork filtering/wrapping.
 
-        ``namespaces`` maps ``tool.name`` → factory key (from
-        ``ToolsService.tool_namespaces``).  Tools missing from the map get
-        their own single-tool namespace.  The loaded set is *not* reset.
+        Each tool must carry a non-empty ``namespace`` that belongs to the
+        policy's known namespaces.  Tools with an unknown namespace are placed
+        in a synthetic namespace under their own name (legacy path — emit a
+        warning rather than crashing, so incomplete tool migrations don't
+        deadlock the agent).  The loaded set is *not* reset.
         """
         grouped: dict[str, list[str]] = {}
         for tool in tools:
-            grouped.setdefault(namespaces.get(tool.name, tool.name), []).append(tool.name)
+            ns = getattr(tool, "namespace", "") or tool.name
+            grouped.setdefault(ns, []).append(tool.name)
         self._namespaces = tuple(
             ToolNamespace(
                 name=namespace,

@@ -54,6 +54,7 @@ RUN_SKILL_SCRIPT_TOOL = "run_skill_script"
 )
 class SkillExecTool(Tool):
     name = RUN_SKILL_SCRIPT_TOOL
+    namespace: ClassVar[str] = "skill"
     description = (
         "在已激活 skill 的工作目录中执行 shell 命令（execScript）。"
         "需先 activate_skill；附件已挂载到工作根/<文件名>。"

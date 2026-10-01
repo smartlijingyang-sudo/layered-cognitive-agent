@@ -315,7 +315,7 @@ class ToolForkDispatchExecutor:
 
         _defer_session = current_defer_session()
         if _defer_session is not None:
-            _defer_session.update_turn(items, forked.tool_namespaces())
+            _defer_session.update_turn(items)
         _assert_sandbox_tools_visible(bindings, items)
         forked_tools = ForkedTools(
             items=items,

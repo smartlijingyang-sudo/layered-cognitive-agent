@@ -33,6 +33,7 @@ class ToolSearchTool(Tool):
     """
 
     name: ClassVar[str] = "tool_search"
+    namespace: ClassVar[str] = "core"
     description: ClassVar[str] = (
         "Load the full tool schemas for a deferred namespace. Namespaces "
         "not listed in the per-turn tool schemas appear only as one-line "
