@@ -33,7 +33,7 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3]
 LCA = ROOT / "lca"
 HARNESS = LCA / "harness"
 L1 = LCA / "cognition"

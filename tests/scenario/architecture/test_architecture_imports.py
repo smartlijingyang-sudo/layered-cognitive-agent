@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3]
 COGNITION_DIR = ROOT / "lca" / "cognition"
 
 # 业务 cognition 不应直接 import coordinator 实现。

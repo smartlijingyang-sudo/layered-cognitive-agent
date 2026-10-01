@@ -14,7 +14,7 @@ from typer.testing import CliRunner
 
 from lca.infrastructure.cli.cli.cli import app
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 ACCEPTANCE_CRITERIA = (
     REPOSITORY_ROOT / "history/2026-08/adr-0074-plugin-remediation/acceptance-criteria.md"
 )

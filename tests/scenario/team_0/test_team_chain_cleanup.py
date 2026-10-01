@@ -24,7 +24,7 @@ from lca.plugins.strategies.pipeline.pipeline import SequentialStrategy
 from tests.support.strategy_registry import build_strategy_registry
 from tests.support.team_stage import stage_with_invoker
 
-_ROOT = Path(__file__).resolve().parents[1]
+_ROOT = Path(__file__).resolve().parents[3]
 
 
 class TestDecisionSingleDelegationField(unittest.TestCase):

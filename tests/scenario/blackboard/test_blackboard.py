@@ -16,7 +16,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 BB_PATH = REPO_ROOT / "lca" / "cognition" / "collaboration" / "blackboard.py"
 
 

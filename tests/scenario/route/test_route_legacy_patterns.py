@@ -13,7 +13,7 @@ from io import StringIO
 from pathlib import Path
 from unittest import mock
 
-_REPO = str(Path(__file__).resolve().parents[1])
+_REPO = str(Path(__file__).resolve().parents[3])
 if _REPO not in sys.path:
     sys.path.insert(0, _REPO)
 

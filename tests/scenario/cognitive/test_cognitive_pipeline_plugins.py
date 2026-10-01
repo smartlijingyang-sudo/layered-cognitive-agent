@@ -26,7 +26,7 @@ from lca.plugins.cognitive.brain._standard_factory import (
     STANDARD_COGNITIVE_BRAIN_FACTORY_REQUIREMENTS,
 )
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[3]
 
 
 class _ThinkPipeline:

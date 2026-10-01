@@ -18,7 +18,7 @@ from lca.plugins.collaboration.modes.cordis_creator import _CordisCreatorModeAda
 from lca.plugins.collaboration.modes.solo import _SoloModeAdapter
 from lca.plugins.collaboration.modes.team import _TeamModeAdapter
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3]
 
 
 def _source(relative_path: str) -> str:
