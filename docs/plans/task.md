@@ -419,7 +419,7 @@
 | ONBOARDING-TASK-3 | 助理创建自动继承老用户画像 (`AssistantCatalog.create`) | Completed | 成功在 AssistantCatalog.create 接入 user_store.get_user_md 自动继承机制，显式传入优先，单测 2/2 passed，commit 95b5e84ae |
 | ONBOARDING-TASK-4 | 开场白脚本化编排与网关 Reaction 桥接 | Completed | 成功落地 lca/application/onboarding/script.py 编排逻辑与 /v1/onboarding/welcome 端点，支持新老用户两阶段同构开场白，7/7 测试通过，ruff 门禁 clean |
 | ONBOARDING-TASK-5 | 前端 LobeHub UI 起名 Widget 补丁与交互组件 | Completed | 成功落地 AssistantNamingWidget.tsx 与 assistant_naming_widget.py 声明式补丁，支持候选点选、自定义输入、实时预览与庆祝 Reaction，通过 byte-identical 完整性验证 |
-| ONBOARDING-TASK-6 | 全链路不变量集成测试与门禁核验 (INV-01 ~ INV-08) | In Progress | 编写端到端不变量测试套件并跑通全流程断言 |
+| ONBOARDING-TASK-6 | 全链路不变量集成测试与门禁核验 (INV-01 ~ INV-08) | Completed | 成功落地 tests/scenario/test_conversational_onboarding_e2e.py，覆盖 INV-01~08 全量不变量（终身单次幂等、DB SSOT、单写Digest、新助理画像自动继承、开场白定速、严格冻结契约、🎉庆祝Reaction、多租户强隔离），20/20 测试全绿，ruff 0 违规，byte-identical clean |
 | BRAINSTORM-FILE-SSOT-CONTEXT | 深度剖析文件即 SSOT、Standing 文件与前端编辑弹窗架构 | Completed | 已摸透 LCA 现有 layout.toml 9 大 Standing 文件、refresh_injected 实时注入、Catalog revise_profile 及双写机制 |
 | BRAINSTORM-FILE-SSOT-QUESTIONS | 澄清文件编辑器弹窗定位、与 Onboarding 关系及落地节奏（单步提问） | In Progress | 提炼关键设计共鸣并向用户发起单步澄清提问 |
 | BRAINSTORM-FILE-SSOT-APPROACHES | 提出 2-3 种前后端传输与交互落地架构方案及权衡 | Pending | 待提炼 |
