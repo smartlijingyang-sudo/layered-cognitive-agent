@@ -114,8 +114,8 @@ class PlanReviseExecutor:
 
     semantic_name: str = "plan.revise"
     region: str = "plan"
-    declared_inputs: tuple[PortName, ...] = ("state", "reflection")
-    declared_outputs: tuple[PortName, ...] = ("task_list",)
+    declared_inputs: tuple[PortName, ...] = (PortName("state"), PortName("reflection"))
+    declared_outputs: tuple[PortName, ...] = (PortName("task_list"),)
 
     async def node_execute(
         self,
@@ -128,8 +128,8 @@ class PlanReviseExecutor:
         outputs 端口(yaml):task_list
         """
         del context  # unused: pure function of input ports
-        state = input.port_values.get("state")
-        reflection_value = input.port_values.get("reflection")
+        state = input.port_values.get(PortName("state"))
+        reflection_value = input.port_values.get(PortName("reflection"))
         if not isinstance(reflection_value, Reflection):
             raise TypeError(
                 "plan.revise expects Reflection on port 'reflection',"
@@ -149,7 +149,7 @@ class PlanReviseExecutor:
         next_revision = current.revision if is_no_op else current.revision + 1
         return NodeOutput(
             port_values={
-                "task_list": TaskList(
+                PortName("task_list"): TaskList(
                     entries=next_entries,
                     revision=next_revision,
                 ),
