@@ -48,8 +48,8 @@ class ShortcutTryExecutor:
 
     semantic_name: str = "shortcut.try"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("state",)
-    declared_outputs: tuple[PortName, ...] = ("decision",)
+    declared_inputs: tuple[PortName, ...] = (PortName("state"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("decision"),)
 
     async def node_execute(
         self,
@@ -67,7 +67,7 @@ class ShortcutTryExecutor:
         ``agent.reasoning.turn`` 走 LLM 完整路径)。
         """
         runtime = context.runtime
-        state = input.port_values.get("state") or runtime.state
+        state = input.port_values.get(PortName("state")) or getattr(runtime, "state", None)
         if state is None or not isinstance(state, AgentState):
             return NodeOutput(port_values={})
 
@@ -77,7 +77,7 @@ class ShortcutTryExecutor:
             return NodeOutput(port_values={})
 
         decision = await shortcut.try_shortcut(state)
-        return NodeOutput(port_values={"decision": decision})
+        return NodeOutput(port_values={PortName("decision"): decision})
 
 
 @plugin(
