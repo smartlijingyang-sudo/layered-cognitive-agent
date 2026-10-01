@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 from lca.contracts.atoms.enums.enums import ContentType
 from lca.contracts.atoms.ids.ids import new_id
@@ -95,6 +95,7 @@ class CreateNameWidgetTool(_BaseOnboardingTool):
     """Record user name to DB + Home and generate naming widget token."""
 
     name = CREATE_NAME_WIDGET_TOOL
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     description = (
         "记录用户姓名并生成起名交互 Widget 卡片。"
         "将 user_name 沉淀到数据库与当前助理的 USER.md，并返回候选助理名与 Widget Token。"
@@ -164,6 +165,7 @@ class UpdateIdentityTool(_BaseOnboardingTool):
     """Set assistant identity (name, vibe, emoji), mark completed, and celebrate."""
 
     name = UPDATE_IDENTITY_TOOL
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     description = (
         "为当前助理确立名字与人设，写盘 IDENTITY.md 与 profile.json，标记迎新完成并追加庆祝 Reaction。"
         "参数: name (必填，助理名字)，vibe (可选，风格调性)，emoji (可选，表情)。"

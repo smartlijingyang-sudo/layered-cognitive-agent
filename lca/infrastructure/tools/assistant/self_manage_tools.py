@@ -18,7 +18,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 from lca.contracts.atoms.enums.enums import ContentType
 from lca.contracts.atoms.ids.ids import new_id
@@ -100,6 +100,7 @@ class ListAssistantSkillsTool(_BaseAssistantTool):
     """List the skills installed in the bound assistant's Home (read-only)."""
 
     name = _LIST_ASSISTANT_SKILLS_TOOL
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
     required_grant: ClassVar[str] = "skill.import"
     description = "列出当前助理 Home 已安装的技能（skill_id 列表）。只读，不修改任何配置。"
     parameters: ClassVar[dict[str, Any]] = {
@@ -141,6 +142,7 @@ class DeleteAssistantSkillTool(_BaseAssistantTool):
     """Delete a skill from the assistant's Home (sensitive, requires confirmation)."""
 
     name = _DELETE_ASSISTANT_SKILL_TOOL
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     required_grant: ClassVar[str] = "skill.import"
     description = (
         "删除当前助理 Home 的一个已安装技能（不可逆，敏感操作）。"
@@ -187,6 +189,7 @@ class EditAssistantSkillTool(_BaseAssistantTool):
     """Edit a skill in the assistant's Home (COW, non-sensitive)."""
 
     name = _EDIT_ASSISTANT_SKILL_TOOL
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     required_grant: ClassVar[str] = "skill.import"
     description = (
         "编辑当前助理 Home 的一个已安装技能（写时复制：若该技能链接自全局库，"
@@ -237,6 +240,7 @@ class UpdateAssistantSoulTool(_BaseAssistantTool):
     """Update the assistant's SOUL.md (safety sections are platform-protected)."""
 
     name = _UPDATE_ASSISTANT_SOUL_TOOL
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     required_grant: ClassVar[str] = "profile.revise"
     description = (
         "修改当前助理的 SOUL.md 的四核心段（身份/性格/能力/语气）。"
@@ -281,6 +285,7 @@ class UpdateAssistantProfileTool(_BaseAssistantTool):
     """Update the assistant's profile.json name/description (non-sensitive)."""
 
     name = _UPDATE_ASSISTANT_PROFILE_TOOL
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     required_grant: ClassVar[str] = "profile.revise"
     description = (
         "修改当前助理的 profile（名字 / 描述 / emoji 通过描述体现）。非敏感操作，改完告知用户。"
@@ -325,6 +330,7 @@ class UpdateAssistantGrantsTool(_BaseAssistantTool):
     """Update the assistant's grants.yaml (sensitive, requires confirmation)."""
 
     name = _UPDATE_ASSISTANT_GRANTS_TOOL
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     required_grant: ClassVar[str] = "profile.revise"
     description = (
         "修改当前助理的 grants.yaml（能力授权，扩权敏感）。"
@@ -377,6 +383,7 @@ class UpdateAssistantUserTool(_BaseAssistantTool):
     """
 
     name = _UPDATE_ASSISTANT_USER_TOOL
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     required_grant: ClassVar[str] = "profile.revise"
     description = (
         "修改当前助理的 USER.md（用户画像：姓名、角色、技术偏好、工作习惯等）。"
@@ -421,6 +428,7 @@ class ListAssistantToolsTool(_BaseAssistantTool):
     """List the assistant's effective tool set: builtin policy + custom tools."""
 
     name = _LIST_ASSISTANT_TOOLS_TOOL
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
     required_grant: ClassVar[str] = "profile.revise"
     description = (
         "列出当前助理的工具集：内置工具的 allow/deny 策略 + 自定义工具详情。只读，不修改任何配置。"
@@ -442,6 +450,8 @@ class ListAssistantToolsTool(_BaseAssistantTool):
             tools = data.get("tools") if isinstance(data, dict) else {}
             allow = tools.get("allow") if isinstance(tools, dict) else []
             deny = tools.get("deny") if isinstance(tools, dict) else []
+            allow = allow if isinstance(allow, list) else []
+            deny = deny if isinstance(deny, list) else []
             grants = load_grants(Path(spec.home_path))
 
             custom_tools: list[dict[str, object]] = []
@@ -483,6 +493,7 @@ class CreateAssistantToolTool(_BaseAssistantTool):
     """Create a custom tool in the assistant's Home (ADR-0243 D6)."""
 
     name = _CREATE_ASSISTANT_TOOL_TOOL
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     required_grant: ClassVar[str] = "profile.revise"
     description = (
         "为当前助理新增一个自定义工具，写入 Home 的 tools/ 目录。"
@@ -527,6 +538,7 @@ class UpdateAssistantToolTool(_BaseAssistantTool):
     """Update a custom tool in the assistant's Home (ADR-0243 D6)."""
 
     name = _UPDATE_ASSISTANT_TOOL_TOOL
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     required_grant: ClassVar[str] = "profile.revise"
     description = (
         "修改当前助理的一个自定义工具。"
@@ -574,6 +586,7 @@ class DeleteAssistantToolTool(_BaseAssistantTool):
     """Delete a custom tool from the assistant's Home (sensitive)."""
 
     name = _DELETE_ASSISTANT_TOOL_TOOL
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     required_grant: ClassVar[str] = "profile.revise"
     description = (
         "删除当前助理的一个自定义工具（不可逆，敏感操作）。"
