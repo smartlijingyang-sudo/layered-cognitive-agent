@@ -176,12 +176,17 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
       setErrorMsg(null);
       try {
         const token = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
+        const userId =
+          (typeof window !== 'undefined' && (window as any)?.__LCA_USER_ID) ||
+          process.env.NEXT_PUBLIC_MOCK_DEV_USER_ID ||
+          'local-dev-user';
         const url = `/lca-api/v1/assistants/${assistantId}/standing-files`;
         const res = await fetch(url, {
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
             'x-lca-token': token,
+            'x-lca-user-id': userId,
           },
         });
         const contentType = res.headers.get('content-type') || '';

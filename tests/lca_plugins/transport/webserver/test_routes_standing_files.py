@@ -199,3 +199,46 @@ def test_standing_file_update_memory_md_direct_write(tmp_path: Any) -> None:
     verify_resp = client.get(f"/v1/assistants/{assistant_id}/standing-files/MEMORY.md")
     assert verify_resp.status_code == 200
     assert verify_resp.json()["content"] == new_memory
+
+
+class _FakeOwnership:
+    def __init__(self, agent_map: dict[str, str], user_assts: dict[str, list[str]]) -> None:
+        self._agent_map = agent_map
+        self._user_assts = user_assts
+
+    def assistant_id_for_agent(self, agent_id: str) -> str | None:
+        return self._agent_map.get(agent_id)
+
+    def assistant_id_for_client(self, user_id: str, client_id: str) -> str | None:
+        return None
+
+    def assistant_ids_for(self, user_id: str) -> tuple[str, ...]:
+        return tuple(self._user_assts.get(user_id, []))
+
+
+def test_standing_files_resolve_agent_id_and_inbox(tmp_path: Any) -> None:
+    app, _, assistant_id = _create_test_app(tmp_path)
+    app.state.assistant_ownership = _FakeOwnership(
+        agent_map={"agt_mock_123": assistant_id},
+        user_assts={"local-dev-user": [assistant_id]},
+    )
+    client = TestClient(app)
+
+    # 1. 以 agt_* 请求列表，自动解析为 asst_*
+    agt_resp = client.get("/v1/assistants/agt_mock_123/standing-files")
+    assert agt_resp.status_code == 200
+    data = agt_resp.json()
+    assert data["assistant_id"] == assistant_id
+    assert len(data["files"]) == 4
+
+    # 2. 以 agt_* 请求单文件，正常返回内容
+    agt_file_resp = client.get("/v1/assistants/agt_mock_123/standing-files/SOUL.md")
+    assert agt_file_resp.status_code == 200
+    assert agt_file_resp.json()["filename"] == "SOUL.md"
+
+    # 3. 以 inbox 请求列表，自动回退到用户的首选助理
+    inbox_resp = client.get("/v1/assistants/inbox/standing-files")
+    assert inbox_resp.status_code == 200
+    inbox_data = inbox_resp.json()
+    assert inbox_data["assistant_id"] == assistant_id
+    assert len(inbox_data["files"]) == 4

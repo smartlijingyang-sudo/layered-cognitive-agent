@@ -173,11 +173,16 @@ export const StandingFileFullscreenEditor = memo<StandingFileFullscreenEditorPro
       setConflictData(null);
       try {
         const token = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
+        const userId =
+          (typeof window !== 'undefined' && (window as any)?.__LCA_USER_ID) ||
+          process.env.NEXT_PUBLIC_MOCK_DEV_USER_ID ||
+          'local-dev-user';
         const url = `/lca-api/v1/assistants/${assistantId}/standing-files/${filename}`;
         const res = await fetch(url, {
           headers: {
             Authorization: `Bearer ${token}`,
             'x-lca-token': token,
+            'x-lca-user-id': userId,
           },
         });
         const contentType = res.headers.get('content-type') || '';
@@ -225,6 +230,10 @@ export const StandingFileFullscreenEditor = memo<StandingFileFullscreenEditorPro
       setConflictData(null);
       try {
         const token = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
+        const userId =
+          (typeof window !== 'undefined' && (window as any)?.__LCA_USER_ID) ||
+          process.env.NEXT_PUBLIC_MOCK_DEV_USER_ID ||
+          'local-dev-user';
         const url = `/lca-api/v1/assistants/${assistantId}/standing-files/${filename}`;
         const payload = {
           content,
@@ -238,6 +247,7 @@ export const StandingFileFullscreenEditor = memo<StandingFileFullscreenEditorPro
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
             'x-lca-token': token,
+            'x-lca-user-id': userId,
           },
           body: JSON.stringify(payload),
         });

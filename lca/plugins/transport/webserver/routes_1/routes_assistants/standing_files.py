@@ -84,6 +84,9 @@ def _resolve_assistant_id(request: Request, user_id: str, raw_id: str) -> str:
             resolved = ownership.assistant_id_for_client(user_id, "lobe-agent:inbox")
             if resolved:
                 return resolved
+            user_assts = ownership.assistant_ids_for(user_id)
+            if user_assts:
+                return user_assts[0]
 
     return raw_id
 

@@ -79,6 +79,10 @@ def apply(ctx: PatchContext) -> bool:
             "  const agentTitle = useAgentStore((s) =>\n"
             "    agentId ? agentSelectors.getAgentMetaById(agentId)(s)?.title : undefined,\n"
             "  );\n\n"
+            "  const lcaAssistantId = useAgentStore((s) =>\n"
+            "    agentId ? (s.agentMap[agentId] as any)?.agencyConfig?.lcaAssistantId : undefined,\n"
+            "  );\n"
+            "  const targetAssistantId = lcaAssistantId || agentId;\n\n"
             "  const [drawerOpen, setDrawerOpen] = useState(false);\n"
             "  const [editorOpen, setEditorOpen] = useState(false);\n"
             "  const [editingFile, setEditingFile] = useState<{\n"
@@ -97,6 +101,42 @@ def apply(ctx: PatchContext) -> bool:
         )
         header_text = header_text.replace(target_needle, replacement)
 
+    if "targetAssistantId" not in header_text:
+        needle_agent_title = (
+            "  const agentTitle = useAgentStore((s) =>\n"
+            "    agentId ? agentSelectors.getAgentMetaById(agentId)(s)?.title : undefined,\n"
+            "  );"
+        )
+        if needle_agent_title in header_text:
+            header_text = header_text.replace(
+                needle_agent_title,
+                (
+                    "  const agentTitle = useAgentStore((s) =>\n"
+                    "    agentId ? agentSelectors.getAgentMetaById(agentId)(s)?.title : undefined,\n"
+                    "  );\n\n"
+                    "  const lcaAssistantId = useAgentStore((s) =>\n"
+                    "    agentId ? (s.agentMap[agentId] as any)?.agencyConfig?.lcaAssistantId : undefined,\n"
+                    "  );\n"
+                    "  const targetAssistantId = lcaAssistantId || agentId;"
+                ),
+                1,
+            )
+            header_text = header_text.replace(
+                "<AssistantTopMascot\n            assistantId={agentId}",
+                "<AssistantTopMascot\n            assistantId={targetAssistantId}",
+                1,
+            )
+            header_text = header_text.replace(
+                "<AssistantStatusDrawer\n        open={drawerOpen}\n        onClose={() => setDrawerOpen(false)}\n        assistantId={agentId}",
+                "<AssistantStatusDrawer\n        open={drawerOpen}\n        onClose={() => setDrawerOpen(false)}\n        assistantId={targetAssistantId}",
+                1,
+            )
+            header_text = header_text.replace(
+                "<StandingFileFullscreenEditor\n          open={editorOpen}\n          onClose={() => setEditorOpen(false)}\n          assistantId={agentId}",
+                "<StandingFileFullscreenEditor\n          open={editorOpen}\n          onClose={() => setEditorOpen(false)}\n          assistantId={targetAssistantId}",
+                1,
+            )
+
     # 注入 NavHeader children 与 Drawer / Editor 模态窗
     navheader_close = "slotClassNames={{\n          left: headerStyles.slotLeft,\n          right: headerStyles.slotRight,\n        }}\n      />"
     if navheader_close in header_text and "<AssistantTopMascot" not in header_text:
@@ -108,7 +148,7 @@ def apply(ctx: PatchContext) -> bool:
             "      >\n"
             "        <Flexbox horizontal align={'center'} justify={'center'} style={{ pointerEvents: 'auto' }}>\n"
             "          <AssistantTopMascot\n"
-            "            assistantId={agentId}\n"
+            "            assistantId={targetAssistantId}\n"
             "            name={agentTitle || '架构小助'}\n"
             "            onOpenDrawer={() => setDrawerOpen(true)}\n"
             "          />\n"
@@ -117,7 +157,7 @@ def apply(ctx: PatchContext) -> bool:
             "      <AssistantStatusDrawer\n"
             "        open={drawerOpen}\n"
             "        onClose={() => setDrawerOpen(false)}\n"
-            "        assistantId={agentId}\n"
+            "        assistantId={targetAssistantId}\n"
             "        assistantName={agentTitle || '架构小助'}\n"
             "        onEditFile={handleEditFile}\n"
             "      />\n\n"
@@ -125,7 +165,7 @@ def apply(ctx: PatchContext) -> bool:
             "        <StandingFileFullscreenEditor\n"
             "          open={editorOpen}\n"
             "          onClose={() => setEditorOpen(false)}\n"
-            "          assistantId={agentId}\n"
+            "          assistantId={targetAssistantId}\n"
             "          assistantName={agentTitle || '架构小助'}\n"
             "          filename={editingFile.filename}\n"
             "          filePath={editingFile.filePath}\n"
