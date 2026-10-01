@@ -55,6 +55,19 @@ class _BaseOnboardingTool(Tool):
     ) -> None:
         self._catalog = catalog
         self._assistant_id = assistant_id
+        if user_store is None:
+            user_store = getattr(catalog, "_user_store", None)
+        if user_id is None:
+            import contextlib
+            import json
+            from pathlib import Path
+
+            with contextlib.suppress(Exception):
+                spec = catalog.get(assistant_id)
+                manifest_path = Path(spec.home_path) / "manifest.json"
+                if manifest_path.is_file():
+                    m = json.loads(manifest_path.read_text(encoding="utf-8"))
+                    user_id = m.get("user_id")
         self._user_store = user_store
         self._user_id = user_id
 

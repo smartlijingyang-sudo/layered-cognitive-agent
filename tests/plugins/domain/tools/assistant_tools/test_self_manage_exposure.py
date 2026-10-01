@@ -26,6 +26,10 @@ from lca.infrastructure.tools.assistant.self_manage_tools import (
     _UPDATE_ASSISTANT_USER_TOOL,
     assistant_self_manage_tools_from_run,
 )
+from lca.infrastructure.tools.onboarding.naming_tools import (
+    CREATE_NAME_WIDGET_TOOL,
+    UPDATE_IDENTITY_TOOL,
+)
 
 _FULL_FAMILY = {
     _CREATE_ASSISTANT_TOOL_TOOL,
@@ -39,6 +43,8 @@ _FULL_FAMILY = {
     _UPDATE_ASSISTANT_SOUL_TOOL,
     _UPDATE_ASSISTANT_TOOL_TOOL,
     _UPDATE_ASSISTANT_USER_TOOL,
+    CREATE_NAME_WIDGET_TOOL,
+    UPDATE_IDENTITY_TOOL,
 }
 
 

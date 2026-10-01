@@ -633,6 +633,11 @@ def assistant_self_manage_tools_from_run(
     assistant_id = explicit or current_assistant_id().strip()
     if not assistant_id:
         return []
+    from lca.infrastructure.tools.onboarding.naming_tools import (
+        CreateNameWidgetTool,
+        UpdateIdentityTool,
+    )
+
     return [
         ListAssistantSkillsTool(catalog=catalog, assistant_id=assistant_id, overlay=overlay),
         DeleteAssistantSkillTool(catalog=catalog, assistant_id=assistant_id, overlay=overlay),
@@ -656,6 +661,8 @@ def assistant_self_manage_tools_from_run(
         DeleteAssistantToolTool(
             catalog=catalog, assistant_id=assistant_id, tool_overlay=tool_overlay
         ),
+        CreateNameWidgetTool(catalog=catalog, assistant_id=assistant_id),
+        UpdateIdentityTool(catalog=catalog, assistant_id=assistant_id),
     ]
 
 

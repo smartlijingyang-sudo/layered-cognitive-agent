@@ -1,9 +1,10 @@
 'use client';
 
-import { Button, Flexbox, Typography } from '@lobehub/ui';
+import { Button, Flexbox } from '@lobehub/ui';
 import { Input } from 'antd';
 import { createStaticStyles } from 'antd-style';
 import React, { memo, useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const styles = createStaticStyles(({ css, cssVar }) => {
   return {
@@ -97,12 +98,12 @@ export interface NamingCandidate {
 }
 
 export interface AssistantNamingWidgetProps {
-  embedToken?: string;
+  allowCustom?: boolean;
   assistantId?: string;
   candidates?: NamingCandidate[];
-  allowCustom?: boolean;
-  fixedChoice?: string;
   defaultCustomValue?: string;
+  embedToken?: string;
+  fixedChoice?: string;
   onSettled?: (name: string, vibe: string) => void;
 }
 
@@ -110,20 +111,37 @@ export const AssistantNamingWidget = memo<AssistantNamingWidgetProps>(
   ({
     embedToken = '',
     assistantId = '',
-    candidates = [
-      { name: '星澜', vibe: '温柔敏锐', rationale: '如星光与波澜般清澈洞察' },
-      { name: '破晓', vibe: '坚毅明晰', rationale: '如晨曦初升般果断可靠' },
-    ],
+    candidates: propCandidates,
     allowCustom = true,
     fixedChoice,
     defaultCustomValue = '',
     onSettled,
   }) => {
+    const { i18n } = useTranslation();
+    const isZh = (i18n.language || '').toLowerCase().startsWith('zh');
+
+    const defaultCandidates: NamingCandidate[] = useMemo(() => {
+      if (propCandidates && propCandidates.length > 0) {
+        return propCandidates;
+      }
+      return isZh
+        ? [
+            { name: '星澜', rationale: '如星光与波澜般清澈洞察', vibe: '温柔敏锐' },
+            { name: '破晓', rationale: '如晨曦初升般果断可靠', vibe: '坚毅明晰' },
+          ]
+        : [
+            { name: 'Athena', rationale: 'Wise and resolute personal companion', vibe: 'Sharp & Focused' },
+            { name: 'Nova', rationale: 'Clear insight and steadfast execution', vibe: 'Calm & Thorough' },
+          ];
+    }, [propCandidates, isZh]);
+
     const [selectedName, setSelectedName] = useState<string>(
-      fixedChoice || (candidates.length > 0 ? candidates[0].name : '')
+      fixedChoice || (defaultCandidates.length > 0 ? defaultCandidates[0].name : '')
     );
     const [selectedVibe, setSelectedVibe] = useState<string>(
-      fixedChoice ? '官方专属' : (candidates.length > 0 ? candidates[0].vibe : '')
+      fixedChoice
+        ? (isZh ? '官方专属' : 'Default')
+        : (defaultCandidates.length > 0 ? defaultCandidates[0].vibe : '')
     );
     const [customValue, setCustomValue] = useState<string>(defaultCustomValue);
     const [isCustom, setIsCustom] = useState<boolean>(false);
@@ -138,10 +156,10 @@ export const AssistantNamingWidget = memo<AssistantNamingWidgetProps>(
     }, [fixedChoice, isCustom, customValue, selectedName]);
 
     const activeVibe = useMemo(() => {
-      if (fixedChoice) return '官方专属';
-      if (isCustom) return '个性自拟';
+      if (fixedChoice) return isZh ? '官方专属' : 'Default';
+      if (isCustom) return isZh ? '个性自拟' : 'Custom';
       return selectedVibe;
-    }, [fixedChoice, isCustom, selectedVibe]);
+    }, [fixedChoice, isCustom, selectedVibe, isZh]);
 
     const handleCandidateClick = useCallback((cand: NamingCandidate) => {
       setIsCustom(false);
@@ -163,19 +181,28 @@ export const AssistantNamingWidget = memo<AssistantNamingWidgetProps>(
           onSettled(activeName, activeVibe);
         }
 
+        const token = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
+        const userId =
+          (typeof window !== 'undefined' && (window as any)?.__LCA_USER_ID) ||
+          process.env.NEXT_PUBLIC_MOCK_DEV_USER_ID ||
+          'local-dev-user';
+
         // Post to LCA settlement endpoint if embedToken or assistantId available
         if (assistantId || embedToken) {
-          await fetch('/v1/onboarding/naming/settle', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
+          await fetch('/lca-api/v1/onboarding/naming/settle', {
             body: JSON.stringify({
-              token: embedToken,
               assistant_id: assistantId,
               name: activeName,
+              token: embedToken,
               vibe: activeVibe,
             }),
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+              'x-lca-token': token,
+              'x-lca-user-id': userId,
+            },
+            method: 'POST',
           }).catch((err) => {
             console.warn('[AssistantNamingWidget] settle endpoint notify error:', err);
           });
@@ -196,8 +223,12 @@ export const AssistantNamingWidget = memo<AssistantNamingWidgetProps>(
           <div className={styles.settledBanner}>
             <span className={styles.reactionCelebration}>🎉</span>
             <div>
-              <strong>很高兴遇见你！</strong>
-              <div>我是 {settledName}，专属身份已锚定，让我们开始并肩前行吧 ✨</div>
+              <strong>{isZh ? '很高兴遇见你！' : 'Nice to meet you!'}</strong>
+              <div>
+                {isZh
+                  ? `我是 ${settledName}，专属身份已锚定，让我们开始并肩前行吧 ✨`
+                  : `I'm ${settledName}. My personal identity is set, let's take things off your plate! ✨`}
+              </div>
             </div>
           </div>
         </Flexbox>
@@ -207,33 +238,35 @@ export const AssistantNamingWidget = memo<AssistantNamingWidgetProps>(
     return (
       <Flexbox className={styles.card}>
         <div className={styles.title}>
-          <span>为您设定专属助理身份与名称</span>
+          <span>{isZh ? '为您设定专属助理身份与名称' : 'Name Your Personal Agent'}</span>
           <span>✨</span>
         </div>
         <div className={styles.subtitle}>
-          点选下方灵感候选名或输入自拟称呼，完成专属命名仪式：
+          {isZh
+            ? '点选下方灵感候选名或输入自拟称呼，完成专属命名仪式：'
+            : 'Choose a name below or enter your own to complete the naming ceremony:'}
         </div>
 
-        {/* 候选选项 */}
+        {/* Candidate Chips */}
         <div className={styles.candidateGrid}>
           {fixedChoice ? (
             <Button
-              type="primary"
               className={styles.candidateChip}
+              type="primary"
             >
               <span className={styles.chipName}>{fixedChoice}</span>
-              <span className={styles.chipVibe}>官方固定项</span>
+              <span className={styles.chipVibe}>{isZh ? '官方固定项' : 'Default'}</span>
             </Button>
           ) : (
-            candidates.map((cand) => {
+            defaultCandidates.map((cand) => {
               const isSelected = !isCustom && selectedName === cand.name;
               return (
                 <Button
-                  key={cand.name}
-                  type={isSelected ? 'primary' : 'default'}
                   className={styles.candidateChip}
+                  key={cand.name}
                   onClick={() => handleCandidateClick(cand)}
                   title={cand.rationale}
+                  type={isSelected ? 'primary' : 'default'}
                 >
                   <span className={styles.chipName}>{cand.name}</span>
                   <span className={styles.chipVibe}>{cand.vibe}</span>
@@ -243,40 +276,44 @@ export const AssistantNamingWidget = memo<AssistantNamingWidgetProps>(
           )}
         </div>
 
-        {/* 自定义输入框 */}
+        {/* Custom Input */}
         {allowCustom && !fixedChoice && (
           <div className={styles.customInputWrapper}>
             <Input
-              placeholder="或者，输入你喜欢的自定义称呼..."
-              value={customValue}
+              allowClear
+              maxLength={20}
               onChange={handleCustomChange}
               onFocus={() => setIsCustom(true)}
-              maxLength={20}
-              allowClear
+              placeholder={isZh ? '或者，输入你喜欢的自定义称呼...' : 'Or enter a custom name...'}
+              value={customValue}
             />
           </div>
         )}
 
-        {/* 实时动态预览 */}
+        {/* Live Preview */}
         {activeName && (
           <div className={styles.previewBox}>
-            💡 预览：「你好，我是 <strong>{activeName}</strong>（{activeVibe}），很高兴为你服务！」
+            {isZh
+              ? <>💡 预览：「你好，我是 <strong>{activeName}</strong>（{activeVibe}），很高兴为你服务！」</>
+              : <>💡 Preview: "Hey, I'm <strong>{activeName}</strong> ({activeVibe}), ready to help!"</>}
           </div>
         )}
 
-        {/* 确认按钮 */}
+        {/* Confirm Button */}
         <Button
-          type="primary"
           className={styles.submitBtn}
-          loading={submitting}
           disabled={!activeName}
+          loading={submitting}
           onClick={handleConfirm}
+          type="primary"
         >
-          确定称呼并启程 ✨
+          {isZh ? '确定称呼并启程 ✨' : 'Confirm Name & Get Started ✨'}
         </Button>
       </Flexbox>
     );
   }
 );
+
+AssistantNamingWidget.displayName = 'AssistantNamingWidget';
 
 export default AssistantNamingWidget;

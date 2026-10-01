@@ -136,7 +136,20 @@ async def onboarding_welcome(request: Request) -> JSONResponse:
 
         user_name = extract_user_name_from_user_md(user_store.get_user_md(user_id) or "")
 
-    assistant_name = str(request.query_params.get("assistant_name") or "小助")
+    assistant_id = str(request.query_params.get("assistant_id") or "").strip()
+    assistant_name = str(request.query_params.get("assistant_name") or "")
+    if not assistant_name and assistant_id:
+        catalog = _catalog_from_request(request)
+        if catalog is not None:
+            import contextlib
+
+            with contextlib.suppress(Exception):
+                spec = catalog.get(assistant_id)
+                if spec and spec.profile_name:
+                    assistant_name = spec.profile_name
+    if not assistant_name:
+        assistant_name = "小助"
+
     role_title = str(request.query_params.get("role_title") or "专属")
     locale = str(request.query_params.get("locale") or request.headers.get("accept-language") or "en")
 
