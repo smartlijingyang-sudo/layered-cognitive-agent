@@ -227,7 +227,7 @@ def allowed_root_entries(layout: ContextLayout | None = None) -> frozenset[str]:
     """
 
     chosen = packaged_layout() if layout is None else layout
-    roots = set(chosen.standing_files)
+    roots = {name.split("/", 1)[0] for name in chosen.standing_files}
     for relative in (
         chosen.people_dir,
         chosen.groups_dir,

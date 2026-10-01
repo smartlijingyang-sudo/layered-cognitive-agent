@@ -21,10 +21,14 @@ from lca.infrastructure.memory.contextfiles.domain.standing import (
 def test_standing_order_comes_from_the_layout_file() -> None:
     assert packaged_layout().standing_files == (
         "SOUL.md",
+        "IDENTITY.md",
         "USER.md",
         "MEMORY.md",
         "AGENTS.md",
         "TOOLS.md",
+        "memory/people/INDEX.md",
+        "memory/groups/INDEX.md",
+        "dreams/alignment/derived/ALIGNMENT_SYNTHESIS.md",
     )
 
 

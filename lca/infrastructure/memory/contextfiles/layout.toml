@@ -1,6 +1,16 @@
 # Default context-file layout. A home replaces any field in the file named
 # by home_override. This file is the authority. Python only loads it.
-standing_files = ["SOUL.md", "USER.md", "MEMORY.md", "AGENTS.md", "TOOLS.md"]
+standing_files = [
+    "SOUL.md",
+    "IDENTITY.md",
+    "USER.md",
+    "MEMORY.md",
+    "AGENTS.md",
+    "TOOLS.md",
+    "memory/people/INDEX.md",
+    "memory/groups/INDEX.md",
+    "dreams/alignment/derived/ALIGNMENT_SYNTHESIS.md",
+]
 people_dir = "memory/people"
 people_index = "INDEX.md"
 groups_dir = "memory/groups"

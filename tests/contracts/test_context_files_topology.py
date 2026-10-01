@@ -13,7 +13,7 @@ from lca.infrastructure.memory.contextfiles.domain.layout import (
 
 def test_allowed_root_entries_cover_the_landed_files() -> None:
     allowed = allowed_root_entries()
-    for name in ("SOUL.md", "USER.md", "MEMORY.md", "AGENTS.md", "TOOLS.md"):
+    for name in ("SOUL.md", "IDENTITY.md", "USER.md", "MEMORY.md", "AGENTS.md", "TOOLS.md"):
         assert name in allowed
     for root in ("memory", "side-chats", "dreams", "revisions", "skills", "workspace"):
         assert root in allowed
