@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TypedDict, cast
 
 from pydantic import BaseModel
 
@@ -57,6 +57,27 @@ class Config(BaseModel):
     model_config = {"extra": "forbid"}
 
 
+class _SoloAgentKwargs(TypedDict, total=False):
+    """Typed view of the conditional ``Agent`` constructor kwargs.
+
+    Mirrors the subset of ``Agent.__init__`` that :func:`build_solo_agent`
+    sets, so ``Agent(**kwargs)`` stays fully type-checked while the
+    runtime-overridden entries remain conditional.
+    """
+
+    role: str
+    goal: str
+    backstory: str
+    role_profile: RoleProfile | None
+    tools: tuple[Tool, ...]
+    llm: LLMAdapter
+    observability: BoundObservability
+    scope: Context | None
+    max_steps: int
+    max_wall_clock_seconds: int
+    memory: MemorySystem
+
+
 def build_solo_agent(
     llm: LLMAdapter,
     *,
@@ -91,7 +112,7 @@ def build_solo_agent(
     else:
         goal = ""
         backstory = ""
-    kwargs: dict[str, object] = {
+    kwargs: _SoloAgentKwargs = {
         "role": role,
         "goal": goal,
         "backstory": backstory,
@@ -134,11 +155,16 @@ class _SoloModeAdapter(ModeAdapter):
         session = build_request.assembly.session
         memory = None
         if build_request.role_profile is not None and build_request.assistant_home_path:
-            from lca.infrastructure.memory.assistant_memory import AssistantMemory
+            from lca.infrastructure.memory.assistant_memory import (
+                AssistantMemory,
+                _ProfileBackfillCallback,
+            )
 
             memory = AssistantMemory(
                 build_request.assistant_home_path,
-                profile_backfill=build_request.profile_backfill,
+                profile_backfill=cast(
+                    "_ProfileBackfillCallback | None", build_request.profile_backfill
+                ),
             )
         return build_solo_agent(
             build_request.llm,
