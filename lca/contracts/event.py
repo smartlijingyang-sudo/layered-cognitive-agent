@@ -13,14 +13,14 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict
 
 # ── 闭集：category 与 plane ──────────────────────────────────────────────
 
 
-class Category(str, Enum):
+class Category(StrEnum):
     """事件 category 闭集（ADR-0180 D2）。
 
     本枚举是协议层最小集；机制 boot 时从 ``lca_kernel/events/config/**/*.yaml``
@@ -194,7 +194,7 @@ class Category(str, Enum):
     SPINE_SKILL_PACKAGE_SEARCHED = "spine.skill.package.searched"
 
 
-class Plane(str, Enum):
+class Plane(StrEnum):
     """事件语义平面（沿用 ADR-0063 三平面）。"""
 
     SURFACE = "surface"
