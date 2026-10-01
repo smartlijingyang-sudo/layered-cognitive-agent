@@ -10,7 +10,6 @@ import copy
 import inspect
 import math
 import os
-import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, is_dataclass
 from typing import Any
@@ -18,6 +17,7 @@ from typing import Any
 import structlog
 from pydantic import BaseModel
 
+from lca.contracts.atoms.ids.ids import utc_now_ms
 from lca_kernel.events.fold.fold import EpochHeader, foldRequestHeader
 from lca_kernel.events.session.session import (
     SESSION_FORMAT_VERSION,
@@ -33,11 +33,6 @@ from lca_kernel.events.session.session import (
 _log = structlog.get_logger(__name__)
 
 __all__ = ["Session"]
-
-
-def _now_ms() -> int:
-    """append / 创建时刻的 Unix epoch 毫秒（对齐 dsh ``Date.now()``）。"""
-    return int(time.time() * 1000)
 
 
 def _to_jsonable(value: Any) -> Any:
@@ -186,7 +181,7 @@ class Session(SessionProtocol):
             header = SessionHeader(
                 version=SESSION_FORMAT_VERSION,
                 id=session_id,
-                created_at=_now_ms(),
+                created_at=utc_now_ms(),
             )
         if header.id != session_id:
             raise ValueError(f"header.id {header.id!r} 与 session_id {session_id!r} 不一致")
@@ -258,7 +253,7 @@ class Session(SessionProtocol):
         event = SessionEvent(
             type=event_type,
             seq=len(self._log),
-            time=_now_ms(),
+            time=utc_now_ms(),
             data=snapshot,
             session_id=self.id,
             actor=actor,

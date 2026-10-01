@@ -16,12 +16,12 @@ from __future__ import annotations
 
 import asyncio
 import json
-import time
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any, cast
 
 import redis.exceptions
 
+from lca.contracts.atoms.ids.ids import utc_now_ms
 from lca.contracts.transport.stream_keys import (
     STREAM_MAXLEN,
     STREAM_RETENTION_SECONDS,
@@ -73,7 +73,7 @@ class LcaStreamEventLog:
             "stepIndex": str(step_index),
             "operationId": run_id,
             "data": json.dumps(data),
-            "timestamp": str(_now_ms()),
+            "timestamp": str(utc_now_ms()),
         }
         last_exc: Exception | None = None
         for attempt in range(_PUBLISH_ATTEMPTS):
@@ -171,10 +171,6 @@ class LcaStreamEventLog:
                     current_last_id = str(msg_id)
                     event = _parse_redis_stream_row((str(msg_id), fields))  # type: ignore[arg-type]
                     yield _encode_sse_agent_event(event)
-
-
-def _now_ms() -> int:
-    return int(time.time() * 1000)
 
 
 def _parse_redis_stream_row(row: tuple[object, dict[str, object]]) -> dict[str, object]:
