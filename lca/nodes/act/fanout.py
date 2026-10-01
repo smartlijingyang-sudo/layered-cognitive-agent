@@ -83,8 +83,8 @@ class ActFanoutExecutor:
 
     semantic_name: str = "act.fanout"
     region: str = "act"
-    declared_inputs: tuple[PortName, ...] = ("envelopes", "envelope")
-    declared_outputs: tuple[PortName, ...] = ("envelopes", "envelope", "routing")
+    declared_inputs: tuple[PortName, ...] = (PortName("envelopes"), PortName("envelope"))
+    declared_outputs: tuple[PortName, ...] = (PortName("envelopes"), PortName("envelope"), PortName("routing"))
 
     async def node_execute(
         self,
@@ -99,10 +99,10 @@ class ActFanoutExecutor:
                             routing (RoutingDecision)
         """
         del context  # unused: pure function of input port value
-        port_values: dict[str, Any] = input.port_values
+        port_values: dict[PortName, Any] = input.port_values
 
         # Resolve source: prefer the N:N ``envelopes`` typed port; fall back to 1:1 ``envelope``.
-        envelopes_in: tuple[CommandEnvelope, ...] | None = port_values.get("envelopes")
+        envelopes_in: tuple[CommandEnvelope, ...] | None = port_values.get(PortName("envelopes"))
         if envelopes_in is not None:
             if not isinstance(envelopes_in, tuple):
                 # Accept list-shaped values from upstream typed-port adapters.
@@ -132,7 +132,7 @@ class ActFanoutExecutor:
                 next_hint = NEXT_HINT_FANOUT_EMPTY
         else:
             # Back-compat: 1:1 single-envelope path.
-            envelope = port_values.get("envelope")
+            envelope = port_values.get(PortName("envelope"))
             if envelope is not None and not isinstance(envelope, CommandEnvelope):
                 raise TypeError(
                     "act.fanout: 'envelope' port must be a CommandEnvelope "
@@ -153,9 +153,9 @@ class ActFanoutExecutor:
         )
         return NodeOutput(
             port_values={
-                "envelopes": envelopes_out,
-                "envelope": envelope_out,
-                "routing": routing,
+                PortName("envelopes"): envelopes_out,
+                PortName("envelope"): envelope_out,
+                PortName("routing"): routing,
             }
         )
 
