@@ -47,8 +47,8 @@ class PromptSectionsAssembleExecutor:
 
     semantic_name: str = "prompt.sections.assemble"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("template_selection", "prompt_template_provider")
-    declared_outputs: tuple[PortName, ...] = ("prompt_template",)
+    declared_inputs: tuple[PortName, ...] = (PortName("template_selection"), PortName("prompt_template_provider"))
+    declared_outputs: tuple[PortName, ...] = (PortName("prompt_template"),)
 
     async def node_execute(
         self,
@@ -61,14 +61,14 @@ class PromptSectionsAssembleExecutor:
         prompt_template_provider (PromptTemplateProvider)
         outputs 端口(yaml):prompt_template (PromptTemplate)
         """
-        selection = input.port_values.get("template_selection")
+        selection = input.port_values.get(PortName("template_selection"))
         if not isinstance(selection, TemplateSelection):
             raise TypeError(
                 "prompt.sections.assemble: 'template_selection' port must be a "
                 f"TemplateSelection instance, got {type(selection).__name__}"
             )
 
-        provider = input.port_values.get("prompt_template_provider")
+        provider = input.port_values.get(PortName("prompt_template_provider"))
         if not isinstance(provider, PromptTemplateProvider):
             raise RuntimeError(
                 "prompt.sections.assemble: 'prompt_template_provider' typed port "
@@ -79,7 +79,7 @@ class PromptSectionsAssembleExecutor:
         template = provider.get_template(selection.template_id)
         if template is None:
             raise MissingPromptSectionError(selection.template_id, "pure")
-        return NodeOutput(port_values={"prompt_template": template})
+        return NodeOutput(port_values={PortName("prompt_template"): template})
 
 
 @plugin(
