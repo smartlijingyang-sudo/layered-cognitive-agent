@@ -56,26 +56,49 @@ def test_a3_central_namespace_map_removed():
     assert "tool_namespaces" not in src
 
 
-_TOOL_NAME_RE = re.compile(r"""name\s*=\s*["']([A-Za-z_][A-Za-z0-9_]*)["']""")
+_TOOL_NAME_RE = re.compile(r"""(?<!api_)name\s*=\s*["']([A-Za-z_][A-Za-z0-9_]*)["']""")  # api_name 是前端契约名,不是重复注册
+
+
+def _names_in_file(path: pathlib.Path) -> list[str]:
+    """单文件扫描:跳过 ToolApi(name=...) 前端契约声明块(按括号配平)."""
+    names: list[str] = []
+    skip_depth = 0
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if "ToolApi(" in line:
+            skip_depth = line.count("(") - line.count(")")
+            continue
+        if skip_depth > 0:
+            skip_depth += line.count("(") - line.count(")")
+            if skip_depth <= 0:
+                skip_depth = 0
+            continue
+        names.extend(_TOOL_NAME_RE.findall(line))
+    return names
 
 
 def _tool_names_from_source() -> list[str]:
-    """从工具源码目录收集 name="..." 声明(与 registry 无关的独立扫描)."""
+    """从工具源码目录收集 name="..." 声明(与 registry 无关的独立扫描).
+
+    只收 Tool 的内部注册名;前端契约名(api_name=.../ToolApi(name=...),
+    如 LobeHub 的 activateSkill)是故意设计的另一层名字,不在扫描范围.
+    """
     root = pathlib.Path(__file__).resolve().parents[2]
     names: list[str] = []
     for sub in ("lca/infrastructure/tools", "lca/infrastructure/tool"):
         for path in (root / sub).rglob("*.py"):
             if "__pycache__" in path.parts:
                 continue
-            names.extend(_TOOL_NAME_RE.findall(path.read_text(encoding="utf-8")))
+            names.extend(_names_in_file(path))
     return names
 
 
 def test_a4_no_snake_camel_duplicate_tool_names():
-    """同一工具不许同时存在 snake_case 与 camelCase 双拼(ADR-0256 §3).
+    """同一工具不许同时注册 snake_case 与 camelCase 两个内部名.
 
-    今天的 activate_skill/activateSkill、import_skill/importSkill、
-    search_skill/searchSkill 三对双拼必须收敛为 snake_case.
+    说明:activate_skill/activateSkill 这类"双拼"是故意设计——内部名(模型可见)
+    用 snake_case,api_name(前端契约:LobeHub/computer companion/wechat 展示)
+    用 camelCase,两者在 RenderContract 里显式配对。扫描排除 api_name,只查
+    真正的重复注册。2026-10-01 修正:此前版本误报 api_name 为双拼。
     """
     seen: dict[str, str] = {}
     for name in _tool_names_from_source():
