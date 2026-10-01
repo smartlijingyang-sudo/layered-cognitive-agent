@@ -32,7 +32,7 @@ from lca.nodes.think.history.assemble import HistoryDeriveExecutor
 # ── Minimal tool stub (Tool is runtime_checkable Protocol + Pydantic is_instance) ──
 
 
-def _make_stub_tool(name: str) -> type:
+def _make_stub_tool(name: str, namespace: str = "") -> type:
     """Build a Tool Protocol-conforming class with ClassVars + async execute.
 
     Tool Protocol declares ``name/description/parameters`` as ClassVar;
@@ -51,6 +51,7 @@ def _make_stub_tool(name: str) -> type:
         (),
         {
             "name": name,
+            "namespace": namespace or name,
             "description": f"description for {name}",
             "parameters": {"type": "object", "properties": {}},
             "execute": _execute,
@@ -267,13 +268,10 @@ async def test_defer_catalog_is_replaced_not_stacked() -> None:
         set_current_defer_session,
     )
 
-    search = _make_stub_tool("tool_search")()
-    run = _make_stub_tool("runCommand")()
+    search = _make_stub_tool("tool_search", namespace="core")()
+    run = _make_stub_tool("runCommand", namespace="shell")()
     session = ToolDeferSession(DeferPolicy.default())
-    session.update_turn(
-        (search, run),
-        {"tool_search": "tool_search", "runCommand": "runCommand"},
-    )
+    session.update_turn((search, run))
     _wire, catalog = session.render_turn()
     token = set_current_defer_session(session)
     try:
@@ -304,6 +302,53 @@ async def test_defer_catalog_is_replaced_not_stacked() -> None:
     assert [spec["function"]["name"] for spec in request.tools] == ["tool_search"]
 
 
+async def test_defer_catalog_with_custom_discovery_rule_is_stripped() -> None:
+    """INV-06: 自定义 discovery_rule 时，组装仍能干净剥离旧 catalog，防止多轮膨胀。"""
+    from lca.infrastructure.tool_defer.policy import DeferPolicy
+    from lca.infrastructure.tool_defer.session import (
+        ToolDeferSession,
+        reset_current_defer_session,
+        set_current_defer_session,
+    )
+
+    search = _make_stub_tool("tool_search", namespace="core")()
+    run = _make_stub_tool("runCommand", namespace="shell")()
+    custom_policy = DeferPolicy(
+        namespace_descriptions={"shell": "执行命令"},
+        discovery_rule="Custom discovery rule: invoke tool_search before running commands.",
+    )
+    session = ToolDeferSession(custom_policy)
+    session.update_turn((search, run))
+    _wire, catalog = session.render_turn()
+    token = set_current_defer_session(session)
+    try:
+        # Simulate previous turn where catalog was appended
+        writer = _FakeWriter(
+            messages=[{"role": "user", "content": "q"}],
+            system=f"identity\n\n{catalog}",
+        )
+        forked = ForkedTools.model_construct(
+            items=(search, run),
+            binding_keys=frozenset(),
+        )
+        out = await HistoryDeriveExecutor().node_execute(
+            context=_node_context(),
+            input=NodeInput(
+                port_values={
+                    "state": _make_state(),
+                    "writer": writer,
+                    "forked_tools": forked,
+                }
+            ),
+        )
+    finally:
+        reset_current_defer_session(token)
+    request = out.port_values["model_visible_request"]
+    assert isinstance(request, ModelVisibleRequest)
+    assert request.system.count("Deferred tool namespaces") == 1
+    assert request.system.startswith("identity")
+
+
 async def test_node_execute_tools_empty_when_forked_tools_missing() -> None:
     """ForkedTools 缺失 → ``request.tools == ()``,不抛(向后兼容测试/无工具 run)。"""
     executor = HistoryDeriveExecutor()
@@ -332,7 +377,7 @@ def test_alignment_synthesis_not_appended_when_already_injected() -> None:
         "对齐综述\n"
         "<!-- END INJECTED FILE: dreams/alignment/derived/ALIGNMENT_SYNTHESIS.md -->"
     )
-    out = _append_alignment_synthesis(already, runtime={"home_path": "/tmp/no-home"})
+    out = _append_alignment_synthesis(already, runtime={"home_path": "/var/empty-home"})
     assert out == already
     assert out.count("<!-- INJECTED FILE: dreams/alignment/derived/ALIGNMENT_SYNTHESIS.md -->") == 1
     assert out.count("ALIGNMENT_SYNTHESIS.md") == 2  # 开闭标记各一次，无重复注入

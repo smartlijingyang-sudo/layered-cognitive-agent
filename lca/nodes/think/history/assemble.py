@@ -187,21 +187,29 @@ class HistoryDeriveExecutor:
 
 
 _DEFER_CATALOG_HEADER = "Deferred tool namespaces (not yet loaded):"
+_DEFER_CATALOG_PATTERN = re.compile(
+    r"\n*" + re.escape(_DEFER_CATALOG_HEADER) + r"(?:\n[^\n]+)*\n*",
+)
+_DEFER_SENTINEL_PATTERN = re.compile(
+    r"\n*<!-- BEGIN DEFERRED TOOL CATALOG -->.*?<!-- END DEFERRED TOOL CATALOG -->\n*",
+    re.DOTALL,
+)
 
 
 def _strip_defer_catalog(system: str) -> str:
-    """Drop every previously appended defer catalog, leaving the prompt."""
+    """Drop every previously appended defer catalog, leaving the prompt.
 
-    if _DEFER_CATALOG_HEADER not in system:
-        return system
-    from lca.infrastructure.tool_defer.policy import DeferPolicy
-
-    end = re.escape(DeferPolicy.default().discovery_rule)
-    pattern = re.compile(
-        r"\n*" + re.escape(_DEFER_CATALOG_HEADER) + r"\n.*?" + end + r"\n*",
-        re.DOTALL,
-    )
-    return pattern.sub("\n\n", system).strip()
+    Uses paragraph-level boundary matching to strip catalog blocks without
+    coupling to internal DeferPolicy discovery rules. Supports both explicit
+    sentinel markers and canonical header blocks.
+    """
+    if not system:
+        return ""
+    if "<!-- BEGIN DEFERRED TOOL CATALOG -->" in system:
+        system = _DEFER_SENTINEL_PATTERN.sub("\n\n", system)
+    if _DEFER_CATALOG_HEADER in system:
+        system = _DEFER_CATALOG_PATTERN.sub("\n\n", system)
+    return system.strip()
 
 
 def _resolve_port(name: str, *, input: NodeInput, context: NodeContext) -> Any:
