@@ -8,6 +8,9 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Any
+
 from lca.infrastructure.memory.contextfiles.domain.standing_path import (
     is_standing_write_path,
     standing_write_block_message,
@@ -33,7 +36,7 @@ def test_rejects_semantic_json() -> None:
 
 def test_allows_regular_workspace_files() -> None:
     assert not is_standing_write_path("/home/u/projects/USER.md")
-    assert not is_standing_write_path("/tmp/report.md")
+    assert not is_standing_write_path("/tmp/report.md")  # noqa: S108
     assert not is_standing_write_path("/mnt/data/outputs/chart.png")
 
 
@@ -45,3 +48,18 @@ def test_message_mentions_memory_add() -> None:
     msg = standing_write_block_message()
     assert "memory_add" in msg
     assert "standing" in msg
+
+
+def test_workspace_file_with_dot_lca_segment_is_not_blocked() -> None:
+    """INV-04: 工作区内的项目文件即使包含 .lca 目录段也必须放行，不被误杀。"""
+    assert not is_standing_write_path("/home/lichao/my_project/.lca/USER.md")
+    assert not is_standing_write_path("/home/lichao/my_project/.lca/SOUL.md")
+
+
+def test_custom_lca_home_override_is_honored(tmp_path: Path, monkeypatch: Any) -> None:
+    """INV-04: 当配置自定义 LCA_HOME 时，该自治目录下的 standing 文件必须严格防御。"""
+    custom_home = tmp_path / "custom_agent_data"
+    monkeypatch.setenv("LCA_HOME", str(custom_home))
+    assert is_standing_write_path(custom_home / "assistants/asst_1/SOUL.md")
+    assert is_standing_write_path(custom_home / "assistants/asst_1/memory/USER.md")
+    assert is_standing_write_path(custom_home / "assistants/asst_1/memory/semantic.json")

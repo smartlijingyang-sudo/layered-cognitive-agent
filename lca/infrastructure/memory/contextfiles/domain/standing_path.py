@@ -10,30 +10,43 @@ guard rejects those paths before any backend writes them.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 from lca.infrastructure.memory.contextfiles.domain.layout import packaged_layout
+from lca.infrastructure.path.locator import expand_user_path, get_lca_home
 
 _SEMANTIC_REL = ("memory", "semantic.json")
-_AGENT_HOME_SEGMENTS = (".lca",)
 
 
 def is_standing_write_path(path: str | Path) -> bool:
     """True when ``path`` names an assistant standing file or semantic memory.
 
-    Only paths inside ``~/.lca`` count. A workspace file that happens to share
-    a basename with a standing file stays writable.
+    Only paths inside authoritative ``get_lca_home()`` or an assistant directory
+    (``.../.lca/assistants/...``) count. A workspace file that happens to share
+    a basename with a standing file stays writable, even if in a workspace ``.lca/`` subfolder.
     """
-    expanded = os.path.expanduser(str(path))
-    segments = [segment for segment in expanded.replace("\\", "/").split("/") if segment]
-    if not segments:
+    raw_str = str(path).replace("\\", "/")
+    expanded = expand_user_path(path).resolve()
+    lca_home = get_lca_home().resolve()
+
+    try:
+        is_under_lca_home = expanded.is_relative_to(lca_home)
+    except (ValueError, AttributeError):
+        is_under_lca_home = False
+
+    segments = [s for s in raw_str.split("/") if s]
+    has_lca_assistants = any(
+        segments[i] == ".lca" and i + 1 < len(segments) and segments[i + 1] == "assistants"
+        for i in range(len(segments) - 1)
+    )
+
+    if not is_under_lca_home and not has_lca_assistants:
         return False
-    if _AGENT_HOME_SEGMENTS[0] not in segments:
-        return False
-    if segments[-2:] == list(_SEMANTIC_REL):
+
+    if len(segments) >= 2 and segments[-2:] == list(_SEMANTIC_REL):
         return True
-    basename = segments[-1].lower()
+
+    basename = segments[-1].lower() if segments else ""
     return basename in {name.split("/")[-1].lower() for name in packaged_layout().standing_files}
 
 
