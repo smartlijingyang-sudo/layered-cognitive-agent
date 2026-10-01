@@ -11,6 +11,7 @@ plan reference。
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 from lca.contracts.models.assistant.plan_overlay import SectionOverride
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
@@ -31,9 +32,9 @@ from lca.contracts.protocols.state.scope_plan import ScopePlan
 # PhaseBinding / ControlEntry / CognitivePhaseGraphPlan retired in ADR-0221 P3:
 # the v2 runtime builds its executable plan directly from
 # ``PlanInterpreter`` + NodeExecutor subgraphs, so the plan no longer
-# carries the v1 declarative phase graph region.
-DeclarativeControlEntry = None  # type: ignore[misc]
-PhaseBinding = None  # type: ignore[misc]
+# carries the v1 declarative phase graph region. The v1 element type of
+# ``control_entries`` no longer exists; the v2 runtime never populates
+# this region (always the empty tuple), so its element type is ``Any``.
 
 # Schema version for CompiledRunPlan. v2 evolves v1; it is not a parallel plan.
 COMPILED_RUN_PLAN_VERSION: str = DECLARATIVE_PLAN_VERSION
@@ -58,7 +59,7 @@ class CompiledRunPlan:
     revision: str = "v2"
     plugin_specs: tuple[PluginSpec, ...] = ()
     capability_bindings: tuple[CapabilityBinding, ...] = ()
-    control_entries: tuple[DeclarativeControlEntry, ...] = ()
+    control_entries: tuple[Any, ...] = ()
     replacement_map: tuple[ReplacementDecision, ...] = ()
     effect_policy: EffectPolicyPlan | None = None
     action_authority: ActionAuthorityPlan | None = None
