@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -114,7 +115,7 @@ def _register(app: typer.Typer) -> None:
 
 
 @pytest.fixture
-def fake_facade_clean() -> MagicMock:
+def fake_facade_clean() -> Iterator[MagicMock]:
     """A ``DoctorFacade`` stub that returns a clean report for every call.
 
     The stub's ``doctor_profile`` echoes the path passed in as the report
@@ -128,7 +129,7 @@ def fake_facade_clean() -> MagicMock:
 
 
 @pytest.fixture
-def fake_facade_error() -> MagicMock:
+def fake_facade_error() -> Iterator[MagicMock]:
     """A ``DoctorFacade`` stub that returns an error report."""
     with patch(f"{_PROFILE_MODULE}.DoctorFacade") as facade_cls:
         instance = MagicMock()
@@ -138,7 +139,7 @@ def fake_facade_error() -> MagicMock:
 
 
 @pytest.fixture
-def fake_facade_activation_ref() -> MagicMock:
+def fake_facade_activation_ref() -> Iterator[MagicMock]:
     """A ``DoctorFacade`` stub whose report carries an ``activation_ref``."""
     with patch(f"{_PROFILE_MODULE}.DoctorFacade") as facade_cls:
         instance = MagicMock()
