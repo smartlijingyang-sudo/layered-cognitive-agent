@@ -61,8 +61,8 @@ class InterruptExecutor:
 
     semantic_name: str = "intervene.interrupt"
     region: str = "intervene"
-    declared_inputs: tuple[PortName, ...] = ("decision", "spine_seq")
-    declared_outputs: tuple[PortName, ...] = ("command", "routing")
+    declared_inputs: tuple[PortName, ...] = (PortName("decision"), PortName("spine_seq"))
+    declared_outputs: tuple[PortName, ...] = (PortName("command"), PortName("routing"))
 
     async def node_execute(
         self,
@@ -70,13 +70,13 @@ class InterruptExecutor:
         input: NodeInput,
     ) -> NodeOutput:
         del context
-        decision = input.port_values.get("decision")
+        decision = input.port_values.get(PortName("decision"))
         if not isinstance(decision, Decision):
             raise TypeError(
                 f"intervene.interrupt expects Decision on port 'decision', "
                 f"got {type(decision).__name__}"
             )
-        seq = input.port_values.get("spine_seq")
+        seq = input.port_values.get(PortName("spine_seq"))
         if seq is None:
             seq = SpineContext.current_sequence()
         if not isinstance(seq, int) or isinstance(seq, bool):
@@ -101,7 +101,7 @@ class InterruptExecutor:
             should_terminate=True,
             next_hint="intervene.resume",
         )
-        return NodeOutput(port_values={"command": cmd, "routing": routing})
+        return NodeOutput(port_values={PortName("command"): cmd, PortName("routing"): routing})
 
 
 @plugin(
