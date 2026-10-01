@@ -200,6 +200,7 @@
 | [0260](0260-forced-retrieval-and-write-before-claim.md) | 强制检索与写盘铁律契约：写盘确认门（acknowledgement.py）升不变量、检索义务决策树升契约+补 home-bound 渲染盲区、当场写/先读后写/冲突原地修正/凭证红线四纪律；ADR-0255 §4.2/§4.3 的 LCA 落地提案 | Proposed |
 | [0261](0261-self-introspection-projection.md) | 自省投影契约：自省答案只许来自本 turn 注入块（禁用工作区文件搜寻）、点名配置文件必须真实注入（BackstorySection 守卫升不变量并推广）、新增只读自省工具与写工具配对；ADR-0255 §4.8 的 LCA 落地提案 | Proposed |
 | [0262](0262-skill-discovery-and-acquisition.md) | Skill 发现与沉淀契约：先查后动手（提示级义务）、先查后断言（检索失败≠检索无结果）、沉淀晋升三段门（candidate→批准→安装）、补 BM25/regex 双模式；ADR-0255 §4.9 的 LCA 落地提案 | Proposed |
+| [0263](0263-routine-scheduling-mutual-exclusion-and-self-healing.md) | 例程调度互斥与自愈契约：单实例互斥锁（owner+心跳）、锁超时自愈收割、busy→显式 SKIP 可观测、触发记录持久化、失败隔离；生产 Muse 调度模式的 LCA 落地提案 | Proposed |
 | [0255](0255-muse-production-runtime-full-reference.md) | Muse 生产运行时全量参考：每 turn 上下文装配顺序、9 个 standing 文件全文与权限矩阵、36 工具命名空间函数清单与关键参数、9 大机制（记忆三层/强制检索/落笔写盘/provenance/压缩豁免/子 agent 继承/自省投影）与 12 条验收用例；ADR-0254 的实证 companion | Proposed |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
