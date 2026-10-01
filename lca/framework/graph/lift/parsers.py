@@ -7,15 +7,18 @@ outside the lift package should go through :func:`lift_graph_spec` /
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, Literal
 
 from lca.contracts.protocols.graph.binding import BindingKind
 from lca.contracts.protocols.graph.errors import PlanLiftError
 from lca.contracts.protocols.graph.node_io import NodeIOSchema, PortSpec
 from lca.contracts.protocols.graph.plan import EdgeLoopObligation, SubgraphReference
+from lca.contracts.protocols.graph.ports import PortName
 from lca.contracts.protocols.graph.predicate import PortRef, Predicate
 
-_LEAF_PREDICATE_KINDS = frozenset({"eq", "ne", "in", "exists", "missing"})
+_LEAF_PREDICATE_KINDS: frozenset[Literal["eq", "ne", "in", "exists", "missing"]] = frozenset(
+    {"eq", "ne", "in", "exists", "missing"}
+)
 
 
 def binding_from(value: object) -> BindingKind:
@@ -110,7 +113,7 @@ def to_port_specs(names: object) -> tuple[PortSpec, ...]:
             if not item:
                 continue
             try:
-                out.append(PortSpec(name=item))
+                out.append(PortSpec(name=PortName(item)))
             except Exception:  # noqa: S112
                 continue
         elif isinstance(item, Mapping):
@@ -120,7 +123,7 @@ def to_port_specs(names: object) -> tuple[PortSpec, ...]:
             try:
                 out.append(
                     PortSpec(
-                        name=name,
+                        name=PortName(name),
                         required=bool(item.get("required", True)),
                         payload_type=None,  # YAML cannot carry live types
                     )
@@ -188,7 +191,7 @@ def coerce_when(raw: object) -> Predicate | None:
             if raw
             else Predicate(
                 kind="eq",
-                port=PortRef(name="__never__"),
+                port=PortRef(name=PortName("__never__")),
                 value=True,
             )
         )
@@ -251,9 +254,9 @@ def coerce_loop(raw: object) -> EdgeLoopObligation | None:
             )
         terminal_pred = coerce_when(terminal_raw)
     return EdgeLoopObligation(
-        max_iterations=max_iterations_int,
+        maxIterations=max_iterations_int,
         budget=budget_str,
-        terminal_predicate=terminal_pred,
+        terminalPredicate=terminal_pred,
     )
 
 
@@ -262,7 +265,7 @@ def parse_predicate_dict(raw: Mapping[str, Any]) -> Predicate:
     kind = str(raw.get("kind", ""))
     if not kind:
         raise PlanLiftError("predicate dict missing 'kind' field")
-    bool_kinds = frozenset({"and", "or", "not"})
+    bool_kinds: frozenset[Literal["and", "or", "not"]] = frozenset({"and", "or", "not"})
     if kind in bool_kinds:
         children_raw = raw.get("children", ())
         if not isinstance(children_raw, (list, tuple)):
@@ -284,7 +287,7 @@ def parse_port_ref(raw: object) -> PortRef:
     if isinstance(raw, Mapping):
         name = str(raw.get("name", ""))
         field = raw.get("field")
-        return PortRef(name=name, field=str(field) if field is not None else None)
+        return PortRef(name=PortName(name), field=str(field) if field is not None else None)
     raise PlanLiftError(f"port ref must be a dict or PortRef, got {type(raw).__name__}")
 
 
