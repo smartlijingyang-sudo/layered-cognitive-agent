@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import AsyncIterator
 
 import pytest
 
@@ -12,7 +13,7 @@ from lca.infrastructure.observability.running_operation_store import (
 
 
 @pytest.fixture
-async def store() -> SqliteRunningOperationStore:
+async def store() -> AsyncIterator[SqliteRunningOperationStore]:
     s = SqliteRunningOperationStore(":memory:")
     yield s
     await s.delete_all_for_test()
