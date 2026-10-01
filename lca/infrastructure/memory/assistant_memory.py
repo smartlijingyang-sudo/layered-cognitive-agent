@@ -489,7 +489,9 @@ class AssistantMemory(MemorySystem):
         except ValueError:
             category_value = MemoryCategory.FACT.value
         try:
-            confidence_value = float(confidence) if confidence is not None else None
+            confidence_value = (
+                float(confidence) if isinstance(confidence, (int, float, str)) else None
+            )
         except (TypeError, ValueError):
             confidence_value = None
         dedupe_key_value = canonical_dedupe_key(
@@ -711,7 +713,7 @@ class AssistantMemory(MemorySystem):
                 retired_at_ms=entry.get("retired_at_ms")
                 if isinstance(entry.get("retired_at_ms"), int)
                 else None,
-                metadata=entry.get("metadata") if isinstance(entry.get("metadata"), dict) else {},
+                metadata=_as_metadata_dict(entry.get("metadata")),
             )
             for entry in self._load(layer)
             if not entry.get("deleted", False)
@@ -719,7 +721,7 @@ class AssistantMemory(MemorySystem):
 
 
 def _explainable(entry: dict[str, Any]) -> ExplainableRecord:
-    metadata = entry.get("metadata") if isinstance(entry.get("metadata"), dict) else {}
+    metadata = _as_metadata_dict(entry.get("metadata"))
     confidence = entry.get("confidence")
     created = entry.get("created_at_ms")
     revision = entry.get("revision_of")
@@ -775,6 +777,11 @@ def _stored_metadata(source: str, metadata: dict[str, Any] | None) -> dict[str, 
         if key != "source":
             stored[key] = value
     return stored
+
+
+def _as_metadata_dict(value: object) -> dict[str, Any]:
+    """Coerce a raw metadata payload to ``dict[str, Any]``; non-dict becomes {}."""
+    return value if isinstance(value, dict) else {}
 
 
 def _as_category(value: object) -> MemoryCategory:
