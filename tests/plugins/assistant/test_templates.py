@@ -228,3 +228,18 @@ class TestBootstrapCompletion:
         )
         spec = catalog.get(handle.assistant_id)
         assert spec.assistant_id == handle.assistant_id
+
+    def test_templates_have_no_host_private_hardcodings(self) -> None:
+        """INV-01: 角色模板中严禁包含任何宿主机私网 IP、特定端口或个人智库路径。"""
+        forbidden_tokens = (
+            "10.36.6.252",
+            "127.0.0.1:7890",
+            "~/everything-library",
+            "Asia/Shanghai (UTC+8)",
+        )
+        for path in TEMPLATES_DIR.rglob("*.md"):
+            content = path.read_text(encoding="utf-8")
+            for token in forbidden_tokens:
+                assert token not in content, (
+                    f"Template {path.relative_to(TEMPLATES_DIR)} contains forbidden hardcoding: {token}"
+                )

@@ -6,14 +6,14 @@
 | BRAINSTORM-HARDCODING-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量测试）并获取审批 | Completed | 3 大小节（边界与自治等级、核心组件架构设计、测试不变量矩阵）均获用户审批通过 |
 | BRAINSTORM-HARDCODING-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-01-hardcoding-remediation-design.md |
 | BRAINSTORM-HARDCODING-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 成功落盘 docs/plans/2026-10-01-hardcoding-remediation-plan.md 并完成实施分解 |
-| HARDCODING-TASK-1 | 模板与预设清洗 (TOOLS.md, AGENTS.md, USER.md) | Ready | 待执行 |
-| HARDCODING-TASK-2 | Prompt 真实感知注入与消除假象 (runtime_env.py) | Ready | 待执行 |
+| HARDCODING-TASK-1 | 模板与预设清洗 (TOOLS.md, AGENTS.md, USER.md) | Completed | 清除 TOOLS.md 私网 IP(10.36.6.252) 与代理(7890)，清除 6 个 AGENTS.md 智库路径与 6 个 USER.md 固定时区，新增 test_templates_have_no_host_private_hardcodings 断言全绿 (60/60 passed) |
+| HARDCODING-TASK-2 | Prompt 真实感知注入与消除假象 (runtime_env.py) | In_Progress | 执行中：准备重构 runtime_env.py 消除 Muse Spark 与固定东八区假象 |
 | HARDCODING-TASK-3 | 路径安全拦截收敛至权威 Locator (standing_path.py) | Ready | 待执行 |
 | HARDCODING-TASK-4 | 参数截断检测精细化与防误杀 (leaked_tool_call.py) | Ready | 待执行 |
 | HARDCODING-TASK-5 | 历史组装 Defer Catalog 标记解耦 (assemble.py) | Ready | 待执行 |
 | HARDCODING-TASK-6 | 全链路不变量回归验证与门禁体检 (INV-01 ~ INV-06) | Ready | 待执行 |
 | ADR-0256-TASK-1 | Contracts 层强化与 DeferPolicy 8 域闭环 (`Tool.namespace` & `DeferPolicy`) | Completed | Tool.namespace 与 ToolApi.namespace 契约增加，DeferPolicy 固化 8 域描述与 shell 审批，单测 3/3 passed，commit 9c8a6b566 |
-| ADR-0256-TASK-2 | 工具 Factory 与 Manifest 显式声明 Namespace 并下沉 SSOT | In_Progress | 执行中 |
+| ADR-0256-TASK-2 | 工具 Factory 与 Manifest 显式声明 Namespace 并下沉 SSOT | Completed | 23项工具显式声明 8 大 namespace，彻底切除 ToolsService._tool_namespaces，20/20 单测全通，commit bbb74b882 |
 | ADR-0256-TASK-3 | ToolDeferSession 协议升级与 ToolSearch 批量加载 | Ready | 待执行 |
 | ADR-0256-TASK-4 | Cognition Wire Gate 升级为 Namespace 可见性判定与驼峰双拼清理 | Ready | 待执行 |
 | ADR-0256-TASK-5 | 接入安全控制面：Shell 域审批策略挂载 | Ready | 待执行 |
