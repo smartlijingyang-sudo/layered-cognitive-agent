@@ -79,7 +79,7 @@ class AggregatorGraphNodeExecutor(GraphNodeExecutor):
     kind=PluginKind.PRIMITIVE,
     effects="none",
     description="Register the default predecessor-result aggregation primitive for graph nodes.",
-    test_suite="tests/test_graph_node_executors.py",
+    test_suite="tests/scenario/graph/test_graph_node_executors.py",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(

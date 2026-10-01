@@ -90,7 +90,7 @@ def _task_for_node(context: GraphNodeExecutionContext) -> str:
     kind=PluginKind.PRIMITIVE,
     effects="none",
     description="Register the default Team-member execution primitive for graph Agent nodes.",
-    test_suite="tests/test_graph_node_executors.py",
+    test_suite="tests/scenario/graph/test_graph_node_executors.py",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(

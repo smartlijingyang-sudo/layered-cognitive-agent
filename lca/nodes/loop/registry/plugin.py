@@ -78,7 +78,7 @@ class GraphNodeExecutorRegistry(GraphNodeExecutorRegistryProtocol):
     kind=PluginKind.SEAM,
     effects="none",
     description="Provide the closed registry for collaboration graph-node primitives.",
-    test_suite="tests/test_graph_node_executors.py",
+    test_suite="tests/scenario/graph/test_graph_node_executors.py",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(

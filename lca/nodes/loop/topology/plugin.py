@@ -60,7 +60,7 @@ class TopologyGraphNodeExecutor(GraphNodeExecutor):
     kind=PluginKind.PRIMITIVE,
     effects="none",
     description="Register default no-op primitives for graph entry, exit, and router nodes.",
-    test_suite="tests/test_graph_node_executors.py",
+    test_suite="tests/scenario/graph/test_graph_node_executors.py",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(
