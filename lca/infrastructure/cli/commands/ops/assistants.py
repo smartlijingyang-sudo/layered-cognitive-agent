@@ -84,8 +84,10 @@ def _soul_diff(
     """对比两个修订快照的配置面文件差异（unified diff）。"""
     snap_from = _load_snapshot(assistant_id, from_seq)
     snap_to = _load_snapshot(assistant_id, to_seq)
-    files_from = snap_from.get("files") if isinstance(snap_from.get("files"), dict) else {}
-    files_to = snap_to.get("files") if isinstance(snap_to.get("files"), dict) else {}
+    raw_from = snap_from.get("files")
+    files_from = raw_from if isinstance(raw_from, dict) else {}
+    raw_to = snap_to.get("files")
+    files_to = raw_to if isinstance(raw_to, dict) else {}
     if not files_from and not files_to:
         typer.echo(f"revision {from_seq} / {to_seq} 均不含文件内容（digest-only 快照）")
         return
