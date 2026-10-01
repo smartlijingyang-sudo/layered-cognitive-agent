@@ -9,6 +9,7 @@ The strategy deliberately reuses :class:`AgentClient.fanout` instead
 of calling :meth:`consult` N times — the production agent client may
 batch, route, or short-circuit per-target.
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Sequence
@@ -20,6 +21,7 @@ from lca.contracts.protocols.agent.client import (
     AgentRequest,
     AgentResponse,
 )
+from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 from lca.contracts.protocols.graph.binding import BindingKind
 from lca.contracts.protocols.graph.node_io import (
     NodeInput,
@@ -35,7 +37,7 @@ FanoutReducer = Callable[[Sequence[AgentResponse]], dict[str, Any]]
 # strategies' stub clients emit on the same port key when a host wires
 # them in tandem. Framework-local on purpose: the host declares its
 # own cognition-layer port names via ``NodeIOSchema``.
-STUB_ECHO_PORT: str = "echo_payload"
+STUB_ECHO_PORT: PortName = PortName("echo_payload")
 
 
 def default_fanout_reducer(responses: Iterable[AgentResponse]) -> dict[str, Any]:
@@ -43,7 +45,11 @@ def default_fanout_reducer(responses: Iterable[AgentResponse]) -> dict[str, Any]
     merged: dict[str, Any] = {}
     for response in responses:
         if response.status == "ok":
-            merged.update(response.payload)
+            # PortName is a str subtype; per-item assignment keeps the
+            # FanoutReducer dict[str, Any] contract while accepting
+            # PortName-keyed payloads.
+            for key, value in response.payload.items():
+                merged[key] = value
     return merged
 
 
@@ -54,13 +60,9 @@ class AgentFanoutStrategy(NodeStrategy):
     client: AgentClient | None = None
     reducer: FanoutReducer = default_fanout_reducer
 
-    async def execute(
-        self, context: StrategyContext, input: NodeInput
-    ) -> NodeOutput:
+    async def execute(self, context: StrategyContext, input: NodeInput) -> NodeOutput:
         if self.client is None:
-            raise RuntimeError(
-                "AgentFanoutStrategy.execute called without client"
-            )
+            raise RuntimeError("AgentFanoutStrategy.execute called without client")
         targets = context.node_config.get("targets") or ()
         if not isinstance(targets, (list, tuple)) or len(targets) == 0:
             raise RuntimeError(
@@ -76,7 +78,12 @@ class AgentFanoutStrategy(NodeStrategy):
         )
         responses = await self.client.fanout(request, targets=targets)
         merged = self.reducer(responses)
-        return NodeOutput(port_values=merged, producer_node=context.node_id)
+        # Seam: the reducer contract is dict[str, Any]; lift keys into
+        # PortName at the port boundary (adapter.py precedent).
+        return NodeOutput(
+            port_values={PortName(k): v for k, v in merged.items()},
+            producer_node=context.node_id,
+        )
 
 
 class _StubClient:
