@@ -11,7 +11,7 @@ FieldProducer merge + I17 在 hook 内经 :mod:`spine_enrich` 执行（wave 2）
 
 from __future__ import annotations
 
-import hashlib
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 import json
 import logging
 from collections.abc import Callable, Sequence
@@ -83,9 +83,9 @@ def _stamp_event_record(
         sort_keys=True,
         default=str,
     )
-    causality_id = "sha256:" + hashlib.sha256(causality_payload.encode()).hexdigest()
+    causality_id = "sha256:" + sha256_hex(causality_payload.encode())
     new_hash = (
-        "sha256:" + hashlib.sha256(((prev_hash or "") + causality_id).encode("utf-8")).hexdigest()
+        "sha256:" + sha256_hex(((prev_hash or "") + causality_id).encode("utf-8"))
     )
 
     _ref_trace_id = getattr(ref, "trace_id", None) if ref is not None else None

@@ -40,7 +40,7 @@ ADR-0185 §3.2 vs reality（偏差已显式记录）:
 
 from __future__ import annotations
 
-import hashlib
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 import logging
 from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Any
@@ -84,7 +84,7 @@ del _payload_cls, _rebuild_ns, _typing
 
 
 def _sha256_hex(data: bytes) -> str:
-    return f"sha256:{hashlib.sha256(data).hexdigest()}"
+    return f"sha256:{sha256_hex(data)}"
 
 
 def _canonical_digest(header: EpochHeader) -> str:

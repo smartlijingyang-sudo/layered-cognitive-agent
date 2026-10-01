@@ -10,7 +10,7 @@ Every service sees the same shape: what changed, summary line, file list.
 
 from __future__ import annotations
 
-import hashlib
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -180,6 +180,6 @@ class StateStore:
                     continue
                 rel = str(f.relative_to(base.parent))
                 stat = f.stat()
-                content_hash = hashlib.sha256(f.read_bytes()).hexdigest()[:16]
+                content_hash = sha256_hex(f.read_bytes(), length=16)
                 result[rel] = (stat.st_mtime, content_hash)
         return result

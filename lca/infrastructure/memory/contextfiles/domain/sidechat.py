@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 
 _MARKER = re.compile(r"<!-- side-chat: ([A-Za-z0-9_-]+) -->")
 _BULLET = re.compile(r"^-\s+(.+)$")
@@ -132,9 +133,7 @@ def _recorded_on(line: str) -> str:
 
 
 def _content_id(content: str) -> str:
-    import hashlib
-
-    digest = hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
+    digest = sha256_hex(content.encode("utf-8"), length=16)
     return f"sidechat-{digest}"
 
 

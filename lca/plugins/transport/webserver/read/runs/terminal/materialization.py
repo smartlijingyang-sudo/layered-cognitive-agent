@@ -28,6 +28,7 @@ from __future__ import annotations
 import contextlib
 import fcntl
 import hashlib
+from lca.contracts.observability.canonical_digest import canonical_digest
 import json
 import time
 import traceback
@@ -184,9 +185,7 @@ def record_terminal_materialization(session: RunSession) -> None:
             # The other 4 fields are deterministic per spec §10.5.
             payload_for_hash = health_report.model_dump(mode="json")
             payload_for_hash.pop("generated_at", None)
-            health_hash = hashlib.sha256(
-                json.dumps(payload_for_hash, sort_keys=True, ensure_ascii=False).encode("utf-8")
-            ).hexdigest()
+            health_hash = canonical_digest(payload_for_hash, length=64, prefix="")
 
         # G-12: under the per-run-id flock, check for early-return.
         with _materialization_lock(manifest_path):

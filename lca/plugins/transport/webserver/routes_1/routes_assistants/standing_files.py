@@ -9,7 +9,7 @@ Endpoints:
 from __future__ import annotations
 
 import contextlib
-import hashlib
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -50,7 +50,7 @@ _PROFILE_PATCH_FIELDS: dict[str, str] = {
 
 def sha256_of_str(text: str) -> str:
     """Compute sha256 digest with ``sha256:`` prefix for optimistic concurrency control."""
-    return f"sha256:{hashlib.sha256(text.encode('utf-8')).hexdigest()}"
+    return f"sha256:{sha256_hex(text.encode('utf-8'))}"
 
 
 def _summarize(content: str, max_lines: int = 3, max_chars: int = 150) -> str:

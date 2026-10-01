@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 from lca.infrastructure.memory.contextfiles.domain.curated import contains_secret
 from lca.infrastructure.memory.contextfiles.domain.edit import (
     FileVersion,
@@ -128,9 +129,7 @@ class SideChatDirectory:
 
 
 def _record_id(content: str) -> str:
-    import hashlib
-
-    digest = hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
+    digest = sha256_hex(content.encode("utf-8"), length=16)
     return f"sc-{digest}"
 
 

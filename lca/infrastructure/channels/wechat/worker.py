@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import hashlib
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -25,7 +25,7 @@ DispatchFunction = Callable[
 def derive_wechat_session_id(assistant_id: str, ilink_user_id: str) -> str:
     """Deterministically derive an isolated LCA session ID for a WeChat user."""
     seed = f"{assistant_id}:{ilink_user_id}".encode()
-    hash_part = hashlib.sha256(seed).hexdigest()[:16]
+    hash_part = sha256_hex(seed, length=16)
     asst_prefix = assistant_id.replace("asst_", "")[:8]
     return f"sess_wc_{asst_prefix}_{hash_part}"
 

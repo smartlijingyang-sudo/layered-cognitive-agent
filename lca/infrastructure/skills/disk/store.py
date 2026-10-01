@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import hashlib
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 import json
 import re
 from datetime import UTC, datetime
@@ -40,7 +40,7 @@ def sanitize_skill_id(raw: str) -> str:
 
 
 def content_hash(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
+    return sha256_hex(data)
 
 
 class DiskSkillPackageStore(SkillPackageInstaller, SkillPackageStore):

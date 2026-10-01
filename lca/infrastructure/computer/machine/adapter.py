@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-import hashlib
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 import posixpath
 import time
 from typing import Any
@@ -79,7 +79,7 @@ class MachineLocalExecAdapter:
             if hasattr(self._computer, "_scope") and orig_scope is not None:
                 self._computer._scope = orig_scope
         digest = (
-            "sha256-" + hashlib.sha256(result.content.encode()).hexdigest()[:16]
+            "sha256-" + sha256_hex(result.content.encode(), length=16)
             if result.content
             else None
         )

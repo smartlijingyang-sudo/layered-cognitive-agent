@@ -26,7 +26,7 @@ consistency, large enough that fsync is not on the hot path).
 
 from __future__ import annotations
 
-import hashlib
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 import json
 import logging
 import os
@@ -75,7 +75,7 @@ def offload_sidecar_path(
     ``legacy_sha256_only=True`` to get the original ``<sha256>.json``
     layout for older readers.
     """
-    digest = hashlib.sha256(encoded).hexdigest()
+    digest = sha256_hex(encoded)
     if legacy_sha256_only:
         sidecar_name = f"{digest}.json"
     else:

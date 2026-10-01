@@ -6,7 +6,7 @@ Tools delegate here; they do not manage sessions directly.
 
 from __future__ import annotations
 
-import hashlib
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
@@ -66,7 +66,7 @@ def _append_artifact_scanner(code: str) -> str:
 
 
 def _file_fingerprint(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
+    return sha256_hex(data)
 
 
 class RunBoundSandboxRuntime(SandboxRuntime):

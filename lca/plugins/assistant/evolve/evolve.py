@@ -21,7 +21,7 @@ EP payload 禁止 SKILL 全文 / 草稿正文（ADR-0187 §3 D2 末段 + D9）�
 
 from __future__ import annotations
 
-import hashlib
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 import json
 from collections.abc import Callable, Mapping
 from pathlib import Path
@@ -413,7 +413,7 @@ class _AssistantEvolveImpl(AssistantEvolve, SkillAcquirer):
         pending_dir.mkdir(parents=True, exist_ok=True)
         draft_path = pending_dir / f"{candidate.candidate_id}.md"
         draft_path.write_text(candidate.procedure, encoding="utf-8")
-        draft_digest = f"sha256:{hashlib.sha256(candidate.procedure.encode('utf-8')).hexdigest()}"
+        draft_digest = f"sha256:{sha256_hex(candidate.procedure.encode('utf-8'))}"
         card: dict[str, Any] = {
             "candidate_id": candidate.candidate_id,
             "assistant_id": assistant_id,
@@ -447,7 +447,7 @@ class _AssistantEvolveImpl(AssistantEvolve, SkillAcquirer):
 
 def _content_digest(text: str) -> str:
     """``sha256:<hex>`` 内容 digest（与 _home_layout.sha256_digest 同形态）。"""
-    return f"sha256:{hashlib.sha256(text.encode('utf-8')).hexdigest()}"
+    return f"sha256:{sha256_hex(text.encode('utf-8'))}"
 
 
 def _skill_name(candidate_id: str) -> str:

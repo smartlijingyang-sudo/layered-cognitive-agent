@@ -11,7 +11,7 @@ people/groups INDEX.md ordered by intimacy, and writes
 
 from __future__ import annotations
 
-import hashlib
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -135,7 +135,7 @@ def _trail_facts(home: Path, *, now_ms: int) -> tuple[EpisodeFact, ...]:
 
 
 def _trail_episode(entry: TrailEntry) -> EpisodeFact:
-    digest = hashlib.sha256(entry.content.encode("utf-8")).hexdigest()[:12]
+    digest = sha256_hex(entry.content.encode("utf-8"), length=12)
     if is_preference_statement(entry.content):
         category = MemoryCategory.PREFERENCE
         authority = True

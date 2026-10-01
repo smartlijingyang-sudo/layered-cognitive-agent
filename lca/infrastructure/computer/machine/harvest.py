@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import base64
-import hashlib
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 import json
 import mimetypes
 import os
@@ -98,7 +98,7 @@ async def harvest_plane_outputs(
         data = await read_machine_bytes(computer_op, path)
         if not data:
             continue
-        digest = hashlib.sha256(data).hexdigest()
+        digest = sha256_hex(data)
         if fingerprints.get(path) == digest:
             continue
         fingerprints[path] = digest

@@ -1,4 +1,4 @@
-import hashlib
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict
@@ -35,4 +35,4 @@ class AutoReviewVerdict(BaseModel):
 def compute_action_fingerprint(tool_name: str, arguments: dict) -> str:
     """计算确定性 SHA-256 动作指纹，确保 Escalate 人审同一动作不可变重放。"""
     raw = f"{tool_name}:{sorted(arguments.items())}"
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    return sha256_hex(raw.encode("utf-8"))

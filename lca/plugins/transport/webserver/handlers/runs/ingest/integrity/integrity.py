@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import base64
-import hashlib
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 import re
 
 from lca.plugins.transport.webserver.handlers.runs.ingest.models.models import FileIntegrityError
@@ -26,7 +26,7 @@ _DATA_URI_RE = re.compile(r"^data:([^;,]+)?;base64,(.+)$", re.IGNORECASE | re.DO
 
 def content_hash(content: bytes) -> str:
     """Return the SHA-256 digest used by the ingest cache integrity gate."""
-    return hashlib.sha256(content).hexdigest()
+    return sha256_hex(content)
 
 
 def validate_file_integrity(

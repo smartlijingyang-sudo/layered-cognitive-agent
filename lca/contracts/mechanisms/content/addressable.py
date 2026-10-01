@@ -14,6 +14,16 @@ from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
 
+def sha256_hex(data: bytes, *, length: int | None = None) -> str:
+    """Canonical sha256 hex digest —— 机制收敛点。
+
+    算法（sha256）+ 编码（hex）收敛到此一处；截断长度是调用方策略，
+    以显式 ``length`` 参数保留（``None`` 返回全 64 hex）。
+    """
+    digest = hashlib.sha256(data).hexdigest()
+    return digest if length is None else digest[:length]
+
+
 @runtime_checkable
 class ContentAddressableStore(Protocol):
     """纯 CAS:内容寻址、按摘要读、不可变。"""
@@ -41,7 +51,7 @@ class InMemoryContentAddressableStore:
     _items: dict[str, bytes] = field(default_factory=dict)
 
     def put(self, payload: bytes, *, media_type: str = "application/octet-stream") -> str:
-        digest = hashlib.sha256(payload).hexdigest()
+        digest = sha256_hex(payload)
         self._items[digest] = payload
         return digest
 
@@ -64,4 +74,5 @@ class InMemoryContentAddressableStore:
 __all__ = [
     "ContentAddressableStore",
     "InMemoryContentAddressableStore",
+    "sha256_hex",
 ]
