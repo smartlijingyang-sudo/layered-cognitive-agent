@@ -274,7 +274,7 @@ def test_route_legacy_patterns_tests_are_exempt(tmp_path: Path, script_scan_modu
     test_file.write_text(
         "from lca.contracts.runtime.intent import RunIntent\n"
         "from lca.harness.profile.resolve.resolve import resolve_profile\n"
-        "from lca.harness.composition.plan_compiler import compile_plan\n"
+        "from lca_kernel.plan.plan_compile import compile_plan\n"
         "def test_x():\n"
         "    p = resolve_profile('/profiles/x.yaml')\n"
         "    plan = compile_plan(p)\n"
@@ -310,7 +310,7 @@ def test_route_legacy_patterns_helpers_are_exempt(tmp_path: Path, script_scan_mo
     helper_file = harness_dir / "fixture_helper.py"
     helper_file.write_text(
         "from lca.harness.profile.resolve.resolve import resolve_profile\n"
-        "from lca.harness.composition.plan_compiler import compile_plan\n"
+        "from lca_kernel.plan.plan_compile import compile_plan\n"
         "def helper():\n"
         "    p = resolve_profile('/profiles/x.yaml')\n"
         "    return compile_plan(p)\n",

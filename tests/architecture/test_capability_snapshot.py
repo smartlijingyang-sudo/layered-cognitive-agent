@@ -93,7 +93,7 @@ def test_plan_ref_stability() -> None:
 
 def test_plan_ref_is_independent_of_checkout_path() -> None:
     """Equivalent relative and absolute Profile inputs share one plan identity."""
-    from lca.harness.composition.plan_compiler import compile_plan
+    from lca_kernel.plan.plan_compile import compile_plan
     from lca.harness.plan import compiled_run_plan_ref
     from lca.harness.profile.resolve.resolve import resolve_profile
 

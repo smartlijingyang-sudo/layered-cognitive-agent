@@ -16,7 +16,7 @@ from unittest.mock import patch
 
 import pytest
 
-from lca.harness.composition.plan_compiler import PlanCompilerError
+from lca_kernel.plan.plan_compile import PlanCompilerError
 from lca.harness.diagnostics.doctor.compile_dry_run import (
     DoctorCompileError,
     ProfileCompileDryRun,

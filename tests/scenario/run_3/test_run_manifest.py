@@ -139,7 +139,7 @@ def test_manifest_plan_ref_round_trip_with_real_compiled_run_plan_ref() -> None:
     锁住 plan_ref 的事实格式:16 hex chars(declarative 路径)或 mode
     fingerprint(solo 路径,同样 16 hex)。任何 reader 都按 16-hex 解析。
     """
-    from lca.harness.composition.plan_compiler import compile_plan
+    from lca_kernel.plan.plan_compile import compile_plan
     from lca.harness.plan import compiled_run_plan_ref
     from lca.harness.profile.resolve.resolve import resolve_profile
 

@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from lca.harness.composition.plan_compiler import compile_plan
+from lca_kernel.plan.plan_compile import compile_plan
 from lca.harness.profile.resolve.resolve import resolve_profile
 
 REPO_ROOT = Path(__file__).resolve().parents[2]

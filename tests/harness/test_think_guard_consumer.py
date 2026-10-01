@@ -145,7 +145,7 @@ class TestDeclarativeControlProjection:
         from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
             SemanticPhase,
         )
-        from lca.harness.composition.plan_compiler import compile_plan
+        from lca_kernel.plan.plan_compile import compile_plan
         from lca.harness.profile.resolve.resolve import resolve_profile
 
         plan = compile_plan(resolve_profile("profiles/web-standard.yaml"))
@@ -162,7 +162,7 @@ class TestDeclarativeControlProjection:
         from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
             SemanticPhase,
         )
-        from lca.harness.composition.plan_compiler import compile_plan
+        from lca_kernel.plan.plan_compile import compile_plan
         from lca.harness.profile.resolve.resolve import resolve_profile
 
         plan = compile_plan(resolve_profile("profiles/web-standard.yaml"))
