@@ -15,6 +15,7 @@ producer of that kind.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from typing import Any
 
 from lca.cognition.memory.daytime import record_task_episode
 from lca.contracts.atoms.control.slot import ControlSlot
@@ -50,8 +51,8 @@ class PerceiveObserveExecutor:
 
     semantic_name: str = "phase.perceive.observe"
     region: str = "perceive"
-    declared_inputs: tuple[PortName, ...] = ("state",)
-    declared_outputs: tuple[PortName, ...] = ("manifest",)
+    declared_inputs: tuple[PortName, ...] = (PortName("state"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("manifest"),)
 
     async def node_execute(
         self,
@@ -60,7 +61,7 @@ class PerceiveObserveExecutor:
     ) -> NodeOutput:
         runtime = context.runtime or {}
         # Tool turns often stop before reflect. The utterance is already here.
-        state = input.port_values.get("state")
+        state = input.port_values.get(PortName("state"))
         if state is None and hasattr(runtime, "get"):
             state = runtime.get("agent_state")
         record_task_episode(runtime, state)
@@ -69,31 +70,37 @@ class PerceiveObserveExecutor:
             hub = runtime.get("perceive_hub")
         routing = RoutingDecision(action_type=ActionType.RESPOND)
         if not isinstance(hub, PerceiveHub):
-            return NodeOutput(port_values={"manifest": None, "routing": routing})
+            return NodeOutput(port_values={PortName("manifest"): None, PortName("routing"): routing})
         manifest = await hub.perceive(state)  # type: ignore[arg-type]
         merged = await self._merge_assistant_bootstrap(runtime, manifest)
-        return NodeOutput(port_values={"manifest": merged, "routing": routing})
+        return NodeOutput(port_values={PortName("manifest"): merged, PortName("routing"): routing})
 
     @staticmethod
     async def _merge_assistant_bootstrap(runtime: object, manifest: object) -> object:
         """合并 per-assistant bootstrap 投影；任何失败保持原 manifest。"""
         if not isinstance(manifest, ContextManifest):
             return manifest
-        bootstrap = getattr(runtime, "assistant_bootstrap", None)
-        if bootstrap is None and hasattr(runtime, "get"):
-            bootstrap = runtime.get("assistant_bootstrap")
+        runtime_get = getattr(runtime, "get", None)
+        bootstrap: Any = getattr(runtime, "assistant_bootstrap", None)
+        if bootstrap is None and callable(runtime_get):
+            bootstrap = runtime_get("assistant_bootstrap")
         assistant_id = getattr(runtime, "assistant_id", None)
-        if assistant_id is None and hasattr(runtime, "get"):
-            assistant_id = runtime.get("assistant_id")
+        if assistant_id is None and callable(runtime_get):
+            assistant_id = runtime_get("assistant_id")
         if bootstrap is None or not str(assistant_id or "").strip():
             return manifest
+        project: Any = getattr(bootstrap, "project", None)
+        if not callable(project):
+            return manifest
         try:
-            projection = bootstrap.project(str(assistant_id))
+            projection = project(str(assistant_id))
             bootstrap_manifest = getattr(projection, "manifest", None)
+            projection_items: Any = getattr(projection, "items", None)
             if isinstance(bootstrap_manifest, ContextManifest):
                 items: tuple[object, ...] = bootstrap_manifest.items
-            elif callable(getattr(projection, "items", None)):
-                items = tuple(projection.items())
+            elif callable(projection_items):
+                raw_items: Any = projection_items()
+                items = tuple(raw_items)
             else:
                 items = ()
         except Exception:
