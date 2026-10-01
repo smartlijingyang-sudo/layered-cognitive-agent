@@ -430,5 +430,4 @@ __all__ = [
     "BundleSubgraphResolver",
     "_compile_bundle_graph",
     "default_subgraph_resolver",
-    "resolve_factory",
 ]
