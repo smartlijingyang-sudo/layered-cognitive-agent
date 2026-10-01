@@ -248,11 +248,3 @@ def render_diagnostic_trace_line(item: dict[str, Any]) -> None:
         print(f"  output: {json.dumps(output, ensure_ascii=False, sort_keys=True)}")
     if item.get("error_type"):
         print(f"  error: {item['error_type']}: {item.get('error_message', '')}")
-
-
-def resolve_diagnose_journal_path(
-    explicit: Path | None,
-    trace_id: str | None,
-) -> Path | None:
-    """Pick a journal artifact to scan (returns ``None`` instead of raising)."""
-    return _resolve_journal_artifact(jsonl=explicit, trace_id=trace_id)
