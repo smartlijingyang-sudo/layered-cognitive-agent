@@ -17,7 +17,9 @@ from lca.infrastructure.tool_defer.session import (
 class FakeTool:
     """Minimal structural Tool: name/description/parameters + execute."""
 
-    def __init__(self, name: str, params: dict[str, Any] | None = None, namespace: str = "") -> None:
+    def __init__(
+        self, name: str, params: dict[str, Any] | None = None, namespace: str = ""
+    ) -> None:
         self.name = name
         self.namespace = namespace
         self.description = f"fake tool {name}"

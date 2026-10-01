@@ -46,17 +46,13 @@ class ToolSearchTool(Tool):
         "properties": {
             "namespace": {
                 "type": "string",
-                "description": (
-                    "Namespace key from the deferred catalog, "
-                    'e.g. "file".'
-                ),
+                "description": ('Namespace key from the deferred catalog, e.g. "file".'),
             },
             "namespaces": {
                 "type": "array",
                 "items": {"type": "string"},
                 "description": (
-                    "List of namespace keys to load in batch, "
-                    'e.g. ["file", "memory"].'
+                    'List of namespace keys to load in batch, e.g. ["file", "memory"].'
                 ),
             },
         },
@@ -95,8 +91,14 @@ class ToolSearchTool(Tool):
         )
 
     def validate(self, args: dict[str, Any]) -> str | None:
-        has_ns = "namespace" in args and isinstance(args["namespace"], str) and bool(args["namespace"])
-        has_nss = "namespaces" in args and isinstance(args["namespaces"], list) and bool(args["namespaces"])
+        has_ns = (
+            "namespace" in args and isinstance(args["namespace"], str) and bool(args["namespace"])
+        )
+        has_nss = (
+            "namespaces" in args
+            and isinstance(args["namespaces"], list)
+            and bool(args["namespaces"])
+        )
         if not has_ns and not has_nss:
             return "Either 'namespace' (str) or 'namespaces' (list[str]) must be provided"
         if has_ns and not isinstance(args["namespace"], str):

@@ -78,13 +78,17 @@ class MachineAccessStrategy:
                 op = machine_operation(tool_name) or ""
                 paths = call_paths(op, arguments)
                 target_resource = paths[0] if paths else None
-                cmd = arguments.get("command") if isinstance(arguments.get("command"), str) else None
+                cmd = (
+                    arguments.get("command") if isinstance(arguments.get("command"), str) else None
+                )
 
                 # Determine reason and risk level
                 if target_resource and any(sub in target_resource for sub in _SENSITIVE_SUBSTRINGS):
                     reason_kind = ApprovalReasonKind.SENSITIVE_RESOURCE
                     risk_level = RiskLevel.HIGH
-                elif target_resource and (".." in target_resource or decision.verdict is AccessVerdict.DENY):
+                elif target_resource and (
+                    ".." in target_resource or decision.verdict is AccessVerdict.DENY
+                ):
                     reason_kind = ApprovalReasonKind.UNAUTHORIZED_PATH
                     risk_level = RiskLevel.HIGH if ".." in target_resource else RiskLevel.CRITICAL
                 elif cmd:
@@ -217,7 +221,9 @@ class NamespaceApprovalStrategy:
         approval_rules = (
             self._approval_mapping
             if self._approval_mapping is not None
-            else (policy.namespace_approval if policy is not None else {"shell": "require_approval"})
+            else (
+                policy.namespace_approval if policy is not None else {"shell": "require_approval"}
+            )
         )
 
         session_tool_to_ns: dict[str, str] = {}

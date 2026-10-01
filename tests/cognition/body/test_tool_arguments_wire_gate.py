@@ -223,9 +223,7 @@ def test_unloaded_namespace_is_not_executable() -> None:
         assert "tool_search" in (hidden.error or "")
         visible = unexposed_tool_block_observation(
             _decision(
-                ToolCall(
-                    call_id="c2", tool_name="tool_search", arguments={"namespace": "shell"}
-                )
+                ToolCall(call_id="c2", tool_name="tool_search", arguments={"namespace": "shell"})
             )
         )
         assert visible is None
