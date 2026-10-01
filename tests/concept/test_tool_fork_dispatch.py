@@ -405,12 +405,6 @@ def _write_custom_tool(home, tool_id: str, *, builtin: str, name: str | None = N
     (tool_dir / "tool.json").write_text(json.dumps(spec), encoding="utf-8")
 
 
-@pytest.mark.skip(
-    reason="源码 bug（已立案 backlog）：AssistantCustomTool 显式不继承 Tool 协议 "
-    "(lca/infrastructure/tools/assistant/custom_tool.py:29-36)，但 ForkedTools.items "
-    "要求 isinstance(item, Tool) —— assistant_id+home_path 且 {home}/tools/ 有自定义工具时 "
-    "dispatch.py:320 抛 ValidationError。源码修好（继承 Tool 或包装）后解除 skip。"
-)
 @pytest.mark.asyncio
 async def test_assistant_id_merges_custom_tools(tmp_path) -> None:
     """I-B17:自定义工具进入 ForkedTools；包装被 deny 内置工具的 preset 被跳过。"""

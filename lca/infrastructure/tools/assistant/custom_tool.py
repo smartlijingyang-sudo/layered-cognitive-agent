@@ -26,8 +26,8 @@ _BUILTIN_PRESET = "builtin_preset"
 _SANDBOX_SCRIPT = "sandbox_script"
 
 
-class AssistantCustomTool:
-    """一个 ``ToolSpec`` 的运行时实例（不显式继承 ``Tool`` 协议）。
+class AssistantCustomTool(Tool):
+    """一个 ``ToolSpec`` 的运行时实例（显式继承 ``Tool`` 协议）。
 
     ``name`` / ``description`` / ``parameters`` 是实例属性（来自
     ``tool.json``），``ToolSchema.from_any`` 经 ``getattr`` 读取，兼容
