@@ -168,12 +168,96 @@ class ApprovalPolicyRegistry:
         return [strat for _, strat in self._strategies]
 
 
+_STANDARD_SHELL_TOOLS: frozenset[str] = frozenset(
+    {
+        "runCommand",
+        "run_command",
+        "execScript",
+        "exec_script",
+        "executeCode",
+        "execute_code",
+        "getCommandOutput",
+        "get_command_output",
+        "killCommand",
+        "kill_command",
+        "box_run_command",
+        "bash",
+        "run_skill_script",
+    }
+)
+
+
+class NamespaceApprovalStrategy:
+    """Strategy inspecting tool namespace approval requirements (e.g. shell domain)."""
+
+    strategy_name = "namespace_approval"
+
+    def __init__(
+        self,
+        tool_namespaces: Mapping[str, str] | None = None,
+        approval_mapping: Mapping[str, str] | None = None,
+    ) -> None:
+        self._tool_namespaces = tool_namespaces
+        self._approval_mapping = approval_mapping
+
+    def evaluate(
+        self,
+        tool_calls: Sequence[ToolCall],
+        plane: PlaneRef | None = None,
+    ) -> ApprovalRequirement | None:
+        del plane
+        if not isinstance(tool_calls, (list, tuple)):
+            return None
+
+        # Build dynamic tool -> namespace map from defer session if present
+        from lca.infrastructure.tool_defer.session import current_defer_session
+
+        defer_session = current_defer_session()
+        policy = defer_session.policy if defer_session is not None else None
+        approval_rules = (
+            self._approval_mapping
+            if self._approval_mapping is not None
+            else (policy.namespace_approval if policy is not None else {"shell": "require_approval"})
+        )
+
+        session_tool_to_ns: dict[str, str] = {}
+        if defer_session is not None:
+            for ns_obj in defer_session.namespaces:
+                for tname in ns_obj.tool_names:
+                    session_tool_to_ns[tname] = ns_obj.name
+
+        for call in tool_calls:
+            tool_name = getattr(call, "tool_name", None)
+            if not isinstance(tool_name, str) or not tool_name:
+                continue
+
+            ns: str | None = None
+            if self._tool_namespaces and tool_name in self._tool_namespaces:
+                ns = self._tool_namespaces[tool_name]
+            elif tool_name in session_tool_to_ns:
+                ns = session_tool_to_ns[tool_name]
+            elif tool_name in _STANDARD_SHELL_TOOLS:
+                ns = "shell"
+
+            if ns and approval_rules.get(ns) == "require_approval":
+                return ApprovalRequirement(
+                    required=True,
+                    reason_kind=ApprovalReasonKind.ELEVATED_COMMAND,
+                    risk_level=RiskLevel.HIGH,
+                    summary=f"高危命令或脚本调用需用户授权: {tool_name} (命名空间: {ns})",
+                    target_resource=tool_name,
+                    details={"tool_name": tool_name, "namespace": ns},
+                )
+        return None
+
+
 def build_default_approval_engine() -> ApprovalPolicyEngine:
     """Build standard default approval engine with built-in strategy chain."""
     return ApprovalPolicyEngine(
         strategies=[
             HITLInteractionStrategy(),
             MachineAccessStrategy(),
+            NamespaceApprovalStrategy(),
             DefaultAllowStrategy(),
         ]
     )
