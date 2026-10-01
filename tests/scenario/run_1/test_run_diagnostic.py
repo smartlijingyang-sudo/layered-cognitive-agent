@@ -1,19 +1,20 @@
 """RunDiagnostic end-to-end — see ADR-0122.
 
-The previous ``phase_failure_stop_result`` crammed failure summary into
-``StopDecision.final_output`` (a string slot for the successful answer).
-The reducer then wrote a fixed Chinese fallback when ``state.last_error``
-was empty, which is exactly what ``run_f03bd17f77f1`` ended up showing in
-``doctor_report.H6.error``.
-
 These tests cover:
 
 - ``RunDiagnostic`` is a typed, frozen, JSON-friendly value object.
-- ``phase_failure_stop_result`` emits ``StopDecision.failure: RunDiagnostic``,
-  leaving ``final_output`` None.
 - ``reducer.apply_stop`` propagates the diagnostic message into
   ``state.last_error`` instead of letting the fallback kick in.
 - ``TerminalOutcome.error_ref.diagnostic`` carries the RunDiagnostic.
+
+The ``phase_failure_stop_result`` cases that used to live here were
+retired with the v1 phase-failure machinery (``PhaseExecutionFailure`` /
+``PhaseAttemptFailure`` and the ``plugins.loop.phase._shared.failure_stop``
+helper, all deleted in the ADR-0221 v2 cutover): failure stops are now
+produced by the v2 driver, not by a loop-phase helper. The machine-readable
+summary format those cases asserted (``node={...} error_kind={...}
+attempts=N[...]``) is preserved below as a literal diagnostic message so
+the reducer / ErrorRef propagation contracts stay covered.
 """
 
 from __future__ import annotations
@@ -22,16 +23,28 @@ from dataclasses import FrozenInstanceError
 
 from lca.contracts.models.core.policy.stop import StopDecision, StopReason
 from lca.contracts.models.core.state.lifecycle import TaskStatus
-from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
-    PhaseAttemptFailure,
-    PhaseExecutionFailure,
-)
-from lca.plugins.loop.phase._shared.failure_stop import phase_failure_stop_result
 from lca.runtime.support.diagnostic import (
     PhaseAttemptSummary,
     RunDiagnostic,
     StackFrame,
 )
+
+_SUMMARY = "node=think.main error_kind=internal attempts=1[1:permanent:RuntimeError]"
+
+
+def _failure_diagnostic() -> RunDiagnostic:
+    return RunDiagnostic(
+        run_id="r",
+        trace_id="t",
+        phase="think",
+        node_id="think.main",
+        error_type="RuntimeError",
+        message=_SUMMARY,
+        stack=(),
+        causation=(),
+        attempts=(),
+        extra=(("error_kind", "internal"),),
+    )
 
 
 def test_run_diagnostic_is_frozen_and_serialisable() -> None:
@@ -59,59 +72,13 @@ def test_run_diagnostic_is_frozen_and_serialisable() -> None:
     assert d["stack"][0]["filename"] == "x.py"
 
 
-def test_phase_failure_stop_result_binds_diagnostic_not_final_output() -> None:
-    failure = PhaseExecutionFailure(
-        node_id="think.main",
-        attempts=(PhaseAttemptFailure(attempt=1, category="permanent", error_type="RuntimeError"),),
-    )
-    res = phase_failure_stop_result(
-        failure,
-        plan_ref="plan",
-        run_id="run",
-        trace_id="trace",
-        suggested_action="bind FileStore via RunAmbit",
-    )
-    assert res.result_kind == "stop_decision"
-    stop: StopDecision = res.payload
-    assert stop.should_stop is True
-    assert stop.reason is StopReason.ERROR
-    assert stop.status is TaskStatus.FAILED
-    # ADR-0122: failure carries the diagnostic; final_output stays None.
-    assert stop.final_output is None
-    assert isinstance(stop.failure, RunDiagnostic)
-    assert stop.failure.node_id == "think.main"
-    assert stop.failure.error_type == "RuntimeError"
-    assert stop.failure.attempts[0].category == "permanent"
-    assert stop.failure.suggested_action == "bind FileStore via RunAmbit"
-
-
 def test_reducer_apply_stop_propagates_diagnostic_message() -> None:
     """``state.last_error`` must be filled from the RunDiagnostic, not fall back."""
     from lca.contracts.models.core.state.state import AgentState, Budget
-    from lca.plugins.loop.phase._shared.failure_stop import _summarize_attempts
     from lca.plugins.loop.reducer.plugin import DefaultReducer
 
-    # ADR-clean-truths 决策 一:用真构造路径(phase_failure_stop_result 用的
-    # 摘要生成器)造 message,而不是直接写字面量。这样 reducer 透传测试与
-    # 摘要格式测试共享同一生成器。
-    failure = PhaseExecutionFailure(
-        node_id="think.main",
-        attempts=(PhaseAttemptFailure(attempt=1, category="permanent", error_type="RuntimeError"),),
-    )
-    diag = RunDiagnostic(
-        run_id="r",
-        trace_id="t",
-        phase="think",
-        node_id="think.main",
-        error_type="RuntimeError",
-        message=_summarize_attempts(failure),
-        stack=(),
-        causation=(),
-        attempts=(),
-        extra=(("error_kind", failure.error_kind),),
-    )
+    diag = _failure_diagnostic()
     stop = StopDecision(
-        should_stop=True,
         reason=StopReason.ERROR,
         status=TaskStatus.FAILED,
         failure=diag,
@@ -130,26 +97,10 @@ def test_terminal_outcome_error_ref_carries_diagnostic() -> None:
     """TerminalOutcome.error_ref.diagnostic preserves the typed failure."""
     from lca.contracts.models.core.state.state import AgentState, Budget
     from lca.contracts.models.core.state.terminal_outcome import ErrorRef
-    from lca.plugins.loop.phase._shared.failure_stop import _summarize_attempts
     from lca.plugins.loop.reducer.plugin import DefaultReducer
 
-    failure = PhaseExecutionFailure(
-        node_id="think.main",
-        attempts=(PhaseAttemptFailure(attempt=1, category="permanent", error_type="RuntimeError"),),
-    )
-    diag = RunDiagnostic(
-        run_id="r",
-        trace_id="t",
-        phase="think",
-        node_id="think.main",
-        error_type="RuntimeError",
-        message=_summarize_attempts(failure),
-        stack=(),
-        causation=(),
-        attempts=(),
-    )
+    diag = _failure_diagnostic()
     stop = StopDecision(
-        should_stop=True,
         reason=StopReason.ERROR,
         status=TaskStatus.FAILED,
         failure=diag,
@@ -168,20 +119,3 @@ def test_terminal_outcome_error_ref_carries_diagnostic() -> None:
     assert err.message is not None
     assert "node=think.main" in err.message
     assert "attempts=" in err.message
-
-
-def test_phase_failure_stop_result_no_final_output_when_only_failure() -> None:
-    """Regression: ``StopDecision.final_output`` stays None for failure stops.
-
-    Before ADR-0122 the same field stored the failure message, which then
-    got treated as the run's successful output by the reducer.
-    """
-    failure = PhaseExecutionFailure(
-        node_id="think.main",
-        attempts=(PhaseAttemptFailure(attempt=1, category="permanent", error_type="E"),),
-    )
-    res = phase_failure_stop_result(failure, plan_ref="p", run_id="r", trace_id="t")
-    stop: StopDecision = res.payload
-    assert stop.final_output is None
-    assert stop.failure is not None
-    assert stop.failure.error_type == "E"
