@@ -186,7 +186,7 @@ async def wechat_gateway_dispatch(
         return getattr(session, "error", None) or "执行完成。"
 
     output_chunks: list[str] = []
-    with open(spine_path, encoding="utf-8") as f:  # noqa: ASYNC230
+    with open(spine_path, encoding="utf-8") as f:
         for line in f:
             stripped = line.strip()
             if not stripped:

@@ -52,7 +52,7 @@ class Config(BaseModel):
     dev_mode: bool = False
     """True = 归属检查放行（存量单用户行为）；False = fail-closed。"""
 
-    expected_token: str = "lca-local"  # noqa: S105  dev 共享 token，非凭据
+    expected_token: str = "lca-local"
     """``Authorization: Bearer`` / ``X-LCA-Token`` 期望值（dev_mode=False 时校验）。"""
 
     @field_validator("dev_mode", mode="before")

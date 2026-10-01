@@ -15,7 +15,7 @@ Adopters:
 from __future__ import annotations
 
 
-class ContractViolation(ValueError):  # noqa: N818  (ADR-0214 §3.1 explicit name)
+class ContractViolation(ValueError):
     """Raised when a typed Contract invariant is violated.
 
     Subclasses :class:`ValueError` because contract violations manifest as

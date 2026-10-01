@@ -70,7 +70,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         def _score_current(name: str, value: float, attributes: dict[str, Any]) -> None:
             """向 Langfuse SDK 转发分数。SDK 未安装或失败时降级为 no-op。"""
             try:
-                import langfuse  # noqa: F401  # pyright: ignore[reportMissingImports]
+                import langfuse  # pyright: ignore[reportMissingImports]
                 from langfuse import Langfuse  # pyright: ignore[reportMissingImports]
 
                 client = Langfuse(

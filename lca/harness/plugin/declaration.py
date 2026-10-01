@@ -108,7 +108,7 @@ def plugin(
     setup: _PluginSetupT,
     *,
     id: str,
-    Config: type[BaseModel] | None = None,  # noqa: N803
+    Config: type[BaseModel] | None = None,
     provides: Sequence[Capability[object] | str] | None = None,
     requires: Sequence[Capability[object] | str] | None = None,
     implements: object = None,
@@ -133,7 +133,7 @@ def plugin(
     setup: None = None,
     *,
     id: str,
-    Config: type[BaseModel] | None = None,  # noqa: N803
+    Config: type[BaseModel] | None = None,
     provides: Sequence[Capability[object] | str] | None = None,
     requires: Sequence[Capability[object] | str] | None = None,
     implements: object = None,
@@ -157,7 +157,7 @@ def plugin(
     setup: PluginSetupFn[Any] | None = None,
     *,
     id: str,
-    Config: type[BaseModel] | None = None,  # noqa: N803
+    Config: type[BaseModel] | None = None,
     provides: Sequence[Capability[object] | str] | None = None,
     requires: Sequence[Capability[object] | str] | None = None,
     implements: object = None,

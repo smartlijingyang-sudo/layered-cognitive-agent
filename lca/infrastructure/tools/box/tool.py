@@ -239,7 +239,7 @@ class BoxRunCommandTool(Tool):
         def _run() -> subprocess.CompletedProcess[str]:
             # 员工机 Shell 语义需要管道；AutoReviewWrappedTool 在暴露前已保证
             # auto_review_mode != "off"，上层 SafeExecutor 仍会做权限清单闸。
-            return subprocess.run(  # noqa: S602
+            return subprocess.run(
                 command,
                 shell=True,
                 capture_output=True,

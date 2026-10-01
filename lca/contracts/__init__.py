@@ -88,7 +88,6 @@ from lca.contracts.protocols.journal.spec.spec import (
 )
 
 # Re-export barrel: every `from X import Y` above is intentional public re-export.
-# ruff: noqa: F401
 __all__ = sorted(
     name
     for name, value in globals().items()

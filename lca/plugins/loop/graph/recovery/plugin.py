@@ -35,7 +35,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
     VerificationDeclaration,
 )
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
-    OwnershipDeclaration,  # noqa: F811
+    OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 

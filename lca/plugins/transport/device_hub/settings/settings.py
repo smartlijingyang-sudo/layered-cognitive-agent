@@ -8,7 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class DeviceHubSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="LCA_DEVICE_", extra="ignore")
 
-    service_token: str = "lca-local-host"  # noqa: S105 — stack-local shared secret
+    service_token: str = "lca-local-host"
     jwt_secret: str = ""
     db_path: str = "traces/devices.db"
     subject: str = "local-dev-user"

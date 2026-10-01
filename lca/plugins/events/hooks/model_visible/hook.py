@@ -64,7 +64,7 @@ _log = logging.getLogger(__name__)
 # 普通 rebuild 下也不收口。本模块 import 时一次性 rebuild,显式提供
 # ``_types_namespace`` 把 forward-ref 链钉到 Any。
 # (对齐 PR-0 注释 "PR-0 在 lca_kernel.events.types 落地" 后续工作)
-import typing as _typing  # noqa: E402  # intentional: must follow the TYPE_CHECKING-only imports above so rebuild_namespace is bound before any first payload instantiation.
+import typing as _typing  # intentional: must follow the TYPE_CHECKING-only imports above so rebuild_namespace is bound before any first payload instantiation.
 
 _rebuild_ns = {
     "AssistantRequestConfig": _typing.Any,

@@ -25,7 +25,7 @@ import typer
 # look up via ``build_pipeline``. The modules themselves never reference
 # step functions by name; the import here is the only place that wires
 # the registry before any command runs.
-import lca.infrastructure.cli.steps.steps  # noqa: F401  -- step registration
+import lca.infrastructure.cli.steps.steps
 from lca.infrastructure.cli.commands import (
     assistants,
     audit,
@@ -135,7 +135,7 @@ def logs_alias(
     verbose: bool = typer.Option(
         False, "--verbose", "-v", help="(同 -v) 显示完整 payload + sidecar traceback"
     ),
-    config: Path | None = typer.Option(  # noqa: B008 — typer Option sentinel
+    config: Path | None = typer.Option(
         None, "--config", "-c", help="(同 -c) 配置文件"
     ),
 ) -> None:

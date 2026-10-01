@@ -13,7 +13,7 @@ import shlex
 from dataclasses import dataclass, field
 
 
-class ProgramState(str, enum.Enum):  # noqa: UP042
+class ProgramState(str, enum.Enum):
     """Lifecycle state of one supervised program.
 
     String-valued so :class:`ProgramStatus` serialises naturally in

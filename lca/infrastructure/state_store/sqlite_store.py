@@ -80,7 +80,7 @@ class SqliteStateStore(StateStore):
         if sha256(payload).hexdigest() != expected_digest:
             raise ValueError(f"state snapshot digest mismatch: {state_ref}")
         # The database is a private runtime artifact written by this service only.
-        state = pickle.loads(payload)  # noqa: S301
+        state = pickle.loads(payload)
         if not isinstance(state, AgentState):
             raise TypeError(f"state snapshot has unexpected type: {type(state).__name__}")
         return state

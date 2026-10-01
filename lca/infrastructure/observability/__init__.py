@@ -115,7 +115,7 @@ from lca.infrastructure.observability.events.event.descriptor_registry import (
     UnknownEventDescriptorError,
 )
 from lca.infrastructure.observability.events.event.descriptors_data import build_default_registry
-from lca.infrastructure.observability.facade.facade.facade import (  # noqa: F401
+from lca.infrastructure.observability.facade.facade.facade import (
     BoundObservability,
     EvidenceBinding,
     OperationRecorder,

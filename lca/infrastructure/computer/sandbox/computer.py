@@ -215,7 +215,7 @@ def _format_content(payload: dict[str, Any]) -> str:
     return json.dumps(payload, ensure_ascii=False)
 
 
-from lca.infrastructure.computer.runtime.exec import ComputerRuntimeExecMixin  # noqa: E402
+from lca.infrastructure.computer.runtime.exec import ComputerRuntimeExecMixin
 
 
 class SandboxComputer(_SandboxComputerBase, ComputerRuntimeExecMixin):

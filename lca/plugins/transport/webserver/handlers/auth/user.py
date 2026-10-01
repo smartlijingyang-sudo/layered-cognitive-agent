@@ -23,7 +23,7 @@ from starlette.responses import JSONResponse
 from lca.plugins.transport.webserver.handlers.cors.cors import CORS_HEADERS
 
 DEFAULT_DEV_USER_ID = "local-dev-user"
-DEFAULT_EXPECTED_TOKEN = "lca-local"  # noqa: S105  dev 共享 token，非凭据
+DEFAULT_EXPECTED_TOKEN = "lca-local"
 
 
 def _err(detail: str, *, status_code: int, code: str) -> JSONResponse:

@@ -70,7 +70,7 @@ class KernelServeSpawner:
 
     @property
     def health_url(self) -> str:
-        probe_host = "127.0.0.1" if self._config.host in ("0.0.0.0", "::") else self._config.host  # noqa: S104 — bind-all sentinel
+        probe_host = "127.0.0.1" if self._config.host in ("0.0.0.0", "::") else self._config.host
         return f"http://{probe_host}:{self._config.port}/health"
 
     def run(self) -> SpawnResult:
@@ -80,7 +80,7 @@ class KernelServeSpawner:
         profile = self._config.profile
 
         try:
-            proc = subprocess.Popen(  # noqa: S603 — argv list, no shell
+            proc = subprocess.Popen(
                 [
                     sys.executable, "-m", "lca_kernel", "serve",
                     "--profile", profile,

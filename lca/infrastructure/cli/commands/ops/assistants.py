@@ -138,14 +138,14 @@ def _request(
     }
     if data:
         headers["content-type"] = "application/json"
-    req = urllib.request.Request(  # noqa: S310 — CLI to local kernel; LCA_OPS_BASE_URL is operator-controlled.
+    req = urllib.request.Request(
         url,
         data=data,
         method=method,
         headers=headers,
     )
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:  # noqa: S310 — same justification as Request above.
+        with urllib.request.urlopen(req, timeout=15) as resp:
             text = resp.read().decode("utf-8")
             status = resp.status
     except urllib.error.HTTPError as exc:

@@ -37,7 +37,7 @@ def verify_token(
         return AuthenticatedUser(
             user_id=settings.subject,
             workspace_id=None,
-            token_type="serviceToken",  # noqa: S106
+            token_type="serviceToken",
         )
     if kind == "jwt":
         return _verify_jwt(token, settings)
@@ -46,7 +46,7 @@ def verify_token(
             return AuthenticatedUser(
                 user_id="api-key-user",
                 workspace_id=None,
-                token_type="apiKey",  # noqa: S106
+                token_type="apiKey",
             )
         raise AuthError("apiKey auth is not configured")
     if kind == "machineToken":
@@ -56,13 +56,13 @@ def verify_token(
                 return AuthenticatedUser(
                     user_id=req.user_id or "companion-user",
                     workspace_id=req.workspace_id,
-                    token_type="machineToken",  # noqa: S106
+                    token_type="machineToken",
                 )
         if token.startswith("mtk-") and pairing_service is None:
             return AuthenticatedUser(
                 user_id="companion-user",
                 workspace_id=None,
-                token_type="machineToken",  # noqa: S106
+                token_type="machineToken",
             )
         raise AuthError("Invalid machine token")
     raise AuthError(f"Unknown token type: {kind}")
@@ -104,7 +104,7 @@ def _verify_jwt(token: str, settings: DeviceHubSettings) -> AuthenticatedUser:
     return AuthenticatedUser(
         user_id=user_id,
         workspace_id=str(workspace) if workspace else None,
-        token_type="jwt",  # noqa: S106
+        token_type="jwt",
     )
 
 

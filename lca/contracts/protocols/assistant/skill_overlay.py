@@ -160,11 +160,11 @@ class SkillActivationReceipt:
 # ── 失败语义异常 ─────────────────────────────────────────────────────
 
 
-class SkillNotInstalled(LookupError):  # noqa: N818
+class SkillNotInstalled(LookupError):
     """``activate`` 找不到 ``{home}/skills/<skill_id>/`` 落盘包。"""
 
 
-class SkillNotVerified(RuntimeError):  # noqa: N818
+class SkillNotVerified(RuntimeError):
     """``activate`` 拒收：包未过 0067 三闸（artifact_state 非 VERIFIED/ACTIVE）。
 
     对应 ADR-0187 §3 D6「未验证包在 run 中不可被 `activate`」。

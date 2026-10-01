@@ -35,14 +35,14 @@ __all__ = [
 ]
 
 
-class JobsCapabilityMissing(RuntimeError):  # noqa: N818
+class JobsCapabilityMissing(RuntimeError):
     """profile 缺 ``continuous_control_plane_factory`` capability（fail-closed）。
 
     ADR-0187 §3 D10：缺 capability ⇒ jobs 注册拒收，**不**降级为隐式线程。
     """
 
 
-class JobNotRegistered(RuntimeError):  # noqa: N818
+class JobNotRegistered(RuntimeError):
     """``fire`` 的 job 未注册（本进程注册表与 0093 队列均无该 work item）。"""
 
 

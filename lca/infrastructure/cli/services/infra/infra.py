@@ -56,8 +56,8 @@ class InfraService:
         for name in wanted:
             service = self._compose_service(name)
             try:
-                result = subprocess.run(  # noqa: S603
-                    ["docker", "compose", "up", "-d", service],  # noqa: S607
+                result = subprocess.run(
+                    ["docker", "compose", "up", "-d", service],
                     cwd=compose_dir,
                     capture_output=True,
                     text=True,
@@ -92,7 +92,7 @@ class InfraService:
         if compose_dir:
             with contextlib.suppress(Exception):
                 subprocess.run(
-                    ["docker", "compose", "down"],  # noqa: S607
+                    ["docker", "compose", "down"],
                     cwd=compose_dir,
                     capture_output=True,
                     timeout=30,

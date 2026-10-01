@@ -23,7 +23,7 @@ import structlog
 
 from lca.cognition.body.emit._args_summary import summarize_args
 from lca.cognition.body.tools.tool_result_preview import tool_files
-from lca.contracts.models.core.execution.decision import Observation, ToolCall  # noqa: F401
+from lca.contracts.models.core.execution.decision import Observation, ToolCall
 from lca.contracts.models.observability.diagnostic.diagnostic import (
     DiagnosticCategory,
     DiagnosticStatus,

@@ -240,7 +240,7 @@ class PluginContract:
                 )
             if not any(privilege.startswith(prefix) for prefix in PRIVILEGE_PREFIXES):
                 warnings.warn(
-                    f"PluginContract.privileges entry {privilege!r} does not "  # noqa: S608 — warning text, not a query sink
+                    f"PluginContract.privileges entry {privilege!r} does not "
                     f"start with a known prefix from PRIVILEGE_PREFIXES; "
                     "update the closed set via ADR before relying on it",
                     UserWarning,

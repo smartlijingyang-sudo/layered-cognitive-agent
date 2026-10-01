@@ -37,7 +37,7 @@ from lca.framework.graph.port_reader import PortReader
 from lca.framework.graph.port_registry import PortRegistry
 from lca.framework.graph.predicate_evaluator import evaluate_predicate
 from lca.framework.graph.recorder import VisitRecorder
-from lca.framework.graph.strategies import (  # noqa: F401  side-effect: register strategies
+from lca.framework.graph.strategies import (
     agent_consult_strategy,
     agent_fanout_strategy,
     gate_chain_strategy,

@@ -17,7 +17,7 @@ class VocalMessageType(StrEnum):
     TEXT = "text"
     ATTACHMENT = "attachment"
     WIDGET = "widget"
-    SECRET_REQUEST = "secret_request"  # noqa: S105  # enum 名,非密码
+    SECRET_REQUEST = "secret_request"  # enum 名,非密码
 
 
 class WidgetOption(BaseModel):

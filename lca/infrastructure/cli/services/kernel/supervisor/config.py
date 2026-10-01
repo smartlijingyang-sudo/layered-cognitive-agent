@@ -123,7 +123,7 @@ def parse_program_config(path: str | Path) -> list[ProgramConfig]:
 def default_program_config(
     *,
     profile: str = "profiles/web-assistant.yaml",
-    host: str = "0.0.0.0",  # noqa: S104 — bind-all default
+    host: str = "0.0.0.0",
     port: int = 8765,
 ) -> ProgramConfig:
     """Build the dev-default LCA program."""
@@ -147,7 +147,7 @@ def default_program_config(
         startretries=3,
         stopwaitsecs=15.0,
         environment={},
-        stdout_logfile="/tmp/lca-kernel.stdout.log",  # noqa: S108
-        stderr_logfile="/tmp/lca-kernel.stderr.log",  # noqa: S108
+        stdout_logfile="/tmp/lca-kernel.stdout.log",
+        stderr_logfile="/tmp/lca-kernel.stderr.log",
         readiness_timeout=30.0,
     )

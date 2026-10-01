@@ -1,6 +1,5 @@
 """Host-runtime provider for LCA CLI deployment and per-user connect daemon control."""
 
-# ruff: noqa: S101, S603, S607
 
 from __future__ import annotations
 

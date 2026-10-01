@@ -28,7 +28,7 @@ class KernelServeConfig(BaseModel):
     loopback)与本字段无关。
     """
 
-    host: str = "0.0.0.0"  # noqa: S104 — default bind all interfaces for LAN access
+    host: str = "0.0.0.0"
     port: int = 8765
     health_path: str = "/health"
     profile: str = "profiles/web-assistant.yaml"
@@ -136,7 +136,7 @@ class OpsConfig(BaseModel):
     daemon: DaemonConfig = Field(default_factory=DaemonConfig)
     onlyboxes: OnlyboxesConfig = Field(default_factory=OnlyboxesConfig)
     run_dir: str = ".lca-ops"
-    sudo_pass_file: str = ".lobehub-stack/sudo.pass"  # noqa: S105
+    sudo_pass_file: str = ".lobehub-stack/sudo.pass"
 
     @classmethod
     def load(cls, path: Path | str | None = None) -> Self:

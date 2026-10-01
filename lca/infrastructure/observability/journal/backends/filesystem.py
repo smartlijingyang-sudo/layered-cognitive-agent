@@ -147,7 +147,7 @@ class FilesystemJournalStore(JournalStoreBackend):
                 self._events.append(stamped)
             except JournalFormatError:
                 raise
-            except Exception:  # noqa: S112 — 单行字段异常按损坏行处理,继续下一行
+            except Exception:
                 # 其他字段级异常 —— 跳过单行,不影响其他行
                 continue
 

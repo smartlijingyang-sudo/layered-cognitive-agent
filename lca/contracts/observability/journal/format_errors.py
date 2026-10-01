@@ -20,7 +20,7 @@ class JournalFormatError(Exception):
     """L15: journal 格式拒绝的公共基类。"""
 
 
-class VersionTooOld(JournalFormatError):  # noqa: N818 — name mandated by ADR-0169 §D3 L15
+class VersionTooOld(JournalFormatError):
     """记录 ``SCHEMA_VERSION`` 小于 reader 的最小支持版本。"""
 
     def __init__(self, schema_version: int, min_supported: int) -> None:
@@ -29,7 +29,7 @@ class VersionTooOld(JournalFormatError):  # noqa: N818 — name mandated by ADR-
         super().__init__(f"journal schema_version={schema_version} < min_supported={min_supported}")
 
 
-class VersionTooNew(JournalFormatError):  # noqa: N818 — name mandated by ADR-0169 §D3 L15
+class VersionTooNew(JournalFormatError):
     """记录 ``SCHEMA_VERSION`` 大于 reader 的最大支持版本。"""
 
     def __init__(self, schema_version: int, max_supported: int) -> None:
@@ -38,7 +38,7 @@ class VersionTooNew(JournalFormatError):  # noqa: N818 — name mandated by ADR-
         super().__init__(f"journal schema_version={schema_version} > max_supported={max_supported}")
 
 
-class UnknownEventType(JournalFormatError):  # noqa: N818 — name mandated by ADR-0169 §D3 L15
+class UnknownEventType(JournalFormatError):
     """未知的 ``event_type`` 且非 ``ignorable``。"""
 
     def __init__(self, event_type: str) -> None:

@@ -102,15 +102,15 @@ class AssistantEvolveError(RuntimeError):
     """evolve 错误基类（4xx 语义；不静默回落）。"""
 
 
-class MissingWriteApproval(AssistantEvolveError):  # noqa: N818
+class MissingWriteApproval(AssistantEvolveError):
     """promote 未携带合法 :cls:`WriteApproval`（fail-closed）。"""
 
 
-class PromoteGateRejected(AssistantEvolveError):  # noqa: N818
+class PromoteGateRejected(AssistantEvolveError):
     """0067 三闸（identity / invariant / experiment）拒绝提升。"""
 
 
-class UnknownCandidate(AssistantEvolveError):  # noqa: N818
+class UnknownCandidate(AssistantEvolveError):
     """promote / 查询的 candidate_id 不在 ``{home}/.evolve/pending/``。"""
 
 

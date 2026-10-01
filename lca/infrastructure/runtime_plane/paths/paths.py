@@ -20,7 +20,7 @@ from lca.contracts.models.core.state.guest_layout import join_under, outputs_und
 from lca.contracts.models.core.state.plane import PlaneRef
 
 _WINDOWS_PLATFORMS = frozenset({"win32", "windows", "cygwin"})
-_POSIX_TEMP_PREFIXES = ("/tmp", "/var/tmp")  # noqa: S108 — OS temp prefixes, not file creation
+_POSIX_TEMP_PREFIXES = ("/tmp", "/var/tmp")
 
 
 def is_windows(platform: str) -> bool:

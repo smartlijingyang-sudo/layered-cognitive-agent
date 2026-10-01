@@ -114,7 +114,7 @@ class PerceiveService:
                     sensors.append(entry.factory())
             except MissingCapabilityError:
                 raise
-            except Exception:  # noqa: S112 — broken factory must not abort Hub
+            except Exception:
                 continue
 
         assembler = self._assembly.require(

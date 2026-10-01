@@ -381,8 +381,8 @@ class LobeHubService:
             patch_script = self._root / "deploy" / "lobehub" / "patch_lobehub.py"
             if patch_script.exists():
                 with suppress(subprocess.SubprocessError, OSError):
-                    subprocess.run(  # noqa: S603
-                        ["python3", str(patch_script)],  # noqa: S607
+                    subprocess.run(
+                        ["python3", str(patch_script)],
                         cwd=self._root,
                         capture_output=True,
                         timeout=60,
@@ -419,8 +419,8 @@ class LobeHubService:
             return False
 
         try:
-            subprocess.run(  # noqa: S603
-                ["bash", str(sync_script)],  # noqa: S607
+            subprocess.run(
+                ["bash", str(sync_script)],
                 env={"LOBEHUB_RELEASE": self._config.release},
                 cwd=self._root,
                 capture_output=True,
@@ -446,8 +446,8 @@ class LobeHubService:
             summary = _VerifySummary(0, 0, (), error="script or ui source missing")
         else:
             try:
-                proc = subprocess.run(  # noqa: S603
-                    ["python3", str(patch_script), "verify"],  # noqa: S607
+                proc = subprocess.run(
+                    ["python3", str(patch_script), "verify"],
                     cwd=self._root,
                     capture_output=True,
                     text=True,
@@ -574,8 +574,8 @@ class LobeHubService:
                 # git apply 不接受绝对 --directory;必须 cwd=ui_dir + 相对路径
                 rel_dir = bun_pkg_root.resolve().relative_to(self._dir.resolve())
                 # --reject: 让 git 把 apply 不上的 hunk 写到 .rej 文件方便诊断
-                result = subprocess.run(  # noqa: S603
-                    [  # noqa: S607
+                result = subprocess.run(
+                    [
                         "git",
                         "apply",
                         "--reject",
@@ -700,7 +700,7 @@ class LobeHubService:
             if vite_host:
                 return f"http://{vite_host}:{self._kernel_serve.port}"
         bind = self._kernel_serve.host
-        if bind in {"0.0.0.0", "::"}:  # noqa: S104 — checking bind, not binding
+        if bind in {"0.0.0.0", "::"}:
             return f"http://10.36.6.252:{self._kernel_serve.port}"
         return self._kernel_serve.base_url.rstrip("/")
 
@@ -711,7 +711,7 @@ class LobeHubService:
 
         try:
             subprocess.run(
-                ["bun", "install"],  # noqa: S607
+                ["bun", "install"],
                 cwd=self._dir,
                 capture_output=True,
                 timeout=300,
@@ -806,8 +806,8 @@ class LobeHubService:
             log_path = self._state.log_file(log_name)
             log_path.parent.mkdir(parents=True, exist_ok=True)
             log_handle = log_path.open("a")
-            proc = subprocess.Popen(  # noqa: S603
-                ["bun", "run", script],  # noqa: S607
+            proc = subprocess.Popen(
+                ["bun", "run", script],
                 cwd=self._dir,
                 env=self._child_env(),
                 stdout=log_handle,

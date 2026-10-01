@@ -61,7 +61,7 @@ class ToolInstallReceipt:
             raise ValueError("install_path 必为非空路径")
 
 
-class ToolNotInstalled(LookupError):  # noqa: N818
+class ToolNotInstalled(LookupError):
     """``remove`` 找不到 ``{home}/tools/<tool_id>/`` 落盘定义。"""
 
 

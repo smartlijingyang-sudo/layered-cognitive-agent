@@ -3,7 +3,6 @@
 These manage system-level resources shared across all users.
 """
 
-# ruff: noqa: S603
 
 from __future__ import annotations
 

@@ -4,7 +4,6 @@ Every subsystem (user, workspace, tools, venv, path, packages, cli)
 is a Provider with three operations: provision, destroy, status.
 """
 
-# ruff: noqa: S603, S607
 
 from __future__ import annotations
 

@@ -144,7 +144,7 @@ class BashTool(Tool):
 
         def _run() -> subprocess.CompletedProcess[str]:
             # Creator shell 语义有意为之；上层 SafeExecutor 必须 gate。
-            return subprocess.run(  # noqa: S602
+            return subprocess.run(
                 command,
                 shell=True,
                 capture_output=True,
@@ -230,15 +230,15 @@ __all__ = ["IDENTIFIER", "MANIFEST", "BashTool", "build_bash_tool"]
 # plugin graph well-formed.
 
 
-from pydantic import BaseModel, ConfigDict  # noqa: E402
+from pydantic import BaseModel, ConfigDict
 
-from lca.contracts.atoms.control.slot import ControlSlot  # noqa: E402
-from lca.contracts.atoms.functional.group import FunctionalGroup  # noqa: E402
-from lca.contracts.atoms.scope.scope import Scope  # noqa: E402
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (  # noqa: E402
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin  # noqa: E402
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):

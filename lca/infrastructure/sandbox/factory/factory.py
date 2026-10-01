@@ -55,7 +55,7 @@ def set_sandbox_resolver(resolver: Callable[[], Sandbox | None] | None) -> None:
 
 
 _ENV_BASE_URL = "ONLYBOXES_BASE_URL"
-_ENV_ACCESS_TOKEN = "ONLYBOXES_ACCESS_TOKEN"  # noqa: S105
+_ENV_ACCESS_TOKEN = "ONLYBOXES_ACCESS_TOKEN"
 _ENV_SANDBOX_BACKEND = "LCA_SANDBOX_BACKEND"
 _BACKEND_ONLYBOXES = "onlyboxes"
 _BACKEND_LOCAL = "local"

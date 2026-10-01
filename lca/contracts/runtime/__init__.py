@@ -46,7 +46,7 @@ from lca.contracts.runtime.trust import (
     TrustEnvelope,
 )
 
-__all__ = (  # noqa: RUF022  sorted() order is enforced by test_runtime_package_exports::test_all_is_sorted
+__all__ = (
     "DEFAULT_EXTERNAL_KIND_BY_TRUST",
     "EMPTY_TRUST_ENVELOPE",
     "ExternalPluginKind",

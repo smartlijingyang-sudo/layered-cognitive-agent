@@ -117,8 +117,8 @@ class DaemonService:
         """Stop the daemon."""
         # Kill by user process match
         with contextlib.suppress(Exception):
-            subprocess.run(  # noqa: S603
-                ["pkill", "-u", self._config.user, "-f", "node.*index.js.*connect"],  # noqa: S607
+            subprocess.run(
+                ["pkill", "-u", self._config.user, "-f", "node.*index.js.*connect"],
                 capture_output=True,
                 timeout=5,
             )
@@ -251,7 +251,7 @@ class DaemonService:
             tsc_bin = src / "node_modules" / ".bin" / "tsc"
             cmd = [str(tsc_bin)] if tsc_bin.exists() else ["npx", "--yes", "tsc"]
             try:
-                subprocess.run(  # noqa: S603
+                subprocess.run(
                     cmd,
                     cwd=src,
                     capture_output=True,
@@ -263,7 +263,7 @@ class DaemonService:
 
         try:
             subprocess.run(
-                ["npm", "install"],  # noqa: S607
+                ["npm", "install"],
                 cwd=cli_src,
                 capture_output=True,
                 timeout=120,
@@ -346,8 +346,8 @@ class DaemonService:
             return False
         self._sudo.run(["chmod", "-R", "a+rX", str(python_root)])
         try:
-            deps = subprocess.run(  # noqa: S603
-                [  # noqa: S607
+            deps = subprocess.run(
+                [
                     "uv",
                     "pip",
                     "install",
@@ -368,7 +368,7 @@ class DaemonService:
             return False
         if deps.returncode != 0:
             return False
-        verify = subprocess.run(  # noqa: S603
+        verify = subprocess.run(
             [
                 str(venv_py),
                 "-c",
@@ -419,8 +419,8 @@ exec node {cli_js} connect \\
             return None
 
         time.sleep(1)
-        pid_result = subprocess.run(  # noqa: S603
-            ["pgrep", "-u", owner, "-f", "node.*index.js.*connect"],  # noqa: S607
+        pid_result = subprocess.run(
+            ["pgrep", "-u", owner, "-f", "node.*index.js.*connect"],
             capture_output=True,
             text=True,
             timeout=5,

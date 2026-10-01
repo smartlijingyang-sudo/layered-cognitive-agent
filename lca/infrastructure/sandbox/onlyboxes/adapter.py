@@ -233,7 +233,7 @@ class OnlyboxesSandboxAdapter(Sandbox):
         ext = _LANG_EXTENSION.get(lang_key, _DEFAULT_EXTENSION)
         runner = _LANG_RUNNER.get(lang_key, _DEFAULT_RUNNER)
 
-        code_path = f"/tmp/lca-code-{new_id('code')}.{ext}"  # noqa: S108
+        code_path = f"/tmp/lca-code-{new_id('code')}.{ext}"
         await self._write_text_file(code, code_path, session_id="", timeout_s=timeout_s)
         return await self._exec_terminal(
             f"{runner} '{code_path}'",
@@ -266,7 +266,7 @@ class OnlyboxesSandboxAdapter(Sandbox):
         ext = _LANG_EXTENSION.get(lang_key, _DEFAULT_EXTENSION)
         runner = _LANG_RUNNER.get(lang_key, _DEFAULT_RUNNER)
 
-        code_path = f"/tmp/lca-code-{new_id('code')}.{ext}"  # noqa: S108
+        code_path = f"/tmp/lca-code-{new_id('code')}.{ext}"
         await self._write_text_file(code, code_path, session_id=session_id, timeout_s=timeout_s)
         return await self._exec_terminal(
             f"{runner} '{code_path}'",

@@ -44,7 +44,7 @@ def _auth_from_body(request: Request, body: dict[str, Any]) -> AuthenticatedUser
     token_type = str(body.get("tokenType") or body.get("token_type") or "serviceToken")
     if not token:
         token = _settings(request).service_token
-        token_type = "serviceToken"  # noqa: S105
+        token_type = "serviceToken"
     pairing_service = getattr(request.app.state, "device_pairing", None)
     return verify_token(token, token_type, _settings(request), pairing_service=pairing_service)
 

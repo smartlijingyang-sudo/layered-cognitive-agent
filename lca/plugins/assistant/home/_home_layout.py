@@ -92,7 +92,7 @@ class AssistantCatalogError(RuntimeError):
     """Catalog 错误基类(4xx 语义;不静默回落)。"""
 
 
-class AssistantDigestMismatch(AssistantCatalogError):  # noqa: N818
+class AssistantDigestMismatch(AssistantCatalogError):
     """manifest 配置面 digest 与磁盘文件 digest 不一致(I-A3 fail-closed)。
 
     触发场景:resolve 时重算文件 digest,与 ``manifest.json.digests`` 比对
@@ -100,7 +100,7 @@ class AssistantDigestMismatch(AssistantCatalogError):  # noqa: N818
     """
 
 
-class AssistantAlreadyExists(AssistantCatalogError):  # noqa: N818
+class AssistantAlreadyExists(AssistantCatalogError):
     """``create`` 时 ``assistant_id`` 已存在。"""
 
 

@@ -51,7 +51,7 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 # import 时跑(测试 / 业务方直接调 SpineLlmRequestHeaderPayload 不再需要
 # 先 model_rebuild)。
 from lca.plugins.events.hooks.model_visible import (
-    hook as _hook_module,  # noqa: F401  (import for side effect)
+    hook as _hook_module,
 )
 
 

@@ -31,7 +31,7 @@ from typing import Protocol, runtime_checkable
 from lca.contracts.harness.tasks.session import SessionEvent, SessionHeader
 
 
-class CheckpointFailure(RuntimeError):  # noqa: N818 —— checkpoint 契约词汇,非通用异常
+class CheckpointFailure(RuntimeError):
     """durability checkpoint 未完成:flush barrier 失败,下游动作不得执行。
 
     由 checkpoint 策略的三个边界(模型请求前 / 顶层工具副作用前 / 步边界)

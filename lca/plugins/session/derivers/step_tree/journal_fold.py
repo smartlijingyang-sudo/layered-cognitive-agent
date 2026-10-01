@@ -821,7 +821,7 @@ def fold_step_tree(
             continue
         try:
             _apply(state, coerced)
-        except Exception:  # noqa: S112 — 纯函数不 log;单 event 失败 skip 不中断 fold
+        except Exception:
             continue
     return _materialize(
         state,

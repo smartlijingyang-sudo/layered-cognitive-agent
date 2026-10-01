@@ -188,7 +188,7 @@ class PluginShapeDoctor:
             baseline regressed), which keeps subprocess result codes
             transparent to the caller.
         """
-        result = subprocess.run(  # noqa: S603 — script path is repo-controlled, validated
+        result = subprocess.run(
             [sys.executable, str(self._script), "--json", "--no-baseline-gate"],
             capture_output=True,
             text=True,

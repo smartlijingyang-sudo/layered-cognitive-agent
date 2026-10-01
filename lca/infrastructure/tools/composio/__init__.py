@@ -71,7 +71,7 @@ class ComposioManagementExecutor:
     def __init__(self, integration: ComposioIntegration) -> None:
         self._integration = integration
 
-    async def composioConnect(self, params: dict[str, Any]) -> Observation:  # noqa: N802
+    async def composioConnect(self, params: dict[str, Any]) -> Observation:
         service = str(params.get("service") or "").strip()
         if not service:
             return _validation_error("service is required")
@@ -117,7 +117,7 @@ class ComposioManagementExecutor:
             },
         )
 
-    async def composioRefresh(self, params: dict[str, Any]) -> Observation:  # noqa: N802
+    async def composioRefresh(self, params: dict[str, Any]) -> Observation:
         service = str(params.get("service") or "").strip()
         if not service:
             return _validation_error("service is required")

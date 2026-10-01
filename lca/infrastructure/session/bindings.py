@@ -115,7 +115,7 @@ def _resolve_checkpoint_policy() -> SessionCheckpointPolicyProtocol:
             SessionCheckpointPolicy(enabled=True),
         )
     policy = _default_checkpoint_policy
-    assert policy is not None  # noqa: S101
+    assert policy is not None
     return policy
 
 

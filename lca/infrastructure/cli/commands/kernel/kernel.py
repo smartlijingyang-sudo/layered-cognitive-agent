@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 # Matches KernelServeConfig.host default — referenced from typer Option to
 # keep the printed command and the actual config value in lockstep, and to
 # give ruff S104 a named literal to attach noqa to.
-_LAN_BIND_DEFAULT = "0.0.0.0"  # noqa: S104 — bind-all intentional, see KernelServeConfig
+_LAN_BIND_DEFAULT = "0.0.0.0"
 
 
 def register(app: typer.Typer) -> None:
@@ -161,7 +161,7 @@ def register(app: typer.Typer) -> None:
             # then restored before the JSON report itself is emitted. Using
             # `with` would close the handle we want to swap in and out, so
             # the open() is intentionally not inside a context manager.
-            devnull = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115 — see comment above
+            devnull = open(os.devnull, "w", encoding="utf-8")
             saved_stdout = sys.stdout
             sys.stdout = devnull
 
@@ -423,7 +423,7 @@ def _serialize_plan(plan: object) -> dict[str, object]:
     return data
 
 
-_STDERR_DIR = Path("/tmp")  # noqa: S108 — kernel stderr files are stable paths under KernelServeSpawner._STDERR_DIR; keep aligned with spawner.py
+_STDERR_DIR = Path("/tmp")
 _STDERR_PREFIX = "lca-kernel.stderr."
 
 

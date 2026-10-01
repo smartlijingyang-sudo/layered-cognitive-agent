@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 _STATE_PATH = Path(
     os.environ.get(
         "LCA_SUPERVISOR_STATE",
-        "/tmp/lca-supervisor.state.json",  # noqa: S108
+        "/tmp/lca-supervisor.state.json",
     )
 )
 

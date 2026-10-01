@@ -139,7 +139,7 @@ class FileWriteTool(Tool):
                 extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
             )
 
-        path = Path(args["path"]).expanduser()  # noqa: ASYNC240 — Creator Tool 同步 fs 可接受
+        path = Path(args["path"]).expanduser()
         # validate_writable_file is the host-fs path policy seam: rejects
         # empty paths and existing-directory targets up front, and creates
         # parent directories on demand.  Keeping this single source of truth
@@ -209,15 +209,15 @@ __all__ = ["IDENTIFIER", "MANIFEST", "FileWriteTool", "build_file_write_tool"]
 # ── Plugin manifest setup ─────────────────────────────────────
 
 
-from pydantic import BaseModel, ConfigDict  # noqa: E402
+from pydantic import BaseModel, ConfigDict
 
-from lca.contracts.atoms.control.slot import ControlSlot  # noqa: E402
-from lca.contracts.atoms.functional.group import FunctionalGroup  # noqa: E402
-from lca.contracts.atoms.scope.scope import Scope  # noqa: E402
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (  # noqa: E402
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
+from lca.contracts.atoms.scope.scope import Scope
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin  # noqa: E402
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):

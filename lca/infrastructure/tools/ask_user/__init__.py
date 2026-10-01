@@ -77,7 +77,7 @@ class AskUserExecutor:
     def validate(self, api_name: str, args: dict[str, Any]) -> str | None:
         return _validate(args)
 
-    async def askUserQuestion(self, params: dict[str, Any]) -> Observation:  # noqa: N802
+    async def askUserQuestion(self, params: dict[str, Any]) -> Observation:
         _auto_inject_freeform(params)
         error = _validate(params)
         if error:

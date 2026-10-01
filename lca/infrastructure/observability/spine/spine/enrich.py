@@ -45,7 +45,7 @@ __all__ = [
 ]
 
 
-class I17Violation(Exception):  # noqa: N818 — name mandated by Task 9.2 brief
+class I17Violation(Exception):
     """Raised when a ``*.start`` event is emitted without ``source_location``."""
 
 

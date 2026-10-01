@@ -57,9 +57,9 @@ if TYPE_CHECKING:
 # needed. The legacy per-PID stderr files are written by the standalone
 # ``lca_kernel serve`` path (no supervisor in front) and are not used by
 # the supervisor-managed flow.
-_STDOUT_LOGFILE = "/tmp/lca-kernel.stdout.log"  # noqa: S108 — supervisor-owned log path
-_STDERR_LOGFILE = "/tmp/lca-kernel.stderr.log"  # noqa: S108 — supervisor-owned log path
-_STDERR_GLOB = "/tmp/lca-kernel.stderr.*.log"  # noqa: S108 — supervisor-owned log dir
+_STDOUT_LOGFILE = "/tmp/lca-kernel.stdout.log"
+_STDERR_LOGFILE = "/tmp/lca-kernel.stderr.log"
+_STDERR_GLOB = "/tmp/lca-kernel.stderr.*.log"
 
 # Single boot.pending_event line, captured into groups.
 _BOOT_EVENT_RE = re.compile(
@@ -145,7 +145,7 @@ def _latest_kernel_stderr() -> Path | None:
     if stdout_path.exists():
         return stdout_path
     candidates = sorted(
-        Path("/tmp").glob("lca-kernel.stderr.*.log"),  # noqa: S108 — supervisor-owned log dir
+        Path("/tmp").glob("lca-kernel.stderr.*.log"),
         key=lambda p: p.stat().st_mtime,
         reverse=True,
     )
@@ -431,7 +431,7 @@ def _run_health_probe(host: str, port: int, findings: list[Finding]) -> PhaseRes
     body: dict[str, Any] | None = None
     error: str | None = None
     try:
-        with urllib.request.urlopen(url, timeout=2.0) as resp:  # noqa: S310 — URL is operator-supplied loopback host:port for /health
+        with urllib.request.urlopen(url, timeout=2.0) as resp:
             raw = resp.read().decode("utf-8")
             body = cast("dict[str, Any]", json.loads(raw))
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:

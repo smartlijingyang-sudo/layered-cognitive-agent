@@ -263,7 +263,7 @@ class TransportRegistryProtocol(Protocol):
 
 # ---------- ADR-0246 M1: LocalExecPort ----------
 
-from lca.contracts.models.core.execution.local_exec import (  # noqa: E402
+from lca.contracts.models.core.execution.local_exec import (
     CapabilityGrant,
     EffectReceipt,
     LocalExecTarget,

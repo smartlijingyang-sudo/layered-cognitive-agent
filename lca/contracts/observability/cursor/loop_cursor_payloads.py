@@ -175,7 +175,7 @@ class ToolSchema:
         if callable(to_openai):
             try:
                 return ToolSchema.from_openai(cast("dict[str, Any]", to_openai()))
-            except Exception:  # noqa: S110 — 兜底走下一条 transform 分支
+            except Exception:
                 pass
         if isinstance(obj, dict):
             return ToolSchema.from_openai(obj)

@@ -74,7 +74,7 @@ class WechatChannelService:
         """Persist config and start the channel worker."""
         path = self._get_config_path(assistant_id)
         path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:  # noqa: ASYNC230
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(config.model_dump(), f, ensure_ascii=False, indent=2)
         with contextlib.suppress(OSError):
             path.chmod(0o600)
