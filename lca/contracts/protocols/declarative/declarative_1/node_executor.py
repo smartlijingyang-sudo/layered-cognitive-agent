@@ -15,7 +15,8 @@ think / act / control node plugin implements it directly; the legacy
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Protocol, runtime_checkable
+from collections.abc import Mapping
+from typing import Any, Protocol, runtime_checkable
 
 from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 
@@ -23,7 +24,7 @@ from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 class NodeContext:
     """节点级执行上下文。框架注入,plugin 只读。"""
 
-    __slots__ = ("runtime", "budget", "metadata")
+    __slots__ = ("budget", "metadata", "runtime")
 
     def __init__(
         self,
@@ -49,7 +50,7 @@ class NodeInput:
 class NodeOutput:
     """节点输出。"""
 
-    __slots__ = ("port_values", "next_hint")
+    __slots__ = ("next_hint", "port_values")
 
     def __init__(
         self,
