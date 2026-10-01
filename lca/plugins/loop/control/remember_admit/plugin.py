@@ -87,7 +87,7 @@ class RememberAdmitExecutor:
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",
-    test_suite="tests/declarative/test_control_contributions.py",
+    test_suite="tests/remember/test_admit_dedupe_supersede.py",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(

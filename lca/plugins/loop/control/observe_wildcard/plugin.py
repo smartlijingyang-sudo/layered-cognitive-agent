@@ -58,7 +58,7 @@ class ObserveWildcardExecutor:
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",
-    test_suite="tests/declarative/test_control_contributions.py",
+    test_suite="tests/harness/test_think_guard_consumer.py::TestDeclarativeControlProjection::test_stop_control_projection_is_bound_to_the_stop_phase",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(
