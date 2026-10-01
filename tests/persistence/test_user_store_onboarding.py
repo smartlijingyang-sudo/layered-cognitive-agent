@@ -27,3 +27,9 @@ def test_sqlite_user_store_onboarding_state_and_user_md(tmp_path: Path):
     reloaded_store = SqliteUserAssistantStore(db_path)
     assert reloaded_store.get_onboarding_state("u_test_1") == "completed"
     assert reloaded_store.get_user_md("u_test_1") == sample_md
+
+    # 5. Empty display_name does not overwrite existing username
+    store.update_user_md("u_test_1", "# Updated\n", display_name="")
+    with store._use_connection() as conn:
+        row = conn.execute("SELECT username FROM lca_users WHERE user_id = ?", ("u_test_1",)).fetchone()
+        assert row[0] == "李超"
