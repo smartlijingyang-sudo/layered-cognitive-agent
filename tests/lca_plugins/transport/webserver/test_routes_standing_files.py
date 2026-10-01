@@ -125,3 +125,69 @@ def test_standing_files_unknown_assistant_returns_404(tmp_path: Any) -> None:
 
     response = client.get("/v1/assistants/asst_nonexistent/standing-files")
     assert response.status_code == 404
+
+
+def test_standing_file_update_success(tmp_path: Any) -> None:
+    app, catalog, assistant_id = _create_test_app(tmp_path)
+    client = TestClient(app)
+
+    # 1. 先读获取当前 hash 与原文
+    read_resp = client.get(f"/v1/assistants/{assistant_id}/standing-files/SOUL.md")
+    assert read_resp.status_code == 200
+    current_hash = read_resp.json()["content_hash"]
+    original_soul = read_resp.json()["content"]
+
+    # 2. 追加新准则保持 SOUL 完整度要求
+    new_content = original_soul + "\n\n- 演化增量：用户是至高第一真理，坚决遵循三原则并持续沉淀知识。"
+    put_resp = client.put(
+        f"/v1/assistants/{assistant_id}/standing-files/SOUL.md",
+        json={"content": new_content, "expected_hash": current_hash, "actor": "user_ui"},
+    )
+    assert put_resp.status_code == 200
+    data = put_resp.json()
+    assert data["assistant_id"] == assistant_id
+    assert data["filename"] == "SOUL.md"
+    assert data["revision_seq"] >= 1
+    assert data["new_hash"].startswith("sha256:")
+    assert catalog.get(assistant_id).revision_seq == data["revision_seq"]
+
+    # 3. 验证再次读取与磁盘真值一致
+    verify_resp = client.get(f"/v1/assistants/{assistant_id}/standing-files/SOUL.md")
+    assert verify_resp.status_code == 200
+    assert verify_resp.json()["content"] == new_content
+
+
+def test_standing_file_update_optimistic_lock_conflict(tmp_path: Any) -> None:
+    app, _, assistant_id = _create_test_app(tmp_path)
+    client = TestClient(app)
+
+    put_resp = client.put(
+        f"/v1/assistants/{assistant_id}/standing-files/SOUL.md",
+        json={"content": "# 冲突内容", "expected_hash": "sha256:wrong_stale_hash", "actor": "user_ui"},
+    )
+    assert put_resp.status_code == 409
+    err = put_resp.json()["error"]
+    assert err["code"] == "conflict"
+    assert "current_hash" in err
+    assert "current_content" in err
+
+
+def test_standing_file_update_memory_md_direct_write(tmp_path: Any) -> None:
+    app, _, assistant_id = _create_test_app(tmp_path)
+    client = TestClient(app)
+
+    read_resp = client.get(f"/v1/assistants/{assistant_id}/standing-files/MEMORY.md")
+    assert read_resp.status_code == 200
+    current_hash = read_resp.json()["content_hash"]
+
+    new_memory = "# MEMORY.md\n- 用户偏好使用 Rust 和 Python\n- 严禁未经性能评估引入重依赖"
+    put_resp = client.put(
+        f"/v1/assistants/{assistant_id}/standing-files/MEMORY.md",
+        json={"content": new_memory, "expected_hash": current_hash},
+    )
+    assert put_resp.status_code == 200
+    assert put_resp.json()["filename"] == "MEMORY.md"
+
+    verify_resp = client.get(f"/v1/assistants/{assistant_id}/standing-files/MEMORY.md")
+    assert verify_resp.status_code == 200
+    assert verify_resp.json()["content"] == new_memory

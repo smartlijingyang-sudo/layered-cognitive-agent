@@ -8,6 +8,7 @@ Endpoints:
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 from datetime import UTC, datetime
 from pathlib import Path
@@ -16,6 +17,7 @@ from typing import Any
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+from lca.contracts.protocols.assistant.catalog import ProfilePatch
 from lca.plugins.domain.assistant.catalog.plugin import (
     AssistantCatalogError,
 )
@@ -175,8 +177,133 @@ async def get_standing_file(request: Request) -> JSONResponse:
 
 
 async def update_standing_file(request: Request) -> JSONResponse:
-    """``PUT /v1/assistants/{assistant_id}/standing-files/{filename}`` (Task 2 Placeholder)."""
-    return _not_implemented("update_standing_file_not_implemented")
+    """``PUT /v1/assistants/{assistant_id}/standing-files/{filename}`` —— 更新单个常驻文件内容。"""
+    user_id, auth_error = _user_from_request(request)
+    if auth_error is not None:
+        return auth_error
+
+    catalog = _catalog_from_request(request)
+    if catalog is None:
+        return _not_implemented("catalog_unavailable", "standing_files.update")
+
+    assistant_id = str(request.path_params.get("assistant_id") or "")
+    filename = str(request.path_params.get("filename") or "")
+
+    if filename not in STANDING_FILES_WHITELIST:
+        return _error_envelope(
+            "disallowed_file",
+            status_code=400,
+            error_type="invalid_request",
+            detail=f"Only standing files {STANDING_FILES_WHITELIST} may be updated",
+        )
+
+    ownership_error = _ownership_error(request, user_id, assistant_id)
+    if ownership_error is not None:
+        return ownership_error
+
+    try:
+        body = await request.json()
+    except (ValueError, OSError):
+        return _error_envelope("invalid_json", status_code=400, error_type="invalid_request")
+    if not isinstance(body, dict):
+        return _error_envelope(
+            "invalid_request",
+            status_code=400,
+            error_type="invalid_request",
+            detail="body 必须是 JSON object",
+        )
+
+    new_content = body.get("content")
+    if not isinstance(new_content, str):
+        return _error_envelope(
+            "invalid_request",
+            status_code=400,
+            error_type="invalid_request",
+            detail="content 必须为字符串",
+        )
+
+    expected_hash = body.get("expected_hash")
+    actor = str(body.get("actor") or "user_ui").strip()
+
+    try:
+        spec = catalog.get(assistant_id)
+    except AssistantCatalogError as exc:
+        return _error_envelope(
+            "assistant_not_found", status_code=404, error_type="not_found", detail=str(exc)
+        )
+
+    home = Path(spec.home_path)
+    file_path = home / filename
+
+    # 1. 乐观锁检测：读取当前磁盘真值并核验 hash
+    current_content = file_path.read_text(encoding="utf-8") if file_path.is_file() else ""
+    current_hash = sha256_of_str(current_content)
+
+    if expected_hash is not None and expected_hash != current_hash:
+        return _json(
+            {
+                "error": {
+                    "code": "conflict",
+                    "type": "optimistic_lock_conflict",
+                    "detail": (
+                        f"File {filename} was modified on disk; "
+                        f"expected {expected_hash}, got {current_hash}"
+                    ),
+                    "current_hash": current_hash,
+                    "current_content": current_content,
+                }
+            },
+            status_code=409,
+        )
+
+    # 2. 执行写盘与同步
+    revision_seq = spec.revision_seq
+    try:
+        if filename == "SOUL.md":
+            revision = catalog.revise_profile(
+                assistant_id, ProfilePatch(soul_md=new_content), actor=actor
+            )
+            revision_seq = revision.revision_seq
+        elif filename == "IDENTITY.md":
+            revision = catalog.revise_profile(
+                assistant_id, ProfilePatch(identity_md=new_content), actor=actor
+            )
+            revision_seq = revision.revision_seq
+        elif filename == "USER.md":
+            revision = catalog.revise_profile(
+                assistant_id, ProfilePatch(user_md=new_content), actor=actor
+            )
+            revision_seq = revision.revision_seq
+            # 同步更新 user_store
+            user_store = getattr(request.app.state, "user_store", None)
+            if user_store is None:
+                user_store = getattr(catalog, "_user_store", None)
+            if user_store is not None and user_id:
+                with contextlib.suppress(Exception):
+                    user_store.update_user_md(user_id, new_content)
+        elif filename == "MEMORY.md":
+            # MEMORY.md 不进 catalog profile digest（I-A13），直接原子写盘
+            file_path.write_text(new_content, encoding="utf-8")
+    except AssistantCatalogError as exc:
+        return _error_envelope(
+            "invalid_request", status_code=400, error_type="invalid_request", detail=str(exc)
+        )
+
+    new_hash = sha256_of_str(new_content)
+    stat = file_path.stat()
+    mtime_iso = datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat()
+
+    return _json(
+        {
+            "assistant_id": assistant_id,
+            "filename": filename,
+            "path": str(file_path),
+            "new_hash": new_hash,
+            "revision_seq": revision_seq,
+            "updated_at": mtime_iso,
+        },
+        status_code=200,
+    )
 
 
 async def standing_file_dispatcher(request: Request) -> JSONResponse:

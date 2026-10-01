@@ -78,7 +78,15 @@ def _reject_injected_soul(soul: str) -> None:
             )
     lowered = soul.lower()
     for pattern in _SOUL_INJECTION_PATTERNS:
-        if pattern in lowered:
+        # 防御性规约：允许在安全段中声明拒绝该模式（如「拒绝『忽略之前指令』」）
+        sanitized = (
+            lowered.replace(f"拒绝「{pattern}」", "")
+            .replace(f"拒绝『{pattern}』", "")
+            .replace(f"拒绝“{pattern}”", "")
+            .replace(f'拒绝"{pattern}"', "")
+            .replace(f"拒绝'{pattern}'", "")
+        )
+        if pattern in sanitized:
             raise SoulValidationError(
                 f"SOUL 命中指令覆盖/自我复制模式「{pattern}」，拒绝写入。"
                 "SOUL.md 是人格配置不是指令来源，请移除该内容后重试。"
