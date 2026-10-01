@@ -70,7 +70,7 @@ grouped.setdefault(namespaces.get(tool.name, tool.name), []).append(tool.name)
 - `core` 只放 `tool_search`。EAGER 的标准是"几乎每 turn 都用且 schema 极小"；且 defer 协议要求 loader 必须在 wire 上（session.py 已有注释：目录指向不存在的 loader 是死锁）。
 - `memory` 保持 DEFERRED：2026-10-01 run 实证模型已学会 `tool_search(namespace='memory')`，协议可 cover，不必破例。
 - `shell` 独立成域且目录行自带"危险"字样——描述即行为约束。
-- `skill` 域含三对 snake/camel 双拼（`activate_skill`/`activateSkill` 等）：重构时 canonicalize 为 snake_case，wire gate 的 `_name_forms` 兼容代码随之删除。
+- `skill` 域的 snake/camel "双拼"（`activate_skill`/`activateSkill` 等）是**故意设计的双层命名**，不是 slop，不做 canonicalize：内部名（模型可见）用 snake_case，`api_name`/`ToolApi(name=...)`（前端契约：LobeHub/computer companion/wechat 展示）用 camelCase，两者在 `RenderContract` 里显式配对声明。wire gate 的 `_name_forms` 容错保留（前端 camelCase 名字在 wire 上还活着）。【2026-10-01 修正：此前版本误判为 slop 并要求收敛，已纠正；验收用例 A4 同步修正为只扫描内部注册名】另注：`runCommand`/`listFiles` 等工具内部名本身就是 camelCase（computer companion 的 dispatch 依赖），说明内部命名约定 snake+camel 并存——这是值得未来统一的一致性问题，但超出本 ADR 范围。
 
 ## 4. 契约层改动
 
@@ -138,7 +138,7 @@ if tool.namespace not in session.loaded_namespaces and tool.namespace not in eag
 ## 9. 落地 checklist（按序）
 
 1. contracts：`Tool.namespace`、`DeferPolicy.namespace_descriptions` 必填化 + `namespace_approval`；
-2. 全部 factory 声明 namespace；删 `ToolsService.tool_namespaces`；canonicalize 三对双拼工具名为 snake_case；
+2. 全部 factory 声明 namespace；删 `ToolsService.tool_namespaces`；
 3. `update_turn` 改分组键 + fail-fast；`_describe` 删默认实现；
 4. 写入 §3 的 8 句目录描述；
 5. `tool_search` 加批量参数；
@@ -154,7 +154,7 @@ if tool.namespace not in session.loaded_namespaces and tool.namespace not in eag
 4. 模型调用未加载域的工具被 wire gate 拒掉，错误信息含正确的 `tool_search` 指引，且 run 不死（错误抛回模型重试）；
 5. `shell` 域的 `runCommand` 触发用户审批；
 6. 批量 `tool_search(namespaces=['file','memory'])` 一次往返返回两域 schema；
-7. 双拼工具名只剩 snake_case，`_name_forms` 已删除；
+7. 验收用例 A4 只扫描 Tool 内部注册名（排除 `api_name`/`ToolApi` 前端契约名），无 snake/camel 重复注册则通过；
 8. 真实 run 复盘：首 turn 目录 8 行、模型经 `tool_search` 取数、无单工具 namespace、tool 健康全绿。
 
 ---
