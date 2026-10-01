@@ -9,6 +9,7 @@ to ``brain.reflect`` when no pipeline is wired.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.enums.enums import ActionType, ContentType
@@ -25,7 +26,8 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.models.cognition.boundary import ProceduralMemoryCandidate
-from lca.contracts.models.core.execution.decision import Observation
+from lca.contracts.models.core.execution.decision import Observation, Reflection
+from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -114,11 +116,11 @@ class ReflectScoreExecutor:
     semantic_name: str = "phase.reflect.score"
     region: str = "reflect"
     declared_inputs: tuple[PortName, ...] = (
-        "observation",
-        "state",
-        "cognitive_reflection_pipeline",
+        PortName("observation"),
+        PortName("state"),
+        PortName("cognitive_reflection_pipeline"),
     )
-    declared_outputs: tuple[PortName, ...] = ("reflection",)
+    declared_outputs: tuple[PortName, ...] = (PortName("reflection"),)
 
     async def node_execute(
         self,
@@ -126,15 +128,15 @@ class ReflectScoreExecutor:
         input: NodeInput,
     ) -> NodeOutput:
         runtime = context.runtime or {}
-        observation = _normalize_observation(input.port_values.get("observation"))
+        observation = _normalize_observation(input.port_values.get(PortName("observation")))
         brain = getattr(runtime, "brain", None)
         if brain is None and hasattr(runtime, "get"):
             brain = runtime.get("brain")
-        pipeline = input.port_values.get("cognitive_reflection_pipeline")
-        state = input.port_values.get("state")
+        pipeline = input.port_values.get(PortName("cognitive_reflection_pipeline"))
+        state = input.port_values.get(PortName("state"))
         if state is None and hasattr(runtime, "get"):
             state = runtime.get("agent_state")
-        payload: object | None = None
+        payload: Reflection | None = None
         # Prefer ``brain.reflect`` when the profile wired one: ``ModularBrain``
         # owns the canonical critic → pipeline wiring, so this path reaches
         # ``SimpleCritic.critique`` and emits a non-empty
@@ -144,7 +146,12 @@ class ReflectScoreExecutor:
         # never learned a tool had succeeded, so the agent re-issued the
         # same tool call every step (run-time loop until budget exhaustion).
         if isinstance(brain, Brain) and observation is not None:
-            payload = await brain.reflect(state, observation)
+            # Ports/runtime are untyped carriers (Mapping[PortName, Any] /
+            # dict), so narrow to the Brain protocol's typed contract here.
+            payload = await brain.reflect(
+                cast("AgentState", state),
+                cast("Observation", observation),
+            )
         elif pipeline is not None and observation is not None:
             # Backward-compat: profiles that expose the reflection pipeline
             # capability but not a brain (lab / fixture paths). Without a
@@ -177,8 +184,8 @@ class ReflectScoreExecutor:
 
         return NodeOutput(
             port_values={
-                "reflection": payload,
-                "routing": RoutingDecision(action_type=ActionType.RESPOND),
+                PortName("reflection"): payload,
+                PortName("routing"): RoutingDecision(action_type=ActionType.RESPOND),
             },
         )
 
