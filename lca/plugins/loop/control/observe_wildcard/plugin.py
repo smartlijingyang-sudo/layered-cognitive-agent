@@ -36,7 +36,7 @@ class ObserveWildcardExecutor:
     semantic_name: str = "control.observe.wildcard"
     region: str = "phase:stop"
     declared_inputs: tuple[PortName, ...] = ()
-    declared_outputs: tuple[PortName, ...] = ("verdict",)
+    declared_outputs: tuple[PortName, ...] = (PortName("verdict"),)
 
     async def node_execute(
         self,
@@ -46,8 +46,8 @@ class ObserveWildcardExecutor:
         del context, input
         return NodeOutput(
             port_values={
-                "verdict": {"verdict": "allow"},
-                "routing": RoutingDecision(action_type=ActionType.RESPOND),
+                PortName("verdict"): {"verdict": "allow"},
+                PortName("routing"): RoutingDecision(action_type=ActionType.RESPOND),
             },
         )
 

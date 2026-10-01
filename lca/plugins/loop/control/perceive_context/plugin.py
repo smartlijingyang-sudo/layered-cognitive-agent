@@ -43,7 +43,7 @@ class PerceiveContextExecutor:
     semantic_name: str = "control.perceive.context"
     region: str = "phase:perceive"
     declared_inputs: tuple[PortName, ...] = ()
-    declared_outputs: tuple[PortName, ...] = ("verdict",)
+    declared_outputs: tuple[PortName, ...] = (PortName("verdict"),)
 
     async def node_execute(
         self,
@@ -69,8 +69,8 @@ class PerceiveContextExecutor:
         should_stop = verdict.kind == ControlVerdictKind.STOP
         return NodeOutput(
             port_values={
-                "verdict": verdict,
-                "routing": RoutingDecision(
+                PortName("verdict"): verdict,
+                PortName("routing"): RoutingDecision(
                     action_type=ActionType.RESPOND,
                     should_terminate=should_stop,
                     next_hint="stop" if should_stop else None,
