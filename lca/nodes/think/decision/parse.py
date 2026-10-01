@@ -112,8 +112,9 @@ def _guard_acknowledgement(*, context: NodeContext, text: str | None) -> str | N
 
     Assistant memory holds one unspent successful projection at a time. A
     claiming reply spends it; a non-claiming reply does not. With no assistant
-    memory and no injected receipt the original text is unchanged. An injected
-    receipt still follows ``may_acknowledge`` and is not spent.
+    memory and no injected receipt a claiming reply is replaced by the refusal
+    (ADR-0260 S6 fail-closed). An injected receipt still follows
+    ``may_acknowledge`` and is not spent.
     """
     return guard_reply(text, getattr(context, "runtime", None))
 

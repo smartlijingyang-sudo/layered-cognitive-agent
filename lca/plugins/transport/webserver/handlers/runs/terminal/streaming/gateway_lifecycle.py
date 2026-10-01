@@ -59,6 +59,9 @@ async def register_gateway_run(
     session = get_session(run_id)
     if session is None:
         return
+    # 缺陷1修复：把 topic_id 落到 session，跨 run 会话自愈日志按 topic 归档。
+    if topic_id:
+        session.topic_id = topic_id
 
     scope = str(body.get("scope") or "main")
     options = body.get("options")

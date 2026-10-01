@@ -49,6 +49,9 @@ class AssistantCustomTool:
         self.is_idempotent: bool = False
         self.effect_kind: str = "ephemeral"
         self.default_timeout_s: int = DEFAULT_TOOL_TIMEOUT_S
+        # ADR-0256: ToolSpec 未声明 namespace 时默认 core（常驻可见），
+        # 与 defer 引入前的行为兼容；缺省会导致 ForkedTools 校验失败。
+        self.namespace: str = "core"
 
     def validate(self, args: dict[str, Any]) -> str | None:
         """按 ``parameters`` 的 ``required`` 列表做前置校验。"""

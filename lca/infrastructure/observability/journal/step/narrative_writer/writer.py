@@ -64,12 +64,25 @@ def _render_step(
     if step.thinking is not None:
         lines.extend(_render_thinking(step.thinking))
         lines.append("")
-    if step.tool_call is not None:
-        lines.extend(_render_tool_call(step.tool_call))
+    # 一个 decision 可一次发出多个 tool call（run_04457e1757b1 实测：同一
+    # turn 内 update_assistant_profile + update_identity）。单数字段只保留首个
+    # 调用，narrative 必须渲染全量 tool_calls，否则调用会"失踪"。
+    calls = step.tool_calls or ((step.tool_call,) if step.tool_call is not None else ())
+    results = step.tool_results or (
+        (step.tool_result,) if step.tool_result is not None else ()
+    )
+    results_by_invocation = {r.invocation_id: r for r in results}
+    for call in calls:
+        lines.extend(_render_tool_call(call))
+        matched = results_by_invocation.get(call.invocation_id)
+        if matched is not None:
+            lines.extend(_render_tool_result(matched))
         lines.append("")
-    if step.tool_result is not None:
-        lines.extend(_render_tool_result(step.tool_result))
-        lines.append("")
+    call_ids = {c.invocation_id for c in calls}
+    for result in results:
+        if result.invocation_id not in call_ids:
+            lines.extend(_render_tool_result(result))
+            lines.append("")
     if step.reflect is not None:
         lines.extend(_render_reflect(step.reflect))
         lines.append("")
@@ -118,6 +131,8 @@ def _render_summary(doc: JournalDocument) -> list[str]:
             summary = _short(s.tool_result.delta_summary, 60)
         elif s.thinking is not None and s.thinking.decision:
             summary = f"[{s.thinking.decision}]"
+        elif s.tool_calls:
+            summary = "; ".join(_short(c.arguments_summary, 60) for c in s.tool_calls)
         elif s.tool_call is not None:
             summary = _short(s.tool_call.arguments_summary, 60)
         lines.append(

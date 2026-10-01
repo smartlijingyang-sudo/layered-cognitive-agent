@@ -8,6 +8,7 @@ current turn, mirror only its files, then compose the final prompt.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from lca.contracts.models.core.conversation.conversation import ConversationTurn
@@ -52,14 +53,24 @@ class LobeHubRunInput:
     skipped_files: tuple[str, ...] = field(default_factory=tuple)
 
 
-def parse_messages(messages: list[Any]) -> ParsedMessages:
+def parse_messages(
+    messages: list[Any],
+    *,
+    assistant_home: Path | None = None,
+    topic_id: str = "",
+) -> ParsedMessages:
     """Parse text, current-turn file references, and compact prior-turn context."""
     if not messages:
         return ParsedMessages(user_text="")
     user_text = _extract_last_user_text(messages)
     last_user = _last_user_message(messages)
     file_refs = _collect_file_refs([last_user] if last_user is not None else [])
-    prior_turns = extract_prior_turns(messages, plain_text_fn=_history_plain_text)
+    prior_turns = extract_prior_turns(
+        messages,
+        plain_text_fn=_history_plain_text,
+        assistant_home=assistant_home,
+        topic_id=topic_id,
+    )
     return ParsedMessages(
         user_text=user_text,
         file_refs=tuple(file_refs),
@@ -81,9 +92,11 @@ async def prepare_run_from_messages(
     store: FileStore,
     *,
     fetcher: FileFetcher | None = None,
+    assistant_home: Path | None = None,
+    topic_id: str = "",
 ) -> LobeHubRunInput:
     """Parse, mirror current-turn files, and compose a final LCA run task."""
-    parsed = parse_messages(messages)
+    parsed = parse_messages(messages, assistant_home=assistant_home, topic_id=topic_id)
     if not parsed.user_text:
         return LobeHubRunInput(user_text="", question="")
     ingest = await ingest_file_refs(parsed.file_refs, store, fetcher=fetcher)

@@ -67,6 +67,7 @@ class RunTerminalizer:
             finally:
                 self._registry.clear_inflight(session.run_id)
                 self._registry.prune()
+                _maybe_append_conversation_log(session, success)
                 self._materializer(session)
                 if session.hub is not None:
                     await _dispose_export(session.hub)
@@ -85,6 +86,47 @@ class RunTerminalizer:
                         "run_session_close_token_reset_failed",
                         run_id=session.run_id,
                     )
+
+
+def _maybe_append_conversation_log(session: RunSession, success: bool) -> None:
+    """Best-effort cross-run history persistence (defect-1 fix).
+
+    On terminal success, record the (last user text, final assistant text)
+    pair into the assistant's per-topic conversation log so later runs can
+    gap-fill assistant turns the client failed to persist. Never raises and
+    never blocks the terminal transition.
+    """
+    if not success:
+        return
+    try:
+        from lca.infrastructure.path.locator import get_lca_home
+        from lca.plugins.transport.webserver.handlers.runs.session.message.conversation_log import (
+            append_conversation_turn,
+        )
+
+        assistant_id = getattr(session, "assistant_id", "")
+        topic_id = getattr(session, "topic_id", "")
+        if not isinstance(assistant_id, str) or not assistant_id:
+            return
+        if not isinstance(topic_id, str) or not topic_id:
+            return
+        user_text = getattr(session, "user_text", "")
+        assistant_text = getattr(session, "output", "")
+        if not isinstance(user_text, str) or not user_text.strip():
+            return
+        if not isinstance(assistant_text, str) or not assistant_text.strip():
+            return
+        append_conversation_turn(
+            assistant_home=get_lca_home() / "assistants" / assistant_id,
+            topic_id=topic_id,
+            user_text=user_text.strip(),
+            assistant_text=assistant_text.strip(),
+        )
+    except Exception:
+        _log.exception(
+            "conversation_log.append_failed",
+            run_id=getattr(session, "run_id", "?"),
+        )
 
 
 __all__ = ["RunTerminalizer"]

@@ -13,6 +13,8 @@ from lca.infrastructure.memory.contextfiles.domain.curated import may_acknowledg
 
 _CLAIM = re.compile(
     r"已记下|已记住|我记住了|我记下了|已经记录|记下来了|记下了|帮你记下|"
+    # run_45fa85c1ee75 实测漏网：未来式承诺同样是写盘宣称
+    r"我[来先会]?记下|我.{0,6}记录下来|"
     r"I(?:'ve| have) (?:noted|remembered)",
     re.IGNORECASE,
 )
@@ -28,23 +30,28 @@ def guard_memory_claim(text: str, *, allowed: bool) -> str:
 
 
 def guard_reply(text: str | None, runtime: object | None) -> str | None:
-    """Spend one unspent successful projection, or fall back to an injected receipt."""
+    """Spend one unspent successful projection, or fall back to an injected receipt.
 
+    ADR-0260 §6 fail-closed: a draft that claims a memory write is allowed
+    only with a spent claim right or an allowing receipt. With no memory
+    subsystem and no injected receipt the claim is replaced by the refusal
+    (previously fail-open: "我记下了" sailed through on memory-less runs,
+    e.g. run_45fa85c1ee75).
+    """
+
+    if text is None or _CLAIM.search(text) is None:
+        return text
     memory = getattr(runtime, "memory", None) if runtime is not None else None
     if memory is None and runtime is not None and hasattr(runtime, "get"):
         memory = runtime.get("memory")
     take = getattr(memory, "take_claim_right", None) if memory is not None else None
     if callable(take):
-        if text is None or _CLAIM.search(text) is None:
-            return text
-        if take() is None:
-            return _REFUSAL
-        return text
+        return text if take() is not None else _REFUSAL
     receipt = getattr(runtime, "memory_receipt", None) if runtime is not None else None
     if receipt is None and runtime is not None and hasattr(runtime, "get"):
         receipt = runtime.get("memory_receipt")
-    if receipt is None or text is None:
-        return text
+    if receipt is None:
+        return _REFUSAL
     allowed = getattr(receipt, "may_acknowledge", None)
     if allowed is None:
         allowed = may_acknowledge_projection(receipt)

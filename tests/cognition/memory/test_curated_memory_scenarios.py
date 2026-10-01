@@ -364,9 +364,14 @@ async def test_decision_parse_keeps_remembered_claim_with_receipt() -> None:
 
 
 @pytest.mark.asyncio
-async def test_decision_parse_without_memory_receipt_keeps_original_text() -> None:
+async def test_decision_parse_without_memory_receipt_refuses_claim() -> None:
+    # 2026-10-01 契约变更（run_45fa85c1ee75：无记忆子系统时"记下了"直接放行，
+    # 违背 ADR-0260 §6 fail-closed）：无回执的宣称必须被拒绝句替换。
     decision = await _parse_decision("好的，已记下。", may_acknowledge=None)
-    assert decision.response_text == "好的，已记下。"
+    assert decision.response_text == "这条还没有写入记忆文件。我不能说已经记下。"
+    # 非宣称文本不受影响
+    decision2 = await _parse_decision("好的，收到。", may_acknowledge=None)
+    assert decision2.response_text == "好的，收到。"
 
 
 def test_runtime_view_exposes_memory_receipt_from_memory_seam(tmp_path: Path) -> None:

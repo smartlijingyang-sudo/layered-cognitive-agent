@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import redis.exceptions
@@ -157,7 +158,12 @@ async def decode_create_run(
     if isinstance(resume_tool_result, JSONResponse):
         return resume_tool_result
 
-    run_input: LobeHubRunInput = await prepare_run_from_messages(messages, file_store)
+    run_input: LobeHubRunInput = await prepare_run_from_messages(
+        messages,
+        file_store,
+        assistant_home=_assistant_home_of(assistant_id),
+        topic_id=topic_id_from_body(body),
+    )
     if resume_approval is None and resume_tool_result is None and not run_input.user_text.strip():
         return _err("messages must include a non-empty user message", status_code=400)
 
@@ -184,6 +190,18 @@ async def decode_create_run(
         resume_approval=resume_approval,
         resume_tool_result=resume_tool_result,
     )
+
+
+def _assistant_home_of(assistant_id: str) -> Path | None:
+    """Resolve ``{lca_home}/assistants/{assistant_id}``; None when unbound.
+
+    Used for the defect-1 conversation-log self-healing path only.
+    """
+    if not assistant_id:
+        return None
+    from lca.infrastructure.path.locator import get_lca_home
+
+    return get_lca_home() / "assistants" / assistant_id
 
 
 def _decode_resume_approval(raw: Any) -> dict[str, Any] | JSONResponse | None:

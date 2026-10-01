@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from lca.contracts.models.core.conversation.conversation import ConversationTurn
+from lca.plugins.transport.webserver.handlers.runs.session.message.conversation_log import (
+    fill_history_gaps,
+)
 
 MAX_HISTORY_MESSAGES = 12
 MAX_HISTORY_CHARS = 6000
@@ -18,8 +22,16 @@ def extract_prior_turns(
     messages: list[Any],
     *,
     plain_text_fn: PlainTextExtractor,
+    assistant_home: Path | None = None,
+    topic_id: str = "",
 ) -> tuple[ConversationTurn, ...]:
-    """Return compact user/assistant context before the latest user message."""
+    """Return compact user/assistant context before the latest user message.
+
+    ``assistant_home`` + ``topic_id`` enable backend self-healing (defect-1
+    fix): when the client drops assistant rows from ``messages``, consecutive
+    user turns are gap-filled from the per-topic conversation log. Both must
+    be provided; otherwise the raw client history is used unchanged.
+    """
     turns: list[ConversationTurn] = []
     for item in messages:
         if not isinstance(item, dict):
@@ -30,6 +42,8 @@ def extract_prior_turns(
         text = plain_text_fn(item.get("content"))
         if text:
             turns.append(ConversationTurn(role=role, content=text))
+    if assistant_home is not None and topic_id:
+        turns = fill_history_gaps(turns, assistant_home=assistant_home, topic_id=topic_id)
     if len(turns) <= 1:
         return ()
     if turns[-1].role == "user":

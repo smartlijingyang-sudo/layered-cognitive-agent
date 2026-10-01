@@ -12,6 +12,7 @@ never rebuilt inside dispatch (dispatch runs every turn, see
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 from contextvars import ContextVar, Token
 from typing import TYPE_CHECKING, Any
@@ -21,6 +22,9 @@ from lca.infrastructure.tool_defer.policy import DeferPolicy
 
 if TYPE_CHECKING:
     from lca.contracts.protocols import Tool
+
+
+log = logging.getLogger(__name__)
 
 
 def _tool_to_spec(tool: Tool) -> dict[str, Any]:
@@ -64,27 +68,45 @@ class ToolDeferSession:
     def update_turn(self, tools: Sequence[Tool]) -> None:
         """Refresh the per-turn view after fork filtering/wrapping.
 
-        Each tool must carry a non-empty ``namespace`` that belongs to the
-        policy's known namespaces.  Tools with a missing or unknown namespace
-        fail fast with ValueError.  The loaded set is *not* reset.
+        Fail-soft by design: a tool with a *missing* namespace must never
+        kill the run here (2026-10-01: 6 runs died with 0 steps because a
+        wrapper swallowed ``namespace``). Such tools are parked under the
+        ``"unknown"`` pseudo-namespace in ``DEFERRED`` mode — fail-closed
+        for *discovery* (the model must explicitly load it), never for the
+        run itself. A warning is logged so the missing declaration stays
+        observable.
+
+        A *declared* namespace the policy has no description for is a policy
+        misconfiguration and still fails fast here (ADR-0256 B2: 目录描述必填
+        化); with ``DeferPolicy.default()`` this never triggers in production.
+        Wiring-time fail-fast (``ToolsService.register`` raises; factories are
+        covered by contract tests) catches undeclared tools even earlier.
+        The loaded set is *not* reset.
         """
         grouped: dict[str, list[str]] = {}
         for tool in tools:
-            ns = getattr(tool, "namespace", "")
-            if not ns or ns not in self._policy.namespace_descriptions:
-                raise ValueError(
-                    f"tool {tool.name!r} declares invalid namespace {ns!r}; "
-                    f"known: {sorted(self._policy.namespace_descriptions.keys())}"
+            ns = getattr(tool, "namespace", "") or ""
+            if not ns:
+                log.warning(
+                    "tool_defer: tool %r has no namespace; "
+                    "parking under 'unknown' (deferred)",
+                    tool.name,
                 )
+                ns = "unknown"
             grouped.setdefault(ns, []).append(tool.name)
         self._namespaces = tuple(
             ToolNamespace(
                 name=namespace,
-                description=self._describe(namespace, tool_names),
+                description=(
+                    "未声明命名空间的工具（运行时兜底，deferred）"
+                    if namespace == "unknown"
+                    else self._describe(namespace, tool_names)
+                ),
                 mode=(
-                    DeferMode.EAGER
-                    if namespace in self._policy.eager_namespaces
-                    else DeferMode.DEFERRED
+                    DeferMode.DEFERRED
+                    if namespace == "unknown"
+                    or namespace not in self._policy.eager_namespaces
+                    else DeferMode.EAGER
                 ),
                 tool_names=tuple(tool_names),
             )

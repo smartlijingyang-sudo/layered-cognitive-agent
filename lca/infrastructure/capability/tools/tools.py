@@ -65,7 +65,19 @@ class ToolsService(ToolRegistry):
         return disposer
 
     def register(self, tool: Tool) -> None:
-        """Legacy path: register a pre-built tool instance directly."""
+        """Legacy path: register a pre-built tool instance directly.
+
+        ADR-0256 fail-fast: a tool without a declared non-empty
+        ``namespace`` is rejected here — at wiring time — instead of
+        surfacing later inside ``ToolDeferSession.update_turn``.
+        """
+        namespace = getattr(tool, "namespace", "")
+        if not namespace:
+            raise ValueError(
+                f"cannot register tool {tool.name!r}: missing non-empty "
+                "'namespace' (ADR-0256: namespace is factory-declared "
+                "metadata required for defer/wire gating)"
+            )
         self._tools[tool.name] = tool
 
     def unregister(self, name: str) -> Tool | None:

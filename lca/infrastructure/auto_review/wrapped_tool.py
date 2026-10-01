@@ -76,6 +76,24 @@ class AutoReviewWrappedTool(Tool):
 
         return self._denied(verdict)
 
+    def __getattr__(self, name: str) -> Any:
+        '''Delegate any non-overridden attribute to the wrapped tool.
+
+        The wrapper intentionally overrides only review-relevant behavior
+        (``name``, ``description``, ``execute``); every other member of the
+        ``Tool`` protocol surface — including ``namespace`` (ADR-0256) — is
+        transparently forwarded so the wrapped tool keeps behaving like the
+        inner one. Without this, ``getattr(tool, "namespace", "")`` in
+        ``ToolDeferSession.update_turn`` always saw ``""`` and killed the
+        run (2026-10-01: 6 runs died with 0 steps). Dunder/private names
+        raise ``AttributeError`` normally so copy/pickle probes behave.
+        '''
+        if name.startswith("_"):
+            raise AttributeError(
+                f"{type(self).__name__} has no attribute {name!r}"
+            )
+        return getattr(self._inner, name)
+
     @staticmethod
     def _denied(verdict: AutoReviewVerdict) -> Observation:
         return Observation(
