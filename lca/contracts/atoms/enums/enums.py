@@ -6,10 +6,10 @@
 
 from __future__ import annotations
 
-from enum import Enum, StrEnum
+from enum import StrEnum
 
 
-class ActionType(str, Enum):
+class ActionType(StrEnum):
     """Agent 决策行动类型。"""
 
     RESPOND = "respond"
@@ -21,21 +21,21 @@ class ActionType(str, Enum):
     SHORT_CIRCUIT = "short_circuit"
 
 
-class DecisionGateName(str, Enum):
+class DecisionGateName(StrEnum):
     """内置收尾策略名称（registry 键；由 LeadMandate 展开，非用户旋钮）。"""
 
     MUST_CONSULT_ALL = "must_consult_all"
     NONE = "none"
 
 
-class StreamChannel(str, Enum):
+class StreamChannel(StrEnum):
     """StepTextDelta 可见性通道（ADR-0051 Phase 2）。"""
 
     DECISION = "decision"
     ANSWER = "answer"
 
 
-class RunActivityPhase(str, Enum):
+class RunActivityPhase(StrEnum):
     """Run 级活动相位 — SSE 心跳 / 进度条（ADR-0051 Phase 2）。"""
 
     LLM_THINKING = "llm_thinking"
@@ -43,7 +43,7 @@ class RunActivityPhase(str, Enum):
     SANDBOX_EXEC = "sandbox_exec"
 
 
-class ActionScope(str, Enum):
+class ActionScope(StrEnum):
     """Which built-in actions a Body may execute (construction-time closed set)."""
 
     SOLO = "solo"
@@ -51,7 +51,7 @@ class ActionScope(str, Enum):
     LEAD = "lead"
 
 
-class HookEvent(str, Enum):
+class HookEvent(StrEnum):
     """Cordis lifecycle hook namespace (observe-only; platform uses RuntimeLifecycle SSOT).
 
     PRE_* / POST_* removed per cognitive constitution v3 PR10 — phase boundaries
@@ -64,14 +64,14 @@ class HookEvent(str, Enum):
     ON_COMPLETE = "on_complete"
 
 
-class SpanStatus(str, Enum):
+class SpanStatus(StrEnum):
     """TraceSpan 执行状态。"""
 
     OK = "ok"
     ERROR = "error"
 
 
-class SnapshotReason(str, Enum):
+class SnapshotReason(StrEnum):
     """StateSnapshot 快照触发原因。"""
 
     PERIODIC = "periodic"
@@ -80,7 +80,7 @@ class SnapshotReason(str, Enum):
     ON_ERROR = "on_error"
 
 
-class DelegationProtocol(str, Enum):
+class DelegationProtocol(StrEnum):
     """委派传输协议。"""
 
     INTERNAL = "internal"
@@ -88,7 +88,7 @@ class DelegationProtocol(str, Enum):
     MCP = "mcp"
 
 
-class ContentType(str, Enum):
+class ContentType(StrEnum):
     """Observation 载荷内容类型。"""
 
     TEXT = "text"
@@ -97,7 +97,7 @@ class ContentType(str, Enum):
     STRUCTURED = "structured"
 
 
-class ReflectionVerdict(str, Enum):
+class ReflectionVerdict(StrEnum):
     """自省判定结果。"""
 
     ON_TRACK = "on_track"
@@ -106,7 +106,7 @@ class ReflectionVerdict(str, Enum):
     DEGRADED_BUT_COMPLETED = "degraded_but_completed"
 
 
-class MessageKind(str, Enum):
+class MessageKind(StrEnum):
     """AgentMessage Part 种类。"""
 
     TEXT = "text"
@@ -114,14 +114,14 @@ class MessageKind(str, Enum):
     FILE = "file"
 
 
-class MessageRole(str, Enum):
+class MessageRole(StrEnum):
     """消息发送方角色。"""
 
     USER = "user"
     AGENT = "agent"
 
 
-class RoleStatus(str, Enum):
+class RoleStatus(StrEnum):
     """团队委派进度状态。
 
     ``DONE_PARTIAL``：已收获可用部分证据并终止重试（证据平面 usable，
@@ -135,7 +135,7 @@ class RoleStatus(str, Enum):
     FAILED = "failed"
 
 
-class MemoryLayer(str, Enum):
+class MemoryLayer(StrEnum):
     """多级记忆层级（CoALA 分类）。"""
 
     WORKING = "working"
@@ -148,7 +148,7 @@ SHAREABLE_LAYERS: frozenset[MemoryLayer] = frozenset({MemoryLayer.SEMANTIC, Memo
 """只有 semantic / procedural 两层可跨 Agent 共享（CoALA 语义边界）。"""
 
 
-class MemoryRecordKind(str, Enum):
+class MemoryRecordKind(StrEnum):
     """记忆记录语义分类——观察写入记忆时的类型化标记。
 
     此前成员委派返回 / 工具结果 / 自身回复都被压扁成 ``TOOL_RESULT:`` 字符串，
@@ -181,7 +181,7 @@ class MemoryCategory(StrEnum):
     PROCEDURAL = "procedural"
 
 
-class LLMStreamEventType(str, Enum):
+class LLMStreamEventType(StrEnum):
     """LLM 流式事件类型 —— 值与 OpenAI Responses SSE ``type`` 字符串对齐。"""
 
     OUTPUT_TEXT_DELTA = "response.output_text.delta"
@@ -191,7 +191,7 @@ class LLMStreamEventType(str, Enum):
     COMPLETED = "response.completed"
 
 
-class FinishReason(str, Enum):
+class FinishReason(StrEnum):
     """LLM 生成结束原因 —— 归一化各 provider 的 finish/stop/status 信号。
 
     ``LENGTH`` 表示输出被 max_tokens 截断；与 tool_call 并存时，
@@ -206,7 +206,7 @@ class FinishReason(str, Enum):
     UNKNOWN = "unknown"
 
 
-class ComponentKind(str, Enum):
+class ComponentKind(StrEnum):
     """组件注册表分类键 —— 值域有限，适用契约 1（值域即类型）。
 
     对应 ComponentRegistryProtocol.register(category, name, impl) 中的
