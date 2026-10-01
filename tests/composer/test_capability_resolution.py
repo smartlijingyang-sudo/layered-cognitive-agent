@@ -169,15 +169,19 @@ def test_runtime_assembly_uses_the_shared_scope_adapter_for_all_plan_reads() -> 
     """运行时闭合与阶段执行器均不得绕开统一的计划能力接缝。"""
 
     runtime_assembly = (
-        Path(__file__).resolve().parents[2] / "lca/plugins/composer/runtime/runtime_assembly.py"
+        Path(__file__).resolve().parents[2] / "lca/plugins/composer/runtime/runtime/assembly.py"
     ).read_text(encoding="utf-8")
     runtime_capabilities = (
-        Path(__file__).resolve().parents[2] / "lca/plugins/composer/runtime/runtime_capabilities.py"
+        Path(__file__).resolve().parents[2] / "lca/plugins/composer/runtime/runtime/capabilities.py"
+    ).read_text(encoding="utf-8")
+    capability_resolution = (
+        Path(__file__).resolve().parents[2]
+        / "lca/plugins/composer/composition/capability_resolution.py"
     ).read_text(encoding="utf-8")
 
     assert "resolve_runtime_capabilities" in runtime_assembly
     assert "require_declared_capabilities(" in runtime_capabilities
-    assert "require_exact_bindings(capabilities)" in runtime_capabilities
+    assert "self.require_provider_binding(selected[capability])" in capability_resolution
     assert "require_capability(" not in runtime_assembly
     assert "require_capability(" not in runtime_capabilities
     assert 'getattr(scope, "inject"' not in runtime_capabilities
