@@ -62,14 +62,18 @@ def _role() -> RoleProfile:
     )
 
 
-def test_f1_topology_rejects_identity_md(tmp_path: Path) -> None:
+def test_f1_topology_rejects_unknown_root_md(tmp_path: Path) -> None:
+    # IDENTITY.md used to be asserted as a violation here; commit 925a2e97f
+    # promoted it into the 9-standing-file layout (layout.toml standing_files),
+    # so it is whitelisted by design and no longer rejected.
     home = tmp_path / "asst"
     home.mkdir()
-    for name in ("SOUL.md", "USER.md", "MEMORY.md", "AGENTS.md", "TOOLS.md"):
+    for name in ("SOUL.md", "USER.md", "MEMORY.md", "AGENTS.md", "TOOLS.md", "IDENTITY.md"):
         (home / name).write_text("body\n", encoding="utf-8")
-    (home / "IDENTITY.md").write_text("should not be a root file\n", encoding="utf-8")
+    (home / "NOT_A_STANDING.md").write_text("unknown root file\n", encoding="utf-8")
     violations = validate_root_entries(tuple(entry.name for entry in home.iterdir()))
-    assert "IDENTITY.md" in violations
+    assert "NOT_A_STANDING.md" in violations
+    assert "IDENTITY.md" not in violations
     assert "SOUL.md" not in violations
 
 

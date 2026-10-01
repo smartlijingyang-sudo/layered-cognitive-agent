@@ -71,7 +71,7 @@ class _BaseOnboardingTool(Tool):
         self._user_store = user_store
         self._user_id = user_id
 
-    def _ok(self, start: float, payload: dict[str, Any] | None, text: str = "") -> Observation:
+    def _ok(self, start: float, payload: dict[str, Any] | None) -> Observation:
         return Observation(
             observation_id=new_id("obs"),
             success=True,
