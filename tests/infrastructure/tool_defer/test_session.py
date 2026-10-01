@@ -58,6 +58,16 @@ def _wire_names(wire: tuple[dict[str, Any], ...]) -> list[str]:
 # --- render_turn: first-turn projection ------------------------------------
 
 
+def test_missing_loader_does_not_hide_every_tool() -> None:
+    """Defer without tool_search is a deadlock. Render the full list instead."""
+    session = _session()
+    tools = (FakeTool("runCommand"), FakeTool("readFile"))
+    session.update_turn(tools, {"runCommand": "runCommand", "readFile": "readFile"})
+    wire, catalog = session.render_turn()
+    assert _wire_names(wire) == ["runCommand", "readFile"]
+    assert catalog == ""
+
+
 def test_first_turn_injects_only_eager_schemas() -> None:
     session = _session()
     session.update_turn(_tools(), _namespaces())
@@ -80,6 +90,22 @@ def test_unloaded_namespace_schemas_never_leak_into_catalog() -> None:
             assert json.dumps(tool.parameters) not in catalog
     # No per-tool schema fragment at all — only one-liners.
     assert '"properties"' not in catalog
+
+
+def test_catalog_hint_appears_only_once_at_the_end() -> None:
+    """Each deferred namespace line carries just its name and description.
+
+    The loading hint lives only in the trailing ``discovery_rule``, not on
+    every line, so a 64-namespace catalog does not repeat it 64 times.
+    """
+    session = _session()
+    session.update_turn(_tools(), _namespaces())
+    _, catalog = session.render_turn()
+    # discovery_rule 里只有一次 loading hint；每行目录不再重复它
+    assert catalog.count("via tool_search") == 1
+    assert catalog.count("[deferred —") == 0
+    assert catalog.count("- browser: 2 tools: b_one, b_two") == 1
+    assert catalog.count("- core: 1 tools: core_a") == 1
 
 
 def test_deferred_wire_is_smaller_than_full_wire() -> None:
@@ -195,11 +221,23 @@ def test_render_without_turn_view_returns_empty() -> None:
     assert catalog == ""
 
 
-def test_unknown_tool_gets_own_namespace() -> None:
+def test_turn_without_the_loader_renders_every_schema() -> None:
+    """No tool_search on the turn. Hiding mystery and pointing at a missing loader deadlocks."""
     session = _session()
     session.update_turn((FakeTool("mystery"),), {})
     wire, catalog = session.render_turn()
-    assert _wire_names(wire) == []
+    assert _wire_names(wire) == ["mystery"]
+    assert catalog == ""
+
+
+def test_unknown_tool_stays_deferred_when_the_loader_is_present() -> None:
+    session = _session()
+    session.update_turn(
+        (FakeTool("tool_search"), FakeTool("mystery")),
+        {"tool_search": "tool_search"},
+    )
+    wire, catalog = session.render_turn()
+    assert _wire_names(wire) == ["tool_search"]
     assert "mystery" in catalog
 
 

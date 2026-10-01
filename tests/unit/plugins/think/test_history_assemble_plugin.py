@@ -258,6 +258,52 @@ async def test_node_execute_populates_tools_from_forked_tools_port() -> None:
     assert by_name["runCommand"]["function"]["parameters"]["type"] == "object"
 
 
+async def test_defer_catalog_is_replaced_not_stacked() -> None:
+    """Last turn's header already holds the catalog. Assemble must not append a second copy."""
+    from lca.infrastructure.tool_defer.policy import DeferPolicy
+    from lca.infrastructure.tool_defer.session import (
+        ToolDeferSession,
+        reset_current_defer_session,
+        set_current_defer_session,
+    )
+
+    search = _make_stub_tool("tool_search")()
+    run = _make_stub_tool("runCommand")()
+    session = ToolDeferSession(DeferPolicy.default())
+    session.update_turn(
+        (search, run),
+        {"tool_search": "tool_search", "runCommand": "runCommand"},
+    )
+    _wire, catalog = session.render_turn()
+    token = set_current_defer_session(session)
+    try:
+        writer = _FakeWriter(
+            messages=[{"role": "user", "content": "q"}],
+            system=f"identity\n\n{catalog}\n\n{catalog}",
+        )
+        forked = ForkedTools.model_construct(
+            items=(search, run),
+            binding_keys=frozenset(),
+        )
+        out = await HistoryDeriveExecutor().node_execute(
+            context=_node_context(),
+            input=NodeInput(
+                port_values={
+                    "state": _make_state(),
+                    "writer": writer,
+                    "forked_tools": forked,
+                }
+            ),
+        )
+    finally:
+        reset_current_defer_session(token)
+    request = out.port_values["model_visible_request"]
+    assert isinstance(request, ModelVisibleRequest)
+    assert request.system.count("Deferred tool namespaces") == 1
+    assert request.system.startswith("identity")
+    assert [spec["function"]["name"] for spec in request.tools] == ["tool_search"]
+
+
 async def test_node_execute_tools_empty_when_forked_tools_missing() -> None:
     """ForkedTools 缺失 → ``request.tools == ()``,不抛(向后兼容测试/无工具 run)。"""
     executor = HistoryDeriveExecutor()
@@ -269,6 +315,27 @@ async def test_node_execute_tools_empty_when_forked_tools_missing() -> None:
     request = out.port_values["model_visible_request"]
     assert isinstance(request, ModelVisibleRequest)
     assert request.tools == ()
+
+
+def test_alignment_synthesis_not_appended_when_already_injected() -> None:
+    """当 standing 快照已注入 ALIGNMENT_SYNTHESIS.md 时不再重复追加。
+
+    ``run_f213fbb77a2d`` 的系统提示里 ALIGNMENT_SYNTHESIS.md 出现两次：
+    一次在注入块内，一次由 ``_append_alignment_synthesis`` 追加。已注入
+    时直接跳过，避免同一内容重复占 prompt。
+    """
+    from lca.nodes.think.history.assemble import _append_alignment_synthesis
+
+    already = (
+        "ROLE: 默认助理\n"
+        "<!-- INJECTED FILE: dreams/alignment/derived/ALIGNMENT_SYNTHESIS.md -->\n"
+        "对齐综述\n"
+        "<!-- END INJECTED FILE: dreams/alignment/derived/ALIGNMENT_SYNTHESIS.md -->"
+    )
+    out = _append_alignment_synthesis(already, runtime={"home_path": "/tmp/no-home"})
+    assert out == already
+    assert out.count("<!-- INJECTED FILE: dreams/alignment/derived/ALIGNMENT_SYNTHESIS.md -->") == 1
+    assert out.count("ALIGNMENT_SYNTHESIS.md") == 2  # 开闭标记各一次，无重复注入
 
 
 # ── System prompt seam (spec §G + run_a0cdcd40d8b9 regression) ─────────
