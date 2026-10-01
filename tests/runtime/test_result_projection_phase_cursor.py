@@ -22,9 +22,11 @@ from lca.contracts.models.core.state.terminal_outcome import (
     TerminalOutcome,
     TerminalOutcomeKind,
 )
+from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
+    ExecutionOutcome,
+)
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     DeclarativeRunOutcome,
-    ExecutionOutcome,
     PhaseRunCursor,
 )
 from lca.runtime.projection.result_projection import TerminalResultProjection
