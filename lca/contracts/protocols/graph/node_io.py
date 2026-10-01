@@ -28,8 +28,6 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-import dataclasses
-
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from lca.contracts.protocols.graph.ports import PortName

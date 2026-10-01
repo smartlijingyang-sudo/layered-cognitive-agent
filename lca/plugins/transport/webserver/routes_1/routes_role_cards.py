@@ -19,7 +19,6 @@ role_id 中的 ``/`` 在 path param 里需要 URL encode（Starlette 支持 path
 
 from __future__ import annotations
 
-import dataclasses
 from typing import Any
 
 from starlette.requests import Request
@@ -27,7 +26,6 @@ from starlette.responses import JSONResponse
 
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
-from lca.contracts.capabilities import ASSISTANT_CATALOG
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
     AuthorityContract,
@@ -43,7 +41,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.contracts.routing import RouteSpec
-from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.transport.webserver.handlers.cors.cors import CORS_HEADERS
 from lca.plugins.transport.webserver.route.register import register_routes
 

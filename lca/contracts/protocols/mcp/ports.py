@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any, Protocol, runtime_checkable
 
 from lca.contracts.models.mcp.types import (
-    MCPServerConfig,
     MCPServerStatus,
     MCPTool,
     MCPToolResult,
