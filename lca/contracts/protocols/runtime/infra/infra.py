@@ -49,6 +49,7 @@ class Tool(Protocol):
     """
 
     name: ClassVar[str]
+    namespace: ClassVar[str]
     description: ClassVar[str]
     parameters: ClassVar[dict[str, Any]]
     is_idempotent: ClassVar[bool]
