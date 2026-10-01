@@ -45,8 +45,8 @@ class ThinkRouteExecutor:
     region: str = "think"
     # ADR-0219 §5.5: typed port contract declared on the plugin (graph
     # layer does not know port names; it only knows topology).
-    declared_inputs: tuple[PortName, ...] = ("in_assembled_manifest",)
-    declared_outputs: tuple[PortName, ...] = ("route_choice", "enforced_state")
+    declared_inputs: tuple[PortName, ...] = (PortName("in_assembled_manifest"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("route_choice"), PortName("enforced_state"))
 
     async def node_execute(
         self,
@@ -62,10 +62,10 @@ class ThinkRouteExecutor:
 
         _log = logging.getLogger(__name__)
         runtime = context.runtime
-        state = runtime.state
+        state = getattr(runtime, "state", None)
         brain = getattr(runtime, "brain", None)
         router = getattr(brain, "skill_router", None) if brain is not None else None
-        reducer = runtime.reducer
+        reducer = getattr(runtime, "reducer", None)
 
         if state is None:
             raise RuntimeError("think.route requires runtime.state; got None")
@@ -91,8 +91,8 @@ class ThinkRouteExecutor:
         routed_state = apply_skill_route(state, active_template)
         return NodeOutput(
             port_values={
-                "route_choice": active_template,
-                "enforced_state": routed_state,
+                PortName("route_choice"): active_template,
+                PortName("enforced_state"): routed_state,
             },
         )
 
