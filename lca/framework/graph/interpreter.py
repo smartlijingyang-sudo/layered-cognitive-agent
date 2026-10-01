@@ -65,6 +65,7 @@ from lca.contracts.protocols.graph.errors import (
 )
 from lca.contracts.protocols.graph.node_io import NodeOutput
 from lca.contracts.protocols.graph.plan import Plan, PlanEdge, PlanNode
+from lca.contracts.protocols.graph.ports import PortName
 from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.contracts.protocols.graph.strategy import StrategyContext
 from lca.contracts.protocols.graph.visit import DispatchDecision, VisitRecord
@@ -251,7 +252,7 @@ class PlanInterpreter:
                         outcome="failure",
                         error=repr(exc),
                         elapsed_ms=self.clock() - visit_started,
-                        inputs=dict(inputs.port_values),
+                        inputs=_str_keyed(inputs.port_values),
                         outputs={},
                         occurred_at_ms=self.clock(),
                     )
@@ -299,8 +300,8 @@ class PlanInterpreter:
                         outcome="success",
                         error="",
                         elapsed_ms=self.clock() - visit_started,
-                        inputs=inputs.port_values,
-                        outputs=output.port_values,
+                        inputs=_str_keyed(inputs.port_values),
+                        outputs=_str_keyed(output.port_values),
                         dispatch="terminal",
                         occurred_at_ms=self.clock(),
                     )
@@ -316,7 +317,7 @@ class PlanInterpreter:
                 )
                 self.recorder.record(visit)
                 visits.append(visit)
-                facts.extend(output.port_values.get("facts", ()) or ())
+                facts.extend(output.port_values.get(PortName("facts"), ()) or ())
                 terminal_node = node.id
                 break
 
@@ -340,8 +341,8 @@ class PlanInterpreter:
                                 outcome="success",
                                 error="",
                                 elapsed_ms=self.clock() - visit_started,
-                                inputs=inputs.port_values,
-                                outputs=output.port_values,
+                                inputs=_str_keyed(inputs.port_values),
+                                outputs=_str_keyed(output.port_values),
                                 dispatch="terminal",
                                 occurred_at_ms=self.clock(),
                             )
@@ -357,7 +358,7 @@ class PlanInterpreter:
                         )
                         self.recorder.record(visit)
                         visits.append(visit)
-                        facts.extend(output.port_values.get("facts", ()) or ())
+                        facts.extend(output.port_values.get(PortName("facts"), ()) or ())
                         terminal_node = node.id
                         break
 
@@ -369,25 +370,25 @@ class PlanInterpreter:
             )
             if edge is None:
                 skipped = [
-                    e
+                    (e, loop)
                     for e in plan.edges
                     if e.source == node.id
-                    and e.loop is not None
-                    and traversal.edge_counts.get((e.source, e.target), 0) >= e.loop.max_iterations
+                    and (loop := e.loop) is not None
+                    and traversal.edge_counts.get((e.source, e.target), 0) >= loop.max_iterations
                 ]
                 if skipped:
-                    bound = skipped[0]
+                    bound, bound_loop = skipped[0]
                     taken = traversal.edge_counts.get((bound.source, bound.target), 0)
                     raise LoopObligationExceededError(
                         f"plan {plan.id!r}: edge {bound.source!r} → {bound.target!r} "
-                        f"exhausted loop.maxIterations={bound.loop.max_iterations} "
+                        f"exhausted loop.maxIterations={bound_loop.max_iterations} "
                         f"(taken={taken}); no fallback edge matched. "
                         f"This is the act→think re-ask / recovery loop class — "
                         f"the run failed to converge.",
                         plan_id=plan.id,
                         source=bound.source,
                         target=bound.target,
-                        max_iterations=bound.loop.max_iterations,
+                        max_iterations=bound_loop.max_iterations,
                         taken=taken,
                     )
             dispatch = self._classify(edge, output)
@@ -400,8 +401,8 @@ class PlanInterpreter:
                     outcome="success",
                     error="",
                     elapsed_ms=self.clock() - visit_started,
-                    inputs=inputs.port_values,
-                    outputs=output.port_values,
+                    inputs=_str_keyed(inputs.port_values),
+                    outputs=_str_keyed(output.port_values),
                     dispatch=dispatch.kind,
                     occurred_at_ms=self.clock(),
                 )
@@ -419,7 +420,7 @@ class PlanInterpreter:
             )
             self.recorder.record(visit)
             visits.append(visit)
-            facts.extend(output.port_values.get("facts", ()) or ())
+            facts.extend(output.port_values.get(PortName("facts"), ()) or ())
             terminal_node = node.id
             traversal.advance(edge=edge, dispatch_kind=dispatch.kind)
         return InterpretationResult(
@@ -456,7 +457,17 @@ class InterpretationResult:
     output: dict[str, Any] = field(default_factory=dict)
 
 
-def _terminate_routing(merged: dict[str, Any]) -> RoutingDecision | None:
+def _str_keyed(values: Mapping[PortName, Any]) -> dict[str, Any]:
+    """Project port values onto the str-keyed observation plane.
+
+    ``PortName`` is a ``NewType`` over ``str`` (ADR-0219 §5), so the keys
+    are already strings at runtime; the copy makes the erasure explicit
+    where port values cross into ``GraphObservation`` / result dicts.
+    """
+    return {str(name): value for name, value in values.items()}
+
+
+def _terminate_routing(merged: Mapping[PortName, Any]) -> RoutingDecision | None:
     """Return the first ``RoutingDecision`` asking to terminate, if any.
 
     Scans this visit's merged ports (not the registry) so only the
@@ -475,8 +486,8 @@ def _terminal_port_values(ports: PortRegistry, plan: Plan) -> dict[str, Any]:
     Falls back to the full snapshot when the plan declares no outputs.
     """
     if not plan.declared_inputs:
-        return dict(ports.snapshot())
-    return ports.exit_subgraph(plan.declared_inputs)
+        return _str_keyed(ports.snapshot())
+    return _str_keyed(ports.exit_subgraph(plan.declared_inputs))
 
 
 def _resolve_depth(outer_state: Any) -> int:
