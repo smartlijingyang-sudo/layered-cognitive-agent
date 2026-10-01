@@ -1,5 +1,11 @@
 | Task ID | Description | Status | Evidence |
 |---|---|---|---|
+| ADR-0256-TASK-1 | Contracts 层强化与 DeferPolicy 8 域闭环 (`Tool.namespace` & `DeferPolicy`) | Ready | 待执行 |
+| ADR-0256-TASK-2 | 工具 Factory 与 Manifest 显式声明 Namespace 并下沉 SSOT | Ready | 待执行 |
+| ADR-0256-TASK-3 | ToolDeferSession 协议升级与 ToolSearch 批量加载 | Ready | 待执行 |
+| ADR-0256-TASK-4 | Cognition Wire Gate 升级为 Namespace 可见性判定与驼峰双拼清理 | Ready | 待执行 |
+| ADR-0256-TASK-5 | 接入安全控制面：Shell 域审批策略挂载 | Ready | 待执行 |
+| ADR-0256-TASK-6 | ADR-0256 全量符合性集成验收与 Pre-push 门禁体检 | Ready | 待执行 |
 | ADR-0255-TASK-1 | 9 大 Standing 文件布局与根拓扑白名单扩展 (`layout.toml` & `layout.py`) | Completed | layout.toml 扩展为 9 个 standing files，domain/layout.py 支持嵌套路径并加入 IDENTITY.md 白名单，15/15 单测全通，commit 925a2e97f |
 | ADR-0255-TASK-2 | 助理 Home 初始化默认骨架物化 (`IDENTITY.md` 与目录索引) | Completed | 补齐 IDENTITY.md/people/groups/alignment_synthesis 模板，更新 _scaffold_standing_notes 与 write_home_files，13/13 模板单测全通，commit 9a1bd1ab1 |
 | ADR-0255-TASK-3 | 上下文装配时间与 Runtime 元数据渲染 (Developer Timestamp & Runtime Row) | Completed | runtime_env.py 落地，注册 RuntimeEnvSection 与 DeveloperTimestampSection，8/8 单测全通，commit fa4af3182 |
