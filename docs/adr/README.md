@@ -196,6 +196,7 @@
 | [0256](0256-tool-namespace-taxonomy.md) | 工具命名空间划分规范：8 域划分、namespace 声明式元数据下沉 factory、defer 加载/审批/wire gate 三者同粒度，附 6 处代码改动与 8 条验收标准；ADR-0255 L1 defer 的划分规范 | Proposed |
 | [0257](0257-delegation-context-inheritance-and-verification.md) | 委派上下文继承与复核协议：委派信封（standing 全量+父 turn 摘要+记忆投影）、回灌只收 evidence 指针、不可逆失败先验效果；ADR-0255 §4.6 的 LCA 落地提案 | Proposed |
 | [0258](0258-compaction-exemption-and-reinjection.md) | 压缩豁免与重注契约：standing 永不进压缩流、摘要带  血统、刷新读失败保留旧块 fail-closed；ADR-0255 §4.5 的 LCA 落地提案 | Proposed |
+| [0259](0259-timestamp-trust-and-date-derivation.md) | 时间戳信任与日期推导契约：now 唯一来源升不变量、日期推导必须经可信工具验证、事件/记录/检索三时间分离；ADR-0255 §4.7 的 LCA 落地提案 | Proposed |
 | [0255](0255-muse-production-runtime-full-reference.md) | Muse 生产运行时全量参考：每 turn 上下文装配顺序、9 个 standing 文件全文与权限矩阵、36 工具命名空间函数清单与关键参数、9 大机制（记忆三层/强制检索/落笔写盘/provenance/压缩豁免/子 agent 继承/自省投影）与 12 条验收用例；ADR-0254 的实证 companion | Proposed |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
