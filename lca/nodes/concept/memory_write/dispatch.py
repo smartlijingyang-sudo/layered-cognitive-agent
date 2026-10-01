@@ -31,6 +31,7 @@ from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeInput,
     NodeOutput,
 )
+from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
@@ -44,8 +45,14 @@ class MemoryWriteDispatchExecutor:
 
     semantic_name = "memory.write.dispatch"
     region = "concept"
-    declared_inputs = ("memory_receipt", "observation", "reflection", "state", "memory")
-    declared_outputs = ("memory_receipt",)
+    declared_inputs: tuple[PortName, ...] = (
+        PortName("memory_receipt"),
+        PortName("observation"),
+        PortName("reflection"),
+        PortName("state"),
+        PortName("memory"),
+    )
+    declared_outputs: tuple[PortName, ...] = (PortName("memory_receipt"),)
 
     async def node_execute(
         self,
@@ -59,10 +66,10 @@ class MemoryWriteDispatchExecutor:
         outputs 端口(yaml):memory_receipt (MemoryReceipt,可能填 memory_ref)
         """
         runtime_obj = context.runtime
-        receipt = input.port_values.get("memory_receipt")
-        observation = input.port_values.get("observation")
-        reflection = input.port_values.get("reflection")
-        state = input.port_values.get("state") or runtime_obj.state
+        receipt = input.port_values.get(PortName("memory_receipt"))
+        observation = input.port_values.get(PortName("observation"))
+        reflection = input.port_values.get(PortName("reflection"))
+        state = input.port_values.get(PortName("state")) or getattr(runtime_obj, "state", None)
 
         if not isinstance(receipt, MemoryReceipt):
             raise TypeError(
@@ -86,9 +93,9 @@ class MemoryWriteDispatchExecutor:
             )
 
         if not receipt.admitted or state is None:
-            return NodeOutput(port_values={"memory_receipt": receipt})
+            return NodeOutput(port_values={PortName("memory_receipt"): receipt})
 
-        memory = input.port_values.get("memory")
+        memory = input.port_values.get(PortName("memory"))
         if not isinstance(memory, MemorySystem):
             raise RuntimeError(
                 "memory.write.dispatch: 'memory' typed port missing from input "
@@ -104,7 +111,7 @@ class MemoryWriteDispatchExecutor:
                 "may_acknowledge": may_acknowledge_projection(projection),
             }
         )
-        return NodeOutput(port_values={"memory_receipt": stamped})
+        return NodeOutput(port_values={PortName("memory_receipt"): stamped})
 
 
 @plugin(
