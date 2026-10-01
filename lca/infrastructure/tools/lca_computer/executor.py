@@ -68,8 +68,21 @@ class LcaComputerExecutor:
 
     async def write_file(self, params: dict[str, Any]) -> ComputerOpResult:
         content = params.get("content")
+        path = _str_arg(params, "path")
+        from lca.infrastructure.memory.contextfiles.domain.standing_path import (
+            is_standing_write_path,
+            standing_write_block_message,
+        )
+
+        if is_standing_write_path(path):
+            return ComputerOpResult(
+                success=False,
+                content="",
+                state={"error": standing_write_block_message(), "retryable": False},
+                error=standing_write_block_message(),
+            )
         return await self._ops.write_file(
-            path=_str_arg(params, "path"),
+            path=path,
             content=str(content) if content is not None else "",
             create_directories=bool(
                 params.get("createDirectories", params.get("create_directories", True))
@@ -77,8 +90,21 @@ class LcaComputerExecutor:
         )
 
     async def edit_file(self, params: dict[str, Any]) -> ComputerOpResult:
+        path = _str_arg(params, "path")
+        from lca.infrastructure.memory.contextfiles.domain.standing_path import (
+            is_standing_write_path,
+            standing_write_block_message,
+        )
+
+        if is_standing_write_path(path):
+            return ComputerOpResult(
+                success=False,
+                content="",
+                state={"error": standing_write_block_message(), "retryable": False},
+                error=standing_write_block_message(),
+            )
         return await self._ops.edit_file(
-            path=_str_arg(params, "path"),
+            path=path,
             search=_str_arg(params, "search"),
             replace=_str_arg(params, "replace"),
             replace_all=bool(params.get("all", params.get("replace_all", False))),

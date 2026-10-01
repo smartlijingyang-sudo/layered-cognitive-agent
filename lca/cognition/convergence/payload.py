@@ -27,11 +27,19 @@ def _file_names(value: object | None) -> tuple[str, ...]:
     ``mimeType``; see ``infrastructure/tools/sandbox/observation.py``), while
     writeFile-shaped producers carry plain name strings. Stringifying a dict
     entry would surface its repr as a filename.
+
+    Listing-shaped tools (``listFiles`` / ``searchFiles``) also carry a
+    ``files`` key whose entries have ``isDirectory``. Those are directory
+    listings, not files created by this call, so entries with an
+    ``isDirectory`` key are skipped (see tests/cognition/body/
+    test_listfiles_not_files_created.py).
     """
     if not isinstance(value, (list, tuple)):
         return ()
     names: list[str] = []
     for item in value:
+        if isinstance(item, dict) and "isDirectory" in item:
+            continue
         name = str(item.get("name") or "") if isinstance(item, dict) else str(item or "")
         if name:
             names.append(name)

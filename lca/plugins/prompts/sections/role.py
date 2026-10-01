@@ -39,8 +39,17 @@ class BackstorySection:
         text = (role_profile.backstory or "").strip()
         if not text:
             return SectionOutput(text="")
+        # The injected block lets `refresh_injected` replace this section in
+        # place from disk. `BACKSTORY:` stays on the same line as the opening
+        # marker so the prompt still reads as the role's backstory.
+        wrapped = (
+            f"{label_line('BACKSTORY', text)}\n"
+            "<!-- INJECTED FILE: SOUL.md -->\n"
+            f"{text}\n"
+            "<!-- END INJECTED FILE: SOUL.md -->"
+        )
         return SectionOutput(
-            text=label_line("BACKSTORY", text) + "\n\n" + _PERSONA_INJECTION_WARNING
+            text=wrapped + "\n\n" + _PERSONA_INJECTION_WARNING
         )
 
 

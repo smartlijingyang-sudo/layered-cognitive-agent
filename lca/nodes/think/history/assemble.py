@@ -33,6 +33,7 @@ Canonical shape: hand-written ``@dataclass(frozen=True, slots=True)`` +
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -170,9 +171,10 @@ class HistoryDeriveExecutor:
         system = _refresh_standing(system, runtime=context.runtime)
         system = _append_standing_diff(system, runtime=context.runtime)
         system = _append_alignment_synthesis(system, runtime=context.runtime)
-        tools, defer_catalog = _forked_to_tools_deferred(
-            input.port_values.get("forked_tools")
-        )
+        tools, defer_catalog = _forked_to_tools_deferred(input.port_values.get("forked_tools"))
+        # The folded header is last turn's request, catalog included.
+        # Appending again stacks a second copy of the same directory.
+        system = _strip_defer_catalog(system)
         if defer_catalog:
             system = f"{system}\n\n{defer_catalog}" if system else defer_catalog
         return NodeOutput(
@@ -182,6 +184,24 @@ class HistoryDeriveExecutor:
                 )
             }
         )
+
+
+_DEFER_CATALOG_HEADER = "Deferred tool namespaces (not yet loaded):"
+
+
+def _strip_defer_catalog(system: str) -> str:
+    """Drop every previously appended defer catalog, leaving the prompt."""
+
+    if _DEFER_CATALOG_HEADER not in system:
+        return system
+    from lca.infrastructure.tool_defer.policy import DeferPolicy
+
+    end = re.escape(DeferPolicy.default().discovery_rule)
+    pattern = re.compile(
+        r"\n*" + re.escape(_DEFER_CATALOG_HEADER) + r"\n.*?" + end + r"\n*",
+        re.DOTALL,
+    )
+    return pattern.sub("\n\n", system).strip()
 
 
 def _resolve_port(name: str, *, input: NodeInput, context: NodeContext) -> Any:
@@ -227,10 +247,14 @@ def _append_alignment_synthesis(system: str, *, runtime: object) -> str:
 
     The synthesis is a soft alignment signal. It is read from disk on every
     assembly so a fresh dream pass reaches the model without a restart.
+    When the standing snapshot already injected the synthesis file, it is
+    already visible and must not be appended a second time.
     """
 
     home_path = _home_path(runtime)
     if not home_path:
+        return system
+    if "INJECTED FILE: dreams/alignment/derived/ALIGNMENT_SYNTHESIS.md" in system:
         return system
     try:
         synthesis = load_alignment_synthesis(

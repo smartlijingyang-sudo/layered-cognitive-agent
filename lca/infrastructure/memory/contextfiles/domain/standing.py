@@ -162,7 +162,7 @@ def _ensure_live_note(output: list[str], live_note: str) -> None:
     if not live_note or live_note in output:
         return
     for index, line in enumerate(output):
-        if line.startswith("<!-- INJECTED FILE:"):
+        if "<!-- INJECTED FILE:" in line:
             output.insert(index, live_note)
             output.insert(index + 1, "")
             return
@@ -170,9 +170,11 @@ def _ensure_live_note(output: list[str], live_note: str) -> None:
 
 def _injected_name(line: str, *, end: bool = False) -> str | None:
     prefix = "<!-- END INJECTED FILE:" if end else "<!-- INJECTED FILE:"
-    if not line.startswith(prefix) or not line.endswith("-->"):
+    marker = f"{prefix} "
+    position = line.find(marker)
+    if position < 0 or not line.endswith("-->"):
         return None
-    return line[len(prefix) : -len("-->")].strip() or None
+    return line[position + len(marker) : -len("-->")].strip() or None
 
 
 def _strip_injected(history: str) -> str:

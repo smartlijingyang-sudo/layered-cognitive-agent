@@ -12,8 +12,9 @@ never rebuilt inside dispatch (dispatch runs every turn, see
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from contextvars import ContextVar, Token
-from typing import TYPE_CHECKING, Any, Mapping, Sequence
+from typing import TYPE_CHECKING, Any
 
 from lca.contracts.models.cognition.tool_defer import DeferMode, ToolNamespace
 from lca.infrastructure.tool_defer.policy import DeferPolicy
@@ -60,9 +61,7 @@ class ToolDeferSession:
         """This turn's namespace view (turn order)."""
         return self._namespaces
 
-    def update_turn(
-        self, tools: Sequence[Tool], namespaces: Mapping[str, str]
-    ) -> None:
+    def update_turn(self, tools: Sequence[Tool], namespaces: Mapping[str, str]) -> None:
         """Refresh the per-turn view after fork filtering/wrapping.
 
         ``namespaces`` maps ``tool.name`` → factory key (from
@@ -101,9 +100,7 @@ class ToolDeferSession:
         Idempotent — a second load returns the same payload.  Raises
         ``KeyError`` with the known namespaces on unknown input.
         """
-        target = next(
-            (ns for ns in self._namespaces if ns.name == namespace), None
-        )
+        target = next((ns for ns in self._namespaces if ns.name == namespace), None)
         if target is None:
             known = ", ".join(sorted(ns.name for ns in self._namespaces)) or "(none)"
             raise KeyError(f"unknown tool namespace {namespace!r}; known: {known}")
@@ -126,19 +123,23 @@ class ToolDeferSession:
             return tuple(self._specs.values()), ""
         if not self._namespaces:
             return (), ""
+        # Defer is only coherent when the loader itself is on the wire.
+        # A catalog that points at a missing tool_search, with an empty
+        # tools array, is a deadlock. Fall back to the full projection.
+        eager_present = any(
+            namespace.name in self._policy.eager_namespaces for namespace in self._namespaces
+        )
+        if not eager_present:
+            return tuple(self._specs.values()), ""
         wire: list[dict[str, Any]] = []
         catalog_lines: list[str] = []
         for namespace in self._namespaces:
-            if (
-                namespace.mode == DeferMode.EAGER
-                or namespace.name in self._loaded
-            ):
+            if namespace.mode == DeferMode.EAGER or namespace.name in self._loaded:
                 wire.extend(self._specs[name] for name in namespace.tool_names)
             else:
-                catalog_lines.append(
-                    f"- {namespace.name}: {namespace.description} "
-                    f"[deferred — {self._policy.catalog_hint}]"
-                )
+                # 一行一个 namespace，不再重复拼接 loading hint；提示只保留
+                # 在末尾的 discovery_rule，减少目录文本的重复膨胀。
+                catalog_lines.append(f"- {namespace.name}: {namespace.description}")
         catalog = ""
         if catalog_lines:
             catalog = (

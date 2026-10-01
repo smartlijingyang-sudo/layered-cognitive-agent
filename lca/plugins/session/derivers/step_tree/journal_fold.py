@@ -526,7 +526,9 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
         )
     elif ep == "llm.call.start":
         # 标记 LLM 窗口开启;stream.token 据此判断是否属于当前 step。
-        if state.open_step is not None:
+        # 非流式内部调用(memory_extract / summarisation)不产生 stream token,
+        # 也不为它们开 UI 步骤(EventTranslator 同款过滤),避免 token 混入当前帧。
+        if state.open_step is not None and payload.get("stream") is not False:
             state.open_step.llm_started = True
             call_model = str(payload.get("model") or "")
             if call_model and not state.open_step.model:
@@ -544,6 +546,10 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
                     target.stream_final_chunks.append(delta)
     elif ep == "llm.call.end":
         # 收口:把累积的 stream 缓冲拼成 ThinkingTrace。
+        # 非流式内部调用没有 token 缓冲,若此时收口会把先前用户可见的回答
+        # 清空并覆盖成提取调用的指标(见 tests/.../test_journal_fold_internal_llm_call.py)。
+        if payload.get("stream") is False:
+            return
         target = state.open_step
         if target is not None:
             model = str(payload.get("model") or target.model or "unknown")
