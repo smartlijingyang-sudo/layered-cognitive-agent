@@ -157,8 +157,8 @@ class PlanComposeExecutor:
 
     semantic_name: str = "plan.compose"
     region: str = "plan"
-    declared_inputs: tuple[PortName, ...] = ("state", "decision", "observation")
-    declared_outputs: tuple[PortName, ...] = ("task_list",)
+    declared_inputs: tuple[PortName, ...] = (PortName("state"), PortName("decision"), PortName("observation"))
+    declared_outputs: tuple[PortName, ...] = (PortName("task_list"),)
 
     async def node_execute(
         self,
@@ -171,9 +171,9 @@ class PlanComposeExecutor:
         outputs 端口(yaml):task_list
         """
         del context  # unused: pure function of input ports
-        state = input.port_values.get("state")
-        decision_value = input.port_values.get("decision")
-        observation_value = input.port_values.get("observation")
+        state = input.port_values.get(PortName("state"))
+        decision_value = input.port_values.get(PortName("decision"))
+        observation_value = input.port_values.get(PortName("observation"))
         if not isinstance(decision_value, Decision):
             raise TypeError(
                 "plan.compose expects Decision on port 'decision',"
@@ -194,7 +194,7 @@ class PlanComposeExecutor:
         )
         return NodeOutput(
             port_values={
-                "task_list": TaskList(
+                PortName("task_list"): TaskList(
                     entries=next_entries,
                     revision=current.revision + 1,
                 ),
