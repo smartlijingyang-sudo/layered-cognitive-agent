@@ -6,6 +6,11 @@ import re
 from collections.abc import Sequence
 
 from lca.contracts.models.core.conversation.attachment import AttachmentRecord
+from lca.contracts.protocols.runtime.attachment.errors import (
+    AttachmentError,
+    AttachmentErrorCode,
+)
+from lca.infrastructure.attachment import _dedupe_ids
 from lca.contracts.protocols.runtime.infra.infra import AttachmentIdentity
 from lca.infrastructure.attachment.files.info import AttachmentManifest
 from lca.infrastructure.attachment.layout.layout import AttachmentLayout
@@ -41,15 +46,14 @@ class FileStoreAttachmentIdentity(AttachmentIdentity):
 
     def resolve(self, attachment_ids: Sequence[str]) -> tuple[AttachmentRecord, ...]:
         records: list[AttachmentRecord] = []
-        seen: set[str] = set()
-        for raw_id in attachment_ids:
-            attachment_id = str(raw_id).strip()
-            if not attachment_id or attachment_id in seen:
-                continue
+        for attachment_id in _dedupe_ids(attachment_ids):
             stored = self._store.get(attachment_id)
             if stored is None:
-                continue
-            seen.add(attachment_id)
+                raise AttachmentError(
+                    AttachmentErrorCode.MISSING_ATTACHMENT,
+                    f"unknown attachment_id={attachment_id!r}",
+                    context={"attachment_id": attachment_id},
+                )
             records.append(
                 AttachmentRecord(
                     attachment_id=stored.attachment_id,
@@ -62,10 +66,25 @@ class FileStoreAttachmentIdentity(AttachmentIdentity):
             )
         return tuple(records)
 
+    def _resolve_tolerant(self, attachment_ids: Sequence[str]) -> tuple[AttachmentRecord, ...]:
+        """resolve 的容错变体：未知 id 跳过而非抛错。
+
+        容忍理由：compose_question / stage_payload 是面向用户的容错路径，
+        未知附件 id 不应打断整轮对话；该语义由
+        tests/scenario/attachment/test_attachment_identity.py::test_unknown_attachment_ids_are_skipped
+        锁定。
+        """
+        try:
+            return self.resolve(attachment_ids)
+        except AttachmentError as exc:
+            if exc.code is not AttachmentErrorCode.MISSING_ATTACHMENT:
+                raise
+            return ()
+
     def compose_question(self, user_text: str, attachment_ids: Sequence[str]) -> str:
         text = user_text.strip()
         document = AttachmentManifest.from_records(
-            self.resolve(attachment_ids), policy=self._policy
+            self._resolve_tolerant(attachment_ids), policy=self._policy
         )
         block = document.render()
         if not block:
@@ -76,7 +95,7 @@ class FileStoreAttachmentIdentity(AttachmentIdentity):
 
     def stage_payload(self, run_id: str, attachment_ids: Sequence[str]) -> dict[str, bytes]:
         payload: dict[str, bytes] = {}
-        for record in self.resolve(attachment_ids):
+        for record in self._resolve_tolerant(attachment_ids):
             raw = self._store.read_bytes(record.attachment_id)
             if raw is None:
                 continue

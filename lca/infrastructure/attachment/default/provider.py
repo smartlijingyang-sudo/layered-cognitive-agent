@@ -37,6 +37,7 @@ from lca.contracts.models.core.workspace.file_ref import FileRef, FileRefKind
 from lca.contracts.protocols.runtime.attachment.attachment import (
     ResolvedAttachment,
 )
+from lca.infrastructure.attachment import _dedupe_ids
 from lca.contracts.protocols.runtime.attachment.errors import (
     AttachmentError,
     AttachmentErrorCode,
@@ -77,11 +78,7 @@ class DefaultAttachmentResolver:
 
     def resolve(self, attachment_ids: Sequence[str]) -> tuple[ResolvedAttachment, ...]:
         out: list[ResolvedAttachment] = []
-        seen: set[str] = set()
-        for raw_id in attachment_ids:
-            aid = str(raw_id).strip()
-            if not aid or aid in seen:
-                continue
+        for aid in _dedupe_ids(attachment_ids):
             stored = self.store.get(aid)
             if stored is None:
                 raise AttachmentError(
@@ -89,7 +86,6 @@ class DefaultAttachmentResolver:
                     f"unknown attachment_id={aid!r}",
                     context={"attachment_id": aid},
                 )
-            seen.add(aid)
             inline = self._maybe_inline(stored)
             out.append(
                 ResolvedAttachment(

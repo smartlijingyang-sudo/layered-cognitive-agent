@@ -14,6 +14,11 @@ from lca.contracts.models.core.execution.sandbox import (
 )
 from lca.contracts.models.core.state.plane import PlaneKind
 from lca.infrastructure.attachment.layout.layout import AttachmentLayout, sanitize_attachment_name
+from lca.contracts.protocols.runtime.attachment.errors import (
+    AttachmentError,
+    AttachmentErrorCode,
+)
+from lca.infrastructure.attachment import _dedupe_ids
 from lca.infrastructure.attachment.settings.settings import get_attachment_policy
 from lca.infrastructure.file.store import FileStore, LocalFileStore
 from lca.infrastructure.sandbox.factory.factory import ONLYBOXES
@@ -61,15 +66,14 @@ def resolve_machine_attachment_paths(
     """Ordered ``(absolute_path, size)`` pairs for this run's staged inbox copies."""
     active_layout = layout if layout is not None else AttachmentLayout()
     paths: list[tuple[str, int | None]] = []
-    seen: set[str] = set()
-    for raw_id in attachment_ids:
-        attachment_id = str(raw_id).strip()
-        if not attachment_id or attachment_id in seen:
-            continue
+    for attachment_id in _dedupe_ids(attachment_ids):
         meta = store.get(attachment_id)
         if meta is None:
-            continue
-        seen.add(attachment_id)
+            raise AttachmentError(
+                AttachmentErrorCode.MISSING_ATTACHMENT,
+                f"unknown attachment_id={attachment_id!r}",
+                context={"attachment_id": attachment_id},
+            )
         path = active_layout.absolute_file(root, run_id, meta.name)
         paths.append((path, meta.size_bytes))
     return paths
