@@ -29,7 +29,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from lca.contracts.mechanisms.content.addressable import ContentAddressableStore
 from lca.contracts.observability.evidence.evidence import (
     Classification,
     EvidenceIntegrityError,
@@ -260,9 +259,3 @@ def _enforce_audience(ref_classification: Classification, audience: Classificati
 __all__ = [
     "FilesystemEvidenceStore",
 ]
-
-
-# Re-export CAS for convenience
-def as_cas(store: EvidenceStore) -> ContentAddressableStore:
-    """Best-effort 把 EvidenceStore 降级到 CAS view(只读契约)。"""
-    raise TypeError("EvidenceStore is not a CAS; convert via FilesystemEvidenceStore directly")
