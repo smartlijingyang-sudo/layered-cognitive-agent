@@ -117,7 +117,7 @@ class PerceiveObserveExecutor:
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",
-    test_suite="tests/declarative/test_phase_subgraph_parity.py",
+    test_suite="tests/perceive/test_observe_records_task_episode.py",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(

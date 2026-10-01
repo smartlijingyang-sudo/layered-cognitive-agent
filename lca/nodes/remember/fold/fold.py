@@ -64,7 +64,7 @@ class RememberFoldExecutor:
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="memory",
-    test_suite="tests/declarative/test_phase_subgraph_parity.py",
+    test_suite="tests/integration/test_memory_and_procedural_distillation.py",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(

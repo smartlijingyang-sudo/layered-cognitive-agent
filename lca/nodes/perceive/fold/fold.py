@@ -106,7 +106,7 @@ class PerceiveFoldExecutor:
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",
-    test_suite="tests/declarative/test_phase_subgraph_parity.py",
+    test_suite="tests/nodes/test_perceive_fold_observation.py",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(

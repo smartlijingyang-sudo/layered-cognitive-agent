@@ -85,7 +85,7 @@ class ReflectAdmitRecoveryExecutor:
     layer="L2",
     kind=PluginKind.PRIMITIVE,
     effects="none",
-    test_suite="tests/declarative/test_phase_subgraph_parity.py",
+    test_suite="tests/plugins/loop/phase/reflect/test_effect_receipt_conversion.py",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(
