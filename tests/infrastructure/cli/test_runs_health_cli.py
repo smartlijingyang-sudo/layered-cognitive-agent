@@ -31,7 +31,20 @@ def test_health_cli_runs_on_audit_run():
     if not run_dirs:
         import pytest
         pytest.skip("No audit runs")
-    run_id = run_dirs[0].name
+    # Not every run dir carries a spine file (e.g. run-ambient-1 has only
+    # kernel.log): pick the first one that does, else the CLI exits 2 with
+    # empty stdout and json.loads blows up.
+    run_id = next(
+        (
+            d.name
+            for d in run_dirs
+            if (d / f"{d.name}.spine.jsonl").is_file()
+        ),
+        None,
+    )
+    if run_id is None:
+        import pytest
+        pytest.skip("No audit runs with a spine file")
     result = _runner.invoke(_make_real_app(), ["runs", "health", run_id])
     assert result.exit_code == 0, f"CLI failed: {result.stderr}"
     payload = json.loads(result.stdout)
