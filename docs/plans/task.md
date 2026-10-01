@@ -426,7 +426,7 @@
 | BRAINSTORM-FILE-SSOT-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/双写并发/测试不变量）并获取审批 | Completed | 全部 4 节（系统边界/交互拓扑/REST契约与并发锁/测试矩阵）已获用户确认 |
 | BRAINSTORM-FILE-SSOT-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-01-assistant-avatar-drawer-and-file-ssot-editor-design.md 并提交 git |
 | BRAINSTORM-FILE-SSOT-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 成功落盘实施计划 docs/plans/2026-10-01-assistant-avatar-drawer-and-file-ssot-editor-plan.md 并完成任务分解 |
-| FILE-SSOT-TASK-1 | 后端 REST 契约：查询与单文件读取端点 (`standing_files.py`) | Pending | 待执行 |
+| FILE-SSOT-TASK-1 | 后端 REST 契约：查询与单文件读取端点 (`standing_files.py`) | In Progress | 编写测试与实现 standing_files.py 列表与详情端点 |
 | FILE-SSOT-TASK-2 | 乐观锁并发写入与 Catalog / user_store 同步端点 | Pending | 待执行 |
 | FILE-SSOT-TASK-3 | 前端组件：居中动态呼吸 Mascot (`AssistantTopMascot.tsx`) | Pending | 待执行 |
 | FILE-SSOT-TASK-4 | 前端组件：右侧多 Section 滑出抽屉 (`AssistantStatusDrawer.tsx`) | Pending | 待执行 |
