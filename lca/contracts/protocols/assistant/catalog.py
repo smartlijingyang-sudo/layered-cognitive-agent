@@ -217,7 +217,9 @@ class AssistantCatalog(Protocol):
         """列出 Home；``user_id`` 非空时按 manifest 归属过滤（ADR-0252 D5）。"""
         ...
 
-    def revise_profile(self, assistant_id: str, patch: ProfilePatch) -> PlanRevision:
+    def revise_profile(
+        self, assistant_id: str, patch: ProfilePatch, *, actor: str = "system"
+    ) -> PlanRevision:
         """patch 模式：digest 重算 + ``revision_seq++`` + ``revisions/`` 快照 + EP。"""
         ...
 
