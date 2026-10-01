@@ -50,8 +50,8 @@ class ThinkDecisionRepairExecutor:
 
     semantic_name: str = "think.decision.repair"
     region: str = "think"
-    declared_inputs: tuple[PortName, ...] = ("decision", "tools")
-    declared_outputs: tuple[PortName, ...] = ("decision", "routing")
+    declared_inputs: tuple[PortName, ...] = (PortName("decision"), PortName("tools"))
+    declared_outputs: tuple[PortName, ...] = (PortName("decision"), PortName("routing"))
 
     async def node_execute(
         self,
@@ -81,7 +81,7 @@ class ThinkDecisionRepairExecutor:
         outer plan's edge predicate (``decision.action_type ==
         respond``) of the very signal that lets the run complete.
         """
-        decision = input.port_values.get("decision")
+        decision = input.port_values.get(PortName("decision"))
         if decision is None:
             return NodeOutput(port_values={})
         if not _has_tool_calls(decision):
@@ -89,12 +89,12 @@ class ThinkDecisionRepairExecutor:
             # unchanged; only use_tool paths need repair below.
             return NodeOutput(
                 port_values={
-                    "decision": decision,
-                    "routing": _route_ok(),
+                    PortName("decision"): decision,
+                    PortName("routing"): _route_ok(),
                 }
             )
 
-        registry = input.port_values.get("tools")
+        registry = input.port_values.get(PortName("tools"))
 
         outcome, repaired_calls = _validate_or_repair_calls(
             decision.tool_calls,
@@ -105,16 +105,16 @@ class ThinkDecisionRepairExecutor:
         if outcome == _SCHEMA_REJECTED:
             return NodeOutput(
                 port_values={
-                    "decision": decision,
-                    "routing": _route_rejected_schema(),
+                    PortName("decision"): decision,
+                    PortName("routing"): _route_rejected_schema(),
                 }
             )
 
         if outcome == _REPAIR_REJECTED:
             return NodeOutput(
                 port_values={
-                    "decision": decision,
-                    "routing": _route_rejected_truncated(),
+                    PortName("decision"): decision,
+                    PortName("routing"): _route_rejected_truncated(),
                 }
             )
 
@@ -122,15 +122,15 @@ class ThinkDecisionRepairExecutor:
             repaired_decision = _with_tool_calls(decision, repaired_calls)
             return NodeOutput(
                 port_values={
-                    "decision": repaired_decision,
-                    "routing": _route_repaired(),
+                    PortName("decision"): repaired_decision,
+                    PortName("routing"): _route_repaired(),
                 }
             )
 
         return NodeOutput(
             port_values={
-                "decision": decision,
-                "routing": _route_ok(),
+                PortName("decision"): decision,
+                PortName("routing"): _route_ok(),
             }
         )
 
