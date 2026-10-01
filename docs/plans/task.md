@@ -426,9 +426,9 @@
 | BRAINSTORM-FILE-SSOT-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/双写并发/测试不变量）并获取审批 | Completed | 全部 4 节（系统边界/交互拓扑/REST契约与并发锁/测试矩阵）已获用户确认 |
 | BRAINSTORM-FILE-SSOT-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-01-assistant-avatar-drawer-and-file-ssot-editor-design.md 并提交 git |
 | BRAINSTORM-FILE-SSOT-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 成功落盘实施计划 docs/plans/2026-10-01-assistant-avatar-drawer-and-file-ssot-editor-plan.md 并完成任务分解 |
-| FILE-SSOT-TASK-1 | 后端 REST 契约：查询与单文件读取端点 (`standing_files.py`) | In Progress | 编写测试与实现 standing_files.py 列表与详情端点 |
-| FILE-SSOT-TASK-2 | 乐观锁并发写入与 Catalog / user_store 同步端点 | Pending | 待执行 |
-| FILE-SSOT-TASK-3 | 前端组件：居中动态呼吸 Mascot (`AssistantTopMascot.tsx`) | Pending | 待执行 |
-| FILE-SSOT-TASK-4 | 前端组件：右侧多 Section 滑出抽屉 (`AssistantStatusDrawer.tsx`) | Pending | 待执行 |
-| FILE-SSOT-TASK-5 | 前端组件：全屏沉浸式 Markdown 编辑器模态窗 (`StandingFileFullscreenEditor.tsx`) | Pending | 待执行 |
-| FILE-SSOT-TASK-6 | 前端补丁挂载与全链路不变量集成测试 (INV-01 ~ INV-06) | Pending | 待执行 |
+| FILE-SSOT-TASK-1 | 后端 REST 契约：查询与单文件读取端点 (`standing_files.py`) | Completed | 成功落地 standing_files.py 列表与详情端点，注册至 router.py，单测 4/4 passed，commit c79ae374d |
+| FILE-SSOT-TASK-2 | 乐观锁并发写入与 Catalog / user_store 同步端点 | Completed | 落地 update_standing_file 端点，实现 sha256 乐观并发锁防御（409 Conflict）、revise_profile 同步与 user_store 回填，防御性规约解除模板误杀，7/7 单测全绿，commit 8dee9cac4 |
+| FILE-SSOT-TASK-3 | 前端组件：居中动态呼吸 Mascot (`AssistantTopMascot.tsx`) | Completed | 落地 AssistantTopMascot.tsx 组件，支持水豚 SVG 形象、呼吸起伏与眨眼微动动画、在线指示器与抽屉唤起契约，4/4 单测全绿，commit 7578cdbe2 |
+| FILE-SSOT-TASK-4 | 前端组件：右侧多 Section 滑出抽屉 (`AssistantStatusDrawer.tsx`) | Completed | 落地 AssistantStatusDrawer.tsx 组件，支持 480px 宽度、Identity/Memory/Workspace 横向切 Tab、4 大 Standing Files 状态卡片预览与全屏编辑触发，4/4 单测全绿，commit f8dd25893 |
+| FILE-SSOT-TASK-5 | 前端组件：全屏沉浸式 Markdown 编辑器模态窗 (`StandingFileFullscreenEditor.tsx`) | Completed | 落地 StandingFileFullscreenEditor.tsx 组件，支持等宽字体、行号栏滚动同步、Ctrl+S 快捷保存、expected_hash 乐观并发锁校验与 409 冲突 Diff 对比，4/4 单测全绿，commit 5c89f85c4 |
+| FILE-SSOT-TASK-6 | 前端补丁挂载与全链路不变量集成测试 (INV-01 ~ INV-06) | Completed | 落地 assistant_status_drawer.py 声明式补丁，挂载至 Conversation Header，check_patch_integrity 100/100 文件 byte-identical 全过，落地 test_standing_files_editor_flow.py 覆盖 INV-01~06，全链路 25/25 单测全绿，commit 166758b12 |
