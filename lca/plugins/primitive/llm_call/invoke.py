@@ -52,8 +52,12 @@ class LlmInvokeExecutor:
 
     semantic_name: str = "llm.invoke"
     region: str = "primitive"
-    declared_inputs: tuple[PortName, ...] = ("render", "tools", "state")
-    declared_outputs: tuple[PortName, ...] = ("response",)
+    declared_inputs: tuple[PortName, ...] = (
+        PortName("render"),
+        PortName("tools"),
+        PortName("state"),
+    )
+    declared_outputs: tuple[PortName, ...] = (PortName("response"),)
 
     async def node_execute(
         self,
@@ -69,9 +73,9 @@ class LlmInvokeExecutor:
         typed contract:每个 typed input port 验证类型,缺失 / 类型错 → TypeError
         让 fail-loud 在图驱动里捕获(而非在 LLM 内部悄悄降级)。
         """
-        render = input.port_values.get("render")
-        tools = input.port_values.get("tools")
-        state = input.port_values.get("state")
+        render = input.port_values.get(PortName("render"))
+        tools = input.port_values.get(PortName("tools"))
+        state = input.port_values.get(PortName("state"))
         if not isinstance(render, ReasonerTurnRender):
             raise TypeError(
                 "llm.invoke: 'render' port must be a ReasonerTurnRender instance, "
@@ -136,7 +140,7 @@ class LlmInvokeExecutor:
         finally:
             pass  # explicit DI; no ContextVar reset needed
 
-        return NodeOutput(port_values={"response": response})
+        return NodeOutput(port_values={PortName("response"): response})
 
 
 def _resolve_llm(context: NodeContext) -> LLMAdapter | None:
