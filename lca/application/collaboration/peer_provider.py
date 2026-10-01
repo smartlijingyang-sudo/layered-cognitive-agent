@@ -11,13 +11,13 @@ import logging
 from collections.abc import Sequence
 from pathlib import Path
 
-from lca.agent.role_library import FileRoleLibrary
 from lca.contracts.models.collaboration.peer import PeerProfile
 from lca.contracts.protocols.collaboration.casting.casting import (
     RoleCard,
     RoleNotFoundError,
 )
 from lca.infrastructure.path.locator import get_lca_home
+from lca.infrastructure.roles import FileRoleLibrary
 
 _logger = logging.getLogger(__name__)
 

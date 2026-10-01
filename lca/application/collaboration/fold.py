@@ -145,7 +145,7 @@ class DelegationFoldAggregator:
         if self._role_library is not None:
             return self._role_library
         try:
-            from lca.agent.role_library import FileRoleLibrary
+            from lca.infrastructure.roles import FileRoleLibrary
 
             self._role_library = FileRoleLibrary()
             return self._role_library

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import yaml
 
-from lca.agent.role_library import FileRoleLibrary
+from lca.infrastructure.roles import FileRoleLibrary
 
 
 def test_architecture_triad_role_cards_exist_and_valid():
