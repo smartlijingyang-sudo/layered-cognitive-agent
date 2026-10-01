@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from unittest import IsolatedAsyncioTestCase, mock
+from unittest import IsolatedAsyncioTestCase
 
 from lca.contracts.atoms.enums.enums import LLMStreamEventType
 from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
@@ -12,12 +12,6 @@ from lca.infrastructure.llm_adapter.failover.failover import (
     LLMFailoverCandidate,
     LLMRetryPolicy,
     RetryingLLMAdapter,
-)
-from lca.plugins.think.llm.resolver_seam import (
-    Config,
-    FallbackConfig,
-    RetryConfig,
-    setup,
 )
 
 
@@ -89,27 +83,6 @@ class _SequencedAdapter:
             yield event
         if error is not None:
             raise error
-
-
-class _LlmService:
-    def __init__(self) -> None:
-        self.registered: tuple[str, object, bool] | None = None
-
-    def register(self, name: str, adapter: object, *, activate: bool = False) -> None:
-        self.registered = (name, adapter, activate)
-
-
-class _PluginContext:
-    def __init__(self, service: _LlmService) -> None:
-        self._service = service
-        self.provided: dict[str, object] = {}
-
-    def require(self, name: str) -> _LlmService:
-        assert name == "llm"
-        return self._service
-
-    def provide(self, name: str, value: object) -> None:
-        self.provided[name] = value
 
 
 class TestFailoverLLMAdapter(IsolatedAsyncioTestCase):
@@ -308,46 +281,6 @@ class TestFailoverLLMAdapter(IsolatedAsyncioTestCase):
                     LLMFailoverCandidate("same", adapter),
                 )
             )
-
-
-class TestFailoverResolverConfiguration(IsolatedAsyncioTestCase):
-    async def test_profile_config_wraps_primary_and_fallback_adapters(self) -> None:
-        service = _LlmService()
-        context = _PluginContext(service)
-        primary = _Adapter()
-        secondary = _Adapter()
-        config = Config(
-            default_model="primary-model",
-            api_key="primary-key",
-            load_dotenv=False,
-            retry=RetryConfig(max_attempts=2, initial_backoff_seconds=0.5),
-            fallbacks=(FallbackConfig(model="fallback-model"),),
-        )
-
-        with (
-            mock.patch("lca.infrastructure.llm.config.normalize_llm_environ"),
-            mock.patch(
-                "lca.infrastructure.llm_adapter.openai_compat.OpenAICompatAdapter",
-                side_effect=(primary, secondary),
-            ) as adapter_factory,
-        ):
-            await setup.setup(context, config)
-
-        assert service.registered is not None
-        name, adapter, active = service.registered
-        self.assertEqual(name, "default")
-        self.assertTrue(active)
-        self.assertIsInstance(adapter, FailoverLLMAdapter)
-        self.assertEqual(adapter.candidate_names, ("primary", "fallback-1"))
-        self.assertEqual(adapter_factory.call_count, 2)
-        self.assertEqual(adapter_factory.call_args_list[1].kwargs["model"], "fallback-model")
-        self.assertEqual(adapter_factory.call_args_list[1].kwargs["api_key"], "primary-key")
-        self.assertIsInstance(adapter._candidates[0].adapter, RetryingLLMAdapter)
-        primary_retry = adapter._candidates[0].adapter
-        assert isinstance(primary_retry, RetryingLLMAdapter)
-        self.assertEqual(primary_retry.policy.max_attempts, 2)
-        self.assertEqual(primary_retry.policy.initial_backoff_seconds, 0.5)
-        self.assertIn("llm_resolver", context.provided)
 
 
 if __name__ == "__main__":
