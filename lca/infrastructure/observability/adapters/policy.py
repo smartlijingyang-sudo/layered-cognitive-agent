@@ -91,13 +91,6 @@ def json_default(value: object) -> object:
     return str(value)
 
 
-def safe_repr(value: Any) -> Any:
-    """结构化安全表示：原语透传，复杂对象走 JSON 可序列化结构。"""
-    if isinstance(value, (str, int, float, bool, type(None))):
-        return value
-    return json.loads(json.dumps(value, ensure_ascii=False, default=json_default))
-
-
 def otel_safe_attributes(attributes: dict[str, Any]) -> dict[str, Any]:
     """OTel 只接受原语；嵌套值用 stdlib ``json.dumps`` 压成字符串。"""
     out: dict[str, Any] = {}
