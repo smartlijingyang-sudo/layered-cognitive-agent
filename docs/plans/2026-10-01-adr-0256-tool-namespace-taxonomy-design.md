@@ -84,7 +84,7 @@ sequenceDiagram
 
     Note over Turn: 渲染首 Turn 上下文
     Turn->>LLM: core 域完整 Schema (tool_search) + 其余 7 域目录 (8 行纯净一句话)
-    
+
     rect rgb(240, 248, 255)
     Note over LLM: 场景 A：需要操作文件
     LLM->>Body: tool_search(namespace="file")
