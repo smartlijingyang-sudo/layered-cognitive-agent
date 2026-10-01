@@ -22,6 +22,10 @@ _log = structlog.get_logger(__name__)
 class DynamicPluginToolAdapter(Tool):
     """Wraps a dynamically compiled callable or plugin instance into a standard Tool."""
 
+    # ADR-0256: runtime-authored (creator/preset) plugins are third-party code
+    # from the built-in toolset's perspective -> ext domain (composio precedent).
+    # Without this, ToolsService.register fail-fasts with ValueError.
+    namespace: ClassVar[str] = "ext"
     is_idempotent: ClassVar[bool] = False
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
     default_timeout_s: ClassVar[int] = 30
@@ -189,8 +193,8 @@ class DynamicToolBridge:
                     kind=RuntimeKind.PLUGIN,
                     operation="tool.bridged",
                     source=tool.name,
-                    outcome=OperationOutcome.SUCCESS,
-                    input={"tool_name": tool.name},
+                    outcome=OperationOutcome.OK,
+                    attributes={"tool_name": tool.name},
                 )
             )
         except Exception:
@@ -232,8 +236,8 @@ class DynamicToolBridge:
                     kind=RuntimeKind.PLUGIN,
                     operation="tool.unbridged",
                     source=tool_name,
-                    outcome=OperationOutcome.SUCCESS,
-                    input={"tool_name": tool_name},
+                    outcome=OperationOutcome.OK,
+                    attributes={"tool_name": tool_name},
                 )
             )
         except Exception:
