@@ -241,24 +241,16 @@ class SqliteUserAssistantStore(AssistantOwnership):
         display_name: str | None = None,
     ) -> None:
         with self._use_connection() as connection:
-            if display_name:
-                connection.execute(
-                    """
-                    UPDATE lca_users
-                    SET user_md = ?, username = COALESCE(?, username), updated_at = datetime('now')
-                    WHERE user_id = ?
-                    """,
-                    (user_md, display_name, user_id),
-                )
-            else:
-                connection.execute(
-                    """
-                    UPDATE lca_users
-                    SET user_md = ?, updated_at = datetime('now')
-                    WHERE user_id = ?
-                    """,
-                    (user_md, user_id),
-                )
+            # display_name=None 时 COALESCE(NULL, username)=username（无操作），
+            # 单条语句等价覆盖原 if/else 两分支。
+            connection.execute(
+                """
+                UPDATE lca_users
+                SET user_md = ?, username = COALESCE(?, username), updated_at = datetime('now')
+                WHERE user_id = ?
+                """,
+                (user_md, display_name, user_id),
+            )
 
     def get_user_md(self, user_id: str) -> str | None:
         with self._use_connection() as connection:
@@ -433,24 +425,16 @@ class PostgresUserAssistantStore(AssistantOwnership):
         display_name: str | None = None,
     ) -> None:
         def _run(cur: Any) -> None:
-            if display_name:
-                cur.execute(
-                    """
-                    UPDATE lca_users
-                    SET user_md = %s, username = COALESCE(%s, username), updated_at = now()
-                    WHERE user_id = %s
-                    """,
-                    (user_md, display_name, user_id),
-                )
-            else:
-                cur.execute(
-                    """
-                    UPDATE lca_users
-                    SET user_md = %s, updated_at = now()
-                    WHERE user_id = %s
-                    """,
-                    (user_md, user_id),
-                )
+            # display_name=None 时 COALESCE(NULL, username)=username（无操作），
+            # 单条语句等价覆盖原 if/else 两分支。
+            cur.execute(
+                """
+                UPDATE lca_users
+                SET user_md = %s, username = COALESCE(%s, username), updated_at = now()
+                WHERE user_id = %s
+                """,
+                (user_md, display_name, user_id),
+            )
 
         self._use_cursor(_run)
 
