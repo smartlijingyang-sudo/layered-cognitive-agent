@@ -11,6 +11,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from lca.infrastructure.sandbox.factory.factory import ONLYBOXES, resolve_sandbox, sandbox_backend
 from lca.infrastructure.sandbox.onlyboxes.adapter import OnlyboxesSandboxAdapter
+from lca.plugins.events.publishers._session_publish import (
+    reset_publish_session,
+    set_publish_session,
+)
+from lca.session.append import Session
 from lca.infrastructure.sandbox.onlyboxes.artifacts import (
     ARTIFACT_BEGIN,
     ARTIFACT_END,
@@ -32,6 +37,41 @@ def _terminal_ok_response() -> MagicMock:
     resp.text = json.dumps({"exit_code": 0, "stdout": "", "stderr": ""})
     resp.ok = True
     return resp
+
+
+class _BoundPublishSessionMixin:
+    """Bind a throwaway Session so the observability facade's fail-loud
+    ``record()`` (requires a bound Session since c2b0607eb) emits instead of
+    raising ``MissingPublishSessionError``.
+
+    Same in-process-test pattern as
+    ``tests/infrastructure/test_fact_committer.py``: module-level binding is
+    test-only and reset in tearDown.
+    """
+
+    def setUp(self) -> None:
+        super().setUp()  # type: ignore[misc]
+        self._publish_session_token = set_publish_session(Session("onlyboxes_test"))
+
+    def tearDown(self) -> None:
+        reset_publish_session(self._publish_session_token)
+        super().tearDown()  # type: ignore[misc]
+
+
+def _without_output_collection():
+    """Stub ``_collect_outputs`` -> () for unit tests.
+
+    ``_exec_terminal`` calls ``_collect_outputs`` on every success, which in
+    turn calls ``_exec_terminal`` again — unbounded mutual recursion in
+    ``lca/**`` (since 7f6a3d0e5). With a bound publish Session the facade
+    ``record()`` no longer raises, so mocked-success tests would recurse
+    forever. These unit tests target command construction/delegation, not
+    output collection, so they stub it out. The source-side recursion is
+    proposed to iter-quality (backlog), tests must not depend on its fix.
+    """
+    return patch.object(
+        OnlyboxesSandboxAdapter, "_collect_outputs", new=AsyncMock(return_value=())
+    )
 
 
 # ── bootstrap / artifact unit tests ─────────────────────────────────
@@ -98,7 +138,7 @@ class FactoryTests(unittest.TestCase):
 # ── adapter tests (unified terminalExec channel) ────────────────────
 
 
-class OnlyboxesAdapterTests(unittest.IsolatedAsyncioTestCase):
+class OnlyboxesAdapterTests(_BoundPublishSessionMixin, unittest.IsolatedAsyncioTestCase):
     async def test_run_uses_terminal_endpoint(self) -> None:
         """run() should write code to /tmp then execute via terminalExec."""
         response = MagicMock()
@@ -113,7 +153,8 @@ class OnlyboxesAdapterTests(unittest.IsolatedAsyncioTestCase):
             access_token="obx_token",  # noqa: S106
             client=client,
         )
-        result = await adapter.run("print(42)", invocation_id="sbx_1")
+        with _without_output_collection():
+            result = await adapter.run("print(42)", invocation_id="sbx_1")
 
         self.assertTrue(result.success)
         self.assertEqual(result.exit_code, 0)
@@ -158,7 +199,8 @@ class OnlyboxesAdapterTests(unittest.IsolatedAsyncioTestCase):
             access_token="tok",  # noqa: S106
             client=client,
         )
-        result = await adapter.run_terminal("ls -la", invocation_id="term_1")
+        with _without_output_collection():
+            result = await adapter.run_terminal("ls -la", invocation_id="term_1")
 
         self.assertTrue(result.success)
         self.assertEqual(result.stdout, "ok\n")
@@ -180,7 +222,8 @@ class OnlyboxesAdapterTests(unittest.IsolatedAsyncioTestCase):
             access_token="tok",  # noqa: S106
             client=client,
         )
-        session = await adapter.create_session()
+        with _without_output_collection():
+            session = await adapter.create_session()
 
         self.assertIsNotNone(session)
         self.assertEqual(session.session_id, "terminal-session")
@@ -206,7 +249,7 @@ class OnlyboxesAdapterTests(unittest.IsolatedAsyncioTestCase):
 # ── write_files tests ────────────────────────────────────────────────
 
 
-class WriteFilesTests(unittest.IsolatedAsyncioTestCase):
+class WriteFilesTests(_BoundPublishSessionMixin, unittest.IsolatedAsyncioTestCase):
     async def test_write_files_chunks_large_file(self) -> None:
         """大于 48KB 的文件应分块写入。"""
         adapter = OnlyboxesSandboxAdapter(base_url="http://fake", access_token="tok")  # noqa: S106
@@ -220,7 +263,8 @@ class WriteFilesTests(unittest.IsolatedAsyncioTestCase):
         adapter._client.post = AsyncMock(side_effect=mock_post)
 
         data = b"x" * (48 * 1024 + 1000)  # slightly larger than one chunk
-        result = await adapter.write_files({"big.bin": data}, base_dir="/mnt/data")
+        with _without_output_collection():
+            result = await adapter.write_files({"big.bin": data}, base_dir="/mnt/data")
 
         self.assertTrue(result.success)
         # At least 2 terminal calls: mkdir+truncate + at least 1 chunk
@@ -245,10 +289,11 @@ class WriteFilesTests(unittest.IsolatedAsyncioTestCase):
         adapter._client = MagicMock()
         adapter._client.post = AsyncMock(side_effect=mock_post)
 
-        result = await adapter.write_files(
-            {"data.csv": "https://example.com/data.csv"},
-            base_dir="/mnt/data",
-        )
+        with _without_output_collection():
+            result = await adapter.write_files(
+                {"data.csv": "https://example.com/data.csv"},
+                base_dir="/mnt/data",
+            )
 
         self.assertTrue(result.success)
         # Should have a curl command
@@ -268,13 +313,14 @@ class WriteFilesTests(unittest.IsolatedAsyncioTestCase):
         adapter._client = MagicMock()
         adapter._client.post = AsyncMock(side_effect=mock_post)
 
-        result = await adapter.write_files(
-            {
-                "remote.csv": "https://example.com/data.csv",
-                "local.bin": b"small",
-            },
-            base_dir="/mnt/data",
-        )
+        with _without_output_collection():
+            result = await adapter.write_files(
+                {
+                    "remote.csv": "https://example.com/data.csv",
+                    "local.bin": b"small",
+                },
+                base_dir="/mnt/data",
+            )
 
         self.assertTrue(result.success)
         curl_calls = [c for c in calls if "curl" in c["body"].get("command", "")]
@@ -299,7 +345,7 @@ class WriteFilesTests(unittest.IsolatedAsyncioTestCase):
 # ── run_in_session tests ─────────────────────────────────────────────
 
 
-class RunInSessionTests(unittest.IsolatedAsyncioTestCase):
+class RunInSessionTests(_BoundPublishSessionMixin, unittest.IsolatedAsyncioTestCase):
     async def test_run_in_session_uses_session_id(self) -> None:
         """run_in_session should pass session_id in terminal body."""
         response = MagicMock()
@@ -314,7 +360,8 @@ class RunInSessionTests(unittest.IsolatedAsyncioTestCase):
             access_token="tok",  # noqa: S106
             client=client,
         )
-        result = await adapter.run_in_session("sess-abc", "print(1)")
+        with _without_output_collection():
+            result = await adapter.run_in_session("sess-abc", "print(1)")
 
         self.assertTrue(result.success)
         # All calls should carry the session_id
@@ -326,7 +373,7 @@ class RunInSessionTests(unittest.IsolatedAsyncioTestCase):
 # ── parse_terminal_response artifact harvest tests ──────────────────
 
 
-class ParseTerminalResponseHarvestTests(unittest.TestCase):
+class ParseTerminalResponseHarvestTests(_BoundPublishSessionMixin, unittest.TestCase):
     """parse_terminal_response() should call strip_artifacts() — ADR-0046 alignment."""
 
     def _make_response(self, stdout: str, exit_code: int = 0) -> MagicMock:
