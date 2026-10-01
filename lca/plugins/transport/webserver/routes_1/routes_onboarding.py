@@ -41,10 +41,8 @@ from lca.plugins.transport.webserver.handlers.auth.user import (
 from lca.plugins.transport.webserver.handlers.cors.cors import CORS_HEADERS
 from lca.plugins.transport.webserver.route.register import register_routes
 
-
 def _json(payload: dict[str, Any], *, status_code: int = 200) -> JSONResponse:
     return JSONResponse(payload, status_code=status_code, headers=CORS_HEADERS)
-
 
 def _error(detail: str, *, status_code: int, code: str) -> JSONResponse:
     return _json(
@@ -52,16 +50,15 @@ def _error(detail: str, *, status_code: int, code: str) -> JSONResponse:
         status_code=status_code,
     )
 
-
-def _resolver_from_request(request: Request) -> Any | None:
+def _app_state_attr(request: Request, attr: str) -> Any | None:
+    """request.app.state.<attr> 的空安全读取（app/state 缺省时回 None）。"""
     state = getattr(request, "app", None)
     if state is None:
         return None
     state_obj = getattr(state, "state", None)
     if state_obj is None:
         return None
-    return getattr(state_obj, "role_card_resolver", None)
-
+    return getattr(state_obj, attr, None)
 
 async def onboarding_presets(request: Request) -> JSONResponse:
     """``GET /v1/onboarding/presets`` —— 角色预设 + 技能目录。"""
@@ -74,7 +71,7 @@ async def onboarding_presets(request: Request) -> JSONResponse:
     del user_id  # 预设是全局数据，不做用户过滤（ADR-0252 开放问题 3）
 
     roles: list[dict[str, str]] = []
-    resolver = _resolver_from_request(request)
+    resolver = _app_state_attr(request, "role_card_resolver")
     if resolver is not None:
         for dept in resolver.list_departments():
             for entry in resolver.list_by_department(dept.department_id):
@@ -107,17 +104,6 @@ async def onboarding_presets(request: Request) -> JSONResponse:
 
     return _json({"roles": roles, "skills": skills}, status_code=200)
 
-
-def _ownership_from_request(request: Request) -> Any | None:
-    state = getattr(request, "app", None)
-    if state is None:
-        return None
-    state_obj = getattr(state, "state", None)
-    if state_obj is None:
-        return None
-    return getattr(state_obj, "assistant_ownership", None)
-
-
 async def onboarding_welcome(request: Request) -> JSONResponse:
     """``GET /v1/onboarding/welcome`` —— 首次迎新 / 打招呼话术（两阶段同构）。"""
     expected_token, dev_mode = auth_config_of(request)
@@ -127,7 +113,7 @@ async def onboarding_welcome(request: Request) -> JSONResponse:
     if auth_error is not None:
         return auth_error
 
-    user_store = _ownership_from_request(request)
+    user_store = _app_state_attr(request, "assistant_ownership")
     state = user_store.get_onboarding_state(user_id) if user_store else "pending"
 
     user_name = ""
@@ -139,7 +125,7 @@ async def onboarding_welcome(request: Request) -> JSONResponse:
     assistant_id = str(request.query_params.get("assistant_id") or "").strip()
     assistant_name = str(request.query_params.get("assistant_name") or "")
     if not assistant_name and assistant_id:
-        catalog = _catalog_from_request(request)
+        catalog = _app_state_attr(request, "assistant_catalog")
         if catalog is not None:
             import contextlib
 
@@ -174,17 +160,6 @@ async def onboarding_welcome(request: Request) -> JSONResponse:
         status_code=200,
     )
 
-
-def _catalog_from_request(request: Request) -> Any | None:
-    state = getattr(request, "app", None)
-    if state is None:
-        return None
-    state_obj = getattr(state, "state", None)
-    if state_obj is None:
-        return None
-    return getattr(state_obj, "assistant_catalog", None)
-
-
 async def onboarding_naming_settle(request: Request) -> JSONResponse:
     """``POST /v1/onboarding/naming/settle`` —— 前端起名 Widget 确认命名并落盘。"""
     expected_token, dev_mode = auth_config_of(request)
@@ -210,12 +185,12 @@ async def onboarding_naming_settle(request: Request) -> JSONResponse:
         return _error("name 必须为非空字符串", status_code=400, code="invalid_request")
 
     # 1. 沉淀至 user_store 权威库：标记迎新已完成
-    user_store = _ownership_from_request(request)
+    user_store = _app_state_attr(request, "assistant_ownership")
     if user_store is not None:
         user_store.set_onboarding_state(user_id, "completed")
 
     # 2. 同步至当前助理 Home（IDENTITY.md 与 profile.json）
-    catalog = _catalog_from_request(request)
+    catalog = _app_state_attr(request, "assistant_catalog")
     if catalog is not None and assistant_id:
         try:
             from lca.contracts.protocols.assistant.catalog import ProfilePatch
@@ -247,13 +222,11 @@ async def onboarding_naming_settle(request: Request) -> JSONResponse:
         status_code=200,
     )
 
-
 ROUTE_SPECS: tuple[RouteSpec, ...] = (
     RouteSpec("/v1/onboarding/presets", onboarding_presets, ("GET", "OPTIONS")),
     RouteSpec("/v1/onboarding/welcome", onboarding_welcome, ("GET", "OPTIONS")),
     RouteSpec("/v1/onboarding/naming/settle", onboarding_naming_settle, ("POST", "OPTIONS")),
 )
-
 
 @plugin(
     id="lca.plugins.transport.webserver.routes_1.routes_onboarding",
@@ -291,6 +264,5 @@ async def setup(ctx: PluginContext, config: Any) -> None:
         ROUTE_SPECS,
         plugin_id="lca.plugins.transport.webserver.routes_1.routes_onboarding",
     )
-
 
 __all__ = ["ROUTE_SPECS", "onboarding_presets", "setup"]
