@@ -138,16 +138,27 @@ def test_b5_single_namespace_load_returns_full_schemas():
         assert fn["name"] and fn["description"] and fn["parameters"]
 
 
-@pytest.mark.skip(reason="ADR-0256 §6 未落地:tool_search 尚未支持批量加载")
 def test_b6_batch_load_multiple_namespaces():
-    """tool_search(namespaces=['file','memory']) 一次往返返回两域 schema(验收 6)."""
+    """load_namespaces(['file','memory']) 一次往返返回两域 schema(验收 6)."""
     session = _session()
     session.update_turn(_tools_8ns(), _map_8ns())
-    assert hasattr(session, "load_namespaces"), "缺少批量加载入口"
-    payload = session.load_namespaces(["file", "memory"])  # 意向 API,返回同 load_namespace 的 dict
-    names = {s["function"]["name"] for s in payload["tools"]}
-    assert {"file_tool", "memory_tool"} <= names
+    payload = session.load_namespaces(["file", "memory"])
+    assert payload["namespaces"] == ["file", "memory"]
+    names = [s["function"]["name"] for s in payload["tools"]]
+    assert names == ["file_tool", "memory_tool"]  # 按传入顺序拼接
     assert session.loaded_namespaces == {"file", "memory"}
+
+
+def test_b6_batch_load_dedupes_repeated_names_and_rejects_unknown():
+    """重复名字只贡献一次 tools;未知名字透出 load_namespace 的 KeyError."""
+    session = _session()
+    session.update_turn(_tools_8ns(), _map_8ns())
+    payload = session.load_namespaces(["file", "file", "memory"])
+    assert payload["namespaces"] == ["file", "memory"]
+    assert [s["function"]["name"] for s in payload["tools"]] == ["file_tool", "memory_tool"]
+    with pytest.raises(KeyError) as exc:
+        session.load_namespaces(["file", "not_a_namespace"])
+    assert "not_a_namespace" in str(exc.value)
 
 
 def test_b7_load_is_idempotent_and_unknown_namespace_errors():

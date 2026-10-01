@@ -111,6 +111,23 @@ class ToolDeferSession:
             "tools": [self._specs[name] for name in target.tool_names],
         }
 
+    def load_namespaces(self, namespaces: list[str]) -> dict[str, Any]:
+        """Load several namespaces at once; return the merged payload.
+
+        Semantics = one :meth:`load_namespace` call per name (already
+        idempotent), with the wire specs concatenated in the given order.
+        A repeated name contributes its tools once; an unknown name raises
+        :meth:`load_namespace` ``KeyError`` unchanged.
+        """
+        loaded: list[str] = []
+        tools: list[dict[str, Any]] = []
+        for namespace in namespaces:
+            payload = self.load_namespace(namespace)
+            if namespace not in loaded:
+                loaded.append(namespace)
+                tools.extend(payload["tools"])
+        return {"namespaces": loaded, "tools": tools}
+
     def render_turn(self) -> tuple[tuple[dict[str, Any], ...], str]:
         """Project ``(wire_specs, catalog_text)`` for this turn.
 
