@@ -78,14 +78,14 @@ class ApproveGateExecutor:
 
     semantic_name: str = "act.approve.gate"
     region: str = "intervene"
-    declared_inputs: tuple[PortName, ...] = ("decision", "command")
+    declared_inputs: tuple[PortName, ...] = (PortName("decision"), PortName("command"))
     # ADR-0237 / PR-1b: emit ``approval_routing`` (not ``routing``) so
     # the typed port does not collide with downstream ``act.fanout``'s
     # ``routing`` in the kernel-wide :class:`PortRegistry`
     # (last-write-wins would overwrite the gate's signal before the
     # outer plan reads it). The outer plan reads via
     # ``act.main.declared_outputs: [approval_routing]``.
-    declared_outputs: tuple[PortName, ...] = ("decision", "approval_routing")
+    declared_outputs: tuple[PortName, ...] = (PortName("decision"), PortName("approval_routing"))
 
     async def node_execute(
         self,
@@ -102,20 +102,20 @@ class ApproveGateExecutor:
         ``context.runtime``. ``needs_approval`` is read from the typed
         ``Decision.needs_approval`` field (L-2 / G-9 follow-through).
         """
-        decision = input.port_values.get("decision")
+        decision = input.port_values.get(PortName("decision"))
         if not isinstance(decision, Decision):
             raise TypeError(
                 "act.approve.gate: 'decision' port must be a Decision "
                 f"instance, got {type(decision).__name__}"
             )
-        command = input.port_values.get("command")
+        command = input.port_values.get(PortName("command"))
         if command is not None and not isinstance(command, Command):
             raise TypeError(
                 "act.approve.gate: 'command' port must be a Command or None, "
                 f"got {type(command).__name__}"
             )
 
-        req = input.port_values.get("approval_requirement")
+        req = input.port_values.get(PortName("approval_requirement"))
         if req is not None and hasattr(req, "required"):
             needs_approval = bool(req.required)
         else:
@@ -145,9 +145,9 @@ class ApproveGateExecutor:
             next_node=next_node,
             next_hint=next_hint,
         )
-        port_values = {"decision": decision, "approval_routing": routing}
+        port_values = {PortName("decision"): decision, PortName("approval_routing"): routing}
         if req is not None:
-            port_values["approval_requirement"] = req
+            port_values[PortName("approval_requirement")] = req
         return NodeOutput(port_values=port_values)
 
 
