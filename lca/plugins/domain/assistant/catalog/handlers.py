@@ -666,6 +666,9 @@ class _AssistantCatalogImpl(_AssistantCatalogEventsMixin, AssistantCatalog):
             _validate_plan_yaml_text(patch.plan_yaml)
             (home.root / "plan.yaml").write_text(patch.plan_yaml, encoding="utf-8")
             changes.append("plan.yaml")
+        if patch.identity_md is not None:
+            (home.root / "IDENTITY.md").write_text(patch.identity_md, encoding="utf-8")
+            changes.append("IDENTITY.md")
         if patch.extra:
             raise _CatalogConfigError(
                 f"ProfilePatch 不支持 extra 字段: {', '.join(sorted(patch.extra))}"

@@ -158,6 +158,8 @@ class ProfilePatch:
 
     None = 不动；非 None = 覆盖整个 plan.yaml（须通过 ``PlanOverlay``
     schema 校验，未知字段 fail-closed），digest 重算并 ``revision_seq++``。"""
+    identity_md: str | None = None
+    """``{home}/IDENTITY.md`` 的原始 Markdown 文本；None = 不动。"""
     extra: dict[str, str] = field(default_factory=dict)
     """预留给后续字段；非空时由 Catalog 决定是否接受。"""
 
