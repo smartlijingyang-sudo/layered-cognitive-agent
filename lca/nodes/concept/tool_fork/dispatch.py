@@ -39,6 +39,7 @@ from lca.contracts.models.cognition.boundary import (
     BindingsView,
     ForkedTools,
 )
+from lca.contracts.protocols import Tool
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -84,7 +85,7 @@ def _bindings_from_runtime_plane() -> BindingsView | None:
 _SANDBOX_TOOL_APIS: frozenset[str] = frozenset({"runCommand", "executeCode"})
 
 
-def _filter_solo_creator_tools(items: tuple) -> tuple:
+def _filter_solo_creator_tools(items: tuple[Tool, ...]) -> tuple[Tool, ...]:
     """Drop Creator host-CWD primitives — single source of truth in solo mode.
 
     Delegates to ``filter_solo_tools`` in ``lca.plugins.collaboration.modes.solo``
@@ -104,7 +105,7 @@ def _tool_api_name(tool: object) -> str:
     return name
 
 
-def _assert_sandbox_tools_visible(bindings: BindingsView, items: tuple) -> None:
+def _assert_sandbox_tools_visible(bindings: BindingsView, items: tuple[Tool, ...]) -> None:
     """Fail loud when Profile→Bindings declare sandbox but fork omitted APIs."""
     sandbox_expected = bindings.sandbox is not None
     if not sandbox_expected:
@@ -133,8 +134,11 @@ def _assert_sandbox_tools_visible(bindings: BindingsView, items: tuple) -> None:
         )
 
 
-def _custom_tools_from_home(home_path: str, items: tuple) -> tuple:
+def _custom_tools_from_home(home_path: str, items: tuple[Tool, ...]) -> tuple:
     """Load assistant custom tools from ``{home}/tools/`` (ADR-0243 D5).
+
+    返回含 ``AssistantCustomTool``（动态工具，成员为实例属性，与 ``Tool``
+    协议的 ClassVar 成员静态不兼容——裁定项 B-059），故返回类型不参数化。
 
     Only ``builtin_preset`` tools whose backing builtin is present in the
     filtered run tool set are materialized; a preset wrapping a denied or
@@ -143,7 +147,6 @@ def _custom_tools_from_home(home_path: str, items: tuple) -> tuple:
     from pathlib import Path
 
     from lca.contracts.models.assistant.tool_spec import ToolSpec
-    from lca.contracts.protocols import Tool
     from lca.infrastructure.tools.assistant.custom_tool import AssistantCustomTool
 
     tools_root = Path(home_path) / "tools"
@@ -188,8 +191,8 @@ class ToolForkDispatchExecutor:
     semantic_name: str = "tool.fork.dispatch"
     region: str = "concept"
     # ADR-0219 §5.5: typed port contract declared on the plugin.
-    declared_inputs: tuple[PortName, ...] = ("bindings", "tools")
-    declared_outputs: tuple[PortName, ...] = ("forked_tools",)
+    declared_inputs: tuple[PortName, ...] = (PortName("bindings"), PortName("tools"))
+    declared_outputs: tuple[PortName, ...] = (PortName("forked_tools"),)
 
     async def node_execute(
         self,
@@ -206,7 +209,7 @@ class ToolForkDispatchExecutor:
         两路都空 → fail loud,要求运行时显式 set
         ``BindingsViewBuilder``。
         """
-        bindings = input.port_values.get("bindings")
+        bindings = input.port_values.get(PortName("bindings"))
         if bindings is None:
             bindings = _bindings_from_runtime_plane()
         if not isinstance(bindings, BindingsView):
@@ -215,12 +218,12 @@ class ToolForkDispatchExecutor:
                 f"instance, got {type(bindings).__name__}"
             )
 
-        tools_service = input.port_values.get("tools")
+        tools_service = input.port_values.get(PortName("tools"))
         if tools_service is None:
             raise RuntimeError("tool.fork.dispatch: 'tools' typed port missing from input ports")
 
         forked = tools_service.fork_for_run(bindings)
-        items = tuple(forked.list_tools())
+        items: tuple[Tool, ...] = tuple(forked.list_tools())
         # Drop Creator host-CWD primitives when the active mode is solo —
         # the solo Adapter (build_solo_agent) applies the same filter to
         # Agent.tools at composition time; tool_fork.dispatch is the second
@@ -321,7 +324,7 @@ class ToolForkDispatchExecutor:
             items=items,
             binding_keys=_FORKED_BINDING_KEYS,
         )
-        return NodeOutput(port_values={"forked_tools": forked_tools})
+        return NodeOutput(port_values={PortName("forked_tools"): forked_tools})
 
 
 @plugin(

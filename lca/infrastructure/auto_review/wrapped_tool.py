@@ -54,6 +54,10 @@ class AutoReviewWrappedTool(Tool):
         return getattr(self._inner, "effect_kind", "ephemeral")
 
     @property
+    def namespace(self) -> str:
+        return self._inner.namespace
+
+    @property
     def default_timeout_s(self) -> int:
         return self._inner.default_timeout_s
 
@@ -81,7 +85,7 @@ class AutoReviewWrappedTool(Tool):
 
         The wrapper intentionally overrides only review-relevant behavior
         (``name``, ``description``, ``execute``); every other member of the
-        ``Tool`` protocol surface — including ``namespace`` (ADR-0256) — is
+        ``Tool`` protocol surface is
         transparently forwarded so the wrapped tool keeps behaving like the
         inner one. Without this, ``getattr(tool, "namespace", "")`` in
         ``ToolDeferSession.update_turn`` always saw ``""`` and killed the

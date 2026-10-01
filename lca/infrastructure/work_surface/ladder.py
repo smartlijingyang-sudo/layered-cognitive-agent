@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from enum import StrEnum
+from typing import TypeVar
 
 LADDER_ORDER_TUPLE = (
     "memory",
@@ -112,7 +113,10 @@ def _is_box_surface_tool(name: str) -> bool:
     }
 
 
-def order_tools_by_ladder(tools: Sequence[object]) -> list[object]:
+_T = TypeVar("_T")
+
+
+def order_tools_by_ladder(tools: Sequence[_T]) -> list[_T]:
     """稳定排序：低阶工作面工具在前，未知工作面工具保持原序在后。"""
     return sorted(tools, key=_tool_ladder_rank)
 
