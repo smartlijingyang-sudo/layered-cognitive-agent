@@ -60,8 +60,8 @@ class ActObserveCommitFactExecutor:
 
     semantic_name: str = "act.observe.commit_fact"
     region: str = "act"
-    declared_inputs: tuple[PortName, ...] = ("receipt",)
-    declared_outputs: tuple[PortName, ...] = ("receipt",)
+    declared_inputs: tuple[PortName, ...] = (PortName("receipt"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("receipt"),)
 
     async def node_execute(
         self,
@@ -77,13 +77,13 @@ class ActObserveCommitFactExecutor:
         fail-loud,AGENTS.md §3 C13)。
         """
         del context  # unused: pure function of input ports
-        receipt = input.port_values.get("receipt")
+        receipt = input.port_values.get(PortName("receipt"))
         if not isinstance(receipt, EffectReceipt):
             raise TypeError(
                 "act.observe.commit_fact: 'receipt' port must be an EffectReceipt "
                 f"instance, got {type(receipt).__name__}"
             )
-        return NodeOutput(port_values={"receipt": receipt})
+        return NodeOutput(port_values={PortName("receipt"): receipt})
 
 
 @plugin(
