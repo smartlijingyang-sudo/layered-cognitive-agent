@@ -19,9 +19,7 @@ from lca.infrastructure.memory.contextfiles.domain.standing_path import (
 
 def test_rejects_shadow_user_md_under_assistant_memory() -> None:
     # 真实故障路径：writeFile 写入 memory/USER.md
-    assert is_standing_write_path(
-        "/home/lichao/.lca/assistants/asst_x/memory/USER.md"
-    )
+    assert is_standing_write_path("/home/lichao/.lca/assistants/asst_x/memory/USER.md")
 
 
 def test_rejects_standing_files_under_agent_home() -> None:

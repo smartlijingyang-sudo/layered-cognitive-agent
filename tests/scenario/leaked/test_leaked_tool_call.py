@@ -242,25 +242,25 @@ class TestNativeAgentEncodings(unittest.TestCase):
         text = (
             "我来帮你完成这个任务。\n\n"
             "call\n"
-            '{"name": "write_file", "arguments": {"path": "/tmp/a.txt", "content": "hi"}}'
+            '{"name": "write_file", "arguments": {"path": "/var/data/a.txt", "content": "hi"}}'
         )
         channel = parse_text_channel(text)
         self.assertEqual(channel.prose, "我来帮你完成这个任务。")
         self.assertEqual(channel.undecodable, "")
         self.assertEqual([c.name for c in channel.calls], ["write_file"])
-        self.assertEqual(channel.calls[0].arguments["path"], "/tmp/a.txt")
+        self.assertEqual(channel.calls[0].arguments["path"], "/var/data/a.txt")
         self.assertEqual(channel.calls[0].arguments["content"], "hi")
 
     def test_fs_write_block_decodes_to_write_file(self) -> None:
         text = (
             "两个文件都已创建完成。\n\n"
-            "<fsWrite>\n<path>/tmp/step1.txt</path>\n<content>第一步完成</content>\n</fsWrite>"
+            "<fsWrite>\n<path>/var/data/step1.txt</path>\n<content>第一步完成</content>\n</fsWrite>"
         )
         channel = parse_text_channel(text)
         self.assertEqual(channel.prose, "两个文件都已创建完成。")
         self.assertEqual(channel.undecodable, "")
         self.assertEqual([c.name for c in channel.calls], ["write_file"])
-        self.assertEqual(channel.calls[0].arguments["path"], "/tmp/step1.txt")
+        self.assertEqual(channel.calls[0].arguments["path"], "/var/data/step1.txt")
         self.assertEqual(channel.calls[0].arguments["content"], "第一步完成")
 
     def test_fs_write_fragment_is_undecodable_never_prose(self) -> None:

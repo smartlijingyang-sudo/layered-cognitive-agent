@@ -11,7 +11,7 @@
 | HARDCODING-TASK-3 | 路径安全拦截收敛至权威 Locator (standing_path.py) | Completed | 废除 .lca 模糊段匹配，接入 expand_user_path 与 get_lca_home 权威前缀，工作区文件放行，自定义 LCA_HOME 防御生效，单测 11/11 全绿 |
 | HARDCODING-TASK-4 | 参数截断检测精细化与防误杀 (leaked_tool_call.py) | Completed | 将 _TRUNCATED_VALUE 收紧为尾部点号截断 (re.compile(r"…|\.{4,}\s*(\Z|\"|\')"))，消解合法参数（如正则 grep "a....b"）误杀；新增 test_regex_with_dots_is_not_rejected_as_truncated 断言；28/28 测试通过 |
 | HARDCODING-TASK-5 | 历史组装 Defer Catalog 标记解耦 (assemble.py) | Completed | 重构 _strip_defer_catalog，采用段落边界与哨兵标记解耦 DeferPolicy 内部 discovery_rule；消解多轮多 catalog 堆积漏洞；新增 test_defer_catalog_with_custom_discovery_rule_is_stripped；19/19 测试全通 |
-| HARDCODING-TASK-6 | 全链路不变量回归验证与门禁体检 (INV-01 ~ INV-06) | In_Progress | 执行中：进行全量关联不变量测试回归与代码格式/门禁核验 |
+| HARDCODING-TASK-6 | 全链路不变量回归验证与门禁体检 (INV-01 ~ INV-06) | Completed | 关联不变量测试套件 122/122 100% 全绿（templates 60/60, runtime_env 7/7, standing_path 8/8, leaked 22/22, assemble 19/19, namespace 6/6）；ruff check 0 报错；ruff format 格式校验通过；git diff --check clean；负向边界 100% 遵守 |
 | ADR-0256-TASK-1 | Contracts 层强化与 DeferPolicy 8 域闭环 (`Tool.namespace` & `DeferPolicy`) | Completed | Tool.namespace 与 ToolApi.namespace 契约增加，DeferPolicy 固化 8 域描述与 shell 审批，单测 3/3 passed，commit 9c8a6b566 |
 | ADR-0256-TASK-2 | 工具 Factory 与 Manifest 显式声明 Namespace 并下沉 SSOT | Completed | 23项工具显式声明 8 大 namespace，彻底切除 ToolsService._tool_namespaces，20/20 单测全通，commit bbb74b882 |
 | ADR-0256-TASK-3 | ToolDeferSession 协议升级与 ToolSearch 批量加载 | Ready | 待执行 |

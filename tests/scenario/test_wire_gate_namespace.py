@@ -135,12 +135,10 @@ def test_f3_duplicate_emissions_in_one_turn_deduplicated():
     from lca.contracts.models.core.conversation.llm import LLMResponse, NativeToolCall
 
     dupes = [
-        NativeToolCall(call_id=f"call-{i}", name="listFiles",
-                       arguments={"path": "/home/lichao"})
+        NativeToolCall(call_id=f"call-{i}", name="listFiles", arguments={"path": "/home/lichao"})
         for i in range(21)
     ]
-    other = NativeToolCall(call_id="call-x", name="listFiles",
-                           arguments={"path": "/var/data"})
+    other = NativeToolCall(call_id="call-x", name="listFiles", arguments={"path": "/var/data"})
     projection = project_llm_response(LLMResponse(text="", tool_calls=[*dupes, other]))
     names = [(c.tool_name, c.arguments.get("path")) for c in projection.tool_calls]
     assert names == [("listFiles", "/home/lichao"), ("listFiles", "/var/data")]

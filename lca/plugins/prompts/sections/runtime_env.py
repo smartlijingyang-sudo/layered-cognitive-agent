@@ -84,7 +84,9 @@ def render_developer_timestamp(
     tz_abbr = dt.tzname() or "UTC"
     tz_display = tz_name or tz_abbr
     device_part = f" [device_id={device_id}]" if device_id else ""
-    line1 = f"[{weekday} {date_str} {time_str} {tz_abbr}] [client_timezone={tz_display}]{device_part}"
+    line1 = (
+        f"[{weekday} {date_str} {time_str} {tz_abbr}] [client_timezone={tz_display}]{device_part}"
+    )
     line2 = f"Sent from: {sent_from}"
     return f"{line1}\n{line2}"
 
