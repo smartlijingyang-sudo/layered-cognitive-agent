@@ -44,8 +44,8 @@ class CapabilityRoleComposeExecutor:
 
     semantic_name: str = "capability.role.compose"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("role", "team_awareness")
-    declared_outputs: tuple[PortName, ...] = ("role_snapshot",)
+    declared_inputs: tuple[PortName, ...] = (PortName("role"), PortName("team_awareness"))
+    declared_outputs: tuple[PortName, ...] = (PortName("role_snapshot"),)
 
     async def node_execute(
         self,
@@ -61,20 +61,20 @@ class CapabilityRoleComposeExecutor:
         由 driver 从 runtime team 注入。None 是合法值(solo run)。
         """
         del context
-        role = input.port_values.get("role")
+        role = input.port_values.get(PortName("role"))
         if not isinstance(role, RoleProfile):
             raise TypeError(
                 "capability.role.compose: 'role' port must be a RoleProfile "
                 f"instance, got {type(role).__name__}"
             )
-        team_awareness = input.port_values.get("team_awareness")
+        team_awareness = input.port_values.get(PortName("team_awareness"))
         if team_awareness is not None and not isinstance(team_awareness, TeamAwareness):
             raise TypeError(
                 "capability.role.compose: 'team_awareness' port must be a "
                 f"TeamAwareness instance or None, got {type(team_awareness).__name__}"
             )
         role_snapshot = RoleSnapshot(profile=role, team_awareness=team_awareness)
-        return NodeOutput(port_values={"role_snapshot": role_snapshot})
+        return NodeOutput(port_values={PortName("role_snapshot"): role_snapshot})
 
 
 @plugin(
