@@ -172,12 +172,25 @@ export const StandingFileFullscreenEditor = memo<StandingFileFullscreenEditorPro
       setLoading(true);
       setConflictData(null);
       try {
+        const token = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
         const url = `/lca-api/v1/assistants/${assistantId}/standing-files/${filename}`;
-        let res = await fetch(url);
+        const res = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'x-lca-token': token,
+          },
+        });
+        const contentType = res.headers.get('content-type') || '';
         if (!res.ok) {
-          res = await fetch(`/v1/assistants/${assistantId}/standing-files/${filename}`);
+          if (contentType.includes('application/json')) {
+            const errData = await res.json().catch(() => null);
+            throw new Error(errData?.error?.detail || `加载文件失败 (HTTP ${res.status})`);
+          }
+          throw new Error(`加载文件失败 (HTTP ${res.status})`);
         }
-        if (!res.ok) throw new Error(`加载文件失败 (HTTP ${res.status})`);
+        if (!contentType.includes('application/json')) {
+          throw new Error(`接口返回非 JSON 响应 (HTTP ${res.status})`);
+        }
         const data = await res.json();
         setContent(data.content || '');
         setOriginalContent(data.content || '');
@@ -211,6 +224,7 @@ export const StandingFileFullscreenEditor = memo<StandingFileFullscreenEditorPro
       setSaving(true);
       setConflictData(null);
       try {
+        const token = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
         const url = `/lca-api/v1/assistants/${assistantId}/standing-files/${filename}`;
         const payload = {
           content,
@@ -218,35 +232,41 @@ export const StandingFileFullscreenEditor = memo<StandingFileFullscreenEditorPro
           actor: 'user_ui',
         };
 
-        let res = await fetch(url, {
+        const res = await fetch(url, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+            'x-lca-token': token,
+          },
           body: JSON.stringify(payload),
         });
 
-        if (!res.ok && res.status === 404) {
-          // 兜底直连
-          res = await fetch(`/v1/assistants/${assistantId}/standing-files/${filename}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-        }
+        const contentType = res.headers.get('content-type') || '';
 
         if (res.status === 409) {
           // 409 Conflict: 乐观锁并发冲突
-          const errData = await res.json();
+          const errData = contentType.includes('application/json')
+            ? await res.json().catch(() => null)
+            : null;
           setConflictData({
-            current_hash: errData.error?.current_hash || '',
-            current_content: errData.error?.current_content || '',
+            current_hash: errData?.error?.current_hash || '',
+            current_content: errData?.error?.current_content || '',
           });
           message.warning('检测到并发修改冲突！磁盘真值已被更新，请核对后再提交。');
           return;
         }
 
         if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error?.detail || `保存失败 (HTTP ${res.status})`);
+          if (contentType.includes('application/json')) {
+            const errData = await res.json().catch(() => null);
+            throw new Error(errData?.error?.detail || `保存失败 (HTTP ${res.status})`);
+          }
+          throw new Error(`保存失败 (HTTP ${res.status})`);
+        }
+
+        if (!contentType.includes('application/json')) {
+          throw new Error(`接口返回非 JSON 响应 (HTTP ${res.status})`);
         }
 
         const data = await res.json();

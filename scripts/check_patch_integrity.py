@@ -74,6 +74,35 @@ class _CaptureCtx:
         except FileNotFoundError:
             return False
 
+    def replace_once(self, rel: str, anchor: str, insert: str, *, label: str = "") -> str:
+        text = self.read(rel)
+        if anchor not in text:
+            tag = label or rel
+            raise SystemExit(f"[{tag}] anchor not found")
+        return text.replace(anchor, insert, 1)
+
+    def replace_first_of(
+        self,
+        rel: str,
+        replacements: tuple[tuple[str, str], ...],
+        *,
+        label: str,
+    ) -> str:
+        text = self.read(rel)
+        for anchor, insert in replacements:
+            if anchor in text:
+                return text.replace(anchor, insert, 1)
+        needles = " | ".join(repr(a[:80]) for a, _ in replacements)
+        raise SystemExit(f"[{label}] none of {len(replacements)} anchors found: {needles}")
+
+    def replace_all(self, rel: str, old: str, new: str) -> str:
+        text = self.read(rel)
+        return text.replace(old, new)
+
+    def create_file(self, rel: str, content: str) -> bool:
+        self.written[rel] = content
+        return True
+
 
 def _iter_patches():
     out: list[tuple[Path, object]] = []

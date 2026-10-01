@@ -27,6 +27,7 @@ from lca.plugins.transport.webserver.routes_1.routes_assistants.codecs import (
     _json,
     _not_implemented,
     _ownership_error,
+    _ownership_from_request,
     _user_from_request,
 )
 
@@ -52,6 +53,41 @@ def _summarize(content: str, max_lines: int = 3, max_chars: int = 150) -> str:
     return snippet
 
 
+def _resolve_assistant_id(request: Request, user_id: str, raw_id: str) -> str:
+    """解析助理 ID：优先使用 raw_id，若未匹配且为 agt_* 或 inbox，尝试经由 ownership 映射。"""
+    if not raw_id:
+        return raw_id
+    catalog = _catalog_from_request(request)
+    if catalog is not None:
+        try:
+            catalog.get(raw_id)
+            return raw_id
+        except (AssistantCatalogError, ValueError):
+            pass
+
+    ownership = _ownership_from_request(request)
+    if ownership is not None:
+        # 1. 尝试以 agent_id 反查 (如 agt_*)
+        getter = getattr(ownership, "assistant_id_for_agent", None)
+        if getter is not None:
+            resolved = getter(raw_id)
+            if resolved:
+                return resolved
+
+        # 2. 尝试以 client_id (如 lobe-agent:inbox / lobe-agent:{raw_id}) 查
+        for candidate_client_id in (f"lobe-agent:{raw_id}", raw_id):
+            resolved = ownership.assistant_id_for_client(user_id, candidate_client_id)
+            if resolved:
+                return resolved
+
+        if raw_id == "inbox":
+            resolved = ownership.assistant_id_for_client(user_id, "lobe-agent:inbox")
+            if resolved:
+                return resolved
+
+    return raw_id
+
+
 async def list_standing_files(request: Request) -> JSONResponse:
     """``GET /v1/assistants/{assistant_id}/standing-files`` —— 查询 4 大常驻文件元数据与摘要。"""
     user_id, auth_error = _user_from_request(request)
@@ -62,7 +98,8 @@ async def list_standing_files(request: Request) -> JSONResponse:
     if catalog is None:
         return _not_implemented("catalog_unavailable", "standing_files.list")
 
-    assistant_id = str(request.path_params.get("assistant_id") or "")
+    raw_id = str(request.path_params.get("assistant_id") or "")
+    assistant_id = _resolve_assistant_id(request, user_id, raw_id)
     ownership_error = _ownership_error(request, user_id, assistant_id)
     if ownership_error is not None:
         return ownership_error
@@ -123,7 +160,8 @@ async def get_standing_file(request: Request) -> JSONResponse:
     if catalog is None:
         return _not_implemented("catalog_unavailable", "standing_files.get")
 
-    assistant_id = str(request.path_params.get("assistant_id") or "")
+    raw_id = str(request.path_params.get("assistant_id") or "")
+    assistant_id = _resolve_assistant_id(request, user_id, raw_id)
     filename = str(request.path_params.get("filename") or "")
 
     if filename not in STANDING_FILES_WHITELIST:
@@ -186,7 +224,8 @@ async def update_standing_file(request: Request) -> JSONResponse:
     if catalog is None:
         return _not_implemented("catalog_unavailable", "standing_files.update")
 
-    assistant_id = str(request.path_params.get("assistant_id") or "")
+    raw_id = str(request.path_params.get("assistant_id") or "")
+    assistant_id = _resolve_assistant_id(request, user_id, raw_id)
     filename = str(request.path_params.get("filename") or "")
 
     if filename not in STANDING_FILES_WHITELIST:

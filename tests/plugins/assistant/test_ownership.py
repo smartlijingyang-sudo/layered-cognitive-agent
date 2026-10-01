@@ -75,8 +75,10 @@ def test_set_agent_id(store: SqliteUserAssistantStore) -> None:
     store.ensure_user("user_1")
     store.bind(_binding())
     assert store.agent_id_of("asst_1") is None
+    assert store.assistant_id_for_agent("agt_1") is None
     store.set_agent_id("asst_1", "agt_1")
     assert store.agent_id_of("asst_1") == "agt_1"
+    assert store.assistant_id_for_agent("agt_1") == "asst_1"
 
 
 def test_agent_id_unique_index(store: SqliteUserAssistantStore) -> None:

@@ -175,18 +175,28 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
       setLoading(true);
       setErrorMsg(null);
       try {
+        const token = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
         const url = `/lca-api/v1/assistants/${assistantId}/standing-files`;
-        const res = await fetch(url, { headers: { 'Content-Type': 'application/json' } });
+        const res = await fetch(url, {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+            'x-lca-token': token,
+          },
+        });
+        const contentType = res.headers.get('content-type') || '';
         if (!res.ok) {
-          // 兜底直连
-          const fallbackRes = await fetch(`/v1/assistants/${assistantId}/standing-files`);
-          if (!fallbackRes.ok) throw new Error(`HTTP ${fallbackRes.status}`);
-          const data = await fallbackRes.json();
-          setFiles(data.files || []);
-        } else {
-          const data = await res.json();
-          setFiles(data.files || []);
+          if (contentType.includes('application/json')) {
+            const errData = await res.json().catch(() => null);
+            throw new Error(errData?.error?.detail || `加载失败 (HTTP ${res.status})`);
+          }
+          throw new Error(`加载失败 (HTTP ${res.status})`);
         }
+        if (!contentType.includes('application/json')) {
+          throw new Error(`接口返回非 JSON 响应 (HTTP ${res.status})`);
+        }
+        const data = await res.json();
+        setFiles(data.files || []);
       } catch (err: any) {
         setErrorMsg(err.message || '加载常驻文件列表失败');
       } finally {

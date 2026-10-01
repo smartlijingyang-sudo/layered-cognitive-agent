@@ -93,6 +93,9 @@ class AssistantOwnership(Protocol):
     def agent_id_of(self, assistant_id: str) -> str | None:
         """返回已绑定的 LobeHub ``agt_*``；未绑定返回 ``None``。"""
 
+    def assistant_id_for_agent(self, agent_id: str) -> str | None:
+        """返回已绑定该 LobeHub ``agt_*`` 的 ``asst_*``；未绑定返回 ``None``。"""
+
     def set_onboarding_state(self, user_id: str, state: str) -> None:
         """更新用户 onboarding 状态（pending|agent_created|completed）。"""
 

@@ -425,17 +425,41 @@ def discover_patches_with_failures() -> tuple[list[PatchModule], list[str]]:
 # ── Engine helpers ─────────────────────────────────────────────────────
 
 
-def _filter(modules: list[PatchModule], names: tuple[str, ...]) -> list[PatchModule]:
-    if not names:
-        return list(modules)
+def _topological_sort(modules: list[PatchModule]) -> list[PatchModule]:
     by_name = {m.meta.name: m for m in modules}
+    visited: set[str] = set()
+    result: list[PatchModule] = []
+
+    def visit(name: str, stack: list[str]) -> None:
+        if name in visited:
+            return
+        if name in stack:
+            raise SystemExit(f"Cyclic patch dependency: {' -> '.join(stack + [name])}")
+        m = by_name.get(name)
+        if m is None:
+            return
+        for dep in m.meta.depends_on:
+            visit(dep, stack + [name])
+        visited.add(name)
+        result.append(m)
+
+    for m in modules:
+        visit(m.meta.name, [])
+    return result
+
+
+def _filter(modules: list[PatchModule], names: tuple[str, ...]) -> list[PatchModule]:
+    sorted_modules = _topological_sort(modules)
+    if not names:
+        return sorted_modules
+    by_name = {m.meta.name: m for m in sorted_modules}
     selected: list[PatchModule] = []
     for n in names:
         if n not in by_name:
             available = ", ".join(sorted(by_name))
             raise SystemExit(f"unknown patch: {n}\nAvailable: {available}")
         selected.append(by_name[n])
-    return selected
+    return _topological_sort(selected)
 
 
 def _compute_patch_hash(pm: PatchModule) -> str:

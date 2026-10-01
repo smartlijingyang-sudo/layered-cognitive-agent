@@ -432,3 +432,11 @@
 | FILE-SSOT-TASK-4 | 前端组件：右侧多 Section 滑出抽屉 (`AssistantStatusDrawer.tsx`) | Completed | 落地 AssistantStatusDrawer.tsx 组件，支持 480px 宽度、Identity/Memory/Workspace 横向切 Tab、4 大 Standing Files 状态卡片预览与全屏编辑触发，4/4 单测全绿，commit f8dd25893 |
 | FILE-SSOT-TASK-5 | 前端组件：全屏沉浸式 Markdown 编辑器模态窗 (`StandingFileFullscreenEditor.tsx`) | Completed | 落地 StandingFileFullscreenEditor.tsx 组件，支持等宽字体、行号栏滚动同步、Ctrl+S 快捷保存、expected_hash 乐观并发锁校验与 409 冲突 Diff 对比，4/4 单测全绿，commit 5c89f85c4 |
 | FILE-SSOT-TASK-6 | 前端补丁挂载与全链路不变量集成测试 (INV-01 ~ INV-06) | Completed | 落地 assistant_status_drawer.py 声明式补丁，挂载至 Conversation Header，check_patch_integrity 100/100 文件 byte-identical 全过，落地 test_standing_files_editor_flow.py 覆盖 INV-01~06，全链路 25/25 单测全绿，commit 166758b12 |
+| DEBUG-SSOT-1 | 修复前端组件鉴权头与彻底切除引发 HTML `<` 报错的 SPA 伪回退 | Completed | 成功重构 AssistantStatusDrawer.tsx 与 StandingFileFullscreenEditor.tsx 移除 fallbackRes 并注入 Bearer 鉴权头 |
+| DEBUG-SSOT-2 | 修复 Next.js 中间件 `/lca-api` 穿透保护，避免未登录重定向至 `/signin` HTML | Completed | 成功更新 lca_user_header 补丁与 engine.py 拓扑排序保障 |
+| DEBUG-SSOT-3 | 前端 Header 助理 ID 智能解析与后端 `standing_files.py` 防御性寻址 | Completed | 落地 assistant_id_for_agent 反查接口与 standing_files.py 智能寻址 |
+| DEBUG-SSOT-4 | 补丁重打生效、全套单测与场景回归验证、门禁核验 | Completed | 36/36 补丁 byte-identical 验证通过，INV-01~06 测试 6/6 全绿 |
+| ONBOARDING-SCRIPT-BILINGUAL | 开场白双语化与 Muse 经典英文原版落地 (`script.py`, `routes_onboarding.py`) | In Progress | 更新 script.py 支持 Muse 原版英文与中文 Locale 自适应，routes_onboarding 接入 locale 参数 |
+| ONBOARDING-AUTO-TRIGGER-UI | 前端会话加载主动迎新触发器 (`useOnboardingGreeting` 声明式补丁) | Pending | 新用户首次进入空白 Agent 会话时自动触发 /v1/onboarding/welcome 并插入双气泡 assistant 消息 |
+| ONBOARDING-WIDGET-MOUNT | 消息流起名卡片挂载与结算闭环 (`AssistantNamingWidget` + `routes_onboarding.py`) | Pending | 拦截 `[widget:name_picker?...]` 渲染起名卡片并闭环 /v1/onboarding/naming/settle 端点 |
+| ONBOARDING-E2E-VERIFICATION | 全链路端到端回归验证与内核热重载核验 | Pending | 运行全量单测、端到端场景断言与前端真实交互核验 |
