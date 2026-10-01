@@ -9,6 +9,7 @@ On status="failed" or status="timeout", the strategy raises so the
 kernel can route to a terminal node via :class:`TerminateStrategy`.
 On status="ok", the response payload is forwarded as ``NodeOutput``.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -19,6 +20,7 @@ from lca.contracts.protocols.agent.client import (
     AgentRequest,
     AgentResponse,
 )
+from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 from lca.contracts.protocols.graph.binding import BindingKind
 from lca.contracts.protocols.graph.node_io import (
     NodeInput,
@@ -42,13 +44,9 @@ class AgentConsultStrategy(NodeStrategy):
     schema: NodeIOSchema = field(default_factory=NodeIOSchema)
     client: AgentClient | None = None
 
-    async def execute(
-        self, context: StrategyContext, input: NodeInput
-    ) -> NodeOutput:
+    async def execute(self, context: StrategyContext, input: NodeInput) -> NodeOutput:
         if self.client is None:
-            raise RuntimeError(
-                "AgentConsultStrategy.execute called without client"
-            )
+            raise RuntimeError("AgentConsultStrategy.execute called without client")
         target = str(context.node_config.get("target_agent", ""))
         if not target:
             raise RuntimeError(
@@ -78,7 +76,7 @@ class _StubClient:
         return AgentResponse(
             source_agent=request.target_agent,
             status="ok",
-            payload={STUB_ECHO_PORT: f"echo:{request.target_agent}"},
+            payload={PortName(STUB_ECHO_PORT): f"echo:{request.target_agent}"},
         )
 
     async def fanout(self, request: AgentRequest, *, targets: Any) -> Any:
@@ -86,7 +84,7 @@ class _StubClient:
             AgentResponse(
                 source_agent=t,
                 status="ok",
-                payload={STUB_ECHO_PORT: f"echo:{t}"},
+                payload={PortName(STUB_ECHO_PORT): f"echo:{t}"},
             )
             for t in targets
         ]
