@@ -105,6 +105,24 @@ def _forked_to_tools(forked: object) -> tuple[dict[str, Any], ...]:
     return tuple(_tool_to_spec(tool) for tool in forked.items)
 
 
+def _forked_to_tools_deferred(
+    forked: object,
+) -> tuple[tuple[dict[str, Any], ...], str]:
+    """Defer-aware projection → ``(wire specs, catalog text)``.
+
+    No ambient defer session (tests, legacy run entries) → legacy full
+    projection and no catalog, so behavior is unchanged.
+    """
+    from lca.infrastructure.tool_defer.session import current_defer_session
+
+    session = current_defer_session()
+    if session is None:
+        return _forked_to_tools(forked), ""
+    if not isinstance(forked, ForkedTools) or not forked.items:
+        return (), ""
+    return session.render_turn()
+
+
 @dataclass(frozen=True, slots=True)
 class HistoryDeriveExecutor:
     """think.history.assemble 节点:writer + response + forked_tools → :class:`ModelVisibleRequest`.
@@ -152,7 +170,11 @@ class HistoryDeriveExecutor:
         system = _refresh_standing(system, runtime=context.runtime)
         system = _append_standing_diff(system, runtime=context.runtime)
         system = _append_alignment_synthesis(system, runtime=context.runtime)
-        tools = _forked_to_tools(input.port_values.get("forked_tools"))
+        tools, defer_catalog = _forked_to_tools_deferred(
+            input.port_values.get("forked_tools")
+        )
+        if defer_catalog:
+            system = f"{system}\n\n{defer_catalog}" if system else defer_catalog
         return NodeOutput(
             port_values={
                 "model_visible_request": ModelVisibleRequest(

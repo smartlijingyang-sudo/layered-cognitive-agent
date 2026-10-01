@@ -30,9 +30,11 @@ from lca.contracts.models.cognition.task import (
     TaskList,
     TaskStatus,
 )
+from lca.contracts.models.cognition.tool_defer import DeferMode, ToolNamespace
 
 __all__ = [
     "BrainPromptCatalog",
+    "DeferMode",
     "MissingPromptSectionError",
     "MissingSectionKindError",
     "PromptAssembler",
@@ -56,6 +58,7 @@ __all__ = [
     "TaskId",
     "TaskList",
     "TaskStatus",
+    "ToolNamespace",
     "normalize_assembler_result",
     "normalize_selector_result",
 ]

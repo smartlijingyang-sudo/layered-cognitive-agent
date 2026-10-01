@@ -24,7 +24,9 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 class Config(BaseModel):
     model_config = {"extra": "forbid"}
-    factories: list[str] = Field(default_factory=lambda: ["g2a", "mcp"])
+    factories: list[str] = Field(
+        default_factory=lambda: ["g2a", "mcp", "tool_search"]
+    )
 
 
 def _g2a_factory(bindings: object) -> list:
@@ -51,9 +53,16 @@ def _mcp_factory(bindings: object) -> list:
     return build_ambient_mcp_tools()
 
 
+def _tool_search_factory(bindings: object) -> object:
+    from lca.infrastructure.tool_defer.tool_search import tool_search_factory
+
+    return tool_search_factory(bindings)
+
+
 _TOOL_FACTORIES = {
     "g2a": _g2a_factory,
     "mcp": _mcp_factory,
+    "tool_search": _tool_search_factory,
 }
 
 

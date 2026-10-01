@@ -307,6 +307,15 @@ class ToolForkDispatchExecutor:
             from lca.infrastructure.work_surface.ladder import order_tools_by_ladder
 
             items = tuple(order_tools_by_ladder(items))
+        # Defer-tool seam (Muse L1 alignment): refresh this turn's
+        # namespace view on the run-scoped session.  Without a session
+        # (tests / legacy run entries) the downstream assembler falls back
+        # to full-schema projection — behavior unchanged.
+        from lca.infrastructure.tool_defer.session import current_defer_session
+
+        _defer_session = current_defer_session()
+        if _defer_session is not None:
+            _defer_session.update_turn(items, forked.tool_namespaces())
         _assert_sandbox_tools_visible(bindings, items)
         forked_tools = ForkedTools(
             items=items,

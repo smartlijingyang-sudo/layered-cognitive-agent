@@ -1625,6 +1625,29 @@ public_api = [
 ]
 schema_version = "1.0.0"
 
+[tool.lca.package_contracts."lca.infrastructure.tool_defer"]
+responsibility = "lca/infrastructure/tool_defer. Muse 式延迟工具加载：run 级 defer 会话（ContextVar 三件套）、每 turn 命名空间视图刷新与目录渲染、tool_search 加载工具本体。"
+not_responsible_for = "工具定义与实例化、fork 过滤与包装、prompt 模板与工具目录渲染"
+allowed_dependencies = [
+    "lca.contracts",
+]
+forbidden_dependencies = [
+    "lca.cognition",
+    "lca.runtime",
+    "lca.agent",
+    "lca.application",
+    "lca.harness",
+    "lca.plugins",
+    "gateway",
+]
+side_effects = [
+    "log:emit",
+]
+public_api = [
+    "lca.infrastructure.tool_defer",
+]
+schema_version = "1.0.0"
+
 [tool.lca.package_contracts."lca.infrastructure.tools"]
 responsibility = "lca/infrastructure/tools. 外部世界：文件、LLM、网络、进程、存储、观测、插件内核。具体职责见各包 docstring；本 README 由脚手架生成，待包负责人补充。"
 not_responsible_for = "认知决策、阶段编排、组合根"

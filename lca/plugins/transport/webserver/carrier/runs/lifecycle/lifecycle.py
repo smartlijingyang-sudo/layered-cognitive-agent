@@ -265,7 +265,7 @@ class RunLifecycleCoordinator:
             # ``bindings`` / ``tools`` ports on the resumed traversal.
             # Missing cache (pre-pause-code runs) leaves ports unseeded —
             # same as before this change.
-            capability_token = tools_token = None
+            capability_token = tools_token = defer_token = None
             if getattr(session, "capability_bindings", None) is not None:
                 from lca.infrastructure.runtime_plane.capability_bindings import (
                     reset_capability_bindings,
@@ -273,10 +273,19 @@ class RunLifecycleCoordinator:
                     set_capability_bindings,
                     set_current_tools_service,
                 )
+                from lca.infrastructure.tool_defer.policy import DeferPolicy
+                from lca.infrastructure.tool_defer.session import (
+                    ToolDeferSession,
+                    reset_current_defer_session,
+                    set_current_defer_session,
+                )
 
                 capability_token = set_capability_bindings(session.capability_bindings)
                 if getattr(session, "tools_service", None) is not None:
                     tools_token = set_current_tools_service(session.tools_service)
+                    defer_token = set_current_defer_session(
+                        ToolDeferSession(DeferPolicy.default())
+                    )
             try:
                 # P3-06: snapshot/runnable are hot-path cache; authority is Session facts.
                 with (
@@ -291,6 +300,8 @@ class RunLifecycleCoordinator:
                     reset_capability_bindings(capability_token)
                 if tools_token is not None:
                     reset_current_tools_service(tools_token)
+                if defer_token is not None:
+                    reset_current_defer_session(defer_token)
             if self._outcomes.apply_resume(session, result):
                 self._registry.mark_paused(session)
                 return

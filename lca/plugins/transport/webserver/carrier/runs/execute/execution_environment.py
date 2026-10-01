@@ -36,6 +36,12 @@ from lca.infrastructure.runtime_plane.capability_bindings import (
     set_capability_bindings,
     set_current_tools_service,
 )
+from lca.infrastructure.tool_defer.policy import DeferPolicy
+from lca.infrastructure.tool_defer.session import (
+    ToolDeferSession,
+    reset_current_defer_session,
+    set_current_defer_session,
+)
 from lca.infrastructure.sandbox.runtime.scope import bind_sandbox_runtime
 from lca.infrastructure.skills.assistant.resolver import resolve_skill_store
 from lca.infrastructure.workspace import run_workspace_scope
@@ -303,6 +309,11 @@ class RunExecutionEnvironment:
                 # ContextVar pattern — both are per-turn typed values
                 # that the kernel reads once at outer-plan entry.
                 tools_token = set_current_tools_service(tools_service)
+                # Defer-tool seam (Muse L1 alignment): one session per run;
+                # think.reason's per-turn fork only refreshes the turn view.
+                defer_token = set_current_defer_session(
+                    ToolDeferSession(DeferPolicy.default())
+                )
                 with (
                     run_workspace_scope(session.run_id) as workspace,
                     run_scope(ambit.scope) if ambit.scope is not None else nullcontext(),
@@ -336,6 +347,8 @@ class RunExecutionEnvironment:
                     reset_capability_bindings(capability_token)
                 if tools_token is not None:
                     reset_current_tools_service(tools_token)
+                if defer_token is not None:
+                    reset_current_defer_session(defer_token)
                 structlog.contextvars.clear_contextvars()
                 if coordinator_token is not None:
                     reset_current_coordinator(coordinator_token)
