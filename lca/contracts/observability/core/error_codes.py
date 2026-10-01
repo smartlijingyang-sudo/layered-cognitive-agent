@@ -6,10 +6,10 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class ErrorCategory(str, Enum):
+class ErrorCategory(StrEnum):
     """错误大类。"""
 
     LLM = "llm"
@@ -24,7 +24,7 @@ class ErrorCategory(str, Enum):
     USER = "user"
 
 
-class ErrorCode(str, Enum):
+class ErrorCode(StrEnum):
     """稳定错误码(0065 §六 + 0064 §9 收尾)。"""
 
     # LLM
