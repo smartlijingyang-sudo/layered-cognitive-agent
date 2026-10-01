@@ -18,6 +18,9 @@ import pytest
 from lca.contracts.models.auto_review.models import AutoReviewMode
 from lca.contracts.models.cognition.boundary import BindingsView
 from lca.contracts.models.core.execution.decision import Observation
+from lca.contracts.models.core.execution.tool import ToolApi, ToolManifest, ToolMeta
+from lca.contracts.protocols import Tool
+from lca.infrastructure.tools.builder.builder import build_tools_from_manifest
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -29,34 +32,46 @@ from lca.infrastructure.vocal.tool_adapter import SendMessageVocalTool
 from lca.nodes.concept.tool_fork.dispatch import ToolForkDispatchExecutor
 
 
-@dataclass
-class _ToolStub:
-    name: str
-    description: str = ""
-    parameters: dict[str, Any] | None = None
-    is_idempotent: bool = True
-    effect_kind: str = "ephemeral"
-    default_timeout_s: int = 30
+def _ToolStub(name: str, *, namespace: str = "core") -> Tool:
+    """Build a real ``Tool`` instance via the generic manifest builder.
 
-    async def execute(self, args: dict[str, Any]) -> Observation:
+    ``ForkedTools`` (pydantic, ADR-0220 §4.1 typed fork boundary) requires
+    ``isinstance(item, Tool)`` — a plain dataclass stub no longer satisfies
+    it. Call-site shape ``_ToolStub(name=...)`` is unchanged.
+    """
+    manifest = ToolManifest(
+        identifier=f"test-{name}",
+        type="builtin",
+        api=(
+            ToolApi(
+                name=name,
+                description=f"fake {name}",
+                parameters={"type": "object", "properties": {}},
+                namespace=namespace,
+            ),
+        ),
+        meta=ToolMeta(avatar="\U0001F9EA", title=name, description=f"fake {name}"),
+    )
+
+    async def _invoke(executor: object, api_name: str, args: dict[str, Any]) -> Observation:
+        del executor
         return Observation(
-            observation_id=f"obs_{self.name}",
+            observation_id=f"obs_{api_name}",
             success=True,
             payload={"command": args.get("command")},
         )
 
-    def validate(self, args: dict[str, Any]) -> str | None:
-        return None
+    return build_tools_from_manifest(manifest, object(), invoke_fn=_invoke)[0]
 
 
 @dataclass
 class _ToolsServiceStub:
-    tools: dict[str, _ToolStub]
+    tools: dict[str, Tool]
 
     def fork_for_run(self, bindings: BindingsView) -> _ToolsServiceStub:
         return _ToolsServiceStub(tools=dict(self.tools))
 
-    def list_tools(self) -> list[_ToolStub]:
+    def list_tools(self) -> list[Tool]:
         return list(self.tools.values())
 
 
