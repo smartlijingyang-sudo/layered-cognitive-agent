@@ -15,8 +15,9 @@ think.reason inner_graph 第 2 节点 plugin:把 compat-era ``(state, plan)``
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, replace
-from typing import Any
+from typing import Any, cast
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -35,6 +36,7 @@ from lca.contracts.models.cognition.boundary import (
     TemplateSelection,
 )
 from lca.contracts.models.core.perceive.projection import current_manifest_from_state
+from lca.contracts.models.team.role.team import RoleProfile
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -51,8 +53,8 @@ _log = logging.getLogger(__name__)
 
 def _refresh_role_profile(
     runtime: object,
-    role_profile: object,
-) -> object:
+    role_profile: RoleProfile | None,
+) -> RoleProfile | None:
     """Re-read the standing files when the run is bound to an assistant home.
 
     The injected ``standing_refresher`` returns the freshly assembled
@@ -77,6 +79,8 @@ def _refresh_role_profile(
     refreshed = refresher(home_path, fallback=fallback)
     if not refreshed or refreshed == fallback:
         return role_profile
+    if role_profile is None:
+        return role_profile
     return replace(role_profile, backstory=refreshed)
 
 
@@ -84,15 +88,17 @@ def _resolve_refresher(runtime: object) -> Any:
     """Read the ``standing_refresher`` capability off the runtime view."""
 
     refresher = getattr(runtime, "standing_refresher", None)
-    if refresher is None and hasattr(runtime, "get"):
-        refresher = runtime.get("standing_refresher")
+    if refresher is None:
+        get = getattr(runtime, "get", None)
+        if callable(get):
+            refresher = get("standing_refresher")
     return refresher
 
 
 def _state_to_boundary(
     state: object,
     plan: object,
-    role_profile: object,
+    role_profile: RoleProfile,
 ) -> tuple[ReasonerContext, TemplateSelection, RoleSnapshot]:
     """Translate the legacy (state, plan) adapter inputs into typed DTOs.
 
@@ -116,13 +122,24 @@ def _state_to_boundary(
     selection = TemplateSelection(
         template_id=template_id,
         variant=variant if variant in ("react", "hierarchical", "routing", "casting") else "react",
-        decision_path=decision_path,
+        decision_path=(
+            decision_path
+            if decision_path
+            in (
+                "active_template_override",
+                "consult_duty",
+                "team_awareness_routing",
+                "profile_default",
+                "legacy",
+            )
+            else "legacy"
+        ),
     )
     snapshot = RoleSnapshot(profile=role_profile, team_awareness=awareness)
     return context, selection, snapshot
 
 
-def _resolve_role_profile(runtime: object) -> object | None:
+def _resolve_role_profile(runtime: object) -> RoleProfile | None:
     """Read ``role_profile`` off ``runtime.brain`` (typed Brain attribute).
 
     PromptReasoner no longer owns RoleProfile (eng/retire-v1-reasoner-sandbox);
@@ -157,8 +174,8 @@ class ThinkReasonRenderExecutor:
     region: str = "think"
     # ADR-0219 §5.5: typed port contract declared on the plugin (graph
     # layer does not know port names; it only knows topology).
-    declared_inputs: tuple[PortName, ...] = ("turn_plan",)
-    declared_outputs: tuple[PortName, ...] = ("turn_render",)
+    declared_inputs: tuple[PortName, ...] = (PortName("turn_plan"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("turn_render"),)
 
     async def node_execute(
         self,
@@ -174,7 +191,7 @@ class ThinkReasonRenderExecutor:
         state = getattr(runtime, "state", None)
         brain = getattr(runtime, "brain", None)
         reasoner = getattr(brain, "reasoner", None) if brain is not None else None
-        plan = input.port_values.get("turn_plan")
+        plan = input.port_values.get(PortName("turn_plan"))
         render_turn = getattr(reasoner, "render_turn", None) if reasoner is not None else None
         role_profile = _resolve_role_profile(runtime)
         role_profile = _refresh_role_profile(runtime, role_profile)
@@ -197,14 +214,16 @@ class ThinkReasonRenderExecutor:
             raise RuntimeError(
                 f"think.reason.render: cannot render the turn prompt — missing {', '.join(missing)}"
             )
-        boundary = _state_to_boundary(state, plan, role_profile)
-        render = render_turn(*boundary)
+        # The fail-loud check above guarantees role_profile is present and
+        # render_turn is callable; the runtime view itself is untyped.
+        boundary = _state_to_boundary(state, plan, cast("RoleProfile", role_profile))
+        render = cast("Callable[..., Any]", render_turn)(*boundary)
         _log.debug(
             "think.reason.render emitted turn_render variant=%s section_count=%s",
             getattr(render, "variant", None),
             getattr(render, "section_count", None),
         )
-        return NodeOutput(port_values={"turn_render": render})
+        return NodeOutput(port_values={PortName("turn_render"): render})
 
 
 @plugin(
