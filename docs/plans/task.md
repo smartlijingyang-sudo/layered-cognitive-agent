@@ -408,3 +408,9 @@
 | DEBUG-CLI-AUTH-FIX | 修复 lca-ops runs create 缺失租户与鉴权头（注入 x-lca-user-id 与 Authorization 头） | Completed | 成功在 runs.py 与 assistants.py 中补齐 x-lca-user-id 与 Authorization Bearer 默认头并支持环境变量覆盖，消解 401 租户鉴权脱节缺口 |
 | DEBUG-REGRESSION-AND-LIVE-VERIFY | 全链路回归测试、门禁检查与 live 评测复测验证 | Completed | 1. 自动化测试：test_session_concurrency_isolation 3/3 passed，live_read 7/7 passed，session_observe 7/7 passed，eval suite 55/55 passed；2. 架构门禁：ruff check 0 报错，git diff --check 干净；3. 内核实测：PID 3318207 健康启动；4. 并发实测：双 Run 真实并发实测，两份 spine.jsonl 交叉污染事件均为 0（100% 隔离）；5. 能力评测：7 项能力 probe 全数通过（含物理设备/未授权审批/密钥泄露等高危红队用例 100% 成功防御） |
 
+| BRAINSTORM-ONBOARDING-CONTEXT | 深度梳理 Muse Onboarding 范式与 LCA 现有架构（Session/Standing文件/LobeHub Patch/工具体系）对齐点 | Completed | 已梳理 Muse 6 步机制、LCA 现有 USER.md/IDENTITY.md 拓扑、LobeHub 补丁体系与首次登录触发点 |
+| BRAINSTORM-ONBOARDING-QUESTIONS | 澄清 LCA Onboarding 机制的核心定位、触发载体与交互组件边界（单步提问） | Completed | 用户明确：兼顾新用户全局迎新与后续新建助理；老用户已填画像由新助理无缝继承（不重复索要姓名），新助理仅主动打招呼并定制该助理自身身份（IDENTITY.md） |
+| BRAINSTORM-ONBOARDING-APPROACHES | 提出 2-3 种具体落地架构方案与权衡对比 | Completed | 提出方案 A/B/C，用户明确选定方案 A（分层两阶段同构流水线 + LobeHub 原生交互 Widget 补丁，强调极致用户交互体验） |
+| BRAINSTORM-ONBOARDING-DESIGN-SECTIONS | 逐步呈现设计细节（Owns/Does NOT own/不变量/契约模型）并获取用户审批 | Completed | 全部 4 节（系统边界与两阶段状态机/核心契约与工具链/前端LobeHub交互增强/测试架构与不变量矩阵）全盘获批 |
+| BRAINSTORM-ONBOARDING-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-01-conversational-onboarding-and-assistant-naming-design.md 并提交 git |
+| BRAINSTORM-ONBOARDING-TRANSITION | 转换至实施计划制定（writing-plans） | In Progress | 准备转换至 writing-plans skill 制定落地实施计划 |
