@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -71,7 +72,7 @@ def _stub_plan_result() -> PlanResolutionResult:
 
 
 @pytest.fixture
-def plan_service_mock() -> MagicMock:
+def plan_service_mock() -> Iterator[MagicMock]:
     """Patch the source ``PlanResolutionService`` class for one test.
 
     Yields a ``MagicMock`` standing in for the constructed instance so

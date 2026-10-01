@@ -9,6 +9,7 @@ run_id 逐事件从 ref.event_id 的 Session 投递形态 "{session.id}:{seq}" �
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -23,7 +24,7 @@ from lca_kernel.events.persistence.persistence import PersistenceObserver
 
 
 @pytest.fixture(autouse=True)
-def _isolate_write_behind_singletons() -> None:
+def _isolate_write_behind_singletons() -> Iterator[None]:
     PersistenceObserver.reset_singleton()
     RunWriteBehindRegistry.reset_singleton()
     yield

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import Any
 
 import pytest
@@ -23,7 +24,7 @@ from tests.support.observability_helpers import _RunStoreBackend, make_test_boun
 
 
 @pytest.fixture(autouse=True)
-def _test_event_bus() -> None:
+def _test_event_bus() -> Iterator[None]:
     """Provide a configured test EventBus for Session-bound publishes."""
     bus = build_test_bus()
     EventBus.set_default(bus)

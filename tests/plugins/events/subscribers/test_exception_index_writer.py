@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -14,7 +15,7 @@ from lca_kernel.events.payloads.payloads import SpineEventPayload
 
 
 @pytest.fixture(autouse=True)
-def _reset_registry() -> None:
+def _reset_registry() -> Iterator[None]:
     RunWriteBehindRegistry.reset_singleton()
     yield
     RunWriteBehindRegistry.reset_singleton()

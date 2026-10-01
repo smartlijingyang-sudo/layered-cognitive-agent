@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Iterator
 from typing import Any
 from unittest.mock import patch
 
@@ -24,7 +25,7 @@ from tests.support.gateway_scripted import ScriptedLLMResolver
 
 
 @pytest.fixture(autouse=True)
-def _test_event_bus() -> None:
+def _test_event_bus() -> Iterator[None]:
     bus = build_test_bus()
     EventBus.set_default(bus)
     yield

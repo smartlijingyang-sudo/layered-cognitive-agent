@@ -17,6 +17,7 @@ import os
 import socket
 import subprocess
 import time
+from collections.abc import Iterator
 from typing import Any
 
 import httpx
@@ -43,7 +44,7 @@ def _wait_for_health(url: str, timeout: float = 30.0) -> None:
 
 
 @pytest.fixture(scope="module")
-def kernel_process() -> dict[str, Any]:
+def kernel_process() -> Iterator[dict[str, Any]]:
     """Start a real LCA kernel on a free port for the test module.
 
     Skipped unless ``LCA_E2E_KERNEL=1`` is set — without the env flag

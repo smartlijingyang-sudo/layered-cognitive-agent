@@ -12,6 +12,7 @@ HTTP 请求被 trace emit 拖到 500。本测试确保 trace 是装饰,observabi
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterator
 from typing import Any
 
 import pytest
@@ -29,7 +30,7 @@ from lca_kernel.events.errors.errors import (
 
 
 @pytest.fixture(autouse=True)
-def _reset_trace_emit_failures() -> None:
+def _reset_trace_emit_failures() -> Iterator[None]:
     """每个测试前清空 trace_emit_failures 计数,避免测试间状态污染。"""
     _trace_emit_failures.clear()
     yield

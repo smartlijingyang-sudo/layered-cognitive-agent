@@ -9,6 +9,7 @@ degradation).
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import Any
 
 import pytest
@@ -55,7 +56,7 @@ def client() -> TestClient:
 
 
 @pytest.fixture(autouse=True)
-def _reset_event_bus_singleton() -> None:
+def _reset_event_bus_singleton() -> Iterator[None]:
     """Avoid cross-test bleed: each test gets a fresh EventBus instance."""
     from lca_kernel.events import EventBus
 

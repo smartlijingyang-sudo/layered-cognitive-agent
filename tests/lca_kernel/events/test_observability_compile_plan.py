@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -12,7 +13,7 @@ _CONFIG = Path(__file__).resolve().parents[3] / "lca_kernel" / "events" / "confi
 
 
 @pytest.fixture(autouse=True)
-def _clear_plan_cache() -> None:
+def _clear_plan_cache() -> Iterator[None]:
     reset_compiled_plan_cache()
     yield
     reset_compiled_plan_cache()

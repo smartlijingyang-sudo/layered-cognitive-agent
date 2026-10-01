@@ -7,6 +7,7 @@ verified so a regression in one path doesn't hide behind another.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -49,7 +50,7 @@ def client() -> TestClient:
 
 
 @pytest.fixture(autouse=True)
-def _reset_event_bus_singleton() -> None:
+def _reset_event_bus_singleton() -> Iterator[None]:
     from lca_kernel.events import EventBus
 
     EventBus.reset_singleton()

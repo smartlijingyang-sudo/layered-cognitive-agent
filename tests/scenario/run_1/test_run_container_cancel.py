@@ -8,6 +8,7 @@ detach，hub.close 时出现「Token was created in a different Context」。
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterator
 from typing import Any
 
 import pytest
@@ -27,7 +28,7 @@ from tests.support.observability_helpers import make_test_bound
 
 
 @pytest.fixture(autouse=True)
-def _test_event_bus() -> None:
+def _test_event_bus() -> Iterator[None]:
     bus = build_test_bus()
     EventBus.set_default(bus)
     yield
