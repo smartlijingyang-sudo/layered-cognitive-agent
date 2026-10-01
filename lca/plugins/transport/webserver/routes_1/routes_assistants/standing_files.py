@@ -39,6 +39,15 @@ STANDING_FILES_WHITELIST: tuple[str, ...] = (
 )
 
 
+# filename -> ProfilePatch 字段名。SOUL/IDENTITY/USER 三文件经 catalog revise_profile
+# 落盘（USER 额外同步 user_store）；MEMORY.md 直接写盘，不进此表。
+_PROFILE_PATCH_FIELDS: dict[str, str] = {
+    "SOUL.md": "soul_md",
+    "IDENTITY.md": "identity_md",
+    "USER.md": "user_md",
+}
+
+
 def sha256_of_str(text: str) -> str:
     """Compute sha256 digest with ``sha256:`` prefix for optimistic concurrency control."""
     return f"sha256:{hashlib.sha256(text.encode('utf-8')).hexdigest()}"
@@ -91,21 +100,46 @@ def _resolve_assistant_id(request: Request, user_id: str, raw_id: str) -> str:
     return raw_id
 
 
-async def list_standing_files(request: Request) -> JSONResponse:
-    """``GET /v1/assistants/{assistant_id}/standing-files`` —— 查询 4 大常驻文件元数据与摘要。"""
+def _prelude(
+    request: Request, op: str, filename: str | None = None, verb: str = "accessed"
+) -> tuple[str, Any, str] | JSONResponse:
+    """三 handler 公共前置：鉴权 → 取 catalog → 解析 assistant_id → 白名单 → ownership。
+
+    成功返回 ``(user_id, catalog, assistant_id)``，失败返回已构造好的错误响应，
+    调用方用 ``isinstance(pre, tuple)`` 区分。错误顺序与原三处内联代码一致。
+    """
     user_id, auth_error = _user_from_request(request)
     if auth_error is not None:
         return auth_error
 
     catalog = _catalog_from_request(request)
     if catalog is None:
-        return _not_implemented("catalog_unavailable", "standing_files.list")
+        return _not_implemented("catalog_unavailable", f"standing_files.{op}")
 
     raw_id = str(request.path_params.get("assistant_id") or "")
     assistant_id = _resolve_assistant_id(request, user_id, raw_id)
+
+    if filename is not None and filename not in STANDING_FILES_WHITELIST:
+        return _error_envelope(
+            "disallowed_file",
+            status_code=400,
+            error_type="invalid_request",
+            detail=f"Only standing files {STANDING_FILES_WHITELIST} may be {verb}",
+        )
+
     ownership_error = _ownership_error(request, user_id, assistant_id)
     if ownership_error is not None:
         return ownership_error
+
+    return user_id, catalog, assistant_id
+
+
+async def list_standing_files(request: Request) -> JSONResponse:
+    """``GET /v1/assistants/{assistant_id}/standing-files`` —— 查询 4 大常驻文件元数据与摘要。"""
+    pre = _prelude(request, "list")
+    if not isinstance(pre, tuple):
+        return pre
+    _user_id, catalog, assistant_id = pre
 
     try:
         spec = catalog.get(assistant_id)
@@ -119,65 +153,42 @@ async def list_standing_files(request: Request) -> JSONResponse:
 
     for filename in STANDING_FILES_WHITELIST:
         file_path = home / filename
+        size_bytes, line_count = 0, 0
+        updated_at, summary = "", ""
+        content_hash = sha256_of_str("")
         if file_path.is_file():
             try:
                 stat = file_path.stat()
                 content = file_path.read_text(encoding="utf-8")
-                mtime_iso = datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat()
-                files_data.append(
-                    {
-                        "filename": filename,
-                        "path": str(file_path),
-                        "size_bytes": stat.st_size,
-                        "line_count": len(content.splitlines()),
-                        "updated_at": mtime_iso,
-                        "content_hash": sha256_of_str(content),
-                        "summary": _summarize(content),
-                    }
-                )
+                size_bytes = stat.st_size
+                line_count = len(content.splitlines())
+                updated_at = datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat()
+                content_hash = sha256_of_str(content)
+                summary = _summarize(content)
             except (OSError, UnicodeDecodeError):
                 continue
-        else:
-            files_data.append(
-                {
-                    "filename": filename,
-                    "path": str(file_path),
-                    "size_bytes": 0,
-                    "line_count": 0,
-                    "updated_at": "",
-                    "content_hash": sha256_of_str(""),
-                    "summary": "",
-                }
-            )
+        files_data.append(
+            {
+                "filename": filename,
+                "path": str(file_path),
+                "size_bytes": size_bytes,
+                "line_count": line_count,
+                "updated_at": updated_at,
+                "content_hash": content_hash,
+                "summary": summary,
+            }
+        )
 
     return _json({"assistant_id": assistant_id, "files": files_data}, status_code=200)
 
 
 async def get_standing_file(request: Request) -> JSONResponse:
     """``GET /v1/assistants/{assistant_id}/standing-files/{filename}`` —— 读取单个常驻文件内容。"""
-    user_id, auth_error = _user_from_request(request)
-    if auth_error is not None:
-        return auth_error
-
-    catalog = _catalog_from_request(request)
-    if catalog is None:
-        return _not_implemented("catalog_unavailable", "standing_files.get")
-
-    raw_id = str(request.path_params.get("assistant_id") or "")
-    assistant_id = _resolve_assistant_id(request, user_id, raw_id)
     filename = str(request.path_params.get("filename") or "")
-
-    if filename not in STANDING_FILES_WHITELIST:
-        return _error_envelope(
-            "disallowed_file",
-            status_code=400,
-            error_type="invalid_request",
-            detail=f"Only standing files {STANDING_FILES_WHITELIST} may be accessed",
-        )
-
-    ownership_error = _ownership_error(request, user_id, assistant_id)
-    if ownership_error is not None:
-        return ownership_error
+    pre = _prelude(request, "get", filename=filename, verb="accessed")
+    if not isinstance(pre, tuple):
+        return pre
+    _user_id, catalog, assistant_id = pre
 
     try:
         spec = catalog.get(assistant_id)
@@ -219,29 +230,11 @@ async def get_standing_file(request: Request) -> JSONResponse:
 
 async def update_standing_file(request: Request) -> JSONResponse:
     """``PUT /v1/assistants/{assistant_id}/standing-files/{filename}`` —— 更新单个常驻文件内容。"""
-    user_id, auth_error = _user_from_request(request)
-    if auth_error is not None:
-        return auth_error
-
-    catalog = _catalog_from_request(request)
-    if catalog is None:
-        return _not_implemented("catalog_unavailable", "standing_files.update")
-
-    raw_id = str(request.path_params.get("assistant_id") or "")
-    assistant_id = _resolve_assistant_id(request, user_id, raw_id)
     filename = str(request.path_params.get("filename") or "")
-
-    if filename not in STANDING_FILES_WHITELIST:
-        return _error_envelope(
-            "disallowed_file",
-            status_code=400,
-            error_type="invalid_request",
-            detail=f"Only standing files {STANDING_FILES_WHITELIST} may be updated",
-        )
-
-    ownership_error = _ownership_error(request, user_id, assistant_id)
-    if ownership_error is not None:
-        return ownership_error
+    pre = _prelude(request, "update", filename=filename, verb="updated")
+    if not isinstance(pre, tuple):
+        return pre
+    user_id, catalog, assistant_id = pre
 
     try:
         body = await request.json()
@@ -301,28 +294,20 @@ async def update_standing_file(request: Request) -> JSONResponse:
     # 2. 执行写盘与同步
     revision_seq = spec.revision_seq
     try:
-        if filename == "SOUL.md":
+        patch_field = _PROFILE_PATCH_FIELDS.get(filename)
+        if patch_field is not None:
             revision = catalog.revise_profile(
-                assistant_id, ProfilePatch(soul_md=new_content), actor=actor
+                assistant_id, ProfilePatch(**{patch_field: new_content}), actor=actor
             )
             revision_seq = revision.revision_seq
-        elif filename == "IDENTITY.md":
-            revision = catalog.revise_profile(
-                assistant_id, ProfilePatch(identity_md=new_content), actor=actor
-            )
-            revision_seq = revision.revision_seq
-        elif filename == "USER.md":
-            revision = catalog.revise_profile(
-                assistant_id, ProfilePatch(user_md=new_content), actor=actor
-            )
-            revision_seq = revision.revision_seq
-            # 同步更新 user_store
-            user_store = getattr(request.app.state, "user_store", None)
-            if user_store is None:
-                user_store = getattr(catalog, "_user_store", None)
-            if user_store is not None and user_id:
-                with contextlib.suppress(Exception):
-                    user_store.update_user_md(user_id, new_content)
+            if filename == "USER.md":
+                # 同步更新 user_store
+                user_store = getattr(request.app.state, "user_store", None)
+                if user_store is None:
+                    user_store = getattr(catalog, "_user_store", None)
+                if user_store is not None and user_id:
+                    with contextlib.suppress(Exception):
+                        user_store.update_user_md(user_id, new_content)
         elif filename == "MEMORY.md":
             # MEMORY.md 不进 catalog profile digest（I-A13），直接原子写盘
             file_path.write_text(new_content, encoding="utf-8")
