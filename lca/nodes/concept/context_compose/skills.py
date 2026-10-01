@@ -46,8 +46,12 @@ class ContextSkillsMergeExecutor:
 
     semantic_name: str = "context.skills.merge"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("manifest", "task", "state")
-    declared_outputs: tuple[PortName, ...] = ("context",)
+    declared_inputs: tuple[PortName, ...] = (
+        PortName("manifest"),
+        PortName("task"),
+        PortName("state"),
+    )
+    declared_outputs: tuple[PortName, ...] = (PortName("context"),)
 
     async def node_execute(
         self,
@@ -61,19 +65,19 @@ class ContextSkillsMergeExecutor:
         outputs 端口(yaml):context (ReasonerContext)
         """
         del context
-        manifest = input.port_values.get("manifest")
+        manifest = input.port_values.get(PortName("manifest"))
         if manifest is not None and not isinstance(manifest, ContextManifest):
             raise TypeError(
                 "context.skills.merge: 'manifest' port must be a "
                 f"ContextManifest instance or None, got {type(manifest).__name__}"
             )
-        task = input.port_values.get("task", "")
+        task = input.port_values.get(PortName("task"), "")
         if not isinstance(task, str):
             raise TypeError(
                 "context.skills.merge: 'task' port must be a str "
                 f"instance, got {type(task).__name__}"
             )
-        state = input.port_values.get("state")
+        state = input.port_values.get(PortName("state"))
         if state is not None and not isinstance(state, AgentState):
             raise TypeError(
                 "context.skills.merge: 'state' port must be an AgentState "
@@ -89,7 +93,7 @@ class ContextSkillsMergeExecutor:
             activated_skills=activated_skills,
             manifest=manifest,
         )
-        return NodeOutput(port_values={"context": reasoner_context})
+        return NodeOutput(port_values={PortName("context"): reasoner_context})
 
 
 @plugin(
