@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 import warnings
 
-from lca.application import default_context as dc
+from lca.application.api import default_context as dc
 
 
 def test_set_default_ctx_emits_deprecation_warning() -> None:
@@ -43,7 +43,7 @@ def test_module_load_emits_deprecation_notice() -> None:
 
 def test_set_default_ctx_is_not_exported_via_default_context_star() -> None:
     """Star-imports cannot accidentally bring ``set_default_ctx`` in."""
-    from lca.application import default_context as dc_module
+    from lca.application.api import default_context as dc_module
 
     exported = set(getattr(dc_module, "__all__", ()))
     assert "set_default_ctx" not in exported, (
