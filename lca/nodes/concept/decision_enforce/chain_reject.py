@@ -16,6 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 
 from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.enums.enums import ActionType
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.harness.composition.plugin_contract import (
@@ -46,8 +47,8 @@ class GateChainRejectExecutor:
 
     semantic_name: str = "gate.chain.reject"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("decision", "enforced_decision")
-    declared_outputs: tuple[PortName, ...] = ("decision", "routing")
+    declared_inputs: tuple[PortName, ...] = (PortName("decision"), PortName("enforced_decision"))
+    declared_outputs: tuple[PortName, ...] = (PortName("decision"), PortName("routing"))
 
     async def node_execute(
         self,
@@ -63,8 +64,8 @@ class GateChainRejectExecutor:
 
         _log = logging.getLogger(__name__)
         del context
-        candidate = input.port_values.get("decision")
-        enforced = input.port_values.get("enforced_decision")
+        candidate = input.port_values.get(PortName("decision"))
+        enforced = input.port_values.get(PortName("enforced_decision"))
         _log.info(
             "gate.chain.reject port_values_keys=%s candidate=%r",
             sorted(input.port_values.keys()),
@@ -94,8 +95,8 @@ class GateChainRejectExecutor:
         )
         return NodeOutput(
             port_values={
-                "decision": stamped,
-                "routing": RoutingDecision(action_type=stamped.action_type),
+                PortName("decision"): stamped,
+                PortName("routing"): RoutingDecision(action_type=ActionType(stamped.action_type)),
             }
         )
 
