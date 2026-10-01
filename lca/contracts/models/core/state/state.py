@@ -17,7 +17,9 @@ from lca.contracts.models.team.team.awareness import TeamAwareness
 
 if TYPE_CHECKING:
     from lca.contracts.models.cognition.task import TaskList
-    from lca.framework.graph.adapter import PhaseRunCursor
+    from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
+        PhaseRunCursor,
+    )
 
 
 @dataclass

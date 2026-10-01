@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from lca.infrastructure.observability.spine.event.record import Outcome
@@ -50,10 +50,14 @@ if TYPE_CHECKING:
     )
     from lca.contracts.protocols.act.effect.handler import EffectHandlerRegistry
     from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyStore
-    from lca.contracts.protocols.session.resume.input import ResumeInputAdapter
+    from lca.contracts.protocols.session.resume.input import (
+        ResumeInput,
+        ResumeInputAdapter,
+    )
     from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
     from lca.contracts.protocols.state.plan import CompiledRunPlan
     from lca.harness.declarative.lifecycle.phase_observation import PhaseObserver
+    from lca_kernel.events.session.session import SessionProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -195,7 +199,11 @@ class CognitiveRuntime(Runtime):
             session_reader = resolve_session_reader()
             run_writer: RunSessionWriter | None = None
             if session_reader is not None:
-                run_writer = RunSessionWriter(session=session_reader)
+                # Seam: resolve_session_reader deliberately exposes the read face
+                # (SPEC H); the bound value is always the full Session
+                # (resolve_raw_session isinstance-guaranteed), so the writer's
+                # SessionProtocol requirement holds.
+                run_writer = RunSessionWriter(session=cast("SessionProtocol", session_reader))
                 # Layer the per-run writer into the phase capabilities so
                 # think subgraph node executors (``history.derive``,
                 # ``llm.call``) can read it via ``context.runtime.writer``;
@@ -336,7 +344,9 @@ class CognitiveRuntime(Runtime):
                 if isinstance(payload, str):
                     stripped = payload.strip()
                     if stripped:
-                        RunSessionWriter(session=session_reader).append_user_message(
+                        RunSessionWriter(
+                            session=cast("SessionProtocol", session_reader)
+                        ).append_user_message(
                             message_id=f"human_answer:{obs.observation_id}",
                             role="human",
                             content=stripped,
@@ -397,7 +407,7 @@ class CognitiveRuntime(Runtime):
             resume_envelope=True,
         )
 
-    async def _capture_resume_memory(self, state: object, resume_input: object) -> None:
+    async def _capture_resume_memory(self, state: object, resume_input: ResumeInput) -> None:
         """补跑记忆捕获：人工回答 → LLM 蒸馏 → memory.update（ADR-0246 PR-8）。
 
         必须严格满足 fail-soft 原则：记忆提炼属于旁路增强，任何异常（如
