@@ -82,8 +82,8 @@ async def test_full_conversational_onboarding_e2e_lifecycle(tmp_path: Path) -> N
     # INV-05: Pending user receives exact 2-bubble scripted opening
     opening_bubbles = get_onboarding_opening_messages(user_state=alice_state)
     assert len(opening_bubbles) == 2
-    assert "个人 Agent" in opening_bubbles[0]
-    assert "怎么称呼你" in opening_bubbles[1]
+    assert "personal agent" in opening_bubbles[0]
+    assert "what’s your name" in opening_bubbles[1] or "what's your name" in opening_bubbles[1]
 
     # Create Alice's first assistant
     handle_1 = catalog.create(

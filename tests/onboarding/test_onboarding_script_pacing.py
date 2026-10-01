@@ -8,11 +8,18 @@ from lca.application.onboarding.script import (
 
 def test_onboarding_opening_new_user_two_bubbles():
     msgs = get_onboarding_opening_messages(user_state="pending")
-    # INV-05: Exactly 2 messages, deterministic wording
+    # INV-05: Exactly 2 messages, deterministic Muse English wording by default
     assert len(msgs) == 2
-    assert "个人 Agent" in msgs[0]
-    assert "接过去" in msgs[0]
-    assert "怎么称呼你" in msgs[1]
+    assert "personal agent" in msgs[0]
+    assert "take things off your plate" in msgs[0]
+    assert "what’s your name" in msgs[1] or "what's your name" in msgs[1]
+
+    # Locale zh delivers Chinese bubbles
+    msgs_zh = get_onboarding_opening_messages(user_state="pending", locale="zh-CN")
+    assert len(msgs_zh) == 2
+    assert "个人 Agent" in msgs_zh[0]
+    assert "接过去" in msgs_zh[0]
+    assert "怎么称呼你" in msgs_zh[1]
 
 
 def test_onboarding_opening_existing_user_greeting():

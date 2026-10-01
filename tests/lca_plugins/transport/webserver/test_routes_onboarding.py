@@ -40,7 +40,8 @@ async def test_onboarding_route_registers() -> None:
     await plugin.setup(ctx, None)
     assert "/v1/onboarding/presets" in router._exact
     assert "/v1/onboarding/welcome" in router._exact
-    assert len(ctx._fake_runtime.effects) == 2
+    assert "/v1/onboarding/naming/settle" in router._exact
+    assert len(ctx._fake_runtime.effects) == 3
 
 
 def test_onboarding_route_exposes_public_constant() -> None:
@@ -50,6 +51,7 @@ def test_onboarding_route_exposes_public_constant() -> None:
     assert {spec.path for spec in ROUTE_SPECS} == {
         "/v1/onboarding/presets",
         "/v1/onboarding/welcome",
+        "/v1/onboarding/naming/settle",
     }
 
 
@@ -146,6 +148,9 @@ class _FakeOwnership:
     def get_onboarding_state(self, user_id: str) -> str:
         return self.states.get(user_id, "pending")
 
+    def set_onboarding_state(self, user_id: str, state: str) -> None:
+        self.states[user_id] = state
+
     def get_user_md(self, user_id: str) -> str | None:
         return self.user_mds.get(user_id)
 
@@ -198,3 +203,40 @@ def test_onboarding_welcome_handler_pending_and_completed() -> None:
     assert len(data_completed["messages"]) == 1
     assert "李超" in data_completed["messages"][0]
     assert "星澜" in data_completed["messages"][0]
+
+
+@pytest.mark.asyncio
+async def test_onboarding_naming_settle_handler() -> None:
+    from starlette.applications import Starlette
+    from starlette.routing import Route
+    from starlette.testclient import TestClient
+
+    from lca.plugins.transport.webserver.router.router import RouteRegistry
+    from lca.plugins.transport.webserver.routes_1.routes_onboarding import (
+        onboarding_naming_settle,
+    )
+
+    app = Starlette()
+    router = RouteRegistry()
+    router.register_http(
+        Route("/v1/onboarding/naming/settle", onboarding_naming_settle, methods=["POST", "OPTIONS"])
+    )
+    router.install(app)
+
+    fake_store = _FakeOwnership()
+    fake_store.states["user_settle"] = "pending"
+    app.state.assistant_ownership = fake_store
+
+    client = TestClient(app)
+
+    resp = client.post(
+        "/v1/onboarding/naming/settle",
+        json={"assistant_id": "asst_demo", "name": "星澜", "vibe": "敏锐专注"},
+        headers={"x-lca-user-id": "user_settle", "Authorization": "Bearer lca-local"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is True
+    assert data["name"] == "星澜"
+    assert data["reaction"] == "🎉"
+    assert fake_store.states["user_settle"] == "completed"

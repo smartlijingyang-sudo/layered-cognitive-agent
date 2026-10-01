@@ -138,6 +138,7 @@ async def onboarding_welcome(request: Request) -> JSONResponse:
 
     assistant_name = str(request.query_params.get("assistant_name") or "小助")
     role_title = str(request.query_params.get("role_title") or "专属")
+    locale = str(request.query_params.get("locale") or request.headers.get("accept-language") or "en")
 
     from lca.application.onboarding.script import get_onboarding_opening_messages
 
@@ -146,6 +147,7 @@ async def onboarding_welcome(request: Request) -> JSONResponse:
         user_name=user_name,
         assistant_name=assistant_name,
         role_title=role_title,
+        locale=locale,
     )
 
     return _json(
@@ -160,9 +162,83 @@ async def onboarding_welcome(request: Request) -> JSONResponse:
     )
 
 
+def _catalog_from_request(request: Request) -> Any | None:
+    state = getattr(request, "app", None)
+    if state is None:
+        return None
+    state_obj = getattr(state, "state", None)
+    if state_obj is None:
+        return None
+    return getattr(state_obj, "assistant_catalog", None)
+
+
+async def onboarding_naming_settle(request: Request) -> JSONResponse:
+    """``POST /v1/onboarding/naming/settle`` —— 前端起名 Widget 确认命名并落盘。"""
+    expected_token, dev_mode = auth_config_of(request)
+    user_id, auth_error = user_id_from_request(
+        request, expected_token=expected_token, dev_mode=dev_mode
+    )
+    if auth_error is not None:
+        return auth_error
+
+    try:
+        body = await request.json()
+    except Exception:
+        return _error("invalid_json", status_code=400, code="invalid_request")
+
+    if not isinstance(body, dict):
+        return _error("body 必须是 JSON object", status_code=400, code="invalid_request")
+
+    assistant_id = str(body.get("assistant_id") or "").strip()
+    name = str(body.get("name") or "").strip()
+    vibe = str(body.get("vibe") or "").strip()
+
+    if not name:
+        return _error("name 必须为非空字符串", status_code=400, code="invalid_request")
+
+    # 1. 沉淀至 user_store 权威库：标记迎新已完成
+    user_store = _ownership_from_request(request)
+    if user_store is not None:
+        user_store.set_onboarding_state(user_id, "completed")
+
+    # 2. 同步至当前助理 Home（IDENTITY.md 与 profile.json）
+    catalog = _catalog_from_request(request)
+    if catalog is not None and assistant_id:
+        try:
+            from lca.contracts.protocols.assistant.catalog import ProfilePatch
+
+            identity_content = (
+                f"# IDENTITY.md - Assistant Identity\n\n"
+                f"- **Name:** {name}\n"
+                f"- **Vibe:** {vibe or '专属'}\n"
+            )
+            catalog.revise_profile(
+                assistant_id,
+                ProfilePatch(
+                    profile_name=name,
+                    identity_md=identity_content,
+                ),
+            )
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("failed to revise profile during naming settle: %s", exc)
+
+    return _json(
+        {
+            "ok": True,
+            "assistant_id": assistant_id,
+            "name": name,
+            "vibe": vibe,
+            "reaction": "🎉",
+        },
+        status_code=200,
+    )
+
+
 ROUTE_SPECS: tuple[RouteSpec, ...] = (
     RouteSpec("/v1/onboarding/presets", onboarding_presets, ("GET", "OPTIONS")),
     RouteSpec("/v1/onboarding/welcome", onboarding_welcome, ("GET", "OPTIONS")),
+    RouteSpec("/v1/onboarding/naming/settle", onboarding_naming_settle, ("POST", "OPTIONS")),
 )
 
 
