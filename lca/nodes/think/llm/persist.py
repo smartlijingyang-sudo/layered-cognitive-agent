@@ -34,6 +34,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginIdentity,
 )
 from lca.contracts.models.core.conversation.llm import LLMResponse
+from lca.contracts.models.session.call_id import CallId
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -57,8 +58,8 @@ class LlmPersistExecutor:
     region: str = "think"
     # Runtime-carrier reads for ``state`` + ``writer``; the rest of the
     # think subgraph uses the same pattern.
-    declared_inputs: tuple[PortName, ...] = ("llm_response",)
-    declared_outputs: tuple[PortName, ...] = ("journaled",)
+    declared_inputs: tuple[PortName, ...] = (PortName("llm_response"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("journaled"),)
 
     async def node_execute(
         self,
@@ -74,10 +75,10 @@ class LlmPersistExecutor:
         """
         state = _resolve_state(context=context)
         writer = _resolve_writer(context=context)
-        response = _resolve_port("llm_response", input=input)
+        response = _resolve_port(PortName("llm_response"), input=input)
         step = int(getattr(state, "step", 0) or 0)
         _persist_assistant(writer=writer, response=response, step=step)
-        return NodeOutput(port_values={"journaled": True})
+        return NodeOutput(port_values={PortName("journaled"): True})
 
 
 def _persist_assistant(
@@ -116,13 +117,13 @@ def _persist_assistant(
         writer.append_tool_call(
             turn=step,
             step=step,
-            call_id=tc.call_id,
+            call_id=CallId(tc.call_id),
             name=tc.name,
             arguments=str(tc.arguments),
         )
 
 
-def _resolve_port(name: str, *, input: NodeInput) -> Any:
+def _resolve_port(name: PortName, *, input: NodeInput) -> Any:
     """Read a typed port from ``input.port_values``."""
     value = input.port_values.get(name)
     if value is None:
