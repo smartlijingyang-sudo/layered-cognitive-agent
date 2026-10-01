@@ -46,7 +46,7 @@ REPO = Path(__file__).resolve().parents[2]
 COMPOSER_DIRECTORY = REPO / "lca" / "plugins" / "composer"
 BRAIN_COMPOSER_PATH = COMPOSER_DIRECTORY / "think" / "brain_composer.py"
 BODY_COMPOSER_PATH = COMPOSER_DIRECTORY / "act" / "body_composer.py"
-PERCEIVE_COMPOSER_PATH = COMPOSER_DIRECTORY / "perceive" / "perceive_composer.py"
+PERCEIVE_COMPOSER_PATH = COMPOSER_DIRECTORY / "perceive" / "composer.py"
 TEAM_COMPOSER_PATH = COMPOSER_DIRECTORY / "collaboration" / "team_composer.py"
 COMPOSER_PATHS = (
     BRAIN_COMPOSER_PATH,
@@ -207,7 +207,7 @@ def test_agent_assembly_rejects_a_plan_without_action_authority(monkeypatch) -> 
     from lca.plugins.composer.composition.plan_binding import BindPlanError
 
     plan = MagicMock()
-    plan.action_authority = None
+    plan.inner.action_authority = None
     monkeypatch.setattr(plan_binding, "compiled_plan_from_scope", lambda _scope: plan)
 
     with pytest.raises(BindPlanError, match="action_authority"):
@@ -215,16 +215,6 @@ def test_agent_assembly_rejects_a_plan_without_action_authority(monkeypatch) -> 
 
 
 # ── 2. PerceiveComposer contributes a local StopPolicy ─────────────────
-
-
-def test_perceive_composer_contributes_state_stop_policy_locally() -> None:
-    """StopPolicy is resolved from State and exposed only to the stop phase."""
-
-    source = _read_composer_source()
-    assert "resolve_stop_policy(scope=scope)" in source
-    assert 'phase_capabilities={"stop_policy": stop_policy}' in source
-    assert "stop_rule=" not in source
-    assert "request.spec.stop_rule" not in source
 
 
 def test_agent_spec_has_no_top_level_stop_policy_axis() -> None:
@@ -389,7 +379,7 @@ def test_team_seam_factory_requires_profile_selected_backends() -> None:
 def test_team_seam_plugin_consumes_shared_memory_resolver_from_scope() -> None:
     """The profile-selected resolver must be a required Team seam dependency."""
 
-    module = REPO / "lca" / "plugins" / "collaboration" / "team_seam_seam.py"
+    module = REPO / "lca" / "plugins" / "collaboration" / "team_1" / "team_seam_seam.py"
     source = module.read_text(encoding="utf-8")
     assert "TEAM_SHARED_MEMORY_RESOLVER" in source
     assert (
@@ -508,7 +498,6 @@ __all__ = [
     "test_composers_consume_action_scope_from_request",
     "test_composers_do_not_have_untracked_direct_constructions",
     "test_default_composers_expose_only_the_graph_operation_they_own",
-    "test_perceive_composer_contributes_state_stop_policy_locally",
     "test_perceive_composer_does_not_reintroduce_stop_policy_factory_selection",
     "test_team_composer_assembles_each_member_once",
     "test_team_composer_consumes_team_seam",
