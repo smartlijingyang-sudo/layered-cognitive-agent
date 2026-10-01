@@ -35,8 +35,11 @@ if TYPE_CHECKING:
 _log = logging.getLogger(__name__)
 
 
-def _snapshot_attrs(cursor: Any) -> tuple[str, int, int] | None:
-    """Read ``(run_id, step_index, incarnation)`` from cursor snapshot。
+def _snapshot_attrs(cursor: Any) -> tuple[str, int] | None:
+    """Read ``(run_id, incarnation)`` from cursor snapshot。
+
+    step 身份由 :class:`ModelVisibleHook` 内部派生 + 锁定(本地计数器 SSOT),
+    不再要求 cursor snapshot 暴露 ``step_index``(ADR-0169 I-CURSOR-2 已移除)。
 
     cursor 缺席 / 已 dispose / 无 ``snapshot`` 属性 → 返回 ``None``;调用方按
     「透明降级」处理(hook 内部亦走同语义)。
@@ -48,15 +51,10 @@ def _snapshot_attrs(cursor: Any) -> tuple[str, int, int] | None:
     except Exception:
         return None
     run_id = getattr(snap, "run_id", None)
-    step_index = getattr(snap, "step_index", None)
     incarnation = getattr(snap, "incarnation", None)
-    if (
-        not isinstance(run_id, str)
-        or not isinstance(step_index, int)
-        or not isinstance(incarnation, int)
-    ):
+    if not isinstance(run_id, str) or not isinstance(incarnation, int):
         return None
-    return run_id, step_index, incarnation
+    return run_id, incarnation
 
 
 def _model_identity(kwargs: dict[str, Any]) -> tuple[str, str]:
@@ -254,7 +252,7 @@ class ModelVisibleHookAdapter(LLMAdapter):
         attrs = _snapshot_attrs(cursor)
         system_text = self._system_text_from_prompt(reasoner_prompt)
         if attrs is not None:
-            run_id, _step_index, incarnation = attrs
+            run_id, incarnation = attrs
             try:
                 _emit_lifecycle_pre(self._hook, kwargs)
                 self._hook.capture_pre_llm(
@@ -281,11 +279,10 @@ class ModelVisibleHookAdapter(LLMAdapter):
                     _log.debug("model_visible_fail_model_failed: %s", fail_exc)
             raise
         if attrs is not None:
-            run_id, step_index, incarnation = attrs
+            run_id, incarnation = attrs
             try:
                 self._hook.capture_post_llm(
                     run_id=run_id,
-                    step_index=step_index,
                     incarnation=incarnation,
                     response=response,
                 )
@@ -300,7 +297,7 @@ class ModelVisibleHookAdapter(LLMAdapter):
         attrs = _snapshot_attrs(cursor)
         system_text = self._system_text_from_prompt(reasoner_prompt)
         if attrs is not None:
-            run_id, _step_index, incarnation = attrs
+            run_id, incarnation = attrs
             try:
                 _emit_lifecycle_pre(self._hook, kwargs)
                 self._hook.capture_pre_llm(
@@ -327,11 +324,10 @@ class ModelVisibleHookAdapter(LLMAdapter):
                     and event.response is not None
                 ):
                     if attrs is not None:
-                        run_id, step_index, incarnation = attrs
+                        run_id, incarnation = attrs
                         try:
                             self._hook.capture_post_llm(
                                 run_id=run_id,
-                                step_index=step_index,
                                 incarnation=incarnation,
                                 response=event.response,
                             )

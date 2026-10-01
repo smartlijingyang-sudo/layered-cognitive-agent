@@ -18,15 +18,30 @@ from typing import Any, ClassVar
 
 import pytest
 
+from lca.plugins.session.runtime.bus.facade import as_bus_facade
 from lca_kernel.events.bus.bus import EventBus
 
 # ── fixtures ────────────────────────────────────────────────────────────
-# bus / bound_session 来自上层 conftest:publish 走绑定 Session 路径
-# (ADR-0186 fail-loud),EventBus.set_default / 复位由 bound_session 统一承担。
+# bound_session 来自上层 conftest:publish 走绑定 Session 路径(ADR-0186 fail-loud)。
+# hook 构造的 bus 形参沿用生产惯用法 EventBus.default()(与 EnvelopeBus.default()
+# 同一单例,仅作鉴权 registry 载体);_CapturingSession 委托走 as_bus_facade append。
 
 
 @pytest.fixture
-def hook(bound_session: Any) -> Any:
+def hook(bound_session: Any, bus: Any) -> Any:
+    """单实例 ModelVisibleHook + state state。
+
+    bus 形参来自上层 conftest 的测试 catalog bus;本 fixture 将其
+    set_default(鉴权走 EventBus.default().registry),teardown 时复位单例。
+    """
+    EventBus.set_default(bus)
+    try:
+        yield _build_hook_fixture(bus)
+    finally:
+        EventBus.reset_singleton()
+
+
+def _build_hook_fixture(bus: Any) -> Any:
     """单实例 :class:`ModelVisibleHook` + state state (cursor / prompt 显式传入)。
 
     spec section H: hook 构造不再接 ``cursor_provider`` / ``prompt_ctx_getter``
@@ -63,7 +78,7 @@ def hook(bound_session: Any) -> Any:
             self._snapshot.step_index += 1
             self._snapshot.step_id = step_id
 
-    h = ModelVisibleHook(bus=bound_session.bus)
+    h = ModelVisibleHook(bus=bus)
 
     def make_prompt(template_id: str, text: str) -> Any:
         return CurrentReasonerPrompt(
@@ -143,7 +158,6 @@ def test_capture_pre_llm_initial_then_change(hook: Any) -> None:
 
     ref1 = hook.hook.capture_pre_llm(
         run_id="run-1",
-        step_index=0,
         incarnation=1,
         kwargs={"tools": [], "messages": []},
         system_prompt_text=hook.state["prompt"].system_prompt_text,
@@ -155,7 +169,6 @@ def test_capture_pre_llm_initial_then_change(hook: Any) -> None:
     hook.state["prompt"] = hook.make_prompt("t1", "second")
     ref2 = hook.hook.capture_pre_llm(
         run_id="run-1",
-        step_index=0,
         incarnation=1,
         kwargs={"tools": [], "messages": []},
         system_prompt_text=hook.state["prompt"].system_prompt_text,
@@ -172,7 +185,6 @@ def test_capture_pre_llm_fold_skips_repeat(hook: Any) -> None:
     kwargs: dict[str, Any] = {"tools": [], "messages": []}
     ref1 = hook.hook.capture_pre_llm(
         run_id="run-1",
-        step_index=0,
         incarnation=1,
         kwargs=kwargs,
         system_prompt_text=hook.state["prompt"].system_prompt_text,
@@ -181,7 +193,6 @@ def test_capture_pre_llm_fold_skips_repeat(hook: Any) -> None:
 
     ref2 = hook.hook.capture_pre_llm(
         run_id="run-1",
-        step_index=0,
         incarnation=1,
         kwargs=kwargs,
         system_prompt_text=hook.state["prompt"].system_prompt_text,
@@ -190,90 +201,80 @@ def test_capture_pre_llm_fold_skips_repeat(hook: Any) -> None:
 
 
 def test_capture_pre_llm_advances_cursor_step(hook: Any) -> None:
-    """回归锁(缺口 B,run_a7ead118420b):capture_pre_llm 经 open_step 推进 cursor。
+    """回归锁(缺口 B,run_a7ead118420b):capture_pre_llm 推进 step 计数。
 
-    修复前 hook 路径不调 cursor 的 L6 自增(record_request_header 被
-    EventBus publish 取代后丢失),cursor.step_index 恒 0:所有 header
-    的 step_id=step-001,foldRequestHeader 只覆盖 step-001;
-    ``step.*.record`` payload.step_index=0 挂不上 fold 帧 →
-    journal.tool_total=0(H-xref)。
+    spec H 之后 step 边界由 hook 本地计数器唯一驱动(cursor 不再参与
+    step 计数,见 hook docstring);本测试锁定原意图——连续两次不同
+    header 的请求 step_id 递增(step-001/step-002),不堆积在一步。
+    (原 cursor.open_step / snapshot.step_index 断言随架构移除。)
     """
-    from lca.contracts.observability.core.incarnation import Incarnation
-    from lca.infrastructure.observability.loop_cursor import InMemoryLoopCursor
-
-    cursor = InMemoryLoopCursor(
-        run_id="run-adv",
-        trace_id="t-adv",
-        incarnation=Incarnation(run_id="run-adv", plan_ref="p", incarnation_seq=1),
-    )
-    hook.state["cursor"] = cursor
     hook.state["prompt"] = hook.make_prompt("t1", "sys-a")
 
     ref1 = hook.hook.capture_pre_llm(
         run_id="run-adv",
-        step_index=0,
         incarnation=1,
         kwargs={"tools": [], "messages": []},
         system_prompt_text=hook.state["prompt"].system_prompt_text,
     )
     assert ref1 is not None
-    assert cursor.snapshot.step_index == 1
-    assert cursor.snapshot.step_id == "step-001"
+    assert hook.hook._step_counter == 1
+    assert hook.hook._last_step_id["run-adv"] == "step-001"
 
-    # 第二次 LLM 请求:adapter 读到新 snapshot(step_index=1)→ step-002
+    # 第二次 LLM 请求(header 变化)→ 新开 step-002
     hook.state["prompt"] = hook.make_prompt("t1", "sys-b")
     ref2 = hook.hook.capture_pre_llm(
         run_id="run-adv",
-        step_index=cursor.snapshot.step_index,
         incarnation=1,
         kwargs={"tools": [], "messages": []},
         system_prompt_text=hook.state["prompt"].system_prompt_text,
     )
     assert ref2 is not None
-    assert cursor.snapshot.step_index == 2
-    assert cursor.snapshot.step_id == "step-002"
+    assert hook.hook._step_counter == 2
+    assert hook.hook._last_step_id["run-adv"] == "step-002"
 
 
 def test_capture_pre_llm_fold_skip_does_not_advance_cursor(hook: Any) -> None:
-    """fold 命中(同 step 重试,同 header)→ 跳过 publish 也不推进步。"""
-    hook.state["cursor"] = hook.StubCursor("run-skip")
+    """fold 命中(同 step 重试,同 header)→ 跳过 publish 也不推进步。
+
+    spec H 之后 step 计数器在 hook 本地;fold 跳过分支计数器不增
+    (原 cursor.opened_steps 断言随架构移除,意图由计数器断言继承)。
+    """
     hook.state["prompt"] = hook.make_prompt("t1", "stable")
 
     kwargs: dict[str, Any] = {"tools": [], "messages": []}
     ref1 = hook.hook.capture_pre_llm(
         run_id="run-skip",
-        step_index=0,
         incarnation=1,
         kwargs=kwargs,
         system_prompt_text=hook.state["prompt"].system_prompt_text,
     )
     assert ref1 is not None
-    assert hook.state["cursor"].opened_steps == ["step-001"]
+    assert hook.hook._step_counter == 1
 
     ref2 = hook.hook.capture_pre_llm(
         run_id="run-skip",
-        step_index=0,
         incarnation=1,
         kwargs=kwargs,
         system_prompt_text=hook.state["prompt"].system_prompt_text,
     )
     assert ref2 is None, "同 header 同 step 应 fold 跳过"
-    assert hook.state["cursor"].opened_steps == ["step-001"], "fold 跳过不得新开步"
+    assert hook.hook._step_counter == 1, "fold 跳过不得新开步"
 
 
-def test_capture_pre_llm_transparent_when_prompt_missing(hook: Any) -> None:
-    """prompt 未注入 → 透明降级,不发盘,不抛错。
+def test_capture_pre_llm_publishes_when_prompt_missing(hook: Any) -> None:
+    """prompt 缺席(``None``)→ 仍 publish(空 system 归一为 absent),不抛错。
 
-    spec section H: hook 现在收 ``system_prompt_text`` 显式 kwarg;
-    ``None`` 仍 publish(空 system 归一为 absent)。
+    spec section H: hook 收 ``system_prompt_text`` 显式 kwarg;
+    ``None`` 仍 publish。原名 transparent_when_prompt_missing 的断言
+    (``ref is None``)与本 docstring 记载的 spec-H 行为矛盾,已按文档对齐。
     """
-    hook.state["cursor"] = hook.StubCursor("run-1")
     hook.state["prompt"] = None
 
     ref = hook.hook.capture_pre_llm(
-        run_id="run-1", step_index=0, incarnation=1, kwargs={}, system_prompt_text=None
+        run_id="run-1", incarnation=1, kwargs={}, system_prompt_text=None
     )
-    assert ref is None
+    assert ref is not None
+    assert ref.category == "spine.llm.request.header"
 
 
 def test_capture_pre_llm_transparent_when_cursor_missing(hook: Any) -> None:
@@ -284,7 +285,6 @@ def test_capture_pre_llm_transparent_when_cursor_missing(hook: Any) -> None:
     # capture_pre_llm 不要求 cursor(由 caller 注入 run_id);prompt 齐全即发
     ref = hook.hook.capture_pre_llm(
         run_id="run-1",
-        step_index=0,
         incarnation=1,
         kwargs={},
         system_prompt_text=hook.state["prompt"].system_prompt_text,
@@ -330,7 +330,7 @@ def test_capture_pre_llm_narrows_tool_objects(hook: Any, bound_session: Any) -> 
 
         def append(self, payload: Any, *, producer: Any = None) -> Any:
             captured.append(payload)
-            return bound_session.bus.publish(payload, producer=producer)
+            return as_bus_facade(bound_session).append(payload, producer=producer)
 
     hook.state["cursor"] = hook.StubCursor("run-narrow")
     hook.state["prompt"] = hook.make_prompt("t1", "sys")
@@ -339,7 +339,6 @@ def test_capture_pre_llm_narrows_tool_objects(hook: Any, bound_session: Any) -> 
     try:
         ref = hook.hook.capture_pre_llm(
             run_id="run-narrow",
-            step_index=0,
             incarnation=1,
             kwargs={"tools": [_Tool()], "messages": []},
             system_prompt_text=hook.state["prompt"].system_prompt_text,
@@ -373,7 +372,6 @@ def test_capture_pre_llm_construction_failure_is_transparent(hook: Any) -> None:
 
     ref = hook.hook.capture_pre_llm(
         run_id="run-bad",
-        step_index=0,
         incarnation=1,
         kwargs={"tools": [], "messages": [], "manifest": object()},
         system_prompt_text=hook.state["prompt"].system_prompt_text,
@@ -384,7 +382,7 @@ def test_capture_pre_llm_construction_failure_is_transparent(hook: Any) -> None:
 # ── 盖章 3: assistant payload + digest 关联 ─────────────────────────────
 
 
-def test_capture_post_llm_emits_assistant_payload(hook: Any) -> None:
+def test_capture_post_llm_emits_assistant_payload(hook: Any, bound_session: Any) -> None:
     """capture_post_llm 发 ``spine.llm.request.header.assistant`` + header_digest。"""
     from lca.plugins.events.publishers.model_visible.publisher import (
         ModelVisiblePublisher,
@@ -395,7 +393,6 @@ def test_capture_post_llm_emits_assistant_payload(hook: Any) -> None:
 
     hook.hook.capture_pre_llm(
         run_id="run-2",
-        step_index=0,
         incarnation=1,
         kwargs={"tools": [], "messages": []},
         system_prompt_text=hook.state["prompt"].system_prompt_text,
@@ -407,13 +404,11 @@ def test_capture_post_llm_emits_assistant_payload(hook: Any) -> None:
         finish_reason: ClassVar[str] = "stop"
         usage: ClassVar[dict[str, int]] = {"prompt_tokens": 5, "completion_tokens": 3}
 
-    # publish 后 EventBus 应有 self-observers 等 fanout 行为,但本测试只关心
-    # 抛错与否 + 返回 ref + category。bus 不挂 sink,published 计数仍涨。
-    pre_count = bus_count_published(hook.hook._bus)
-    ref = hook.hook.capture_post_llm(
-        run_id="run-2", step_index=0, incarnation=1, response=_StubResponse()
-    )
-    post_count = bus_count_published(hook.hook._bus)
+    # publish 走 publish_via_session → Session.append(ADR-0186),不经 bus。
+    # 本测试只关心抛错与否 + 返回 ref + category + session 落盘计数涨 1。
+    pre_count = bound_session.event_count
+    ref = hook.hook.capture_post_llm(run_id="run-2", incarnation=1, response=_StubResponse())
+    post_count = bound_session.event_count
 
     assert ref is not None
     assert ref.category == "spine.llm.request.header.assistant"
@@ -449,7 +444,7 @@ def test_capture_post_llm_reads_llmresponse_text_field(hook: Any, monkeypatch: A
         finish_reason="stop",
         tool_calls=[],
     )
-    hook.hook.capture_post_llm(run_id="run-text", step_index=0, incarnation=1, response=response)
+    hook.hook.capture_post_llm(run_id="run-text", incarnation=1, response=response)
 
     payload = captured.get("payload")
     assert payload is not None
@@ -465,20 +460,18 @@ def test_capture_post_llm_without_prior_header(hook: Any) -> None:
         finish_reason: ClassVar[str] = "stop"
         usage: ClassVar[dict[str, int]] = {}
 
-    ref = hook.hook.capture_post_llm(
-        run_id="run-orphan", step_index=2, incarnation=1, response=_StubResponse()
-    )
+    ref = hook.hook.capture_post_llm(run_id="run-orphan", incarnation=1, response=_StubResponse())
     assert ref is not None
     assert ref.category == "spine.llm.request.header.assistant"
 
 
-def test_adapter_pre_post_share_step_identity_after_open_step(bound_session: Any) -> None:
-    """回归锁(缺口 B):open_step 推进 cursor 后,pre/post 仍配对同一 step。
+def test_adapter_pre_post_share_step_identity(bound_session: Any, bus: Any) -> None:
+    """回归锁(缺口 B):pre/post 配对同一 step。
 
-    修复前 adapter 在 await 内层 LLM 之后重读 cursor snapshot;
-    capture_pre_llm 已推进 step → post 拿到新 step_index,assistant
-    payload 错挂到下一步(无对应 header)。修复后同一次调用共用入站
-    快照,header 与 assistant 的 step_id 一致。
+    step 身份由 hook 内部派生 + 锁定(本地计数器 SSOT);同一次 adapter
+    调用内 pre publish 的 step 即 post 挂载的 step,header 与 assistant
+    的 step_id 一致。(原 open_step / cursor.snapshot.step_index 机制
+    已随 spec H 移除,断言改为 hook 计数器 + payload step_id。)
     """
     import asyncio
 
@@ -506,11 +499,8 @@ def test_adapter_pre_post_share_step_identity_after_open_step(bound_session: Any
         selector_decision_path="default",
         system_prompt_text="sys",
     )
-    hook = ModelVisibleHook(
-        bus=bound_session.bus,
-        cursor_provider=lambda: cursor,
-        prompt_ctx_getter=lambda: prompt,
-    )
+    EventBus.set_default(bus)
+    hook = ModelVisibleHook(bus=bus)
 
     class _Inner:
         async def complete(self, prompt_text: str, **kwargs: Any) -> LLMResponse:
@@ -526,12 +516,13 @@ def test_adapter_pre_post_share_step_identity_after_open_step(bound_session: Any
     class _CapturingSession:
         def append(self, payload: Any, *, producer: Any = None) -> Any:
             captured.append(payload)
-            return bound_session.bus.publish(payload, producer=producer)
+            return as_bus_facade(bound_session).append(payload, producer=producer)
 
     token = set_publish_session(_CapturingSession())
     try:
-        response = asyncio.run(adapter.complete("hello"))
+        response = asyncio.run(adapter.complete("hello", cursor=cursor, reasoner_prompt=prompt))
     finally:
+        EventBus.reset_singleton()
         reset_publish_session(token)
 
     assert response.text == "done"
@@ -541,8 +532,7 @@ def test_adapter_pre_post_share_step_identity_after_open_step(bound_session: Any
     assert len(assistants) == 1
     assert headers[0].step_id == "step-001"
     assert assistants[0].step_id == "step-001", "post 必须与 pre 同 step"
-    assert cursor.snapshot.step_index == 1
-    assert cursor.snapshot.step_id == "step-001"
+    assert hook._step_counter == 1, "一次 LLM 调用只开一个 step"
 
 
 # ── 盖章 4: setup() 装配 marker + hook(不依赖真实 Cordis) ──────────────
@@ -615,6 +605,8 @@ def test_plugin_decorator_metadata() -> None:
 
 
 def bus_count_published(bus: EventBus[Any]) -> int:
-    """读 EventBus.delivery_snapshot 的 published 总和(0 sink 时仍计数)。"""
+    """LEGACY:publish 已改走 Session.append,本 helper 不再被任何测试使用。
+    保留仅作历史参照。
+    """
     snap = bus.delivery_snapshot()
     return sum(c.get("published", 0) for c in snap.values())

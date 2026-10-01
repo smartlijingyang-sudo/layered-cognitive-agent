@@ -164,6 +164,8 @@ class ModelVisibleHook:
         # step 边界单源(SSOT):本地计数器,每次 capture_pre_llm publish
         # 成功 +1;cursor 不参与 step 计数(只持 phase)。
         self._step_counter: int = 0
+        # per-run 最近一次 publish 的 step_id;post 侧挂载用(pre/post 同 step)。
+        self._last_step_id: dict[str, str] = {}
 
     # ── 状态管理 ────────────────────────────────────────────────────
 
@@ -179,6 +181,7 @@ class ModelVisibleHook:
         """run 收口时清缓存;cursor.close 后调,避免 dict 长期增长。"""
         self._last_headers = {k: v for k, v in self._last_headers.items() if k[0] != run_id}
         self._resume_run_step = {k for k in self._resume_run_step if k[0] != run_id}
+        self._last_step_id.pop(run_id, None)
 
     # ── PreDispatchHook 形状(ADR-0185 §3.2)─────────────────────────
 
@@ -234,13 +237,12 @@ class ModelVisibleHook:
 
         - fold 命中(headerEquals(prev, current) 且非 resume)→ 跳过,返回 ``None``。
         - payload 构造 / publish 抛错 → 吞错 + log(warning),返回 ``None``(L10)。
-        - publish 成功 → ``self._step_counter`` 自增(纯内存);fold 跳过
-          分支不增(同 step 重试 attempt,不新开步)。
+        - fold 检查通过并 publish 成功 → ``self._step_counter`` 自增(纯内存);
+          fold 跳过分支不增(同 step 重试 attempt,不新开步)。
+        - fold 比对锚点为该 run 上次 publish 的 header(``_step_id_for`` 当前
+          计数器对应的 step),而非本次待派生的新 step。
         """
         system_text = system_prompt_text or ""
-
-        self._step_counter += 1
-        step_id = _step_id_for(self._step_counter)
 
         current = EpochHeader(
             config=kwargs.get("config"),
@@ -249,9 +251,17 @@ class ModelVisibleHook:
         )
         current = canonicalHeader(current)
 
-        key = (run_id, step_id)
-        previous = self._last_headers.get(key)
+        # fold 比对锚点:该 run 上次 publish 的 header。计数器在 fold 检查
+        # 之后、publish 路径上才 +1 —— fold 跳过不新开步(方法 docstring 语义)。
+        # 此前先 +1 导致 key 恒为新 step,fold 分支不可达。
+        fold_key = (run_id, _step_id_for(self._step_counter))
+        previous = self._last_headers.get(fold_key)
         previous_digest = _canonical_digest(previous) if previous is not None else None
+
+        # 本次待 publish 的 step(resume 标记比对 + payload 用)。计数器在
+        # publish 成功后才真正 +1(失败/吞错不推进,不烧 step 号)。
+        step_id = _step_id_for(self._step_counter + 1)
+        key = (run_id, step_id)
 
         is_resume = key in self._resume_run_step
         if is_resume:
@@ -259,7 +269,7 @@ class ModelVisibleHook:
         elif previous is None:
             reason = "initial"
         elif headerEquals(previous, current):
-            return None  # fold 优化:同 header 不发
+            return None  # fold 优化:同 header 不发,不推进计数器
         else:
             reason = "change"
 
@@ -295,9 +305,10 @@ class ModelVisibleHook:
             _log.warning("model_visible_pre_publish_failed: %s", exc)
             return None
 
-        # step_id 已写入 payload(self._step_counter 在 publish 前 +1,
-        # 见上);hook 是 step 边界单源,无下游推进动作。
+        # hook 是 step 边界单源,无下游推进动作。仅 publish 成功才推进计数器。
+        self._step_counter += 1
         self._last_headers[key] = current
+        self._last_step_id[run_id] = step_id
         # resume 一次性标记:publish 后清除(下次 capture_pre_llm 走 change/initial)
         self._resume_run_step.discard(key)
         return ref
@@ -306,7 +317,6 @@ class ModelVisibleHook:
         self,
         *,
         run_id: str,
-        step_index: int,
         incarnation: int,
         response: Any,
     ) -> EventRef | None:
@@ -314,8 +324,10 @@ class ModelVisibleHook:
 
         Args:
             run_id: 透传到 payload 的 run 标识。
-            step_index: cursor.snapshot.step_index;step_id = ``f"step-{step_index + 1:03d}"``。
             incarnation: cursor.snapshot.incarnation。
+            step 身份:由本 hook 在 pre 侧派生并锁定(``_last_step_id[run_id]``),
+            post 挂到同 run 最近一次 publish 的 step,保证与 pre 同 step。
+            (cursor.snapshot 已不再暴露 step_index,见 ADR-0169 I-CURSOR-2。)
             response: LLM 响应对象;读取 ``content`` / ``tool_calls`` /
                 ``finish_reason`` / ``usage`` 属性。形态不匹配 → 字段取空值
                 (``""`` / ``()`` / ``{}``),仍 publish(降级而非跳过,便于
@@ -326,15 +338,21 @@ class ModelVisibleHook:
 
         失败语义:
 
-        - 对应 (run_id, step_id) 无最近 header → 仍 publish,header_digest
-          = 空字符串(对齐 ADR-0185 §3.3 ``header_digest`` 必填语义;
+        - 该 run 无最近 header(``_last_step_id`` 缺失)→ 仍 publish,
+          header_digest = 空字符串(对齐 ADR-0185 §3.3 ``header_digest`` 必填语义;
           空 = 未关联 request header)。
         - 任一 publish 抛错 → 吞错 + log(L10)。
         """
-        step_id = _step_id_for(step_index + 1)
-        key = (run_id, step_id)
-        previous = self._last_headers.get(key)
-        digest = _canonical_digest(previous) if previous is not None else ""
+        step_id = self._last_step_id.get(run_id)
+        if step_id is None:
+            # 异常路径:该 run 此前无 pre publish(pre 抛错被吞或未调)——仍
+            # publish,header_digest 为空(ADR-0185 §3.3 必填语义)。
+            step_id = _step_id_for(self._step_counter)
+            digest = ""
+        else:
+            key = (run_id, step_id)
+            previous = self._last_headers.get(key)
+            digest = _canonical_digest(previous) if previous is not None else ""
 
         # LLMResponse 契约字段是 ``text``(lca/contracts/models/core/llm.py);
         # 旧实现读 ``.content`` 恒为空 → 模型输出文本全丢。优先 ``.text``,
