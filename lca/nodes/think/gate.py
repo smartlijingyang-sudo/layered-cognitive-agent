@@ -50,8 +50,8 @@ class ThinkGateExecutor:
     region: str = "think"
     # ADR-0219 §5.5: typed port contract declared on the plugin (graph
     # layer does not know port names; it only knows topology).
-    declared_inputs: tuple[PortName, ...] = ("decision",)
-    declared_outputs: tuple[PortName, ...] = ("decision",)
+    declared_inputs: tuple[PortName, ...] = (PortName("decision"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("decision"),)
 
     async def node_execute(
         self,
@@ -64,10 +64,10 @@ class ThinkGateExecutor:
         语义:gate 是 decision 的 transformer,enforce 之后仍是 decision。
         """
         runtime = context.runtime
-        state = runtime.state
+        state = getattr(runtime, "state", None)
         brain = getattr(runtime, "brain", None)
         gate = getattr(brain, "decision_gate", None) if brain is not None else None
-        decision = input.port_values.get("decision")
+        decision = input.port_values.get(PortName("decision"))
 
         if decision is None:
             return NodeOutput(port_values={})
@@ -75,7 +75,7 @@ class ThinkGateExecutor:
         if state is not None and isinstance(gate, DecisionGate):
             decision = await gate.enforce(state, decision)
 
-        return NodeOutput(port_values={"decision": decision})
+        return NodeOutput(port_values={PortName("decision"): decision})
 
 
 @plugin(
