@@ -118,7 +118,7 @@ def _forked_to_tools_deferred(
     session = current_defer_session()
     if session is None:
         return _forked_to_tools(forked), ""
-    if not isinstance(forked, ForkedTools) or not forked.items:
+    if not isinstance(forked, ForkedTools):
         return (), ""
     return session.render_turn()
 

@@ -59,12 +59,13 @@ class ToolSearchTool(Tool):
     default_timeout_s: ClassVar[int] = 30
 
     async def execute(self, args: dict[str, Any]) -> Observation:
+        err = self.validate(args)
+        if err is not None:
+            return _error(f"tool_search: {err}")
         session = current_defer_session()
         if session is None:
             return _error("tool_search: no defer session bound to this run")
-        namespace = args.get("namespace")
-        if not isinstance(namespace, str) or not namespace:
-            return _error("tool_search: 'namespace' must be a non-empty string")
+        namespace = args["namespace"]
         try:
             payload = session.load_namespace(namespace)
         except KeyError as exc:

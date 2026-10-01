@@ -70,25 +70,20 @@ class ToolDeferSession:
         their own single-tool namespace.  The loaded set is *not* reset.
         """
         grouped: dict[str, list[str]] = {}
-        order: list[str] = []
         for tool in tools:
-            namespace = namespaces.get(tool.name, tool.name)
-            if namespace not in grouped:
-                grouped[namespace] = []
-                order.append(namespace)
-            grouped[namespace].append(tool.name)
+            grouped.setdefault(namespaces.get(tool.name, tool.name), []).append(tool.name)
         self._namespaces = tuple(
             ToolNamespace(
                 name=namespace,
-                description=self._describe(namespace, grouped[namespace]),
+                description=self._describe(namespace, tool_names),
                 mode=(
                     DeferMode.EAGER
                     if namespace in self._policy.eager_namespaces
                     else DeferMode.DEFERRED
                 ),
-                tool_names=tuple(grouped[namespace]),
+                tool_names=tuple(tool_names),
             )
-            for namespace in order
+            for namespace, tool_names in grouped.items()
         )
         self._specs = {tool.name: _tool_to_spec(tool) for tool in tools}
 
