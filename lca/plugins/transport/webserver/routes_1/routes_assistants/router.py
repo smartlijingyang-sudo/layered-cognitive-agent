@@ -49,6 +49,10 @@ from lca.plugins.transport.webserver.routes_1.routes_assistants.profile import (
 from lca.plugins.transport.webserver.routes_1.routes_assistants.skills import (
     install_assistant_skill,
 )
+from lca.plugins.transport.webserver.routes_1.routes_assistants.standing_files import (
+    list_standing_files,
+    standing_file_dispatcher,
+)
 
 ROUTE_SPECS: tuple[RouteSpec, ...] = (
     # Path is shared between POST (create) and GET (list); the
@@ -106,6 +110,16 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
         "/v1/assistants/{assistant_id}/jobs/{job_id}:fire",
         fire_assistant_job,
         ("POST", "OPTIONS"),
+    ),
+    RouteSpec(
+        "/v1/assistants/{assistant_id}/standing-files",
+        list_standing_files,
+        ("GET", "OPTIONS"),
+    ),
+    RouteSpec(
+        "/v1/assistants/{assistant_id}/standing-files/{filename}",
+        standing_file_dispatcher,
+        ("GET", "PUT", "OPTIONS"),
     ),
 )
 

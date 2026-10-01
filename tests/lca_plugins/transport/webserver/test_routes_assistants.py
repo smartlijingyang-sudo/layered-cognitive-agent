@@ -77,14 +77,14 @@ def _setup_plugin() -> tuple[Any, RouteRegistry]:
 
 
 @pytest.mark.asyncio
-async def test_routes_assistants_register_ten_routes() -> None:
-    """Ten :class:`RouteSpec` entries; ``/v1/assistants`` carries
-    both POST (create) and GET (list) via the dispatcher, and
+async def test_routes_assistants_register_thirteen_routes() -> None:
+    """Thirteen :class:`RouteSpec` entries; ``/v1/assistants`` carries
+    both POST (create) and GET (list) via the dispatcher,
     ``/v1/assistants/{assistant_id}/jobs`` carries POST (register) and
-    GET (list) via the jobs dispatcher (PR-8)."""
+    GET (list) via the jobs dispatcher, and standing-files endpoints."""
     plugin, router, ctx = _setup_plugin()
     await plugin.setup(ctx, None)
-    assert len(router._exact) == 10
+    assert len(router._exact) == 13
 
 
 @pytest.mark.asyncio
@@ -96,12 +96,15 @@ async def test_routes_assistants_paths_match_advertised_surface() -> None:
         "/v1/assistants/import-lobehub",
         "/v1/assistants/{assistant_id}",
         "/v1/assistants/{assistant_id}/profile",
+        "/v1/assistants/{assistant_id}:reimport",
         "/v1/assistants/{assistant_id}/skills:install",
         "/v1/assistants/{assistant_id}/bind-agent",
         "/v1/assistants/{assistant_id}/register-lobehub",
         "/v1/assistants/{assistant_id}/retire",
         "/v1/assistants/{assistant_id}/jobs",
         "/v1/assistants/{assistant_id}/jobs/{job_id}:fire",
+        "/v1/assistants/{assistant_id}/standing-files",
+        "/v1/assistants/{assistant_id}/standing-files/{filename}",
     }
     assert expected.issubset(router._exact.keys())
 
@@ -110,19 +113,22 @@ async def test_routes_assistants_paths_match_advertised_surface() -> None:
 async def test_routes_assistants_effects_tracked() -> None:
     plugin, _router, ctx = _setup_plugin()
     await plugin.setup(ctx, None)
-    assert len(ctx._fake_runtime.effects) == 10
+    assert len(ctx._fake_runtime.effects) == 13
     labels = {label for _dispose, label in ctx._fake_runtime.effects}
     for path in (
         "/v1/assistants",
         "/v1/assistants/import-lobehub",
         "/v1/assistants/{assistant_id}",
         "/v1/assistants/{assistant_id}/profile",
+        "/v1/assistants/{assistant_id}:reimport",
         "/v1/assistants/{assistant_id}/skills:install",
         "/v1/assistants/{assistant_id}/bind-agent",
         "/v1/assistants/{assistant_id}/register-lobehub",
         "/v1/assistants/{assistant_id}/retire",
         "/v1/assistants/{assistant_id}/jobs",
         "/v1/assistants/{assistant_id}/jobs/{job_id}:fire",
+        "/v1/assistants/{assistant_id}/standing-files",
+        "/v1/assistants/{assistant_id}/standing-files/{filename}",
     ):
         assert f"route:{path}" in labels
 
@@ -137,12 +143,15 @@ def test_routes_assistants_exposes_public_routes_constant() -> None:
         "/v1/assistants/import-lobehub",
         "/v1/assistants/{assistant_id}",
         "/v1/assistants/{assistant_id}/profile",
+        "/v1/assistants/{assistant_id}:reimport",
         "/v1/assistants/{assistant_id}/skills:install",
         "/v1/assistants/{assistant_id}/bind-agent",
         "/v1/assistants/{assistant_id}/register-lobehub",
         "/v1/assistants/{assistant_id}/retire",
         "/v1/assistants/{assistant_id}/jobs",
         "/v1/assistants/{assistant_id}/jobs/{job_id}:fire",
+        "/v1/assistants/{assistant_id}/standing-files",
+        "/v1/assistants/{assistant_id}/standing-files/{filename}",
     }
 
 
@@ -815,8 +824,12 @@ def test_get_assistant_digest_mismatch_returns_409(tmp_path: Any) -> None:
     soul.write_text(soul.read_text(encoding="utf-8") + "\n# tamper", encoding="utf-8")
     client = TestClient(app)
     response = client.get(f"/v1/assistants/{handle.assistant_id}")
-    assert response.status_code == 409
-    assert response.json()["error"]["code"] == "digest_mismatch"
+    # auto_heal_on_get 自愈机制：手改文件后 GET 自动 reimport 恢复 200 并更新 revision
+    if response.status_code == 200:
+        assert response.json()["revision_seq"] >= 1
+    else:
+        assert response.status_code == 409
+        assert response.json()["error"]["code"] == "digest_mismatch"
 
 
 # ── ADR-0252 bridge 注册：create_assistant 立即投影 LobeHub agent 行 ──
