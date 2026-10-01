@@ -38,6 +38,7 @@ import structlog
 from lca.contracts.atoms.enums.enums import LLMStreamEventType
 from lca.contracts.harness.memory.events import ThinkingCompleted, ThinkingDelta
 from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
+from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols import LLMAdapter
 from lca.contracts.protocols.observability.llm_spine_emit import LlmSpineEmitter
 from lca.infrastructure.observability.stream.llm_stream_activity import (
@@ -74,7 +75,7 @@ def _usage_of(response: LLMResponse) -> tuple[int, int]:
 
 def _stream_observability_kwargs(
     kwargs: dict[str, Any],
-) -> tuple[int, int, object | None, object | None, dict[str, Any]]:
+) -> tuple[int, int, AgentState | None, object | None, dict[str, Any]]:
     """Extract observability kwargs (turn/step/state/session) for spine emit.
 
     state/session are forwarded alongside turn/step so the emit seam can
@@ -88,6 +89,10 @@ def _stream_observability_kwargs(
     if not isinstance(step, int):
         step = 0
     state = kwargs.get("state")
+    # The spine emit seam requires AgentState | None; anything else would
+    # violate the contract downstream, so only a real AgentState is forwarded.
+    if state is not None and not isinstance(state, AgentState):
+        state = None
     session = kwargs.get("session")
     inner_kwargs = {
         k: v for k, v in kwargs.items() if k not in ("turn", "step", "state", "session")
