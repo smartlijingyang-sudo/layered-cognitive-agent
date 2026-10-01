@@ -9,14 +9,14 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from lca.contracts.models.observability.journal.journal import JournalEvent
 
 
-class EventPlane(str, Enum):
+class EventPlane(StrEnum):
     """事件在账本中的语义平面。"""
 
     SURFACE = "surface"
@@ -29,7 +29,7 @@ class EventPlane(str, Enum):
     """插件、Hook、适配器与传输如何完成一次运行的解释记录。"""
 
 
-class EventAudience(str, Enum):
+class EventAudience(StrEnum):
     """投影读取事件的最低许可受众。"""
 
     END_USER = "end_user"
@@ -38,7 +38,7 @@ class EventAudience(str, Enum):
     RESTRICTED = "restricted"
 
 
-class EventSensitivity(str, Enum):
+class EventSensitivity(StrEnum):
     """事件 payload 的数据敏感等级。"""
 
     PUBLIC = "public"
@@ -46,14 +46,14 @@ class EventSensitivity(str, Enum):
     CONFIDENTIAL = "confidential"
 
 
-class EventDurability(str, Enum):
+class EventDurability(StrEnum):
     """账本在资源压力下对事件的持久化承诺。"""
 
     REQUIRED = "required"
     BEST_EFFORT = "best_effort"
 
 
-class RuntimeKind(str, Enum):
+class RuntimeKind(StrEnum):
     """运行解释事件的稳定对象域。"""
 
     AGENT = "agent"
@@ -70,7 +70,7 @@ class RuntimeKind(str, Enum):
     RETRY = "retry"
 
 
-class OperationOutcome(str, Enum):
+class OperationOutcome(StrEnum):
     """一次可测操作的结果。"""
 
     STARTED = "started"
