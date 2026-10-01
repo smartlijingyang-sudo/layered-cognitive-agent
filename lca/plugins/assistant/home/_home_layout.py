@@ -409,12 +409,12 @@ def render_template(template_id: str, *, name: str, description: str) -> Templat
         files[_BOOTSTRAP_FILE] = bootstrap_src.read_text(encoding="utf-8")
 
     # 其余常驻文件是活备忘，不进配置面摘要。投影文件等第一次写入再出现。
-    files.update(_scaffold_standing_notes())
+    files.update(_scaffold_standing_notes(name=name, description=description))
 
     return TemplateRender(files=files)
 
 
-def _scaffold_standing_notes() -> dict[str, str]:
+def _scaffold_standing_notes(*, name: str = "", description: str = "") -> dict[str, str]:
     """Load standing files that are neither config face nor the projection.
 
     A quirk edit must not change ``manifest_digest``. ``MEMORY.md`` stays out
@@ -425,13 +425,18 @@ def _scaffold_standing_notes() -> dict[str, str]:
     layout = packaged_layout()
     skip = set(CONFIG_FACE_FILES) | {layout.projection_file}
     notes: dict[str, str] = {}
-    for name in layout.standing_files:
-        if name in skip:
+    for entry in layout.standing_files:
+        if entry in skip:
             continue
-        src = _templates_root() / name
+        src = _templates_root() / entry
         if not src.is_file():
-            raise AssistantCatalogError(f"常驻文件模板缺失: {name}")
-        notes[name] = src.read_text(encoding="utf-8")
+            raise AssistantCatalogError(f"常驻文件模板缺失: {entry}")
+        text = src.read_text(encoding="utf-8")
+        if name:
+            text = text.replace("{{ name }}", name)
+        if description:
+            text = text.replace("{{ description }}", description)
+        notes[entry] = text
     return notes
 
 
@@ -446,7 +451,9 @@ def write_home_files(home: Path, files: Mapping[str, str]) -> None:
         raise AssistantAlreadyExists(f"assistant home 已存在: {home}")
     home.mkdir(parents=True, exist_ok=False)
     for rel, content in files.items():
-        (home / rel).write_text(content, encoding="utf-8")
+        target = home / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
     scaffold_subdirs(home)
 
 
