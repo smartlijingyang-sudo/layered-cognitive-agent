@@ -44,7 +44,7 @@ _SANDBOX_FALLBACK = "无匹配 skill。建议用 execute_code 直接编码实现
         state=(
             COMMON["items"],
             COMMON["page"],
-            COMMON["page_size"],
+            COMMON["result_page_size"],
             COMMON["total"],
             COMMON["content"],
         ),
