@@ -133,7 +133,7 @@ def _tool_calls_payload(response: LLMResponse) -> list[ToolCall] | None:
         out.append(
             ToolCall(
                 id=str(getattr(call, "call_id", "")),
-                name=str(getattr(call, "tool_name", "")),
+                name=str(getattr(call, "name", "")),
                 arguments=(
                     arguments
                     if isinstance(arguments, str)

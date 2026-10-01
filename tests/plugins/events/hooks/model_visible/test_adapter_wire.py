@@ -68,3 +68,33 @@ def test_kwargs_for_hook_records_history_verbatim_when_prompt_is_empty() -> None
     assert out["messages"] == tuple(history)
     assert out["messages"][-1]["role"] == "tool"
     assert out["messages"][-1]["tool_call_id"] == "call_1"
+
+
+def test_tool_calls_payload_uses_native_tool_call_name() -> None:
+    """Regression: _tool_calls_payload read "tool_name" (an LLMStreamEvent
+    field) instead of "name" (the NativeToolCall field), so the post-hook
+    journal event recorded every tool call with an empty name."""
+    from lca.contracts.models.core.conversation.llm import (
+        LLMResponse,
+        NativeToolCall,
+    )
+    from lca.plugins.events.hooks.model_visible.adapter import _tool_calls_payload
+
+    response = LLMResponse(
+        text="",
+        tool_calls=[
+            NativeToolCall(call_id="call_1", name="executeCode", arguments={"code": "1"}),
+        ],
+    )
+    payload = _tool_calls_payload(response)
+    assert payload is not None
+    assert payload[0]["id"] == "call_1"
+    assert payload[0]["name"] == "executeCode"
+    assert payload[0]["arguments"] == '{"code": "1"}'
+
+
+def test_tool_calls_payload_returns_none_without_tool_calls() -> None:
+    from lca.contracts.models.core.conversation.llm import LLMResponse
+    from lca.plugins.events.hooks.model_visible.adapter import _tool_calls_payload
+
+    assert _tool_calls_payload(LLMResponse(text="ok")) is None
