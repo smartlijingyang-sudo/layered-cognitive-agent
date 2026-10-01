@@ -18,22 +18,25 @@ composer 装配 ``instrument_llm(llm, *, ctx=...)`` 从
 
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from lca.contracts.atoms.enums.enums import LLMStreamEventType
 from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
+from lca.contracts.models.session.tool_call import ToolCall
 from lca.contracts.protocols import LLMAdapter
 
 if TYPE_CHECKING:
     from lca.plugins.events.hooks.model_visible.hook import ModelVisibleHook
+    from lca_kernel.events.session.session import SessionProtocol
 
 _log = logging.getLogger(__name__)
 
 
-def _snapshot_attrs(cursor: Any) -> tuple[str, int] | None:
-    """Read ``(run_id, incarnation)`` from cursor snapshot。
+def _snapshot_attrs(cursor: Any) -> tuple[str, int, int] | None:
+    """Read ``(run_id, step_index, incarnation)`` from cursor snapshot。
 
     cursor 缺席 / 已 dispose / 无 ``snapshot`` 属性 → 返回 ``None``;调用方按
     「透明降级」处理(hook 内部亦走同语义)。
@@ -45,10 +48,15 @@ def _snapshot_attrs(cursor: Any) -> tuple[str, int] | None:
     except Exception:
         return None
     run_id = getattr(snap, "run_id", None)
+    step_index = getattr(snap, "step_index", None)
     incarnation = getattr(snap, "incarnation", None)
-    if not isinstance(run_id, str) or not isinstance(incarnation, int):
+    if (
+        not isinstance(run_id, str)
+        or not isinstance(step_index, int)
+        or not isinstance(incarnation, int)
+    ):
         return None
-    return run_id, incarnation
+    return run_id, step_index, incarnation
 
 
 def _model_identity(kwargs: dict[str, Any]) -> tuple[str, str]:
@@ -102,7 +110,7 @@ def _kwargs_for_hook(
         # First turn of a run: the derived history is still empty and the
         # whole request is the prompt. Record the user row the wire builder
         # emits, so the header shows what the model saw instead of ``[]``.
-        rows = list(history or ())
+        rows: list[Any] = list(history or ())
         if wire_prompt:
             rows.append({"role": "user", "content": wire_prompt})
         out["messages"] = tuple(rows)
@@ -116,17 +124,22 @@ def _kwargs_for_hook(
     return out
 
 
-def _tool_calls_payload(response: LLMResponse) -> list[dict[str, Any]] | None:
+def _tool_calls_payload(response: LLMResponse) -> list[ToolCall] | None:
     if not response.tool_calls:
         return None
-    out: list[dict[str, Any]] = []
+    out: list[ToolCall] = []
     for call in response.tool_calls:
+        arguments = getattr(call, "arguments", "")
         out.append(
-            {
-                "id": getattr(call, "call_id", ""),
-                "name": getattr(call, "tool_name", ""),
-                "arguments": getattr(call, "arguments", {}),
-            }
+            ToolCall(
+                id=str(getattr(call, "call_id", "")),
+                name=str(getattr(call, "tool_name", "")),
+                arguments=(
+                    arguments
+                    if isinstance(arguments, str)
+                    else json.dumps(arguments, ensure_ascii=False, default=str)
+                ),
+            )
         )
     return out
 
@@ -158,9 +171,15 @@ def _emit_lifecycle_post(hook: Any, response: LLMResponse) -> None:
         step=step,
         usage=usage,
         content=text,
-        tool_calls=tool_calls,
+        # Catalog event contract is list[dict[str, Any]]; ToolCall is its
+        # wire-shaped specialization (runtime-identical plain dicts).
+        tool_calls=[dict(call) for call in tool_calls] if tool_calls is not None else None,
     )
-    RunSessionWriter(session=session).append_assistant_message(
+    # Seam: resolve_session_reader deliberately exposes the read face
+    # (SPEC H); the bound value is always the full Session
+    # (resolve_raw_session isinstance-guaranteed), so the writer's
+    # SessionProtocol requirement holds.
+    RunSessionWriter(session=cast("SessionProtocol", session)).append_assistant_message(
         turn=1,
         step=step,
         role="assistant",
@@ -235,7 +254,7 @@ class ModelVisibleHookAdapter(LLMAdapter):
         attrs = _snapshot_attrs(cursor)
         system_text = self._system_text_from_prompt(reasoner_prompt)
         if attrs is not None:
-            run_id, incarnation = attrs
+            run_id, _step_index, incarnation = attrs
             try:
                 _emit_lifecycle_pre(self._hook, kwargs)
                 self._hook.capture_pre_llm(
@@ -262,10 +281,11 @@ class ModelVisibleHookAdapter(LLMAdapter):
                     _log.debug("model_visible_fail_model_failed: %s", fail_exc)
             raise
         if attrs is not None:
-            run_id, incarnation = attrs
+            run_id, step_index, incarnation = attrs
             try:
                 self._hook.capture_post_llm(
                     run_id=run_id,
+                    step_index=step_index,
                     incarnation=incarnation,
                     response=response,
                 )
@@ -280,7 +300,7 @@ class ModelVisibleHookAdapter(LLMAdapter):
         attrs = _snapshot_attrs(cursor)
         system_text = self._system_text_from_prompt(reasoner_prompt)
         if attrs is not None:
-            run_id, incarnation = attrs
+            run_id, _step_index, incarnation = attrs
             try:
                 _emit_lifecycle_pre(self._hook, kwargs)
                 self._hook.capture_pre_llm(
@@ -307,10 +327,11 @@ class ModelVisibleHookAdapter(LLMAdapter):
                     and event.response is not None
                 ):
                     if attrs is not None:
-                        run_id, incarnation = attrs
+                        run_id, step_index, incarnation = attrs
                         try:
                             self._hook.capture_post_llm(
                                 run_id=run_id,
+                                step_index=step_index,
                                 incarnation=incarnation,
                                 response=event.response,
                             )
