@@ -238,7 +238,7 @@ def _layer_graph(events: list[SpineRow]) -> dict[str, Any]:
     return report
 
 
-def _inject_node_windows(events: list[SpineRow]) -> list[SpineRow]:
+def _inject_node_windows(events: list[SpineRow]) -> list[dict[str, Any]]:
     """Pair phase_graph.node.{start,end} by (node_id, visit_index) and
     nest _ts_in / _ts_out into end.payload.outputs. build_debug_graph
     surfaces these on each node entry; cross-node joiner reads them back.
@@ -250,15 +250,15 @@ def _inject_node_windows(events: list[SpineRow]) -> list[SpineRow]:
         if ep == "phase_graph.node.start":
             key = (p.get("node_id") or "", p.get("visit_index", 1))
             starts[key] = str(ev.get("ts") or "")
-    decorated: list[SpineRow] = []
+    decorated: list[dict[str, Any]] = []
     for ev in events:
-        copy = dict(ev)
+        copy: dict[str, Any] = dict(ev)
         ep = copy.get("execution_point")
-        p = dict(copy.get("payload") or {})
+        p: dict[str, Any] = dict(copy.get("payload") or {})
         if ep == "phase_graph.node.end":
             key = (p.get("node_id") or "", p.get("visit_index", 1))
             ts_in = starts.get(key)
-            outs = dict(p.get("outputs") or {})
+            outs: dict[str, Any] = dict(p.get("outputs") or {})
             if ts_in:
                 outs["_ts_in"] = ts_in
             outs["_ts_out"] = copy.get("ts")
@@ -509,7 +509,7 @@ def _layer_diff(events: list[SpineRow]) -> dict[str, Any]:
         }
     blueprint = json.loads(blueprint_path.read_text(encoding="utf-8"))
     expected_nodes = {n["id"] for n in blueprint.get("nodes", [])}
-    executed_nodes = {
+    executed_nodes: set[Any] = {
         (e.get("payload") or {}).get("node_id")
         for e in events
         if e.get("execution_point") == "phase_graph.node.end"
@@ -676,7 +676,9 @@ def _layer_explain(events: list[SpineRow]) -> dict[str, Any]:
                 for e in llm_errors
             ],
             "first_prompt": prompt_summary,
-            "terminal_outcome": (terminal.get("payload") or {}).get("outcome"),
+            "terminal_outcome": (terminal.get("payload") or {}).get("outcome")
+            if terminal is not None
+            else None,
             "health_summary": health_summary,
             "next_actions": actions,
             "hint": actions[0],
