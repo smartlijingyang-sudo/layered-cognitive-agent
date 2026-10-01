@@ -907,6 +907,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "detect-secrets" },
+    { name = "grimp" },
     { name = "import-linter" },
     { name = "interrogate" },
     { name = "mypy" },
@@ -938,6 +939,7 @@ security = [
     { name = "vulture" },
 ]
 test = [
+    { name = "grimp" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
@@ -980,6 +982,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "detect-secrets", specifier = ">=1.5" },
+    { name = "grimp", specifier = ">=3.0" },
     { name = "import-linter", specifier = ">=2.1" },
     { name = "interrogate", specifier = ">=1.7" },
     { name = "mypy", specifier = ">=1.13" },
@@ -1007,6 +1010,7 @@ security = [
     { name = "vulture", specifier = ">=2.13" },
 ]
 test = [
+    { name = "grimp", specifier = ">=3.0" },
     { name = "pytest", specifier = ">=8.3" },
     { name = "pytest-asyncio", specifier = ">=0.24" },
     { name = "pytest-cov", specifier = ">=6.0" },

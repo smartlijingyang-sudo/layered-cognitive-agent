@@ -212,6 +212,7 @@ typecheck = [
     "pydantic>=2.9",
 ]
 test = [
+    "grimp>=3.0",
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
     "pytest-cov>=6.0",

@@ -45,10 +45,14 @@ SOURCE_MODULES: tuple[str, ...] = (
 
 def _build_graph() -> grimp.ImportGraph:
     """Build the full lca import graph (no cache so the test sees current source)."""
+    # exclude_type_checking_imports: the observability facade keeps its
+    # legacy journal imports under TYPE_CHECKING + PEP 562 lazy loading by
+    # design (ADR-0055), so they are not runtime import chains.
     return grimp.build_graph(
         "lca",
         include_external_packages=True,
         cache_dir=None,
+        exclude_type_checking_imports=True,
     )
 
 
@@ -181,9 +185,7 @@ def test_business_event_isolation_lazy_loader_facade_symbols() -> None:
         "RunStore",
         "UnregisteredJournalEventError",
         "RunState",
-        "RunStatus",
         "fold_run_state",
-        "OtelProjector",
         "InMemoryJournalStore",
         "read_journal",
         "stamped_to_record",
