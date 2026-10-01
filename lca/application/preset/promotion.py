@@ -108,8 +108,8 @@ class PresetPromotionService:
                     kind=RuntimeKind.PLUGIN,
                     operation="preset.shared",
                     source=preset_id,
-                    outcome=OperationOutcome.SUCCESS,
-                    input={
+                    outcome=OperationOutcome.OK,
+                    attributes={
                         "preset_id": preset_id,
                         "source_asst": pkg.assistant_id,
                         "shared_path": str(target_dir),
