@@ -12,6 +12,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from lca.contracts.protocols.graph.ports import PortName
 from lca.framework.graph.host_wiring import (
     LegacyResultShim as _LegacyResultShim,
 )
@@ -52,9 +53,10 @@ from lca.framework.graph.strategy_registry import (
     StrategyRegistry,
     default_strategy_registry,
 )
+from lca.framework.graph.traversal import PlanTraversal
 
 
-def _resolve_default_port_registry_seed(scope: Any) -> dict[str, Any]:
+def _resolve_default_port_registry_seed(scope: Any) -> dict[PortName, Any]:
     """Build the production kernel seed for the outer plan's ``PortRegistry``.
 
     ADR-0241 §2: the kernel seeds two kernel-owned typed ports so the
@@ -72,7 +74,7 @@ def _resolve_default_port_registry_seed(scope: Any) -> dict[str, Any]:
     lookups are local and idempotent, safe to call at every outer
     plan entry.
     """
-    seed: dict[str, Any] = {}
+    seed: dict[PortName, Any] = {}
     if scope is not None:
         getter = getattr(scope, "get", None) or getattr(scope, "resolve", None)
         if callable(getter):
@@ -81,7 +83,7 @@ def _resolve_default_port_registry_seed(scope: Any) -> dict[str, Any]:
             except (KeyError, AttributeError, TypeError):
                 tools_service = None
             if tools_service is not None:
-                seed["tools"] = tools_service
+                seed[PortName("tools")] = tools_service
     try:
         from lca.infrastructure.runtime_plane.capability_bindings import (
             current_bindings_view,
@@ -91,7 +93,7 @@ def _resolve_default_port_registry_seed(scope: Any) -> dict[str, Any]:
     except Exception:
         bindings_view = None
     if bindings_view is not None:
-        seed["bindings"] = bindings_view
+        seed[PortName("bindings")] = bindings_view
     return seed
 
 
@@ -99,7 +101,7 @@ def _port_registry_seed_for(
     *,
     seed: Mapping[str, Any] | Callable[[], Mapping[str, Any]] | None,
     scope: Any,
-) -> dict[str, Any]:
+) -> dict[PortName, Any]:
     """Normalize the kernel-seed input into a single ``set_outer_input`` payload.
 
     - ``Mapping`` → used directly (test injection).
@@ -111,8 +113,8 @@ def _port_registry_seed_for(
         return _resolve_default_port_registry_seed(scope)
     if callable(seed):
         produced = seed()
-        return dict(produced)
-    return dict(seed)
+        return {PortName(k): v for k, v in dict(produced).items()}
+    return {PortName(k): v for k, v in seed.items()}
 
 
 @dataclass(frozen=True, slots=True)
@@ -170,20 +172,24 @@ class PlanInterpreterAdapter:
         *,
         state: object = None,
         outer_state: object = None,
-        traversal: object = None,
+        traversal: PlanTraversal | None = None,
         input: object = None,
         budget: object = None,
         capabilities: object = None,
-        artifacts: object = None,
+        artifacts: Mapping[str, object] | None = None,
         spec: object = None,
         port_registry_seed: Mapping[str, Any] | Callable[[], Mapping[str, Any]] | None = None,
     ) -> object:
         plan = lift_executable_plan(executable)
         seeded_state = state if outer_state is None else outer_state
+        # __post_init__ defaults observer/clock, but field types stay Optional;
+        # re-resolve locally for a provably non-None seam.
+        observer = self.graph_observer if self.graph_observer is not None else NullGraphObserver()
+        clock = self.graph_clock if self.graph_clock is not None else _default_graph_clock
         interp = PlanInterpreter(
             registry=self.registry or default_strategy_registry(),
-            observer=self.graph_observer,
-            clock=self.graph_clock,
+            observer=observer,
+            clock=clock,
             artifacts=artifacts or {},
             results_by_phase=self._phase_results,
         )
@@ -211,7 +217,7 @@ class PlanInterpreterAdapter:
         input: object = None,
         budget: object = None,
         capabilities: object = None,
-        artifacts: object = None,
+        artifacts: Mapping[str, object] | None = None,
         spec: object = None,
         port_registry_seed: Mapping[str, Any] | Callable[[], Mapping[str, Any]] | None = None,
     ) -> object:
@@ -231,10 +237,14 @@ class PlanInterpreterAdapter:
             )
         start_id = getattr(cursor, "current_node_id", "") or _plan_entry_id(plan)
         visited = tuple(getattr(cursor, "visited_nodes", ()) or ())
+        # __post_init__ defaults observer/clock, but field types stay Optional;
+        # re-resolve locally for a provably non-None seam.
+        observer = self.graph_observer if self.graph_observer is not None else NullGraphObserver()
+        clock = self.graph_clock if self.graph_clock is not None else _default_graph_clock
         interp = PlanInterpreter(
             registry=self.registry or default_strategy_registry(),
-            observer=self.graph_observer,
-            clock=self.graph_clock,
+            observer=observer,
+            clock=clock,
             artifacts=artifacts or {},
             results_by_phase=self._phase_results,
         )
