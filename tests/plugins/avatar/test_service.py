@@ -117,19 +117,25 @@ class FakeStore:
 
 
 class FakePublisher:
-    def __init__(self) -> None:
+    def __init__(self, fail_on: set[str] | None = None) -> None:
         self.events: list[tuple[str, AvatarUpdatedEvent]] = []
+        self.failed_types: list[str] = []
+        self.fail_on = fail_on or set()
 
     def publish(self, assistant_id: str, event: AvatarUpdatedEvent) -> None:
+        if event.type in self.fail_on:
+            self.failed_types.append(event.type)
+            raise RuntimeError(f"publish failed: {event.type}")
         self.events.append((assistant_id, event))
 
 
 def _service(
     provider: FakeProvider | None = None,
+    publisher: FakePublisher | None = None,
 ) -> tuple[AvatarService, FakeStore, FakeProvider, FakePublisher]:
     store = FakeStore()
     provider = provider or FakeProvider()
-    publisher = FakePublisher()
+    publisher = publisher or FakePublisher()
     svc = AvatarService(
         store=store,
         provider=provider,
@@ -307,6 +313,19 @@ async def test_video_poll_timeout_marks_failed(monkeypatch):
     await svc.set("asst_1", candidates[0].candidate_id)
     await asyncio.sleep(0.2)
     assert store.state.active.video_status == "failed"
+
+
+@pytest.mark.asyncio
+async def test_video_ready_publish_failure_keeps_status_ready():
+    publisher = FakePublisher(fail_on={"avatar_video_ready"})
+    svc, store, _, _ = _service(publisher=publisher)
+    candidates = await svc.create("asst_1", "头像")
+    await svc.set("asst_1", candidates[0].candidate_id)
+    await _settle()
+    # ready 已持久化；publish 失败不得把 video_status 降级为 failed。
+    assert store.state.active.video_status == "ready"
+    assert publisher.failed_types == ["avatar_video_ready"]
+    assert all(ev.type != "avatar_video_ready" for _, ev in publisher.events)
 
 
 @pytest.mark.asyncio

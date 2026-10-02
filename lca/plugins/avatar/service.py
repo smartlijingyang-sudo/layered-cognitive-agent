@@ -247,18 +247,27 @@ class AvatarService:
         data = await self.provider.download(url)
         video_path = self.store.write_video(assistant_id, candidate_id, data)
         if self._persist_video_status(assistant_id, candidate_id, "ready"):
-            self.publisher.publish(
-                assistant_id,
-                AvatarUpdatedEvent(
-                    type="avatar_video_ready",
-                    assistant_id=assistant_id,
-                    payload={
-                        "candidate_id": candidate_id,
-                        "video_status": "ready",
-                        "file_path": video_path,
-                    },
-                ),
-            )
+            # 推送是通知面副作用：publish 失败只记录日志，不得把已持久化的
+            # ready 状态降级为 failed（视频本身已成功）。
+            try:
+                self.publisher.publish(
+                    assistant_id,
+                    AvatarUpdatedEvent(
+                        type="avatar_video_ready",
+                        assistant_id=assistant_id,
+                        payload={
+                            "candidate_id": candidate_id,
+                            "video_status": "ready",
+                            "file_path": video_path,
+                        },
+                    ),
+                )
+            except Exception:
+                logger.exception(
+                    "avatar_video_ready publish failed for %s/%s",
+                    assistant_id,
+                    candidate_id,
+                )
 
     def _persist_video_status(
         self,
