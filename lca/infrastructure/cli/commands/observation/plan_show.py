@@ -31,7 +31,13 @@ def register(app: typer.Typer) -> None:
         )
 
         plan: dict[str, Any] | None = None
-        run_dir = Path("traces/runs") / find_latest_run_id()
+        latest_run_id = find_latest_run_id()
+        if latest_run_id is None:
+            # find_latest_run_id returns None when traces/runs/ is missing
+            # or empty; exit cleanly instead of TypeError from Path / None.
+            typer.echo("no runs found under traces/runs.", err=True)
+            raise typer.Exit(code=1)
+        run_dir = Path("traces/runs") / latest_run_id
         bp_path = run_dir / "blueprint.json"
         if bp_path.exists():
             plan = json.loads(bp_path.read_text(encoding="utf-8"))

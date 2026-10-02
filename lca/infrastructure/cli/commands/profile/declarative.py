@@ -202,7 +202,9 @@ def register(app: typer.Typer) -> None:
                 return None
             if isinstance(ref, dict):
                 return dict(ref)
-            if is_dataclass(ref):
+            # is_dataclass is True for dataclass *classes* too, but asdict
+            # only accepts instances; a class is not projectable -> None.
+            if is_dataclass(ref) and not isinstance(ref, type):
                 return dict(asdict(ref))
             return None
 

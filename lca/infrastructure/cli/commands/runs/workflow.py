@@ -167,7 +167,7 @@ def register(app: typer.Typer) -> None:
             # the supervisor's frozen dataclass.
             import dataclasses as _dc
 
-            if _dc.is_dataclass(payload["status"]):
+            if _dc.is_dataclass(payload["status"]) and not isinstance(payload["status"], type):
                 payload["status"] = _dc.asdict(payload["status"])
             typer.echo(__import__("json").dumps(payload, indent=2, ensure_ascii=False))
         else:
