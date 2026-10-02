@@ -20,7 +20,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from importlib import import_module
 from typing import Any, Literal, cast
 
@@ -28,6 +28,8 @@ from lca.contracts.atoms.ids.ids import RunId, TraceId
 from lca.contracts.models.observability.event.event import OperationOutcome, RuntimeKind
 from lca.contracts.observability.evidence.evidence import (
     EvidenceRef,
+)
+from lca.contracts.observability.evidence.evidence import (
     EvidenceRef as _EvidenceRef,  # alias for JournalRecord.evidence compat
 )
 
@@ -134,7 +136,7 @@ class StampedEvent:
     """CompiledRunPlan canonical hash (PR-6 V5)；auto-stamped by RunStore."""
 
 
-class DelegationMechanism(str, Enum):
+class DelegationMechanism(StrEnum):
     """委派发起机制（封闭词表）。"""
 
     DELEGATE = "delegate"
@@ -486,7 +488,7 @@ class ToolDenied(JournalEvent):
 # ── Phase 退出收口（ADR-0159 / ADR-0162）─────────────────
 
 
-class ToolLifecycleEndKind(str, Enum):
+class ToolLifecycleEndKind(StrEnum):
     """Tool 调用生命周期终结原因（用户能感知的事实）。
 
     ADR-0162 决策 一:NOT_INVOKED_AFTER_STREAM 迁出至独立
@@ -882,7 +884,7 @@ class BootPluginFiberSpawned(JournalEvent):
     plugin_id: str = ""
     layer: str = ""  # L0/L1/L2/L3/L4
     kind: str = ""  # seam/provider/primitive/bridge
-    stage: "Stage" = -1  # type: ignore[name-defined]
+    stage: Stage = -1  # type: ignore[name-defined]
     duration_ms: float = 0.0
     status: Literal["started", "ok", "failed"] = "started"
     failure_kind: str | None = None
