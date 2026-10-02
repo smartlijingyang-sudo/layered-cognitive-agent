@@ -94,14 +94,14 @@ class Config(BaseModel):
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Provide a deny-by-default ``ToolPermissionManifest``.
 
-    ``allowed_tools = ()`` makes the permission gate reject every
+    ``allowed_tools = []`` makes the permission gate reject every
     envelope, which is the safe default until a profile bundles a
     policy-aware adapter. Profiles that need allowlist semantics
     should ship their own ``permission_manifest.<name>`` provider
     in ``bundles/<profile>/...`` and disable this one.
     """
     del config
-    manifest = ToolPermissionManifest(allowed_tools=())
+    manifest = ToolPermissionManifest(allowed_tools=[])
     ctx.provide(_PROVIDES_KEY, manifest)
 
 

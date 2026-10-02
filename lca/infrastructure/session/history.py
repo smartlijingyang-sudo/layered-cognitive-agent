@@ -9,15 +9,20 @@ infrastructure instead of runtime, keeping the dependency direction
 
 from __future__ import annotations
 
-from lca.contracts.models.session.message import Message
+from typing import Any
+
 from lca.contracts.protocols.session.model.context import SessionReader
 
 
-def derive_turn_history(session: SessionReader | None) -> list[Message]:
+def derive_turn_history(session: SessionReader | None) -> list[dict[str, Any]]:
     """Return the model-visible message history for a bound session reader.
 
     ``None`` (no bound run session) yields an empty history so an unbound LLM
     turn still works without a journal.
+
+    The wire shape is ``list[dict[str, Any]]`` — exactly what
+    :meth:`SessionReader.derive_messages` returns. (The ``list[Message]``
+    shape lives on the writer-side protocol only; the reader never had it.)
     """
     if session is None:
         return []

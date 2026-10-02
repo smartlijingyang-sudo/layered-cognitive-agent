@@ -16,6 +16,7 @@ from lca.contracts.models.cognition.boundary import (
     RoleSnapshot,
     TemplateSelection,
 )
+from lca.contracts.models.cognition.prompt_assembly import _coerce_decision_path
 from lca.contracts.models.cognition.reasoner_turn import ReasonerTurnPlan, ReasonerTurnRender
 from lca.contracts.models.core.conversation.llm import LLMResponse
 from lca.contracts.models.core.state.state import AgentState
@@ -340,8 +341,13 @@ async def run_reasoner_generate_thoughts_with_spine_facts(
     rendered_template_id = (
         render.trace.template_id if render.trace is not None else plan.template_id
     )
+    # The trace carries the raw selector string; coerce to the closed
+    # SelectorDecisionPath vocabulary (unknown -> "legacy", the canonical
+    # semantic in prompt_assembly).
     rendered_decision_path = (
-        render.trace.selector_decision_path if render.trace is not None else plan.decision_path
+        _coerce_decision_path(render.trace.selector_decision_path)
+        if render.trace is not None
+        else plan.decision_path
     )
     rendered_sections_preview = (
         tuple(s.name for s in render.trace.sections)
