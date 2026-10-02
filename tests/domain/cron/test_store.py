@@ -69,7 +69,13 @@ def test_delete_job_keeps_runs(tmp_path: Path) -> None:
         receipts=(TargetReceipt(chat_id=None, state="silent"),),
         finished_at=datetime(2026, 10, 2, 9, 1, tzinfo=UTC),
     )
-    store.append_run("job_1", run)
+    store.append_run(
+        "job_1",
+        run_id=run.run_id,
+        outcome=run.outcome,
+        receipts=run.receipts,
+        finished_at=run.finished_at,
+    )
 
     assert store.delete_job("job_1") is True
     assert store.get_job("job_1") is None
@@ -85,9 +91,29 @@ def test_delete_missing_returns_false(tmp_path: Path) -> None:
 
 def test_append_and_list_runs(tmp_path: Path) -> None:
     store = CronStore(tmp_path)
-    run1 = CronRun(run_id="run_1", outcome="completed")
-    run2 = CronRun(run_id="run_2", outcome="timed_out")
-    store.append_run("job_1", run1)
-    store.append_run("job_1", run2)
+    store.append_run("job_1", run_id="run_1", outcome="completed")
+    store.append_run("job_1", run_id="run_2", outcome="timed_out")
     assert [r.run_id for r in store.list_runs("job_1")] == ["run_1", "run_2"]
-    assert store.get_run("job_1", "run_2") == run2
+    assert store.get_run("job_1", "run_2") == CronRun(run_id="run_2", outcome="timed_out")
+
+
+def test_append_run_generates_run_id(tmp_path: Path) -> None:
+    store = CronStore(tmp_path)
+    rid = store.append_run(
+        "job_1",
+        outcome="completed",
+        finished_at=datetime(2026, 10, 2, 9, 1, tzinfo=UTC),
+    )
+    assert rid.startswith("job_1-")
+    run = store.get_run("job_1", rid)
+    assert run is not None
+    assert run.outcome == "completed"
+    assert run.finished_at == datetime(2026, 10, 2, 9, 1, tzinfo=UTC)
+    assert run.receipts == ()
+
+
+def test_get_run_records(tmp_path: Path) -> None:
+    store = CronStore(tmp_path)
+    store.append_run("job_1", run_id="r1", outcome="completed")
+    store.append_run("job_1", run_id="r2", outcome="runtime_failure")
+    assert [r.run_id for r in store.get_run_records("job_1")] == ["r1", "r2"]

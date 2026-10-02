@@ -135,7 +135,13 @@ def test_list_items_hides_completed_oneshot(tmp_path: Path) -> None:
         receipts=(TargetReceipt(chat_id=None, state="silent"),),
         finished_at=datetime(2026, 10, 1, 9, 1, tzinfo=UTC),
     )
-    svc._store.append_run("job_1", run)
+    svc._store.append_run(
+        "job_1",
+        run_id=run.run_id,
+        outcome=run.outcome,
+        receipts=run.receipts,
+        finished_at=run.finished_at,
+    )
     items = svc.list_items(owner="user_1", now=now)
     assert items == []
 
@@ -153,7 +159,13 @@ def test_last_delivery_summary_prefers_failed(tmp_path: Path) -> None:
         ),
         finished_at=datetime(2026, 10, 1, 9, 1, tzinfo=UTC),
     )
-    svc._store.append_run("job_1", run)
+    svc._store.append_run(
+        "job_1",
+        run_id=run.run_id,
+        outcome=run.outcome,
+        receipts=run.receipts,
+        finished_at=run.finished_at,
+    )
     items = svc.list_items(owner="user_1", now=datetime(2026, 10, 2, 9, 0, tzinfo=UTC))
     assert items[0].last_delivery == "failed"
 

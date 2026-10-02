@@ -472,7 +472,6 @@ def test_delete_assistant_job_removes_definition_keeps_runs(tmp_path: Any) -> No
     """ADR-0268 §9：DELETE 只删定义，run 记录保留，GET 列表为空。"""
     from datetime import UTC, datetime
 
-    from lca.contracts.models.cron.models import CronRun
     from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
     from lca.domain.cron.store import CronStore
 
@@ -499,12 +498,10 @@ def test_delete_assistant_job_removes_definition_keeps_runs(tmp_path: Any) -> No
     store = CronStore(Path(spec.home_path))
     store.append_run(
         "daily_brief",
-        CronRun(
-            run_id="run_1",
-            outcome="completed",
-            receipts=(),
-            finished_at=datetime.now(UTC),
-        ),
+        run_id="run_1",
+        outcome="completed",
+        receipts=(),
+        finished_at=datetime.now(UTC),
     )
     assert store.get_run("daily_brief", "run_1") is not None
 

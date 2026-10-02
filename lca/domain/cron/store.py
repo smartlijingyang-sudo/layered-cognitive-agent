@@ -12,9 +12,12 @@ import contextlib
 import json
 import os
 import tempfile
+import uuid
+from datetime import datetime
 from pathlib import Path
+from typing import Literal
 
-from lca.contracts.models.cron.models import CronJob, CronRun
+from lca.contracts.models.cron.models import CronJob, CronRun, TargetReceipt
 
 __all__ = ["CronStore"]
 
@@ -83,12 +86,32 @@ class CronStore:
         path.unlink()
         return True
 
-    def append_run(self, job_id: str, run: CronRun) -> None:
-        """追加一条 run 记录（只追加，不覆盖）。"""
+    def append_run(
+        self,
+        job_id: str,
+        *,
+        outcome: Literal["completed", "runtime_failure", "timed_out", "superseded"],
+        finished_at: datetime | None = None,
+        receipts: tuple[TargetReceipt, ...] = (),
+        run_id: str | None = None,
+    ) -> str:
+        """追加一条 run 记录（只追加，不覆盖），返回实际写入的 ``run_id``。
+
+        ``run_id`` 缺省时生成 ``<job_id>-<uuid4hex>``；正式 cron worker
+        显式传入，保持与 handoff 上下文里的 ``run_id`` 一致。
+        """
+        rid = run_id or f"{job_id}-{uuid.uuid4().hex}"
+        run = CronRun(
+            run_id=rid,
+            outcome=outcome,
+            receipts=receipts,
+            finished_at=finished_at,
+        )
         _atomic_write_text(
-            self._runs_dir(job_id) / f"{run.run_id}.json",
+            self._runs_dir(job_id) / f"{rid}.json",
             run.model_dump_json(indent=2),
         )
+        return rid
 
     def get_run(self, job_id: str, run_id: str) -> CronRun | None:
         path = self._runs_dir(job_id) / f"{run_id}.json"
@@ -98,6 +121,10 @@ class CronStore:
 
     def list_runs(self, job_id: str) -> list[CronRun]:
         """按 run_id 字典序返回 run 记录（调用方负责时间语义）。"""
+        return self.get_run_records(job_id)
+
+    def get_run_records(self, job_id: str) -> list[CronRun]:
+        """按 run_id 字典序返回该任务的 run 记录（与 ``list_runs`` 同序）。"""
         runs_dir = self._runs_dir(job_id)
         if not runs_dir.is_dir():
             return []

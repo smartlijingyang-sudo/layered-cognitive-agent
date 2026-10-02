@@ -27,7 +27,6 @@ from typing import Any
 
 from lca.contracts.models.cron.models import (
     CronJob,
-    CronRun,
     CronValidationError,
     TargetReceipt,
 )
@@ -183,12 +182,10 @@ class CronScheduler:
             outcome = await self._execute_with_retries(job, run_id)
             self._store.append_run(
                 job.id,
-                CronRun(
-                    run_id=run_id,
-                    outcome=outcome,
-                    receipts=(),
-                    finished_at=self._clock(),
-                ),
+                outcome=outcome,
+                receipts=(),
+                finished_at=self._clock(),
+                run_id=run_id,
             )
         except Exception:
             # 意外错误（如落盘失败）也不让 worker 任务带着异常结束。
@@ -196,12 +193,10 @@ class CronScheduler:
             with contextlib.suppress(Exception):
                 self._store.append_run(
                     job.id,
-                    CronRun(
-                        run_id=run_id,
-                        outcome="runtime_failure",
-                        receipts=(),
-                        finished_at=self._clock(),
-                    ),
+                    outcome="runtime_failure",
+                    receipts=(),
+                    finished_at=self._clock(),
+                    run_id=run_id,
                 )
         finally:
             self._active.pop(job.id, None)
@@ -285,12 +280,10 @@ class CronScheduler:
     def _record_superseded(self, job_id: str, run_id: str, now: datetime) -> None:
         self._store.append_run(
             job_id,
-            CronRun(
-                run_id=run_id,
-                outcome="superseded",
-                receipts=(TargetReceipt(chat_id=None, state="not_sent"),),
-                finished_at=now,
-            ),
+            outcome="superseded",
+            receipts=(TargetReceipt(chat_id=None, state="not_sent"),),
+            finished_at=now,
+            run_id=run_id,
         )
 
     # ---- 文件锁（ADR-0263 §9①②，与 ProactiveScheduler 同模式） ----

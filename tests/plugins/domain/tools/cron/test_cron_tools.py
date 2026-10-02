@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from lca.contracts.models.cognition.boundary import BindingsView
-from lca.contracts.models.cron.models import CronRun, TargetReceipt
+from lca.contracts.models.cron.models import TargetReceipt
 from lca.contracts.protocols import Tool
 from lca.domain.cron.service import CronService
 from lca.domain.cron.store import CronStore
@@ -125,12 +125,10 @@ async def test_cron_view_returns_definition_and_runs(tmp_path: Path) -> None:
 
     svc._store.append_run(
         "job_1",
-        CronRun(
-            run_id="run_1",
-            outcome="completed",
-            receipts=(TargetReceipt(chat_id="chat_1", state="delivered"),),
-            finished_at=datetime(2026, 10, 1, 9, 1, tzinfo=UTC),
-        ),
+        run_id="run_1",
+        outcome="completed",
+        receipts=(TargetReceipt(chat_id="chat_1", state="delivered"),),
+        finished_at=datetime(2026, 10, 1, 9, 1, tzinfo=UTC),
     )
     obs2 = await tools["cron.view"].execute({"id": "job_1"})
     assert len(obs2.payload["runs"]) == 1
