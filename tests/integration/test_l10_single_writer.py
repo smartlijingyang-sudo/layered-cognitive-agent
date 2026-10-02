@@ -19,6 +19,9 @@ def _make_sink(tmp_path: Path, run_id: str) -> FileSink:
     return FileSink(tmp_path, run_id=run_id)
 
 
+# NOTE: writable.step.* EPs were retired by ADR-0167 D11; the writable
+# matrix now uses writable.segment.start/end. These L10 tests assert the
+# single-writer invariant only, so they use the current segment EP.
 def test_l10_sink_line_count_equals_spine_append(tmp_path: Path) -> None:
     """L10:spine.append N 次 → sink.path 行数 = N(1:1)。"""
     sink = _make_sink(tmp_path, "run_l10_seq_test")
@@ -27,7 +30,7 @@ def test_l10_sink_line_count_equals_spine_append(tmp_path: Path) -> None:
     n_appends = 5
     for i in range(1, n_appends + 1):
         spine.append(
-            execution_point="writable.step.start",
+            execution_point="writable.segment.start",
             channel="fact",
             caller_payload={"seq": i},
             outcome="success",
@@ -57,7 +60,7 @@ def test_l10_spine_filename_produces_spine_suffixed_file(tmp_path: Path) -> None
 
     spine = EventSpine(sinks=[sink], run_id=run_id)
     spine.append(
-        execution_point="writable.step.start",
+        execution_point="writable.segment.start",
         channel="fact",
         caller_payload={"seq": 1},
         outcome="success",
@@ -83,7 +86,7 @@ def test_l10_legacy_events_jsonl_still_supported(tmp_path: Path) -> None:
 
     spine = EventSpine(sinks=[sink], run_id="legacy_run")
     spine.append(
-        execution_point="writable.step.start",
+        execution_point="writable.segment.start",
         channel="fact",
         caller_payload={"seq": 1},
         outcome="success",
@@ -107,13 +110,13 @@ def test_l10_single_writer_no_concurrent_writers(tmp_path: Path) -> None:
     spine_b = EventSpine(sinks=[sink_b], run_id="run_a")
 
     spine_a.append(
-        execution_point="writable.step.start",
+        execution_point="writable.segment.start",
         channel="fact",
         caller_payload={"seq": 1},
         outcome="success",
     )
     spine_b.append(
-        execution_point="writable.step.start",
+        execution_point="writable.segment.start",
         channel="fact",
         caller_payload={"seq": 2},
         outcome="success",
