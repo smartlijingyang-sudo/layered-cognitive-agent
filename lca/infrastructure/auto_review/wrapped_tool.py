@@ -54,6 +54,10 @@ class AutoReviewWrappedTool(Tool):
         return getattr(self._inner, "effect_kind", "ephemeral")
 
     @property
+    def namespace(self) -> str:
+        return self._inner.namespace
+
+    @property
     def default_timeout_s(self) -> int:
         return self._inner.default_timeout_s
 

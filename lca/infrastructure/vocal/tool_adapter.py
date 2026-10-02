@@ -25,6 +25,7 @@ class SendMessageVocalTool(Tool):
     """ADR-0248 唯一声道的标准 Tool 适配器。"""
 
     name: ClassVar[str] = "send_message"
+    namespace: ClassVar[str] = "agent"
     description: ClassVar[str] = (
         "向用户对外唯一声道发射正式消息。在门控模式下，大模型普通内省文本用户不可见，"
         "必须调用此工具交付气泡或选项卡。支持类型：text（普通气泡）、"
