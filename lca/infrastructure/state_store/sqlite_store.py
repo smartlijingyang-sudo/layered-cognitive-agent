@@ -15,8 +15,8 @@ import pickle
 import sqlite3
 from hashlib import sha256
 from pathlib import Path
-from time import time
 
+from lca.contracts.atoms.ids.ids import utc_now_ms
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols import StateStore
 
@@ -63,7 +63,7 @@ class SqliteStateStore(StateStore):
                     sha256 = excluded.sha256,
                     updated_at_ms = excluded.updated_at_ms
                 """,
-                (state_ref, sqlite3.Binary(payload), digest, int(time() * 1000)),
+                (state_ref, sqlite3.Binary(payload), digest, utc_now_ms()),
             )
 
     def _load_state(self, state_ref: str) -> AgentState:
