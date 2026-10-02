@@ -336,7 +336,7 @@ class SimpleBody(Body):
         best-effort:取不到 cursor 或 advance 抛 CursorError → warning + 继续。
 
         ``action_type`` 是 ``Decision.action_type`` 的字符串值
-        (contracts/models/core/decision.py:69),不是 ``ActionType`` enum。
+        (lca/contracts/models/core/execution/decision.py:90),不是 ``ActionType`` enum。
         字典 key 用 ``.value`` 是为了字典查表类型诚实,与调用者传入形态一致。
         """
         target = _ACTION_TO_PHASE.get(action_type)
@@ -353,7 +353,7 @@ class SimpleBody(Body):
         from lca.contracts.models.core.policy.budget import TERMINAL_RESERVE_STEPS
 
         last_decision = state.history[-1].decision if state.history else None
-        # ``Decision.action_type`` 是 str(contracts/models/core/decision.py:69),
+        # ``Decision.action_type`` 是 str(lca/contracts/models/core/execution/decision.py:90),
         # 与 ``ActionType(str, Enum)`` 字面量等价;这里用 enum 表达 closure set
         # 只是为了 IDE 跳转 / 重构追踪,运行时比较仍然走 str 值。
         should_seal = last_decision is not None and last_decision.action_type in {
