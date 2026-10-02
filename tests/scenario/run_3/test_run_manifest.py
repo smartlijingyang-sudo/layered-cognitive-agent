@@ -134,10 +134,10 @@ def test_manifest_plan_ref_top_level_field() -> None:
 
 
 def test_manifest_plan_ref_round_trip_with_real_compiled_run_plan_ref() -> None:
-    """用真 compiled_run_plan_ref(16-hex)做 round-trip。
+    """用真 compiled_run_plan_ref 做 round-trip。
 
-    锁住 plan_ref 的事实格式:16 hex chars(declarative 路径)或 mode
-    fingerprint(solo 路径,同样 16 hex)。任何 reader 都按 16-hex 解析。
+    锁住 plan_ref 的事实格式:ADR-0185 S2.5 wire form ``sha256:`` 前缀 +
+    16 hex chars(declarative 路径)。任何 reader 都按 wire form 解析。
     """
     from lca_kernel.plan.plan_compile import compile_plan
     from lca.harness.plan import compiled_run_plan_ref
@@ -147,9 +147,11 @@ def test_manifest_plan_ref_round_trip_with_real_compiled_run_plan_ref() -> None:
     plan = compile_plan(profile)
     expected_ref = compiled_run_plan_ref(plan)
 
-    # 真实 plan_ref 长度恰好 16 hex
-    assert len(expected_ref) == 16
-    assert all(c in "0123456789abcdef" for c in expected_ref)
+    # ADR-0185 S2.5 wire form: ``sha256:`` prefix + 16 hex chars.
+    assert expected_ref.startswith("sha256:")
+    hex_part = expected_ref[len("sha256:"):]
+    assert len(hex_part) == 16
+    assert all(c in "0123456789abcdef" for c in hex_part)
 
     m = RunManifest(run_id="r", plan_ref=expected_ref)
     restored = RunManifest.from_dict(m.to_dict())
