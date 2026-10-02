@@ -55,10 +55,12 @@ def _count_phase_graph_module_lines(bundle_path: Path) -> int:
 class TestADR0194Acceptance:
     """Executable subset of ADR-0194 §9 Overall Done criteria."""
 
+    @pytest.mark.skip(reason=("archaeology: subject 已有意退役——bundles/declarative-phase-graph.yaml 删于 ""d262aaf7e(ADR-0236 PR-7);lca/plugins/loop/phase/*/standard/plugin.py 删于 ""63a68a4da(ADR-0221 v2 PlanInterpreter)。ADR-0194 迁移已完成,本验收项无 subject。"))
     def test_loop_readme_and_phase_bundle_exist(self) -> None:
         assert (ROOT / "lca" / "loop" / "README.md").is_file()
         assert BUNDLE.is_file()
 
+    @pytest.mark.skip(reason=("archaeology: subject 已有意退役——bundles/declarative-phase-graph.yaml 删于 ""d262aaf7e(ADR-0236 PR-7);lca/plugins/loop/phase/*/standard/plugin.py 删于 ""63a68a4da(ADR-0221 v2 PlanInterpreter)。ADR-0194 迁移已完成,本验收项无 subject。"))
     def test_standard_phase_executors_in_loop_seam(self) -> None:
         phases = ("perceive", "think", "act", "reflect", "remember", "stop")
         for phase in phases:
@@ -68,6 +70,7 @@ class TestADR0194Acceptance:
             assert "@plugin(" in source
             assert "PhaseExecutor" in source or "execute" in source
 
+    @pytest.mark.skip(reason=("archaeology: subject 已有意退役——bundles/declarative-phase-graph.yaml 删于 ""d262aaf7e(ADR-0236 PR-7);lca/plugins/loop/phase/*/standard/plugin.py 删于 ""63a68a4da(ADR-0221 v2 PlanInterpreter)。ADR-0194 迁移已完成,本验收项无 subject。"))
     def test_no_flat_phase_graph_in_declarative_bundle(self) -> None:
         """Six standard executors must bind loop.phase.*, not legacy phase_graph paths."""
         text = BUNDLE.read_text(encoding="utf-8")
@@ -76,6 +79,7 @@ class TestADR0194Acceptance:
             assert f"lca.plugins.phase_graph.{phase}" not in text
             assert f"lca.plugins.phase_graph.standard.{phase}" not in text
 
+    @pytest.mark.skip(reason=("archaeology: subject 已有意退役——bundles/declarative-phase-graph.yaml 删于 ""d262aaf7e(ADR-0236 PR-7);lca/plugins/loop/phase/*/standard/plugin.py 删于 ""63a68a4da(ADR-0221 v2 PlanInterpreter)。ADR-0194 迁移已完成,本验收项无 subject。"))
     def test_declarative_bundle_no_legacy_phase_graph_modules(self) -> None:
         """declarative-phase-graph + declarative-recovery: zero phase_graph $module (or COMPAT allowlist)."""
         offenders: list[str] = []
@@ -109,6 +113,7 @@ class TestADR0194Acceptance:
             f"{_WEB_APP_PHASE_GRAPH_MODULE_BASELINE} when migration reduces debt."
         )
 
+    @pytest.mark.skip(reason=("archaeology: subject 已有意退役——bundles/declarative-phase-graph.yaml 删于 ""d262aaf7e(ADR-0236 PR-7);lca/plugins/loop/phase/*/standard/plugin.py 删于 ""63a68a4da(ADR-0221 v2 PlanInterpreter)。ADR-0194 迁移已完成,本验收项无 subject。"))
     def test_control_slots_in_loop_seam(self) -> None:
         text = BUNDLE.read_text(encoding="utf-8")
         assert "lca.plugins.loop.control." in text
