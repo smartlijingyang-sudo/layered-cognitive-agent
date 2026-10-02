@@ -18,12 +18,19 @@ def test_spine_yaml_loads_spine_events_after_pr6() -> None:
     替换 ``spine.llm.request.header`` shell entry 为 typed payload,替换不增数。
     loop cursor record_* + i17 self-observation 新增 7 个 spine 类别。
     assistant.yaml + composio.yaml 新增 23 个 spine 类别（ADR-0187 + composio debug）。
+
+    135→143（+11/−3，实证 git diff 04e9f8a7e..HEAD）：新增 think.gate.start/end
+    （brain.gate.* 退役替换）、phase.evidence/phase.fact + runtime.diagnostic
+    （b43e45221 ADR-0192 fact plane）、llm.tool_call.streaming（f97a8db33）、
+    phase_graph.subgraph.enter/exit（be63ec032）、body.deterministic_fail /
+    effect.receipt / terminal.commit（c2b0607eb）；移除 brain.gate.start/end、
+    phase.gate.fold（退役）。
     """
     config_dir = Path(__file__).resolve().parents[3] / "lca_kernel" / "events" / "config"
     registry = EventRegistry.load(config_dir)
     spine_specs = [s for s in registry.specs if s.category.value.startswith("spine.")]
-    assert len(spine_specs) == 135, (
-        f"spine 事件应 135 个（131 + skill.package 4）；found {len(spine_specs)}"
+    assert len(spine_specs) == 143, (
+        f"spine 事件应 143 个（135 +11 新增 −3 退役）；found {len(spine_specs)}"
     )
     spec = next(
         s
