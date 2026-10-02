@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-import time
 
+from lca.contracts.atoms.ids.ids import utc_now_ms
 from lca.contracts.models.browser.models import DesktopLock
 
 
@@ -22,13 +22,10 @@ class DesktopLockManager:
         self._current_lock: DesktopLock | None = None
         self._mutex = asyncio.Lock()
 
-    def _now_ms(self) -> int:
-        return int(time.time() * 1000)
-
     def _is_expired(self) -> bool:
         if self._current_lock is None:
             return True
-        return self._current_lock.is_expired(self._now_ms())
+        return self._current_lock.is_expired(utc_now_ms())
 
     def is_locked(self) -> bool:
         """检查当前是否有未过期的桌面锁。"""
@@ -54,7 +51,7 @@ class DesktopLockManager:
         """
         async with self._mutex:
             ttl = ttl_seconds if ttl_seconds is not None else self.default_ttl_s
-            now = self._now_ms()
+            now = utc_now_ms()
 
             # 如果当前无锁，或当前锁已超时，允许抢占
             if self._current_lock is None or self._is_expired():
