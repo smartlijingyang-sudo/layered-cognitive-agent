@@ -31,8 +31,10 @@ from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
 
 REPO = Path(__file__).resolve().parents[2]
 LCA = REPO / "lca"
-JOBS_MODULE = LCA / "plugins" / "assistant" / "jobs.py"
-EVOLVE_MODULE = LCA / "plugins" / "assistant" / "evolve.py"
+# jobs.py moved into the jobs/ package (package split).
+JOBS_MODULE = LCA / "plugins" / "assistant" / "jobs" / "jobs.py"
+# evolve.py moved into the evolve/ package (package split).
+EVOLVE_MODULE = LCA / "plugins" / "assistant" / "evolve" / "evolve.py"
 
 _FIXED_NOW = datetime(2026, 9, 4, 12, 0, 0, tzinfo=UTC)
 
