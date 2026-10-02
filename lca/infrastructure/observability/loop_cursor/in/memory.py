@@ -2,8 +2,9 @@
 
 非法转移 raise CursorError;无 spine 写入;纯内存状态。
 公共面与 :class:`StdLoopCursor` 对齐(2026-09-14 dead-code 修剪):
-``record_*`` / ``halt`` / ``close`` / ``fork`` / ``resume_cursor`` 全删,
-只留 ``advance`` + ``open_step`` + snapshot。
+``record_*`` / ``halt`` / ``close`` / ``fork`` / ``resume_cursor`` 全删;
+``open_step`` 随 cursor 第二轨退役移除,只留 ``advance`` + snapshot
+(``incarnation`` 只读暴露)。
 """
 
 from __future__ import annotations
@@ -36,7 +37,7 @@ class InMemoryLoopCursor:
             trace_id=trace_id,
             incarnation=incarnation,
         )
-        # 可选 spine:有则 ``advance`` / ``open_step`` 派生 EP;无则纯内存状态机。
+        # 可选 spine:有则 ``advance`` 派生 EP;无则纯内存状态机。
         self._spine = spine
 
     @property

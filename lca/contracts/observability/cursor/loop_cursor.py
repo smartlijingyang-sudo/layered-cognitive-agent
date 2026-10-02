@@ -1,8 +1,9 @@
 """LoopCursor 控制面 Protocol(ADR-0169 D1)。
 
-业务路径唯一允许调用 ``advance`` / ``open_step``;其余 record_* /
-halt / close / fork 全部不在公共面(2026-09-14 dead-code 修剪:这些方法
-在生产路径零 caller,被删除)。
+业务路径唯一允许调用 ``advance``;其余 record_* / halt / close / fork
+全部不在公共面(2026-09-14 dead-code 修剪:这些方法在生产路径零
+caller,被删除);``open_step`` 属 cursor 第二轨,已退役(见下 Protocol
+不暴露清单)。
 """
 
 from __future__ import annotations
