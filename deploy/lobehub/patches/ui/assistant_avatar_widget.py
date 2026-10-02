@@ -25,10 +25,12 @@ meta = PatchMeta(
     depends_on=("connector_auth_card",),
     why="Provide generated-image avatar candidate picker cards in chat backed by the avatar REST API",
     technical_detail=(
-        "Installs AssistantAvatarWidget.tsx in Conversation/Messages/components and mounts it in Assistant/index.tsx"
+        "Installs AssistantAvatarWidget.tsx in Conversation/Messages/components, mounts it in "
+        "Assistant/index.tsx next to a LCA-AVATAR-PICKER-MOUNT comment marker, and verifies the "
+        "mount marker (not just the component file) so reverts of Assistant/index.tsx are detected."
     ),
-    verify_file=_COMPONENT_REL,
-    verify_marker="avatar/candidates",
+    verify_file=_ASSISTANT_REL,
+    verify_marker="LCA-AVATAR-PICKER-MOUNT",
 )
 
 
@@ -103,6 +105,7 @@ def apply(ctx: PatchContext) -> bool:
     )
     mount_repl = (
         f"{mount_anchor}\n"
+        "            {/* LCA-AVATAR-PICKER-MOUNT */}\n"
         "            {isAvatarPickerWidget && (\n"
         "              <AssistantAvatarWidget\n"
         "                assistantId={agentId}\n"

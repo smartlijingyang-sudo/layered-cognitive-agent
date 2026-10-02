@@ -18,7 +18,16 @@ from pathlib import Path
 
 import pytest
 
-from deploy.lobehub.engine import PatchContext
+from deploy.lobehub.engine import (
+    Manifest,
+    PatchContext,
+    PatchEntry,
+    PatchModule,
+    _compute_patch_hash,
+    _read_manifest,
+    _write_manifest,
+    reconcile,
+)
 from deploy.lobehub.patches.ui.assistant_avatar_widget import apply, meta
 
 _COMPONENT_REL = "src/features/Conversation/Messages/components/AssistantAvatarWidget.tsx"
@@ -158,12 +167,13 @@ def test_assistant_avatar_widget_patch_module() -> None:
     content = path.read_text(encoding="utf-8")
     assert "AssistantAvatarWidget" in content
     assert "avatar/candidates" in content or "avatar/set" in content
+    assert "LCA-AVATAR-PICKER-MOUNT" in content
 
 
 def test_avatar_widget_patch_meta() -> None:
     assert meta.name == "assistant_avatar_widget"
-    assert meta.verify_marker == "avatar/candidates"
-    assert meta.verify_file == _COMPONENT_REL
+    assert meta.verify_marker == "LCA-AVATAR-PICKER-MOUNT"
+    assert meta.verify_file == _ASSISTANT_REL
     assert _COMPONENT_REL in meta.files
     assert _ASSISTANT_REL in meta.files
 
@@ -185,6 +195,26 @@ def test_avatar_widget_apply_writes_component_and_mounts(tmp_path: Path) -> None
     assert "isAvatarPickerWidget" in assistant
     assert "<AssistantAvatarWidget" in assistant
     assert "assistantId={agentId}" in assistant
+    assert "LCA-AVATAR-PICKER-MOUNT" in assistant
+
+
+def test_avatar_widget_verify_targets_mount_marker(tmp_path: Path) -> None:
+    """The patch's verify marker must live in Assistant/index.tsx next to the
+    mount, so a reverted Assistant/index.tsx is detected by verify/reconcile."""
+    ui = _seed_ui(tmp_path)
+    ctx = PatchContext(ui_dir=ui)
+    assert apply(ctx) is True
+
+    assert meta.verify_file == _ASSISTANT_REL
+    assert meta.verify_marker == "LCA-AVATAR-PICKER-MOUNT"
+    assistant = (ui / _ASSISTANT_REL).read_text(encoding="utf-8")
+    assert meta.verify_marker in assistant
+    # Marker sits immediately above the mount.
+    assert (
+        "LCA-AVATAR-PICKER-MOUNT */}\n"
+        "            {isAvatarPickerWidget && (\n"
+        "              <AssistantAvatarWidget"
+    ) in assistant
 
 
 def test_avatar_widget_apply_is_idempotent(tmp_path: Path) -> None:
@@ -203,3 +233,69 @@ def test_avatar_widget_apply_raises_when_anchor_missing(tmp_path: Path) -> None:
     ctx = PatchContext(ui_dir=ui)
     with pytest.raises(SystemExit, match="assistant_avatar_widget"):
         apply(ctx)
+
+
+def test_avatar_widget_reconcile_restores_missing_mount(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """If Assistant/index.tsx loses the mount (e.g. upstream sync restores it),
+    reconcile must detect the missing LCA-AVATAR-PICKER-MOUNT marker, restore
+    both declared files from upstream, and mark the patch pending for re-apply.
+    This is the regression the old verify_file=_COMPONENT_REL allowed: verify
+    would report OK while the mount silently vanished."""
+    from deploy.lobehub import engine as eng
+
+    root = tmp_path / "repo"
+    ui = root / "lobehub-ui"
+    upstream = root / ".lobehub-upstream"
+    monkeypatch.setattr(eng, "ROOT", root)
+    monkeypatch.setattr(eng, "UI", ui)
+    monkeypatch.setattr(eng, "MANIFEST_FILE", ui / ".lca-manifest.json")
+    monkeypatch.setattr(eng, "LEGACY_STAMP", ui / ".lca-patched")
+    monkeypatch.setattr(eng, "LEGACY_HASHES", ui / ".lca-patch-hashes")
+    monkeypatch.setattr(eng, "_UPSTREAM", upstream)
+
+    def write(rel: str, content: str) -> None:
+        p = ui / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(content, encoding="utf-8")
+
+    def write_upstream(rel: str, content: str) -> None:
+        p = upstream / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(content, encoding="utf-8")
+
+    # Upstream = pristine LobeHub files (no widget mount). UI matches upstream,
+    # so the mount marker is absent and reconcile must treat the patch as broken.
+    write_upstream(_COMPONENT_REL, "/* upstream component */\n")
+    write_upstream(_ASSISTANT_REL, _STUB_ASSISTANT)
+    write(_COMPONENT_REL, "/* upstream component */\n")
+    write(_ASSISTANT_REL, _STUB_ASSISTANT)
+
+    pm = PatchModule(meta=meta, apply=apply)
+    sha = _compute_patch_hash(pm)
+
+    manifest = Manifest()
+    manifest.patches["assistant_avatar_widget"] = PatchEntry(
+        name="assistant_avatar_widget",
+        status="applied",
+        source_sha=sha,
+        written=[_COMPONENT_REL, _ASSISTANT_REL],
+    )
+    _write_manifest(manifest)
+
+    reconcile(modules=[pm])
+
+    # Files restored to upstream baseline; patch marked pending.
+    assert (ui / _ASSISTANT_REL).read_text() == _STUB_ASSISTANT
+    assert (ui / _COMPONENT_REL).read_text() == "/* upstream component */\n"
+    assert _read_manifest().patches["assistant_avatar_widget"].status == "pending"
+
+    # Re-apply re-injects the mount + marker.
+    ctx = PatchContext(ui_dir=ui, manifest=_read_manifest())
+    ctx._current_patch = "assistant_avatar_widget"
+    assert pm.apply(ctx)
+    assistant_text = (ui / _ASSISTANT_REL).read_text()
+    assert "LCA-AVATAR-PICKER-MOUNT" in assistant_text
+    assert "<AssistantAvatarWidget" in assistant_text
+    assert "assistantId={agentId}" in assistant_text
