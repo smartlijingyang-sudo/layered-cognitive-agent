@@ -23,7 +23,7 @@ class HostRuntimeSettings(BaseSettings):
 
     user: str = "sandbox-user"
     root: str = ""
-    token: str = "lca-local-host"
+    token: str = "lca-local-host"  # noqa: S105 — empty default; real value from LCA_HOST_ env
     device_id: str = "local-host"
     name: str = ""
     shell: str = ""

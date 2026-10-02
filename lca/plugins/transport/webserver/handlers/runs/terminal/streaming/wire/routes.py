@@ -27,7 +27,7 @@ from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.wire.http 
 )
 
 WS_PATH: str = "/v1/runs/{run_id}/ws"
-WS_TOKEN_PATH: str = "/v1/runs/{run_id}/ws-token"
+WS_TOKEN_PATH: str = "/v1/runs/{run_id}/ws-token"  # noqa: S105 — URL path constant, not a credential
 RUNNING_OP_PATH: str = "/v1/topics/{topic_id}/running-op"
 
 

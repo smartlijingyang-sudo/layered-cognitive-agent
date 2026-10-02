@@ -27,7 +27,7 @@ class KernelServeHttpClient:
         base_url: str,
         *,
         token: str = "",
-        token_type: str = "serviceToken",
+        token_type: str = "serviceToken",  # noqa: S107 — token-type discriminator, not a credential
     ) -> None:
         self._base = base_url.rstrip("/") + "/"
         self._token = token
