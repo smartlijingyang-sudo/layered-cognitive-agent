@@ -29,6 +29,10 @@ class ProactiveJob(BaseModel):
     )
     target: DeliveryTarget = Field(..., description="投递落点")
     requested: bool = Field(default=False, description="是否用户明确要求")
+    request_ref: str | None = Field(
+        default=None,
+        description="requested=True 时的引用 ID；须为 job:<id> 形式，由 scheduler 以任务定义背书，gate 做机械校验",
+    )
     worth_interrupting: bool = Field(default=False, description="是否值得打断")
     enabled: bool = Field(default=True, description="是否启用")
     stale_multiplier: float = Field(

@@ -235,6 +235,10 @@ async def onboarding_naming_settle(request: Request) -> JSONResponse:
             locale=_locale,
         )
         _target = DeliveryTarget(kind=DeliveryTargetKind.RESPONSE_CARRIED)
+        # requested 的 trigger 上下文背书：本请求刚刚完成了该 user_id 的
+        # onboarding（上文已落盘），引用与背书都来自这次真实完成的事件，
+        # 不是消息生产方的自声明（ADR-0264 §4①）。
+        _event_ref = f"onboarding-completed:{user_id}"
         _request = ProactiveRequest(
             message=ProactiveMessage(
                 id=f"onboarding-welcome-{user_id}",
@@ -243,6 +247,9 @@ async def onboarding_naming_settle(request: Request) -> JSONResponse:
             ),
             target=_target,
             requested=True,
+            request_ref=_event_ref,
+            known_request_refs=(_event_ref,),
+            declared=VerdictKind.DELIVER_CHAT,
         )
         _verdict = _decide_worthiness(_request)
         if _verdict.kind == VerdictKind.DELIVER_CHAT:

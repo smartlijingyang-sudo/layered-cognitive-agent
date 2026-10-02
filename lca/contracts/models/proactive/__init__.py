@@ -13,6 +13,7 @@ from lca.contracts.models.proactive.message import (
     ProactiveMessage,
     ProactiveSource,
 )
+from lca.contracts.models.proactive.policy import ProactivePolicy
 from lca.contracts.models.proactive.schedule import ProactiveJob, TickReport
 from lca.contracts.models.proactive.worthiness import (
     ProactiveRequest,
@@ -25,6 +26,7 @@ __all__ = [
     "DeliveryTargetKind",
     "ProactiveJob",
     "ProactiveMessage",
+    "ProactivePolicy",
     "ProactiveRequest",
     "ProactiveSource",
     "TickReport",
