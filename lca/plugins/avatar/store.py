@@ -11,6 +11,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal, cast
 
+from PIL import Image
+
 from lca.contracts.models.avatar import (
     AVATAR_SIZES,
     CANDIDATE_TTL,
@@ -112,8 +114,7 @@ class AvatarStore:
             width, height = _ORIGINAL_SIZE
             target.write_bytes(data)
         else:
-            width, height = _SIZES_PX[size]
-            _resize_image(data, target, _SIZES_PX[size])
+            width, height = _resize_image(data, target, _SIZES_PX[size])
         return AvatarVariant(
             size=size,
             file_path=f"{rel_dir}/{size}{_IMAGE_EXT}",
@@ -131,15 +132,16 @@ class AvatarStore:
     def copy_candidate_to_active(
         self, assistant_id: str, candidate: AvatarCandidate
     ) -> AvatarActiveBundle:
-        active = self.active_dir()
-        if active.exists():
-            shutil.rmtree(active)
+        active_root = self.active_dir()
+        if active_root.exists():
+            shutil.rmtree(active_root)
+        active = active_root / candidate.candidate_id
         shutil.copytree(self.candidate_dir(candidate.candidate_id), active)
         variants = tuple(
             AvatarVariant(
                 size=v.size,
                 file_path=f"active/{candidate.candidate_id}/{v.size}{_IMAGE_EXT}",
-                url=f"/lca-api/v1/assistants/{assistant_id}/avatar/files/active/{v.size}{_IMAGE_EXT}",
+                url=f"/lca-api/v1/assistants/{assistant_id}/avatar/files/active/{candidate.candidate_id}/{v.size}{_IMAGE_EXT}",
                 width=v.width,
                 height=v.height,
             )
@@ -168,11 +170,9 @@ class AvatarStore:
         return removed
 
 
-def _resize_image(data: bytes, target: Path, size: tuple[int, int]) -> None:
-    # Pillow 尚未纳入项目依赖；加入 pyproject 后此 ignore 可移除。
-    from PIL import Image  # type: ignore[import-not-found]
-
+def _resize_image(data: bytes, target: Path, size: tuple[int, int]) -> tuple[int, int]:
     with Image.open(io.BytesIO(data)) as im:
-        im = im.convert("RGB")
-        im.thumbnail(size, Image.LANCZOS)
-        im.save(target, "PNG")
+        rgb = im.convert("RGB")
+        rgb.thumbnail(size, Image.Resampling.LANCZOS)
+        rgb.save(target, "PNG")
+        return rgb.size

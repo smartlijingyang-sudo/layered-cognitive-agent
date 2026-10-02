@@ -1,7 +1,9 @@
+import io
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
 from lca.contracts.models.avatar import (
     CANDIDATE_TTL,  # noqa: F401  # 同上
@@ -40,6 +42,19 @@ def test_write_and_read_image(store: AvatarStore, tmp_path: Path):
     assert (tmp_path / "avatar" / "candidates" / "c1" / "original.png").exists()
 
 
+def test_write_image_resizes_small(store: AvatarStore):
+    buf = io.BytesIO()
+    Image.new("RGB", (64, 64), (255, 0, 0)).save(buf, "PNG")
+    variant = store.write_image("asst_1", "c1", "small", buf.getvalue())
+    assert variant.size == "small"
+    assert variant.width == 64 and variant.height == 64
+    path = store.candidate_dir("c1") / "small.png"
+    assert path.exists()
+    with Image.open(path) as im:
+        assert im.format == "PNG"
+        assert im.size == (64, 64)
+
+
 def test_copy_candidate_to_active(store: AvatarStore):
     now = datetime(2026, 10, 2, 12, 0, tzinfo=UTC)
     cand = store._make_candidate("asst_1", "c1", "create", "prompt", now)
@@ -48,7 +63,7 @@ def test_copy_candidate_to_active(store: AvatarStore):
     )
     bundle = store.copy_candidate_to_active("asst_1", cand)
     assert bundle.candidate_id == "c1"
-    assert (store.active_dir() / "original.png").exists()
+    assert (store.active_dir() / "c1" / "original.png").exists()
 
 
 def test_cleanup_expired(store: AvatarStore):
