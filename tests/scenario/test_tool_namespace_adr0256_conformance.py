@@ -1,7 +1,7 @@
 """ADR-0256 全量符合性集成验收测试套件 (INV-01 ~ INV-07).
 
-验证 8 大工具命名空间划分规范（决策粒度 × 加载粒度 × 审批粒度三合一）：
-1. INV-01: 首 turn 目录行严格 7 行纯净描述，绝无 'N tools:' 降级文本；
+验证工具命名空间划分规范（ADR-0256 8 域 + ADR-0268 新增 ``lca``/``cron``）：
+1. INV-01: 首 turn 目录行严格 9 行纯净描述，绝无 'N tools:' 降级文本；
 2. INV-02: 缺少或非法 namespace 的工具在 update_turn 时必抛 ValueError (Fail-fast)；
 3. INV-03: 单域加载 tool_search(namespace='file') 一次返回该域全部工具；
 4. INV-04: 批量加载 tool_search(namespaces=['file', 'memory']) 支持多域合并去重；
@@ -52,7 +52,7 @@ class _ConformanceTool:
         return {"ok": True, "tool": self.name, "args": args}
 
 
-def _make_8_domain_tools() -> list[Tool]:
+def _make_standard_domain_tools() -> list[Tool]:
     tools: list[Tool] = [ToolSearchTool()]  # core
     for ns in STANDARD_NAMESPACES:
         if ns == "core":
@@ -61,10 +61,10 @@ def _make_8_domain_tools() -> list[Tool]:
     return tools
 
 
-def test_inv_01_catalog_has_exact_seven_pure_lines_no_tool_counts() -> None:
-    """INV-01: 目录行除 eager core 外恰好 7 行，无 'N tools:' 降级文本."""
+def test_inv_01_catalog_has_exact_nine_pure_lines_no_tool_counts() -> None:
+    """INV-01: 目录行除 eager core 外恰好 9 行，无 'N tools:' 降级文本."""
     session = ToolDeferSession(DeferPolicy.default())
-    tools = _make_8_domain_tools()
+    tools = _make_standard_domain_tools()
     session.update_turn(tools)
     wire, catalog = session.render_turn()
 
@@ -72,9 +72,9 @@ def test_inv_01_catalog_has_exact_seven_pure_lines_no_tool_counts() -> None:
     wire_names = [spec["function"]["name"] for spec in wire]
     assert "tool_search" in wire_names
 
-    # 目录行严格 7 行
+    # 目录行严格 9 行
     catalog_lines = [line for line in catalog.splitlines() if line.startswith("- ")]
-    assert len(catalog_lines) == 7
+    assert len(catalog_lines) == 9
     assert "tools:" not in catalog
     assert "- core: " not in catalog
 
@@ -85,8 +85,12 @@ def test_inv_01_catalog_has_exact_seven_pure_lines_no_tool_counts() -> None:
         assert f"- {ns}: {expected_desc}" in catalog
 
 
-def test_inv_02_missing_or_invalid_namespace_fails_fast() -> None:
-    """INV-02: 任何未声明 namespace 或声明未知域的工具在 update_turn 时必然抛错."""
+def test_inv_02_missing_or_undeclared_namespace_handling() -> None:
+    """INV-02: 未声明 namespace 的工具 fail-soft 停靠 unknown；声明未知域则抛错.
+
+    6d190d51b 起缺失 namespace 不再杀 run（fail-soft，停靠 ``unknown``）。
+    声明了 policy 没有描述的 namespace 仍是 fail-fast（ADR-0256 B2）。
+    """
     session = ToolDeferSession(DeferPolicy.default())
 
     class UnannotatedTool:
@@ -98,9 +102,12 @@ def test_inv_02_missing_or_invalid_namespace_fails_fast() -> None:
         async def execute(self, args: dict[str, Any]) -> dict[str, Any]:
             return {}
 
-    with pytest.raises(ValueError, match="orphan"):
-        session.update_turn((UnannotatedTool(),))  # type: ignore[arg-type]
+    # 缺失 namespace：fail-soft 停靠 unknown，不抛错。
+    session.update_turn((UnannotatedTool(),))  # type: ignore[arg-type]
+    namespaces = {ns.name for ns in session.namespaces}
+    assert "unknown" in namespaces
 
+    # 声明了 policy 没有描述的 namespace：仍 fail-fast。
     with pytest.raises(ValueError, match="invalid_namespace"):
         session.update_turn((_ConformanceTool("bad", "invalid_namespace"),))  # type: ignore[arg-type]
 
@@ -152,7 +159,7 @@ async def test_inv_04_batch_loading_multiple_domains() -> None:
 def test_inv_05_unloaded_namespace_wire_gate_blocking() -> None:
     """INV-05: Wire Gate 对未加载域调用直接拦截并返回 guidance."""
     session = ToolDeferSession(DeferPolicy.default())
-    tools = _make_8_domain_tools()
+    tools = _make_standard_domain_tools()
     session.update_turn(tools)
 
     token = set_current_defer_session(session)

@@ -23,6 +23,7 @@ from lca.infrastructure.tools import ask_user as ask_user_module
 from lca.infrastructure.tools import environment_awareness, lca_computer
 from lca.infrastructure.tools import web_search as web_search_module
 from lca.infrastructure.tools import write_file as write_file_module
+from lca.infrastructure.tools.lca import build_tools as build_lca_tools
 from lca.infrastructure.tools.skills.tool.set import build_operational_skill_tools
 
 SEARCH_SKILL_TOOL = "search_skill"
@@ -110,6 +111,7 @@ def build_default_tools(
             *build_operational_skill_tools(
                 sandbox=skill_sandbox, file_store=file_store, store=skill_store
             ),
+            *build_lca_tools(),
         ]
 
     write_tools: list[Tool] = (
@@ -121,6 +123,7 @@ def build_default_tools(
         *write_tools,
         *awareness_tools,
         *build_operational_skill_tools(sandbox=None, file_store=file_store, store=skill_store),
+        *build_lca_tools(),
     ]
 
 

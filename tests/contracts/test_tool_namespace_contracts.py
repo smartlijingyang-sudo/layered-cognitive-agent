@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any, ClassVar
+
 from lca.contracts.models.core.execution.tool import ToolApi
 from lca.contracts.protocols import Tool
 from lca.infrastructure.tool_defer.policy import STANDARD_NAMESPACES, DeferPolicy
@@ -9,12 +11,12 @@ from lca.infrastructure.tool_defer.policy import STANDARD_NAMESPACES, DeferPolic
 
 def test_tool_protocol_requires_namespace() -> None:
     class IncompleteTool:
-        name = "test"
-        description = "test"
-        parameters = {}
-        is_idempotent = True
-        effect_kind = "ephemeral"
-        default_timeout_s = 10
+        name: ClassVar[str] = "test"
+        description: ClassVar[str] = "test"
+        parameters: ClassVar[dict[str, Any]] = {}
+        is_idempotent: ClassVar[bool] = True
+        effect_kind: ClassVar[str] = "ephemeral"
+        default_timeout_s: ClassVar[int] = 10
 
         async def execute(self, args):
             return None
@@ -36,7 +38,7 @@ def test_tool_api_has_namespace_field() -> None:
     assert api.namespace == "file"
 
 
-def test_defer_policy_standard_eight_namespaces() -> None:
+def test_defer_policy_standard_namespaces() -> None:
     policy = DeferPolicy.default()
     assert policy.eager_namespaces == frozenset({"core"})
     assert set(policy.namespace_descriptions.keys()) == set(STANDARD_NAMESPACES)
@@ -49,6 +51,8 @@ def test_defer_policy_standard_eight_namespaces() -> None:
         "web",
         "agent",
         "ext",
+        "lca",
+        "cron",
     }
     assert "shell" in policy.namespace_approval
     assert policy.namespace_approval["shell"] == "require_approval"
