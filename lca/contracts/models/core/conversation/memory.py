@@ -3,20 +3,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from lca.contracts.atoms.enums.enums import MemoryCategory, MemoryLayer, MemoryRecordKind
 
 
-class MemoryTrust(str, Enum):
+class MemoryTrust(StrEnum):
     """模型消费记忆时必须遵守的可信度分级。"""
 
     TRUSTED = "trusted"
     UNTRUSTED_HISTORY = "untrusted_history"
 
 
-class MemoryRelationKind(str, Enum):
+class MemoryRelationKind(StrEnum):
     """时态记忆图中允许的事实关系。"""
 
     EXTENDS = "extends"

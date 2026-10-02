@@ -9,11 +9,11 @@ Journal。因此本模型保持小而稳定：关联骨架、操作身份、结�
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class DiagnosticCategory(str, Enum):
+class DiagnosticCategory(StrEnum):
     """诊断事件的对象域；用于跨插件与跨后端的稳定过滤。"""
 
     AGENT = "agent"
@@ -27,7 +27,7 @@ class DiagnosticCategory(str, Enum):
     JOURNAL = "journal"
 
 
-class DiagnosticStatus(str, Enum):
+class DiagnosticStatus(StrEnum):
     """一次诊断操作的终态。"""
 
     INFO = "info"

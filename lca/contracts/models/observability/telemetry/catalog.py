@@ -8,7 +8,7 @@ catalog 一行，缺一即 CI 失败。
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 from lca.contracts.atoms.telemetry.telemetry import (
     ATTR_AGENT_ROLE,
@@ -24,7 +24,7 @@ from lca.contracts.atoms.telemetry.telemetry import (
 )
 
 
-class VocabDomain(str, Enum):
+class VocabDomain(StrEnum):
     """词汇所属语义域。"""
 
     RUN = "run"
@@ -34,7 +34,7 @@ class VocabDomain(str, Enum):
     EVENT = "event"
 
 
-class VocabKind(str, Enum):
+class VocabKind(StrEnum):
     """词汇种类：span（有持续时长）或 event（瞬时事实）。"""
 
     SPAN = "span"

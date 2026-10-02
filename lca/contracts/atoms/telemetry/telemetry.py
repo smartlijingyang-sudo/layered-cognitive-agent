@@ -17,10 +17,10 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class SpanName(str, Enum):
+class SpanName(StrEnum):
     """稳定 span 名（全链路可观测）。"""
 
     # ── 运行域 ──
@@ -49,7 +49,7 @@ class SpanName(str, Enum):
     ERROR = "error"
 
 
-class EventName(str, Enum):
+class EventName(StrEnum):
     """业务事件名（瞬时事实，挂在当前 span 下）。"""
 
     # ── 决策域 ──
