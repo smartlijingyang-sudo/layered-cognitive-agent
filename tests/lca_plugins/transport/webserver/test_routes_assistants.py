@@ -254,10 +254,10 @@ def test_retire_assistant_returns_501_when_catalog_missing() -> None:
     assert response.json()["error"]["code"] == "catalog_unavailable"
 
 
-# ── jobs routes: 501 COMPAT envelope until assistant.jobs wires ──────
+# ── jobs routes: GET/POST wired (ADR-0268 P4), fire stays 501 ────────
 
 
-def test_get_assistant_jobs_returns_501_when_jobs_missing() -> None:
+def test_get_assistant_jobs_returns_501_when_catalog_missing() -> None:
     plugin, router, ctx = _setup_plugin()
     _run_plugin_setup(plugin, ctx)
     app = _app_with_routes(router)
@@ -265,12 +265,11 @@ def test_get_assistant_jobs_returns_501_when_jobs_missing() -> None:
     response = client.get("/v1/assistants/asst_1/jobs")
     assert response.status_code == 501
     body = response.json()
-    assert body["error"]["code"] == "jobs_unavailable"
+    assert body["error"]["code"] == "catalog_unavailable"
     assert "COMPAT" in body["error"]["marker"]
-    assert "delete-when: 2026-12-31" in body["error"]["marker"]
 
 
-def test_post_assistant_jobs_returns_501_when_jobs_missing() -> None:
+def test_post_assistant_jobs_returns_501_when_catalog_missing() -> None:
     plugin, router, ctx = _setup_plugin()
     _run_plugin_setup(plugin, ctx)
     app = _app_with_routes(router)
@@ -280,7 +279,7 @@ def test_post_assistant_jobs_returns_501_when_jobs_missing() -> None:
         json={"job_id": "daily_brief", "schedule": "0 9 * * *", "prompt": "x"},
     )
     assert response.status_code == 501
-    assert response.json()["error"]["code"] == "jobs_unavailable"
+    assert response.json()["error"]["code"] == "catalog_unavailable"
 
 
 def test_fire_assistant_job_returns_501_when_jobs_missing() -> None:
@@ -291,6 +290,62 @@ def test_fire_assistant_job_returns_501_when_jobs_missing() -> None:
     response = client.post("/v1/assistants/asst_1/jobs/daily_brief:fire")
     assert response.status_code == 501
     assert response.json()["error"]["code"] == "jobs_unavailable"
+
+
+def test_assistant_jobs_list_and_create_with_catalog(tmp_path: Any) -> None:
+    """ADR-0268 P4: GET/POST jobs 读写 CronJob；响应只含 CronListItem 投影闭集。"""
+    app, catalog = _app_with_catalog(tmp_path)
+    from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
+
+    handle = catalog.create(CreateAssistantRequest(name="定时助理"))
+    assistant_id = handle.assistant_id
+    client = TestClient(app)
+
+    empty = client.get(f"/v1/assistants/{assistant_id}/jobs")
+    assert empty.status_code == 200
+    assert empty.json() == {"assistant_id": assistant_id, "jobs": []}
+
+    response = client.post(
+        f"/v1/assistants/{assistant_id}/jobs",
+        json={
+            "id": "daily_brief",
+            "title": "每日简报",
+            "schedule": {"kind": "daily", "hour": 9, "minute": 0},
+            "timezone": "Asia/Shanghai",
+            "body": "生成每日简报",
+            "execution": {"kind": "agent"},
+            "chat_id": "chat_1",
+        },
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["assistant_id"] == assistant_id
+    job = body["job"]
+    assert set(job) == {
+        "id",
+        "title",
+        "schedule_label",
+        "next_run_local",
+        "due",
+        "enabled",
+        "last_run_local",
+        "last_delivery",
+    }
+    assert job["id"] == "daily_brief"
+    assert job["title"] == "每日简报"
+    assert job["schedule_label"] == "每天 09:00"
+    assert isinstance(job["next_run_local"], str)
+    assert isinstance(job["due"], bool)
+    assert job["enabled"] is True
+    assert job["last_run_local"] is None
+    assert job["last_delivery"] is None
+
+    listed = client.get(f"/v1/assistants/{assistant_id}/jobs")
+    assert listed.status_code == 200
+    jobs = listed.json()["jobs"]
+    assert len(jobs) == 1
+    assert set(jobs[0]) == set(job)
+    assert jobs[0]["id"] == "daily_brief"
 
 
 # ── PR-6: install handler wired behavior ─────────────────────────────
