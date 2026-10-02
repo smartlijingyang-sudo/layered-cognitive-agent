@@ -36,7 +36,7 @@ def bus() -> EventBus[EventPayload]:
 def _reset_ambient_trace():
     """每个测试独立:收尾强制清 ambient trace,防跨用例串。"""
     yield
-    from lca_kernel.events import bus as bus_module
+    from lca_kernel.events.bus import bus as bus_module
 
     bus_module._current_trace_id.set(None)
 

@@ -329,21 +329,25 @@ class EnvelopeBus(Generic[P]):
 
     @classmethod
     def default(cls) -> EnvelopeBus[P]:
-        if cls._default_instance is None:
+        # NOTE(round-0390): the singleton slot lives on EnvelopeBus
+        # explicitly. `cls._default_instance = ...` would create a per-subclass
+        # shadow (EventBus.set_default then invisible to EnvelopeBus.default),
+        # contradicting the documented shared-variable intent below.
+        if EnvelopeBus._default_instance is None:
             from pathlib import Path
 
             config_dir = Path(__file__).resolve().parent.parent / "config"
             registry = EventRegistry.load(config_dir)
-            cls._default_instance = cls(registry)
-        return cls._default_instance
+            EnvelopeBus._default_instance = cls(registry)
+        return EnvelopeBus._default_instance
 
     @classmethod
     def set_default(cls, instance: EnvelopeBus[P] | None) -> None:
-        cls._default_instance = instance
+        EnvelopeBus._default_instance = instance
 
     @classmethod
     def reset_singleton(cls) -> None:
-        cls._default_instance = None
+        EnvelopeBus._default_instance = None
 
 
 # ── EventBus —— EnvelopeBus 兼容 shim ────────────────────────────────────

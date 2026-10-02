@@ -48,11 +48,13 @@ def authorized_plugin() -> type:
 
 @pytest.fixture
 def subscriber_plugin() -> type:
-    from lca.plugins.events.subscribers.console_projector.subscriber import (
-        ConsoleProjectorSubscriber,
-    )
+    # NOTE(round-0390): ConsoleProjectorSubscriber was retired in f8b7f0896
+    # (old event plane). SpineFileSink is authorized in the yaml
+    # consumer_rules for team.* and spine.* — use it as the plugin
+    # identity token (same pattern as round-0356).
+    from lca.plugins.events.sinks.spine_file_sink.sink import SpineFileSink
 
-    return ConsoleProjectorSubscriber
+    return SpineFileSink
 
 
 @pytest.fixture

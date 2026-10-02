@@ -199,9 +199,15 @@ class SpineEventRecord:
         # EventRecord.__post_init__ whitelist check during the spine
         # byte-layout migration; restore it here so unknown EPs fail loud
         # instead of silently round-tripping through persistence.
+        # NOTE(round-0390): "unknown" is the documented sentinel for
+        # non-spine categories (see build_record docstring below); it is
+        # not an unregistered EP, so it is exempt from the guard.
         from lca_kernel.events.payloads.spine import SPINE_EXECUTION_POINTS
 
-        if self.execution_point not in SPINE_EXECUTION_POINTS:
+        if (
+            self.execution_point not in SPINE_EXECUTION_POINTS
+            and self.execution_point != "unknown"
+        ):
             msg = (
                 f"UnknownExecutionPoint({self.execution_point!r}): "
                 "not in SPINE_EXECUTION_POINTS whitelist. "

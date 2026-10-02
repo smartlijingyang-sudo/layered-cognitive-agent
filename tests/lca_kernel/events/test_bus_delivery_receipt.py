@@ -59,11 +59,13 @@ def team_payload() -> TeamDelegationCacheHit:
 @pytest.fixture
 def subscriber_plugin() -> type:
     """team. 前缀 consumer_rules 授权的订阅方。"""
-    from lca.plugins.events.subscribers.console_projector.subscriber import (
-        ConsoleProjectorSubscriber,
-    )
+    # NOTE(round-0390): ConsoleProjectorSubscriber was retired in f8b7f0896
+    # (old event plane). SpineFileSink is authorized in the yaml
+    # consumer_rules for team.* and spine.* — use it as the plugin
+    # identity token (same pattern as round-0356).
+    from lca.plugins.events.sinks.spine_file_sink.sink import SpineFileSink
 
-    return ConsoleProjectorSubscriber
+    return SpineFileSink
 
 
 @pytest.fixture
@@ -77,7 +79,10 @@ def spine_producer() -> type:
 @pytest.fixture
 def spine_payload() -> SpineEventPayload:
     return SpineEventPayload(
-        execution_point="brain.think.start",
+        # NOTE(round-0390): 'brain.think.start' retired from
+        # SPINE_EXECUTION_POINTS; 'think.gate.start' is the
+        # registered equivalent.
+        execution_point="think.gate.start",
         channel="fact",
         payload={"state_id": "s1"},
     )
@@ -188,13 +193,25 @@ class TestDeliveryCounters:
         class _Producer:
             pass
 
+        # NOTE(round-0390): EventRegistry.from_specs re-derives publishers
+        # from publishers_tokens (PR-5 dual-track; EventSpec.publishers is
+        # informational). Build the registry directly so the local
+        # _Producer stays authorized.
         spec = EventSpec(
             category=Category.TEAM_DELEGATION_CACHE_HIT,
             plane=Plane.STRUCTURAL,
             payload_class=TeamDelegationCacheHit,
-            publishers=frozenset({_Producer}),
         )
-        isolated = EventBus(EventRegistry.from_specs([spec]))
+        registry = EventRegistry(
+            specs=(spec,),
+            publishers={Category.TEAM_DELEGATION_CACHE_HIT: frozenset({_Producer})},
+            subscribers={},
+            consumer_rules=(),
+            payload_by_category={
+                Category.TEAM_DELEGATION_CACHE_HIT: TeamDelegationCacheHit
+            },
+        )
+        isolated = EventBus(registry)
         isolated.mount_sink("rec", _RecordingSink())
         payload = TeamDelegationCacheHit(callee_role="a", subtask="b", step=1)
         isolated.publish(payload, producer=_Producer)
@@ -247,14 +264,14 @@ class TestZeroSinkPolicy:
         seen: list[EventPayload] = []
         bus.subscribe(
             plugin=subscriber_plugin,
-            category=Category.SPINE_COGNITION_BRAIN_THINK_START,
+            category=Category.SPINE_COGNITION_THINK_GATE_START,
             on_event=lambda p, _r: seen.append(p),
         )
         with pytest.raises(EventNoSinkError) as excinfo:
             bus.publish(spine_payload, producer=spine_producer)
-        assert excinfo.value.category == "spine.cognition.brain.think.start"
+        assert excinfo.value.category == "spine.cognition.think.gate.start"
         assert seen == []
-        assert _counts(bus, "spine.cognition.brain.think.start") == {
+        assert _counts(bus, "spine.cognition.think.gate.start") == {
             "published": 1,
             "persisted": 0,
             "delivered": 0,
@@ -268,7 +285,7 @@ class TestZeroSinkPolicy:
         assert bus.delivery_policy.strict is False
         ref = bus.publish(spine_payload, producer=spine_producer)
         assert ref.persisted is False
-        assert _counts(bus, "spine.cognition.brain.think.start") == {
+        assert _counts(bus, "spine.cognition.think.gate.start") == {
             "published": 1,
             "persisted": 0,
             "delivered": 0,
@@ -276,7 +293,7 @@ class TestZeroSinkPolicy:
         }
         captured = capsys.readouterr()
         assert "zero sinks" in captured.out
-        assert "spine.cognition.brain.think.start" in captured.out
+        assert "spine.cognition.think.gate.start" in captured.out
 
     def test_strict_still_counts_non_persistent_category(
         self, bus, team_producer, team_payload
@@ -318,7 +335,7 @@ class TestDeliverySnapshot:
     def test_only_published_categories_appear(self, bus, team_producer, team_payload) -> None:
         """未发生 publish 的 category 不占快照条目。"""
         bus.publish(team_payload, producer=team_producer)
-        assert "spine.cognition.brain.think.start" not in bus.delivery_snapshot()
+        assert "spine.cognition.think.gate.start" not in bus.delivery_snapshot()
 
 
 # ── events-delivery CLI ──────────────────────────────────────────────────
@@ -330,7 +347,15 @@ class TestEventsDeliveryCommand:
         self, team_producer: type, team_payload: TeamDelegationCacheHit
     ) -> EventBus[EventPayload]:
         """把带计数的 bus 注入进程单例,供 CLI 命令读取。"""
-        registry = EventRegistry.load(_DEFAULT_CONFIG_DIR)
+        # NOTE(round-0390): yaml publishers use id-form tokens
+        # ('delegation_cache'); without the test catalog they stay unresolved
+        # and publish is unauthorized. Mirror build_test_bus().
+        from lca_kernel.events.test.catalog import build_test_catalog
+
+        registry = EventRegistry.load(
+            _DEFAULT_CONFIG_DIR, catalog=build_test_catalog()
+        )
+        registry.refresh()
         seeded: EventBus[EventPayload] = EventBus(registry)
         seeded.publish(team_payload, producer=team_producer)
         EventBus.set_default(seeded)
