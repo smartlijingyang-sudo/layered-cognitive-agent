@@ -17,34 +17,15 @@ def explain_declarative_plan(profile: Path) -> dict[str, Any]:
 
 
 def render_declarative_graph(profile: Path) -> str:
-    """Render capability, phase, relation, and replacement data as Mermaid."""
+    """Render capability, relation, and replacement data as Mermaid."""
     plan = compile_plan(resolve_profile(profile))
     lines = ["flowchart LR"]
-
-    if plan.phase_graph:
-        lines.append("  subgraph phase_graph[Phase Graph]")
-        for node in plan.phase_graph.nodes:
-            node_id = _mermaid_id("phase", node.id)
-            label = f"{node.semantic_phase.value}\\n{node.id}"
-            if node.terminal:
-                label += "\\nterminal"
-            lines.append(f"    {node_id}{_mermaid_label(label)}")
-        for edge in plan.phase_graph.edges:
-            source = _mermaid_id("phase", edge.source)
-            target = _mermaid_id("phase", edge.target)
-            edge_label = edge.when
-            if edge.loop is not None:
-                edge_label = (
-                    f"{edge_label}\\nloop≤{edge.loop.max_iterations}, budget={edge.loop.budget}"
-                )
-            lines.append(f"    {source} -->|{_mermaid_text(edge_label)}| {target}")
-        lines.append("  end")
 
     lines.append("  subgraph capability_graph[Capability Graph]")
     for binding in plan.capability_bindings:
         capability_id = _mermaid_id("cap", binding.capability)
-        provider_id = _mermaid_id("plugin", binding.provider)
-        lines.append(f"    {provider_id}{_mermaid_label(binding.provider)}")
+        provider_id = _mermaid_id("plugin", binding.owner_plugin)
+        lines.append(f"    {provider_id}{_mermaid_label(binding.owner_plugin)}")
         lines.append(f"    {capability_id}{_mermaid_label(binding.capability)}")
         lines.append(f"    {provider_id} -. provides .-> {capability_id}")
     lines.append("  end")
