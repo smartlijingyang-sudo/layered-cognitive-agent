@@ -23,6 +23,8 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
+import pytest
+
 from lca.contracts.models.observability.diagnostic.diagnostic import DiagnosticStatus
 from lca.infrastructure.session.commit.fact_committer import emit_diagnostic
 
@@ -82,18 +84,21 @@ def test_tool_journal_denied_uses_failed_status() -> None:
 
 def test_tool_journal_complete_ok_uses_succeeded_status() -> None:
     """``record_tool_invoked_diagnostic`` (ok=True) → tool.complete 必须 SUCCEEDED。"""
+    from lca.cognition.body.emit.tool_journal import record_tool_invoked_diagnostic
     from lca.contracts.models.core.execution.decision import Observation
     from lca.contracts.models.observability.tool.journal_receipt import (
         tool_invoked_receipt,
     )
-    from lca.cognition.body.emit.tool_journal import record_tool_invoked_diagnostic
 
     captured: list[dict[str, Any]] = []
 
     class _FakeTool:
         name = "fake_tool"
 
-    obs = Observation(success=True, payload={"k": "v"}, error="", extra={})
+    # observation_id became required on Observation; tests assert status, not id.
+    obs = Observation(
+        observation_id="obs-test-ok", success=True, payload={"k": "v"}, error="", extra={}
+    )
     receipt = tool_invoked_receipt(
         tool_name="fake_tool",
         invocation_id="inv-2",
@@ -115,18 +120,20 @@ def test_tool_journal_complete_ok_uses_succeeded_status() -> None:
 
 def test_tool_journal_complete_fail_uses_failed_status() -> None:
     """``record_tool_invoked_diagnostic`` (ok=False) → tool.complete 必须 FAILED。"""
+    from lca.cognition.body.emit.tool_journal import record_tool_invoked_diagnostic
     from lca.contracts.models.core.execution.decision import Observation
     from lca.contracts.models.observability.tool.journal_receipt import (
         tool_invoked_receipt,
     )
-    from lca.cognition.body.emit.tool_journal import record_tool_invoked_diagnostic
 
     captured: list[dict[str, Any]] = []
 
     class _FakeTool:
         name = "fake_tool"
 
-    obs = Observation(success=False, payload={}, error="boom", extra={})
+    obs = Observation(
+        observation_id="obs-test-fail", success=False, payload={}, error="boom", extra={}
+    )
     receipt = tool_invoked_receipt(
         tool_name="fake_tool",
         invocation_id="inv-3",
@@ -154,7 +161,7 @@ def test_perceive_sensor_read_failure_uses_failed_status() -> None:
     调用并校验 status。
     """
     from lca.cognition.perceive.hub import SequentialPerceiveHub
-    from lca.contracts.models.core.state.state import AgentState
+    from lca.contracts.models.core.state.state import AgentState, Budget
     from lca.contracts.protocols.think.cognition import Sensor
 
     captured: list[dict[str, Any]] = []
@@ -164,7 +171,8 @@ def test_perceive_sensor_read_failure_uses_failed_status() -> None:
             raise RuntimeError("sensor exploded")
 
     hub = SequentialPerceiveHub(sensors=[_BoomSensor()], memory=None)
-    state = AgentState(step=0)
+    # trace_id/task/budget became required on AgentState.
+    state = AgentState(trace_id="test", task="test", budget=Budget(), step=0)
 
     with patch(
         "lca.cognition.perceive.hub.emit_diagnostic",
@@ -217,6 +225,15 @@ def _load_diagnostic_status_distribution(worktree_root: Path) -> Counter:
 def test_audit_runs_diagnostic_status_is_mixed() -> None:
     """3 个 audit run 的 runtime.diagnostic.status 分布不是 100% failed。"""
     worktree_root = Path(__file__).resolve().parents[3]
+    # Audit traces are git-ignored local artifacts; skip when absent
+    # instead of failing (fixture issue, not a code regression).
+    missing = [
+        run_id
+        for run_id in _AUDIT_RUN_IDS
+        if not (_audit_run_dir(worktree_root, run_id) / f"{run_id}.spine.jsonl").exists()
+    ]
+    if missing:
+        pytest.skip(f"audit traces absent in this worktree: {missing}")
     dist = _load_diagnostic_status_distribution(worktree_root)
     assert dist, "expected some runtime.diagnostic events in audit runs"
     assert dist.get("failed", 0) < sum(dist.values()), (
