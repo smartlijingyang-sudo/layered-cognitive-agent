@@ -55,4 +55,4 @@ def identity_transform(
 register_strategy(TransformStrategy(transform=identity_transform))
 
 
-__all__ = ["TransformStrategy", "Transform", "identity_transform"]
+__all__ = ["Transform", "TransformStrategy", "identity_transform"]
