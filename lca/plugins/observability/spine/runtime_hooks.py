@@ -54,6 +54,7 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
+from lca.contracts.observability import EventSpine
 from lca.harness.declarative.compile.instrument.wrap import (
     _emit_spine_direct,
     set_active_spine_accessor,
@@ -61,7 +62,6 @@ from lca.harness.declarative.compile.instrument.wrap import (
 from lca.infrastructure.observability.spine.context.context import SpineContext
 from lca.infrastructure.observability.spine.event.record import Channel
 from lca.infrastructure.observability.spine.event.record import Outcome as OutcomeT
-from lca.infrastructure.observability.spine.event.spine import EventSpine
 
 log = logging.getLogger(__name__)
 
