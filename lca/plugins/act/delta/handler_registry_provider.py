@@ -45,8 +45,8 @@ class DefaultDeltaHandlerRegistry(InMemoryDeltaHandlerRegistry):  # type: ignore
     """Compatibility factory with the provider's default handler set."""
 
     def __init__(self) -> None:
-        super().__init__()
-        register_default_delta_handlers(self)
+        super().__init__()  # type: ignore[call-arg] # make_inmemory_registry bakes kind into the dynamic _init; pyright models only the cast base signature
+        register_default_delta_handlers(self)  # type: ignore[arg-type] # dynamic class inherits DeltaHandlerRegistry at runtime; pyright cannot model types.new_class
 
 
 __all__ = [
