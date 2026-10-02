@@ -202,6 +202,7 @@
 | [0262](0262-skill-discovery-and-acquisition.md) | Skill 发现与沉淀契约：先查后动手（提示级义务）、先查后断言（检索失败≠检索无结果）、沉淀晋升三段门（candidate→批准→安装）、补 BM25/regex 双模式；ADR-0255 §4.9 的 LCA 落地提案 | Proposed |
 | [0263](0263-routine-scheduling-mutual-exclusion-and-self-healing.md) | 例程调度互斥与自愈契约：单实例互斥锁（owner+心跳）、锁超时自愈收割、busy→显式 SKIP 可观测、触发记录持久化、失败隔离；生产 Muse 调度模式的 LCA 落地提案 | Proposed |
 | [0264](0264-proactive-messaging-pipeline.md) | 主动消息三层管道契约：触发/裁决/投递三层分离、裁决纯函数四态（REJECTED/DELIVER_CHAT/DELIVER_QUIET/SILENT）、fail-closed 只用在精确可判定处、投递复用 surface 事件+turn=-1 哨兵+幂等键、落点默认回发起上下文；生产 Muse 主动行为机制的 LCA 落地提案 | Proposed |
+| [0265](0265-system-prompt-assembly-order.md) | 系统提示装配顺序契约：stable→volatile 带序约束（宪法层→时间锚点→用户 live 配置→能力面→运行上下文→行为规则）、profile 扩展只许带内增删、义务段不得可选；ADR-0255 §1.1 的 LCA 落地提案 | Proposed |
 | [0255](0255-muse-production-runtime-full-reference.md) | Muse 生产运行时全量参考：每 turn 上下文装配顺序、9 个 standing 文件全文与权限矩阵、36 工具命名空间函数清单与关键参数、9 大机制（记忆三层/强制检索/落笔写盘/provenance/压缩豁免/子 agent 继承/自省投影）与 12 条验收用例；ADR-0254 的实证 companion | Proposed |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
