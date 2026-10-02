@@ -215,7 +215,9 @@ def _format_content(payload: dict[str, Any]) -> str:
     return json.dumps(payload, ensure_ascii=False)
 
 
-from lca.infrastructure.computer.runtime.exec import ComputerRuntimeExecMixin
+# NOTE (E402 intentional): deferred past `normalize_sandbox_path` —
+# `runtime/exec.py` back-imports it at module import time.
+from lca.infrastructure.computer.runtime.exec import ComputerRuntimeExecMixin  # noqa: E402
 
 
 class SandboxComputer(_SandboxComputerBase, ComputerRuntimeExecMixin):

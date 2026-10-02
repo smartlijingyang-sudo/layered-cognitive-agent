@@ -11,6 +11,11 @@ from typing import Any, ClassVar, Literal, Protocol, runtime_checkable
 from lca.contracts.atoms.enums.enums import LLMStreamEventType
 from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.models.core.execution.decision import AgentCard, Observation
+from lca.contracts.models.core.execution.local_exec import (
+    CapabilityGrant,
+    EffectReceipt,
+    LocalExecTarget,
+)
 from lca.contracts.models.core.execution.sandbox import (
     SANDBOX_MOUNT_ROOT,
     MountManifest,
@@ -260,14 +265,6 @@ class TransportRegistryProtocol(Protocol):
 
     def list_protocols(self) -> list[str]: ...
 
-
-# ---------- ADR-0246 M1: LocalExecPort ----------
-
-from lca.contracts.models.core.execution.local_exec import (
-    CapabilityGrant,
-    EffectReceipt,
-    LocalExecTarget,
-)
 
 
 @runtime_checkable

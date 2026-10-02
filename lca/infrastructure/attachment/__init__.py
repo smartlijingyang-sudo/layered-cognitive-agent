@@ -20,15 +20,18 @@ def _dedupe_ids(attachment_ids: Sequence[str]) -> list[str]:
         out.append(attachment_id)
     return out
 
-from lca.infrastructure.attachment.layout.layout import AttachmentLayout
-from lca.infrastructure.attachment.prompt.prompt import (
+# NOTE (E402 intentional): these imports must follow `_dedupe_ids` above —
+# `prompt.py` / `service.py` do `from lca.infrastructure.attachment import _dedupe_ids`
+# at module import time, so the name must exist before these imports run.
+from lca.infrastructure.attachment.layout.layout import AttachmentLayout  # noqa: E402
+from lca.infrastructure.attachment.prompt.prompt import (  # noqa: E402
     format_machine_uploaded_files_prompt,
     format_sandbox_uploaded_files_prompt,
     resolve_machine_attachment_paths,
     sandbox_attachment_path,
 )
-from lca.infrastructure.attachment.service.service import FileStoreAttachmentIdentity
-from lca.infrastructure.attachment.settings.settings import (
+from lca.infrastructure.attachment.service.service import FileStoreAttachmentIdentity  # noqa: E402
+from lca.infrastructure.attachment.settings.settings import (  # noqa: E402
     AttachmentPolicyDocument,
     AttachmentSettings,
     get_attachment_policy,

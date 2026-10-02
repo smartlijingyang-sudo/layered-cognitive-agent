@@ -24,7 +24,12 @@ import subprocess
 import time
 from typing import Any, ClassVar
 
+from pydantic import BaseModel, ConfigDict
+
+from lca.contracts.atoms.control.slot import ControlSlot
+from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.atoms.scope.scope import Scope
 from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
 from lca.contracts.harness.composition.plugin_contract import (
     ArchitectureContract,
@@ -37,6 +42,10 @@ from lca.contracts.harness.composition.plugin_contract import (
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.execution.tool import ParameterSpec, ToolApi, ToolManifest, ToolMeta
 from lca.contracts.protocols import Tool
+from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
+    OwnershipDeclaration,
+)
+from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 IDENTIFIER = "bash"
 
@@ -230,15 +239,6 @@ __all__ = ["IDENTIFIER", "MANIFEST", "BashTool", "build_bash_tool"]
 # plugin graph well-formed.
 
 
-from pydantic import BaseModel, ConfigDict
-
-from lca.contracts.atoms.control.slot import ControlSlot
-from lca.contracts.atoms.functional.group import FunctionalGroup
-from lca.contracts.atoms.scope.scope import Scope
-from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
-    OwnershipDeclaration,
-)
-from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 
 
 class Config(BaseModel):

@@ -64,13 +64,12 @@ _log = logging.getLogger(__name__)
 # 普通 rebuild 下也不收口。本模块 import 时一次性 rebuild,显式提供
 # ``_types_namespace`` 把 forward-ref 链钉到 Any。
 # (对齐 PR-0 注释 "PR-0 在 lca_kernel.events.types 落地" 后续工作)
-import typing as _typing  # intentional: must follow the TYPE_CHECKING-only imports above so rebuild_namespace is bound before any first payload instantiation.
 
 _rebuild_ns = {
-    "AssistantRequestConfig": _typing.Any,
-    "MessageDict": _typing.Any,
-    "ToolCallDict": _typing.Any,
-    "UsageDict": _typing.Any,
+    "AssistantRequestConfig": Any,
+    "MessageDict": Any,
+    "ToolCallDict": Any,
+    "UsageDict": Any,
 }
 for _payload_cls in (
     SpineLlmRequestHeaderPayload,
@@ -80,7 +79,7 @@ for _payload_cls in (
         _payload_cls.model_rebuild(force=True, _types_namespace=_rebuild_ns)
     except Exception as exc:  # INTENTIONAL: 失败仅记日志,publish 主路径不挡
         _log.debug("payload_model_rebuild_skip: %s", exc)
-del _payload_cls, _rebuild_ns, _typing
+del _payload_cls, _rebuild_ns
 
 
 def _sha256_hex(data: bytes) -> str:
