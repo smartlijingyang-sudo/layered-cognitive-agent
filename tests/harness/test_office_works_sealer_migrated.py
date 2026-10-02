@@ -138,7 +138,7 @@ class TestOfficeWorksSealerMigration:
             task="x",
             budget=Budget(max_steps=10),
             step=0,
-            history=[
+            control_turns=[
                 Turn(
                     decision=Decision(
                         decision_id="d",
@@ -171,7 +171,7 @@ class TestOfficeWorksSealerMigration:
             task="x",
             budget=Budget(max_steps=10),
             step=0,
-            history=[
+            control_turns=[
                 Turn(
                     decision=Decision(
                         decision_id="d",
