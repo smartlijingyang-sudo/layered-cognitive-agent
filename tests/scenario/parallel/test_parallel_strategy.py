@@ -12,6 +12,7 @@ from lca.contracts.models.core.state.state import Budget
 from lca.contracts.models.team.team.coordination import FanOut
 from lca.contracts.protocols import TeamAssembly
 from lca.plugins.strategies.fan.out import ParallelStrategy
+from tests.support.session_gate_helpers import bound_session
 from tests.support.strategy_registry import build_strategy_registry
 from tests.support.team_stage import stage_with_invoker
 
@@ -45,6 +46,13 @@ def _make_agent(trace_id: str, output: str, delay: float = 0.0):
 
 
 class TestParallelStrategyBasic(unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        self._session_ctx = bound_session()
+        self._session_ctx.__enter__()
+
+    def tearDown(self) -> None:
+        self._session_ctx.__exit__(None, None, None)
+
     """ParallelStrategy 基本功能。"""
 
     async def test_parallel_runs_all_members_concurrently(self) -> None:
@@ -86,6 +94,13 @@ class TestParallelStrategyBasic(unittest.IsolatedAsyncioTestCase):
 
 
 class TestParallelStrategyConcurrency(unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        self._session_ctx = bound_session()
+        self._session_ctx.__enter__()
+
+    def tearDown(self) -> None:
+        self._session_ctx.__exit__(None, None, None)
+
     """验证并行策略确实并发执行（总耗时 < 各成员耗时之和）。"""
 
     async def test_parallel_is_faster_than_sequential(self) -> None:
@@ -119,6 +134,13 @@ class TestParallelStrategyRegistration(unittest.TestCase):
 
 
 class TestParallelStrategyTraceIsolation(unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        self._session_ctx = bound_session()
+        self._session_ctx.__enter__()
+
+    def tearDown(self) -> None:
+        self._session_ctx.__exit__(None, None, None)
+
     """并行执行时，每个成员产生独立的 trace_id，互不干扰。"""
 
     async def test_each_member_has_independent_trace(self) -> None:
