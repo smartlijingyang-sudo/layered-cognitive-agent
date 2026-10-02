@@ -74,16 +74,17 @@ def test_standing_files_list_returns_four_standing_files(tmp_path: Any) -> None:
     data = response.json()
     assert data["assistant_id"] == assistant_id
     files = data["files"]
-    assert len(files) == 4
+    assert len(files) == 5
     filenames = [f["filename"] for f in files]
     assert "IDENTITY.md" in filenames
     assert "SOUL.md" in filenames
     assert "USER.md" in filenames
+    assert "AGENTS.md" in filenames
     assert "MEMORY.md" in filenames
 
     # 验证元数据字段完整性
     for f in files:
-        assert f["filename"] in {"IDENTITY.md", "SOUL.md", "USER.md", "MEMORY.md"}
+        assert f["filename"] in {"IDENTITY.md", "SOUL.md", "USER.md", "AGENTS.md", "MEMORY.md"}
         assert f["path"].endswith(f["filename"])
         assert isinstance(f["size_bytes"], int)
         assert isinstance(f["line_count"], int)
@@ -229,7 +230,7 @@ def test_standing_files_resolve_agent_id_and_inbox(tmp_path: Any) -> None:
     assert agt_resp.status_code == 200
     data = agt_resp.json()
     assert data["assistant_id"] == assistant_id
-    assert len(data["files"]) == 4
+    assert len(data["files"]) == 5
 
     # 2. 以 agt_* 请求单文件，正常返回内容
     agt_file_resp = client.get("/v1/assistants/agt_mock_123/standing-files/SOUL.md")
@@ -241,4 +242,4 @@ def test_standing_files_resolve_agent_id_and_inbox(tmp_path: Any) -> None:
     assert inbox_resp.status_code == 200
     inbox_data = inbox_resp.json()
     assert inbox_data["assistant_id"] == assistant_id
-    assert len(inbox_data["files"]) == 4
+    assert len(inbox_data["files"]) == 5
