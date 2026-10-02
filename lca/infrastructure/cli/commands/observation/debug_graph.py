@@ -22,6 +22,8 @@ from typing import Any
 
 import typer
 
+from lca.infrastructure.text.truncate import ASCII_ELLIPSIS, truncate_text
+
 _LOG_DEBUG_GRAPH_TAG = "debug-graph"
 
 # Anomaly heuristic: only mark a reducer method as anomalous when its
@@ -74,7 +76,8 @@ def _classify_node(end_event: dict[str, Any]) -> tuple[str, str]:
 
 def _truncate(s: str, n: int = 120) -> str:
     s = s.replace("\n", " ").strip()
-    return s if len(s) <= n else s[: n - 3] + "..."
+    # Canonical truncation; the hard-coded 3 was len(ASCII_ELLIPSIS).
+    return s if len(s) <= n else truncate_text(s, n - len(ASCII_ELLIPSIS), suffix=ASCII_ELLIPSIS)
 
 
 def _safe_repr(v: Any, n: int = 60) -> str:
