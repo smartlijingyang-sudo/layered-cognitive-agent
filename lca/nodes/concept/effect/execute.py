@@ -258,8 +258,26 @@ def _append_tool_result_surface(
         return
     state = getattr(context.runtime, "state", None)
     step = getattr(state, "step", 0) or 0
+    # Source-aware verification (ProvenanceGuard): mint a stable SourceRef for
+    # every model-visible tool result so the source identity travels with the
+    # evidence instead of collapsing into anonymous context. Additive only —
+    # existing attribution (call_id) and content contracts are unchanged.
+    from lca.infrastructure.source_verify.registry import (
+        ensure_registry,
+        source_marker,
+    )
+
+    registry = ensure_registry(getattr(context, "runtime", None))
     for row in rows:
         content, error = _row_surface(row, receipt)
+        ref = registry.register_tool_result(
+            call_id=row.call_id,
+            tool_name=receipt.provider or "",
+            content=content,
+            label=receipt.provider or "",
+        )
+        marked = source_marker(ref.source_id)
+        content = f"{marked}\n{content}" if content else marked
         try:
             writer.append_tool_result(
                 turn=step,
@@ -271,6 +289,7 @@ def _append_tool_result_surface(
                     "tool_name": receipt.provider,
                     "outcome": receipt.outcome.value,
                     "invocation_id": receipt.invocation_id,
+                    "source_id": ref.source_id,
                 },
             )
         except Exception:
