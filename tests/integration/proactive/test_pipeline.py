@@ -73,6 +73,33 @@ def test_tick_delivers_due_job_to_session():
         sched.release_lock()
 
 
+def test_crash_between_deliver_and_state_save_does_not_duplicate():
+    """deliver 成功、state 落盘前崩溃 → 重跑同一 firing 不重复投递。
+
+    message id 取名义触发时刻而非 tick 执行时刻：state 未推进时两次
+    _run_job 产出同一 id，deliverer 的 (session_id, proactive_id) 去重兜住。
+    """
+    tmp = Path(tempfile.mkdtemp())
+    store = SessionStore()
+    deliverer = ProactiveDeliverer(store, state_dir=tmp / "state")
+    sched = ProactiveScheduler(
+        lock_dir=tmp / "locks",
+        state_dir=tmp / "state",
+        job_source=lambda: [],
+        deliverer=deliverer,
+        default_interval_s=60,
+    )
+    job = _job("job-crash", "sess-crash", content="别重复")
+    js: dict = {}  # 模拟崩溃：state 从未落盘，两次调用看到同一 js
+    assert sched._run_job(job, js, now_ms=1_000_000) == "delivered"
+    # 更晚的 tick 重跑同一 firing（state 仍未推进）
+    assert sched._run_job(job, js, now_ms=9_999_999) == "delivered"
+    session = store.get("sess-crash")
+    assert session is not None
+    events = [e for e in session._log if e.type == "surface/assistant_message"]
+    assert len(events) == 1
+
+
 def test_tick_skips_not_due_job():
     tmp = Path(tempfile.mkdtemp())
     job = ProactiveJob(

@@ -154,8 +154,12 @@ class ProactiveScheduler:
     # ---- 单 job 执行：构造请求 → 裁决 → 投递 ----
 
     def _run_job(self, job: ProactiveJob, js: dict, now_ms: int) -> str:
+        # 幂等键：名义触发时刻（上次成功 + interval），而非 tick 执行时刻。
+        # deliver 成功、state 落盘前崩溃 → 下次 tick（state 未推进）重算出
+        # 同一 id，deliverer 的 (session_id, proactive_id) 去重兜住不重复投递。
+        fire_ms = js.get("last_run_ms", 0) + job.interval_seconds * 1000
         message = ProactiveMessage(
-            id=f"{job.id}-{now_ms}",
+            id=f"{job.id}-{fire_ms}",
             content=job.content,
             source=job.source,
         )
