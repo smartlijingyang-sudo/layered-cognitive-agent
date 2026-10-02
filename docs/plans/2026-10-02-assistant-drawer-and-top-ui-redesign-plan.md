@@ -4,7 +4,7 @@
 
 **Goal:** Redesign the assistant right status drawer and top mascot avatar to provide product-level clean UI, 5 distinct tabs (动态, 批准, 即将到来, 身份, 连接器), 2-column identity cards with direct click-to-edit, dual-pane activity log modal, and fix chat input autofill and avatar head truncation.
 
-**Architecture:** 
+**Architecture:**
 - Frontend React/Ant Design components in `deploy/lobehub/patches/ui/`.
 - Managed and synchronized into `lobehub-ui/` via `deploy/lobehub/patch_lobehub.py`.
 - Pure frontend styling, state management, and API integration with existing assistant endpoints.

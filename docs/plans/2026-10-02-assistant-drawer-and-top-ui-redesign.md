@@ -1,8 +1,8 @@
 # Assistant Drawer & Top UI Redesign
 
-**Date**: 2026-10-02  
-**Autopilot Level**: `DRAFT`  
-**Status**: Approved by User  
+**Date**: 2026-10-02
+**Autopilot Level**: `DRAFT`
+**Status**: Approved by User
 
 ## 1. Context & Motivation
 
