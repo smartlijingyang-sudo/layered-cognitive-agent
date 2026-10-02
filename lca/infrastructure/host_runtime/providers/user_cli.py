@@ -41,7 +41,7 @@ class CLIProvider(Provider):
             self.run(["npx", "tsc"], check=False)
             if (kernel_serve_client / "src").is_dir():
                 subprocess.run(
-                    ["npx", "tsc"],
+                    ["npx", "tsc"],  # noqa: S607 -- npx via PATH is intentional in deploy provisioning
                     cwd=str(kernel_serve_client),
                     capture_output=True,
                     timeout=60,
@@ -157,8 +157,8 @@ exec node {self._cli_js} connect \\
             raise AssertionError("user is None in _launch_daemon")
         password_file = Path(".lobehub-stack/sudo.pass")
         password = password_file.read_text().strip() if password_file.is_file() else ""
-        subprocess.run(
-            [
+        subprocess.run(  # noqa: S603 -- deploy provisioning; daemon-launch argv fixed by provider code
+            [  # noqa: S607 -- sudo via PATH is intentional in deploy provisioning
                 "sudo",
                 "-S",
                 "-p",
@@ -192,8 +192,8 @@ exec node {self._cli_js} connect \\
 
     def _report_kernel_serve_status(self, report: StatusReport) -> None:
         try:
-            result = subprocess.run(
-                ["curl", "-sf", self.config.kernel_serve.health_url],
+            result = subprocess.run(  # noqa: S603 -- fixed argv; health_url from operator config
+                ["curl", "-sf", self.config.kernel_serve.health_url],  # noqa: S607 -- curl via PATH is intentional in deploy provisioning
                 capture_output=True,
                 text=True,
                 timeout=5,

@@ -217,7 +217,7 @@ class VenvProvider(Provider):
             env.update(os.environ)
             import subprocess
 
-            result = subprocess.run(
+            result = subprocess.run(  # noqa: S603 -- argv from which()-resolved tool + config paths; provisioning-time only
                 [uv, "pip", "install", "--python", f"{venv_dir}/bin/python3", "-r", str(req)],
                 env=env,
                 capture_output=True,

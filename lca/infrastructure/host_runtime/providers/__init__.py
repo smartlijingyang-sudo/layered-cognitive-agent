@@ -85,7 +85,7 @@ class Provider(ABC):
     ) -> subprocess.CompletedProcess[str]:
         if sudo:
             cmd = ["sudo", "-n", *cmd]
-        return subprocess.run(
+        return subprocess.run(  # noqa: S603 -- argv fixed: ["which", name]; callers pass literal tool names
             cmd,
             capture_output=True,
             text=True,
@@ -99,15 +99,15 @@ class Provider(ABC):
         pass_file = Path(".lobehub-stack/sudo.pass")
         if pass_file.is_file():
             pw = pass_file.read_text().strip()
-            return subprocess.run(
-                ["sudo", "-S", "-p", "", *cmd],
+            return subprocess.run(  # noqa: S603 -- deploy provisioning; cmd list built by provider code, not user input
+                ["sudo", "-S", "-p", "", *cmd],  # noqa: S607 -- sudo via PATH is intentional in deploy provisioning
                 input=pw,
                 capture_output=True,
                 text=True,
                 timeout=300,
             )
-        return subprocess.run(
-            ["sudo", "-n", *cmd],
+        return subprocess.run(  # noqa: S603 -- deploy provisioning; cmd list built by provider code, not user input
+            ["sudo", "-n", *cmd],  # noqa: S607 -- sudo via PATH is intentional in deploy provisioning
             capture_output=True,
             text=True,
             timeout=300,
@@ -119,8 +119,8 @@ class Provider(ABC):
 
     @staticmethod
     def which(name: str) -> str | None:
-        result = subprocess.run(
-            ["which", name],
+        result = subprocess.run(  # noqa: S603 -- argv fixed: ["which", name]; name is a literal tool name from provisioning code
+            ["which", name],  # noqa: S607 -- which via PATH is intentional; name is a literal tool name
             capture_output=True,
             text=True,
             timeout=5,

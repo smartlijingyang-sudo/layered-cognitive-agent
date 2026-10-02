@@ -153,7 +153,7 @@ class BashTool(Tool):
 
         def _run() -> subprocess.CompletedProcess[str]:
             # Creator shell 语义有意为之；上层 SafeExecutor 必须 gate。
-            return subprocess.run(
+            return subprocess.run(  # noqa: S602 -- shell semantics intentional for Creator flow; SafeExecutor must gate (see comment above)
                 command,
                 shell=True,
                 capture_output=True,
