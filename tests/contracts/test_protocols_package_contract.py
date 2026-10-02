@@ -46,7 +46,12 @@ class TestProtocolsPackageSurface:
             and not isinstance(value, types.ModuleType)
             and name != "annotations"
         )
-        assert protocols.__all__ == derived, (
+        # NOTE (round-0343): order is intentionally NOT asserted here.
+        # ``__all__`` follows the repo's RUF022 isort-style order
+        # (SCREAMING_SNAKE, CamelCase, lowercase), which differs from plain
+        # ``sorted()`` codepoint order on mixed-case names; ruff enforces the
+        # order globally (repo-wide 0). This test pins membership only.
+        assert sorted(protocols.__all__) == derived, (
             "lca.contracts.protocols.__all__ drifted away from the "
             "explicit re-exports. The derivation is the source of truth."
         )
@@ -77,7 +82,9 @@ class TestProtocolsPackageSurface:
         "Reducer",
         "SkillPackage",
         "CompiledRunPlan",
-        "PhaseExecutor",
+        # ADR-0221 retired ``PhaseExecutor``; ``NodeExecutor`` is the sole
+        # node-level executor Protocol (see lca/contracts/protocols/__init__.py).
+        "NodeExecutor",
         "ToolExecutionPipeline",
     ],
 )
