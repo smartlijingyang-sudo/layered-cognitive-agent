@@ -80,3 +80,31 @@ entries:
     name: lca_plugins_assistant_curator
     $module: lca.plugins.assistant.curator.curator
     config: {}
+
+  - id: lca-avatar
+    name: lca_plugins_avatar
+    $module: lca.plugins.avatar.plugin
+    config:
+      assistants_root:
+        from_env: LCA_ASSISTANTS_ROOT
+        required: false
+      api_key:
+        from_env: AVATAR_IMAGE_API_KEY
+        required: false
+      base_url:
+        from_env: AVATAR_IMAGE_BASE_URL
+        required: false
+      model:
+        from_env: AVATAR_IMAGE_MODEL
+        required: false
+      edit_model:
+        from_env: AVATAR_IMAGE_EDIT_MODEL
+        required: false
+      video_model:
+        from_env: AVATAR_VIDEO_MODEL
+        required: false
+
+  - id: lca-tool-avatar
+    name: lca_plugins_avatar_tools
+    $module: lca.plugins.avatar.tools
+    config: {}
