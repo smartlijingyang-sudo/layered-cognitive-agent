@@ -12,9 +12,9 @@ from lca_kernel.events.payloads.payloads import (
 from lca_kernel.events.payloads.spine import SPINE_EXECUTION_POINTS, SpineEventPayload
 
 __all__ = [
+    "SPINE_EXECUTION_POINTS",
     "EventPluginSpec",
     "MechanismDispatchEventPayload",
-    "SPINE_EXECUTION_POINTS",
     "SpineEventPayload",
     "SpineLlmRequestHeaderAssistantPayload",
     "SpineLlmRequestHeaderPayload",
