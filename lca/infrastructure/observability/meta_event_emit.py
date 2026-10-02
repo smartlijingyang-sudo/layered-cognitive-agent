@@ -31,6 +31,8 @@ from lca.contracts.harness.memory.events import (
     ToolSchemaPublished,
 )
 from lca.contracts.harness.memory.skill import SkillCatalogEntry
+from lca.contracts.models.messaging.reaction import MessageReaction
+from lca.contracts.models.messaging.reaction_event import ReactionAddedCommitted
 from lca.contracts.observability.closure.skill_meta_ep_closure import (
     SKILL_PACKAGE_ACTIVATED,
     SKILL_PACKAGE_INSTALL_FAILED,
@@ -96,6 +98,22 @@ def emit_tool_schema_published(tool_names: tuple[str, ...]) -> Any | None:
     return _emit_session(
         ToolSchemaPublished(tool_names=names, digest=tool_registry_digest(names)),
         actor="system",
+    )
+
+
+def emit_reaction_added(reaction: MessageReaction) -> Any | None:
+    """Emit one ``reaction.added.v1`` catalog fact for an attached reaction.
+
+    Called by ``ReactToMessageTool`` after the reaction is committed to the
+    store; the fact drives the gateway ``reaction_added`` wire event.
+    """
+    return _emit_session(
+        ReactionAddedCommitted(
+            message_id=reaction.message_id,
+            emoji=reaction.emoji,
+            actor=reaction.actor,
+        ),
+        actor=reaction.actor,
     )
 
 
@@ -354,6 +372,7 @@ __all__ = [
     "emit_inbox_spliced",
     "emit_prompt_section_published",
     "emit_prompt_sections_from_trace",
+    "emit_reaction_added",
     "emit_skill_activated",
     "emit_skill_catalog_published",
     "emit_skill_install_failed",

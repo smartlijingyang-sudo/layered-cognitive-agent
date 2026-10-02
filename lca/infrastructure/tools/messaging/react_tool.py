@@ -27,6 +27,7 @@ from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.models.messaging.reaction import MessageReaction
 from lca.contracts.protocols import Tool
 from lca.infrastructure.messaging.reaction_store import ReactionStore
+from lca.infrastructure.observability.meta_event_emit import emit_reaction_added
 
 REACT_TO_MESSAGE_TOOL = "react_to_message"
 
@@ -86,7 +87,21 @@ class ReactToMessageTool(Tool):
         except ValidationError as exc:
             return self._fail(start, f"reaction 参数非法: {exc.errors()[0]['msg']}")
 
+        existing = self._store.list_for(reaction.message_id)
+        if any(r.emoji == reaction.emoji and r.actor == reaction.actor for r in existing):
+            return self._ok(
+                start,
+                payload={
+                    "message_id": reaction.message_id,
+                    "emoji": reaction.emoji,
+                    "actor": reaction.actor,
+                    "message": f"已在消息 {reaction.message_id} 上贴 {reaction.emoji}",
+                    "deduped": True,
+                },
+            )
+
         self._store.add(reaction)
+        emit_reaction_added(reaction)
         return self._ok(
             start,
             payload={
@@ -94,5 +109,6 @@ class ReactToMessageTool(Tool):
                 "emoji": reaction.emoji,
                 "actor": reaction.actor,
                 "message": f"已在消息 {reaction.message_id} 上贴 {reaction.emoji}",
+                "deduped": False,
             },
         )

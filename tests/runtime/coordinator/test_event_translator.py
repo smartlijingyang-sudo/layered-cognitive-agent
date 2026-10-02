@@ -305,6 +305,22 @@ def test_tool_invoked_becomes_tool_end_without_projected_state() -> None:
     assert out["data"]["result"]["state"] == {"stdout": "ok", "exitCode": 0}
 
 
+def test_reaction_added_becomes_reaction_added_wire_event() -> None:
+    t = EventTranslator()
+    stamped = {
+        "event": {
+            "type": "ReactionAdded",
+            "message_id": "m1",
+            "emoji": "🎉",
+            "actor": "assistant",
+        }
+    }
+    out = t.translate(stamped)
+    assert out is not None
+    assert out["type"] == "reaction_added"
+    assert out["data"] == {"message_id": "m1", "emoji": "🎉", "actor": "assistant"}
+
+
 def test_step_start_with_human_approval_has_requires_approval() -> None:
     t = EventTranslator()
     stamped = {
