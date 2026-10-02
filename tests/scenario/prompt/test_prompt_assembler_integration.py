@@ -51,6 +51,7 @@ from lca.plugins.prompts.sections import (
     HierarchicalInstructionsSection,
     MemberReportsSection,
     MemberStatusSection,
+    MemoryRetrievalSection,
     ReactToolUsageSection,
     ReactWorkflowSection,
     RoleSection,
@@ -133,6 +134,8 @@ def _registry_with_builtins() -> _RegistryImpl:
     registry.register(MemberReportsSection(), kind="stateful", name="member_reports_text")
     registry.register(MemberStatusSection(), kind="stateful", name="member_status_text")
     registry.register(EvidencePackSection(), kind="stateful", name="evidence_pack_text")
+    # ADR-0265 §3 C3: memory_retrieval 已是必须段 (optional=False)，缺失即 MissingPromptSectionError；与生产 boot (sections/plugin.py) 保持一致。
+    registry.register(MemoryRetrievalSection(), kind="stateful", name="memory_retrieval")
     return registry
 
 
