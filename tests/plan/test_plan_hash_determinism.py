@@ -51,8 +51,8 @@ class TestPlanHashDeterminism:
     def test_plan_ref_is_16_char_sha256_hex(self) -> None:
         resolved = resolve_profile(WEB_STANDARD)
         plan = compile_plan(resolved)
-        assert len(compiled_run_plan_ref(plan)) == 16
-        assert re.match(r"^[0-9a-f]{16}$", compiled_run_plan_ref(plan))
+        # ADR-0185 S2.5 wire form: ``sha256:`` prefix + 16 hex chars.
+        assert re.match(r"^sha256:[0-9a-f]{16}$", compiled_run_plan_ref(plan))
 
     def test_sub_plan_hashes_also_stable(self) -> None:
         resolved = resolve_profile(WEB_STANDARD)
