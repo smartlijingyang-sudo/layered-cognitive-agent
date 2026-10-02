@@ -16,6 +16,7 @@ from lca.runtime.session.run_session_writer import (
     RunSessionWriter,
     SessionWriterUnboundError,
 )
+from lca_kernel.events.fold.inputs import SURFACE_TOOL_RESULT_TYPE
 
 
 @dataclass
@@ -123,7 +124,7 @@ def test_append_assistant_message_with_tool_calls_writes_tool_calls_in_payload()
 
 
 def test_append_tool_call_writes_log_only_event() -> None:
-    """log/tool_call is NOT a surface event; it pairs surface/tool_result via source_event_seqs."""
+    """log/tool_call is NOT a surface event; it pairs the tool-result surface event via source_event_seqs."""
     session = _InMemorySession()
     writer = RunSessionWriter(session=session)
     ref = writer.append_tool_call(
@@ -150,8 +151,8 @@ def test_append_tool_result_links_to_assistant_via_source_event_seqs() -> None:
         turn=0, step=0, call_id="c1", content="ok", error=None, meta=None
     )
     event = session.last_event()
-    assert ref.category == "surface/tool_result"
-    assert event.type == "surface/tool_result"
+    assert ref.category == SURFACE_TOOL_RESULT_TYPE
+    assert event.type == SURFACE_TOOL_RESULT_TYPE
     assert event.data["tool_call_id"] == "c1"
     assert event.source_event_seqs  # populated for pairing provenance
     assert event.source_event_seqs == (0,)  # links to the assistant row's seq
