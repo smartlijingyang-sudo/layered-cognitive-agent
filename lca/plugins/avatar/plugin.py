@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal
@@ -54,6 +55,8 @@ from lca.plugins.avatar.service import AvatarService
 from lca.plugins.avatar.store import AvatarStore
 
 __all__ = ["Config", "setup"]
+
+logger = logging.getLogger(__name__)
 
 # 持有后台调度任务引用，避免被 GC（RUF006）；完成即从集合移除。
 _scheduler_tasks: set[asyncio.Task[None]] = set()
@@ -156,8 +159,10 @@ class _AvatarCronStore:
 def _make_notifier(session_store: Any) -> Callable[[str, str], None]:
     """构造定时换装的轻量通知钩子（ProactiveDeliverer + SESSION_APPEND）。
 
-    ``avatar_costume_scheduler._notify(assistant_id, text)`` 只给 assistant_id，
-    因此 session_id 暂以 assistant_id 充当；正式会话映射落地后可替换。
+    ``avatar_costume_scheduler._notify(assistant_id, text)`` 只给 assistant_id。
+    为避免 ``ProactiveDeliverer`` 在 session 缺失时 ``create`` 伪造会话，
+    只在 ``session_store.get(assistant_id)`` 命中已有 session 时才投递；
+    没有对应 session 则跳过并记录日志（通知是轻量附加，绝不产生会话）。
     """
     from lca.contracts.atoms.ids.ids import new_id
     from lca.contracts.models.proactive.message import (
@@ -171,6 +176,12 @@ def _make_notifier(session_store: Any) -> Callable[[str, str], None]:
     deliverer = ProactiveDeliverer(session_store)
 
     def notifier(assistant_id: str, text: str) -> None:
+        if session_store.get(assistant_id) is None:
+            logger.info(
+                "avatar costume notification skipped: no session for assistant_id=%s",
+                assistant_id,
+            )
+            return
         message = ProactiveMessage(
             id=new_id("avatar_notify"),
             content=text,
