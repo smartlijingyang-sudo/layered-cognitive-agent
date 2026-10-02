@@ -2,8 +2,11 @@
 
 These sections encode the mandatory retrieval decision tree, the terminal
 anti-hallucination gate, and the cross-chat privacy firewall as model-visible
-rules. They render only when the run is bound to an assistant home so
-unbound runs keep their prompt unchanged.
+rules. The retrieval-duty section renders for every run (ADR-0260 section 6,
+decision 2: the home-bound gate was a coverage omission, not intentional
+design); runs without an assistant home get an explicit "no persistent memory
+available" declaration instead of an empty block (fail-open by design). The
+privacy firewall still renders only for home-bound runs.
 """
 
 from __future__ import annotations
@@ -25,6 +28,7 @@ _RETRIEVAL_DUTY = (
     "- 实质请求先 memory_search（多角度，首个 query 贴近用户原话）；命中则 memory_explain 精读，未命中扫常驻文件兜底。\n"
     "- 易变事实复验（价格/档期/状态）行动前工具重验，记忆只给线索不给结论。\n"
     "- 检索落空：承认缺失并标注不确定性，绝不编造。\n"
+    "- 未检索标注: 本次未执行任何检索时，涉及记忆/事实的断言必须标注\"未经检索\"的不确定性，绝不编造。\n"
     "- 自省投影防幻觉: 自我认知以注入实体文件为准，不盲目探测。\n\n"
     "## 记忆写入与写盘铁律\n"
     "- 落笔前写盘: 收到写盘回执后，才可回复\"记下了\"；\n"
@@ -39,6 +43,13 @@ _PRIVACY_FIREWALL = (
     "- 检索到不等于可透露。分支会话检索到主记忆或其他分支的内容时，不得向外泄露私密信息。\n"
     "- 本分支特有结论与未定决议写入 side-chats/<id>/MEMORY.md；"
     "跨会话的通用事实与用户偏好，先请用户确认再写入主记忆。"
+)
+
+
+_RETRIEVAL_DUTY_UNBOUND = (
+    "## 记忆检索义务与决策树\n"
+    "- 本次会话无持久记忆可用（未绑定 assistant home），不存在可检索的记忆源。\n"
+    "- 未检索标注: 涉及记忆/事实的断言必须标注\"未经检索\"的不确定性，绝不编造。\n"
 )
 
 
@@ -58,9 +69,9 @@ class MemoryRetrievalSection:
         activated_skills: tuple[ActivatedSkill, ...],
     ) -> SectionOutput:
         del task, awareness, manifest, tools, activated_skills
-        if not _has_home(role_profile):
-            return SectionOutput(text="")
-        return SectionOutput(text=_RETRIEVAL_DUTY)
+        if _has_home(role_profile):
+            return SectionOutput(text=_RETRIEVAL_DUTY)
+        return SectionOutput(text=_RETRIEVAL_DUTY_UNBOUND)
 
 
 class PrivacyFirewallSection:
