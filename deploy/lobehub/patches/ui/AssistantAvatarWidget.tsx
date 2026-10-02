@@ -1,18 +1,26 @@
 'use client';
 
-import { Button, Card, Flex, Tag, Typography, message as antMessage } from 'antd';
+import { Button, Empty, Tag, Typography, message } from 'antd';
 import { createStaticStyles } from 'antd-style';
-import React, { memo, useCallback, useState } from 'react';
-
-import { AnimalSvgRenderer, type AnimalSpecies } from '@/features/Conversation/components/AssistantTopMascot';
+import React, { memo, useCallback, useEffect, useState } from 'react';
 
 const { Text, Title } = Typography;
 
-export interface AvatarCandidate {
-  species: AnimalSpecies;
-  title: string;
-  tag: string;
-  desc: string;
+export interface AvatarVariantPayload {
+  size: string;
+  url: string;
+}
+
+export interface AvatarCandidatePayload {
+  candidate_id: string;
+  prompt?: string;
+  variants: AvatarVariantPayload[];
+}
+
+export interface GeneratedCandidate {
+  id: string;
+  imageUrl?: string;
+  prompt?: string;
 }
 
 export interface AssistantAvatarWidgetProps {
@@ -20,42 +28,41 @@ export interface AssistantAvatarWidgetProps {
   assistantId?: string;
   /** 形象主题 (如 dino / animals) */
   theme?: string;
-  /** 候选列表自定义数据 */
-  candidates?: AvatarCandidate[];
-  /** 换装成功回调 */
-  onSuccess?: (species: AnimalSpecies) => void;
   /** 自定义类名 */
   className?: string;
   /** 自定义样式 */
   style?: React.CSSProperties;
 }
 
-const DEFAULT_CANDIDATES: AvatarCandidate[] = [
-  {
-    species: 'dino',
-    title: '暴龙·小恐龙',
-    tag: '霸气活力',
-    desc: '活泼好动，敏锐果断，充满无限探索冲劲与行动力。',
-  },
-  {
-    species: 'capybara',
-    title: '治愈·水豚',
-    tag: '温和沉稳',
-    desc: '情绪极其稳定，淡定从容，提供最有安全感的陪伴。',
-  },
-  {
-    species: 'fox',
-    title: '机智·小赤狐',
-    tag: '灵动机敏',
-    desc: '洞察入微，聪明机巧，擅长发现最精妙的解决方案。',
-  },
-  {
-    species: 'owl',
-    title: '博学·智慧鸮',
-    tag: '严谨深邃',
-    desc: '博古通今，见解独到，夜以继日守望系统稳健架构。',
-  },
-];
+const CANDIDATES_ENDPOINT = (assistantId: string) =>
+  `/lca-api/v1/assistants/${assistantId}/avatar/candidates`;
+
+const SET_ENDPOINT = (assistantId: string) =>
+  `/lca-api/v1/assistants/${assistantId}/avatar/set`;
+
+function authHeaders(): Record<string, string> {
+  const envToken =
+    typeof process !== 'undefined'
+      ? (process as { env?: Record<string, string | undefined> }).env
+          ?.NEXT_PUBLIC_LCA_TOKEN
+      : undefined;
+  const token = envToken || 'lca-local';
+  const mockDevUserId =
+    typeof process !== 'undefined'
+      ? (process as { env?: Record<string, string | undefined> }).env
+          ?.NEXT_PUBLIC_MOCK_DEV_USER_ID
+      : undefined;
+  const userId =
+    (typeof window !== 'undefined' &&
+      (window as { __LCA_USER_ID?: string } | undefined)?.__LCA_USER_ID) ||
+    mockDevUserId ||
+    'local-dev-user';
+  return {
+    Authorization: `Bearer ${token}`,
+    'x-lca-token': token,
+    'x-lca-user-id': userId,
+  };
+}
 
 const styles = createStaticStyles(({ css, cssVar }) => {
   return {
@@ -116,6 +123,13 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       align-items: center;
       justify-content: center;
     `,
+    candidateImage: css`
+      width: 96px;
+      height: 96px;
+      object-fit: cover;
+      border-radius: 12px;
+      border: 1px solid ${cssVar.colorBorderSecondary};
+    `,
     cardTitle: css`
       font-size: 13px;
       font-weight: 600;
@@ -129,6 +143,14 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       color: ${cssVar.colorTextSecondary};
       line-height: 15px;
       margin-top: 4px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    `,
+    emptyState: css`
+      padding: 24px 8px;
+      text-align: center;
     `,
     footer: css`
       display: flex;
@@ -143,100 +165,84 @@ const styles = createStaticStyles(({ css, cssVar }) => {
 /**
  * 会话流交互式选图换装卡片 (AssistantAvatarWidget)
  *
- * 助理根据用户期望推荐候选形象，用户可直接点击卡片预览并一键原子更新 IDENTITY.md。
+ * 候选来自生成式管线（GET /v1/assistants/{id}/avatar/candidates），确认后调用
+ * POST /v1/assistants/{id}/avatar/set 激活。成功即清空候选池（服务端同步清空）
+ * 并广播 ``lca-assistant-avatar-changed``，失败则保留候选并给出警告。
  */
 export const AssistantAvatarWidget = memo<AssistantAvatarWidgetProps>(
-  ({
-    assistantId,
-    candidates = DEFAULT_CANDIDATES,
-    onSuccess,
-    className,
-    style,
-  }) => {
-    const [selectedSpecies, setSelectedSpecies] = useState<AnimalSpecies>(candidates[0]?.species || 'dino');
+  ({ assistantId, className, style }) => {
+    const [candidates, setCandidates] = useState<GeneratedCandidate[]>([]);
+    const [selectedId, setSelectedId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [confirmed, setConfirmed] = useState(false);
 
-    // 确认换装并原子更新 IDENTITY.md
-    const handleConfirm = useCallback(async () => {
+    const effectiveId = assistantId || 'default';
+
+    const loadCandidates = useCallback(async () => {
       setLoading(true);
       try {
-        const token = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
-        const userId =
-          (typeof window !== 'undefined' && (window as any)?.__LCA_USER_ID) ||
-          process.env.NEXT_PUBLIC_MOCK_DEV_USER_ID ||
-          'local-dev-user';
-
-        // 1. 读取现有 IDENTITY.md 获取哈希与内容
-        const getUrl = `/lca-api/v1/assistants/${assistantId || 'default'}/standing-files/IDENTITY.md`;
-        const getRes = await fetch(getUrl, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'x-lca-token': token,
-            'x-lca-user-id': userId,
-          },
-        });
-
-        let currentContent = '';
-        let expectedHash: string | undefined = undefined;
-
-        if (getRes.ok) {
-          const fileData = await getRes.json();
-          currentContent = fileData.content || '';
-          expectedHash = fileData.content_hash;
+        const res = await fetch(CANDIDATES_ENDPOINT(effectiveId), { headers: authHeaders() });
+        if (!res.ok) {
+          setCandidates([]);
+          return;
         }
-
-        // 2. 替换或追加 avatar 配置
-        let newContent = currentContent;
-        if (newContent.includes('avatar:')) {
-          newContent = newContent.replace(/avatar:\s*["']?[^"'\n]+["']?/, `avatar: "${selectedSpecies}"`);
-        } else if (newContent.startsWith('---')) {
-          newContent = newContent.replace(/^---\n/, `---\navatar: "${selectedSpecies}"\n`);
-        } else {
-          newContent = `---\navatar: "${selectedSpecies}"\n---\n\n` + newContent;
-        }
-
-        // 3. 提交原子更新
-        const updateUrl = `/lca-api/v1/assistants/${assistantId || 'default'}/standing-files/IDENTITY.md`;
-        const updateRes = await fetch(updateUrl, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-            'x-lca-token': token,
-            'x-lca-user-id': userId,
-          },
-          body: JSON.stringify({
-            content: newContent,
-            expected_hash: expectedHash,
+        const data = await res.json();
+        const list: GeneratedCandidate[] = (data.candidates || []).map(
+          (c: AvatarCandidatePayload) => ({
+            id: c.candidate_id,
+            imageUrl: c.variants.find((v) => v.size === 'medium')?.url || c.variants[0]?.url,
+            prompt: c.prompt,
           }),
-        });
-
-        if (updateRes.ok) {
-          setConfirmed(true);
-          antMessage.success(`🎉 换装成功！助理新形象已切换为【${selectedSpecies}】！`);
-          // 广播更新事件
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(
-              new CustomEvent('lca-assistant-avatar-changed', {
-                detail: { assistantId, species: selectedSpecies },
-              }),
-            );
-          }
-          onSuccess?.(selectedSpecies);
-        } else {
-          // 容错友好提示
-          setConfirmed(true);
-          antMessage.success(`🎉 形象选择成功【${selectedSpecies}】！`);
-          onSuccess?.(selectedSpecies);
-        }
-      } catch (err: any) {
-        antMessage.warning(`形象已在当前会话激活`);
-        setConfirmed(true);
+        );
+        setCandidates(list);
+        setSelectedId((prev) =>
+          prev && list.some((c) => c.id === prev) ? prev : list[0]?.id || null,
+        );
+      } catch {
+        setCandidates([]);
       } finally {
         setLoading(false);
       }
-    }, [assistantId, selectedSpecies, onSuccess]);
+    }, [effectiveId]);
+
+    useEffect(() => {
+      setConfirmed(false);
+      void loadCandidates();
+    }, [loadCandidates]);
+
+    // 确认换装：POST /avatar/set 激活候选；成功后清空候选池并广播事件。
+    const handleConfirm = useCallback(async () => {
+      if (!selectedId) return;
+      setLoading(true);
+      try {
+        const res = await fetch(SET_ENDPOINT(effectiveId), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          body: JSON.stringify({ candidate_id: selectedId }),
+        });
+        if (!res.ok) {
+          message.warning('形象激活失败，请稍后重试');
+          return;
+        }
+        setConfirmed(true);
+        setCandidates([]);
+        setSelectedId(null);
+        message.success('我的头像换好了 🎉');
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('lca-assistant-avatar-changed', {
+              detail: { assistant_id: effectiveId, candidate_id: selectedId },
+            }),
+          );
+        }
+      } catch {
+        message.warning('形象激活失败，请稍后重试');
+      } finally {
+        setLoading(false);
+      }
+    }, [effectiveId, selectedId]);
+
+    const selected = candidates.find((c) => c.id === selectedId) || null;
 
     return (
       <div className={`${styles.container} ${className || ''}`} style={style}>
@@ -245,64 +251,91 @@ export const AssistantAvatarWidget = memo<AssistantAvatarWidgetProps>(
             <Title level={5} style={{ margin: 0 }}>
               🎨 挑选助理新形象
             </Title>
-            <Tag color="purple">动态萌宠</Tag>
+            <Tag color="purple">AI 生成</Tag>
           </div>
           <Text type="secondary" style={{ fontSize: 12 }}>
             选择后点击确认即可全局生效
           </Text>
         </div>
 
-        {/* 候选卡片网格 */}
-        <div className={styles.grid}>
-          {candidates.map((cand) => {
-            const isSelected = selectedSpecies === cand.species;
-            return (
-              <div
-                key={cand.species}
-                className={`${styles.candidateCard} ${isSelected ? 'selected' : ''}`}
-                onClick={() => !confirmed && setSelectedSpecies(cand.species)}
-              >
-                <div className={styles.avatarWrapper}>
-                  <AnimalSvgRenderer species={cand.species} size={54} />
-                </div>
-                <div className={styles.cardTitle}>
-                  <span>{cand.title}</span>
-                  <Tag color={isSelected ? 'blue' : 'default'} style={{ fontSize: 10, margin: 0 }}>
-                    {cand.tag}
-                  </Tag>
-                </div>
-                <div className={styles.cardDesc}>{cand.desc}</div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* 确认操作栏 */}
-        <div className={styles.footer}>
-          <div>
-            {confirmed ? (
-              <Text type="success" style={{ fontSize: 12, fontWeight: 500 }}>
-                ✓ 已成功写入 IDENTITY.md 全局生效
-              </Text>
-            ) : (
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                当前选中：<strong>{selectedSpecies}</strong>
-              </Text>
-            )}
+        {loading && candidates.length === 0 ? (
+          <div className={styles.emptyState}>
+            <Text type="secondary">加载候选形象中...</Text>
           </div>
+        ) : candidates.length === 0 ? (
+          <div className={styles.emptyState}>
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description="先让助理生成几个新形象吧"
+            />
+          </div>
+        ) : (
+          <>
+            <div className={styles.grid}>
+              {candidates.map((cand) => {
+                const isSelected = selectedId === cand.id;
+                return (
+                  <div
+                    key={cand.id}
+                    className={`${styles.candidateCard} ${isSelected ? 'selected' : ''}`}
+                    onClick={() => !confirmed && setSelectedId(cand.id)}
+                  >
+                    <div className={styles.avatarWrapper}>
+                      {cand.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={cand.imageUrl}
+                          alt={cand.prompt || cand.id}
+                          className={styles.candidateImage}
+                        />
+                      ) : (
+                        <Text type="secondary" style={{ fontSize: 32 }}>
+                          🖼️
+                        </Text>
+                      )}
+                    </div>
+                    <div className={styles.cardTitle}>
+                      <span>{cand.prompt ? cand.prompt.slice(0, 12) : '新形象'}</span>
+                      <Tag color={isSelected ? 'blue' : 'default'} style={{ fontSize: 10, margin: 0 }}>
+                        {isSelected ? '已选中' : '候选'}
+                      </Tag>
+                    </div>
+                    {cand.prompt && <div className={styles.cardDesc}>{cand.prompt}</div>}
+                  </div>
+                );
+              })}
+            </div>
 
-          <div>
-            {!confirmed ? (
-              <Button type="primary" size="small" loading={loading} onClick={handleConfirm}>
+            <div className={styles.footer}>
+              <div>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  当前选中：
+                  <strong>{selected?.prompt || selectedId || '未选择'}</strong>
+                </Text>
+              </div>
+              <Button
+                type="primary"
+                size="small"
+                loading={loading}
+                disabled={!selectedId}
+                onClick={handleConfirm}
+              >
                 确认使用此形象
               </Button>
-            ) : (
-              <Button size="small" type="default" disabled>
-                ✓ 已生效
-              </Button>
-            )}
+            </div>
+          </>
+        )}
+
+        {confirmed && (
+          <div className={styles.footer}>
+            <Text type="success" style={{ fontSize: 12, fontWeight: 500 }}>
+              ✓ 新形象已生效
+            </Text>
+            <Button size="small" type="default" disabled>
+              ✓ 已生效
+            </Button>
           </div>
-        </div>
+        )}
       </div>
     );
   },

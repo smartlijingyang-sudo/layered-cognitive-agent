@@ -1,7 +1,8 @@
-"""Patch: render interactive AssistantAvatarWidget for candidate avatar picker.
+"""Patch: render interactive AssistantAvatarWidget for generated-image candidate picker.
 
-Allows users to pick new avatar characters (e.g. dinosaur, capybara, fox, owl)
-from interactive candidate cards in chat and atomizes the selection to IDENTITY.md.
+Fetches candidates from ``GET /v1/assistants/{id}/avatar/candidates``, activates
+the selected one via ``POST /v1/assistants/{id}/avatar/set``, broadcasts
+``lca-assistant-avatar-changed`` and shows first-person success feedback.
 """
 
 from __future__ import annotations
@@ -17,17 +18,17 @@ _SOURCE_NAME = "AssistantAvatarWidget.tsx"
 
 meta = PatchMeta(
     name="assistant_avatar_widget",
-    description="Render interactive AssistantAvatarWidget for candidate avatar picker",
+    description="Render interactive AssistantAvatarWidget for generated-image candidate picker",
     files=(_COMPONENT_REL, _ASSISTANT_REL),
     risk="low",
     category="ui",
     depends_on=("connector_auth_card",),
-    why="Provide interactive avatar candidate picker cards in chat with atomic IDENTITY.md update",
+    why="Provide generated-image avatar candidate picker cards in chat backed by the avatar REST API",
     technical_detail=(
         "Installs AssistantAvatarWidget.tsx in Conversation/Messages/components and mounts it in Assistant/index.tsx"
     ),
-    verify_file=_ASSISTANT_REL,
-    verify_marker="AssistantAvatarWidget",
+    verify_file=_COMPONENT_REL,
+    verify_marker="avatar/candidates",
 )
 
 
@@ -51,13 +52,18 @@ def apply(ctx: PatchContext) -> bool:
         "import ConnectorAuthCard from '../components/ConnectorAuthCard';\n"
         "import AssistantAvatarWidget from '../components/AssistantAvatarWidget';"
     )
-    if "import AssistantAvatarWidget from '../components/AssistantAvatarWidget';" not in assistant_text:
+    if (
+        "import AssistantAvatarWidget from '../components/AssistantAvatarWidget';"
+        not in assistant_text
+    ):
         if import_anchor not in assistant_text:
-            raise AssertionError("assistant_avatar_widget: ConnectorAuthCard import anchor not found")
+            raise SystemExit("assistant_avatar_widget: ConnectorAuthCard import anchor not found")
         assistant_text = assistant_text.replace(import_anchor, import_repl, 1)
 
     # 注入检测逻辑
-    detect_anchor = "    const isNamingWidget = Boolean(content && content.includes('[widget:name_picker'));"
+    detect_anchor = (
+        "    const isNamingWidget = Boolean(content && content.includes('[widget:name_picker'));"
+    )
     detect_repl = (
         "    const isAvatarPickerWidget = Boolean(\n"
         "      content &&\n"
@@ -79,7 +85,10 @@ def apply(ctx: PatchContext) -> bool:
         "      cleanContent = cleanContent.replace(/\\[widget:avatar_picker\\?[^\\]]+\\]/g, '').trim();\n"
         "    }"
     )
-    if "isAvatarPickerWidget && cleanContent" not in assistant_text and clean_anchor in assistant_text:
+    if (
+        "isAvatarPickerWidget && cleanContent" not in assistant_text
+        and clean_anchor in assistant_text
+    ):
         assistant_text = assistant_text.replace(clean_anchor, clean_repl, 1)
 
     # 注入 messageExtra 挂载
