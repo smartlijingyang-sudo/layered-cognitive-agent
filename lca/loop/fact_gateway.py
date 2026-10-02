@@ -14,7 +14,7 @@ from typing import Any, cast
 import structlog
 
 from lca.contracts.models.core.state.state import AgentState
-from lca.contracts.protocols.loop.fact_gateway import AppendReceipt, FactGateway
+from lca.contracts.protocols.loop.fact_gateway import AppendReceipt
 from lca.contracts.protocols.loop.spine_publish import (
     get_active_field_producers,
     get_active_spine_enricher,
@@ -172,7 +172,14 @@ def _catalog_session_for(publish_writer: object) -> SessionProtocol:
     return cast("SessionProtocol", publish_writer)
 
 
-class DefaultFactGateway(FactGateway):
+# Deliberately not an explicit FactGateway subclass: PR2 Task 4 collapsed
+# the surface write path (tests/integration/test_pr2_write_path_collapsed.py
+# pins the collapse), so this gateway implements only the
+# catalog/spine/diagnostic legs and must not reintroduce a surface seam.
+# Structural typing keeps it compatible with the FactGateway protocol for
+# the implemented seams; dropping the Protocol base is runtime-neutral
+# (Protocol bases never block instantiation).
+class DefaultFactGateway:
     """把 ``Session.append`` 收口为唯一事实生产门面。
 
     Publish seam (bridge/facade) 只用于 spine EP;catalog / surface 始终写 raw Session。
