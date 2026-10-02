@@ -8,6 +8,7 @@ from typing import Any
 
 from lca.cognition.brain.reasoner.reasoner import PromptReasoner
 from lca.contracts.atoms.enums.enums import LLMStreamEventType
+from lca.contracts.models.cognition.reasoner_turn import ReasonerTurnRender
 from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.models.core.execution.decision import Decision, Observation, ToolCall, Turn
 from lca.contracts.models.core.state.state import AgentState, Budget
@@ -30,6 +31,20 @@ def _profile() -> RoleProfile:
 
 def _state(*, step: int = 3) -> AgentState:
     return AgentState(trace_id="t", task="task", budget=Budget(), step=step)
+
+
+def _render() -> ReasonerTurnRender:
+    """最小 ReasonerTurnRender:trace=None 跳过 cursor/prompt 块,直测 stream/complete 路径。"""
+    return ReasonerTurnRender(
+        prompt="p",
+        trace=None,
+        section_count=0,
+        manifest=None,
+        activated_skill_ids=(),
+        section_outputs=None,
+        total_chars=None,
+        variant=None,
+    )
 
 
 def _state_after_web_search(*, step: int = 1) -> AgentState:
@@ -120,7 +135,7 @@ class TestReasonerStreamPath(unittest.IsolatedAsyncioTestCase):
         expected = '{"action_type":"respond","response_text":"news summary","confidence":0.9}'
         llm = _EmptyStreamCompleteFallbackLLM(expected)
         reasoner = PromptReasoner(llm=llm)
-        result = await reasoner.generate_thoughts(_state())
+        result = await reasoner.complete_turn(_state(), _render(), [])
         self.assertEqual(result.text, expected)
         self.assertEqual(llm.complete_calls, 1)
 
@@ -144,7 +159,7 @@ class TestReasonerStreamPath(unittest.IsolatedAsyncioTestCase):
 
         llm = _RetryCompleteLLM()
         reasoner = PromptReasoner(llm=llm)
-        result = await reasoner.generate_thoughts(_state())
+        result = await reasoner.complete_turn(_state(), _render(), [])
         self.assertEqual(result.text, expected)
         self.assertEqual(llm.complete_calls, 2)
 
@@ -152,7 +167,7 @@ class TestReasonerStreamPath(unittest.IsolatedAsyncioTestCase):
         expected = '{"action_type":"respond","response_text":"hello","confidence":1.0}'
         llm = _DualPathLLM(expected)
         reasoner = PromptReasoner(llm=llm)
-        result = await reasoner.generate_thoughts(_state(step=7))
+        result = await reasoner.complete_turn(_state(step=7), _render(), [])
         self.assertEqual(result.text, expected)
         self.assertEqual(llm.stream_steps, [7])
 
@@ -163,7 +178,7 @@ class TestReasonerStreamPath(unittest.IsolatedAsyncioTestCase):
         )
         llm = _ReasoningOnlyStreamLLM(reasoning_json)
         reasoner = PromptReasoner(llm=llm)
-        result = await reasoner.generate_thoughts(_state())
+        result = await reasoner.complete_turn(_state(), _render(), [])
         self.assertEqual(result.text, "")
 
     async def test_post_search_uses_stream(self) -> None:
@@ -185,7 +200,7 @@ class TestReasonerStreamPath(unittest.IsolatedAsyncioTestCase):
 
         llm = _PostSearchLLM()
         reasoner = PromptReasoner(llm=llm)
-        result = await reasoner.generate_thoughts(_state_after_web_search())
+        result = await reasoner.complete_turn(_state_after_web_search(), _render(), [])
         self.assertEqual(result.text, expected)
         self.assertEqual(calls, ["stream"])
 
