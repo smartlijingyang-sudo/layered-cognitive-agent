@@ -6,7 +6,7 @@ tree. Plugin implementations live under
 ``lca.plugins.events.publishers.spine_reflector_runtime`` and
 ``spine_reflector_agent_spawn``.
 
-Default implementation: ``lca/runtime/envelope_emitter.py::SpineEnvelopeEmitter``.
+Default implementation: ``lca/runtime/projection/envelope_emitter.py::SpineEnvelopeEmitter``.
 
 ``exception.caught`` is not on this Protocol. That EP carries a
 normalized :class:`~lca.contracts.observability.ExceptionRecord` and

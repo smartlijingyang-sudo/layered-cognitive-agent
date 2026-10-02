@@ -11,14 +11,8 @@ from typing import Any, Protocol
 class MiddlewareRegistration:
     """One middleware binding to a cognitive phase event.
 
-    `callback` is OPTIONAL (default None) to preserve the existing 3-field
-    constructor signature used at 4 production callers (F1 fix):
-    - lca/plugins/budget_policy/__init__.py:55
-    - lca/plugins/loop_intervention_policy/__init__.py:55
-    - lca/runtime/hook_middleware.py:57
-    - lca/runtime/loop_intervention_mw.py:47
-
-    These callers pass seam_key/priority/plugin_id only — the actual callback
+    `callback` is OPTIONAL (default None): registrations carry
+    seam_key/priority/plugin_id only — the actual callback
     is registered separately via `InMemoryMiddlewareRegistry.register()`.
     """
 
