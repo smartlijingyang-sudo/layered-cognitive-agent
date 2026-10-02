@@ -29,6 +29,7 @@ class AvatarImageProvider(Protocol):
     ) -> bytes: ...
     async def create_video(self, image_bytes: bytes) -> str: ...
     async def get_video(self, task_id: str) -> VideoStatus: ...
+    async def download(self, url: str) -> bytes: ...
 
 
 class Grok2ApiProvider:
@@ -90,6 +91,13 @@ class Grok2ApiProvider:
     async def _get(self, path: str) -> dict[str, Any]:
         resp = await self._request("GET", path)
         return cast("dict[str, Any]", resp.json())
+
+    async def download(self, url: str) -> bytes:
+        """下载生成结果；文件端点无需鉴权，故不携带 Authorization。
+
+        下载失败（网络、5xx）仍按瞬时错误指数退避重试。
+        """
+        return await self._download(url)
 
     async def _download(self, url: str) -> bytes:
         """下载生成结果；文件端点无需鉴权，故不携带 Authorization。

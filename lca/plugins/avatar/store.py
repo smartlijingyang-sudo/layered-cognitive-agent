@@ -129,6 +129,14 @@ class AvatarStore:
             raise FileNotFoundError(path)
         return path.read_bytes()
 
+    def write_video(self, assistant_id: str, candidate_id: str, data: bytes) -> str:
+        """写视频变体到 ``avatar/video/<candidate_id>.mp4``，返回相对路径。"""
+        rel_path = f"video/{candidate_id}.mp4"
+        target = self.base_dir / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+        return rel_path
+
     def copy_candidate_to_active(
         self, assistant_id: str, candidate: AvatarCandidate
     ) -> AvatarActiveBundle:

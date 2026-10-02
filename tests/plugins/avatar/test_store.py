@@ -55,6 +55,12 @@ def test_write_image_resizes_small(store: AvatarStore):
         assert im.size == (64, 64)
 
 
+def test_write_video(store: AvatarStore):
+    rel = store.write_video("asst_1", "c1", b"mp4-bytes")
+    assert rel == "video/c1.mp4"
+    assert (store.base_dir / "video" / "c1.mp4").read_bytes() == b"mp4-bytes"
+
+
 def test_copy_candidate_to_active(store: AvatarStore):
     now = datetime(2026, 10, 2, 12, 0, tzinfo=UTC)
     cand = store._make_candidate("asst_1", "c1", "create", "prompt", now)

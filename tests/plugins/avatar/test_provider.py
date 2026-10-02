@@ -193,6 +193,19 @@ async def test_grok2_api_provider_satisfies_avatar_image_provider_protocol():
 
 
 @pytest.mark.asyncio
+async def test_public_download_returns_bytes_without_auth():
+    seen = {}
+
+    def handler(request: Request) -> Response:
+        seen["auth"] = request.headers.get("Authorization")
+        return Response(200, content=b"MP4")
+
+    provider = _provider(handler)
+    assert await provider.download("http://test/video.mp4") == b"MP4"
+    assert seen["auth"] is None
+
+
+@pytest.mark.asyncio
 async def test_download_does_not_send_auth_header():
     seen = {}
 
