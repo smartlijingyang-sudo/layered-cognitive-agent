@@ -64,14 +64,20 @@ def test_tool_result_fill_empty_only() -> None:
 
 
 def test_phase_think_fold_model_name() -> None:
+    # fold SSOT: llm.request.header opens the step; llm.call.end creates the
+    # ThinkingTrace; phase.think.fold then patches its model.
     events = [
-        {"execution_point": "brain.think.start", "payload": {}, "when": 1.0},
+        {
+            "execution_point": "llm.request.header",
+            "payload": {"step_id": "step-001", "config": {}},
+            "when": 1.0,
+        },
+        {"execution_point": "llm.call.end", "payload": {"latency_ms": 10}, "when": 1.05},
         {
             "execution_point": "phase.think.fold",
             "payload": {"objective_kind": "model_name", "objective": "claude-test"},
             "when": 1.1,
         },
-        {"execution_point": "brain.think.end", "payload": {}, "when": 2.0},
     ]
     doc = fold_step_tree(events, run_id="r_model", outcome="completed")
     assert doc.steps[0].thinking is not None
@@ -79,6 +85,8 @@ def test_phase_think_fold_model_name() -> None:
 
 
 def test_header_model_from_config_payload() -> None:
+    # fold SSOT: the header opens the step with the config model; llm.call.end
+    # materializes the ThinkingTrace carrying it.
     events = [
         {
             "execution_point": "llm.request.header",
@@ -88,6 +96,7 @@ def test_header_model_from_config_payload() -> None:
             },
             "when": 1.0,
         },
+        {"execution_point": "llm.call.end", "payload": {"latency_ms": 5}, "when": 1.5},
         {"execution_point": "writable.step.end", "payload": {"outcome": "success"}, "when": 2.0},
     ]
     doc = fold_step_tree(events, run_id="r_header", outcome="completed")
