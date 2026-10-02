@@ -31,7 +31,7 @@ from lca_kernel.events.persistence.persistence import FsyncProtocol as KernelFsy
 
 def _make_rec(**overrides: Any) -> EventRecord:
     base = {
-        "execution_point": "brain.think.start",
+        "execution_point": "think.gate.start",
         "channel": "fact",
         "span_id": "01HM",
         "parent_span_id": None,

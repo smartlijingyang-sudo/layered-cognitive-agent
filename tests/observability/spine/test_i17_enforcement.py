@@ -49,9 +49,9 @@ def _make_spine() -> EventSpine:
 
 
 def _make_span() -> SpanContext:
-    """Return a ``SpanContext`` suitable for emitting a ``brain.think.start`` event."""
+    """Return a ``SpanContext`` suitable for emitting a ``think.gate.start`` event."""
     return SpanContext(
-        execution_point="brain.think.start",
+        execution_point="think.gate.start",
         span_id="lca-span-i17-0001",
         parent_span_id=None,
     )
@@ -119,7 +119,7 @@ def test_i17_rejects_event_without_source() -> None:
 
     with pytest.raises(I17ViolationError) as excinfo:
         pipeline.emit(
-            execution_point="brain.think.start",
+            execution_point="think.gate.start",
             channel="fact",
             span_ctx=_make_span(),
             caller_payload={},
@@ -130,7 +130,7 @@ def test_i17_rejects_event_without_source() -> None:
     # offending execution_point so logs can be triaged.
     message = str(excinfo.value)
     assert "source_location" in message
-    assert "brain.think.start" in message
+    assert "think.gate.start" in message
 
 
 def test_i17_rejects_even_when_other_fields_present() -> None:
@@ -165,7 +165,7 @@ def test_i17_accepts_event_with_source_location_from_producer() -> None:
     spine = _make_spine()
 
     record = pipeline.emit(
-        execution_point="brain.think.start",
+        execution_point="think.gate.start",
         channel="fact",
         span_ctx=_make_span(),
         caller_payload={},
@@ -173,7 +173,7 @@ def test_i17_accepts_event_with_source_location_from_producer() -> None:
     )
 
     assert isinstance(record, EventRecord)
-    assert record.execution_point == "brain.think.start"
+    assert record.execution_point == "think.gate.start"
     assert record.payload["source_location"] == {
         "file": "stub.py",
         "line": 1,
@@ -189,7 +189,7 @@ def test_i17_accepts_caller_supplied_source_location() -> None:
     spine = _make_spine()
 
     record = pipeline.emit(
-        execution_point="brain.think.start",
+        execution_point="think.gate.start",
         channel="fact",
         span_ctx=_make_span(),
         caller_payload={
@@ -216,14 +216,14 @@ def test_i17_does_not_apply_to_end_events() -> None:
     spine = _make_spine()
 
     record = pipeline.emit(
-        execution_point="brain.think.end",
+        execution_point="think.gate.end",
         channel="fact",
         span_ctx=_make_span(),
         caller_payload={},
         spine=spine,
     )
 
-    assert record.execution_point == "brain.think.end"
+    assert record.execution_point == "think.gate.end"
     assert "source_location" not in record.payload
 
 

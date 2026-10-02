@@ -24,9 +24,9 @@ def test_event_spine_writes_event(tmp_path: Path):
     SpineContext.set_run("r1")
     fs = FileSink(tmp_path, run_id="r1")
     spine = EventSpine(sinks=[fs], subscribers=[])
-    span = SpineContext.push_span("brain.think.start")
+    span = SpineContext.push_span("think.gate.start")
     rec = spine.append(
-        execution_point="brain.think.start",
+        execution_point="think.gate.start",
         channel="fact",
         caller_payload={"x": 1},
         span_ctx=span,
@@ -36,7 +36,7 @@ def test_event_spine_writes_event(tmp_path: Path):
     lines = (tmp_path / "r1.spine.jsonl").read_text().splitlines()
     assert len(lines) == 1
     obj = json.loads(lines[0])
-    assert obj["execution_point"] == "brain.think.start"
+    assert obj["execution_point"] == "think.gate.start"
     assert obj["sequence"] >= 1
     assert obj["causality_id"].startswith("sha256:")
 
@@ -48,17 +48,17 @@ def test_event_spine_fd1_raises_to_business(tmp_path: Path):
     # Replace the fd with an invalid one — writes will raise OSError
     fs._fd = -1  # type: ignore[attr-defined]
     fs._closed = False  # type: ignore[attr-defined]
-    span = SpineContext.push_span("brain.think.start")
+    span = SpineContext.push_span("think.gate.start")
     # Sequence counter is per-process ContextVar; tests run in same
     # interpreter, so don't assert exact value here. Just assert FD-1.
     with pytest.raises(OSError):
         spine.append(
-            execution_point="brain.think.start",
+            execution_point="think.gate.start",
             channel="fact",
             caller_payload={},
             span_ctx=span,
         )
-    SpineContext.pop_span("brain.think.start")  # cleanup
+    SpineContext.pop_span("think.gate.start")  # cleanup
 
 
 def test_event_spine_fd2_deriver_failure_contained(tmp_path: Path):
@@ -73,9 +73,9 @@ def test_event_spine_fd2_deriver_failure_contained(tmp_path: Path):
         raise RuntimeError("deriver boom")
 
     spine = EventSpine(sinks=[fs], subscribers=[good, bad])
-    span = SpineContext.push_span("brain.think.start")
+    span = SpineContext.push_span("think.gate.start")
     rec = spine.append(
-        execution_point="brain.think.start",
+        execution_point="think.gate.start",
         channel="fact",
         caller_payload={},
         span_ctx=span,
@@ -118,16 +118,16 @@ def test_event_spine_subscribe_returns_disposer(tmp_path: Path):
         seen.append(rec)
 
     dispose = spine.subscribe(d)
-    span = SpineContext.push_span("brain.think.start")
+    span = SpineContext.push_span("think.gate.start")
     spine.append(
-        execution_point="brain.think.start",
+        execution_point="think.gate.start",
         channel="fact",
         span_ctx=span,
     )
     assert len(seen) == 1
     dispose()
     spine.append(
-        execution_point="brain.think.start",
+        execution_point="think.gate.start",
         channel="fact",
         span_ctx=span,
     )

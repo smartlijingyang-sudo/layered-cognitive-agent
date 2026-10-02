@@ -92,7 +92,7 @@ def test_append_via_session_forwards_to_bound_hook(tmp_path: Path) -> None:
     token = bind_session_append_hook(hook)
     try:
         rec = spine.append_via_session(
-            execution_point="brain.think.start",
+            execution_point="think.gate.start",
             channel="fact",
             caller_payload={"via": "session"},
         )
@@ -101,7 +101,7 @@ def test_append_via_session_forwards_to_bound_hook(tmp_path: Path) -> None:
         spine.close()
 
     assert len(hook.calls) == 1
-    assert hook.calls[0]["execution_point"] == "brain.think.start"
+    assert hook.calls[0]["execution_point"] == "think.gate.start"
     assert hook.calls[0]["caller_payload"] == {"via": "session"}
     # 钩子返回值原样回传;转发拥有写入,同步路径未触 sink / subscribers
     assert rec.payload == {"via": "session-stub"}
@@ -120,7 +120,7 @@ def test_append_via_session_runtime_error_when_no_hook(tmp_path: Path) -> None:
     try:
         with pytest.raises(RuntimeError, match="no Session hook bound"):
             spine.append_via_session(
-                execution_point="brain.think.start",
+                execution_point="think.gate.start",
                 channel="fact",
                 caller_payload={"via": "fail-loud"},
             )
@@ -141,7 +141,7 @@ def test_append_via_session_raising_hook_propagates(tmp_path: Path) -> None:
     try:
         with pytest.raises(RuntimeError, match="session runtime unavailable"):
             spine.append_via_session(
-                execution_point="brain.think.start",
+                execution_point="think.gate.start",
                 channel="fact",
                 caller_payload={"via": "contained"},
             )
@@ -163,7 +163,7 @@ def test_append_prefers_session_hook_when_bound(tmp_path: Path) -> None:
     token = bind_session_append_hook(hook)
     try:
         rec = spine.append(
-            execution_point="brain.think.start",
+            execution_point="think.gate.start",
             channel="fact",
             caller_payload={"via": "append-session"},
         )
@@ -172,7 +172,7 @@ def test_append_prefers_session_hook_when_bound(tmp_path: Path) -> None:
         spine.close()
 
     assert len(hook.calls) == 1
-    assert hook.calls[0]["execution_point"] == "brain.think.start"
+    assert hook.calls[0]["execution_point"] == "think.gate.start"
     assert hook.calls[0]["caller_payload"] == {"via": "append-session"}
     assert rec.payload == {"via": "session-stub"}
     assert seen == []
@@ -188,7 +188,7 @@ def test_append_runtime_error_when_no_hook(tmp_path: Path) -> None:
     try:
         with pytest.raises(RuntimeError, match="no Session hook bound"):
             spine.append(
-                execution_point="brain.think.start",
+                execution_point="think.gate.start",
                 channel="fact",
                 caller_payload={"via": "fail-loud"},
             )

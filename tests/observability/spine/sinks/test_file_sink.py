@@ -12,7 +12,7 @@ from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
 
 def _make_rec(**overrides) -> EventRecord:
     base = {
-        "execution_point": "brain.think.start",
+        "execution_point": "think.gate.start",
         "channel": "fact",
         "span_id": "01HM",
         "parent_span_id": None,
@@ -40,7 +40,7 @@ def test_file_sink_appends_and_reads_back(tmp_path: Path):
     lines = (tmp_path / "r1.spine.jsonl").read_text().splitlines()
     assert len(lines) == 1
     obj = json.loads(lines[0])
-    assert obj["execution_point"] == "brain.think.start"
+    assert obj["execution_point"] == "think.gate.start"
 
 
 def test_file_sink_oversize_uses_sidecar(tmp_path: Path):

@@ -37,7 +37,7 @@ from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
 
 def _make_rec(**overrides: object) -> EventRecord:
     base: dict[str, object] = {
-        "execution_point": "brain.think.start",
+        "execution_point": "think.gate.start",
         "channel": "fact",
         "span_id": "01HM",
         "parent_span_id": None,

@@ -31,7 +31,7 @@ from lca.infrastructure.observability.spine.sinks.tracing_file_sink import (
 
 def _make_record(
     *,
-    execution_point: str = "brain.think.start",
+    execution_point: str = "think.gate.start",
     run_id: str = "run_test",
     seq: int = 1,
     payload: dict | None = None,
@@ -77,10 +77,10 @@ def _make_exception_record(
 
 def test_main_ledger_written(tmp_path: Path) -> None:
     sink = TracingFileSink(tmp_path, run_id="run_test")
-    sink.write(_make_record(execution_point="brain.think.start"))
+    sink.write(_make_record(execution_point="think.gate.start"))
     sink.close()
     content = (tmp_path / "run_test.spine.jsonl").read_text()
-    assert "brain.think.start" in content
+    assert "think.gate.start" in content
 
 
 def test_request_header_writes_system_prompt_file(tmp_path: Path) -> None:
@@ -131,7 +131,7 @@ def test_exceptions_count_increments(tmp_path: Path) -> None:
     assert sink.exceptions_count == 1
     sink.write(_make_exception_record(seq=2))
     assert sink.exceptions_count == 2
-    sink.write(_make_record(execution_point="brain.think.start", seq=3))
+    sink.write(_make_record(execution_point="think.gate.start", seq=3))
     assert sink.exceptions_count == 2  # 不变
 
 
@@ -145,7 +145,7 @@ def test_zero_exceptions_unlinks_empty_index_on_close(tmp_path: Path) -> None:
     from lca.infrastructure.observability.spine.sinks.file_sink import FileSink
 
     sink = FileSink(tmp_path, run_id="run_empty")
-    sink.write(_make_record(execution_point="brain.think.start", seq=1))
+    sink.write(_make_record(execution_point="think.gate.start", seq=1))
     sink.close()
     exc_path = tmp_path / "run_empty.exceptions.jsonl"
     assert not exc_path.exists(), (
@@ -190,7 +190,7 @@ def test_main_ledger_failure_falls_back(tmp_path: Path, caplog) -> None:
     sink._main._fd = -999  # invalid fd → os.write raises OSError
     try:
         with caplog.at_level(logging.ERROR):
-            sink.write(_make_record(execution_point="brain.think.start"))
+            sink.write(_make_record(execution_point="think.gate.start"))
     finally:
         sink._main._fd = original_fd
     sink.close()
@@ -198,7 +198,7 @@ def test_main_ledger_failure_falls_back(tmp_path: Path, caplog) -> None:
     fb = tmp_path / "FALLBACK.log"
     assert fb.exists(), "FALLBACK.log 必须落盘"
     content = fb.read_text()
-    assert "brain.think.start" in content
+    assert "think.gate.start" in content
     assert "main_failed" in content
 
 

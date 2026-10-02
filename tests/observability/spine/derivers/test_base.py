@@ -32,25 +32,25 @@ def test_deriver_failing_one_does_not_block_business(
 
     fs = FileSink(tmp_path, run_id="r1")
     spine = EventSpine(sinks=[fs], subscribers=[BadDeriver().on_event])
-    span = SpineContext.push_span("brain.think.start")
+    span = SpineContext.push_span("think.gate.start")
     try:
         with caplog.at_level(
             logging.WARNING,
             logger="lca.infrastructure.observability.spine.event.spine",
         ):
             rec = spine.append(
-                execution_point="brain.think.start",
+                execution_point="think.gate.start",
                 channel="fact",
                 caller_payload={},
                 span_ctx=span,
             )
     finally:
         spine.close()
-        SpineContext.pop_span("brain.think.start")
+        SpineContext.pop_span("think.gate.start")
 
     # business continues — append returned a record
     assert rec is not None
-    assert rec.execution_point == "brain.think.start"
+    assert rec.execution_point == "think.gate.start"
     # FD-2 channel emitted the failure
     assert any("spine.deriver_failed" in record.getMessage() for record in caplog.records), (
         caplog.text

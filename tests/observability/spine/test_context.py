@@ -32,17 +32,17 @@ def test_epoch_monotonic():
 
 
 def test_span_push_pop_match():
-    span = SpineContext.push_span("brain.think.start")
+    span = SpineContext.push_span("think.gate.start")
     assert span.span_id
     assert span.parent_span_id is None
     assert SpineContext.current_span() is span
-    back = SpineContext.pop_span("brain.think.start")
+    back = SpineContext.pop_span("think.gate.start")
     assert back.span_id == span.span_id
     assert SpineContext.current_span() is None
 
 
 def test_span_pop_mismatch_raises():
-    SpineContext.push_span("brain.think.start")
+    SpineContext.push_span("think.gate.start")
     with pytest.raises(PhaseMachineViolation):
         SpineContext.pop_span("agent_loop.iteration.end")
 
@@ -54,9 +54,9 @@ def test_span_pop_empty_raises():
 
 def test_nested_spans_parent_chain():
     root = SpineContext.push_span("kernel.run.start")
-    inner = SpineContext.push_span("brain.think.start")
+    inner = SpineContext.push_span("think.gate.start")
     assert inner.parent_span_id == root.span_id
-    SpineContext.pop_span("brain.think.start")
+    SpineContext.pop_span("think.gate.start")
     SpineContext.pop_span("kernel.run.start")
 
 

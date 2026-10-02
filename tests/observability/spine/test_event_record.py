@@ -12,7 +12,7 @@ from lca.infrastructure.observability.spine.event.record import EventRecord
 
 def _rec(**overrides):
     base = {
-        "execution_point": "brain.think.start",
+        "execution_point": "think.gate.start",
         "channel": "fact",
         "span_id": "01HMABC",
         "parent_span_id": None,
@@ -60,6 +60,6 @@ def test_event_record_sequence_must_be_positive():
 
 def test_event_record_carries_minimum_schema():
     rec = _rec(outcome="success")
-    assert rec.execution_point == "brain.think.start"
+    assert rec.execution_point == "think.gate.start"
     assert rec.channel == "fact"
     assert rec.payload == {"k": 1}
