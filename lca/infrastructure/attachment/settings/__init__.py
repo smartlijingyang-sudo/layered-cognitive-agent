@@ -9,4 +9,4 @@ from lca.infrastructure.attachment.settings.settings import (
     reset_attachment_settings_for_tests,
 )
 
-__all__ = ['AttachmentPolicyDocument', 'load_attachment_policy', 'AttachmentSettings', 'get_attachment_settings', 'get_attachment_policy', 'reset_attachment_settings_for_tests']
+__all__ = ['AttachmentPolicyDocument', 'AttachmentSettings', 'get_attachment_policy', 'get_attachment_settings', 'load_attachment_policy', 'reset_attachment_settings_for_tests']

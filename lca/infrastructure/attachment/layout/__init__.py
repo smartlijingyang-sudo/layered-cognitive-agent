@@ -6,4 +6,4 @@ from lca.infrastructure.attachment.layout.layout import (
     sanitize_run_segment,
 )
 
-__all__ = ['sanitize_attachment_name', 'sanitize_run_segment', 'AttachmentLayout']
+__all__ = ['AttachmentLayout', 'sanitize_attachment_name', 'sanitize_run_segment']
