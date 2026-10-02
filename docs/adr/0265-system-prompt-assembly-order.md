@@ -95,3 +95,12 @@ profile YAML 扩展模板（"the default surface Profile YAML extends"）只许�
 - **ADR-0259**：C1 已立 developer 时间戳的信任语义（"now" 唯一可信来源）；本 ADR 补位置语义（D1）。
 - **ADR-0260**：C2 检索义务决策树；本 ADR 指出其模板层盲区（D3），C3 与其呼应。
 - **ADR-0258**：standing 热更新与压缩豁免；B4 的 live 配置定位与 0258 一致（standing 永不进压缩流、每 turn 重注）。
+
+---
+
+## 7. 决策记录（2026-10-02，李超授权 Athena 按 muse 思想裁决）
+
+1. **带序 vs 精确顺序：带序（维持 C1），不锁死精确快照**。理由：精确快照会在带内合法变更（如 T4 认可的 team 段追加）时产生 toil 式失败——防不住真正的违规，只增加维护成本。可精确判定的违规是"跨带逆序"，C2 的加载期 fail-fast 已经覆盖它；T1/T4 的带序断言就是验收。fail-closed 用在可精确判定处，带内顺序不属于。
+2. **D1 时间锚点：`developer_timestamp` 移入 B3 并改为必需；`runtime_env` 留 B8**。理由：ADR-0259 C1 已立"now 唯一可信来源"为不变量——不变量不能是可选的，可选的时间锚点等于没有时间锚点，这是必改项；位置上 stable→volatile 原则要求可信锚点前置，recency 加权只是模型行为假设，不能凌驾契约不变量。`runtime_env` 是环境尾注（B8 的语义正是"per-turn 固定格式信息"），不是信任锚点，留在尾部。实现项：react 模板第 18 位前移 + 去 fallback，转 tests/quality 落地。
+3. **turn 级装配：先做顺序审计，不直接立 ADR**。理由：LCA 的 turn 级 9 块顺序从未实证审计过——为没测量过的东西立法是 premature legislation（YAGNI）。裁决是"审计先行"：arch lane 下一轮输出 run 组装链路 9 块顺序实证，有缺口再立 ADR。已记 backlog 跟踪，不是丢弃。
+4. **D3 豁免形态：profile YAML 内声明**。理由：豁免是 profile 的属性，放一起读一次看全；独立注册表是第二个 SSOT，会漂移（注册表与 profile 不一致时以哪个为准？——与 ADR-0254 选 A 同一理由：无裁决机制的同步是复杂度而非机制）。审计需求用工具扫描所有 profile YAML 的豁免声明满足（机制，不人肉对表）。豁免声明须结构化（义务项、理由、时间），C2 加载期校验覆盖。
