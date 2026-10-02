@@ -40,7 +40,7 @@ class TestOpenAiCompatGateway(unittest.TestCase):
         with (
             TestClient(create_scripted_app(registry, llm_resolver=ScriptedLLMResolver())) as client,
             patch(
-                "gateway.openai_housekeeping.create_simple_completion",
+                "lca.plugins.transport.webserver.handlers.openai.housekeeping.create_simple_completion",
                 new=AsyncMock(
                     return_value=("topic title", {"prompt_tokens": 1, "completion_tokens": 2})
                 ),
@@ -68,7 +68,7 @@ class TestOpenAiCompatGateway(unittest.TestCase):
         with (
             TestClient(app) as client,
             patch(
-                "gateway.openai_housekeeping.create_simple_completion",
+                "lca.plugins.transport.webserver.handlers.openai.housekeeping.create_simple_completion",
                 new=AsyncMock(
                     return_value=("topic title", {"prompt_tokens": 1, "completion_tokens": 2})
                 ),
@@ -89,16 +89,23 @@ class TestOpenAiCompatGateway(unittest.TestCase):
         self.assertIn("topic title", body)
         self.assertEqual(registry.status_counts().get("running", 0), 0)
 
-    def test_chat_completions_without_llm_returns_503(self) -> None:
-        class _Unavailable:
-            def is_available(self) -> bool:
-                return False
+    def test_chat_completions_without_llm_key_returns_502(self) -> None:
+        """No LLM_API_KEY -> StructuredLLMError -> 502, never a crash.
 
-            def resolve(self, *, mode: str | None = None):
-                raise RuntimeError("unavailable")
-
-        app = create_scripted_app(llm_resolver=_Unavailable())
-        with TestClient(app) as client:
+        The resolver-based 503 contract was retired when the compat handlers
+        moved to direct-upstream via env credentials
+        (lca.infrastructure.openai.compat.create_simple_completion ignores
+        the llm_resolver service); "without LLM" now means
+        llm_openai_credentials() yields no key.
+        """
+        app = create_scripted_app()
+        with (
+            TestClient(app) as client,
+            patch(
+                "lca.infrastructure.openai.compat.llm_openai_credentials",
+                return_value=(None, None, None),
+            ),
+        ):
             response = client.post(
                 "/v1/chat/completions",
                 json={
@@ -106,7 +113,7 @@ class TestOpenAiCompatGateway(unittest.TestCase):
                     "messages": [{"role": "user", "content": "hi"}],
                 },
             )
-        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.status_code, 502)
 
     def test_unbooted_compat_endpoints_return_503(self) -> None:
         """Missing lifespan context is an availability error, never a server error.
@@ -282,7 +289,7 @@ class TestOpenAiEmbeddingsEndpoint(unittest.TestCase):
                 create_scripted_app(RunRegistry(), llm_resolver=ScriptedLLMResolver())
             ) as client,
             patch(
-                "gateway.openai_endpoints.create_embeddings",
+                "lca.plugins.transport.webserver.handlers.openai.endpoints.create_embeddings",
                 new=AsyncMock(
                     return_value={
                         "object": "list",
@@ -316,7 +323,7 @@ class TestOpenAiResponsesEndpoint(unittest.TestCase):
         with (
             TestClient(create_scripted_app(registry, llm_resolver=ScriptedLLMResolver())) as client,
             patch(
-                "gateway.openai_housekeeping.create_simple_completion",
+                "lca.plugins.transport.webserver.handlers.openai.housekeeping.create_simple_completion",
                 return_value=("ok", {}),
             ),
         ):
@@ -338,7 +345,7 @@ class TestOpenAiResponsesEndpoint(unittest.TestCase):
         with (
             TestClient(create_scripted_app(registry, llm_resolver=ScriptedLLMResolver())) as client,
             patch(
-                "gateway.openai_endpoints.create_structured_completion",
+                "lca.plugins.transport.webserver.handlers.openai.endpoints.create_structured_completion",
                 return_value=(
                     '{"satisfied": true}',
                     {"input_tokens": 1, "output_tokens": 2, "total_tokens": 3},
@@ -376,7 +383,7 @@ class TestOpenAiResponsesEndpoint(unittest.TestCase):
         with (
             TestClient(create_scripted_app(registry, llm_resolver=ScriptedLLMResolver())) as client,
             patch(
-                "gateway.openai_endpoints.passthrough_responses_completion",
+                "lca.plugins.transport.webserver.handlers.openai.endpoints.passthrough_responses_completion",
                 new=AsyncMock(
                     return_value=__import__(
                         "starlette.responses", fromlist=["JSONResponse"]

@@ -10,7 +10,11 @@ resolver injection before yielding.
 from __future__ import annotations
 
 import asyncio
+import sys
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
+from unittest.mock import patch as _patch
 
 from lca_kernel import run_kernel_lifespan
 from tests.support.gateway_scripted import ScriptedLLMResolver
@@ -52,24 +56,29 @@ def create_scripted_app(
     from lca.plugins.transport.webserver.bootstrap.bootstrap import install_bootstrap_state
     from lca_kernel.cli.cli import create_app
 
-    app = asyncio.run(create_app(profile_path=profile_path))
+    # create_app's build lifespan (cli.py _build + BuildCompleteError) also ends
+    # with K6's sys.exit(0); neutralize it here as well (see _scripted_lifespan).
+    with _patch.object(sys, "exit", lambda code=0: None):
+        app = asyncio.run(create_app(profile_path=profile_path))
     resolver = llm_resolver if llm_resolver is not None else ScriptedLLMResolver()
 
-    async def _scripted_lifespan(asgi_scope: dict[str, Any], receive: Any, send: Any) -> None:
-        if asgi_scope["type"] != "lifespan":
-            return
-        try:
+    @asynccontextmanager
+    async def _scripted_lifespan(app: Any) -> AsyncIterator[dict[str, Any]]:
+        """Boot a kernel for the TestClient lifespan; inject the scripted resolver.
+
+        Follows lca_kernel.boot.lifespan.make_lifespan's protocol (async CM
+        taking app; Starlette's Router.lifespan owns the protocol messages).
+        K6's sys.exit(0) on shutdown is neutralized for the test process
+        (same rationale as tests/lca_kernel/test_lifespan.py::block_sys_exit).
+        """
+        with _patch.object(sys, "exit", lambda code=0: None):
             async with run_kernel_lifespan(profile_path or "profiles/web-standard.yaml") as state:
                 ctx = state["ctx"]
                 ctx.provide("llm_resolver", resolver)
                 app.state.ctx = ctx
                 ctx.inject("route_registry").install(app)
                 install_bootstrap_state(app, ctx)
-                await send({"type": "lifespan.startup.complete"})
-                await receive()
-                await send({"type": "lifespan.shutdown.complete"})
-        except Exception as exc:
-            await send({"type": "lifespan.startup.failed", "message": str(exc)})
+                yield {"ctx": ctx}
 
     app.router.lifespan_context = _scripted_lifespan  # type: ignore[assignment]
     return app
