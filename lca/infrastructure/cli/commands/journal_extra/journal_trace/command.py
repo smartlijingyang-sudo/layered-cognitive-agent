@@ -154,8 +154,11 @@ def register(app: typer.Typer) -> None:
             raise SystemExit(1)
         events_path = _resolve_events_path(traces_root, resolved_run_id)
         all_events: list[dict[str, Any]] = []
+        decode_skipped = 0
         for event in _iter_events(events_path):
             if event.get("__decode_error__"):
+                # _iter_events 文档:decode 失败行由 caller 计入 skipped。
+                decode_skipped += 1
                 continue
             all_events.append(event)
 
@@ -172,8 +175,8 @@ def register(app: typer.Typer) -> None:
             return
 
         rows: list[TraceRow] = []
-        skipped = 0
-        total = 0
+        skipped = decode_skipped
+        total = decode_skipped
         for event in all_events:
             total += 1
             payload = event.get("payload")

@@ -75,11 +75,13 @@ def _make_record(
 def _write_events_jsonl(run_dir: Path, records: list[EventRecord]) -> Path:
     """Append one ``EventRecord`` per line via ``FileSink``. Returns the path."""
     # PR-4 收口:FileSink 默认 spine 命名 = <run_id>.spine.jsonl;旧 events.jsonl layout 已下线。
-    sink = FileSink(run_dir, run_id="run_test")
+    # run_id 取 run 目录名,调用方传参 run_id 须与目录名一致。
+    run_id = run_dir.name
+    sink = FileSink(run_dir, run_id=run_id)
     for record in records:
         sink.write(record)
     sink.close()
-    return run_dir / "run_test.spine.jsonl"
+    return run_dir / f"{run_id}.spine.jsonl"
 
 
 @pytest.fixture
@@ -117,7 +119,7 @@ def traces_root(tmp_path: Path) -> Path:
         ),
         _make_record(
             sequence=2,
-            execution_point="brain.think.start",
+            execution_point="think.gate.start",
             payload={
                 "source_location": {
                     "file": "brain/think.py",
@@ -131,7 +133,7 @@ def traces_root(tmp_path: Path) -> Path:
         ),
         _make_record(
             sequence=3,
-            execution_point="brain.think.end",
+            execution_point="think.gate.end",
             payload={"return_value": "ok"},
             outcome="success",
             when_iso="2026-09-01T00:00:03+00:00",
@@ -173,7 +175,7 @@ def test_default_table_includes_source_column(traces_root: Path) -> None:
     """The default table includes seq / point / channel / outcome / when / source."""
     result = runner.invoke(
         app,
-        ["journal", "trace", "run_test", "--traces-root", str(traces_root)],
+        ["journal", "trace", "run_test", "--no-human", "--traces-root", str(traces_root)],
     )
     assert result.exit_code == 0, result.stderr
     assert "seq" in result.stdout
@@ -183,8 +185,8 @@ def test_default_table_includes_source_column(traces_root: Path) -> None:
     # pointing at brain/perceive.py:42 — both must appear.
     assert "brain/perceive.py:42" in result.stdout
     assert "perceive" in result.stdout
-    # Events without source_location (brain.think.end) show "-".
-    assert "brain.think.end" in result.stdout
+    # Events without source_location (think.gate.end) show "-".
+    assert "think.gate.end" in result.stdout
     # The trace summary footer counts rendered rows.
     assert "events rendered" in result.stdout
 
@@ -193,7 +195,7 @@ def test_default_table_does_not_show_locals(traces_root: Path) -> None:
     """The default table does NOT show next_frame / locals columns."""
     result = runner.invoke(
         app,
-        ["journal", "trace", "run_test", "--traces-root", str(traces_root)],
+        ["journal", "trace", "run_test", "--no-human", "--traces-root", str(traces_root)],
     )
     assert result.exit_code == 0
     # The ``locals`` column header MUST NOT appear unless ``--locals``
@@ -212,6 +214,7 @@ def test_locals_flag_adds_locals_columns(traces_root: Path) -> None:
         [
             "journal",
             "trace",
+            "--no-human",
             "run_test",
             "--locals",
             "--traces-root",
@@ -234,6 +237,7 @@ def test_locals_implies_source(traces_root: Path) -> None:
         [
             "journal",
             "trace",
+            "--no-human",
             "run_test",
             "--locals",
             "--traces-root",
@@ -251,6 +255,7 @@ def test_source_flag_keeps_locals_column_off(traces_root: Path) -> None:
         [
             "journal",
             "trace",
+            "--no-human",
             "run_test",
             "--source",
             "--traces-root",
@@ -271,6 +276,7 @@ def test_redacted_locals_value_surfaces_in_table(traces_root: Path) -> None:
         [
             "journal",
             "trace",
+            "--no-human",
             "run_test",
             "--locals",
             "--traces-root",
@@ -294,6 +300,7 @@ def test_json_output_carries_source_and_locals(traces_root: Path) -> None:
         [
             "journal",
             "trace",
+            "--no-human",
             "run_test",
             "--json",
             "--locals",
@@ -314,7 +321,7 @@ def test_json_output_carries_source_and_locals(traces_root: Path) -> None:
     assert rows[0]["source_location"]["line"] == 42
     assert rows[0]["source_location"]["function"] == "perceive"
     assert rows[0]["next_frame"] == "agent/loop.py:100 (step)"
-    # brain.think.end has no source_location — JSON encodes ``None``.
+    # think.gate.end has no source_location — JSON encodes ``None``.
     assert rows[2]["source_location"] is None
     assert rows[2]["locals_snapshot"] is None
 
@@ -326,6 +333,7 @@ def test_json_output_default_skips_locals_columns(traces_root: Path) -> None:
         [
             "journal",
             "trace",
+            "--no-human",
             "run_test",
             "--json",
             "--traces-root",
@@ -376,14 +384,14 @@ def test_event_without_source_location_renders_dash(traces_root: Path) -> None:
     """``*.end`` events lacking ``source_location`` render as ``-`` in source column."""
     result = runner.invoke(
         app,
-        ["journal", "trace", "run_test", "--traces-root", str(traces_root)],
+        ["journal", "trace", "run_test", "--no-human", "--traces-root", str(traces_root)],
     )
     assert result.exit_code == 0
-    # brain.think.end has no source_location. Find the row and assert
+    # think.gate.end has no source_location. Find the row and assert
     # the source column is "-".
     lines = result.stdout.splitlines()
-    # Find the row for brain.think.end.
-    target = next(line for line in lines if "brain.think.end" in line)
+    # Find the row for think.gate.end.
+    target = next(line for line in lines if "think.gate.end" in line)
     # The source column is the last column on this row; the row
     # formatter pads it. We assert the column begins with "-".
     assert " - " in target or target.rstrip().endswith("-")
@@ -397,7 +405,7 @@ def test_limit_flag_caps_rows(tmp_path: Path) -> None:
     records = [
         _make_record(
             sequence=i,
-            execution_point=("brain.perceive.start" if i % 2 else "brain.think.start"),
+            execution_point=("brain.perceive.start" if i % 2 else "think.gate.start"),
             payload={
                 "source_location": {
                     "file": f"f{i}.py",
@@ -417,6 +425,7 @@ def test_limit_flag_caps_rows(tmp_path: Path) -> None:
         [
             "journal",
             "trace",
+            "--no-human",
             "limited",
             "--limit",
             "2",
@@ -467,6 +476,7 @@ def test_skips_malformed_jsonl_lines(tmp_path: Path) -> None:
         [
             "journal",
             "trace",
+            "--no-human",
             "malformed",
             "--traces-root",
             str(root),
@@ -599,6 +609,7 @@ def test_explicit_run_id_still_works(traces_root: Path) -> None:
         [
             "journal",
             "trace",
+            "--no-human",
             "run_test",
             "--traces-root",
             str(traces_root),
