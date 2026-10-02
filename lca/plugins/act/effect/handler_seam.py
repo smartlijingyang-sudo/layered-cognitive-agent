@@ -61,7 +61,11 @@ async def setup(ctx: PluginContext, config: Config) -> None:
 
     # A seam declares an empty capability container.  The separately enabled
     # provider plugin owns all default handler registration.
-    ctx.provide("effect_handler_registry", InMemoryEffectHandlerRegistry())
+    # make_inmemory_registry builds the class dynamically (types.new_class):
+    # it installs a zero-arg __init__ (kind baked into the dynamic _init),
+    # which pyright cannot model from the static base signature.
+    # Zero-arg construction is runtime-verified (see handlers_provider).
+    ctx.provide("effect_handler_registry", InMemoryEffectHandlerRegistry())  # pyright: ignore[reportCallIssue]
 
 
 __all__ = ["setup"]

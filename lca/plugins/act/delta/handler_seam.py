@@ -60,7 +60,11 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     from lca.plugins.act.delta.handler_registry_provider import InMemoryDeltaHandlerRegistry
 
     # 接缝只提供中性能力容器；默认 handler 由独立 provider 统一安装。
-    ctx.provide("delta_handler_registry", InMemoryDeltaHandlerRegistry())
+    # make_inmemory_registry builds the class dynamically (types.new_class):
+    # it installs a zero-arg __init__ (kind baked into the dynamic _init),
+    # which pyright cannot model from the static base signature.
+    # Zero-arg construction is runtime-verified (see handlers_provider).
+    ctx.provide("delta_handler_registry", InMemoryDeltaHandlerRegistry())  # pyright: ignore[reportCallIssue]
 
 
 __all__ = ["setup"]
