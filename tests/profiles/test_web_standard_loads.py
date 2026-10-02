@@ -4,10 +4,14 @@ web-standard 是 ADR-0169 §D11 / ADR-0174 的主 profile;
 本测试保证:
 - 加载 ``profiles/web-standard.yaml`` 不抛
 - bundle 展开 + patch 合并 + 环境引用展开均成功
-- 解析后 ``observability`` 段可读(``loop_cursor`` / ``projection_host`` /
-  ``persistence`` / ``model_visible`` / ``close_barrier`` 五段齐备)
-- 默认 deriver initial 列表有 4 个 key
-- 已注册的 plugin 不被新增的 observability 段破坏(entries 数量 ≥ 之前)
+- observability 接线经 bundle 组合存在(``observability-default`` /
+  ``observation-9module`` / ``loop_cursor.spine_default``;内联
+  ``observability:`` 段已退役)
+- ``loop_cursor.spine_default`` bundle 提供五段 wiring
+  (``loop_cursor_factory`` / ``projection_host`` / ``persistence`` /
+  ``model_visible`` / ``close_barrier``)
+- 默认 deriver 以 bundle entries 声明
+- 已注册的 plugin 不被 observability 接线破坏(entries 数量 ≥ 之前)
 
 不验证 resolve 全过程(那是 K1b / ``test_resolve_profile``);只验
 ``load_profile_source`` 适配层无回归。
@@ -32,56 +36,69 @@ def test_web_standard_loads_without_error() -> None:
     assert src.bundles == (
         "bundles/base.yaml",
         "bundles/observability-default.yaml",
+        "bundles/observation-9module.yaml",
         "bundles/web-app.yaml",
         "bundles/scenario-cordis-creator.yaml",
-        "bundles/declarative-phase-graph.yaml",
         "bundles/loop_cursor.spine_default.yaml",
         "bundles/session-runtime.yaml",
         "bundles/event-bus-components.yaml",
+        "bundles/outer/phase_main.yaml",
+        "bundles/think/think_subgraph.yaml",
+        "bundles/act/act_subgraph.yaml",
+        "bundles/perceive/perceive_subgraph.yaml",
+        "bundles/reflect/reflect_subgraph.yaml",
+        "bundles/remember/remember_subgraph.yaml",
     )
 
 
 def test_web_standard_has_observability_section() -> None:
-    """Profile 顶层有 ``observability:`` 段(ADR-0169 §D8 PR-25 装配入口)。"""
-    import yaml
-
-    raw = yaml.safe_load(PROFILE_PATH.read_text(encoding="utf-8"))
-    assert isinstance(raw, dict)
-    obs = raw.get("observability")
-    assert obs is not None, "web-standard.yaml 缺 observability 段"
-    assert "loop_cursor" in obs
-    assert "projection_host" in obs
-    assert "persistence" in obs
-    assert "model_visible" in obs
-    assert "close_barrier" in obs
+    """observability 接线经 bundle 组合存在(内联 ``observability:`` 段已退役)。"""
+    src = load_profile_source(PROFILE_PATH)
+    assert src is not None
+    for bundle in (
+        "bundles/observability-default.yaml",
+        "bundles/observation-9module.yaml",
+        "bundles/loop_cursor.spine_default.yaml",
+    ):
+        assert bundle in src.bundles, f"web-standard 缺 observability bundle: {bundle}"
 
 
 def test_web_standard_loop_cursor_implementation_is_std() -> None:
-    """``loop_cursor.implementation`` 是 ``std``(默认实现)。"""
+    """``loop_cursor.spine_default`` bundle 提供五段 wiring(ADR-0174 §D2)。"""
     import yaml
 
-    raw = yaml.safe_load(PROFILE_PATH.read_text(encoding="utf-8"))
-    lc = raw["observability"]["loop_cursor"]
-    assert lc["implementation"] == "std"
-    assert lc["spine_default"] == "loop_cursor.spine_default"
+    bundle_path = REPO_ROOT / "bundles" / "loop_cursor.spine_default.yaml"
+    raw = yaml.safe_load(bundle_path.read_text(encoding="utf-8"))
+    provides = raw.get("provides") or []
+    for key in (
+        "loop_cursor_factory",
+        "projection_host",
+        "persistence",
+        "model_visible",
+        "close_barrier",
+    ):
+        assert key in provides, f"loop_cursor.spine_default 缺 provides: {key}"
 
 
 def test_web_standard_projection_host_initial_keys() -> None:
-    """``projection_host.initial`` 列表 = 4 个默认 deriver key。"""
+    """默认 deriver 以 bundle entries 声明(内联 ``initial`` 列表已退役)。"""
     import yaml
 
-    raw = yaml.safe_load(PROFILE_PATH.read_text(encoding="utf-8"))
-    initial = raw["observability"]["projection_host"]["initial"]
-    assert isinstance(initial, list)
-    assert set(initial) == {"step_tree", "narrative", "graph", "cost"}
+    bundle_path = REPO_ROOT / "bundles" / "loop_cursor.spine_default.yaml"
+    raw = yaml.safe_load(bundle_path.read_text(encoding="utf-8"))
+    entry_ids = {e.get("id") for e in raw.get("entries") or [] if isinstance(e, dict)}
+    for deriver in (
+        "spine.deriver.anomaly",
+        "spine.deriver.narrative",
+        "spine.deriver.graph",
+        "spine.deriver.live_tail",
+    ):
+        assert deriver in entry_ids, f"缺默认 deriver: {deriver}"
 
 
 def test_web_standard_observability_plan_ref() -> None:
-    """``observability.plan_ref`` = ``web-standard``。"""
-    import yaml
-
-    raw = yaml.safe_load(PROFILE_PATH.read_text(encoding="utf-8"))
-    assert raw["observability"]["plan_ref"] == "web-standard"
+    """Retired:内联 ``observability.plan_ref`` 已随内联段退役;plan_ref 现由编译期计算。"""
+    pytest.skip("retired: observability.plan_ref 内联字段已退役")
 
 
 def test_web_standard_bundles_unaffected_by_observability_section() -> None:
@@ -100,8 +117,13 @@ def test_web_standard_patch_section_still_valid() -> None:
     yaml_raw = __import__("yaml").safe_load(PROFILE_PATH.read_text(encoding="utf-8"))
     patch = yaml_raw.get("patch") or []
     patch_ids_yaml = {p.get("id") for p in patch if isinstance(p, dict)}
-    assert "lca-llm-resolver" in patch_ids_yaml
     assert "spine.sink.file" in patch_ids_yaml
+    # lca-llm-resolver 已迁入 bundles/base.yaml(不再是 profile patch)
+    base_raw = __import__("yaml").safe_load(
+        (REPO_ROOT / "bundles" / "base.yaml").read_text(encoding="utf-8")
+    )
+    base_ids = {e.get("id") for e in base_raw.get("entries") or [] if isinstance(e, dict)}
+    assert "lca-llm-resolver" in base_ids
 
 
 def test_web_standard_fallback_policy_unchanged() -> None:
@@ -116,15 +138,14 @@ def test_web_standard_fallback_policy_unchanged() -> None:
 
 
 @pytest.mark.parametrize(
-    "section_key",
-    ["loop_cursor", "projection_host", "persistence", "model_visible", "close_barrier"],
+    "provided_key",
+    ["loop_cursor_factory", "projection_host", "persistence", "model_visible", "close_barrier"],
 )
-def test_web_standard_each_observability_section_is_mapping(section_key: str) -> None:
-    """每一段都是 mapping(PR-25 wiring 契约)。"""
+def test_web_standard_each_observability_section_is_mapping(provided_key: str) -> None:
+    """每段 wiring 由 bundle provides(PR-25 wiring 契约,内联段已退役)。"""
     import yaml
 
-    raw = yaml.safe_load(PROFILE_PATH.read_text(encoding="utf-8"))
-    section = raw["observability"].get(section_key)
-    assert isinstance(section, dict), (
-        f"observability.{section_key} must be mapping, got {type(section).__name__}"
-    )
+    bundle_path = REPO_ROOT / "bundles" / "loop_cursor.spine_default.yaml"
+    raw = yaml.safe_load(bundle_path.read_text(encoding="utf-8"))
+    provides = raw.get("provides") or []
+    assert provided_key in provides, f"bundle 缺 provides: {provided_key}"
