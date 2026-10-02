@@ -117,8 +117,8 @@ class ActObserveExecutor:
 
     semantic_name: str = "act.observe.normalize"
     region: str = "act"
-    declared_inputs: tuple[PortName, ...] = ("receipt", "journal")
-    declared_outputs: tuple[PortName, ...] = ("receipt",)
+    declared_inputs: tuple[PortName, ...] = (PortName("receipt"), PortName("journal"))
+    declared_outputs: tuple[PortName, ...] = (PortName("receipt"),)
 
     async def node_execute(
         self,
@@ -135,7 +135,7 @@ class ActObserveExecutor:
         ``act.observe.commit_fact`` 节点通过 typed-port capability 注入)。
         """
         del context  # unused: pure function of input port value
-        receipt = input.port_values.get("receipt")
+        receipt = input.port_values.get(PortName("receipt"))
         if not isinstance(receipt, EffectReceipt):
             raise TypeError(
                 "act.observe.normalize: 'receipt' port must be an EffectReceipt "
@@ -143,7 +143,7 @@ class ActObserveExecutor:
             )
 
         normalized = _normalize_receipt(receipt)
-        return NodeOutput(port_values={"receipt": normalized})
+        return NodeOutput(port_values={PortName("receipt"): normalized})
 
 
 @plugin(
