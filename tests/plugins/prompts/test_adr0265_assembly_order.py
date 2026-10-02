@@ -152,3 +152,23 @@ def test_t2_profile_extension_before_b1_fails_fast() -> None:
     )
     with pytest.raises(ValueError):
         _build_provider(Config(profile_templates=(violating,)))
+
+
+@pytest.mark.parametrize("template_id", _TEMPLATE_IDS)
+def test_t3_memory_retrieval_required_in_default_templates(template_id: str) -> None:
+    """T3（契约规格，预期红）：memory_retrieval 在默认三模板中为必需段。
+
+    ADR-0265 §3 C3 可选语义分级：可选只许用于"能力缺席"（如无 team 时
+    teammates 为空），不许用于"义务缺席"——memory_retrieval 承载
+    ADR-0260 C2 检索义务决策树，不得为可选；§7④ 裁决改为必需
+    （或 profile YAML 显式豁免声明，本测试覆盖默认模板无豁免的情形）。
+
+    当前三模板均为 optional=True（fallback ""）：检索义务在模板层可
+    整体静默缺席（D3 模板层盲区）。待 quality lane 落地 §7④。
+    """
+    template = _builtin_templates()[template_id]
+    ref = next(s for s in template.sections if s.name == "memory_retrieval")
+    assert ref.optional is False, (
+        f"{template_id}: memory_retrieval 必须为必需段"
+        f"（ADR-0265 §3 C3 / §7④），当前 optional={ref.optional}"
+    )
