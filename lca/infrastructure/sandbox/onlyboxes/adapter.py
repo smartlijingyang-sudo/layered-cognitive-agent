@@ -100,8 +100,15 @@ class OnlyboxesSandboxAdapter(Sandbox):
         session_id: str = "",
         timeout_s: int = DEFAULT_SANDBOX_TIMEOUT_S,
         invocation_id: str = "",
+        _collect: bool = True,
     ) -> SandboxResult:
-        """Unified terminal execution channel — aligned with LobeHub execTerminal."""
+        """Unified terminal execution channel — aligned with LobeHub execTerminal.
+
+        ``_collect`` gates the post-success ``_collect_outputs`` sweep.
+        Infrastructure calls issued from inside ``_collect_outputs`` pass
+        ``_collect=False`` so a successful ``ls``/``base64`` never re-enters
+        collection (previously unbounded mutual recursion).
+        """
         emitter = SandboxStreamEmitter(invocation_id)
         t_ms = timeout_ms(timeout_s)
 
@@ -129,7 +136,7 @@ class OnlyboxesSandboxAdapter(Sandbox):
                 return SandboxResult(success=False, exit_code=1, error=err, stderr=err + "\n")
 
             result = parse_terminal_response(response, emitter)
-            if result.success:
+            if result.success and _collect:
                 collected = await self._collect_outputs(session_id=session_id)
                 if collected:
                     result = replace(result, generated_files=collected)
@@ -300,6 +307,7 @@ class OnlyboxesSandboxAdapter(Sandbox):
                 f"ls -1p '{output_dir}' 2>/dev/null | grep -v '/$' || true",
                 session_id=session_id,
                 timeout_s=10,
+                _collect=False,
             )
         except Exception:
             _log.debug("onlyboxes_outputs_ls_failed", exc_info=True)
@@ -316,6 +324,7 @@ class OnlyboxesSandboxAdapter(Sandbox):
                     f"base64 -w0 '{output_dir}/{name}'",
                     session_id=session_id,
                     timeout_s=30,
+                    _collect=False,
                 )
                 if not read.success:
                     continue
