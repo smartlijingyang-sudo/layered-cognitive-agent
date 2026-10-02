@@ -54,12 +54,12 @@ def _install_publisher_exception(
     函数级 import 不容易拦截;改直接 patch :mod:`route_register` 内部
     ``_safe_emit`` 用的函数引用。
     """
-    from lca.loop import transport_emit
+    from lca.loop import transport
 
     def _enter(**_kwargs: Any) -> None:
         raise exception
 
-    monkeypatch.setattr(transport_emit, "emit_transport_route_enter", _enter)
+    monkeypatch.setattr(transport, "emit_transport_route_enter", _enter)
 
 
 def test_async_handler_succeeds_when_enter_trace_fails(
@@ -101,12 +101,12 @@ def test_async_handler_succeeds_when_exit_trace_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """async handler 业务成功,但 exit trace 抛 EventNoSinkError → handler 仍 200。"""
-    from lca.loop import transport_emit
+    from lca.loop import transport
 
     def _exit(**_kwargs: Any) -> None:
         raise EventNoSinkError("spine.transport.route.exit")
 
-    monkeypatch.setattr(transport_emit, "emit_transport_route_exit", _exit)
+    monkeypatch.setattr(transport, "emit_transport_route_exit", _exit)
 
     async def _handler(request: Any) -> dict[str, str]:
         return {"ok": "true"}
@@ -121,10 +121,10 @@ def test_async_handler_propagates_handler_exception(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """handler 自身抛 ValueError → 仍上抛,不被 trace 装饰吞掉。"""
-    from lca.loop import transport_emit
+    from lca.loop import transport
 
     monkeypatch.setattr(
-        transport_emit,
+        transport,
         "emit_transport_route_exit",
         lambda **_k: (_ for _ in ()).throw(EventNoSinkError("spine.transport.route.exit")),
     )
@@ -141,12 +141,12 @@ def test_async_handler_propagates_non_eventbus_trace_exception(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """trace emit 抛非 EventMechanismError 异常(代码 bug)→ 仍上抛。"""
-    from lca.loop import transport_emit
+    from lca.loop import transport
 
     def _enter(**_kwargs: Any) -> None:
         raise RuntimeError("code bug, not EventMechanismError")
 
-    monkeypatch.setattr(transport_emit, "emit_transport_route_enter", _enter)
+    monkeypatch.setattr(transport, "emit_transport_route_enter", _enter)
 
     async def _handler(request: Any) -> dict[str, str]:
         return {"ok": "true"}
