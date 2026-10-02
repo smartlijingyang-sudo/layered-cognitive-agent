@@ -23,9 +23,9 @@ def apply_matplotlib_cjk() -> str | None:
         "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
     )
     try:
-        import matplotlib
-        from matplotlib import font_manager as fm
-        from matplotlib.figure import Figure
+        import matplotlib  # type: ignore[import-not-found]  # optional dep
+        from matplotlib import font_manager as fm  # type: ignore[import-not-found]  # optional dep
+        from matplotlib.figure import Figure  # type: ignore[import-not-found]  # optional dep
     except ImportError:
         return None
 
