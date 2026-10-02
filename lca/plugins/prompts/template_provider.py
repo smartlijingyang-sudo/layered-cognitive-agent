@@ -54,6 +54,11 @@ def _builtin_section_refs() -> tuple[tuple[str, str, bool, str | None], ...]:
         # ADR-0248：gated 模式声带契约（非 gated 渲染为空，零侵入）
         ("vocal_contract", "stateful", True, ""),
         ("current_date", "stateful", False, None),
+        # ADR-0265 §7 D1 决议②：developer_timestamp 是"now"唯一可信来源
+        # （ADR-0259 C1 不变量），不许为可选；移入 B3 时间锚点带（current_date 旁），
+        # 不再尾置。可选变必需：registry 缺失该段时装配期 fail-fast（与
+        # memory_retrieval 的 7391aae5a 同语义）；渲染为空仍按 strip_empty_fields 跳过。
+        ("developer_timestamp", "pure", False, ""),
         ("tools", "stateful", False, None),
         ("cloud_sandbox", "stateful", False, None),
         ("available_skills", "pure", False, None),
@@ -98,21 +103,22 @@ def _builtin_templates() -> Mapping[str, _PromptTemplate]:
             for (n, k, o, f) in sl
         )
 
-    react_section_count = 13  # through react_tool_usage_guidelines
+    react_section_count = 14  # base gains developer_timestamp at B3
     routing_extra = 4  # teammates, assigned_roles, member_reports, routing_instructions
     hierarchical_extra = 4  # member_status, evidence_pack, hierarchical_instructions (+ extra)
     home_ref = (("home", "stateful", True, ""),)
     autonomous_presets_ref = (("autonomous_presets", "stateful", True, ""),)
     user_profile_ref = (("user_profile", "stateful", True, ""),)
     runtime_env_ref = (("runtime_env", "pure", True, ""),)
-    developer_timestamp_ref = (("developer_timestamp", "pure", True, ""),)
+    # developer_timestamp 已移入 B3（见 _builtin_section_refs），不再是尾段；
+    # runtime_env 留 B8 环境尾注（ADR-0265 §7 D1 决议②）。
     # ADR-0265 §3 C3 / §7④：memory_retrieval 承载 ADR-0260 C2 检索义务决策树，
     # 不得为可选（"义务缺席"不许用可选+fallback "" 静默）。optional=False 后，
     # 若 registry 缺失该 section，装配期抛 MissingPromptSectionError（fail-fast）；
     # section 正常渲染为空仍按 strip_empty_fields 跳过（渲染路径行为不变）。
     memory_retrieval_ref = (("memory_retrieval", "stateful", False, ""),)
     skill_duty_ref = (("skill_duty", "stateful", True, ""),)
-    adr0255_tail = memory_retrieval_ref + skill_duty_ref + developer_timestamp_ref + runtime_env_ref
+    adr0255_tail = memory_retrieval_ref + skill_duty_ref + runtime_env_ref
     return {
         "react_prompt": _PromptTemplate(
             id="react_prompt",
@@ -201,8 +207,10 @@ def _validate_profile_template(
     3. 新段不许出现在 B1（role/backstory）之前。
 
     诚实注记：ADR C1 的全带序表（B1–B8）不在此强制——builtin 自身的段序
-    与带序表有 4 处倒置（T1 预期红，待 arch 轮架构解释裁决）；若按带序表
-    强制，逐字照抄 builtin 的合法 profile 会被误杀。故以 builtin 相对顺序
+    与带序表有 3 处倒置（T1 预期红，待 arch 轮架构解释裁决；原第 4 处
+    skill_duty(B7)->developer_timestamp(B3) 已由 §7 D1 落地消除，
+    developer_timestamp 现为 B3 必需段）；若按带序表强制，
+    逐字照抄 builtin 的合法 profile 会被误杀。故以 builtin 相对顺序
     为基线，这是 C2 的可判定部分。
     """
     builtin = builtins.get(tpl_cfg.id)
