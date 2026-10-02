@@ -130,12 +130,12 @@ def test_business_dirs_have_no_event_bus_module() -> None:
 
 
 def test_runtime_event_publisher_unchanged() -> None:
-    """``lca/runtime/runtime_event_publisher.py``(lifecycle 而非 cordis)不应被本 PR 误删。
+    """``lca/runtime/loop/runtime_event_publisher.py``(lifecycle 而非 cordis)不应被本 PR 误删。
 
     PR-30 目标仅是 cordis 双词表收口;runtime lifecycle publisher 是独立
     插件子系统,职责清晰,本 PR 不应触及。本测试防止误删蔓延。
     """
-    target = REPO_ROOT / "lca" / "runtime" / "runtime_event_publisher.py"
+    target = REPO_ROOT / "lca" / "runtime" / "loop" / "runtime_event_publisher.py"
     assert target.exists(), (
         f"unexpected: lifecycle publisher missing (PR-30 should not touch it): {target}"
     )

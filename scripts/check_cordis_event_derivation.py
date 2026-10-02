@@ -120,11 +120,11 @@ def _check_event_descriptor_has_cordis_name() -> list[Violation]:
     其他名字 ⇒ 违规(防止 EventDescriptor 失掉 cordis 派生职责)。
     """
     out: list[Violation] = []
-    descriptor_path = REPO_ROOT / "lca" / "contracts" / "observability" / "event_descriptor.py"
+    descriptor_path = REPO_ROOT / "lca" / "contracts" / "observability" / "event" / "descriptor.py"
     if not descriptor_path.exists():
         return [
             Violation(
-                path="lca/contracts/observability/event_descriptor.py",
+                path="lca/contracts/observability/event/descriptor.py",
                 line=0,
                 message="EventDescriptor 模块不存在(ADR-0169 §D6 / I-CURSOR-4 必存)",
                 category="I-CURSOR-4",
