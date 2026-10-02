@@ -37,7 +37,7 @@ class DoctorFinding:
 
     code: str  # DOC-XX-NNN
     severity: DoctorSeverity
-    owner: str  # ADR-XXXX or script owner
+    owner: str  # ADR number (e.g. ADR-0199) or script owner
     message: str  # human-readable description
     remediation: str  # human-readable fix hint
     plugin_id: str | None = None  # None for profile-level findings
