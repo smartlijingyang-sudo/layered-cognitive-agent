@@ -72,11 +72,11 @@ class _FixedStrategy(NodeStrategy):
     next_target: str = ""
 
     async def execute(self, context, input):  # type: ignore[override]
+        # Routing follows the plan edge a->b; legacy result_kind/next_hints
+        # were removed from NodeOutput (typed RoutingDecision port store).
         return NodeOutput(
             port_values={"decision": self.payload_value},
             producer_node=context.node_id,
-            result_kind="decision",
-            next_hints={"next": self.next_target},
         )
 
 
@@ -175,7 +175,8 @@ async def test_subgraph_boundary_emits_enter_and_exit(tmp_path: Path, monkeypatc
             edges=(PlanEdge(source="inner_a", target="inner_b"),),
         )
         monkeypatch.setattr(
-            "lca.framework.graph.strategies.subgraph_strategy._load_subgraph_plan",
+            # Loader moved to subgraph_run (public load_subgraph_plan); same signature.
+            "lca.framework.graph.strategies.subgraph_run.load_subgraph_plan",
             lambda ref, entry: sub_plan,
         )
 
@@ -277,8 +278,6 @@ class _LiveToolPortStrategy(NodeStrategy):
             return NodeOutput(
                 port_values={"forked_tools": _live_forked_tools()},
                 producer_node=context.node_id,
-                result_kind="decision",
-                next_hints={"next": "b"},
             )
         if self.fail_on_b:
             raise TimeoutError("llm stream idle timeout")
@@ -286,8 +285,6 @@ class _LiveToolPortStrategy(NodeStrategy):
         return NodeOutput(
             port_values={"response": "done"},
             producer_node=context.node_id,
-            result_kind="decision",
-            next_hints={"next": ""},
         )
 
 
