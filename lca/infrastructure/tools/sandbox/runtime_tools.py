@@ -30,6 +30,7 @@ class SandboxInspectTool(Tool):
     """Structured probe of the sandbox workspace — files, sheets, columns, NaN counts."""
 
     name = SANDBOX_INSPECT_TOOL_NAME
+    namespace: ClassVar[str] = "file"
     description = (
         "探查沙箱工作根已挂载文件的结构化 profile（路径、sheets、columns、NaN 计数）。"
         "分析 Excel/CSV 前应先调用；run 首触沙箱时会自动 inspect，可跳过重复调用。"
@@ -68,6 +69,7 @@ class SandboxExecuteTool(Tool):
     """Execute Python in the run-bound sandbox."""
 
     name = SANDBOX_EXECUTE_TOOL_NAME
+    namespace: ClassVar[str] = "shell"
     description = (
         "在 run 绑定的隔离沙箱中执行 Python。环境已挂载 run 附件到工作根/<文件名>；"
         "产出写到 outputs/ 自动收集。\n"

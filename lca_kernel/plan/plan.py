@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from lca_kernel.plan.plan_compile import (
     COMPILED_RUN_PLAN_VERSION,
+    CompiledRunPlan,
     CompileOptions,
     PlanCompilerError,
     compile_plan,
@@ -25,7 +26,7 @@ def compile_run_plan(
     resolved,
     *,
     options: CompileOptions | None = None,
-) -> object:
+) -> CompiledRunPlan:
     """公共 API 入口(同 :func:`compile_plan`)."""
     return compile_plan(resolved, options=options)
 

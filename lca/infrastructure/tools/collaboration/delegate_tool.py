@@ -32,6 +32,7 @@ class TeamCastTool(Tool):
     """将复合任务转交给协同专家团队并发分析并由 Fold 节点产出权威综合结论。"""
 
     name = TEAM_CAST_TOOL
+    namespace: ClassVar[str] = "agent"
     description = (
         "将复合系统架构与技术演化任务转交给协同专家团队并发协同分析。输入任务目标，"
         "多位专家将分别在独立沙箱中核查并由 Fold 节点产出权威综合结论，防止上下文膨胀。"
@@ -138,6 +139,7 @@ class HandoffToPeerTool(Tool):
     """将单点任务转交给指定专家队友。"""
 
     name = PEER_HANDOFF_TOOL
+    namespace: ClassVar[str] = "agent"
     description = (
         "将单点任务转交给指定专家队友。以不可变的 HandoffEnvelope 切片转交，"
         "专家将在独立环境中分析并返回摘要。"
