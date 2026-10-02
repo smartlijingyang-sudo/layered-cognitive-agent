@@ -21,11 +21,13 @@ import logging
 import os
 import socket
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
 from lca.cognition.proactive.worthiness import decide
 from lca.contracts.models.proactive.message import ProactiveMessage
+from lca.contracts.models.proactive.policy import ProactivePolicy
 from lca.contracts.models.proactive.schedule import ProactiveJob, TickReport
 from lca.contracts.models.proactive.worthiness import (
     ProactiveRequest,
@@ -57,12 +59,15 @@ class ProactiveScheduler:
         job_source: JobSource,
         deliverer: ProactiveDeliverer,
         default_interval_s: int = 3600,
+        policy: ProactivePolicy | None = None,
     ) -> None:
         self._lock_dir = Path(lock_dir)
         self._state_dir = Path(state_dir)
         self._job_source = job_source
         self._deliverer = deliverer
         self._default_interval_s = default_interval_s
+        # 全局政策由 gate 统一执行（唯一卡点），scheduler 只透传不自查
+        self._policy = policy if policy is not None else ProactivePolicy()
 
     # ---- 对外入口：carrier 每 tick 调用一次 ----
 
@@ -154,13 +159,30 @@ class ProactiveScheduler:
             content=job.content,
             source=job.source,
         )
+        # 调用方声明（ADR-0264 §4①）：cron 任务按配置声明期望裁决，
+        # gate 只做 downgrade-only 交叉校验，不多花模型调用。
+        declared = (
+            VerdictKind.DELIVER_CHAT
+            if (job.worth_interrupting or job.requested)
+            else VerdictKind.DELIVER_QUIET
+        )
+        # requested 的 trigger 上下文背书：cron 的"请求记录"就是任务定义本身，
+        # scheduler 只背书 job:<id> 形式的引用；对不上的按 unrequested 处理。
+        known_refs = (f"job:{job.id}",) if job.request_ref else ()
         request = ProactiveRequest(
             message=message,
             target=job.target,
             requested=job.requested,
+            declared=declared,
+            request_ref=job.request_ref,
+            known_request_refs=known_refs,
             worth_interrupting=job.worth_interrupting,
         )
-        verdict = decide(request)
+        verdict = decide(
+            request,
+            policy=self._policy,
+            now=datetime.fromtimestamp(now_ms / 1000, tz=timezone.utc),
+        )
         if verdict.kind == VerdictKind.REJECTED:
             _log.warning(
                 "proactive.rejected job_id=%s reason=%s", job.id, verdict.reason
