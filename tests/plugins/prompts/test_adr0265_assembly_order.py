@@ -53,6 +53,7 @@ _SECTION_BANDS: dict[str, int] = {
     "react_workflow": 7,
     "react_tool_usage_guidelines": 7,
     "memory_retrieval": 7,
+    "skill_duty": 7,  # 0262 C1: 独立 skill 义务提示块，与 memory_retrieval 同属 B7 行为规则
     "vocal_contract": 7,
     # B8 环境尾注
     "runtime_env": 8,
