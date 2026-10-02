@@ -7,10 +7,12 @@ from lca_kernel.events.compile.replay import replay_projection
 
 
 def test_replay_journal_step_tree() -> None:
+    # fold SSOT: llm.request.header is the sole step-boundary signal;
+    # writable.step.start no longer opens steps.
     events = [
         {
-            "execution_point": "writable.step.start",
-            "payload": {"step_id": "step_001", "phase": "think"},
+            "execution_point": "llm.request.header",
+            "payload": {"step_id": "step_001", "config": {}},
             "when": 1.0,
         },
         {
@@ -24,8 +26,13 @@ def test_replay_journal_step_tree() -> None:
 
 
 def test_replay_matches_live_fold_for_tool_evidence() -> None:
+    # fold SSOT: the step is opened by llm.request.header (brain.think.start retired).
     events = [
-        {"execution_point": "brain.think.start", "payload": {}, "when": 1.0},
+        {
+            "execution_point": "llm.request.header",
+            "payload": {"step_id": "step-001", "config": {}},
+            "when": 1.0,
+        },
         {
             "execution_point": "step.tool_call.record",
             "payload": {
@@ -51,7 +58,6 @@ def test_replay_matches_live_fold_for_tool_evidence() -> None:
             },
             "when": 1.3,
         },
-        {"execution_point": "brain.think.end", "payload": {}, "when": 2.0},
     ]
     kwargs = {"run_id": "r_parity", "outcome": "completed"}
     live = fold_step_tree(events, **kwargs)
