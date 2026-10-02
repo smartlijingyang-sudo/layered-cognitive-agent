@@ -450,4 +450,12 @@
 | CONNECTOR-TASK-5-DRAWER-HUB | 右侧抽屉全局连接器中枢 Tab (ConnectorsPanel.tsx in AssistantStatusDrawer) | Completed | 落地 6 大生态连接器中枢、工具清单折叠面板、助理启用开关与顶部 Profile 编辑铅笔菜单，4/4 单测全绿，commit c6dc0cb2c |
 | CONNECTOR-TASK-6-AVATAR-PICKER | 会话流交互式选图卡片与换装闭环 (AssistantAvatarWidget.tsx & Drawer 铅笔快捷菜单) | Completed | 落地 4 大候选卡片网格交互、一键原子更新 IDENTITY.md 与成功动效反馈，4/4 单测全绿，commit 3d0ad6e93 |
 | CONNECTOR-TASK-7-INTEGRATION-E2E | 全量补丁 byte-identical 核验、全套单测回归与端到端内核热重载核验 | Completed | 39 个 LobeHub 补丁 100% 校验通过（0 broken），81/81 关联回归测试 100% 全绿，内核顺利平滑热重启（pid=976135, 24380 fibers 0 fail） |
+| LOBEHUB-CONNECTOR-STORE-FIX | 修复 LobeHub 连接器/Skill 市场入口缺失与 Composio 隐藏，使用 agent-browser 实机验证 | Completed | 1. 根因与修复：注入 COMPOSIO_API_KEY 恢复 Gmail 等 30+ 款连接器；修复 AssistantAvatarWidget Vite 500 编译路径；2. 补丁与服务：ensure 校验 39 补丁一致性并热启 LobeHub (:3010)；3. agent-browser 实机验证全通：捕获 /settings/connector 面板、Gmail 已连接状态，以及 Skill Store 模态窗下的 LobeHub、Skills、MCP 三大 Tab，图件已落盘 docs/plans/ |
+| MUSE-CONNECTOR-BRAINSTORM-DESIGN | 工业级 7 层连接器架构设计头脑风暴、四节呈批与设计文档落盘 | Completed | 概念模型、连接状态机/LobeHub卡片协议、双层权限/滑动窗口硬限流、测试不变量矩阵全部获批，落盘 docs/plans/2026-10-02-muse-connector-architecture-design.md 与 plan.md |
+| MUSE-CONNECTOR-M1-STATE-MACHINE | 【M1】连接器运行时底座：连接状态机与凭据安全 Vault (core/state.py, core/vault.py) | In Progress | 正在开发，定义状态枚举、流转规则、Token零暴露安全 Vault 与确定性单测 |
+| MUSE-CONNECTOR-M2-GMAIL-CLI | 【M2】首个切片 Gmail CLI 封装：Manifest 规范与 SKILL.md 自动注入 | Pending | 待执行 |
+| MUSE-CONNECTOR-M3-CARD-AND-PROMPT | 【M3】LobeHub 卡片协议联动与 Prompt 认知注入 (ConnectedServicesSection) | Pending | 待执行 |
+| MUSE-CONNECTOR-M4-PERM-AND-QUOTA | 【M4】双层正交权限引擎 (permissions.py) 与滑动窗口硬配额执行器 (rate_limiter.py) | Pending | 待执行 |
+| MUSE-CONNECTOR-M5-INTEGRATION-E2E | 【M5】全链路单测回归 (INV-01 ~ INV-08) 与端到端活体验证 | Pending | 待执行 |
+
 
