@@ -14,6 +14,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
+from lca.contracts.atoms.ids.ids import utc_now_ms
+
 
 @dataclass(slots=True)
 class OpenAIChatChunkBuilder:
@@ -25,7 +27,7 @@ class OpenAIChatChunkBuilder:
     """
 
     model: str
-    response_id: str = field(default_factory=lambda: f"chatcmpl-lca-{int(time.time() * 1000)}")
+    response_id: str = field(default_factory=lambda: f"chatcmpl-lca-{utc_now_ms()}")
     created: int = field(default_factory=lambda: int(time.time()))
     object_type: str = "chat.completion.chunk"
 
