@@ -111,12 +111,15 @@ class TestMethodSignatures:
         # the originating RunIntent (PR-0199-P1-10) so the dispatcher can
         # see the user-facing request payload.
         assert list(sig.parameters) == ["self", "activation", "intent"]
-        assert sig.return_annotation == "RunHandle"
+        # NOTE (round-0346): protocol honestly declares Awaitable[RunHandle]
+        # since 32eb71e49 (concrete impl is ``async def``).
+        assert sig.return_annotation == "Awaitable[RunHandle]"
 
     def test_dispatch_resume_takes_activation_and_run_id(self) -> None:
         sig = inspect.signature(RuntimeFacade.dispatch_resume)
         assert list(sig.parameters) == ["self", "activation", "run_id"]
-        assert sig.return_annotation == "RunHandle"
+        # NOTE (round-0346): see above -- Awaitable[RunHandle] since 32eb71e49.
+        assert sig.return_annotation == "Awaitable[RunHandle]"
 
     def test_protocol_method_arity(self) -> None:
         # Each method declares exactly the contract arity (excluding ``self``).
