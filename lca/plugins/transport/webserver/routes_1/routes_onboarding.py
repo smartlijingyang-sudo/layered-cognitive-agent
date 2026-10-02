@@ -278,10 +278,20 @@ async def onboarding_naming_settle(request: Request) -> JSONResponse:
         from lca.cognition.proactive import decide as _decide_followup
         from lca.contracts.models.proactive import (
             DeliveryTarget as _FollowupTarget,
+        )
+        from lca.contracts.models.proactive import (
             DeliveryTargetKind as _FollowupTargetKind,
+        )
+        from lca.contracts.models.proactive import (
             ProactiveMessage as _FollowupMessage,
+        )
+        from lca.contracts.models.proactive import (
             ProactiveRequest as _FollowupRequest,
+        )
+        from lca.contracts.models.proactive import (
             ProactiveSource as _FollowupSource,
+        )
+        from lca.contracts.models.proactive import (
             VerdictKind as _FollowupVerdict,
         )
         from lca.infrastructure.proactive import ProactiveDeliverer as _FollowupDeliverer
