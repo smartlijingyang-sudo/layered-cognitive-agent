@@ -44,8 +44,8 @@ class ActActionResolveExecutor:
 
     semantic_name: str = "act.action.resolve"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("decision",)
-    declared_outputs: tuple[PortName, ...] = ("decision",)
+    declared_inputs: tuple[PortName, ...] = (PortName("decision"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("decision"),)
 
     async def node_execute(
         self,
@@ -58,13 +58,13 @@ class ActActionResolveExecutor:
         outputs 端口(yaml):decision (Decision)
         """
         del context
-        decision = input.port_values.get("decision")
+        decision = input.port_values.get(PortName("decision"))
         if not isinstance(decision, Decision):
             raise TypeError(
                 "act.action.resolve: 'decision' port must be a Decision "
                 f"instance, got {type(decision).__name__}"
             )
-        return NodeOutput(port_values={"decision": decision})
+        return NodeOutput(port_values={PortName("decision"): decision})
 
 
 @plugin(
