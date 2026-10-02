@@ -173,7 +173,6 @@ def test_inv_07_and_08_routine_legal_silence_and_spend_fusing(tmp_path):
     spec = RoutineSpec(
         id="rt_monitor",
         name="监控例程",
-        interval_seconds=300,
         prompt="定期巡检",
         assistant_id="asst_monitor",
         daily_budget_tokens=2000,
