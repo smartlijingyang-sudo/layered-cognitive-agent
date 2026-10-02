@@ -71,7 +71,7 @@ class ComposioManagementExecutor:
     def __init__(self, integration: ComposioIntegration) -> None:
         self._integration = integration
 
-    async def composioConnect(self, params: dict[str, Any]) -> Observation:
+    async def composioConnect(self, params: dict[str, Any]) -> Observation:  # noqa: N802
         service = str(params.get("service") or "").strip()
         if not service:
             return _validation_error("service is required")
@@ -117,7 +117,7 @@ class ComposioManagementExecutor:
             },
         )
 
-    async def composioRefresh(self, params: dict[str, Any]) -> Observation:
+    async def composioRefresh(self, params: dict[str, Any]) -> Observation:  # noqa: N802
         service = str(params.get("service") or "").strip()
         if not service:
             return _validation_error("service is required")
@@ -183,6 +183,29 @@ def _validation_error(message: str) -> Observation:
     )
 
 
+_TOOL_GUIDANCE_OVERRIDES: dict[str, str] = {
+    "GMAIL_FETCH_EMAILS": (
+        "Fetches full email message details (including complete HTML bodies). "
+        "NOTE: Defaults to only 1 message if max_results is omitted! If fetching multiple messages, "
+        "always specify max_results (e.g. max_results=10). "
+        "IMPORTANT: To check inbox overview, list recent emails, or search topics without fetching heavy bodies, "
+        "strongly prefer GMAIL_LIST_THREADS instead."
+    ),
+    "GMAIL_LIST_THREADS": (
+        "PREFERRED tool for checking inbox overview and listing recent emails. "
+        "Retrieves discussions with message snippets, subjects, and participant summaries, "
+        "making it much lighter and more reliable for listing recent emails."
+    ),
+}
+
+
+def _augment_tool_description(tool_name: str, raw_description: str) -> str:
+    override = _TOOL_GUIDANCE_OVERRIDES.get(tool_name)
+    if override:
+        return override
+    return raw_description or f"Composio action {tool_name}"
+
+
 def _action_manifest(identifier: str, label: str, tools: tuple[Any, ...]) -> ToolManifest:
     return ToolManifest(
         identifier=f"composio-{identifier}",
@@ -209,7 +232,7 @@ def build_tools(integration: ComposioIntegration | None) -> list[Tool]:
         apis = tuple(
             ToolApi(
                 name=tool.name,
-                description=tool.description or f"Composio action {tool.name}",
+                description=_augment_tool_description(tool.name, tool.description or ""),
                 parameters=tool.input_schema or {"type": "object", "properties": {}},
                 is_idempotent=False,
                 namespace="ext",
