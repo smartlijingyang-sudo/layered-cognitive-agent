@@ -45,8 +45,8 @@ class ThinkRouteDecideExecutor:
 
     semantic_name: str = "think.route.decide"
     region: str = "think"
-    declared_inputs: tuple[PortName, ...] = ("decision",)
-    declared_outputs: tuple[PortName, ...] = ("routing",)
+    declared_inputs: tuple[PortName, ...] = (PortName("decision"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("routing"),)
 
     async def node_execute(
         self,
@@ -59,7 +59,7 @@ class ThinkRouteDecideExecutor:
         outputs 端口(yaml): routing
         """
         del context  # unused: pure function of input ports
-        decision = input.port_values.get("decision")
+        decision = input.port_values.get(PortName("decision"))
         if decision is None:
             # No shortcut decision — fall through to full reasoning path.
             routing = RoutingDecision(
@@ -72,7 +72,7 @@ class ThinkRouteDecideExecutor:
                 action_type=ActionType.SHORT_CIRCUIT,
                 next_node="think.gate",
             )
-        return NodeOutput(port_values={"routing": routing})
+        return NodeOutput(port_values={PortName("routing"): routing})
 
 
 @plugin(

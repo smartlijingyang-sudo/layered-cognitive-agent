@@ -45,8 +45,8 @@ class ThinkShortcutExecutor:
     region: str = "think"
     # ADR-0219 §5.5: typed port contract declared on the plugin (graph
     # layer does not know port names; it only knows topology).
-    declared_inputs: tuple[PortName, ...] = ("in_assembled_manifest",)
-    declared_outputs: tuple[PortName, ...] = ("decision",)
+    declared_inputs: tuple[PortName, ...] = (PortName("in_assembled_manifest"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("decision"),)
 
     async def node_execute(
         self,
@@ -62,7 +62,7 @@ class ThinkShortcutExecutor:
 
         _log = logging.getLogger(__name__)
         runtime = context.runtime
-        state = runtime.state
+        state = getattr(runtime, "state", None)
         brain = getattr(runtime, "brain", None)
         cap = getattr(brain, "supports_shortcut", None) if brain is not None else None
 
@@ -82,7 +82,7 @@ class ThinkShortcutExecutor:
             # No shortcut available — fall through to think.reason plan.
             _log.info("think.shortcut no-shortcut path; routing to think.reason next")
             return NodeOutput(port_values={})
-        return NodeOutput(port_values={"decision": decision})
+        return NodeOutput(port_values={PortName("decision"): decision})
 
 
 @plugin(
