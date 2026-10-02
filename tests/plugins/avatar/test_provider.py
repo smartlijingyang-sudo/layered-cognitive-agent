@@ -12,8 +12,9 @@ from __future__ import annotations
 import httpx
 import pytest
 from httpx import AsyncClient, MockTransport, Request, Response
+from pydantic import ValidationError
 
-from lca.plugins.avatar.provider import Grok2ApiProvider, VideoStatus
+from lca.plugins.avatar.provider import AvatarImageProvider, Grok2ApiProvider, VideoStatus
 
 
 def _provider(handler) -> Grok2ApiProvider:
@@ -173,3 +174,34 @@ async def test_get_video_maps_unknown_status_to_pending():
     status = await provider.get_video("task_1")
     assert status.state == "pending"
     assert status.url == "http://test/video.mp4"
+
+
+def test_video_status_forbids_extra():
+    with pytest.raises(ValidationError):
+        VideoStatus(task_id="t", state="pending", extra_field=1)  # type: ignore[call-arg]
+
+
+@pytest.mark.asyncio
+async def test_grok2_api_provider_satisfies_avatar_image_provider_protocol():
+    def handler(request: Request) -> Response:
+        if request.url.path == "/v1/images/generations":
+            return Response(200, json={"data": [{"url": "http://test/img.png"}]})
+        return Response(200, content=b"PNG")
+
+    provider: AvatarImageProvider = _provider(handler)
+    assert await provider.generate_image("hello") == b"PNG"
+
+
+@pytest.mark.asyncio
+async def test_download_does_not_send_auth_header():
+    seen = {}
+
+    def handler(request: Request) -> Response:
+        if request.url.path == "/v1/images/generations":
+            return Response(200, json={"data": [{"url": "http://test/img.png"}]})
+        seen["auth"] = request.headers.get("Authorization")
+        return Response(200, content=b"PNG")
+
+    provider = _provider(handler)
+    assert await provider.generate_image("hello") == b"PNG"
+    assert seen["auth"] is None

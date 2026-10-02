@@ -17,16 +17,18 @@ MAX_RETRIES = 2
 
 
 class VideoStatus(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
     task_id: str
     state: Literal["pending", "running", "ready", "failed"]
     url: str | None = None
 
 
 class AvatarImageProvider(Protocol):
-    def generate_image(self, prompt: str, reference_image_bytes: bytes | None = None) -> bytes: ...
-    def create_video(self, image_bytes: bytes) -> str: ...
-    def get_video(self, task_id: str) -> VideoStatus: ...
+    async def generate_image(
+        self, prompt: str, reference_image_bytes: bytes | None = None
+    ) -> bytes: ...
+    async def create_video(self, image_bytes: bytes) -> str: ...
+    async def get_video(self, task_id: str) -> VideoStatus: ...
 
 
 class Grok2ApiProvider:
@@ -90,8 +92,25 @@ class Grok2ApiProvider:
         return cast("dict[str, Any]", resp.json())
 
     async def _download(self, url: str) -> bytes:
-        resp = await self._request("GET", url)
-        return resp.content
+        """下载生成结果；文件端点无需鉴权，故不携带 Authorization。
+
+        下载失败（网络、5xx）仍按瞬时错误指数退避重试。
+        """
+        last_exc: Exception | None = None
+        for attempt in range(MAX_RETRIES + 1):
+            try:
+                resp = await self._client.get(url)
+                if resp.status_code in RETRYABLE_STATUS:
+                    await asyncio.sleep(0.5 * (2**attempt))
+                    continue
+                resp.raise_for_status()
+                return resp.content
+            except httpx.HTTPStatusError:
+                raise
+            except (httpx.HTTPError, httpx.TransportError) as exc:
+                last_exc = exc
+                await asyncio.sleep(0.5 * (2**attempt))
+        raise RuntimeError(f"GET {url} failed after {MAX_RETRIES + 1} attempts") from last_exc
 
     async def generate_image(
         self, prompt: str, reference_image_bytes: bytes | None = None
