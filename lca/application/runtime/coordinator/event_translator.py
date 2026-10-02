@@ -96,6 +96,9 @@ class EventTranslator:
     translations like HITL pause), or None to ignore.
     """
 
+    def __init__(self) -> None:
+        self._streamed_text: bool = False
+
     def translate(self, stamped: dict) -> list[dict] | dict | None:
         """Return the AgentStreamEvent envelope(s) or None to ignore."""
         event = stamped.get("event") or {}
@@ -105,6 +108,13 @@ class EventTranslator:
 
         execution_point = event.get("execution_point")
         if isinstance(execution_point, str):
+            if execution_point == "llm.call.start":
+                self._streamed_text = False
+            elif execution_point == "llm.stream.token":
+                self._streamed_text = True
+            elif execution_point == "llm.request.header.assistant" and self._streamed_text:
+                # Tokens were already streamed incrementally; drop full header to prevent duplication
+                return None
             spine_handler = _SPINE_HANDLERS.get(execution_point)
             if spine_handler is not None:
                 return spine_handler(event)
