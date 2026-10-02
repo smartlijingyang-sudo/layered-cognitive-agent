@@ -1,7 +1,7 @@
-import time
 import uuid
 from typing import Any
 
+from lca.contracts.atoms.ids.ids import utc_now_ms
 from lca.contracts.models.vocal.models import (
     DeliveryReceipt,
     SendMessagePayload,
@@ -27,7 +27,7 @@ class DirectVocalGate(VocalGateProtocol):
         self._visible.append({"type": payload.type.value, "content": payload.content})
         return DeliveryReceipt(
             message_id=str(uuid.uuid4()),
-            delivered_at_ms=int(time.time() * 1000),
+            delivered_at_ms=utc_now_ms(),
             vocal_type=payload.type,
             is_terminal_for_turn=False,
         )
@@ -80,7 +80,7 @@ class GatedVocalGate(VocalGateProtocol):
             )
 
         msg_id = str(uuid.uuid4())
-        now_ms = int(time.time() * 1000)
+        now_ms = utc_now_ms()
         is_terminal = False
 
         if payload.type == VocalMessageType.WIDGET:
