@@ -1,6 +1,6 @@
 """Session projection 契约（spec §2.2.6）。
 
-投影注册表/单元契约归 ``lca/contracts/protocols/session/projection_unit.py``
+投影注册表/单元契约归 ``lca/contracts/protocols/session/projection/unit.py``
 （ADR-0186 后的 DSH 对齐形态）；本模块保留跨平面共享的快照类型。
 """
 

@@ -152,7 +152,7 @@ class RunFact:
 class RunDelta:
     """State mutation delta（PR-7 数据面 + ADR-0070 Reducer 协议）。
 
-    Reducer 协议（lca/contracts/protocols/reducer.py）的输入；RunDelta
+    Reducer 协议（lca/contracts/protocols/state/reducer.py）的输入；RunDelta
     是 apply_* 方法接收的事实包装。RunDelta.facts 累积 1..N RunFact，
     reducer 输出新 AgentState。
 
