@@ -36,7 +36,10 @@ from pathlib import Path
 
 LCA_ROOT = Path("lca")
 BRAIN_DIR = LCA_ROOT / "cognition" / "brain"
-RUNTIME_FILE = LCA_ROOT / "runtime" / "runtime_loop.py"
+# NOTE(round-0357): modular_brain.py 已迁入 pipeline/ 子包(291a55c0d 目录纪律整理);
+# runtime_loop.py 已迁入 runtime/loop/(agent_runtime 重组)。旧扁平路径均已删除。
+MODULAR_BRAIN = BRAIN_DIR / "pipeline" / "modular_brain.py"
+RUNTIME_FILE = LCA_ROOT / "runtime" / "loop" / "runtime_loop.py"
 REDUCER_PROTOCOL = LCA_ROOT / "contracts" / "protocols" / "state" / "reducer.py"
 REDUCER_DEFAULT = LCA_ROOT / "plugins" / "loop" / "reducer" / "plugin.py"
 
@@ -48,7 +51,7 @@ class TestCV4NoGateChainField:
     """
 
     def test_modular_brain_has_no_gate_chain_field(self) -> None:
-        source = (BRAIN_DIR / "modular_brain.py").read_text(encoding="utf-8")
+        source = MODULAR_BRAIN.read_text(encoding="utf-8")
         tree = ast.parse(source)
         forbidden_attrs = {"_gate_chain", "_gates", "_chain", "_gates_chain"}
         violations: list[str] = []
@@ -80,7 +83,7 @@ class TestCV4BrainNoDirectStateMutation:
         唯一允许的是 reducer 内部 mutation（被 audit_state_writers 的 allowlist
         豁免）。本测试扫描 ModularBrain.think 方法体并验证无直接 mutation。
         """
-        source = (BRAIN_DIR / "modular_brain.py").read_text(encoding="utf-8")
+        source = MODULAR_BRAIN.read_text(encoding="utf-8")
         tree = ast.parse(source)
         # Find ModularBrain class
         brain_cls = next(
@@ -191,13 +194,11 @@ class TestCV4StopPolicyFlow:
     也不允许作为 ``CognitiveRuntime`` 或 ``AgentGraph`` 的顶层依赖。
     """
 
-    def test_stop_phase_executor_invokes_stop_policy(self) -> None:
-        """Default stop PhaseExecutor consumes only its ``stop_policy`` capability."""
-        from pathlib import Path
-
-        stop_executor = Path("lca/plugins/loop/phase/stop/standard/plugin.py").read_text(encoding="utf-8")
-        assert "stop_policy.decide(" in stop_executor
-        assert "stop_rule" not in stop_executor
+    # NOTE(round-0357, orphan): ``test_stop_phase_executor_invokes_stop_policy`` retired here.
+    # The entire ``lca/plugins/loop/phase/`` tree (incl. stop/standard/plugin.py) was
+    # intentionally deleted by 63a68a4da ("refactor(declarative): cut kernel driver over
+    # to v2 PlanInterpreter per ADR-0221"); the stop.decide slot is now declarative and
+    # there is no stop PhaseExecutor left for this CV4 guard to scan.
 
 
 class TestCV4AllControlSlot11:
@@ -210,12 +211,11 @@ class TestCV4AllControlSlot11:
         中至少 stop.decide 与 think.guard 已在 Stop PhaseExecutor / ModularBrain
         中被实际调用（PR-1/4）。其余槽位 PR-7 / PR-8 / PR-9 落地。
         """
-        stop_executor_src = Path("lca/plugins/loop/phase/stop/standard/plugin.py").read_text(encoding="utf-8")
+        # NOTE(round-0357): stop phase executor half retired (63a68a4da deleted
+        # lca/plugins/loop/phase/ per ADR-0221); think_guard half still live.
         think_guard_src = Path(
             "lca/plugins/loop/control/think_guard/plugin.py"
         ).read_text(encoding="utf-8")
         # think.guard runs through declarative TRANSFORM + GOVERN contributions.
         assert "ThinkGuardEnforceExecutor" in think_guard_src
-        assert "ContributionRole.TRANSFORM" in think_guard_src
-        # stop.decide must be referenced through the stop phase's local policy.
-        assert "stop_policy.decide" in stop_executor_src
+        assert "control.think.guard" in think_guard_src  # NOTE(round-0357): ContributionRole 旧贡献模型已迁为 NodeExecutor 语义名
