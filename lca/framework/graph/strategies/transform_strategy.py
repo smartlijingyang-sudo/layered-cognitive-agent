@@ -10,6 +10,7 @@ Use cases:
 - Aggregation in fan-in nodes.
 - Cheap reducers (port_values -> single typed payload).
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -22,10 +23,11 @@ from lca.contracts.protocols.graph.node_io import (
     NodeIOSchema,
     NodeOutput,
 )
+from lca.contracts.protocols.graph.ports import PortName
 from lca.contracts.protocols.graph.strategy import NodeStrategy, StrategyContext
 from lca.framework.graph.strategy_registry import register_strategy
 
-Transform = Callable[[dict[str, Any], StrategyContext], dict[str, Any]]
+Transform = Callable[[dict[PortName, Any], StrategyContext], dict[PortName, Any]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,20 +36,16 @@ class TransformStrategy(NodeStrategy):
     schema: NodeIOSchema = field(default_factory=NodeIOSchema)
     transform: Transform | None = None
 
-    async def execute(
-        self, context: StrategyContext, input: NodeInput
-    ) -> NodeOutput:
+    async def execute(self, context: StrategyContext, input: NodeInput) -> NodeOutput:
         if self.transform is None:
-            raise RuntimeError(
-                "TransformStrategy.execute called without transform"
-            )
+            raise RuntimeError("TransformStrategy.execute called without transform")
         produced = self.transform(dict(input.port_values), context)
         return NodeOutput(port_values=produced, producer_node=context.node_id)
 
 
 def identity_transform(
-    port_values: dict[str, Any], context: StrategyContext
-) -> dict[str, Any]:
+    port_values: dict[PortName, Any], context: StrategyContext
+) -> dict[PortName, Any]:
     """Default transform — pass inputs through to outputs unchanged."""
     return dict(port_values)
 
