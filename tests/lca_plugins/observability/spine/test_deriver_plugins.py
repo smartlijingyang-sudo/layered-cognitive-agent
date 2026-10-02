@@ -21,7 +21,7 @@ from lca.plugins.observability.spine.derivers import (
 )
 
 _BASE_KWARGS: dict[str, object] = {
-    "execution_point": "brain.think.start",
+    "execution_point": "think.gate.start",
     "channel": "fact",
     "span_id": "lca-span-00000001",
     "parent_span_id": None,
@@ -74,14 +74,14 @@ def test_live_tail_module_declares_plugin() -> None:
 def test_graph_deriver_on_event_and_flush_writes_digraph(tmp_path: Path) -> None:
     out = tmp_path / "phase_graph.dot"
     deriver = GraphDeriver(output_path=out)
-    deriver.on_event(_make_event(execution_point="brain.think.start", sequence=1))
-    deriver.on_event(_make_event(execution_point="brain.think.end", sequence=2))
+    deriver.on_event(_make_event(execution_point="think.gate.start", sequence=1))
+    deriver.on_event(_make_event(execution_point="think.gate.end", sequence=2))
     deriver.on_event(_make_event(execution_point="think.gate.start", sequence=3))
     written = deriver.flush()
     assert written == out
     text = out.read_text(encoding="utf-8")
     assert "digraph" in text
-    assert "brain.think.start" in text
+    assert "think.gate.start" in text
     assert "->" in text
 
 
@@ -143,4 +143,5 @@ def test_live_tail_subscribe_is_carrier_passthrough_not_event_spine() -> None:
     deriver = LiveTailDeriver(tail=spy)
     result = deriver.subscribe(after_seq=3)
     assert result == "passthrough-iter"
-    assert spy.subscribe_calls == [((), {"after_seq": 3})]
+    # 生产为 positional 透传 self._tail.subscribe(after_seq)；不断言 kwarg 形态。
+    assert spy.subscribe_calls == [((3,), {})]
