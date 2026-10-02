@@ -284,6 +284,10 @@ ignore = [
 "lca/contracts/protocols/**/*.py" = ["ARG002", "TC002"]
 "lca/contracts/mechanisms.py" = ["ARG002"]
 "lca/contracts/action.py" = ["ARG002"]
+# contracts/__init__ is a re-export barrel: __all__ is computed from globals() at
+# module load (see its docstring), so ruff cannot see the re-exports. F401 is a
+# false positive here by design.
+"lca/contracts/__init__.py" = ["F401"]
 # contracts/transport mirrors the native TS wire; camelCase JSON keys (assistantMessage,
 # toolCalling, ...) are intentional byte-compat with the TS source, not Python naming.
 "lca/contracts/transport/**/*.py" = ["N815", "N802"]
