@@ -100,3 +100,20 @@
 2. **stale 阈值：默认 2×routine interval，可配；绝对上限 90 分钟**。理由：interval 倍数自适应不同频率的 routine；绝对上限防 interval 超长时的锁饿死（对齐三路 cron 5400s stale 收割实践）。
 3. **失败重试/死信：重试 3 次（退避 1min/5min/15min），3 次后进死信保留 7 天可查**。理由：数字需要有人定——取业界常见值，可配；死信保留是 fail-closed（失败可审计，不静默丢弃）。
 4. **tick 驱动落点：carrier 内**。理由：缺口四承认生产无 tick 驱动——先让调度器在现有 carrier 生命周期内跑起来（最小可用）；独立 daemon 是部署形态升级，YAGNI now。
+
+---
+
+## 10. 决策记录（2026-10-02）：ProactiveScheduler tick 驱动接线
+
+**背景**：§9④ 已裁决"tick 驱动落点：carrier 内"，但 carrier 侧无 tick 循环、无 `ProactiveJob` 生产调用方——缺的是 HOW。本节裁决机制形态；**哪些 job 存在是产品配置，不是架构决策**。
+
+**裁决**（李超授权 Athena 按 muse 思想裁决）：
+
+1. **驱动位置**：`lca_kernel/boot/lifespan.py` 的 startup 阶段起 asyncio 后台任务，shutdown 阶段取消并等待结束。理由：lifespan 是既有的生命周期缝合点（`make_lifespan` 已有 startup/shutdown 语义）；不另起独立 daemon（§9④）。
+2. **tick 节奏**：固定 60s，可配 `tick_interval_s`。理由：tick() 廉价（只做 due 检查）；job 的 interval 控制实际触发，驱动层不做自适应调度（YAGNI）。
+3. **阻塞 I/O**：tick() 是文件 I/O（锁+state），放 executor 线程（`asyncio.to_thread`），不阻塞事件循环。
+4. **异常语义**：tick 抛错 → 记 log，循环继续。理由：驱动层 fail-open（一次失败不杀死驱动）；job 级失败走既有的重试/死信（fail-closed），两层正交。
+5. **job 来源**：`job_source` 背后是一个启动时装配的静态 registry（接口已存在，不新发明）；初始可为空（驱动空转）。理由：YAGNI——不做 job CRUD、不做 DB；routine spec 转换是未来工作（等 routine spec 长出 content 字段）。
+6. **关机语义**：cancel 后 await 当前 tick 完成（tick 自管理锁生命周期，§9①），不丢锁、不丢 state。
+
+**实现接口约定**（给 quality lane）：驱动封装为独立单元（start/stop），lifespan 只调 start/stop 保持薄；单元测试覆盖"tick 异常循环不死"、"shutdown 等待当前 tick"、"空 registry 空转"。
