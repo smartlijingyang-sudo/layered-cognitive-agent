@@ -297,7 +297,7 @@ def _doc_sandbox_delta() -> EventDoc:
     return EventDoc(
         summary="沙箱执行的原始增量输出(stdout/stderr 各成流)",
         why="前端实时显示工具运行日志;落盘由 projector 合并",
-        arch="L0 sandbox;lca/infrastructure/sandbox/streaming.py",
+        arch="L0 sandbox;lca/infrastructure/sandbox/streaming/streaming.py",
         layer="L0",
     )
 

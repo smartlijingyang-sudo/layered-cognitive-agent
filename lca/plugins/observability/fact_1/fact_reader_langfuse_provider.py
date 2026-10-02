@@ -1,7 +1,8 @@
 """Langfuse JournalProjector factory plugin (Tier-2) —— 占位实现。
 
 把 Langfuse 读者注册为 ``fact_readers`` 的 factory；真实实现复用
-``lca/infrastructure/observability/exporters/langfuse.py``（之后 PR 重构）。
+``lca/infrastructure/observability/exporters/langfuse.py``（该模块已在
+1fac8e1a3 作为死代码删除；真实 reader 实现待重新设计，当前保持 no-op）。
 当前返回 no-op reader：保证 boot 链路通畅，不引入额外网络副作用。
 """
 
@@ -85,7 +86,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     def _make_langfuse_reader(
         settings: ObservabilitySettings | None = None, **unused: Any
     ) -> JournalProjector:
-        # 真实实现待 exporters/langfuse 迁移完成后替换；当前保留 no-op 以保 boot 链通畅。
+        # exporters/langfuse 已删（1fac8e1a3 死代码）；真实实现待重新设计，当前保留 no-op 以保 boot 链通畅。
         del unused
         _settings = settings
         return _NoopReader()
