@@ -7,7 +7,8 @@ replace any factory capability without changing the runtime kernel.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
+from typing import cast
 
 from pydantic import BaseModel
 
@@ -51,6 +52,7 @@ from lca.contracts.protocols.runtime.runtime.composition import (
 from lca.contracts.protocols.runtime.runtime.lifecycle import RuntimeLifecyclePublisher
 from lca.contracts.protocols.state.delta_handler import DeltaHandlerRegistry
 from lca.contracts.protocols.state.reducer import Reducer
+from lca.framework.graph.observation import GraphObserver
 from lca.harness.declarative.execute.dispatch import RegistryDeltaReducer, RegistryEffectDispatcher
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.runtime.loop.runtime_journal import RuntimeJournalCommitter
@@ -174,16 +176,29 @@ class DefaultDeclarativeInterpreterFactory(DeclarativeInterpreterFactory):
         # act subgraph dispatches.
         from lca.framework.graph.adapter import PlanInterpreterAdapter
 
-        return PlanInterpreterAdapter(
-            journal=journal,
-            effect_gateway=effect_gateway,
-            reducer=reducer,
-            phase_observer=phase_observer,
-            lifecycle_publisher=lifecycle_publisher,
-            node_executors=node_executors if isinstance(node_executors, Mapping) else None,
-            node_executor_runtime_scope=node_executor_runtime_scope,
-            graph_observer=graph_observer,
-            graph_clock=graph_clock,
+        # Seam: DeclarativeInterpreter declares run/resume with opaque
+        # **kwargs; PlanInterpreterAdapter exposes the same two async
+        # methods with keyword-only params covering every kwarg the
+        # driver passes (outer_state/traversal). isinstance() against
+        # the runtime_checkable protocol passes; the cast only bridges
+        # pyright's stricter **kwargs-vs-keyword-only assignability.
+        return cast(
+            "DeclarativeInterpreter",
+            PlanInterpreterAdapter(
+                journal=journal,
+                effect_gateway=effect_gateway,
+                reducer=reducer,
+                phase_observer=phase_observer,
+                lifecycle_publisher=lifecycle_publisher,
+                node_executors=node_executors if isinstance(node_executors, Mapping) else None,
+                node_executor_runtime_scope=node_executor_runtime_scope,
+                graph_observer=graph_observer
+                if isinstance(graph_observer, GraphObserver)
+                else None,
+                graph_clock=cast(
+                    "Callable[[], int] | None", graph_clock if callable(graph_clock) else None
+                ),
+            ),
         )
 
 
