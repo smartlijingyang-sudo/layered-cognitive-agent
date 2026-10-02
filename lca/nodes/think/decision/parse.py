@@ -75,8 +75,8 @@ class DecisionParseExecutor:
 
     semantic_name: str = "decision.parse"
     region: str = "think"
-    declared_inputs: tuple[PortName, ...] = ("state", "llm_response")
-    declared_outputs: tuple[PortName, ...] = ("decision",)
+    declared_inputs: tuple[PortName, ...] = (PortName("state"), PortName("llm_response"))
+    declared_outputs: tuple[PortName, ...] = (PortName("decision"),)
 
     async def node_execute(
         self,
@@ -84,8 +84,8 @@ class DecisionParseExecutor:
         input: NodeInput,
     ) -> NodeOutput:
         """Project an :class:`LLMResponse` into a :class:`Decision`."""
-        _resolve_port("state", input=input, context=context)
-        llm_response = _resolve_port("llm_response", input=input, context=context)
+        _resolve_port(PortName("state"), input=input, context=context)
+        llm_response = _resolve_port(PortName("llm_response"), input=input, context=context)
         tool_calls, delegations, intent = _project_response(llm_response)
         action_type = _infer_action_type(tool_calls=tool_calls, delegations=delegations)
         decision_id = new_id("decision")
@@ -93,7 +93,7 @@ class DecisionParseExecutor:
         response_text = _guard_acknowledgement(context=context, text=response_text)
         return NodeOutput(
             port_values={
-                "decision": Decision(
+                PortName("decision"): Decision(
                     decision_id=decision_id,
                     action_type=action_type,
                     rationale=intent,
@@ -119,7 +119,7 @@ def _guard_acknowledgement(*, context: NodeContext, text: str | None) -> str | N
     return guard_reply(text, getattr(context, "runtime", None))
 
 
-def _resolve_port(name: str, *, input: NodeInput, context: NodeContext) -> Any:
+def _resolve_port(name: PortName, *, input: NodeInput, context: NodeContext) -> Any:
     """Read a declared port from ``input.port_values`` or ``context.runtime``."""
     value = input.port_values.get(name)
     if value is None and hasattr(context, "runtime") and context.runtime is not None:

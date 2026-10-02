@@ -41,8 +41,8 @@ class RememberFoldExecutor:
 
     semantic_name: str = "phase.remember.fold"
     region: str = "remember"
-    declared_inputs: tuple[PortName, ...] = ("memory_receipt",)
-    declared_outputs: tuple[PortName, ...] = ("memory_receipt",)
+    declared_inputs: tuple[PortName, ...] = (PortName("memory_receipt"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("memory_receipt"),)
 
     async def node_execute(
         self,
@@ -52,8 +52,8 @@ class RememberFoldExecutor:
         del context
         return NodeOutput(
             port_values={
-                "memory_receipt": input.port_values.get("memory_receipt"),
-                "routing": RoutingDecision(action_type=ActionType.RESPOND),
+                PortName("memory_receipt"): input.port_values.get(PortName("memory_receipt")),
+                PortName("routing"): RoutingDecision(action_type=ActionType.RESPOND),
             },
         )
 
