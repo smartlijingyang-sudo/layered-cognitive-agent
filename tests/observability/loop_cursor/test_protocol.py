@@ -55,8 +55,6 @@ def test_cursor_snapshot_is_frozen() -> None:
         run_id="r1",
         trace_id="t1",
         incarnation=1,
-        step_id=None,
-        step_index=0,
         iteration=0,
         attempt_in_step=0,
         phase=None,
@@ -74,14 +72,32 @@ def test_cursor_error_is_exception_subclass() -> None:
 
 def test_loop_cursor_protocol_has_only_live_methods() -> None:
     # 2026-09-14 dead-code 修剪:record_* / halt / close / fork 全部删除,
-    # Protocol 只剩 advance + open_step + snapshot。
-    expected = {"advance", "open_step", "snapshot"}
+    # LoopCursor docstring 钉死第二轨方法禁止扩展:open_step / begin_step /
+    # end_step 等不在 snapshot 暴露,step 边界由 ModelVisibleHook 唯一驱动。
+    # Protocol 只剩 advance + snapshot。
+    expected = {"advance", "snapshot"}
     assert expected <= set(dir(LoopCursor))
     # 反向断言:被删的方法绝不能再悄悄出现(防止回归)。
     forbidden = {
-        "halt", "close", "fork",
-        "record_thinking", "record_tool_call",
-        "record_tool_result", "record_request_header",
+        "halt",
+        "close",
+        "fork",
+        "record_thinking",
+        "record_tool_call",
+        "record_tool_result",
+        "record_request_header",
+        "open_step",
+        "begin_step",
+        "end_step",
+        "open_segment",
+        "close_segment",
+        "register_projection",
+        "emit_step_start",
+        "resume_cursor",
+        "emit_phase",
+        "emit",
+        "subscribe",
+        "flush",
     }
     leaked = forbidden & set(dir(LoopCursor))
     assert not leaked, f"deleted methods leaked back into LoopCursor Protocol: {leaked}"
