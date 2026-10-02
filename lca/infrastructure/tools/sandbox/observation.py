@@ -11,13 +11,16 @@ from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_EXECUTI
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.execution.sandbox import SANDBOX_PREVIEW_CHAR_LIMIT
 from lca.infrastructure.file.store import FileStore
+from lca.infrastructure.text.truncate import ASCII_ELLIPSIS, truncate_text
 from lca.infrastructure.workspace.deliverable import is_office_name
 
 _LOG_MIME = "text/plain"
 
 
 def _truncate_preview(text: str, limit: int = SANDBOX_PREVIEW_CHAR_LIMIT) -> str:
-    return text if len(text) <= limit else text[:limit] + "..."
+    # Canonical truncation (lca.infrastructure.text.truncate); the old
+    # hand-rolled body was byte-identical to this call (probe 0297).
+    return truncate_text(text, limit, suffix=ASCII_ELLIPSIS)
 
 
 def _stored_part(
