@@ -22,6 +22,7 @@ from lca.contracts.models.session.tool_call import ToolCall
 from lca.contracts.models.session.tool_error import ToolError
 from lca.contracts.protocols.session.run_session_writer import RunSessionWriterProtocol
 from lca.session.lifecycle.bind import _event_ref_from_session
+from lca_kernel.events.fold.inputs import SURFACE_TOOL_RESULT_TYPE
 from lca_kernel.events.session.session import SessionEvent, SessionProtocol
 
 
@@ -72,7 +73,7 @@ def _surface_event_to_message(event: Any) -> Message:
         if tool_calls is not None:
             msg["tool_calls"] = tool_calls
         return msg
-    if event.type == "surface/tool_result":
+    if event.type in ("surface/tool_result", SURFACE_TOOL_RESULT_TYPE):
         msg = Message(
             role="tool",
             content=_tool_result_content(event.data),
@@ -284,11 +285,16 @@ class RunSessionWriter(RunSessionWriterProtocol):
         result with its preceding ``surface/assistant_message`` that declared
         the matching ``tool_call_id``.
         """
+        # 局部导入:避免模块加载期引入 infrastructure 层依赖。
+        from lca.infrastructure.session.projections.tool_result_message import (
+            build_openai_tool_result_message,
+        )
+
         session = self._require_session()
         assistant_seq = self._last_assistant_tool_call_seq(call_id)
         source_event_seqs = (assistant_seq,) if assistant_seq is not None else None
         event = session.append(
-            "surface/tool_result",
+            SURFACE_TOOL_RESULT_TYPE,
             {
                 "turn": turn,
                 "step": step,
@@ -297,8 +303,16 @@ class RunSessionWriter(RunSessionWriterProtocol):
                 "error": error,
                 "meta": meta,
                 "tool_call_id": call_id,
+                # ADR-0201: derive_event_message 消费 data["message"] 构造
+                # OpenAI tool 消息;缺失则工具结果无法进入模型可见面。
+                "message": build_openai_tool_result_message(
+                    tool_call_id=str(call_id),
+                    content=content,
+                ),
             },
-            surface_op="tool_result",
+            # SurfaceOp 契约只允许 "append" | replace;"tool_result" 是
+            # 事件类型后缀的误用,会导致 fold/投影静默丢弃本事件。
+            surface_op="append",
             source_event_seqs=source_event_seqs,
         )
         return self._event_ref(session, event)
@@ -339,7 +353,11 @@ class RunSessionWriter(RunSessionWriterProtocol):
         :class:`RunHealthReport` deriver.
         """
         session = self._require_session()
-        surface_events = [e for e in session.snapshot_events() if e.type.startswith("surface/")]
+        surface_events = [
+            e
+            for e in session.snapshot_events()
+            if e.type.startswith("surface/") or e.type == SURFACE_TOOL_RESULT_TYPE
+        ]
         msgs = [_surface_event_to_message(e) for e in surface_events]
         counter: list[int] = [0]
         msgs = _drop_orphan_tool_results(msgs, counter=counter)

@@ -34,4 +34,5 @@ def test_commit_body_tool_execute_end_appends_tool_role_message() -> None:
     tool_msgs = [m for m in assembled.messages if m.get("role") == "tool"]
     assert len(tool_msgs) == 1
     assert tool_msgs[0]["tool_call_id"] == "toolu_abc"
-    assert tool_msgs[0]["content"] == "page one"
+    # Production convention (observation_content): dict payloads JSON-encode.
+    assert tool_msgs[0]["content"] == '{"stdout": "page one"}'

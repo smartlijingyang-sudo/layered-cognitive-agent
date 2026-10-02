@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from lca.runtime.session.run_session_writer import RunSessionWriter
+from lca_kernel.events.fold.inputs import SURFACE_TOOL_RESULT_TYPE
 
 
 @dataclass
@@ -152,7 +153,7 @@ def test_orphan_tool_result_without_assistant_kept_in_journal_but_dropped_at_wir
     writer.append_tool_result(turn=0, step=0, call_id="Z", content="orphan", error=None, meta=None)
 
     # Journal holds the orphan event (provenance + audit trail).
-    assert any(e.type == "surface/tool_result" for e in session.events)
+    assert any(e.type == SURFACE_TOOL_RESULT_TYPE for e in session.events)
 
     msgs = writer.derive_messages()
 

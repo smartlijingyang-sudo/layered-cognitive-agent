@@ -36,6 +36,7 @@ from lca.contracts.models.core.execution.decision import Decision, ToolCall
 from lca.contracts.models.team.role.team import CacheConfig, RetryPolicy
 from lca.contracts.protocols.runtime.infra.infra import Tool
 from lca.runtime.session.run_session_writer import RunSessionWriter
+from lca_kernel.events.fold.inputs import SURFACE_TOOL_RESULT_TYPE
 
 # ── Minimal in-memory SessionProtocol fixture ──────────────────────────────
 
@@ -201,8 +202,7 @@ def test_n_tool_results_per_decision() -> None:
 
     asyncio.run(body.dispatch_tool_calls(decision=_three_call_decision()))
 
-    surface_events = [e for e in session.events if e.type.startswith("surface/")]
-    result_events = [e for e in surface_events if e.type == "surface/tool_result"]
+    result_events = [e for e in session.events if e.type == SURFACE_TOOL_RESULT_TYPE]
     assert len(result_events) == 3
 
     result_call_ids = {e.data["tool_call_id"] for e in result_events}

@@ -32,6 +32,7 @@ from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.team.role.team import CacheConfig, RetryPolicy
 from lca.contracts.protocols.runtime.infra.infra import Tool
 from lca.runtime.session.run_session_writer import RunSessionWriter
+from lca_kernel.events.fold.inputs import SURFACE_TOOL_RESULT_TYPE
 
 # ── Minimal in-memory SessionProtocol fixture ──────────────────────────────
 
@@ -248,11 +249,15 @@ def test_tool_result_persisted_after_tool_execution() -> None:
     assert receipt.outcome is EffectOutcome.SUCCEEDED
     assert recorder.calls == [{"name": "echo", "args": {"x": 1}}]
 
-    surface_events = [e for e in session.events if e.type.startswith("surface/")]
+    surface_events = [
+        e
+        for e in session.events
+        if e.type.startswith("surface/") or e.type == SURFACE_TOOL_RESULT_TYPE
+    ]
     assert [e.type for e in surface_events] == [
         "surface/user_message",
         "surface/assistant_message",
-        "surface/tool_result",
+        SURFACE_TOOL_RESULT_TYPE,
     ]
 
 

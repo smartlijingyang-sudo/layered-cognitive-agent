@@ -177,6 +177,7 @@ def commit_body_tool_execute_end(
     显式接受 bool 是为了 fold binding / HOP 多源对账能拿到这个字段
     (spine.yaml 已声明 ``ok: bool``)。不传时从 outcome 派生。
     """
+    from lca.cognition.body.emit.observation_surface import observation_content
     from lca.runtime.session.run_session_writer import RunSessionWriter
 
     del state
@@ -184,7 +185,6 @@ def commit_body_tool_execute_end(
         return None
     if ok is None:
         ok = outcome == "success"
-    payload = observation.payload if observation is not None else None
     error = observation.error if observation is not None else None
     meta = {
         "tool_name": tool_name,
@@ -199,7 +199,7 @@ def commit_body_tool_execute_end(
         turn=0,
         step=0,
         call_id=CallId(invocation_id),
-        content="" if payload is None else str(payload),
+        content=observation_content(observation) if observation is not None else "",
         error=ToolError(message=error) if error is not None else None,
         meta=meta,
     )
