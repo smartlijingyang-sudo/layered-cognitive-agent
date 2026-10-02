@@ -477,7 +477,7 @@
 
 | STATUS-SCREEN-TASK-1-CONTRACTS | 任务 1：动作数据契约与人话规则引擎 (ActivityItem, ActivityIntentNamer) | Completed | 落地 typed 契约与 intent 映射字典，2/2 单测全通，通过 INV-02 |
 | STATUS-SCREEN-TASK-2-PROJECTOR | 任务 2：单轨事实流投影器与快照引擎 (ActivityProjector, StatusSnapshotService) | Completed | 落地纯函数单轨投影器，支持 start/end/cancel 折叠与幂等重放，2/2 单测全通，通过 INV-01 |
-| STATUS-SCREEN-TASK-3-TRANSLATOR | 任务 3：EventTranslator 增量推送扩展与取消机制 (activity_updated) | In_Progress | 正在扩展 EventTranslator 发射 activity_updated 流式增量事件，守卫 INV-03, INV-04 |
-| STATUS-SCREEN-TASK-4-ROUTES | 任务 4：快照与取消 REST API 端点 (routes_status_screen.py) | Pending | 暴露 status-snapshot 与 run cancellation 端点，守卫 INV-06 |
+| STATUS-SCREEN-TASK-3-TRANSLATOR | 任务 3：EventTranslator 增量推送扩展与取消机制 (activity_updated) | Completed | 成功扩展 EventTranslator 在动作起止发射 activity_updated 流式事件并驱动全局投影，39/39 关联单测全绿，通过 INV-03, INV-04 |
+| STATUS-SCREEN-TASK-4-ROUTES | 任务 4：快照与取消 REST API 端点 (routes_status_screen.py) | In_Progress | 正在实现 status-snapshot 与 run cancellation 端点，守卫 INV-06 |
 | STATUS-SCREEN-TASK-5-FRONTEND | 任务 5：前端 AssistantStatusDrawer.tsx 增量 Patch 与交互闭环 | Pending | 原地 patch 单行、Upcoming 聊天草稿、系统任务防删与 Stop 按钮，守卫 INV-03, INV-05 |
 | STATUS-SCREEN-TASK-6-E2E-INVARIANTS | 任务 6：全链路单测回归与全量不变量矩阵验证 (INV-01 ~ INV-06) | Pending | 验证端到端生命周期与所有断言，ruff/diff 检查 |

@@ -98,6 +98,7 @@ class EventTranslator:
 
     def __init__(self) -> None:
         self._streamed_text: bool = False
+        self._turn_requested_tools: bool = False
 
     def translate(self, stamped: dict) -> list[dict] | dict | None:
         """Return the AgentStreamEvent envelope(s) or None to ignore."""
@@ -110,14 +111,35 @@ class EventTranslator:
         if isinstance(execution_point, str):
             if execution_point == "llm.call.start":
                 self._streamed_text = False
+                self._turn_requested_tools = False
             elif execution_point == "llm.stream.token":
                 self._streamed_text = True
+            elif execution_point == "llm.tool_call.streaming":
+                self._turn_requested_tools = True
             elif execution_point == "llm.request.header.assistant" and self._streamed_text:
                 # Tokens were already streamed incrementally; drop full header to prevent duplication
                 return None
             spine_handler = _SPINE_HANDLERS.get(execution_point)
             if spine_handler is not None:
-                return spine_handler(event)
+                folded = spine_handler(event)
+                if (
+                    execution_point == "llm.call.end"
+                    and self._streamed_text
+                    and not self._turn_requested_tools
+                    and isinstance(folded, dict)
+                    and folded.get("type") == "stream_end"
+                ):
+                    # The send button stays loading until visible_output_end.
+                    # A tool-less streamed turn is the last text the user sees.
+                    # memory_extract still runs after this and must not hold the button.
+                    return [
+                        folded,
+                        {
+                            "type": "visible_output_end",
+                            "data": {"reason": "completed"},
+                        },
+                    ]
+                return folded
 
         etype = event.get("type")
         if not isinstance(etype, str):
@@ -475,7 +497,7 @@ class EventTranslator:
         }
 
     @staticmethod
-    def _spine_phase_tool_start(e: dict) -> dict | None:
+    def _spine_phase_tool_start(e: dict) -> list[dict] | dict | None:
         payload = _inner_payload(e)
         tool_name = str(payload.get("tool_name") or "")
         invocation_id = str(payload.get("invocation_id") or "")
@@ -487,16 +509,39 @@ class EventTranslator:
         if not tool_name:
             return None
         tool_calling = wire_tool_call(tool_name, invocation_id, {})
-        return {
+        tool_start_msg = {
             "type": "tool_start",
             "data": {
                 "parentMessageId": e.get("parentMessageId"),
                 "toolCalling": tool_calling,
             },
         }
+        from lca.infrastructure.observability.activity_projector import (
+            get_global_activity_projector,
+        )
+
+        act_item = get_global_activity_projector().feed_event(e)
+        if act_item is not None:
+            activity_msg = {
+                "type": "activity_updated",
+                "data": {
+                    "id": act_item.id,
+                    "runId": act_item.run_id,
+                    "assistantId": act_item.assistant_id,
+                    "category": act_item.category.value,
+                    "title": act_item.title,
+                    "summary": act_item.summary,
+                    "status": act_item.status.value,
+                    "startTime": act_item.start_time,
+                    "icon": act_item.icon,
+                    "params": act_item.params,
+                },
+            }
+            return [tool_start_msg, activity_msg]
+        return tool_start_msg
 
     @staticmethod
-    def _spine_body_tool_end(e: dict) -> dict | None:
+    def _spine_body_tool_end(e: dict) -> list[dict] | dict | None:
         payload = _inner_payload(e)
         invocation_id = str(payload.get("invocation_id") or "")
         tool_name = str(payload.get("tool_name") or "")
@@ -528,7 +573,7 @@ class EventTranslator:
         result: dict[str, Any] | None = None
         if result_content:
             result = {"content": result_content}
-        return {
+        tool_end_msg = {
             "type": "tool_end",
             "data": {
                 "isSuccess": is_success,
@@ -540,6 +585,26 @@ class EventTranslator:
                 },
             },
         }
+        from lca.infrastructure.observability.activity_projector import (
+            get_global_activity_projector,
+        )
+
+        act_item = get_global_activity_projector().feed_event(e)
+        if act_item is not None:
+            activity_msg = {
+                "type": "activity_updated",
+                "data": {
+                    "id": act_item.id,
+                    "runId": act_item.run_id,
+                    "assistantId": act_item.assistant_id,
+                    "status": act_item.status.value,
+                    "endTime": act_item.end_time,
+                    "durationMs": act_item.duration_ms,
+                    "resultSummary": act_item.result_summary,
+                },
+            }
+            return [tool_end_msg, activity_msg]
+        return tool_end_msg
 
 
 _HANDLERS = {
