@@ -6,6 +6,8 @@ import { createStaticStyles } from 'antd-style';
 import React, { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useChatStore } from '@/store/chat';
+
 const styles = createStaticStyles(({ css, cssVar }) => {
   return {
     card: css`
@@ -172,6 +174,45 @@ export const AssistantNamingWidget = memo<AssistantNamingWidgetProps>(
       setIsCustom(true);
     }, []);
 
+    const appendFollowupMessages = useCallback(
+      async (messages: string[], appendConnectors: boolean) => {
+        if (messages.length === 0) return;
+        try {
+          const optimisticCreateMessage = useChatStore.getState().optimisticCreateMessage;
+          let parentId: string | undefined;
+          for (let i = 0; i < messages.length; i++) {
+            const state = useChatStore.getState();
+            // The last followup bubble carries a widget marker so the
+            // assistant message component can render ConnectorsPanel below
+            // it (bubbles first, connectors card second). The marker is
+            // stripped from the displayed text by the same component.
+            const content =
+              appendConnectors && i === messages.length - 1
+                ? `${messages[i]}\n\n[widget:connectors_panel]`
+                : messages[i];
+            const created = await optimisticCreateMessage({
+              agentId: assistantId || state.activeAgentId,
+              content,
+              groupId: state.activeGroupId,
+              parentId,
+              role: 'assistant',
+              threadId: state.activeThreadId,
+              topicId: state.activeTopicId,
+            });
+            if (created?.id) {
+              parentId = created.id;
+            }
+            if (i < messages.length - 1) {
+              await new Promise((resolve) => setTimeout(resolve, 600));
+            }
+          }
+        } catch (err) {
+          console.warn('[AssistantNamingWidget] failed to append followup messages:', err);
+        }
+      },
+      [assistantId],
+    );
+
     const handleConfirm = useCallback(async () => {
       if (!activeName || submitting || settled) return;
       setSubmitting(true);
@@ -189,23 +230,36 @@ export const AssistantNamingWidget = memo<AssistantNamingWidgetProps>(
 
         // Post to LCA settlement endpoint if embedToken or assistantId available
         if (assistantId || embedToken) {
-          await fetch('/lca-api/v1/onboarding/naming/settle', {
-            body: JSON.stringify({
-              assistant_id: assistantId,
-              name: activeName,
-              token: embedToken,
-              vibe: activeVibe,
-            }),
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-              'x-lca-token': token,
-              'x-lca-user-id': userId,
-            },
-            method: 'POST',
-          }).catch((err) => {
+          try {
+            const res = await fetch('/lca-api/v1/onboarding/naming/settle', {
+              body: JSON.stringify({
+                assistant_id: assistantId,
+                name: activeName,
+                token: embedToken,
+                vibe: activeVibe,
+              }),
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+                'x-lca-token': token,
+                'x-lca-user-id': userId,
+              },
+              method: 'POST',
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data && typeof data === 'object') {
+                const messages = Array.isArray(data.followup_messages)
+                  ? data.followup_messages.filter(
+                      (m): m is string => typeof m === 'string' && m.trim().length > 0,
+                    )
+                  : [];
+                void appendFollowupMessages(messages, data.show_connectors === true);
+              }
+            }
+          } catch (err) {
             console.warn('[AssistantNamingWidget] settle endpoint notify error:', err);
-          });
+          }
         }
 
         setSettled(true);
@@ -215,7 +269,7 @@ export const AssistantNamingWidget = memo<AssistantNamingWidgetProps>(
       } finally {
         setSubmitting(false);
       }
-    }, [activeName, activeVibe, assistantId, embedToken, onSettled, settled, submitting]);
+    }, [activeName, activeVibe, appendFollowupMessages, assistantId, embedToken, onSettled, settled, submitting]);
 
     if (settled) {
       return (
