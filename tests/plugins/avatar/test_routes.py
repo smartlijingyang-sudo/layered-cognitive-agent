@@ -59,6 +59,14 @@ class _FakeCtx:
         return self._fake_runtime
 
 
+class _FakeOwnership:
+    def __init__(self, owner_map: dict[str, str]) -> None:
+        self._owner_map = owner_map
+
+    def owner_of(self, assistant_id: str) -> str | None:
+        return self._owner_map.get(assistant_id)
+
+
 class FakeAvatarService:
     """轻量假服务：路由只消费 get/create/edit/set/clear + .store 属性。"""
 
@@ -154,6 +162,31 @@ def _register_service(assistant_id: str, base_dir: Path) -> FakeAvatarService:
     service = FakeAvatarService(assistant_id, base_dir)
     avatar_service_registry.register(assistant_id, service)
     return service
+
+
+def _enable_auth(app: Starlette) -> None:
+    """关闭 dev_mode，启用 Bearer token + x-lca-user-id 鉴权。"""
+    app.state.lca_auth_dev_mode = False
+    app.state.lca_auth_expected_token = "test-token"  # noqa: S105  # 测试专用
+
+
+def _auth_headers(user_id: str) -> dict[str, str]:
+    return {"Authorization": "Bearer test-token", "x-lca-user-id": user_id}
+
+
+def _avatar_urls(assistant_id: str) -> list[tuple[str, str]]:
+    """返回全部 avatar 端点的 (method, path)，供 401/404 遍历断言。"""
+    return [
+        ("GET", f"/v1/assistants/{assistant_id}/avatar"),
+        ("GET", f"/v1/assistants/{assistant_id}/avatar/candidates"),
+        ("POST", f"/v1/assistants/{assistant_id}/avatar/candidates"),
+        ("POST", f"/v1/assistants/{assistant_id}/avatar/set"),
+        ("POST", f"/v1/assistants/{assistant_id}/avatar/clear"),
+        (
+            "GET",
+            f"/v1/assistants/{assistant_id}/avatar/files/candidates/cand-1/original.png",
+        ),
+    ]
 
 
 # ── ROUTE_SPECS ──────────────────────────────────────────────
@@ -263,6 +296,46 @@ def test_post_avatar_candidates_missing_user_request_returns_400(
     assert resp.json()["error"]["type"] == "invalid_request"
 
 
+def test_post_avatar_candidates_non_string_user_request_returns_400(
+    app: Starlette, tmp_path: Path
+) -> None:
+    assistant_id = "asst_bad_usr_type"
+    _register_service(assistant_id, tmp_path / "avatar")
+    client = TestClient(app)
+    resp = client.post(
+        f"/v1/assistants/{assistant_id}/avatar/candidates",
+        json={"user_request": 123},
+    )
+    assert resp.status_code == 400
+    assert "字符串" in resp.json()["error"]["detail"]
+
+
+def test_post_avatar_candidates_non_string_reference_image_returns_400(
+    app: Starlette, tmp_path: Path
+) -> None:
+    assistant_id = "asst_bad_ref_type"
+    _register_service(assistant_id, tmp_path / "avatar")
+    client = TestClient(app)
+    resp = client.post(
+        f"/v1/assistants/{assistant_id}/avatar/candidates",
+        json={"user_request": "换头像", "reference_image": 42},
+    )
+    assert resp.status_code == 400
+    assert "base64" in resp.json()["error"]["detail"]
+
+
+def test_post_avatar_candidates_invalid_base64_returns_400(app: Starlette, tmp_path: Path) -> None:
+    assistant_id = "asst_bad_b64"
+    _register_service(assistant_id, tmp_path / "avatar")
+    client = TestClient(app)
+    resp = client.post(
+        f"/v1/assistants/{assistant_id}/avatar/candidates",
+        json={"user_request": "换头像", "reference_image": "not-valid-base64!!!"},
+    )
+    assert resp.status_code == 400
+    assert "base64" in resp.json()["error"]["detail"]
+
+
 # ── /avatar/set ──────────────────────────────────────────────
 
 
@@ -292,6 +365,20 @@ def test_post_avatar_set_unknown_candidate_returns_409(app: Starlette, tmp_path:
     )
     assert resp.status_code == 409
     assert "candidate not found" in resp.json()["error"]["detail"]
+
+
+def test_post_avatar_set_non_string_candidate_id_returns_400(
+    app: Starlette, tmp_path: Path
+) -> None:
+    assistant_id = "asst_set_bad_type"
+    _register_service(assistant_id, tmp_path / "avatar")
+    client = TestClient(app)
+    resp = client.post(
+        f"/v1/assistants/{assistant_id}/avatar/set",
+        json={"candidate_id": 123},
+    )
+    assert resp.status_code == 400
+    assert "字符串" in resp.json()["error"]["detail"]
 
 
 # ── /avatar/clear ────────────────────────────────────────────
@@ -333,6 +420,20 @@ def test_get_avatar_file_serves_png(app: Starlette, tmp_path: Path) -> None:
     assert resp.content == b"\x89PNG-fake-bytes"
 
 
+def test_get_avatar_file_serves_mp4_with_video_content_type(app: Starlette, tmp_path: Path) -> None:
+    assistant_id = "asst_file_mp4"
+    base_dir = tmp_path / "avatar"
+    _register_service(assistant_id, base_dir)
+    target = base_dir / "video" / "cand-9.mp4"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(b"fake-mp4-bytes")
+    client = TestClient(app)
+    resp = client.get(f"/v1/assistants/{assistant_id}/avatar/files/video/cand-9.mp4")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "video/mp4"
+    assert resp.content == b"fake-mp4-bytes"
+
+
 def test_get_avatar_file_rejects_path_traversal(app: Starlette, tmp_path: Path) -> None:
     assistant_id = "asst_trav"
     _register_service(assistant_id, tmp_path / "avatar")
@@ -349,6 +450,44 @@ def test_get_avatar_file_rejects_disallowed_path(app: Starlette, tmp_path: Path)
     resp = client.get(f"/v1/assistants/{assistant_id}/avatar/files/state.json")
     assert resp.status_code == 400
     assert resp.json()["error"]["type"] == "invalid_request"
+
+
+# ── 鉴权与归属（ADR-0252 D4/D6） ────────────────────────────
+
+
+def test_unauthenticated_requests_rejected_401(app: Starlette, tmp_path: Path) -> None:
+    assistant_id = "asst_auth_401"
+    _register_service(assistant_id, tmp_path / "avatar")
+    _enable_auth(app)
+    client = TestClient(app)
+    for method, url in _avatar_urls(assistant_id):
+        resp = client.request(method, url)
+        assert resp.status_code == 401, f"{method} {url} -> {resp.status_code}"
+        assert resp.json()["error"]["type"] == "auth"
+
+
+def test_cross_user_access_rejected_404(app: Starlette, tmp_path: Path) -> None:
+    assistant_id = "asst_auth_owner_bob"
+    _register_service(assistant_id, tmp_path / "avatar")
+    app.state.assistant_ownership = _FakeOwnership({assistant_id: "bob"})
+    _enable_auth(app)
+    client = TestClient(app)
+    for method, url in _avatar_urls(assistant_id):
+        resp = client.request(method, url, headers=_auth_headers("alice"))
+        assert resp.status_code == 404, f"{method} {url} -> {resp.status_code}"
+        assert resp.json()["error"]["code"] == "assistant_not_found"
+
+
+def test_owner_can_access_avatar(app: Starlette, tmp_path: Path) -> None:
+    assistant_id = "asst_auth_owner_alice"
+    svc = _register_service(assistant_id, tmp_path / "avatar")
+    svc.state = svc.state.model_copy(update={"candidates": [svc._candidate("cand-1")]})
+    app.state.assistant_ownership = _FakeOwnership({assistant_id: "alice"})
+    _enable_auth(app)
+    client = TestClient(app)
+    resp = client.get(f"/v1/assistants/{assistant_id}/avatar", headers=_auth_headers("alice"))
+    assert resp.status_code == 200
+    assert resp.json()["assistant_id"] == assistant_id
 
 
 # ── resolve_safe_path 单测 ───────────────────────────────────
