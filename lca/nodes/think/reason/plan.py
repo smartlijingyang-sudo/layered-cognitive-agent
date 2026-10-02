@@ -11,6 +11,7 @@ ADR-0218 §3.3:节点 plugin 由作者显式书写完整 ``@plugin(...)`` 装饰
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -23,6 +24,7 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
+from lca.contracts.models.cognition.reasoner_turn import ReasonerTurnPlan
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -44,7 +46,7 @@ class ThinkReasonPlanExecutor:
     # ADR-0219 §5.5: typed port contract declared on the plugin (graph
     # layer does not know port names; it only knows topology).
     declared_inputs: tuple[PortName, ...] = ()
-    declared_outputs: tuple[PortName, ...] = ("turn_plan",)
+    declared_outputs: tuple[PortName, ...] = (PortName("turn_plan"),)
 
     async def node_execute(
         self,
@@ -66,13 +68,15 @@ class ThinkReasonPlanExecutor:
         build = getattr(reasoner, "build_turn_plan", None) if reasoner is not None else None
         if reasoner is None or state is None or not callable(build):
             return NodeOutput(port_values={})
-        plan = build(state)
+        # Seam: reasoner arrives via runtime carrier; its contract is
+        # build_turn_plan -> ReasonerTurnPlan (cognition/brain/reasoner/reasoner.py).
+        plan = cast("ReasonerTurnPlan", build(state))
         _log.debug(
             "think.reason.plan emitted turn_plan template_id=%s decision_path=%s",
             plan.template_id,
             plan.decision_path,
         )
-        return NodeOutput(port_values={"turn_plan": plan})
+        return NodeOutput(port_values={PortName("turn_plan"): plan})
 
 
 @plugin(
