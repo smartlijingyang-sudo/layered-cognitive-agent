@@ -15,18 +15,19 @@ machinery.
 Default behavior: a stub that echoes the target agent. Production
 wiring replaces ``executor`` with the actual team machinery at boot.
 """
+
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+from lca.cognition.wire.close_out_adapter import CloseOutAdapter
 from lca.contracts.protocols.agent.client import (
     AgentRequest,
     AgentResponse,
 )
-from lca.cognition.wire.close_out_adapter import CloseOutAdapter
-
+from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 
 AgentExecutor = Any  # callable(request) -> response; typed by host
 
@@ -79,7 +80,7 @@ def _stub_consult(request: AgentRequest) -> AgentResponse:
     return AgentResponse(
         source_agent=request.target_agent,
         status="ok",
-        payload={"response": f"echo:{request.target_agent}"},
+        payload={PortName("response"): f"echo:{request.target_agent}"},
     )
 
 
@@ -108,7 +109,7 @@ def _to_response(
     return AgentResponse(
         source_agent=source,
         status="ok",
-        payload={"response": raw},
+        payload={PortName("response"): raw},
     )
 
 
