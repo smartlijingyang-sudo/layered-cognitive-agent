@@ -164,13 +164,16 @@ const styles = createStaticStyles(({ css, cssVar }) => {
     connectorCard: css`
       background: ${cssVar.colorBgContainer};
       border: 1px solid ${cssVar.colorBorderSecondary};
-      border-radius: 12px;
+      border-radius: 14px;
       padding: 14px 16px;
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      box-sizing: border-box;
 
       &:hover {
         border-color: ${cssVar.colorPrimaryBorder};
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+        transform: translateY(-1px);
       }
     `,
     cardHeader: css`
@@ -185,9 +188,9 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       gap: 10px;
     `,
     iconBox: css`
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -213,7 +216,9 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       align-items: center;
       justify-content: space-between;
       padding-top: 10px;
+      margin-top: 6px;
       border-top: 1px solid ${cssVar.colorBorderSecondary};
+      gap: 12px;
     `,
     switchRow: css`
       display: flex;
@@ -221,6 +226,7 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       gap: 8px;
       font-size: 12px;
       color: ${cssVar.colorTextTertiary};
+      flex: 1;
     `,
     toolsCollapse: css`
       margin-top: 10px;
@@ -251,6 +257,25 @@ const styles = createStaticStyles(({ css, cssVar }) => {
     `,
   };
 });
+
+const getBrandBg = (type: string) => {
+  switch (type) {
+    case 'gmail':
+      return 'rgba(234, 67, 53, 0.1)';
+    case 'googledrive':
+      return 'rgba(0, 172, 71, 0.1)';
+    case 'github':
+      return 'rgba(0, 0, 0, 0.06)';
+    case 'slack':
+      return 'rgba(224, 30, 90, 0.1)';
+    case 'notion':
+      return 'rgba(0, 0, 0, 0.06)';
+    case 'companion':
+      return 'rgba(114, 46, 209, 0.1)';
+    default:
+      return 'rgba(22, 119, 255, 0.1)';
+  }
+};
 
 /**
  * 品牌图标组件
@@ -335,8 +360,12 @@ export const ConnectorsPanel = memo<ConnectorsPanelProps>(({ assistantId, classN
         const activeApps = new Set<string>();
         if (Array.isArray(data?.connections)) {
           for (const conn of data.connections) {
-            if (conn.status === 'ACTIVE' || conn.status === 'CONNECTED') {
-              activeApps.add((conn.appName || '').toLowerCase());
+            const status = conn?.customParams?.composio?.status || conn?.status;
+            const normId = (conn?.identifier || conn?.appName || conn?.app_slug || '')
+              .toLowerCase()
+              .replace(/[^a-z0-9]/g, '');
+            if (status === 'ACTIVE' || status === 'CONNECTED') {
+              activeApps.add(normId);
             }
           }
         }
@@ -344,7 +373,8 @@ export const ConnectorsPanel = memo<ConnectorsPanelProps>(({ assistantId, classN
         setConnectors((prev) =>
           prev.map((item) => {
             if (item.category === 'cloud') {
-              const isConn = activeApps.has(item.id.toLowerCase());
+              const itemId = item.id.toLowerCase().replace(/[^a-z0-9]/g, '');
+              const isConn = activeApps.has(itemId);
               return { ...item, connected: isConn };
             }
             return item;
@@ -379,19 +409,26 @@ export const ConnectorsPanel = memo<ConnectorsPanelProps>(({ assistantId, classN
       }
       try {
         setLoading(true);
-        const res = await fetch(`/lca-api/composio/connect/${item.id}`, {
+        const lcaId = item.id === 'googledrive' ? 'google-drive' : item.id;
+        const res = await fetch('/lca-api/composio/connections', {
           method: 'POST',
           headers: {
+            'Content-Type': 'application/json',
             Authorization: 'Bearer dev_local_token',
             'x-lca-token': 'dev_local_token',
             'x-lca-user-id': 'dev_user',
           },
+          body: JSON.stringify({ identifier: lcaId }),
         });
         if (res.ok) {
           const data = await res.json();
-          if (data?.authUrl) {
-            window.open(data.authUrl, `OAuth_${item.name}`, 'width=620,height=720');
+          const redirectUrl = data?.redirectUrl || data?.authUrl;
+          if (redirectUrl) {
+            window.open(redirectUrl, `OAuth_${item.name}`, 'width=620,height=720');
             antMessage.info(`已开启 ${item.name} 授权窗口，完成授权后点击“刷新状态”`);
+          } else if (data?.status === 'ACTIVE') {
+            antMessage.success(`${item.name} 已授权连接！`);
+            await refreshConnections();
           }
         } else {
           antMessage.warning(`正在引导发起 ${item.name} 授权，请稍候`);
@@ -402,7 +439,7 @@ export const ConnectorsPanel = memo<ConnectorsPanelProps>(({ assistantId, classN
         setLoading(false);
       }
     },
-    [],
+    [refreshConnections],
   );
 
   const connectedCount = useMemo(
@@ -426,7 +463,7 @@ export const ConnectorsPanel = memo<ConnectorsPanelProps>(({ assistantId, classN
       {/* 顶部统计与刷新栏 */}
       <div className={styles.topSummary}>
         <div className={styles.summaryText}>
-          ⚡ 全局连接器生态：
+          ⚡ 外部生态连接：
           <Tag color="success" style={{ marginLeft: 6 }}>
             已连接 {connectedCount} / {connectors.length}
           </Tag>
@@ -454,7 +491,7 @@ export const ConnectorsPanel = memo<ConnectorsPanelProps>(({ assistantId, classN
           <div key={item.id} className={styles.connectorCard}>
             <div className={styles.cardHeader}>
               <div className={styles.brandBlock}>
-                <div className={styles.iconBox}>
+                <div className={styles.iconBox} style={{ background: getBrandBg(item.iconType) }}>
                   <ConnectorIcon type={item.iconType} />
                 </div>
                 <div>
@@ -469,9 +506,13 @@ export const ConnectorsPanel = memo<ConnectorsPanelProps>(({ assistantId, classN
 
               <div>
                 {item.connected ? (
-                  <Tag color="success">🟢 已连接</Tag>
+                  <Tag color="success" style={{ margin: 0, borderRadius: 6 }}>
+                    🟢 已连接
+                  </Tag>
                 ) : (
-                  <Tag color="default">⚪ 未连接</Tag>
+                  <Tag color="default" style={{ margin: 0, borderRadius: 6 }}>
+                    ⚪ 未配置
+                  </Tag>
                 )}
               </div>
             </div>
@@ -509,13 +550,14 @@ export const ConnectorsPanel = memo<ConnectorsPanelProps>(({ assistantId, classN
                 />
               </div>
 
-              <div>
+              <div style={{ flexShrink: 0 }}>
                 {!item.connected ? (
                   <Button
                     size="small"
                     type="primary"
                     onClick={() => handleConnect(item)}
                     loading={loading}
+                    style={{ borderRadius: 8, padding: '0 12px' }}
                   >
                     立即连接
                   </Button>
@@ -523,7 +565,12 @@ export const ConnectorsPanel = memo<ConnectorsPanelProps>(({ assistantId, classN
                   <Button
                     size="small"
                     type="text"
-                    style={{ color: '#52c41a' }}
+                    style={{
+                      color: '#52c41a',
+                      background: 'rgba(82, 196, 26, 0.08)',
+                      borderRadius: 8,
+                      padding: '0 10px',
+                    }}
                     onClick={() => refreshConnections()}
                   >
                     ✓ 运行中
