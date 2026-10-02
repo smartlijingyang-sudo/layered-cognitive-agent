@@ -112,9 +112,11 @@ def test_health_payload_event_bus_dropped_sets_degraded(
     def _fake_snapshot(self: Any) -> dict[str, dict[str, int]]:
         return fake_snapshot
 
-    monkeypatch.setattr("lca_kernel.events.EventBus.delivery_snapshot", _fake_snapshot)
-    # Force the lazy lookup inside _read_event_bus_health to use the patched class.
-    monkeypatch.setattr("lca_kernel.events.bus.EventBus.delivery_snapshot", _fake_snapshot)
+    # ADR-0268: bus renamed to EnvelopeBus; production calls
+    # ``lca_kernel.events.EnvelopeBus.default().delivery_snapshot()``
+    # directly, so the patch target must be EnvelopeBus (patching the
+    # EventBus compat shim subclass would not affect the base class).
+    monkeypatch.setattr("lca_kernel.events.EnvelopeBus.delivery_snapshot", _fake_snapshot)
 
     body = client.get("/health").json()
     assert body["status"] == "degraded"
@@ -172,12 +174,12 @@ def test_health_payload_plugin_block_reports_fiber_count_separate_from_event_reg
 def test_health_payload_event_bus_missing_graceful(
     monkeypatch: pytest.MonkeyPatch, client: TestClient
 ) -> None:
-    """If EventBus.delivery_snapshot raises, health still returns the core shape."""
+    """If EnvelopeBus.delivery_snapshot raises, health still returns the core shape."""
 
     def _boom(self: Any) -> dict[str, dict[str, int]]:
         raise RuntimeError("event bus unavailable")
 
-    monkeypatch.setattr("lca_kernel.events.bus.EventBus.delivery_snapshot", _boom)
+    monkeypatch.setattr("lca_kernel.events.EnvelopeBus.delivery_snapshot", _boom)
 
     body = client.get("/health").json()
     assert body["status"] == "ok"
