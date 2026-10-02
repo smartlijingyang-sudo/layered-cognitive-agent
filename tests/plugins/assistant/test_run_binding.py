@@ -146,13 +146,13 @@ class TestValidateAssistantBinding:
         request = _request_with_catalog(catalog)
         assert _validate_assistant_binding(request, handle.assistant_id) is None
 
-    def test_digest_mismatch_returns_409(self, catalog: AssistantCatalogImpl) -> None:
+    def test_digest_mismatch_auto_heals(self, catalog: AssistantCatalogImpl) -> None:
+        # 143f6697e 起 catalog.get 为 auto-heal：篡改后校验通过（None），不再返回 409
         handle = catalog.create(CreateAssistantRequest(name="篡改目标"))
         soul = Path(handle.home_path) / "SOUL.md"
         soul.write_text(soul.read_text(encoding="utf-8") + "\n# tampered", encoding="utf-8")
         request = _request_with_catalog(catalog)
-        response = _validate_assistant_binding(request, handle.assistant_id)
-        assert response is not None and response.status_code == 409
+        assert _validate_assistant_binding(request, handle.assistant_id) is None
 
 
 class TestRunAmbitAssistantId:

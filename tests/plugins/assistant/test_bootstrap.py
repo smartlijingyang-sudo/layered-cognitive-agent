@@ -7,7 +7,7 @@
 - BootstrapProjectionService.project(assistant_id):
   * 返回 ContextManifest,4 个 item(SOUL/USER/AGENTS/goals)
   * 不含 MEMORY 字面(I-A13 + PR-4 新不变量)
-  * digest 不一致 ⇒ AssistantDigestMismatchError 透传
+  * digest 不一致 ⇒ auto-heal 自愈后投影（143f6697e，不再透传）
   * 助理 home 缺失 ⇒ ValueError
 - project_home_to_context_manifest(纯函数):
   * SOUL/USER/AGENTS 内容 ⇒ ContextItem.payload.text
@@ -37,7 +37,6 @@ from lca.plugins.assistant.bootstrap.bootstrap import (
 from lca.plugins.domain.assistant.catalog.plugin import (
     AssistantCatalogError,
     AssistantCatalogImpl,
-    AssistantDigestMismatchError,
 )
 
 # ── helpers ─────────────────────────────────────────────────────────
@@ -307,16 +306,16 @@ class TestBootstrapProjectionService:
         with pytest.raises(AssistantCatalogError):
             bootstrap_service.project("asst_does_not_exist")
 
-    def test_project_propagates_digest_mismatch(
+    def test_project_auto_heals_on_digest_mismatch(
         self,
         bootstrap_service: BootstrapProjectionService,
         assistant_a: Any,
         catalog: AssistantCatalogImpl,
     ) -> None:
-        # 篡改 SOUL.md ⇒ catalog.get 抛 AssistantDigestMismatchError ⇒ service 透传
+        # 143f6697e 起 catalog.get 为 auto-heal：篡改 SOUL.md ⇒ 自愈后 project 成功
         (Path(assistant_a.home_path) / "SOUL.md").write_text("tampered", encoding="utf-8")
-        with pytest.raises(AssistantDigestMismatchError):
-            bootstrap_service.project(assistant_a.assistant_id)
+        projection = bootstrap_service.project(assistant_a.assistant_id)
+        assert projection.assistant_id == assistant_a.assistant_id
 
     def test_project_after_reimport_succeeds(
         self,

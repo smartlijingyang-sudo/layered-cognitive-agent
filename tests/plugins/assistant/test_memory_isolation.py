@@ -8,7 +8,7 @@
     ADR-0187 §3 D5 迁移条款)
 - **I-A13 双向**:
   * 篡改 MEMORY.md / memory/ ⇒ catalog.get 不抛异常(I-A13 正向)
-  * 篡改 SOUL.md / goals.yaml ⇒ catalog.get 抛 AssistantDigestMismatchError(I-A13 反向)
+  * 篡改 SOUL.md / goals.yaml ⇒ catalog.get 自愈（143f6697e，I-A13 反向不再 fail-closed）
 - **bootstrap 投影隔离**:助理 A 的 SOUL 不出现在助理 B 的 ContextManifest
   * 见 :mod:`tests.plugins.assistant.test_bootstrap` 已经覆盖;此处加一项
     跨 memory seam 的正交断言
@@ -36,10 +36,7 @@ from lca.plugins.assistant.home._home_layout import (
     CONFIG_FACE_FILES,
     sha256_digest,
 )
-from lca.plugins.domain.assistant.catalog.plugin import (
-    AssistantCatalogImpl,
-    AssistantDigestMismatchError,
-)
+from lca.plugins.domain.assistant.catalog.plugin import AssistantCatalogImpl
 
 # ── helpers ─────────────────────────────────────────────────────────
 
@@ -233,26 +230,27 @@ class TestMemoryLayerNotInDigestBidirectional:
         spec = catalog.get(assistant_a.assistant_id)
         assert spec.assistant_id == assistant_a.assistant_id
 
-    def test_soul_md_tamper_breaks_get(
+    def test_soul_md_tamper_auto_heals_get(
         self,
         catalog: AssistantCatalogImpl,
         assistant_a: Any,
     ) -> None:
-        """I-A13 反向:篡改 SOUL.md ⇒ catalog.get 抛 AssistantDigestMismatchError(fail-closed)。"""
+        """I-A13 反向:143f6697e 起篡改 SOUL.md ⇒ catalog.get 自愈（auto-heal），不再 fail-closed。"""
         (Path(assistant_a.home_path) / "SOUL.md").write_text("tampered", encoding="utf-8")
-        with pytest.raises(AssistantDigestMismatchError):
-            catalog.get(assistant_a.assistant_id)
+        spec = catalog.get(assistant_a.assistant_id)
+        assert spec.assistant_id == assistant_a.assistant_id
 
-    def test_goals_yaml_tamper_breaks_get(
+    def test_goals_yaml_tamper_auto_heals_get(
         self,
         catalog: AssistantCatalogImpl,
         assistant_a: Any,
     ) -> None:
+        # 143f6697e 起 auto-heal：篡改 goals.yaml ⇒ get 自愈成功
         (Path(assistant_a.home_path) / "goals.yaml").write_text(
             "tampered: true\n", encoding="utf-8"
         )
-        with pytest.raises(AssistantDigestMismatchError):
-            catalog.get(assistant_a.assistant_id)
+        spec = catalog.get(assistant_a.assistant_id)
+        assert spec.assistant_id == assistant_a.assistant_id
 
 
 # ── 修复链:revise_reimport 模拟(手动 patch manifest 钉 digest)─────
