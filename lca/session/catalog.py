@@ -5,7 +5,6 @@ Known-type closure and read-path fail-closed validation.
 
 from __future__ import annotations
 
-from lca.contracts.harness import memory as _memory_events
 from lca.contracts.harness.tasks.session import event_registry
 from lca_kernel.events.fold.fold import SURFACE_EVENT_TYPES
 from lca_kernel.events.payloads.spine import SPINE_EVENT_CATEGORIES, SPINE_EXECUTION_POINTS
