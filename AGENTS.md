@@ -104,7 +104,7 @@ contracts → infrastructure → cognition → runtime → agent
 | C13 | 信息血统闭合 | 任一跨边界传递(emit / fold / slot / transport / dispatch)必能静态回答 D1 定义点 / D2 约束 / D3 转换链 / D4 消费者四问,且必经 typed Contract(Pydantic frozen, `extra="forbid"`);无 Contract 跨边界 = fail-loud;详见 ADR-0195 §1.4 |
 | C14 | 图与业务隔离 | 图框架不知道业务，业务不感知图框架，互不侵入 |
 
-**闭集(六语义 phase):** `perceive → think → act → reflect → remember`;Gate 是 Think 原语子链(`DecisionGate`,非 graph node)。插件可替换实现,不能无 ADR 增加步骤或核心事件词表。
+**闭集(五语义 phase):** `perceive → think → act → reflect → remember`;Gate 是 Think 原语子链(`DecisionGate`,非 graph node)。插件可替换实现,不能无 ADR 增加步骤或核心事件词表。
 
 **扩展路径:** `Protocol → Seam → Provider / Adapter → Registry → Plugin → Profile / Bundle`。密钥只能经 Profile `{from_env: ...}` 进入;插件不得自行读取 `os.environ`。
 
