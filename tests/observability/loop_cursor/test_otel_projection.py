@@ -20,13 +20,13 @@ from lca.infrastructure.observability.loop_cursor.projections.otel_projection im
 from lca.infrastructure.observability.spine.event.record import EventRecord
 
 
-def _snap(seq: int = 0, step_id: str | None = "s1") -> CursorSnapshot:
+# Step identity rides on the EventRecord (hook-driven), never on the
+# snapshot — CursorSnapshot exposes no step fields (contract pinned).
+def _snap(seq: int = 0) -> CursorSnapshot:
     return CursorSnapshot(
         run_id="r",
         trace_id="t",
         incarnation=1,
-        step_id=step_id,
-        step_index=1,
         iteration=1,
         attempt_in_step=0,
         phase="think",  # type: ignore[arg-type]
@@ -36,7 +36,9 @@ def _snap(seq: int = 0, step_id: str | None = "s1") -> CursorSnapshot:
     )
 
 
-def _record(*, ep: str, seq: int, payload: dict[str, Any] | None = None) -> EventRecord:
+def _record(
+    *, ep: str, seq: int, payload: dict[str, Any] | None = None, step_id: str | None = None
+) -> EventRecord:
     now = datetime.now(UTC)
     return EventRecord(
         execution_point=ep,
@@ -51,7 +53,7 @@ def _record(*, ep: str, seq: int, payload: dict[str, Any] | None = None) -> Even
         when_corrected=now,
         prev_event_hash=None,
         run_id="r",
-        step_id=None,
+        step_id=step_id,
         payload=payload or {},
     )
 

@@ -66,7 +66,8 @@ class OtelProjection:
             spans.append(
                 {
                     "name": "lca.llm.step",
-                    "step_id": snapshot.step_id,
+                    "step_id": record.step_id,  # hook-driven step identity lives on the
+                    # record; CursorSnapshot exposes no step fields
                     "sequence": record.sequence,
                     "attributes": _extract_attributes(record.payload),
                     "events": [],
@@ -77,7 +78,8 @@ class OtelProjection:
             spans.append(
                 {
                     "name": "lca.step.thinking",
-                    "step_id": snapshot.step_id,
+                    "step_id": record.step_id,  # hook-driven step identity lives on the
+                    # record; CursorSnapshot exposes no step fields
                     "sequence": record.sequence,
                     "attributes": _extract_attributes(record.payload),
                     "events": [],
@@ -88,7 +90,8 @@ class OtelProjection:
             spans.append(
                 {
                     "name": f"lca.{record.execution_point}",
-                    "step_id": snapshot.step_id,
+                    "step_id": record.step_id,  # hook-driven step identity lives on the
+                    # record; CursorSnapshot exposes no step fields
                     "sequence": record.sequence,
                     "attributes": _extract_attributes(record.payload),
                     "events": [],

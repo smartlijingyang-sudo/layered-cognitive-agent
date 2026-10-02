@@ -12,13 +12,11 @@ from lca.infrastructure.observability.loop_cursor.projections.otel_projection im
 from lca.infrastructure.observability.spine.event.record import EventRecord
 
 
-def _snap(*, step_id: str = "step_1") -> CursorSnapshot:
+def _snap() -> CursorSnapshot:
     return CursorSnapshot(
         run_id="run_otel",
         trace_id="trace_otel",
         incarnation=1,
-        step_id=step_id,
-        step_index=1,
         iteration=1,
         attempt_in_step=0,
         phase="think",  # type: ignore[arg-type]
