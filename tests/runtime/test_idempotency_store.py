@@ -68,11 +68,11 @@ async def test_gateway_reuses_receipt_after_runtime_reconstruction(tmp_path) -> 
         EffectPolicyPlan,
     )
     from lca.harness.declarative.execute.dispatch import RegistryEffectDispatcher
-    from lca.loop.driver import RuntimePhaseCapabilities
     from lca.plugins.act.effect.handlers_provider import (
         InMemoryEffectHandlerRegistry,
         register_default_effect_handlers,
     )
+    from lca.runtime.support.runtime_bindings import RuntimePhaseCapabilities
 
     class Body:
         calls = 0
