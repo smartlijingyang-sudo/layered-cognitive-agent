@@ -20,9 +20,9 @@ import logging
 import os
 import socket
 import time
-from datetime import datetime, timezone, UTC
-from pathlib import Path
 from collections.abc import Callable
+from datetime import UTC, datetime
+from pathlib import Path
 
 from lca.cognition.proactive.worthiness import decide
 from lca.contracts.models.proactive.message import ProactiveMessage
@@ -198,7 +198,7 @@ class ProactiveScheduler:
                 job.target,
                 annotate_unretrieved=verdict.annotate_unretrieved,
             )
-        except Exception as exc:  # noqa: BLE001 — 失败转重试/死信，不炸 tick
+        except Exception as exc:  # 失败转重试/死信，不炸 tick
             js["last_error"] = str(exc)
             _log.warning("proactive.deliver_failed job_id=%s", job.id, exc_info=True)
             return "failed"

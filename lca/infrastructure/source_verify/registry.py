@@ -7,7 +7,7 @@ ProvenanceGuard 的第一原则: 绝不把证据塌缩成一个匿名上下文.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone, UTC
+from datetime import UTC, datetime
 from typing import Any
 
 from lca.contracts.models.cognition.source_verify import SourceKind, SourceRef

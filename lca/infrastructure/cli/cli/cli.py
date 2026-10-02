@@ -25,7 +25,7 @@ import typer
 # look up via ``build_pipeline``. The modules themselves never reference
 # step functions by name; the import here is the only place that wires
 # the registry before any command runs.
-import lca.infrastructure.cli.steps.steps
+import lca.infrastructure.cli.steps.steps  # noqa: F401
 from lca.infrastructure.cli.commands import (
     assistants,
     audit,

@@ -161,7 +161,7 @@ def _in_quiet_hours(policy: ProactivePolicy, now: datetime | None) -> bool:
     """是否落在 quiet hours 内（处理跨午夜；起止相同视为未设置）。"""
     try:
         tz = ZoneInfo(policy.timezone)
-    except Exception:  # noqa: BLE001 — 时区配错不炸 tick，降级为不限流并记 warning
+    except Exception:  # 时区配错不炸 tick，降级为不限流并记 warning
         _log.warning("proactive.bad_timezone timezone=%r", policy.timezone)
         return False
     if now is None:

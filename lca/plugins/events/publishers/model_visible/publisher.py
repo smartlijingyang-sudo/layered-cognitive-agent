@@ -50,7 +50,7 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 # Eager import 让 hook 模块的 module-level forward-ref rebuild 在 publisher
 # import 时跑(测试 / 业务方直接调 SpineLlmRequestHeaderPayload 不再需要
 # 先 model_rebuild)。
-from lca.plugins.events.hooks.model_visible import (
+from lca.plugins.events.hooks.model_visible import (  # noqa: F401
     hook as _hook_module,
 )
 

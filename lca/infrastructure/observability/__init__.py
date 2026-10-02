@@ -213,6 +213,7 @@ __all__ = [
     "EventPlane",
     "EventProjection",
     "EventSensitivity",
+    "EvidenceBinding",
     "InMemoryEventDescriptorRegistry",
     "InMemoryJournalStore",
     "JournalEvent",

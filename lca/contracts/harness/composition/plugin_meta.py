@@ -24,9 +24,7 @@ The schema (per spec §13.3.1):
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
-
-from typing import NotRequired
+from typing import Literal, NotRequired, TypedDict
 
 # Plugin layer taxonomy (spec §3.5).
 PluginLayer = Literal[
