@@ -26,7 +26,10 @@ from lca.infrastructure.memory.contextfiles.domain.sidechat import (
 )
 from lca.infrastructure.memory.contextfiles.events.publisher import SideChatRecorded
 from lca.infrastructure.memory.contextfiles.ports.events import DomainEventPublisher
-from lca.infrastructure.memory.contextfiles.ports.file_store import FileStore
+from lca.infrastructure.memory.contextfiles.ports.file_store import (
+    FileSnapshot,
+    FileStore,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +136,7 @@ def _record_id(content: str) -> str:
     return f"sc-{digest}"
 
 
-def _version(snapshot: object | None) -> FileVersion | None:
+def _version(snapshot: FileSnapshot | None) -> FileVersion | None:
     if snapshot is None:
         return None
     return FileVersion(path=str(snapshot.path), mtime_ns=int(snapshot.mtime_ns))
