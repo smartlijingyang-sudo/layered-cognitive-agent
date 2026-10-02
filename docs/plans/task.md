@@ -467,3 +467,10 @@
 | DRAWER-TASK-5 | Implement `⚖️ 批准` & `⏰ 即将到来` Panels | Completed | 落地 ⚖️ 批准记录面板（待审批/已批准/已拒绝）与 ⏰ 即将到来定时计划面板（对接 /jobs 端点，支持开关切换与计划说明），commit 68232c9c9 |
 | DRAWER-TASK-6 | Upgrade `ConnectorsPanel.tsx` UI & Prevent Button Overflow | Completed | 连接器卡片升级微质感风格（独立品牌背景色、状态徽标、工具折叠），底部控制栏弹性间隙与 flexShrink:0 保证“立即连接”按钮绝不贴边或溢出，commit 68232c9c9 |
 | DRAWER-TASK-7 | Patch Engine Synchronization & Verification | Completed | patch_lobehub.py 成功编译同步至 lobehub-ui/（39 ok, 0 broken），16/16 单元与场景测试 100% 全绿（耗时 2.83s） |
+
+| STATUS-SCREEN-BRAINSTORM-CONTEXT | 步骤 1：排查项目上下文与现有机制（Session/Spine事件流、WebSocket、ADR-0268 cron投影、审批引擎） | Completed | 已摸清 LCA 单轨事件、EventTranslator、/v1/runs/{run_id}/ws、CronListItem 投影与现有 Drawer 现状 |
+| STATUS-SCREEN-BRAINSTORM-QUESTIONS | 步骤 2：针对统一事件日志、WebSocket通信范围与Tab结构提出澄清问题（单步提问） | Completed | 确定采用投影模式、快照API+运行期WS增量Patch方案，并保持5 Tab结构 |
+| STATUS-SCREEN-BRAINSTORM-APPROACHES | 步骤 3：提炼 2-3 种系统落地与可观测性投影架构方案并给出推荐 | Completed | 用户选定方案 A（单轨事实投影器 + 流式协议增量扩展） |
+| STATUS-SCREEN-BRAINSTORM-DESIGN-SECTIONS | 步骤 4：逐步呈现分节设计规范（Owns/Does NOT own/统一日志/增量WS/人话规则/不变量）并呈批 | Completed | 全部 3 节设计规范均获用户审核批准 |
+| STATUS-SCREEN-BRAINSTORM-DESIGN-DOC | 步骤 5：沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-02-status-screen-unified-event-log-design.md 并提交 git |
+| STATUS-SCREEN-BRAINSTORM-TRANSITION | 步骤 6：转入实施阶段（调用 writing-plans 制定落地计划） | In_Progress | 正在调用 writing-plans 制定分任务实施计划 |
