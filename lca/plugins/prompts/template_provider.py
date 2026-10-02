@@ -47,12 +47,15 @@ def _builtin_section_refs() -> tuple[tuple[str, str, bool, str | None], ...]:
     """
 
     return (
-        # react_prompt (no-LLM-supplied team sections)
+        # react_prompt (no-LLM-supplied team sections)。
+        # ADR-0265 §7 目标顺序：B1–B8 带序单调——
+        # role→backstory→goal→current_date→developer_timestamp→user_profile→home→
+        # autonomous_presets→tools→cloud_sandbox→available_skills→activated_skills→
+        # task→context→react_workflow→react_tool_usage_guidelines→memory_retrieval→
+        # skill_duty→vocal_contract（尾段）→runtime_env。
         ("role", "pure", False, None),
-        ("goal", "pure", False, None),
         ("backstory", "pure", False, None),
-        # ADR-0248：gated 模式声带契约（非 gated 渲染为空，零侵入）
-        ("vocal_contract", "stateful", True, ""),
+        ("goal", "pure", False, None),
         ("current_date", "stateful", False, None),
         # ADR-0265 §7 D1 决议②：developer_timestamp 是"now"唯一可信来源
         # （ADR-0259 C1 不变量），不许为可选；移入 B3 时间锚点带（current_date 旁），
@@ -103,12 +106,17 @@ def _builtin_templates() -> Mapping[str, _PromptTemplate]:
             for (n, k, o, f) in sl
         )
 
-    react_section_count = 14  # base gains developer_timestamp at B3
+    react_section_count = 13  # ADR-0265 §7：vocal_contract 移入尾段，react 基座剩 13 段
+    # ADR-0265 §7：B4 组（user_profile/home/autonomous_presets）插在 B3 之后、
+    # B5（tools…）之前。base 前 5 段为 B1–B3（role/backstory/goal/current_date/
+    # developer_timestamp），B4 组拼在其后，再接 base 剩余的 B5–B7 段。
+    b1_b3_count = 5
     routing_extra = 4  # teammates, assigned_roles, member_reports, routing_instructions
     hierarchical_extra = 4  # member_status, evidence_pack, hierarchical_instructions (+ extra)
     home_ref = (("home", "stateful", True, ""),)
     autonomous_presets_ref = (("autonomous_presets", "stateful", True, ""),)
     user_profile_ref = (("user_profile", "stateful", True, ""),)
+    b4_refs = user_profile_ref + home_ref + autonomous_presets_ref
     runtime_env_ref = (("runtime_env", "pure", True, ""),)
     # developer_timestamp 已移入 B3（见 _builtin_section_refs），不再是尾段；
     # runtime_env 留 B8 环境尾注（ADR-0265 §7 D1 决议②）。
@@ -118,16 +126,20 @@ def _builtin_templates() -> Mapping[str, _PromptTemplate]:
     # section 正常渲染为空仍按 strip_empty_fields 跳过（渲染路径行为不变）。
     memory_retrieval_ref = (("memory_retrieval", "stateful", False, ""),)
     skill_duty_ref = (("skill_duty", "stateful", True, ""),)
-    adr0255_tail = memory_retrieval_ref + skill_duty_ref + runtime_env_ref
+    # ADR-0248：gated 模式声带契约（非 gated 渲染为空，零侵入）。ADR-0265 §7
+    # 把 vocal_contract 定为 B7 行为规则段、落在 skill_duty 之后（原在 base
+    # 头部 current_date 之前，为 T1 倒置 vocal_contract(B7)->current_date(B3)）；
+    # 可选语义不变。
+    vocal_contract_ref = (("vocal_contract", "stateful", True, ""),)
+    adr0255_tail = memory_retrieval_ref + skill_duty_ref + vocal_contract_ref + runtime_env_ref
     return {
         "react_prompt": _PromptTemplate(
             id="react_prompt",
             variant=_variant_for("react_prompt"),
             sections=refs(
-                base[:react_section_count]
-                + user_profile_ref
-                + home_ref
-                + autonomous_presets_ref
+                base[:b1_b3_count]
+                + b4_refs
+                + base[b1_b3_count:react_section_count]
                 + adr0255_tail
             ),
         ),
@@ -135,11 +147,10 @@ def _builtin_templates() -> Mapping[str, _PromptTemplate]:
             id="routing_prompt",
             variant=_variant_for("routing_prompt"),
             sections=refs(
-                base[:react_section_count]
+                base[:b1_b3_count]
+                + b4_refs
+                + base[b1_b3_count:react_section_count]
                 + base[react_section_count : react_section_count + routing_extra]
-                + user_profile_ref
-                + home_ref
-                + autonomous_presets_ref
                 + adr0255_tail
             ),
         ),
@@ -147,15 +158,14 @@ def _builtin_templates() -> Mapping[str, _PromptTemplate]:
             id="hierarchical_prompt",
             variant=_variant_for("hierarchical_prompt"),
             sections=refs(
-                base[:react_section_count]
+                base[:b1_b3_count]
+                + b4_refs
+                + base[b1_b3_count:react_section_count]
                 + base[
                     react_section_count + routing_extra : react_section_count
                     + routing_extra
                     + hierarchical_extra
                 ]
-                + user_profile_ref
-                + home_ref
-                + autonomous_presets_ref
                 + adr0255_tail
             ),
         ),
@@ -206,12 +216,9 @@ def _validate_profile_template(
     2. optional 只许收紧（True→False），不许放松（False→True，如把 B3 段改为可选）；
     3. 新段不许出现在 B1（role/backstory）之前。
 
-    诚实注记：ADR C1 的全带序表（B1–B8）不在此强制——builtin 自身的段序
-    与带序表有 3 处倒置（T1 预期红，待 arch 轮架构解释裁决；原第 4 处
-    skill_duty(B7)->developer_timestamp(B3) 已由 §7 D1 落地消除，
-    developer_timestamp 现为 B3 必需段）；若按带序表强制，
-    逐字照抄 builtin 的合法 profile 会被误杀。故以 builtin 相对顺序
-    为基线，这是 C2 的可判定部分。
+    诚实注记：以 builtin 相对顺序为基线——builtin 已按 ADR-0265 §7 目标顺序
+    重排（B1–B8 带序单调，T1 转绿），基线与带序表一致；逐字照抄 builtin 的
+    合法 profile 不会被误杀。optional 收紧/放松与 B1 前置禁令见上。
     """
     builtin = builtins.get(tpl_cfg.id)
     refs = list(tpl_cfg.sections)
