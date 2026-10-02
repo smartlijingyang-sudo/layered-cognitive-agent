@@ -46,8 +46,8 @@ class ActValidateExecutor:
 
     semantic_name: str = "act.validate"
     region: str = "act"
-    declared_inputs: tuple[PortName, ...] = ("decision",)
-    declared_outputs: tuple[PortName, ...] = ("decision",)
+    declared_inputs: tuple[PortName, ...] = (PortName("decision"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("decision"),)
 
     async def node_execute(
         self,
@@ -60,7 +60,7 @@ class ActValidateExecutor:
         outputs 端口(yaml): decision (Decision)
         """
         del context
-        decision = input.port_values.get("decision")
+        decision = input.port_values.get(PortName("decision"))
         if not isinstance(decision, Decision):
             raise TypeError(
                 "act.validate: 'decision' port must be a Decision "
@@ -87,7 +87,7 @@ class ActValidateExecutor:
         if action_type in {ActionType.DELEGATE, ActionType.HANDOFF} and not decision.delegations:
             raise ValueError("act.validate: DELEGATE/HANDOFF action has no delegations")
 
-        return NodeOutput(port_values={"decision": decision})
+        return NodeOutput(port_values={PortName("decision"): decision})
 
 
 @plugin(
