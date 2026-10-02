@@ -211,6 +211,55 @@ async def onboarding_naming_settle(request: Request) -> JSONResponse:
             import logging
             logging.getLogger(__name__).warning("failed to revise profile during naming settle: %s", exc)
 
+    # 3. 主动欢迎消息：由本响应携带（RESPONSE_CARRIED），前端直接渲染为
+    #    assistant 气泡。走 WorthinessGate 裁决（requested=True 必达）。
+    #    失败不炸主流程（fail-soft）：settle 的核心是落盘已完成。
+    welcome_message: str | None = None
+    try:
+        from lca.application.onboarding.script import get_onboarding_opening_messages
+        from lca.cognition.proactive import decide as _decide_worthiness
+        from lca.contracts.models.proactive import (
+            DeliveryTarget,
+            DeliveryTargetKind,
+            ProactiveMessage,
+            ProactiveRequest,
+            ProactiveSource,
+            VerdictKind,
+        )
+        from lca.infrastructure.proactive import ProactiveDeliverer
+
+        _locale = str(request.headers.get("accept-language") or "zh")
+        _bubbles = get_onboarding_opening_messages(
+            user_state="completed",
+            assistant_name=name,
+            locale=_locale,
+        )
+        _target = DeliveryTarget(kind=DeliveryTargetKind.RESPONSE_CARRIED)
+        _request = ProactiveRequest(
+            message=ProactiveMessage(
+                id=f"onboarding-welcome-{user_id}",
+                content=_bubbles[0],
+                source=ProactiveSource.ONBOARDING_COMPLETED,
+            ),
+            target=_target,
+            requested=True,
+        )
+        _verdict = _decide_worthiness(_request)
+        if _verdict.kind == VerdictKind.DELIVER_CHAT:
+            _receipt = ProactiveDeliverer().deliver(
+                _request.message,
+                _target,
+                annotate_unretrieved=_verdict.annotate_unretrieved,
+            )
+            welcome_message = _receipt["carried_message"]["content"]
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "onboarding welcome message failed; response continues without it",
+            exc_info=True,
+        )
+
     return _json(
         {
             "ok": True,
@@ -218,6 +267,7 @@ async def onboarding_naming_settle(request: Request) -> JSONResponse:
             "name": name,
             "vibe": vibe,
             "reaction": "🎉",
+            "welcome_message": welcome_message,
         },
         status_code=200,
     )
