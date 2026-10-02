@@ -81,6 +81,7 @@ from lca.contracts.models.observability.journal.journal import (
     ToolStarted,
 )
 from lca.contracts.observability.registry.named_registry import NamedRegistry
+from lca.contracts.observability.trace.tool import TraceTool
 from lca.contracts.protocols import JournalProjector
 from lca.infrastructure.observability.adapters.policy import AttributePolicy, Verbosity
 from lca.infrastructure.observability.adapters.view import SpanView

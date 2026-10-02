@@ -65,7 +65,9 @@ class LangfuseProjection:
         payload = record.payload if isinstance(record.payload, dict) else {}
         scores.append(
             {
-                "step_id": payload.get(_FIELD_STEP_ID) or snapshot.step_id,
+                # hook-driven step identity lives on the record;
+                # CursorSnapshot exposes no step fields (cf. otel_projection).
+                "step_id": payload.get(_FIELD_STEP_ID) or record.step_id,
                 "model": payload.get(_FIELD_MODEL),
                 "sequence": record.sequence,
                 "score": None,  # 由 view/flush 阶段填入(LLM-as-judge)

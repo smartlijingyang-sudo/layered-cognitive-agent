@@ -182,10 +182,15 @@ def record(event: JournalEvent) -> StampedEvent | None:
     from dataclasses import asdict
 
     from lca.infrastructure.session.bindings import (
-        resolve_session_reader,
+        active_publish_session,
+        resolve_raw_session,
     )
 
-    session = resolve_session_reader()
+    # record() 需要写面 Session.append（docstring 亦明示“经 raw
+    # Session.append”）；resolve_session_reader 只返回读面 Protocol（静态
+    # 上无 append），而运行时对象恒为 raw Session —— 直接解析 raw
+    # session，与旧路径返回同一对象，零行为差。
+    session = resolve_raw_session(active_publish_session())
     bound = _bound.get()
     if session is None:
         if bound is not None and bound.journal is not None:

@@ -16,11 +16,22 @@ incarnation 显式身份(ADR-0169 D6 / L14):
 
 from __future__ import annotations
 
-from typing import cast
+from typing import Protocol, runtime_checkable
 
 from lca.contracts.observability.core.incarnation import Incarnation
 from lca.infrastructure.observability.loop_cursor.spine._spine_port import WritePort
 from lca.infrastructure.observability.loop_cursor.std.std import StdLoopCursor
+
+
+@runtime_checkable
+class _PlanRefCarrier(Protocol):
+    """Duck-type contract for the profile object: must carry ``plan_ref``.
+
+    ADR-0169 D6: no silent fallback to "default"; a missing field is a
+    construction error, raised fail-loud in ``from_profile`` below.
+    """
+
+    plan_ref: str
 
 
 class LoopCursorFactory:
@@ -62,11 +73,11 @@ class LoopCursorFactory:
         # ADR-0068 §决策二 + ADR-0169 D6:cursor 的 plan_ref 直接来自
         # profile.``plan_ref`` 字段(由 RunSessionBuilder._compute_plan_ref
         # 写入的 SSOT)。这是 cursor.incarnation.plan_ref 的唯一来源。
-        # 之前的 ``getattr(profile, "plan_ref", "default")`` 历史兜底
-        # 已被删:cursor 的 identity 不应 silent 落到 ``"default"``。
-        # profile 必须显式声明 ``plan_ref``,构造时缺字段向上抛清晰错误
-        # 而不是 silent 默认。
-        if not hasattr(profile, "plan_ref"):
+
+        # isinstance 即 hasattr 语义（data member 只查存在性）；缺字段在
+        # 此抛 TypeError（而非 silent fallback，ADR-0169 D6）。窄化后
+        # profile.plan_ref 静态可见，无需 cast / getattr。
+        if not isinstance(profile, _PlanRefCarrier):
             raise TypeError(
                 "LoopCursorFactory.from_profile requires profile.plan_ref; "
                 "got "
@@ -74,7 +85,7 @@ class LoopCursorFactory:
                 "Use RunSessionBuilder._compute_plan_ref to derive it before "
                 "constructing the cursor."
             )
-        plan_ref = cast("str", profile.plan_ref)
+        plan_ref = str(profile.plan_ref)
         incarnation = Incarnation(
             run_id=run_id,
             plan_ref=str(plan_ref),
