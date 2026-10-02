@@ -20,6 +20,8 @@ from lca.contracts.models.core.execution.result import (
     UnregisteredActionError,
 )
 from lca.contracts.models.core.state.state import AgentState
+from lca.contracts.models.session.call_id import CallId
+from lca.contracts.models.session.tool_error import ToolError
 from lca.contracts.models.team.role.team import RetryPolicy
 from lca.contracts.observability.cursor.loop_cursor import PhaseName
 from lca.contracts.protocols import Body, SafeExecutor, ToolRegistry, TransportRegistryProtocol
@@ -54,9 +56,18 @@ def _observation_content(observation: Observation) -> str:
     return observation_content(observation)
 
 
-def _observation_error(observation: Observation) -> dict[str, Any] | None:
-    """Project an Observation error to the writer's ``ToolError`` TypedDict."""
-    return observation_error(observation)
+def _observation_error(observation: Observation) -> ToolError | None:
+    """Project an Observation error to the writer's ``ToolError`` contract."""
+    raw = observation_error(observation)
+    if raw is None:
+        return None
+    # The emit helper returns exactly the ToolError key set (kind/
+    # message/retryable); project key-by-key so the contract stays explicit.
+    return ToolError(
+        kind=str(raw.get("kind", "execution")),
+        message=str(raw.get("message", "unknown")),
+        retryable=bool(raw.get("retryable", False)),
+    )
 
 
 # Body 是 phase=act 执行平面;advance(phase) 是把 cursor 推到对应窗口的 SSOT。
@@ -279,7 +290,7 @@ class SimpleBody(Body):
                 self.writer.append_tool_result(
                     turn=turn,
                     step=step,
-                    call_id=call.call_id,
+                    call_id=CallId(call.call_id),
                     content=_observation_content(observation),
                     error=_observation_error(observation),
                     meta={"tool_name": call.tool_name},
