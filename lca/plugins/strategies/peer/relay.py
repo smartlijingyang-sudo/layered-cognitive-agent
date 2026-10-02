@@ -69,7 +69,7 @@ class Config(BaseModel):
     kind=PluginKind.PRIMITIVE,
     effects="none",
     description="Register peer_relay TeamStrategy factory.",
-    test_suite="tests/test_handoff_strategy.py",
+    test_suite="tests/scenario/team_0/test_team_chain_cleanup.py::TestTypedProcessDispatch::test_registry_maps_to_typed_classes",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(
