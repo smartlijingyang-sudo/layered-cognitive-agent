@@ -457,5 +457,6 @@
 | MUSE-CONNECTOR-M3-CARD-AND-PROMPT | 【M3】LobeHub 卡片协议联动与 Prompt 认知注入 (ConnectedServicesSection) | Completed | 落地 ConnectedServicesSection 提示词注入（解决 Agent 认知断层，无溢出且 Token 零泄露），升级 composioConnect 工具返回 [widget:connector_auth?...] 交互式卡片插桩语法，22/22 单测全通，通过 INV-01/INV-02/INV-03 |
 | MUSE-CONNECTOR-M4-PERM-AND-QUOTA | 【M4】双层正交权限引擎 (permissions.py) 与滑动窗口硬配额执行器 (rate_limiter.py) | Completed | 落地 ConnectorPermissionEngine（双层正交权限 Provider Scope ∩ Action ALLOW/ASK/DENY 硬拦截）与 SlidingWindowRateLimiter（60s滑动窗口硬配额计算与精确 retry_after_seconds 退避），通过 INV-04 与 INV-05，单测 19/19 全绿 |
 | MUSE-CONNECTOR-M5-INTEGRATION-E2E | 【M5】全链路单测回归 (INV-01 ~ INV-08) 与端到端活体验证 | Completed | 落地 tests/scenario/test_muse_connector_invariants.py，8/8 项测试 100% 覆盖断言 INV-01 至 INV-08 全量不变量（Token零泄露、状态机确定性、卡片协议优先、双层权限硬拦截、滑动窗口限流、写操作暂存、多账号强隔离与AP-01负向边界），连接器全套 30/30 测试全绿，ruff clean |
+| MUSE-CONNECTOR-FLOW-VERIFICATION | 【全流程测试】5大真实场景对话流闭环验证 (Scenario A ~ E in test_muse_connector_conversational_flow.py) | Completed | 落地全套多轮会话流程测试（初次连接挂载Widget与激活、两阶段写暂存+ASK审批卡片放行、只读切发信增量提权卡片mode=add_scope、用户手动撤销Token死循环防御REAUTHORIZATION_REQUIRED、突发并发滑动窗口硬限流+精确退避自愈），全量 48/48 测试 100% 通过（2.43s） |
 
 
