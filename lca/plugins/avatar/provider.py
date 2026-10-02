@@ -47,7 +47,12 @@ class Grok2ApiProvider:
         self.model = model
         self.edit_model = edit_model
         self.video_model = video_model
-        self._client = _client or httpx.AsyncClient(base_url=self.base_url)
+        # 生图/视频经本地 grok2api 代理转发上游，单张图常超过 httpx 默认
+        # 5s 读超时；用 180s 覆盖 create/video 轮询场景（工具 default_timeout_s=120）。
+        self._client = _client or httpx.AsyncClient(
+            base_url=self.base_url,
+            timeout=httpx.Timeout(180.0),
+        )
 
     async def _request(
         self,

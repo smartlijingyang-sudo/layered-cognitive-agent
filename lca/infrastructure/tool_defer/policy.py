@@ -17,6 +17,8 @@ STANDARD_NAMESPACES: tuple[str, ...] = (
     # ADR-0268 §4：新增 lca（运行时控制）与 cron（定时任务）两个域。
     "lca",
     "cron",
+    # ADR-0269 §4：新增 avatar（头像生成与换装）工具域。
+    "avatar",
 )
 
 DEFAULT_NAMESPACE_DESCRIPTIONS: dict[str, str] = {
@@ -30,6 +32,7 @@ DEFAULT_NAMESPACE_DESCRIPTIONS: dict[str, str] = {
     "ext": "第三方集成：连接与刷新外部服务",
     "lca": "运行时控制：handoff 轮静默结束",
     "cron": "定时任务：创建、查看、更新、删除与即将到来列表",
+    "avatar": "头像生成与换装：创建候选、激活、查询、清除与定时换装",
 }
 
 DEFAULT_NAMESPACE_APPROVAL: dict[str, str] = {

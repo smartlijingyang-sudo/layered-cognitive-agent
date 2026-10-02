@@ -53,6 +53,7 @@ def test_defer_policy_standard_namespaces() -> None:
         "ext",
         "lca",
         "cron",
+        "avatar",
     }
     assert "shell" in policy.namespace_approval
     assert policy.namespace_approval["shell"] == "require_approval"

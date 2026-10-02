@@ -142,7 +142,7 @@ class AvatarCreateTool(Tool):
             service = avatar_service_registry.current()
             candidates = await service.create(assistant_id, str(args["user_request"]))
             return _success_observation(
-                {"candidates": [c.model_dump() for c in candidates]}, started
+                {"candidates": [c.model_dump(mode="json") for c in candidates]}, started
             )
         except Exception as exc:
             return _error_observation(str(exc), started)
@@ -196,7 +196,7 @@ class AvatarEditTool(Tool):
                 reference_image=reference_image,
             )
             return _success_observation(
-                {"candidates": [c.model_dump() for c in candidates]}, started
+                {"candidates": [c.model_dump(mode="json") for c in candidates]}, started
             )
         except Exception as exc:
             return _error_observation(str(exc), started)
@@ -234,7 +234,7 @@ class AvatarSetTool(Tool):
             assistant_id = avatar_service_registry.current_assistant_id()
             service = avatar_service_registry.current()
             bundle = await service.set(assistant_id, str(args["candidate_id"]))
-            return _success_observation({"active": bundle.model_dump()}, started)
+            return _success_observation({"active": bundle.model_dump(mode="json")}, started)
         except Exception as exc:
             return _error_observation(str(exc), started)
 
@@ -261,7 +261,7 @@ class AvatarGetTool(Tool):
             assistant_id = avatar_service_registry.current_assistant_id()
             service = avatar_service_registry.current()
             state = await service.get(assistant_id)
-            return _success_observation({"state": state.model_dump()}, started)
+            return _success_observation({"state": state.model_dump(mode="json")}, started)
         except Exception as exc:
             return _error_observation(str(exc), started)
 
@@ -288,7 +288,7 @@ class AvatarClearTool(Tool):
             assistant_id = avatar_service_registry.current_assistant_id()
             service = avatar_service_registry.current()
             state = await service.clear(assistant_id)
-            return _success_observation({"state": state.model_dump()}, started)
+            return _success_observation({"state": state.model_dump(mode="json")}, started)
         except Exception as exc:
             return _error_observation(str(exc), started)
 
@@ -397,7 +397,7 @@ class AvatarScheduleTool(Tool):
                 created_chat_id=chat_id,
                 now=datetime.now(UTC),
             )
-            return _success_observation({"job": job.model_dump()}, started)
+            return _success_observation({"job": job.model_dump(mode="json")}, started)
         except Exception as exc:
             return _error_observation(str(exc), started)
 
