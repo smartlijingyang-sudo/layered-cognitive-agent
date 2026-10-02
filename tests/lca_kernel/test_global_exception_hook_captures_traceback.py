@@ -78,7 +78,7 @@ def test_excepthook_captures_attribute_error_into_spine(monkeypatch: pytest.Monk
         captured.append(record.asdict())
 
     monkeypatch.setattr(
-        "lca_kernel.lifecycle.emit_exception_caught",
+        "lca_kernel.boot.lifecycle.emit_exception_caught",
         fake_emit_exception_caught,
         raising=False,
     )
@@ -112,7 +112,7 @@ def test_asyncio_handler_captures_task_exception(monkeypatch: pytest.MonkeyPatch
         captured.append(record.asdict())
 
     monkeypatch.setattr(
-        "lca_kernel.lifecycle.emit_exception_caught",
+        "lca_kernel.boot.lifecycle.emit_exception_caught",
         fake_emit,
         raising=False,
     )
@@ -158,7 +158,7 @@ def test_threading_excepthook_captures_thread_exception(
         captured.append(record.asdict())
 
     monkeypatch.setattr(
-        "lca_kernel.lifecycle.emit_exception_caught",
+        "lca_kernel.boot.lifecycle.emit_exception_caught",
         fake_emit,
         raising=False,
     )
@@ -190,7 +190,7 @@ def test_excepthook_recursion_guard(monkeypatch: pytest.MonkeyPatch) -> None:
         raise RuntimeError("emit itself broken")
 
     monkeypatch.setattr(
-        "lca_kernel.lifecycle.emit_exception_caught",
+        "lca_kernel.boot.lifecycle.emit_exception_caught",
         fake_emit,
         raising=False,
     )
@@ -216,7 +216,7 @@ def test_excepthook_recursion_guard(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_excepthook_still_triggers_shutdown(monkeypatch: pytest.MonkeyPatch) -> None:
     """归一化异常后,原 shutdown 路径仍要走(``coordinator.interrupt(1)``)。"""
     monkeypatch.setattr(
-        "lca_kernel.lifecycle.emit_exception_caught",
+        "lca_kernel.boot.lifecycle.emit_exception_caught",
         lambda r: None,
         raising=False,
     )
@@ -249,7 +249,7 @@ def test_excepthook_noop_when_shutting_down(monkeypatch: pytest.MonkeyPatch) -> 
         captured.append(record.asdict())
 
     monkeypatch.setattr(
-        "lca_kernel.lifecycle.emit_exception_caught",
+        "lca_kernel.boot.lifecycle.emit_exception_caught",
         fake_emit,
         raising=False,
     )
