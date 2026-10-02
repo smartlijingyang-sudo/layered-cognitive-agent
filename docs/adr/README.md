@@ -192,7 +192,7 @@
 | [0251](0251-openmuse-runtime-sandbox-durable-task-evidence.md) | OpenMuse 架构解剖与借鉴 — 长程租约任务、防漂移双门禁与可接管沙箱证据 | Proposed |
 | [0252](0252-multi-user-onboarding-and-identity.md) | 多用户登录与 Onboarding 隔离 — LCA 自有数据库 + LobeHub 原生前端（归属关系 LCA 全权控制，身份 SSOT = Better Auth users） | Implemented |
 | [0253](0253-muse-sentinel-egress-and-credential-boundary.md) | Meta Muse 出站控制面、凭证边界与污点审批 — 沙箱无默认路由、独立进程按 request_digest 兑付密钥、私有数据取消自动放行、审批事件与对话正文隔离 | Proposed |
-| [0254](0254-commercial-context-files-and-continuous-memory-runtime.md) | 上下文文件与持续记忆。不替代 ADR-0247。已落地：MEMORY.md 投影、常驻文件按磁盘重读、写盘回执先于「已记下」、人物/群体页、TOOLS.md、实时监听与 WATCHER_FAULT、Side Chat 隔离与私人内容过滤、FTS 检索、做梦慢路径（显式偏好固化、亲近度、偏好综述） | Accepted |
+| [0254](0254-commercial-context-files-and-continuous-memory-runtime.md) | 上下文文件与持续记忆。2026-10-02 v2 修订：记忆 SSOT 二选一选 A（Markdown 为准；0247 的 MemoryRecord 领域语义继续继承，bank/index 降为可重建派生索引）。已落地：MEMORY.md 投影、常驻文件按磁盘重读、写盘回执先于「已记下」、人物/群体页、TOOLS.md、实时监听与 WATCHER_FAULT、Side Chat 隔离与私人内容过滤、FTS 检索、做梦慢路径（显式偏好固化、亲近度、偏好综述） | Accepted |
 | [0256](0256-tool-namespace-taxonomy.md) | 工具命名空间划分规范：8 域划分、namespace 声明式元数据下沉 factory、defer 加载/审批/wire gate 三者同粒度，附 6 处代码改动与 8 条验收标准；ADR-0255 L1 defer 的划分规范。2026-10-02 修订：fail-fast→fail-soft（硬 fail-fast 收敛到 wiring time，见 §11）；2026-10-02 状态升级 Accepted | Accepted |
 | [0257](0257-delegation-context-inheritance-and-verification.md) | 委派上下文继承与复核协议：委派信封（standing 全量+父 turn 摘要+记忆投影）、回灌只收 evidence 指针、不可逆失败先验效果；ADR-0255 §4.6 的 LCA 落地提案 | Proposed |
 | [0258](0258-compaction-exemption-and-reinjection.md) | 压缩豁免与重注契约：standing 永不进压缩流、摘要带  血统、刷新读失败保留旧块 fail-closed；ADR-0255 §4.5 的 LCA 落地提案 | Proposed |
@@ -201,6 +201,7 @@
 | [0261](0261-self-introspection-projection.md) | 自省投影契约：自省答案只许来自本 turn 注入块（禁用工作区文件搜寻）、点名配置文件必须真实注入（BackstorySection 守卫升不变量并推广）、新增只读自省工具与写工具配对；ADR-0255 §4.8 的 LCA 落地提案 | Proposed |
 | [0262](0262-skill-discovery-and-acquisition.md) | Skill 发现与沉淀契约：先查后动手（提示级义务）、先查后断言（检索失败≠检索无结果）、沉淀晋升三段门（candidate→批准→安装）、补 BM25/regex 双模式；ADR-0255 §4.9 的 LCA 落地提案 | Proposed |
 | [0263](0263-routine-scheduling-mutual-exclusion-and-self-healing.md) | 例程调度互斥与自愈契约：单实例互斥锁（owner+心跳）、锁超时自愈收割、busy→显式 SKIP 可观测、触发记录持久化、失败隔离；生产 Muse 调度模式的 LCA 落地提案 | Proposed |
+| [0264](0264-proactive-messaging-pipeline.md) | 主动消息三层管道契约：触发/裁决/投递三层分离、裁决纯函数四态（REJECTED/DELIVER_CHAT/DELIVER_QUIET/SILENT）、fail-closed 只用在精确可判定处、投递复用 surface 事件+turn=-1 哨兵+幂等键、落点默认回发起上下文；生产 Muse 主动行为机制的 LCA 落地提案 | Proposed |
 | [0255](0255-muse-production-runtime-full-reference.md) | Muse 生产运行时全量参考：每 turn 上下文装配顺序、9 个 standing 文件全文与权限矩阵、36 工具命名空间函数清单与关键参数、9 大机制（记忆三层/强制检索/落笔写盘/provenance/压缩豁免/子 agent 继承/自省投影）与 12 条验收用例；ADR-0254 的实证 companion | Proposed |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
