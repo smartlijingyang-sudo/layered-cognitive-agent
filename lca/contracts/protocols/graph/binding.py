@@ -10,10 +10,10 @@ implementation. The kernel dispatches via :func:`lca.framework.graph.strategy_re
 """
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class BindingKind(str, Enum):
+class BindingKind(StrEnum):
     """Closed enumeration of graph node kinds.
 
     The string value is the canonical name; yaml ``binding:`` fields

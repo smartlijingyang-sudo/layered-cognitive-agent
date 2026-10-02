@@ -37,11 +37,11 @@ from __future__ import annotations
 import warnings
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class EnvelopeVerdict(str, Enum):
+class EnvelopeVerdict(StrEnum):
     """5 闸单调聚合后的 envelope 状态（PR-7 数据面）。"""
 
     AUTHORIZED = "authorized"
@@ -166,7 +166,7 @@ class RunDelta:
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
 
-class Verdict(str, Enum):
+class Verdict(StrEnum):
     """5 闸单调聚合后的最终 verdict（PR-7 数据面 + ADR-0066 §四）。
 
     单调性：DENIED > BUDGET_EXHAUSTED > CONSTRAINT_VIOLATED > SAFE_BOUNDARY_VIOLATED >

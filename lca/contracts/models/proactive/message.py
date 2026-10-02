@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """主动消息领域契约：消息、投递目标、触发源。
 
 三层架构中的契约层（contracts）：只定义形状，不含行为。
@@ -15,13 +14,13 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
-class ProactiveSource(str, Enum):
+class ProactiveSource(StrEnum):
     """主动消息触发源。"""
 
     ONBOARDING_COMPLETED = "onboarding_completed"
@@ -30,7 +29,7 @@ class ProactiveSource(str, Enum):
     MANUAL = "manual"
 
 
-class DeliveryTargetKind(str, Enum):
+class DeliveryTargetKind(StrEnum):
     """投递落点种类。"""
 
     SESSION_APPEND = "session_append"
@@ -56,9 +55,10 @@ class DeliveryTarget(BaseModel):
 
     @model_validator(mode="after")
     def validate_target(self) -> DeliveryTarget:
-        if self.kind == DeliveryTargetKind.SESSION_APPEND:
-            if not self.session_id or not self.session_id.strip():
-                raise ValueError("SESSION_APPEND 必须指定非空 session_id")
+        if self.kind == DeliveryTargetKind.SESSION_APPEND and (
+            not self.session_id or not self.session_id.strip()
+        ):
+            raise ValueError("SESSION_APPEND 必须指定非空 session_id")
         return self
 
 

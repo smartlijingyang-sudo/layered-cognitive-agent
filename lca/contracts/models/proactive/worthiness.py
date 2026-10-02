@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """主动消息裁决契约：请求与裁决结果。
 
 裁决层（cognition/proactive/worthiness.WorthinessGate）是纯函数：
@@ -18,14 +17,14 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from lca.contracts.models.proactive.message import DeliveryTarget, ProactiveMessage
 
 
-class VerdictKind(str, Enum):
+class VerdictKind(StrEnum):
     """裁决结果种类。"""
 
     DELIVER_CHAT = "deliver_chat"
