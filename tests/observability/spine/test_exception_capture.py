@@ -197,7 +197,9 @@ def test_emit_exception_caught_has_single_definition() -> None:
             if line.lstrip().startswith("def emit_exception_caught"):
                 hits.append(f"{path.relative_to(repo_root)}:{lineno}")
     assert len(hits) == 1, hits
-    assert hits[0].startswith("lca/infrastructure/observability/spine/exception_emit.py:")
+    # NOTE: emitter moved into exception/ subpackage (directory discipline);
+    # SSOT is still the single definition site.
+    assert hits[0].startswith("lca/infrastructure/observability/spine/exception/emit.py:")
 
 
 def test_emit_exception_caught_writes_sidecar_for_any_exception(tmp_path: Path) -> None:
