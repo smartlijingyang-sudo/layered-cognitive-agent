@@ -138,14 +138,14 @@ def _request(
     }
     if data:
         headers["content-type"] = "application/json"
-    req = urllib.request.Request(
+    req = urllib.request.Request(  # noqa: S310 -- URL from operator CLI args/env; scheme not attacker-controlled
         url,
         data=data,
         method=method,
         headers=headers,
     )
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=15) as resp:  # noqa: S310 -- URL from operator CLI args/env; scheme not attacker-controlled
             text = resp.read().decode("utf-8")
             status = resp.status
     except urllib.error.HTTPError as exc:

@@ -239,7 +239,7 @@ def _create(
     )
     user_id = os.environ.get("LCA_USER_ID", "local-dev-user").strip() or "local-dev-user"
     auth_token = os.environ.get("LCA_AUTH_TOKEN", "lca-local").strip() or "lca-local"
-    request = urllib.request.Request(
+    request = urllib.request.Request(  # noqa: S310 -- URL built from --base-url option + fixed path; operator-controlled
         f"{base_url.rstrip('/')}/runs",
         method="POST",
         headers={
@@ -250,7 +250,7 @@ def _create(
         data=json.dumps(body).encode("utf-8"),
     )
     try:
-        with urllib.request.urlopen(
+        with urllib.request.urlopen(  # noqa: S310 -- URL built from --base-url option + fixed path; operator-controlled
             request, timeout=15
         ) as response:
             receipt = json.loads(response.read().decode("utf-8"))
@@ -442,7 +442,7 @@ def _poll_terminal_status(run_id: str, base_url: str) -> tuple[str | None, float
     url = f"{base_url.rstrip('/')}/runs/{run_id}/doctor"
     user_id = os.environ.get("LCA_USER_ID", "local-dev-user").strip() or "local-dev-user"
     auth_token = os.environ.get("LCA_AUTH_TOKEN", "lca-local").strip() or "lca-local"
-    poll_req = urllib.request.Request(
+    poll_req = urllib.request.Request(  # noqa: S310 -- URL built from --base-url option + fixed path; operator-controlled
         url,
         headers={
             "x-lca-user-id": user_id,
@@ -451,7 +451,7 @@ def _poll_terminal_status(run_id: str, base_url: str) -> tuple[str | None, float
     )
     while time.monotonic() < deadline:
         try:
-            with urllib.request.urlopen(poll_req, timeout=10) as resp:
+            with urllib.request.urlopen(poll_req, timeout=10) as resp:  # noqa: S310 -- URL built from --base-url option + fixed path; operator-controlled
                 doctor = json.loads(resp.read().decode("utf-8"))
         except (urllib.error.URLError, urllib.error.HTTPError):
             time.sleep(_POST_CREATE_POLL_INTERVAL_S)
