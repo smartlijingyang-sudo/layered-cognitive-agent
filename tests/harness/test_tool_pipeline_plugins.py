@@ -177,12 +177,14 @@ async def test_legacy_safe_executor_uses_provider_pipeline_contract() -> None:
 
     assert result.success is True
     assert result.payload == "hello"
+    # NOTE(round-0355): order follows the node's _ALL_REF_ORDER
+    # (envelope-shape first since 39fa69654 PR-2/ADR-0234 extraction).
     assert result.extra["policy_verdict_refs"] == [
+        "effect.pre_dispatch.envelope-shape:valid",
         "effect.pre_dispatch.permission:allow",
         "effect.pre_dispatch.grant:valid",
         "effect.pre_dispatch.budget:valid",
         "effect.pre_dispatch.safe-boundary:valid",
-        "effect.pre_dispatch.envelope-shape:valid",
     ]
     envelope = result.extra["command_envelope"]
     assert envelope["plan_ref"] == "test_plan_ref_for_pipeline_test"
@@ -208,14 +210,15 @@ async def test_legacy_safe_executor_requires_active_compiled_plan_ref() -> None:
 
 @pytest.mark.asyncio
 async def test_legacy_safe_executor_denies_before_provider_execution() -> None:
-    from lca.contracts.models.core.execution.result import ToolExecutionError
 
     executor = PipelineSafeExecutor(
         ToolPermissionManifest(allowed_tools=[]),
         plan_ref_provider=lambda: "denied_plan_ref",
     )
 
-    with pytest.raises(ToolExecutionError, match="未在 ToolPermissionManifest"):
+    # NOTE(round-0355): since 39fa69654 (PR-2/ADR-0234) the envelope-check node
+    # raises ValueError on deny and the executor propagates it unwrapped.
+    with pytest.raises(ValueError, match="permission denied"):
         await executor.execute(
             _LegacyEchoTool(),
             {"message": "must not execute"},
