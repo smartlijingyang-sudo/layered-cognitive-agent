@@ -38,7 +38,8 @@ def test_state_module_does_not_declare_final_output() -> None:
 def test_runtime_reducer_does_not_read_state_final_output() -> None:
     """reducer.py 代码段不含 state.final_output 引用。"""
 
-    from lca.plugins.runtime import reducer as reducer_module
+    # NOTE (round-0344): canonical path since 74e827d9a bulk shim deletion.
+    from lca.plugins.loop.reducer import plugin as reducer_module
 
     src = reducer_module.__file__ or ""
     with open(src, encoding="utf-8") as fh:
@@ -69,7 +70,10 @@ def test_harness_projection_agent_state_does_not_write_final_output() -> None:
 def test_stop_policy_does_not_read_state_final_output() -> None:
     """stop_policy.py 不含 state.final_output 读取(迁移到 StopDecision.final_output 或 TerminalOutcome)。"""
 
-    import lca.plugins.loop.state.stop_policy.plugin as stop_policy_module
+    # NOTE (round-0344): stop_policy plugin retired by c2b0607eb
+    # (stop-decision retirement); termination decisions now live in
+    # lca.loop.driver via StopDecision/TerminalOutcome.
+    import lca.loop.driver as stop_policy_module
 
     src = stop_policy_module.__file__ or ""
     with open(src, encoding="utf-8") as fh:
