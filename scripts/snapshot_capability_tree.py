@@ -390,15 +390,31 @@ def _module_source(module: str) -> Path:
 
 
 def _manifest_from_module(plugin_id: str, module: str) -> PluginManifest:
-    """Parse an active module missed by the plugin-directory scan."""
+    """Parse an active module missed by the plugin-directory scan.
+
+    包模块(如 ``lca.nodes.think.decision_repair``)的 ``@plugin`` 装饰器
+    往往不在 ``__init__.py`` 而在包内子模块(如 ``executor.py``)——此时
+    逐个解析包内 ``*.py`` 直到 id 命中,而非只看 ``__init__.py``。
+    """
     source = _module_source(module)
+    candidates = [source]
+    if source.name == "__init__.py" and source.parent.is_dir():
+        candidates.extend(
+            p for p in sorted(source.parent.glob("*.py")) if p != source
+        )
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+        try:
+            tree = ast.parse(candidate.read_text(encoding="utf-8"))
+        except (SyntaxError, UnicodeDecodeError):
+            continue
+        manifest = _parse_plugin_decorator(tree, module)
+        if manifest is not None and manifest.id == plugin_id:
+            return manifest
     if not source.exists():
         raise RuntimeError(f"active plugin module source not found: {module}")
-    tree = ast.parse(source.read_text(encoding="utf-8"))
-    manifest = _parse_plugin_decorator(tree, module)
-    if manifest is None or manifest.id != plugin_id:
-        raise RuntimeError(f"active plugin manifest not statically discoverable: {plugin_id}")
-    return manifest
+    raise RuntimeError(f"active plugin manifest not statically discoverable: {plugin_id}")
 
 
 def _build_capability_tree(profile: str) -> CapabilityTree:
@@ -425,8 +441,8 @@ def _build_capability_tree(profile: str) -> CapabilityTree:
         for capability in plugin.definition.provided_capability_keys
     }
 
-    from lca.harness.composition.plan_compiler import compile_plan
     from lca.harness.plan import compiled_run_plan_ref
+    from lca_kernel.plan.plan_compile import compile_plan
 
     compiled_plan = compile_plan(resolved)
     declarative_control_contributions: dict[str, list[str]] = {}

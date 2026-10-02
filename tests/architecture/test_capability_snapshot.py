@@ -16,6 +16,7 @@ W0 baseline acceptance criteria:
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import replace
 from pathlib import Path
 
@@ -82,8 +83,10 @@ def test_plan_ref_stability() -> None:
     tree = _build_capability_tree(DEFAULT_PROFILE)
     # The plan_ref should be stable across runs
     # If this fails, the snapshot logic or profile structure changed
-    assert len(tree.plan_ref) == 16, f"plan_ref should be 16 chars, got {len(tree.plan_ref)}"
-    assert tree.plan_ref.isalnum(), f"plan_ref should be alphanumeric, got {tree.plan_ref}"
+    # ADR-0185 S2.5 wire form: sha256: + 16 hex（旧 16-hex 裸格式已退役）
+    assert re.match(r"^sha256:[0-9a-f]{16}$", tree.plan_ref), (
+        f"plan_ref 应为 sha256:+16hex wire form, got {tree.plan_ref}"
+    )
     # Re-build and assert same hash
     tree2 = _build_capability_tree(DEFAULT_PROFILE)
     assert tree.plan_ref == tree2.plan_ref, (
@@ -93,9 +96,9 @@ def test_plan_ref_stability() -> None:
 
 def test_plan_ref_is_independent_of_checkout_path() -> None:
     """Equivalent relative and absolute Profile inputs share one plan identity."""
-    from lca_kernel.plan.plan_compile import compile_plan
     from lca.harness.plan import compiled_run_plan_ref
     from lca.harness.profile.resolve.resolve import resolve_profile
+    from lca_kernel.plan.plan_compile import compile_plan
 
     relative_plan = compile_plan(resolve_profile(DEFAULT_PROFILE))
     absolute_plan = compile_plan(resolve_profile(REPO / DEFAULT_PROFILE))
