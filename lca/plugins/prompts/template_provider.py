@@ -106,7 +106,11 @@ def _builtin_templates() -> Mapping[str, _PromptTemplate]:
     user_profile_ref = (("user_profile", "stateful", True, ""),)
     runtime_env_ref = (("runtime_env", "pure", True, ""),)
     developer_timestamp_ref = (("developer_timestamp", "pure", True, ""),)
-    memory_retrieval_ref = (("memory_retrieval", "stateful", True, ""),)
+    # ADR-0265 §3 C3 / §7④：memory_retrieval 承载 ADR-0260 C2 检索义务决策树，
+    # 不得为可选（"义务缺席"不许用可选+fallback "" 静默）。optional=False 后，
+    # 若 registry 缺失该 section，装配期抛 MissingPromptSectionError（fail-fast）；
+    # section 正常渲染为空仍按 strip_empty_fields 跳过（渲染路径行为不变）。
+    memory_retrieval_ref = (("memory_retrieval", "stateful", False, ""),)
     skill_duty_ref = (("skill_duty", "stateful", True, ""),)
     adr0255_tail = (
         memory_retrieval_ref + skill_duty_ref + developer_timestamp_ref + runtime_env_ref
