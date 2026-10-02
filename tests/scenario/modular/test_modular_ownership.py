@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from lca.cognition.team.modes.default_modes import (
     _CordisCreatorModeAdapter as CompatibilityCreatorAdapter,
 )
@@ -52,7 +54,7 @@ def test_default_mode_facade_keeps_backward_imports_without_owning_behavior() ->
 
 def test_ingress_only_orchestrates_text_history_and_file_reference_parsing() -> None:
     """Message ingress must not regain its platform-specific parsing implementations."""
-    source = _source("gateway/runs/ingest/ingress.py")
+    source = _source("lca/plugins/transport/webserver/handlers/runs/ingest/ingress/ingress.py")
 
     assert "lca.plugins.transport.webserver.handlers.runs.session.message.history" in source
     assert "lca.plugins.transport.webserver.handlers.runs.session.message.text" in source
@@ -63,7 +65,7 @@ def test_ingress_only_orchestrates_text_history_and_file_reference_parsing() -> 
 
 def test_ingest_facade_keeps_policy_cache_transport_and_mirroring_separate() -> None:
     """The stable ingest path must not become a second implementation container."""
-    source = _source("gateway/runs/ingest/ingest.py")
+    source = _source("lca/plugins/transport/webserver/handlers/runs/ingest/ingest/ingest.py")
 
     assert "lca.plugins.transport.webserver.handlers.runs.ingest.cache.cache" in source
     assert "lca.plugins.transport.webserver.handlers.runs.ingest.integrity.integrity" in source
@@ -100,10 +102,10 @@ def test_temporal_memory_store_delegates_schema_and_record_codec() -> None:
 
 def test_terminalizer_only_coordinates_terminal_transition_order() -> None:
     """Terminal status, artifact closure, manifest, and exporter cleanup have owners."""
-    source = _source("lca/plugins/transport/webserver/handlers/runs/terminal/terminalizer.py")
+    source = _source("lca/plugins/transport/webserver/handlers/runs/terminal/terminalizer/terminalizer.py")
 
     assert "lca.plugins.transport.webserver.handlers.runs.terminal.status.status" in source
-    assert "lca.plugins.transport.webserver.read.runs.artifact.closure" in source
+    assert "lca.infrastructure.tools.run.finalizer" in source
     assert "lca.plugins.transport.webserver.read.runs.terminal.materialization" in source
     assert "lca.plugins.transport.webserver.carrier.runs.lifecycle.export_disposal" in source
     assert "def _derive_terminal_status" not in source
@@ -112,22 +114,23 @@ def test_terminalizer_only_coordinates_terminal_transition_order() -> None:
 
 def test_openai_shim_is_a_facade_over_protocol_service_and_http_adapters() -> None:
     """OpenAI compatibility must not regain wire, LLM, or HTTP orchestration ownership."""
-    source = _source("gateway/openai_shim.py")
+    source = _source("lca/plugins/transport/webserver/handlers/openai/shim.py")
 
-    assert "gateway.openai_protocol" in source
-    assert "gateway.openai_endpoints" in source
+    assert "handlers.openai.protocol" in source
+    assert "handlers.openai.endpoints" in source
     assert "async def " not in source
     assert "def _message_text" not in source
 
-    endpoint_source = _source("gateway/openai_endpoints.py")
-    assert "gateway.openai_housekeeping" in endpoint_source
+    endpoint_source = _source("lca/plugins/transport/webserver/handlers/openai/endpoints.py")
+    assert "handlers.openai.housekeeping" in endpoint_source
 
 
+# NOTE(2026-10-02, round-0417):test_user_provider_facade_* 已退役——
+# lca/infrastructure/host_runtime/providers/user.py 在 43f76e975
+# ("remove re-export shells") 被刻意删除,三模块改为直引
+# (lca/infrastructure/host_runtime/environment.py:18-20)。新形态由
+# tests/architecture/test_no_shallow_reexport_shells.py 守护(断言 user.py
+# 不存在)。本 stub 保留占位以防后人误以为测试缺失。
 def test_user_provider_facade_separates_account_workspace_and_cli_resources() -> None:
-    """Host-runtime user resources must keep independently managed lifecycles."""
-    source = _source("lca/infrastructure/host_runtime/providers/user.py")
-
-    assert "providers.user_account" in source
-    assert "providers.user_workspace" in source
-    assert "providers.user_cli" in source
-    assert "class " not in source
+    """Retired: SUT(user.py re-export shell)已刻意删除,见上 NOTE。"""
+    pytest.skip("retired: user.py removed in 43f76e975; guarded by test_no_shallow_reexport_shells.py")
