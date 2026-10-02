@@ -441,5 +441,13 @@
 | ONBOARDING-WIDGET-MOUNT | 消息流起名卡片挂载与结算闭环 (`AssistantNamingWidget` + `routes_onboarding.py`) | Completed | self_manage_tools_from_run 注册 CreateNameWidgetTool 与 UpdateIdentityTool，双语化 AssistantNamingWidget 挂载至 Assistant/index.tsx，拦截 [widget:name_picker?...] 渲染候选芯片并闭环 /v1/onboarding/naming/settle 结算与 🎉 反应 |
 | ONBOARDING-E2E-VERIFICATION | 全链路端到端回归验证与内核热重载核验 | Completed | 全量 Onboarding 与 Patch 测试套件 23/23 全绿，37/37 补丁 103 个目标文件 100% byte-identical，ruff 0 报错，git diff clean；内核成功平滑重启（pid=1814498），实测 live 3010 代理 /lca-api/v1/onboarding/welcome 准确返回两条经典 Muse 英文开场白 |
 | AGENTS-SIDEBAR | 把 AGENTS.md 接入右侧抽屉并闭环后端白名单与前端展示 | Completed | 后端 standing_files.py 扩展白名单与 ProfilePatch.agents_md 闭环；前端 AssistantStatusDrawer 增加 📋 Rules 与 AGENTS.md 元数据卡片；patch_lobehub 成功应用且 check_patch_integrity 103 文件全过；单测 6/6 全绿；真实 API 查询 /standing-files 验证正常 |
-| DEBUG-RECENT-RUNS-ROOTCAUSE | 排查近三次 run 的三大缺陷（回答重复两遍、邮件只报一封、连接只有裸链接）根因 | In Progress | 完成三项缺陷深度溯源：1. llm.request.header.assistant 全量文本被当作增量 append 导致回答翻倍；2. GMAIL_FETCH_EMAILS 无参只吐首封完整HTML邮件；3. composioConnect 返回裸文本链接未触发卡片化 |
-| BRAINSTORM-CONNECTOR-UI | 头脑风暴与交互设计：聊天流交互式连接器卡片 & 右侧抽屉连接器 Tab（对齐 LobeHub 原生质感） | In Progress | 正在根据需求展开澄清与方案提炼 |
+| DEBUG-RECENT-RUNS-ROOTCAUSE | 排查近三次 run 的三大缺陷（回答重复两遍、邮件只报一封、连接只有裸链接）根因 | Completed | 完成三项缺陷深度溯源：1. llm.request.header.assistant 全量文本被当作增量 append 导致回答翻倍；2. GMAIL_FETCH_EMAILS 无参只吐首封完整HTML邮件；3. composioConnect 返回裸文本链接未触发卡片化 |
+| BRAINSTORM-CONNECTOR-UI | 头脑风暴与交互设计：连接器中枢、全助理动态Avatar与近期Run缺陷设计落地 | Completed | 已完成全套 5 节方案呈批，沉淀设计文档 docs/plans/2026-10-02-connectors-ui-and-run-fixes-design.md 与实施计划 docs/plans/2026-10-02-connectors-ui-and-run-fixes-plan.md 并提交 git |
+| CONNECTOR-TASK-1-STREAM-DEDUP | 修复 Answer 文本翻倍缺陷：EventTranslator 流式 Header 互斥消重守卫 | Pending | 待执行 |
+| CONNECTOR-TASK-2-GMAIL-GUIDANCE | 修复邮件查询只报一封：Composio 工具元数据与 GMAIL_LIST_THREADS 概览推荐 | Pending | 待执行 |
+| CONNECTOR-TASK-3-UNIVERSAL-AVATAR | 全助理通用普惠动态动物 Avatar 引擎与顶栏防裁剪居中校准 | Pending | 待执行 |
+| CONNECTOR-TASK-4-CHAT-CARD | 会话流交互式连接器授权卡片 (ConnectorAuthCard.tsx) | Pending | 待执行 |
+| CONNECTOR-TASK-5-DRAWER-HUB | 右侧抽屉全局连接器中枢 Tab (ConnectorsPanel.tsx in AssistantStatusDrawer) | Pending | 待执行 |
+| CONNECTOR-TASK-6-AVATAR-PICKER | 会话流交互式选图卡片与换装闭环 (AssistantAvatarWidget.tsx & Drawer 铅笔快捷菜单) | Pending | 待执行 |
+| CONNECTOR-TASK-7-INTEGRATION-E2E | 全量补丁 byte-identical 核验、全套单测回归与端到端内核热重载核验 | Pending | 待执行 |
+
