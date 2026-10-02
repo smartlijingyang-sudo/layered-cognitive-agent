@@ -268,6 +268,60 @@ async def onboarding_naming_settle(request: Request) -> JSONResponse:
             exc_info=True,
         )
 
+    # 4. 改名后固定流程（对齐 Muse）：庆祝 → 能力介绍 → 连接引导。
+    #    固定文案来自 script.get_post_naming_messages，requested=True 必达，
+    #    走同样的 WorthinessGate/ProactiveDeliverer 模式。
+    #    失败 fail-soft：settle 核心（落盘）已完成，不炸主流程。
+    followup_messages: list[str] = []
+    try:
+        from lca.application.onboarding.script import get_post_naming_messages
+        from lca.cognition.proactive import decide as _decide_followup
+        from lca.contracts.models.proactive import (
+            DeliveryTarget as _FollowupTarget,
+            DeliveryTargetKind as _FollowupTargetKind,
+            ProactiveMessage as _FollowupMessage,
+            ProactiveRequest as _FollowupRequest,
+            ProactiveSource as _FollowupSource,
+            VerdictKind as _FollowupVerdict,
+        )
+        from lca.infrastructure.proactive import ProactiveDeliverer as _FollowupDeliverer
+
+        _followup_locale = str(request.headers.get("accept-language") or "zh")
+        _followup_event_ref = f"onboarding-completed:{user_id}"
+        for _idx, _bubble in enumerate(
+            get_post_naming_messages(
+                assistant_name=name,
+                locale=_followup_locale,
+            )
+        ):
+            _freq = _FollowupRequest(
+                message=_FollowupMessage(
+                    id=f"onboarding-postnaming-{user_id}-{_idx}",
+                    content=_bubble,
+                    source=_FollowupSource.ONBOARDING_COMPLETED,
+                ),
+                target=_FollowupTarget(kind=_FollowupTargetKind.RESPONSE_CARRIED),
+                requested=True,
+                request_ref=_followup_event_ref,
+                known_request_refs=(_followup_event_ref,),
+                declared=_FollowupVerdict.DELIVER_CHAT,
+            )
+            _fverdict = _decide_followup(_freq)
+            if _fverdict.kind == _FollowupVerdict.DELIVER_CHAT:
+                _frecept = _FollowupDeliverer().deliver(
+                    _freq.message,
+                    _freq.target,
+                    annotate_unretrieved=_fverdict.annotate_unretrieved,
+                )
+                followup_messages.append(_frecept["carried_message"]["content"])
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "onboarding post-naming followup failed; response continues without it",
+            exc_info=True,
+        )
+
     return _json(
         {
             "ok": True,
@@ -276,6 +330,8 @@ async def onboarding_naming_settle(request: Request) -> JSONResponse:
             "vibe": vibe,
             "reaction": "🎉",
             "welcome_message": welcome_message,
+            "followup_messages": followup_messages,
+            "show_connectors": True,
         },
         status_code=200,
     )
