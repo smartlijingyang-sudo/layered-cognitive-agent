@@ -15,11 +15,11 @@ from __future__ import annotations
 import warnings
 from collections.abc import Mapping
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from types import MappingProxyType
 
 
-class FallbackPolicy(str, Enum):
+class FallbackPolicy(StrEnum):
     """Profile 缺少 runtime capability 时允许的显式装配策略。"""
 
     PRODUCTION = "production"

@@ -20,7 +20,7 @@ state outside what the caller threads in. The runtime injects them into
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Protocol, runtime_checkable
 
 from lca.contracts.atoms.enums.enums import MemoryLayer, MemoryRecordKind
@@ -28,7 +28,7 @@ from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.conversation.memory import MemoryRecord
 
 
-class MemoryAuthority(str, Enum):
+class MemoryAuthority(StrEnum):
     """Origin authority of a memory write (v3 §5.5).
 
     Drives ``MemoryPolicy`` accept / reject decisions. Adding new

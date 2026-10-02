@@ -6,10 +6,10 @@ Aligns with LobeHub ``resolveExecutionTarget()``.  Pure decision: no I/O.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 
-class ExecutionTarget(str, Enum):
+class ExecutionTarget(StrEnum):
     SANDBOX = "sandbox"
     DEVICE = "device"
     AUTO = "auto"

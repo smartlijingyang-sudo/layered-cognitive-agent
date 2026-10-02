@@ -19,11 +19,11 @@ The agent always gets a chance to degrade gracefully.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class DegradationKind(str, Enum):
+class DegradationKind(StrEnum):
     """Classification of tool failures for degradation purposes."""
 
     PERMISSION = "permission"  # 403, auth, insufficient permissions

@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from time import time
 from typing import Any
 
 
-class ApprovalState(str, Enum):
+class ApprovalState(StrEnum):
     """Durable states for one human approval request."""
 
     REQUESTED = "requested"

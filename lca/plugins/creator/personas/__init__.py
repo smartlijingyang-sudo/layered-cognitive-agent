@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from lca.contracts.atoms.artifact.state import ArtifactState
 
 
-class CreatorFace(str, Enum):
+class CreatorFace(StrEnum):
     """Creator 4 faces (ADR-0074 §三 V7 acceptance)。
 
     字符串值稳定（CLI / journal / plan_ref 引用）；新增 face 必须经

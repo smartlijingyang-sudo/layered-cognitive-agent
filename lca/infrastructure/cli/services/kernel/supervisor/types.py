@@ -8,12 +8,12 @@ import them without cycles.
 
 from __future__ import annotations
 
-import enum
+from enum import StrEnum
 import shlex
 from dataclasses import dataclass, field
 
 
-class ProgramState(str, enum.Enum):
+class ProgramState(StrEnum):
     """Lifecycle state of one supervised program.
 
     String-valued so :class:`ProgramStatus` serialises naturally in

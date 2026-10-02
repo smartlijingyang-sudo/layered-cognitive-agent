@@ -6,14 +6,14 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class Setting(str, Enum):
+class Setting(StrEnum):
     """Canonical settings ids (the LCA_LOOP_* env vars)."""
 
     PersistFullPrompt = "persist_full_prompt"

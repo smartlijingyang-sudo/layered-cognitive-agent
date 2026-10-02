@@ -7,7 +7,7 @@ Generation knobs stay in ``llm_adapter.settings.LLMSettings``.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -17,7 +17,7 @@ from lca.infrastructure.llm_adapter.factory.factory import load_dotenv_if_presen
 DEFAULT_CHAT_MODEL = "qwen3.7-plus"
 
 
-class LLMFace(str, Enum):
+class LLMFace(StrEnum):
     """Which wire a caller needs.
 
     ``AGENT`` may be Anthropic Messages. ``OPENAI_COMPAT`` is chat/completions

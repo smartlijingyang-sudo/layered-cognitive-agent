@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class LlmTurnMode(str, Enum):
+class LlmTurnMode(StrEnum):
     """How the Reasoner invokes the LLM for a single step (GeneralChatAgent parity).
 
     STREAM — default: streamed completion; text and tool_calls come from the same

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class ApiName(str, Enum):
+class ApiName(StrEnum):
     LIST_FILES = "listFiles"
     READ_FILE = "readFile"
     WRITE_FILE = "writeFile"
@@ -20,8 +20,6 @@ class ApiName(str, Enum):
     EXECUTE_CODE = "executeCode"
     EXPORT_FILE = "exportFile"
 
-    def __str__(self) -> str:
-        return self.value
 
 
 # exportFile is sandbox-only (file download mechanism is specific to sandbox).

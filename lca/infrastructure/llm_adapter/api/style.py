@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class LLMApiStyle(str, Enum):
+class LLMApiStyle(StrEnum):
     """OpenAICompatAdapter 内部 Strategy 选择键。"""
 
     CHAT_COMPLETIONS = "chat_completions"

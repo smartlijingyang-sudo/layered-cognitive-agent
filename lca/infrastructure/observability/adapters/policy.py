@@ -9,7 +9,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import re
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import Any
 
 _PREVIEW_KEYS = frozenset(
@@ -48,7 +48,7 @@ _SUFFIX = "..."
 _REDACTED = "[REDACTED]"
 
 
-class Verbosity(str, Enum):
+class Verbosity(StrEnum):
     """信息量档位：控制预览长度与属性丰度。"""
 
     MINIMAL = "minimal"

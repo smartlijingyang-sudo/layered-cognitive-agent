@@ -18,10 +18,10 @@ LobeHub UI → LCA gateway:
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class AgentPhase(str, Enum):
+class AgentPhase(StrEnum):
     """Stable phase ids aligned with @lobechat/agent-runtime context.phase."""
 
     USER_INPUT = "user_input"
