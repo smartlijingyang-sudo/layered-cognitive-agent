@@ -69,3 +69,32 @@ async def test_tool_fork_dispatch_fail_loud_when_sandbox_tools_missing(
             _Ctx(),  # type: ignore[arg-type]
             NodeInput(port_values={"bindings": bindings}),
         )
+
+
+def test_assert_sandbox_tools_visible_passes_with_new_naming() -> None:
+    """v1 退役后的新命名 (box_run_command/sandbox_execute) 同样放行。"""
+    bindings = BindingsView(sandbox=object())
+    items = (
+        SimpleNamespace(name="g2a:box_run_command"),
+        SimpleNamespace(name="g2a:sandbox_execute"),
+    )
+    _assert_sandbox_tools_visible(bindings, items)
+
+
+def test_assert_sandbox_tools_visible_passes_with_mixed_naming() -> None:
+    """一组 v1 名、一组新名 → 放行（按组接受任一命名）。"""
+    bindings = BindingsView(sandbox=object())
+    items = (
+        SimpleNamespace(name="g2a:runCommand"),
+        SimpleNamespace(name="g2a:sandbox_execute"),
+    )
+    _assert_sandbox_tools_visible(bindings, items)
+
+
+def test_assert_sandbox_tools_visible_fails_when_one_group_missing() -> None:
+    """只有 command 组、缺 code 组 → 仍然 fail-loud。"""
+    bindings = BindingsView(sandbox=object())
+    with pytest.raises(RuntimeError, match="sandbox_execute"):
+        _assert_sandbox_tools_visible(
+            bindings, (SimpleNamespace(name="box_run_command"),)
+        )
