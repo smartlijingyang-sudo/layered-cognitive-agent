@@ -145,7 +145,13 @@ def _read_emits(node: object, key: str) -> tuple[str, object] | None:
     for val in present:
         if not isinstance(val, (list, tuple)):
             return ("malformed", val)
-    return ("declared", list(present[0]))
+    first = present[0]
+    if isinstance(first, (list, tuple)):
+        return ("declared", list(first))
+    # Unreachable: the loop above returns for every non-list/tuple value,
+    # so present[0] is necessarily a list or tuple here; pyright cannot
+    # carry that narrowing through list indexing.
+    return None
 
 
 def _is_empty_or_absent(read: tuple[str, object] | None) -> bool:
@@ -153,7 +159,10 @@ def _is_empty_or_absent(read: tuple[str, object] | None) -> bool:
     if read is None:
         return True
     if read[0] == "declared":
-        return len(read[1]) == 0
+        # The "declared" tag is only ever produced with a list payload
+        # (see _read_emits); the isinstance recheck keeps the static
+        # type honest with zero runtime behaviour change.
+        return isinstance(read[1], list) and len(read[1]) == 0
     # "malformed" is handled separately; do not treat it as "empty".
     return False
 
