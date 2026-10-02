@@ -14,6 +14,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+# 迁移脚本位于仓库根 scripts/,测试以绝对路径调用(脚本从未存在于
+# tests/scenario/scripts/,原相对路径 + cwd=tests/scenario 恒 FileNotFoundError)。
+_SCRIPT = Path(__file__).resolve().parents[3] / "scripts" / "migrate_journal_v1_to_v2.py"
+
 
 def _v1_record(**overrides: object) -> dict[str, object]:
     base: dict[str, object] = {
@@ -47,7 +51,7 @@ def test_migrate_v1_to_v2(tmp_path: Path) -> None:
     rc = subprocess.run(  # noqa: S603  # intentional CLI invocation
         [
             sys.executable,
-            "scripts/migrate_journal_v1_to_v2.py",
+            str(_SCRIPT),
             str(input_path),
             str(output_path),
         ],
@@ -93,7 +97,7 @@ def test_migrate_skips_already_v2(tmp_path: Path) -> None:
     rc = subprocess.run(  # noqa: S603  # intentional CLI invocation
         [
             sys.executable,
-            "scripts/migrate_journal_v1_to_v2.py",
+            str(_SCRIPT),
             str(input_path),
             str(output_path),
         ],
@@ -119,7 +123,7 @@ def test_migrate_in_place(tmp_path: Path) -> None:
     rc = subprocess.run(  # noqa: S603  # intentional CLI invocation
         [
             sys.executable,
-            "scripts/migrate_journal_v1_to_v2.py",
+            str(_SCRIPT),
             "--in-place",
             str(input_path),
         ],
@@ -138,7 +142,7 @@ def test_migrate_missing_file_returns_nonzero(tmp_path: Path) -> None:
     rc = subprocess.run(  # noqa: S603  # intentional CLI invocation
         [
             sys.executable,
-            "scripts/migrate_journal_v1_to_v2.py",
+            str(_SCRIPT),
             str(tmp_path / "nonexistent.jsonl"),
             str(tmp_path / "out.jsonl"),
         ],
@@ -159,7 +163,7 @@ def test_migrate_unknown_schema_warns_but_passes_through(tmp_path: Path) -> None
     rc = subprocess.run(  # noqa: S603  # intentional CLI invocation
         [
             sys.executable,
-            "scripts/migrate_journal_v1_to_v2.py",
+            str(_SCRIPT),
             str(input_path),
             str(output_path),
         ],
@@ -182,7 +186,7 @@ def test_migrate_invalid_json_returns_nonzero(tmp_path: Path) -> None:
     rc = subprocess.run(  # noqa: S603  # intentional CLI invocation
         [
             sys.executable,
-            "scripts/migrate_journal_v1_to_v2.py",
+            str(_SCRIPT),
             str(input_path),
             str(output_path),
         ],
