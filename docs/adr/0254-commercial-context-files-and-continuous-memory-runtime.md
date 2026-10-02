@@ -308,3 +308,13 @@ Runtime 启动 Inotify 监听器。当任一 Standing 文件在磁盘发生变�
 - **与 ADR-0247 的关系**：0247 的 `MemoryRecord` **领域语义**（dedupe/supersede/provenance/lifecycle）继续继承；**存储真值**不再是 JSON——正文“不替代”段落与 §0 Q3 已同步修订。
 - **裁决理由（muse 思想）**：① SSOT 字面即“单一”——B 方案的“双层并存+同步裁决”引入了一个没有裁决机制的同步问题，是复杂度而非机制；② 生产 Muse 的实测形态就是 Markdown 为底座、索引为派生（ADR-0255 §4.2/§4.3）；③ ADR-0258 C2 已确立“journal 是压缩摘要细节恢复的唯一合法路径”——与 A 一致、与 B 冲突。
 - **联动**：ADR-0258 §5③ 的修订引用要求由本条覆盖。
+
+### v3 — 2026-10-02：SSOT 按写者域划分澄清（非反转 v2）
+
+- **背景**：arch 轮只读实证（todo-14）发现语义记忆真实写路径为 JSON-first（先写 `semantic.json`，再精选投影 `MEMORY.md`，投影失败回滚 JSON），与 v2“`semantic.json` 为只读派生索引”措辞直接矛盾。同时发现 `USER.md` 被系统全量重建。
+- **裁决**（李超授权 Athena 按 muse 思想）：v2 的“Markdown 为准”**收敛到用户域**，不泛化到 agent 域。SSOT 的粒度是写者域，不是全局：
+  1. **用户域**（`USER.md`/`SOUL.md`/`TOOLS.md`/`IDENTITY.md`/`MEMORY.md` 精选版/`people/`/`groups/`/daily）：**Markdown 是 SSOT**，v2 在此域完全成立。系统不得从 JSON 重建这些文件；`USER.md` 被系统全量重建若属实则为 bug（用户以为拥有文件、实际被覆盖），已立项 quality lane 实证。
+  2. **Agent 域**（`semantic.json` 及语义管线）：**JSON 是主存储**，v2 的“派生、只读、可重建”措辞在此域收回。当前 JSON-first 写路径 + 回滚语义是 sound 的，不动。
+- **裁决理由（muse 思想）**：① 信息论硬约束——精选投影是 lossy（有损）的，有损投影在数学上不可能作为重建源，v2“索引损坏不丢真值”在此不成立；② 机制决定归属——用户写 MD、agent 写 JSON，各自域内单一真值，跨域在定义的同步点（精选投影）交接，这是实测的写者分布，不是偏好；③ YAGNI——JSON-first 语义管线是工作中的可靠机制（原子写+回滚），为满足一句过泛的措辞去重构它，是倒果为因。
+- **与 v2 的关系**：v2 不撤销。v2 正确裁决了用户域的 Markdown SSOT（这是 standing 文件概念的核心：用户拥有并编辑）；v3 只把 v2 过泛到 agent 域的部分收回。`bank/`/`index/` 仍为派生索引（此点 v2 无误）。
+- **后续**：ADR-0266（或本 ADR v4） documenting 两域边界、写权限矩阵、`USER.md` 重建问题的实证结论。
