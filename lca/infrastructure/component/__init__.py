@@ -6,4 +6,4 @@ from lca.infrastructure.component.registry import (
     RegistryKeyError,
 )
 
-__all__ = ['RegistryKeyError', 'NamedRegistry', 'ComponentRegistry']
+__all__ = ['ComponentRegistry', 'NamedRegistry', 'RegistryKeyError']
