@@ -252,7 +252,9 @@ def test_cognitive_emit_context_manifested_via_gateway() -> None:
                 kind="policy_fact",
                 payload="loop warning",
                 provenance="repeat_tool_call",
-                source="repeat_tool_call",
+                # NOTE(round-0426): ContextItem 从未有过 source 字段;
+                # 5cb931881 把 PolicyFact(source=...) 迁成 ContextItem 时误带过来的
+                # stale kwarg(provenance 已承载 repeat_tool_call,断言只查 provenance)。
             ),
         ),
         digest="digest-gw",
