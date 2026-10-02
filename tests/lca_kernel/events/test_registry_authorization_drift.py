@@ -30,11 +30,11 @@ def _config_dir() -> Path:
 
 
 def test_validate_publisher_authorization_passes_with_aligned_catalog() -> None:
-    """catalog 与 yaml 现状对齐(2026-09-04 web-standard)→ validate 通过。
+    """catalog 与 yaml 现状对齐 → validate 通过。
 
-    真实 boot 路径会注入 14 个 publisher(11 个 spine_reflector_X +
-    delegation_cache + model_visible + events.bus)。此测试用同一份
-    catalog 注入,验证 :meth:`validate_publisher_authorization` 不抛。
+    现行 marker 鉴权只剩 delegation_cache + events.model_visible.publisher
+    (reflector 族退役,spine categories 走 FactGateway class-path 授权)。
+    此测试用同一份 catalog 注入,验证 :meth:`validate_publisher_authorization` 不抛。
     """
     from lca_kernel.events.test.catalog import build_test_catalog
 
@@ -68,9 +68,10 @@ def test_validate_publisher_authorization_drift_message_includes_token() -> None
     """Drift 信息含具体 token,运营可据此定位 yaml 错位行。"""
     from lca_kernel.events.test.catalog import build_test_catalog
 
-    # 拿掉一个 reflector 的 catalog 项,模拟"yaml 引用了但 plugin 没启"
+    # 拿掉 delegation_cache 的 catalog 项,模拟"yaml 引用了但 plugin 没启"
+    # (reflector 族已退役;现行 marker 鉴权只剩 delegation_cache + model_visible)
     catalog = build_test_catalog()
-    catalog.pop("events.spine.reflector.transport", None)
+    catalog.pop("delegation_cache", None)
     registry = EventRegistry.load(_config_dir(), catalog=catalog)
     registry.refresh()
     with pytest.raises(UnknownPluginIdError) as ei:
@@ -87,17 +88,13 @@ def test_check_manifest_emits_aligned_passes_for_known_publisher() -> None:
     catalog = build_test_catalog()
     registry = EventRegistry.load(_config_dir(), catalog=catalog)
     registry.refresh()
-    # transport reflector 声明的 6 个 emit 全是已登记 category
+    # model_visible publisher 声明的 2 个 emit 全是已登记 category
     emits = (
-        "spine.transport.route.enter",
-        "spine.transport.route.exit",
-        "spine.transport.sse.publish",
-        "spine.kernel.run.start",
-        "spine.kernel.run.stop",
-        "spine.kernel.run.cancelled",
+        "spine.llm.request.header",
+        "spine.llm.request.header.assistant",
     )
     # 不应抛
-    registry.check_manifest_emits_aligned("events.spine.reflector.transport", emits)
+    registry.check_manifest_emits_aligned("events.model_visible.publisher", emits)
 
 
 def test_check_manifest_emits_aligned_fails_for_unknown_execution_point() -> None:
@@ -109,8 +106,8 @@ def test_check_manifest_emits_aligned_fails_for_unknown_execution_point() -> Non
     registry.refresh()
     with pytest.raises(AuthMatrixMismatchError) as ei:
         registry.check_manifest_emits_aligned(
-            "events.spine.reflector.transport",
-            ("spine.transport.route.enter", "spine.does.not.exist"),
+            "events.model_visible.publisher",
+            ("spine.llm.request.header", "spine.does.not.exist"),
         )
     assert "spine.does.not.exist" in ei.value.missing_publish
 
@@ -122,11 +119,11 @@ def test_check_manifest_emits_aligned_fails_for_emits_not_in_publishers() -> Non
     catalog = build_test_catalog()
     registry = EventRegistry.load(_config_dir(), catalog=catalog)
     registry.refresh()
-    # spine_reflector_transport 试图 publish cognition category,自己不在该集合
+    # model_visible 试图 publish delegation_cache 的 category,自己不在该集合
     with pytest.raises(AuthMatrixMismatchError):
         registry.check_manifest_emits_aligned(
-            "events.spine.reflector.transport",
-            ("spine.cognition.brain.perceive.start",),
+            "events.model_visible.publisher",
+            ("team.delegation.cache_hit",),
         )
 
 
