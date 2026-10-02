@@ -45,8 +45,8 @@ class ActCapabilityGrantExecutor:
 
     semantic_name: str = "act.capability.grant"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("decision",)
-    declared_outputs: tuple[PortName, ...] = ("decision",)
+    declared_inputs: tuple[PortName, ...] = (PortName("decision"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("decision"),)
 
     async def node_execute(
         self,
@@ -59,13 +59,13 @@ class ActCapabilityGrantExecutor:
         outputs 端口(yaml):decision (Decision)
         """
         del context
-        decision = input.port_values.get("decision")
+        decision = input.port_values.get(PortName("decision"))
         if not isinstance(decision, Decision):
             raise TypeError(
                 "act.capability.grant: 'decision' port must be a Decision "
                 f"instance, got {type(decision).__name__}"
             )
-        return NodeOutput(port_values={"decision": decision})
+        return NodeOutput(port_values={PortName("decision"): decision})
 
 
 @plugin(
