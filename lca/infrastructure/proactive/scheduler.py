@@ -85,7 +85,6 @@ class ProactiveScheduler:
     def _tick_locked(self, now_ms: int) -> TickReport:
         self._prune_dead_letters(now_ms)
         state = self._load_state()
-        report = TickReport(tick_at_ms=now_ms, lock_acquired=True)
         due = delivered = silent = rejected = failed = dead = 0
 
         for job in self._job_source():
