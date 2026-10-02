@@ -11,7 +11,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from inspect import isawaitable
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol, cast, runtime_checkable
 
 from lca.contracts.models.core.state.state import AgentState, Budget
 from lca.contracts.protocols.graph.node_io import NodeInput, NodeOutput
@@ -122,7 +122,9 @@ class DefaultSubgraphRun:
 
                 exit_subgraph(depth_token)
             raise
-        merged_output: Mapping[str, Any] = outcome  # type: ignore[assignment]
+        # The inner port snapshot is PortName-keyed at runtime (see the
+        # set_outer_input comments above); the declared str alias is loose.
+        merged_output = cast("Mapping[PortName, Any]", outcome)
         outer_output = translate_outputs(context, merged_output)
         observe_exit(
             self.observer,
@@ -140,7 +142,7 @@ class DefaultSubgraphRun:
         return NodeOutput(port_values=outer_output, producer_node=context.node_id)
 
 
-def translate_inputs(context: StrategyContext, input: NodeInput) -> dict[str, Any]:
+def translate_inputs(context: StrategyContext, input: NodeInput) -> dict[PortName, Any]:
     """Project outer input ports onto inner declared inputs by name (ADR-0241 §1).
 
     Name-based projection semantics:
@@ -168,8 +170,10 @@ def translate_inputs(context: StrategyContext, input: NodeInput) -> dict[str, An
     return {name: outer_ports[name] for name in inner_input_names if name in outer_ports}
 
 
-def translate_outputs(context: StrategyContext, merged_output: Mapping[str, Any]) -> dict[str, Any]:
-    outer_output: dict[str, Any] = dict(merged_output)
+def translate_outputs(
+    context: StrategyContext, merged_output: Mapping[PortName, Any]
+) -> dict[PortName, Any]:
+    outer_output: dict[PortName, Any] = dict(merged_output)
     outer_declared_outputs = outer_declared_outputs_of(context)
     if outer_declared_outputs:
         # Prefer name-based mapping. ``merged_output`` is the inner
@@ -198,7 +202,7 @@ def translate_outputs(context: StrategyContext, merged_output: Mapping[str, Any]
             if translated:
                 outer_output = translated
     if outer_declared_outputs and len(outer_output) != len(outer_declared_outputs):
-        direct_mapped = {}
+        direct_mapped: dict[PortName, Any] = {}
         for outer_name in outer_declared_outputs:
             if outer_name in merged_output:
                 direct_mapped[outer_name] = merged_output[outer_name]
@@ -207,10 +211,10 @@ def translate_outputs(context: StrategyContext, merged_output: Mapping[str, Any]
     return outer_output
 
 
-def outer_declared_outputs_of(context: StrategyContext) -> tuple[str, ...]:
+def outer_declared_outputs_of(context: StrategyContext) -> tuple[PortName, ...]:
     declared = context.node_config.get("declared_outputs") if context.node_config else None
     if isinstance(declared, (list, tuple)) and declared:
-        return tuple(str(name) for name in declared)
+        return tuple(PortName(str(name)) for name in declared)
     return ()
 
 
