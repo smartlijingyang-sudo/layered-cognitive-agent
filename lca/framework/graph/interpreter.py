@@ -69,6 +69,7 @@ from lca.contracts.protocols.graph.ports import PortName
 from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.contracts.protocols.graph.strategy import StrategyContext
 from lca.contracts.protocols.graph.visit import DispatchDecision, VisitRecord
+from lca.framework.graph.node_latency import NodeLatencyTracker
 from lca.framework.graph.observation import (
     KIND_EDGE,
     KIND_VISIT_END,
@@ -136,6 +137,7 @@ class PlanInterpreter:
 
     registry: StrategyRegistry
     recorder: VisitRecorder = field(default_factory=VisitRecorder)
+    latency: NodeLatencyTracker = field(default_factory=NodeLatencyTracker)
     artifacts: Mapping[str, object] = field(default_factory=dict)
     observer: GraphObserver = field(default_factory=NullGraphObserver)
     clock: Clock = field(default=_default_clock)
@@ -257,6 +259,7 @@ class PlanInterpreter:
                         occurred_at_ms=self.clock(),
                     )
                 )
+                self.latency.record(node.id, self.clock() - visit_started)
                 raise
             # Success-path only: a raising strategy exits through the
             # ``visit_end(outcome="failure")`` observation above, which is
@@ -306,6 +309,7 @@ class PlanInterpreter:
                         occurred_at_ms=self.clock(),
                     )
                 )
+                self.latency.record(node.id, self.clock() - visit_started)
                 visit = VisitRecord(
                     plan_ref=plan.id,
                     node_id=node.id,
@@ -347,6 +351,7 @@ class PlanInterpreter:
                                 occurred_at_ms=self.clock(),
                             )
                         )
+                        self.latency.record(node.id, self.clock() - visit_started)
                         visit = VisitRecord(
                             plan_ref=plan.id,
                             node_id=node.id,
@@ -407,6 +412,7 @@ class PlanInterpreter:
                     occurred_at_ms=self.clock(),
                 )
             )
+            self.latency.record(node.id, self.clock() - visit_started)
             if edge is not None:
                 self.observer.observe(_edge_of(plan.id, node.id, edge, depth, self.clock()))
             visit = VisitRecord(
