@@ -210,6 +210,10 @@
 | [0270](0270-task-intake-gate.md) | 任务受理门契约：首 turn 必答 7 问（run 时精简版）、触及改契约/闭集/SSOT 时 fail-closed 停出方案、受理答案落 journal evidence；ADR-0255 §0 的 LCA 落地提案 | Proposed |
 | [0271](0271-avatar-system-alignment-and-supplement.md) | Avatar 头像系统对齐与补遗：与 ADR-0269 的重叠清单、三处实质冲突（IDENTITY.md 写入路径/avatar 第九域/视频异步类型归属）、新增并发守卫/候选上限/隐私补强/第一人称话术 | Proposed |
 | [0272](0272-realtime-info-routing-iron-rule.md) | 实时信息路由铁律契约：查询 vs 核验路由二分、search 结果证据纪律（肯定弱化/否定纪律）、真机任务书三要素、账号内数据走 skill 优先；ADR-0255 §3.3 的 LCA 落地提案 | Proposed |
+| [0273](0273-streaming-interleave-think-act.md) | 流式交错契约：think 流式产出期间 act 侧做无副作用预准备（参数校验/审批预判/连接预热），交错点在 emit seam、不改六 phase 拓扑；hint 不是承诺、正式 dispatch 仍完整 fail-closed | Proposed |
+| [0274](0274-phase-wire-budget.md) | Phase Wire 预算契约：phase 级 token 预算配置层声明、装配后 wire 投射前强制执行；超预算时 perceive 按传感器优先级裁剪、think 触发工具域 defer；ADR-0256 预算思想的 phase 级推广 | Proposed |
+| [0275](0275-window-pressure-phase-degradation.md) | 窗口压力 phase 降级契约：WindowPressure 信号 SSOT（phase 只读不写）、降级策略声明式进配置、落点为 control 贡献契约新 slot；reflect 高压力降级快速路径、remember 批量异步；与 0258 记忆层压缩正交 | Proposed |
+
 | [0255](0255-muse-production-runtime-full-reference.md) | Muse 生产运行时全量参考：每 turn 上下文装配顺序、9 个 standing 文件全文与权限矩阵、36 工具命名空间函数清单与关键参数、9 大机制（记忆三层/强制检索/落笔写盘/provenance/压缩豁免/子 agent 继承/自省投影）与 12 条验收用例；ADR-0254 的实证 companion | Proposed |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
