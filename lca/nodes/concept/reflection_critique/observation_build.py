@@ -49,8 +49,8 @@ class ReflectObservationBuildExecutor:
 
     semantic_name: str = "reflect.observation.build"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("receipt",)
-    declared_outputs: tuple[PortName, ...] = ("observation",)
+    declared_inputs: tuple[PortName, ...] = (PortName("receipt"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("observation"),)
 
     async def node_execute(
         self,
@@ -63,7 +63,7 @@ class ReflectObservationBuildExecutor:
         outputs 端口(yaml):observation (Observation)
         """
         del context
-        receipt = input.port_values.get("receipt")
+        receipt = input.port_values.get(PortName("receipt"))
         if not isinstance(receipt, EffectReceipt):
             raise TypeError(
                 "reflect.observation.build: 'receipt' port must be an "
@@ -71,7 +71,7 @@ class ReflectObservationBuildExecutor:
             )
 
         observation = _build_observation(receipt)
-        return NodeOutput(port_values={"observation": observation})
+        return NodeOutput(port_values={PortName("observation"): observation})
 
 
 def _build_observation(receipt: EffectReceipt) -> Observation:
