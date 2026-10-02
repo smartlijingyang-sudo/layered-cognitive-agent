@@ -5,7 +5,7 @@ no-op accumulator**:不在 import 时崩溃,apply 仍然累加最小 span 描述
 内部 state;view 返回该列表;host 可在外部 flush 时落盘。
 
 设计要点:
-- try/except ImportError 在模块级进行;``_OTEL_AVAILABLE`` 与 ``_Tracer``
+- try/except ImportError 在模块级进行;``_OTEL_AVAILABLE`` 与 ``_otel_trace``
   是占位,在 SDK 缺席时为 None。
 - reducer state 是 dict[str, Any](``{"spans": list[dict[str, Any]]}``),
   避免引入 ``opentelemetry`` 类型依赖 dataclass。
