@@ -30,7 +30,9 @@ def test_result_from_state_not_in_source() -> None:
     (def from_state)与调用必须清除。
     """
 
-    from lca.contracts.models.core import result as result_module
+    # NOTE (round-0347): result submodule now lives under
+    # lca.contracts.models.core.execution (no longer re-exported).
+    from lca.contracts.models.core.execution import result as result_module
 
     src = result_module.__file__ or ""
     with open(src, encoding="utf-8") as fh:
