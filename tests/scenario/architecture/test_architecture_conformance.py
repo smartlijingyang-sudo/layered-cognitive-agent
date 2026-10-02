@@ -116,7 +116,7 @@ class TestPhaseAllowlist:
 
     def test_runtime_loop_calls_only_allowed_seams(self) -> None:
         """No seam outside the allowlist is referenced in runtime_loop.py."""
-        src = _read_source(L2 / "runtime_loop.py")
+        src = _read_source(L2 / "loop" / "runtime_loop.py")
         # cordis-style on(...) / events.on(...) would be the legacy surface.
         # We assert: runtime_loop does not bind to cordis surface here.
         bad = re.findall(r'events\.on\(\s*[\'"](agent\.[a-z_]+)[\'"]', src)
@@ -356,7 +356,7 @@ class TestIgnoreEmitReturn:
     """
 
     def test_runtime_loop_ignores_emit_return(self) -> None:
-        src = _read_source(L2 / "runtime_loop.py")
+        src = _read_source(L2 / "loop" / "runtime_loop.py")
         # The cogent signature: every ``state = await self._emit(...)`` is
         # replaced by ``await self._emit(...)`` (return discarded).  Even
         # before PR5, runtime_loop re-uses the result of old _emit; PR5
