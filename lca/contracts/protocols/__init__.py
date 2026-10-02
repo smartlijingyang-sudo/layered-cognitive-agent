@@ -24,13 +24,6 @@ from lca.contracts.mechanisms import (
 # ── ActionHandler（ADR-0074 插件化行动处理器）────────
 from lca.contracts.protocols.act.action.handler import ActionHandler, ActionHandlerRegistry
 
-# ── Agent client protocol (PR-6; pure add) ─────
-from lca.contracts.protocols.agent import (
-    AgentClient,
-    AgentRequest,
-    AgentResponse,
-)
-
 # ── CommandEnvelope + RunFact (ADR-0068 §五 + ADR-0074 PR-7 V4) ─────────
 from lca.contracts.protocols.act.command.envelope import (
     BudgetReservation,
@@ -68,6 +61,13 @@ from lca.contracts.protocols.act.tool.pipeline import (
     ToolPreDecision,
     ToolProvider,
     ToolRenderer,
+)
+
+# ── Agent client protocol (PR-6; pure add) ─────
+from lca.contracts.protocols.agent import (
+    AgentClient,
+    AgentRequest,
+    AgentResponse,
 )
 
 # ── L3 Agent / Team 入口 ──────────────────────────────────
@@ -112,6 +112,23 @@ from lca.contracts.protocols.declarative.declarative_1.declarative_execution imp
     EffectDispatcher,
     JournalCommitter,
 )
+
+# ADR-0221: ``NodeExecutor`` is the sole node-level executor Protocol
+# (replaces ``PhaseExecutor``). Re-exported alongside
+# ``GraphNodeExecutor`` (the orchestration-graph variant) for callers
+# that distinguish them.
+from lca.contracts.protocols.declarative.declarative_1.node_executor import (
+    NodeContext as PhaseNodeContext,
+)
+from lca.contracts.protocols.declarative.declarative_1.node_executor import (
+    NodeExecutor,
+)
+from lca.contracts.protocols.declarative.declarative_1.node_executor import (
+    NodeInput as PhaseNodeInput,
+)
+from lca.contracts.protocols.declarative.declarative_1.node_executor import (
+    NodeOutput as PhaseNodeOutput,
+)
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
     DECLARATIVE_PLAN_VERSION,
     PLUGIN_SPEC_VERSION,
@@ -136,16 +153,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph i
     ValidationIssue,
     ValidationReport,
 )
-# ADR-0221: ``NodeExecutor`` is the sole node-level executor Protocol
-# (replaces ``PhaseExecutor``). Re-exported alongside
-# ``GraphNodeExecutor`` (the orchestration-graph variant) for callers
-# that distinguish them.
-from lca.contracts.protocols.declarative.declarative_1.node_executor import (
-    NodeContext as PhaseNodeContext,
-    NodeExecutor,
-    NodeInput as PhaseNodeInput,
-    NodeOutput as PhaseNodeOutput,
-)
+
 # ControlEntry retired in ADR-0221; phase control surfaces are now
 # additional NodeExecutor nodes in each phase subgraph bundle.
 from lca.contracts.protocols.gate.budget_policy import BudgetPolicy
@@ -171,8 +179,10 @@ from lca.contracts.protocols.graph import (
     PlanNode,
     PortSpec,
     StrategyContext,
-    SubgraphReference as GraphSubgraphReference,
     VisitRecord,
+)
+from lca.contracts.protocols.graph import (
+    SubgraphReference as GraphSubgraphReference,
 )
 
 # ── ArtifactClosure（ADR-0074 可定制 loop exit 闭合文本）────────
@@ -323,6 +333,10 @@ from lca.contracts.protocols.think.cognitive_pipeline import (
 )
 
 __all__ = [
+    "COMPILED_RUN_PLAN_VERSION",
+    "DECLARATIVE_PLAN_VERSION",
+    "PLUGIN_SPEC_VERSION",
+    "SANDBOX_SKILL_MOUNT_PREFIX",
     "ActionAuthorityPlan",
     "ActionHandler",
     "ActionHandlerRegistry",
@@ -343,7 +357,6 @@ __all__ = [
     "BudgetCeiling",
     "BudgetPolicy",
     "BudgetReservation",
-    "COMPILED_RUN_PLAN_VERSION",
     "CapabilityBinding",
     "CapabilityDeclaration",
     "CapabilityGrant",
@@ -359,7 +372,6 @@ __all__ = [
     "ControlVerdict",
     "ControlVerdictKind",
     "Critic",
-    "DECLARATIVE_PLAN_VERSION",
     "DecisionGate",
     "DecisionGateAssembler",
     "DecisionRef",
@@ -408,7 +420,6 @@ __all__ = [
     "NodeStrategy",
     "ObservabilityBackend",
     "OrchestrationRegistryProtocol",
-    "PLUGIN_SPEC_VERSION",
     "PerceiveHub",
     "PerceiveHubAssembler",
     "PhaseBudgetSnapshot",
@@ -462,7 +473,6 @@ __all__ = [
     "RuntimeLifecycleSubscriber",
     "RuntimeLifecycleSubscriberContribution",
     "RuntimeLifecycleSubscriberRegistry",
-    "SANDBOX_SKILL_MOUNT_PREFIX",
     "SafeExecutor",
     "Sandbox",
     "SandboxRuntime",

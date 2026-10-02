@@ -164,8 +164,8 @@ class NodeOutput(BaseModel):
 
 
 __all__ = [
-    "NodeInput",
     "NodeIOSchema",
+    "NodeInput",
     "NodeOutput",
     "NodeSchemaError",
     "PortSpec",
