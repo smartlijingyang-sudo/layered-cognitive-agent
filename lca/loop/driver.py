@@ -331,6 +331,9 @@ class DeclarativeExecution:
         from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
             ExecutionOutcome,
         )
+        from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
+            PhaseRunCursor as _ContractsPhaseRunCursor,
+        )
         from lca.framework.graph.adapter import PhaseRunCursor
 
         output_ports = dict(interpretation.output or {})
@@ -367,10 +370,14 @@ class DeclarativeExecution:
 
         @_dc(frozen=True, slots=True)
         class _OutcomeShim:
-            kind: object = _kind
-            cursor: object = _cursor_value
-            stop: object = _stop_value
-            error_fact: object | None = None
+            # B-074: 成员按实际类型标注。cursor 双路径各用其一——
+            # 暂停路径用 contracts PhaseRunCursor(_paused_outcome_parts),
+            # 非暂停路径用 framework PhaseRunCursor(interpretation 终端节点产物);
+            # 两者同名不同类,此处取并集。error_fact 在 shim 中始终为 None。
+            kind: ExecutionOutcome = _kind
+            cursor: PhaseRunCursor | _ContractsPhaseRunCursor | None = _cursor_value
+            stop: StopDecision = _stop_value
+            error_fact: None = None
             approval_request: dict | None = _field(default_factory=lambda: _approval_ref)
 
         _outcome = _OutcomeShim()
