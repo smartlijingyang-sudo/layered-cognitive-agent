@@ -28,11 +28,12 @@ from pathlib import Path
 
 import pytest
 
+from lca.contracts.atoms.scope.scope import Scope
+from lca.harness.plan import compiled_run_plan_ref
+from lca.harness.profile.resolve.resolve import resolve_profile
 from lca_kernel.plan.plan_compile import (
     compile_plan as compile_plan_factory,
 )
-from lca.harness.plan import compiled_run_plan_ref
-from lca.harness.profile.resolve.resolve import resolve_profile
 
 GOLDEN_PROFILES_DIR = Path("tests/golden/profiles")
 
@@ -61,9 +62,11 @@ class TestGoldenProfileCoverage:
 
         # V1: control is carried only by the declarative plan projection.
         assert isinstance(plan.control_entries, tuple)
-        # V2: plan_ref is stable 16-char hex
+        # V2: plan_ref is stable; canonical_digest now emits a
+        # "sha256:"-prefixed digest (DEFAULT_DIGEST_PREFIX).
         plan_ref_value = compiled_run_plan_ref(plan)
-        assert len(plan_ref_value) == 16
+        assert plan_ref_value.startswith("sha256:"), plan_ref_value
+        assert len(plan_ref_value) == len("sha256:") + 16, plan_ref_value
 
     @pytest.mark.parametrize("profile_filename", GOLDEN_PROFILES)
     def test_profile_has_non_empty_capability(self, profile_filename: str) -> None:
@@ -81,9 +84,14 @@ class TestGoldenProfileCoverage:
         path = GOLDEN_PROFILES_DIR / profile_filename
         resolved = resolve_profile(path)
         plan = compile_plan_factory(resolved)
-        # ScopePlan has visibility (≥ 1 Scope)
-        assert len(plan.scope.visibility) >= 1
-        # lifecycle is set (string Scope value)
+        # ScopePlan is well-formed: visibility is a tuple of Scope
+        # (CompileOptions.visibility defaults to () since the ADR-0221
+        # cutover; emptiness is legal — visibility is only
+        # serialized/projected, never used for access decisions).
+        assert isinstance(plan.scope.visibility, tuple)
+        assert all(isinstance(v, Scope) for v in plan.scope.visibility)
+        # lifecycle is set (valid Scope member)
+        assert isinstance(plan.scope.lifecycle, Scope)
         assert plan.scope.lifecycle.value != ""
 
     @pytest.mark.parametrize("profile_filename", GOLDEN_PROFILES)
