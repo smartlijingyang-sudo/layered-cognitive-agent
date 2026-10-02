@@ -14,6 +14,12 @@
 | 硬编码治理 | 2026-10-01-hardcoding-remediation-design.md | 2026-10-01-hardcoding-remediation-plan.md | Approved；iter-arch 评估结论：不整篇 ADR 化（INV 矩阵已承载契约价值，见 iteration-backlog todo-4） |
 | LCA runnable capability test suite | 2026-10-01-lca-runnable-capability-test-suite-design.md | —（仅 design） | 2026-10-01 新增，状态待确认 |
 
+## 2026-10-02 新增
+
+| 主题 | 文件 | 状态 |
+|---|---|---|
+| ADR-0268 cron 地基进度交接 | 2026-10-02-adr-0268-cron-foundation-handoff.md | 已合入 `tmp/adr0268-merged`；后续实现见 [ADR-0268 §14](../adr/0268-context-bus-async-executors-and-cron-projection.md) |
+
 ## 历史归档（按月）
 
 - **2026-09-30**：commercial-context-files-and-continuous-memory-design、commercial-dialogue-scenario-eval-design/-plan、mailbox-ledger-dashboard-page-design/-plan

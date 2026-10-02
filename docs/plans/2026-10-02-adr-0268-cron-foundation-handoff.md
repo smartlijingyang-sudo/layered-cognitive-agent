@@ -24,12 +24,12 @@
 ## 未完成（按 ADR §14 验收顺序）
 
 1. 结构保证剩余两条
-   - `lca.nothing_to_do` 工具与「用户轮 wire 不暴露它」的过滤
+   - `lca.nothing_to_do` 工具、「用户轮 wire 不暴露它」的过滤，以及用户轮发出该调用回注错误的契约测试（§14.1、§14.2）
    - 模型改 schedule/timezone/`cron.remove` 的审批回注：写函数在审批结果回注前不调用
 2. cron 工具插件（`cron.add/view/update/remove/list`）注册到 `cron` 命名空间
    - 参考 `lca/plugins/domain/tools/assistant_tools/plugin.py` 的工厂模式与 `current_assistant_id()`
    - 需要解决 assistant home 路径注入与 `created_chat_id` 获取
-3. 调度器 tick（重叠队列、超时重试、stale 收割）与 handoff 注入
+3. 调度器 tick（重叠队列、超时重试、stale 收割）与 handoff 注入；随实现补 ADR §14.3 故障注入测试（worker 被杀重试、审批 10 分钟不变、superseded 竞态、`cron.list` 失败）
 4. HTTP jobs 路由替换 501（`lca/plugins/transport/webserver/routes_1/routes_assistants/jobs.py`）
 5. 前端「即将到来」tab（`deploy/lobehub/patches`）
 
@@ -53,6 +53,8 @@
 
 ## 注意事项
 
+- `mypy` 四个 cron 路径退出 1 是既有失败：38 个错误都在 cron 包之外（parent `__init__` re-export 引入），cron 文件本身无错误。
+- `lint-imports` 退出 1 是既有失败：`lca.infrastructure.cli.commands.kernel` 与 `events_delivery` 的 ignored import 没有匹配。
 - `check_package_contracts.py` 有 47 个既有失败（旧包），新增 cron 包未引入新失败。
 - `tests/architecture/test_assistant_evolve_jobs_invariants.py` 有 4 个既有失败，因为它扫描 `lca/plugins/assistant/jobs.py`，该路径不存在。
 - 工作区有并发会话的未提交文件（`event_translator.py`、`deploy/`、`docs/plans/task.md` 等），不要动、不要提交。
