@@ -48,10 +48,10 @@ def test_spine_envelope_emitter_dispatches_to_runtime_emit() -> None:
 
     emitter = SpineEnvelopeEmitter()
     with patch(
-        "lca.runtime.envelope_emitter.emit_runtime_reducer_apply_start",
+        "lca.runtime.projection.envelope_emitter.emit_runtime_reducer_apply_start",
         side_effect=_start,
     ), patch(
-        "lca.runtime.envelope_emitter.emit_runtime_reducer_apply_end",
+        "lca.runtime.projection.envelope_emitter.emit_runtime_reducer_apply_end",
         side_effect=_end,
     ):
         emitter.emit_reducer_apply_start(method="apply_step_advanced")
@@ -93,10 +93,10 @@ def test_spine_envelope_emitter_dispatches_to_agent_spawn_emit() -> None:
 
     emitter = SpineEnvelopeEmitter()
     with patch(
-        "lca.runtime.envelope_emitter.emit_agent_loop_iteration_start",
+        "lca.runtime.projection.envelope_emitter.emit_agent_loop_iteration_start",
         side_effect=_start,
     ), patch(
-        "lca.runtime.envelope_emitter.emit_agent_loop_iteration_end",
+        "lca.runtime.projection.envelope_emitter.emit_agent_loop_iteration_end",
         side_effect=_end,
     ):
         emitter.emit_agent_loop_iteration_start(trace_id="t-1", role="coder", kind="fresh")
@@ -132,7 +132,7 @@ def test_spine_envelope_emitter_swallows_reflector_exceptions() -> None:
 
     emitter = SpineEnvelopeEmitter()
     with patch(
-        "lca.runtime.envelope_emitter.emit_runtime_reducer_apply_start",
+        "lca.runtime.projection.envelope_emitter.emit_runtime_reducer_apply_start",
         side_effect=RuntimeError("spine unavailable"),
     ):
         emitter.emit_reducer_apply_start(method="x")
