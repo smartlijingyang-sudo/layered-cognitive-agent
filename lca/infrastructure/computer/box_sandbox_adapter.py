@@ -255,13 +255,17 @@ class OnlyboxesBoxAdapter(BoxExecutionPort):
             stdout_b, stderr_b = await asyncio.wait_for(
                 proc.communicate(), timeout=float(timeout_s)
             )
-        except (FileNotFoundError, OSError):
-            # 容器不存在或 docker 未就绪，自动回退到本地隔离沙箱
-            return await self._fallback.run_command(command, timeout_s)
         except TimeoutError:
+            # 注意:TimeoutError 是 OSError 的子类,必须写在前面——否则会被
+            # 下面的 (FileNotFoundError, OSError) 提前捕获,超时将误走
+            # fallback 且容器进程永不 kill(原分支不可达,pyright
+            # reportUnusedExcept 实证)。
             proc.kill()
             await proc.wait()
             raise TimeoutError(f"容器命令执行超时（>{timeout_s}s）") from None
+        except (FileNotFoundError, OSError):
+            # 容器不存在或 docker 未就绪，自动回退到本地隔离沙箱
+            return await self._fallback.run_command(command, timeout_s)
 
         return BoxCommandResult(
             stdout=stdout_b.decode("utf-8", errors="replace"),

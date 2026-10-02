@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 import structlog
 
@@ -19,6 +19,13 @@ from lca.contracts.protocols.mcp.ports import MCPClientPort
 from lca.infrastructure.mcp.transports import create_mcp_transport
 
 _log = structlog.get_logger(__name__)
+
+
+@runtime_checkable
+class _SyncClosableTransport(Protocol):
+    """Transport with an optional synchronous close (no running loop)."""
+
+    def close_sync(self) -> None: ...
 
 
 class MCPClient(MCPClientPort):
@@ -220,7 +227,8 @@ class MCPClient(MCPClientPort):
 
     def close_sync(self) -> None:
         """Synchronously disconnect transport without active loop."""
-        if hasattr(self._transport, "close_sync"):
-            self._transport.close_sync()
+        transport = self._transport
+        if isinstance(transport, _SyncClosableTransport):
+            transport.close_sync()
         self._status = MCPServerStatus.DISCONNECTED
         self._tools.clear()

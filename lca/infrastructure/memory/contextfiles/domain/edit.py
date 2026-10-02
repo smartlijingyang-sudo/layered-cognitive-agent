@@ -30,12 +30,12 @@ def require_fresh(expected: FileVersion | None, current: FileVersion | None) -> 
     conflicts when the other side reports a real file.
     """
 
-    if expected is None and current is None:
-        return
+    if current is None:
+        if expected is None:
+            return
+        raise StaleSnapshotOperationError(f"file disappeared during edit: {expected.path}")
     if expected is None:
         raise StaleSnapshotOperationError(f"file appeared during edit: {current.path}")
-    if current is None:
-        raise StaleSnapshotOperationError(f"file disappeared during edit: {expected.path}")
     if expected.path != current.path or expected.mtime_ns != current.mtime_ns:
         raise StaleSnapshotOperationError(
             f"file changed during edit: {expected.path} (mtime {expected.mtime_ns} -> {current.mtime_ns})"
