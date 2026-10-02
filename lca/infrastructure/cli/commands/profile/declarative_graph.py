@@ -74,13 +74,22 @@ def _mermaid_text(value: str) -> str:
 def audit_declarative_boundaries(root: Path) -> dict[str, Any]:
     """Reject implementation-identity dispatch in MTK and PlanInterpreter (v2)."""
     files = (
-        root / "lca/contracts/protocols/declarative_phase_graph.py",
+        # v2 successors (ADR-0221): the phase-graph contract moved into
+        # declarative_2; the plan interpreter is framework/graph/interpreter.py.
+        # The old GraphAssembler (compile/assembler.py) was deleted wholesale
+        # in the v2 cutover with no direct successor; it stays listed so a
+        # missing target is reported loudly instead of crashing.
+        root / "lca/contracts/protocols/declarative/declarative_2/declarative_phase_graph.py",
         root / "lca/harness/declarative/compile/assembler.py",
-        root / "lca/harness/declarative/execute/interpreter.py",
+        root / "lca/framework/graph/interpreter.py",
     )
     violations: list[dict[str, Any]] = []
+    missing: list[str] = []
     forbidden = {"simple", "default"}
     for path in files:
+        if not path.is_file():
+            missing.append(str(path.relative_to(root)))
+            continue
         tree = ast.parse(path.read_text(), filename=str(path))
         for node in ast.walk(tree):
             if isinstance(node, ast.Compare):
@@ -112,9 +121,10 @@ def audit_declarative_boundaries(root: Path) -> dict[str, Any]:
                 )
     return {
         "audit": "declarative-boundaries",
-        "scanned": [str(path.relative_to(root)) for path in files],
+        "scanned": [str(path.relative_to(root)) for path in files if path.is_file()],
+        "missing": missing,
         "violations": violations,
-        "valid": not violations,
+        "valid": not violations and not missing,
     }
 
 
