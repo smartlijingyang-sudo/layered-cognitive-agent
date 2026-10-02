@@ -204,7 +204,7 @@
 | [0264](0264-proactive-messaging-pipeline.md) | 主动消息三层管道契约：触发/裁决/投递三层分离、裁决纯函数四态（REJECTED/DELIVER_CHAT/DELIVER_QUIET/SILENT）、fail-closed 只用在精确可判定处、投递复用 surface 事件+turn=-1 哨兵+幂等键、落点默认回发起上下文；生产 Muse 主动行为机制的 LCA 落地提案 | Proposed |
 | [0265](0265-system-prompt-assembly-order.md) | 系统提示装配顺序契约：stable→volatile 带序约束（宪法层→时间锚点→用户 live 配置→能力面→运行上下文→行为规则）、profile 扩展只许带内增删、义务段不得可选；ADR-0255 §1.1 的 LCA 落地提案 | Proposed |
 | [0267](0267-agent-behavior-three-mechanisms.md) | Agent 行为三机制补齐：工具失败降为数据不杀死 run、记忆按用户画像加权呈现、推理不复述规则条文 | Proposed |
-| [0268](0268-context-bus-async-executors-and-cron-projection.md) | 上下文总线、四类异步执行体与 cron 即将到来投影：lca.nothing_to_do 与 cron 域分离、CronJob 单一 schedule、服务端 next_run、handoff 后由父决定说不说、重叠时只留最新排队项 | Proposed |
+| [0268](0268-context-bus-async-executors-and-cron-projection.md) | 上下文总线、四类异步执行体与 cron 即将到来投影：lca.nothing_to_do 与 cron 域分离、含一次性的 CronJob、服务端 next_run（列表只给时间字符串）、间隔从创建时间起相位、handoff 后由父决定说不说、重叠时只留最新排队项、run 回执必写 | Proposed |
 | [0255](0255-muse-production-runtime-full-reference.md) | Muse 生产运行时全量参考：每 turn 上下文装配顺序、9 个 standing 文件全文与权限矩阵、36 工具命名空间函数清单与关键参数、9 大机制（记忆三层/强制检索/落笔写盘/provenance/压缩豁免/子 agent 继承/自省投影）与 12 条验收用例；ADR-0254 的实证 companion | Proposed |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。

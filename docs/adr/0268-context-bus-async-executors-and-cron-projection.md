@@ -20,12 +20,12 @@
 
 ## 0. 接任务前 7 问
 
-1. **问题是什么？** 用户要在对话右侧看到每周、每天、每小时的任务，能读下次触发时间，能改。用户在对话里提到提醒时，助理要能建任务。到点要有人干活。干完的例行结果默认不打断用户。用户没看到气泡时，仍能确认任务跑过。
-2. **受影响的事实或契约是什么？** 任务定义、下次触发时间、worker 能看见的上下文、handoff 文本、静默信号、投递目标、右侧列表的数据来源。
-3. **唯一真值在哪里？** 任务定义在 `CronJob` 存储。下次触发时间是 `next_run` 对这份定义的纯函数，不是前端状态，也不是模型上下文。某次运行的结果是追加的 run 记录。卡片是这两份事实的投影。
+1. **问题是什么？** 用户要在对话右侧看到一次性提醒，以及每周、每天、每小时的任务，能读下次触发时间，能改。用户在对话里提到提醒时，助理要能建任务。只答应一个时刻的，只跑那一次。到点要有人干活。干完的例行结果默认不打断用户。用户没看到气泡时，仍能确认任务跑过。
+2. **受影响的事实或契约是什么？** 任务定义、下次触发、worker 能看见的上下文、handoff 文本、静默信号、投递回执、右侧列表的字段闭集。
+3. **唯一真值在哪里？** 任务定义在 `CronJob` 存储。`next_run` 是纯函数，调用方传入 `now`。某次运行的结果是只追加的 run 记录，每条结束的 run 都有投递回执。卡片是这两份事实的投影。列表投影不带 schedule 原字段。
 4. **改变哪个边界？** 工具命名空间增加 `lca` 与 `cron`。调度与执行与投递分成三个所有者。右侧栏增加一个只读投影加用户编辑入口。0263 的「不排队」对 `CronJob` 改为「运行中的留下，排队只留最新一次」。
 5. **现有 Protocol / ADR 能否表达？** 不能。0255 是参考，不是 LCA 契约。0264 在工人报告出来之前就决定说不说。`RoutineSpec` 允许 cron 表达式和间隔同时存在或同时为空，调度器不读这两个字段。`JobSpec.schedule` 是不解析的字符串，HTTP 固定 501。三套记录都没有对客户端暴露的 `next_run`。
-6. **失败、重试、恢复和幂等语义是什么？** 见 §7、§8、§9。runtime 失败和超时可按 `max_retries` 重试。worker 自己报告没做完，不重试。同一 id 的 `cron.add` 不覆盖。删任务和改周期要等审批回注。
+6. **失败、重试、恢复和幂等语义是什么？** 见 §7、§8、§9。runtime 失败和超时可按 `max_retries` 重试。worker 自己报告没做完，不重试。同一 id 的 `cron.add` 不覆盖。模型删任务或改周期时，写操作挂起，审批结果回注之后才落盘。未点选则存储不变。
 7. **如何验证？** §14。
 
 ---
@@ -50,7 +50,20 @@
 
 这条规则覆盖同步工具，也覆盖 §3 的四类异步执行体。异步执行体的差别只有两处。谁触发。执行体是什么。回注的形态都是一条后到的消息。模型不轮询。
 
-审批卡片是同步阻塞的一种回注。runtime 挂起这次调用，用户点选之后，点选结果作为工具结果注入。未点选之前，这次调用没有结果。删数据和改周期走这条路径，见 §9。
+审批卡片是同步阻塞的一种回注。runtime 挂起这次调用，用户点选之后，点选结果作为工具结果注入。未点选之前，这次调用没有结果，存储也不变。删数据和改周期走这条路径，见 §9。
+
+### 2.1 结构保证
+
+下面四条在模型不遵守 prompt 时仍然成立。只写进 prompt 的句子不算这些语义。
+
+| 语义 | 代码结构 |
+|---|---|
+| `lca.nothing_to_do` 只在 handoff 轮可用 | 组装用户轮的 wire 时不放入该工具。模型发出调用也只得到错误回注。见 §4 |
+| 下次触发由服务端计算 | `cron.list` 只给 `next_run_local` 字符串、`schedule_label` 字符串和 `due`。不给 `schedule`、`timezone`、`anchor_at`、`every_seconds`、`at`。见 §5、§10 |
+| 改周期或模型删除要等批准 | 写发生在被挂起的那次工具调用里。审批结果回注之前写函数不被调用。未点选不是「模型记得先别写」。见 §9 |
+| worker 看不见父聊天 | 组装 worker 上下文的函数不接收父 transcript。调用点没有这个参数可传。见 §3.4 |
+
+服务端不解析用户原话，也不在 `oneshot` 与周期 `kind` 之间互改。因此「这句话是在说每天还是在说明天」不是结构保证。模型若把「明天 9 点」写成 `daily`，存储会按 `daily` 保存。端到端「每天 9 点提醒我」仍是一次 `cron.add` 就出现卡片，不再要求第二次点选。已经落盘的 `oneshot` 要改成周期时，才由上表第三条挡住。
 
 ---
 
@@ -107,10 +120,7 @@
 
 调度器到点，用任务的 `body` 原文启动 worker。worker 与父隔离。它看不见父的聊天记录、工具结果和 birth 之后的新上下文。
 
-worker 的初始上下文只有：
-
-- `body` 原文
-- 产品上下文。`job_id`、`owner`、workspace 路径、timezone、`report`、`delivery_targets`、本次 `run_id`
+组装函数的参数只有 `body` 和产品上下文。产品上下文是 `job_id`、`owner`、workspace 路径、timezone、`report`、`delivery_targets`、本次 `run_id`。参数列表里没有父 transcript、父工具结果或 birth 之后的父消息。测试钉住这个签名。函数原样传入存储里的 `body`，不把父对话附加进去。`cron.add` 时若调用方把聊天抄进 `body`，那段文字会随任务定义进入 worker。那是定义内容，组装函数仍然没有父轮可读。
 
 `execution.kind = agent` 时，worker 跑完交出 `worker_message`。runtime 把它包成 §6 的 handoff，注入父的下一轮。父按 §6 决定说不说。
 
@@ -133,10 +143,10 @@ worker 的初始上下文只有：
 | 工具 | 效果 |
 |---|---|
 | `cron.add` | 新建。id 已存在则返回现有记录，不修改 |
-| `cron.view` | 按 id 返回全量定义 |
-| `cron.update` | 以 `cron.view` 的全量记录覆盖。调用方先读再写 |
-| `cron.remove` | 删除定义与尚未注入的 handoff。走 §9 审批 |
-| `cron.list` | 返回该 owner 的投影，含 `next_run_local` |
+| `cron.view` | 按 id 返回全量定义和只追加的 run 记录。给模型工具，不给即将到来 tab |
+| `cron.update` | 模型路径先 `cron.view` 再整份覆盖。卡片路径只提交用户改过的字段，由服务端合并。见 §9 |
+| `cron.remove` | 删除定义与尚未注入的 handoff。不删除已结束的 run 记录。模型路径走 §9 挂起 |
+| `cron.list` | 返回该 owner 的 §10 投影。含 `next_run_local` 与 `schedule_label`。不含 schedule 原字段 |
 
 `file`、`shell`、`memory`、`skill` 的现有工具不改名，不在 `lca` 下再注册一份。
 
@@ -144,9 +154,13 @@ worker 的初始上下文只有：
 
 ## 5. CronJob
 
-一份定义，一种 schedule。禁止「cron 表达式和间隔可以同时有，也可以同时没有」。
+一份定义，一种 schedule。禁止「cron 表达式和间隔可以同时有，也可以同时没有」。一次性提醒是第五种 schedule，不是每天的特例。
 
 ```python
+class OneShotSchedule(BaseModel):
+    kind: Literal["oneshot"]
+    at: datetime  # aware。只在这一刻触发一次
+
 class IntervalSchedule(BaseModel):
     kind: Literal["interval"]
     every_seconds: int  # > 0
@@ -179,14 +193,15 @@ class ChatDelivery(BaseModel):
 class CronJob(BaseModel):
     id: str
     title: str
-    schedule: IntervalSchedule | HourlySchedule | DailySchedule | WeeklySchedule
-    timezone: str  # IANA。缺省 Asia/Shanghai。ZoneInfo 不能加载则拒绝
+    schedule: OneShotSchedule | IntervalSchedule | HourlySchedule | DailySchedule | WeeklySchedule
+    timezone: str  # IANA。调用方没给时，服务端填入该用户的当前 timezone。用户没有 timezone 则拒绝，不用机器时区，也不写 Asia/Shanghai
     body: str
     execution: AgentExecution | SpaceActionExecution
     delivery_targets: tuple[ChatDelivery, ...]
     report: Literal["always", "anomalies_only"]  # 缺省 anomalies_only
     owner: str
     created_chat_id: str
+    anchor_at: datetime  # aware。服务端在 cron.add 时写入。调用方不能传。间隔的相位从这里算
     enabled: bool
     max_retries: int  # >= 0。缺省 0
     timeout_seconds: int | None  # None 表示按 §7 推导
@@ -196,20 +211,39 @@ class CronJob(BaseModel):
 
 - `agent` 的 `delivery_targets` 至少一条。`space_action` 的 `delivery_targets` 必须为空。
 - `created_chat_id` 是侧聊时，每条 `delivery_targets.chat_id` 必须等于 `created_chat_id`。否则 `cron.add` 和 `cron.update` 拒绝。侧聊任务不能投到主聊天，也不能在主聊天里创建。
-- `owner` 被删除时，其下 `CronJob`、run 记录和未注入 handoff 一并删除。
+- `owner` 被删除时，其下 `CronJob` 定义与未注入 handoff 一并删除。已结束的 run 记录保留。没有按 `run_id` 删除或改写回执的入口。
 - `report` 写进 worker 的产品上下文和 handoff 的 `task_context`。runtime 不根据 `report` 丢弃 handoff。说不说由父在看到 `worker_message` 之后决定。
+- 用户只给出一个时刻、没有给出重复规则时，调用方应传 `oneshot`。服务端不把 `oneshot` 展开成每天，也不把 `daily` 收成 `oneshot`。服务端不从中文判断种类，所以这一条对「新建时选错种类」还不是结构保证。已落盘的 `oneshot` 改成周期仍按 §9 挂起。
+- `timezone` 缺省取该用户当前的 client timezone（与 developer timestamp 上的 `client_timezone` 同一来源）。取不到就拒绝这次 `cron.add`。`ZoneInfo` 不能加载的名字同样拒绝。ADR-0264 的 `ProactivePolicy.timezone` 仍可以有自己的缺省，本字段不借用它。
 
-`next_run` 是纯函数。它不读时钟。调用方传入 aware 的 `now`。naive datetime 拒绝。
+`next_run` 是纯函数。它不读时钟，也不读 `enabled`。调用方传入任务定义、`last_run` 和 aware 的 `now`。同一输入两次调用，结果相同。naive datetime 拒绝。timezone 非法或 `ZoneInfo` 不能加载时，返回类型化拒绝，不抛裸异常。
 
-- 小时、日、周。返回该 timezone 下严格晚于 `now` 的下一次墙钟。`now` 正好卡在触发点上时，取再下一档。
-- 间隔。`last_run` 为空时，结果等于 `now`（首次到期）。`last_run` 有值时，从 `last_run + every_seconds` 起按间隔前进，直到大于等于 `now`。
-- 返回值是该 timezone 的 aware datetime。投影字段 `next_run_local` 格式为 `YYYY-MM-DD HH:MM`。
+```python
+class NextFire(BaseModel):
+    upcoming: datetime | None  # 有值则严格晚于 now，且是该 timezone 的 aware datetime
+    due: bool                  # 这一刻要触发。due 本身不是时间戳
+```
 
-`enabled = false` 时仍计算 `next_run_local`，并在投影里标出停用。停用任务不到点。
+`upcoming` 有值时必有 `upcoming > now`。函数不返回早于或等于 `now` 的 datetime。到点用 `due`，不把过去的 `at` 交给客户端。
+
+- 一次性，已有 `last_run`。`upcoming` 为空，`due` 为假。
+- 一次性，没跑过且 `at > now`。`upcoming` 等于 `at`，`due` 为假。
+- 一次性，没跑过且 `at <= now`。`upcoming` 为空，`due` 为真。只补跑这一次，不改成周期。
+- 小时、日、周。`upcoming` 是严格晚于 `now` 的下一档墙钟。`now` 正好落在触发点上时 `due` 为真，`upcoming` 取再下一档。早于 `now` 的档不补跑。
+- 间隔。相位从 `anchor_at` 起。`last_run` 为空时，第一候选是 `anchor_at + every_seconds`。创建当时 `anchor_at` 等于传入的 `now`，所以第一候选晚于 `now` 一个间隔。`last_run` 有值时，第一候选是 `last_run + every_seconds`。候选早于 `now` 时按 `every_seconds` 前进，直到严格晚于 `now` 的一档作为 `upcoming`。某一档等于 `now` 时 `due` 为真，`upcoming` 再过一个 `every_seconds`。
+
+墙钟缺口与歧义：
+
+- 春令时缺口里不存在的本地时刻不作为结果。日、周任务跳过该日，取下一周期里真实存在的同一墙钟。小时任务取缺口之后的下一档真实分钟。
+- 秋令时回拨造成的歧义时刻取 `fold=0`。
+- 间隔按 `every_seconds` 的绝对时长前进。
+- 调用方构造的 `at` 若落在缺口里，在进入 `next_run` 之前就类型化拒绝。
+
+`upcoming` 有值时，`next_run_local` 为 `YYYY-MM-DD HH:MM`。`enabled = false` 不改变纯函数的结果。调度器看到 `enabled = false` 时不入队。投影仍给出 `next_run_local`，并把列表上的 `due` 写成假，同时标停用。已完成的一次性任务不进入即将到来。`due` 为真且 `upcoming` 为空的未跑一次性任务仍在列表里，带 `due: true`，不带 `next_run_local`。
 
 存储只有一个写入者。路径是助理 home 下的 `cron/<job_id>.json`。定义用原子替换写入。run 记录追加在 `cron/<job_id>/runs/`。`ProactiveJob`、`RoutineSpec`、`JobSpec` 都不是这份存储。
 
-`RoutineSpec.cron_expr` 与 `interval_seconds` 在实现本 ADR 时删除，不留双字段兼容。例程若仍需要 ADR-0248 的预算闸，引用 `CronJob.id`，不自带第二套钟。`GET/POST /v1/assistants/{id}/jobs` 在接到 `CronJob` 存储之前保持 501。接到之后，该路由读写 `CronJob`，不再接受未解析的 schedule 字符串。
+`RoutineSpec.cron_expr` 与 `interval_seconds` 能否删除，由 §14 第 0 条决定。全仓确认除模型定义和测试夹具外没有读写，才在同一次实现里删掉这两个字段，不留双字段兼容。检索到生产读写，字段留在原地，这一条不实施。例程若仍需要 ADR-0248 的预算闸，引用 `CronJob.id`，不自带第二套钟。`GET/POST /v1/assistants/{id}/jobs` 在接到 `CronJob` 存储之前保持 501。接到之后，该路由读写 `CronJob`，不再接受未解析的 schedule 字符串。
 
 ---
 
@@ -239,7 +273,30 @@ runtime 把这条记录作为 developer 消息注入父的下一轮。父不订�
 
 写出报告时，正文进入 `delivery_targets` 里的 chat。多个目标各写一份。目标 chat 不存在则该目标失败，其他目标仍写，run 记录记下每个目标的结果。
 
-`lca.nothing_to_do` 成功后，run 记录的 `delivery` 为 `silent`。卡片用这个字段表示「跑过，未发气泡」。
+```python
+class TargetReceipt(BaseModel):  # extra="forbid"
+    chat_id: str | None
+    state: Literal["delivered", "failed", "silent", "not_sent"]
+
+class CronRun(BaseModel):  # extra="forbid"
+    run_id: str
+    outcome: Literal["completed", "runtime_failure", "timed_out", "superseded"]
+    receipts: tuple[TargetReceipt, ...]
+    finished_at: datetime | None
+```
+
+`ScheduledHandoff` 同样 `extra="forbid"`。缺字段在契约测试里失败。
+
+worker 结束时先追加 run，`outcome` 已定。`receipts` 在投递决定写下之前可以为空，`finished_at` 仍记下 worker 结束时间。空的 `receipts` 表示未决，读出来就是未决，不是成功，也不是缺键。handoff 轮结束时 `receipts` 必须非空，否则该轮不能标结束。`superseded` 和成功的 `space_action` 没有父轮，追加时就写上 `not_sent`。
+
+| `state` | 何时写 |
+|---|---|
+| `silent` | 父调用 `lca.nothing_to_do` 成功。一条回执，`chat_id` 为空。未发气泡 |
+| `delivered` | 该目标 chat 已写入报告。每个写成功的目标一条 |
+| `failed` | 该目标应写但没写成。每个失败目标一条。其他目标仍按自己的结果写 |
+| `not_sent` | 成功的 `space_action`，或 `outcome = superseded`。一条回执，没有父投递 |
+
+卡片用最近一条 run。`silent` 必须带着 `finished_at`。只有 `outcome`、没有回执的最近一条，卡片显示未决，不显示成功。
 
 ---
 
@@ -249,12 +306,13 @@ runtime 把这条记录作为 developer 消息注入父的下一轮。父不订�
 
 | schedule | gap_seconds |
 |---|---|
+| oneshot | 无。未声明 `timeout_seconds` 时，超时为 86400 |
 | interval | `every_seconds` |
 | hourly | 3600 |
 | daily | 86400 |
 | weekly | 604800 |
 
-实际超时秒数是 `min(86400, max(timeout_seconds 或 gap_seconds, gap_seconds))`。未声明超时时，周任务的 worker 上限是 86400 秒，不是 7 天。
+有自然间隔时，实际超时秒数是 `min(86400, max(timeout_seconds 或 gap_seconds, gap_seconds))`。未声明超时时，周任务的 worker 上限是 86400 秒，不是 7 天。一次性任务只用 `min(86400, timeout_seconds)`，没声明则是 86400。
 
 超时杀掉 worker，记 `outcome = timed_out`。
 
@@ -271,8 +329,8 @@ runtime 把这条记录作为 developer 消息注入父的下一轮。父不订�
 同一 `job_id`：
 
 - 已有运行中的 run 时，新的到点不杀掉它，也不平行再起一个 worker。
-- 排队槽只有一个。新的到点写入这个槽。槽里更早的待跑项取消，记 `superseded`。
-- 运行中的 run 结束后，若槽里有待跑项，立刻起那一次。没有则等待下一次 `next_run`。
+- 排队槽只有一个。新的到点写入这个槽。槽里更早的待跑项取消，记 `superseded`，回执为 `not_sent`。
+- 运行中的 run 结束后，若槽里有待跑项，立刻起那一次。没有则等待下一次 `due` 或 `upcoming`。
 - `superseded` 不产生 handoff，不重试。
 
 0264 的 `ProactiveJob` 仍按自身的 tick 与裁决。它不进入这个排队槽，也不出现在「即将到来」。
@@ -283,29 +341,44 @@ runtime 把这条记录作为 developer 消息注入父的下一轮。父不订�
 
 | 动作 | 谁 | 门槛 |
 |---|---|---|
-| `cron.add`，用户本轮明确说了周期 | 模型 | 直接写入。卡片上立刻可见 |
-| `cron.add`，用户没说周期，模型认为该有 | 模型 | 直接写入。`report` 缺省 `anomalies_only`。卡片上立刻可见 |
-| 改 `title`、`body`、`report`、`enabled` | 模型或卡片上的用户 | 直接写入 |
-| 改 `schedule` 或 `timezone`，从而改变下一次触发 | 模型 | 审批卡片。用户点了才写。未点则保持原定义 |
-| 同上 | 卡片上的用户 | 用户的保存就是批准，不再弹卡片 |
-| `cron.remove` | 模型 | 审批卡片 |
+| `cron.add`，用户给了一个时刻，没给重复规则 | 模型 | 应传 `oneshot`。直接写入。卡片上立刻可见 |
+| `cron.add`，用户给了重复规则（每小时、每天、每周、每隔） | 模型 | 应传对应的周期 schedule。直接写入。卡片上立刻可见。不再点一次审批 |
+| `cron.add`，用户没给时刻也没给周期，模型要建周期任务 | 模型 | 审批卡片。未点则不建。服务端看不到中文原话，这一行靠调用方遵守，见 §2.1 |
+| 把已有 `oneshot` 改成周期，或改周期档位、间隔、`timezone` | 模型 | 这次 `cron.update` 挂起。点选结果回注之后才调用写。点同意后服务端重写 `anchor_at` 并清掉 `last_run`。点拒绝则错误回注，定义不变 |
+| 同上 | 卡片上的用户 | 用户的保存就是批准，不再弹卡片。请求里带的是用户新填的 schedule，不是从列表里读回的原字段 |
+| 改 `title`、`body`、`report`、`enabled` | 模型或卡片上的用户 | 直接写入。卡片只提交改过的字段，服务端合并进存储的定义 |
+| `cron.remove` | 模型 | 这次调用挂起。回注同意后才删定义与未注入 handoff。不删已结束的 run |
 | `cron.remove` | 卡片上的用户 | 用户的删除就是批准 |
 
-审批未完成时定义不变。重复的审批请求以同一 `job_id` 加同一目标定义为幂等键，不叠多张卡片。
+挂起期间定义不变。十分钟未点选，`cron.view` 仍是旧定义，写函数没有被调用。重复的审批请求以同一 `job_id` 加同一目标定义为幂等键，不叠多张卡片。
 
-用户只在对话里答应一次「到点跑」，得到的是 `execution.kind = agent` 的周期任务，不是只跑一次。把周期任务改成另一档 schedule，按上表重新审批。
+服务端按传入的 `kind` 原样保存，不在一次性与周期之间互改，也不从中文原话推断 `kind`。用户只答应一个时刻时，调用方应传 `oneshot`。用户说出重复规则时，调用方应传该周期，并一次写入。这两句对新建还不是结构保证。结构上能挡住的是已落盘定义的改周期和模型删除。
 
 ---
 
 ## 10. 即将到来
 
-右侧 tab 的注册点是 `useBusinessWorkingSidebarTabs`。key 为 `upcoming`，标签为「即将到来」。持久改动写在 `deploy/lobehub/patches/`，不写进 gitignore 的 `lobehub-ui/` 源码。
+对话右侧有一个「即将到来」tab。它只请求 `cron.list` 的投影，不请求 `cron.view`。浏览器不计算下次触发。保存前不在本地预览下一次时间。请求失败时显示错误，不显示本地猜测的时间。注册点、补丁文件和组件名不属于本契约。
 
-tab 打开时请求与 `cron.list` 相同的投影。浏览器不计算下次触发。请求失败时显示错误，不显示本地猜测的时间。
+```python
+class CronListItem(BaseModel):  # extra="forbid"
+    id: str
+    title: str
+    schedule_label: str  # 给人读。契约不定义文法。客户端不用它计时
+    next_run_local: str | None  # YYYY-MM-DD HH:MM。仅 upcoming 有值
+    due: bool
+    enabled: bool
+    last_run_local: str | None  # 最近一条 run 的 finished_at。没有 run 则为空
+    last_delivery: Literal["delivered", "failed", "silent", "not_sent"] | None
+```
 
-每张卡片展示 `title`、schedule 的人话、`next_run_local`、`enabled`、最近一次 `delivery`（`never`、`silent`、`delivered`、`failed`、`superseded`）。用户可以改 §9 允许卡片改的字段。保存调用 `cron.update` 的同一存储写入口。
+两个时间字段都为空，表示还没有 run，卡片显示尚未运行。`last_run_local` 有值且 `last_delivery` 为空，表示 worker 已结束、投递未决。多个目标的回执汇总成一个 `last_delivery`。有 `failed` 则为 `failed`，否则有 `delivered` 则为 `delivered`，否则取那一条 `silent` 或 `not_sent`。未决不汇总成这四态。
 
-`delivery = silent` 的卡片仍然显示最近一次运行时间。没有气泡不等于没有跑。
+卡片展示 `title`、`schedule_label`、时间。时间只渲染 `next_run_local`。`due` 为真且没有 `next_run_local` 时，展示服务端给出的到点标记，不展示过去的时刻。`enabled = false` 时列表上的 `due` 为假，仍展示 `next_run_local` 并标停用。最近一条回执按 §6 展示。`silent` 显示跑过的时间，并标明没有气泡。
+
+用户可以改 §9 允许卡片改的字段。改 schedule 时提交用户新填的值。服务端合并后在响应里返回新的 `next_run_local`。卡片不从响应以外的数据重算这个字符串。
+
+已完成的一次性任务不在这张表里。run 记录只追加。卡片显示最近一条。更早的记录留在 `cron/<job_id>/runs/`，`cron.view` 能读到。压缩父对话不删除这些记录。没有气泡不等于没有跑。
 
 ---
 
@@ -314,7 +387,11 @@ tab 打开时请求与 `cron.list` 相同的投影。浏览器不计算下次触
 - 命名空间 `smart`。它不说明调用进了哪一个 runtime。
 - 把 ADR-0255 的 15 个 `muse.*` 工具整包复制为 `lca.*`。文件、shell、记忆已经有域。
 - 用 `ProactiveJob.content` 充当 worker 指令。那份字符串是投递给用户的正文。
-- 在浏览器里用 cron 表达式推下次触发。
+- 在浏览器里用 cron 表达式、`schedule_label` 或本地钟推下次触发。
+- 把「明天这个时刻提醒我」写成每天同一时刻。
+- 把 `next_run` 的到点结果做成一个早于 `now` 的时间戳。
+- 间隔任务在创建后的下一秒就跑。第一次在 `anchor_at` 之后的一个间隔。
+- 用 prompt 代替 §2.1 的四条结构。包括「用户提问时别调用静默」「改周期前记得等」「worker 别看父聊天」。
 - 用 exec 死循环代替调度器。
 - 让 cron worker 复制父聊天。那是 §3.2 的 subagent，而且本 ADR 不在本轮实现它。
 - 用 ADR-0264 的 `decide` 在 worker 报告生成之前判定静默。
@@ -325,13 +402,14 @@ tab 打开时请求与 `cron.list` 相同的投影。浏览器不计算下次触
 
 | 事实 | 所有者 | 外部可见后果 |
 |---|---|---|
-| `CronJob` 定义 | cron 存储 | 卡片、`cron.list`、worker 的 `body` |
-| `next_run_local` | `next_run` 纯函数 | 卡片上的时间 |
-| run 记录 | cron 存储，只追加 | 卡片上的最近一次结果。压缩父对话不删除 |
+| `CronJob` 定义 | cron 存储 | `cron.view` 与 worker 的 `body`。列表只有 §10 的投影 |
+| `NextFire` | `next_run` 纯函数 | `upcoming` 变成 `next_run_local`。`due` 变成列表上的到点标记 |
+| `schedule_label` | cron 存储在读时生成 | 卡片上的人话。不参与客户端计时 |
+| run 记录与回执 | cron 存储，只追加 | 卡片上的最近一次。更早的仍可 `cron.view`。压缩父对话不删除 |
 | handoff 文本 | runtime 注入父的下一轮 | 父能决定说或不说 |
-| 可见气泡 | 父的回复 | 出现在 `delivery_targets` 的 chat |
-| 无气泡 | `lca.nothing_to_do` | 该 chat 没有新气泡。卡片记 `silent` |
-| 审批点选 | 用户 | 点选前定义不变 |
+| 可见气泡 | 父的回复 | 出现在 `delivery_targets` 的 chat。回执 `delivered` 或 `failed` |
+| 无气泡 | `lca.nothing_to_do`，或 `not_sent` | 该 chat 没有新气泡。`silent` 仍有完成时间 |
+| 审批点选 | 用户 | 回注前写函数不调用，定义不变 |
 
 ---
 
@@ -339,11 +417,14 @@ tab 打开时请求与 `cron.list` 相同的投影。浏览器不计算下次触
 
 | 事件 | 结果 |
 |---|---|
-| 未知 timezone、非法 schedule、侧聊跨 chat 投递 | `cron.add` / `cron.update` 拒绝，存储不变 |
+| 未知 timezone、用户没有 timezone 且调用方没传、非法 schedule、`at` 落在时区缺口、侧聊跨 chat 投递 | `cron.add` / `cron.update` 类型化拒绝，存储不变。不抛裸异常 |
+| 调用方传入 `oneshot` 或某个周期 `kind` | 原样保存，不互改。服务端不从中文判断该不该是周期 |
+| 模型把已有 `oneshot` 改成周期，或改周期、间隔、timezone，或 `cron.remove` | 写挂起。未点选或点拒绝，定义不变 |
 | 重复 id 的 `cron.add` | 返回现有记录，不修改 |
 | worker 超时 | 杀进程，按 §7 重试或 handoff |
 | worker 报告未完成 | `completed`，不重试，handoff |
-| 排队槽被更新的到点替换 | 旧排队项 `superseded`，无 handoff |
+| 排队槽被更新的到点替换 | 旧排队项 `superseded`，回执 `not_sent`，无 handoff |
+| handoff 轮结束时 `receipts` 仍为空 | 该轮不能标结束。读出来是未决，不是成功 |
 | 持锁进程崩溃 | 按 ADR-0263 stale 收割后，槽里的待跑项可以启动 |
 | `nothing_to_do` 出现在用户提问轮 | 工具错误回注，不静默 |
 | 父既不回复也不调用 `nothing_to_do` | 本轮不结束为静默。runtime 继续等待 |
@@ -353,19 +434,33 @@ tab 打开时请求与 `cron.list` 相同的投影。浏览器不计算下次触
 
 ## 14. 验收
 
-实现按这个顺序提交。前一条没有测试之前，不开始下一条。
+还原靠结构和测试。第 1 条到第 4 条按顺序落地，前一条没绿不做下一条。第 0 条只门控 `RoutineSpec` 两个字段的删除，不挡住第 1 条。
 
-1. `next_run` 对小时、日、周、间隔和 naive datetime 的字面断言通过。`CronJob` 拒绝双 schedule、非法 timezone、侧聊跨 chat、`space_action` 带投递目标。
-2. `cron.list` 投影的 `next_run_local` 与 `next_run` 相同。停用任务仍带时间，并标停用。
-3. 右侧 `upcoming` tab 只渲染该投影。改标题保存后，再次 `cron.list` 读到新标题。
-4. 模型经 `cron.add` 写入的记录与卡片读到的是同一文件。
-5. 到点的 `agent` worker 初始消息含 `body`，不含父聊天原文。完成后父的下一轮能看到 `ScheduledHandoff`。
-6. 父调用 `lca.nothing_to_do` 后，目标 chat 没有新气泡，卡片 `delivery = silent`。用户提问轮调用该工具得到错误。
-7. 同一任务运行中再次到点，只保留最新排队项。运行中的那次不被杀掉。
-8. 超时重试不超过 `max_retries`。worker 的「没做完」不增加尝试次数。
-9. 模型 `cron.remove` 在审批点选前不删除文件。
+0. 全仓检索 `cron_expr` 与 `RoutineSpec` 的 `interval_seconds`。除 `lca/contracts/models/routine/models.py` 的字段定义和直接构造该模型的测试外，没有生产读写，才允许删除这两个字段。检索到其他生产读写，停止删除，字段保持原样。`ProactiveJob.interval_seconds` 不在这次检索的删除范围内。
+1. 四条结构先在代码里成立。测试钉住的是结构。
+   - 用户轮的 wire schema 里没有 `lca.nothing_to_do`。
+   - `next_run` 无 I/O。时钟由调用方传入。
+   - 模型发起的改 schedule、改 timezone、`cron.remove`，审批回注前不调用写函数。
+   - 组装 worker 初始上下文的函数参数里没有父 transcript。签名测试拒绝新增这类参数。组装结果等于存储里的 `body` 加上产品上下文，不附加父轮。
+2. 属性测试与契约测试。
+   - 任意合法 schedule、任意 aware `now`，`upcoming` 要么为空，要么严格晚于 `now`。同一输入两次结果相同。非法 timezone、用户没有 timezone、naive datetime、落在缺口里的 `at`，都得到类型化拒绝。
+   - 春令时缺口日不返回不存在的本地时刻。日任务与周任务取下一周期里真实存在的同一墙钟。秋令时歧义取 `fold=0`。
+   - 一次性且 `at > now` 时，`upcoming` 等于 `at`。一次性且 `at <= now`、没跑过时，`due` 为真且 `upcoming` 为空，`kind` 仍是 `oneshot`。已有 `last_run` 则不在即将到来里。间隔在 `last_run` 为空且 `anchor_at == now` 时，`upcoming == anchor_at + every_seconds`。
+   - `ScheduledHandoff` 缺任一字段，契约测试失败。
+   - `CronListItem` 缺字段、多字段，或出现 `schedule`、`timezone`、`anchor_at`、`every_seconds`、`at`，契约测试失败。`next_run_local` 与 `upcoming` 的墙钟一致。停用的周期任务仍带 `next_run_local`，列表上的 `due` 为假，并标停用。
+   - 用户轮发出 `lca.nothing_to_do`，回注是错误。
+   - `CronJob` 拒绝双 schedule、侧聊跨 chat、`space_action` 带投递目标。
+3. 故障注入。每增加一种重试或审批语义，就增加对应的注入。
+   - worker 跑到一半被杀。按 `max_retries` 重试。耗尽后 handoff 的 `outcome = timed_out`。父结束该轮时 `receipts` 非空。
+   - worker 交出「没做完」。不重试。`outcome = completed`。
+   - 审批卡片 10 分钟没有点选。定义文件的字节不变。再次 `cron.view` 仍是旧定义。
+   - 两个到点同时撞上运行中的 run。旧排队项 `outcome = superseded` 且回执 `not_sent`。无 handoff。运行中的 worker 不被杀。
+   - `cron.list` 失败。前端显示错误，不显示本地猜测的时间，也不用 `schedule_label` 补一个时间。
+4. 端到端黑盒，周级探针，不作为每次提交的门槛。用户说「每天9点提醒我」。卡片出现，中间没有第二次点选。mock 时钟到 9 点。worker 跑完。handoff 回到父。无异常。父调用 `lca.nothing_to_do`。卡片显示 `silent` 和这次运行时间。
 
-§3.1、§3.2、§3.3 的实现不在这 9 条里。它们的契约以本 ADR 为准，另有实现时不得改种子和回注的形状。
+同一次实现还要满足这些不变量。模型 `cron.add` 与卡片读到的是同一份 `CronJob` 文件。卡片改标题保存后，再次 `cron.list` 读到新标题。右侧 tab 只渲染 `CronListItem`。
+
+§3.1、§3.2、§3.3 的实现不在这四条里。它们的契约以本 ADR 为准，另有实现时不得改种子和回注的形状。
 
 ---
 
