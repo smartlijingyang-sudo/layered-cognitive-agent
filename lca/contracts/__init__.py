@@ -88,7 +88,8 @@ from lca.contracts.protocols.journal.spec.spec import (
 )
 
 # Re-export barrel: every `from X import Y` above is intentional public re-export.
-__all__ = sorted(
+# __all__ 按设计从 globals() 计算（字面量复写数百个名字会漂移）。
+__all__ = sorted(  # pyright: ignore[reportUnsupportedDunderAll]
     name
     for name, value in globals().items()
     if not name.startswith("_")

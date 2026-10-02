@@ -26,7 +26,6 @@ __all__ = [
     "get_search_settings",
     "is_search_intent",
     "resolve_llm_search_kwargs",
-    "search",
     "search_routing_hint",
     "search_run_scope",
     "web_search",

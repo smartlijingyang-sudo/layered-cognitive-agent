@@ -25,7 +25,8 @@ _SUBMODULES = (
     "query_endpoints",
 )
 
-__all__ = list(_SUBMODULES)
+# _SUBMODULES 是 SSOT（__getattr__ 亦用它）；字面量复写会漂移，故保留计算式。
+__all__ = list(_SUBMODULES)  # pyright: ignore[reportUnsupportedDunderAll]
 
 
 def __getattr__(name: str) -> Any:
