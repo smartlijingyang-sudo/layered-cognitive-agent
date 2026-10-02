@@ -54,7 +54,7 @@ provider 用本机 grok2api 代理（`AVATAR_IMAGE_BASE_URL` 默认 `http://127.
 - 图生图：`POST /v1/images/edits`（multipart，`AVATAR_IMAGE_EDIT_MODEL`）。
 - 视频：`POST /v1/videos` + 轮询 `GET /v1/videos/{id}`，异步生成，完成后推 `avatar_video_ready`。
 
-身份特征（对齐 Muse 的 IDENTITY 混入）：`_load_identity()` 读 `profile.json` + `IDENTITY.md`（若存在）+ `SOUL.md` 身份/性格/语气章节；`_summarize_traits()` 一次 qwen 调用产出 3–6 个英文风格标签，LLM 不可用时确定性 fallback。prompt = `{user_request_verbatim}` + `Identity traits: {traits}`。用户请求原样传递，工具不改写。
+身份特征（对齐 Muse 的 IDENTITY 混入）：`_load_identity()` 读 `profile.json` + `IDENTITY.md`（若存在）+ `SOUL.md` 身份/性格/语气章节；`_summarize_traits()` 一次 qwen 调用产出 3–6 个英文风格标签，LLM 不可用时确定性 fallback。LLM 摘要器经插件配置 `summarizer_llm` 注入（默认 `None` = 确定性 fallback，为出厂默认）。prompt = `{user_request_verbatim}` + `Identity traits: {traits}`。用户请求原样传递，工具不改写。
 
 ## 4. 三态候选池
 
@@ -76,10 +76,10 @@ ADR-0268 的正式 cron worker 实现后，本调度器可退役，由 worker �
 
 ## 7. 安全红线
 
-- `reference_image` 只允许来自用户上传（FileStore provenance=user）或当前 active 头像；工具入参校验强制。
+- `reference_image` 只允许 ``/files/<attachment_id>`` 用户上传附件引用，或省略（=当前 active 头像）；裸 base64 / data URI 来源不明，一律拒绝（工具返回失败 Observation，REST 返回 400）。工具与 REST 入参校验强制。
 - 成人向内容由 provider 自身 policy 判断，工具层不拦截。
 - `AVATAR_IMAGE_API_KEY` 只从 `.env` 读取，禁止进日志/回执/prompt/事件。
-- 图片静态服务白名单 + 路径规范化。
+- 图片静态服务白名单 + 路径规范化；每个助理的 avatar 文件只在其独立 ``avatar/`` 目录内解析，跨助理不可达。
 
 ## 8. 验证
 

@@ -13,7 +13,6 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -266,18 +265,21 @@ def test_post_avatar_candidates_create(app: Starlette, tmp_path: Path) -> None:
 
 
 def test_post_avatar_candidates_edit_with_reference_image(app: Starlette, tmp_path: Path) -> None:
+    from lca.infrastructure.file.store import LocalFileStore
+
     assistant_id = "asst_edit"
     svc = _register_service(assistant_id, tmp_path / "avatar")
-    raw = b"fake-png-bytes"
-    b64 = base64.b64encode(raw).decode("ascii")
+    file_store = LocalFileStore(tmp_path / "uploads")
+    stored = file_store.put(data=b"fake-png-bytes", name="photo.png", mime_type="image/png")
+    app.state.file_store = file_store
     client = TestClient(app)
     resp = client.post(
         f"/v1/assistants/{assistant_id}/avatar/candidates",
-        json={"user_request": "换件毛衣", "reference_image": b64},
+        json={"user_request": "换件毛衣", "reference_image": stored.url},
     )
     assert resp.status_code == 200
     assert svc.edit_calls == 1
-    assert svc.last_reference_image == raw
+    assert svc.last_reference_image == b"fake-png-bytes"
     data = resp.json()
     assert data["candidates"][0]["candidate_id"].startswith("edit-")
 
@@ -321,10 +323,12 @@ def test_post_avatar_candidates_non_string_reference_image_returns_400(
         json={"user_request": "换头像", "reference_image": 42},
     )
     assert resp.status_code == 400
-    assert "base64" in resp.json()["error"]["detail"]
+    assert "/files/" in resp.json()["error"]["detail"]
 
 
-def test_post_avatar_candidates_invalid_base64_returns_400(app: Starlette, tmp_path: Path) -> None:
+def test_post_avatar_candidates_rejects_base64_reference_returns_400(
+    app: Starlette, tmp_path: Path
+) -> None:
     assistant_id = "asst_bad_b64"
     _register_service(assistant_id, tmp_path / "avatar")
     client = TestClient(app)
@@ -333,7 +337,21 @@ def test_post_avatar_candidates_invalid_base64_returns_400(app: Starlette, tmp_p
         json={"user_request": "换头像", "reference_image": "not-valid-base64!!!"},
     )
     assert resp.status_code == 400
-    assert "base64" in resp.json()["error"]["detail"]
+    assert "/files/" in resp.json()["error"]["detail"]
+
+
+def test_post_avatar_candidates_rejects_data_uri_reference_returns_400(
+    app: Starlette, tmp_path: Path
+) -> None:
+    assistant_id = "asst_bad_data_uri"
+    _register_service(assistant_id, tmp_path / "avatar")
+    client = TestClient(app)
+    resp = client.post(
+        f"/v1/assistants/{assistant_id}/avatar/candidates",
+        json={"user_request": "换头像", "reference_image": "data:image/png;base64,AAAA"},
+    )
+    assert resp.status_code == 400
+    assert "/files/" in resp.json()["error"]["detail"]
 
 
 # ── /avatar/set ──────────────────────────────────────────────

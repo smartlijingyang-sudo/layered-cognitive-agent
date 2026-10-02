@@ -122,7 +122,7 @@ video/<candidate_id>.mp4
 - `IDENTITY.md`（若存在，含历史 `avatar:` frontmatter）；
 - `SOUL.md` 的身份/性格/语气章节。
 
-`_summarize_traits(identity) -> str`：一次 qwen LLM 调用，产出 3–6 个英文风格标签（如 "sharp, warm, cyberpunk"）。LLM 不可用时确定性 fallback：`name + description + emoji` 拼接。
+`_summarize_traits(identity) -> str`：一次 qwen LLM 调用，产出 3–6 个英文风格标签（如 "sharp, warm, cyberpunk"）。LLM 经插件配置 `summarizer_llm` 注入（默认 `None` = 确定性 fallback：`name + description + emoji` 拼接，为出厂默认）。
 
 **prompt 模板**：
 
@@ -199,10 +199,10 @@ Style: consistent character, high quality avatar portrait, centered.
 
 ## 12. 安全红线
 
-- **reference_image 来源约束**：只允许「用户经 `/api/device/files/upload` 上传的附件（FileStore 记录上传来源）」或「当前 active 头像图片」。工具入参校验强制，来源不明拒绝返回。
+- **reference_image 来源约束**：只允许 ``/files/<attachment_id>`` 用户上传附件引用（FileStore），或省略（=当前 active 头像图片）。裸 base64 / data URI 来源不明，工具入参校验直接拒绝（失败 Observation），REST 返回 400。
 - **成人向内容**：工具层不拦截，由生图 provider 自身 policy 判断（与 Muse 一致）。
 - **密钥**：`AVATAR_IMAGE_API_KEY` 只从 `.env` 读取，禁止写入日志、回执、prompt 或事件。
-- **路径安全**：`/avatar/files/{path}` 白名单 + 路径规范化，防目录穿越。
+- **路径安全**：`/avatar/files/{path}` 白名单 + 路径规范化，防目录穿越；文件只在本助理独立 `avatar/` 目录内解析，跨助理不可达。
 - **状态文件**：`avatar/state.json` 走 assistant home 原子写 + revision，不绕过 `AssistantCatalog` 配置面保护。
 
 ## 13. 失败语义、幂等与恢复

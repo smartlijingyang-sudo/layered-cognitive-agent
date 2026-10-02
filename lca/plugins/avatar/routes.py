@@ -128,6 +128,14 @@ def _resolve_service(assistant_id: str) -> tuple[Any, Any]:
         )
 
 
+def _file_store_from_request(request: Any) -> Any:
+    """读 ``app.state.file_store``（webserver bootstrap 装配，spec §12）。"""
+    app = getattr(request, "app", None)
+    if app is None:
+        return None
+    return getattr(app.state, "file_store", None)
+
+
 # ── 端点 ───────────────────────────────────────────────────
 
 
@@ -158,9 +166,10 @@ async def get_candidates(request: Any) -> Any:
 async def post_candidates(request: Any) -> Any:
     """``POST /v1/assistants/{id}/avatar/candidates`` —— create 或 edit。
 
-    body ``{user_request, reference_image?}``：reference_image 为 base64 字符串时
-    走 ``service.edit``（图生图），否则 ``service.create``。非字符串的
-    ``user_request`` / ``reference_image`` 一律 400。
+    body ``{user_request, reference_image?}``：reference_image 只接受
+    ``/files/<attachment_id>`` 附件引用（spec §12），解析为图片字节后走
+    ``service.edit``（图生图）；缺省时 ``service.create``。裸 base64 / data
+    URI 来源不明，一律 400。
     """
     _, assistant_id, error = _auth_prelude(request)
     if error is not None:
@@ -197,23 +206,43 @@ async def post_candidates(request: Any) -> Any:
             "invalid_request",
             status_code=400,
             error_type="invalid_request",
-            detail="reference_image 必须为 base64 字符串",
+            detail="reference_image 必须为 /files/<attachment_id> 字符串引用",
+        )
+    reference_image = reference_image.strip() if reference_image else None
+    if reference_image is not None and not reference_image.startswith("/files/"):
+        return _error(
+            "invalid_request",
+            status_code=400,
+            error_type="invalid_request",
+            detail="reference_image 只允许 /files/<attachment_id> 附件引用；裸 base64/data URI 拒绝",
         )
     try:
         if reference_image:
-            import base64
-            import binascii
-
-            try:
-                reference = base64.b64decode(reference_image)
-            except (ValueError, binascii.Error) as exc:
+            aid = reference_image[len("/files/") :].rstrip("/")
+            if not aid:
                 return _error(
                     "invalid_request",
                     status_code=400,
                     error_type="invalid_request",
-                    detail=f"reference_image 不是合法 base64: {exc}",
+                    detail="reference_image 缺少 attachment id",
                 )
-            candidates = await service.edit(assistant_id, user_request, reference_image=reference)
+            file_store = _file_store_from_request(request)
+            if file_store is None:
+                return _error(
+                    "invalid_request",
+                    status_code=400,
+                    error_type="invalid_request",
+                    detail="服务器未装配文件存储，无法解析 reference_image",
+                )
+            data = file_store.read_bytes(aid)
+            if data is None:
+                return _error(
+                    "invalid_request",
+                    status_code=400,
+                    error_type="invalid_request",
+                    detail=f"reference_image 附件不存在: {aid}",
+                )
+            candidates = await service.edit(assistant_id, user_request, reference_image=data)
         else:
             candidates = await service.create(assistant_id, user_request)
     except ValueError as exc:

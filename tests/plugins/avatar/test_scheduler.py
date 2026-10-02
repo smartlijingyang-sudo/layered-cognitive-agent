@@ -16,6 +16,7 @@ import pytest
 from lca.contracts.models.cron.models import (
     CronJob,
     DailySchedule,
+    IntervalSchedule,
     OneShotSchedule,
     SpaceActionExecution,
 )
@@ -86,7 +87,9 @@ async def test_due_job_triggers_edit_and_appends_completed_run(tmp_path: Path) -
     store = CronStore(tmp_path)
     store.save_job(_due_oneshot_job("j1", "雨天装扮"))
     service = _FakeAvatarService()
-    scheduler = AvatarCostumeScheduler(service=service, cron_store=store, tick_seconds=60)
+    scheduler = AvatarCostumeScheduler(
+        service_resolver=lambda aid: service, cron_store=store, tick_seconds=60
+    )
 
     await scheduler._tick()
 
@@ -101,7 +104,9 @@ async def test_failed_edit_appends_runtime_failure(tmp_path: Path) -> None:
     store = CronStore(tmp_path)
     store.save_job(_due_oneshot_job("j1", "雨天装扮"))
     service = _FakeAvatarService(fail=True)
-    scheduler = AvatarCostumeScheduler(service=service, cron_store=store, tick_seconds=60)
+    scheduler = AvatarCostumeScheduler(
+        service_resolver=lambda aid: service, cron_store=store, tick_seconds=60
+    )
 
     await scheduler._tick()
 
@@ -114,7 +119,7 @@ async def test_failed_edit_appends_runtime_failure(tmp_path: Path) -> None:
 async def test_run_forever_can_be_stopped(tmp_path: Path) -> None:
     store = CronStore(tmp_path)
     scheduler = AvatarCostumeScheduler(
-        service=_FakeAvatarService(), cron_store=store, tick_seconds=60
+        service_resolver=lambda aid: _FakeAvatarService(), cron_store=store, tick_seconds=60
     )
 
     task = asyncio.create_task(scheduler.run_forever())
@@ -165,7 +170,9 @@ async def test_daily_job_fires_after_second_boundary_alignment(
     # daily 12:00 Asia/Shanghai = 04:00 UTC；模拟相位偏移 .123456 的循环。
     store.save_job(_job("j1", "雨天装扮"))
     service = _FakeAvatarService()
-    scheduler = AvatarCostumeScheduler(service=service, cron_store=store, tick_seconds=60)
+    scheduler = AvatarCostumeScheduler(
+        service_resolver=lambda aid: service, cron_store=store, tick_seconds=60
+    )
 
     # 03:59:00.123456 UTC（上海 11:59:00.123456）：未到 12:00，不触发。
     await scheduler._tick()
@@ -180,3 +187,84 @@ async def test_daily_job_fires_after_second_boundary_alignment(
     # 边界时刻：daily 任务到期，触发换装。
     await scheduler._tick()
     assert service.edits == [("asst_1", "雨天装扮", True)]
+
+
+def _interval_job(job_id: str, body: str) -> CronJob:
+    """每小时触发的 interval 任务，anchor 在整点。"""
+    return _job(job_id, body).model_copy(
+        update={
+            "schedule": IntervalSchedule(every_seconds=3600),
+            "timezone": "UTC",
+            "anchor_at": datetime(2026, 10, 2, 12, 0, tzinfo=UTC),
+        }
+    )
+
+
+@pytest.mark.asyncio
+async def test_scheduler_uses_latest_finished_run(tmp_path: Path) -> None:
+    """run 记录按 run_id 字典序落盘；``_latest_run`` 必须取 finished_at 最大者。"""
+    store = CronStore(tmp_path)
+    job = _interval_job("j1", "整点换装")
+    store.save_job(job)
+    # 故意让较新的 run 排在字典序前面，使 runs[-1] 是较旧的 run。
+    store.append_run(
+        "j1",
+        outcome="completed",
+        finished_at=datetime(2026, 10, 2, 13, 15, tzinfo=UTC),
+        run_id="j1-a",
+    )
+    store.append_run(
+        "j1",
+        outcome="completed",
+        finished_at=datetime(2026, 10, 2, 13, 0, tzinfo=UTC),
+        run_id="j1-b",
+    )
+    service = _FakeAvatarService()
+    scheduler = AvatarCostumeScheduler(
+        service_resolver=lambda aid: service, cron_store=store, tick_seconds=60
+    )
+    now = datetime(2026, 10, 2, 14, 15, tzinfo=UTC)
+    await scheduler._process_job(job, now)
+
+    # 若错误地取 runs[-1]（13:00），next_run 会推进到 15:00 → 不触发。
+    # 取 max(finished_at)=13:15 时候选=14:15==now → 触发。
+    assert service.edits == [("asst_1", "整点换装", True)]
+
+
+class _CleanupRecordingCronStore(CronStore):
+    """记录 ``cleanup_expired`` 调用次数的 CronStore 包装。"""
+
+    def __init__(self, store: CronStore) -> None:
+        self._inner = store
+        self.cleanup_calls = 0
+
+    def list_jobs(self):
+        return self._inner.list_jobs()
+
+    def get_run_records(self, job_id: str):
+        return self._inner.get_run_records(job_id)
+
+    def append_run(self, job_id: str, *, outcome, finished_at=None, receipts=(), run_id=None):
+        return self._inner.append_run(
+            job_id, outcome=outcome, finished_at=finished_at, receipts=receipts, run_id=run_id
+        )
+
+    def cleanup_expired(self, now):
+        self.cleanup_calls += 1
+        return 0
+
+
+@pytest.mark.asyncio
+async def test_scheduler_cleanup_runs_hourly_not_every_tick(tmp_path: Path) -> None:
+    """清理每小时最多一次，同一小时内第二次 tick 不重复执行。"""
+    store = _CleanupRecordingCronStore(CronStore(tmp_path))
+    scheduler = AvatarCostumeScheduler(
+        service_resolver=lambda aid: _FakeAvatarService(),
+        cron_store=store,
+        tick_seconds=60,
+        cleanup_interval_seconds=3600,
+    )
+    await scheduler._tick()
+    assert store.cleanup_calls == 1
+    await scheduler._tick()
+    assert store.cleanup_calls == 1

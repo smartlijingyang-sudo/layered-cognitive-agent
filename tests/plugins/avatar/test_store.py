@@ -1,4 +1,5 @@
 import io
+import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -114,3 +115,72 @@ def test_cleanup_expired(store: AvatarStore):
     removed = store.cleanup_expired(now)
     assert removed == 1
     assert store.load_state("asst_1").candidates == []
+
+
+def test_load_state_prunes_expired_candidates(store: AvatarStore):
+    """惰性清理：读状态时过期候选消失，未过期候选保留。"""
+    now = datetime(2026, 10, 2, 12, 0, tzinfo=UTC)
+    expired = store._make_candidate("asst_1", "old", "create", "p", now - timedelta(hours=25))
+    fresh = store._make_candidate("asst_1", "new", "create", "p", now)
+    store.save_state(
+        AvatarState(
+            assistant_id="asst_1",
+            active=None,
+            candidates=[expired, fresh],
+            updated_at=now,
+        )
+    )
+    loaded = store.load_state("asst_1")
+    assert [c.candidate_id for c in loaded.candidates] == ["new"]
+    # 目录清理由 ``cleanup_expired``（调度器小时扫除）负责，load_state 只剪状态。
+
+
+def test_save_state_appends_revision(store: AvatarStore, tmp_path: Path):
+    """每次状态写入都向 assistant home ``revisions/avatar-N.json`` 追加快照。"""
+    store.save_state(_state())
+    revisions_dir = tmp_path / "revisions"
+    assert (revisions_dir / "avatar-0.json").exists()
+    store.save_state(_state())
+    assert (revisions_dir / "avatar-1.json").exists()
+    snapshot = json.loads((revisions_dir / "avatar-1.json").read_text(encoding="utf-8"))
+    assert snapshot["kind"] == "avatar"
+    assert snapshot["assistant_id"] == "asst_1"
+
+
+def test_multi_assistant_store_isolation(tmp_path: Path):
+    """spec §5：不同助理的 store 互不可见；B 的 set 不得清空 A 的 active。"""
+    from types import SimpleNamespace
+
+    from lca.plugins.avatar.registry import avatar_service_registry
+    from lca.plugins.avatar.store import resolve_safe_path
+
+    now = datetime(2026, 10, 2, 12, 0, tzinfo=UTC)
+    store_a = AvatarStore(tmp_path / "asst_a" / "avatar")
+    store_b = AvatarStore(tmp_path / "asst_b" / "avatar")
+    avatar_service_registry.clear()
+    try:
+        avatar_service_registry.register("asst_a", SimpleNamespace(store=store_a))
+        avatar_service_registry.register("asst_b", SimpleNamespace(store=store_b))
+
+        cand_a = store_a._make_candidate("asst_a", "a1", "create", "p", now)
+        store_a.save_state(
+            AvatarState(assistant_id="asst_a", active=None, candidates=[cand_a], updated_at=now)
+        )
+        cand_b = store_b._make_candidate("asst_b", "b1", "create", "p", now)
+        store_b.save_state(
+            AvatarState(assistant_id="asst_b", active=None, candidates=[cand_b], updated_at=now)
+        )
+
+        store_a.copy_candidate_to_active("asst_a", cand_a)
+        store_b.copy_candidate_to_active("asst_b", cand_b)
+
+        # B 的 set 不得清空 A 的 active 文件。
+        assert (store_a.active_dir() / "a1" / "original.png").exists()
+        assert (store_b.active_dir() / "b1" / "original.png").exists()
+
+        # A 的 active URL 仍可服务；B 读不到 A 的文件。
+        assert resolve_safe_path("asst_a", "active/a1/original.png") != b""
+        with pytest.raises(FileNotFoundError):
+            resolve_safe_path("asst_b", "active/a1/original.png")
+    finally:
+        avatar_service_registry.clear()

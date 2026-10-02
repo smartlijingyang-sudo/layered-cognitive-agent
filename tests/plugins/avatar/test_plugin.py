@@ -133,10 +133,10 @@ async def test_plugin_setup_wires_registry_routes_and_scheduler(
     )
     await plugin_module.setup.setup(ctx, config)
 
-    # registry 懒解析返回真实 AvatarService，store 指向配置的 assistants_root。
+    # registry 懒解析返回真实 AvatarService，store 指向该助理的 avatar 目录。
     service = avatar_service_registry.get("asst_test")
     assert isinstance(service, AvatarService)
-    assert service.store.base_dir == tmp_path
+    assert service.store.base_dir == tmp_path / "asst_test" / "avatar"
 
     # 上下文提供了 avatar.service / avatar.events。
     assert "avatar.service" in ctx.provided
@@ -169,6 +169,23 @@ async def test_plugin_setup_fails_without_api_key(tmp_path: Path) -> None:
     config = plugin_module.Config(assistants_root=str(tmp_path))
     with pytest.raises(RuntimeError, match="AVATAR_IMAGE_API_KEY"):
         await plugin_module.setup.setup(ctx, config)
+
+
+async def test_plugin_setup_wires_llm_summarizer(tmp_path: Path) -> None:
+    """配置 ``summarizer_llm`` 后，服务经 ``summarize_traits(identity, llm=...)`` 透传。"""
+    from lca.plugins.avatar import plugin as plugin_module
+    from lca.plugins.transport.webserver.router.router import RouteRegistry
+
+    ctx = _StubCtx(RouteRegistry())
+    config = plugin_module.Config(
+        assistants_root=str(tmp_path),
+        api_key=SecretStr("test-key"),
+        summarizer_llm=lambda identity: "llm-traits",
+    )
+    await plugin_module.setup.setup(ctx, config)
+
+    service = avatar_service_registry.get("asst_llm")
+    assert service.summarizer("任意身份文本") == "llm-traits"
 
 
 def test_routes_and_events_setup_accept_stub_ctx() -> None:
@@ -243,6 +260,31 @@ def test_avatar_cron_store_aggregates_and_routes_runs(tmp_path: Path) -> None:
     records2 = store.get_run_records("job-2")
     assert len(records2) == 1
     assert records2[0].outcome == "runtime_failure"
+
+
+def test_avatar_cron_store_cleanup_expired(tmp_path: Path) -> None:
+    """调度器扫除：``_AvatarCronStore.cleanup_expired`` 清掉助理 avatar 过期候选。"""
+    from datetime import UTC, datetime, timedelta
+
+    from lca.contracts.models.avatar import AvatarState
+    from lca.plugins.avatar.plugin import _AvatarCronStore
+    from lca.plugins.avatar.store import AvatarStore
+
+    base_dir = tmp_path / "assistants"
+    (base_dir / "asst_1").mkdir(parents=True)
+    now = datetime(2026, 10, 2, 12, 0, tzinfo=UTC)
+    avatar_store = AvatarStore(base_dir / "asst_1" / "avatar")
+    expired = avatar_store._make_candidate(
+        "asst_1", "old", "create", "p", now - timedelta(hours=25)
+    )
+    avatar_store.save_state(
+        AvatarState(assistant_id="asst_1", active=None, candidates=[expired], updated_at=now)
+    )
+
+    store = _AvatarCronStore(base_dir)
+    removed = store.cleanup_expired(now)
+    assert removed == 1
+    assert avatar_store.load_state("asst_1").candidates == []
 
 
 # ── notifier session 守卫 ───────────────────────────────────────

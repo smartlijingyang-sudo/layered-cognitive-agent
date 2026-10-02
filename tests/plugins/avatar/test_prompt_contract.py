@@ -16,7 +16,6 @@ from typing import Literal, cast
 import pytest
 
 from lca.contracts.models.avatar import (
-    AvatarCandidate,
     AvatarState,
     AvatarUpdatedEvent,
     AvatarVariant,
@@ -65,7 +64,7 @@ class _FakeStore:
             height=512,
         )
 
-    def publish(self, assistant_id: str, event: AvatarUpdatedEvent) -> None:  # noqa: D102
+    def publish(self, assistant_id: str, event: AvatarUpdatedEvent) -> None:
         pass
 
 

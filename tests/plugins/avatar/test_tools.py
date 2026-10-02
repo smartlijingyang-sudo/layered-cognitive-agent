@@ -320,15 +320,30 @@ async def test_edit_execute_defaults_reference_to_none(fake_service: FakeAvatarS
 
 
 @pytest.mark.asyncio
-async def test_edit_execute_decodes_base64_reference(fake_service: FakeAvatarService) -> None:
+async def test_edit_execute_rejects_base64_reference(fake_service: FakeAvatarService) -> None:
+    """裸 base64 来源不明，必须拒绝（spec §12 红线）。"""
     tool = AvatarEditTool()
     png_b64 = base64.b64encode(b"image-bytes").decode()
     with _bound_assistant():
         obs = await tool.execute(
             {"user_request": "换件毛衣", "reference_image": f"data:image/png;base64,{png_b64}"}
         )
-    assert obs.success is True
-    assert fake_service.edits[0][2] == b"image-bytes"
+    assert obs.success is False
+    assert "/files/" in obs.error
+    assert fake_service.edits == []
+
+
+@pytest.mark.asyncio
+async def test_edit_execute_rejects_data_uri_reference(fake_service: FakeAvatarService) -> None:
+    """data URI 来源不明，必须拒绝（spec §12 红线）。"""
+    tool = AvatarEditTool()
+    with _bound_assistant():
+        obs = await tool.execute(
+            {"user_request": "换件毛衣", "reference_image": "data:image/png;base64,AAAA"}
+        )
+    assert obs.success is False
+    assert "/files/" in obs.error
+    assert fake_service.edits == []
 
 
 @pytest.mark.asyncio
@@ -346,7 +361,7 @@ async def test_edit_execute_resolves_filestore_reference(
 
 
 @pytest.mark.asyncio
-async def test_edit_execute_rejects_undecodable_reference(
+async def test_edit_execute_rejects_non_filestore_reference(
     fake_service: FakeAvatarService,
 ) -> None:
     tool = AvatarEditTool()
@@ -355,7 +370,7 @@ async def test_edit_execute_rejects_undecodable_reference(
             {"user_request": "换件毛衣", "reference_image": "not a valid image !!"}
         )
     assert obs.success is False
-    assert "reference_image" in obs.error
+    assert "/files/" in obs.error
     assert fake_service.edits == []
 
 

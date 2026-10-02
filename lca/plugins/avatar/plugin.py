@@ -2,10 +2,11 @@
 
 把 Task 1–9 的组件接成 ``@plugin(id="lca-avatar")`` 单一入口：
 
-- 构造共享 ``AvatarStore`` / ``Grok2ApiProvider`` / ``AvatarEventPublisher``，
-  向上下文提供 ``avatar.service`` / ``avatar.events``；
+- 构造 ``Grok2ApiProvider`` / ``AvatarEventPublisher``，向上下文提供
+  ``avatar.service`` / ``avatar.events``；
 - 把 ``avatar_service_registry`` 的懒解析器接上：``get(assistant_id)`` 对任意
-  助理 id 构造并缓存 ``AvatarService``（REST/WS/工具共享同一服务）；
+  助理 id 构造并缓存按助理绑定的 ``AvatarService``（REST/WS/工具共享注册表，
+  每个服务持有独立 ``AvatarStore``，spec §5）；
 - 调用 ``routes.setup`` 与 ``events.setup`` 挂载 REST 与 WS 路由；
 - 启动 ``AvatarCostumeScheduler`` 后台循环消费 ``avatar_schedule`` 创建的
   cron 换装任务（跨所有 assistant home 扫描），并用 ``ProactiveDeliverer``
@@ -24,6 +25,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Callable
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
@@ -74,6 +76,7 @@ class Config(BaseModel):
     edit_model: str | None = None
     video_model: str | None = None
     tick_seconds: int = 60
+    summarizer_llm: Callable[[str], str] | None = None
 
 
 def _secret_value(value: SecretStr | str | None) -> str | None:
@@ -119,6 +122,14 @@ class _AvatarCronStore:
             for child in sorted(self._base_dir.iterdir())
             if child.is_dir()
         ]
+
+    def cleanup_expired(self, now: datetime) -> int:
+        """扫描所有 assistant home 的 avatar 目录，清理过期候选（spec §5）。"""
+        removed = 0
+        for assistant_id, _ in self._assistant_stores():
+            avatar_store = AvatarStore(self._base_dir / assistant_id / "avatar")
+            removed += avatar_store.cleanup_expired(now)
+        return removed
 
     def list_jobs(self) -> list[CronJob]:
         self._job_owner.clear()
@@ -233,7 +244,6 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     edit_model = config.edit_model or "grok-imagine-image-lite"
     video_model = config.video_model or "grok-imagine-video"
 
-    store = AvatarStore(base_dir)
     provider = Grok2ApiProvider(
         base_url=base_url,
         api_key=api_key,
@@ -244,14 +254,17 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     publisher = events.AvatarEventPublisher()
 
     def _summarizer(identity: str) -> str:
-        # 确定性 fallback（ADR-0269 §3）；LLM 摘要后续可经 config 注入。
-        return summarize_traits(identity, llm=None)
+        # ADR-0269 §3：配置了 ``summarizer_llm`` 则透传 LLM 摘要，否则使用
+        # 确定性 fallback（出厂默认）。插件不读 os.environ，只经 Profile 注入。
+        return summarize_traits(identity, llm=config.summarizer_llm)
 
     def _home_resolver(assistant_id: str) -> Path:
         return base_dir / assistant_id
 
     def _build_service(assistant_id: str) -> AvatarService:
-        del assistant_id  # 服务本身按 assistant_id 参数寻址，无需按 id 区分实例。
+        # spec §5：每个助理独立 ``avatar/`` 目录；服务绑定专属 store，
+        # 一个助理永远读不到另一个助理的文件。
+        store = AvatarStore(base_dir / assistant_id / "avatar")
         return AvatarService(
             store=store,
             provider=provider,
@@ -263,6 +276,8 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     # 懒解析：REST/WS/工具对任意 assistant_id 都能拿到服务（Task 10 ruling #2）。
     avatar_service_registry.set_resolver(_build_service)
 
+    # ``ctx.provide`` 的默认服务实例（契约要求）。真实访问一律经注册表
+    # 懒解析出按 assistant 绑定的服务；该实例仅供兼容面消费。
     service = _build_service("")
     ctx.provide("avatar.service", service)
     ctx.provide("avatar.events", publisher)
@@ -275,7 +290,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
     # ProactiveDeliverer（session.store 缺席时 notifier=None，不阻塞装配）。
     session_store = ctx.soft_get("session.store")
     scheduler = AvatarCostumeScheduler(
-        service=service,
+        service_resolver=avatar_service_registry.get,
         cron_store=_AvatarCronStore(base_dir),
         tick_seconds=config.tick_seconds,
         notifier=_make_notifier(session_store) if session_store is not None else None,

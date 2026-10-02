@@ -16,8 +16,6 @@ chat id 解析（ADR-0268），``created_chat_id`` 取不到时回退 ``"system"
 
 from __future__ import annotations
 
-import base64
-import binascii
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -72,41 +70,31 @@ def _error_observation(error: str, started: float) -> Observation:
 def _decode_reference_image(value: Any) -> bytes | None:
     """把 ``avatar_edit`` 的 ``reference_image`` 解码为图片字节。
 
-    接受三种来源：
+    只接受两种来源（ADR-0269 §7 / spec §12 红线）：
 
-    - ``data:image/...;base64,<b64>`` data URI；
-    - 裸 base64 字符串；
-    - ``/files/<attachment_id>`` FileStore 用户上传引用。
+    - ``None``/空 —— 服务端回退读当前 active 头像；
+    - ``/files/<attachment_id>`` —— FileStore 用户上传附件引用。
 
-    参数缺省/空时返回 ``None``（服务端回退读当前 active 头像）。
-    无法识别的来源抛 ``ValueError``，由 execute 转成失败 Observation。
+    裸 base64 与 data URI 属于来源不明，一律拒绝（抛 ``ValueError``，
+    由 execute 转成失败 Observation）。
     """
     if value is None:
         return None
     if not isinstance(value, str) or not value.strip():
         raise ValueError("reference_image must be a non-empty string")
     raw = value.strip()
-    if raw.startswith("/files/"):
-        aid = raw[len("/files/") :].rstrip("/")
-        if not aid:
-            raise ValueError("reference_image file reference missing attachment id")
-        store = current_file_store()
-        if store is None:
-            raise ValueError("no file store in run context for reference_image")
-        data = store.read_bytes(aid)
-        if data is None:
-            raise ValueError(f"reference_image attachment not found: {aid}")
-        return data
-    if raw.startswith("data:"):
-        if "base64," not in raw:
-            raise ValueError("unsupported data URI: expected base64 payload")
-        return base64.b64decode(raw.partition("base64,")[2].strip())
-    try:
-        return base64.b64decode(raw, validate=True)
-    except (binascii.Error, ValueError) as exc:
-        raise ValueError(
-            "reference_image is neither a valid base64 string nor a /files/ reference"
-        ) from exc
+    if not raw.startswith("/files/"):
+        raise ValueError("reference_image must be a /files/<attachment_id> reference")
+    aid = raw[len("/files/") :].rstrip("/")
+    if not aid:
+        raise ValueError("reference_image file reference missing attachment id")
+    store = current_file_store()
+    if store is None:
+        raise ValueError("no file store in run context for reference_image")
+    data = store.read_bytes(aid)
+    if data is None:
+        raise ValueError(f"reference_image attachment not found: {aid}")
+    return data
 
 
 class AvatarCreateTool(Tool):
@@ -165,8 +153,8 @@ class AvatarEditTool(Tool):
             "reference_image": {
                 "type": "string",
                 "description": (
-                    "可选：base64（data URI 或裸 base64）或 /files/<attachment_id> 用户上传引用。"
-                    "缺省读当前 active 头像。"
+                    "可选：/files/<attachment_id> 用户上传附件引用（spec §12）。"
+                    "缺省读当前 active 头像。裸 base64/data URI 拒绝。"
                 ),
             },
         },
@@ -486,7 +474,7 @@ MANIFEST = ToolManifest(
         "reference_image": ParameterSpec(
             type="string",
             required=False,
-            description="base64 或 /files/<attachment_id> 用户上传引用",
+            description="/files/<attachment_id> 用户上传附件引用（spec §12），缺省读当前 active 头像",
         ),
         "schedule": ParameterSpec(
             type="object",
