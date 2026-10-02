@@ -20,6 +20,7 @@ from lca.contracts.protocols import LLMAdapter, TeamStage
 from lca.plugins.composer.collaboration.team_transport import build_team_transport
 from lca.plugins.strategies.graph.graph import GraphStrategy
 from tests.support.graph_node_executors import build_default_graph_node_executor_registry
+from tests.support.session_gate_helpers import bound_session
 
 
 class _LLM(LLMAdapter):
@@ -29,7 +30,10 @@ class _LLM(LLMAdapter):
         import json
         import re
 
-        role_m = re.search(r"ROLE:\s*([^\n]+)", prompt)
+        # ROLE 行随 prompt 架构迁移到了 system kwarg（prompt 仅剩 objective + 前驱上下文）；保留 prompt 回退。
+        role_m = re.search(r"ROLE:\s*([^\n]+)", str(kwargs.get("system") or ""))
+        if role_m is None:
+            role_m = re.search(r"ROLE:\s*([^\n]+)", prompt)
         role = role_m.group(1).strip() if role_m else ""
         if "市场" in role:
             r = "MARKET_ANALYSIS"
@@ -54,6 +58,11 @@ class TestGraphFanIn(unittest.IsolatedAsyncioTestCase):
         from lca.application.api.api import ensure_default_ctx
 
         await ensure_default_ctx()
+        self._session_ctx = bound_session()
+        self._session_ctx.__enter__()
+
+    async def asyncTearDown(self) -> None:
+        self._session_ctx.__exit__(None, None, None)
 
     async def test_parallel_outputs_visible(self):
         llm = _LLM()

@@ -10,6 +10,7 @@ from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEve
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.team.team.coordination import Debate
 from lca.contracts.protocols import LLMAdapter
+from tests.support.session_gate_helpers import bound_session
 
 
 def _decision(**kwargs):
@@ -24,7 +25,10 @@ class DebatePricingLLM(LLMAdapter):
     async def complete(self, prompt: str, **kwargs):
         import re
 
-        m = re.search(r"ROLE:\s*([^\n]+)", prompt)
+        # ROLE 行在 system kwarg（prompt 架构迁移）；保留 prompt 回退。
+        m = re.search(r"ROLE:\s*([^\n]+)", str(kwargs.get("system") or ""))
+        if m is None:
+            m = re.search(r"ROLE:\s*([^\n]+)", prompt)
         role = m.group(1).strip() if m else ""
         converging = "Previous proposals" in prompt
         if not converging:
@@ -48,9 +52,17 @@ class DebatePricingLLM(LLMAdapter):
 
 class TestDebateStrategyCapability(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
+        from lca.application.api.api import ensure_default_ctx
+
+        await ensure_default_ctx()
+        self._session_ctx = bound_session()
+        self._session_ctx.__enter__()
         self.llm = DebatePricingLLM()
         self.a = Agent(role="保守派定价策略师", goal="", backstory="", tools=[], llm=self.llm)
         self.b = Agent(role="激进派定价策略师", goal="", backstory="", tools=[], llm=self.llm)
+
+    async def asyncTearDown(self):
+        self._session_ctx.__exit__(None, None, None)
 
     async def test_default_debate_multi_round(self):
         team = Team(members=[self.a, self.b], coordination=Debate(max_rounds=3))

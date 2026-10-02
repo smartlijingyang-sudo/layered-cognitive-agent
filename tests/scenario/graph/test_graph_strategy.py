@@ -17,6 +17,7 @@ from lca.contracts.models.team.role.team import RoleProfile, ToolPermissionManif
 from lca.contracts.protocols import TeamAssembly
 from lca.plugins.strategies.graph.graph import GraphStrategy
 from tests.support.graph_node_executors import build_default_graph_node_executor_registry
+from tests.support.session_gate_helpers import bound_session
 from tests.support.team_stage import stage_with_invoker
 
 
@@ -163,6 +164,13 @@ class TestExecutionGraphValidation(unittest.TestCase):
 
 
 class TestGraphStrategyLinearExecution(unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        self._session_ctx = bound_session()
+        self._session_ctx.__enter__()
+
+    def tearDown(self) -> None:
+        self._session_ctx.__exit__(None, None, None)
+
     """线性图执行（等价于 Sequential）。"""
 
     async def test_linear_graph_executes_in_order(self) -> None:
@@ -205,6 +213,13 @@ class TestGraphStrategyLinearExecution(unittest.IsolatedAsyncioTestCase):
 
 
 class TestGraphStrategyConditionalEdge(unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        self._session_ctx = bound_session()
+        self._session_ctx.__enter__()
+
+    def tearDown(self) -> None:
+        self._session_ctx.__exit__(None, None, None)
+
     """条件分支。"""
 
     async def test_conditional_takes_matching_branch(self) -> None:
@@ -269,6 +284,13 @@ class TestGraphStrategyConditionalEdge(unittest.IsolatedAsyncioTestCase):
 
 
 class TestGraphStrategyParallelFanOut(unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        self._session_ctx = bound_session()
+        self._session_ctx.__enter__()
+
+    def tearDown(self) -> None:
+        self._session_ctx.__exit__(None, None, None)
+
     """并行扇出/扇入。"""
 
     async def test_parallel_fan_out_executes_all(self) -> None:
