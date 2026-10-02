@@ -46,6 +46,7 @@ from lca.plugins.prompts.sections import (
     CloudSandboxSection,
     ContextSection,
     CurrentDateSection,
+    DeveloperTimestampSection,
     EvidencePackSection,
     GoalSection,
     HierarchicalInstructionsSection,
@@ -124,6 +125,8 @@ def _registry_with_builtins() -> _RegistryImpl:
         kind="pure",
         name="hierarchical_instructions",
     )
+    # ADR-0265 §7 D1 决议②：developer_timestamp 已是 B3 必须段 (optional=False)，缺失即 MissingPromptSectionError；与生产 boot (sections/plugin.py) 保持一致。
+    registry.register(DeveloperTimestampSection(), kind="pure", name="developer_timestamp")
     # Stateful sections
     registry.register(CurrentDateSection(), kind="stateful", name="current_date")
     registry.register(TaskSection(), kind="stateful", name="task")
