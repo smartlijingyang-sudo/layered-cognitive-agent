@@ -44,8 +44,8 @@ def test_stream_token_followed_by_header_assistant_does_not_duplicate() -> None:
         }
     }
     out_end = t.translate(end_ev)
-    assert out_end is not None
-    assert out_end["type"] == "stream_end"
+    assert isinstance(out_end, list)
+    assert [item["type"] for item in out_end] == ["stream_end", "visible_output_end"]
 
     # 4. Header assistant arrives carrying the FULL assistant text.
     # Because tokens were already streamed, this event MUST return None to avoid duplication!
@@ -59,9 +59,7 @@ def test_stream_token_followed_by_header_assistant_does_not_duplicate() -> None:
         }
     }
     out_header = t.translate(header_ev)
-    assert out_header is None, (
-        f"Expected None to prevent duplicate append, but got {out_header}"
-    )
+    assert out_header is None, f"Expected None to prevent duplicate append, but got {out_header}"
 
 
 def test_non_streamed_call_still_emits_header_content_as_fallback() -> None:

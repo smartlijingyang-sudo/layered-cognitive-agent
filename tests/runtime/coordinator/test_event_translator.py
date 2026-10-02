@@ -75,6 +75,8 @@ def test_spine_llm_call_end_becomes_stream_end() -> None:
     LCA must do the same on ``llm.call.end`` so the Thinking block closes and
     the next ``stream_start`` can open a new assistant row instead of wiping
     the previous step's reasoning on the same message.
+
+    No tokens were streamed, so this end does not claim the answer is on screen.
     """
     t = EventTranslator()
     stamped = {
@@ -86,6 +88,108 @@ def test_spine_llm_call_end_becomes_stream_end() -> None:
     }
     out = t.translate(stamped)
     assert out is not None
+    assert out["type"] == "stream_end"
+
+
+def test_streamed_answer_turn_also_ends_visible_output() -> None:
+    """A tool-less streamed answer is the last text the user will see.
+
+    ``run_b47a48174010`` finished the answer at llm.call.end (stream=true) and
+    then spent 7s in non-streaming memory_extract. The send button stays
+    loading until ``visible_output_end`` sets ``visibleLoadingDone``.
+    """
+    t = EventTranslator()
+    assert (
+        t.translate(
+            {
+                "event": {
+                    "execution_point": "llm.call.start",
+                    "payload": {"stream": True},
+                }
+            }
+        )["type"]
+        == "stream_start"
+    )
+    t.translate(
+        {
+            "event": {
+                "execution_point": "llm.stream.token",
+                "payload": {"text_delta": "该睡觉了", "channel_kind": "output"},
+            }
+        }
+    )
+    out = t.translate(
+        {
+            "event": {
+                "execution_point": "llm.call.end",
+                "stream": True,
+                "payload": {"stream": True, "outcome": "success"},
+            }
+        }
+    )
+    assert isinstance(out, list)
+    assert [item["type"] for item in out] == ["stream_end", "visible_output_end"]
+    assert out[1]["data"] == {"reason": "completed"}
+    # The hidden follow-up call must not open or close another UI step.
+    assert (
+        t.translate(
+            {
+                "event": {
+                    "execution_point": "llm.call.start",
+                    "stream": False,
+                    "payload": {"stream": False, "prompt_preview": "ROLE: memory_extract"},
+                }
+            }
+        )
+        is None
+    )
+    assert (
+        t.translate(
+            {
+                "event": {
+                    "execution_point": "llm.call.end",
+                    "stream": False,
+                    "payload": {"stream": False, "outcome": "success"},
+                }
+            }
+        )
+        is None
+    )
+
+
+def test_streamed_tool_turn_keeps_visible_output_open() -> None:
+    """Tool arguments stream before llm.call.end, and another answer follows.
+
+    Clearing the send button on that end would show idle while the tool runs.
+    """
+    t = EventTranslator()
+    t.translate({"event": {"execution_point": "llm.call.start", "payload": {"stream": True}}})
+    t.translate(
+        {
+            "event": {
+                "execution_point": "llm.stream.token",
+                "payload": {"text_delta": "查一下", "channel_kind": "output"},
+            }
+        }
+    )
+    t.translate(
+        {
+            "event": {
+                "execution_point": "llm.tool_call.streaming",
+                "payload": {"tool_name": "listEnvironments", "invocation_id": "call_1"},
+            }
+        }
+    )
+    out = t.translate(
+        {
+            "event": {
+                "execution_point": "llm.call.end",
+                "stream": True,
+                "payload": {"stream": True, "outcome": "success"},
+            }
+        }
+    )
+    assert isinstance(out, dict)
     assert out["type"] == "stream_end"
 
 
