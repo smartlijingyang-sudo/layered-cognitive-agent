@@ -158,7 +158,12 @@ def _role_profile_for_assistant(
         return None
     if home_path is None:
         spec = _assistant_spec_for_run(scope, assistant_id)
-        home_path = spec.home_path if spec is not None else None
+        if spec is None:
+            raise RuntimeError(
+                "assistant_id is set but no assistant catalog entry found; "
+                "cannot resolve the assistant Home"
+            )
+        home_path = spec.home_path
     from lca.plugins.assistant.persona.persona import persona_from_home
 
     persona = persona_from_home(home_path)
@@ -166,7 +171,7 @@ def _role_profile_for_assistant(
         role=persona.role,
         goal=persona.goal,
         backstory=persona.backstory,
-        tool_permission_manifest=ToolPermissionManifest(allowed_tools=()),
+        tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
         extra={
             "assistant_id": assistant_id,
             "assistant_home_path": home_path or "",
@@ -261,7 +266,12 @@ def tools_from_scope(
         return tools
     if home_path is None:
         spec = _assistant_spec_for_run(scope, assistant_id)
-        home_path = spec.home_path if spec is not None else None
+        if spec is None:
+            raise RuntimeError(
+                "assistant_id is set but no assistant catalog entry found; "
+                "cannot resolve the assistant Home"
+            )
+        home_path = spec.home_path
     from lca.infrastructure.tools.assistant.filter import filter_tools_by_assistant
 
     filtered = filter_tools_by_assistant(tools, home_path)
