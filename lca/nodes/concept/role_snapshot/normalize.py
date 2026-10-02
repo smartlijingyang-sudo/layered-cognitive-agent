@@ -40,8 +40,8 @@ class CapabilityRoleNormalizeExecutor:
 
     semantic_name: str = "capability.role.normalize"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("role_profile",)
-    declared_outputs: tuple[PortName, ...] = ("role",)
+    declared_inputs: tuple[PortName, ...] = (PortName("role_profile"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("role"),)
 
     async def node_execute(
         self,
@@ -56,13 +56,13 @@ class CapabilityRoleNormalizeExecutor:
         P3 no-op:RoleProfile 已是 frozen dataclass,直接透传。
         """
         del context
-        role_profile = input.port_values.get("role_profile")
+        role_profile = input.port_values.get(PortName("role_profile"))
         if not isinstance(role_profile, RoleProfile):
             raise TypeError(
                 "capability.role.normalize: 'role_profile' port must be a "
                 f"RoleProfile instance, got {type(role_profile).__name__}"
             )
-        return NodeOutput(port_values={"role": role_profile})
+        return NodeOutput(port_values={PortName("role"): role_profile})
 
 
 @plugin(
