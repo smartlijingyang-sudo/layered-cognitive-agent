@@ -4,8 +4,9 @@
 契约依据：ADR-0265 §3（C1 带序 B1–B8、C2 扩展纪律、C3 可选语义分级），
 §7 四项已裁决（2026-10-02，李超授权按 muse 思想裁决）。
 
-实证基线（2026-10-02，`_builtin_templates()` 实测）：
-- react_prompt 19 段 / routing_prompt 23 段 / hierarchical_prompt 22 段；
+实证基线（2026-10-03，`_builtin_templates()` 实测）：
+- react_prompt 20 段 / routing_prompt 24 段 / hierarchical_prompt 23 段
+  （2026-10-02 基线 19/23/22；+1 来自 ADR-0262 C1 的 skill_duty 独立段）；
 - routing = react 基座[:13] + 4 team 段 + user_profile/home/autonomous_presets + 尾三段；
   hierarchical = react 基座[:13] + 3 team 段 + 同上（不含 routing 的 4 段）。
 """
@@ -84,6 +85,10 @@ def test_t4_team_sections_preserve_b1_b5_order(template_id: str) -> None:
     ]
     # 完整性哨兵：防止测试空转（B1-B5 共 12 段；模板增删段时此数会变，
     # 此时应同步复核本测试而非静默放过）。
+    # 注：[:4] 保持 goal 在 backstory 之前——这是 T1 预期红钉住的倒置
+    # （goal(B2)->backstory(B1)），§7① 带序重排落地后此处同步翻为
+    # ["role", "backstory", "goal", "current_date"]。本轮 arch 轮决议原拟
+    # 直接更新该值，实测模板现状未变故维持现状，避免哨兵误红。
     assert react_b1_b5[:4] == ["role", "goal", "backstory", "current_date"]
     assert len(react_b1_b5) == 12
     cur_b1_b5 = [
@@ -102,12 +107,14 @@ def test_t1_band_order_no_inversion(template_id: str) -> None:
     ADR-0265 §3 C1：section 必须落在 B1–B8 带内，跨带不许逆序；
     §7① 裁决维持带序（不锁死精确快照——带内顺序可调）。
 
-    当前实现偏离（2026-10-02 实测 `_builtin_templates()`，待 quality lane
-    按 §7①② 落地带序重排）：
+    当前实现偏离（2026-10-03 实测 `_builtin_templates()`；§7 D1 决议②
+    developer_timestamp 前移 B3 必需已由 quality 轮落地（2026-10-03 06:09，
+    merge 3294e2c3c），剩余 3 处待 §7① 带序重排）：
     - goal(B2) 在 backstory(B1) 之前；
     - vocal_contract(B7) 在 current_date(B3) 之前；
-    - react_tool_usage_guidelines(B7) 在 user_profile(B4) 之前（D2）；
-    - memory_retrieval(B7) 在 developer_timestamp(B3) 之前（D1）。
+    - react_tool_usage_guidelines(B7) 在 user_profile(B4) 之前（D2）。
+    （D1 倒置 memory_retrieval(B7)->developer_timestamp(B3) 已随前移消除，
+    skill_duty(B7)->developer_timestamp(B3) 一并消除。）
     team 协作段未在 C1 定带，不参与本断言（ADR 缺口，见文件头）。
     """
     banded = _banded_names(template_id)
