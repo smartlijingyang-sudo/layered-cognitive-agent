@@ -61,7 +61,8 @@ _DEMO_PIPELINE: dict[str, object] = {
         "consumer_rules": [
             {
                 "prefix": "spine.",
-                "plugins": ["lca.plugins.events.sinks.spine_chain_sink.sink.SpineChainSink"],
+                # NOTE(round-0356): spine_chain_sink 在 f8b7f0896 被退役,换现存 SpineFileSink。
+                "plugins": ["lca.plugins.events.sinks.spine_file_sink.sink.SpineFileSink"],
                 "failure": "fail_fast",
             }
         ],
@@ -235,7 +236,7 @@ class TestRegisterAndApply:
         record = SpineEventRecord(
             event_id="evt-1",
             category="spine.kernel.run.start",
-            execution_point="ep",
+            execution_point="kernel.run.start",  # NOTE(round-0356): EP 白名单(ADR-0208)
             channel="spine",
             payload={"run_id": "run-x"},
             ts="1970-01-01T00:00:00Z",
@@ -260,9 +261,17 @@ class TestRegisterAndApply:
 
     def test_apply_pipeline_wires_consumer_rules(self, capsys: pytest.CaptureFixture[str]) -> None:
         """consumer_rules 只作元数据:apply 不 subscribe;显式 subscribe 后 publish 才命中。"""
-        from lca.plugins.events.subscribers.console_projector.subscriber import (
-            ConsoleProjectorSubscriber,
-        )
+        # NOTE(round-0356): ConsoleProjectorSubscriber 在 f8b7f0896 被退役;
+        # 用 yaml 鉴权矩阵已授权的 SpineFileSink 作 plugin 身份,on_event 仍走
+        # 本地回调(沿用原 stdout 行为 "幂等短路"),仅验证 consumer_rules wiring 语义。
+        from lca.plugins.events.sinks.spine_file_sink.sink import SpineFileSink
+
+        def _on_event(payload, _ref) -> None:
+            if hasattr(payload, "callee_role"):
+                print(f"⇢ {payload.callee_role}: 幂等短路")
+
+        projector_cls = SpineFileSink
+        _projector_on_event = _on_event
 
         from lca.contracts.event import Category
         from lca_kernel.events.pipeline.pipeline import ConsumerRule
@@ -272,7 +281,7 @@ class TestRegisterAndApply:
             consumer_rules=(
                 ConsumerRule(
                     prefix="team.",
-                    plugins=(ConsoleProjectorSubscriber,),
+                    plugins=(projector_cls,),
                     failure=FailureSemantics.CONTAINED,
                 ),
             ),
@@ -288,11 +297,10 @@ class TestRegisterAndApply:
         )
         assert "幂等短路" not in capsys.readouterr().out
 
-        projector = ConsoleProjectorSubscriber()
         bus.subscribe(
-            plugin=ConsoleProjectorSubscriber,
+            plugin=projector_cls,
             category=Category.TEAM_DELEGATION_CACHE_HIT,
-            on_event=projector.on_event,
+            on_event=_projector_on_event,
             failure=FailureSemantics.CONTAINED,
         )
         bus.publish(
