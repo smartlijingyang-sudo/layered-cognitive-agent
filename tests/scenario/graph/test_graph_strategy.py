@@ -2,12 +2,8 @@
 
 from __future__ import annotations
 
-import os
-import sys
 import unittest
 from unittest.mock import AsyncMock, MagicMock
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from lca.contracts.models.core.execution.result import Result
 from lca.contracts.models.core.state.state import Budget
