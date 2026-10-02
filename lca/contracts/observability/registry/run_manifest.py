@@ -49,6 +49,23 @@ class ManifestEvidence:
     detail: str = ""
 
 
+def _empty_health_summary() -> RunHealthSummary:
+    """Zero-value summary: no conditions evaluated yet.
+
+    Mirrors the empty-summary convention used by terminal materialization
+    when no health report exists (all counters 0, no per-type status).
+    ``RunHealthSummary`` has no defaults, so a bare ``RunHealthSummary()``
+    call raises TypeError at runtime.
+    """
+    return RunHealthSummary(
+        conditions_ok=0,
+        conditions_degraded=0,
+        conditions_failed=0,
+        conditions_unknown=0,
+        by_type={},
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class RunManifest:
     """terminal materialization(0065 §一 + L7)。
@@ -70,7 +87,7 @@ class RunManifest:
     session_error: str = ""  # 终态 carrier 错误;顶层可读(ADR-0165.1 / ADR-0122)
     session_status: str = ""  # RunSession.status.value 物化快照
     # PR-1 / Task 1.7: 新字段 — 取代 legacy 字段作为完整性 source.
-    health_summary: RunHealthSummary = field(default_factory=RunHealthSummary)
+    health_summary: RunHealthSummary = field(default_factory=_empty_health_summary)
     health_hash: str = ""
     # @deprecated — delete-when: 2027-01-01;保留以维持旧 reader 解析。
     terminal_event_seq: int = 0
@@ -108,7 +125,7 @@ class RunManifest:
         elif isinstance(hs_raw, Mapping):
             health_summary = RunHealthSummary.model_validate(hs_raw)
         else:
-            health_summary = RunHealthSummary()
+            health_summary = _empty_health_summary()
         return cls(
             schema=str(payload.get("schema", "lca.run_manifest/1")),
             run_id=str(payload.get("run_id", "")),
