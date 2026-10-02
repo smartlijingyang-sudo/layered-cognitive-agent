@@ -361,19 +361,20 @@ class TestExecutionPointLabeling:
 
     def test_session_event_with_explicit_ep_kept_verbatim(self) -> None:
         """data 携带 execution_point 时原样保留(反查不回退)。"""
+        # brain.think.start 已退役(C11 闭集守卫拒绝);用现行注册 EP 覆盖同语义。
         from lca_kernel.events.session.session import SessionEvent
 
         sink = _StubSink()
         observer = PersistenceObserver(sink=sink, fsync_policy=FsyncProtocol.COMMIT)
         event = SessionEvent(
-            type="spine.cognition.brain.think.start",
+            type="spine.cognition.think.gate.start",
             seq=1,
             time=1_788_512_185_000,
-            data={"execution_point": "brain.think.start", "state_id": "s"},
+            data={"execution_point": "think.gate.start", "state_id": "s"},
             session_id="run_ep_keep",
         )
         observer(_StubSession("run_ep_keep"), event)
-        assert sink.records[0].execution_point == "brain.think.start"
+        assert sink.records[0].execution_point == "think.gate.start"
 
     def test_session_event_non_spine_category_stays_unknown(self) -> None:
         """非 spine category 且无 execution_point → 保持 "unknown"。"""
