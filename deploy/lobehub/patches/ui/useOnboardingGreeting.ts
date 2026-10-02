@@ -26,6 +26,13 @@ export const useOnboardingGreeting = (
   const userId = useUserStore(userProfileSelectors.userId);
   const greetingInFlightRef = useRef<string | null>(null);
 
+  // Keep latest context and messages in refs to avoid useEffect cancellations when messages update
+  const contextRef = useRef(context);
+  contextRef.current = context;
+
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+
   useEffect(() => {
     const agentId = context.agentId;
     // Only proceed when an agent is bound and messages is an initialized empty array
@@ -33,8 +40,15 @@ export const useOnboardingGreeting = (
       return;
     }
 
-    const storageKey = `lca_greeted_${userId || 'anon'}_${agentId}`;
-    if (typeof window !== 'undefined' && window.sessionStorage?.getItem(storageKey)) {
+    const token = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
+    const effectiveUserId =
+      userId ||
+      (typeof window !== 'undefined' && (window as any)?.__LCA_USER_ID) ||
+      process.env.NEXT_PUBLIC_MOCK_DEV_USER_ID ||
+      'local-dev-user';
+
+    const storageKey = `lca_greeted_${effectiveUserId}_${agentId}`;
+    if (typeof window !== 'undefined' && window.localStorage?.getItem(storageKey)) {
       return;
     }
 
@@ -47,13 +61,6 @@ export const useOnboardingGreeting = (
 
     const runGreeting = async () => {
       try {
-        const token = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
-        const effectiveUserId =
-          userId ||
-          (typeof window !== 'undefined' && (window as any)?.__LCA_USER_ID) ||
-          process.env.NEXT_PUBLIC_MOCK_DEV_USER_ID ||
-          'local-dev-user';
-
         const rawLocale = (i18n.language || (typeof window !== 'undefined' && window.navigator?.language) || 'en').toLowerCase();
         const locale = rawLocale.startsWith('zh') ? 'zh' : 'en';
 
@@ -69,8 +76,9 @@ export const useOnboardingGreeting = (
         if (!res.ok || cancelled) return;
         const data = await res.json();
 
-        if (typeof window !== 'undefined' && window.sessionStorage) {
-          window.sessionStorage.setItem(storageKey, '1');
+        // Mark as greeted in localStorage across sessions / tabs
+        if (typeof window !== 'undefined' && window.localStorage) {
+          window.localStorage.setItem(storageKey, '1');
         }
 
         if (cancelled) return;
@@ -80,16 +88,18 @@ export const useOnboardingGreeting = (
           let parentId: string | undefined = undefined;
 
           for (let i = 0; i < data.messages.length; i++) {
-            if (cancelled) break;
+            // Note: we do not cancel delivery mid-greeting for the same agent
+            if (contextRef.current.agentId !== agentId) break;
             const content = data.messages[i];
+            const currentContext = contextRef.current;
             const created = await optimisticCreateMessage({
-              agentId: context.agentId,
+              agentId: currentContext.agentId,
               content,
-              groupId: context.groupId,
+              groupId: currentContext.groupId,
               parentId,
               role: 'assistant',
-              threadId: context.threadId,
-              topicId: context.topicId,
+              threadId: currentContext.threadId,
+              topicId: currentContext.topicId,
             });
             if (created?.id) {
               parentId = created.id;
@@ -111,9 +121,12 @@ export const useOnboardingGreeting = (
     runGreeting();
 
     return () => {
-      cancelled = true;
+      // Only mark cancelled if switching away from this agent
+      if (contextRef.current.agentId !== agentId) {
+        cancelled = true;
+      }
     };
-  }, [context.agentId, context.topicId, context.threadId, context.groupId, messages, userId, i18n.language]);
+  }, [context.agentId, context.topicId, context.threadId, context.groupId, !messages || messages.length === 0, userId, i18n.language]);
 };
 
 export default useOnboardingGreeting;
