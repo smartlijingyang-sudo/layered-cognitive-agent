@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from typing import Protocol, cast
+
 from lca.contracts.mechanisms import HookRegistry
 from lca.contracts.models.core.execution.result import Result
+from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.core.state.terminal_outcome import ResumeCursor
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
     DeclarativeValidationError,
@@ -15,6 +18,22 @@ from lca.contracts.protocols.runtime.infra.infra import StateStore
 from lca.contracts.protocols.runtime.runtime.composition import ResultFinalizer
 from lca.contracts.protocols.state.reducer import Reducer
 from lca.runtime.projection.result_projection import TerminalResultProjection
+
+
+class _TerminalInterpretation(Protocol):
+    """Structural shape of the v2 interpretation shim handed to ``finalize``.
+
+    The v2 driver (``lca/loop/driver.py``) builds a local shim dataclass
+    mirroring the v1 ``InterpretationResult`` shape: ``state`` is the agent
+    state and ``outcome`` carries a ``DeclarativeRunOutcome``-shaped value
+    (every other signature in this module already names that type for the
+    same runtime value). Declared structurally so the shim stays
+    driver-local and no runtime -> framework import edge is reintroduced
+    (see 7e64db293).
+    """
+
+    state: AgentState
+    outcome: DeclarativeRunOutcome | None
 
 
 class RuntimeResultFinalizer(ResultFinalizer):
@@ -57,13 +76,13 @@ class RuntimeResultFinalizer(ResultFinalizer):
         """
         # ADR-0221 P3: the v2 driver hands the finalizer a shim that
         # mirrors the v1 ``InterpretationResult`` shape so the legacy
-        # reducer pipeline stays intact; duck-typed access to the
-        # ``state`` / ``outcome`` fields below works without a hard
-        # ``isinstance`` check.
-        _ = interpretation  # keep the binding alive for the field reads
-        final_state = interpretation.state
+        # reducer pipeline stays intact. The base ``ResultFinalizer``
+        # protocol declares ``interpretation: object``; narrow here to the
+        # structural seam contract the driver actually provides.
+        interp = cast("_TerminalInterpretation", interpretation)
+        final_state = interp.state
 
-        outcome = interpretation.outcome
+        outcome = interp.outcome
         if outcome is None:
             raise DeclarativeValidationError(
                 "RT-004",
