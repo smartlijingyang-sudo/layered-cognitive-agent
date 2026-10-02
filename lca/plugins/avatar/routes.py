@@ -311,6 +311,9 @@ async def get_avatar_file(request: Any) -> Any:
     _, assistant_id, error = _auth_prelude(request)
     if error is not None:
         return error
+    _, error = _resolve_service(assistant_id)
+    if error is not None:
+        return error
     rel_path = str(request.path_params["path"])
     try:
         data = resolve_safe_path(assistant_id, rel_path)

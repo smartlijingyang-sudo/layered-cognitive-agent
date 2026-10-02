@@ -452,6 +452,14 @@ def test_get_avatar_file_rejects_disallowed_path(app: Starlette, tmp_path: Path)
     assert resp.json()["error"]["type"] == "invalid_request"
 
 
+def test_get_avatar_file_unknown_assistant_returns_404(app: Starlette) -> None:
+    """未注册助理的文件请求必须映射 404，而不是 500。"""
+    client = TestClient(app)
+    resp = client.get("/v1/assistants/asst_nonexistent/avatar/files/candidates/cand-1/original.png")
+    assert resp.status_code == 404
+    assert resp.json()["error"]["code"] == "assistant_not_found"
+
+
 # ── 鉴权与归属（ADR-0252 D4/D6） ────────────────────────────
 
 
