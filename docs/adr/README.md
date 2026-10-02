@@ -203,9 +203,13 @@
 | [0263](0263-routine-scheduling-mutual-exclusion-and-self-healing.md) | 例程调度互斥与自愈契约：单实例互斥锁（owner+心跳）、锁超时自愈收割、busy→显式 SKIP 可观测、触发记录持久化、失败隔离；生产 Muse 调度模式的 LCA 落地提案 | Proposed |
 | [0264](0264-proactive-messaging-pipeline.md) | 主动消息三层管道契约：触发/裁决/投递三层分离、裁决纯函数四态（REJECTED/DELIVER_CHAT/DELIVER_QUIET/SILENT）、fail-closed 只用在精确可判定处、投递复用 surface 事件+turn=-1 哨兵+幂等键、落点默认回发起上下文；生产 Muse 主动行为机制的 LCA 落地提案 | Proposed |
 | [0265](0265-system-prompt-assembly-order.md) | 系统提示装配顺序契约：stable→volatile 带序约束（宪法层→时间锚点→用户 live 配置→能力面→运行上下文→行为规则）、profile 扩展只许带内增删、义务段不得可选；ADR-0255 §1.1 的 LCA 落地提案 | Proposed |
+| [0266](0266-standing-write-matrix-and-update-mechanics.md) | Standing 文件写权限矩阵与更新机制契约：谁可以改 standing 文件、在线写 read-before-write、离线写冲突消解（字段级合并/真冲突 fail-closed）、读取新鲜度语义（三层）；ADR-0255 §2.11/§2.12 的 LCA 落地提案 | Proposed |
 | [0267](0267-agent-behavior-three-mechanisms.md) | Agent 行为三机制补齐：工具失败降为数据不杀死 run、记忆按用户画像加权呈现、推理不复述规则条文 | Proposed |
 | [0268](0268-context-bus-async-executors-and-cron-projection.md) | 上下文总线、四类异步执行体与 cron 即将到来投影：lca.nothing_to_do 与 cron 域分离、含一次性的 CronJob、服务端 next_run（列表只给时间字符串）、间隔从创建时间起相位、handoff 后由父决定说不说、重叠时只留最新排队项、run 回执必写 | Proposed |
 | [0269](0269-assistant-avatar-system.md) | 助理头像生成系统：独立 avatar 插件、身份感知生图（用户原话+identity traits）、create/edit/set 三态候选池（生成与激活解耦、24h TTL）、多尺寸+异步视频变体、cron 定时换装（SpaceActionExecution artifact_id=avatar + 轻量调度器）、Redis pub/sub WS 推送通道 | Proposed |
+| [0270](0270-task-intake-gate.md) | 任务受理门契约：首 turn 必答 7 问（run 时精简版）、触及改契约/闭集/SSOT 时 fail-closed 停出方案、受理答案落 journal evidence；ADR-0255 §0 的 LCA 落地提案 | Proposed |
+| [0271](0271-avatar-system-alignment-and-supplement.md) | Avatar 头像系统对齐与补遗：与 ADR-0269 的重叠清单、三处实质冲突（IDENTITY.md 写入路径/avatar 第九域/视频异步类型归属）、新增并发守卫/候选上限/隐私补强/第一人称话术 | Proposed |
+| [0272](0272-realtime-info-routing-iron-rule.md) | 实时信息路由铁律契约：查询 vs 核验路由二分、search 结果证据纪律（肯定弱化/否定纪律）、真机任务书三要素、账号内数据走 skill 优先；ADR-0255 §3.3 的 LCA 落地提案 | Proposed |
 | [0255](0255-muse-production-runtime-full-reference.md) | Muse 生产运行时全量参考：每 turn 上下文装配顺序、9 个 standing 文件全文与权限矩阵、36 工具命名空间函数清单与关键参数、9 大机制（记忆三层/强制检索/落笔写盘/provenance/压缩豁免/子 agent 继承/自省投影）与 12 条验收用例；ADR-0254 的实证 companion | Proposed |
 
 > 同名 `0165` 系列有两份(stub + 执行点强制):[0165-event-spine-unified-log.md](0165-event-spine-unified-log.md) 与 [0165-execution-point-enforcement.md](0165-execution-point-enforcement.md)(原 0165.1)。SSOT / 轨迹文件组织以 [0167](0167-spine-ssot-and-step-materialization.md) 为准。
