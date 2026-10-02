@@ -146,7 +146,11 @@ def format_record_line(record: MemoryRecord) -> str:
         return f"- [{layer}] 我此前的回复(step={step}): {record.content}"
     # ADR-0246 PR-5: semantic 层结构化事实行用 ``category`` 标签，不再是原文层名。
     category = getattr(record, "category", None)
-    if category in {MemoryCategory.IDENTITY, MemoryCategory.PREFERENCE, MemoryCategory.FACT}:
+    if category is not None and category in {
+        MemoryCategory.IDENTITY,
+        MemoryCategory.PREFERENCE,
+        MemoryCategory.FACT,
+    }:
         return f"- [{category.value}] {record.content}"
     return f"- [{layer}] {record.content}"
 

@@ -158,9 +158,11 @@ def _validate_approval_resume_node(plan: Plan) -> None:
     )
 
 
-def _predicate_reads_routing_next_hint(pred: Predicate) -> bool:
+def _predicate_reads_routing_next_hint(pred: Predicate | None) -> bool:
     """Walk a predicate tree and report whether any leaf reads the routing
     port's ``next_hint`` field.
+
+    ``None`` (an unconditional edge) reads nothing and returns ``False``.
 
     The port name is ``approval_routing`` (renamed from ``routing`` per
     ADR-0237 / PR-1b to avoid the ``PortRegistry.last-write-wins``

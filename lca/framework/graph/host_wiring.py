@@ -97,11 +97,15 @@ def make_recursive_runner(adapter: Any) -> RecursiveRunner:
                         return getattr(self._base, name)
 
                 seeded_state = _DepthCarrier(outer_state, depth)
+        # The inner plan gets its own mutable phase mirror: sharing the outer
+        # dict would let inner phase payloads clobber outer ones under the
+        # same phase keys (think/act/reflect/... accumulate per plan run).
+        inner_mirror = dict(outer_mirror) if outer_mirror is not None else {}
         interp = PlanInterpreter(
             registry=adapter.registry,
             observer=adapter.graph_observer,
             clock=adapter.graph_clock,
-            results_by_phase=outer_mirror if outer_mirror is not None else {},
+            results_by_phase=inner_mirror,
         )
         result = await interp.run(sub_plan, outer_state=seeded_state, port_registry=port_registry)
         return dict(result.output)
