@@ -19,6 +19,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from lca.contracts.protocols.graph.errors import UnknownFieldError
+from lca.contracts.protocols.graph.ports import PortName
 from lca.contracts.protocols.graph.predicate import PortRef
 from lca.framework.graph.port_registry import PortRegistry
 
@@ -73,7 +74,7 @@ class PortReader(BaseModel):
         """Check whether the port is set in the registry (without raising)."""
         return name in self.registry.snapshot()
 
-    def _resolve_field(self, port_name: str, field_name: str, value: Any) -> Any:
+    def _resolve_field(self, port_name: PortName, field_name: str, value: Any) -> Any:
         """Navigate into ``field_name`` on ``value``."""
         payload_type = self.registry.port_type(port_name)
 

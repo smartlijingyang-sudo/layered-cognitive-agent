@@ -253,27 +253,20 @@ def _project_to_phase_graph(
     )
 
 
-def _wrap_compiled_run_plan(
-    spec: BundleGraphSpec,
-    phase_graph: CognitivePhaseGraphPlan,
-) -> CompiledRunPlan:
+def _wrap_compiled_run_plan(spec: BundleGraphSpec) -> CompiledRunPlan:
     """v2 CompiledRunPlan 包装(实现 V2BundleGraphPlanMarker)。
 
     走纯 v2 路径,**不再伪装成老 declarative plan**:
-    - phase_graph 含 BundleGraphNode 投影的 PhaseNode(PlanInterpreter /
-      BundleGraphSpec 路径消费;不调 v0 phase executor)
-    - phase_bindings:最小合法(GraphAssembler 已退役;生产单轨为
-      PlanInterpreter + BundleGraphSpec)
-    - capability / validation_report / provenance:最小合法
-    - 实现 V2BundleGraphPlanMarker:isinstance 命中,PlanInterpreter 走 v2 分支
+    - ADR-0221 已从 CompiledRunPlan 退役 phase_graph / phase_bindings 字段:
+      不再构造 PhaseBinding(63a68a4da 删除了该类,旧 import 必 ImportError),
+      plan 只带 v2 数据区(capability / scope / provenance / validation_report)
+    - 实现 V2BundleGraphPlanMarker:isinstance 命中,PlanInterpreter 走 v2 分支;
+      NodeGraphDriver 经 get_bundle_graph_spec() 读原始 BundleGraphSpec
 
-    delete-when:PlanInterpreter v2 分支稳定后,可进一步精简 phase_bindings /
+    delete-when:PlanInterpreter v2 分支稳定后,可进一步精简
     capability / validation_report(本 ADR §8 实施步骤 #11)。
     """
-    from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
-        PhaseBinding,
-        PlanProvenance,
-    )
+    from lca.contracts.protocols.declarative.declarative_1.declarative_graph import PlanProvenance
     from lca.contracts.protocols.declarative.declarative_1.v2_plan_marker import (
         V2BundleGraphPlanMarker,
     )
@@ -294,14 +287,6 @@ def _wrap_compiled_run_plan(
         patches=(),
         task_id=None,
         env_fingerprint=None,
-    )
-    phase_bindings = tuple(
-        PhaseBinding(
-            node_id=n.id,
-            semantic_phase=n.semantic_phase,
-            executor_capability=n.binding,
-        )
-        for n in phase_graph.nodes
     )
     capability = CapabilityPlan(
         profile_path=profile_path,
@@ -336,8 +321,6 @@ def _wrap_compiled_run_plan(
         revision="v3",
         plugin_specs=(),
         capability_bindings=(),
-        phase_graph=phase_graph,
-        phase_bindings=phase_bindings,
         control_entries=(),
         replacement_map=(),
         effect_policy=(),
@@ -359,8 +342,10 @@ def _compile_bundle_graph(plan_ref: str, *, runtime: Any | None = None) -> Compi
     CordisBackedRuntime 实例,缓存命中率不变。
     """
     spec = _load_bundle_graph_spec(plan_ref)
-    phase_graph, _factories = _project_to_phase_graph(spec, runtime=runtime)
-    return _wrap_compiled_run_plan(spec, phase_graph)
+    # ADR-0221 退役了 phase_graph/phase_bindings 字段,投影结果已无处可挂;
+    # 此处调用仅保留其 fail-loud factory 校验副作用。
+    _project_to_phase_graph(spec, runtime=runtime)
+    return _wrap_compiled_run_plan(spec)
 
 
 class BundleSubgraphResolver:

@@ -75,7 +75,7 @@ class WechatIlinkClient:
     def __init__(
         self,
         base_url: str = DEFAULT_BASE_URL,
-        transport: httpx.BaseTransport | None = None,
+        transport: httpx.AsyncBaseTransport | None = None,
         timeout: float = DEFAULT_TIMEOUT,
     ) -> None:
         self.base_url = base_url.rstrip("/")
