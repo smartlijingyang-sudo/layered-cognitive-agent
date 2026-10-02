@@ -6,8 +6,10 @@ from dataclasses import replace
 from datetime import UTC
 
 from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.event import Category
 from lca.contracts.models.core.execution.decision import DelegationSpec, Observation
 from lca.contracts.models.core.state.state import AgentState, Budget
+from lca.loop.fact_gateway import DefaultFactGateway
 from lca.plugins.events.publishers.delegation_cache.plugin import (
     PUBLISHER_PLUGIN_ID,
     DelegationCachePlugin,
@@ -67,7 +69,6 @@ def test_manifest_provides_match_setup_keys() -> None:
 def test_delegation_cache_plugin_emits_via_session() -> None:
     """命中缓存 → Session.append(TeamDelegationCacheHit) + Observation。"""
     from typing import Any
-    from unittest.mock import MagicMock
 
     from lca.plugins.events.publishers._session_publish import (
         reset_publish_session,
@@ -83,7 +84,14 @@ def test_delegation_cache_plugin_emits_via_session() -> None:
         def append(self, payload: Any, *, producer: Any) -> EventRef:
             captured["payload"] = payload
             captured["producer"] = producer
-            return MagicMock(name="SessionRef", category="team.delegation.cache_hit")
+            return EventRef(
+                event_id="test-delegation-cache:1",
+                category="team.delegation.cache_hit",
+                trace_id="test-delegation-cache",
+                ts=0.0,
+                persisted=False,
+                subscriber_count=0,
+            )
 
     token = set_publish_session(FakeSession())
     try:
@@ -96,9 +104,14 @@ def test_delegation_cache_plugin_emits_via_session() -> None:
 
     assert isinstance(observation, Observation)
     assert observation.success is True
-    assert isinstance(captured["payload"], TeamDelegationCacheHit)
-    assert captured["producer"] is DelegationCachePlugin
-    assert captured["payload"].callee_role == "analyst"
+    payload = captured["payload"]
+    # commit_delegation_cache_hit publishes a spine fact (ADR-0193 taxonomy);
+    # the session now receives a SpineEventPayload envelope, not the DTO.
+    assert payload.category == Category.SPINE_TEAM_DELEGATION_CACHE_HIT
+    # Fact-gateway seam: DefaultFactGateway is the session producer
+    # for spine facts (see publish_ep observer-path comment).
+    assert captured["producer"] is DefaultFactGateway
+    assert payload.payload["callee_role"] == "analyst"
 
 
 def test_cached_observation_no_hit_returns_none() -> None:
@@ -111,7 +124,6 @@ def test_cached_observation_no_hit_returns_none() -> None:
 def test_cache_module_delegates_to_plugin() -> None:
     """infrastructure 缓存模块 → DelegationCachePlugin → Session.append。"""
     from typing import Any
-    from unittest.mock import MagicMock
 
     from lca.infrastructure.delegation.cache import cached_delegation_observation
     from lca.plugins.events.publishers._session_publish import (
@@ -128,7 +140,14 @@ def test_cache_module_delegates_to_plugin() -> None:
         def append(self, payload: Any, *, producer: Any) -> EventRef:
             del producer
             captured.append(payload)
-            return MagicMock(name="SessionRef")
+            return EventRef(
+                event_id="test-delegation-cache:2",
+                category="team.delegation.cache_hit",
+                trace_id="test-delegation-cache",
+                ts=0.0,
+                persisted=False,
+                subscriber_count=0,
+            )
 
     token = set_publish_session(FakeSession())
     try:
@@ -141,7 +160,8 @@ def test_cache_module_delegates_to_plugin() -> None:
 
     assert isinstance(observation, Observation)
     assert len(captured) == 1
-    assert isinstance(captured[0], TeamDelegationCacheHit)
+    assert captured[0].category == Category.SPINE_TEAM_DELEGATION_CACHE_HIT
+    assert captured[0].payload["callee_role"] == "analyst"
 
 
 def test_unauthorized_plugin_class_cannot_publish() -> None:
