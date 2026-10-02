@@ -71,7 +71,7 @@ class ThinkContextTruncateExecutor:
     # repair``). The plan validator does not model runtime carriers as
     # port producers, so a typed ``state`` input would fail to lift.
     declared_inputs: tuple = ()
-    declared_outputs: tuple[PortName, ...] = ("compact_receipt",)
+    declared_outputs: tuple[PortName, ...] = (PortName("compact_receipt"),)
 
     async def node_execute(
         self,
@@ -101,7 +101,7 @@ class ThinkContextTruncateExecutor:
                 receipt = self._apply_truncate(payload=payload, budget=budget)
         except Exception:
             receipt = CompactReceipt.skipped(bytes_seen=0)
-        return NodeOutput(port_values={"compact_receipt": receipt})
+        return NodeOutput(port_values={PortName("compact_receipt"): receipt})
 
     def _apply_truncate(
         self,
