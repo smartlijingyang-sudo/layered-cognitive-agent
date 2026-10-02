@@ -23,6 +23,9 @@ from lca.infrastructure.cli.services.kernel.supervisor.decisions import (
     _EXIT_CLEAN,
     decide_restart,
 )
+from lca.infrastructure.cli.services.kernel.supervisor.process import (
+    _PhantomProc,
+)
 from lca.infrastructure.cli.services.kernel.supervisor.state import (
     _hydrate_from_state_file,
     _write_state,
@@ -76,7 +79,9 @@ class KernelSupervisor:
 
     def __init__(self, config: ProgramConfig) -> None:
         self._config = config
-        self._proc: subprocess.Popen[bytes] | None = None
+        # _hydrate_from_state_file installs a _PhantomProc here when the
+        # supervisor is rehydrated from a previous process' state file.
+        self._proc: subprocess.Popen[bytes] | _PhantomProc | None = None
         self._state: ProgramState = ProgramState.STOPPED
         self._restart_count = 0
         self._last_exit_code: int | None = None
@@ -179,16 +184,15 @@ class KernelSupervisor:
         if proc.poll() is None:
             with contextlib.suppress(ProcessLookupError, AttributeError):
                 proc.send_signal(signal.SIGTERM)
-        # PhantomProc has no .wait(); use os-level waitpid via os.waitpid
-        # with WNOHANG so we don't block forever.
+        # Both union members expose .wait() (Popen and _PhantomProc).
         try:
-            proc.wait(timeout=deadline)  # type: ignore[attr-defined]
+            proc.wait(timeout=deadline)
         except (subprocess.TimeoutExpired, AttributeError):
             with contextlib.suppress(OSError, ProcessLookupError):
                 # already dead or reaped: SIGKILL has nothing to signal
                 os.kill(proc.pid, signal.SIGKILL)
             with contextlib.suppress(subprocess.TimeoutExpired, AttributeError):
-                proc.wait(timeout=2.0)  # type: ignore[attr-defined]
+                proc.wait(timeout=2.0)
         self._join_threads(timeout=2.0)
         self._close_log_files()
         with self._state_lock():

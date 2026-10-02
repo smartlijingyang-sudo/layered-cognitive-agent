@@ -59,8 +59,10 @@ def _parse_env(raw: str) -> dict[str, str]:
 
 def parse_program_config(path: str | Path) -> list[ProgramConfig]:
     """Parse a supervisord-style config file into a list of programs."""
+    # NOTE: allow_no_value defaults to False and is stored privately
+    # (ConfigParser._allow_no_value); assigning it post-construction
+    # would be a no-op, so it is simply left at the default.
     parser = configparser.ConfigParser()
-    parser.allow_no_value = False
     read = parser.read(path, encoding="utf-8")
     if not read:
         raise ValueError(f"config file unreadable or empty: {path}")

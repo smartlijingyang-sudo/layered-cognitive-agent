@@ -131,5 +131,11 @@ class KernelServeService:
             "KernelServeService 不提供 restart()。改用 `./scripts/lca-ops kernel-restart` 子命令。"
         )
 
+    def ensure_ready(self) -> bool:  # pragma: no cover - intentional stub
+        raise NotImplementedError(
+            "KernelServeService 不提供 ensure_ready()。kernel 进程由 "
+            "K6 ``lca_kernel.lifecycle`` 守护;lca-ops 不做幂等准备工作。"
+        )
+
 
 __all__ = ["KernelServeService"]
