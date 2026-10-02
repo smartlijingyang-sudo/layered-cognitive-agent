@@ -26,7 +26,13 @@ from lca.contracts.protocols import DecisionGate
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 INJECTOR_PATH = (
-    REPO_ROOT / "lca" / "cognition" / "brain" / "decision_gates" / "artifact_respond_injector.py"
+    REPO_ROOT
+    / "lca"
+    / "cognition"
+    / "brain"
+    / "decision_gates"
+    / "artifact"
+    / "respond_injector.py"
 )
 
 
