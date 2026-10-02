@@ -62,7 +62,28 @@ def _to_jsonable(value: Any) -> Any:
 # 单 event payload hard cap(以 _to_jsonable 之后的 JSON 字节数估算)。
 # 超过即 fail-loud,避免一次同步 emit 把 asyncio 事件循环独占数秒
 # (per 2026-09-16 stall postmortem)。环境变量可覆盖,默认 8 MiB。
-_MAX_SNAPSHOT_BYTES = int(os.environ.get("LCA_SESSION_MAX_SNAPSHOT_BYTES", str(8 * 1024 * 1024)))
+#
+# 注意:阈值在首次使用时懒读环境变量,而非 import 时求值——import 时读 env
+# 会让任何在 sys.modules["os"] 被临时替换(测试 sandbox stub 见
+# tests/support/inline_sandbox.py)或 os 未就绪的上下文中懒导入本模块
+# 直接崩溃。对外仍暴露 `_MAX_SNAPSHOT_BYTES` 属性(PEP 562 模块 __getattr__),
+# `from lca.session.append import _MAX_SNAPSHOT_BYTES` 与
+# monkeypatch.setattr 照常工作。
+_DEFAULT_MAX_SNAPSHOT_BYTES = 8 * 1024 * 1024
+
+
+def _read_max_snapshot_bytes() -> int:
+    """读单 event payload 上限:monkeypatch 覆盖 > 环境变量 > 默认 8 MiB。"""
+    override = globals().get("_MAX_SNAPSHOT_BYTES")
+    if isinstance(override, int) and not isinstance(override, bool):
+        return override
+    return int(os.environ.get("LCA_SESSION_MAX_SNAPSHOT_BYTES", str(_DEFAULT_MAX_SNAPSHOT_BYTES)))
+
+
+def __getattr__(name: str) -> Any:
+    if name == "_MAX_SNAPSHOT_BYTES":
+        return _read_max_snapshot_bytes()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def _estimate_size(value: Any) -> int:
@@ -137,9 +158,10 @@ def _snapshot_data(data: Mapping[str, Any]) -> dict[str, Any]:
         raise TypeError(f"session event data 必须是 Mapping, got {type(data).__name__}")
     lifted = _to_jsonable(data)
     size = _estimate_size(lifted)
-    if size > _MAX_SNAPSHOT_BYTES:
+    max_bytes = _read_max_snapshot_bytes()
+    if size > max_bytes:
         raise TypeError(
-            f"session event payload 超过 _MAX_SNAPSHOT_BYTES={_MAX_SNAPSHOT_BYTES} "
+            f"session event payload 超过 _MAX_SNAPSHOT_BYTES={max_bytes} "
             f"(估算 {size} bytes);降低单 event payload 大小或调高 "
             f"LCA_SESSION_MAX_SNAPSHOT_BYTES。"
         )
