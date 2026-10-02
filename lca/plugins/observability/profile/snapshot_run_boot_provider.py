@@ -15,7 +15,7 @@ class PluginSnapshotEntry(TypedDict):
     """profile_snapshot.json ``plugins[]`` slim 形态 —— P3 字段瘦身。
 
     只保留 ``id / layer / kind / effects``(4 字段),``description / config`` 等
-    详细元数据随 ResolvedProfile 走 SSOT(``lca/harness/profile/resolve.py``),
+    详细元数据随 ResolvedProfile 走 SSOT(``lca/harness/profile/resolve/resolve.py``),
     不在 snapshot 里重复。Reader 端按这 4 字段解析即可。
     """
 

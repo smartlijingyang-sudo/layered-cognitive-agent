@@ -537,10 +537,10 @@ def run_restart_report(
 
     # Phases 2 & 3 require the kernel to actually be up.
     # Compare against ProgramState.RUNNING.value (lowercase, see
-    # ``lca/infrastructure/cli/services/kernel/supervisor.py``) so this
+    # ``lca/infrastructure/cli/services/kernel/supervisor/types.py``) so this
     # stays in lockstep with the supervisor's enum, not a hand-typed string.
     try:
-        from lca.infrastructure.cli.services.kernel.supervisor import (
+        from lca.infrastructure.cli.services.kernel.supervisor.types import (
             ProgramState,
         )
 

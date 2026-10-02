@@ -169,8 +169,9 @@ class BundleGraphSpec:
 class FactoryResolutionError(DeclarativeValidationError):
     """Factory lookup failure — placed here so consumers can import from a stable module.
 
-    Cordis-backed resolution uses ``runtime.resolve_factory(factory, region)`` (see
-    lca/framework/subgraph/plugins/runtime.py); this error is raised when neither
+    Cordis-backed resolution uses ``runtime.resolve_factory(factory, region)``
+    (``SubgraphRuntime`` seam, see ``lca/harness/declarative/compile/subgraph_resolver.py``);
+    this error is raised when neither
     the composite key (``f"{region}::{factory}"``) nor the region-less fallback
     (just ``factory``) finds a registered NodeExecutor.
     """
