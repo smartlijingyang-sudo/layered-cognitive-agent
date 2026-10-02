@@ -197,7 +197,8 @@ def _run_boot_check(profile: Path, findings: list[Finding]) -> PhaseResult:
             from lca.contracts.protocols.graph.errors import PlanLiftError
             from lca_kernel.boot.plan_validation import validate_profile_plans
 
-            assert resolved is not None  # resolve check passed above
+            if resolved is None:
+                raise AssertionError("resolved is None despite resolve check above")
             validate_profile_plans(resolved)
             checks.append({"name": "plan_lift", "ok": True})
         except PlanLiftError as exc:

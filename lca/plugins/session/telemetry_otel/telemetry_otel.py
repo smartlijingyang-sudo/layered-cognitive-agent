@@ -216,7 +216,8 @@ class OtelTelemetryBackend:
             if self._started or self._closed:
                 return
             provider = self._build_provider()
-            assert provider is not None
+            if provider is None:
+                raise AssertionError("_build_provider() returned None")
             self._provider = provider
             self._logger = provider.get_logger(_SCOPE)
             self._worker = threading.Thread(target=self._run, daemon=True)

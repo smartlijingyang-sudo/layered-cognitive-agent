@@ -129,7 +129,8 @@ class CLIProvider(Provider):
             Path(file.name).unlink(missing_ok=True)
 
     def _write_start_script(self, start_script: Path) -> None:
-        assert self.user is not None
+        if self.user is None:
+            raise AssertionError("user is None in _write_start_script")
         script_content = f"""\
 #!/bin/sh
 export PATH="{self.config.paths.venv_dir}/bin:{self.config.paths.managed_path}"
@@ -152,7 +153,8 @@ exec node {self._cli_js} connect \\
         self.run_sudo(["chmod", "755", str(start_script)])
 
     def _launch_daemon(self, start_script: Path) -> None:
-        assert self.user is not None
+        if self.user is None:
+            raise AssertionError("user is None in _launch_daemon")
         password_file = Path(".lobehub-stack/sudo.pass")
         password = password_file.read_text().strip() if password_file.is_file() else ""
         subprocess.run(
@@ -176,7 +178,8 @@ exec node {self._cli_js} connect \\
         )
 
     def _report_daemon_status(self, report: StatusReport) -> None:
-        assert self.user is not None
+        if self.user is None:
+            raise AssertionError("user is None in _report_daemon_status")
         pid_file = Path(self.user.state_dir) / "connect.pid"
         if not pid_file.is_file():
             report.fail("daemon", "not running")

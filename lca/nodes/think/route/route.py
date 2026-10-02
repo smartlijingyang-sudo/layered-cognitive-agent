@@ -75,9 +75,10 @@ class ThinkRouteExecutor:
             _log.info("think.route: no SkillRouter wired; falling through to think.reason")
             return NodeOutput(port_values={})
 
-        assert isinstance(router, SkillRouter), (
-            "think.route runtime.skill_router must implement SkillRouter"
-        )
+        if not isinstance(router, SkillRouter):
+            raise AssertionError(
+                "think.route runtime.skill_router must implement SkillRouter"
+            )
         if reducer is None:
             raise RuntimeError(
                 "think.route requires runtime.reducer when a SkillRouter is configured"

@@ -74,9 +74,10 @@ class ThinkShortcutExecutor:
             # which is think.reason (the full reason path).
             _log.info("think.shortcut: no SupportsShortcut wired; falling through to think.reason")
             return NodeOutput(port_values={})
-        assert isinstance(cap, SupportsShortcut), (
-            "think.shortcut runtime.supports_shortcut must implement SupportsShortcut"
-        )
+        if not isinstance(cap, SupportsShortcut):
+            raise AssertionError(
+                "think.shortcut runtime.supports_shortcut must implement SupportsShortcut"
+            )
         decision = await cap.try_shortcut(state)
         if decision is None:
             # No shortcut available — fall through to think.reason plan.

@@ -188,7 +188,8 @@ class ProactiveDeliverer:
         target: DeliveryTarget,
         annotate_unretrieved: bool,
     ) -> dict[str, Any]:
-        assert target.session_id is not None
+        if target.session_id is None:
+            raise AssertionError("target.session_id is None")
         if self._store is None:
             raise RuntimeError("SESSION_APPEND 需要 session_store")
         # 幂等：写前最后一公里查去重状态

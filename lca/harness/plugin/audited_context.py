@@ -55,7 +55,8 @@ def check_privilege(
 
     if contract is None:
         # contract_by_id is guaranteed non-None by the prior guard.
-        assert contract_by_id is not None
+        if contract_by_id is None:
+            raise AssertionError("contract_by_id is None despite prior guard")
         if plugin_id not in contract_by_id:
             raise UndeclaredPrivilegeError(
                 f"plugin {plugin_id!r} is not in the contract registry; cannot "
