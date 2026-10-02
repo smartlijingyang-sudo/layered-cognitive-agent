@@ -132,3 +132,33 @@
 | 冲突记录（X1–X3） | 未覆盖 | ✅ 本 ADR |
 | 并发守卫/池上限/隐私补强/第一人称话术 | 未覆盖 | ✅ N1–N4 |
 | 草稿待拍板 5 项归宿 | 部分已决策 | ✅ N5 |
+
+---
+
+## 实现跟踪注记（2026-10-03 iter-arch 轮，HEAD `d390b2ef8`）
+
+本轮对照实现核验 N1–N4 / X1–X3 的落地状态（只记录事实，不改契约）：
+
+- **N1（并发/重入守卫）❌ 未落地**：`lca/plugins/avatar/service.py::create/edit` 无
+  in-flight 守卫（无 lock/mutex 标记），客户端双击会产生两次真实生成；
+  `candidate_id` 含秒级时间戳（`%Y%m%d%H%M%S`），同秒并发存在 id 冲突可能。
+  N1 仍为 Proposed，待 quality 轮落地 + tests 轮按 T-N1 验收。
+- **N2（候选池上限 20 FIFO）❌ 未落地**：`create` 只是 `candidates + new` 追加，
+  无上限淘汰；24h TTL 已落地（`CANDIDATE_TTL` + `load_state` 懒清理，见
+  `d390b2ef8` commit message Important 3）。N2 仍为 Proposed。
+- **N3（隐私补强）✅ 工具层已满足**：`d390b2ef8` 后 `tools.py::_decode_reference_image`
+  只接受 `/files/<attachment_id>`（用户上传附件）或 `None`（→ 当前 active 图），
+  raw base64 / data URI 被工具层拒绝；`AvatarCandidate` 模型不存照片二进制
+  （`prompt` 仅文本）；落盘走 assistant home 本地路径（`store.py`），不走鉴权 CDN。
+  模型层未记录 provenance 字段——设计取舍为"入口强制而非状态记录"，
+  与 N3 本意（防 agent 自行取用媒体库照片）一致。tests 轮可按 T-N3 验收。
+- **X2（avatar 第九域）✅ 方向已落定**：ADR-0269 §4 决策为独立第 9 域（非并入现有域），
+  实现已联动（`policy.py:20-21/35`、`tools.py` 6 工具 `namespace="avatar"`）；
+  ADR-0256 已加 §13 修订注记同步"8 域 → 9 域"。X2 关闭。
+- **新增观察（超出 0269/0271 文档范围）**：`d390b2ef8` 落地了 per-assistant 隔离
+  （store 按 assistant 隔离、`service` 全函数取 `current_assistant_id()`、
+  `save_state` 写 `revisions/avatar-N.json` 快照到 assistant home）——建议 0269
+  后续修订时补一句多 assistant 隔离声明；arch 轮不改 agy 的文档，只记录。
+- **服务层现状**：`lca/plugins/avatar/` 已有 tools/service/store/registry/routes/events
+  六模块（create/edit/set/get/clear/schedule 六工具），todo-27 Phase 4 契约测试的
+  前置条件（服务层稳定）已具备——tests lane 可认领。

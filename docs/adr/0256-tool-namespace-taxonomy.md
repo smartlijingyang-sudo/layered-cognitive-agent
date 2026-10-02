@@ -4,7 +4,7 @@
 
 **Accepted — 2026-10-02**
 
-> **一句话**：终结"单工具 namespace"的退化现状——namespace 归属改为工具 factory 的声明式元数据，按 8 域划分（core/file/shell/memory/skill/web/agent/ext），让模型决策粒度、defer 加载粒度、审批边界三者同粒度，并给出可直接落地的 6 处代码改动 + 验收标准。
+> **一句话**：终结"单工具 namespace"的退化现状——namespace 归属改为工具 factory 的声明式元数据，按 9 域划分（core/file/shell/memory/skill/web/agent/ext/avatar；第 9 域见 §13），让模型决策粒度、defer 加载粒度、审批边界三者同粒度，并给出可直接落地的 6 处代码改动 + 验收标准。
 
 **Extends**：
 - [ADR-0255](0255-muse-production-runtime-full-reference.md)（Muse 生产运行时全量参考）：本 ADR 是 0255 §L1 defer 落地的**划分规范**——0255 记录了"defer 按 namespace 延迟加载"这一机制，本 ADR 回答"namespace 具体怎么切、切几块、每块装什么"；
@@ -196,3 +196,20 @@ if tool.namespace not in session.loaded_namespaces and tool.namespace not in eag
 - **状态升级**：Task 1–6 全绿上 main；A1/A2/B1/B2 验收用例全转真用例；fail-soft 修订（§11，李超本人 ea8b9f7ae）已在生产验证；8 域 conformance 套件绿。Proposed 使命完成，升级为 Accepted。
 - **裁决**：李超 2026-10-02 授权 Athena 按 muse 思想裁决 backlog todo-1 的状态迁移建议 → 升级。
 - **升级理由（muse 思想）**：契约的 Proposed 期是用来“验证机制”的；当验收矩阵全绿 + 生产实证（6 个 run 的 fail-soft 行为符合预期）+ 修订记录闭环时，继续挂 Proposed 是不诚实的状态——状态必须反映现实。
+
+---
+
+## 13. 修订记录（2026-10-03）：8 域 → 9 域（ADR-0269 §4 落定）
+
+- **背景**：ADR-0269《助理头像生成系统》§4 决策新增独立工具域 `avatar`（头像生成与换装），
+  未并入现有域——ADR-0271 X2 提出的方向问题（独立第 9 域 vs 并入现有域）已被 0269 §4
+  + 实现落定（非 arch 轮擅自决定，本修订仅记录事实）。
+- **实现联动已就位**：`lca/infrastructure/tool_defer/policy.py:20-21`（domain 清单 + 注释引用
+  ADR-0269 §4）、`:35`（`namespace_descriptions["avatar"]`）；
+  `lca/plugins/avatar/tools.py` 6 个工具均声明 `namespace="avatar"`；
+  conformance 套件绿（`tests/unit/test_namespace_declaration.py` 仅剩 pre-existing
+  `lca.nothing_to_do` 红，与 avatar 无关）。
+- **本文档同步**：摘要行"8 域"已改为"9 域"；§12 的"8 域 conformance 套件绿"指 2026-10-02
+  升级当时的历史状态，保留原样（历史快照不改写）。
+- **残留**：`tests/unit/test_namespace_declaration.py:25` docstring 仍写"8 域白名单"——
+  属 `tests/**`，交 tests lane 顺手改，arch 轮不越界。
