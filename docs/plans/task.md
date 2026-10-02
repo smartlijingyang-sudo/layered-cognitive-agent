@@ -473,4 +473,11 @@
 | STATUS-SCREEN-BRAINSTORM-APPROACHES | 步骤 3：提炼 2-3 种系统落地与可观测性投影架构方案并给出推荐 | Completed | 用户选定方案 A（单轨事实投影器 + 流式协议增量扩展） |
 | STATUS-SCREEN-BRAINSTORM-DESIGN-SECTIONS | 步骤 4：逐步呈现分节设计规范（Owns/Does NOT own/统一日志/增量WS/人话规则/不变量）并呈批 | Completed | 全部 3 节设计规范均获用户审核批准 |
 | STATUS-SCREEN-BRAINSTORM-DESIGN-DOC | 步骤 5：沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-02-status-screen-unified-event-log-design.md 并提交 git |
-| STATUS-SCREEN-BRAINSTORM-TRANSITION | 步骤 6：转入实施阶段（调用 writing-plans 制定落地计划） | In_Progress | 正在调用 writing-plans 制定分任务实施计划 |
+| STATUS-SCREEN-BRAINSTORM-TRANSITION | 步骤 6：转入实施阶段（调用 writing-plans 制定落地计划） | Completed | 成功落盘实施计划 docs/plans/2026-10-02-status-screen-unified-event-log-plan.md 并提交 git |
+
+| STATUS-SCREEN-TASK-1-CONTRACTS | 任务 1：动作数据契约与人话规则引擎 (ActivityItem, ActivityIntentNamer) | Pending | 定义 typed 契约与 intent 映射，守卫 INV-02 |
+| STATUS-SCREEN-TASK-2-PROJECTOR | 任务 2：单轨事实流投影器与快照引擎 (ActivityProjector, StatusSnapshotService) | Pending | 基于单轨事实流纯函数投影，守卫 INV-01 |
+| STATUS-SCREEN-TASK-3-TRANSLATOR | 任务 3：EventTranslator 增量推送扩展与取消机制 (activity_updated) | Pending | 动作流式发射 running/completed/cancelled，守卫 INV-03, INV-04 |
+| STATUS-SCREEN-TASK-4-ROUTES | 任务 4：快照与取消 REST API 端点 (routes_status_screen.py) | Pending | 暴露 status-snapshot 与 run cancellation 端点，守卫 INV-06 |
+| STATUS-SCREEN-TASK-5-FRONTEND | 任务 5：前端 AssistantStatusDrawer.tsx 增量 Patch 与交互闭环 | Pending | 原地 patch 单行、Upcoming 聊天草稿、系统任务防删与 Stop 按钮，守卫 INV-03, INV-05 |
+| STATUS-SCREEN-TASK-6-E2E-INVARIANTS | 任务 6：全链路单测回归与全量不变量矩阵验证 (INV-01 ~ INV-06) | Pending | 验证端到端生命周期与所有断言，ruff/diff 检查 |
