@@ -71,6 +71,11 @@ entries:
     $module: lca.plugins.domain.tools.assistant_tools.plugin
     config: {}
 
+  - id: lca.plugins.domain.tools.cron
+    name: lca_plugins_domain_tools_cron
+    $module: lca.plugins.domain.tools.cron.plugin
+    config: {}
+
   - id: lca-assistant-curator
     name: lca_plugins_assistant_curator
     $module: lca.plugins.assistant.curator.curator

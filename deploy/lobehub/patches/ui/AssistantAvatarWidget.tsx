@@ -4,7 +4,7 @@ import { Button, Card, Flex, Tag, Typography, message as antMessage } from 'antd
 import { createStaticStyles } from 'antd-style';
 import React, { memo, useCallback, useState } from 'react';
 
-import { AnimalSvgRenderer, type AnimalSpecies } from './AssistantTopMascot';
+import { AnimalSvgRenderer, type AnimalSpecies } from '@/features/Conversation/components/AssistantTopMascot';
 
 const { Text, Title } = Typography;
 

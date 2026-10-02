@@ -86,10 +86,12 @@ def _bindings_from_runtime_plane() -> BindingsView | None:
 # box path wires box_run_command/sandbox_execute instead. Accept either
 # naming scheme per group — the fork must surface command execution AND
 # code execution, in one form or the other.
-_SANDBOX_TOOL_APIS: frozenset[frozenset[str]] = frozenset({
-    frozenset({"runCommand", "box_run_command"}),
-    frozenset({"executeCode", "sandbox_execute"}),
-})
+_SANDBOX_TOOL_APIS: frozenset[frozenset[str]] = frozenset(
+    {
+        frozenset({"runCommand", "box_run_command"}),
+        frozenset({"executeCode", "sandbox_execute"}),
+    }
+)
 
 
 def _filter_solo_creator_tools(items: tuple[Tool, ...]) -> tuple[Tool, ...]:
@@ -132,8 +134,7 @@ def _assert_sandbox_tools_visible(bindings: BindingsView, items: tuple[Tool, ...
         return
     present = {_tool_api_name(tool) for tool in items}
     missing = sorted(
-        f"one of {sorted(group)}" for group in _SANDBOX_TOOL_APIS
-        if not (group & present)
+        f"one of {sorted(group)}" for group in _SANDBOX_TOOL_APIS if not (group & present)
     )
     if missing:
         raise RuntimeError(
@@ -264,6 +265,13 @@ class ToolForkDispatchExecutor:
         vocal_gate = getattr(bindings, "vocal_gate", None)
         auto_review_mode = getattr(bindings, "auto_review_mode", "off")
         auto_review_gate = getattr(bindings, "auto_review_gate", None)
+
+        # ADR-0268 §4：lca.nothing_to_do 只在 handoff 轮可用。用户轮 wire
+        # 不放该工具；模型发出调用由 unexposed_tool_block_observation 回注
+        # 错误（§14.1、§14.2 结构保证）。
+        from lca.infrastructure.tools.lca import filter_handoff_only_tools
+
+        items = filter_handoff_only_tools(items, origin)
 
         # 子代理物理禁声：send_message 绝不进入子代理工具集（ADR-0248 §5.3）。
         if origin == "subagent":

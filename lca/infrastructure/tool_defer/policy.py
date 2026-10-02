@@ -14,6 +14,9 @@ STANDARD_NAMESPACES: tuple[str, ...] = (
     "web",
     "agent",
     "ext",
+    # ADR-0268 §4：新增 lca（运行时控制）与 cron（定时任务）两个域。
+    "lca",
+    "cron",
 )
 
 DEFAULT_NAMESPACE_DESCRIPTIONS: dict[str, str] = {
@@ -25,6 +28,8 @@ DEFAULT_NAMESPACE_DESCRIPTIONS: dict[str, str] = {
     "web": "联网搜索与网页抓取",
     "agent": "助理管理、派发子任务、向用户提问",
     "ext": "第三方集成：连接与刷新外部服务",
+    "lca": "运行时控制：handoff 轮静默结束",
+    "cron": "定时任务：创建、查看、更新、删除与即将到来列表",
 }
 
 DEFAULT_NAMESPACE_APPROVAL: dict[str, str] = {

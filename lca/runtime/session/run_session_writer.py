@@ -80,6 +80,9 @@ def _surface_event_to_message(event: Any) -> Message:
             tool_call_id=event.data.get("tool_call_id"),
         )
         return msg
+    if event.type == "surface/developer_message":
+        # ADR-0268 §6：cron handoff 作为 developer 消息注入父轮。
+        return Message(role="developer", content=event.data.get("content"))
     # Other surface event types (extensions) fall through with role=event.type
     # so orphan-drop and downstream consumers see them rather than silently drop.
     return Message(role=event.type)
@@ -212,6 +215,34 @@ class RunSessionWriter(RunSessionWriterProtocol):
             "surface/user_message",
             {"message_id": message_id, "role": role, "content": content},
             surface_op="user_message",
+        )
+        return self._event_ref(session, event)
+
+    def append_developer_message(
+        self,
+        *,
+        message_id: str,
+        content: str,
+        job_id: str | None = None,
+        run_id: str | None = None,
+    ) -> EventRef:
+        """Append a ``surface/developer_message`` row (ADR-0268 §6).
+
+        Used by the cron handoff injection path: the worker report enters the
+        parent session as a developer message before the next user turn, so
+        the assistant can decide whether to surface it. ``job_id`` / ``run_id``
+        stay in the journal for replay provenance.
+        """
+        session = self._require_session()
+        event = session.append(
+            "surface/developer_message",
+            {
+                "message_id": message_id,
+                "content": content,
+                "job_id": job_id,
+                "run_id": run_id,
+            },
+            surface_op="developer_message",
         )
         return self._event_ref(session, event)
 

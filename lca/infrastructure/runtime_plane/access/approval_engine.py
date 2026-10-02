@@ -190,6 +190,36 @@ _STANDARD_SHELL_TOOLS: frozenset[str] = frozenset(
     }
 )
 
+#: ADR-0268 §2.1/§9：模型发起的 cron 写操作必须挂起等审批回注。
+_CRON_MUTATION_TOOLS: frozenset[str] = frozenset({"cron.update", "cron.remove"})
+
+
+class CronMutationApprovalStrategy:
+    """ADR-0268 §2.1/§9：模型路径 cron 写操作在审批回注前挂起。"""
+
+    strategy_name = "cron_mutation_approval"
+
+    def evaluate(
+        self,
+        tool_calls: Sequence[ToolCall],
+        plane: PlaneRef | None = None,
+    ) -> ApprovalRequirement | None:
+        del plane
+        if not isinstance(tool_calls, (list, tuple)):
+            return None
+        for call in tool_calls:
+            tool_name = getattr(call, "tool_name", None)
+            if tool_name in _CRON_MUTATION_TOOLS:
+                return ApprovalRequirement(
+                    required=True,
+                    reason_kind=ApprovalReasonKind.POLICY_RULE,
+                    risk_level=RiskLevel.MEDIUM,
+                    summary=f"cron 写操作需用户授权后回注: {tool_name}",
+                    target_resource=tool_name,
+                    details={"tool_name": tool_name},
+                )
+        return None
+
 
 class NamespaceApprovalStrategy:
     """Strategy inspecting tool namespace approval requirements (e.g. shell domain)."""
@@ -264,6 +294,7 @@ def build_default_approval_engine() -> ApprovalPolicyEngine:
             HITLInteractionStrategy(),
             MachineAccessStrategy(),
             NamespaceApprovalStrategy(),
+            CronMutationApprovalStrategy(),
             DefaultAllowStrategy(),
         ]
     )

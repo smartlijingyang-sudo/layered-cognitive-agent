@@ -450,4 +450,34 @@
 | CONNECTOR-TASK-5-DRAWER-HUB | 右侧抽屉全局连接器中枢 Tab (ConnectorsPanel.tsx in AssistantStatusDrawer) | Completed | 落地 6 大生态连接器中枢、工具清单折叠面板、助理启用开关与顶部 Profile 编辑铅笔菜单，4/4 单测全绿，commit c6dc0cb2c |
 | CONNECTOR-TASK-6-AVATAR-PICKER | 会话流交互式选图卡片与换装闭环 (AssistantAvatarWidget.tsx & Drawer 铅笔快捷菜单) | Completed | 落地 4 大候选卡片网格交互、一键原子更新 IDENTITY.md 与成功动效反馈，4/4 单测全绿，commit 3d0ad6e93 |
 | CONNECTOR-TASK-7-INTEGRATION-E2E | 全量补丁 byte-identical 核验、全套单测回归与端到端内核热重载核验 | Completed | 39 个 LobeHub 补丁 100% 校验通过（0 broken），81/81 关联回归测试 100% 全绿，内核顺利平滑热重启（pid=976135, 24380 fibers 0 fail） |
+| LOBEHUB-CONNECTOR-STORE-FIX | 修复 LobeHub 连接器/Skill 市场入口缺失与 Composio 隐藏，使用 agent-browser 实机验证 | Completed | 1. 根因与修复：注入 COMPOSIO_API_KEY 恢复 Gmail 等 30+ 款连接器；修复 AssistantAvatarWidget Vite 500 编译路径；2. 补丁与服务：ensure 校验 39 补丁一致性并热启 LobeHub (:3010)；3. agent-browser 实机验证全通：捕获 /settings/connector 面板、Gmail 已连接状态，以及 Skill Store 模态窗下的 LobeHub、Skills、MCP 三大 Tab，图件已落盘 docs/plans/ |
+| MUSE-CONNECTOR-BRAINSTORM-DESIGN | 工业级 7 层连接器架构设计头脑风暴、四节呈批与设计文档落盘 | Completed | 概念模型、连接状态机/LobeHub卡片协议、双层权限/滑动窗口硬限流、测试不变量矩阵全部获批，落盘 docs/plans/2026-10-02-muse-connector-architecture-design.md 与 plan.md |
+| MUSE-CONNECTOR-M1-STATE-MACHINE | 【M1】连接器运行时底座：连接状态机与凭据安全 Vault (core/state.py, core/vault.py) | Completed | 落地 ConnectionState、ConnectorStateMachine、ConnectionMetadata（frozen且禁止Token泄露）、format_connector_auth_widget 与 ConnectorVault，单测 9/9 100% 全绿，通过 INV-01/INV-02/INV-03 |
+| MUSE-CONNECTOR-M2-GMAIL-CLI | 【M2】首个切片 Gmail CLI 封装：Manifest 规范与 SKILL.md 自动注入 | Completed | 落地 GmailConnectorCLI、manifest.yaml 规范与 SKILL.md 动态生成物化器，支持 +read/+search/+send 与 accounts/status，通过 INV-02/INV-03/INV-06（强制--upload暂存），单测 16/16 全绿 |
+| MUSE-CONNECTOR-M3-CARD-AND-PROMPT | 【M3】LobeHub 卡片协议联动与 Prompt 认知注入 (ConnectedServicesSection) | Completed | 落地 ConnectedServicesSection 提示词注入（解决 Agent 认知断层，无溢出且 Token 零泄露），升级 composioConnect 工具返回 [widget:connector_auth?...] 交互式卡片插桩语法，22/22 单测全通，通过 INV-01/INV-02/INV-03 |
+| MUSE-CONNECTOR-M4-PERM-AND-QUOTA | 【M4】双层正交权限引擎 (permissions.py) 与滑动窗口硬配额执行器 (rate_limiter.py) | Completed | 落地 ConnectorPermissionEngine（双层正交权限 Provider Scope ∩ Action ALLOW/ASK/DENY 硬拦截）与 SlidingWindowRateLimiter（60s滑动窗口硬配额计算与精确 retry_after_seconds 退避），通过 INV-04 与 INV-05，单测 19/19 全绿 |
+| MUSE-CONNECTOR-M5-INTEGRATION-E2E | 【M5】全链路单测回归 (INV-01 ~ INV-08) 与端到端活体验证 | Completed | 落地 tests/scenario/test_muse_connector_invariants.py，8/8 项测试 100% 覆盖断言 INV-01 至 INV-08 全量不变量（Token零泄露、状态机确定性、卡片协议优先、双层权限硬拦截、滑动窗口限流、写操作暂存、多账号强隔离与AP-01负向边界），连接器全套 30/30 测试全绿，ruff clean |
+| MUSE-CONNECTOR-FLOW-VERIFICATION | 【全流程测试】5大真实场景对话流闭环验证 (Scenario A ~ E in test_muse_connector_conversational_flow.py) | Completed | 落地全套多轮会话流程测试（初次连接挂载Widget与激活、两阶段写暂存+ASK审批卡片放行、只读切发信增量提权卡片mode=add_scope、用户手动撤销Token死循环防御REAUTHORIZATION_REQUIRED、突发并发滑动窗口硬限流+精确退避自愈），全量 48/48 测试 100% 通过（2.43s） |
 
+
+| DRAWER-TASK-1 | Fix Top Mascot Truncation & Chat Input Autofill | Completed | Mascot 增加 6px 顶部外边距与 10px 内边距平移，呼吸振幅降至 1.5px 彻底杜绝 44px 顶栏切头；handleTriggerChatEdit 适配 window.__mainEditor.setDocument 与 focus，commit 6295ada1d |
+| DRAWER-TASK-2 | Clean Up Technical Wording & Setup 5-Tab Layout | Completed | 抽屉标题纯净为 {assistantName}，彻底移除“状态与真值中心”和“File as SSOT”底层横幅；重构为 5 个产品化 Tab（动态/批准/即将到来/身份/连接器），自适应等宽排布绝不挤出，commit 68232c9c9 |
+| DRAWER-TASK-3 | Implement `🪪 身份` 2-Column Grid & Click-to-Edit | Completed | 合并前三项配置为 🪪 身份 Tab，采用 2 列网格卡片（一行两个），卡片全局 hover 与手型直接点击唤起编辑，彻底移除“全屏编辑资源”按钮与技术哈希，commit 68232c9c9 |
+| DRAWER-TASK-4 | Implement `🕒 动态` (Activity Timeline) with Dual-Pane Log Modal | Completed | 落地按今天/昨天/较早时间分组的行动卡片，点击整行唤起双栏详情弹窗（左侧行动列表，右侧人读执行概述、具体指令、产出结果与耗时），commit 68232c9c9 |
+| DRAWER-TASK-5 | Implement `⚖️ 批准` & `⏰ 即将到来` Panels | Completed | 落地 ⚖️ 批准记录面板（待审批/已批准/已拒绝）与 ⏰ 即将到来定时计划面板（对接 /jobs 端点，支持开关切换与计划说明），commit 68232c9c9 |
+| DRAWER-TASK-6 | Upgrade `ConnectorsPanel.tsx` UI & Prevent Button Overflow | Completed | 连接器卡片升级微质感风格（独立品牌背景色、状态徽标、工具折叠），底部控制栏弹性间隙与 flexShrink:0 保证“立即连接”按钮绝不贴边或溢出，commit 68232c9c9 |
+| DRAWER-TASK-7 | Patch Engine Synchronization & Verification | Completed | patch_lobehub.py 成功编译同步至 lobehub-ui/（39 ok, 0 broken），16/16 单元与场景测试 100% 全绿（耗时 2.83s） |
+
+| STATUS-SCREEN-BRAINSTORM-CONTEXT | 步骤 1：排查项目上下文与现有机制（Session/Spine事件流、WebSocket、ADR-0268 cron投影、审批引擎） | Completed | 已摸清 LCA 单轨事件、EventTranslator、/v1/runs/{run_id}/ws、CronListItem 投影与现有 Drawer 现状 |
+| STATUS-SCREEN-BRAINSTORM-QUESTIONS | 步骤 2：针对统一事件日志、WebSocket通信范围与Tab结构提出澄清问题（单步提问） | Completed | 确定采用投影模式、快照API+运行期WS增量Patch方案，并保持5 Tab结构 |
+| STATUS-SCREEN-BRAINSTORM-APPROACHES | 步骤 3：提炼 2-3 种系统落地与可观测性投影架构方案并给出推荐 | Completed | 用户选定方案 A（单轨事实投影器 + 流式协议增量扩展） |
+| STATUS-SCREEN-BRAINSTORM-DESIGN-SECTIONS | 步骤 4：逐步呈现分节设计规范（Owns/Does NOT own/统一日志/增量WS/人话规则/不变量）并呈批 | Completed | 全部 3 节设计规范均获用户审核批准 |
+| STATUS-SCREEN-BRAINSTORM-DESIGN-DOC | 步骤 5：沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-02-status-screen-unified-event-log-design.md 并提交 git |
+| STATUS-SCREEN-BRAINSTORM-TRANSITION | 步骤 6：转入实施阶段（调用 writing-plans 制定落地计划） | Completed | 成功落盘实施计划 docs/plans/2026-10-02-status-screen-unified-event-log-plan.md 并提交 git |
+
+| STATUS-SCREEN-TASK-1-CONTRACTS | 任务 1：动作数据契约与人话规则引擎 (ActivityItem, ActivityIntentNamer) | Completed | 落地 typed 契约与 intent 映射字典，2/2 单测全通，通过 INV-02 |
+| STATUS-SCREEN-TASK-2-PROJECTOR | 任务 2：单轨事实流投影器与快照引擎 (ActivityProjector, StatusSnapshotService) | Completed | 落地纯函数单轨投影器，支持 start/end/cancel 折叠与幂等重放，2/2 单测全通，通过 INV-01 |
+| STATUS-SCREEN-TASK-3-TRANSLATOR | 任务 3：EventTranslator 增量推送扩展与取消机制 (activity_updated) | Completed | 成功扩展 EventTranslator 在动作起止发射 activity_updated 流式事件并驱动全局投影，39/39 关联单测全绿，通过 INV-03, INV-04 |
+| STATUS-SCREEN-TASK-4-ROUTES | 任务 4：快照与取消 REST API 端点 (routes_status_screen.py) | Completed | 落地 /v1/assistants/{id}/status-snapshot 快照聚合端点与 cancel 同步，9/9 单测全绿，通过 INV-06 |
+| STATUS-SCREEN-TASK-5-FRONTEND | 任务 5：前端 AssistantStatusDrawer.tsx 增量 Patch 与交互闭环 | Completed | 落地快照初始化、WS 单行原地 patch、Upcoming 聊天草稿、系统任务防删与 Stop 按钮，39 补丁全部同步且 0 broken，通过 INV-03, INV-05 |
+| STATUS-SCREEN-TASK-6-E2E-INVARIANTS | 任务 6：全链路单测回归与全量不变量矩阵验证 (INV-01 ~ INV-06) | Completed | 落地 tests/scenario/test_status_screen_invariants.py，6/6 场景测试 100% 覆盖并验证 INV-01 至 INV-06 全部不变量（单轨事实源纯函数投影确定性、动作起始人话标题锁定、WS增量原地Patch幂等性、真实Stop取消与审计记录、Upcoming系统任务防护与聊天草稿触发、快照聚合与最终一致性），全套状态屏关联测试 12/12 全通，门禁检查 0 报错 |

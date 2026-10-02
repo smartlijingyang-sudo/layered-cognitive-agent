@@ -322,7 +322,7 @@ export const StandingFileFullscreenEditor = memo<StandingFileFullscreenEditorPro
                 {isDirty ? (
                   <Tag color="orange">未保存变更</Tag>
                 ) : (
-                  <Tag color="green">已同步磁盘</Tag>
+                  <Tag color="green">已同步</Tag>
                 )}
               </span>
               <Text type="secondary" style={{ fontSize: 12 }}>
@@ -344,7 +344,7 @@ export const StandingFileFullscreenEditor = memo<StandingFileFullscreenEditorPro
                 disabled={loading || !isDirty}
                 size="middle"
               >
-                保存并写盘
+                保存变更
               </Button>
             </Flex>
           </div>

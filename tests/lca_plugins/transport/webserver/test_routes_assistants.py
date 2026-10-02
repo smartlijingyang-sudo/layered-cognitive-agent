@@ -77,14 +77,15 @@ def _setup_plugin() -> tuple[Any, RouteRegistry]:
 
 
 @pytest.mark.asyncio
-async def test_routes_assistants_register_thirteen_routes() -> None:
-    """Thirteen :class:`RouteSpec` entries; ``/v1/assistants`` carries
+async def test_routes_assistants_register_fourteen_routes() -> None:
+    """Fourteen :class:`RouteSpec` entries; ``/v1/assistants`` carries
     both POST (create) and GET (list) via the dispatcher,
     ``/v1/assistants/{assistant_id}/jobs`` carries POST (register) and
-    GET (list) via the jobs dispatcher, and standing-files endpoints."""
+    GET (list) via the jobs dispatcher, the item path carries card-path
+    PUT/DELETE, and standing-files endpoints."""
     plugin, router, ctx = _setup_plugin()
     await plugin.setup(ctx, None)
-    assert len(router._exact) == 13
+    assert len(router._exact) == 14
 
 
 @pytest.mark.asyncio
@@ -103,6 +104,7 @@ async def test_routes_assistants_paths_match_advertised_surface() -> None:
         "/v1/assistants/{assistant_id}/retire",
         "/v1/assistants/{assistant_id}/jobs",
         "/v1/assistants/{assistant_id}/jobs/{job_id}:fire",
+        "/v1/assistants/{assistant_id}/jobs/{job_id}",
         "/v1/assistants/{assistant_id}/standing-files",
         "/v1/assistants/{assistant_id}/standing-files/{filename}",
     }
@@ -113,7 +115,7 @@ async def test_routes_assistants_paths_match_advertised_surface() -> None:
 async def test_routes_assistants_effects_tracked() -> None:
     plugin, _router, ctx = _setup_plugin()
     await plugin.setup(ctx, None)
-    assert len(ctx._fake_runtime.effects) == 13
+    assert len(ctx._fake_runtime.effects) == 14
     labels = {label for _dispose, label in ctx._fake_runtime.effects}
     for path in (
         "/v1/assistants",
@@ -127,6 +129,7 @@ async def test_routes_assistants_effects_tracked() -> None:
         "/v1/assistants/{assistant_id}/retire",
         "/v1/assistants/{assistant_id}/jobs",
         "/v1/assistants/{assistant_id}/jobs/{job_id}:fire",
+        "/v1/assistants/{assistant_id}/jobs/{job_id}",
         "/v1/assistants/{assistant_id}/standing-files",
         "/v1/assistants/{assistant_id}/standing-files/{filename}",
     ):
@@ -150,6 +153,7 @@ def test_routes_assistants_exposes_public_routes_constant() -> None:
         "/v1/assistants/{assistant_id}/retire",
         "/v1/assistants/{assistant_id}/jobs",
         "/v1/assistants/{assistant_id}/jobs/{job_id}:fire",
+        "/v1/assistants/{assistant_id}/jobs/{job_id}",
         "/v1/assistants/{assistant_id}/standing-files",
         "/v1/assistants/{assistant_id}/standing-files/{filename}",
     }
@@ -254,10 +258,10 @@ def test_retire_assistant_returns_501_when_catalog_missing() -> None:
     assert response.json()["error"]["code"] == "catalog_unavailable"
 
 
-# ── jobs routes: 501 COMPAT envelope until assistant.jobs wires ──────
+# ── jobs routes: GET/POST wired (ADR-0268 P4), fire stays 501 ────────
 
 
-def test_get_assistant_jobs_returns_501_when_jobs_missing() -> None:
+def test_get_assistant_jobs_returns_501_when_catalog_missing() -> None:
     plugin, router, ctx = _setup_plugin()
     _run_plugin_setup(plugin, ctx)
     app = _app_with_routes(router)
@@ -265,12 +269,11 @@ def test_get_assistant_jobs_returns_501_when_jobs_missing() -> None:
     response = client.get("/v1/assistants/asst_1/jobs")
     assert response.status_code == 501
     body = response.json()
-    assert body["error"]["code"] == "jobs_unavailable"
+    assert body["error"]["code"] == "catalog_unavailable"
     assert "COMPAT" in body["error"]["marker"]
-    assert "delete-when: 2026-12-31" in body["error"]["marker"]
 
 
-def test_post_assistant_jobs_returns_501_when_jobs_missing() -> None:
+def test_post_assistant_jobs_returns_501_when_catalog_missing() -> None:
     plugin, router, ctx = _setup_plugin()
     _run_plugin_setup(plugin, ctx)
     app = _app_with_routes(router)
@@ -280,7 +283,7 @@ def test_post_assistant_jobs_returns_501_when_jobs_missing() -> None:
         json={"job_id": "daily_brief", "schedule": "0 9 * * *", "prompt": "x"},
     )
     assert response.status_code == 501
-    assert response.json()["error"]["code"] == "jobs_unavailable"
+    assert response.json()["error"]["code"] == "catalog_unavailable"
 
 
 def test_fire_assistant_job_returns_501_when_jobs_missing() -> None:
@@ -291,6 +294,243 @@ def test_fire_assistant_job_returns_501_when_jobs_missing() -> None:
     response = client.post("/v1/assistants/asst_1/jobs/daily_brief:fire")
     assert response.status_code == 501
     assert response.json()["error"]["code"] == "jobs_unavailable"
+
+
+def test_assistant_jobs_list_and_create_with_catalog(tmp_path: Any) -> None:
+    """ADR-0268 P4: GET/POST jobs 读写 CronJob；响应只含 CronListItem 投影闭集。"""
+    app, catalog = _app_with_catalog(tmp_path)
+    from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
+
+    handle = catalog.create(CreateAssistantRequest(name="定时助理"))
+    assistant_id = handle.assistant_id
+    client = TestClient(app)
+
+    empty = client.get(f"/v1/assistants/{assistant_id}/jobs")
+    assert empty.status_code == 200
+    assert empty.json() == {"assistant_id": assistant_id, "jobs": []}
+
+    response = client.post(
+        f"/v1/assistants/{assistant_id}/jobs",
+        json={
+            "id": "daily_brief",
+            "title": "每日简报",
+            "schedule": {"kind": "daily", "hour": 9, "minute": 0},
+            "timezone": "Asia/Shanghai",
+            "body": "生成每日简报",
+            "execution": {"kind": "agent"},
+            "chat_id": "chat_1",
+        },
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["assistant_id"] == assistant_id
+    job = body["job"]
+    assert set(job) == {
+        "id",
+        "title",
+        "schedule_label",
+        "next_run_local",
+        "due",
+        "enabled",
+        "last_run_local",
+        "last_delivery",
+    }
+    assert job["id"] == "daily_brief"
+    assert job["title"] == "每日简报"
+    assert job["schedule_label"] == "每天 09:00"
+    assert isinstance(job["next_run_local"], str)
+    assert isinstance(job["due"], bool)
+    assert job["enabled"] is True
+    assert job["last_run_local"] is None
+    assert job["last_delivery"] is None
+
+    listed = client.get(f"/v1/assistants/{assistant_id}/jobs")
+    assert listed.status_code == 200
+    jobs = listed.json()["jobs"]
+    assert len(jobs) == 1
+    assert set(jobs[0]) == set(job)
+    assert jobs[0]["id"] == "daily_brief"
+
+
+def test_put_assistant_job_rewrites_anchor_at_and_returns_projection(tmp_path: Any) -> None:
+    """ADR-0268 §9 卡片路径：PUT 只合并改过的字段，改 schedule 重写 anchor_at。
+
+    响应仍只含 :class:`CronListItem` 投影闭集字段。
+    """
+    import time
+
+    from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
+    from lca.domain.cron.store import CronStore
+
+    app, catalog = _app_with_catalog(tmp_path)
+    handle = catalog.create(CreateAssistantRequest(name="定时助理"))
+    assistant_id = handle.assistant_id
+    client = TestClient(app)
+
+    created = client.post(
+        f"/v1/assistants/{assistant_id}/jobs",
+        json={
+            "id": "daily_brief",
+            "title": "每日简报",
+            "schedule": {"kind": "daily", "hour": 9, "minute": 0},
+            "timezone": "Asia/Shanghai",
+            "body": "生成每日简报",
+            "execution": {"kind": "agent"},
+            "chat_id": "chat_1",
+        },
+    )
+    assert created.status_code == 201
+
+    spec = catalog.get(assistant_id)
+    store = CronStore(Path(spec.home_path))
+    original = store.get_job("daily_brief")
+    assert original is not None
+    original_anchor = original.anchor_at
+
+    time.sleep(0.01)
+    response = client.put(
+        f"/v1/assistants/{assistant_id}/jobs/daily_brief",
+        json={"schedule": {"kind": "daily", "hour": 10, "minute": 30}},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["assistant_id"] == assistant_id
+    job = body["job"]
+    assert set(job) == {
+        "id",
+        "title",
+        "schedule_label",
+        "next_run_local",
+        "due",
+        "enabled",
+        "last_run_local",
+        "last_delivery",
+    }
+    assert job["id"] == "daily_brief"
+    assert job["title"] == "每日简报"
+    assert job["schedule_label"] == "每天 10:30"
+    assert isinstance(job["next_run_local"], str)
+    assert isinstance(job["due"], bool)
+    assert job["enabled"] is True
+
+    updated = store.get_job("daily_brief")
+    assert updated is not None
+    assert updated.anchor_at > original_anchor
+    assert updated.schedule.hour == 10
+    assert updated.schedule.minute == 30
+    # 只改 schedule 时其他字段保持不动
+    assert updated.title == "每日简报"
+    assert updated.timezone == "Asia/Shanghai"
+    assert updated.body == "生成每日简报"
+
+
+def test_put_assistant_job_missing_returns_404(tmp_path: Any) -> None:
+    """PUT 不存在的 job → 404 ``job_not_found``。"""
+    from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
+
+    app, catalog = _app_with_catalog(tmp_path)
+    handle = catalog.create(CreateAssistantRequest(name="定时助理"))
+    client = TestClient(app)
+    response = client.put(
+        f"/v1/assistants/{handle.assistant_id}/jobs/nope",
+        json={"title": "x"},
+    )
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "job_not_found"
+
+
+def test_put_assistant_job_invalid_body_returns_400(tmp_path: Any) -> None:
+    """PUT body 带非法 schedule → 400 ``invalid_request``。"""
+    from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
+
+    app, catalog = _app_with_catalog(tmp_path)
+    handle = catalog.create(CreateAssistantRequest(name="定时助理"))
+    assistant_id = handle.assistant_id
+    client = TestClient(app)
+    created = client.post(
+        f"/v1/assistants/{assistant_id}/jobs",
+        json={
+            "id": "daily_brief",
+            "title": "每日简报",
+            "schedule": {"kind": "daily", "hour": 9, "minute": 0},
+            "timezone": "Asia/Shanghai",
+            "body": "生成每日简报",
+            "execution": {"kind": "agent"},
+            "chat_id": "chat_1",
+        },
+    )
+    assert created.status_code == 201
+    response = client.put(
+        f"/v1/assistants/{assistant_id}/jobs/daily_brief",
+        json={"schedule": {"kind": "yearly", "hour": 10}},
+    )
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "invalid_request"
+
+
+def test_delete_assistant_job_removes_definition_keeps_runs(tmp_path: Any) -> None:
+    """ADR-0268 §9：DELETE 只删定义，run 记录保留，GET 列表为空。"""
+    from datetime import UTC, datetime
+
+    from lca.contracts.models.cron.models import CronRun
+    from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
+    from lca.domain.cron.store import CronStore
+
+    app, catalog = _app_with_catalog(tmp_path)
+    handle = catalog.create(CreateAssistantRequest(name="定时助理"))
+    assistant_id = handle.assistant_id
+    client = TestClient(app)
+
+    created = client.post(
+        f"/v1/assistants/{assistant_id}/jobs",
+        json={
+            "id": "daily_brief",
+            "title": "每日简报",
+            "schedule": {"kind": "daily", "hour": 9, "minute": 0},
+            "timezone": "Asia/Shanghai",
+            "body": "生成每日简报",
+            "execution": {"kind": "agent"},
+            "chat_id": "chat_1",
+        },
+    )
+    assert created.status_code == 201
+
+    spec = catalog.get(assistant_id)
+    store = CronStore(Path(spec.home_path))
+    store.append_run(
+        "daily_brief",
+        CronRun(
+            run_id="run_1",
+            outcome="completed",
+            receipts=(),
+            finished_at=datetime.now(UTC),
+        ),
+    )
+    assert store.get_run("daily_brief", "run_1") is not None
+
+    response = client.delete(f"/v1/assistants/{assistant_id}/jobs/daily_brief")
+    assert response.status_code == 200
+    assert response.json() == {"assistant_id": assistant_id, "deleted": "daily_brief"}
+
+    # 定义已删，run 记录保留
+    assert store.get_job("daily_brief") is None
+    assert store.get_run("daily_brief", "run_1") is not None
+
+    listed = client.get(f"/v1/assistants/{assistant_id}/jobs")
+    assert listed.status_code == 200
+    assert listed.json() == {"assistant_id": assistant_id, "jobs": []}
+
+
+def test_delete_assistant_job_missing_returns_404(tmp_path: Any) -> None:
+    """DELETE 不存在的 job → 404 ``job_not_found``。"""
+    from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
+
+    app, catalog = _app_with_catalog(tmp_path)
+    handle = catalog.create(CreateAssistantRequest(name="定时助理"))
+    client = TestClient(app)
+    response = client.delete(f"/v1/assistants/{handle.assistant_id}/jobs/nope")
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "job_not_found"
 
 
 # ── PR-6: install handler wired behavior ─────────────────────────────
@@ -549,6 +789,11 @@ def test_handlers_are_coroutine_callables() -> None:
         retire_assistant,
         revise_assistant_profile,
     )
+    from lca.plugins.transport.webserver.routes_1.routes_assistants.jobs import (
+        assistant_job_item,
+        delete_assistant_job,
+        update_assistant_job,
+    )
 
     for fn in (
         create_assistant,
@@ -559,6 +804,9 @@ def test_handlers_are_coroutine_callables() -> None:
         retire_assistant,
         list_assistant_jobs,
         create_assistant_job,
+        update_assistant_job,
+        delete_assistant_job,
+        assistant_job_item,
         fire_assistant_job,
     ):
         assert inspect.iscoroutinefunction(fn), f"{fn.__name__} must be async"

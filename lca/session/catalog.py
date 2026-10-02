@@ -32,6 +32,8 @@ def known_session_event_types() -> frozenset[str]:
     types.update(SURFACE_EVENT_TYPES)
     types.update(SPINE_EXECUTION_POINTS)
     types.update(SPINE_EVENT_CATEGORIES)
+    # RunSessionWriter 使用的 DSH 对齐 surface 词表（ADR-0268 §6）。
+    types.add("surface/developer_message")
     return frozenset(types)
 
 

@@ -18,6 +18,11 @@ from lca.plugins.prompts.sections.base import (
     StaticTextSection,
     build_static_text,
 )
+from lca.plugins.prompts.sections.connected_services import (
+    ConnectedServicesSection,
+    build_connected_services,
+    render_connected_services_text,
+)
 from lca.plugins.prompts.sections.context import (
     AutonomousPresetsSection,
     ContextSection,
@@ -110,6 +115,7 @@ __all__ = [
     "BackstorySection",
     "CloudSandboxSection",
     "Config",
+    "ConnectedServicesSection",
     "ContextSection",
     "CurrentDateSection",
     "DeveloperTimestampSection",
@@ -138,6 +144,7 @@ __all__ = [
     "build_available_skills_section",
     "build_backstory_section",
     "build_cloud_sandbox_section",
+    "build_connected_services",
     "build_context",
     "build_current_date",
     "build_developer_timestamp",
@@ -160,6 +167,7 @@ __all__ = [
     "build_tools_section",
     "build_user_profile",
     "build_vocal_contract",
+    "render_connected_services_text",
     "render_developer_timestamp",
     "render_runtime_row",
     "setup",
