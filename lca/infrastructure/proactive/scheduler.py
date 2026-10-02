@@ -191,7 +191,7 @@ class ProactiveScheduler:
         if verdict.kind == VerdictKind.SILENT:
             return "silent"
         try:
-            self._deliverer.deliver(
+            receipt = self._deliverer.deliver(
                 message,
                 job.target,
                 annotate_unretrieved=verdict.annotate_unretrieved,
@@ -200,6 +200,13 @@ class ProactiveScheduler:
             js["last_error"] = str(exc)
             _log.warning("proactive.deliver_failed job_id=%s", job.id, exc_info=True)
             return "failed"
+        if receipt.get("duplicate"):
+            # 幂等命中：session 里已有该消息，本次 tick 视为投递成功
+            _log.info(
+                "proactive.duplicate_skipped job_id=%s message_id=%s",
+                job.id,
+                message.id,
+            )
         return "delivered"
 
     # ---- 文件锁（ADR-0263 §9①②） ----
