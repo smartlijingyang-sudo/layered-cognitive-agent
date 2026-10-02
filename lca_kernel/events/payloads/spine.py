@@ -1,10 +1,10 @@
 """Spine 壳类 payload（ADR-0181 D2 / ADR-0183 PR-7）。
 
 承载 spine EP 字符串 + caller payload dict + chain 字段，套进
-:class:`EventBus` 发送。SPINE_EXECUTION_POINTS 是 spine EP 字符串闭集，
-完整迁移自 ``lca/infrastructure/observability/spine/manifest.py`` 的
-``EXECUTION_POINTS`` 75 EP（试点 PR 已迁 1 个，余 74 个按 ADR-0181 §迁移
-PR 切分逐个扩到 ``lca_kernel/events/config/observability/spine.yaml``）。
+:class:`EventBus` 发送。SPINE_EXECUTION_POINTS 是 spine EP 字符串闭集，承自
+``lca/infrastructure/observability/spine/manifest/manifest.py`` 的
+``EXECUTION_POINTS``（ADR-0195 O1 COMPAT re-export；迁移已完成，现 SSOT 为
+``lca_kernel/events/config/observability/spine.yaml`` → 本模块）。
 
 不是 enum，EP 跨 5 层（transport / kernel / agent_loop / cognition /
 body / llm / runtime / writable / phase / step），跨层 enum 违反架构不变量。
@@ -18,8 +18,8 @@ from pydantic import ConfigDict, Field, model_validator
 
 from lca.contracts.event import Category, EventPayload, Plane
 
-# spine EP 字符串闭集（原 lca/infrastructure/observability/spine/manifest.py
-# EXECUTION_POINTS 75 EP 完整迁移；试点 PR 已迁 1 个 = brain.perceive.start）。
+# spine EP 字符串闭集（承自 manifest/manifest.py COMPAT 的 EXECUTION_POINTS；
+# 现 SSOT 为 spine.yaml；迁移已完成，139 EP 全部收录于此）。
 SPINE_EXECUTION_POINTS: tuple[str, ...] = (
     # Transport (ADR-0112)
     "transport.route.enter",
