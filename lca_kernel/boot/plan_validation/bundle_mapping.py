@@ -92,10 +92,11 @@ def _apply_entry_fallback(mapping: Mapping[str, Any]) -> dict[str, Any]:
     "exactly one entry" rule passes for legacy bundles that omit it.
     """
     spec = dict(mapping)
-    nodes = list(spec.get("nodes") or ())
+    nodes = spec.get("nodes") or ()
     if nodes and not any(isinstance(n, dict) and n.get("entry") for n in nodes):
-        nodes[0] = {**nodes[0], "entry": True}
-        spec["nodes"] = nodes
+        first = nodes[0]
+        if isinstance(first, dict):
+            spec["nodes"] = [{**first, "entry": True}, *nodes[1:]]
     return spec
 
 
