@@ -101,7 +101,7 @@ def test_list_items_projection(tmp_path: Path) -> None:
     assert item.id == "job_1"
     assert item.schedule_label == "每天 09:00"
     # now 是 09:00 整（Asia/Shanghai 与 UTC 同一天内差 8 小时，UTC 09:00 = 上海 17:00）
-    assert item.next_run_local is not None
+    assert item.next_run_local == "2026-10-03 09:00"
     assert item.due is False
     assert item.enabled is True
     assert item.last_run_local is None
