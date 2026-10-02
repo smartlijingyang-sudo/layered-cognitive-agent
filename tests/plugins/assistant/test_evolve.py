@@ -233,13 +233,19 @@ class TestProposeEvidenceGate:
         )
         assert candidate is None
 
-    def test_propose_returns_experiment_candidate(self, evolve: AssistantEvolveImpl) -> None:
-        candidate = evolve.propose(
+    def test_propose_returns_experiment_candidate(
+        self, catalog: AssistantCatalogImpl
+    ) -> None:
+        # 显式传参：不依赖 AssistantEvolveImpl 默认 min_evidence（0262 C4
+        # 提案拟把默认 1 收紧为 3 以对齐 auto_acquire；本用例在两种默认下
+        # 都应通过，断言的是"证据+置信度充足 -> experiment 候选"语义本身）。
+        impl = AssistantEvolveImpl(catalog=catalog, min_evidence=3)
+        candidate = impl.propose(
             task_ref="t",
             procedure="p",
             success=True,
             confidence=0.9,
-            evidence_refs=("e1",),
+            evidence_refs=("e1", "e2", "e3"),
         )
         assert candidate is not None
         assert candidate.status == "experiment"
