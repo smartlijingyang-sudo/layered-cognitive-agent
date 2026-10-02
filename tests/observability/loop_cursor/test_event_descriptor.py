@@ -28,7 +28,7 @@ from lca.contracts.observability.infra.cordis_event_table import (
 
 def test_event_descriptor_is_frozen() -> None:
     """EventDescriptor 必须 frozen=True;字段赋值冻结。"""
-    descriptor = EventDescriptor.derive("writable.step.start")
+    descriptor = EventDescriptor.derive("phase.think.fold")
     with pytest.raises(FrozenInstanceError):
         descriptor.execution_point = "writable.step.end"  # type: ignore[misc]
 

@@ -29,13 +29,11 @@ class _StubRecord:
     payload: dict[str, Any]
 
 
-def _snap(seq: int = 0, step_id: str | None = "s1") -> CursorSnapshot:
+def _snap(seq: int = 0) -> CursorSnapshot:
     return CursorSnapshot(
         run_id="r",
         trace_id="t",
         incarnation=1,
-        step_id=step_id,
-        step_index=1,
         iteration=1,
         attempt_in_step=0,
         phase="think",  # type: ignore[arg-type]

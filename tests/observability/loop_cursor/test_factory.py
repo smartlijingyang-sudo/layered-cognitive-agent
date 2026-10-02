@@ -121,14 +121,23 @@ def test_factory_cursor_satisfies_loop_cursor_protocol() -> None:
         spine=_StubSpine(),  # type: ignore[arg-type]
     )
     # Protocol 不带 runtime_checkable —— 直接验证契约面
-    # 2026-09-14 修剪后只剩 advance + open_step
+    # Protocol 钉死只剩 advance + snapshot;open_step 属第二轨禁止扩展
     assert hasattr(cursor, "snapshot")
     assert hasattr(cursor, "advance")
-    assert hasattr(cursor, "open_step")
+    assert not hasattr(cursor, "open_step")
     # 反向断言:被删的方法绝不能再悄悄出现(防止回归)。
-    for removed in ("halt", "close", "fork",
-                    "record_thinking", "record_tool_call",
-                    "record_tool_result", "record_request_header"):
+    for removed in (
+        "halt",
+        "close",
+        "fork",
+        "record_thinking",
+        "record_tool_call",
+        "record_tool_result",
+        "record_request_header",
+        "begin_step",
+        "end_step",
+        "emit_step_start",
+    ):
         assert not hasattr(cursor, removed), (
             f"{removed} 已从 LoopCursor Protocol 删除,留存在实现层会"
             "让历史 compat 路径复活(run_c2d944661a78 类 bug)"

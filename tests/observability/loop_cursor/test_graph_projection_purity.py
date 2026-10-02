@@ -62,8 +62,6 @@ def _snapshot(seq: int = 0) -> CursorSnapshot:
         run_id="r",
         trace_id="t",
         incarnation=1,
-        step_id=f"step-{seq:03d}",
-        step_index=seq,
         iteration=0,
         attempt_in_step=0,
         phase="think",
@@ -82,13 +80,13 @@ def test_apply_is_pure_no_self_state_leakage() -> None:
     """Two consecutive apply() calls with the same input must yield equal state."""
     proj = _GraphProjection()
     state = proj.init()
-    record_a = _make_record("brain.think.start", 1)
+    record_a = _make_record("phase.think.fold", 1)
     state_after_a = proj.apply(state, _snapshot(1), record_a)
 
     # Build a second, semantically-identical input (fresh record, same EP).
     proj_fresh = _GraphProjection()
     state_fresh = proj_fresh.init()
-    record_b = _make_record("brain.think.start", 99)
+    record_b = _make_record("phase.think.fold", 99)
     state_after_b = proj_fresh.apply(state_fresh, _snapshot(1), record_b)
 
     assert state_after_a == state_after_b, (
@@ -101,11 +99,11 @@ def test_apply_chains_edges_through_state_not_self() -> None:
     """The previous edge endpoint must be carried by state, not by ``self``."""
     proj = _GraphProjection()
     state = proj.init()
-    state = proj.apply(state, _snapshot(1), _make_record("brain.think.start", 1))
+    state = proj.apply(state, _snapshot(1), _make_record("phase.think.fold", 1))
     state = proj.apply(state, _snapshot(2), _make_record("llm.request.header", 2))
     edges = state.edges
     assert edges == [
-        ("brain.think.start", "llm.request.header"),
+        ("phase.think.fold", "llm.request.header"),
     ], f"Unexpected edges: {edges}"
     # And ``state.last_endpoint`` is the latest record.
     assert state.last_endpoint == "llm.request.header"
@@ -124,7 +122,7 @@ def test_restore_resets_state() -> None:
     """After restore, the projection returns to the seed state."""
     proj = _GraphProjection()
     state = proj.init()
-    state = proj.apply(state, _snapshot(1), _make_record("brain.think.start", 1))
+    state = proj.apply(state, _snapshot(1), _make_record("phase.think.fold", 1))
     state = proj.apply(state, _snapshot(2), _make_record("llm.request.header", 2))
     restored = proj.restore(state)
     assert restored.edges == []
