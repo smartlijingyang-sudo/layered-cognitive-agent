@@ -152,9 +152,15 @@ class PromptReasoner:
             )
 
             raise MissingPromptSectionError(template_id, "pure")
+        registry = self._section_registry
+        if registry is None:
+            raise RuntimeError(
+                "PromptReasoner.render_turn needs section_registry; "
+                "inject it at Cordis compose boot."
+            )
         prompt, trace = render_template(
             template=tpl,
-            registry=self._section_registry,
+            registry=registry,
             role_profile=role.profile,
             task=context.task,
             awareness=role.team_awareness,

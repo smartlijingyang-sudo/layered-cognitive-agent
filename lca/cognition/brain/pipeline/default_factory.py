@@ -97,7 +97,11 @@ class SimpleBrainFactory:
             section_registry=self._section_registry,
         )
         return ModularBrain(
-            reasoner=reasoner,
+            # Reasoner protocol declares object-typed params but documents
+            # typed DTO methods (ADR-0220 S6 N10); PromptReasoner is the
+            # stricter sole implementation (runtime-verified). Contract
+            # tightening needs an ADR; see backlog.
+            reasoner=reasoner,  # pyright: ignore[reportArgumentType]
             critic=self._critic_factory(),
             agent_gates=self._agent_gate_factory()
             if self._agent_gate_factory is not None

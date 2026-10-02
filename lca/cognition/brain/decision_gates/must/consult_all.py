@@ -6,6 +6,8 @@ ADR-0049：短路与强制改写均挂载 DelegationBudget（timeout_s），
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from lca.cognition.member_status.consult_policy import (
     ConsultNextAction,
     compute_required_action_from_duty,
@@ -153,8 +155,9 @@ class MustConsultAllMembers(DecisionGate):
                     )
                 else:
                     patched.append(spec)
-            decision.delegations = patched
-            return decision
+            # Decision is frozen: build the patched copy instead of
+            # mutating (the old assignment raised FrozenInstanceError).
+            return replace(decision, delegations=patched)
 
         roles = list(nxt.target_roles)
         rationale = _RATIONALE_FORCE_MULTI if len(roles) > 1 else _RATIONALE_FORCE_SINGLE
