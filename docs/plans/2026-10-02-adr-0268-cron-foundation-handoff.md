@@ -21,34 +21,39 @@
    - 投影只暴露 `CronListItem` 闭集，`next_run_local` 与墙钟一致，停用任务 due 强制为假，已完成 oneshot 不进列表，`last_delivery` 按 §10 汇总
    - 测试 `tests/domain/cron/test_service.py`
 
-## 未完成（按 ADR §14 验收顺序）
+## 已完成（主体）
 
-1. 结构保证剩余两条
-   - `lca.nothing_to_do` 工具、「用户轮 wire 不暴露它」的过滤，以及用户轮发出该调用回注错误的契约测试（§14.1、§14.2）
-   - 模型改 schedule/timezone/`cron.remove` 的审批回注：写函数在审批结果回注前不调用
-2. cron 工具插件（`cron.add/view/update/remove/list`）注册到 `cron` 命名空间
-   - 参考 `lca/plugins/domain/tools/assistant_tools/plugin.py` 的工厂模式与 `current_assistant_id()`
-   - 需要解决 assistant home 路径注入与 `created_chat_id` 获取
-3. 调度器 tick（重叠队列、超时重试、stale 收割）与 handoff 注入；随实现补 ADR §14.3 故障注入测试（worker 被杀重试、审批 10 分钟不变、superseded 竞态、`cron.list` 失败）
-4. HTTP jobs 路由替换 501（`lca/plugins/transport/webserver/routes_1/routes_assistants/jobs.py`）
-5. 前端「即将到来」tab（`deploy/lobehub/patches`）
+1. 结构保证（§14.1、§14.2）
+   - `lca.nothing_to_do` 工具（`lca/infrastructure/tools/lca/`）已注册 `lca` 命名空间，用户轮 wire 过滤，用户轮调用回注错误
+   - `next_run` 纯函数与 worker 上下文签名测试（地基阶段）
+   - 模型改 schedule/timezone/`cron.remove` 走审批门：`decision_needs_approval` 对 `cron.update`/`cron.remove` 返回 True，工具执行前暂停，写函数不被调用
+2. cron 工具插件（`lca/plugins/domain/tools/cron/plugin.py`）
+   - `cron.add` 直接写（重复 id 不覆盖）；`cron.view` 全量定义 + run；`cron.list` 只暴露 `CronListItem` 闭集
+   - `cron.update`/`cron.remove` 不调用写函数，返回审批提示；写由卡片路径 HTTP PUT/DELETE 完成
+   - 已挂入 `bundles/assistant-runtime.yaml`
+3. 调度器与 handoff 注入（`lca/infrastructure/cron/scheduler.py`）
+   - 文件锁、心跳、stale 收割；重叠队列（superseded + not_sent）；超时重试
+   - `surface/developer_message` 事件类型注入父轮（`RunSessionWriter.append_developer_message`）
+   - §14.3 故障注入测试
+4. HTTP jobs 路由（`routes_assistants/jobs.py`）
+   - GET 列表投影、POST 创建（`chat_id` 作为 `created_chat_id`）、PUT 卡片更新（改 schedule/timezone 重写 `anchor_at`）、DELETE 删除定义
+   - `:fire` 保持 501（CronJob 无 HTTP fire）
+5. 前端「即将到来」tab（`deploy/lobehub/patches/ui/cron_upcoming_panel.py` + `CronUpcomingPanel.tsx`）
 
 ## 关键文件
 
 - 契约：`lca/contracts/models/cron/`
 - 领域：`lca/domain/cron/`（next_run、store、worker_context、service）
 - 工具线：`lca/cognition/body/tools/tool_wire_gate.py`、`lca/infrastructure/tool_defer/session.py`
-- 审批现状：探索报告确认现有 HITL 在审批后不会自动继续调用写函数，`cron.update` 需要新机制
+- 审批现状：`decision_needs_approval` 对 `cron.update`/`cron.remove` 返回 True，工具执行前经 `act.approve.gate` 暂停，写函数不被调用；写由卡片路径 HTTP PUT/DELETE 完成
 - 工具注册参考：`lca/plugins/domain/tools/assistant_tools/plugin.py`、`lca/plugins/tools/file_write.py`
+- 实施文件：`lca/plugins/domain/tools/cron/plugin.py`、`lca/infrastructure/tools/cron/`、`lca/infrastructure/cron/scheduler.py`、`routes_assistants/jobs.py`、`deploy/lobehub/patches/ui/cron_upcoming_panel.py`
 
 ## 验证命令
 
 ```bash
-.venv/bin/pytest tests/contracts/cron tests/domain/cron -q
-.venv/bin/ruff check lca/contracts/models/cron lca/domain/cron tests/contracts/cron tests/domain/cron
-.venv/bin/ruff format --check lca/contracts/models/cron lca/domain/cron tests/contracts/cron tests/domain/cron
-.venv/bin/mypy lca/contracts/models/cron lca/domain/cron tests/contracts/cron tests/domain/cron
-.venv/bin/lint-imports
+.venv/bin/pytest tests/contracts/cron tests/domain/cron tests/plugins/domain/tools/cron tests/infrastructure/cron tests/lca_plugins/transport/webserver tests/infrastructure/runtime_plane/access -q
+.venv/bin/ruff check lca/contracts/models/cron lca/domain/cron lca/infrastructure/cron lca/infrastructure/tools/cron lca/plugins/domain/tools/cron tests/contracts/cron tests/domain/cron tests/infrastructure/cron tests/plugins/domain/tools/cron
 ```
 
 ## 注意事项
@@ -57,4 +62,6 @@
 - `lint-imports` 退出 1 是既有失败：`lca.infrastructure.cli.commands.kernel` 与 `events_delivery` 的 ignored import 没有匹配。
 - `check_package_contracts.py` 有 47 个既有失败（旧包），新增 cron 包未引入新失败。
 - `tests/architecture/test_assistant_evolve_jobs_invariants.py` 有 4 个既有失败，因为它扫描 `lca/plugins/assistant/jobs.py`，该路径不存在。
+- `tests/architecture/test_session_lifecycle_producers.py[approval.resolved.v1]` 与 `tests/plugins/session/test_runtime.py::test_plugin_manifest_metadata` 是既有失败，与 cron 实现无关。
+- ADR-0268 §14.4 端到端周级探针尚未作为常驻测试落地。
 - 工作区有并发会话的未提交文件（`event_translator.py`、`deploy/`、`docs/plans/task.md` 等），不要动、不要提交。
