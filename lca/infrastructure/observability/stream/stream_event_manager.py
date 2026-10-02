@@ -78,9 +78,11 @@ class LcaStreamEventLog:
         last_exc: Exception | None = None
         for attempt in range(_PUBLISH_ATTEMPTS):
             try:
+                # redis-py xadd fields: Dict[FieldT, EncodableT] has TypeVars
+                # no call site can solve (dict invariance); runtime takes dict[str, str].
                 event_id = await self._redis.xadd(
                     key,
-                    event,
+                    event,  # type: ignore[arg-type]
                     id="*",
                     maxlen=maxlen_int,
                     approximate=approximate,
@@ -133,7 +135,7 @@ class LcaStreamEventLog:
         result = await self._redis.xrange(stream_key(run_id), "-", "+", count=1)
         if not result:
             return None
-        return _parse_redis_stream_row(result[0])
+        return _parse_redis_stream_row(result[0])  # type: ignore[arg-type]
 
     async def subscribe(
         self,
