@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from lca.contracts.harness.composition.composer import (
     AgentCompositionRequest,
@@ -15,6 +15,15 @@ from lca.plugins.composer.think.brain import (
 
 if TYPE_CHECKING:
     from cordis import Context
+
+    from lca.contracts.protocols.think.cognition import Brain, DecisionGate
+
+
+@runtime_checkable
+class _GatableBrain(Protocol):
+    """Brain variant carrying an optional lead decision gate (structural)."""
+
+    def with_gate(self, decision_gate: DecisionGate) -> Brain: ...
 
 
 class BrainComposer:
@@ -41,7 +50,7 @@ class BrainComposer:
 
         llm = instrument_llm(request.spec.llm, ctx=scope)
         brain = resolve_brain(request.spec, llm, scope=scope)
-        if request.decision_gate is not None and hasattr(brain, "with_gate"):
+        if request.decision_gate is not None and isinstance(brain, _GatableBrain):
             brain = brain.with_gate(request.decision_gate)
         # PR-C: the deleted reasoner-composer plugin used to publish
         # ``reasoner`` and ``llm_adapter`` capabilities at boot. The typed
