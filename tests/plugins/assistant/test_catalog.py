@@ -3,7 +3,7 @@
 覆盖契约:
 
 - create:物化 Home + manifest + 发 assistant.created EP;返回值 = AssistantHandle
-- get:digest 校验通过 ⇒ 返回 AssistantSpec;digest 不匹配 ⇒ AssistantDigestMismatchError
+- get:digest 不匹配 ⇒ 自动 reimport 自愈(Terraform refresh 模型,143f6697e),返回 AssistantSpec
 - list:扫 ``{assistants_root}/*/manifest.json``;digest 不一致的不列
 - manifest schema_version=1 + 8 个配置面 digest 字段
 - 记忆面(MEMORY.md / memory/)不在 digest 列(I-A13)
@@ -39,12 +39,11 @@ from lca.contracts.protocols.declarative.declarative_1.declarative_common import
 from lca.harness.plugin.manifest import EffectClass
 from lca.harness.plugin_api import definition_from_plugin
 from lca.plugins.assistant.events._events import AssistantCreatedEventPayload
-from lca.plugins.assistant.home._home_layout import CONFIG_FACE_FILES, SCHEMA_VERSION
+from lca.plugins.assistant.home._home_layout import CONFIG_FACE_FILES, SCHEMA_VERSION, sha256_digest
 from lca.plugins.assistant.persona.persona import persona_from_home
 from lca.plugins.domain.assistant.catalog.plugin import (
     AssistantCatalogError,
     AssistantCatalogImpl,
-    AssistantDigestMismatchError,
     Config,
     PlanOverlayValidationError,
     setup,
@@ -341,27 +340,31 @@ class TestGet:
         with pytest.raises(AssistantCatalogError):
             catalog.get("asst_does_not_exist")
 
-    def test_get_digest_mismatch_on_soul_tamper_fails_closed(
+    def test_get_digest_mismatch_on_soul_tamper_auto_heals(
         self,
         catalog: AssistantCatalogImpl,
         request_default: CreateAssistantRequest,
     ) -> None:
-        """I-A3 fail-closed:篡改 SOUL.md 后 get 必须抛 AssistantDigestMismatchError。"""
+        """143f6697e 起读路径自愈:篡改 SOUL.md 后 get 不锁死,自动 reimport。"""
         handle = catalog.create(request_default)
         (Path(handle.home_path) / "SOUL.md").write_text("tampered", encoding="utf-8")
-        with pytest.raises(AssistantDigestMismatchError):
-            catalog.get(handle.assistant_id)
+        spec = catalog.get(handle.assistant_id)
+        assert spec.assistant_id == handle.assistant_id
+        manifest = json.loads((Path(handle.home_path) / "manifest.json").read_text(encoding="utf-8"))
+        assert manifest["digests"]["SOUL.md"] == sha256_digest(Path(handle.home_path) / "SOUL.md")
 
-    def test_get_digest_mismatch_on_goals_tamper_fails_closed(
+    def test_get_digest_mismatch_on_goals_tamper_auto_heals(
         self,
         catalog: AssistantCatalogImpl,
         request_default: CreateAssistantRequest,
     ) -> None:
-        """配置面 yaml 篡改同样 fail-closed。"""
+        """配置面 yaml 篡改同样自愈,不锁死。"""
         handle = catalog.create(request_default)
         (Path(handle.home_path) / "goals.yaml").write_text("tampered: true\n", encoding="utf-8")
-        with pytest.raises(AssistantDigestMismatchError):
-            catalog.get(handle.assistant_id)
+        spec = catalog.get(handle.assistant_id)
+        assert spec.assistant_id == handle.assistant_id
+        manifest = json.loads((Path(handle.home_path) / "manifest.json").read_text(encoding="utf-8"))
+        assert manifest["digests"]["goals.yaml"] == sha256_digest(Path(handle.home_path) / "goals.yaml")
 
     def test_get_returns_plan_overlay_and_manifest_digest(
         self,
@@ -532,30 +535,34 @@ class TestMemoryLayerDigestPolicy:
         spec = catalog.get(handle.assistant_id)
         assert spec.assistant_id == handle.assistant_id
 
-    def test_config_face_modification_does_break_get(
+    def test_config_face_modification_auto_heals_get(
         self,
         catalog: AssistantCatalogImpl,
         request_default: CreateAssistantRequest,
     ) -> None:
-        """配置面写入必须触发 fail-closed(与上对照;双向 I-A13)。"""
+        """配置面写入触发自愈(与上对照;双向 I-A13)。"""
         handle = catalog.create(request_default)
         (Path(handle.home_path) / "USER.md").write_text("tampered", encoding="utf-8")
-        with pytest.raises(AssistantDigestMismatchError):
-            catalog.get(handle.assistant_id)
+        spec = catalog.get(handle.assistant_id)
+        assert spec.assistant_id == handle.assistant_id
+        manifest = json.loads((Path(handle.home_path) / "manifest.json").read_text(encoding="utf-8"))
+        assert manifest["digests"]["USER.md"] == sha256_digest(Path(handle.home_path) / "USER.md")
 
 
 # ── plan.yaml 进 manifest digest（ADR-0242 D10 / I-B10）──────────────
 
 
 class TestPlanYamlDigest:
-    def test_plan_yaml_tamper_breaks_get(self, catalog: AssistantCatalogImpl) -> None:
-        """plan.yaml 是配置面：直接改文件 ⇒ digest 不匹配 ⇒ fail-closed。"""
+    def test_plan_yaml_tamper_auto_heals_get(self, catalog: AssistantCatalogImpl) -> None:
+        """plan.yaml 是配置面：直接改文件 ⇒ digest 不匹配 ⇒ 自愈。"""
         handle = catalog.create(CreateAssistantRequest(name="Plan实验"))
         (Path(handle.home_path) / "plan.yaml").write_text(
             "prompt:\n  template: react_prompt\n", encoding="utf-8"
         )
-        with pytest.raises(AssistantDigestMismatchError):
-            catalog.get(handle.assistant_id)
+        spec = catalog.get(handle.assistant_id)
+        assert spec.assistant_id == handle.assistant_id
+        manifest = json.loads((Path(handle.home_path) / "manifest.json").read_text(encoding="utf-8"))
+        assert manifest["digests"]["plan.yaml"] == sha256_digest(Path(handle.home_path) / "plan.yaml")
 
     def test_plan_yaml_present_in_manifest_digests(
         self,
@@ -856,11 +863,11 @@ class TestInheritFromSnapshot:
         with pytest.raises(AssistantCatalogError):
             catalog.create(CreateAssistantRequest(name="x", inherit_from="asst_does_not_exist"))
 
-    def test_inherit_from_digest_mismatch_raises(self, catalog: AssistantCatalogImpl) -> None:
+    def test_inherit_from_digest_mismatch_auto_heals(self, catalog: AssistantCatalogImpl) -> None:
         source = catalog.create(CreateAssistantRequest(name="篡改来源"))
         (Path(source.home_path) / "SOUL.md").write_text("tampered", encoding="utf-8")
-        with pytest.raises(AssistantCatalogError):
-            catalog.create(CreateAssistantRequest(name="x", inherit_from=source.assistant_id))
+        new_handle = catalog.create(CreateAssistantRequest(name="x", inherit_from=source.assistant_id))
+        assert new_handle.assistant_id
 
 
 # ── Home 卫生（ADR-0242 D2）─────────────────────────────────────────
