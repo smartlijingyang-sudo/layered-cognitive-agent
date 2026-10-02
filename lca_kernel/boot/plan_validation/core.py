@@ -125,9 +125,9 @@ _PLAN_CHECKS: tuple[_CheckCallable, ...] = (
     # M1 outer edge SSOT: bounded admit_recovery on phase.main.outer.
     AdmitRecoveryEdgeCheck(),
     UseToolReaskEdgeCheck(),
-    # Style / SSOT checks (skip in test fixtures that don't declare
-    # these fields, but kept available for ``DEFAULT_CHECKS`` to
-    # enable on production bundles via config):
+    # Style / SSOT checks are not wired into the default set (they are
+    # skipped in test fixtures that don't declare these fields). Wire
+    # them per-profile via extra config when ready:
     # - NodeIdNamingCheck
     # - PortNamingConventionCheck
     # - PlanIdAliasSuffixCheck
