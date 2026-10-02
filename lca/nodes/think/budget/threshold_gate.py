@@ -19,6 +19,7 @@ Canonical shape: hand-written ``@dataclass(frozen=True, slots=True)`` +
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.enums.enums import ActionType
@@ -85,7 +86,7 @@ class ThinkBudgetThresholdGateExecutor:
     semantic_name: str = "think.budget.gate"
     region: str = "think"
     declared_inputs: tuple = ()
-    declared_outputs: tuple[PortName, ...] = ("routing", "decision")
+    declared_outputs: tuple[PortName, ...] = (PortName("routing"), PortName("decision"))
 
     async def node_execute(
         self,
@@ -96,9 +97,9 @@ class ThinkBudgetThresholdGateExecutor:
         del input  # state arrives via the runtime carrier
         budget = _resolve_budget(context=context)
         routing = _decide(budget)
-        ports: dict[str, object] = {"routing": routing}
+        ports: dict[PortName, Any] = {PortName("routing"): routing}
         if routing.should_terminate:
-            ports["decision"] = _harvest_decision(budget, context=context)
+            ports[PortName("decision")] = _harvest_decision(budget, context=context)
         return NodeOutput(port_values=ports)
 
 
