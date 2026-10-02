@@ -129,8 +129,12 @@ def _jobs_from_request(request: Request) -> Any | None:
     return getattr(state_obj, "assistant_jobs", None)
 
 
-def _user_from_request(request: Request) -> tuple[str, JSONResponse | None]:
-    """解析请求身份（ADR-0252 D4）；返回 ``(user_id, error_response)``。"""
+def _user_from_request(request: Request) -> tuple[str | None, JSONResponse | None]:
+    """解析请求身份（ADR-0252 D4）；返回 ``(user_id, error_response)``。
+
+    成功 ``(str, None)``；失败 ``(None, JSONResponse)``——与
+    ``user_id_from_request`` 同型。调用方恒先判 error_response。
+    """
     expected_token, dev_mode = auth_config_of(request)
     return user_id_from_request(request, expected_token=expected_token, dev_mode=dev_mode)
 

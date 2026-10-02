@@ -111,6 +111,8 @@ def _prelude(
     user_id, auth_error = _user_from_request(request)
     if auth_error is not None:
         return auth_error
+    # 契约:user_id_from_request 成功时 user_id 必为 str;auth 通过后可收窄。
+    assert user_id is not None  # noqa: S101
 
     catalog = _catalog_from_request(request)
     if catalog is None:

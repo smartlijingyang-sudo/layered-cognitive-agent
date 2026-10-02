@@ -14,6 +14,7 @@ import httpx
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
+from lca.cognition.team.modes_catalog import SOLO_ROLE
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.functional.group import FunctionalGroup
 from lca.contracts.atoms.scope.scope import Scope
@@ -118,7 +119,7 @@ async def wechat_gateway_dispatch(
         return f"[{assistant_id}] 收到微信消息: {user_text}"
 
     resolved_id = await _resolve_assistant_id(assistant_id)
-    agent_ref = AgentRef(agent_id=resolved_id)
+    agent_ref = AgentRef(agent_id=resolved_id, name=SOLO_ROLE)
     run_request = RunRequest(
         profile="web-assistant",
         question=user_text,

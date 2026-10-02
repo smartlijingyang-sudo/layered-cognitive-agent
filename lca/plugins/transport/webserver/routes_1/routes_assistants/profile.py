@@ -44,6 +44,8 @@ async def create_assistant(request: Request) -> JSONResponse:
     user_id, auth_error = _user_from_request(request)
     if auth_error is not None:
         return auth_error
+    # 契约:user_id_from_request 成功时 user_id 必为 str;auth 通过后可收窄。
+    assert user_id is not None  # noqa: S101
 
     catalog = _catalog_from_request(request)
     if catalog is None:
@@ -224,6 +226,8 @@ async def list_assistants(request: Request) -> JSONResponse:
     user_id, auth_error = _user_from_request(request)
     if auth_error is not None:
         return auth_error
+    # 契约:user_id_from_request 成功时 user_id 必为 str;auth 通过后可收窄。
+    assert user_id is not None  # noqa: S101
     catalog = _catalog_from_request(request)
     if catalog is None:
         return _not_implemented("catalog_unavailable", "AssistantCatalog.list")
@@ -270,6 +274,8 @@ async def get_assistant(request: Request) -> JSONResponse:
     user_id, auth_error = _user_from_request(request)
     if auth_error is not None:
         return auth_error
+    # 契约:user_id_from_request 成功时 user_id 必为 str;auth 通过后可收窄。
+    assert user_id is not None  # noqa: S101
     catalog = _catalog_from_request(request)
     if catalog is None:
         return _not_implemented("catalog_unavailable", "AssistantCatalog.get")
@@ -326,6 +332,8 @@ async def revise_assistant_profile(request: Request) -> JSONResponse:
     user_id, auth_error = _user_from_request(request)
     if auth_error is not None:
         return auth_error
+    # 契约:user_id_from_request 成功时 user_id 必为 str;auth 通过后可收窄。
+    assert user_id is not None  # noqa: S101
     catalog = _catalog_from_request(request)
     if catalog is None:
         return _not_implemented("catalog_unavailable", "AssistantCatalog.revise_profile")
@@ -423,6 +431,8 @@ async def reimport_assistant(request: Request) -> JSONResponse:
     user_id, auth_error = _user_from_request(request)
     if auth_error is not None:
         return auth_error
+    # 契约:user_id_from_request 成功时 user_id 必为 str;auth 通过后可收窄。
+    assert user_id is not None  # noqa: S101
     catalog = _catalog_from_request(request)
     if catalog is None:
         return _not_implemented("catalog_unavailable", "AssistantCatalog.reimport")
@@ -472,6 +482,8 @@ async def retire_assistant(request: Request) -> JSONResponse:
     user_id, auth_error = _user_from_request(request)
     if auth_error is not None:
         return auth_error
+    # 契约:user_id_from_request 成功时 user_id 必为 str;auth 通过后可收窄。
+    assert user_id is not None  # noqa: S101
     assistant_id = str(request.path_params.get("assistant_id") or "")
     ownership_error = _ownership_error(request, user_id, assistant_id)
     if ownership_error is not None:
