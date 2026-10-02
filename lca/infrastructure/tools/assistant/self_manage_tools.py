@@ -29,6 +29,8 @@ from lca.contracts.models.core.policy.budget import DEFAULT_TOOL_TIMEOUT_S
 from lca.contracts.protocols import Tool
 from lca.contracts.protocols.assistant.catalog import ProfilePatch
 from lca.infrastructure.assistant.io import load_grants
+from lca.infrastructure.memory.contextfiles.domain.layout import packaged_layout
+from lca.infrastructure.memory.contextfiles.domain.standing import render_injected
 from lca.infrastructure.observability.facade.run.ambit import current_assistant_id
 
 if TYPE_CHECKING:
@@ -47,6 +49,7 @@ _LIST_ASSISTANT_TOOLS_TOOL = "list_assistant_tools"
 _CREATE_ASSISTANT_TOOL_TOOL = "create_assistant_tool"
 _UPDATE_ASSISTANT_TOOL_TOOL = "update_assistant_tool"
 _DELETE_ASSISTANT_TOOL_TOOL = "delete_assistant_tool"
+_READ_ASSISTANT_SELF_CONFIG_TOOL = "read_assistant_self_config"
 
 _SENSITIVE_CONFIRMATION_HINT = (
     "这是敏感操作，必须先经用户确认：调用 askUserQuestion 询问用户是否确认，"
@@ -424,6 +427,111 @@ class UpdateAssistantUserTool(_BaseAssistantTool):
         )
 
 
+class ReadAssistantSelfConfigTool(_BaseAssistantTool):
+    """Read the assistant's standing-file projections (ADR-0261 C3).
+
+    Read-only counterpart of the ``update_assistant_*`` tools: returns the
+    same ``<!-- INJECTED FILE: X -->`` projections the prompt assembler
+    injects, straight from ``{home}`` disk state. It never exposes the raw
+    system prompt (ADR-0253 boundary).
+
+    ``redacted=True`` is the peer / cross-trust-boundary variant (ADR-0257
+    section 7): body text is stripped and only the markdown heading skeleton
+    plus file metadata is returned, so no PII crosses the boundary.
+    Same-machine subagents inherit the transcript and keep ``redacted=False``.
+    """
+
+    name = _READ_ASSISTANT_SELF_CONFIG_TOOL
+    namespace: ClassVar[str] = "core"
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
+    required_grant: ClassVar[str] = "profile.revise"
+    description = (
+        "读取当前助理的人格配置投影（SOUL.md / IDENTITY.md / USER.md / TOOLS.md 的注入块原文）。"
+        "只读，不修改任何配置；返回内容与 prompt 注入块逐字节一致，用于回答“你的 soul 里是什么”类自省问题，"
+        "无需再用文件工具搜寻工作区（ADR-0261 C1）。peer/跨信任边界调用时传 redacted=true 返回脱敏版。"
+        "参数: files（可选，standing 清单子集，缺省为四个人格文件）、redacted（可选，默认 false）。"
+    )
+    parameters: ClassVar[dict[str, Any]] = {
+        "type": "object",
+        "properties": {
+            "files": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "要读取的 standing 文件名，必须是 packaged_layout 清单的子集",
+            },
+            "redacted": {
+                "type": "boolean",
+                "description": "peer/跨信任边界时传 true：只返回标题骨架与元数据，正文剥离（ADR-0257 section 7）",
+            },
+        },
+    }
+
+    _DEFAULT_FILES: ClassVar[tuple[str, ...]] = (
+        "SOUL.md",
+        "IDENTITY.md",
+        "USER.md",
+        "TOOLS.md",
+    )
+
+    async def execute(self, args: dict[str, Any]) -> Observation:
+        start = time.monotonic()
+        redacted = args.get("redacted") is True
+        requested = args.get("files")
+        if requested is None:
+            names = list(self._DEFAULT_FILES)
+        elif isinstance(requested, (list, tuple)) and all(
+            isinstance(n, str) for n in requested
+        ):
+            names = [n.strip() for n in requested if n.strip()]
+            if not names:
+                return self._fail(start, "files 为空列表")
+        else:
+            return self._fail(start, "files 必须为字符串数组")
+        allowed = set(packaged_layout().standing_files)
+        unknown = [n for n in names if n not in allowed]
+        if unknown:
+            return self._fail(start, f"不在 standing 清单内: {', '.join(unknown)}")
+        try:
+            spec = self._catalog.get(self._assistant_id)
+            home = Path(spec.home_path)
+        except Exception as exc:
+            return self._fail(start, f"读取助理配置失败: {exc}")
+        entries: list[dict[str, Any]] = []
+        for name in names:
+            try:
+                body = (home / name).read_text(encoding="utf-8")
+            except OSError:
+                continue
+            if not body.strip():
+                continue
+            text = self._redacted_skeleton(body) if redacted else body
+            entries.append(
+                {
+                    "file": name,
+                    "chars": len(body),
+                    "redacted": redacted,
+                    "projection": render_injected(name, text),
+                }
+            )
+        return self._ok(
+            start,
+            {
+                "assistant_id": self._assistant_id,
+                "redacted": redacted,
+                "files": entries,
+            },
+        )
+
+    @staticmethod
+    def _redacted_skeleton(body: str) -> str:
+        headings = [
+            line.strip() for line in body.splitlines() if line.lstrip().startswith("#")
+        ]
+        note = "[已脱敏：peer 上下文仅返回标题骨架，ADR-0257 section 7]"
+        skeleton = "\n".join(headings)
+        return f"{note}\n{skeleton}" if skeleton else note
+
+
 class ListAssistantToolsTool(_BaseAssistantTool):
     """List the assistant's effective tool set: builtin policy + custom tools."""
 
@@ -659,6 +767,7 @@ def assistant_self_manage_tools_from_run(
         UpdateAssistantProfileTool(catalog=catalog, assistant_id=assistant_id),
         UpdateAssistantGrantsTool(catalog=catalog, assistant_id=assistant_id),
         UpdateAssistantUserTool(catalog=catalog, assistant_id=assistant_id),
+        ReadAssistantSelfConfigTool(catalog=catalog, assistant_id=assistant_id),
         ListAssistantToolsTool(
             catalog=catalog,
             assistant_id=assistant_id,
@@ -686,6 +795,7 @@ __all__ = [
     "_EDIT_ASSISTANT_SKILL_TOOL",
     "_LIST_ASSISTANT_SKILLS_TOOL",
     "_LIST_ASSISTANT_TOOLS_TOOL",
+    "_READ_ASSISTANT_SELF_CONFIG_TOOL",
     "_UPDATE_ASSISTANT_GRANTS_TOOL",
     "_UPDATE_ASSISTANT_PROFILE_TOOL",
     "_UPDATE_ASSISTANT_SOUL_TOOL",
@@ -697,6 +807,7 @@ __all__ = [
     "EditAssistantSkillTool",
     "ListAssistantSkillsTool",
     "ListAssistantToolsTool",
+    "ReadAssistantSelfConfigTool",
     "UpdateAssistantGrantsTool",
     "UpdateAssistantProfileTool",
     "UpdateAssistantSoulTool",
