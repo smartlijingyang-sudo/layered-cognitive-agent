@@ -29,7 +29,7 @@ barrier 入口),检查返回的 :class:`FlushResult` 列表 —— 任一 ``ok=F
   顶层性与取消,本策略只提供 barrier 本身。
 
 接线点 —— 模型请求边界 ``lca/cognition/brain/llm_turn/executor.py``、工具
-副作用边界 ``lca/cognition/body/safe_executor.py`` —— 属后续融合阶段;
+副作用边界 ``lca/plugins/cognitive/body/safe_executor.py`` —— 属后续融合阶段;
 本插件只提供 capability 面,本次变更不修改这两个文件。
 """
 
