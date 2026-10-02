@@ -28,7 +28,7 @@ _FORBIDDEN_PARAM_NAMES = (
 
 
 def _product(**overrides: Any) -> WorkerProductContext:
-    base = {
+    base: dict[str, Any] = {
         "job_id": "job_1",
         "owner": "user_1",
         "workspace_path": "/home/user/assistants/asst_1",

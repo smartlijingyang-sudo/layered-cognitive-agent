@@ -1,6 +1,7 @@
 """Cron domain package (ADR-0268)."""
 
 from lca.domain.cron.next_run import next_run
+from lca.domain.cron.service import CronService
 from lca.domain.cron.store import CronStore
 from lca.domain.cron.worker_context import (
     WorkerProductContext,
@@ -8,6 +9,7 @@ from lca.domain.cron.worker_context import (
 )
 
 __all__ = [
+    "CronService",
     "CronStore",
     "WorkerProductContext",
     "assemble_worker_context",
