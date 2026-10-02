@@ -52,8 +52,8 @@ def test_architecture_08_plugins_layer() -> None:
 
 
 def test_architecture_09_gateway_carrier() -> None:
-    """明确 gateway 作为载体入口。"""
-    _require_path("gateway")
+    """明确 gateway 作为载体入口（现址 lca.plugins.transport.webserver）。"""
+    _require_path("lca", "plugins", "transport", "webserver")
 
 
 def test_architecture_10_contracts_protocols() -> None:
@@ -92,8 +92,8 @@ def test_architecture_16_infra_sandbox() -> None:
 
 
 def test_architecture_17_infra_file_store() -> None:
-    """守护 file_store seam 位于基础设施层。"""
-    _require_path("lca", "infrastructure", "file_store.py")
+    """守护 file_store seam 位于基础设施层（py->package）。"""
+    _require_path("lca", "infrastructure", "file")
 
 
 def test_architecture_18_infra_skills() -> None:
@@ -121,19 +121,9 @@ def test_architecture_22_cognitive_perception() -> None:
     _require_path("lca", "cognition", "sensors")
 
 
-def test_architecture_23_runtime_reducer() -> None:
-    """守护 reducer 作为状态唯一写入相关模块。"""
-    _require_path("lca", "runtime", "reducer.py")
-
-
 def test_architecture_24_runtime_declarative() -> None:
-    """守护声明式运行时目录。"""
-    _require_path("lca", "runtime", "declarative_runtime.py")
-
-
-def test_architecture_25_runtime_recovery() -> None:
-    """守护恢复策略位于运行层。"""
-    _require_path("lca", "runtime", "checkpoint_resolution.py")
+    """守护声明式运行时驱动（COMPAT shim 已删，正典 lca.loop.driver）。"""
+    _require_path("lca", "loop", "driver.py")
 
 
 def test_architecture_26_agent_team() -> None:
@@ -151,13 +141,13 @@ def test_architecture_27_agent_delegation() -> None:
 
 
 def test_architecture_28_app_spawn() -> None:
-    """守护 spawn 作为组合根装配入口。"""
-    _require_path("lca", "application", "spawn.py")
+    """守护 spawn 作为组合根装配入口（-> application.api）。"""
+    _require_path("lca", "application", "api", "spawn.py")
 
 
 def test_architecture_29_app_runtime_factory() -> None:
-    """守护 runtime factory 的组合根位置。"""
-    _require_path("lca", "plugins", "composer", "runtime", "runtime_factory.py")
+    """守护 runtime factory 的组合根位置（生产 facade；fixture/ 仅测试用）。"""
+    _require_path("lca", "plugins", "composer", "runtime", "runtime", "factory.py")
 
 
 def test_architecture_30_harness_profile() -> None:
@@ -166,8 +156,8 @@ def test_architecture_30_harness_profile() -> None:
 
 
 def test_architecture_31_harness_boot() -> None:
-    """守护 boot 装配 seam。"""
-    _require_path("lca", "harness", "profile", "boot.py")
+    """守护 boot 装配 seam（py->package）。"""
+    _require_path("lca", "harness", "profile", "boot")
 
 
 def test_architecture_32_harness_plugin_api() -> None:
@@ -212,11 +202,6 @@ def test_architecture_38_bundle_base() -> None:
     _require_path("bundles", "base.yaml")
 
 
-def test_architecture_39_bundle_declarative() -> None:
-    """守护声明式 bundle 的显式组合入口。"""
-    _require_path("bundles", "declarative-phase-graph.yaml")
-
-
 def test_architecture_40_adr_directory() -> None:
     """守护 ADR 作为架构决策记录目录。"""
     _require_path("docs", "adr")
@@ -233,8 +218,8 @@ def test_architecture_42_skill_directory() -> None:
 
 
 def test_architecture_43_architecture_tests() -> None:
-    """守护架构测试作为接口测试面。"""
-    _require_path("tests", "test_architecture_conformance.py")
+    """守护架构测试作为接口测试面（-> scenario/architecture）。"""
+    _require_path("tests", "scenario", "architecture", "test_architecture_conformance.py")
 
 
 def test_architecture_44_lint_config() -> None:
