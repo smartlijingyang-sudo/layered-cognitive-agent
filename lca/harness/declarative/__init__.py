@@ -14,20 +14,16 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-
     from lca.harness.declarative.controls.approval import (
         ApprovalState,
         ApprovalStateMachine,
         ApprovalTransition,
     )
-    from lca.harness.declarative.lifecycle.phase_context import RestrictedPhaseContext
 
 __all__ = [
     "ApprovalState",
     "ApprovalStateMachine",
     "ApprovalTransition",
-
-    "RestrictedPhaseContext",
 ]
 
 _RETIRED_V1 = frozenset(
@@ -41,6 +37,10 @@ _RETIRED_V1 = frozenset(
         "PhaseVisit",
         "DeclarativePlanProjection",
         "compile_declarative_projection",
+        # ADR-0221: v1 execution contracts (PhaseContext / PhaseResult /
+        # PhaseCapabilityReader) retired; RestrictedPhaseContext subclassed
+        # the retired PhaseContext and had no consumers.
+        "RestrictedPhaseContext",
     }
 )
 
@@ -54,12 +54,6 @@ def __getattr__(name: str) -> Any:
         from lca.harness.declarative.controls import approval as _approval
 
         return getattr(_approval, name)
-    if name == "RestrictedPhaseContext":
-        from lca.harness.declarative.lifecycle.phase_context import (
-            RestrictedPhaseContext,
-        )
-
-        return RestrictedPhaseContext
     if name in _RETIRED_V1:
         raise AttributeError(
             f"lca.harness.declarative.{name} was retired with the v0 GraphAssembler "
