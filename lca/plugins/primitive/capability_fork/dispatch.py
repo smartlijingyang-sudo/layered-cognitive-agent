@@ -59,8 +59,8 @@ class CapabilityForkDispatchExecutor:
     semantic_name: str = "capability.fork.dispatch"
     region: str = "primitive"
     # ADR-0219 §5.5: typed port contract declared on the plugin.
-    declared_inputs: tuple[PortName, ...] = ("bindings",)
-    declared_outputs: tuple[PortName, ...] = ("forked_tools",)
+    declared_inputs: tuple[PortName, ...] = (PortName("bindings"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("forked_tools"),)
 
     async def node_execute(
         self,
@@ -72,7 +72,7 @@ class CapabilityForkDispatchExecutor:
         inputs 端口(yaml):bindings (BindingsView)
         outputs 端口(yaml):forked_tools (ForkedTools)
         """
-        bindings = input.port_values.get("bindings")
+        bindings = input.port_values.get(PortName("bindings"))
         if not isinstance(bindings, BindingsView):
             raise TypeError(
                 "capability.fork.dispatch: 'bindings' port must be a BindingsView "
@@ -90,7 +90,7 @@ class CapabilityForkDispatchExecutor:
             items=tuple(forked.list_tools()),
             binding_keys=_FORKED_BINDING_KEYS,
         )
-        return NodeOutput(port_values={"forked_tools": forked_tools})
+        return NodeOutput(port_values={PortName("forked_tools"): forked_tools})
 
 
 @plugin(
