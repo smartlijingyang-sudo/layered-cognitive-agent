@@ -33,6 +33,9 @@ class _FakeTool:
     """Stand-in Tool object satisfying the duck-typed Protocol for tests."""
 
     name: ClassVar[str] = "fake_tool"
+    # NOTE (round-0345): ``Tool`` protocol requires ``namespace``; without it
+    # runtime isinstance() fails and pydantic rejects every ForkedTools(...).
+    namespace: ClassVar[str] = "fake_ns"
     description: ClassVar[str] = "fake"
     parameters: ClassVar[dict] = {"type": "object"}
     is_idempotent: ClassVar[bool] = False
