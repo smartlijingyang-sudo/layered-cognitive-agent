@@ -56,7 +56,8 @@ async def register_gateway_run(
     get_session = getattr(registry, "get", None)
     if not callable(get_session):
         return
-    session = get_session(run_id)
+    # registry.get 无类型(duck-type 会话);Any 显式声明避免 callable() 窄化为 object。
+    session: Any = get_session(run_id)
     if session is None:
         return
     # 缺陷1修复：把 topic_id 落到 session，跨 run 会话自愈日志按 topic 归档。

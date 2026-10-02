@@ -53,8 +53,9 @@ class RegistryRunQueries:
         if session is None and not spine_path.is_file():
             return None
         target_path = spine_path
-        if session is not None and getattr(session, "locator", None) is not None:
-            step_path = session.locator.journal_step_path(run_id)
+        locator = getattr(session, "locator", None) if session is not None else None
+        if locator is not None:
+            step_path = locator.journal_step_path(run_id)
             if step_path.exists():
                 target_path = step_path
         else:
