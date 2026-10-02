@@ -71,8 +71,8 @@ class DelegateComposeExecutor:
 
     semantic_name: str = "delegate.compose"
     region: str = "delegate"
-    declared_inputs: tuple[PortName, ...] = ("decision", "capability_grant")
-    declared_outputs: tuple[PortName, ...] = ("delegation_request",)
+    declared_inputs: tuple[PortName, ...] = (PortName("decision"), PortName("capability_grant"))
+    declared_outputs: tuple[PortName, ...] = (PortName("delegation_request"),)
 
     async def node_execute(
         self,
@@ -88,8 +88,8 @@ class DelegateComposeExecutor:
         member (C5 monotonicity).
         """
         del context
-        decision = _resolve_port("decision", input=input)
-        grant = _resolve_port("capability_grant", input=input)
+        decision = _resolve_port(PortName("decision"), input=input)
+        grant = _resolve_port(PortName("capability_grant"), input=input)
         _enforce_delegate_capability(grant)
         targets = _targets_from_decision(decision)
         requests = tuple(
@@ -104,10 +104,10 @@ class DelegateComposeExecutor:
             )
             for target in targets
         )
-        return NodeOutput(port_values={"delegation_request": requests})
+        return NodeOutput(port_values={PortName("delegation_request"): requests})
 
 
-def _resolve_port(name: str, *, input: NodeInput) -> Any:
+def _resolve_port(name: PortName, *, input: NodeInput) -> Any:
     """Pull a declared port from ``input.port_values``; missing → TypeError."""
     value = input.port_values.get(name)
     if value is None:

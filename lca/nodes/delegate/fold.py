@@ -90,8 +90,8 @@ class DelegateFoldExecutor:
 
     semantic_name: str = "delegate.fold"
     region: str = "delegate"
-    declared_inputs: tuple[PortName, ...] = ("delegation_receipt",)
-    declared_outputs: tuple[PortName, ...] = ("decision", "folded_result")
+    declared_inputs: tuple[PortName, ...] = (PortName("delegation_receipt"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("decision"), PortName("folded_result"))
 
     async def node_execute(
         self,
@@ -106,7 +106,7 @@ class DelegateFoldExecutor:
         """
         del context  # unused: pure function of input ports
 
-        raw = input.port_values.get("delegation_receipt")
+        raw = input.port_values.get(PortName("delegation_receipt"))
         if raw is None:
             receipts: tuple[DelegationReceipt, ...] = ()
         elif isinstance(raw, tuple):
@@ -153,8 +153,8 @@ class DelegateFoldExecutor:
 
         return NodeOutput(
             port_values={
-                "decision": decision,
-                "folded_result": folded,
+                PortName("decision"): decision,
+                PortName("folded_result"): folded,
             }
         )
 

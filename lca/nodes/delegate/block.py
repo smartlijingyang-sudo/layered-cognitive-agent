@@ -74,8 +74,11 @@ class DelegateAwaitExecutor:
 
     semantic_name: str = "delegate.await"
     region: str = "delegate"
-    declared_inputs: tuple[PortName, ...] = ("delegation_request", "delegation_receipt")
-    declared_outputs: tuple[PortName, ...] = ("delegation_receipt",)
+    declared_inputs: tuple[PortName, ...] = (
+        PortName("delegation_request"),
+        PortName("delegation_receipt"),
+    )
+    declared_outputs: tuple[PortName, ...] = (PortName("delegation_receipt"),)
 
     async def node_execute(
         self,
@@ -83,8 +86,8 @@ class DelegateAwaitExecutor:
         input: NodeInput,
     ) -> NodeOutput:
         del context  # unused: pure pass-through of typed input ports
-        receipts = _coerce_receipts(input.port_values.get("delegation_receipt"))
-        return NodeOutput(port_values={"delegation_receipt": receipts})
+        receipts = _coerce_receipts(input.port_values.get(PortName("delegation_receipt")))
+        return NodeOutput(port_values={PortName("delegation_receipt"): receipts})
 
 
 @plugin(
