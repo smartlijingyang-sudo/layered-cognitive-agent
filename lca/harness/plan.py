@@ -11,7 +11,7 @@ import json
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict, is_dataclass
 from enum import Enum
-from typing import Any, cast
+from typing import Any, Protocol, cast
 
 from lca.contracts.observability.canonical_digest import canonical_digest
 from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
@@ -39,6 +39,18 @@ def declarative_plan_hash(value: Any) -> str:
     return canonical_digest(canonical_json(value), length=32)
 
 
+class _V2PlanWrapper(Protocol):
+    """Structural shape of ``lca_kernel``'s ``V2ExecutablePlan``.
+
+    Imported eagerly it would cycle (lca_kernel imports lca.harness.*),
+    so this module only duck-types on it; the Protocol documents the
+    shape for the seam cast in ``_unwrap_v2``.
+    """
+
+    inner: CompiledRunPlan
+    graph_spec: dict[str, Any]
+
+
 def _unwrap_v2(plan: CompiledRunPlan | Any) -> CompiledRunPlan:
     """Return the ``CompiledRunPlan`` inside a v2 wrapper, or ``plan`` itself.
 
@@ -54,7 +66,11 @@ def _unwrap_v2(plan: CompiledRunPlan | Any) -> CompiledRunPlan:
     (``inner`` + ``graph_spec``) is stable on the wrapper class.
     """
     if hasattr(plan, "inner") and hasattr(plan, "graph_spec"):
-        return plan.inner
+        # Seam cast (0132 idiom): pyright cannot narrow attribute access
+        # through hasattr duck-typing; the wrapper shape (inner +
+        # graph_spec) is stable on V2ExecutablePlan. Behavior identical
+        # to ``plan.inner`` above.
+        return cast("_V2PlanWrapper", plan).inner
     return plan
 
 

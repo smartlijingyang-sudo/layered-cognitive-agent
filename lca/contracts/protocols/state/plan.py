@@ -19,14 +19,13 @@ from lca.contracts.protocols.declarative.declarative_1.declarative_common import
 )
 from lca.contracts.protocols.declarative.declarative_1.declarative_graph import (
     ActionAuthorityPlan,
-    CapabilityBinding,
     EffectPolicyPlan,
     PlanProvenance,
     ReplacementDecision,
     ValidationReport,
 )
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import PluginSpec
-from lca.contracts.protocols.perceive.capability_plan import CapabilityPlan
+from lca.contracts.protocols.perceive.capability_plan import CapabilityPlan, ProviderBinding
 from lca.contracts.protocols.state.scope_plan import ScopePlan
 
 # PhaseBinding / ControlEntry / CognitivePhaseGraphPlan retired in ADR-0221 P3:
@@ -58,7 +57,11 @@ class CompiledRunPlan:
     input_provenance: tuple[tuple[str, str], ...] = ()
     revision: str = "v2"
     plugin_specs: tuple[PluginSpec, ...] = ()
-    capability_bindings: tuple[CapabilityBinding, ...] = ()
+    # ADR-0221 P3: populated from ``CapabilityPlan.provider_bindings``
+    # (``ProviderBinding``: owner_plugin / fallback_policy / effect_class).
+    # The v1 ``CapabilityBinding`` (provider / cardinality / grant) is retired
+    # from this region; no producer assigns it here anymore.
+    capability_bindings: tuple[ProviderBinding, ...] = ()
     control_entries: tuple[Any, ...] = ()
     replacement_map: tuple[ReplacementDecision, ...] = ()
     effect_policy: EffectPolicyPlan | None = None
