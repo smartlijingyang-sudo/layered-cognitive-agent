@@ -28,7 +28,7 @@ class KernelServeConfig(BaseModel):
     loopback)与本字段无关。
     """
 
-    host: str = "0.0.0.0"
+    host: str = "0.0.0.0"  # noqa: S104 -- kernel-serve LAN bind default; health probes use loopback (see health_url)
     port: int = 8765
     health_path: str = "/health"
     profile: str = "profiles/web-assistant.yaml"
@@ -42,7 +42,7 @@ class KernelServeConfig(BaseModel):
     @property
     def health_url(self) -> str:
         """Full health check URL (always loopback — bind may be 0.0.0.0)."""
-        probe_host = "127.0.0.1" if self.host in {"0.0.0.0", "::"} else self.host
+        probe_host = "127.0.0.1" if self.host in {"0.0.0.0", "::"} else self.host  # noqa: S104 -- comparison against bind-all, not a bind
         return f"http://{probe_host}:{self.port}{self.health_path}"
 
 

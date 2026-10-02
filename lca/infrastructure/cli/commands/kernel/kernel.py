@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 # Matches KernelServeConfig.host default — referenced from typer Option to
 # keep the printed command and the actual config value in lockstep, and to
 # give ruff S104 a named literal to attach noqa to.
-_LAN_BIND_DEFAULT = "0.0.0.0"
+_LAN_BIND_DEFAULT = "0.0.0.0"  # noqa: S104 -- LAN service binds all interfaces by design (operator CLI); named literal per comment above
 
 
 def register(app: typer.Typer) -> None:

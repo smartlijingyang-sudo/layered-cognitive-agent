@@ -70,7 +70,7 @@ class KernelServeSpawner:
 
     @property
     def health_url(self) -> str:
-        probe_host = "127.0.0.1" if self._config.host in ("0.0.0.0", "::") else self._config.host
+        probe_host = "127.0.0.1" if self._config.host in ("0.0.0.0", "::") else self._config.host  # noqa: S104 -- comparison against bind-all, not a bind
         return f"http://{probe_host}:{self._config.port}/health"
 
     def run(self) -> SpawnResult:

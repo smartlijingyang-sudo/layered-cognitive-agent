@@ -700,7 +700,7 @@ class LobeHubService:
             if vite_host:
                 return f"http://{vite_host}:{self._kernel_serve.port}"
         bind = self._kernel_serve.host
-        if bind in {"0.0.0.0", "::"}:
+        if bind in {"0.0.0.0", "::"}:  # noqa: S104 -- comparison against bind-all, not a bind
             return f"http://10.36.6.252:{self._kernel_serve.port}"
         return self._kernel_serve.base_url.rstrip("/")
 

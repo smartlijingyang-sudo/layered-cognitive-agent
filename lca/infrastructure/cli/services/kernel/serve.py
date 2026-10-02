@@ -50,7 +50,7 @@ from lca.infrastructure.cli.services.kernel.spawner import KernelServeSpawner
 
 # Hosts that bind-all. Used by spawner's LAN probe to decide whether to
 # re-check the Next.js proxy's expected URL after loopback /health is ready.
-_BIND_ALL_HOSTS = frozenset({"0.0.0.0", "::"})
+_BIND_ALL_HOSTS = frozenset({"0.0.0.0", "::"})  # noqa: S104 -- bind-all host set for comparison, not a bind
 
 
 class KernelServeService:

@@ -125,7 +125,7 @@ def parse_program_config(path: str | Path) -> list[ProgramConfig]:
 def default_program_config(
     *,
     profile: str = "profiles/web-assistant.yaml",
-    host: str = "0.0.0.0",
+    host: str = "0.0.0.0",  # noqa: S104 -- supervisor program LAN bind default
     port: int = 8765,
 ) -> ProgramConfig:
     """Build the dev-default LCA program."""
