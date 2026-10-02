@@ -9,6 +9,7 @@ The strategy is intentionally side-effect free: observers must not
 mutate state directly. Mutation goes through the existing journal /
 reducer seam (planned PR-7 wiring).
 """
+
 from __future__ import annotations
 
 import logging
@@ -16,6 +17,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 from lca.contracts.protocols.graph.binding import BindingKind
 from lca.contracts.protocols.graph.node_io import (
     NodeInput,
@@ -25,7 +27,7 @@ from lca.contracts.protocols.graph.node_io import (
 from lca.contracts.protocols.graph.strategy import NodeStrategy, StrategyContext
 from lca.framework.graph.strategy_registry import register_strategy
 
-Observer = Callable[[StrategyContext, dict[str, Any], dict[str, Any]], None]
+Observer = Callable[[StrategyContext, dict[PortName, Any], dict[PortName, Any]], None]
 
 log = logging.getLogger(__name__)
 
@@ -36,9 +38,7 @@ class ObserveStrategy(NodeStrategy):
     schema: NodeIOSchema = field(default_factory=NodeIOSchema)
     observer: Observer | None = None
 
-    async def execute(
-        self, context: StrategyContext, input: NodeInput
-    ) -> NodeOutput:
+    async def execute(self, context: StrategyContext, input: NodeInput) -> NodeOutput:
         port_values = dict(input.port_values)
         if self.observer is not None:
             try:
@@ -52,8 +52,8 @@ class ObserveStrategy(NodeStrategy):
 
 def _noop_observer(
     context: StrategyContext,
-    inputs: dict[str, Any],
-    outputs: dict[str, Any],
+    inputs: dict[PortName, Any],
+    outputs: dict[PortName, Any],
 ) -> None:
     return None
 
