@@ -535,7 +535,9 @@ def test_restore_with_header_events_initializes_fold() -> None:
         type=REQUEST_HEADER,
         seq=0,
         time=4001,
-        data=_header_payload(system="restored-sys", model="m-restored"), session_id="s")
+        data=_header_payload(system="restored-sys", model="m-restored"),
+        session_id="s",
+    )
 
     session = store.restore("s-fold", header, [header_event])
 
@@ -592,7 +594,14 @@ def test_restore_from_log_fail_closed_then_restore(tmp_path: Path) -> None:
         "\n".join(
             [
                 json.dumps({"type": "turn.started.v1", "seq": 0, "time": 1, "data": {"turn": 1}}),
-                json.dumps({"type": "turn.ended.v1", "seq": 1, "time": 2, "data": {"turn": 1, "reason": "done"}}),
+                json.dumps(
+                    {
+                        "type": "turn.ended.v1",
+                        "seq": 1,
+                        "time": 2,
+                        "data": {"turn": 1, "reason": "done"},
+                    }
+                ),
             ]
         )
         + "\n",
@@ -645,9 +654,9 @@ async def test_setup_provides_session_store() -> None:
 
 def test_plugin_manifest_metadata() -> None:
     from lca.harness.plugin.declaration import definition_from_plugin
-    from lca.plugins.session.runtime import plugin as plugin_module
+    from lca.plugins.session.runtime.plugin.plugin import setup as plugin_setup
 
-    definition = definition_from_plugin(plugin_module.setup, module=__name__)
+    definition = definition_from_plugin(plugin_setup, module=__name__)
     assert definition.id == "lca.plugins.session.runtime"
     assert definition.spec.layer == "L2"
     assert "session.store" in definition.provided_capability_keys

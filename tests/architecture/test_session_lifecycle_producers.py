@@ -39,7 +39,12 @@ ALLOW_HARNESS_ONLY: frozenset[str] = frozenset(
 _LIFECYCLE_SEAM_PRODUCERS: dict[str, tuple[str, ...]] = {
     "turn.started.v1": ("begin_turn",),
     "turn.ended.v1": ("end_turn",),
-    "step.started.v1": ("begin_step", "request_model", "emit_phase_catalog_facts", "_emit_perceive"),
+    "step.started.v1": (
+        "begin_step",
+        "request_model",
+        "emit_phase_catalog_facts",
+        "_emit_perceive",
+    ),
     "step.ended.v1": ("end_step", "end_turn", "_emit_remember"),
     "model.requested.v1": ("request_model",),
     "model.completed.v1": ("complete_model",),
@@ -48,6 +53,7 @@ _LIFECYCLE_SEAM_PRODUCERS: dict[str, tuple[str, ...]] = {
     "session.created.v1": ("create_session",),
     "session.checkpoint.v1": ("checkpoint", "emit_approval_pause_from_result"),
     "approval.persisted.v1": ("persist_approval", "emit_approval_pause_from_result"),
+    "approval.resolved.v1": ("append_approval_resolved_if_pending",),
 }
 
 _CONSUMER_LINE = re.compile(
