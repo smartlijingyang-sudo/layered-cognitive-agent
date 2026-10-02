@@ -13,12 +13,15 @@
 
 Step 边界语法(闭集,不引入新词表):
 
-- ``writable.step.start`` / ``writable.step.end`` —— 显式 step 边。
-- ``llm.request.header`` —— cursor step 边(StdLoopCursor.record_request_header):
-  已开 step 以 ``success`` 关闭;新 step 以 payload ``step_id`` 开启,
-  缺省 ``step_{seq:03d}``;payload ``model`` / ``reason`` 留在帧上。
-- ``brain.think.start`` / ``brain.think.end`` —— 无显式边时的隐式 think step。
+- ``llm.request.header`` —— 唯一 step 边(cursor step 边,
+  StdLoopCursor.record_request_header):已开 step 以 ``success`` 关闭;
+  新 step 以 payload ``step_id`` 开启,缺省 ``step_{seq:03d}``;
+  payload ``model`` / ``reason`` 留在帧上。
 - ``phase.*.fold``(:data:`PHASE_FOLD_EPS`)—— phase 累计,不切 step。
+
+(历史:``writable.step.start`` / ``writable.step.end`` 与
+``brain.think.start`` / ``brain.think.end`` 曾为 step 边信号,现已退役;
+fold 端无处理,到达的事件按其他 EP 照常挂到当前帧。)
 
 设计原则:
 
