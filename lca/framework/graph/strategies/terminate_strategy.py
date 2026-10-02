@@ -37,6 +37,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from lca.contracts.models.cognition.boundary import StopPayload
+from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 from lca.contracts.protocols.graph.binding import BindingKind
 from lca.contracts.protocols.graph.node_io import (
     NodeInput,
@@ -46,7 +47,7 @@ from lca.contracts.protocols.graph.node_io import (
 from lca.contracts.protocols.graph.strategy import NodeStrategy, StrategyContext
 from lca.framework.graph.strategy_registry import register_strategy
 
-TerminateFn = Callable[[dict[str, Any], StrategyContext], dict[str, Any]]
+TerminateFn = Callable[[dict[PortName, Any], StrategyContext], dict[PortName, Any]]
 
 # Fallback port names used only when the strategy's schema is empty
 # (legacy / undeclared wiring). Hosts that declare an ``io_schema`` get
@@ -57,16 +58,18 @@ _DEFAULT_ACT_OUTCOME_PORT: str = "act_outcome"
 _DEFAULT_TERMINAL_OUTCOME_PORT: str = "terminal_outcome"
 
 
-def _resolve_terminate_ports(schema: NodeIOSchema) -> tuple[str, str, str]:
+def _resolve_terminate_ports(schema: NodeIOSchema) -> tuple[PortName, PortName, PortName]:
     """Resolve ``(decision_in, act_outcome_in, terminal_outcome_out)``.
 
     Uses the schema's first two required inputs and first output when
     declared; falls back to the legacy default names otherwise.
     """
     required = schema.required_inputs()
-    decision_port = required[0] if len(required) >= 1 else _DEFAULT_DECISION_PORT
-    act_outcome_port = required[1] if len(required) >= 2 else _DEFAULT_ACT_OUTCOME_PORT
-    terminal_port = schema.outputs[0].name if schema.outputs else _DEFAULT_TERMINAL_OUTCOME_PORT
+    decision_port = required[0] if len(required) >= 1 else PortName(_DEFAULT_DECISION_PORT)
+    act_outcome_port = required[1] if len(required) >= 2 else PortName(_DEFAULT_ACT_OUTCOME_PORT)
+    terminal_port = (
+        schema.outputs[0].name if schema.outputs else PortName(_DEFAULT_TERMINAL_OUTCOME_PORT)
+    )
     return decision_port, act_outcome_port, terminal_port
 
 
@@ -90,9 +93,9 @@ class TerminateStrategy(NodeStrategy):
 
 def _default_terminate(
     schema: NodeIOSchema,
-    port_values: dict[str, Any],
+    port_values: dict[PortName, Any],
     context: StrategyContext,
-) -> dict[str, Any]:
+) -> dict[PortName, Any]:
     """Build a :class:`StopPayload` from the schema-declared port inputs.
 
     Reads the ``decision`` and ``act_outcome`` ports (resolved from
