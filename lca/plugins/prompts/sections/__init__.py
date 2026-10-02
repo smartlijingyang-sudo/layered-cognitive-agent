@@ -66,7 +66,9 @@ from lca.plugins.prompts.sections.runtime_env import (
 )
 from lca.plugins.prompts.sections.skills import (
     ActivatedSkillsSection,
+    SkillDutySection,
     build_activated_skills,
+    build_skill_duty,
 )
 from lca.plugins.prompts.sections.task import TaskSection, build_task
 from lca.plugins.prompts.sections.teammates import (
@@ -132,6 +134,7 @@ __all__ = [
     "RoleSection",
     "RoutingInstructionsSection",
     "RuntimeEnvSection",
+    "SkillDutySection",
     "StaticTextSection",
     "TaskSection",
     "TeammatesSection",
@@ -161,6 +164,7 @@ __all__ = [
     "build_role_section",
     "build_routing_instructions",
     "build_runtime_env",
+    "build_skill_duty",
     "build_static_text",
     "build_task",
     "build_teammates",

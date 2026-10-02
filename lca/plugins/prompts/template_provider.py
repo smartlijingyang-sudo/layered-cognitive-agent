@@ -107,7 +107,10 @@ def _builtin_templates() -> Mapping[str, _PromptTemplate]:
     runtime_env_ref = (("runtime_env", "pure", True, ""),)
     developer_timestamp_ref = (("developer_timestamp", "pure", True, ""),)
     memory_retrieval_ref = (("memory_retrieval", "stateful", True, ""),)
-    adr0255_tail = memory_retrieval_ref + developer_timestamp_ref + runtime_env_ref
+    skill_duty_ref = (("skill_duty", "stateful", True, ""),)
+    adr0255_tail = (
+        memory_retrieval_ref + skill_duty_ref + developer_timestamp_ref + runtime_env_ref
+    )
     return {
         "react_prompt": _PromptTemplate(
             id="react_prompt",
