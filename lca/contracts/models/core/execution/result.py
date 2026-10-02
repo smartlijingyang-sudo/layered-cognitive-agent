@@ -88,7 +88,7 @@ class Result:
 # ADR-0158 决策 五:Result.from_state 整段删除,Result.output 改由
 # TerminalOutcome.final_output_ref 解析(ADR-0077 §三「Result 只读 TerminalOutcome
 # 与 projection」)。原方法占位 50 行被清除,AgentState.final_output 读取方
-# 同步迁移(后续 commit)。
+# 已同步迁移(见 state.py ADR-0158 决策四注释"本 commit 同步迁移")。
 
 
 class ApprovalPendingError(Exception):
