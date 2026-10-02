@@ -59,13 +59,11 @@ class TestPostCodemodSmoke:
         assert defn.logic_address.functional_group is expected_group
         assert defn.logic_address.revision == defn.contract.identity.version
 
-    def test_act_authorize_is_G6_DECISION(self) -> None:
-        from lca.plugins.loop.control.act_authorize.plugin import setup
-
-        self._assert_contract_complete(
-            type("M", (), {"setup": staticmethod(setup)}),
-            expected_group=FunctionalGroup.G6_DECISION,
-        )
+    # NOTE(round-0352, orphan): ``test_act_authorize_is_G6_DECISION`` was retired here.
+    # The ``lca.plugins.loop.control.act_authorize`` plugin was intentionally deleted by
+    # 9ba7dfa8a ("refactor(act): delete dead phase.act.standard + 6 control.act.* plugins");
+    # the codemod smoke net only pins live plugins. The remaining 5 tests still cover the
+    # G0..G7 group spread; the G6_DECISION slot is covered by test_observe_wildcard_is_G6_DECISION.
 
     def test_observe_wildcard_is_G6_DECISION(self) -> None:
         from lca.plugins.loop.control.observe_wildcard.plugin import setup
