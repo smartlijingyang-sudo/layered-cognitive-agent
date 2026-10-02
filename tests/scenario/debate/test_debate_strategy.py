@@ -10,6 +10,7 @@ from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import Budget
 from lca.contracts.protocols import Synthesizer
 from lca.plugins.strategies.debate.debate import DebateStrategy
+from tests.support.session_gate_helpers import bound_session
 from tests.support.strategy_registry import build_strategy_registry
 from tests.support.team_stage import stage_with_invoker
 
@@ -47,6 +48,13 @@ def _make_agent(
 
 
 class TestDebateStrategyConvergence(unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        self._session_ctx = bound_session()
+        self._session_ctx.__enter__()
+
+    def tearDown(self) -> None:
+        self._session_ctx.__exit__(None, None, None)
+
     """验证多轮辩论收敛行为。"""
 
     async def test_single_member_runs_full_rounds(self) -> None:
@@ -88,6 +96,13 @@ class TestDebateStrategyConvergence(unittest.IsolatedAsyncioTestCase):
 
 
 class TestDebateStrategyMaxRounds(unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        self._session_ctx = bound_session()
+        self._session_ctx.__enter__()
+
+    def tearDown(self) -> None:
+        self._session_ctx.__exit__(None, None, None)
+
     """验证超时熔断（max_rounds 上限）。"""
 
     async def test_max_rounds_limit(self) -> None:
@@ -142,6 +157,13 @@ class TestDebateStrategyMaxRounds(unittest.IsolatedAsyncioTestCase):
 
 
 class TestDebateStrategyArbitration(unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        self._session_ctx = bound_session()
+        self._session_ctx.__enter__()
+
+    def tearDown(self) -> None:
+        self._session_ctx.__exit__(None, None, None)
+
     """验证仲裁正确性。"""
 
     async def test_arbitration_via_synthesizer(self) -> None:
@@ -174,6 +196,13 @@ class TestDebateStrategyArbitration(unittest.IsolatedAsyncioTestCase):
 
 
 class TestDebateStrategyEdgeCases(unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        self._session_ctx = bound_session()
+        self._session_ctx.__enter__()
+
+    def tearDown(self) -> None:
+        self._session_ctx.__exit__(None, None, None)
+
     """边界情况。"""
 
     async def test_empty_members_returns_failed(self) -> None:
