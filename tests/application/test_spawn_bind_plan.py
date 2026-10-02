@@ -145,14 +145,13 @@ class TestStrictPlanBinding:
         Individual composers may return partial contributions, but binding is
         the one closure seam and must reject missing runtime dependencies.
         """
-        from lca.contracts.protocols.state.plan import CapabilityBinding
+        from lca.contracts.protocols.perceive.capability_plan import ProviderBinding
 
         plan = _plan(
             with_capability_bindings=(
-                CapabilityBinding(
+                ProviderBinding(
                     capability="composer.brain",
-                    provider="plugin.composer.brain",
-                    cardinality="one",
+                    owner_plugin="plugin.composer.brain",
                 ),
             ),
         )
@@ -171,14 +170,13 @@ class TestStrictPlanBinding:
             bind_plan(_request(), _plan(), scope=object())
 
     def test_complete_composers_return_complete_plan_binding(self) -> None:
-        from lca.contracts.protocols.state.plan import CapabilityBinding
+        from lca.contracts.protocols.perceive.capability_plan import ProviderBinding
 
         plan = _plan(
             with_capability_bindings=tuple(
-                CapabilityBinding(
+                ProviderBinding(
                     capability=key,
-                    provider=f"plugin.{key}",
-                    cardinality="one",
+                    owner_plugin=f"plugin.{key}",
                 )
                 for key in ("composer.brain", "composer.body", "composer.perceive")
             )
@@ -196,7 +194,7 @@ class TestStrictPlanBinding:
     def test_agent_binding_reads_the_plan_frozen_on_the_scope(self) -> None:
         """Production Agent binding must not accept a second plan interpretation."""
 
-        from lca.contracts.protocols.state.plan import CapabilityBinding
+        from lca.contracts.protocols.perceive.capability_plan import ProviderBinding
         from lca.harness.profile.boot.products import (
             ProfileBootProducts,
             attach_profile_boot_products,
@@ -204,10 +202,9 @@ class TestStrictPlanBinding:
 
         plan = _plan(
             with_capability_bindings=tuple(
-                CapabilityBinding(
+                ProviderBinding(
                     capability=key,
-                    provider=f"plugin.{key}",
-                    cardinality="one",
+                    owner_plugin=f"plugin.{key}",
                 )
                 for key in ("composer.brain", "composer.body", "composer.perceive")
             )
@@ -227,14 +224,13 @@ class TestStrictPlanBinding:
     def test_team_composer_is_not_called_while_binding_agent_graph(self) -> None:
         """A Team-only composer cannot join AgentGraph composition by accident."""
 
-        from lca.contracts.protocols.state.plan import CapabilityBinding
+        from lca.contracts.protocols.perceive.capability_plan import ProviderBinding
 
         plan = _plan(
             with_capability_bindings=tuple(
-                CapabilityBinding(
+                ProviderBinding(
                     capability=key,
-                    provider=f"plugin.{key}",
-                    cardinality="one",
+                    owner_plugin=f"plugin.{key}",
                 )
                 for key in ("composer.brain", "composer.body", "composer.perceive", "composer.team")
             )
@@ -247,17 +243,14 @@ class TestStrictPlanBinding:
         )
 
     def test_plan_ref_is_propagated(self) -> None:
-        from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
-            CapabilityBinding,
-        )
+        from lca.contracts.protocols.perceive.capability_plan import ProviderBinding
         from lca.harness.plan import compiled_run_plan_ref
 
         plan = _plan(
             with_capability_bindings=tuple(
-                CapabilityBinding(
+                ProviderBinding(
                     capability=key,
-                    provider=f"plugin.{key}",
-                    cardinality="one",
+                    owner_plugin=f"plugin.{key}",
                 )
                 for key in ("composer.brain", "composer.body", "composer.perceive")
             )
@@ -266,15 +259,14 @@ class TestStrictPlanBinding:
         assert result.plan_ref == compiled_run_plan_ref(plan)
 
     def test_unresolvable_provider_binding_fails_closed(self) -> None:
-        from lca.contracts.protocols.state.plan import CapabilityBinding
+        from lca.contracts.protocols.perceive.capability_plan import ProviderBinding
 
         plan = _plan(
             with_binding=True,
             with_capability_bindings=tuple(
-                CapabilityBinding(
+                ProviderBinding(
                     capability=key,
-                    provider=f"plugin.{key}",
-                    cardinality="one",
+                    owner_plugin=f"plugin.{key}",
                 )
                 for key in ("composer.brain", "composer.body", "composer.perceive")
             ),
@@ -293,14 +285,13 @@ class TestStrictTeamBinding:
     def test_agent_composers_are_not_called_while_binding_team_graph(self) -> None:
         """Only the TeamGraph composer is eligible for Team composition."""
 
-        from lca.contracts.protocols.state.plan import CapabilityBinding
+        from lca.contracts.protocols.perceive.capability_plan import ProviderBinding
 
         plan = _plan(
             with_capability_bindings=tuple(
-                CapabilityBinding(
+                ProviderBinding(
                     capability=key,
-                    provider=f"plugin.{key}",
-                    cardinality="one",
+                    owner_plugin=f"plugin.{key}",
                 )
                 for key in ("composer.brain", "composer.body", "composer.perceive", "composer.team")
             )
@@ -309,14 +300,13 @@ class TestStrictTeamBinding:
         assert result.composer_capability == "composer.team"
 
     def test_complete_team_composer_returns_binding(self) -> None:
-        from lca.contracts.protocols.state.plan import CapabilityBinding
+        from lca.contracts.protocols.perceive.capability_plan import ProviderBinding
 
         plan = _plan(
             with_capability_bindings=(
-                CapabilityBinding(
+                ProviderBinding(
                     capability="composer.team",
-                    provider="plugin.composer.team",
-                    cardinality="one",
+                    owner_plugin="plugin.composer.team",
                 ),
             ),
         )
@@ -329,14 +319,13 @@ class TestStrictTeamBinding:
     def test_team_binding_reads_the_plan_frozen_on_the_scope(self) -> None:
         """Production Team binding must not accept a second plan interpretation."""
 
-        from lca.contracts.protocols.state.plan import CapabilityBinding
+        from lca.contracts.protocols.perceive.capability_plan import ProviderBinding
 
         plan = _plan(
             with_capability_bindings=(
-                CapabilityBinding(
+                ProviderBinding(
                     capability="composer.team",
-                    provider="plugin.composer.team",
-                    cardinality="one",
+                    owner_plugin="plugin.composer.team",
                 ),
             ),
         )
@@ -392,10 +381,6 @@ def _plan(
     from lca.contracts.atoms.scope.scope import Scope
     from lca.contracts.protocols.declarative.declarative_2.declarative_phase_graph import (
         ActionAuthorityPlan,
-        CognitivePhaseGraphPlan,
-        PhaseBinding,
-        PhaseNode,
-        SemanticPhase,
     )
     from lca.contracts.protocols.perceive.capability_plan import CapabilityPlan, ProviderBinding
     from lca.contracts.protocols.state.plan import CompiledRunPlan
@@ -405,24 +390,6 @@ def _plan(
         (ProviderBinding(capability="missing_capability", owner_plugin="missing_plugin"),)
         if with_binding
         else ()
-    )
-    phase_graph = CognitivePhaseGraphPlan(
-        entry="perceive.main",
-        nodes=(
-            PhaseNode(
-                id="perceive.main",
-                semantic_phase=SemanticPhase.PERCEIVE,
-                binding="phase.perceive.standard",
-            ),
-        ),
-        edges=(),
-    )
-    phase_bindings = (
-        PhaseBinding(
-            node_id="perceive.main",
-            semantic_phase=SemanticPhase.PERCEIVE,
-            executor_capability="phase.perceive.standard",
-        ),
     )
     return CompiledRunPlan(
         profile_path="test.yaml",
@@ -437,8 +404,6 @@ def _plan(
             budget_ceiling=BudgetCeiling(),
         ),
         capability_bindings=with_capability_bindings,
-        phase_graph=phase_graph,
-        phase_bindings=phase_bindings,
         action_authority=ActionAuthorityPlan(
             allowed_actions=frozenset({"respond"}),
             scope="solo",
