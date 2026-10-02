@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import time
 from typing import Any
 
 from lca.application.routine.spend_guard import SpendGuard
+from lca.contracts.atoms.ids.ids import utc_now_ms
 from lca.contracts.models.routine.models import RoutineSpec, RoutineTrigger
 from lca.contracts.models.vocal.wake import WakeSource
 from lca.domain.routine.repository import JsonRoutineRepository
@@ -47,7 +47,7 @@ class RoutineSchedulerService:
 
     def record_triggered(self, routine_id: str, trigger_source: str = "cron") -> RoutineTrigger:
         """记录例程触发并更新最后触发时间戳。"""
-        now_ms = int(time.time() * 1000)
+        now_ms = utc_now_ms()
         self._last_triggered[routine_id] = now_ms
         return RoutineTrigger(
             routine_id=routine_id,
