@@ -460,3 +460,10 @@
 | MUSE-CONNECTOR-FLOW-VERIFICATION | 【全流程测试】5大真实场景对话流闭环验证 (Scenario A ~ E in test_muse_connector_conversational_flow.py) | Completed | 落地全套多轮会话流程测试（初次连接挂载Widget与激活、两阶段写暂存+ASK审批卡片放行、只读切发信增量提权卡片mode=add_scope、用户手动撤销Token死循环防御REAUTHORIZATION_REQUIRED、突发并发滑动窗口硬限流+精确退避自愈），全量 48/48 测试 100% 通过（2.43s） |
 
 
+| DRAWER-TASK-1 | Fix Top Mascot Truncation & Chat Input Autofill | Completed | Mascot 增加 6px 顶部外边距与 10px 内边距平移，呼吸振幅降至 1.5px 彻底杜绝 44px 顶栏切头；handleTriggerChatEdit 适配 window.__mainEditor.setDocument 与 focus，commit 6295ada1d |
+| DRAWER-TASK-2 | Clean Up Technical Wording & Setup 5-Tab Layout | Completed | 抽屉标题纯净为 {assistantName}，彻底移除“状态与真值中心”和“File as SSOT”底层横幅；重构为 5 个产品化 Tab（动态/批准/即将到来/身份/连接器），自适应等宽排布绝不挤出，commit 68232c9c9 |
+| DRAWER-TASK-3 | Implement `🪪 身份` 2-Column Grid & Click-to-Edit | Completed | 合并前三项配置为 🪪 身份 Tab，采用 2 列网格卡片（一行两个），卡片全局 hover 与手型直接点击唤起编辑，彻底移除“全屏编辑资源”按钮与技术哈希，commit 68232c9c9 |
+| DRAWER-TASK-4 | Implement `🕒 动态` (Activity Timeline) with Dual-Pane Log Modal | Completed | 落地按今天/昨天/较早时间分组的行动卡片，点击整行唤起双栏详情弹窗（左侧行动列表，右侧人读执行概述、具体指令、产出结果与耗时），commit 68232c9c9 |
+| DRAWER-TASK-5 | Implement `⚖️ 批准` & `⏰ 即将到来` Panels | Completed | 落地 ⚖️ 批准记录面板（待审批/已批准/已拒绝）与 ⏰ 即将到来定时计划面板（对接 /jobs 端点，支持开关切换与计划说明），commit 68232c9c9 |
+| DRAWER-TASK-6 | Upgrade `ConnectorsPanel.tsx` UI & Prevent Button Overflow | Completed | 连接器卡片升级微质感风格（独立品牌背景色、状态徽标、工具折叠），底部控制栏弹性间隙与 flexShrink:0 保证“立即连接”按钮绝不贴边或溢出，commit 68232c9c9 |
+| DRAWER-TASK-7 | Patch Engine Synchronization & Verification | Completed | patch_lobehub.py 成功编译同步至 lobehub-ui/（39 ok, 0 broken），16/16 单元与场景测试 100% 全绿（耗时 2.83s） |
