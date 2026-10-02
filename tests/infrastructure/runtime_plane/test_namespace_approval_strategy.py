@@ -31,3 +31,30 @@ def test_file_namespace_auto_pass() -> None:
     ]
     requirement = strategy.evaluate(tool_calls)
     assert requirement is None
+def test_shell_delete_vectors_require_approval_via_default_engine() -> None:
+    """S6 回归（todo-10a）：仓库内不存在独立的文件删除工具——删文件的唯一
+    模型可达向量是 shell 命名空间（runCommand/rm 等）。默认审批引擎必须对
+    全部 shell 工具变体要求审批，对标 ADR-0256 shell 域 REQUIRE_APPROVAL。"""
+    from lca.infrastructure.runtime_plane.access.approval_engine import (
+        build_default_approval_engine,
+    )
+
+    engine = build_default_approval_engine()
+    for tool_name in (
+        "runCommand",
+        "run_command",
+        "box_run_command",
+        "execute_code",
+        "executeCode",
+        "exec_script",
+    ):
+        requirement = engine.evaluate(
+            [
+                ToolCall(
+                    tool_name=tool_name,
+                    call_id="c1",
+                    arguments={"command": "rm /tmp/lca-mt-test/shopping.txt"},
+                )
+            ]
+        )
+        assert requirement.required is True, tool_name
