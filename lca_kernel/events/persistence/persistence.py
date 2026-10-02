@@ -362,7 +362,7 @@ class PersistenceObserver:
     async def stop(self) -> None:
         return
 
-    async def flush(self, session: SessionProtocol | None = None, *, timeout: float = 30.0) -> None:
+    async def flush(self, session: SessionProtocol | None = None, *, timeout_s: float = 30.0) -> None:
         """Drain write-behind buffers (Session duck-type flush + explicit API)."""
         self.flush_sync(session.id if session is not None else None)
 
@@ -379,7 +379,7 @@ class PersistenceObserver:
             registry.flush_all()
         self._last_flush_ms = registry.last_flush_ms
 
-    async def flush_for(self, event_id: str, *, timeout: float = 5.0) -> None:
+    async def flush_for(self, event_id: str, *, timeout_s: float = 5.0) -> None:
         if event_id in self._written_event_ids:
             return
         if self._sink is not None:
@@ -388,9 +388,9 @@ class PersistenceObserver:
                 event = asyncio.Event()
                 self._flush_events[event_id] = event
             try:
-                await asyncio.wait_for(event.wait(), timeout=timeout)
+                await asyncio.wait_for(event.wait(), timeout=timeout_s)
             except TimeoutError as exc:
-                raise PersistenceFlushTimeoutError(event_id, timeout) from exc
+                raise PersistenceFlushTimeoutError(event_id, timeout_s) from exc
             return
 
         registry = self._ensure_registry()
@@ -407,9 +407,9 @@ class PersistenceObserver:
             event = asyncio.Event()
             self._flush_events[event_id] = event
         try:
-            await asyncio.wait_for(event.wait(), timeout=timeout)
+            await asyncio.wait_for(event.wait(), timeout=timeout_s)
         except TimeoutError as exc:
-            raise PersistenceFlushTimeoutError(event_id, timeout) from exc
+            raise PersistenceFlushTimeoutError(event_id, timeout_s) from exc
 
     def enqueue_spine_record(self, record: SpineEventRecord) -> None:
         """Public enqueue entry for shim callers (SpineFileSink.append)."""

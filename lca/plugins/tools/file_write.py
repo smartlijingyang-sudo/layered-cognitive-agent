@@ -148,7 +148,7 @@ class FileWriteTool(Tool):
                 extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
             )
 
-        path = Path(args["path"]).expanduser()
+        path = Path(args["path"]).expanduser()  # noqa: ASYNC240 -- expanduser is pure CPU, no I/O
         # validate_writable_file is the host-fs path policy seam: rejects
         # empty paths and existing-directory targets up front, and creates
         # parent directories on demand.  Keeping this single source of truth

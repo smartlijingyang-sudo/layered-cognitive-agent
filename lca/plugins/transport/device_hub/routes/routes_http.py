@@ -697,7 +697,7 @@ async def download_companion(request: Request) -> Response:
     from pathlib import Path
 
     standalone = (
-        Path(__file__).resolve().parents[4]
+        Path(__file__).resolve().parents[4]  # noqa: ASYNC240 -- resolves module install path; handler already does blocking file read by design
         / "infrastructure"
         / "computer"
         / "companion"
@@ -706,7 +706,7 @@ async def download_companion(request: Request) -> Response:
     if standalone.exists():
         content = standalone.read_text(encoding="utf-8")
     else:
-        candidate = Path(__file__).resolve().parents[5] / "scripts" / "lca-companion"
+        candidate = Path(__file__).resolve().parents[5] / "scripts" / "lca-companion"  # noqa: ASYNC240 -- resolves module install path; handler already does blocking file read by design
         if candidate.exists():
             content = candidate.read_text(encoding="utf-8")
         else:

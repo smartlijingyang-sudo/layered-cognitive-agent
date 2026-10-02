@@ -466,7 +466,7 @@ class CompanionClient:
             f"hostname={socket.gethostname()}&platform={self.config.platform}&channel=companion"
         )
 
-        user_home = os.path.expanduser("~")
+        user_home = os.path.expanduser("~")  # noqa: ASYNC240 -- expanduser/getcwd are pure CPU, no I/O
         current_workdir = os.getcwd()
 
         _log.info("connecting_to_gateway", url=ws_url)

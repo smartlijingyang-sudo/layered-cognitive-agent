@@ -128,7 +128,7 @@ class TestPersistenceObserverWrites:
             ts=0.0,
         )
         observer.on_session_event(_authorized_payload(), ref)
-        await observer.flush_for("evt-w2b", timeout=1.0)
+        await observer.flush_for("evt-w2b", timeout_s=1.0)
         assert sink.records and sink.records[0].event_id == "evt-w2b"
         assert observer.consumer_running is False
 

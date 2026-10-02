@@ -187,7 +187,7 @@ async def wechat_gateway_dispatch(
         return getattr(session, "error", None) or "执行完成。"
 
     output_chunks: list[str] = []
-    with open(spine_path, encoding="utf-8") as f:
+    with open(spine_path, encoding="utf-8") as f:  # noqa: ASYNC230 -- request-scoped single spine-file read; endpoint exists to serve file content
         for line in f:
             stripped = line.strip()
             if not stripped:

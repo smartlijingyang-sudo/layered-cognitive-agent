@@ -181,7 +181,7 @@ class _StepTreeBundle:
 async def setup(ctx: PluginContext, config: Config) -> None:
     """Provide filesystem RunLedger + RunJournalFactory."""
     root = Path(config.root)
-    root.mkdir(parents=True, exist_ok=True)
+    root.mkdir(parents=True, exist_ok=True)  # noqa: ASYNC240 -- plugin setup is boot-time one-off; mkdir of configured root
     factory = FilesystemRunLedgerFactory(root=root, fsync_each_append=config.fsync_each_append)
     ctx.provide(RUN_LEDGER_FACTORY.key, factory)
 
