@@ -40,12 +40,27 @@ class TestPortSpec:
 
 
 class TestNodeIOSchema:
-    def test_duplicate_names_fail_loud(self) -> None:
-        with pytest.raises(ValidationError):
+    def test_duplicate_names_within_direction_fail_loud(self) -> None:
+        # Same name twice on the same side fails loud. The model_validator
+        # raises NodeSchemaError, which pydantic surfaces as ValidationError.
+        with pytest.raises(ValidationError, match="duplicate input port name"):
             NodeIOSchema(
-                inputs=(PortSpec(name="decision"),),
-                outputs=(PortSpec(name="decision"),),
+                inputs=(PortSpec(name="decision"), PortSpec(name="decision")),
             )
+        with pytest.raises(ValidationError, match="duplicate output port name"):
+            NodeIOSchema(
+                outputs=(PortSpec(name="decision"), PortSpec(name="decision")),
+            )
+
+    def test_cross_direction_alias_is_permitted(self) -> None:
+        # A port on both sides is an intentional read+write alias
+        # (e.g. an act subgraph reads ``decision`` and emits a stamped
+        # ``decision`` downstream under the same name).
+        schema = NodeIOSchema(
+            inputs=(PortSpec(name="decision"),),
+            outputs=(PortSpec(name="decision"),),
+        )
+        assert schema.output_names() == frozenset({"decision"})
 
     def test_required_inputs(self) -> None:
         schema = NodeIOSchema(
@@ -89,8 +104,7 @@ class TestNodeOutput:
     def test_producer_node_field(self) -> None:
         out = NodeOutput(producer_node="b")
         assert out.producer_node == "b"
-        assert out.next_hint is None
-
+        assert out.port_values == {}
 
 class TestBindingKind:
     def test_nine_entries(self) -> None:
@@ -119,10 +133,10 @@ class TestPlanNode:
 
 
 class TestPlanEdge:
-    def test_default_when_is_true(self) -> None:
+    def test_default_when_is_always_true(self) -> None:
         e = PlanEdge(source="a", target="b")
-        assert e.when == "true"
-
+        # D4 cutover: string DSL deleted; None means the edge fires unconditionally.
+        assert e.when is None
 
 class TestPlan:
     def _node(self, id_: str, *, entry: bool = False) -> PlanNode:
