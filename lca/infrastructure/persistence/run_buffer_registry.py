@@ -9,12 +9,12 @@ from __future__ import annotations
 
 import logging
 import threading
-import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
+from lca.contracts.atoms.ids.ids import utc_now_ms
 from lca.contracts.observability.evidence.fsync import FsyncProtocol
 from lca.infrastructure.persistence.jsonl_sink import JsonlFileSink
 from lca.infrastructure.persistence.run_paths import (
@@ -205,7 +205,7 @@ class RunWriteBehindRegistry:
             return
         state.spine_buffer.flush()
         state.exceptions_buffer.flush()
-        self._last_flush_ms = int(time.time() * 1000)
+        self._last_flush_ms = utc_now_ms()
 
     def dispose_run(self, run_id: str) -> None:
         with self._lock:
@@ -214,7 +214,7 @@ class RunWriteBehindRegistry:
             return
         state.spine_buffer.dispose()
         state.exceptions_buffer.dispose()
-        self._last_flush_ms = int(time.time() * 1000)
+        self._last_flush_ms = utc_now_ms()
 
     def flush_all(self) -> None:
         with self._lock:
