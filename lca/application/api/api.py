@@ -159,6 +159,11 @@ class Agent(AgentUnit):
                     allowed_tools=[t.name for t in actual_tools]
                 ),
             )
+        if llm is None:
+            raise TypeError(
+                "Agent requires llm: LLMAdapter (AgentSpec.llm is "
+                "non-optional); pass an explicit adapter."
+            )
         self._spec = AgentSpec(
             profile=role_profile,
             llm=llm,

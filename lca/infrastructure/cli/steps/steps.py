@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from lca.infrastructure.cli.pipeline.pipeline import PipelineContext, register_step
 from lca.infrastructure.cli.service.service import CliShippingService
+from lca.infrastructure.cli.services.kernel.serve import KernelServeService
 
 # ── Infrastructure Steps ──────────────────────────────────────────────
 
@@ -207,8 +208,9 @@ def stack_heal(ctx: PipelineContext) -> None:
     """Heal every service. Do the work here — do not bounce the operator.
 
     PR-3 (ADR-0213): kernel_serve 走 ``spawner().run()`` 直接拿
-    ``SpawnResult``,原样透传 actionable 到 operator;不 fallback 到
-    "kernel 没在跑,去 heal"。再走 STATUS_SERVICES 修外部服务。
+    ``SpawnResult``;失败时用其精简字段（exit_code/port/duration_ms）
+    组装 actionable（785e541d2 后无 failed_stage/actionable 字段）;
+    不 fallback 到"kernel 没在跑,去 heal"。再走 STATUS_SERVICES 修外部服务。
     kernel_serve 不在 STATUS_SERVICES 里,因为 status 只观察不拉起
     (那是 heal 的工作)。
     """
@@ -219,20 +221,26 @@ def stack_heal(ctx: PipelineContext) -> None:
         ks = ctx.registry.get("kernel_serve")
         if ks.state().is_running:
             pass  # already healthy; skip spawn
+        elif not isinstance(ks, KernelServeService):
+            # 'kernel_serve' 恒注册为 KernelServeService；换了实现又没有
+            # spawner()，fail-loud 而不是 AttributeError。
+            raise TypeError(
+                "stack.heal expects 'kernel_serve' to be KernelServeService, "
+                f"got {type(ks).__name__}"
+            )
         else:
             spawner = ks.spawner()
             result = spawner.run()
             if not result.ok:
-                failed = result.failed_stage or "unknown"
-                err = next((s.error for s in result.steps if not s.ok), "unknown")
-                actionable = result.actionable or (
-                    f"Inspect stderr: {result.stderr_path}"
-                    if result.stderr_path
-                    else "no actionable hint"
+                # SpawnResult 自 785e541d2 起为精简形状（ok/pid/port/
+                # exit_code/duration_ms）；旧的 failed_stage/steps/
+                # actionable/stderr_path 已不存在，读它们必 AttributeError
+                # （被外层 except 吞掉后反而掩盖了真实的 spawn 失败原因）。
+                actionable = (
+                    f"spawn failed (exit_code={result.exit_code}, "
+                    f"port={result.port}, {result.duration_ms}ms)"
                 )
-                ctx.console.error(
-                    f"kernel_serve spawn failed at stage={failed}: {err}\n  action: {actionable}"
-                )
+                ctx.console.error(f"kernel_serve spawn failed: {actionable}")
                 leftover.append(f"kernel_serve: {actionable}")
                 ctx.failed = True
             else:
