@@ -12,7 +12,7 @@ from __future__ import annotations
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Protocol
 
 from lca.contracts.event import Category, EventPayload
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 # ── 公开枚举 / 哨兵 ──────────────────────────────────────────────────────
 
 
-class FailureSemantics(str, Enum):
+class FailureSemantics(StrEnum):
     """consumer 失败语义(sink vs subscriber)。
 
     FAIL_FAST = sink 路径(失败上抛 publisher);CONTAINED = subscriber
@@ -37,7 +37,7 @@ class FailureSemantics(str, Enum):
     CONTAINED = "contained"
 
 
-class FailureAction(str, Enum):
+class FailureAction(StrEnum):
     """FailureHook 决定如何处置 consumer 抛出的异常。
 
     - CONTAIN: 吞错,记日志,继续走 post_dispatch 链(默认)

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, replace
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Generic, TypeAlias, TypeVar
 
 from pydantic import BaseModel
@@ -64,7 +64,7 @@ PluginMetadata: TypeAlias = Mapping[str, object]
 RawRelationEntry: TypeAlias = Mapping[str, object]
 
 
-class PluginKind(str, Enum):
+class PluginKind(StrEnum):
     SEAM = "seam"
     PROVIDER = "provider"
     PRIMITIVE = "primitive"
@@ -73,7 +73,7 @@ class PluginKind(str, Enum):
     BRIDGE = "bridge"
 
 
-class EffectClass(str, Enum):
+class EffectClass(StrEnum):
     NONE = "none"
     TOOLS = "tools"
     MEMORY = "memory"

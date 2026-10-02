@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 # ── 公开枚举 / dataclass ─────────────────────────────────────────────────
 
 
-class Stage(str, Enum):
+class Stage(StrEnum):
     """hook 装载阶段。"""
 
     PRE_DISPATCH = "pre_dispatch"
