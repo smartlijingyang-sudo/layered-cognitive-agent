@@ -403,7 +403,7 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
     kind=PluginKind.PROVIDER,
     effects="none",
     description="Register /lca-api/channels/wechat/* routes.",
-    test_suite="tests.transport.test_routes_channels_wechat",
+    test_suite="tests/transport/test_routes_channels_wechat.py",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(

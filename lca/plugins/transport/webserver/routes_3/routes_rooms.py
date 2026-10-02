@@ -283,7 +283,7 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
     kind=PluginKind.PROVIDER,
     effects="none",
     description="Register /v1/rooms REST routes (room runtime go-live M1).",
-    test_suite="tests.collaboration.test_room_routes",
+    test_suite="tests/collaboration/test_room_routes.py",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(

@@ -173,7 +173,7 @@ def _activate_process_local_spine(ctx: PluginContext, event_spine: EventSpine) -
         "publishes event_spine + spine_context so downstream plugins "
         "and the wrap_instrument family route through one entry point."
     ),
-    test_suite="tests.lca_plugins.observability.spine.test_core",
+    test_suite="tests/lca_plugins/observability/spine/test_core_spine_like_shim.py::test_spine_core_satisfies_spine_like",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(

@@ -218,7 +218,7 @@ def install_bootstrap_state(
     kind=PluginKind.PROVIDER,
     effects="none",
     description="Bootstrap webserver 进程级资源到 Starlette app.state (从 gateway/bootstrap.py 迁来).",
-    test_suite="tests.lca_plugins.transport.webserver.test_bootstrap_plugin",
+    test_suite="tests/scenario/webserver/test_webserver_bootstrap.py",
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
         architecture=ArchitectureContract(
