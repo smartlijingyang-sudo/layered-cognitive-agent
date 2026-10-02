@@ -31,13 +31,13 @@ from lca.infrastructure.observability.spine.event.record import EventRecord
 
 
 # ── helpers ────────────────────────────────────────────────────────────
-def _snap(seq: int = 0, phase: str | None = "think", step_id: str | None = "s1") -> CursorSnapshot:
+def _snap(seq: int = 0, phase: str | None = "think") -> CursorSnapshot:
+    # CursorSnapshot exposes no step fields (contract pinned in its
+    # docstring); step identity rides on the EventRecord.
     return CursorSnapshot(
         run_id="r",
         trace_id="t",
         incarnation=1,
-        step_id=step_id,
-        step_index=1,
         iteration=1,
         attempt_in_step=0,
         phase=phase,  # type: ignore[arg-type]
@@ -148,7 +148,7 @@ def test_dispose_is_idempotent() -> None:
 
 # ── 2. drive 顺序 & apply ────────────────────────────────────────────
 def test_drive_invokes_apply_for_every_active_definition() -> None:
-    seen: list[tuple[str, int, int]] = []
+    seen: list[tuple[str, int]] = []
 
     class _P(LoopProjectionDefinition):
         def __init__(self, key: str) -> None:
@@ -160,7 +160,9 @@ def test_drive_invokes_apply_for_every_active_definition() -> None:
             return 0
 
         def apply(self, state, snapshot, record):
-            seen.append((self.key, record.sequence, snapshot.step_index))
+            # Snapshot deliberately exposes no step fields; assert drive
+            # delivers (definition, record) pairing instead.
+            seen.append((self.key, record.sequence))
             return state + 1
 
         def view(self, state):
@@ -173,7 +175,7 @@ def test_drive_invokes_apply_for_every_active_definition() -> None:
     host.register(_P("a"))
     host.register(_P("b"))
     host.drive(_snap(seq=7), _record(ep="phase.think.fold", seq=7))
-    assert sorted(seen) == [("a", 7, 1), ("b", 7, 1)]
+    assert sorted(seen) == [("a", 7), ("b", 7)]
 
     snap_view = host.view_snapshot()
     assert set(snap_view) == {"a", "b"}
@@ -316,7 +318,8 @@ def test_default_projection_host_does_not_subscribe_close_ep_via_spine() -> None
         / "infrastructure"
         / "observability"
         / "loop_cursor"
-        / "projection_host.py"
+        / "projection"
+        / "host.py"
     )
     source = host_path.read_text(encoding="utf-8")
     tree = ast.parse(source)

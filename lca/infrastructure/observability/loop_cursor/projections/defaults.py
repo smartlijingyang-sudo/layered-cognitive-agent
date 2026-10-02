@@ -50,7 +50,6 @@ class _CountState:
     last_execution_point: str | None = None
     last_seq: int = 0
     last_phase: str | None = None
-    last_step_index: int | None = None
     tags: dict[str, int] = field(default_factory=dict)
 
 
@@ -70,7 +69,6 @@ class _StepTreeProjection:
             last_execution_point=record.execution_point,
             last_seq=record.sequence,
             last_phase=record.payload.get("phase") if isinstance(record.payload, dict) else None,
-            last_step_index=snapshot.step_index,
             tags=dict(state.tags),
         )
 
@@ -103,7 +101,6 @@ class _NarrativeProjection:
             last_execution_point=record.execution_point,
             last_seq=record.sequence,
             last_phase=record.payload.get("phase") if isinstance(record.payload, dict) else None,
-            last_step_index=snapshot.step_index,
             tags=dict(state.tags),
         )
 
@@ -225,7 +222,11 @@ class _ModelVisibleProjection:
     ) -> _ModelVisibleState:
         if record.execution_point != "llm.request.header":
             return _ModelVisibleState(headers=state.headers, last_step_id=state.last_step_id)
-        return _ModelVisibleState(headers=state.headers + 1, last_step_id=snapshot.step_id)
+        # Step identity is hook-driven: the model_visible hook derives and
+        # locks step_id at pre-side and publishes it on the header record
+        # (SSOT step boundary). CursorSnapshot deliberately exposes no step
+        # fields (see its docstring).
+        return _ModelVisibleState(headers=state.headers + 1, last_step_id=record.step_id)
 
     def view(self, state: _ModelVisibleState) -> dict[str, Any]:
         return {
