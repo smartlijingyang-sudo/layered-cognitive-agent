@@ -112,9 +112,7 @@ def _builtin_templates() -> Mapping[str, _PromptTemplate]:
     # section 正常渲染为空仍按 strip_empty_fields 跳过（渲染路径行为不变）。
     memory_retrieval_ref = (("memory_retrieval", "stateful", False, ""),)
     skill_duty_ref = (("skill_duty", "stateful", True, ""),)
-    adr0255_tail = (
-        memory_retrieval_ref + skill_duty_ref + developer_timestamp_ref + runtime_env_ref
-    )
+    adr0255_tail = memory_retrieval_ref + skill_duty_ref + developer_timestamp_ref + runtime_env_ref
     return {
         "react_prompt": _PromptTemplate(
             id="react_prompt",
@@ -185,11 +183,65 @@ class Config(BaseModel):
     section_overrides: dict[str, dict[str, object]] = Field(default_factory=dict)
 
 
+# ADR-0265 §3 C1：B1 宪法层（身份与人格，永不后移）。C2 ① 禁止 profile
+# 把新段插到 B1 之前——B1 成员是唯一不依赖带序解释、可判定的锚点。
+_B1_SECTION_NAMES = frozenset({"role", "backstory"})
+
+
+def _validate_profile_template(
+    tpl_cfg: PromptTemplateConfig,
+    builtins: Mapping[str, _PromptTemplate],
+) -> None:
+    """ADR-0265 §3 C2 扩展纪律：模板加载期 fail-fast。
+
+    profile 模板整体替换同名 builtin 模板时校验三条：
+    1. 已知段的相对顺序必须与 builtin 一致（不许把 B4/B7 的段移到 B5 之前
+       等跨序——相对顺序基线即 builtin 自身）；
+    2. optional 只许收紧（True→False），不许放松（False→True，如把 B3 段改为可选）；
+    3. 新段不许出现在 B1（role/backstory）之前。
+
+    诚实注记：ADR C1 的全带序表（B1–B8）不在此强制——builtin 自身的段序
+    与带序表有 4 处倒置（T1 预期红，待 arch 轮架构解释裁决）；若按带序表
+    强制，逐字照抄 builtin 的合法 profile 会被误杀。故以 builtin 相对顺序
+    为基线，这是 C2 的可判定部分。
+    """
+    builtin = builtins.get(tpl_cfg.id)
+    refs = list(tpl_cfg.sections)
+    if builtin is not None:
+        builtin_by_name = {r.name: r for r in builtin.sections}
+        prof_known = [r.name for r in refs if r.name in builtin_by_name]
+        builtin_known = [r.name for r in builtin.sections if r.name in set(prof_known)]
+        if prof_known != builtin_known:
+            raise ValueError(
+                f"profile template {tpl_cfg.id!r} reorders known sections "
+                f"(ADR-0265 §3 C2): profile order {prof_known} != "
+                f"builtin order {builtin_known}"
+            )
+        for r in refs:
+            b = builtin_by_name.get(r.name)
+            if b is not None and not b.optional and r.optional:
+                raise ValueError(
+                    f"profile template {tpl_cfg.id!r}: section {r.name!r} must "
+                    f"not be relaxed to optional (ADR-0265 §3 C2: B3 等段不许改为可选)"
+                )
+    known_names = {r.name for r in builtin.sections} if builtin is not None else set()
+    for r in refs:
+        if r.name in _B1_SECTION_NAMES:
+            break
+        if r.name not in known_names:
+            raise ValueError(
+                f"profile template {tpl_cfg.id!r}: new section {r.name!r} must "
+                f"not precede the B1 constitution layer (ADR-0265 §3 C2 ①)"
+            )
+
+
 def _build_provider(config: Config) -> _ProviderImpl:
     """Compose built-ins + profile overrides into the runtime provider."""
 
-    merged: dict[str, _PromptTemplate] = dict(_builtin_templates())
+    builtins = _builtin_templates()
+    merged: dict[str, _PromptTemplate] = dict(builtins)
     for tpl_cfg in config.profile_templates:
+        _validate_profile_template(tpl_cfg, builtins)
         merged[tpl_cfg.id] = _PromptTemplate(
             id=tpl_cfg.id,
             variant=tpl_cfg.variant,
