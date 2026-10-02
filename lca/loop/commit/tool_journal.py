@@ -7,13 +7,18 @@ Unbound session → no-op (legacy journal path retires).
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.models.observability.tool.journal_receipt import ToolJournalReceipt
+from lca.contracts.models.session.call_id import CallId
+from lca.contracts.models.session.tool_error import ToolError
 from lca.contracts.protocols.loop.fact_gateway import AppendReceipt
 from lca.loop.fact_gateway import append_catalog_bound, publish_ep_bound
+
+if TYPE_CHECKING:
+    from lca_kernel.events.session.session import SessionProtocol
 
 
 def _phase_tool_context() -> tuple[int, str]:
@@ -179,7 +184,7 @@ def commit_body_tool_execute_end(
         return None
     if ok is None:
         ok = outcome == "success"
-    content = observation.content if observation is not None else None
+    payload = observation.payload if observation is not None else None
     error = observation.error if observation is not None else None
     meta = {
         "tool_name": tool_name,
@@ -190,12 +195,12 @@ def commit_body_tool_execute_end(
     }
     if latency_ms is not None:
         meta["latency_ms"] = latency_ms
-    ref = RunSessionWriter(session=session).append_tool_result(
+    ref = RunSessionWriter(session=cast("SessionProtocol", session)).append_tool_result(
         turn=0,
         step=0,
-        call_id=invocation_id,
-        content="" if content is None else str(content),
-        error=error,
+        call_id=CallId(invocation_id),
+        content="" if payload is None else str(payload),
+        error=ToolError(message=error) if error is not None else None,
         meta=meta,
     )
     from lca.contracts.protocols.loop.fact_gateway import AppendReceipt
