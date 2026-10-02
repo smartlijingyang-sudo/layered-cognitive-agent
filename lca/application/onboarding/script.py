@@ -68,3 +68,52 @@ def get_onboarding_opening_messages(
             f"You can call me {asst_label}, or customize my name and vibe below:"
         )
     return (greeting,)
+
+
+# ── 改名后固定流程（对齐 Muse onboarding 机制）─────────────────────────────
+# 固定文案放模块常量，函数只做 locale 选择和变量填充。
+# 模型不即兴发挥：庆祝 → 能力介绍 → 连接引导，三步顺序写死。
+
+_POST_NAMING_CELEBRATE_ZH = "{name}，名字不错，我喜欢！"
+_POST_NAMING_INTRO_ZH = (
+    "关于我，有几件事你可能想知道：\n"
+    "• 我有自己的电脑，你不在的时候我也能帮你把事情办了。\n"
+    "• 经过你的同意，我可以帮你管邮箱、日历这些应用。"
+)
+_POST_NAMING_CONNECT_ZH = "想先从连接邮箱开始吗？或者直接告诉我你清单上的其他事。"
+
+_POST_NAMING_CELEBRATE_EN = "{name} it is. I like it."
+_POST_NAMING_INTRO_EN = (
+    "A few things to know about me:\n"
+    "• I have my own computer, so I can get things done while you're away.\n"
+    "• With your approval, I can manage apps like your email and calendar."
+)
+_POST_NAMING_CONNECT_EN = (
+    "Want to start by connecting Gmail? Or hand me something else on your list."
+)
+
+
+def get_post_naming_messages(
+    *,
+    assistant_name: str,
+    locale: str = "zh",
+) -> tuple[str, ...]:
+    """返回改名成功后的固定介绍气泡（庆祝 → 能力介绍 → 连接引导）。
+
+    文案固定，只有名字是变量。前端依次渲染为 assistant 气泡，
+    随后展示连接器卡片（由 settle 响应的 show_connectors 触发）。
+    """
+    is_zh = locale.strip().lower().startswith("zh")
+    name = assistant_name.strip() or ("小助" if is_zh else "Assistant")
+
+    if is_zh:
+        return (
+            _POST_NAMING_CELEBRATE_ZH.format(name=name),
+            _POST_NAMING_INTRO_ZH,
+            _POST_NAMING_CONNECT_ZH,
+        )
+    return (
+        _POST_NAMING_CELEBRATE_EN.format(name=name),
+        _POST_NAMING_INTRO_EN,
+        _POST_NAMING_CONNECT_EN,
+    )
