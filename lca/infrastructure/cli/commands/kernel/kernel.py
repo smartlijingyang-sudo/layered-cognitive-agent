@@ -423,7 +423,7 @@ def _serialize_plan(plan: object) -> dict[str, object]:
     return data
 
 
-_STDERR_DIR = Path("/tmp")
+_STDERR_DIR = Path("/tmp")  # noqa: S108 — supervisor stderr dir (cross-process contract)
 _STDERR_PREFIX = "lca-kernel.stderr."
 
 

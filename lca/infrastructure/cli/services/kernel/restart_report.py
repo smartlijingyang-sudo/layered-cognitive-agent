@@ -57,9 +57,10 @@ if TYPE_CHECKING:
 # needed. The legacy per-PID stderr files are written by the standalone
 # ``lca_kernel serve`` path (no supervisor in front) and are not used by
 # the supervisor-managed flow.
-_STDOUT_LOGFILE = "/tmp/lca-kernel.stdout.log"
-_STDERR_LOGFILE = "/tmp/lca-kernel.stderr.log"
-_STDERR_GLOB = "/tmp/lca-kernel.stderr.*.log"
+# NOTE (S108 intentional): supervisor<->CLI well-known log paths; tempfile would break readers.
+_STDOUT_LOGFILE = "/tmp/lca-kernel.stdout.log"  # noqa: S108
+_STDERR_LOGFILE = "/tmp/lca-kernel.stderr.log"  # noqa: S108
+_STDERR_GLOB = "/tmp/lca-kernel.stderr.*.log"  # noqa: S108
 
 # Single boot.pending_event line, captured into groups.
 _BOOT_EVENT_RE = re.compile(
@@ -145,7 +146,7 @@ def _latest_kernel_stderr() -> Path | None:
     if stdout_path.exists():
         return stdout_path
     candidates = sorted(
-        Path("/tmp").glob("lca-kernel.stderr.*.log"),
+        Path("/tmp").glob("lca-kernel.stderr.*.log"),  # noqa: S108 — reads supervisor-written stderr files
         key=lambda p: p.stat().st_mtime,
         reverse=True,
     )

@@ -113,7 +113,7 @@ def find_stderr_for_run(run_id: str) -> Path | None:
             started_at = json.loads(manifest.read_text(encoding="utf-8")).get("started_at")
         except Exception:
             started_at = None
-    candidates = sorted(glob.glob("/tmp/lca-kernel.stderr.*.log"))
+    candidates = sorted(glob.glob("/tmp/lca-kernel.stderr.*.log"))  # noqa: S108 — reads supervisor-written stderr files
     if not candidates:
         return None
     # Strategy 1: exact run_id match in stderr body.
@@ -144,7 +144,7 @@ def find_stderr_for_run(run_id: str) -> Path | None:
 
 def find_latest_kernel_stderr() -> Path | None:
     """Most recently modified kernel stderr file (current kernel process)."""
-    candidates = sorted(glob.glob("/tmp/lca-kernel.stderr.*.log"), key=os.path.getmtime)
+    candidates = sorted(glob.glob("/tmp/lca-kernel.stderr.*.log"), key=os.path.getmtime)  # noqa: S108 — reads supervisor-written stderr files
     return Path(candidates[-1]) if candidates else None
 
 

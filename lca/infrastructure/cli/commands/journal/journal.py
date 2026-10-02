@@ -99,7 +99,7 @@ def register(app: typer.Typer, group: typer.Typer | None = None) -> None:
             # endpoint returns 5xx: see docs/debug/README.md ("后端 5xx 的
             # 快速分流"). Distinct from traces/runs/<id>/kernel.log, which
             # is the per-run terminal-failure fallback (mostly absent).
-            "kernel": Path("/tmp/lca-kernel.log"),
+            "kernel": Path("/tmp/lca-kernel.log"),  # noqa: S108 — well-known kernel log path (supervisor contract)
         }
         if target not in log_map:
             print(f"Unknown target: {target}. Use: journal, kernel, lobehub, lobehub-spa, daemon")

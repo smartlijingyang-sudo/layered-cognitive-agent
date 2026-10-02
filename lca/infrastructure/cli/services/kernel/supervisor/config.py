@@ -149,7 +149,7 @@ def default_program_config(
         startretries=3,
         stopwaitsecs=15.0,
         environment={},
-        stdout_logfile="/tmp/lca-kernel.stdout.log",
-        stderr_logfile="/tmp/lca-kernel.stderr.log",
+        stdout_logfile="/tmp/lca-kernel.stdout.log",  # noqa: S108 — supervisor writes here; CLI readers depend on it
+        stderr_logfile="/tmp/lca-kernel.stderr.log",  # noqa: S108 — supervisor writes here; CLI readers depend on it
         readiness_timeout=30.0,
     )

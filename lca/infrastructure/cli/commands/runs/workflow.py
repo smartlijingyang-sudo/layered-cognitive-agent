@@ -206,7 +206,7 @@ def _prune_legacy_kernel_logs() -> None:
     import contextlib
     from pathlib import Path as _Path
 
-    for legacy in _Path("/tmp").glob("lca-kernel.stderr.*.log"):
+    for legacy in _Path("/tmp").glob("lca-kernel.stderr.*.log"):  # noqa: S108 — reads supervisor-written stderr files
         if legacy.name == "lca-kernel.stderr.log":
             continue  # supervisor's stderr; handled by the truncate below
         with contextlib.suppress(OSError):
