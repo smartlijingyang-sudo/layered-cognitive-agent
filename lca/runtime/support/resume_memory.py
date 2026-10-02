@@ -7,6 +7,8 @@ run 从 ``askUserQuestion`` 暂停恢复时，人工回答本身也是用户陈�
 
 from __future__ import annotations
 
+from typing import Protocol, runtime_checkable
+
 from lca.contracts.atoms.enums.enums import ReflectionVerdict
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.execution.decision import Reflection
@@ -18,6 +20,17 @@ from lca.nodes.reflect.memory_extract.memory_extract import (
 )
 
 __all__ = ["capture_resume_memory"]
+
+
+@runtime_checkable
+class _SupportsUpdate(Protocol):
+    """Duck-type 协议:带 ``update`` 方法的记忆存储。
+
+    参数故意保持 ``object`` 宽松——本模块从 capability 字典取对象,
+    不假设具体记忆实现(0248 同式)。
+    """
+
+    async def update(self, state: object, observation: object, reflection: Reflection) -> None: ...
 
 
 async def capture_resume_memory(
@@ -52,7 +65,7 @@ async def capture_resume_memory(
         return False
     if not candidates:
         return False
-    if memory is None or not hasattr(memory, "update"):
+    if not isinstance(memory, _SupportsUpdate):
         return False
     reflection = Reflection(
         reflection_id=new_id("refl"),

@@ -25,7 +25,7 @@ from lca.infrastructure.observability.loop_cursor.spine._spine_port import (
     reset_session_append_hook,
 )
 from lca.infrastructure.observability.spine.context.context import SpineContext
-from lca.infrastructure.observability.spine.event.record import Channel, EventRecord, Outcome, Phase
+from lca.infrastructure.observability.spine.event.record import Channel, EventRecord, Outcome
 from lca.infrastructure.observability.spine.sinks.base import EventSink
 from lca.infrastructure.observability.spine.spine.enrich import (
     enrich_spine_payload,
@@ -53,7 +53,7 @@ def _stamp_event_record(
     caller_payload: dict[str, Any] | None,
     outcome: Outcome | None,
     span_ctx: Any | None,
-    phase: Phase,
+    phase: str,
     reason: str | None,
     when: datetime | None,
     ref: Any,
@@ -126,7 +126,7 @@ def _publish_producer_failures(
     producer_failures: list[tuple[Any, dict[str, Any]]],
     outer_execution_point: str,
     span_ctx: Any | None,
-    phase: Phase,
+    phase: str,
 ) -> None:
     for producer_origin, entry in producer_failures:
         try:
@@ -167,7 +167,7 @@ def make_session_spine_append_hook(bridge: RunEventSessionBridge) -> SessionAppe
         caller_payload: dict[str, Any] | None = None,
         outcome: Outcome | None = None,
         span_ctx: Any | None = None,
-        phase: Phase = "live",
+        phase: str = "live",
         reason: str | None = None,
         when: datetime | None = None,
         ref: Any = None,

@@ -38,7 +38,7 @@ class EventRecord:
     step_id: str | None
     payload: dict[str, Any] = field(default_factory=dict)
     # Optional — used by PR-6 orphan semantics
-    phase: Phase = "live"
+    phase: str = "live"
     reason: str | None = None
     # Optional — trace_id 由 EventBus.publish 注入(ADR-0183 §3.9 PR-12);
     # 老路径不接 ref 时为 None,保持向后兼容。

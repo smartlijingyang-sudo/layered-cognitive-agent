@@ -36,7 +36,6 @@ from lca.infrastructure.observability.spine.event.record import (
     Channel,
     EventRecord,
     Outcome,
-    Phase,
 )
 from lca.infrastructure.observability.spine.sinks.base import EventSink
 
@@ -81,7 +80,7 @@ class SessionAppendHook(Protocol):
         caller_payload: dict[str, Any] | None = None,
         outcome: Outcome | None = None,
         span_ctx: Any | None = None,
-        phase: Phase = "live",
+        phase: str = "live",
         reason: str | None = None,
         when: datetime | None = None,
         ref: Any = None,
@@ -132,7 +131,7 @@ def spine_port_append(
     caller_payload: dict[str, Any] | None = None,
     outcome: Outcome | None = None,
     span_ctx: Any | None = None,
-    phase: Phase = "live",
+    phase: str = "live",
     reason: str | None = None,
     when: datetime | None = None,
     ref: Any = None,
