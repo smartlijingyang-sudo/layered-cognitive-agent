@@ -43,8 +43,8 @@ class PlanCompilerError(ValueError):
     """PlanCompiler 编译失败（profile 不合法 / 子 plan 投影失败）。"""
 
 
-@dataclass(frozen=True, slots=True)
-class V2ExecutablePlan:
+@dataclass(frozen=True, slots=True, kw_only=True)
+class V2ExecutablePlan(CompiledRunPlan):
     """CompiledRunPlan + the v2 graph spec lifted from the resolved bundle.
 
     ADR-0221 P3: the runtime kernel no longer rebuilds an executable
@@ -53,21 +53,22 @@ class V2ExecutablePlan:
     wrapper carries that spec alongside the immutable compiled plan so
     ``DeclarativeRuntimeDriver`` can hand the graph to
     ``PlanInterpreter`` directly.
+
+    Subclasses ``CompiledRunPlan`` (kw_only: parent already has defaulted
+    fields) so ``compile_plan``'s declared return type stays honest — the
+    wrapper IS-A plan at the type level, not just via ``__getattr__``
+    delegation. Parent fields are copied from ``inner`` at construction.
     """
 
-    inner: object  # CompiledRunPlan — typed loosely to avoid cycle import.
+    inner: CompiledRunPlan
 
     def __getattr__(self, name: str):
-        # Delegate CompiledRunPlan surface to ``inner`` so legacy callers
-        # that touch ``plan.plan_version`` / ``plan.phase_graph`` / etc.
-        # still work without knowing about the wrapper. The wrapper itself
-        # exposes only ``inner`` / ``graph_spec`` / ``profile_path`` /
-        # ``plugin_specs`` explicitly; everything else falls through.
+        # Fallback for anything outside the parent surface: delegate to
+        # ``inner`` so legacy callers keep working without knowing about
+        # the wrapper.
         return getattr(self.inner, name)
 
     graph_spec: dict = field(default_factory=dict)
-    profile_path: str = ""
-    plugin_specs: tuple = ()  # delegated to ``inner.plugin_specs`` at construction; surfaced here so CLI / introspection see the catalog without reaching into ``inner``.
 
 
 def _resolve_bundle_path(entry: str, resolved: ResolvedProfile) -> Path:
@@ -161,10 +162,12 @@ def _wrap_v2_plan(plan, *, resolved, overlay: PlanOverlay | None = None):
         nodes[0]["entry"] = True
         graph_spec["nodes"] = nodes
     return V2ExecutablePlan(
+        profile_path=resolved.profile_path,
+        capability=plan.capability,
+        scope=plan.scope,
+        plugin_specs=plan.plugin_specs,
         inner=plan,
         graph_spec=graph_spec,
-        profile_path=resolved.profile_path,
-        plugin_specs=getattr(plan, "plugin_specs", ()) or (),
     )
 
 
