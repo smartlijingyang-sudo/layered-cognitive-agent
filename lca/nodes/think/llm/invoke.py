@@ -60,8 +60,8 @@ class LlmInvokeExecutor:
     # Runtime-carrier read for ``state`` + ``adapter`` (the plan validator
     # does not model runtime carriers as port producers, and the rest
     # of the think subgraph uses the same pattern).
-    declared_inputs: tuple[PortName, ...] = ("model_visible_request",)
-    declared_outputs: tuple[PortName, ...] = ("llm_response", "usage")
+    declared_inputs: tuple[PortName, ...] = (PortName("model_visible_request"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("llm_response"), PortName("usage"))
 
     async def node_execute(
         self,
@@ -85,7 +85,7 @@ class LlmInvokeExecutor:
         empty (regression guarded by ``test_invoke``).
         """
         state = _resolve_state(context=context)
-        request = _resolve_port("model_visible_request", input=input)
+        request = _resolve_port(PortName("model_visible_request"), input=input)
         adapter = _resolve_adapter(context=context)
 
         prompt, history = _split_wire_turn(request.messages)
@@ -120,8 +120,8 @@ class LlmInvokeExecutor:
 
         return NodeOutput(
             port_values={
-                "llm_response": response,
-                "usage": response.usage or TokenUsage(),
+                PortName("llm_response"): response,
+                PortName("usage"): response.usage or TokenUsage(),
             }
         )
 
@@ -194,7 +194,7 @@ def _model_visible_identity(state: Any, request: Any) -> tuple[Any, Any]:
     return cursor, reasoner_prompt
 
 
-def _resolve_port(name: str, *, input: NodeInput) -> Any:
+def _resolve_port(name: PortName, *, input: NodeInput) -> Any:
     """Read a typed port from ``input.port_values``.
 
     Typed-port-only read. Runtime-carrier resources (e.g. ``state``)
