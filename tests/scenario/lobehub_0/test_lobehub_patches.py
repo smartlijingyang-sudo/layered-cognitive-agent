@@ -130,6 +130,29 @@ export class ConversationControlStub {
     void response;
     void context;
     void options;
+    const optimisticContext = { topicId: 'topic-1' };
+    // 1. Mark intervention as approved and set tool result to user's response
+    await this.#get().optimisticUpdateMessagePlugin(
+      toolMessageId,
+      { intervention: { status: 'approved' } },
+      optimisticContext,
+    );
+
+    const toolContent = options?.toolResultContent ?? `User submitted: ${JSON.stringify(response)}`;
+    await this.#get().optimisticUpdateMessageContent(
+      toolMessageId,
+      toolContent,
+      undefined,
+      optimisticContext,
+    );
+
+    if (options?.pluginState) {
+      await this.#get().optimisticUpdatePluginState(
+        toolMessageId,
+        options.pluginState,
+        optimisticContext,
+      );
+    }
     // NOTE: intentionally do NOT bail on Stop here. `intervention: approved`
     // and the tool result are already persisted above; returning early would
     // leave the submission recorded but never resumed — a stuck conversation.
@@ -284,6 +307,24 @@ export class GatewayActionImpl {
     });
 
     // Same demux as the initial-run path: a reconnected supervisor WS can also
+    const eventRouter = (event: unknown): void => {
+      eventHandler(event);
+    };
+
+    this.#get().connectToGateway({
+      gatewayUrl: agentGatewayUrl,
+      onEvent: eventRouter,
+      onSessionComplete: ({ succeeded, terminalReceived, authFailed }) => {
+        if (authFailed) return;
+        if (succeeded || terminalReceived) {
+          this.clearLocalRunningOperation({ operationId, topicId });
+        }
+      },
+      operationId,
+      resumeOnConnect: true,
+      token,
+      topicId,
+    });
   };
 
   clearLocalRunningOperation = (_params: { operationId: string; topicId: string }): void => {};
