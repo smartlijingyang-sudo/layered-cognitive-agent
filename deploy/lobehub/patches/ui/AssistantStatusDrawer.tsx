@@ -1,8 +1,24 @@
 'use client';
 
-import { Button, Drawer, Empty, Flex, Segmented, Spin, Tag, Tooltip, Typography } from 'antd';
+import {
+  Button,
+  Drawer,
+  Dropdown,
+  Empty,
+  Flex,
+  type MenuProps,
+  Segmented,
+  Spin,
+  Tag,
+  Tooltip,
+  Typography,
+  message as antMessage,
+} from 'antd';
 import { createStaticStyles } from 'antd-style';
 import React, { memo, useCallback, useEffect, useState } from 'react';
+
+import AssistantTopMascot from './AssistantTopMascot';
+import ConnectorsPanel from './ConnectorsPanel';
 
 const { Text, Title, Paragraph } = Typography;
 
@@ -31,7 +47,7 @@ export interface AssistantStatusDrawerProps {
   className?: string;
 }
 
-type SectionKey = 'identity' | 'rules' | 'memory' | 'workspace';
+type SectionKey = 'identity' | 'rules' | 'memory' | 'workspace' | 'connectors';
 
 const styles = createStaticStyles(({ css, cssVar }) => {
   return {
@@ -42,10 +58,56 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       height: 100%;
       background: ${cssVar.colorBgLayout};
     `,
-    headerMeta: css`
+    profileHeader: css`
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 14px 16px 18px 16px;
       margin-bottom: 16px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid ${cssVar.colorBorderSecondary};
+      background: ${cssVar.colorBgContainer};
+      border: 1px solid ${cssVar.colorBorderSecondary};
+      border-radius: 16px;
+      position: relative;
+    `,
+    avatarBox: css`
+      position: relative;
+      margin-bottom: 8px;
+    `,
+    pencilBtn: css`
+      position: absolute;
+      right: -2px;
+      bottom: -2px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: ${cssVar.colorBgContainer};
+      border: 1px solid ${cssVar.colorBorderSecondary};
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s ease;
+      z-index: 5;
+
+      &:hover {
+        transform: scale(1.15);
+        border-color: ${cssVar.colorPrimary};
+        background: ${cssVar.colorFillTertiary};
+      }
+    `,
+    profileMeta: css`
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    `,
+    profileNameRow: css`
+      display: flex;
+      align-items: center;
+      gap: 8px;
     `,
     segmentWrapper: css`
       margin-bottom: 16px;
@@ -61,6 +123,8 @@ const styles = createStaticStyles(({ css, cssVar }) => {
         text-align: center;
         border-radius: 8px;
         font-weight: 500;
+        font-size: 12px;
+        padding: 4px 2px;
       }
     `,
     cardsList: css`
@@ -153,8 +217,8 @@ const FILE_ROLE_METADATA: Record<string, { label: string; icon: string; tagColor
 /**
  * 助理状态与文件真值抽屉组件 (Assistant Status Drawer)
  *
- * 右侧 480px 滑出面板，支持 Identity / Memory / Workspace 三大横向 Section 切换，
- * 呈现 4 大核心 Standing Files 卡片预览与「全屏编辑」触发入口。
+ * 右侧 480px 滑出面板，支持 Identity / Rules / Memory / Workspace / Connectors 五大横向 Tab 切换，
+ * 顶部呈现大尺寸动态 Mascot 头像、名称及编辑铅笔快捷菜单，点击自动回填聊天框。
  */
 export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
   ({
@@ -215,6 +279,25 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
         fetchStandingFiles();
       }
     }, [open, assistantId, fetchStandingFiles]);
+
+    // 点击铅笔快捷编辑形象或名字：自动填入聊天输入框并 focus
+    const handleTriggerChatEdit = useCallback(
+      (promptText: string) => {
+        try {
+          const textarea = document.querySelector('textarea') as HTMLTextAreaElement | null;
+          if (textarea) {
+            textarea.value = promptText;
+            textarea.dispatchEvent(new Event('input', { bubbles: true }));
+            textarea.focus();
+          }
+        } catch {
+          // fallback
+        }
+        antMessage.info('已将指令填入输入框，请补充你的具体期望');
+        onClose();
+      },
+      [onClose],
+    );
 
     // 分类筛选文件
     const displayedFiles = files.filter((f) => {
@@ -279,6 +362,19 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
       );
     };
 
+    const editMenuItems: MenuProps['items'] = [
+      {
+        key: 'edit_avatar',
+        label: '🎨 修改形象与头像',
+        onClick: () => handleTriggerChatEdit('我想修改你的形象和头像，改成：'),
+      },
+      {
+        key: 'edit_name',
+        label: '✏️ 修改助理名字',
+        onClick: () => handleTriggerChatEdit('我想给你改个名字，改成：'),
+      },
+    ];
+
     return (
       <Drawer
         title={
@@ -303,7 +399,40 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
         }
       >
         <div className={styles.drawerBody}>
-          {/* 横向分段选择器 (Identity / Memory / Workspace) */}
+          {/* 顶部 Profile 头像与编辑铅笔快捷操作区 */}
+          <div className={styles.profileHeader}>
+            <div className={styles.avatarBox}>
+              <AssistantTopMascot
+                assistantId={assistantId}
+                name={assistantName}
+                size={68}
+                showName={false}
+              />
+              <Dropdown menu={{ items: editMenuItems }} placement="bottomRight" trigger={['click']}>
+                <button
+                  className={styles.pencilBtn}
+                  title="修改形象或名字"
+                  aria-label="Edit assistant avatar or name"
+                >
+                  ✏️
+                </button>
+              </Dropdown>
+            </div>
+
+            <div className={styles.profileMeta}>
+              <div className={styles.profileNameRow}>
+                <Title level={4} style={{ margin: 0 }}>
+                  {assistantName}
+                </Title>
+                <Tag color="cyan">在线助理</Tag>
+              </div>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                ID: {assistantId ? assistantId.slice(0, 18) + '...' : '当前活跃助理'}
+              </Text>
+            </div>
+          </div>
+
+          {/* 横向分段选择器 (Identity / Rules / Memory / Workspace / Connectors) */}
           <div className={styles.segmentWrapper}>
             <Segmented<SectionKey>
               value={activeSection}
@@ -313,12 +442,17 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                 { label: '📋 Rules', value: 'rules' },
                 { label: '🧠 Memory', value: 'memory' },
                 { label: '📁 Workspace', value: 'workspace' },
+                { label: '⚡ Connectors', value: 'connectors' },
               ]}
             />
           </div>
 
           {/* 内容区 */}
-          {loading && files.length === 0 ? (
+          {activeSection === 'connectors' ? (
+            <div className={styles.cardsList}>
+              <ConnectorsPanel assistantId={assistantId} />
+            </div>
+          ) : loading && files.length === 0 ? (
             <Flex justify="center" align="center" style={{ flex: 1 }}>
               <Spin tip="正在读取磁盘唯一真值文件..." />
             </Flex>

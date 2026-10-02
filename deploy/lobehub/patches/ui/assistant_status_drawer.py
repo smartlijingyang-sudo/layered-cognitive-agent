@@ -10,19 +10,20 @@ _HERE = Path(__file__).resolve().parent
 _MASCOT_REL = "src/features/Conversation/components/AssistantTopMascot.tsx"
 _DRAWER_REL = "src/features/Conversation/components/AssistantStatusDrawer.tsx"
 _EDITOR_REL = "src/features/Conversation/components/StandingFileFullscreenEditor.tsx"
+_CONNECTORS_REL = "src/features/Conversation/components/ConnectorsPanel.tsx"
 _HEADER_REL = "src/routes/(main)/agent/features/Conversation/Header/index.tsx"
 
 meta = PatchMeta(
     name="assistant_status_drawer",
     description="Render top animated mascot and right-side status drawer for assistant standing files",
-    files=(_MASCOT_REL, _DRAWER_REL, _EDITOR_REL, _HEADER_REL),
+    files=(_MASCOT_REL, _DRAWER_REL, _EDITOR_REL, _CONNECTORS_REL, _HEADER_REL),
     risk="low",
     category="ui",
     depends_on=(),
-    why="Provide Muse-style top animated mascot avatar and right status drawer with file SSOT editor",
+    why="Provide Muse-style top animated mascot avatar and right status drawer with file SSOT editor and connectors hub",
     technical_detail=(
-        "Installs AssistantTopMascot.tsx, AssistantStatusDrawer.tsx, and"
-        " StandingFileFullscreenEditor.tsx, then patches agent Conversation Header to display"
+        "Installs AssistantTopMascot.tsx, AssistantStatusDrawer.tsx, StandingFileFullscreenEditor.tsx,"
+        " and ConnectorsPanel.tsx, then patches agent Conversation Header to display"
         " center breathing Mascot and trigger right-side standing files drawer"
     ),
     verify_file=_HEADER_REL,
@@ -33,7 +34,7 @@ meta = PatchMeta(
 def apply(ctx: PatchContext) -> bool:
     changed = False
 
-    # 1. 写入三大 UI 组件
+    # 1. 写入 UI 组件
     mascot_source = _HERE / "AssistantTopMascot.tsx"
     if not mascot_source.is_file():
         raise SystemExit(f"[assistant_status_drawer] missing mascot source: {mascot_source}")
@@ -50,6 +51,12 @@ def apply(ctx: PatchContext) -> bool:
     if not editor_source.is_file():
         raise SystemExit(f"[assistant_status_drawer] missing editor source: {editor_source}")
     if ctx.write_if_changed(_EDITOR_REL, editor_source.read_text(encoding="utf-8")):
+        changed = True
+
+    connectors_source = _HERE / "ConnectorsPanel.tsx"
+    if not connectors_source.is_file():
+        raise SystemExit(f"[assistant_status_drawer] missing connectors source: {connectors_source}")
+    if ctx.write_if_changed(_CONNECTORS_REL, connectors_source.read_text(encoding="utf-8")):
         changed = True
 
     # 2. Patch Conversation Header/index.tsx
