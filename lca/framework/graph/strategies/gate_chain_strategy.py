@@ -20,12 +20,14 @@ Protocol (the same one the existing pipeline calls). This keeps
 concept, and prevents drift between graph-level and pipeline-level
 gate implementations.
 """
+
 from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 from lca.contracts.protocols.graph.binding import BindingKind
 from lca.contracts.protocols.graph.node_io import (
     NodeInput,
@@ -39,7 +41,7 @@ from lca.framework.graph.strategy_registry import register_strategy
 # (legacy / undeclared). Hosts that declare an ``io_schema`` get the
 # schema's own names; the framework does not encode cognition-layer
 # port names.
-_DEFAULT_DECISION_PORT: str = "decision"
+_DEFAULT_DECISION_PORT: PortName = PortName("decision")
 
 
 class _DecisionLike(Protocol):
@@ -58,12 +60,12 @@ def _looks_like_decision(payload: Any) -> bool:
     return hasattr(payload, "decision_id")
 
 
-def _input_port_name(schema: NodeIOSchema) -> str:
+def _input_port_name(schema: NodeIOSchema) -> PortName:
     required = schema.required_inputs()
     return required[0] if required else _DEFAULT_DECISION_PORT
 
 
-def _output_port_name(schema: NodeIOSchema) -> str:
+def _output_port_name(schema: NodeIOSchema) -> PortName:
     if schema.outputs:
         return schema.outputs[0].name
     return _DEFAULT_DECISION_PORT
@@ -75,9 +77,7 @@ class GateChainStrategy(NodeStrategy):
     schema: NodeIOSchema = field(default_factory=NodeIOSchema)
     gates: Sequence[Any] = ()
 
-    async def execute(
-        self, context: StrategyContext, input: NodeInput
-    ) -> NodeOutput:
+    async def execute(self, context: StrategyContext, input: NodeInput) -> NodeOutput:
         in_port = _input_port_name(self.schema)
         out_port = _output_port_name(self.schema)
         decision_payload = input.port_values.get(in_port)
