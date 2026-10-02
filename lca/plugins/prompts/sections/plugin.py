@@ -58,7 +58,10 @@ from lca.plugins.prompts.sections.runtime_env import (
     build_developer_timestamp,
     build_runtime_env,
 )
-from lca.plugins.prompts.sections.skills import build_activated_skills
+from lca.plugins.prompts.sections.skills import (
+    build_activated_skills,
+    build_skill_duty,
+)
 from lca.plugins.prompts.sections.task import build_task
 from lca.plugins.prompts.sections.teammates import (
     build_assigned_roles,
@@ -229,6 +232,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         ("home", build_home(Config())),
         ("autonomous_presets", build_autonomous_presets(Config())),
         ("memory_retrieval", build_memory_retrieval(Config())),
+        ("skill_duty", build_skill_duty(Config())),
         ("privacy_firewall", build_privacy_firewall(Config())),
         ("teammates", build_teammates(Config())),
         ("assigned_roles_text", build_assigned_roles(Config())),
