@@ -14,11 +14,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 
-class SourceKind(str, Enum):
+class SourceKind(StrEnum):
     """一条证据的来源种类."""
 
     TOOL = "tool"  # 工具调用输出
@@ -28,7 +28,7 @@ class SourceKind(str, Enum):
     SYSTEM = "system"  # 系统 / standing 文件
 
 
-class VerifyMode(str, Enum):
+class VerifyMode(StrEnum):
     """校验层的介入强度."""
 
     OFF = "off"  # 关闭, 只采集来源, 不校验
@@ -36,7 +36,7 @@ class VerifyMode(str, Enum):
     ENFORCE = "enforce"  # 拦截: 可疑答案走复核 / 兜底
 
 
-class ClaimVerdict(str, Enum):
+class ClaimVerdict(StrEnum):
     """单条断言的来源裁决."""
 
     SUPPORTED = "supported"  # 引用的来源真实包含该断言的字面依据

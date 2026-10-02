@@ -16,16 +16,16 @@ class VerifyPolicy:
     ENFORCE 拦截可疑答案走复核 / 兜底."""
 
     @classmethod
-    def default(cls) -> "VerifyPolicy":
+    def default(cls) -> VerifyPolicy:
         """生产默认: 采集 + 告警, 不拦截."""
         return cls(mode=VerifyMode.WARN)
 
     @classmethod
-    def disabled(cls) -> "VerifyPolicy":
+    def disabled(cls) -> VerifyPolicy:
         """完全关闭: 只保留来源采集, 跳过校验."""
         return cls(mode=VerifyMode.OFF)
 
     @classmethod
-    def enforcing(cls) -> "VerifyPolicy":
+    def enforcing(cls) -> VerifyPolicy:
         """强制模式: 可疑答案拦截, 需配套复核 / 兜底链路."""
         return cls(mode=VerifyMode.ENFORCE)
