@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import time
-
+from lca.contracts.atoms.ids.ids import utc_now_ms
 from lca.plugins.session.runtime.store.store import SessionStore
 from lca.session.append import Session
 from lca_kernel.events.session.session import SESSION_FORMAT_VERSION, SessionHeader
@@ -76,7 +75,7 @@ def fork_session(
     header = SessionHeader(
         version=SESSION_FORMAT_VERSION,
         id=child_session_id,
-        created_at=int(time.time() * 1000),
+        created_at=utc_now_ms(),
         parent_session=live.id,
         seed_length=len(seed_events),
         is_seeded=True,
