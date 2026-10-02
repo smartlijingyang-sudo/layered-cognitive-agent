@@ -15,10 +15,10 @@ error）。**PluginManifest 可不填该字段**，不阻断 PR 合并。
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class FunctionalGroup(str, Enum):
+class FunctionalGroup(StrEnum):
     """13 原语群分类学（ADR-0069 §一）。
 
     群成员声明是 plugin 作者的"语义坐标"声明；缺失 = plugin 没有清晰

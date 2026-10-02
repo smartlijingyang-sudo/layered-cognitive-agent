@@ -35,7 +35,7 @@ functions（``plan_template_to_dict`` / ``parse_plan_template_id``）。
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from lca.contracts.atoms.control.slot import ControlSlot
@@ -44,7 +44,7 @@ from lca.contracts.atoms.relation.relation import Relation
 from lca.contracts.atoms.scope.scope import Scope
 
 
-class PlanTemplateId(str, Enum):
+class PlanTemplateId(StrEnum):
     """12 标准 PlanTemplate ID（ADR-0069 §五 + tracker §16.2）。"""
 
     RAG = "rag"

@@ -10,10 +10,10 @@ ADR-0255 §3 (Muse production runtime reference).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 
-class DeferMode(str, Enum):
+class DeferMode(StrEnum):
     """Per-namespace injection mode."""
 
     EAGER = "eager"

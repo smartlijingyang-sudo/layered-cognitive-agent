@@ -32,7 +32,7 @@ concern，独立文件更易回溯 ADR 来源（§13.3）。
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 
 from lca.contracts.harness.composition.plugin_meta import PluginMeta
@@ -44,7 +44,7 @@ if TYPE_CHECKING:
 # ── 错误码（机器可读，挂载拒绝事件必填） ────────────────────
 
 
-class ComposerErrorCode(str, Enum):
+class ComposerErrorCode(StrEnum):
     """挂载/卸载/inspect 任一动作被拒时的具名错误码。
 
     出现在 :class:`PluginMountRejected.reason_code` 字段，供 lca-ops trace /

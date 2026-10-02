@@ -5,10 +5,10 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class SessionEventType(str, Enum):
+class SessionEventType(StrEnum):
     """session 任何状态变更。"""
 
     # Session 生命周期

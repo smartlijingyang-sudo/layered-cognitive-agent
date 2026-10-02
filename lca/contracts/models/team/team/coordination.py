@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from lca.contracts.atoms.enums.enums import DecisionGateName
@@ -23,7 +23,7 @@ DEFAULT_COORDINATION_MAX_ROUNDS = 3
 """轮次型协调机制（PeerSwarm / Debate）的默认轮数上限。"""
 
 
-class LeadMandate(str, Enum):
+class LeadMandate(StrEnum):
     """Authority and obligations of a TeamLead (closed set)."""
 
     ROUTING = "routing"

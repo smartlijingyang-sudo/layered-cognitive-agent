@@ -6,13 +6,13 @@ webserver session 的 ``RunStatus``、Journal reducer 的 ``JournalRunStatus``
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from lca.contracts.atoms.enums.enums import SpanStatus
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 
 
-class RunLifecycleStatus(str, Enum):
+class RunLifecycleStatus(StrEnum):
     """LCA run 状态机唯一 enum（I-FW-SSOT-2）。
 
     所有权:状态机词表归本 enum;webserver session(``RunStatus`` 别名)、

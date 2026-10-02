@@ -6,7 +6,7 @@ Provider-neutral result shapes for code sandboxes. No I/O — pure data.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 # Default wall-clock budget for a single sandbox invocation (seconds).
@@ -93,7 +93,7 @@ class SandboxFile:
     data: bytes
 
 
-class SandboxErrorKind(str, Enum):
+class SandboxErrorKind(StrEnum):
     """Structured failure classification for sandbox observations (ADR-0050)."""
 
     NONE = "none"

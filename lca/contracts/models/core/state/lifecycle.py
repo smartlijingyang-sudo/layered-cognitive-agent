@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from lca.contracts.atoms.enums.enums import DelegationProtocol
 from lca.contracts.atoms.ids.ids import utc_now
 
 
-class TaskStatus(str, Enum):
+class TaskStatus(StrEnum):
     """Agent / Team 任务生命周期状态（A2A 兼容）。"""
 
     SUBMITTED = "submitted"

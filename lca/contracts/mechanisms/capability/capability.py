@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 
 
-class CapabilityKey(str, Enum):
+class CapabilityKey(StrEnum):
     """全部能力接缝键。仅可替换后端进此表；编排（Brain/Loop/Team）不是 seam。"""
 
     LLM = "llm"

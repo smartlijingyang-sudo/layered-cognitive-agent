@@ -7,10 +7,10 @@ adding a new code requires a new ADR-level entry, not a free addition.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class AttachmentErrorCode(str, Enum):
+class AttachmentErrorCode(StrEnum):
     """Closed vocabulary for attachment / FileRef failures."""
 
     UNRESOLVED_REF = "attachment.unresolved_ref"

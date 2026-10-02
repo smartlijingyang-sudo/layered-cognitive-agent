@@ -8,10 +8,10 @@ aggregator and lets control plugins depend only on the data contract.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 
-class ControlVerdictKind(str, Enum):
+class ControlVerdictKind(StrEnum):
     """Closed verdict vocabulary shared by control contributions."""
 
     ALLOW = "allow"

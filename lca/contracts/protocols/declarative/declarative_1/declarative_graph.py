@@ -11,7 +11,7 @@ binding-to-PhaseExecutor table.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import (
     DeclarativeValidationError,
@@ -22,7 +22,7 @@ from lca.contracts.protocols.declarative.declarative_1.declarative_fault_toleran
 )
 
 
-class ValidationSeverity(str, Enum):
+class ValidationSeverity(StrEnum):
     """Severity values carried by declarative validation findings."""
 
     ERROR = "error"

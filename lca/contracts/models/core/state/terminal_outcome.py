@@ -12,11 +12,11 @@ read. Adding a new kind requires ADR supersession of ADR-0077 (宪法 C6).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class TerminalOutcomeKind(str, Enum):
+class TerminalOutcomeKind(StrEnum):
     """Closed set of terminal outcomes（ADR-0077 §决策一，宪法 C6 闭集）。
 
     Every non-"继续循环" exit path must map to exactly one of these values.

@@ -34,10 +34,10 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class Relation(str, Enum):
+class Relation(StrEnum):
     """11 关系代数闭集（ADR-0069 §三）。
 
     字符串值稳定（序列化 / journal / plan_ref 引用）；新增关系必须

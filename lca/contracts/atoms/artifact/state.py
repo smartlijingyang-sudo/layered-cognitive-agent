@@ -21,10 +21,10 @@ PR-8 阶段：4 状态 enum + 合法迁移矩阵 + InvalidStateTransition except
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class ArtifactState(str, Enum):
+class ArtifactState(StrEnum):
     """Artifact 4 状态机（PR-8 + ADR-0074 §三裁剪）。
 
     字符串值稳定（journal / plan_ref / journal_record 序列化）；新增状态

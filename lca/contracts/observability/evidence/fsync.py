@@ -11,10 +11,10 @@ re-export,实现侧(FileSink / TracingFileSink / lca_kernel persistence)
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class FsyncProtocol(str, Enum):
+class FsyncProtocol(StrEnum):
     """append 型 fd 的 fsync 节奏契约(闭集)。
 
     声明单个 append fd "何时 fsync",决定进程崩溃 / SIGKILL / 断电时

@@ -24,13 +24,13 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from lca.contracts.observability.health.report import RunHealthSummary
 
 
-class IntegrityState(str, Enum):
+class IntegrityState(StrEnum):
     """evidence 完整性校验状态。"""
 
     OK = "ok"

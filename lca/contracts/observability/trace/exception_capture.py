@@ -21,13 +21,13 @@ from __future__ import annotations
 import traceback
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 _TRACEBACK_FRAME_BUDGET = 64  # frames retained from the most recent
 
 
-class ErrKind(str, Enum):
+class ErrKind(StrEnum):
     """OpenTelemetry-style exception kind —— provider/triage categorical。
 
     与 OpenTelemetry ``semantic_conventions.exception.type`` 同构。

@@ -14,10 +14,10 @@ observe / checkpoint / safe-boundary——必须以最小插件或插件组贡�
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class ControlSlot(str, Enum):
+class ControlSlot(StrEnum):
     """有限、类型化的 Control Slot（ADR-0066 §二 + tracker §19）。
 
     11 个槽位：

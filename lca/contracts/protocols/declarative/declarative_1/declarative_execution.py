@@ -17,7 +17,7 @@ typed interpretation result and by the runtime bindings.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from lca.contracts.models.core.policy.stop import StopDecision
@@ -59,7 +59,7 @@ class PhaseRunCursor:
             object.__setattr__(self, "causation_refs", tuple(self.causation_refs))
 
 
-class ExecutionOutcome(str, Enum):
+class ExecutionOutcome(StrEnum):
     """声明式单次执行结果闭集(收敛契约 note-1:与 ``RunLifecycleStatus`` 不合并)。
 
     语义边界:``RunLifecycleStatus`` 是 run 生命周期状态;本 enum 是

@@ -11,10 +11,10 @@ tracker §15.4 ADR-0074 V9 写 "8 个合法 scope" 含 invocation；v3.1
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class Scope(str, Enum):
+class Scope(StrEnum):
     """Scope 闭集（ADR-0074 §三 + tracker §15.3 + §15.4）。
 
     7 个合法 scope：scope 决定 plugin 生命周期、grant 衰减、event 可见性
