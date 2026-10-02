@@ -84,15 +84,27 @@ async def _start_run(
     """
     ctx = getattr(request.app.state, "ctx", None)
     file_store = getattr(request.app.state, "file_store", None)
+    if file_store is None:
+        return RunDispatchResult(
+            run_id="",
+            trace_id="",
+            accepted=False,
+            rejection_reason="file_store unavailable",
+        )
     run_input = await command_endpoints.prepare_run_from_messages(
         [{"role": "user", "content": objective}],
         file_store,
     )
     run_port = getattr(request.app.state, "run_port", None)
+    if run_port is None:
+        return RunDispatchResult(
+            run_id="",
+            trace_id="",
+            accepted=False,
+            rejection_reason="run_port unavailable",
+        )
     agent_raw = (
-        {"id": coordinator_agent_id, "name": coordinator_agent_id}
-        if coordinator_agent_id
-        else None
+        {"id": coordinator_agent_id, "name": coordinator_agent_id} if coordinator_agent_id else None
     )
     agent = command_endpoints.parse_agent_ref(agent_raw)
     run_request = command_endpoints.RunRequest(
@@ -148,18 +160,32 @@ async def _read_run_status(request: Request, run_id: str) -> RunOutcome:
 
 def _dispatcher_for(request: Request, room_id: str) -> RoomDispatcher:
     """Build a RoomDispatcher wired to the live RunPort for this request."""
-    return RoomDispatcher(
-        room_repository=JsonRoomRepository(),
-        message_store=JsonRoomMessageStore(),
-        run_starter=lambda *, objective, mode, correlation_id, coordinator_agent_id=None, selected_peers=None, room_id=room_id: _start_run(
+    bound_room_id = room_id
+
+    async def run_starter(
+        *,
+        objective: str,
+        mode: str,
+        correlation_id: str,
+        coordinator_agent_id: str | None = None,
+        selected_peers: tuple[str, ...] | None = None,
+        room_id: str | None = None,
+    ) -> RunDispatchResult:
+        # Matches the RunStarter protocol (untyped lambda failed pyright).
+        return await _start_run(
             request,
-            room_id=room_id,
+            room_id=room_id if room_id is not None else bound_room_id,
             objective=objective,
             mode=mode,
             correlation_id=correlation_id,
             coordinator_agent_id=coordinator_agent_id,
             selected_peers=selected_peers,
-        ),
+        )
+
+    return RoomDispatcher(
+        room_repository=JsonRoomRepository(),
+        message_store=JsonRoomMessageStore(),
+        run_starter=run_starter,
         run_status_reader=lambda run_id: _read_run_status(request, run_id),
     )
 
