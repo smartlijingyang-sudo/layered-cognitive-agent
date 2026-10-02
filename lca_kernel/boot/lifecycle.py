@@ -142,7 +142,7 @@ class DefaultShutdownCoordinator:
                 kernel.dispose(),
                 timeout=FAIL_LOUD_RELEASE_TIMEOUT_MS / 1000,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             pass  # ↑ K6:dispose 超时不再阻塞进程
         except Exception as exc:
             raise KernelError(f"shutdown failed: {exc}") from exc

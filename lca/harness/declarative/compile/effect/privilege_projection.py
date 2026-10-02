@@ -39,9 +39,9 @@ if TYPE_CHECKING:
 
 
 def project_privileges_into_effect_policy(
-    plan: "EffectPolicyPlan",
-    plugin_contracts: tuple["PluginContract", ...] = (),
-) -> "EffectPolicyPlan":
+    plan: EffectPolicyPlan,
+    plugin_contracts: tuple[PluginContract, ...] = (),
+) -> EffectPolicyPlan:
     """Augment an existing ``EffectPolicyPlan`` with privilege projections.
 
     Reads :attr:`PluginContract.privileges` for each contract and unions
@@ -79,9 +79,9 @@ def project_privileges_into_effect_policy(
 
 
 def build_effect_policy_with_privileges(
-    specs: tuple["PluginSpec", ...],
-    plugin_contracts: tuple["PluginContract", ...] = (),
-) -> "EffectPolicyPlan":
+    specs: tuple[PluginSpec, ...],
+    plugin_contracts: tuple[PluginContract, ...] = (),
+) -> EffectPolicyPlan:
     """Compile ``EffectPolicyPlan`` from ``PluginSpec`` declarations AND project privileges.
 
     Convenience wrapper that calls :func:`compile_effect_policy` and then

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """主动消息领域契约（Proactive Messaging）。
 
 三层架构：

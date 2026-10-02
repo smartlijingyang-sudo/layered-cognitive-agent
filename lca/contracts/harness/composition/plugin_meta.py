@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from typing import Literal, TypedDict
 
-from typing_extensions import NotRequired
+from typing import NotRequired
 
 # Plugin layer taxonomy (spec §3.5).
 PluginLayer = Literal[

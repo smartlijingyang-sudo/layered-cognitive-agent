@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """ProactiveScheduler：主动消息调度器（对齐 ADR-0263 §9）。
 
 职责：tick 驱动 → 文件锁互斥 → 到期任务 → 裁决 → 投递 →
@@ -21,9 +20,9 @@ import logging
 import os
 import socket
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
-from typing import Callable
+from collections.abc import Callable
 
 from lca.cognition.proactive.worthiness import decide
 from lca.contracts.models.proactive.message import ProactiveMessage
@@ -184,7 +183,7 @@ class ProactiveScheduler:
         verdict = decide(
             request,
             policy=self._policy,
-            now=datetime.fromtimestamp(now_ms / 1000, tz=timezone.utc),
+            now=datetime.fromtimestamp(now_ms / 1000, tz=UTC),
         )
         if verdict.kind == VerdictKind.REJECTED:
             _log.warning(

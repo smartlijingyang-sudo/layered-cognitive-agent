@@ -157,7 +157,7 @@ class InternalTransport(AgentTransport):
             return await fut
         try:
             return await asyncio.wait_for(asyncio.shield(fut), timeout=timeout_s)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return await self._harvest_on_timeout(task_id, fut)
 
     async def _harvest_on_timeout(

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """主动消息基础设施层（infrastructure）：调度与投递实现。"""
 
 from lca.infrastructure.proactive.deliverer import (

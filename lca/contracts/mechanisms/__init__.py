@@ -177,6 +177,7 @@ class ComponentRegistryProtocol(Protocol):
     def list(self, category: str) -> list[str]: ...
 
 __all__ = [
+    "REQUIRED_CAPABILITY_KEYS",
     "CapabilityContext",
     "CapabilityGrantExceeded",
     "CapabilityKey",
@@ -193,7 +194,6 @@ __all__ = [
     "NotMounted",
     "PluginFactory",
     "PluginMetaMissing",
-    "REQUIRED_CAPABILITY_KEYS",
     "UnmountResult",
     "consume",
     "provider_current",

@@ -45,7 +45,7 @@ def register(app: typer.Typer) -> None:
     )
     def health_cmd(
         run_id: str = typer.Argument(..., help="run_id (例: run_xxx)"),
-        spine_path: Optional[Path] = typer.Option(
+        spine_path: Path | None = typer.Option(
             None,
             "--spine",
             help="Override spine file path. Default: traces/runs/<run_id>/<run_id>.spine.jsonl",

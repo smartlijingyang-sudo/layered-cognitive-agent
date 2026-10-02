@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """主动消息全局政策（ProactivePolicy）。
 
 muse 思想注记：

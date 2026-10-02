@@ -80,7 +80,7 @@ class EffectGovernanceDeclaration:
     def __post_init__(self) -> None:
         if self.effect_class not in ALLOWED_EFFECTS:
             raise DeclarativeValidationError(
-                "PS-006", f"effect_governance effect_class must be in ALLOWED_EFFECTS"
+                "PS-006", "effect_governance effect_class must be in ALLOWED_EFFECTS"
             )
         _require_non_empty_text(self.policy, "effect_governance.policy")
 

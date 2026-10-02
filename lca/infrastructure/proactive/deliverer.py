@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """ProactiveDeliverer：主动消息投递层。
 
 职责单一：把裁决通过的消息 append 进目标 session 的

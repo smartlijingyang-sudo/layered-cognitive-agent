@@ -7,7 +7,7 @@ ProvenanceGuard 的第一原则: 绝不把证据塌缩成一个匿名上下文.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from typing import Any
 
 from lca.contracts.models.cognition.source_verify import SourceKind, SourceRef
@@ -64,7 +64,7 @@ class SourceRegistry:
             label=label,
             tool_name=tool_name,
             call_id=call_id,
-            captured_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            captured_at=datetime.now(UTC).isoformat(timespec="seconds"),
         )
         self._entries[source_id] = _SourceEntry(ref=ref, content=content)
         return ref
