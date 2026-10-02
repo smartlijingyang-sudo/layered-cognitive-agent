@@ -81,6 +81,7 @@ patch:
       format: graph_timeline
 
   - id: lca-llm-resolver
-    config:
-      default_model: qwen3.7-plus
-      load_dotenv: true
+    # NOTE(round-0358): Config 自 506b7630d 起为空(extra=forbid),adapter 改由
+    # phase.think.reasoner.credentials 经 composition root 绑定;旧 default_model /
+    # load_dotenv 键已无法通过校验,此处对齐 bundles/base.yaml 的空配置。
+    config: {}

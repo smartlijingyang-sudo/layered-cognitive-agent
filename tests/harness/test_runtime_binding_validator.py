@@ -13,7 +13,6 @@ from pathlib import Path
 
 import pytest
 
-from lca_kernel.plan.plan_compile import CompileOptions, compile_plan
 from lca.harness.plan import compiled_run_plan_ref
 from lca.harness.profile.boot.runtime_closure import (
     FallbackPolicy,
@@ -26,6 +25,7 @@ from lca.harness.profile.validate.runtime_binding_validator import (
     profile_allows_test_defaults,
     validate_runtime_closure,
 )
+from lca_kernel.plan.plan_compile import CompileOptions, compile_plan
 
 # W1 §144 验收：每份 golden profile 都必须能生成完整 compiled plan。
 # 通用生产 profile（不依赖外部 secret/endpoint 的）纳入此清单。
@@ -66,12 +66,15 @@ def test_compile_plan_validates_runtime_closure() -> None:
     assert compiled_run_plan_ref(plan)
 
 
-def test_missing_effect_handler_registry_fails_compile(tmp_path: Path) -> None:
-    """禁用 effect_handler_registry seam + provider 时 compile 必须失败。
+def test_missing_effect_handler_registry_fails_closure_validation(tmp_path: Path) -> None:
+    """禁用 effect_handler_registry seam + provider 时闭包校验必须失败。
 
     provider 依赖 seam 提供的 capability；只禁 seam 会触发 resolve 期的
     ``Missing capability`` 错误（依赖图不闭合）。同时禁 provider 才能让
-    resolve 通过、compile 阶段才报 ``MissingBindingError``。
+    resolve 通过、校验阶段才报 ``MissingBindingError``。
+    NOTE(round-0358): v1 编译器的 compile 内钩子随 ADR-0221 P3 退役；
+    canonical 校验入口现为 lca_kernel/boot/closure.py::assert_runtime_closure
+    (ADR-0115)，此处直接调用 validate_runtime_closure。
     """
     profile_content = """
 bundles:
@@ -88,10 +91,10 @@ patch:
 
     resolved = resolve_profile(profile_path)
     with pytest.raises(MissingBindingError, match="effect_handler_registry"):
-        compile_plan(resolved, options=CompileOptions())
+        validate_runtime_closure(resolved)
 
 
-def test_missing_delta_handler_registry_fails_compile(tmp_path: Path) -> None:
+def test_missing_delta_handler_registry_fails_closure_validation(tmp_path: Path) -> None:
     """禁用 delta_handler_registry seam + provider 时 compile 必须失败。"""
     profile_content = """
 bundles:
@@ -108,10 +111,10 @@ patch:
 
     resolved = resolve_profile(profile_path)
     with pytest.raises(MissingBindingError, match="delta_handler_registry"):
-        compile_plan(resolved, options=CompileOptions())
+        validate_runtime_closure(resolved)
 
 
-def test_missing_evidence_store_fails_compile(tmp_path: Path) -> None:
+def test_missing_evidence_store_fails_closure_validation(tmp_path: Path) -> None:
     """禁用 evidence_store seam 时 compile 必须失败（生产 profile）。"""
     profile_content = """
 bundles:
@@ -126,11 +129,18 @@ patch:
 
     resolved = resolve_profile(profile_path)
     with pytest.raises(MissingBindingError, match="evidence_store"):
-        compile_plan(resolved, options=CompileOptions())
+        validate_runtime_closure(resolved)
 
 
-def test_missing_reducer_fails_compile(tmp_path: Path) -> None:
-    """禁用 reducer plugin 时 compile 必须失败（ADR-0076 §四）。"""
+def test_missing_reducer_fails_closure_validation(tmp_path: Path) -> None:
+    """禁用 reducer plugin 时必须失败（ADR-0076 §四）。
+
+    NOTE(round-0358): 依赖图收紧后缺失在 resolve 期即硬失败
+    (ProfileResolveError: phase.think.route requires 'reducer'),到不了
+    validate_runtime_closure;硬失败保证前移到了更早的层级,此处据实断言。
+    """
+    from lca.harness.profile.validate.errors import ProfileResolveError
+
     profile_content = """
 bundles:
   - bundles/base.yaml
@@ -142,9 +152,8 @@ patch:
     profile_path = tmp_path / "test-missing-reducer.yaml"
     profile_path.write_text(profile_content)
 
-    resolved = resolve_profile(profile_path)
-    with pytest.raises(MissingBindingError, match="reducer"):
-        compile_plan(resolved, options=CompileOptions())
+    with pytest.raises(ProfileResolveError, match="reducer"):
+        resolve_profile(profile_path)
 
 
 def test_default_reducer_plugin_declares_reducer_capability() -> None:
@@ -285,7 +294,7 @@ fallback_policy:
 
     resolved = resolve_profile(profile_path)
     with pytest.raises(MissingBindingError, match="evidence_store"):
-        compile_plan(resolved, options=CompileOptions())
+        validate_runtime_closure(resolved)
 
 
 def test_fallback_policy_invalid_value_rejected(tmp_path: Path) -> None:
@@ -379,9 +388,9 @@ __all__ = [
     "test_fallback_policy_production_does_not_relax",
     "test_fallback_policy_test_default_passes",
     "test_missing_binding_error_message_is_helpful",
-    "test_missing_delta_handler_registry_fails_compile",
-    "test_missing_effect_handler_registry_fails_compile",
-    "test_missing_evidence_store_fails_compile",
+    "test_missing_delta_handler_registry_fails_closure_validation",
+    "test_missing_effect_handler_registry_fails_closure_validation",
+    "test_missing_evidence_store_fails_closure_validation",
     "test_profile_allows_test_defaults_only_for_runtime_closure_capabilities",
     "test_runtime_closure_requirements_not_empty",
 ]

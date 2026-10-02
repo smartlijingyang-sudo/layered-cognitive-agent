@@ -85,10 +85,10 @@ _RUNTIME_CLOSURE_CATALOG: tuple[RuntimeClosureRequirement, ...] = (
         "evidence_store",
         "lca.plugins.observability.evidence.store_seam",
     ),
-    RuntimeClosureRequirement(
-        "stop_policy",
-        "lca.plugins.loop.state.stop_policy.plugin",
-    ),
+    # NOTE(round-0358): "stop_policy" requirement removed — its provider module
+    # lca.plugins.loop.state.stop_policy.plugin was deleted by 63a68a4da
+    # (ADR-0221 v2 PlanInterpreter cutover); no bundle/profile/plugin provides the
+    # "stop_policy" capability anymore, so the requirement was unsatisfiable.
     RuntimeClosureRequirement(
         "reducer",
         "lca.plugins.loop.reducer.plugin",

@@ -1,6 +1,6 @@
 """Runtime binding 完整性验证（W1 / ADR-0076）。
 
-Compile 阶段必须验证 runtime closure 的完整性：生产 profile 缺少关键
+Boot 阶段必须验证 runtime closure 的完整性：生产 profile 缺少关键
 binding 时立即失败，不允许静默降级到默认实现。
 
 W1 目标：
@@ -12,7 +12,7 @@ W1 目标：
 
 契约入口：
 - :data:`RUNTIME_CLOSURE_REQUIREMENTS`（生产必需 capability 集合，单一事实源）
-- :func:`validate_runtime_closure`（compile_plan 钩入）
+- :func:`validate_runtime_closure`（boot 钩入，经 lca_kernel/boot/closure.py::assert_runtime_closure，ADR-0115）
 - :exc:`MissingBindingError`（错误信息含 candidates / expected_from / fallback option）
 """
 

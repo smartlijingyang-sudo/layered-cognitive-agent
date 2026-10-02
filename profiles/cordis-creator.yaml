@@ -37,9 +37,9 @@ bundles:
 
 patch:
   - id: lca-llm-resolver
-    config:
-      default_model: qwen3.7-plus
-      load_dotenv: true
+    # NOTE(round-0358): Config 自 506b7630d 起为空(extra=forbid);旧 default_model /
+    # load_dotenv 键已无法通过校验,对齐空配置。
+    config: {}
 
 profile:
   id: cordis-creator
