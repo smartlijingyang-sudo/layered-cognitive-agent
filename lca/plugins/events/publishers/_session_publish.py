@@ -48,7 +48,15 @@ def _authorize_producer(payload: Any, producer: Any) -> None:
     if category is None or producer_cls is None:
         return
     registry = bus.registry
-    if not registry.can_publish(producer_cls, category):
+    # can_publish fail-closes on anything that is not a type/str (its
+    # _coerce_plugin maps those to None -> deny). Spell the denial out
+    # so the checker sees the declared ``type | str`` parameter.
+    allowed = (
+        registry.can_publish(producer_cls, category)
+        if isinstance(producer_cls, (type, str))
+        else False
+    )
+    if not allowed:
         identifier = getattr(producer_cls, "__name__", str(producer_cls))
         cat_value = getattr(category, "value", category)
         raise UnauthorizedPublishError(identifier, cat_value)

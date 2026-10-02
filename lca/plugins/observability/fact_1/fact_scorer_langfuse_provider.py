@@ -77,7 +77,9 @@ async def setup(ctx: PluginContext, config: Config) -> None:
                     secret_key=cfg.langfuse_secret_key,
                     host=cfg.langfuse_host,
                 )
-                client.score_current_span(name=name, value=value, data=attributes or None)
+                # langfuse>=4 renamed the payload kwarg: ``data`` does not
+                # exist (TypeError at runtime); the field is ``metadata``.
+                client.score_current_span(name=name, value=value, metadata=attributes or None)
             except ImportError:
                 pass  # INTENTIONAL: Langfuse SDK 未安装；不影响框架
             except Exception:
