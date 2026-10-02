@@ -455,7 +455,7 @@
 | MUSE-CONNECTOR-M1-STATE-MACHINE | 【M1】连接器运行时底座：连接状态机与凭据安全 Vault (core/state.py, core/vault.py) | Completed | 落地 ConnectionState、ConnectorStateMachine、ConnectionMetadata（frozen且禁止Token泄露）、format_connector_auth_widget 与 ConnectorVault，单测 9/9 100% 全绿，通过 INV-01/INV-02/INV-03 |
 | MUSE-CONNECTOR-M2-GMAIL-CLI | 【M2】首个切片 Gmail CLI 封装：Manifest 规范与 SKILL.md 自动注入 | Completed | 落地 GmailConnectorCLI、manifest.yaml 规范与 SKILL.md 动态生成物化器，支持 +read/+search/+send 与 accounts/status，通过 INV-02/INV-03/INV-06（强制--upload暂存），单测 16/16 全绿 |
 | MUSE-CONNECTOR-M3-CARD-AND-PROMPT | 【M3】LobeHub 卡片协议联动与 Prompt 认知注入 (ConnectedServicesSection) | Completed | 落地 ConnectedServicesSection 提示词注入（解决 Agent 认知断层，无溢出且 Token 零泄露），升级 composioConnect 工具返回 [widget:connector_auth?...] 交互式卡片插桩语法，22/22 单测全通，通过 INV-01/INV-02/INV-03 |
-| MUSE-CONNECTOR-M4-PERM-AND-QUOTA | 【M4】双层正交权限引擎 (permissions.py) 与滑动窗口硬配额执行器 (rate_limiter.py) | In Progress | 正在开发，实现 Action 三态（ALLOW/ASK/DENY）权限校验与 60s 滑动窗口硬配额拦截器 |
-| MUSE-CONNECTOR-M5-INTEGRATION-E2E | 【M5】全链路单测回归 (INV-01 ~ INV-08) 与端到端活体验证 | Pending | 待执行 |
+| MUSE-CONNECTOR-M4-PERM-AND-QUOTA | 【M4】双层正交权限引擎 (permissions.py) 与滑动窗口硬配额执行器 (rate_limiter.py) | Completed | 落地 ConnectorPermissionEngine（双层正交权限 Provider Scope ∩ Action ALLOW/ASK/DENY 硬拦截）与 SlidingWindowRateLimiter（60s滑动窗口硬配额计算与精确 retry_after_seconds 退避），通过 INV-04 与 INV-05，单测 19/19 全绿 |
+| MUSE-CONNECTOR-M5-INTEGRATION-E2E | 【M5】全链路单测回归 (INV-01 ~ INV-08) 与端到端活体验证 | In Progress | 正在开发，落地综合不变量集成套件 tests/scenario/test_muse_connector_invariants.py 并执行完整门禁核验 |
 
 
