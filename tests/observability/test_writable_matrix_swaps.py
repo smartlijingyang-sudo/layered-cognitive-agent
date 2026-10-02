@@ -76,12 +76,12 @@ def _build_coord(spine: _SpySpine, tmp: Path, **overrides) -> StepCoordinator:
 
 def _scenario_events() -> list[EventRecord]:
     return [
-        _make_event(ep="writable.step.start", seq=1, phase="think"),
+        _make_event(ep="think.gate.start", seq=1, phase="think"),
         _make_event(ep="writable.segment.start", seq=2, kind="think"),
         _make_event(ep="llm.call.start", seq=3, model="q"),
         _make_event(ep="llm.call.end", seq=4, model="q"),
         _make_event(ep="writable.segment.end", seq=5),
-        _make_event(ep="writable.step.end", seq=6, outcome="success"),
+        _make_event(ep="think.gate.end", seq=6, outcome="success"),
     ]
 
 
@@ -95,13 +95,15 @@ def _drive(coord: StepCoordinator, events: list[EventRecord]) -> _SpySpine:
     spine_spy = coord.registry.require("emitter")._spine  # type: ignore[attr-defined]
     for ev in events:
         ep = ev.execution_point
-        if ep == "writable.step.start":
+        # NOTE: think.gate.* here are test-driver markers for step boundaries
+        # (real writable.step.* EPs were retired); they never reach the spine.
+        if ep == "think.gate.start":
             coord.begin_step(ev.payload.get("phase", "think"))
         elif ep == "writable.segment.start":
             coord.begin_segment(ev.payload.get("kind", "think"))
         elif ep == "writable.segment.end":
             coord.end_segment()
-        elif ep == "writable.step.end":
+        elif ep == "think.gate.end":
             coord.end_step(ev.outcome or "success")
         else:
             # llm.* / phase.* 走 spine append —— 由 reflector / adapter
