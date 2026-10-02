@@ -18,10 +18,12 @@ from lca.contracts.models.core.policy.stop import StopDecision
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 from lca.contracts.models.core.state.state import AgentState
 from lca.contracts.protocols.graph.routing import RoutingDecision
-from lca.contracts.protocols.runtime.runtime.composition import ResultFinalizer
+from lca.contracts.protocols.runtime.runtime.composition import (
+    ResultFinalizer,
+    RuntimeJournal,
+)
 from lca.framework.graph.adapter import PhaseRunCursor
 from lca.framework.graph.interpreter import InterpretationResult, PlanInterpreter
-from lca.runtime.loop.runtime_journal import RuntimeJournal
 from lca.runtime.support.checkpoint_resolution import DeclarativeCheckpoint
 from lca.runtime.support.runtime_bindings import DeclarativeRuntimeBindings
 
