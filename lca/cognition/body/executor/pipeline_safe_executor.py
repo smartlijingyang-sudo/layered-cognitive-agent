@@ -53,6 +53,7 @@ from lca.contracts.protocols.act.tool.pipeline import (
     ToolPreDecision,
     ToolProvider,
 )
+from lca.contracts.protocols.declarative.declarative_1.ports import PortName
 from lca.infrastructure.tool.pipeline import DefaultToolExecutionPipeline
 from lca.infrastructure.tools.tool.invocation_scope import tool_invocation_scope
 
@@ -356,9 +357,11 @@ class PipelineSafeExecutor(SafeExecutor):
                     "node_id": "effect.pre_dispatch.envelope_check",
                 },
             ),
-            NodeInput(port_values={"envelope": envelope}),
+            NodeInput(port_values={PortName("envelope"): envelope}),
         )
-        return replace(envelope, policy_verdict_refs=tuple(out.port_values["verdict_refs"]))
+        return replace(
+            envelope, policy_verdict_refs=tuple(out.port_values[PortName("verdict_refs")])
+        )
 
     async def _run_pipeline_and_observe(
         self,
