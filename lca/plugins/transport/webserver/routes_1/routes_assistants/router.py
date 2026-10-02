@@ -31,6 +31,7 @@ from lca.contracts.routing import RouteSpec
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.transport.webserver.route.register import register_routes
 from lca.plugins.transport.webserver.routes_1.routes_assistants.jobs import (
+    assistant_job_item,
     assistant_jobs_root,
     fire_assistant_job,
 )
@@ -110,6 +111,12 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
         "/v1/assistants/{assistant_id}/jobs/{job_id}:fire",
         fire_assistant_job,
         ("POST", "OPTIONS"),
+    ),
+    # 卡片路径（ADR-0268 §9）：PUT 合并用户改过的字段，DELETE 删除定义。
+    RouteSpec(
+        "/v1/assistants/{assistant_id}/jobs/{job_id}",
+        assistant_job_item,
+        ("PUT", "DELETE", "OPTIONS"),
     ),
     RouteSpec(
         "/v1/assistants/{assistant_id}/standing-files",
