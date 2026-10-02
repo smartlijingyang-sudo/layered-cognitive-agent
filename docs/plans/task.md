@@ -443,11 +443,11 @@
 | AGENTS-SIDEBAR | 把 AGENTS.md 接入右侧抽屉并闭环后端白名单与前端展示 | Completed | 后端 standing_files.py 扩展白名单与 ProfilePatch.agents_md 闭环；前端 AssistantStatusDrawer 增加 📋 Rules 与 AGENTS.md 元数据卡片；patch_lobehub 成功应用且 check_patch_integrity 103 文件全过；单测 6/6 全绿；真实 API 查询 /standing-files 验证正常 |
 | DEBUG-RECENT-RUNS-ROOTCAUSE | 排查近三次 run 的三大缺陷（回答重复两遍、邮件只报一封、连接只有裸链接）根因 | Completed | 完成三项缺陷深度溯源：1. llm.request.header.assistant 全量文本被当作增量 append 导致回答翻倍；2. GMAIL_FETCH_EMAILS 无参只吐首封完整HTML邮件；3. composioConnect 返回裸文本链接未触发卡片化 |
 | BRAINSTORM-CONNECTOR-UI | 头脑风暴与交互设计：连接器中枢、全助理动态Avatar与近期Run缺陷设计落地 | Completed | 已完成全套 5 节方案呈批，沉淀设计文档 docs/plans/2026-10-02-connectors-ui-and-run-fixes-design.md 与实施计划 docs/plans/2026-10-02-connectors-ui-and-run-fixes-plan.md 并提交 git |
-| CONNECTOR-TASK-1-STREAM-DEDUP | 修复 Answer 文本翻倍缺陷：EventTranslator 流式 Header 互斥消重守卫 | Pending | 待执行 |
-| CONNECTOR-TASK-2-GMAIL-GUIDANCE | 修复邮件查询只报一封：Composio 工具元数据与 GMAIL_LIST_THREADS 概览推荐 | Pending | 待执行 |
-| CONNECTOR-TASK-3-UNIVERSAL-AVATAR | 全助理通用普惠动态动物 Avatar 引擎与顶栏防裁剪居中校准 | Pending | 待执行 |
-| CONNECTOR-TASK-4-CHAT-CARD | 会话流交互式连接器授权卡片 (ConnectorAuthCard.tsx) | Pending | 待执行 |
-| CONNECTOR-TASK-5-DRAWER-HUB | 右侧抽屉全局连接器中枢 Tab (ConnectorsPanel.tsx in AssistantStatusDrawer) | Pending | 待执行 |
-| CONNECTOR-TASK-6-AVATAR-PICKER | 会话流交互式选图卡片与换装闭环 (AssistantAvatarWidget.tsx & Drawer 铅笔快捷菜单) | Pending | 待执行 |
-| CONNECTOR-TASK-7-INTEGRATION-E2E | 全量补丁 byte-identical 核验、全套单测回归与端到端内核热重载核验 | Pending | 待执行 |
+| CONNECTOR-TASK-1-STREAM-DEDUP | 修复 Answer 文本翻倍缺陷：EventTranslator 流式 Header 互斥消重守卫 | Completed | 成功引入 _streamed_text 守卫，拦截流式后的 header assistant 全量 append，INV-01 单测与全量 36/36 全绿，commit ebf58c06e |
+| CONNECTOR-TASK-2-GMAIL-GUIDANCE | 修复邮件查询只报一封：Composio 工具元数据与 GMAIL_LIST_THREADS 概览推荐 | Completed | 成功增加 _TOOL_GUIDANCE_OVERRIDES 与 _augment_tool_description，强化 GMAIL_FETCH_EMAILS 与 GMAIL_LIST_THREADS 指引，3/3 单测全绿，commit edc27c46d |
+| CONNECTOR-TASK-3-UNIVERSAL-AVATAR | 全助理通用普惠动态动物 Avatar 引擎与顶栏防裁剪居中校准 | Completed | 落地四级确定性动物解析（8大图鉴）、OpenAI dots量子轨道与微动动效、解决顶栏切头，9/9 单测全绿，commit 6913e4c7d |
+| CONNECTOR-TASK-4-CHAT-CARD | 会话流交互式连接器授权卡片 (ConnectorAuthCard.tsx) | Completed | 落地品牌 Icon、OAuth 居中弹窗、自动轮询状态机与声明式补丁挂载，5/5 单测全绿，commit 7d7c827ff |
+| CONNECTOR-TASK-5-DRAWER-HUB | 右侧抽屉全局连接器中枢 Tab (ConnectorsPanel.tsx in AssistantStatusDrawer) | Completed | 落地 6 大生态连接器中枢、工具清单折叠面板、助理启用开关与顶部 Profile 编辑铅笔菜单，4/4 单测全绿，commit c6dc0cb2c |
+| CONNECTOR-TASK-6-AVATAR-PICKER | 会话流交互式选图卡片与换装闭环 (AssistantAvatarWidget.tsx & Drawer 铅笔快捷菜单) | Completed | 落地 4 大候选卡片网格交互、一键原子更新 IDENTITY.md 与成功动效反馈，4/4 单测全绿，commit 3d0ad6e93 |
+| CONNECTOR-TASK-7-INTEGRATION-E2E | 全量补丁 byte-identical 核验、全套单测回归与端到端内核热重载核验 | Completed | 39 个 LobeHub 补丁 100% 校验通过（0 broken），81/81 关联回归测试 100% 全绿，内核顺利平滑热重启（pid=976135, 24380 fibers 0 fail） |
 
