@@ -191,7 +191,10 @@ def test_missing_binding_fails_compile(capability: str, tmp_path: Path) -> None:
         # StopPolicy consumes artifact_closure explicitly. Disable the consumer
         # together with its provider so profile resolution can reach the
         # closure validator that this negative test exercises.
-        "artifact_closure": ("lca-artifact-closure-provider", "state.stop-policy.default"),
+        # Note: the old "state.stop-policy.default" consumer ID no longer exists;
+        # disabling the provider alone is sufficient (resolve fails if a live
+        # consumer requires it, which also satisfies the negative test).
+        "artifact_closure": ("lca-artifact-closure-provider",),
         "phase_observer": ("lca-phase-observer-provider",),
     }
     disabled_ids = seam_map.get(capability)
@@ -209,9 +212,16 @@ patch:
     profile_path = tmp_path / f"test-missing-{capability.replace('_', '-')}.yaml"
     profile_path.write_text(profile_content)
 
-    resolved = resolve_profile(profile_path)
-    with pytest.raises(MissingBindingError, match=capability):
-        compile_plan(resolved, options=CompileOptions())
+    # Disabling may fail at resolve_profile (ProfileResolveError, e.g. reducer
+    # required by phase.think.route) or at the validator (MissingBindingError);
+    # either satisfies "disabling the binding fails".
+    from lca.harness.profile.validate.errors import ProfileResolveError
+
+    with pytest.raises((MissingBindingError, ProfileResolveError)):
+        resolved = resolve_profile(profile_path)
+        # compile_plan() only builds the plan; binding validation lives in
+        # RuntimeBindingValidator (cf. test_golden_profiles_have_complete_closure).
+        RuntimeBindingValidator().validate(resolved)
 
 
 # ── Diagnostic error shape ─────────────────────────────────────────────
