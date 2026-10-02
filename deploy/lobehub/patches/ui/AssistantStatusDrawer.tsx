@@ -617,8 +617,8 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
     const [activeSection, setActiveSection] = useState<SectionKey>('activity');
     const [loading, setLoading] = useState(false);
     const [files, setFiles] = useState<StandingFileInfo[]>([]);
-    const [activities] = useState<ActivityItem[]>(DEFAULT_ACTIVITIES);
-    const [approvals] = useState<ApprovalRecord[]>(DEFAULT_APPROVALS);
+    const [activities, setActivities] = useState<ActivityItem[]>(DEFAULT_ACTIVITIES);
+    const [approvals, setApprovals] = useState<ApprovalRecord[]>(DEFAULT_APPROVALS);
     const [upcomingJobs, setUpcomingJobs] = useState<UpcomingJob[]>(DEFAULT_UPCOMING_JOBS);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -631,8 +631,8 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
       [activities, selectedActivityId],
     );
 
-    // 拉取后端真值文件列表
-    const fetchStandingFiles = useCallback(async () => {
+    // 1. 拉取后端完整快照 (Status Snapshot API)
+    const fetchStatusSnapshot = useCallback(async () => {
       if (!assistantId) return;
       setLoading(true);
       setErrorMsg(null);
@@ -642,7 +642,7 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
           (typeof window !== 'undefined' && (window as any)?.__LCA_USER_ID) ||
           process.env.NEXT_PUBLIC_MOCK_DEV_USER_ID ||
           'local-dev-user';
-        const url = `/lca-api/v1/assistants/${assistantId}/standing-files`;
+        const url = `/lca-api/v1/assistants/${assistantId}/status-snapshot`;
         const res = await fetch(url, {
           headers: {
             'Content-Type': 'application/json',
@@ -651,66 +651,190 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
             'x-lca-user-id': userId,
           },
         });
-        const contentType = res.headers.get('content-type') || '';
-        if (!res.ok) {
-          if (contentType.includes('application/json')) {
-            const errData = await res.json().catch(() => null);
-            throw new Error(errData?.error?.detail || `加载失败 (HTTP ${res.status})`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.activities) && data.activities.length > 0) {
+            setActivities(
+              data.activities.map((a: any) => ({
+                id: a.id,
+                dateGroup: 'today',
+                icon:
+                  a.icon === 'mail'
+                    ? '✉️'
+                    : a.icon === 'terminal'
+                      ? '💻'
+                      : a.icon === 'browser'
+                        ? '🌐'
+                        : a.icon === 'robot'
+                          ? '🤖'
+                          : a.icon === 'clock'
+                            ? '⏰'
+                            : '⚙️',
+                iconBg: a.status === 'running' ? '#e6f7ff' : '#f5f5f5',
+                title: a.title,
+                summary: a.summary,
+                timestamp: a.start_time
+                  ? new Date(a.start_time).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })
+                  : '刚刚',
+                status:
+                  a.status === 'completed'
+                    ? 'success'
+                    : a.status === 'running'
+                      ? 'running'
+                      : 'warning',
+                toolBadge: a.category,
+                detail: {
+                  toolName: a.category,
+                  params: a.params,
+                  result: a.result_summary,
+                  durationMs: a.duration_ms,
+                  runId: a.run_id,
+                },
+              })),
+            );
           }
-          throw new Error(`加载失败 (HTTP ${res.status})`);
+          if (Array.isArray(data.upcoming) && data.upcoming.length > 0) {
+            setUpcomingJobs(
+              data.upcoming.map((j: any) => ({
+                id: j.id,
+                title: j.title || '定时提醒',
+                schedule: j.schedule_label || '按计划触发',
+                timezone: j.timezone || 'Asia/Shanghai',
+                enabled: j.enabled !== false,
+                body: j.body || '',
+                nextRun: j.next_run_local || (j.due ? '即刻触发' : '按计划触发'),
+                delivery: j.last_delivery || '当前对话',
+                is_system: j.is_system || false,
+              })),
+            );
+          }
+          if (Array.isArray(data.approvals) && data.approvals.length > 0) {
+            setApprovals(data.approvals);
+          }
+          if (Array.isArray(data.identity?.files)) {
+            setFiles(data.identity.files);
+          }
         }
-        if (!contentType.includes('application/json')) {
-          throw new Error(`接口返回非 JSON 响应 (HTTP ${res.status})`);
-        }
-        const data = await res.json();
-        setFiles(data.files || []);
       } catch (err: any) {
-        setErrorMsg(err.message || '加载配置列表失败');
+        console.warn('Failed to load status snapshot, using fallback', err);
       } finally {
         setLoading(false);
       }
     }, [assistantId]);
 
-    // 拉取即将到来的任务 (Jobs API)
-    const fetchJobs = useCallback(async () => {
-      if (!assistantId) return;
-      try {
-        const token = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
-        const url = `/lca-api/v1/assistants/${assistantId}/jobs`;
-        const res = await fetch(url, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'x-lca-token': token,
-          },
+    // 2. 监听 WebSocket activity_updated 增量消息并原地 patch 单行
+    useEffect(() => {
+      const onActivityUpdated = (e: any) => {
+        const patch = e.detail || e;
+        if (!patch || !patch.id) return;
+        setActivities((prev) => {
+          const idx = prev.findIndex((item) => item.id === patch.id);
+          const iconChar =
+            patch.icon === 'mail'
+              ? '✉️'
+              : patch.icon === 'terminal'
+                ? '💻'
+                : patch.icon === 'browser'
+                  ? '🌐'
+                  : patch.icon === 'robot'
+                    ? '🤖'
+                    : patch.icon === 'clock'
+                      ? '⏰'
+                      : '⚙️';
+          const statusStr =
+            patch.status === 'completed'
+              ? 'success'
+              : patch.status === 'running'
+                ? 'running'
+                : 'warning';
+
+          if (idx >= 0) {
+            const updated = [...prev];
+            updated[idx] = {
+              ...updated[idx],
+              title: patch.title || updated[idx].title,
+              summary: patch.summary || updated[idx].summary,
+              status: statusStr,
+              detail: {
+                ...updated[idx].detail,
+                result: patch.resultSummary || updated[idx].detail?.result,
+                durationMs: patch.durationMs ?? updated[idx].detail?.durationMs,
+              },
+            };
+            return updated;
+          }
+          const newItem: ActivityItem = {
+            id: patch.id,
+            dateGroup: 'today',
+            icon: iconChar,
+            iconBg: patch.status === 'running' ? '#e6f7ff' : '#f5f5f5',
+            title: patch.title || '执行操作',
+            summary: patch.summary || '',
+            timestamp: '刚刚',
+            status: statusStr,
+            toolBadge: patch.category,
+            detail: {
+              toolName: patch.category || patch.title,
+              params: patch.params,
+              runId: patch.runId,
+            },
+          };
+          return [newItem, ...prev];
         });
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data?.jobs) && data.jobs.length > 0) {
-            setUpcomingJobs(
-              data.jobs.map((j: any) => ({
-                id: j.id,
-                title: j.title || '定时提醒',
-                schedule: j.schedule,
-                timezone: j.timezone || 'Asia/Shanghai',
-                enabled: j.enabled !== false,
-                body: j.body || '',
-                nextRun: '按计划触发',
-                delivery: '当前对话',
-              })),
-            );
+      };
+
+      if (typeof window !== 'undefined') {
+        window.addEventListener('lca:activity_updated', onActivityUpdated);
+        (window as any).__onLcaActivityUpdated = onActivityUpdated;
+      }
+      return () => {
+        if (typeof window !== 'undefined') {
+          window.removeEventListener('lca:activity_updated', onActivityUpdated);
+          if ((window as any).__onLcaActivityUpdated === onActivityUpdated) {
+            delete (window as any).__onLcaActivityUpdated;
           }
         }
-      } catch {
-        // 使用默认预设
-      }
-    }, [assistantId]);
+      };
+    }, []);
 
     useEffect(() => {
       if (open && assistantId) {
-        fetchStandingFiles();
-        fetchJobs();
+        fetchStatusSnapshot();
       }
-    }, [open, assistantId, fetchStandingFiles, fetchJobs]);
+    }, [open, assistantId, fetchStatusSnapshot]);
+
+    // 3. 运行中动作取消中断 (Stop 机制)
+    const handleStopActivity = useCallback(
+      async (activityId: string, runId?: string) => {
+        try {
+          const token = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
+          const targetRunId = runId || 'current';
+          await fetch(`/lca-api/v1/runs/${targetRunId}/cancel`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+              'x-lca-token': token,
+            },
+            body: JSON.stringify({ activity_id: activityId, assistant_id: assistantId }),
+          });
+          setActivities((prev) =>
+            prev.map((a) =>
+              a.id === activityId
+                ? { ...a, status: 'warning', summary: `${a.summary} (已停止)` }
+                : a,
+            ),
+          );
+          antMessage.info('已请求取消该动作');
+        } catch (err: any) {
+          antMessage.error(err.message || '取消失败');
+        }
+      },
+      [assistantId],
+    );
 
     // 点击铅笔快捷编辑形象或名字：自动填入聊天输入框并 focus
     const handleTriggerChatEdit = useCallback(
@@ -762,6 +886,33 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
       );
       antMessage.success(enabled ? '已启用该提醒计划' : '已停用该提醒计划');
     }, []);
+
+    // 删除定时任务 (系统任务拒绝删除保护)
+    const handleDeleteJob = useCallback(
+      async (job: UpcomingJob) => {
+        if ((job as any).is_system) {
+          antMessage.error('系统任务不可删除');
+          return;
+        }
+        try {
+          const token = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
+          const url = `/lca-api/v1/assistants/${assistantId}/jobs/${job.id}`;
+          const res = await fetch(url, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}`, 'x-lca-token': token },
+          });
+          if (!res.ok) {
+            const data = await res.json().catch(() => null);
+            throw new Error(data?.error?.detail || '删除失败');
+          }
+          setUpcomingJobs((prev) => prev.filter((j) => j.id !== job.id));
+          antMessage.success('已删除该定时任务');
+        } catch (err: any) {
+          antMessage.error(err.message || '删除失败');
+        }
+      },
+      [assistantId],
+    );
 
     // 渲染身份卡片 (2 列网格，整卡直接点击编辑)
     const renderIdentityCard = (file: StandingFileInfo) => {
@@ -819,35 +970,70 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
       [activities],
     );
 
-    const renderActivityRow = (act: ActivityItem) => (
-      <div
-        key={act.id}
-        className={styles.activityRow}
-        onClick={() => {
-          setSelectedActivityId(act.id);
-          setDetailModalOpen(true);
-        }}
-      >
-        <div className={styles.activityIconBox} style={{ background: act.iconBg }}>
-          {act.icon}
-        </div>
-        <div className={styles.activityMain}>
-          <div className={styles.activityTopRow}>
-            <span className={styles.activityTitle}>{act.title}</span>
-            <span style={{ fontSize: 11, color: '#8c8c8c' }}>{act.timestamp}</span>
+    const renderActivityRow = (act: ActivityItem) => {
+      const isRunning = act.status === 'running';
+      return (
+        <div
+          key={act.id}
+          className={styles.activityRow}
+          onClick={() => {
+            setSelectedActivityId(act.id);
+            setDetailModalOpen(true);
+          }}
+        >
+          <div className={styles.activityIconBox} style={{ background: act.iconBg }}>
+            {act.icon}
           </div>
-          <div className={styles.activitySummary}>{act.summary}</div>
-          <div className={styles.activityBottom}>
-            {act.toolBadge && (
-              <Tag color="blue" style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px', margin: 0 }}>
-                {act.toolBadge}
-              </Tag>
-            )}
-            <span>点击查看执行详情 ›</span>
+          <div className={styles.activityMain}>
+            <div className={styles.activityTopRow}>
+              <span className={styles.activityTitle}>{act.title}</span>
+              <Flex align="center" gap={6}>
+                {isRunning ? (
+                  <>
+                    <Tag color="processing" style={{ margin: 0, fontSize: 11 }}>
+                      运行中
+                    </Tag>
+                    <Button
+                      size="small"
+                      danger
+                      type="text"
+                      style={{ fontSize: 11, height: 22, padding: '0 6px' }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleStopActivity(act.id, act.detail?.runId);
+                      }}
+                    >
+                      停止
+                    </Button>
+                  </>
+                ) : act.status === 'success' ? (
+                  <Tag color="success" style={{ margin: 0, fontSize: 11 }}>
+                    ✓ 已完成
+                  </Tag>
+                ) : (
+                  <Tag color="default" style={{ margin: 0, fontSize: 11 }}>
+                    已结束
+                  </Tag>
+                )}
+                <span style={{ fontSize: 11, color: '#8c8c8c' }}>{act.timestamp}</span>
+              </Flex>
+            </div>
+            <div className={styles.activitySummary}>{act.summary}</div>
+            <div className={styles.activityBottom}>
+              {act.toolBadge && (
+                <Tag color="blue" style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px', margin: 0 }}>
+                  {act.toolBadge}
+                </Tag>
+              )}
+              {act.detail?.durationMs ? (
+                <span style={{ fontSize: 11, color: '#8c8c8c' }}>耗时 {act.detail.durationMs}ms · </span>
+              ) : null}
+              <span>点击查看执行详情 ›</span>
+            </div>
           </div>
         </div>
-      </div>
-    );
+      );
+    };
 
     const editMenuItems: MenuProps['items'] = [
       {
@@ -999,11 +1185,34 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                         <Text strong style={{ fontSize: 13 }}>
                           {job.title}
                         </Text>
-                        <Switch
-                          size="small"
-                          checked={job.enabled}
-                          onChange={(checked) => handleToggleJob(job.id, checked)}
-                        />
+                        <Flex align="center" gap={6}>
+                          <Switch
+                            size="small"
+                            checked={job.enabled}
+                            onChange={(checked) => handleToggleJob(job.id, checked)}
+                          />
+                          <Button
+                            size="small"
+                            type="text"
+                            style={{ fontSize: 12, padding: '0 4px', color: '#1890ff' }}
+                            onClick={() =>
+                              handleTriggerChatEdit(`把定时任务「${job.title}」的执行计划修改一下：`)
+                            }
+                            title="通过对话编辑此任务"
+                          >
+                            ✏️ 编辑
+                          </Button>
+                          <Button
+                            size="small"
+                            type="text"
+                            danger
+                            style={{ fontSize: 12, padding: '0 4px' }}
+                            onClick={() => handleDeleteJob(job)}
+                            title="删除此任务"
+                          >
+                            🗑️
+                          </Button>
+                        </Flex>
                       </div>
                       <Flex gap={6} align="center" wrap="wrap">
                         <Tag color="processing" style={{ fontSize: 11 }}>

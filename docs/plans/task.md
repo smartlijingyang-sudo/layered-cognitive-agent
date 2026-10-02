@@ -479,5 +479,5 @@
 | STATUS-SCREEN-TASK-2-PROJECTOR | 任务 2：单轨事实流投影器与快照引擎 (ActivityProjector, StatusSnapshotService) | Completed | 落地纯函数单轨投影器，支持 start/end/cancel 折叠与幂等重放，2/2 单测全通，通过 INV-01 |
 | STATUS-SCREEN-TASK-3-TRANSLATOR | 任务 3：EventTranslator 增量推送扩展与取消机制 (activity_updated) | Completed | 成功扩展 EventTranslator 在动作起止发射 activity_updated 流式事件并驱动全局投影，39/39 关联单测全绿，通过 INV-03, INV-04 |
 | STATUS-SCREEN-TASK-4-ROUTES | 任务 4：快照与取消 REST API 端点 (routes_status_screen.py) | Completed | 落地 /v1/assistants/{id}/status-snapshot 快照聚合端点与 cancel 同步，9/9 单测全绿，通过 INV-06 |
-| STATUS-SCREEN-TASK-5-FRONTEND | 任务 5：前端 AssistantStatusDrawer.tsx 增量 Patch 与交互闭环 | In_Progress | 正在实现抽屉快照拉取、WS 单行原地 patch、Upcoming 聊天草稿、系统任务防删与 Stop 按钮 |
-| STATUS-SCREEN-TASK-6-E2E-INVARIANTS | 任务 6：全链路单测回归与全量不变量矩阵验证 (INV-01 ~ INV-06) | Pending | 验证端到端生命周期与所有断言，ruff/diff 检查 |
+| STATUS-SCREEN-TASK-5-FRONTEND | 任务 5：前端 AssistantStatusDrawer.tsx 增量 Patch 与交互闭环 | Completed | 落地快照初始化、WS 单行原地 patch、Upcoming 聊天草稿、系统任务防删与 Stop 按钮，39 补丁全部同步且 0 broken，通过 INV-03, INV-05 |
+| STATUS-SCREEN-TASK-6-E2E-INVARIANTS | 任务 6：全链路单测回归与全量不变量矩阵验证 (INV-01 ~ INV-06) | In_Progress | 正在编写全链路场景集成测试，验证 INV-01 至 INV-06 |
