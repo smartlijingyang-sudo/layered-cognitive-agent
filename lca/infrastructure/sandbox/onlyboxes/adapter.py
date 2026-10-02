@@ -169,10 +169,14 @@ class OnlyboxesSandboxAdapter(Sandbox):
     ) -> None:
         """Write binary data to *path* in base64-encoded chunks."""
         # Truncate target and ensure parent directory exists.
+        # Internal plumbing: _collect=False — these intermediate results are
+        # discarded, only the caller's own _exec_terminal collects outputs,
+        # so sweeping here would only waste ls/base64 round-trips per chunk.
         await self._exec_terminal(
             f"mkdir -p \"$(dirname '{path}')\" && : > '{path}'",
             session_id=session_id,
             timeout_s=timeout_s,
+            _collect=False,
         )
         for offset in range(0, max(len(data), 1), WRITE_CHUNK_BYTES):
             chunk = base64.b64encode(data[offset : offset + WRITE_CHUNK_BYTES]).decode("ascii")
@@ -180,6 +184,7 @@ class OnlyboxesSandboxAdapter(Sandbox):
                 f"printf '%s' '{chunk}' | base64 -d >> '{path}'",
                 session_id=session_id,
                 timeout_s=timeout_s,
+                _collect=False,
             )
 
     # ── Sandbox protocol: write_files ───────────────────────────────
