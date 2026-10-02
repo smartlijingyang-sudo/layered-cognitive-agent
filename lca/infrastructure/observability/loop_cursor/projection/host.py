@@ -202,9 +202,9 @@ class StdProjectionHost:
     ) -> None:
         """Checkpoint replay 入口;调用每条 deriver 的 restore(state)。
 
-        ``base_seq`` 是 checkpoint seq;``cut`` 表 replay 截止。
-        当前实现按 deriver 的 ``restore(init_state)`` 重置;若 deriver
-        未提供则保留当前 state(silent 兼容)。
+        ``base_seq`` 是 checkpoint seq;``cut`` 预留:replay 截止点
+        (当前实现仅按 deriver 的 ``restore(init_state)`` 重置,暂不消费;
+        若 deriver 未提供则保留当前 state(silent 兼容))。
         """
         with self._lock:
             for key, definition in list(self._definitions.items()):
@@ -231,6 +231,7 @@ class StdProjectionHost:
                     monotonic=True,
                 )
             _ = header  # reserved;keep for caller-supplied metadata
+            _ = cut  # reserved;replay cutoff not yet consumed by reset-to-init restore
 
     # ── flush / close ─────────────────────────────────────────────
     def flush_all(self) -> FlushReport:
