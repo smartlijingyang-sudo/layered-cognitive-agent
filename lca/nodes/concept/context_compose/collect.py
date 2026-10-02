@@ -41,8 +41,8 @@ class ContextLinesCollectExecutor:
 
     semantic_name: str = "context.lines.collect"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("state",)
-    declared_outputs: tuple[PortName, ...] = ("manifest",)
+    declared_inputs: tuple[PortName, ...] = (PortName("state"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("manifest"),)
 
     async def node_execute(
         self,
@@ -57,7 +57,7 @@ class ContextLinesCollectExecutor:
         P3 阶段:从 ``state.perceive`` 读 manifest。state 不存在时返 None。
         真实 manifest 收集发生在 perceive 阶段,本节点只做 typed 透传。
         """
-        state = input.port_values.get("state")
+        state = input.port_values.get(PortName("state"))
         if state is None:
             state = context.runtime.get("state")
         if state is not None and not isinstance(state, AgentState):
@@ -68,7 +68,7 @@ class ContextLinesCollectExecutor:
         manifest: ContextManifest | None = None
         if state is not None and state.perceive is not None:
             manifest = state.perceive.manifest
-        return NodeOutput(port_values={"manifest": manifest})
+        return NodeOutput(port_values={PortName("manifest"): manifest})
 
 
 @plugin(
