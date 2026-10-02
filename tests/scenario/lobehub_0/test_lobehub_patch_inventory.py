@@ -10,9 +10,11 @@ _RUNTIME_SOURCES = {
     "lca_runtime_agent_gateway.py",
     "lca_runtime_chat_persistence.py",
     "lca_runtime_use_gateway_reconnect.py",
+    "lca_assistant_events.py",
     "lcaChatRow.ts",
     "lcaFinishChat.ts",
     "lcaGateway/executeGatewayRun.ts",
+    "lcaGateway/assistantEventClient.ts",
 }
 
 
@@ -24,3 +26,15 @@ def test_runtime_patch_is_gateway_driver() -> None:
     gateway = (runtime / "lca_runtime_agent_gateway.py").read_text(encoding="utf-8")
     assert "lcaExecuteGatewayRun" in gateway
     assert "runLcaJournal" not in gateway
+
+
+def test_lca_assistant_events_registered() -> None:
+    from deploy.lobehub.engine import discover_patches
+
+    runtime = _PATCH_ROOT / "runtime"
+    names = {pm.meta.name for pm in discover_patches()}
+    assert "lca_assistant_events" in names
+    events = (runtime / "lca_assistant_events.py").read_text(encoding="utf-8")
+    assert "assistantEventClient" in events
+    client = (runtime / "lcaGateway" / "assistantEventClient.ts").read_text(encoding="utf-8")
+    assert "lca-assistant-avatar-changed" in client
