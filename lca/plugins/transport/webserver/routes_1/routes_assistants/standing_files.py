@@ -9,7 +9,6 @@ Endpoints:
 from __future__ import annotations
 
 import contextlib
-from lca.contracts.mechanisms.content.addressable import sha256_hex
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -17,6 +16,7 @@ from typing import Any
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 from lca.contracts.protocols.assistant.catalog import ProfilePatch
 from lca.plugins.domain.assistant.catalog.plugin import (
     AssistantCatalogError,
@@ -296,9 +296,16 @@ async def update_standing_file(request: Request) -> JSONResponse:
     try:
         patch_field = _PROFILE_PATCH_FIELDS.get(filename)
         if patch_field is not None:
-            revision = catalog.revise_profile(
-                assistant_id, ProfilePatch(**{patch_field: new_content}), actor=actor
-            )
+            # Explicit per-field construction: the map above only names the
+            # str-typed ProfilePatch fields, so a **{patch_field: ...} unpack
+            # would need pyright to prove which kwarg a dynamic key names.
+            if patch_field == "identity_md":
+                patch = ProfilePatch(identity_md=new_content)
+            elif patch_field == "user_md":
+                patch = ProfilePatch(user_md=new_content)
+            else:  # soul_md — the only remaining key in _PROFILE_PATCH_FIELDS
+                patch = ProfilePatch(soul_md=new_content)
+            revision = catalog.revise_profile(assistant_id, patch, actor=actor)
             revision_seq = revision.revision_seq
             if filename == "USER.md":
                 # 同步更新 user_store
@@ -343,5 +350,8 @@ async def standing_file_dispatcher(request: Request) -> JSONResponse:
     if method == "OPTIONS":
         return _json({}, status_code=200)
     return _error_envelope(
-        "method_not_allowed", status_code=405, detail=f"Unsupported method {method}"
+        "method_not_allowed",
+        status_code=405,
+        error_type="method_not_allowed",
+        detail=f"Unsupported method {method}",
     )
