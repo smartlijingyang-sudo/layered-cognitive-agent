@@ -126,9 +126,12 @@ class TestPlanRefCrossProfile:
     """不同 profile → 不同 plan_ref（hash 包含 profile_path）。"""
 
     def test_two_profiles_yield_different_plan_refs(self) -> None:
+        # The test's own name states the intent: different *profiles* yield
+        # different refs. A task_id option proxy was used instead, but
+        # CompileOptions are deliberately not part of the plan_ref payload
+        # (see B-068, frozen) — hence the false failure. Use two real profiles.
         resolved_std = resolve_profile("profiles/web-standard.yaml")
+        resolved_coding = resolve_profile("profiles/coding-agent.yaml")
         plan_std = compile_plan(resolved_std)
-        # Different profile (use a different default)
-        # Use web-standard + different task_id
-        plan_with_task = compile_plan(resolved_std, options=CompileOptions(task_id="task-1"))
-        assert compiled_run_plan_ref(plan_std) != compiled_run_plan_ref(plan_with_task)
+        plan_coding = compile_plan(resolved_coding)
+        assert compiled_run_plan_ref(plan_std) != compiled_run_plan_ref(plan_coding)
