@@ -31,7 +31,7 @@ import json
 import sys
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TextIO, cast
 
 import typer
 
@@ -142,7 +142,6 @@ def register(app: typer.Typer) -> None:
         logs`` reads stderr instead, so progress is still observable.
         """
         import contextlib
-        import io
         import os
         import time as _time
 
@@ -153,8 +152,8 @@ def register(app: typer.Typer) -> None:
         # Silence stdout while validators run; their `print("✅ ...")`
         # banners would otherwise leak into --json output. Stderr stays
         # open so humans running interactively still see progress.
-        devnull: io.TextIOBase | None = None
-        saved_stdout: io.TextIOBase | None = None
+        devnull: TextIO | None = None
+        saved_stdout: TextIO | None = None
         if as_json:
             # Stdout is replaced for the duration of the validator pass so
             # its `print("✅ ...")` banners do not corrupt the JSON stream,
@@ -394,9 +393,10 @@ def register(app: typer.Typer) -> None:
             typer.echo(f"{layer_name} ({len(rows)}):")
             for row in rows:
                 marker = "ok" if row["status"] == "ok" else f"FAIL({row['status']})"
+                duration_ms = row.get("duration_ms")
+                duration = float(duration_ms) if isinstance(duration_ms, (int, float)) else 0.0
                 typer.echo(
-                    f"  {row['plugin_id']:<64} {row['kind']:<10} {marker:<10} "
-                    f"{float(row['duration_ms']):.1f}ms"
+                    f"  {row['plugin_id']:<64} {row['kind']:<10} {marker:<10} {duration:.1f}ms"
                 )
         typer.echo(f"total: {len(entries)}")
 
