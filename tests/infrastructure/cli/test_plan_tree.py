@@ -181,17 +181,16 @@ def test_plan_tree_missing_subgraph_file(tmp_path: Path) -> None:
     runner = CliRunner()
     app = _build_app()
     result = runner.invoke(app, ["plan", "tree", str(profile)])
-    # Note: pytest's autouse _block_kernel_sys_exit swallows ``sys.exit``,
-    # so ``raise typer.Exit(1)`` doesn't propagate to ``result.exit_code``
-    # under test. Assert on the failure markers in stdout/stderr instead,
-    # which is what an operator sees in production.
+    # Note: the former global ``sys.exit`` stub (tests/conftest.py) was removed
+    # (todo-14); ``result.exit_code`` now carries the real CLI exit code.
+    # Marker assertions stay as the operator-facing signal.
     assert "not found on disk" in result.stdout
     assert "subgraph layers failed to inflate" in (result.stderr or "")
     assert "✗" in result.stdout
 
     json_result = runner.invoke(app, ["plan", "tree", str(profile), "--json"])
-    # typer.Exit swallowed under pytest; payload is still emitted with the
-    # error marker in the layers list — that is the operator-facing signal.
+    # Payload is still emitted with the error marker in the layers list —
+    # that is the operator-facing signal (exit codes are real again post todo-14).
     payload = json.loads(json_result.stdout)
     bad_layers = [layer for layer in payload["layers"] if "error" in layer]
     assert len(bad_layers) == 1

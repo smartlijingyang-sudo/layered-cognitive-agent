@@ -47,11 +47,12 @@ RUN_ID = "run_aaaaaaaaaaaa"
 
 @pytest.fixture
 def real_sys_exit(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Undo ``tests/conftest.py::_block_kernel_sys_exit`` for exit-code asserts.
+    """Pin ``sys.exit`` to real ``SystemExit`` semantics for exit-code asserts.
 
-    That autouse fixture stubs ``sys.exit`` so kernel-dispose tests keep
-    running; typer routes ``typer.Exit`` through ``sys.exit``, so without
-    this the CLI's non-zero exit is unobservable.
+    The former global stub (``tests/conftest.py::_block_kernel_sys_exit``)
+    was removed (todo-14); kernel lifespan/dispose tests now self-protect.
+    This fixture keeps the intent explicit: typer routes ``typer.Exit``
+    through ``sys.exit``, and the CLI's non-zero exit must stay observable.
     """
 
     def _exit(code: int = 0) -> None:

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import sys
-
 import pytest
 
 
@@ -18,12 +16,3 @@ def _ensure_no_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("LANGFUSE_SECRET_KEY", raising=False)
     monkeypatch.setenv("LCA_OBS_INCLUDE_LANGFUSE", "false")
 
-
-@pytest.fixture(autouse=True)
-def _block_kernel_sys_exit(monkeypatch: pytest.MonkeyPatch) -> None:
-    """K6's :class:`DefaultShutdownCoordinator` calls ``sys.exit`` on dispose
-    (kernel is a process-root CM). Test processes must keep running, so
-    neutralize the exit call globally. The kernel lifespan tests assert
-    dispose semantics, not process termination.
-    """
-    monkeypatch.setattr(sys, "exit", lambda code=0: None)
