@@ -6,6 +6,7 @@ state.json 是头像状态唯一真值；图片按候选/激活目录落盘。
 from __future__ import annotations
 
 import io
+import re
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -184,3 +185,51 @@ def _resize_image(data: bytes, target: Path, size: tuple[int, int]) -> tuple[int
         rgb.thumbnail(size, Image.Resampling.LANCZOS)
         rgb.save(target, "PNG")
         return rgb.size
+
+
+# ADR-0269 §7：图片静态服务白名单 + 路径规范化。只允许三种根：
+# candidates/<candidate_id>/<size>.png、active/<candidate_id>/<size>.png、
+# video/<candidate_id>.mp4。candidate_id 由服务生成，形如
+# ``create-20261002120000-0``（字母/数字/`-`/`_`）。
+_AVATAR_FILE_WHITELIST = re.compile(
+    r"^(?:"
+    r"candidates/(?P<candidate_id>[A-Za-z0-9_-]+)/(?:original|small|medium|large)\.png"
+    r"|active/(?P<active_id>[A-Za-z0-9_-]+)/(?:original|small|medium|large)\.png"
+    r"|video/(?P<video_id>[A-Za-z0-9_-]+)\.mp4"
+    r")$"
+)
+
+
+def resolve_safe_path(assistant_id: str, rel_path: str) -> bytes:
+    """解析并读取 assistant 的 avatar 文件（白名单 + 路径归一化）。
+
+    允许的根：``candidates/<candidate_id>/<size>.png``、
+    ``active/<candidate_id>/<size>.png``、``video/<candidate_id>.mp4``。
+    拒绝 ``..``、绝对路径、null 字节与任何越界路径（抛 ``ValueError``，
+    REST 路由映射 400）；文件不存在抛 ``FileNotFoundError``（映射 404）。
+    """
+    from lca.plugins.avatar.registry import avatar_service_registry
+
+    if "\x00" in rel_path:
+        raise ValueError("avatar file path contains null byte")
+    if rel_path.startswith("/") or "\\" in rel_path:
+        raise ValueError("avatar file path must be relative")
+    if _AVATAR_FILE_WHITELIST.match(rel_path) is None:
+        raise ValueError(f"disallowed avatar file path: {rel_path!r}")
+
+    normalized = Path(rel_path)
+    if ".." in normalized.parts:
+        raise ValueError("avatar file path traversal is not allowed")
+
+    service = avatar_service_registry.get(assistant_id)
+    base_dir = Path(service.store.base_dir)
+    base_resolved = base_dir.resolve()
+    target = (base_dir / rel_path).resolve()
+    if not target.is_relative_to(base_resolved):
+        raise ValueError("avatar file path escapes avatar base dir")
+    if not target.is_file():
+        raise FileNotFoundError(target)
+    return target.read_bytes()
+
+
+__all__ = ["AvatarStore", "resolve_safe_path"]
