@@ -35,16 +35,18 @@ STANDING_FILES_WHITELIST: tuple[str, ...] = (
     "IDENTITY.md",
     "SOUL.md",
     "USER.md",
+    "AGENTS.md",
     "MEMORY.md",
 )
 
 
-# filename -> ProfilePatch 字段名。SOUL/IDENTITY/USER 三文件经 catalog revise_profile
+# filename -> ProfilePatch 字段名。SOUL/IDENTITY/USER/AGENTS 四文件经 catalog revise_profile
 # 落盘（USER 额外同步 user_store）；MEMORY.md 直接写盘，不进此表。
 _PROFILE_PATCH_FIELDS: dict[str, str] = {
     "SOUL.md": "soul_md",
     "IDENTITY.md": "identity_md",
     "USER.md": "user_md",
+    "AGENTS.md": "agents_md",
 }
 
 
@@ -305,6 +307,8 @@ async def update_standing_file(request: Request) -> JSONResponse:
                 patch = ProfilePatch(identity_md=new_content)
             elif patch_field == "user_md":
                 patch = ProfilePatch(user_md=new_content)
+            elif patch_field == "agents_md":
+                patch = ProfilePatch(agents_md=new_content)
             else:  # soul_md — the only remaining key in _PROFILE_PATCH_FIELDS
                 patch = ProfilePatch(soul_md=new_content)
             revision = catalog.revise_profile(assistant_id, patch, actor=actor)

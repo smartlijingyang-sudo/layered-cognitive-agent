@@ -31,7 +31,7 @@ export interface AssistantStatusDrawerProps {
   className?: string;
 }
 
-type SectionKey = 'identity' | 'memory' | 'workspace';
+type SectionKey = 'identity' | 'rules' | 'memory' | 'workspace';
 
 const styles = createStaticStyles(({ css, cssVar }) => {
   return {
@@ -146,6 +146,7 @@ const FILE_ROLE_METADATA: Record<string, { label: string; icon: string; tagColor
   'IDENTITY.md': { label: '身份与人设', icon: '🪪', tagColor: 'blue' },
   'SOUL.md': { label: '灵魂与红线', icon: '🌟', tagColor: 'purple' },
   'USER.md': { label: '用户画像', icon: '👤', tagColor: 'cyan' },
+  'AGENTS.md': { label: '工作手册与血训', icon: '📋', tagColor: 'green' },
   'MEMORY.md': { label: '长期事实', icon: '🧠', tagColor: 'gold' },
 };
 
@@ -219,6 +220,9 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
     const displayedFiles = files.filter((f) => {
       if (activeSection === 'identity') {
         return f.filename === 'IDENTITY.md' || f.filename === 'SOUL.md' || f.filename === 'USER.md';
+      }
+      if (activeSection === 'rules') {
+        return f.filename === 'AGENTS.md';
       }
       if (activeSection === 'memory') {
         return f.filename === 'MEMORY.md';
@@ -306,6 +310,7 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
               onChange={setActiveSection}
               options={[
                 { label: '🪪 Identity', value: 'identity' },
+                { label: '📋 Rules', value: 'rules' },
                 { label: '🧠 Memory', value: 'memory' },
                 { label: '📁 Workspace', value: 'workspace' },
               ]}

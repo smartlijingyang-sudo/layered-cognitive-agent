@@ -116,7 +116,7 @@ def test_inv02_content_parity_and_standard_sha256_hash(tmp_path: Path) -> None:
     app, _, _, assistant_id = _create_app_with_user_store(tmp_path)
     client = TestClient(app)
 
-    for filename in ("IDENTITY.md", "SOUL.md", "USER.md", "MEMORY.md"):
+    for filename in ("IDENTITY.md", "SOUL.md", "USER.md", "AGENTS.md", "MEMORY.md"):
         resp = client.get(f"/v1/assistants/{assistant_id}/standing-files/{filename}")
         assert resp.status_code == 200
         data = resp.json()
@@ -178,6 +178,20 @@ def test_inv04_catalog_revision_increments_on_standing_file_write(tmp_path: Path
     assert put_id.status_code == 200
     assert put_id.json()["revision_seq"] == initial_seq + 1
     assert catalog.get(assistant_id).revision_seq == initial_seq + 1
+
+    # 3. 更新 AGENTS.md
+    read_agents = client.get(f"/v1/assistants/{assistant_id}/standing-files/AGENTS.md")
+    assert read_agents.status_code == 200
+    agents_hash = read_agents.json()["content_hash"]
+    new_agents = "# AGENTS.md\n- 沉淀血训：杜绝硬编码"
+
+    put_agents = client.put(
+        f"/v1/assistants/{assistant_id}/standing-files/AGENTS.md",
+        json={"content": new_agents, "expected_hash": agents_hash},
+    )
+    assert put_agents.status_code == 200
+    assert put_agents.json()["revision_seq"] == initial_seq + 2
+    assert catalog.get(assistant_id).revision_seq == initial_seq + 2
 
 
 def test_inv05_user_md_write_syncs_with_global_user_store(tmp_path: Path) -> None:
