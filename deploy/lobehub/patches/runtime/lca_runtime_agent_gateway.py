@@ -45,6 +45,8 @@ _NEW_FILES = (
     "client.ts",
     "interrupt.ts",
     "types.ts",
+    "reactionStore.ts",
+    "reactionStore.test.ts",
 )
 
 _NEW_MARKER = "/* LCA: every chat is a Run */"
