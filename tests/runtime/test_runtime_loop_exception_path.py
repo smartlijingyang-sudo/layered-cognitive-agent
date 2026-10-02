@@ -30,6 +30,7 @@ from lca.contracts.protocols.runtime.runtime.lifecycle import (
 from lca.harness.declarative.compile.instrument.wrap import set_active_spine_accessor
 from lca.infrastructure.observability.facade.run.context import run_scope
 from lca.runtime.loop.runtime_loop import CognitiveRuntime
+from lca.session.append import Session
 from lca_kernel.events.bus.bus import EventBus
 
 
@@ -84,6 +85,37 @@ def sent_payloads() -> Iterator[list[Any]]:
         EventBus.set_default(None)
 
 
+@pytest.fixture
+def bound_session() -> Iterator[Session]:
+    """Bind a real Session: Session-SSOT facts commit instead of loud-drop.
+
+    ``exception.finally`` / ``lifecycle.finally`` (and ``exception.caught``
+    when a session is bound) no longer travel the default EventBus; without
+    a bound session ``publish_ep_bound`` drops them with
+    ``fact_gateway.unbound_drop`` (0379).
+    """
+    from lca.plugins.events.publishers._session_publish import (
+        reset_publish_session,
+        set_publish_session,
+    )
+
+    session = Session("runtime-exception-path-test")
+    token = set_publish_session(session)
+    try:
+        yield session
+    finally:
+        reset_publish_session(token)
+
+
+def _session_facts(session: Session, execution_point: str) -> list[Any]:
+    """Session events carrying the given spine ``execution_point``."""
+    return [
+        event
+        for event in session.snapshot_events()
+        if event.data.get("execution_point") == execution_point
+    ]
+
+
 @dataclass
 class _RecordingSubscriber:
     events: list[RuntimeLifecycleEvent]
@@ -114,8 +146,7 @@ def _state() -> AgentState:
 
 @pytest.mark.asyncio
 async def test_driver_failure_emits_normalized_exception_record(
-    recording_spine: _RecordingSpine,
-    sent_payloads: list[Any],
+    bound_session: Session,
 ) -> None:
     events: list[RuntimeLifecycleEvent] = []
     runtime = _runtime(events)
@@ -126,16 +157,9 @@ async def test_driver_failure_emits_normalized_exception_record(
     with pytest.raises(ValueError, match="driver boom"):
         await runtime._run_driver(_state(), runner=_runner)
 
-    caught = [
-        append
-        for append in recording_spine.appends
-        if append["execution_point"] == "exception.caught"
-    ]
+    caught = _session_facts(bound_session, "exception.caught")
     assert len(caught) == 1
-    event = caught[0]
-    assert event["channel"] == "error"
-    assert event["outcome"] == "failure"
-    payload = event["payload"]
+    payload = caught[0].data["payload"]
     assert payload is not None
     assert payload["boundary"] == "terminal_driver"
     assert payload["exception_class"] == "ValueError"
@@ -146,16 +170,15 @@ async def test_driver_failure_emits_normalized_exception_record(
     assert payload["call_frames"], "call_frames must survive normalization"
 
     assert [event.type for event in events] == [RuntimeLifecycleEventType.FAILED]
-    finally_events = [item for item in sent_payloads if item.execution_point == "exception.finally"]
+    finally_events = _session_facts(bound_session, "exception.finally")
     assert len(finally_events) == 1
-    assert finally_events[0].payload["outcome"] == "failure"
-    assert not [item for item in sent_payloads if item.execution_point == "lifecycle.finally"]
+    assert finally_events[0].data["payload"]["outcome"] == "failure"
+    assert not _session_facts(bound_session, "lifecycle.finally")
 
 
 @pytest.mark.asyncio
 async def test_driver_cancellation_binds_real_exception_instance(
-    recording_spine: _RecordingSpine,
-    sent_payloads: list[Any],
+    bound_session: Session,
 ) -> None:
     events: list[RuntimeLifecycleEvent] = []
     runtime = _runtime(events)
@@ -166,13 +189,9 @@ async def test_driver_cancellation_binds_real_exception_instance(
     with pytest.raises(asyncio.CancelledError):
         await runtime._run_driver(_state(), runner=_runner)
 
-    caught = [
-        append
-        for append in recording_spine.appends
-        if append["execution_point"] == "exception.caught"
-    ]
+    caught = _session_facts(bound_session, "exception.caught")
     assert len(caught) == 1
-    payload = caught[0]["payload"]
+    payload = caught[0].data["payload"]
     assert payload is not None
     # The live instance drives the record: qualname from its type, traceback
     # and err_kind from the instance — no hardcoded class/message strings.
@@ -182,9 +201,9 @@ async def test_driver_cancellation_binds_real_exception_instance(
     assert payload["trace_id"] == "trace-driver"
 
     assert [event.type for event in events] == [RuntimeLifecycleEventType.CANCELED]
-    finally_events = [item for item in sent_payloads if item.execution_point == "exception.finally"]
+    finally_events = _session_facts(bound_session, "exception.finally")
     assert len(finally_events) == 1
-    assert finally_events[0].payload["outcome"] == "cancelled"
+    assert finally_events[0].data["payload"]["outcome"] == "cancelled"
 
 
 @pytest.mark.asyncio
@@ -215,8 +234,7 @@ async def test_driver_run_scope_run_id_reaches_record(
 
 @pytest.mark.asyncio
 async def test_driver_success_keeps_lifecycle_finally_envelope(
-    recording_spine: _RecordingSpine,
-    sent_payloads: list[Any],
+    bound_session: Session,
 ) -> None:
     runtime = _runtime([])
     result = Result(
@@ -233,8 +251,8 @@ async def test_driver_success_keeps_lifecycle_finally_envelope(
     returned = await runtime._run_driver(_state(), runner=_runner)
 
     assert returned is result
-    assert recording_spine.appends == []
-    lifecycle = [item for item in sent_payloads if item.execution_point == "lifecycle.finally"]
+    assert _session_facts(bound_session, "exception.caught") == []
+    lifecycle = _session_facts(bound_session, "lifecycle.finally")
     assert len(lifecycle) == 1
-    assert lifecycle[0].payload["outcome"] == "success"
-    assert not [item for item in sent_payloads if item.execution_point == "exception.finally"]
+    assert lifecycle[0].data["payload"]["outcome"] == "success"
+    assert not _session_facts(bound_session, "exception.finally")
