@@ -23,6 +23,10 @@ class _StubAWSListRegionsTool(Tool):
     parameters: ClassVar[dict] = {"type": "object", "properties": {}}
     is_idempotent: bool = True
     default_timeout_s: int = 5
+    # ADR-0256: namespace is factory-declared metadata, required at wiring
+    # time. Production MCP-adapted tools carry namespace "ext"
+    # (lca/infrastructure/mcp/bridge.py); the stub mirrors that.
+    namespace: str = "ext"
 
     async def execute(self, args: dict) -> Observation:
         return Observation(

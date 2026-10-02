@@ -8,14 +8,35 @@ import pytest
 
 from lca.application.api.api import Agent
 from lca.application.api.spawn import _format_tools_xml
+from lca.infrastructure.mcp.config import find_mcp_config_path
 from lca.infrastructure.mcp.tool_set import (
     build_ambient_mcp_tools,
     reset_ambient_mcp_manager,
 )
 
+# Fallback MCP config used only when no real mcp.yaml exists on the machine
+# (e.g. CI). Names the corp server 'corp' so tool names are deterministic.
+_MINIMAL_CORP_MCP_YAML = 'servers:\n  corp:\n    transport: stdio\n    command: "/opt/lca/venv/bin/python"\n    args: ["-m", "corp_mcp"]\n    env:\n      CORP_OA_BASE_URL: "https://fintech.kltb.com.cn/api"\n    startup_timeout_ms: 10000\n    tool_timeout_ms: 30000\n    enabled: true\n'
+
 
 @pytest.fixture(autouse=True)
-def clean_mcp_ambient():
+def clean_mcp_ambient(tmp_path, monkeypatch):
+    """Pin MCP server naming so these tests are hermetic.
+
+    These tests assert the historical ``mcp__corp__oa_*`` tool names, but a
+    developer's personal mcp.yaml may name the corp server ``corp-mcp``
+    (yielding ``mcp__corp-mcp__oa_*``). Copy the real config (when one exists)
+    with the corp server renamed to ``corp``; the copy lives in tmp_path at
+    test runtime only, so no personal config or secret lands in the repo.
+    """
+    real_path = find_mcp_config_path()
+    if real_path is not None:
+        text = real_path.read_text(encoding="utf-8").replace("corp-mcp:", "corp:")
+    else:
+        text = _MINIMAL_CORP_MCP_YAML
+    cfg = tmp_path / "mcp.yaml"
+    cfg.write_text(text, encoding="utf-8")
+    monkeypatch.setenv("LCA_MCP_CONFIG", str(cfg))
     reset_ambient_mcp_manager()
     yield
     reset_ambient_mcp_manager()
