@@ -12,13 +12,13 @@ from dataclasses import replace
 from pathlib import Path
 from threading import RLock
 
+from lca.contracts.atoms.ids.ids import utc_now_ms
 from lca.contracts.models.core.conversation.memory import MemoryRecord, MemoryRelationKind
 from lca.contracts.protocols.memory.memory import TemporalMemoryStore
 from lca.infrastructure.state_store.sqlite_temporal_codec import (
     TOKEN_PATTERN,
     materialize_record,
     normalize_scope,
-    now_ms,
     record_values,
     row_to_record,
 )
@@ -68,7 +68,7 @@ class SqliteTemporalMemoryStore(TemporalMemoryStore):
         reason: str = "revised",
     ) -> MemoryRecord:
         """Supersede a fact without destroying its historical validity interval."""
-        current = now_ms()
+        current = utc_now_ms()
         with self._lock, self._conn:
             previous = self._select_record(record_id)
             if previous is None:
@@ -118,7 +118,7 @@ class SqliteTemporalMemoryStore(TemporalMemoryStore):
 
     def retire(self, record_id: str, *, reason: str = "retired", at_ms: int | None = None) -> None:
         """Soft-retire a fact while retaining it for audit and historical queries."""
-        retired_at_ms = at_ms if at_ms is not None else now_ms()
+        retired_at_ms = at_ms if at_ms is not None else utc_now_ms()
         with self._lock, self._conn:
             cursor = self._conn.execute(
                 """
@@ -145,7 +145,7 @@ class SqliteTemporalMemoryStore(TemporalMemoryStore):
         """Add an explicit non-destructive relation edge between two stored facts."""
         if source_id == target_id:
             raise ValueError("temporal memory relation endpoints must differ")
-        created = created_at_ms if created_at_ms is not None else now_ms()
+        created = created_at_ms if created_at_ms is not None else utc_now_ms()
         with self._lock, self._conn:
             if self._select_record(source_id) is None or self._select_record(target_id) is None:
                 raise KeyError("temporal memory relation requires two existing records")
@@ -167,7 +167,7 @@ class SqliteTemporalMemoryStore(TemporalMemoryStore):
     ) -> list[MemoryRecord]:
         """Recall active evidence using scope isolation, temporal validity, and lexical ranking."""
         effective_scope = normalize_scope(scope_id)
-        as_of = as_of_ms if as_of_ms is not None else now_ms()
+        as_of = as_of_ms if as_of_ms is not None else utc_now_ms()
         capped_limit = max(1, min(limit, _MAX_RECALL_LIMIT))
         tokens = tuple(
             dict.fromkeys(token.casefold() for token in TOKEN_PATTERN.findall(query) if token)

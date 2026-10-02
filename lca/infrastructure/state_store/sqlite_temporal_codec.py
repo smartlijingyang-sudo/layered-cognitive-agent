@@ -6,18 +6,13 @@ import json
 import re
 import sqlite3
 from dataclasses import replace
-from time import time
 
 from lca.contracts.atoms.enums.enums import MemoryLayer, MemoryRecordKind
+from lca.contracts.atoms.ids.ids import utc_now_ms
 from lca.contracts.models.core.conversation.memory import MemoryRecord, MemoryTrust
 
 DEFAULT_SCOPE = "local:default"
 TOKEN_PATTERN = re.compile(r"[\w-]+", re.UNICODE)
-
-
-def now_ms() -> int:
-    """Return the current UNIX epoch in millisecond precision."""
-    return int(time() * 1000)
 
 
 def normalize_scope(scope_id: str) -> str:
@@ -27,7 +22,7 @@ def normalize_scope(scope_id: str) -> str:
 
 def materialize_record(record: MemoryRecord, *, at_ms: int | None = None) -> MemoryRecord:
     """Fill temporal defaults before a record is persisted as an immutable fact."""
-    current = at_ms if at_ms is not None else now_ms()
+    current = at_ms if at_ms is not None else utc_now_ms()
     created = record.created_at_ms if record.created_at_ms is not None else current
     observed = record.observed_at_ms if record.observed_at_ms is not None else created
     valid_from = record.valid_from_ms if record.valid_from_ms is not None else observed
@@ -101,7 +96,6 @@ __all__ = [
     "TOKEN_PATTERN",
     "materialize_record",
     "normalize_scope",
-    "now_ms",
     "record_values",
     "row_to_record",
 ]
