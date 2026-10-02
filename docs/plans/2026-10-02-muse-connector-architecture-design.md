@@ -32,9 +32,10 @@
     - `connections.json`：**仅存储非敏感元数据**（`service`, `account_id`, `state`, `connection_id`, `auth_url`, `scopes`）；
     - `permissions.json`：存储用户细粒度 Action 开关（Allow / Ask / Deny）；
   - **并发写与原子性保证**：所有本地 JSON 写入强制执行 `atomic_write_json`（写临时文件 + `os.replace`），杜绝并发写入损坏文件；
-- **退出策略（Vendor Lock-in 免疫）**：
-  - 架构抽象出 `OAuthProviderProtocol` 隔离 Seam：Composio 仅作为该协议的一个实现适配器（`ComposioOAuthAdapter`）；
-  - 后续若需完全自建私有 OAuth，仅需编写 `NativeGoogleOAuthAdapter` / `NativeGitHubOAuthAdapter` 替换该适配器，上层 CLI、状态机、权限层、SKILL.md 及 LobeHub 卡片组件**零改动无缝切换**。
+- **退出策略（Vendor Lock-in 免疫，规划中、未落地）**：
+  - 计划抽象 `OAuthProviderProtocol` 隔离 Seam：Composio 作为该协议的首个实现适配器（`ComposioOAuthAdapter`）；
+  - 后续若需完全自建私有 OAuth，再编写 `NativeGoogleOAuthAdapter` / `NativeGitHubOAuthAdapter` 替换，上层 CLI、状态机、权限层、SKILL.md 及 LobeHub 卡片组件**零改动无缝切换**。
+  - **状态诚实注**：该 Seam 目前未在 `lca/` 代码中实现（全仓零命中），本节为架构规划而非已落地契约；落地前不作为评审依据。
 
 ---
 
