@@ -109,7 +109,7 @@ class FilesystemJournalStore(JournalStoreBackend):
             except (TypeError, ValueError):
                 # 无法解析为整数 —— 视为格式损坏,跳过(非 schema 拒绝)
                 continue
-            # 方向感知 schema 校验(VersionTooOld / VersionTooNew 必抛)
+            # 方向感知 schema 校验(VersionTooOldError / VersionTooNewError 必抛)
             check_schema_version(version_int)
             # L15: event_type 必须在已知词表,除非显式 ignorable
             event_type = str(payload.get("event_type", "UnknownEvent"))
@@ -117,10 +117,10 @@ class FilesystemJournalStore(JournalStoreBackend):
             ignorable = bool(data.get("ignorable", False))
             if event_type not in JOURNAL_EVENT_CLASSES and not ignorable:
                 from lca.contracts.observability.journal.format_errors import (
-                    UnknownEventType,
+                    UnknownEventTypeError,
                 )
 
-                raise UnknownEventType(event_type)
+                raise UnknownEventTypeError(event_type)
             # 重建 StampedEvent 的最小骨架,seq/ts/event_type/data 已够消费
             from lca.contracts.atoms.ids.ids import RunId, TraceId
             from lca.contracts.models.observability.journal.journal import (

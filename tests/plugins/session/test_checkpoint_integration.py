@@ -10,7 +10,7 @@ import pytest
 from lca.cognition.brain.llm_turn import execute_llm_turn
 from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
 from lca.contracts.models.core.state.state import AgentState, Budget
-from lca.contracts.protocols.session.persistence.service import CheckpointFailure
+from lca.contracts.protocols.session.persistence.service import CheckpointFailureError
 from lca.plugins.events.publishers._session_publish import (
     reset_publish_session,
     set_publish_session,
@@ -44,7 +44,7 @@ async def test_flush_failure_blocks_llm_dispatch() -> None:
     state = AgentState(trace_id="t", task="hi", budget=Budget(), step=0)
     llm = _RecordingLLM()
     try:
-        with pytest.raises(CheckpointFailure, match="disk full"):
+        with pytest.raises(CheckpointFailureError, match="disk full"):
             await execute_llm_turn(llm, [], "prompt", step=0, state=state, task="hi")
     finally:
         reset_publish_session(token)

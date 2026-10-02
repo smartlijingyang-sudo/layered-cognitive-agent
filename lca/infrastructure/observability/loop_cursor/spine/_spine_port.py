@@ -174,7 +174,7 @@ def spine_port_append(
         )
     except Exception as exc:
         # I17 violations always propagate
-        if type(exc).__name__ == "I17Violation" and type(exc).__module__ in (
+        if type(exc).__name__ == "I17ViolationError" and type(exc).__module__ in (
             "lca.infrastructure.observability.spine.spine.enrich",
             "lca.plugins.observability.spine.emit_pipeline",
         ):

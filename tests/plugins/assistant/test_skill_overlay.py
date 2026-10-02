@@ -29,8 +29,8 @@ from lca.contracts.observability.closure.assistant_ep_closure import (
 )
 from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
 from lca.contracts.protocols.assistant.skill_overlay import (
-    SkillNotInstalled,
-    SkillNotVerified,
+    SkillNotInstalledError,
+    SkillNotVerifiedError,
     SkillSource,
 )
 from lca.contracts.protocols.declarative.declarative_1.declarative_common import PluginSpecKind
@@ -389,7 +389,7 @@ class TestActivate:
         overlay: AssistantSkillOverlayImpl,
         handle: Any,
     ) -> None:
-        with pytest.raises(SkillNotInstalled):
+        with pytest.raises(SkillNotInstalledError):
             overlay.activate(handle.assistant_id, "never-installed")
 
     async def test_activate_unverified_package_rejected(
@@ -402,7 +402,7 @@ class TestActivate:
         rogue = home / "skills" / "rogue-skill"
         rogue.mkdir(parents=True)
         (rogue / "SKILL.md").write_text("unverified", encoding="utf-8")
-        with pytest.raises(SkillNotVerified):
+        with pytest.raises(SkillNotVerifiedError):
             overlay.activate(handle.assistant_id, "rogue-skill")
 
     async def test_activate_unknown_assistant_rejected(
@@ -476,7 +476,7 @@ class TestCrossAssistantIsolation:
         other = catalog.create(CreateAssistantRequest(name="Other"))
         await overlay.install(handle.assistant_id, SkillSource(local_path=str(local_skill)))
         assert overlay.list_installed(other.assistant_id) == ()
-        with pytest.raises(SkillNotInstalled):
+        with pytest.raises(SkillNotInstalledError):
             overlay.activate(other.assistant_id, "demo-skill")
 
     async def test_install_into_other_assistant_home_is_independent(

@@ -16,7 +16,7 @@ from starlette.responses import JSONResponse
 from lca.contracts.protocols.memory.operational_skills import SkillImportError
 from lca.plugins.domain.assistant.catalog.plugin import (
     AssistantCatalogError,
-    AssistantDigestMismatch,
+    AssistantDigestMismatchError,
 )
 from lca.plugins.transport.webserver.routes_1.routes_assistants.codecs import (
     _error_envelope,
@@ -82,7 +82,7 @@ async def install_assistant_skill(request: Request) -> JSONResponse:
     actor = str(body.get("actor") or "").strip() or "system"
     try:
         receipt = await overlay.install(assistant_id, source, actor=actor)
-    except AssistantDigestMismatch as exc:
+    except AssistantDigestMismatchError as exc:
         return _error_envelope(
             "digest_mismatch",
             status_code=409,

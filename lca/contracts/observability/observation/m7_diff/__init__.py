@@ -30,7 +30,7 @@ class UnexpectedNode(BaseModel):
     phase: str
 
 
-class ContractViolation(BaseModel):
+class ContractViolationError(BaseModel):
     """契约违反:具体 artifact 字段不符合预期。"""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -61,13 +61,13 @@ class DiffReport(BaseModel):
     plan_ref: str
     missing_nodes: tuple[MissingNode, ...] = ()
     unexpected_nodes: tuple[UnexpectedNode, ...] = ()
-    contract_violations: tuple[ContractViolation, ...] = ()
+    contract_violations: tuple[ContractViolationError, ...] = ()
     edge_deviations: tuple[EdgeDeviation, ...] = ()
     diffed_at: str
 
 
 __all__ = [
-    "ContractViolation",
+    "ContractViolationError",
     "DiffReport",
     "EdgeDeviation",
     "MissingNode",

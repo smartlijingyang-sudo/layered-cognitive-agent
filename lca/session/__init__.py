@@ -31,7 +31,7 @@ from lca.session.lifecycle.bind import (
     unbind_run_event_session,
 )
 from lca.session.lifecycle.checkpoint import (
-    CheckpointFailure,
+    CheckpointFailureError,
     FlushableSession,
     SessionCheckpointPolicy,
     SessionCheckpointPolicyProtocol,
@@ -58,7 +58,7 @@ __all__ = [
     "TOOL_NOT_STARTED",
     "TOOL_OUTCOME_UNKNOWN",
     "BoundRunEventSession",
-    "CheckpointFailure",
+    "CheckpointFailureError",
     "EventSessionBinder",
     "FlushableSession",
     "RunEventSessionBridge",

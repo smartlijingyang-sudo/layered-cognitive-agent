@@ -314,9 +314,9 @@ class _FakeOverlay:
 
             raise AssistantCatalogError("assistant home 不存在")
         if self.outcome == "digest_mismatch":
-            from lca.plugins.domain.assistant.catalog.plugin import AssistantDigestMismatch
+            from lca.plugins.domain.assistant.catalog.plugin import AssistantDigestMismatchError
 
-            raise AssistantDigestMismatch("digest mismatch")
+            raise AssistantDigestMismatchError("digest mismatch")
         from lca.contracts.protocols.assistant.skill_overlay import SkillInstallReceipt
 
         return SkillInstallReceipt(

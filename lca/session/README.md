@@ -39,7 +39,7 @@ bind/recover/repair 所需的事件序列与 `ResolvedProfile` 元数据；持�
 `event_session_binder_from_scope`）、恢复与修复（`recover_live_agent`、
 `recovery_from_events`、`repair_interrupted_turn`、
 `sync_run_status_from_recovery`、`assert_resume_allowed`）、durability
-（`SessionCheckpointPolicy*`、`FlushableSession`、`CheckpointFailure`）、读侧 fold
+（`SessionCheckpointPolicy*`、`FlushableSession`、`CheckpointFailureError`）、读侧 fold
 （`foldSurface`、`foldRequestHeader`、`canonicalHeader`、`headerEquals`）与错误
 （`SessionRecoveryError`、`SessionRepairError`、`UnknownSessionEventTypeError`）。
 
@@ -67,14 +67,14 @@ Wave P1/P4 收敛消失（README「迁移」节的 delete-when）。
 
 包门面与模块 __all__ 声明一一对应（32 项）：
 
-`REQUEST_HEADER_CATEGORY`, `SURFACE_ASSISTANT_TYPE`, `SURFACE_TOOL_RESULT_TYPE`, `TOOL_NOT_STARTED`, `TOOL_OUTCOME_UNKNOWN`, `BoundRunEventSession`, `CheckpointFailure`, `EventSessionBinder`, `FlushableSession`, `RunEventSessionBridge`, `Session`, `SessionCheckpointPolicy`, `SessionCheckpointPolicyProtocol`, `SessionRecoveryError`, `SessionRepairError`, `UnknownSessionEventTypeError`, `append_approval_resolved_if_pending`, `assert_resume_allowed`, `bind_run_event_session`, `bind_run_event_session_from_store`, `canonicalHeader`, `event_session_binder_from_scope`, `foldRequestHeader`, `foldSurface`, `headerEquals`, `known_session_event_types`, `recover_live_agent`, `recovery_from_events`, `repair_interrupted_turn`, `sync_run_status_from_recovery`, `unbind_run_event_session`, `validate_event_type_for_read`
+`REQUEST_HEADER_CATEGORY`, `SURFACE_ASSISTANT_TYPE`, `SURFACE_TOOL_RESULT_TYPE`, `TOOL_NOT_STARTED`, `TOOL_OUTCOME_UNKNOWN`, `BoundRunEventSession`, `CheckpointFailureError`, `EventSessionBinder`, `FlushableSession`, `RunEventSessionBridge`, `Session`, `SessionCheckpointPolicy`, `SessionCheckpointPolicyProtocol`, `SessionRecoveryError`, `SessionRepairError`, `UnknownSessionEventTypeError`, `append_approval_resolved_if_pending`, `assert_resume_allowed`, `bind_run_event_session`, `bind_run_event_session_from_store`, `canonicalHeader`, `event_session_binder_from_scope`, `foldRequestHeader`, `foldSurface`, `headerEquals`, `known_session_event_types`, `recover_live_agent`, `recovery_from_events`, `repair_interrupted_turn`, `sync_run_status_from_recovery`, `unbind_run_event_session`, `validate_event_type_for_read`
 ## 7. 副作用
 
 | 动作 | 后果 |
 |---|---|
 | `Session.append(event_type, data, …)` | 校验 payload → 追加到本 run 日志（仅此一个生产入口）→ 同步 fire observers（异常 contained，不回滚已 commit 的 append）→ 返回落日志的 `SessionEvent` |
 | spine hook（`bind.py`） | 把本 run 的 Session 事件投递到 `<run_id>.spine.jsonl`；未 bind 时不产出 |
-| `checkpoint.py` durability barrier | 三个入口（step 边界、模型请求边界、工具结果批次）共享同一形态：`await session.flush()` → 检查 per-listener `FlushResult` → 放行或抛 `CheckpointFailure`；`enabled=False` 时三入口 no-op 放行 |
+| `checkpoint.py` durability barrier | 三个入口（step 边界、模型请求边界、工具结果批次）共享同一形态：`await session.flush()` → 检查 per-listener `FlushResult` → 放行或抛 `CheckpointFailureError`；`enabled=False` 时三入口 no-op 放行 |
 | `repair.py` | 只在崩溃 turn 追加修复事实；不回写既有事件（仅追加，不可变） |
 
 日志是 append-only：不存在删除或原地修改已提交事件的 API。

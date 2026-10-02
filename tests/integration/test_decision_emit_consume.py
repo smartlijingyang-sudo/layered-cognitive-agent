@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from lca.contracts.errors import ContractViolation
+from lca.contracts.errors import ContractViolationError
 from lca.contracts.models.core.execution.decision import Decision
 from lca.contracts.models.core.execution.task_progress import TaskProgress
 
@@ -59,11 +59,11 @@ def test_decision_explicit_task_progress_is_preserved() -> None:
 
 
 def test_decision_task_progress_with_invalid_confidence() -> None:
-    """task_progress 构造时 confidence 越界 → 抛 :class:`ContractViolation`。
+    """task_progress 构造时 confidence 越界 → 抛 :class:`ContractViolationError`。
 
     即使 Decision 是 frozen,``task_progress`` 字段构造仍触发 TaskProgress.__post_init__。
     """
-    with pytest.raises(ContractViolation):
+    with pytest.raises(ContractViolationError):
         Decision(
             decision_id="dec_3",
             action_type="RESPOND",

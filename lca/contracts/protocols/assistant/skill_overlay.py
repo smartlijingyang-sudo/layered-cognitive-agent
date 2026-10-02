@@ -32,8 +32,8 @@ __all__ = [
     "AssistantSkillOverlay",
     "SkillActivationReceipt",
     "SkillInstallReceipt",
-    "SkillNotInstalled",
-    "SkillNotVerified",
+    "SkillNotInstalledError",
+    "SkillNotVerifiedError",
     "SkillSource",
 ]
 
@@ -160,11 +160,11 @@ class SkillActivationReceipt:
 # ── 失败语义异常 ─────────────────────────────────────────────────────
 
 
-class SkillNotInstalled(LookupError):
+class SkillNotInstalledError(LookupError):
     """``activate`` 找不到 ``{home}/skills/<skill_id>/`` 落盘包。"""
 
 
-class SkillNotVerified(RuntimeError):
+class SkillNotVerifiedError(RuntimeError):
     """``activate`` 拒收：包未过 0067 三闸（artifact_state 非 VERIFIED/ACTIVE）。
 
     对应 ADR-0187 §3 D6「未验证包在 run 中不可被 `activate`」。
@@ -235,8 +235,8 @@ class AssistantSkillOverlay(Protocol):
 
         失败语义：
         - ``assistant_id`` 不存在 / digest 不匹配 ⇒ Catalog 异常透传；
-        - 包未落盘 ⇒ ``SkillNotInstalled``；
-        - 落盘但 ``artifact_state`` 非 VERIFIED/ACTIVE ⇒ ``SkillNotVerified``。
+        - 包未落盘 ⇒ ``SkillNotInstalledError``；
+        - 落盘但 ``artifact_state`` 非 VERIFIED/ACTIVE ⇒ ``SkillNotVerifiedError``。
 
         外部后果：仅一条 ``assistant.skill.activated`` Spine 事件；
         不写 Home（run 级事实,见 ``SkillActivationReceipt``）。
@@ -258,7 +258,7 @@ class AssistantSkillOverlay(Protocol):
 
         失败语义：
         - ``assistant_id`` 不存在 / digest 不匹配 ⇒ Catalog 异常透传；
-        - 包未落盘 ⇒ ``SkillNotInstalled``（不删盘、不发 EP）。
+        - 包未落盘 ⇒ ``SkillNotInstalledError``（不删盘、不发 EP）。
 
         外部后果：``{home}/skills/<skill_id>/`` 消失 + manifest 修订 +
         一条 ``assistant.profile.revised`` Spine 事件。
@@ -283,7 +283,7 @@ class AssistantSkillOverlay(Protocol):
 
         失败语义：
         - ``assistant_id`` 不存在 / digest 不匹配 ⇒ Catalog 异常透传；
-        - 包未落盘 ⇒ ``SkillNotInstalled``（不写盘、不发 EP）；
+        - 包未落盘 ⇒ ``SkillNotInstalledError``（不写盘、不发 EP）；
         - 新 SKILL.md 校验失败 ⇒ ``SkillImportError``（不写盘、不发 EP）。
 
         外部后果：``{home}/skills/<skill_id>/`` 内容更新 + manifest 修订 +

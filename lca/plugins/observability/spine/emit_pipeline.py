@@ -55,7 +55,7 @@ from lca.infrastructure.observability.spine.event.record import (
 )
 from lca.infrastructure.observability.spine.event.spine import EventSpine
 from lca.infrastructure.observability.spine.spine.enrich import (
-    I17Violation,
+    I17ViolationError,
     enrich_spine_payload,
     set_active_field_producers,
     set_active_spine_enricher,
@@ -259,4 +259,4 @@ async def setup(ctx: PluginContext, config: Any) -> None:
     )
 
 
-__all__ = ["EmitPipeline", "I17Violation", "setup"]
+__all__ = ["EmitPipeline", "I17ViolationError", "setup"]

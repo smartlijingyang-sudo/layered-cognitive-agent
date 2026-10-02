@@ -3,7 +3,7 @@
 覆盖契约:
 
 - create:物化 Home + manifest + 发 assistant.created EP;返回值 = AssistantHandle
-- get:digest 校验通过 ⇒ 返回 AssistantSpec;digest 不匹配 ⇒ AssistantDigestMismatch
+- get:digest 校验通过 ⇒ 返回 AssistantSpec;digest 不匹配 ⇒ AssistantDigestMismatchError
 - list:扫 ``{assistants_root}/*/manifest.json``;digest 不一致的不列
 - manifest schema_version=1 + 8 个配置面 digest 字段
 - 记忆面(MEMORY.md / memory/)不在 digest 列(I-A13)
@@ -44,7 +44,7 @@ from lca.plugins.assistant.persona.persona import persona_from_home
 from lca.plugins.domain.assistant.catalog.plugin import (
     AssistantCatalogError,
     AssistantCatalogImpl,
-    AssistantDigestMismatch,
+    AssistantDigestMismatchError,
     Config,
     PlanOverlayValidationError,
     setup,
@@ -346,10 +346,10 @@ class TestGet:
         catalog: AssistantCatalogImpl,
         request_default: CreateAssistantRequest,
     ) -> None:
-        """I-A3 fail-closed:篡改 SOUL.md 后 get 必须抛 AssistantDigestMismatch。"""
+        """I-A3 fail-closed:篡改 SOUL.md 后 get 必须抛 AssistantDigestMismatchError。"""
         handle = catalog.create(request_default)
         (Path(handle.home_path) / "SOUL.md").write_text("tampered", encoding="utf-8")
-        with pytest.raises(AssistantDigestMismatch):
+        with pytest.raises(AssistantDigestMismatchError):
             catalog.get(handle.assistant_id)
 
     def test_get_digest_mismatch_on_goals_tamper_fails_closed(
@@ -360,7 +360,7 @@ class TestGet:
         """配置面 yaml 篡改同样 fail-closed。"""
         handle = catalog.create(request_default)
         (Path(handle.home_path) / "goals.yaml").write_text("tampered: true\n", encoding="utf-8")
-        with pytest.raises(AssistantDigestMismatch):
+        with pytest.raises(AssistantDigestMismatchError):
             catalog.get(handle.assistant_id)
 
     def test_get_returns_plan_overlay_and_manifest_digest(
@@ -540,7 +540,7 @@ class TestMemoryLayerDigestPolicy:
         """配置面写入必须触发 fail-closed(与上对照;双向 I-A13)。"""
         handle = catalog.create(request_default)
         (Path(handle.home_path) / "USER.md").write_text("tampered", encoding="utf-8")
-        with pytest.raises(AssistantDigestMismatch):
+        with pytest.raises(AssistantDigestMismatchError):
             catalog.get(handle.assistant_id)
 
 
@@ -554,7 +554,7 @@ class TestPlanYamlDigest:
         (Path(handle.home_path) / "plan.yaml").write_text(
             "prompt:\n  template: react_prompt\n", encoding="utf-8"
         )
-        with pytest.raises(AssistantDigestMismatch):
+        with pytest.raises(AssistantDigestMismatchError):
             catalog.get(handle.assistant_id)
 
     def test_plan_yaml_present_in_manifest_digests(
@@ -1024,13 +1024,13 @@ class TestSplitPublicPath:
 
     def test_barrel_reexports_extracted_exceptions(self) -> None:
         from lca.plugins.domain.assistant.catalog.plugin import (
-            AssistantAlreadyExists,
+            AssistantAlreadyExistsError,
             SoulValidationError,
         )
 
         assert issubclass(SoulValidationError, AssistantCatalogError)
         assert issubclass(PlanOverlayValidationError, AssistantCatalogError)
-        assert issubclass(AssistantAlreadyExists, AssistantCatalogError)
+        assert issubclass(AssistantAlreadyExistsError, AssistantCatalogError)
 
     def test_soul_validation_raises_specific_exception(
         self,

@@ -27,7 +27,7 @@ from lca.contracts.protocols.assistant.catalog import (
     CreateAssistantRequest,
     ProfilePatch,
 )
-from lca.contracts.protocols.assistant.skill_overlay import SkillNotInstalled, SkillSource
+from lca.contracts.protocols.assistant.skill_overlay import SkillNotInstalledError, SkillSource
 from lca.infrastructure.tools.assistant.self_manage_tools import (
     DeleteAssistantSkillTool,
     ListAssistantSkillsTool,
@@ -45,7 +45,7 @@ from lca.plugins.assistant.skill.overlay import AssistantSkillOverlayImpl
 from lca.plugins.domain.assistant.catalog.plugin import (
     AssistantCatalogError,
     AssistantCatalogImpl,
-    AssistantDigestMismatch,
+    AssistantDigestMismatchError,
 )
 
 
@@ -258,7 +258,7 @@ class TestSoulRevisionSafety:
         assistant_id = _create(catalog)
         home = Path(catalog.get(assistant_id).home_path)
         (home / "SOUL.md").write_text("被篡改", encoding="utf-8")
-        with pytest.raises(AssistantDigestMismatch):
+        with pytest.raises(AssistantDigestMismatchError):
             catalog.revise_profile(assistant_id, ProfilePatch(soul_md=_valid_soul()))
 
         catalog.reimport(assistant_id, reason="test-tamper")
@@ -371,7 +371,7 @@ class TestSkillOverlayRemove:
     async def test_remove_unknown_skill_raises(self, catalog: AssistantCatalogImpl) -> None:
         overlay = AssistantSkillOverlayImpl(catalog=catalog)
         assistant_id = _create(catalog)
-        with pytest.raises(SkillNotInstalled):
+        with pytest.raises(SkillNotInstalledError):
             await overlay.remove(assistant_id, "nope")
 
 

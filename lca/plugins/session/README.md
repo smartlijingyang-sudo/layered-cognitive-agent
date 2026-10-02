@@ -28,7 +28,7 @@ runtime store、DSH 投影 fold、标题服务、遥测捕获与 checkpoint poli
 | 家族 | 后果 |
 |---|---|
 | `runtime` | 装配期注册 `session.store` capability；run 期的 durable 写仍只经 `Session.append` 单入口 |
-| `checkpoint_policy` | 三个边界触发 `await session.flush()`，失败抛 `CheckpointFailure`；`enabled=False` 时 no-op |
+| `checkpoint_policy` | 三个边界触发 `await session.flush()`，失败抛 `CheckpointFailureError`；`enabled=False` 时 no-op |
 | `telemetry_*` | 默认 DISABLED；启用后外发 OTel，队列满丢弃本批（不回滚已 commit 的 append） |
 | `title_service` / `title_llm_provider` | 生成标题属读侧派生；LLM 失败按 contained 处理并保留回退标题，不阻塞主响应、也不写事实 |
 
@@ -59,8 +59,8 @@ telemetry 的 OTel 导出批次。事实本身不在此层定义——写入口�
 ## 8. 失败语义
 
 按源码 `raise` 统计：`ValueError` 42、`TypeError` 10、`SessionLogReadError` 7、
-`SessionForkError` 6、`CheckpointFailure` 2、`JournalWriteError` 2、
-`RuntimeError` 1。checkpoint 失败上抛 `CheckpointFailure`（不静默放行）；
+`SessionForkError` 6、`CheckpointFailureError` 2、`JournalWriteError` 2、
+`RuntimeError` 1。checkpoint 失败上抛 `CheckpointFailureError`（不静默放行）；
 观测/遥测队列满时丢批次并计数，已 commit 的 append 不回滚；日志读失败抛
 `SessionLogReadError` 而非返回空投影。
 

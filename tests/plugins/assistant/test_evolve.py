@@ -38,9 +38,9 @@ from lca.harness.plugin.manifest import EffectClass
 from lca.harness.plugin_api import definition_from_plugin
 from lca.plugins.assistant.evolve.evolve import (
     AssistantEvolveImpl,
-    MissingWriteApproval,
-    PromoteGateRejected,
-    UnknownCandidate,
+    MissingWriteApprovalError,
+    PromoteGateRejectedError,
+    UnknownCandidateError,
     setup,
 )
 from lca.plugins.domain.assistant.catalog.plugin import AssistantCatalogImpl
@@ -276,7 +276,7 @@ class TestPromoteWithoutApproval:
         digest: ObservationDigest,
     ) -> None:
         candidate = evolve.distill(assistant_id, digest)
-        with pytest.raises(MissingWriteApproval):
+        with pytest.raises(MissingWriteApprovalError):
             evolve.promote(assistant_id, candidate.candidate_id, None)  # type: ignore[arg-type]
 
     def test_promote_non_approval_object_rejected(
@@ -286,13 +286,13 @@ class TestPromoteWithoutApproval:
         digest: ObservationDigest,
     ) -> None:
         candidate = evolve.distill(assistant_id, digest)
-        with pytest.raises(MissingWriteApproval):
+        with pytest.raises(MissingWriteApprovalError):
             evolve.promote(assistant_id, candidate.candidate_id, {"approved_by": "x"})  # type: ignore[arg-type]
 
     def test_promote_unknown_candidate_rejected(
         self, evolve: AssistantEvolveImpl, assistant_id: str, approval: WriteApproval
     ) -> None:
-        with pytest.raises(UnknownCandidate):
+        with pytest.raises(UnknownCandidateError):
             evolve.promote(assistant_id, "asst-skill-candidate-missing", approval)
 
 
@@ -378,8 +378,8 @@ class TestPromoteWithApproval:
     ) -> None:
         candidate = evolve.distill(assistant_id, digest)
         evolve.promote(assistant_id, candidate.candidate_id, approval)
-        # 第二次:候选卡已删 ⇒ UnknownCandidate（不得覆盖已提升包）
-        with pytest.raises(UnknownCandidate):
+        # 第二次:候选卡已删 ⇒ UnknownCandidateError（不得覆盖已提升包）
+        with pytest.raises(UnknownCandidateError):
             evolve.promote(assistant_id, candidate.candidate_id, approval)
 
     def test_promote_non_experiment_card_rejected_by_experiment_gate(
@@ -396,7 +396,7 @@ class TestPromoteWithApproval:
         card = json.loads(card_path.read_text(encoding="utf-8"))
         card["status"] = "active"
         card_path.write_text(json.dumps(card), encoding="utf-8")
-        with pytest.raises(PromoteGateRejected, match="experiment"):
+        with pytest.raises(PromoteGateRejectedError, match="experiment"):
             evolve.promote(assistant_id, candidate.candidate_id, approval)
 
 
@@ -414,7 +414,7 @@ class TestCrossAssistantIsolation:
     ) -> None:
         candidate = evolve.distill(assistant_id, digest)
         other_id = catalog.create(CreateAssistantRequest(name="Other")).assistant_id
-        with pytest.raises(UnknownCandidate):
+        with pytest.raises(UnknownCandidateError):
             evolve.promote(other_id, candidate.candidate_id, approval)
 
     def test_promote_tampered_card_cross_assistant_rejected(
@@ -435,7 +435,7 @@ class TestCrossAssistantIsolation:
         for suffix in (".json", ".md"):
             src = home / ".evolve" / "pending" / f"{candidate.candidate_id}{suffix}"
             (pending_dir / src.name).write_bytes(src.read_bytes())
-        with pytest.raises(PromoteGateRejected, match="identity"):
+        with pytest.raises(PromoteGateRejectedError, match="identity"):
             evolve.promote(other_id, candidate.candidate_id, approval)
 
     def test_list_pending_isolated_per_assistant(

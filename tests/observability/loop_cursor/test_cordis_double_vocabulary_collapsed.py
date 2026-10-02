@@ -105,7 +105,7 @@ def test_cordis_event_table_covers_descriptor_cordis_names() -> None:
 def test_event_descriptor_derive_unknown_ep_fails_loud() -> None:
     """未登记 EP 的 ``derive()`` 必须抛 ``UnknownCordisEventError``。
 
-    I-CURSOR-4 + L15 ``UnknownEventType`` 子型:静默 fallback 被禁止;
+    I-CURSOR-4 + L15 ``UnknownEventTypeError`` 子型:静默 fallback 被禁止;
     调用方必须拿到明确错误码。
     """
     from lca.contracts.observability.event.descriptor import EventDescriptor

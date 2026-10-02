@@ -12,7 +12,7 @@
   * 缺 workspace 子目录 ⇒ FileNotFoundError
 - WorkspaceMaterializationService.materialize(assistant_id):
   * 返回 WorkspaceMaterialization
-  * digest 不一致 ⇒ AssistantDigestMismatch 透传
+  * digest 不一致 ⇒ AssistantDigestMismatchError 透传
   * 助理 home 缺失 ⇒ ValueError 透传
 - 跨助理隔离:助理 A 的 workspace path 不出现在助理 B 的 ExecutionSpace
 - ExecutionSpace 构造不变量:非绝对路径 / ACL 不在子树内 ⇒ ValueError
@@ -42,7 +42,7 @@ from lca.plugins.assistant.workspace.workspace import (
 from lca.plugins.domain.assistant.catalog.plugin import (
     AssistantCatalogError,
     AssistantCatalogImpl,
-    AssistantDigestMismatch,
+    AssistantDigestMismatchError,
 )
 
 # ── helpers ─────────────────────────────────────────────────────────
@@ -235,9 +235,9 @@ class TestWorkspaceMaterializationService:
         workspace_service: WorkspaceMaterializationService,
         assistant_a: Any,
     ) -> None:
-        # 篡改 SOUL.md ⇒ catalog.get 抛 AssistantDigestMismatch ⇒ service 透传
+        # 篡改 SOUL.md ⇒ catalog.get 抛 AssistantDigestMismatchError ⇒ service 透传
         (Path(assistant_a.home_path) / "SOUL.md").write_text("tampered", encoding="utf-8")
-        with pytest.raises(AssistantDigestMismatch):
+        with pytest.raises(AssistantDigestMismatchError):
             workspace_service.materialize(assistant_a.assistant_id)
 
     def test_materialize_with_parent_space_id(

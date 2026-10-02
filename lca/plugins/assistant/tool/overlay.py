@@ -41,7 +41,7 @@ from lca.contracts.protocols.assistant.catalog import AssistantCatalog
 from lca.contracts.protocols.assistant.tool_overlay import (
     AssistantToolOverlay,
     ToolInstallReceipt,
-    ToolNotInstalled,
+    ToolNotInstalledError,
 )
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
@@ -158,7 +158,7 @@ class _AssistantToolOverlayImpl(AssistantToolOverlay):
         home = Path(spec.home_path)
         tool_dir = _tool_dir(home, tool_id)
         if not tool_dir.is_dir():
-            raise ToolNotInstalled(f"tool 未安装: assistant={assistant_id!r} tool={tool_id!r}")
+            raise ToolNotInstalledError(f"tool 未安装: assistant={assistant_id!r} tool={tool_id!r}")
 
         shutil.rmtree(tool_dir)
         manifest = load_manifest(home, assistant_id)

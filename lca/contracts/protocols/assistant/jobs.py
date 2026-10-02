@@ -23,10 +23,10 @@ from lca.contracts.harness.tasks.continuous import (
 
 __all__ = [
     "AssistantJobs",
-    "JobNotRegistered",
+    "JobNotRegisteredError",
     "JobRegistration",
     "JobSpec",
-    "JobsCapabilityMissing",
+    "JobsCapabilityMissingError",
     "Trigger",
     "TriggerKind",
     "WorkItem",
@@ -35,14 +35,14 @@ __all__ = [
 ]
 
 
-class JobsCapabilityMissing(RuntimeError):
+class JobsCapabilityMissingError(RuntimeError):
     """profile 缺 ``continuous_control_plane_factory`` capability（fail-closed）。
 
     ADR-0187 §3 D10：缺 capability ⇒ jobs 注册拒收，**不**降级为隐式线程。
     """
 
 
-class JobNotRegistered(RuntimeError):
+class JobNotRegisteredError(RuntimeError):
     """``fire`` 的 job 未注册（本进程注册表与 0093 队列均无该 work item）。"""
 
 
@@ -121,7 +121,7 @@ class AssistantJobs(Protocol):
     约束（ADR-0187 §3 D10 + §5 I-A12）：
 
     - register / fire 一律经 ``continuous_control_plane_factory`` 进 0093
-      WorkQueue；缺 capability ⇒ :cls:`JobsCapabilityMissing`（fail-closed）；
+      WorkQueue；缺 capability ⇒ :cls:`JobsCapabilityMissingError`（fail-closed）；
     - 本面**无**线程 / 定时器 / 调度循环；投递源仅 ``actor="manual"``
       （Phase 1）；timer / webhook 投递源 = ADR-0187.1（0093 的 Trigger
       来源扩展，不是独立调度器）。

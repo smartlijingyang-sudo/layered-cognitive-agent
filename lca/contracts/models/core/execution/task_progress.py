@@ -4,7 +4,7 @@
 - ``@dataclass(frozen=True, slots=True)``:等价于 Pydantic
   ``extra="forbid"`` + frozen 的 dataclass 形态;LCA contracts 默认用
   dataclass,不引入 Pydantic(已声明)。
-- ``__post_init__`` 校验 confidence 闭区间,违反抛 :class:`ContractViolation`。
+- ``__post_init__`` 校验 confidence 闭区间,违反抛 :class:`ContractViolationError`。
 - ``is_terminal()`` 给 Gate / Projection 用的"任务可停止"判定。
 
 所有权:cognition 在 reasoner 解析阶段必须**显式**构造并填入
@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from lca.contracts.errors import ContractViolation
+from lca.contracts.errors import ContractViolationError
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,19 +47,19 @@ class TaskProgress:
         # model_validator)。越界 confidence 直接拒绝,绝不静默 clamp
         # (C4/C13 fail-loud)。
         if not isinstance(self.confidence, (int, float)) or isinstance(self.confidence, bool):
-            raise ContractViolation(
+            raise ContractViolationError(
                 f"confidence must be a real number in [0, 1], got {type(self.confidence).__name__}"
             )
         if not 0.0 <= float(self.confidence) <= 1.0:
-            raise ContractViolation(f"confidence must be in [0, 1], got {self.confidence}")
+            raise ContractViolationError(f"confidence must be in [0, 1], got {self.confidence}")
         if self.completed is not None and not isinstance(self.completed, tuple):
             # 显式接受 list 输入的话,__post_init__ 不在 self.__setattr__
             # 安全点;为 fail-loud 我们直接拒绝非 tuple 输入。
-            raise ContractViolation(
+            raise ContractViolationError(
                 f"completed must be a tuple[str, ...], got {type(self.completed).__name__}"
             )
         if self.remaining is not None and not isinstance(self.remaining, tuple):
-            raise ContractViolation(
+            raise ContractViolationError(
                 f"remaining must be a tuple[str, ...], got {type(self.remaining).__name__}"
             )
 

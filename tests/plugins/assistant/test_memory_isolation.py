@@ -8,7 +8,7 @@
     ADR-0187 §3 D5 迁移条款)
 - **I-A13 双向**:
   * 篡改 MEMORY.md / memory/ ⇒ catalog.get 不抛异常(I-A13 正向)
-  * 篡改 SOUL.md / goals.yaml ⇒ catalog.get 抛 AssistantDigestMismatch(I-A13 反向)
+  * 篡改 SOUL.md / goals.yaml ⇒ catalog.get 抛 AssistantDigestMismatchError(I-A13 反向)
 - **bootstrap 投影隔离**:助理 A 的 SOUL 不出现在助理 B 的 ContextManifest
   * 见 :mod:`tests.plugins.assistant.test_bootstrap` 已经覆盖;此处加一项
     跨 memory seam 的正交断言
@@ -38,7 +38,7 @@ from lca.plugins.assistant.home._home_layout import (
 )
 from lca.plugins.domain.assistant.catalog.plugin import (
     AssistantCatalogImpl,
-    AssistantDigestMismatch,
+    AssistantDigestMismatchError,
 )
 
 # ── helpers ─────────────────────────────────────────────────────────
@@ -238,9 +238,9 @@ class TestMemoryLayerNotInDigestBidirectional:
         catalog: AssistantCatalogImpl,
         assistant_a: Any,
     ) -> None:
-        """I-A13 反向:篡改 SOUL.md ⇒ catalog.get 抛 AssistantDigestMismatch(fail-closed)。"""
+        """I-A13 反向:篡改 SOUL.md ⇒ catalog.get 抛 AssistantDigestMismatchError(fail-closed)。"""
         (Path(assistant_a.home_path) / "SOUL.md").write_text("tampered", encoding="utf-8")
-        with pytest.raises(AssistantDigestMismatch):
+        with pytest.raises(AssistantDigestMismatchError):
             catalog.get(assistant_a.assistant_id)
 
     def test_goals_yaml_tamper_breaks_get(
@@ -251,7 +251,7 @@ class TestMemoryLayerNotInDigestBidirectional:
         (Path(assistant_a.home_path) / "goals.yaml").write_text(
             "tampered: true\n", encoding="utf-8"
         )
-        with pytest.raises(AssistantDigestMismatch):
+        with pytest.raises(AssistantDigestMismatchError):
             catalog.get(assistant_a.assistant_id)
 
 

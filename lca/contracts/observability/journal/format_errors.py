@@ -5,11 +5,11 @@
 做错误码分发 / 升级路径决策 / 灰度治理。
 
 错误分类:
-- ``VersionTooOld``  : 记录 schema 早于 reader 最小支持版本 —— 通常表示
+- ``VersionTooOldError``  : 记录 schema 早于 reader 最小支持版本 —— 通常表示
   需要迁移或回退到旧 reader。
-- ``VersionTooNew``  : 记录 schema 晚于 reader 最大支持版本 —— 通常表示
+- ``VersionTooNewError``  : 记录 schema 晚于 reader 最大支持版本 —— 通常表示
   需要升级 reader 或主动拒绝新写入。
-- ``UnknownEventType``: event_type 不在 reader 已知词表内,且 envelope 未
+- ``UnknownEventTypeError``: event_type 不在 reader 已知词表内,且 envelope 未
   携带 ``ignorable=true`` 标记 —— 表示不可静默跳过,需要登记或升级。
 """
 
@@ -20,7 +20,7 @@ class JournalFormatError(Exception):
     """L15: journal 格式拒绝的公共基类。"""
 
 
-class VersionTooOld(JournalFormatError):
+class VersionTooOldError(JournalFormatError):
     """记录 ``SCHEMA_VERSION`` 小于 reader 的最小支持版本。"""
 
     def __init__(self, schema_version: int, min_supported: int) -> None:
@@ -29,7 +29,7 @@ class VersionTooOld(JournalFormatError):
         super().__init__(f"journal schema_version={schema_version} < min_supported={min_supported}")
 
 
-class VersionTooNew(JournalFormatError):
+class VersionTooNewError(JournalFormatError):
     """记录 ``SCHEMA_VERSION`` 大于 reader 的最大支持版本。"""
 
     def __init__(self, schema_version: int, max_supported: int) -> None:
@@ -38,7 +38,7 @@ class VersionTooNew(JournalFormatError):
         super().__init__(f"journal schema_version={schema_version} > max_supported={max_supported}")
 
 
-class UnknownEventType(JournalFormatError):
+class UnknownEventTypeError(JournalFormatError):
     """未知的 ``event_type`` 且非 ``ignorable``。"""
 
     def __init__(self, event_type: str) -> None:
@@ -48,7 +48,7 @@ class UnknownEventType(JournalFormatError):
 
 __all__ = [
     "JournalFormatError",
-    "UnknownEventType",
-    "VersionTooNew",
-    "VersionTooOld",
+    "UnknownEventTypeError",
+    "VersionTooNewError",
+    "VersionTooOldError",
 ]

@@ -55,7 +55,7 @@ from lca.plugins.assistant.home._home_layout import (
     SOUL_SAFETY_SECTIONS,
     TEMPLATE_REGISTRY,
     AssistantCatalogError,
-    AssistantDigestMismatch,
+    AssistantDigestMismatchError,
     HomePaths,
     build_manifest,
     cleanup_home,
@@ -192,7 +192,7 @@ def _materialize_default_tools(home: Path, names: tuple[str, ...]) -> None:
 # ── 局部异常 ─────────────────────────────────────────────────────────
 
 
-class _DigestMismatch(AssistantDigestMismatch):
+class _DigestMismatchError(AssistantDigestMismatchError):
     """带 home 路径的 digest 不匹配异常。"""
 
     def __init__(
@@ -211,7 +211,7 @@ class _DigestMismatch(AssistantDigestMismatch):
 
 
 class _CatalogConfigError(AssistantCatalogError):
-    """PR-3 范围对 template_id 等做硬限;非 AssistantDigestMismatch/AlreadyExists。"""
+    """PR-3 范围对 template_id 等做硬限;非 AssistantDigestMismatchError/AlreadyExists。"""
 
     def __init__(self, message: str) -> None:
         super().__init__(message)
@@ -483,7 +483,7 @@ class _AssistantCatalogImpl(_AssistantCatalogEventsMixin, AssistantCatalog):
     def get(self, assistant_id: str) -> AssistantSpec:
         """digest 校验 + 读 Home + 构 AssistantSpec。
 
-        digest 不一致时不再抛 AssistantDigestMismatch 锁死助理，而是按
+        digest 不一致时不再抛 AssistantDigestMismatchError 锁死助理，而是按
         ADR-0187 §3 D2 的 revise_reimport 语义自愈：以磁盘现状重算 digest、
         revision_seq++、记 revision 快照（actor="filesystem"），然后继续。
         这是 Terraform refresh 模型——采纳现实为新基线，读路径永不阻断；
@@ -816,7 +816,7 @@ class _AssistantCatalogImpl(_AssistantCatalogEventsMixin, AssistantCatalog):
         }
         mismatches = diff_digests(declared, actual_digests)
         if mismatches:
-            raise _DigestMismatch(home, assistant_id, mismatches)
+            raise _DigestMismatchError(home, assistant_id, mismatches)
 
     def _copy_inherited_snapshot(
         self, source_id: str, dest_home: Path

@@ -13,7 +13,7 @@ fail-closed durability checkpoint 边界(``docs/specs/session-event-pipeline-spe
 
 三个入口共享语义:先 ``await session.flush()``(Session 的唯一 durability
 barrier 入口),检查返回的 :class:`FlushResult` 列表 —— 任一 ``ok=False``
-抛 :class:`CheckpointFailure`(fail-closed:下游不得执行);全部 ok → 放行。
+抛 :class:`CheckpointFailureError`(fail-closed:下游不得执行);全部 ok → 放行。
 
 设计要点:
 
@@ -51,7 +51,7 @@ from lca.contracts.harness.composition.plugin_contract import (
 from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import (
     OwnershipDeclaration,
 )
-from lca.contracts.protocols.session.persistence.service import CheckpointFailure
+from lca.contracts.protocols.session.persistence.service import CheckpointFailureError
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca_kernel.events.session.session import FlushResult
 
@@ -104,7 +104,7 @@ class SessionCheckpointPolicy:
         """模型请求边界(DSH ``llm/stream``):adapter 流构造前做检查点。
 
         放行后已提交请求前缀已 durable —— 响应前崩溃不会丢请求;
-        :class:`CheckpointFailure` 表示调用方不得发出本次模型请求。
+        :class:`CheckpointFailureError` 表示调用方不得发出本次模型请求。
         """
         await self._checkpoint(session, boundary="llm/stream")
 
@@ -112,7 +112,7 @@ class SessionCheckpointPolicy:
         """顶层工具副作用边界(DSH ``tools/execute``):工具体执行前做检查点。
 
         放行后记录的调用已 durable —— 副作用前崩溃留下可匹配的调用记录;
-        :class:`CheckpointFailure` 表示调用方不得进入工具体。嵌套工具派发
+        :class:`CheckpointFailureError` 表示调用方不得进入工具体。嵌套工具派发
         不应调本入口(复用外层检查点,由融合阶段执行侧判定)。
         """
         await self._checkpoint(session, boundary="tools/execute")
@@ -121,7 +121,7 @@ class SessionCheckpointPolicy:
         """步边界(DSH ``agent/pre-step``):下一步请求前排空上一步已提交批次。
 
         放行后上一步的响应与有序工具结果已 durable;
-        :class:`CheckpointFailure` 表示回合应在发起下一请求前失败。
+        :class:`CheckpointFailureError` 表示回合应在发起下一请求前失败。
         """
         await self._checkpoint(session, boundary="agent/pre-step")
 
@@ -131,9 +131,9 @@ class SessionCheckpointPolicy:
         失败语义:
 
         - ``enabled=False`` → 直接放行(不触发 flush);
-        - ``session.flush()`` 自身抛错 → 包装为 :class:`CheckpointFailure`
+        - ``session.flush()`` 自身抛错 → 包装为 :class:`CheckpointFailureError`
           (``__cause__`` 持原异常);
-        - 返回列表任一 ``ok=False`` → :class:`CheckpointFailure`(message 带
+        - 返回列表任一 ``ok=False`` → :class:`CheckpointFailureError`(message 带
           boundary、session id 与首个失败 listener 及其错误);
         - 空列表(未注册任何 flush listener/observer)→ 放行,无可检查点。
         """
@@ -144,7 +144,7 @@ class SessionCheckpointPolicy:
             results = await session.flush()
         except Exception as exc:
             msg = f"checkpoint {boundary}: session={session_id!r} flush raised: {exc!r}"
-            raise CheckpointFailure(msg) from exc
+            raise CheckpointFailureError(msg) from exc
         failure = next((result for result in results if not result.ok), None)
         if failure is not None:
             listener = type(failure.listener).__name__
@@ -152,7 +152,7 @@ class SessionCheckpointPolicy:
                 f"checkpoint {boundary}: session={session_id!r} flush not durable "
                 f"(listener={listener}, error={failure.error!r})"
             )
-            raise CheckpointFailure(msg)
+            raise CheckpointFailureError(msg)
 
 
 # ── plugin manifest ────────────────────────────────────────────────────
@@ -168,7 +168,7 @@ class SessionCheckpointPolicy:
     description=(
         "SessionCheckpointPolicy(DSH session-checkpoint-policy 的 LCA 形态):模型请求前 /"
         " 顶层工具副作用前 / 步边界三个 fail-closed durability 检查点;先 await"
-        " session.flush(),任一 FlushResult(ok=False) 抛 CheckpointFailure(下游不得执行),"
+        " session.flush(),任一 FlushResult(ok=False) 抛 CheckpointFailureError(下游不得执行),"
         "全部 ok 放行。被动调用面,不订阅事件。提供 session.checkpoint.policy capability。"
     ),
     test_suite="tests/plugins/session/test_checkpoint_policy.py",

@@ -28,8 +28,8 @@ from lca.contracts.protocols.assistant.skill_overlay import (
     AssistantSkillOverlay,
     SkillActivationReceipt,
     SkillInstallReceipt,
-    SkillNotInstalled,
-    SkillNotVerified,
+    SkillNotInstalledError,
+    SkillNotVerifiedError,
     SkillSource,
 )
 from lca.contracts.protocols.memory.operational_skills import SkillImporter, SkillPackage
@@ -186,13 +186,13 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
         manifest = load_manifest(home, assistant_id)
         skill_dir = home / "skills" / sanitize_skill_id(skill_id)
         if not skill_dir.is_dir():
-            raise SkillNotInstalled(f"skill 未安装: assistant={assistant_id!r} skill={skill_id!r}")
+            raise SkillNotInstalledError(f"skill 未安装: assistant={assistant_id!r} skill={skill_id!r}")
         skills_section = manifest.get("skills")
         section: Mapping[str, Any] = skills_section if isinstance(skills_section, dict) else {}
         entry = section.get(skill_id)
         state = str(entry.get("artifact_state") or "") if isinstance(entry, dict) else ""
         if state not in _ACTIVATABLE_STATES:
-            raise SkillNotVerified(
+            raise SkillNotVerifiedError(
                 f"skill 未过 0067 闸门,不可 activate: assistant={assistant_id!r} "
                 f"skill={skill_id!r} state={state or '(无索引记录)'}"
             )
@@ -230,14 +230,14 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
         """删除已安装 skill（ADR-0242 D6）：删盘 + manifest 修订 + EP。
 
         ``catalog.get`` 先做 digest 校验（fail-closed）；未知 skill 抛
-        ``SkillNotInstalled``，不删盘、不发 EP。配置变更统一发
+        ``SkillNotInstalledError``，不删盘、不发 EP。配置变更统一发
         ``assistant.profile.revised`` EP（12 EP 闭集内）。
         """
         spec = self._catalog.get(assistant_id)  # digest 校验 fail-closed
         home = Path(spec.home_path)
         skill_dir = home / "skills" / skill_id
         if not skill_dir.is_dir():
-            raise SkillNotInstalled(f"skill 未安装: {skill_id}")
+            raise SkillNotInstalledError(f"skill 未安装: {skill_id}")
 
         shutil.rmtree(skill_dir)
 
@@ -288,7 +288,7 @@ class _AssistantSkillOverlayImpl(AssistantSkillOverlay):
         skills_root = home / "skills"
         skill_dir = skills_root / sanitize_skill_id(skill_id)
         if not skill_dir.is_dir():
-            raise SkillNotInstalled(f"skill 未安装: assistant={assistant_id!r} skill={skill_id!r}")
+            raise SkillNotInstalledError(f"skill 未安装: assistant={assistant_id!r} skill={skill_id!r}")
 
         staging_root = skills_root / _STAGING_DIR_NAME / uuid.uuid4().hex
         try:

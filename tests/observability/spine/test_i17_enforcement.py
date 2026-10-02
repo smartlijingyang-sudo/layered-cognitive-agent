@@ -108,16 +108,16 @@ def _stub_source_attacher() -> Any:
 
 
 def test_i17_rejects_event_without_source() -> None:
-    """A ``*.start`` event without ``source_location`` MUST raise ``I17Violation``."""
+    """A ``*.start`` event without ``source_location`` MUST raise ``I17ViolationError``."""
     from lca.plugins.observability.spine.emit_pipeline import (
         EmitPipeline,
-        I17Violation,
+        I17ViolationError,
     )
 
     pipeline = EmitPipeline(producers=[], anomaly=_StubAnomaly())
     spine = _make_spine()
 
-    with pytest.raises(I17Violation) as excinfo:
+    with pytest.raises(I17ViolationError) as excinfo:
         pipeline.emit(
             execution_point="brain.think.start",
             channel="fact",
@@ -137,13 +137,13 @@ def test_i17_rejects_even_when_other_fields_present() -> None:
     """A ``*.start`` event missing ``source_location`` MUST raise, regardless of other fields."""
     from lca.plugins.observability.spine.emit_pipeline import (
         EmitPipeline,
-        I17Violation,
+        I17ViolationError,
     )
 
     pipeline = EmitPipeline(producers=[], anomaly=_StubAnomaly())
     spine = _make_spine()
 
-    with pytest.raises(I17Violation):
+    with pytest.raises(I17ViolationError):
         pipeline.emit(
             execution_point="brain.perceive.start",
             channel="fact",
@@ -249,8 +249,8 @@ def test_i17_does_not_apply_to_non_start_non_end_events() -> None:
 
 
 def test_i17_violation_is_exported() -> None:
-    """``I17Violation`` MUST be part of the public surface of emit_pipeline."""
+    """``I17ViolationError`` MUST be part of the public surface of emit_pipeline."""
     import lca.plugins.observability.spine.emit_pipeline as emit_pipeline_module
 
-    assert hasattr(emit_pipeline_module, "I17Violation")
-    assert "I17Violation" in emit_pipeline_module.__all__
+    assert hasattr(emit_pipeline_module, "I17ViolationError")
+    assert "I17ViolationError" in emit_pipeline_module.__all__

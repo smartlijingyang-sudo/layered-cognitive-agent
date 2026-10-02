@@ -53,9 +53,9 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.harness.plugin_api import EffectClass, PluginContext, PluginKind, plugin
 from lca.plugins.assistant.home._home_layout import (
-    AssistantAlreadyExists,
+    AssistantAlreadyExistsError,
     AssistantCatalogError,
-    AssistantDigestMismatch,
+    AssistantDigestMismatchError,
     SoulValidationError,
 )
 
@@ -187,10 +187,10 @@ def _try_build_role_resolver() -> Any | None:
 
 
 __all__ = [
-    "AssistantAlreadyExists",
+    "AssistantAlreadyExistsError",
     "AssistantCatalogError",
     "AssistantCatalogImpl",
-    "AssistantDigestMismatch",
+    "AssistantDigestMismatchError",
     "Config",
     "PlanOverlayValidationError",
     "SoulValidationError",

@@ -191,7 +191,7 @@ class TestIA12JobsMustGoThrough0093:
 
     def test_missing_capability_rejects_register_and_fire(self, tmp_path: Path) -> None:
         from lca.contracts.protocols.assistant.jobs import (
-            JobsCapabilityMissing,
+            JobsCapabilityMissingError,
             JobSpec,
         )
         from lca.plugins.assistant.jobs.jobs import AssistantJobsImpl
@@ -201,9 +201,9 @@ class TestIA12JobsMustGoThrough0093:
         assistant_id = catalog.create(CreateAssistantRequest(name="A12")).assistant_id
         impl = AssistantJobsImpl(catalog=catalog, control_plane_factory=None)
         spec = JobSpec(job_id="j", schedule="0 9 * * *", prompt="x")
-        with pytest.raises(JobsCapabilityMissing):
+        with pytest.raises(JobsCapabilityMissingError):
             impl.register(assistant_id, spec)
-        with pytest.raises(JobsCapabilityMissing):
+        with pytest.raises(JobsCapabilityMissingError):
             impl.fire(assistant_id, "j")
 
 

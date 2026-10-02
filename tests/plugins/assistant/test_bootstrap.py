@@ -7,7 +7,7 @@
 - BootstrapProjectionService.project(assistant_id):
   * 返回 ContextManifest,4 个 item(SOUL/USER/AGENTS/goals)
   * 不含 MEMORY 字面(I-A13 + PR-4 新不变量)
-  * digest 不一致 ⇒ AssistantDigestMismatch 透传
+  * digest 不一致 ⇒ AssistantDigestMismatchError 透传
   * 助理 home 缺失 ⇒ ValueError
 - project_home_to_context_manifest(纯函数):
   * SOUL/USER/AGENTS 内容 ⇒ ContextItem.payload.text
@@ -37,7 +37,7 @@ from lca.plugins.assistant.bootstrap.bootstrap import (
 from lca.plugins.domain.assistant.catalog.plugin import (
     AssistantCatalogError,
     AssistantCatalogImpl,
-    AssistantDigestMismatch,
+    AssistantDigestMismatchError,
 )
 
 # ── helpers ─────────────────────────────────────────────────────────
@@ -313,9 +313,9 @@ class TestBootstrapProjectionService:
         assistant_a: Any,
         catalog: AssistantCatalogImpl,
     ) -> None:
-        # 篡改 SOUL.md ⇒ catalog.get 抛 AssistantDigestMismatch ⇒ service 透传
+        # 篡改 SOUL.md ⇒ catalog.get 抛 AssistantDigestMismatchError ⇒ service 透传
         (Path(assistant_a.home_path) / "SOUL.md").write_text("tampered", encoding="utf-8")
-        with pytest.raises(AssistantDigestMismatch):
+        with pytest.raises(AssistantDigestMismatchError):
             bootstrap_service.project(assistant_a.assistant_id)
 
     def test_project_after_reimport_succeeds(
@@ -407,7 +407,7 @@ class TestMemoryTamperDoesNotAffectBootstrap:
         bootstrap_service: BootstrapProjectionService,
         assistant_a: Any,
     ) -> None:
-        """记忆面写入不应导致 bootstrap 投影抛 AssistantDigestMismatch(I-A13 双向)。"""
+        """记忆面写入不应导致 bootstrap 投影抛 AssistantDigestMismatchError(I-A13 双向)。"""
         home = Path(assistant_a.home_path)
         (home / "MEMORY.md").write_text("some memory content", encoding="utf-8")
         (home / "memory" / "notes.json").write_text("{}", encoding="utf-8")

@@ -383,10 +383,10 @@ def _validate_assistant_binding(request: Request, assistant_id: str) -> JSONResp
     except Exception as exc:
         from lca.plugins.assistant.home._home_layout import (
             AssistantCatalogError,
-            AssistantDigestMismatch,
+            AssistantDigestMismatchError,
         )
 
-        if isinstance(exc, AssistantDigestMismatch):
+        if isinstance(exc, AssistantDigestMismatchError):
             return _err(
                 f"assistant {assistant_id!r} 配置面 digest 不一致",
                 status_code=409,

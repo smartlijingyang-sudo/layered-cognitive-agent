@@ -9,15 +9,15 @@
 from lca.contracts.observability.journal.errors import JournalWriteError
 from lca.contracts.observability.journal.format_errors import (
     JournalFormatError,
-    UnknownEventType,
-    VersionTooNew,
-    VersionTooOld,
+    UnknownEventTypeError,
+    VersionTooNewError,
+    VersionTooOldError,
 )
 
 __all__ = [
     "JournalFormatError",
     "JournalWriteError",
-    "UnknownEventType",
-    "VersionTooNew",
-    "VersionTooOld",
+    "UnknownEventTypeError",
+    "VersionTooNewError",
+    "VersionTooOldError",
 ]

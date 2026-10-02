@@ -102,15 +102,15 @@ class AssistantEvolveError(RuntimeError):
     """evolve 错误基类（4xx 语义；不静默回落）。"""
 
 
-class MissingWriteApproval(AssistantEvolveError):
+class MissingWriteApprovalError(AssistantEvolveError):
     """promote 未携带合法 :cls:`WriteApproval`（fail-closed）。"""
 
 
-class PromoteGateRejected(AssistantEvolveError):
+class PromoteGateRejectedError(AssistantEvolveError):
     """0067 三闸（identity / invariant / experiment）拒绝提升。"""
 
 
-class UnknownCandidate(AssistantEvolveError):
+class UnknownCandidateError(AssistantEvolveError):
     """promote / 查询的 candidate_id 不在 ``{home}/.evolve/pending/``。"""
 
 
@@ -268,19 +268,19 @@ class _AssistantEvolveImpl(AssistantEvolve, SkillAcquirer):
     ) -> SkillInstallReceipt:
         """0067 三闸 + ``WriteApproval`` 后写 ``{home}/skills/``；发 promoted EP。
 
-        失败语义：无审批 / 审批非法 ⇒ :cls:`MissingWriteApproval`；
-        三闸任一拒绝 ⇒ :cls:`PromoteGateRejected`；候选不存在 ⇒
-        :cls:`UnknownCandidate`。全部 fail-closed，不部分写盘。
+        失败语义：无审批 / 审批非法 ⇒ :cls:`MissingWriteApprovalError`；
+        三闸任一拒绝 ⇒ :cls:`PromoteGateRejectedError`；候选不存在 ⇒
+        :cls:`UnknownCandidateError`。全部 fail-closed，不部分写盘。
         """
         if not isinstance(approval, WriteApproval):
-            raise MissingWriteApproval(
+            raise MissingWriteApprovalError(
                 f"promote 必须携带 WriteApproval,得到 {type(approval).__name__}"
             )
         spec = self._catalog.get(assistant_id)
         home = Path(spec.home_path)
         card_path = home / _PENDING_DIR / f"{candidate_id}.json"
         if not card_path.is_file():
-            raise UnknownCandidate(f"candidate_id={candidate_id!r} 不在 {home / _PENDING_DIR}")
+            raise UnknownCandidateError(f"candidate_id={candidate_id!r} 不在 {home / _PENDING_DIR}")
         card = _read_card(card_path)
         draft_path = card_path.with_suffix(".md")
         draft_md = draft_path.read_text(encoding="utf-8") if draft_path.is_file() else ""
@@ -369,7 +369,7 @@ class _AssistantEvolveImpl(AssistantEvolve, SkillAcquirer):
     def _gate_identity(self, card: Mapping[str, Any], assistant_id: str) -> None:
         """identity 闸：候选必须属于本助理，审批凭据必须合法。"""
         if str(card.get("assistant_id", "")) != assistant_id:
-            raise PromoteGateRejected(
+            raise PromoteGateRejectedError(
                 f"identity 闸拒绝:候选 assistant={card.get('assistant_id')!r} "
                 f"不属于 {assistant_id!r}"
             )
@@ -382,20 +382,20 @@ class _AssistantEvolveImpl(AssistantEvolve, SkillAcquirer):
         """
         for field_name in ("candidate_id", "skill_name", "task_ref"):
             if not str(card.get(field_name, "")).strip():
-                raise PromoteGateRejected(f"invariant 闸拒绝:提案卡缺 {field_name!r}")
+                raise PromoteGateRejectedError(f"invariant 闸拒绝:提案卡缺 {field_name!r}")
         skill_dir = home / "skills" / str(card["skill_name"])
         if skill_dir.exists():
-            raise PromoteGateRejected(f"invariant 闸拒绝:skill 目录已存在 {skill_dir}")
+            raise PromoteGateRejectedError(f"invariant 闸拒绝:skill 目录已存在 {skill_dir}")
         if not draft_md.strip():
-            raise PromoteGateRejected("invariant 闸拒绝:草稿正文为空")
+            raise PromoteGateRejectedError("invariant 闸拒绝:草稿正文为空")
         if not is_legal_transition(ArtifactState.DRAFT, ArtifactState.VERIFIED):
-            raise PromoteGateRejected("invariant 闸拒绝:0067 状态机不允许 DRAFT→VERIFIED")
+            raise PromoteGateRejectedError("invariant 闸拒绝:0067 状态机不允许 DRAFT→VERIFIED")
 
     def _gate_experiment(self, card: Mapping[str, Any]) -> None:
         """experiment 闸：只有 experiment 候选可提升；非 experiment 拒收。"""
         status = str(card.get("status", ""))
         if status != _EXPERIMENT_SCOPE:
-            raise PromoteGateRejected(f"experiment 闸拒绝:候选状态={status!r},仅 experiment 可提升")
+            raise PromoteGateRejectedError(f"experiment 闸拒绝:候选状态={status!r},仅 experiment 可提升")
 
     # ── 内部 ─────────────────────────────────────────────────────────
 
@@ -479,13 +479,13 @@ def _draft_procedure(*, assistant_id: str, task_ref: str, digest: ObservationDig
 
 
 def _read_card(card_path: Path) -> dict[str, Any]:
-    """读提案卡；非 dict / 缺 candidate_id 抛 :cls:`UnknownCandidate`。"""
+    """读提案卡；非 dict / 缺 candidate_id 抛 :cls:`UnknownCandidateError`。"""
     try:
         data = json.loads(card_path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
-        raise UnknownCandidate(f"提案卡不可读: {card_path} ({exc})") from exc
+        raise UnknownCandidateError(f"提案卡不可读: {card_path} ({exc})") from exc
     if not isinstance(data, dict) or not str(data.get("candidate_id", "")).strip():
-        raise UnknownCandidate(f"提案卡结构非法: {card_path}")
+        raise UnknownCandidateError(f"提案卡结构非法: {card_path}")
     return data
 
 
@@ -574,8 +574,8 @@ __all__ = [
     "AssistantEvolveError",
     "AssistantEvolveImpl",
     "Config",
-    "MissingWriteApproval",
-    "PromoteGateRejected",
-    "UnknownCandidate",
+    "MissingWriteApprovalError",
+    "PromoteGateRejectedError",
+    "UnknownCandidateError",
     "setup",
 ]

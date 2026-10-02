@@ -124,7 +124,7 @@ class TestUnverifiedPackageCannotActivate:
     @pytest.mark.asyncio
     async def test_manually_drafted_package_rejected(self, tmp_path: Path) -> None:
         from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
-        from lca.contracts.protocols.assistant.skill_overlay import SkillNotVerified
+        from lca.contracts.protocols.assistant.skill_overlay import SkillNotVerifiedError
         from lca.plugins.assistant.skill.overlay import AssistantSkillOverlayImpl
         from lca.plugins.domain.assistant.catalog.plugin import AssistantCatalogImpl
 
@@ -135,7 +135,7 @@ class TestUnverifiedPackageCannotActivate:
         rogue.mkdir(parents=True)
         (rogue / "SKILL.md").write_text("draft", encoding="utf-8")
 
-        with pytest.raises(SkillNotVerified):
+        with pytest.raises(SkillNotVerifiedError):
             overlay.activate(handle.assistant_id, "rogue")
 
     def test_activate_state_allowlist_is_closed(self) -> None:

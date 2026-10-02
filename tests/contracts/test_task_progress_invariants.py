@@ -1,6 +1,6 @@
 """TaskProgress dataclass invariants (ADR-0214 §3.1 / §3.6).
 
-- confidence 越界 → :class:`ContractViolation`
+- confidence 越界 → :class:`ContractViolationError`
 - frozen/slots 不变
 - ``is_terminal()`` 边界判定
 """
@@ -11,7 +11,7 @@ import dataclasses
 
 import pytest
 
-from lca.contracts.errors import ContractViolation
+from lca.contracts.errors import ContractViolationError
 from lca.contracts.models.core.execution.task_progress import TaskProgress
 
 
@@ -28,13 +28,13 @@ def test_default_construction_is_empty_quadruple() -> None:
 
 def test_confidence_above_one_raises_contract_violation() -> None:
     """confidence > 1.0 必须 fail-loud (C13 fail-loud)。"""
-    with pytest.raises(ContractViolation):
+    with pytest.raises(ContractViolationError):
         TaskProgress(confidence=1.01)
 
 
 def test_confidence_below_zero_raises_contract_violation() -> None:
     """confidence < 0.0 必须 fail-loud。"""
-    with pytest.raises(ContractViolation):
+    with pytest.raises(ContractViolationError):
         TaskProgress(confidence=-0.01)
 
 
@@ -48,21 +48,21 @@ def test_confidence_at_boundaries_is_valid() -> None:
 
 def test_confidence_non_numeric_raises_contract_violation() -> None:
     """非数值 confidence 必须 fail-loud(防 bool/int 误传)。"""
-    with pytest.raises(ContractViolation):
+    with pytest.raises(ContractViolationError):
         TaskProgress(confidence=True)
-    with pytest.raises(ContractViolation):
+    with pytest.raises(ContractViolationError):
         TaskProgress(confidence="0.5")  # type: ignore[arg-type]
 
 
 def test_completed_must_be_tuple() -> None:
     """completed 不是 tuple → fail-loud(防止 fold 中 set/list 渗漏)。"""
-    with pytest.raises(ContractViolation):
+    with pytest.raises(ContractViolationError):
         TaskProgress(completed=["a"])  # type: ignore[arg-type]
 
 
 def test_remaining_must_be_tuple() -> None:
     """remaining 不是 tuple → fail-loud。"""
-    with pytest.raises(ContractViolation):
+    with pytest.raises(ContractViolationError):
         TaskProgress(remaining=["x"])  # type: ignore[arg-type]
 
 

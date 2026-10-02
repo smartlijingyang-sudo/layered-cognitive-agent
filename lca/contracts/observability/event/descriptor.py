@@ -27,10 +27,10 @@ class EventDescriptor:
     - ``cordis_name``:派生到 cordis 事件总线的事件名,以 ``"agent."``
       前缀收口;或 ``None`` 表示该 EP 不暴露给 cordis(仅 spine)。
     - ``schema_version``:L15 方向感知 journal 格式拒绝的版本号;
-      写盘时记录,读盘时 ``< 1`` ⇒ ``VersionTooOld``,``> `` 时段
-      当前 ``SCHEMA_VERSION`` ⇒ ``VersionTooNew``。
+      写盘时记录,读盘时 ``< 1`` ⇒ ``VersionTooOldError``,``> `` 时段
+      当前 ``SCHEMA_VERSION`` ⇒ ``VersionTooNewError``。
     - ``ignorable``:未知 event_type + ``ignorable is False`` ⇒
-      ``UnknownEventType``(L15 第三子类型)。
+      ``UnknownEventTypeError``(L15 第三子类型)。
     """
 
     execution_point: str
@@ -43,7 +43,7 @@ class EventDescriptor:
         """由 execution_point 派生到 EventDescriptor。
 
         失败模式:EP 未登记 ⇒ ``UnknownCordisEventError``(KeyError 子类);
-        调用方可与 L15 第三子类型 ``UnknownEventType`` 对齐。
+        调用方可与 L15 第三子类型 ``UnknownEventTypeError`` 对齐。
 
         派生是 deterministic 与 zero-side-effect:同一 EP 多次派生得到
         字面相同的 EventDescriptor;无 I/O,无全局可变状态。

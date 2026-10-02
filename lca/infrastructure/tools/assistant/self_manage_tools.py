@@ -379,7 +379,7 @@ class UpdateAssistantUserTool(_BaseAssistantTool):
 
     USER.md stores the long-term user profile (name, role, preferences).
     Writing through this tool ensures the catalog digest stays consistent —
-    prevents the _DigestMismatch that occurs when files are written directly.
+    prevents the _DigestMismatchError that occurs when files are written directly.
     """
 
     name = _UPDATE_ASSISTANT_USER_TOOL

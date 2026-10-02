@@ -79,7 +79,7 @@ from lca.contracts.observability.observation.m6_artifact import (
     ArtifactSnapshot as ArtifactSnapshot,
 )
 from lca.contracts.observability.observation.m7_diff import (
-    ContractViolation as ContractViolation,
+    ContractViolationError as ContractViolationError,
 )
 from lca.contracts.observability.observation.m7_diff import (
     DiffReport as DiffReport,
@@ -115,7 +115,7 @@ from lca.contracts.observability.observation.m9_replay import (
 __all__ = [
     "ArtifactSnapshot",
     "BundleLoad",
-    "ContractViolation",
+    "ContractViolationError",
     "ControlTrace",
     "DecisionTrace",
     "DiffReport",

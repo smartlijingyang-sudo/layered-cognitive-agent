@@ -36,7 +36,7 @@ _TRACEBACK_CAPPED_BYTES = 4096
 
 
 def _is_i17_violation(exc: BaseException) -> bool:
-    """Duck-typed check for ``I17Violation`` without a static import.
+    """Duck-typed check for ``I17ViolationError`` without a static import.
 
     ``lca.harness`` must not statically import ``lca.plugins``. The
     I17 class lives in :mod:`lca.plugins.observability.spine.emit_pipeline`
@@ -46,7 +46,7 @@ def _is_i17_violation(exc: BaseException) -> bool:
     keeping the assembler import graph unchanged.
     """
     cls = type(exc)
-    return cls.__name__ == "I17Violation" and cls.__module__ in (
+    return cls.__name__ == "I17ViolationError" and cls.__module__ in (
         "lca.infrastructure.observability.spine.spine.enrich",
         "lca.plugins.observability.spine.emit_pipeline",
     )

@@ -106,7 +106,7 @@ class _WorkspaceMaterializationService:
     ) -> WorkspaceMaterialization:
         """拉 catalog 拿 spec（隐式触发 digest 校验），再物化 ExecutionSpace。
 
-        digest 不一致 ⇒ catalog 抛 ``AssistantDigestMismatch`` 透传，PR-4
+        digest 不一致 ⇒ catalog 抛 ``AssistantDigestMismatchError`` 透传，PR-4
         不吞错。
         """
         spec = self._catalog.get(assistant_id)

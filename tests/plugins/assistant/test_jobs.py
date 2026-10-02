@@ -5,7 +5,7 @@
 - register ⇒ 0093 WorkItem（trigger / profile / grant / options）+
   ``assistant.job.registered`` EP
 - 缺 ``continuous_control_plane_factory`` ⇒ register / fire 拒收
-  （:cls:`JobsCapabilityMissing`，fail-closed，不降级隐式线程）
+  （:cls:`JobsCapabilityMissingError`，fail-closed，不降级隐式线程）
 - fire（``actor="manual"``）⇒ MANUAL Trigger 投递 0093 +
   ``assistant.job.fired`` EP
 - disabled JobSpec 不进 0093；重复注册幂等（0093 去重）；未注册拒收
@@ -34,8 +34,8 @@ from lca.contracts.observability.closure.assistant_ep_closure import (
 )
 from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
 from lca.contracts.protocols.assistant.jobs import (
-    JobNotRegistered,
-    JobsCapabilityMissing,
+    JobNotRegisteredError,
+    JobsCapabilityMissingError,
     JobSpec,
 )
 from lca.harness.plugin.manifest import EffectClass
@@ -224,14 +224,14 @@ class TestRegisterWithoutControlPlane:
         self, catalog: AssistantCatalogImpl, assistant_id: str, job_spec: JobSpec
     ) -> None:
         impl = AssistantJobsImpl(catalog=catalog, control_plane_factory=None)
-        with pytest.raises(JobsCapabilityMissing, match="continuous_control_plane_factory"):
+        with pytest.raises(JobsCapabilityMissingError, match="continuous_control_plane_factory"):
             impl.register(assistant_id, job_spec)
 
     def test_missing_capability_rejects_fire(
         self, catalog: AssistantCatalogImpl, assistant_id: str
     ) -> None:
         impl = AssistantJobsImpl(catalog=catalog, control_plane_factory=None)
-        with pytest.raises(JobsCapabilityMissing):
+        with pytest.raises(JobsCapabilityMissingError):
             impl.fire(assistant_id, "daily_brief")
 
 
@@ -293,13 +293,13 @@ class TestFire:
     def test_fire_unregistered_job_rejected(
         self, jobs: AssistantJobsImpl, assistant_id: str
     ) -> None:
-        with pytest.raises(JobNotRegistered):
+        with pytest.raises(JobNotRegisteredError):
             jobs.fire(assistant_id, "ghost_job")
 
     def test_fire_disabled_job_rejected(self, jobs: AssistantJobsImpl, assistant_id: str) -> None:
         spec = JobSpec(job_id="paused_job", schedule="0 9 * * *", prompt="x", enabled=False)
         jobs.register(assistant_id, spec)
-        with pytest.raises(JobNotRegistered, match="disabled"):
+        with pytest.raises(JobNotRegisteredError, match="disabled"):
             jobs.fire(assistant_id, "paused_job")
 
     def test_fire_recovers_registration_from_0093_queue(

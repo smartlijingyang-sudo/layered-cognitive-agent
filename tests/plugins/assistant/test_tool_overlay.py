@@ -6,7 +6,7 @@
   ``revision_seq++`` + 发 ``assistant.profile.revised`` EP（四件套）
 - create 校验：非法 ToolSpec / 重复创建 ⇒ 不写盘、不发 EP
 - update：覆盖式修改，``tool_id`` 必须等于 ``spec.name``
-- remove：删盘 + manifest 修订 + EP；未知工具抛 ``ToolNotInstalled``
+- remove：删盘 + manifest 修订 + EP；未知工具抛 ``ToolNotInstalledError``
 - list_installed：扫 ``{home}/tools/`` 返回回执
 - 跨助理隔离：A 的工具不出现在 B
 - plugin Manifest：provides / requires / effects / test_suite / emits 声明
@@ -28,7 +28,7 @@ from lca.contracts.observability.closure.assistant_ep_closure import (
     ASSISTANT_REQUIRED_FIELDS,
 )
 from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
-from lca.contracts.protocols.assistant.tool_overlay import ToolNotInstalled
+from lca.contracts.protocols.assistant.tool_overlay import ToolNotInstalledError
 from lca.plugins.assistant.tool.overlay import AssistantToolOverlayImpl
 from lca.plugins.domain.assistant.catalog.plugin import AssistantCatalogImpl
 
@@ -219,7 +219,7 @@ class TestRemove:
         overlay: AssistantToolOverlayImpl,
         handle: Any,
     ) -> None:
-        with pytest.raises(ToolNotInstalled):
+        with pytest.raises(ToolNotInstalledError):
             await overlay.remove(handle.assistant_id, "missing")
 
 

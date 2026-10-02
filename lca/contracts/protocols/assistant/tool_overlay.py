@@ -24,7 +24,7 @@ from lca.contracts.models.assistant.tool_spec import ToolSpec
 __all__ = [
     "AssistantToolOverlay",
     "ToolInstallReceipt",
-    "ToolNotInstalled",
+    "ToolNotInstalledError",
 ]
 
 
@@ -61,7 +61,7 @@ class ToolInstallReceipt:
             raise ValueError("install_path 必为非空路径")
 
 
-class ToolNotInstalled(LookupError):
+class ToolNotInstalledError(LookupError):
     """``remove`` 找不到 ``{home}/tools/<tool_id>/`` 落盘定义。"""
 
 
@@ -111,7 +111,7 @@ class AssistantToolOverlay(Protocol):
     ) -> None:
         """删除 ``{home}/tools/<tool_id>/`` 并发 ``assistant.profile.revised`` EP。
 
-        失败语义：``tool_id`` 未落盘 ⇒ ``ToolNotInstalled``（不删盘、不发 EP）。
+        失败语义：``tool_id`` 未落盘 ⇒ ``ToolNotInstalledError``（不删盘、不发 EP）。
         """
         ...
 

@@ -2,7 +2,7 @@
 
 覆盖:
 - 三个异常子类的字面契约
-- ``check_schema_version`` 方向感知（VersionTooOld / VersionTooNew / 通过）
+- ``check_schema_version`` 方向感知（VersionTooOldError / VersionTooNewError / 通过）
 - ``FilesystemJournalStore`` 装载旧/新/未知事件时的方向感知拒绝
 """
 
@@ -15,9 +15,9 @@ import pytest
 
 from lca.contracts.observability.journal.format_errors import (
     JournalFormatError,
-    UnknownEventType,
-    VersionTooNew,
-    VersionTooOld,
+    UnknownEventTypeError,
+    VersionTooNewError,
+    VersionTooOldError,
 )
 from lca.infrastructure.observability.journal.backends.filesystem import (
     FilesystemJournalStore,
@@ -33,14 +33,14 @@ from lca.infrastructure.observability.journal.schema_version import (
 
 
 def test_version_too_old_subclasses_journal_format_error() -> None:
-    err = VersionTooOld(schema_version=0, min_supported=MIN_SUPPORTED_VERSION)
+    err = VersionTooOldError(schema_version=0, min_supported=MIN_SUPPORTED_VERSION)
     assert isinstance(err, JournalFormatError)
     assert err.schema_version == 0
     assert err.min_supported == MIN_SUPPORTED_VERSION
 
 
 def test_version_too_new_subclasses_journal_format_error() -> None:
-    err = VersionTooNew(
+    err = VersionTooNewError(
         schema_version=MAX_SUPPORTED_VERSION + 1, max_supported=MAX_SUPPORTED_VERSION
     )
     assert isinstance(err, JournalFormatError)
@@ -49,7 +49,7 @@ def test_version_too_new_subclasses_journal_format_error() -> None:
 
 
 def test_unknown_event_type_subclasses_journal_format_error() -> None:
-    err = UnknownEventType("MysteryEvent")
+    err = UnknownEventTypeError("MysteryEvent")
     assert isinstance(err, JournalFormatError)
     assert err.event_type == "MysteryEvent"
 
@@ -64,14 +64,14 @@ def test_schema_version_constants() -> None:
 
 
 def test_version_too_old_raises() -> None:
-    with pytest.raises(VersionTooOld) as excinfo:
+    with pytest.raises(VersionTooOldError) as excinfo:
         check_schema_version(MIN_SUPPORTED_VERSION - 1)
     assert excinfo.value.schema_version == MIN_SUPPORTED_VERSION - 1
     assert excinfo.value.min_supported == MIN_SUPPORTED_VERSION
 
 
 def test_version_too_new_raises() -> None:
-    with pytest.raises(VersionTooNew) as excinfo:
+    with pytest.raises(VersionTooNewError) as excinfo:
         check_schema_version(MAX_SUPPORTED_VERSION + 1)
     assert excinfo.value.schema_version == MAX_SUPPORTED_VERSION + 1
     assert excinfo.value.max_supported == MAX_SUPPORTED_VERSION
@@ -115,7 +115,7 @@ def _line_with_event_type(
 
 def test_unknown_event_type_with_ignorable_false_raises(tmp_path: Path) -> None:
     path = _write_line(tmp_path, _line_with_event_type("MysteryEvent", ignorable=False))
-    with pytest.raises(UnknownEventType) as excinfo:
+    with pytest.raises(UnknownEventTypeError) as excinfo:
         FilesystemJournalStore(tmp_path)
     assert excinfo.value.event_type == "MysteryEvent"
     # 文件存在但加载拒绝 —— 不消费任何事件
@@ -123,9 +123,9 @@ def test_unknown_event_type_with_ignorable_false_raises(tmp_path: Path) -> None:
 
 
 def test_unknown_event_type_with_ignorable_true_passes(tmp_path: Path) -> None:
-    """``ignorable=true`` 时未登记事件不抛 UnknownEventType(reader 边界放行)。"""
+    """``ignorable=true`` 时未登记事件不抛 UnknownEventTypeError(reader 边界放行)。"""
     _write_line(tmp_path, _line_with_event_type("MysteryEvent", ignorable=True))
-    # 仅断言:不抛 UnknownEventType / VersionToo*
+    # 仅断言:不抛 UnknownEventTypeError / VersionToo*
     store = FilesystemJournalStore(tmp_path)
     # 至少读到 0 或 1 行;读到的元素 event_type 仍是 MysteryEvent
     for stamped in store.events():
@@ -137,7 +137,7 @@ def test_filesystem_load_rejects_version_too_old(tmp_path: Path) -> None:
         tmp_path,
         _line_with_event_type("AgentRunStarted", schema_version=MIN_SUPPORTED_VERSION - 1),
     )
-    with pytest.raises(VersionTooOld):
+    with pytest.raises(VersionTooOldError):
         FilesystemJournalStore(tmp_path)
     assert path.exists()
 
@@ -147,7 +147,7 @@ def test_filesystem_load_rejects_version_too_new(tmp_path: Path) -> None:
         tmp_path,
         _line_with_event_type("AgentRunStarted", schema_version=MAX_SUPPORTED_VERSION + 1),
     )
-    with pytest.raises(VersionTooNew):
+    with pytest.raises(VersionTooNewError):
         FilesystemJournalStore(tmp_path)
     assert path.exists()
 

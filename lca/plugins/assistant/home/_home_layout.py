@@ -32,9 +32,9 @@ __all__ = [
     "SOUL_CORE_SECTIONS",
     "SOUL_SAFETY_SECTIONS",
     "TEMPLATE_REGISTRY",
-    "AssistantAlreadyExists",
+    "AssistantAlreadyExistsError",
     "AssistantCatalogError",
-    "AssistantDigestMismatch",
+    "AssistantDigestMismatchError",
     "HomePaths",
     "SoulValidationError",
     "build_manifest",
@@ -92,7 +92,7 @@ class AssistantCatalogError(RuntimeError):
     """Catalog 错误基类(4xx 语义;不静默回落)。"""
 
 
-class AssistantDigestMismatch(AssistantCatalogError):
+class AssistantDigestMismatchError(AssistantCatalogError):
     """manifest 配置面 digest 与磁盘文件 digest 不一致(I-A3 fail-closed)。
 
     触发场景:resolve 时重算文件 digest,与 ``manifest.json.digests`` 比对
@@ -100,7 +100,7 @@ class AssistantDigestMismatch(AssistantCatalogError):
     """
 
 
-class AssistantAlreadyExists(AssistantCatalogError):
+class AssistantAlreadyExistsError(AssistantCatalogError):
     """``create`` 时 ``assistant_id`` 已存在。"""
 
 
@@ -446,9 +446,9 @@ def render_default_template(*, name: str, description: str) -> TemplateRender:
 
 
 def write_home_files(home: Path, files: Mapping[str, str]) -> None:
-    """把 file payload 字典写到 Home(一次性);已存在抛 AssistantAlreadyExists。"""
+    """把 file payload 字典写到 Home(一次性);已存在抛 AssistantAlreadyExistsError。"""
     if home.exists():
-        raise AssistantAlreadyExists(f"assistant home 已存在: {home}")
+        raise AssistantAlreadyExistsError(f"assistant home 已存在: {home}")
     home.mkdir(parents=True, exist_ok=False)
     for rel, content in files.items():
         target = home / rel

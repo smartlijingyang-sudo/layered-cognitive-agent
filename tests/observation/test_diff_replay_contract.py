@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from lca.contracts.observability.observation import (
     ArtifactSnapshot,
-    ContractViolation,
+    ContractViolationError,
     DiffReport,
     EdgeDeviation,
     FailureExplanation,
@@ -36,7 +36,7 @@ def test_unexpected_node_signals_framework_bug() -> None:
 
 
 def test_contract_violation_carries_observed() -> None:
-    v = ContractViolation(
+    v = ContractViolationError(
         node_id="act.main",
         artifact_key="decision",
         expected="action_type ∈ granted",

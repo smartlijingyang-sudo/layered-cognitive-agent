@@ -202,10 +202,10 @@ def test_fold_preserves_termination_reason() -> None:
 
 
 def test_projection_apply_rejects_out_of_range_confidence() -> None:
-    """projection.apply() 重建 ``TaskProgressCommitted`` 时,confidence 越界抛 :class:`ContractViolation`."""
+    """projection.apply() 重建 ``TaskProgressCommitted`` 时,confidence 越界抛 :class:`ContractViolationError`."""
     import pytest as _pytest
 
-    from lca.contracts.errors import ContractViolation
+    from lca.contracts.errors import ContractViolationError
 
     proj = TaskProgressProjection()
     bad_event = SessionEvent(
@@ -221,5 +221,5 @@ def test_projection_apply_rejects_out_of_range_confidence() -> None:
         },
         session_id="t",
     )
-    with _pytest.raises(ContractViolation):
+    with _pytest.raises(ContractViolationError):
         proj.apply(bad_event)

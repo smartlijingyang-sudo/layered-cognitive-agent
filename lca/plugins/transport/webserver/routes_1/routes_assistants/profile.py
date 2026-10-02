@@ -13,7 +13,7 @@ from starlette.responses import JSONResponse
 from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
 from lca.plugins.domain.assistant.catalog.plugin import (
     AssistantCatalogError,
-    AssistantDigestMismatch,
+    AssistantDigestMismatchError,
 )
 from lca.plugins.transport.webserver.routes_1.routes_assistants.codecs import (
     _bind_ownership,
@@ -283,7 +283,7 @@ async def get_assistant(request: Request) -> JSONResponse:
 
     try:
         spec = catalog.get(assistant_id)
-    except AssistantDigestMismatch as exc:
+    except AssistantDigestMismatchError as exc:
         return _error_envelope(
             "digest_mismatch", status_code=409, error_type="conflict", detail=str(exc)
         )
@@ -378,7 +378,7 @@ async def revise_assistant_profile(request: Request) -> JSONResponse:
     try:
         revision = catalog.revise_profile(assistant_id, patch, actor=actor)
         home_path = catalog.get(assistant_id).home_path
-    except AssistantDigestMismatch as exc:
+    except AssistantDigestMismatchError as exc:
         return _error_envelope(
             "digest_mismatch",
             status_code=409,

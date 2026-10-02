@@ -14,7 +14,7 @@ from lca.infrastructure.observability.spine.context.context import SpineContext
 from lca.infrastructure.observability.spine.event.spine import EventSpine
 from lca.infrastructure.observability.spine.sinks.base import EventSink
 from lca.infrastructure.observability.spine.spine.enrich import (
-    I17Violation,
+    I17ViolationError,
     enrich_spine_payload,
     set_active_field_producers,
     set_active_spine_enricher,
@@ -91,7 +91,7 @@ def test_session_hook_i17_propagates_without_sink_fallback() -> None:
     sink = _RecordingSink()
     spine = EventSpine(sinks=[sink])
     try:
-        with pytest.raises(I17Violation):
+        with pytest.raises(I17ViolationError):
             spine.append(
                 execution_point="phase_graph.node.start",
                 channel="fact",

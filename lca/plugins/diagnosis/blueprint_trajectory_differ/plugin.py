@@ -14,7 +14,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from lca.contracts.observability.observation import (
-    ContractViolation,
+    ContractViolationError,
     DiffReport,
     MissingNode,
     NodeExit,
@@ -62,14 +62,14 @@ def diff_blueprint_trajectory(
         for node_id, phase in ((e.node_id, e.phase) for e in node_exits)
         if node_id not in expected_ids
     )
-    violations: list[ContractViolation] = []
+    violations: list[ContractViolationError] = []
     for exit in node_exits:
         outputs = exit.outputs or {}
         if exit.phase == "act":
             decision = outputs.get("decision")
             if decision is None:
                 violations.append(
-                    ContractViolation(
+                    ContractViolationError(
                         node_id=exit.node_id,
                         artifact_key="decision",
                         expected="decision.action_type ∈ actions_authorized",
@@ -78,7 +78,7 @@ def diff_blueprint_trajectory(
                 )
         elif exit.phase == "think" and outputs.get("decision") is None:
             violations.append(
-                ContractViolation(
+                ContractViolationError(
                     node_id=exit.node_id,
                     artifact_key="decision",
                     expected="think 产出 Decision",

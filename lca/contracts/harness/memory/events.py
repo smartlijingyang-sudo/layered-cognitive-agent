@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from lca.contracts.errors import ContractViolation
+from lca.contracts.errors import ContractViolationError
 from lca.contracts.harness.memory.skill import SkillCatalogEntry
 from lca.contracts.harness.tasks.session import session_event
 
@@ -558,11 +558,11 @@ class TaskProgressCommitted:
         # (本文件全部事件均为 dataclass, 不引 Pydantic)。confidence 闭区间
         # 与 :class:`TaskProgress` 保持同语义 — fail-loud,不静默 clamp。
         if not isinstance(self.confidence, (int, float)) or isinstance(self.confidence, bool):
-            raise ContractViolation(
+            raise ContractViolationError(
                 f"confidence must be a real number in [0, 1], got {type(self.confidence).__name__}"
             )
         if not 0.0 <= float(self.confidence) <= 1.0:
-            raise ContractViolation(f"confidence must be in [0, 1], got {self.confidence}")
+            raise ContractViolationError(f"confidence must be in [0, 1], got {self.confidence}")
 
 
 @session_event("session.end_seed.v1", visibility="audit")

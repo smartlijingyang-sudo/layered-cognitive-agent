@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from lca.contracts.protocols.session.persistence.service import CheckpointFailure
+from lca.contracts.protocols.session.persistence.service import CheckpointFailureError
 
 
 @runtime_checkable
@@ -32,7 +32,7 @@ class SessionCheckpointPolicyProtocol(Protocol):
 
 
 __all__ = [
-    "CheckpointFailure",
+    "CheckpointFailureError",
     "FlushableSession",
     "SessionCheckpointPolicyProtocol",
 ]

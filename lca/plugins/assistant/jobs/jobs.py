@@ -11,9 +11,9 @@ ADR-0187.1（0093 的 Trigger 来源扩展，不是独立调度器）。
 失败语义：
 
 - profile 缺 ``continuous_control_plane_factory`` ⇒ register / fire 抛
-  :cls:`JobsCapabilityMissing`（fail-closed，不降级隐式线程）；
+  :cls:`JobsCapabilityMissingError`（fail-closed，不降级隐式线程）；
 - 助理缺失 / digest 不一致 ⇒ catalog.get 抛错透传（I-A3 fail-closed）；
-- fire 未注册 job ⇒ :cls:`JobNotRegistered`。
+- fire 未注册 job ⇒ :cls:`JobNotRegisteredError`。
 
 Phase 1 限制：``list_jobs`` 返回本进程 ``register`` 过的登记；跨进程重启
 后 ``fire`` 仍可按确定性 work_id 从 0093 队列恢复投递。
@@ -60,9 +60,9 @@ from lca.contracts.observability.closure.assistant_ep_closure import (
 from lca.contracts.protocols.assistant.catalog import AssistantCatalog
 from lca.contracts.protocols.assistant.jobs import (
     AssistantJobs,
-    JobNotRegistered,
+    JobNotRegisteredError,
     JobRegistration,
-    JobsCapabilityMissing,
+    JobsCapabilityMissingError,
     JobSpec,
     WorkItemHandle,
 )
@@ -204,11 +204,11 @@ class _AssistantJobsImpl(AssistantJobs):
         registration = self._registrations.get((assistant_id, job_id))
         registered_item = plane.get(_registration_work_id(assistant_id, job_id))
         if registration is None and registered_item is None:
-            raise JobNotRegistered(
+            raise JobNotRegisteredError(
                 f"assistant={assistant_id!r} job={job_id!r} 未注册,先走 register"
             )
         if registration is not None and registration.status == "disabled":
-            raise JobNotRegistered(
+            raise JobNotRegisteredError(
                 f"assistant={assistant_id!r} job={job_id!r} 处于 disabled,拒收投递"
             )
 
@@ -263,9 +263,9 @@ class _AssistantJobsImpl(AssistantJobs):
     # ── 内部 ─────────────────────────────────────────────────────────
 
     def _require_factory(self, op: str) -> ContinuousControlPlaneFactory:
-        """factory 缺失 ⇒ :cls:`JobsCapabilityMissing`（fail-closed）。"""
+        """factory 缺失 ⇒ :cls:`JobsCapabilityMissingError`（fail-closed）。"""
         if self._factory is None:
-            raise JobsCapabilityMissing(
+            raise JobsCapabilityMissingError(
                 f"assistant.jobs.{op} 拒收:profile 缺 {CONTINUOUS_CONTROL_PLANE_FACTORY.key}"
                 " capability(ADR-0187 §3 D10,不降级隐式线程)"
             )

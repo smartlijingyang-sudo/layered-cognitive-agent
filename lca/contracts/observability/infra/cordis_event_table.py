@@ -19,7 +19,7 @@ from lca.contracts.observability.cursor.loop_cursor import PhaseName
 
 
 class UnknownCordisEventError(KeyError):
-    """未登记 execution_point 的查表失败（ADR-0169 L12 + L15 UnknownEventType）。
+    """未登记 execution_point 的查表失败（ADR-0169 L12 + L15 UnknownEventTypeError）。
 
     KeyError 子类便于调用方 ``except KeyError`` 兜底;单独捕获请用本类。
     """

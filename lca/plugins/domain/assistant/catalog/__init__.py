@@ -6,10 +6,10 @@
 """
 
 from lca.plugins.domain.assistant.catalog.plugin import (
-    AssistantAlreadyExists,
+    AssistantAlreadyExistsError,
     AssistantCatalogError,
     AssistantCatalogImpl,
-    AssistantDigestMismatch,
+    AssistantDigestMismatchError,
     Config,
     PlanOverlayValidationError,
     SoulValidationError,
@@ -17,10 +17,10 @@ from lca.plugins.domain.assistant.catalog.plugin import (
 )
 
 __all__ = [
-    "AssistantAlreadyExists",
+    "AssistantAlreadyExistsError",
     "AssistantCatalogError",
     "AssistantCatalogImpl",
-    "AssistantDigestMismatch",
+    "AssistantDigestMismatchError",
     "Config",
     "PlanOverlayValidationError",
     "SoulValidationError",

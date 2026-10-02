@@ -398,10 +398,10 @@ def test_module_export_surface() -> None:
 
     assert hasattr(emit_pipeline_module, "EmitPipeline")
     assert hasattr(emit_pipeline_module, "setup")
-    assert hasattr(emit_pipeline_module, "I17Violation")
+    assert hasattr(emit_pipeline_module, "I17ViolationError")
     assert "EmitPipeline" in emit_pipeline_module.__all__
     assert "setup" in emit_pipeline_module.__all__
-    assert "I17Violation" in emit_pipeline_module.__all__
+    assert "I17ViolationError" in emit_pipeline_module.__all__
 
 
 # ── setup wiring ─────────────────────────────────────────────────────

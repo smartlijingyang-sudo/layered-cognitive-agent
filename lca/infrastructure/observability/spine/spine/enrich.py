@@ -42,7 +42,7 @@ log = logging.getLogger(__name__)
 
 __all__ = [
     "EnrichResult",
-    "I17Violation",
+    "I17ViolationError",
     "enrich_spine_payload",
     "get_active_field_producers",
     "get_active_spine_enricher",
@@ -53,7 +53,7 @@ __all__ = [
 ]
 
 
-class I17Violation(Exception):
+class I17ViolationError(Exception):
     """Raised when a ``*.start`` event is emitted without ``source_location``."""
 
 
@@ -182,7 +182,7 @@ def enrich_spine_payload(
         )
 
     if execution_point.endswith(".start") and "source_location" not in merged:
-        raise I17Violation(
+        raise I17ViolationError(
             f"I17: execution_point={execution_point!r} requires "
             f"'source_location' in payload (ADR-0165.1 §96; "
             f"ADR-i17-tb spine-wide strong contract)"

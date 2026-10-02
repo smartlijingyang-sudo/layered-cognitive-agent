@@ -17,7 +17,7 @@ Service Definition 的 LCA Protocol 形态:纯类型(Protocol + 异常),无 I/O,
 ``lca_kernel``(pyproject 契约 6 kernel-domain-isolation),新平面信封
 (:mod:`lca_kernel.events.session`)由实现侧在 seam 处适配,本契约不感知。
 
-:class:`CheckpointFailure` 是 checkpoint 策略
+:class:`CheckpointFailureError` 是 checkpoint 策略
 (``lca.plugins.session.checkpoint_policy``)在 flush barrier 未完成时抛出的
 fail-closed 异常;契约层只定义类型,不含行为。
 """
@@ -31,7 +31,7 @@ from typing import Protocol, runtime_checkable
 from lca.contracts.harness.tasks.session import SessionEvent, SessionHeader
 
 
-class CheckpointFailure(RuntimeError):
+class CheckpointFailureError(RuntimeError):
     """durability checkpoint 未完成:flush barrier 失败,下游动作不得执行。
 
     由 checkpoint 策略的三个边界(模型请求前 / 顶层工具副作用前 / 步边界)
@@ -82,7 +82,7 @@ class SessionPersistenceService(Protocol):
         成功返回 ⇒ 此前经 :meth:`append` 接受的事件崩溃后仍存在;失败抛异常
         (排空/fsync 错误向上传播),已保留事件待重试,不丢失、不静默截断已
         提交前缀。checkpoint 策略以本方法为 fail-closed 判定点:flush 失败 →
-        :class:`CheckpointFailure` → 下游不得执行。
+        :class:`CheckpointFailureError` → 下游不得执行。
         """
         ...
 
@@ -101,4 +101,4 @@ class SessionPersistenceService(Protocol):
         ...
 
 
-__all__ = ["CheckpointFailure", "SessionPersistenceService"]
+__all__ = ["CheckpointFailureError", "SessionPersistenceService"]

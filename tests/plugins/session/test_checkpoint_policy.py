@@ -3,12 +3,12 @@
 覆盖契约:
 
 - flush 全 ok → 三个入口都放行不抛(空结果列表亦放行)
-- FlushResult(ok=False) → 三个入口各抛 CheckpointFailure(fail-closed)
-- session.flush 自身抛异常 → CheckpointFailure 包装(__cause__ 持原异常)
+- FlushResult(ok=False) → 三个入口各抛 CheckpointFailureError(fail-closed)
+- session.flush 自身抛异常 → CheckpointFailureError 包装(__cause__ 持原异常)
 - enabled=False → no-op 放行,不触发 flush(LCA 扩展)
 - plugin 装配:setup 提供 session.checkpoint.policy capability;manifest 元数据
 - 端到端:真 SessionStore + 总是失败的 FlushListener → before_model_request
-  抛 CheckpointFailure
+  抛 CheckpointFailureError
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from lca.contracts.protocols.session.persistence.service import CheckpointFailure
+from lca.contracts.protocols.session.persistence.service import CheckpointFailureError
 from lca.plugins.session.checkpoint_policy.checkpoint_policy import (
     Config,
     FlushableSession,
@@ -115,7 +115,7 @@ async def test_failed_result_raises_checkpoint_failure(entry_point: str) -> None
     session = _FakeFlushSession(results=[_ok_result(), _failed_result(OSError("disk full"))])
     policy = SessionCheckpointPolicy()
 
-    with pytest.raises(CheckpointFailure, match="disk full"):
+    with pytest.raises(CheckpointFailureError, match="disk full"):
         await getattr(policy, entry_point)(session)
 
 
@@ -125,7 +125,7 @@ async def test_flush_exception_wrapped_in_checkpoint_failure(entry_point: str) -
     session = _FakeFlushSession(exc=boom)
     policy = SessionCheckpointPolicy()
 
-    with pytest.raises(CheckpointFailure) as excinfo:
+    with pytest.raises(CheckpointFailureError) as excinfo:
         await getattr(policy, entry_point)(session)
 
     assert excinfo.value.__cause__ is boom
@@ -216,14 +216,14 @@ class _RecordingListener:
 
 
 async def test_end_to_end_failing_listener_blocks_model_request() -> None:
-    """端到端:真 Session 的 flush 链报 ok=False → CheckpointFailure(fail-closed)。"""
+    """端到端:真 Session 的 flush 链报 ok=False → CheckpointFailureError(fail-closed)。"""
     store = SessionStore()
     session = store.create("s-e2e-fail")
     session.append("spine.turn.started", {"turn": 1})
     session.register_flush_listener(_AlwaysFailListener())
     policy = SessionCheckpointPolicy()
 
-    with pytest.raises(CheckpointFailure, match="disk full"):
+    with pytest.raises(CheckpointFailureError, match="disk full"):
         await policy.before_model_request(session)
 
 
