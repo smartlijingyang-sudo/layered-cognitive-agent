@@ -64,9 +64,10 @@ from lca_kernel.runtime.observability import ObservabilityRuntime
 
 if TYPE_CHECKING:
     from lca.harness.profile.resolve.resolve import ResolvedProfile
+    from lca_kernel.plan.plan_compile import CompiledRunPlan
 
 
-def compile_profile(resolved: "ResolvedProfile") -> object:
+def compile_profile(resolved: "ResolvedProfile") -> "CompiledRunPlan":
     """编译 ``ResolvedProfile`` → ``CompiledRunPlan``(公共 alias)。
 
     命名遵循 ADR-0106 §8.1 函数前缀表(``compile_*``);实现委托给
