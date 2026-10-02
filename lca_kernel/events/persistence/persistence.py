@@ -17,13 +17,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol, runtime_checkable
 
+from lca.contracts.atoms.ids.ids import utc_now_ms
 from lca.contracts.observability.evidence.fsync import FsyncProtocol
 from lca.infrastructure.persistence.run_buffer_registry import RunWriteBehindRegistry
 
@@ -370,7 +370,7 @@ class PersistenceObserver:
         """Synchronous drain for tests and explicit callers."""
         if self._sink is not None:
             self._sink.flush()
-            self._last_flush_ms = int(time.time() * 1000)
+            self._last_flush_ms = utc_now_ms()
             return
         registry = self._ensure_registry()
         if run_id is not None:
@@ -454,7 +454,7 @@ class PersistenceObserver:
         self._written_total += 1
         if self._fsync_policy is FsyncProtocol.PER_WRITE:
             sink.flush()
-            self._last_flush_ms = int(time.time() * 1000)
+            self._last_flush_ms = utc_now_ms()
         elif self._fsync_policy is FsyncProtocol.BATCH and self._fsync_interval_ms > 0:
             self._maybe_fsync_batched()
         self._notify_flush(event_id)
@@ -464,7 +464,7 @@ class PersistenceObserver:
         if sink is None:
             return
         last = self._last_flush_ms
-        now_ms = int(time.time() * 1000)
+        now_ms = utc_now_ms()
         if last is None or (now_ms - last) >= self._fsync_interval_ms:
             sink.flush()
             self._last_flush_ms = now_ms
