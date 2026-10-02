@@ -127,8 +127,9 @@ class AvatarCreateTool(Tool):
     default_timeout_s = 120
 
     def validate(self, args: dict[str, Any]) -> str | None:
-        if not str(args.get("user_request", "")).strip():
-            return "user_request must be non-empty"
+        user_request = args.get("user_request")
+        if not isinstance(user_request, str) or not user_request.strip():
+            return "user_request must be a non-empty string"
         return None
 
     async def execute(self, args: dict[str, Any]) -> Observation:
@@ -175,8 +176,9 @@ class AvatarEditTool(Tool):
     default_timeout_s = 120
 
     def validate(self, args: dict[str, Any]) -> str | None:
-        if not str(args.get("user_request", "")).strip():
-            return "user_request must be non-empty"
+        user_request = args.get("user_request")
+        if not isinstance(user_request, str) or not user_request.strip():
+            return "user_request must be a non-empty string"
         return None
 
     async def execute(self, args: dict[str, Any]) -> Observation:
@@ -218,7 +220,10 @@ class AvatarSetTool(Tool):
     default_timeout_s = 30
 
     def validate(self, args: dict[str, Any]) -> str | None:
-        return None if str(args.get("candidate_id", "")).strip() else "candidate_id is required"
+        candidate_id = args.get("candidate_id")
+        if not isinstance(candidate_id, str) or not candidate_id.strip():
+            return "candidate_id must be a non-empty string"
+        return None
 
     async def execute(self, args: dict[str, Any]) -> Observation:
         started = time.monotonic()
@@ -357,8 +362,9 @@ class AvatarScheduleTool(Tool):
         self._owner = owner
 
     def validate(self, args: dict[str, Any]) -> str | None:
-        if not str(args.get("user_request", "")).strip():
-            return "user_request must be non-empty"
+        user_request = args.get("user_request")
+        if not isinstance(user_request, str) or not user_request.strip():
+            return "user_request must be a non-empty string"
         schedule = args.get("schedule")
         if not isinstance(schedule, dict) or not isinstance(schedule.get("kind"), str):
             return "schedule must be an object with a 'kind'"

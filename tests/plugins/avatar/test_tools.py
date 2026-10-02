@@ -249,6 +249,30 @@ def test_schedule_tool_requires_user_request_and_schedule() -> None:
     )
 
 
+def test_create_tool_rejects_non_string_user_request() -> None:
+    tool = AvatarCreateTool()
+    assert tool.validate({"user_request": 123}) is not None
+    assert tool.validate({"user_request": True}) is not None
+
+
+def test_edit_tool_rejects_non_string_user_request() -> None:
+    tool = AvatarEditTool()
+    assert tool.validate({"user_request": 123}) is not None
+    assert tool.validate({"user_request": True}) is not None
+
+
+def test_set_tool_rejects_non_string_candidate_id() -> None:
+    tool = AvatarSetTool()
+    assert tool.validate({"candidate_id": 123}) is not None
+    assert tool.validate({"candidate_id": True}) is not None
+
+
+def test_schedule_tool_rejects_non_string_user_request() -> None:
+    tool = AvatarScheduleTool()
+    assert tool.validate({"user_request": 123, "schedule": {"kind": "daily"}}) is not None
+    assert tool.validate({"user_request": True, "schedule": {"kind": "daily"}}) is not None
+
+
 # ── execute 成功路径（经注册表注入 fake service） ──────────────────────
 
 
@@ -268,6 +292,18 @@ async def test_create_execute_validates_before_service(fake_service: FakeAvatarS
     tool = AvatarCreateTool()
     with _bound_assistant():
         obs = await tool.execute({"user_request": ""})
+    assert obs.success is False
+    assert "user_request" in obs.error
+    assert fake_service.created == []
+
+
+@pytest.mark.asyncio
+async def test_create_execute_rejects_non_string_user_request(
+    fake_service: FakeAvatarService,
+) -> None:
+    tool = AvatarCreateTool()
+    with _bound_assistant():
+        obs = await tool.execute({"user_request": 123})
     assert obs.success is False
     assert "user_request" in obs.error
     assert fake_service.created == []
@@ -324,6 +360,18 @@ async def test_edit_execute_rejects_undecodable_reference(
 
 
 @pytest.mark.asyncio
+async def test_edit_execute_rejects_non_string_user_request(
+    fake_service: FakeAvatarService,
+) -> None:
+    tool = AvatarEditTool()
+    with _bound_assistant():
+        obs = await tool.execute({"user_request": True})
+    assert obs.success is False
+    assert "user_request" in obs.error
+    assert fake_service.edits == []
+
+
+@pytest.mark.asyncio
 async def test_set_execute_returns_active_bundle(fake_service: FakeAvatarService) -> None:
     tool = AvatarSetTool()
     with _bound_assistant():
@@ -332,6 +380,18 @@ async def test_set_execute_returns_active_bundle(fake_service: FakeAvatarService
     assert obs.error is None
     assert fake_service.set_calls == [(ASSISTANT_ID, "c1")]
     assert obs.payload["active"]["candidate_id"] == "c1"
+
+
+@pytest.mark.asyncio
+async def test_set_execute_rejects_non_string_candidate_id(
+    fake_service: FakeAvatarService,
+) -> None:
+    tool = AvatarSetTool()
+    with _bound_assistant():
+        obs = await tool.execute({"candidate_id": 123})
+    assert obs.success is False
+    assert "candidate_id" in obs.error
+    assert fake_service.set_calls == []
 
 
 @pytest.mark.asyncio
@@ -450,6 +510,22 @@ async def test_schedule_execute_rejects_invalid_schedule(fake_service: FakeAvata
         obs = await tool.execute({"user_request": "雨天装扮", "schedule": {"kind": "daily"}})
     assert obs.success is False
     assert obs.error is not None
+
+
+@pytest.mark.asyncio
+async def test_schedule_execute_rejects_non_string_user_request(
+    fake_service: FakeAvatarService,
+) -> None:
+    tool = AvatarScheduleTool(service=FakeCronService())
+    with _bound_assistant():
+        obs = await tool.execute(
+            {
+                "user_request": 123,
+                "schedule": {"kind": "daily", "hour": 12, "minute": 0},
+            }
+        )
+    assert obs.success is False
+    assert "user_request" in obs.error
 
 
 @pytest.mark.asyncio
