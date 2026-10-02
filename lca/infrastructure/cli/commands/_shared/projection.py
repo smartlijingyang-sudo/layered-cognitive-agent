@@ -11,8 +11,9 @@ through ongoing spine schema evolution.
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 
 _DEFAULT_TRACES_ROOT = Path("traces")
 
@@ -22,9 +23,15 @@ _DOMAIN_PREFIXES: dict[str, tuple[str, ...]] = {
     "session": ("turn.", "step.started", "step.ended", "message.accepted", "session.created"),
     "llm": ("llm.", "model.", "thinking.", "step.thinking"),
     "prompt": (
-        "prompt_assembler", "prompt.section", "prompt.surface",
-        "reasoner.reason", "skill_router", "think.gate",
-        "gate.decided", "convergence.evaluated", "delivery.evidence",
+        "prompt_assembler",
+        "prompt.section",
+        "prompt.surface",
+        "reasoner.reason",
+        "skill_router",
+        "think.gate",
+        "gate.decided",
+        "convergence.evaluated",
+        "delivery.evidence",
     ),
     "tool": ("body.tool.", "phase.tool.", "step.tool_", "tool.schema"),
     "sandbox": ("body.sandbox.",),
@@ -86,7 +93,10 @@ def load_spine_events(
             continue
         if not isinstance(obj, dict):
             continue
-        out.append(obj)
+        # SpineRow is a total=False tolerant view; obj is an
+        # isinstance-checked dict, so the cast only names the
+        # documented tolerance (no runtime change).
+        out.append(cast("SpineRow", obj))
     return out
 
 
@@ -99,7 +109,8 @@ def filter_by_domain(
     if prefixes is None:
         return []
     return [
-        e for e in events
+        e
+        for e in events
         if any(
             str(e.get("execution_point", "")).startswith(p)
             or p in str(e.get("execution_point", ""))
@@ -161,10 +172,14 @@ def _safe_repr(v: Any, n: int = 60) -> str:
         if is_string_dt:
             inner = v[len("datetime.datetime(") : -1]
             return truncate(inner, n)
-        try:
-            return v.isoformat()
-        except Exception:
-            return f"<{type(v).__name__}>"
+        # A str's repr never starts with "datetime.datetime(" (it starts with a
+        # quote), so reaching here means v is a datetime-like object.
+        if isinstance(v, datetime):
+            try:
+                return v.isoformat()
+            except Exception:
+                return f"<{type(v).__name__}>"
+        return f"<{type(v).__name__}>"
     return truncate(r, n)
 
 
