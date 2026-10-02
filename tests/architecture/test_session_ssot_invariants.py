@@ -21,8 +21,8 @@ from pathlib import Path
 import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_FOLD_MODULE = _REPO_ROOT / "lca_kernel" / "events" / "fold.py"
-_SESSION_MODULE = _REPO_ROOT / "lca_kernel" / "events" / "session.py"
+_FOLD_PACKAGE = _REPO_ROOT / "lca_kernel" / "events" / "fold"
+_SESSION_PACKAGE = _REPO_ROOT / "lca_kernel" / "events" / "session"
 
 
 def _have_ripgrep() -> bool:
@@ -72,7 +72,7 @@ class TestISession1:
 
     def test_i_session_1_session_protocol_exists(self) -> None:
         """SessionProtocol / SessionObserver / SessionEvent 可从 session 模块导入。"""
-        assert _SESSION_MODULE.exists(), "lca_kernel/events/session.py missing"
+        assert (_SESSION_PACKAGE / "session.py").exists(), "lca_kernel/events/session/ 包缺 session.py"
         from lca_kernel.events.session.session import (
             SessionEvent,
             SessionObserver,
@@ -91,44 +91,60 @@ class TestISession2:
     """I-SESSION-2: fold 模块无 I/O / 副作用。"""
 
     def test_i_session_2_fold_no_io(self) -> None:
-        """fold.py 不得 open / pathlib.Path / read|write / print / logging / datetime.now。"""
-        if not _FOLD_MODULE.exists():
-            pytest.skip("lca_kernel/events/fold.py not found")
-        source = _FOLD_MODULE.read_text(encoding="utf-8")
-        tree = ast.parse(source)
+        """fold 包逐文件不得 open / pathlib.Path / read|write / print / logging / datetime.now。
 
-        assert "open(" not in source, "I-SESSION-2: fold.py must not call open()"
+        fold.py 已拆为 lca_kernel/events/fold/ 包(B-083 搬家);守卫意图诚实
+        扩展到包内全部模块。
+        """
+        files = sorted(_FOLD_PACKAGE.glob("*.py"))
+        assert files, "lca_kernel/events/fold/ 包为空"
+        for fold_file in files:
+            source = fold_file.read_text(encoding="utf-8")
+            tree = ast.parse(source)
+            label = fold_file.name
 
-        for pattern in (
-            ".read(",
-            ".read_text(",
-            ".read_bytes(",
-            ".write(",
-            ".write_text(",
-            ".write_bytes(",
-        ):
-            assert pattern not in source, f"I-SESSION-2: fold.py must not contain {pattern!r}"
+            assert "open(" not in source, f"I-SESSION-2: {label} must not call open()"
 
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and node.module == "pathlib":
-                names = [alias.name for alias in node.names]
-                assert "Path" not in names, "I-SESSION-2: fold.py must not import pathlib.Path"
-            if isinstance(node, ast.Import):
-                for alias in node.names:
-                    assert alias.name != "pathlib", "I-SESSION-2: fold.py must not import pathlib"
-                    assert alias.name != "logging", "I-SESSION-2: fold.py must not import logging"
-            if isinstance(node, ast.ImportFrom) and node.module == "logging":
-                pytest.fail("I-SESSION-2: fold.py must not import from logging")
-            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-                assert node.func.id != "print", "I-SESSION-2: fold.py must not call print()"
-            if (
-                isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Attribute)
-                and isinstance(node.func.value, ast.Name)
-                and node.func.value.id in {"datetime", "dt"}
-                and node.func.attr == "now"
+            for pattern in (
+                ".read(",
+                ".read_text(",
+                ".read_bytes(",
+                ".write(",
+                ".write_text(",
+                ".write_bytes(",
             ):
-                pytest.fail("I-SESSION-2: fold.py must not call datetime.now()")
+                assert pattern not in source, (
+                    f"I-SESSION-2: {label} must not contain {pattern!r}"
+                )
+
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.module == "pathlib":
+                    names = [alias.name for alias in node.names]
+                    assert "Path" not in names, (
+                        f"I-SESSION-2: {label} must not import pathlib.Path"
+                    )
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        assert alias.name != "pathlib", (
+                            f"I-SESSION-2: {label} must not import pathlib"
+                        )
+                        assert alias.name != "logging", (
+                            f"I-SESSION-2: {label} must not import logging"
+                        )
+                if isinstance(node, ast.ImportFrom) and node.module == "logging":
+                    pytest.fail(f"I-SESSION-2: {label} must not import from logging")
+                if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+                    assert node.func.id != "print", (
+                        f"I-SESSION-2: {label} must not call print()"
+                    )
+                if (
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                    and isinstance(node.func.value, ast.Name)
+                    and node.func.value.id in {"datetime", "dt"}
+                    and node.func.attr == "now"
+                ):
+                    pytest.fail(f"I-SESSION-2: {label} must not call datetime.now()")
 
 
 # ── I-SESSION-3 ─────────────────────────────────────────────────────────
@@ -160,8 +176,8 @@ class TestISession4:
 
     def test_i_session_4_persistence_is_observer(self) -> None:
         """生产路径应暴露 PersistenceObserver，而非 PersistenceWorker 主写。"""
-        persistence = _REPO_ROOT / "lca_kernel" / "events" / "persistence.py"
-        assert persistence.exists(), "persistence.py missing"
+        persistence = _REPO_ROOT / "lca_kernel" / "events" / "persistence" / "persistence.py"
+        assert persistence.exists(), "lca_kernel/events/persistence/ 包缺 persistence.py"
 
         text = persistence.read_text(encoding="utf-8")
         has_observer = "PersistenceObserver" in text or "class PersistenceObserver" in text
@@ -202,6 +218,7 @@ class TestISession5:
             / "handlers"
             / "runs"
             / "session"
+            / "builder"
             / "builder.py"
         )
         assert builder.exists(), "RunSessionBuilder missing"
@@ -232,7 +249,8 @@ class TestISession5:
             / "observability"
             / "spine"
             / "derivers"
-            / "live_tail.py"
+            / "live"
+            / "tail.py"
         )
         assert live_tail.exists(), "live_tail deriver module missing"
         live_tail_text = live_tail.read_text(encoding="utf-8")
@@ -250,7 +268,7 @@ class TestISession5:
 
 def test_pipeline_loader_has_no_mount_sink() -> None:
     """ADR-0186 PR-3f: pipeline_loader 不得 bus.mount_sink / .mount_sink。"""
-    path = _REPO_ROOT / "lca" / "harness" / "profile" / "pipeline_loader.py"
+    path = _REPO_ROOT / "lca" / "harness" / "profile" / "resolve" / "pipeline_loader.py"
     assert path.exists(), "pipeline_loader.py missing"
     text = path.read_text(encoding="utf-8")
     assert "bus.mount_sink(" not in text, (
@@ -260,19 +278,13 @@ def test_pipeline_loader_has_no_mount_sink() -> None:
 
 
 def test_event_session_has_no_eventbus_dual_write() -> None:
-    """ADR-0186 PR-3f: Bridge.append 不得 EventBus.default().publish 双写。"""
-    path = (
-        _REPO_ROOT
-        / "lca"
-        / "plugins"
-        / "transport"
-        / "webserver"
-        / "handlers"
-        / "runs"
-        / "session"
-        / "event_session.py"
-    )
-    assert path.exists(), "event_session.py missing"
+    """ADR-0186 PR-3f: Bridge.append 不得 EventBus.default().publish 双写。
+
+    RunEventSessionBridge 已迁入 lca.session.lifecycle.bind(旧 event_session.py
+    仅剩 COMPAT re-export);断言跟随生产位置。
+    """
+    path = _REPO_ROOT / "lca" / "session" / "lifecycle" / "bind.py"
+    assert path.exists(), "lca/session/lifecycle/bind.py missing"
     text = path.read_text(encoding="utf-8")
     assert "EventBus.default().publish" not in text, (
         "ADR-0186 PR-3f: event_session still dual-writes via EventBus.default().publish"
@@ -291,7 +303,7 @@ def test_session_publish_has_no_eventbus_fallback() -> None:
 
 def test_pipeline_loader_has_no_bus_subscribe() -> None:
     """ADR-0186 hard closure: pipeline_loader 不得 bus.subscribe / .subscribe(。"""
-    path = _REPO_ROOT / "lca" / "harness" / "profile" / "pipeline_loader.py"
+    path = _REPO_ROOT / "lca" / "harness" / "profile" / "resolve" / "pipeline_loader.py"
     assert path.exists(), "pipeline_loader.py missing"
     text = path.read_text(encoding="utf-8")
     assert "bus.subscribe(" not in text, "ADR-0186: pipeline_loader still calls bus.subscribe("
@@ -309,6 +321,7 @@ def test_builder_has_no_legacy_spine_write_port_fallback() -> None:
         / "handlers"
         / "runs"
         / "session"
+        / "builder"
         / "builder.py"
     )
     text = path.read_text(encoding="utf-8")
@@ -319,9 +332,17 @@ def test_field_producer_merge_lives_in_spine_enrich() -> None:
     """ADR-0186 wave-2 / ADR-0194 P2-06: FieldProducer merge in spine_enrich + gateway."""
     gateway_path = _REPO_ROOT / "lca" / "loop" / "fact_gateway.py"
     enrich_path = (
-        _REPO_ROOT / "lca" / "infrastructure" / "observability" / "spine" / "spine_enrich.py"
+        _REPO_ROOT
+        / "lca"
+        / "infrastructure"
+        / "observability"
+        / "spine"
+        / "spine"
+        / "enrich.py"
     )
-    hook_path = _REPO_ROOT / "lca" / "plugins" / "session" / "runtime" / "spine_hook.py"
+    hook_path = (
+        _REPO_ROOT / "lca" / "plugins" / "session" / "runtime" / "spine" / "hook.py"
+    )
     assert enrich_path.exists()
     enrich_text = enrich_path.read_text(encoding="utf-8")
     assert "producer.produce" in enrich_text
