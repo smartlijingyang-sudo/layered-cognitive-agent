@@ -1,15 +1,21 @@
-"""Avatar WS 推送通道（ADR-0269 §6）。
+"""Avatar WS 推送通道（ADR-0269 §6 / spec §10）。
 
 ``AvatarEventPublisher`` 把 ``AvatarUpdatedEvent`` 发布到 Redis pub/sub
 channel ``assistant_events:<assistant_id>``；``make_avatar_ws_handler``
 生成 Starlette WebSocket 端点，订阅同一 channel 并把消息转发给前端。
 WS 事件是投影通知，不承载状态（ADR-0269 §0 第 3 问）。
+
+鉴权（spec §10「复用网关 WS JWT」）：非 dev_mode 下客户端连接后首帧必须
+为 ``{type:'auth', token}``，用 ``verify_user_jwt`` 校验（与
+``/v1/runs/{run_id}/ws`` 网关同源）；dev_mode 下不要求 token，保留
+REST header 鉴权路径作为非浏览器客户端回退。
 """
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import logging
 from typing import Any
 
@@ -64,24 +70,91 @@ class AvatarEventPublisher:
             )
 
 
-def _authenticate(websocket: Any) -> str | None:
-    """解析 WS 请求身份；失败返回 ``None``（调用方关闭 4401）。
+def _auth_config(websocket: Any) -> tuple[str, bool]:
+    """从 ``app.state`` 读 ``(expected_token, dev_mode)``（同 REST 路由）。"""
+    from lca.plugins.transport.webserver.handlers.auth.user import auth_config_of
 
-    与 REST 路由同型（ADR-0252 D4）：Bearer token + ``x-lca-user-id``。
-    WebSocket 也有 ``.headers`` / ``.app``，可直接鸭子类型传给 auth helper。
+    return auth_config_of(websocket)
+
+
+def _authenticate(websocket: Any) -> str | None:
+    """REST header 鉴权路径（ADR-0252 D4，dev_mode 回退用）。
+
+    浏览器 WebSocket 握手无法设置 header，因此该路径只在 dev_mode 下作为
+    非浏览器客户端的回退；非 dev_mode 走 ``_jwt_auth_user`` 首帧 JWT。
     """
     from lca.plugins.transport.webserver.handlers.auth.user import (
-        auth_config_of,
         user_id_from_request,
     )
 
-    expected_token, dev_mode = auth_config_of(websocket)
+    expected_token, dev_mode = _auth_config(websocket)
     user_id, error = user_id_from_request(
         websocket, expected_token=expected_token, dev_mode=dev_mode
     )
     if error is not None:
         return None
     return user_id
+
+
+async def _recv_auth_frame(websocket: Any) -> dict[str, Any] | None:
+    """读取并解析客户端首帧 JSON（镜像 gateway WS 的 ``_recv_json``）。"""
+    from starlette.websockets import WebSocketDisconnect
+
+    try:
+        payload = await websocket.receive_text()
+    except WebSocketDisconnect:
+        return None
+    if not payload or payload.startswith(":"):
+        return None
+    for line in payload.split("\n"):
+        if line.startswith("data:"):
+            try:
+                parsed = json.loads(line[len("data:") :].strip())
+                return parsed if isinstance(parsed, dict) else None
+            except json.JSONDecodeError:
+                continue
+    try:
+        parsed = json.loads(payload)
+    except json.JSONDecodeError:
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+async def _jwt_auth_user(websocket: Any) -> str | None:
+    """首帧 JWT 握手（gateway WS 模式，spec §10）。
+
+    客户端首帧必须为 ``{type:'auth', token}``；``verify_user_jwt`` 校验
+    通过后返回 ``sub`` 用户 id，任何失败返回 ``None``（调用方关闭 4401）。
+    ``operation_id`` 不绑定——avatar 事件 token 的铸造路径尚未定义，助理
+    归属由 ``sub`` 经 ``_is_authorized`` 校验。
+    """
+    from lca.plugins.transport.webserver.handlers.runs.terminal.streaming.auth import (
+        InvalidTokenError,
+        verify_user_jwt,
+    )
+
+    frame = await _recv_auth_frame(websocket)
+    if not frame or frame.get("type") != "auth":
+        return None
+    token = str(frame.get("token") or "")
+    app = getattr(websocket, "app", None)
+    state = getattr(app, "state", None) if app is not None else None
+    jwt_keys = getattr(state, "jwt_keys", None) if state is not None else None
+    public_pem = getattr(jwt_keys, "public_pem", None) if jwt_keys is not None else None
+    try:
+        payload = verify_user_jwt(token, public_key_pem=public_pem)
+    except InvalidTokenError:
+        return None
+    user_id = payload.get("sub")
+    return str(user_id) if user_id else None
+
+
+async def _auth_failed(websocket: Any, reason: str) -> None:
+    """发送 ``auth_failed`` 帧并关闭 4401（gateway WS 同型）。"""
+    with contextlib.suppress(Exception):
+        await websocket.send_json({"type": "auth_failed", "reason": reason})
+    with contextlib.suppress(Exception):
+        await websocket.close(code=4401)
 
 
 def _is_authorized(websocket: Any, user_id: str, assistant_id: str) -> bool:
@@ -127,10 +200,20 @@ def make_avatar_ws_handler(redis: Any | None = None) -> Any:
         assistant_id = str(websocket.path_params["id"])
         await websocket.accept()
 
-        user_id = _authenticate(websocket)
-        if user_id is None:
-            await websocket.close(code=4401)
-            return
+        _, dev_mode = _auth_config(websocket)
+        if dev_mode:
+            # dev_mode：不要求 JWT；保留 header 鉴权路径作为非浏览器客户端回退。
+            user_id = _authenticate(websocket)
+            if user_id is None:
+                await _auth_failed(websocket, "missing user identity")
+                return
+        else:
+            # 非 dev_mode：首帧 JWT 握手（gateway WS 模式，spec §10）。
+            user_id = await _jwt_auth_user(websocket)
+            if user_id is None:
+                await _auth_failed(websocket, "invalid or missing auth token")
+                return
+
         if not _is_authorized(websocket, user_id, assistant_id):
             await websocket.close(code=4404)
             return
