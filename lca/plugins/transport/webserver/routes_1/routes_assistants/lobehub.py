@@ -33,6 +33,12 @@ from lca.plugins.transport.webserver.routes_1.routes_assistants.codecs import (
 )
 
 
+def _manifest_revision_seq(manifest: dict[str, object]) -> int:
+    """Return the manifest ``revision_seq`` as an int, tolerating drift."""
+    raw = manifest.get("revision_seq", 0)
+    return raw if isinstance(raw, int) else 0
+
+
 async def import_lobehub_agent(request: Request) -> JSONResponse:
     """``POST /v1/assistants/import-lobehub`` — 从 LobeHub agent JSON 导入助理。
 
@@ -113,7 +119,7 @@ async def import_lobehub_agent(request: Request) -> JSONResponse:
     new_manifest = build_manifest(
         assistant_id=handle.assistant_id,
         template_id="assistant.default",
-        revision_seq=int(manifest.get("revision_seq", 0)) + (1 if system_role or emoji else 0),
+        revision_seq=_manifest_revision_seq(manifest) + (1 if system_role or emoji else 0),
         home=home,
     )
     if system_role or emoji:
