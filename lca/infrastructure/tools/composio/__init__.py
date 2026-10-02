@@ -9,6 +9,7 @@ from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_VALIDAT
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.core.execution.tool import ToolApi, ToolManifest, ToolMeta
 from lca.contracts.protocols import Tool
+from lca.infrastructure.connectors.core.state import format_connector_auth_widget
 from lca.infrastructure.integrations.composio import get_app_by_identifier
 from lca.infrastructure.integrations.composio.service.service import ComposioIntegration
 from lca.infrastructure.tools.builder.builder import build_tools_from_manifest
@@ -101,8 +102,15 @@ class ComposioManagementExecutor:
             )
 
         redirect = conn.redirect_url or ""
+        conn_id = conn.connected_account_id or ""
+        widget = format_connector_auth_widget(
+            app_name=conn.label or service.capitalize(),
+            auth_url=redirect,
+            connection_id=conn_id,
+        )
         text = (
-            f"To connect {conn.label}, open this authorization link and complete sign-in:\n\n"
+            f"To connect {conn.label}, please authorize via the interactive card below:\n\n"
+            f"{widget}\n\n"
             f"{redirect}\n\n"
             "After authorization the OAuth callback on LCA will refresh the connection automatically."
         )
