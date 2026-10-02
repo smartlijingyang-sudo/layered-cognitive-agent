@@ -478,7 +478,7 @@ def _doc_memory_committed() -> EventDoc:
     return EventDoc(
         summary="记忆提交到持久层(scratchpad / long-term / vector store)",
         why="审计记忆写入;C5 capability grant 衰减在此强制",
-        arch="L1 memory.simple_memory;lca/cognition/memory.py",
+        arch="L1 memory.simple_memory;lca/cognition/memory/simple/memory.py",
         layer="L1",
     )
 

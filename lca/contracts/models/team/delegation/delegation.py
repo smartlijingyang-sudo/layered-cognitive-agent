@@ -9,7 +9,7 @@
   （``TeamAwareness.results``）的元素；
 - ``find_result``：幂等键 ``(target_role, subtask)`` 的纯查询函数。
 
-contracts 放纯函数的先例：``lca/contracts/role_status_rules.py``。
+contracts 放纯函数的先例：``lca/contracts/models/team/role/status_rules.py``。
 """
 
 from __future__ import annotations

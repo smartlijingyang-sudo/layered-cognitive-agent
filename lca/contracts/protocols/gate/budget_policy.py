@@ -13,7 +13,7 @@ policy seam no longer cares which concrete agent produced them.
 Migration (2026-08-30):
   - BudgetAware class deleted (no replacement; consumers pass data)
   - BudgetPolicy.resolve signature changed to keyword-only data params
-  - LeadBudgetPolicy (lca/application/policies.py) implements new signature
+  - LeadBudgetPolicy (lca/application/authoring/policies.py) implements new signature
   - agent_assembly.promote_lead unpacks lead agent and forwards data
 """
 
