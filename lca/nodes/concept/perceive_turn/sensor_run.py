@@ -45,8 +45,8 @@ class PerceiveSensorRunExecutor:
 
     semantic_name: str = "perceive.sensor.run"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("raw_inputs",)
-    declared_outputs: tuple[PortName, ...] = ("observations",)
+    declared_inputs: tuple[PortName, ...] = (PortName("raw_inputs"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("observations"),)
 
     async def node_execute(
         self,
@@ -59,7 +59,7 @@ class PerceiveSensorRunExecutor:
         outputs 端口(yaml):observations (tuple[Observation, ...])
         """
         del context
-        raw_inputs = input.port_values.get("raw_inputs") or ()
+        raw_inputs = input.port_values.get(PortName("raw_inputs")) or ()
         if not isinstance(raw_inputs, tuple):
             raise TypeError(
                 "perceive.sensor.run: 'raw_inputs' port must be a tuple, "
@@ -69,7 +69,7 @@ class PerceiveSensorRunExecutor:
         for idx, raw in enumerate(raw_inputs):
             obs = _project(raw, idx)
             observations.append(obs)
-        return NodeOutput(port_values={"observations": tuple(observations)})
+        return NodeOutput(port_values={PortName("observations"): tuple(observations)})
 
 
 def _project(raw: Any, idx: int) -> Observation:
