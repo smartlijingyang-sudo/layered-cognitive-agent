@@ -11,7 +11,7 @@
 
 P3(slim):删 ``materializer_version`` / ``evidence_integrity`` / ``pricing_ref``;
 前两者从未在 reader 中被消费,后者语义与 ``CostProjector.pricing_ref``
-(``lca/contracts/observability/cost.py``)无关 —— manifest 字段空串从未承载真值。
+(``lca/contracts/observability/cost/cost.py``)无关 —— manifest 字段空串从未承载真值。
 
 PR-1 / Task 1.7: 新增 ``health_summary`` + ``health_hash`` 两个**必备**
 字段(取代 ``terminal_event_seq`` / ``ledger_high_watermark`` /

@@ -782,7 +782,7 @@ def _materialize(
         closed_at=state.last_ts,
         total_steps=len(steps_list),
     )
-    # Totals 契约(lca/contracts/models/observability/journal_totals.py):
+    # Totals 契约(lca/contracts/models/observability/journal/totals.py):
     # totals.segments == sum(len(s.segments) for s in steps) —— 只计已挂进
     # step 的 segment;无 step 可挂的 think/act fold 只进 phases 计数。
     seg_count = sum(len(f.segments) for f in state.closed_frames)
