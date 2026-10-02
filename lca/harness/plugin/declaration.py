@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Protocol, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Any, Protocol, cast, overload
 
 from cordis.plugin import Plugin as CordisPlugin
 from cordis.plugin import plugin as _cordis_plugin
@@ -48,7 +48,6 @@ if TYPE_CHECKING:
         PluginSpec,
     )
 
-_PluginSetupT = TypeVar("_PluginSetupT", bound="PluginSetupFn[Any]")
 
 
 def _resolve_plugin_contract(
@@ -105,7 +104,7 @@ class PluginCarrier(Protocol):
 
 @overload
 def plugin(
-    setup: _PluginSetupT,
+    setup: PluginSetupFn[Any],
     *,
     id: str,
     Config: type[BaseModel] | None = None,  # noqa: N803 -- public plugin() kwarg used as Config= by every plugin; intentional capitalization

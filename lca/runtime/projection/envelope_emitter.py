@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import contextlib
 from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import Any
 
 from lca.infrastructure.session.emit.runtime_emit import (
     emit_exception_finally,
@@ -25,13 +25,11 @@ from lca.loop.emit.cognitive.agent_spawn import (
     emit_agent_loop_iteration_start,
 )
 
-_F = TypeVar("_F", bound=Callable[..., Any])
-
 
 class SpineEnvelopeEmitter:
     """Default :class:`EnvelopeEmitter` that delegates runtime EPs to FactGateway."""
 
-    def _safe_emit(self, fn: _F, /, **kwargs: Any) -> None:
+    def _safe_emit(self, fn: Callable[..., Any], /, **kwargs: Any) -> None:
         with contextlib.suppress(BaseException):
             fn(**kwargs)
 
