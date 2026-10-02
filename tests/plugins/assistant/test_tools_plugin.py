@@ -93,8 +93,8 @@ async def test_factory_adds_create_skill_tool_when_assistant_id_bound() -> None:
     await tools_plugin.setup.setup(ctx, None)
 
     produced = tools_service.factories["assistant"]({"assistant_id": "asst_demo"})
-    # create_assistant + list_role_cards + create_assistant_skill + 10 个自我管理工具（ADR-0242 D6 + ADR-0243 D6）
-    assert isinstance(produced, list) and len(produced) == 13
+    # create_assistant + list_role_cards + create_assistant_skill + 13 个自我管理工具（ADR-0242 D6 + ADR-0243 D6，+DeleteAssistantToolTool/CreateNameWidgetTool/UpdateIdentityTool）
+    assert isinstance(produced, list) and len(produced) == 16
     assert isinstance(produced[0], AssistantCreateTool)
     assert isinstance(produced[1], RoleCardListTool)
     assert isinstance(produced[2], AssistantCreateSkillTool)
@@ -118,7 +118,7 @@ async def test_factory_adds_tools_when_bindings_view_carries_assistant_id() -> N
 
     view = BindingsView(assistant_id="asst_demo")
     produced = tools_service.factories["assistant"](view)
-    assert isinstance(produced, list) and len(produced) == 13
+    assert isinstance(produced, list) and len(produced) == 16
     assert isinstance(produced[2], AssistantCreateSkillTool)
     assert produced[2]._assistant_id == "asst_demo"
     assert produced[2].required_grant == "skill.import"
