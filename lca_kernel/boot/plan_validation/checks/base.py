@@ -48,8 +48,9 @@ class PlanCheck(ABC):
     """One plan-level boot-time invariant.
 
     Subclasses implement :meth:`run`. The default ``__call__``
-    adapts the method to the existing
-    ``Callable[[Plan, str], PlanLiftError | None]`` shape so
+    adapts the method to the ``(plan, *, plan_id)`` keyword-only
+    shape (see ``_CheckCallable`` in
+    :mod:`lca_kernel.boot.plan_validation.core`) so
     :func:`_check_lifted_plan` can iterate over a heterogeneous
     registry without special-casing each strategy.
     """

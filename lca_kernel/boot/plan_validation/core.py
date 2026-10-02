@@ -30,9 +30,9 @@ when the profile carries no bundles (empty profile is a no-op).
 from __future__ import annotations
 
 import sys
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from pydantic import ValidationError
 
@@ -93,7 +93,19 @@ from lca_kernel.boot.plan_validation.typed_ports import (
     _check_typed_port_wiring,
 )
 
-_PLAN_CHECKS: tuple[Callable[[Plan, str], PlanLiftError | None], ...] = (
+
+class _CheckCallable(Protocol):
+    """Call shape every entry of :data:`_PLAN_CHECKS` honors.
+
+    ``plan_id`` is keyword-only in every producer (the four legacy
+    free functions) and in :meth:`PlanCheck.__call__`, and the only
+    consumer (:func:`_check_lifted_plan`) always passes it by keyword.
+    """
+
+    def __call__(self, plan: Plan, *, plan_id: str) -> PlanLiftError | None: ...
+
+
+_PLAN_CHECKS: tuple[_CheckCallable, ...] = (
     # Original free-function checks (kept for backward compat with
     # the test that imports them by name).
     _check_typed_port_wiring,
