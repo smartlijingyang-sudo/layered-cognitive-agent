@@ -74,13 +74,13 @@ class EffectPreDispatchEnvelopeCheckExecutor(NodeExecutor):
 
     semantic_name: str = "effect.pre_dispatch.envelope_check"
     region: str = "effect"
-    declared_inputs: tuple[PortName, ...] = ("envelope",)
-    declared_outputs: tuple[PortName, ...] = ("envelope", "verdict_refs")
+    declared_inputs: tuple[PortName, ...] = (PortName("envelope"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("envelope"), PortName("verdict_refs"))
     permission_manifest: ToolPermissionManifest | None = None
 
     async def execute(self, context: NodeContext, input: NodeInput) -> NodeOutput:
         port_values = input.port_values
-        envelope = port_values.get("envelope")
+        envelope = port_values.get(PortName("envelope"))
 
         if not isinstance(envelope, CommandEnvelope):
             raise TypeError(
@@ -138,8 +138,8 @@ class EffectPreDispatchEnvelopeCheckExecutor(NodeExecutor):
 
         return NodeOutput(
             port_values={
-                "envelope": envelope,
-                "verdict_refs": _ALL_REF_ORDER,
+                PortName("envelope"): envelope,
+                PortName("verdict_refs"): _ALL_REF_ORDER,
             }
         )
 

@@ -160,8 +160,8 @@ class ReflectMemoryExtractExecutor:
 
     semantic_name: str = "phase.reflect.memory.extract"
     region: str = "reflect"
-    declared_inputs: tuple[PortName, ...] = ("reflection",)
-    declared_outputs: tuple[PortName, ...] = ("reflection", "routing")
+    declared_inputs: tuple[PortName, ...] = (PortName("reflection"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("reflection"), PortName("routing"))
     pre_filter: MemoryPreFilter | None = None
     governor_enabled: bool = False
     now_ms: Callable[[], int] | None = None
@@ -171,7 +171,7 @@ class ReflectMemoryExtractExecutor:
         context: NodeContext,
         input: NodeInput,
     ) -> NodeOutput:
-        reflection = input.port_values.get("reflection")
+        reflection = input.port_values.get(PortName("reflection"))
         if reflection is None:
             return self._passthrough(reflection)
         extra = getattr(reflection, "extra", None)
@@ -278,8 +278,8 @@ class ReflectMemoryExtractExecutor:
     def _passthrough(reflection: object) -> NodeOutput:
         return NodeOutput(
             port_values={
-                "reflection": reflection,
-                "routing": RoutingDecision(action_type=ActionType.RESPOND),
+                PortName("reflection"): reflection,
+                PortName("routing"): RoutingDecision(action_type=ActionType.RESPOND),
             }
         )
 

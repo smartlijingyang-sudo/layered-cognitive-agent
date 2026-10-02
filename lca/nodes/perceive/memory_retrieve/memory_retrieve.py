@@ -77,8 +77,8 @@ class PerceiveMemoryRetrieveExecutor:
 
     semantic_name: str = "phase.perceive.memory_retrieve"
     region: str = "perceive"
-    declared_inputs: tuple[PortName, ...] = ("manifest",)
-    declared_outputs: tuple[PortName, ...] = ("manifest", "memories", "routing")
+    declared_inputs: tuple[PortName, ...] = (PortName("manifest"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("manifest"), PortName("memories"), PortName("routing"))
 
     async def node_execute(
         self,
@@ -86,7 +86,7 @@ class PerceiveMemoryRetrieveExecutor:
         input: NodeInput,
     ) -> NodeOutput:
         runtime = context.runtime or {}
-        manifest = input.port_values.get("manifest")
+        manifest = input.port_values.get(PortName("manifest"))
         # Canonical capability is the composed MemorySystem under ``memory``
         # (ADR-0244 D4). ``memory_provider`` remains a test-only fallback.
         memory = getattr(runtime, "memory", None)
@@ -118,9 +118,9 @@ class PerceiveMemoryRetrieveExecutor:
         routing = RoutingDecision(action_type=ActionType.RESPOND)
         return NodeOutput(
             port_values={
-                "manifest": manifest,
-                "memories": tuple(memories),
-                "routing": routing,
+                PortName("manifest"): manifest,
+                PortName("memories"): tuple(memories),
+                PortName("routing"): routing,
             }
         )
 
