@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from lca.contracts.protocols import ArtifactClosure
 from lca.contracts.protocols.act.effect.handler import EffectHandlerRegistry
 from lca.contracts.protocols.journal.idempotency.idempotency import IdempotencyStore
@@ -20,7 +22,14 @@ from lca.runtime.support.resume_input import HumanAnswerResumeInputAdapter
 def effect_handlers() -> EffectHandlerRegistry:
     """Create the provider-owned default effect handlers for fixtures."""
 
-    registry = InMemoryEffectHandlerRegistry()
+    # make_inmemory_registry builds the class dynamically (types.new_class):
+    # it installs a zero-arg __init__ and the protocol's snapshot method,
+    # which pyright cannot model from the static base. Zero-arg construction
+    # and protocol satisfaction are runtime-verified (isinstance True).
+    registry = cast(
+        "EffectHandlerRegistry",
+        InMemoryEffectHandlerRegistry(),  # pyright: ignore[reportCallIssue]
+    )
     register_default_effect_handlers(registry)
     return registry
 
@@ -28,7 +37,10 @@ def effect_handlers() -> EffectHandlerRegistry:
 def delta_handlers() -> DeltaHandlerRegistry:
     """Create the provider-owned default delta handlers for fixtures."""
 
-    return DefaultDeltaHandlerRegistry()
+    # DefaultDeltaHandlerRegistry subclasses the dynamically built in-memory
+    # registry whose DeltaHandlerRegistry base pyright cannot see; the
+    # instance genuinely satisfies the protocol at runtime (isinstance True).
+    return cast("DeltaHandlerRegistry", DefaultDeltaHandlerRegistry())
 
 
 def artifact_closure() -> ArtifactClosure:
