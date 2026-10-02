@@ -257,7 +257,7 @@ class _FakePluginContext:
         self.provided[key] = value
 
 
-def test_default_assembly_registers_null_storage_not_file_storage(tmp_path: Path) -> None:
+async def test_default_assembly_registers_null_storage_not_file_storage(tmp_path: Path) -> None:
     """ADR-0186:assembly 的 storage 面必须是 NullStorage,不得是文件写入实现。
 
     <run_id>.spine.jsonl 的唯一 durable 写者是 Session / spine-sink 链;
@@ -269,7 +269,13 @@ def test_default_assembly_registers_null_storage_not_file_storage(tmp_path: Path
     )
 
     ctx = _FakePluginContext(_SpySpine())
-    assembly_plugin.setup(ctx, {"run_dir": str(tmp_path / "run")})
+    # NOTE(f96931978): plugin setup became async; must be awaited
+    # (asyncio mode=AUTO). Previously the un-awaited call silently skipped
+    # ctx.provide, hence KeyError: 'writable_face_registry'.
+    await assembly_plugin.setup(
+        ctx,
+        {"run_dir": str(tmp_path / "run")},
+    )
 
     reg = ctx.provided["writable_face_registry"]
     assert isinstance(reg, WritableFaceRegistry)
@@ -285,7 +291,7 @@ def test_default_assembly_registers_null_storage_not_file_storage(tmp_path: Path
     assert not isinstance(storage, RoutingFileStorage)
     # storage 面写路径是 no-op,且不产生任何文件。
     storage.write(b'{"should":"not land"}\n')
-    assert list(tmp_path.iterdir()) == []
+    assert list(tmp_path.iterdir()) == []  # noqa: ASYNC240  # test-only local assertion, no real I/O concern
 
 
 def test_swap_storage_preserves_hash_chain(tmp_path: Path) -> None:
