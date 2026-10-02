@@ -286,7 +286,16 @@ class _CollectingPublishSession:
                 time=float(len(self.payloads)),
             )
         self.payloads.append(event_type_or_payload)
-        return self._bus.publish(event_type_or_payload, producer=producer)  # type: ignore[attr-defined]
+        ref = self._bus.publish(event_type_or_payload, producer=producer)  # type: ignore[attr-defined]
+        # bridge/facade 语义:合成 session.id:seq 格式 ref;生产
+        # _receipt_from_bus_ref 只接受冒号格式,原生 bus 的 evt_<hex>
+        # 在此不适用(0377)。
+        from types import SimpleNamespace
+
+        return SimpleNamespace(
+            event_id=f"collecting-session:{len(self.payloads)}",
+            ts=ref.ts,
+        )
 
 
 def _bind_collecting_session() -> tuple[_CollectingPublishSession, object, object]:
@@ -393,14 +402,14 @@ class TestInstrumentApply:
     def test_instrument_apply_without_bound_session_is_noop(self) -> None:
         """run context 之外(boot/测试未 bind Session)→ marker no-op,不挡 fold。"""
         from lca.plugins.events.publishers._session_publish import (
-            current_publish_session,
+            get_active_session,
             reset_publish_session,
             set_publish_session,
         )
 
         token = set_publish_session(None)  # type: ignore[arg-type]
         try:
-            assert current_publish_session() is None
+            assert get_active_session() is None
             state = DefaultReducer().apply_paused(_state(), "snap-ref")
         finally:
             reset_publish_session(token)
