@@ -63,22 +63,24 @@ def _latest_run(runs: list[CronRun]) -> CronRun | None:
     return max(runs, key=lambda r: r.finished_at.timestamp() if r.finished_at else 0.0)
 
 
+# 回执状态汇总优先级（ADR-0268 §10）：最严重的优先。
+_DELIVERY_PRIORITY: tuple[Literal["delivered", "failed", "silent", "not_sent"], ...] = (
+    "failed",
+    "delivered",
+    "silent",
+    "not_sent",
+)
+
+
 def _summary_last_delivery(
     run: CronRun | None,
 ) -> Literal["delivered", "failed", "silent", "not_sent"] | None:
     """按 ADR-0268 §10 汇总多个目标回执为一个 ``last_delivery``。"""
     if run is None or not run.receipts:
         return None
-    states = [receipt.state for receipt in run.receipts]
-    if "failed" in states:
-        return "failed"
-    if "delivered" in states:
-        return "delivered"
-    if "silent" in states:
-        return "silent"
-    if "not_sent" in states:
-        return "not_sent"
-    return None
+    states = {receipt.state for receipt in run.receipts}
+    # receipt.state 是闭集 Literal；任一状态必命中其一分支。
+    return next((s for s in _DELIVERY_PRIORITY if s in states), None)
 
 
 class CronService:
