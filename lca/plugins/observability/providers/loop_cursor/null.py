@@ -47,7 +47,7 @@ def _null_factory() -> type:
     _in_memory_mod = importlib.import_module(
         "lca.infrastructure.observability.loop_cursor.in.memory"
     )
-    InMemoryLoopCursor = _in_memory_mod.InMemoryLoopCursor
+    in_memory_loop_cursor = _in_memory_mod.InMemoryLoopCursor
     from lca.contracts.observability.core.incarnation import Incarnation
     from lca.infrastructure.observability.loop_cursor.state.state import _CursorState
 
@@ -69,7 +69,7 @@ def _null_factory() -> type:
                 plan_ref=str(plan_ref),
                 incarnation_seq=1,
             )
-            cursor = InMemoryLoopCursor(
+            cursor = in_memory_loop_cursor(
                 run_id=run_id,
                 trace_id=trace_id,
                 incarnation=incarnation,

@@ -77,7 +77,7 @@ class AskUserExecutor:
     def validate(self, api_name: str, args: dict[str, Any]) -> str | None:
         return _validate(args)
 
-    async def askUserQuestion(self, params: dict[str, Any]) -> Observation:
+    async def askUserQuestion(self, params: dict[str, Any]) -> Observation:  # noqa: N802 -- tool wire name (LLM calls by this name); renaming breaks the contract
         _auto_inject_freeform(params)
         error = _validate(params)
         if error:

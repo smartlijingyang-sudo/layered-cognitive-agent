@@ -58,7 +58,7 @@ class WriteFileExecutor:
     def validate(self, api_name: str, args: dict[str, Any]) -> str | None:
         return _validate(args)
 
-    async def writeFile(self, params: dict[str, Any]) -> Observation:
+    async def writeFile(self, params: dict[str, Any]) -> Observation:  # noqa: N802 -- tool wire name (LLM calls by this name); renaming breaks the contract
         start = time.monotonic()
         error = _validate(params)
         if error:
