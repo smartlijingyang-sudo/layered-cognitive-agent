@@ -232,9 +232,9 @@ class DefaultActionHandlerRegistry(InMemoryActionHandlerRegistry):  # type: igno
     """
 
     def __init__(self, batch_execution_policy: ToolBatchExecutionPolicy | None = None) -> None:
-        super().__init__()
+        super().__init__()  # type: ignore[call-arg] # make_inmemory_registry bakes kind into the dynamic _init; pyright models only the cast base signature
         register_default_action_handlers(
-            self,
+            self,  # type: ignore[arg-type] # dynamic class inherits ActionHandlerRegistry at runtime (isinstance True); pyright cannot model types.new_class
             batch_execution_policy=batch_execution_policy or _compatibility_safe_batch_policy(),
         )
 
