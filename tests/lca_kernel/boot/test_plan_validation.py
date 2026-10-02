@@ -297,16 +297,14 @@ class TestValidateProfilePlans:
         resolved = _resolved_profile((outer_path,))
         # Pin the inner-plan path resolver to tmp_path so this test
         # never reads the real production ``bundles/`` tree.
-        import lca.framework.graph.lifter as lifter_mod
-        import lca_kernel.boot.plan_validation as pv_mod
+        # NOTE (B-075): the symbol moved from lca.framework.graph.lifter
+        # to lca.framework.graph.lift.subgraph_contract, and production
+        # looks it up in core's module namespace (core.py::_resolve),
+        # not in lifter's or the package __init__'s.
+        import lca_kernel.boot.plan_validation.core as core_mod
 
         monkeypatch.setattr(
-            lifter_mod,
-            "_bundle_yaml_path",
-            lambda plan_ref: tmp_path / plan_ref,
-        )
-        monkeypatch.setattr(
-            pv_mod,
+            core_mod,
             "_bundle_yaml_path",
             lambda plan_ref: tmp_path / plan_ref,
         )
