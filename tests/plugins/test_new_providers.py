@@ -371,4 +371,7 @@ class TestDefaultWorkspaceGateChain:
         assert isinstance(gate, ChainedDecisionGate)
         underlying = getattr(gate, "_gates", None)
         assert underlying is not None
-        assert len(underlying) == 5
+        # 6-gate standard chain (RepeatToolCall, ToolLoopBreaker,
+        # ProgressLoopDetector, DeliverySatisfied, TerminalRespond,
+        # ArtifactRespondInjector); see build_default_workspace_gate_chain docstring.
+        assert len(underlying) == 6
