@@ -200,10 +200,10 @@ def test_t5_mandatory_search_decision_tree_in_prompt() -> None:
     )
     text = out.text
     assert "记忆检索义务与决策树" in text
-    assert "豁免: 纯寒暄、简短无实质确认" in text
-    assert "实质请求必须先调用 memory_search" in text
+    assert "豁免: 纯寒暄、简短确认、逐字复制当轮材料、用户明确要求不查。" in text
+    assert "实质请求先 memory_search" in text
     assert "首个 query 贴近用户原话" in text
-    assert "防幻觉终端闸门" in text
+    assert "承认缺失并标注不确定性，绝不编造" in text
 
 
 # ── T6: 易变事实复验约束 ───────────────────────────────────────────────────
@@ -265,8 +265,7 @@ def test_t10_credential_redline_in_memory_rules() -> None:
         activated_skills=(),
     )
     assert "凭证红线" in out.text
-    assert "密码、Token、API Key 绝不写入记忆原文" in out.text
-    assert "只记录存放位置" in out.text
+    assert "密码/Token/API Key 只记位置不记原文" in out.text
 
 
 # ── T12: 会话压缩不失忆（Standing 文件完全豁免） ──────────────────────────
