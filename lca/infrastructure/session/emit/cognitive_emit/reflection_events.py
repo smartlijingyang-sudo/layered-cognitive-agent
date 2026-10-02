@@ -9,9 +9,11 @@ no-op when no Session is bound (tests / offline).
 from __future__ import annotations
 
 import contextlib
+from collections.abc import Sequence
 from typing import Any, cast
 
 from lca.contracts.models.cognition.boundary import (
+    ForkedTools,
     ReasonerContext,
     RoleSnapshot,
     TemplateSelection,
@@ -20,7 +22,7 @@ from lca.contracts.models.cognition.prompt_assembly import _coerce_decision_path
 from lca.contracts.models.cognition.reasoner_turn import ReasonerTurnPlan, ReasonerTurnRender
 from lca.contracts.models.core.conversation.llm import LLMResponse
 from lca.contracts.models.core.state.state import AgentState
-from lca.contracts.protocols import Reasoner
+from lca.contracts.protocols import Reasoner, Tool
 from lca.infrastructure.session.emit.cognitive_emit.envelope import (
     AppendReceipt,
     publish_ep_bound,
@@ -262,6 +264,7 @@ def _emit_reasoner_meta_from_render(plan: ReasonerTurnPlan, render: ReasonerTurn
 async def run_reasoner_generate_thoughts_with_spine_facts(
     reasoner: Reasoner,
     state: AgentState,
+    tools: Sequence[Tool] | ForkedTools | None = None,
 ) -> LLMResponse:
     """Run ``Reasoner`` with reasoner spine EPs via FactGateway.
 
@@ -373,7 +376,12 @@ async def run_reasoner_generate_thoughts_with_spine_facts(
     with contextlib.suppress(Exception):
         emit_reasoner_reason_start_for_state(state, state_id=plan.state_id)
     try:
-        response = await cast("Any", complete_turn(state, render))
+        # NOTE: complete_turn requires explicit tools (no silent fallback);
+        # the deprecated seam has no fork, so an explicit empty list is passed
+        # when the caller provides none.
+        response = await cast(
+            "Any", complete_turn(state, render, tools if tools is not None else [])
+        )
     except BaseException:
         with contextlib.suppress(Exception):
             emit_reasoner_reason_end_for_state(

@@ -200,14 +200,27 @@ async def test_prompt_assembler_eps_emitted_with_payload():
             sections=(SectionReference(name="role", kind="pure"),),
         )
         registry = _StubRegistry({("role", "pure"): _StaticPure()})
-        assembler = _make_assembler(template, registry)
         role_profile = RoleProfile(
             role="r",
             goal="g",
             backstory="b",
             tool_permission_manifest=ToolPermissionManifest(allowed_tools=[]),
         )
-        reasoner = PromptReasoner(llm=_NoopLLM())
+        reasoner = PromptReasoner(
+            llm=_NoopLLM(),
+            template_provider=_StubProvider(template),
+            section_registry=registry,
+        )
+        # NOTE: the (deprecated) spine-facts seam requires reasoner.role_profile
+        # to build the typed RoleSnapshot DTO (reflection_events.py:290).
+        reasoner.role_profile = role_profile
+        # NOTE: render_turn needs a selector (or template_id); the stub pins the
+        # template the test asserts on.
+        class _StubSelector:
+            def select(self, *, state):
+                return ("react_prompt", "profile_default")
+
+        reasoner.selector = _StubSelector()
         await run_reasoner_generate_thoughts_with_spine_facts(reasoner, _build_state())
     finally:
         reset_publish_session(token)
