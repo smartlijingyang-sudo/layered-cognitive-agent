@@ -8,8 +8,10 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
+import pytest
 
 from lca.contracts.models.cron.models import (
     CronJob,
@@ -119,3 +121,62 @@ async def test_run_forever_can_be_stopped(tmp_path: Path) -> None:
     scheduler.stop()
     await asyncio.wait_for(task, timeout=1)
     assert task.done()
+
+
+def test_seconds_until_boundary_aligns_to_wall_clock() -> None:
+    base = datetime(2026, 10, 2, 12, 0, tzinfo=UTC)
+    assert AvatarCostumeScheduler._seconds_until_boundary(base, tick_seconds=60) == 60.0
+
+    fractional = datetime(2026, 10, 2, 12, 0, 0, 123456, tzinfo=UTC)
+    assert AvatarCostumeScheduler._seconds_until_boundary(
+        fractional, tick_seconds=60
+    ) == pytest.approx(59.876544)
+
+    mid = datetime(2026, 10, 2, 12, 0, 30, 500000, tzinfo=UTC)
+    assert AvatarCostumeScheduler._seconds_until_boundary(mid, tick_seconds=60) == pytest.approx(
+        29.5
+    )
+
+    # 对齐后的下一唤醒时刻落在秒边界上。
+    aligned = fractional + timedelta(
+        seconds=AvatarCostumeScheduler._seconds_until_boundary(fractional, 60)
+    )
+    assert aligned.second == 0
+    assert aligned.microsecond == 0
+
+
+async def test_daily_job_fires_after_second_boundary_alignment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import lca.plugins.avatar.scheduler as scheduler_mod
+
+    real_datetime = scheduler_mod.datetime
+
+    class _FakeDatetime(real_datetime):
+        current = real_datetime(2026, 10, 2, 3, 59, 0, 123456, tzinfo=UTC)
+
+        @classmethod
+        def now(cls, tz=None):
+            return cls.current
+
+    monkeypatch.setattr(scheduler_mod, "datetime", _FakeDatetime)
+
+    store = CronStore(tmp_path)
+    # daily 12:00 Asia/Shanghai = 04:00 UTC；模拟相位偏移 .123456 的循环。
+    store.save_job(_job("j1", "雨天装扮"))
+    service = _FakeAvatarService()
+    scheduler = AvatarCostumeScheduler(service=service, cron_store=store, tick_seconds=60)
+
+    # 03:59:00.123456 UTC（上海 11:59:00.123456）：未到 12:00，不触发。
+    await scheduler._tick()
+    assert service.edits == []
+
+    # 按边界对齐后下一次唤醒落在 04:00:00.000000 UTC（上海 12:00:00.000）。
+    delay = scheduler._seconds_until_boundary(_FakeDatetime.current, 60)
+    _FakeDatetime.current = _FakeDatetime.current + timedelta(seconds=delay)
+    assert _FakeDatetime.current.second == 0
+    assert _FakeDatetime.current.microsecond == 0
+
+    # 边界时刻：daily 任务到期，触发换装。
+    await scheduler._tick()
+    assert service.edits == [("asst_1", "雨天装扮", True)]

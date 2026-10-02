@@ -101,15 +101,33 @@ class AvatarCostumeScheduler:
         """请求 ``run_forever`` 在下一个 tick 边界退出（测试与关停用）。"""
         self._stop.set()
 
+    @staticmethod
+    def _seconds_until_boundary(now: datetime, tick_seconds: int) -> float:
+        """距下一个 ``tick_seconds`` 墙钟边界的秒数。
+
+        ``next_run`` 的 daily/hourly/weekly 判定要求 ``second == 0`` 且
+        ``microsecond == 0``；固定相位偏移的循环（如永远落在 ``.123456``）
+        会永久错过该瞬间。按墙钟秒边界对齐后，60s 循环总在 ``:00.000``
+        醒来，消除系统性的相位偏移。
+        """
+        seconds_into_period = now.second + now.microsecond / 1_000_000
+        return tick_seconds - (seconds_into_period % tick_seconds)
+
     async def run_forever(self) -> None:
-        """每 ``tick_seconds`` 执行一次扫描；``stop()`` 后退出。"""
+        """每 ``tick_seconds`` 扫描一次，并把唤醒对齐到墙钟秒边界。
+
+        对齐到边界（60s tick 落在 ``:00.000``）避免 ``next_run`` 的
+        ``second == 0 and microsecond == 0`` 判定被相位偏移永久错过；
+        ``stop()`` 可随时中断对齐等待。
+        """
         while not self._stop.is_set():
             try:
                 await self._tick()
             except Exception:
                 logger.exception("avatar scheduler tick failed")
+            delay = self._seconds_until_boundary(datetime.now(UTC), self.tick_seconds)
             try:
-                await asyncio.wait_for(self._stop.wait(), timeout=self.tick_seconds)
+                await asyncio.wait_for(self._stop.wait(), timeout=delay)
             except TimeoutError:
                 continue
 
