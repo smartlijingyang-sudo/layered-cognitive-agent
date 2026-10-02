@@ -20,12 +20,14 @@ def test_normalize_helpers_importable_from_plugin_declaration() -> None:
     """
     import lca.harness.plugin.declaration as pd
 
+    # NOTE (round-0350): ``_normalize_contributes`` retired by 63a68a4da
+    # (ADR-0221 cutover removed the declarative phase-graph contribution
+    # machinery); no replacement exists. Dropped from the pin list.
     for name in (
         "_normalize_keys",
         "_normalize_implements",
         "_normalize_effects",
         "_normalize_relations",
-        "_normalize_contributes",
         "_config_from_annotations",
     ):
         assert hasattr(pd, name), f"missing {name} in plugin_declaration"
