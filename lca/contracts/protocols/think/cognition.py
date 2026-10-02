@@ -9,6 +9,36 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Protocol, runtime_checkable
 
+# Re-export the prompt-assembly protocols from the canonical home so
+# existing ``from lca.contracts.protocols.think.cognition import ...``
+# imports keep working during the transition (redundant aliases mark
+# the re-export intent explicitly).
+from lca.contracts.models.cognition.prompt_assembly import (
+    MissingPromptSectionError as MissingPromptSectionError,
+)
+from lca.contracts.models.cognition.prompt_assembly import (
+    MissingSectionKindError as MissingSectionKindError,
+)
+from lca.contracts.models.cognition.prompt_assembly import PromptAssembler as PromptAssembler
+from lca.contracts.models.cognition.prompt_assembly import (
+    PromptSectionRegistry as PromptSectionRegistry,
+)
+from lca.contracts.models.cognition.prompt_assembly import PromptTemplate as PromptTemplate
+from lca.contracts.models.cognition.prompt_assembly import (
+    PromptTemplateConfig as PromptTemplateConfig,
+)
+from lca.contracts.models.cognition.prompt_assembly import (
+    PromptTemplateProvider as PromptTemplateProvider,
+)
+from lca.contracts.models.cognition.prompt_assembly import (
+    PromptTemplateSelector as PromptTemplateSelector,
+)
+from lca.contracts.models.cognition.prompt_assembly import PureSection as PureSection
+from lca.contracts.models.cognition.prompt_assembly import SectionKind as SectionKind
+from lca.contracts.models.cognition.prompt_assembly import SectionManifest as SectionManifest
+from lca.contracts.models.cognition.prompt_assembly import SectionOutput as SectionOutput
+from lca.contracts.models.cognition.prompt_assembly import SectionReference as SectionReference
+from lca.contracts.models.cognition.prompt_assembly import StatefulSection as StatefulSection
 from lca.contracts.models.core.conversation.llm import LLMResponse
 from lca.contracts.models.core.execution.decision import Decision, Observation, Reflection
 from lca.contracts.models.core.perceive.perception import ContextItem, ContextManifest
@@ -235,29 +265,3 @@ class BrainFactory(Protocol):
         tools: list[Tool] | None = None,
         template_provider: object | None = None,
     ) -> Brain: ...
-
-
-# Re-export the prompt-assembly protocols from the canonical home so
-# existing ``from lca.contracts.protocols.think.cognition import ...``
-# imports keep working during the transition.
-from lca.contracts.models.cognition.prompt_assembly import (
-    MissingPromptSectionError,
-    MissingSectionKindError,
-    PromptAssembler,
-    PromptSectionRegistry,
-    PromptTemplate,
-    PromptTemplateConfig,
-    PromptTemplateProvider,
-    PromptTemplateSelector,
-    PureSection,
-    SectionKind,
-    SectionManifest,
-    SectionOutput,
-    SectionReference,
-    StatefulSection,
-)
-
-
-# Re-export the prompt-assembly protocols from the canonical home so
-# existing ``from lca.contracts.protocols.think.cognition import ...``
-# imports keep working during the transition.
