@@ -35,7 +35,7 @@ def bus() -> EventBus[EventPayload]:
 
 @pytest.fixture(autouse=True)
 def _clean_ambient() -> None:
-    from lca_kernel.events import bus as bus_module
+    from lca_kernel.events.bus import bus as bus_module
 
     bus_module._current_trace_id.set(None)
 
