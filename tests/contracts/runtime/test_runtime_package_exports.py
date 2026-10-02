@@ -79,13 +79,23 @@ _FORBIDDEN_UPPER_LAYERS: tuple[str, ...] = (
     "lca.plugins",
 )
 
+# Canonical public surface of lca.contracts.runtime, in the codebase's
+# static-import order (RUF022 isort-style: SCREAMING_SNAKE constants, then
+# CamelCase, then lowercase). Plain ``sorted()`` is NOT the rule here:
+# codepoint order would put "ExternalPluginKind" before "RESERVED_NAMESPACES",
+# which ruff RUF022 rejects. Keep in sync with lca/contracts/runtime/__init__.py.
 _EXPECTED_ALL: tuple[str, ...] = (
     "DEFAULT_EXTERNAL_KIND_BY_TRUST",
     "EMPTY_TRUST_ENVELOPE",
+    "RESERVED_NAMESPACES",
     "ExternalPluginKind",
+    "PlanProposal",
     "PluginOrigin",
     "PluginSource",
     "PluginTrustLevel",
+    "ProposalStatus",
+    "ResourceId",
+    "ResourceKind",
     "RunHandle",
     "RunIntent",
     "RunMode",
@@ -93,6 +103,8 @@ _EXPECTED_ALL: tuple[str, ...] = (
     "RuntimeFacade",
     "SessionActivation",
     "TrustEnvelope",
+    "build_proposal",
+    "compute_proposal_ref",
     "default_external_kind",
     "is_high_isolation_kind",
     "is_sandbox_kind",
@@ -115,8 +127,12 @@ class TestPackageSurface:
         assert isinstance(runtime_pkg.__all__, tuple)
 
     def test_all_is_sorted(self) -> None:
-        """``__all__`` is sorted to match the codebase's static-import style."""
-        assert list(runtime_pkg.__all__) == sorted(runtime_pkg.__all__)
+        """``__all__`` matches the pinned surface in static-import style order.
+
+        The codebase style is RUF022 isort-style, not plain ``sorted()``
+        codepoint order (see _EXPECTED_ALL comment).
+        """
+        assert runtime_pkg.__all__ == _EXPECTED_ALL
 
 
 class TestIdentityReExports:
