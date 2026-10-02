@@ -62,4 +62,4 @@ class _PhantomProc:
             except ChildProcessError:
                 return -1
             time.sleep(0.1)
-        raise subprocess.TimeoutExpired(self._pid, timeout)
+        raise subprocess.TimeoutExpired(str(self._pid), timeout or 10.0)
