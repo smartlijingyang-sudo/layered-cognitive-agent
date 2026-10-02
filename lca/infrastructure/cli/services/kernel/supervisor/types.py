@@ -8,9 +8,9 @@ import them without cycles.
 
 from __future__ import annotations
 
-from enum import StrEnum
 import shlex
 from dataclasses import dataclass, field
+from enum import StrEnum
 
 
 class ProgramState(StrEnum):

@@ -11,13 +11,13 @@ FieldProducer merge + I17 在 hook 内经 :mod:`spine_enrich` 执行（wave 2）
 
 from __future__ import annotations
 
-from lca.contracts.mechanisms.content.addressable import sha256_hex
 import json
 import logging
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 from lca.infrastructure.observability.loop_cursor.spine._spine_port import (
     SESSION_SSOT_HOOK_MARKER,
     SessionAppendHook,

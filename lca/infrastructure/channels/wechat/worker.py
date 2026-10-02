@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from lca.contracts.mechanisms.content.addressable import sha256_hex
 import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -12,6 +11,7 @@ from typing import Any
 import httpx
 
 from lca.contracts.channels.wechat import WechatChannelConfig
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 from lca.infrastructure.channels.wechat.client import WechatIlinkClient
 
 logger = logging.getLogger(__name__)

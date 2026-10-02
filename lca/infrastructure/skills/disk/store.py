@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from lca.contracts.mechanisms.content.addressable import sha256_hex
 import json
 import re
 from datetime import UTC, datetime
 from pathlib import Path
 
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 from lca.contracts.protocols.memory.operational_skills import (
     SKILL_MAX_CONTENT_CHARS,
     SKILL_MAX_RESOURCE_BYTES,

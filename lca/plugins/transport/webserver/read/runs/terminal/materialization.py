@@ -28,7 +28,6 @@ from __future__ import annotations
 import contextlib
 import fcntl
 import hashlib
-from lca.contracts.observability.canonical_digest import canonical_digest
 import json
 import time
 import traceback
@@ -38,6 +37,7 @@ from typing import Any
 
 import structlog
 
+from lca.contracts.observability.canonical_digest import canonical_digest
 from lca.contracts.observability.health.report import (
     RunHealthSummary,
 )

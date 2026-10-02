@@ -6,7 +6,6 @@ Tools delegate here; they do not manage sessions directly.
 
 from __future__ import annotations
 
-from lca.contracts.mechanisms.content.addressable import sha256_hex
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
@@ -14,6 +13,7 @@ from typing import Any
 
 import structlog
 
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 from lca.contracts.models.core.execution.sandbox import (
     DEFAULT_SANDBOX_TIMEOUT_S,
     MountManifest,

@@ -21,7 +21,6 @@ EP payload 禁止 SKILL 全文 / 草稿正文（ADR-0187 §3 D2 末段 + D9）�
 
 from __future__ import annotations
 
-from lca.contracts.mechanisms.content.addressable import sha256_hex
 import json
 from collections.abc import Callable, Mapping
 from pathlib import Path
@@ -51,6 +50,7 @@ from lca.contracts.harness.journal.artifact import (
     migrate_to_active,
     migrate_to_verified,
 )
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 from lca.contracts.observability.closure.assistant_ep_closure import (
     ASSISTANT_SKILL_EVOLVED_PROMOTED,
     ASSISTANT_SKILL_EVOLVED_PROPOSED,

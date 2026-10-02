@@ -11,7 +11,6 @@ people/groups INDEX.md ordered by intimacy, and writes
 
 from __future__ import annotations
 
-from lca.contracts.mechanisms.content.addressable import sha256_hex
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -20,6 +19,7 @@ from pydantic import BaseModel, ConfigDict
 
 from lca.contracts.atoms.enums.enums import MemoryCategory, MemoryLayer
 from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 from lca.contracts.models.core.conversation.memory import MemoryRecord
 from lca.contracts.models.memory.episode import (
     ClusterView,

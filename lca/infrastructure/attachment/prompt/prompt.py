@@ -13,12 +13,12 @@ from lca.contracts.models.core.execution.sandbox import (
     SANDBOX_INIT_MAX_FILES,
 )
 from lca.contracts.models.core.state.plane import PlaneKind
-from lca.infrastructure.attachment.layout.layout import AttachmentLayout, sanitize_attachment_name
 from lca.contracts.protocols.runtime.attachment.errors import (
     AttachmentError,
     AttachmentErrorCode,
 )
 from lca.infrastructure.attachment import _dedupe_ids
+from lca.infrastructure.attachment.layout.layout import AttachmentLayout, sanitize_attachment_name
 from lca.infrastructure.attachment.settings.settings import get_attachment_policy
 from lca.infrastructure.file.store import FileStore, LocalFileStore
 from lca.infrastructure.sandbox.factory.factory import ONLYBOXES

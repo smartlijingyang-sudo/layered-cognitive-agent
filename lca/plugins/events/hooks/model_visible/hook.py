@@ -40,11 +40,11 @@ ADR-0185 §3.2 vs reality（偏差已显式记录）:
 
 from __future__ import annotations
 
-from lca.contracts.mechanisms.content.addressable import sha256_hex
 import logging
 from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Any
 
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 from lca.contracts.observability.cursor.loop_cursor_payloads import ToolSchema
 from lca_kernel.events.fold.fold import EpochHeader, canonicalHeader, headerEquals
 from lca_kernel.events.payloads.model_visible import (

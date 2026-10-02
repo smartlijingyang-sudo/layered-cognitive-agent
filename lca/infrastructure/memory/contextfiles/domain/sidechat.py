@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
+
 from lca.contracts.mechanisms.content.addressable import sha256_hex
 
 _MARKER = re.compile(r"<!-- side-chat: ([A-Za-z0-9_-]+) -->")

@@ -26,7 +26,6 @@ consistency, large enough that fsync is not on the hot path).
 
 from __future__ import annotations
 
-from lca.contracts.mechanisms.content.addressable import sha256_hex
 import json
 import logging
 import os
@@ -35,6 +34,7 @@ import time
 from pathlib import Path
 from typing import Any, ClassVar
 
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 from lca.contracts.observability.evidence.fsync import FsyncProtocol
 from lca.infrastructure.observability.spine.event.record import EventRecord
 from lca.infrastructure.observability.spine.sinks.naming import (

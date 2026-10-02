@@ -22,9 +22,17 @@ from typing import Any
 from lca.contracts.observability.spine.producer import FieldProducer
 from lca.contracts.protocols.loop.spine_publish import (
     SpineEnrichResult,
+)
+from lca.contracts.protocols.loop.spine_publish import (
     get_active_field_producers as _contract_get_producers,
+)
+from lca.contracts.protocols.loop.spine_publish import (
     get_active_spine_enricher as _contract_get_enricher,
+)
+from lca.contracts.protocols.loop.spine_publish import (
     set_active_field_producers as _contract_set_producers,
+)
+from lca.contracts.protocols.loop.spine_publish import (
     set_active_spine_enricher as _contract_set_enricher,
 )
 from lca.infrastructure.observability.spine.event.record import Channel

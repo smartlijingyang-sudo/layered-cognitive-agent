@@ -4,9 +4,9 @@
 from __future__ import annotations
 
 import base64
-from lca.contracts.mechanisms.content.addressable import sha256_hex
 import re
 
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 from lca.plugins.transport.webserver.handlers.runs.ingest.models.models import FileIntegrityError
 
 _MAGIC_BYTES: dict[str, bytes] = {

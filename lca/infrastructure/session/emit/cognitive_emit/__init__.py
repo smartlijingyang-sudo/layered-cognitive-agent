@@ -18,6 +18,8 @@ from __future__ import annotations
 
 from lca.infrastructure.session.emit.cognitive_emit.envelope import (
     append_catalog_bound as append_catalog_bound,
+)
+from lca.infrastructure.session.emit.cognitive_emit.envelope import (
     publish_ep_bound as publish_ep_bound,
 )
 from lca.infrastructure.session.emit.cognitive_emit.gate_events import (
@@ -28,6 +30,8 @@ from lca.infrastructure.session.emit.cognitive_emit.gate_events import (
 )
 from lca.infrastructure.session.emit.cognitive_emit.reflection_events import (
     _emit_reasoner_meta_from_render as _emit_reasoner_meta_from_render,
+)
+from lca.infrastructure.session.emit.cognitive_emit.reflection_events import (
     emit_critic_eval_end_for_state,
     emit_critic_eval_start_for_state,
     emit_prompt_assembler_end_for_state,
@@ -50,7 +54,11 @@ from lca.infrastructure.session.emit.cognitive_emit.step_events import (
 )
 from lca.infrastructure.session.emit.cognitive_emit.tool_events import (
     emit_body_tool_execute_end_for_state as emit_body_tool_execute_end_for_state,
+)
+from lca.infrastructure.session.emit.cognitive_emit.tool_events import (
     emit_body_tool_execute_start_for_state as emit_body_tool_execute_start_for_state,
+)
+from lca.infrastructure.session.emit.cognitive_emit.tool_events import (
     emit_phase_act_fold_end_for_state,
     emit_phase_act_fold_start_for_state,
     emit_phase_tool_call_end_for_state,

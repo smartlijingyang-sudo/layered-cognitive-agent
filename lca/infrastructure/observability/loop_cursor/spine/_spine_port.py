@@ -29,6 +29,8 @@ from typing import Any, Protocol
 
 from lca.contracts.protocols.loop.spine_publish import (
     is_session_ssot_hook_active as _contract_hook_active,
+)
+from lca.contracts.protocols.loop.spine_publish import (
     mark_session_ssot_hook_active,
 )
 from lca.infrastructure.observability.spine.context.context import SpineContext

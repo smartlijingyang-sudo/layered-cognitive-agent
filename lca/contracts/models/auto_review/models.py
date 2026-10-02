@@ -1,7 +1,8 @@
-from lca.contracts.mechanisms.content.addressable import sha256_hex
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict
+
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 
 
 class AutoReviewMode(StrEnum):

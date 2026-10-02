@@ -12,6 +12,7 @@ from contextlib import suppress
 from typing import Any
 
 from lca.contracts.atoms.artifact.state import ArtifactState
+from lca.contracts.harness.composition.plugin_meta import PluginMeta
 from lca.contracts.harness.journal.artifact import (
     ArtifactController,
     CapabilityArtifact,
@@ -34,7 +35,6 @@ from lca.contracts.mechanisms.composition.composition import (
     PluginMetaMissing,
     UnmountResult,
 )
-from lca.contracts.harness.composition.plugin_meta import PluginMeta
 
 
 def build_default_invariant_checker() -> InvariantChecker:

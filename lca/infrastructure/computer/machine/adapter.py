@@ -5,11 +5,11 @@
 
 from __future__ import annotations
 
-from lca.contracts.mechanisms.content.addressable import sha256_hex
 import posixpath
 import time
 from typing import Any
 
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 from lca.contracts.models.core.execution.local_exec import (
     CapabilityGrant,
     EffectReceipt,

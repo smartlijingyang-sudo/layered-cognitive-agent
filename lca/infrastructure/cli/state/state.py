@@ -10,10 +10,11 @@ Every service sees the same shape: what changed, summary line, file list.
 
 from __future__ import annotations
 
-from lca.contracts.mechanisms.content.addressable import sha256_hex
 import json
 from dataclasses import dataclass
 from pathlib import Path
+
+from lca.contracts.mechanisms.content.addressable import sha256_hex
 
 
 @dataclass(frozen=True)

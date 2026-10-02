@@ -37,11 +37,11 @@ from lca.contracts.models.core.workspace.file_ref import FileRef, FileRefKind
 from lca.contracts.protocols.runtime.attachment.attachment import (
     ResolvedAttachment,
 )
-from lca.infrastructure.attachment import _dedupe_ids
 from lca.contracts.protocols.runtime.attachment.errors import (
     AttachmentError,
     AttachmentErrorCode,
 )
+from lca.infrastructure.attachment import _dedupe_ids
 from lca.infrastructure.attachment.layout.layout import (
     AttachmentLayout,
     sanitize_attachment_name,
