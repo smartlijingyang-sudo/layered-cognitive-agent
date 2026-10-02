@@ -12,8 +12,6 @@ class RoutineSpec(BaseModel):
 
     id: str = Field(..., description="例程唯一标识符（如 rt_check_build）")
     name: str = Field(..., description="例程业务展示名称")
-    cron_expr: str | None = Field(default=None, description="标准 5 段 cron 表达式（如 0 * * * *）")
-    interval_seconds: int | None = Field(default=None, description="固定执行间隔（秒）")
     prompt: str = Field(..., description="意图型执行提示词")
     spend_budget_per_run: int = Field(default=15, description="单次执行最大推理步数上限")
     daily_budget_tokens: int = Field(default=100_000, description="单日 Token 消耗硬熔断上限")

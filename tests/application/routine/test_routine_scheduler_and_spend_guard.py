@@ -42,7 +42,6 @@ def test_routine_repository_crud(tmp_path):
     spec = RoutineSpec(
         id="rt_daily_summary",
         name="每日总结",
-        cron_expr="0 18 * * *",
         prompt="汇总今日工作日志",
         assistant_id="asst_1",
         daily_budget_tokens=50_000,
@@ -54,7 +53,6 @@ def test_routine_repository_crud(tmp_path):
     loaded = repo.get("rt_daily_summary")
     assert loaded is not None
     assert loaded.id == "rt_daily_summary"
-    assert loaded.cron_expr == "0 18 * * *"
 
     # 查列表
     all_routines = repo.list_all()
@@ -78,7 +76,6 @@ async def test_routine_scheduler_legal_silence_and_spend_fusing(tmp_path):
     spec = RoutineSpec(
         id="rt_silent_poll",
         name="静默轮询",
-        interval_seconds=60,
         prompt="静默轮询外部指标",
         assistant_id="asst_1",
         daily_budget_tokens=500,

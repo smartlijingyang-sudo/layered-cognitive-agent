@@ -10,14 +10,12 @@ def test_routine_spec_frozen_and_valid() -> None:
     spec = RoutineSpec(
         id="rt_check_build",
         name="检查构建日志",
-        cron_expr="0 * * * *",
         prompt="检查过去一小时的构建日志，仅在发现错误时汇报",
         spend_budget_per_run=10,
         daily_budget_tokens=50_000,
         assistant_id="asst_dev",
     )
     assert spec.id == "rt_check_build"
-    assert spec.cron_expr == "0 * * * *"
     assert spec.spend_budget_per_run == 10
     assert spec.enabled is True
 
