@@ -1,0 +1,3296 @@
+{
+  "edges": [
+    [
+      "body.simple",
+      "lca-factory-seams-default"
+    ],
+    [
+      "convergence.policy.default",
+      "gate.delivery-satisfied"
+    ],
+    [
+      "events.model_visible.publisher",
+      "lca.events.bus"
+    ],
+    [
+      "gate.artifact-respond-injector",
+      "gates"
+    ],
+    [
+      "gate.delivery-satisfied",
+      "gates"
+    ],
+    [
+      "gate.multi-tool-loop-breaker",
+      "gates"
+    ],
+    [
+      "gate.multi-tool-loop-breaker",
+      "loop.policy.default"
+    ],
+    [
+      "gate.must-consult-all",
+      "gates"
+    ],
+    [
+      "gate.progress-loop-detector",
+      "gates"
+    ],
+    [
+      "gate.progress-loop-detector",
+      "loop.policy.default"
+    ],
+    [
+      "gate.repeat-tool-call",
+      "gates"
+    ],
+    [
+      "gate.repeat-tool-call",
+      "loop.policy.default"
+    ],
+    [
+      "gate.terminal-respond",
+      "gates"
+    ],
+    [
+      "gate.tool-loop-breaker",
+      "gates"
+    ],
+    [
+      "gate.tool-loop-breaker",
+      "loop.policy.default"
+    ],
+    [
+      "gates",
+      "gates.chain.sequential"
+    ],
+    [
+      "gates",
+      "lca-brain-simple"
+    ],
+    [
+      "graph-node.agent.default",
+      "lca.graph-node-executor-registry"
+    ],
+    [
+      "graph-node.aggregator.default",
+      "lca.graph-node-executor-registry"
+    ],
+    [
+      "graph-node.topology.default",
+      "lca.graph-node-executor-registry"
+    ],
+    [
+      "guard.tool-result-spill",
+      "tool.guards.service"
+    ],
+    [
+      "guard.tool-timeout",
+      "tool.guards.service"
+    ],
+    [
+      "lca-action-handler-provider",
+      "lca-action-handler-registry-seam"
+    ],
+    [
+      "lca-action-handler-provider",
+      "lca-tool-batch-execution-policy"
+    ],
+    [
+      "lca-attribute-policy-default-factory",
+      "lca-attribute-policy-seam"
+    ],
+    [
+      "lca-brain-prompt-sections",
+      "lca-prompt-section-registry"
+    ],
+    [
+      "lca-brain-simple",
+      "lca-cognitive-reflection-pipeline-standard"
+    ],
+    [
+      "lca-brain-simple",
+      "lca-cognitive-think-pipeline-standard"
+    ],
+    [
+      "lca-brain-simple",
+      "lca-critic-simple"
+    ],
+    [
+      "lca-brain-simple",
+      "lca-decision-classifier-seam"
+    ],
+    [
+      "lca-brain-simple",
+      "lca-factory-seams-default"
+    ],
+    [
+      "lca-brain-simple",
+      "lca-prompt-assembler-section-manifest"
+    ],
+    [
+      "lca-brain-simple",
+      "lca-prompt-section-registry"
+    ],
+    [
+      "lca-brain-simple",
+      "lca-prompt-template-selector-team-awareness"
+    ],
+    [
+      "lca-brain-simple",
+      "lca-reasoner-prompt"
+    ],
+    [
+      "lca-cli-debug-command-seam",
+      "lca-cli-debug-trace"
+    ],
+    [
+      "lca-component-budget-policy-contributor",
+      "lca-component-registry-seam"
+    ],
+    [
+      "lca-component-memory-contributor",
+      "lca-component-registry-seam"
+    ],
+    [
+      "lca-component-registry-seam",
+      "lca-component-state-store-contributor"
+    ],
+    [
+      "lca-default-reducer",
+      "phase.think.route"
+    ],
+    [
+      "lca-delta-handler-provider",
+      "lca-delta-handler-registry-seam"
+    ],
+    [
+      "lca-effect-handler-provider",
+      "lca-effect-handler-registry-seam"
+    ],
+    [
+      "lca-event-descriptor-bootstrap",
+      "lca-event-descriptor-registry"
+    ],
+    [
+      "lca-fact-reader-console-factory",
+      "lca-fact-reader-seam"
+    ],
+    [
+      "lca-fact-reader-langfuse-factory",
+      "lca-fact-reader-seam"
+    ],
+    [
+      "lca-fact-reader-otel-factory",
+      "lca-fact-reader-seam"
+    ],
+    [
+      "lca-fact-scorer-seam",
+      "lca-langfuse-eval-scorer"
+    ],
+    [
+      "lca-fact-store-memory-factory",
+      "lca-journal-store-factory-registry"
+    ],
+    [
+      "lca-factory-seams-default",
+      "resume_input.human_answer"
+    ],
+    [
+      "lca-factory-seams-default",
+      "strategy.debate"
+    ],
+    [
+      "lca-factory-seams-default",
+      "strategy.fan_out"
+    ],
+    [
+      "lca-factory-seams-default",
+      "strategy.graph"
+    ],
+    [
+      "lca-factory-seams-default",
+      "strategy.lead"
+    ],
+    [
+      "lca-factory-seams-default",
+      "strategy.peer_relay"
+    ],
+    [
+      "lca-factory-seams-default",
+      "strategy.peer_swarm"
+    ],
+    [
+      "lca-factory-seams-default",
+      "strategy.pipeline"
+    ],
+    [
+      "lca-file-store-provider",
+      "lca-file-store-service"
+    ],
+    [
+      "lca-file-store-service",
+      "lca-webserver-bootstrap"
+    ],
+    [
+      "lca-gateway-routes-channels-wechat",
+      "lca-webserver-router"
+    ],
+    [
+      "lca-gateway-routes-device",
+      "lca-webserver-router"
+    ],
+    [
+      "lca-gateway-routes-health-options",
+      "lca-webserver-router"
+    ],
+    [
+      "lca-gateway-routes-openai-compat-files",
+      "lca-webserver-router"
+    ],
+    [
+      "lca-gateway-routes-rooms",
+      "lca-webserver-router"
+    ],
+    [
+      "lca-gateway-routes-runs-sessions",
+      "lca-webserver-router"
+    ],
+    [
+      "lca-gateway-ws-mount",
+      "lca-web-server"
+    ],
+    [
+      "lca-genai-llm-mapper",
+      "lca-genai-semantic-mapper-seam"
+    ],
+    [
+      "lca-genai-semantic-mapper-seam",
+      "lca-genai-tool-mapper"
+    ],
+    [
+      "lca-journal-memory-factory",
+      "lca-journal-seam"
+    ],
+    [
+      "lca-llm-resolver",
+      "lca-loop-cognitive"
+    ],
+    [
+      "lca-llm-resolver",
+      "phase.think.reasoner.credentials"
+    ],
+    [
+      "lca-loop-cognitive",
+      "lca-run-loop-driver-registry"
+    ],
+    [
+      "lca-loop-cognitive",
+      "lca-run-mode-registry-seam"
+    ],
+    [
+      "lca-memory-compaction-policy-simple",
+      "lca-memory-provider"
+    ],
+    [
+      "lca-memory-provider",
+      "lca-memory-service"
+    ],
+    [
+      "lca-memory-provider",
+      "lca-memory-write-policy-simple"
+    ],
+    [
+      "lca-memory-provider",
+      "lca-retrieval-layered"
+    ],
+    [
+      "lca-mode-cordis-creator-default",
+      "lca-role-cordis-creator"
+    ],
+    [
+      "lca-mode-cordis-creator-default",
+      "lca-run-mode-registry-seam"
+    ],
+    [
+      "lca-mode-cordis-creator-default",
+      "lca-tool-cordis-control"
+    ],
+    [
+      "lca-mode-solo-default",
+      "lca-run-mode-registry-seam"
+    ],
+    [
+      "lca-mode-team-default",
+      "lca-run-mode-registry-seam"
+    ],
+    [
+      "lca-mode-team-default",
+      "lca-team-caster-default"
+    ],
+    [
+      "lca-mode-team-default",
+      "lca-team-role-library-default"
+    ],
+    [
+      "lca-phase-observer-provider",
+      "lca-phase-observer-registry-seam"
+    ],
+    [
+      "lca-phase-observer-registry-seam",
+      "lca-phase-observer-tracing-provider"
+    ],
+    [
+      "lca-prompt-assembler-section-manifest",
+      "lca-prompt-section-registry"
+    ],
+    [
+      "lca-prompt-assembler-section-manifest",
+      "lca-prompt-template-provider-builtin"
+    ],
+    [
+      "lca-runtime-lifecycle-logging-provider",
+      "lca-runtime-lifecycle-subscriber-registry-seam"
+    ],
+    [
+      "lca-runtime-lifecycle-publisher",
+      "lca-runtime-lifecycle-subscriber-registry-seam"
+    ],
+    [
+      "lca-sandbox-provider",
+      "lca-sandbox-service"
+    ],
+    [
+      "lca-search-provider",
+      "lca-search-service"
+    ],
+    [
+      "lca-skills-provider",
+      "lca-skills-service"
+    ],
+    [
+      "lca-state-store-provider",
+      "lca-state-store-service"
+    ],
+    [
+      "lca-team-caster-default",
+      "lca-team-casting-prompt-renderer-builtin"
+    ],
+    [
+      "lca-team-communication-default",
+      "lca-team-seam-seam"
+    ],
+    [
+      "lca-team-seam-seam",
+      "lca-team-shared-memory-default"
+    ],
+    [
+      "lca-tool-bash",
+      "lca-tools-service"
+    ],
+    [
+      "lca-tool-file-write",
+      "lca-tools-service"
+    ],
+    [
+      "lca-tools-provider",
+      "lca-tools-service"
+    ],
+    [
+      "lca-tools-service",
+      "phase.primitive.capability.fork.dispatch"
+    ],
+    [
+      "lca-trace-tool-provider",
+      "lca-trace-tool-seam"
+    ],
+    [
+      "lca-tracer-otel-factory",
+      "lca-tracer-seam"
+    ],
+    [
+      "lca-transport-provider",
+      "lca-transport-service"
+    ],
+    [
+      "lca-web-server",
+      "lca-webserver-bootstrap"
+    ],
+    [
+      "lca-web-server",
+      "lca-webserver-router"
+    ],
+    [
+      "lca.graph-node-executor-registry",
+      "strategy.graph"
+    ],
+    [
+      "lca.plugins.session.checkpoint_policy",
+      "lca.plugins.session.runtime"
+    ],
+    [
+      "lca.plugins.session.model_visible",
+      "lca.plugins.session.projection_registry"
+    ],
+    [
+      "lca.plugins.session.projection_cache",
+      "lca.plugins.session.projection_registry"
+    ],
+    [
+      "lca.plugins.session.projection_registry",
+      "lca.plugins.session.runtime"
+    ],
+    [
+      "lca.plugins.session.projection_registry",
+      "lca.plugins.session.session_stats"
+    ],
+    [
+      "lca.plugins.session.projection_registry",
+      "lca.plugins.session.session_turn_outline"
+    ],
+    [
+      "lca.plugins.session.projection_registry",
+      "lca.plugins.session.token_usage"
+    ],
+    [
+      "lca.plugins.session.projection_registry",
+      "lca.plugins.session.turn_control"
+    ],
+    [
+      "lca.plugins.session.runtime",
+      "lca.plugins.session.spine_anomaly"
+    ],
+    [
+      "lca.plugins.session.runtime",
+      "lca.plugins.session.telemetry_capture"
+    ],
+    [
+      "lca.plugins.session.runtime",
+      "lca.plugins.session.title_service"
+    ],
+    [
+      "lca.plugins.session.runtime",
+      "observation.event_hub"
+    ],
+    [
+      "lca.plugins.session.spine_anomaly",
+      "spine.deriver.anomaly"
+    ],
+    [
+      "lca.plugins.session.telemetry_capture",
+      "lca.plugins.session.telemetry_otel"
+    ],
+    [
+      "observability.close_barrier",
+      "observability.close_barrier.standard"
+    ],
+    [
+      "observability.loop_cursor.factory",
+      "observability.loop_cursor.standard"
+    ],
+    [
+      "observability.persistence",
+      "observability.persistence.null"
+    ],
+    [
+      "observability.projection_host",
+      "observability.projection_host.standard"
+    ],
+    [
+      "observation.event_hub",
+      "observation.node_trajectory"
+    ],
+    [
+      "observation.event_hub",
+      "observation.runtime_bookkeeping"
+    ],
+    [
+      "perceive",
+      "perceive.hub.sequential"
+    ],
+    [
+      "perceive",
+      "sensor.clock"
+    ],
+    [
+      "perceive",
+      "sensor.inbox-facts"
+    ],
+    [
+      "perceive",
+      "sensor.skill-catalog"
+    ],
+    [
+      "perceive",
+      "sensor.team-inbox"
+    ],
+    [
+      "perceive",
+      "sensor.workspace-artifacts"
+    ],
+    [
+      "safe_executor.simple",
+      "tool.guards.service"
+    ],
+    [
+      "spine.core",
+      "spine.emit_pipeline"
+    ],
+    [
+      "spine.core",
+      "spine.sink.file"
+    ],
+    [
+      "spine.core",
+      "writable.matrix.default"
+    ],
+    [
+      "spine.deriver.anomaly",
+      "spine.emit_pipeline"
+    ]
+  ],
+  "manifest_hash": null,
+  "nodes": [
+    {
+      "disabled": false,
+      "id": "body.simple",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "bodies"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "control.observe.checkpoint",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "phase:stop::control.observe.checkpoint"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "control.observe.wildcard",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "phase:stop::control.observe.wildcard"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "control.perceive.context",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "phase:perceive::control.perceive.context"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "control.remember.admit",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "phase:remember::control.remember.admit"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "control.think.guard",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "phase:think::control.think.guard",
+        "phase:think::control.think.guard.enforce"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "convergence.policy.default",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "convergence_policy",
+        "convergence_runtime"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "delegation_cache",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "delegation_cache"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "diagnosis.blueprint_trajectory_differ",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "diagnosis.diff"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "diagnosis.failure_explainer",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "diagnosis.explainer"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "diagnosis.run_replay",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "diagnosis.replay"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "events.model_visible.publisher",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "event.bus.publisher.model_visible",
+        "llm.adapter.hook.model_visible"
+      ],
+      "requires": [
+        "event.bus"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "events.subscriber.exception_index_writer",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "events.subscriber.exception_index"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "gate.artifact-respond-injector",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "gates"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "gate.delivery-satisfied",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "convergence_runtime",
+        "gates"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "gate.multi-tool-loop-breaker",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "gates",
+        "loop_guard_policy"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "gate.must-consult-all",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "gates"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "gate.progress-loop-detector",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "gates",
+        "loop_guard_policy"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "gate.repeat-tool-call",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "gates",
+        "loop_guard_policy"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "gate.terminal-respond",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "gates"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "gate.tool-loop-breaker",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "gates",
+        "loop_guard_policy"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "gates",
+      "kind": "seam",
+      "layer": "L1",
+      "provides": [
+        "gates"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "gates.chain.sequential",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "gates"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "graph-node.agent.default",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [],
+      "requires": [
+        "graph_node_executors"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "graph-node.aggregator.default",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [],
+      "requires": [
+        "graph_node_executors"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "graph-node.topology.default",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [],
+      "requires": [
+        "graph_node_executors"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "guard.tool-result-spill",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "tool_guards"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "guard.tool-timeout",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "tool_guards"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-action-handler-provider",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "action_handler_registry",
+        "tool_batch_execution_policy"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-action-handler-registry-seam",
+      "kind": "seam",
+      "layer": "L1",
+      "provides": [
+        "action_handler_registry"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-artifact-closure-provider",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "artifact_closure"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-attribute-policy-default-factory",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "attribute_policy_backends"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-attribute-policy-seam",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "attribute_policy_backends"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-brain-prompt-catalog-default",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "brain_prompt_catalog_factory"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-brain-prompt-sections",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "prompt_section_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-brain-simple",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "brains",
+        "cognitive.reflection_pipeline",
+        "cognitive.think_pipeline",
+        "critic.simple",
+        "decision_classifier",
+        "gates",
+        "prompt_assembler",
+        "prompt_section_registry",
+        "prompt_template_selector",
+        "reasoner.prompt"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-cli-debug-command-seam",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "cli_debug_command"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-cli-debug-trace",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "cli_debug_command"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-cognitive-reflection-pipeline-standard",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "cognitive.reflection_pipeline"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-cognitive-runtime-factory",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "runtime_factory"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-cognitive-think-pipeline-standard",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "cognitive.think_pipeline"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-component-budget-policy-contributor",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [
+        "lead_budget_policy_resolver"
+      ],
+      "requires": [
+        "component_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-component-memory-contributor",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [],
+      "requires": [
+        "component_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-component-registry-seam",
+      "kind": "seam",
+      "layer": "L4",
+      "provides": [
+        "component_registry"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-component-state-store-contributor",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [],
+      "requires": [
+        "component_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-critic-simple",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "critic.simple"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-decision-classifier-seam",
+      "kind": "seam",
+      "layer": "L1",
+      "provides": [
+        "decision_classifier"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-declarative-runtime-seams-provider",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "checkpoint_state_resolver_factory",
+        "declarative_interpreter_factory",
+        "delta_reducer_factory",
+        "effect_dispatcher_factory",
+        "result_finalizer_factory",
+        "runtime_journal_factory"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-default-reducer",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "reducer"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-delta-handler-provider",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [],
+      "requires": [
+        "delta_handler_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-delta-handler-registry-seam",
+      "kind": "seam",
+      "layer": "L2",
+      "provides": [
+        "delta_handler_registry"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-effect-handler-provider",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [],
+      "requires": [
+        "effect_handler_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-effect-handler-registry-seam",
+      "kind": "seam",
+      "layer": "L2",
+      "provides": [
+        "effect_handler_registry"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-effect-permission-manifest-web-standard",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "permission_manifest.web_standard"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-event-descriptor-bootstrap",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "event_descriptor_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-event-descriptor-registry",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "event_descriptor_registry"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-evidence-store-seam",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "evidence_policy",
+        "evidence_store"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-fact-reader-console-factory",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "fact_readers"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-fact-reader-langfuse-factory",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "fact_readers"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-fact-reader-otel-factory",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "fact_readers"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-fact-reader-seam",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "fact_readers"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-fact-scorer-seam",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "fact_scorers"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-fact-store-memory-factory",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "journal_store_factories"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-factory-seams-default",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "bodies",
+        "brains",
+        "hooks",
+        "resume_input_adapters",
+        "team_strategies"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-file-store-provider",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "file_store"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-file-store-service",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "file_store"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-gateway-routes-channels-wechat",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "route_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-gateway-routes-device",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "route_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-gateway-routes-health-options",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "route_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-gateway-routes-openai-compat-files",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "route_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-gateway-routes-rooms",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "route_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-gateway-routes-runs-sessions",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "route_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-gateway-ws-mount",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "web_server"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-genai-llm-mapper",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "genai_semantic_mapper"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-genai-semantic-mapper-seam",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "genai_semantic_mapper"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-genai-tool-mapper",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "genai_semantic_mapper"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-idempotency-store-seam",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "idempotency_store"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-journal-memory-factory",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "journal_backends"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-journal-seam",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "journal_backends"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-journal-store",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "journal_store"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-journal-store-factory-registry",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "journal_store_factories"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-langfuse-eval-scorer",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "fact_scorers"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-llm-resolver",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "llm_resolver"
+      ],
+      "requires": [
+        "llm_adapter"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-loop-cognitive",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [
+        "run_loop_driver_registry[cognitive]"
+      ],
+      "requires": [
+        "llm_resolver",
+        "run_loop_driver_registry",
+        "run_mode_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-memory-compaction-policy-simple",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "memory.compaction_policy"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-memory-provider",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "memory",
+        "memory.compaction_policy",
+        "memory.retrieval_policy",
+        "memory.write_policy"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-memory-service",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "memory"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-memory-write-policy-simple",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "memory.write_policy"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-mode-cordis-creator-default",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [],
+      "requires": [
+        "cordis_control_tool_factory",
+        "role.cordis_creator",
+        "run_mode_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-mode-solo-default",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [],
+      "requires": [
+        "run_mode_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-mode-team-default",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [],
+      "requires": [
+        "run_mode_registry",
+        "team_caster",
+        "team_role_library"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-observability-service",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "observability"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-phase-observer-provider",
+      "kind": "composite",
+      "layer": "L2",
+      "provides": [
+        "phase_observer"
+      ],
+      "requires": [
+        "phase_observer_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-phase-observer-registry-seam",
+      "kind": "seam",
+      "layer": "L2",
+      "provides": [
+        "phase_observer_registry"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-phase-observer-tracing-provider",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [],
+      "requires": [
+        "phase_observer_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-plan-body-composer",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [
+        "composer.body"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-plan-brain-composer",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [
+        "composer.brain"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-plan-perceive-composer",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [
+        "composer.perceive"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-plan-team-composer",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [
+        "composer.team"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-prompt-assembler-section-manifest",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "prompt_assembler"
+      ],
+      "requires": [
+        "prompt_section_registry",
+        "prompt_template_provider"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-prompt-section-registry",
+      "kind": "seam",
+      "layer": "L1",
+      "provides": [
+        "prompt_section_registry"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-prompt-template-provider-builtin",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "prompt_template_provider"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-prompt-template-selector-team-awareness",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "prompt_template_selector"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-reasoner-prompt",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "reasoner.prompt"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-retrieval-layered",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "memory.retrieval_policy",
+        "retrieval.layered"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-role-cordis-creator",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [
+        "role.cordis_creator"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-run-ledger-factory-seam",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "run_ledger_factory"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-run-loop-driver-registry",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "run_loop_driver_registry"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-run-mode-registry-seam",
+      "kind": "seam",
+      "layer": "L1",
+      "provides": [
+        "run_mode_registry"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-runtime-lifecycle-logging-provider",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [],
+      "requires": [
+        "runtime_lifecycle_subscriber_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-runtime-lifecycle-publisher",
+      "kind": "composite",
+      "layer": "L2",
+      "provides": [
+        "runtime_lifecycle_publisher"
+      ],
+      "requires": [
+        "runtime_lifecycle_subscriber_registry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-runtime-lifecycle-subscriber-registry-seam",
+      "kind": "seam",
+      "layer": "L2",
+      "provides": [
+        "runtime_lifecycle_subscriber_registry"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-sandbox-provider",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "sandbox"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-sandbox-service",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "sandbox"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-search-provider",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "search"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-search-service",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "search"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-skills-provider",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "skills"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-skills-service",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "skills"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-state-store-provider",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "state_store"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-state-store-service",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "state_store"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-team-caster-default",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [
+        "team_caster"
+      ],
+      "requires": [
+        "team_casting_prompt_renderer"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-team-casting-prompt-renderer-builtin",
+      "kind": "provider",
+      "layer": "L4",
+      "provides": [
+        "team_casting_prompt_renderer"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-team-communication-default",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [
+        "team_communication"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-team-role-library-default",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [
+        "team_role_library"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-team-seam-seam",
+      "kind": "seam",
+      "layer": "L3",
+      "provides": [
+        "team_seam"
+      ],
+      "requires": [
+        "team_communication",
+        "team_shared_memory_resolver"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-team-shared-memory-default",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [
+        "team_shared_memory_resolver"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-tool-bash",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "tools.bash"
+      ],
+      "requires": [
+        "tools"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-tool-batch-execution-policy",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "tool_batch_execution_policy"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-tool-cordis-control",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "cordis_control_tool_factory"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-tool-file-write",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "tools.file_write"
+      ],
+      "requires": [
+        "tools"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-tools-provider",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "tools"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-tools-service",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "tools"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-trace-tool-provider",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [],
+      "requires": [
+        "trace_inspector_tools"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-trace-tool-seam",
+      "kind": "seam",
+      "layer": "L3",
+      "provides": [
+        "trace_inspector_tools"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-tracer-otel-factory",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "tracer_backends"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-tracer-seam",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "tracer_backends"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-transport-provider",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [],
+      "requires": [
+        "transport"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-transport-service",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "transport"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-web-server",
+      "kind": "seam",
+      "layer": "L1",
+      "provides": [
+        "web_server"
+      ],
+      "requires": [
+        "install_bootstrap_state",
+        "route_registry",
+        "webserver_bootstrap_config"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-webserver-bootstrap",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "install_bootstrap_state",
+        "webserver_bootstrap_config",
+        "webserver_bootstrap_factory"
+      ],
+      "requires": [
+        "file_store"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca-webserver-jwt-keys",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "jwt_keys"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca-webserver-router",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "route_registry"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca.events.bus",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "event.bus"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca.events.sink.spine_file",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "event.sink.spine_file"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca.graph-node-executor-registry",
+      "kind": "seam",
+      "layer": "L3",
+      "provides": [
+        "graph_node_executors"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca.nodes.delegate.compose",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "delegate::delegate.compose"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca.nodes.intervene.approve_gate",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "intervene::act.approve.gate"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca.nodes.intervene.interrupt",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "intervene::intervene.interrupt"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca.nodes.plan.compose",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "plan::plan.compose"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca.nodes.plan.revise",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "plan::plan.revise"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca.plugins.session.checkpoint_policy",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "session.checkpoint.policy"
+      ],
+      "requires": [
+        "session.store"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca.plugins.session.model_visible",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "session.projection.model_visible"
+      ],
+      "requires": [
+        "session.projections"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca.plugins.session.projection_cache",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "session.projection_cache"
+      ],
+      "requires": [
+        "session.projections"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca.plugins.session.projection_registry",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "session.projections"
+      ],
+      "requires": [
+        "session.store"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca.plugins.session.runtime",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "session.store"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "lca.plugins.session.session_stats",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "session.projection.session_stats"
+      ],
+      "requires": [
+        "session.projections"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca.plugins.session.session_turn_outline",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "session.projection.session_turn_outline"
+      ],
+      "requires": [
+        "session.projections"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca.plugins.session.spine_anomaly",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "session.spine_anomaly"
+      ],
+      "requires": [
+        "deriver.anomaly",
+        "session.store"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca.plugins.session.telemetry_capture",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "session.telemetry"
+      ],
+      "requires": [
+        "session.store"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca.plugins.session.telemetry_otel",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "session.telemetry.backend.otel"
+      ],
+      "requires": [
+        "session.telemetry"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca.plugins.session.title_service",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "session.title"
+      ],
+      "requires": [
+        "session.store"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca.plugins.session.token_usage",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "session.projection.token_usage",
+        "session.token_meter"
+      ],
+      "requires": [
+        "session.projections"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "lca.plugins.session.turn_control",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "session.projection.turn_control"
+      ],
+      "requires": [
+        "session.projections"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "loop.policy.default",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "loop_guard_policy"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "observability.close_barrier",
+      "kind": "seam",
+      "layer": "L1",
+      "provides": [
+        "observability.close_barrier"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "observability.close_barrier.standard",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "observability.close_barrier"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "observability.loop_cursor.factory",
+      "kind": "seam",
+      "layer": "L1",
+      "provides": [
+        "observability.loop_cursor"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "observability.loop_cursor.standard",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "observability.loop_cursor"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "observability.persistence",
+      "kind": "seam",
+      "layer": "L1",
+      "provides": [
+        "observability.persistence"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "observability.persistence.null",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "observability.persistence"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "observability.projection_host",
+      "kind": "seam",
+      "layer": "L1",
+      "provides": [
+        "observability.projection_host"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "observability.projection_host.standard",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "observability.projection_host"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "observation.artifact_snapshot",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "observation.artifact_snapshot"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "observation.control_trace",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "observation.control_trace"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "observation.decision_trace",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "observation.decision_trace"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "observation.event_hub",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "observation.event_hub"
+      ],
+      "requires": [
+        "observation.node_enter",
+        "observation.node_exit",
+        "observation.runtime_bookkeeping",
+        "session.store"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "observation.lifecycle.bundle_load",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "observation.lifecycle.bundle_load"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "observation.lifecycle.plan_compile",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "observation.plan_compile"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "observation.lifecycle.subgraph_resolve",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "observation.subgraph_resolve"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "observation.llm_call_trace",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "observation.llm_call_trace"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "observation.node_trajectory",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "observation.node_enter",
+        "observation.node_exit"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "observation.runtime_bookkeeping",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "observation.runtime_bookkeeping"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "observation.tool_call_trace",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "observation.tool_call_trace"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "perceive",
+      "kind": "seam",
+      "layer": "L1",
+      "provides": [
+        "perceive"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "perceive.hub.sequential",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "perceive"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "phase.concept.act_subgraph.act_authorize",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "act::act.authorize"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.concept.act_subgraph.act_envelope",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "act::act.envelope"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.concept.act_subgraph.act_fanout",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "act::act.fanout"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.concept.act_subgraph.act_join",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "act::act.join"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.concept.act_subgraph.act_observe",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "act::act.observe.normalize"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.concept.act_subgraph.act_observe_commit_fact",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "act::act.observe.commit_fact"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.concept.act_subgraph.act_observe_terminate_decide",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "act::act.observe.terminate_decide"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.concept.act_subgraph.act_validate",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "act::act.validate"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.concept.context_compose.context_lines_collect",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "concept::context.lines.collect"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.concept.context_compose.context_skills_merge",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "concept::context.skills.merge"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.concept.decision_classify.decision_compose_action",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "concept::decision.compose.action"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.concept.decision_classify.decision_parse_response",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "concept::decision.parse.response"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.concept.decision_enforce.gate_chain_reject",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "concept::gate.chain.reject"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.concept.decision_enforce.gate_chain_run",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "concept::gate.chain.run"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.concept.effect.pre_dispatch_envelope_check",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "effect::effect.pre_dispatch.envelope_check"
+      ],
+      "requires": [
+        "permission_manifest.*"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "phase.concept.effect_execute.effect_execute",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "concept::effect.execute"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.concept.role_snapshot.capability_role_compose",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "concept::capability.role.compose"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.concept.role_snapshot.capability_role_normalize",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "concept::capability.role.normalize"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.concept.template_select.prompt_candidate_enumerate",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "concept::prompt.candidate.enumerate"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.concept.template_select.prompt_candidate_pick",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "concept::prompt.candidate.pick"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.concept.template_select.prompt_candidate_score",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "concept::prompt.candidate.score"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.concept.tool.fork.dispatch",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "concept::tool.fork.dispatch"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.delegate.fold",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "delegate::delegate.fold"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.perceive.fold",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "perceive::phase.perceive.fold"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.perceive.memory_retrieve",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "perceive::phase.perceive.memory_retrieve"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.perceive.observe",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "perceive::phase.perceive.observe"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.primitive.capability.fork.dispatch",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "primitive::capability.fork.dispatch"
+      ],
+      "requires": [
+        "tools"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "phase.reflect.admit_recovery",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "reflect::phase.reflect.admit_recovery"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.reflect.memory.extract",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "reflect::phase.reflect.memory.extract"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.reflect.score",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "reflect::phase.reflect.score"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.remember.admit",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "remember::phase.remember.admit"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.remember.fold",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "remember::phase.remember.fold"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.remember.write",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "remember::phase.remember.write"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.think.budget.gate",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "think::think.budget.gate"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.think.context.truncate",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "think::think.context.truncate"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.think.decision.parse",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "think::decision.parse"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.think.decision.repair",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "think::think.decision.repair"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.think.gate",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "think::think.gate"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.think.history.derive",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "think::history.derive"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.think.llm.invoke",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "think::llm.invoke"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.think.llm.persist",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "think::llm.persist"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.think.reason.plan",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "think::think.reason.plan"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.think.reason.render",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "think::think.reason.render"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.think.reasoner.credentials",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "llm_adapter"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.think.route",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "think::think.route"
+      ],
+      "requires": [
+        "reducer"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "phase.think.route.decide",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "think::think.route.decide"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "phase.think.shortcut",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [
+        "think::think.shortcut"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "resume_input.human_answer",
+      "kind": "provider",
+      "layer": "L2",
+      "provides": [],
+      "requires": [
+        "resume_input_adapters"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "safe_executor.simple",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "safe_executor.simple"
+      ],
+      "requires": [
+        "tool_guards"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "sensor.clock",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "perceive"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "sensor.inbox-facts",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "perceive"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "sensor.skill-catalog",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "perceive"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "sensor.team-inbox",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "perceive"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "sensor.workspace-artifacts",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [],
+      "requires": [
+        "perceive"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "spine.classifier.exception.builtin",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "field_producer.exception.builtin"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "spine.classifier.exception.unclass",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "field_producer.exception.unclass"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "spine.core",
+      "kind": "seam",
+      "layer": "L1",
+      "provides": [
+        "event_spine",
+        "spine_context"
+      ],
+      "requires": [
+        "emit_pipeline",
+        "file_sink"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "spine.deriver.anomaly",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "deriver.anomaly"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "spine.deriver.graph",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "graph"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "spine.deriver.live_tail",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "live_tail"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "spine.deriver.narrative",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "narrative"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "spine.emit_pipeline",
+      "kind": "seam",
+      "layer": "L1",
+      "provides": [
+        "emit_pipeline"
+      ],
+      "requires": [
+        "deriver.anomaly",
+        "field_producer.*"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "spine.sink.console",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "console_sink"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "spine.sink.file",
+      "kind": "provider",
+      "layer": "L0",
+      "provides": [
+        "file_sink"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "spine.spantree",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "field_producer.spantree"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "spine.wrap.assembler",
+      "kind": "seam",
+      "layer": "L0",
+      "provides": [
+        "assembler_wrap"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "strategy.debate",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [],
+      "requires": [
+        "team_strategies"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "strategy.fan_out",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [],
+      "requires": [
+        "team_strategies"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "strategy.graph",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [],
+      "requires": [
+        "graph_node_executors",
+        "team_strategies"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "strategy.lead",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [],
+      "requires": [
+        "team_strategies"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "strategy.peer_relay",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [],
+      "requires": [
+        "team_strategies"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "strategy.peer_swarm",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [],
+      "requires": [
+        "team_strategies"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "strategy.pipeline",
+      "kind": "provider",
+      "layer": "L3",
+      "provides": [],
+      "requires": [
+        "team_strategies"
+      ]
+    },
+    {
+      "disabled": false,
+      "id": "tool.guards.service",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "tool_guards"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "tools.compose_service",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "tools.compose_service"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "transport.compose_service",
+      "kind": "provider",
+      "layer": "L1",
+      "provides": [
+        "transport.compose_service"
+      ],
+      "requires": []
+    },
+    {
+      "disabled": false,
+      "id": "writable.matrix.default",
+      "kind": "seam",
+      "layer": "L2",
+      "provides": [
+        "writable_face_registry"
+      ],
+      "requires": [
+        "event_spine"
+      ]
+    }
+  ],
+  "profile": "profiles/web-standard.yaml"
+}

@@ -13,8 +13,9 @@ This test boots the canonical web-standard profile and asserts:
   (i.e. lives under a PR-10 domain dir).
 * A sample of canonical seam/provider pairs both resolve, share a
   domain dir, and are not silently disabled.
-* The resolved capability set is identical to the pre-PR-10 baseline
-  captured at ``docs/notes/baselines/capability-set-web-standard-pre-pr10.json``.
+* The resolved capability set is identical to the drift-pin snapshot at
+  ``docs/notes/baselines/capability-set-web-standard-2026-10-02.json``
+  (regenerated 2026-10-02, round-0354; the pre-PR-10 file is kept as history).
 
 Reference:
     docs/notes/proposed/seam/2026-09-04-plugin-universe-single-entry.md
@@ -105,14 +106,14 @@ def test_every_resolved_plugin_lives_under_a_domain(resolved) -> None:
         if domain in {"seams", "providers"}:
             bad.append(f"{plugin.id} -> {module}")
     assert not bad, (
-        f"plugins still under legacy seams/providers tree:\n  "
+        "plugins still under legacy seams/providers tree:\n  "
         + "\n  ".join(bad)
     )
 
 
 def test_sample_pairs_share_domain_and_resolve(resolved) -> None:
     """Sample pairs: both files in same domain dir, both visible, capability unchanged."""
-    profile, id_to_module = resolved
+    profile, _id_to_module = resolved
     plugins_by_id = {p.id: p for p in profile.plugins}
 
     expected_pair_specs: list[tuple[str, str, str]] = [
@@ -120,7 +121,9 @@ def test_sample_pairs_share_domain_and_resolve(resolved) -> None:
         ("lca-llm-resolver", "lca-cognitive-think-pipeline-standard", "think"),
         ("lca-action-handler-registry-seam", "lca-action-handler-provider", "act"),
         ("lca-memory-service", "lca-memory-provider", "memory"),
-        ("lca-team-seam-seam", "lca-session-command-ledger", "collaboration"),
+        # NOTE(round-0354): the (lca-team-seam-seam, lca-session-command-ledger)
+        # collaboration pair was retired here — lca-session-command-ledger has zero
+        # references in lca/ (plugin removed); nothing to pin.
         ("lca-observability-service", "lca-phase-observer-registry-seam", "perceive"),
         ("lca-attribute-policy-seam", "lca-attribute-policy-default-factory", "observability"),
         ("lca-state-store-service", "lca-state-store-provider", "state"),
@@ -156,8 +159,9 @@ def test_sample_pairs_share_domain_and_resolve(resolved) -> None:
 
 def test_baseline_capability_set_matches(resolved) -> None:
     """The set of resolved plugin ids + their (provides, requires, kind, layer)
-    tuples must equal the pre-PR-10 baseline snapshot at
-    ``docs/notes/baselines/capability-set-web-standard-pre-pr10.json``.
+    tuples must equal the drift-pin snapshot at
+    ``docs/notes/baselines/capability-set-web-standard-2026-10-02.json``
+    (regenerated 2026-10-02, round-0354; 262 enabled plugins / 137 edges).
 
     This is a stronger guarantee than the per-pair check above: it catches
     silent capability-string renames, missed migrations, and accidental
@@ -169,7 +173,7 @@ def test_baseline_capability_set_matches(resolved) -> None:
         / "docs"
         / "notes"
         / "baselines"
-        / "capability-set-web-standard-pre-pr10.json"
+        / "capability-set-web-standard-2026-10-02.json"
     )
     assert baseline_path.exists(), (
         f"baseline missing at {baseline_path} — capture it via "
