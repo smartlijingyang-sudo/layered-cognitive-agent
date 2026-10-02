@@ -54,6 +54,9 @@ from lca.plugins.transport.webserver.routes_1.routes_assistants.standing_files i
     list_standing_files,
     standing_file_dispatcher,
 )
+from lca.plugins.transport.webserver.routes_1.routes_assistants.status_screen import (
+    assistant_status_snapshot,
+)
 
 ROUTE_SPECS: tuple[RouteSpec, ...] = (
     # Path is shared between POST (create) and GET (list); the
@@ -127,6 +130,11 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
         "/v1/assistants/{assistant_id}/standing-files/{filename}",
         standing_file_dispatcher,
         ("GET", "PUT", "OPTIONS"),
+    ),
+    RouteSpec(
+        "/v1/assistants/{assistant_id}/status-snapshot",
+        assistant_status_snapshot,
+        ("GET", "OPTIONS"),
     ),
 )
 
