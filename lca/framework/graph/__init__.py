@@ -27,6 +27,13 @@ Subsequent PRs:
   ``PhaseExecutor`` / ``PhaseInput`` / ``PhaseResult``.
 """
 
+# Import-time side effect: each strategy module registers itself against the
+# default StrategyRegistry when lca.framework.graph.strategies is imported
+# (see strategies/__init__.py). Importing the submodules here as well was
+# redundant -- the package import alone triggers all nine registrations
+# (empirically verified). The redundant alias marks the intentional
+# re-export and keeps ruff F401 quiet without expanding __all__.
+from lca.framework.graph import strategies as strategies
 from lca.framework.graph.adapter import PlanInterpreterAdapter
 from lca.framework.graph.interpreter import InterpretationResult, PlanInterpreter
 from lca.framework.graph.lifter import (
@@ -37,17 +44,6 @@ from lca.framework.graph.port_reader import PortReader
 from lca.framework.graph.port_registry import PortRegistry
 from lca.framework.graph.predicate_evaluator import evaluate_predicate
 from lca.framework.graph.recorder import VisitRecorder
-from lca.framework.graph.strategies import (
-    agent_consult_strategy,
-    agent_fanout_strategy,
-    gate_chain_strategy,
-    node_executor_strategy,
-    observe_strategy,
-    parallel_strategy,
-    subgraph_strategy,
-    terminate_strategy,
-    transform_strategy,
-)
 from lca.framework.graph.strategy_registry import (
     NodeExecutorLookup,
     StrategyRegistry,
