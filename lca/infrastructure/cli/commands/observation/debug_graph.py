@@ -16,6 +16,7 @@ llm 响应、tool_calls、gate verdict,并按可靠性自动标注每一步状�
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -94,10 +95,15 @@ def _safe_repr(v: Any, n: int = 60) -> str:
             # 截到 'tzinfo=...' 之前作为可读摘要
             inner = v[len("datetime.datetime(") : -1]
             return _truncate(inner, n)
-        try:
-            return v.isoformat()
-        except Exception:
-            return f"<{type(v).__name__}>"
+        # str 的 repr 以引号开头, 走不到这里;
+        # 能到这里的只有 datetime 对象
+        # （0225 projection.py 同型修法）。
+        if isinstance(v, datetime):
+            try:
+                return v.isoformat()
+            except Exception:
+                return f"<{type(v).__name__}>"
+        return f"<{type(v).__name__}>"
     return _truncate(r, n)
 
 

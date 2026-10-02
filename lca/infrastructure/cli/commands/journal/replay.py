@@ -69,7 +69,9 @@ def register(app: typer.Typer) -> None:
         )
 
         for row in load_spine_events(run_id, traces_root=traces_root):
-            deriver.on_event(row)
+            # SpineRow is a TypedDict view, not a dict[str, Any]; hand
+            # _coerce's dict branch a plain dict copy (it only reads).
+            deriver.on_event(dict(row))
         if out is None:
             out = run_dir / "journal.trajectory.html"
         out.parent.mkdir(parents=True, exist_ok=True)

@@ -38,7 +38,9 @@ def emit(
     )
 
 
-def output_option(default: OutputMode) -> typer.Option:
+# NOTE: typer.Option is an overloaded factory *function*, not a class,
+# and its overloads return Any; annotating `-> typer.Option` is a lie.
+def output_option(default: OutputMode) -> Any:
     """Standard `--output` flag with stable help text."""
     return typer.Option(
         default,
