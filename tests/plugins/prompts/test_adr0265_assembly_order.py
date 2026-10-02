@@ -14,7 +14,15 @@ from __future__ import annotations
 
 import pytest
 
-from lca.plugins.prompts.template_provider import _builtin_templates
+from lca.contracts.models.cognition.prompt_assembly import (
+    PromptTemplateConfig,
+    SectionReference,
+)
+from lca.plugins.prompts.template_provider import (
+    _build_provider,
+    _builtin_templates,
+    Config,
+)
 
 # ADR-0265 §3 C1 带序（B1–B8）。team 协作段
 #（teammates/assigned_roles_text/member_reports_text/routing_instructions/
@@ -84,3 +92,63 @@ def test_t4_team_sections_preserve_b1_b5_order(template_id: str) -> None:
         f"{template_id}: team 段追加改变了 B1–B5 相对顺序："
         f"{cur_b1_b5} != {react_b1_b5}"
     )
+
+
+@pytest.mark.parametrize("template_id", _TEMPLATE_IDS)
+def test_t1_band_order_no_inversion(template_id: str) -> None:
+    """T1（契约规格，预期红）：B1–B8 带序不许逆序；带内顺序不锁死。
+
+    ADR-0265 §3 C1：section 必须落在 B1–B8 带内，跨带不许逆序；
+    §7① 裁决维持带序（不锁死精确快照——带内顺序可调）。
+
+    当前实现偏离（2026-10-02 实测 `_builtin_templates()`，待 quality lane
+    按 §7①② 落地带序重排）：
+    - goal(B2) 在 backstory(B1) 之前；
+    - vocal_contract(B7) 在 current_date(B3) 之前；
+    - react_tool_usage_guidelines(B7) 在 user_profile(B4) 之前（D2）；
+    - memory_retrieval(B7) 在 developer_timestamp(B3) 之前（D1）。
+    team 协作段未在 C1 定带，不参与本断言（ADR 缺口，见文件头）。
+    """
+    banded = _banded_names(template_id)
+    inversions = [
+        (a, ba, b, bb)
+        for (a, ba), (b, bb) in zip(banded, banded[1:])
+        if ba > bb
+    ]
+    assert not inversions, (
+        f"{template_id}: band order violated — B1–B8 must not invert: "
+        + "; ".join(f"{a}(B{ba}) -> {b}(B{bb})" for a, ba, b, bb in inversions)
+    )
+
+
+def test_t2_profile_extension_before_b1_fails_fast() -> None:
+    """T2（契约规格，预期红）：profile 在 B1 之前插段 → 模板加载期抛错。
+
+    ADR-0265 §3 C2 扩展纪律：只许在带内追加；把新段插到 B1 之前
+    （或把 B4/B7 的段移到 B5 之前、把 B3 的段改为可选）→ 模板加载期
+    报错（fail-fast，与 ADR-0256 wiring-time fail-fast 同一思想）。
+
+    当前 `_build_provider` 无带序校验——profile 配置直接整体替换模板，
+    违规不抛错（待实现），故本测试预期红。
+    """
+    builtin_sections = _builtin_templates()["react_prompt"].sections
+    violating = PromptTemplateConfig(
+        id="react_prompt",
+        variant="react",
+        sections=(
+            SectionReference(
+                name="evil_pre_b1", kind="pure", optional=True, fallback=""
+            ),
+            *(
+                SectionReference(
+                    name=ref.name,
+                    kind=ref.kind,
+                    optional=ref.optional,
+                    fallback=ref.fallback,
+                )
+                for ref in builtin_sections
+            ),
+        ),
+    )
+    with pytest.raises(ValueError):
+        _build_provider(Config(profile_templates=(violating,)))
