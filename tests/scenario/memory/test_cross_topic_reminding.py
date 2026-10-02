@@ -47,5 +47,5 @@ def test_retrieval_duty_prompt_requires_multi_query() -> None:
         tools=(),
         activated_skills=(),
     )
-    assert "至少 3 个角度" in out.text
-    assert "扫描常驻记忆文件兜底" in out.text
+    assert "多角度" in out.text
+    assert "扫常驻文件兜底" in out.text

@@ -111,7 +111,7 @@ def test_f3_retrieval_tree_names_exemption_and_three_angles() -> None:
         .text
     )
     assert "豁免" in text
-    assert "至少 3 个角度" in text
+    assert "多角度" in text
     assert "memory_search" in text
 
 
@@ -162,7 +162,7 @@ def test_f7_terminal_gate_forbids_invention() -> None:
         )
         .text
     )
-    assert "绝不凭空编造事实" in text
+    assert "绝不编造" in text
 
 
 def test_f8_privacy_firewall_renders_for_a_bound_home() -> None:

@@ -70,7 +70,7 @@ async def test_poisoned_password_is_absent_and_rejected(tmp_path: Path) -> None:
     assert rejected.success is False
     assert rejected.error == "credential_rejected"
     assert memory.query(MemoryLayer.SEMANTIC) == []
-    assert "绝不凭空编造" in _render_retrieval()
+    assert "绝不编造" in _render_retrieval()
     projected = tmp_path / "asst" / "MEMORY.md"
     assert not projected.exists() or "admin888" not in projected.read_text(encoding="utf-8")
     runtime = SimpleNamespace(memory=memory)

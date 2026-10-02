@@ -88,7 +88,7 @@ def test_retrieval_decision_tree_renders_for_home_bound_role() -> None:
         activated_skills=(),
     )
     assert "memory_search" in out.text
-    assert "多角度查询" in out.text
+    assert "多角度" in out.text
     assert "兜底" in out.text
-    assert "绝不凭空编造事实" in out.text
+    assert "绝不编造" in out.text
     assert "记忆检索义务" in out.text

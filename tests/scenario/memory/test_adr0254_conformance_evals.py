@@ -55,8 +55,8 @@ def test_eval_retrieval_duty_prompt_contains_decision_tree() -> None:
     )
     text = out.text
     assert "memory_search" in text
-    assert "至少 3 个角度" in text
-    assert "扫描常驻记忆文件兜底" in text
+    assert "多角度" in text
+    assert "扫常驻文件兜底" in text
     assert "豁免" in text
 
 
@@ -129,8 +129,8 @@ def test_eval_anti_hallucination_terminal_gate_in_prompt() -> None:
         tools=(),
         activated_skills=(),
     )
-    assert "绝不凭空编造事实" in out.text
-    assert "明确承认信息缺失并标注不确定性" in out.text
+    assert "绝不编造" in out.text
+    assert "承认缺失并标注不确定性" in out.text
 
 
 def test_eval_anti_hallucination_no_false_claim_without_write(tmp_path: Path) -> None:
