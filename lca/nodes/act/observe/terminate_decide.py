@@ -70,8 +70,11 @@ class ActObserveTerminateDecideExecutor:
 
     semantic_name: str = "act.observe.terminate_decide"
     region: str = "act"
-    declared_inputs: tuple[PortName, ...] = ("receipt",)
-    declared_outputs: tuple[PortName, ...] = ("receipt", "should_terminate")
+    declared_inputs: tuple[PortName, ...] = (PortName("receipt"),)
+    declared_outputs: tuple[PortName, ...] = (
+        PortName("receipt"),
+        PortName("should_terminate"),
+    )
 
     async def node_execute(
         self,
@@ -91,7 +94,7 @@ class ActObserveTerminateDecideExecutor:
         Observation 回到模型。
         """
         del context  # unused: pure function of input port value
-        receipt = input.port_values.get("receipt")
+        receipt = input.port_values.get(PortName("receipt"))
         if not isinstance(receipt, EffectReceipt):
             raise TypeError(
                 "act.observe.terminate_decide: 'receipt' port must be an "
@@ -102,8 +105,8 @@ class ActObserveTerminateDecideExecutor:
 
         return NodeOutput(
             port_values={
-                "receipt": receipt,
-                "should_terminate": should_terminate,
+                PortName("receipt"): receipt,
+                PortName("should_terminate"): should_terminate,
             }
         )
 
