@@ -283,16 +283,40 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
     // 点击铅笔快捷编辑形象或名字：自动填入聊天输入框并 focus
     const handleTriggerChatEdit = useCallback(
       (promptText: string) => {
+        let inserted = false;
         try {
-          const textarea = document.querySelector('textarea') as HTMLTextAreaElement | null;
-          if (textarea) {
-            textarea.value = promptText;
-            textarea.dispatchEvent(new Event('input', { bubbles: true }));
-            textarea.focus();
+          if (typeof window !== 'undefined') {
+            const mainEditor = (window as any)?.__mainEditor || (window as any)?.__editor;
+            if (mainEditor && typeof mainEditor.setDocument === 'function') {
+              mainEditor.setDocument('markdown', promptText);
+              mainEditor.focus?.();
+              inserted = true;
+            }
           }
         } catch {
-          // fallback
+          // continue to fallback
         }
+
+        if (!inserted) {
+          try {
+            const editorEl = document.querySelector(
+              '.ProseMirror, [contenteditable="true"], textarea',
+            ) as HTMLElement | null;
+            if (editorEl) {
+              if ('value' in editorEl) {
+                (editorEl as HTMLTextAreaElement).value = promptText;
+              } else {
+                editorEl.textContent = promptText;
+              }
+              editorEl.dispatchEvent(new Event('input', { bubbles: true }));
+              editorEl.focus();
+              inserted = true;
+            }
+          } catch {
+            // fallback
+          }
+        }
+
         antMessage.info('已将指令填入输入框，请补充你的具体期望');
         onClose();
       },

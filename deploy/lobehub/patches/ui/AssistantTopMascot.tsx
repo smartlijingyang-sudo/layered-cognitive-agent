@@ -106,7 +106,8 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       justify-content: center;
       cursor: pointer;
       user-select: none;
-      padding: 6px 12px 3px 12px;
+      padding: 10px 12px 3px 12px;
+      margin-top: 6px;
       border-radius: 20px;
       transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
       background: transparent;
@@ -221,7 +222,7 @@ const styles = createStaticStyles(({ css, cssVar }) => {
           transform: translateY(0px) scale(1);
         }
         50% {
-          transform: translateY(-2.5px) scale(1.03);
+          transform: translateY(-1.5px) scale(1.02);
         }
       }
 
