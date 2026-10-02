@@ -114,7 +114,7 @@ def to_port_specs(names: object) -> tuple[PortSpec, ...]:
                 continue
             try:
                 out.append(PortSpec(name=PortName(item)))
-            except Exception:
+            except Exception:  # noqa: S112 -- lenient YAML parsing: invalid port specs are skipped
                 continue
         elif isinstance(item, Mapping):
             name = item.get("name")
@@ -128,7 +128,7 @@ def to_port_specs(names: object) -> tuple[PortSpec, ...]:
                         payload_type=None,  # YAML cannot carry live types
                     )
                 )
-            except Exception:
+            except Exception:  # noqa: S112 -- lenient YAML parsing: invalid port specs are skipped
                 continue
     return tuple(out)
 

@@ -147,7 +147,7 @@ class FilesystemJournalStore(JournalStoreBackend):
                 self._events.append(stamped)
             except JournalFormatError:
                 raise
-            except Exception:
+            except Exception:  # noqa: S112 -- per-line skip: one bad journal line must not abort the read (see comment above)
                 # 其他字段级异常 —— 跳过单行,不影响其他行
                 continue
 

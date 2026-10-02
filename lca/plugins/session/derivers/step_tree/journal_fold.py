@@ -831,7 +831,7 @@ def fold_step_tree(
             continue
         try:
             _apply(state, coerced)
-        except Exception:
+        except Exception:  # noqa: S112 -- fold is best-effort; one bad event must not abort materialization
             continue
     return _materialize(
         state,

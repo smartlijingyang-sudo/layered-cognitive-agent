@@ -129,6 +129,6 @@ def ensure_registry(runtime: Any | None) -> SourceRegistry:
                 runtime[_REGISTRY_ATTR] = reg
             else:
                 setattr(runtime, _REGISTRY_ATTR, reg)
-        except Exception:
+        except Exception:  # noqa: S110 -- best-effort registry attach; runtime may be immutable
             pass
     return reg

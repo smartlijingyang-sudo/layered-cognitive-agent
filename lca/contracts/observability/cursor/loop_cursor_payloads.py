@@ -175,7 +175,7 @@ class ToolSchema:
         if callable(to_openai):
             try:
                 return ToolSchema.from_openai(cast("dict[str, Any]", to_openai()))
-            except Exception:
+            except Exception:  # noqa: S110 -- documented fallback chain (see docstring step 4)
                 pass
         if isinstance(obj, dict):
             return ToolSchema.from_openai(obj)

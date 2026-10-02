@@ -114,7 +114,7 @@ class PerceiveService:
                     sensors.append(entry.factory())
             except MissingCapabilityError:
                 raise
-            except Exception:
+            except Exception:  # noqa: S112 -- one faulty sensor must not kill perception assembly; MissingCapabilityError still raised
                 continue
 
         assembler = self._assembly.require(
