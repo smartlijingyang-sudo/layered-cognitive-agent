@@ -7,7 +7,7 @@ from pathlib import Path
 from lca.contracts.models.core.execution.sandbox import SANDBOX_MOUNT_ROOT, SANDBOX_OUTPUT_SUBDIR
 from lca.infrastructure.sandbox.factory.factory import ONLYBOXES
 
-_REPO = Path(__file__).resolve().parents[1]
+_REPO = Path(__file__).resolve().parents[3]  # repo root (4a6b5e04a moved this file one level deeper)
 _ONLYBOXES = _REPO / "deploy" / "onlyboxes"
 
 

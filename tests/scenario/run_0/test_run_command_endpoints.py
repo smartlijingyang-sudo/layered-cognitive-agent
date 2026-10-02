@@ -17,6 +17,22 @@ from starlette.testclient import TestClient
 from lca.plugins.transport.webserver.handlers.runs.api.command_endpoints import create_run
 from lca.plugins.transport.webserver.handlers.runs.ingest.ingress.ingress import LobeHubRunInput
 from lca.plugins.transport.webserver.handlers.runs.terminal.port.port import RunReceipt
+from lca.plugins.transport.webserver.handlers.runs.terminal.streaming import (
+    auth,
+    gateway_lifecycle,
+)
+
+
+async def _noop_register_gateway_run(*_args: object, **_kwargs: object) -> None:
+    """No-op ``register_gateway_run``: 本测试只验证 payload-shape 与别名解析，
+    网关流注册是 post-dispatch 副作用，无 redis 环境下会 503，与断言无关。"""
+    return None
+
+
+def _stub_mint_user_jwt(**_kwargs: object) -> str:
+    """Stub ``mint_user_jwt``: ws_token 签发与别名解析断言无关，无 JWT 密钥
+    环境下原函数抛 JwtSecretUnconfiguredError → 503。"""
+    return "stub.jwt.token"
 
 
 def _identity_mode(_ctx: object, key: str) -> str:
@@ -44,6 +60,16 @@ def _post_runs(spy: AsyncMock, payload: dict[str, object]) -> object:
             "lca.plugins.transport.webserver.handlers.runs.api.command_endpoints.prepare_run_from_messages",
             new=AsyncMock(return_value=_INPUT),
         ),
+        # gateway_lifecycle.register_gateway_run（redis）与 auth.mint_user_jwt
+        #（JWT 签名密钥）都是 create_run 的 post-dispatch 副作用，与
+        # payload-shape / 别名解析断言无关；测试环境无 redis/JWT 密钥时原实现
+        # 抛异常 → 503，在此 stub（沿用 test_runs_sessions_facade_path.py 模式）。
+        patch.object(
+            gateway_lifecycle,
+            "register_gateway_run",
+            new=_noop_register_gateway_run,
+        ),
+        patch.object(auth, "mint_user_jwt", new=_stub_mint_user_jwt),
     ):
         return TestClient(_app(spy)).post("/runs", json=payload)
 
