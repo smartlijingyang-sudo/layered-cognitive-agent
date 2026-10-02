@@ -49,8 +49,8 @@ class PromptCandidateEnumerateExecutor:
 
     semantic_name: str = "prompt.candidate.enumerate"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("state",)
-    declared_outputs: tuple[PortName, ...] = ("candidates",)
+    declared_inputs: tuple[PortName, ...] = (PortName("state"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("candidates"),)
 
     async def node_execute(
         self,
@@ -66,7 +66,7 @@ class PromptCandidateEnumerateExecutor:
         """
         del context
         del input
-        return NodeOutput(port_values={"candidates": _CANDIDATE_TUPLE})
+        return NodeOutput(port_values={PortName("candidates"): _CANDIDATE_TUPLE})
 
 
 @plugin(
