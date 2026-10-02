@@ -1,0 +1,47 @@
+name: gmail
+display_name: Gmail
+description: Access Gmail to read, search, draft, and send emails securely.
+version: "1.0.0"
+auth:
+  type: oauth2
+  provider: google
+  scopes:
+    initial:
+      - "https://www.googleapis.com/auth/gmail.readonly"
+    additional:
+      send:
+        - "https://www.googleapis.com/auth/gmail.send"
+      modify:
+        - "https://www.googleapis.com/auth/gmail.modify"
+rate_limits:
+  units_per_minute: 250
+  mode: enforce
+  methods:
+    "+read": 1
+    "+search": 1
+    "users messages list": 1
+    "users messages get": 5
+    "+send": 100
+    "users messages send": 100
+commands:
+  shortcuts:
+    - name: "+read"
+      description: "Quickly read recent emails or unread messages"
+      units: 1
+    - name: "+search"
+      description: "Search messages by query"
+      units: 1
+    - name: "+send"
+      description: "Send an email. Requires --upload <staged_file> for safety."
+      units: 100
+      requires_scope: "send"
+      requires_approval: true
+  system:
+    - name: "status"
+      description: "Check connection status and active accounts"
+    - name: "accounts"
+      description: "List configured accounts"
+    - name: "connect"
+      description: "Initiate OAuth connection flow"
+    - name: "disconnect"
+      description: "Disconnect account and purge stored credentials"
