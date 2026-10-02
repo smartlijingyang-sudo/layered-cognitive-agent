@@ -166,6 +166,11 @@ def _wrap_v2_plan(plan, *, resolved, overlay: PlanOverlay | None = None):
         capability=plan.capability,
         scope=plan.scope,
         plugin_specs=plan.plugin_specs,
+        # ADR-0242 D10: per-agent prompt 覆盖须随包装器透出；
+        # 未复制时父类字段取默认值 None/()，__getattr__ fallback
+        # 因父类字段已存在而永不触发（0373 实证）。
+        prompt_template_id=plan.prompt_template_id,
+        prompt_section_overrides=plan.prompt_section_overrides,
         inner=plan,
         graph_spec=graph_spec,
     )
