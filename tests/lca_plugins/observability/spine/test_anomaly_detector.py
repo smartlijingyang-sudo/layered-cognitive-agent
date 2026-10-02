@@ -28,7 +28,7 @@ from lca.infrastructure.observability.spine.event.record import EventRecord
 
 
 _BASE_KWARGS: dict[str, object] = {
-    "execution_point": "brain.think.start",
+    "execution_point": "think.gate.start",
     "channel": "fact",
     "span_id": "lca-span-00000001",
     "parent_span_id": None,
@@ -99,7 +99,7 @@ def test_check_near_timeout_trips_when_duration_exceeds_threshold() -> None:
     detector = AnomalyDetector()
     # 100 ms declared budget; 95 ms > 94 ms = 0.94 * 100 → trip.
     event = _make_event(
-        execution_point="brain.think.end",
+        execution_point="think.gate.end",
         payload={"duration_ms": 95, "declared": {"timeout_ms": 100}},
     )
     assert detector._check_near_timeout(event) is True
@@ -111,7 +111,7 @@ def test_check_near_timeout_does_not_trip_when_under_threshold() -> None:
 
     detector = AnomalyDetector()
     event = _make_event(
-        execution_point="brain.think.end",
+        execution_point="think.gate.end",
         payload={"duration_ms": 50, "declared": {"timeout_ms": 100}},
     )
     assert detector._check_near_timeout(event) is False
@@ -159,7 +159,7 @@ def test_check_cycle_trips_on_repeated_execution_point_in_window() -> None:
 
     detector = AnomalyDetector()
     base = dict(_BASE_KWARGS)
-    base["execution_point"] = "brain.think.start"
+    base["execution_point"] = "think.gate.start"
 
     # First occurrence: not a cycle yet.
     first = EventRecord(**base)  # type: ignore[arg-type]
@@ -175,8 +175,8 @@ def test_check_cycle_resets_when_different_execution_point_observed() -> None:
     from lca.plugins.observability.spine.derivers.anomaly import AnomalyDetector
 
     detector = AnomalyDetector()
-    first = _make_event(execution_point="brain.think.start")
-    second = _make_event(execution_point="brain.think.end")
+    first = _make_event(execution_point="think.gate.start")
+    second = _make_event(execution_point="think.gate.end")
     assert detector._check_cycle(first) is False
     assert detector._check_cycle(second) is False
 
@@ -255,7 +255,7 @@ def test_check_state_machine_violation_trips_on_phase_orphan_without_reason() ->
     # Simulate a state-machine violation: pop_span observed on an
     # empty stack (encoded in payload; we never mutate SpineContext here).
     event = _make_event(
-        execution_point="brain.think.end",
+        execution_point="think.gate.end",
         payload={"state_machine_violation": "pop_on_empty_stack"},
     )
     assert detector._check_state_machine_violation(event) is True
