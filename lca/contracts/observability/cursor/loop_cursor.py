@@ -71,10 +71,10 @@ class LoopCursor(Protocol):
     业务路径唯一允许做的:
         - advance(phase)        : 转移 phase 窗口;唯一派生
                                   ``phase.<name>.fold`` EP。
-        - bump_step()           : LLM 边界 step_index 自增,**不发 EP**;
-                                  step 边界由 hook 端
-                                  ``spine.llm.request.header`` 唯一发射
-                                  (ADR-0169 I-CURSOR + ADR-0185)。
+
+    step 边界由 hook 端 ``spine.llm.request.header`` 唯一发射,不在
+    cursor 暴露(ADR-0169 I-CURSOR + ADR-0185);``bump_step`` 已随
+    step_index 一并移除。
 
     不暴露:
         ``record_thinking`` / ``record_tool_call`` / ``record_tool_result`` /
