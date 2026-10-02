@@ -135,7 +135,7 @@ def logs_alias(
     verbose: bool = typer.Option(
         False, "--verbose", "-v", help="(同 -v) 显示完整 payload + sidecar traceback"
     ),
-    config: Path | None = typer.Option(
+    config: Path | None = typer.Option(  # noqa: B008 -- standard typer pattern: Option() in defaults is the documented typer idiom
         None, "--config", "-c", help="(同 -c) 配置文件"
     ),
 ) -> None:

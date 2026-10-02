@@ -204,7 +204,7 @@ class TelemetryLLMAdapter(LLMAdapter):
                 _log.warning("thinking_session_append_failed", exc_info=True)
 
         # Reasoning deltas must not block the LLM read loop.
-        _ = asyncio.create_task(_run())
+        _ = asyncio.create_task(_run())  # noqa: RUF006 -- fire-and-forget by design; _run() logs its own exceptions, deltas must not block the read loop
 
     async def complete(self, prompt: str, **kwargs: Any) -> LLMResponse:
         model = _model_label(self._inner)
