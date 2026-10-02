@@ -5,11 +5,12 @@
 不 mock 关键链路（decide/deliver/session.append 全是真实调用）。
 """
 
+import logging
 import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, "/tmp/proactive-1")
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from lca.cognition.proactive import decide  # noqa: F401  (链路完整性：gate 真实参与)
 from lca.contracts.models.proactive import (
@@ -18,35 +19,44 @@ from lca.contracts.models.proactive import (
     ProactiveJob,
     ProactiveSource,
 )
+from lca.contracts.models.proactive.policy import ProactivePolicy
 from lca.infrastructure.proactive import ProactiveDeliverer, ProactiveScheduler
 from lca.plugins.session.runtime.store.store import SessionStore
 
 
-def _make_scheduler(tmp: Path, jobs: list[ProactiveJob]) -> ProactiveScheduler:
+def _make_scheduler(
+    tmp: Path, jobs: list[ProactiveJob], policy: ProactivePolicy | None = None
+) -> tuple[ProactiveScheduler, SessionStore]:
     store = SessionStore()
-    deliverer = ProactiveDeliverer(store)
+    deliverer = ProactiveDeliverer(store, state_dir=tmp / "state")
     sched = ProactiveScheduler(
         lock_dir=tmp / "locks",
         state_dir=tmp / "state",
         job_source=lambda: jobs,
         deliverer=deliverer,
         default_interval_s=60,
+        policy=policy,
     )
     return sched, store
 
 
-def test_tick_delivers_due_job_to_session():
-    tmp = Path(tempfile.mkdtemp())
-    job = ProactiveJob(
-        id="job1",
+def _job(job_id, session_id, content="x", **kw):
+    base = dict(
+        id=job_id,
         interval_seconds=60,
-        content="该喝水了",
+        content=content,
         target=DeliveryTarget(
-            kind=DeliveryTargetKind.SESSION_APPEND, session_id="sess-1"
+            kind=DeliveryTargetKind.SESSION_APPEND, session_id=session_id
         ),
         requested=True,
     )
-    sched, store = _make_scheduler(tmp, [job])
+    base.update(kw)
+    return ProactiveJob(**base)
+
+
+def test_tick_delivers_due_job_to_session():
+    tmp = Path(tempfile.mkdtemp())
+    sched, store = _make_scheduler(tmp, [_job("job1", "sess-1", content="该喝水了")])
     try:
         report = sched.tick(now_ms=1_000_000)
         assert report.lock_acquired is True
@@ -93,15 +103,7 @@ def test_lock_contention_second_tick_skipped():
     """两个调度器实例（模拟两个 carrier 进程）竞争：持有锁的一方未释放时，
     另一方 tick 拿不到锁直接跳过。"""
     tmp = Path(tempfile.mkdtemp())
-    job = ProactiveJob(
-        id="job3",
-        interval_seconds=60,
-        content="x",
-        target=DeliveryTarget(
-            kind=DeliveryTargetKind.SESSION_APPEND, session_id="sess-3"
-        ),
-        requested=True,
-    )
+    job = _job("job3", "sess-3")
     sched1, _ = _make_scheduler(tmp, [job])
     sched2, _ = _make_scheduler(tmp, [job])
     # sched1 模拟崩溃进程：只拿锁不走 tick（锁不释放）
@@ -122,15 +124,7 @@ def test_stale_lock_reaped():
     import json
 
     tmp = Path(tempfile.mkdtemp())
-    job = ProactiveJob(
-        id="job4",
-        interval_seconds=60,
-        content="x",
-        target=DeliveryTarget(
-            kind=DeliveryTargetKind.SESSION_APPEND, session_id="sess-4"
-        ),
-        requested=True,
-    )
+    job = _job("job4", "sess-4")
     sched, store = _make_scheduler(tmp, [job])
     # 手工写入一个 stale 锁（模拟崩溃残留）：mtime=1_000_000，
     # tick 时刻已过 130s > stale 阈值（2×60s=120s）
@@ -154,15 +148,7 @@ def test_failed_delivery_retries_then_dead_letters():
             raise RuntimeError("store exploded")
 
     deliverer = ProactiveDeliverer(BrokenStore())
-    job = ProactiveJob(
-        id="job5",
-        interval_seconds=60,
-        content="x",
-        target=DeliveryTarget(
-            kind=DeliveryTargetKind.SESSION_APPEND, session_id="sess-5"
-        ),
-        requested=True,
-    )
+    job = _job("job5", "sess-5")
     sched = ProactiveScheduler(
         lock_dir=tmp / "locks",
         state_dir=tmp / "state",
@@ -204,3 +190,65 @@ def test_response_carried_does_not_touch_session():
     assert receipt["delivered"] is True
     assert receipt["carried_message"]["content"] == "欢迎"
     assert store.list() == ()
+
+
+# ---------------- T2 / T4（ADR-0264 §5） ----------------
+
+
+def test_credential_job_rejected_warns_no_session_residue(caplog):
+    """T2：含凭证消息整条拒绝 + warning 事件可查，session 无残留。"""
+    tmp = Path(tempfile.mkdtemp())
+    job = _job("job-cred", "sess-cred", content="your api_key: sk-live-abcdef123456")
+    sched, store = _make_scheduler(tmp, [job])
+    try:
+        with caplog.at_level(
+            logging.WARNING, logger="lca.infrastructure.proactive.scheduler"
+        ):
+            report = sched.tick(now_ms=1_000_000)
+        assert report.rejected == 1
+        assert report.delivered == 0
+        assert "proactive.rejected" in caplog.text
+        # 无残留：REJECTED 路径根本不创建 session
+        assert store.get("sess-cred") is None
+    finally:
+        sched.release_lock()
+
+
+def test_disabled_policy_silent_no_session_event():
+    """T4（政策层端到端）：enabled=False → SILENT，session 无新事件。"""
+    tmp = Path(tempfile.mkdtemp())
+    job = _job("job-q", "sess-q", content="该喝水了")
+    sched, store = _make_scheduler(
+        tmp, [job], policy=ProactivePolicy(enabled=False)
+    )
+    try:
+        report = sched.tick(now_ms=1_000_000)
+        assert report.silent == 1
+        assert report.delivered == 0
+        assert store.get("sess-q") is None
+    finally:
+        sched.release_lock()
+
+
+def test_requested_with_verified_ref_delivers_chat(caplog):
+    """requested + 合法 request_ref（job:<id> 背书）→ 必达。"""
+    tmp = Path(tempfile.mkdtemp())
+    job = ProactiveJob(
+        id="job-req",
+        interval_seconds=60,
+        content="standing reminder",
+        target=DeliveryTarget(
+            kind=DeliveryTargetKind.SESSION_APPEND, session_id="sess-req"
+        ),
+        requested=True,
+        request_ref="job:job-req",
+    )
+    sched, store = _make_scheduler(tmp, [job])
+    try:
+        report = sched.tick(now_ms=1_000_000)
+        assert report.delivered == 1
+        session = store.get("sess-req")
+        events = [e for e in session._log if e.type == "surface/assistant_message"]
+        assert len(events) == 1
+    finally:
+        sched.release_lock()
