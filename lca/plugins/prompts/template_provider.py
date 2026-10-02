@@ -207,7 +207,7 @@ def _build_provider(config: Config) -> _ProviderImpl:
     layer="L1",
     effects="none",
     description="Provide profile-selected prompt templates (built-ins + Profile overrides).",
-    test_suite="tests/architecture/test_prompt_template_provider.py",
+    test_suite="tests/architecture/test_reasoner_template_catalog_capability.py::test_builtin_provider_has_the_complete_standard_template_set",
     kind=PluginKind.PROVIDER,
     contract=PluginContract(
         identity=PluginIdentity(version="v1"),
