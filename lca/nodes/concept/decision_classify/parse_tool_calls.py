@@ -58,8 +58,12 @@ class DecisionParseResponseExecutor:
 
     semantic_name: str = "decision.parse.response"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("response",)
-    declared_outputs: tuple[PortName, ...] = ("tool_calls", "delegations", "intent")
+    declared_inputs: tuple[PortName, ...] = (PortName("response"),)
+    declared_outputs: tuple[PortName, ...] = (
+        PortName("tool_calls"),
+        PortName("delegations"),
+        PortName("intent"),
+    )
 
     async def node_execute(
         self,
@@ -73,7 +77,7 @@ class DecisionParseResponseExecutor:
         delegations (tuple[DelegationSpec, ...]), intent (str)
         """
         del context
-        response = input.port_values.get("response")
+        response = input.port_values.get(PortName("response"))
         if not isinstance(response, LLMResponse):
             raise TypeError(
                 "decision.parse.response: 'response' port must be an LLMResponse, "
@@ -83,9 +87,9 @@ class DecisionParseResponseExecutor:
         tool_calls, delegations, intent = _parse_response(response)
         return NodeOutput(
             port_values={
-                "tool_calls": tool_calls,
-                "delegations": delegations,
-                "intent": intent,
+                PortName("tool_calls"): tool_calls,
+                PortName("delegations"): delegations,
+                PortName("intent"): intent,
             }
         )
 
