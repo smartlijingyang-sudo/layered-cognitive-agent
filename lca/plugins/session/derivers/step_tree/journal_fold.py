@@ -390,16 +390,21 @@ def _assign_tool_call(target: _Frame, payload: Mapping[str, Any], ep: str) -> No
         if rec.invocation_id and rec.invocation_id == incoming_inv:
             existing_record = rec
             break
-    if existing_record is None and target.tool_call is not None:
-        if str(getattr(target.tool_call, "invocation_id", "") or "") == incoming_inv:
-            existing_record = target.tool_call
+    if (
+        existing_record is None
+        and target.tool_call is not None
+        and str(getattr(target.tool_call, "invocation_id", "") or "") == incoming_inv
+    ):
+        existing_record = target.tool_call
 
     updated = _binding_engine().apply_tool_call(existing_record, payload, ep)
     if updated is not None:
         _add_or_update_tool_call(target, updated)
-        if target.tool_call is None or target.tool_call.invocation_id == updated.invocation_id:
-            target.tool_call = updated
-        elif not target.tool_call.invocation_id and updated.invocation_id:
+        if (
+            target.tool_call is None
+            or target.tool_call.invocation_id == updated.invocation_id
+            or (not target.tool_call.invocation_id and updated.invocation_id)
+        ):
             target.tool_call = updated
 
 
@@ -410,9 +415,12 @@ def _assign_tool_result(target: _Frame, payload: Mapping[str, Any], ep: str) -> 
         if res.invocation_id and res.invocation_id == incoming_inv:
             existing_result = res
             break
-    if existing_result is None and target.tool_result is not None:
-        if str(getattr(target.tool_result, "invocation_id", "") or "") == incoming_inv:
-            existing_result = target.tool_result
+    if (
+        existing_result is None
+        and target.tool_result is not None
+        and str(getattr(target.tool_result, "invocation_id", "") or "") == incoming_inv
+    ):
+        existing_result = target.tool_result
 
     updated = _binding_engine().apply_tool_result(
         existing_result,
@@ -424,9 +432,11 @@ def _assign_tool_result(target: _Frame, payload: Mapping[str, Any], ep: str) -> 
         if incoming_inv and not getattr(updated, "invocation_id", ""):
             updated = replace(updated, invocation_id=incoming_inv)
         _add_or_update_tool_result(target, updated)
-        if target.tool_result is None or getattr(target.tool_result, "invocation_id", "") == updated.invocation_id:
-            target.tool_result = updated
-        elif not getattr(target.tool_result, "invocation_id", "") and updated.invocation_id:
+        if (
+            target.tool_result is None
+            or getattr(target.tool_result, "invocation_id", "") == updated.invocation_id
+            or (not getattr(target.tool_result, "invocation_id", "") and updated.invocation_id)
+        ):
             target.tool_result = updated
 
 

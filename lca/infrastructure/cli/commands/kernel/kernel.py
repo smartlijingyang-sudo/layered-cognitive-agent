@@ -160,7 +160,7 @@ def register(app: typer.Typer) -> None:
             # then restored before the JSON report itself is emitted. Using
             # `with` would close the handle we want to swap in and out, so
             # the open() is intentionally not inside a context manager.
-            devnull = open(os.devnull, "w", encoding="utf-8")
+            devnull = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115
             saved_stdout = sys.stdout
             sys.stdout = devnull
 

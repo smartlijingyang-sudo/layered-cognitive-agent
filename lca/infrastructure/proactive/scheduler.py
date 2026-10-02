@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
@@ -250,10 +251,8 @@ class ProactiveScheduler:
         return False
 
     def release_lock(self) -> None:
-        try:
+        with contextlib.suppress(OSError):
             self._lock_file.unlink()
-        except OSError:
-            pass
 
     # ---- 状态与死信 ----
 

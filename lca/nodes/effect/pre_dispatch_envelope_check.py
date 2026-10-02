@@ -188,14 +188,11 @@ async def setup(ctx: PluginContext, config: object = None) -> None:
     # ``require_matching`` walks the ``permission_manifest.*`` binding
     # chain — empty when no provider is registered.
     matches = ctx.require_matching("permission_manifest.")
-    if matches:
-        # Pick the first manifest; production profiles that ship
-        # multiple ``permission_manifest.*`` providers should use the
-        # highest-precedence entry (a single ``tool_permission_manifest``
-        # producer is the common case).
-        permission_manifest = next(iter(matches.values()))
-    else:
-        permission_manifest = None
+    # Pick the first manifest; production profiles that ship
+    # multiple ``permission_manifest.*`` providers should use the
+    # highest-precedence entry (a single ``tool_permission_manifest``
+    # producer is the common case).
+    permission_manifest = next(iter(matches.values())) if matches else None
     executor = EffectPreDispatchEnvelopeCheckExecutor(
         permission_manifest=permission_manifest,
     )

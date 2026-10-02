@@ -13,6 +13,7 @@ the cognitive main flow is not blocked (ADR-0246 §0.6).
 
 from __future__ import annotations
 
+import contextlib
 import json
 import re
 import time
@@ -181,11 +182,9 @@ class ReflectMemoryExtractExecutor:
             return self._passthrough(reflection)
 
         if self.governor_enabled:
-            try:
+            # Buffer or template failure must not fail the turn.
+            with contextlib.suppress(Exception):
                 self._apply_governor(context, reflection)
-            except Exception:
-                # Buffer or template failure must not fail the turn.
-                pass
             # Governor 是白天 episode 快记旁路（副作用），不替代语义蒸馏；
             # 下面的 pre-filter 已做成本门控，继续走主流程。
 

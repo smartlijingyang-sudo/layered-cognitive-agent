@@ -219,16 +219,15 @@ def _project_to_phase_graph(
         node_region = n.region if n.region is not None else region_for_resolve
         if runtime is not None and n.sub_spec_ref is None:
             runtime.resolve_factory(n.factory, node_region)  # 命中即返回,失败 fail-loud
-        elif runtime is not None:
+        elif runtime is not None and not n.factory:
             # Sub_spec_ref path: validate the factory is at least
             # syntactically present so the YAML surface stays honest.
-            if not n.factory:
-                raise DeclarativeValidationError(
-                    "PG-001",
-                    f"node {n.id!r} has sub_spec_ref but no factory field; "
-                    "sub_spec_ref delegation requires the node to carry a "
-                    "factory (see ADR-0220 §3.5)",
-                )
+            raise DeclarativeValidationError(
+                "PG-001",
+                f"node {n.id!r} has sub_spec_ref but no factory field; "
+                "sub_spec_ref delegation requires the node to carry a "
+                "factory (see ADR-0220 §3.5)",
+            )
         node_factories.append((n.id, n.factory, node_region))
 
         # ADR-0225: per-node ``max_visits`` projection removed. The

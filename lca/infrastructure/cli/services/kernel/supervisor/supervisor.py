@@ -525,7 +525,7 @@ class KernelSupervisor:
                 # The handle must outlive the function: the subprocess
                 # inherits it and we want every kernel stdout byte flushed
                 # through it until the supervisor's stop()/close cycle.
-                self._stdout_f = open(
+                self._stdout_f = open(  # noqa: SIM115
                     self._config.stdout_logfile, "ab", buffering=0
                 )
             except OSError:
@@ -533,7 +533,7 @@ class KernelSupervisor:
         if self._config.stderr_logfile:
             try:
                 # Same rationale as _stdout_f above.
-                self._stderr_f = open(
+                self._stderr_f = open(  # noqa: SIM115
                     self._config.stderr_logfile, "ab", buffering=0
                 )
             except OSError:
