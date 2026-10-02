@@ -884,7 +884,7 @@ class BootPluginFiberSpawned(JournalEvent):
     plugin_id: str = ""
     layer: str = ""  # L0/L1/L2/L3/L4
     kind: str = ""  # seam/provider/primitive/bridge
-    stage: Stage = -1  # type: ignore[name-defined]
+    stage: Stage = -1  # type: ignore[name-defined]  # noqa: F821 -- intentional forward ref; contracts layer must not import lca_kernel
     duration_ms: float = 0.0
     status: Literal["started", "ok", "failed"] = "started"
     failure_kind: str | None = None
