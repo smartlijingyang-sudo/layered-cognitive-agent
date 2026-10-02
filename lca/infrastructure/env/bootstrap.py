@@ -96,6 +96,7 @@ BOOTSTRAP_PREFIXES: tuple[str, ...] = (
     "OTEL_",  # OpenTelemetry standard
     "VAULT_",  # VAULT_ADDR / VAULT_TOKEN
     "COMPOSIO_",  # COMPOSIO_API_KEY / COMPOSIO_AUTH_CONFIG_IDS
+    "AVATAR_IMAGE_",  # AVATAR_IMAGE_BASE_URL / _API_KEY / _MODEL / _EDIT_MODEL / _VIDEO_MODEL
 )
 
 BOOTSTRAP_FORBIDDEN: frozenset[str] = frozenset(

@@ -35,11 +35,44 @@ def test_save_and_load_state(store: AvatarStore):
 
 
 def test_write_and_read_image(store: AvatarStore, tmp_path: Path):
-    variant = store.write_image("asst_1", "c1", "original", b"png-bytes")
+    buf = io.BytesIO()
+    Image.new("RGB", (512, 512), (0, 128, 255)).save(buf, "PNG")
+    variant = store.write_image("asst_1", "c1", "original", buf.getvalue())
     assert variant.size == "original"
     assert variant.width == 512 and variant.height == 512
-    assert store.read_image("asst_1", "c1", "original") == b"png-bytes"
+    stored = store.read_image("asst_1", "c1", "original")
+    with Image.open(io.BytesIO(stored)) as im:
+        assert im.format == "PNG"
+        assert im.size == (512, 512)
     assert (tmp_path / "avatar" / "candidates" / "c1" / "original.png").exists()
+
+
+def test_write_image_original_normalizes_jpeg_to_png(store: AvatarStore):
+    """JPEG 输入落盘 original 时必须重编码为真实 PNG 并记录实际尺寸。"""
+    buf = io.BytesIO()
+    Image.new("RGB", (320, 200), (10, 20, 30)).save(buf, "JPEG")
+    variant = store.write_image("asst_1", "c1", "original", buf.getvalue())
+    assert variant.size == "original"
+    assert variant.width == 320 and variant.height == 200
+    path = store.candidate_dir("c1") / "original.png"
+    assert path.exists()
+    with Image.open(path) as im:
+        assert im.format == "PNG"
+        assert im.size == (320, 200)
+
+
+def test_write_image_small_normalizes_jpeg_to_png(store: AvatarStore):
+    """JPEG 输入落盘 small 时同样重编码为 PNG（内容类型恒为 PNG）。"""
+    buf = io.BytesIO()
+    Image.new("RGB", (640, 480), (200, 100, 50)).save(buf, "JPEG")
+    variant = store.write_image("asst_1", "c1", "small", buf.getvalue())
+    assert variant.size == "small"
+    assert variant.width == 128 and variant.height == 96
+    path = store.candidate_dir("c1") / "small.png"
+    assert path.exists()
+    with Image.open(path) as im:
+        assert im.format == "PNG"
+        assert im.size == (128, 96)
 
 
 def test_write_image_resizes_small(store: AvatarStore):

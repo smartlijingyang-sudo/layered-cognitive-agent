@@ -111,9 +111,10 @@ class AvatarStore:
         rel_dir = f"candidates/{candidate_id}"
         target = self.base_dir / rel_dir / f"{size}{_IMAGE_EXT}"
         target.parent.mkdir(parents=True, exist_ok=True)
+        # grok2api 代理返回 JPEG，但落盘扩展名/Content-Type 恒为 PNG；
+        # 所有尺寸统一重编码为真实 PNG，避免 MIME 与实际字节不一致。
         if size == "original":
-            width, height = _ORIGINAL_SIZE
-            target.write_bytes(data)
+            width, height = _encode_original_png(data, target)
         else:
             width, height = _resize_image(data, target, _SIZES_PX[size])
         return AvatarVariant(
@@ -179,11 +180,26 @@ class AvatarStore:
         return removed
 
 
+def _save_png_atomic(im: Image.Image, target: Path) -> None:
+    """原子写 PNG：先写同目录临时文件再 replace，避免读图时看到半截字节。"""
+    tmp = target.with_suffix(".tmp")
+    im.save(tmp, "PNG")
+    tmp.replace(target)
+
+
+def _encode_original_png(data: bytes, target: Path) -> tuple[int, int]:
+    """把原始字节重编码为真实 PNG（保持原尺寸），返回实际像素尺寸。"""
+    with Image.open(io.BytesIO(data)) as im:
+        rgb = im.convert("RGB")
+        _save_png_atomic(rgb, target)
+        return rgb.size
+
+
 def _resize_image(data: bytes, target: Path, size: tuple[int, int]) -> tuple[int, int]:
     with Image.open(io.BytesIO(data)) as im:
         rgb = im.convert("RGB")
         rgb.thumbnail(size, Image.Resampling.LANCZOS)
-        rgb.save(target, "PNG")
+        _save_png_atomic(rgb, target)
         return rgb.size
 
 

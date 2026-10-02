@@ -15,6 +15,7 @@ from types import MappingProxyType
 
 import pytest
 
+from lca.infrastructure.env import BOOTSTRAP_PREFIXES
 from lca_kernel.cli.errors import KernelError
 from lca_kernel.runtime.env import EnvSnapshot, load_layered_env
 
@@ -98,3 +99,20 @@ def test_load_layered_env_default_dir_is_cwd(
     _write_dotenv(tmp_path / ".env", "LCA_TEST=cwd-default\n")
     snapshot = load_layered_env("test-bin")
     assert snapshot.dotenv.get("LCA_TEST") == "cwd-default"
+
+
+def test_bootstrap_prefixes_include_avatar_image() -> None:
+    """AVATAR_IMAGE_ is whitelisted so .env may supply avatar plugin keys."""
+    assert "AVATAR_IMAGE_" in BOOTSTRAP_PREFIXES
+
+
+def test_load_layered_env_allows_avatar_image_prefix_keys(tmp_path: Path) -> None:
+    """AVATAR_IMAGE_ prefix keys from .env are allowed (ADR-0269 plugin env)."""
+    _write_dotenv(
+        tmp_path / ".env",
+        "AVATAR_IMAGE_BASE_URL=http://127.0.0.1:8000/v1\nAVATAR_IMAGE_API_KEY=secret\n",
+    )
+    snapshot = load_layered_env("test-bin", tmp_path)
+    assert "AVATAR_IMAGE_BASE_URL" in snapshot.allowed_keys
+    assert "AVATAR_IMAGE_API_KEY" in snapshot.allowed_keys
+    assert "AVATAR_IMAGE_BASE_URL" in snapshot.dotenv
