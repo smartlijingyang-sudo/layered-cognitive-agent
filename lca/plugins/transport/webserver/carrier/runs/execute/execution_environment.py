@@ -185,6 +185,8 @@ class RunExecutionEnvironment:
             # Refs mirror runnable_assembly.tools_from_scope, but with the
             # plane-filtered providers so unforked planes stay unforked.
             capability_token = None
+            tools_token = None
+            defer_token = None
             if assistant_id:
                 from lca.infrastructure.observability.meta_event_emit import (
                     emit_assistant_run_bound,

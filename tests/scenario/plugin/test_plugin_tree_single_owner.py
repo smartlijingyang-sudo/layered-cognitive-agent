@@ -80,8 +80,14 @@ def _unwrap_llm(llm: Any) -> Any:
 
 
 @pytest.fixture
-def no_llm_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Block dotenv reload and clear credential env so boot has no real key."""
+def dummy_llm_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Block dotenv reload; boot with a dummy key (hermetic, no real key).
+
+    The credentials plugin fail-louds on a missing key since 721f7afbe, so a
+    keyless boot is no longer possible. A dummy key keeps these tests hermetic
+    (no real credentials); behavior-critical paths override the resolver with
+    ScriptedLLMResolver / MockLLMAdapter and never touch the network.
+    """
     monkeypatch.setattr(
         "lca.infrastructure.llm.config.prepare_llm_environ",
         lambda: None,
@@ -90,8 +96,8 @@ def no_llm_key(monkeypatch: pytest.MonkeyPatch) -> None:
         "lca.infrastructure.llm_adapter.factory.load_dotenv_if_present",
         lambda path=None: None,
     )
+    monkeypatch.setenv("LLM_API_KEY", "test-dummy-key")
     for key in (
-        "LLM_API_KEY",
         "LLM_BASE_URL",
         "LLM_OPENAI_BASE_URL",
         "LLM_MODEL",
@@ -104,7 +110,7 @@ def no_llm_key(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_dead_ids_absent_from_default_boot(no_llm_key: None) -> None:
+async def test_dead_ids_absent_from_default_boot(dummy_llm_key: None) -> None:
     ctx = await run_kernel(DEFAULT_PROFILE)
     ids = _entry_ids(ctx)
     assert DEAD_DEFAULT_IDS.isdisjoint(ids)
@@ -113,7 +119,7 @@ async def test_dead_ids_absent_from_default_boot(no_llm_key: None) -> None:
 
 
 @pytest.mark.asyncio
-async def test_every_default_entry_is_consumed(no_llm_key: None) -> None:
+async def test_every_default_entry_is_consumed(dummy_llm_key: None) -> None:
     ctx = await run_kernel(DEFAULT_PROFILE)
     injected: set[str] = set()
     orig = ctx.inject
@@ -129,8 +135,11 @@ async def test_every_default_entry_is_consumed(no_llm_key: None) -> None:
     registry = RunRegistry()
     session = create_run_session(registry, question="ping", user_text="ping", mode="solo", ctx=ctx)
     await execute_run(registry, run_id=session.run_id, question="ping", mode="solo", ctx=ctx)
+    # NOTE: "llm" and "stop_policy" dropped from expectations — no plugin
+    # provides them anymore (stop_policy retired with 63a68a4da, requirement
+    # removed round-0358; the llm seam is threaded via the composer consume()
+    # helper in plugins/composer/think/brain.py, not ctx.inject).
     consumed_keys = {
-        "llm",
         "llm_resolver",
         "tools",
         "sandbox",
@@ -145,7 +154,6 @@ async def test_every_default_entry_is_consumed(no_llm_key: None) -> None:
         "brains",
         "bodies",
         "safe_executor.simple",
-        "stop_policy",
         "hooks",
         "journal_store",
         "perceive",
@@ -163,7 +171,7 @@ async def test_every_default_entry_is_consumed(no_llm_key: None) -> None:
 @pytest.mark.asyncio
 @pytest.mark.parametrize("omit_id", SEAM_OMIT_IDS)
 async def test_omitting_seam_plugin_does_not_bypass(
-    omit_id: str, no_llm_key: None, monkeypatch: pytest.MonkeyPatch
+    omit_id: str, dummy_llm_key: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     try:
         ctx = await _boot_omitting(omit_id)
@@ -186,7 +194,7 @@ async def test_omitting_seam_plugin_does_not_bypass(
         _boom,
     )
     monkeypatch.setattr(
-        "lca.infrastructure.skills.factory.resolve_skill_store",
+        "lca.infrastructure.skills.factory.factory.resolve_skill_store",
         _boom,
     )
 
@@ -204,7 +212,7 @@ async def test_omitting_seam_plugin_does_not_bypass(
 
 @pytest.mark.asyncio
 async def test_omitting_tools_provider_skips_g2a_not_fallback(
-    no_llm_key: None, monkeypatch: pytest.MonkeyPatch
+    dummy_llm_key: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """省略 lca-tools-provider 时，g2a 不应被 fallback 调用。
 
@@ -237,7 +245,7 @@ async def test_omitting_tools_provider_skips_g2a_not_fallback(
 
 @pytest.mark.asyncio
 async def test_omitting_skills_provider_does_not_call_resolve_skill_store(
-    no_llm_key: None, monkeypatch: pytest.MonkeyPatch
+    dummy_llm_key: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Skills factory gone → compose/execute miss the seam; no module-level store."""
     from tests.support.gateway_scripted import ScriptedLLMResolver
@@ -248,7 +256,7 @@ async def test_omitting_skills_provider_does_not_call_resolve_skill_store(
     def _boom(*_a: object, **_k: object) -> object:
         raise AssertionError("resolve_skill_store must not run when skills-provider is omitted")
 
-    monkeypatch.setattr("lca.infrastructure.skills.factory.resolve_skill_store", _boom)
+    monkeypatch.setattr("lca.infrastructure.skills.factory.factory.resolve_skill_store", _boom)
 
     from lca.cognition.memory.simple.memory import SimpleMemorySystem
 
@@ -269,22 +277,31 @@ async def test_omitting_skills_provider_does_not_call_resolve_skill_store(
 
 
 @pytest.mark.asyncio
-async def test_llm_single_owner_without_key(no_llm_key: None) -> None:
-    ctx = await run_kernel(DEFAULT_PROFILE)
-    resolver = ctx.inject("llm_resolver")
-    assert resolver.is_available() is False
-    with pytest.raises(Exception, match="LLM_API_KEY"):
-        resolver.resolve()
+async def test_llm_single_owner_without_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keyless boot fails loud at the single credentials owner (721f7afbe).
+
+    The graceful no-key boot (unavailable llm_resolver published at boot) was
+    retired: the credentials plugin is now the single fail-loud owner of the
+    missing-key signal, so boot raises instead of publishing a dead resolver.
+    """
+    monkeypatch.setattr(
+        "lca.infrastructure.llm.config.prepare_llm_environ",
+        lambda: None,
+    )
+    monkeypatch.setattr(
+        "lca.infrastructure.llm_adapter.factory.load_dotenv_if_present",
+        lambda path=None: None,
+    )
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    with pytest.raises(RuntimeError, match="LLM_API_KEY 未配置"):
+        await run_kernel(DEFAULT_PROFILE)
     assert live_credential("${LLM_API_KEY}") is None
     assert live_credential("") is None
     assert live_credential("sk-live") == "sk-live"
-    # No mock/deepseek provider registered on the llm seam.
-    assert "mock" not in set(ctx.inject("llm").providers.names())
-    assert "deepseek" not in set(ctx.inject("llm").providers.names())
 
 
 @pytest.mark.asyncio
-async def test_empty_execution_target_uses_profile_default(no_llm_key: None) -> None:
+async def test_empty_execution_target_uses_profile_default(dummy_llm_key: None) -> None:
     ctx = await run_kernel(DEFAULT_PROFILE)
     registry = ctx.inject("run_loop_driver_registry")
     empty = registry.resolve("")
@@ -295,7 +312,7 @@ async def test_empty_execution_target_uses_profile_default(no_llm_key: None) -> 
 
 
 @pytest.mark.asyncio
-async def test_overlapping_compose_keeps_distinct_adapters(no_llm_key: None) -> None:
+async def test_overlapping_compose_keeps_distinct_adapters(dummy_llm_key: None) -> None:
     ctx = await run_kernel(DEFAULT_PROFILE)
     one = MockLLMAdapter()
     two = MockLLMAdapter()
@@ -307,7 +324,7 @@ async def test_overlapping_compose_keeps_distinct_adapters(no_llm_key: None) -> 
 
 @pytest.mark.asyncio
 async def test_cognitive_driver_composes_once(
-    no_llm_key: None, monkeypatch: pytest.MonkeyPatch
+    dummy_llm_key: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from tests.support.gateway_scripted import ScriptedLLMResolver
 
@@ -320,8 +337,10 @@ async def test_cognitive_driver_composes_once(
         calls["n"] += 1
         return original(spec, **kwargs)
 
-    monkeypatch.setattr("lca.application.api.spawn_agent", counted)
-    monkeypatch.setattr("lca.application.spawn.spawn_agent", counted)
+    # spawn_agent lives in lca.application.api.spawn; the runs path calls it via
+    # lca.application.api.api's module-global (api.py:182), so patch the caller's
+    # namespace (lca.application.spawn no longer exists).
+    monkeypatch.setattr("lca.application.api.api.spawn_agent", counted)
     registry = RunRegistry()
     session = create_run_session(
         registry, question="hello", user_text="hello", mode="solo", ctx=ctx
@@ -332,7 +351,7 @@ async def test_cognitive_driver_composes_once(
 
 
 @pytest.mark.asyncio
-async def test_two_execute_runs_complete_with_scripted_text(no_llm_key: None) -> None:
+async def test_two_execute_runs_complete_with_scripted_text(dummy_llm_key: None) -> None:
     from tests.support.gateway_scripted import ScriptedLLMResolver
 
     ctx = await run_kernel(DEFAULT_PROFILE)
@@ -366,7 +385,7 @@ async def test_dump_profile_matches_boot_ids() -> None:
 
 @pytest.mark.asyncio
 async def test_unknown_execution_target_writes_journal_and_session_error(
-    no_llm_key: None,
+    dummy_llm_key: None,
 ) -> None:
     """sandbox/device/etc. → plane hint; missing-loop token → error visible
     in both the snapshot endpoint (``session.error``) and the journal
