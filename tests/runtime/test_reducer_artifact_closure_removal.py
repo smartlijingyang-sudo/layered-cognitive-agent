@@ -48,7 +48,7 @@ def test_reducer_protocol_does_not_declare_apply_artifact_closure() -> None:
 def test_finalizer_does_not_call_apply_artifact_closure() -> None:
     """finalizer 不再调 apply_artifact_closure(已迁出 reducer 流)。"""
 
-    from lca.runtime import result_finalizer
+    from lca.runtime.projection import result_finalizer
 
     src = result_finalizer.__file__ or ""
     with open(src, encoding="utf-8") as fh:
