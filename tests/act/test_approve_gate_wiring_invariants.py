@@ -187,16 +187,29 @@ def test_act_subgraph_does_not_carry_resume_stub() -> None:
     )
 
 
-def test_outer_resume_cycle_intervene_interrupt_to_resume() -> None:
-    """The outer plan must keep ``intervene.interrupt → intervene.resume``.
+def test_outer_plan_does_not_carry_surgical_resume_path() -> None:
+    """The outer plan must NOT carry surgical-resume nodes/edges.
 
-    On resume the kernel re-projects the persisted Command into the
-    registry and routes back through the subgraph's gate. The outer
-    edge from ``intervene.interrupt`` to ``intervene.resume`` closes
-    the loop at the outer level so a paused run can come back.
+    99ca2bdc0 removed the surgical-resume path: the HITL resume design
+    is full-restart from perceive.main with the human answer folded
+    into state (driver.py). ``intervene.resume`` / ``act.resume`` were
+    dead nodes — the driver always pointed the cursor at perceive.main,
+    never at a resume node. This test pins the close-out at the outer
+    level, mirroring test_act_subgraph_does_not_carry_resume_stub.
     """
+    nodes = _nodes(OUTER_PLAN)
+    assert "intervene.resume" not in nodes, (
+        "intervene.resume reappeared in the outer plan; resume is "
+        "full-restart from perceive.main (99ca2bdc0), not a surgical "
+        "resume node."
+    )
+    assert "act.resume" not in nodes, (
+        "act.resume reappeared in the outer plan; the surgical-resume "
+        "delegate was removed in 99ca2bdc0."
+    )
     edges = _edges(OUTER_PLAN)
-    assert ("intervene.interrupt", "intervene.resume") in edges, (
-        "intervene.interrupt → intervene.resume outer edge missing — "
-        "resume cycle is not closed at the outer level"
+    resume_edges = [(s, t) for s, t in edges if "resume" in s or "resume" in t]
+    assert not resume_edges, (
+        "surgical-resume edges reappeared in the outer plan: "
+        f"{sorted(resume_edges)}"
     )
