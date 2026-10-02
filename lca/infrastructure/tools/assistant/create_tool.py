@@ -23,7 +23,7 @@ import json
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 import yaml
 
@@ -48,6 +48,7 @@ class AssistantCreateTool(Tool):
     """创建一个新助理：物化 AssistantHome 并（尽力）注册前端入口。"""
 
     name = CREATE_ASSISTANT_TOOL
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     namespace: ClassVar[str] = "agent"
     description = (
         "创建一个新助理（个人助手）：在后端初始化其人设/目标/技能配置，"

@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -120,6 +120,7 @@ class FileWriteTool(Tool):
     """file_write Tool 实现。"""
 
     name = "file_write"
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     namespace = "file"  # ADR-0256: 与 MANIFEST.api[0].namespace 一致
     description = MANIFEST.api[0].description
     parameters: ClassVar[dict[str, Any]] = MANIFEST.api[0].parameters

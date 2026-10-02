@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal
 
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
@@ -105,6 +105,7 @@ class CordisControlTool(Tool):
     """Run the four Creator faces through one Composer-bound artifact lifecycle."""
 
     name = "cordis_control"
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     namespace = "core"  # ADR-0256: 与 MANIFEST.api[0].namespace 一致
     description = MANIFEST.api[0].description
     parameters: ClassVar[dict[str, Any]] = MANIFEST.api[0].parameters

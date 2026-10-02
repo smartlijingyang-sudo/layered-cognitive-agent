@@ -11,7 +11,7 @@ next think's ``ContextManifest``.
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal
 
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.observability.journal.journal import TeamMessagePublished
@@ -63,6 +63,8 @@ def build_team_message_publish_tool() -> object:
 
     class _TeamMessagePublishTool(Tool):
         name = TEAM_MESSAGE_TOOL_NAME
+        namespace = "team"
+        effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
         description = "Publish a message on the team's topic."
         parameters: ClassVar[dict[str, Any]] = {
             "type": "object",

@@ -6,7 +6,7 @@ import shutil
 import tempfile
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 from lca.contracts.atoms.enums.enums import ContentType
 from lca.contracts.atoms.ids.ids import new_id
@@ -29,6 +29,7 @@ class AssistantCreateSkillTool(Tool):
     """Create/install a skill under ``{assistant_home}/skills/<skill_id>/``."""
 
     name = CREATE_ASSISTANT_SKILL_TOOL
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     namespace: ClassVar[str] = "agent"
     required_grant: ClassVar[str] = "skill.import"
     description = (

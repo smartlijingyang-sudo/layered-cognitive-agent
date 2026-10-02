@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import subprocess
 import time
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -117,6 +117,7 @@ class BashTool(Tool):
     """bash Tool 实现。"""
 
     name = "bash"
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     namespace = "shell"  # ADR-0256: 与 MANIFEST.api[0].namespace 一致
     description = MANIFEST.api[0].description
     parameters: ClassVar[dict[str, Any]] = MANIFEST.api[0].parameters

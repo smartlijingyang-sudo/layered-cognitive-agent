@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -33,6 +33,7 @@ class ProfileDiffTool(Tool):
     """Compare two declarative profile payloads without reading or writing files."""
 
     name = "profile_diff"
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
     namespace = "core"  # ADR-0256: 与 MANIFEST.api[0].namespace 一致
     description = "Compare two profile candidates without applying either one."
     parameters: ClassVar[dict[str, Any]] = {

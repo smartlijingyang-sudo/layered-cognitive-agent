@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -38,6 +38,7 @@ class ProfileApplyTool(Tool):
     """
 
     name = "profile_apply"
+    effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
     namespace = "core"  # ADR-0256: 与 MANIFEST.api[0].namespace 一致
     description = "Preview an approved profile candidate; production application is disabled."
     parameters: ClassVar[dict[str, Any]] = {
