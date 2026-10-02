@@ -566,7 +566,7 @@ def _write_spine_header_records(
         record = {
             "event_id": f"ev-{step_id}",
             "category": "spine.llm.request.header",
-            "execution_point": "spine.llm.request.header",
+            "execution_point": "llm.request.header",
             "channel": "fact",
             "payload": {
                 "step_id": step_id,
@@ -773,7 +773,7 @@ def _write_spine_header_with_tools(
     record = {
         "event_id": f"ev-{step_id}",
         "category": "spine.llm.request.header",
-        "execution_point": "spine.llm.request.header",
+        "execution_point": "llm.request.header",
         "channel": "fact",
         "payload": {
             "step_id": step_id,
