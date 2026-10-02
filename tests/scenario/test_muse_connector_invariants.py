@@ -61,14 +61,22 @@ def test_inv_01_token_zero_exposure(tmp_path: Path) -> None:
 
 def test_inv_02_state_machine_soundness(tmp_path: Path) -> None:
     """INV-02: State machine transitions must be deterministic; unhandled states fail loud."""
-    # Legal transition
+    # Legal transition: NOT_CONNECTED -> AWAITING_AUTH -> ACTIVE
     sm = ConnectorStateMachine(ConnectionState.NOT_CONNECTED)
     sm.transition_to(ConnectionState.AWAITING_AUTH)
     assert sm.state == ConnectionState.AWAITING_AUTH
+    sm.transition_to(ConnectionState.ACTIVE)
+    assert sm.state == ConnectionState.ACTIVE
 
-    # Illegal transition
+    # TOKEN_EXPIRED -> REAUTHORIZATION_REQUIRED (when user revoked remotely)
+    sm.transition_to(ConnectionState.TOKEN_EXPIRED)
+    sm.transition_to(ConnectionState.REAUTHORIZATION_REQUIRED)
+    assert sm.state == ConnectionState.REAUTHORIZATION_REQUIRED
+
+    # Illegal transition: NOT_CONNECTED directly to REAUTHORIZATION_REQUIRED
+    sm_fresh = ConnectorStateMachine(ConnectionState.NOT_CONNECTED)
     with pytest.raises(InvalidStateTransitionError):
-        sm.transition_to(ConnectionState.RATE_LIMITED)
+        sm_fresh.transition_to(ConnectionState.REAUTHORIZATION_REQUIRED)
 
     # CLI status when not connected returns structured info
     vault = ConnectorVault(user_id="anon", lca_home=tmp_path)
@@ -80,12 +88,27 @@ def test_inv_02_state_machine_soundness(tmp_path: Path) -> None:
     assert "connectionId" in status_res
 
 
-def test_inv_03_card_protocol_priority() -> None:
-    """INV-03: Must trigger LobeHub interactive card widget, strictly forbidding raw markdown."""
-    widget = format_connector_auth_widget("Gmail", "https://auth.example.com", "ca_123")
+def test_inv_03a_cli_structured_status_contract(tmp_path: Path) -> None:
+    """INV-03A: CLI must produce structured status with widget markup for LobeHub card."""
+    vault = ConnectorVault(user_id="anon", lca_home=tmp_path)
+    cli = GmailConnectorCLI(vault=vault)
+    res = cli.execute(["status"])
+    assert res["status"] == "not_connected"
+    assert "[widget:connector_auth?" in res["widget"]
+    assert "appName=Gmail" in res["widget"]
+    assert "connectionId=" in res["widget"]
+    # Forbids raw markdown link
+    assert not res["widget"].startswith("[Connect")
+
+
+def test_inv_03b_skill_generator_card_protocol_contract() -> None:
+    """INV-03B: SKILL.md generator must declare widget card protocol and explicitly forbid raw markdown."""
+    widget = format_connector_auth_widget(
+        "Gmail", "https://auth.example.com", "ca_123", mode="add_scope", scope="gmail.send"
+    )
     assert widget.startswith("[widget:connector_auth?")
-    assert "appName=Gmail" in widget
-    assert "connectionId=ca_123" in widget
+    assert "mode=add_scope" in widget
+    assert "scope=gmail.send" in widget
 
     # Skill documentation explicitly forbids raw markdown link anti-pattern
     skill_doc = generate_gmail_skill_content()

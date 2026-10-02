@@ -94,3 +94,39 @@ def test_connector_vault_returns_not_connected_for_unknown_service(tmp_path: Pat
     assert meta.service == "notion"
     assert meta.state == ConnectionState.NOT_CONNECTED
     assert meta.connection_id is None
+
+
+def test_connector_vault_parses_revoked_as_reauthorization_required(tmp_path: Path) -> None:
+    user_conn_dir = tmp_path / "users" / "revoked_user" / "connectors"
+    user_conn_dir.mkdir(parents=True)
+    conn_file = user_conn_dir / "connections.json"
+    conn_file.write_text(
+        json.dumps(
+            {
+                "connections": [
+                    {
+                        "identifier": "google-drive",
+                        "status": "REVOKED",
+                        "connected_account_id": "ca_revoked",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    vault = ConnectorVault(user_id="revoked_user", lca_home=tmp_path)
+    drive = vault.get_connection("google-drive")
+    assert drive is not None
+    assert drive.state == ConnectionState.REAUTHORIZATION_REQUIRED
+
+
+def test_atomic_write_json(tmp_path: Path) -> None:
+    from lca.infrastructure.connectors.core.vault import atomic_write_json
+
+    target = tmp_path / "test_dir" / "data.json"
+    payload = {"status": "ok", "count": 42}
+    atomic_write_json(target, payload)
+
+    assert target.is_file()
+    loaded = json.loads(target.read_text(encoding="utf-8"))
+    assert loaded == payload

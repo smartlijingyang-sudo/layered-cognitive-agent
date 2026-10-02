@@ -17,7 +17,7 @@ class ConnectionState(StrEnum):
     ACTIVE = "ACTIVE"
     ADDITIONAL_ACCESS = "ADDITIONAL_ACCESS"
     TOKEN_EXPIRED = "TOKEN_EXPIRED"  # noqa: S105
-    RATE_LIMITED = "RATE_LIMITED"
+    REAUTHORIZATION_REQUIRED = "REAUTHORIZATION_REQUIRED"
 
 
 class InvalidStateTransitionError(ValueError):
@@ -50,12 +50,19 @@ _VALID_TRANSITIONS: dict[ConnectionState, set[ConnectionState]] = {
     ConnectionState.ACTIVE: {
         ConnectionState.ADDITIONAL_ACCESS,
         ConnectionState.TOKEN_EXPIRED,
-        ConnectionState.RATE_LIMITED,
+        ConnectionState.REAUTHORIZATION_REQUIRED,
         ConnectionState.NOT_CONNECTED,
     },
     ConnectionState.ADDITIONAL_ACCESS: {ConnectionState.ACTIVE, ConnectionState.NOT_CONNECTED},
-    ConnectionState.TOKEN_EXPIRED: {ConnectionState.AWAITING_AUTH, ConnectionState.NOT_CONNECTED},
-    ConnectionState.RATE_LIMITED: {ConnectionState.ACTIVE, ConnectionState.NOT_CONNECTED},
+    ConnectionState.TOKEN_EXPIRED: {
+        ConnectionState.ACTIVE,
+        ConnectionState.REAUTHORIZATION_REQUIRED,
+        ConnectionState.NOT_CONNECTED,
+    },
+    ConnectionState.REAUTHORIZATION_REQUIRED: {
+        ConnectionState.AWAITING_AUTH,
+        ConnectionState.NOT_CONNECTED,
+    },
 }
 
 
@@ -85,17 +92,23 @@ def format_connector_auth_widget(
     app_name: str,
     auth_url: str,
     connection_id: str,
+    mode: str = "initial",
+    scope: str | None = None,
 ) -> str:
-    """Formats standard LobeHub ConnectorAuthCard widget markup (INV-03).
+    """Formats standard LobeHub ConnectorAuthCard widget markup (INV-03A).
 
     Strictly produces widget syntax to trigger LobeHub's interactive card,
-    preventing fallback to raw Markdown links.
+    preventing fallback to raw Markdown links. Supports initial auth and
+    incremental mode (add_scope).
     """
-    params = urlencode(
-        {
-            "appName": app_name,
-            "authUrl": auth_url,
-            "connectionId": connection_id,
-        }
-    )
+    params_dict: dict[str, str] = {
+        "appName": app_name,
+        "authUrl": auth_url,
+        "connectionId": connection_id,
+        "mode": mode,
+    }
+    if scope:
+        params_dict["scope"] = scope
+
+    params = urlencode(params_dict)
     return f"[widget:connector_auth?{params}]"

@@ -20,20 +20,22 @@ def test_render_connected_services_with_active_integrations(tmp_path: Path) -> N
     user_conn_dir.mkdir(parents=True)
     conn_file = user_conn_dir / "connections.json"
     conn_file.write_text(
-        json.dumps({
-            "connections": [
-                {
-                    "identifier": "gmail",
-                    "status": "ACTIVE",
-                    "connected_account_id": "ca_gmail",
-                },
-                {
-                    "identifier": "github",
-                    "status": "ACTIVE",
-                    "connected_account_id": "ca_github",
-                },
-            ]
-        }),
+        json.dumps(
+            {
+                "connections": [
+                    {
+                        "identifier": "gmail",
+                        "status": "ACTIVE",
+                        "connected_account_id": "ca_gmail",
+                    },
+                    {
+                        "identifier": "github",
+                        "status": "ACTIVE",
+                        "connected_account_id": "ca_github",
+                    },
+                ]
+            }
+        ),
         encoding="utf-8",
     )
 
@@ -66,3 +68,29 @@ def test_connected_services_section_render() -> None:
     assert "## Connected External Services" in out.text
     assert "- gmail (status: ACTIVE)" in out.text
     assert "- googledrive (status: ACTIVE)" in out.text
+
+
+def test_render_connected_services_budget_truncation() -> None:
+    mock_vault = MagicMock()
+    # 7 active services
+    mock_vault.list_active_services.return_value = [
+        "gmail",
+        "github",
+        "googledrive",
+        "slack",
+        "notion",
+        "linear",
+        "jira",
+    ]
+
+    # Max 5 services allowed in budget
+    text = render_connected_services_text(vault=mock_vault, max_services=5)
+    assert "- github (status: ACTIVE)" in text
+    assert "- gmail (status: ACTIVE)" in text
+    assert "- googledrive (status: ACTIVE)" in text
+    assert "- jira (status: ACTIVE)" in text
+    assert "- linear (status: ACTIVE)" in text
+    # 2 services folded into summary
+    assert "- ... and 2 more active services" in text
+    # Ensure notion/slack are folded out of the top 5
+    assert "- notion (status: ACTIVE)" not in text

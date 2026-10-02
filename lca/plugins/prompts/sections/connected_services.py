@@ -18,8 +18,11 @@ from lca.contracts.protocols.runtime.infra.infra import Tool
 from lca.infrastructure.connectors.core.vault import ConnectorVault
 
 
-def render_connected_services_text(vault: ConnectorVault | None = None) -> str:
-    """Renders a concise summary of active third-party services."""
+def render_connected_services_text(
+    vault: ConnectorVault | None = None,
+    max_services: int = 5,
+) -> str:
+    """Renders a concise summary of active third-party services with budget protection (max 100 tokens)."""
     active_vault = vault or ConnectorVault()
     active_services = active_vault.list_active_services()
 
@@ -33,8 +36,13 @@ def render_connected_services_text(vault: ConnectorVault | None = None) -> str:
         lines.append(
             "The following external integrations are currently authorized and ACTIVE for this agent:"
         )
-        for svc in sorted(active_services):
+        sorted_services = sorted(active_services)
+        displayed = sorted_services[:max_services]
+        for svc in displayed:
             lines.append(f"- {svc} (status: ACTIVE)")
+        if len(sorted_services) > max_services:
+            remaining = len(sorted_services) - max_services
+            lines.append(f"- ... and {remaining} more active services")
         lines.append(
             "You can directly read, search, and perform allowed actions with these connected services."
         )

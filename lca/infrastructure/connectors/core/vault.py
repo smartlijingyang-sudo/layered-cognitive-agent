@@ -4,11 +4,21 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
+import time
 from pathlib import Path
 from typing import Any
 
 from lca.infrastructure.connectors.core.state import ConnectionMetadata, ConnectionState
 from lca.infrastructure.path.locator import get_lca_home
+
+
+def atomic_write_json(file_path: Path, data: dict[str, Any]) -> None:
+    """Atomically writes JSON data using a temporary file and os.replace to prevent corruption."""
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_file = file_path.with_suffix(f".tmp.{time.time_ns()}")
+    tmp_file.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    os.replace(tmp_file, file_path)
 
 
 class ConnectorVault:
@@ -63,8 +73,8 @@ class ConnectorVault:
                 state = ConnectionState.AWAITING_AUTH
             elif status_raw in ("EXPIRED", "TOKEN_EXPIRED"):
                 state = ConnectionState.TOKEN_EXPIRED
-            elif status_raw in ("RATE_LIMITED",):
-                state = ConnectionState.RATE_LIMITED
+            elif status_raw in ("REVOKED", "REAUTHORIZATION_REQUIRED"):
+                state = ConnectionState.REAUTHORIZATION_REQUIRED
             else:
                 state = ConnectionState.NOT_CONNECTED
 

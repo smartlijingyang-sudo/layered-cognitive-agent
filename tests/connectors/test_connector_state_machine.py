@@ -22,7 +22,7 @@ def test_connection_state_enum_members() -> None:
         "ACTIVE",
         "ADDITIONAL_ACCESS",
         "TOKEN_EXPIRED",
-        "RATE_LIMITED",
+        "REAUTHORIZATION_REQUIRED",
     }
     actual = {s.value for s in ConnectionState}
     assert actual == expected
@@ -44,7 +44,7 @@ def test_connection_metadata_model_frozen_and_valid() -> None:
 
     # Frozen immutability check
     with pytest.raises(ValidationError):
-        meta.state = ConnectionState.RATE_LIMITED  # type: ignore[misc]
+        meta.state = ConnectionState.REAUTHORIZATION_REQUIRED  # type: ignore[misc]
 
 
 def test_connection_metadata_inv01_zero_token_exposure() -> None:
@@ -79,19 +79,15 @@ def test_state_machine_valid_transitions() -> None:
     sm.transition_to(ConnectionState.ACTIVE)
     assert sm.state == ConnectionState.ACTIVE
 
-    # ACTIVE -> RATE_LIMITED
-    sm.transition_to(ConnectionState.RATE_LIMITED)
-    assert sm.state == ConnectionState.RATE_LIMITED
-
-    # RATE_LIMITED -> ACTIVE
-    sm.transition_to(ConnectionState.ACTIVE)
-    assert sm.state == ConnectionState.ACTIVE
-
     # ACTIVE -> TOKEN_EXPIRED
     sm.transition_to(ConnectionState.TOKEN_EXPIRED)
     assert sm.state == ConnectionState.TOKEN_EXPIRED
 
-    # TOKEN_EXPIRED -> AWAITING_AUTH
+    # TOKEN_EXPIRED -> REAUTHORIZATION_REQUIRED (when revoked remotely)
+    sm.transition_to(ConnectionState.REAUTHORIZATION_REQUIRED)
+    assert sm.state == ConnectionState.REAUTHORIZATION_REQUIRED
+
+    # REAUTHORIZATION_REQUIRED -> AWAITING_AUTH (user prompts reauth)
     sm.transition_to(ConnectionState.AWAITING_AUTH)
     assert sm.state == ConnectionState.AWAITING_AUTH
 
@@ -99,10 +95,12 @@ def test_state_machine_valid_transitions() -> None:
 def test_state_machine_invalid_transition_fails_loudly() -> None:
     sm = ConnectorStateMachine(initial_state=ConnectionState.NOT_CONNECTED)
 
-    # NOT_CONNECTED cannot jump directly to RATE_LIMITED
+    # NOT_CONNECTED cannot jump directly to REAUTHORIZATION_REQUIRED
     with pytest.raises(InvalidStateTransitionError) as exc_info:
-        sm.transition_to(ConnectionState.RATE_LIMITED)
-    assert "Invalid transition from NOT_CONNECTED to RATE_LIMITED" in str(exc_info.value)
+        sm.transition_to(ConnectionState.REAUTHORIZATION_REQUIRED)
+    assert "Invalid transition from NOT_CONNECTED to REAUTHORIZATION_REQUIRED" in str(
+        exc_info.value
+    )
 
 
 def test_format_connector_auth_widget_inv03() -> None:

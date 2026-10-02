@@ -170,9 +170,12 @@ export const ConnectorAuthCard = memo<ConnectorAuthCardProps>(
     className,
     style,
   }) => {
-    const [status, setStatus] = useState<'pending' | 'authorizing' | 'connected' | 'error'>('pending');
+    const [status, setStatus] = useState<
+      'pending' | 'authorizing' | 'connected' | 'timeout' | 'error'
+    >('pending');
     const [checking, setChecking] = useState(false);
     const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const startTimeRef = useRef<number>(0);
 
     const cardTitle = title || `${appName} 连接器授权`;
     const cardDesc =
@@ -216,11 +219,12 @@ export const ConnectorAuthCard = memo<ConnectorAuthCardProps>(
       [connectionId, appName, onConnected],
     );
 
-    // 唤起 OAuth 独立窗口
+    // 唤起 OAuth 独立窗口并启动带超时阶梯退避的轮询
     const handleStartAuth = useCallback(() => {
       if (!authUrl) return;
 
       setStatus('authorizing');
+      startTimeRef.current = Date.now();
 
       // 居中开启 620 x 720 弹窗
       const w = 620;
@@ -234,17 +238,40 @@ export const ConnectorAuthCard = memo<ConnectorAuthCardProps>(
         `width=${w},height=${h},top=${top},left=${left},status=no,menubar=no,toolbar=no,location=no`,
       );
 
-      // 启动 2.5s 轮询检测
-      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
-      pollTimerRef.current = setInterval(async () => {
-        const isDone = await checkConnectionStatus(true);
-        if (isDone || (popup && popup.closed)) {
-          if (isDone && pollTimerRef.current) {
-            clearInterval(pollTimerRef.current);
-            pollTimerRef.current = null;
-          }
+      // 清除既有定时器
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+
+      // 递归调度阶梯退避轮询（2.5s -> 5s -> 10s，5分钟硬超时）
+      const scheduleNextPoll = () => {
+        const elapsed = Date.now() - startTimeRef.current;
+        if (elapsed > 300000) {
+          // 5分钟超时
+          setStatus('timeout');
+          antMessage.warning(`⏱️ ${appName} 授权检测已超时，可点击“检测状态”或重新打开授权窗口。`);
+          return;
         }
-      }, 2500);
+
+        // 阶梯间隔：前60s为2.5s，60s-180s为5s，>180s为10s
+        const interval = elapsed < 60000 ? 2500 : elapsed < 180000 ? 5000 : 10000;
+
+        pollTimerRef.current = setTimeout(async () => {
+          const isDone = await checkConnectionStatus(true);
+          if (isDone) {
+            return;
+          }
+          if (popup && popup.closed) {
+            // 窗口虽关但仍执行一次最终检查
+            const finalCheck = await checkConnectionStatus(true);
+            if (!finalCheck) {
+              scheduleNextPoll();
+            }
+          } else {
+            scheduleNextPoll();
+          }
+        }, interval);
+      };
+
+      scheduleNextPoll();
     }, [authUrl, appName, checkConnectionStatus]);
 
     // 组件卸载时清理定时器
@@ -279,6 +306,8 @@ export const ConnectorAuthCard = memo<ConnectorAuthCardProps>(
               <Tag color="success">🟢 已连接</Tag>
             ) : status === 'authorizing' ? (
               <Tag color="processing">⏳ 授权验证中</Tag>
+            ) : status === 'timeout' ? (
+              <Tag color="error">⏱️ 授权超时</Tag>
             ) : (
               <Tag color="warning">🟡 待授权</Tag>
             )}
@@ -293,6 +322,10 @@ export const ConnectorAuthCard = memo<ConnectorAuthCardProps>(
               <Text type="success" style={{ fontSize: 12 }}>
                 ✓ 凭据已持久化就绪
               </Text>
+            ) : status === 'timeout' ? (
+              <Text type="danger" style={{ fontSize: 12 }}>
+                检测已超时，请授权后点击检测状态
+              </Text>
             ) : (
               <Text type="secondary" style={{ fontSize: 12 }}>
                 在新打开的窗口中完成登录授权
@@ -301,7 +334,7 @@ export const ConnectorAuthCard = memo<ConnectorAuthCardProps>(
           </div>
 
           <div style={{ display: 'flex', gap: 8 }}>
-            {status === 'authorizing' && (
+            {(status === 'authorizing' || status === 'timeout') && (
               <Button
                 size="small"
                 loading={checking}
@@ -319,7 +352,11 @@ export const ConnectorAuthCard = memo<ConnectorAuthCardProps>(
                 onClick={handleStartAuth}
                 disabled={!authUrl}
               >
-                {status === 'authorizing' ? '重新打开授权窗' : '立即授权连接'}
+                {status === 'authorizing'
+                  ? '重新打开授权窗'
+                  : status === 'timeout'
+                    ? '重新发起授权'
+                    : '立即授权连接'}
               </Button>
             ) : (
               <Button size="small" type="default" disabled>
