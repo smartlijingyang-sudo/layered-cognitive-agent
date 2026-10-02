@@ -41,8 +41,8 @@ class PerceiveObservationFoldExecutor:
 
     semantic_name: str = "perceive.observation.fold"
     region: str = "concept"
-    declared_inputs: tuple[PortName, ...] = ("observations",)
-    declared_outputs: tuple[PortName, ...] = ("context_items",)
+    declared_inputs: tuple[PortName, ...] = (PortName("observations"),)
+    declared_outputs: tuple[PortName, ...] = (PortName("context_items"),)
 
     async def node_execute(
         self,
@@ -55,7 +55,7 @@ class PerceiveObservationFoldExecutor:
         outputs 端口(yaml):context_items (tuple[ContextItem, ...])
         """
         del context
-        observations = input.port_values.get("observations") or ()
+        observations = input.port_values.get(PortName("observations")) or ()
         if not isinstance(observations, tuple):
             raise TypeError(
                 "perceive.observation.fold: 'observations' port must be a "
@@ -69,7 +69,7 @@ class PerceiveObservationFoldExecutor:
                     f"Observation instances, got {type(obs).__name__}"
                 )
             items.append(_fold(obs))
-        return NodeOutput(port_values={"context_items": tuple(items)})
+        return NodeOutput(port_values={PortName("context_items"): tuple(items)})
 
 
 def _fold(observation: Observation) -> ContextItem:
