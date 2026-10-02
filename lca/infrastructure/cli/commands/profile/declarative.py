@@ -175,6 +175,14 @@ def register(app: typer.Typer) -> None:
         graph_spec = getattr(plan, "graph_spec", None) or {}
         top_nodes = list(graph_spec.get("nodes", []) or [])
         top_edges = list(graph_spec.get("edges", []) or [])
+        if not top_nodes:
+            # B-088: 编译出空顶层图的 profile 几乎必为误配
+            # (垃圾内容/拓扑丢失);直接打印绿勾是假装成功,
+            # fail-loud 让 operator 看到问题而不是绿勾。
+            _fail(
+                "plan tree: empty plan \u2014 no top-level nodes; "
+                "check that the profile declares a phase topology"
+            )
         top_validation = (
             payload.get("declarative", {}).get("validation_report", {})
             if isinstance(payload.get("declarative"), dict)

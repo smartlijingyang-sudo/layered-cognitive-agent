@@ -252,6 +252,17 @@ def test_plan_tree_propagates_compile_errors(tmp_path: Path) -> None:
     assert "plan tree: compile failed" in (result.stderr or "")
 
 
+def test_plan_tree_empty_plan_fails_loud(tmp_path: Path) -> None:
+    """B-088:编译出空顶层图(垃圾内容 profile)时,plan tree 不得打印绿勾假装成功。"""
+    profile = tmp_path / "garbage.yaml"
+    profile.write_text("this is not a real profile: true\n")
+    runner = CliRunner()
+    app = _build_app()
+    result = runner.invoke(app, ["plan", "tree", str(profile)])
+    assert "plan tree: empty plan" in (result.stderr or "")
+    assert "all layers inflated and validated" not in (result.stdout or "")
+
+
 # ── Help text ──────────────────────────────────────────────────────────
 
 
