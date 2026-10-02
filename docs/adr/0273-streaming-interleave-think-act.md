@@ -34,11 +34,18 @@
 
 ### C1 — 交错点固定在 emit seam，不动 phase 拓扑
 
-流式片段事件（`llm.tool_call.streaming`，单 tool call 参数收齐时）的新消费者是"预准备订阅者"，挂在 `lca/loop/emit/` 的事件分发下。六 phase（perceive→think→act→reflect→remember→stop）图拓扑、节点执行顺序**零变化**。
+预准备订阅者挂在 `lca/loop/emit/` 的事件分发下。六 phase（perceive→think→act→reflect→remember→stop）图拓扑、节点执行顺序**零变化**。
+
+> **2026-10-03 修订（触发事件语义纠正）**：本 ADR v1 写“流式片段事件（`llm.tool_call.streaming`，单 tool call 参数收齐时）”，**与实证不符**。
+> `emit_llm_tool_call_streaming` 的 docstring 明确：该事件在“LLM 开始生成工具调用参数（首个 `FUNCTION_CALL_ARGUMENTS_DELTA`）时触发一次，**只带工具名与调用 id，不带参数增量**”，完整参数仍由 COMPLETED 后的 `step.tool_call.record` 落库。因此：
+> - **占位事件**（`llm.tool_call.streaming`）只支持 **tool_name 级**预准备：审批预判、连接/会话预热。
+> - **参数 schema 校验**需要“单 tool call 参数收齐”事件——该事件当前**不存在**。实现层待办：新增 `llm.tool_call.args_complete` 事件契约，或把参数校验推迟到 COMPLETED 后（后者退化为批处理，无交错收益）。
 
 ### C2 — 预准备只允许无副作用动作（白名单）
 
-允许：参数 schema 校验、审批策略预判（复用 ADR-0256 `NamespaceApprovalStrategy` 的判定逻辑，只做**判定**不做**放行**）、连接/会话预热（如 sandbox 会话预建）。
+允许（按触发事件分级）：
+- 占位事件上：审批策略预判（复用 ADR-0256 `NamespaceApprovalStrategy` 的判定逻辑，只做**判定**不做**放行**）、连接/会话预热（如 sandbox 会话预建）——两者只需求 tool_name，可在占位事件到达时即做。
+- 参数收齐事件上（待新增）：参数 schema 校验。
 **禁止**：真实执行工具、写 journal 执行事实、触发用户可见副作用。预准备产出的是 `PrewarmHint`（内存对象），不进任何持久化。
 
 ### C3 — hint 是提示不是承诺；正式 dispatch 仍走完整 fail-closed
@@ -52,7 +59,7 @@ act 正式执行时**重新**走完整校验链（参数校验→审批→执行
 ## 3. 验收用例
 
 - **T1（延迟可测）**：构造"决策流产生 N 个 tool call"的真实 run，对比开关前后"首个 tool_call 流式片段到达 → 首个 `body.tool.execute.start`"的时间差；开启后显著下降（阈值由实现 ADR 定，方向性验收）。
-- **T2（零副作用）**：mock 执行器，跑流式 turn，断言预准备阶段**零**真实工具调用、journal 无新增执行事实。
+- **T2（零副作用）**：mock 执行器，跑流式 turn，断言占位事件触发的预准备阶段**零**真实工具调用、journal 无新增执行事实、且未触及参数校验（无参数可校）。
 - **T3（hint 不信任）**：构造"预判 ALLOW、正式判定 REQUIRE_APPROVAL"的用例，断言正式 dispatch 仍走审批，无 bypass。
 
 ## 4. 待拍板
@@ -60,6 +67,7 @@ act 正式执行时**重新**走完整校验链（参数校验→审批→执行
 1. 预准备订阅者落点：`lca/loop/emit/` 新增模块 vs `body/executor` 内嵌——前者更解耦，后者离执行更近。
 2. `PrewarmHint` 形态：内存 map（tool_call_id → hint）vs 事件属性透传。
 3. 范围：文本回复的流式渲染预准备是否纳入（本 ADR 建议不纳入，tool call 优先）。
+4. `llm.tool_call.args_complete` 新事件契约：参数收齐的定义（单 tool call 语义 vs 整 turn）、与 `step.tool_call.record` 的时序关系、是否引入新事件或复用现有 per-delta 机制（注意 ADR-0162 best_effort 约束）。
 
 ## 5. 实证来源
 
