@@ -81,7 +81,13 @@ def _bindings_from_runtime_plane() -> BindingsView | None:
     return current_bindings_view()
 
 
-_SANDBOX_TOOL_APIS: frozenset[str] = frozenset({"runCommand", "executeCode"})
+# NOTE (E2E 2026-10-02): v1 sandbox used runCommand/executeCode; the GATED
+# box path wires box_run_command instead. Accept either naming scheme —
+# the fork must surface command execution AND code execution in one form.
+_SANDBOX_TOOL_APIS: frozenset[frozenset[str]] = frozenset({
+    frozenset({"runCommand", "box_run_command"}),
+    frozenset({"executeCode", "sandbox_execute"}),
+})
 
 
 def _filter_solo_creator_tools(items: tuple) -> tuple:
@@ -123,13 +129,16 @@ def _assert_sandbox_tools_visible(bindings: BindingsView, items: tuple) -> None:
     if not sandbox_expected:
         return
     present = {_tool_api_name(tool) for tool in items}
-    missing = sorted(_SANDBOX_TOOL_APIS - present)
+    missing = sorted(
+        f"one of {sorted(group)}" for group in _SANDBOX_TOOL_APIS
+        if not (group & present)
+    )
     if missing:
         raise RuntimeError(
             "tool.fork.dispatch: BindingsView declares sandbox but forked "
             f"tools missing {missing}; got {sorted(present)}. "
-            "Profile → Bindings → ForkedTools must surface runCommand/"
-            "executeCode (eng/retire-v1-reasoner-sandbox)."
+            "Profile → Bindings → ForkedTools must surface command/code "
+            "execution tools (eng/retire-v1-reasoner-sandbox)."
         )
 
 

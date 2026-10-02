@@ -21,6 +21,7 @@ class RequestBoxHelpTool(Tool):
     """请求用户协助处理员工机上的交互步骤。"""
 
     name: ClassVar[str] = "request_box_help"
+    namespace: ClassVar[str] = "agent"
     description: ClassVar[str] = (
         "当员工在员工电脑（我的电脑）上遇到只有用户能处理的步骤时调用"
         "（例如 SSO 登录、2FA 验证码、图形验证码、支付确认）。"

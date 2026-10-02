@@ -169,6 +169,7 @@ class SkillLoadTool(Tool):
     """The model-facing ``skill(name)`` tool, backed by SkillCatalogService."""
 
     name = "skill"
+    namespace: ClassVar[str] = "skill"
     description = "Load the full instructions for a skill listed in the skill catalog."
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",

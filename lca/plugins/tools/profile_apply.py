@@ -38,6 +38,7 @@ class ProfileApplyTool(Tool):
     """
 
     name = "profile_apply"
+    namespace = "core"  # ADR-0256: 与 MANIFEST.api[0].namespace 一致
     description = "Preview an approved profile candidate; production application is disabled."
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",

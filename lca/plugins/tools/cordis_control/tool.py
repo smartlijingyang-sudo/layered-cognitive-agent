@@ -105,6 +105,7 @@ class CordisControlTool(Tool):
     """Run the four Creator faces through one Composer-bound artifact lifecycle."""
 
     name = "cordis_control"
+    namespace = "core"  # ADR-0256: 与 MANIFEST.api[0].namespace 一致
     description = MANIFEST.api[0].description
     parameters: ClassVar[dict[str, Any]] = MANIFEST.api[0].parameters
     is_idempotent = False
@@ -219,6 +220,7 @@ def build_cordis_control_tool(
         (Tool,),
         {
             "name": implementation.name,
+            "namespace": implementation.namespace,
             "description": implementation.description,
             "parameters": implementation.parameters,
             "is_idempotent": implementation.is_idempotent,

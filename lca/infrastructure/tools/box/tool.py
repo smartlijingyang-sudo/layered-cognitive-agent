@@ -31,6 +31,7 @@ class BoxReadFileTool(Tool):
     """读取员工电脑（我的电脑）上的文件。"""
 
     name: ClassVar[str] = "box_read_file"
+    namespace: ClassVar[str] = "file"
     description: ClassVar[str] = (
         "读取员工电脑（我的电脑）上的文件内容。路径自动锚定在员工电脑沙箱根目录内，"
         "越界访问会被拒绝。"
@@ -81,6 +82,7 @@ class BoxWriteFileTool(Tool):
     """写入员工电脑（我的电脑）上的文件。"""
 
     name: ClassVar[str] = "box_write_file"
+    namespace: ClassVar[str] = "file"
     description: ClassVar[str] = (
         "在员工电脑（我的电脑）沙箱内写入文件。会自动创建父目录。"
         "路径锚定在员工电脑沙箱根目录内，越界写入会被拒绝。"
@@ -133,6 +135,7 @@ class BoxListFilesTool(Tool):
     """列出员工电脑（我的电脑）沙箱内的目录内容。"""
 
     name: ClassVar[str] = "box_list_files"
+    namespace: ClassVar[str] = "file"
     description: ClassVar[str] = (
         "列出员工电脑（我的电脑）沙箱内指定目录下的文件和子目录。路径锚定在员工电脑沙箱根目录内。"
     )
@@ -181,6 +184,7 @@ class BoxRunCommandTool(Tool):
     """
 
     name: ClassVar[str] = "box_run_command"
+    namespace: ClassVar[str] = "shell"
     description: ClassVar[str] = (
         "在员工电脑（我的电脑）沙箱根目录内执行一条 shell 命令并返回 stdout / stderr。"
         "工作目录固定为员工电脑沙箱根目录。"

@@ -14,6 +14,7 @@ class BrowserNavigateTool(Tool):
     """浏览器导航工具。"""
 
     name: ClassVar[str] = "browser_navigate"
+    namespace: ClassVar[str] = "web"
     description: ClassVar[str] = "控制浏览器打开指定网页 URL。"
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
@@ -59,6 +60,7 @@ class BrowserClickTool(Tool):
     """浏览器点击元素工具。"""
 
     name: ClassVar[str] = "browser_click"
+    namespace: ClassVar[str] = "web"
     description: ClassVar[str] = "点击网页中指定的 CSS 或 XPath 选择器元素。"
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
@@ -101,6 +103,7 @@ class BrowserScreenshotTool(Tool):
     """浏览器截屏工具。"""
 
     name: ClassVar[str] = "browser_screenshot"
+    namespace: ClassVar[str] = "web"
     description: ClassVar[str] = "捕获当前网页可视区域或全页屏幕截图并生成 Artifact。"
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
