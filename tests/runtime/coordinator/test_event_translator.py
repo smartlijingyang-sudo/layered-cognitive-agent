@@ -301,6 +301,17 @@ def test_spine_llm_tool_call_streaming_becomes_tools_calling() -> None:
     assert tool["apiName"] == "executeCode"
 
 
+def _wire_msgs(out):
+    """Normalize translate() output to a list of wire messages.
+
+    The translator appends an ``activity_updated`` message when the global
+    activity projector yields an item for the event (singleton state), so
+    tests locate the wire message by type instead of assuming a bare dict.
+    """
+    assert out is not None
+    return out if isinstance(out, list) else [out]
+
+
 def test_spine_llm_tool_call_streaming_missing_identity_is_ignored() -> None:
     t = EventTranslator()
     stamped = {
@@ -324,10 +335,9 @@ def test_spine_tool_call_record_becomes_tools_calling() -> None:
             },
         }
     }
-    out = t.translate(stamped)
-    assert out is not None
-    assert out["data"]["chunkType"] == "tools_calling"
-    tools = out["data"]["toolsCalling"]
+    msgs = _wire_msgs(t.translate(stamped))
+    chunk = next(m for m in msgs if m.get("data", {}).get("chunkType") == "tools_calling")
+    tools = chunk["data"]["toolsCalling"]
     assert tools[0]["id"] == "tc1"
     assert tools[0]["apiName"] == "runCommand"
     assert tools[0]["identifier"] == "lobe-cloud-sandbox"
@@ -354,10 +364,9 @@ def test_spine_tool_call_record_pending_approval_carries_intervention_marker() -
             },
         }
     }
-    out = t.translate(stamped)
-    assert out is not None
-    assert out["data"]["chunkType"] == "tools_calling"
-    tools = out["data"]["toolsCalling"]
+    msgs = _wire_msgs(t.translate(stamped))
+    chunk = next(m for m in msgs if m.get("data", {}).get("chunkType") == "tools_calling")
+    tools = chunk["data"]["toolsCalling"]
     assert tools[0]["id"] == "toolu_1"
     assert tools[0]["apiName"] == "askUserQuestion"
     assert tools[0]["identifier"] == "lobe-user-interaction"
@@ -381,11 +390,10 @@ def test_tool_started_becomes_tool_start_with_parent_message_id() -> None:
             },
         }
     }
-    out = t.translate(stamped)
-    assert out is not None
-    assert out["type"] == "tool_start"
-    assert out["data"]["parentMessageId"] == "m1"
-    assert out["data"]["toolCalling"]["identifier"] == "lobe-local-system"
+    msgs = _wire_msgs(t.translate(stamped))
+    start = next(m for m in msgs if m["type"] == "tool_start")
+    assert start["data"]["parentMessageId"] == "m1"
+    assert start["data"]["toolCalling"]["identifier"] == "lobe-local-system"
 
 
 def test_tool_invoked_becomes_tool_end_without_projected_state() -> None:
@@ -400,13 +408,12 @@ def test_tool_invoked_becomes_tool_end_without_projected_state() -> None:
             "projected_state": {"stdout": "ok", "exitCode": 0},
         }
     }
-    out = t.translate(stamped)
-    assert out is not None
-    assert out["type"] == "tool_end"
-    assert "projected_state" not in out["data"]  # spec §5.3.1
-    assert out["data"]["isSuccess"] is True
-    assert out["data"]["result"]["content"] == "ok"
-    assert out["data"]["result"]["state"] == {"stdout": "ok", "exitCode": 0}
+    msgs = _wire_msgs(t.translate(stamped))
+    end = next(m for m in msgs if m["type"] == "tool_end")
+    assert "projected_state" not in end["data"]  # spec §5.3.1
+    assert end["data"]["isSuccess"] is True
+    assert end["data"]["result"]["content"] == "ok"
+    assert end["data"]["result"]["state"] == {"stdout": "ok", "exitCode": 0}
 
 
 def test_reaction_added_becomes_reaction_added_wire_event() -> None:
@@ -589,9 +596,9 @@ def test_spine_tool_call_record_passes_description_through_to_wire() -> None:
             },
         }
     }
-    out = t.translate(stamped)
-    assert out is not None
-    args = json.loads(out["data"]["toolsCalling"][0]["arguments"])
+    msgs = _wire_msgs(t.translate(stamped))
+    chunk = next(m for m in msgs if m.get("data", {}).get("chunkType") == "tools_calling")
+    args = json.loads(chunk["data"]["toolsCalling"][0]["arguments"])
     assert args["description"] == "runCommand"
 
 
@@ -614,9 +621,9 @@ def test_tool_started_event_propagates_description_fallback() -> None:
             },
         }
     }
-    out = t.translate(stamped)
-    assert out is not None
-    args = json.loads(out["data"]["toolCalling"]["arguments"])
+    msgs = _wire_msgs(t.translate(stamped))
+    start = next(m for m in msgs if m["type"] == "tool_start")
+    args = json.loads(start["data"]["toolCalling"]["arguments"])
     assert args["description"] == "runCommand"
 
 
@@ -633,9 +640,9 @@ def test_catalog_session_event_tool_started_injects_description() -> None:
         {"tool_name": "runCommand", "invocation_id": "tc1", "arguments": {"command": "ls"}},
     )
     assert stamped is not None
-    out = EventTranslator().translate(stamped)
-    assert out is not None
-    args = json.loads(out["data"]["toolCalling"]["arguments"])
+    msgs = _wire_msgs(EventTranslator().translate(stamped))
+    start = next(m for m in msgs if m["type"] == "tool_start")
+    args = json.loads(start["data"]["toolCalling"]["arguments"])
     assert args["description"] == "runCommand"
 
 
