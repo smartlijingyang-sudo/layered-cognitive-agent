@@ -6,7 +6,7 @@ __keep_llm_key__ = True  # scripted/booted runs need a dummy credential for the 
 
 import unittest
 
-from lca.application.api.api import Agent, Team, TeamLead
+from lca.application.api.api import Agent, Team, TeamLead, ensure_default_ctx
 from lca.cognition.memory.simple.memory import SimpleMemorySystem
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.execution.decision import Decision, Reflection
@@ -69,13 +69,17 @@ class TestFacadeProtocolConformance(unittest.TestCase):
 class TestSpecFaithfulRecomposition(unittest.IsolatedAsyncioTestCase):
     """Team 重组必须无损保留 spec 中的显式选择（旧实现会丢失自定义组件）。"""
 
+    async def asyncSetUp(self) -> None:
+        # Agent/Team 构造需要已预热的默认插件 ctx（ADR-0062 PR-4；同 tests/scenario/team_0/test_team_chain_cleanup.py）
+        await ensure_default_ctx()
+
     async def test_member_keeps_custom_memory_and_brain_instances(self) -> None:
         memory = SimpleMemorySystem()
         brain = _StubBrain()
         agent = _agent(memory=memory, brain=brain)
         team = Team(members=[agent], coordination=Pipeline())
         member = team._handle.members[0]  # type: ignore[attr-defined]
-        self.assertIs(member.runtime.memory.inner, memory)  # type: ignore[attr-defined]
+        self.assertIs(member.runtime.memory, memory)  # type: ignore[attr-defined]
         self.assertIs(member.runtime.brain, brain)  # type: ignore[attr-defined]
 
     async def test_member_keeps_budget(self) -> None:
@@ -87,6 +91,10 @@ class TestSpecFaithfulRecomposition(unittest.IsolatedAsyncioTestCase):
 
 class TestExplicitComposerInjection(unittest.IsolatedAsyncioTestCase):
     """自定义注册必须经显式 composer 贯通 Agent 与 Team（无隐式全局）。"""
+
+    async def asyncSetUp(self) -> None:
+        # 同上：get_or_create_default_ctx 在事件循环内要求已预热 ctx
+        await ensure_default_ctx()
 
     async def test_custom_memory_flows_through_team(self) -> None:
         from lca.application.api.api import get_or_create_default_ctx
@@ -100,7 +108,7 @@ class TestExplicitComposerInjection(unittest.IsolatedAsyncioTestCase):
             scope=ctx,
         )
         member = team._handle.members[0]  # type: ignore[attr-defined]
-        self.assertIsInstance(member.runtime.memory.inner, SimpleMemorySystem)  # type: ignore[attr-defined]
+        self.assertIsInstance(member.runtime.memory, SimpleMemorySystem)  # type: ignore[attr-defined]
 
     async def test_unknown_component_without_composer_raises(self) -> None:
         from lca.contracts.mechanisms.capability.capability import MissingCapabilityError
