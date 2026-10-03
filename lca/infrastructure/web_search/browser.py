@@ -6,7 +6,7 @@
 - ``cdp-persistent``: 常驻 Chrome + ``user-data-dir``，登录态跨次复用；
   优先连已有 ``cdp_endpoint``，连不上才按 ``user-data-dir`` 起新实例.
 
-playwright **延迟 import**：缺依赖时抛 :class:`FeatureUnavailable`（带安装指引），
+playwright **延迟 import**：缺依赖时抛 :class:`FeatureUnavailableError`（带安装指引），
 绝不在 import 本模块时炸 —— BROWSE 档是可选能力.
 """
 
@@ -15,7 +15,7 @@ from __future__ import annotations
 import os
 from enum import StrEnum
 
-from lca.infrastructure.web_search.errors import FeatureUnavailable, FetchError
+from lca.infrastructure.web_search.errors import FeatureUnavailableError, FetchError
 from lca.infrastructure.web_search.fetch import check_url
 
 
@@ -32,7 +32,7 @@ def _playwright():
     try:
         from playwright.sync_api import sync_playwright
     except ImportError as e:
-        raise FeatureUnavailable(
+        raise FeatureUnavailableError(
             "playwright 未安装：pip install playwright && "
             "python -m playwright install chromium"
         ) from e
@@ -75,7 +75,7 @@ class BrowserBackend:
         else:
             if self.mode is BrowserMode.HEADFUL_XVFB and not os.environ.get("DISPLAY"):
                 self.close()
-                raise FeatureUnavailable(
+                raise FeatureUnavailableError(
                     "headful-xvfb 需要虚拟显示：在 xvfb-run 下运行 "
                     "(xvfb-run -a python ...)，或 apt install xvfb"
                 )
@@ -94,7 +94,7 @@ class BrowserBackend:
         except Exception:
             pass
         if not self.user_data_dir:
-            raise FeatureUnavailable(
+            raise FeatureUnavailableError(
                 "cdp-persistent 需要 cdp_endpoint 可连，或传入 user-data-dir "
                 "起新常驻实例（登录态落在该目录，跨次复用）"
             )
@@ -125,7 +125,7 @@ class BrowserBackend:
         """在浏览器里打开 URL 并取正文（URL 纪律同样适用）."""
         u = check_url(url)
         if self._context is None:
-            raise FeatureUnavailable("BrowserBackend 未启动：请用 with 语句")
+            raise FeatureUnavailableError("BrowserBackend 未启动：请用 with 语句")
         try:
             page = self._context.new_page()
             try:

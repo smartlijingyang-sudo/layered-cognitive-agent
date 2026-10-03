@@ -7,7 +7,7 @@ backend 行为用 fake context 注入验证. 不碰真实网络.
 import pytest
 
 from lca.infrastructure.web_search.browser import BrowserBackend, BrowserMode
-from lca.infrastructure.web_search.errors import FeatureUnavailable
+from lca.infrastructure.web_search.errors import FeatureUnavailableError
 
 
 def test_mode_values() -> None:
@@ -30,9 +30,8 @@ def test_missing_playwright_raises_feature_unavailable(monkeypatch) -> None:
         return real_import(name, *a, **k)
 
     monkeypatch.setattr(builtins, "__import__", _fake_import)
-    with pytest.raises(FeatureUnavailable) as e:
-        with BrowserBackend(BrowserMode.HEADLESS):
-            pass
+    with pytest.raises(FeatureUnavailableError) as e, BrowserBackend(BrowserMode.HEADLESS):
+        pass
     assert "pip install playwright" in str(e.value)
 
 
@@ -46,7 +45,7 @@ def test_fetch_text_url_discipline() -> None:
 
 def test_fetch_text_without_enter() -> None:
     b = BrowserBackend(BrowserMode.HEADLESS)
-    with pytest.raises(FeatureUnavailable):
+    with pytest.raises(FeatureUnavailableError):
         b.fetch_text("https://example.com/")
 
 
@@ -141,7 +140,6 @@ def test_headful_xvfb_without_display(monkeypatch) -> None:
     fake_pw_mod.sync_playwright = lambda: _FakePW()
     monkeypatch.setitem(sys.modules, "playwright", types.ModuleType("playwright"))
     monkeypatch.setitem(sys.modules, "playwright.sync_api", fake_pw_mod)
-    with pytest.raises(FeatureUnavailable) as e:
-        with BrowserBackend(BrowserMode.HEADFUL_XVFB):
-            pass
+    with pytest.raises(FeatureUnavailableError) as e, BrowserBackend(BrowserMode.HEADFUL_XVFB):
+        pass
     assert "xvfb-run" in str(e.value)

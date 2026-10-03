@@ -38,10 +38,10 @@ from lca.contracts.models.cognition.web_search import (
 )
 from lca.infrastructure.web_search.browser import BrowserBackend, BrowserMode
 from lca.infrastructure.web_search.errors import (
-    FeatureUnavailable,
+    FeatureUnavailableError,
     FetchError,
     ProviderError,
-    ProviderNotConfigured,
+    ProviderNotConfiguredError,
     WebSearchError,
 )
 from lca.infrastructure.web_search.fetch import FetchResult, fetch_text
@@ -54,11 +54,11 @@ __all__ = [
     "BrowserMode",
     "Citation",
     "DuckDuckGoProvider",
-    "FeatureUnavailable",
+    "FeatureUnavailableError",
     "FetchError",
     "FetchResult",
     "ProviderError",
-    "ProviderNotConfigured",
+    "ProviderNotConfiguredError",
     "SearchOutcome",
     "SearchProvider",
     "SearchRequest",

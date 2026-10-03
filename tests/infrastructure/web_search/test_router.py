@@ -18,10 +18,10 @@ from lca.contracts.models.cognition.web_search import (
     Vertical,
 )
 from lca.infrastructure.web_search.errors import (
-    FeatureUnavailable,
+    FeatureUnavailableError,
     FetchError,
     ProviderError,
-    ProviderNotConfigured,
+    ProviderNotConfiguredError,
 )
 from lca.infrastructure.web_search.fetch import FetchResult
 from lca.infrastructure.web_search.router import SearchRouter
@@ -203,12 +203,12 @@ def test_feature_unavailable_propagates() -> None:
         raise FetchError("nope")
 
     def _factory():
-        raise FeatureUnavailable("no playwright")
+        raise FeatureUnavailableError("no playwright")
 
     router = SearchRouter(
         search_provider=_OkProvider(), fetch_fn=_fetch, browser_factory=_factory
     )
-    with pytest.raises(FeatureUnavailable):  # 缺依赖直接抛，不吞
+    with pytest.raises(FeatureUnavailableError):  # 缺依赖直接抛，不吞
         router.run(SearchRequest(query="q", need_text=True))
 
 
@@ -249,7 +249,7 @@ def test_vertical_without_handler_raises() -> None:
         search_provider=_OkProvider(), fetch_fn=lambda u: None,
         vertical_handlers={},
     )
-    with pytest.raises(ProviderNotConfigured):
+    with pytest.raises(ProviderNotConfiguredError):
         router.run(SearchRequest(query="q", vertical=Vertical.NEWS))
 
 
@@ -272,5 +272,5 @@ def test_vertical_accepts_enum_value() -> None:
     router = SearchRouter(search_provider=_OkProvider(), fetch_fn=lambda u: None)
     req = SearchRequest(query="q")
     object.__setattr__(req, "vertical", "weather")
-    with pytest.raises(ProviderNotConfigured):
+    with pytest.raises(ProviderNotConfiguredError):
         router.run(req)

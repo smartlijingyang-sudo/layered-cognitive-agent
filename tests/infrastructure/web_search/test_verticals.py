@@ -5,7 +5,8 @@
 
 import pytest
 
-from lca.infrastructure.web_search.errors import ProviderNotConfigured
+from lca.contracts.models.cognition.web_search import SearchRequest, Vertical
+from lca.infrastructure.web_search.errors import ProviderNotConfiguredError
 from lca.infrastructure.web_search.providers.base import SearchProvider
 from lca.infrastructure.web_search.verticals import build_default_handlers
 from lca.infrastructure.web_search.verticals.datetime_local import now
@@ -15,7 +16,6 @@ from lca.infrastructure.web_search.verticals.stubs import (
     NewsProviderStub,
     SportsProviderStub,
 )
-from lca.contracts.models.cognition.web_search import SearchRequest, Vertical
 
 
 class _FakeResp:
@@ -106,7 +106,7 @@ def test_datetime_local_fields() -> None:
 def test_stubs_raise_not_configured() -> None:
     for stub in (NewsProviderStub(), SportsProviderStub(), FinanceProviderStub()):
         assert isinstance(stub, SearchProvider)  # 桩也满足协议
-        with pytest.raises(ProviderNotConfigured) as e:
+        with pytest.raises(ProviderNotConfiguredError) as e:
             stub.search("anything")
         assert "API" in str(e.value) or "key" in str(e.value).lower()
 
@@ -125,11 +125,11 @@ def test_weather_handler_missing_coords_fails_fast() -> None:
 
 def test_weather_handler_verified(monkeypatch) -> None:
     import lca.infrastructure.web_search.verticals as verticals_mod
+    from lca.contracts.models.cognition.web_search import Verdict
     from lca.infrastructure.web_search.verticals.openmeteo import (
         HourlyPoint,
         WeatherReport,
     )
-    from lca.contracts.models.cognition.web_search import Verdict
 
     fake = WeatherReport(
         latitude=28.2,

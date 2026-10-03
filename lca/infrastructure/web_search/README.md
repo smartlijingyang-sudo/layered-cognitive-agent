@@ -27,7 +27,7 @@ SEARCH（providers/duckduckgo.py，无 key）
 - `headful-xvfb`：有头 + 虚拟显示（`xvfb-run -a`）
 - `cdp-persistent`：常驻 Chrome + user-data-dir，登录态跨次复用
 
-playwright 延迟 import；缺依赖抛 `FeatureUnavailable`（带安装指引）。
+playwright 延迟 import；缺依赖抛 `FeatureUnavailableError`（带安装指引）。
 
 ## 测试
 

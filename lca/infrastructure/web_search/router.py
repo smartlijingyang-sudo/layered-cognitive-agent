@@ -8,7 +8,7 @@
 3. 每次调用最多 1 个 vertical（``SearchRequest.vertical`` 类型即约束；
    传 list/tuple/set 直接 ``ValueError``）.
 4. 无候选 URL 时不升级：FETCH/BROWSE 需要逐字传入的 URL，绝不猜测.
-5. Query 纪律错误（URL 当 query）直接抛，不吞；FeatureUnavailable（缺依赖）
+5. Query 纪律错误（URL 当 query）直接抛，不吞；FeatureUnavailableError（缺依赖）
    直接抛，不吞.
 """
 
@@ -25,8 +25,8 @@ from lca.contracts.models.cognition.web_search import (
     Vertical,
 )
 from lca.infrastructure.web_search.errors import (
-    FeatureUnavailable,
-    ProviderNotConfigured,
+    FeatureUnavailableError,
+    ProviderNotConfiguredError,
 )
 
 # vertical handler 签名：SearchRequest -> SearchOutcome
@@ -133,7 +133,7 @@ class SearchRouter:
         try:
             with self.browser_factory() as browser:
                 text = browser.fetch_text(results[0].url)
-        except FeatureUnavailable:
+        except FeatureUnavailableError:
             raise  # 缺依赖是环境问题，直接抛
         except Exception as e:
             notes.append(f"BROWSE 档失败（{e}）")
@@ -169,7 +169,7 @@ class SearchRouter:
     ) -> SearchOutcome:
         handler = self.vertical_handlers.get(vertical)
         if handler is None:
-            raise ProviderNotConfigured(
+            raise ProviderNotConfiguredError(
                 f"vertical {vertical.value} 暂无可用 provider"
                 "（news/sports/finance 为桩，需 API key 接入；"
                 "weather/datetime 用 verticals.build_default_handlers()）"

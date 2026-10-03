@@ -2,13 +2,13 @@
 
 现状：这三个 vertical 暂无免 key 的稳定数据源，先立桩.
 每个桩都实现 :class:`SearchProvider` 协议（将来即插即用，router 侧无需改动），
-但 ``search()`` 调用即抛 :class:`ProviderNotConfigured` —— 错误信息里写明
+但 ``search()`` 调用即抛 :class:`ProviderNotConfiguredError` —— 错误信息里写明
 需要什么 key、去哪里申请、替换哪段代码. 绝不静默返回空列表（那会伪装成"搜不到"）.
 """
 
 from __future__ import annotations
 
-from lca.infrastructure.web_search.errors import ProviderNotConfigured
+from lca.infrastructure.web_search.errors import ProviderNotConfiguredError
 from lca.infrastructure.web_search.providers.base import SearchProvider
 
 
@@ -19,7 +19,7 @@ class _StubProvider:
     needs = ""
 
     def search(self, query: str, *, limit: int = 10):
-        raise ProviderNotConfigured(
+        raise ProviderNotConfiguredError(
             f"{self.name} 尚未接入：{self.needs}"
         )
 
