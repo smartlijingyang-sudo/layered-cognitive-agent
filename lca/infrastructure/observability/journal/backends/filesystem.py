@@ -53,9 +53,10 @@ class FilesystemJournalStore(JournalStoreBackend):
         from lca.infrastructure.observability.spine.sinks.naming import (
             resolve_filename,
         )
+        from lca.infrastructure.persistence.run_paths import ensure_run_dir
 
         self._root = Path(root)
-        self._root.mkdir(parents=True, exist_ok=True)
+        ensure_run_dir(self._root)
         # 模板解析:$run_id.spine.jsonl → <run_id>.spine.jsonl
         template = filename if filename is not None else FilesystemJournalStore.DEFAULT_FILENAME
         resolved = resolve_filename(template, run_id)

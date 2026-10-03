@@ -25,10 +25,12 @@ from lca.infrastructure.persistence.run_paths import RUN_DIR_MODE
 #
 # This module pins the writer registry so a new writer that adds a bare
 # ``mkdir``/``open`` on run artifacts turns the scan red instead of silently
-# breaking the contract. Known C1 deviations are pinned as
-# ``xfail(strict)`` regression tests: when the quality lane routes them
-# through ``ensure_run_dir``, the strict xfail turns red and forces this
-# file to be updated.
+# breaking the contract. The two former C1 deviations
+# (``writable_matrix/defaults.py``, ``journal/backends/filesystem.py``) were
+# routed through ``ensure_run_dir`` by the quality lane (2026-10-04); their
+# regression tests are plain behavior tests now. A new known deviation is
+# pinned by mapping the file to None in ``_BARE_MKDIR_ALLOWLIST`` below plus
+# a regression test asserting the 0700 bound.
 #
 # NOTE: the contract text lives in comments, not the module docstring,
 # because ruff 0.15.14 misfires E402 on multi-line docstrings placed before
@@ -96,12 +98,11 @@ def _bare_mkdir_hits() -> list[str]:
 
 
 # Bare ``mkdir`` calls that are NOT per-run-dir violations, each with the
-# reason it is allowed. The two files mapped to None are KNOWN DEVIATIONS
-# (ADR-0281 C1 gaps) pinned by the xfail regression tests below; fixing a
-# deviation requires removing the file from this map AND flipping the xfail.
+# reason it is allowed. A file mapped to None is a KNOWN DEVIATION
+# (ADR-0281 C1 gap) pinned by a regression test below (none currently);
+# fixing a deviation requires removing the file from this map AND turning
+# its regression test into a plain behavior test.
 _BARE_MKDIR_ALLOWLIST = {
-    "infrastructure/observability/writable_matrix/defaults.py": None,
-    "infrastructure/observability/journal/backends/filesystem.py": None,
     "plugins/observability/run/ledger_seam.py": (
         "root.mkdir(parents=True, exist_ok=True)",
         "factory runs-root (traces/runs), not a per-run dir",
@@ -124,8 +125,6 @@ def test_no_unlisted_bare_mkdir_on_run_artifact_writers() -> None:
         rel = hit.split(":", 1)[0]
         allow = _BARE_MKDIR_ALLOWLIST.get(rel)
         if allow is None:
-            if rel in _BARE_MKDIR_ALLOWLIST:
-                continue  # KNOWN DEVIATION, pinned by xfail tests below
             unexpected.append(hit)
             continue
         fragment, _reason = allow
@@ -146,16 +145,8 @@ def test_narrative_writer_mkdir_covered_by_ensure_first() -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "ADR-0281 C1 gap: RoutingFileStorage mkdirs the per-run dir bare "
-        "(writable_matrix/defaults.py:228); quality lane to route through "
-        "ensure_run_dir"
-    ),
-)
 def test_routing_file_storage_holds_dir_bound_on_first_write(tmp_path: Path) -> None:
-    """KNOWN DEVIATION: as the first writer, the storage leaves the run dir 0755."""
+    """ADR-0281 C1: as the first writer, the storage holds the run dir at 0700."""
     prev = os.umask(0o022)
     try:
         run_dir = tmp_path / "run_first_writer"
@@ -169,16 +160,8 @@ def test_routing_file_storage_holds_dir_bound_on_first_write(tmp_path: Path) -> 
     assert stat.S_IMODE(run_dir.stat().st_mode) == RUN_DIR_MODE
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "ADR-0281 C1 gap: FilesystemJournalStore mkdirs the per-run dir bare "
-        "(journal/backends/filesystem.py:58); quality lane to route through "
-        "ensure_run_dir"
-    ),
-)
 def test_filesystem_journal_store_holds_dir_bound(tmp_path: Path) -> None:
-    """KNOWN DEVIATION: as the first writer, the journal store leaves the run dir 0755."""
+    """ADR-0281 C1: as the first writer, the journal store holds the run dir at 0700."""
     prev = os.umask(0o022)
     try:
         run_dir = tmp_path / "run_journal_first"
