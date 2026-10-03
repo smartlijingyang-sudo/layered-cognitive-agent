@@ -34,6 +34,8 @@ from lca.plugins.transport.webserver.routes_1.routes_assistants.jobs import (
     assistant_job_item,
     assistant_jobs_root,
     fire_assistant_job,
+    run_assistant_job,
+    snooze_assistant_job,
 )
 from lca.plugins.transport.webserver.routes_1.routes_assistants.lobehub import (
     bind_agent,
@@ -113,6 +115,16 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
     RouteSpec(
         "/v1/assistants/{assistant_id}/jobs/{job_id}:fire",
         fire_assistant_job,
+        ("POST", "OPTIONS"),
+    ),
+    RouteSpec(
+        "/v1/assistants/{assistant_id}/jobs/{job_id}/run",
+        run_assistant_job,
+        ("POST", "OPTIONS"),
+    ),
+    RouteSpec(
+        "/v1/assistants/{assistant_id}/jobs/{job_id}/snooze",
+        snooze_assistant_job,
         ("POST", "OPTIONS"),
     ),
     # 卡片路径（ADR-0268 §9）：PUT 合并用户改过的字段，DELETE 删除定义。

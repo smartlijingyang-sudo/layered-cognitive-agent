@@ -357,11 +357,109 @@ async def assistant_jobs_root(request: Request) -> JSONResponse:
     return _jobs_not_implemented("jobs_unavailable", f"unsupported method {method!r}")
 
 
+async def run_assistant_job(request: Request) -> JSONResponse:
+    """``POST /v1/assistants/{assistant_id}/jobs/{job_id}/run`` —— 手动立即执行一次。"""
+    pre = _prelude(request, "run")
+    if not isinstance(pre, tuple):
+        return pre
+    user_id, catalog, assistant_id = pre
+    job_id = str(request.path_params.get("job_id") or "")
+
+    try:
+        service = _service_for(catalog, assistant_id)
+    except AssistantCatalogError as exc:
+        return _error_envelope(
+            "assistant_not_found", status_code=404, error_type="not_found", detail=str(exc)
+        )
+
+    existing = service.get_job(job_id)
+    if existing is None or existing.owner != user_id:
+        return _error_envelope(
+            "job_not_found", status_code=404, error_type="not_found", detail=f"job {job_id} 不存在"
+        )
+
+    from lca.infrastructure.cron.worker_runner import CronWorkerRunner
+
+    session_store = getattr(getattr(request.app, "state", None), "session_store", None)
+    runner = CronWorkerRunner(store=service._store, session_store=session_store)
+    outcome = await runner.execute_job(existing)
+
+    service._store.append_run(job_id, outcome="completed", finished_at=datetime.now(UTC))
+
+    return _json(
+        {
+            "assistant_id": assistant_id,
+            "job_id": job_id,
+            "outcome": outcome,
+            "triggered_at": datetime.now(UTC).isoformat(),
+        },
+        status_code=200,
+    )
+
+
+async def snooze_assistant_job(request: Request) -> JSONResponse:
+    """``POST /v1/assistants/{assistant_id}/jobs/{job_id}/snooze`` —— 快捷推迟 N 分钟。"""
+    pre = _prelude(request, "snooze")
+    if not isinstance(pre, tuple):
+        return pre
+    user_id, catalog, assistant_id = pre
+    job_id = str(request.path_params.get("job_id") or "")
+
+    try:
+        service = _service_for(catalog, assistant_id)
+    except AssistantCatalogError as exc:
+        return _error_envelope(
+            "assistant_not_found", status_code=404, error_type="not_found", detail=str(exc)
+        )
+
+    existing = service.get_job(job_id)
+    if existing is None or existing.owner != user_id:
+        return _error_envelope(
+            "job_not_found", status_code=404, error_type="not_found", detail=f"job {job_id} 不存在"
+        )
+
+    import contextlib
+
+    body = {}
+    with contextlib.suppress(Exception):
+        body = await request.json()
+    minutes = int(body.get("minutes", 10)) if isinstance(body, dict) else 10
+    if minutes <= 0:
+        minutes = 10
+
+    from datetime import timedelta
+    from zoneinfo import ZoneInfo
+
+    from lca.contracts.models.cron.models import OneShotSchedule
+
+    tz = ZoneInfo(existing.timezone)
+    new_at = datetime.now(tz) + timedelta(minutes=minutes)
+    new_schedule = OneShotSchedule(at=new_at)
+    updated = existing.model_copy(
+        update={
+            "schedule": new_schedule,
+            "enabled": True,
+            "anchor_at": datetime.now(UTC),
+        }
+    )
+    service.replace_job(updated)
+
+    return _json(
+        {
+            "assistant_id": assistant_id,
+            "job_id": job_id,
+            "snoozed_minutes": minutes,
+            "new_at": new_at.isoformat(),
+        },
+        status_code=200,
+    )
+
+
 async def fire_assistant_job(request: Request) -> JSONResponse:
     """``POST /v1/assistants/{assistant_id}/jobs/{job_id}:fire`` —— 保持 501。
 
     CronJob 没有 HTTP fire 入口（ADR-0268），触发由调度器按 ``next_run``
-    到点执行。
+    到点执行。如需手动立即测试执行，请使用 ``POST .../jobs/{job_id}/run``。
     """
     if _jobs_from_request(request) is None:
         return _jobs_not_implemented("jobs_unavailable", "AssistantJobs.fire")

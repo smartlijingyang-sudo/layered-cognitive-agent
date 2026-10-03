@@ -35,6 +35,8 @@ from lca.plugins.transport.webserver.routes_1.routes_assistants.jobs import (
     create_assistant_job,
     fire_assistant_job,
     list_assistant_jobs,
+    run_assistant_job,
+    snooze_assistant_job,
 )
 from lca.plugins.transport.webserver.routes_1.routes_assistants.lobehub import (
     bind_agent,
@@ -95,5 +97,7 @@ __all__ = [
     "reimport_assistant",
     "retire_assistant",
     "revise_assistant_profile",
+    "run_assistant_job",
     "setup",
+    "snooze_assistant_job",
 ]
