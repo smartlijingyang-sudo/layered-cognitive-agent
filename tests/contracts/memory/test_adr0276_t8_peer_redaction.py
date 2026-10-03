@@ -53,6 +53,8 @@ _SAMPLE_PII = (
 )
 
 _SAMPLE_FILES = [
+    # ada0919cc 起布局含 CONSTITUTION.md（首位）：fixture 须覆盖全布局，pack 按 input 渲染槽位
+    ("CONSTITUTION.md", "# Constitution\n公开章程：测试站位。"),
     ("SOUL.md", "# Soul\n联系电话 13800001111，邮箱 user@example.com。"),
     ("IDENTITY.md", "# Identity\n代号 Athena。"),
     ("USER.md", "# User\n住址：长沙市雨花区测试路 1 号。"),
@@ -93,7 +95,7 @@ class TestPeerStandingRedaction:
         assert "standing_redacted" in out
 
     def test_peer_keeps_standing_skeleton(self):
-        """脱敏只动内容不动骨架：9 文件注入槽位全部保留。"""
+        """脱敏只动内容不动骨架：packaged_layout().standing_files 的注入槽位全部保留。"""
         out = _peer()
         layout = packaged_layout()
         for name in layout.standing_files:
