@@ -12,6 +12,7 @@ never rebuilt inside dispatch (dispatch runs every turn, see
 
 from __future__ import annotations
 
+import difflib
 import logging
 from collections.abc import Sequence
 from contextvars import ContextVar, Token
@@ -25,6 +26,9 @@ if TYPE_CHECKING:
 
 
 log = logging.getLogger(__name__)
+
+MCP_NAMESPACE_PREFIX = "mcp_"
+"""Prefix for per-MCP-server virtual namespaces (e.g. ``mcp_corp``)."""
 
 
 def _tool_to_spec(tool: Tool) -> dict[str, Any]:
@@ -118,10 +122,93 @@ class ToolDeferSession:
         override = self._policy.namespace_descriptions.get(namespace)
         if override:
             return override
+        if namespace.startswith(MCP_NAMESPACE_PREFIX):
+            server = namespace[len(MCP_NAMESPACE_PREFIX):]
+            return (
+                f"MCP 本地服务「{server}」的工具"
+                f"（{len(tool_names)} 个），按需加载"
+            )
         raise ValueError(
             f"namespace {namespace!r} has no description in policy; "
             f"known: {sorted(self._policy.namespace_descriptions.keys())}"
         )
+
+    def _mcp_aliases(self) -> dict[str, str]:
+        """Server-name alias -> canonical namespace, e.g. ``{'corp': 'mcp_corp'}``."""
+        return {
+            ns.name[len(MCP_NAMESPACE_PREFIX):]: ns.name
+            for ns in self._namespaces
+            if ns.name.startswith(MCP_NAMESPACE_PREFIX)
+        }
+
+    def resolve_namespace(self, name: str) -> str:
+        """Canonical namespace for a model-supplied name.
+
+        Exact match first (a declared namespace always wins over an MCP
+        alias), then the MCP server-name alias (``'corp'`` -> ``'mcp_corp'``).
+        Raises ``KeyError`` with close-match suggestions otherwise.
+        """
+        known = sorted(ns.name for ns in self._namespaces)
+        if name in known:
+            return name
+        aliases = self._mcp_aliases()
+        if name in aliases:
+            return aliases[name]
+        candidates = known + sorted(aliases)
+        suggestions = difflib.get_close_matches(name, candidates, n=3, cutoff=0.6)
+        detail = ""
+        if suggestions:
+            rendered = []
+            for s in suggestions:
+                if s in aliases:
+                    rendered.append(f"'{aliases[s]}'（别名 '{s}'）")
+                else:
+                    rendered.append(f"'{s}'")
+            detail = "；您是想找 " + "、".join(rendered) + " 吗？"
+        raise KeyError(
+            f"unknown tool namespace {name!r}{detail}"
+            f"；已知命名空间：{', '.join(known) or '(none)'}"
+        )
+
+    def search_catalog(self, query: str) -> list[dict[str, Any]]:
+        """Keyword discovery over the local namespace catalog (no schema load).
+
+        Matches case-insensitively (Chinese supported) against namespace
+        names, namespace descriptions, tool names and tool descriptions.
+        Rank: namespace-name hit > tool-name hit > description hit.
+        Only local namespaces are covered (declared + MCP virtual) — the
+        skill marketplace is searched separately via ``search_skill``.
+        """
+        q = query.strip().lower()
+        if not q:
+            return []
+        hits: list[dict[str, Any]] = []
+        for ns in self._namespaces:
+            name_hit = q in ns.name.lower()
+            desc_hit = q in ns.description.lower()
+            matched_tools = []
+            for tname in ns.tool_names:
+                spec = self._specs.get(tname, {})
+                tdesc = spec.get("function", {}).get("description", "") or ""
+                if q in tname.lower() or q in tdesc.lower():
+                    matched_tools.append(tname)
+            if not (name_hit or desc_hit or matched_tools):
+                continue
+            rank = 0 if name_hit else (1 if matched_tools else 2)
+            source = "mcp" if ns.name.startswith(MCP_NAMESPACE_PREFIX) else "declared"
+            hits.append(
+                {
+                    "namespace": ns.name,
+                    "description": ns.description,
+                    "matched_tools": matched_tools,
+                    "source": source,
+                    "_rank": rank,
+                }
+            )
+        hits.sort(key=lambda h: (h["_rank"], h["namespace"]))
+        for h in hits:
+            del h["_rank"]
+        return hits
 
     def load_namespace(self, namespace: str) -> dict[str, Any]:
         """Mark *namespace* loaded and return its full wire specs.
@@ -129,11 +216,9 @@ class ToolDeferSession:
         Idempotent — a second load returns the same payload.  Raises
         ``KeyError`` with the known namespaces on unknown input.
         """
-        target = next((ns for ns in self._namespaces if ns.name == namespace), None)
-        if target is None:
-            known = ", ".join(sorted(ns.name for ns in self._namespaces)) or "(none)"
-            raise KeyError(f"unknown tool namespace {namespace!r}; known: {known}")
-        self._loaded.add(namespace)
+        canonical = self.resolve_namespace(namespace)
+        target = next(ns for ns in self._namespaces if ns.name == canonical)
+        self._loaded.add(canonical)
         return {
             "namespace": namespace,
             "description": target.description,
