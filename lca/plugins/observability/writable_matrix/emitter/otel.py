@@ -23,9 +23,6 @@ class OTelEmitter:
 
     _delegate: Any = None
 
-    def bind_delegate(self, delegate: Any) -> None:
-        self._delegate = delegate
-
     def emit(self, record: EventRecord) -> None:
         if self._delegate is not None:
             self._delegate.emit(record)

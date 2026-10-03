@@ -11,8 +11,6 @@ retention_class（来自旧 ``JOURNAL_CATALOG_META``）合在同一个 dataclass
 
 from __future__ import annotations
 
-from collections.abc import Iterable
-
 from lca.contracts.models.observability.event.event import (
     EventAudience,
     EventDescriptor,
@@ -719,10 +717,3 @@ def build_default_registry() -> InMemoryEventDescriptorRegistry:
         ),
     ]
     return InMemoryEventDescriptorRegistry(descriptors)
-
-
-def all_builtin_event_classes() -> Iterable[type]:
-    """所有内置事件的 payload 类（与 ``JOURNAL_EVENT_CLASSES`` 等价）。"""
-    for descriptor in build_default_registry().all():
-        if descriptor.payload_class is not None:
-            yield descriptor.payload_class

@@ -164,13 +164,6 @@ class RunWriteBehindRegistry:
                 for state in self._runs.values()
             )
 
-    def pending_count_for_run(self, run_id: str) -> int:
-        with self._lock:
-            state = self._runs.get(run_id)
-            if state is None:
-                return 0
-            return state.spine_buffer.pending_count + state.exceptions_buffer.pending_count
-
     def enqueue_spine(
         self,
         record: SpineEventRecord,
@@ -222,12 +215,6 @@ class RunWriteBehindRegistry:
             run_ids = list(self._runs)
         for run_id in run_ids:
             self.flush_run(run_id)
-
-    def dispose_all(self) -> None:
-        with self._lock:
-            run_ids = list(self._runs)
-        for run_id in run_ids:
-            self.dispose_run(run_id)
 
     def _state_for(self, run_id: str, *, run_dir: Path | None) -> _RunPersistenceState:
         with self._lock:
