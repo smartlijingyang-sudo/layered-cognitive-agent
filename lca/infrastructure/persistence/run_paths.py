@@ -7,14 +7,43 @@ shape ``"{session.id}:{seq}"`` and resolve spine / exceptions paths under
 
 from __future__ import annotations
 
+import contextlib
 from pathlib import Path
 
-from lca.infrastructure.observability.spine.sinks.naming import (
-    exceptions_filename_for_run,
-    spine_filename_for_run,
-)
-
 _DEFAULT_RUNS_ROOT = Path("traces") / "runs"
+
+RUN_DIR_MODE = 0o700
+"""Access bound for ``traces/runs/<run_id>/``.
+
+Everything a run writes there is model or tool content: the spine ledger
+carries full prompt text and full tool payloads, so whatever a tool downloads
+lands in it verbatim. ``run_56c3352cd22e`` parsed a Google Sheets password
+list and the plaintext credentials appeared 22 times in its ``.spine.jsonl``.
+
+The bound sits on the directory because the artifacts reach it through
+several independent writers (write-behind ``JsonlFileSink``, ``FileSink``,
+``RoutingFileStorage``, the kernel ``SpineSink``) and more can be added.
+``mkdir`` alone is not enough: its mode is ANDed with the process umask and
+``exist_ok=True`` leaves an existing directory untouched, so this chmods
+unconditionally and stays idempotent. ``traces/`` is not mounted into the
+sandbox and no other user reads it.
+"""
+
+
+def ensure_run_dir(path: Path) -> Path:
+    """Create ``path`` if needed and hold it at :data:`RUN_DIR_MODE`.
+
+    precondition: ``path`` is a per-run directory under the runs root, or a
+    test override standing in for one.
+    失败语义: ``mkdir`` 失败原样上抛; ``chmod`` 失败被抑制, 因为目录已存在时
+    它可能属于别的 owner, 而那不该让 run 落盘失败。
+    时序: mkdir → chmod, 每次调用都 chmod, 所以任何一个 writer 先到都会把
+    已存在的目录收紧。
+    """
+    path.mkdir(parents=True, exist_ok=True)
+    with contextlib.suppress(OSError):
+        path.chmod(RUN_DIR_MODE)
+    return path
 
 
 def run_id_from_event_id(event_id: str) -> str:
@@ -22,8 +51,7 @@ def run_id_from_event_id(event_id: str) -> str:
     run_id, sep, seq = event_id.rpartition(":")
     if not sep or not run_id or not seq.isdigit():
         raise ValueError(
-            f"无法从 event_id={event_id!r} 推导 run_id"
-            "（Session 投递契约 '{session.id}:{seq}'）"
+            f"无法从 event_id={event_id!r} 推导 run_id（Session 投递契约 '{{session.id}}:{{seq}}'）"
         )
     return run_id
 
@@ -37,15 +65,26 @@ def run_dir_for(run_id: str, *, run_dir: Path | None = None) -> Path:
 
 def spine_path_for_run(run_id: str, *, run_dir: Path | None = None) -> Path:
     """``<run_dir>/<run_id>.spine.jsonl`` durable ledger path."""
+    # Deferred: ``spine.sinks.__init__`` pulls in ``FileSink``, which imports
+    # ``ensure_run_dir`` from here. A module-level import would make this
+    # module resolve while it is still initializing.
+    from lca.infrastructure.observability.spine.sinks.naming import spine_filename_for_run
+
     return run_dir_for(run_id, run_dir=run_dir) / spine_filename_for_run(run_id)
 
 
 def exceptions_path_for_run(run_id: str, *, run_dir: Path | None = None) -> Path:
     """``<run_dir>/<run_id>.exceptions.jsonl`` grep-friendly index path."""
+    from lca.infrastructure.observability.spine.sinks.naming import (
+        exceptions_filename_for_run,
+    )
+
     return run_dir_for(run_id, run_dir=run_dir) / exceptions_filename_for_run(run_id)
 
 
 __all__ = [
+    "RUN_DIR_MODE",
+    "ensure_run_dir",
     "exceptions_path_for_run",
     "run_dir_for",
     "run_id_from_event_id",

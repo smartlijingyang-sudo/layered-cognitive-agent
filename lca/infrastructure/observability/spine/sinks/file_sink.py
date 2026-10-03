@@ -39,9 +39,11 @@ from lca.contracts.observability.evidence.fsync import FsyncProtocol
 from lca.infrastructure.observability.spine.event.record import EventRecord
 from lca.infrastructure.observability.spine.sinks.naming import (
     DEFAULT_SPINE_TEMPLATE,
+    RUN_ARTIFACT_MODE,
     resolve_filename,
     spine_filename_for_run,
 )
+from lca.infrastructure.persistence.run_paths import ensure_run_dir
 
 log = logging.getLogger(__name__)
 
@@ -187,11 +189,11 @@ class FileSink:
         self._write_exception_index = write_exception_index
         self._legacy_sha256_only = legacy_sha256_only
 
-        self._run_dir.mkdir(parents=True, exist_ok=True)
+        ensure_run_dir(self._run_dir)
         self._fd = os.open(
             str(self._path),
             os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_CLOEXEC,
-            0o644,
+            RUN_ARTIFACT_MODE,
         )
 
         # Exception index — separate append-only fd so an index glitch
@@ -206,7 +208,7 @@ class FileSink:
                 self._exceptions_fd = os.open(
                     str(self._exceptions_path),
                     os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_CLOEXEC,
-                    0o644,
+                    RUN_ARTIFACT_MODE,
                 )
             except OSError as exc:
                 log.error(

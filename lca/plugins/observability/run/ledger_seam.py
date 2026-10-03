@@ -86,8 +86,9 @@ class FilesystemRunLedgerFactory(RunLedgerFactory, RunJournalFactory):
             StepNarrativeWriter,
         )
         from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
+        from lca.infrastructure.persistence.run_paths import ensure_run_dir
 
-        spine_path.parent.mkdir(parents=True, exist_ok=True)
+        ensure_run_dir(spine_path.parent)
 
         narrative_writer = StepNarrativeWriter(spine_path.parent / "journal.narrative.md")
 

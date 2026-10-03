@@ -26,6 +26,20 @@ KERNEL_LOG_FILENAME = "kernel.log"
 # 避免与旧单文件 layout 命名空间字面撞车)。
 BOOT_SPINE_FILENAME = "boot-spine.jsonl"
 
+RUN_ARTIFACT_MODE = 0o600
+"""``os.open`` mode for every append-stream artifact in a run directory.
+
+The spine ledger carries full tool payloads and full prompt text, so anything
+a tool downloads lands there verbatim. ``run_56c3352cd22e`` parsed a Google
+Sheets password list and the plaintext credentials ended up in 22 places in
+its ``.spine.jsonl``. The derived artifacts beside it (``journal.json``,
+``journal.narrative.md``, ``manifest.json``) are 0600 because
+``atomic_write_text`` creates them through ``tempfile``, which is 0600 by
+default; the append streams open their own fd and must state the same bound
+explicitly. ``os.open`` ANDs this with the process umask, so the result is
+0600 or stricter, never looser.
+"""
+
 # 占位符集合(目前只有 $run_id;未来可扩 $trace_id 等)
 _PLACEHOLDER_RUN_ID = "$run_id"
 
@@ -85,6 +99,7 @@ __all__ = [
     "DEFAULT_SPINE_TEMPLATE",
     "EXCEPTIONS_FILE_SUFFIX",
     "KERNEL_LOG_FILENAME",
+    "RUN_ARTIFACT_MODE",
     "SPINE_FILE_SUFFIX",
     "exceptions_filename_for_run",
     "kernel_log_filename",

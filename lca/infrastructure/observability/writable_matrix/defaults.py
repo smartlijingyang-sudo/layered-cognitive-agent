@@ -215,6 +215,7 @@ class RoutingFileStorage:
     ) -> None:
         from lca.infrastructure.observability.spine.sinks.naming import (
             DEFAULT_SPINE_TEMPLATE,
+            RUN_ARTIFACT_MODE,
             resolve_filename,
             spine_filename_for_run,
         )
@@ -228,7 +229,7 @@ class RoutingFileStorage:
         self._fd = os.open(
             str(self._path),
             os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_CLOEXEC,
-            0o644,
+            RUN_ARTIFACT_MODE,
         )
 
     def write(self, payload: bytes) -> None:
@@ -237,4 +238,3 @@ class RoutingFileStorage:
     def close(self) -> None:
         with suppress(OSError):
             os.close(self._fd)
-

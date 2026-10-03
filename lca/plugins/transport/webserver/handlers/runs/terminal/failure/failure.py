@@ -63,8 +63,9 @@ def _append_kernel_log(facts: RunFailureFacts) -> None:
     try:
         from pathlib import Path
 
-        run_dir = Path("traces") / "runs" / facts.run_id
-        run_dir.mkdir(parents=True, exist_ok=True)
+        from lca.infrastructure.persistence.run_paths import ensure_run_dir
+
+        run_dir = ensure_run_dir(Path("traces") / "runs" / facts.run_id)
         line = (
             f"run_failure_observed run_id={facts.run_id} "
             f"trace_id={facts.trace_id} error={facts.error}\n"

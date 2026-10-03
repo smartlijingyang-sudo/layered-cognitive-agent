@@ -18,6 +18,7 @@ from lca.contracts.atoms.ids.ids import utc_now_ms
 from lca.contracts.observability.evidence.fsync import FsyncProtocol
 from lca.infrastructure.persistence.jsonl_sink import JsonlFileSink
 from lca.infrastructure.persistence.run_paths import (
+    ensure_run_dir,
     exceptions_path_for_run,
     run_id_from_event_id,
     spine_path_for_run,
@@ -242,8 +243,8 @@ class RunWriteBehindRegistry:
     def _create_state(self, run_id: str, *, run_dir: Path | None) -> _RunPersistenceState:
         spine_path = spine_path_for_run(run_id, run_dir=run_dir)
         exceptions_path = exceptions_path_for_run(run_id, run_dir=run_dir)
-        spine_path.parent.mkdir(parents=True, exist_ok=True)
-        exceptions_path.parent.mkdir(parents=True, exist_ok=True)
+        ensure_run_dir(spine_path.parent)
+        ensure_run_dir(exceptions_path.parent)
 
         spine_fsync = self._spine_fsync_policy is not FsyncProtocol.COMMIT
         exceptions_fsync = self._exceptions_fsync_policy is FsyncProtocol.PER_WRITE
