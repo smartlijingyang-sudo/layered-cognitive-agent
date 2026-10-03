@@ -70,14 +70,17 @@ class ActivityProjector:
     def feed_event(self, stamped: dict[str, Any]) -> ActivityItem | None:
         event = stamped.get("event") or stamped
         ep = str(event.get("execution_point") or "")
+        # Catalog (gateway) events carry their name in ``type``, not
+        # ``execution_point`` — this is the wire that was dead before.
+        etype = str(event.get("type") or "")
         payload = event.get("payload") if isinstance(event.get("payload"), dict) else event
 
-        if ep in _START_POINTS or ep in _CATALOG_START_POINTS:
+        if ep in _START_POINTS or etype in _CATALOG_START_POINTS:
             return self._on_start(payload)
         if ep in _EXECUTE_START_POINTS:
             return self._on_execute_start(payload)
-        if ep in _END_POINTS or ep in _CATALOG_END_POINTS:
-            return self._on_end(ep, payload)
+        if ep in _END_POINTS or etype in _CATALOG_END_POINTS:
+            return self._on_end(etype or ep, payload)
         return None
 
     # ------------------------------------------------------------------ start
@@ -266,7 +269,12 @@ class ActivityProjector:
         self._items[item.assistant_id][item.id] = item
 
     def _get(self, assistant_id: str, item_id: str) -> ActivityItem | None:
-        return self._items.get(assistant_id, {}).get(item_id)
+        # Gateway events historically do not stamp assistant_id: fall back to
+        # the "default" bucket so an end event can always find its start.
+        item = self._items.get(assistant_id, {}).get(item_id)
+        if item is None and assistant_id != "default":
+            item = self._items.get("default", {}).get(item_id)
+        return item
 
 
 _GLOBAL_PROJECTOR = ActivityProjector()

@@ -78,7 +78,7 @@ def test_catalog_tool_started_reaches_drawer():
     # 网关 catalog 事件之前到不了抽屉（死线）——现在必须能建项
     p = _p()
     item = p.feed_event({
-        "execution_point": "ToolStarted",
+        "type": "ToolStarted",
         "payload": {"call_id": "g1", "tool_name": "gmail_search",
                     "args": {"query": "from:boss"}},
     })
@@ -92,11 +92,11 @@ def test_catalog_tool_started_reaches_drawer():
 def test_catalog_tool_denied_is_failed_with_reason():
     p = _p()
     p.feed_event({
-        "execution_point": "ToolStarted",
+        "type": "ToolStarted",
         "payload": {"call_id": "g2", "tool_name": "shell_exec", "args": {}},
     })
     denied = p.feed_event({
-        "execution_point": "ToolDenied",
+        "type": "ToolDenied",
         "payload": {"call_id": "g2", "tool_name": "shell_exec", "reason": "policy blocked"},
     })
     assert denied.status == ActivityStatus.FAILED
@@ -107,11 +107,11 @@ def test_catalog_tool_denied_is_failed_with_reason():
 def test_catalog_tool_invoked_success():
     p = _p()
     p.feed_event({
-        "execution_point": "ToolStarted",
+        "type": "ToolStarted",
         "payload": {"call_id": "g3", "tool_name": "memory_recall", "args": {}},
     })
     done = p.feed_event({
-        "execution_point": "ToolInvoked",
+        "type": "ToolInvoked",
         "payload": {"call_id": "g3", "tool_name": "memory_recall",
                     "result": {"state": {"summary": "找到 3 条记忆"}}},
     })
