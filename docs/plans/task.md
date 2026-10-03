@@ -568,9 +568,14 @@
 | BRAINSTORM-CONN-WIDGET-DESIGN-SECTIONS | 逐步呈现分节架构规范（边界/工具契约/前端卡片与清洗/测试不变量）并呈批 | Completed | §1 边界自治、§2 拓扑时序、§3 契约/API、§4 不变量矩阵与 §5 ADR 全部呈批通过 |
 | BRAINSTORM-CONN-WIDGET-DESIGN-DOC | 沉淀架构设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-04-connector-capability-intent-and-zero-url-exposure-design.md 并提交 git (commit 6ab77a46a) |
 | BRAINSTORM-CONN-WIDGET-TRANSITION | 转入实施计划制定（调用 writing-plans 规划单流落地步骤） | Completed | 成功落盘 docs/plans/2026-10-04-connector-capability-intent-and-zero-url-exposure-plan.md 并分解为 6 大单流任务 |
-| CAP-TASK-1-VAULT | 契约模型与凭据暂存服务 (`ConnectorAuthIntent` & `ConnectorAuthIntentVault`) | Pending | 待执行 |
-| CAP-TASK-2-ROUTE | 传输层带外能力解析端点 (`POST /api/connectors/auth-intents/{id}/resolve`) | Pending | 待执行 |
-| CAP-TASK-3-TOOL-ZERO-URL | 工具与适配层彻底消解 URL 暴露 (`composioConnect` 与 `ConnectorPreExecutionGuard`) | Pending | 待执行 |
-| CAP-TASK-4-GATEWAY-FALLBACK | 网关层确定性卡片兜底保底挂载 (`run_session_writer.py` / Gateway) | Pending | 待执行 |
-| CAP-TASK-5-FRONTEND-PATCH | 前端补丁升级 (`ConnectorAuthCard.tsx` 与 `connector_auth_card.py`) | Pending | 待执行 |
+| CAP-TASK-1-VAULT | 契约模型与凭据暂存服务 (`ConnectorAuthIntent` & `ConnectorAuthIntentVault`) | Completed | 落地 ConnectorAuthIntent 契约模型与 ConnectorAuthIntentVault 内存保险箱（支持 300s TTL、多租户隔离、消费标记与单例管理），单测 5/5 全绿，commit 65b36544e (INV-CAP-02) |
+| CAP-TASK-2-ROUTE | 传输层带外能力解析端点 (`POST /api/connectors/auth-intents/{id}/resolve`) | Completed | 落地 /composio/auth-intents/{id}/resolve 与 /api/connectors/auth-intents/{id}/resolve，支持 Header X-User-ID 多租户鉴权、300s TTL 与 CORS，单测 3/3 全绿，commit c6d344df6 (INV-CAP-03) |
+| CAP-TASK-3-TOOL-ZERO-URL | 工具与适配层彻底消解 URL 暴露 (`composioConnect` 与 `ConnectorPreExecutionGuard`) | Completed | composioConnect 与 format_connection_not_active_observation 彻底剔除裸 URL，接入 IntentVault 生成短门票并输出 intentId 卡片标签，单测 35/35 全绿，commit 7d5d6b38e (INV-CAP-01) |
+| CAP-TASK-4-GATEWAY-FALLBACK | 网关层确定性卡片兜底保底挂载 (`run_session_writer.py` / Gateway) | Completed | 落地 extract_pending_intents_from_events 与 ensure_intent_widget_in_assistant_message，并在 RunSessionWriter.append_assistant_message 闭环保底挂载，单测 5/5 全绿，commit 653b3feb2 (INV-CAP-04) |
+| CAP-TASK-5-FRONTEND-PATCH | 前端补丁升级 (`ConnectorAuthCard.tsx` 与 `connector_auth_card.py`) | In Progress | 升级 ConnectorAuthCard 支持 intentId 异步兑换，connector_auth_card.py 补丁支持 intentId 解析与正文脱敏，验证 patch 门禁 |
 | CAP-TASK-6-ADR-AND-E2E | ADR-0280 沉淀与全链路端到端集成验收 | Pending | 待执行 |
+| BRAINSTORM-STATELESS-MEMORY-PROJECTION | 长期记忆「一源一镜，镜无状态」架构设计与呈批 | Completed | 厘清底层 JSON 唯一真值、MEMORY.md 纯函数投影、骨架不坍塌及编辑输入事件解析器，已落盘 docs/plans/2026-10-04-stateless-memory-projection-and-writeback-design.md 与 plan (commit 7a85746d1) |
+| MEM-TASK-1-PURE-PROJECTOR | 纯函数投影器与模板骨架保底 (`curated.py`) | Pending | 实现 render_curated_memory_markdown、保留 ## Preferences / ## Facts 骨架与行尾 <!-- id:mem_xxx --> 锚点 (INV-MEM-01~03) |
+| MEM-TASK-2-EDIT-SYNC-SERVICE | Markdown 编辑事件解析器 (`MemoryEditSyncService`) | Pending | 解析提交的 Markdown，比对活跃记录计算 ADD/SUPERSEDE/DELETE 原子操作并驱动 AssistantMemory (INV-MEM-04~05) |
+| MEM-TASK-3-ROUTE-GATE | Webserver Standing File 写入窄门拦截 (`standing_files.py`) | Pending | 拦截 PUT MEMORY.md 严禁直接写盘，转由 MemoryEditSyncService 同步至 semantic.json 并重新投影 (INV-MEM-06) |
+| MEM-TASK-4-INTEGRATION-E2E | 端到端集成与 Prompt 实时感知验收 (`test_memory_stateless_projection_e2e.py`) | Pending | 覆盖工具写入、编辑回写、全链路往返及 persona_from_home Prompt 加载 |
