@@ -7,7 +7,9 @@ ADR-0257 §7（李超 132f381a8 裁决）把"相同"拆成两种形态：
 - peer（跨机/跨组织，如 peter）：脱敏信封 ``standing_redacted``，PII 不出境。
 
 实证：2026-10-03 全仓 grep，``standing_redacted`` 在 ``lca/`` 与 ``tests/``
-零符号——决议已裁决、实现零落地。test_t8 只断言同机快照 9 文件装配，
+实现已落地（``edd8add8e``，quality lane，ADR-0276 T8：
+``pack_peer_standing`` PII 脱敏 + ``standing_redacted`` 标记），本文件 5 枚
+契约钉已由预期红翻绿。test_t8 只断言同机快照 9 文件装配，
 T8 行的"未覆盖同机/peer 区分（0257 §7）"正是 0276 映射表点名的缺口。
 
 本文件 tests lane 定义契约 seam（quality lane 实现时遵循；开放设计点已标注）：
