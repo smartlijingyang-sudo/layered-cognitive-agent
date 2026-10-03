@@ -67,7 +67,7 @@ def apply(ctx: PatchContext) -> bool:
     # 3. Strip the marker from the displayed content.
     strip_anchor = (
         "    if (isAvatarPickerWidget && cleanContent) {\n"
-        "      cleanContent = cleanContent.replace(/\\[widget:avatar_picker\\?[^\\]]+\\]/g, '').trim();\n"
+        "      cleanContent = cleanContent.replace(/\\[widget:avatar_picker(?:\\?[^\\]]+)?\\]/g, '').trim();\n"
         "    }"
     )
     strip_repl = (

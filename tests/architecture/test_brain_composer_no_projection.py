@@ -26,6 +26,20 @@ from lca.contracts.harness.composition.composer import (
 from lca.plugins.composer.think.brain_composer import BrainComposer
 
 
+class _GatableBrainFake:
+    """Structural ``_GatableBrain``: a bare ``MagicMock`` is invisible to the
+    ``@runtime_checkable`` ``isinstance`` guard in ``BrainComposer`` (3.12
+    uses ``inspect.getattr_static``, which never triggers ``__getattr__``),
+    so the gate would silently never be installed."""
+
+    def __init__(self) -> None:
+        self.with_gate_calls: list = []
+
+    def with_gate(self, decision_gate):
+        self.with_gate_calls.append(decision_gate)
+        return self
+
+
 def _request(*, decision_gate: object | None = None) -> AgentCompositionRequest:
     """Minimal ``AgentCompositionRequest`` — only ``spec`` is read by the composer.
 
@@ -35,8 +49,7 @@ def _request(*, decision_gate: object | None = None) -> AgentCompositionRequest:
     / ``PROMPT_TEMPLATE_PROVIDER`` resolution while still exercising
     ``compose_agent``'s slim shape.
     """
-    brain = MagicMock(name="brain")
-    brain.with_gate.return_value = brain
+    brain = _GatableBrainFake()
     spec = SimpleNamespace(
         llm=MagicMock(name="llm"),
         brain=brain,
@@ -82,12 +95,11 @@ def test_brain_composer_invokes_with_gate_when_lead_decision_gate_provided() -> 
     lead_gate = MagicMock(name="lead_gate")
     request = _request(decision_gate=lead_gate)
     composer.compose_agent(request, _scope())
-    assert request.spec.brain.with_gate.call_count == 1, (
+    assert request.spec.brain.with_gate_calls == [lead_gate], (
         "BrainComposer must invoke brain.with_gate(lead_gate) exactly once when a "
         "lead decision gate is installed (ModularBrain.with_gate replaces the legacy "
         "apply_lead_brain helper)."
     )
-    assert request.spec.brain.with_gate.call_args.args == (lead_gate,)
 
 
 def test_brain_composer_module_has_no_phase_capability_projection_call() -> None:
