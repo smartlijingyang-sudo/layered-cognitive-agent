@@ -127,9 +127,7 @@ def test_append_tool_call_writes_log_only_event() -> None:
     """log/tool_call is NOT a surface event; it pairs the tool-result surface event via source_event_seqs."""
     session = _InMemorySession()
     writer = RunSessionWriter(session=session)
-    ref = writer.append_tool_call(
-        turn=0, step=0, call_id="c1", name="bash", arguments="{}"
-    )
+    ref = writer.append_tool_call(turn=0, step=0, call_id="c1", name="bash", arguments="{}")
     event = session.last_event()
     assert ref.category == "log/tool_call"
     assert event.type == "log/tool_call"
@@ -168,14 +166,100 @@ def test_derive_messages_returns_wire_shape() -> None:
     writer = RunSessionWriter(session=session)
     writer.append_user_message(message_id="m1", role="user", content="hello")
     writer.append_assistant_message(
-        turn=0, step=0, role="assistant", content="hi",
-        tool_calls=None, usage=None,
+        turn=0,
+        step=0,
+        role="assistant",
+        content="hi",
+        tool_calls=None,
+        usage=None,
     )
     msgs = writer.derive_messages()
     assert msgs == [
         {"role": "user", "content": "hello"},
         {"role": "assistant", "content": "hi"},
     ]
+
+
+def test_append_tool_result_message_field_includes_error() -> None:
+    """The model-visible tool message carries the error, not only content.
+
+    Regression: run_f70ccf932e9d's ``send_message`` calls hit a deferred-
+    namespace block, but the error was masked by the source marker, so the
+    model saw an empty success and re-asked 24 times.
+    """
+    session = _InMemorySession()
+    writer = RunSessionWriter(session=session)
+    writer.append_assistant_message(
+        turn=0,
+        step=0,
+        role="assistant",
+        content=None,
+        tool_calls=[{"id": "c1", "name": "send_message", "arguments": "{}"}],
+        usage=None,
+    )
+    writer.append_tool_result(
+        turn=0,
+        step=0,
+        call_id="c1",
+        content="[source:tool:c1]",
+        error={
+            "kind": "execution",
+            "message": "tool send_message belongs to deferred namespace 'agent'",
+            "retryable": False,
+        },
+        meta=None,
+    )
+    event = session.last_event()
+    assert "deferred namespace 'agent'" in event.data["message"]["content"]
+    assert "[tool_error kind=execution retryable=False]" in event.data["message"]["content"]
+
+
+def test_derive_messages_tool_result_shows_error() -> None:
+    """derive_messages surfaces a failed tool result's error text."""
+    session = _InMemorySession()
+    writer = RunSessionWriter(session=session)
+    writer.append_assistant_message(
+        turn=0,
+        step=0,
+        role="assistant",
+        content=None,
+        tool_calls=[{"id": "c1", "name": "send_message", "arguments": "{}"}],
+        usage=None,
+    )
+    writer.append_tool_result(
+        turn=0,
+        step=0,
+        call_id="c1",
+        content="[source:tool:c1]",
+        error={
+            "kind": "execution",
+            "message": "namespace_not_loaded",
+            "retryable": False,
+        },
+        meta=None,
+    )
+    msgs = writer.derive_messages()
+    tool_msgs = [m for m in msgs if m.get("role") == "tool"]
+    assert len(tool_msgs) == 1
+    assert "namespace_not_loaded" in tool_msgs[0]["content"]
+
+
+def test_tool_result_content_error_not_masked_by_content() -> None:
+    """A non-empty content (e.g. source marker) must not hide the error."""
+    from lca.runtime.session.run_session_writer import _tool_result_content
+
+    text = _tool_result_content(
+        {
+            "content": "[source:tool:c1]",
+            "error": {
+                "kind": "execution",
+                "message": "namespace_not_loaded",
+                "retryable": False,
+            },
+        }
+    )
+    assert text.startswith("[source:tool:c1]")
+    assert "[tool_error kind=execution retryable=False] namespace_not_loaded" in text
 
 
 def test_request_header_returns_epoch_header_system_field() -> None:

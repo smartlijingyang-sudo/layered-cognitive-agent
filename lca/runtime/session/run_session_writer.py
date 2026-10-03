@@ -41,20 +41,22 @@ def _tool_result_content(data: dict[str, Any]) -> str:
     An empty ``role=tool`` row is indistinguishable from an unanswered
     call, so the model re-issues it (``run_71456ce99914``: two sandbox
     timeouts came back zero-length and the model kept guessing file
-    paths). The journal keeps the fact split — payload in ``content``,
+    paths). A failed call's ``error`` must reach the model even when the
+    content is non-empty — a source marker alone masked ``namespace_not_loaded``
+    and reopened the retry loop (``run_f70ccf932e9d``: 24 ``send_message``
+    re-asks). The journal keeps the fact split — payload in ``content``,
     classification in ``error`` — and this projection is the single place
     that joins them into what the model reads.
     """
+    from lca.infrastructure.session.projections.tool_result_message import tool_error_text
+
     content = data.get("content")
     text = content if isinstance(content, str) else ("" if content is None else str(content))
+    error_text = tool_error_text(data.get("error"))
+    if error_text:
+        return f"{text}\n{error_text}" if text.strip() else error_text
     if text.strip():
         return text
-    error = data.get("error")
-    if isinstance(error, dict):
-        kind = error.get("kind") or "execution"
-        message = str(error.get("message") or "").strip() or "unknown error"
-        retryable = bool(error.get("retryable"))
-        return f"[tool_error kind={kind} retryable={retryable}] {message}"
     return "[tool_result] (no output)"
 
 
@@ -339,6 +341,7 @@ class RunSessionWriter(RunSessionWriterProtocol):
                 "message": build_openai_tool_result_message(
                     tool_call_id=str(call_id),
                     content=content,
+                    error=error,
                 ),
             },
             # SurfaceOp 契约只允许 "append" | replace;"tool_result" 是

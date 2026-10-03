@@ -180,7 +180,9 @@ class RunExecutionEnvironment:
             bind_facade_run(facade_ctx),
             bind_run_ambit(ambit),
             run_identity_scopes(
-                session.run_id, session.attachment_ids, assistant_id,
+                session.run_id,
+                session.attachment_ids,
+                assistant_id,
             ),
         ):
             log_context: dict[str, str] = {
@@ -323,7 +325,13 @@ class RunExecutionEnvironment:
                 tools_token = set_current_tools_service(tools_service)
                 # Defer-tool seam (Muse L1 alignment): one session per run;
                 # think.reason's per-turn fork only refreshes the turn view.
-                defer_token = set_current_defer_session(ToolDeferSession(DeferPolicy.default()))
+                # Gated vocal mode keeps the ``agent`` namespace eager so
+                # ``send_message`` is visible from turn one (ADR-0248);
+                # otherwise the vocal contract makes the model call a tool
+                # whose schema was never loaded.
+                defer_token = set_current_defer_session(
+                    ToolDeferSession(DeferPolicy.for_vocal_mode(vocal_mode))
+                )
                 with (
                     run_workspace_scope(session.run_id) as workspace,
                     run_scope(ambit.scope) if ambit.scope is not None else nullcontext(),

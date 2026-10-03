@@ -283,8 +283,12 @@ class RunLifecycleCoordinator:
                 capability_token = set_capability_bindings(session.capability_bindings)
                 if getattr(session, "tools_service", None) is not None:
                     tools_token = set_current_tools_service(session.tools_service)
+                    # Mirror the create-run policy (ADR-0248): gated vocal
+                    # mode keeps the ``agent`` namespace eager so the resumed
+                    # run's vocal contract and visible tool schema agree.
+                    vocal_mode = getattr(bindings, "vocal_mode", "direct") or "direct"
                     defer_token = set_current_defer_session(
-                        ToolDeferSession(DeferPolicy.default())
+                        ToolDeferSession(DeferPolicy.for_vocal_mode(vocal_mode))
                     )
             try:
                 # P3-06: snapshot/runnable are hot-path cache; authority is Session facts.

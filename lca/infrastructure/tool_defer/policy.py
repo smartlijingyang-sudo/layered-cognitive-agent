@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+
+from lca.contracts.models.vocal.models import VocalMode
 
 STANDARD_NAMESPACES: tuple[str, ...] = (
     "core",
@@ -78,6 +80,25 @@ class DeferPolicy:
     def default(cls) -> DeferPolicy:
         """The production default: defer everything except core."""
         return cls()
+
+    @classmethod
+    def for_vocal_mode(cls, vocal_mode: str) -> DeferPolicy:
+        """Per-run policy for a vocal mode; gated keeps ``agent`` eager.
+
+        The gated vocal contract makes ``send_message`` the assistant's only
+        channel to the user (ADR-0248), so the ``agent`` namespace that
+        carries it must be visible on the first turn. Leaving it deferred
+        made the model call a tool whose schema was never loaded, spinning
+        the act→think re-ask loop until LoopObligationExceededError
+        (run_f70ccf932e9d).
+        """
+        policy = cls.default()
+        if str(vocal_mode or "") == VocalMode.GATED.value:
+            return replace(
+                policy,
+                eager_namespaces=policy.eager_namespaces | {"agent"},
+            )
+        return policy
 
 
 __all__ = [

@@ -57,3 +57,64 @@ def test_defer_policy_standard_namespaces() -> None:
     }
     assert "shell" in policy.namespace_approval
     assert policy.namespace_approval["shell"] == "require_approval"
+
+
+def test_defer_policy_for_vocal_mode_gated_keeps_agent_eager() -> None:
+    """Gated vocal mode must expose ``send_message`` from the first turn."""
+    policy = DeferPolicy.for_vocal_mode("gated")
+    assert "core" in policy.eager_namespaces
+    assert "agent" in policy.eager_namespaces
+
+
+def test_defer_policy_for_vocal_mode_direct_unchanged() -> None:
+    policy = DeferPolicy.for_vocal_mode("direct")
+    assert policy.eager_namespaces == frozenset({"core"})
+
+
+def _stub_tool(name: str, namespace: str) -> Any:
+    async def _execute(self, args):  # pragma: no cover - stub
+        return None
+
+    def _validate(self, args):  # pragma: no cover - stub
+        return None
+
+    return type(
+        f"_StubTool_{name}",
+        (),
+        {
+            "name": name,
+            "namespace": namespace,
+            "description": f"description for {name}",
+            "parameters": {"type": "object", "properties": {}},
+            "execute": _execute,
+            "validate": _validate,
+        },
+    )()
+
+
+def test_gated_policy_renders_send_message_on_the_wire() -> None:
+    """Gated policy: send_message schema is model-visible, not a catalog line."""
+    from lca.infrastructure.tool_defer.session import ToolDeferSession
+
+    search = _stub_tool("tool_search", "core")
+    send = _stub_tool("send_message", "agent")
+    session = ToolDeferSession(DeferPolicy.for_vocal_mode("gated"))
+    session.update_turn((search, send))
+    wire, catalog = session.render_turn()
+    names = [spec["function"]["name"] for spec in wire]
+    assert "send_message" in names
+    assert "send_message" not in catalog
+
+
+def test_direct_policy_defers_send_message_to_catalog() -> None:
+    """Direct policy keeps deferring send_message until tool_search loads it."""
+    from lca.infrastructure.tool_defer.session import ToolDeferSession
+
+    search = _stub_tool("tool_search", "core")
+    send = _stub_tool("send_message", "agent")
+    session = ToolDeferSession(DeferPolicy.default())
+    session.update_turn((search, send))
+    wire, catalog = session.render_turn()
+    names = [spec["function"]["name"] for spec in wire]
+    assert "send_message" not in names
+    assert "- agent:" in catalog
