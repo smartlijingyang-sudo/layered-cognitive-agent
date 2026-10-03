@@ -259,4 +259,3 @@ def test_inv_const_06_context_assembly_and_backstory_order(tmp_path: Any) -> Non
     if "<!-- INJECTED FILE: SOUL.md -->" in live_backstory:
         soul_idx = live_backstory.index("<!-- INJECTED FILE: SOUL.md -->")
         assert const_idx < soul_idx, "CONSTITUTION.md 必须在 SOUL.md 之前注入"
-

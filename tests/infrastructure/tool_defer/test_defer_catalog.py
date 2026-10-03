@@ -69,19 +69,20 @@ def _wire_names(wire: tuple[dict[str, Any], ...]) -> list[str]:
 def test_b1_catalog_has_one_line_per_deferred_namespace():
     """目录每行一句话可读,无 'N tools:' fallback 文本(验收 1).
 
-    8 域中 core(tool_search)是 eager 域,直接上 wire 不进目录,
-    所以目录恰好 7 行.
+    8 域中 core(tool_search) 与 memory 是 eager 域,直接上 wire 不进目录,
+    所以目录恰好 6 行.
     """
     session = _session()
     session.update_turn(_tools_8ns())
     _, catalog = session.render_turn()
     lines = [line for line in catalog.splitlines() if line.startswith("- ")]
-    assert len(lines) == 7, f"期望 7 行目录,实际 {len(lines)} 行:\n{catalog}"
+    assert len(lines) == 6, f"期望 6 行目录,实际 {len(lines)} 行:\n{catalog}"
     assert "tools:" not in catalog
     assert "- core: " not in catalog
+    assert "- memory: " not in catalog
     assert "- tool_search: " not in catalog
     for ns in NAMESPACES_8:
-        if ns == "core":
+        if ns in ("core", "memory"):
             continue
         assert f"- {ns}: {DESCRIPTIONS[ns]}" in catalog
 
@@ -93,24 +94,25 @@ def test_b2_missing_description_fails_fast():
         session.update_turn(_tools_8ns())
 
 
-def test_b3_tool_search_eager_every_turn():
-    """core/tool_search 每 turn 都在 wire 上(loader 缺席即死锁)."""
+def test_b3_tool_search_and_memory_eager_every_turn():
+    """core/tool_search 与 memory 每 turn 都在 wire 上."""
     session = _session()
     session.update_turn(_tools_8ns())
     for _ in range(3):
         wire, _ = session.render_turn()
-        assert _wire_names(wire) == ["tool_search"]
+        assert _wire_names(wire) == ["tool_search", "memory_tool"]
 
 
 def test_b4_unloaded_namespace_contributes_catalog_only():
-    """只加载 file 域:memory/shell 等只出现在目录行,不进 wire."""
+    """只加载 file 域:shell/web 等只出现在目录行,不进 wire."""
     session = _session()
     session.update_turn(_tools_8ns())
     session.load_namespace("file")
     wire, catalog = session.render_turn()
-    assert _wire_names(wire) == ["tool_search", "file_tool"]
-    assert "- memory: " in catalog
+    assert _wire_names(wire) == ["tool_search", "file_tool", "memory_tool"]
+    assert "- shell: " in catalog
     assert "- file: " not in catalog
+    assert "- memory: " not in catalog
 
 
 def test_b5_single_namespace_load_returns_full_schemas():

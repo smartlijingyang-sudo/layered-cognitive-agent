@@ -66,6 +66,9 @@ class ToolApi:
     # failure cannot leave the world in an unrecoverable interleaving.
     # Mirrors ADR-0232 §Decision 2 and AGENTS.md §3 C10 narrow door.
     effects: Literal["read", "write", "external"] = "external"
+    # Per-tool eager override (ADR-0256 §14, ADR-0279): when True, this specific
+    # tool is injected onto the wire on every turn even if its namespace is deferred.
+    eager: bool = False
 
 
 @dataclass(frozen=True)

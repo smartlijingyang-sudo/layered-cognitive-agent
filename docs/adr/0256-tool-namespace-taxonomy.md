@@ -213,3 +213,21 @@ if tool.namespace not in session.loaded_namespaces and tool.namespace not in eag
   升级当时的历史状态，保留原样（历史快照不改写）。
 - **残留**：`tests/unit/test_namespace_declaration.py:25` docstring 仍写"8 域白名单"——
   属 `tests/**`，交 tests lane 顺手改，arch 轮不越界。
+
+---
+
+## 14. 修订记录（2026-10-04）：Per-Tool Eager 覆盖语义与 File 只读常驻（ADR-0279 前置配套）
+
+- **背景与判定框架**：
+  “（使用频率 × 缺失时代价）> wire 成本”的工具应当常驻（Eager）。
+  文件“先看再动”是所有行动的前置条件，模型看不见文件 schema 容易凭空编造文件内容（幻觉等级与假装记下同级）。
+  但文件的写操作（`writeFile`/`editFile`/`moveFiles`）涉及不可逆副作用与审批冷静期，不宜全域常驻。
+  因此将 Defer 的判定粒度从单一 Namespace 扩展支持**工具级覆盖（Per-tool Eager Override）**。
+- **契约定义**：
+  - `ToolApi`（Manifest 声明）与 `Tool` 实例支持可选字段 `eager: bool = False`；
+  - Wire 组装规则：
+    $$\text{EagerTools} = \{ t \mid \text{namespace}(t) \in \text{policy.eager\_namespaces} \} \cup \{ t \mid t\text{.eager} = \text{True} \}$$
+  - Prompt Catalog 规则：若某 Deferred 域内部所有工具均已为 Eager，则该域不进入 Deferred 目录行；若仍存在未加载的写/外部工具（如 `file` 域的 `writeFile`/`editFile`/`moveFiles`），则保留目录行并精准描述为“文件系统（写操作）：写入、编辑、移动文件”，彻底杜绝“Prompt 说没有但 Wire 上有”的认知错位。
+- **真只读审计**：
+  - 针对 Eager 的 5 个只读工具（`listFiles`、`readFile`、`searchFiles`、`grepContent`、`globFiles`）实施严格只读审计测试（见 `tests/infrastructure/tool_defer/test_per_tool_eager_file.py`），断言执行后目标目录树、文件内容与 mtime 严格不变；
+  - 参数递归与文件数上限保留硬限制（`maxLines=500`、`limit=200/1000`），防止 context 暴涨。

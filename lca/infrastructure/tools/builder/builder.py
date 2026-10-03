@@ -102,6 +102,7 @@ def _build_single_tool(
             "parameters": api.parameters,
             "is_idempotent": api.is_idempotent,
             "default_timeout_s": api.default_timeout_ms // 1000,
+            "eager": getattr(api, "eager", False),
             "execute": execute,
             "validate": validate,
         },

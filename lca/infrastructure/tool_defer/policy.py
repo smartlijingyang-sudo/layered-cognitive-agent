@@ -25,7 +25,7 @@ STANDARD_NAMESPACES: tuple[str, ...] = (
 
 DEFAULT_NAMESPACE_DESCRIPTIONS: dict[str, str] = {
     "core": "推理原语：按需加载工具目录",
-    "file": "文件系统：列出、读取、写入、编辑、移动、搜索文件内容",
+    "file": "文件系统（写操作）：写入、编辑、移动文件",
     "shell": "执行 shell 命令与脚本；危险操作会先请示你",
     "memory": "搜索与写入长期记忆",
     "skill": "技能的发现、安装与调用",
@@ -49,9 +49,12 @@ class DeferPolicy:
     enabled: bool = True
     """False restores legacy behavior: every tool schema, every turn."""
 
-    eager_namespaces: frozenset[str] = frozenset({"core"})
+    eager_namespaces: frozenset[str] = frozenset({"core", "memory"})
     """Namespaces whose full schemas inject every turn. ``core``
-    must stay eager — it holds the tool_search loader itself (Muse L0)."""
+    must stay eager — it holds the tool_search loader itself (Muse L0).
+    ``memory`` must stay eager — aligns with ADR-0260 mandatory retrieval
+    duty and write-before-claim contract so memory tools are immediately
+    available without a separate tool_search roundtrip."""
 
     namespace_descriptions: Mapping[str, str] = field(
         default_factory=lambda: dict(DEFAULT_NAMESPACE_DESCRIPTIONS)

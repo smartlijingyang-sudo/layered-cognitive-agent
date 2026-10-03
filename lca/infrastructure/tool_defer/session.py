@@ -52,6 +52,7 @@ class ToolDeferSession:
     def __init__(self, policy: DeferPolicy) -> None:
         self._policy = policy
         self._loaded: set[str] = set()
+        self._eager_tools: set[str] = set()
         self._namespaces: tuple[ToolNamespace, ...] = ()
         self._specs: dict[str, dict[str, Any]] = {}  # tool name -> wire spec
 
@@ -117,6 +118,7 @@ class ToolDeferSession:
             for namespace, tool_names in grouped.items()
         )
         self._specs = {tool.name: _tool_to_spec(tool) for tool in tools}
+        self._eager_tools = {tool.name for tool in tools if getattr(tool, "eager", False)}
 
     def _describe(self, namespace: str, tool_names: list[str]) -> str:
         override = self._policy.namespace_descriptions.get(namespace)
@@ -294,9 +296,14 @@ class ToolDeferSession:
             if namespace.mode == DeferMode.EAGER or namespace.name in self._loaded:
                 wire.extend(self._specs[name] for name in namespace.tool_names)
             else:
-                # 一行一个 namespace，不再重复拼接 loading hint；提示只保留
-                # 在末尾的 discovery_rule，减少目录文本的重复膨胀。
-                catalog_lines.append(f"- {namespace.name}: {namespace.description}")
+                has_deferred = False
+                for name in namespace.tool_names:
+                    if name in self._eager_tools:
+                        wire.append(self._specs[name])
+                    else:
+                        has_deferred = True
+                if has_deferred:
+                    catalog_lines.append(f"- {namespace.name}: {namespace.description}")
         catalog = ""
         if catalog_lines:
             catalog = (

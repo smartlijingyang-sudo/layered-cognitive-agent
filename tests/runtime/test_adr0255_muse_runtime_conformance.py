@@ -232,9 +232,9 @@ def test_t6_volatile_fact_revalidation_constraint() -> None:
 
 
 def test_t8_subagent_transcript_and_standing_inheritance(tmp_path: Path) -> None:
-    """T8: 子 Agent 继承包含 9 大 Standing 文件的完整装配快照。"""
+    """T8: 子 Agent 继承包含 Standing 文件的完整装配快照。"""
     layout = packaged_layout()
-    assert len(layout.standing_files) == 9
+    assert len(layout.standing_files) == 10
 
     files = [(name, f"content for {name}") for name in layout.standing_files]
     snapshot = assemble_standing(files, budget_chars=5000, order=layout.standing_files)

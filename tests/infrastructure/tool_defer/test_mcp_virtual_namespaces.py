@@ -101,7 +101,7 @@ def test_describe_mcp_virtual_namespace() -> None:
 
 def test_describe_declared_namespace_still_uses_policy() -> None:
     session = _session_with_mcp()
-    assert session._describe("file", ["x"]) == "文件系统：列出、读取、写入、编辑、移动、搜索文件内容"
+    assert session._describe("file", ["x"]) == "文件系统（写操作）：写入、编辑、移动文件"
 
 
 def test_describe_unknown_non_mcp_still_raises() -> None:

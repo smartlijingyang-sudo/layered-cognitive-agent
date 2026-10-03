@@ -61,25 +61,27 @@ def _make_standard_domain_tools() -> list[Tool]:
     return tools
 
 
-def test_inv_01_catalog_has_exact_ten_pure_lines_no_tool_counts() -> None:
-    """INV-01: 目录行除 eager core 外恰好 10 行，无 'N tools:' 降级文本."""
+def test_inv_01_catalog_has_exact_nine_pure_lines_no_tool_counts() -> None:
+    """INV-01: 目录行除 eager (core, memory) 外恰好 9 行，无 'N tools:' 降级文本."""
     session = ToolDeferSession(DeferPolicy.default())
     tools = _make_standard_domain_tools()
     session.update_turn(tools)
     wire, catalog = session.render_turn()
 
-    # core 域在 wire 上
+    # core 与 memory 域在 wire 上
     wire_names = [spec["function"]["name"] for spec in wire]
     assert "tool_search" in wire_names
+    assert "memory_sample_tool" in wire_names
 
-    # 目录行严格 10 行
+    # 目录行严格 9 行 (11 个标准域 - 2 个 eager 域)
     catalog_lines = [line for line in catalog.splitlines() if line.startswith("- ")]
-    assert len(catalog_lines) == 10
+    assert len(catalog_lines) == 9
     assert "tools:" not in catalog
     assert "- core: " not in catalog
+    assert "- memory: " not in catalog
 
     for ns in STANDARD_NAMESPACES:
-        if ns == "core":
+        if ns in ("core", "memory"):
             continue
         expected_desc = DEFAULT_NAMESPACE_DESCRIPTIONS[ns]
         assert f"- {ns}: {expected_desc}" in catalog

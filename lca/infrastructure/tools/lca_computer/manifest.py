@@ -90,12 +90,25 @@ _SHELL_API_NAMES = frozenset(
     }
 )
 
+_READ_FILE_API_NAMES = frozenset(
+    {
+        ApiName.LIST_FILES,
+        ApiName.READ_FILE,
+        ApiName.SEARCH_FILES,
+        ApiName.GREP_CONTENT,
+        ApiName.GLOB_FILES,
+    }
+)
+
 
 def _apis_for(names: Iterable[ApiName]) -> tuple[ToolApi, ...]:
     out: list[ToolApi] = []
     for name in names:
         desc, idempotent = _ALL_API_SPECS[name]
-        namespace = "shell" if name in _SHELL_API_NAMES else "file"
+        is_shell = name in _SHELL_API_NAMES
+        namespace = "shell" if is_shell else "file"
+        is_read = name in _READ_FILE_API_NAMES
+        effects = "read" if is_read else ("external" if is_shell else "write")
         out.append(
             ToolApi(
                 name=name,
@@ -103,6 +116,8 @@ def _apis_for(names: Iterable[ApiName]) -> tuple[ToolApi, ...]:
                 parameters=_PARAM_BUILDERS[name](),
                 is_idempotent=idempotent,
                 namespace=namespace,
+                effects=effects,
+                eager=is_read,
             )
         )
     return tuple(out)

@@ -40,7 +40,7 @@ def test_tool_api_has_namespace_field() -> None:
 
 def test_defer_policy_standard_namespaces() -> None:
     policy = DeferPolicy.default()
-    assert policy.eager_namespaces == frozenset({"core"})
+    assert policy.eager_namespaces == frozenset({"core", "memory"})
     assert set(policy.namespace_descriptions.keys()) == set(STANDARD_NAMESPACES)
     assert set(STANDARD_NAMESPACES) == {
         "core",
@@ -63,15 +63,58 @@ def test_defer_policy_for_vocal_mode_gated_keeps_agent_eager() -> None:
     """Gated vocal mode must expose ``send_message`` from the first turn."""
     policy = DeferPolicy.for_vocal_mode("gated")
     assert "core" in policy.eager_namespaces
+    assert "memory" in policy.eager_namespaces
     assert "agent" in policy.eager_namespaces
 
 
 def test_defer_policy_for_vocal_mode_direct_unchanged() -> None:
     policy = DeferPolicy.for_vocal_mode("direct")
-    assert policy.eager_namespaces == frozenset({"core"})
+    assert policy.eager_namespaces == frozenset({"core", "memory"})
 
 
-def _stub_tool(name: str, namespace: str) -> Any:
+def test_defer_policy_keeps_memory_eager_on_wire() -> None:
+    """Memory namespace tools stay eager on wire to align with ADR-0260."""
+    from lca.infrastructure.tool_defer.session import ToolDeferSession
+
+    search = _stub_tool("tool_search", "core")
+    mem_add = _stub_tool("memory_add", "memory")
+    file_tool = _stub_tool("writeFile", "file")
+    session = ToolDeferSession(DeferPolicy.default())
+    session.update_turn((search, mem_add, file_tool))
+    wire, catalog = session.render_turn()
+    names = [spec["function"]["name"] for spec in wire]
+    assert "tool_search" in names
+    assert "memory_add" in names
+    assert "writeFile" not in names
+    assert "- file:" in catalog
+    assert "- memory:" not in catalog
+
+
+def test_per_tool_eager_file_read_on_the_wire() -> None:
+    """Per-tool eager override: file read tools stay on wire while write tools stay deferred."""
+    from lca.infrastructure.tool_defer.session import ToolDeferSession
+
+    search = _stub_tool("tool_search", "core")
+    read_tool = _stub_tool("readFile", "file", eager=True)
+    write_tool = _stub_tool("writeFile", "file", eager=False)
+    session = ToolDeferSession(DeferPolicy.default())
+    session.update_turn((search, read_tool, write_tool))
+    wire, catalog = session.render_turn()
+    names = [spec["function"]["name"] for spec in wire]
+    assert "tool_search" in names
+    assert "readFile" in names
+    assert "writeFile" not in names
+    assert "- file:" in catalog
+
+    # Loading namespace 'file' brings writeFile onto the wire and clears catalog line
+    session.load_namespace("file")
+    wire_after, catalog_after = session.render_turn()
+    names_after = [spec["function"]["name"] for spec in wire_after]
+    assert "writeFile" in names_after
+    assert "- file:" not in catalog_after
+
+
+def _stub_tool(name: str, namespace: str, eager: bool = False) -> Any:
     async def _execute(self, args):  # pragma: no cover - stub
         return None
 
@@ -84,6 +127,7 @@ def _stub_tool(name: str, namespace: str) -> Any:
         {
             "name": name,
             "namespace": namespace,
+            "eager": eager,
             "description": f"description for {name}",
             "parameters": {"type": "object", "properties": {}},
             "execute": _execute,

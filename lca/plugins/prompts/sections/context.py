@@ -110,7 +110,7 @@ class HomeSection:
         ("home_dir", "home_dir: {home}"),
         (
             "memory_dir",
-            "memory_dir: {home}/memory/  (持久化记忆；系统自动写入，勿用沙箱命令访问)",
+            "memory_dir: {home}/memory/  (持久化记忆；通过 memory 工具读写，勿用沙箱命令访问)",
         ),
         ("skills_dir", "skills_dir: {home}/skills/"),
         ("presets_dir", "presets_dir: {home}/presets/  (自主创造的预置包目录)"),
@@ -126,9 +126,8 @@ class HomeSection:
         ),
         (
             "memory_note",
-            "记忆说明: 用户让你记住的偏好/事实由系统自动写入 memory_dir，"
-            "也可用 memory_search / memory_add / memory_update / memory_remove 读写；"
-            "下次会话会自动带到你的上下文。",
+            "记忆说明: 用户明确要求记住的事项/案例/偏好必须调用 memory_add 写入 memory_dir；"
+            "检索使用 memory_search。落笔前先写盘，收到写盘回执后才可回复'记下了'。",
         ),
     )
 
