@@ -41,6 +41,16 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
         composio_handlers.connection_by_identifier,
         ("DELETE", "OPTIONS"),
     ),
+    RouteSpec(
+        "/composio/auth-intents/{intent_id}/resolve",
+        composio_handlers.resolve_auth_intent,
+        ("POST", "OPTIONS"),
+    ),
+    RouteSpec(
+        "/api/connectors/auth-intents/{intent_id}/resolve",
+        composio_handlers.resolve_auth_intent,
+        ("POST", "OPTIONS"),
+    ),
 )
 
 

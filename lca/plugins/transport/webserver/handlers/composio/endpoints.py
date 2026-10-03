@@ -171,6 +171,41 @@ async def connection_refresh(request: Request) -> JSONResponse:
     return await refresh_connection(request)
 
 
+async def resolve_auth_intent(request: Request) -> JSONResponse:
+    if request.method == "OPTIONS":
+        return await composio_options(request)
+
+    intent_id = str(request.path_params.get("intent_id") or "").strip()
+    if not intent_id:
+        return _error("intent_id is required", status_code=400)
+
+    user_id = str(
+        request.headers.get("X-User-ID")
+        or request.headers.get("x-user-id")
+        or request.query_params.get("user_id")
+        or "default"
+    ).strip()
+
+    from lca.infrastructure.connectors.core.intent_vault import get_default_intent_vault
+
+    vault = get_default_intent_vault()
+    intent = vault.resolve_intent(intent_id, user_id=user_id)
+    if intent is None:
+        return _error("intent not found, expired, or forbidden", status_code=404)
+
+    return JSONResponse(
+        {
+            "intentId": intent.intent_id,
+            "service": intent.service,
+            "appName": intent.app_name,
+            "authUrl": intent.auth_url,
+            "connectionId": intent.connection_id,
+            "expiresAt": intent.expires_at,
+        },
+        headers=cors_headers(),
+    )
+
+
 async def _read_json(request: Request) -> dict[str, Any]:
     try:
         body = await request.json()
