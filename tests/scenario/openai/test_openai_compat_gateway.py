@@ -5,6 +5,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import AsyncMock, patch
 
+import pytest
 from starlette.testclient import TestClient
 
 from lca.infrastructure.observability.journal.stream.live_tail import LiveTail
@@ -22,6 +23,28 @@ from lca.plugins.transport.webserver.handlers.runs.session.session.session impor
 )
 from tests.support.gateway_scripted import ScriptedLLMResolver
 from tests.support.webserver_app import create_scripted_app
+
+
+@pytest.fixture(autouse=True)
+def _scripted_boot_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Satisfy the fail-loud boot gate of the scripted gateway app.
+
+    ``tests/conftest.py`` deletes ``LLM_API_KEY`` for every test, but the
+    scripted app boots the reasoner credentials plugin
+    (``phase.think.reasoner.credentials`` raises when no key is present).
+    Patch only the agent-face credential lookup (``llm_credentials``);
+    the compat request path
+    (``lca.infrastructure.openai.compat.llm_openai_credentials``) still
+    sees "no key", so unpatched tests keep exercising the real no-key
+    contract (StructuredLLMError -> 502) instead of attempting real
+    upstream calls with a dummy key. (The plugin does a function-local
+    ``from ... import llm_credentials`` inside ``setup()``, so the patch
+    point is the defining module, not the plugin module.)
+    """
+    monkeypatch.setattr(
+        "lca.infrastructure.llm.config.llm_credentials",
+        lambda: ("dummy", None, None),
+    )
 
 
 class TestOpenAiCompatGateway(unittest.TestCase):
@@ -115,27 +138,26 @@ class TestOpenAiCompatGateway(unittest.TestCase):
             )
         self.assertEqual(response.status_code, 502)
 
-    def test_unbooted_compat_endpoints_return_503(self) -> None:
-        """Missing lifespan context is an availability error, never a server error.
+    def test_compat_endpoints_no_key_return_502(self) -> None:
+        """Routes are installed and booted; a missing LLM key is 502, not 404.
 
         ADR-0115 thin factory: routes are only available after lifespan
-        startup. With the scripted LLM installed and the routes plugin
-        active, ``/v1/responses`` returns 200 (housekeeping OK). The
-        scripted resolver does not provide embeddings, so ``/v1/embeddings``
-        returns a non-2xx response (502) but never a 5xx server error
-        from missing route / unbooted state.
+        startup. The compat handlers now resolve credentials direct-upstream
+        (``llm_openai_credentials()``), so "without LLM" means no key and
+        every POST compat endpoint maps that to 502 via StructuredLLMError
+        (same contract as ``test_chat_completions_without_llm_key_returns_502``).
+        A 502 here proves the route is installed (would be 404 otherwise)
+        and the lifespan context booted; the old "housekeeping OK -> 200"
+        expectation belonged to the retired resolver-based contract.
         """
         app = create_scripted_app()
         with TestClient(app) as client:
             response = client.post("/v1/responses", json={"model": "solo", "input": "hello"})
-            self.assertEqual(response.status_code, 200)
-            # Embeddings endpoint returns 502 because scripted resolver
-            # does not implement embeddings; this proves the route is
-            # installed (would be 404 otherwise) and the ctx is booted.
+            self.assertEqual(response.status_code, 502)
             emb_response = client.post(
                 "/v1/embeddings", json={"model": "text-embedding-3-small", "input": "hello"}
             )
-            self.assertIn(emb_response.status_code, {200, 502, 503})
+            self.assertEqual(emb_response.status_code, 502)
 
 
 class TestRunRegistryDedup(unittest.TestCase):
