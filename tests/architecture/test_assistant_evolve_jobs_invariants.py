@@ -100,10 +100,12 @@ class TestIA8EvolveCandidatesDefaultExperiment:
 
         catalog, evolve, _ = _make_env(tmp_path)
         assistant_id = catalog.create(CreateAssistantRequest(name="A8")).assistant_id
+        # 3 个 evidence_refs：满足 ADR-0262 C4 收紧后的证据门（min_evidence=3），
+        # 使本文件在默认收紧前后都不误红（0262 C4 跨 lane 解耦前置）。
         digest = ObservationDigest(
             assistant_id=assistant_id,
-            run_ids=("run-1",),
-            evidence_refs=("spine:run-1",),
+            run_ids=("run-1", "run-2", "run-3"),
+            evidence_refs=("spine:run-1", "spine:run-2", "spine:run-3"),
             observed_at="2026-09-04T11:00:00Z",
         )
         candidate = evolve.distill(assistant_id, digest)
@@ -116,10 +118,12 @@ class TestIA8EvolveCandidatesDefaultExperiment:
 
         catalog, evolve, _ = _make_env(tmp_path)
         assistant_id = catalog.create(CreateAssistantRequest(name="A8")).assistant_id
+        # 3 个 evidence_refs：满足 ADR-0262 C4 收紧后的证据门（min_evidence=3），
+        # 使本文件在默认收紧前后都不误红（0262 C4 跨 lane 解耦前置）。
         digest = ObservationDigest(
             assistant_id=assistant_id,
-            run_ids=("run-1",),
-            evidence_refs=("spine:run-1",),
+            run_ids=("run-1", "run-2", "run-3"),
+            evidence_refs=("spine:run-1", "spine:run-2", "spine:run-3"),
             observed_at="2026-09-04T11:00:00Z",
         )
         evolve.distill(assistant_id, digest)
@@ -131,10 +135,12 @@ class TestIA8EvolveCandidatesDefaultExperiment:
 
         catalog, evolve, _ = _make_env(tmp_path)
         assistant_id = catalog.create(CreateAssistantRequest(name="A8")).assistant_id
+        # 3 个 evidence_refs：满足 ADR-0262 C4 收紧后的证据门（min_evidence=3），
+        # 使本文件在默认收紧前后都不误红（0262 C4 跨 lane 解耦前置）。
         digest = ObservationDigest(
             assistant_id=assistant_id,
-            run_ids=("run-1",),
-            evidence_refs=("spine:run-1",),
+            run_ids=("run-1", "run-2", "run-3"),
+            evidence_refs=("spine:run-1", "spine:run-2", "spine:run-3"),
             observed_at="2026-09-04T11:00:00Z",
         )
         candidate = evolve.distill(assistant_id, digest)
@@ -223,10 +229,12 @@ class TestEvolveEpPayloadWhitelist:
 
         catalog, evolve, emitted = _make_env(tmp_path)
         assistant_id = catalog.create(CreateAssistantRequest(name="EP")).assistant_id
+        # 3 个 evidence_refs：满足 ADR-0262 C4 收紧后的证据门（min_evidence=3），
+        # 使本文件在默认收紧前后都不误红（0262 C4 跨 lane 解耦前置）。
         digest = ObservationDigest(
             assistant_id=assistant_id,
-            run_ids=("run-1",),
-            evidence_refs=("spine:run-1",),
+            run_ids=("run-1", "run-2", "run-3"),
+            evidence_refs=("spine:run-1", "spine:run-2", "spine:run-3"),
             observed_at="2026-09-04T11:00:00Z",
         )
         candidate = evolve.distill(assistant_id, digest)
