@@ -81,10 +81,12 @@ def assistant_id(catalog: AssistantCatalogImpl) -> str:
 
 @pytest.fixture
 def digest(assistant_id: str) -> ObservationDigest:
+    # 3 个 evidence_refs：满足 ADR-0262 C4 收紧后的证据门（min_evidence=3），
+    # 使共享 fixture 在默认收紧前后都不误红（0262 C4 跨 lane 解耦前置）。
     return ObservationDigest(
         assistant_id=assistant_id,
-        run_ids=("run-1", "run-2"),
-        evidence_refs=("spine:run-1", "spine:run-2"),
+        run_ids=("run-1", "run-2", "run-3"),
+        evidence_refs=("spine:run-1", "spine:run-2", "spine:run-3"),
         observed_at="2026-09-04T11:00:00Z",
     )
 
