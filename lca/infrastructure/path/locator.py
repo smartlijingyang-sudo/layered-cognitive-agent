@@ -157,8 +157,8 @@ def expand_user_path(path: str | Path) -> Path:
 
 
 __all__ = [
+    "assistant_workspace_root",
     "expand_user_path",
     "get_lca_home",
     "get_real_user_home",
-    "assistant_workspace_root",
 ]
