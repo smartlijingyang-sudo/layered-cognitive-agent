@@ -96,6 +96,8 @@ function createLcaRunOnSessionComplete(
     context: ConversationContext;
     deliverables: LcaDeliverables;
     gatewayOpId: string;
+    serverRunId?: string;
+    assistantId?: string;
     model: string;
     topicId: string;
   },
@@ -149,6 +151,32 @@ function createLcaRunOnSessionComplete(
           topicId,
         });
       }
+    }
+    if (typeof window !== 'undefined') {
+      const activeRunId = params.serverRunId || gatewayOpId;
+      window.dispatchEvent(
+        new CustomEvent('lca:run_completed', {
+          detail: {
+            runId: activeRunId,
+            assistantId: params.assistantId || context.agentId,
+            succeeded,
+          },
+        }),
+      );
+      window.dispatchEvent(
+        new CustomEvent('lca:activity_updated', {
+          detail: {
+            id: activeRunId,
+            runId: activeRunId,
+            assistantId: params.assistantId || context.agentId,
+            status: succeeded ? 'completed' : 'failed',
+            endTime: new Date().toISOString(),
+            currentStep: null,
+          },
+        }),
+      );
+      window.dispatchEvent(new CustomEvent('lca:jobs_updated'));
+      window.dispatchEvent(new CustomEvent('lca:status_refresh'));
     }
   };
 }
@@ -353,6 +381,41 @@ export async function lcaExecuteGatewayRun(
     type: 'execServerAgentRuntime',
   });
 
+  if (typeof window !== 'undefined') {
+    const lastUserMsg = wireMessages.filter((m) => m.role === 'user').slice(-1)[0]?.content || '';
+    const userSummary =
+      typeof lastUserMsg === 'string' && lastUserMsg.trim()
+        ? lastUserMsg.length > 35
+          ? lastUserMsg.slice(0, 35) + '...'
+          : lastUserMsg
+        : '与用户对话交互';
+    window.dispatchEvent(
+      new CustomEvent('lca:run_started', {
+        detail: {
+          runId: receipt.runId,
+          assistantId: assistantId || context.agentId,
+          summary: userSummary,
+        },
+      }),
+    );
+    window.dispatchEvent(
+      new CustomEvent('lca:activity_updated', {
+        detail: {
+          id: receipt.runId,
+          runId: receipt.runId,
+          assistantId: assistantId || context.agentId,
+          category: 'tool',
+          title: '会话交互',
+          summary: userSummary,
+          status: 'running',
+          icon: 'chat',
+          startTime: new Date().toISOString(),
+          currentStep: '智能体思考并回复中...',
+        },
+      }),
+    );
+  }
+
   if (assistantMessageId) {
     state.associateMessageWithOperation(assistantMessageId, gatewayOpId);
   }
@@ -403,6 +466,8 @@ export async function lcaExecuteGatewayRun(
       context,
       deliverables,
       gatewayOpId,
+      serverRunId: receipt.runId,
+      assistantId,
       model: params.model,
       topicId,
     }),
@@ -510,6 +575,7 @@ export async function lcaResumeGatewayRun(
       context,
       deliverables,
       gatewayOpId,
+      serverRunId: runId,
       model: 'solo',
       topicId,
     }),

@@ -224,6 +224,24 @@ class ActivityProjector:
             args = _extract_arguments(event, payload, tool_calling)
 
             if not existing:
+                run_id_val = str(event.get("run_id") or payload.get("run_id") or "")
+                # Fallback: check if there is an existing running item for this run_id & tool_name
+                for store_asst_id in (asst_id, "default"):
+                    store_dict = self._items.get(store_asst_id, {})
+                    for candidate_id, candidate in list(store_dict.items()):
+                        if (
+                            candidate.status == ActivityStatus.RUNNING
+                            and (not run_id_val or candidate.run_id == run_id_val)
+                            and (not tool_name or candidate.tool_name == tool_name)
+                        ):
+                            existing = candidate
+                            if candidate_id != inv_id:
+                                store_dict.pop(candidate_id, None)
+                            break
+                    if existing:
+                        break
+
+            if not existing:
                 # Synthesize fallback item if start was missed/dropped
                 title, summary, icon = ActivityIntentNamer.name(tool_name, args)
                 category = _determine_category(tool_name)

@@ -711,6 +711,9 @@ const computeDateGroup = (timeStr?: string): 'today' | 'yesterday' | 'earlier' =
 
 const mapActivityIcon = (icon?: string): string => {
   switch (icon) {
+    case 'chat':
+    case 'message':
+      return '💬';
     case 'mail':
       return '✉️';
     case 'terminal':
@@ -985,7 +988,7 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
         });
         if (res.ok) {
           const data = await res.json();
-          if (Array.isArray(data.activities) && data.activities.length > 0) {
+          if (Array.isArray(data.activities)) {
             setActivities(
               data.activities.map((a: any) => {
                 const ft = formatActivityTime(a.start_time);
@@ -1013,7 +1016,7 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
               }),
             );
           }
-          if (Array.isArray(data.upcoming) && data.upcoming.length > 0) {
+          if (Array.isArray(data.upcoming)) {
             setUpcomingJobs(
               data.upcoming.map((j: any) => ({
                 id: j.id,
@@ -1028,7 +1031,7 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
               })),
             );
           }
-          if (Array.isArray(data.approvals) && data.approvals.length > 0) {
+          if (Array.isArray(data.approvals)) {
             setApprovals(data.approvals);
           }
           if (Array.isArray(data.identity?.files)) {
@@ -1075,7 +1078,15 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
         const patch = e.detail || e;
         if (!patch || !patch.id) return;
         setActivities((prev) => {
-          const idx = prev.findIndex((item) => item.id === patch.id);
+          let idx = prev.findIndex((item) => item.id === patch.id);
+          if (idx < 0 && (patch.runId || patch.toolName)) {
+            idx = prev.findIndex(
+              (item) =>
+                item.status === 'running' &&
+                (patch.runId ? item.detail?.runId === patch.runId : true) &&
+                (patch.toolName ? item.detail?.toolName === patch.toolName : true),
+            );
+          }
           const iconChar = mapActivityIcon(patch.icon);
           const statusStr = mapBackendStatus(patch.status);
           const ft = formatActivityTime(patch.startTime);
@@ -1126,6 +1137,17 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
           };
           return [newItem, ...prev];
         });
+
+        // 联动更新：如果是 cron 相关的 activity 更新，立即刷新即将到来/任务列表
+        if (
+          patch.category === 'cron' ||
+          (typeof patch.toolName === 'string' && patch.toolName.startsWith('cron.'))
+        ) {
+          fetchStatusSnapshot();
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('lca:jobs_updated'));
+          }
+        }
       };
 
       if (typeof window !== 'undefined') {
@@ -1140,12 +1162,40 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
           }
         }
       };
-    }, []);
+    }, [fetchStatusSnapshot]);
 
     useEffect(() => {
       if (open && assistantId) {
         fetchStatusSnapshot();
+        const pollTimer = setInterval(() => {
+          if (!document.hidden) {
+            fetchStatusSnapshot();
+          }
+        }, 5000);
+        return () => clearInterval(pollTimer);
       }
+    }, [open, assistantId, fetchStatusSnapshot]);
+
+    // 监听 Run 启停与状态刷新事件，实时拉取动态与即将到来
+    useEffect(() => {
+      if (!open || !assistantId) return;
+      const handleRefresh = () => {
+        fetchStatusSnapshot();
+      };
+      if (typeof window !== 'undefined') {
+        window.addEventListener('lca:run_started', handleRefresh);
+        window.addEventListener('lca:run_completed', handleRefresh);
+        window.addEventListener('lca:status_refresh', handleRefresh);
+        window.addEventListener('lca:jobs_updated', handleRefresh);
+      }
+      return () => {
+        if (typeof window !== 'undefined') {
+          window.removeEventListener('lca:run_started', handleRefresh);
+          window.removeEventListener('lca:run_completed', handleRefresh);
+          window.removeEventListener('lca:status_refresh', handleRefresh);
+          window.removeEventListener('lca:jobs_updated', handleRefresh);
+        }
+      };
     }, [open, assistantId, fetchStatusSnapshot]);
 
     // 3. 运行中动作取消中断 (Stop 机制)

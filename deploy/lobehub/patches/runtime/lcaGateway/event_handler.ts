@@ -126,7 +126,15 @@ export const createLcaGatewayEventHandler = (
     // the window where AssistantStatusDrawer listens for
     // `lca:activity_updated` and patches the activity list in place.
     if ((event.type as string) === 'activity_updated') {
-      const data = event.data as
+      let rawData = event.data;
+      if (typeof rawData === 'string') {
+        try {
+          rawData = JSON.parse(rawData);
+        } catch {
+          // ignore
+        }
+      }
+      const data = rawData as
         | {
             id?: string;
             runId?: string;

@@ -117,3 +117,47 @@ def test_status_snapshot_endpoint_returns_aggregated_views(tmp_path: Path):
     assert cancelled_item is not None
     assert cancelled_item["status"] == "cancelled"
     assert cancelled_item["result_summary"] == "User cancelled operation"
+
+
+def test_status_snapshot_includes_assistant_owned_cron_jobs(tmp_path: Path):
+    from datetime import UTC, datetime
+
+    from lca.contracts.models.cron.models import (
+        AgentExecution,
+        ChatDelivery,
+        CronJob,
+        DailySchedule,
+    )
+    from lca.domain.cron.store import CronStore
+
+    app, catalog, assistant_id = _create_test_app(tmp_path)
+    client = TestClient(app)
+    spec = catalog.get(assistant_id)
+
+    # Create a cron job owned by assistant_id
+    store = CronStore(Path(spec.home_path))
+    store.save_job(
+        CronJob(
+            id="job_reminder_01",
+            title="喝水提醒",
+            schedule=DailySchedule(kind="daily", hour=10, minute=0),
+            timezone="Asia/Shanghai",
+            body="提醒喝水",
+            execution=AgentExecution(kind="agent"),
+            delivery_targets=(ChatDelivery(chat_id="chat_01"),),
+            owner=assistant_id,
+            created_chat_id="chat_01",
+            anchor_at=datetime.now(UTC),
+        )
+    )
+
+    resp = client.get(
+        f"/v1/assistants/{assistant_id}/status-snapshot",
+        headers={"x-lca-user-id": "local-dev-user"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "upcoming" in data
+    assert len(data["upcoming"]) == 1
+    assert data["upcoming"][0]["id"] == "job_reminder_01"
+    assert data["upcoming"][0]["title"] == "喝水提醒"

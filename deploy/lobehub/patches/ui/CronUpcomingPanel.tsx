@@ -221,13 +221,40 @@ export const CronUpcomingPanel = memo<CronUpcomingPanelProps>(
 
     useEffect(() => {
       fetchJobs();
-      // 15 秒静默轮询保持与后端同步
+
+      const onJobsUpdated = () => {
+        fetchJobs();
+      };
+      const onActivityUpdated = (e: any) => {
+        const patch = e.detail || e;
+        if (patch?.category === 'cron' || patch?.toolName?.startsWith?.('cron.')) {
+          fetchJobs();
+        }
+      };
+
+      if (typeof window !== 'undefined') {
+        window.addEventListener('lca:jobs_updated', onJobsUpdated);
+        window.addEventListener('lca:run_completed', onJobsUpdated);
+        window.addEventListener('lca:status_refresh', onJobsUpdated);
+        window.addEventListener('lca:activity_updated', onActivityUpdated);
+      }
+
+      // 8 秒静默轮询保持与后端同步
       const timer = setInterval(() => {
         if (!document.hidden) {
           fetchJobs();
         }
-      }, 15000);
-      return () => clearInterval(timer);
+      }, 8000);
+
+      return () => {
+        clearInterval(timer);
+        if (typeof window !== 'undefined') {
+          window.removeEventListener('lca:jobs_updated', onJobsUpdated);
+          window.removeEventListener('lca:run_completed', onJobsUpdated);
+          window.removeEventListener('lca:status_refresh', onJobsUpdated);
+          window.removeEventListener('lca:activity_updated', onActivityUpdated);
+        }
+      };
     }, [fetchJobs]);
 
     // 手动立即触发一次 (Run Now)

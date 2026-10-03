@@ -84,7 +84,11 @@ async def assistant_status_snapshot(request: Request) -> JSONResponse:
     upcoming: list[dict[str, Any]] = []
     try:
         cron_service = CronService(CronStore(Path(spec.home_path)))
-        items = cron_service.list_items(owner=user_id, now=datetime.now(UTC))
+        items = cron_service.list_items(
+            owner=user_id,
+            now=datetime.now(UTC),
+            allow_owners=(assistant_id,),
+        )
         upcoming = [item.model_dump() for item in items]
     except Exception:
         upcoming = []

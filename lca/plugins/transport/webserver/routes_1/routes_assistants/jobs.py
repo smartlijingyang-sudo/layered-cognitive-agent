@@ -293,7 +293,7 @@ async def update_assistant_job(request: Request) -> JSONResponse:
 
     service.replace_job(updated)
 
-    items = service.list_items(owner=user_id, now=now)
+    items = service.list_items(owner=user_id, now=now, allow_owners=(assistant_id,))
     item = next((candidate for candidate in items if candidate.id == updated.id), None)
     if item is None:
         # 已完成的一次性任务不在「即将到来」投影里（ADR-0268 §10），卡片路径没有卡片可返回。
