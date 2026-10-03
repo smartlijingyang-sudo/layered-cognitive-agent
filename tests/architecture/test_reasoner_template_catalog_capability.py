@@ -51,5 +51,5 @@ def test_standard_brain_plugins_require_the_template_provider() -> None:
 def test_brain_factory_has_no_direct_builtin_prompt_loader() -> None:
     """Only the profile-selected catalog plugin may load bundled templates."""
 
-    source = (REPO / "lca/cognition/brain/default_factory.py").read_text(encoding="utf-8")
+    source = (REPO / "lca/cognition/brain/pipeline/default_factory.py").read_text(encoding="utf-8")
     assert "load_builtin_prompt" not in source
