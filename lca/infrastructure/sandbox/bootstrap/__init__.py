@@ -1,8 +1,0 @@
-"""Public exports for ``bootstrap`` (auto-fixed)."""
-
-from lca.infrastructure.sandbox.bootstrap.bootstrap import (
-    build_workspace_init_command,
-    sandbox_output_path,
-)
-
-__all__ = ['build_workspace_init_command', 'sandbox_output_path']
