@@ -32,6 +32,7 @@ from lca.plugins.transport.webserver.routes_1.routes_assistants.codecs import (
 )
 
 STANDING_FILES_WHITELIST: tuple[str, ...] = (
+    "CONSTITUTION.md",
     "IDENTITY.md",
     "SOUL.md",
     "USER.md",
@@ -363,8 +364,8 @@ async def update_standing_file(request: Request) -> JSONResponse:
                 if user_store is not None and user_id:
                     with contextlib.suppress(Exception):
                         user_store.update_user_md(user_id, new_content)
-        elif filename == "MEMORY.md":
-            # MEMORY.md 不进 catalog profile digest（I-A13），直接原子写盘
+        elif filename in ("MEMORY.md", "CONSTITUTION.md"):
+            # MEMORY.md 与 CONSTITUTION.md 不进 catalog profile digest，直接原子写盘
             file_path.write_text(new_content, encoding="utf-8")
     except AssistantCatalogError as exc:
         return _error_envelope(

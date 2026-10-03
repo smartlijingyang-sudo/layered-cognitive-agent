@@ -76,8 +76,9 @@ def test_standing_files_list_returns_four_standing_files(tmp_path: Any) -> None:
     data = response.json()
     assert data["assistant_id"] == assistant_id
     files = data["files"]
-    assert len(files) == 5
+    assert len(files) == 6
     filenames = [f["filename"] for f in files]
+    assert "CONSTITUTION.md" in filenames
     assert "IDENTITY.md" in filenames
     assert "SOUL.md" in filenames
     assert "USER.md" in filenames
@@ -86,7 +87,14 @@ def test_standing_files_list_returns_four_standing_files(tmp_path: Any) -> None:
 
     # 验证元数据字段完整性
     for f in files:
-        assert f["filename"] in {"IDENTITY.md", "SOUL.md", "USER.md", "AGENTS.md", "MEMORY.md"}
+        assert f["filename"] in {
+            "CONSTITUTION.md",
+            "IDENTITY.md",
+            "SOUL.md",
+            "USER.md",
+            "AGENTS.md",
+            "MEMORY.md",
+        }
         assert f["path"].endswith(f["filename"])
         assert isinstance(f["size_bytes"], int)
         assert isinstance(f["line_count"], int)
@@ -232,7 +240,7 @@ def test_standing_files_resolve_agent_id_and_inbox(tmp_path: Any) -> None:
     assert agt_resp.status_code == 200
     data = agt_resp.json()
     assert data["assistant_id"] == assistant_id
-    assert len(data["files"]) == 5
+    assert len(data["files"]) == 6
 
     # 2. 以 agt_* 请求单文件，正常返回内容
     agt_file_resp = client.get("/v1/assistants/agt_mock_123/standing-files/SOUL.md")
@@ -244,7 +252,7 @@ def test_standing_files_resolve_agent_id_and_inbox(tmp_path: Any) -> None:
     assert inbox_resp.status_code == 200
     inbox_data = inbox_resp.json()
     assert inbox_data["assistant_id"] == assistant_id
-    assert len(inbox_data["files"]) == 5
+    assert len(inbox_data["files"]) == 6
 
 
 def test_standing_file_memory_md_uninitialized_returns_template_and_supports_initial_write(
@@ -342,3 +350,43 @@ def test_constitution_template_contains_core_charter() -> None:
     assert "LCA Architecture & Governance Principles" in disk_text
     assert "Assistant Home & Directory Topology" in disk_text
     assert "Runtime Environment & Context Perception" in disk_text
+
+
+def test_constitution_standing_file_endpoints(tmp_path: Any) -> None:
+    app, _, assistant_id = _create_test_app(tmp_path)
+    client = TestClient(app)
+
+    # 1. 列表包含 CONSTITUTION.md
+    list_resp = client.get(f"/v1/assistants/{assistant_id}/standing-files")
+    assert list_resp.status_code == 200
+    assert any(f["filename"] == "CONSTITUTION.md" for f in list_resp.json()["files"])
+
+    # 2. 未建盘时降级返回 200 与模板哈希 (INV-CONST-03)
+    get_resp = client.get(f"/v1/assistants/{assistant_id}/standing-files/CONSTITUTION.md")
+    assert get_resp.status_code == 200
+    get_data = get_resp.json()
+    assert get_data["filename"] == "CONSTITUTION.md"
+    assert "Who You Are" in get_data["content"]
+    assert get_data["content_hash"].startswith("sha256:")
+
+    # 3. 携带模板哈希更新写入 (INV-CONST-04)
+    h = get_data["content_hash"]
+    custom_content = "# Custom Constitution\n\n## Core Principles\n- Test invariant"
+    put_resp = client.put(
+        f"/v1/assistants/{assistant_id}/standing-files/CONSTITUTION.md",
+        json={"content": custom_content, "expected_hash": h},
+    )
+    assert put_resp.status_code == 200
+    assert put_resp.json()["filename"] == "CONSTITUTION.md"
+
+    # 4. 再次获取验证内容
+    get_resp2 = client.get(f"/v1/assistants/{assistant_id}/standing-files/CONSTITUTION.md")
+    assert get_resp2.status_code == 200
+    assert get_resp2.json()["content"] == custom_content
+
+    # 5. 冲突乐观锁 409
+    put_conflict = client.put(
+        f"/v1/assistants/{assistant_id}/standing-files/CONSTITUTION.md",
+        json={"content": "# Conflict", "expected_hash": "sha256:wrong_hash"},
+    )
+    assert put_conflict.status_code == 409
