@@ -7,7 +7,8 @@ closure). The fold function:
 - reads one spine file (``<run_id>.spine.jsonl``, line-delimited JSON,
   one event per line);
 - discovers the eight registered derivers via
-  ``importlib.metadata.entry_points(group="lca.health_derivers")``;
+  ``importlib.metadata.entry_points(group="lca.health_derivers")``
+  (lazily on first fold -- see ``_get_derivers``);
 - calls each deriver's ``evaluate(events)`` and concatenates the
   returned ``RunHealthCondition`` list;
 - aggregates the conditions into a ``RunHealthSummary`` whose
@@ -68,8 +69,32 @@ def _discover_derivers() -> tuple[HealthDeriver, ...]:
     return tuple(ep.load()() for ep in eps)
 
 
-# Module-level cache; ``fold_run_health`` is called per-run, no churn.
-_DERIVERS: tuple[HealthDeriver, ...] = _discover_derivers()
+# Lazily-populated deriver cache; see ``_get_derivers``.
+_DERIVERS_CACHE: tuple[HealthDeriver, ...] | None = None
+
+
+def _get_derivers() -> tuple[HealthDeriver, ...]:
+    """Return the registered health derivers, discovered lazily.
+
+    The registry is read on first use, not at import time. Import-time
+    discovery is racy: ``importlib.metadata.entry_points`` can return
+    an incomplete set when the module is first imported (process-level
+    ``FastPath`` ``lru_cache`` / ``Lookup`` mtime ``method_cache``
+    churn during editable installs -- empirically 0/8 on some full-suite
+    runs, which then folded every run to all-``unknown``).
+
+    An empty first discovery is retried once -- a genuinely empty
+    registry stays empty and is cached as such. The fold keeps its
+    no-external-sink contract and returns an all-``unknown`` report
+    in that case (fail-open: ``_worst_status`` maps empty conditions
+    to ``unknown``).
+    """
+    global _DERIVERS_CACHE
+    if _DERIVERS_CACHE is None:
+        _DERIVERS_CACHE = _discover_derivers()
+        if not _DERIVERS_CACHE:
+            _DERIVERS_CACHE = _discover_derivers()
+    return _DERIVERS_CACHE
 
 
 def _normalize_event(rec: dict[str, object]) -> SpineEvent | None:
@@ -203,7 +228,7 @@ def fold_run_health(spine_path: Path) -> RunHealthReport:
     """
     events = _read_spine_events(spine_path)
     conditions: list[RunHealthCondition] = []
-    for deriver in _DERIVERS:
+    for deriver in _get_derivers():
         conditions.extend(deriver.evaluate(events))
     return RunHealthReport(
         schema_version="1.0",
@@ -231,9 +256,9 @@ def _worst_status(report: RunHealthReport) -> RunHealthStatus:
 
 
 __all__ = [
-    "_DERIVERS",
     "_discover_derivers",
     "_extract_run_id",
+    "_get_derivers",
     "_normalize_event",
     "_read_spine_events",
     "_summarize",
