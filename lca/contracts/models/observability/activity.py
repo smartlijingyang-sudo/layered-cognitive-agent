@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import re
 from contextlib import suppress
 from enum import StrEnum
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
@@ -70,16 +72,11 @@ def _deconstruct_command(cmd: str) -> tuple[str, str, str]:
 
     inner_cmd = raw_cmd
     if raw_cmd.startswith("ssh") and ("'" in raw_cmd or '"' in raw_cmd):
-        import re
-
         m = re.search(r"ssh\S*\s+['\"](.*?)['\"]", raw_cmd)
         if m:
             inner_cmd = (
                 m.group(1).replace('echo "ZZSTART";', "").replace('echo "ZZEND";', "").strip()
             )
-
-    import re
-    from pathlib import Path
 
     main_cmd = re.split(r"[|;&]", inner_cmd)[0].strip()
     tokens = main_cmd.split()
@@ -272,8 +269,6 @@ class ActivityIntentNamer:
 
         # File operations
         if "write" in lowered or "create" in lowered or "save" in lowered:
-            from pathlib import Path
-
             target = str(
                 args.get("name")
                 or args.get("target_file")
@@ -404,9 +399,6 @@ def parse_step_evidence(
     step_id: str = "",
 ) -> StepEvidence:
     """Parses a tool execution step into a structured 5-element StepEvidence model."""
-    import re
-    from pathlib import Path
-
     args = arguments or {}
     res = tool_result or {}
     th = thinking or {}
