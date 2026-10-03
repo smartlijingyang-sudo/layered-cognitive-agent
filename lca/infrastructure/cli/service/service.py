@@ -241,6 +241,36 @@ def pid_on_port(port: int) -> int | None:
     return None
 
 
+def pid_on_listening_port(port: int) -> int | None:
+    """Return the PID of the process LISTENING on ``port``, or None.
+
+    Unlike ``pid_on_port``, this only counts listening sockets, so a browser's
+    outbound connection to the dev server never looks like the port is still
+    occupied. Used when waiting for a port to be released after a kill.
+    """
+    import re
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["ss", "-tlnp"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        bound = re.compile(rf":{port}\s")
+        for line in result.stdout.splitlines():
+            if not bound.search(line):
+                continue
+            match = re.search(r"pid=(\d+)", line)
+            if match:
+                return int(match.group(1))
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        # INTENTIONAL: ss 缺失或解析失败 → 无法确认监听者,回 None。
+        pass
+    return None
+
+
 def http_ready(url: str, timeout: float = 2.0) -> bool:
     """Check if an HTTP endpoint is ready (2xx/3xx).
 
@@ -274,6 +304,41 @@ def http_ready(url: str, timeout: float = 2.0) -> bool:
         # INTENTIONAL: HTTP 检查失败 → 回 False;这是 readiness probe,
         # caller 会重试或报错,不阻断启动流程。
         return False
+
+
+def http_code(url: str, timeout: float = 2.0) -> int:
+    """Return the HTTP status code for ``url``, or 0 when unreachable.
+
+    Same probe shape as ``http_ready`` but returns the raw code instead of
+    the 2xx/3xx boolean. Used by checks that must require exactly 200 (e.g.
+    the LobeHub route-integrity probe: ``/signin`` answering a redirect means
+    the dev route table collapsed, which ``http_ready`` would miss).
+    """
+    import subprocess
+
+    try:
+        r = subprocess.run(
+            [
+                "curl",
+                "-sS",
+                "--max-time",
+                str(timeout),
+                "-o",
+                "/dev/null",
+                "-w",
+                "%{http_code}",
+                url,
+            ],
+            capture_output=True,
+            timeout=timeout + 1,
+            text=True,
+        )
+        if r.returncode != 0:
+            return 0
+        return int((r.stdout or "").strip())
+    except Exception:
+        # INTENTIONAL: 探针失败视为不可达(0),由 caller 决定如何归类。
+        return 0
 
 
 def health_body_ok(url: str, timeout: float = 2.0) -> bool:

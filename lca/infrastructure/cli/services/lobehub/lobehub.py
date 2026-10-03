@@ -25,12 +25,20 @@ from lca.infrastructure.cli.service.service import (
     ServiceState,
     ServiceStatus,
     free_port,
+    http_code,
     http_ready,
     kill_tree,
     pid_alive,
+    pid_on_listening_port,
     pid_on_port,
 )
 from lca.infrastructure.cli.state.state import StateStore
+
+# Redirect statuses on the /signin probe mean the dev route table collapsed:
+# every URL falls into not-found.tsx, which redirects to '/', and '/signin' is
+# rewritten to /spa-auth/... only to bounce back. A healthy /signin must answer
+# 200 with the auth SPA HTML; any 3xx here is the collapse signature.
+SIGNIN_REDIRECT_CODES = frozenset({301, 302, 307, 308})
 
 
 @dataclass(frozen=True, slots=True)
@@ -188,6 +196,12 @@ class LobeHubService:
         time.sleep(0.5)
         free_port(self._config.dev_port)
         free_port(self._config.spa_port)
+        # Wait for the listeners to actually disappear before returning.
+        # Otherwise a heal triggered right after stop() spawns a fresh
+        # `next dev` that hits EADDRINUSE and corrupts the shared .next
+        # dev state (the redirect-loop outage on 2026-10-03).
+        self._wait_port_free(self._config.dev_port)
+        self._wait_port_free(self._config.spa_port)
         self._state.remove_pid(self.name)
         self._state.remove_pid(self._SPA_NAME)
 
@@ -224,6 +238,15 @@ class LobeHubService:
         # Dev server responding? HTTP is the ground truth for "UI is up".
         dev_ok = http_ready(f"{self._config.dev_url}/", timeout=2.0)
         checks.append(HealthCheck("dev", dev_ok, f":{self._config.dev_port}"))
+
+        # Route integrity: /signin must answer 200. A 3xx here means the route
+        # table collapsed (every URL falls into not-found → redirect('/')), which
+        # root probes miss because they accept 3xx as "ready". 5xx/timeout (000)
+        # is left to the spa/dev checks so a compiling first request is not misread.
+        signin_code = http_code(f"{self._config.dev_url}/signin", timeout=2.0)
+        routes_ok = signin_code == 200
+        routes_redirect = signin_code in SIGNIN_REDIRECT_CODES
+        checks.append(HealthCheck("routes", routes_ok, f"/signin -> {signin_code}"))
 
         spa_pid = pid_on_port(self._config.spa_port)
         spa_ok = spa_pid is not None
@@ -325,6 +348,18 @@ class LobeHubService:
                 f"{self._config.dev_url} still answers"
             )
             next_action = "./scripts/lca-ops lobehub heal"
+        elif dev_ok and routes_redirect:
+            # Route table collapsed: /signin bounces back to /, every URL falls
+            # into not-found. http_ready still sees 3xx on "/" so restart must
+            # be forced here instead of letting heal reuse the broken listener.
+            status = ServiceStatus.DEGRADED
+            detail = "routes collapsed (/signin redirects)"
+            why = (
+                f"{self._config.dev_url}/signin answered {signin_code}; the dev route "
+                "table collapsed and every URL falls into not-found. A full restart "
+                "is required to rebuild the route table."
+            )
+            next_action = "./scripts/lca-ops lobehub restart"
         elif dev_ok:
             if patches_broken:
                 status = ServiceStatus.DEGRADED
@@ -400,7 +435,10 @@ class LobeHubService:
             self._spa_ready()
             return self.state()
 
-        if current.is_running:
+        # Route collapse: HTTP still answers (3xx), so `current.is_running` is
+        # False, but start() would reuse the broken listener via http_ready.
+        # Force a full stop so the port is released and the route table rebuilds.
+        if current.is_running or current.next_action == "./scripts/lca-ops lobehub restart":
             self.stop()
 
         self.ensure_ready()
@@ -829,6 +867,20 @@ class LobeHubService:
             if port_pid:
                 pids.append(port_pid)
         return list(set(pids))
+
+    def _wait_port_free(self, port: int, timeout: float = 10.0) -> None:
+        """Poll until no process is LISTENING on ``port`` (best effort).
+
+        ``pid_on_listening_port`` only counts listening sockets, so a browser's
+        outbound connection to the dev server does not make the port look
+        occupied. If the listener does not disappear within ``timeout``, give
+        up silently — the subsequent start() will surface any real failure.
+        """
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if pid_on_listening_port(port) is None:
+                return
+            time.sleep(0.25)
 
 
 def _find_bun_pkg_root(ui_dir: Path, pkg_name: str) -> Path | None:

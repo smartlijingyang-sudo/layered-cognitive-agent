@@ -9,7 +9,12 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from lca.infrastructure.cli.service.service import health_body_ok, http_ready
+from lca.infrastructure.cli.service.service import (
+    health_body_ok,
+    http_code,
+    http_ready,
+    pid_on_listening_port,
+)
 
 
 def _curl_result(*, code: str, returncode: int = 0) -> MagicMock:
@@ -114,3 +119,45 @@ def test_health_body_ok_false_when_status_field_missing() -> None:
     body = '{"runs": {}, "live": {}}'
     with patch("subprocess.run", return_value=_curl_body_result(body=body, code="200")):
         assert health_body_ok("http://10.36.6.252:8765/health") is False
+
+
+# ── http_code (route-integrity probe, 2026-10-03) ──────────────────
+
+
+def test_http_code_returns_status_code() -> None:
+    """http_code must return the raw status code, not a 2xx/3xx boolean."""
+    with patch("subprocess.run", return_value=_curl_result(code="200")):
+        assert http_code("http://10.36.6.252:3010/signin") == 200
+    with patch("subprocess.run", return_value=_curl_result(code="307")):
+        assert http_code("http://10.36.6.252:3010/signin") == 307
+    with patch("subprocess.run", return_value=_curl_result(code="500")):
+        assert http_code("http://10.36.6.252:3010/signin") == 500
+
+
+def test_http_code_zero_on_curl_failure() -> None:
+    """curl exit non-zero (unreachable) → 0, matching the readiness convention."""
+    with patch("subprocess.run", return_value=_curl_result(code="000", returncode=7)):
+        assert http_code("http://10.36.6.252:3010/signin") == 0
+
+
+# ── pid_on_listening_port ──────────────────────────────────────────
+
+
+def _ss_result(lines: str) -> MagicMock:
+    result = MagicMock()
+    result.returncode = 0
+    result.stdout = lines
+    return result
+
+
+def test_pid_on_listening_port_finds_listener() -> None:
+    """Only a LISTENING socket on the port should be reported."""
+    out = 'LISTEN 0 511 *:3010 *:* users:(("next-server",pid=1234,fd=22))\n'
+    with patch("subprocess.run", return_value=_ss_result(out)):
+        assert pid_on_listening_port(3010) == 1234
+
+
+def test_pid_on_listening_port_none_when_free() -> None:
+    """No listening socket → None (connected clients must not count)."""
+    with patch("subprocess.run", return_value=_ss_result("")):
+        assert pid_on_listening_port(3010) is None
