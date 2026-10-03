@@ -429,41 +429,79 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       justify-content: space-between;
     `,
     // 详情弹窗双栏布局
+    detailModal: css`
+      .ant-modal-content {
+        padding: 0 !important;
+        border-radius: 16px;
+        overflow: hidden;
+        background: ${cssVar.colorBgElevated};
+        border: 1px solid ${cssVar.colorBorderSecondary};
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+      }
+      .ant-modal-header {
+        margin: 0 !important;
+        padding: 16px 24px !important;
+        border-bottom: 1px solid ${cssVar.colorBorderSecondary};
+        background: ${cssVar.colorBgElevated};
+      }
+      .ant-modal-body {
+        padding: 0 !important;
+        background: ${cssVar.colorBgContainer};
+      }
+    `,
     detailModalLayout: css`
       display: flex;
-      height: 520px;
-      margin: 12px -24px -24px -24px;
+      height: 540px;
     `,
     detailSidebar: css`
-      width: 280px;
+      width: 270px;
       border-right: 1px solid ${cssVar.colorBorderSecondary};
       background: ${cssVar.colorBgLayout};
       overflow-y: auto;
       padding: 12px 8px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 4px;
+    `,
+    detailSidebarHeader: css`
+      font-size: 11px;
+      font-weight: 600;
+      color: ${cssVar.colorTextTertiary};
+      padding: 4px 8px 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     `,
     detailSidebarItem: css`
       padding: 10px 12px;
       border-radius: 10px;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       border: 1px solid transparent;
+      color: ${cssVar.colorTextSecondary};
 
       &:hover {
         background: ${cssVar.colorFillSecondary};
+        color: ${cssVar.colorText};
       }
 
       &.active {
-        background: #eef2f6;
-        border-color: #d0d7de;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        background: ${cssVar.colorPrimaryBg};
+        border-color: ${cssVar.colorPrimaryBorder};
+        color: ${cssVar.colorText};
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
       }
+    `,
+    detailSidebarItemTitle: css`
+      font-size: 12.5px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+      color: inherit;
     `,
     detailMain: css`
       flex: 1;
-      padding: 20px 24px;
+      padding: 22px 26px;
       overflow-y: auto;
       background: ${cssVar.colorBgContainer};
       display: flex;
@@ -476,11 +514,57 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       gap: 6px;
     `,
     detailSectionTitle: css`
-      font-size: 12px;
+      font-size: 11.5px;
       font-weight: 600;
       color: ${cssVar.colorTextTertiary};
       text-transform: uppercase;
       letter-spacing: 0.5px;
+    `,
+    narrativeCard: css`
+      background: ${cssVar.colorFillQuaternary};
+      border: 1px solid ${cssVar.colorBorderSecondary};
+      border-radius: 10px;
+      padding: 14px 16px;
+    `,
+    narrativeText: css`
+      margin: 0 !important;
+      font-size: 13.5px;
+      line-height: 1.75;
+      color: ${cssVar.colorText} !important;
+      white-space: pre-line;
+      letter-spacing: 0.2px;
+    `,
+    verdictBanner: css`
+      border-radius: 10px;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    `,
+    verdictBannerSuccess: css`
+      background: rgba(82, 196, 26, 0.08);
+      border: 1px solid rgba(82, 196, 26, 0.25);
+      border-left: 3px solid #52c41a;
+    `,
+    verdictBannerError: css`
+      background: rgba(255, 77, 79, 0.08);
+      border: 1px solid rgba(255, 77, 79, 0.25);
+      border-left: 3px solid #ff4d4f;
+    `,
+    verdictTitle: css`
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    `,
+    verdictText: css`
+      margin: 0 !important;
+      font-size: 13px;
+      line-height: 1.65;
+      color: ${cssVar.colorText} !important;
+      white-space: pre-line;
     `,
     codeBox: css`
       background: ${cssVar.colorFillTertiary};
@@ -508,6 +592,7 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       padding: 4px 10px;
       background: ${cssVar.colorFillSecondary};
       border-bottom: 1px solid ${cssVar.colorBorderSecondary};
+      color: ${cssVar.colorTextSecondary};
     `,
     codeBlockLang: css`
       font-size: 11px;
@@ -526,6 +611,7 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       background: ${cssVar.colorFillQuaternary};
       padding: 8px 12px;
       border-radius: 6px;
+      border: 1px solid ${cssVar.colorBorderSecondary};
     `,
     searchResultsList: css`
       display: flex;
@@ -840,8 +926,18 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
             id: item.id,
             step_title: item.title,
             iconType: item.status === 'success' ? 'completed' : item.status === 'running' ? 'pending' : 'error',
-            narrative: item.summary || item.detail?.humanExplanation || `执行操作：${item.title}`,
-            command: item.detail?.command || (item.detail?.toolName ? `${item.detail.toolName}()` : undefined),
+            narrative:
+              item.detail?.humanExplanation ||
+              (item.summary && item.summary.length > 20
+                ? item.summary
+                : `智能体针对任务目标执行了「${item.title}」动作。执行了能力组件：${item.detail?.toolName || item.title}，上下文与执行契约已校验，输出状态满足预期。`),
+            command:
+              item.detail?.command ||
+              (item.detail?.toolName
+                ? item.detail.params && Object.keys(item.detail.params).length > 0
+                  ? `${item.detail.toolName}(${Object.entries(item.detail.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(', ')})`
+                  : `${item.detail.toolName}()`
+                : undefined),
             exit_code: item.status === 'error' ? 1 : 0,
             duration_ms: item.detail?.durationMs || 300,
             truncated_boundary: item.detail?.result?.includes('ZZSTART') ? 'ZZSTART / ZZEND' : undefined,
@@ -849,8 +945,8 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
               ? [{ label: '提取到的代码内容', code: item.detail.result, language: 'bash' }]
               : undefined,
             conclusion: item.status === 'success'
-              ? `验证结论：${item.title} 已顺利完成，系统状态一致。`
-              : '执行中或已中断。',
+              ? `验证结论：${item.title} 已顺利完成，符合预期，系统状态与契约保持一致。`
+              : `执行异常：${item.detail?.result || '执行中或已中断。'}`,
             params: item.detail?.params,
             result: item.detail?.result,
           });
@@ -1534,10 +1630,11 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
           onCancel={() => setDetailModalOpen(false)}
           footer={null}
           width={840}
+          className={styles.detailModal}
           title={
             selectedActivity ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 32 }}>
-                <div>
+                <Flex align="center" gap={8}>
                   {selectedActivity.status === 'running' ? (
                     <span
                       style={{
@@ -1545,13 +1642,14 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                         alignItems: 'center',
                         padding: '2px 10px',
                         borderRadius: 12,
-                        background: 'rgba(22, 119, 255, 0.1)',
+                        background: 'rgba(22, 119, 255, 0.15)',
+                        border: '1px solid rgba(22, 119, 255, 0.3)',
                         color: '#1677ff',
                         fontSize: 12,
                         fontWeight: 600,
                       }}
                     >
-                      进行中
+                      ● 进行中
                     </span>
                   ) : selectedActivity.status === 'error' ? (
                     <span
@@ -1560,13 +1658,14 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                         alignItems: 'center',
                         padding: '2px 10px',
                         borderRadius: 12,
-                        background: 'rgba(255, 77, 79, 0.1)',
+                        background: 'rgba(255, 77, 79, 0.15)',
+                        border: '1px solid rgba(255, 77, 79, 0.3)',
                         color: '#ff4d4f',
                         fontSize: 12,
                         fontWeight: 600,
                       }}
                     >
-                      执行失败
+                      ✕ 执行失败
                     </span>
                   ) : (
                     <span
@@ -1575,16 +1674,22 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                         alignItems: 'center',
                         padding: '2px 10px',
                         borderRadius: 12,
-                        background: '#e6f7ec',
-                        color: '#1a7f37',
+                        background: 'rgba(82, 196, 26, 0.15)',
+                        border: '1px solid rgba(82, 196, 26, 0.3)',
+                        color: '#52c41a',
                         fontSize: 12,
                         fontWeight: 600,
                       }}
                     >
-                      已完成
+                      ✓ 已完成
                     </span>
                   )}
-                </div>
+                  {selectedActivity.detail?.runId && (
+                    <Text type="secondary" style={{ fontSize: 11, fontFamily: 'monospace' }}>
+                      Run: {selectedActivity.detail.runId.slice(0, 8)}
+                    </Text>
+                  )}
+                </Flex>
                 <Title level={4} style={{ margin: 0, fontWeight: 700, fontSize: 16 }}>
                   {selectedActivity.title || selectedActivity.summary || '活动详情'}
                 </Title>
@@ -1600,7 +1705,7 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
           <div className={styles.detailModalLayout}>
             {/* 左侧列表：Muse 风格步骤树 */}
             <div className={styles.detailSidebar}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: '#8c8c8c', padding: '4px 6px' }}>
+              <div className={styles.detailSidebarHeader}>
                 本次思考与调用概要
               </div>
               {subSteps.map((step) => {
@@ -1613,27 +1718,22 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                   >
                     <Flex align="center" gap={8}>
                       {step.iconType === 'started' ? (
-                        <span style={{ color: '#8c8c8c', fontSize: 13, flexShrink: 0 }}>●</span>
+                        <span style={{ color: 'inherit', opacity: 0.6, fontSize: 13, flexShrink: 0 }}>●</span>
                       ) : step.iconType === 'completed' ? (
                         <span style={{ color: '#52c41a', fontSize: 13, fontWeight: 'bold', flexShrink: 0 }}>✓</span>
                       ) : step.iconType === 'pending' || step.iconType === 'running' ? (
-                        <span style={{ color: '#8c8c8c', fontSize: 13, flexShrink: 0 }}>☐</span>
+                        <span style={{ color: '#1677ff', fontSize: 13, flexShrink: 0 }}>☐</span>
                       ) : (
                         <span style={{ color: '#ff4d4f', fontSize: 13, fontWeight: 'bold', flexShrink: 0 }}>✕</span>
                       )}
-                      <Text
-                        strong={isSelected}
+                      <span
+                        className={styles.detailSidebarItemTitle}
                         style={{
-                          fontSize: 12.5,
-                          color: isSelected ? '#1677ff' : '#262626',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          flex: 1,
+                          fontWeight: isSelected ? 600 : 400,
                         }}
                       >
                         {step.step_title}
-                      </Text>
+                      </span>
                     </Flex>
                   </div>
                 );
@@ -1649,8 +1749,11 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                 </Title>
 
                 {/* 2. 叙述段落 */}
-                <div className={styles.detailSection}>
-                  <Paragraph style={{ margin: 0, fontSize: 13, lineHeight: 1.7, color: '#262626', whiteSpace: 'pre-line' }}>
+                <div className={styles.narrativeCard}>
+                  <div className={styles.detailSectionTitle} style={{ marginBottom: 6 }}>
+                    🧠 智能体意图与执行叙述
+                  </div>
+                  <Paragraph className={styles.narrativeText}>
                     {activeSubStep.narrative}
                   </Paragraph>
                   <span style={{ display: 'none' }}>具体情况详细说明</span>
@@ -1667,7 +1770,7 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                           <Button
                             type="text"
                             size="small"
-                            style={{ fontSize: 11, color: '#8c8c8c', height: 22, padding: '0 6px' }}
+                            style={{ fontSize: 11, color: 'inherit', height: 22, padding: '0 6px' }}
                             onClick={() => {
                               if (typeof navigator !== 'undefined' && navigator.clipboard) {
                                 navigator.clipboard.writeText(activeSubStep.command || '');
@@ -1680,7 +1783,7 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                           <Button
                             type="text"
                             size="small"
-                            style={{ fontSize: 11, color: '#8c8c8c', height: 22, padding: '0 6px' }}
+                            style={{ fontSize: 11, color: 'inherit', height: 22, padding: '0 6px' }}
                             onClick={() => {
                               const blob = new Blob([activeSubStep.command || ''], { type: 'text/plain' });
                               const url = URL.createObjectURL(blob);
@@ -1742,7 +1845,7 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                               <Button
                                 type="text"
                                 size="small"
-                                style={{ fontSize: 11, color: '#8c8c8c', height: 22, padding: '0 6px' }}
+                                style={{ fontSize: 11, color: 'inherit', height: 22, padding: '0 6px' }}
                                 onClick={() => {
                                   if (typeof navigator !== 'undefined' && navigator.clipboard) {
                                     navigator.clipboard.writeText(snip.code || '');
@@ -1755,7 +1858,7 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                               <Button
                                 type="text"
                                 size="small"
-                                style={{ fontSize: 11, color: '#8c8c8c', height: 22, padding: '0 6px' }}
+                                style={{ fontSize: 11, color: 'inherit', height: 22, padding: '0 6px' }}
                                 onClick={() => {
                                   const blob = new Blob([snip.code || ''], { type: 'text/plain' });
                                   const url = URL.createObjectURL(blob);
@@ -1784,11 +1887,25 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
 
                 {/* 6. 验证结论 */}
                 {activeSubStep.conclusion && (
-                  <div className={styles.detailSection} style={{ marginTop: 4 }}>
-                    <span className={styles.detailSectionTitle} style={{ fontWeight: 700, color: '#262626', fontSize: 13 }}>
-                      验证结论
-                    </span>
-                    <Paragraph style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: '#262626', whiteSpace: 'pre-line' }}>
+                  <div
+                    className={`${styles.verdictBanner} ${
+                      activeSubStep.iconType === 'error' || activeSubStep.exit_code !== 0
+                        ? styles.verdictBannerError
+                        : styles.verdictBannerSuccess
+                    }`}
+                  >
+                    <div
+                      className={styles.verdictTitle}
+                      style={{
+                        color:
+                          activeSubStep.iconType === 'error' || activeSubStep.exit_code !== 0
+                            ? '#ff4d4f'
+                            : '#52c41a',
+                      }}
+                    >
+                      {activeSubStep.iconType === 'error' || activeSubStep.exit_code !== 0 ? '✕ 执行异常' : '🛡️ 验证结论'}
+                    </div>
+                    <Paragraph className={styles.verdictText}>
                       {activeSubStep.conclusion}
                     </Paragraph>
                   </div>

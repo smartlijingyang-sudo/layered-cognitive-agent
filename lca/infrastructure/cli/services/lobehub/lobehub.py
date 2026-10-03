@@ -761,7 +761,7 @@ class LobeHubService:
         consec = 0
         for _ in range(120):
             time.sleep(0.5)
-            if http_ready(f"{self._config.dev_url}/", timeout=1.0):
+            if http_ready(f"{self._config.dev_url}/", timeout=3.0):
                 consec += 1
                 if consec >= needed:
                     return True
@@ -823,8 +823,11 @@ class LobeHubService:
         # deployment.
         gateway_http = self._client_gateway_base()
         gateway_ws = gateway_http.replace("http://", "ws://", 1).replace("https://", "wss://", 1)
+        no_proxy_hosts = "localhost,127.0.0.1,10.36.6.252,0.0.0.0"
         return {
             **os.environ,
+            "NO_PROXY": no_proxy_hosts,
+            "no_proxy": no_proxy_hosts,
             "PORT": str(self._config.dev_port),
             "SPA_PORT": str(self._config.spa_port),
             "VITE_DEV_PORT": str(self._config.spa_port),
@@ -834,7 +837,7 @@ class LobeHubService:
             "NEXT_PUBLIC_LCA_GATEWAY_URL": gateway_ws,
             "NEXT_PUBLIC_LCA_HOST_CONSOLE": os.environ.get("NEXT_PUBLIC_LCA_HOST_CONSOLE", "0"),
             "RAYON_NUM_THREADS": os.environ.get("RAYON_NUM_THREADS", "2"),
-            "NODE_OPTIONS": os.environ.get("NODE_OPTIONS", "--max-old-space-size=4096"),
+            "NODE_OPTIONS": os.environ.get("NODE_OPTIONS", "--max-old-space-size=2048"),
         }
 
     def _spawn_script(self, script: str, log_name: str) -> int | None:

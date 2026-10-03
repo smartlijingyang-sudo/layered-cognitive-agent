@@ -159,7 +159,9 @@ class ActivityProjector:
             existing = self._get(asst_id, inv_id) or self._get("default", inv_id)
             tool_name = _extract_tool_name(event, payload, tool_calling)
             args = _extract_arguments(event, payload, tool_calling)
-            ts = _format_iso(event.get("timestamp") or payload.get("timestamp") or event.get("created_at"))
+            ts = _format_iso(
+                event.get("timestamp") or payload.get("timestamp") or event.get("created_at")
+            )
             if existing:
                 refreshed = ActivityItem(
                     id=existing.id,
@@ -177,7 +179,10 @@ class ActivityProjector:
                     result_summary=existing.result_summary,
                     is_system=existing.is_system,
                     tool_name=existing.tool_name or tool_name,
-                    current_step=existing.current_step or ActivityIntentNamer.live_step(existing.tool_name or tool_name, existing.params),
+                    current_step=existing.current_step
+                    or ActivityIntentNamer.live_step(
+                        existing.tool_name or tool_name, existing.params
+                    ),
                 )
                 self._save(refreshed)
                 return refreshed
@@ -337,6 +342,8 @@ class ActivityProjector:
         return cancelled
 
     def get_activities(self, assistant_id: str) -> list[ActivityItem]:
+        if self._seed_traces and not self._seeded:
+            self.seed_from_traces()
         store = self._items.get(assistant_id, {})
         # Gateway tool events historically do not stamp assistant_id, so
         # the projector stores them under "default". Surface those real
@@ -344,11 +351,6 @@ class ActivityProjector:
         # kernel restart even though runs executed through the gateway.
         default_store = self._items.get("default", {})
         merged = {**default_store, **store}
-        if not merged and self._seed_traces and not self._seeded:
-            self.seed_from_traces()
-            store = self._items.get(assistant_id, {})
-            default_store = self._items.get("default", {})
-            merged = {**default_store, **store}
         # Return descending by start_time
         return sorted(merged.values(), key=lambda x: x.start_time, reverse=True)
 
@@ -404,21 +406,22 @@ class ActivityProjector:
                 if not isinstance(s, dict):
                     continue
                 tcs = s.get("tool_calls") or []
+                trs_list = s.get("tool_results") or []
                 trs = {
                     tr.get("invocation_id"): tr
-                    for tr in (s.get("tool_results") or [])
+                    for tr in trs_list
                     if isinstance(tr, dict) and tr.get("invocation_id")
                 }
                 step_entered = s.get("entered_at")
                 # 诚实：缺 entered_at 就空着，不编造假时间戳
                 start_time = _format_iso(step_entered)
 
-                for tc in tcs:
+                for idx, tc in enumerate(tcs):
                     if not isinstance(tc, dict):
                         continue
                     inv_id = str(tc.get("invocation_id") or "")
                     if not inv_id:
-                        continue
+                        inv_id = f"{run_id}_s{s.get('step_index', 0)}_tc{idx}"
                     tool_name = str(tc.get("name") or tc.get("tool_name") or "")
                     args = tc.get("arguments") if isinstance(tc.get("arguments"), dict) else {}
                     title, summary, icon = ActivityIntentNamer.name(tool_name, args)
@@ -428,6 +431,8 @@ class ActivityProjector:
                     duration_ms = None
                     result_summary = None
                     tr = trs.get(inv_id)
+                    if not tr and idx < len(trs_list) and isinstance(trs_list[idx], dict):
+                        tr = trs_list[idx]
                     if tr:
                         is_ok = tr.get("ok", True)
                         status = ActivityStatus.COMPLETED if is_ok else ActivityStatus.FAILED

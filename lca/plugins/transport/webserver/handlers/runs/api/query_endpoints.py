@@ -166,60 +166,105 @@ def _read_run_journal_detail(
     rich_steps = []
     for s in raw_steps:
         th = s.get("thinking") or {}
-        tc = s.get("tool_call") or {}
-        tr = s.get("tool_result") or {}
-        evidence = None
-        if tc and tc.get("name"):
-            try:
-                ev = parse_step_evidence(
-                    tool_name=tc.get("name") or "",
-                    arguments=tc.get("arguments"),
-                    tool_result=tr,
-                    thinking=th,
-                    step_id=str(s.get("step_id") or ""),
-                )
-                evidence = ev.model_dump()
-            except Exception:
-                evidence = None
+        raw_tcs = s.get("tool_calls") or []
+        raw_trs = s.get("tool_results") or []
 
-        rich_steps.append(
-            {
-                "step_id": s.get("step_id"),
-                "step_index": s.get("step_index"),
-                "phase": s.get("phase"),
-                "duration_ms": s.get("duration_ms"),
-                "thinking": {
-                    "model": th.get("model"),
-                    "latency_ms": th.get("latency_ms"),
-                    "reasoning": th.get("reasoning"),
-                    "prompt_tokens": th.get("prompt_tokens"),
-                    "completion_tokens": th.get("completion_tokens"),
-                    "decision": th.get("decision"),
-                    "raw_response_preview": th.get("raw_response_preview"),
-                },
-                "tool_call": (
-                    {
+        if not raw_tcs:
+            tc_single = s.get("tool_call")
+            if tc_single and tc_single.get("name"):
+                raw_tcs = [tc_single]
+                tr_single = s.get("tool_result")
+                raw_trs = [tr_single] if tr_single else []
+
+        if not raw_tcs:
+            rich_steps.append(
+                {
+                    "step_id": s.get("step_id"),
+                    "step_index": s.get("step_index"),
+                    "phase": s.get("phase"),
+                    "duration_ms": s.get("duration_ms"),
+                    "thinking": {
+                        "model": th.get("model"),
+                        "latency_ms": th.get("latency_ms"),
+                        "reasoning": th.get("reasoning"),
+                        "prompt_tokens": th.get("prompt_tokens"),
+                        "completion_tokens": th.get("completion_tokens"),
+                        "decision": th.get("decision"),
+                        "raw_response_preview": th.get("raw_response_preview"),
+                    },
+                    "tool_call": None,
+                    "tool_result": None,
+                    "evidence": None,
+                }
+            )
+            continue
+
+        trs_by_id = {
+            tr.get("invocation_id"): tr
+            for tr in raw_trs
+            if isinstance(tr, dict) and tr.get("invocation_id")
+        }
+
+        for idx, tc in enumerate(raw_tcs):
+            if not isinstance(tc, dict):
+                continue
+            inv_id = str(tc.get("invocation_id") or "")
+            tr = trs_by_id.get(inv_id) if inv_id else None
+            if not tr and idx < len(raw_trs) and isinstance(raw_trs[idx], dict):
+                tr = raw_trs[idx]
+            if tr is None:
+                tr = {}
+
+            sub_step_id = (
+                f"{s.get('step_id') or 'step'}-{idx + 1}"
+                if len(raw_tcs) > 1
+                else str(s.get("step_id") or "")
+            )
+
+            evidence = None
+            if tc.get("name"):
+                try:
+                    ev = parse_step_evidence(
+                        tool_name=tc.get("name") or "",
+                        arguments=tc.get("arguments"),
+                        tool_result=tr,
+                        thinking=th,
+                        step_id=str(sub_step_id or ""),
+                    )
+                    evidence = ev.model_dump()
+                except Exception:
+                    evidence = None
+
+            rich_steps.append(
+                {
+                    "step_id": sub_step_id,
+                    "step_index": s.get("step_index"),
+                    "phase": s.get("phase"),
+                    "duration_ms": tr.get("latency_ms") or s.get("duration_ms"),
+                    "thinking": {
+                        "model": th.get("model"),
+                        "latency_ms": th.get("latency_ms"),
+                        "reasoning": th.get("reasoning"),
+                        "prompt_tokens": th.get("prompt_tokens"),
+                        "completion_tokens": th.get("completion_tokens"),
+                        "decision": th.get("decision"),
+                        "raw_response_preview": th.get("raw_response_preview"),
+                    },
+                    "tool_call": {
                         "name": tc.get("name"),
                         "arguments": tc.get("arguments"),
                         "arguments_summary": tc.get("arguments_summary"),
-                    }
-                    if tc
-                    else None
-                ),
-                "tool_result": (
-                    {
-                        "ok": tr.get("ok"),
+                    },
+                    "tool_result": {
+                        "ok": tr.get("ok", True),
                         "latency_ms": tr.get("latency_ms"),
                         "stdout_head": tr.get("stdout_head"),
                         "delta_summary": tr.get("delta_summary"),
                         "error": tr.get("error"),
-                    }
-                    if tr
-                    else None
-                ),
-                "evidence": evidence,
-            }
-        )
+                    },
+                    "evidence": evidence,
+                }
+            )
 
     doctor_report = None
     manifest_path = step_path.parent / "manifest.json"

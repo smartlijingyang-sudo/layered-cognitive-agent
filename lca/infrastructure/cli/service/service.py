@@ -283,6 +283,8 @@ def http_ready(url: str, timeout: float = 2.0) -> bool:
         r = subprocess.run(
             [
                 "curl",
+                "--noproxy",
+                "*",
                 "-sS",
                 "--max-time",
                 str(timeout),
@@ -320,6 +322,8 @@ def http_code(url: str, timeout: float = 2.0) -> int:
         r = subprocess.run(
             [
                 "curl",
+                "--noproxy",
+                "*",
                 "-sS",
                 "--max-time",
                 str(timeout),
