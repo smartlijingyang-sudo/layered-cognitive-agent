@@ -19,7 +19,9 @@ from lca.infrastructure.memory.contextfiles.domain.standing import (
 
 
 def test_standing_order_comes_from_the_layout_file() -> None:
+    # ada0919cc: CONSTITUTION.md 注册为 standing_files 首位（deliberate 布局变更）
     assert packaged_layout().standing_files == (
+        "CONSTITUTION.md",
         "SOUL.md",
         "IDENTITY.md",
         "USER.md",

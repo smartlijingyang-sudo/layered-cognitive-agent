@@ -155,12 +155,25 @@ class TestIAssistantRoutesEpSurface:
     不出现 cordis publish / EventBus publish / 直接 EP 发射 helper 调用。
     """
 
+    @staticmethod
+    def _sources():
+        """PR-5 起 routes_assistants 为子包（原单文件已拆分）：扫描包内全部 .py。"""
+        pkg = (
+            _REPO_ROOT
+            / "lca"
+            / "plugins"
+            / "transport"
+            / "webserver"
+            / "routes_1"
+            / "routes_assistants"
+        )
+        assert pkg.is_dir(), f"routes_assistants subpackage missing: {pkg}"
+        return [(f.name, f.read_text(encoding="utf-8")) for f in sorted(pkg.glob("*.py"))]
+
     def test_routes_assistants_does_not_emit_cordis_events(self) -> None:
-        """``routes_assistants.py`` 不得调 cordis EventBus.publish /
+        """``routes_assistants``（PR-5 起为子包）不得调 cordis EventBus.publish /
         publish_event 等直接发射面（EP 发射是 catalog 责任，PR-3）。
         """
-        target = _REPO_ROOT / "lca" / "plugins" / "transport" / "webserver" / "routes_assistants.py"
-        text = target.read_text(encoding="utf-8")
         # 显式禁词（按需追加；EP 发射面 ≠ cordis 事件总线）
         forbidden = (
             "EventBus.publish",
@@ -168,29 +181,29 @@ class TestIAssistantRoutesEpSurface:
             "publish_assistant_",
             "emit_assistant_",
         )
-        for token in forbidden:
-            assert token not in text, (
-                f"I-A11 violated: routes_assistants contains {token!r}; "
-                "EP emission belongs to the catalog plugin (PR-3)."
-            )
+        for name, text in self._sources():
+            for token in forbidden:
+                assert token not in text, (
+                    f"I-A11 violated: routes_assistants/{name} contains {token!r}; "
+                    "EP emission belongs to the catalog plugin (PR-3)."
+                )
 
     def test_routes_assistants_does_not_strip_event_descriptor_layer(self) -> None:
         """路由模块不得修改 EP 描述符 registry / cordis 事件表 —— 注册
         面只由 ``event_descriptors_data.build_default_registry`` 在 boot
         一次性导入（PR-2 已落）。"""
-        target = _REPO_ROOT / "lca" / "plugins" / "transport" / "webserver" / "routes_assistants.py"
-        text = target.read_text(encoding="utf-8")
         forbidden = (
             "register_event_descriptor",
             "register_assistant",
             "ASSISTANT_EVENT_DESCRIPTORS",
             "ASSISTANT_EVENT_POINTS",
         )
-        for token in forbidden:
-            assert token not in text, (
-                f"I-A11 violated: routes_assistants touches EP registration "
-                f"surface via {token!r}; this belongs to PR-3 catalog."
-            )
+        for name, text in self._sources():
+            for token in forbidden:
+                assert token not in text, (
+                    f"I-A11 violated: routes_assistants/{name} touches EP registration "
+                    f"surface via {token!r}; this belongs to PR-3 catalog."
+                )
 
 
 # ── I-A12 / I-A13 占位声明（PR-8 / PR-3+ 范畴）───────────────────────────────
