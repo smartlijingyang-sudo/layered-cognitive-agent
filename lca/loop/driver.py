@@ -164,8 +164,9 @@ def _pause_from_interrupt(visits: tuple) -> dict | None:
 def _paused_outcome_parts(pause: dict, *, plan_ref: str, visits: tuple) -> tuple:
     """Build the paused ``(stop, cursor, approval_request)`` triple.
 
-    The run stopped at ``intervene.interrupt``; resume re-enters at
-    ``intervene.resume`` (outer yaml), so the durable cursor points
+    The run stopped at ``intervene.interrupt``; resume restarts the
+    graph at ``perceive.main`` (full-restart design, 99ca2bdc0 — the
+    human answer is folded into state), so the durable cursor points
     there. ``approval_id`` follows the ``<plan_ref>:<node>:<visit>``
     shape the transport logs on resume.
     """
