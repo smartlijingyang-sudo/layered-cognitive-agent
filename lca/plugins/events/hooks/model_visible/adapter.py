@@ -101,7 +101,7 @@ def _kwargs_for_hook(
     wire_prompt = (prompt or str(out.get("prompt") or "")).strip()
     if isinstance(history, (list, tuple)) and history:
         if wire_prompt:
-            from lca.infrastructure.llm_adapter.openai_compat.history import (
+            from lca.infrastructure.llm_adapter.openai_compat.history._history import (
                 openai_messages_with_history,
             )
 
