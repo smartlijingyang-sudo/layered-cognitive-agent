@@ -13,15 +13,16 @@ from datetime import datetime
 from typing import Literal
 
 __all__ = [
-    "EpisodicTrace",
-    "SemanticClaim",
-    "ProceduralRule",
-    "ConsolidationRecord",
-    "ScoredCandidate",
-    "W_SEMANTIC",
-    "W_SALIENCE",
-    "W_RECENCY",
     "W_CUE",
+    "W_RECENCY",
+    "W_SALIENCE",
+    "W_SEMANTIC",
+    "ConsolidationRecord",
+    "EpisodicTrace",
+    "ProceduralRule",
+    "ScoredCandidate",
+    "SemanticClaim",
+    "WorkingMemoryPercept",
 ]
 
 # ADR-0277 检索评分权重（已裁决，P3 评分 SSOT）：
@@ -46,6 +47,19 @@ def _require_non_empty(name: str, value: str) -> None:
 
 
 @dataclass(frozen=True)
+class WorkingMemoryPercept:
+    """工作记忆感知（Baddeley working memory）：Run 内瞬态激活目标与焦点实体。"""
+
+    task_goal: str
+    focal_entities: tuple[str, ...] = ()
+    active_cues: tuple[str, ...] = ()
+    observed_at_ms: int = 0
+
+    def __post_init__(self) -> None:
+        _require_non_empty("task_goal", self.task_goal)
+
+
+@dataclass(frozen=True)
 class EpisodicTrace:
     """情景记忆：何时何地何事（Tulving episodic，对应 LCA 的 L1 日志层）。
 
@@ -59,6 +73,8 @@ class EpisodicTrace:
     who: tuple[str, ...]  # 相关人物
     what: str  # 事件原文（non-lossy）
     salience: float  # 显著性 0..1（编码门控用）
+    associated_tool: str | None = None
+    ttl_days: int | None = None
 
     def __post_init__(self) -> None:
         _require_non_empty("what", self.what)
@@ -78,8 +94,11 @@ class SemanticClaim:
     confidence: float  # 0..1
     sources: tuple[str, ...]  # provenance：trace id / 文档 / 对话轮次
     valid_from: datetime | None
-    valid_to: datetime | None  # None=当前有效；被取代时填值，不删除
-    supersedes: str | None  # 被取代的 claim id（Zep 式非丢失）
+    valid_to: datetime | None = None  # None=当前有效；被取代时填值，不删除
+    supersedes: str | None = None  # 被取代的 claim id（Zep 式非丢失）
+    category: str = "fact"  # identity | preference | fact | constraint
+    dedupe_key: str | None = None  # 抽象维度键（如 preference:tech_stack）
+    sensitivity: Literal["normal", "high"] = "normal"  # 表达分寸防火墙用
 
     def __post_init__(self) -> None:
         _require_non_empty("claim", self.claim)

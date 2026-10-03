@@ -493,3 +493,9 @@
 | BRAINSTORM-COGNITIVE-MEMORY-DESIGN-SECTIONS | 步骤 4：逐步呈现分节架构规范（边界分层/存储布局/多层扩散/自主避坑与Skill沉淀/测试矩阵）并呈批 | Completed | 3 大小节设计规范与 7 维度 28 项核心验收矩阵均获用户审批通过 |
 | BRAINSTORM-COGNITIVE-MEMORY-DESIGN-DOC | 步骤 5：沉淀架构设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-03-cognitive-memory-architecture-design.md 并提交 git (commit 9a60c9633) |
 | BRAINSTORM-COGNITIVE-MEMORY-TRANSITION | 步骤 6：转入实施计划制定（调用 writing-plans 规划单流落地步骤） | Completed | 成功落盘实施计划 docs/plans/2026-10-03-cognitive-memory-architecture-plan.md 并提交 git (commit 07f2a1570) |
+| COGNITIVE-MEMORY-TASK-1 | 任务 1：契约层与四层认知记忆领域模型 (Contracts & ADR-0277 兼容合流) | Completed | 成功扩充 WorkingMemoryPercept 并向后兼容丰富 SemanticClaim/EpisodicTrace，落地 cognitive.py 端口协议，单测与 ADR-0277 全量 149 测试 100% 全绿 |
+| COGNITIVE-MEMORY-TASK-2 | 任务 2：开放实体知识图谱与 File-as-SSOT 存储适配器 (Infrastructure) | In_Progress | 正在编写 test_entity_graph_store.py 并落地 EntityGraphStore、GRAPH.md 微索引（带预算与沉降GC）与 SQLite FTS5+Graph 派生索引器 |
+| COGNITIVE-MEMORY-TASK-3 | 任务 3：摄入模态门控与反思过滤器 (Ingestion Guards) | Pending | 待实现反事实举例丢弃、反讽过滤与显著性频次门控 |
+| COGNITIVE-MEMORY-TASK-4 | 任务 4：极简冷启动装配与 System 2 内部追忆工具 (Cognitive Saccade) | Pending | 待实现 <500 Token 视界装配与 SystemTwoRecallEngine 2跳联想追忆 |
+| COGNITIVE-MEMORY-TASK-5 | 任务 5：表达分寸防火墙与工具踩坑避坑哨兵 (Tact & Pitfall Shield) | Pending | 待实现高敏感记忆隔离、禁炫耀声带契约与 TOOLS.md 调用前按需避坑注入 |
+| COGNITIVE-MEMORY-TASK-6 | 任务 6：7 大维度 28 项核心场景双轨基准评测 (Two-Track Evals Benchmark) | Pending | 待落地 28 项全量场景自动化评测并跑通 100% 验收断言 |
