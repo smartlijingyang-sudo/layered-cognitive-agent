@@ -9,8 +9,10 @@ no ContextVar lookup.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from typing import Any, Literal
+from urllib.parse import parse_qs, urlencode
 
 from lca.contracts.models.core.conversation.conversation import ConversationTurn
 from lca.contracts.models.session.call_id import CallId
@@ -259,6 +261,14 @@ class RunSessionWriter(RunSessionWriterProtocol):
         usage: TokenUsage | None,
     ) -> EventRef:
         session = self._require_session()
+        # INV-CAP-04: Deterministic widget fallback guard when model omits widget
+        if content is not None:
+            pending = extract_pending_intents_from_events(session.snapshot_events())
+            if pending:
+                content = ensure_intent_widget_in_assistant_message(
+                    raw_model_content=content,
+                    pending_intents=pending,
+                )
         event = session.append(
             "surface/assistant_message",
             {
@@ -423,4 +433,130 @@ class RunSessionWriter(RunSessionWriterProtocol):
         return session.request_header()
 
 
-__all__ = ["RunSessionWriter", "SessionWriterUnboundError"]
+def extract_pending_intents_from_events(
+    events: Sequence[Any],
+) -> list[dict[str, str]]:
+    """Extract unmounted connector capability intents from session events (INV-CAP-04).
+
+    An intent is considered unmounted if it was emitted in a ``surface/tool_result`` event
+    but has not yet appeared in any preceding ``surface/assistant_message`` event.
+    """
+    mounted_intent_ids: set[str] = set()
+    tool_intents: list[dict[str, str]] = []
+
+    for event in events:
+        event_type = getattr(event, "type", "")
+        data = getattr(event, "data", {}) or {}
+
+        if event_type == "surface/assistant_message":
+            content = data.get("content") or ""
+            for match in re.finditer(r"\[widget:connector_auth\?([^\]]+)\]", content):
+                qs = parse_qs(match.group(1))
+                intent_id = (qs.get("intentId") or qs.get("intent_id") or [None])[0]
+                if intent_id:
+                    mounted_intent_ids.add(intent_id)
+
+        elif event_type in ("surface/tool_result", SURFACE_TOOL_RESULT_TYPE):
+            content = data.get("content") or ""
+            found = False
+            for match in re.finditer(r"\[widget:connector_auth\?([^\]]+)\]", content):
+                qs = parse_qs(match.group(1))
+                intent_id = (qs.get("intentId") or qs.get("intent_id") or [None])[0]
+                app_name = (qs.get("appName") or qs.get("app_name") or ["Connector"])[0]
+                connection_id = (qs.get("connectionId") or qs.get("connection_id") or [""])[0]
+                mode = (qs.get("mode") or [""])[0]
+                if intent_id:
+                    tool_intents.append(
+                        {
+                            "intent_id": intent_id,
+                            "app_name": app_name,
+                            "connection_id": connection_id,
+                            "mode": mode,
+                        }
+                    )
+                    found = True
+
+            if not found:
+                meta = data.get("meta") or {}
+                intent_id = meta.get("intent_id") or data.get("intent_id")
+                if intent_id:
+                    tool_intents.append(
+                        {
+                            "intent_id": intent_id,
+                            "app_name": meta.get("app_name") or data.get("app_name") or "Connector",
+                            "connection_id": meta.get("connection_id") or data.get("connection_id") or "",
+                            "mode": meta.get("mode") or data.get("mode") or "",
+                        }
+                    )
+
+    # Return only unmounted intents (deduplicated by intent_id)
+    seen: set[str] = set()
+    unmounted: list[dict[str, str]] = []
+    for item in tool_intents:
+        iid = item["intent_id"]
+        if iid not in mounted_intent_ids and iid not in seen:
+            seen.add(iid)
+            unmounted.append(item)
+
+    return unmounted
+
+
+def ensure_intent_widget_in_assistant_message(
+    raw_model_content: str | None,
+    pending_intents: Sequence[dict[str, Any] | Any] | None = None,
+) -> str:
+    """Ensure that all pending connector auth intents are represented as widgets (INV-CAP-04).
+
+    If the raw model content already contains the intentId, it is not duplicated.
+    Otherwise, a standard [widget:connector_auth?...] tag is appended.
+    """
+    content = raw_model_content or ""
+    if not pending_intents:
+        return content
+
+    widgets_to_append: list[str] = []
+    for item in pending_intents:
+        if isinstance(item, dict):
+            intent_id = item.get("intent_id") or item.get("intentId")
+            app_name = item.get("app_name") or item.get("appName") or "Connector"
+            connection_id = item.get("connection_id") or item.get("connectionId") or ""
+            mode = item.get("mode") or ""
+        else:
+            intent_id = getattr(item, "intent_id", None) or getattr(item, "intentId", None)
+            app_name = getattr(item, "app_name", "Connector") or getattr(item, "appName", "Connector")
+            connection_id = getattr(item, "connection_id", "") or getattr(item, "connectionId", "")
+            mode = getattr(item, "mode", "")
+
+        if not intent_id:
+            continue
+
+        if intent_id in content:
+            continue
+
+        params: dict[str, str] = {
+            "intentId": str(intent_id),
+            "appName": str(app_name),
+        }
+        if connection_id:
+            params["connectionId"] = str(connection_id)
+        if mode:
+            params["mode"] = str(mode)
+
+        tag = f"[widget:connector_auth?{urlencode(params)}]"
+        widgets_to_append.append(tag)
+
+    if not widgets_to_append:
+        return content
+
+    suffix = "\n\n".join(widgets_to_append)
+    if content.strip():
+        return f"{content.rstrip()}\n\n{suffix}"
+    return suffix
+
+
+__all__ = [
+    "RunSessionWriter",
+    "SessionWriterUnboundError",
+    "ensure_intent_widget_in_assistant_message",
+    "extract_pending_intents_from_events",
+]
