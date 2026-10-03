@@ -213,6 +213,7 @@
 | [0273](0273-streaming-interleave-think-act.md) | 流式交错契约：think 流式产出期间 act 侧做无副作用预准备（参数校验/审批预判/连接预热），交错点在 emit seam、不改六 phase 拓扑；hint 不是承诺、正式 dispatch 仍完整 fail-closed | Proposed |
 | [0274](0274-phase-wire-budget.md) | Phase Wire 预算契约：phase 级 token 预算配置层声明、装配后 wire 投射前强制执行；超预算时 perceive 按传感器优先级裁剪、think 触发工具域 defer；ADR-0256 预算思想的 phase 级推广 | Proposed |
 | [0275](0275-window-pressure-phase-degradation.md) | 窗口压力 phase 降级契约：WindowPressure 信号 SSOT（phase 只读不写）、降级策略声明式进配置、落点为 control 贡献契约新 slot；reflect 高压力降级快速路径、remember 批量异步；与 0258 记忆层压缩正交 | Proposed |
+| [0277](0277-cognitive-memory-reconstruction.md) | 记忆机制的认知重构：typed 记忆对象（EpisodicTrace/SemanticClaim/ProceduralRule）+ perceive 传感器注册表 + remember 四决策 consolidation（encode/link/decay/schema）；吸取 Letta（sleep-time）、Zep（双时间线）、Mem0（reconcile）、ACT-R（激活度评分）、Soar（四记忆独立学习）；对齐人类记忆模型（Tulving/遗忘曲线/编码深度/系统巩固） | Proposed |
 | [0276](0276-acceptance-evidence-mapping.md) | 0255 §6 验收映射与证据诚实契约：T1–T12 的 owner/锚点/证据等级（L1/L2/L3）映射表 SSOT、缺席不许静默（实锤 T7/T11 缺席）、套件名实相符；ADR-0255 §6 的 LCA 落地提案 | Proposed |
 
 | [0255](0255-muse-production-runtime-full-reference.md) | Muse 生产运行时全量参考：每 turn 上下文装配顺序、9 个 standing 文件全文与权限矩阵、36 工具命名空间函数清单与关键参数、9 大机制（记忆三层/强制检索/落笔写盘/provenance/压缩豁免/子 agent 继承/自省投影）与 12 条验收用例；ADR-0254 的实证 companion | Proposed |
