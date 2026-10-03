@@ -1,4 +1,5 @@
 """Activity projector behavior tests: start/end folding, catalog events, honest timestamps."""
+
 from lca.contracts.models.observability.activity import (
     ActivityCategory,
     ActivityIntentNamer,
@@ -13,34 +14,52 @@ def _p():
 
 def test_start_creates_running_item_with_intent():
     p = _p()
-    item = p.feed_event({
-        "execution_point": "phase.tool.call.start",
-        "payload": {
-            "invocation_id": "c1", "run_id": "r1", "assistant_id": "a1",
-            "tool_name": "run_shell", "arguments": {"command": "ls -la"},
-            "timestamp": "2026-10-03T08:00:00Z",
-        },
-    })
+    item = p.feed_event(
+        {
+            "execution_point": "phase.tool.call.start",
+            "payload": {
+                "invocation_id": "c1",
+                "run_id": "r1",
+                "assistant_id": "a1",
+                "tool_name": "run_shell",
+                "arguments": {"command": "ls -la"},
+                "timestamp": "2026-10-03T08:00:00Z",
+            },
+        }
+    )
     assert item is not None
     assert item.status == ActivityStatus.RUNNING
     assert item.category == ActivityCategory.COMMAND
-    assert item.title == "Running command"
+    assert item.title == "执行 ls 指令"
     assert item.summary == "ls -la"
 
 
 def test_end_completes_item_with_duration():
     p = _p()
-    p.feed_event({
-        "execution_point": "phase.tool.call.start",
-        "payload": {"invocation_id": "c1", "assistant_id": "a1",
-                    "tool_name": "run_shell", "arguments": {"command": "ls"},
-                    "timestamp": "2026-10-03T08:00:00Z"},
-    })
-    done = p.feed_event({
-        "execution_point": "body.tool.execute.end",
-        "payload": {"invocation_id": "c1", "assistant_id": "a1", "ok": True,
-                    "latency_ms": 120, "timestamp": "2026-10-03T08:00:07Z"},
-    })
+    p.feed_event(
+        {
+            "execution_point": "phase.tool.call.start",
+            "payload": {
+                "invocation_id": "c1",
+                "assistant_id": "a1",
+                "tool_name": "run_shell",
+                "arguments": {"command": "ls"},
+                "timestamp": "2026-10-03T08:00:00Z",
+            },
+        }
+    )
+    done = p.feed_event(
+        {
+            "execution_point": "body.tool.execute.end",
+            "payload": {
+                "invocation_id": "c1",
+                "assistant_id": "a1",
+                "ok": True,
+                "latency_ms": 120,
+                "timestamp": "2026-10-03T08:00:07Z",
+            },
+        }
+    )
     assert done.status == ActivityStatus.COMPLETED
     assert done.duration_ms == 120
     assert done.end_time == "2026-10-03T08:00:07Z"
@@ -49,11 +68,16 @@ def test_end_completes_item_with_duration():
 def test_catalog_tool_started_reaches_drawer():
     # 网关 catalog 事件之前到不了抽屉（死线）——现在必须能建项
     p = _p()
-    item = p.feed_event({
-        "type": "ToolStarted",
-        "payload": {"call_id": "g1", "tool_name": "gmail_search",
-                    "args": {"query": "from:boss"}},
-    })
+    item = p.feed_event(
+        {
+            "type": "ToolStarted",
+            "payload": {
+                "call_id": "g1",
+                "tool_name": "gmail_search",
+                "args": {"query": "from:boss"},
+            },
+        }
+    )
     assert item is not None
     assert item.status == ActivityStatus.RUNNING
     assert item.category == ActivityCategory.TOOL
@@ -62,58 +86,87 @@ def test_catalog_tool_started_reaches_drawer():
 
 def test_catalog_tool_denied_is_failed_with_reason():
     p = _p()
-    p.feed_event({
-        "type": "ToolStarted",
-        "payload": {"call_id": "g2", "tool_name": "shell_exec", "args": {}},
-    })
-    denied = p.feed_event({
-        "type": "ToolDenied",
-        "payload": {"call_id": "g2", "tool_name": "shell_exec", "reason": "policy blocked"},
-    })
+    p.feed_event(
+        {
+            "type": "ToolStarted",
+            "payload": {"call_id": "g2", "tool_name": "shell_exec", "args": {}},
+        }
+    )
+    denied = p.feed_event(
+        {
+            "type": "ToolDenied",
+            "payload": {"call_id": "g2", "tool_name": "shell_exec", "reason": "policy blocked"},
+        }
+    )
     assert denied.status == ActivityStatus.FAILED
     assert "policy blocked" in (denied.result_summary or "")
 
 
 def test_catalog_tool_invoked_success():
     p = _p()
-    p.feed_event({
-        "type": "ToolStarted",
-        "payload": {"call_id": "g3", "tool_name": "memory_recall", "args": {}},
-    })
-    done = p.feed_event({
-        "type": "ToolInvoked",
-        "payload": {"call_id": "g3", "tool_name": "memory_recall",
-                    "result": {"state": {"summary": "找到 3 条记忆"}}},
-    })
+    p.feed_event(
+        {
+            "type": "ToolStarted",
+            "payload": {"call_id": "g3", "tool_name": "memory_recall", "args": {}},
+        }
+    )
+    done = p.feed_event(
+        {
+            "type": "ToolInvoked",
+            "payload": {
+                "call_id": "g3",
+                "tool_name": "memory_recall",
+                "result": {"state": {"summary": "找到 3 条记忆"}},
+            },
+        }
+    )
     assert done.status == ActivityStatus.COMPLETED
     assert done.result_summary == "找到 3 条记忆"
 
 
 def test_failed_end_carries_error_message():
     p = _p()
-    p.feed_event({
-        "execution_point": "step.tool_call.record",
-        "payload": {"invocation_id": "c5", "assistant_id": "a1",
-                    "tool_name": "run_shell", "arguments": {},
-                    "timestamp": "2026-10-03T08:02:00Z"},
-    })
-    failed = p.feed_event({
-        "execution_point": "body.tool.execute.end",
-        "payload": {"invocation_id": "c5", "assistant_id": "a1", "ok": False,
-                    "error": "exit code 1: file not found"},
-    })
+    p.feed_event(
+        {
+            "execution_point": "step.tool_call.record",
+            "payload": {
+                "invocation_id": "c5",
+                "assistant_id": "a1",
+                "tool_name": "run_shell",
+                "arguments": {},
+                "timestamp": "2026-10-03T08:02:00Z",
+            },
+        }
+    )
+    failed = p.feed_event(
+        {
+            "execution_point": "body.tool.execute.end",
+            "payload": {
+                "invocation_id": "c5",
+                "assistant_id": "a1",
+                "ok": False,
+                "error": "exit code 1: file not found",
+            },
+        }
+    )
     assert failed.status == ActivityStatus.FAILED
     assert "exit code 1" in (failed.result_summary or "")
 
 
 def test_cancel_clears_without_fake_timestamp():
     p = _p()
-    p.feed_event({
-        "execution_point": "phase.tool.call.start",
-        "payload": {"invocation_id": "c6", "assistant_id": "a1",
-                    "tool_name": "run_shell", "arguments": {},
-                    "timestamp": "2026-10-03T08:03:00Z"},
-    })
+    p.feed_event(
+        {
+            "execution_point": "phase.tool.call.start",
+            "payload": {
+                "invocation_id": "c6",
+                "assistant_id": "a1",
+                "tool_name": "run_shell",
+                "arguments": {},
+                "timestamp": "2026-10-03T08:03:00Z",
+            },
+        }
+    )
     cancelled = p.cancel_activity("a1", "c6")
     assert cancelled is not None
     assert cancelled.status == ActivityStatus.CANCELLED
@@ -122,9 +175,14 @@ def test_cancel_clears_without_fake_timestamp():
 
 def test_intent_namer_returns_title_summary_icon():
     assert ActivityIntentNamer.name("run_shell", {"command": "echo hi"}) == (
-        "Running command", "echo hi", "terminal"
+        "执行 echo 指令",
+        "echo hi",
+        "terminal",
     )
-    assert ActivityIntentNamer.name("browser_navigate", {"url": "https://a.com/b"})[0] == "Browsing a.com"
+    assert (
+        ActivityIntentNamer.name("browser_navigate", {"url": "https://a.com/b"})[0]
+        == "Browsing a.com"
+    )
     assert ActivityIntentNamer.name("subagent.spawn", {"role": "Tester"})[0] == "执行子任务: Tester"
     assert ActivityIntentNamer.name("memory_recall", {})[0] == "检索认知长期记忆"
     title, summary, _icon = ActivityIntentNamer.name("unknown_tool_xyz", {})

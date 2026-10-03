@@ -47,19 +47,25 @@ def test_activity_item_schema_and_immutability():
 
 def test_activity_intent_namer_rules():
     # Gmail search
-    t1, s1, i1 = ActivityIntentNamer.name("hatch_gws_cli", {"action": "search", "query": "meeting", "service": "gmail"})
+    t1, s1, i1 = ActivityIntentNamer.name(
+        "hatch_gws_cli", {"action": "search", "query": "meeting", "service": "gmail"}
+    )
     assert t1 == "正在搜索 Gmail 邮件"
     assert "meeting" in s1
     assert i1 == "mail"
 
     # Gmail send
-    t_send, s_send, i_send = ActivityIntentNamer.name("GMAIL_SEND_EMAIL", {"to": "alice@example.com", "subject": "Quarterly Report"})
+    t_send, s_send, i_send = ActivityIntentNamer.name(
+        "GMAIL_SEND_EMAIL", {"to": "alice@example.com", "subject": "Quarterly Report"}
+    )
     assert "alice@example.com" in t_send
     assert "Quarterly Report" in s_send
     assert i_send == "mail"
 
     # Google Drive
-    t_drive, s_drive, i_drive = ActivityIntentNamer.name("hatch_gws_cli", {"service": "drive", "query": "Q3-Plan"})
+    t_drive, s_drive, i_drive = ActivityIntentNamer.name(
+        "hatch_gws_cli", {"service": "drive", "query": "Q3-Plan"}
+    )
     assert t_drive == "正在访问 Google Drive 文档"
     assert "Q3-Plan" in s_drive
     assert i_drive == "document"
@@ -70,20 +76,25 @@ def test_activity_intent_namer_rules():
     assert "lca/core" in s_gh
     assert i_gh == "github"
 
-    # Shell
+    # Shell / command dynamic deconstruction (INV-01)
     t2, s2, i2 = ActivityIntentNamer.name("run_shell", {"command": "git status -s"})
-    assert t2 == "Running command"
+    assert "Running command" not in t2
+    assert "Git" in t2 or "git" in t2 or "状态" in t2
     assert "git status" in s2
     assert i2 == "terminal"
 
     # Browser
-    t3, s3, i3 = ActivityIntentNamer.name("browser.spawn_task", {"url": "https://github.com/pulls", "task": "Check PRs"})
+    t3, s3, i3 = ActivityIntentNamer.name(
+        "browser.spawn_task", {"url": "https://github.com/pulls", "task": "Check PRs"}
+    )
     assert "github.com" in t3
     assert "Check PRs" in s3
     assert i3 == "browser"
 
     # Subagent
-    t_sub, s_sub, i_sub = ActivityIntentNamer.name("subagent.spawn", {"role": "代码审查员", "prompt": "审核PR差异"})
+    t_sub, s_sub, i_sub = ActivityIntentNamer.name(
+        "subagent.spawn", {"role": "代码审查员", "prompt": "审核PR差异"}
+    )
     assert "代码审查员" in t_sub
     assert "审核PR差异" in s_sub
     assert i_sub == "robot"
@@ -94,6 +105,60 @@ def test_activity_intent_namer_rules():
     assert i_cron == "clock"
 
     # Fallback with description
-    t4, _s4, i4 = ActivityIntentNamer.name("custom_tool", {"description": "同步云端配置", "key": "val"})
+    t4, _s4, i4 = ActivityIntentNamer.name(
+        "custom_tool", {"description": "同步云端配置", "key": "val"}
+    )
     assert t4 == "同步云端配置"
     assert i4 == "tool"
+
+
+def test_activity_intent_namer_dynamic_deconstruction_no_running_command():
+    test_cases = [
+        (
+            "run_shell",
+            {"command": "sed -n '285,340p' activity_projector.py"},
+            "读取 activity_projector.py (285-340行)",
+        ),
+        (
+            "box_run_command",
+            {"command": "grep -E 'seed_from_|rehydrate_' lca/"},
+            "检索 seed_from_|rehydrate_ 关键词",
+        ),
+        (
+            "shell",
+            {"command": "git worktree add -b iter-restart-1640"},
+            "创建工作树 iter-restart-1640",
+        ),
+        ("run_shell", {"command": "python tmp/test_restart.py"}, "执行 tmp/test_restart.py 验证"),
+        ("writeFile", {"name": "tmp/add_seed.py"}, "创建脚本 tmp/add_seed.py"),
+    ]
+    for tool_name, args, expected_keyword in test_cases:
+        title, _summary, _icon = ActivityIntentNamer.name(tool_name, args)
+        assert "Running command" not in title, (
+            f"Tool {tool_name} returned hardcoded 'Running command'"
+        )
+        assert any(k in title for k in expected_keyword.split()), (
+            f"Expected keyword from '{expected_keyword}' in '{title}'"
+        )
+
+
+def test_evidence_parser_five_elements_structure():
+    from lca.contracts.models.observability.activity import StepEvidence, parse_step_evidence
+
+    parsed = parse_step_evidence(
+        tool_name="box_run_command",
+        arguments={"command": 'ssh252 \'echo "ZZSTART"; sed -n "285,340p" activity_projector.py\''},
+        tool_result={
+            "ok": True,
+            "latency_ms": 3841,
+            "stdout_head": "class ActivityProjector:\n    def __init__...",
+        },
+        thinking={"reasoning": "读取 activity_projector 初始化逻辑并验证冷启动分支"},
+    )
+    assert isinstance(parsed, StepEvidence)
+    assert "ssh252" in parsed.command
+    assert parsed.duration_ms == 3841
+    assert parsed.exit_code == 0
+    assert len(parsed.code_snippets) > 0 or len(parsed.search_results) > 0
+    assert parsed.conclusion is not None
+    assert "验证" in parsed.conclusion or "完成" in parsed.conclusion or "成功" in parsed.conclusion

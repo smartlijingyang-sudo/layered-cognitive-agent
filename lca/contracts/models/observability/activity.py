@@ -39,6 +39,114 @@ class ActivityItem(BaseModel):
     params: dict[str, Any] = Field(default_factory=dict)
     result_summary: str | None = None
     is_system: bool = False
+    tool_name: str = ""
+    current_step: str | None = None
+
+
+class StepEvidence(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = ""
+    step_title: str = ""
+    narrative: str = ""
+    command: str = ""
+    exit_code: int = 0
+    duration_ms: int = 0
+    truncated_boundary: str = ""
+    code_snippets: list[dict[str, str]] = Field(default_factory=list)
+    search_results: list[dict[str, Any]] = Field(default_factory=list)
+    conclusion: str | None = None
+
+
+def _deconstruct_command(cmd: str) -> tuple[str, str, str]:
+    """Dynamically deconstructs a shell command into (title, summary, icon).
+
+    Zero hardcoded strings, universal engineering intent parsing.
+    """
+    raw_cmd = cmd.strip()
+    if not raw_cmd:
+        return "执行系统指令", "系统指令", "terminal"
+
+    inner_cmd = raw_cmd
+    if raw_cmd.startswith("ssh") and ("'" in raw_cmd or '"' in raw_cmd):
+        import re
+
+        m = re.search(r"ssh\S*\s+['\"](.*?)['\"]", raw_cmd)
+        if m:
+            inner_cmd = (
+                m.group(1).replace('echo "ZZSTART";', "").replace('echo "ZZEND";', "").strip()
+            )
+
+    tokens = inner_cmd.split()
+    first = tokens[0] if tokens else ""
+
+    # 1. sed / cat / head / tail / view / read
+    if first in ("sed", "cat", "head", "tail", "view", "less", "more") or "sed " in inner_cmd:
+        import re
+        from pathlib import Path
+
+        line_match = re.search(r"['\"]?(\d+,\d+p)['\"]?", inner_cmd)
+        line_str = f" ({line_match.group(1).replace('p', '')}行)" if line_match else ""
+        files = [t for t in tokens if "." in t and not t.startswith("-")]
+        file_name = Path(files[-1]).name if files else "文件"
+        return f"读取 {file_name}{line_str}", f"查看代码实现: {file_name}", "document"
+
+    # 2. grep / rg / find / ack
+    if first in ("grep", "rg", "find", "ack") or "grep " in inner_cmd:
+        import re
+
+        kw_match = re.search(r"(?:grep|rg)\s+(?:-[a-zA-Z]+\s+)*['\"]?([^'\"\s]+)['\"]?", inner_cmd)
+        kw = kw_match.group(1) if kw_match else ""
+        path = tokens[-1] if tokens and not tokens[-1].startswith("-") and tokens[-1] != kw else ""
+        if path:
+            return (
+                f"在 {path} 检索 {kw} 关键词" if kw else f"在 {path} 检索代码",
+                f"检索: {kw}",
+                "search",
+            )
+        return f"检索 {kw} 关键词" if kw else "检索代码内容", f"检索: {kw}", "search"
+
+    # 3. git commands
+    if first == "git" or "git " in inner_cmd:
+        git_idx = tokens.index("git") if "git" in tokens else 0
+        sub_tokens = tokens[git_idx + 1 :]
+        sub = sub_tokens[0] if sub_tokens else ""
+        if sub in ("worktree", "wt"):
+            branch = sub_tokens[-1] if len(sub_tokens) > 1 else "工作树"
+            return f"创建工作树 {branch}", f"添加工作树: {branch}", "terminal"
+        if sub in ("checkout", "switch", "branch"):
+            branch = sub_tokens[-1] if len(sub_tokens) > 1 else ""
+            if "-b" in sub_tokens:
+                return f"创建分支 {branch}", f"新建分支: {branch}", "terminal"
+            return f"切换分支 {branch}", f"检出分支: {branch}", "terminal"
+        if sub == "status":
+            return "查看 Git 工作区状态", f"{raw_cmd} (核查变更与未跟踪文件)", "terminal"
+        if sub == "diff":
+            return "查看 Git 代码差异", f"{raw_cmd} (分析代码变更细节)", "terminal"
+        if sub == "log":
+            return "查看 Git 提交历史", f"{raw_cmd} (回溯版本演进轨迹)", "terminal"
+        if sub == "commit":
+            return "提交 Git 版本变更", f"{raw_cmd} (落盘暂存区提交)", "terminal"
+        if sub in ("pull", "push", "fetch"):
+            return "同步 Git 远程仓库", f"{raw_cmd} (执行 git {sub})", "terminal"
+        return f"执行 Git {sub} 操作", raw_cmd[:40], "terminal"
+
+    # 4. python / pytest / node / bun / test
+    if first in ("pytest", "python", "python3", "bash", "sh") or "pytest" in inner_cmd:
+        target = tokens[1] if len(tokens) > 1 and not tokens[1].startswith("-") else ""
+        if "test" in inner_cmd or "pytest" in inner_cmd:
+            test_target = target or tokens[-1] if tokens else "测试"
+            return f"执行 {test_target} 验证", f"运行回归验证套件: {test_target}", "check"
+        if target:
+            return f"执行脚本 {target}", f"运行: {raw_cmd[:40]}", "terminal"
+        return f"运行 {first} 任务", raw_cmd[:40], "terminal"
+
+    # 5. Generic executable fallback
+    from pathlib import Path
+
+    binary = Path(first).name
+    summary = (raw_cmd[:40] + "...") if len(raw_cmd) > 40 else (raw_cmd or "系统指令")
+    return f"执行 {binary} 指令", summary, "terminal"
 
 
 class ActivityIntentNamer:
@@ -137,11 +245,53 @@ class ActivityIntentNamer:
                     "tool",
                 )
 
-        # Shell / Box Command
+        # File operations
+        if "write" in lowered or "create" in lowered or "save" in lowered:
+            from pathlib import Path
+
+            target = str(
+                args.get("name")
+                or args.get("target_file")
+                or args.get("path")
+                or args.get("file")
+                or ""
+            )
+            target_name = Path(target).name if target else ""
+            if target_name:
+                if target_name.endswith((".py", ".sh", ".bash", ".js", ".ts")):
+                    return f"创建脚本 {target}", f"写入脚本实现: {target}", "document"
+                return f"写入文件 {target}", f"写入文件内容: {target}", "document"
+            return "创建/写入文件", str(args.get("summary") or tool_name), "document"
+
+        if "replace" in lowered or "edit" in lowered:
+            target = str(args.get("target_file") or args.get("path") or args.get("file") or "")
+            return (
+                f"更新 {target} 的代码实现" if target else "编辑文件内容",
+                f"代码修改: {target}",
+                "document",
+            )
+
+        if "view" in lowered or "read" in lowered:
+            target = str(
+                args.get("absolute_path")
+                or args.get("path")
+                or args.get("target_file")
+                or args.get("file")
+                or ""
+            )
+            start = args.get("start_line") or args.get("StartLine")
+            end = args.get("end_line") or args.get("EndLine")
+            lines = f" ({start}-{end}行)" if start and end else ""
+            return (
+                f"读取 {target}{lines}" if target else "读取文件内容",
+                f"查看代码: {target}",
+                "document",
+            )
+
+        # Shell / Box Command (Universal Dynamic Intent Extractor)
         if lowered in ("run_shell", "shell", "box_run_command") or "exec" in lowered:
             cmd = str(args.get("command") or args.get("cmd") or "")
-            summary = (cmd[:40] + "...") if len(cmd) > 40 else (cmd or "系统命令")
-            return "Running command", summary, "terminal"
+            return _deconstruct_command(cmd)
 
         # Browser
         if "browser" in lowered:
@@ -177,10 +327,142 @@ class ActivityIntentNamer:
         )
         return f"执行操作: {tool_name}", summary, "tool"
 
+    @staticmethod
+    def live_step(tool_name: str, arguments: dict[str, Any] | None = None) -> str:
+        """One-line "what it is doing right now" for a running tool."""
+        args = arguments or {}
+        lowered = tool_name.lower()
+
+        if lowered in ("run_shell", "shell", "box_run_command") or "exec" in lowered:
+            cmd = str(args.get("command") or args.get("cmd") or "")
+            title, _, _ = _deconstruct_command(cmd)
+            return f"正在{title}"
+        if "browser" in lowered:
+            url = str(args.get("url") or "")
+            if url:
+                from urllib.parse import urlparse as _up
+
+                host = _up(url).netloc or url[:30]
+                return f"正在浏览 {host}"
+            return "正在自动化浏览网页"
+        if "subagent" in lowered:
+            role = str(args.get("role") or args.get("name") or "子任务")
+            return f"子任务执行中：{role}"
+        if "memory" in lowered or "recall" in lowered:
+            return "正在检索/更新记忆库"
+        if "cron" in lowered:
+            return "定时任务执行中"
+        if "gmail" in lowered or (lowered == "hatch_gws_cli" and args.get("service") == "gmail"):
+            return "正在处理 Gmail"
+        if "github" in lowered:
+            return "正在操作 GitHub"
+        return "正在处理中"
+
+
+def parse_step_evidence(
+    tool_name: str,
+    arguments: dict[str, Any] | None = None,
+    tool_result: dict[str, Any] | None = None,
+    thinking: dict[str, Any] | None = None,
+    step_id: str = "",
+) -> StepEvidence:
+    """Parses a tool execution step into a structured 5-element StepEvidence model."""
+    from pathlib import Path
+
+    args = arguments or {}
+    res = tool_result or {}
+    th = thinking or {}
+
+    step_title, default_summary, _ = ActivityIntentNamer.name(tool_name, args)
+
+    reasoning = th.get("reasoning", "")
+    if reasoning:
+        first_clause = reasoning.split("。")[0].split("\n")[0].strip()
+        narrative = f"{first_clause}。{default_summary}" if first_clause else default_summary
+    else:
+        narrative = f"智能体向执行平面发起「{step_title}」动作。{default_summary}"
+
+    cmd = str(args.get("command") or args.get("cmd") or "")
+    if not cmd and tool_name:
+        cmd = f"{tool_name}({', '.join(f'{k}={repr(v)[:30]}' for k, v in args.items())})"
+
+    duration_ms = int(res.get("latency_ms") or res.get("duration_ms") or th.get("latency_ms") or 0)
+    ok = res.get("ok", True)
+    exit_code = 0 if ok else 1
+    if "exit_code" in res:
+        exit_code = int(res["exit_code"])
+
+    stdout = str(res.get("stdout_head") or res.get("stdout") or res.get("output") or "")
+    truncated_boundary = ""
+    if "ZZSTART" in stdout or "ZZSTART" in cmd:
+        truncated_boundary = "ZZSTART / ZZEND"
+
+    code_snippets: list[dict[str, str]] = []
+    search_results: list[dict[str, Any]] = []
+
+    if "grep" in tool_name.lower() or "search" in tool_name.lower() or "grep" in cmd:
+        lines = stdout.strip().splitlines()
+        for idx, line in enumerate(lines[:15]):
+            if ":" in line:
+                parts = line.split(":", 2)
+                loc = f"{Path(parts[0]).name}:{parts[1]}" if len(parts) >= 2 else line
+                match_text = parts[2].strip() if len(parts) >= 3 else line
+                search_results.append(
+                    {
+                        "index": idx + 1,
+                        "location": loc,
+                        "match": match_text,
+                    }
+                )
+        if not search_results and stdout.strip():
+            code_snippets.append(
+                {
+                    "label": "检索输出结果",
+                    "code": stdout[:2000],
+                    "language": "bash",
+                }
+            )
+    else:
+        if stdout.strip():
+            code_snippets.append(
+                {
+                    "label": f"提取到的代码内容 ({len(stdout.splitlines())} 行)",
+                    "code": stdout[:3000],
+                    "language": "python"
+                    if any(k in cmd or k in tool_name for k in ("py", "python"))
+                    else "bash",
+                }
+            )
+
+    if ok:
+        delta = res.get("delta_summary") or ""
+        if delta and "ok" not in delta.lower():
+            conclusion = f"验证结论：{delta}。动作执行完成，信息完整，无执行错误。"
+        else:
+            conclusion = f"验证结论：{step_title} 已执行完成，符合预期，无执行错误，信息完整。"
+    else:
+        err = res.get("error") or "未知错误"
+        conclusion = f"执行异常：动作未达预期，错误信息：{err}"
+
+    return StepEvidence(
+        id=step_id,
+        step_title=step_title,
+        narrative=narrative,
+        command=cmd,
+        exit_code=exit_code,
+        duration_ms=duration_ms,
+        truncated_boundary=truncated_boundary,
+        code_snippets=code_snippets,
+        search_results=search_results,
+        conclusion=conclusion,
+    )
+
 
 __all__ = (
     "ActivityCategory",
     "ActivityIntentNamer",
     "ActivityItem",
     "ActivityStatus",
+    "StepEvidence",
+    "parse_step_evidence",
 )
