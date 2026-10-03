@@ -346,3 +346,13 @@ def test_bundle_references_avatar_plugins() -> None:
     modules = {entry["$module"] for entry in data["entries"]}
     assert "lca.plugins.avatar.plugin" in modules
     assert "lca.plugins.avatar.tools" in modules
+
+
+def test_plugin_config_supports_prompt_expander_llm() -> None:
+    from lca.plugins.avatar.plugin import Config
+
+    def mock_llm(req: str) -> str:
+        return f"expanded: {req}"
+
+    cfg = Config(prompt_expander_llm=mock_llm)
+    assert cfg.prompt_expander_llm is mock_llm

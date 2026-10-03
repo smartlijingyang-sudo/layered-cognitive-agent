@@ -77,6 +77,7 @@ class Config(BaseModel):
     video_model: str | None = None
     tick_seconds: int = 60
     summarizer_llm: Callable[[str], str] | None = None
+    prompt_expander_llm: Callable[[str], Any] | None = None
 
 
 def _secret_value(value: SecretStr | str | None) -> str | None:
@@ -258,6 +259,14 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         # 确定性 fallback（出厂默认）。插件不读 os.environ，只经 Profile 注入。
         return summarize_traits(identity, llm=config.summarizer_llm)
 
+    from lca.plugins.avatar.expander import LlmPromptExpander, RulePromptExpander
+
+    expander = (
+        LlmPromptExpander(llm=config.prompt_expander_llm)
+        if config.prompt_expander_llm is not None
+        else RulePromptExpander()
+    )
+
     def _home_resolver(assistant_id: str) -> Path:
         return base_dir / assistant_id
 
@@ -271,6 +280,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
             summarizer=_summarizer,
             publisher=publisher,
             home_resolver=_home_resolver,
+            expander=expander,
         )
 
     # 懒解析：REST/WS/工具对任意 assistant_id 都能拿到服务（Task 10 ruling #2）。

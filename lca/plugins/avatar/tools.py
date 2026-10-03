@@ -103,11 +103,23 @@ class AvatarCreateTool(Tool):
     name = "avatar_create"
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     namespace = "avatar"
-    description = "Generate new avatar candidates from the user's request. Never activates."
+    description = (
+        "Generate new avatar candidates from the user's request. Never activates. "
+        "MUST include '[widget:avatar_picker]' in final response so user can pick from the 4-grid card. "
+        "DO NOT print raw candidate image URLs or markdown links."
+    )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
             "user_request": {"type": "string", "description": "用户原话，原样传递"},
+            "visual_prompt": {
+                "type": "string",
+                "description": (
+                    "可选：根据用户意图提炼的具体肖像/视觉特征英文或中文描述"
+                    "（如主体外貌特征、面部细节、衣着服饰、艺术风格、光影与居中构图），"
+                    "避免将对话式口语当成画面主体"
+                ),
+            },
         },
         "required": ["user_request"],
     }
@@ -118,6 +130,9 @@ class AvatarCreateTool(Tool):
         user_request = args.get("user_request")
         if not isinstance(user_request, str) or not user_request.strip():
             return "user_request must be a non-empty string"
+        visual_prompt = args.get("visual_prompt")
+        if visual_prompt is not None and not isinstance(visual_prompt, str):
+            return "visual_prompt must be a string if provided"
         return None
 
     async def execute(self, args: dict[str, Any]) -> Observation:
@@ -128,9 +143,24 @@ class AvatarCreateTool(Tool):
         try:
             assistant_id = avatar_service_registry.current_assistant_id()
             service = avatar_service_registry.current()
-            candidates = await service.create(assistant_id, str(args["user_request"]))
+            visual_prompt = args.get("visual_prompt")
+            candidates = await service.create(
+                assistant_id,
+                str(args["user_request"]),
+                visual_prompt=str(visual_prompt) if visual_prompt else None,
+            )
             return _success_observation(
-                {"candidates": [c.model_dump(mode="json") for c in candidates]}, started
+                {
+                    "candidates": [c.model_dump(mode="json") for c in candidates],
+                    "widget_tag": "[widget:avatar_picker]",
+                    "display_instruction": (
+                        "Candidates generated successfully. In your final text response to the user, "
+                        "you MUST include the tag '[widget:avatar_picker]' so the frontend renders the "
+                        "interactive 4-grid candidate picker card. DO NOT dump or print raw candidate image URLs "
+                        "or markdown image links."
+                    ),
+                },
+                started,
             )
         except Exception as exc:
             return _error_observation(str(exc), started)
@@ -144,12 +174,22 @@ class AvatarEditTool(Tool):
     namespace = "avatar"
     description = (
         "Generate img2img avatar candidates from the user's request, optionally "
-        "from a reference image. Never activates."
+        "from a reference image. Never activates. "
+        "MUST include '[widget:avatar_picker]' in final response so user can pick from the 4-grid card. "
+        "DO NOT print raw candidate image URLs or markdown links."
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
             "user_request": {"type": "string", "description": "用户原话，原样传递"},
+            "visual_prompt": {
+                "type": "string",
+                "description": (
+                    "可选：根据用户意图提炼的具体肖像/视觉特征英文或中文描述"
+                    "（如主体外貌特征、面部细节、衣着服饰、艺术风格、光影与居中构图），"
+                    "避免将对话式口语当成画面主体"
+                ),
+            },
             "reference_image": {
                 "type": "string",
                 "description": (
@@ -167,6 +207,9 @@ class AvatarEditTool(Tool):
         user_request = args.get("user_request")
         if not isinstance(user_request, str) or not user_request.strip():
             return "user_request must be a non-empty string"
+        visual_prompt = args.get("visual_prompt")
+        if visual_prompt is not None and not isinstance(visual_prompt, str):
+            return "visual_prompt must be a string if provided"
         return None
 
     async def execute(self, args: dict[str, Any]) -> Observation:
@@ -178,13 +221,25 @@ class AvatarEditTool(Tool):
             reference_image = _decode_reference_image(args.get("reference_image"))
             assistant_id = avatar_service_registry.current_assistant_id()
             service = avatar_service_registry.current()
+            visual_prompt = args.get("visual_prompt")
             candidates = await service.edit(
                 assistant_id,
                 str(args["user_request"]),
                 reference_image=reference_image,
+                visual_prompt=str(visual_prompt) if visual_prompt else None,
             )
             return _success_observation(
-                {"candidates": [c.model_dump(mode="json") for c in candidates]}, started
+                {
+                    "candidates": [c.model_dump(mode="json") for c in candidates],
+                    "widget_tag": "[widget:avatar_picker]",
+                    "display_instruction": (
+                        "Candidates generated successfully. In your final text response to the user, "
+                        "you MUST include the tag '[widget:avatar_picker]' so the frontend renders the "
+                        "interactive 4-grid candidate picker card. DO NOT dump or print raw candidate image URLs "
+                        "or markdown image links."
+                    ),
+                },
+                started,
             )
         except Exception as exc:
             return _error_observation(str(exc), started)
@@ -465,6 +520,11 @@ MANIFEST = ToolManifest(
             type="string",
             required=True,
             description="用户原话，原样传递",
+        ),
+        "visual_prompt": ParameterSpec(
+            type="string",
+            required=False,
+            description="提炼的肖像/视觉特征描述（外貌面部、服饰、艺术风格、光影构图），避免将对话式口语当成画面主体",
         ),
         "candidate_id": ParameterSpec(
             type="string",

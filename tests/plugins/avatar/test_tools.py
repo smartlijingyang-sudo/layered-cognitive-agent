@@ -49,6 +49,7 @@ class FakeAvatarService:
     def __init__(self) -> None:
         self.created: list[tuple[str, str]] = []
         self.edits: list[tuple[str, str, bytes | None]] = []
+        self.last_visual_prompt: str | None = None
         self.set_calls: list[tuple[str, str]] = []
         self.get_calls: list[str] = []
         self.clear_calls: list[str] = []
@@ -71,9 +72,12 @@ class FakeAvatarService:
             expires_at=utcnow() + CANDIDATE_TTL,
         )
 
-    async def create(self, assistant_id: str, user_request: str) -> list[AvatarCandidate]:
+    async def create(
+        self, assistant_id: str, user_request: str, **kwargs: Any
+    ) -> list[AvatarCandidate]:
         if self.fail is not None:
             raise self.fail
+        self.last_visual_prompt = kwargs.get("visual_prompt")
         self.created.append((assistant_id, user_request))
         return [self._candidate("c1")]
 
@@ -83,9 +87,11 @@ class FakeAvatarService:
         user_request: str,
         reference_image: bytes | None = None,
         auto_activate: bool = False,
+        **kwargs: Any,
     ) -> list[AvatarCandidate]:
         if self.fail is not None:
             raise self.fail
+        self.last_visual_prompt = kwargs.get("visual_prompt")
         self.edits.append((assistant_id, user_request, reference_image))
         return [self._candidate("c1")]
 
@@ -569,3 +575,60 @@ async def test_schedule_execute_without_service_returns_failure(
         )
     assert obs.success is False
     assert obs.error is not None
+
+
+@pytest.mark.asyncio
+async def test_create_execute_passes_visual_prompt_and_returns_widget_guidance(
+    fake_service: FakeAvatarService,
+) -> None:
+    tool = AvatarCreateTool()
+    with _bound_assistant():
+        obs = await tool.execute(
+            {
+                "user_request": "改成：弗洛伊德",
+                "visual_prompt": "Portrait of Sigmund Freud, elderly psychoanalyst",
+            }
+        )
+    assert obs.success is True
+    assert fake_service.last_visual_prompt == "Portrait of Sigmund Freud, elderly psychoanalyst"
+    assert "[widget:avatar_picker]" in obs.payload["widget_tag"]
+    assert "DO NOT" in obs.payload["display_instruction"]
+
+
+@pytest.mark.asyncio
+async def test_edit_execute_passes_visual_prompt_and_returns_widget_guidance(
+    fake_service: FakeAvatarService,
+) -> None:
+    tool = AvatarEditTool()
+    with _bound_assistant():
+        obs = await tool.execute(
+            {
+                "user_request": "换成弗洛伊德风格",
+                "visual_prompt": "Portrait of Sigmund Freud",
+            }
+        )
+    assert obs.success is True
+    assert fake_service.last_visual_prompt == "Portrait of Sigmund Freud"
+    assert "[widget:avatar_picker]" in obs.payload["widget_tag"]
+    assert "DO NOT" in obs.payload["display_instruction"]
+
+
+def test_create_tool_rejects_non_string_visual_prompt() -> None:
+    tool = AvatarCreateTool()
+    assert tool.validate({"user_request": "换个头像", "visual_prompt": 123}) is not None
+
+
+def test_edit_tool_rejects_non_string_visual_prompt() -> None:
+    tool = AvatarEditTool()
+    assert tool.validate({"user_request": "换个头像", "visual_prompt": ["foo"]}) is not None
+
+
+def test_tools_schema_and_description_contain_visual_prompt_guidance() -> None:
+    for tool_cls in (AvatarCreateTool, AvatarEditTool):
+        assert "visual_prompt" in tool_cls.parameters["properties"]
+        prop = tool_cls.parameters["properties"]["visual_prompt"]
+        desc = prop["description"]
+        assert "肖像" in desc or "视觉特征" in desc
+        assert "面部" in desc or "风格" in desc or "光影" in desc
+        assert "[widget:avatar_picker]" in tool_cls.description
+        assert "DO NOT" in tool_cls.description
