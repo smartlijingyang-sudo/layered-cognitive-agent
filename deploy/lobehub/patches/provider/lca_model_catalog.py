@@ -117,8 +117,9 @@ _TOOL_USE_TS = """import { aiModelSelectors, useAiInfraStore } from '@/store/aiI
 import { LCA_CHAT_MODELS } from '@/hooks/useEnabledChatModels';
 
 export const useModelSupportToolUse = (model: string, provider: string) => {
-  if ((LCA_CHAT_MODELS as readonly string[]).includes(model)) return true;
-  return useAiInfraStore(aiModelSelectors.isModelSupportToolUse(model, provider));
+  const isLcaModel = (LCA_CHAT_MODELS as readonly string[]).includes(model);
+  const supportInStore = useAiInfraStore(aiModelSelectors.isModelSupportToolUse(model, provider));
+  return isLcaModel || supportInStore;
 };
 """
 
