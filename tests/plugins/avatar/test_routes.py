@@ -59,11 +59,19 @@ class _FakeCtx:
 
 
 class _FakeOwnership:
-    def __init__(self, owner_map: dict[str, str]) -> None:
+    def __init__(
+        self,
+        owner_map: dict[str, str],
+        agent_map: dict[str, str] | None = None,
+    ) -> None:
         self._owner_map = owner_map
+        self._agent_map = agent_map or {}
 
     def owner_of(self, assistant_id: str) -> str | None:
         return self._owner_map.get(assistant_id)
+
+    def assistant_id_for_agent(self, agent_id: str) -> str | None:
+        return self._agent_map.get(agent_id)
 
 
 class FakeAvatarService:
@@ -569,3 +577,21 @@ def test_resolve_safe_path_rejects_bad_path(tmp_path: Path, bad_path: str) -> No
     _register_service(assistant_id, tmp_path / "avatar")
     with pytest.raises(ValueError):
         resolve_safe_path(assistant_id, bad_path)
+
+
+def test_routes_resolve_agt_agent_id_to_assistant_id(app: Starlette, tmp_path: Path) -> None:
+    assistant_id = "asst_real_id"
+    agent_id = "agt_frontend_row"
+    _register_service(assistant_id, tmp_path / "avatar")
+    _enable_auth(app)
+    app.state.assistant_ownership = _FakeOwnership(
+        owner_map={assistant_id: "alice"},
+        agent_map={agent_id: assistant_id},
+    )
+    client = TestClient(app)
+    resp = client.get(
+        f"/v1/assistants/{agent_id}/avatar",
+        headers=_auth_headers("alice"),
+    )
+    assert resp.status_code == 200
+    assert resp.json()["assistant_id"] == assistant_id

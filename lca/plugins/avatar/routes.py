@@ -100,12 +100,27 @@ def _ownership_error(request: Any, user_id: str, assistant_id: str) -> Any | Non
     return None
 
 
+def _resolve_assistant_id(request: Any, raw_id: str) -> str:
+    """解析助理 ID：优先使用 raw_id，若未匹配且为 agt_*，尝试经由 ownership 映射。"""
+    if not raw_id:
+        return raw_id
+    ownership = _ownership_from_request(request)
+    if ownership is not None:
+        getter = getattr(ownership, "assistant_id_for_agent", None)
+        if getter is not None:
+            resolved = getter(raw_id)
+            if resolved:
+                return resolved
+    return raw_id
+
+
 def _auth_prelude(request: Any) -> tuple[str, str, Any]:
     """鉴权 + 归属校验；成功返回 ``(user_id, assistant_id, None)``。"""
     user_id, auth_error = _user_from_request(request)
     if auth_error is not None:
         return "", "", auth_error
-    assistant_id = _assistant_id(request)
+    raw_id = _assistant_id(request)
+    assistant_id = _resolve_assistant_id(request, raw_id)
     ownership_error = _ownership_error(request, user_id, assistant_id)
     if ownership_error is not None:
         return "", "", ownership_error
