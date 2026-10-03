@@ -19,6 +19,7 @@ from lca.contracts.mechanisms.capability.capability import (
     require_capability,
 )
 from lca.contracts.models.core.state.plane import PlaneBindings
+from lca.contracts.models.observability.activity import parse_step_evidence
 from lca.contracts.observability.registry.run_locator import RunLocator
 from lca.infrastructure.observability.journal.sse.frames import parse_last_event_id
 from lca.plugins.transport.webserver.handlers.cors.cors import cors_headers
@@ -126,12 +127,146 @@ async def stream_journal_live(request: Request) -> StreamingResponse | JSONRespo
     )
 
 
+_DEFAULT_JOURNAL_ROOT = Path("traces") / "runs"
+
+
+def _read_run_journal_detail(
+    run_id: str, locator: RunLocator | None = None
+) -> dict[str, Any] | None:
+    """Read full steps, thinking, tool calls, and outputs from journal.json."""
+    step_path: Path | None = None
+    if locator is not None:
+        try:
+            step_path = locator.journal_step_path(run_id)
+        except Exception:
+            step_path = None
+    if step_path is None or not step_path.is_file():
+        fallback_path = _DEFAULT_JOURNAL_ROOT / run_id / "journal.json"
+        if fallback_path.is_file():
+            step_path = fallback_path
+
+    if step_path is None or not step_path.is_file():
+        return None
+
+    try:
+        data = json.loads(step_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+    metadata = data.get("metadata") or {}
+    raw_steps = data.get("steps") or []
+
+    output = ""
+    for s in reversed(raw_steps):
+        th = s.get("thinking") or {}
+        if th.get("raw_response_preview"):
+            output = th.get("raw_response_preview")
+            break
+
+    rich_steps = []
+    for s in raw_steps:
+        th = s.get("thinking") or {}
+        tc = s.get("tool_call") or {}
+        tr = s.get("tool_result") or {}
+        evidence = None
+        if tc and tc.get("name"):
+            try:
+                ev = parse_step_evidence(
+                    tool_name=tc.get("name") or "",
+                    arguments=tc.get("arguments"),
+                    tool_result=tr,
+                    thinking=th,
+                    step_id=str(s.get("step_id") or ""),
+                )
+                evidence = ev.model_dump()
+            except Exception:
+                evidence = None
+
+        rich_steps.append(
+            {
+                "step_id": s.get("step_id"),
+                "step_index": s.get("step_index"),
+                "phase": s.get("phase"),
+                "duration_ms": s.get("duration_ms"),
+                "thinking": {
+                    "model": th.get("model"),
+                    "latency_ms": th.get("latency_ms"),
+                    "reasoning": th.get("reasoning"),
+                    "prompt_tokens": th.get("prompt_tokens"),
+                    "completion_tokens": th.get("completion_tokens"),
+                    "decision": th.get("decision"),
+                    "raw_response_preview": th.get("raw_response_preview"),
+                },
+                "tool_call": (
+                    {
+                        "name": tc.get("name"),
+                        "arguments": tc.get("arguments"),
+                        "arguments_summary": tc.get("arguments_summary"),
+                    }
+                    if tc
+                    else None
+                ),
+                "tool_result": (
+                    {
+                        "ok": tr.get("ok"),
+                        "latency_ms": tr.get("latency_ms"),
+                        "stdout_head": tr.get("stdout_head"),
+                        "delta_summary": tr.get("delta_summary"),
+                        "error": tr.get("error"),
+                    }
+                    if tr
+                    else None
+                ),
+                "evidence": evidence,
+            }
+        )
+
+    doctor_report = None
+    manifest_path = step_path.parent / "manifest.json"
+    if manifest_path.is_file():
+        try:
+            mdata = json.loads(manifest_path.read_text(encoding="utf-8"))
+            doctor_report = mdata.get("extra", {}).get("doctor_report")
+        except Exception:
+            doctor_report = None
+
+    return {
+        "run_id": run_id,
+        "trace_id": data.get("trace_id") or run_id,
+        "status": metadata.get("outcome") or "completed",
+        "session_status": metadata.get("outcome") or "completed",
+        "question": metadata.get("objective") or "",
+        "output": output,
+        "started_at": data.get("started_at"),
+        "closed_at": data.get("closed_at"),
+        "steps": rich_steps,
+        "doctor_report": doctor_report,
+    }
+
+
 async def get_run(request: Request) -> JSONResponse:
     """GET /runs/{run_id} — retrieve a compatibility summary through the owner."""
     run_id = request.path_params["run_id"]
     summary = await _run_port_of(request).summary(run_id)
-    if summary is None:
+    locator = _run_locator_of(request)
+    journal_detail = _read_run_journal_detail(run_id, locator)
+
+    if summary is None and journal_detail is None:
         return JSONResponse({"error": "run not found"}, status_code=404, headers=cors_headers())
+
+    if summary is None:
+        return JSONResponse(journal_detail, headers=cors_headers())
+
+    if journal_detail:
+        if not summary.get("steps") and journal_detail.get("steps"):
+            summary["steps"] = journal_detail["steps"]
+        if not summary.get("question") and journal_detail.get("question"):
+            summary["question"] = journal_detail["question"]
+        if not summary.get("output") and journal_detail.get("output"):
+            summary["output"] = journal_detail["output"]
+        if journal_detail.get("doctor_report"):
+            summary["doctor_report"] = journal_detail["doctor_report"]
+
     return JSONResponse(summary, headers=cors_headers())
 
 
