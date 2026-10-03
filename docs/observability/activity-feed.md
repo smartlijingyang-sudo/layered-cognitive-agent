@@ -103,3 +103,4 @@ catalog: ToolStarted/Invoked/Denied ─┘                   │                
 - **直连 kernel 的 run**：spine 工具事件按 ADR-0220/0240 有意只带 `state_id`（富信息留给 control-plane），translator 静默丢弃——这类 run 的动态栏目前为空。网关（web UI）路径完整。
 - ✅ **回填硬编码时间戳已清**：`seed_from_traces` 缺 `entered_at` 时 `_format_iso(None)` 留空（`lca/infrastructure/observability/activity_projector.py:412-413`，注释"缺 entered_at 就空着，不编造假时间戳"）；此前 `"2026-10-03T00:00:00Z"` 债务关闭。
 - ✅ **`tool_name` / `current_step` 已恢复**：`634fe4c4c` 的移除被 `f17a7effe`（honesty 分支 `c9bcb5b51`）撤销，`d89fc6e73` 去重；后端快照与 WS（7 处 `activity_updated` 带 `toolName`）均透出真实值，前端 `AssistantStatusDrawer.tsx:911/917/1270` 已消费。
+- ✅ **诚实边界有回归钉**：（INV-01 ~ INV-06，commit ）钉住本节诚实边界——回填只取已落盘的 completed/failed、不编造时间戳、start 缺失时的合成 fallback。
