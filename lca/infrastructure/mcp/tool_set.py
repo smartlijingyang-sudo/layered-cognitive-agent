@@ -38,15 +38,6 @@ def get_ambient_mcp_manager() -> MCPHub | None:
         return None
 
 
-async def reset_ambient_mcp_manager_async() -> None:
-    """Asynchronously reset and close the cached ambient MCP manager."""
-    global _AMBIENT_MCP_MANAGER
-    if _AMBIENT_MCP_MANAGER is not None:
-        mgr = _AMBIENT_MCP_MANAGER
-        _AMBIENT_MCP_MANAGER = None
-        await mgr.close()
-
-
 def reset_ambient_mcp_manager() -> None:
     """Reset the cached ambient MCP manager (useful for tests and loop changes)."""
     global _AMBIENT_MCP_MANAGER

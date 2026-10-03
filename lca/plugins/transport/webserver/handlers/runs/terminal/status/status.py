@@ -49,16 +49,6 @@ def fallback_terminal_status(session: RunSession, success: bool) -> None:
         session.status = RunLifecycleStatus.FAILED
 
 
-def resolve_live_terminal_hint(session: RunSession) -> tuple[str, str]:
-    """Return the terminal status/error hint for live SSE synthetic ``done``.
-
-    Session fold is SSOT (ADR-0186). Carrier ``RunSession`` fields are the
-    fallback when fold has not yet observed a root terminal fact — typical
-    during terminalize or when the live subscriber reconnects after hub close.
-    """
-    return resolve_live_terminal_hint_dto(session).as_tuple()
-
-
 def resolve_live_terminal_hint_dto(session: RunSession) -> LiveTerminalHint:
     """Structured terminal hint for the run live observe seam."""
     status = session.status.value if hasattr(session.status, "value") else str(session.status)
@@ -69,7 +59,6 @@ __all__ = [
     "current_task_cancelled",
     "derive_terminal_status",
     "fallback_terminal_status",
-    "resolve_live_terminal_hint",
     "resolve_live_terminal_hint_dto",
     "task_cancelled",
 ]
