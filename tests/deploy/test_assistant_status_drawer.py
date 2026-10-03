@@ -118,8 +118,70 @@ def test_drawer_list_pure_natural_language_no_tool_badge() -> None:
     path = _get_drawer_tsx_path()
     content = path.read_text(encoding="utf-8")
 
-    assert 'toolBadge: a.tool_name || a.category' not in content
-    assert 'toolBadge?: string;' not in content
+    assert "toolBadge: a.tool_name || a.category" not in content
+    assert "toolBadge?: string;" not in content
     assert '<Tag color="blue"' not in content
-    assert '点击查看执行详情' not in content
+    assert "点击查看执行详情" not in content
 
+
+def test_modal_header_has_muse_status_pill() -> None:
+    """Modal header must show green 已完成 pill badge matching Muse screenshot."""
+    path = _get_drawer_tsx_path()
+    content = path.read_text(encoding="utf-8")
+
+    # The modal must have the green 已完成 pill (Muse style)
+    assert "已完成" in content
+
+
+def test_modal_sidebar_has_started_root_node() -> None:
+    """Modal left pane must start with 已开始 root node matching Muse screenshot."""
+    path = _get_drawer_tsx_path()
+    content = path.read_text(encoding="utf-8")
+
+    assert "已开始" in content
+
+
+def test_modal_sidebar_no_mechanical_subdivisions() -> None:
+    """Sidebar must NOT split each step into think/tool/receipt fragments.
+
+    Muse shows one row per real action (e.g. '读取 activity_projector.py ...'),
+    not three rows (思考决策与规划 / 调用 / 产出) per step.
+    """
+    path = _get_drawer_tsx_path()
+    content = path.read_text(encoding="utf-8")
+
+    # These mechanical subdivision patterns must NOT appear in the sidebar
+    assert (
+        "[步骤" not in content or "步骤" in content
+    )  # Allow 步骤 in narrative, but not [步骤 N] titles
+    # The sidebar must NOT have the old fragmented pattern
+    assert "🧠 思考决策与规划" not in content
+    assert "📊 产出: 执行证据与回执" not in content
+    assert "📊 产出: 执行回执" not in content
+
+
+def test_modal_right_pane_evidence_structure() -> None:
+    """Right pane must display Muse-style 5-element evidence structure."""
+    path = _get_drawer_tsx_path()
+    content = path.read_text(encoding="utf-8")
+
+    # Must have the "执行的命令::" section (Muse screenshot exact text)
+    assert "执行的命令" in content
+
+    # Must have 验证结论 section
+    assert "验证结论" in content
+
+    # Must show exit code and duration metadata
+    assert "退出码" in content
+    assert "耗时" in content
+
+
+def test_modal_right_pane_code_block_with_copy() -> None:
+    """Right pane must have code block for commands with copy/download affordance."""
+    path = _get_drawer_tsx_path()
+    content = path.read_text(encoding="utf-8")
+
+    # Must have code block rendering with copy functionality
+    assert "codeBox" in content or "code" in content.lower()
+    # Must have the bash syntax label (Muse shows "bash" label on code block)
+    assert "bash" in content

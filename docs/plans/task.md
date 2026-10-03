@@ -519,7 +519,6 @@
 | BRAINSTORM-MUSE-ACTIVITY-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 成功落盘 docs/plans/2026-10-03-muse-activity-feed-alignment-plan.md 并分解为 5 大单流任务 |
 | MUSE-ACT-TASK-1-CONTRACTS | 契约层通用动态语义解构器与结构化证据模型 (ActivityIntentNamer & StepEvidence) | Completed | 落地 _deconstruct_command 动态解析 git/grep/sed/pytest/file，杜绝 'Running command'；落地 StepEvidence 与 parse_step_evidence 5 要素模型；单测 14/14 全绿，commit 578532e30 |
 | MUSE-ACT-TASK-2-QUERY-ENDPOINT | 后端真值打通与 Run Steps 结构化证据投影 (query_endpoints.py) | Completed | query_endpoints.py 接入 parse_step_evidence 丰富 rich_steps.evidence 5 要素对象；单测 3/3 通过，覆盖只读隔离 INV-06，commit 97ee8540c |
-| MUSE-ACT-TASK-3-DRAWER-LIST | 前端抽屉列表高保真对齐（清除技术徽章，纯自然语言流） (AssistantStatusDrawer.tsx) | In Progress | 正在重构抽屉列表项：彻底清除 COMMAND 标签，深色圆角勾选框 + 自然语言标题 + 结果摘要 + 4:39 pm 时间戳 |
-
-| MUSE-ACT-TASK-4-MODAL-DUAL-PANE | 前端任务详情双栏弹窗高保真对齐（绿色药丸 + 真实步骤树 + 5 要素证据面板） | Pending | 待执行 |
+| MUSE-ACT-TASK-3-DRAWER-LIST | 前端抽屉列表高保真对齐（清除技术徽章，纯自然语言流） (AssistantStatusDrawer.tsx) | Completed | 彻底清除 COMMAND 标签与 toolBadge，深色圆角勾选框 + 纯自然语言标题 + 结果摘要与友好时间戳，test_drawer_list_pure_natural_language_no_tool_badge 单测通过 |
+| MUSE-ACT-TASK-4-MODAL-DUAL-PANE | 前端任务详情双栏弹窗高保真对齐（绿色药丸 + 真实步骤树 + 5 要素证据面板） | Completed | 落地顶部绿色已完成药丸徽标与任务大标题，左侧步骤树首节点已开始与真实动作流，右侧 5 要素高保真证据面板（bash 语法高亮代码块、元数据 Bullets、代码提取/检索结果、加粗验证结论），14/14 单测全绿，byte-identical 同步完成 |
 | MUSE-ACT-TASK-5-INTEGRATION-E2E | 全链路不变量集成验收与 Pre-Push 门禁体检 (INV-01 ~ INV-06) | Pending | 待执行 |
