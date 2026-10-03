@@ -150,6 +150,10 @@ def _merge_job_update(existing: CronJob, body: dict[str, Any], *, now: datetime)
     return CronJob.model_validate(merged_data)
 
 
+def _is_authorized_owner(job_owner: str, user_id: str, assistant_id: str) -> bool:
+    return job_owner in (user_id, assistant_id)
+
+
 def _service_for(catalog: Any, assistant_id: str) -> CronService:
     """构造以 assistant home 为根的 ``CronService``。"""
     spec = catalog.get(assistant_id)
@@ -262,7 +266,7 @@ async def update_assistant_job(request: Request) -> JSONResponse:
         )
 
     existing = service.get_job(job_id)
-    if existing is None or existing.owner != user_id:
+    if existing is None or not _is_authorized_owner(existing.owner, user_id, assistant_id):
         return _error_envelope(
             "job_not_found", status_code=404, error_type="not_found", detail=f"job {job_id} 不存在"
         )
@@ -319,7 +323,7 @@ async def delete_assistant_job(request: Request) -> JSONResponse:
         )
 
     existing = service.get_job(job_id)
-    if existing is None or existing.owner != user_id:
+    if existing is None or not _is_authorized_owner(existing.owner, user_id, assistant_id):
         return _error_envelope(
             "job_not_found", status_code=404, error_type="not_found", detail=f"job {job_id} 不存在"
         )
@@ -377,7 +381,7 @@ async def run_assistant_job(request: Request) -> JSONResponse:
         )
 
     existing = service.get_job(job_id)
-    if existing is None or existing.owner != user_id:
+    if existing is None or not _is_authorized_owner(existing.owner, user_id, assistant_id):
         return _error_envelope(
             "job_not_found", status_code=404, error_type="not_found", detail=f"job {job_id} 不存在"
         )
@@ -417,7 +421,7 @@ async def snooze_assistant_job(request: Request) -> JSONResponse:
         )
 
     existing = service.get_job(job_id)
-    if existing is None or existing.owner != user_id:
+    if existing is None or not _is_authorized_owner(existing.owner, user_id, assistant_id):
         return _error_envelope(
             "job_not_found", status_code=404, error_type="not_found", detail=f"job {job_id} 不存在"
         )
