@@ -378,7 +378,11 @@ def test_heal_runs_patch_engine_in_place_when_markers_broken(tmp_path: Path) -> 
 
     def _fake_run(cmd: object, **_kwargs: object) -> object:
         invoked.append(list(cmd))  # type: ignore[arg-type]
-        broken_count[0] = 0
+        # 只有补丁引擎本身能修复 marker：自 3add9bc4f 起 state() 会先经
+        # http_code 探针 /signin（curl），那种探测调用不得提前清零 broken 计数，
+        # 否则 heal() 会看到"已修复"而提前返回、不再跑补丁引擎。
+        if isinstance(cmd, (list, tuple)) and cmd and cmd[0] == "python3":
+            broken_count[0] = 0
 
         class _R:
             returncode = 0
@@ -407,7 +411,9 @@ def test_heal_runs_patch_engine_in_place_when_markers_broken(tmp_path: Path) -> 
 
     stop.assert_not_called()
     start.assert_not_called()
-    assert invoked and invoked[0][0] == "python3"
+    # 自 3add9bc4f 起 state() 先经 http_code 探针 /signin（curl），补丁引擎调用
+    # 不再一定是第一次 subprocess 调用；不断言顺序，只断言补丁引擎被调用过。
+    assert any(cmd[0] == "python3" for cmd in invoked), invoked
     assert state.status == ServiceStatus.RUNNING
 
 

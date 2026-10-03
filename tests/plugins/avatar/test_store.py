@@ -10,6 +10,7 @@ from lca.contracts.models.avatar import (
     CANDIDATE_TTL,  # noqa: F401  # 同上
     AvatarState,
     AvatarVariant,  # noqa: F401  # 后续任务消费该类型，此处保持公共导入面
+    utcnow,
 )
 from lca.plugins.avatar.store import AvatarStore
 
@@ -118,8 +119,12 @@ def test_cleanup_expired(store: AvatarStore):
 
 
 def test_load_state_prunes_expired_candidates(store: AvatarStore):
-    """惰性清理：读状态时过期候选消失，未过期候选保留。"""
-    now = datetime(2026, 10, 2, 12, 0, tzinfo=UTC)
+    """惰性清理：读状态时过期候选消失，未过期候选保留。
+
+    注意：load_state 内部用 wall-clock 剪枝，now 必须取当前时间；
+    硬编码过去的时间点会在 24h 后把"未过期"候选也剪掉（time-bomb）。
+    """
+    now = utcnow()
     expired = store._make_candidate("asst_1", "old", "create", "p", now - timedelta(hours=25))
     fresh = store._make_candidate("asst_1", "new", "create", "p", now)
     store.save_state(
