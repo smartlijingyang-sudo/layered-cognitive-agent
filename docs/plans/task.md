@@ -483,3 +483,13 @@
 | STATUS-SCREEN-TASK-6-E2E-INVARIANTS | 任务 6：全链路单测回归与全量不变量矩阵验证 (INV-01 ~ INV-06) | Completed | 落地 tests/scenario/test_status_screen_invariants.py，6/6 场景测试 100% 覆盖并验证 INV-01 至 INV-06 全部不变量（单轨事实源纯函数投影确定性、动作起始人话标题锁定、WS增量原地Patch幂等性、真实Stop取消与审计记录、Upcoming系统任务防护与聊天草稿触发、快照聚合与最终一致性），全套状态屏关联测试 12/12 全通，门禁检查 0 报错 |
 
 | DEBUG-FRONTEND-9876 | 调查并修复前端打不开（9876端口 ERR_CONNECTION_REFUSED、Vite连接丢失）问题 | Completed | 根因追溯与闭环：1. 根因剖析：_ensure_env() 存在非幂等无条件写入缺陷，导致每次 lca-ops status 触碰 .env 触发 Vite 清空缓存重新依赖优化；而当前宿主机 0 Swap 且可用内存仅 5-8GB，Vite 8 底层 Rolldown 默认在 8 核多线程并发打包峰值内存超 4.6GB 触发内核 OOM Killer 杀掉 Node (SIGKILL)，致使 :9876 进程死亡连接拒绝；2. 架构修复：重构 _ensure_env 实现严格内容比对幂等，避免无谓触发 Vite 重打包；_child_env 注入 RAYON_NUM_THREADS=2 与 NODE_OPTIONS="--max-old-space-size=2560" 进行 Rust/Node 内存硬限流保护；修复 default_model 补丁幂等写入；3. 验证通过：单测 26/26 100% 全绿，已成功生成并固化 deps 缓存，LobeHub 双端口 (:3010 / :9876) 全面健康恢复，curl 200 OK 且资源响应正常 |
+| MEMORY-CONTEXT-INVENTORY-ADR | 深入调研 Memory 与 Agent Context 根源 ADR（包括 ADR-0277 及相关根源 ADR） | Completed | 已深度研读 ADR-0277, ADR-0265, ADR-0255, ADR-0254, ADR-0249, ADR-0247, ADR-0244, ADR-0258, ADR-0259, ADR-0260, ADR-0261, ADR-0266, ADR-0268 等 13 篇根源架构设计 |
+| MEMORY-CONTEXT-INVENTORY-IMPL | 深入排查 Agent 记忆与上下文组装在代码中的真实实现（Prompt assembly, Semantic memory, Standing notes, Reflection, Session history, Compaction, Runtime context 等） | Completed | 已完整排查 template_provider(B1-B8)、assemble.py(HistoryDeriveExecutor)、sections/*、AssistantMemory、memory_tools、acknowledgement、memory_extract、memory_retrieve、layout.toml 等全链路实现 |
+| MEMORY-CONTEXT-INVENTORY-SYNTHESIS | 盘整 Agent 所见全部上下文与记忆体系，输出全景架构梳理与结构化盘整报告 | Completed | 已全面梳理 B1-B8 系统提示词 8 大带、3 大动态外挂、三级存储拓扑、生命周期流、写盘硬门禁及与 ADR-0277 差异对比 |
+
+| BRAINSTORM-COGNITIVE-MEMORY-EXPLORE | 步骤 1：深度对标认知科学（Baddeley/Tulving/ACT-R/Soar）与业界（Letta/Mem0/Zep/Obelisk/Muse）范式 | Completed | 已对标人类记忆三级系统、激活度模型、双时间线、Obelisk FTS5 双面索引及生产 Muse 运行时机制 |
+| BRAINSTORM-COGNITIVE-MEMORY-QUESTIONS | 步骤 2：针对极简上下文冷启动、多层渐进检索与自主经验沉淀提出澄清问题（单步提问） | Completed | 用户明确选择核心架构模式：选项 C（双系统仿生混合模式：System 1 极简感知打底 + System 2 自主按需多跳深挖） |
+| BRAINSTORM-COGNITIVE-MEMORY-APPROACHES | 步骤 3：提炼 2-3 种高内聚低耦合的认知记忆与持续进化架构方案及权衡对比 | Completed | 对比分析选项 A、B、C 优劣与运行本质，确定选项 C 为兼顾极致轻量、深层联想、高可维护与长期演化的最优解 |
+| BRAINSTORM-COGNITIVE-MEMORY-DESIGN-SECTIONS | 步骤 4：逐步呈现分节架构规范（边界分层/存储布局/多层扩散/自主避坑与Skill沉淀/测试矩阵）并呈批 | In_Progress | 正在分节呈批详细架构设计（第 1 节：架构边界、自治等级与四层认知记忆领域模型） |
+| BRAINSTORM-COGNITIVE-MEMORY-DESIGN-DOC | 步骤 5：沉淀架构设计文档至 docs/plans/ 并提交 git | Pending | 待落盘设计文档 |
+| BRAINSTORM-COGNITIVE-MEMORY-TRANSITION | 步骤 6：转入实施计划制定（调用 writing-plans 规划单流落地步骤） | Pending | 待转入实施阶段 |
