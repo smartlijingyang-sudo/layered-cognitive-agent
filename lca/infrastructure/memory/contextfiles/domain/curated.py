@@ -128,6 +128,53 @@ def render_curated_markdown(
     return text
 
 
+def render_curated_memory_markdown(
+    records: Sequence[Any],
+    *,
+    char_budget: int = _CHAR_BUDGET,
+    source_note: str = "",
+) -> str:
+    """Pure functional projection of MemoryRecord sequence into MEMORY.md markdown.
+
+    Filters out deleted records and category=IDENTITY. Renders persistent
+    ## Preferences and ## Facts skeleton with embedded <!-- id:mem_xxx --> tags.
+    """
+    claims: list[CuratedClaim] = []
+    for r in records:
+        if getattr(r, "deleted", False):
+            continue
+        cat = getattr(r, "category", None)
+        cat_val = cat.value if hasattr(cat, "value") else str(cat or "")
+        if cat_val == "identity":
+            continue
+        if contains_secret(str(getattr(r, "content", ""))):
+            continue
+        metadata = getattr(r, "metadata", None)
+        if not isinstance(metadata, dict):
+            metadata = {}
+        source = str(metadata.get("source") or getattr(r, "source", "") or "user").strip()
+        trigger = str(metadata.get("trigger") or "").strip()
+        created_at_ms = getattr(r, "created_at_ms", None)
+        recorded_on = ""
+        if isinstance(created_at_ms, (int, float)) and created_at_ms > 0:
+            import datetime
+            dt = datetime.datetime.fromtimestamp(created_at_ms / 1000.0, tz=datetime.timezone.utc)
+            recorded_on = dt.strftime("%Y-%m-%d")
+
+        claims.append(
+            CuratedClaim(
+                claim_id=str(getattr(r, "record_id", "") or ""),
+                kind=cat_val,
+                body=str(getattr(r, "content", "") or ""),
+                importance=float(getattr(r, "importance", 0.5) or 0.5),
+                source=source,
+                trigger=trigger,
+                recorded_on=recorded_on,
+            )
+        )
+    return render_curated_markdown(claims, char_budget=char_budget, source_note=source_note)
+
+
 def plan_curated_projection(
     claims: Sequence[CuratedClaim],
     *,
@@ -155,7 +202,7 @@ def plan_curated_projection(
         "下次写入会重写本文件。直接改这里不会改记录。",
         "",
     ]
-    grouped: dict[str, list[str]] = {"Facts": [], "Preferences": []}
+    grouped: dict[str, list[str]] = {"Preferences": [], "Facts": []}
     for claim in exempt:
         grouped[_SECTION_FOR[claim.kind]].append(_bullet(claim))
     omitted: list[CuratedClaim] = []
@@ -174,13 +221,18 @@ def plan_curated_projection(
 
 def _sections(grouped: dict[str, list[str]]) -> list[str]:
     lines: list[str] = []
-    for title in ("Facts", "Preferences"):
-        bullets = grouped[title]
-        if not bullets:
-            continue
+    placeholders = {
+        "Preferences": "- _（暂无偏好记录）_",
+        "Facts": "- _（暂无事实记录）_",
+    }
+    for title in ("Preferences", "Facts"):
+        bullets = grouped.get(title) or []
         lines.append(f"## {title}")
         lines.append("")
-        lines.extend(bullets)
+        if bullets:
+            lines.extend(bullets)
+        else:
+            lines.append(placeholders[title])
         lines.append("")
     return lines
 
@@ -192,7 +244,10 @@ def _bullet(claim: CuratedClaim) -> str:
     suffix = f" This came from {source} when {trigger}"
     if claim.recorded_on:
         suffix += f", recorded {claim.recorded_on}"
-    return f"- {body}.{suffix}." if not body.endswith((".", "。")) else f"- {body}{suffix}."
+    rendered = f"- {body}.{suffix}." if not body.endswith((".", "。")) else f"- {body}{suffix}."
+    if claim.claim_id:
+        rendered = f"{rendered} <!-- id:{claim.claim_id} -->"
+    return rendered
 
 
 __all__ = [
@@ -202,4 +257,6 @@ __all__ = [
     "may_acknowledge_projection",
     "plan_curated_projection",
     "render_curated_markdown",
+    "render_curated_memory_markdown",
 ]
+
