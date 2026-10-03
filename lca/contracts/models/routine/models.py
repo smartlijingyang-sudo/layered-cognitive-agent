@@ -17,6 +17,12 @@ class RoutineSpec(BaseModel):
     daily_budget_tokens: int = Field(default=100_000, description="单日 Token 消耗硬熔断上限")
     enabled: bool = Field(default=True, description="是否启用当前例程")
     assistant_id: str = Field(..., description="所属绑定的 Assistant ID")
+    interval_s: int | None = Field(
+        default=None,
+        description="触发间隔（秒）；ADR-0248 §3.4 承诺的 Cron/间隔周期判定一直缺这个字段，"
+        "ADR-0263 §8 时间窗口判定与 §9 stale 默认（2x interval，上限 90min）需要它。"
+        "None 表示未声明周期（手动/事件驱动型），调度窗口回退到生产约定（见 scheduler）。",
+    )
 
     @model_validator(mode="after")
     def validate_routine_semantics(self) -> RoutineSpec:
@@ -32,6 +38,8 @@ class RoutineSpec(BaseModel):
             raise ValueError("spend_budget_per_run 必须大于 0")
         if self.daily_budget_tokens <= 0:
             raise ValueError("daily_budget_tokens 必须大于 0")
+        if self.interval_s is not None and self.interval_s <= 0:
+            raise ValueError("interval_s 必须大于 0")
         return self
 
 
