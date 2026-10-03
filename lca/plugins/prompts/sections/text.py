@@ -78,6 +78,8 @@ _REACT_TOOL_USAGE_TEXT = """<tool_usage_guidelines>
 - Do not pip install packages listed as pre-installed (reportlab, openpyxl, pandas, python-docx, pypdf). Use them directly.
 - PDF Chinese text: use reportlab's built-in STSong-Light CID font; do not fc-list or download fonts.
 - matplotlib CJK is preconfigured; do not set font.sans-serif; do not fc-list.
+- 动态授权与第三方连接严禁在文本中脑补或拼装 URL。所有第三方服务连接与授权必须调用官方工具生成。
+- 动身份先报身份：凡使用凭据/授权操作外部服务，在回复中必须显式注明所使用的账号身份。
 </tool_usage_guidelines>"""
 
 _ROUTING_INSTRUCTIONS_TEXT = """你是团队主导者（lead，自由路由模式）。

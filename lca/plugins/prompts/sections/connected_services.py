@@ -24,10 +24,10 @@ def render_connected_services_text(
 ) -> str:
     """Renders a concise summary of active third-party services with budget protection (max 100 tokens)."""
     active_vault = vault or ConnectorVault()
-    active_services = active_vault.list_active_services()
+    active_conns = [c for c in active_vault.list_connections() if c.is_active]
 
     lines = ["## Connected External Services"]
-    if not active_services:
+    if not active_conns:
         lines.append("No external services are currently connected.")
         lines.append(
             "When external services are needed, check status and use interactive authorization cards."
@@ -36,12 +36,13 @@ def render_connected_services_text(
         lines.append(
             "The following external integrations are currently authorized and ACTIVE for this agent:"
         )
-        sorted_services = sorted(active_services)
-        displayed = sorted_services[:max_services]
-        for svc in displayed:
-            lines.append(f"- {svc} (status: ACTIVE)")
-        if len(sorted_services) > max_services:
-            remaining = len(sorted_services) - max_services
+        sorted_conns = sorted(active_conns, key=lambda c: c.service)
+        displayed = sorted_conns[:max_services]
+        for conn in displayed:
+            ident_str = f" [account: {conn.account_identity}]" if conn.account_identity else ""
+            lines.append(f"- {conn.service} (status: ACTIVE{ident_str})")
+        if len(sorted_conns) > max_services:
+            remaining = len(sorted_conns) - max_services
             lines.append(f"- ... and {remaining} more active services")
         lines.append(
             "You can directly read, search, and perform allowed actions with these connected services."

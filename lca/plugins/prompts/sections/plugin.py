@@ -37,6 +37,7 @@ from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.plugins.prompts.sections import text as _text
 from lca.plugins.prompts.sections import vocal as _vocal
 from lca.plugins.prompts.sections.base import _ToolsConfig
+from lca.plugins.prompts.sections.connected_services import build_connected_services
 from lca.plugins.prompts.sections.context import (
     build_autonomous_presets,
     build_context,
@@ -211,6 +212,7 @@ async def setup(ctx: PluginContext, config: Config) -> None:
         ),
         ("react_workflow", build_react_workflow(Config()), "static"),
         ("react_tool_usage_guidelines", build_react_tool_usage(Config()), "static"),
+        ("connected_services", build_connected_services(Config()), "static"),
         ("routing_instructions", build_routing_instructions(Config()), "static"),
         ("hierarchical_instructions", build_hierarchical_instructions(Config()), "static"),
         ("runtime_env", build_runtime_env(Config()), "static"),

@@ -71,6 +71,7 @@ def _builtin_section_refs() -> tuple[tuple[str, str, bool, str | None], ...]:
         # react template's static instruction blocks
         ("react_workflow", "pure", True, ""),
         ("react_tool_usage_guidelines", "pure", True, ""),
+        ("connected_services", "pure", True, ""),
         # routing_prompt adds team sections
         ("teammates", "stateful", False, None),
         ("assigned_roles_text", "stateful", False, None),
@@ -106,7 +107,7 @@ def _builtin_templates() -> Mapping[str, _PromptTemplate]:
             for (n, k, o, f) in sl
         )
 
-    react_section_count = 13  # ADR-0265 §7：vocal_contract 移入尾段，react 基座剩 13 段
+    react_section_count = 14  # ADR-0265 §7 + connected_services 静态段，react 基座 14 段
     # ADR-0265 §7：B4 组（user_profile/home/autonomous_presets）插在 B3 之后、
     # B5（tools…）之前。base 前 5 段为 B1–B3（role/backstory/goal/current_date/
     # developer_timestamp），B4 组拼在其后，再接 base 剩余的 B5–B7 段。

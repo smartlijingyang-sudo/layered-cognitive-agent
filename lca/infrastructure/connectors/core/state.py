@@ -42,6 +42,10 @@ class ConnectionMetadata(BaseModel):
     scopes: list[str] = Field(default_factory=list)
     created_at: float | None = None
 
+    @property
+    def is_active(self) -> bool:
+        return self.state == ConnectionState.ACTIVE
+
 
 # Legal state transition directed graph
 _VALID_TRANSITIONS: dict[ConnectionState, set[ConnectionState]] = {
