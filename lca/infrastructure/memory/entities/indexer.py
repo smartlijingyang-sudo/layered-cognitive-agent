@@ -148,6 +148,17 @@ class EntityGraphIndexer:
             )
             conn.commit()
 
+    def delete_entity(self, domain: str, slug: str) -> None:
+        """从 SQLite 索引中彻底删除实体及其全部关联关系。"""
+        with self._get_connection() as conn:
+            conn.execute("DELETE FROM entities WHERE domain = ? AND slug = ?;", (domain, slug))
+            conn.execute("DELETE FROM entities_fts WHERE domain = ? AND slug = ?;", (domain, slug))
+            conn.execute(
+                "DELETE FROM entity_relations WHERE source_slug = ? OR target_slug = ?;",
+                (slug, slug),
+            )
+            conn.commit()
+
     def search(self, query: str, limit: int = 10) -> list[EntitySearchResult]:
         """全文检索实体（采用分词与多词项高精度匹配）。"""
         terms = tokenize(query)

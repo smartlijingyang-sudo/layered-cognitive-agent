@@ -498,4 +498,4 @@
 | COGNITIVE-MEMORY-TASK-3 | 任务 3：摄入模态门控与反思过滤器 (Ingestion Guards) | Completed | 成功实现 filter_ingestion_modality 拦截反事实/假设举例与反讽、SalienceGate 防止单次偶发事件过度泛化为偏好，并无缝接入 memory_extract 节点，单测与 33 reflect 测试全绿 |
 | COGNITIVE-MEMORY-TASK-4 | 任务 4：极简冷启动装配与 System 2 内部追忆工具 (Cognitive Saccade) | Completed | 成功实现 SystemTwoRecallEngine 与 internal_recall 内部追忆工具，支持最多 2 跳关系路径扩散、未命中诚实返回 NoRecall、冷启动预算控制在 500 Token 内，4/4 单测 100% 全绿 |
 | COGNITIVE-MEMORY-TASK-5 | 任务 5：表达分寸防火墙与工具踩坑避坑哨兵 (Tact & Pitfall Shield) | Completed | 成功实现 MemoryTactFirewall（敏感记忆隔离与禁显摆声带契约）、ToolPitfallShield（TOOLS.md 避坑毫秒级注入）与 SkillQuarantineGate（技能隔离待审门防野蛮生长），4/4 单测 100% 全绿 |
-| COGNITIVE-MEMORY-TASK-6 | 任务 6：7 大维度 28 项核心场景双轨基准评测 (Two-Track Evals Benchmark) | In_Progress | 正在落地 28 项场景规范文档 docs/specs/ 与轨 A（代码不变量 100% 通过）+ 轨 B（行为评测）自动化测试套件 |
+| COGNITIVE-MEMORY-TASK-6 | 任务 6：7 大维度 28 项核心场景双轨基准评测 (Two-Track Evals Benchmark) | Completed | 成功落盘规范文档 docs/specs/cognitive-memory-evals-benchmark.md，落地轨 A（确定性不变量 10/10 100% 通过）与轨 B（行为语义评测 11/11 100% 通过，超过 >=90% 阈值），全套认知测试 39/39 100% 全绿 |

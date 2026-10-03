@@ -17,11 +17,16 @@ class EntityGraphStore:
 
     def __init__(
         self,
-        root_path: Path,
+        root_path: Path | str | None = None,
         max_active_entities: int = 50,
         max_graph_entries: int = 15,
+        *,
+        base_dir: Path | str | None = None,
     ) -> None:
-        self.root_path = Path(root_path)
+        target_path = root_path if root_path is not None else base_dir
+        if target_path is None:
+            raise ValueError("Either root_path or base_dir must be provided")
+        self.root_path = Path(target_path)
         self.max_active_entities = max_active_entities
         self.max_graph_entries = max_graph_entries
 
@@ -87,6 +92,8 @@ class EntityGraphStore:
             updated_at_ms=now_ms,
         )
 
+    save_entity = write_entity
+
     def read_entity(self, domain: str, slug: str) -> str | None:
         """读取实体内容（优先活跃目录，其次归档目录）。"""
         active_path = self.entities_dir / domain / f"{slug}.md"
@@ -98,6 +105,23 @@ class EntityGraphStore:
             return archive_path.read_text(encoding="utf-8")
 
         return None
+
+    def delete_entity(self, domain: str, slug: str) -> bool:
+        """物理删除实体文件（含活跃与归档），并清除 SQLite 派生索引与微索引（右忘/遗忘）。"""
+        deleted = False
+        active_file = self.entities_dir / domain / f"{slug}.md"
+        if active_file.is_file():
+            active_file.unlink()
+            deleted = True
+        archive_file = self.archives_dir / domain / f"{slug}.md"
+        if archive_file.is_file():
+            archive_file.unlink()
+            deleted = True
+
+        if deleted:
+            self._indexer.delete_entity(domain, slug)
+            self._refresh_graph_micro_index()
+        return deleted
 
     def search_entities(self, query: str, limit: int = 10) -> list[EntitySearchResult]:
         """通过 SQLite 派生索引全文检索实体。"""
