@@ -112,3 +112,71 @@ async def test_wsot05_ingest_writes_conversation_id(monkeypatch, tmp_path):
     assert stored is not None
     assert stored.conversation_id == "topic_9"
     assert store.read_bytes(result.attachment_ids[0]) == b"ingest-me"
+# ---------------------------------------------------------------------------
+# WSOT-07: per-run assistant resolution — the run's assistant wins over the
+# global LCA_ASSISTANT_ID default; other assistants are never pointed at the
+# default assistant's workspace.
+# ---------------------------------------------------------------------------
+
+def test_ssot_run_assistant_beats_global_default(monkeypatch, tmp_path):
+    """run 作用域绑定的 assistant 优先于全局 LCA_ASSISTANT_ID 默认值。"""
+    from lca.infrastructure.path.locator import assistant_workspace_root
+    from lca.infrastructure.tools.run.assistant_scope import run_assistant_scope
+
+    monkeypatch.setenv("LCA_HOME", str(tmp_path))
+    monkeypatch.delenv("LCA_WORKSPACE_ROOT", raising=False)
+    monkeypatch.delenv("LCA_LOCAL_SANDBOX_ROOT", raising=False)
+    monkeypatch.setenv("LCA_ASSISTANT_ID", "asst_default")
+
+    with run_assistant_scope("asst_other"):
+        root = assistant_workspace_root()
+    assert root == tmp_path / "assistants" / "asst_other" / "workspace"
+    assert "asst_default" not in str(root)
+
+
+def test_ssot_explicit_arg_still_wins_over_run_scope(monkeypatch, tmp_path):
+    """显式参数仍高于 run 作用域。"""
+    from lca.infrastructure.path.locator import assistant_workspace_root
+    from lca.infrastructure.tools.run.assistant_scope import run_assistant_scope
+
+    monkeypatch.setenv("LCA_HOME", str(tmp_path))
+    monkeypatch.delenv("LCA_WORKSPACE_ROOT", raising=False)
+    monkeypatch.delenv("LCA_LOCAL_SANDBOX_ROOT", raising=False)
+    monkeypatch.delenv("LCA_ASSISTANT_ID", raising=False)
+
+    with run_assistant_scope("asst_run"):
+        root = assistant_workspace_root("asst_explicit")
+    assert root == tmp_path / "assistants" / "asst_explicit" / "workspace"
+
+
+def test_ssot_no_run_scope_falls_back_to_env_default(monkeypatch, tmp_path):
+    """无 run 作用域时回退到 LCA_ASSISTANT_ID 全局默认（CLI/测试场景）。"""
+    from lca.infrastructure.path.locator import assistant_workspace_root
+    from lca.infrastructure.tools.run.assistant_scope import (
+        get_current_assistant_id,
+    )
+
+    monkeypatch.setenv("LCA_HOME", str(tmp_path))
+    monkeypatch.delenv("LCA_WORKSPACE_ROOT", raising=False)
+    monkeypatch.delenv("LCA_LOCAL_SANDBOX_ROOT", raising=False)
+    monkeypatch.setenv("LCA_ASSISTANT_ID", "asst_default")
+
+    assert get_current_assistant_id() == ""
+    root = assistant_workspace_root()
+    assert root == tmp_path / "assistants" / "asst_default" / "workspace"
+
+
+def test_ssot_assistant_scope_is_run_local():
+    """作用域退出后恢复；嵌套覆盖按栈语义。"""
+    from lca.infrastructure.tools.run.assistant_scope import (
+        get_current_assistant_id,
+        run_assistant_scope,
+    )
+
+    assert get_current_assistant_id() == ""
+    with run_assistant_scope("asst_a"):
+        assert get_current_assistant_id() == "asst_a"
+        with run_assistant_scope("asst_b"):
+            assert get_current_assistant_id() == "asst_b"
+        assert get_current_assistant_id() == "asst_a"
+    assert get_current_assistant_id() == ""

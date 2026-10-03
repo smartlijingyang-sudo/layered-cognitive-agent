@@ -290,7 +290,11 @@ class RunLifecycleCoordinator:
                 # P3-06: snapshot/runnable are hot-path cache; authority is Session facts.
                 with (
                     bind_run_ambit(ambit) if ambit is not None else nullcontext(),
-                    run_identity_scopes(session.run_id, session.attachment_ids or ()),
+                    run_identity_scopes(
+                        session.run_id,
+                        session.attachment_ids or (),
+                        getattr(session, "assistant_id", "") or "",
+                    ),
                     run_workspace_scope(session.run_id),
                     plane_bindings_scope(bindings) if bindings is not None else nullcontext(),
                 ):

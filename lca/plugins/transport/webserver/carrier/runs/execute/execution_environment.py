@@ -179,7 +179,9 @@ class RunExecutionEnvironment:
         with (
             bind_facade_run(facade_ctx),
             bind_run_ambit(ambit),
-            run_identity_scopes(session.run_id, session.attachment_ids),
+            run_identity_scopes(
+                session.run_id, session.attachment_ids, assistant_id,
+            ),
         ):
             log_context: dict[str, str] = {
                 "run_id": session.run_id,

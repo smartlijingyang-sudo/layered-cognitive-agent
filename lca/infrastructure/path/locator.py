@@ -87,8 +87,11 @@ def assistant_workspace_root(assistant_id: str | None = None) -> Path:
     1. ``LCA_WORKSPACE_ROOT`` env — explicit ops override (wins).
     2. ``LCA_LOCAL_SANDBOX_ROOT`` env — backward compat with the pre-SSOT
        local-sandbox override.
-    3. ``{lca_home}/assistants/<assistant_id>/workspace`` — the per-assistant
-       durable workspace (assistant_id from arg or ``LCA_ASSISTANT_ID`` env).
+    3. The current run's ``assistant_id`` — from the explicit arg, else the
+       run-scoped ambient scope (``run_assistant_scope``), else the
+       ``LCA_ASSISTANT_ID`` env default. Each assistant gets its own
+       ``{lca_home}/assistants/<assistant_id>/workspace``; a run is never
+       pointed at another assistant's workspace by a global default.
     4. Legacy fallback: writable ``/mnt/data``, else
        ``~/.cache/lca/local-sandbox/mnt/data`` (keeps exotic deployments
        working).
@@ -99,7 +102,16 @@ def assistant_workspace_root(assistant_id: str | None = None) -> Path:
     legacy = os.environ.get("LCA_LOCAL_SANDBOX_ROOT", "").strip()
     if legacy:
         return Path(legacy).resolve()
-    aid = (assistant_id or os.environ.get("LCA_ASSISTANT_ID", "")).strip()
+    aid = (assistant_id or "").strip()
+    if not aid:
+        # Lazy import: assistant_scope imports no lca modules, but locator is
+        # imported early in several chains — keep this edge cycle-proof.
+        from lca.infrastructure.tools.run.assistant_scope import (
+            get_current_assistant_id,
+        )
+        aid = get_current_assistant_id()
+    if not aid:
+        aid = os.environ.get("LCA_ASSISTANT_ID", "").strip()
     if aid:
         return get_lca_home() / "assistants" / aid / "workspace"
     try:
