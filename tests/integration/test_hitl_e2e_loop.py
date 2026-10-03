@@ -86,13 +86,17 @@ class TestStep1ComposeSetsNeedsApproval:
         assert len(decision.tool_calls) == 1
         assert decision.tool_calls[0].tool_name == "askUserQuestion"
 
+        # NOTE: "bash" is a shell-namespace tool and now requires approval
+        # (ADR-0256 Task 5, machine-access classification wired into _compose).
+        # The "regular tool" here must be a non-shell tool.
+
     def test_regular_tool_does_not_set_needs_approval(self) -> None:
         decision = _compose(
             tool_calls=(
                 ToolCall(
                     call_id="tc-2",
-                    tool_name="bash",
-                    arguments={"command": "echo hi"},
+                    tool_name="readFile",
+                    arguments={"path": "notes/todo.txt"},
                 ),
             ),
             delegations=(),
@@ -124,10 +128,13 @@ class TestStep2ApproveGateRoutesToInterrupt:
         assert routing.next_node == "intervene.interrupt"
 
     @pytest.mark.asyncio
+    # NOTE: "bash" is shell-namespace (REQUIRE_APPROVAL per ADR-0256 T5),
+    # so it would route to interrupt. Use a non-shell tool for the
+    # "regular tool skips the gate" case.
     async def test_skipped_for_regular_tool(self) -> None:
         gate = ApproveGateExecutor()
         decision = _compose(
-            tool_calls=(ToolCall(call_id="tc", tool_name="bash", arguments={}),),
+            tool_calls=(ToolCall(call_id="tc", tool_name="readFile", arguments={}),),
             delegations=(),
             intent="",
         )
