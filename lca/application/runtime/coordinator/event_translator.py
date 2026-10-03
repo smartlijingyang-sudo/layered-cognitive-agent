@@ -252,6 +252,8 @@ class EventTranslator:
                     "startTime": act_item.start_time,
                     "icon": act_item.icon,
                     "params": act_item.params,
+                    "toolName": act_item.tool_name,
+                    "currentStep": act_item.current_step,
                 },
             }
             return [tool_start_msg, activity_msg]
@@ -301,6 +303,8 @@ class EventTranslator:
                     "endTime": act_item.end_time,
                     "durationMs": act_item.duration_ms,
                     "resultSummary": act_item.result_summary,
+                    "toolName": act_item.tool_name,
+                    "currentStep": act_item.current_step,
                 },
             }
             return [tool_end_msg, activity_msg]

@@ -39,6 +39,8 @@ class ActivityItem(BaseModel):
     params: dict[str, Any] = Field(default_factory=dict)
     result_summary: str | None = None
     is_system: bool = False
+    tool_name: str = ""
+    current_step: str | None = None
 
 
 class ActivityIntentNamer:
@@ -96,6 +98,40 @@ class ActivityIntentNamer:
             return desc.strip(), str(args.get("summary") or tool_name), "tool"
 
         return f"执行操作: {tool_name}", str(args.get("summary") or "处理中"), "tool"
+
+    @staticmethod
+    def live_step(tool_name: str, arguments: dict[str, Any] | None = None) -> str:
+        """One-line "what it is doing right now" for a running tool.
+
+        Muse 思想：进行时要有血有肉——running 不是一个静态 tag，
+        而是一句能回答"它现在在干什么"的话。每种工具讲自己的状态语言。
+        """
+        args = arguments or {}
+        lowered = tool_name.lower()
+
+        if lowered in ("run_shell", "shell", "box_run_command") or "exec" in lowered:
+            cmd = str(args.get("command") or args.get("cmd") or "")
+            short = (cmd[:42] + "...") if len(cmd) > 42 else cmd
+            return f"正在执行命令：{short}" if short else "正在执行系统命令"
+        if "browser" in lowered:
+            url = str(args.get("url") or "")
+            if url:
+                from urllib.parse import urlparse as _up
+                host = _up(url).netloc or url[:30]
+                return f"正在浏览 {host}"
+            return "正在自动化浏览网页"
+        if "subagent" in lowered:
+            role = str(args.get("role") or args.get("name") or "子任务")
+            return f"子任务执行中：{role}"
+        if "memory" in lowered or "recall" in lowered:
+            return "正在检索/更新记忆库"
+        if "cron" in lowered:
+            return "定时任务执行中"
+        if "gmail" in lowered or (lowered == "hatch_gws_cli" and args.get("service") == "gmail"):
+            return "正在处理 Gmail"
+        if "github" in lowered:
+            return "正在操作 GitHub"
+        return "正在处理中"
 
 
 __all__ = (

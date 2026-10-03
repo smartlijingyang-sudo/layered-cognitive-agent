@@ -83,7 +83,7 @@ def test_projector_cancel_and_determinism():
     cancelled = p1.cancel_activity("architect", "call_sub")
     assert cancelled is not None
     assert cancelled.status == ActivityStatus.CANCELLED
-    assert cancelled.result_summary == "User cancelled operation"
+    assert cancelled.result_summary == "用户取消了该操作"
 
 
 def test_get_activities_falls_back_to_unstamped_default_bucket():
