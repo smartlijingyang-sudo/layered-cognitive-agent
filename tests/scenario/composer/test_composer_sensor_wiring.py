@@ -6,6 +6,8 @@ The PerceiveHub must include ``InboxFactsSensor`` in solo / team mode and
 
 from __future__ import annotations
 
+__keep_llm_key__ = True  # scripted/booted runs need a dummy credential for the reasoner fail-loud gate (see tests/conftest.py)
+
 from dataclasses import dataclass, field
 from typing import Any
 

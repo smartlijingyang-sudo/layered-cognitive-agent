@@ -6,6 +6,8 @@ tests/fixtures/team_scenarios/*.yaml + tests/support/scenario_loader.py。
 
 from __future__ import annotations
 
+__keep_llm_key__ = True  # scripted/booted runs need a dummy credential for the reasoner fail-loud gate (see tests/conftest.py)
+
 import pytest
 
 from lca.application.api.api import Agent, Team, TeamLead, ensure_default_ctx
@@ -38,7 +40,7 @@ from tests.harness.trace_assert import (
 from tests.support.strategy_registry import build_strategy_registry
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="module")
 async def _boot_default_ctx_for_module() -> None:
     """Team/Agent construction needs a warm default plugin ctx (ADR-0062 PR-4)."""
     await ensure_default_ctx()
