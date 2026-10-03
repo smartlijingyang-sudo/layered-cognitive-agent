@@ -173,28 +173,48 @@ class ToolDeferSession:
     def search_catalog(self, query: str) -> list[dict[str, Any]]:
         """Keyword discovery over the local namespace catalog (no schema load).
 
-        Matches case-insensitively (Chinese supported) against namespace
-        names, namespace descriptions, tool names and tool descriptions.
-        Rank: namespace-name hit > tool-name hit > description hit.
+        Token-based, case-insensitive (Chinese supported): the query is split
+        on whitespace and a namespace matches when at least one token hits
+        the namespace name, its description, a tool name or a tool
+        description. Rank: token coverage desc, then namespace-name hit >
+        tool-name hit > description hit.
         Only local namespaces are covered (declared + MCP virtual) — the
         skill marketplace is searched separately via ``search_skill``.
         """
-        q = query.strip().lower()
-        if not q:
+        tokens = [t for t in query.strip().lower().split() if t]
+        if not tokens:
             return []
         hits: list[dict[str, Any]] = []
         for ns in self._namespaces:
-            name_hit = q in ns.name.lower()
-            desc_hit = q in ns.description.lower()
-            matched_tools = []
-            for tname in ns.tool_names:
-                spec = self._specs.get(tname, {})
-                tdesc = spec.get("function", {}).get("description", "") or ""
-                if q in tname.lower() or q in tdesc.lower():
-                    matched_tools.append(tname)
-            if not (name_hit or desc_hit or matched_tools):
+            ns_name = ns.name.lower()
+            ns_desc = ns.description.lower()
+            tool_descs = {
+                tname: (
+                    self._specs.get(tname, {}).get("function", {}).get("description", "")
+                    or ""
+                ).lower()
+                for tname in ns.tool_names
+            }
+            matched_tokens = 0
+            name_hit = False
+            matched_tools: list[str] = []
+            for tok in tokens:
+                tok_name_hit = tok in ns_name
+                tok_desc_hit = tok in ns_desc
+                tok_tools = [
+                    tname
+                    for tname in ns.tool_names
+                    if tok in tname.lower() or tok in tool_descs[tname]
+                ]
+                if tok_name_hit or tok_desc_hit or tok_tools:
+                    matched_tokens += 1
+                name_hit = name_hit or tok_name_hit
+                for tname in tok_tools:
+                    if tname not in matched_tools:
+                        matched_tools.append(tname)
+            if matched_tokens == 0:
                 continue
-            rank = 0 if name_hit else (1 if matched_tools else 2)
+            kind_rank = 0 if name_hit else (1 if matched_tools else 2)
             source = "mcp" if ns.name.startswith(MCP_NAMESPACE_PREFIX) else "declared"
             hits.append(
                 {
@@ -202,10 +222,10 @@ class ToolDeferSession:
                     "description": ns.description,
                     "matched_tools": matched_tools,
                     "source": source,
-                    "_rank": rank,
+                    "_rank": (kind_rank, -matched_tokens, ns.name),
                 }
             )
-        hits.sort(key=lambda h: (h["_rank"], h["namespace"]))
+        hits.sort(key=lambda h: h["_rank"])
         for h in hits:
             del h["_rank"]
         return hits
@@ -220,7 +240,7 @@ class ToolDeferSession:
         target = next(ns for ns in self._namespaces if ns.name == canonical)
         self._loaded.add(canonical)
         return {
-            "namespace": namespace,
+            "namespace": canonical,
             "description": target.description,
             "tools": [self._specs[name] for name in target.tool_names],
         }
@@ -238,8 +258,9 @@ class ToolDeferSession:
         seen_names: set[str] = set()
         for namespace in namespaces:
             payload = self.load_namespace(namespace)
-            if namespace not in loaded:
-                loaded.append(namespace)
+            canonical = payload["namespace"]
+            if canonical not in loaded:
+                loaded.append(canonical)
             for tool_spec in payload["tools"]:
                 tname = tool_spec["function"]["name"]
                 if tname not in seen_names:
