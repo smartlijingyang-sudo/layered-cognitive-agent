@@ -490,6 +490,6 @@
 | BRAINSTORM-COGNITIVE-MEMORY-EXPLORE | 步骤 1：深度对标认知科学（Baddeley/Tulving/ACT-R/Soar）与业界（Letta/Mem0/Zep/Obelisk/Muse）范式 | Completed | 已对标人类记忆三级系统、激活度模型、双时间线、Obelisk FTS5 双面索引及生产 Muse 运行时机制 |
 | BRAINSTORM-COGNITIVE-MEMORY-QUESTIONS | 步骤 2：针对极简上下文冷启动、多层渐进检索与自主经验沉淀提出澄清问题（单步提问） | Completed | 用户明确选择核心架构模式：选项 C（双系统仿生混合模式：System 1 极简感知打底 + System 2 自主按需多跳深挖） |
 | BRAINSTORM-COGNITIVE-MEMORY-APPROACHES | 步骤 3：提炼 2-3 种高内聚低耦合的认知记忆与持续进化架构方案及权衡对比 | Completed | 对比分析选项 A、B、C 优劣与运行本质，确定选项 C 为兼顾极致轻量、深层联想、高可维护与长期演化的最优解 |
-| BRAINSTORM-COGNITIVE-MEMORY-DESIGN-SECTIONS | 步骤 4：逐步呈现分节架构规范（边界分层/存储布局/多层扩散/自主避坑与Skill沉淀/测试矩阵）并呈批 | In_Progress | 正在分节呈批详细架构设计（第 1 节：架构边界、自治等级与四层认知记忆领域模型） |
-| BRAINSTORM-COGNITIVE-MEMORY-DESIGN-DOC | 步骤 5：沉淀架构设计文档至 docs/plans/ 并提交 git | Pending | 待落盘设计文档 |
-| BRAINSTORM-COGNITIVE-MEMORY-TRANSITION | 步骤 6：转入实施计划制定（调用 writing-plans 规划单流落地步骤） | Pending | 待转入实施阶段 |
+| BRAINSTORM-COGNITIVE-MEMORY-DESIGN-SECTIONS | 步骤 4：逐步呈现分节架构规范（边界分层/存储布局/多层扩散/自主避坑与Skill沉淀/测试矩阵）并呈批 | Completed | 3 大小节设计规范与 7 维度 28 项核心验收矩阵均获用户审批通过 |
+| BRAINSTORM-COGNITIVE-MEMORY-DESIGN-DOC | 步骤 5：沉淀架构设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-03-cognitive-memory-architecture-design.md 并提交 git (commit 9a60c9633) |
+| BRAINSTORM-COGNITIVE-MEMORY-TRANSITION | 步骤 6：转入实施计划制定（调用 writing-plans 规划单流落地步骤） | Completed | 成功落盘实施计划 docs/plans/2026-10-03-cognitive-memory-architecture-plan.md 并提交 git (commit 07f2a1570) |
