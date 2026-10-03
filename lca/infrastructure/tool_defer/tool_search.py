@@ -24,22 +24,32 @@ def _error(message: str) -> Observation:
 
 
 class ToolSearchTool(Tool):
-    """Load the full parameter schemas of one deferred tool namespace.
+    """Discover and load deferred tool namespaces on demand.
 
-    The model's catalog lists deferred namespaces as one-liners; calling
-    this tool marks the namespace loaded — its full schemas inject from
-    the next turn on, and the load result is also returned immediately so
-    the agent can inspect signatures before calling.
+    Two modes (local-first, nothing is stuffed into the prompt):
+
+    - ``query`` — intent discovery WITHOUT loading schemas: keyword search
+      over the local namespace catalog (declared namespaces + per-MCP-server
+      virtual namespaces like ``mcp_corp``). Use this when you are not sure
+      which namespace holds a capability.
+    - ``namespace`` / ``namespaces`` — load full parameter schemas of the
+      named namespace(s). Each MCP server is addressable as
+      ``mcp_<server>`` (e.g. ``mcp_corp``); the bare server name also works
+      as an alias (``corp`` -> ``mcp_corp``).
+
+    Loading is idempotent — loading an already-loaded namespace returns
+    its schemas again without side effects. For the skill marketplace
+    (non-local skills), use ``search_skill`` instead.
     """
 
     name: ClassVar[str] = "tool_search"
     namespace: ClassVar[str] = "core"
     description: ClassVar[str] = (
-        "Load the full tool schemas for a deferred namespace. Namespaces "
-        "not listed in the per-turn tool schemas appear only as one-line "
-        "catalog entries; call this to make their tools available. "
-        "Loading is idempotent — loading an already-loaded namespace "
-        "returns its schemas again without side effects."
+        "Discover or load deferred tool namespaces on demand. "
+        "query=<keywords>: find which local namespace holds a capability "
+        "(no schemas loaded; MCP servers appear as mcp_<server>). "
+        "namespace=<name>: load full schemas (alias: bare MCP server name, "
+        "e.g. 'corp' -> 'mcp_corp'). Loading is idempotent."
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
@@ -53,6 +63,16 @@ class ToolSearchTool(Tool):
                 "items": {"type": "string"},
                 "description": (
                     'List of namespace keys to load in batch, e.g. ["file", "memory"].'
+                ),
+            },
+            "query": {
+                "type": "string",
+                "description": (
+                    "Intent keywords to discover namespaces WITHOUT loading schemas, "
+                    "e.g. 'OA 审批'. Searches namespace names, descriptions, tool "
+                    "names and tool descriptions (local only: declared namespaces "
+                    "+ MCP servers as mcp_<server>). Use search_skill for the "
+                    "marketplace."
                 ),
             },
         },
@@ -79,6 +99,13 @@ class ToolSearchTool(Tool):
                 success=True,
                 payload=payload,
             )
+        if "query" in args and isinstance(args["query"], str) and args["query"].strip():
+            hits = session.search_catalog(args["query"])
+            return Observation(
+                observation_id="tool_search:query",
+                success=True,
+                payload={"query": args["query"], "namespaces": hits},
+            )
         namespace = args["namespace"]
         try:
             payload = session.load_namespace(namespace)
@@ -94,13 +121,19 @@ class ToolSearchTool(Tool):
         has_ns = (
             "namespace" in args and isinstance(args["namespace"], str) and bool(args["namespace"])
         )
+        has_query = (
+            "query" in args and isinstance(args["query"], str) and bool(args["query"].strip())
+        )
         has_nss = (
             "namespaces" in args
             and isinstance(args["namespaces"], list)
             and bool(args["namespaces"])
         )
-        if not has_ns and not has_nss:
-            return "Either 'namespace' (str) or 'namespaces' (list[str]) must be provided"
+        if not has_ns and not has_nss and not has_query:
+            return (
+                "One of 'namespace' (str), 'namespaces' (list[str]) "
+                "or 'query' (str) must be provided"
+            )
         if has_ns and not isinstance(args["namespace"], str):
             return "'namespace' must be a non-empty string"
         if has_nss and not all(isinstance(x, str) and bool(x) for x in args["namespaces"]):
