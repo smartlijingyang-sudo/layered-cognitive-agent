@@ -218,6 +218,7 @@
 | [0278](0278-scheduler-mutual-exclusion-convergence.md) | 双调度器互斥与自愈契约收敛：routine scheduler（0263）与 cron daemon（0268 深化）独立实现同一文件锁互斥语义（owner=hostname:pid、stale=2×interval/上限90min）；missed-run 补偿 vs 重试+死信的失败语义分岔待裁决 | Proposed |
 | [0279](0279-intent-tool-reconciliation-and-jit-hydration.md) | 意图-工具结构对账与 JIT 动态装配契约：结构差集检测思考链意图工具引用与当轮 tool_calls 鸿沟、动态展开 deferred schema 并回环重调；告别动词表启发式与假声称 | Proposed |
 | [0280](0280-zero-model-exposure-for-capable-urls.md) | 携带能力特权 URL 的零大模型暴露与带外意图兑换：工具层特权 URL 进 Vault、仅向大模型暴露 intent_id、网关层确定性卡片挂载保底、前端带外异步兑换与居中弹窗 | Implemented |
+| [0281](0281-run-artifact-filesystem-permissions.md) | Run 产物文件系统权限契约：traces/runs/<run_id>/ 目录 0700 / 产出文件 0600 owner-only 持有、ensure_run_dir 收紧语义、新增 writer 三件套纪律 | Proposed |
 
 | [0255](0255-muse-production-runtime-full-reference.md) | Muse 生产运行时全量参考：每 turn 上下文装配顺序、9 个 standing 文件全文与权限矩阵、36 工具命名空间函数清单与关键参数、9 大机制（记忆三层/强制检索/落笔写盘/provenance/压缩豁免/子 agent 继承/自省投影）与 12 条验收用例；ADR-0254 的实证 companion | Proposed |
 
