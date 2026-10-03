@@ -8,7 +8,6 @@ to ``brain.reflect`` when no pipeline is wired.
 
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass
 from typing import cast
 
@@ -41,7 +40,6 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.contracts.protocols.think.cognition import Brain
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.nodes.visit_metrics import VisitMetricsMixin
 
 
 def _normalize_observation(value: object) -> object:
@@ -112,7 +110,7 @@ def _extract_procedural_candidate(
 
 
 @dataclass(frozen=True, slots=True)
-class ReflectScoreExecutor(VisitMetricsMixin):
+class ReflectScoreExecutor:
     """Primitive: invoke the selected reflection seam, emit ``reflection``."""
 
     semantic_name: str = "phase.reflect.score"
@@ -125,21 +123,6 @@ class ReflectScoreExecutor(VisitMetricsMixin):
     declared_outputs: tuple[PortName, ...] = (PortName("reflection"),)
 
     async def node_execute(
-        self,
-        context: NodeContext,
-        input: NodeInput,
-    ) -> NodeOutput:
-        """Protocol entry — time the visit, then delegate to ``_node_execute``.
-
-        todo-28 C1 observability: additive only, visit behavior unchanged.
-        """
-        start = time.perf_counter()
-        try:
-            return await self._node_execute(context, input)
-        finally:
-            self.record_visit((time.perf_counter() - start) * 1000.0)
-
-    async def _node_execute(
         self,
         context: NodeContext,
         input: NodeInput,
@@ -162,10 +145,6 @@ class ReflectScoreExecutor(VisitMetricsMixin):
         # to ``ReflectionVerdict.ON_TRACK, lesson=None`` — the outer loop
         # never learned a tool had succeeded, so the agent re-issued the
         # same tool call every step (run-time loop until budget exhaustion).
-        if observation is None:
-            # Zero-cost fast path (ADR-0244 PR-3 Task 8): nothing to score —
-            # skip brain.reflect / the LLM critic entirely.
-            self.note_fast_path()
         if isinstance(brain, Brain) and observation is not None:
             # Ports/runtime are untyped carriers (Mapping[PortName, Any] /
             # dict), so narrow to the Brain protocol's typed contract here.

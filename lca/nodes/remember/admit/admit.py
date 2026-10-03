@@ -8,7 +8,6 @@ Pure text or zero-candidate reflections are filtered with zero cost (admitted=Fa
 
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -35,11 +34,10 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.nodes.visit_metrics import VisitMetricsMixin
 
 
 @dataclass(frozen=True, slots=True)
-class RememberAdmitExecutor(VisitMetricsMixin):
+class RememberAdmitExecutor:
     """Primitive: verify authority and admit memory candidates; emit admitted flag."""
 
     semantic_name: str = "phase.remember.admit"
@@ -63,21 +61,6 @@ class RememberAdmitExecutor(VisitMetricsMixin):
         context: NodeContext,
         input: NodeInput,
     ) -> NodeOutput:
-        """Protocol entry — time the visit, then delegate to ``_node_execute``.
-
-        todo-28 C1 observability: additive only, visit behavior unchanged.
-        """
-        start = time.perf_counter()
-        try:
-            return await self._node_execute(context, input)
-        finally:
-            self.record_visit((time.perf_counter() - start) * 1000.0)
-
-    async def _node_execute(
-        self,
-        context: NodeContext,
-        input: NodeInput,
-    ) -> NodeOutput:
         del context
         decision = input.port_values.get(PortName("decision"))
         observation = input.port_values.get(PortName("observation"))
@@ -85,12 +68,10 @@ class RememberAdmitExecutor(VisitMetricsMixin):
 
         # Fast-Path: missing reflection or explicit fast_path flag
         if reflection is None:
-            self.note_fast_path()
             return self._emit_rejection(decision, observation, reflection)
 
         extra: dict[str, Any] = getattr(reflection, "extra", {}) or {}
         if extra.get("fast_path") is True:
-            self.note_fast_path()
             return self._emit_rejection(decision, observation, reflection)
 
         # Extract candidates

@@ -12,7 +12,6 @@ the verdict is purely about routing — it does not modify the typed
 
 from __future__ import annotations
 
-import time
 from collections.abc import Mapping
 from dataclasses import dataclass
 
@@ -40,7 +39,6 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.nodes.visit_metrics import VisitMetricsMixin
 
 
 def _is_failure(observation: object) -> bool:
@@ -54,7 +52,7 @@ def _is_failure(observation: object) -> bool:
 
 
 @dataclass(frozen=True, slots=True)
-class ReflectAdmitRecoveryExecutor(VisitMetricsMixin):
+class ReflectAdmitRecoveryExecutor:
     """Decide whether the outer loop may route through recovery edges."""
 
     semantic_name: str = "phase.reflect.admit_recovery"
@@ -63,21 +61,6 @@ class ReflectAdmitRecoveryExecutor(VisitMetricsMixin):
     declared_outputs: tuple[PortName, ...] = (PortName("reflection"), PortName("routing"))
 
     async def node_execute(
-        self,
-        context: NodeContext,
-        input: NodeInput,
-    ) -> NodeOutput:
-        """Protocol entry — time the visit, then delegate to ``_node_execute``.
-
-        todo-28 C1 observability: additive only, visit behavior unchanged.
-        """
-        start = time.perf_counter()
-        try:
-            return await self._node_execute(context, input)
-        finally:
-            self.record_visit((time.perf_counter() - start) * 1000.0)
-
-    async def _node_execute(
         self,
         context: NodeContext,
         input: NodeInput,
