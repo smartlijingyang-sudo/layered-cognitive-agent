@@ -119,3 +119,75 @@ async def test_edit_prompt_also_carries_user_request_verbatim() -> None:
     assert isinstance(result, list)
     for candidate in result:
         assert candidate.prompt.startswith(user_request), candidate.prompt
+
+
+def test_service_has_zero_hardcoded_figures() -> None:
+    """AST 守卫：断言 service.py 绝对不存在任何 _KNOWN_FIGURE_MAP 或写死人物名单。"""
+    import ast
+
+    service_path = Path(__file__).resolve().parents[3] / "lca" / "plugins" / "avatar" / "service.py"
+    tree = ast.parse(service_path.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and node.id in (
+            "_KNOWN_FIGURE_MAP",
+            "FIGURE_MAP",
+            "KNOWN_FIGURES",
+        ):
+            pytest.fail(f"Found forbidden hardcoded figure identifier in service.py: {node.id}")
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            assert "西格蒙德·弗洛伊德" not in node.value, "Found hardcoded figure Freud in service.py"
+
+
+@pytest.mark.parametrize(
+    ("raw_input", "expected_subject"),
+    [
+        ("我想修改你的形象和头像，改成：爱因斯坦", "爱因斯坦"),
+        ("请帮我换成一个赛博朋克猫", "赛博朋克猫"),
+        ("把头像改成：鲁迅", "鲁迅"),
+        ("我想修改你的形象和头像，改成：弗洛伊德", "弗洛伊德"),
+        ("达芬奇", "达芬奇"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_create_prompt_generically_expands_arbitrary_figures_and_styles(
+    raw_input: str, expected_subject: str
+) -> None:
+    svc = _service()
+    candidates = await svc.create("asst_1", raw_input)
+    assert len(candidates) > 0
+    prompt = candidates[0].prompt
+    assert prompt.startswith(raw_input)
+    assert "Visual focus:" in prompt
+    assert f"Close-up avatar portrait of {expected_subject}" in prompt
+
+
+@pytest.mark.asyncio
+async def test_create_prompt_with_custom_expander() -> None:
+    class _CustomExpander:
+        async def expand(self, user_request: str) -> str:
+            return f"Custom stylized {user_request}"
+
+    svc = AvatarService(
+        store=_FakeStore(),
+        provider=_FakeProvider(),
+        summarizer=lambda id: "",
+        publisher=_FakeStore(),
+        home_resolver=lambda id: Path("/nonexistent-avatar-home"),
+        expander=_CustomExpander(),
+    )
+    candidates = await svc.create("asst_1", "极客猫咪")
+    assert len(candidates) > 0
+    prompt = candidates[0].prompt
+    assert "Visual focus: Custom stylized 极客猫咪" in prompt
+
+
+@pytest.mark.asyncio
+async def test_create_prompt_with_explicit_visual_prompt() -> None:
+    svc = _service()
+    user_request = "换个头像"
+    visual_prompt = "Cyberpunk neon fox portrait"
+    candidates = await svc.create("asst_1", user_request, visual_prompt=visual_prompt)
+    assert len(candidates) > 0
+    prompt = candidates[0].prompt
+    assert prompt.startswith(user_request)
+    assert "Cyberpunk neon fox portrait" in prompt

@@ -30,6 +30,7 @@ from lca.contracts.models.avatar import (
     AvatarVariant,
     utcnow,
 )
+from lca.plugins.avatar.expander import PromptExpander, RulePromptExpander
 from lca.plugins.avatar.identity import load_identity
 from lca.plugins.avatar.provider import VideoStatus
 
@@ -75,21 +76,33 @@ class AvatarService:
         summarizer: Callable[[str], str],
         publisher: PublisherLike,
         home_resolver: Callable[[str], Path],
+        expander: PromptExpander | None = None,
     ) -> None:
         self.store = store
         self.provider = provider
         self.summarizer = summarizer
         self.publisher = publisher
         self.home_resolver = home_resolver
+        self.expander = expander or RulePromptExpander()
         # 持有后台视频任务引用，避免被 GC；完成即从集合移除。
         self._video_tasks: set[asyncio.Task[None]] = set()
 
-    def _build_prompt(self, user_request: str, identity: str) -> str:
+    async def _build_prompt(
+        self,
+        user_request: str,
+        identity: str,
+        *,
+        visual_prompt: str | None = None,
+    ) -> str:
         traits = self.summarizer(identity)
-        return (
-            f"{user_request}\n\nIdentity traits: {traits}\n"
-            "Style: consistent character, high quality avatar portrait, centered."
-        )
+        parts = [user_request]
+        focus = visual_prompt or await self.expander.expand(user_request)
+        if focus:
+            parts.append(f"\nVisual focus: {focus}")
+        if traits:
+            parts.append(f"\nIdentity traits: {traits}")
+        parts.append("Style: consistent character, high quality avatar portrait, centered.")
+        return "\n".join(parts)
 
     async def _generate_candidates(
         self,
@@ -97,9 +110,11 @@ class AvatarService:
         kind: Literal["create", "edit"],
         user_request: str,
         reference: bytes | None,
+        *,
+        visual_prompt: str | None = None,
     ) -> list[AvatarCandidate]:
         identity = load_identity(self.home_resolver(assistant_id))
-        prompt = self._build_prompt(user_request, identity)
+        prompt = await self._build_prompt(user_request, identity, visual_prompt=visual_prompt)
         now = utcnow()
         candidates: list[AvatarCandidate] = []
         for i in range(NUM_CANDIDATES):
@@ -122,9 +137,15 @@ class AvatarService:
             )
         return candidates
 
-    async def create(self, assistant_id: str, user_request: str) -> list[AvatarCandidate]:
+    async def create(
+        self,
+        assistant_id: str,
+        user_request: str,
+        *,
+        visual_prompt: str | None = None,
+    ) -> list[AvatarCandidate]:
         candidates = await self._generate_candidates(
-            assistant_id, "create", user_request, reference=None
+            assistant_id, "create", user_request, reference=None, visual_prompt=visual_prompt
         )
         state = self.store.load_state(assistant_id)
         self.store.save_state(
@@ -140,13 +161,19 @@ class AvatarService:
         user_request: str,
         reference_image: bytes | None = None,
         auto_activate: bool = False,
+        *,
+        visual_prompt: str | None = None,
     ) -> list[AvatarCandidate] | AvatarActiveBundle:
         state = self.store.load_state(assistant_id)
         reference = reference_image
         if reference is None and state.active is not None:
             reference = self.store.read_image(assistant_id, state.active.candidate_id, "original")
         candidates = await self._generate_candidates(
-            assistant_id, "edit", user_request, reference=reference
+            assistant_id,
+            "edit",
+            user_request,
+            reference=reference,
+            visual_prompt=visual_prompt,
         )
         if not auto_activate:
             self.store.save_state(
@@ -158,6 +185,7 @@ class AvatarService:
         candidate = candidates[0]
         bundle = self.store.copy_candidate_to_active(assistant_id, candidate)
         self.store.save_state(
+
             state.model_copy(update={"active": bundle, "candidates": [], "updated_at": utcnow()})
         )
         self.publisher.publish(
