@@ -185,3 +185,22 @@ def test_modal_right_pane_code_block_with_copy() -> None:
     assert "codeBox" in content or "code" in content.lower()
     # Must have the bash syntax label (Muse shows "bash" label on code block)
     assert "bash" in content
+
+
+def test_modal_dark_mode_color_invariants() -> None:
+    """Verifies dark mode compatibility for activity modal: zero hardcoded dark fonts, proper elevated modal styling."""
+    path = _get_drawer_tsx_path()
+    content = path.read_text(encoding="utf-8")
+
+    # Invariant 1: No hardcoded black/dark text color #262626 (invisible in dark mode)
+    assert "#262626" not in content
+
+    # Invariant 2: No hardcoded stark light-mode background in active sidebar items
+    assert "background: #eef2f6" not in content
+
+    # Invariant 3: Modal uses detailModal container styling with colorBgElevated and structured cards
+    assert "detailModal:" in content
+    assert "colorBgElevated" in content
+    assert "narrativeCard" in content
+    assert "verdictBanner" in content
+

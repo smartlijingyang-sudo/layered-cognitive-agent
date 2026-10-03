@@ -24,7 +24,8 @@ meta = PatchMeta(
     technical_detail=(
         "Installs AssistantTopMascot.tsx, AssistantStatusDrawer.tsx, StandingFileFullscreenEditor.tsx,"
         " and ConnectorsPanel.tsx, then patches agent Conversation Header to display"
-        " center breathing Mascot and trigger right-side standing files drawer"
+        " center breathing Mascot and trigger right-side standing files drawer."
+        " Updated dynamic activity modal colors with dark-mode white-gray typography and top-tier aesthetic."
     ),
     verify_file=_HEADER_REL,
     verify_marker="AssistantTopMascot",
