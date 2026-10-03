@@ -93,7 +93,7 @@ def dummy_llm_key(monkeypatch: pytest.MonkeyPatch) -> None:
         lambda: None,
     )
     monkeypatch.setattr(
-        "lca.infrastructure.llm_adapter.factory.load_dotenv_if_present",
+        "lca.infrastructure.llm_adapter.factory.factory.load_dotenv_if_present",
         lambda path=None: None,
     )
     monkeypatch.setenv("LLM_API_KEY", "test-dummy-key")
@@ -183,7 +183,7 @@ async def test_omitting_seam_plugin_does_not_bypass(
     def _boom(*_a: object, **_k: object) -> object:
         raise AssertionError(f"module-level factory used after omitting {omit_id}")
 
-    monkeypatch.setattr("lca.infrastructure.sandbox.factory.resolve_sandbox", _boom)
+    monkeypatch.setattr("lca.infrastructure.sandbox.factory.factory.resolve_sandbox", _boom)
     monkeypatch.setattr("lca.infrastructure.tools.default.set.resolve_sandbox", _boom)
     import lca.infrastructure.file.store as file_store_module
 
@@ -289,7 +289,7 @@ async def test_llm_single_owner_without_key(monkeypatch: pytest.MonkeyPatch) -> 
         lambda: None,
     )
     monkeypatch.setattr(
-        "lca.infrastructure.llm_adapter.factory.load_dotenv_if_present",
+        "lca.infrastructure.llm_adapter.factory.factory.load_dotenv_if_present",
         lambda path=None: None,
     )
     monkeypatch.delenv("LLM_API_KEY", raising=False)

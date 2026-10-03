@@ -188,9 +188,9 @@ class SandboxRuntimeToolTests(unittest.IsolatedAsyncioTestCase):
             patch.dict(
                 os.environ, {"ONLYBOXES_BASE_URL": "http://x", "ONLYBOXES_ACCESS_TOKEN": "obx_x"}
             ),
-            patch("lca.infrastructure.sandbox.factory.onlyboxes_base_url", return_value="http://x"),
+            patch("lca.infrastructure.sandbox.factory.factory.onlyboxes_base_url", return_value="http://x"),
             patch(
-                "lca.infrastructure.sandbox.factory.onlyboxes_access_token", return_value="obx_x"
+                "lca.infrastructure.sandbox.factory.factory.onlyboxes_access_token", return_value="obx_x"
             ),
         ):
             tools = build_default_tools(self.store)
