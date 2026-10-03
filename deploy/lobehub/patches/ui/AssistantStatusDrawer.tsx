@@ -11,11 +11,21 @@ import {
   Segmented,
   Spin,
   Switch,
-  Tag,
   Tooltip,
   Typography,
   message as antMessage,
 } from 'antd';
+import {
+  ActionIcon,
+  Alert,
+  Block,
+  CopyButton,
+  Flexbox,
+  Highlighter,
+  Snippet,
+  Tag,
+  Text as LobeText,
+} from '@lobehub/ui';
 import { createStaticStyles } from 'antd-style';
 import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -158,7 +168,7 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       display: flex;
       flex-direction: column;
       height: 100%;
-      background: ${cssVar.colorBgLayout};
+      background: ${cssVar.colorBgContainer};
     `,
     profileHeader: css`
       display: flex;
@@ -167,7 +177,7 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       justify-content: center;
       padding: 14px 16px 18px 16px;
       margin-bottom: 16px;
-      background: ${cssVar.colorBgContainer};
+      background: ${cssVar.colorBgElevated};
       border: 1px solid ${cssVar.colorBorderSecondary};
       border-radius: 16px;
       position: relative;
@@ -183,9 +193,9 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       width: 24px;
       height: 24px;
       border-radius: 50%;
-      background: ${cssVar.colorBgContainer};
+      background: ${cssVar.colorBgElevated};
       border: 1px solid ${cssVar.colorBorderSecondary};
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -197,7 +207,7 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       &:hover {
         transform: scale(1.15);
         border-color: ${cssVar.colorPrimary};
-        background: ${cssVar.colorFillTertiary};
+        background: ${cssVar.colorFillSecondary};
       }
     `,
     profileMeta: css`
@@ -227,6 +237,12 @@ const styles = createStaticStyles(({ css, cssVar }) => {
         font-weight: 500;
         font-size: 11.5px;
         padding: 5px 2px;
+        color: ${cssVar.colorTextSecondary};
+      }
+      .ant-segmented-item-selected {
+        background: ${cssVar.colorFillSecondary};
+        color: #ffffff !important;
+        font-weight: 600;
       }
     `,
     cardsList: css`
@@ -246,12 +262,12 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       padding-right: 2px;
     `,
     identityCard: css`
-      background: ${cssVar.colorBgContainer};
+      background: ${cssVar.colorBgElevated};
       border: 1px solid ${cssVar.colorBorderSecondary};
       border-radius: 14px;
       padding: 14px;
       min-width: 0;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       cursor: pointer;
       display: flex;
@@ -260,7 +276,7 @@ const styles = createStaticStyles(({ css, cssVar }) => {
 
       &:hover {
         border-color: ${cssVar.colorPrimary};
-        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
         transform: translateY(-2px);
       }
     `,
@@ -276,7 +292,7 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       display: flex;
       align-items: center;
       gap: 6px;
-      color: ${cssVar.colorText};
+      color: #ffffff;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -299,7 +315,7 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       align-items: center;
       justify-content: space-between;
       font-size: 11px;
-      color: ${cssVar.colorTextQuaternary};
+      color: ${cssVar.colorTextTertiary};
       margin-top: 4px;
       border-top: 1px solid ${cssVar.colorBorderSecondary};
       padding-top: 6px;
@@ -308,8 +324,8 @@ const styles = createStaticStyles(({ css, cssVar }) => {
     timelineGroupTitle: css`
       font-size: 12px;
       font-weight: 600;
-      color: ${cssVar.colorTextTertiary};
-      margin: 4px 0 2px 4px;
+      color: ${cssVar.colorTextSecondary};
+      margin: 8px 0 4px 4px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
     `,
@@ -317,7 +333,7 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       display: flex;
       align-items: flex-start;
       gap: 12px;
-      background: ${cssVar.colorBgContainer};
+      background: ${cssVar.colorBgElevated};
       border: 1px solid ${cssVar.colorBorderSecondary};
       border-radius: 12px;
       padding: 12px 14px;
@@ -325,8 +341,9 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       transition: all 0.2s ease;
 
       &:hover {
-        border-color: ${cssVar.colorPrimaryBorder};
-        box-shadow: 0 3px 12px rgba(0, 0, 0, 0.04);
+        border-color: ${cssVar.colorBorder};
+        background: ${cssVar.colorFillSecondary};
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
         transform: translateY(-1px);
       }
     `,
@@ -355,7 +372,7 @@ const styles = createStaticStyles(({ css, cssVar }) => {
     activityTitle: css`
       font-size: 13px;
       font-weight: 600;
-      color: ${cssVar.colorText};
+      color: #ffffff;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -374,12 +391,12 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       align-items: center;
       gap: 8px;
       font-size: 11px;
-      color: ${cssVar.colorTextQuaternary};
+      color: ${cssVar.colorTextTertiary};
       margin-top: 2px;
     `,
     // 审批卡片样式
     approvalCard: css`
-      background: ${cssVar.colorBgContainer};
+      background: ${cssVar.colorBgElevated};
       border: 1px solid ${cssVar.colorBorderSecondary};
       border-radius: 12px;
       padding: 14px;
@@ -387,7 +404,7 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       flex-direction: column;
       gap: 8px;
       transition: all 0.2s ease;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 
       &:hover {
         border-color: ${cssVar.colorPrimaryBorder};
@@ -404,12 +421,12 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       background: ${cssVar.colorFillTertiary};
       padding: 4px 8px;
       border-radius: 6px;
-      color: ${cssVar.colorText};
+      color: #ffffff;
       word-break: break-all;
     `,
     // 即将到来卡片样式
     upcomingCard: css`
-      background: ${cssVar.colorBgContainer};
+      background: ${cssVar.colorBgElevated};
       border: 1px solid ${cssVar.colorBorderSecondary};
       border-radius: 12px;
       padding: 14px;
@@ -420,7 +437,7 @@ const styles = createStaticStyles(({ css, cssVar }) => {
 
       &:hover {
         border-color: ${cssVar.colorPrimaryBorder};
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
       }
     `,
     upcomingTopRow: css`
@@ -428,37 +445,48 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       align-items: center;
       justify-content: space-between;
     `,
-    // 详情弹窗双栏布局
+    // 详情弹窗双栏布局 (原生 LobeHub 暗色设计：富有层次的 colorBgElevated、纯白清晰字体、非漆黑低对比)
     detailModal: css`
       .ant-modal-content {
         padding: 0 !important;
         border-radius: 16px;
         overflow: hidden;
-        background: ${cssVar.colorBgElevated};
+        background: ${cssVar.colorBgElevated} !important;
         border: 1px solid ${cssVar.colorBorderSecondary};
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+        box-shadow: ${cssVar.boxShadow};
       }
       .ant-modal-header {
         margin: 0 !important;
-        padding: 16px 24px !important;
+        padding: 18px 24px !important;
         border-bottom: 1px solid ${cssVar.colorBorderSecondary};
-        background: ${cssVar.colorBgElevated};
+        background: ${cssVar.colorBgElevated} !important;
       }
       .ant-modal-body {
         padding: 0 !important;
-        background: ${cssVar.colorBgContainer};
+        background: ${cssVar.colorBgElevated} !important;
+      }
+      .ant-modal-close {
+        top: 18px;
+        right: 20px;
+        color: ${cssVar.colorTextSecondary};
+        transition: all 0.2s ease;
+        &:hover {
+          color: #ffffff;
+          background: ${cssVar.colorFillSecondary};
+        }
       }
     `,
     detailModalLayout: css`
       display: flex;
-      height: 540px;
+      height: 560px;
+      background: ${cssVar.colorBgElevated};
     `,
     detailSidebar: css`
-      width: 270px;
+      width: 280px;
       border-right: 1px solid ${cssVar.colorBorderSecondary};
-      background: ${cssVar.colorBgLayout};
+      background: ${cssVar.colorFillQuaternary};
       overflow-y: auto;
-      padding: 12px 8px;
+      padding: 14px 10px;
       display: flex;
       flex-direction: column;
       gap: 4px;
@@ -466,10 +494,10 @@ const styles = createStaticStyles(({ css, cssVar }) => {
     detailSidebarHeader: css`
       font-size: 11px;
       font-weight: 600;
-      color: ${cssVar.colorTextTertiary};
+      color: ${cssVar.colorTextSecondary};
       padding: 4px 8px 8px;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.6px;
     `,
     detailSidebarItem: css`
       padding: 10px 12px;
@@ -477,18 +505,19 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       cursor: pointer;
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       border: 1px solid transparent;
-      color: ${cssVar.colorTextSecondary};
+      color: rgba(255, 255, 255, 0.85);
 
       &:hover {
-        background: ${cssVar.colorFillSecondary};
-        color: ${cssVar.colorText};
+        background: ${cssVar.colorFillTertiary};
+        color: #ffffff;
       }
 
       &.active {
-        background: ${cssVar.colorPrimaryBg};
-        border-color: ${cssVar.colorPrimaryBorder};
-        color: ${cssVar.colorText};
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+        background: ${cssVar.colorFillSecondary};
+        border-color: ${cssVar.colorBorder};
+        color: #ffffff !important;
+        font-weight: 600;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
       }
     `,
     detailSidebarItemTitle: css`
@@ -501,55 +530,64 @@ const styles = createStaticStyles(({ css, cssVar }) => {
     `,
     detailMain: css`
       flex: 1;
-      padding: 22px 26px;
+      padding: 24px 28px;
       overflow-y: auto;
-      background: ${cssVar.colorBgContainer};
+      background: ${cssVar.colorBgElevated};
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 18px;
     `,
     detailSection: css`
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 8px;
     `,
     detailSectionTitle: css`
-      font-size: 11.5px;
+      font-size: 12px;
       font-weight: 600;
-      color: ${cssVar.colorTextTertiary};
+      color: ${cssVar.colorTextSecondary};
       text-transform: uppercase;
       letter-spacing: 0.5px;
     `,
     narrativeCard: css`
-      background: ${cssVar.colorFillQuaternary};
+      background: ${cssVar.colorFillTertiary};
       border: 1px solid ${cssVar.colorBorderSecondary};
-      border-radius: 10px;
-      padding: 14px 16px;
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     `,
     narrativeText: css`
       margin: 0 !important;
       font-size: 13.5px;
       line-height: 1.75;
-      color: ${cssVar.colorText} !important;
+      color: #ffffff !important;
       white-space: pre-line;
       letter-spacing: 0.2px;
     `,
     verdictBanner: css`
+      border-radius: 10px;
+    `,
+    verdictBannerSuccess: css`
+      background: rgba(82, 196, 26, 0.12);
+      border: 1px solid rgba(82, 196, 26, 0.35);
+      border-left: 3px solid #52c41a;
       border-radius: 10px;
       padding: 12px 16px;
       display: flex;
       flex-direction: column;
       gap: 6px;
     `,
-    verdictBannerSuccess: css`
-      background: rgba(82, 196, 26, 0.08);
-      border: 1px solid rgba(82, 196, 26, 0.25);
-      border-left: 3px solid #52c41a;
-    `,
     verdictBannerError: css`
-      background: rgba(255, 77, 79, 0.08);
-      border: 1px solid rgba(255, 77, 79, 0.25);
+      background: rgba(255, 77, 79, 0.12);
+      border: 1px solid rgba(255, 77, 79, 0.35);
       border-left: 3px solid #ff4d4f;
+      border-radius: 10px;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
     `,
     verdictTitle: css`
       font-size: 12px;
@@ -563,55 +601,11 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       margin: 0 !important;
       font-size: 13px;
       line-height: 1.65;
-      color: ${cssVar.colorText} !important;
+      color: #ffffff !important;
       white-space: pre-line;
     `,
     codeBox: css`
-      background: ${cssVar.colorFillTertiary};
-      border: 1px solid ${cssVar.colorBorderSecondary};
-      border-radius: 8px;
-      padding: 10px 12px;
       font-family: ui-monospace, SFMono-Regular, monospace;
-      font-size: 12px;
-      color: ${cssVar.colorText};
-      white-space: pre-wrap;
-      word-break: break-all;
-      max-height: 180px;
-      overflow-y: auto;
-    `,
-    codeBlockWrapper: css`
-      border: 1px solid ${cssVar.colorBorderSecondary};
-      border-radius: 8px;
-      overflow: hidden;
-      background: ${cssVar.colorFillTertiary};
-    `,
-    codeBlockHeader: css`
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 4px 10px;
-      background: ${cssVar.colorFillSecondary};
-      border-bottom: 1px solid ${cssVar.colorBorderSecondary};
-      color: ${cssVar.colorTextSecondary};
-    `,
-    codeBlockLang: css`
-      font-size: 11px;
-      font-weight: 600;
-      color: ${cssVar.colorTextTertiary};
-      font-family: ui-monospace, SFMono-Regular, monospace;
-      text-transform: lowercase;
-    `,
-    metadataBullets: css`
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      font-size: 12px;
-      color: ${cssVar.colorTextSecondary};
-      font-family: ui-monospace, SFMono-Regular, monospace;
-      background: ${cssVar.colorFillQuaternary};
-      padding: 8px 12px;
-      border-radius: 6px;
-      border: 1px solid ${cssVar.colorBorderSecondary};
     `,
     searchResultsList: css`
       display: flex;
@@ -626,13 +620,13 @@ const styles = createStaticStyles(({ css, cssVar }) => {
     searchResultIndex: css`
       font-size: 12px;
       font-weight: 700;
-      color: ${cssVar.colorText};
+      color: #ffffff;
       width: 18px;
     `,
     searchResultLoc: css`
       font-size: 12px;
       font-weight: 600;
-      color: ${cssVar.colorPrimary};
+      color: ${cssVar.colorInfo};
       font-family: ui-monospace, SFMono-Regular, monospace;
     `,
   };

@@ -155,11 +155,12 @@ class CronService:
         for job in self._store.list_jobs():
             if valid_owners and job.owner not in valid_owners:
                 continue
-            # 已完成的一次性任务不进入即将到来。
+            # 已完成且未被推迟至未来的单次任务不进入即将到来。
             runs = self._store.list_runs(job.id)
             latest = _latest_run(runs)
             if job.schedule.kind == "oneshot" and latest is not None:
-                continue
+                if latest.finished_at is not None and job.schedule.at <= latest.finished_at:
+                    continue
             last_run_dt = latest.finished_at if latest is not None else None
             fire = next_run(job, last_run=last_run_dt, now=now)
             upcoming = fire.upcoming
