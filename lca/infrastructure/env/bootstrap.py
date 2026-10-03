@@ -97,6 +97,12 @@ BOOTSTRAP_PREFIXES: tuple[str, ...] = (
     "VAULT_",  # VAULT_ADDR / VAULT_TOKEN
     "COMPOSIO_",  # COMPOSIO_API_KEY / COMPOSIO_AUTH_CONFIG_IDS
     "AVATAR_IMAGE_",  # AVATAR_IMAGE_BASE_URL / _API_KEY / _MODEL / _EDIT_MODEL / _VIDEO_MODEL
+    # Third-party service keys consumed by lca providers: TAVILY_API_KEY
+    # (web search), TYPESAFE_API_KEY (memory pre-filter), CPK_* (intelligence
+    # / telemetry).
+    "TAVILY_",
+    "TYPESAFE_",
+    "CPK_",
 )
 
 BOOTSTRAP_FORBIDDEN: frozenset[str] = frozenset(
