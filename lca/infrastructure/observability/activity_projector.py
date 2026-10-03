@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import contextlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -12,19 +13,8 @@ from lca.contracts.models.observability.activity import (
     ActivityStatus,
 )
 
-# --- Event vocabulary -------------------------------------------------------
-# Spine execution points.
-_START_POINTS = ("phase.tool.call.start", "step.tool_call.record")
-_EXECUTE_START_POINTS = ("body.tool.execute.start",)
-_END_POINTS = ("body.tool.execute.end", "phase.tool.call.end")
-# Gateway catalog events (spec §5.3.1: ToolInvoked carries ``result.state`` natively).
-_CATALOG_START_POINTS = ("ToolStarted", "tool.started.v1")
-_CATALOG_END_POINTS = ("ToolInvoked", "tool.invoked.v1", "ToolDenied", "tool.denied.v1")
 
-_FAILURE_OUTCOMES = ("failure", "failed", "error", "denied")
-
-
-def _category_for(tool_name: str) -> ActivityCategory:
+def _determine_category(tool_name: str) -> ActivityCategory:
     lowered = tool_name.lower()
     if "shell" in lowered or "exec" in lowered:
         return ActivityCategory.COMMAND
@@ -37,313 +27,256 @@ def _category_for(tool_name: str) -> ActivityCategory:
     return ActivityCategory.TOOL
 
 
-def _iso_ts(ts: Any) -> str:
+def _format_iso(val: Any) -> str:
     """Unix timestamp (float/int) -> ISO string; '' when unknown (honest)."""
-    try:
-        if ts is None or ts == "":
-            return ""
-        return datetime.fromtimestamp(float(ts), tz=timezone.utc).isoformat()
-    except (TypeError, ValueError, OverflowError, OSError):
-        return ""
+    if isinstance(val, (int, float)):
+        return datetime.fromtimestamp(val, tz=UTC).isoformat()
+    if isinstance(val, str) and val.strip():
+        return val.strip()
+    return ""
 
 
-def _seed_result_summary(tr: dict[str, Any], status: ActivityStatus) -> str:
-    if status == ActivityStatus.FAILED:
-        err = str(tr.get("error") or "").strip()
-        return f"失败：{err[:120]}" if err else "执行失败（无错误详情）"
-    out = str(tr.get("stdout_head") or tr.get("delta_summary") or "").strip()
-    return (out[:100] + "...") if len(out) > 100 else out
+def _extract_inv_id(
+    event: dict[str, Any], payload: dict[str, Any], tool_calling: dict[str, Any]
+) -> str:
+    return str(
+        event.get("invocation_id")
+        or payload.get("invocation_id")
+        or tool_calling.get("id")
+        or tool_calling.get("invocation_id")
+        or payload.get("tool_call_id")
+        or payload.get("call_id")
+        or tool_calling.get("call_id")
+        or event.get("id")
+        or ""
+    )
 
 
-def _inv_id(payload: dict[str, Any]) -> str:
-    return str(payload.get("invocation_id") or payload.get("tool_call_id") or payload.get("call_id") or "")
+def _extract_tool_name(
+    event: dict[str, Any], payload: dict[str, Any], tool_calling: dict[str, Any]
+) -> str:
+    return str(
+        event.get("tool_name")
+        or payload.get("tool_name")
+        or tool_calling.get("apiName")
+        or tool_calling.get("identifier")
+        or tool_calling.get("name")
+        or ""
+    )
 
 
-def _tool_name(payload: dict[str, Any]) -> str:
-    return str(payload.get("tool_name") or payload.get("tool") or "")
-
-
-def _arguments(payload: dict[str, Any]) -> dict[str, Any]:
-    args = payload.get("arguments")
-    if isinstance(args, dict):
-        return args
-    args = payload.get("args")
-    if isinstance(args, dict):
-        return args
-    params = payload.get("params")
-    if isinstance(params, dict):
-        return params
-    return {}
+def _extract_arguments(
+    event: dict[str, Any], payload: dict[str, Any], tool_calling: dict[str, Any]
+) -> dict[str, Any]:
+    args = event.get("arguments") or payload.get("arguments") or tool_calling.get("arguments") or {}
+    if isinstance(args, str):
+        try:
+            parsed = json.loads(args)
+            if isinstance(parsed, dict):
+                return parsed
+        except Exception:
+            return {"raw": args}
+    return args if isinstance(args, dict) else {}
 
 
 class ActivityProjector:
-    """Pure-function projection engine folding Session/Spine facts into ActivityItem.
+    """Pure-function projection engine folding Session/Spine facts into ActivityItem."""
 
-    Muse 思想：动态是"活"的——start 拍的是意图，execute.start 修正为真实
-    开始时间，end 落的是结果；running 的每一刻都有 current_step 可看。
-    """
-
-    def __init__(self, trace_root: str | Path | None = None) -> None:
+    def __init__(
+        self,
+        cache_path: Path | str | None = None,
+        seed_traces: bool = False,
+    ) -> None:
         # In-memory projection store per assistant: {assistant_id: {item_id: ActivityItem}}
         self._items: dict[str, dict[str, ActivityItem]] = {}
-        # Kernel restarts wipe memory; reseed recent activities from persisted
-        # run journals so the drawer's 「动态」 tab is not empty after a restart.
-        self._trace_root = Path(trace_root) if trace_root else None
+        self._cache_path = Path(cache_path) if cache_path else None
+        self._seed_traces = seed_traces
         self._seeded = False
+        if self._cache_path and self._cache_path.is_file():
+            self._load_cache()
+        if not self._items and self._seed_traces:
+            self.seed_from_traces()
 
-    # ------------------------------------------------------------------ feed
     def feed_event(self, stamped: dict[str, Any]) -> ActivityItem | None:
         event = stamped.get("event") or stamped
-        ep = str(event.get("execution_point") or "")
-        # Catalog (gateway) events carry their name in ``type``, not
-        # ``execution_point`` — this is the wire that was dead before.
-        etype = str(event.get("type") or "")
+        ep = event.get("execution_point")
+        ev_type = str(event.get("type") or "")
         payload = event.get("payload") if isinstance(event.get("payload"), dict) else event
-
-        if ep in _START_POINTS or etype in _CATALOG_START_POINTS:
-            return self._on_start(payload)
-        if ep in _EXECUTE_START_POINTS:
-            return self._on_execute_start(payload)
-        if ep in _END_POINTS or etype in _CATALOG_END_POINTS:
-            return self._on_end(etype or ep, payload)
-        return None
-
-    # ------------------------------------------------------------------ start
-    def _on_start(self, payload: dict[str, Any]) -> ActivityItem | None:
-        inv_id = _inv_id(payload)
-        if not inv_id:
-            return None
-        tool_name = _tool_name(payload)
-        args = _arguments(payload)
-        title, summary, icon = ActivityIntentNamer.name(tool_name, args)
-
-        item = ActivityItem(
-            id=inv_id,
-            run_id=str(payload.get("run_id") or "run_current"),
-            assistant_id=str(payload.get("assistant_id") or "default"),
-            category=_category_for(tool_name),
-            title=title,
-            summary=summary,
-            status=ActivityStatus.RUNNING,
-            # 诚实：没有时间戳就空着，不编造 "2026-10-02T00:00:00Z" 这种假时间
-            start_time=str(payload.get("timestamp") or ""),
-            icon=icon,
-            params=args,
-            tool_name=tool_name,
-            current_step=ActivityIntentNamer.live_step(tool_name, args),
+        tool_calling = (
+            payload.get("toolCalling") if isinstance(payload.get("toolCalling"), dict) else payload
         )
-        self._save(item)
-        return item
 
-    # ---------------------------------------------------------- execute start
-    def _on_execute_start(self, payload: dict[str, Any]) -> ActivityItem | None:
-        """body.tool.execute.start: the tool REALLY started executing now.
+        is_start = ep in ("phase.tool.call.start", "step.tool_call.record") or ev_type in (
+            "ToolStarted",
+            "tool.started.v1",
+        )
+        is_end = ep == "body.tool.execute.end" or ev_type in (
+            "ToolInvoked",
+            "tool.invoked.v1",
+            "ToolDenied",
+            "tool.denied.v1",
+        )
 
-        Refresh start_time to the true execution moment and set the live step.
-        If the start event was missed (gateway restart), synthesize the item so
-        the drawer never shows a dangling end without a row.
-        """
-        inv_id = _inv_id(payload)
-        if not inv_id:
-            return None
-        asst_id = str(payload.get("assistant_id") or "default")
-        ts = str(payload.get("timestamp") or "")
-        existing = self._get(asst_id, inv_id)
-        if existing is None:
-            tool_name = _tool_name(payload)
-            args = _arguments(payload)
+        # Handle Start: phase.tool.call.start / step.tool_call.record / ToolStarted
+        if is_start:
+            inv_id = _extract_inv_id(event, payload, tool_calling)
+            if not inv_id:
+                return None
+            run_id = str(event.get("run_id") or payload.get("run_id") or "run_current")
+            asst_id = str(event.get("assistant_id") or payload.get("assistant_id") or "default")
+            tool_name = _extract_tool_name(event, payload, tool_calling)
+            args = _extract_arguments(event, payload, tool_calling)
             title, summary, icon = ActivityIntentNamer.name(tool_name, args)
+            category = _determine_category(tool_name)
+            ts = _format_iso(
+                event.get("timestamp") or payload.get("timestamp") or event.get("created_at")
+            )
+
             item = ActivityItem(
                 id=inv_id,
-                run_id=str(payload.get("run_id") or "run_current"),
+                run_id=run_id,
                 assistant_id=asst_id,
-                category=_category_for(tool_name),
+                category=category,
                 title=title,
                 summary=summary,
                 status=ActivityStatus.RUNNING,
                 start_time=ts,
                 icon=icon,
                 params=args,
-                tool_name=tool_name,
-                current_step=ActivityIntentNamer.live_step(tool_name, args),
             )
             self._save(item)
             return item
-        updated = self._evolve(
-            existing,
-            start_time=ts or existing.start_time,
-            current_step=ActivityIntentNamer.live_step(existing.tool_name, existing.params),
-        )
-        self._save(updated)
-        return updated
 
-    # -------------------------------------------------------------------- end
-    def _on_end(self, ep: str, payload: dict[str, Any]) -> ActivityItem | None:
-        inv_id = _inv_id(payload)
-        if not inv_id:
-            return None
-        asst_id = str(payload.get("assistant_id") or "default")
-        existing = self._get(asst_id, inv_id)
-        if existing is None:
-            return None
+        # Handle End: body.tool.execute.end / ToolInvoked / ToolDenied
+        if is_end:
+            inv_id = _extract_inv_id(event, payload, tool_calling)
+            if not inv_id:
+                return None
+            asst_id = str(event.get("assistant_id") or payload.get("assistant_id") or "default")
 
-        denied = ep in ("ToolDenied", "tool.denied.v1")
-        outcome = str(payload.get("outcome") or "").lower()
-        ok = payload.get("ok")
+            existing = self._get(asst_id, inv_id) or self._get("default", inv_id)
+            if not existing:
+                for store in self._items.values():
+                    if inv_id in store:
+                        existing = store[inv_id]
+                        break
 
-        if denied:
-            status = ActivityStatus.FAILED
-        elif outcome == "cancelled":
-            status = ActivityStatus.CANCELLED
-        elif isinstance(ok, bool):
-            status = ActivityStatus.COMPLETED if ok else ActivityStatus.FAILED
-        else:
-            status = (
-                ActivityStatus.COMPLETED
-                if outcome not in _FAILURE_OUTCOMES
-                else ActivityStatus.FAILED
+            tool_name = _extract_tool_name(event, payload, tool_calling)
+            args = _extract_arguments(event, payload, tool_calling)
+
+            if not existing:
+                # Synthesize fallback item if start was missed/dropped
+                title, summary, icon = ActivityIntentNamer.name(tool_name, args)
+                category = _determine_category(tool_name)
+                ts = _format_iso(
+                    event.get("timestamp") or payload.get("timestamp") or event.get("created_at")
+                )
+                existing = ActivityItem(
+                    id=inv_id,
+                    run_id=str(event.get("run_id") or payload.get("run_id") or "run_current"),
+                    assistant_id=asst_id,
+                    category=category,
+                    title=title,
+                    summary=summary,
+                    status=ActivityStatus.RUNNING,
+                    start_time=ts,
+                    icon=icon,
+                    params=args,
+                )
+
+            # Determine success / status
+            if ev_type in ("ToolDenied", "tool.denied.v1"):
+                status = ActivityStatus.FAILED
+                res_content = str(
+                    event.get("reason") or payload.get("reason") or "Denied by policy"
+                )
+            else:
+                ok = (
+                    event.get("isSuccess")
+                    if "isSuccess" in event
+                    else (payload.get("ok") if "ok" in payload else event.get("ok"))
+                )
+                outcome = str(payload.get("outcome") or event.get("outcome") or "").lower()
+                is_success = (
+                    ok
+                    if isinstance(ok, bool)
+                    else outcome not in ("failure", "failed", "error", "cancelled")
+                )
+                status = (
+                    ActivityStatus.CANCELLED
+                    if outcome == "cancelled"
+                    else (ActivityStatus.COMPLETED if is_success else ActivityStatus.FAILED)
+                )
+                res_content = ""
+                res_raw = event.get("result") or payload.get("result")
+                if isinstance(res_raw, dict):
+                    state = res_raw.get("state")
+                    if isinstance(state, dict):
+                        res_content = str(state.get("summary") or state.get("content") or "")
+                    if not res_content:
+                        res_content = str(res_raw.get("content") or res_raw.get("error") or "")
+                elif payload.get("message") and isinstance(payload.get("message"), dict):
+                    res_content = str(payload["message"].get("content") or "")
+                elif event.get("output_text"):
+                    res_content = str(event.get("output_text"))
+                if not res_content:
+                    res_content = str(payload.get("error") or "")
+
+            duration_ms = (
+                event.get("executionTime")
+                if event.get("executionTime") is not None
+                else (payload.get("latency_ms") or payload.get("executionTime"))
             )
+            end_time = _format_iso(event.get("timestamp") or payload.get("timestamp"))
 
-        result_summary = self._result_summary(ep, payload, status)
-        updated = self._evolve(
-            existing,
-            status=status,
-            end_time=str(payload.get("timestamp") or ""),
-            duration_ms=payload.get("latency_ms"),
-            result_summary=result_summary,
-            current_step=ActivityProjector._CLEAR,  # 落盘了，不再有"正在干什么"
-        )
-        self._save(updated)
-        return updated
+            updated = ActivityItem(
+                id=existing.id,
+                run_id=existing.run_id,
+                assistant_id=existing.assistant_id,
+                category=existing.category,
+                title=existing.title,
+                summary=existing.summary,
+                status=status,
+                start_time=existing.start_time,
+                end_time=end_time,
+                duration_ms=duration_ms,
+                icon=existing.icon,
+                params=existing.params or args,
+                result_summary=(res_content[:100] + "...")
+                if len(res_content) > 100
+                else res_content,
+                is_system=existing.is_system,
+            )
+            self._save(updated)
+            return updated
 
-    @staticmethod
-    def _result_summary(ep: str, payload: dict[str, Any], status: ActivityStatus) -> str:
-        if ep in ("ToolDenied", "tool.denied.v1"):
-            reason = str(payload.get("reason") or "denied")
-            return f"调用被拒绝：{reason}"
-        if status == ActivityStatus.CANCELLED:
-            return "用户取消了该操作"
-        if status == ActivityStatus.FAILED:
-            err = payload.get("error") or payload.get("message")
-            if isinstance(err, dict):
-                err = err.get("content") or err.get("text") or ""
-            err = str(err or "").strip()
-            return f"失败：{err[:120]}" if err else "执行失败（无错误详情）"
-        # spec §5.3.1: ToolInvoked carries result.state natively
-        result = payload.get("result")
-        state = result.get("state") if isinstance(result, dict) else None
-        content = ""
-        if isinstance(state, dict):
-            content = str(state.get("summary") or state.get("content") or "")
-        if not content:
-            msg = payload.get("message")
-            if isinstance(msg, dict):
-                content = str(msg.get("content") or "")
-            elif msg:
-                content = str(msg)
-        content = content.strip()
-        return (content[:100] + "...") if len(content) > 100 else content
+        return None
 
-    # ------------------------------------------------------------------ cancel
     def cancel_activity(self, assistant_id: str, activity_id: str) -> ActivityItem | None:
         existing = self._get(assistant_id, activity_id)
         if not existing:
             return None
         # 诚实：end_time 不知道就不填，不写 "cancelled" 这种假时间戳
-        cancelled = self._evolve(
-            existing,
+        cancelled = ActivityItem(
+            id=existing.id,
+            run_id=existing.run_id,
+            assistant_id=existing.assistant_id,
+            category=existing.category,
+            title=existing.title,
+            summary=existing.summary,
             status=ActivityStatus.CANCELLED,
-            result_summary="用户取消了该操作",
-            current_step=ActivityProjector._CLEAR,
+            start_time=existing.start_time,
+            end_time=None,
+            duration_ms=existing.duration_ms,
+            icon=existing.icon,
+            params=existing.params,
+            result_summary="User cancelled operation",
+            is_system=existing.is_system,
         )
         self._save(cancelled)
         return cancelled
 
-    def seed_from_traces(self, root_dir: str | Path | None = None, limit: int = 50) -> int:
-        """Rehydrate recent activities from persisted run journals.
-
-        Muse 思想：kernel 重启后动态栏不能是空的——从 trace 里把最近的
-        真实活动捞回来。只取已落盘的 completed/failed；重启时刻"running"
-        的已经死了，显示成 running 就是撒谎，所以不取。
-        Returns the number of activities seeded.
-        """
-        self._seeded = True
-        root = Path(root_dir) if root_dir else self._trace_root
-        if root is None:
-            root = Path("traces/runs")
-        if not root.is_dir():
-            return 0
-
-        try:
-            run_dirs = sorted(
-                [d for d in root.iterdir() if d.is_dir() and d.name.startswith("run_")],
-                key=lambda d: d.stat().st_mtime,
-                reverse=True,
-            )[:limit]
-        except OSError:
-            return 0
-
-        added = 0
-        for rdir in run_dirs:
-            jp = rdir / "journal.json"
-            if not jp.is_file():
-                continue
-            try:
-                with open(jp, encoding="utf-8") as f:
-                    j = json.load(f)
-            except (OSError, json.JSONDecodeError, UnicodeDecodeError, ValueError):
-                continue
-            if not isinstance(j, dict):
-                continue
-            run_id = str(j.get("run_id") or rdir.name)
-            for si, step in enumerate(j.get("steps") or []):
-                if not isinstance(step, dict):
-                    continue
-                calls = step.get("tool_calls") or []
-                results = step.get("tool_results") or []
-                entered = step.get("entered_at")
-                exited = step.get("exited_at")
-                for ci, tc in enumerate(calls):
-                    if not isinstance(tc, dict):
-                        continue
-                    tool_name = str(tc.get("name") or "")
-                    if not tool_name:
-                        continue
-                    tr = results[ci] if ci < len(results) and isinstance(results[ci], dict) else {}
-                    ok = tr.get("ok")
-                    status = (
-                        ActivityStatus.COMPLETED if ok is not False
-                        else ActivityStatus.FAILED
-                    )
-                    args = tc.get("arguments") if isinstance(tc.get("arguments"), dict) else {}
-                    title, summary, icon = ActivityIntentNamer.name(tool_name, args)
-                    item = ActivityItem(
-                        id=f"seed:{run_id}:{si}:{ci}",
-                        run_id=run_id,
-                        assistant_id="default",
-                        category=_category_for(tool_name),
-                        title=title,
-                        summary=summary,
-                        status=status,
-                        start_time=_iso_ts(entered),
-                        end_time=_iso_ts(exited),
-                        duration_ms=tr.get("latency_ms"),
-                        icon=icon,
-                        params=args,
-                        result_summary=_seed_result_summary(tr, status),
-                        tool_name=tool_name,
-                        current_step=None,
-                    )
-                    self._save(item)
-                    added += 1
-        return added
-
-    # ------------------------------------------------------------------- query
     def get_activities(self, assistant_id: str) -> list[ActivityItem]:
-        # Cold start after a kernel restart: pull recent real activities back
-        # from disk once, so the drawer is not empty.
-        if not self._seeded and not self._items:
-            self.seed_from_traces()
         store = self._items.get(assistant_id, {})
         # Gateway tool events historically do not stamp assistant_id, so
         # the projector stores them under "default". Surface those real
@@ -351,41 +284,179 @@ class ActivityProjector:
         # kernel restart even though runs executed through the gateway.
         default_store = self._items.get("default", {})
         merged = {**default_store, **store}
+        if not merged and self._seed_traces and not self._seeded:
+            self.seed_from_traces()
+            store = self._items.get(assistant_id, {})
+            default_store = self._items.get("default", {})
+            merged = {**default_store, **store}
         # Return descending by start_time
         return sorted(merged.values(), key=lambda x: x.start_time, reverse=True)
 
-    # ------------------------------------------------------------------ internals
-    # Sentinel: pass _CLEAR to explicitly reset a field to None.
-    _CLEAR: Any = object()
+    def seed_from_traces(self, root_dir: str | Path = "traces/runs", limit: int = 50) -> int:
+        """Seed activities from recent disk trace journals on restart/cold start."""
+        self._seeded = True
+        root = Path(root_dir)
+        if not root.is_dir():
+            return 0
 
-    def _evolve(self, item: ActivityItem, **changes: Any) -> ActivityItem:
-        """Rebuild a frozen ActivityItem with changed fields.
+        run_to_asst: dict[str, str] = {}
+        db_path = Path("traces/runtime/lca_running_operations.sqlite3")
+        if db_path.is_file():
+            with contextlib.suppress(Exception):
+                import sqlite3
 
-        Pass ``ActivityProjector._CLEAR`` as a value to explicitly reset
-        that field to None (plain None means "keep the old value").
-        """
-        data = item.model_dump()
-        for key, value in changes.items():
-            if value is None:
+                conn = sqlite3.connect(str(db_path))
+                for r in (
+                    conn.cursor()
+                    .execute("SELECT run_id, agent_id FROM lca_running_operations")
+                    .fetchall()
+                ):
+                    if r[0] and r[1] and r[1] not in ("solo", "team"):
+                        run_to_asst[r[0]] = r[1]
+
+        added = 0
+        try:
+            run_dirs = sorted(
+                [d for d in root.iterdir() if d.is_dir() and d.name.startswith("run_")],
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )[:limit]
+        except Exception:
+            return 0
+
+        for rdir in run_dirs:
+            jp = rdir / "journal.json"
+            if not jp.is_file():
                 continue
-            data[key] = None if value is self._CLEAR else value
-        return ActivityItem(**data)
+            j = None
+            with (
+                contextlib.suppress(OSError, json.JSONDecodeError, UnicodeDecodeError),
+                open(jp, encoding="utf-8") as f,
+            ):
+                j = json.load(f)
+            if not isinstance(j, dict):
+                continue
+
+            run_id = str(j.get("run_id") or rdir.name)
+            asst_id = run_to_asst.get(run_id, "default")
+            steps = j.get("steps") or []
+            for s in steps:
+                if not isinstance(s, dict):
+                    continue
+                tcs = s.get("tool_calls") or []
+                trs = {
+                    tr.get("invocation_id"): tr
+                    for tr in (s.get("tool_results") or [])
+                    if isinstance(tr, dict) and tr.get("invocation_id")
+                }
+                step_entered = s.get("entered_at")
+                if isinstance(step_entered, (int, float)):
+                    start_time = datetime.fromtimestamp(step_entered, tz=UTC).isoformat()
+                else:
+                    start_time = str(step_entered or "2026-10-03T00:00:00Z")
+
+                for tc in tcs:
+                    if not isinstance(tc, dict):
+                        continue
+                    inv_id = str(tc.get("invocation_id") or "")
+                    if not inv_id:
+                        continue
+                    tool_name = str(tc.get("name") or tc.get("tool_name") or "")
+                    args = tc.get("arguments") if isinstance(tc.get("arguments"), dict) else {}
+                    title, summary, icon = ActivityIntentNamer.name(tool_name, args)
+                    category = _determine_category(tool_name)
+
+                    status = ActivityStatus.COMPLETED
+                    duration_ms = None
+                    result_summary = None
+                    tr = trs.get(inv_id)
+                    if tr:
+                        is_ok = tr.get("ok", True)
+                        status = ActivityStatus.COMPLETED if is_ok else ActivityStatus.FAILED
+                        duration_ms = tr.get("latency_ms")
+                        res_content = str(
+                            tr.get("delta_summary")
+                            or tr.get("stdout_head")
+                            or tr.get("error")
+                            or ""
+                        )
+                        result_summary = (
+                            (res_content[:100] + "...")
+                            if len(res_content) > 100
+                            else (res_content or None)
+                        )
+
+                    item = ActivityItem(
+                        id=inv_id,
+                        run_id=run_id,
+                        assistant_id=asst_id,
+                        category=category,
+                        title=title,
+                        summary=summary,
+                        status=status,
+                        start_time=start_time,
+                        end_time=start_time,
+                        duration_ms=duration_ms,
+                        icon=icon,
+                        params=args,
+                        result_summary=result_summary,
+                    )
+                    if asst_id not in self._items:
+                        self._items[asst_id] = {}
+                    if item.id not in self._items[asst_id]:
+                        self._items[asst_id][item.id] = item
+                        added += 1
+
+        if added > 0:
+            self._save_cache()
+        return added
 
     def _save(self, item: ActivityItem) -> None:
         if item.assistant_id not in self._items:
             self._items[item.assistant_id] = {}
         self._items[item.assistant_id][item.id] = item
+        self._save_cache()
 
     def _get(self, assistant_id: str, item_id: str) -> ActivityItem | None:
-        # Gateway events historically do not stamp assistant_id: fall back to
-        # the "default" bucket so an end event can always find its start.
-        item = self._items.get(assistant_id, {}).get(item_id)
-        if item is None and assistant_id != "default":
-            item = self._items.get("default", {}).get(item_id)
-        return item
+        return self._items.get(assistant_id, {}).get(item_id)
+
+    def _load_cache(self) -> None:
+        if not self._cache_path or not self._cache_path.is_file():
+            return
+        with (
+            contextlib.suppress(OSError, json.JSONDecodeError, UnicodeDecodeError),
+            open(self._cache_path, encoding="utf-8") as f,
+        ):
+            data = json.load(f)
+            if isinstance(data, dict):
+                for asst_id, items_dict in data.items():
+                    if isinstance(items_dict, dict):
+                        if asst_id not in self._items:
+                            self._items[asst_id] = {}
+                        for i_id, item_raw in items_dict.items():
+                            if isinstance(item_raw, dict):
+                                with contextlib.suppress(Exception):
+                                    self._items[asst_id][i_id] = ActivityItem(**item_raw)
+
+    def _save_cache(self) -> None:
+        if not self._cache_path:
+            return
+        with contextlib.suppress(OSError, TypeError):
+            self._cache_path.parent.mkdir(parents=True, exist_ok=True)
+            serializable = {
+                asst_id: {i_id: item.model_dump() for i_id, item in items.items()}
+                for asst_id, items in self._items.items()
+            }
+            tmp = self._cache_path.with_suffix(".tmp")
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(serializable, f, ensure_ascii=False, indent=2)
+            tmp.replace(self._cache_path)
 
 
-_GLOBAL_PROJECTOR = ActivityProjector()
+_GLOBAL_PROJECTOR = ActivityProjector(
+    cache_path=Path("traces/runtime/activity_cache.json"),
+    seed_traces=True,
+)
 
 
 def get_global_activity_projector() -> ActivityProjector:

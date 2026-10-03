@@ -92,3 +92,22 @@ def test_assistant_status_drawer_refresh_binding_no_undefined_identifiers() -> N
     # Regression: fetchStandingFiles must not be referenced as undefined identifier
     assert "fetchStandingFiles" not in content
     assert "onClick={fetchStatusSnapshot}" in content
+
+
+def test_assistant_status_drawer_activity_detail_contract() -> None:
+    path = _get_drawer_tsx_path()
+    content = path.read_text(encoding="utf-8")
+
+    # 点击单个 item 弹窗只展示当前活动/运行内部的思考与调用概要，不再展示跨 run 全局行动列表
+    assert "本次思考与调用概要" in content
+    assert "近期行动列表" not in content
+
+    # 弹窗标题与内容绝不出现“人读”字样或“Agent 行动记录与人读日志”
+    assert "Agent 行动记录与人读日志" not in content
+    assert "人读执行概述" not in content
+    assert "人读" not in content
+
+    # 弹窗标题绑定为选中 item 的具体概要标题
+    assert "selectedActivity.title" in content
+    # 右侧展示具体情况的清晰文本说明
+    assert "具体情况详细说明" in content

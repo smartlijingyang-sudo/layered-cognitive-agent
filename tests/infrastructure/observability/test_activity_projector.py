@@ -83,7 +83,7 @@ def test_projector_cancel_and_determinism():
     cancelled = p1.cancel_activity("architect", "call_sub")
     assert cancelled is not None
     assert cancelled.status == ActivityStatus.CANCELLED
-    assert cancelled.result_summary == "用户取消了该操作"
+    assert cancelled.result_summary == "User cancelled operation"
 
 
 def test_get_activities_falls_back_to_unstamped_default_bucket():
@@ -106,3 +106,79 @@ def test_get_activities_falls_back_to_unstamped_default_bucket():
     assert len(items) == 1
     assert items[0].id == "call_default"
     assert items[0].assistant_id == "default"
+
+
+def test_activity_projector_disk_cache_roundtrip(tmp_path):
+    cache_file = tmp_path / "activity_cache.json"
+    p1 = ActivityProjector(cache_path=cache_file, seed_traces=False)
+
+    ev = {
+        "execution_point": "phase.tool.call.start",
+        "payload": {
+            "invocation_id": "call_cached_1",
+            "run_id": "run_cache",
+            "assistant_id": "asst_cache",
+            "tool_name": "tool_search",
+            "arguments": {"query": "git"},
+            "timestamp": "2026-10-03T12:00:00Z",
+        },
+    }
+    p1.feed_event(ev)
+    assert cache_file.is_file()
+
+    # Re-instantiate projector and verify items are loaded from cache
+    p2 = ActivityProjector(cache_path=cache_file, seed_traces=False)
+    cached_items = p2.get_activities("asst_cache")
+    assert len(cached_items) == 1
+    assert cached_items[0].id == "call_cached_1"
+    assert cached_items[0].title == "发现与检索工具"
+
+
+def test_activity_projector_seed_from_traces(tmp_path):
+    # Setup mock trace run directory
+    run_dir = tmp_path / "run_test_abc"
+    run_dir.mkdir(parents=True)
+    journal_path = run_dir / "journal.json"
+
+    import json
+
+    mock_journal = {
+        "run_id": "run_test_abc",
+        "started_at": 1791000000.0,
+        "steps": [
+            {
+                "step_index": 1,
+                "entered_at": 1791000000.0,
+                "exited_at": 1791000005.0,
+                "duration_ms": 5000,
+                "tool_calls": [
+                    {
+                        "name": "GITHUB_LIST_COMMITS",
+                        "invocation_id": "toolu_abc_1",
+                        "arguments": {"owner": "test", "repo": "test-repo"},
+                    }
+                ],
+                "tool_results": [
+                    {
+                        "invocation_id": "toolu_abc_1",
+                        "ok": True,
+                        "latency_ms": 320,
+                        "stdout_head": "commit history",
+                        "delta_summary": "Found 10 commits",
+                    }
+                ],
+            }
+        ],
+    }
+    journal_path.write_text(json.dumps(mock_journal), encoding="utf-8")
+
+    projector = ActivityProjector(cache_path=None, seed_traces=False)
+    added = projector.seed_from_traces(root_dir=tmp_path)
+    assert added == 1
+
+    items = projector.get_activities("any_assistant")
+    assert len(items) == 1
+    assert items[0].id == "toolu_abc_1"
+    assert items[0].title == "查询 GitHub 提交记录"
+    assert items[0].status == ActivityStatus.COMPLETED
+    assert items[0].duration_ms == 320

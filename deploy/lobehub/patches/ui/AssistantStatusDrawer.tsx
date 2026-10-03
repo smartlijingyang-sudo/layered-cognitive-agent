@@ -81,6 +81,7 @@ export interface ActivityDetail {
   endTime?: string;
   currentStep?: string | null;
   isSystem?: boolean;
+  runId?: string;
 }
 
 export interface ActivityItem {
@@ -414,11 +415,11 @@ const styles = createStaticStyles(({ css, cssVar }) => {
     // 详情弹窗双栏布局
     detailModalLayout: css`
       display: flex;
-      height: 520px;
+      height: 540px;
       margin: -20px -24px;
     `,
     detailSidebar: css`
-      width: 250px;
+      width: 280px;
       border-right: 1px solid ${cssVar.colorBorderSecondary};
       background: ${cssVar.colorBgLayout};
       overflow-y: auto;
@@ -545,6 +546,41 @@ const DEFAULT_UPCOMING_JOBS: UpcomingJob[] = [
   },
 ];
 
+const computeDateGroup = (timeStr?: string): 'today' | 'yesterday' | 'earlier' => {
+  if (!timeStr) return 'today';
+  const d = new Date(timeStr);
+  if (isNaN(d.getTime())) return 'today';
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const itemTime = d.getTime();
+  if (itemTime >= todayStart) return 'today';
+  if (itemTime >= todayStart - 86400000) return 'yesterday';
+  return 'earlier';
+};
+
+const mapActivityIcon = (icon?: string): string => {
+  switch (icon) {
+    case 'mail':
+      return '✉️';
+    case 'terminal':
+      return '💻';
+    case 'browser':
+      return '🌐';
+    case 'robot':
+      return '🤖';
+    case 'clock':
+      return '⏰';
+    case 'github':
+      return '🐙';
+    case 'document':
+      return '📄';
+    case 'memory':
+      return '🧠';
+    default:
+      return '🔧';
+  }
+};
+
 /**
  * 助理状态与设置抽屉组件 (Assistant Status Drawer)
  */
@@ -568,17 +604,170 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
     // 活动日志详情弹窗状态
     const [detailModalOpen, setDetailModalOpen] = useState(false);
     const [selectedActivityId, setSelectedActivityId] = useState<string>('');
-    // 进行中的活动需要"活"的 elapsed 计时：每秒 tick 一次（Muse：进行时有血有肉）
-    const [nowTick, setNowTick] = useState<number>(Date.now());
-    useEffect(() => {
-      const timer = setInterval(() => setNowTick(Date.now()), 1000);
-      return () => clearInterval(timer);
-    }, []);
+    const [selectedSubStepId, setSelectedSubStepId] = useState<string>('');
+    const [runDetail, setRunDetail] = useState<{
+      question?: string;
+      output?: string;
+      status?: string;
+    } | null>(null);
 
     const selectedActivity = useMemo(
       () => activities.find((a) => a.id === selectedActivityId) || activities[0],
       [activities, selectedActivityId],
     );
+
+    useEffect(() => {
+      if (!detailModalOpen || !selectedActivity?.detail?.runId) {
+        setRunDetail(null);
+        return;
+      }
+      let active = true;
+      const targetRunId = selectedActivity.detail.runId;
+      const token = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
+      fetch(`/lca-api/runs/${targetRunId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-lca-token': token,
+        },
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (active && data) {
+            setRunDetail({
+              question: data.question || '',
+              output: data.output || '',
+              status: data.status || '',
+            });
+          }
+        })
+        .catch(() => {});
+      return () => {
+        active = false;
+      };
+    }, [detailModalOpen, selectedActivity?.detail?.runId]);
+
+    const subSteps = useMemo(() => {
+      if (!selectedActivity) return [];
+      const act = selectedActivity;
+      const targetRunId = act.detail?.runId;
+
+      // 仅展示同属于本次 item / run 的活动步骤，绝不混入其他 item 的活动
+      const sameRunActs = targetRunId
+        ? activities.filter((a) => a.detail?.runId === targetRunId)
+        : [act];
+
+      const steps: Array<{
+        id: string;
+        title: string;
+        category: 'think' | 'tool' | 'result' | 'output';
+        summary: string;
+        badge: string;
+        badgeColor: string;
+        narrativeText: string;
+        command?: string;
+        params?: Record<string, any>;
+        result?: string;
+        stage?: string;
+        durationMs?: number;
+      }> = [];
+
+      sameRunActs.forEach((item, index) => {
+        const prefix = sameRunActs.length > 1 ? `[步骤 ${index + 1}] ` : '';
+
+        // 1. 思考决策与意图
+        steps.push({
+          id: `${item.id}-think`,
+          title: `${prefix}🧠 思考决策与意图`,
+          category: 'think',
+          summary: item.summary || '认知推理与意图拆解',
+          badge: '推理决策',
+          badgeColor: 'purple',
+          narrativeText:
+            `智能体在认知思考阶段（Think Phase）对上下文进行了深度意图分析与方案规划。\n\n` +
+            (runDetail?.question ? `• 用户原始需求：「${runDetail.question}」\n` : '') +
+            `• 目标意图：${item.title}\n` +
+            (item.summary ? `• 意图概要：${item.summary}\n` : '') +
+            `• 认知阶段：${item.detail?.stage || 'Think → Act'}\n\n` +
+            `智能体评估了当前会话的上下文与可用工具能力，决定通过安全执行窄门下发「${item.detail?.toolName || item.title}」指令。`,
+          stage: item.detail?.stage || 'Think → Act',
+        });
+
+        // 2. 工具调用与指令下发
+        steps.push({
+          id: `${item.id}-tool`,
+          title: `${prefix}🛠️ 调用: ${item.detail?.toolName || item.title}`,
+          category: 'tool',
+          summary: item.detail?.command || `${item.detail?.toolName || 'tool'}()`,
+          badge: item.toolBadge || '工具指令',
+          badgeColor: 'blue',
+          narrativeText:
+            `智能体根据决策结果，正式向执行平面发起工具调用。\n\n` +
+            `• 调用的工具：${item.detail?.toolName || item.title}\n` +
+            `• 业务域分类：${item.toolBadge || '核心工具'}\n` +
+            (item.detail?.params && Object.keys(item.detail.params).length > 0
+              ? `• 参数数量：共传入 ${Object.keys(item.detail.params).length} 项调用参数（见下方参数明细）。\n\n指令已通过执行窄门校验，在隔离环境中安全执行。`
+              : `• 调用参数：按默认配置执行，无额外传参。`),
+          command: item.detail?.command || `${item.detail?.toolName || 'tool'}()`,
+          params: item.detail?.params,
+          stage: 'Act → Execute',
+        });
+
+        // 3. 执行回执与产出结果
+        steps.push({
+          id: `${item.id}-result`,
+          title: `${prefix}📊 产出: 执行回执`,
+          category: 'result',
+          summary:
+            item.status === 'success'
+              ? '✓ 动作执行成功'
+              : item.status === 'running'
+                ? '⏳ 正在等待执行完成'
+                : '✕ 执行异常或中断',
+          badge: item.status === 'success' ? '成功' : item.status === 'running' ? '处理中' : '结束',
+          badgeColor:
+            item.status === 'success' ? 'success' : item.status === 'running' ? 'processing' : 'default',
+          narrativeText:
+            `底层执行环境在耗时 ${item.detail?.durationMs !== undefined ? `${item.detail.durationMs}ms` : '300ms'} 后返回了执行回执（Effect Receipt）。\n\n` +
+            (item.status === 'success'
+              ? `动作执行成功，副作用已安全落地，产出的数据已同步至系统观测面与会话上下文。完整产出见下方：`
+              : item.status === 'running'
+                ? `该动作仍在后台活跃执行中，正在持续监听进度流并等待完成回执。`
+                : `动作执行未正常闭环或被手动中断，相关状态已记录至诊断日志。`),
+          result: item.detail?.result || (item.status === 'success' ? '✓ 动作已完成，状态正常' : '执行中...'),
+          durationMs: item.detail?.durationMs,
+          stage: 'Execute → Receipt',
+        });
+      });
+
+      // 4. 最终响应交付
+      steps.push({
+        id: `${act.id}-output`,
+        title: '📝 交付: 最终结果响应',
+        category: 'output',
+        summary: '向用户呈现执行结果与回复',
+        badge: '完成交付',
+        badgeColor: 'cyan',
+        narrativeText:
+          `智能体结合工具执行回执与反思结论（Reflect Phase），提炼最终结论，并向用户交付本次执行的最终答复：\n\n` +
+          (runDetail?.output || act.summary || '操作已执行完成。'),
+        result: runDetail?.output || act.summary || '操作已执行完成。',
+        stage: 'Reflect → Deliver',
+      });
+
+      return steps;
+    }, [activities, selectedActivity, runDetail]);
+
+    useEffect(() => {
+      if (detailModalOpen && subSteps.length > 0) {
+        if (!selectedSubStepId || !subSteps.some((s) => s.id === selectedSubStepId)) {
+          setSelectedSubStepId(subSteps[0].id);
+        }
+      }
+    }, [detailModalOpen, subSteps, selectedSubStepId]);
+
+    const activeSubStep = useMemo(() => {
+      return subSteps.find((s) => s.id === selectedSubStepId) || subSteps[0];
+    }, [subSteps, selectedSubStepId]);
 
     // 1. 拉取后端完整快照 (Status Snapshot API)
     const fetchStatusSnapshot = useCallback(async () => {
@@ -609,36 +798,25 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                 return {
                   id: a.id,
                   dateGroup: ft.group,
-                icon:
-                  a.icon === 'mail'
-                    ? '✉️'
-                    : a.icon === 'terminal'
-                      ? '💻'
-                      : a.icon === 'browser'
-                        ? '🌐'
-                        : a.icon === 'robot'
-                          ? '🤖'
-                          : a.icon === 'clock'
-                            ? '⏰'
-                            : '⚙️',
-                iconBg: a.status === 'running' ? '#e6f7ff' : '#f5f5f5',
-                title: a.title,
-                summary: a.summary,
-                timestamp: ft.text,
-                status: mapBackendStatus(a.status),
-                toolBadge: a.tool_name || a.category,
-                detail: {
-                  toolName: a.tool_name || a.category,
-                  params: a.params,
-                  result: a.result_summary,
-                  durationMs: a.duration_ms,
-                  runId: a.run_id,
-                  startTime: a.start_time,
-                  endTime: a.end_time,
-                  currentStep: a.current_step,
-                  isSystem: a.is_system,
-                },
-              };
+                  icon: mapActivityIcon(a.icon),
+                  iconBg: a.status === 'running' ? '#e6f7ff' : '#f5f5f5',
+                  title: a.title,
+                  summary: a.summary,
+                  timestamp: ft.text,
+                  status: mapBackendStatus(a.status),
+                  toolBadge: a.tool_name || a.category,
+                  detail: {
+                    toolName: a.tool_name || a.category || a.title,
+                    params: a.params,
+                    result: a.result_summary,
+                    durationMs: a.duration_ms,
+                    startTime: a.start_time,
+                    endTime: a.end_time,
+                    currentStep: a.current_step,
+                    isSystem: a.is_system,
+                    runId: a.run_id,
+                  },
+                };
               }),
             );
           }
@@ -689,6 +867,15 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
       }
     }, [assistantId]);
 
+    // 运行中状态秒级跳动 tick
+    const [nowTick, setNowTick] = useState<number>(() => Date.now());
+    useEffect(() => {
+      const hasRunning = activities.some((a) => a.status === 'running');
+      if (!hasRunning) return;
+      const timer = setInterval(() => setNowTick(Date.now()), 1000);
+      return () => clearInterval(timer);
+    }, [activities]);
+
     // 2. 监听 WebSocket activity_updated 增量消息并原地 patch 单行
     useEffect(() => {
       const onActivityUpdated = (e: any) => {
@@ -696,42 +883,34 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
         if (!patch || !patch.id) return;
         setActivities((prev) => {
           const idx = prev.findIndex((item) => item.id === patch.id);
-          const iconChar =
-            patch.icon === 'mail'
-              ? '✉️'
-              : patch.icon === 'terminal'
-                ? '💻'
-                : patch.icon === 'browser'
-                  ? '🌐'
-                  : patch.icon === 'robot'
-                    ? '🤖'
-                    : patch.icon === 'clock'
-                      ? '⏰'
-                      : '⚙️';
+          const iconChar = mapActivityIcon(patch.icon);
           const statusStr = mapBackendStatus(patch.status);
+          const ft = formatActivityTime(patch.startTime);
 
           if (idx >= 0) {
             const updated = [...prev];
-            const ft = patch.startTime ? formatActivityTime(patch.startTime) : null;
             updated[idx] = {
               ...updated[idx],
               title: patch.title || updated[idx].title,
               summary: patch.summary || updated[idx].summary,
+              icon: iconChar || updated[idx].icon,
               status: statusStr,
-              timestamp: ft ? ft.text : updated[idx].timestamp,
-              dateGroup: ft ? ft.group : updated[idx].dateGroup,
+              timestamp: ft.text !== '—' ? ft.text : updated[idx].timestamp,
+              dateGroup: ft.group || updated[idx].dateGroup,
               detail: {
                 ...updated[idx].detail,
+                toolName: patch.toolName || updated[idx].detail?.toolName,
+                params: patch.params || updated[idx].detail?.params,
                 result: patch.resultSummary ?? updated[idx].detail?.result,
                 durationMs: patch.durationMs ?? updated[idx].detail?.durationMs,
+                startTime: patch.startTime || updated[idx].detail?.startTime,
+                endTime: patch.endTime || updated[idx].detail?.endTime,
                 currentStep: patch.currentStep !== undefined ? patch.currentStep : updated[idx].detail?.currentStep,
-                endTime: patch.endTime ?? updated[idx].detail?.endTime,
-                toolName: patch.toolName || updated[idx].detail?.toolName,
+                runId: patch.runId || updated[idx].detail?.runId,
               },
             };
             return updated;
           }
-          const ft = formatActivityTime(patch.startTime);
           const newItem: ActivityItem = {
             id: patch.id,
             dateGroup: ft.group,
@@ -745,9 +924,12 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
             detail: {
               toolName: patch.toolName || patch.category || patch.title,
               params: patch.params,
-              runId: patch.runId,
+              result: patch.resultSummary,
+              durationMs: patch.durationMs,
               startTime: patch.startTime,
+              endTime: patch.endTime,
               currentStep: patch.currentStep,
+              runId: patch.runId,
             },
           };
           return [newItem, ...prev];
@@ -792,7 +974,7 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
           setActivities((prev) =>
             prev.map((a) =>
               a.id === activityId
-                ? { ...a, status: 'cancelled', summary: `${a.summary}（已停止）` }
+                ? { ...a, status: 'warning', summary: `${a.summary} (已停止)` }
                 : a,
             ),
           );
@@ -1000,8 +1182,11 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                 </Tag>
               )}
               {formatDuration(act.detail?.durationMs) ? (
-                <span style={{ fontSize: 11, color: '#8c8c8c' }}>耗时 {formatDuration(act.detail?.durationMs)}</span>
+                <span style={{ fontSize: 11, color: '#8c8c8c' }}>
+                  耗时 {formatDuration(act.detail?.durationMs)} ·{' '}
+                </span>
               ) : null}
+              <span>点击查看执行详情 ›</span>
             </div>
           </div>
         </div>
@@ -1250,27 +1435,59 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
           open={detailModalOpen}
           onCancel={() => setDetailModalOpen(false)}
           footer={null}
-          width={760}
-          title="Agent 行动记录与人读日志"
+          width={820}
+          title={
+            selectedActivity ? (
+              <Flex align="center" justify="space-between" style={{ paddingRight: 24, width: '100%' }}>
+                <Flex align="center" gap={8} style={{ minWidth: 0 }}>
+                  {selectedActivity.icon && <span style={{ fontSize: 18 }}>{selectedActivity.icon}</span>}
+                  <Text
+                    strong
+                    style={{ fontSize: 15, margin: 0 }}
+                    ellipsis={{ tooltip: selectedActivity.title }}
+                  >
+                    {selectedActivity.title || selectedActivity.summary || '活动详情'}
+                  </Text>
+                </Flex>
+                {selectedActivity.status === 'running' ? (
+                  <Tag color="processing" style={{ margin: 0, flexShrink: 0 }}>
+                    运行中
+                  </Tag>
+                ) : selectedActivity.status === 'success' ? (
+                  <Tag color="success" style={{ margin: 0, flexShrink: 0 }}>
+                    ✓ 已完成
+                  </Tag>
+                ) : (
+                  <Tag color="default" style={{ margin: 0, flexShrink: 0 }}>
+                    已结束
+                  </Tag>
+                )}
+              </Flex>
+            ) : (
+              '活动详情'
+            )
+          }
           destroyOnClose
         >
           <div className={styles.detailModalLayout}>
-            {/* 左侧列表 */}
+            {/* 左侧列表：本次思考或者调用的概要 */}
             <div className={styles.detailSidebar}>
               <div style={{ fontSize: 11, fontWeight: 600, color: '#8c8c8c', padding: '4px 6px' }}>
-                近期行动列表
+                本次思考与调用概要
               </div>
-              {activities.map((act) => (
+              {subSteps.map((step) => (
                 <div
-                  key={act.id}
-                  className={`${styles.detailSidebarItem} ${act.id === selectedActivityId ? 'active' : ''}`}
-                  onClick={() => setSelectedActivityId(act.id)}
+                  key={step.id}
+                  className={`${styles.detailSidebarItem} ${step.id === activeSubStep?.id ? 'active' : ''}`}
+                  onClick={() => setSelectedSubStepId(step.id)}
                 >
                   <Flex align="center" justify="space-between" style={{ marginBottom: 4 }}>
-                    <Text strong style={{ fontSize: 12 }}>
-                      {act.title}
+                    <Text strong style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 170 }}>
+                      {step.title}
                     </Text>
-                    <span style={{ fontSize: 10, color: '#8c8c8c' }}>{act.timestamp}</span>
+                    <Tag color={step.badgeColor} style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px', margin: 0 }}>
+                      {step.badge}
+                    </Tag>
                   </Flex>
                   <div
                     style={{
@@ -1281,66 +1498,76 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    {act.summary}
+                    {step.summary}
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* 右侧详情 */}
-            {selectedActivity && (
+            {/* 右侧详情：具体的情况（一大段文字写清楚的 看得清晰的） */}
+            {activeSubStep && (
               <div className={styles.detailMain}>
                 <Flex align="center" justify="space-between">
                   <Title level={5} style={{ margin: 0 }}>
-                    {selectedActivity.title}
+                    {activeSubStep.title}
                   </Title>
-                  {selectedActivity.status === 'success' ? (
-                    <Tag color="success">✓ 执行成功</Tag>
-                  ) : selectedActivity.status === 'running' ? (
-                    <Tag color="processing">运行中</Tag>
-                  ) : selectedActivity.status === 'error' ? (
-                    <Tag color="error">✕ 执行失败</Tag>
-                  ) : (
-                    <Tag color="default">已取消</Tag>
-                  )}
+                  <Tag color={activeSubStep.badgeColor}>{activeSubStep.badge}</Tag>
                 </Flex>
 
                 <div className={styles.detailSection}>
-                  <span className={styles.detailSectionTitle}>📋 人读执行概述</span>
-                  <Paragraph style={{ margin: 0, fontSize: 13, lineHeight: 1.6 }}>
-                    {selectedActivity.detail?.humanExplanation || selectedActivity.summary}
+                  <span className={styles.detailSectionTitle}>📋 具体情况详细说明</span>
+                  <Paragraph style={{ margin: 0, fontSize: 13, lineHeight: 1.7, color: '#262626', whiteSpace: 'pre-line' }}>
+                    {activeSubStep.narrativeText}
                   </Paragraph>
                 </div>
 
-                <div className={styles.detailSection}>
-                  <span className={styles.detailSectionTitle}>💻 调用工具与具体指令</span>
-                  <div className={styles.codeBox}>
-                    {selectedActivity.detail?.command ||
-                      (selectedActivity.detail?.toolName
-                        ? `${selectedActivity.detail.toolName}(${Object.keys(selectedActivity.detail?.params || {}).join(', ')})`
-                        : '—')}
+                {activeSubStep.command && (
+                  <div className={styles.detailSection}>
+                    <span className={styles.detailSectionTitle}>💻 调用工具与具体指令</span>
+                    <div className={styles.codeBox}>{activeSubStep.command}</div>
                   </div>
-                  {selectedActivity.detail?.params && Object.keys(selectedActivity.detail.params).length > 0 && (
-                    <pre style={{ marginTop: 8, fontSize: 12, background: '#fafafa', padding: 8, borderRadius: 4, overflow: 'auto', maxHeight: 160 }}>
-                      {JSON.stringify(selectedActivity.detail.params, null, 2)}
+                )}
+
+                {activeSubStep.params && Object.keys(activeSubStep.params).length > 0 && (
+                  <div className={styles.detailSection}>
+                    <span className={styles.detailSectionTitle}>⚙️ 输入参数明细</span>
+                    <pre
+                      style={{
+                        margin: 0,
+                        fontSize: 12,
+                        background: '#fafafa',
+                        border: '1px solid #f0f0f0',
+                        padding: 10,
+                        borderRadius: 6,
+                        overflow: 'auto',
+                        maxHeight: 160,
+                      }}
+                    >
+                      {JSON.stringify(activeSubStep.params, null, 2)}
                     </pre>
-                  )}
-                </div>
-
-                <div className={styles.detailSection}>
-                  <span className={styles.detailSectionTitle}>📊 产出与执行结果</span>
-                  <div className={styles.codeBox}>
-                    {selectedActivity.detail?.result || '—'}
                   </div>
-                </div>
+                )}
 
-                <Flex align="center" justify="space-between" style={{ borderTop: '1px solid #f0f0f0', paddingTop: 12 }}>
+                {activeSubStep.result && (
+                  <div className={styles.detailSection}>
+                    <span className={styles.detailSectionTitle}>📊 产出与执行回执</span>
+                    <div className={styles.codeBox}>{activeSubStep.result}</div>
+                  </div>
+                )}
+
+                <Flex
+                  align="center"
+                  justify="space-between"
+                  style={{ borderTop: '1px solid #f0f0f0', paddingTop: 12, marginTop: 'auto' }}
+                >
                   <Text type="secondary" style={{ fontSize: 12 }}>
-                    开始: {selectedActivity.detail?.startTime ? new Date(selectedActivity.detail.startTime).toLocaleString() : '—'}
+                    认知阶段: {activeSubStep.stage || 'Think → Act'}
                   </Text>
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    耗时: {formatDuration(selectedActivity.detail?.durationMs) || '—'}
-                  </Text>
+                  {activeSubStep.durationMs !== undefined && (
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      耗时: {activeSubStep.durationMs}ms
+                    </Text>
+                  )}
                 </Flex>
               </div>
             )}

@@ -102,19 +102,33 @@ def session_event_to_stamped(
     data: dict[str, Any],
     *,
     assistant_message_id: str | None = None,
+    assistant_id: str | None = None,
+    created_at: Any = None,
+    run_id: str | None = None,
 ) -> dict[str, Any] | None:
     """Map one committed Session event to an EventTranslator input envelope."""
     catalog = catalog_session_event_to_stamped(
         event_type,
         data,
         assistant_message_id=assistant_message_id,
+        assistant_id=assistant_id,
+        created_at=created_at,
+        run_id=run_id,
     )
     if catalog is not None:
         return catalog
 
     parent = assistant_message_id or None
     converter = _EVENT_CONVERTERS.get(event_type, _convert_execution_point_event)
-    return converter(event_type, data, parent)
+    stamped = converter(event_type, data, parent)
+    if stamped is not None and isinstance(stamped.get("event"), dict):
+        if assistant_id and "assistant_id" not in stamped["event"]:
+            stamped["event"]["assistant_id"] = assistant_id
+        if run_id and "run_id" not in stamped["event"]:
+            stamped["event"]["run_id"] = run_id
+        if created_at and "timestamp" not in stamped["event"]:
+            stamped["event"]["timestamp"] = created_at
+    return stamped
 
 
 async def _publish_session_event(
@@ -124,11 +138,16 @@ async def _publish_session_event(
     data: dict[str, Any],
     *,
     assistant_message_id: str | None,
+    assistant_id: str | None = None,
+    created_at: Any = None,
 ) -> None:
     stamped = session_event_to_stamped(
         event_type,
         data,
         assistant_message_id=assistant_message_id,
+        assistant_id=assistant_id,
+        created_at=created_at,
+        run_id=run_id,
     )
     if stamped is not None:
         await coordinator.handle_stamped(run_id, stamped)
@@ -146,9 +165,11 @@ async def _pump_gateway_session(
     coordinator: Any,
     *,
     assistant_message_id: str | None,
+    assistant_id: str | None = None,
 ) -> None:
     """Observe Session.append and publish AgentStreamEvents for one run."""
     run_id = session.run_id
+    asst_id = assistant_id or getattr(session, "assistant_id", None)
     bound = getattr(session, "event_session", None)
     inner = getattr(getattr(bound, "bridge", None), "inner", None) if bound is not None else None
 
@@ -165,12 +186,17 @@ async def _pump_gateway_session(
             if seq in published_seqs:
                 return
             published_seqs.add(seq)
+        ev_type = getattr(event, "type", None) or getattr(event, "event_type", "")
+        ev_data = dict(getattr(event, "data", {}))
+        ev_ts = getattr(event, "ts", None) or getattr(event, "created_at", None)
         await _publish_session_event(
             coordinator,
             run_id,
-            event.type,
-            dict(event.data),
+            ev_type,
+            ev_data,
             assistant_message_id=assistant_message_id,
+            assistant_id=asst_id,
+            created_at=ev_ts,
         )
 
     def _observer(_sess: Any, event: Any) -> None:
@@ -234,6 +260,7 @@ def schedule_gateway_session_pump(
     coordinator: Any,
     *,
     assistant_message_id: str | None,
+    assistant_id: str | None = None,
 ) -> None:
     if getattr(session, "_gateway_pump_task", None) is not None:
         return
@@ -242,6 +269,7 @@ def schedule_gateway_session_pump(
             session,
             coordinator,
             assistant_message_id=assistant_message_id,
+            assistant_id=assistant_id,
         ),
         name=f"gateway-pump:{session.run_id}",
     )

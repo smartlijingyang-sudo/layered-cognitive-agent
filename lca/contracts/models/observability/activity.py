@@ -39,8 +39,6 @@ class ActivityItem(BaseModel):
     params: dict[str, Any] = Field(default_factory=dict)
     result_summary: str | None = None
     is_system: bool = False
-    tool_name: str = ""
-    current_step: str | None = None
 
 
 class ActivityIntentNamer:
@@ -62,11 +60,82 @@ class ActivityIntentNamer:
 
         # Connectors: Drive
         if "drive" in lowered or (lowered == "hatch_gws_cli" and args.get("service") == "drive"):
-            return "正在访问 Google Drive 文档", str(args.get("query") or "浏览文档目录"), "document"
+            return (
+                "正在访问 Google Drive 文档",
+                str(args.get("query") or "浏览文档目录"),
+                "document",
+            )
 
         # Connectors: GitHub
         if "github" in lowered:
-            return "正在检索 GitHub 仓库", str(args.get("repo") or args.get("query") or "查看代码与 Issue"), "github"
+            repo = args.get("repo") or ""
+            owner = args.get("owner") or ""
+            repo_display = f"{owner}/{repo}" if (owner and repo) else (repo or owner)
+            if "branch" in lowered:
+                return (
+                    "检索 GitHub 分支",
+                    str(repo_display or args.get("query") or "获取分支列表"),
+                    "github",
+                )
+            if "commit" in lowered:
+                return (
+                    "查询 GitHub 提交记录",
+                    str(
+                        repo_display
+                        or args.get("query")
+                        or args.get("q")
+                        or args.get("commit_sha")
+                        or "查看历史提交"
+                    ),
+                    "github",
+                )
+            if "readme" in lowered:
+                return "读取 GitHub README", str(repo_display or "项目说明文档"), "github"
+            if "content" in lowered or "file" in lowered:
+                path = args.get("path") or "根目录"
+                return f"浏览 GitHub 文件: {path}", str(repo_display or "仓库代码"), "github"
+            return (
+                "正在检索 GitHub 仓库",
+                str(repo_display or args.get("query") or "查看代码与 Issue"),
+                "github",
+            )
+
+        # Tool discovery
+        if "tool_search" in lowered:
+            q = args.get("query") or (
+                ", ".join(args.get("namespaces", []))
+                if isinstance(args.get("namespaces"), list)
+                else ""
+            )
+            return "发现与检索工具", f"检索: {q}" if q else "按需探索工具集", "tool"
+
+        # Cognitive memory & recall
+        if "memory" in lowered or "recall" in lowered:
+            q = str(args.get("query") or args.get("content") or args.get("text") or "")
+            if "search" in lowered or "recall" in lowered:
+                return (
+                    "检索认知长期记忆",
+                    f"追忆: {q[:30]}" if q else "联想相关知识与偏好",
+                    "memory",
+                )
+            if "add" in lowered or "save" in lowered:
+                return "沉淀事实到长期记忆", f"记录: {q[:30]}" if q else "更新记忆库", "memory"
+            if "update" in lowered or "supersede" in lowered:
+                return "演化与修正长期记忆", f"修正: {q[:30]}" if q else "修正历史事实", "memory"
+            if "delete" in lowered:
+                return "清理废弃记忆条目", f"删除: {q[:30]}" if q else "遗忘过时信息", "memory"
+            return "认知记忆库操作", (q[:30] if q else "维护知识与偏好"), "memory"
+
+        # Assistant self configuration
+        if "assistant" in lowered or "soul" in lowered:
+            if "read" in lowered or "config" in lowered:
+                return "读取助理自治配置", str(args.get("summary") or "自省身份与能力"), "tool"
+            if "soul" in lowered:
+                return (
+                    "演化助理核心灵魂 (SOUL)",
+                    str(args.get("summary") or "更新原则与使命"),
+                    "tool",
+                )
 
         # Shell / Box Command
         if lowered in ("run_shell", "shell", "box_run_command") or "exec" in lowered:
@@ -97,41 +166,16 @@ class ActivityIntentNamer:
         if isinstance(desc, str) and desc.strip():
             return desc.strip(), str(args.get("summary") or tool_name), "tool"
 
-        return f"执行操作: {tool_name}", str(args.get("summary") or "处理中"), "tool"
-
-    @staticmethod
-    def live_step(tool_name: str, arguments: dict[str, Any] | None = None) -> str:
-        """One-line "what it is doing right now" for a running tool.
-
-        Muse 思想：进行时要有血有肉——running 不是一个静态 tag，
-        而是一句能回答"它现在在干什么"的话。每种工具讲自己的状态语言。
-        """
-        args = arguments or {}
-        lowered = tool_name.lower()
-
-        if lowered in ("run_shell", "shell", "box_run_command") or "exec" in lowered:
-            cmd = str(args.get("command") or args.get("cmd") or "")
-            short = (cmd[:42] + "...") if len(cmd) > 42 else cmd
-            return f"正在执行命令：{short}" if short else "正在执行系统命令"
-        if "browser" in lowered:
-            url = str(args.get("url") or "")
-            if url:
-                from urllib.parse import urlparse as _up
-                host = _up(url).netloc or url[:30]
-                return f"正在浏览 {host}"
-            return "正在自动化浏览网页"
-        if "subagent" in lowered:
-            role = str(args.get("role") or args.get("name") or "子任务")
-            return f"子任务执行中：{role}"
-        if "memory" in lowered or "recall" in lowered:
-            return "正在检索/更新记忆库"
-        if "cron" in lowered:
-            return "定时任务执行中"
-        if "gmail" in lowered or (lowered == "hatch_gws_cli" and args.get("service") == "gmail"):
-            return "正在处理 Gmail"
-        if "github" in lowered:
-            return "正在操作 GitHub"
-        return "正在处理中"
+        summary = str(
+            args.get("summary")
+            or args.get("query")
+            or args.get("path")
+            or args.get("url")
+            or args.get("command")
+            or args.get("cmd")
+            or "处理中"
+        )
+        return f"执行操作: {tool_name}", summary, "tool"
 
 
 __all__ = (

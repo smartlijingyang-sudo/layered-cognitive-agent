@@ -75,6 +75,11 @@ async def register_gateway_run(
     resolved_user_id = user_id or getattr(session, "user_id", "") or None
     resolved_assistant_id = assistant_id or getattr(session, "assistant_id", "") or None
 
+    if resolved_assistant_id and not getattr(session, "assistant_id", None):
+        session.assistant_id = resolved_assistant_id
+    if agent_id and not getattr(session, "agent_id", None):
+        session.agent_id = agent_id
+
     await coordinator.start(
         run_id,
         ctx={
@@ -90,6 +95,7 @@ async def register_gateway_run(
         session,
         coordinator,
         assistant_message_id=assistant_message_id,
+        assistant_id=resolved_assistant_id,
     )
 
 

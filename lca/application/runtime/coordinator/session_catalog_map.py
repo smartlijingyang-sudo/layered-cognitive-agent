@@ -33,18 +33,37 @@ def is_suppressed_spine_ep(execution_point: str | None) -> bool:
     return execution_point in SUPPRESSED_SPINE_EPS
 
 
+def _format_timestamp(ts: Any) -> str:
+    if isinstance(ts, (int, float)):
+        from datetime import UTC, datetime
+
+        return datetime.fromtimestamp(ts, tz=UTC).isoformat()
+    if isinstance(ts, str):
+        return ts
+    return ""
+
+
 def catalog_session_event_to_stamped(
     event_type: str,
     data: dict[str, Any],
     *,
     assistant_message_id: str | None = None,
+    assistant_id: str | None = None,
+    created_at: Any = None,
+    run_id: str | None = None,
 ) -> dict[str, Any] | None:
     """Map one catalog session event to an EventTranslator envelope, or None."""
     parent = assistant_message_id or None
     handler = _CATALOG_HANDLERS.get(event_type)
     if handler is None:
         return None
-    return handler(data, parent=parent)
+    return handler(
+        data,
+        parent=parent,
+        assistant_id=assistant_id,
+        created_at=created_at,
+        run_id=run_id,
+    )
 
 
 def _parent_body(body: dict[str, Any], parent: str | None) -> dict[str, Any]:
@@ -53,23 +72,46 @@ def _parent_body(body: dict[str, Any], parent: str | None) -> dict[str, Any]:
     return body
 
 
-def _map_tool_started(data: dict[str, Any], *, parent: str | None) -> dict[str, Any]:
+def _map_tool_started(
+    data: dict[str, Any],
+    *,
+    parent: str | None,
+    assistant_id: str | None = None,
+    created_at: Any = None,
+    run_id: str | None = None,
+    **_kwargs: Any,
+) -> dict[str, Any]:
     tool_name = str(data.get("tool_name") or "")
     invocation_id = str(data.get("invocation_id") or "")
     arguments = data.get("arguments") if isinstance(data.get("arguments"), dict) else {}
     tool_calling = wire_tool_call(tool_name, invocation_id, arguments)
+    ts_str = _format_timestamp(created_at or data.get("timestamp") or data.get("created_at"))
     return {
         "event": _parent_body(
             {
                 "type": "ToolStarted",
                 "payload": tool_calling,
+                "tool_name": tool_name,
+                "invocation_id": invocation_id,
+                "arguments": arguments,
+                "assistant_id": assistant_id or data.get("assistant_id") or "default",
+                "run_id": run_id or data.get("run_id") or "",
+                "timestamp": ts_str,
             },
             parent,
         )
     }
 
 
-def _map_tool_invoked(data: dict[str, Any], *, parent: str | None) -> dict[str, Any]:
+def _map_tool_invoked(
+    data: dict[str, Any],
+    *,
+    parent: str | None,
+    assistant_id: str | None = None,
+    created_at: Any = None,
+    run_id: str | None = None,
+    **_kwargs: Any,
+) -> dict[str, Any]:
     tool_name = str(data.get("tool_name") or "")
     invocation_id = str(data.get("invocation_id") or "")
     arguments = data.get("arguments") if isinstance(data.get("arguments"), dict) else {}
@@ -94,6 +136,7 @@ def _map_tool_invoked(data: dict[str, Any], *, parent: str | None) -> dict[str, 
         text_payload = data.get("text")
         if isinstance(text_payload, str) and text_payload:
             result = {"content": text_payload}
+    ts_str = _format_timestamp(created_at or data.get("timestamp") or data.get("created_at"))
     return {
         "event": _parent_body(
             {
@@ -103,27 +146,52 @@ def _map_tool_invoked(data: dict[str, Any], *, parent: str | None) -> dict[str, 
                 "executionTime": data.get("latency_ms"),
                 "result": result,
                 "payload": {"toolCalling": tool_calling},
+                "tool_name": tool_name,
+                "invocation_id": invocation_id,
+                "arguments": arguments,
+                "assistant_id": assistant_id or data.get("assistant_id") or "default",
+                "run_id": run_id or data.get("run_id") or "",
+                "timestamp": ts_str,
             },
             parent,
         )
     }
 
 
-def _map_tool_denied(data: dict[str, Any], *, parent: str | None) -> dict[str, Any]:
+def _map_tool_denied(
+    data: dict[str, Any],
+    *,
+    parent: str | None,
+    assistant_id: str | None = None,
+    created_at: Any = None,
+    run_id: str | None = None,
+    **_kwargs: Any,
+) -> dict[str, Any]:
     tool_name = str(data.get("tool_name") or "")
+    invocation_id = str(data.get("invocation_id") or "")
+    ts_str = _format_timestamp(created_at or data.get("timestamp") or data.get("created_at"))
     return {
         "event": _parent_body(
             {
                 "type": "ToolDenied",
                 "reason": str(data.get("reason") or "denied"),
-                "payload": {"toolCalling": wire_tool_call(tool_name, tool_name, {})},
+                "payload": {
+                    "toolCalling": wire_tool_call(tool_name, invocation_id or tool_name, {})
+                },
+                "tool_name": tool_name,
+                "invocation_id": invocation_id,
+                "assistant_id": assistant_id or data.get("assistant_id") or "default",
+                "run_id": run_id or data.get("run_id") or "",
+                "timestamp": ts_str,
             },
             parent,
         )
     }
 
 
-def _map_session_checkpoint(data: dict[str, Any], *, parent: str | None) -> dict[str, Any] | None:
+def _map_session_checkpoint(
+    data: dict[str, Any], *, parent: str | None, **_kwargs: Any
+) -> dict[str, Any] | None:
     status = str(data.get("status") or "")
     if status == "waiting_input":
         reason = "waiting_for_human"
@@ -147,7 +215,9 @@ def _map_session_checkpoint(data: dict[str, Any], *, parent: str | None) -> dict
     return stamped
 
 
-def _map_approval_persisted(data: dict[str, Any], *, parent: str | None) -> dict[str, Any] | None:
+def _map_approval_persisted(
+    data: dict[str, Any], *, parent: str | None, **_kwargs: Any
+) -> dict[str, Any] | None:
     """``approval.persisted.v1`` stays journal-internal (recovery SSOT).
 
     It always pairs with a ``waiting_input`` checkpoint, which already
@@ -159,7 +229,9 @@ def _map_approval_persisted(data: dict[str, Any], *, parent: str | None) -> dict
     return None
 
 
-def _map_reaction_added(data: dict[str, Any], *, parent: str | None) -> dict[str, Any]:
+def _map_reaction_added(
+    data: dict[str, Any], *, parent: str | None, **_kwargs: Any
+) -> dict[str, Any]:
     del parent
     return {
         "event": {
