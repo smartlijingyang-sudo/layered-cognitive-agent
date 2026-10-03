@@ -66,6 +66,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.contracts.protocols.think.learning import (
+    SKILL_ACQUISITION_MIN_CONFIDENCE,
     SkillAcquirer,
     SkillAcquisitionCandidate,
 )
@@ -122,8 +123,8 @@ class Config(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    min_confidence: float = Field(default=0.7, ge=0.0, le=1.0)
-    min_evidence: int = Field(default=1, ge=1)
+    min_confidence: float = Field(default=SKILL_ACQUISITION_MIN_CONFIDENCE, ge=0.0, le=1.0)
+    min_evidence: int = Field(default=1, ge=1)  # ADR-0262 C4 pending: -> SKILL_ACQUISITION_MIN_EVIDENCE (3) after tests lane decouples the digest fixture.
     draft_confidence: float = Field(default=0.8, ge=0.0, le=1.0)
 
 
@@ -142,8 +143,8 @@ class _AssistantEvolveImpl(AssistantEvolve, SkillAcquirer):
         *,
         catalog: AssistantCatalog,
         event_emitter: Callable[[str, Mapping[str, Any]], Any] | None = None,
-        min_confidence: float = 0.7,
-        min_evidence: int = 1,
+        min_confidence: float = SKILL_ACQUISITION_MIN_CONFIDENCE,
+        min_evidence: int = 1,  # ADR-0262 C4 pending: -> SKILL_ACQUISITION_MIN_EVIDENCE (3) after tests lane decouples the digest fixture.
         draft_confidence: float = 0.8,
     ) -> None:
         self._catalog = catalog
