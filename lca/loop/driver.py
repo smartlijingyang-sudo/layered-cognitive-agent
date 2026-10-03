@@ -470,9 +470,10 @@ class DeclarativeExecution:
             if str(data.get("id", "")).endswith(".subgraph"):
                 continue
             return data
-        # No v2 graph found: emit a single empty Plan so the interpreter
-        # at least runs end-to-end and the kernel can report the
-        # completion back to the caller.
+        # No v2 graph found: emit an empty graph spec and fail loudly.
+        # lift_graph_spec rejects a zero-node spec with PlanLiftError
+        # (no termination policy), so the interpreter never runs and no
+        # completion is reported. Fail-loud is deliberate (ADR-0221 P3).
         return {
             "id": getattr(plan, "profile_path", "fallback") or "fallback",
             "nodes": [],
