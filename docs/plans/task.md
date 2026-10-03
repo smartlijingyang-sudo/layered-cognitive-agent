@@ -578,4 +578,4 @@
 | MEM-TASK-1-PURE-PROJECTOR | 纯函数投影器与模板骨架保底 (`curated.py`) | Completed | 实现 render_curated_memory_markdown、保留 ## Preferences / ## Facts 骨架与行尾 <!-- id:mem_xxx --> 锚点，单测 23/23 全绿，commit 35167f829 (INV-MEM-01~03) |
 | MEM-TASK-2-EDIT-SYNC-SERVICE | Markdown 编辑事件解析器 (`MemoryEditSyncService`) | Completed | 解析提交的 Markdown，比对活跃记录计算 ADD/SUPERSEDE/DELETE 原子操作并驱动 AssistantMemory，单测 25/25 全绿，commit d7671e324 (INV-MEM-04~05) |
 | MEM-TASK-3-ROUTE-GATE | Webserver Standing File 写入窄门拦截 (`standing_files.py`) | Completed | 拦截 PUT MEMORY.md 严禁直接写盘，转由 MemoryEditSyncService 同步至 semantic.json 并重新投影，测试 25/25 全绿 (INV-MEM-06) |
-| MEM-TASK-4-INTEGRATION-E2E | 端到端集成与 Prompt 实时感知验收 (`test_memory_stateless_projection_e2e.py`) | In Progress | 编写端到端集成测试，覆盖工具写入、编辑回写、全链路往返及 persona_from_home Prompt 实时感知 |
+| MEM-TASK-4-INTEGRATION-E2E | 端到端集成与 Prompt 实时感知验收 (`test_memory_stateless_projection_e2e.py`) | Completed | 落地端到端集成测试，覆盖工具写入、编辑回写、全链路往返及 persona_from_home Prompt 实时感知，150/150 测试全绿 (INV-MEM-01~06) |
