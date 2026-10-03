@@ -70,7 +70,7 @@ def test_gap_fill_restores_missing_assistant_turn(tmp_path: Path) -> None:
     ]
 
 
-def test_gap_fill_no_log_match_leaves_history_unchanged(tmp_path: Path) -> None:
+def test_gap_fill_no_log_match_drops_orphaned_user_turn(tmp_path: Path) -> None:
     home = tmp_path / "asst"
     turns = extract_prior_turns(
         [_msg("user", "第一句"), _msg("user", "第二句")],
@@ -78,7 +78,26 @@ def test_gap_fill_no_log_match_leaves_history_unchanged(tmp_path: Path) -> None:
         assistant_home=home,
         topic_id="t-no-such",
     )
-    assert _roles(turns) == [("user", "第一句")]
+    assert _roles(turns) == []
+
+
+def test_gap_fill_no_log_match_preserves_earlier_completed_turns(tmp_path: Path) -> None:
+    home = tmp_path / "asst"
+    turns = extract_prior_turns(
+        [
+            _msg("user", "已完成提问"),
+            _msg("assistant", "已完成回答"),
+            _msg("user", "失败提问"),
+            _msg("user", "当前提问"),
+        ],
+        plain_text_fn=_plain,
+        assistant_home=home,
+        topic_id="t-no-such",
+    )
+    assert _roles(turns) == [
+        ("user", "已完成提问"),
+        ("assistant", "已完成回答"),
+    ]
 
 
 def test_gap_fill_disabled_without_topic_id(tmp_path: Path) -> None:
@@ -87,11 +106,12 @@ def test_gap_fill_disabled_without_topic_id(tmp_path: Path) -> None:
         assistant_home=home, topic_id="t1", user_text="第一句", assistant_text="回复一"
     )
     # legacy call shape: no assistant_home/topic_id -> no lookup attempted
+    # Trailing un-replied user messages are dropped to prevent leakage
     turns = extract_prior_turns(
         [_msg("user", "第一句"), _msg("user", "第二句")],
         plain_text_fn=_plain,
     )
-    assert _roles(turns) == [("user", "第一句")]
+    assert _roles(turns) == []
 
 
 def test_gap_fill_matches_normalized_text(tmp_path: Path) -> None:
@@ -113,9 +133,7 @@ def test_gap_fill_prefers_newest_pair(tmp_path: Path) -> None:
     append_conversation_turn(
         assistant_home=home, topic_id="t1", user_text="q", assistant_text="new"
     )
-    assert (
-        find_assistant_reply(assistant_home=home, topic_id="t1", user_text="q") == "new"
-    )
+    assert find_assistant_reply(assistant_home=home, topic_id="t1", user_text="q") == "new"
 
 
 def test_topic_id_sanitized_against_traversal(tmp_path: Path) -> None:
@@ -145,18 +163,14 @@ def test_append_failure_never_raises(tmp_path: Path, monkeypatch: pytest.MonkeyP
 
     monkeypatch.setattr(Path, "mkdir", _boom)
     # must not raise even when the directory cannot be created
-    append_conversation_turn(
-        assistant_home=home, topic_id="t1", user_text="q", assistant_text="a"
-    )
+    append_conversation_turn(assistant_home=home, topic_id="t1", user_text="q", assistant_text="a")
 
 
 def test_fill_history_gaps_skips_corrupt_lines(tmp_path: Path) -> None:
     home = tmp_path / "asst"
     path = conversation_log_path(home, "t1")
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        'not json\n{"user": "q", "assistant": "a"}\n{"user": 123}\n', encoding="utf-8"
-    )
+    path.write_text('not json\n{"user": "q", "assistant": "a"}\n{"user": 123}\n', encoding="utf-8")
     assert find_assistant_reply(assistant_home=home, topic_id="t1", user_text="q") == "a"
 
 
@@ -194,18 +208,16 @@ def _terminal_session(**kwargs: Any) -> Any:
 async def test_terminalize_appends_conversation_log_on_success(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(
-        "lca.infrastructure.path.locator.get_lca_home", lambda: tmp_path
-    )
+    monkeypatch.setattr("lca.infrastructure.path.locator.get_lca_home", lambda: tmp_path)
     session = _terminal_session()
     registry = MagicMock()
 
     async def _finalize(_run_id: str) -> None:
         return None
 
-    await RunTerminalizer(
-        registry, finalizer=_finalize, materializer=lambda _s: None
-    ).terminalize(session, success=True)
+    await RunTerminalizer(registry, finalizer=_finalize, materializer=lambda _s: None).terminalize(
+        session, success=True
+    )
 
     path = tmp_path / "assistants" / "asst_1" / "conversations" / "topic_1.jsonl"
     lines = path.read_text(encoding="utf-8").splitlines()
@@ -218,18 +230,16 @@ async def test_terminalize_appends_conversation_log_on_success(
 async def test_terminalize_skips_log_on_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(
-        "lca.infrastructure.path.locator.get_lca_home", lambda: tmp_path
-    )
+    monkeypatch.setattr("lca.infrastructure.path.locator.get_lca_home", lambda: tmp_path)
     session = _terminal_session()
     registry = MagicMock()
 
     async def _finalize(_run_id: str) -> None:
         return None
 
-    await RunTerminalizer(
-        registry, finalizer=_finalize, materializer=lambda _s: None
-    ).terminalize(session, success=False)
+    await RunTerminalizer(registry, finalizer=_finalize, materializer=lambda _s: None).terminalize(
+        session, success=False
+    )
 
     path = tmp_path / "assistants" / "asst_1" / "conversations" / "topic_1.jsonl"
     assert not path.exists()
@@ -239,17 +249,15 @@ async def test_terminalize_skips_log_on_failure(
 async def test_terminalize_skips_log_without_topic(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(
-        "lca.infrastructure.path.locator.get_lca_home", lambda: tmp_path
-    )
+    monkeypatch.setattr("lca.infrastructure.path.locator.get_lca_home", lambda: tmp_path)
     session = _terminal_session(topic_id="")
     registry = MagicMock()
 
     async def _finalize(_run_id: str) -> None:
         return None
 
-    await RunTerminalizer(
-        registry, finalizer=_finalize, materializer=lambda _s: None
-    ).terminalize(session, success=True)
+    await RunTerminalizer(registry, finalizer=_finalize, materializer=lambda _s: None).terminalize(
+        session, success=True
+    )
 
     assert not (tmp_path / "assistants").exists()

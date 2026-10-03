@@ -46,8 +46,8 @@ def extract_prior_turns(
         turns = fill_history_gaps(turns, assistant_home=assistant_home, topic_id=topic_id)
     if len(turns) <= 1:
         return ()
-    if turns[-1].role == "user":
-        turns = turns[:-1]
+    while turns and turns[-1].role == "user":
+        turns.pop()
     if not turns:
         return ()
     return tuple(truncate_turns_to_budget(turns[-MAX_HISTORY_MESSAGES:], MAX_HISTORY_CHARS))

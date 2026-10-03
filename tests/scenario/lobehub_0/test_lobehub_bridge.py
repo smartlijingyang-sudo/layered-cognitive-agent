@@ -152,8 +152,9 @@ class TestLobeHubMessageParser(unittest.TestCase):
         ]
         parsed = parse_messages(messages)
         self.assertEqual(parsed.user_text, "今天有什么新闻")
-        self.assertEqual(len(parsed.prior_turns), 1)
-        self.assertEqual(parsed.prior_turns[0].role, "user")
+        # Empty assistant means preceding user turn was never answered;
+        # un-replied user turns must not leak into prior_turns as active requests.
+        self.assertEqual(len(parsed.prior_turns), 0)
 
     def test_strips_feedback_analysis_context_from_history(self) -> None:
         messages = [
