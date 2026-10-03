@@ -85,9 +85,10 @@ def complete_model(
 ) -> None:
     """``model.completed.v1`` + ``assistant.responded.v1`` (catalog-only).
 
-    Surface event (``surface/assistant_message``) is appended separately by
-    :meth:`RunSessionWriter.append_assistant_message` — see
-    :func:`lca.plugins.events.hooks.model_visible.adapter._emit_lifecycle_post`.
+    The model-visible ``surface/assistant_message`` row is written by the
+    ``think.llm.persist`` graph node, which is the single producer for that
+    fact. This helper stays catalog-only so one response yields one surface
+    row.
     """
     if _session() is None:
         return

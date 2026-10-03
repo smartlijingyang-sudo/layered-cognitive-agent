@@ -90,7 +90,7 @@ class EffectExecuteExecutor:
         outputs 端口:receipts (list[EffectReceipt], length 1)
 
         职责还包括把 Observation 以 ``surface/tool_result`` 追加到 Session。
-        这是模型能看到工具结果的唯一途径:think 侧 ``llm.call`` 已经写了
+        这是模型能看到工具结果的唯一途径:think 侧 ``llm.persist`` 已经写了
         ``surface/assistant_message``,act 侧若不写对应 result,
         ``derive_messages`` 就还原不出 ``role=tool`` 行,模型会以为自己的
         工具调用没有得到回应而反复重发同一个调用。

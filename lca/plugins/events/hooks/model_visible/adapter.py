@@ -14,6 +14,13 @@ composer 装配 ``instrument_llm(llm, *, ctx=...)`` 从
 装饰器自身只是「调用 hook」,不持有真值、不写盘;所有事实走 hook 内部 fold
 + EventBus.publish,落 :class:`SpineLlmRequestHeaderPayload` /
 :class:`SpineLlmRequestHeaderAssistantPayload` 至 ``<run_id>.spine.jsonl``。
+
+本装饰器只发 catalog 事实(``model.completed.v1`` / ``assistant.responded.v1``)。
+模型可见的 ``surface/assistant_message`` 由 ``think.llm.persist`` 独家写入:
+它从 typed runtime carrier 拿到 writer(ADR-0226 §1 要求注入,禁止 ContextVar
+查找),且在图里每轮只有一个位置。这里再写一次会让 ``derive_messages`` 把每
+一轮 assistant 投影两遍,模型据此学会把自己的话重复两遍。
+守护见 ``tests/integration/test_assistant_surface_single_producer.py``。
 """
 
 from __future__ import annotations
@@ -21,7 +28,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from lca.contracts.atoms.enums.enums import LLMStreamEventType
 from lca.contracts.models.core.conversation.llm import LLMResponse, LLMStreamEvent
@@ -30,7 +37,6 @@ from lca.contracts.protocols import LLMAdapter
 
 if TYPE_CHECKING:
     from lca.plugins.events.hooks.model_visible.hook import ModelVisibleHook
-    from lca_kernel.events.session.session import SessionProtocol
 
 _log = logging.getLogger(__name__)
 
@@ -151,16 +157,16 @@ def _emit_lifecycle_pre(hook: Any, kwargs: dict[str, Any]) -> None:
 
 
 def _emit_lifecycle_post(hook: Any, response: LLMResponse) -> None:
-    from lca.infrastructure.session.bindings import (
-        resolve_session_reader,
-    )
+    """Emit the catalog facts for one completed response.
+
+    ``complete_model`` self-guards when no Session is bound, so this needs
+    no session lookup of its own. The model-visible ``surface/assistant_message``
+    row is written by ``think.llm.persist``; appending it here as well puts
+    two copies of every turn in ``derive_messages``.
+    """
     from lca.infrastructure.session.emit.lifecycle_emit import complete_model
-    from lca.runtime.session.run_session_writer import RunSessionWriter
 
     step = hook._step_counter
-    session = resolve_session_reader()
-    if session is None:
-        return
     tool_calls = _tool_calls_payload(response)
     text = response.text or ""
     usage = response.usage if isinstance(response.usage, dict) else None
@@ -172,18 +178,6 @@ def _emit_lifecycle_post(hook: Any, response: LLMResponse) -> None:
         # Catalog event contract is list[dict[str, Any]]; ToolCall is its
         # wire-shaped specialization (runtime-identical plain dicts).
         tool_calls=[dict(call) for call in tool_calls] if tool_calls is not None else None,
-    )
-    # Seam: resolve_session_reader deliberately exposes the read face
-    # (SPEC H); the bound value is always the full Session
-    # (resolve_raw_session isinstance-guaranteed), so the writer's
-    # SessionProtocol requirement holds.
-    RunSessionWriter(session=cast("SessionProtocol", session)).append_assistant_message(
-        turn=1,
-        step=step,
-        role="assistant",
-        content=text or None,
-        tool_calls=tool_calls,
-        usage=None,
     )
 
 
