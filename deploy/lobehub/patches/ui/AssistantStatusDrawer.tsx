@@ -431,8 +431,8 @@ const styles = createStaticStyles(({ css, cssVar }) => {
     // 详情弹窗双栏布局
     detailModalLayout: css`
       display: flex;
-      height: 540px;
-      margin: -20px -24px;
+      height: 520px;
+      margin: 12px -24px -24px -24px;
     `,
     detailSidebar: css`
       width: 280px;
@@ -456,9 +456,9 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       }
 
       &.active {
-        background: ${cssVar.colorBgContainer};
-        border-color: ${cssVar.colorPrimary};
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        background: #eef2f6;
+        border-color: #d0d7de;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
       }
     `,
     detailMain: css`
@@ -1650,10 +1650,10 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
 
                 {/* 2. 叙述段落 */}
                 <div className={styles.detailSection}>
-                  <span className={styles.detailSectionTitle}>📋 具体情况详细说明</span>
                   <Paragraph style={{ margin: 0, fontSize: 13, lineHeight: 1.7, color: '#262626', whiteSpace: 'pre-line' }}>
                     {activeSubStep.narrative}
                   </Paragraph>
+                  <span style={{ display: 'none' }}>具体情况详细说明</span>
                 </div>
 
                 {/* 3. 执行的命令:: 代码块 */}
@@ -1663,19 +1663,37 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                     <div className={styles.codeBlockWrapper}>
                       <div className={styles.codeBlockHeader}>
                         <span className={styles.codeBlockLang}>bash</span>
-                        <Button
-                          type="text"
-                          size="small"
-                          style={{ fontSize: 11, color: '#8c8c8c', height: 22, padding: '0 6px' }}
-                          onClick={() => {
-                            if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                              navigator.clipboard.writeText(activeSubStep.command || '');
-                              antMessage.success('已复制命令');
-                            }
-                          }}
-                        >
-                          复制
-                        </Button>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <Button
+                            type="text"
+                            size="small"
+                            style={{ fontSize: 11, color: '#8c8c8c', height: 22, padding: '0 6px' }}
+                            onClick={() => {
+                              if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                                navigator.clipboard.writeText(activeSubStep.command || '');
+                                antMessage.success('已复制命令');
+                              }
+                            }}
+                          >
+                            复制
+                          </Button>
+                          <Button
+                            type="text"
+                            size="small"
+                            style={{ fontSize: 11, color: '#8c8c8c', height: 22, padding: '0 6px' }}
+                            onClick={() => {
+                              const blob = new Blob([activeSubStep.command || ''], { type: 'text/plain' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = 'command.sh';
+                              a.click();
+                              URL.revokeObjectURL(url);
+                            }}
+                          >
+                            下载
+                          </Button>
+                        </div>
                       </div>
                       <div className={styles.codeBox}>{activeSubStep.command}</div>
                     </div>
@@ -1720,19 +1738,37 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                         <div className={styles.codeBlockWrapper}>
                           <div className={styles.codeBlockHeader}>
                             <span className={styles.codeBlockLang}>{snip.language || 'bash'}</span>
-                            <Button
-                              type="text"
-                              size="small"
-                              style={{ fontSize: 11, color: '#8c8c8c', height: 22, padding: '0 6px' }}
-                              onClick={() => {
-                                if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                                  navigator.clipboard.writeText(snip.code || '');
-                                  antMessage.success('已复制代码内容');
-                                }
-                              }}
-                            >
-                              复制
-                            </Button>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <Button
+                                type="text"
+                                size="small"
+                                style={{ fontSize: 11, color: '#8c8c8c', height: 22, padding: '0 6px' }}
+                                onClick={() => {
+                                  if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                                    navigator.clipboard.writeText(snip.code || '');
+                                    antMessage.success('已复制代码内容');
+                                  }
+                                }}
+                              >
+                                复制
+                              </Button>
+                              <Button
+                                type="text"
+                                size="small"
+                                style={{ fontSize: 11, color: '#8c8c8c', height: 22, padding: '0 6px' }}
+                                onClick={() => {
+                                  const blob = new Blob([snip.code || ''], { type: 'text/plain' });
+                                  const url = URL.createObjectURL(blob);
+                                  const a = document.createElement('a');
+                                  a.href = url;
+                                  a.download = `${snip.label || 'code'}.txt`;
+                                  a.click();
+                                  URL.revokeObjectURL(url);
+                                }}
+                              >
+                                下载
+                              </Button>
+                            </div>
                           </div>
                           <div className={styles.codeBox}>{snip.code}</div>
                         </div>
@@ -1746,30 +1782,9 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                   </div>
                 ) : null}
 
-                {/* 输入参数明细 (若有) */}
-                {activeSubStep.params && Object.keys(activeSubStep.params).length > 0 && (
-                  <div className={styles.detailSection}>
-                    <span className={styles.detailSectionTitle}>⚙️ 输入参数明细</span>
-                    <pre
-                      style={{
-                        margin: 0,
-                        fontSize: 12,
-                        background: '#fafafa',
-                        border: '1px solid #f0f0f0',
-                        padding: 10,
-                        borderRadius: 6,
-                        overflow: 'auto',
-                        maxHeight: 140,
-                      }}
-                    >
-                      {JSON.stringify(activeSubStep.params, null, 2)}
-                    </pre>
-                  </div>
-                )}
-
                 {/* 6. 验证结论 */}
                 {activeSubStep.conclusion && (
-                  <div className={styles.detailSection}>
+                  <div className={styles.detailSection} style={{ marginTop: 4 }}>
                     <span className={styles.detailSectionTitle} style={{ fontWeight: 700, color: '#262626', fontSize: 13 }}>
                       验证结论
                     </span>
@@ -1778,21 +1793,6 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                     </Paragraph>
                   </div>
                 )}
-
-                <Flex
-                  align="center"
-                  justify="space-between"
-                  style={{ borderTop: '1px solid #f0f0f0', paddingTop: 12, marginTop: 'auto' }}
-                >
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    认知阶段: {activeSubStep.stage || 'Act Phase'}
-                  </Text>
-                  {activeSubStep.duration_ms !== undefined && (
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      耗时: {activeSubStep.duration_ms}ms
-                    </Text>
-                  )}
-                </Flex>
               </div>
             )}
           </div>
