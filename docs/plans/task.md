@@ -553,4 +553,9 @@
 | BRAINSTORM-THEMATIC-STANDING-FILE-APPROACHES | 提出 2-3 种具体架构方案（THEME.md / CONSTITUTION.md / PHILOSOPHY.md）与权衡对比 | Completed | 用户明确选定方案 B：新增 `CONSTITUTION.md`（根本宪法与行为契约，UI卡片为「📜 根本宪法」） |
 | BRAINSTORM-THEMATIC-STANDING-FILE-DESIGN-SECTIONS | 逐步呈现分节设计规范（Owns/Does NOT own、Prompt 注入与 UI 卡片、内容定制改写规范、测试断言）并呈批 | Completed | 3 大小节（架构边界与拓扑、零遗漏全量内容与特色目录、INV-CONST-01~06 测试断言）全部呈批通过 |
 | BRAINSTORM-THEMATIC-STANDING-FILE-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-04-thematic-standing-file-constitution-design.md |
-| BRAINSTORM-THEMATIC-STANDING-FILE-TRANSITION | 转入实施计划制定（调用 writing-plans 规划落地） | In Progress | 正在调用 writing-plans 规划实施计划 |
+| BRAINSTORM-THEMATIC-STANDING-FILE-TRANSITION | 转入实施计划制定（调用 writing-plans 规划落地） | Completed | 成功落盘 docs/plans/2026-10-04-thematic-standing-file-constitution-plan.md 并完成实施分解 |
+| CONST-TASK-1-LAYOUT | 拓扑与契约层扩展 (`layout.toml` & `layout.py`) | Pending | 待执行 |
+| CONST-TASK-2-TEMPLATES | 模板基座物化与默认模板注入 (`templates/` & `standing_files.py`) | Pending | 待执行 |
+| CONST-TASK-3-ROUTES | 传输层路由白名单、优雅降级与乐观锁 (`standing_files.py`) | Pending | 待执行 |
+| CONST-TASK-4-UI-PATCH | 前端 UI 补丁与卡片元数据 (`AssistantStatusDrawer.tsx`) | Pending | 待执行 |
+| CONST-TASK-5-INTEGRATION-E2E | 上下文装配、活跃助理物化与全链路集成验收 (`test_constitution_standing_file_e2e.py`) | Pending | 待执行 |
