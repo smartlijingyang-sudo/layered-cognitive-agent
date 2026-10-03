@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from .firewall import MemoryTactFirewall
 from .modality import ModalityResult, filter_ingestion_modality
 from .salience import SalienceGate, SalienceVerdict
 
 __all__ = [
+    "MemoryTactFirewall",
     "ModalityResult",
     "SalienceGate",
     "SalienceVerdict",

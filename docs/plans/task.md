@@ -497,5 +497,5 @@
 | COGNITIVE-MEMORY-TASK-2 | 任务 2：开放实体知识图谱与 File-as-SSOT 存储适配器 (Infrastructure) | Completed | 成功实现 EntityGraphStore 开放分类创建、GRAPH.md 常驻微索引（Top 15条，Token预算受控）、超限沉降 GC（archives/entities/）与 SQLite FTS5+Graph 派生索引器，4/4 单测全绿 |
 | COGNITIVE-MEMORY-TASK-3 | 任务 3：摄入模态门控与反思过滤器 (Ingestion Guards) | Completed | 成功实现 filter_ingestion_modality 拦截反事实/假设举例与反讽、SalienceGate 防止单次偶发事件过度泛化为偏好，并无缝接入 memory_extract 节点，单测与 33 reflect 测试全绿 |
 | COGNITIVE-MEMORY-TASK-4 | 任务 4：极简冷启动装配与 System 2 内部追忆工具 (Cognitive Saccade) | Completed | 成功实现 SystemTwoRecallEngine 与 internal_recall 内部追忆工具，支持最多 2 跳关系路径扩散、未命中诚实返回 NoRecall、冷启动预算控制在 500 Token 内，4/4 单测 100% 全绿 |
-| COGNITIVE-MEMORY-TASK-5 | 任务 5：表达分寸防火墙与工具踩坑避坑哨兵 (Tact & Pitfall Shield) | In_Progress | 正在实现高敏感记忆隔离、禁显摆声带契约、TOOLS.md 避坑单行红线毫秒级注入与 skills 隔离待审门 |
-| COGNITIVE-MEMORY-TASK-6 | 任务 6：7 大维度 28 项核心场景双轨基准评测 (Two-Track Evals Benchmark) | Pending | 待落地 28 项全量场景自动化评测并跑通 100% 验收断言 |
+| COGNITIVE-MEMORY-TASK-5 | 任务 5：表达分寸防火墙与工具踩坑避坑哨兵 (Tact & Pitfall Shield) | Completed | 成功实现 MemoryTactFirewall（敏感记忆隔离与禁显摆声带契约）、ToolPitfallShield（TOOLS.md 避坑毫秒级注入）与 SkillQuarantineGate（技能隔离待审门防野蛮生长），4/4 单测 100% 全绿 |
+| COGNITIVE-MEMORY-TASK-6 | 任务 6：7 大维度 28 项核心场景双轨基准评测 (Two-Track Evals Benchmark) | In_Progress | 正在落地 28 项场景规范文档 docs/specs/ 与轨 A（代码不变量 100% 通过）+ 轨 B（行为评测）自动化测试套件 |
