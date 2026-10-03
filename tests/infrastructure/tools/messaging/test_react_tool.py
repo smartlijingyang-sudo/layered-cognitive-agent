@@ -4,12 +4,13 @@ Covers MessageReaction validation, ReactionStore behavior, and
 ReactToMessageTool execution.
 """
 
+import unittest.mock
+
 import pytest
 
 from lca.contracts.models.messaging.reaction import MessageReaction
 from lca.infrastructure.messaging.reaction_store import ReactionStore
 from lca.infrastructure.tools.messaging.react_tool import ReactToMessageTool
-
 
 # ── MessageReaction ──────────────────────────────────────────────
 
@@ -118,3 +119,54 @@ def test_react_tool_metadata():
     assert "message_id" in ReactToMessageTool.parameters["properties"]
     assert "emoji" in ReactToMessageTool.parameters["properties"]
     assert set(ReactToMessageTool.parameters["required"]) == {"message_id", "emoji"}
+
+
+# ── ReactToMessageTool event emission & idempotency ─────────────
+
+
+@pytest.mark.asyncio
+async def test_react_tool_fresh_reaction_adds_and_emits_once():
+    store = ReactionStore()
+    tool = ReactToMessageTool(store=store)
+    with unittest.mock.patch(
+        "lca.infrastructure.tools.messaging.react_tool.emit_reaction_added"
+    ) as mock_emit:
+        obs = await tool.execute({"message_id": "msg_42", "emoji": "👍"})
+    assert obs.success is True
+    assert obs.payload["deduped"] is False
+    assert len(store.list_for("msg_42")) == 1
+    mock_emit.assert_called_once()
+    reaction = mock_emit.call_args.args[0]
+    assert reaction.message_id == "msg_42"
+    assert reaction.emoji == "👍"
+    assert reaction.actor == "assistant"
+
+
+@pytest.mark.asyncio
+async def test_react_tool_repeat_reaction_is_deduped_without_emit():
+    store = ReactionStore()
+    tool = ReactToMessageTool(store=store)
+    first = await tool.execute({"message_id": "msg_42", "emoji": "👍"})
+    assert first.success is True
+    assert len(store.list_for("msg_42")) == 1
+
+    with unittest.mock.patch(
+        "lca.infrastructure.tools.messaging.react_tool.emit_reaction_added"
+    ) as mock_emit:
+        second = await tool.execute({"message_id": "msg_42", "emoji": "👍"})
+    assert second.success is True
+    assert second.payload["deduped"] is True
+    assert len(store.list_for("msg_42")) == 1
+    mock_emit.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_react_tool_invalid_emoji_is_rejected_without_emit():
+    tool = ReactToMessageTool(store=ReactionStore())
+    with unittest.mock.patch(
+        "lca.infrastructure.tools.messaging.react_tool.emit_reaction_added"
+    ) as mock_emit:
+        obs = await tool.execute({"message_id": "msg_42", "emoji": "not-an-emoji"})
+    assert obs.success is False
+    assert obs.error is not None
+    mock_emit.assert_not_called()

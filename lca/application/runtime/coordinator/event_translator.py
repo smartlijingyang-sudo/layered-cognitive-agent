@@ -274,6 +274,17 @@ class EventTranslator:
         }
 
     @staticmethod
+    def _reaction_added(e: dict) -> dict:
+        return {
+            "type": "reaction_added",
+            "data": {
+                "message_id": e.get("message_id"),
+                "emoji": e.get("emoji"),
+                "actor": e.get("actor"),
+            },
+        }
+
+    @staticmethod
     def _step_start(e: dict) -> dict:
         return {
             "type": "step_start",
@@ -617,6 +628,7 @@ _HANDLERS = {
     "ToolStarted": EventTranslator._tool_started,
     "ToolInvoked": EventTranslator._tool_invoked,
     "ToolDenied": EventTranslator._tool_denied,
+    "ReactionAdded": EventTranslator._reaction_added,
     "StepStart": EventTranslator._step_start,
     "StepFinished": EventTranslator._step_finished,
     "SpineClose": EventTranslator._spine_close,

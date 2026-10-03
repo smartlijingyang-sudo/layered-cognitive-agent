@@ -42,6 +42,7 @@ import {
   persistLcaToolResult,
 } from './lcaStepPersist';
 import { createLcaInMemoryMessagesReader } from './messageService';
+import { addReaction } from './reactionStore';
 
 const log = debug('lobe-client:lca-gateway');
 
@@ -96,6 +97,25 @@ export const createLcaGatewayEventHandler = (
         'lca-gateway does not emit tool_execute; ignoring toolCallId=%s',
         (event.data as { toolCallId?: string } | undefined)?.toolCallId,
       );
+      return;
+    }
+
+    // `reaction_added` is an LCA extension event that is not part of the
+    // native AgentStreamEventType union — widen before matching.
+    if ((event.type as string) === 'reaction_added') {
+      // LCA-only wire event: the backend translator emits snake_case fields
+      // (message_id/emoji/actor). Record it in the reaction store and drop the
+      // event — the native gateway switch has no reaction_added case.
+      const data = event.data as
+        | { message_id?: string; emoji?: string; actor?: string }
+        | undefined;
+      if (data?.message_id && data?.emoji) {
+        addReaction({
+          message_id: data.message_id,
+          emoji: data.emoji,
+          actor: data.actor || 'assistant',
+        });
+      }
       return;
     }
 

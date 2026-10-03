@@ -159,12 +159,25 @@ def _map_approval_persisted(data: dict[str, Any], *, parent: str | None) -> dict
     return None
 
 
+def _map_reaction_added(data: dict[str, Any], *, parent: str | None) -> dict[str, Any]:
+    del parent
+    return {
+        "event": {
+            "type": "ReactionAdded",
+            "message_id": str(data.get("message_id") or ""),
+            "emoji": str(data.get("emoji") or ""),
+            "actor": str(data.get("actor") or "assistant"),
+        },
+    }
+
+
 _CATALOG_HANDLERS = {
     "tool.started.v1": _map_tool_started,
     "tool.invoked.v1": _map_tool_invoked,
     "tool.denied.v1": _map_tool_denied,
     "session.checkpoint.v1": _map_session_checkpoint,
     "approval.persisted.v1": _map_approval_persisted,
+    "reaction.added.v1": _map_reaction_added,
 }
 
 
