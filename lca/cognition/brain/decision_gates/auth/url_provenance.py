@@ -41,10 +41,7 @@ def is_auth_intent_url(url: str) -> bool:
 
     # Check OAuth query parameters
     query_params = parse_qs(parsed.query)
-    if any(k in _AUTH_QUERY_KEYS for k in query_params):
-        return True
-
-    return False
+    return any(k in _AUTH_QUERY_KEYS for k in query_params)
 
 
 def _get_provenance_set(state: AgentState) -> set[str]:
