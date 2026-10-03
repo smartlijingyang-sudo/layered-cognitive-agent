@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.execution.decision import Observation
 from lca.infrastructure.connectors.core.exceptions import ConnectionNotActiveError
