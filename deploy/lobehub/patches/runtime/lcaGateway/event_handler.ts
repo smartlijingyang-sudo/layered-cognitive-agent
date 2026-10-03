@@ -119,6 +119,34 @@ export const createLcaGatewayEventHandler = (
       return;
     }
 
+    // `activity_updated` is an LCA extension wire event emitted by the
+    // EventTranslator alongside tool_start/tool_end. The native gateway
+    // switch has no case for it, so without this branch the status drawer's
+    // 「动态」 tab would never receive live run/tool activity. Dispatch it to
+    // the window where AssistantStatusDrawer listens for
+    // `lca:activity_updated` and patches the activity list in place.
+    if ((event.type as string) === 'activity_updated') {
+      const data = event.data as
+        | {
+            id?: string;
+            runId?: string;
+            assistantId?: string;
+            category?: string;
+            title?: string;
+            summary?: string;
+            status?: string;
+            icon?: string;
+            params?: Record<string, unknown>;
+            resultSummary?: string;
+            durationMs?: number;
+          }
+        | undefined;
+      if (data?.id) {
+        window.dispatchEvent(new CustomEvent('lca:activity_updated', { detail: data }));
+      }
+      return;
+    }
+
     let nextEvent = event;
     const store = get();
 

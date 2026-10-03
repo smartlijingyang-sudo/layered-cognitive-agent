@@ -526,6 +526,46 @@ describe('createLcaGatewayEventHandler (multi-run / multi-LLM)', () => {
     expect(runLifecycle.completeRun).not.toHaveBeenCalled();
     expect(store.completeOperation).not.toHaveBeenCalled();
   });
+
+  it('dispatches lca:activity_updated to the window for live status drawer updates', async () => {
+    const { store } = createStore();
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+    const handler = createLcaGatewayEventHandler(() => store, {
+      assistantMessageId: 'assistant-msg',
+      context,
+      operationId: 'op-1',
+    });
+
+    handler(
+      makeEvent('activity_updated' as never, {
+        id: 'call-1',
+        runId: 'run-1',
+        assistantId: 'agent-1',
+        category: 'command',
+        title: 'Running command',
+        summary: 'ls -la',
+        status: 'running',
+        icon: '💻',
+        params: { command: 'ls -la' },
+      } as never, 1),
+    );
+
+    // The LCA wire event is consumed here: it must not fall through to the
+    // native switch (which has no activity_updated case), and it must
+    // surface on the window so AssistantStatusDrawer can patch the activity
+    // list in real time.
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'lca:activity_updated',
+        detail: expect.objectContaining({
+          id: 'call-1',
+          runId: 'run-1',
+          status: 'running',
+          category: 'command',
+        }),
+      }),
+    );
+  });
 });
 
 // Patch-level lock for the LCA HITL state-convergence PR. These tests read the
