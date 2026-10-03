@@ -9,6 +9,7 @@ writes, no reducer calls.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 
 from lca.contracts.atoms.control.slot import ControlSlot
@@ -35,6 +36,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.nodes.visit_metrics import VisitMetricsMixin
 
 
 def _decision_id(decision: object) -> str:
@@ -42,7 +44,7 @@ def _decision_id(decision: object) -> str:
 
 
 @dataclass(frozen=True, slots=True)
-class RememberWriteExecutor:
+class RememberWriteExecutor(VisitMetricsMixin):
     """Primitive: mint envelope + dispatch to ``effect_gateway``; emit envelope."""
 
     semantic_name: str = "phase.remember.write"
@@ -62,6 +64,21 @@ class RememberWriteExecutor:
         context: NodeContext,
         input: NodeInput,
     ) -> NodeOutput:
+        """Protocol entry — time the visit, then delegate to ``_node_execute``.
+
+        todo-28 C1 observability: additive only, visit behavior unchanged.
+        """
+        start = time.perf_counter()
+        try:
+            return await self._node_execute(context, input)
+        finally:
+            self.record_visit((time.perf_counter() - start) * 1000.0)
+
+    async def _node_execute(
+        self,
+        context: NodeContext,
+        input: NodeInput,
+    ) -> NodeOutput:
         runtime = context.runtime or {}
         decision = input.port_values.get(PortName("decision"))
         observation = input.port_values.get(PortName("observation"))
@@ -71,6 +88,7 @@ class RememberWriteExecutor:
 
         # Fast-Path / Rejection: if admitted is explicitly False, skip minting envelope
         if admitted is False or decision is None or observation is None or reflection is None:
+            self.note_fast_path()
             return NodeOutput(
                 port_values={
                     PortName("envelope"): None,
