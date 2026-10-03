@@ -91,6 +91,16 @@ def lobehub_stop(ctx: PipelineContext) -> None:
     ctx.console.service_state("lobehub", state)
 
 
+@register_step("lobehub.heal")
+def lobehub_heal(ctx: PipelineContext) -> None:
+    """Heal LobeHub dev server (re-apply broken patches, revive Vite SPA)."""
+    svc = ctx.registry.get("lobehub")
+    state = svc.heal()
+    ctx.console.service_state("lobehub", state)
+    if not state.is_healthy:
+        ctx.fail("LobeHub failed to heal")
+
+
 # ── Daemon Steps ──────────────────────────────────────────────────────
 
 
@@ -254,6 +264,8 @@ def stack_heal(ctx: PipelineContext) -> None:
         ctx.failed = True
     # 2) 外部平台服务
     for name in STATUS_SERVICES:
+        if name == "kernel_serve":
+            continue
         svc = ctx.registry.get(name)
         try:
             state = svc.heal()

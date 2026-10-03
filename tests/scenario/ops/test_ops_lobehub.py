@@ -409,3 +409,12 @@ def test_heal_runs_patch_engine_in_place_when_markers_broken(tmp_path: Path) -> 
     start.assert_not_called()
     assert invoked and invoked[0][0] == "python3"
     assert state.status == ServiceStatus.RUNNING
+
+
+def test_lobehub_heal_step_registered() -> None:
+    """lobehub.heal step must be registered in the pipeline step registry."""
+    import lca.infrastructure.cli.steps.steps  # noqa: F401
+    from lca.infrastructure.cli.pipeline.pipeline import get_step
+
+    step = get_step("lobehub.heal")
+    assert callable(step)

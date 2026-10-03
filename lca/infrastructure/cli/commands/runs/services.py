@@ -24,7 +24,7 @@ def register(app: typer.Typer) -> None:
 
     @app.command()
     def lobehub(
-        action: str = typer.Argument(None, help="start | stop | restart | status | ensure"),
+        action: str = typer.Argument(None, help="start | stop | restart | status | ensure | heal"),
         json_mode: bool = typer.Option(False, "--json", help="JSON，给 agent"),
         quiet: bool = typer.Option(False, "--quiet", "-q", help="少输出"),
         config: Path | None = typer.Option(None, "--config", "-c", help="配置文件"),
@@ -35,8 +35,9 @@ def register(app: typer.Typer) -> None:
                 "lobehub  Next :3010 + Vite SPA :9876\n"
                 "  日志    .lca-ops/lobehub.log（Next）/ lobehub-spa.log（Vite）\n"
                 "  排障    docs/debug/lobehub-frontend-debug.md\n"
-                "  动作    start | stop | restart | status | ensure\n"
+                "  动作    start | stop | restart | status | ensure | heal\n"
                 "  ensure  同步源码、打补丁、写 .env、bun install\n"
+                "  heal    自愈：补打失效补丁，单独拉起退出的 Vite SPA\n"
                 "  注意    lobehub 自身不带 LCA 后端;后端进程见 ./scripts/lca-ops kernel-restart\n"
                 "  例子    ./scripts/lca-ops lobehub restart\n"
                 "          ./scripts/lca-ops journal logs lobehub-spa\n"
@@ -49,9 +50,10 @@ def register(app: typer.Typer) -> None:
             "restart": "lobehub.restart",
             "status": "stack.status",
             "ensure": "lobehub.ensure",
+            "heal": "lobehub.heal",
         }
         if action not in step_map:
-            ctx.console.error(f"未知动作 {action}。用: start stop restart status ensure")
+            ctx.console.error(f"未知动作 {action}。用: start stop restart status ensure heal")
             raise typer.Exit(1)
         pipeline = build_pipeline(f"lobehub.{action}", [step_map[action]])
         pipeline.execute(ctx)

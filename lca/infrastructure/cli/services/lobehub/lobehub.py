@@ -373,11 +373,15 @@ class LobeHubService:
         if current.is_running and not current.next_action:
             return current
 
+        spa_down = not any(c.name == "spa" and c.ok for c in current.checks)
+        next_up = any(c.name == "dev" and c.ok for c in current.checks)
+        patches_broken = any(c.name == "patches" and not c.ok for c in current.checks) or (
+            current.next_action.startswith("python3 ") or "broken" in current.detail
+        )
+
         # Patch drift/broken → run the patch engine in place; do NOT stop Next.
         # The dev server will HMR the patched files.
-        if (current.is_running or current.status == ServiceStatus.DEGRADED) and (
-            current.next_action.startswith("python3 ") or "broken" in current.detail
-        ):
+        if (current.is_running or current.status == ServiceStatus.DEGRADED) and patches_broken:
             patch_script = self._root / "deploy" / "lobehub" / "patch_lobehub.py"
             if patch_script.exists():
                 with suppress(subprocess.SubprocessError, OSError):
@@ -388,13 +392,12 @@ class LobeHubService:
                         timeout=60,
                     )
                 self._verify_cache = None
+            if not spa_down:
                 return self.state()
 
-        spa_down = not any(c.name == "spa" and c.ok for c in current.checks)
-        next_up = any(c.name == "dev" and c.ok for c in current.checks)
-
-        if next_up and spa_down and current.next_action.endswith("heal"):
+        if next_up and spa_down:
             self._ensure_spa()
+            self._spa_ready()
             return self.state()
 
         if current.is_running:
@@ -793,7 +796,7 @@ class LobeHubService:
             "NEXT_PUBLIC_LCA_GATEWAY_URL": gateway_ws,
             "NEXT_PUBLIC_LCA_HOST_CONSOLE": os.environ.get("NEXT_PUBLIC_LCA_HOST_CONSOLE", "0"),
             "RAYON_NUM_THREADS": os.environ.get("RAYON_NUM_THREADS", "2"),
-            "NODE_OPTIONS": os.environ.get("NODE_OPTIONS", "--max-old-space-size=2560"),
+            "NODE_OPTIONS": os.environ.get("NODE_OPTIONS", "--max-old-space-size=4096"),
         }
 
     def _spawn_script(self, script: str, log_name: str) -> int | None:
@@ -804,6 +807,7 @@ class LobeHubService:
             proc = subprocess.Popen(
                 ["bun", "run", script],
                 cwd=self._dir,
+                stdin=subprocess.DEVNULL,
                 env=self._child_env(),
                 stdout=log_handle,
                 stderr=subprocess.STDOUT,

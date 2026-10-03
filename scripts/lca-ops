@@ -27,4 +27,7 @@ export LCA_HOME="${LCA_HOME:-${HOME}/.lca}"
 if [ "${LCA_USE_UV:-0}" = "1" ] && command -v uv >/dev/null 2>&1; then
   exec uv run python3 -m lca.infrastructure.cli.cli "$@"
 fi
+if [ -x "${ROOT}/.venv/bin/python3" ]; then
+  exec "${ROOT}/.venv/bin/python3" -m lca.infrastructure.cli.cli "$@"
+fi
 exec python3 -m lca.infrastructure.cli.cli "$@"
