@@ -329,13 +329,6 @@ class DeclarativeExecution:
         from dataclasses import field as _field
 
         from lca.contracts.models.core.policy.stop import StopReason
-        from lca.loop.tool_error import (
-            ToolErrorKind,
-            build_failure_explanation,
-            classify_tool_error,
-            count_consecutive_tool_failures,
-            find_terminal_tool_error,
-        )
         from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
             ExecutionOutcome,
         )
@@ -343,6 +336,12 @@ class DeclarativeExecution:
             PhaseRunCursor as _ContractsPhaseRunCursor,
         )
         from lca.framework.graph.adapter import PhaseRunCursor
+        from lca.loop.tool_error import (
+            build_failure_explanation,
+            classify_tool_error,
+            count_consecutive_tool_failures,
+            find_terminal_tool_error,
+        )
 
         output_ports = dict(interpretation.output or {})
 
