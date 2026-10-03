@@ -219,13 +219,14 @@ class RoutingFileStorage:
             resolve_filename,
             spine_filename_for_run,
         )
+        from lca.infrastructure.persistence.run_paths import ensure_run_dir
 
         if spine_filename or file_name == DEFAULT_SPINE_TEMPLATE:
             file_name = spine_filename_for_run(Path(run_dir).name)
         else:
             file_name = resolve_filename(file_name, Path(run_dir).name)
         self._path = Path(run_dir) / file_name
-        Path(run_dir).mkdir(parents=True, exist_ok=True)
+        ensure_run_dir(Path(run_dir))
         self._fd = os.open(
             str(self._path),
             os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_CLOEXEC,
