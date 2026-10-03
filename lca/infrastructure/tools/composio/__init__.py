@@ -160,7 +160,9 @@ class ComposioActionExecutor:
         self._identifier = identifier
 
     async def invoke(self, tool_slug: str, params: dict[str, Any]) -> Observation:
-        from lca.infrastructure.connectors.core.adapter import format_connection_not_active_observation
+        from lca.infrastructure.connectors.core.adapter import (
+            format_connection_not_active_observation,
+        )
         from lca.infrastructure.connectors.core.exceptions import ConnectionNotActiveError
 
         try:

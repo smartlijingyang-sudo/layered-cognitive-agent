@@ -8,7 +8,6 @@ user messages), blocking hallucinated auth links at the cognitive boundary.
 from __future__ import annotations
 
 import re
-from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from lca.cognition.brain.decision_gates.chained.chained import record_gate_decided
