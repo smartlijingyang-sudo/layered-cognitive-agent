@@ -22,7 +22,7 @@ def test_projector_folds_events_deterministically():
     item1 = projector.feed_event(start_ev)
     assert item1 is not None
     assert item1.status == ActivityStatus.RUNNING
-    assert item1.title == "Running command"
+    assert item1.title == "执行 ls 指令"
     assert "ls -la" in item1.summary
     assert item1.category == ActivityCategory.COMMAND
 

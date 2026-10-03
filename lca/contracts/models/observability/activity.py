@@ -40,7 +40,6 @@ class ActivityItem(BaseModel):
     params: dict[str, Any] = Field(default_factory=dict)
     result_summary: str | None = None
     is_system: bool = False
-    tool_name: str = ""
     current_step: str | None = None
 
 

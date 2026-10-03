@@ -145,7 +145,6 @@ class ActivityProjector:
                 icon=icon,
                 tool_name=tool_name,
                 params=args,
-                tool_name=tool_name,
                 current_step=ActivityIntentNamer.live_step(tool_name, args),
             )
             self._save(item)
@@ -238,7 +237,6 @@ class ActivityProjector:
                     icon=icon,
                     tool_name=tool_name,
                     params=args,
-                    tool_name=tool_name,
                     current_step=None,
                 )
 
@@ -305,7 +303,6 @@ class ActivityProjector:
                 if len(res_content) > 100
                 else res_content,
                 is_system=existing.is_system,
-                tool_name=existing.tool_name or tool_name,
                 current_step=None,
             )
             self._save(updated)
@@ -334,7 +331,6 @@ class ActivityProjector:
             params=existing.params,
             result_summary="User cancelled operation",
             is_system=existing.is_system,
-            tool_name=existing.tool_name,
             current_step=None,
         )
         self._save(cancelled)
@@ -463,7 +459,6 @@ class ActivityProjector:
                         tool_name=tool_name,
                         params=args,
                         result_summary=result_summary,
-                        tool_name=tool_name,
                         current_step=None,
                     )
                     if asst_id not in self._items:
