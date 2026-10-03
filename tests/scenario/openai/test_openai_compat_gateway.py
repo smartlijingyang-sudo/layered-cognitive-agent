@@ -45,6 +45,17 @@ def _scripted_boot_key(monkeypatch: pytest.MonkeyPatch) -> None:
         "lca.infrastructure.llm.config.llm_credentials",
         lambda: ("dummy", None, None),
     )
+    # Hermeticity: llm_openai_credentials() re-runs prepare_llm_environ()
+    # per request, and load_dotenv_if_present() walks up from the pytest
+    # *process* CWD -- launching pytest from the repo checkout (whose
+    # git-ignored .env carries a real LLM_API_KEY) silently resurrects the
+    # key after conftest deleted it and flips the no-key tests to 200.
+    # Neutralize dotenv discovery for this module so credential resolution
+    # here is purely env-driven, which is exactly the contract under test.
+    monkeypatch.setattr(
+        "lca.infrastructure.llm.config.load_dotenv_if_present",
+        lambda *args, **kwargs: None,
+    )
 
 
 class TestOpenAiCompatGateway(unittest.TestCase):
