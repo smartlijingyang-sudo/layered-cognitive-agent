@@ -12,6 +12,7 @@ import binascii
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 
 _SECRET = re.compile(
     r"(?i)(\bsk-(?:[A-Za-z0-9]+-){0,3}[A-Za-z0-9]{8,}\b"
@@ -158,7 +159,7 @@ def render_curated_memory_markdown(
         recorded_on = ""
         if isinstance(created_at_ms, (int, float)) and created_at_ms > 0:
             import datetime
-            dt = datetime.datetime.fromtimestamp(created_at_ms / 1000.0, tz=datetime.timezone.utc)
+            dt = datetime.datetime.fromtimestamp(created_at_ms / 1000.0, tz=datetime.UTC)
             recorded_on = dt.strftime("%Y-%m-%d")
 
         claims.append(
