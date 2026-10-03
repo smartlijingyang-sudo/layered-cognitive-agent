@@ -64,10 +64,45 @@ def make_lifespan(
     async def _lifespan(app: Any) -> AsyncIterator[dict[str, Any]]:
         # Startup: 装 ctx 到 app.state(handler 通过 request.app.state.ctx 读)
         app.state.ctx = ctx
-        yield {"ctx": ctx}
-        # Shutdown: 不主动 del — 进程级 K6 LIFO dispose 走的是 ctx.dispose(),
-        # app.state 上 ctx 引用被一并回收(无副作用)。测试驱动 lifespan 后
-        # 仍能读 app.state.ctx(跟深 seek app.current 同款语义)。
+
+        # 启动常驻 Cron 调度守护协程（ADR-0268 生产运行态）
+        cron_daemon = None
+        try:
+            import contextlib
+            from pathlib import Path
+
+            from lca.domain.cron.store import MultiAssistantCronStore
+            from lca.infrastructure.cron.daemon import CronDaemonService
+            from lca.infrastructure.path.locator import get_lca_home
+
+            lca_home = get_lca_home()
+            store = MultiAssistantCronStore(lca_home / "assistants")
+            raw_lock_dir = getattr(ctx, "lock_dir", None)
+            lock_dir = Path(raw_lock_dir) if raw_lock_dir else (lca_home / "locks")
+            workspace_path = str(getattr(ctx, "workspace", "") or lca_home)
+            session_store = None
+            if hasattr(ctx, "inject"):
+                with contextlib.suppress(Exception):
+                    session_store = ctx.inject("session_store")
+
+            cron_daemon = CronDaemonService(
+                store=store,
+                lock_dir=lock_dir,
+                workspace_path=workspace_path,
+                session_store=session_store,
+            )
+            await cron_daemon.start()
+            app.state.cron_daemon = cron_daemon
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).exception("lifespan: failed to start CronDaemonService")
+
+        try:
+            yield {"ctx": ctx}
+        finally:
+            if cron_daemon is not None:
+                await cron_daemon.stop()
 
     # @asynccontextmanager 把 async function 转成 sync context manager;
     # Starlette 期望 sync generator function,运行时与 cast 标注一致。

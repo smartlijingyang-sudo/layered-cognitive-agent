@@ -19,7 +19,7 @@ from typing import Literal
 
 from lca.contracts.models.cron.models import CronJob, CronRun, TargetReceipt
 
-__all__ = ["CronStore"]
+__all__ = ["CronStore", "MultiAssistantCronStore"]
 
 
 def _atomic_write_text(path: Path, payload: str) -> None:
@@ -137,3 +137,64 @@ class CronStore:
             except ValueError:
                 continue
         return runs
+
+
+class MultiAssistantCronStore:
+    """跨全部助理 home 的 CronStore 聚合代理（用于后台 CronDaemonService 统一调度）。"""
+
+    def __init__(self, assistants_dir: Path | None = None) -> None:
+        if assistants_dir is None:
+            from lca.infrastructure.path.locator import get_lca_home
+
+            self._dir = get_lca_home() / "assistants"
+        else:
+            self._dir = Path(assistants_dir)
+
+    def _stores(self) -> dict[str, CronStore]:
+        if not self._dir.is_dir():
+            return {}
+        stores: dict[str, CronStore] = {}
+        for p in self._dir.iterdir():
+            if p.is_dir() and (p / "cron").is_dir():
+                stores[p.name] = CronStore(p)
+        return stores
+
+    def list_jobs(self) -> list[CronJob]:
+        all_jobs: list[CronJob] = []
+        for s in self._stores().values():
+            all_jobs.extend(s.list_jobs())
+        return all_jobs
+
+    def get_job(self, job_id: str) -> CronJob | None:
+        for s in self._stores().values():
+            j = s.get_job(job_id)
+            if j is not None:
+                return j
+        return None
+
+    def append_run(
+        self,
+        job_id: str,
+        *,
+        outcome: Literal["completed", "runtime_failure", "timed_out", "superseded"],
+        finished_at: datetime | None = None,
+        receipts: tuple[TargetReceipt, ...] = (),
+        run_id: str | None = None,
+    ) -> str:
+        for s in self._stores().values():
+            if s.get_job(job_id) is not None:
+                return s.append_run(
+                    job_id,
+                    outcome=outcome,
+                    finished_at=finished_at,
+                    receipts=receipts,
+                    run_id=run_id,
+                )
+        return f"{job_id}-{uuid.uuid4().hex}"
+
+    def list_runs(self, job_id: str) -> list[CronRun]:
+        for s in self._stores().values():
+            runs = s.list_runs(job_id)
+            if runs:
+                return runs
+        return []
