@@ -7,6 +7,10 @@
 
 ### 图 1 / 图 3：任务执行详情视图
 
+![任务详情：冷启动代码证据](images/activity-task-detail-coldstart.png)
+
+![任务详情：grep 检索证据](images/activity-task-detail-grep.png)
+
 这是一个**任务**（task）的执行轨迹面板，标题「验证Activity重启与事件完整性」，右上角「已完成」是任务终态。
 
 - **左侧**：步骤清单。✓ 是已完成的步骤（读代码、建 worktree、跑验证脚本……），◐/□ 是待办。点击步骤，右侧显示该步骤产出的**证据**。
@@ -16,6 +20,8 @@
   - 结论：冷启动路径已覆盖，信息完整，无执行错误。
 
 ### 图 2：助手动态栏（Activity Feed）
+
+![助手右侧抽屉“今天”动态栏](images/activity-drawer-today.png)
 
 这是**助手右侧抽屉**的「动态」tab（`AssistantStatusDrawer.tsx`），按 `今天 / 昨天 / 更早` 分组。每一行就是一个 **Activity**：
 
