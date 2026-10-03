@@ -364,8 +364,23 @@ async def update_standing_file(request: Request) -> JSONResponse:
                 if user_store is not None and user_id:
                     with contextlib.suppress(Exception):
                         user_store.update_user_md(user_id, new_content)
-        elif filename in ("MEMORY.md", "CONSTITUTION.md"):
-            # MEMORY.md 与 CONSTITUTION.md 不进 catalog profile digest，直接原子写盘
+        elif filename == "MEMORY.md":
+            # MEMORY.md 为纯函数投影，编辑操作必须经由 MemoryEditSyncService 同步回写至
+            # memory/semantic.json 唯一真理，并重新生成规范 Markdown 投影，严禁直接写盘破坏不变量 (INV-MEM-06)
+            from lca.infrastructure.memory.assistant_memory import AssistantMemory
+            from lca.infrastructure.memory.contextfiles.service.memory_edit_sync import (
+                MemoryEditSyncService,
+            )
+
+            assistant_memory = AssistantMemory(home)
+            sync_service = MemoryEditSyncService(assistant_memory)
+            sync_service.apply_markdown_edit(new_content)
+            with contextlib.suppress(Exception):
+                await assistant_memory.refresh_user_profile()
+            if file_path.is_file():
+                new_content = file_path.read_text(encoding="utf-8")
+        elif filename == "CONSTITUTION.md":
+            # CONSTITUTION.md 不进 catalog profile digest，直接原子写盘
             file_path.write_text(new_content, encoding="utf-8")
     except AssistantCatalogError as exc:
         return _error_envelope(

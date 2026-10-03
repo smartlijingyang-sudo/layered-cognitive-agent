@@ -191,15 +191,24 @@ def test_standing_file_update_optimistic_lock_conflict(tmp_path: Any) -> None:
     assert "current_content" in err
 
 
-def test_standing_file_update_memory_md_direct_write(tmp_path: Any) -> None:
-    app, _, assistant_id = _create_test_app(tmp_path)
+def test_standing_file_update_memory_md_syncs_to_semantic_and_projects(tmp_path: Any) -> None:
+    """PUT MEMORY.md does not direct-write; it reconciles to semantic.json and re-projects (INV-MEM-06)."""
+    import json
+
+    app, catalog, assistant_id = _create_test_app(tmp_path)
     client = TestClient(app)
 
     read_resp = client.get(f"/v1/assistants/{assistant_id}/standing-files/MEMORY.md")
     assert read_resp.status_code == 200
     current_hash = read_resp.json()["content_hash"]
 
-    new_memory = "# MEMORY.md\n- 用户偏好使用 Rust 和 Python\n- 严禁未经性能评估引入重依赖"
+    new_memory = (
+        "# 长期记忆\n\n"
+        "## Preferences\n"
+        "- 用户偏好使用 Rust 和 Python\n\n"
+        "## Facts\n"
+        "- 严禁未经性能评估引入重依赖\n"
+    )
     put_resp = client.put(
         f"/v1/assistants/{assistant_id}/standing-files/MEMORY.md",
         json={"content": new_memory, "expected_hash": current_hash},
@@ -207,9 +216,24 @@ def test_standing_file_update_memory_md_direct_write(tmp_path: Any) -> None:
     assert put_resp.status_code == 200
     assert put_resp.json()["filename"] == "MEMORY.md"
 
+    # 1. 验证磁盘上的 memory/semantic.json 真实沉淀了这两条记录
+    spec = catalog.get(assistant_id)
+    semantic_json_path = Path(spec.home_path) / "memory" / "semantic.json"
+    assert semantic_json_path.is_file()
+    records = json.loads(semantic_json_path.read_text(encoding="utf-8"))
+    active_contents = [r["content"] for r in records if not r.get("deleted")]
+    assert "用户偏好使用 Rust 和 Python" in active_contents
+    assert "严禁未经性能评估引入重依赖" in active_contents
+
+    # 2. 验证 GET MEMORY.md 返回的是规范的纯函数投影，带有锚点与头部骨架
     verify_resp = client.get(f"/v1/assistants/{assistant_id}/standing-files/MEMORY.md")
     assert verify_resp.status_code == 200
-    assert verify_resp.json()["content"] == new_memory
+    projected = verify_resp.json()["content"]
+    assert "## Preferences" in projected
+    assert "## Facts" in projected
+    assert "用户偏好使用 Rust 和 Python" in projected
+    assert "严禁未经性能评估引入重依赖" in projected
+    assert "<!-- id:mem_" in projected
 
 
 class _FakeOwnership:
@@ -299,14 +323,21 @@ def test_standing_file_memory_md_uninitialized_returns_template_and_supports_ini
     assert put_resp.status_code == 200
     assert put_resp.json()["filename"] == "MEMORY.md"
 
-    # 4. 断言磁盘物理文件已被创建落盘
+    # 4. 断言磁盘物理文件已被创建落盘且包含相应偏好条目与骨架
     assert memory_path.is_file()
-    assert memory_path.read_text(encoding="utf-8") == first_memory
+    projected_text = memory_path.read_text(encoding="utf-8")
+    assert "偏好使用 Python 和 Rust" in projected_text
+    assert "## Preferences" in projected_text
+    assert "## Facts" in projected_text
 
-    # 5. 再次 GET 应返回最新落盘的内容
+    # 5. 再次 GET 应返回最新落盘的投影内容
     verify_resp = client.get(f"/v1/assistants/{assistant_id}/standing-files/MEMORY.md")
     assert verify_resp.status_code == 200
-    assert verify_resp.json()["content"] == first_memory
+    assert verify_resp.json()["content"] == projected_text
+
+    # 6. semantic.json 必须已被持久化
+    semantic_path = Path(spec.home_path) / "memory" / "semantic.json"
+    assert semantic_path.is_file()
 
 
 def test_standing_file_memory_md_initial_write_with_empty_hash_compatibility(
@@ -331,7 +362,11 @@ def test_standing_file_memory_md_initial_write_with_empty_hash_compatibility(
     )
     assert put_resp.status_code == 200
     assert memory_path.is_file()
-    assert memory_path.read_text(encoding="utf-8") == custom_content
+    projected = memory_path.read_text(encoding="utf-8")
+    assert "纯手工新建记忆条目" in projected
+    assert "## Facts" in projected
+    semantic_path = Path(spec.home_path) / "memory" / "semantic.json"
+    assert semantic_path.is_file()
 
 
 def test_constitution_template_contains_core_charter() -> None:

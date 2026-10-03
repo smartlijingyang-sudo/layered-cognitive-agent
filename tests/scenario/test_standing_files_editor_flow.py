@@ -299,7 +299,9 @@ def test_inv07_uninitialized_memory_md_full_lifecycle_and_prompt_injection(
 
     # 6. 物理磁盘落盘断言与 I-A13 不变量断言
     assert memory_file.is_file()
-    assert memory_file.read_text(encoding="utf-8") == first_content
+    assert (home / "memory" / "semantic.json").is_file()
+    disk_memory_text = memory_file.read_text(encoding="utf-8")
+    assert "偏好 Python 和 Rust 技术栈" in disk_memory_text
     assert catalog.get(assistant_id).revision_seq == initial_seq, (
         "MEMORY.md 写入必须不触发 revision_seq (I-A13)"
     )
@@ -313,13 +315,15 @@ def test_inv07_uninitialized_memory_md_full_lifecycle_and_prompt_injection(
     # 8. 后续编辑：二次读取并成功保存演进
     read_again = client.get(f"/v1/assistants/{assistant_id}/standing-files/MEMORY.md")
     assert read_again.status_code == 200
-    assert read_again.json()["content"] == first_content
+    assert read_again.json()["content"] == disk_memory_text
     disk_hash = read_again.json()["content_hash"]
 
-    second_content = first_content + "- 偏好短回复。\n"
+    second_content = disk_memory_text + "\n- 偏好短回复。\n"
     put_again = client.put(
         f"/v1/assistants/{assistant_id}/standing-files/MEMORY.md",
         json={"content": second_content, "expected_hash": disk_hash},
     )
     assert put_again.status_code == 200
-    assert memory_file.read_text(encoding="utf-8") == second_content
+    updated_memory_text = memory_file.read_text(encoding="utf-8")
+    assert "偏好短回复" in updated_memory_text
+    assert "偏好 Python 和 Rust 技术栈" in updated_memory_text

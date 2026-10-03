@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any
 
 from lca.contracts.atoms.enums.enums import MemoryCategory, MemoryLayer
 from lca.contracts.atoms.ids.ids import new_id
@@ -147,6 +146,10 @@ class MemoryEditSyncService:
             if old_id not in seen_record_ids:
                 self._memory.remove(old_id)
                 deleted_count += 1
+
+        # Ensure projection is always fresh on disk even if 0 claim deltas occurred
+        if hasattr(self._memory, "_project_curated"):
+            self._memory._project_curated(())
 
         _log.info(
             "MemoryEditSync applied: added=%d superseded=%d deleted=%d",

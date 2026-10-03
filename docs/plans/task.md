@@ -572,10 +572,10 @@
 | CAP-TASK-2-ROUTE | 传输层带外能力解析端点 (`POST /api/connectors/auth-intents/{id}/resolve`) | Completed | 落地 /composio/auth-intents/{id}/resolve 与 /api/connectors/auth-intents/{id}/resolve，支持 Header X-User-ID 多租户鉴权、300s TTL 与 CORS，单测 3/3 全绿，commit c6d344df6 (INV-CAP-03) |
 | CAP-TASK-3-TOOL-ZERO-URL | 工具与适配层彻底消解 URL 暴露 (`composioConnect` 与 `ConnectorPreExecutionGuard`) | Completed | composioConnect 与 format_connection_not_active_observation 彻底剔除裸 URL，接入 IntentVault 生成短门票并输出 intentId 卡片标签，单测 35/35 全绿，commit 7d5d6b38e (INV-CAP-01) |
 | CAP-TASK-4-GATEWAY-FALLBACK | 网关层确定性卡片兜底保底挂载 (`run_session_writer.py` / Gateway) | Completed | 落地 extract_pending_intents_from_events 与 ensure_intent_widget_in_assistant_message，并在 RunSessionWriter.append_assistant_message 闭环保底挂载，单测 5/5 全绿，commit 653b3feb2 (INV-CAP-04) |
-| CAP-TASK-5-FRONTEND-PATCH | 前端补丁升级 (`ConnectorAuthCard.tsx` 与 `connector_auth_card.py`) | In Progress | 升级 ConnectorAuthCard 支持 intentId 异步兑换，connector_auth_card.py 补丁支持 intentId 解析与正文脱敏，验证 patch 门禁 |
-| CAP-TASK-6-ADR-AND-E2E | ADR-0280 沉淀与全链路端到端集成验收 | Pending | 待执行 |
+| CAP-TASK-5-FRONTEND-PATCH | 前端补丁升级 (`ConnectorAuthCard.tsx` 与 `connector_auth_card.py`) | Completed | 升级 ConnectorAuthCard 支持 intentId 异步兑换，connector_auth_card.py 补丁支持 intentId 解析与生产域名识别，patch 校验 45/45 全绿，commit 6f790dbd3 (INV-CAP-05) |
+| CAP-TASK-6-ADR-AND-E2E | ADR-0280 沉淀与全链路端到端集成验收 | In Progress | 编写 docs/adr/0280-zero-model-exposure-for-capable-urls.md 与 tests/scenario/test_connector_capability_intent_e2e.py |
 | BRAINSTORM-STATELESS-MEMORY-PROJECTION | 长期记忆「一源一镜，镜无状态」架构设计与呈批 | Completed | 厘清底层 JSON 唯一真值、MEMORY.md 纯函数投影、骨架不坍塌及编辑输入事件解析器，已落盘 docs/plans/2026-10-04-stateless-memory-projection-and-writeback-design.md 与 plan (commit 7a85746d1) |
 | MEM-TASK-1-PURE-PROJECTOR | 纯函数投影器与模板骨架保底 (`curated.py`) | Completed | 实现 render_curated_memory_markdown、保留 ## Preferences / ## Facts 骨架与行尾 <!-- id:mem_xxx --> 锚点，单测 23/23 全绿，commit 35167f829 (INV-MEM-01~03) |
 | MEM-TASK-2-EDIT-SYNC-SERVICE | Markdown 编辑事件解析器 (`MemoryEditSyncService`) | Completed | 解析提交的 Markdown，比对活跃记录计算 ADD/SUPERSEDE/DELETE 原子操作并驱动 AssistantMemory，单测 25/25 全绿，commit d7671e324 (INV-MEM-04~05) |
-| MEM-TASK-3-ROUTE-GATE | Webserver Standing File 写入窄门拦截 (`standing_files.py`) | In Progress | 拦截 PUT MEMORY.md 严禁直接写盘，转由 MemoryEditSyncService 同步至 semantic.json 并重新投影 (INV-MEM-06) |
-| MEM-TASK-4-INTEGRATION-E2E | 端到端集成与 Prompt 实时感知验收 (`test_memory_stateless_projection_e2e.py`) | Pending | 覆盖工具写入、编辑回写、全链路往返及 persona_from_home Prompt 加载 |
+| MEM-TASK-3-ROUTE-GATE | Webserver Standing File 写入窄门拦截 (`standing_files.py`) | Completed | 拦截 PUT MEMORY.md 严禁直接写盘，转由 MemoryEditSyncService 同步至 semantic.json 并重新投影，测试 25/25 全绿 (INV-MEM-06) |
+| MEM-TASK-4-INTEGRATION-E2E | 端到端集成与 Prompt 实时感知验收 (`test_memory_stateless_projection_e2e.py`) | In Progress | 编写端到端集成测试，覆盖工具写入、编辑回写、全链路往返及 persona_from_home Prompt 实时感知 |
