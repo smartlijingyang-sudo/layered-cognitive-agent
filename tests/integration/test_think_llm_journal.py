@@ -110,8 +110,7 @@ def _bind_run_cursor(ctx: Any, run_id: str, bridge: Any) -> Any:
     """
     from types import SimpleNamespace
 
-    from lca.cognition.body.executor.cursor_record import CursorRecord
-
+    from lca.infrastructure.observability.loop_cursor.cursor_record import CursorRecord
     from lca.infrastructure.observability.loop_cursor.persistence.coordinator import (
         NullPersistenceCoordinator,
     )
@@ -229,7 +228,7 @@ def test_think_llm_journal_populates_journal_json() -> None:
 
                     reset_capability_bindings(token)
             finally:
-                from lca.cognition.body.executor.cursor_record import CursorRecord
+                from lca.infrastructure.observability.loop_cursor.cursor_record import CursorRecord
 
                 CursorRecord.bind(cursor_token)
                 # Keep ``bound`` in scope: the fold deriver reads the
