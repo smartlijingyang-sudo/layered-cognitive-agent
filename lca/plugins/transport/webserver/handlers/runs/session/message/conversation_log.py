@@ -133,12 +133,7 @@ def fill_history_gaps(
         return list(turns)
     filled: list[ConversationTurn] = []
     for index, turn in enumerate(turns):
-        filled.append(turn)
-        if (
-            turn.role == "user"
-            and index + 1 < len(turns)
-            and turns[index + 1].role == "user"
-        ):
+        if turn.role == "user" and index + 1 < len(turns) and turns[index + 1].role == "user":
             reply = find_assistant_reply(
                 assistant_home=assistant_home,
                 topic_id=topic_id,
@@ -150,7 +145,16 @@ def fill_history_gaps(
                     topic_id,
                     turn.content,
                 )
+                filled.append(turn)
                 filled.append(ConversationTurn(role="assistant", content=reply))
+            else:
+                log.warning(
+                    "conversation_log.orphan_dropped topic_id=%s user_text=%.60s",
+                    topic_id,
+                    turn.content,
+                )
+        else:
+            filled.append(turn)
     return filled
 
 

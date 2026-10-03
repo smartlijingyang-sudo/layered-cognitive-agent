@@ -116,4 +116,4 @@ def test_status_snapshot_endpoint_returns_aggregated_views(tmp_path: Path):
     cancelled_item = next((a for a in act2 if a["id"] == "call_snap_01"), None)
     assert cancelled_item is not None
     assert cancelled_item["status"] == "cancelled"
-    assert cancelled_item["result_summary"] == "User cancelled operation"
+    assert cancelled_item["result_summary"] == "用户取消了该操作"

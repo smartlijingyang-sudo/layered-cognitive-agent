@@ -5,14 +5,17 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Mapping
 from contextlib import suppress
 from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from pydantic import TypeAdapter, ValidationError
 
 from lca.contracts.atoms.ids.ids import new_id
+from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.models.cron.models import (
     AgentExecution,
@@ -99,12 +102,21 @@ _CRON_JOB_PROPERTIES: dict[str, Any] = {
 }
 
 
-def _error(message: str) -> Observation:
+def _error(
+    message: str,
+    *,
+    failure_kind: str = FAILURE_KIND_VALIDATION,
+    extra: dict[str, Any] | None = None,
+) -> Observation:
+    obs_extra: dict[str, Any] = {FAILURE_KIND: failure_kind}
+    if extra:
+        obs_extra.update(extra)
     return Observation(
         observation_id=new_id("obs"),
         success=False,
         payload=None,
         error=message,
+        extra=obs_extra,
     )
 
 
@@ -125,15 +137,19 @@ def _current_chat_id() -> str:
         if ambit is not None:
             scope = getattr(ambit, "scope", None)
             for source in (ambit, scope):
-                for attr in ("chat_id", "session_id", "conversation_id"):
+                for attr in ("chat_id", "topic_id", "session_id", "conversation_id"):
                     value = getattr(source, attr, None)
                     if isinstance(value, str) and value.strip():
                         return value.strip()
+            # 单测/CLI/solo 场景下若未注入 chat_id，回退到当前 run_id，保障审计与投递身份单调
+            run_id = getattr(ambit, "run_id", None)
+            if run_id:
+                return str(run_id).strip()
     return ""
 
 
 def _current_timezone() -> str:
-    """从运行上下文解析用户当前时区（client_timezone 同源），无则返回空串。"""
+    """从运行上下文解析用户当前时区（client_timezone 同源），无则返回系统/默认时区。"""
     from lca.infrastructure.observability.facade.run.ambit import current_run_ambit
 
     with suppress(Exception):
@@ -145,7 +161,13 @@ def _current_timezone() -> str:
                     value = getattr(source, attr, None)
                     if isinstance(value, str) and value.strip():
                         return value.strip()
-    return ""
+    with suppress(Exception):
+        link = os.path.realpath("/etc/localtime")
+        parts = link.split("/zoneinfo/")
+        if len(parts) == 2 and parts[1]:
+            ZoneInfo(parts[1])
+            return parts[1]
+    return "Asia/Shanghai"
 
 
 def _resolve_chat_id(args: Mapping[str, Any]) -> str:

@@ -38,10 +38,12 @@ __all__ = [
     "bind_run_ambit",
     "current_assistant_id",
     "current_attachment_ids",
+    "current_chat_id",
     "current_file_store",
     "current_plan_ref",
     "current_role",
     "current_run_ambit",
+    "current_topic_id",
     "current_workspace",
 ]
 
@@ -68,6 +70,10 @@ class RunAmbit:
     """ADR-0187 §3 D7：本 run 绑定的助理 id（``asst_*``）；空 = 遗留默认
     agent 路径（I-A1）。载体侧（``ScopePlan.lifecycle`` agent 级）与
     人设注入（RoleProfile 覆盖）都从本字段取真值。"""
+    chat_id: str = ""
+    """当前 run 所属的聊天/会话 id（空 = 遗留/单测路径）。"""
+    topic_id: str = ""
+    """当前 run 所属的话题 id（空 = 遗留/单测路径）。"""
 
 
 _run_ambit: ContextVar[RunAmbit | None] = ContextVar("lca_run_ambit", default=None)
@@ -117,3 +123,19 @@ def current_assistant_id() -> str:
     """Return the assistant_id bound to the current run ('' = legacy path)."""
     a = current_run_ambit()
     return a.assistant_id if a is not None else ""
+
+
+def current_chat_id() -> str:
+    """Return the chat_id bound to the current run ('' = unbound)."""
+    a = current_run_ambit()
+    if a is None:
+        return ""
+    return a.chat_id or a.topic_id
+
+
+def current_topic_id() -> str:
+    """Return the topic_id bound to the current run ('' = unbound)."""
+    a = current_run_ambit()
+    if a is None:
+        return ""
+    return a.topic_id or a.chat_id

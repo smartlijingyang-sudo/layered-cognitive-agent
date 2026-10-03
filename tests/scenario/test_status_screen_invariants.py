@@ -189,7 +189,7 @@ def test_inv_04_real_stop_cancellation_and_audit():
     cancelled = projector.cancel_activity("architect", "call_long_proc")
     assert cancelled is not None
     assert cancelled.status == ActivityStatus.CANCELLED
-    assert cancelled.result_summary == "User cancelled operation"
+    assert cancelled.result_summary == "用户取消了该操作"
 
     items = projector.get_activities("architect")
     item = next(i for i in items if i.id == "call_long_proc")
