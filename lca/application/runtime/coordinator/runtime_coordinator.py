@@ -89,10 +89,7 @@ class LcaAgentRuntimeCoordinator:
 
         await self._persist_tool_plugin_state(run_id, event, etype=etype)
 
-        envelope = self._translator.translate(stamped)
-        if envelope is None:
-            return
-        envelopes = envelope if isinstance(envelope, list) else [envelope]
+        envelopes = self._translator.translate(stamped)
         for one in envelopes:
             if one["type"] == "agent_runtime_end" and self._artifact_closure_resolver is not None:
                 closure = await self._artifact_closure_resolver(run_id)

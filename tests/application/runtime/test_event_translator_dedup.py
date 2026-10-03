@@ -21,8 +21,7 @@ def test_stream_token_followed_by_header_assistant_does_not_duplicate() -> None:
         }
     }
     out_start = t.translate(start_ev)
-    assert out_start is not None
-    assert out_start["type"] == "stream_start"
+    assert out_start[0]["type"] == "stream_start"
 
     # 2. Token streamed incrementally
     token_ev = {
@@ -32,9 +31,8 @@ def test_stream_token_followed_by_header_assistant_does_not_duplicate() -> None:
         }
     }
     out_token = t.translate(token_ev)
-    assert out_token is not None
-    assert out_token["type"] == "stream_chunk"
-    assert out_token["data"]["content"] == "你好！我是架构小助"
+    assert out_token[0]["type"] == "stream_chunk"
+    assert out_token[0]["data"]["content"] == "你好！我是架构小助"
 
     # 3. LLM call end
     end_ev = {
@@ -59,7 +57,7 @@ def test_stream_token_followed_by_header_assistant_does_not_duplicate() -> None:
         }
     }
     out_header = t.translate(header_ev)
-    assert out_header is None, f"Expected None to prevent duplicate append, but got {out_header}"
+    assert out_header == [], f"Expected [] to prevent duplicate append, but got {out_header}"
 
 
 def test_non_streamed_call_still_emits_header_content_as_fallback() -> None:
@@ -77,7 +75,6 @@ def test_non_streamed_call_still_emits_header_content_as_fallback() -> None:
         }
     }
     out_header = t.translate(header_ev)
-    assert out_header is not None
-    assert out_header["type"] == "stream_chunk"
-    assert out_header["data"]["chunkType"] == "text"
-    assert out_header["data"]["content"] == "离线非流式回复内容"
+    assert out_header[0]["type"] == "stream_chunk"
+    assert out_header[0]["data"]["chunkType"] == "text"
+    assert out_header[0]["data"]["content"] == "离线非流式回复内容"
