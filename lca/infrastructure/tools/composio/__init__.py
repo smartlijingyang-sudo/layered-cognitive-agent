@@ -160,8 +160,27 @@ class ComposioActionExecutor:
         self._identifier = identifier
 
     async def invoke(self, tool_slug: str, params: dict[str, Any]) -> Observation:
+        from lca.infrastructure.connectors.core.adapter import format_connection_not_active_observation
+        from lca.infrastructure.connectors.core.exceptions import ConnectionNotActiveError
+
         try:
+            conn = self._integration.get_connection(self._identifier)
+            if conn is None or not conn.is_active:
+                raise ConnectionNotActiveError(
+                    service=self._identifier,
+                    user_id=self._integration.settings.default_user_id,
+                    state=conn.status if conn else "NOT_CONNECTED",
+                )
             content = await self._integration.execute_action(self._identifier, tool_slug, params)
+        except ConnectionNotActiveError as exc:
+            conn_entry = self._integration.get_connection(self._identifier)
+            redirect = conn_entry.redirect_url if conn_entry else ""
+            conn_id = conn_entry.connected_account_id if conn_entry else ""
+            return format_connection_not_active_observation(
+                exc,
+                auth_url=redirect or "",
+                connection_id=conn_id or "",
+            )
         except Exception as exc:
             return Observation(
                 observation_id=new_id("obs"),
@@ -176,6 +195,7 @@ class ComposioActionExecutor:
                 "text": content,
                 "identifier": self._identifier,
                 "tool_slug": tool_slug,
+                "account_identity": getattr(conn, "account_identity", None) or conn.connected_account_id or "default",
                 "state": {"content": [{"type": "text", "text": content}]},
             },
         )
