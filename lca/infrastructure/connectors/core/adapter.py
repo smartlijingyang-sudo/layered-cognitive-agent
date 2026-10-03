@@ -27,17 +27,31 @@ def format_connection_not_active_observation(
     auth_url: str = "",
     connection_id: str = "",
 ) -> Observation:
-    """Translates a ConnectionNotActiveError into a structured Observation with widget syntax."""
+    """Translates a ConnectionNotActiveError into a structured Observation with widget syntax (Zero Model URL Exposure)."""
+    from lca.infrastructure.connectors.core.intent_vault import get_default_intent_vault
+
     app_label = get_service_label(error.service)
+    intent_id = ""
+    if auth_url:
+        vault = get_default_intent_vault()
+        intent_id = vault.create_intent(
+            service=error.service,
+            app_name=app_label,
+            auth_url=auth_url,
+            connection_id=connection_id,
+            user_id=error.user_id,
+        )
+
     widget = format_connector_auth_widget(
         app_name=app_label,
-        auth_url=auth_url,
+        intent_id=intent_id if intent_id else None,
+        auth_url="" if intent_id else auth_url,
         connection_id=connection_id,
     )
     text = (
-        f"服务 {app_label} 当前尚未连接授权。\n\n"
+        f"服务 {app_label} 当前尚未连接授权。你在回复中必须原样输出以下卡片挂载标签：\n\n"
         f"{widget}\n\n"
-        f"请通过上方卡片完成授权连接。"
+        f"严禁在回复中输出裸 URL 或假链接，前端会自动将上述标签渲染为交互式授权卡片。"
     )
     return Observation(
         observation_id=new_id("obs"),
@@ -48,7 +62,11 @@ def format_connection_not_active_observation(
             "connected": False,
             "widget": widget,
             "text": text,
-            "auth_url": auth_url,
+            "intent_id": intent_id,
             "connection_id": connection_id,
+            "display_instruction": (
+                f"服务 {app_label} 授权卡片门票已就绪。在最终回复中你必须原样包含挂载标签 '{widget}'，"
+                "严禁输出裸 URL 或脑补链接。"
+            ),
         },
     )

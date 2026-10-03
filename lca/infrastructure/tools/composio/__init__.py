@@ -24,8 +24,10 @@ MANAGEMENT_MANIFEST = ToolManifest(
             name="composioConnect",
             description=(
                 "Connect a Composio-managed third-party service via OAuth "
-                "(e.g. google-drive, gmail, slack). Returns an authorization URL "
-                "when user action is required."
+                "(e.g. google-drive, gmail, slack). Emits an interactive [widget:connector_auth?...] "
+                "ticket for user authorization. In your final response to the user, you MUST include "
+                "the exact [widget:connector_auth?...] tag verbatim so the frontend renders the "
+                "interactive authorization card. DO NOT print raw authorization URLs or markdown links."
             ),
             parameters={
                 "type": "object",
@@ -103,16 +105,32 @@ class ComposioManagementExecutor:
 
         redirect = conn.redirect_url or ""
         conn_id = conn.connected_account_id or ""
+        app_name = conn.label or service.capitalize()
+
+        from lca.infrastructure.connectors.core.intent_vault import get_default_intent_vault
+
+        intent_id = ""
+        if redirect:
+            user_id = getattr(self._integration, "user_id", None) or "default"
+            vault = get_default_intent_vault()
+            intent_id = vault.create_intent(
+                service=service,
+                app_name=app_name,
+                auth_url=redirect,
+                connection_id=conn_id,
+                user_id=user_id,
+            )
+
         widget = format_connector_auth_widget(
-            app_name=conn.label or service.capitalize(),
-            auth_url=redirect,
+            app_name=app_name,
+            intent_id=intent_id if intent_id else None,
+            auth_url="" if intent_id else redirect,
             connection_id=conn_id,
         )
         text = (
-            f"To connect {conn.label}, please authorize via the interactive card below:\n\n"
+            f"服务 {app_name} 授权门票已就绪。你在最终回复中必须原样输出以下卡片挂载标签：\n\n"
             f"{widget}\n\n"
-            f"{redirect}\n\n"
-            "After authorization the OAuth callback on LCA will refresh the connection automatically."
+            "严禁在回复中输出裸 URL 或编造链接，前端会自动将上述标签渲染为交互式授权卡片。"
         )
         return Observation(
             observation_id=new_id("obs"),
@@ -121,7 +139,12 @@ class ComposioManagementExecutor:
                 "text": text,
                 "identifier": service,
                 "connected": False,
-                "redirect_url": redirect,
+                "intent_id": intent_id,
+                "widget_tag": widget,
+                "display_instruction": (
+                    f"服务 {app_name} 授权卡片门票已就绪。在最终回复中你必须原样包含挂载标签 '{widget}'，"
+                    "严禁输出裸 URL 或脑补链接。"
+                ),
             },
         )
 

@@ -95,23 +95,28 @@ class ConnectorStateMachine:
 
 def format_connector_auth_widget(
     app_name: str,
-    auth_url: str,
-    connection_id: str,
+    auth_url: str = "",
+    connection_id: str = "",
     mode: str = "initial",
     scope: str | None = None,
+    intent_id: str | None = None,
 ) -> str:
-    """Formats standard LobeHub ConnectorAuthCard widget markup (INV-03A).
+    """Formats standard LobeHub ConnectorAuthCard widget markup (INV-03A / INV-CAP-01).
 
     Strictly produces widget syntax to trigger LobeHub's interactive card,
-    preventing fallback to raw Markdown links. Supports initial auth and
-    incremental mode (add_scope).
+    preventing fallback to raw Markdown links. Supports intent_id (Zero Model URL Exposure),
+    initial auth, and incremental mode (add_scope).
     """
     params_dict: dict[str, str] = {
         "appName": app_name,
-        "authUrl": auth_url,
         "connectionId": connection_id,
         "mode": mode,
     }
+    if intent_id:
+        params_dict["intentId"] = intent_id
+    elif auth_url:
+        params_dict["authUrl"] = auth_url
+
     if scope:
         params_dict["scope"] = scope
 
