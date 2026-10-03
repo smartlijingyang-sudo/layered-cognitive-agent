@@ -60,6 +60,8 @@ class _FakeUserStore:
 
 def _create_app_with_user_store(
     tmp_path: Path,
+    *,
+    ensure_memory: bool = True,
 ) -> tuple[Starlette, AssistantCatalogImpl, _FakeUserStore, str]:
     router = RouteRegistry()
     ctx = _FakeCtx(router)
@@ -82,7 +84,7 @@ def _create_app_with_user_store(
         )
     )
     home = Path(handle.home_path)
-    if not (home / "MEMORY.md").is_file():
+    if ensure_memory and not (home / "MEMORY.md").is_file():
         (home / "MEMORY.md").write_text("# MEMORY.md\n- 记忆基线事实", encoding="utf-8")
 
     return app, catalog, user_store, handle.assistant_id
@@ -223,3 +225,101 @@ def test_inv06_patch_integrity_and_declarative_contracts() -> None:
     )
     assert res.returncode == 0, f"check_patch_integrity failed:\n{res.stdout}\n{res.stderr}"
     assert "all source / deployed / byte-identical" in res.stdout
+
+
+def test_inv07_uninitialized_memory_md_full_lifecycle_and_prompt_injection(
+    tmp_path: Path,
+) -> None:
+    """新助理 MEMORY.md 全流程生命周期闭环:
+    1. 初始未落盘状态下，抽屉与文件读取接口优雅降级返回默认骨架模板与哈希 (200 OK)；
+    2. Prompt 组装阶段自动忽略未落盘文件，零冗余 Token；
+    3. 乐观锁冲突防护：携带伪造/过期哈希尝试保存被 409 拦截；
+    4. 携带模板哈希执行首次持久化保存，物理文件原子落盘；
+    5. I-A13 不变量校验：MEMORY.md 写入不变更 catalog revision_seq；
+    6. 物理落盘后，Prompt 组装 (refresh_standing_backstory) 自动捕获该文件并完整注入 <!-- INJECTED FILE: MEMORY.md -->；
+    7. 再次读取与增量修改，基于磁盘真值持续演进。
+    """
+    from lca.infrastructure.memory.contextfiles.service.assembly import refresh_standing_backstory
+
+    app, catalog, _, assistant_id = _create_app_with_user_store(tmp_path, ensure_memory=False)
+    client = TestClient(app)
+
+    spec = catalog.get(assistant_id)
+    home = Path(spec.home_path)
+    memory_file = home / "MEMORY.md"
+    assert not memory_file.exists(), "新助理主目录默认不得存在 MEMORY.md"
+    initial_seq = spec.revision_seq
+
+    # 1. 验证模型冷启动提示词中无 MEMORY.md 锚点注入（避免空文件浪费 Token）
+    initial_backstory = refresh_standing_backstory(str(home), "")
+    assert "<!-- INJECTED FILE: MEMORY.md -->" not in initial_backstory
+
+    # 2. 抽屉列表接口能看到 MEMORY.md 条目与模板摘要
+    list_resp = client.get(f"/v1/assistants/{assistant_id}/standing-files")
+    assert list_resp.status_code == 200
+    files = {f["filename"]: f for f in list_resp.json()["files"]}
+    assert "MEMORY.md" in files
+    drawer_mem = files["MEMORY.md"]
+    assert "长期记忆" in drawer_mem["summary"]
+
+    # 3. 点击卡片查看：GET 返回 200 OK，包含标准骨架模板，哈希与列表一致
+    get_resp = client.get(f"/v1/assistants/{assistant_id}/standing-files/MEMORY.md")
+    assert get_resp.status_code == 200
+    get_payload = get_resp.json()
+    assert get_payload["filename"] == "MEMORY.md"
+    assert "## Preferences" in get_payload["content"]
+    assert "## Facts" in get_payload["content"]
+    template_hash = get_payload["content_hash"]
+    assert template_hash == drawer_mem["content_hash"]
+
+    # 4. 乐观锁防冲突：携带错误哈希发起写请求被 409 阻断
+    conflict_resp = client.put(
+        f"/v1/assistants/{assistant_id}/standing-files/MEMORY.md",
+        json={
+            "content": "冲突内容",
+            "expected_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        },
+    )
+    assert conflict_resp.status_code == 409
+    assert not memory_file.exists()
+
+    # 5. 首次保存：携带模板哈希提交真实记忆事实
+    first_content = (
+        "# 长期记忆\n\n"
+        "## Preferences\n"
+        "- 偏好 Python 和 Rust 技术栈。 This came from 用户, recorded 2026-10-03.\n\n"
+        "## Facts\n"
+        "- 架构决策遵循 DDD 单向依赖。 This came from 架构师, recorded 2026-10-03.\n"
+    )
+    put_resp = client.put(
+        f"/v1/assistants/{assistant_id}/standing-files/MEMORY.md",
+        json={"content": first_content, "expected_hash": template_hash},
+    )
+    assert put_resp.status_code == 200
+
+    # 6. 物理磁盘落盘断言与 I-A13 不变量断言
+    assert memory_file.is_file()
+    assert memory_file.read_text(encoding="utf-8") == first_content
+    assert catalog.get(assistant_id).revision_seq == initial_seq, (
+        "MEMORY.md 写入必须不触发 revision_seq (I-A13)"
+    )
+
+    # 7. 物理落盘后，Prompt 提示词即刻感知并注入真实记忆块
+    updated_backstory = refresh_standing_backstory(str(home), "")
+    assert "<!-- INJECTED FILE: MEMORY.md -->" in updated_backstory
+    assert "偏好 Python 和 Rust 技术栈" in updated_backstory
+    assert "<!-- END INJECTED FILE: MEMORY.md -->" in updated_backstory
+
+    # 8. 后续编辑：二次读取并成功保存演进
+    read_again = client.get(f"/v1/assistants/{assistant_id}/standing-files/MEMORY.md")
+    assert read_again.status_code == 200
+    assert read_again.json()["content"] == first_content
+    disk_hash = read_again.json()["content_hash"]
+
+    second_content = first_content + "- 偏好短回复。\n"
+    put_again = client.put(
+        f"/v1/assistants/{assistant_id}/standing-files/MEMORY.md",
+        json={"content": second_content, "expected_hash": disk_hash},
+    )
+    assert put_again.status_code == 200
+    assert memory_file.read_text(encoding="utf-8") == second_content
