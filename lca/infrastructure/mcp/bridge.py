@@ -13,6 +13,16 @@ from lca.contracts.protocols.act.tool.pipeline import ToolDefinition
 from lca.infrastructure.mcp.hub import MCPHub
 
 
+def mcp_namespace_for(server_name: str) -> str:
+    """Defer-system namespace for one MCP server's tools.
+
+    e.g. ``'corp'`` -> ``'mcp_corp'``. The ``mcp_`` prefix keeps MCP servers
+    out of the declared-namespace registry (ADR-0256) while making each
+    server addressable via ``tool_search`` (exact name or server-name alias).
+    """
+    return f"mcp_{server_name}"
+
+
 def adapt_mcp_tool_to_lca(manager: MCPHub, mcp_tool: MCPTool) -> Tool:
     """Build a first-class LCA Tool from an MCPTool declaration."""
     tool_name = mcp_tool.qualified_name
@@ -51,7 +61,7 @@ def adapt_mcp_tool_to_lca(manager: MCPHub, mcp_tool: MCPTool) -> Tool:
             "parameters": parameters,
             "is_idempotent": False,
             "default_timeout_s": 60,
-            "namespace": "ext",
+            "namespace": mcp_namespace_for(mcp_tool.server_name),
             "execute": execute,
         },
     )

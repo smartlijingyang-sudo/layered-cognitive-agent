@@ -100,7 +100,7 @@ def test_b1_profile_reachable_tools_declare_namespace():
     assert ENV_MANIFEST.api[0].namespace == "core"
     assert build_env_tools(catalog=None)[0].namespace == "core"
 
-    # MCP bridge → ext（第三方集成）
+    # MCP bridge → mcp_<server>（每个 MCP server 一个虚拟命名空间，按需加载）
     class _FakeMgr:
         def execute_tool(self, *args: object, **kwargs: object) -> object:
             raise NotImplementedError
@@ -115,7 +115,7 @@ def test_b1_profile_reachable_tools_declare_namespace():
             input_schema={},
         ),
     )
-    assert mcp_tool.namespace == "ext"
+    assert mcp_tool.namespace == "mcp_srv"  # server_name="srv"
 
     # composio → ext（第三方集成）
     assert all(api.namespace == "ext" for api in MANAGEMENT_MANIFEST.api)
