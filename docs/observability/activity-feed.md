@@ -41,7 +41,7 @@
 
 | 字段 | 含义 | 来源 |
 |---|---|---|
-| `id` | 工具调用唯一标识 | `invocation_id` / `call_id`；回填项直接用 tool call 的 `invocation_id`（无 `seed:` 前缀） |
+| `id` | 工具调用唯一标识 | `invocation_id` / `call_id`；回填项直接用 tool call 的 `invocation_id`（无 `seed:` 前缀）；缺失时合成 `{run_id}_s{step_index}_tc{idx}`（补位标识，非原始 id） |
 | `tool_name` | 工具名（`str`，默认 `""`） | `_extract_tool_name()`：事件 `tool_name` → payload `tool_name` → tool_calling `apiName`/`identifier`/`name`；既用于派生 title/summary/icon/category，也落盘随快照与 WS 透出前端 |
 | `title` / `summary` | 人读标题/摘要 | `ActivityIntentNamer.name()` 按工具类型生成 |
 | `current_step` | 进行时人读动作短语（`str \| None`） | `ActivityIntentNamer.live_step(tool_name, args)`；start 建项时写入，刷新时沿用已存值（`existing.current_step or live_step(...)`） |
@@ -66,7 +66,7 @@ spine: body.tool.execute.*  ──┘      │  feed_event()      │  get_activ
 catalog: ToolStarted/Invoked/Denied ─┘                   │                      │
                                                          ▼                      ▼
                                               seed_from_traces()          快照映射 + 增量 patch
-                                              (kernel 重启回填)
+                                              (kernel 重启回填：__init__ 空存储 / 首次 get_activities)
 ```
 
 ### 3.1 后端：事件 → ActivityItem
@@ -81,7 +81,7 @@ catalog: ToolStarted/Invoked/Denied ─┘                   │                
 - **start**：建 `RUNNING` 项（`phase.tool.call.start` / `step.tool_call.record` / `ToolStarted`）；`tool_name=_extract_tool_name(...)`，`current_step=ActivityIntentNamer.live_step(tool_name, args)`；同 id 刷新时沿用已存的 `tool_name`/`current_step`（`existing.tool_name or tool_name`）。
 - **execute.start**：当前 `feed_event` 不处理（既非 start 也非 end 分支，静默丢弃），没有 `start_time` 修正。
 - **end**：落 `completed` / `failed`（`ToolDenied` 必红，错误信息进 `result_summary`）/ `cancelled`；判据：`isSuccess`（bool）优先，否则 `outcome`（failure/failed/error/cancelled 为负）；start 缺失时合成 fallback 项。
-- **重启恢复**：`seed_from_traces()` 从 `traces/runs/*/journal.json` 回填最近 50 个 run 的 `tool_calls`/`tool_results`；`__init__`（活动项为空且 `seed_traces=True`）与 `feed_event()`（`_seeded` 只跑一次）两处冷启动；`feed_event()` 额外合并 `default` 存储——网关工具事件不带 `assistant_id`，不合并重启后抽屉为空。**只取已落盘的 completed/failed**——重启时刻"running"的已经死了，显示成运行中就是撒谎。细则：无 `tool_result` 的 tool_call 按 `COMPLETED` 乐观回填；回填项 `end_time` = `start_time`（无真实结束时刻）。
+- **重启恢复**：`seed_from_traces()` 从 `traces/runs/*/journal.json` 回填最近 50 个 run 的 `tool_calls`/`tool_results`；冷启动两处：`__init__`（活动项为空且 `seed_traces=True`）与 `get_activities()`（首次读且 `_seeded` 为假，只跑一次；0739281da 起不再要求"存储为空"）——`feed_event()` 不触发回填。`get_activities()` 额外合并 `default` 存储——网关工具事件不带 `assistant_id`，不合并重启后抽屉为空。**只取已落盘的 completed/failed**——重启时刻"running"的已经死了，显示成运行中就是撒谎。细则：无 `tool_result` 的 tool_call 按 `COMPLETED` 乐观回填；tool_result 先按 `invocation_id` 关联、未命中按同 step 位置兜底；tool_call 缺 `invocation_id` 时合成 `{run_id}_s{step_index}_tc{idx}`（补位标识）；回填项 `end_time` = `start_time`（无真实结束时刻）。
 
 ### 3.2 前端：AssistantStatusDrawer.tsx
 
@@ -96,11 +96,11 @@ catalog: ToolStarted/Invoked/Denied ─┘                   │                
 
 **进行时**：`running` 的行每秒 tick 显示 elapsed（"运行中 · 3分12秒"）；有 `currentStep` 时显示它（`act.detail?.currentStep ?? act.summary`），后端 `live_step()` 在 start 时生成；右侧有"停止"按钮调取消接口。
 
-**详情弹窗**：状态 Tag 按实际四态渲染（以前硬编码"✓ 执行成功"）；"调用工具"显示 `toolName(参数名)` + 参数 JSON；"产出"显示 `result` 或"—"（以前没结果时撒谎写"✓ 动作已完成"）；"耗时"用 `formatDuration` → `1.2s` 而非 `1200ms`，无则"—"）。
+**详情弹窗**（双栏，0739281da 对齐 Muse UX）：左侧步骤树（首节点"● 已开始"+真实动作流，选中高亮）；右侧 **5 要素证据面板**——叙述卡片（`ev.narrative`，缺则回退 reasoning/toolName(参数) 拼装）、bash 高亮命令块（带复制按钮）、元数据 bullets（退出码/耗时）、代码提取-检索结果块、加粗验证结论（`ev.conclusion`，缺则"验证结论：动作执行完成，符合预期，无执行错误"）。状态 Tag 按实际四态渲染（以前硬编码"✓ 执行成功"）；"耗时"用 `formatDuration` → `1.2s` 而非 `1200ms`，无则"—"。
 
 ### 3.3 已知的诚实边界
 
 - **直连 kernel 的 run**：spine 工具事件按 ADR-0220/0240 有意只带 `state_id`（富信息留给 control-plane），translator 静默丢弃——这类 run 的动态栏目前为空。网关（web UI）路径完整。
 - ✅ **回填硬编码时间戳已清**：`seed_from_traces` 缺 `entered_at` 时 `_format_iso(None)` 留空（`lca/infrastructure/observability/activity_projector.py:412-413`，注释"缺 entered_at 就空着，不编造假时间戳"）；此前 `"2026-10-03T00:00:00Z"` 债务关闭。
 - ✅ **`tool_name` / `current_step` 已恢复**：`634fe4c4c` 的移除被 `f17a7effe`（honesty 分支 `c9bcb5b51`）撤销，`d89fc6e73` 去重；后端快照与 WS（7 处 `activity_updated` 带 `toolName`）均透出真实值，前端 `AssistantStatusDrawer.tsx:911/917/1270` 已消费。
-- ✅ **诚实边界有回归钉**：（INV-01 ~ INV-06，commit ）钉住本节诚实边界——回填只取已落盘的 completed/failed、不编造时间戳、start 缺失时的合成 fallback。
+- ✅ **诚实边界有回归钉**：`tests/scenario/test_muse_activity_invariants.py`（INV-01 ~ INV-06，13 例）钉住本节诚实边界——回填只取已落盘的 completed/failed、不编造时间戳、start 缺失时的合成 fallback。

@@ -112,6 +112,8 @@ agent 答"对话上下文 ✅ 有，`/mnt/data` 工作区 ❌ 没有，不会自
 
 ## Task 4：历史 traces/files 迁移 + 旧根废弃
 
+> **状态（2026-10-03 21:0x，李超决策）：本 Task 已撤销——"历史不迁移"。** `traces/files/` 旧根保留只读；迁移脚本/双读/废弃/回填 memory 均不执行；设计要点 4 的"迁移期双读"随之作废。
+
 **步骤**
 1. 一次性迁移脚本：`traces/files/{id}/` → `{home}/workspace/uploads/{id}/`
    （blob + meta.json 原样搬；meta 缺 conversation_id 的标 `migrated:true`，不编造）。
