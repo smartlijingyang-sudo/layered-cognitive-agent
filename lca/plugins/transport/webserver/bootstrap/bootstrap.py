@@ -27,7 +27,7 @@ Plugin ``setup`` 阶段提供:
 from __future__ import annotations
 
 import contextlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
@@ -48,11 +48,12 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 from lca.contracts.protocols.runtime.infra.infra import MachineResolver
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.file.store import FileStore, LocalFileStore
+from lca.infrastructure.path.locator import assistant_workspace_root
 
 
 @dataclass(frozen=True, slots=True)
 class WebserverBootstrapConfig:
-    file_store_root: Path = Path("traces/files")
+    file_store_root: Path = field(default_factory=lambda: assistant_workspace_root() / "uploads")
     file_store_url_prefix: str = "/files"
     device_settings: Any = None  # Optional[DeviceHubSettings];测试用,生产用默认
 

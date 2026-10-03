@@ -18,8 +18,8 @@ from pathlib import Path
 from typing import Protocol
 
 from lca.contracts.atoms.ids.ids import new_id
+from lca.infrastructure.path.locator import assistant_workspace_root
 
-_DEFAULT_ROOT = Path("traces/files")
 _SAFE_NAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
 _MAX_NAME_LEN = 180
 
@@ -52,6 +52,8 @@ class FileStore(Protocol):
     def read_bytes(self, attachment_id: str) -> bytes | None: ...
 
     def exists(self, attachment_id: str) -> bool: ...
+
+    def list(self) -> list[StoredFile]: ...
 
 
 def _safe_filename(name: str) -> str:
@@ -130,7 +132,9 @@ class LocalFileStore:
     """Filesystem-backed FileStore with JSON sidecars."""
 
     def __init__(self, root: Path | None = None, *, public_url_prefix: str = "/files") -> None:
-        self._root = (root if root is not None else _DEFAULT_ROOT).resolve()
+        self._root = (
+            root if root is not None else assistant_workspace_root() / "uploads"
+        ).resolve()
         self._root.mkdir(parents=True, exist_ok=True)
         self._url_prefix = public_url_prefix.rstrip("/")
 
@@ -208,6 +212,20 @@ class LocalFileStore:
 
     def exists(self, attachment_id: str) -> bool:
         return (self._root / attachment_id / "meta.json").is_file()
+
+    def list(self) -> list[StoredFile]:
+        """List all stored files, newest first (Workspace SSOT discovery)."""
+        found: list[StoredFile] = []
+        if not self._root.is_dir():
+            return found
+        for child in self._root.iterdir():
+            if not child.is_dir():
+                continue
+            stored = self.get(child.name)
+            if stored is not None:
+                found.append(stored)
+        found.sort(key=lambda s: s.attachment_id, reverse=True)
+        return found
 
     def read_text_preview(self, attachment_id: str, *, max_chars: int = 4000) -> str | None:
         data = self.read_bytes(attachment_id)

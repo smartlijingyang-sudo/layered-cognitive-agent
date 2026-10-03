@@ -21,12 +21,13 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
     OwnershipDeclaration,
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.infrastructure.path.locator import assistant_workspace_root
 
 
 class Config(BaseModel):
     model_config = {"extra": "forbid"}
     providers: list[str] = Field(default_factory=lambda: ["local"])
-    local_root: Path = Path("traces/files")
+    local_root: Path = Field(default_factory=lambda: assistant_workspace_root() / "uploads")
     public_url_prefix: str = "/files"
 
 
