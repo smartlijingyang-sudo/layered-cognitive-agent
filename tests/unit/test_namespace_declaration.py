@@ -20,9 +20,9 @@ import pytest
 
 from lca.infrastructure.tool_defer.policy import STANDARD_NAMESPACES
 
-# 白名单即源码 SSOT，不手写第二份：
-# ADR-0256 8 域（core/file/shell/memory/skill/web/agent/ext）
-# + ADR-0268 §4 lca/cron + ADR-0269 §4 avatar。
+# 白名单即源码 SSOT，不手写第二份（共 11 域：
+# ADR-0256 的 8 域 core/file/shell/memory/skill/web/agent/ext
+# + ADR-0268 §4 的 lca/cron + ADR-0269 §4 的 avatar）。
 NAMESPACE_WHITELIST = set(STANDARD_NAMESPACES)
 
 
