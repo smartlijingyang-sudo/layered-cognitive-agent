@@ -31,9 +31,19 @@ from lca.contracts.models.cognition.task import (
     TaskStatus,
 )
 from lca.contracts.models.cognition.tool_defer import DeferMode, ToolNamespace
+from lca.contracts.models.cognition.web_search import (
+    Citation,
+    SearchOutcome,
+    SearchRequest,
+    SearchResult,
+    SearchTier,
+    Verdict,
+    Vertical,
+)
 
 __all__ = [
     "BrainPromptCatalog",
+    "Citation",
     "DeferMode",
     "MissingPromptSectionError",
     "MissingSectionKindError",
@@ -52,6 +62,10 @@ __all__ = [
     "SectionOutput",
     "SectionReference",
     "SectionTrace",
+    "SearchOutcome",
+    "SearchRequest",
+    "SearchResult",
+    "SearchTier",
     "SelectorDecisionPath",
     "StatefulSection",
     "TaskEntry",
@@ -59,6 +73,8 @@ __all__ = [
     "TaskList",
     "TaskStatus",
     "ToolNamespace",
+    "Verdict",
+    "Vertical",
     "normalize_assembler_result",
     "normalize_selector_result",
 ]
