@@ -128,3 +128,66 @@ remember phase 不再是"写文件"，而是对每个候选记忆做一次**显�
 3. sleep-time consolidation 用独立 cron（如现有三路迭代）还是 remember phase 内联？
 4. 与 0260 T4 的 `revision_of` 链合并还是并存（`supersedes` vs `revision_of` 二选一）？
 5. 落地顺序：先 C1+C2（类型+来源，纯结构），再 C3（评分），最后 C4（双时间线）？还是一次到位？
+
+## 6. Implementation Notes（2026-10-03 落地）
+
+> 落地分支 `mem/adr-0277`（worktree 隔离开发），6 个 phase commits 已合入 main。测试 118 passed / 2 skipped（skip 的是真模型集成测试，门控 `LAYA_REAL_TEST=1`）。
+
+### 落地 commits
+
+- `81d511346` feat(memory): typed memory objects（P1）
+- `4ed71892d` feat(memory): perceive sensor registry（P2）
+- `900275427` feat(memory): retrieval scoring SSOT（P3）
+- `a5d8a6be2` feat(memory): remember consolidation（P5）
+- `2e9edb7bd` test(memory): bi-temporal acceptance A2（P6）
+- `cfe6d1473` feat(memory): Laya System-1 backend（P4）
+
+### 模块映射
+
+| ADR 设计 | 落地位置 |
+|---|---|
+| §2.1 Typed 对象 | `lca/cognition/memory/types.py`：EpisodicTrace / SemanticClaim / ProceduralRule / ConsolidationRecord / ScoredCandidate（frozen dataclass，`__post_init__` 校验 0..1/非空；`SemanticClaim.is_valid_at(ts)`；权重常量 W_SEMANTIC=0.4 / W_SALIENCE=0.25 / W_RECENCY=0.2 / W_CUE=0.15） |
+| §2.2 感知器注册表 | `lca/cognition/memory/sensors.py`：EpisodicSensor / SemanticSensor（含显式 `as_of` point-in-time）/ RelationSensor / MemorySensorRegistry（MIN_CONFIDENCE=0.3 门控 + max_percepts token 预算）/ NoRecall（fail-closed sentinel） |
+| §2.2 检索评分 | `lca/cognition/memory/scoring.py`：MemoryScorer Protocol / WeightedScorer（ACT-R 确定性公式，默认主路径）/ LayaScorer / HybridScorer（确定性打底 + Laya 重排 top-k，低 confidence 回退）/ ShadowComparator（默认开，写 JSONL 对比日志） |
+| §2.3 四决策 | `lca/cognition/memory/consolidation.py`：EncodeGate（salience<0.3 丢弃）/ LinkDecider（reconcile：冲突→旧 claim 填 valid_to + supersedes 链；重复→merge；无关→ADD）/ DecayPolicy（Ebbinghaus 降权，Jost：只降权不删除）/ RuleDecider / RuleSchemaExtractor（规则版占位）/ LayaDecider（noul/choice，低 confidence 回退规则版） |
+| Laya 可插拔后端 | `lca/cognition/memory/laya_backend.py`：LayaScoreEngine（延迟导入、温度校准默认 1.5、中文走 multilingual Router；不可用时 fail-closed） |
+
+### 契约覆盖（诚实）
+
+- C1 类型铁律 ✅：percept 必为三类之一；registry 不上报裸文本。
+- C2 来源诚实 ✅：confidence<0.3 的 sensor 显式返回 NoRecall，不降级为文本。
+- C3 评分 SSOT ✅：`score = 0.4·semantic_sim + 0.25·salience + 0.2·recency_decay + 0.15·cue_match`，`recency_decay = (1+age_hours)^(-0.5)`。权重为初值，调参需评测背书。
+- C4 双时间线 ✅：valid_from/valid_to + supersedes；as_of point-in-time 查询；失效不删除。
+- C5 决策审计 ✅：ConsolidationRecord{decision, target_id, rationale}，decision 四选一、rationale 非空。
+- C6 状态诚实：仍有效——未做 LongMemEval 式评测前，不声称"LCA 记忆已对齐人类记忆模型"。
+
+### 验收 A1–A5
+
+- A1 ✅ test_0277_sensors.py：SemanticPercept 断言 confidence/sources 存在且非空。
+- A2 ✅ test_0277_bitemporal.py：改地址冲突 → 旧 claim valid_to 被填、新 claim 生效且 supersedes 指向上游、as_of 查回历史。
+- A3 ✅ test_0277_consolidation.py：salience<0.3 在 encode 阶段被丢弃。
+- A4 ✅ test_0277_scoring.py：相同 semantic_sim 下更新/更高 salience 的排前面。
+- A5 ✅ test_0277_consolidation.py：每次决策 ConsolidationRecord 非空、decision 四选一。
+
+### 待拍板 5 项裁决（2026-10-03，已定，执行完毕）
+
+1. PreferenceClaim 不独立，仍 3 类型（以后可插）。
+2. 权重初值 semantic 0.4 / salience 0.25 / recency 0.2 / cue_match 0.15。
+3. sleep-time 落在现有 cron/hook 的 remember 离线任务（RuleSchemaExtractor 为规则版占位）。
+4. 失效关系用 supersedes（Zep 非丢失式）。
+5. 落地顺序 P1→P6（本节即执行记录）。
+
+### Laya 集成状态
+
+- checkpoint：`convaiinnovations/laya-typed-decisions`，已下载至 `/home/lichao/.cache/laya/checkpoints/`（repo 外持久目录；snapshot `1a793eb5`）。
+- 真模型验证：2026-10-03 在 252（L20）实测通过——engine 可用（load_error=None）；中文 query「用户住在哪里？」3 候选打分 label=2/1/2（校准后 confidence 0.24–0.33，保守）；noul decide 返回 decision='no'（confidence 0.50）。System-1 速度符合预期。
+- 约束遵守：打分必须用 typed-decisions checkpoint（base 在 typed-decisions 上低于多数类基线 0.36 vs 0.46）；confidence 温度校准（默认 temperature=1.5，应对出厂 over-confident）。
+- shadow 模式：**默认开**。ShadowComparator 同时跑 WeightedScorer + LayaScorer，写 `./shadow_scores.jsonl`；shadow 数据证明 Laya 更优之前，Laya 永不做主 scorer。
+- 隔离纪律：Laya 绝不碰 typed 对象定义、传感器注册表结构、双时间线 schema、reconcile 记账逻辑——确定性骨架零模型方差。
+
+### 已知偏差 / 后续（backlog）
+
+- cue 匹配是双向子串启发式 v1："地址"这类主题词命中不了"住在……"文本（P6 测试用 `cues=["地址","住在"]` 绕过，docstring 已注明）。sensor 侧以后要升级主题词匹配。
+- LinkDecider 冲突检测是"主题词重叠 + 文本不同"启发式 v1，docstring 已诚实标注。
+- RuleSchemaExtractor 是规则版占位（7 天窗口 ≥3 次相似 what → 提炼 claim，confidence=0.6），LLM 版以后插。
+- 权重调参需自建 LongMemEval 式评测集（C6 约束）；shadow 日志攒够数据后才能裁决 Laya 是否转正。
