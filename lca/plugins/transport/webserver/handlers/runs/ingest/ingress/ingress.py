@@ -99,7 +99,9 @@ async def prepare_run_from_messages(
     parsed = parse_messages(messages, assistant_home=assistant_home, topic_id=topic_id)
     if not parsed.user_text:
         return LobeHubRunInput(user_text="", question="")
-    ingest = await ingest_file_refs(parsed.file_refs, store, fetcher=fetcher)
+    ingest = await ingest_file_refs(
+        parsed.file_refs, store, fetcher=fetcher, conversation_id=topic_id or None
+    )
     question = compose_run_question(parsed.user_text, ingest.attachment_ids, store)
     return LobeHubRunInput(
         user_text=parsed.user_text,

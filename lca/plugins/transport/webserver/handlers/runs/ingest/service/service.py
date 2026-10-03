@@ -56,6 +56,7 @@ async def ingest_file_refs(
     fetcher: FileFetcher | None = None,
     cache: IngestCache | None = None,
     settings: LobeHubBridgeSettings | None = None,
+    conversation_id: str | None = None,
 ) -> IngestResult:
     """Mirror selected files through local, cache, and guarded remote paths."""
     cfg = settings if settings is not None else bridge_settings()
@@ -101,7 +102,12 @@ async def ingest_file_refs(
         if len(data) > MAX_INGEST_FILE_BYTES:
             skipped.append(ref.name)
             continue
-        stored = store.put(data=data, name=ref.name, mime_type=mime or ref.mime_type)
+        stored = store.put(
+            data=data,
+            name=ref.name,
+            mime_type=mime or ref.mime_type,
+            conversation_id=conversation_id,
+        )
         active_cache.remember(
             ref,
             stored.attachment_id,
