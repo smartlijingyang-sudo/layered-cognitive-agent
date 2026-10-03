@@ -324,3 +324,21 @@ def test_standing_file_memory_md_initial_write_with_empty_hash_compatibility(
     assert put_resp.status_code == 200
     assert memory_path.is_file()
     assert memory_path.read_text(encoding="utf-8") == custom_content
+
+
+def test_constitution_template_contains_core_charter() -> None:
+    from lca.plugins.transport.webserver.routes_1.routes_assistants.standing_files import (
+        DEFAULT_STANDING_FILE_TEMPLATES,
+    )
+
+    template_path = Path("lca/plugins/assistant/templates/CONSTITUTION.md")
+    assert template_path.is_file()
+    disk_text = template_path.read_text(encoding="utf-8")
+
+    assert "CONSTITUTION.md" in DEFAULT_STANDING_FILE_TEMPLATES
+    assert DEFAULT_STANDING_FILE_TEMPLATES["CONSTITUTION.md"] == disk_text
+
+    assert "Who You Are" in disk_text
+    assert "LCA Architecture & Governance Principles" in disk_text
+    assert "Assistant Home & Directory Topology" in disk_text
+    assert "Runtime Environment & Context Perception" in disk_text

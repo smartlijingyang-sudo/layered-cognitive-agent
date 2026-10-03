@@ -556,7 +556,7 @@
 | BRAINSTORM-THEMATIC-STANDING-FILE-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-04-thematic-standing-file-constitution-design.md |
 | BRAINSTORM-THEMATIC-STANDING-FILE-TRANSITION | 转入实施计划制定（调用 writing-plans 规划落地） | Completed | 成功落盘 docs/plans/2026-10-04-thematic-standing-file-constitution-plan.md 并完成实施分解 |
 | CONST-TASK-1-LAYOUT | 拓扑与契约层扩展 (`layout.toml` & `layout.py`) | Completed | layout.toml 首位成功注册 CONSTITUTION.md，packaged_layout() 15/15 单测全绿 |
-| CONST-TASK-2-TEMPLATES | 模板基座物化与默认模板注入 (`templates/` & `standing_files.py`) | In Progress | 正在物化权威 CONSTITUTION.md 并注入 DEFAULT_STANDING_FILE_TEMPLATES |
-| CONST-TASK-3-ROUTES | 传输层路由白名单、优雅降级与乐观锁 (`standing_files.py`) | Pending | 待执行 |
+| CONST-TASK-2-TEMPLATES | 模板基座物化与默认模板注入 (`templates/` & `standing_files.py`) | Completed | 物化权威 CONSTITUTION.md（含六维价值/双平面/执行窄门/反思防脆弱/拓扑与感知全量规范），DEFAULT_STANDING_FILE_TEMPLATES 注入一致模板，单测全绿 |
+| CONST-TASK-3-ROUTES | 传输层路由白名单、优雅降级与乐观锁 (`standing_files.py`) | In Progress | 正在增加 STANDING_FILES_WHITELIST 与端到端单测 |
 | CONST-TASK-4-UI-PATCH | 前端 UI 补丁与卡片元数据 (`AssistantStatusDrawer.tsx`) | Pending | 待执行 |
 | CONST-TASK-5-INTEGRATION-E2E | 上下文装配、活跃助理物化与全链路集成验收 (`test_constitution_standing_file_e2e.py`) | Pending | 待执行 |

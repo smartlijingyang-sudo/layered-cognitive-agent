@@ -39,9 +39,19 @@ STANDING_FILES_WHITELIST: tuple[str, ...] = (
     "MEMORY.md",
 )
 
+def _load_template_file(filename: str) -> str:
+    path = Path(__file__).resolve().parents[4] / "assistant" / "templates" / filename
+    try:
+        return path.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+
+
 DEFAULT_STANDING_FILE_TEMPLATES: dict[str, str] = {
+    "CONSTITUTION.md": _load_template_file("CONSTITUTION.md"),
     "MEMORY.md": ("# 长期记忆\n\n## Preferences\n\n## Facts\n"),
 }
+
 
 
 # filename -> ProfilePatch 字段名。SOUL/IDENTITY/USER/AGENTS 四文件经 catalog revise_profile
