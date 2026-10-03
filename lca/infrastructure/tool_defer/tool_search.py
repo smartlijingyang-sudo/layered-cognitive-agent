@@ -9,17 +9,22 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
+from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
 from lca.contracts.models.core.execution.decision import Observation
 from lca.contracts.protocols import Tool
 from lca.infrastructure.tool_defer.session import current_defer_session
 
 
 def _error(message: str) -> Observation:
+    # docs/specs/tool-failure-recovery.md §3: 参数校验失败 → failure_kind="validation"。
+    # 带分类的失败回到 think 重规划（act.main → think.main），而不是被
+    # act.observe.terminate_decide 读成 host 派发失败而终止 run。
     return Observation(
         observation_id="tool_search:error",
         success=False,
         payload={"error": message},
         error=message,
+        extra={FAILURE_KIND: FAILURE_KIND_VALIDATION},
     )
 
 
