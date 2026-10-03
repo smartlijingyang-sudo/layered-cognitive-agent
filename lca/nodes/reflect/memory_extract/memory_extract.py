@@ -55,7 +55,8 @@ from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.contracts.protocols.memory.filter import MemoryPreFilter
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.memory.episode_buffer import EpisodeBuffer
-from lca.infrastructure.memory.pre_filter import DEFAULT_MEMORY_TOKENS, FallbackMemoryFilter
+from lca.infrastructure.memory.pre_filter.fallback_filter import FallbackMemoryFilter
+from lca.infrastructure.memory.pre_filter.tokens import DEFAULT_MEMORY_TOKENS
 from lca.nodes.fast_path import FastPathCounter
 
 # 快速路径成本门：仅当用户陈述可能包含自我身份/偏好信号时才值得调 LLM 蒸馏。
