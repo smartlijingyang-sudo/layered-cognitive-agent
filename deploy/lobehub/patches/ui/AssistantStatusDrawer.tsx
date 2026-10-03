@@ -93,7 +93,6 @@ export interface ActivityItem {
   summary: string;
   timestamp: string;
   status: 'success' | 'running' | 'error' | 'cancelled';
-  toolBadge?: string;
   detail: ActivityDetail;
 }
 
@@ -609,6 +608,34 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
       question?: string;
       output?: string;
       status?: string;
+      steps?: Array<{
+        step_id: string;
+        step_index: number;
+        phase: string;
+        duration_ms?: number;
+        thinking?: {
+          model?: string;
+          latency_ms?: number;
+          reasoning?: string;
+          prompt_tokens?: number;
+          completion_tokens?: number;
+          decision?: string;
+          raw_response_preview?: string;
+        };
+        tool_call?: {
+          name?: string;
+          arguments?: Record<string, any>;
+          arguments_summary?: string;
+        };
+        tool_result?: {
+          ok?: boolean;
+          latency_ms?: number;
+          stdout_head?: string;
+          delta_summary?: string;
+          error?: string;
+        };
+      }>;
+      doctor_report?: any;
     } | null>(null);
 
     const selectedActivity = useMemo(
@@ -617,12 +644,18 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
     );
 
     useEffect(() => {
-      if (!detailModalOpen || !selectedActivity?.detail?.runId) {
+      if (!detailModalOpen) {
+        setRunDetail(null);
+        return;
+      }
+      const targetRunId =
+        selectedActivity?.detail?.runId ||
+        (selectedActivity?.id?.startsWith('run_') ? selectedActivity.id : '');
+      if (!targetRunId) {
         setRunDetail(null);
         return;
       }
       let active = true;
-      const targetRunId = selectedActivity.detail.runId;
       const token = process.env.NEXT_PUBLIC_LCA_TOKEN || 'lca-local';
       fetch(`/lca-api/runs/${targetRunId}`, {
         headers: {
@@ -637,6 +670,8 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
               question: data.question || '',
               output: data.output || '',
               status: data.status || '',
+              steps: Array.isArray(data.steps) ? data.steps : [],
+              doctor_report: data.doctor_report,
             });
           }
         })
@@ -644,7 +679,7 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
       return () => {
         active = false;
       };
-    }, [detailModalOpen, selectedActivity?.detail?.runId]);
+    }, [detailModalOpen, selectedActivity?.detail?.runId, selectedActivity?.id]);
 
     const subSteps = useMemo(() => {
       if (!selectedActivity) return [];
@@ -671,6 +706,135 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
         durationMs?: number;
       }> = [];
 
+      // 优先从底层真实产生的 runDetail.steps 生成富步骤清单与详实叙述
+      if (runDetail?.steps && runDetail.steps.length > 0) {
+        runDetail.steps.forEach((s) => {
+          const stepNum = s.step_index || 1;
+          const th = s.thinking;
+          const tc = s.tool_call;
+          const tr = s.tool_result;
+
+          // 1. 思考决策与规划
+          if (th?.reasoning || s.phase === 'think') {
+            const modelName = th?.model || 'LLM';
+            const tokenText = th?.prompt_tokens
+              ? ` · Token: ${th.prompt_tokens.toLocaleString()} in / ${(th.completion_tokens || 0).toLocaleString()} out`
+              : '';
+            steps.push({
+              id: `${s.step_id}-think`,
+              title: `[步骤 ${stepNum}] 🧠 思考决策与规划`,
+              category: 'think',
+              summary: tc?.name
+                ? `决定调用 ${tc.name}`
+                : th?.decision === 'respond'
+                  ? '生成最终用户答复'
+                  : (tc?.arguments_summary || '意图拆解与方案评估'),
+              badge: modelName,
+              badgeColor: 'purple',
+              narrativeText:
+                (th?.reasoning ? `${th.reasoning}\n\n` : '') +
+                (runDetail.question ? `• 任务目标：「${runDetail.question}」\n` : '') +
+                (th?.decision ? `• 决策行动：${th.decision}\n` : '') +
+                `• 推理模型：${modelName}` +
+                (th?.latency_ms ? ` (耗时 ${formatDuration(th.latency_ms)})\n` : '\n') +
+                (th?.prompt_tokens
+                  ? `• Token 开销：输入 ${th.prompt_tokens.toLocaleString()} · 输出 ${(th.completion_tokens || 0).toLocaleString()}`
+                  : ''),
+              stage: `Think Phase · ${modelName}${tokenText}`,
+              durationMs: th?.latency_ms || s.duration_ms,
+            });
+          }
+
+          // 2. 工具调用指令下发
+          if (tc?.name) {
+            steps.push({
+              id: `${s.step_id}-tool`,
+              title: `[步骤 ${stepNum}] 🛠️ 调用: ${tc.name}`,
+              category: 'tool',
+              summary: tc.arguments_summary || (tc.arguments ? JSON.stringify(tc.arguments).slice(0, 60) : `${tc.name}()`),
+              badge: tc.name.toUpperCase(),
+              badgeColor: 'blue',
+              narrativeText:
+                `智能体根据决策结果，正式向执行平面发起「${tc.name}」工具调用。\n\n` +
+                (tc.arguments_summary ? `• 调用参数概要：${tc.arguments_summary}\n` : '') +
+                (tc.arguments && Object.keys(tc.arguments).length > 0
+                  ? `• 参数数量：共传入 ${Object.keys(tc.arguments).length} 项调用参数（见下方参数明细）。\n\n指令已通过执行窄门校验，在隔离环境中安全执行。`
+                  : `• 调用参数：按默认配置执行，无额外传参。`),
+              command: `${tc.name}(${Object.keys(tc.arguments || {}).join(', ')})`,
+              params: tc.arguments,
+              stage: 'Act Phase → Safe Executor',
+              durationMs: tr?.latency_ms,
+            });
+          }
+
+          // 3. 执行回执与产出证据
+          if (tr) {
+            const isOk = tr.ok !== false;
+            const hasStdout = Boolean(tr.stdout_head && tr.stdout_head.trim());
+            steps.push({
+              id: `${s.step_id}-result`,
+              title: `[步骤 ${stepNum}] 📊 产出: ${hasStdout ? '执行证据与回执' : '执行回执'}`,
+              category: 'result',
+              summary: tr.delta_summary || (isOk ? '✓ 执行成功' : '✕ 执行失败'),
+              badge: isOk ? '✓ 成功' : '✕ 失败',
+              badgeColor: isOk ? 'success' : 'error',
+              narrativeText:
+                `底层执行环境在耗时 ${tr.latency_ms !== undefined ? `${tr.latency_ms}ms` : '—'} 后返回了执行回执（Effect Receipt）：\n\n` +
+                (hasStdout
+                  ? tr.stdout_head
+                  : (tr.delta_summary || (isOk ? '动作执行成功，副作用已安全落地，产出数据已同步至系统上下文。' : `执行发生异常：${tr.error || '未知错误'}`))),
+              result: tr.stdout_head || tr.delta_summary || (isOk ? '✓ 动作已完成，状态正常' : tr.error),
+              durationMs: tr.latency_ms,
+              stage: 'Execute → Effect Receipt',
+            });
+          }
+        });
+
+        // 最终交付
+        if (runDetail.output) {
+          steps.push({
+            id: `${act.id}-output`,
+            title: '📝 交付: 最终结果响应',
+            category: 'output',
+            summary: '向用户呈现执行结果与回复',
+            badge: '完成交付',
+            badgeColor: 'cyan',
+            narrativeText:
+              `智能体结合工具执行回执与反思结论（Reflect Phase），提炼最终结论，并向用户交付本次执行的最终答复：\n\n` +
+              runDetail.output,
+            result: runDetail.output,
+            stage: 'Reflect → Deliver',
+          });
+        }
+
+        // 自动化体检
+        if (runDetail.doctor_report) {
+          const dr = runDetail.doctor_report;
+          steps.push({
+            id: `${act.id}-doctor`,
+            title: '🩺 验证: 任务因果与闭包核验',
+            category: 'result',
+            summary: dr.summary || '执行因果链与健康核验通过',
+            badge: dr.outcome === 'completed' ? '✓ 闭合' : '健康核验',
+            badgeColor: 'green',
+            narrativeText:
+              `系统观测面对本次任务执行的全链路因果、落盘完整性与成功率进行了自动化体检（Doctor Verification）：\n\n` +
+              `• 任务终态：${dr.outcome || dr.status || 'completed'}\n` +
+              `• 体检结论：${dr.summary || 'ok'}\n` +
+              (dr.hops
+                ? Object.entries(dr.hops)
+                    .map(([k, v]: [string, any]) => `• [${k}] ${v.detail || (v.ok ? '通过' : '未通过')}`)
+                    .join('\n')
+                : ''),
+            result: JSON.stringify(dr.hops || {}, null, 2),
+            stage: 'Observability → Doctor',
+          });
+        }
+
+        return steps;
+      }
+
+      // 兜底降级：若 runDetail.steps 未能加载，使用同 run 的活动聚合
       sameRunActs.forEach((item, index) => {
         const prefix = sameRunActs.length > 1 ? `[步骤 ${index + 1}] ` : '';
 
@@ -698,12 +862,12 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
           title: `${prefix}🛠️ 调用: ${item.detail?.toolName || item.title}`,
           category: 'tool',
           summary: item.detail?.command || `${item.detail?.toolName || 'tool'}()`,
-          badge: item.toolBadge || '工具指令',
+          badge: item.detail?.toolName || '工具指令',
           badgeColor: 'blue',
           narrativeText:
             `智能体根据决策结果，正式向执行平面发起工具调用。\n\n` +
             `• 调用的工具：${item.detail?.toolName || item.title}\n` +
-            `• 业务域分类：${item.toolBadge || '核心工具'}\n` +
+            `• 业务域分类：${item.detail?.toolName || '核心工具'}\n` +
             (item.detail?.params && Object.keys(item.detail.params).length > 0
               ? `• 参数数量：共传入 ${Object.keys(item.detail.params).length} 项调用参数（见下方参数明细）。\n\n指令已通过执行窄门校验，在隔离环境中安全执行。`
               : `• 调用参数：按默认配置执行，无额外传参。`),
@@ -804,7 +968,6 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                   summary: a.summary,
                   timestamp: ft.text,
                   status: mapBackendStatus(a.status),
-                  toolBadge: a.tool_name || a.category,
                   detail: {
                     toolName: a.tool_name || a.category || a.title,
                     params: a.params,
@@ -920,7 +1083,6 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
             summary: patch.summary || '',
             timestamp: ft.text,
             status: statusStr,
-            toolBadge: patch.toolName || patch.category,
             detail: {
               toolName: patch.toolName || patch.category || patch.title,
               params: patch.params,
@@ -1122,6 +1284,18 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
 
     const renderActivityRow = (act: ActivityItem) => {
       const isRunning = act.status === 'running';
+      const isError = act.status === 'error';
+      // Muse-style: dark rounded box with outline checkmark icon
+      const iconBoxBg = isRunning
+        ? 'rgba(22, 119, 255, 0.15)'
+        : isError
+          ? 'rgba(255, 77, 79, 0.12)'
+          : 'rgba(255, 255, 255, 0.06)';
+      const checkColor = isRunning
+        ? '#1677ff'
+        : isError
+          ? '#ff4d4f'
+          : 'rgba(255, 255, 255, 0.45)';
       return (
         <div
           key={act.id}
@@ -1131,62 +1305,47 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
             setDetailModalOpen(true);
           }}
         >
-          <div className={styles.activityIconBox} style={{ background: act.iconBg }}>
-            {act.icon}
+          <div className={styles.activityIconBox} style={{ background: iconBoxBg }}>
+            {isRunning ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={checkColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" strokeDasharray="63" strokeDashoffset="0">
+                  <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1.2s" repeatCount="indefinite" />
+                </circle>
+              </svg>
+            ) : isError ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={checkColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="15" y1="9" x2="9" y2="15" />
+                <line x1="9" y1="9" x2="15" y2="15" />
+              </svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={checkColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="9 12 11.5 14.5 16 10" />
+              </svg>
+            )}
           </div>
           <div className={styles.activityMain}>
-            <div className={styles.activityTopRow}>
-              <span className={styles.activityTitle}>{act.title}</span>
-              <Flex align="center" gap={6}>
-                {isRunning ? (
-                  <>
-                    <Tag color="processing" style={{ margin: 0, fontSize: 11 }}>
-                      运行中{formatElapsed(act.detail?.startTime, nowTick) ? ` · ${formatElapsed(act.detail?.startTime, nowTick)}` : ''}
-                    </Tag>
-                    <Button
-                      size="small"
-                      danger
-                      type="text"
-                      style={{ fontSize: 11, height: 22, padding: '0 6px' }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleStopActivity(act.id, act.detail?.runId);
-                      }}
-                    >
-                      停止
-                    </Button>
-                  </>
-                ) : act.status === 'success' ? (
-                  <Tag color="success" style={{ margin: 0, fontSize: 11 }}>
-                    ✓ 已完成
-                  </Tag>
-                ) : act.status === 'error' ? (
-                  <Tag color="error" style={{ margin: 0, fontSize: 11 }}>
-                    ✕ 失败
-                  </Tag>
-                ) : (
-                  <Tag color="default" style={{ margin: 0, fontSize: 11 }}>
-                    已取消
-                  </Tag>
-                )}
-                <span style={{ fontSize: 11, color: '#8c8c8c' }}>{act.timestamp}</span>
-              </Flex>
-            </div>
+            <span className={styles.activityTitle}>{act.title}</span>
             <div className={styles.activitySummary}>
               {isRunning && act.detail?.currentStep ? act.detail.currentStep : act.summary}
             </div>
             <div className={styles.activityBottom}>
-              {act.toolBadge && (
-                <Tag color="blue" style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px', margin: 0 }}>
-                  {act.toolBadge}
-                </Tag>
+              <span>{act.timestamp}</span>
+              {isRunning && (
+                <Button
+                  size="small"
+                  danger
+                  type="text"
+                  style={{ fontSize: 11, height: 18, padding: '0 4px', lineHeight: '18px' }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleStopActivity(act.id, act.detail?.runId);
+                  }}
+                >
+                  停止
+                </Button>
               )}
-              {formatDuration(act.detail?.durationMs) ? (
-                <span style={{ fontSize: 11, color: '#8c8c8c' }}>
-                  耗时 {formatDuration(act.detail?.durationMs)} ·{' '}
-                </span>
-              ) : null}
-              <span>点击查看执行详情 ›</span>
             </div>
           </div>
         </div>

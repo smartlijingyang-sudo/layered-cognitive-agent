@@ -111,3 +111,15 @@ def test_assistant_status_drawer_activity_detail_contract() -> None:
     assert "selectedActivity.title" in content
     # 右侧展示具体情况的清晰文本说明
     assert "具体情况详细说明" in content
+
+
+def test_drawer_list_pure_natural_language_no_tool_badge() -> None:
+    """Verifies INV-03: Drawer list is pure natural language without technical badges."""
+    path = _get_drawer_tsx_path()
+    content = path.read_text(encoding="utf-8")
+
+    assert 'toolBadge: a.tool_name || a.category' not in content
+    assert 'toolBadge?: string;' not in content
+    assert '<Tag color="blue"' not in content
+    assert '点击查看执行详情' not in content
+
