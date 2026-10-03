@@ -218,7 +218,7 @@ class EventTranslator:
         }
 
     @staticmethod
-    def _tool_started(e: dict) -> list[dict] | dict:
+    def _tool_started(e: dict) -> dict:
         payload = e.get("payload") or e.get("toolCalling") or {}
         if not payload and e.get("tool_name"):
             payload = wire_tool_call(
@@ -233,34 +233,10 @@ class EventTranslator:
                 "toolCalling": payload,
             },
         }
-        from lca.infrastructure.observability.activity_projector import (
-            get_global_activity_projector,
-        )
-
-        act_item = get_global_activity_projector().feed_event(e)
-        if act_item is not None:
-            activity_msg = {
-                "type": "activity_updated",
-                "data": {
-                    "id": act_item.id,
-                    "runId": act_item.run_id,
-                    "assistantId": act_item.assistant_id,
-                    "category": act_item.category.value,
-                    "title": act_item.title,
-                    "summary": act_item.summary,
-                    "status": act_item.status.value,
-                    "startTime": act_item.start_time,
-                    "icon": act_item.icon,
-                    "params": act_item.params,
-                    "toolName": act_item.tool_name,
-                    "currentStep": act_item.current_step,
-                },
-            }
-            return [tool_start_msg, activity_msg]
         return tool_start_msg
 
     @staticmethod
-    def _tool_invoked(e: dict) -> list[dict] | dict:
+    def _tool_invoked(e: dict) -> dict:
         """spec §5.3.1: NO top-level projected_state — use ``result.state`` (native shape).
 
         Also surface ``output_text`` (the inline stdout / content for non-evidence
@@ -287,31 +263,10 @@ class EventTranslator:
                 "executionTime": e.get("executionTime"),
             },
         }
-        from lca.infrastructure.observability.activity_projector import (
-            get_global_activity_projector,
-        )
-
-        act_item = get_global_activity_projector().feed_event(e)
-        if act_item is not None:
-            activity_msg = {
-                "type": "activity_updated",
-                "data": {
-                    "id": act_item.id,
-                    "runId": act_item.run_id,
-                    "assistantId": act_item.assistant_id,
-                    "status": act_item.status.value,
-                    "endTime": act_item.end_time,
-                    "durationMs": act_item.duration_ms,
-                    "resultSummary": act_item.result_summary,
-                    "toolName": act_item.tool_name,
-                    "currentStep": act_item.current_step,
-                },
-            }
-            return [tool_end_msg, activity_msg]
         return tool_end_msg
 
     @staticmethod
-    def _tool_denied(e: dict) -> list[dict] | dict:
+    def _tool_denied(e: dict) -> dict:
         tool_end_msg = {
             "type": "tool_end",
             "data": {
@@ -319,27 +274,6 @@ class EventTranslator:
                 "result": {"error": e.get("reason", "denied")},
             },
         }
-        from lca.infrastructure.observability.activity_projector import (
-            get_global_activity_projector,
-        )
-
-        act_item = get_global_activity_projector().feed_event(e)
-        if act_item is not None:
-            activity_msg = {
-                "type": "activity_updated",
-                "data": {
-                    "id": act_item.id,
-                    "runId": act_item.run_id,
-                    "assistantId": act_item.assistant_id,
-                    "status": act_item.status.value,
-                    "endTime": act_item.end_time,
-                    "durationMs": act_item.duration_ms,
-                    "resultSummary": act_item.result_summary,
-                    "toolName": act_item.tool_name,
-                    "currentStep": act_item.current_step,
-                },
-            }
-            return [tool_end_msg, activity_msg]
         return tool_end_msg
 
     @staticmethod
@@ -555,7 +489,7 @@ class EventTranslator:
         }
 
     @staticmethod
-    def _spine_tool_call_record(e: dict) -> list[dict] | dict | None:
+    def _spine_tool_call_record(e: dict) -> dict | None:
         payload = _inner_payload(e)
         tool_name = str(payload.get("tool_name") or "")
         invocation_id = str(payload.get("invocation_id") or payload.get("tool_call_id") or "")
@@ -577,38 +511,11 @@ class EventTranslator:
         }
         # `step.tool_call.record` is the gateway-path tool START signal that
         # survives `SUPPRESSED_SPINE_EPS` (phase.tool.call.start is suppressed
-        # in favour of catalog ToolStarted). Feed the activity projector here
-        # so the status drawer's 「动态」 tab sees live tool starts for web-UI
-        # runs. Mirror `_spine_phase_tool_start` so the wire carries
-        # `activity_updated` to the frontend.
-        from lca.infrastructure.observability.activity_projector import (
-            get_global_activity_projector,
-        )
-
-        act_item = get_global_activity_projector().feed_event(e)
-        if act_item is not None:
-            activity_msg = {
-                "type": "activity_updated",
-                "data": {
-                    "id": act_item.id,
-                    "runId": act_item.run_id,
-                    "assistantId": act_item.assistant_id,
-                    "category": act_item.category.value,
-                    "title": act_item.title,
-                    "summary": act_item.summary,
-                    "status": act_item.status.value,
-                    "startTime": act_item.start_time,
-                    "icon": act_item.icon,
-                    "params": act_item.params,
-                    "toolName": act_item.tool_name,
-                    "currentStep": act_item.current_step,
-                },
-            }
-            return [stream_chunk_msg, activity_msg]
+        # in favour of catalog ToolStarted).
         return stream_chunk_msg
 
     @staticmethod
-    def _spine_phase_tool_start(e: dict) -> list[dict] | dict | None:
+    def _spine_phase_tool_start(e: dict) -> dict | None:
         payload = _inner_payload(e)
         tool_name = str(payload.get("tool_name") or "")
         invocation_id = str(payload.get("invocation_id") or "")
@@ -627,34 +534,10 @@ class EventTranslator:
                 "toolCalling": tool_calling,
             },
         }
-        from lca.infrastructure.observability.activity_projector import (
-            get_global_activity_projector,
-        )
-
-        act_item = get_global_activity_projector().feed_event(e)
-        if act_item is not None:
-            activity_msg = {
-                "type": "activity_updated",
-                "data": {
-                    "id": act_item.id,
-                    "runId": act_item.run_id,
-                    "assistantId": act_item.assistant_id,
-                    "category": act_item.category.value,
-                    "title": act_item.title,
-                    "summary": act_item.summary,
-                    "status": act_item.status.value,
-                    "startTime": act_item.start_time,
-                    "icon": act_item.icon,
-                    "params": act_item.params,
-                    "toolName": act_item.tool_name,
-                    "currentStep": act_item.current_step,
-                },
-            }
-            return [tool_start_msg, activity_msg]
         return tool_start_msg
 
     @staticmethod
-    def _spine_body_tool_end(e: dict) -> list[dict] | dict | None:
+    def _spine_body_tool_end(e: dict) -> dict | None:
         payload = _inner_payload(e)
         invocation_id = str(payload.get("invocation_id") or "")
         tool_name = str(payload.get("tool_name") or "")
@@ -698,57 +581,7 @@ class EventTranslator:
                 },
             },
         }
-        from lca.infrastructure.observability.activity_projector import (
-            get_global_activity_projector,
-        )
-
-        act_item = get_global_activity_projector().feed_event(e)
-        if act_item is not None:
-            activity_msg = {
-                "type": "activity_updated",
-                "data": {
-                    "id": act_item.id,
-                    "runId": act_item.run_id,
-                    "assistantId": act_item.assistant_id,
-                    "status": act_item.status.value,
-                    "endTime": act_item.end_time,
-                    "durationMs": act_item.duration_ms,
-                    "resultSummary": act_item.result_summary,
-                    "toolName": act_item.tool_name,
-                    "currentStep": act_item.current_step,
-                },
-            }
-            return [tool_end_msg, activity_msg]
         return tool_end_msg
-
-    @staticmethod
-    def _spine_body_tool_execute_start(e: dict) -> list[dict] | dict | None:
-        """body.tool.execute.start: the tool really started executing now.
-
-        Feed the projector so start_time is refreshed to the true execution
-        moment and the live step is published — the drawer's 「动态」 tab
-        then shows what the tool is doing instead of a static "running".
-        """
-        from lca.infrastructure.observability.activity_projector import (
-            get_global_activity_projector,
-        )
-
-        act_item = get_global_activity_projector().feed_event(e)
-        if act_item is not None:
-            activity_msg = {
-                "type": "activity_updated",
-                "data": {
-                    "id": act_item.id,
-                    "runId": act_item.run_id,
-                    "assistantId": act_item.assistant_id,
-                    "status": act_item.status.value,
-                    "startTime": act_item.start_time,
-                    "toolName": act_item.tool_name,
-                    "currentStep": act_item.current_step,
-                },
-            }
-            return [activity_msg]
-        return None
 
 
 _HANDLERS = {
@@ -777,7 +610,6 @@ _SPINE_HANDLERS = {
     "llm.request.header.assistant": EventTranslator._spine_llm_header_assistant,
     "step.tool_call.record": EventTranslator._spine_tool_call_record,
     "phase.tool.call.start": EventTranslator._spine_phase_tool_start,
-    "body.tool.execute.start": EventTranslator._spine_body_tool_execute_start,
     "body.tool.execute.end": EventTranslator._spine_body_tool_end,
 }
 

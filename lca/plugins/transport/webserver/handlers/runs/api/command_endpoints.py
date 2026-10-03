@@ -665,18 +665,6 @@ async def cancel_run(request: Request) -> JSONResponse:
             headers=cors_headers(),
         )
 
-    # Synchronize ActivityProjector state to cancelled
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
-    activity_id = str(body.get("activity_id") or "")
-    assistant_id = str(body.get("assistant_id") or "default")
-    from lca.infrastructure.observability.activity_projector import get_global_activity_projector
-
-    if activity_id:
-        get_global_activity_projector().cancel_activity(assistant_id, activity_id)
-
     return JSONResponse({"status": receipt.status or "canceled"}, headers=cors_headers())
 
 

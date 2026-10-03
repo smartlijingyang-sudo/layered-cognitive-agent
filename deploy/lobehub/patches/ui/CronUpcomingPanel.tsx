@@ -225,18 +225,10 @@ export const CronUpcomingPanel = memo<CronUpcomingPanelProps>(
       const onJobsUpdated = () => {
         fetchJobs();
       };
-      const onActivityUpdated = (e: any) => {
-        const patch = e.detail || e;
-        if (patch?.category === 'cron' || patch?.toolName?.startsWith?.('cron.')) {
-          fetchJobs();
-        }
-      };
-
       if (typeof window !== 'undefined') {
         window.addEventListener('lca:jobs_updated', onJobsUpdated);
         window.addEventListener('lca:run_completed', onJobsUpdated);
         window.addEventListener('lca:status_refresh', onJobsUpdated);
-        window.addEventListener('lca:activity_updated', onActivityUpdated);
       }
 
       // 8 秒静默轮询保持与后端同步
@@ -252,7 +244,6 @@ export const CronUpcomingPanel = memo<CronUpcomingPanelProps>(
           window.removeEventListener('lca:jobs_updated', onJobsUpdated);
           window.removeEventListener('lca:run_completed', onJobsUpdated);
           window.removeEventListener('lca:status_refresh', onJobsUpdated);
-          window.removeEventListener('lca:activity_updated', onActivityUpdated);
         }
       };
     }, [fetchJobs]);

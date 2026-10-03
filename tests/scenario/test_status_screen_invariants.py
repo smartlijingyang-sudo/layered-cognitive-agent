@@ -1,25 +1,37 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from starlette.applications import Starlette
+from starlette.routing import Route
 from starlette.testclient import TestClient
 
-from lca.application.runtime.coordinator.event_translator import EventTranslator
 from lca.contracts.models.observability.activity import (
+    ActivityCategory,
     ActivityIntentNamer,
     ActivityStatus,
 )
+from lca.contracts.observability.registry.status import RunLifecycleStatus
 from lca.contracts.protocols.assistant.catalog import CreateAssistantRequest
-from lca.infrastructure.observability.activity_projector import (
-    ActivityProjector,
-    get_global_activity_projector,
-)
+from lca.infrastructure.observability.activity_feed import ActivityFeed
 from lca.plugins.domain.assistant.catalog.plugin import AssistantCatalogImpl
+from lca.plugins.transport.webserver.handlers.runs.api.command_endpoints import cancel_run
+from lca.plugins.transport.webserver.handlers.runs.terminal.port.port import RunCommandReceipt
 from lca.plugins.transport.webserver.router.router import RouteRegistry
+from lca.plugins.transport.webserver.routes_1.routes_assistants import status_screen
 from lca.plugins.transport.webserver.routes_1.routes_assistants.router import setup
+
+if TYPE_CHECKING:
+    import pytest
+
+_ToolCalls = tuple[tuple[str, dict[str, Any]], ...]
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class _FakeRuntime:
@@ -66,60 +78,301 @@ def _setup_test_app(tmp_path: Path) -> tuple[Starlette, AssistantCatalogImpl, st
     return app, catalog, handle.assistant_id
 
 
-def test_inv_01_single_track_fact_and_pure_projection_determinism():
-    """INV-01: ActivityProjector folds events deterministically without parallel store."""
-    events = [
-        {
-            "execution_point": "phase.tool.call.start",
-            "payload": {
-                "invocation_id": "call_inv1",
-                "run_id": "run_01",
-                "assistant_id": "architect",
-                "tool_name": "run_shell",
-                "arguments": {"command": "git log -n 1"},
-                "timestamp": "2026-10-02T10:00:00Z",
+def _run_dir(runs_root: Path, run_id: str) -> Path:
+    run_dir = runs_root / run_id
+    run_dir.mkdir(parents=True)
+    return run_dir
+
+
+def _write_manifest(run_dir: Path, run_id: str) -> None:
+    (run_dir / "manifest.json").write_text(
+        json.dumps({"schema": "lca.run_manifest/1", "run_id": run_id}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
+def _write_journal(
+    run_dir: Path,
+    run_id: str,
+    *,
+    objective: str,
+    outcome: str,
+    started_at: float,
+    closed_at: float,
+    tool_calls: _ToolCalls = (),
+) -> None:
+    (run_dir / "journal.json").write_text(
+        json.dumps(
+            {
+                "schema": "lca.journal/3.1",
+                "run_id": run_id,
+                "metadata": {
+                    "agent_role": "solo",
+                    "strategy_key": "solo",
+                    "plan_ref": "sha256:abc",
+                    "objective": objective,
+                    "attachments": [],
+                    "outcome": outcome,
+                    "started_at": started_at,
+                    "closed_at": closed_at,
+                    "total_steps": len(tool_calls),
+                    "extra": {},
+                },
+                "steps": [
+                    {
+                        "step_index": index,
+                        "entered_at": started_at,
+                        "tool_calls": [
+                            {
+                                "invocation_id": f"toolu_{index}",
+                                "name": name,
+                                "arguments": arguments,
+                            }
+                        ],
+                        "tool_results": [],
+                    }
+                    for index, (name, arguments) in enumerate(tool_calls, start=1)
+                ],
             },
-        },
-        {
-            "execution_point": "body.tool.execute.end",
-            "payload": {
-                "invocation_id": "call_inv1",
-                "run_id": "run_01",
-                "assistant_id": "architect",
-                "tool_name": "run_shell",
-                "ok": True,
-                "latency_ms": 80,
-                "message": {"content": "commit abc"},
-                "timestamp": "2026-10-02T10:00:00.080Z",
-            },
-        },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+
+def _write_spine(
+    run_dir: Path,
+    run_id: str,
+    *,
+    started_ts: str,
+    objective: str = "",
+    tool_calls: _ToolCalls = (),
+    stop_outcome: str | None = None,
+    stop_ts: str | None = None,
+) -> None:
+    records: list[dict[str, Any]] = [
+        _record(
+            run_id,
+            seq=1,
+            execution_point="kernel.run.start",
+            payload={"run_id": run_id, "trace_id": f"trace_{run_id}"},
+            ts=started_ts,
+        )
     ]
+    seq = 2
+    if objective:
+        records.append(
+            _record(
+                run_id,
+                seq=seq,
+                execution_point="phase.think.fold",
+                payload={
+                    "incarnation": 1,
+                    "objective": objective,
+                    "objective_kind": "user_text",
+                    "phase": "think",
+                    "summary": "started",
+                },
+                ts=started_ts,
+            )
+        )
+        seq += 1
+    for name, arguments in tool_calls:
+        records.append(
+            _record(
+                run_id,
+                seq=seq,
+                execution_point="step.tool_call.record",
+                payload={
+                    "arguments": arguments,
+                    "invocation_id": f"toolu_{seq}",
+                    "run_id": run_id,
+                    "step": seq,
+                    "tool_name": name,
+                },
+                ts=started_ts,
+            )
+        )
+        seq += 1
+    if stop_outcome is not None:
+        records.append(
+            _record(
+                run_id,
+                seq=seq,
+                execution_point="kernel.run.stop",
+                payload={"outcome": stop_outcome, "run_id": run_id, "trace_id": f"trace_{run_id}"},
+                ts=stop_ts or started_ts,
+            )
+        )
+    lines = "".join(json.dumps(record, ensure_ascii=False) + "\n" for record in records)
+    (run_dir / f"{run_id}.spine.jsonl").write_text(lines, encoding="utf-8")
 
-    p1 = ActivityProjector()
-    p2 = ActivityProjector()
-    for ev in events:
-        p1.feed_event(ev)
-        p2.feed_event(ev)
 
-    assert p1.get_activities("architect") == p2.get_activities("architect")
-    items = p1.get_activities("architect")
-    assert len(items) == 1
-    assert items[0].status == ActivityStatus.COMPLETED
-    assert items[0].duration_ms == 80
+def _record(
+    run_id: str, *, seq: int, execution_point: str, payload: dict[str, Any], ts: str
+) -> dict[str, Any]:
+    return {
+        "category": f"spine.{execution_point}",
+        "causation_id": None,
+        "channel": "fact",
+        "event_hash": None,
+        "event_id": f"{run_id}:{seq}",
+        "execution_point": execution_point,
+        "payload": payload,
+        "prev_event_hash": None,
+        "trace_id": None,
+        "ts": ts,
+    }
 
 
-def test_inv_02_action_start_locks_human_title():
-    """INV-02: Action start locks human-readable intent title, never exposing raw internal tool names."""
-    # Test connector tool name mapping
+def _tree_state(root: Path) -> dict[str, tuple[int, str]]:
+    return {
+        str(path.relative_to(root)): (
+            path.stat().st_size,
+            hashlib.sha256(path.read_bytes()).hexdigest(),
+        )
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
+
+
+@dataclass(frozen=True)
+class _SessionStub:
+    run_id: str
+    status: RunLifecycleStatus
+
+
+class _RegistryStub:
+    def __init__(self, sessions: tuple[_SessionStub, ...] = ()) -> None:
+        self._sessions = {session.run_id: session for session in sessions}
+
+    def get(self, run_id: str) -> _SessionStub | None:
+        return self._sessions.get(run_id)
+
+    def sessions(self) -> tuple[_SessionStub, ...]:
+        return tuple(self._sessions.values())
+
+
+class _CancelPortStub:
+    def __init__(self) -> None:
+        self.cancelled: list[str] = []
+
+    async def cancel(self, run_id: str) -> RunCommandReceipt:
+        self.cancelled.append(run_id)
+        return RunCommandReceipt(accepted=True, status="canceled")
+
+
+def test_inv_01_single_track_fact_and_pure_projection_determinism(tmp_path: Path) -> None:
+    """INV-01: The feed is a pure function of the artifacts on disk.
+
+    Retargeted from ``ActivityProjector``, which folded transport events into a
+    mutable process-global store. There is no event track left to be single, so
+    the invariant now binds the read: two independent feeds over one
+    ``runs_root`` agree, and one feed re-read agree with itself.
+    """
+    runs_root = tmp_path / "runs"
+    list_dir = _run_dir(runs_root, "run_a1")
+    _write_manifest(list_dir, "run_a1")
+    _write_journal(
+        list_dir,
+        "run_a1",
+        objective="帮我列出文件",
+        outcome="completed",
+        started_at=1791028800.0,
+        closed_at=1791028830.0,
+        tool_calls=(("listFiles", {"path": "."}),),
+    )
+    git_dir = _run_dir(runs_root, "run_a2")
+    _write_manifest(git_dir, "run_a2")
+    _write_journal(
+        git_dir,
+        "run_a2",
+        objective="查一下最近三次提交",
+        outcome="failed",
+        started_at=1791018000.0,
+        closed_at=1791018050.0,
+        tool_calls=(("runCommand", {"command": "git log --oneline -3"}),),
+    )
+
+    first = ActivityFeed(runs_root).list_activities()
+    second = ActivityFeed(runs_root).list_activities()
+    feed = ActivityFeed(runs_root)
+    again = feed.list_activities()
+
+    assert first == second == again
+    assert [row.run_id for row in first] == ["run_a1", "run_a2"]
+    assert first[0].status is ActivityStatus.COMPLETED
+    assert first[0].start_time == "2026-10-03T12:00:00+00:00"
+    assert first[0].duration_ms == 30000
+    assert first[0].summary == "调用 1 个工具：listFiles"
+    assert first[1].status is ActivityStatus.FAILED
+    assert first[1].duration_ms == 50000
+    assert first[1].category is ActivityCategory.COMMAND
+    assert first[1].icon == "terminal"
+
+
+def test_inv_02_action_start_locks_human_title(tmp_path: Path) -> None:
+    """INV-02: The row title stays the human objective; the namer supplies icon and live step.
+
+    The title no longer comes from the tool call, because one row now covers a
+    whole run rather than one action. ``ActivityIntentNamer`` still owns the
+    icon and the ``current_step`` of a running row.
+    """
+    runs_root = tmp_path / "runs"
+    mail_dir = _run_dir(runs_root, "run_b1")
+    _write_manifest(mail_dir, "run_b1")
+    _write_journal(
+        mail_dir,
+        "run_b1",
+        objective="帮我搜索出行确认邮件 <!-- system-context: 用户偏好 -->",
+        outcome="completed",
+        started_at=1791028800.0,
+        closed_at=1791028830.0,
+        tool_calls=(
+            (
+                "hatch_gws_cli",
+                {"action": "search", "query": "travel confirmation", "service": "gmail"},
+            ),
+        ),
+    )
+    browse_dir = _run_dir(runs_root, "run_b2")
+    _write_spine(
+        browse_dir,
+        "run_b2",
+        started_ts="2026-10-03T14:00:00+00:00",
+        objective="浏览 webhook 文档",
+        tool_calls=(
+            (
+                "browser.spawn_task",
+                {"url": "https://docs.github.com", "task": "Search webhook docs"},
+            ),
+        ),
+    )
+
+    rows = ActivityFeed(runs_root).list_activities(live_run_ids=("run_b2",))
+    by_id = {row.run_id: row for row in rows}
+
+    mail = by_id["run_b1"]
+    assert mail.title == "帮我搜索出行确认邮件"
+    assert "hatch_gws_cli" not in mail.title
+    assert mail.icon == "mail"
+    assert mail.tool_name == "hatch_gws_cli"
+    assert mail.current_step is None
+
+    browse = by_id["run_b2"]
+    assert browse.title == "浏览 webhook 文档"
+    assert browse.status is ActivityStatus.RUNNING
+    assert browse.icon == "browser"
+    assert browse.current_step == "Browsing docs.github.com"
+    assert browse.end_time is None
+
     title, summary, icon = ActivityIntentNamer.name(
         "hatch_gws_cli", {"action": "search", "query": "travel confirmation", "service": "gmail"}
     )
     assert title == "正在搜索 Gmail 邮件"
     assert "travel confirmation" in summary
     assert icon == "mail"
-    assert "hatch_gws_cli" not in title
 
-    # Test browser task
     title2, summary2, icon2 = ActivityIntentNamer.name(
         "browser.spawn_task", {"url": "https://docs.github.com", "task": "Search webhook docs"}
     )
@@ -128,99 +381,222 @@ def test_inv_02_action_start_locks_human_title():
     assert icon2 == "browser"
 
 
-def test_inv_03_incremental_patch_idempotence():
-    """INV-03: Multiple events for the same id idempotently patch without duplication."""
-    translator = EventTranslator()
-    stamped_start = {
-        "event": {
-            "execution_point": "phase.tool.call.start",
-            "payload": {
-                "invocation_id": "call_idem",
-                "run_id": "run_idem",
-                "assistant_id": "architect",
-                "tool_name": "run_shell",
-                "arguments": {"command": "cargo test"},
-            },
-        },
-    }
-    stamped_end = {
-        "event": {
-            "execution_point": "body.tool.execute.end",
-            "payload": {
-                "invocation_id": "call_idem",
-                "run_id": "run_idem",
-                "assistant_id": "architect",
-                "tool_name": "run_shell",
-                "ok": True,
-                "latency_ms": 300,
-            },
-        },
-    }
+def test_inv_03_reread_reflects_artifact_change(tmp_path: Path) -> None:
+    """INV-03: Re-reading tracks the artifact; re-reading an unchanged artifact is stable.
 
-    # Emit start twice, then end twice
-    translator.translate(stamped_start)
-    translator.translate(stamped_start)
-    translator.translate(stamped_end)
-    translator.translate(stamped_end)
-
-    items = get_global_activity_projector().get_activities("architect")
-    idem_items = [i for i in items if i.id == "call_idem"]
-    assert len(idem_items) == 1
-    assert idem_items[0].status == ActivityStatus.COMPLETED
-    assert idem_items[0].duration_ms == 300
-
-
-def test_inv_04_real_stop_cancellation_and_audit():
-    """INV-04: Stop cancellation sets status to cancelled and is durable in projector."""
-    projector = get_global_activity_projector()
-    projector.feed_event(
-        {
-            "execution_point": "phase.tool.call.start",
-            "payload": {
-                "invocation_id": "call_long_proc",
-                "run_id": "run_long",
-                "assistant_id": "architect",
-                "tool_name": "run_shell",
-                "arguments": {"command": "sleep 100"},
-            },
-        }
+    Replaces incremental patch idempotence. Nothing is patched any more, so the
+    invariant that survives is the one the memo has to honour: a changed
+    artifact is visible on the next read, and an unchanged one yields equal
+    rows without a second derivation drifting.
+    """
+    runs_root = tmp_path / "runs"
+    run_dir = _run_dir(runs_root, "run_c1")
+    _write_manifest(run_dir, "run_c1")
+    _write_journal(
+        run_dir,
+        "run_c1",
+        objective="第一版目标",
+        outcome="completed",
+        started_at=1791000000.0,
+        closed_at=1791000030.0,
+        tool_calls=(("listFiles", {"path": "."}),),
     )
 
-    cancelled = projector.cancel_activity("architect", "call_long_proc")
-    assert cancelled is not None
-    assert cancelled.status == ActivityStatus.CANCELLED
-    assert cancelled.result_summary == "User cancelled operation"
+    feed = ActivityFeed(runs_root)
+    first = feed.list_activities()
+    assert len(first) == 1
+    assert first[0].title == "第一版目标"
+    assert first[0].status is ActivityStatus.COMPLETED
+    assert first[0].duration_ms == 30000
+    assert feed.list_activities() == first
 
-    items = projector.get_activities("architect")
-    item = next(i for i in items if i.id == "call_long_proc")
-    assert item.status == ActivityStatus.CANCELLED
+    # Both the objective and the outcome change byte length, so the memo stamp
+    # moves on size alone even where mtime resolution is coarse.
+    _write_journal(
+        run_dir,
+        "run_c1",
+        objective="第二版目标（更长）",
+        outcome="failed",
+        started_at=1791000000.0,
+        closed_at=1791000060.0,
+        tool_calls=(("listFiles", {"path": "."}),),
+    )
+
+    third = feed.list_activities()
+    assert len(third) == 1
+    assert third != first
+    assert third[0].title == "第二版目标（更长）"
+    assert third[0].status is ActivityStatus.FAILED
+    assert third[0].duration_ms == 60000
+    assert feed.list_activities() == third
 
 
-def test_inv_05_upcoming_system_job_protection_and_chat_draft():
+def test_inv_04_real_stop_cancellation_and_audit(tmp_path: Path) -> None:
+    """INV-04: Cancellation is a control-plane act on the run; the feed only reports it.
+
+    Replaces ``projector.cancel_activity``. The observation plane no longer
+    carries a cancellable row, so the invariant splits: the ledger's terminal
+    outcome (``kernel.run.stop`` or ``journal.metadata.outcome``) reads back as
+    ``CANCELLED``, and the cancel handler returns its receipt without writing
+    to any activity store.
+    """
+    runs_root = tmp_path / "runs"
+    stopped_dir = _run_dir(runs_root, "run_d1")
+    _write_manifest(stopped_dir, "run_d1")
+    _write_journal(
+        stopped_dir,
+        "run_d1",
+        objective="跑一个很长的命令",
+        outcome="stopped",
+        started_at=1791028800.0,
+        closed_at=1791028810.0,
+        tool_calls=(("runCommand", {"command": "sleep 100"}),),
+    )
+    canceled_dir = _run_dir(runs_root, "run_d2")
+    _write_spine(
+        canceled_dir,
+        "run_d2",
+        started_ts="2026-10-03T16:00:00Z",
+        objective="另一个很长的命令",
+        tool_calls=(("runCommand", {"command": "sleep 100"}),),
+        stop_outcome="canceled",
+        stop_ts="2026-10-03T16:00:05Z",
+    )
+
+    app = Starlette(
+        routes=[Route("/runs/{run_id}/cancel", cancel_run, methods=["POST", "OPTIONS"])]
+    )
+    port = _CancelPortStub()
+    app.state.run_port = port
+    app.state.registry = _RegistryStub(
+        (_SessionStub(run_id="run_d1", status=RunLifecycleStatus.RUNNING),)
+    )
+    before = _tree_state(tmp_path)
+
+    response = TestClient(app).post("/runs/run_d1/cancel")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "canceled"}
+    assert port.cancelled == ["run_d1"]
+    assert _tree_state(tmp_path) == before
+    assert not (REPO_ROOT / "traces" / "runtime" / "activity_cache.json").exists()
+
+    rows = ActivityFeed(runs_root).list_activities(live_run_ids=("run_d2",))
+    by_id = {row.run_id: row for row in rows}
+    assert by_id["run_d1"].status is ActivityStatus.CANCELLED
+    assert by_id["run_d1"].end_time == "2026-10-03T12:00:10+00:00"
+    assert by_id["run_d2"].status is ActivityStatus.CANCELLED
+    assert by_id["run_d2"].end_time == "2026-10-03T16:00:05+00:00"
+    assert by_id["run_d2"].duration_ms == 5000
+
+
+def test_inv_05_upcoming_system_job_protection_and_chat_draft() -> None:
     """INV-05: System jobs reject deletion with explicit guard."""
-    # Upcoming job with is_system=True
     system_job = {
         "id": "job_sys_01",
         "title": "系统记忆归纳",
         "is_system": True,
     }
     assert system_job["is_system"] is True
-    # The client-side and server-side contracts reject deleting system-owned jobs
 
 
-def test_inv_06_snapshot_aggregation_and_eventual_consistency(tmp_path: Path):
-    """INV-06: Snapshot API returns complete aggregate of Activity, Approvals, Upcoming, Identity."""
+def test_inv_06_snapshot_aggregation_and_eventual_consistency(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """INV-06: The snapshot aggregates Activity, Approvals, Upcoming and Identity.
+
+    Reads a ``tmp_path`` runs_root instead of the process-wide feed, which would
+    fold whatever real runs happen to sit under ``traces/runs``.
+    """
+    runs_root = tmp_path / "runs"
+    newer = _run_dir(runs_root, "run_f1")
+    _write_manifest(newer, "run_f1")
+    _write_journal(
+        newer,
+        "run_f1",
+        objective="整理本周架构评审记录",
+        outcome="completed",
+        started_at=1791028800.0,
+        closed_at=1791028830.0,
+        tool_calls=(("listFiles", {"path": "."}),),
+    )
+    older = _run_dir(runs_root, "run_f2")
+    _write_manifest(older, "run_f2")
+    _write_journal(
+        older,
+        "run_f2",
+        objective="检索记忆库中的分层原则",
+        outcome="completed",
+        started_at=1791018000.0,
+        closed_at=1791018005.0,
+        tool_calls=(("memory_search", {"query": "分层原则"}),),
+    )
+
     app, _, assistant_id = _setup_test_app(tmp_path)
+    app.state.registry = _RegistryStub()
+    monkeypatch.setattr(status_screen, "get_activity_feed", lambda: ActivityFeed(runs_root))
     client = TestClient(app)
 
     resp = client.get(
         f"/v1/assistants/{assistant_id}/status-snapshot",
         headers={"x-lca-user-id": "local-dev-user"},
     )
+
     assert resp.status_code == 200
     data = resp.json()
     assert data["assistant_id"] == assistant_id
-    assert isinstance(data["activities"], list)
-    assert isinstance(data["approvals"], list)
-    assert isinstance(data["upcoming"], list)
-    assert isinstance(data["identity"]["files"], list)
+    assert [row["run_id"] for row in data["activities"]] == ["run_f1", "run_f2"]
+    assert [row["title"] for row in data["activities"]] == [
+        "整理本周架构评审记录",
+        "检索记忆库中的分层原则",
+    ]
+    assert data["approvals"] == []
+    assert data["upcoming"] == []
+    assert "IDENTITY.md" in [f["filename"] for f in data["identity"]["files"]]
+
+
+def test_inv_07_rows_carry_start_time_and_sort_newest_first(tmp_path: Path) -> None:
+    """INV-07: No row ships an empty start_time, and rows come back newest first.
+
+    Locks the defect that motivated replacing the projector: rows built from a
+    transport-fed cache could carry no timestamp at all, which both blanked the
+    timeline and made the sort order arbitrary. A journal whose ``started_at``
+    is still ``0.0`` recovers the moment from the ledger's opening record.
+    """
+    runs_root = tmp_path / "runs"
+    stamped = _run_dir(runs_root, "run_e1")
+    _write_manifest(stamped, "run_e1")
+    _write_journal(
+        stamped,
+        "run_e1",
+        objective="整理归档",
+        outcome="completed",
+        started_at=1791028800.0,
+        closed_at=1791028810.0,
+    )
+    recovered = _run_dir(runs_root, "run_e2")
+    _write_manifest(recovered, "run_e2")
+    _write_journal(
+        recovered,
+        "run_e2",
+        objective="启动即失败的运行",
+        outcome="failed",
+        started_at=0.0,
+        closed_at=0.0,
+    )
+    _write_spine(recovered, "run_e2", started_ts="2026-10-03T14:00:00+00:00")
+    live = _run_dir(runs_root, "run_e3")
+    _write_spine(live, "run_e3", started_ts="2026-10-03T16:00:00Z", objective="正在进行")
+
+    rows = ActivityFeed(runs_root).list_activities(live_run_ids=("run_e3",))
+
+    assert [row.run_id for row in rows] == ["run_e3", "run_e2", "run_e1"]
+    assert [row.start_time for row in rows] == [
+        "2026-10-03T16:00:00+00:00",
+        "2026-10-03T14:00:00+00:00",
+        "2026-10-03T12:00:00+00:00",
+    ]
+    assert all(row.start_time.strip() for row in rows)
+    assert rows[1].status is ActivityStatus.FAILED
+    assert rows[1].end_time is None
+    assert rows[2].status is ActivityStatus.COMPLETED

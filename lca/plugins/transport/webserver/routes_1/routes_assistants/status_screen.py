@@ -1,6 +1,6 @@
 """Status Screen aggregated snapshot endpoint (/v1/assistants/{id}/status-snapshot).
 
-Aggregates Activity (unified event log projection), Approvals (pending queue),
+Aggregates Activity (fold of the run ledger), Approvals (pending queue),
 Upcoming (ADR-0268 cron.list projection), and Identity standing files metadata.
 """
 
@@ -13,9 +13,10 @@ from typing import Any
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+from lca.contracts.observability.registry.status import RunLifecycleStatus
 from lca.domain.cron.service import CronService
 from lca.domain.cron.store import CronStore
-from lca.infrastructure.observability.activity_projector import get_global_activity_projector
+from lca.infrastructure.observability.activity_feed import get_activity_feed
 from lca.plugins.domain.assistant.catalog.plugin import AssistantCatalogError
 from lca.plugins.transport.webserver.routes_1.routes_assistants.codecs import (
     _error_envelope,
@@ -27,6 +28,34 @@ from lca.plugins.transport.webserver.routes_1.routes_assistants.standing_files i
     _summarize,
     sha256_of_str,
 )
+
+_TERMINAL_STATUSES = frozenset(
+    {
+        RunLifecycleStatus.COMPLETED,
+        RunLifecycleStatus.FAILED,
+        RunLifecycleStatus.CANCELLED,
+        RunLifecycleStatus.TIMEOUT,
+    }
+)
+
+
+def _live_run_ids(request: Request) -> frozenset[str]:
+    """Run ids the kernel is still executing.
+
+    The registry is the authority on liveness. Without it the feed cannot tell a
+    run in flight from one abandoned mid-ledger, since both leave the same
+    on-disk shape. ``app.state`` is untyped at this boundary, so a missing
+    registry reads as "nothing is live" rather than as an error.
+    """
+    registry = getattr(request.app.state, "registry", None)
+    sessions = getattr(registry, "sessions", None)
+    if not callable(sessions):
+        return frozenset()
+    return frozenset(
+        str(session.run_id)
+        for session in sessions()
+        if getattr(session, "status", None) not in _TERMINAL_STATUSES
+    )
 
 
 def _collect_standing_files(home_path: str) -> list[dict[str, Any]]:
@@ -77,8 +106,10 @@ async def assistant_status_snapshot(request: Request) -> JSONResponse:
             "assistant_not_found", status_code=404, error_type="not_found", detail=str(exc)
         )
 
-    # 1. Activities from global single-track event projector
-    activities = get_global_activity_projector().get_activities(assistant_id)
+    # 1. Activities folded from the run ledger, one row per run. The feed is not
+    # assistant-scoped: run artifacts carry no assistant binding yet, so every
+    # assistant sees the same recent runs.
+    activities = get_activity_feed().list_activities(live_run_ids=_live_run_ids(request))
 
     # 2. Upcoming tasks from ADR-0268 CronStore
     upcoming: list[dict[str, Any]] = []

@@ -163,18 +163,6 @@ function createLcaRunOnSessionComplete(
           },
         }),
       );
-      window.dispatchEvent(
-        new CustomEvent('lca:activity_updated', {
-          detail: {
-            id: activeRunId,
-            runId: activeRunId,
-            assistantId: params.assistantId || context.agentId,
-            status: succeeded ? 'completed' : 'failed',
-            endTime: new Date().toISOString(),
-            currentStep: null,
-          },
-        }),
-      );
       window.dispatchEvent(new CustomEvent('lca:jobs_updated'));
       window.dispatchEvent(new CustomEvent('lca:status_refresh'));
     }
@@ -395,22 +383,6 @@ export async function lcaExecuteGatewayRun(
           runId: receipt.runId,
           assistantId: assistantId || context.agentId,
           summary: userSummary,
-        },
-      }),
-    );
-    window.dispatchEvent(
-      new CustomEvent('lca:activity_updated', {
-        detail: {
-          id: receipt.runId,
-          runId: receipt.runId,
-          assistantId: assistantId || context.agentId,
-          category: 'tool',
-          title: '会话交互',
-          summary: userSummary,
-          status: 'running',
-          icon: 'chat',
-          startTime: new Date().toISOString(),
-          currentStep: '智能体思考并回复中...',
         },
       }),
     );

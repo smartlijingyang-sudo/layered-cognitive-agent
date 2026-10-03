@@ -142,6 +142,56 @@ def test_activity_intent_namer_dynamic_deconstruction_no_running_command():
         )
 
 
+def test_activity_intent_namer_memory_tool_discovery_and_github_queries() -> None:
+    t_mem, s_mem, i_mem = ActivityIntentNamer.name("memory_recall", {})
+    assert t_mem == "检索认知长期记忆"
+    assert s_mem == "联想相关知识与偏好"
+    assert i_mem == "memory"
+
+    t_find, s_find, i_find = ActivityIntentNamer.name("tool_search", {"query": "Google Drive"})
+    assert t_find == "发现与检索工具"
+    assert s_find == "检索: Google Drive"
+    assert i_find == "tool"
+
+    t_branch, s_branch, i_branch = ActivityIntentNamer.name(
+        "GITHUB_LIST_BRANCHES",
+        {"owner": "smartlijingyang-sudo", "repo": "layered-cognitive-agent"},
+    )
+    assert t_branch == "检索 GitHub 分支"
+    assert s_branch == "smartlijingyang-sudo/layered-cognitive-agent"
+    assert i_branch == "github"
+
+    t_commit, s_commit, i_commit = ActivityIntentNamer.name(
+        "GITHUB_LIST_COMMITS", {"owner": "test", "repo": "test-repo"}
+    )
+    assert t_commit == "查询 GitHub 提交记录"
+    assert s_commit == "test/test-repo"
+    assert i_commit == "github"
+
+
+def test_activity_intent_namer_defaults_when_arguments_are_thin() -> None:
+    assert ActivityIntentNamer.name("run_shell", {"command": "echo hi"}) == (
+        "执行 echo 指令",
+        "echo hi",
+        "terminal",
+    )
+    assert ActivityIntentNamer.name("browser_navigate", {"url": "https://a.com/b"}) == (
+        "Browsing a.com",
+        "自动化网页浏览",
+        "browser",
+    )
+    assert ActivityIntentNamer.name("subagent.spawn", {"role": "Tester"}) == (
+        "执行子任务: Tester",
+        "后台协同任务",
+        "robot",
+    )
+    assert ActivityIntentNamer.name("unknown_tool_xyz", {}) == (
+        "执行操作: unknown_tool_xyz",
+        "处理中",
+        "tool",
+    )
+
+
 def test_evidence_parser_five_elements_structure():
     from lca.contracts.models.observability.activity import StepEvidence, parse_step_evidence
 

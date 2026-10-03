@@ -967,7 +967,7 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
       return subSteps.find((s) => s.id === selectedSubStepId) || subSteps[0];
     }, [subSteps, selectedSubStepId]);
 
-    // 1. 拉取后端完整快照 (Status Snapshot API)
+    // 拉取后端完整快照 (Status Snapshot API)
     const fetchStatusSnapshot = useCallback(async () => {
       if (!assistantId) return;
       setLoading(true);
@@ -1073,133 +1073,29 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
       return () => clearInterval(timer);
     }, [activities]);
 
-    // 2. 监听 WebSocket activity_updated 增量消息并原地 patch 单行
-    useEffect(() => {
-      const onActivityUpdated = (e: any) => {
-        const patch = e.detail || e;
-        if (!patch || !patch.id) return;
-        setActivities((prev) => {
-          let idx = prev.findIndex((item) => item.id === patch.id);
-          if (idx < 0 && (patch.runId || patch.toolName)) {
-            idx = prev.findIndex(
-              (item) =>
-                item.status === 'running' &&
-                (patch.runId ? item.detail?.runId === patch.runId : true) &&
-                (patch.toolName ? item.detail?.toolName === patch.toolName : true),
-            );
-          }
-          const iconChar = mapActivityIcon(patch.icon);
-          const statusStr = mapBackendStatus(patch.status);
-          const ft = formatActivityTime(patch.startTime);
-
-          if (idx >= 0) {
-            const updated = [...prev];
-            updated[idx] = {
-              ...updated[idx],
-              title: patch.title || updated[idx].title,
-              summary: patch.summary || updated[idx].summary,
-              icon: iconChar || updated[idx].icon,
-              status: statusStr,
-              timestamp: ft.text !== '—' ? ft.text : updated[idx].timestamp,
-              dateGroup: ft.group || updated[idx].dateGroup,
-              detail: {
-                ...updated[idx].detail,
-                toolName: patch.toolName || updated[idx].detail?.toolName,
-                params: patch.params || updated[idx].detail?.params,
-                result: patch.resultSummary ?? updated[idx].detail?.result,
-                durationMs: patch.durationMs ?? updated[idx].detail?.durationMs,
-                startTime: patch.startTime || updated[idx].detail?.startTime,
-                endTime: patch.endTime || updated[idx].detail?.endTime,
-                currentStep: patch.currentStep !== undefined ? patch.currentStep : updated[idx].detail?.currentStep,
-                runId: patch.runId || updated[idx].detail?.runId,
-              },
-            };
-            return updated;
-          }
-          const newItem: ActivityItem = {
-            id: patch.id,
-            dateGroup: ft.group,
-            icon: iconChar,
-            iconBg: patch.status === 'running' ? '#e6f7ff' : '#f5f5f5',
-            title: patch.title || '执行操作',
-            summary: patch.summary || '',
-            timestamp: ft.text,
-            status: statusStr,
-            detail: {
-              toolName: patch.toolName || patch.category || patch.title,
-              params: patch.params,
-              result: patch.resultSummary,
-              durationMs: patch.durationMs,
-              startTime: patch.startTime,
-              endTime: patch.endTime,
-              currentStep: patch.currentStep,
-              runId: patch.runId,
-            },
-          };
-          return [newItem, ...prev];
-        });
-
-        // 联动更新：如果是 cron 相关的 activity 更新，立即刷新即将到来/任务列表
-        if (
-          patch.category === 'cron' ||
-          (typeof patch.toolName === 'string' && patch.toolName.startsWith('cron.'))
-        ) {
-          fetchStatusSnapshot();
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('lca:jobs_updated'));
-          }
-        }
-      };
-
-      if (typeof window !== 'undefined') {
-        window.addEventListener('lca:activity_updated', onActivityUpdated);
-        (window as any).__onLcaActivityUpdated = onActivityUpdated;
-      }
-      return () => {
-        if (typeof window !== 'undefined') {
-          window.removeEventListener('lca:activity_updated', onActivityUpdated);
-          if ((window as any).__onLcaActivityUpdated === onActivityUpdated) {
-            delete (window as any).__onLcaActivityUpdated;
-          }
-        }
-      };
-    }, [fetchStatusSnapshot]);
-
-    useEffect(() => {
-      if (open && assistantId) {
-        fetchStatusSnapshot();
-        const pollTimer = setInterval(() => {
-          if (!document.hidden) {
-            fetchStatusSnapshot();
-          }
-        }, 5000);
-        return () => clearInterval(pollTimer);
-      }
-    }, [open, assistantId, fetchStatusSnapshot]);
-
-    // 监听 Run 启停与状态刷新事件，实时拉取动态与即将到来
+    // The snapshot is the only source for 动态. Polling stays cheap because the
+    // backend folds run artifacts on read and memoizes them by file identity.
     useEffect(() => {
       if (!open || !assistantId) return;
-      const handleRefresh = () => {
-        fetchStatusSnapshot();
-      };
-      if (typeof window !== 'undefined') {
-        window.addEventListener('lca:run_started', handleRefresh);
-        window.addEventListener('lca:run_completed', handleRefresh);
-        window.addEventListener('lca:status_refresh', handleRefresh);
-        window.addEventListener('lca:jobs_updated', handleRefresh);
-      }
+      const refresh = () => fetchStatusSnapshot();
+      refresh();
+      const pollTimer = setInterval(() => {
+        if (!document.hidden) refresh();
+      }, 3000);
+      window.addEventListener('lca:run_started', refresh);
+      window.addEventListener('lca:run_completed', refresh);
+      window.addEventListener('lca:status_refresh', refresh);
+      window.addEventListener('lca:jobs_updated', refresh);
       return () => {
-        if (typeof window !== 'undefined') {
-          window.removeEventListener('lca:run_started', handleRefresh);
-          window.removeEventListener('lca:run_completed', handleRefresh);
-          window.removeEventListener('lca:status_refresh', handleRefresh);
-          window.removeEventListener('lca:jobs_updated', handleRefresh);
-        }
+        clearInterval(pollTimer);
+        window.removeEventListener('lca:run_started', refresh);
+        window.removeEventListener('lca:run_completed', refresh);
+        window.removeEventListener('lca:status_refresh', refresh);
+        window.removeEventListener('lca:jobs_updated', refresh);
       };
     }, [open, assistantId, fetchStatusSnapshot]);
 
-    // 3. 运行中动作取消中断 (Stop 机制)
+    // 运行中动作取消中断 (Stop 机制)
     const handleStopActivity = useCallback(
       async (activityId: string, runId?: string) => {
         try {
