@@ -84,3 +84,25 @@ def test_projector_cancel_and_determinism():
     assert cancelled is not None
     assert cancelled.status == ActivityStatus.CANCELLED
     assert cancelled.result_summary == "User cancelled operation"
+
+
+def test_get_activities_falls_back_to_unstamped_default_bucket():
+    # Gateway tool events historically lack assistant_id; the projector
+    # stores them under "default". get_activities must surface them so the
+    # status drawer shows real runs even without per-assistant stamping.
+    projector = ActivityProjector()
+    start_ev = {
+        "execution_point": "phase.tool.call.start",
+        "payload": {
+            "invocation_id": "call_default",
+            "run_id": "run_003",
+            "tool_name": "editFile",
+            "arguments": {"path": "/home/u/a.md"},
+            "timestamp": "2026-10-02T11:00:00Z",
+        },
+    }
+    assert projector.feed_event(start_ev) is not None
+    items = projector.get_activities(assistant_id="asst_any")
+    assert len(items) == 1
+    assert items[0].id == "call_default"
+    assert items[0].assistant_id == "default"

@@ -124,8 +124,14 @@ class ActivityProjector:
 
     def get_activities(self, assistant_id: str) -> list[ActivityItem]:
         store = self._items.get(assistant_id, {})
+        # Gateway tool events historically do not stamp assistant_id, so
+        # the projector stores them under "default". Surface those real
+        # activities too — otherwise the status drawer stays empty after a
+        # kernel restart even though runs executed through the gateway.
+        default_store = self._items.get("default", {})
+        merged = {**default_store, **store}
         # Return descending by start_time
-        return sorted(store.values(), key=lambda x: x.start_time, reverse=True)
+        return sorted(merged.values(), key=lambda x: x.start_time, reverse=True)
 
     def _save(self, item: ActivityItem) -> None:
         if item.assistant_id not in self._items:

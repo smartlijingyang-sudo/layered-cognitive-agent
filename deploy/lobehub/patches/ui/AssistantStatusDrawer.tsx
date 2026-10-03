@@ -183,7 +183,7 @@ const styles = createStaticStyles(({ css, cssVar }) => {
     `,
     identityGrid: css`
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px;
       overflow-y: auto;
       flex: 1;
@@ -194,6 +194,7 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       border: 1px solid ${cssVar.colorBorderSecondary};
       border-radius: 14px;
       padding: 14px;
+      min-width: 0;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       cursor: pointer;
@@ -223,6 +224,8 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      flex: 1;
+      min-width: 0;
     `,
     identitySummary: css`
       font-size: 11px;
@@ -447,105 +450,6 @@ const FILE_ROLE_METADATA: Record<string, { label: string; icon: string; tagColor
   'MEMORY.md': { label: '长期事实', icon: '🧠', tagColor: 'gold' },
 };
 
-// 预设高拟真人读行动日志
-const DEFAULT_ACTIVITIES: ActivityItem[] = [
-  {
-    id: 'act-1',
-    dateGroup: 'today',
-    icon: '✓',
-    iconBg: 'rgba(82, 196, 26, 0.12)',
-    title: '检索并更新记忆偏好',
-    summary: '自动识别用户架构偏好（DDD思维与TypeScript规范），并成功同步至长期事实。',
-    timestamp: '15:24',
-    status: 'success',
-    toolBadge: 'memory',
-    detail: {
-      stage: 'Reflect → Remember',
-      toolName: 'memory_update',
-      humanExplanation: '助理在与你的交谈中捕获了架构工程规范，判定为长期偏好事实，执行了幂等写盘。',
-      command: 'memory_update(scope="architecture_principles", key="ddd_guardrails")',
-      result: '✓ 事实已写入 MEMORY.md，索引哈希: e4f82a90...',
-      durationMs: 320,
-    },
-  },
-  {
-    id: 'act-2',
-    dateGroup: 'today',
-    icon: '💻',
-    iconBg: 'rgba(22, 119, 255, 0.12)',
-    title: '执行系统健康与环境探测',
-    summary: '运行了机器环境诊断命令，核验本地 Companion 连接链路及 Python 运行环境。',
-    timestamp: '14:10',
-    status: 'success',
-    toolBadge: 'shell',
-    detail: {
-      stage: 'Perceive → Act',
-      toolName: 'local_runCommand',
-      humanExplanation: '执行轻量级探测命令以确认执行环境状态，确保后续文件修改与工具执行可用。',
-      command: 'python3 --version && uname -a',
-      result: 'Python 3.12.3\nLinux 6.8.0-45-generic x86_64 GNU/Linux',
-      durationMs: 450,
-    },
-  },
-  {
-    id: 'act-3',
-    dateGroup: 'today',
-    icon: '🌐',
-    iconBg: 'rgba(19, 194, 194, 0.12)',
-    title: '检索外部生态服务状态',
-    summary: '同步 Google Drive 与 Gmail 授权状态，连接健康无漂移。',
-    timestamp: '11:45',
-    status: 'success',
-    toolBadge: 'connectors',
-    detail: {
-      stage: 'Think → Observe',
-      toolName: 'composio_verify_status',
-      humanExplanation: '后台轮询生态连接凭证有效期，确认 Gmail 与 GitHub 连接器持续活跃。',
-      command: 'GET /lca-api/composio/connections',
-      result: '{"active_apps": ["gmail", "github"], "status": "READY"}',
-      durationMs: 210,
-    },
-  },
-  {
-    id: 'act-4',
-    dateGroup: 'yesterday',
-    icon: '📄',
-    iconBg: 'rgba(114, 46, 209, 0.12)',
-    title: '更新工作手册 AGENTS.md 准则',
-    summary: '根据系统架构演进，新增了 UI 补丁防裁剪与连接器安全约束。',
-    timestamp: '昨天 17:30',
-    status: 'success',
-    toolBadge: 'file_edit',
-    detail: {
-      stage: 'Act → Commit',
-      toolName: 'replace_file_content',
-      humanExplanation: '根据最新架构决策将防截断与纯净 UI 规范固化至工作手册中。',
-      command: 'replace_file_content(path="deploy/lobehub/.../AssistantStatusDrawer.tsx")',
-      result: '✓ 文件更新成功，SHA-256 乐观锁校验通过。',
-      durationMs: 620,
-    },
-  },
-  {
-    id: 'act-5',
-    dateGroup: 'earlier',
-    icon: '✓',
-    iconBg: 'rgba(82, 196, 26, 0.12)',
-    title: '完成系统全链路冒烟测试',
-    summary: '通过端到端生命周期检查，48项契约不变量断言全部通过。',
-    timestamp: '9月30日',
-    status: 'success',
-    toolBadge: 'test',
-    detail: {
-      stage: 'Verify → Terminal',
-      toolName: 'pytest_verify',
-      humanExplanation: '全量守护套件运行完成，未检测到破坏性架构偏离。',
-      command: 'pytest tests/scenario/test_muse_connector_invariants.py',
-      result: '8 passed in 1.42s',
-      durationMs: 1420,
-    },
-  },
-];
-
 // 预设审批记录
 const DEFAULT_APPROVALS: ApprovalRecord[] = [
   {
@@ -617,14 +521,14 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
     const [activeSection, setActiveSection] = useState<SectionKey>('activity');
     const [loading, setLoading] = useState(false);
     const [files, setFiles] = useState<StandingFileInfo[]>([]);
-    const [activities, setActivities] = useState<ActivityItem[]>(DEFAULT_ACTIVITIES);
+    const [activities, setActivities] = useState<ActivityItem[]>([]);
     const [approvals, setApprovals] = useState<ApprovalRecord[]>(DEFAULT_APPROVALS);
     const [upcomingJobs, setUpcomingJobs] = useState<UpcomingJob[]>(DEFAULT_UPCOMING_JOBS);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     // 活动日志详情弹窗状态
     const [detailModalOpen, setDetailModalOpen] = useState(false);
-    const [selectedActivityId, setSelectedActivityId] = useState<string>(DEFAULT_ACTIVITIES[0]?.id || '');
+    const [selectedActivityId, setSelectedActivityId] = useState<string>('');
 
     const selectedActivity = useMemo(
       () => activities.find((a) => a.id === selectedActivityId) || activities[0],
@@ -1139,24 +1043,32 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
             {/* Tab 1: 🕒 动态 */}
             {activeSection === 'activity' && (
               <div className={styles.cardsList}>
-                {todayActivities.length > 0 && (
+                {todayActivities.length === 0 &&
+                yesterdayActivities.length === 0 &&
+                earlierActivities.length === 0 ? (
+                  <Empty description="暂无动态，执行 Run 后这里会展示最新行动记录" style={{ margin: '40px 0' }} />
+                ) : (
                   <>
-                    <div className={styles.timelineGroupTitle}>今天</div>
-                    {todayActivities.map(renderActivityRow)}
-                  </>
-                )}
+                    {todayActivities.length > 0 && (
+                      <>
+                        <div className={styles.timelineGroupTitle}>今天</div>
+                        {todayActivities.map(renderActivityRow)}
+                      </>
+                    )}
 
-                {yesterdayActivities.length > 0 && (
-                  <>
-                    <div className={styles.timelineGroupTitle}>昨天</div>
-                    {yesterdayActivities.map(renderActivityRow)}
-                  </>
-                )}
+                    {yesterdayActivities.length > 0 && (
+                      <>
+                        <div className={styles.timelineGroupTitle}>昨天</div>
+                        {yesterdayActivities.map(renderActivityRow)}
+                      </>
+                    )}
 
-                {earlierActivities.length > 0 && (
-                  <>
-                    <div className={styles.timelineGroupTitle}>更早</div>
-                    {earlierActivities.map(renderActivityRow)}
+                    {earlierActivities.length > 0 && (
+                      <>
+                        <div className={styles.timelineGroupTitle}>更早</div>
+                        {earlierActivities.map(renderActivityRow)}
+                      </>
+                    )}
                   </>
                 )}
               </div>
