@@ -549,6 +549,7 @@
 | CONN-GOV-TASK-5-INTEGRATION-E2E | 全链路端到端集成验收与 Pre-Push 门禁体检 (INV-CONN-01 ~ 06) | Completed | 落地 tests/scenario/test_connector_ssot_governance_e2e.py，全链路 39/39 关联测试 100% 全绿，覆盖 INV-CONN-01 至 INV-CONN-06 全套不变量，ruff 0 报错，git diff --check clean，commit c6b59ba6e |
 | DEBUG-LAST-RUN-MEMORY-ADD | 调查并修复最后一个 run 中模型声称要 memory add 却未实际调用 tool 的根因 | Completed | 根因追溯闭环：1. Prompt 误导模型“系统自动写入”；2. memory 域原设为 DEFERRED 导致首轮无 schema 触发幻觉。已完成：1. HomeSection prompt 剔除自动写入误导，明确必须调 memory_add 工具写盘并收到回执后方可回复；2. DeferPolicy 将 memory 移入 eager_namespaces 与 core 并立；3. 契约与 catalog 单元测试全绿 (73/73 passed)；4. 重启内核热生效 |
 | ADR-0279-PROPOSAL | 起草 ADR-0279：意图-工具结构对账与 JIT 动态装配架构提案 | Completed | 成功落盘 docs/adr/0279-intent-tool-reconciliation-and-jit-hydration.md 并更新 docs/adr/README.md 索引；结构差集对账与 think.decision.repair 拓扑复用获 ADR 索引门禁测试守护 |
+| PER-TOOL-EAGER-FILE-READ | Per-tool Eager 下沉与 File 只读工具常驻落地（五步闭环） | Completed | 1. ToolApi 增加 eager 声明；2. lca_computer 读工具（listFiles/readFile/searchFiles/grepContent/globFiles）设为 eager；3. DeferPolicy 目录改为“文件系统（写操作）”；4. 落地 tests/infrastructure/tool_defer/test_per_tool_eager_file.py（Wire组装/加载/严格只读审计）；5. ADR-0256 增加 §14 修订记录；80/80 测试全绿 |
 | BRAINSTORM-THEMATIC-STANDING-FILE-CONTEXT | 深度探索 Standing Files 架构、Muse 原文、LCA 适配定位与上下文装配机制 | Completed | 已深度研读 ADR-0255 §1.2/§2 系统指令与 Standing Files 架构、layout.toml、standing_files.py 路由、AssistantStatusDrawer 5大卡片及用户提供的 Muse 原版 Persona 文本 |
 | BRAINSTORM-THEMATIC-STANDING-FILE-QUESTIONS | 澄清定位、归属形式（全新 Standing File vs 重塑 SOUL.md / IDENTITY.md）与定制化改写细节 | Completed | 用户明确确认该内容与现有文件不同，作为全新独立元文件落地 |
 | BRAINSTORM-THEMATIC-STANDING-FILE-APPROACHES | 提出 2-3 种具体架构方案（THEME.md / CONSTITUTION.md / PHILOSOPHY.md）与权衡对比 | Completed | 用户明确选定方案 B：新增 `CONSTITUTION.md`（根本宪法与行为契约，UI卡片为「📜 根本宪法」） |
@@ -559,4 +560,4 @@
 | CONST-TASK-2-TEMPLATES | 模板基座物化与默认模板注入 (`templates/` & `standing_files.py`) | Completed | 物化权威 CONSTITUTION.md（含六维价值/双平面/执行窄门/反思防脆弱/拓扑与感知全量规范），DEFAULT_STANDING_FILE_TEMPLATES 注入一致模板，单测全绿 |
 | CONST-TASK-3-ROUTES | 传输层路由白名单、优雅降级与乐观锁 (`standing_files.py`) | Completed | STANDING_FILES_WHITELIST 首位注册 CONSTITUTION.md，update_standing_file 支持原子直接写盘与乐观并发冲突 409 拦截，12/12 路由测试全绿 |
 | CONST-TASK-4-UI-PATCH | 前端 UI 补丁与卡片元数据 (`AssistantStatusDrawer.tsx`) | Completed | FILE_ROLE_METADATA 注册「📜 根本宪法」，patch_lobehub 成功应用且 45 补丁一致，16/16 UI单测全绿 |
-| CONST-TASK-5-INTEGRATION-E2E | 上下文装配、活跃助理物化与全链路集成验收 (`test_constitution_standing_file_e2e.py`) | In Progress | 正在编写全链路端到端不变量测试 test_constitution_standing_file_e2e.py 并物化活跃助理文件 |
+| CONST-TASK-5-INTEGRATION-E2E | 上下文装配、活跃助理物化与全链路集成验收 (`test_constitution_standing_file_e2e.py`) | Completed | 覆盖 INV-CONST-01 至 INV-CONST-06 全部 6 大架构不变量（拓扑SSOT/白名单/优雅降级与哈希/乐观并发控制/UI卡片补丁/Prompt上下文宪法首位注入），6/6 E2E 单测全绿，关联 56 项单测与场景测试 100% 通过，asst_29c963417967 活跃助理权威物化落盘 |
