@@ -83,3 +83,12 @@ def test_assistant_status_drawer_editor_autofill_contract() -> None:
     # INV-05: 必须支持向 LobeHub 富文本聊天编辑器回填指令
     assert "__mainEditor" in content
     assert "setDocument" in content
+
+
+def test_assistant_status_drawer_refresh_binding_no_undefined_identifiers() -> None:
+    path = _get_drawer_tsx_path()
+    content = path.read_text(encoding="utf-8")
+
+    # Regression: fetchStandingFiles must not be referenced as undefined identifier
+    assert "fetchStandingFiles" not in content
+    assert "onClick={fetchStatusSnapshot}" in content

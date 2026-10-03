@@ -717,9 +717,27 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
           if (Array.isArray(data.identity?.files)) {
             setFiles(data.identity.files);
           }
+        } else {
+          // 兜底直接拉取常驻真值文件 (standing-files)
+          const fallbackRes = await fetch(`/lca-api/v1/assistants/${assistantId}/standing-files`, {
+            headers: { Authorization: `Bearer ${token}`, 'x-lca-token': token },
+          });
+          if (fallbackRes.ok) {
+            const sfData = await fallbackRes.json();
+            if (Array.isArray(sfData.files)) setFiles(sfData.files);
+          }
         }
       } catch (err: any) {
-        console.warn('Failed to load status snapshot, using fallback', err);
+        console.warn('Failed to load status snapshot, trying standing-files fallback', err);
+        try {
+          const fallbackRes = await fetch(`/lca-api/v1/assistants/${assistantId}/standing-files`);
+          if (fallbackRes.ok) {
+            const sfData = await fallbackRes.json();
+            if (Array.isArray(sfData.files)) setFiles(sfData.files);
+          }
+        } catch {
+          // ignore
+        }
       } finally {
         setLoading(false);
       }
@@ -1065,7 +1083,7 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
           onClose={onClose}
           className={className}
           extra={
-            <Button size="small" onClick={fetchStandingFiles} loading={loading}>
+            <Button size="small" onClick={fetchStatusSnapshot} loading={loading}>
               刷新
             </Button>
           }
