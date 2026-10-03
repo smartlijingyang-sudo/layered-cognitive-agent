@@ -21,7 +21,7 @@ class TestDecisionClassifierProtocol:
 
     def test_protocol_is_runtime_checkable(self):
         """Protocol should be runtime checkable."""
-        assert hasattr(DecisionClassifier, "__protocol_attrs__")
+        assert DecisionClassifier._is_runtime_protocol is True
 
     def test_protocol_has_classify_method(self):
         """Protocol should define classify method."""
@@ -49,10 +49,10 @@ class TestEffectHandlerProtocols:
     """EffectHandler + EffectHandlerRegistry Protocol tests."""
 
     def test_effect_handler_is_runtime_checkable(self):
-        assert hasattr(EffectHandler, "__protocol_attrs__")
+        assert EffectHandler._is_runtime_protocol is True
 
     def test_effect_handler_registry_is_runtime_checkable(self):
-        assert hasattr(EffectHandlerRegistry, "__protocol_attrs__")
+        assert EffectHandlerRegistry._is_runtime_protocol is True
 
     def test_effect_handler_has_handle_method(self):
         assert hasattr(EffectHandler, "handle")
@@ -91,10 +91,10 @@ class TestDeltaHandlerProtocols:
     """DeltaHandler + DeltaHandlerRegistry Protocol tests."""
 
     def test_delta_handler_is_runtime_checkable(self):
-        assert hasattr(DeltaHandler, "__protocol_attrs__")
+        assert DeltaHandler._is_runtime_protocol is True
 
     def test_delta_handler_registry_is_runtime_checkable(self):
-        assert hasattr(DeltaHandlerRegistry, "__protocol_attrs__")
+        assert DeltaHandlerRegistry._is_runtime_protocol is True
 
     def test_delta_handler_has_apply_method(self):
         assert hasattr(DeltaHandler, "apply")
@@ -133,10 +133,10 @@ class TestActionHandlerProtocols:
     """ActionHandler + ActionHandlerRegistry Protocol tests."""
 
     def test_action_handler_is_runtime_checkable(self):
-        assert hasattr(ActionHandler, "__protocol_attrs__")
+        assert ActionHandler._is_runtime_protocol is True
 
     def test_action_handler_registry_is_runtime_checkable(self):
-        assert hasattr(ActionHandlerRegistry, "__protocol_attrs__")
+        assert ActionHandlerRegistry._is_runtime_protocol is True
 
     def test_action_handler_has_create_method(self):
         assert hasattr(ActionHandler, "create")
@@ -178,7 +178,7 @@ class TestArtifactClosureProtocol:
     """ArtifactClosure Protocol tests."""
 
     def test_protocol_is_runtime_checkable(self):
-        assert hasattr(ArtifactClosure, "__protocol_attrs__")
+        assert ArtifactClosure._is_runtime_protocol is True
 
     def test_protocol_has_synthesize_method(self):
         assert hasattr(ArtifactClosure, "synthesize")
