@@ -38,7 +38,7 @@ def parse_memory_markdown_claims(
 ) -> list[tuple[MemoryCategory, str, str | None]]:
     """Parse a MEMORY.md string into structured (category, body, record_id) tuples."""
     items: list[tuple[MemoryCategory, str, str | None]] = []
-    current_category: MemoryCategory | None = None
+    current_category: MemoryCategory = MemoryCategory.FACT
 
     for line in markdown_text.splitlines():
         line_stripped = line.strip()
