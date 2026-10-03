@@ -163,6 +163,26 @@ class RoutineFileLock:
             reclaimed_at_ms=now_ms,
         )
 
+    def refresh_heartbeat(self) -> None:
+        """Refresh the held lock's heartbeat to the current time (ADR-0263 T5f).
+
+        Best-effort: no-op when the lock file is missing, corrupt, or owned by
+        someone else — the tick driver must never touch another holder's lock.
+        Called by the tick driver's heartbeat thread so a long-running
+        executor is not reclaimed as stale mid-flight.
+        """
+        try:
+            data = json.loads(self._path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return
+        if not isinstance(data, dict) or data.get("owner") != self._owner:
+            return
+        data["heartbeat_ms"] = utc_now_ms()
+        try:
+            self._path.write_text(json.dumps(data), encoding="utf-8")
+        except OSError:
+            return
+
 
 __all__ = [
     "DEFAULT_STALE_AFTER_S",
