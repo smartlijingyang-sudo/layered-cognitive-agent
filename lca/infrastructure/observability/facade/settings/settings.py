@@ -109,31 +109,3 @@ class ObservabilitySettings(BaseSettings):
             for part in self.scorer_backends.replace(",", "+").split("+")
             if part.strip()
         ]
-
-    def backend_names(self) -> list[str]:
-        """解析 backends，并按 include_langfuse / 凭据决定是否挂 Langfuse。"""
-        return resolve_backend_names(
-            self.backends,
-            include_langfuse=self.include_langfuse,
-            public_key=self.langfuse_public_key,
-            secret_key=self.langfuse_secret_key,
-        )
-
-
-def resolve_backend_names(
-    backends: str,
-    *,
-    include_langfuse: bool | None,
-    public_key: str,
-    secret_key: str,
-) -> list[str]:
-    """纯函数：backends 字符串 + Langfuse 开关 → 读者名单。"""
-    names = [part.strip() for part in backends.replace(",", "+").split("+") if part.strip()]
-    want = include_langfuse
-    if want is None:
-        want = bool(public_key.strip() and secret_key.strip())
-    if want and "langfuse" not in names:
-        names.append("langfuse")
-    if not want:
-        names = [name for name in names if name != "langfuse"]
-    return names
