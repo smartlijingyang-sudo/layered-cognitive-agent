@@ -15,6 +15,7 @@ from __future__ import annotations
 import dataclasses
 import importlib
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 
@@ -26,6 +27,11 @@ from lca.contracts.runtime.resource import (
 # ---------------------------------------------------------------------------
 # Construction (per kind)
 # ---------------------------------------------------------------------------
+
+
+# Repo root derived from this file's location (not a hardcoded checkout path),
+# so subprocess-based tests exercise the tree under test (worktrees included).
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def test_construct_skill_resource_id() -> None:
@@ -306,8 +312,12 @@ def test_no_upper_layer_lca_imports() -> None:
     """
     import subprocess
     import sys as _sys
+
     result = subprocess.run(
-        [_sys.executable, "-c", """
+        [
+            _sys.executable,
+            "-c",
+            """
 import sys
 import lca.contracts.runtime.resource
 forbidden = (
@@ -317,8 +327,12 @@ forbidden = (
 leaked = [n for n in sys.modules if n in forbidden]
 assert leaked == [], f"resource pulled upper-layer modules: {leaked!r}"
 print("OK")
-"""],
-        capture_output=True, text=True, check=False, cwd="/home/lichao/layered-cognitive-agent",
+""",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=_REPO_ROOT,
     )
     assert result.returncode == 0, f"subprocess failed: {result.stderr}"
 
