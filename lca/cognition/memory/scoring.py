@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import logging
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -38,6 +39,9 @@ try:  # laya_backend 由 P4 并行实现；导入失败即视为 engine 不可�
 except ImportError:  # pragma: no cover - 缺模块是预期的正常分支
     LayaScore = None  # type: ignore[assignment]
     LayaScoreEngine = None  # type: ignore[assignment]
+
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "DEFAULT_SHADOW_LOG",
@@ -77,7 +81,10 @@ def _check_weights(
 ) -> None:
     """断言四权重和 ≈ 1.0，否则抛 AssertionError（ADR-0277 权重铁律）。"""
     total = w_semantic + w_salience + w_recency + w_cue
-    assert abs(total - 1.0) <= _WEIGHT_TOL, f"评分权重和必须 ≈ 1.0，实际={total!r}"
+    if abs(total - 1.0) > _WEIGHT_TOL:
+        # 显式 raise（不用 assert）：AssertionError 是已文档化并由测试锁定的公开
+        # 错误契约（test_weights_sum_assertion），且 assert 在 -O 下会被剥离。
+        raise AssertionError(f"评分权重和必须 ≈ 1.0，实际={total!r}")
 
 
 class WeightedScorer(MemoryScorer):
@@ -247,7 +254,7 @@ class LayaScorer(MemoryScorer):
                 confidence=r.confidence,
                 laya_score=self._map_score(r.label, r.confidence),
             )
-            for c, r in zip(candidates, results)
+            for c, r in zip(candidates, results, strict=True)  # fail-closed：engine 长度漂移时直接炸，不静默丢候选
         ]
         items.sort(key=lambda it: it.laya_score, reverse=True)
         return items
@@ -412,7 +419,8 @@ class HybridScorer(MemoryScorer):
                 pairs = [(c, self._laya.text_of(c)) for c in top]
                 self._shadow.compare(query, pairs, self._weighted, self._laya)
             except Exception:
-                pass  # shadow 是可观测性，不许影响检索
+                # shadow 是可观测性，不许影响检索；记 debug 留痕以便排查对比管线故障。
+                logger.debug("shadow 对比失败（不影响检索）", exc_info=True)
         final = reranked + tail
         final.sort(key=lambda c: c.score, reverse=True)
         return final
