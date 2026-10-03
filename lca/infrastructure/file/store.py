@@ -1,6 +1,6 @@
 """Local file product store — shared by gateway upload and write_file tool.
 
-Layout (under root, default ``traces/files``)::
+Layout (under root, default ``{workspace}/uploads`` via the workspace SSOT)::
 
     {attachment_id}/meta.json
     {attachment_id}/blob   # raw bytes (original name in meta)
