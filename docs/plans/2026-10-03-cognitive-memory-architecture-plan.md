@@ -10,14 +10,14 @@
 
 ---
 
-### Task 1: 契约层与四层认知记忆领域模型 (Contracts)
+### Task 1: 契约层与四层认知记忆领域模型 (Contracts & ADR-0277 兼容合流)
 
 **Files:**
-- Create: `lca/contracts/models/memory/cognitive.py`
-- Create: `lca/contracts/protocols/memory/cognitive.py`
+- Modify: `lca/cognition/memory/types.py` (在 ADR-0277 基础类型上增量扩充 `WorkingMemoryPercept` 及兼容字段)
+- Create: `lca/contracts/protocols/memory/cognitive.py` (定义 `WorkingMemoryPort`, `EntityGraphPort`, `InternalRecallPort`)
 - Test: `tests/contracts/test_cognitive_memory_contracts.py`
 - Does NOT own: 基础设施持久化、图节点拓扑、Session 事件底层 (AP-01)
-- Invariants to test: 模型不可变（`frozen=True, extra="forbid"`）、Zep 双时间线校验、`dedupe_key` 格式校验 (AP-02)
+- Invariants to test: 模型不可变（`frozen=True`）、`WorkingMemoryPercept` 契约、`SemanticClaim` 与 `EpisodicTrace` 向后兼容性、0277 原有 149 单测 100% 绿 (AP-02)
 
 **Step 1: Write the failing test**
 
@@ -25,42 +25,52 @@
 # tests/contracts/test_cognitive_memory_contracts.py
 import pytest
 from datetime import datetime, UTC
-from pydantic import ValidationError
-from lca.contracts.models.memory.cognitive import (
+from dataclasses import FrozenInstanceError
+from lca.cognition.memory.types import (
     SemanticClaim,
     EpisodicTrace,
     WorkingMemoryPercept,
 )
 
-def test_semantic_claim_immutability_and_double_timeline():
+def test_working_memory_percept_contract():
+    wm = WorkingMemoryPercept(
+        task_goal="查询亲戚结婚礼数",
+        focal_entities=("xiaowen", "cousin"),
+        active_cues=("wedding", "gift"),
+    )
+    with pytest.raises(FrozenInstanceError):
+        wm.task_goal = "篡改"
+    assert "xiaowen" in wm.focal_entities
+
+def test_semantic_claim_compatible_extension():
     claim = SemanticClaim(
-        claim_id="claim_01",
+        id="c1",
+        claim="全栈使用 Rust 与 Go",
+        confidence=1.0,
+        sources=("t1",),
+        valid_from=datetime.now(UTC),
         category="preference",
         dedupe_key="preference:tech_stack",
-        statement="全栈使用 Rust 与 Go",
-        confidence=1.0,
-        sources=("trace_01",),
-        valid_from=datetime.now(UTC),
+        sensitivity="normal",
     )
-    with pytest.raises(ValidationError):
-        claim.confidence = 0.5  # immutable
-    assert claim.valid_to is None
+    assert claim.category == "preference"
     assert claim.sensitivity == "normal"
 ```
 
 **Step 2: Run test to verify it fails**
-Run: `pytest tests/contracts/test_cognitive_memory_contracts.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'lca.contracts.models.memory.cognitive'`
+Run: `uv run pytest tests/contracts/test_cognitive_memory_contracts.py -v`
+Expected: FAIL with `ImportError: cannot import name 'WorkingMemoryPercept'`
 
 **Step 3: Write minimal implementation**
-创建 `lca/contracts/models/memory/cognitive.py` 定义 `SemanticClaim`, `EpisodicTrace`, `WorkingMemoryPercept`, `ProceduralSkill` 及枚举。
+在 `lca/cognition/memory/types.py` 增补 `WorkingMemoryPercept` 并为 `SemanticClaim` / `EpisodicTrace` 添加兼容字段；在 `lca/contracts/protocols/memory/cognitive.py` 建立端口协议。
 
 **Step 4: Run test to verify it passes**
-Run: `pytest tests/contracts/test_cognitive_memory_contracts.py -v`
-Expected: PASS
+Run: `uv run pytest tests/contracts/test_cognitive_memory_contracts.py -v && uv run pytest tests/cognition/memory/ -v`
+Expected: PASS (含 0277 原有全部测试)
 
 **Step 5: Commit**
-`git add lca/contracts/models/memory/cognitive.py tests/contracts/test_cognitive_memory_contracts.py && git commit -m "feat(memory): 落地认知记忆核心领域模型与不可变契约"`
+`git add lca/cognition/memory/types.py lca/contracts/protocols/memory/cognitive.py tests/contracts/test_cognitive_memory_contracts.py && git commit -m "feat(memory): 增量扩展认知记忆第四层工作记忆契约并对齐 ADR-0277"`
+
 
 ---
 
@@ -72,7 +82,7 @@ Expected: PASS
 - Modify: `lca/infrastructure/memory/assistant_memory.py`
 - Test: `tests/infrastructure/memory/test_entity_graph_store.py`
 - Does NOT own: 认知层提示词装配、外部非 LCA 文件 (AP-01)
-- Invariants to test: Markdown 是唯一业务 SSOT、目录开放自主创建、SQLite 纯派生可删重建、遥测侧表只读从属 (AP-02)
+- Invariants to test: Markdown 是唯一业务 SSOT、目录开放自主创建（非硬编码）、`GRAPH.md` 视界预算控制（Top 15条，$\le 100$ Token）、超限实体自动沉降 GC 至 `archives/entities/`、SQLite 纯派生可删秒级重建 (AP-02)
 
 **Step 1: Write the failing test**
 
@@ -95,17 +105,24 @@ def test_entity_graph_open_taxonomy_and_rebuild(tmp_path: Path):
     results = store.search_entities("维生素")
     assert len(results) == 1
     assert results[0].slug == "medication"
+
+def test_entity_graph_budget_and_gc(tmp_path: Path):
+    store = EntityGraphStore(tmp_path, max_active_entities=5)
+    for i in range(10):
+        store.write_entity("misc", f"item_{i}", f"实体描述内容 {i}")
+    # 断言活跃列表受限，旧实体沉降至 archives/entities/
+    assert (tmp_path / "memory/archives/entities/misc/item_0.md").is_file()
 ```
 
 **Step 2: Run test to verify it fails**
-Run: `pytest tests/infrastructure/memory/test_entity_graph_store.py -v`
+Run: `uv run pytest tests/infrastructure/memory/test_entity_graph_store.py -v`
 Expected: FAIL with `ModuleNotFoundError`
 
 **Step 3: Write minimal implementation**
-实现 `EntityGraphStore` 支持动态创建 `memory/entities/<domain>/<slug>.md`、自动更新 `GRAPH.md` 微索引，并在 SQLite 建立 FTS5 与关系三元组派生索引。
+实现 `EntityGraphStore` 支持动态创建 `memory/entities/<domain>/<slug>.md`、自动更新 `GRAPH.md` 微索引（预算保护与 GC 沉降），并在 SQLite 建立 FTS5 与关系三元组派生索引。
 
 **Step 4: Run test to verify it passes**
-Run: `pytest tests/infrastructure/memory/test_entity_graph_store.py -v`
+Run: `uv run pytest tests/infrastructure/memory/test_entity_graph_store.py -v`
 Expected: PASS
 
 **Step 5: Commit**
@@ -137,14 +154,14 @@ def test_hypothetical_examples_and_sarcasm_rejected():
 ```
 
 **Step 2: Run test to verify it fails**
-Run: `pytest tests/cognition/memory/test_memory_ingestion_guards.py -v`
+Run: `uv run pytest tests/cognition/memory/test_memory_ingestion_guards.py -v`
 Expected: FAIL with `ModuleNotFoundError`
 
 **Step 3: Write minimal implementation**
 在 `lca/cognition/memory/guards/` 落地模态与显著性门控，并在 `memory_extract.py` 中接入。
 
 **Step 4: Run test to verify it passes**
-Run: `pytest tests/cognition/memory/test_memory_ingestion_guards.py -v`
+Run: `uv run pytest tests/cognition/memory/test_memory_ingestion_guards.py -v`
 Expected: PASS
 
 **Step 5: Commit**
@@ -160,7 +177,7 @@ Expected: PASS
 - Modify: `lca/nodes/think/history/assemble.py`
 - Test: `tests/cognition/memory/test_system_two_recall.py`
 - Does NOT own: 模型权重训练、底层网络通信 (AP-01)
-- Invariants to test: 极简启动记忆预算 $\le 500$ Token、多跳回忆深度 $\le 2$ 熔断、未命中输出 `NoRecall` (AP-02)
+- Invariants to test: 极简启动记忆预算 $\le 500$ Token、复用 0277 HybridScorer 评分打底、多跳回忆深度 $\le 2$ 熔断、未命中输出 `NoRecall` (AP-02)
 
 **Step 1: Write the failing test**
 
@@ -181,14 +198,14 @@ def test_recall_max_two_hops_and_no_hallucination():
 ```
 
 **Step 2: Run test to verify it fails**
-Run: `pytest tests/cognition/memory/test_system_two_recall.py -v`
+Run: `uv run pytest tests/cognition/memory/test_system_two_recall.py -v`
 Expected: FAIL
 
 **Step 3: Write minimal implementation**
-实现 `SystemTwoRecallEngine`（支持 FTS5+Graph 2跳追忆）与 `internal_recall` 认知工具，并在 `assemble.py` 固化冷启动视界预算。
+实现 `SystemTwoRecallEngine`（结合 ADR-0277 的 `HybridScorer` 与 FTS5+Graph 2跳追忆）与 `internal_recall` 认知工具，并在 `assemble.py` 固化冷启动视界预算。
 
 **Step 4: Run test to verify it passes**
-Run: `pytest tests/cognition/memory/test_system_two_recall.py -v`
+Run: `uv run pytest tests/cognition/memory/test_system_two_recall.py -v`
 Expected: PASS
 
 **Step 5: Commit**
@@ -204,7 +221,7 @@ Expected: PASS
 - Modify: `lca/plugins/prompts/sections/memory.py`
 - Test: `tests/cognition/memory/test_tact_and_pitfall_shield.py`
 - Does NOT own: 宿主机外部进程 (AP-01)
-- Invariants to test: 高敏感记忆在非直接提问时 100% 遮蔽、`TOOLS.md` 命中工具前 100% 注入局部安全红线、禁用炫耀式套话 (AP-02)
+- Invariants to test: 高敏感记忆在非直接提问时 100% 遮蔽、`TOOLS.md` 命中工具前 100% 注入局部安全红线、禁用炫耀式套话、Skill 自动结晶写入 `skills/quarantine/` 隔离待审门 (AP-02)
 
 **Step 1: Write the failing test**
 
@@ -229,42 +246,43 @@ def test_tool_pitfall_shield_injects_before_tool_execution():
 ```
 
 **Step 2: Run test to verify it fails**
-Run: `pytest tests/cognition/memory/test_tact_and_pitfall_shield.py -v`
+Run: `uv run pytest tests/cognition/memory/test_tact_and_pitfall_shield.py -v`
 Expected: FAIL
 
 **Step 3: Write minimal implementation**
-实现 `MemoryTactFirewall` 与 `ToolPitfallShield`，挂载至认知装配通道。
+实现 `MemoryTactFirewall` 与 `ToolPitfallShield`，并为技能结晶添加 `quarantine/` 隔离待审门，挂载至认知装配通道。
 
 **Step 4: Run test to verify it passes**
-Run: `pytest tests/cognition/memory/test_tact_and_pitfall_shield.py -v`
+Run: `uv run pytest tests/cognition/memory/test_tact_and_pitfall_shield.py -v`
 Expected: PASS
 
 **Step 5: Commit**
-`git add lca/cognition/memory/guards/firewall.py lca/infrastructure/tools/shield/ tests/cognition/memory/test_tact_and_pitfall_shield.py && git commit -m "feat(cognition): 落地表达分寸防火墙与工具踩坑避坑哨兵"`
+`git add lca/cognition/memory/guards/firewall.py lca/infrastructure/tools/shield/ tests/cognition/memory/test_tact_and_pitfall_shield.py && git commit -m "feat(cognition): 落地表达分寸防火墙、工具踩坑哨兵与技能隔离门"`
 
 ---
 
-### Task 6: 7 大维度 28 项核心场景全量自动化基准评测 (Evals Benchmark)
+### Task 6: 7 大维度 28 项核心场景双轨基准评测 (Two-Track Evals Benchmark)
 
 **Files:**
 - Create: `docs/specs/cognitive-memory-evals-benchmark.md`
-- Create: `tests/evals/test_cognitive_memory_28_benchmark.py`
+- Create: `tests/evals/test_cognitive_memory_deterministic_benchmark.py` (轨 A: 确定性代码不变量)
+- Create: `tests/evals/test_cognitive_memory_behavioral_evals.py` (轨 B: LLM 行为表现评测)
 - Test: 全量回归与门禁核验
 - Does NOT own: 外部系统 (AP-01)
-- Invariants to test: 28 项核心场景评测断言全数通过（通过率 100%）、零回归 (AP-02)
+- Invariants to test: 轨 A 确定性不变量断言 100% 通过（退出码 0），轨 B 行为基准评测达标率 $\ge 90\%$ (AP-02)
 
-**Step 1: Write the failing benchmark test suite**
-编写 `test_cognitive_memory_28_benchmark.py`，完整覆盖指代消解、多跳关系、时间推理、矛盾检测、假设举例隔离、反讽过滤、主动单次销账、敏感不乱提、工具避坑注入、记忆注入防御等全部 28 个场景。
+**Step 1: Write the failing benchmark test suites**
+分别编写轨 A 确定性测试（覆盖双时间线、取代链、模态拦截丢弃、高敏感遮蔽、工具安全哨兵等）与轨 B 行为表现测试（覆盖推测带不确定性、不显摆、先接情绪再建议、多跳亲属关系礼数等）。
 
 **Step 2: Run benchmark to observe baseline pass rate**
-Run: `pytest tests/evals/test_cognitive_memory_28_benchmark.py -v`
+Run: `uv run pytest tests/evals/test_cognitive_memory_deterministic_benchmark.py -v`
 
 **Step 3: Refine and integrate system pipeline**
 打通端到端评测驱动 Runner，确保各模块协同闭环。
 
-**Step 4: Verify 100% pass rate**
-Run: `pytest tests/evals/test_cognitive_memory_28_benchmark.py -v`
-Expected: 28/28 passed (100%)
+**Step 4: Verify pass rates**
+Run: `uv run pytest tests/evals/test_cognitive_memory_deterministic_benchmark.py -v`
+Expected: 100% passed (Exit code 0)
 
 **Step 5: Commit**
-`git add docs/specs/cognitive-memory-evals-benchmark.md tests/evals/test_cognitive_memory_28_benchmark.py && git commit -m "test(evals): 落地认知记忆 7 大维度 28 项全量自动化基准评测套件"`
+`git add docs/specs/cognitive-memory-evals-benchmark.md tests/evals/ && git commit -m "test(evals): 落地认知记忆 7 大维度 28 项双轨自动化基准评测套件"`
