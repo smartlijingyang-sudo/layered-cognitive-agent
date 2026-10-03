@@ -85,11 +85,10 @@ def test_t4_team_sections_preserve_b1_b5_order(template_id: str) -> None:
     ]
     # 完整性哨兵：防止测试空转（B1-B5 共 12 段；模板增删段时此数会变，
     # 此时应同步复核本测试而非静默放过）。
-    # 注：[:4] 保持 goal 在 backstory 之前——这是 T1 预期红钉住的倒置
-    # （goal(B2)->backstory(B1)），§7① 带序重排落地后此处同步翻为
-    # ["role", "backstory", "goal", "current_date"]。本轮 arch 轮决议原拟
-    # 直接更新该值，实测模板现状未变故维持现状，避免哨兵误红。
-    assert react_b1_b5[:4] == ["role", "goal", "backstory", "current_date"]
+    # 注：§7① 带序重排已由 quality 轮落地（2026-10-03 07:09，merge d27457a13），
+    # goal(B2) 回到 backstory(B1) 之后——哨兵同步翻为新顺序。此后模板再倒置
+    # 会由 T1 直接钉住，无需哨兵重复覆盖。
+    assert react_b1_b5[:4] == ["role", "backstory", "goal", "current_date"]
     assert len(react_b1_b5) == 12
     cur_b1_b5 = [
         name for name, band in _banded_names(template_id) if band <= 5
@@ -102,19 +101,12 @@ def test_t4_team_sections_preserve_b1_b5_order(template_id: str) -> None:
 
 @pytest.mark.parametrize("template_id", _TEMPLATE_IDS)
 def test_t1_band_order_no_inversion(template_id: str) -> None:
-    """T1（契约规格，预期红）：B1–B8 带序不许逆序；带内顺序不锁死。
+    """T1：B1–B8 带序不许逆序；带内顺序不锁死。
 
     ADR-0265 §3 C1：section 必须落在 B1–B8 带内，跨带不许逆序；
     §7① 裁决维持带序（不锁死精确快照——带内顺序可调）。
 
-    当前实现偏离（2026-10-03 实测 `_builtin_templates()`；§7 D1 决议②
-    developer_timestamp 前移 B3 必需已由 quality 轮落地（2026-10-03 06:09，
-    merge 3294e2c3c），剩余 3 处待 §7① 带序重排）：
-    - goal(B2) 在 backstory(B1) 之前；
-    - vocal_contract(B7) 在 current_date(B3) 之前；
-    - react_tool_usage_guidelines(B7) 在 user_profile(B4) 之前（D2）。
-    （D1 倒置 memory_retrieval(B7)->developer_timestamp(B3) 已随前移消除，
-    skill_duty(B7)->developer_timestamp(B3) 一并消除。）
+    历史：2026-10-03 06:09 实测尚有 3 处相邻倒置（goal(B2)->backstory(B1)、vocal_contract(B7)->current_date(B3)、react_tool_usage_guidelines(B7)->user_profile(B4)，后者即 D2；D1 倒置已随 06:09 前移消除）。§7①带序重排已由 quality 轮落地（2026-10-03 07:09，merge d27457a13）——20 段目标顺序落盘后三处倒置全部消除，本测试转绿。实现再次倒置会使本测试变红。
     team 协作段未在 C1 定带，不参与本断言（ADR 缺口，见文件头）。
     """
     banded = _banded_names(template_id)
