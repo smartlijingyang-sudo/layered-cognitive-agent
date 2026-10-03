@@ -143,6 +143,7 @@ class ActivityProjector:
                 status=ActivityStatus.RUNNING,
                 start_time=ts,
                 icon=icon,
+                tool_name=tool_name,
                 params=args,
                 tool_name=tool_name,
                 current_step=ActivityIntentNamer.live_step(tool_name, args),
@@ -235,6 +236,7 @@ class ActivityProjector:
                     status=ActivityStatus.RUNNING,
                     start_time=ts,
                     icon=icon,
+                    tool_name=tool_name,
                     params=args,
                     tool_name=tool_name,
                     current_step=None,
@@ -297,6 +299,7 @@ class ActivityProjector:
                 end_time=end_time,
                 duration_ms=duration_ms,
                 icon=existing.icon,
+                tool_name=tool_name or existing.tool_name,
                 params=existing.params or args,
                 result_summary=(res_content[:100] + "...")
                 if len(res_content) > 100
@@ -327,6 +330,7 @@ class ActivityProjector:
             end_time=None,
             duration_ms=existing.duration_ms,
             icon=existing.icon,
+            tool_name=existing.tool_name,
             params=existing.params,
             result_summary="User cancelled operation",
             is_system=existing.is_system,
@@ -410,10 +414,8 @@ class ActivityProjector:
                     if isinstance(tr, dict) and tr.get("invocation_id")
                 }
                 step_entered = s.get("entered_at")
-                if isinstance(step_entered, (int, float)):
-                    start_time = datetime.fromtimestamp(step_entered, tz=UTC).isoformat()
-                else:
-                    start_time = str(step_entered or "2026-10-03T00:00:00Z")
+                # 诚实：缺 entered_at 就空着，不编造假时间戳
+                start_time = _format_iso(step_entered)
 
                 for tc in tcs:
                     if not isinstance(tc, dict):
@@ -458,6 +460,7 @@ class ActivityProjector:
                         end_time=start_time,
                         duration_ms=duration_ms,
                         icon=icon,
+                        tool_name=tool_name,
                         params=args,
                         result_summary=result_summary,
                         tool_name=tool_name,

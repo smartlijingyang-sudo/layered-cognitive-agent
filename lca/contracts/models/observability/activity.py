@@ -36,6 +36,7 @@ class ActivityItem(BaseModel):
     end_time: str | None = None
     duration_ms: int | None = None
     icon: str
+    tool_name: str = ""
     params: dict[str, Any] = Field(default_factory=dict)
     result_summary: str | None = None
     is_system: bool = False
