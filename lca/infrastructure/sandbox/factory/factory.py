@@ -11,8 +11,11 @@ Optional:
 - ``LCA_SANDBOX_BACKEND`` — ``onlyboxes`` | ``local`` | empty.
   Empty / ``local``: Onlyboxes when credentials exist, else local host-backed.
   ``onlyboxes``: Onlyboxes only (returns ``None`` without credentials).
-- ``LCA_LOCAL_SANDBOX_ROOT`` — host directory backing the local guest mount
-  (default: writable ``/mnt/data``, else ``~/.cache/lca/local-sandbox/mnt/data``).
+- ``LCA_WORKSPACE_ROOT`` — explicit workspace SSOT override (wins).
+- ``LCA_LOCAL_SANDBOX_ROOT`` — legacy host directory override backing the local
+  guest mount (kept for backward compat; prefer ``LCA_WORKSPACE_ROOT``).
+  Unset: the workspace SSOT (``assistant_workspace_root()``) decides —
+  ``{lca_home}/assistants/<id>/workspace`` when the assistant is known.
 """
 
 from __future__ import annotations

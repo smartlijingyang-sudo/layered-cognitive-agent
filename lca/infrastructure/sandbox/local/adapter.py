@@ -52,23 +52,15 @@ _LANG_RUNNER: dict[str, str] = {
 
 
 def default_local_root() -> str:
-    """Resolve the host directory that backs the guest mount."""
-    configured = os.getenv(_ENV_ROOT, "").strip()
-    if configured:
-        return configured
-    # Prefer the canonical guest path when the process can write it
-    # (ops may have prepared /mnt/data). Otherwise fall back to cache.
-    try:
-        path = Path(SANDBOX_MOUNT_ROOT)
-        path.mkdir(parents=True, exist_ok=True)
-        probe = path / ".lca-write-probe"
-        probe.write_text("ok", encoding="utf-8")
-        probe.unlink(missing_ok=True)
-        return str(path)
-    except OSError:
-        cache = Path.home() / ".cache" / "lca" / "local-sandbox" / "mnt" / "data"
-        cache.mkdir(parents=True, exist_ok=True)
-        return str(cache)
+    """Resolve the host directory that backs the guest mount.
+
+    Delegates to the workspace SSOT
+    (:func:`lca.infrastructure.path.locator.assistant_workspace_root`);
+    kept as a thin wrapper for backward compatibility.
+    """
+    from lca.infrastructure.path.locator import assistant_workspace_root
+
+    return str(assistant_workspace_root())
 
 
 def _ensure_dir(path: Path) -> None:
