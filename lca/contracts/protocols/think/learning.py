@@ -15,6 +15,13 @@ from typing import Protocol, runtime_checkable
 
 from lca.contracts.models.core.state.lifecycle import TaskStatus
 
+#: Shared evidence-gate defaults for every :class:`SkillAcquirer` implementation
+#: (ADR-0262 C4). The strict auto_acquire threshold is the canonical one;
+#: evolve's looser ``min_evidence=1`` was an undocumented drift, fixed by
+#: making all defaults reference these constants.
+SKILL_ACQUISITION_MIN_CONFIDENCE: float = 0.7
+SKILL_ACQUISITION_MIN_EVIDENCE: int = 3
+
 
 @dataclass(frozen=True, slots=True)
 class SkillAcquisitionCandidate:
