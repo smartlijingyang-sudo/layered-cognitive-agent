@@ -34,10 +34,11 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.nodes.fast_path import FastPathCounter
 
 
 @dataclass(frozen=True, slots=True)
-class RememberAdmitExecutor:
+class RememberAdmitExecutor(FastPathCounter):
     """Primitive: verify authority and admit memory candidates; emit admitted flag."""
 
     semantic_name: str = "phase.remember.admit"
@@ -68,10 +69,12 @@ class RememberAdmitExecutor:
 
         # Fast-Path: missing reflection or explicit fast_path flag
         if reflection is None:
+            self.note_fast_path()
             return self._emit_rejection(decision, observation, reflection)
 
         extra: dict[str, Any] = getattr(reflection, "extra", {}) or {}
         if extra.get("fast_path") is True:
+            self.note_fast_path()
             return self._emit_rejection(decision, observation, reflection)
 
         # Extract candidates

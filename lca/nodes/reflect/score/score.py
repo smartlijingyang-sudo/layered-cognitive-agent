@@ -40,6 +40,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.contracts.protocols.think.cognition import Brain
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.nodes.fast_path import FastPathCounter
 
 
 def _normalize_observation(value: object) -> object:
@@ -110,7 +111,7 @@ def _extract_procedural_candidate(
 
 
 @dataclass(frozen=True, slots=True)
-class ReflectScoreExecutor:
+class ReflectScoreExecutor(FastPathCounter):
     """Primitive: invoke the selected reflection seam, emit ``reflection``."""
 
     semantic_name: str = "phase.reflect.score"
@@ -145,6 +146,10 @@ class ReflectScoreExecutor:
         # to ``ReflectionVerdict.ON_TRACK, lesson=None`` — the outer loop
         # never learned a tool had succeeded, so the agent re-issued the
         # same tool call every step (run-time loop until budget exhaustion).
+        if observation is None:
+            # Zero-cost fast path (ADR-0244 PR-3 Task 8): nothing to score —
+            # skip brain.reflect / the LLM critic entirely.
+            self.note_fast_path()
         if isinstance(brain, Brain) and observation is not None:
             # Ports/runtime are untyped carriers (Mapping[PortName, Any] /
             # dict), so narrow to the Brain protocol's typed contract here.

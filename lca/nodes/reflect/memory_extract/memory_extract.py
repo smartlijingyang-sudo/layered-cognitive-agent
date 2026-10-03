@@ -56,6 +56,7 @@ from lca.contracts.protocols.memory.filter import MemoryPreFilter
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.memory.episode_buffer import EpisodeBuffer
 from lca.infrastructure.memory.pre_filter import DEFAULT_MEMORY_TOKENS, FallbackMemoryFilter
+from lca.nodes.fast_path import FastPathCounter
 
 # 快速路径成本门：仅当用户陈述可能包含自我身份/偏好信号时才值得调 LLM 蒸馏。
 # 这是成本门（避免普通回复产生 LLM 调用），不是提取启发式；提取本身由 LLM
@@ -161,7 +162,7 @@ def _format_existing_memories(runtime: Any) -> str:
 
 
 @dataclass(frozen=True, slots=True)
-class ReflectMemoryExtractExecutor:
+class ReflectMemoryExtractExecutor(FastPathCounter):
     """Primitive: distill the current user statement into memory candidates."""
 
     semantic_name: str = "phase.reflect.memory.extract"
@@ -179,11 +180,15 @@ class ReflectMemoryExtractExecutor:
     ) -> NodeOutput:
         reflection = input.port_values.get(PortName("reflection"))
         if reflection is None:
+            # ADR-0246 PR-3: zero-LLM fast path — nothing to distill.
+            self.note_fast_path()
             return self._passthrough(reflection)
         extra = getattr(reflection, "extra", None)
         if not isinstance(extra, dict):
             extra = {}
         if extra.get("fast_path") is True or extra.get("memory_candidates"):
+            # ADR-0246 PR-3: zero-LLM fast path — upstream already decided.
+            self.note_fast_path()
             return self._passthrough(reflection)
 
         if self.governor_enabled:
