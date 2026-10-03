@@ -31,6 +31,7 @@ import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 
 import AssistantTopMascot from './AssistantTopMascot';
 import ConnectorsPanel from './ConnectorsPanel';
+import CronUpcomingPanel from './CronUpcomingPanel';
 
 const { Text, Title, Paragraph } = Typography;
 
@@ -1316,15 +1317,15 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
       const isError = act.status === 'error';
       // Muse-style: dark rounded box with outline checkmark icon
       const iconBoxBg = isRunning
-        ? 'rgba(22, 119, 255, 0.15)'
+        ? 'rgba(96, 177, 255, 0.18)'
         : isError
-          ? 'rgba(255, 77, 79, 0.12)'
-          : 'rgba(255, 255, 255, 0.06)';
+          ? 'rgba(244, 65, 108, 0.18)'
+          : 'rgba(196, 240, 66, 0.15)';
       const checkColor = isRunning
-        ? '#1677ff'
+        ? '#60b1ff'
         : isError
-          ? '#ff4d4f'
-          : 'rgba(255, 255, 255, 0.45)';
+          ? '#f4416c'
+          : '#c4f042';
       return (
         <div
           key={act.id}
@@ -1518,9 +1519,9 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                       <Text type="secondary" style={{ fontSize: 12 }}>
                         {appr.reason}
                       </Text>
-                      <div style={{ fontSize: 11, color: '#8c8c8c', alignSelf: 'flex-end' }}>
+                      <Text type="secondary" style={{ fontSize: 11, alignSelf: 'flex-end' }}>
                         {appr.timestamp}
-                      </div>
+                      </Text>
                     </div>
                   ))
                 )}
@@ -1529,64 +1530,8 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
 
             {/* Tab 3: ⏰ 即将到来 */}
             {activeSection === 'upcoming' && (
-              <div className={styles.cardsList}>
-                {upcomingJobs.length === 0 ? (
-                  <Empty description="暂无设定的定时任务或提醒" style={{ margin: '40px 0' }} />
-                ) : (
-                  upcomingJobs.map((job) => (
-                    <div key={job.id} className={styles.upcomingCard}>
-                      <div className={styles.upcomingTopRow}>
-                        <Text strong style={{ fontSize: 13 }}>
-                          {job.title}
-                        </Text>
-                        <Flex align="center" gap={6}>
-                          <Switch
-                            size="small"
-                            checked={job.enabled}
-                            onChange={(checked) => handleToggleJob(job.id, checked)}
-                          />
-                          <Button
-                            size="small"
-                            type="text"
-                            style={{ fontSize: 12, padding: '0 4px', color: '#1890ff' }}
-                            onClick={() =>
-                              handleTriggerChatEdit(`把定时任务「${job.title}」的执行计划修改一下：`)
-                            }
-                            title="通过对话编辑此任务"
-                          >
-                            ✏️ 编辑
-                          </Button>
-                          <Button
-                            size="small"
-                            type="text"
-                            danger
-                            style={{ fontSize: 12, padding: '0 4px' }}
-                            onClick={() => handleDeleteJob(job)}
-                            title="删除此任务"
-                          >
-                            🗑️
-                          </Button>
-                        </Flex>
-                      </div>
-                      <Flex gap={6} align="center" wrap="wrap">
-                        <Tag color="processing" style={{ fontSize: 11 }}>
-                          {job.schedule}
-                        </Tag>
-                        {job.delivery && (
-                          <Tag color="default" style={{ fontSize: 11 }}>
-                            投递: {job.delivery}
-                          </Tag>
-                        )}
-                      </Flex>
-                      <Paragraph type="secondary" style={{ fontSize: 12, margin: 0 }}>
-                        {job.body}
-                      </Paragraph>
-                      <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 2 }}>
-                        下次触发时间: {job.nextRun || '根据 Cron 自动计算'}
-                      </div>
-                    </div>
-                  ))
-                )}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '0 4px' }}>
+                <CronUpcomingPanel assistantId={assistantId} />
               </div>
             )}
 
@@ -1623,73 +1568,37 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
           open={detailModalOpen}
           onCancel={() => setDetailModalOpen(false)}
           footer={null}
-          width={840}
+          width={860}
           className={styles.detailModal}
           title={
             selectedActivity ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 32 }}>
-                <Flex align="center" gap={8}>
+              <Flexbox gap={6} style={{ paddingRight: 32 }}>
+                <Flexbox horizontal align="center" gap={8}>
                   {selectedActivity.status === 'running' ? (
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        padding: '2px 10px',
-                        borderRadius: 12,
-                        background: 'rgba(22, 119, 255, 0.15)',
-                        border: '1px solid rgba(22, 119, 255, 0.3)',
-                        color: '#1677ff',
-                        fontSize: 12,
-                        fontWeight: 600,
-                      }}
-                    >
+                    <Tag color="processing" style={{ fontWeight: 600 }}>
                       ● 进行中
-                    </span>
+                    </Tag>
                   ) : selectedActivity.status === 'error' ? (
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        padding: '2px 10px',
-                        borderRadius: 12,
-                        background: 'rgba(255, 77, 79, 0.15)',
-                        border: '1px solid rgba(255, 77, 79, 0.3)',
-                        color: '#ff4d4f',
-                        fontSize: 12,
-                        fontWeight: 600,
-                      }}
-                    >
+                    <Tag color="error" style={{ fontWeight: 600 }}>
                       ✕ 执行失败
-                    </span>
+                    </Tag>
                   ) : (
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        padding: '2px 10px',
-                        borderRadius: 12,
-                        background: 'rgba(82, 196, 26, 0.15)',
-                        border: '1px solid rgba(82, 196, 26, 0.3)',
-                        color: '#52c41a',
-                        fontSize: 12,
-                        fontWeight: 600,
-                      }}
-                    >
+                    <Tag color="success" style={{ fontWeight: 600 }}>
                       ✓ 已完成
-                    </span>
+                    </Tag>
                   )}
                   {selectedActivity.detail?.runId && (
                     <Text type="secondary" style={{ fontSize: 11, fontFamily: 'monospace' }}>
                       Run: {selectedActivity.detail.runId.slice(0, 8)}
                     </Text>
                   )}
-                </Flex>
-                <Title level={4} style={{ margin: 0, fontWeight: 700, fontSize: 16 }}>
+                </Flexbox>
+                <Title level={4} style={{ margin: 0, fontWeight: 700, fontSize: 16, color: '#ffffff' }}>
                   {selectedActivity.title || selectedActivity.summary || '活动详情'}
                 </Title>
-              </div>
+              </Flexbox>
             ) : (
-              <Title level={4} style={{ margin: 0, fontWeight: 700, fontSize: 16 }}>
+              <Title level={4} style={{ margin: 0, fontWeight: 700, fontSize: 16, color: '#ffffff' }}>
                 活动详情
               </Title>
             )
@@ -1712,13 +1621,13 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                   >
                     <Flex align="center" gap={8}>
                       {step.iconType === 'started' ? (
-                        <span style={{ color: 'inherit', opacity: 0.6, fontSize: 13, flexShrink: 0 }}>●</span>
+                        <span style={{ color: '#aaaaaa', fontSize: 13, flexShrink: 0 }}>●</span>
                       ) : step.iconType === 'completed' ? (
-                        <span style={{ color: '#52c41a', fontSize: 13, fontWeight: 'bold', flexShrink: 0 }}>✓</span>
+                        <span style={{ color: '#c4f042', fontSize: 13, fontWeight: 'bold', flexShrink: 0 }}>✓</span>
                       ) : step.iconType === 'pending' || step.iconType === 'running' ? (
-                        <span style={{ color: '#1677ff', fontSize: 13, flexShrink: 0 }}>☐</span>
+                        <span style={{ color: '#60b1ff', fontSize: 13, flexShrink: 0 }}>☐</span>
                       ) : (
-                        <span style={{ color: '#ff4d4f', fontSize: 13, fontWeight: 'bold', flexShrink: 0 }}>✕</span>
+                        <span style={{ color: '#f4416c', fontSize: 13, fontWeight: 'bold', flexShrink: 0 }}>✕</span>
                       )}
                       <span
                         className={styles.detailSidebarItemTitle}
@@ -1738,13 +1647,13 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
             {activeSubStep && (
               <div className={styles.detailMain}>
                 {/* 1. 粗体步骤大标题 */}
-                <Title level={4} style={{ margin: 0, fontWeight: 700, fontSize: 16 }}>
+                <Title level={4} style={{ margin: 0, fontWeight: 700, fontSize: 16, color: '#ffffff' }}>
                   {activeSubStep.step_title}
                 </Title>
 
                 {/* 2. 叙述段落 */}
                 <div className={styles.narrativeCard}>
-                  <div className={styles.detailSectionTitle} style={{ marginBottom: 6 }}>
+                  <div className={styles.detailSectionTitle}>
                     🧠 智能体意图与执行叙述
                   </div>
                   <Paragraph className={styles.narrativeText}>
@@ -1757,152 +1666,116 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                 {activeSubStep.command && (
                   <div className={styles.detailSection}>
                     <span className={styles.detailSectionTitle}>执行的命令::</span>
-                    <div className={styles.codeBlockWrapper}>
-                      <div className={styles.codeBlockHeader}>
-                        <span className={styles.codeBlockLang}>bash</span>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <Button
-                            type="text"
-                            size="small"
-                            style={{ fontSize: 11, color: 'inherit', height: 22, padding: '0 6px' }}
-                            onClick={() => {
-                              if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                                navigator.clipboard.writeText(activeSubStep.command || '');
-                                antMessage.success('已复制命令');
-                              }
-                            }}
-                          >
-                            复制
-                          </Button>
-                          <Button
-                            type="text"
-                            size="small"
-                            style={{ fontSize: 11, color: 'inherit', height: 22, padding: '0 6px' }}
-                            onClick={() => {
-                              const blob = new Blob([activeSubStep.command || ''], { type: 'text/plain' });
-                              const url = URL.createObjectURL(blob);
-                              const a = document.createElement('a');
-                              a.href = url;
-                              a.download = 'command.sh';
-                              a.click();
-                              URL.revokeObjectURL(url);
-                            }}
-                          >
-                            下载
-                          </Button>
-                        </div>
-                      </div>
-                      <div className={styles.codeBox}>{activeSubStep.command}</div>
-                    </div>
+                    <Highlighter
+                      language="bash"
+                      copyable
+                      showLanguage
+                      variant="filled"
+                      style={{ maxHeight: 220, overflow: 'auto', borderRadius: 8 }}
+                    >
+                      {activeSubStep.command}
+                    </Highlighter>
                   </div>
                 )}
 
                 {/* 4. 元数据信息点 (退出码、耗时、边界截取) */}
                 {(activeSubStep.exit_code !== undefined || activeSubStep.duration_ms !== undefined) && (
-                  <div className={styles.metadataBullets}>
-                    <div>
-                      · 退出码: {activeSubStep.exit_code ?? 0}, 耗时: {activeSubStep.duration_ms ?? 0}ms
-                    </div>
-                    {activeSubStep.truncated_boundary && (
-                      <div>· 输出已通过 {activeSubStep.truncated_boundary} 边界截取</div>
+                  <Flexbox horizontal gap={8} wrap="wrap" align="center">
+                    <Tag color={activeSubStep.exit_code === 0 ? 'success' : 'error'}>
+                      {activeSubStep.exit_code === 0 ? '✓ 退出码: 0' : `✕ 退出码: ${activeSubStep.exit_code}`}
+                    </Tag>
+                    {activeSubStep.duration_ms !== undefined && (
+                      <Tag color="default">
+                        ⏱ 耗时: {activeSubStep.duration_ms}ms
+                      </Tag>
                     )}
-                  </div>
+                    {activeSubStep.stage && (
+                      <Tag color="cyan">
+                        阶段: {activeSubStep.stage}
+                      </Tag>
+                    )}
+                    {activeSubStep.truncated_boundary && (
+                      <Tag color="warning">
+                        边界截取: {activeSubStep.truncated_boundary}
+                      </Tag>
+                    )}
+                  </Flexbox>
                 )}
 
                 {/* 5. 提取到的代码内容 / 检索结果 */}
                 {activeSubStep.search_results && activeSubStep.search_results.length > 0 ? (
                   <div className={styles.detailSection}>
                     <span className={styles.detailSectionTitle}>检索结果：</span>
-                    <div className={styles.searchResultsList}>
+                    <Flexbox gap={8}>
                       {activeSubStep.search_results.map((res, i) => (
-                        <div key={i} className={styles.searchResultItem}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span className={styles.searchResultIndex}>{res.index || i + 1}.</span>
-                            <span className={styles.searchResultLoc}>{res.location}</span>
-                          </div>
-                          <div className={styles.codeBox} style={{ margin: '4px 0 0', maxHeight: 80 }}>
+                        <Block key={i} variant="filled" padding={12} gap={6} style={{ borderRadius: 8 }}>
+                          <Flexbox horizontal align="center" gap={6}>
+                            <Tag color="cyan">{res.index || i + 1}</Tag>
+                            <Text code style={{ color: '#60b1ff', fontSize: 12 }}>
+                              {res.location}
+                            </Text>
+                          </Flexbox>
+                          <Highlighter
+                            language="bash"
+                            variant="borderless"
+                            copyable
+                            style={{ maxHeight: 100, overflow: 'auto' }}
+                          >
                             {res.match}
-                          </div>
-                        </div>
+                          </Highlighter>
+                        </Block>
                       ))}
-                    </div>
+                    </Flexbox>
                   </div>
                 ) : activeSubStep.code_snippets && activeSubStep.code_snippets.length > 0 ? (
                   <div className={styles.detailSection}>
                     {activeSubStep.code_snippets.map((snip, i) => (
-                      <div key={i} style={{ marginBottom: 10 }}>
-                        <span className={styles.detailSectionTitle}>{snip.label || '提取到的代码内容'}</span>
-                        <div className={styles.codeBlockWrapper}>
-                          <div className={styles.codeBlockHeader}>
-                            <span className={styles.codeBlockLang}>{snip.language || 'bash'}</span>
-                            <div style={{ display: 'flex', gap: 6 }}>
-                              <Button
-                                type="text"
-                                size="small"
-                                style={{ fontSize: 11, color: 'inherit', height: 22, padding: '0 6px' }}
-                                onClick={() => {
-                                  if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                                    navigator.clipboard.writeText(snip.code || '');
-                                    antMessage.success('已复制代码内容');
-                                  }
-                                }}
-                              >
-                                复制
-                              </Button>
-                              <Button
-                                type="text"
-                                size="small"
-                                style={{ fontSize: 11, color: 'inherit', height: 22, padding: '0 6px' }}
-                                onClick={() => {
-                                  const blob = new Blob([snip.code || ''], { type: 'text/plain' });
-                                  const url = URL.createObjectURL(blob);
-                                  const a = document.createElement('a');
-                                  a.href = url;
-                                  a.download = `${snip.label || 'code'}.txt`;
-                                  a.click();
-                                  URL.revokeObjectURL(url);
-                                }}
-                              >
-                                下载
-                              </Button>
-                            </div>
-                          </div>
-                          <div className={styles.codeBox}>{snip.code}</div>
-                        </div>
+                      <div key={i} style={{ marginBottom: 12 }}>
+                        <Highlighter
+                          language={snip.language || 'bash'}
+                          fileName={snip.label || '提取到的代码内容'}
+                          copyable
+                          showLanguage
+                          variant="filled"
+                          style={{ maxHeight: 240, overflow: 'auto', borderRadius: 8 }}
+                        >
+                          {snip.code}
+                        </Highlighter>
                       </div>
                     ))}
                   </div>
                 ) : activeSubStep.result ? (
                   <div className={styles.detailSection}>
                     <span className={styles.detailSectionTitle}>提取到的代码内容</span>
-                    <div className={styles.codeBox}>{activeSubStep.result}</div>
+                    <Highlighter
+                      language="bash"
+                      copyable
+                      variant="filled"
+                      style={{ maxHeight: 200, overflow: 'auto', borderRadius: 8 }}
+                    >
+                      {activeSubStep.result}
+                    </Highlighter>
                   </div>
                 ) : null}
 
                 {/* 6. 验证结论 */}
                 {activeSubStep.conclusion && (
-                  <div
-                    className={`${styles.verdictBanner} ${
-                      activeSubStep.iconType === 'error' || activeSubStep.exit_code !== 0
-                        ? styles.verdictBannerError
-                        : styles.verdictBannerSuccess
-                    }`}
-                  >
-                    <div
-                      className={styles.verdictTitle}
-                      style={{
-                        color:
-                          activeSubStep.iconType === 'error' || activeSubStep.exit_code !== 0
-                            ? '#ff4d4f'
-                            : '#52c41a',
-                      }}
-                    >
-                      {activeSubStep.iconType === 'error' || activeSubStep.exit_code !== 0 ? '✕ 执行异常' : '🛡️ 验证结论'}
-                    </div>
-                    <Paragraph className={styles.verdictText}>
-                      {activeSubStep.conclusion}
-                    </Paragraph>
-                  </div>
+                  <Alert
+                    type={activeSubStep.iconType === 'error' || activeSubStep.exit_code !== 0 ? 'error' : 'success'}
+                    message={
+                      <span style={{ fontWeight: 700, fontSize: 13, color: activeSubStep.iconType === 'error' || activeSubStep.exit_code !== 0 ? '#f4416c' : '#c4f042' }}>
+                        {activeSubStep.iconType === 'error' || activeSubStep.exit_code !== 0 ? '✕ 执行异常' : '🛡️ 验证结论'}
+                      </span>
+                    }
+                    description={
+                      <div style={{ color: '#ffffff', fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-line', marginTop: 4 }}>
+                        {activeSubStep.conclusion}
+                      </div>
+                    }
+                    variant="filled"
+                    showIcon
+                    style={{ borderRadius: 10 }}
+                  />
                 )}
               </div>
             )}
