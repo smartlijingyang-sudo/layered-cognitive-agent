@@ -406,16 +406,15 @@ def test_model_saw_prefers_spine_when_present(tmp_path: Path) -> None:
     assert str(run_dir / "r_demo.spine.jsonl") in text
 
 
-def test_model_saw_falls_back_to_model_visible_when_spine_missing(
+def test_model_saw_marks_unavailable_when_spine_missing(
     tmp_path: Path,
 ) -> None:
-    """run_dir 下不存在 spine 时,链接走 model_visible/(PR-3 双轨期)。"""
+    """run_dir 下不存在 spine 时,Model saw 标注 unavailable(ADR-0185 PR-4:sidecar 已退役)。"""
     run_dir = tmp_path / "run_xyz"
     run_dir.mkdir()
     writer = StepNarrativeWriter(run_dir / "journal.narrative.md")
     text = writer.render(_build_sample_doc())
-    assert "legacy sidecar" in text
-    assert "model_visible" in text
+    assert "fold unavailable (no spine ledger; sidecar retired)" in text
     assert "fold 重建" not in text
 
 
@@ -451,7 +450,7 @@ def test_model_saw_does_not_read_cwd_relative_traces(tmp_path: Path) -> None:
         os.chdir(old_cwd)
 
     # 必须走 fallback —— decoy 不可触发 spine 优先
-    assert "legacy sidecar" in text
+    assert "fold unavailable (no spine ledger; sidecar retired)" in text
     assert "fold 重建" not in text
 
 
@@ -475,5 +474,5 @@ def test_model_saw_empty_path_renders_fallback(tmp_path: Path) -> None:
         os.chdir(old_cwd)
 
     # 无 run_dir ⇒ 直接 fallback
-    assert "legacy sidecar" in text
+    assert "fold unavailable (no spine ledger; sidecar retired)" in text
     assert "fold 重建" not in text
