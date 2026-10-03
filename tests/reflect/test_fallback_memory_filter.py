@@ -54,7 +54,7 @@ async def test_fallback_when_disabled():
 
 @pytest.mark.asyncio
 async def test_fallback_when_no_api_key_and_no_primary(monkeypatch):
-    monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+    monkeypatch.setenv("TYPESAFE_API_KEY", "")
     fallback = AsyncMock()
     fallback.evaluate.return_value = FilterDecision(False, "none", "regex", 0.0)
 

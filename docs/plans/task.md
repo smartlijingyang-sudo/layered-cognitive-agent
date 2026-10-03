@@ -495,7 +495,7 @@
 | BRAINSTORM-COGNITIVE-MEMORY-TRANSITION | 步骤 6：转入实施计划制定（调用 writing-plans 规划单流落地步骤） | Completed | 成功落盘实施计划 docs/plans/2026-10-03-cognitive-memory-architecture-plan.md 并提交 git (commit 07f2a1570) |
 | COGNITIVE-MEMORY-TASK-1 | 任务 1：契约层与四层认知记忆领域模型 (Contracts & ADR-0277 兼容合流) | Completed | 成功扩充 WorkingMemoryPercept 并向后兼容丰富 SemanticClaim/EpisodicTrace，落地 cognitive.py 端口协议，单测与 ADR-0277 全量 149 测试 100% 全绿 |
 | COGNITIVE-MEMORY-TASK-2 | 任务 2：开放实体知识图谱与 File-as-SSOT 存储适配器 (Infrastructure) | Completed | 成功实现 EntityGraphStore 开放分类创建、GRAPH.md 常驻微索引（Top 15条，Token预算受控）、超限沉降 GC（archives/entities/）与 SQLite FTS5+Graph 派生索引器，4/4 单测全绿 |
-| COGNITIVE-MEMORY-TASK-3 | 任务 3：摄入模态门控与反思过滤器 (Ingestion Guards) | In_Progress | 正在编写 test_memory_ingestion_guards.py 并实现反事实/假设举例拦截与显著性频次门控 |
-| COGNITIVE-MEMORY-TASK-4 | 任务 4：极简冷启动装配与 System 2 内部追忆工具 (Cognitive Saccade) | Pending | 待实现 <500 Token 视界装配与 SystemTwoRecallEngine 2跳联想追忆 |
+| COGNITIVE-MEMORY-TASK-3 | 任务 3：摄入模态门控与反思过滤器 (Ingestion Guards) | Completed | 成功实现 filter_ingestion_modality 拦截反事实/假设举例与反讽、SalienceGate 防止单次偶发事件过度泛化为偏好，并无缝接入 memory_extract 节点，单测与 33 reflect 测试全绿 |
+| COGNITIVE-MEMORY-TASK-4 | 任务 4：极简冷启动装配与 System 2 内部追忆工具 (Cognitive Saccade) | In_Progress | 正在编写 test_system_two_recall.py 并实现基于 0277 HybridScorer 的 SystemTwoRecallEngine 与 internal_recall 内部多跳追忆工具 |
 | COGNITIVE-MEMORY-TASK-5 | 任务 5：表达分寸防火墙与工具踩坑避坑哨兵 (Tact & Pitfall Shield) | Pending | 待实现高敏感记忆隔离、禁炫耀声带契约与 TOOLS.md 调用前按需避坑注入 |
 | COGNITIVE-MEMORY-TASK-6 | 任务 6：7 大维度 28 项核心场景双轨基准评测 (Two-Track Evals Benchmark) | Pending | 待落地 28 项全量场景自动化评测并跑通 100% 验收断言 |

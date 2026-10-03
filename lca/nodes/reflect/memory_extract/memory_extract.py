@@ -25,6 +25,11 @@ from pydantic import BaseModel, ConfigDict
 
 from lca.cognition.memory.daytime import episode_home
 from lca.cognition.memory.govern import govern
+from lca.cognition.memory.guards import (
+    ModalityResult,
+    SalienceGate,
+    filter_ingestion_modality,
+)
 from lca.contracts.atoms.control.slot import ControlSlot
 from lca.contracts.atoms.enums.enums import ActionType, MemoryCategory
 from lca.contracts.atoms.functional.group import FunctionalGroup
@@ -196,6 +201,11 @@ class ReflectMemoryExtractExecutor:
         if not task:
             return self._passthrough(reflection)
 
+        # 摄入模态门控：反事实、举例、假设与反讽拦截
+        modality = filter_ingestion_modality(task)
+        if modality != ModalityResult.ADMIT_FACT:
+            return self._passthrough(reflection)
+
         filter_ = self.pre_filter if self.pre_filter is not None else FallbackMemoryFilter()
         decision = await filter_.evaluate(task)
         if not decision.should_extract:
@@ -214,6 +224,9 @@ class ReflectMemoryExtractExecutor:
         try:
             response = await adapter.complete(prompt)
             candidates = _parse_candidates(getattr(response, "text", "") or "")
+            if candidates:
+                salience_gate = SalienceGate()
+                candidates = [c for c in candidates if salience_gate.evaluate(task, c).admitted]
         except Exception:
             # 提取失败不阻塞主流程（ADR-0246 §0.6 fail-soft）。
             return self._passthrough(reflection)

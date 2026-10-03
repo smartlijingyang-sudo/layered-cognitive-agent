@@ -5,7 +5,11 @@ from __future__ import annotations
 import asyncio
 import os
 
-from typesafe_sdk import AsyncTypeSafeClient, Noul
+try:
+    from typesafe_sdk import AsyncTypeSafeClient, Noul
+except ImportError:
+    AsyncTypeSafeClient = None  # type: ignore[assignment,misc]
+    Noul = None  # type: ignore[assignment,misc]
 
 from lca.contracts.protocols.memory.filter import FilterDecision, MemoryPreFilter
 
@@ -30,6 +34,8 @@ class TypeSafeMemoryFilter(MemoryPreFilter):
         self._timeout_seconds = timeout_seconds
 
     async def evaluate(self, text: str) -> FilterDecision:
+        if AsyncTypeSafeClient is None:
+            raise RuntimeError("typesafe_sdk is not installed")
         if not self._api_key:
             raise ValueError("TYPESAFE_API_KEY is not configured")
 
