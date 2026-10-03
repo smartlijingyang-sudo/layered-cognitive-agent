@@ -561,3 +561,10 @@
 | CONST-TASK-3-ROUTES | 传输层路由白名单、优雅降级与乐观锁 (`standing_files.py`) | Completed | STANDING_FILES_WHITELIST 首位注册 CONSTITUTION.md，update_standing_file 支持原子直接写盘与乐观并发冲突 409 拦截，12/12 路由测试全绿 |
 | CONST-TASK-4-UI-PATCH | 前端 UI 补丁与卡片元数据 (`AssistantStatusDrawer.tsx`) | Completed | FILE_ROLE_METADATA 注册「📜 根本宪法」，patch_lobehub 成功应用且 45 补丁一致，16/16 UI单测全绿 |
 | CONST-TASK-5-INTEGRATION-E2E | 上下文装配、活跃助理物化与全链路集成验收 (`test_constitution_standing_file_e2e.py`) | Completed | 覆盖 INV-CONST-01 至 INV-CONST-06 全部 6 大架构不变量（拓扑SSOT/白名单/优雅降级与哈希/乐观并发控制/UI卡片补丁/Prompt上下文宪法首位注入），6/6 E2E 单测全绿，关联 56 项单测与场景测试 100% 通过，asst_29c963417967 活跃助理权威物化落盘 |
+| DEBUG-CONNECTOR-URL-RUN | 调查最后一次 run 连接器为何直接给出 URL 而非卡片且非工具吐出根因 (systematic-debugging) | Completed | 已基于 systematic-debugging 深度溯源 run_61bb49e2e068 与 run_ff2938984e44：1. 工具确实吐出了卡片与URL：composioConnect 产生了 [widget:connector_auth?...] 与真实链接；2. 模型丢弃卡片并倾倒裸URL：工具返回文本将裸 redirect_url 与 widget 混排且缺乏 display_instruction 强约束，误导模型以为系统在上方渲染卡片并提取裸 URL 输出；3. 前端补丁兜底盲区：前端仅识别旧接口域名（api/v1/auth/redirect, backend.composio.dev），对新生产域名 connect.composio.dev/link 判定为 false 导致降级兜底未激活 |
+| BRAINSTORM-CONN-WIDGET-CONTEXT | 探索项目上下文：连接器卡片协议、工具输出契约、前端补丁与认知门禁现状 | Completed | 依据前序根因分析，已梳理 composioConnect 工具描述与回执、connector_auth_card 补丁逻辑及 URL 门禁 |
+| BRAINSTORM-CONN-WIDGET-QUESTIONS | 澄清连接器卡片职责边界与架构稳定机制倾向（单步提问） | In Progress | 正在向用户呈现关于底层职责划分与端到端闭环机制的核心权衡问题 |
+| BRAINSTORM-CONN-WIDGET-APPROACHES | 提炼 2-3 种职责清晰、高稳定度的卡片与授权机制方案及权衡对比 | Pending | 待执行 |
+| BRAINSTORM-CONN-WIDGET-DESIGN-SECTIONS | 逐步呈现分节架构规范（边界/工具契约/前端卡片与清洗/测试不变量）并呈批 | Pending | 待执行 |
+| BRAINSTORM-CONN-WIDGET-DESIGN-DOC | 沉淀架构设计文档至 docs/plans/ 并提交 git | Pending | 待执行 |
+| BRAINSTORM-CONN-WIDGET-TRANSITION | 转入实施计划制定（调用 writing-plans 规划单流落地步骤） | Pending | 待执行 |
