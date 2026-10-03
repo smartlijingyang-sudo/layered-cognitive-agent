@@ -96,8 +96,8 @@ git commit -m "feat(cognition): add UrlProvenanceGate to block hallucinated URLs
 
 **Step 1: Write the failing test**
 编写 `tests/connectors/test_connector_pre_execution_guard.py`：
-- 模拟未激活 Google Drive 时，直接调用 `GOOGLEDRIVE_FIND_FILE`，断言被 `ConnectorPreExecutionGuard` 拦截；
-- 断言拦截回执 `Observation.success == False`，`error == "SERVICE_NOT_CONNECTED"`，且包含合法 `[widget:connector_auth?...]` 语法；
+- 通用覆盖所有外部连接器：模拟未激活 Google Drive、Gmail、GitHub、Slack 等受控服务时，直接调用对应的操作类工具（如 `GOOGLEDRIVE_FIND_FILE`、`GMAIL_SEND_EMAIL`、`GITHUB_GET_USER` 等），断言均被 `ConnectorPreExecutionGuard` 统一切断拦截；
+- 断言拦截回执 `Observation.success == False`，`error == "SERVICE_NOT_CONNECTED"`，且包含对应服务的合法 `[widget:connector_auth?...]` 语法；
 - 模拟已激活状态，断言放行。
 
 **Step 2: Run test to verify it fails**

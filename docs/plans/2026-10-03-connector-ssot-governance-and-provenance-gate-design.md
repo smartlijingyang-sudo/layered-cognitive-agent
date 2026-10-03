@@ -31,8 +31,8 @@
   1. **用户主权存储模型与全局隔离解耦**：
      - 重构 `lca/infrastructure/connectors/core/vault.py` 与 `lca/infrastructure/integrations/composio/settings/settings.py`，连接器持久化严格收敛至 `~/.lca/users/{user_id}/connectors/connections.json`；
      - 彻底切除向全局单文件的隐式 fallback，新用户默认连接器状态为空集。
-  2. **状态驱动与执行窄门硬拦截**：
-     - 在操作类工具执行底层实现 `ConnectorPreExecutionGuard`：在调用 `GOOGLEDRIVE_*` / `GMAIL_*` 前强校验 SSOT 文件状态；若未处于 `ACTIVE`，立即 fail-fast 拦截并下发结构化 `[widget:connector_auth?...]` 官方卡片。
+  2. **状态驱动与执行窄门硬拦截（全生态连接器通用）**：
+     - 在操作类工具执行底层实现通用的 `ConnectorPreExecutionGuard`：在调用任何受控外部生态工具（Google Drive、Gmail、GitHub、Slack、Notion 等）前，强校验该服务在当前用户 SSOT 文件中的状态；若未处于 `ACTIVE`，立即 fail-fast 拦截并下发该服务专属的结构化 `[widget:connector_auth?...]` 官方卡片，坚决杜绝未连接直接操作。
   3. **认知层 URL 事实血统门禁 (`UrlProvenanceGate`)**：
      - 在 `lca/cognition/think/gate/` 责任链挂载门禁，静态扫描决策与回复中的外部 URL，必须严格具备 Session 事实血统（工具 Observation / Receipt 或平台白名单），任何未经工具产出的编造 URL 一律判定 `Verdict(rejected, reason="URL_WITHOUT_PROVENANCE")`。
   4. **动身份先报身份透明契约**：
