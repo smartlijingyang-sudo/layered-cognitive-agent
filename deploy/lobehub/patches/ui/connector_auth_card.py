@@ -3,6 +3,7 @@
 Renders high-grade interactive OAuth authorization cards in the chat flow whenever
 Composio connection requests or links are emitted, replacing bare links with
 popup authorization and automatic connection state polling.
+Supports intentId (Zero Model URL Exposure, INV-CAP-05).
 """
 
 from __future__ import annotations
@@ -39,8 +40,11 @@ def apply(ctx: PatchContext) -> bool:
     source = _HERE / _SOURCE_NAME
     if not source.is_file():
         raise SystemExit(f"[connector_auth_card] missing patch source: {source}")
-    if ctx.write_if_changed(_COMPONENT_REL, source.read_text(encoding="utf-8")):
+    content = source.read_text(encoding="utf-8")
+    if ctx.write_if_changed(_COMPONENT_REL, content):
         changed = True
+    else:
+        ctx._record(_COMPONENT_REL)
 
     # 2. Patch Assistant/index.tsx
     assistant_text = ctx.read(_ASSISTANT_REL)
@@ -57,13 +61,14 @@ def apply(ctx: PatchContext) -> bool:
             raise AssertionError("connector_auth_card: AssistantNamingWidget import anchor not found")
         assistant_text = assistant_text.replace(import_anchor, import_repl, 1)
 
-    # 注入解析逻辑
-    parse_anchor = "    const cleanContent = isNamingWidget\n      ? content.replace(/\\[widget:name_picker\\?token=[^\\]]+\\]/g, '').trim()\n      : content;"
-    parse_repl = (
-        "    const isNamingWidget = Boolean(content && content.includes('[widget:name_picker'));\n"
-        "    const namingToken = isNamingWidget\n"
-        "      ? (content.match(/\\[widget:name_picker\\?token=([^\\]]+)\\]/) || [])[1]\n"
-        "      : undefined;\n"
+    # 升级或注入解析逻辑 (支持 intentId & 生产域名 connect.composio.dev & 裸链接脱敏)
+    parse_anchor = (
+        "    const cleanContent = isNamingWidget\n"
+        "      ? content.replace(/\\[widget:name_picker\\?token=[^\\]]+\\]/g, '').trim()\n"
+        "      : content;"
+    )
+
+    old_parse_block = (
         "    const isConnectorAuthWidget = Boolean(\n"
         "      content &&\n"
         "        (content.includes('[widget:connector_auth') ||\n"
@@ -103,21 +108,53 @@ def apply(ctx: PatchContext) -> bool:
         "    }"
     )
 
-    naming_block_anchor = (
-        "    const isNamingWidget = Boolean(content && content.includes('[widget:name_picker'));\n"
-        "    const namingToken = isNamingWidget\n"
-        "      ? (content.match(/\\[widget:name_picker\\?token=([^\\]]+)\\]/) || [])[1]\n"
-        "      : undefined;\n"
-        "    const cleanContent = isNamingWidget\n"
+    new_parse_repl = (
+        "    const isConnectorAuthWidget = Boolean(\n"
+        "      content &&\n"
+        "        (content.includes('[widget:connector_auth') ||\n"
+        "          content.includes('connect.composio.dev') ||\n"
+        "          content.includes('composio.dev/api/v1/auth/redirect') ||\n"
+        "          content.includes('backend.composio.dev')),\n"
+        "    );\n"
+        "    let connectorAuthProps: { appName?: string; authUrl?: string; intentId?: string; connectionId?: string } | null = null;\n"
+        "    if (isConnectorAuthWidget && content) {\n"
+        "      const widgetMatch = content.match(/\\[widget:connector_auth\\?([^\\]]+)\\]/);\n"
+        "      if (widgetMatch) {\n"
+        "        const params = new URLSearchParams(widgetMatch[1]);\n"
+        "        const intentId = params.get('intentId') || '';\n"
+        "        connectorAuthProps = {\n"
+        "          appName: params.get('appName') || 'Gmail',\n"
+        "          authUrl: intentId || params.get('authUrl') || '',\n"
+        "          intentId: intentId,\n"
+        "          connectionId: params.get('connectionId') || '',\n"
+        "        };\n"
+        "      } else {\n"
+        "        const urlMatch = content.match(/https?:\\/\\/[^\\s\\)\\\"\\'\\>]+composio\\.dev[^\\s\\)\\\"\\'\\>]*/);\n"
+        "        if (urlMatch) {\n"
+        "          const authUrl = urlMatch[0];\n"
+        "          const tokenMatch = authUrl.match(/token=([^&]+)/);\n"
+        "          const lower = content.toLowerCase();\n"
+        "          const appName = lower.includes('github') ? 'GitHub' : lower.includes('slack') ? 'Slack' : lower.includes('drive') ? 'Google Drive' : 'Gmail';\n"
+        "          connectorAuthProps = {\n"
+        "            appName,\n"
+        "            authUrl,\n"
+        "            connectionId: tokenMatch ? tokenMatch[1] : undefined,\n"
+        "          };\n"
+        "        }\n"
+        "      }\n"
+        "    }\n"
+        "    let cleanContent = isNamingWidget\n"
         "      ? content.replace(/\\[widget:name_picker\\?token=[^\\]]+\\]/g, '').trim()\n"
-        "      : content;"
+        "      : content;\n"
+        "    if (isConnectorAuthWidget && cleanContent) {\n"
+        "      cleanContent = cleanContent.replace(/\\[widget:connector_auth\\?[^\\]]+\\]/g, '').trim();\n"
+        "    }"
     )
 
-    if "connectorAuthProps" not in assistant_text:
-        if naming_block_anchor in assistant_text:
-            assistant_text = assistant_text.replace(naming_block_anchor, parse_repl, 1)
-        elif parse_anchor in assistant_text:
-            assistant_text = assistant_text.replace(parse_anchor, parse_repl, 1)
+    if old_parse_block in assistant_text:
+        assistant_text = assistant_text.replace(old_parse_block, new_parse_repl, 1)
+    elif "connectorAuthProps" not in assistant_text and parse_anchor in assistant_text:
+        assistant_text = assistant_text.replace(parse_anchor, new_parse_repl, 1)
 
     # 注入 messageExtra 挂载
     naming_widget_mount = (

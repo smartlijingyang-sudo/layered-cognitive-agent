@@ -9,8 +9,10 @@ const { Text } = Typography;
 export interface ConnectorAuthCardProps {
   /** 连接器名称，如 Gmail / GitHub / Slack / Google Drive */
   appName?: string;
-  /** OAuth 授权跳转 URL */
+  /** OAuth 授权跳转 URL (直接模式或备选) */
   authUrl?: string;
+  /** 能力凭据意图 ID（Zero Model URL Exposure，点击时异步向后端兑换真实 URL） */
+  intentId?: string;
   /** 连接实例 ID，用于向后端刷新轮询 */
   connectionId?: string;
   /** 自定义卡片标题 */
@@ -163,6 +165,7 @@ export const ConnectorAuthCard = memo<ConnectorAuthCardProps>(
   ({
     appName = 'Gmail',
     authUrl,
+    intentId,
     connectionId,
     title,
     description,
@@ -174,6 +177,9 @@ export const ConnectorAuthCard = memo<ConnectorAuthCardProps>(
       'pending' | 'authorizing' | 'connected' | 'timeout' | 'error'
     >('pending');
     const [checking, setChecking] = useState(false);
+    const [resolvedUrl, setResolvedUrl] = useState<string | undefined>(
+      authUrl && authUrl.startsWith('http') ? authUrl : undefined,
+    );
     const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
     const startTimeRef = useRef<number>(0);
 
@@ -219,9 +225,56 @@ export const ConnectorAuthCard = memo<ConnectorAuthCardProps>(
       [connectionId, appName, onConnected],
     );
 
-    // 唤起 OAuth 独立窗口并启动带超时阶梯退避的轮询
-    const handleStartAuth = useCallback(() => {
-      if (!authUrl) return;
+    // 唤起 OAuth 独立窗口并启动带超时阶梯退避的轮询（支持 intentId 异步兑换）
+    const handleStartAuth = useCallback(async () => {
+      let targetUrl = resolvedUrl;
+      const effectiveIntentId =
+        intentId || (authUrl && (authUrl.startsWith('cai_') || !authUrl.startsWith('http')) ? authUrl : undefined);
+
+      // 如果有 intentId 且尚未解析出真实 URL，异步向网关兑换一次性授权 URL
+      if (!targetUrl && effectiveIntentId) {
+        try {
+          setChecking(true);
+          const res = await fetch(`/lca-api/composio/auth-intents/${effectiveIntentId}/resolve`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer dev_local_token',
+              'x-lca-token': 'dev_local_token',
+              'x-lca-user-id': 'dev_user',
+            },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            targetUrl = data?.auth_url || data?.authUrl;
+            if (targetUrl) {
+              setResolvedUrl(targetUrl);
+            }
+          } else if (res.status === 410) {
+            setStatus('timeout');
+            antMessage.error('⏱️ 授权凭据已超时失效，请重新让助理发起连接。');
+            return;
+          } else {
+            antMessage.error('获取授权链接失败，请稍后重试。');
+            return;
+          }
+        } catch {
+          antMessage.error('网络请求异常，请检查网关连接。');
+          return;
+        } finally {
+          setChecking(false);
+        }
+      }
+
+      // 如果未解析到但 authUrl 为有效 http 链接
+      if (!targetUrl && authUrl && authUrl.startsWith('http')) {
+        targetUrl = authUrl;
+      }
+
+      if (!targetUrl) {
+        antMessage.warning('未能获取有效的授权跳转链接。');
+        return;
+      }
 
       setStatus('authorizing');
       startTimeRef.current = Date.now();
@@ -233,7 +286,7 @@ export const ConnectorAuthCard = memo<ConnectorAuthCardProps>(
       const top = window.screen.height / 2 - h / 2;
 
       const popup = window.open(
-        authUrl,
+        targetUrl,
         `OAuth_${appName}`,
         `width=${w},height=${h},top=${top},left=${left},status=no,menubar=no,toolbar=no,location=no`,
       );
@@ -272,7 +325,7 @@ export const ConnectorAuthCard = memo<ConnectorAuthCardProps>(
       };
 
       scheduleNextPoll();
-    }, [authUrl, appName, checkConnectionStatus]);
+    }, [resolvedUrl, authUrl, intentId, appName, checkConnectionStatus]);
 
     // 组件卸载时清理定时器
     useEffect(() => {
@@ -350,7 +403,7 @@ export const ConnectorAuthCard = memo<ConnectorAuthCardProps>(
                 size="small"
                 loading={status === 'authorizing' && checking}
                 onClick={handleStartAuth}
-                disabled={!authUrl}
+                disabled={!authUrl && !intentId && !resolvedUrl}
               >
                 {status === 'authorizing'
                   ? '重新打开授权窗'

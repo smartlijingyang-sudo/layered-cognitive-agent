@@ -83,3 +83,17 @@ def test_connector_auth_card_patch_module() -> None:
     content = path.read_text(encoding="utf-8")
     assert "ConnectorAuthCard" in content
     assert "assistant_naming_widget" in content or "depends_on" in content
+
+
+def test_connector_auth_card_intent_id_support() -> None:
+    """INV-CAP-05: Verify ConnectorAuthCard.tsx and connector_auth_card.py support intentId async resolution."""
+    card_path = _get_card_tsx_path()
+    card_content = card_path.read_text(encoding="utf-8")
+    assert "intentId" in card_content
+    assert "auth-intents" in card_content
+    assert "resolve" in card_content
+
+    patch_path = _get_patch_py_path()
+    patch_content = patch_path.read_text(encoding="utf-8")
+    assert "intentId" in patch_content
+    assert "connect.composio.dev" in patch_content
