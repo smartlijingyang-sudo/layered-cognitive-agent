@@ -53,9 +53,10 @@ def is_standing_write_path(path: str | Path) -> bool:
 def standing_write_block_message() -> str:
     """Reason returned to the model when it targets a standing file."""
     return (
-        "writeFile 不能覆盖助手自身的 standing 记忆文件（SOUL / IDENTITY / USER / "
-        "MEMORY 等）。用户身份与偏好请用 memory_add 写入；人格文件由用户或 "
-        "revise_profile 管理。"
+        "writeFile 不能覆盖助手自身的 standing 文件（SOUL / IDENTITY / USER / "
+        "MEMORY 等）。修改助手自身的名字/人格/身份，请用 agent 命名空间的 "
+        "update_assistant_profile / update_assistant_soul 工具（或由用户经 "
+        "revise_profile 修改）；记录用户（人类）的身份与偏好，请用 memory_add。"
     )
 
 

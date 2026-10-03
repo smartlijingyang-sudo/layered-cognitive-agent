@@ -46,6 +46,8 @@ def test_message_mentions_memory_add() -> None:
     msg = standing_write_block_message()
     assert "memory_add" in msg
     assert "standing" in msg
+    assert "update_assistant_profile" in msg
+    assert "update_assistant_soul" in msg
 
 
 def test_workspace_file_with_dot_lca_segment_is_not_blocked() -> None:

@@ -446,10 +446,10 @@ class ReadAssistantSelfConfigTool(_BaseAssistantTool):
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "ephemeral"
     required_grant: ClassVar[str] = "profile.revise"
     description = (
-        "读取当前助理的人格配置投影（SOUL.md / IDENTITY.md / USER.md / TOOLS.md 的注入块原文）。"
+        "读取当前助理的人格配置投影（SOUL.md / USER.md / TOOLS.md 的注入块原文）。"
         "只读，不修改任何配置；返回内容与 prompt 注入块逐字节一致，用于回答“你的 soul 里是什么”类自省问题，"
         "无需再用文件工具搜寻工作区（ADR-0261 C1）。peer/跨信任边界调用时传 redacted=true 返回脱敏版。"
-        "参数: files（可选，standing 清单子集，缺省为四个人格文件）、redacted（可选，默认 false）。"
+        "参数: files（可选，standing 清单子集，缺省为三个人格文件）、redacted（可选，默认 false）。"
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
@@ -468,7 +468,6 @@ class ReadAssistantSelfConfigTool(_BaseAssistantTool):
 
     _DEFAULT_FILES: ClassVar[tuple[str, ...]] = (
         "SOUL.md",
-        "IDENTITY.md",
         "USER.md",
         "TOOLS.md",
     )

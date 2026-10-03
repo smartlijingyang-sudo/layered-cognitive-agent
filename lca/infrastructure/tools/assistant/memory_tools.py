@@ -222,7 +222,9 @@ class MemoryAddTool(_BaseMemoryTool):
     effect_kind: ClassVar[Literal["ephemeral", "persistent", "stateful_once"]] = "persistent"
     required_grant: ClassVar[str] = "profile.revise"
     description = (
-        "把用户明确陈述的身份/偏好/事实写入结构化记忆。"
+        "把用户（人类）明确陈述的身份/偏好/事实写入结构化记忆。"
+        "不要用它修改助理自身的名字/人格/设定——助理自身的配置请用 agent 命名空间的 "
+        "update_assistant_profile / update_assistant_soul。"
         "参数: content（结构化事实，如「用户身份：系统架构师」）、category（identity/"
         "preference/fact）、dedupe_key（可选，属性维度键，如 preference:tech_stack、identity:role，"
         "同维度新事实会自动覆盖旧事实，严禁包含具体取值）。"
