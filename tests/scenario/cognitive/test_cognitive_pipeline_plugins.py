@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+__keep_llm_key__ = True  # scripted/booted runs need a dummy credential for the reasoner fail-loud gate (see tests/conftest.py)
+
 from pathlib import Path
 from unittest.mock import MagicMock
 

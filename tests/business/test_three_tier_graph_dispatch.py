@@ -176,10 +176,6 @@ class TestTopLevelBundlesLayout:
             + "\n".join(sorted(graph_offenders))
         )
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="ADR-0220 Proposed — three layer subdirs not yet created (P2/P3/P5)",
-    )
     def test_three_tier_subdirs_eventually_exist(self) -> None:
         """§3.1 — the three layer subdirs must exist post-migration.
 
@@ -306,10 +302,6 @@ class TestBusinessGraphReferenceOnly:
 class TestConceptGraphTypedPorts:
     """§3.3 — concept graphs declare typed inputs/outputs on every node."""
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="ADR-0220 Proposed — bundles/concept/ not yet populated (P3/P4)",
-    )
     def test_concept_graph_nodes_have_typed_inputs_outputs(self) -> None:
         """Each concept-graph node must declare ``inputs:`` + ``outputs:`` lists."""
         if not CONCEPT_DIR.is_dir():
