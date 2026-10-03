@@ -536,3 +536,10 @@
 | CRON-TASK-5-INCHAT-CARD | 前端对话流原生交互式任务卡片组件 (`CronTaskCard.tsx` + 渲染挂载) | Completed | 落地 CronTaskCard.tsx 磨砂玻璃卡片、快捷推迟胶囊(+10m/+30m/+1h)、原地编辑/删除/暂停、cron_task_card_widget 补丁，测试全绿，commit 7689c65d7 |
 | CRON-TASK-6-UPCOMING-PANEL | 前端右侧栏「即将到来」抽屉顶级交互升级 (`CronUpcomingPanel.tsx`) | Completed | 落地全能编辑/新建弹窗、立即执行（Run Now）、启停开关与删除确认，SWR 自动轮询同步，单测全绿，commit 18e6647b0 |
 | CRON-TASK-7-INTEGRATION-E2E | 全链路端到端集成验证与门禁体检 (INV-CRON-01 ~ INV-CRON-06) | Completed | 编写 tests/scenario/test_cron_full_lifecycle_invariants.py，覆盖 INV-CRON-01 至 INV-CRON-06 验收矩阵（崩溃重启自愈、到期精准触发与执行记录落盘、关机防轰炸补偿、会话日志原生注入与卡片契约、交互式操作原地响应、并发与文件锁安全），46/46 全量关联测试 100% 全绿，ruff check/format 0 报错，git diff --check clean |
+| BRAINSTORM-CONNECTOR-GOV-CONTEXT | 深度剖析用户/助理级连接器隔离、状态真值与机制硬防线现状 | Completed | 深度定位三大机制断层：1. 全局单文件 connections.json 缺乏 user_id/assistant 隔离；2. 缺乏「先跑 status 确认连接」的状态预检强约束；3. 缺乏「URL 必须有事实血统来源，严禁模型自行脑补 URL」的认知/门禁硬防线 |
+| BRAINSTORM-CONNECTOR-GOV-QUESTIONS | 澄清连接器用户隔离、预检状态机与防编硬防线核心需求（单步提问） | Completed | 用户选定「用户级隔离 + 助理级授权」主权模型（~/.lca/users/{user_id}/connectors/，新用户天然隔离且绝对为空） |
+| BRAINSTORM-CONNECTOR-GOV-APPROACHES | 提炼 2-3 种根因机制治理方案（隔离模型/预检拦截/URL防伪门禁）与权衡对比 | Completed | 用户明确选定方案 A，并明确核心交互预期：问到 Google 时自动查 ext -> 查连接状态 -> 没连给卡片 / 连了直接用 |
+| BRAINSTORM-CONNECTOR-GOV-DESIGN-SECTIONS | 逐步呈现设计细节（边界/用户级隔离/预检拦截/身份声明/不变量测试）并获取审批 | Completed | 全部 4 节架构规范（边界与自治等级、SSOT文件驱动与用户隔离、UrlProvenanceGate与身份透明、INV-CONN-01~06断言矩阵）均获用户审批通过 |
+| BRAINSTORM-CONNECTOR-GOV-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-03-connector-ssot-governance-and-provenance-gate-design.md 并提交 git |
+| BRAINSTORM-CONNECTOR-GOV-TRANSITION | 转换至实施计划制定（writing-plans） | In Progress | 正在调用 writing-plans skill 制定单流落地实施计划 |
+| STANDING-FILES-MEMORY-DEGRADE | 修复未初始化的 MEMORY.md 在 GET 接口抛 404，补齐默认模板与优雅降级 | In Progress | 正在完善 standing_files.py 默认模板优雅降级与测试覆盖 |
