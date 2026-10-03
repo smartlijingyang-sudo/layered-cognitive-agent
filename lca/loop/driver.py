@@ -329,6 +329,13 @@ class DeclarativeExecution:
         from dataclasses import field as _field
 
         from lca.contracts.models.core.policy.stop import StopReason
+        from lca.loop.tool_error import (
+            ToolErrorKind,
+            build_failure_explanation,
+            classify_tool_error,
+            count_consecutive_tool_failures,
+            find_terminal_tool_error,
+        )
         from lca.contracts.protocols.declarative.declarative_1.declarative_execution import (
             ExecutionOutcome,
         )
@@ -363,6 +370,30 @@ class DeclarativeExecution:
             )
             if stop_decision.failure is not None or stop_decision.reason is StopReason.ERROR:
                 _kind = ExecutionOutcome.FAILED
+                # Tool error recovery: 不要静默死。terminal 由工具错误导致时，
+                # 附上一句中文用户可读解释（say-do 感知）。已有 final_output
+                # （模型自己产出）时不覆盖。
+                # docs/specs/tool-failure-recovery.md §7
+                if not (stop_decision.final_output or "").strip():
+                    _tool_name, _tool_error = find_terminal_tool_error(
+                        interpretation.visits
+                    )
+                    if _tool_name is not None or _tool_error is not None:
+                        from dataclasses import replace as _replace
+
+                        _kind_err = classify_tool_error(_tool_error)
+                        _attempts = count_consecutive_tool_failures(
+                            interpretation.visits, _tool_name
+                        )
+                        _explanation = build_failure_explanation(
+                            tool_name=_tool_name,
+                            error_text=_tool_error,
+                            attempts=max(_attempts, 1),
+                            kind=_kind_err,
+                        )
+                        stop_decision = _replace(
+                            stop_decision, final_output=_explanation
+                        )
             else:
                 _kind = ExecutionOutcome.COMPLETED
 
