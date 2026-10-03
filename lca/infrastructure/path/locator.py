@@ -70,6 +70,50 @@ def get_lca_home() -> Path:
     return get_real_user_home() / ".lca"
 
 
+
+def assistant_workspace_root(assistant_id: str | None = None) -> Path:
+    """Return the single authoritative workspace directory (Workspace SSOT).
+
+    This is the ONE place that decides where "the workspace" lives on the
+    host. Every host-side consumer (local sandbox mount, FileStore root,
+    WorkspaceService) must resolve through here instead of hardcoding
+    ``/mnt/data`` or ``traces/files``.
+
+    The guest contract is untouched: inside the sandbox the path is still
+    ``/mnt/data`` (``SANDBOX_MOUNT_ROOT``, Onlyboxes image contract); this
+    function decides what host directory that guest path is backed by.
+
+    Resolution priority:
+    1. ``LCA_WORKSPACE_ROOT`` env — explicit ops override (wins).
+    2. ``LCA_LOCAL_SANDBOX_ROOT`` env — backward compat with the pre-SSOT
+       local-sandbox override.
+    3. ``{lca_home}/assistants/<assistant_id>/workspace`` — the per-assistant
+       durable workspace (assistant_id from arg or ``LCA_ASSISTANT_ID`` env).
+    4. Legacy fallback: writable ``/mnt/data``, else
+       ``~/.cache/lca/local-sandbox/mnt/data`` (keeps exotic deployments
+       working).
+    """
+    override = os.environ.get("LCA_WORKSPACE_ROOT", "").strip()
+    if override:
+        return Path(override).resolve()
+    legacy = os.environ.get("LCA_LOCAL_SANDBOX_ROOT", "").strip()
+    if legacy:
+        return Path(legacy).resolve()
+    aid = (assistant_id or os.environ.get("LCA_ASSISTANT_ID", "")).strip()
+    if aid:
+        return get_lca_home() / "assistants" / aid / "workspace"
+    try:
+        path = Path("/mnt/data")
+        path.mkdir(parents=True, exist_ok=True)
+        probe = path / ".lca-write-probe"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink(missing_ok=True)
+        return path
+    except OSError:
+        cache = Path.home() / ".cache" / "lca" / "local-sandbox" / "mnt" / "data"
+        cache.mkdir(parents=True, exist_ok=True)
+        return cache
+
 def expand_user_path(path: str | Path) -> Path:
     """Expand user tilde references against the authoritative user/LCA home.
 
@@ -104,4 +148,5 @@ __all__ = [
     "expand_user_path",
     "get_lca_home",
     "get_real_user_home",
+    "assistant_workspace_root",
 ]
