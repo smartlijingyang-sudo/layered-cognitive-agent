@@ -168,11 +168,59 @@ class AskHumanOperation(TerminalOperation):
     """Expose an explicit human-input observation for the terminal action."""
 
 
+def _journal_blocked_call(decision: Decision, block: Observation) -> Observation:
+    """Journal a call the wire gate refused, then hand the block back.
+
+    ``SafeExecutor`` is the only emitter of ``step.tool_call.record`` and
+    ``step.tool_result.record``, and a refused call never reaches it. Without
+    this pair the refusal is absent from the step tree, so ``ToolDeriver``
+    reads no fact and reports ``tool=ok``: ``run_56c3352cd22e`` refused 2 of
+    10 calls and doctor still said ``ok (3 steps, 8 tools)``.
+
+    ``status`` separates a call refused before dispatch from one that ran and
+    failed. ``latency_ms`` stays 0 because nothing executed.
+    """
+    from lca.cognition.body.emit._args_summary import summarize_args
+    from lca.loop.commit.tool_journal import (
+        record_step_tool_call,
+        record_step_tool_result,
+    )
+
+    call = next((tc for tc in decision.tool_calls if tc.call_id == block.tool_call_id), None)
+    if call is None:
+        return block
+    invocation_id = (block.tool_call_id or "").strip() or new_id("inv")
+    arguments = dict(call.arguments or {})
+    error = block.error or ""
+    record_step_tool_call(
+        tool_name=call.tool_name,
+        invocation_id=invocation_id,
+        arguments=arguments,
+        arguments_summary=summarize_args(arguments),
+        status="wire_blocked",
+    )
+    record_step_tool_result(
+        tool_name=call.tool_name,
+        invocation_id=invocation_id,
+        outcome="failure",
+        ok=False,
+        error=error or None,
+        delta_summary=error[:120],
+        failure_kind=(
+            block.extra.get(FAILURE_KIND)
+            if isinstance(getattr(block, "extra", None), dict)
+            else None
+        ),
+    )
+    return block
+
+
 class UseToolOperation(Action):
     """处理 use_tool 动作：wire 闸门 → 查找工具 → 权限校验 → 执行。
 
     ADR-0047：``tool_wire_status`` 为 incomplete/invalid 时**禁止执行**，
     返回 ``Observation(success=False)`` 回灌 loop（不抛、不 respond 收口）。
+    三条闸门都在派发前返回，各自经 :func:`_journal_blocked_call` 留下事实。
     """
 
     def __init__(
@@ -194,16 +242,16 @@ class UseToolOperation(Action):
             raise ToolExecutionError("use_tool 需要至少一个 tool_call")
         wire_block = tool_wire_block_observation(decision)
         if wire_block is not None:
-            return wire_block
+            return _journal_blocked_call(decision, wire_block)
         hidden = unexposed_tool_block_observation(decision)
         if hidden is not None:
-            return hidden
+            return _journal_blocked_call(decision, hidden)
         # ADR-0047: a call whose required arguments never arrived must not
         # execute with an empty payload; the model gets the retry instruction
         # instead of the tool's downstream error.
         missing_block = missing_arguments_block_observation(decision, self._tool_registry)
         if missing_block is not None:
-            return missing_block
+            return _journal_blocked_call(decision, missing_block)
 
         # PR-3.3: emit body.tool.execute.start/end at the action-handler layer
         # so the spine sees one ``start``/``end`` pair per ``use_tool`` decision
