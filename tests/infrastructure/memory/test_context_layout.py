@@ -232,3 +232,9 @@ def test_projection_file_comes_from_the_home_overlay(tmp_path: Path) -> None:
     assert not (home / "MEMORY.md").exists()
     assert memory.last_curated_receipt is not None
     assert memory.last_curated_receipt.path == str(projected)
+
+
+def test_constitution_md_is_first_standing_file() -> None:
+    layout = packaged_layout()
+    assert layout.standing_files[0] == "CONSTITUTION.md"
+    assert "CONSTITUTION.md" in layout.standing_files

@@ -1,6 +1,7 @@
 # Default context-file layout. A home replaces any field in the file named
 # by home_override. This file is the authority. Python only loads it.
 standing_files = [
+    "CONSTITUTION.md",
     "SOUL.md",
     "IDENTITY.md",
     "USER.md",
