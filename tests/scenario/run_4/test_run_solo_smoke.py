@@ -20,6 +20,10 @@ from pathlib import Path
 
 import httpx
 
+# Repo root derived from this file's location (not a hardcoded checkout path),
+# so subprocess-based tests exercise the tree under test (worktrees included).
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+
 
 def test_solo_run_does_not_fail_with_no_filestore_in_ambient_scope(
     tmp_path: Path,
@@ -43,10 +47,15 @@ def test_solo_run_does_not_fail_with_no_filestore_in_ambient_scope(
             "18766",
             "--allow-unknown-env",
         ],
-        cwd="/home/lichao/layered-cognitive-agent",
+        cwd=_REPO_ROOT,
         stdout=log_fh,
         stderr=subprocess.STDOUT,
         preexec_fn=os.setsid,
+        # The kernel fail-louds at boot without an API key; conftest scrubs
+        # LLM_API_KEY from the test process env and a worktree has no .env,
+        # so hand the child an explicit dummy (the assertions under test
+        # don't need a real key).
+        env={**os.environ, "LLM_API_KEY": "dummy"},
     )
     try:
         # Wait for the kernel to come up.

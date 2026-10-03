@@ -7,6 +7,7 @@ I-HPC-11.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import get_args
 
 import pytest
@@ -22,6 +23,11 @@ from lca.contracts.runtime.external_plugin import (
 # ---------------------------------------------------------------------------
 # default_external_kind — per-trust-level defaults (ADR-0199 §3.4)
 # ---------------------------------------------------------------------------
+
+
+# Repo root derived from this file's location (not a hardcoded checkout path),
+# so subprocess-based tests exercise the tree under test (worktrees included).
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def test_default_external_kind_for_core() -> None:
@@ -135,8 +141,12 @@ def test_no_io_imports_in_module() -> None:
     """
     import subprocess
     import sys as _sys
+
     result = subprocess.run(
-        [_sys.executable, "-c", """
+        [
+            _sys.executable,
+            "-c",
+            """
 import sys
 import lca.contracts.runtime.external_plugin
 forbidden = (
@@ -149,8 +159,12 @@ leaked = sorted(
 )
 assert leaked == [], f"external_plugin pulled upper-layer: {leaked}"
 print("OK")
-"""],
-        capture_output=True, text=True, check=False, cwd="/home/lichao/layered-cognitive-agent",
+""",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=_REPO_ROOT,
     )
     assert result.returncode == 0, f"subprocess failed: {result.stderr}"
 

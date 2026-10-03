@@ -33,6 +33,9 @@ from pathlib import Path
 import httpx
 import pytest
 
+# Repo root derived from this file's location (not a hardcoded checkout path),
+# so subprocess-based tests exercise the tree under test (worktrees included).
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 pytestmark = pytest.mark.skip(
     reason=(
         "GET /runs/{id}/live retired in P1 (ADR-0200); "
@@ -98,10 +101,15 @@ def _boot_kernel(tmp_path: Path) -> tuple[subprocess.Popen, Path]:
             str(PORT),
             "--allow-unknown-env",
         ],
-        cwd="/home/lichao/layered-cognitive-agent",
+        cwd=_REPO_ROOT,
         stdout=log_fh,
         stderr=subprocess.STDOUT,
         preexec_fn=os.setsid,
+        # The kernel fail-louds at boot without an API key; conftest scrubs
+        # LLM_API_KEY from the test process env and a worktree has no .env,
+        # so hand the child an explicit dummy (the assertions under test
+        # don't need a real key).
+        env={**os.environ, "LLM_API_KEY": "dummy"},
     )
     return proc, log_path
 

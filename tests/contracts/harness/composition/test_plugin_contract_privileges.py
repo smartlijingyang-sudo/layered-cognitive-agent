@@ -13,6 +13,7 @@ whose privilege it has not declared.
 from __future__ import annotations
 
 import warnings
+from pathlib import Path
 
 import pytest
 
@@ -28,6 +29,11 @@ from lca.contracts.harness.composition.plugin_contract import (
 # ---------------------------------------------------------------------------
 # Defaults and basic field behaviour
 # ---------------------------------------------------------------------------
+
+
+# Repo root derived from this file's location (not a hardcoded checkout path),
+# so subprocess-based tests exercise the tree under test (worktrees included).
+_REPO_ROOT = Path(__file__).resolve().parents[4]
 
 
 def test_plugin_contract_privileges_default_empty() -> None:
@@ -257,8 +263,12 @@ def test_no_journal_or_session_import() -> None:
     """
     import subprocess
     import sys as _sys
+
     result = subprocess.run(
-        [_sys.executable, "-c", """
+        [
+            _sys.executable,
+            "-c",
+            """
 import sys
 import lca.contracts.harness.composition.plugin_contract
 forbidden = (
@@ -274,8 +284,12 @@ leaked = [
 ]
 assert leaked == [], f"plugin_contract pulled: {leaked}"
 print("OK")
-"""],
-        capture_output=True, text=True, check=False, cwd="/home/lichao/layered-cognitive-agent",
+""",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=_REPO_ROOT,
     )
     assert result.returncode == 0, f"subprocess failed: {result.stderr}"
 
