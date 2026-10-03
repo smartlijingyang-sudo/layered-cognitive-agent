@@ -45,7 +45,8 @@ def test_assistant_status_drawer_standing_files_contract() -> None:
     path = _get_drawer_tsx_path()
     content = path.read_text(encoding="utf-8")
 
-    # INV-03: 必须覆盖 5 大核心 Standing Files 与点击编辑入口
+    # INV-03: 必须覆盖 6 大核心 Standing Files 与点击编辑入口
+    assert "CONSTITUTION.md" in content
     assert "IDENTITY.md" in content
     assert "SOUL.md" in content
     assert "USER.md" in content
@@ -53,6 +54,13 @@ def test_assistant_status_drawer_standing_files_contract() -> None:
     assert "MEMORY.md" in content
     assert "onEditFile" in content
     assert "standing-files" in content
+
+
+def test_constitution_card_metadata() -> None:
+    path = _get_drawer_tsx_path()
+    content = path.read_text(encoding="utf-8")
+    assert "'CONSTITUTION.md': { label: '根本宪法', icon: '📜', tagColor: 'purple' }" in content
+
 
 
 def test_assistant_status_drawer_props_and_layout() -> None:

@@ -634,11 +634,12 @@ const styles = createStaticStyles(({ css, cssVar }) => {
 });
 
 const FILE_ROLE_METADATA: Record<string, { label: string; icon: string; tagColor: string }> = {
+  'CONSTITUTION.md': { label: '根本宪法', icon: '📜', tagColor: 'purple' },
   'IDENTITY.md': { label: '人设与形象', icon: '🪪', tagColor: 'blue' },
-  'SOUL.md': { label: '灵魂与红线', icon: '🌟', tagColor: 'purple' },
+  'SOUL.md': { label: '角色灵魂', icon: '🌟', tagColor: 'gold' },
   'USER.md': { label: '用户画像', icon: '👤', tagColor: 'cyan' },
   'AGENTS.md': { label: '工作手册', icon: '📋', tagColor: 'green' },
-  'MEMORY.md': { label: '长期事实', icon: '🧠', tagColor: 'gold' },
+  'MEMORY.md': { label: '长期事实', icon: '🧠', tagColor: 'magenta' },
 };
 
 // 预设审批记录

@@ -558,5 +558,5 @@
 | CONST-TASK-1-LAYOUT | 拓扑与契约层扩展 (`layout.toml` & `layout.py`) | Completed | layout.toml 首位成功注册 CONSTITUTION.md，packaged_layout() 15/15 单测全绿 |
 | CONST-TASK-2-TEMPLATES | 模板基座物化与默认模板注入 (`templates/` & `standing_files.py`) | Completed | 物化权威 CONSTITUTION.md（含六维价值/双平面/执行窄门/反思防脆弱/拓扑与感知全量规范），DEFAULT_STANDING_FILE_TEMPLATES 注入一致模板，单测全绿 |
 | CONST-TASK-3-ROUTES | 传输层路由白名单、优雅降级与乐观锁 (`standing_files.py`) | Completed | STANDING_FILES_WHITELIST 首位注册 CONSTITUTION.md，update_standing_file 支持原子直接写盘与乐观并发冲突 409 拦截，12/12 路由测试全绿 |
-| CONST-TASK-4-UI-PATCH | 前端 UI 补丁与卡片元数据 (`AssistantStatusDrawer.tsx`) | In Progress | 正在向 AssistantStatusDrawer.tsx 补丁注入「📜 根本宪法」元数据与全屏编辑器卡片 |
-| CONST-TASK-5-INTEGRATION-E2E | 上下文装配、活跃助理物化与全链路集成验收 (`test_constitution_standing_file_e2e.py`) | Pending | 待执行 |
+| CONST-TASK-4-UI-PATCH | 前端 UI 补丁与卡片元数据 (`AssistantStatusDrawer.tsx`) | Completed | FILE_ROLE_METADATA 注册「📜 根本宪法」，patch_lobehub 成功应用且 45 补丁一致，16/16 UI单测全绿 |
+| CONST-TASK-5-INTEGRATION-E2E | 上下文装配、活跃助理物化与全链路集成验收 (`test_constitution_standing_file_e2e.py`) | In Progress | 正在编写全链路端到端不变量测试 test_constitution_standing_file_e2e.py 并物化活跃助理文件 |
