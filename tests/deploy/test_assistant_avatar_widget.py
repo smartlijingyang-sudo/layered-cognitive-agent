@@ -9,7 +9,8 @@ Validates:
    first-person success copy 「我的头像换好了 🎉」.
 4. Empty candidate pool renders the generate-first prompt; set failure keeps
    candidates visible and warns (antd ``message.warning``).
-5. Patch integration into Assistant/index.tsx via assistant_avatar_widget.py.
+5. Patch integration into Assistant/index.tsx and AssistantGroup
+   ContentBlock.tsx via assistant_avatar_widget.py.
 """
 
 from __future__ import annotations
@@ -32,6 +33,7 @@ from deploy.lobehub.patches.ui.assistant_avatar_widget import apply, meta
 
 _COMPONENT_REL = "src/features/Conversation/Messages/components/AssistantAvatarWidget.tsx"
 _ASSISTANT_REL = "src/features/Conversation/Messages/Assistant/index.tsx"
+_CONTENT_BLOCK_REL = "src/features/Conversation/Messages/AssistantGroup/components/ContentBlock.tsx"
 
 _STUB_ASSISTANT = r"""'use client';
 
@@ -85,6 +87,50 @@ const AssistantMessage = memo<{ id: string; index: number }>(({ id }) => {
 export default AssistantMessage;
 """
 
+_STUB_CONTENT_BLOCK = r"""import { Flexbox } from '@lobehub/ui';
+import { memo } from 'react';
+
+import SafeBoundary from '@/components/ErrorBoundary';
+import { LOADING_FLAT } from '@/const/message';
+
+import { dataSelectors, useConversationStore } from '../../../store';
+import MessageContent from './MessageContent';
+
+interface ContentBlockProps {
+  assistantId: string;
+  content?: string;
+  contentOverride?: string;
+  disableMarkdownStreaming?: boolean;
+  hasToolsOverride?: boolean;
+  id: string;
+}
+
+const ContentBlock = memo<ContentBlockProps>(
+  ({ assistantId, content, contentOverride, disableMarkdownStreaming, hasToolsOverride, id }) => {
+    const hasContent = !!content && content !== LOADING_FLAT;
+    const hasTools = false;
+    const showMessageContent = hasContent || content === LOADING_FLAT || hasTools;
+
+    return (
+      <Flexbox gap={8} id={id}>
+        {showMessageContent && (
+          <SafeBoundary variant="alert">
+            <MessageContent
+              contentOverride={contentOverride}
+              disableStreaming={disableMarkdownStreaming}
+              hasToolsOverride={hasToolsOverride}
+              id={id}
+            />
+          </SafeBoundary>
+        )}
+      </Flexbox>
+    );
+  },
+);
+
+export default ContentBlock;
+"""
+
 
 def _widget_tsx_path() -> Path:
     return (
@@ -113,6 +159,18 @@ def _seed_ui(tmp_path: Path) -> Path:
     assistant.parent.mkdir(parents=True, exist_ok=True)
     assistant.write_text(_STUB_ASSISTANT, encoding="utf-8")
     return tmp_path
+
+
+def _seed_content_block(ui: Path) -> None:
+    content_block = ui / _CONTENT_BLOCK_REL
+    content_block.parent.mkdir(parents=True, exist_ok=True)
+    content_block.write_text(_STUB_CONTENT_BLOCK, encoding="utf-8")
+
+
+def _seed_ui_with_content_block(tmp_path: Path) -> Path:
+    ui = _seed_ui(tmp_path)
+    _seed_content_block(ui)
+    return ui
 
 
 # ── Component source contract ────────────────────────────────────
@@ -179,7 +237,7 @@ def test_avatar_widget_patch_meta() -> None:
 
 
 def test_avatar_widget_apply_writes_component_and_mounts(tmp_path: Path) -> None:
-    ui = _seed_ui(tmp_path)
+    ui = _seed_ui_with_content_block(tmp_path)
     ctx = PatchContext(ui_dir=ui)
 
     assert apply(ctx) is True
@@ -201,7 +259,7 @@ def test_avatar_widget_apply_writes_component_and_mounts(tmp_path: Path) -> None
 def test_avatar_widget_verify_targets_mount_marker(tmp_path: Path) -> None:
     """The patch's verify marker must live in Assistant/index.tsx next to the
     mount, so a reverted Assistant/index.tsx is detected by verify/reconcile."""
-    ui = _seed_ui(tmp_path)
+    ui = _seed_ui_with_content_block(tmp_path)
     ctx = PatchContext(ui_dir=ui)
     assert apply(ctx) is True
 
@@ -218,7 +276,76 @@ def test_avatar_widget_verify_targets_mount_marker(tmp_path: Path) -> None:
 
 
 def test_avatar_widget_apply_is_idempotent(tmp_path: Path) -> None:
-    ui = _seed_ui(tmp_path)
+    ui = _seed_ui_with_content_block(tmp_path)
+    ctx = PatchContext(ui_dir=ui)
+    assert apply(ctx) is True
+    assert apply(ctx) is False
+
+
+def test_avatar_widget_strip_regex_matches_bare_and_query_forms(tmp_path: Path) -> None:
+    """The strip regex must match both [widget:avatar_picker] and query form."""
+    ui = _seed_ui_with_content_block(tmp_path)
+    ctx = PatchContext(ui_dir=ui)
+    assert apply(ctx) is True
+
+    assistant = (ui / _ASSISTANT_REL).read_text(encoding="utf-8")
+    assert r"\[widget:avatar_picker(?:\?[^\]]+)?\]" in assistant
+    assert r"avatar_picker(?:\?[^\]]+)?" in assistant
+
+
+def test_avatar_widget_strip_does_not_use_old_query_only_regex(tmp_path: Path) -> None:
+    """The avatar strip line must not be the old query-only regex."""
+    ui = _seed_ui_with_content_block(tmp_path)
+    ctx = PatchContext(ui_dir=ui)
+    assert apply(ctx) is True
+
+    assistant = (ui / _ASSISTANT_REL).read_text(encoding="utf-8")
+    assert r"\[widget:avatar_picker\?[^\]]+\]" not in assistant
+
+
+def test_avatar_widget_patch_module_has_optional_query_group() -> None:
+    content = _patch_py_path().read_text(encoding="utf-8")
+    assert r"\\[widget:avatar_picker(?:\\?[^\\]]+)?\\]" in content
+
+
+def test_avatar_widget_patch_meta_includes_content_block() -> None:
+    assert _CONTENT_BLOCK_REL in meta.files
+
+
+def test_avatar_widget_patch_content_block_writes_detection_and_mount(
+    tmp_path: Path,
+) -> None:
+    ui = _seed_ui_with_content_block(tmp_path)
+    ctx = PatchContext(ui_dir=ui)
+    assert apply(ctx) is True
+
+    content_block = (ui / _CONTENT_BLOCK_REL).read_text(encoding="utf-8")
+    assert "isAvatarPickerWidget" in content_block
+    assert "avatarPickerCleanContent" in content_block
+    assert "avatarGroupAgentId" in content_block
+    assert "AssistantAvatarWidget" in content_block
+    assert (
+        "contentOverride={isAvatarPickerWidget ? avatarPickerCleanContent : contentOverride}"
+        in content_block
+    )
+    assert "assistantId={avatarGroupAgentId}" in content_block
+    assert (
+        "import AssistantAvatarWidget from '../../components/AssistantAvatarWidget';"
+        in content_block
+    )
+
+
+def test_avatar_widget_patch_content_block_strip_regex(tmp_path: Path) -> None:
+    ui = _seed_ui_with_content_block(tmp_path)
+    ctx = PatchContext(ui_dir=ui)
+    assert apply(ctx) is True
+
+    content_block = (ui / _CONTENT_BLOCK_REL).read_text(encoding="utf-8")
+    assert r"\[widget:avatar_picker(?:\?[^\]]+)?\]" in content_block
+
+
+def test_avatar_widget_apply_content_block_is_idempotent(tmp_path: Path) -> None:
+    ui = _seed_ui_with_content_block(tmp_path)
     ctx = PatchContext(ui_dir=ui)
     assert apply(ctx) is True
     assert apply(ctx) is False
@@ -269,8 +396,10 @@ def test_avatar_widget_reconcile_restores_missing_mount(
     # so the mount marker is absent and reconcile must treat the patch as broken.
     write_upstream(_COMPONENT_REL, "/* upstream component */\n")
     write_upstream(_ASSISTANT_REL, _STUB_ASSISTANT)
+    write_upstream(_CONTENT_BLOCK_REL, _STUB_CONTENT_BLOCK)
     write(_COMPONENT_REL, "/* upstream component */\n")
     write(_ASSISTANT_REL, _STUB_ASSISTANT)
+    write(_CONTENT_BLOCK_REL, _STUB_CONTENT_BLOCK)
 
     pm = PatchModule(meta=meta, apply=apply)
     sha = _compute_patch_hash(pm)
@@ -299,3 +428,7 @@ def test_avatar_widget_reconcile_restores_missing_mount(
     assert "LCA-AVATAR-PICKER-MOUNT" in assistant_text
     assert "<AssistantAvatarWidget" in assistant_text
     assert "assistantId={agentId}" in assistant_text
+    content_block_text = (ui / _CONTENT_BLOCK_REL).read_text()
+    assert "isAvatarPickerWidget" in content_block_text
+    assert "<AssistantAvatarWidget" in content_block_text
+    assert "assistantId={avatarGroupAgentId}" in content_block_text
