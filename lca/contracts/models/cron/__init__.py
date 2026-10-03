@@ -1,5 +1,9 @@
-"""Cron contract models package (ADR-0268)."""
-
+from lca.contracts.models.cron.card import (
+    CronTaskCardAction,
+    CronTaskCardWidgetPayload,
+    parse_cron_task_card_widget,
+    serialize_cron_task_card_widget,
+)
 from lca.contracts.models.cron.models import (
     AgentExecution,
     ChatDelivery,
@@ -24,6 +28,8 @@ __all__ = [
     "CronJob",
     "CronListItem",
     "CronRun",
+    "CronTaskCardAction",
+    "CronTaskCardWidgetPayload",
     "CronValidationError",
     "DailySchedule",
     "HourlySchedule",
@@ -34,4 +40,6 @@ __all__ = [
     "SpaceActionExecution",
     "TargetReceipt",
     "WeeklySchedule",
+    "parse_cron_task_card_widget",
+    "serialize_cron_task_card_widget",
 ]
