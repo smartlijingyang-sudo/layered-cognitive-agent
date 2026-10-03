@@ -89,7 +89,16 @@ class ToolSearchTool(Tool):
         session = current_defer_session()
         if session is None:
             return _error("tool_search: no defer session bound to this run")
-        if "namespaces" in args and isinstance(args["namespaces"], list):
+        has_nss = "namespaces" in args and isinstance(args["namespaces"], list)
+        has_ns = (
+            "namespace" in args
+            and isinstance(args["namespace"], str)
+            and bool(args["namespace"])
+        )
+        has_query = (
+            "query" in args and isinstance(args["query"], str) and bool(args["query"].strip())
+        )
+        if has_nss:
             try:
                 payload = session.load_namespaces(args["namespaces"])
             except KeyError as exc:
@@ -99,22 +108,25 @@ class ToolSearchTool(Tool):
                 success=True,
                 payload=payload,
             )
-        if "query" in args and isinstance(args["query"], str) and args["query"].strip():
+        if has_ns:
+            try:
+                payload = session.load_namespace(args["namespace"])
+            except KeyError as exc:
+                return _error(f"tool_search: {exc}")
+            return Observation(
+                observation_id=f"tool_search:{payload['namespace']}",
+                success=True,
+                payload=payload,
+            )
+        if has_query:
             hits = session.search_catalog(args["query"])
             return Observation(
                 observation_id="tool_search:query",
                 success=True,
                 payload={"query": args["query"], "namespaces": hits},
             )
-        namespace = args["namespace"]
-        try:
-            payload = session.load_namespace(namespace)
-        except KeyError as exc:
-            return _error(f"tool_search: {exc}")
-        return Observation(
-            observation_id=f"tool_search:{payload['namespace']}",
-            success=True,
-            payload=payload,
+        return _error(
+            "tool_search: one of 'namespace', 'namespaces' or 'query' must be provided"
         )
 
     def validate(self, args: dict[str, Any]) -> str | None:
