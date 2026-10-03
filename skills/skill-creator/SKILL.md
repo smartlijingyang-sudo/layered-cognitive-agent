@@ -42,7 +42,7 @@ references:
 
 若技能需要脚本 / 参考文件（`resources/`、`scripts/`、`references/`、`assets/`）：
 
-1. 在沙箱 / 工作区建一个**专用目录**，例如 `/mnt/data/skill-drafts/<skill_id>/`。
+1. 在你的 Workspace 建一个**专用目录**，例如 `skill-drafts/<skill_id>/`（沙箱内可见路径为 `/mnt/data/skill-drafts/<skill_id>/`）。
 2. 用 `writeFile` 把 `SKILL.md` 和 `resources/...` 等文件写进该目录。
 3. 安装时传 `sandbox_path` 指向该目录（见 STEP 4），附属文件会一并安装。
 
