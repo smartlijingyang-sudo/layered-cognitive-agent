@@ -38,7 +38,9 @@ class _FakeCtx:
         return self._fake_runtime
 
 
-def _create_test_app(tmp_path: Any) -> tuple[Starlette, AssistantCatalogImpl, str]:
+def _create_test_app(
+    tmp_path: Any, *, ensure_memory: bool = True
+) -> tuple[Starlette, AssistantCatalogImpl, str]:
     router = RouteRegistry()
     ctx = _FakeCtx(router)
     import asyncio
@@ -57,9 +59,9 @@ def _create_test_app(tmp_path: Any) -> tuple[Starlette, AssistantCatalogImpl, st
             seed_user_md="# USER.md\n用户是架构师",
         )
     )
-    # Ensure MEMORY.md exists in home
+    # Ensure MEMORY.md exists in home if requested
     home = Path(handle.home_path)
-    if not (home / "MEMORY.md").is_file():
+    if ensure_memory and not (home / "MEMORY.md").is_file():
         (home / "MEMORY.md").write_text("# MEMORY.md\n- 长期记忆初始条目", encoding="utf-8")
 
     return app, catalog, handle.assistant_id
@@ -243,3 +245,82 @@ def test_standing_files_resolve_agent_id_and_inbox(tmp_path: Any) -> None:
     inbox_data = inbox_resp.json()
     assert inbox_data["assistant_id"] == assistant_id
     assert len(inbox_data["files"]) == 5
+
+
+def test_standing_file_memory_md_uninitialized_returns_template_and_supports_initial_write(
+    tmp_path: Any,
+) -> None:
+    """新助理尚未生成 MEMORY.md 时，GET 返回默认模板且状态码为 200，并支持使用模板 hash 首写落盘。"""
+    app, catalog, assistant_id = _create_test_app(tmp_path, ensure_memory=False)
+    client = TestClient(app)
+
+    spec = catalog.get(assistant_id)
+    memory_path = Path(spec.home_path) / "MEMORY.md"
+    assert not memory_path.exists(), "新创建助理在磁盘上默认不得存在 MEMORY.md"
+
+    # 1. 列表接口应包含 MEMORY.md 及其模板摘要，不崩溃
+    list_resp = client.get(f"/v1/assistants/{assistant_id}/standing-files")
+    assert list_resp.status_code == 200
+    files_by_name = {f["filename"]: f for f in list_resp.json()["files"]}
+    assert "MEMORY.md" in files_by_name
+    mem_item = files_by_name["MEMORY.md"]
+    assert mem_item["content_hash"].startswith("sha256:")
+    assert "长期记忆" in mem_item["summary"]
+
+    # 2. 单文件 GET 请求不报 404，优雅降级返回默认模板
+    get_resp = client.get(f"/v1/assistants/{assistant_id}/standing-files/MEMORY.md")
+    assert get_resp.status_code == 200
+    get_data = get_resp.json()
+    assert get_data["filename"] == "MEMORY.md"
+    assert "## Preferences" in get_data["content"]
+    assert "## Facts" in get_data["content"]
+    template_hash = get_data["content_hash"]
+    assert template_hash == mem_item["content_hash"]
+
+    # 3. 基于模板 hash 进行首次持久化写入
+    first_memory = (
+        "# 长期记忆\n\n"
+        "## Preferences\n"
+        "- 偏好使用 Python 和 Rust。 This came from user, recorded 2026-10-03.\n\n"
+        "## Facts\n"
+    )
+    put_resp = client.put(
+        f"/v1/assistants/{assistant_id}/standing-files/MEMORY.md",
+        json={"content": first_memory, "expected_hash": template_hash},
+    )
+    assert put_resp.status_code == 200
+    assert put_resp.json()["filename"] == "MEMORY.md"
+
+    # 4. 断言磁盘物理文件已被创建落盘
+    assert memory_path.is_file()
+    assert memory_path.read_text(encoding="utf-8") == first_memory
+
+    # 5. 再次 GET 应返回最新落盘的内容
+    verify_resp = client.get(f"/v1/assistants/{assistant_id}/standing-files/MEMORY.md")
+    assert verify_resp.status_code == 200
+    assert verify_resp.json()["content"] == first_memory
+
+
+def test_standing_file_memory_md_initial_write_with_empty_hash_compatibility(
+    tmp_path: Any,
+) -> None:
+    """对于未建物理文件的场景，PUT 同时兼容客户端以空字符串 hash 作为基线的写入。"""
+    from lca.plugins.transport.webserver.routes_1.routes_assistants.standing_files import (
+        sha256_of_str,
+    )
+
+    app, catalog, assistant_id = _create_test_app(tmp_path, ensure_memory=False)
+    client = TestClient(app)
+
+    spec = catalog.get(assistant_id)
+    memory_path = Path(spec.home_path) / "MEMORY.md"
+    assert not memory_path.exists()
+
+    custom_content = "# 长期记忆\n- 纯手工新建记忆条目"
+    put_resp = client.put(
+        f"/v1/assistants/{assistant_id}/standing-files/MEMORY.md",
+        json={"content": custom_content, "expected_hash": sha256_of_str("")},
+    )
+    assert put_resp.status_code == 200
+    assert memory_path.is_file()
+    assert memory_path.read_text(encoding="utf-8") == custom_content

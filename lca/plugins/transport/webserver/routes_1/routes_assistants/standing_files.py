@@ -39,6 +39,10 @@ STANDING_FILES_WHITELIST: tuple[str, ...] = (
     "MEMORY.md",
 )
 
+DEFAULT_STANDING_FILE_TEMPLATES: dict[str, str] = {
+    "MEMORY.md": ("# 长期记忆\n\n## Preferences\n\n## Facts\n"),
+}
+
 
 # filename -> ProfilePatch 字段名。SOUL/IDENTITY/USER/AGENTS 四文件经 catalog revise_profile
 # 落盘（USER 额外同步 user_store）；MEMORY.md 直接写盘，不进此表。
@@ -171,6 +175,13 @@ async def list_standing_files(request: Request) -> JSONResponse:
                 summary = _summarize(content)
             except (OSError, UnicodeDecodeError):
                 continue
+        else:
+            default_content = DEFAULT_STANDING_FILE_TEMPLATES.get(filename)
+            if default_content is not None:
+                size_bytes = len(default_content.encode("utf-8"))
+                line_count = len(default_content.splitlines())
+                content_hash = sha256_of_str(default_content)
+                summary = _summarize(default_content)
         files_data.append(
             {
                 "filename": filename,
@@ -203,6 +214,19 @@ async def get_standing_file(request: Request) -> JSONResponse:
 
     file_path = Path(spec.home_path) / filename
     if not file_path.is_file():
+        default_content = DEFAULT_STANDING_FILE_TEMPLATES.get(filename)
+        if default_content is not None:
+            return _json(
+                {
+                    "assistant_id": assistant_id,
+                    "filename": filename,
+                    "path": str(file_path),
+                    "content": default_content,
+                    "content_hash": sha256_of_str(default_content),
+                    "updated_at": "",
+                },
+                status_code=200,
+            )
         return _error_envelope(
             "file_not_found",
             status_code=404,
@@ -275,10 +299,18 @@ async def update_standing_file(request: Request) -> JSONResponse:
     file_path = home / filename
 
     # 1. 乐观锁检测：读取当前磁盘真值并核验 hash
-    current_content = file_path.read_text(encoding="utf-8") if file_path.is_file() else ""
-    current_hash = sha256_of_str(current_content)
+    if file_path.is_file():
+        current_content = file_path.read_text(encoding="utf-8")
+        current_hash = sha256_of_str(current_content)
+        valid_expected_hashes = {current_hash}
+    else:
+        default_content = DEFAULT_STANDING_FILE_TEMPLATES.get(filename, "")
+        current_content = default_content
+        current_hash = sha256_of_str(current_content)
+        # 初始写入时，允许客户端携带默认模板 hash，也兼容携带空字符串 hash
+        valid_expected_hashes = {current_hash, sha256_of_str("")}
 
-    if expected_hash is not None and expected_hash != current_hash:
+    if expected_hash is not None and expected_hash not in valid_expected_hashes:
         return _json(
             {
                 "error": {
