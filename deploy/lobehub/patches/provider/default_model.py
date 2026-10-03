@@ -53,10 +53,12 @@ def apply(ctx: PatchContext) -> bool:
                 f"export const DEFAULT_MINI_PROVIDER = '{provider}';",
             ),
         ]
+        new_text = text
         for pattern, repl in pairs:
-            text, count = re.subn(pattern, repl, text, count=1)
+            new_text, count = re.subn(pattern, repl, new_text, count=1)
             if count != 1:
                 raise SystemExit(f"[default_model] regex failed for {pattern} in {rel}")
-        ctx.write(rel, text)
-        changed = True
+        if new_text != text:
+            ctx.write(rel, new_text)
+            changed = True
     return changed

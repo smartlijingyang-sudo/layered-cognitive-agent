@@ -145,3 +145,68 @@ def test_child_env_gateway_url_handles_loopback_bind(
         f"NEXT_PUBLIC_LCA_GATEWAY_URL must not carry 0.0.0.0; got {url!r}"
     )
     assert url.startswith("ws://")
+
+
+def test_child_env_injects_memory_guards(lobehub_service) -> None:
+    """Child env must set RAYON_NUM_THREADS and NODE_OPTIONS to guard against OOM.
+
+    Vite 8 uses Rolldown (Rust) which by default uses all host CPU cores for parallel
+    dependency pre-bundling. On memory-constrained hosts without swap, this causes
+    fatal OOM kills unless capped.
+    """
+    env = lobehub_service._child_env()
+    assert env.get("RAYON_NUM_THREADS") == "2"
+    assert "--max-old-space-size" in env.get("NODE_OPTIONS", "")
+
+
+def test_ensure_env_is_idempotent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """_ensure_env must not touch .env when values already match, preventing Vite watcher restart loops."""
+    from lca.infrastructure.cli.services.lobehub.lobehub import LobeHubService
+
+    cfg_path = tmp_path / "lca-ops.yaml"
+    cfg_path.write_text(
+        "kernel_serve:\n  host: 10.36.6.252\n  port: 8765\n  health_path: /health\n"
+        "  profile: profiles/web-standard.yaml\n"
+        "lobehub:\n  host: 10.36.6.252\n  release: v2.2.13\n  dir: lobehub-ui\n"
+        "  dev_port: 3010\n  spa_port: 9876\n  env_template: deploy/lobehub/.env.lca\n"
+    )
+    cfg = OpsConfig.load(cfg_path)
+    monkeypatch.setattr("os.environ", {}, raising=False)
+    ui_dir = tmp_path / "lobehub-ui"
+    ui_dir.mkdir(parents=True)
+    template_dir = tmp_path / "deploy" / "lobehub"
+    template_dir.mkdir(parents=True)
+    template_file = template_dir / ".env.lca"
+    template_file.write_text(
+        "OPENAI_PROXY_URL=http://replace-me\n"
+        "NEXT_PUBLIC_OPENAI_PROXY_URL=http://replace-me\n"
+        "OPENAI_API_KEY=replace-me\n"
+        "QWEN_PROXY_URL=http://replace-me\n"
+        "QWEN_API_KEY=replace-me\n"
+        "NEXT_PUBLIC_LCA_GATEWAY_URL=ws://replace-me\n"
+        "LCA_GATEWAY_PUBLIC_URL=http://replace-me\n"
+        "CUSTOM_KEY=keep_me\n"
+    )
+
+    state_dir = tmp_path / "state_d"
+    state_dir.mkdir()
+    svc = LobeHubService(
+        config=cfg.lobehub,
+        gateway=cfg.kernel_serve,
+        state_dir=state_dir,
+        root=tmp_path,
+    )
+
+    # First call: .env does not exist, copies and updates -> True
+    first_changed = svc._ensure_env()
+    assert first_changed is True
+    env_content = (ui_dir / ".env").read_text()
+    assert "OPENAI_API_KEY=lca-local" in env_content
+    assert "CUSTOM_KEY=keep_me" in env_content
+
+    # Second call: .env already has expected values -> False (must not touch file)
+    mtime_before = (ui_dir / ".env").stat().st_mtime_ns
+    second_changed = svc._ensure_env()
+    assert second_changed is False
+    mtime_after = (ui_dir / ".env").stat().st_mtime_ns
+    assert mtime_before == mtime_after

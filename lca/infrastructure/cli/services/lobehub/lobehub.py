@@ -650,34 +650,27 @@ class LobeHubService:
         # is _child_env() which carries the same value into subprocess env.
         gateway_ws = gateway_base.replace("http://", "ws://", 1).replace("https://", "wss://", 1)
 
+        targets = {
+            "OPENAI_PROXY_URL=": kernel_serve_url,
+            "NEXT_PUBLIC_OPENAI_PROXY_URL=": kernel_serve_url,
+            "OPENAI_API_KEY=": "lca-local",
+            "QWEN_PROXY_URL=": kernel_serve_url,
+            "QWEN_API_KEY=": "lca-local",
+            "NEXT_PUBLIC_LCA_GATEWAY_URL=": gateway_ws,
+            "LCA_GATEWAY_PUBLIC_URL=": gateway_base,
+        }
+
         for line in lines:
-            if line.startswith("OPENAI_PROXY_URL="):
-                updated.append(f"OPENAI_PROXY_URL={kernel_serve_url}")
-                changed = True
-            elif line.startswith("NEXT_PUBLIC_OPENAI_PROXY_URL="):
-                updated.append(f"NEXT_PUBLIC_OPENAI_PROXY_URL={kernel_serve_url}")
-                changed = True
-            elif line.startswith("OPENAI_API_KEY="):
-                updated.append("OPENAI_API_KEY=lca-local")
-                changed = True
-            elif line.startswith("QWEN_PROXY_URL="):
-                updated.append(f"QWEN_PROXY_URL={kernel_serve_url}")
-                changed = True
-            elif line.startswith("QWEN_API_KEY="):
-                updated.append("QWEN_API_KEY=lca-local")
-                changed = True
-            elif line.startswith("NEXT_PUBLIC_LCA_GATEWAY_URL="):
-                updated.append(f"NEXT_PUBLIC_LCA_GATEWAY_URL={gateway_ws}")
-                changed = True
-            elif line.startswith("LCA_GATEWAY_PUBLIC_URL="):
-                # Mirror of NEXT_PUBLIC_LCA_GATEWAY_URL: read by
-                # lca_runtime_agent_gateway patch engine to inject
-                # LCA_GATEWAY_WS_URL into lcaGateway/client.ts. Kept in
-                # sync so the patch engine never falls back to its
-                # sentinel literal.
-                updated.append(f"LCA_GATEWAY_PUBLIC_URL={gateway_base}")
-                changed = True
-            else:
+            matched = False
+            for prefix, val in targets.items():
+                if line.startswith(prefix):
+                    new_line = f"{prefix}{val}"
+                    if line != new_line:
+                        changed = True
+                    updated.append(new_line)
+                    matched = True
+                    break
+            if not matched:
                 updated.append(line)
 
         if changed:
@@ -799,6 +792,8 @@ class LobeHubService:
             "ENABLED_OPENAI": "1",
             "NEXT_PUBLIC_LCA_GATEWAY_URL": gateway_ws,
             "NEXT_PUBLIC_LCA_HOST_CONSOLE": os.environ.get("NEXT_PUBLIC_LCA_HOST_CONSOLE", "0"),
+            "RAYON_NUM_THREADS": os.environ.get("RAYON_NUM_THREADS", "2"),
+            "NODE_OPTIONS": os.environ.get("NODE_OPTIONS", "--max-old-space-size=2560"),
         }
 
     def _spawn_script(self, script: str, log_name: str) -> int | None:
