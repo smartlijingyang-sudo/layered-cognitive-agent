@@ -140,11 +140,20 @@ class CronService:
     def get_run_records(self, job_id: str) -> list[CronRun]:
         return self._store.list_runs(job_id)
 
-    def list_items(self, owner: str, *, now: datetime) -> list[CronListItem]:
-        """生成该 owner 的「即将到来」投影列表。"""
+    def list_items(
+        self,
+        owner: str | None = None,
+        *,
+        now: datetime,
+        allow_owners: tuple[str, ...] = (),
+    ) -> list[CronListItem]:
+        """生成「即将到来」投影列表。"""
         items: list[CronListItem] = []
+        valid_owners = {owner} if owner is not None else set()
+        valid_owners.update(allow_owners)
+
         for job in self._store.list_jobs():
-            if job.owner != owner:
+            if valid_owners and job.owner not in valid_owners:
                 continue
             # 已完成的一次性任务不进入即将到来。
             runs = self._store.list_runs(job.id)

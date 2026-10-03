@@ -170,7 +170,11 @@ async def list_assistant_jobs(request: Request) -> JSONResponse:
             "assistant_not_found", status_code=404, error_type="not_found", detail=str(exc)
         )
 
-    items = service.list_items(owner=user_id, now=datetime.now(UTC))
+    items = service.list_items(
+        owner=user_id,
+        now=datetime.now(UTC),
+        allow_owners=(assistant_id,),
+    )
     return _json(
         {"assistant_id": assistant_id, "jobs": [item.model_dump() for item in items]},
         status_code=200,
