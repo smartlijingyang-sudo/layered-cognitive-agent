@@ -110,6 +110,7 @@ class ActivityProjector:
             "ToolStarted",
             "tool.started.v1",
         )
+        is_exec_start = ep == "body.tool.execute.start"
         is_end = ep == "body.tool.execute.end" or ev_type in (
             "ToolInvoked",
             "tool.invoked.v1",
@@ -143,9 +144,62 @@ class ActivityProjector:
                 start_time=ts,
                 icon=icon,
                 params=args,
+                tool_name=tool_name,
+                current_step=ActivityIntentNamer.live_step(tool_name, args),
             )
             self._save(item)
             return item
+
+        # Handle execute.start: body.tool.execute.start (refresh start_time to true execution moment)
+        if is_exec_start:
+            inv_id = _extract_inv_id(event, payload, tool_calling)
+            if not inv_id:
+                return None
+            asst_id = str(event.get("assistant_id") or payload.get("assistant_id") or "default")
+            existing = self._get(asst_id, inv_id) or self._get("default", inv_id)
+            tool_name = _extract_tool_name(event, payload, tool_calling)
+            args = _extract_arguments(event, payload, tool_calling)
+            ts = _format_iso(event.get("timestamp") or payload.get("timestamp") or event.get("created_at"))
+            if existing:
+                refreshed = ActivityItem(
+                    id=existing.id,
+                    run_id=existing.run_id,
+                    assistant_id=existing.assistant_id,
+                    category=existing.category,
+                    title=existing.title,
+                    summary=existing.summary,
+                    status=ActivityStatus.RUNNING,
+                    start_time=ts or existing.start_time,
+                    end_time=existing.end_time,
+                    duration_ms=existing.duration_ms,
+                    icon=existing.icon,
+                    params=existing.params,
+                    result_summary=existing.result_summary,
+                    is_system=existing.is_system,
+                    tool_name=existing.tool_name or tool_name,
+                    current_step=existing.current_step or ActivityIntentNamer.live_step(existing.tool_name or tool_name, existing.params),
+                )
+                self._save(refreshed)
+                return refreshed
+            else:
+                title, summary, icon = ActivityIntentNamer.name(tool_name, args)
+                category = _determine_category(tool_name)
+                item = ActivityItem(
+                    id=inv_id,
+                    run_id=str(event.get("run_id") or payload.get("run_id") or "run_current"),
+                    assistant_id=asst_id,
+                    category=category,
+                    title=title,
+                    summary=summary,
+                    status=ActivityStatus.RUNNING,
+                    start_time=ts,
+                    icon=icon,
+                    params=args,
+                    tool_name=tool_name,
+                    current_step=ActivityIntentNamer.live_step(tool_name, args),
+                )
+                self._save(item)
+                return item
 
         # Handle End: body.tool.execute.end / ToolInvoked / ToolDenied
         if is_end:
@@ -182,6 +236,8 @@ class ActivityProjector:
                     start_time=ts,
                     icon=icon,
                     params=args,
+                    tool_name=tool_name,
+                    current_step=None,
                 )
 
             # Determine success / status
@@ -246,6 +302,8 @@ class ActivityProjector:
                 if len(res_content) > 100
                 else res_content,
                 is_system=existing.is_system,
+                tool_name=existing.tool_name or tool_name,
+                current_step=None,
             )
             self._save(updated)
             return updated
@@ -272,6 +330,8 @@ class ActivityProjector:
             params=existing.params,
             result_summary="User cancelled operation",
             is_system=existing.is_system,
+            tool_name=existing.tool_name,
+            current_step=None,
         )
         self._save(cancelled)
         return cancelled
@@ -400,6 +460,8 @@ class ActivityProjector:
                         icon=icon,
                         params=args,
                         result_summary=result_summary,
+                        tool_name=tool_name,
+                        current_step=None,
                     )
                     if asst_id not in self._items:
                         self._items[asst_id] = {}

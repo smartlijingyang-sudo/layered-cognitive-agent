@@ -252,6 +252,8 @@ class EventTranslator:
                     "startTime": act_item.start_time,
                     "icon": act_item.icon,
                     "params": act_item.params,
+                    "toolName": act_item.tool_name,
+                    "currentStep": act_item.current_step,
                 },
             }
             return [tool_start_msg, activity_msg]
@@ -301,6 +303,8 @@ class EventTranslator:
                     "endTime": act_item.end_time,
                     "durationMs": act_item.duration_ms,
                     "resultSummary": act_item.result_summary,
+                    "toolName": act_item.tool_name,
+                    "currentStep": act_item.current_step,
                 },
             }
             return [tool_end_msg, activity_msg]
@@ -331,6 +335,8 @@ class EventTranslator:
                     "endTime": act_item.end_time,
                     "durationMs": act_item.duration_ms,
                     "resultSummary": act_item.result_summary,
+                    "toolName": act_item.tool_name,
+                    "currentStep": act_item.current_step,
                 },
             }
             return [tool_end_msg, activity_msg]
@@ -594,6 +600,8 @@ class EventTranslator:
                     "startTime": act_item.start_time,
                     "icon": act_item.icon,
                     "params": act_item.params,
+                    "toolName": act_item.tool_name,
+                    "currentStep": act_item.current_step,
                 },
             }
             return [stream_chunk_msg, activity_msg]
@@ -638,6 +646,8 @@ class EventTranslator:
                     "startTime": act_item.start_time,
                     "icon": act_item.icon,
                     "params": act_item.params,
+                    "toolName": act_item.tool_name,
+                    "currentStep": act_item.current_step,
                 },
             }
             return [tool_start_msg, activity_msg]
@@ -704,10 +714,41 @@ class EventTranslator:
                     "endTime": act_item.end_time,
                     "durationMs": act_item.duration_ms,
                     "resultSummary": act_item.result_summary,
+                    "toolName": act_item.tool_name,
+                    "currentStep": act_item.current_step,
                 },
             }
             return [tool_end_msg, activity_msg]
         return tool_end_msg
+
+    @staticmethod
+    def _spine_body_tool_execute_start(e: dict) -> list[dict] | dict | None:
+        """body.tool.execute.start: the tool really started executing now.
+
+        Feed the projector so start_time is refreshed to the true execution
+        moment and the live step is published — the drawer's 「动态」 tab
+        then shows what the tool is doing instead of a static "running".
+        """
+        from lca.infrastructure.observability.activity_projector import (
+            get_global_activity_projector,
+        )
+
+        act_item = get_global_activity_projector().feed_event(e)
+        if act_item is not None:
+            activity_msg = {
+                "type": "activity_updated",
+                "data": {
+                    "id": act_item.id,
+                    "runId": act_item.run_id,
+                    "assistantId": act_item.assistant_id,
+                    "status": act_item.status.value,
+                    "startTime": act_item.start_time,
+                    "toolName": act_item.tool_name,
+                    "currentStep": act_item.current_step,
+                },
+            }
+            return [activity_msg]
+        return None
 
 
 _HANDLERS = {
@@ -736,6 +777,7 @@ _SPINE_HANDLERS = {
     "llm.request.header.assistant": EventTranslator._spine_llm_header_assistant,
     "step.tool_call.record": EventTranslator._spine_tool_call_record,
     "phase.tool.call.start": EventTranslator._spine_phase_tool_start,
+    "body.tool.execute.start": EventTranslator._spine_body_tool_execute_start,
     "body.tool.execute.end": EventTranslator._spine_body_tool_end,
 }
 
