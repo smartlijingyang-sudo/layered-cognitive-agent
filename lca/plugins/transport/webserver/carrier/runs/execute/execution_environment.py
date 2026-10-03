@@ -119,6 +119,12 @@ class RunExecutionEnvironment:
         driver = _resolve_driver(session, self._ctx)
         providers = _resolve_run_providers(bindings, self._ctx)
 
+        chat_id = (
+            getattr(session, "chat_id", "") or getattr(session, "topic_id", "") or ""
+        ).strip()
+        topic_id = (
+            getattr(session, "topic_id", "") or getattr(session, "chat_id", "") or ""
+        ).strip()
         ambit = RunAmbit(
             scope=RunScope(
                 trace_id=cast("TraceId", session.trace_id),
@@ -129,6 +135,8 @@ class RunExecutionEnvironment:
             attachment_ids=tuple(session.attachment_ids or ()),
             file_store=providers.file_store,
             assistant_id=(getattr(session, "assistant_id", "") or "").strip(),
+            chat_id=chat_id,
+            topic_id=topic_id,
         )
         # Capture the ambient snapshot on the session so a HIL resume can
         # re-bind it (FileStore etc.) without re-resolving providers.
@@ -313,9 +321,7 @@ class RunExecutionEnvironment:
                 tools_token = set_current_tools_service(tools_service)
                 # Defer-tool seam (Muse L1 alignment): one session per run;
                 # think.reason's per-turn fork only refreshes the turn view.
-                defer_token = set_current_defer_session(
-                    ToolDeferSession(DeferPolicy.default())
-                )
+                defer_token = set_current_defer_session(ToolDeferSession(DeferPolicy.default()))
                 with (
                     run_workspace_scope(session.run_id) as workspace,
                     run_scope(ambit.scope) if ambit.scope is not None else nullcontext(),

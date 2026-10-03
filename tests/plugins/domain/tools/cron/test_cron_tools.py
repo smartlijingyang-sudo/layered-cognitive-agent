@@ -11,11 +11,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from lca.contracts.atoms.semantic.keys import FAILURE_KIND, FAILURE_KIND_VALIDATION
 from lca.contracts.models.cognition.boundary import BindingsView
 from lca.contracts.models.cron.models import TargetReceipt
 from lca.contracts.protocols import Tool
 from lca.domain.cron.service import CronService
 from lca.domain.cron.store import CronStore
+from lca.infrastructure.observability.facade.run.ambit import RunAmbit, bind_run_ambit
 from lca.infrastructure.tools.cron import build_cron_tools
 from lca.plugins.domain.tools.cron.plugin import _cron_tools_factory
 
@@ -91,7 +93,36 @@ async def test_cron_add_requires_chat_id(tmp_path: Path) -> None:
     obs = await tools["cron.add"].execute(_add_args(chat_id=""))
     assert obs.success is False
     assert "chat_id" in (obs.error or "")
+    assert obs.extra[FAILURE_KIND] == FAILURE_KIND_VALIDATION
     assert svc.get_job("job_1") is None
+
+
+async def test_cron_add_resolves_chat_id_and_timezone_from_ambient(tmp_path: Path) -> None:
+    svc = _service(tmp_path)
+    tools = _tools(svc)
+    with bind_run_ambit(RunAmbit(topic_id="topic_ambient_1", run_id="run_ambient_1")):
+        args = _add_args(id="job_ambient")
+        args.pop("chat_id")
+        args.pop("timezone")
+        obs = await tools["cron.add"].execute(args)
+        assert obs.success is True
+        job = svc.get_job("job_ambient")
+        assert job is not None
+        assert job.created_chat_id == "topic_ambient_1"
+        assert job.timezone == "Asia/Shanghai"
+
+
+async def test_cron_add_resolves_run_id_when_chat_id_and_topic_id_empty(tmp_path: Path) -> None:
+    svc = _service(tmp_path)
+    tools = _tools(svc)
+    with bind_run_ambit(RunAmbit(run_id="run_solo_123")):
+        args = _add_args(id="job_solo")
+        args.pop("chat_id")
+        obs = await tools["cron.add"].execute(args)
+        assert obs.success is True
+        job = svc.get_job("job_solo")
+        assert job is not None
+        assert job.created_chat_id == "run_solo_123"
 
 
 async def test_cron_list_returns_projection_closed_set(tmp_path: Path) -> None:
@@ -141,6 +172,7 @@ async def test_cron_view_missing_job_is_error(tmp_path: Path) -> None:
     obs = await tools["cron.view"].execute({"id": "missing"})
     assert obs.success is False
     assert "not found" in (obs.error or "")
+    assert obs.extra[FAILURE_KIND] == FAILURE_KIND_VALIDATION
 
 
 async def test_cron_update_does_not_write(tmp_path: Path) -> None:
@@ -159,6 +191,7 @@ async def test_cron_update_does_not_write(tmp_path: Path) -> None:
     )
     assert obs.success is False
     assert "审批" in (obs.error or "")
+    assert obs.extra[FAILURE_KIND] == FAILURE_KIND_VALIDATION
     assert obs.extra["approval_request"]["type"] == "cron_update"
     assert obs.extra["approval_request"]["job_id"] == "job_1"
 
@@ -176,6 +209,7 @@ async def test_cron_remove_does_not_write(tmp_path: Path) -> None:
     obs = await tools["cron.remove"].execute({"id": "job_1"})
     assert obs.success is False
     assert "审批" in (obs.error or "")
+    assert obs.extra[FAILURE_KIND] == FAILURE_KIND_VALIDATION
     assert obs.extra["approval_request"]["type"] == "cron_remove"
     assert obs.extra["approval_request"]["job_id"] == "job_1"
 

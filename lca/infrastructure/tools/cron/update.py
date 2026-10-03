@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from typing import Any, ClassVar, Literal
 
-from lca.contracts.atoms.ids.ids import new_id
 from lca.contracts.models.core.execution.decision import Observation
 from lca.domain.cron.service import CronService
 from lca.infrastructure.tools.cron.common import (
@@ -52,11 +51,8 @@ class CronUpdateTool:
         job_id = args["id"].strip()
         if self._service.get_job(job_id) is None:
             return _error(f"cron job {job_id!r} not found")
-        return Observation(
-            observation_id=new_id("obs"),
-            success=False,
-            payload=None,
-            error="需要审批：cron.update 写操作挂起，等待用户批准",
+        return _error(
+            "需要审批：cron.update 写操作挂起，等待用户批准",
             extra={
                 "approval_request": {
                     "type": "cron_update",
