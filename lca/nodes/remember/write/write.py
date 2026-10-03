@@ -35,6 +35,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.protocols.graph.routing import RoutingDecision
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
+from lca.nodes.fast_path import FastPathCounter
 
 
 def _decision_id(decision: object) -> str:
@@ -42,7 +43,7 @@ def _decision_id(decision: object) -> str:
 
 
 @dataclass(frozen=True, slots=True)
-class RememberWriteExecutor:
+class RememberWriteExecutor(FastPathCounter):
     """Primitive: mint envelope + dispatch to ``effect_gateway``; emit envelope."""
 
     semantic_name: str = "phase.remember.write"
@@ -71,6 +72,7 @@ class RememberWriteExecutor:
 
         # Fast-Path / Rejection: if admitted is explicitly False, skip minting envelope
         if admitted is False or decision is None or observation is None or reflection is None:
+            self.note_fast_path()
             return NodeOutput(
                 port_values={
                     PortName("envelope"): None,
