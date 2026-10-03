@@ -83,8 +83,8 @@ def test_connector_vault_fallback_to_composio(tmp_path: Path) -> None:
     slack = vault.get_connection("slack")
     assert slack is not None
     assert slack.service == "slack"
-    assert slack.state == ConnectionState.ACTIVE
-    assert slack.connection_id == "ca_slack_fallback"
+    assert slack.state == ConnectionState.NOT_CONNECTED
+    assert slack.connection_id is None
 
 
 def test_connector_vault_returns_not_connected_for_unknown_service(tmp_path: Path) -> None:

@@ -67,42 +67,32 @@
   - 新用户初次访问，其对应的目录与文件不存在，`ConnectorVault` 判定为空列表 `[]`，绝不读取其他用户或公共目录的数据；
   - 任何写入使用 `atomic_write_json` 临时文件替换，保证多进程并发读写无损坏。
 
-### 3.2 状态驱动交互闭环（三步状态机）
+### 3.2 状态驱动与执行窄门分层解耦（C2/C10 双平面正规化）
 
-```mermaid
-flowchart TD
-    UserQuery["用户指令: '查看我的 Google Drive'"] --> LoadExt["Agent 加载 ext 命名空间"]
-    LoadExt --> CheckStatus["调用状态/连接工具: 查询 SSOT 文件"]
-    CheckStatus --> SSOT{"读取 user/connectors/connections.json: 是否 ACTIVE?"}
-    
-    SSOT -->|否 (新用户或未连)| ReturnWidget["工具权威生成 [widget:connector_auth] 并回执"]
-    ReturnWidget --> AgentReply["Agent 告知未连接，并如实呈现官方授权卡片"]
-    
-    SSOT -->|是 (已认证)| ReturnActive["工具回执: ACTIVE + 绑定的账号身份"]
-    ReturnActive --> DirectUse["Agent 直接调用 GOOGLEDRIVE_* 操作工具执行业务"]
-    
-    DirectUse --> PreGuard{"执行层前置守卫: 再验 SSOT 文件状态"}
-    PreGuard -->|ACTIVE| ExecuteSuccess["安全执行，返回真实文件数据"]
-    PreGuard -->|非 ACTIVE 越权调用| FailFast["底层拦截: 返回未连接 + 强刷授权卡片"]
-```
+1. **约定归约定，硬流程归硬流程**：
+   - “先查 status 再动手”作为 Skill 行为指引与约定，由 Agent 在需要时按需调用，**不作为每次调用的强行前置链路**，避免产生双倍 token 与双倍延迟开销；
+   - 状态兜底全权交给执行层的 `ConnectorPreExecutionGuard`。
 
-1. **查状态（官方授权流）**：
-   - 问到 Google，Agent 自动查 `ext`，调用状态查询；
-   - 工具直接读取当前 `user_id` 的 SSOT 文件：
-     - 若未认证：工具返回动态 OAuth 会话链接，并通过 `format_connector_auth_widget` 生成 `[widget:connector_auth?appName=Google+Drive&authUrl=...&connectionId=...]`；
-     - 若已认证：工具返回 `ACTIVE` 以及绑定的 `account_identity`。
-2. **执行窄门前置硬拦截 (`ConnectorPreExecutionGuard`)**：
-   - 即使模型产生跳步幻觉直接调用操作类工具，底层执行前置守卫核验 SSOT 文件；
-   - 若状态非 `ACTIVE`，直接阻断并返回 `Observation(success=False, error="SERVICE_NOT_CONNECTED", widget=...)`。
+2. **`ConnectorPreExecutionGuard` 严格分层**：
+   - **执行层（Infrastructure / Body）**：只负责 fail-closed 拦截，校验当前用户 SSOT 文件中的连接状态。若非 `ACTIVE`，抛出强类型异常：
+     ```python
+     class ConnectionNotActiveError(RuntimeError):
+         def __init__(self, service: str, user_id: str) -> None:
+             super().__init__(f"Connector service {service!r} is not active for user {user_id!r}")
+             self.service = service
+             self.user_id = user_id
+     ```
+   - **适配/表现层（Adapter / Output Formatter）**：捕获 `ConnectionNotActiveError`，根据契约生成标准结构化回执，由表现层将其转译为前端支持的 `[widget:connector_auth?...]` 授权卡片。执行层与表现层严禁穿透。
 
-### 3.3 URL 事实血统门禁 (`UrlProvenanceGate`)
-- 位于 `lca/cognition/think/gate/chain.py` 的认知闸门责任链中。
-- **血统核验逻辑**：
-  1. 正则扫描决策/输出文本中的所有 `http://` 与 `https://` 链接；
-  2. 提取当前 Session 历史中由工具执行产生的事实血统（`session.receipts` 中各 `Observation` 的 `stdout`、`payload.auth_url`、`payload.redirect_url` 等）；
-  3. 比对白名单（本地回环地址、已知系统静态文档源）；
-  4. **违例判定**：凡不在血统或白名单内的外部 URL，Gate 直接判为 `Verdict(rejected, reason="URL_WITHOUT_PROVENANCE")` 并触发决策修复重思。
-- **效果**：编造的假 URL 无法流向传输层，彻底杜绝输出假链接。
+### 3.3 Auth 意图 URL 血统门禁 (`AuthUrlProvenanceGate`)
+- 门禁作用域**精准收窄至 Auth 认证意图 URL**（通过正则匹配包含 `authorize`、`oauth`、`token`、`login`、`signin`、`composio.dev` 等认证授权特征的外部地址）；
+- 放行普通文档链接、开源仓库地址、用户提问中的 URL 复述，避免用重锤误伤正常交互；
+- 一旦检测到未经工具回执背书的假授权 URL，触发驳回修复。
+
+### 3.4 认知源头铁律：根治模型“走文本偷懒”
+在系统核心行为规范（Prompt 契约）中注入不可动摇的底线铁律：
+> **“动态授权与第三方连接严禁在文本中脑补或拼接 URL。所有授权与连接动作必须调用官方工具生成，违者视作严重违规。”**
+从认知源头斩断偷懒动机，护栏兜底保证绝对安全。
 
 ### 3.4 身份透明契约 (Identity Accountability)
 - 外部生态工具在回执中必须显式暴露 `account_identity`；

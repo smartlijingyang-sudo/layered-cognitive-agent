@@ -13,8 +13,16 @@ _DEFAULT_CALLBACK_URL = "http://10.36.6.252:8765/composio/oauth/callback"
 _DEFAULT_USER_ID = "lca-local-user"
 
 
-def _default_connections_path() -> Path:
-    return get_lca_home() / "composio" / "connections.json"
+def resolve_user_connections_path(
+    user_id: str = _DEFAULT_USER_ID,
+    lca_home: Path | None = None,
+) -> Path:
+    home = lca_home or get_lca_home()
+    return home / "users" / user_id / "connectors" / "connections.json"
+
+
+def _default_connections_path(user_id: str = _DEFAULT_USER_ID) -> Path:
+    return resolve_user_connections_path(user_id)
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,14 +51,17 @@ class ComposioSettings:
         elif isinstance(auth_config_ids, str) and auth_config_ids.strip():
             parsed_auth = _parse_auth_config_ids(auth_config_ids)
 
+        owner = (default_user_id or _DEFAULT_USER_ID).strip()
         path = (
-            expand_user_path(connections_path) if connections_path else _default_connections_path()
+            expand_user_path(connections_path)
+            if connections_path
+            else resolve_user_connections_path(owner)
         )
         return cls(
             api_key=api_key.strip(),
             base_url=(base_url or _DEFAULT_BASE_URL).rstrip("/"),
             callback_url=callback_url or _DEFAULT_CALLBACK_URL,
-            default_user_id=(default_user_id or _DEFAULT_USER_ID).strip(),
+            default_user_id=owner,
             auth_config_ids=parsed_auth,
             connections_path=path,
         )

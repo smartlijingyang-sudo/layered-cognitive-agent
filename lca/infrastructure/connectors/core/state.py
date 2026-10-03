@@ -36,6 +36,7 @@ class ConnectionMetadata(BaseModel):
     service: str
     account_id: str = "default"
     state: ConnectionState
+    account_identity: str | None = None
     connection_id: str | None = None
     auth_url: str | None = None
     scopes: list[str] = Field(default_factory=list)

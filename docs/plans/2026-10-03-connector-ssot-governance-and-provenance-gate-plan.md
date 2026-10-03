@@ -49,29 +49,29 @@ git commit -m "feat(connectors): enforce user-scoped SSOT vault isolation withou
 
 ---
 
-### Task 2: 认知层 URL 事实血统门禁 `UrlProvenanceGate` (INV-CONN-03)
+### Task 2: 认知层 Auth 意图 URL 事实血统门禁 `AuthUrlProvenanceGate` (INV-CONN-03)
 
 **Files:**
 - Create: `lca/cognition/think/gate/url_provenance.py`
 - Modify: `lca/cognition/think/gate/chain.py`
 - Test: `tests/cognition/test_url_provenance_gate.py`
 - Does NOT own: `lca/infrastructure/tools/**`, `deploy/lobehub/**` (AP-01)
-- Invariants to test: INV-CONN-03（正则提取 URL，无血统必须 100% 驳回为 `URL_WITHOUT_PROVENANCE`）
+- Invariants to test: INV-CONN-03（精准收窄至 Auth 意图 URL，无事实血统必须 100% 驳回为 `URL_WITHOUT_PROVENANCE`；放行普通文档链接、repo 地址与用户复述）
 
 **Step 1: Write the failing test**
 编写 `tests/cognition/test_url_provenance_gate.py`：
-- 测试当回复包含 `https://app.composio.dev/authorize?mode=composio` 且当前 Session 事实流中无该 URL 时，Gate 返回 `Verdict(rejected, reason="URL_WITHOUT_PROVENANCE: ...")`；
-- 测试当 URL 逐字出现在 Tool Observation 事实流中时，Gate 放行；
-- 测试本地回环与平台白名单放行。
+- 测试当回复包含未经工具背书的 Auth 链接（如 `https://app.composio.dev/authorize?mode=composio` 或包含 `oauth`/`token` 路径）时，Gate 严格驳回；
+- 测试正常文档 URL、GitHub 仓库链接、本地 localhost 链接，以及用户在会话中主动粘贴并由模型引用的链接，Gate 正常放行；
+- 测试经过工具 Observation 真实返回的官方授权链接，Gate 正常放行。
 
 **Step 2: Run test to verify it fails**
 Run: `pytest tests/cognition/test_url_provenance_gate.py -v`
 Expected: FAIL
 
 **Step 3: Write minimal implementation**
-- 编写 `UrlProvenanceGate`，继承 Gate 契约；
-- 在 `chain.py` 的默认 Gate 链中注册 `UrlProvenanceGate`；
-- 检查 candidate decision 与 session facts。
+- 编写 `AuthUrlProvenanceGate`，利用 Auth 意图识别正则过滤出需要强核验的认证授权类 URL；
+- 核验 Session 事实流；
+- 在 `chain.py` 挂载门禁。
 
 **Step 4: Run test to verify it passes**
 Run: `pytest tests/cognition/test_url_provenance_gate.py -v`
@@ -80,7 +80,7 @@ Expected: PASS
 **Step 5: Commit**
 ```bash
 git add lca/cognition/think/gate/url_provenance.py lca/cognition/think/gate/chain.py tests/cognition/test_url_provenance_gate.py
-git commit -m "feat(cognition): add UrlProvenanceGate to block hallucinated URLs at cognitive boundary"
+git commit -m "feat(cognition): add AuthUrlProvenanceGate scoped to authorization URLs"
 ```
 
 ---
@@ -91,23 +91,22 @@ git commit -m "feat(cognition): add UrlProvenanceGate to block hallucinated URLs
 - Create: `lca/infrastructure/connectors/core/guard.py`
 - Modify: `lca/infrastructure/tools/composio/__init__.py`
 - Test: `tests/connectors/test_connector_pre_execution_guard.py`
-- Does NOT own: `lca/cognition/**` (AP-01)
-- Invariants to test: INV-CONN-02（未连接时直接调用操作工具必被拦截，回执下发 `[widget:connector_auth?...]` 官方卡片语法）
+- Does NOT own: `lca/cognition/**`, `deploy/lobehub/patches/ui/**` (AP-01)
+- Invariants to test: INV-CONN-02（分层解耦：执行层拦截抛出类型化 `ConnectionNotActiveError`；适配层转译结构化回执，严禁执行层感知前端卡片语法）
 
 **Step 1: Write the failing test**
 编写 `tests/connectors/test_connector_pre_execution_guard.py`：
-- 通用覆盖所有外部连接器：模拟未激活 Google Drive、Gmail、GitHub、Slack 等受控服务时，直接调用对应的操作类工具（如 `GOOGLEDRIVE_FIND_FILE`、`GMAIL_SEND_EMAIL`、`GITHUB_GET_USER` 等），断言均被 `ConnectorPreExecutionGuard` 统一切断拦截；
-- 断言拦截回执 `Observation.success == False`，`error == "SERVICE_NOT_CONNECTED"`，且包含对应服务的合法 `[widget:connector_auth?...]` 语法；
-- 模拟已激活状态，断言放行。
+- 执行层断言：未激活服务直接调用操作类工具（如 `GOOGLEDRIVE_FIND_FILE`、`GMAIL_SEND_EMAIL`），Guard 抛出 `ConnectionNotActiveError(service=..., user_id=...)`；
+- 适配层断言：工具执行封装器捕获该异常，向外输出包含错误类型与服务标识的结构化回执；
+- 验证已激活状态放行。
 
 **Step 2: Run test to verify it fails**
 Run: `pytest tests/connectors/test_connector_pre_execution_guard.py -v`
 Expected: FAIL
 
 **Step 3: Write minimal implementation**
-- 落地 `ConnectorPreExecutionGuard`；
-- 在 Composio Tool Provider 执行包装器中注入该 Guard；
-- 确保未连接时产生规范的官方授权卡片指令。
+- 落地 `ConnectionNotActiveError` 契约与 `ConnectorPreExecutionGuard`；
+- 在 Composio Tool Provider 中装配分层拦截与适配转译。
 
 **Step 4: Run test to verify it passes**
 Run: `pytest tests/connectors/test_connector_pre_execution_guard.py -v`
@@ -116,26 +115,28 @@ Expected: PASS
 **Step 5: Commit**
 ```bash
 git add lca/infrastructure/connectors/core/guard.py lca/infrastructure/tools/composio/__init__.py tests/connectors/test_connector_pre_execution_guard.py
-git commit -m "feat(connectors): add ConnectorPreExecutionGuard for fail-fast authorization check"
+git commit -m "feat(connectors): add ConnectorPreExecutionGuard with layered ConnectionNotActiveError"
 ```
 
 ---
 
-### Task 4: 动身份先报身份与回执透明契约 (INV-CONN-05)
+### Task 4: 根除走文本偷懒病根 & 动身份先报身份透明契约 (INV-CONN-05)
 
 **Files:**
-- Modify: `lca/infrastructure/tools/composio/__init__.py`
 - Modify: `lca/plugins/prompts/sections/connected_services.py`
+- Modify: `lca/plugins/prompts/sections/text.py`
 - Modify: `lca/plugins/prompts/sections/plugin.py`
 - Modify: `lca/plugins/prompts/template_provider.py`
+- Modify: `lca/infrastructure/tools/composio/__init__.py`
 - Test: `tests/infrastructure/tools/test_connector_identity_disclosure.py`
 - Does NOT own: `lca/contracts/models/**` (AP-01)
-- Invariants to test: INV-CONN-05（工具回执显式包含 `account_identity`，Prompt 注入 `ConnectedServicesSection`）
+- Invariants to test: INV-CONN-05（Prompt 核心铁律注入、工具回执显式包含 `account_identity`）
 
 **Step 1: Write the failing test**
 编写 `tests/infrastructure/tools/test_connector_identity_disclosure.py`：
-- 断言调用 `composioConnect` 或操作类工具时，回执 payload 包含非空 `account_identity`；
-- 断言 Prompt 模板成功装配 `ConnectedServicesSection` 并注入活跃连接的账号身份。
+- 断言 System Prompt 包含核心铁律：禁止在文本中拼装动态授权/OAuth/连接 URL，所有授权与连接动作必须调用官方工具生成；
+- 断言调用操作类工具时，回执 payload 包含非空 `account_identity`；
+- 断言 Prompt 模板成功装配 `ConnectedServicesSection`。
 
 **Step 2: Run test to verify it fails**
 Run: `pytest tests/infrastructure/tools/test_connector_identity_disclosure.py -v`

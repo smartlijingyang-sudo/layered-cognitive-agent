@@ -542,9 +542,9 @@
 | BRAINSTORM-CONNECTOR-GOV-DESIGN-SECTIONS | 逐步呈现设计细节（边界/用户级隔离/预检拦截/身份声明/不变量测试）并获取审批 | Completed | 全部 4 节架构规范（边界与自治等级、SSOT文件驱动与用户隔离、UrlProvenanceGate与身份透明、INV-CONN-01~06断言矩阵）均获用户审批通过 |
 | BRAINSTORM-CONNECTOR-GOV-DESIGN-DOC | 沉淀设计文档至 docs/plans/ 并提交 git | Completed | 成功落盘 docs/plans/2026-10-03-connector-ssot-governance-and-provenance-gate-design.md 并提交 git |
 | BRAINSTORM-CONNECTOR-GOV-TRANSITION | 转换至实施计划制定（writing-plans） | Completed | 成功落盘实施计划 docs/plans/2026-10-03-connector-ssot-governance-and-provenance-gate-plan.md 并分解为 5 大单流任务 |
-| CONN-GOV-TASK-1-ISOLATION | 用户主权 SSOT 存储与全局隔离解耦 (`vault.py`, `settings.py`, `service.py`) | Pending | 待执行 (INV-CONN-01) |
-| CONN-GOV-TASK-2-PROVENANCE-GATE | 认知层 URL 事实血统门禁 (`UrlProvenanceGate` & `gate.chain.run`) | Pending | 待执行 (INV-CONN-03) |
+| CONN-GOV-TASK-1-ISOLATION | 用户主权 SSOT 存储与全局隔离解耦 (`vault.py`, `settings.py`, `service.py`) | Completed | 落地 resolve_user_connections_path，ConnectorVault 彻底切除旧全局 fallback，单测 24/24 全绿，实现新用户 100% 干净隔离 (INV-CONN-01) |
+| CONN-GOV-TASK-2-PROVENANCE-GATE | 认知层 Auth 意图 URL 事实血统门禁 (`AuthUrlProvenanceGate` & `gate.chain.run`) | In Progress | 正在落地 AuthUrlProvenanceGate 与单测断言 (INV-CONN-03) |
 | CONN-GOV-TASK-3-EXEC-GUARD | 状态驱动执行窄门硬拦截 (`ConnectorPreExecutionGuard` & fail-fast 官方卡片) | Pending | 待执行 (INV-CONN-02) |
 | CONN-GOV-TASK-4-IDENTITY-DISCLOSURE | 动身份先报身份与回执透明契约 (`account_identity` & `ConnectedServicesSection`) | Pending | 待执行 (INV-CONN-05) |
 | CONN-GOV-TASK-5-INTEGRATION-E2E | 全链路端到端集成验收与 Pre-Push 门禁体检 (INV-CONN-01 ~ 06) | Pending | 待执行 |
-| STANDING-FILES-MEMORY-DEGRADE | 修复未初始化的 MEMORY.md 在 GET 接口抛 404，补齐默认模板与优雅降级 | In Progress | 正在完善 standing_files.py 默认模板优雅降级与测试覆盖 |
+| STANDING-FILES-MEMORY-DEGRADE | 修复未初始化的 MEMORY.md 在 GET 接口抛 404，补齐默认模板与优雅降级 | Completed | 落地 DEFAULT_STANDING_FILE_TEMPLATES，未建盘文件降级返回 200 与骨架模板，PUT 初始写兼容模板与空哈希，全量 10/10 单测通过 |
