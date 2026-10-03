@@ -81,9 +81,14 @@ def make_lifespan(
             lock_dir = Path(raw_lock_dir) if raw_lock_dir else (lca_home / "locks")
             workspace_path = str(getattr(ctx, "workspace", "") or lca_home)
             session_store = None
-            if hasattr(ctx, "inject"):
+            with contextlib.suppress(Exception):
+                if hasattr(ctx, "inject"):
+                    session_store = ctx.inject("session.store") or ctx.inject("session_store")
+                elif hasattr(ctx, "require"):
+                    session_store = ctx.require("session.store")
+            if session_store is None:
                 with contextlib.suppress(Exception):
-                    session_store = ctx.inject("session_store")
+                    session_store = getattr(app.state, "session_store", None)
 
             cron_daemon = CronDaemonService(
                 store=store,
