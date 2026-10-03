@@ -80,7 +80,7 @@ catalog: ToolStarted/Invoked/Denied ─┘                   │                
 
 - **start**：建 `RUNNING` 项（`phase.tool.call.start` / `step.tool_call.record` / `ToolStarted`）；`tool_name=_extract_tool_name(...)`，`current_step=ActivityIntentNamer.live_step(tool_name, args)`；同 id 刷新时沿用已存的 `tool_name`/`current_step`（`existing.tool_name or tool_name`）。
 - **execute.start**：当前 `feed_event` 不处理（既非 start 也非 end 分支，静默丢弃），没有 `start_time` 修正。
-- **end**：落 `completed` / `failed`（`ToolDenied` 必红，错误信息进 `result_summary`）/ `cancelled`；判据：`isSuccess`（bool）优先，否则 `outcome`（failure/failed/error/cancelled 为负）；start 缺失时合成 fallback 项。
+- **end**：落 `completed` / `failed`（`ToolDenied` 必红，错误信息进 `result_summary`）/ `cancelled`；判据：`isSuccess`（bool）优先，否则 `outcome`（failure/failed/error/cancelled 为负）。**关联顺序**（`51d240a72` 起）：① `invocation_id` 在当前 assistant 存储与 `default` 存储直查；② 全存储按 `invocation_id` 兜底；③ `run_id` + `tool_name` 回退匹配——在 assistant 与 `default` 存储中找 `RUNNING` 且 run_id（为空则通配）与 tool_name（为空则通配）一致的项，解决工具结束事件 id 对不上时状态悬挂（命中后旧 id 条目被新 `invocation_id` 替换）；④ 仍无才合成 fallback 项（`RUNNING` 起步再按判据落状态）。
 - **重启恢复**：`seed_from_traces()` 从 `traces/runs/*/journal.json` 回填最近 50 个 run 的 `tool_calls`/`tool_results`；冷启动两处：`__init__`（活动项为空且 `seed_traces=True`）与 `get_activities()`（首次读且 `_seeded` 为假，只跑一次；0739281da 起不再要求"存储为空"）——`feed_event()` 不触发回填。`get_activities()` 额外合并 `default` 存储——网关工具事件不带 `assistant_id`，不合并重启后抽屉为空。**只取已落盘的 completed/failed**——重启时刻"running"的已经死了，显示成运行中就是撒谎。细则：无 `tool_result` 的 tool_call 按 `COMPLETED` 乐观回填；tool_result 先按 `invocation_id` 关联、未命中按同 step 位置兜底；tool_call 缺 `invocation_id` 时合成 `{run_id}_s{step_index}_tc{idx}`（补位标识）；回填项 `end_time` = `start_time`（无真实结束时刻）。
 
 ### 3.2 前端：AssistantStatusDrawer.tsx
