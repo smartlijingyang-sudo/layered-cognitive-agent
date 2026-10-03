@@ -40,7 +40,7 @@ import json
 import threading
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from enum import StrEnum
 from pathlib import Path
 
@@ -191,7 +191,7 @@ class RoutineTickDriver:
     def get_failure_state(self, routine_id: str) -> FailureState | None:
         """Read the persisted failure state; ``None`` when never failed (or cleared)."""
         data = self._read_json(self._failures_dir / f"{routine_id}.json")
-        if not isinstance(data, dict):
+        if data is None:
             return None
         try:
             return FailureState(
@@ -296,16 +296,7 @@ class RoutineTickDriver:
                 dead_at_s=now,
                 expires_at_s=now + DEAD_LETTER_TTL_S,
             )
-            self._write_json(
-                self._dead_dir / f"{spec.id}.json",
-                {
-                    "routine_id": letter.routine_id,
-                    "attempts": letter.attempts,
-                    "last_error": letter.last_error,
-                    "dead_at_s": letter.dead_at_s,
-                    "expires_at_s": letter.expires_at_s,
-                },
-            )
+            self._write_json(self._dead_dir / f"{spec.id}.json", asdict(letter))
             self._clear_failure_state(spec.id)
             self._emit(
                 EVENT_DEAD_LETTERED,
@@ -341,7 +332,7 @@ class RoutineTickDriver:
 
     def _read_dead(self, path: Path) -> DeadLetter | None:
         data = self._read_json(path)
-        if not isinstance(data, dict):
+        if data is None:
             return None
         try:
             return DeadLetter(
