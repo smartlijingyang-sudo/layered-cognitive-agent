@@ -54,3 +54,28 @@ def test_assistant_top_mascot_renders_mascot_visual_and_status() -> None:
     # 包含 SVG Mascot 与状态指示点
     assert "<svg" in content or "svg" in content.lower()
     assert "statusDot" in content or "status" in content
+
+
+def test_assistant_top_mascot_supports_custom_avatar_image() -> None:
+    path = _get_mascot_tsx_path()
+    content = path.read_text(encoding="utf-8")
+
+    # 必须支持 avatarUrl prop 与 isImageUrl 检测
+    assert "avatarUrl" in content
+    assert "isImageUrl" in content or "effectiveAvatarUrl" in content
+    # 必须包含自定义头像图片渲染类与 fallback
+    assert "mascot-custom-avatar" in content or "<img" in content
+    assert "AnimalSvgRenderer" in content
+
+
+def test_assistant_top_mascot_retains_drawer_click_and_effects_with_avatar_image() -> None:
+    path = _get_mascot_tsx_path()
+    content = path.read_text(encoding="utf-8")
+
+    # 无论使用 SVG 还是自定义图片头像，都必须保留量子环、呼吸浮动与抽屉唤起回调
+    assert "onOpenDrawer" in content
+    assert "mascot-quantum-orbit" in content or "quantumOrbit" in content
+    assert "haloGlow" in content
+    assert "mascotSvg" in content
+    assert "onClick" in content
+    assert "namePill" in content

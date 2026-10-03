@@ -1,7 +1,7 @@
 'use client';
 
 import { createStaticStyles } from 'antd-style';
-import React, { memo, useCallback, useMemo } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 
 export type AnimalSpecies =
   | 'capybara'
@@ -31,6 +31,8 @@ export interface AssistantTopMascotProps {
   name?: string;
   /** 显式指定形象或物种 */
   avatar?: string;
+  /** 显式头像图片 URL (若未指定且 assistantId 存在，将自动查询 active avatar) */
+  avatarUrl?: string;
   /** 形象视觉尺寸 (默认 42px) */
   size?: number;
   /** 是否展示名字药丸 (默认 true) */
@@ -597,17 +599,83 @@ export const AnimalSvgRenderer = memo<{ species: AnimalSpecies; size: number }>(
 
 AnimalSvgRenderer.displayName = 'AnimalSvgRenderer';
 
+const AVATAR_ENDPOINT = (assistantId: string) =>
+  `/lca-api/v1/assistants/${assistantId}/avatar`;
+
+const activeUrlCache = new Map<string, string | null>();
+const inflightFetches = new Map<string, Promise<string | null>>();
+
+function authHeaders(): Record<string, string> {
+  const envToken =
+    typeof process !== 'undefined'
+      ? (process as { env?: Record<string, string | undefined> }).env
+          ?.NEXT_PUBLIC_LCA_TOKEN
+      : undefined;
+  const token = envToken || 'lca-local';
+  const mockDevUserId =
+    typeof process !== 'undefined'
+      ? (process as { env?: Record<string, string | undefined> }).env
+          ?.NEXT_PUBLIC_MOCK_DEV_USER_ID
+      : undefined;
+  const userId =
+    (typeof window !== 'undefined' &&
+      (window as { __LCA_USER_ID?: string } | undefined)?.__LCA_USER_ID) ||
+    mockDevUserId ||
+    'local-dev-user';
+  return {
+    Authorization: `Bearer ${token}`,
+    'x-lca-token': token,
+    'x-lca-user-id': userId,
+  };
+}
+
+export async function fetchActiveAvatarUrl(assistantId: string): Promise<string | null> {
+  const cached = activeUrlCache.get(assistantId);
+  if (cached !== undefined) return cached;
+  const inflight = inflightFetches.get(assistantId);
+  if (inflight) return inflight;
+  const promise = (async () => {
+    try {
+      const res = await fetch(AVATAR_ENDPOINT(assistantId), { headers: authHeaders() });
+      if (!res.ok) return null;
+      const data: any = await res.json();
+      const original = data.active?.variants?.find((v: any) => v.size === 'original');
+      const url = original?.url || data.active?.variants?.[0]?.url || null;
+      activeUrlCache.set(assistantId, url);
+      return url;
+    } catch {
+      return null;
+    } finally {
+      inflightFetches.delete(assistantId);
+    }
+  })();
+  inflightFetches.set(assistantId, promise);
+  return promise;
+}
+
+export function isImageUrl(val?: string): boolean {
+  if (!val) return false;
+  const lower = val.trim().toLowerCase();
+  return (
+    lower.startsWith('http://') ||
+    lower.startsWith('https://') ||
+    lower.startsWith('/') ||
+    lower.startsWith('data:')
+  );
+}
+
 /**
  * 顶栏居中动态呼吸 Mascot 组件 (Muse Style Universal Dynamic Avatar)
  *
  * 普惠全助理动态萌宠引擎：四级确定性解析 + 呼吸起伏 + 眨眼微动 + OpenAI/Muse 风格双旋轨道光晕；
- * 彻底消除头部切头现象，支持点击滑出 Status Drawer 与形象编辑。
+ * 支持自定义生成头像与动物矢量双轨渲染，彻底消除头部切头现象，支持点击滑出 Status Drawer 与形象编辑。
  */
 export const AssistantTopMascot = memo<AssistantTopMascotProps>(
   ({
     assistantId,
     name = '架构小助',
     avatar,
+    avatarUrl,
     size = 42,
     showName = true,
     status = 'online',
@@ -620,6 +688,41 @@ export const AssistantTopMascot = memo<AssistantTopMascotProps>(
       () => resolveAnimalSpecies(avatar, name, assistantId),
       [avatar, name, assistantId],
     );
+
+    const [fetchedAvatarUrl, setFetchedAvatarUrl] = useState<string | null>(null);
+    const [imageError, setImageError] = useState(false);
+
+    useEffect(() => {
+      if (avatarUrl || isImageUrl(avatar) || !assistantId) return;
+      let cancelled = false;
+      const refresh = async () => {
+        const url = await fetchActiveAvatarUrl(assistantId);
+        if (!cancelled) {
+          setFetchedAvatarUrl(url);
+          setImageError(false);
+        }
+      };
+      void refresh();
+
+      const onAvatarChanged = (event: Event) => {
+        const detail = (event as CustomEvent<{ assistantId?: string; assistant_id?: string }>).detail;
+        const changedId = detail?.assistantId || detail?.assistant_id;
+        if (changedId && changedId !== assistantId) return;
+        activeUrlCache.delete(assistantId);
+        void refresh();
+      };
+      window.addEventListener('lca-assistant-avatar-changed', onAvatarChanged);
+      return () => {
+        cancelled = true;
+        window.removeEventListener('lca-assistant-avatar-changed', onAvatarChanged);
+      };
+    }, [assistantId, avatar, avatarUrl]);
+
+    const effectiveAvatarUrl = useMemo(() => {
+      if (avatarUrl) return avatarUrl;
+      if (isImageUrl(avatar)) return avatar;
+      return fetchedAvatarUrl;
+    }, [avatarUrl, avatar, fetchedAvatarUrl]);
 
     const handleClick = useCallback(() => {
       onOpenDrawer?.(assistantId);
@@ -643,9 +746,27 @@ export const AssistantTopMascot = memo<AssistantTopMascotProps>(
           <div className={styles.haloGlow} />
           <div className={`${styles.quantumOrbit} mascot-quantum-orbit`} />
 
-          {/* 灵动动物矢量 SVG (支持 8 大物种自适应与动画) */}
+          {/* 灵动动物矢量 SVG 或 自定义头像图片 (均享有呼吸起伏动画与微动) */}
           <div className={styles.mascotSvg}>
-            <AnimalSvgRenderer species={species} size={size} />
+            {effectiveAvatarUrl && !imageError ? (
+              <img
+                src={effectiveAvatarUrl}
+                alt={name}
+                className="mascot-custom-avatar"
+                onError={() => setImageError(true)}
+                style={{
+                  width: size,
+                  height: size,
+                  borderRadius: '50%',
+                  objectFit: 'cover',
+                  display: 'block',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.16)',
+                  border: '1.5px solid rgba(255, 255, 255, 0.65)',
+                }}
+              />
+            ) : (
+              <AnimalSvgRenderer species={species} size={size} />
+            )}
           </div>
 
           {/* 在线状态指示微光 */}

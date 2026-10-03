@@ -2,9 +2,9 @@
 
 import { Avatar } from 'antd';
 import type { ReactNode } from 'react';
-import { memo, useEffect, useState } from 'react';
+import React, { memo, useEffect, useState } from 'react';
 
-import {
+import AssistantTopMascot, {
   AnimalSvgRenderer,
   resolveAnimalSpecies,
   type AnimalSpecies,
@@ -92,10 +92,27 @@ export interface AssistantAvatarImageProps {
   shape?: 'circle' | 'square';
   /** active 为空时渲染的默认头像节点；缺省为 SVG 萌宠回退 */
   fallback?: ReactNode;
+  /** 助理显示名称 */
+  name?: string;
+  /** 点击唤起右侧状态抽屉的回调 */
+  onOpenDrawer?: (assistantId?: string) => void;
+  /** 兼容通用点击回调 */
+  onClick?: () => void;
+  /** 是否展示名字药丸 (默认 true) */
+  showName?: boolean;
 }
 
 export const AssistantAvatarImage = memo<AssistantAvatarImageProps>(
-  ({ assistantId, size = 32, shape = 'circle', fallback }) => {
+  ({
+    assistantId,
+    size = 32,
+    shape = 'circle',
+    fallback,
+    name,
+    onOpenDrawer,
+    onClick,
+    showName = true,
+  }) => {
     const [activeUrl, setActiveUrl] = useState<string | null>(null);
 
     useEffect(() => {
@@ -121,15 +138,42 @@ export const AssistantAvatarImage = memo<AssistantAvatarImageProps>(
       };
     }, [assistantId]);
 
-    if (activeUrl) {
-      return <Avatar src={activeUrl} size={size} shape={shape} />;
+    // 1. 消息气泡场景 (shape === 'square')：仅呈现纯方形头像，不带顶栏动效与名字药丸
+    if (shape === 'square') {
+      if (activeUrl) {
+        return <Avatar src={activeUrl} size={size} shape="square" />;
+      }
+      if (fallback) return <>{fallback}</>;
+      const species = resolveAnimalSpecies(undefined, undefined, assistantId) as AnimalSpecies;
+      return (
+        <Avatar size={size} shape="square">
+          <AnimalSvgRenderer species={species} size={size} />
+        </Avatar>
+      );
     }
-    if (fallback) return <>{fallback}</>;
-    const species = resolveAnimalSpecies(undefined, undefined, assistantId) as AnimalSpecies;
+
+    // 2. 顶栏/通用场景 (shape === 'circle')：必须完整保有 Muse 动效（呼吸、量子环、光晕）与点击抽屉交互
+    if (React.isValidElement(fallback)) {
+      return React.cloneElement(fallback as React.ReactElement<any>, {
+        avatarUrl: activeUrl || undefined,
+        assistantId: assistantId || (fallback.props as any)?.assistantId,
+        size: size || (fallback.props as any)?.size,
+        name: name || (fallback.props as any)?.name,
+        onOpenDrawer: onOpenDrawer || (fallback.props as any)?.onOpenDrawer,
+        onClick: onClick || (fallback.props as any)?.onClick,
+      });
+    }
+
     return (
-      <Avatar size={size} shape={shape}>
-        <AnimalSvgRenderer species={species} size={size} />
-      </Avatar>
+      <AssistantTopMascot
+        assistantId={assistantId}
+        name={name}
+        avatarUrl={activeUrl || undefined}
+        size={size}
+        showName={showName}
+        onOpenDrawer={onOpenDrawer}
+        onClick={onClick}
+      />
     );
   },
 );

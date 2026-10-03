@@ -213,3 +213,16 @@ def test_avatar_image_apply_raises_when_header_anchor_missing(tmp_path: Path) ->
     ctx = PatchContext(ui_dir=ui)
     with pytest.raises(SystemExit, match="assistant_avatar_image"):
         apply(ctx)
+
+
+def test_avatar_image_header_preserves_mascot_effects_and_drawer_callback() -> None:
+    path = _component_tsx_path()
+    content = path.read_text(encoding="utf-8")
+
+    # 顶栏模式下必须完整保有 Mascot 动效与抽屉交互
+    assert "onOpenDrawer" in content
+    assert "React.isValidElement(fallback)" in content or "cloneElement" in content
+    assert "avatarUrl" in content
+    assert "AssistantTopMascot" in content
+    # 消息气泡专用方形模式与顶栏模式分离
+    assert "shape === 'square'" in content or 'shape === "square"' in content

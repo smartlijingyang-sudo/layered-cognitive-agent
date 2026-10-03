@@ -92,6 +92,8 @@ def apply(ctx: PatchContext) -> bool:
         mascot_repl = (
             "          <AssistantAvatarImage\n"
             "            assistantId={targetAssistantId}\n"
+            "            name={agentTitle || '架构小助'}\n"
+            "            onOpenDrawer={() => setDrawerOpen(true)}\n"
             "            size={42}\n"
             "            fallback={\n"
             "              <AssistantTopMascot\n"
