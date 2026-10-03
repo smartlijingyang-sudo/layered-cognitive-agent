@@ -160,3 +160,61 @@ def test_live_step_per_category_language():
     # 长命令截断
     long_cmd = "x" * 100
     assert ActivityIntentNamer.live_step("run_shell", {"command": long_cmd}).endswith("...")
+
+
+def test_seed_from_traces_rehydrates_after_restart(tmp_path):
+    """Kernel restart wipes memory; seed_from_traces pulls real activities back."""
+    from lca.infrastructure.observability.activity_projector import ActivityProjector
+
+    run_dir = tmp_path / "run_abc123"
+    run_dir.mkdir()
+    (run_dir / "journal.json").write_text(
+        '{"run_id": "run_abc123", "steps": ['
+        '{"entered_at": 1791003119.0, "exited_at": 1791003134.0,'
+        ' "tool_calls": [{"invocation_id": "", "name": "run_shell",'
+        ' "arguments": {"command": "echo hi"}}],'
+        ' "tool_results": [{"ok": true, "latency_ms": 42}]},'
+        '{"entered_at": 1791003200.0, "exited_at": 1791003210.0,'
+        ' "tool_calls": [{"invocation_id": "", "name": "browser_navigate",'
+        ' "arguments": {"url": "https://x.com"}}],'
+        ' "tool_results": [{"ok": false, "error": "timeout"}]}'
+        "]}",
+        encoding="utf-8",
+    )
+    p = ActivityProjector(trace_root=tmp_path)
+    n = p.seed_from_traces()
+    assert n == 2
+    acts = p.get_activities("default")
+    assert len(acts) == 2
+    by_tool = {a.tool_name: a for a in acts}
+    ok_item = by_tool["run_shell"]
+    assert ok_item.status == ActivityStatus.COMPLETED
+    assert ok_item.current_step is None  # seeded never pretends to be running
+    assert ok_item.start_time != ""
+    assert ok_item.duration_ms == 42
+    fail_item = by_tool["browser_navigate"]
+    assert fail_item.status == ActivityStatus.FAILED
+    assert "timeout" in (fail_item.result_summary or "")
+
+
+def test_seed_from_traces_missing_dir_is_graceful(tmp_path):
+    from lca.infrastructure.observability.activity_projector import ActivityProjector
+
+    p = ActivityProjector(trace_root=tmp_path / "nope")
+    assert p.seed_from_traces() == 0
+    assert p.get_activities("x") == []
+
+
+def test_get_activities_lazy_seeds_once(tmp_path):
+    from lca.infrastructure.observability.activity_projector import ActivityProjector
+
+    run_dir = tmp_path / "run_z"
+    run_dir.mkdir()
+    (run_dir / "journal.json").write_text(
+        '{"run_id": "run_z", "steps": [{"entered_at": 1.0,'
+        ' "tool_calls": [{"name": "t"}], "tool_results": [{"ok": true}]}]}',
+        encoding="utf-8",
+    )
+    p = ActivityProjector(trace_root=tmp_path)
+    assert len(p.get_activities("default")) == 1
+    assert len(p.get_activities("default")) == 1  # no duplication

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from lca.contracts.models.observability.activity import (
@@ -34,6 +37,24 @@ def _category_for(tool_name: str) -> ActivityCategory:
     return ActivityCategory.TOOL
 
 
+def _iso_ts(ts: Any) -> str:
+    """Unix timestamp (float/int) -> ISO string; '' when unknown (honest)."""
+    try:
+        if ts is None or ts == "":
+            return ""
+        return datetime.fromtimestamp(float(ts), tz=timezone.utc).isoformat()
+    except (TypeError, ValueError, OverflowError, OSError):
+        return ""
+
+
+def _seed_result_summary(tr: dict[str, Any], status: ActivityStatus) -> str:
+    if status == ActivityStatus.FAILED:
+        err = str(tr.get("error") or "").strip()
+        return f"失败：{err[:120]}" if err else "执行失败（无错误详情）"
+    out = str(tr.get("stdout_head") or tr.get("delta_summary") or "").strip()
+    return (out[:100] + "...") if len(out) > 100 else out
+
+
 def _inv_id(payload: dict[str, Any]) -> str:
     return str(payload.get("invocation_id") or payload.get("tool_call_id") or payload.get("call_id") or "")
 
@@ -62,9 +83,13 @@ class ActivityProjector:
     开始时间，end 落的是结果；running 的每一刻都有 current_step 可看。
     """
 
-    def __init__(self) -> None:
+    def __init__(self, trace_root: str | Path | None = None) -> None:
         # In-memory projection store per assistant: {assistant_id: {item_id: ActivityItem}}
         self._items: dict[str, dict[str, ActivityItem]] = {}
+        # Kernel restarts wipe memory; reseed recent activities from persisted
+        # run journals so the drawer's 「动态」 tab is not empty after a restart.
+        self._trace_root = Path(trace_root) if trace_root else None
+        self._seeded = False
 
     # ------------------------------------------------------------------ feed
     def feed_event(self, stamped: dict[str, Any]) -> ActivityItem | None:
@@ -234,8 +259,91 @@ class ActivityProjector:
         self._save(cancelled)
         return cancelled
 
+    def seed_from_traces(self, root_dir: str | Path | None = None, limit: int = 50) -> int:
+        """Rehydrate recent activities from persisted run journals.
+
+        Muse 思想：kernel 重启后动态栏不能是空的——从 trace 里把最近的
+        真实活动捞回来。只取已落盘的 completed/failed；重启时刻"running"
+        的已经死了，显示成 running 就是撒谎，所以不取。
+        Returns the number of activities seeded.
+        """
+        self._seeded = True
+        root = Path(root_dir) if root_dir else self._trace_root
+        if root is None:
+            root = Path("traces/runs")
+        if not root.is_dir():
+            return 0
+
+        try:
+            run_dirs = sorted(
+                [d for d in root.iterdir() if d.is_dir() and d.name.startswith("run_")],
+                key=lambda d: d.stat().st_mtime,
+                reverse=True,
+            )[:limit]
+        except OSError:
+            return 0
+
+        added = 0
+        for rdir in run_dirs:
+            jp = rdir / "journal.json"
+            if not jp.is_file():
+                continue
+            try:
+                with open(jp, encoding="utf-8") as f:
+                    j = json.load(f)
+            except (OSError, json.JSONDecodeError, UnicodeDecodeError, ValueError):
+                continue
+            if not isinstance(j, dict):
+                continue
+            run_id = str(j.get("run_id") or rdir.name)
+            for si, step in enumerate(j.get("steps") or []):
+                if not isinstance(step, dict):
+                    continue
+                calls = step.get("tool_calls") or []
+                results = step.get("tool_results") or []
+                entered = step.get("entered_at")
+                exited = step.get("exited_at")
+                for ci, tc in enumerate(calls):
+                    if not isinstance(tc, dict):
+                        continue
+                    tool_name = str(tc.get("name") or "")
+                    if not tool_name:
+                        continue
+                    tr = results[ci] if ci < len(results) and isinstance(results[ci], dict) else {}
+                    ok = tr.get("ok")
+                    status = (
+                        ActivityStatus.COMPLETED if ok is not False
+                        else ActivityStatus.FAILED
+                    )
+                    args = tc.get("arguments") if isinstance(tc.get("arguments"), dict) else {}
+                    title, summary, icon = ActivityIntentNamer.name(tool_name, args)
+                    item = ActivityItem(
+                        id=f"seed:{run_id}:{si}:{ci}",
+                        run_id=run_id,
+                        assistant_id="default",
+                        category=_category_for(tool_name),
+                        title=title,
+                        summary=summary,
+                        status=status,
+                        start_time=_iso_ts(entered),
+                        end_time=_iso_ts(exited),
+                        duration_ms=tr.get("latency_ms"),
+                        icon=icon,
+                        params=args,
+                        result_summary=_seed_result_summary(tr, status),
+                        tool_name=tool_name,
+                        current_step=None,
+                    )
+                    self._save(item)
+                    added += 1
+        return added
+
     # ------------------------------------------------------------------- query
     def get_activities(self, assistant_id: str) -> list[ActivityItem]:
+        # Cold start after a kernel restart: pull recent real activities back
+        # from disk once, so the drawer is not empty.
+        if not self._seeded and not self._items:
+            self.seed_from_traces()
         store = self._items.get(assistant_id, {})
         # Gateway tool events historically do not stamp assistant_id, so
         # the projector stores them under "default". Surface those real
