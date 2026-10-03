@@ -90,18 +90,29 @@ def wire_tool_call(
 
 
 class EventTranslator:
-    """Pure fold from a StampedEvent to an AgentStreamEvent payload.
+    """Pure fold from a StampedEvent to AgentStreamEvent payloads.
 
-    Returns a single event dict, a list of event dicts (for multi-event
-    translations like HITL pause), or None to ignore.
+    Always returns a list of envelope dicts; an empty list means the
+    event is ignored. Multi-event translations (e.g. HITL pause) yield
+    more than one envelope.
     """
 
     def __init__(self) -> None:
         self._streamed_text: bool = False
         self._turn_requested_tools: bool = False
 
-    def translate(self, stamped: dict) -> list[dict] | dict | None:
-        """Return the AgentStreamEvent envelope(s) or None to ignore."""
+    def translate(self, stamped: dict) -> list[dict]:
+        """Return the AgentStreamEvent envelopes for one stamped event.
+
+        Single-shape contract: always a list; empty list means ignore.
+        """
+        folded = self._fold(stamped)
+        if folded is None:
+            return []
+        return folded if isinstance(folded, list) else [folded]
+
+    def _fold(self, stamped: dict) -> list[dict] | dict | None:
+        """Internal fold; tri-state (list | dict | None), normalized by translate()."""
         event = stamped.get("event") or {}
         kind = event.get("kind")
         if kind == "ignore":

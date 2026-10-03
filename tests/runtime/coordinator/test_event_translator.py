@@ -13,45 +13,41 @@ def test_llm_call_started_becomes_stream_start() -> None:
     t = EventTranslator()
     stamped = {"event": {"type": "LlmCallStarted", "assistantMessage": {"id": "a1"}}}
     out = t.translate(stamped)
-    assert out is not None
-    assert out["type"] == "stream_start"
-    assert out["data"]["assistantMessage"]["id"] == "a1"
+    assert out[0]["type"] == "stream_start"
+    assert out[0]["data"]["assistantMessage"]["id"] == "a1"
 
 
 def test_text_delta_becomes_stream_chunk_text() -> None:
     t = EventTranslator()
     stamped = {"event": {"type": "LlmCallTextDelta", "delta": "hi"}}
     out = t.translate(stamped)
-    assert out is not None
-    assert out["type"] == "stream_chunk"
-    assert out["data"]["chunkType"] == "text"
-    assert out["data"]["content"] == "hi"
-    assert out["data"]["snapshotMode"] == "append"
+    assert out[0]["type"] == "stream_chunk"
+    assert out[0]["data"]["chunkType"] == "text"
+    assert out[0]["data"]["content"] == "hi"
+    assert out[0]["data"]["snapshotMode"] == "append"
 
 
 def test_step_text_delta_answer_channel_becomes_stream_chunk_text() -> None:
     t = EventTranslator()
     stamped = {"event": {"type": "StepTextDelta", "text_delta": "hi", "channel": "answer"}}
     out = t.translate(stamped)
-    assert out is not None
-    assert out["data"]["chunkType"] == "text"
-    assert out["data"]["content"] == "hi"
+    assert out[0]["data"]["chunkType"] == "text"
+    assert out[0]["data"]["content"] == "hi"
 
 
 def test_step_text_delta_decision_channel_is_ignored() -> None:
     t = EventTranslator()
     stamped = {"event": {"type": "StepTextDelta", "text_delta": "secret", "channel": "decision"}}
-    assert t.translate(stamped) is None
+    assert t.translate(stamped) == []
 
 
 def test_reasoning_delta_becomes_stream_chunk_reasoning() -> None:
     t = EventTranslator()
     stamped = {"event": {"type": "ReasoningDelta", "text_delta": "thinking"}}
     out = t.translate(stamped)
-    assert out is not None
-    assert out["type"] == "stream_chunk"
-    assert out["data"]["chunkType"] == "reasoning"
-    assert out["data"]["reasoning"] == "thinking"
+    assert out[0]["type"] == "stream_chunk"
+    assert out[0]["data"]["chunkType"] == "reasoning"
+    assert out[0]["data"]["reasoning"] == "thinking"
 
 
 def test_spine_llm_call_start_becomes_stream_start_with_parent() -> None:
@@ -64,9 +60,8 @@ def test_spine_llm_call_start_becomes_stream_start_with_parent() -> None:
         }
     }
     out = t.translate(stamped)
-    assert out is not None
-    assert out["type"] == "stream_start"
-    assert out["data"]["assistantMessage"]["id"] == "msg_assistant"
+    assert out[0]["type"] == "stream_start"
+    assert out[0]["data"]["assistantMessage"]["id"] == "msg_assistant"
 
 
 def test_spine_llm_call_end_becomes_stream_end() -> None:
@@ -87,8 +82,7 @@ def test_spine_llm_call_end_becomes_stream_end() -> None:
         }
     }
     out = t.translate(stamped)
-    assert out is not None
-    assert out["type"] == "stream_end"
+    assert out[0]["type"] == "stream_end"
 
 
 def test_streamed_answer_turn_also_ends_visible_output() -> None:
@@ -107,7 +101,7 @@ def test_streamed_answer_turn_also_ends_visible_output() -> None:
                     "payload": {"stream": True},
                 }
             }
-        )["type"]
+        )[0]["type"]
         == "stream_start"
     )
     t.translate(
@@ -141,7 +135,7 @@ def test_streamed_answer_turn_also_ends_visible_output() -> None:
                 }
             }
         )
-        is None
+        == []
     )
     assert (
         t.translate(
@@ -153,7 +147,7 @@ def test_streamed_answer_turn_also_ends_visible_output() -> None:
                 }
             }
         )
-        is None
+        == []
     )
 
 
@@ -189,8 +183,8 @@ def test_streamed_tool_turn_keeps_visible_output_open() -> None:
             }
         }
     )
-    assert isinstance(out, dict)
-    assert out["type"] == "stream_end"
+    assert isinstance(out, list)
+    assert out[0]["type"] == "stream_end"
 
 
 def test_spine_llm_call_start_non_streaming_is_dropped() -> None:
@@ -209,7 +203,7 @@ def test_spine_llm_call_start_non_streaming_is_dropped() -> None:
             "payload": {"model": "solo", "stream": False, "prompt_preview": "ROLE: memory_extract"},
         }
     }
-    assert t.translate(stamped) is None
+    assert t.translate(stamped) == []
 
 
 def test_spine_llm_call_end_non_streaming_is_dropped() -> None:
@@ -222,7 +216,7 @@ def test_spine_llm_call_end_non_streaming_is_dropped() -> None:
             "payload": {"model": "solo", "stream": False, "outcome": "success"},
         }
     }
-    assert t.translate(stamped) is None
+    assert t.translate(stamped) == []
 
 
 def test_spine_llm_call_end_stream_failure_becomes_error() -> None:
@@ -245,9 +239,8 @@ def test_spine_llm_call_end_stream_failure_becomes_error() -> None:
         }
     }
     out = t.translate(stamped)
-    assert out is not None
-    assert out["type"] == "error"
-    assert "qwen3.7-plus" in out["data"]["message"]
+    assert out[0]["type"] == "error"
+    assert "qwen3.7-plus" in out[0]["data"]["message"]
 
 
 def test_spine_llm_stream_token_reasoning() -> None:
@@ -259,9 +252,8 @@ def test_spine_llm_stream_token_reasoning() -> None:
         }
     }
     out = t.translate(stamped)
-    assert out is not None
-    assert out["data"]["chunkType"] == "reasoning"
-    assert out["data"]["reasoning"] == "plan"
+    assert out[0]["data"]["chunkType"] == "reasoning"
+    assert out[0]["data"]["reasoning"] == "plan"
 
 
 def test_spine_llm_header_assistant_becomes_stream_chunk_text() -> None:
@@ -273,10 +265,9 @@ def test_spine_llm_header_assistant_becomes_stream_chunk_text() -> None:
         }
     }
     out = t.translate(stamped)
-    assert out is not None
-    assert out["type"] == "stream_chunk"
-    assert out["data"]["chunkType"] == "text"
-    assert out["data"]["content"] == "你好呀！"
+    assert out[0]["type"] == "stream_chunk"
+    assert out[0]["data"]["chunkType"] == "text"
+    assert out[0]["data"]["content"] == "你好呀！"
 
 
 def test_spine_llm_tool_call_streaming_becomes_tools_calling() -> None:
@@ -293,23 +284,22 @@ def test_spine_llm_tool_call_streaming_becomes_tools_calling() -> None:
         }
     }
     out = t.translate(stamped)
-    assert out is not None
-    assert out["type"] == "stream_chunk"
-    assert out["data"]["chunkType"] == "tools_calling"
-    tool = out["data"]["toolsCalling"][0]
+    assert out[0]["type"] == "stream_chunk"
+    assert out[0]["data"]["chunkType"] == "tools_calling"
+    tool = out[0]["data"]["toolsCalling"][0]
     assert tool["id"] == "toolu_x"
     assert tool["apiName"] == "executeCode"
 
 
 def _wire_msgs(out):
-    """Normalize translate() output to a list of wire messages.
+    """translate() always returns a list; locate the wire message by type.
 
     The translator appends an ``activity_updated`` message when the global
     activity projector yields an item for the event (singleton state), so
-    tests locate the wire message by type instead of assuming a bare dict.
+    tests locate the wire message by type instead of assuming a single item.
     """
-    assert out is not None
-    return out if isinstance(out, list) else [out]
+    assert isinstance(out, list)
+    return out
 
 
 def test_spine_llm_tool_call_streaming_missing_identity_is_ignored() -> None:
@@ -320,7 +310,7 @@ def test_spine_llm_tool_call_streaming_missing_identity_is_ignored() -> None:
             "payload": {"model": "solo"},
         }
     }
-    assert t.translate(stamped) is None
+    assert t.translate(stamped) == []
 
 
 def test_spine_tool_call_record_becomes_tools_calling() -> None:
@@ -427,9 +417,8 @@ def test_reaction_added_becomes_reaction_added_wire_event() -> None:
         }
     }
     out = t.translate(stamped)
-    assert out is not None
-    assert out["type"] == "reaction_added"
-    assert out["data"] == {"message_id": "m1", "emoji": "🎉", "actor": "assistant"}
+    assert out[0]["type"] == "reaction_added"
+    assert out[0]["data"] == {"message_id": "m1", "emoji": "🎉", "actor": "assistant"}
 
 
 def test_step_start_with_human_approval_has_requires_approval() -> None:
@@ -443,11 +432,10 @@ def test_step_start_with_human_approval_has_requires_approval() -> None:
         }
     }
     out = t.translate(stamped)
-    assert out is not None
-    assert out["type"] == "step_start"
-    assert out["data"]["phase"] == "human_approval"
-    assert out["data"]["requiresApproval"] is True
-    assert out["data"]["pendingToolsCalling"] == [{"id": "tc1"}]
+    assert out[0]["type"] == "step_start"
+    assert out[0]["data"]["phase"] == "human_approval"
+    assert out[0]["data"]["requiresApproval"] is True
+    assert out[0]["data"]["pendingToolsCalling"] == [{"id": "tc1"}]
 
 
 def test_spine_close_with_waiting_human_becomes_agent_runtime_end() -> None:
@@ -497,19 +485,18 @@ def test_spine_close_with_done_becomes_agent_runtime_end_completed() -> None:
         "event": {"type": "SpineClose", "reason": "completed", "final_state": {"status": "done"}}
     }
     out = t.translate(stamped)
-    assert out is not None
-    assert out["type"] == "agent_runtime_end"
-    assert out["data"]["reason"] == "completed"
+    assert out[0]["type"] == "agent_runtime_end"
+    assert out[0]["data"]["reason"] == "completed"
 
 
 def test_unknown_event_returns_none() -> None:
     t = EventTranslator()
-    assert t.translate({"event": {"type": "UnknownThing"}}) is None
+    assert t.translate({"event": {"type": "UnknownThing"}}) == []
 
 
 def test_unknown_event_kind_returns_none() -> None:
     t = EventTranslator()
-    assert t.translate({"event": {"type": "LlmCallTextDelta", "kind": "ignore"}}) is None
+    assert t.translate({"event": {"type": "LlmCallTextDelta", "kind": "ignore"}}) == []
 
 
 def test_agent_intervention_request_is_not_emitted_by_lca() -> None:
@@ -533,7 +520,7 @@ def test_agent_intervention_request_is_not_emitted_by_lca() -> None:
     assert "AgentInterventionRequest" not in event_translator._HANDLERS
     assert "AgentInterventionRequest" not in event_translator._SPINE_HANDLERS
     t = EventTranslator()
-    assert t.translate({"event": {"type": "AgentInterventionRequest"}}) is None
+    assert t.translate({"event": {"type": "AgentInterventionRequest"}}) == []
 
 
 # ── description fallback (collapsed tool chip must never be empty) ─────────
@@ -664,7 +651,7 @@ def test_spine_phase_tool_start_empty_payload_returns_none() -> None:
             "payload": {"state_id": "trace_x"},
         }
     }
-    assert t.translate(stamped) is None
+    assert t.translate(stamped) == []
 
 
 def test_spine_body_tool_end_empty_payload_returns_none() -> None:
@@ -685,4 +672,4 @@ def test_spine_body_tool_end_empty_payload_returns_none() -> None:
             "payload": {"state_id": "trace_x", "outcome": "ok"},
         }
     }
-    assert t.translate(stamped) is None
+    assert t.translate(stamped) == []
