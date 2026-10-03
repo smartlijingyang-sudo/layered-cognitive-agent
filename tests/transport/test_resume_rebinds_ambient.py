@@ -101,7 +101,20 @@ def test_resume_binds_spine_hook_in_task_context(monkeypatch) -> None:
         RunLifecycleCoordinator,
     )
 
-    bridge = MagicMock(name="bridge")
+    class _BridgeFake:
+        """Minimal ``SessionObserverTarget``: ``set_session`` fail-fasts with
+        ``isinstance(..., SessionObserverTarget)`` and a bare ``MagicMock``
+        is invisible to that ``@runtime_checkable`` check on 3.12
+        (``inspect.getattr_static`` never triggers ``__getattr__``)."""
+
+        def __init__(self) -> None:
+            self.observed: list = []
+
+        def observe(self, plugin, callback):
+            self.observed.append((plugin, callback))
+            return object()
+
+    bridge = _BridgeFake()
     bound = MagicMock(name="bound")
     bound.bridge = bridge
 
