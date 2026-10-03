@@ -545,6 +545,6 @@
 | CONN-GOV-TASK-1-ISOLATION | 用户主权 SSOT 存储与全局隔离解耦 (`vault.py`, `settings.py`, `service.py`) | Completed | 落地 resolve_user_connections_path，ConnectorVault 彻底切除旧全局 fallback，单测 24/24 全绿，实现新用户 100% 干净隔离 (INV-CONN-01) |
 | CONN-GOV-TASK-2-PROVENANCE-GATE | 认知层 Auth 意图 URL 事实血统门禁 (`AuthUrlProvenanceGate` & `gate.chain.run`) | Completed | 落地 AuthUrlProvenanceGate，精准收窄至 auth 意图 URL，无血统强力拦截改写，单测 4/4 全绿 (INV-CONN-03) |
 | CONN-GOV-TASK-3-EXEC-GUARD | 状态驱动执行窄门硬拦截 (`ConnectorPreExecutionGuard` & `ConnectionNotActiveError`) | Completed | 落地 ConnectionNotActiveError 类型化错误与 ConnectorPreExecutionGuard，适配层转译官方卡片，严格执行窄门分层 (INV-CONN-02) |
-| CONN-GOV-TASK-4-IDENTITY-DISCLOSURE | 根除走文本偷懒病根 & 动身份先报身份透明契约 (`ConnectedServicesSection` & 核心铁律) | In Progress | 正在注入 Prompt 核心铁律、回执 account_identity 与挂载 ConnectedServicesSection (INV-CONN-05) |
-| CONN-GOV-TASK-5-INTEGRATION-E2E | 全链路端到端集成验收与 Pre-Push 门禁体检 (INV-CONN-01 ~ 06) | Pending | 待执行 |
+| CONN-GOV-TASK-4-IDENTITY-DISCLOSURE | 根除走文本偷懒病根 & 动身份先报身份透明契约 (`ConnectedServicesSection` & 核心铁律) | Completed | 注入动态URL严禁脑补与动身份先报身份两大核心铁律；ConnectedServicesSection 透传展示 account_identity；挂载到 built-in 模板基座；通过 42/42 测试，commit a0f9809ce (INV-CONN-05) |
+| CONN-GOV-TASK-5-INTEGRATION-E2E | 全链路端到端集成验收与 Pre-Push 门禁体检 (INV-CONN-01 ~ 06) | Completed | 落地 tests/scenario/test_connector_ssot_governance_e2e.py，全链路 39/39 关联测试 100% 全绿，覆盖 INV-CONN-01 至 INV-CONN-06 全套不变量，ruff 0 报错，git diff --check clean，commit c6b59ba6e |
 | STANDING-FILES-MEMORY-DEGRADE | 修复未初始化的 MEMORY.md 在 GET 接口抛 404，补齐默认模板与优雅降级 | Completed | 落地 DEFAULT_STANDING_FILE_TEMPLATES，未建盘文件降级返回 200 与骨架模板，PUT 初始写兼容模板与空哈希，全量 10/10 单测通过 |
