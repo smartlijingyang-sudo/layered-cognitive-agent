@@ -30,17 +30,17 @@ except ImportError:  # pragma: no cover - P4 落地前必然走这里
     LayaScoreEngine = None  # type: ignore[assignment]
 
 __all__ = [
-    "ConsolidationOutcome",
-    "LinkResult",
     "ConsolidationContext",
     "ConsolidationDecider",
-    "EncodeGate",
-    "LinkDecider",
+    "ConsolidationOutcome",
     "DecayPolicy",
-    "RuleDecider",
-    "SchemaExtractor",
-    "RuleSchemaExtractor",
+    "EncodeGate",
     "LayaDecider",
+    "LinkDecider",
+    "LinkResult",
+    "RuleDecider",
+    "RuleSchemaExtractor",
+    "SchemaExtractor",
 ]
 
 # C5：decision 四选一（运行时校验用，Literal 只做静态检查）
@@ -488,7 +488,7 @@ class SchemaExtractor(Protocol):
 def _schema_claim_id(who_key: tuple[str, ...], norm_what: str) -> str:
     """确定性 claim id：同一 (who, 主题) 重复提炼时 id 稳定。"""
     digest = hashlib.md5(
-        f"{'|'.join(who_key)}\x00{norm_what}".encode("utf-8")
+        f"{'|'.join(who_key)}\x00{norm_what}".encode()
     ).hexdigest()[:12]
     return f"schema-{digest}"
 

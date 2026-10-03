@@ -199,8 +199,8 @@ def count_consecutive_tool_failures(visits: Any, tool_name: str | None) -> int:
 
 
 __all__ = [
-    "ToolErrorKind",
     "ToolErrorBudget",
+    "ToolErrorKind",
     "build_failure_explanation",
     "classify_tool_error",
     "count_consecutive_tool_failures",

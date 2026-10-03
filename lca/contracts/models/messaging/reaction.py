@@ -6,7 +6,7 @@ text reply. The frontend renders it as a small badge on the message corner.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -23,7 +23,7 @@ class MessageReaction(BaseModel):
         default="assistant", description="谁贴的"
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="贴上时间（UTC）",
     )
 

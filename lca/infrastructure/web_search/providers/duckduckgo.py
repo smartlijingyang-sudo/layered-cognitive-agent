@@ -16,7 +16,6 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from lca.contracts.models.cognition.web_search import SearchResult
 from lca.infrastructure.web_search.errors import ProviderError
-from lca.infrastructure.web_search.providers.base import SearchProvider
 
 ENDPOINT = "https://html.duckduckgo.com/html/"
 _USER_AGENT = (

@@ -18,7 +18,7 @@ class _StubProvider:
     name = "stub"
     needs = ""
 
-    def search(self, query: str, *, limit: int = 10):  # noqa: ANN001, ANN202
+    def search(self, query: str, *, limit: int = 10):
         raise ProviderNotConfigured(
             f"{self.name} 尚未接入：{self.needs}"
         )

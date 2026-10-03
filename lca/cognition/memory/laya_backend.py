@@ -105,7 +105,7 @@ def recalibrate_probs(probs: list[float], temperature: float) -> list[float]:
     ``temperature < 1`` sharpens. Must be > 0.
     """
     if not (temperature > 0) or not math.isfinite(temperature):
-        raise ValueError("temperature must be a positive finite number, got %r" % (temperature,))
+        raise ValueError(f"temperature must be a positive finite number, got {temperature!r}")
     eps = 1e-12
     zs = [math.log(max(p, eps)) for p in probs]
     scaled = [z / temperature for z in zs]
@@ -156,9 +156,7 @@ class LayaScoreEngine:
         device: str | None = None,
     ) -> None:
         if not (temperature > 0) or not math.isfinite(temperature):
-            raise ValueError(
-                "temperature must be a positive finite number, got %r" % (temperature,)
-            )
+            raise ValueError(f"temperature must be a positive finite number, got {temperature!r}")
         self.checkpoint = checkpoint
         self.cache_dir = cache_dir
         self.temperature = temperature
@@ -166,21 +164,19 @@ class LayaScoreEngine:
         self._agent: Any = None
         self._load_error: str | None = None
         try:
-            import laya  # noqa: F401  (lazy: backend must import without laya installed)
-        except Exception as exc:  # noqa: BLE001 - any import failure -> unavailable
-            self._load_error = "laya package import failed: %s" % (exc,)
+            import laya  # lazy: backend must import without laya installed
+        except Exception as exc:  # any import failure -> unavailable
+            self._load_error = f"laya package import failed: {exc}"
             return
         try:
             if cache_dir:
                 # Keep weights in the caller's cache dir, not the HF default.
                 os.environ.setdefault("HF_HOME", cache_dir)
-                os.environ.setdefault(
-                    "HUGGINGFACE_HUB_CACHE", os.path.join(cache_dir, "hub")
-                )
+                os.environ.setdefault("HUGGINGFACE_HUB_CACHE", os.path.join(cache_dir, "hub"))
             # "typed-decisions" alias resolves to the same standalone repo.
             self._agent = laya.load(checkpoint, device=device)
-        except Exception as exc:  # noqa: BLE001 - any load failure -> unavailable
-            self._load_error = "laya checkpoint load failed (%s): %s" % (checkpoint, exc)
+        except Exception as exc:  # any load failure -> unavailable
+            self._load_error = f"laya checkpoint load failed ({checkpoint}): {exc}"
 
     # ------------------------------------------------------------------ state
 
@@ -214,9 +210,9 @@ class LayaScoreEngine:
     def _require_available(self) -> Any:
         if self._agent is None:
             raise RuntimeError(
-                "LayaScoreEngine is not available: %s. "
-                "Install the 'laya' package and download checkpoint %r "
-                "(see module docstring)." % (self._load_error, self.checkpoint)
+                f"LayaScoreEngine is not available: {self._load_error}. "
+                f"Install the 'laya' package and download checkpoint {self.checkpoint!r} "
+                "(see module docstring)."
             )
         return self._agent
 
@@ -244,7 +240,7 @@ class LayaScoreEngine:
                 "criteria": levels,
             }
         }
-        states = ["Query: %s\nCandidate: %s" % (query, cand) for cand in candidates]
+        states = [f"Query: {query}\nCandidate: {cand}" for cand in candidates]
         payload = agent.predict_batch(states, question)
         # predict_batch returns one payload per state:
         # [{"model": ..., "answers": {qid: ans}, "usage": ...}, ...]
@@ -265,7 +261,7 @@ class LayaScoreEngine:
             probs = [p / total for p in probs]
             calibrated = recalibrate_probs(probs, self.temperature)
             expected = sum(i * p for i, p in enumerate(probs))
-            label = max(0, min(n_levels - 1, int(round(expected))))
+            label = max(0, min(n_levels - 1, round(expected)))
             out.append(LayaScore(label=label, confidence=max(calibrated)))
         return out
 
@@ -297,8 +293,8 @@ class LayaScoreEngine:
         for qid, qdef in schema.items():
             if not isinstance(qdef, dict) or qdef.get("type") not in ("choice", "score", "noul"):
                 raise ValueError(
-                    "schema[%r] must define a Laya question with type in "
-                    "{choice, score, noul}" % (qid,)
+                    f"schema[{qid!r}] must define a Laya question with type in "
+                    "{choice, score, noul}"
                 )
         payload = agent.predict(state, schema)
         # Agent.predict returns {"model": ..., "answers": {qid: ans}, "usage": ...}
@@ -312,7 +308,7 @@ class LayaScoreEngine:
             if qtype == "choice":
                 values[qid] = str(ans.get("choice"))
             elif qtype == "score":
-                values[qid] = str(int(round(float(ans.get("score", 0.0)))))
+                values[qid] = str(round(float(ans.get("score", 0.0))))
             elif qtype == "noul":
                 values[qid] = "yes" if float(ans.get("noul", 0.0)) >= 0.5 else "no"
             else:

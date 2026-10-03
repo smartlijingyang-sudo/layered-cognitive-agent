@@ -65,7 +65,7 @@ class BrowserBackend:
         self._context = None
 
     # -- lifecycle -----------------------------------------------------
-    def __enter__(self) -> "BrowserBackend":
+    def __enter__(self) -> BrowserBackend:
         pw_factory = _playwright()
         self._pw = pw_factory()
         pw = self._pw.__enter__()

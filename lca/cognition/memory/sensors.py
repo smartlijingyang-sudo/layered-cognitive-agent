@@ -16,22 +16,22 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Protocol, Union
+from typing import Protocol
 
 from lca.cognition.memory.types import EpisodicTrace, SemanticClaim
 
 __all__ = [
     "MIN_CONFIDENCE",
     "EpisodicPercept",
-    "SemanticPercept",
-    "RelationPercept",
-    "Percept",
-    "NoRecall",
     "EpisodicSensor",
-    "SemanticSensor",
-    "RelationSensor",
     "MemorySensor",
     "MemorySensorRegistry",
+    "NoRecall",
+    "Percept",
+    "RelationPercept",
+    "RelationSensor",
+    "SemanticPercept",
+    "SemanticSensor",
 ]
 
 # C2 上报铁律：confidence 低于此阈值的 percept 不上报（fail-closed），
@@ -107,7 +107,7 @@ class RelationPercept:
 
 
 # 任一 typed 感知（C1 类型铁律的"类型"全集）。
-Percept = Union[EpisodicPercept, SemanticPercept, RelationPercept]
+Percept = EpisodicPercept | SemanticPercept | RelationPercept
 
 _PERCEPT_TYPES = (EpisodicPercept, SemanticPercept, RelationPercept)
 
@@ -157,7 +157,7 @@ def _cue_hit_count(cues: list[str], *texts: str) -> int:
 
 def _fail_closed_no_recall(
     percepts: list[Percept], reason: str
-) -> list[Union[Percept, NoRecall]]:
+) -> list[Percept | NoRecall]:
     """C2 门控：过滤 confidence < MIN_CONFIDENCE 的 percept。
 
     过滤后无剩余 → 显式返回 [NoRecall]（fail-closed），
@@ -180,7 +180,7 @@ class EpisodicSensor:
 
     def perceive(
         self, cues: list[str], now: datetime, limit: int = 5
-    ) -> list[Union[EpisodicPercept, NoRecall]]:
+    ) -> list[EpisodicPercept | NoRecall]:
         """召回与 cues 相关的情景记忆。
 
         返回 typed percept 列表，或单个 NoRecall（无命中 / 命中者
@@ -226,7 +226,7 @@ class SemanticSensor:
         now: datetime,
         limit: int = 5,
         as_of: datetime | None = None,
-    ) -> list[Union[SemanticPercept, NoRecall]]:
+    ) -> list[SemanticPercept | NoRecall]:
         """查询与 cues 相关的语义断言。
 
         ``as_of=None``（默认）：只查当前有效集；
@@ -280,7 +280,7 @@ class RelationSensor:
 
     def perceive(
         self, cues: list[str], now: datetime, limit: int = 5
-    ) -> list[Union[RelationPercept, NoRecall]]:
+    ) -> list[RelationPercept | NoRecall]:
         hits = [
             (person, context)
             for person, context in self._relations.items()
@@ -309,7 +309,7 @@ class MemorySensor(Protocol):
 
     def perceive(
         self, cues: list[str], now: datetime, limit: int = 5
-    ) -> list: ...  # noqa: E704
+    ) -> list: ...
 
 
 class MemorySensorRegistry:
@@ -343,7 +343,7 @@ class MemorySensorRegistry:
 
     def perceive_all(
         self, cues: list[str], now: datetime
-    ) -> dict[str, list[Union[Percept, NoRecall]]]:
+    ) -> dict[str, list[Percept | NoRecall]]:
         """触发全部 sensor 感知，依次过 C2 门控与 token 预算，返回分组结果。"""
         # 1) 各 sensor 独立感知
         raw: dict[str, list] = {}
@@ -363,7 +363,7 @@ class MemorySensorRegistry:
         pool.sort(key=lambda t: t[0], reverse=True)
         kept_ids = {id(p) for _, _, p in pool[: self.max_percepts]}
         # 4) 组装（保持注册顺序；预算截光的 sensor 给空列表）
-        out: dict[str, list[Union[Percept, NoRecall]]] = {}
+        out: dict[str, list[Percept | NoRecall]] = {}
         for name in self._sensors:
             percepts, norc = gated[name]
             alive = sorted(
