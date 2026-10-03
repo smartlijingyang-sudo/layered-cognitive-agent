@@ -830,3 +830,28 @@ grep -rn 'artifacts\["think"\]\|artifacts\.get("think")' lca/ plugins/  # = 0 (A
 | `Reflection` | 反思 | `concept.reflection.critique` | `agent.memory.turn` |
 | `MemoryReceipt` | 记忆回执 | `concept.memory.write` | `agent.stop.turn` |
 | `StopPayload` | 终止载荷 | `concept.stop.should_check` | `agent.run.phase` loop back 边 |
+---
+
+## 附录 C — Accepted 闸门实证评估（2026-10-03，iter-arch lane）
+
+> 本节为迭代轮实证记录，不改变 ADR 状态（仍为 Proposed，待评审）。
+> 评估基线：main @ `2d9722c39`。方法：静态实证（grep / 文件存在性），未做行为级验证。
+
+| 门 | ADR 原文要求 | 实证结论 |
+|---|---|---|
+| G1 | `bundles/` 三层独立目录 + `lca-ops audit-plugin-shape` 把图层登记为 `PluginKind` | 部分通过：`bundles/primitive/`、`bundles/concept/`、`bundles/agent/` 三目录存在；`scripts/lca-ops` 内未找到图层 `PluginKind` 登记 |
+| G2 | 11 个 boundary DTO 在 `lca/contracts/models/cognition/boundary.py` 集中定义，全部 `frozen=True` | **未通过**：`boundary.py` 只含其中 7 个（`BindingsView`/`ForkedTools`/`RoleSnapshot`/`ReasonerContext`/`TemplateSelection`/`MemoryReceipt`/`StopPayload`）。`ReasonerTurnRender` 在 `lca/contracts/models/cognition/reasoner_turn.py`，`Decision`/`Reflection` 在 `lca/contracts/models/core/execution/decision.py`（另 `Reflection` 见 `task.py`），`EffectReceipt` 在 `lca/contracts/harness/act/effect_receipt.py`（普通类，非 BaseModel）与 `lca/contracts/models/core/execution/local_exec.py`（BaseModel）各一。现状是**领域分置**而非集中定义 |
+| G3 | `bundles/agent/reasoning_turn.yaml` 存在并通过 `tests/integration/think/test_agent_reasoning_turn.py::test_e2e_with_prep_graph` | 部分通过：yaml 存在；该测试文件在仓库中不存在（全仓零命中） |
+| G4 | `PromptReasoner` 只剩 `render_turn`/`complete_turn`；5 个私有成员删除；`reasoner.py` ≤ 280 行 | **未通过**：`reasoner.py` 270 行 ✓；`_resolve_tools`/`_legacy_*` 已删除 ✓；但 `PromptReasoner` 仍保留公开方法 `build_turn_plan`（除 `render_turn`/`complete_turn` 之外），与"只剩两个方法"不符 |
+| G5 | `AgentState` 删除 5 个 `_xxx_ref` 私有属性；`reasoner.py` 中 `getattr(state, "_xxx_ref", None)` 归零 | 通过：lca/ 内零 `state._xxx_ref` 反射（`runtime_plane.make_sandbox_ref` 为无关符号） |
+| G6 | `reasoner_provider.setup` 删除 `runtime().inject("tools")` 偷 inject 路径；`bundles/base.yaml` 增两个 plugin id 并显式 `requires=("tools",)` | 通过：`lca/plugins/` 内零 `runtime().inject(` |
+| G7 | 端到端 run ping 六语义走通，`broken_hop=None` | 未验证（需真实 run，本轮未执行） |
+| G8 | `tests/think/` + `tests/integration/think/` + `tests/harness/graph/execute/` 100+ 不退化；新增 `tests/business/test_three_tier_graph_dispatch.py` | 部分通过：dispatch 测试存在（含 7 处 three-tier 断言）；`tests/think/` 存在，但 `tests/integration/think/` 与 `tests/harness/graph/execute/` 目录已不存在（布局已演进） |
+| G9 | 零三类 grep | 通过 |
+
+### 结论
+
+- **G2 与 G4 是 ADR 原文与实现实质分歧**：DTO 落点（集中 vs 领域分置）、`build_turn_plan` 去留。需 ADR 作者或评审人裁决：修订 ADR 闸门措辞以承认现状，或调整实现向 ADR 对齐。本轮不裁决。
+- **G1/G3/G8 是过期引用**：`audit-plugin-shape` 登记、`test_e2e_with_prep_graph`、`tests/integration/think/` 目录引用需随布局演进更新或删去。
+- G7 行为验证仍缺席；tests lane 可在全量 sweep 中补定向运行。
+- 本节证据采集命令与输出已归档于 backlog `done（2026-10-03 iter-arch 15:09 跟踪轮）`。
