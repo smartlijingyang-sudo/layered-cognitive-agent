@@ -18,11 +18,16 @@ from typing import Any, ClassVar
 
 import pytest
 
-NAMESPACE_WHITELIST = {"core", "file", "shell", "memory", "skill", "web", "agent", "ext"}
+from lca.infrastructure.tool_defer.policy import STANDARD_NAMESPACES
+
+# 白名单即源码 SSOT，不手写第二份：
+# ADR-0256 8 域（core/file/shell/memory/skill/web/agent/ext）
+# + ADR-0268 §4 lca/cron + ADR-0269 §4 avatar。
+NAMESPACE_WHITELIST = set(STANDARD_NAMESPACES)
 
 
 def test_a1_all_tools_declare_namespace_in_whitelist():
-    """注册表里每个工具都声明 namespace,且值在 8 域白名单内."""
+    """注册表里每个工具都声明 namespace,且值在标准域白名单内（SSOT 见 STANDARD_NAMESPACES）."""
     from lca.infrastructure.tools.default.set import build_default_tools
 
     tools = build_default_tools()  # 落地后应可无参构造,否则补 fixture
