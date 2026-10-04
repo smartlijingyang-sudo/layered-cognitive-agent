@@ -22,11 +22,11 @@ Always check connection status first before invoking operations:
 gmail status
 ```
 
-If status returns `not_connected`, output the card widget line directly:
+If status returns `not_connected`, copy the `widget` line from the status output verbatim:
 ```text
-[widget:connector_auth?appName=Gmail&authUrl=<authUrl>&connectionId=<connectionId>]
+[widget:connector_auth?appName=Gmail&intentId=<intentId>&connectionId=<connectionId>]
 ```
-**CRITICAL**: Do NOT generate markdown links `[Connect Gmail](url)`. Do NOT invent URLs. Do NOT ask user for credentials.
+**CRITICAL**: Copy the widget tag exactly as returned — the real URL is sealed in the vault and resolved by the frontend; never substitute a URL for the intentId. Do NOT generate markdown links `[Connect Gmail](url)`. Do NOT invent URLs. Do NOT ask user for credentials.
 
 ## Commands
 
