@@ -39,6 +39,7 @@ from lca.plugins.composer.composition.cordis_composer import (
 )
 from lca.plugins.prompts.sections import AutonomousPresetsSection
 from lca.plugins.tools.cordis_control import build_cordis_control_tool
+from tests.support.session_gate_helpers import bound_session
 
 
 class DummySafeExecutor:
@@ -127,7 +128,7 @@ async def test_scenario_1_data_engineering_preset_creation(tmp_path: Path) -> No
     journal = MemoryJournal()
     obs = BoundObservability(journal=journal)
 
-    with bind_backends(obs):
+    with bound_session("closed-loop"), bind_backends(obs):
         ctx = Context()
         composer = CordisComposer(ctx, invariant_checker=build_default_invariant_checker())
         control_tool = build_cordis_control_tool(
@@ -200,7 +201,7 @@ async def test_scenario_2_same_session_zero_restart_trigger(tmp_path: Path) -> N
     journal = MemoryJournal()
     obs = BoundObservability(journal=journal)
 
-    with bind_backends(obs):
+    with bound_session("closed-loop"), bind_backends(obs):
         tools_service = ToolsService()
         safe_executor = DummySafeExecutor(allowed_tools=["builtin_bash"])
 
@@ -400,7 +401,7 @@ async def test_scenario_5_hot_upgrade_and_safe_rollback(tmp_path: Path) -> None:
     journal = MemoryJournal()
     obs_b = BoundObservability(journal=journal)
 
-    with bind_backends(obs_b):
+    with bound_session("closed-loop"), bind_backends(obs_b):
         tools_service = ToolsService()
         safe_executor = DummySafeExecutor(allowed_tools=["builtin_bash"])
 
