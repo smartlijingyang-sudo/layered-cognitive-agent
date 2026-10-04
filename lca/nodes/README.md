@@ -29,7 +29,7 @@ graph-node-executors.
 | 事实投递 | 需要落事实的节点（如 `think/dispatch/llm.py`）经注入的 writer / `FactGateway` 调 `append_assistant_message` / `append_tool_call` / `append_tool_result`，仍收敛到 `Session.append` 单入口 |
 | 失败 | 抛给 kernel：kernel 记录带 `error` 的 `VisitRecord` 后向上抛；节点内不做 `except: pass` 式吞没 |
 
-`perceive/`、`act/`、`remember/`、`reflect/`、`stop/` 目前是保留空目录，尚无节点实现。
+`perceive/`、`act/`、`remember/`、`reflect/` 均已有节点实现（见 Layout）；空的 `stop/` 目录已于 2026-10-04 删除——region 集合以文件系统为准（`collect_region_prefixes()`，import-time 生成），不再镜像六语义 phase 闭集（ADR-0194 / ADR-0070 的语义闭集不变）。
 
 ## 3. 输入
 
@@ -90,11 +90,10 @@ lca/nodes/
 │   ├── aggregator/plugin.py
 │   ├── topology/plugin.py
 │   └── registry/plugin.py
-├── perceive/             # reserved for six-phase nodes (empty today)
-├── act/                  # reserved
-├── remember/             # reserved
-├── reflect/              # reserved
-└── stop/                 # reserved
+├── perceive/             # six-phase region: fold, memory_retrieve, observe
+├── act/                  # six-phase region: authorize, envelope, fanout, join, observe, validate
+├── remember/             # six-phase region: admit, fold, write
+└── reflect/              # six-phase region: admit_recovery, memory_extract, score
 ```
 
 ## Rules
@@ -102,9 +101,14 @@ lca/nodes/
 1. **Region is the first directory level.** `lca/nodes/<region>/<sub-group>/<node>.py`
    for nodes that cluster; `lca/nodes/<region>/<node>.py` for single-node
    sub-groups (`think/gate.py`).
-2. **All six phase regions exist as directories.** Even when empty, the
-   directory tree mirrors the six-phase closed set `{perceive, think, act,
-   remember, reflect, stop}`. A new phase node always has a home.
+2. **The directory tree is the region SSOT.** Region prefixes are generated
+   at import time from the top-level directories of `lca/nodes/`
+   (`collect_region_prefixes()`); the tree no longer mirrors the six-phase
+   semantic closed set one-to-one — the empty `stop/` directory was removed
+   on 2026-10-04 (see the ADR-0231 revision note), while the semantic closed
+   set `{perceive, think, act, remember, reflect, stop}` per ADR-0194/ADR-0070
+   stays unchanged. A new region earns its prefix by creating the directory;
+   a new phase node always has a home.
 3. **`loop/` is region-equivalent for outer-loop graph-node-executors.**
    The four roles (`agent` / `aggregator` / `topology` / `registry`) do not
    appear in the six-phase closed set; they implement `NodeExecutor` for
