@@ -1,35 +1,26 @@
-"""URL 铁律回归：react_tool_usage_guidelines 渲染文本必须包含 URL 铁律三句。"""
+"""URL 铁律守卫：prompt 规则不许硬编码在 py 里，必须进 contextfiles 常驻 md（CONSTITUTION.md）。"""
 
 from __future__ import annotations
 
-from lca.plugins.prompts.sections.plugin import Config
-from lca.plugins.prompts.sections.text import build_react_tool_usage
+from lca.plugins.prompts.sections.text import (
+    _REACT_TOOL_USAGE_TEXT,
+    _REACT_TOOL_USAGE_TEXT_GATED,
+)
+
+_FORBIDDEN_FRAGMENTS = (
+    "URL 铁律",
+    "拼装 URL",
+    "脑补或拼装",
+    "照单全信",
+    "只发给用户本人",
+)
 
 
-def _render_default_text() -> str:
-    section = build_react_tool_usage(Config())
-    out = section.render(role_profile=None, tools=())  # type: ignore[arg-type]
-    return out.text
+def test_no_url_rules_hardcoded_in_py() -> None:
+    for fragment in _FORBIDDEN_FRAGMENTS:
+        assert fragment not in _REACT_TOOL_USAGE_TEXT, fragment
+        assert fragment not in _REACT_TOOL_USAGE_TEXT_GATED, fragment
 
 
-def test_section_renders_tool_usage_block() -> None:
-    text = _render_default_text()
-    assert "<tool_usage_guidelines>" in text
-    assert "react_tool_usage" not in text  # section 名不进正文
-
-
-def test_url_iron_rule_no_assembled_url() -> None:
-    text = _render_default_text()
-    assert "URL 铁律" in text
-    assert "严禁凭记忆或参数知识拼装 URL" in text
-
-
-def test_tool_returned_url_verbatim() -> None:
-    text = _render_default_text()
-    assert "照单全信" in text
-    assert "先用工具验证" in text
-
-
-def test_token_url_only_to_user() -> None:
-    text = _render_default_text()
-    assert "只发给用户本人" in text
+def test_identity_disclosure_line_stays() -> None:
+    assert "动身份先报身份" in _REACT_TOOL_USAGE_TEXT
