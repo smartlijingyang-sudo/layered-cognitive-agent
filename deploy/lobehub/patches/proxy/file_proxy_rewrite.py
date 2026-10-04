@@ -29,6 +29,23 @@ def apply(ctx: PatchContext) -> bool:
 def _patch_next(ctx: PatchContext) -> bool:
     rel = "next.config.ts"
     text = ctx.read(rel)
+    if "allowedDevOrigins" in text:
+        return False
+    old_patched = "const nextConfig = {\n  ..._baseConfig,\n  async rewrites() {"
+    new_patched = """const nextConfig = {
+  ..._baseConfig,
+  allowedDevOrigins: [
+    '10.36.6.252',
+    'localhost',
+    '127.0.0.1',
+    ...(process.env.VITE_DEV_HOST ? [process.env.VITE_DEV_HOST] : []),
+  ],
+  async rewrites() {"""
+    if old_patched in text:
+        text = text.replace(old_patched, new_patched, 1)
+        ctx.write(rel, text)
+        return True
+
     if "LCA: file proxy" in text:
         return False
     old = "const nextConfig = defineConfig({"
@@ -42,6 +59,12 @@ def _patch_next(ctx: PatchContext) -> bool:
 // LCA: file proxy — artifact downloads via Next.js rewrite → LCA gateway
 const nextConfig = {
   ..._baseConfig,
+  allowedDevOrigins: [
+    '10.36.6.252',
+    'localhost',
+    '127.0.0.1',
+    ...(process.env.VITE_DEV_HOST ? [process.env.VITE_DEV_HOST] : []),
+  ],
   async rewrites() {
     const base = process.env.LCA_GATEWAY_PUBLIC_URL || 'http://10.36.6.252:8765';
     const baseRewrites = typeof _baseConfig.rewrites === 'function'
