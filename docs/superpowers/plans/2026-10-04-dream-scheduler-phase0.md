@@ -154,6 +154,7 @@ the event loop. The kernel process serves HTTP on the same loop.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -206,12 +207,10 @@ class DreamScheduler:
                 await self.sweep_once()
             except Exception:
                 logger.exception("dream sweep failed")
-            try:
+            with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(
                     self._stop.wait(), timeout=float(self._tick_seconds)
                 )
-            except TimeoutError:
-                pass
 
     async def sweep_once(self) -> tuple[DreamReport | None, ...]:
         """Run one pass over every home. Returns one report per home, None when skipped."""
@@ -273,7 +272,9 @@ The replacement structure hands one synchronous function to `asyncio.to_thread` 
 
 `sweep_once` also gains per-home containment around the whole `_run_home` call. Today one home raising aborts the rest of the sweep, so a single corrupt home silently starves every home after it in catalog order. A failing home yields `None` and logs; the sweep continues.
 
-The three tests below stay as the required behaviour, and gain a fourth asserting that a stale lock from a dead pid is reclaimed rather than skipped, and a fifth asserting that one home raising does not prevent the next home from being visited.
+The three tests below stay as the required behaviour, and gain three more. A fourth asserts that a stale lock from a dead pid is reclaimed rather than skipped. A fifth asserts that one home raising does not prevent the next home from being visited. A sixth asserts that `run_forever` survives a raising `homes` callable and keeps ticking.
+
+That sixth test corrects a ruling the controller got wrong. Per-home containment wraps only the `_run_home` call, so `self._now_ms()` and `self._homes()` in `sweep_once` stay outside it, and Task 4's `homes` callable does catalog listing plus a `(home / "memory").is_dir()` stat that raises `OSError`. `run_forever`'s `except Exception` handler therefore stays reachable after this task and must not be deleted as redundant. It is the only supervisor the plugin's background task has: without it, one raising `homes()` kills the loop for the process lifetime. Note that `except Exception` does not catch `asyncio.CancelledError`, which derives from `BaseException`, so Task 4's dispose-by-cancel path is unaffected by keeping the handler.
 
 A minutes-level timer makes collision with a live user turn routine rather than theoretical. Both the online memory tools and `run_dream` rewrite `{home}/memory/semantic.json` with a non-atomic `write_text` (`lca/infrastructure/memory/assistant_memory.py:215`), and the only guard is `StaleSnapshotOperationError` at `:213`, which aborts rather than waits. `run_dream` does not catch it, so a collision today leaves a half-promoted pass with no receipt.
 
