@@ -146,17 +146,21 @@ nodes:
         binding_edge: think.decision.parse
 
   # PR-3.8.3: typed-boundary repair node between decision.parse
-  # and think.gate. Reads the parsed Decision + the per-run tools
-  # registry (via context.runtime) and emits either the original
-  # Decision (well-formed / irreparable) or the repaired Decision
-  # (truncated JSON successfully repaired). The accompanying
-  # RoutingDecision's reason gates downstream routing: decision_ok
-  # and decision_repaired forward to think.gate;
-  # decision_rejected_{schema,truncated} re-route to
-  # think.route.decide for a full re-reason.
+  # and think.gate. Reads the parsed Decision + the per-run
+  # ``forked_tools`` port (the exact list this cycle offered the
+  # model) and emits either the original Decision (well-formed /
+  # irreparable) or the repaired Decision (truncated JSON
+  # successfully repaired). The accompanying RoutingDecision's reason
+  # gates downstream routing: decision_ok and decision_repaired
+  # forward to think.gate; decision_rejected_{schema,truncated}
+  # re-route to think.route.decide for a full re-reason.
+  # ``forked_tools``, never ``tools``: the boot-time plan lift accepts
+  # only ports a reachable predecessor inside this plan produces, and
+  # ``tools`` is seeded on the outer registry. Run
+  # scripts/check_plan_lift.py before editing this list.
   - id: think.decision.repair
     factory: think.decision.repair
-    inputs: [decision]
+    inputs: [decision, forked_tools]
     outputs: [decision, routing]
     config:
 

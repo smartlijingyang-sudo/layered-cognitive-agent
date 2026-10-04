@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from lca.contracts.atoms.control.slot import ControlSlot
@@ -16,7 +17,9 @@ from lca.contracts.harness.composition.plugin_contract import (
     PluginContract,
     PluginIdentity,
 )
+from lca.contracts.models.cognition.boundary import ForkedTools
 from lca.contracts.models.core.execution.decision import Decision
+from lca.contracts.protocols import Tool
 from lca.contracts.protocols.declarative.declarative_1.node_executor import (
     NodeContext,
     NodeInput,
@@ -50,7 +53,7 @@ class ThinkDecisionRepairExecutor:
 
     semantic_name: str = "think.decision.repair"
     region: str = "think"
-    declared_inputs: tuple[PortName, ...] = (PortName("decision"), PortName("tools"))
+    declared_inputs: tuple[PortName, ...] = (PortName("decision"), PortName("forked_tools"))
     declared_outputs: tuple[PortName, ...] = (PortName("decision"), PortName("routing"))
 
     async def node_execute(
@@ -60,14 +63,16 @@ class ThinkDecisionRepairExecutor:
     ) -> NodeOutput:
         """think 子图节点入口。
 
-        inputs 端口(yaml): decision, tools
+        inputs 端口(yaml): decision, forked_tools
         outputs 端口(yaml): decision, routing
 
-        Reads the ``decision`` port and the optional ``tools`` typed
-        port (a ``ToolRegistry`` per ADR-0047). Emits the original or
-        repaired ``Decision`` plus a ``RoutingDecision`` whose
-        ``next_node`` steers the waterfall toward ``think.gate``
-        (ok / repaired) or ``think.route.decide`` (rejected).
+        Reads the ``decision`` port and the ``forked_tools`` typed port,
+        the per-run :class:`ForkedTools` list this think cycle offered
+        the model, so the schema checked here is the schema the model
+        saw. Emits the original or repaired ``Decision`` plus a
+        ``RoutingDecision`` whose ``next_node`` steers the waterfall
+        toward ``think.gate`` (ok / repaired) or ``think.route.decide``
+        (rejected).
 
         Empty ``decision`` (None) yields an empty ``NodeOutput`` so the
         bundle edge decides routing — typical wiring:
@@ -94,7 +99,7 @@ class ThinkDecisionRepairExecutor:
                 }
             )
 
-        registry = input.port_values.get(PortName("tools"))
+        registry = _tool_lookup_from_port(input.port_values.get(PortName("forked_tools")))
 
         outcome, repaired_calls = _validate_or_repair_calls(
             decision.tool_calls,
@@ -133,6 +138,37 @@ class ThinkDecisionRepairExecutor:
                 PortName("routing"): _route_ok(),
             }
         )
+
+
+@dataclass(frozen=True, slots=True)
+class _ForkedToolLookup:
+    """Read-only ``.get(name)`` view over the per-run forked tool list."""
+
+    by_name: Mapping[str, Tool]
+
+    def get(self, name: str) -> Tool | None:
+        return self.by_name.get(name)
+
+
+def _tool_lookup_from_port(port_value: object) -> _ForkedToolLookup:
+    """Adapt the ``forked_tools`` port into a name lookup, or fail loud.
+
+    A ``None`` registry degrades every downstream check to "no schema
+    declared" and forwards malformed arguments to the Body, so the
+    missing port is a contract break, not a state to route around.
+    """
+    if port_value is None:
+        raise RuntimeError(
+            "think.decision.repair: 'forked_tools' typed port missing from input ports"
+        )
+    if not isinstance(port_value, ForkedTools):
+        raise TypeError(
+            "think.decision.repair: 'forked_tools' port must be a ForkedTools "
+            f"instance, got {type(port_value).__name__}"
+        )
+    # ``tool.name`` is the wire name ``think.history.assemble._tool_to_spec``
+    # sends the model, so it is what ``ToolCall.tool_name`` carries back.
+    return _ForkedToolLookup({tool.name: tool for tool in port_value.items})
 
 
 def _has_tool_calls(decision: object) -> bool:
