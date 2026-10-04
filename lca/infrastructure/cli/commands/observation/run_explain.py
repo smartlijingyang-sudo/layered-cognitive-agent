@@ -20,7 +20,7 @@ from lca.contracts.observability.observation import (
     NodeExit,
     PlanBlueprint,
 )
-from lca.infrastructure.cli.commands._shared.projection import spine_filename_for_run_cwd
+from lca.infrastructure.cli.commands._shared.projection import load_spine_facts
 from lca.plugins.diagnosis.failure_explainer.plugin import explain_failure
 
 _LOG = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ def register(app: typer.Typer) -> None:
         run_id: str = typer.Argument(..., help="run_id (例: run_xxx)"),
         json_mode: bool = typer.Option(True, "--json/--human", help="默认 --json"),
     ) -> None:
-        facts = _load_facts(run_id)
+        facts = load_spine_facts(run_id)
         if not facts:
             typer.echo(f"no facts for run_id={run_id}", err=True)
             raise typer.Exit(code=1)
@@ -51,22 +51,6 @@ def register(app: typer.Typer) -> None:
             _render_human(report)
 
 
-def _load_facts(run_id: str) -> list[dict[str, Any]]:
-    spine_path = spine_filename_for_run_cwd(run_id)
-    if not spine_path.exists():
-        return []
-    out: list[dict[str, Any]] = []
-    for line in spine_path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            obj = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if (obj.get("execution_point") or "").startswith(("observation.", "diagnosis.")):
-            out.append(obj)
-    return out
 
 
 def _find_blueprint(facts: list[dict[str, Any]]) -> PlanBlueprint | None:

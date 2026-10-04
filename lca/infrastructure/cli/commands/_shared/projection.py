@@ -11,6 +11,7 @@ through ongoing spine schema evolution.
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import Any, TypedDict, cast
@@ -116,6 +117,45 @@ def filter_by_domain(
             or p in str(e.get("execution_point", ""))
             for p in prefixes
         )
+    ]
+
+
+# EP-prefix families for the unified domain projection. Unlike _DOMAIN_PREFIXES
+# (keyed on DEBUG_RUN_META_FAMILIES with substring semantics), these families
+# match by pure startswith on execution_point -- the exact semantics the
+# observation CLI modules hand-rolled in their private _load_facts loops.
+# This function is the delete-when target of the SHARED_LOADER_EXEMPT entries
+# in scripts/lca-cli-shape.py.
+_EP_PREFIX_FAMILIES: dict[str, tuple[str, ...]] = {
+    "observation": ("observation.",),
+    "diagnosis": ("diagnosis.",),
+    "graph": ("phase_graph.",),
+}
+
+
+def load_spine_facts(
+    run_id: str,
+    families: Sequence[str] = ("observation", "diagnosis"),
+    *,
+    traces_root: Path | None = None,
+) -> list[SpineRow]:
+    """Read the spine ledger and keep rows in the named EP-prefix families.
+
+    Fail-soft like load_spine_events (missing file / bad JSON -> []).
+    Unknown family names raise ValueError; known families are the keys of
+    the module's EP-prefix family map.
+    """
+    try:
+        prefixes = tuple(p for f in families for p in _EP_PREFIX_FAMILIES[f])
+    except KeyError as exc:
+        raise ValueError(
+        f"unknown spine fact family {exc.args[0]!r}; "
+        f"known: {sorted(_EP_PREFIX_FAMILIES)}"
+        ) from exc
+    return [
+        e
+        for e in load_spine_events(run_id, traces_root)
+        if str(e.get("execution_point") or "").startswith(prefixes)
     ]
 
 

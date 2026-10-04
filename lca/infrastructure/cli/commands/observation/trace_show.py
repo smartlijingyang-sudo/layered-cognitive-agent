@@ -17,7 +17,10 @@ from typing import Any
 
 import typer
 
-from lca.infrastructure.cli.commands._shared.projection import spine_filename_for_run_cwd
+from lca.infrastructure.cli.commands._shared.projection import (
+    load_spine_facts,
+    spine_filename_for_run_cwd,
+)
 from lca.infrastructure.observability.graph_timeline import is_graph_event, render_record
 
 
@@ -44,7 +47,7 @@ def register(app: typer.Typer) -> None:
             typer.echo(f"no spine file at {spine_path}", err=True)
             raise typer.Exit(code=1)
 
-        facts = _load_facts(run_id)
+        facts = load_spine_facts(run_id, ("observation", "diagnosis", "graph"))
         if node:
             facts = [f for f in facts if _payload_of(f).get("node_id") == node]
         if kind:
@@ -75,26 +78,6 @@ def _seq_of(record: dict[str, Any]) -> str:
     return event_id.rsplit(":", 1)[-1] if ":" in event_id else ""
 
 
-def _load_facts(run_id: str) -> list[dict[str, Any]]:
-    """从 trace spine SSOT 读 observation.* / diagnosis.* / phase_graph.* facts。"""
-    spine_path = spine_filename_for_run_cwd(run_id)
-    if not spine_path.exists():
-        return []
-    out: list[dict[str, Any]] = []
-    for line in spine_path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            obj = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if not isinstance(obj, dict):
-            continue
-        ep = _ep_of(obj)
-        if ep.startswith("observation.") or ep.startswith("diagnosis.") or is_graph_event(ep):
-            out.append(obj)
-    return out
 
 
 def _render_trace_human(facts: list[dict[str, Any]], *, full: bool = False) -> None:

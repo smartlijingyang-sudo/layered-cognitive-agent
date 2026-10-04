@@ -63,6 +63,7 @@ LOADER_FUNCS: tuple[str, ...] = (
 # Public API names that qualify a file as delegating to the shared loader.
 SHARED_PROJECTION_NAMES: tuple[str, ...] = (
     "load_spine_events",
+    "load_spine_facts",
     "filter_by_domain",
     "summarize_outputs",
     "truncate",
@@ -81,19 +82,6 @@ SHARED_LOADER_EXEMPT: frozenset[str] = frozenset(
         # delete-when: PR-6 (journal refactor) folds replay's spine read into
         # a typed helper that exposes EventRecord without changing callers.
         "lca/infrastructure/cli/commands/journal/replay.py",
-        # observation/run_explain.py: filters facts by execution_point
-        # prefix (``observation.*``/``diagnosis.*``). The shared
-        # ``filter_by_domain`` keys on a different meta family
-        # (DEBUG_RUN_META_FAMILIES), so swapping the loader would change
-        # which rows survive. delete-when: domain projection is unified.
-        "lca/infrastructure/cli/commands/observation/run_explain.py",
-        # observation/run_replay.py: same as run_explain (filters by EP).
-        # delete-when: domain projection is unified.
-        "lca/infrastructure/cli/commands/observation/run_replay.py",
-        # observation/trace_show.py: same as run_explain (filters by EP +
-        # is_graph_event), and the loader returns facts (not generic events).
-        # delete-when: domain projection is unified.
-        "lca/infrastructure/cli/commands/observation/trace_show.py",
     }
 )
 

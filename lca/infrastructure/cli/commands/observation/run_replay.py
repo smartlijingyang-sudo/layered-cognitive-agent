@@ -21,7 +21,7 @@ from lca.contracts.observability.observation import (
     RunReplay,
     ToolCallTrace,
 )
-from lca.infrastructure.cli.commands._shared.projection import spine_filename_for_run_cwd
+from lca.infrastructure.cli.commands._shared.projection import load_spine_facts
 from lca.infrastructure.observability.graph_timeline import (
     is_graph_event,
     render_record,
@@ -36,7 +36,7 @@ def run_replay_command(
     show_graph: bool = False,
     as_json: bool = True,
 ) -> None:
-    facts = _load_facts(run_id)
+    facts = load_spine_facts(run_id, ("observation", "diagnosis", "graph"))
     if not facts:
         typer.echo(f"no facts for run_id={run_id}", err=True)
         raise typer.Exit(code=1)
@@ -82,23 +82,6 @@ def register(app: typer.Typer) -> None:
         run_replay_command(run_id=run_id, show_graph=show_graph, as_json=json_mode)
 
 
-def _load_facts(run_id: str) -> list[dict[str, Any]]:
-    spine_path = spine_filename_for_run_cwd(run_id)
-    if not spine_path.exists():
-        return []
-    out: list[dict[str, Any]] = []
-    for line in spine_path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            obj = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        ep = obj.get("execution_point") or ""
-        if ep.startswith(("observation.", "diagnosis.", "phase_graph.")):
-            out.append(obj)
-    return out
 
 
 def _find_blueprint(facts: list[dict[str, Any]]) -> PlanBlueprint | None:
