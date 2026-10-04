@@ -2,7 +2,7 @@
 
 ## 状态
 
-**Proposed — 2026-10-02**
+**Accepted — 2026-10-05**（§7/§9/§10 已全部裁决；Accepted≠Implemented，C1–C5 实施另行排期）
 
 > **一句话**：生产 Muse 调度模式（锁目录 + mtime 心跳 + stale 收割 + busy→SKIP 跳过）的 LCA 落地提案。`RoutineSchedulerService`（ADR-0248 §3.4/s04）只有触发判定 + 预算闸，缺五条契约：① 同一 routine 单实例互斥；② 锁超时自愈（持锁崩溃不饿死后来者）；③ busy→显式 SKIP（可观测的跳过 verdict，不静默）；④ 触发记录持久化（重启不丢）；⑤ 单 routine 失败不杀 tick 循环。
 
@@ -117,3 +117,18 @@
 6. **关机语义**：cancel 后 await 当前 tick 完成（tick 自管理锁生命周期，§9①），不丢锁、不丢 state。
 
 **实现接口约定**（给 quality lane）：驱动封装为独立单元（start/stop），lifespan 只调 start/stop 保持薄；单元测试覆盖"tick 异常循环不死"、"shutdown 等待当前 tick"、"空 registry 空转"。
+
+
+---
+
+## 11. 决策记录（2026-10-05）：Proposed → Accepted
+
+**裁决**（李超授权 Athena 按第一性原理拍板）：状态翻为 Accepted。
+
+第一性原理：§7 的 4 个待拍板（锁介质 / stale 阈值 / 重试死信 / tick 落点）已在 §9
+（2026-10-02，李超授权裁决）全部定案，§10 tick 驱动接线形态亦已裁决；正文无待决事项，
+维持 Proposed 没有信息量。Accepted 是对契约的认可，不是实施完成的声明——C1–C5
+尚未实施（仅触发判定落地），实施排期为 quality lane P1 工作。
+
+联动：ADR-0278（routine scheduler 与 cron daemon 的互斥语义收敛）仍为 Proposed，
+其“missed-run 补偿 vs 重试+死信”分岔待另行裁决，不影响本 ADR 的 Accepted 状态。
