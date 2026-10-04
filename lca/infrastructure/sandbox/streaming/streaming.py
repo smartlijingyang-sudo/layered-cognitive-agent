@@ -32,6 +32,11 @@ class SandboxStreamEmitter:
         chunk = sanitize_stream_text(text if text is not None else "")
         if chunk == "":
             return
+        from lca.infrastructure.session.bindings import active_publish_session
+
+        # 热路径 cheap 检查(todo-38,2026-10-05 裁决):无 Session 时跳过,不抛 RuntimeError。
+        if active_publish_session() is None:
+            return
         record(
             SandboxOutputDelta(
                 invocation_id=self._invocation_id,

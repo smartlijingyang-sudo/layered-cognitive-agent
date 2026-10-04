@@ -207,16 +207,22 @@ class CognitiveAgent(AgentUnit):
         )
 
         partial_token = begin_partial_buffer()
-        record(
-            AgentRunStarted(
-                agent_role=role,
-                strategy_key=_STRATEGY_KEY_SOLO if top_level else "",
-                objective=objective,
-                objective_preview=objective_preview(objective),
-                from_role=ctx.from_role if ctx else "",
+        from lca.infrastructure.session.bindings import active_publish_session
+
+        # 热路径 cheap 检查(todo-38,2026-10-05 裁决):本函数 docstring 允许
+        # “intentionally unbound”,无 Session 时跳过,不抛 RuntimeError。
+        has_session = active_publish_session() is not None
+        if has_session:
+            record(
+                AgentRunStarted(
+                    agent_role=role,
+                    strategy_key=_STRATEGY_KEY_SOLO if top_level else "",
+                    objective=objective,
+                    objective_preview=objective_preview(objective),
+                    from_role=ctx.from_role if ctx else "",
+                )
             )
-        )
-        if resumed_snapshot is not None:
+        if resumed_snapshot is not None and has_session:
             record_run_resumed(resumed_snapshot)
         finish_status = TaskStatus.CANCELED.value
         finish_output = ""
@@ -246,14 +252,16 @@ class CognitiveAgent(AgentUnit):
             iteration_outcome = "failure"
             raise
         finally:
-            record(
-                AgentRunFinished(
-                    status=finish_status,
-                    output_text=finish_output,
-                    steps=finish_steps,
-                    error=finish_error,
+            # 热路径 cheap 检查(todo-38,2026-10-05 裁决):ContextVar 按上下文隔离,每次现查。
+            if active_publish_session() is not None:
+                record(
+                    AgentRunFinished(
+                        status=finish_status,
+                        output_text=finish_output,
+                        steps=finish_steps,
+                        error=finish_error,
+                    )
                 )
-            )
             reset_partial_buffer(partial_token)
             emit_agent_loop_iteration_end(
                 trace_id=iteration_trace_id,

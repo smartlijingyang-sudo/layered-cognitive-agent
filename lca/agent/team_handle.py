@@ -106,18 +106,25 @@ class TeamHandle(TeamUnit):
             iteration_kind="fresh",
         )
         with bind_backends(self._observability), run_scope(scope):
-            record(
-                TeamRunStarted(
-                    team_id=self._profile.team_id,
-                    strategy_key=self._profile.strategy_key,
-                    mandate=self._profile.mandate or "",
-                    lead_role=self._profile.lead_role,
-                    members=self._profile.member_roles,
-                    objective=text,
-                    objective_preview=objective_preview(text),
-                    plan_steps=plan_steps_joined(self._profile.strategy_key, self._profile.mandate),
+            from lca.infrastructure.session.bindings import active_publish_session
+
+            # 热路径 cheap 检查(todo-38,2026-10-05 裁决):event_session_binder
+            # 缺席时无 Session,跳过,不抛 RuntimeError。
+            if active_publish_session() is not None:
+                record(
+                    TeamRunStarted(
+                        team_id=self._profile.team_id,
+                        strategy_key=self._profile.strategy_key,
+                        mandate=self._profile.mandate or "",
+                        lead_role=self._profile.lead_role,
+                        members=self._profile.member_roles,
+                        objective=text,
+                        objective_preview=objective_preview(text),
+                        plan_steps=plan_steps_joined(
+                            self._profile.strategy_key, self._profile.mandate
+                        ),
+                    )
                 )
-            )
             # 默认 CANCELED：CancelledError 是 BaseException，不会进 except Exception。
             # finally 保证任何退出路径都发射 Finished，OTel attach 在同 task 配对 detach。
             finish_status = TaskStatus.CANCELED.value
@@ -141,14 +148,16 @@ class TeamHandle(TeamUnit):
                 iteration_outcome = "failure"
                 raise
             finally:
-                record(
-                    TeamRunFinished(
-                        status=finish_status,
-                        output_text=finish_output,
-                        steps=finish_steps,
-                        error=finish_error,
+                # 热路径 cheap 检查(todo-38,2026-10-05 裁决):ContextVar 按上下文隔离,每次现查。
+                if active_publish_session() is not None:
+                    record(
+                        TeamRunFinished(
+                            status=finish_status,
+                            output_text=finish_output,
+                            steps=finish_steps,
+                            error=finish_error,
+                        )
                     )
-                )
                 emit_agent_loop_iteration_end(
                     trace_id=iteration_trace_id,
                     role=iteration_role,
