@@ -638,6 +638,10 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
                     raw_response_preview=assistant_content[:600] if assistant_content else "",
                 )
             if isinstance(tool_calls, list) and tool_calls:
+                # Predicted intents from LLM are isolated to thinking trace only;
+                # they MUST NOT contaminate target.tool_calls or target.tool_call,
+                # which are strictly owned by step.tool_call.record (INV-02).
+                first_tc: ToolCallRecord | None = None
                 for call_item in tool_calls:
                     if not isinstance(call_item, Mapping):
                         continue
@@ -662,9 +666,10 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
                         arguments=dict(call_args) if isinstance(call_args, dict) else {},
                         arguments_summary="",
                     )
-                    _add_or_update_tool_call(target, tc_record)
-                    if target.tool_call is None:
-                        target.tool_call = tc_record
+                    if first_tc is None:
+                        first_tc = tc_record
+                if first_tc is not None and target.thinking is not None:
+                    target.thinking = replace(target.thinking, tool_call=first_tc)
     elif ep == "phase.act.fold.start":
         _record_phase(state, "act", ts, event)
     elif ep in PHASE_FOLD_EPS:
@@ -719,7 +724,16 @@ def _apply(state: _StepTreeState, event: Mapping[str, Any]) -> None:
         if target is not None:
             if ep == "step.tool_call.record":
                 _assign_tool_call(target, payload, ep)
-            else:
+            elif ep == "step.tool_result.record":
+                _assign_tool_result(target, payload, ep)
+            elif (
+                ep == "body.tool.execute.end"
+                and payload.get("wrapper") != "decision"
+                and not target.tool_results
+            ):
+                # Decision-level brackets must never create a ToolResult.
+                # Only use body.tool.execute.end as a fallback if no step.tool_result.record
+                # was recorded for this step (INV-02).
                 _assign_tool_result(target, payload, ep)
     elif ep == "exception.caught":
         _capture_exception(state, payload, ts)
@@ -760,10 +774,19 @@ def _materialize(
             duration_ms=max(0, int((f.exited_at - f.entered_at) * 1000)) if f.exited_at else None,
             context_before=f.context_before,
             thinking=f.thinking,
-            tool_call=f.tool_call,
+            tool_call=f.tool_call
+            or (f.thinking.tool_call if not f.tool_calls and f.thinking else None),
             tool_result=f.tool_result,
-            tool_calls=tuple(f.tool_calls) if f.tool_calls else (() if f.tool_call is None else (f.tool_call,)),
-            tool_results=tuple(f.tool_results) if f.tool_results else (() if f.tool_result is None else (f.tool_result,)),
+            tool_calls=tuple(f.tool_calls)
+            if f.tool_calls
+            else (
+                (f.tool_call,)
+                if f.tool_call is not None
+                else ((f.thinking.tool_call,) if f.thinking and f.thinking.tool_call else ())
+            ),
+            tool_results=tuple(f.tool_results)
+            if f.tool_results
+            else (() if f.tool_result is None else (f.tool_result,)),
             reflect=f.reflect,
             segments=tuple(f.segments),
             outcome=_journal_step_outcome(f.outcome),
