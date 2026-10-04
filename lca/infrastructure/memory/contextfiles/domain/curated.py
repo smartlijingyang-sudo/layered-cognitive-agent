@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import datetime
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -129,18 +130,14 @@ def render_curated_markdown(
     return text
 
 
-def render_curated_memory_markdown(
-    records: Sequence[Any],
-    *,
-    char_budget: int = _CHAR_BUDGET,
-    source_note: str = "",
-) -> str:
-    """Pure functional projection of MemoryRecord sequence into MEMORY.md markdown.
+def curated_claims_from_records(records: Sequence[Any]) -> list[CuratedClaim]:
+    """Map host records into the portable projection input (single mapping path).
 
-    Filters out deleted records and category=IDENTITY. Renders persistent
-    ## Preferences and ## Facts skeleton with embedded <!-- id:mem_xxx --> tags.
+    Filters out deleted records, ``identity`` category, and secret-bearing
+    content. Both the pure renderer and the disk-cache refresh go through
+    this one function, so mapping semantics cannot diverge again.
     """
-    claims: list[CuratedClaim] = []
+    claims = []
     for r in records:
         if getattr(r, "deleted", False):
             continue
@@ -158,10 +155,8 @@ def render_curated_memory_markdown(
         created_at_ms = getattr(r, "created_at_ms", None)
         recorded_on = ""
         if isinstance(created_at_ms, (int, float)) and created_at_ms > 0:
-            import datetime
             dt = datetime.datetime.fromtimestamp(created_at_ms / 1000.0, tz=datetime.UTC)
             recorded_on = dt.strftime("%Y-%m-%d")
-
         claims.append(
             CuratedClaim(
                 claim_id=str(getattr(r, "record_id", "") or ""),
@@ -173,7 +168,42 @@ def render_curated_memory_markdown(
                 recorded_on=recorded_on,
             )
         )
-    return render_curated_markdown(claims, char_budget=char_budget, source_note=source_note)
+    return claims
+
+
+def plan_curated_memory_projection(
+    records: Sequence[Any],
+    *,
+    char_budget: int = _CHAR_BUDGET,
+    source_note: str = "",
+) -> tuple[str, tuple[CuratedClaim, ...]]:
+    """Project host records to markdown and report budget-omitted claims.
+
+    The single entry point for disk-cache refresh: ``_project_curated`` calls
+    this so record mapping, filtering, and budgeting stay in one place.
+    """
+    return plan_curated_projection(
+        curated_claims_from_records(records),
+        char_budget=char_budget,
+        source_note=source_note,
+    )
+
+
+def render_curated_memory_markdown(
+    records: Sequence[Any],
+    *,
+    char_budget: int = _CHAR_BUDGET,
+    source_note: str = "",
+) -> str:
+    """Pure functional projection of MemoryRecord sequence into MEMORY.md markdown.
+
+    Filters out deleted records and category=IDENTITY. Renders persistent
+    ## Preferences and ## Facts skeleton with embedded id tags.
+    """
+    text, _omitted = plan_curated_memory_projection(
+        records, char_budget=char_budget, source_note=source_note
+    )
+    return text
 
 
 def plan_curated_projection(
