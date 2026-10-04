@@ -51,11 +51,11 @@ Every task's deliverable implicitly satisfies these. Values are copied from the 
 
 | File | Responsibility |
 |---|---|
-| `lca/infrastructure/memory/dream_scheduler.py` (create) | The sweep loop: interval bookkeeping, home fan-out, per-home lock, off-loop `run_dream`, evidence write. No plugin imports, no Cordis dependency |
+| `lca/application/memory/dream_scheduler.py` (create) | The sweep loop: interval bookkeeping, home fan-out, per-home lock, off-loop `run_dream`, evidence write. No plugin imports, no Cordis dependency |
 | `lca/plugins/memory/dream_scheduler/plugin.py` (create) | The `@plugin` entry: config parse, catalog resolution, callback construction, `asyncio.create_task`, LIFO dispose |
 | `bundles/assistant-runtime.yaml` (modify) | Declare the plugin id so the profile that binds assistant homes loads it |
 | `profiles/web-assistant.yaml` (modify) | Set `tick_seconds`, putting the cadence upper bound in configuration |
-| `tests/infrastructure/memory/test_dream_scheduler.py` (create) | Loop, fan-out, lock, collision, evidence, change detection |
+| `tests/application/memory/test_dream_scheduler.py` (create) | Loop, fan-out, lock, collision, evidence, change detection |
 | `tests/plugins/test_dream_scheduler_plugin_shape.py` (create) | Plugin shape and dispose registration |
 | `tests/scenario/memory/test_dream_scheduler_live_sweep.py` (create) | End-to-end Phase 0 evidence against real homes |
 
@@ -66,8 +66,8 @@ Every task's deliverable implicitly satisfies these. Values are copied from the 
 ### Task 1: The sweep loop with an injected clock
 
 **Files:**
-- Create: `lca/infrastructure/memory/dream_scheduler.py`
-- Test: `tests/infrastructure/memory/test_dream_scheduler.py`
+- Create: `lca/application/memory/dream_scheduler.py`
+- Test: `tests/application/memory/test_dream_scheduler.py`
 
 **Interfaces:**
 - Consumes: `run_dream` from `lca.infrastructure.memory.dream`; `RoutineFileLock` from `lca.application.routine.locks`.
@@ -76,12 +76,12 @@ Every task's deliverable implicitly satisfies these. Values are copied from the 
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# tests/infrastructure/memory/test_dream_scheduler.py
+# tests/application/memory/test_dream_scheduler.py
 from pathlib import Path
 
 import pytest
 
-from lca.infrastructure.memory.dream_scheduler import DreamScheduler
+from lca.application.memory.dream_scheduler import DreamScheduler
 
 
 @pytest.fixture
@@ -104,7 +104,6 @@ def _scheduler(tmp_path: Path, homes: list[Path], clock: list[int], calls: list[
     )
 
 
-@pytest.mark.anyio
 async def test_sweep_once_visits_every_home(tmp_path: Path, clock: list[int]) -> None:
     homes = [tmp_path / "a", tmp_path / "b"]
     calls: list[Path] = []
@@ -115,7 +114,6 @@ async def test_sweep_once_visits_every_home(tmp_path: Path, clock: list[int]) ->
     assert calls == homes
 
 
-@pytest.mark.anyio
 async def test_interval_skips_a_sweep_that_is_not_due_yet(
     tmp_path: Path, clock: list[int]
 ) -> None:
@@ -135,13 +133,13 @@ async def test_interval_skips_a_sweep_that_is_not_due_yet(
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `uv run pytest tests/infrastructure/memory/test_dream_scheduler.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'lca.infrastructure.memory.dream_scheduler'`
+Run: `uv run pytest tests/application/memory/test_dream_scheduler.py -v`
+Expected: FAIL with `ModuleNotFoundError: No module named 'lca.application.memory.dream_scheduler'`
 
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# lca/infrastructure/memory/dream_scheduler.py
+# lca/application/memory/dream_scheduler.py
 """Periodic sweep that runs the offline memory consolidation per assistant home.
 
 The loop keeps its own interval bookkeeping. It does not route through
@@ -168,7 +166,7 @@ logger = logging.getLogger(__name__)
 _Backfill = Callable[[str, list], object]
 _Render = Callable[[Sequence], str]
 DreamFn = Callable[..., DreamReport]
-EvidenceWriter = Callable[[Path, DreamReport | None, int], None]
+EvidenceWriter = Callable[[Path, DreamReport | None, int], object]
 
 _ROUTINE_ID = "memory_dream"
 
@@ -254,13 +252,13 @@ class DreamScheduler:
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `uv run pytest tests/infrastructure/memory/test_dream_scheduler.py -v`
+Run: `uv run pytest tests/application/memory/test_dream_scheduler.py -v`
 Expected: PASS, 2 tests
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lca/infrastructure/memory/dream_scheduler.py tests/infrastructure/memory/test_dream_scheduler.py
+git add lca/application/memory/dream_scheduler.py tests/application/memory/test_dream_scheduler.py
 git commit -m "feat(memory): add the dream sweep loop with an injected clock"
 ```
 
@@ -271,8 +269,8 @@ git commit -m "feat(memory): add the dream sweep loop with an injected clock"
 A minutes-level timer makes collision with a live user turn routine rather than theoretical. Both the online memory tools and `run_dream` rewrite `{home}/memory/semantic.json` with a non-atomic `write_text` (`lca/infrastructure/memory/assistant_memory.py:215`), and the only guard is `StaleSnapshotOperationError` at `:213`, which aborts rather than waits. `run_dream` does not catch it, so a collision today leaves a half-promoted pass with no receipt.
 
 **Files:**
-- Modify: `lca/infrastructure/memory/dream_scheduler.py` (`_run_home`)
-- Test: `tests/infrastructure/memory/test_dream_scheduler.py`
+- Modify: `lca/application/memory/dream_scheduler.py` (`_run_home`)
+- Test: `tests/application/memory/test_dream_scheduler.py`
 
 **Interfaces:**
 - Consumes: `DreamScheduler._run_home` from Task 1; `StaleSnapshotOperationError` from `lca.infrastructure.memory.contextfiles.domain.edit`.
@@ -281,12 +279,11 @@ A minutes-level timer makes collision with a live user turn routine rather than 
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# appended to tests/infrastructure/memory/test_dream_scheduler.py
+# appended to tests/application/memory/test_dream_scheduler.py
 from lca.application.routine.locks import RoutineFileLock
 from lca.infrastructure.memory.contextfiles.domain.edit import StaleSnapshotOperationError
 
 
-@pytest.mark.anyio
 async def test_a_held_lock_skips_the_home(tmp_path: Path, clock: list[int]) -> None:
     home = tmp_path / "a"
     calls: list[Path] = []
@@ -300,7 +297,6 @@ async def test_a_held_lock_skips_the_home(tmp_path: Path, clock: list[int]) -> N
     holder.release()
 
 
-@pytest.mark.anyio
 async def test_a_write_collision_is_contained_not_raised(
     tmp_path: Path, clock: list[int]
 ) -> None:
@@ -320,7 +316,6 @@ async def test_a_write_collision_is_contained_not_raised(
     assert reports == (None,)
 
 
-@pytest.mark.anyio
 async def test_the_lock_is_released_after_a_collision(tmp_path: Path, clock: list[int]) -> None:
     def colliding(home, *, now_ms, backfill, render):
         raise StaleSnapshotOperationError("semantic.json changed during edit")
@@ -341,12 +336,12 @@ async def test_the_lock_is_released_after_a_collision(tmp_path: Path, clock: lis
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `uv run pytest tests/infrastructure/memory/test_dream_scheduler.py -v -k "collision or held_lock"`
+Run: `uv run pytest tests/application/memory/test_dream_scheduler.py -v -k "collision or held_lock"`
 Expected: `test_a_held_lock_skips_the_home` PASSES (Task 1 already locks), `test_a_write_collision_is_contained_not_raised` FAILS with `StaleSnapshotOperationError` propagating out of `sweep_once`
 
 - [ ] **Step 3: Contain the collision in `_run_home`**
 
-Replace the `try:` / `finally:` body of `_run_home` in `lca/infrastructure/memory/dream_scheduler.py` with:
+Replace the `try:` / `finally:` body of `_run_home` in `lca/application/memory/dream_scheduler.py` with:
 
 ```python
         try:
@@ -380,13 +375,13 @@ from lca.infrastructure.memory.contextfiles.domain.edit import StaleSnapshotOper
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `uv run pytest tests/infrastructure/memory/test_dream_scheduler.py -v`
+Run: `uv run pytest tests/application/memory/test_dream_scheduler.py -v`
 Expected: PASS, 5 tests
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lca/infrastructure/memory/dream_scheduler.py tests/infrastructure/memory/test_dream_scheduler.py
+git add lca/application/memory/dream_scheduler.py tests/application/memory/test_dream_scheduler.py
 git commit -m "fix(memory): contain dream write collisions instead of stranding the pass"
 ```
 
@@ -399,8 +394,8 @@ ADR-0287 §4 Phase 0 requires "真实触发证据". A new execution point would 
 Change detection matters because every pass unconditionally rewrites `ALIGNMENT_SYNTHESIS.md` (`dream.py:266`), the people and groups indexes (`:265`), and the FTS index (`:269`). At a 5-minute cadence across 528 homes that is roughly 150k file rewrites per day for passes that promote nothing.
 
 **Files:**
-- Modify: `lca/infrastructure/memory/dream_scheduler.py`
-- Test: `tests/infrastructure/memory/test_dream_scheduler.py`
+- Modify: `lca/application/memory/dream_scheduler.py`
+- Test: `tests/application/memory/test_dream_scheduler.py`
 
 **Interfaces:**
 - Consumes: `DreamReport` from `lca.infrastructure.memory.dream` (fields `promoted: tuple[str, ...]`, `upserted: int`, `trail_facts: int`, `synthesis_written: bool`, `index_documents: int`).
@@ -409,11 +404,11 @@ Change detection matters because every pass unconditionally rewrites `ALIGNMENT_
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# appended to tests/infrastructure/memory/test_dream_scheduler.py
+# appended to tests/application/memory/test_dream_scheduler.py
 import json
 
 from lca.infrastructure.memory.dream import DreamReport
-from lca.infrastructure.memory.dream_scheduler import write_dream_evidence
+from lca.application.memory.dream_scheduler import write_dream_evidence
 
 
 def _report(**overrides) -> DreamReport:
@@ -458,12 +453,12 @@ def test_a_no_change_pass_does_not_rewrite_existing_evidence(tmp_path: Path) -> 
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `uv run pytest tests/infrastructure/memory/test_dream_scheduler.py -v -k evidence`
+Run: `uv run pytest tests/application/memory/test_dream_scheduler.py -v -k evidence`
 Expected: FAIL with `ImportError: cannot import name 'write_dream_evidence'`
 
 - [ ] **Step 3: Write the implementation**
 
-Append to `lca/infrastructure/memory/dream_scheduler.py`:
+Append to `lca/application/memory/dream_scheduler.py`:
 
 ```python
 _EVIDENCE_RELATIVE = ("dreams", "last_run.json")
@@ -510,13 +505,13 @@ Add `import json` to the module imports.
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `uv run pytest tests/infrastructure/memory/test_dream_scheduler.py -v`
+Run: `uv run pytest tests/application/memory/test_dream_scheduler.py -v`
 Expected: PASS, 7 tests
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lca/infrastructure/memory/dream_scheduler.py tests/infrastructure/memory/test_dream_scheduler.py
+git add lca/application/memory/dream_scheduler.py tests/application/memory/test_dream_scheduler.py
 git commit -m "feat(memory): record dream run evidence as a file artifact"
 ```
 
@@ -615,7 +610,7 @@ from pydantic import BaseModel, ConfigDict
 from lca.contracts.capabilities import ASSISTANT_CATALOG
 from lca.contracts.models.core.conversation.memory import MemoryRecord
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.infrastructure.memory.dream_scheduler import DreamScheduler, write_dream_evidence
+from lca.application.memory.dream_scheduler import DreamScheduler, write_dream_evidence
 from lca.plugins.assistant.profile.profile import ProfileBackfillService, render_user_profile
 
 logger = logging.getLogger(__name__)
@@ -731,8 +726,8 @@ Append to the plugin patch list in `profiles/web-assistant.yaml`, next to the ex
 
 - [ ] **Step 5: Run tests and the plugin shape gate**
 
-Run: `uv run pytest tests/plugins/test_dream_scheduler_plugin_shape.py -v && ./scripts/lca-ops audit-plugin-shape`
-Expected: PASS, 4 tests; audit exits 0 for the new plugin id
+Run: `uv run pytest tests/plugins/test_dream_scheduler_plugin_shape.py -v && ./scripts/lca-ops audit-plugin-shape && uv run python scripts/check_plan_lift.py`
+Expected: PASS, 4 tests; audit exits 0 for the new plugin id; `check_plan_lift.py` exits 0. The lift check is mandatory because this task edits a bundle: it runs the same two calls `boot_check` uses (`resolve_profile_with_deployment_env` then `validate_profile_plans`), and skipping it before a bundle change has taken the shared kernel down.
 
 - [ ] **Step 6: Verify the profile still resolves**
 
@@ -766,9 +761,9 @@ from pathlib import Path
 
 import pytest
 
-from lca.contracts.atoms.enums.enums import MemoryCategory, ResidualClass
-from lca.contracts.models.memory.episode import EpisodeFact
-from lca.infrastructure.memory.dream_scheduler import DreamScheduler, write_dream_evidence
+from lca.contracts.atoms.enums.enums import MemoryCategory
+from lca.contracts.models.memory.episode import EpisodeFact, ResidualClass
+from lca.application.memory.dream_scheduler import DreamScheduler, write_dream_evidence
 from lca.infrastructure.memory.episode_buffer import EpisodeBuffer
 
 
@@ -785,7 +780,6 @@ def _identity_fact(trace_id: str) -> EpisodeFact:
     )
 
 
-@pytest.mark.anyio
 async def test_a_sweep_promotes_a_captured_episode_and_leaves_evidence(
     tmp_path: Path,
 ) -> None:
@@ -812,7 +806,6 @@ async def test_a_sweep_promotes_a_captured_episode_and_leaves_evidence(
     assert evidence["promoted"] == ["identity:role"]
 
 
-@pytest.mark.anyio
 async def test_a_second_sweep_promotes_nothing_and_keeps_the_evidence_stable(
     tmp_path: Path,
 ) -> None:
