@@ -53,10 +53,23 @@ class GmailConnectorCLI:
             }
 
         conn_id = conn.connection_id or "ca_gmail_auth"
-        auth_url = conn.auth_url or f"https://backend.composio.dev/api/v1/auth/redirect?token={conn_id}"
-        widget = format_connector_auth_widget(
+        auth_url = (
+            conn.auth_url or f"https://backend.composio.dev/api/v1/auth/redirect?token={conn_id}"
+        )
+        # Zero Model URL Exposure: 真实 auth_url 只进 intent vault，
+        # widget 标签与返回体只携带 intentId（与 composio 路径同模式）。
+        from lca.infrastructure.connectors.core.intent_vault import get_default_intent_vault
+
+        intent_id = get_default_intent_vault().create_intent(
+            service="gmail",
             app_name="Gmail",
             auth_url=auth_url,
+            connection_id=conn_id,
+            user_id=account_id or "default",
+        )
+        widget = format_connector_auth_widget(
+            app_name="Gmail",
+            intent_id=intent_id,
             connection_id=conn_id,
         )
         return {
@@ -64,7 +77,7 @@ class GmailConnectorCLI:
             "service": "gmail",
             "account_id": account_id,
             "appName": "Gmail",
-            "authUrl": auth_url,
+            "intentId": intent_id,
             "connectionId": conn_id,
             "widget": widget,
         }
