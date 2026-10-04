@@ -6,6 +6,11 @@ import json
 from pathlib import Path
 from typing import Any
 
+from lca.infrastructure.observability.spine.sinks.naming import (
+    exceptions_filename_for_run,
+    spine_filename_for_run,
+)
+
 _DEFAULT_TRACES_ROOT = Path("traces") / "runs"
 
 
@@ -20,7 +25,7 @@ def load_exception_records(
 ) -> list[dict[str, Any]]:
     """Load ``exception.caught`` payloads from ``*.exceptions.jsonl`` or spine fallback."""
     run_path = _run_dir(run_id, traces_root=traces_root)
-    exceptions_path = run_path / f"{run_id}.exceptions.jsonl"
+    exceptions_path = run_path / exceptions_filename_for_run(run_id)
     records: list[dict[str, Any]] = []
     if exceptions_path.is_file():
         for line in exceptions_path.read_text(encoding="utf-8").splitlines():
@@ -36,7 +41,7 @@ def load_exception_records(
                 records.append(payload)
         return records
 
-    spine_path = run_path / f"{run_id}.spine.jsonl"
+    spine_path = run_path / spine_filename_for_run(run_id)
     if not spine_path.is_file():
         return []
     for line in spine_path.read_text(encoding="utf-8").splitlines():
