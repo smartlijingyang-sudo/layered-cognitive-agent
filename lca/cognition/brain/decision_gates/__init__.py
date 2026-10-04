@@ -16,9 +16,6 @@ from lca.cognition.brain.decision_gates.delivery.satisfied import DeliverySatisf
 from lca.cognition.brain.decision_gates.must.consult_all import (
     MustConsultAllMembers,
 )
-from lca.cognition.brain.decision_gates.office.works_sealer import (
-    OfficeWorksSealer,  # deprecated: kept for backwards compat imports
-)
 from lca.cognition.brain.decision_gates.progress.loop_detector import (
     ProgressLoopDetector,
 )
@@ -56,7 +53,6 @@ __all__ = [
     "DecisionGate",
     "DeliverySatisfiedGate",
     "MustConsultAllMembers",
-    "OfficeWorksSealer",  # deprecated: see module docstring
     "ProgressLoopDetector",
     "RepeatToolCallGate",
     "TerminalRespondGate",
