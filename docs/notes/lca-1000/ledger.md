@@ -312,3 +312,15 @@
 - 验证结果: ruff check 1 文件全过；import 冒烟 OK（__all__ 仅剩 emit_agent_loop_iteration_end/start）；targeted pytest(tests/loop/test_fact_gateway.py + tests/runtime/test_envelope_emitter_binding.py)：19 passed，0 failed，无预存失败。
 - commit: b2018d4ac（refactor(lca-1000): 第0482轮 agent_spawn 死 emit 公开函数 3 处删除(死接口路径收敛)，2 files），未 push。
 - 备注: 只 add 本轮 2 个文件（agent_spawn.py + ledger.md）；并发会话的大量未提交/已暂存改动未触碰。ledger.md 随带并发会话的 28 行格式微调（子条目缩进），内容未改动，如实披露。备份:/tmp/bak_0482/(252)。教训：经 ssh 双引号命令串传 heredoc 多行脚本不可靠（首版脚本断言异常），改用 python3 - + stdin 传脚本，一次成功；以后 252 上跑多行脚本统一走 stdin。
+## 第0483轮 (2026-10-05 01:03-01:09 CST)
+- 改了什么: 删除整模块 lca/loop/emit/spine/kernel_loop.py（emit_kernel_boot_start / emit_kernel_boot_completed / emit_loop_fork 三公开函数 + __all__ + 模块级 docstring/imports 共约 75 行）。1 file，整文件删除。
+- 依据 skill 哪一节: SKILL.md Deletion test（删除后复杂度凭空消失，无调用方需搬复杂度 = pass-through）；LANGUAGE.md Module（一个 Module 对应一个 Interface）/ Interface / seam 纪律；DEEPENING.md seam 纪律；deslop 清单：死接口路径。
+- 为什么这是实质改动(非凑数): 三函数全库零外部调用（git grep 函数名仅命中本文件与 ledger 自述；模块路径零代码导入方，spine/__init__.py 为空无重导出）；EP 事件契约（lca/contracts/event.py SPINE_KERNEL_BOOT_START/COMPLETED、SPINE_LOOP_FORK、lca_kernel/events/payloads/spine.py、spine.yaml）与现行投递路径（DefaultFactGateway，report_emit_points.md:83/84/90）原样保留，删除仅移除一条无人走的重复投递便捷层，不删事件系统任何能力。与 ADR-0194 无冲突（ADR 定的现行 publisher 是 gateway，不是本模块）。类比先例：480 轮 spawn_member、482 轮 3 死 emit 函数删除。
+- 候选清单（本轮 explore，逐一验证后取舍）:
+  1. 上述 kernel_loop 整模块删除 —— 选中（上轮备选 #2，本轮逐一复核：函数名/模块路径/事件名字串/测试目录全库 grep + __init__ 检查后执行；删文件而非仅删函数，因模块内已无存活符号，留空壳才是新 slop）。
+  2. phase_fact.py —— 驳回：有真实引用（3 个架构测试 tests/architecture/test_fact_plane_invariants.py / test_mtk_no_business_ids.py / test_session_lifecycle_producers.py + README）。
+  3. ep.py 的 publish_spine_ep —— 驳回：现行 fact-gateway EP 投递 seam，deletion test 不通过（删掉复杂度搬到 N 个调用方）。
+  4. kernel.boot.* / loop.fork 事件契约（contracts/event.py、payloads/spine.py、spine.yaml）—— 驳回：属事件契约与配置，非代码死路径，删之破坏订阅/路由。
+- 验证结果: ruff check lca/loop/emit/spine/ 全过；包导入冒烟（import lca.loop.emit.spine）OK；targeted pytest（tests/observability/spine/sinks/test_routing_file_sink.py + tests/observability/spine/test_orphan.py，事件名字串走契约路径的直接相关测试）：8 passed，0 failed，无预存失败；代码引用复查仅剩 scripts/migrate_import_paths.py 一处恒等映射（一次性迁移脚本的历史条目，非运行时依赖，不动）。
+- commit: f7dcba47d refactor(lca-1000): 第0483轮 spine 死 emit 模块 kernel_loop 删除(死接口路径收敛),2 files，未 push。
+- 备注: 只 add/stage 了本轮 2 个文件（kernel_loop.py 删除 + ledger.md）；工作区干净（无并发会话未提交改动）；备份 /tmp/bak_0483/（252）。遗留：lca/loop/README.md:120 与 docs/specs/cognitive-directory-discipline.md:129 的目录树列表仍列出 kernel_loop，属文档轻微滞后，留待后续文档轮次统一处理，本轮不扩大 scope。
