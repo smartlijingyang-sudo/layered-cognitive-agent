@@ -514,3 +514,22 @@
 - 验证结果: ruff check 1 文件首次即过（All checks passed!）；amport 冒烟无循环（模块级补 import 后）；行为等价 python 断言全绿（SSOT 逐字节相等；legacy fallback → 同目录 boot-spine.jsonl；boot_path passthrough、非 legacy 名 passthrough、默认路径三条分支与旧行为逐一等价）；targeted pytest `tests/lca_plugins/observability/spine/test_sinks.py`（插件 @plugin 声明的 test_suite）：14 passed，0 failed。
 - commit: b3b610886a54b6cd7b092d86a4f6da0225e74a36（refactor(lca-1000): 第0495轮 boot-spine legacy fallback 影子拼写收敛至 BOOT_SPINE_FILENAME(Seam)；未 push）。
 - 备注: 只 add 本轮 2 个文件（代码 1 + ledger.md）；编辑前 git status --porcelain 仅见本轮文件（无并发会话未提交改动）；备份 /tmp/bak_0495_init.py（252，原文件完整备份，1 文件）。base64+stdin 喂 python 编辑/验证路径继续稳定可靠（直接 -c 因嵌套引号失败一次，文件未动，无影响）。
+
+## 第0496轮 (2026-10-05 07:33-08:05 CST)
+- 改了什么: 删除 session COMPAT re-export shim 模块 + 两处导入方直连 canonical seam（4 files net：2 modified + 2 deleted）：
+  - 删 `lca/plugins/transport/webserver/handlers/runs/session/event/session.py`（COMPAT re-export：纯 `from lca.session.lifecycle.bind import ...` 透传 + `__all__`；自身 0 逻辑）；
+  - 删 `lca/plugins/transport/webserver/handlers/runs/session/event/__init__.py`（split_oversized_directories 自动创建的空包 stub，无任何 re-export）——整个 `event/` 目录已无存在理由；
+  - `.../session/session/session.py:33`：shim import → `from lca.session.lifecycle.bind import (BoundRunEventSession, unbind_run_event_session)`（isort 块内无空行，ruff I001 修复确认）；
+  - `.../session/builder/builder.py:44`：shim import 删除，`unbind_run_event_session` 并入既有 canonical import `from lca.session.lifecycle.bind import (bind_run_event_session_from_store, unbind_run_event_session)`（该文件早已直连 canonical seam 取 `bind_run_event_session_from_store`，seam 归属无歧义）。
+- 依据 skill 哪一节: deslop 清单 死兼容路径（该 shim 模块头 docstring 自带 `COMPAT(delete-when: no webserver-local imports of this module remain)`；本轮把最后 2 处 webserver-local importer 迁走后条件达成，删除是其声明的完成路径）+ SKILL.md Deletion test（删掉 shim 后复杂度直接消失：0 行逻辑、无需复刻到 N 个调用方——纯 pass-through indirection，赚回了删除价值）+ DEEPENING.md Seam discipline（`lca.session.lifecycle.bind` 是 session run-bind 的单一真实 seam：ADR-0186 session-as-event-ssot 已收口到 `lca/session/lifecycle/bind.py`；shim 是迁移残留的 hypothetical 级单 adapter 间接层）+ LANGUAGE.md Locality（bind/unbind 的归属知识只存在一处——`lca/session/lifecycle/bind.py`）/ Interface（caller 侧名字、调用约定、error mode 全未碰：同名对象逐字节同一）。
+- 为什么这是实质改动(非凑数): 删除一个真实的死兼容间接模块（1 个透传 .py + 1 个自动包 stub），而非注释措辞调整。shim 的 delete-when 条件是代码自己写的契约；条件达成后保留它就是 deslop 定义的"死兼容路径"。全库 py grep 确认删除前仅 2 处 importer、删除后 0 残留（属性名 `session.event_session` 系无关字段）；non-py 全库 grep 无 docs/manifest 引用（目录扫描因体量大耗时，改用 docs/ + tests/architecture/ 定向 grep 覆盖关键面，0 命中）。
+- 关键设计决策（夜间跳过 grilling，记台账）: 删整个 `event/` 目录而非只删 session.py（`__init__.py` 是自动生成的空包 stub，独留无意义；属同一兼容路径的一体两面，非夹带）。不碰跟踪文档 `docs/notes/implemented/seam/2026-09-04-session-as-event-ssot.md`（历史记录，按既有惯例不动 docs）。`kernel.log`/`boot`/`_DEFAULT_BOOT_PATH` 等 493/494 驳回项维持原判（需 grilling 的设计决策，本轮不碰）。
+- 候选清单（本轮 explore，逐一验证后取舍）：
+  1. 上述 session event shim 删除 —— 选中（delete-when 条件可由本轮合法达成；纯透传，deletion test 满分）。
+  2. `naming.py:15` 过期 COMPAT 标记（2026-09-02 添加，≥14 天条件已满足）—— 驳回（单独成轮只是删一行注释，属凑数边界；且条件满足≠删标记有负载价值，夜间不单独开轮）。
+  3. `tail.py:81` COMPAT（delete-when: ADR-0170 §D3 LiveTail 单身份重构）—— 驳回（重构未完成，"issue 待开"；依赖 `LiveTail.on_event` 改收 `EventRecord` 的设计决策，需 grilling，夜间轮不动）。
+  4. `codecs.py:29,34` / `handlers.py:593` / `evolve.py:325` 的 `delete-when: 2026-12-31` —— 驳回（日期未到）。
+  5. 命名收敛弧复查（484→495）：exceptions/kernel.log/spine/boot/exceptions-template 全库 code site 归零，剩余均为 docstring/注释文案，按 494/495 惯例 docstring 不是 code site —— 弧线收口，无动作。
+- 验证结果: ruff check 2 文件首次（isort I001 空行问题一次修复后）即过（All checks passed!）；行为等价 python 断言全绿（两文件导出名字 `is` canonical 对象；旧 shim 路径 `import` 抛 ModuleNotFoundError 确认删除彻底）；全库 grep：`session.event.session`/`session/event/session` 在 lca/ tests/ 的 .py 中 0 残留；targeted pytest（`tests/transport/test_resume_rebinds_ambient.py` + `tests/session/test_session_public_api.py`——直接覆盖 bind/unbind 与两编辑模块）：8 passed，0 failed，无预存失败。
+- commit: 见 git log --grep='第0496轮'（refactor(lca-1000): 第0496轮 删除 session event COMPAT re-export shim，两处导入方直连 lifecycle.bind seam；未 push）。
+- 备注: 只 add 本轮 4 个文件（代码 2 modified + 2 deleted via git rm + ledger.md）；编辑前 git status --porcelain 干净（无并发会话未提交改动）；备份 /tmp/bak_0496/（252，3 文件：session.py/builder.py/event_session.py——首次 cp 因重名冲突漏了 event_session.py，已补）。本地 heredoc 嵌套引号翻车一次（文件未动），改用 muse.write 写脚本 + base64 经 stdin 喂远程 python，稳定。ruff 链式命令一次引号放错跑到本机（`/home/hatch/.local/bin/ruff` 不存在，exit 127），纠正后在 252 重跑通过——两处插曲均未造成文件改动。

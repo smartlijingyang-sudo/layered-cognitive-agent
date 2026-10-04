@@ -30,10 +30,6 @@ from lca.infrastructure.observability import BoundObservability
 from lca.infrastructure.observability.facade.run.ambit import RunAmbit
 from lca.infrastructure.observability.loop_cursor.cursor_record import CursorRecord
 from lca.infrastructure.persistence.run_paths import default_runs_root
-from lca.plugins.transport.webserver.handlers.runs.session.event.session import (
-    BoundRunEventSession,
-    unbind_run_event_session,
-)
 from lca.plugins.transport.webserver.handlers.runs.session.health.health import RunHealthProjection
 from lca.plugins.transport.webserver.handlers.runs.session.index.index import (
     DEFAULT_MAX_TERMINAL,
@@ -50,6 +46,10 @@ from lca.plugins.transport.webserver.read.runs.identity.identity import (
 )
 from lca.plugins.transport.webserver.read.runs.journal.projection_binding import (
     ProcessJournalBinding,
+)
+from lca.session.lifecycle.bind import (
+    BoundRunEventSession,
+    unbind_run_event_session,
 )
 
 # COMPAT(delete-when: rg 'RunStatus' tests/ lca/plugins/transport/ = 0 except alias,
