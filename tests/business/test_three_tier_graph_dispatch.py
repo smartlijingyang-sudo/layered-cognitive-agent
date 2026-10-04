@@ -94,6 +94,16 @@ ALLOWED_ACTION_DOMAINS: frozenset[str] = frozenset(
         # belongs to the business graph's outer topology rather than
         # to the layer-1/2 N9 closed-set vocabulary.
         "loop",
+        # ADR-0286 C1: ``primitive.*`` is ADR-0220 §3.2's own layer-family
+        # namespace (``THREE_TIER_PREFIXES``), not an outside intrusion:
+        # ``<family>.<action-domain>.<detail>`` (``primitive.spine.compose``
+        # / ``primitive.spine.dispatch`` / ``primitive.dto.map``). The action
+        # domain still answers to the N9 closed set (``spine`` is in it; the
+        # ``dto`` second segment is out of this guard's scope — it only
+        # checks the first segment). The §14 acceptance grep never ran the
+        # closed-set first-segment check on these directories; ``concept.*``
+        # has zero node-id usage repo-wide, so only ``primitive`` is excepted.
+        "primitive",
     }
 )
 
