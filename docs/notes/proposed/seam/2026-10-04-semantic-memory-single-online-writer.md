@@ -34,13 +34,13 @@ ADR-0249（Accepted）§0.1 的问题陈述是「在主对话轮次（`reflect/r
 
 **在线轨。** `memory_add` / `memory_update` / `memory_remove` 是语义记忆唯一的在线写者。
 
-**离线轨。** `phase.reflect.memory.extract` 的 LLM 语义蒸馏移入 `run_dream`。在线保留毫秒级残差门控（`SalienceGate`、`filter_ingestion_modality`、`EpisodeBuffer`），即 ADR-0249 的 Fast Path。`bundles/reflect/reflect_subgraph.yaml` 的三节点拓扑相应收窄，`bundles/base.yaml:172` 的组件声明随之调整。
+**离线轨。** `phase.reflect.memory.extract` 的 LLM 语义蒸馏移入 `run_dream`。在线保留毫秒级残差门控（`SalienceGate`、`filter_ingestion_modality`、`EpisodeBuffer`），即 ADR-0249 的 Fast Path。`EpisodeBuffer` 的写入受 `governor_enabled` 控制且插件默认关闭，Phase 0 的第二个条件要求目标 profile 打开它或补齐等价的捕获路径。`bundles/reflect/reflect_subgraph.yaml` 的三节点拓扑相应收窄，`bundles/base.yaml:172` 的组件声明随之调整。
 
 `run_dream` 的调度是前置条件。它当前的唯一调用方是 `lca/infrastructure/cli/commands/ops/memory.py`，`{home}/routines/` 为空目录，bundles / profiles / deploy 无引用，宿主 crontab 无条目。离线轨在拿到调度之前不承接任何写入。
 
 **认领权。** 来源改为本轮 memory 工具的 Observation。`claim-latch.json` 及其读写路径、`take_claim_right`、`last_curated_receipt` setter 的 latch 副作用退役。ADR-0260 C1 的不变量保持，「一次写盘至多支撑一次用户可见宣称」由轮次作用域保证。此项触及 ADR-0260 §3 明列的非目标，退役前必须先有 ADR 裁决，见 §交付门禁 Phase 2。
 
-轮次边界是 `run_id`。认领权是对本 run journal 中 memory 工具 Observation 的派生读，既不是运行时缓存也不落盘。HIL 暂停与恢复保持同一 `run_id`，`RunSession.ambit` 是跨暂停的 ambient 真值载体，恢复侧不重新解析 providers，见 [HIL resume 必须重绑 RunAmbit](../../implemented/seam/2026-09-05-hil-resume-rebinds-ambit.md)。因此 `askUserQuestion` 暂停后恢复的回复与暂停前的写盘属于同一轮，派生读自然重建认领权，跨暂停不存在悬挂状态。把认领权缓存进实例字段会复现 `run_4fcfb6d83c8c` 那一类双实例不同步，派生读从结构上排除它。
+轮次边界是 `run_id`。认领权是对本 run journal 中 memory 工具 Observation 的派生读，既不是运行时缓存也不落盘。作用域必须窄到不含另一个 run 的写盘证据，否则上一轮的写盘会支撑本轮的宣称，正是 latch 的泄漏形态；证据助理的会话投影 `tpc_08VEI91yFzbm.jsonl` 一个文件里承载 6 轮对应 6 个不同 `run_id`，`ResumeCursor` 也把 `session_seq`（`terminal_outcome.py:92`）与 run 级 cursor 分成两个轴，所以按会话派生不可用。HIL 暂停与恢复保持同一 `run_id`，`RunSession.ambit` 是跨暂停的 ambient 真值载体，恢复侧不重新解析 providers，见 [HIL resume 必须重绑 RunAmbit](../../implemented/seam/2026-09-05-hil-resume-rebinds-ambit.md)。因此 `askUserQuestion` 暂停后恢复的回复与暂停前的写盘属于同一轮，派生读自然重建认领权，跨暂停不存在悬挂状态。把认领权缓存进实例字段会复现 `run_4fcfb6d83c8c` 那一类双实例不同步，派生读从结构上排除它。
 
 **对账。** 收敛到单一具名闸，具备 ADD / UPDATE / DELETE / NOOP 四操作，重复输入产 NOOP 而不是退役旧行。承载体取决于 ADR-0277 待拍板⑥/⑦。`_append_semantic` 的内联去重与未中选的另一套退役。
 
@@ -50,7 +50,13 @@ ADR-0249（Accepted）§0.1 的问题陈述是「在主对话轮次（`reflect/r
 
 四个 Phase。Phase 0 到 Phase 1 严格串行，前一个的验收未达成则后一个不启动。Phase 2 与 Phase 3 各以自己的 ADR 裁决为前置，在 Phase 1 之后互不依赖，可并行。这是门禁，不是建议顺序。
 
-**Phase 0，dream 调度落地并跑稳。** `{home}/routines/` 或 ADR-0268 CronJob 中存在 `run_dream` 条目，且有条目之外的真实触发证据，例如 `dreams/` 下产物时间戳或 dream 自身的 journal 记录。调度周期需给出上界并接受 §产品决策待接受 的约束。Phase 0 未达成时 extract 保持在线，本提案其余部分不启动。
+**Phase 0，离线轨可承接。** 两个条件都满足才算达成，缺一个都不启动 Phase 1。
+
+其一，dream 调度落地并跑稳。`{home}/routines/` 或 ADR-0268 CronJob 中存在 `run_dream` 条目，且有条目之外的真实触发证据，例如 `dreams/` 下产物时间戳或 dream 自身的 journal 记录。调度周期需给出上界并接受 §产品决策待接受 的约束。
+
+其二，目标 profile 存在真实写入的在线残差捕获路径。`governor_enabled` 打开且 `{home}/memory/episodes/` 有本轮新增，或者每日流水补齐生产写入方。这条来自 §产品决策待接受 的实测结论，没开 governor 的 profile 上 extract 是隐式事实的唯一来源，移离线即丢失。
+
+Phase 0 未达成时 extract 保持在线，本提案其余部分不启动。
 
 **Phase 1，extract 的 LLM 蒸馏移入离线轨。** 仅在 Phase 0 验收达成后启动。在线保留毫秒级残差门控。47 个 extract-only 维度的落盘时延从本 Phase 起才发生，因此调度必须在本 Phase 之前已经跑稳，退化窗口一天都不开。
 
@@ -62,13 +68,14 @@ ADR-0249（Accepted）§0.1 的问题陈述是「在主对话轮次（`reflect/r
 
 47 个 extract-only 事实维度的落盘时机从当轮变为下一次 dream pass。这是用户可感知的行为变化，需要产品负责人明确接受，不因 ADR-0260 §6.3 已裁决而默认通过。§6.3 裁决的是归属，不是时延。
 
-机制事实决定时延的严重度。
+机制事实决定时延的严重度，其中两条比提案初稿假设的更差。
 
-- 在线残差门控把信号写进 `{home}/memory/episodes/<fact_id>.json`（`EpisodeBuffer`）与每日流水 `memory/YYYY-MM-DD.md`。捕获是当轮的。
+- 在线残差捕获不是普遍开启的。`EpisodeBuffer` 只在 `governor_enabled` 为真时写 `{home}/memory/episodes/`，插件默认 `False`（`memory_extract.py:182`），只有 `profiles/web-assistant.yaml:99` 打开它，该处注释写明其它部署没有这块家目录、应继续走今天的提取器。24 个助理中 5 个有 `memory/episodes/`，本 Note 的证据助理 `asst_ce7fecd65188` 没有。
+- 每日流水 `memory/YYYY-MM-DD.md` 没有生产写入方。`TrailWriter`（`contextfiles/service/trail.py:16`）只被测试构造，24 个助理的 memory 目录下 `20*.md` 计数为 0。`run_dream` 经 `parse_trail` 读它，FTS 索引覆盖它，但没有任何在线路径产生它。
 - `AssistantMemory.retrieve` 只读 `semantic.json` 与 `episodic.json`，不读 `memory/episodes/`。捕获到的残差在提升为语义记录之前不进注入路径。
-- `memory_search` 的 FTS 索引覆盖 curated records 与 trail files，由 `run_dream` 重建。两次 dream 之间索引是旧的。
+- `memory_search` 的 FTS 索引覆盖 curated records 与 trail files（`contextfiles/service/indexing.py:34`），由 `run_dream` 重建。两次 dream 之间索引是旧的。
 
-所以间隔期内这条偏好既不在系统提示里，也搜不到。今天随口纠正的偏好，在下一次 dream 之前会持续被违反。
+结论按部署分两种。开了 governor 的 profile 上，残差当轮进 `episodes/`，时延只影响提升，间隔期内这条偏好既不在系统提示里也搜不到，今天随口纠正的偏好在下一次 dream 之前会持续被违反。没开 governor 的 profile 上，extract 是隐式事实的唯一来源，移离线后不存在任何捕获路径，这 47 个维度对应的行为是丢失而不是延迟，直到在线捕获路径补齐为止。
 
 时延的可接受度完全由 dream 调度周期决定，而当前周期不存在，`run_dream` 只有手动 CLI 入口。每日一次对偏好纠正不够。`memory_extract.py:64` 放宽成本门正是为了让「还是简洁一点好」这类无第一人称偏好句落盘，把它推迟一天与该意图冲突。
 
@@ -106,11 +113,12 @@ Phase 0。
 
 - `{home}/routines/` 或 ADR-0268 CronJob 中存在 `run_dream` 条目，且有真实触发证据。
 - 调度周期上界满足 §产品决策待接受 的接受条件，且该上界写在调度配置里而不是只写在文档里。
+- 目标 profile 跑一个含隐式偏好陈述的 turn 后，`{home}/memory/episodes/` 出现新增文件，或每日流水出现当轮追加行。
 
 Phase 1。
 
 - 在线 turn 的 spine 中不出现 `phase.reflect.memory.extract` 触发的 `adapter.complete`。
-- 在线 turn 之后 `{home}/memory/episodes/` 仍有新增，残差捕获没有随蒸馏一起移走。
+- Phase 1 之后重跑同一条隐式偏好陈述，`{home}/memory/episodes/` 或每日流水的新增与 Phase 1 之前一致，残差捕获没有随蒸馏一起移走。
 - 同 dedupe_key 同时存在 user 与 model 来源的维度占比从 17/89 降至 0。
 
 Phase 2。
@@ -127,7 +135,8 @@ Phase 3 与守卫 remedy。
 
 ## Risks
 
-- 47 个 extract-only 维度的落盘时延是产品决策，见 §产品决策待接受。Phase 0 门禁保证它在调度跑稳之前不发生，调度周期上界决定它是否可接受。
+- 47 个 extract-only 维度的落盘时延是产品决策，见 §产品决策待接受。Phase 0 门禁保证它在离线轨可承接之前不发生，调度周期上界决定它是否可接受。在没开 governor 的 profile 上这个代价是丢失而不是延迟，Phase 0 的第二个条件就是为此设的。
+- 每日流水缺生产写入方是独立缺口。`run_dream` 与 FTS 索引都消费它，`TrailWriter` 却只被测试构造。补齐它属于 ADR-0254 的落地范围，不由本提案承担，但 Phase 0 的第二个条件在 governor 关闭的部署上会落到它身上。
 - re-ask remedy 增加一次 LLM 调用，上限由已有的 re-ask 硬上限约束，触顶回落 `_REFUSAL`。
 - 对账承载体依赖 ADR-0277 待拍板⑥/⑦。若裁决结果是不引入 `SemanticClaim`，`LinkDecider` 需改造为在 `MemoryRecord` 上工作，`consolidation.py` 的类型层随之调整。
 - 撤回条件有两条。dream pass 拿不到满足周期上界的调度时离线轨不成立，Phase 1 不启动，退回「在线双写者 + 轮次作用域认领权」，即只落 Phase 2 与守卫 remedy。ADR 裁决否决派生读时 Phase 2 不启动，latch 保留并补轮次身份，跨轮泄漏由轮次作用域关闭，此时 Alternatives considered 里「给 latch 加轮次身份，保留双写者」那一项成为次优落点。
@@ -138,6 +147,7 @@ Phase 3 与守卫 remedy。
 2. ADR-0277 待拍板⑥（typed 对象是运行时投影还是新存储真值，与 ADR-0254 v2 决策 A 的关系）与待拍板⑦（`SemanticClaim` 与 ADR-0247 `MemoryRecord` 是替代、包装还是并行）决定对账闸的承载体，是 Phase 3 的硬前置。见 [ADR-0277 四问深审](../../audit-2026-10-03-adr0277-review.md) Q4。
 3. ADR-0277 待拍板③（sleep-time 载体）与 `run_dream` 的调度归属是同一件事的两面，需一并裁决，并给出 Phase 0 要求的周期上界。
 4. §产品决策待接受 的落盘时延尚未获得产品负责人明确接受，接受前 Phase 1 不启动。
+5. 每日流水的生产写入方由谁补。`TrailWriter` 已实现且被 `DiskFileStore` 的 append-only 窄门保护，但没有在线调用方。归 ADR-0254 落地还是本提案 Phase 0，需要裁决；在 governor 关闭的部署上，Phase 0 的第二个条件依赖这个答案。
 
 ## Related
 
