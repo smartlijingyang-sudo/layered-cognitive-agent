@@ -76,6 +76,8 @@ provides=("<region>::<sub-group>.<node>",)
 
 当前 region 集合（2026-09-16 快照）：`{think, act, perceive, reflect, remember, stop, concept, primitive, intervene, delegate, plan, loop}`。
 
+> 2026-10-04 修订注：`stop/` 空目录已在 `55cba5659`（2026-10-04 deslop）删除，当前实际集合为上述 11 个（去 `stop`）；D1 的文件系统当前实际目录规则不变，`RegionPrefix` 与 `collect_region_prefixes()` 随文件系统同步，测试 `test_region_prefix.py` 的快照期望集已同步删除。
+
 ### D2 — RegionPrefix enum 是视图，不是 SSOT
 
 `lca/contracts/atoms/enums/region_prefix.py::RegionPrefix` 是对 `lca/nodes/` 目录的**只读视图**。`RegionPrefix.parse(s)` 接受字符串返回 enum，未知字符串抛 `UnknownRegionPrefixError`（Pydantic-style fail-loud）。**该 enum 不替代文件系统**，但提供：
