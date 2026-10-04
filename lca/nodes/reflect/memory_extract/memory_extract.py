@@ -136,20 +136,28 @@ def _parse_candidates(text: str) -> list[dict[str, Any]]:
 
 
 def _format_existing_memories(runtime: Any) -> str:
-    """提取当前活跃的身份与偏好记忆，供提取器做上下文感知的覆盖与演化。"""
+    """提取当前全部活跃语义记忆，供提取器做上下文感知的覆盖与演化。
+
+    Every live category is shown. The prompt this feeds instructs the
+    extractor to reuse an existing ``dedupe_key`` when revising a fact, and
+    ``AssistantMemory._append_semantic`` converges two records when their
+    ``dedupe_key`` matches or their content fingerprints do. Filtering to
+    IDENTITY and PREFERENCE defeated both: a FACT already on disk was
+    invisible here, so the extractor minted a fresh key for it and the store
+    kept two live records of one fact. ``run_4fcfb6d83c8c`` wrote
+    用户当前正在学习英语 twice, 15 seconds apart, one row from ``memory_add``
+    and one from this node.
+    """
     memory = getattr(runtime, "memory", None)
     if memory is None and hasattr(runtime, "get"):
         memory = runtime.get("memory")
     if memory is None or not hasattr(memory, "query"):
         return "（无）"
     try:
-        from lca.contracts.atoms.enums.enums import MemoryCategory, MemoryLayer
+        from lca.contracts.atoms.enums.enums import MemoryLayer
 
         records = [
-            r
-            for r in memory.query(MemoryLayer.SEMANTIC)
-            if getattr(r, "category", None) in {MemoryCategory.IDENTITY, MemoryCategory.PREFERENCE}
-            and not getattr(r, "deleted", False)
+            r for r in memory.query(MemoryLayer.SEMANTIC) if not getattr(r, "deleted", False)
         ]
         if not records:
             return "（无）"
