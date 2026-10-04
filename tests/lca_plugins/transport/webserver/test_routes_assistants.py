@@ -1,8 +1,8 @@
 """lca.plugins.transport.webserver.routes_assistants — /v1/assistants (PR-5).
 
-Test the registry surface (7 routes: six catalog/overlay endpoints + two
-jobs endpoints sharing one path, PR-8) and the COMPAT 501 envelope used
-while the owning capability is absent. The handler bodies must remain
+Pin the registry surface against :data:`_ADVERTISED_PATHS`, the single home
+for the expected ``/v1/assistants`` path set, and the COMPAT 501 envelope
+used while the owning capability is absent. The handler bodies must remain
 "fail-closed 4xx" (ADR-0187 §3 D7) but never crash the registry boot.
 """
 
@@ -17,6 +17,29 @@ from starlette.testclient import TestClient
 
 from lca.contracts.protocols.assistant.role_resolver import RoleNotFoundError
 from lca.plugins.transport.webserver.router.router import RouteRegistry
+
+#: Expected ``ROUTE_SPECS`` surface, in declaration order. Adding a route means
+#: adding its path here; the registry, effect-tracking and constant tests all
+#: read this tuple, so one entry keeps the three of them in step.
+_ADVERTISED_PATHS: tuple[str, ...] = (
+    "/v1/assistants",
+    "/v1/assistants/import-lobehub",
+    "/v1/assistants/{assistant_id}",
+    "/v1/assistants/{assistant_id}/profile",
+    "/v1/assistants/{assistant_id}:reimport",
+    "/v1/assistants/{assistant_id}/skills:install",
+    "/v1/assistants/{assistant_id}/bind-agent",
+    "/v1/assistants/{assistant_id}/register-lobehub",
+    "/v1/assistants/{assistant_id}/retire",
+    "/v1/assistants/{assistant_id}/jobs",
+    "/v1/assistants/{assistant_id}/jobs/{job_id}:fire",
+    "/v1/assistants/{assistant_id}/jobs/{job_id}/run",
+    "/v1/assistants/{assistant_id}/jobs/{job_id}/snooze",
+    "/v1/assistants/{assistant_id}/jobs/{job_id}",
+    "/v1/assistants/{assistant_id}/standing-files",
+    "/v1/assistants/{assistant_id}/standing-files/{filename}",
+    "/v1/assistants/{assistant_id}/status-snapshot",
+)
 
 _STUB_ROLE_CARDS: dict[str, object] = {
     "engineering/architect": {
@@ -77,62 +100,31 @@ def _setup_plugin() -> tuple[Any, RouteRegistry]:
 
 
 @pytest.mark.asyncio
-async def test_routes_assistants_register_fourteen_routes() -> None:
-    """Fourteen :class:`RouteSpec` entries; ``/v1/assistants`` carries
+async def test_routes_assistants_registers_no_unadvertised_route() -> None:
+    """One registration per advertised path; ``/v1/assistants`` carries
     both POST (create) and GET (list) via the dispatcher,
     ``/v1/assistants/{assistant_id}/jobs`` carries POST (register) and
-    GET (list) via the jobs dispatcher, the item path carries card-path
-    PUT/DELETE, and standing-files endpoints."""
+    GET (list) via the jobs dispatcher, and the item path carries card-path
+    PUT/DELETE."""
     plugin, router, ctx = _setup_plugin()
     await plugin.setup(ctx, None)
-    assert len(router._exact) == 14
+    assert len(router._exact) == len(_ADVERTISED_PATHS)
 
 
 @pytest.mark.asyncio
 async def test_routes_assistants_paths_match_advertised_surface() -> None:
     plugin, router, ctx = _setup_plugin()
     await plugin.setup(ctx, None)
-    expected = {
-        "/v1/assistants",
-        "/v1/assistants/import-lobehub",
-        "/v1/assistants/{assistant_id}",
-        "/v1/assistants/{assistant_id}/profile",
-        "/v1/assistants/{assistant_id}:reimport",
-        "/v1/assistants/{assistant_id}/skills:install",
-        "/v1/assistants/{assistant_id}/bind-agent",
-        "/v1/assistants/{assistant_id}/register-lobehub",
-        "/v1/assistants/{assistant_id}/retire",
-        "/v1/assistants/{assistant_id}/jobs",
-        "/v1/assistants/{assistant_id}/jobs/{job_id}:fire",
-        "/v1/assistants/{assistant_id}/jobs/{job_id}",
-        "/v1/assistants/{assistant_id}/standing-files",
-        "/v1/assistants/{assistant_id}/standing-files/{filename}",
-    }
-    assert expected.issubset(router._exact.keys())
+    assert set(_ADVERTISED_PATHS).issubset(router._exact.keys())
 
 
 @pytest.mark.asyncio
 async def test_routes_assistants_effects_tracked() -> None:
     plugin, _router, ctx = _setup_plugin()
     await plugin.setup(ctx, None)
-    assert len(ctx._fake_runtime.effects) == 14
+    assert len(ctx._fake_runtime.effects) == len(_ADVERTISED_PATHS)
     labels = {label for _dispose, label in ctx._fake_runtime.effects}
-    for path in (
-        "/v1/assistants",
-        "/v1/assistants/import-lobehub",
-        "/v1/assistants/{assistant_id}",
-        "/v1/assistants/{assistant_id}/profile",
-        "/v1/assistants/{assistant_id}:reimport",
-        "/v1/assistants/{assistant_id}/skills:install",
-        "/v1/assistants/{assistant_id}/bind-agent",
-        "/v1/assistants/{assistant_id}/register-lobehub",
-        "/v1/assistants/{assistant_id}/retire",
-        "/v1/assistants/{assistant_id}/jobs",
-        "/v1/assistants/{assistant_id}/jobs/{job_id}:fire",
-        "/v1/assistants/{assistant_id}/jobs/{job_id}",
-        "/v1/assistants/{assistant_id}/standing-files",
-        "/v1/assistants/{assistant_id}/standing-files/{filename}",
-    ):
+    for path in _ADVERTISED_PATHS:
         assert f"route:{path}" in labels
 
 
@@ -141,22 +133,7 @@ def test_routes_assistants_exposes_public_routes_constant() -> None:
 
     assert isinstance(ROUTE_SPECS, tuple)
     paths = {spec.path for spec in ROUTE_SPECS}
-    assert paths == {
-        "/v1/assistants",
-        "/v1/assistants/import-lobehub",
-        "/v1/assistants/{assistant_id}",
-        "/v1/assistants/{assistant_id}/profile",
-        "/v1/assistants/{assistant_id}:reimport",
-        "/v1/assistants/{assistant_id}/skills:install",
-        "/v1/assistants/{assistant_id}/bind-agent",
-        "/v1/assistants/{assistant_id}/register-lobehub",
-        "/v1/assistants/{assistant_id}/retire",
-        "/v1/assistants/{assistant_id}/jobs",
-        "/v1/assistants/{assistant_id}/jobs/{job_id}:fire",
-        "/v1/assistants/{assistant_id}/jobs/{job_id}",
-        "/v1/assistants/{assistant_id}/standing-files",
-        "/v1/assistants/{assistant_id}/standing-files/{filename}",
-    }
+    assert paths == set(_ADVERTISED_PATHS)
 
 
 # ── 501 COMPAT envelope behavior ──────────────────────────────────────
