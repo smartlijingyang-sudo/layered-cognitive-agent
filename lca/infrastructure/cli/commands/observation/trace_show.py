@@ -13,11 +13,11 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any
 
 import typer
 
+from lca.infrastructure.cli.commands._shared.projection import spine_filename_for_run_cwd
 from lca.infrastructure.observability.graph_timeline import is_graph_event, render_record
 
 
@@ -39,7 +39,7 @@ def register(app: typer.Typer) -> None:
         ),
         json_mode: bool = typer.Option(True, "--json/--human", help="默认 --json"),
     ) -> None:
-        spine_path = _spine_path(run_id)
+        spine_path = spine_filename_for_run_cwd(run_id)
         if not spine_path.exists():
             typer.echo(f"no spine file at {spine_path}", err=True)
             raise typer.Exit(code=1)
@@ -60,10 +60,6 @@ def register(app: typer.Typer) -> None:
             _render_trace_human(facts, full=full)
 
 
-def _spine_path(run_id: str) -> Path:
-    return Path("traces/runs") / run_id / f"{run_id}.spine.jsonl"
-
-
 def _ep_of(record: dict[str, Any]) -> str:
     return str(record.get("execution_point") or record.get("event_type") or "")
 
@@ -81,7 +77,7 @@ def _seq_of(record: dict[str, Any]) -> str:
 
 def _load_facts(run_id: str) -> list[dict[str, Any]]:
     """从 trace spine SSOT 读 observation.* / diagnosis.* / phase_graph.* facts。"""
-    spine_path = _spine_path(run_id)
+    spine_path = spine_filename_for_run_cwd(run_id)
     if not spine_path.exists():
         return []
     out: list[dict[str, Any]] = []

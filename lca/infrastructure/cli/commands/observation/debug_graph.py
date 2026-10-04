@@ -17,11 +17,11 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 import typer
 
+from lca.infrastructure.cli.commands._shared.projection import spine_filename_for_run_cwd
 from lca.infrastructure.text.truncate import ASCII_ELLIPSIS, truncate_text
 
 _LOG_DEBUG_GRAPH_TAG = "debug-graph"
@@ -34,10 +34,6 @@ _FAIL_OUTCOMES = {"fail", "failed", "failure", "error", "rejected"}
 _STOP_METHODS: set[str] = set()
 
 
-def _spine_path(run_id: str) -> Path:
-    return Path("traces/runs") / run_id / f"{run_id}.spine.jsonl"
-
-
 def _load_events(run_id: str) -> list[dict[str, Any]]:
     """Read spine.jsonl; missing file returns empty list.
 
@@ -45,10 +41,6 @@ def _load_events(run_id: str) -> list[dict[str, Any]]:
     execution_points can render — debug-graph is the fallback path that must
     work even when the spine contains non-whitelisted EPs.
     """
-    from lca.infrastructure.cli.commands._shared.projection import (
-        spine_filename_for_run_cwd,
-    )
-
     p = spine_filename_for_run_cwd(run_id)
     if not p.exists():
         return []
@@ -363,7 +355,7 @@ def register(app: typer.Typer) -> None:
     ) -> None:
         events = _load_events(run_id)
         if not events:
-            typer.echo(f"no spine at {_spine_path(run_id)}", err=True)
+            typer.echo(f"no spine at {spine_filename_for_run_cwd(run_id)}", err=True)
             raise typer.Exit(code=1)
         report = build_debug_graph(events)
         if json_mode:
@@ -376,7 +368,7 @@ def debug_graph_command(run_id: str, as_json: bool = False) -> None:
     """供顶层 alias (``lca-ops debug-graph``) 复用的实函数。"""
     events = _load_events(run_id)
     if not events:
-        typer.echo(f"no spine at {_spine_path(run_id)}", err=True)
+        typer.echo(f"no spine at {spine_filename_for_run_cwd(run_id)}", err=True)
         raise typer.Exit(code=1)
     report = build_debug_graph(events)
     if as_json:

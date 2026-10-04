@@ -324,3 +324,19 @@
 - 验证结果: ruff check lca/loop/emit/spine/ 全过；包导入冒烟（import lca.loop.emit.spine）OK；targeted pytest（tests/observability/spine/sinks/test_routing_file_sink.py + tests/observability/spine/test_orphan.py，事件名字串走契约路径的直接相关测试）：8 passed，0 failed，无预存失败；代码引用复查仅剩 scripts/migrate_import_paths.py 一处恒等映射（一次性迁移脚本的历史条目，非运行时依赖，不动）。
 - commit: f7dcba47d refactor(lca-1000): 第0483轮 spine 死 emit 模块 kernel_loop 删除(死接口路径收敛),2 files，未 push。
 - 备注: 只 add/stage 了本轮 2 个文件（kernel_loop.py 删除 + ledger.md）；工作区干净（无并发会话未提交改动）；备份 /tmp/bak_0483/（252）。遗留：lca/loop/README.md:120 与 docs/specs/cognitive-directory-discipline.md:129 的目录树列表仍列出 kernel_loop，属文档轻微滞后，留待后续文档轮次统一处理，本轮不扩大 scope。
+## 第0484轮 (2026-10-05 01:33-01:48 CST)
+- 改了什么: CLI 三命令的 spine 路径约定收敛至命名 SSOT seam（3 files，11 insertions，19 deletions）：
+  - lca/infrastructure/cli/commands/observation/debug_graph.py：删除本地 `def _spine_path`（raw `f"{run_id}.spine.jsonl"` 拼接）；2 处调用点改用已存在的 `_shared.projection.spine_filename_for_run_cwd`（该模块 `_load_events` 早已在用——本文件内部本就不一致）；import 上提至模块级；删掉因此闲置的 `pathlib.Path` 导入。
+  - lca/infrastructure/cli/commands/observation/trace_show.py：同上（删除本地 `_spine_path`，2 处调用点改用 `spine_filename_for_run_cwd`，模块级 import，删闲置 `Path` 导入）。
+  - lca/infrastructure/cli/commands/journal/session.py：保留带 `traces_root` 参数的 `_spine_path`（调用方传 `--traces-root` 测试覆盖 seam，语义与 cwd 两处不同），但把 raw 字串拼接待换成 `spine_filename_for_run(run_id)`（deferred import，沿用 journal.py/replay.py 同包惯例）。
+- 依据 skill 哪一节: DEEPENING.md 第1节 In-process（Always deepenable — merge the modules and test through the new interface directly）+ Seam discipline（One adapter = hypothetical seam；此处 seam 真实：`spine_filename_for_run_cwd` 已有 debug_graph._load_events / runs/debug.py / scripts/lca-cli-shape.py 调用方）；LANGUAGE.md Depth / Interface（含 error modes）/ Locality（文件名约定改一处）；SKILL.md Deletion test（删掉本地 helper 后复杂度不搬家——命名约定早已收敛在 naming.py，cwd 路径布局收敛在 projection）。
+- 为什么这是实质改动(非凑数): 三处 helper 是同一条 `<run_id>.spine.jsonl` 命名约定的 3 份拷贝，且直接违反仓库内成文禁令：`lca/contracts/observability/core/ssot.py`（"禁止再有 run_dir / "<run_id>.spine.jsonl" 之类的字符串拼接"）与 naming.py ADR-0169 PR-4（"禁止再写 run_dir / "<run_id>.spine.jsonl" 字符串拼接"）。ssot.py 明确记载历史回归根因：spine 文件名字串被多处 reader 硬编码，PR-27 改名后所有未同步 reader 沉默读到全零。本轮消除 3 处已知的违规点，命名约定彻底收敛到 SSOT；不是浅层分发器（三处语义逐字节一致，python 断言验证；session.py 的 traces_root 参数是正当差异，保留 helper 只换文件名来源）。类比先例：481 轮 `_resolve_port`×5 收敛。
+- 候选清单（本轮 explore，逐一验证后取舍）：
+  1. 上述 `_spine_path`×3 收敛 —— 选中。
+  2. 其余 raw `.spine.jsonl` 字串（activity_feed.py×3 glob、exceptions.py、run_explain.py、run_replay.py、runs/health.py、runs/runs.py、routes_channels_wechat.py、failure_reader.py、fold_deriver.py、curator.py、scripts/*）—— 发现但本轮不做：语义各异（glob 模式、`run_dir.name` 变体、help 文案、脚本），逐个需单独评审，留待后续轮次；记入本轮台账备查。
+  3. replay.py 的 fail-soft `_spine_path`（返回 None 变体）—— 已走 SSOT helper，语义正当差异，保留。
+  4. llm.py 5 个 emit 函数 —— 全有真实调用者（经 protocol/adapters），驳回。
+  5. lca/loop/README.md:121 kernel_loop 滞后格 —— 单格文档修正，低于本轮实质硬门槛（改一句话不算一轮），留待文档轮次。
+- 验证结果: ruff check 3 文件全过；行为等价 python 断言（`spine_filename_for_run(rid) == f"{rid}.spine.jsonl"`、`spine_filename_for_run_cwd(rid) == Path("traces/runs")/rid/f"{rid}.spine.jsonl"`、session helper 双 traces_root 断言、两模块 `_spine_path` 属性消失断言）EQUIV-OK；targeted pytest（test_debug_graph.py + test_trace_show_graph_facts.py + test_projection.py）：23 passed，0 failed，无预存失败。
+- commit: f8b0fc9d474fcb32913d48c52a2f818da87ac2ee refactor(lca-1000): 第0484轮 CLI 三命令 _spine_path 重复约定收敛至 spine 命名 SSOT(加深/Seam)，4 files，未 push。
+- 备注: 只 add 了本轮 4 个文件（3 代码 + ledger.md）；工作区无并发会话未提交改动（并发会话在本轮期间新增 3 个已提交 commit，未触碰）；备份 /tmp/bak_0484/（252，3 文件）。附带发现：台账 483 轮记录的 commit f7dcba47d 已不在 main 历史上（`git branch --contains` 为空、`merge-base --is-ancestor` 为否），同内容现为 25fa1c795——并发会话 rebase/改写了历史；本轮起台账以提交时实际 hash 为准。

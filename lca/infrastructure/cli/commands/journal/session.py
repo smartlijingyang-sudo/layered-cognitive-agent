@@ -17,7 +17,11 @@ _DEFAULT_TRACES_ROOT = Path("traces")
 
 
 def _spine_path(run_id: str, traces_root: Path) -> Path:
-    return traces_root / "runs" / run_id / f"{run_id}.spine.jsonl"
+    from lca.infrastructure.observability.spine.sinks.naming import (
+        spine_filename_for_run,
+    )
+
+    return traces_root / "runs" / run_id / spine_filename_for_run(run_id)
 
 
 def _load_run_events(run_id: str, traces_root: Path) -> tuple[Any, ...]:
