@@ -43,12 +43,15 @@ from lca.plugins.composer.composition.cordis_composer import (
 )
 from lca.plugins.tools.cordis_control import build_cordis_control_tool
 from tests.scenario.cordis.test_cordis_creator_e2e import SCRATCH, _plugin_source
+from tests.support.session_gate_helpers import bound_session
 
 
 @contextmanager
 def bind_journal():
     journal = MemoryJournal()
-    with bind_backends(BoundObservability(journal=journal)):
+    # D3 裁决(todo-38/todo-50):record() 需要 bound publish Session；无 Session 即抛。
+    # 生产 run 中工具执行恒有 Session，此处绑定即是对生产路径的忠实模拟。
+    with bound_session("cordis-audit"), bind_backends(BoundObservability(journal=journal)):
         yield journal
 
 
