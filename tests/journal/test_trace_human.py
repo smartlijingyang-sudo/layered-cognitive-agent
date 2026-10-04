@@ -413,3 +413,56 @@ def test_max_detail_per_node_truncates(traces_root: Path) -> None:
     # envelope exceeds the cap.
     out = result.stdout
     assert ("+N more" in out) or ("+more" in out) or ("more lines" in out)
+
+
+# ── footer counts read step.tool_call.record (ADR-0285) ──────────
+
+
+def test_human_footer_counts_step_tool_call_record(tmp_path: Path) -> None:
+    """Footer ``tool call`` / ``blocked`` counts come from
+    ``step.tool_call.record`` (ADR-0285), not from bracket EPs.
+
+    ``status="wire_blocked"`` attempts are shown separately as blocked
+    and excluded from the executed tool-call count.
+    """
+    root = tmp_path / "traces"
+    run_dir = root / "runs" / "run_human"
+    run_dir.mkdir(parents=True)
+
+    t0 = "2026-09-01T00:00:00+00:00"
+    records = [
+        _record(
+            sequence=1,
+            execution_point="kernel.run.start",
+            payload={"run_id": "run_human", "trace_id": "trace_h1"},
+            when_iso=t0,
+        ),
+        _record(
+            sequence=2,
+            execution_point="step.tool_call.record",
+            payload={"tool_name": "a", "invocation_id": "toolu_a", "status": "wire_blocked"},
+            when_iso=t0,
+        ),
+        _record(
+            sequence=3,
+            execution_point="step.tool_call.record",
+            payload={"tool_name": "b", "invocation_id": "toolu_b"},
+            when_iso=t0,
+        ),
+        _record(
+            sequence=4,
+            execution_point="kernel.run.stop",
+            payload={"run_id": "run_human", "trace_id": "trace_h1"},
+            outcome="success",
+            when_iso=t0,
+        ),
+    ]
+    _write_jsonl(run_dir, records)
+
+    result = runner.invoke(
+        app,
+        ["journal", "trace", "run_human", "--traces-root", str(root)],
+    )
+    assert result.exit_code == 0, result.stderr
+    assert "1 tool call" in result.stdout
+    assert "1 blocked" in result.stdout

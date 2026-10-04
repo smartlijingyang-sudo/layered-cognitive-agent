@@ -736,12 +736,26 @@ def _render_human(
             ep_counter.get(e.get("execution_point", "?"), 0) + 1
         )
     exceptions = ep_counter.get("exception.caught", 0)
-    tools = ep_counter.get("phase.tool.call.end", 0)
+    # ADR-0285: tool-call counts read ``step.tool_call.record`` — each
+    # attempt carries its own status; ``wire_blocked`` attempts are shown
+    # separately and excluded from the executed tool-call count.
+    blocked = 0
+    tools = 0
+    for e in events:
+        if e.get("execution_point") != "step.tool_call.record":
+            continue
+        payload = e.get("payload")
+        if not isinstance(payload, dict):
+            continue
+        if payload.get("status") == "wire_blocked":
+            blocked += 1
+        else:
+            tools += 1
     llms = ep_counter.get("llm.call.start", 0)
     phase_nodes = ep_counter.get("phase_graph.node.start", 0)
     summary = (
         f"▶ run done · {phase_nodes} phase nodes · {llms} llm call"
-        f" · {tools} tool call · {exceptions} exception"
+        f" · {tools} tool call · {blocked} blocked · {exceptions} exception"
         f" · {len(events)} events · {_format_delta_ms(total_ms).lstrip('Δ+')}"
     )
     output.append("")
