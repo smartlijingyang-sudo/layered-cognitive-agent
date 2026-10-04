@@ -42,12 +42,8 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.contracts.routing import RouteSpec
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
-from lca.plugins.transport.webserver.handlers.cors.cors import CORS_HEADERS
 from lca.plugins.transport.webserver.route.register import register_routes
-
-
-def _json(payload: dict[str, Any], *, status_code: int = 200) -> JSONResponse:
-    return JSONResponse(payload, status_code=status_code, headers=CORS_HEADERS)
+from lca.plugins.transport.webserver.routes_1.routes_assistants.codecs import _json
 
 
 def _resolver_from_request(request: Request) -> Any | None:

@@ -36,7 +36,7 @@ _ASSISTANT_JOBS_MARKER = (
 )
 
 
-def _json(payload: dict[str, Any], *, status_code: int) -> JSONResponse:
+def _json(payload: dict[str, Any], *, status_code: int = 200) -> JSONResponse:
     return JSONResponse(payload, status_code=status_code, headers=CORS_HEADERS)
 
 
