@@ -146,10 +146,10 @@ def test_home_overlay_changes_standing_order(tmp_path: Path) -> None:
     (home / "SOUL.md").write_text("soul-body", encoding="utf-8")
     (home / "TOOLS.md").write_text("tools-body", encoding="utf-8")
     (home / "AGENTS.md").write_text("手册正文", encoding="utf-8")
-    persona = persona_from_home(str(home))
+    persona = persona_from_home(str(home), platform_root=tmp_path / "platform")
     assert persona.backstory.index("tools-body") < persona.backstory.index("soul-body")
     assert "手册正文" not in persona.backstory
-    refreshed = refresh_standing_backstory(str(home), "fallback")
+    refreshed = refresh_standing_backstory(str(home), "fallback", platform_root=tmp_path / "platform")
     assert refreshed.index("tools-body") < refreshed.index("soul-body")
 
 
@@ -158,7 +158,7 @@ def test_home_overlay_shrinks_the_backstory_budget(tmp_path: Path) -> None:
     home.mkdir()
     _overlay(home, "backstory_budget_chars = 40\n")
     (home / "SOUL.md").write_text("字" * 500, encoding="utf-8")
-    persona = persona_from_home(str(home))
+    persona = persona_from_home(str(home), platform_root=tmp_path / "platform")
     assert len(persona.backstory) <= 40
     assert "字" * 50 not in persona.backstory
 
@@ -171,7 +171,7 @@ def test_home_overlay_renames_the_agents_heading(tmp_path: Path) -> None:
         'standing_files = ["AGENTS.md"]\nagents_heading = "## 自定义约定"\n',
     )
     (home / "AGENTS.md").write_text("手册正文", encoding="utf-8")
-    persona = persona_from_home(str(home))
+    persona = persona_from_home(str(home), platform_root=tmp_path / "platform")
     assert "## 自定义约定" in persona.backstory
     assert "工作约定" not in persona.backstory
 
@@ -203,6 +203,7 @@ def test_preserve_uses_the_supplied_layout(tmp_path: Path) -> None:
         "规则\n" + render_injected("MEMORY.md", "旧记忆"),
         DiskFileStore(tmp_path),
         layout=layout,
+        platform_root=tmp_path / "shared",
     )
     assert "旧记忆" not in out
     assert "新笔记" in out
