@@ -32,6 +32,7 @@ from lca.contracts.protocols.declarative.declarative_2.declarative_plugin import
 )
 from lca.harness.plugin_api import PluginContext, PluginKind, plugin
 from lca.infrastructure.observability.spine.sinks.naming import (
+    BOOT_SPINE_FILENAME,
     DEFAULT_SPINE_TEMPLATE,
 )
 from lca.infrastructure.observability.spine.sinks.routing_file_sink import (
@@ -70,7 +71,7 @@ def _resolve_boot_path(cfg: Mapping[str, Any]) -> Path:
     if "path" in cfg:
         legacy = Path(str(cfg["path"]))
         if legacy.name == _LEGACY_SINGLE_FILE_LAYOUT:
-            return legacy.with_name("boot-spine.jsonl")
+            return legacy.with_name(BOOT_SPINE_FILENAME)
         return legacy
     return Path(_DEFAULT_BOOT_PATH)
 
