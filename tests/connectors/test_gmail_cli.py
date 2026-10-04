@@ -5,22 +5,34 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from lca.infrastructure.connectors.core.intent_vault import (
+    ConnectorAuthIntentVault,
+    set_default_intent_vault,
+)
 from lca.infrastructure.connectors.core.state import ConnectionState
 from lca.infrastructure.connectors.core.vault import ConnectorVault
 from lca.infrastructure.connectors.gmail.cli import GmailConnectorCLI
 
 
 def test_gmail_cli_status_not_connected(tmp_path: Path) -> None:
+    # 缺口一收敛：status 走 vault intent 路径，返回体/widget 只带 intentId。
+    set_default_intent_vault(ConnectorAuthIntentVault())
     vault = ConnectorVault(user_id="test_user", lca_home=tmp_path)
     cli = GmailConnectorCLI(vault=vault)
 
     res = cli.execute(["status"])
     assert res["status"] == "not_connected"
     assert res["appName"] == "Gmail"
-    assert "authUrl" in res
+    # Zero Model URL Exposure：返回体不带裸 authUrl
+    assert "authUrl" not in res
+    assert res["intentId"].startswith("cai_")
     assert "connectionId" in res
     # INV-03: Must provide widget markup
     assert "[widget:connector_auth?" in res["widget"]
+    # widget 标签只带 intentId，不含裸 URL
+    assert f"intentId={res['intentId']}" in res["widget"]
+    assert "authUrl" not in res["widget"]
+    assert "http" not in res["widget"]
 
 
 def test_gmail_cli_status_active(tmp_path: Path) -> None:

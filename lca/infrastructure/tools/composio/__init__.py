@@ -121,10 +121,11 @@ class ComposioManagementExecutor:
                 user_id=user_id,
             )
 
+        # Fail-closed: 不再传递 auth_url 回退分支 —— create_intent 永不返回空，
+        # intent 为空即无凭据，标签不带任何 URL（旧分支不可达，已删除）。
         widget = format_connector_auth_widget(
             app_name=app_name,
             intent_id=intent_id if intent_id else None,
-            auth_url="" if intent_id else redirect,
             connection_id=conn_id,
         )
         text = (
