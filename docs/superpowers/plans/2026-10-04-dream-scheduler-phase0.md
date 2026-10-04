@@ -59,7 +59,7 @@ Every task's deliverable implicitly satisfies these. Values are copied from the 
 | `tests/plugins/test_dream_scheduler_plugin_shape.py` (create) | Plugin shape and dispose registration |
 | `tests/scenario/memory/test_dream_scheduler_live_sweep.py` (create) | End-to-end Phase 0 evidence against real homes |
 
-`dream_scheduler.py` lives in infrastructure next to `dream.py` because it owns no cognition and no contract. The plugin file is the only place that touches the harness.
+`dream_scheduler.py` lives in `lca/application/memory/` because it needs `RoutineFileLock` from `lca/application/routine/locks`, and `pyproject.toml:82-92` contract 2 forbids `lca.infrastructure` from importing `lca.application`. `application` is the composition root, so it may import its own layer and downward into `lca.infrastructure.memory.dream`. The package needs an `__init__.py`: without one grimp treats the directory as a namespace package and skips it, which would leave the module outside layering enforcement entirely. The plugin file is the only place that touches the harness.
 
 ---
 
