@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import importlib
 
+import pytest
+
 from lca.infrastructure.memory.contextfiles.domain.layout import packaged_layout
 from lca.infrastructure.memory.contextfiles.domain.standing import (
     assemble_standing,
@@ -100,3 +102,35 @@ def test_refresh_standing_backstory_uses_infrastructure_standing() -> None:
     text = __import__("pathlib").Path(source).read_text(encoding="utf-8")
     assert "lca.cognition" not in text
     assert callable(loader.refresh_standing_backstory)
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "P1 todo-40: fd53f1642 把 URL 铁律从 react_tool_usage_guidelines 段搬进 "
+        "CONSTITUTION.md 模板，但铁律在模板内偏移 13651/23838，远超 backstory "
+        "3000 预算（首文件 cap 仅预算一半），组装后模型实际看不到。45ac7b6c0 时代 "
+        "该规则在 section 全量渲染、模型必见；迁移后只剩负向测试（不在 py）为绿， "
+        "正向契约断裂。修法待源码侧决策（模板前置/提预算/独立 section），tests lane 只钉契约。"
+    ),
+)
+def test_url_iron_rule_survives_standing_assembly() -> None:
+    """正向契约：URL 铁律必须能到达组装后的 backstory（模型实际看到的文本）。
+
+    负向测试 test_no_url_rules_hardcoded_in_py 只保证"不在 py 里硬编码"，
+    不保证"在宪法里仍然生效"——本测试补另一半：源头模板里必须有，
+    且经 assemble_standing（与 persona_from_home / refresh_standing_backstory
+    同预算）裁剪后仍然在场。
+    """
+    from lca.plugins.transport.webserver.routes_1.routes_assistants.standing_files import (
+        DEFAULT_STANDING_FILE_TEMPLATES,
+    )
+
+    template = DEFAULT_STANDING_FILE_TEMPLATES["CONSTITUTION.md"]
+    assert "URL 铁律" in template, "铁律已从 CONSTITUTION.md 模板源头消失"
+    out = assemble_standing(
+        [("CONSTITUTION.md", template)],
+        budget_chars=packaged_layout().backstory_budget_chars,
+        order=packaged_layout().standing_files,
+    )
+    assert "URL 铁律" in out, "铁律被 backstory 预算截断，模型实际看不到"
