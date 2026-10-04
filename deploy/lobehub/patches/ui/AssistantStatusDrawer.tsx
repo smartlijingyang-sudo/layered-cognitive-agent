@@ -665,6 +665,7 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       &:hover { opacity: 0.75; }
     `,
     inspectionZone: css`
+      flex-shrink: 0;
       border: 1px solid ${cssVar.colorBorderSecondary};
       border-radius: 10px;
       overflow: hidden;
@@ -715,6 +716,8 @@ const styles = createStaticStyles(({ css, cssVar }) => {
     `,
     detailMain: css`
       flex: 1;
+      min-height: 0;
+      max-height: 560px;
       padding: 24px 28px;
       overflow-y: auto;
       background: ${cssVar.colorBgElevated};
@@ -944,6 +947,8 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
     const [detailModalOpen, setDetailModalOpen] = useState(false);
     const [selectedActivityId, setSelectedActivityId] = useState<string>('');
     const [selectedSubStepId, setSelectedSubStepId] = useState<string>('');
+    const [narrativeExpanded, setNarrativeExpanded] = useState(false);
+    const [inspectionOpen, setInspectionOpen] = useState(true);
     const [runDetail, setRunDetail] = useState<{
       question?: string;
       output?: string;
@@ -1878,7 +1883,7 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                 activeSubStep.stateVisual?.iconType === 'error' ||
                 (typeof activeSubStep.exit_code === 'number' && activeSubStep.exit_code !== 0);
               return (
-                <div className={styles.detailMain}>
+                <div className={styles.detailMain} data-testid="lca-detail-main">
                   {/* 1. Hero Verdict Card — 结论前置 */}
                   {activeSubStep.conclusion && (
                     <div
@@ -1902,8 +1907,7 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                   {activeSubStep.narrative && (() => {
                     const LIMIT = 120;
                     const isLong = activeSubStep.narrative.length > LIMIT;
-                    const [expanded, setExpanded] = React.useState(false);
-                    const shown = isLong && !expanded
+                    const shown = isLong && !narrativeExpanded
                       ? activeSubStep.narrative.slice(0, LIMIT) + '…'
                       : activeSubStep.narrative;
                     return (
@@ -1914,9 +1918,9 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                         {isLong && (
                           <button
                             className={styles.narrativeExpandBtn}
-                            onClick={() => setExpanded((v) => !v)}
+                            onClick={() => setNarrativeExpanded((v) => !v)}
                           >
-                            {expanded
+                            {narrativeExpanded
                               ? '收起 ▴'
                               : `展开全部思考 (共 ${activeSubStep.narrative.length} 字) ▾`}
                           </button>
@@ -2015,17 +2019,16 @@ export const AssistantStatusDrawer = memo<AssistantStatusDrawerProps>(
                     const tr = activeSubStep.tool_result;
                     const hasAny = th || (tc?.arguments && Object.keys(tc.arguments).length > 0) || tr?.stdout_head || tr?.stderr || tr?.error;
                     if (!hasAny) return null;
-                    const [inspOpen, setInspOpen] = React.useState(false);
                     return (
                       <div className={styles.inspectionZone}>
                         <div
                           className={styles.inspectionZoneHeader}
-                          onClick={() => setInspOpen((v) => !v)}
+                          onClick={() => setInspectionOpen((v) => !v)}
                         >
                           <span>🔍 深度工程观测与诊断数据</span>
-                          <span style={{ fontSize: 11 }}>{inspOpen ? '▴ 收起' : '▾ 按需展开'}</span>
+                          <span style={{ fontSize: 11 }}>{inspectionOpen ? '▴ 收起' : '▾ 按需展开'}</span>
                         </div>
-                        {inspOpen && (
+                        {inspectionOpen && (
                           <div className={styles.inspectionZoneBody}>
 
                             {/* Card A: 模型与决策指标 */}
