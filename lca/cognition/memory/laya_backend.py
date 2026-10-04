@@ -46,10 +46,13 @@ with a clear message -- importing this module itself never raises.
 from __future__ import annotations
 
 import json
+import logging
 import math
 import os
 from dataclasses import dataclass, field
 from typing import Any
+
+log = logging.getLogger(__name__)
 
 DEFAULT_CHECKPOINT = "convaiinnovations/laya-typed-decisions"
 DEFAULT_CACHE_DIR = "/home/lichao/.cache/laya/checkpoints"
@@ -200,10 +203,10 @@ class LayaScoreEngine:
 
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
-            except Exception:
-                pass
-        except Exception:
-            pass
+            except Exception as exc:
+                log.debug("laya close: torch empty_cache 失败，忽略: %s", exc)
+        except Exception as exc:
+            log.debug("laya close: gc 失败，忽略: %s", exc)
 
     # ------------------------------------------------------------- primitives
 
